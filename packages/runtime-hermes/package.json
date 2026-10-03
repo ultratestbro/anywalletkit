@@ -1,0 +1,41 @@
+{
+  "name": "@forgewallet/runtime-hermes",
+  "version": "0.0.1",
+  "description": "The one documented place for React Native / Hermes polyfills the forgewallet SDK relies on: AbortSignal.timeout/any, crypto.subtle.digest, TextEncoder checks, Buffer.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "keywords": [
+    "react-native",
+    "hermes",
+    "polyfill",
+    "abortsignal",
+    "webcrypto"
+  ],
+  "dependencies": {
+    "@noble/hashes": "^2.4.0"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.3"
+  }
+}
