@@ -16,5 +16,29 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm test
-  # Browser (web worker) and React Native Hermes targets are added in phase 1
-  # alongside the first chain packages — see docs/SDK.md §9.
+
+  browser:
+    # Every package test file, executed in Chromium (vitest browser mode).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build
+      - run: pnpm test:browser
+
+  hermes:
+    # Derive + sign on every chain inside the Hermes VM React Native ships
+    # (react-native/sdks/hermesc/linux64-bin/hermes), bundle lowered with the RN Babel preset.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test:hermes

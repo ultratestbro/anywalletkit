@@ -46,8 +46,12 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 ```sh
 pnpm install
 pnpm build
-pnpm test
+pnpm test            # Node
+pnpm test:browser    # Chromium via Playwright (locally: PW_CHANNEL=chrome to use installed Chrome)
+pnpm test:hermes     # the Hermes VM React Native ships; derive + sign on every chain vs the golden vectors
 ```
+
+Three runtimes, one test suite: a package is not green until all three are.
 
 ## License
 

@@ -1,0 +1,24 @@
+{
+  "name": "@forgewallet/example-hermes-smoke",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Runs derive + sign for every chain inside the Hermes VM and compares with the golden vectors.",
+  "scripts": {
+    "test:hermes": "node run.mjs"
+  },
+  "dependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "@forgewallet/core": "workspace:*",
+    "@forgewallet/wallet-evm": "workspace:*",
+    "@forgewallet/wallet-solana": "workspace:*",
+    "@noble/hashes": "^2.4.0",
+    "fastestsmallesttextencoderdecoder": "^1.0.22"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@react-native/babel-preset": "^0.87.1",
+    "esbuild": "^0.28.2",
+    "hermes-engine-cli": "^0.12.0"
+  }
+}
