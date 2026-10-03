@@ -1,0 +1,53 @@
+{
+  "name": "@forgewallet/core",
+  "version": "0.0.1",
+  "description": "Signer and account interfaces, protocol base classes, errors and key-derivation helpers for the forgewallet SDK.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./protocols": {
+      "types": "./dist/protocols/index.d.ts",
+      "import": "./dist/protocols/index.js",
+      "require": "./dist/protocols/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo 'lint: configured in phase 1'"
+  },
+  "keywords": [
+    "wallet",
+    "sdk",
+    "multichain",
+    "bip39",
+    "bip32",
+    "slip10",
+    "evm",
+    "bitcoin",
+    "ton",
+    "tron",
+    "solana"
+  ],
+  "dependencies": {
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/bip32": "^2.4.0",
+    "@scure/bip39": "^2.4.0"
+  }
+}

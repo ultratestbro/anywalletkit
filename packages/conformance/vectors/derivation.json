@@ -1,0 +1,346 @@
+{
+  "generatedAt": "2026-10-03T20:41:14.043Z",
+  "source": "recorded from the wallet managers in vaultyvault node_modules",
+  "message": "forgewallet parity vector v1",
+  "evmTx": {
+    "to": "0x000000000000000000000000000000000000dEaD",
+    "value": "1000000000000000",
+    "data": "0x",
+    "nonce": 7,
+    "gasLimit": "21000",
+    "maxFeePerGas": "30000000000",
+    "maxPriorityFeePerGas": "1000000000",
+    "chainId": 1,
+    "type": 2
+  },
+  "evmTypedData": {
+    "domain": {
+      "name": "Forge",
+      "version": "1",
+      "chainId": 1,
+      "verifyingContract": "0x000000000000000000000000000000000000dEaD"
+    },
+    "types": {
+      "Mail": [
+        {
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "name": "amount",
+          "type": "uint256"
+        }
+      ]
+    },
+    "message": {
+      "to": "0x000000000000000000000000000000000000dEaD",
+      "amount": 42
+    }
+  },
+  "versions": {
+    "wallet-evm": "1.0.0-beta.14",
+    "wallet-btc": "1.0.0-beta.13",
+    "wallet-ton": "1.0.0-beta.12",
+    "wallet-tron": "1.0.0-beta.9",
+    "wallet-solana": "1.0.0-beta.12"
+  },
+  "seeds": {
+    "bip39-abandon-12": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "hardhat-12": "test test test test test test test test test test test junk",
+    "bip39-abandon-24": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art"
+  },
+  "vectors": {
+    "evm": {
+      "bip39-abandon-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/60'/0'/0/0",
+            "address": "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
+            "publicKey": "0237b0bb7a8288d38ed49a524b5dc98cff3eb5ca824c9f9dc0dfdb3d9cd600f299",
+            "signMessage": "0x5ca78cf734d9056550edb20c21c434e3311043f04002128383d840f994e9efec6d7896a73c9de3ceeb61d997eea199285caf114f9454670ff89e73d03d1123db1b",
+            "signTransaction": "0x02f8720107843b9aca008506fc23ac0082520894000000000000000000000000000000000000dead87038d7ea4c6800080c080a019b076f96801bed5ec2a5babfb4229ce433e66a3e19ffb7d43abc641fd0ac81ba021eb9bf221bd8e87177dcaf86a43b9b6aa82efdca75f2b13213f874ced70b35e",
+            "signTypedData": "0xcc482dc23f1a1f520db8b5c861a0d1e5130444d50696fda854b1dc8732b5580375995749b54938ab176c9c2b4fa4fc947152d4164aa65f1558bc1fc268789a011c"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/60'/0'/0/1",
+            "address": "0x6Fac4D18c912343BF86fa7049364Dd4E424Ab9C0",
+            "publicKey": "039fd0991d0222b4e1339c1a1a5b5f6d9f6a96672a3247b638ee6156d9ea877a2f",
+            "signMessage": "0x6d1e8c78357c6fea8622690508c661da4381a09e6cb79927766dd966834ebc0912af99d15f92c61113ededa89b22a9cadb0e288bb0f15462c4946562fc8e5c731c",
+            "signTransaction": "0x02f8720107843b9aca008506fc23ac0082520894000000000000000000000000000000000000dead87038d7ea4c6800080c080a01a516859b515d2d9b38c5a04c52f81a0530b98f94a6e46a9ff059870b13a6815a079bb4833e0072e429ef90e383701f76c7946ab4e7ac35c8631013c82e575c379",
+            "signTypedData": "0x71318a90d48085f93ee48e58c75a150e7d21829019bfc12fc6c6db61abb1f30d3fc0f49678db2f65045204b2e32534c756659f1709c25f11fba18617e86a00191b"
+          }
+        ]
+      },
+      "hardhat-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/60'/0'/0/0",
+            "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+            "publicKey": "038318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75",
+            "signMessage": "0xee3b87fdcd0ceca6029fca2140977cac8919b44b51de51ebb1ac6dff4c3fbf472b32d2a9b754986f722b4b6803448415502a3e87ed58efab68d1f608ef8195101b",
+            "signTransaction": "0x02f8720107843b9aca008506fc23ac0082520894000000000000000000000000000000000000dead87038d7ea4c6800080c001a02edfd1c7a81685c3191e87c851d46b555424db59ab4c8a0fdb555e333f4e95f4a00334a10d6eb2fb75da395baff1f301e45fc65e9a7b3ceb79489ed1cf6e237b88",
+            "signTypedData": "0x8054bfe3bc0e70c095ced6e98275dd5089419d90036c46a073297fa4d2e7574652d54221b186d2433c62c943e7c588926ac3b1c2a52521ad3a31a36ad100a7ca1c"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/60'/0'/0/1",
+            "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "publicKey": "02ba5734d8f7091719471e7f7ed6b9df170dc70cc661ca05e688601ad984f068b0",
+            "signMessage": "0x38f167d71e5ac9cffc057f55d9b8286ef6853b9c39a9942d579f7afc962a09092b7b743ba4ff48ef9a13bf8acbdabd91109c23d42df33ffe555b2369ffd9e60f1b",
+            "signTransaction": "0x02f8720107843b9aca008506fc23ac0082520894000000000000000000000000000000000000dead87038d7ea4c6800080c001a099c79691c829e116d2462d8fac954d380b6a03e7bbc2e83cbcb8f47c7d014ec6a02b178ce8db6e3ce62a35d6c8701853f035aef10460ed7ce315e4c26d01f455bb",
+            "signTypedData": "0x44507007714496dfc6d1c2588d8f0d1ae02fb17e59d7fa6471cdae735633b9b025270fb5a130de42d8a4b69e83adbbab5104d8887470a87cca6add27277233641c"
+          }
+        ]
+      },
+      "bip39-abandon-24": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/60'/0'/0/0",
+            "address": "0xF278cF59F82eDcf871d630F28EcC8056f25C1cdb",
+            "publicKey": "02dc286c821c7490afbe20a79d13123b9f41f3d7ef21e4a9caacd22f5983b28eca",
+            "signMessage": "0x82999c4ef887152381b0ac846cad7aba0f335b0f909ca4932cccb4d2f8c953b556b9ec4e99218796bdff44d5f79e334dea673d1b448e49ca2fa5112ddbfb04541c",
+            "signTransaction": "0x02f8720107843b9aca008506fc23ac0082520894000000000000000000000000000000000000dead87038d7ea4c6800080c001a03ca4303dea8036caac3d117a6465e8d195415df0192793ba84c1670044e8de10a07d8db5d4bc80e0cca9315bdf676788a23f48d87cdb61b463126fd08ae3ec62be",
+            "signTypedData": "0xf30094178ee9feef6717af19feced4cd668630ea47d081d94e6b059a37d0ff0968ef34a9a66509a7b149578a00a33c2164117d511e024aa474979f359c7215e81c"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/60'/0'/0/1",
+            "address": "0xf785bD075874b8423D3583728a981399f31e95aA",
+            "publicKey": "03efd4cb0d8102293499b4f79d73d8343faa44d0e3fc14537872b437c8ec527a0c",
+            "signMessage": "0x2ed31ce668a8d59f93bcff0a93ed25e37756cd7486dd395ebf4e31d0aea6f8a23bcb11e89a458888a0b3b7e5277bf69b2b11044ce0a83e839604e2a11e581bc71c",
+            "signTransaction": "0x02f8720107843b9aca008506fc23ac0082520894000000000000000000000000000000000000dead87038d7ea4c6800080c001a015d33aafa7acda8eb47b0a18fbdc1be0c57489c8e3dd0e1c997a2087c1dce154a04ef39e443007980c52acc79329b2fdb8b3363b36c704bd38fdad252655cda57e",
+            "signTypedData": "0x3ce042080e8ccd0eb3967567c19be3464c8dee261dffb4522a097add134678fd27e1d358bce620b30b831cef6b34f985c7e8c2847855982fc2cd878e0edcffe91c"
+          }
+        ]
+      }
+    },
+    "btc": {
+      "bip39-abandon-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/84'/0'/0'/0/0",
+            "address": "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
+            "publicKey": "0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c",
+            "signMessage": "J68rIiJzt9k3l7iZR+wH/IrNweMuYOdakJ+sGN9Bz3SpOc8/3nCIO8kGCDqXxd/C9hHvcfe4XU1iuEjvSSNRlvY="
+          },
+          {
+            "index": 1,
+            "path": "m/84'/0'/0'/0/1",
+            "address": "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g",
+            "publicKey": "03e775fd51f0dfb8cd865d9ff1cca2a158cf651fe997fdc9fee9c1d3b5e995ea77",
+            "signMessage": "J/g48olfbRIh0/tH1vDYmucax1q1DGt4OKukNh4MywpaMslTu5L1D3QncRndvG6yxVJz23jDXGY4rDVmV2RURys="
+          }
+        ]
+      },
+      "hardhat-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/84'/0'/0'/0/0",
+            "address": "bc1q4qw42stdzjqs59xvlrlxr8526e3nunw7mp73te",
+            "publicKey": "03fc2a760d930aa1459b35185f45784f4b42050311b232ed490f05db13f448e154",
+            "signMessage": "J6w7oQ6dwkGM5dZcIviDYPTj2DFNs8Q3t/2FJGwD84ynZdhJOxa/0SU9YHtd4lM5YFWqROQV7AuA2hcezJRmhmw="
+          },
+          {
+            "index": 1,
+            "path": "m/84'/0'/0'/0/1",
+            "address": "bc1qp533522veg9uyhpx3sva9vqrnfzmt262n4lsuq",
+            "publicKey": "0240c206b458db812db788af3b34f45dabb3824c58ce19cd1ff991fe1f2bceb976",
+            "signMessage": "JxBi0EKGXSbEfaOAaSPHxZhtMqSmlw6irS23OhA3RICxR2gq7VlQ+Dr1Oln/I2+5DnaqeIswBgPr5D5uCz5hppo="
+          }
+        ]
+      },
+      "bip39-abandon-24": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/84'/0'/0'/0/0",
+            "address": "bc1qzmtrqsfuaf6l6kkcsseumq26ukaphfj9skkug6",
+            "publicKey": "03c5db199831f23a3a1575518c8e9e948bfd495481aac442dec64b447ee76bd6fa",
+            "signMessage": "J7PD6/YZNNwUdS8zqgNQQbrHbqysEGRNZx4q54Rrd021awh75WGQyC+R2tJEZitGlzuDardXBvZKPHRrw3UtRiU="
+          },
+          {
+            "index": 1,
+            "path": "m/84'/0'/0'/0/1",
+            "address": "bc1qyn0ml52dy0udru3nafudt6af7x2kv7ngysfk0k",
+            "publicKey": "036e77119c26d0f05ee01a0a80bb56bda05bc7a047b4368f66ebb4e53d2c19437a",
+            "signMessage": "KBk6zOeolnqHEJQQf1iAVXrY8cSfdpeD0N/Fm0wRYfIidYg4Po8UOfCRkEnSpQc0iQeIx+JMr7lQPJDXgdVuVq0="
+          }
+        ]
+      }
+    },
+    "ton": {
+      "bip39-abandon-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/607'/0'",
+            "address": "UQBHyu-oZVDHRYQ1-rKlGqpHy5yAqanPBirEQNMNOmfHLtaT",
+            "publicKey": "7952e94118f34607c75e23258dd9220d66ccac5a3ee074125c25068e8107bfbf",
+            "signMessage": "4cf3d32f906a29080395a0afbf0c34ed47f12480899260bb83a5dd650b17509a45ecc51bbae6afdcf4040de401637ca6b249223f93a4738c975e6221e8a5f105"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/607'/1'",
+            "address": "UQAockb65N9NqreZHrYfhipG94Q_gZYTBkV0mvaopLEEzOgi",
+            "publicKey": "1d87da6f9190dddea5650e9156ff32ca359e61fb473642f0c76b7b79514f0d4d",
+            "signMessage": "475965666aea6e77f4fcda4c8359887796d084abe52d194ea51b2a52a68acbc65fd066a356af512b4929d04cf2f740d43797b63b69f9d3f76953a005efa58e0c"
+          }
+        ]
+      },
+      "hardhat-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/607'/0'",
+            "address": "UQDHMWKzTPGWZyEK8xgNb8-4jfFnjLu-cx84ZCU0zGlR5N8r",
+            "publicKey": "c7ead976255c7200c7a161675cc41caa71d08e6211f9e110cc699f65507b9358",
+            "signMessage": "888d782ee6cd05b572badae48b8eaafe61a11d306dd36267851bd94c4605c259507320add4d416a0c3ff05e79de20e498fe55f8f59a9fa8e3b77752ff359fb0a"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/607'/1'",
+            "address": "UQDFO4hhhXju5mUZgkpSBa3PoeWp9QEK7tVuwEwvP2WfUibn",
+            "publicKey": "7dc19e075441458842ea21bfcfadb4092a8700deaf51c093155b977a29113517",
+            "signMessage": "4bdf8c087d77f4ad4d3bb1d3f73adb3ba52ce0d53740ee54da6b342031dc4b652762263b7b3e940f0156e1dd9f72271d1063efdb7d1e7d3058d8957064c78605"
+          }
+        ]
+      },
+      "bip39-abandon-24": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/607'/0'",
+            "address": "UQC020bHeiUqqyw8BB4EttblmRidKkT_hnINJ-8rZCP0L1Dw",
+            "publicKey": "c6d2c947e552974c9f739fd7a02652519b8eef8cb9eef7867ac2e8f85777f244",
+            "signMessage": "73350d5c0565338105b2fa055ff2157dc51b08570cef0afd3719a65eac554ff95eeb8ae5b2c5614fc6b8e8e9515a4d11c43dae9069b38e1db6e074da3911ca0e"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/607'/1'",
+            "address": "UQBF5e73EENxa7aUNeAU4owyNxyIH7ssJR9z-8qwisaXwJks",
+            "publicKey": "ee05097e317756c05030181035a4e9feca2a6eea2b9eb7d08e6f9fb9d4f005eb",
+            "signMessage": "c930d073703ecc9dd4961c63457ffbd356cbe8a229c73f9a75057666b3d6ddda00e5f588a4294d7958f089d15b68fa7c5da7f1381cb8e9860105d46528259c00"
+          }
+        ]
+      }
+    },
+    "tron": {
+      "bip39-abandon-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/195'/0'/0/0",
+            "address": "TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH",
+            "publicKey": "03ff21f8e64d3a3c0198edfbb7afdc79be959432e92e2f8a1984bb436a414b8edc",
+            "signMessage": "0xa00660d193e8754656fc2452c38c391f6a61ee0d8be86848672f1f27e99eca6f192b4fad6bb114df02340a576582c679d028e4bc039a684c1258ccc201de6cad1c"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/195'/0'/0/1",
+            "address": "TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK",
+            "publicKey": "0209b9854ad6e016c5d72aee08f763821bd5e32489c12bcc078a935a14f29dbed6",
+            "signMessage": "0x96e142797e7e177097eb8a81f43449c725365548b71496af469b8daddabfe420575e92bb3350c670d9154a9bc293a0678515fa36a121e97d29828086f0b121d01c"
+          }
+        ]
+      },
+      "hardhat-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/195'/0'/0/0",
+            "address": "TWer2Ygk5TEheHp3TPuYeqxmB6SsGZmaL6",
+            "publicKey": "030738c1aa72b07ff1a894198374a34c760913db0e6a5679d48477873b8f1fa865",
+            "signMessage": "0x43d8e1f16b0e110a5dbd8cf84409c0828d8af3aa0380c40ac6426183b6faae884c38d427eb08743e87a171c22df517c7b3ec1eb84137608f1cf3d35dd25d52c41c"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/195'/0'/0/1",
+            "address": "TPjjvMwjPoDC32V2dGDYTkLH4E5LAtBZ6C",
+            "publicKey": "02c535cb0bdd16fa25620fd200879166cafbf31c269880fc033879ad2b280e8742",
+            "signMessage": "0x5a482f1b75472b41772f3d94d888ab60fce9ca999b37cf67e2358b0fe256eca272f31faa8de3fa92eb5960c0b8545d4cc1e221ca600ee0f0ff2068ddec6663bf1c"
+          }
+        ]
+      },
+      "bip39-abandon-24": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/195'/0'/0/0",
+            "address": "TEfhiqsW1SdN44DeHrAWVmbyr8ZbvChrtS",
+            "publicKey": "026de71b829451772b77b4c6de3bdf67eaf22794bccfb73dc64fb35ff0af32ed2c",
+            "signMessage": "0x28eb1a52b0bc13fa5ce484a8b94163839b8857516f7b08988f143f766e2a0f3c3c15028d229acc882233c06bdd769bb84866afd50522a6d45f04573a4fb7a6b61c"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/195'/0'/0/1",
+            "address": "TBNqMYHXhL8hH3Ruj2VtXimvpEtNTzWi28",
+            "publicKey": "035331b830149f4dc30da1e76b389901e6970398f40252b9b79298a2a90106ceef",
+            "signMessage": "0x2ff92ff7aea2a818d5fbb60abc672068f36c146bb553eab206b37462270ff76735fad31db037c1babad493a29b22653390f63a71d0b6b61cf126f1c0aa55b1751b"
+          }
+        ]
+      }
+    },
+    "solana": {
+      "bip39-abandon-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/501'/0'/0'",
+            "address": "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
+            "publicKey": "f036276246a75b9de3349ed42b15e232f6518fc20f5fcd4f1d64e81f9bd258f7",
+            "signMessage": "14366d4bdd1d0efe9743b58aabb3bde6756a30f27d45e19337d9585e8b8cbfe1224b71801d5441a46964287f6053d557d09f0630a7560a4768502aaccb723b03"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/501'/1'/0'",
+            "address": "Hh8QwFUA6MtVu1qAoq12ucvFHNwCcVTV7hpWjeY1Hztb",
+            "publicKey": "f8029acf5cbcbdd5ac46ec147f3b78a3df6e5022ef0411db2bab650d329a4cd4",
+            "signMessage": "c1ac5f222c1a7f091f58499a016e3c9820ce7e6bb397dab5d7b0d75de9d7d5e2bedac4f7a0418903a7cf49cd31ba03e9540ab40d9057d95b31e8476fb31d0300"
+          }
+        ]
+      },
+      "hardhat-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/501'/0'/0'",
+            "address": "oeYf6KAJkLYhBuR8CiGc6L4D4Xtfepr85fuDgA9kq96",
+            "publicKey": "0bf32b9f0db09672038fea36139b18f98a5f0149ef4ce0332e44b9a77e83c22d",
+            "signMessage": "055ac494d6ce2ebfdd319a623e9b1e8337bcef29a434c9b8c5db2eef3d2820c4e2a6562389e89d48b3d70d5284147da9dad42149c665191f552f7af7b6e0330b"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/501'/1'/0'",
+            "address": "AqynRZwvVqUPRwRJXvm6odUb3t93fDjnWe3p6BeuUFxD",
+            "publicKey": "9245441f4a752ea6328c6d8d2d2afcb36d131db998a47ca04d6d5d8587d0b012",
+            "signMessage": "b8c444235c9fe0d7cd9a7dae82f9fd03fed424b2bdace53d54cf0751d3b486a075550a65265d80d6675980cad6797292289420c92378f1b93b07e5df0f4bcc07"
+          }
+        ]
+      },
+      "bip39-abandon-24": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/501'/0'/0'",
+            "address": "3Cy3YNTFywCmxoxt8n7UH6hg6dLo5uACowX3CFceaSnx",
+            "publicKey": "20c821b6510834ae1c47084c6f61fd97864d5f12d731f95f4b06fe477b1efb45",
+            "signMessage": "77a0880fa1f745432775094fed381d23521bb8679cedac3ef891911d730a2cbd990fe249001c849ac9442a3255ee153d962564967f80475f386d103a37dae800"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/501'/1'/0'",
+            "address": "5frqxtii9LeGq2bz3dSNokvZcEooF483MzeU24JrhcTA",
+            "publicKey": "45632d6e888681237618e0716779104dbf83cd4c26b4695604e05db7aef43609",
+            "signMessage": "6ce41d434ecd97aeb573a30ca30c48b1b197ae0ff54ccedc646ada1b6ba76485e0b21fcbb2c11957c52fdbd6125e8372fd53a2d7a7cbb58099730f27ebc53c0e"
+          }
+        ]
+      }
+    }
+  }
+}

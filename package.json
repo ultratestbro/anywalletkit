@@ -1,0 +1,25 @@
+{
+  "name": "forgewallet",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Open multichain wallet SDK: one seed, every chain, protocol modules anyone can contribute.",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.30.2",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter './packages/**' run build",
+    "test": "pnpm -r --filter './packages/**' run test",
+    "typecheck": "pnpm -r --filter './packages/**' run typecheck",
+    "lint": "pnpm -r --filter './packages/**' run lint",
+    "changeset": "changeset",
+    "release": "pnpm build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^3.0.3",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  }
+}

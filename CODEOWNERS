@@ -1,0 +1,5 @@
+# Every package has a named maintainer. A module without an active owner is
+# marked deprecated in the registry, never silently kept.
+*                         @ultratestbro
+/packages/core/           @ultratestbro
+/packages/conformance/    @ultratestbro
