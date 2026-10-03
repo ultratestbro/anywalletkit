@@ -1,0 +1,48 @@
+{
+  "name": "@forgewallet/wallet-evm",
+  "version": "0.0.1",
+  "description": "EVM wallet for the forgewallet SDK: BIP-32 m/44'/60'/0'/0/i accounts, EIP-191 / EIP-712 / EIP-1559 signing, ERC-20 transfer and approve, built on viem.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo 'lint: configured in phase 1'"
+  },
+  "keywords": [
+    "wallet",
+    "evm",
+    "ethereum",
+    "viem",
+    "bip32",
+    "eip1559",
+    "eip712",
+    "erc20"
+  ],
+  "dependencies": {
+    "@forgewallet/core": "workspace:*",
+    "@noble/curves": "^2.4.0",
+    "viem": "^2.57.2"
+  },
+  "devDependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "vitest": "^5.0.3"
+  }
+}

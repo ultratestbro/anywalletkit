@@ -31,7 +31,7 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 |---|---|---|
 | `@forgewallet/core` | phase 0 | Signer / account interfaces, protocol base classes, errors, BIP-39 + BIP-32 / SLIP-10 helpers |
 | `@forgewallet/conformance` | phase 0 | Golden vectors + `describeChainModule` / `describeProtocolModule` test suites |
-| `@forgewallet/wallet-evm` | P0, phase 1 | |
+| `@forgewallet/wallet-evm` | phase 1 ✓ | viem; m/44'/60'/0'/0/i; EIP-191 / EIP-712 / EIP-1559 (+ legacy, 2930, 7702 shapes); ERC-20 transfer + approve; byte-for-byte signature vectors |
 | `@forgewallet/wallet-solana` | P0, phase 1 | |
 | `@forgewallet/wallet-ton` | P0, phase 2 | |
 | `@forgewallet/wallet-tron` | P0, phase 2 | |
