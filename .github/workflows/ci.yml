@@ -18,18 +18,6 @@ jobs:
       - run: pnpm test
       - run: pnpm registry:check # registry/modules.json must match the manifests
 
-  browser:
-    # Every package test file, executed in Chromium (vitest browser mode).
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm build
-      - run: pnpm test:browser
 
   hermes:
     # Derive + sign on every chain inside the Hermes VM React Native ships

@@ -18,8 +18,11 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Signer is separate from the account.** The private key lives in a `Signer`.
   The local seed signer is one implementation; a Safe, a hardware wallet, MPC or
   a backend signer are others. The SDK never *requires* a seed.
-- **Three runtimes in CI**: browser (web worker), React Native Hermes, Node.
-  No Bare, no native modules, no polyfill magic inside packages.
+- **Built for mobile apps.** React Native / Hermes is the primary target and the
+  release gate (`pnpm test:hermes` runs every chain in the real Hermes VM); Node is
+  where the suites run. No Bare, no native modules, no polyfill magic inside packages.
+  Browsers are out of scope for now (that track returns with an embedded,
+  semi-custodial wallet kit later).
 - **Standard derivation.** Wallets on the standard paths resolve the same
   addresses from the same seed, pinned by golden vectors in
   `packages/conformance/vectors`. Migrating costs nothing in user funds.
@@ -56,12 +59,11 @@ Every protocol module ships a `module.json`; `pnpm registry` builds
 ```sh
 pnpm install
 pnpm build
-pnpm test            # Node
-pnpm test:browser    # Chromium via Playwright (locally: PW_CHANNEL=chrome to use installed Chrome)
-pnpm test:hermes     # the Hermes VM React Native ships; derive + sign on every chain vs the golden vectors
+pnpm test            # Node: every suite
+pnpm test:hermes     # the Hermes VM React Native ships: derive + sign on every chain vs the golden vectors, protocol modules load and quote-guard
 ```
 
-Three runtimes, one test suite: a package is not green until all three are.
+A package is not green until Node AND Hermes are.
 
 ## License
 

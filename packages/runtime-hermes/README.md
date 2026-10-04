@@ -8,6 +8,7 @@ import 'react-native-get-random-values'
 import { Buffer } from 'buffer'
 global.Buffer ??= Buffer
 import 'fastestsmallesttextencoderdecoder/EncoderDecoderTogether.min.js'
+import 'react-native-url-polyfill/auto'
 import { installHermesRuntime } from '@forgewallet/runtime-hermes'
 installHermesRuntime()
 ```
@@ -21,5 +22,6 @@ What it installs, each only when missing:
 | `crypto.subtle.digest` (SHA-256/384/512 via noble) | the Solana ed25519 polyfill creates `subtle` without `digest` |
 | `structuredClone` | missing on older Hermes |
 
-It throws when the two things only the app can provide are absent: `crypto.getRandomValues`
-and `TextEncoder`/`TextDecoder`. SDK packages never import this package themselves.
+It throws when the things only the app can provide are absent: `crypto.getRandomValues`,
+`TextEncoder`/`TextDecoder`, and a full WHATWG `URL` (React Native's built-in one has no
+working `searchParams`; providers parse endpoints and query strings with it). SDK packages never import this package themselves.

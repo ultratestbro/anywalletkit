@@ -4,8 +4,8 @@ Solana accounts at `m/44'/501'/i'/0'` (SLIP-10 ed25519 — Phantom / Solflare de
 pinned by golden vectors in `@forgewallet/conformance`.
 
 Signing uses noble ed25519 over the compiled message bytes, so there is no
-WebCrypto dependency: the same code runs in Node, in a browser worker and in
-React Native Hermes without the Ed25519 subtle polyfill.
+WebCrypto dependency: the same code runs in Node and in React Native Hermes
+without the Ed25519 subtle polyfill.
 
 ```ts
 import WalletManagerSolana from '@forgewallet/wallet-solana'

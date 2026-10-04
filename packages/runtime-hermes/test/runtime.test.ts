@@ -61,5 +61,6 @@ describe('runtime-hermes', () => {
     const r = installHermesRuntime()
     expect(r.getRandomValues).toBe('native')
     expect(r.textEncoder).toBe('native')
+    expect(r.url).toBe('native')
   })
 })

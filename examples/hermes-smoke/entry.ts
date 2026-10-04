@@ -14,6 +14,7 @@ import { WalletManagerSolana } from '@forgewallet/wallet-solana'
 import { WalletManagerTon } from '@forgewallet/wallet-ton'
 import { WalletManagerTron } from '@forgewallet/wallet-tron'
 import { WalletManagerBtc } from '@forgewallet/wallet-btc'
+import { smokeProtocols } from './protocols.js'
 
 declare const print: ((s: string) => void) | undefined
 const out = (s: string) => (typeof print === 'function' ? print(s) : console.log(s))
@@ -72,6 +73,10 @@ async function main() {
     }
     btc.dispose()
   }
+  await smokeProtocols((what, ok, detail) => {
+    if (!ok) throw new Error(`protocol check failed: ${what}${detail ? ` :: ${detail}` : ''}`)
+    checks++
+  })
   out(`HERMES_SMOKE_OK ${checks}`)
 }
 

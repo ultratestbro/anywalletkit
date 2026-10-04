@@ -19,6 +19,8 @@ export interface HermesRuntimeReport {
   subtleDigest: 'native' | 'polyfilled' | 'unavailable'
   textEncoder: 'native' | 'missing'
   getRandomValues: 'native' | 'missing'
+  /** WHATWG URL: RN ships a partial one (no working searchParams); providers parse endpoints with it. */
+  url: 'native' | 'partial' | 'missing'
   structuredClone: 'native' | 'polyfilled'
 }
 
@@ -95,6 +97,16 @@ export function installBufferSubarrayFix(): 'native' | 'patched' | 'no-buffer' {
   return 'patched'
 }
 
+/** URL/URLSearchParams probe. 'partial' = RN's built-in stub (no searchParams); fix with react-native-url-polyfill/auto. */
+export function probeUrl(): 'native' | 'partial' | 'missing' {
+  const g = globalThis as { URL?: new (u: string) => { protocol: string; searchParams?: { get(k: string): string | null } } }
+  if (typeof g.URL !== 'function') return 'missing'
+  try {
+    const u = new g.URL('https://example.com/p?x=1')
+    return u.protocol === 'https:' && u.searchParams?.get('x') === '1' ? 'native' : 'partial'
+  } catch { return 'partial' }
+}
+
 export function installStructuredClone(): 'native' | 'polyfilled' {
   const g = globalThis as { structuredClone?: unknown }
   if (typeof g.structuredClone === 'function') return 'native'
@@ -115,10 +127,12 @@ export function installHermesRuntime(options: { throwOnMissing?: boolean } = {})
     structuredClone: installStructuredClone(),
     textEncoder: typeof globalThis.TextEncoder === 'function' && typeof globalThis.TextDecoder === 'function' ? 'native' : 'missing',
     getRandomValues: typeof globalThis.crypto?.getRandomValues === 'function' ? 'native' : 'missing',
+    url: probeUrl(),
   }
   if (options.throwOnMissing !== false) {
     if (report.getRandomValues === 'missing') throw new Error("crypto.getRandomValues is missing. Add `import 'react-native-get-random-values'` as the FIRST import of your app entry.")
     if (report.textEncoder === 'missing') throw new Error("TextEncoder/TextDecoder are missing. Add `import 'fastestsmallesttextencoderdecoder/EncoderDecoderTogether.min.js'` to your app entry.")
+    if (report.url !== 'native') throw new Error(`URL is ${report.url}. Add \`import 'react-native-url-polyfill/auto'\` to your app entry — swap and staking providers parse endpoint URLs and query strings with it.`)
   }
   return report
 }

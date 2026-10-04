@@ -18,9 +18,10 @@ const outfile = join(outdir, 'smoke.js')
 
 await build({
   entryPoints: [join(here, 'entry.ts')],
-  bundle: true, format: 'iife', platform: 'neutral', target: 'es2020', outfile,
+  bundle: true, format: 'iife', platform: 'browser', target: 'es2020', outfile,
 
-  mainFields: ['react-native', 'module', 'main'], conditions: ['react-native', 'import', 'default'],
+  // Metro's resolution order: react-native → browser → main (ethers' ws → ws-browser, ws → browser stub, etc.).
+  mainFields: ['react-native', 'browser', 'main'], conditions: ['react-native', 'browser', 'import', 'default'],
   define: { 'process.env.NODE_ENV': '"production"' },
   // @ton/crypto-primitives' react-native build requires expo-crypto (random bytes) at module load and
   // react-native-fast-pbkdf2 for mnemonics — an Expo app has them; the smoke supplies stand-ins.

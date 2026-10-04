@@ -18,4 +18,7 @@ if (typeof g.TextDecoder === 'undefined' && typeof g.TextEncoder !== 'undefined'
 // react-native-get-random-values stand-in (NOT secure; nothing in the smoke derives keys from it).
 const c = (g.crypto ??= {}) as { getRandomValues?: (a: ArrayBufferView) => ArrayBufferView }
 c.getRandomValues ??= (a) => { const u = new Uint8Array(a.buffer, a.byteOffset, a.byteLength); for (let i = 0; i < u.length; i++) u[i] = Math.floor(Math.random() * 256); return a }
+// React Native provides fetch; the bare VM does not. The smoke never reaches the network:
+// every call fails with an ordinary Error (what an offline phone produces), never a ReferenceError.
+g.fetch ??= async (input: unknown) => { throw new Error(`network disabled in the Hermes smoke (${typeof input === 'string' ? input : 'request'})`) }
 export {}
