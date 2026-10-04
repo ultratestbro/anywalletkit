@@ -1,0 +1,17 @@
+{
+  "name": "@forgewallet/protocol-swidge-lifi",
+  "type": "swidge",
+  "chains": [
+    "eip155:*",
+    "solana:*"
+  ],
+  "tier": "core",
+  "maintainers": [
+    "@ultratestbro"
+  ],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/forgewallet",
+  "path": "packages/protocol-swidge-lifi",
+  "description": "LI.FI REST cross-chain swaps and bridges.",
+  "addedAt": "2026-10-04"
+}

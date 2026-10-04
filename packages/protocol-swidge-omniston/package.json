@@ -40,7 +40,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "module.json"
   ],
   "scripts": {
     "build": "tsup",

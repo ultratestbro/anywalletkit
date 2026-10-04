@@ -24,6 +24,13 @@ export interface ProtocolSuiteOptions<P> {
   samples?: Partial<Record<string, unknown[]>>
   /** Methods this module intentionally leaves unimplemented (must throw NotImplementedError). */
   notImplemented?: string[]
+  /**
+   * Methods the protocol itself has no use for (e.g. a staking protocol whose payouts settle
+   * automatically has nothing to claim). They must still exist and throw a clear Error on every
+   * account; they are excluded from the read-only check. Prefer `notImplemented` when the
+   * operation exists in the protocol but the module has not built it yet.
+   */
+  unsupported?: string[]
   /** Account factory for reads; default: the recording mock. Use a fixture-backed one for real quote checks. */
   account?: () => IWalletAccount
   /** Constructor config, when the module requires one (e.g. swidge engines need `fromChain`). */
@@ -34,6 +41,7 @@ export interface ProtocolSuiteOptions<P> {
 export function describeProtocolModule<P extends object>(name: string, o: ProtocolSuiteOptions<P>): void {
   const { writes, reads } = SURFACE[o.type]!
   const skip = new Set(o.notImplemented ?? [])
+  const unsupported = new Set(o.unsupported ?? [])
 
   describe(`${name}: conformance (${o.type})`, () => {
     it('implements the full surface (every method is a function)', () => {
@@ -48,11 +56,18 @@ export function describeProtocolModule<P extends object>(name: string, o: Protoc
       }
     })
 
+    it('unsupported methods throw a clear Error even with a signing account', async () => {
+      const p = new o.Protocol(createMockAccount(), o.config) as AnyProtocol
+      for (const m of unsupported) {
+        await expect((p[m] as (...a: unknown[]) => Promise<unknown>)(...(o.samples?.[m] ?? [{}]))).rejects.toBeInstanceOf(Error)
+      }
+    })
+
     it('constructs with a read-only account and refuses writes with a clear error', async () => {
       const ro = createMockAccount().toReadOnlyAccount()
       const p = new o.Protocol(ro, o.config) as AnyProtocol
       for (const m of writes) {
-        if (skip.has(m)) continue
+        if (skip.has(m) || unsupported.has(m)) continue
         const args = o.samples?.[m] ?? [{}]
         await expect((p[m] as (...a: unknown[]) => Promise<unknown>)(...args)).rejects.toSatisfy(
           (e: unknown) => e instanceof ReadOnlyAccountError || /read-only|requires .* account/i.test(String((e as Error)?.message)),
@@ -64,7 +79,7 @@ export function describeProtocolModule<P extends object>(name: string, o: Protoc
       const account = o.account?.() ?? createMockAccount()
       const p = new o.Protocol(account, o.config) as AnyProtocol
       for (const m of reads) {
-        if (skip.has(m)) continue
+        if (skip.has(m) || unsupported.has(m)) continue
         const args = o.samples?.[m]
         if (!args) continue
         try { await (p[m] as (...a: unknown[]) => Promise<unknown>)(...args) } catch { /* fixtures may be absent; we only assert no send */ }

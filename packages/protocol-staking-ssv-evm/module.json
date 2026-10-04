@@ -1,0 +1,15 @@
+{
+  "name": "@forgewallet/protocol-staking-ssv-evm",
+  "type": "staking",
+  "chains": [
+    "eip155:1"
+  ],
+  "tier": "core",
+  "maintainers": [
+    "@ultratestbro"
+  ],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/forgewallet",
+  "path": "packages/protocol-staking-ssv-evm",
+  "addedAt": "2026-10-04"
+}

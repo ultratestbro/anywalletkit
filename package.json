@@ -16,7 +16,9 @@
     "changeset": "changeset",
     "release": "pnpm build && changeset publish",
     "test:browser": "vitest run --config vitest.browser.config.ts",
-    "test:hermes": "pnpm --filter @forgewallet/example-hermes-smoke test:hermes"
+    "test:hermes": "pnpm --filter @forgewallet/example-hermes-smoke test:hermes",
+    "registry": "node scripts/build-registry.mjs",
+    "registry:check": "node scripts/build-registry.mjs && git diff --exit-code registry/modules.json"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",

@@ -1,0 +1,1 @@
+{ "extends": "../../tsconfig.base.json", "compilerOptions": { "rootDir": ".", "noEmit": true, "types": ["node"], "allowJs": false }, "include": ["types", "tests/**/*.ts"] }

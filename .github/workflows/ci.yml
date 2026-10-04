@@ -16,6 +16,7 @@ jobs:
       - run: pnpm build          # workspace types resolve through each package's dist
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm registry:check # registry/modules.json must match the manifests
 
   browser:
     # Every package test file, executed in Chromium (vitest browser mode).

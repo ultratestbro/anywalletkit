@@ -1,0 +1,15 @@
+{
+  "name": "@forgewallet/protocol-staking-spl-stake-pool-solana",
+  "type": "staking",
+  "chains": [
+    "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+  ],
+  "tier": "core",
+  "maintainers": [
+    "@ultratestbro"
+  ],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/forgewallet",
+  "path": "packages/protocol-staking-spl-stake-pool-solana",
+  "addedAt": "2026-10-04"
+}

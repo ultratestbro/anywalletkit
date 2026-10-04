@@ -1,0 +1,17 @@
+{
+  "name": "@forgewallet/protocol-swidge-omniston",
+  "type": "swidge",
+  "chains": [
+    "ton:-239",
+    "eip155:*"
+  ],
+  "tier": "core",
+  "maintainers": [
+    "@ultratestbro"
+  ],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/forgewallet",
+  "path": "packages/protocol-swidge-omniston",
+  "description": "STON.fi Omniston TON swaps and TON\u2194EVM orders.",
+  "addedAt": "2026-10-04"
+}

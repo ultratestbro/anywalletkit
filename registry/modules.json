@@ -1,0 +1,191 @@
+{
+  "$schema": "./modules.schema.json",
+  "generatedAt": "2026-10-04",
+  "count": 11,
+  "modules": [
+    {
+      "name": "@forgewallet/protocol-approvals-evm",
+      "type": "approvals",
+      "chains": [
+        "eip155:*"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-approvals-evm",
+      "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@forgewallet/protocol-lending-mellow-evm",
+      "type": "lending",
+      "chains": [
+        "eip155:1"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-lending-mellow-evm",
+      "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@forgewallet/protocol-staking-lido-evm",
+      "type": "staking",
+      "chains": [
+        "eip155:1"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-staking-lido-evm",
+      "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@forgewallet/protocol-staking-spl-stake-pool-solana",
+      "type": "staking",
+      "chains": [
+        "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-staking-spl-stake-pool-solana",
+      "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@forgewallet/protocol-staking-ssv-evm",
+      "type": "staking",
+      "chains": [
+        "eip155:1"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-staking-ssv-evm",
+      "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@forgewallet/protocol-staking-tonstakers-ton",
+      "type": "staking",
+      "chains": [
+        "ton:-239"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-staking-tonstakers-ton",
+      "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@forgewallet/protocol-swidge-lifi",
+      "type": "swidge",
+      "chains": [
+        "eip155:*",
+        "solana:*"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-swidge-lifi",
+      "description": "LI.FI REST cross-chain swaps and bridges.",
+      "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@forgewallet/protocol-swidge-near-intents",
+      "type": "swidge",
+      "chains": [
+        "eip155:*",
+        "solana:*",
+        "ton:-239",
+        "tron:0x2b6653dc",
+        "bip122:000000000019d6689c085ae165831e93"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-swidge-near-intents",
+      "description": "NEAR Intents (1Click) cross-chain swaps.",
+      "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@forgewallet/protocol-swidge-omniston",
+      "type": "swidge",
+      "chains": [
+        "ton:-239",
+        "eip155:*"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-swidge-omniston",
+      "description": "STON.fi Omniston TON swaps and TON↔EVM orders.",
+      "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@forgewallet/protocol-swidge-router",
+      "type": "swidge",
+      "chains": [
+        "eip155:*",
+        "solana:*",
+        "ton:-239",
+        "tron:0x2b6653dc",
+        "bip122:000000000019d6689c085ae165831e93"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-swidge-router",
+      "description": "Auctions every engine provider and any external swidge module, executes the winner.",
+      "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@forgewallet/protocol-swidge-thorchain",
+      "type": "swidge",
+      "chains": [
+        "eip155:1",
+        "eip155:43114",
+        "eip155:56",
+        "bip122:000000000019d6689c085ae165831e93",
+        "tron:0x2b6653dc"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-swidge-thorchain",
+      "description": "THORChain native cross-chain swaps.",
+      "addedAt": "2026-10-04"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@forgewallet/protocol-approvals-evm",
+  "type": "approvals",
+  "chains": [
+    "eip155:*"
+  ],
+  "tier": "core",
+  "maintainers": [
+    "@ultratestbro"
+  ],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/forgewallet",
+  "path": "packages/protocol-approvals-evm",
+  "addedAt": "2026-10-04"
+}

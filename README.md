@@ -42,7 +42,13 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | `@forgewallet/protocol-swidge-near-intents`, `-lifi`, `-thorchain`, `-omniston` | phase 3 ✓ | the four providers (NEAR Intents 1Click, LI.FI REST, THORChain, STON.fi Omniston), each also a standalone `SwidgeProtocol` |
 | `@forgewallet/swidge-assets` | phase 3 ✓ | CAIP-19 asset registry shared by the swidge packages |
 | `@forgewallet/kit` | phase 3 ✓ | orchestrator: register chain wallets + protocol modules, accounts by CAIP-2 chain, policies (fee cap, allow/block lists, confirm) before every broadcast |
-| `@forgewallet/protocol-staking-*`, `protocol-lending-*`, `protocol-approvals-*` | P2, phase 4 | Lido, SSV, Tonstakers, Jito / SPL stake pools, Mellow, approvals |
+| `@forgewallet/protocol-staking-lido-evm`, `-ssv-evm`, `-tonstakers-ton`, `-spl-stake-pool-solana` | phase 4 ✓ | `StakingProtocol` modules (two-phase withdrawals): Lido, SSV Network, Tonstakers, Jito / SPL stake pools |
+| `@forgewallet/protocol-lending-mellow-evm` | phase 4 ✓ | Mellow Core Vaults (Lido EarnETH / EarnUSD) as a `LendingProtocol` |
+| `@forgewallet/protocol-approvals-evm` | phase 4 ✓ | token-approval discovery (ERC-20 / 721 / 1155 / Permit2 / EIP-7702), risk flags, revoke |
+
+Every protocol module ships a `module.json`; `pnpm registry` builds
+[registry/modules.json](registry/modules.json) from them (11 modules today). See
+[registry/README.md](registry/README.md) for tiers and how to list an external module.
 
 
 ## Develop

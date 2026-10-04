@@ -1,0 +1,59 @@
+{
+  "name": "@forgewallet/protocol-lending-mellow-evm",
+  "version": "0.1.0",
+  "description": "A simple package that lets @forgewallet/wallet-evm wallet accounts use Mellow Core Vaults (Lido EarnETH / EarnUSD and any vault on the same contracts): supply through the sync or async deposit queue, redeem and claim through the redeem queue, read the position, fees, oracle reports and APY.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "index.js",
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./index.js"
+    },
+    "./package": {
+      "default": "./package.json"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "src",
+    "types",
+    "module.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "echo \"plain ESM, nothing to build\"",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test tests/*.test.js && vitest run",
+    "lint": "echo ok",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": {
+    "ethers": "^6.17.0"
+  },
+  "peerDependencies": {
+    "@forgewallet/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@forgewallet/core": "workspace:*",
+    "@forgewallet/conformance": "workspace:*",
+    "vitest": "^5.0.3"
+  },
+  "keywords": [
+    "protocol",
+    "lending",
+    "vault",
+    "mellow",
+    "lido",
+    "earn",
+    "earneth",
+    "earnusd",
+    "ethereum",
+    "lending-protocol",
+    "forgewallet",
+    "lending"
+  ]
+}
