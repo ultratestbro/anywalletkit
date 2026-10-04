@@ -1,0 +1,894 @@
+/**
+ * `SwidgeProtocol` adapter over the cross-chain engine.
+ *
+ * The engine speaks in symbols + CAIP-2 chain ids and a deposit-address /
+ * calldata execution model; `SwidgeProtocol` speaks in provider token ids
+ * bound to an account whose chain is the source. This base bridges the two:
+ * it maps `SwidgeOptions` → the engine's `QuoteParams`, delegates quoting to a
+ * provider (or the router, in the aggregator), and executes the source leg
+ * through the bound account. Subclasses only supply "which provider(s)".
+ */
+import {SwidgeProtocol} from "@forgewallet/core";
+import {encodeFunctionData} from "viem";
+import type {
+  SwidgeOptions,
+  SwidgeQuote,
+  SwidgeResult,
+  SwidgeStatusOptions,
+  SwidgeStatusResult,
+  SwidgeStatus,
+  SwidgeFee,
+  SwidgeProtocolConfig,
+  SwidgeSupportedChain,
+  SwidgeSupportedToken,
+  SwidgeSupportedTokensOptions,
+  BridgeOptions,
+  BridgeResult,
+  SwapOptions,
+  SwapResult,
+} from "@forgewallet/core";
+import {
+  CC_SOURCE_CHAINS,
+  ccAsset,
+  ccAssetByToken,
+  type CcChain,
+} from "@forgewallet/swidge-assets";
+import type {CrossChainProvider, IntentStatus, QuoteParams, Quote, UnsignedTx} from "../types.js";
+import {
+  SwidgeConfigurationError,
+  SwidgeExecutionError,
+  SwidgeFeeLimitError,
+  SwidgeQuoteError,
+  SwidgeUnsupportedOperationError,
+  SwidgeValidationError,
+} from "../errors.js";
+
+const ZERO = "0x0000000000000000000000000000000000000000";
+
+const ERC20_TRANSFER_ABI = [
+  {
+    type: "function",
+    name: "transfer",
+    stateMutability: "nonpayable",
+    inputs: [
+      {name: "to", type: "address"},
+      {name: "amount", type: "uint256"},
+    ],
+    outputs: [{type: "bool"}],
+  },
+] as const;
+
+/** Our config adds the account's source chain (CAIP-2) the type omits. */
+/**
+ * Where an execution is, for progress UIs. A source leg can spend a minute
+ * before anything is signed (two awaited ERC-20 approvals for USDT), so
+ * "signing" alone reads as hung. Diagnostics only: a throwing observer can
+ * never change the outcome.
+ */
+export type SwidgeExecutionPhase = "approving" | "preflight" | "signing" | "broadcast";
+export interface SwidgeExecutionPhaseDetail {
+  /** approving: which approval of how many (USDT on Ethereum needs two). */
+  index?: number;
+  total?: number;
+  /** broadcast: the source transaction hash. */
+  hash?: string;
+}
+
+export interface SwidgeEngineConfig extends SwidgeProtocolConfig {
+  /** CAIP-2 of the chain the bound account lives on (the swidge source). */
+  fromChain: string;
+  /** Progress observer, see {@link SwidgeExecutionPhase}. */
+  onExecutionPhase?: (phase: SwidgeExecutionPhase, detail?: SwidgeExecutionPhaseDetail) => void;
+  /** Explicit escape hatch for adapters that can prove chain binding elsewhere. */
+  skipAccountChainCheck?: boolean;
+  /** Optional account chain identity when the account does not expose a provider. */
+  accountChain?: string;
+  /**
+   * Decodes a base64 BoC into a TON `Cell` for deposits that carry a cell body
+   * (e.g. Omniston escrow payloads). The package deliberately does not depend on
+   * `@ton/core`; the caller supplies e.g. `(b) => Cell.fromBase64(b)`. Without
+   * it, cell-body deposits fail closed — a TON account treats a string body
+   * as a TEXT COMMENT, which would strand the swap.
+   */
+  decodeTonBody?: (bocBase64: string) => unknown;
+}
+
+/**
+ * A bound wallet account. `@forgewallet/core` does not re-export
+ * its account interfaces, so we accept it opaquely and reach the write surface
+ * we need through {@link SwidgeSigner}. Passing `undefined` builds a quote-only
+ * protocol (no `swidge()` execution).
+ */
+export type SwidgeAccount = unknown;
+
+/** Minimal write surface we need off the bound account to send the leg. */
+interface SwidgeSigner {
+  getAddress(): Promise<string> | string;
+  sendTransaction(tx: {
+    to?: string;
+    data?: string;
+    value?: bigint;
+    chainId?: number;
+    gasLimit?: bigint;
+    /** TON message body: a text comment (string) or a decoded Cell. */
+    body?: string | unknown;
+    /** Tron: swap memo the account must place in `raw_data.data`. */
+    memo?: string;
+  }): Promise<{hash?: string}>;
+  /** Official token-transfer surface used by TON/Solana/Tron accounts. */
+  transfer?: (options: {
+    token: string;
+    recipient: string;
+    amount: bigint;
+    /** Tron TRC-20: memo in `raw_data.data` next to the TriggerSmartContract. */
+    memo?: string;
+  }) => Promise<{hash?: string}>;
+  signTypedData?: (args: {domain: unknown; types: unknown; primaryType?: string; message: unknown}) => Promise<string>;
+  /**
+   * Wait until a transaction this account sent is INCLUDED (and succeeded).
+   * Used between an ERC-20 approval and the deposit that spends it: a signer
+   * that returns on broadcast leaves the deposit's gas estimate looking at a
+   * block where the allowance is still zero (or, for USDT's approve(0) →
+   * approve(n) dance, still non-zero) — "execution reverted" before any
+   * funds move. Accounts without it keep the fire-and-forget behaviour.
+   */
+  waitForTransaction?: (hash: string) => Promise<void>;
+  getChainId?: () => Promise<number | bigint> | number | bigint;
+  getNetwork?: () => Promise<{chainId?: number | bigint} | string> | {chainId?: number | bigint} | string;
+  chainId?: number | bigint;
+  _provider?: {getNetwork?: () => Promise<{chainId?: number | bigint}>};
+  provider?: {getNetwork?: () => Promise<{chainId?: number | bigint}>};
+}
+
+/** Versioned provider/intent/source-hash id for durable status tracking. */
+function encodeId(provider: string, intentId: string, sourceTxHash?: string): string {
+  // encodeURIComponent leaves "." unescaped, which would shift decodeId's
+  // split — escape it explicitly so segments are dot-safe.
+  const enc = (v: string) => encodeURIComponent(v).replace(/\./g, "%2E");
+  return `awk1.${[provider, intentId, sourceTxHash].filter((v): v is string => v != null).map(enc).join(".")}`;
+}
+function decodeId(id: string): {provider: string; intentId: string; sourceTxHash?: string} {
+  try {
+    if (!id.startsWith("awk1.")) throw new Error("unsupported id version");
+    const parts = id.slice("awk1.".length).split(".");
+    if (parts.length < 2 || parts.length > 3 || !parts[0] || !parts[1]) throw new Error("invalid id shape");
+    const provider = decodeURIComponent(parts[0]);
+    const intentId = decodeURIComponent(parts[1]);
+    const sourceTxHash = parts[2] ? decodeURIComponent(parts[2]) : undefined;
+    if (!/^[A-Za-z0-9_-]+$/.test(provider) || !intentId || (parts[2] !== undefined && !sourceTxHash)) {
+      throw new Error("invalid id contents");
+    }
+    return {provider, intentId, ...(sourceTxHash ? {sourceTxHash} : {})};
+  } catch {
+    throw new SwidgeValidationError("swidge: malformed swidge status id");
+  }
+}
+
+async function readAccountChain(signer: SwidgeSigner, configured?: string): Promise<string | number | bigint | undefined> {
+  if (configured) return configured;
+  if (typeof signer.getChainId === "function") return await signer.getChainId();
+  if (typeof signer.getNetwork === "function") {
+    const network = await signer.getNetwork();
+    return typeof network === "string" ? network : network?.chainId;
+  }
+  if (signer.chainId != null) return signer.chainId;
+  for (const provider of [signer._provider, signer.provider]) {
+    if (provider?.getNetwork) {
+      const network = await provider.getNetwork();
+      if (network?.chainId != null) return network.chainId;
+    }
+  }
+  return undefined;
+}
+
+/** CAIP-2 → the coarse VM family SwidgeSupportedChain.type expects. */
+function chainType(caip2: string): string {
+  const ns = caip2.split(":")[0] ?? "";
+  if (ns === "eip155") return "evm";
+  if (ns === "solana") return "svm";
+  if (ns === "tron") return "tvm";
+  if (["bitcoin", "litecoin", "doge", "bch", "zcash"].includes(ns)) return "utxo";
+  return ns;
+}
+
+/** Normalize a `toChain` (number chainId | CAIP-2 | numeric string) to CAIP-2. */
+function toCaip2(chain: string | number | undefined, fallback: string): string {
+  if (chain == null || chain === "") return fallback;
+  if (typeof chain === "number") {
+    if (!Number.isSafeInteger(chain) || chain <= 0) throw new SwidgeValidationError("swidge: chain id must be a positive safe integer");
+    return `eip155:${chain}`;
+  }
+  if (/^\d+$/.test(chain)) {
+    const id = Number(chain);
+    if (!Number.isSafeInteger(id) || id <= 0) throw new SwidgeValidationError("swidge: chain id must be a positive safe integer");
+    return `eip155:${id}`;
+  }
+  if (!/^[a-z0-9]{3,8}:[-_A-Za-z0-9]{1,32}$/.test(chain)) {
+    throw new SwidgeValidationError("swidge: chain must be a valid CAIP-2 identifier");
+  }
+  return chain;
+}
+
+/** Resolve a token ref (symbol OR on-chain address) to the engine's symbol. */
+function toSymbol(caip2: string, ref: string): string {
+  const byToken = ref.startsWith("0x") || ref.length > 20 ? ccAssetByToken(caip2, ref) : undefined;
+  if (byToken) return byToken.symbol;
+  if (ccAsset(caip2, ref)) return ref; // already a symbol we know
+  return ref;
+}
+
+/** Resolve a dest token ref to the engine's dest address (zero = native). */
+function toDestAddress(caip2: string, ref: string): string {
+  if (ref.startsWith("0x")) return ref;
+  const asset = ccAssetByToken(caip2, ref) ?? ccAsset(caip2, ref);
+  if (!asset) {
+    throw new Error(`swidge: unknown destination token '${ref}' on ${caip2}`);
+  }
+  return asset.contract ?? ZERO;
+}
+
+function snapshotOptions(options: SwidgeOptions): SwidgeOptions {
+  return Object.freeze({...options});
+}
+
+function snapshotConfig(config?: SwidgeProtocolConfig): SwidgeProtocolConfig | undefined {
+  return config ? Object.freeze({...config}) : undefined;
+}
+
+function snapshotQuote<T extends Quote>(quote: T): T {
+  return Object.freeze({
+    ...quote,
+    ...(quote.txRequest ? {txRequest: Object.freeze({...quote.txRequest})} : {}),
+    ...(quote.providerData ? {providerData: Object.freeze({...quote.providerData})} : {}),
+    ...(quote.fees ? {fees: Object.freeze(quote.fees.map((fee) => Object.freeze({...fee})))} : {}),
+  }) as T;
+}
+
+function exactPositiveAmount(value: number | bigint, name: string): bigint {
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      throw new SwidgeValidationError(`swidge: ${name} must be a positive safe integer or bigint`);
+    }
+    return BigInt(value);
+  }
+  if (value <= 0n) throw new SwidgeValidationError(`swidge: ${name} must be a positive safe integer or bigint`);
+  return value;
+}
+
+function callerConstraints(options: SwidgeOptions): {minAmountOut?: bigint; slippageBps?: number} {
+  let minAmountOut: bigint | undefined;
+  if (options.minAmountOut !== undefined) {
+    try {
+      minAmountOut = BigInt(options.minAmountOut);
+    } catch {
+      throw new Error("swidge: minAmountOut must be a positive integer");
+    }
+    if (minAmountOut <= 0n) throw new Error("swidge: minAmountOut must be a positive integer");
+  }
+  let slippageBps: number | undefined;
+  if (options.slippage !== undefined) {
+    if (!Number.isFinite(options.slippage) || options.slippage < 0 || options.slippage >= 1) {
+      throw new Error("swidge: slippage must be a finite decimal in [0, 1)");
+    }
+    // Providers accept whole bps. Round down so their on-chain/API tolerance
+    // can never be wider than the caller requested; the exact decimal is also
+    // checked against the returned quote below.
+    slippageBps = Math.floor(options.slippage * 10_000);
+  }
+  return {
+    ...(minAmountOut !== undefined ? {minAmountOut} : {}),
+    ...(slippageBps !== undefined ? {slippageBps} : {}),
+  };
+}
+
+function assertQuoteConstraints(q: Quote, options: SwidgeOptions): void {
+  const {minAmountOut} = callerConstraints(options);
+  const nominal = BigInt(q.destAmount);
+  const guaranteed = BigInt(q.minDestAmount);
+  if (minAmountOut !== undefined && guaranteed < minAmountOut) {
+    throw new Error(`swidge: quoted minimum ${guaranteed} is below caller minAmountOut ${minAmountOut}`);
+  }
+  if (options.slippage !== undefined) {
+    const scale = 1_000_000_000n;
+    const permitted = BigInt(Math.floor(options.slippage * Number(scale)));
+    const required = (nominal * (scale - permitted) + scale - 1n) / scale;
+    if (guaranteed < required) {
+      throw new Error(`swidge: quote exceeds caller slippage (${options.slippage})`);
+    }
+  }
+}
+
+function requireExecutionFloor(options: SwidgeOptions): void {
+  if (options.minAmountOut === undefined) {
+    throw new Error("swidge: swidge() requires caller-supplied minAmountOut");
+  }
+  callerConstraints(options);
+}
+
+function mapStatus(s: IntentStatus): SwidgeStatusResult {
+  const status: SwidgeStatus =
+    s.state === "completed"
+      ? "completed"
+      : s.state === "action-required"
+        ? "action-required"
+        : s.state === "refund-pending"
+          ? "refund-pending"
+          : s.state === "partial"
+            ? "partial"
+            : s.state === "failed"
+              ? "failed"
+              : s.state === "refunded"
+                ? "refunded"
+                : s.state === "cancelled"
+                  ? "cancelled"
+                  : s.state === "expired"
+                    ? "expired"
+                    : "pending";
+  return s.destTxHash
+    ? {status, transactions: [{hash: s.destTxHash, type: "destination"}]}
+    : {status};
+}
+
+/**
+ * Abstract swidge protocol backed by the engine. Concrete subclasses bind
+ * either a single provider (contribution-shaped) or the router (aggregator).
+ */
+export abstract class BaseSwidgeProtocol extends SwidgeProtocol {
+  protected readonly fromChain: string;
+
+  constructor(account: SwidgeAccount | undefined, config: SwidgeEngineConfig) {
+    const fromChain = toCaip2(config.fromChain, "");
+    if (!fromChain) throw new SwidgeValidationError("swidge: fromChain is required");
+    const configSnapshot = Object.freeze({...config, fromChain});
+    super(account as never, configSnapshot);
+    this.fromChain = fromChain;
+  }
+
+  /** Quote the route (single provider, or best across the router). */
+  protected abstract resolveQuote(params: QuoteParams): Promise<Quote | null>;
+
+  /** Why the last resolveQuote came back empty (venue names + reasons), or "".
+   *  Rides inside the no-route error so execution failures are diagnosable
+   *  from the surface that shows them. */
+  protected noRouteDetail(): string {
+    return "";
+  }
+  /** Look up a provider by name to resume/track an in-flight swidge. */
+  protected abstract providerFor(name: string): CrossChainProvider | undefined;
+  /** Whether this protocol can route a chain at all (for support discovery). */
+  protected abstract chainSupported(caip2: string): boolean;
+
+  /** Report an execution phase; an observer that throws is ignored. */
+  protected emitPhase(phase: SwidgeExecutionPhase, detail?: SwidgeExecutionPhaseDetail): void {
+    const observer = (this._config as SwidgeEngineConfig).onExecutionPhase;
+    if (!observer) return;
+    try {
+      observer(phase, detail);
+    } catch {
+      /* diagnostics only */
+    }
+  }
+  /** Runtime availability used by the public discovery methods. */
+  protected protocolEnabled(): boolean { return true; }
+  /** Pair-level capability used when discovery specifies both endpoints. */
+  protected pairSupported(fromChain: string, toChain: string): boolean {
+    return this.chainSupported(fromChain) && this.chainSupported(toChain);
+  }
+
+  /** SwidgeOptions → the engine's QuoteParams (exact-in only). */
+  protected toParams(options: SwidgeOptions, dry: boolean): QuoteParams {
+    if (options.fromTokenAmount == null) {
+      throw new SwidgeUnsupportedOperationError("swidge: exact-out swidge is not supported by the engine");
+    }
+    const destChain = toCaip2(options.toChain, this.fromChain);
+    const constraints = callerConstraints(options);
+    const amountIn = exactPositiveAmount(options.fromTokenAmount, "fromTokenAmount");
+    const params: QuoteParams = {
+      sourceChain: this.fromChain,
+      sourceToken: toSymbol(this.fromChain, options.fromToken),
+      destChain,
+      destToken: toDestAddress(destChain, options.toToken),
+      amountIn: amountIn.toString(),
+      destAddress: options.recipient ?? "",
+      dry,
+      ...(constraints.minAmountOut !== undefined ? {minAmountOut: constraints.minAmountOut.toString()} : {}),
+      ...(constraints.slippageBps !== undefined ? {slippageBps: constraints.slippageBps} : {}),
+    };
+    return options.refundAddress ? {...params, refundAddress: options.refundAddress} : params;
+  }
+
+  private async assertAccountChain(signer: SwidgeSigner): Promise<void> {
+    const config = this._config as SwidgeEngineConfig;
+    if (config.skipAccountChainCheck) return;
+    const actual = await readAccountChain(signer, config.accountChain);
+    if (actual == null) {
+      throw new Error(`swidge: account chain identity is unavailable for ${this.fromChain}; set accountChain or explicitly opt out with skipAccountChainCheck`);
+    }
+    const expected = this.fromChain;
+    const expectedId = expected.startsWith("eip155:") ? expected.slice("eip155:".length) : expected;
+    const actualText = typeof actual === "string" ? actual : String(actual);
+    const actualId = actualText.startsWith("eip155:") ? actualText.slice("eip155:".length) : actualText;
+    if (actualId !== expectedId) {
+      throw new Error(`swidge: account is bound to ${actualText}, but fromChain is ${expected}`);
+    }
+  }
+
+  protected assertFeeConfig(config?: SwidgeProtocolConfig): void {
+    const configured = {...(this._config as SwidgeProtocolConfig), ...(config ?? {})};
+    for (const [name, value] of [["maxNetworkFeeBps", configured.maxNetworkFeeBps], ["maxProtocolFeeBps", configured.maxProtocolFeeBps]] as const) {
+      if (value === undefined) continue;
+      const bps = typeof value === "bigint" ? value : Number.isSafeInteger(value) ? BigInt(value) : -1n;
+      if (bps < 0n || bps > 10_000n) throw new SwidgeConfigurationError(`swidge: ${name} must be an integer between 0 and 10000`);
+    }
+  }
+
+  protected assertFeeCaps(
+    fees: readonly SwidgeFee[] | undefined,
+    sourceAmount: bigint,
+    sourceToken: string,
+    config?: SwidgeProtocolConfig,
+  ): void {
+    this.assertFeeConfig(config);
+    const configured = {...(this._config as SwidgeProtocolConfig), ...(config ?? {})};
+    const caps = [
+      ["network", configured.maxNetworkFeeBps],
+      ["protocol", configured.maxProtocolFeeBps],
+    ] as const;
+    if (!caps.some(([, cap]) => cap !== undefined)) return;
+    if (!fees) throw new SwidgeFeeLimitError("swidge: fee caps require an itemized provider fee breakdown");
+    const normalizedSource = sourceToken.toLowerCase();
+    for (const [type, cap] of caps) {
+      if (cap === undefined) continue;
+      const matching = fees.filter((fee) => fee.type === type);
+      if (matching.some((fee) => fee.token.toLowerCase() !== normalizedSource)) {
+        throw new SwidgeFeeLimitError(`swidge: cannot apply ${type} fee cap across different fee tokens`);
+      }
+      const total = matching.reduce((sum, fee) => sum + fee.amount, 0n);
+      const bps = typeof cap === "bigint" ? cap : BigInt(cap);
+      if (total * 10_000n > sourceAmount * bps) {
+        throw new SwidgeFeeLimitError(`swidge: ${type} fee exceeds configured cap`);
+      }
+    }
+  }
+
+  protected assertQuoteFeeCaps(q: Quote, options: SwidgeOptions, config?: SwidgeProtocolConfig): void {
+    const source = ccAsset(this.fromChain, toSymbol(this.fromChain, options.fromToken));
+    if (!source) throw new Error(`swidge: unknown source token '${options.fromToken}' on ${this.fromChain}`);
+    const token = source.contract ?? source.assetId;
+    const fees = q.fees?.map((fee) => ({...fee, amount: BigInt(fee.amount)} as SwidgeFee));
+    this.assertFeeCaps(fees, BigInt(q.sourceAmount), token, config);
+  }
+
+  protected toQuote(q: Quote, options: SwidgeOptions): SwidgeQuote {
+    // Never fabricate a zero-valued fee. Providers that expose base-unit fee
+    // amounts map them precisely; otherwise the net guaranteed output remains
+    // authoritative and the itemized list is honestly empty.
+    const fees: SwidgeFee[] = (q.fees ?? []).map((fee) => ({
+      type: fee.type,
+      amount: BigInt(fee.amount),
+      token: fee.token,
+      included: fee.included,
+      ...(fee.description ? {description: fee.description} : {}),
+    }));
+    return {
+      fromTokenAmount: BigInt(q.sourceAmount),
+      toTokenAmount: BigInt(q.destAmount),
+      toTokenAmountMin: BigInt(q.minDestAmount),
+      fees,
+      ...(q.etaSeconds ? {estimatedDuration: q.etaSeconds} : {}),
+      ...(q.validUntilMs ? {expiry: Math.floor(q.validUntilMs / 1000)} : {}),
+    };
+  }
+
+  override async quoteSwidge(options: SwidgeOptions): Promise<SwidgeQuote> {
+    const snapshot = snapshotOptions(options);
+    const q = await this.resolveQuote(this.toParams(snapshot, true));
+    if (!q) {
+      const detail = this.noRouteDetail();
+      throw new SwidgeQuoteError(`swidge: no route available for the requested pair${detail ? ` :: ${detail}` : ""}`);
+    }
+    assertQuoteConstraints(q, snapshot);
+    this.assertQuoteFeeCaps(q, snapshot);
+    return this.toQuote(q, snapshot);
+  }
+
+  override async swidge(options: SwidgeOptions, config?: SwidgeProtocolConfig): Promise<SwidgeResult> {
+    // Account first: a read-only or missing account is refused before any option is
+    // validated or any network call is made (SDK protocol conformance).
+    const signerCandidate = this._account as Partial<SwidgeSigner> | undefined;
+    if (!signerCandidate || typeof signerCandidate.sendTransaction !== "function") {
+      throw new SwidgeExecutionError("swidge: swidge() requires a signing account (read-only accounts can only quote)");
+    }
+    const snapshot = snapshotOptions(options);
+    requireExecutionFloor(snapshot);
+    const configSnapshot = snapshotConfig(config);
+    this.assertFeeConfig(configSnapshot);
+    const signer = signerCandidate as SwidgeSigner;
+    await this.assertAccountChain(signer);
+    // Refunds land on the SOURCE chain, so the only safe default is the bound
+    // account's own address — never the recipient, which may be a dest-chain
+    // address (a TON-source swap with an EVM recipient would otherwise hand the
+    // provider an EVM string as the TON refund/trader wallet).
+    const selfAddress = await signer.getAddress();
+    const recipient = snapshot.recipient ?? selfAddress;
+    const refundAddress = snapshot.refundAddress ?? selfAddress;
+    const executionOptions = snapshotOptions({...snapshot, recipient, refundAddress});
+    const resolved = await this.resolveQuote(this.toParams(executionOptions, false));
+    if (!resolved) {
+      const detail = this.noRouteDetail();
+      throw new SwidgeQuoteError(`swidge: no route available for the requested pair${detail ? ` :: ${detail}` : ""}`);
+    }
+    const q = snapshotQuote(resolved);
+    assertQuoteConstraints(q, executionOptions);
+    this.assertQuoteFeeCaps(q, executionOptions, configSnapshot);
+
+    const provider = this.providerFor(q.provider);
+    if (!provider) throw new Error(`swidge: provider '${q.provider}' is not registered`);
+    let providerEnabled = false;
+    try { providerEnabled = provider.enabled(); } catch { /* fail closed below */ }
+    if (!providerEnabled) throw new Error(`swidge: provider '${q.provider}' is disabled`);
+    let unsigned: UnsignedTx = Object.freeze({...await provider.buildDeposit(q)});
+
+    if (unsigned.serializedTx) {
+      throw new Error("swidge: serialized provider transactions require a chain-specific account adapter");
+    }
+    if (unsigned.chain && unsigned.chain !== this.fromChain) {
+      throw new Error(`swidge: provider transaction chain ${unsigned.chain} does not match ${this.fromChain}`);
+    }
+    if (unsigned.stateInitBoc !== undefined) {
+      throw new Error("swidge: deposit requires a stateInit the generic account cannot attach");
+    }
+    // A remote build response is not a new authority. For ordinary calldata and
+    // deposit-address providers the validated quote already commits every
+    // execution field; require buildDeposit to reproduce it exactly.
+    if (q.txRequest) {
+      const tx = q.txRequest;
+      const sameAddress = (a: string | undefined, b: string | undefined) =>
+        a === b || (!!a && !!b && a.startsWith("0x") && b.startsWith("0x") && a.toLowerCase() === b.toLowerCase());
+      if (
+        !sameAddress(unsigned.to, tx.to ?? "") ||
+        unsigned.data !== tx.data ||
+        unsigned.value !== (tx.value ?? "0") ||
+        unsigned.chainId !== tx.chainId ||
+        unsigned.gasLimit !== tx.gasLimit ||
+        !sameAddress(unsigned.approvalAddress, tx.approvalAddress) ||
+        unsigned.serializedTx !== tx.serializedTx
+      ) {
+        throw new Error("swidge: provider build does not match the validated quote transaction");
+      }
+    } else if (!unsigned.bodyBoc && !unsigned.typedData) {
+      if (!q.depositAddress || unsigned.to !== q.depositAddress || (unsigned.memo ?? null) !== q.depositMemo) {
+        throw new Error("swidge: provider build does not match the validated quote deposit");
+      }
+    }
+    const executionModels = [unsigned.data !== undefined, unsigned.bodyBoc !== undefined, unsigned.typedData !== undefined]
+      .filter(Boolean).length;
+    if (executionModels > 1 || (unsigned.memo !== undefined && (unsigned.bodyBoc !== undefined || unsigned.typedData !== undefined))) {
+      throw new Error("swidge: provider returned ambiguous execution payloads");
+    }
+    if (unsigned.approvalAddress && !unsigned.data && !unsigned.typedData) {
+      throw new Error("swidge: approval is only valid for calldata or typed-order execution");
+    }
+    // Memo'd deposits: TON carries it as the message body, Tron in
+    // raw_data.data (both TRX and TRC-20 — bifrost reads that field for
+    // either contract type). Every other chain would silently drop it.
+    const tronSource = this.fromChain.startsWith("tron:");
+    if (unsigned.memo && !this.fromChain.startsWith("ton:") && !tronSource) {
+      throw new Error(`swidge: deposit memo execution is not implemented for ${this.fromChain}`);
+    }
+    if (unsigned.data !== undefined && !this.fromChain.startsWith("eip155:")) {
+      throw new Error(`swidge: calldata execution is not implemented for ${this.fromChain}`);
+    }
+    // Cell-body deposits (Omniston escrow): the body MUST be decoded to a Cell —
+    // a TON account renders a string body as a text comment, stranding the
+    // swap. Fail closed unless the caller supplied `decodeTonBody`.
+    let cellBody: unknown;
+    if (unsigned.bodyBoc !== undefined) {
+      if (!unsigned.bodyBoc) throw new Error("swidge: cell-body deposit has an empty body");
+      if (!this.fromChain.startsWith("ton:")) {
+        throw new Error(`swidge: cell-body execution is not implemented for ${this.fromChain}`);
+      }
+      const decode = (this._config as SwidgeEngineConfig).decodeTonBody;
+      if (!decode) {
+        throw new Error("swidge: cell-body deposit needs config.decodeTonBody (e.g. Cell.fromBase64)");
+      }
+      cellBody = decode(unsigned.bodyBoc);
+      if (cellBody == null) {
+        throw new Error("swidge: config.decodeTonBody returned no Cell");
+      }
+    }
+    if (unsigned.chainId !== undefined && this.fromChain.startsWith("eip155:") && String(unsigned.chainId) !== this.fromChain.slice("eip155:".length)) {
+      throw new Error(`swidge: provider transaction chain ${unsigned.chainId} does not match ${this.fromChain}`);
+    }
+
+    // TOKEN-asset sources on deposit-address routes need token-transfer
+    // semantics: a bare {to, value} would move the NATIVE coin with the
+    // token's base-unit amount (audit C1 — e.g. USDT source via a 1Click
+    // deposit address would have sent ETH wei). EVM sources are rewritten
+    // into an ERC-20 transfer(depositAddress, amount); supported non-EVM
+    // sources use the official account.transfer() token surface below.
+    let tokenId: string | undefined;
+    if (!unsigned.data && !unsigned.bodyBoc && !unsigned.typedData) {
+      const src = ccAsset(this.fromChain, toSymbol(this.fromChain, executionOptions.fromToken));
+      if (src?.contract) {
+        if (this.fromChain.startsWith("eip155:")) {
+          unsigned = {
+            ...unsigned,
+            to: src.contract,
+            data: encodeFunctionData({
+              abi: ERC20_TRANSFER_ABI,
+              functionName: "transfer",
+              args: [unsigned.to as `0x${string}`, BigInt(q.sourceAmount)],
+            }),
+            value: "0",
+          };
+        } else if (
+          this.fromChain.startsWith("solana:") ||
+          this.fromChain.startsWith("ton:") ||
+          this.fromChain.startsWith("tron:")
+        ) {
+          // Solana SPL / TON jetton / Tron TRC-20 source. These official 
+          // accounts expose token movement through `transfer()`; their
+          // `sendTransaction({to,value})` surface is a NATIVE transfer and does
+          // not recognize custom token metadata.
+          tokenId = src.contract;
+        } else {
+          throw new Error(
+            `swidge: token deposit-address execution is not implemented for ${this.fromChain} — only cell-body/calldata providers can move non-native assets here`,
+          );
+        }
+      }
+    }
+
+    // A TON jetton transfer needs its memo as a forward payload. Our generic
+    // signer cannot encode that yet, and would otherwise silently drop it. A
+    // Tron TRC-20 memo is a transaction-level field the transfer surface
+    // carries explicitly (`memo`), so it is allowed through below.
+    if (tokenId && (cellBody !== undefined || (unsigned.memo !== undefined && !tronSource))) {
+      throw new Error("swidge: token deposit with memo/cell payload is not implemented");
+    }
+
+    // Bind the value presented to the signer to the already validated quote.
+    // Native deposits and the amount handed to transfer() must carry the exact
+    // input amount; EVM token execution must never attach native value.
+    const source = ccAsset(this.fromChain, toSymbol(this.fromChain, executionOptions.fromToken));
+    if (!source) throw new Error(`swidge: unknown source token '${executionOptions.fromToken}' on ${this.fromChain}`);
+    const executionValue = BigInt(unsigned.value);
+    if (source.contract && this.fromChain.startsWith("eip155:")) {
+      if (executionValue !== 0n) throw new Error("swidge: token execution attempted to attach native value");
+    } else if (!unsigned.typedData && !unsigned.bodyBoc && executionValue !== BigInt(q.sourceAmount)) {
+      throw new Error("swidge: provider execution amount does not match the validated quote");
+    }
+
+    // ERC-20 calldata/typed-order routes need an exact allowance. Do this only
+    // after every local payload/value check so a malformed build cannot leave an
+    // allowance behind before failing validation.
+    let revokeApproval: (() => Promise<void>) | undefined;
+    if (unsigned.approvalAddress && source.contract) {
+      const approve = async (amount: bigint) => {
+        const sent = await signer.sendTransaction({
+          to: source.contract!,
+          data: encodeFunctionData({
+            abi: [{type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{name: "spender", type: "address"}, {name: "amount", type: "uint256"}], outputs: [{type: "bool"}]}] as const,
+            functionName: "approve",
+            args: [unsigned.approvalAddress as `0x${string}`, amount],
+          }),
+          value: 0n,
+          ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
+        });
+        // The next step (a second approve, or the deposit's gas estimate)
+        // reads on-chain allowance: it must see this approval mined.
+        if (sent.hash && typeof signer.waitForTransaction === "function") await signer.waitForTransaction(sent.hash);
+        return sent;
+      };
+      // Install cleanup BEFORE broadcasting approval. An RPC can lose the
+      // response after the transaction was accepted; treating that exception
+      // as "nothing happened" would leave a live allowance with no callback.
+      revokeApproval = async () => { await approve(0n); };
+      try {
+        const zeroFirst = this.fromChain === "eip155:1" && source.symbol.toUpperCase() === "USDT";
+        const total = zeroFirst ? 2 : 1;
+        if (zeroFirst) {
+          this.emitPhase("approving", {index: 1, total});
+          await approve(0n);
+        }
+        this.emitPhase("approving", {index: total, total});
+        await approve(BigInt(executionOptions.fromTokenAmount!));
+      } catch (error) {
+        await revokeApproval().catch(() => {});
+        throw error;
+      }
+    }
+
+    // The quote/build step can be separated from the actual send by an ERC-20
+    // approval. Recheck rotating/halt-sensitive provider state only now.
+    try {
+      if (q.validUntilMs > 0 && q.validUntilMs <= Date.now()) {
+        throw new Error("swidge: quote expired before source broadcast");
+      }
+      let providerStillEnabled = false;
+      try { providerStillEnabled = provider.enabled(); } catch { /* fail closed below */ }
+      if (!providerStillEnabled) throw new Error(`swidge: provider '${q.provider}' was disabled before source broadcast`);
+      if (provider.preflightDeposit) this.emitPhase("preflight");
+      await provider.preflightDeposit?.(q, unsigned);
+    } catch (error) {
+      await revokeApproval?.().catch(() => {});
+      throw error;
+    }
+
+    // GASLESS typed-order execution (Omniston EVM-source): sign the EIP-712
+    // payload and register it with the provider — there is no source tx.
+    if (unsigned.typedData) {
+      try {
+        if (!signer.signTypedData) {
+          throw new Error("swidge: typed-order execution needs an account with signTypedData");
+        }
+        if (!provider.registerSignedOrder) {
+          throw new Error(`swidge: provider '${q.provider}' cannot register signed orders`);
+        }
+        const td = JSON.parse(unsigned.typedData) as {
+          domain: unknown;
+          types: Record<string, unknown>;
+          primaryType?: string;
+          message: unknown;
+        };
+        if (!td || typeof td !== "object" || !td.domain || !td.types || typeof td.types !== "object" || !td.message) {
+          throw new Error("swidge: provider returned malformed typed data");
+        }
+        // ethers infers the domain type and reject an explicit
+        // EIP712Domain entry as an ambiguous primary type.
+        const {EIP712Domain: _domain, ...types} = td.types;
+        const signature = await signer.signTypedData({
+          domain: td.domain,
+          types,
+          ...(td.primaryType ? {primaryType: td.primaryType} : {}),
+          message: td.message,
+        });
+        await provider.registerSignedOrder(q.intentId, signature);
+        return {
+          id: encodeId(q.provider, q.intentId),
+          fees: this.toQuote(q, executionOptions).fees,
+          fromTokenAmount: BigInt(q.sourceAmount),
+          toTokenAmount: BigInt(q.destAmount),
+          toTokenAmountMin: BigInt(q.minDestAmount),
+        };
+      } catch (error) {
+        // Any failed validation/sign/registration must not leave a reusable
+        // exact allowance behind. If the RPC response was lost after
+        // registration, revocation safely prevents execution.
+        await revokeApproval?.().catch(() => {});
+        throw error;
+      }
+    }
+
+    // Execute the source leg through the bound account. Non-EVM token deposits
+    // MUST use transfer({token,recipient,amount}); passing token metadata
+    // to sendTransaction would be ignored and send native SOL/TON/TRX instead.
+    let sent: {hash?: string};
+    this.emitPhase("signing");
+    try {
+      if (tokenId) {
+        if (typeof signer.transfer !== "function") {
+          throw new SwidgeExecutionError(
+            `swidge: ${this.fromChain} token execution requires account.transfer({token, recipient, amount})`,
+          );
+        }
+        sent = await signer.transfer({
+          token: tokenId,
+          recipient: unsigned.to,
+          amount: BigInt(q.sourceAmount),
+          ...(tronSource && unsigned.memo ? {memo: unsigned.memo} : {}),
+        });
+      } else {
+        sent = await signer.sendTransaction({
+          to: unsigned.to,
+          ...(unsigned.data ? {data: unsigned.data} : {}),
+          value: BigInt(unsigned.value),
+          ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
+          ...(unsigned.gasLimit ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
+          ...(cellBody !== undefined
+            ? {body: cellBody}
+            : unsigned.memo
+              ? (tronSource ? {memo: unsigned.memo} : {body: unsigned.memo})
+              : {}),
+        });
+      }
+      if (!sent.hash) throw new SwidgeExecutionError("swidge: account did not return a source transaction hash");
+      this.emitPhase("broadcast", {hash: sent.hash});
+    } catch (error) {
+      await revokeApproval?.().catch(() => {});
+      throw error;
+    }
+
+    if (provider.notifyDeposit) {
+      await provider.notifyDeposit(q.intentId, sent.hash).catch(() => {});
+    }
+
+    const fees = this.toQuote(q, executionOptions).fees;
+    return {
+      id: encodeId(q.provider, q.intentId, sent.hash),
+      fees,
+      fromTokenAmount: BigInt(q.sourceAmount),
+      toTokenAmount: BigInt(q.destAmount),
+      toTokenAmountMin: BigInt(q.minDestAmount),
+      ...(sent.hash ? {hash: sent.hash, transactions: [{hash: sent.hash, type: "source"}]} : {}),
+    };
+  }
+
+  override async getSwidgeStatus(id: string, _options?: SwidgeStatusOptions): Promise<SwidgeStatusResult> {
+    const {provider: name, intentId, sourceTxHash} = decodeId(id);
+    const provider = this.providerFor(name);
+    if (!provider) throw new Error(`swidge: no swidge found for id '${id}'`);
+    return mapStatus(await provider.trackIntent(sourceTxHash == null ? {intentId} : {intentId, sourceTxHash}));
+  }
+
+  /** bridge() has no floor field: quote first, then bind execution
+   * to that quote's minimum so the inherited convenience API stays safe. */
+  override async bridge(options: BridgeOptions): Promise<BridgeResult> {
+    const amount = exactPositiveAmount(options.amount, "amount");
+    const swidgeOptions: SwidgeOptions = {
+      fromToken: options.token,
+      toToken: options.token,
+      toChain: options.targetChain,
+      recipient: options.recipient,
+      fromTokenAmount: amount,
+    };
+    const quote = await this.quoteSwidge(swidgeOptions);
+    const result = await this.swidge({...swidgeOptions, minAmountOut: quote.toTokenAmountMin});
+    const fee = result.fees.filter((f) => f.type === "network").reduce((sum, f) => sum + f.amount, 0n);
+    const bridgeFee = result.fees.filter((f) => f.type === "protocol").reduce((sum, f) => sum + f.amount, 0n);
+    return {hash: result.id, fee, bridgeFee};
+  }
+
+  /** Same protection for legacy exact-in swap() calls whose min is optional. */
+  override async swap(options: SwapOptions): Promise<SwapResult> {
+    if (options.tokenInAmount === undefined) {
+      throw new SwidgeUnsupportedOperationError("swidge: exact-out swap is not supported by the engine");
+    }
+    const amount = exactPositiveAmount(options.tokenInAmount, "tokenInAmount");
+    const swidgeOptions: SwidgeOptions = {
+      fromToken: options.tokenIn,
+      toToken: options.tokenOut,
+      fromTokenAmount: amount,
+      // `to` is optional on the legacy API: omit the key rather than passing
+      // undefined, so swidge() falls back to the bound account's own address.
+      ...(options.to !== undefined ? {recipient: options.to} : {}),
+      ...(options.minAmountOut !== undefined ? {minAmountOut: options.minAmountOut} : {}),
+    };
+    const floor = options.minAmountOut ?? (await this.quoteSwidge(swidgeOptions)).toTokenAmountMin;
+    const result = await this.swidge({...swidgeOptions, minAmountOut: floor});
+    const fee = result.fees.reduce((sum, item) => sum + item.amount, 0n);
+    return {hash: result.id, fee, tokenInAmount: result.fromTokenAmount, tokenOutAmount: result.toTokenAmount};
+  }
+
+  override async getSupportedChains(): Promise<SwidgeSupportedChain[]> {
+    if (!this.protocolEnabled()) return [];
+    return CC_SOURCE_CHAINS.filter((c: CcChain) => this.chainSupported(c.caip2)).map((c) => ({
+      id: c.caip2,
+      name: c.label,
+      type: chainType(c.caip2),
+      nativeToken: c.assets[0]?.symbol ?? "",
+    }));
+  }
+
+  override async getSupportedTokens(options?: SwidgeSupportedTokensOptions): Promise<SwidgeSupportedToken[]> {
+    const wantFrom = options?.fromChain != null ? toCaip2(options.fromChain, "") : undefined;
+    const wantTo = options?.toChain != null ? toCaip2(options.toChain, "") : undefined;
+    if (!this.protocolEnabled() || (wantFrom && wantTo && !this.pairSupported(wantFrom, wantTo))) return [];
+    const out: SwidgeSupportedToken[] = [];
+    for (const c of CC_SOURCE_CHAINS) {
+      if (!this.chainSupported(c.caip2)) continue;
+      if ((wantFrom || wantTo) && c.caip2 !== wantFrom && c.caip2 !== wantTo) continue;
+      for (const a of c.assets) {
+        out.push({
+          token: a.assetId,
+          chain: c.caip2,
+          symbol: a.symbol,
+          decimals: a.decimals,
+          ...(a.contract ? {address: a.contract} : {}),
+        });
+      }
+    }
+    return out;
+  }
+}

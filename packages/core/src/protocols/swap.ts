@@ -14,6 +14,8 @@ export interface SwapCommonOptions {
   tokenOut: string
   /** Receiver of the output tokens. Defaults to the account itself. */
   to?: string
+  /** Minimum acceptable output amount, base units. */
+  minAmountOut?: bigint | number
 }
 export interface SwapBuyOptions { tokenInAmount?: never; tokenOutAmount: bigint | number }
 export interface SwapSellOptions { tokenInAmount: bigint | number; tokenOutAmount?: never }

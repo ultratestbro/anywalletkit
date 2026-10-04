@@ -1,0 +1,43 @@
+{
+  "name": "@forgewallet/kit",
+  "version": "0.0.1",
+  "description": "The forgewallet orchestrator: one seed or signer, registered chain wallets and protocol modules, accounts by CAIP-2 chain, policies that run before anything is broadcast.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "keywords": [
+    "wallet",
+    "sdk",
+    "multichain",
+    "orchestrator",
+    "policies"
+  ],
+  "dependencies": {
+    "@forgewallet/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "vitest": "^5.0.3"
+  }
+}

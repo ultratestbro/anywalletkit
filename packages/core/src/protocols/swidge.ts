@@ -6,7 +6,9 @@ import { ProtocolBase } from './base.js'
 import type { BridgeOptions, BridgeQuote, BridgeResult, IBridgeProtocol } from './bridge.js'
 import type { ISwapProtocol, SwapOptions, SwapQuote, SwapResult } from './swap.js'
 
-export type SwidgeStatus = 'pending' | 'action-required' | 'completed' | 'failed'
+export type SwidgeStatus =
+  | 'pending' | 'action-required' | 'completed' | 'failed'
+  | 'refund-pending' | 'refunded' | 'cancelled' | 'expired' | 'partial'
 export type SwidgeFeeType = 'network' | 'protocol' | 'affiliate' | 'other'
 
 export interface SwidgeProtocolConfig {
@@ -25,6 +27,8 @@ export interface SwidgeCommonOptions {
   refundAddress?: string
   /** Decimal, 0.01 = 1 %. */
   slippage?: number
+  /** Minimum acceptable destination amount, base units (overrides slippage when set). */
+  minAmountOut?: bigint | number
 }
 export interface SwidgeExactInOptions { fromTokenAmount: bigint | number; toTokenAmount?: never }
 export interface SwidgeExactOutOptions { fromTokenAmount?: never; toTokenAmount: bigint | number }
@@ -131,7 +135,7 @@ export class SwidgeProtocol<TConfig extends SwidgeProtocolConfig = SwidgeProtoco
 }
 
 function toSwidgeOptions(o: SwapOptions): SwidgeOptions {
-  const base: SwidgeCommonOptions = { fromToken: o.tokenIn, toToken: o.tokenOut, ...(o.to !== undefined ? { recipient: o.to } : {}) }
+  const base: SwidgeCommonOptions = { fromToken: o.tokenIn, toToken: o.tokenOut, ...(o.to !== undefined ? { recipient: o.to } : {}), ...(o.minAmountOut !== undefined ? { minAmountOut: o.minAmountOut } : {}) }
   return o.tokenInAmount !== undefined
     ? { ...base, fromTokenAmount: o.tokenInAmount }
     : { ...base, toTokenAmount: o.tokenOutAmount as bigint | number }

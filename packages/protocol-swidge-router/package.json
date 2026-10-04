@@ -1,0 +1,96 @@
+{
+  "name": "@forgewallet/protocol-swidge-router",
+  "version": "0.0.1",
+  "description": "Swidge (cross-chain swap+bridge) protocol \u2014 NEAR Intents, LI.FI, THORChain, Omniston behind one router. Conforms to @forgewallet/core SwidgeProtocol.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "require": "./dist/types.cjs"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js",
+      "require": "./dist/config.cjs"
+    },
+    "./router": {
+      "types": "./dist/router.d.ts",
+      "import": "./dist/router.js",
+      "require": "./dist/router.cjs"
+    },
+    "./remote": {
+      "types": "./dist/remote.d.ts",
+      "import": "./dist/remote.js",
+      "require": "./dist/remote.cjs"
+    },
+    "./swidge": {
+      "types": "./dist/swidge.d.ts",
+      "import": "./dist/swidge.js",
+      "require": "./dist/swidge.cjs"
+    },
+    "./swidge/base": {
+      "types": "./dist/swidge/base.d.ts",
+      "import": "./dist/swidge/base.js",
+      "require": "./dist/swidge/base.cjs"
+    },
+    "./swidge/router": {
+      "types": "./dist/swidge/router.d.ts",
+      "import": "./dist/swidge/router.js",
+      "require": "./dist/swidge/router.cjs"
+    },
+    "./providers/near-intents": {
+      "types": "./dist/providers/near-intents.d.ts",
+      "import": "./dist/providers/near-intents.js",
+      "require": "./dist/providers/near-intents.cjs"
+    },
+    "./providers/thorchain": {
+      "types": "./dist/providers/thorchain.d.ts",
+      "import": "./dist/providers/thorchain.js",
+      "require": "./dist/providers/thorchain.cjs"
+    },
+    "./providers/omniston": {
+      "types": "./dist/providers/omniston.d.ts",
+      "import": "./dist/providers/omniston.js",
+      "require": "./dist/providers/omniston.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "dependencies": {
+    "@forgewallet/protocol-swidge-near-intents": "workspace:*",
+    "@forgewallet/protocol-swidge-omniston": "workspace:*",
+    "@forgewallet/protocol-swidge-thorchain": "workspace:*",
+    "@forgewallet/swidge-assets": "workspace:*",
+    "@forgewallet/protocol-swidge-core": "workspace:*"
+  },
+  "peerDependencies": {
+    "@forgewallet/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "vitest": "^5.0.3",
+    "@forgewallet/conformance": "workspace:*",
+    "@forgewallet/core": "workspace:*"
+  },
+  "keywords": []
+}

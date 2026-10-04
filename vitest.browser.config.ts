@@ -8,7 +8,7 @@ import { playwright } from '@vitest/browser-playwright'
 
 export default defineConfig({
   test: {
-    include: ['packages/*/test/**/*.test.ts'],
+    include: ['packages/*/test/**/*.test.ts', 'packages/*/tests/**/*.test.ts'],
     exclude: ['packages/runtime-hermes/**', '**/node_modules/**'],
     browser: {
       enabled: true,

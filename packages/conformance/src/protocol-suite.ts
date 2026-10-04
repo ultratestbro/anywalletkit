@@ -3,7 +3,8 @@ import { NotImplementedError, ReadOnlyAccountError, type IWalletAccount, type IW
 import { createMockAccount } from './mock-account.js'
 
 type AnyProtocol = Record<string, unknown>
-type Ctor<P> = new (account: IWalletAccountReadOnly | IWalletAccount, config?: never) => P
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Ctor<P> = new (account: IWalletAccountReadOnly | IWalletAccount, config?: any) => P
 
 /** Method names per protocol type: [writes, reads]. Writes must refuse a read-only account. */
 const SURFACE: Record<ProtocolType, { writes: string[]; reads: string[] }> = {
@@ -25,6 +26,8 @@ export interface ProtocolSuiteOptions<P> {
   notImplemented?: string[]
   /** Account factory for reads; default: the recording mock. Use a fixture-backed one for real quote checks. */
   account?: () => IWalletAccount
+  /** Constructor config, when the module requires one (e.g. swidge engines need `fromChain`). */
+  config?: unknown
 }
 
 /** The conformance suite every protocol module must pass. */
@@ -34,12 +37,12 @@ export function describeProtocolModule<P extends object>(name: string, o: Protoc
 
   describe(`${name}: conformance (${o.type})`, () => {
     it('implements the full surface (every method is a function)', () => {
-      const p = new o.Protocol(createMockAccount()) as AnyProtocol
+      const p = new o.Protocol(createMockAccount(), o.config) as AnyProtocol
       for (const m of [...writes, ...reads]) expect(typeof p[m], `${m} missing`).toBe('function')
     })
 
     it('methods declared notImplemented throw NotImplementedError, not undefined', async () => {
-      const p = new o.Protocol(createMockAccount()) as AnyProtocol
+      const p = new o.Protocol(createMockAccount(), o.config) as AnyProtocol
       for (const m of skip) {
         await expect((p[m] as (...a: unknown[]) => Promise<unknown>)(...(o.samples?.[m] ?? [{}]))).rejects.toBeInstanceOf(NotImplementedError)
       }
@@ -47,7 +50,7 @@ export function describeProtocolModule<P extends object>(name: string, o: Protoc
 
     it('constructs with a read-only account and refuses writes with a clear error', async () => {
       const ro = createMockAccount().toReadOnlyAccount()
-      const p = new o.Protocol(ro) as AnyProtocol
+      const p = new o.Protocol(ro, o.config) as AnyProtocol
       for (const m of writes) {
         if (skip.has(m)) continue
         const args = o.samples?.[m] ?? [{}]
@@ -59,7 +62,7 @@ export function describeProtocolModule<P extends object>(name: string, o: Protoc
 
     it('reads and quotes never broadcast', async () => {
       const account = o.account?.() ?? createMockAccount()
-      const p = new o.Protocol(account) as AnyProtocol
+      const p = new o.Protocol(account, o.config) as AnyProtocol
       for (const m of reads) {
         if (skip.has(m)) continue
         const args = o.samples?.[m]
