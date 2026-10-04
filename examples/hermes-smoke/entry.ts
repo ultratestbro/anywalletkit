@@ -5,11 +5,15 @@
  */
 import './shim-globals.js'
 import 'fastestsmallesttextencoderdecoder/EncoderDecoderTogether.min.js'
+import './shim-runtime.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { deriveEd25519, deriveSecp256k1, seedFromMnemonicSync } from '@forgewallet/core'
 import { derivationVectors } from '@forgewallet/conformance'
 import { WalletManagerEvm } from '@forgewallet/wallet-evm'
 import { WalletManagerSolana } from '@forgewallet/wallet-solana'
+import { WalletManagerTon } from '@forgewallet/wallet-ton'
+import { WalletManagerTron } from '@forgewallet/wallet-tron'
+import { WalletManagerBtc } from '@forgewallet/wallet-btc'
 
 declare const print: ((s: string) => void) | undefined
 const out = (s: string) => (typeof print === 'function' ? print(s) : console.log(s))
@@ -46,6 +50,27 @@ async function main() {
       eq('solana sign', await a.sign(derivationVectors.message), v.signMessage)
     }
     sol.dispose()
+    const ton = new WalletManagerTon(mnemonic)
+    for (const v of derivationVectors.vectors.ton[seedName]!.accounts) {
+      const a = await ton.getAccount(v.index)
+      eq('ton address', await a.getAddress(), v.address)
+      eq('ton sign', await a.sign(derivationVectors.message), v.signMessage)
+    }
+    ton.dispose()
+    const tron = new WalletManagerTron(mnemonic)
+    for (const v of derivationVectors.vectors.tron[seedName]!.accounts) {
+      const a = await tron.getAccount(v.index)
+      eq('tron address', await a.getAddress(), v.address)
+      eq('tron sign', await a.sign(derivationVectors.message), v.signMessage)
+    }
+    tron.dispose()
+    const btc = new WalletManagerBtc(mnemonic, { network: 'bitcoin' })
+    for (const v of derivationVectors.vectors.btc[seedName]!.accounts) {
+      const a = await btc.getAccount(v.index)
+      eq('btc address', await a.getAddress(), v.address)
+      eq('btc sign', await a.sign(derivationVectors.message), v.signMessage)
+    }
+    btc.dispose()
   }
   out(`HERMES_SMOKE_OK ${checks}`)
 }

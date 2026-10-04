@@ -13,6 +13,7 @@
 import { sha256, sha384, sha512 } from '@noble/hashes/sha2.js'
 
 export interface HermesRuntimeReport {
+  bufferSubarray: 'native' | 'patched' | 'no-buffer'
   abortSignalTimeout: 'native' | 'polyfilled'
   abortSignalAny: 'native' | 'polyfilled'
   subtleDigest: 'native' | 'polyfilled' | 'unavailable'
@@ -69,6 +70,31 @@ export function installSubtleDigest(): 'native' | 'polyfilled' | 'unavailable' {
   return 'polyfilled'
 }
 
+/**
+ * Hermes has no Symbol.species, so `Buffer.prototype.subarray` (and any other
+ * TypedArray method that returns a view) yields a plain Uint8Array — the next
+ * `.copy()` / `.readUInt32BE()` on it throws "undefined is not a function".
+ * @ton/core, bitcoinjs-lib and many Node-style libraries slice Buffers this way.
+ * Patches the global Buffer (the app installs one from the `buffer` package).
+ */
+export function installBufferSubarrayFix(): 'native' | 'patched' | 'no-buffer' {
+  const B = (globalThis as { Buffer?: { alloc(n: number): Uint8Array; prototype: Uint8Array } }).Buffer
+  if (!B) return 'no-buffer'
+  const probe = B.alloc(2).subarray(0, 1)
+  if (probe instanceof (B as unknown as new () => object)) return 'native'
+  const proto = B.prototype as Uint8Array & { subarray: Uint8Array['subarray'] }
+  const original = Uint8Array.prototype.subarray
+  Object.defineProperty(proto, 'subarray', {
+    configurable: true, writable: true,
+    value: function subarray(this: Uint8Array, start?: number, end?: number) {
+      const out = original.call(this, start, end)
+      Object.setPrototypeOf(out, proto)
+      return out
+    },
+  })
+  return 'patched'
+}
+
 export function installStructuredClone(): 'native' | 'polyfilled' {
   const g = globalThis as { structuredClone?: unknown }
   if (typeof g.structuredClone === 'function') return 'native'
@@ -82,6 +108,7 @@ export function installStructuredClone(): 'native' | 'polyfilled' {
  */
 export function installHermesRuntime(options: { throwOnMissing?: boolean } = {}): HermesRuntimeReport {
   const report: HermesRuntimeReport = {
+    bufferSubarray: installBufferSubarrayFix(),
     abortSignalTimeout: installAbortSignalTimeout(),
     abortSignalAny: installAbortSignalAny(),
     subtleDigest: installSubtleDigest(),

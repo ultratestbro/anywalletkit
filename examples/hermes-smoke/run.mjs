@@ -22,6 +22,11 @@ await build({
 
   mainFields: ['react-native', 'module', 'main'], conditions: ['react-native', 'import', 'default'],
   define: { 'process.env.NODE_ENV': '"production"' },
+  // @ton/crypto-primitives' react-native build requires expo-crypto (random bytes) at module load and
+  // react-native-fast-pbkdf2 for mnemonics — an Expo app has them; the smoke supplies stand-ins.
+  // tweetnacl's optional `require('crypto')` is guarded at runtime: leave it unresolved.
+  alias: { 'expo-crypto': join(here, 'stubs/expo-crypto.ts'), 'react-native-fast-pbkdf2': join(here, 'stubs/react-native-fast-pbkdf2.ts') },
+  external: ['crypto'],
   logLevel: 'warning',
 })
 

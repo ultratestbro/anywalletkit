@@ -10,9 +10,14 @@
   "dependencies": {
     "@forgewallet/conformance": "workspace:*",
     "@forgewallet/core": "workspace:*",
+    "@forgewallet/runtime-hermes": "workspace:*",
+    "@forgewallet/wallet-btc": "workspace:*",
     "@forgewallet/wallet-evm": "workspace:*",
     "@forgewallet/wallet-solana": "workspace:*",
+    "@forgewallet/wallet-ton": "workspace:*",
+    "@forgewallet/wallet-tron": "workspace:*",
     "@noble/hashes": "^2.4.0",
+    "buffer": "^6.0.3",
     "fastestsmallesttextencoderdecoder": "^1.0.22"
   },
   "devDependencies": {

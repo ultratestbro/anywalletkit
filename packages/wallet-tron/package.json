@@ -1,0 +1,46 @@
+{
+  "name": "@forgewallet/wallet-tron",
+  "version": "0.0.1",
+  "description": "Tron wallet for the forgewallet SDK: BIP-32 m/44'/195'/0'/0/i accounts, TRX and TRC-20 transfers against a full-node HTTP API, no tronweb.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "keywords": [
+    "wallet",
+    "tron",
+    "trc20",
+    "bip32",
+    "secp256k1"
+  ],
+  "dependencies": {
+    "@forgewallet/core": "workspace:*",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0"
+  },
+  "devDependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "vitest": "^5.0.3"
+  }
+}

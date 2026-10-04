@@ -1,0 +1,51 @@
+{
+  "name": "@forgewallet/wallet-btc",
+  "version": "0.0.1",
+  "description": "Bitcoin wallet for the forgewallet SDK: BIP-84 p2wpkh m/84'/0'/0'/0/i accounts, coin selection, PSBT signing, Blockbook HTTP client.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "keywords": [
+    "wallet",
+    "bitcoin",
+    "bip84",
+    "p2wpkh",
+    "psbt",
+    "blockbook"
+  ],
+  "dependencies": {
+    "@bitcoinerlab/coinselect": "^2.0.1",
+    "@bitcoinerlab/descriptors": "^3.2.0",
+    "@bitcoinerlab/secp256k1": "^2.0.0",
+    "@forgewallet/core": "workspace:*",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
+    "bitcoinjs-lib": "^7.0.2",
+    "buffer": "^6.0.3"
+  },
+  "devDependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "vitest": "^5.0.3"
+  }
+}
