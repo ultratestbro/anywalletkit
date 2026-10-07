@@ -1,5 +1,6 @@
-import { NetworkError, NotImplementedError } from '@forgewallet/core'
-import type { BlockbookTx, BtcClient, BtcClientConfig, BtcConfig, Utxo } from './types.js'
+import { NetworkError } from '@forgewallet/core'
+import { DEFAULT_TIMEOUT_MS, fetchWithTimeout, isIntString, isRecord } from './http.js'
+import type { BlockbookTx, BtcClient, Utxo } from './types.js'
 
 const MEMPOOL_SPACE_URL = 'https://mempool.space'
 
@@ -8,9 +9,9 @@ interface BlockbookVout { n: number; isAddress?: boolean; addresses?: string[]; 
 interface BlockbookAddressTx { txid: string; blockHeight: number; vin?: BlockbookVin[]; vout?: BlockbookVout[] }
 
 /**
- * Pending outgoing value the way Bitcoin Core's wallet counts it:
- * a pending tx is trusted only if every input is ours and confirmed or
- * chained from another trusted tx; only then its change counts back.
+ * Pending outgoing value the way Bitcoin Core's wallet counts it: a pending tx
+ * is trusted only if every input is ours and confirmed or chained from another
+ * trusted tx; only then its change counts back.
  */
 export function unconfirmedOutgoing(transactions: BlockbookAddressTx[] | undefined, address: string): bigint {
   const pending = (transactions ?? []).filter((tx) => tx.blockHeight === -1)
@@ -37,114 +38,97 @@ export function unconfirmedOutgoing(transactions: BlockbookAddressTx[] | undefin
   }, 0n)
 }
 
-/** Blockbook REST transport (Trezor's indexer; also what common `blockbook-http` clients speak). */
+/** Blockbook REST transport (Trezor's indexer; QuickNode's Blockbook add-on speaks the same API). */
 export class BlockbookClient implements BtcClient {
   private readonly base: string
   private readonly fetchFn: typeof fetch
+  private readonly timeoutMs: number
 
-  constructor(config: { url: string }, fetchFn: typeof fetch = globalThis.fetch) {
+  constructor(config: { url: string }, fetchFn: typeof fetch = globalThis.fetch, timeoutMs = DEFAULT_TIMEOUT_MS) {
     this.base = config.url.replace(/\/+$/, '').replace(/\/api$/, '')
     this.fetchFn = fetchFn
+    this.timeoutMs = timeoutMs
   }
 
   async connect(): Promise<void> {}
   async close(): Promise<void> {}
 
-  private async get<T>(path: string): Promise<T> {
+  private async get<T>(path: string, check: (v: unknown) => v is T): Promise<T> {
     const url = `${this.base}/api${path}`
-    let res: Response
-    try { res = await this.fetchFn(url) } catch (e) { throw new NetworkError(`Blockbook request failed: ${url}`, { provider: this.base, cause: e }) }
+    const res = await fetchWithTimeout(this.fetchFn, url, undefined, this.timeoutMs, this.base)
     if (!res.ok) throw new NetworkError(`Blockbook request failed: ${res.status} ${res.statusText} (${url})`, { provider: this.base })
-    return res.json() as Promise<T>
+    let body: unknown
+    try { body = await res.json() } catch (e) { throw new NetworkError(`Blockbook returned non-JSON for ${url}`, { provider: this.base, cause: e }) }
+    if (!check(body)) throw new NetworkError(`Blockbook returned an unexpected shape for ${url}`, { provider: this.base })
+    return body
   }
 
   async getBalance(address: string) {
-    const data = await this.get<{ balance: string; unconfirmedBalance: string; transactions?: BlockbookAddressTx[] }>(`/v2/address/${address}?details=txs`)
+    const data = await this.get(`/v2/address/${address}?details=txs`, (v): v is { balance: string; unconfirmedBalance: string; transactions?: BlockbookAddressTx[] } =>
+      isRecord(v) && isIntString(v.balance) && isIntString(v.unconfirmedBalance) && (v.transactions === undefined || Array.isArray(v.transactions)))
     return { confirmed: BigInt(data.balance), unconfirmed: BigInt(data.unconfirmedBalance), unconfirmedOutgoing: unconfirmedOutgoing(data.transactions, address) }
   }
 
   async listUnspent(address: string): Promise<Utxo[]> {
-    const data = await this.get<Array<{ txid: string; vout: number; value: string; height?: number }>>(`/v2/utxo/${address}`)
+    const data = await this.get(`/v2/utxo/${address}`, (v): v is Array<{ txid: string; vout: number; value: string; height?: number }> =>
+      Array.isArray(v) && v.every((u) => isRecord(u) && typeof u.txid === 'string' && typeof u.vout === 'number' && isIntString(u.value)))
     return data.map((u) => ({ txid: u.txid, vout: u.vout, value: BigInt(u.value), height: u.height ?? -1 }))
   }
 
   async getHistory(address: string) {
     const items: Array<{ txid: string; height: number }> = []
     for (let page = 1; ; page++) {
-      const data = await this.get<{ transactions?: Array<{ txid: string; blockHeight: number }>; totalPages?: number }>(`/v2/address/${address}?details=txslight&pageSize=1000&page=${page}`)
+      const data = await this.get(`/v2/address/${address}?details=txslight&pageSize=1000&page=${page}`, (v): v is { transactions?: Array<{ txid: string; blockHeight: number }>; totalPages?: number } =>
+        isRecord(v) && (v.transactions === undefined || Array.isArray(v.transactions)))
       for (const tx of data.transactions ?? []) items.push({ txid: tx.txid, height: tx.blockHeight })
       if (page >= (data.totalPages ?? 1)) break
     }
     return items
   }
 
+  private static isTx(v: unknown): v is BlockbookTx {
+    return isRecord(v) && typeof v.txid === 'string' && typeof v.blockHeight === 'number' && typeof v.confirmations === 'number'
+  }
+
   async getTransactionInfo(txid: string): Promise<BlockbookTx | undefined> {
-    try { return await this.get<BlockbookTx>(`/v2/tx/${txid}`) } catch (e) {
+    try { return await this.get(`/v2/tx/${txid}`, BlockbookClient.isTx) } catch (e) {
       if (e instanceof NetworkError && /\b(400|404)\b/.test(e.message)) return undefined
       throw e
     }
   }
 
   async getTransaction(txid: string): Promise<string> {
-    const data = await this.get<BlockbookTx>(`/v2/tx/${txid}`)
-    if (!data.hex) throw new Error(`Transaction ${txid} has no hex data`)
+    const data = await this.get(`/v2/tx/${txid}`, BlockbookClient.isTx)
+    if (typeof data.hex !== 'string' || !data.hex) throw new NetworkError(`Transaction ${txid} has no hex data`, { provider: this.base })
     return data.hex
   }
 
   async broadcast(rawTx: string): Promise<string> {
-    const data = await this.get<{ result?: string; error?: { message?: string } | string }>(`/v2/sendtx/${rawTx}`)
+    const data = await this.get(`/v2/sendtx/${rawTx}`, (v): v is { result?: string; error?: { message?: string } | string } => isRecord(v))
     if (data.error) throw new Error(typeof data.error === 'string' ? data.error : data.error.message ?? 'broadcast failed')
-    if (!data.result) throw new Error('Blockbook returned no txid')
+    if (!data.result) throw new NetworkError('Blockbook returned no txid', { provider: this.base })
     return data.result
   }
 
   /** sat/vB. Blockbook reports BTC/kB (×1e5 → sat/vB); falls back to mempool.space when it has no estimate. */
   async estimateFee(blocks: number): Promise<number> {
     try {
-      const data = await this.get<{ result?: string } | string>(`/v1/estimatefee/${blocks}`)
+      const data = await this.get(`/v1/estimatefee/${blocks}`, (v): v is { result?: string } | string => typeof v === 'string' || isRecord(v))
       const rate = Number(typeof data === 'string' ? data : data.result)
       if (rate > 0) return Math.max(rate * 100_000, 1)
     } catch { /* fall through */ }
-    const res = await this.fetchFn(`${MEMPOOL_SPACE_URL}/api/v1/fees/recommended`)
+    const res = await fetchWithTimeout(this.fetchFn, `${MEMPOOL_SPACE_URL}/api/v1/fees/recommended`, undefined, this.timeoutMs, MEMPOOL_SPACE_URL)
     if (!res.ok) throw new NetworkError('Fee estimation request failed', { provider: MEMPOOL_SPACE_URL })
     const d = (await res.json()) as { fastestFee: number; halfHourFee: number; hourFee: number; economyFee: number }
     const satPerVb = blocks <= 1 ? d.fastestFee : blocks <= 3 ? d.halfHourFee : blocks <= 6 ? d.hourFee : d.economyFee
     if (!satPerVb || satPerVb <= 0) throw new NetworkError('Fee estimation is unavailable', { provider: MEMPOOL_SPACE_URL })
     return satPerVb
   }
-}
 
-const isClient = (c: unknown): c is BtcClient => typeof c === 'object' && c !== null && typeof (c as BtcClient).listUnspent === 'function'
-
-function toClient(c: BtcClientConfig | BtcClient, fetchFn: typeof fetch | undefined): BtcClient {
-  if (isClient(c)) return c
-  switch (c.type) {
-    case 'blockbook-http': return new BlockbookClient(c.clientConfig, fetchFn)
-    case 'electrum-ws': throw new NotImplementedError('electrum-ws transport (use blockbook-http in this version)')
-    default: throw new Error(`Unknown BTC client type: ${String((c as { type: string }).type)}`)
-  }
-}
-
-/** One client, or a failover client over the list: each call walks the list in order, `retries` extra rounds. */
-export function createClient(config: BtcConfig): BtcClient | undefined {
-  if (config.client === undefined) return undefined
-  const list = (Array.isArray(config.client) ? config.client : [config.client]).map((c) => toClient(c, config.fetch))
-  if (list.length === 0) return undefined
-  if (list.length === 1) return list[0]!
-  const attempts = list.length + (config.retries ?? 3)
-  const call = (method: keyof BtcClient) => async (...args: unknown[]) => {
-    let last: unknown
-    for (let i = 0; i < attempts; i++) {
-      const c = list[i % list.length]! as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>
-      try { return await c[method]!(...args) } catch (e) { last = e }
-    }
-    throw new NetworkError(`All BTC clients failed for ${method}`, { cause: last })
-  }
-  return {
-    connect: call('connect') as BtcClient['connect'], close: call('close') as BtcClient['close'],
-    getBalance: call('getBalance') as BtcClient['getBalance'], listUnspent: call('listUnspent') as BtcClient['listUnspent'],
-    getHistory: call('getHistory') as BtcClient['getHistory'], getTransaction: call('getTransaction') as BtcClient['getTransaction'],
-    getTransactionInfo: call('getTransactionInfo') as NonNullable<BtcClient['getTransactionInfo']>, broadcast: call('broadcast') as BtcClient['broadcast'],
-    estimateFee: call('estimateFee') as BtcClient['estimateFee'],
+  async getBlockHeight(): Promise<number> {
+    const data = await this.get('/v2', (v): v is { blockbook?: { bestHeight?: number } } => isRecord(v))
+    const h = data.blockbook?.bestHeight
+    if (typeof h !== 'number' || h <= 0) throw new NetworkError('Blockbook did not report a block height', { provider: this.base })
+    return h
   }
 }

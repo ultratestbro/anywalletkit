@@ -1,47 +1,51 @@
 import { InsufficientFundsError, NetworkError, type IWalletAccountReadOnly } from '@forgewallet/core'
-import { coinselect } from '@bitcoinerlab/coinselect'
-import { DescriptorsFactory } from '@bitcoinerlab/descriptors'
-import * as ecc from '@bitcoinerlab/secp256k1'
-import { address as btcAddress, initEccLib, networks, payments, type Network } from 'bitcoinjs-lib'
-import { createClient } from './blockbook.js'
+import type { BTC_NETWORK } from '@scure/btc-signer/utils.js'
+import { INPUT_WEIGHT, decodeAddress, dustLimit, kindOfType, outputVBytes, spendInfo, type ScriptKind } from './address.js'
+import { createClient } from './client.js'
+import { MAX_UTXO_INPUTS, selectAll, selectCoins, type CoinSelection } from './coinselect.js'
+import { DEFAULT_MAX_FEE_RATE } from './describe.js'
+import { UnsupportedAddressTypeError } from './errors.js'
 import { recoverMessagePublicKey } from './message.js'
-import { CAIP2_GENESIS, type BtcClient, type BtcConfig, type BtcNetwork, type BtcReceipt, type BtcSpend, type BtcTransferOptions, type Utxo } from './types.js'
+import { networkParams } from './network.js'
+import { CAIP2_GENESIS, type BtcAddressType, type BtcClient, type BtcConfig, type BtcMaxSpendableResult, type BtcNetwork, type BtcReceipt, type BtcSpend, type BtcTransferOptions } from './types.js'
 
-initEccLib(ecc)
-const { Output } = DescriptorsFactory(ecc)
+export { MAX_UTXO_INPUTS }
 
-/** Same constants so coin selection produces the same inputs, change and fee. */
-export const MIN_TX_FEE_SATS = 141n
-export const MAX_UTXO_INPUTS = 200
-export const DUST_LIMIT_P2WPKH = 294n
-
-export interface SpendPlan {
-  utxos: Array<Utxo & { scriptPubKey: Uint8Array }>
-  /** Fee the plan pays (sats). */
-  fee: bigint
-  /** Change back to the account, 0n when folded into the fee. */
-  changeValue: bigint
-  feeRate: bigint
+export interface SpendPlan extends CoinSelection {
+  /** Sats the recipient gets (the requested value — never reduced). */
+  amount: bigint
+  recipientScript: Uint8Array
+  recipientKind: ScriptKind
 }
 
 const toBig = (v: bigint | number | string): bigint => (typeof v === 'bigint' ? v : BigInt(Math.round(Number(v))))
 export const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
 
+/** Watch-only Bitcoin account: balances, quotes, receipts, BIP-137 verification. No key. */
 export class WalletAccountReadOnlyBtc implements IWalletAccountReadOnly {
   readonly address: string
   readonly chain: string
+  /** Output script of `address`. */
+  readonly scriptPubKey: Uint8Array
+  readonly scriptKind: ScriptKind
+  /** p2wpkh / p2tr when the address is one we know how to spend from; undefined for other script types. */
+  readonly addressType: BtcAddressType | undefined
+  readonly dustLimit: bigint
   protected readonly _config: BtcConfig
   protected readonly _client: BtcClient | undefined
-  protected readonly _network: Network
+  protected readonly _network: BTC_NETWORK
   protected readonly _networkName: BtcNetwork
-  readonly dustLimit = DUST_LIMIT_P2WPKH
 
   constructor(address: string, config: BtcConfig = {}) {
     this._config = config
     this._networkName = config.network ?? 'bitcoin'
-    this._network = networks[this._networkName]
-    btcAddress.toOutputScript(address, this._network) // validates
+    this._network = networkParams(this._networkName)
+    const decoded = decodeAddress(address, this._network)
     this.address = address
+    this.scriptPubKey = decoded.script
+    this.scriptKind = decoded.kind
+    this.addressType = decoded.kind === 'wpkh' ? 'p2wpkh' : decoded.kind === 'tr' ? 'p2tr' : undefined
+    this.dustLimit = dustLimit(decoded.kind)
     this.chain = CAIP2_GENESIS[this._networkName]
     this._client = createClient(config)
   }
@@ -49,6 +53,10 @@ export class WalletAccountReadOnlyBtc implements IWalletAccountReadOnly {
   protected requireClient(what: string): BtcClient {
     if (!this._client) throw new NetworkError(`The wallet must be connected to a client to ${what}.`)
     return this._client
+  }
+
+  get maxFeeRate(): number {
+    return this._config.maxFeeRate ?? DEFAULT_MAX_FEE_RATE
   }
 
   async getAddress(): Promise<string> { return this.address }
@@ -63,40 +71,42 @@ export class WalletAccountReadOnlyBtc implements IWalletAccountReadOnly {
     throw new Error("The 'getTokenBalance' method is not supported on the bitcoin blockchain.")
   }
 
-  protected async resolveFeeRate(spend: BtcSpend): Promise<bigint> {
-    if (spend.feeRate !== undefined) return toBig(spend.feeRate) < 1n ? 1n : toBig(spend.feeRate)
-    const est = await this.requireClient('estimate fees').estimateFee(spend.confirmationTarget ?? 1)
-    return toBig(Math.max(est, 1))
+  /** Weight one of OUR inputs adds; throws for address types we cannot spend from. */
+  protected inputWeight(): number {
+    if (!this.addressType) throw new UnsupportedAddressTypeError(`Cannot build spends from a ${this.scriptKind} address; only p2wpkh and p2tr accounts spend.`)
+    return INPUT_WEIGHT[this.addressType]
   }
 
-  /** Coin selection with the exact parameters (@bitcoinerlab/coinselect, addr() descriptors, remainder = self). */
+  protected async resolveFeeRate(spend: { feeRate?: bigint | number; confirmationTarget?: number }): Promise<bigint> {
+    if (spend.feeRate !== undefined) {
+      const r = toBig(spend.feeRate)
+      return r < 1n ? 1n : r
+    }
+    const est = await this.requireClient('estimate fees').estimateFee(spend.confirmationTarget ?? 1)
+    return BigInt(Math.max(Math.ceil(est), 1))
+  }
+
+  /** Coin selection for a spend (see coinselect.ts). Validates the recipient and the dust floor first. */
   protected async planSpend(spend: BtcSpend): Promise<SpendPlan> {
     const amount = toBig(spend.value)
+    const recipient = decodeAddress(spend.to, this._network)
+    const floor = dustLimit(recipient.kind)
+    if (amount < floor) throw new Error(`The amount must be at least the dust limit of the recipient's address type (${floor} sat).`)
+    const inputWeight = this.inputWeight()
     const feeRate = await this.resolveFeeRate(spend)
-    if (amount <= this.dustLimit) throw new Error(`The amount must be bigger than the dust limit (= ${this.dustLimit}).`)
-    btcAddress.toOutputScript(spend.to, this._network) // validate recipient early
-    const client = this.requireClient('plan a spend')
-    const scriptPubKey = btcAddress.toOutputScript(this.address, this._network)
-    const self = new Output({ descriptor: `addr(${this.address})`, network: this._network })
-    const target = new Output({ descriptor: `addr(${spend.to})`, network: this._network })
-    const unspent = await client.listUnspent(this.address)
-    const total = unspent.reduce((s, u) => s + u.value, 0n)
-    if (unspent.length === 0) throw new InsufficientFundsError(amount, 0n, 'BTC')
-    const result = coinselect({
-      utxos: unspent.map((u) => ({ output: self, value: u.value, ref: u })),
-      remainder: self,
-      targets: [{ output: target, value: amount }],
-      feeRate: Number(feeRate),
+    const utxos = await this.requireClient('plan a spend').listUnspent(this.address)
+    if (utxos.length === 0) throw new InsufficientFundsError(amount, 0n, 'BTC')
+    const own = kindOfType(this.addressType!)
+    const selection = selectCoins({
+      utxos,
+      targets: [{ value: amount, vbytes: outputVBytes(recipient.kind, recipient.script) }],
+      feeRate,
+      inputWeight,
+      changeVBytes: outputVBytes(own),
+      changeDust: dustLimit(own),
+      maxInputs: this._config.maxInputs ?? MAX_UTXO_INPUTS,
     })
-    if (!result) throw new InsufficientFundsError(amount, total, 'BTC')
-    if (result.utxos.length > MAX_UTXO_INPUTS) throw new Error('Exceeded maximum allowed inputs for transaction.')
-    const fee = result.fee > MIN_TX_FEE_SATS ? result.fee : MIN_TX_FEE_SATS
-    const utxos = (result.utxos as unknown as Array<{ ref: Utxo }>).map(({ ref }) => ({ ...ref, scriptPubKey }))
-    const selected = utxos.reduce((s, u) => s + u.value, 0n)
-    const changeValue = selected - fee - amount
-    if (changeValue < 0n) throw new InsufficientFundsError(amount + fee, selected, 'BTC')
-    if (changeValue <= this.dustLimit) return { utxos, fee: fee + changeValue, changeValue: 0n, feeRate }
-    return { utxos, fee, changeValue, feeRate }
+    return { ...selection, amount, recipientScript: recipient.script, recipientKind: recipient.kind }
   }
 
   async quoteSendTransaction(tx: BtcSpend): Promise<{ fee: bigint }> {
@@ -107,6 +117,17 @@ export class WalletAccountReadOnlyBtc implements IWalletAccountReadOnly {
   async quoteTransfer(o: BtcTransferOptions): Promise<{ fee: bigint }> {
     if (o.token) throw new Error('Tokens are not supported on the bitcoin blockchain.')
     return this.quoteSendTransaction({ to: o.recipient, value: o.amount })
+  }
+
+  /** Everything spendable in ONE transaction to a single output of our own address type, no change. */
+  async getMaxSpendable(opts: { feeRate?: bigint | number; confirmationTarget?: number; to?: string } = {}): Promise<BtcMaxSpendableResult> {
+    const inputWeight = this.inputWeight()
+    const feeRate = await this.resolveFeeRate(opts)
+    const utxos = await this.requireClient('plan a spend').listUnspent(this.address)
+    const outKind = opts.to ? decodeAddress(opts.to, this._network).kind : kindOfType(this.addressType!)
+    const sweep = selectAll({ utxos, feeRate, inputWeight, outputVBytes: outputVBytes(outKind), maxInputs: this._config.maxInputs ?? MAX_UTXO_INPUTS })
+    const amount = sweep.amount >= dustLimit(outKind) ? sweep.amount : 0n
+    return { amount, fee: amount > 0n ? sweep.fee : 0n, changeValue: 0n, inputs: amount > 0n ? sweep.utxos.length : 0, feeRate }
   }
 
   /** Undefined until the transaction is mined. */
@@ -121,10 +142,17 @@ export class WalletAccountReadOnlyBtc implements IWalletAccountReadOnly {
     }
   }
 
-  /** BIP-137: recover the key and compare its p2wpkh address with ours. */
+  /** BIP-137: recover the key and compare its p2wpkh address with ours. Taproot addresses have no BIP-137 form. */
   async verify(message: string | Uint8Array, signature: string): Promise<boolean> {
+    if (this.addressType === 'p2tr') throw new UnsupportedAddressTypeError('BIP-137 message signatures do not exist for taproot addresses (BIP-322 is not implemented).')
     const rec = recoverMessagePublicKey(message, signature)
-    if (!rec) return false
-    try { return payments.p2wpkh({ pubkey: rec.publicKey, network: this._network }).address === this.address } catch { return false }
+    if (!rec || rec.publicKey.length !== 33) return false
+    try { return spendInfo(rec.publicKey, this._network, 'p2wpkh').address === this.address } catch { return false }
+  }
+
+  /** Chain tip for anti-fee-sniping; undefined when disabled or the transport cannot tell. */
+  protected async lockTimeHeight(): Promise<number> {
+    if (this._config.antiFeeSniping === false || !this._client?.getBlockHeight) return 0
+    try { return await this._client.getBlockHeight() } catch { return 0 }
   }
 }

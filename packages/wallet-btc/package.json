@@ -1,7 +1,7 @@
 {
   "name": "@forgewallet/wallet-btc",
   "version": "0.0.1",
-  "description": "Bitcoin wallet for the forgewallet SDK: BIP-84 p2wpkh m/84'/0'/0'/0/i accounts, coin selection, PSBT signing, Blockbook HTTP client.",
+  "description": "Bitcoin wallet for the forgewallet SDK on @scure/btc-signer: BIP-84 p2wpkh and BIP-86 taproot accounts, own coin selection, RBF, Blockbook/Esplora transports.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -30,20 +30,18 @@
     "wallet",
     "bitcoin",
     "bip84",
-    "p2wpkh",
+    "bip86",
+    "taproot",
     "psbt",
-    "blockbook"
+    "blockbook",
+    "esplora"
   ],
   "dependencies": {
-    "@bitcoinerlab/coinselect": "^2.0.1",
-    "@bitcoinerlab/descriptors": "^3.2.0",
-    "@bitcoinerlab/secp256k1": "^2.0.0",
     "@forgewallet/core": "workspace:*",
+    "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@scure/base": "^2.4.0",
-    "@scure/btc-signer": "^2.4.1",
-    "bitcoinjs-lib": "^7.0.2",
-    "buffer": "^6.0.3"
+    "@scure/btc-signer": "^2.4.1"
   },
   "devDependencies": {
     "@forgewallet/conformance": "workspace:*",

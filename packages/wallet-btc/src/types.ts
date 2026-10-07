@@ -1,5 +1,8 @@
 export type BtcNetwork = 'bitcoin' | 'testnet' | 'regtest'
 
+/** Address / script type the account spends from. BIP-84 p2wpkh (bc1q…) or BIP-86 p2tr (bc1p…). */
+export type BtcAddressType = 'p2wpkh' | 'p2tr'
+
 /** Minimal chain-data client every transport implements. Values in satoshis, fee rates in sat/vB. */
 export interface BtcClient {
   connect(): Promise<void>
@@ -9,12 +12,14 @@ export interface BtcClient {
   getHistory(address: string): Promise<Array<{ txid: string; height: number }>>
   /** Raw transaction hex. */
   getTransaction(txid: string): Promise<string>
-  /** Full Blockbook-style tx record (used for receipts). */
+  /** Full tx record (used for receipts). */
   getTransactionInfo?(txid: string): Promise<BlockbookTx | undefined>
   /** Broadcast raw hex; returns the txid. */
   broadcast(rawTx: string): Promise<string>
   /** Fee rate in sat/vB for confirmation within `blocks`. */
   estimateFee(blocks: number): Promise<number>
+  /** Current chain tip height (anti-fee-sniping locktime). Optional. */
+  getBlockHeight?(): Promise<number>
 }
 
 export interface Utxo {
@@ -27,20 +32,33 @@ export interface Utxo {
 }
 
 export type BtcClientConfig =
+  /** Trezor Blockbook REST (`https://btc1.trezor.io`, QuickNode's Blockbook add-on, …). */
   | { type: 'blockbook-http'; clientConfig: { url: string } }
-  /** Reserved: the Electrum-over-WebSocket transport is not implemented in this version. */
-  | { type: 'electrum-ws'; clientConfig: { url: string } }
+  /** Esplora REST (`https://mempool.space/api`, `https://blockstream.info/api`). */
+  | { type: 'esplora-http'; clientConfig: { url: string } }
 
 export interface BtcConfig {
   /** One or more transports (config objects or ready `BtcClient`s). A list fails over in order. Omit for an offline (sign-only) wallet. */
   client?: BtcClientConfig | BtcClient | Array<BtcClientConfig | BtcClient>
   network?: BtcNetwork
+  /** p2wpkh (BIP-84, default) or p2tr (BIP-86 taproot). Changes the derivation path and the address. */
+  addressType?: BtcAddressType
   /** Extra attempts across the client list after the first failure (default 3). */
   retries?: number
+  /** Per-request timeout in ms (default 15000). */
+  timeoutMs?: number
   /** Max fee (sats) for `transfer`. */
   transferMaxFee?: bigint | number
   /** Max fee (sats) for `sendTransaction` / `signTransaction`. */
   transactionMaxFee?: bigint | number
+  /** Fee-rate ceiling in sat/vB (default 500). Anything above is refused before signing or broadcast. */
+  maxFeeRate?: number
+  /** Coin-selection input cap (default 200). */
+  maxInputs?: number
+  /** Opt-in to replace-by-fee signalling (default true). */
+  rbf?: boolean
+  /** Set nLockTime to the current height so the tx cannot be mined into a reorg (default true; skipped when the transport has no `getBlockHeight`). */
+  antiFeeSniping?: boolean
   /** Injectable fetch (tests, custom agents). Defaults to globalThis.fetch. */
   fetch?: typeof fetch
 }
@@ -51,6 +69,8 @@ export interface BtcSpend {
   value: bigint | number | string
   feeRate?: bigint | number
   confirmationTarget?: number
+  /** Override the account-level `rbf` default for this spend. */
+  rbf?: boolean
 }
 
 /** `sendTransaction` accepts a spend or an already signed raw transaction hex. */
@@ -74,7 +94,7 @@ export interface BtcReceipt {
   hex?: string
 }
 
-/** Subset of Blockbook's /api/v2/tx record. */
+/** Transport-neutral tx record (Blockbook's /api/v2/tx shape; Esplora is mapped onto it). */
 export interface BlockbookTx {
   txid: string
   blockHeight: number
@@ -82,6 +102,58 @@ export interface BlockbookTx {
   fees?: string
   hex?: string
   blockTime?: number
+}
+
+export interface BtcMaxSpendableResult {
+  /** Max sats one transaction can send after the fee. 0n when nothing is spendable. */
+  amount: bigint
+  fee: bigint
+  /** Always 0n: a sweep leaves no change. */
+  changeValue: bigint
+  /** Inputs the sweep would consume. */
+  inputs: number
+  feeRate: bigint
+}
+
+export type BtcWarning =
+  /** Fee rate above `maxFeeRate` (also a hard error before signing/broadcast). */
+  | 'high-fee-rate'
+  /** Fee exceeds 10 % of the amount sent. */
+  | 'fee-over-10pct-of-amount'
+  /** An output is below its dust threshold. */
+  | 'dust-output'
+  /** Change was below dust and folded into the fee. */
+  | 'no-change'
+
+export interface BtcTxInputDescription {
+  txid: string
+  vout: number
+  value: bigint
+}
+
+export interface BtcTxOutputDescription {
+  /** Undefined for scripts without an address form. */
+  address: string | undefined
+  value: bigint
+  role: 'recipient' | 'change' | 'unknown'
+}
+
+/** "What you sign": the fully resolved transaction before (or after) signing. */
+export interface BtcTxDescription {
+  kind: 'btc-transfer'
+  inputs: BtcTxInputDescription[]
+  outputs: BtcTxOutputDescription[]
+  /** Sats sent to non-change outputs. */
+  amount: bigint
+  fee: bigint
+  /** sat/vB, rounded to 2 decimals. */
+  feeRate: number
+  vsize: number
+  rbf: boolean
+  lockTime: number
+  /** Present once the transaction is signed. */
+  txid?: string
+  warnings: BtcWarning[]
 }
 
 export const CAIP2_GENESIS: Record<BtcNetwork, string> = {

@@ -1,12 +1,14 @@
 import { WalletManager, deriveSecp256k1, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
 import { WalletAccountBtc } from './account.js'
+import { coinType, purposeFor } from './network.js'
 import { WalletAccountReadOnlyBtc } from './read-only-account.js'
 import type { BtcConfig } from './types.js'
 
 /**
- * One seed → BIP-84 p2wpkh accounts at m/84'/0'/0'/0/i (mainnet) or m/84'/1'/0'/0/i
- * (testnet/regtest). Paths may be given relative to m/84'/coin'
- * ("0'/0/i"), or in full.
+ * One seed → Bitcoin accounts.
+ *   p2wpkh (default): BIP-84, m/84'/0'/0'/0/i on mainnet, m/84'/1'/0'/0/i on test networks — bc1q… / tb1q…
+ *   p2tr:             BIP-86, m/86'/0'/0'/0/i (key-path taproot) — bc1p… / tb1p…
+ * Paths may be relative to the purpose/coin prefix ("0'/0/i") or given in full.
  */
 export class WalletManagerBtc extends WalletManager<WalletAccountBtc, BtcConfig> {
   private _seedBytes: Uint8Array | undefined
@@ -17,7 +19,7 @@ export class WalletManagerBtc extends WalletManager<WalletAccountBtc, BtcConfig>
   }
 
   get basePath(): string {
-    return `m/84'/${(this._config.network ?? 'bitcoin') === 'bitcoin' ? 0 : 1}'`
+    return `m/${purposeFor(this._config.addressType ?? 'p2wpkh')}'/${coinType(this._config.network ?? 'bitcoin')}'`
   }
 
   async getAccount(index = 0): Promise<WalletAccountBtc> {
@@ -47,7 +49,7 @@ export class WalletManagerBtc extends WalletManager<WalletAccountBtc, BtcConfig>
     )
     const client = (probe as unknown as { requireClient(w: string): { estimateFee(b: number): Promise<number> } }).requireClient('get fee rates')
     const [fast, normal, slow] = await Promise.all([1, 3, 6].map((b) => client.estimateFee(b)))
-    const big = (n: number) => BigInt(Math.max(Math.round(n), 1))
+    const big = (n: number) => BigInt(Math.max(Math.ceil(n), 1))
     return { slow: big(slow!), normal: big(normal!), fast: big(fast!) }
   }
 
