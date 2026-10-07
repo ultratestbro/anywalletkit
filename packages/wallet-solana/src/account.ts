@@ -1,8 +1,8 @@
 import { SignerError, zeroize, type IWalletAccount, type IWalletAccountReadOnly, type TransferResult } from '@forgewallet/core'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { compileTransaction, getAddressDecoder, getBase64EncodedWireTransaction, type SignatureBytes, type Transaction, type TransactionMessage } from '@solana/kit'
-import { WalletAccountReadOnlySolana, isSignedTransaction } from './read-only-account.js'
-import type { SolanaConfig, SolanaTransaction, SolanaTransferOptions } from './types.js'
+import { WalletAccountReadOnlySolana, type SolanaPlan } from './read-only-account.js'
+import type { SolanaConfig, SolanaFeeQuote, SolanaTransaction, SolanaTransferOptions } from './types.js'
 
 const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
 
@@ -10,10 +10,19 @@ export function addressFromPublicKey(publicKey: Uint8Array): string {
   return getAddressDecoder().decode(publicKey)
 }
 
+/** `TransferResult` plus the full fee breakdown. */
+export interface SolanaSendResult extends TransferResult {
+  quote: SolanaFeeQuote
+}
+
 /**
  * Signing Solana account. Signatures come from noble ed25519 over the compiled
- * message bytes — no WebCrypto, so it runs unchanged in Node, browsers and Hermes.
- * The key is a Uint8Array zeroized by `dispose()`.
+ * message bytes — no WebCrypto, so it runs unchanged in Node and Hermes. The
+ * key is a Uint8Array zeroized by `dispose()`.
+ *
+ * Every broadcast goes through the same plan: hard checks (fee payer, burn
+ * address, missing co-signers) → compute budget → simulation → fee guard →
+ * sign → send. A failing step throws before the key is used.
  */
 export class WalletAccountSolana extends WalletAccountReadOnlySolana implements IWalletAccount {
   /** Blockhash and fee come from the network before signing. */
@@ -47,54 +56,59 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     return toHex(ed25519.sign(bytes, this.key()))
   }
 
-  /** Compile and sign a message; returns the kit `Transaction` (for callers that want to inspect or co-sign). */
-  async signTransactionMessage(msg: TransactionMessage): Promise<Transaction> {
-    const compiled = compileTransaction(msg as never) as Transaction
-    const sig = ed25519.sign(compiled.messageBytes as unknown as Uint8Array, this.key()) as unknown as SignatureBytes
-    return { ...compiled, signatures: Object.freeze({ ...compiled.signatures, [this.address]: sig }) } as Transaction
+  /** Add this wallet's signature to a compiled transaction (other signatures are preserved). */
+  signCompiled(tx: Transaction): Transaction {
+    const sig = ed25519.sign(tx.messageBytes as unknown as Uint8Array, this.key()) as unknown as SignatureBytes
+    return { ...tx, signatures: Object.freeze({ ...tx.signatures, [this.address]: sig }) } as Transaction
   }
 
-  private async maxFeeCheck(fee: bigint, limit: bigint | number | undefined, op: string) {
+  /** Compile and sign a message; returns the kit `Transaction` (for callers that want to inspect or co-sign). */
+  async signTransactionMessage(msg: TransactionMessage): Promise<Transaction> {
+    return this.signCompiled(compileTransaction(msg as never) as Transaction)
+  }
+
+  private maxFeeCheck(fee: bigint, limit: bigint | number | undefined, op: string) {
     if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation.`)
   }
 
-  /** Sign without broadcasting. Returns the base64 wire transaction. */
+  private signPlan(plan: SolanaPlan): Transaction {
+    if (plan.transaction) {
+      const mine = plan.transaction.signatures[this.address]
+      const alreadySigned = mine !== null && mine !== undefined && (mine as Uint8Array).some((b) => b !== 0)
+      return alreadySigned ? plan.transaction : this.signCompiled(plan.transaction)
+    }
+    return this.signCompiled(compileTransaction(plan.message as never) as Transaction)
+  }
+
+  /** Sign without broadcasting. Returns the base64 wire transaction. Simulation still runs (a reverting tx is refused). */
   async signTransaction(tx: SolanaTransaction): Promise<string> {
     this.key()
-    if (isSignedTransaction(tx)) return getBase64EncodedWireTransaction(tx)
-    const msg = await this.prepareMessage(tx)
-    if (this._config.transactionMaxFee !== undefined) await this.maxFeeCheck(await this.feeForMessage(msg), this._config.transactionMaxFee, 'transaction')
-    return getBase64EncodedWireTransaction(await this.signTransactionMessage(msg))
+    const plan = await this.plan(tx)
+    this.maxFeeCheck(plan.quote.fee, this._config.transactionMaxFee, 'transaction')
+    return getBase64EncodedWireTransaction(this.signPlan(plan))
   }
 
   private async broadcast(wire: string): Promise<string> {
     return this.requireRpc('send transactions').sendTransaction(wire as never, { encoding: 'base64', preflightCommitment: this._commitment }).send()
   }
 
-  async sendTransaction(tx: SolanaTransaction): Promise<TransferResult> {
+  async sendTransaction(tx: SolanaTransaction): Promise<SolanaSendResult> {
     this.key()
     this.requireRpc('send transactions')
-    if (isSignedTransaction(tx)) {
-      const { fee } = await this.quoteSendTransaction(tx)
-      await this.maxFeeCheck(fee, this._config.transactionMaxFee, 'transaction')
-      return { hash: await this.broadcast(getBase64EncodedWireTransaction(tx)), fee }
-    }
-    const msg = await this.prepareMessage(tx)
-    const fee = await this.feeForMessage(msg)
-    await this.maxFeeCheck(fee, this._config.transactionMaxFee, 'transaction')
-    const hash = await this.broadcast(getBase64EncodedWireTransaction(await this.signTransactionMessage(msg)))
-    return { hash, fee }
+    const plan = await this.plan(tx)
+    this.maxFeeCheck(plan.quote.fee, this._config.transactionMaxFee, 'transaction')
+    const hash = await this.broadcast(getBase64EncodedWireTransaction(this.signPlan(plan)))
+    return { hash, fee: plan.quote.fee, quote: plan.quote }
   }
 
-  /** SOL (no `token`) or SPL transfer; the recipient's ATA is created when missing. */
-  async transfer(o: SolanaTransferOptions): Promise<TransferResult> {
+  /** SOL (no `token`), SPL or Token-2022 transfer; the recipient's ATA is created when missing. */
+  async transfer(o: SolanaTransferOptions): Promise<SolanaSendResult> {
     this.key()
     this.requireRpc('transfer tokens')
-    const msg = o.token ? await this.buildSplTransfer(o.token, o.recipient, o.amount) : await this.buildNativeTransfer(o.recipient, o.amount)
-    const fee = await this.feeForMessage(msg)
-    await this.maxFeeCheck(fee, this._config.transferMaxFee, 'transfer')
-    const hash = await this.broadcast(getBase64EncodedWireTransaction(await this.signTransactionMessage(msg)))
-    return { hash, fee }
+    const plan = await this.planTransfer(o)
+    this.maxFeeCheck(plan.quote.fee, this._config.transferMaxFee, 'transfer')
+    const hash = await this.broadcast(getBase64EncodedWireTransaction(this.signPlan(plan)))
+    return { hash, fee: plan.quote.fee, quote: plan.quote }
   }
 
   toReadOnlyAccount(): IWalletAccountReadOnly {

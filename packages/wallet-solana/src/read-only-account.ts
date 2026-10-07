@@ -1,27 +1,76 @@
 import { NetworkError, type IWalletAccountReadOnly } from '@forgewallet/core'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import {
-  address, appendTransactionMessageInstructions, compileTransactionMessage, createNoopSigner, createTransactionMessage,
-  getAddressEncoder, getBase64Decoder, getBase64Encoder, getCompiledTransactionMessageEncoder,
-  isSignature, isTransactionMessageWithBlockhashLifetime, isTransactionMessageWithDurableNonceLifetime,
-  pipe, setTransactionMessageFeePayer, setTransactionMessageLifetimeUsingBlockhash,
-  type Address, type Instruction, type Transaction, type TransactionMessage,
+  address, appendTransactionMessageInstructions, compileTransaction, compileTransactionMessage, compressTransactionMessageUsingAddressLookupTables,
+  createNoopSigner, createTransactionMessage, fetchAddressesForLookupTables, getAddressEncoder, getBase64Decoder, getBase64EncodedWireTransaction,
+  getBase64Encoder, getCompiledTransactionMessageDecoder, getCompiledTransactionMessageEncoder, getTransactionMessageComputeUnitLimit,
+  getTransactionMessageComputeUnitPrice, isSignature, isSignerRole, isTransactionMessageWithBlockhashLifetime, isTransactionMessageWithDurableNonceLifetime,
+  isWritableRole, pipe, setTransactionMessageComputeUnitLimit, setTransactionMessageComputeUnitPrice, setTransactionMessageFeePayer,
+  setTransactionMessageLifetimeUsingBlockhash, type Address, type Instruction, type Transaction, type TransactionMessage,
 } from '@solana/kit'
 import { getTransferSolInstruction } from '@solana-program/system'
-import { findAssociatedTokenPda, getCreateAssociatedTokenIdempotentInstruction, getTransferInstruction, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token'
+import { TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, getCreateAssociatedTokenIdempotentInstruction, getTransferCheckedInstruction } from '@solana-program/token'
+import {
+  TOKEN_2022_PROGRAM_ADDRESS, getMintDecoder, getTransferCheckedInstruction as getTransferChecked2022Instruction, getTransferCheckedWithFeeInstruction,
+} from '@solana-program/token-2022'
+import { MAX_U64, ZERO_ADDRESS, decodeWireTransaction, describeTransaction } from './describe.js'
+import { MissingSignersError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { isNativeTransfer, isSignedTransaction, isTransactionMessage } from './guards.js'
 import { createRpc } from './rpc.js'
-import { CAIP2_GENESIS, type SolanaConfig, type SolanaReceipt, type SolanaRpc, type SolanaTransaction, type SolanaTransferOptions } from './types.js'
+import {
+  CAIP2_GENESIS, type SimulationResult, type SolanaConfig, type SolanaFeeQuote, type SolanaReceipt, type SolanaRpc, type SolanaTransaction,
+  type SolanaTransferOptions, type TransactionDescription,
+} from './types.js'
 
-const MAX_U64 = 0xffffffffffffffffn
+export { isNativeTransfer, isSignedTransaction, isTransactionMessage } from './guards.js'
+
+const LAMPORTS_PER_SIGNATURE = 5_000n
+const DEFAULT_MAX_PRIORITY = 5_000_000n
+const CU_LIMIT_FOR_SIMULATION = 1_400_000
+const CU_MIN = 1_000
+const CU_MAX = 1_400_000
+const CU_DEFAULT_PER_INSTRUCTION = 200_000
 const utf8 = (s: string) => new TextEncoder().encode(s)
 const hexToBytes = (h: string) => Uint8Array.from(h.replace(/^0x/, '').match(/.{2}/g) ?? [], (b) => parseInt(b, 16))
+const ceilDiv = (a: bigint, b: bigint) => (a + b - 1n) / b
 
-export const isSignedTransaction = (tx: unknown): tx is Transaction =>
-  typeof tx === 'object' && tx !== null && 'messageBytes' in tx && 'signatures' in tx
-export const isNativeTransfer = (tx: unknown): tx is { to: string; value: bigint | number | string } =>
-  typeof tx === 'object' && tx !== null && 'to' in tx && 'value' in tx
-export const isTransactionMessage = (tx: unknown): tx is TransactionMessage =>
-  typeof tx === 'object' && tx !== null && Array.isArray((tx as TransactionMessage).instructions)
+/** Mint facts a token transfer needs; one `getAccountInfo` + (for fee mints) one `getEpochInfo`. */
+export interface MintInfo {
+  program: Address
+  decimals: number
+  /** Token-2022 TransferFee extension, resolved for the current epoch; undefined for plain mints. */
+  transferFee?: { basisPoints: number; maximumFee: bigint }
+}
+
+/** A fully prepared transaction: what to sign, what it costs, what the simulation said and what it does. */
+export interface SolanaPlan {
+  /** Message-based inputs (transfers, messages): the final message with compute-budget instructions. */
+  message?: TransactionMessage
+  /** Compiled inputs (kit `Transaction` / base64 wire): the transaction as given. */
+  transaction?: Transaction
+  quote: SolanaFeeQuote
+  simulation: SimulationResult | undefined
+  description: TransactionDescription
+}
+
+/** `getRecentPrioritizationFees` percentile (75th) over the given accounts, clamped to the configured range. */
+export function pickPriorityPrice(fees: ReadonlyArray<bigint | number>, min: bigint, max: bigint): bigint {
+  const sorted = fees.map(BigInt).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+  let price = 0n
+  if (sorted.length) {
+    const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.75))
+    price = sorted[idx]!
+  }
+  if (price < min) price = min
+  if (price > max) price = max
+  return price
+}
+
+/** Compute-unit limit from a simulation: ×1.1, clamped. */
+export function computeUnitLimitFromSimulation(unitsConsumed: bigint): number {
+  const padded = Number((unitsConsumed * 11n + 9n) / 10n)
+  return Math.min(CU_MAX, Math.max(CU_MIN, padded))
+}
 
 export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
   readonly address: Address
@@ -51,21 +100,55 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return value
   }
 
-  protected async ata(mint: Address, owner: Address): Promise<Address> {
-    const [ata] = await findAssociatedTokenPda({ mint, owner, tokenProgram: TOKEN_PROGRAM_ADDRESS })
+  // ── Mints and token accounts ────────────────────────────────────────────────
+
+  /** Mint owner program, decimals and (Token-2022) the transfer fee in force this epoch. */
+  async getMintInfo(mint: string): Promise<MintInfo> {
+    const rpc = this.requireRpc('read mints')
+    const info = await rpc.getAccountInfo(address(mint), { commitment: this._commitment, encoding: 'base64' }).send()
+    if (!info.value) throw new Error(`Mint ${mint} does not exist on this network.`)
+    const program = info.value.owner
+    const bytes = getBase64Encoder().encode(info.value.data[0]) as Uint8Array
+    if (program !== TOKEN_PROGRAM_ADDRESS && program !== TOKEN_2022_PROGRAM_ADDRESS) throw new Error(`${mint} is not a token mint (owner ${program}).`)
+    if (bytes.length < 45) throw new Error(`${mint} is not a token mint (account too small).`)
+    const out: MintInfo = { program, decimals: bytes[44]! }
+    if (program === TOKEN_2022_PROGRAM_ADDRESS) {
+      const decoded = getMintDecoder().decode(bytes)
+      const exts = decoded.extensions.__option === 'Some' ? decoded.extensions.value : []
+      const feeCfg = exts.find((e) => e.__kind === 'TransferFeeConfig')
+      if (feeCfg && feeCfg.__kind === 'TransferFeeConfig') {
+        const { epoch } = await rpc.getEpochInfo({ commitment: this._commitment }).send()
+        const fee = epoch >= feeCfg.newerTransferFee.epoch ? feeCfg.newerTransferFee : feeCfg.olderTransferFee
+        if (fee.transferFeeBasisPoints > 0) out.transferFee = { basisPoints: fee.transferFeeBasisPoints, maximumFee: fee.maximumFee }
+      }
+    }
+    return out
+  }
+
+  /** Token-2022 transfer fee for `amount` under `info` (0 for plain mints). */
+  static transferFeeFor(info: MintInfo, amount: bigint): bigint {
+    if (!info.transferFee) return 0n
+    const raw = ceilDiv(amount * BigInt(info.transferFee.basisPoints), 10_000n)
+    return raw > info.transferFee.maximumFee ? info.transferFee.maximumFee : raw
+  }
+
+  protected async ata(mint: Address, owner: Address, tokenProgram: Address = TOKEN_PROGRAM_ADDRESS): Promise<Address> {
+    const [ata] = await findAssociatedTokenPda({ mint, owner, tokenProgram })
     return ata
   }
 
   async getTokenBalance(token: string): Promise<bigint> {
     const rpc = this.requireRpc('retrieve token balances')
-    const ata = await this.ata(address(token), this.address)
+    const mint = address(token)
+    const { program } = await this.getMintInfo(token).catch(() => ({ program: TOKEN_PROGRAM_ADDRESS }))
+    const ata = await this.ata(mint, this.address, program)
     const info = await rpc.getAccountInfo(ata, { commitment: this._commitment, encoding: 'base64' }).send()
     if (!info.value) return 0n
     const bal = await rpc.getTokenAccountBalance(ata, { commitment: this._commitment }).send()
     return BigInt(bal.value.amount)
   }
 
-  /** Batched over getMultipleAccounts (100 per call); amount read from the SPL account layout at offset 64. */
+  /** Batched over getMultipleAccounts (100 per call); amount read from the token-account layout at offset 64. Legacy-program ATAs. */
   async getTokenBalances(tokens: string[]): Promise<Record<string, bigint>> {
     const rpc = this.requireRpc('retrieve token balances')
     const unique = [...new Set(tokens)]
@@ -84,33 +167,14 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return out
   }
 
+  // ── Message construction ────────────────────────────────────────────────────
+
   protected async latestBlockhash() {
     const { value } = await this.requireRpc('fetch a blockhash').getLatestBlockhash({ commitment: this._commitment }).send()
     return value
   }
 
-  protected async buildNativeTransfer(to: string, value: bigint | number | string): Promise<TransactionMessage> {
-    const bh = await this.latestBlockhash()
-    const ix = getTransferSolInstruction({ source: createNoopSigner(this.address), destination: address(to), amount: BigInt(value) })
-    return pipe(
-      createTransactionMessage({ version: 0 }),
-      (m) => setTransactionMessageFeePayer(this.address, m),
-      (m) => setTransactionMessageLifetimeUsingBlockhash(bh, m),
-      (m) => appendTransactionMessageInstructions([ix], m),
-    ) as TransactionMessage
-  }
-
-  protected async buildSplTransfer(token: string, recipient: string, amount: bigint | number | string): Promise<TransactionMessage> {
-    const amt = BigInt(amount)
-    if (amt > MAX_U64) throw new Error('Amount exceeds u64 maximum value')
-    const rpc = this.requireRpc('transfer tokens')
-    const mint = address(token)
-    const to = address(recipient)
-    const [fromAta, toAta] = await Promise.all([this.ata(mint, this.address), this.ata(mint, to)])
-    const instructions: Instruction[] = []
-    const toInfo = await rpc.getAccountInfo(toAta, { commitment: this._commitment, encoding: 'base64' }).send()
-    if (!toInfo.value) instructions.push(getCreateAssociatedTokenIdempotentInstruction({ ata: toAta, mint, owner: to, payer: createNoopSigner(this.address) }))
-    instructions.push(getTransferInstruction({ source: fromAta, destination: toAta, authority: createNoopSigner(this.address), amount: amt }))
+  private async newMessage(instructions: Instruction[]): Promise<TransactionMessage> {
     const bh = await this.latestBlockhash()
     return pipe(
       createTransactionMessage({ version: 0 }),
@@ -118,6 +182,34 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       (m) => setTransactionMessageLifetimeUsingBlockhash(bh, m),
       (m) => appendTransactionMessageInstructions(instructions, m),
     ) as TransactionMessage
+  }
+
+  protected async buildNativeTransfer(to: string, value: bigint | number | string): Promise<TransactionMessage> {
+    const ix = getTransferSolInstruction({ source: createNoopSigner(this.address), destination: address(to), amount: BigInt(value) })
+    return this.newMessage([ix])
+  }
+
+  /** SPL / Token-2022 transfer via `transferChecked` (mint + decimals verified on chain); the recipient ATA is created when missing. */
+  protected async buildTokenTransfer(token: string, recipient: string, amount: bigint | number | string): Promise<{ message: TransactionMessage; tokenFee: bigint }> {
+    const amt = BigInt(amount)
+    if (amt > MAX_U64) throw new Error('Amount exceeds u64 maximum value')
+    const rpc = this.requireRpc('transfer tokens')
+    const mint = address(token)
+    const to = address(recipient)
+    const info = await this.getMintInfo(token)
+    const [fromAta, toAta] = await Promise.all([this.ata(mint, this.address, info.program), this.ata(mint, to, info.program)])
+    const instructions: Instruction[] = []
+    const toInfo = await rpc.getAccountInfo(toAta, { commitment: this._commitment, encoding: 'base64' }).send()
+    const payer = createNoopSigner(this.address)
+    if (!toInfo.value) instructions.push(getCreateAssociatedTokenIdempotentInstruction({ ata: toAta, mint, owner: to, payer, tokenProgram: info.program }))
+    const tokenFee = WalletAccountReadOnlySolana.transferFeeFor(info, amt)
+    const base = { source: fromAta, mint, destination: toAta, authority: payer, amount: amt, decimals: info.decimals }
+    if (info.program === TOKEN_2022_PROGRAM_ADDRESS) {
+      instructions.push(info.transferFee ? getTransferCheckedWithFeeInstruction({ ...base, fee: tokenFee }) : getTransferChecked2022Instruction(base))
+    } else {
+      instructions.push(getTransferCheckedInstruction(base))
+    }
+    return { message: await this.newMessage(instructions), tokenFee }
   }
 
   /** Normalise `{to, value}` or a kit message into a message with lifetime + this account as fee payer. */
@@ -131,11 +223,168 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     }
     const payer = (msg as { feePayer?: Address | { address: Address } }).feePayer
     const payerAddress = typeof payer === 'string' ? payer : payer?.address
-    if (payerAddress !== undefined && payerAddress !== this.address) {
-      throw new Error(`Transaction fee payer (${payerAddress}) does not match wallet address (${this.address})`)
+    if (payerAddress !== undefined && payerAddress !== this.address && !this._config.allowForeignFeePayer) {
+      throw new UnsafeTransactionError(`Transaction fee payer (${payerAddress}) does not match wallet address (${this.address}).`)
     }
-    return setTransactionMessageFeePayer(this.address, msg as never) as TransactionMessage
+    return payerAddress === undefined ? (setTransactionMessageFeePayer(this.address, msg as never) as TransactionMessage) : msg
   }
+
+  /** Compress a v0 message with the given address lookup tables (fetched from the RPC). */
+  protected async withLookupTables(msg: TransactionMessage, tables: string[] | undefined): Promise<TransactionMessage> {
+    if (!tables?.length) return msg
+    if (msg.version !== 0) throw new Error('Address lookup tables need a version 0 transaction message.')
+    const rpc = this.requireRpc('fetch address lookup tables')
+    const byTable = await fetchAddressesForLookupTables(tables.map(address), rpc as never)
+    return compressTransactionMessageUsingAddressLookupTables(msg as never, byTable) as TransactionMessage
+  }
+
+  // ── Compute budget, simulation, planning ────────────────────────────────────
+
+  private budgetPolicy(): { price: bigint | 'auto' | undefined; limit: number | 'auto' | undefined } {
+    const cfg = this._config.priorityFee
+    if (cfg === false) return { price: undefined, limit: undefined }
+    const auto = this._rpc !== undefined
+    const price = cfg?.microLamports ?? (auto ? 'auto' : undefined)
+    const limit = cfg?.computeUnitLimit ?? (auto ? 'auto' : undefined)
+    return { price: price === 'auto' ? 'auto' : price === undefined ? undefined : BigInt(price), limit }
+  }
+
+  private writableAccounts(msg: TransactionMessage): Address[] {
+    const set = new Set<Address>([this.address])
+    for (const ix of msg.instructions) for (const a of ix.accounts ?? []) if (isWritableRole(a.role)) set.add(a.address)
+    return [...set]
+  }
+
+  private signerCount(msg: TransactionMessage): number {
+    const set = new Set<string>([this.address])
+    for (const ix of msg.instructions) for (const a of ix.accounts ?? []) if (isSignerRole(a.role)) set.add(a.address)
+    return set.size
+  }
+
+  /** Wire bytes with all-zero signatures — what `simulateTransaction({sigVerify: false})` accepts. */
+  private unsignedWire(msg: TransactionMessage): string {
+    return getBase64EncodedWireTransaction(compileTransaction(msg as never) as Transaction)
+  }
+
+  private async simulateWire(wire: string): Promise<SimulationResult> {
+    const rpc = this.requireRpc('simulate transactions')
+    const { value } = await rpc.simulateTransaction(wire as never, { encoding: 'base64', sigVerify: false, replaceRecentBlockhash: true, commitment: this._commitment }).send()
+    const logs = value.logs ?? []
+    if (value.err) return { ok: false, error: typeof value.err === 'string' ? value.err : JSON.stringify(value.err), logs }
+    return { ok: true, unitsConsumed: value.unitsConsumed ?? 0n, logs }
+  }
+
+  /** `simulateTransaction` for any accepted input; never throws for an on-chain failure, only for transport errors. */
+  async simulateTransaction(tx: SolanaTransaction): Promise<SimulationResult> {
+    if (typeof tx === 'string') return this.simulateWire(tx)
+    if (isSignedTransaction(tx)) return this.simulateWire(getBase64EncodedWireTransaction(tx))
+    const msg = await this.withLookupTables(await this.prepareMessage(tx), isNativeTransfer(tx) ? tx.lookupTables : undefined)
+    return this.simulateWire(this.unsignedWire(msg))
+  }
+
+  /** Hard checks shared by every signing path. */
+  protected enforce(description: TransactionDescription): void {
+    const burn = description.warnings.find((w) => w.code === 'burn-address')
+    if (burn && !this._config.allowBurn) throw new UnsafeTransactionError(`${burn.message} Set allowBurn to override.`)
+    if (description.feePayer && description.feePayer !== this.address && !this._config.allowForeignFeePayer) {
+      throw new UnsafeTransactionError(`Transaction fee payer (${description.feePayer}) does not match wallet address (${this.address}). Set allowForeignFeePayer to override.`)
+    }
+  }
+
+  /**
+   * Plan a message-based transaction: lookup tables, compute budget (priority
+   * price + unit limit), simulation and the fee quote. Shared by quote / sign /
+   * send so the network is consulted once per fact.
+   */
+  protected async planMessage(input: TransactionMessage, opts: { lookupTables?: string[] | undefined; tokenFee?: bigint | undefined; simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
+    let msg = await this.withLookupTables(input, opts.lookupTables)
+    const description = describeTransaction(msg, { account: this.address })
+    this.enforce(description)
+
+    const policy = this.budgetPolicy()
+    const explicitPrice = getTransactionMessageComputeUnitPrice(msg as never)
+    const explicitLimit = getTransactionMessageComputeUnitLimit(msg)
+    let price: bigint = explicitPrice ?? 0n
+    if (explicitPrice === undefined && policy.price !== undefined) {
+      if (policy.price === 'auto') {
+        const fees = await this.requireRpc('read prioritization fees').getRecentPrioritizationFees(this.writableAccounts(msg)).send()
+        const min = BigInt(this._config.minPriorityMicroLamports ?? 0)
+        const max = BigInt(this._config.maxPriorityMicroLamports ?? DEFAULT_MAX_PRIORITY)
+        price = pickPriorityPrice(fees.map((f) => f.prioritizationFee), min, max)
+      } else price = policy.price
+    }
+    let limit: number | undefined = explicitLimit ?? (typeof policy.limit === 'number' ? policy.limit : undefined)
+    const wantAutoLimit = explicitLimit === undefined && policy.limit === 'auto'
+    const simulate = this._rpc !== undefined && (opts.simulate ?? this._config.simulate) !== false
+
+    let simulation: SimulationResult | undefined
+    if (simulate || wantAutoLimit) {
+      if (price > 0n) msg = setTransactionMessageComputeUnitPrice(price, msg as never) as TransactionMessage
+      const probe = wantAutoLimit ? setTransactionMessageComputeUnitLimit(CU_LIMIT_FOR_SIMULATION, msg) : msg
+      simulation = await this.simulateWire(this.unsignedWire(probe))
+      if (!simulation.ok) {
+        if (simulate) throw new SimulationError(simulation.error, simulation.logs)
+        simulation = undefined
+      } else if (wantAutoLimit) limit = computeUnitLimitFromSimulation(simulation.unitsConsumed)
+    }
+    if (price > 0n && explicitPrice === undefined) msg = setTransactionMessageComputeUnitPrice(price, msg as never) as TransactionMessage
+    if (limit !== undefined && explicitLimit === undefined) msg = setTransactionMessageComputeUnitLimit(limit, msg)
+
+    const nonBudgetIxs = description.items.filter((i) => i.type !== 'compute-budget').length
+    const chargedLimit = limit ?? Math.min(CU_MAX, CU_DEFAULT_PER_INSTRUCTION * Math.max(1, nonBudgetIxs))
+    const priorityFee = price > 0n ? ceilDiv(BigInt(chargedLimit) * price, 1_000_000n) : 0n
+    const baseFee = LAMPORTS_PER_SIGNATURE * BigInt(this.signerCount(msg))
+    const rpcFee = await this.feeForMessage(msg)
+    const fee = rpcFee > baseFee + priorityFee ? rpcFee : baseFee + priorityFee
+    const quote: SolanaFeeQuote = { fee, baseFee, priorityFee, microLamports: price, computeUnitLimit: limit, ...(opts.tokenFee !== undefined ? { tokenFee: opts.tokenFee } : {}) }
+    return { message: msg, quote, simulation, description: describeTransaction(msg, { account: this.address }) }
+  }
+
+  /** Plan a compiled transaction (kit `Transaction` or base64 wire): hard checks, simulation, fee quote. The bytes are never altered. */
+  protected async planCompiled(input: Transaction | string, opts: { simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
+    const transaction = typeof input === 'string' ? decodeWireTransaction(input) : input
+    const description = describeTransaction(transaction, { account: this.address })
+    this.enforce(description)
+    if (!description.signers.some((s) => s.address === this.address)) throw new UnsafeTransactionError('This wallet is not a required signer of the transaction.')
+    const missing = description.signers.filter((s) => s.signed === false && s.address !== this.address).map((s) => s.address)
+    if (missing.length) throw new MissingSignersError(missing)
+
+    let simulation: SimulationResult | undefined
+    if (this._rpc !== undefined && (opts.simulate ?? this._config.simulate) !== false) {
+      simulation = await this.simulateWire(getBase64EncodedWireTransaction(transaction))
+      if (!simulation.ok) throw new SimulationError(simulation.error, simulation.logs)
+    }
+    let price = 0n
+    let limit: number | undefined
+    for (const it of description.items) {
+      if (it.type !== 'compute-budget') continue
+      if (it.kind === 'price') price = it.value
+      if (it.kind === 'limit') limit = Number(it.value)
+    }
+    const nonBudgetIxs = description.items.filter((i) => i.type !== 'compute-budget').length
+    const chargedLimit = limit ?? Math.min(CU_MAX, CU_DEFAULT_PER_INSTRUCTION * Math.max(1, nonBudgetIxs))
+    const priorityFee = price > 0n ? ceilDiv(BigInt(chargedLimit) * price, 1_000_000n) : 0n
+    const baseFee = LAMPORTS_PER_SIGNATURE * BigInt(description.signers.length)
+    const rpcFee = await this.feeForBase64(getBase64Decoder().decode(transaction.messageBytes))
+    const fee = rpcFee > baseFee + priorityFee ? rpcFee : baseFee + priorityFee
+    return { transaction, quote: { fee, baseFee, priorityFee, microLamports: price, computeUnitLimit: limit }, simulation, description }
+  }
+
+  /** Plan any accepted input. */
+  protected async plan(tx: SolanaTransaction, opts: { simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
+    if (typeof tx === 'string' || isSignedTransaction(tx)) return this.planCompiled(tx, opts)
+    return this.planMessage(await this.prepareMessage(tx), { ...opts, lookupTables: isNativeTransfer(tx) ? tx.lookupTables : undefined })
+  }
+
+  protected async planTransfer(o: SolanaTransferOptions, opts: { simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
+    if (o.token) {
+      const { message, tokenFee } = await this.buildTokenTransfer(o.token, o.recipient, o.amount)
+      return this.planMessage(message, { ...opts, lookupTables: o.lookupTables, tokenFee })
+    }
+    return this.planMessage(await this.buildNativeTransfer(o.recipient, o.amount), { ...opts, lookupTables: o.lookupTables })
+  }
+
+  // ── Fees and receipts ───────────────────────────────────────────────────────
 
   protected async feeForMessage(msg: TransactionMessage): Promise<bigint> {
     const b64 = pipe(msg as never, compileTransactionMessage, getCompiledTransactionMessageEncoder().encode, getBase64Decoder().decode)
@@ -148,14 +397,18 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return BigInt(value)
   }
 
-  async quoteSendTransaction(tx: SolanaTransaction): Promise<{ fee: bigint }> {
-    if (isSignedTransaction(tx)) return { fee: await this.feeForBase64(getBase64Decoder().decode(tx.messageBytes)) }
-    return { fee: await this.feeForMessage(await this.prepareMessage(tx)) }
+  /** Full fee breakdown (base + priority, Token-2022 fee for transfers). Simulation runs too, so a reverting tx is reported here. */
+  async quoteSendTransaction(tx: SolanaTransaction): Promise<SolanaFeeQuote> {
+    return (await this.plan(tx)).quote
   }
 
-  async quoteTransfer(o: SolanaTransferOptions): Promise<{ fee: bigint }> {
-    const msg = o.token ? await this.buildSplTransfer(o.token, o.recipient, o.amount) : await this.buildNativeTransfer(o.recipient, o.amount)
-    return { fee: await this.feeForMessage(msg) }
+  async quoteTransfer(o: SolanaTransferOptions): Promise<SolanaFeeQuote> {
+    return (await this.planTransfer(o)).quote
+  }
+
+  /** Decode without the network: what the transaction does and what to be wary of. */
+  describeTransaction(tx: SolanaTransaction): TransactionDescription {
+    return describeTransaction(tx, { account: this.address })
   }
 
   async getTransactionReceipt(hash: string): Promise<SolanaReceipt | undefined> {
@@ -172,3 +425,5 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     try { return ed25519.verify(hexToBytes(signature), typeof message === 'string' ? utf8(message) : message, pub) } catch { return false }
   }
 }
+
+
