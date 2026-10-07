@@ -9,7 +9,7 @@ import './shim-runtime.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { deriveEd25519, deriveSecp256k1, seedFromMnemonicSync } from '@forgewallet/core'
 import { derivationVectors } from '@forgewallet/conformance'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
+import { WalletManagerEvm, describeTransaction, describeTypedData, encodeApprove } from '@forgewallet/wallet-evm'
 import { WalletManagerSolana } from '@forgewallet/wallet-solana'
 import { WalletManagerTon } from '@forgewallet/wallet-ton'
 import { WalletManagerTron } from '@forgewallet/wallet-tron'
@@ -44,6 +44,19 @@ async function main() {
       eq('evm signTypedData', await a.signTypedData(derivationVectors.evmTypedData as never), v.signTypedData)
     }
     evm.dispose()
+    // "What you sign" — offline decode + warnings must run under Hermes too.
+    {
+      const unlimited = describeTransaction({ to: '0xdAC17F958D2ee523a2206206994597C13D831ec7', data: encodeApprove('0x000000000000000000000000000000000000bEEF', 2n ** 256n - 1n), chainId: 1 }, { chainId: 1 })
+      eq('evm describe kind', unlimited.kind, 'erc20-approve')
+      eq('evm describe warning', unlimited.warnings.map((w) => w.code).join(','), 'approve-unlimited')
+      const permit = describeTypedData({
+        domain: { name: 'USD Coin', version: '2', chainId: 1, verifyingContract: '0xdAC17F958D2ee523a2206206994597C13D831ec7' },
+        types: { Permit: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'nonce', type: 'uint256' }, { name: 'deadline', type: 'uint256' }] },
+        message: { owner: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', spender: '0x000000000000000000000000000000000000bEEF', value: 1n, nonce: 0n, deadline: 2n ** 40n },
+      }, { chainId: 1, account: '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266' })
+      eq('evm describeTypedData kind', permit.kind, 'permit')
+      eq('evm describeTypedData warnings', permit.warnings.length, 0)
+    }
     const sol = new WalletManagerSolana(mnemonic)
     for (const v of derivationVectors.vectors.solana[seedName]!.accounts) {
       const a = await sol.getAccount(v.index)

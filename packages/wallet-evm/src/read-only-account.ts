@@ -1,11 +1,12 @@
 import { NetworkError, type IWalletAccountReadOnly } from '@forgewallet/core'
 import {
-  getAddress, hashTypedData, isHex, recoverMessageAddress, recoverAddress, stringToHex,
+  BaseError, ContractFunctionRevertedError, decodeErrorResult, getAddress, hashTypedData, isHex,
+  recoverMessageAddress, recoverAddress, stringToHex,
   type Hex, type PublicClient,
 } from 'viem'
 import { createClient } from './client.js'
 import { ERC20_ABI } from './erc20.js'
-import type { EvmConfig, EvmReceipt, EvmTransaction, EvmTransferOptions, TypedDataInput } from './types.js'
+import type { EvmConfig, EvmReceipt, EvmTransaction, EvmTransferOptions, SimulationResult, TypedDataInput } from './types.js'
 import { encodeTransfer } from './erc20.js'
 
 export const CAIP2_UNKNOWN = 'eip155:unknown'
@@ -97,21 +98,54 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
     return client.getGasPrice()
   }
 
-  /** `gas × feeRate`. */
+  /** Calldata/value/to in the shape viem's `call` / `estimateGas` take. */
+  protected callParams(tx: EvmTransaction) {
+    return {
+      account: this.address,
+      ...(tx.to !== undefined ? { to: getAddress(tx.to) } : {}),
+      ...(tx.value !== undefined ? { value: BigInt(tx.value) } : {}),
+      ...(tx.data !== undefined ? { data: tx.data as Hex } : {}),
+    }
+  }
+
+  /** Gas limit: the tx's own, else one estimate. */
+  protected async gasFor(tx: EvmTransaction): Promise<bigint> {
+    if (tx.gasLimit !== undefined) return BigInt(tx.gasLimit)
+    return this.requireClient('estimate gas').estimateGas(this.callParams(tx))
+  }
+
+  /** Upper-bound fee in wei: `gas × feeRate`, where feeRate is maxFeePerGas (or gasPrice on legacy chains). */
   async quoteSendTransaction(tx: EvmTransaction): Promise<{ fee: bigint }> {
-    const client = this.requireClient('quote send transaction operations')
-    const [gas, feeRate] = await Promise.all([
-      tx.gasLimit !== undefined
-        ? Promise.resolve(BigInt(tx.gasLimit))
-        : client.estimateGas({
-            account: this.address,
-            ...(tx.to !== undefined ? { to: getAddress(tx.to) } : {}),
-            ...(tx.value !== undefined ? { value: BigInt(tx.value) } : {}),
-            ...(tx.data !== undefined ? { data: tx.data as Hex } : {}),
-          }),
-      this.getFeeRate(),
-    ])
+    this.requireClient('quote send transaction operations')
+    const [gas, feeRate] = await Promise.all([this.gasFor(tx), this.getFeeRate()])
     return { fee: gas * feeRate }
+  }
+
+  /**
+   * Dry-run the transaction from this account (`eth_call` + gas estimate).
+   * A revert comes back as `{ok: false, reason}` with the decoded `Error(string)`,
+   * `Panic(uint256)` or custom-error selector; only transport failures throw.
+   */
+  async simulateTransaction(tx: EvmTransaction): Promise<SimulationResult> {
+    const client = this.requireClient('simulate transactions')
+    const params = this.callParams(tx)
+    let returnData: Hex
+    try {
+      const res = await client.call(params)
+      returnData = res.data ?? '0x'
+    } catch (e) {
+      const revert = decodeRevert(e)
+      if (revert) return { ok: false, ...revert }
+      throw e
+    }
+    try {
+      const gas = tx.gasLimit !== undefined ? BigInt(tx.gasLimit) : await client.estimateGas(params)
+      return { ok: true, gas, returnData }
+    } catch (e) {
+      const revert = decodeRevert(e)
+      if (revert) return { ok: false, ...revert }
+      throw e
+    }
   }
 
   async quoteTransfer(options: EvmTransferOptions): Promise<{ fee: bigint }> {
@@ -156,4 +190,45 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
 export function toHexMessage(message: string | Uint8Array): Hex {
   if (typeof message !== 'string') return `0x${Array.from(message, (b) => b.toString(16).padStart(2, '0')).join('')}`
   return isHex(message) ? message : stringToHex(message)
+}
+
+const PANIC: Record<number, string> = {
+  0x01: 'assertion failed', 0x11: 'arithmetic overflow/underflow', 0x12: 'division by zero', 0x21: 'invalid enum value',
+  0x22: 'invalid storage byte array', 0x31: 'pop on empty array', 0x32: 'array index out of bounds', 0x41: 'out of memory', 0x51: 'uninitialized function pointer',
+}
+
+/** Walk a viem error for revert data and turn it into a human reason; undefined when it is not a revert. */
+export function decodeRevert(e: unknown): { reason: string; data?: Hex } | undefined {
+  if (!(e instanceof BaseError)) return undefined
+  const reverted = e.walk((err) => err instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | null
+  const data = reverted?.raw ?? extractRevertData(e)
+  if (data && data !== '0x') {
+    const selector = data.slice(0, 10)
+    try {
+      if (selector === '0x08c379a0') {
+        const d = decodeErrorResult({ abi: [{ type: 'error', name: 'Error', inputs: [{ type: 'string', name: 'message' }] }], data })
+        return { reason: String(d.args?.[0] ?? 'reverted'), data }
+      }
+      if (selector === '0x4e487b71') {
+        const d = decodeErrorResult({ abi: [{ type: 'error', name: 'Panic', inputs: [{ type: 'uint256', name: 'code' }] }], data })
+        const code = Number(d.args?.[0] ?? 0)
+        return { reason: `panic 0x${code.toString(16)}: ${PANIC[code] ?? 'unknown'}`, data }
+      }
+    } catch { /* fall through to selector */ }
+    return { reason: `reverted with custom error ${selector}`, data }
+  }
+  const text = e.shortMessage || e.message
+  if (/revert|execution reverted|out of gas|insufficient funds|gas required exceeds/i.test(text)) return { reason: text }
+  return undefined
+}
+
+function extractRevertData(e: BaseError): Hex | undefined {
+  let cur: unknown = e
+  for (let i = 0; i < 8 && cur && typeof cur === 'object'; i++) {
+    const bag = cur as { data?: unknown; cause?: unknown }
+    if (typeof bag.data === 'string' && isHex(bag.data)) return bag.data as Hex
+    if (bag.data && typeof bag.data === 'object' && typeof (bag.data as { data?: unknown }).data === 'string') return (bag.data as { data: Hex }).data
+    cur = bag.cause
+  }
+  return undefined
 }

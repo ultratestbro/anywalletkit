@@ -20,6 +20,15 @@ export interface EvmConfig {
    * reset itself and waits for it before the real approval.
    */
   autoResetAllowance?: boolean
+  /**
+   * `eth_call` every transaction before signing it and refuse on revert
+   * (SimulationError). Default true whenever a provider is configured.
+   */
+  simulate?: boolean
+  /** Allow value transfers to the zero address (refused by default — UnsafeTransactionError). */
+  allowBurn?: boolean
+  /** Allow signing typed data whose domain names another chain (refused by default — ChainMismatchError). */
+  allowCrossChainTypedData?: boolean
 }
 
 /**
@@ -40,7 +49,7 @@ export interface EvmTransaction {
   chainId?: number | bigint
   accessList?: Array<{ address: Hex; storageKeys: Hex[] }>
   authorizationList?: Array<{ chainId: number; address: Hex; nonce: number; r: Hex; s: Hex; yParity: number }>
-  /** Ignored: always the account itself (kept so objects of that shape pass through). */
+  /** Ignored: always the account itself (kept so ethers-shaped objects pass through). */
   from?: string
 }
 
@@ -76,4 +85,30 @@ export interface EvmReceipt {
   to: string | null
   contractAddress: string | null
   logs: unknown[]
+}
+
+export type SimulationResult =
+  | { ok: true; gas: bigint; returnData: Hex }
+  | { ok: false; reason: string; data?: Hex }
+
+export interface PermitOptions {
+  token: string
+  spender: string
+  value: bigint | number | string
+  /** Unix seconds. */
+  deadline: bigint | number | string
+}
+
+export type PermitInfo =
+  | { supported: false; reason: string }
+  | { supported: true; name: string; version: string; nonce: bigint; domainSeparator: Hex; chainId: number }
+
+export interface SignedPermit {
+  signature: Hex
+  v: number
+  r: Hex
+  s: Hex
+  nonce: bigint
+  deadline: bigint
+  typedData: TypedDataInput
 }
