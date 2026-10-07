@@ -13,7 +13,10 @@ import { TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, getCreateAssociatedToken
 import {
   TOKEN_2022_PROGRAM_ADDRESS, getMintDecoder, getTransferCheckedInstruction as getTransferChecked2022Instruction, getTransferCheckedWithFeeInstruction,
 } from '@solana-program/token-2022'
-import { MAX_U64, ZERO_ADDRESS, decodeWireTransaction, describeTransaction } from './describe.js'
+import { MAX_U64, ZERO_ADDRESS, decodeWireTransaction, describeTransaction, resolveCompiledAccounts } from './describe.js'
+import {
+  DEFAULT_PROGRAM_ALLOWLIST, base64Bytes, bytesEqual, isNativeMint, parseTokenAccount, pubkeyBytes, type SerializedCheck, type SerializedTxGuard,
+} from './serialized.js'
 import { MissingSignersError, SimulationError, UnsafeTransactionError } from './errors.js'
 import { isNativeTransfer, isSignedTransaction, isTransactionMessage } from './guards.js'
 import { createRpc } from './rpc.js'
@@ -340,20 +343,30 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return { message: msg, quote, simulation, description: describeTransaction(msg, { account: this.address }) }
   }
 
-  /** Plan a compiled transaction (kit `Transaction` or base64 wire): hard checks, simulation, fee quote. The bytes are never altered. */
-  protected async planCompiled(input: Transaction | string, opts: { simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
-    const transaction = typeof input === 'string' ? decodeWireTransaction(input) : input
-    const description = describeTransaction(transaction, { account: this.address })
+  /** Signer checks shared by every compiled-transaction path: this wallet must be a required signer and nobody else may still be missing. */
+  protected enforceCompiledSigners(description: TransactionDescription): void {
     this.enforce(description)
     if (!description.signers.some((s) => s.address === this.address)) throw new UnsafeTransactionError('This wallet is not a required signer of the transaction.')
     const missing = description.signers.filter((s) => s.signed === false && s.address !== this.address).map((s) => s.address)
     if (missing.length) throw new MissingSignersError(missing)
+  }
+
+  /** Plan a compiled transaction (kit `Transaction` or base64 wire): hard checks, simulation, fee quote. The bytes are never altered. */
+  protected async planCompiled(input: Transaction | string, opts: { simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
+    const transaction = typeof input === 'string' ? decodeWireTransaction(input) : input
+    const description = describeTransaction(transaction, { account: this.address })
+    this.enforceCompiledSigners(description)
 
     let simulation: SimulationResult | undefined
     if (this._rpc !== undefined && (opts.simulate ?? this._config.simulate) !== false) {
       simulation = await this.simulateWire(getBase64EncodedWireTransaction(transaction))
       if (!simulation.ok) throw new SimulationError(simulation.error, simulation.logs)
     }
+    return { transaction, quote: await this.quoteCompiled(transaction, description), simulation, description }
+  }
+
+  /** Fee of a compiled transaction: signatures + the compute budget it carries, floored by the RPC's own quote. */
+  protected async quoteCompiled(transaction: Transaction, description: TransactionDescription): Promise<SolanaFeeQuote> {
     let price = 0n
     let limit: number | undefined
     for (const it of description.items) {
@@ -367,7 +380,138 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     const baseFee = LAMPORTS_PER_SIGNATURE * BigInt(description.signers.length)
     const rpcFee = await this.feeForBase64(getBase64Decoder().decode(transaction.messageBytes))
     const fee = rpcFee > baseFee + priorityFee ? rpcFee : baseFee + priorityFee
-    return { transaction, quote: { fee, baseFee, priorityFee, microLamports: price, computeUnitLimit: limit }, simulation, description }
+    return { fee, baseFee, priorityFee, microLamports: price, computeUnitLimit: limit }
+  }
+
+  // ── Provider-built (serialized) transactions ────────────────────────────────
+
+  /** Addresses of a lookup-table set, fetched once; `undefined` when the message uses none. */
+  protected async lookupAddresses(tables: readonly string[]): Promise<Record<string, readonly string[]> | undefined> {
+    if (!tables.length) return undefined
+    const rpc = this.requireRpc('fetch address lookup tables')
+    const byTable = await fetchAddressesForLookupTables(tables.map(address), rpc as never)
+    return byTable as unknown as Record<string, readonly string[]>
+  }
+
+  private async accountStates(addresses: readonly string[]): Promise<Map<string, { lamports: bigint; owner: string; data: Uint8Array } | null>> {
+    const rpc = this.requireRpc('read accounts')
+    const out = new Map<string, { lamports: bigint; owner: string; data: Uint8Array } | null>()
+    const unique = [...new Set(addresses)]
+    for (let i = 0; i < unique.length; i += 100) {
+      const chunk = unique.slice(i, i + 100)
+      const { value } = await rpc.getMultipleAccounts(chunk.map(address), { commitment: this._commitment, encoding: 'base64' }).send()
+      chunk.forEach((addr, j) => {
+        const acc = value[j]
+        out.set(addr, acc ? { lamports: BigInt(acc.lamports), owner: acc.owner as string, data: base64Bytes(acc.data[0]) } : null)
+      })
+    }
+    return out
+  }
+
+  /**
+   * Prove what a provider-built transaction does before anyone signs it (see
+   * `serialized.ts`). Throws {@link UnsafeTransactionError} (allowlist, authority
+   * changes, balance violations), {@link MissingSignersError} or
+   * {@link SimulationError}; returns the evidence otherwise. Nothing is signed.
+   */
+  async checkSerialized(base64: string, guard: SerializedTxGuard): Promise<SerializedCheck> {
+    const rpc = this.requireRpc('check provider transactions')
+    const transaction = decodeWireTransaction(base64)
+    const layout0 = resolveCompiledAccounts(transaction)
+    const addressesByLookupTableAddress = await this.lookupAddresses(layout0.tables)
+    const ctx = { account: this.address as string, ...(addressesByLookupTableAddress ? { addressesByLookupTableAddress } : {}) }
+    const description = describeTransaction(transaction, ctx)
+    const layout = resolveCompiledAccounts(transaction, ctx)
+    if (layout.unresolved) throw new UnsafeTransactionError('Some accounts come from lookup tables that could not be resolved; the transaction cannot be audited.', 'unresolved-lookup-tables')
+    this.enforceCompiledSigners(description)
+
+    // 1. Programs.
+    if (!guard.allowUnknownPrograms) {
+      const allowed = new Set(guard.programAllowlist ?? DEFAULT_PROGRAM_ALLOWLIST)
+      const foreign = [...new Set(description.items.map((it) => it.program ?? '<unresolved>').filter((p) => !allowed.has(p)))]
+      if (foreign.length) throw new UnsafeTransactionError(`Transaction invokes programs outside the allowlist: ${foreign.join(', ')}.`, 'unknown-program', foreign)
+    }
+    // 2. Authority / delegate changes are never part of a swap. Closing a token
+    //    account is routine (aggregators unwrap temporary wSOL) ONLY when the
+    //    rent comes back to this wallet.
+    for (const it of description.items) {
+      if (it.type === 'set-authority') throw new UnsafeTransactionError(`Transaction changes an authority on ${it.account}.`, 'sets-authority', [it.account])
+      if (it.type === 'token-approve') throw new UnsafeTransactionError(`Transaction approves ${it.delegate} to spend from ${it.source}.`, 'approves-delegate', [it.delegate])
+      if (it.type === 'close-account' && it.destination !== this.address) throw new UnsafeTransactionError(`Transaction closes ${it.account} with the rent sent to ${it.destination}.`, 'closes-account', [it.account])
+    }
+
+    // 3. Balances: pre-state of every writable account plus the declared ATAs,
+    //    post-state from a simulation that returns those same accounts.
+    const { expect } = guard
+    const me = pubkeyBytes(this.address)
+    const mintAtas = async (mint: string) => Promise.all([this.ata(address(mint), this.address, TOKEN_PROGRAM_ADDRESS), this.ata(address(mint), this.address, TOKEN_2022_PROGRAM_ADDRESS)])
+    const tokenInNative = expect.tokenIn !== undefined && isNativeMint(expect.tokenIn.mint)
+    const tokenInAtas = expect.tokenIn && !tokenInNative ? (await mintAtas(expect.tokenIn.mint)).map(String) : []
+    const tokenOutAtas = expect.maxTokenOut && !isNativeMint(expect.maxTokenOut.mint) ? (await mintAtas(expect.maxTokenOut.mint)).map(String) : []
+    const writable = layout.accounts.filter((a) => isWritableRole(a.role) && a.address !== null).map((a) => a.address as string)
+    const pre = await this.accountStates([this.address, ...tokenInAtas, ...tokenOutAtas, ...writable])
+    const isTokenProgram = (owner: string) => owner === TOKEN_PROGRAM_ADDRESS || owner === TOKEN_2022_PROGRAM_ADDRESS
+    const ownedTokenAccounts = writable.filter((addr) => {
+      const st = pre.get(addr)
+      if (!st || !isTokenProgram(st.owner)) return false
+      const parsed = parseTokenAccount(st.data)
+      return parsed !== null && bytesEqual(parsed.owner, me)
+    })
+    const watched = [...new Set([this.address as string, ...tokenInAtas, ...tokenOutAtas, ...ownedTokenAccounts])]
+
+    const { value } = await rpc.simulateTransaction(getBase64EncodedWireTransaction(transaction) as never, {
+      encoding: 'base64', sigVerify: false, replaceRecentBlockhash: true, commitment: this._commitment, accounts: { addresses: watched.map(address), encoding: 'base64' },
+    }).send()
+    const logs = value.logs ?? []
+    if (value.err) throw new SimulationError(typeof value.err === 'string' ? value.err : JSON.stringify(value.err), logs)
+    const postList = (value as { accounts?: Array<{ lamports: bigint | number; owner: string; data: readonly [string, string] } | null> }).accounts
+    if (!postList || postList.length !== watched.length) throw new NetworkError('simulateTransaction did not return the requested post-state accounts.')
+    const post = new Map<string, { lamports: bigint; owner: string; data: Uint8Array } | null>()
+    watched.forEach((addr, i) => { const acc = postList[i]; post.set(addr, acc ? { lamports: BigInt(acc.lamports), owner: acc.owner, data: base64Bytes(acc.data[0]) } : null) })
+
+    const quote = await this.quoteCompiled(transaction, description)
+    const lamports = (m: Map<string, { lamports: bigint } | null>, addr: string) => m.get(addr)?.lamports ?? 0n
+    const tokenAmount = (m: Map<string, { data: Uint8Array } | null>, addr: string) => { const st = m.get(addr); return st ? (parseTokenAccount(st.data)?.amount ?? 0n) : 0n }
+    const tokenDelta = (atas: readonly string[]) => atas.reduce((sum, a) => sum + tokenAmount(post, a) - tokenAmount(pre, a), 0n)
+
+    const lamportsDelta = lamports(post, this.address) - lamports(pre, this.address)
+    const ceiling = expect.maxLamportsOut + quote.fee
+    if (lamportsDelta < -ceiling) throw new UnsafeTransactionError(`Transaction spends ${-lamportsDelta} lamports; at most ${ceiling} (${expect.maxLamportsOut} + fee ${quote.fee}) allowed.`, 'lamports-out', [String(-lamportsDelta)])
+
+    let tokenInDelta: bigint | undefined
+    if (expect.tokenIn) {
+      if (tokenInNative) {
+        // Receiving SOL: the net change must cover the minimum after the allowed spend.
+        if (lamportsDelta < expect.tokenIn.minAmount - ceiling) throw new UnsafeTransactionError(`Transaction yields ${lamportsDelta} lamports net; at least ${expect.tokenIn.minAmount - ceiling} expected.`, 'slippage', [String(lamportsDelta)])
+      } else {
+        tokenInDelta = tokenDelta(tokenInAtas)
+        if (tokenInDelta < expect.tokenIn.minAmount) throw new UnsafeTransactionError(`Transaction delivers ${tokenInDelta} of ${expect.tokenIn.mint}; at least ${expect.tokenIn.minAmount} expected.`, 'slippage', [String(tokenInDelta)])
+      }
+    }
+    let tokenOutDelta: bigint | undefined
+    if (expect.maxTokenOut && !isNativeMint(expect.maxTokenOut.mint)) {
+      tokenOutDelta = tokenDelta(tokenOutAtas)
+      if (tokenOutDelta < -expect.maxTokenOut.amount) throw new UnsafeTransactionError(`Transaction takes ${-tokenOutDelta} of ${expect.maxTokenOut.mint}; at most ${expect.maxTokenOut.amount} allowed.`, 'token-out', [String(-tokenOutDelta)])
+    }
+    const exempt = new Set([...tokenInAtas, ...tokenOutAtas])
+    for (const addr of ownedTokenAccounts) {
+      if (exempt.has(addr)) continue
+      const before = tokenAmount(pre, addr)
+      const after = tokenAmount(post, addr)
+      if (after < before) throw new UnsafeTransactionError(`Transaction drains ${before - after} from token account ${addr}, which is not part of the swap.`, 'token-drain', [addr])
+    }
+    return { description, simulation: { ok: true, unitsConsumed: value.unitsConsumed ?? 0n, logs }, quote, lamportsDelta, tokenInDelta, tokenOutDelta, watched }
+  }
+
+  /** {@link checkSerialized} without throwing for a refusal: the check or the reason. */
+  async simulateSerialized(base64: string, guard: SerializedTxGuard): Promise<{ ok: true; check: SerializedCheck } | { ok: false; reason: string; code?: string }> {
+    try {
+      return { ok: true, check: await this.checkSerialized(base64, guard) }
+    } catch (e) {
+      if (e instanceof NetworkError) throw e
+      const code = e instanceof UnsafeTransactionError ? e.code : e instanceof SimulationError ? 'simulation' : e instanceof MissingSignersError ? 'missing-signers' : undefined
+      return { ok: false, reason: e instanceof Error ? e.message : String(e), ...(code ? { code } : {}) }
+    }
   }
 
   /** Plan any accepted input. */

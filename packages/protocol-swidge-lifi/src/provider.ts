@@ -1,17 +1,18 @@
-import {lifi as lifiCfg} from "./config.js";
+import {LIFI_SOLANA_CAIP2, lifi as lifiCfg} from "./config.js";
 import {ccAsset} from "@forgewallet/swidge-assets";
 import {timeoutSignal} from "@forgewallet/protocol-swidge-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swidge-core/types";
 
 /**
  * LI.FI meta-aggregator — the CALLDATA execution model: the quote returns a
- * `transactionRequest` the USER'S WALLET must execute (EVM calldata only in
- * this contribution). There is no deposit address — a plain
- * transfer to `transactionRequest.to` would lose funds, so the client branches
- * on `quote.txRequest`. Live-verified shapes (2026-07): EVM→{to,data,value,
- * chainId,gasLimit}; SOL→{data: base64 tx}. Tron returns a raw protobuf we
- * can't hand to wallets yet — Tron stays on the direct NEAR Intents route
- * (LI.FI routes it through NEAR anyway, so nothing is lost).
+ * `transactionRequest` the USER'S WALLET must execute. There is no deposit
+ * address — a plain transfer to `transactionRequest.to` would lose funds, so
+ * the client branches on `quote.txRequest`. Live-verified shapes (2026-07):
+ * EVM → {to, data, value, chainId, gasLimit}; Solana → {data: base64 tx}, a
+ * fully built v0 transaction (Jupiter route) the account signs after proving
+ * its balance effects (`serializedTx`). Tron returns a raw protobuf we can't
+ * hand to wallets yet — Tron stays on the direct NEAR Intents route (LI.FI
+ * routes it through NEAR anyway, so nothing is lost).
  */
 
 const DEFAULT_LIFI_BASE = "https://li.quest/v1";
@@ -33,10 +34,29 @@ const LIFI_CHAIN: Record<string, string> = {
   "eip155:43114": "43114",
   "eip155:534352": "534352",
   "eip155:80094": "80094",
+  [LIFI_SOLANA_CAIP2]: "1151111081099710",
 };
+const CAIP2_BY_LIFI_CHAIN: Record<string, string> = Object.fromEntries(Object.entries(LIFI_CHAIN).map(([caip2, id]) => [id, caip2]));
 
 const EVM_ZERO = "0x0000000000000000000000000000000000000000";
+/** LI.FI's native-SOL token id (the System program address). */
+const SOLANA_NATIVE = "11111111111111111111111111111111";
 const EVM_PLACEHOLDER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
+/** Dry-quote sender on Solana: the publicly known BIP-39 "abandon" account 0. */
+const SOLANA_PLACEHOLDER = "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk";
+const isSolana = (chain: string) => chain === LIFI_SOLANA_CAIP2;
+const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+/** Chain-aware address equality: EVM case-insensitive, Solana exact base58. */
+function sameChainAddress(chain: string, actual: string | undefined, expected: string): boolean {
+  if (isSolana(chain)) return !!actual && BASE58.test(actual) && actual === expected;
+  return sameAddress(actual, expected);
+}
+/** The engine's native sentinel (`0x0…`) in the chain's own notation. */
+function nativeFor(chain: string, token: string): string {
+  if (/^0x0+$/.test(token) || token === SOLANA_NATIVE) return isSolana(chain) ? SOLANA_NATIVE : EVM_ZERO;
+  return token;
+}
 /** LI.FI's documented Diamond entry point on most supported EVM networks. */
 const LIFI_DIAMOND = "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE";
 const DEFAULT_QUOTE_TTL_MS = 55_000;
@@ -82,7 +102,7 @@ function lifiToken(sourceChain: string, symbol: string): string | null {
   const asset = ccAsset(sourceChain, symbol);
   if (!asset) return null;
   if (asset.contract) return asset.contract;
-  return EVM_ZERO;
+  return isSolana(sourceChain) ? SOLANA_NATIVE : EVM_ZERO;
 }
 
 function headers(key: string | undefined): Record<string, string> {
@@ -144,7 +164,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
       const fromToken = lifiToken(params.sourceChain, params.sourceToken);
       if (!fromToken) return null;
 
-      const fromAddress = params.refundAddress ?? EVM_PLACEHOLDER;
+      const solanaSource = isSolana(params.sourceChain);
+      const fromAddress = params.refundAddress ?? (solanaSource ? SOLANA_PLACEHOLDER : EVM_PLACEHOLDER);
 
       try {
         const url = new URL(`${apiBase}/quote`);
@@ -153,12 +174,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         url.searchParams.set("fromToken", fromToken);
         // Native dest is chain-notation-specific: EVM zero address vs the
         // Solana system program — sending the EVM zero to an SVM dest 400s.
-        url.searchParams.set(
-          "toToken",
-          /^0x0+$/.test(params.destToken)
-            ? EVM_ZERO
-            : params.destToken,
-        );
+        url.searchParams.set("toToken", nativeFor(params.destChain, params.destToken));
         url.searchParams.set("fromAmount", params.amountIn);
         url.searchParams.set("fromAddress", fromAddress);
         const toAddress = params.destAddress || fromAddress;
@@ -205,19 +221,29 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         const action = q.action;
         const est = q.estimate;
         const tr = q.transactionRequest;
-        const expectedToToken = /^0x0+$/.test(params.destToken) ? EVM_ZERO : params.destToken;
+        const expectedToToken = nativeFor(params.destChain, params.destToken);
         const expectedFromChain = Number(fromChain);
         const expectedToChain = Number(toChain);
         if (
-          q.type !== "lifi" || !q.id || !action || !est?.toAmount || !est.fromAmount ||
-          !tr || !isHexData(tr.data) || !normalizeAddress(tr.to) || !normalizeAddress(tr.from) ||
-          tr.chainId !== expectedFromChain || !tr.value || !tr.gasLimit ||
-          !trustedAddress(params.sourceChain, tr.to, trustedTransactionTargets) ||
+          q.type !== "lifi" || !q.id || !action || !est?.toAmount || !est.fromAmount || !tr ||
           action.fromChainId !== expectedFromChain || action.toChainId !== expectedToChain ||
           action.fromToken?.chainId !== expectedFromChain || action.toToken?.chainId !== expectedToChain ||
-          !sameAddress(action.fromToken?.address, fromToken) || !sameAddress(action.toToken?.address, expectedToToken) ||
+          !sameChainAddress(params.sourceChain, action.fromToken?.address, fromToken) ||
+          !sameChainAddress(params.destChain, action.toToken?.address, expectedToToken) ||
           action.fromAmount !== params.amountIn || est.fromAmount !== params.amountIn ||
-          !sameAddress(action.fromAddress, fromAddress) || !sameAddress(action.toAddress, toAddress) ||
+          !sameChainAddress(params.sourceChain, action.fromAddress, fromAddress) ||
+          !sameChainAddress(params.destChain, action.toAddress, toAddress)
+        ) return null;
+        // Source-VM execution payload. EVM: calldata to a trusted target.
+        // Solana: a base64 transaction the account proves before signing —
+        // there is no target to trust here, the balance proof replaces it.
+        if (solanaSource) {
+          if (!tr.data || tr.data.length < 64 || tr.data.length % 4 !== 0 || !BASE64.test(tr.data)) return null;
+          if (tr.to !== undefined || tr.value !== undefined || tr.gasLimit !== undefined || est.approvalAddress !== undefined) return null;
+        } else if (
+          !isHexData(tr.data) || !normalizeAddress(tr.to) || !normalizeAddress(tr.from) ||
+          tr.chainId !== expectedFromChain || !tr.value || !tr.gasLimit ||
+          !trustedAddress(params.sourceChain, tr.to, trustedTransactionTargets) ||
           !sameAddress(tr.from, fromAddress)
         ) return null;
         if (
@@ -225,8 +251,10 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           (typeof action.slippage !== "number" || Math.abs(action.slippage - params.slippageBps / 10_000) > 1e-12)
         ) return null;
 
-        const sourceIsToken = fromToken !== EVM_ZERO;
-        if (sourceIsToken) {
+        const sourceIsToken = fromToken !== EVM_ZERO && fromToken !== SOLANA_NATIVE;
+        if (solanaSource) {
+          // No allowances on Solana; nothing to trust beyond the balance proof.
+        } else if (sourceIsToken) {
           if (!trustedAddress(params.sourceChain, est.approvalAddress, trustedApprovalAddresses)) return null;
         } else if (est.approvalAddress !== undefined) {
           // LI.FI started returning an approvalAddress for NATIVE sources too
@@ -238,20 +266,26 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           if (!trustedAddress(params.sourceChain, est.approvalAddress, trustedApprovalAddresses)) return null;
         }
 
-        try {
-          if (BigInt(tr.value) < 0n || BigInt(tr.gasLimit) <= 0n) return null;
-        } catch {
-          return null;
+        let txRequest: NonNullable<Quote["txRequest"]>;
+        if (solanaSource) {
+          // `value` declares what the account may let the tx take in native
+          // coin: the input for a SOL source, nothing for a token source.
+          txRequest = {serializedTx: tr.data!, value: sourceIsToken ? "0" : params.amountIn};
+        } else {
+          try {
+            if (BigInt(tr.value!) < 0n || BigInt(tr.gasLimit!) <= 0n) return null;
+          } catch {
+            return null;
+          }
+          txRequest = {
+            to: tr.to!,
+            data: tr.data!,
+            value: BigInt(tr.value!).toString(),
+            chainId: tr.chainId!,
+            gasLimit: BigInt(tr.gasLimit!).toString(),
+            ...(sourceIsToken && est.approvalAddress ? {approvalAddress: est.approvalAddress} : {}),
+          };
         }
-
-        const txRequest = {
-          to: tr.to!,
-          data: tr.data,
-          value: BigInt(tr.value).toString(),
-          chainId: tr.chainId,
-          gasLimit: BigInt(tr.gasLimit).toString(),
-          ...(sourceIsToken && est.approvalAddress ? {approvalAddress: est.approvalAddress} : {}),
-        };
 
         const feeUsd =
           (est.feeCosts ?? []).reduce((a, f) => a + Number(f.amountUSD ?? 0), 0) +
@@ -287,8 +321,11 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
       const tx = quote.txRequest;
       if (!tx) throw new Error("swidge: LI.FI quote has no transaction request");
+      // The intent id carries the LI.FI source chain; a serialized leg names
+      // its chain so the engine can refuse a mismatched account.
+      const [, fromChain] = quote.intentId.split(":");
       return {
-        chain: "",
+        chain: tx.serializedTx ? CAIP2_BY_LIFI_CHAIN[fromChain ?? ""] ?? "" : "",
         to: tx.to ?? "",
         value: tx.value ?? "0",
         ...(tx.data ? {data: tx.data} : {}),

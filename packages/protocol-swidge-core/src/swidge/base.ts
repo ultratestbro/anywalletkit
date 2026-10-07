@@ -91,7 +91,31 @@ export interface SwidgeEngineConfig extends SwidgeProtocolConfig {
    * as a TEXT COMMENT, which would strand the swap.
    */
   decodeTonBody?: (bocBase64: string) => unknown;
+  /**
+   * Provider-SERIALIZED legs (a swap aggregator's fully built Solana
+   * transaction): how much native coin, in base units, the account may lose
+   * on top of the swap input — rent for a destination token account, wrapped
+   * SOL juggling, priority fees. Default 20 000 000 lamports (0.02 SOL).
+   */
+  serializedNativeAllowance?: bigint | number | string;
 }
+
+/**
+ * What a provider-serialized transaction is allowed to do with the bound
+ * account's balances; derived from the validated quote and handed to the
+ * account's `sendSerializedTransaction` hook, which must prove it (simulate
+ * with post-state balances) before signing. Amounts are base-unit strings.
+ */
+export interface SerializedExecutionExpectation {
+  /** Most native coin the account may lose, fee excluded: swap input (native source) + allowance. */
+  maxValueOut: string;
+  /** Same-chain swaps: the token the account must receive and the quoted minimum (zero address = native). */
+  tokenIn?: {token: string; minAmount: string};
+  /** Token sources: the token the account may send and the exact swap input. */
+  source?: {token: string; maxAmount: string};
+}
+
+const DEFAULT_SERIALIZED_NATIVE_ALLOWANCE = 20_000_000n;
 
 /**
  * A bound wallet account. `@forgewallet/core` does not re-export
@@ -124,6 +148,12 @@ interface SwidgeSigner {
     memo?: string;
   }) => Promise<{hash?: string}>;
   signTypedData?: (args: {domain: unknown; types: unknown; primaryType?: string; message: unknown}) => Promise<string>;
+  /**
+   * Execute a provider-built transaction the account cannot rebuild (a swap
+   * aggregator's serialized Solana tx). The account owns the proof: it must
+   * refuse anything beyond `expect` before signing.
+   */
+  sendSerializedTransaction?: (serializedTx: string, expect: SerializedExecutionExpectation) => Promise<{hash?: string}>;
   /**
    * Wait until a transaction this account sent is INCLUDED (and succeeded).
    * Used between an ERC-20 approval and the deposit that spends it: a signer
@@ -513,7 +543,8 @@ export abstract class BaseSwidgeProtocol extends SwidgeProtocol {
     const recipient = snapshot.recipient ?? selfAddress;
     const refundAddress = snapshot.refundAddress ?? selfAddress;
     const executionOptions = snapshotOptions({...snapshot, recipient, refundAddress});
-    const resolved = await this.resolveQuote(this.toParams(executionOptions, false));
+    const params = this.toParams(executionOptions, false);
+    const resolved = await this.resolveQuote(params);
     if (!resolved) {
       const detail = this.noRouteDetail();
       throw new SwidgeQuoteError(`swidge: no route available for the requested pair${detail ? ` :: ${detail}` : ""}`);
@@ -529,8 +560,15 @@ export abstract class BaseSwidgeProtocol extends SwidgeProtocol {
     if (!providerEnabled) throw new Error(`swidge: provider '${q.provider}' is disabled`);
     let unsigned: UnsignedTx = Object.freeze({...await provider.buildDeposit(q)});
 
-    if (unsigned.serializedTx) {
-      throw new Error("swidge: serialized provider transactions require a chain-specific account adapter");
+    const serialized = unsigned.serializedTx !== undefined;
+    if (serialized) {
+      if (!unsigned.serializedTx) throw new Error("swidge: provider returned an empty serialized transaction");
+      if (unsigned.data !== undefined || unsigned.bodyBoc !== undefined || unsigned.typedData !== undefined || unsigned.memo !== undefined || unsigned.approvalAddress !== undefined) {
+        throw new Error("swidge: provider returned ambiguous execution payloads");
+      }
+      if (typeof signer.sendSerializedTransaction !== "function") {
+        throw new SwidgeExecutionError(`swidge: ${this.fromChain} serialized execution requires account.sendSerializedTransaction`);
+      }
     }
     if (unsigned.chain && unsigned.chain !== this.fromChain) {
       throw new Error(`swidge: provider transaction chain ${unsigned.chain} does not match ${this.fromChain}`);
@@ -608,7 +646,7 @@ export abstract class BaseSwidgeProtocol extends SwidgeProtocol {
     // into an ERC-20 transfer(depositAddress, amount); supported non-EVM
     // sources use the official account.transfer() token surface below.
     let tokenId: string | undefined;
-    if (!unsigned.data && !unsigned.bodyBoc && !unsigned.typedData) {
+    if (!unsigned.data && !unsigned.bodyBoc && !unsigned.typedData && !serialized) {
       const src = ccAsset(this.fromChain, toSymbol(this.fromChain, executionOptions.fromToken));
       if (src?.contract) {
         if (this.fromChain.startsWith("eip155:")) {
@@ -654,7 +692,14 @@ export abstract class BaseSwidgeProtocol extends SwidgeProtocol {
     const source = ccAsset(this.fromChain, toSymbol(this.fromChain, executionOptions.fromToken));
     if (!source) throw new Error(`swidge: unknown source token '${executionOptions.fromToken}' on ${this.fromChain}`);
     const executionValue = BigInt(unsigned.value);
-    if (source.contract && this.fromChain.startsWith("eip155:")) {
+    if (serialized) {
+      // The native coin leaves through the serialized tx itself; `value` only
+      // declares what the account may let it take: the input for a native
+      // source, nothing for a token source.
+      if (executionValue !== (source.contract ? 0n : BigInt(q.sourceAmount))) {
+        throw new Error("swidge: provider execution amount does not match the validated quote");
+      }
+    } else if (source.contract && this.fromChain.startsWith("eip155:")) {
       if (executionValue !== 0n) throw new Error("swidge: token execution attempted to attach native value");
     } else if (!unsigned.typedData && !unsigned.bodyBoc && executionValue !== BigInt(q.sourceAmount)) {
       throw new Error("swidge: provider execution amount does not match the validated quote");
@@ -767,7 +812,18 @@ export abstract class BaseSwidgeProtocol extends SwidgeProtocol {
     let sent: {hash?: string};
     this.emitPhase("signing");
     try {
-      if (tokenId) {
+      if (serialized) {
+        const allowanceRaw = (this._config as SwidgeEngineConfig).serializedNativeAllowance;
+        const allowance = allowanceRaw === undefined ? DEFAULT_SERIALIZED_NATIVE_ALLOWANCE : BigInt(allowanceRaw);
+        if (allowance < 0n) throw new SwidgeConfigurationError("swidge: serializedNativeAllowance must be non-negative");
+        const expect: SerializedExecutionExpectation = {
+          maxValueOut: ((source.contract ? 0n : BigInt(q.sourceAmount)) + allowance).toString(),
+          // Only a same-chain swap lands in this account; a bridge delivers elsewhere.
+          ...(params.destChain === this.fromChain ? {tokenIn: {token: params.destToken, minAmount: q.minDestAmount}} : {}),
+          ...(source.contract ? {source: {token: source.contract, maxAmount: q.sourceAmount}} : {}),
+        };
+        sent = await signer.sendSerializedTransaction!(unsigned.serializedTx!, expect);
+      } else if (tokenId) {
         if (typeof signer.transfer !== "function") {
           throw new SwidgeExecutionError(
             `swidge: ${this.fromChain} token execution requires account.transfer({token, recipient, amount})`,

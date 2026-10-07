@@ -2,9 +2,15 @@ import { SignerError } from '@forgewallet/core'
 
 /** Refused before signing: the transaction would almost certainly destroy funds or sign on someone else's behalf. */
 export class UnsafeTransactionError extends SignerError {
-  constructor(message: string) {
+  /** Machine-readable reason (e.g. `unknown-program`, `token-drain`, `slippage`); undefined for the generic refusals. */
+  readonly code: string | undefined
+  /** What tripped the check (program ids, account addresses…). */
+  readonly details: readonly string[]
+  constructor(message: string, code?: string, details: readonly string[] = []) {
     super(message)
     this.name = 'UnsafeTransactionError'
+    this.code = code
+    this.details = details
   }
 }
 

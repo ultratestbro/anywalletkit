@@ -348,4 +348,76 @@ describe("core public contract", () => {
     expect(sent).toHaveLength(3);
     expect(sent[0]!.data).not.toBe(sent[2]!.data);
   });
+
+  it("executes a provider-serialized transaction only through the account's guarded hook", async () => {
+    const WIRE = "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    const SOL_USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    const SOL_USDT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB";
+    const SENDER = "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk";
+    const quoteFor = (params: {amountIn: string; sourceToken: string; destChain: string}) => ({
+      provider: "serial", intentId: "serial:intent", depositAddress: "", depositMemo: null,
+      txRequest: {serializedTx: WIRE, value: params.sourceToken === "SOL" ? params.amountIn : "0"},
+      sourceAmount: params.amountIn, destAmount: "990000", minDestAmount: "980000",
+      feeUsd: 0, etaSeconds: 1, reliability: 1, validUntilMs: Date.now() + 60_000,
+    });
+    const provider: CrossChainProvider = {
+      name: "serial",
+      enabled: () => true,
+      supportsSameChain: true,
+      supportsRoute: () => true,
+      getQuote: async (params) => quoteFor(params),
+      buildDeposit: async (quote) => ({chain: "solana:mainnet", to: "", value: quote.txRequest!.value!, serializedTx: quote.txRequest!.serializedTx!}),
+      trackIntent: async () => ({state: "pending"}),
+    };
+    class SerialProtocol extends SingleProviderSwidge {
+      protected readonly provider = provider;
+      protected chainSupported(): boolean { return true; }
+    }
+    const sent: unknown[] = [];
+    const serialized: Array<{tx: string; expect: unknown}> = [];
+    const account = {
+      getAddress: async () => SENDER,
+      getChainId: async () => "solana:mainnet",
+      sendTransaction: async (tx: unknown) => { sent.push(tx); return {hash: "plain"}; },
+      transfer: async (tx: unknown) => { sent.push(tx); return {hash: "transfer"}; },
+      sendSerializedTransaction: async (tx: string, expect: unknown) => { serialized.push({tx, expect}); return {hash: "serial-sig"}; },
+    };
+    // (a) SOL → USDC on the same chain: the input plus the native allowance may
+    // leave, and the quoted minimum of USDC must arrive.
+    const sameChain = new SerialProtocol(account, {fromChain: "solana:mainnet"});
+    await expect(sameChain.swidge({
+      fromToken: "SOL", toToken: SOL_USDC, toChain: "solana:mainnet", fromTokenAmount: 50_000_000n, minAmountOut: 980_000n,
+    })).resolves.toMatchObject({hash: "serial-sig"});
+    expect(sent).toHaveLength(0);
+    expect(serialized).toEqual([{tx: WIRE, expect: {
+      maxValueOut: String(50_000_000n + 20_000_000n),
+      tokenIn: {token: SOL_USDC, minAmount: "980000"},
+    }}]);
+    // (b) USDT → Ethereum (bridge): nothing arrives here, so no tokenIn; only
+    // the configured allowance of SOL and exactly the input of USDT may leave.
+    serialized.length = 0;
+    const bridge = new SerialProtocol(account, {fromChain: "solana:mainnet", serializedNativeAllowance: 5_000_000n});
+    await expect(bridge.swidge({
+      fromToken: "USDT", toToken: "0xdac17f958d2ee523a2206206994597c13d831ec7", toChain: 1,
+      recipient: "0x3333333333333333333333333333333333333333", fromTokenAmount: 1_000_000n, minAmountOut: 980_000n,
+    })).resolves.toMatchObject({hash: "serial-sig"});
+    expect(serialized).toEqual([{tx: WIRE, expect: {maxValueOut: "5000000", source: {token: SOL_USDT, maxAmount: "1000000"}}}]);
+    expect(sent).toHaveLength(0);
+    // (c) an account without the hook is refused before anything is sent.
+    const plain = {getAddress: account.getAddress, getChainId: account.getChainId, sendTransaction: account.sendTransaction, transfer: account.transfer};
+    await expect(new SerialProtocol(plain, {fromChain: "solana:mainnet"}).swidge({
+      fromToken: "SOL", toToken: SOL_USDC, toChain: "solana:mainnet", fromTokenAmount: 50_000_000n, minAmountOut: 980_000n,
+    })).rejects.toThrow(/requires account\.sendSerializedTransaction/);
+    expect(sent).toHaveLength(0);
+    // (d) the build must reproduce the quote's serialized bytes.
+    const tampered: CrossChainProvider = {...provider, buildDeposit: async (quote) => ({chain: "solana:mainnet", to: "", value: quote.txRequest!.value!, serializedTx: WIRE.replace("A", "B")})};
+    class TamperedProtocol extends SingleProviderSwidge {
+      protected readonly provider = tampered;
+      protected chainSupported(): boolean { return true; }
+    }
+    await expect(new TamperedProtocol(account, {fromChain: "solana:mainnet"}).swidge({
+      fromToken: "SOL", toToken: SOL_USDC, toChain: "solana:mainnet", fromTokenAmount: 50_000_000n, minAmountOut: 980_000n,
+    })).rejects.toThrow(/does not match the validated quote transaction/);
+    expect(serialized).toHaveLength(1);
+  });
 });

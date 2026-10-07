@@ -145,4 +145,61 @@ describe("LI.FI provider security contract", () => {
     }))));
     await expect(provider.getQuote(PARAMS)).resolves.toBeNull();
   });
+
+  it("quotes Solana sources as a guarded serialized transaction and names the chain on build", async () => {
+    const SOL_CHAIN = 1151111081099710;
+    const SOL_NATIVE = "11111111111111111111111111111111";
+    const SOL_USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    const SOL_SENDER = "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk";
+    const WIRE = "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    const solana = (overrides: Record<string, unknown> = {}) => ({
+      type: "lifi", id: "q-sol",
+      action: {
+        fromToken: {address: SOL_NATIVE, chainId: SOL_CHAIN}, toToken: {address: SOL_USDC, chainId: SOL_CHAIN},
+        fromAmount: "50000000", fromChainId: SOL_CHAIN, toChainId: SOL_CHAIN, slippage: 0.005,
+        fromAddress: SOL_SENDER, toAddress: SOL_SENDER,
+      },
+      estimate: {fromAmount: "50000000", toAmount: "990000", toAmountMin: "980000", executionDuration: 5},
+      transactionRequest: {data: WIRE},
+      ...overrides,
+    });
+    const params = {
+      sourceChain: "solana:mainnet", sourceToken: "SOL", destChain: "solana:mainnet", destToken: SOL_USDC,
+      amountIn: "50000000", destAddress: SOL_SENDER, refundAddress: SOL_SENDER, slippageBps: 50,
+    };
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", async (url: URL) => { requests.push(String(url)); return new Response(JSON.stringify(solana())); });
+    const provider = lifiProvider();
+    expect(provider.supportsRoute({chain: "solana:mainnet", token: "SOL"}, {chain: "eip155:1", token: "USDT"})).toBe(true);
+    expect(provider.supportsChain!("solana:mainnet")).toBe(true);
+    const quote = await provider.getQuote(params);
+    expect(quote).toMatchObject({sourceAmount: "50000000", minDestAmount: "980000", txRequest: {serializedTx: WIRE, value: "50000000"}});
+    expect(quote!.txRequest!.to).toBeUndefined();
+    expect(requests[0]).toContain(`fromChain=${SOL_CHAIN}`);
+    expect(requests[0]).toContain(`fromToken=${SOL_NATIVE}`);
+    await expect(provider.buildDeposit(quote!)).resolves.toEqual({chain: "solana:mainnet", to: "", value: "50000000", serializedTx: WIRE});
+
+    // A token source lets no native value through; a native DEST maps to the Solana sentinel.
+    const usdcSource = solana({
+      action: {...solana().action, fromToken: {address: SOL_USDC, chainId: SOL_CHAIN}, toToken: {address: SOL_NATIVE, chainId: SOL_CHAIN}, fromAmount: "1000000"},
+      estimate: {fromAmount: "1000000", toAmount: "50000000", toAmountMin: "49000000"},
+    });
+    vi.stubGlobal("fetch", async (url: URL) => { requests.push(String(url)); return new Response(JSON.stringify(usdcSource)); });
+    const q2 = await provider.getQuote({...params, sourceToken: "USDC", destToken: "0x0000000000000000000000000000000000000000", amountIn: "1000000"});
+    expect(q2).toMatchObject({txRequest: {serializedTx: WIRE, value: "0"}});
+    expect(requests.at(-1)).toContain(`toToken=${SOL_NATIVE}`);
+
+    // Refusals: EVM-shaped payload on a Solana source, non-base64 data, an approval address.
+    for (const bad of [
+      solana({transactionRequest: {to: DIAMOND, data: "0xdeadbeef", value: "0x0", chainId: 1, gasLimit: "0x5208"}}),
+      solana({transactionRequest: {data: "not base64!!"}}),
+      solana({estimate: {...solana().estimate, approvalAddress: DIAMOND}}),
+    ]) {
+      vi.stubGlobal("fetch", async () => new Response(JSON.stringify(bad)));
+      expect(await provider.getQuote(params)).toBeNull();
+    }
+    // EVM routes are untouched by the Solana path.
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(response())));
+    await expect(provider.getQuote(PARAMS)).resolves.toMatchObject({txRequest: {to: DIAMOND, chainId: 1}});
+  });
 });

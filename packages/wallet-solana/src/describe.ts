@@ -62,14 +62,25 @@ function fromMessage(msg: TransactionMessage): Normalized {
   return { version: msg.version, feePayer, signers: [...signers.keys()].map((address) => ({ address, signed: undefined })), instructions, unresolvedLookups: false }
 }
 
-function fromCompiled(tx: Transaction, ctx: DescribeContext): Normalized {
-  const compiled = getCompiledTransactionMessageDecoder().decode(tx.messageBytes) as unknown as {
-    version: 'legacy' | 0 | 1
-    header: { numSignerAccounts: number; numReadonlySignerAccounts: number; numReadonlyNonSignerAccounts: number }
-    staticAccounts: Address[]
-    instructions: Array<{ programAddressIndex: number; accountIndices?: number[]; data?: Uint8Array }>
-    addressTableLookups?: Array<{ lookupTableAddress: Address; writableIndexes: number[]; readonlyIndexes: number[] }>
-  }
+interface CompiledMessage {
+  version: 'legacy' | 0 | 1
+  header: { numSignerAccounts: number; numReadonlySignerAccounts: number; numReadonlyNonSignerAccounts: number }
+  staticAccounts: Address[]
+  instructions: Array<{ programAddressIndex: number; accountIndices?: number[]; data?: Uint8Array }>
+  addressTableLookups?: Array<{ lookupTableAddress: Address; writableIndexes: number[]; readonlyIndexes: number[] }>
+}
+
+/** The accounts a compiled message loads, in message order, with roles; lookups resolve through `ctx` or come back as `null`. */
+export interface CompiledAccounts {
+  compiled: CompiledMessage
+  accounts: Array<{ address: string | null; role: AccountRole }>
+  /** Lookup tables the message references (empty for legacy). */
+  tables: Address[]
+  unresolved: boolean
+}
+
+export function resolveCompiledAccounts(tx: Transaction, ctx: DescribeContext = {}): CompiledAccounts {
+  const compiled = getCompiledTransactionMessageDecoder().decode(tx.messageBytes) as unknown as CompiledMessage
   const { header, staticAccounts } = compiled
   // Account ordering per the message format: static accounts, then every
   // lookup's writable addresses, then every lookup's readonly addresses.
@@ -87,6 +98,12 @@ function fromCompiled(tx: Transaction, ctx: DescribeContext): Normalized {
   }
   for (const l of lookups) for (const i of l.writableIndexes) all.push({ address: resolve(l.lookupTableAddress, i), role: AccountRole.WRITABLE })
   for (const l of lookups) for (const i of l.readonlyIndexes) all.push({ address: resolve(l.lookupTableAddress, i), role: AccountRole.READONLY })
+  return { compiled, accounts: all, tables: lookups.map((l) => l.lookupTableAddress), unresolved }
+}
+
+function fromCompiled(tx: Transaction, ctx: DescribeContext): Normalized {
+  const { compiled, accounts: all, unresolved } = resolveCompiledAccounts(tx, ctx)
+  const { header, staticAccounts } = compiled
   const at = (i: number) => all[i] ?? { address: null, role: AccountRole.READONLY }
   const instructions: Resolved[] = compiled.instructions.map((ix) => ({
     programAddress: at(ix.programAddressIndex).address,

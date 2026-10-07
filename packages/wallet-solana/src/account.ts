@@ -1,6 +1,8 @@
 import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@forgewallet/core'
 import { compileTransaction, getAddressDecoder, getBase64EncodedWireTransaction, type SignatureBytes, type Transaction, type TransactionMessage } from '@solana/kit'
+import { decodeWireTransaction } from './describe.js'
 import { WalletAccountReadOnlySolana, type SolanaPlan } from './read-only-account.js'
+import type { SerializedCheck, SerializedTxGuard } from './serialized.js'
 import type { SolanaConfig, SolanaFeeQuote, SolanaTransaction, SolanaTransferOptions } from './types.js'
 
 const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
@@ -108,6 +110,20 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     this.maxFeeCheck(plan.quote.fee, this._config.transferMaxFee, 'transfer')
     const hash = await this.broadcast(getBase64EncodedWireTransaction(await this.signPlan(plan)))
     return { hash, fee: plan.quote.fee, quote: plan.quote }
+  }
+
+  /**
+   * Sign and broadcast a provider-built transaction (base64 wire) after
+   * {@link checkSerialized} proved it only does what `guard.expect` allows.
+   * Signatures already present (other parties) are preserved.
+   */
+  async sendSerialized(base64: string, guard: SerializedTxGuard): Promise<SolanaSendResult & { check: SerializedCheck }> {
+    this.requireRpc('send transactions')
+    const check = await this.checkSerialized(base64, guard)
+    this.maxFeeCheck(check.quote.fee, this._config.transactionMaxFee, 'transaction')
+    const plan: SolanaPlan = { transaction: decodeWireTransaction(base64), quote: check.quote, simulation: check.simulation, description: check.description }
+    const hash = await this.broadcast(getBase64EncodedWireTransaction(await this.signPlan(plan)))
+    return { hash, fee: check.quote.fee, quote: check.quote, check }
   }
 
   toReadOnlyAccount(): IWalletAccountReadOnly {

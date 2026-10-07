@@ -97,7 +97,8 @@
       "name": "@forgewallet/protocol-swidge-lifi",
       "type": "swidge",
       "chains": [
-        "eip155:*"
+        "eip155:*",
+        "solana:*"
       ],
       "tier": "core",
       "maintainers": [
@@ -106,7 +107,7 @@
       "conformance": "0.x",
       "repo": "https://github.com/ultratestbro/forgewallet",
       "path": "packages/protocol-swidge-lifi",
-      "description": "LI.FI REST cross-chain swaps and bridges.",
+      "description": "LI.FI REST cross-chain swaps and bridges (EVM calldata; Solana via guarded serialized transactions).",
       "addedAt": "2026-10-04"
     },
     {
