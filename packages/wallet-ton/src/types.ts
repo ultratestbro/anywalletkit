@@ -1,15 +1,26 @@
-import type { Cell, TonClient } from '@ton/ton'
+import type { Cell, StateInit } from '@ton/core'
 
-/** A toncenter v2 endpoint (api keys there are meant for client-side wallets). */
+/** A toncenter v2 JSON-RPC endpoint (api keys there are meant for client-side wallets). */
 export interface TonEndpoint { url: string; secretKey?: string }
 
+/** Anything that can answer a toncenter v2 JSON-RPC call (an endpoint wrapper, a test double, a proxy). */
+export interface TonRpc {
+  call<T = unknown>(method: string, params: Record<string, unknown>): Promise<T>
+}
+
+export type TonProvider = TonEndpoint | TonRpc
+
 export interface TonConfig {
-  /** toncenter endpoint(s) or TonClient(s). A list fails over in order. Omit for an offline (sign-only) wallet. */
-  tonClient?: TonEndpoint | TonClient | Array<TonEndpoint | TonClient>
+  /** toncenter endpoint(s) or `TonRpc`(s). A list fails over in order. Omit for an offline (sign-only) wallet. */
+  tonClient?: TonProvider | TonProvider[]
   /** Alias of `tonClient`. */
-  provider?: TonEndpoint | TonClient | Array<TonEndpoint | TonClient>
+  provider?: TonProvider | TonProvider[]
   /** Extra rounds across the endpoint list after the first full pass (default 3). */
   retries?: number
+  /** Per-request timeout in ms (default 15 000). */
+  timeoutMs?: number
+  /** Injectable fetch (tests, custom agents). Defaults to globalThis.fetch. */
+  fetch?: typeof fetch
   /** Max fee (nanotons) for `transfer`. */
   transferMaxFee?: bigint | number
   /** Max fee (nanotons) for `sendTransaction` / `signTransaction`. */
@@ -18,27 +29,83 @@ export interface TonConfig {
   indexerUrl?: string
   /** tonapi base used for fee rates (default https://tonapi.io/v2). */
   tonApiUrl?: string
-  /** 'mainnet' (ton:-239, default) or 'testnet' (ton:-3). */
+  /**
+   * toncenter v3 trace-emulation endpoint (e.g. https://toncenter.com/api/emulate/v1/emulateTrace).
+   * When set, every send is emulated first and a failing compute/action phase
+   * throws `SimulationError` before anything is signed. Without it the preflight
+   * is `estimateFee` only (fees + the fee cap).
+   */
+  emulateUrl?: string
+  /** Run the preflight (estimateFee + emulation when configured) before signing. Default true. */
+  simulate?: boolean
+  /** Seconds a signed external stays valid (default 60, max 600). */
+  validUntilSeconds?: number
+  /** Nanotons attached to a jetton transfer on top of `forwardTonAmount` (default 0.05 TON). */
+  jettonAttachedValue?: bigint | number | string
+  /** 'mainnet' (ton:-239, default) or 'testnet' (ton:-3). Only the CAIP-2 id and address-flag checks depend on it. */
   network?: 'mainnet' | 'testnet'
+  /**
+   * V5R1 wallet_id parts. Defaults (network id -239, subwallet 0) give the
+   * addresses Tonkeeper and Tonhub derive for a key; change them only to
+   * reach a wallet that was created with different ones.
+   */
+  walletId?: { networkGlobalId?: number; subwalletNumber?: number }
 }
 
-/** A TON transfer. `value` in nanotons. `body`: text comment or a Cell. */
+/** One internal message. `value` in nanotons. `body`: text comment or a Cell; `bodyBoc`: the same as base64 BoC. */
 export interface TonTransaction {
   to: string
   value: bigint | number | string
+  /** Defaults to the flag in a friendly address (EQ… bounceable, UQ… not); raw addresses default to bounceable. */
   bounceable?: boolean
   body?: string | Cell
+  /** Prebuilt message body as base64 BoC (e.g. an Omniston escrow payload). Ignored when `body` is set. */
+  bodyBoc?: string
+  /** StateInit to attach (deploys the destination): `{code, data}`, a StateInit cell, or its base64 BoC. */
+  stateInit?: StateInit | Cell | string
+  /** Send mode for this message (default PAY_GAS_SEPARATELY; IGNORE_ERRORS is always OR-ed in for externals). */
+  sendMode?: number
 }
 
-/** `sendTransaction` also accepts an already built (signed) external-message body Cell. */
-export type TonSendable = TonTransaction | Cell
+/**
+ * What `sendTransaction` / `signTransaction` accept: one message, several
+ * messages in ONE external (up to 255 — swaps need it), or an already signed
+ * V5R1 external-message body Cell.
+ */
+export type TonSendable = TonTransaction | TonTransaction[] | Cell
 
 export interface TonTransferOptions {
   /** Jetton master address. Omit for native TON. */
   token?: string
   recipient: string
   amount: bigint | number | string
+  /** Jetton only: nanotons forwarded to the recipient with the transfer notification (default 1). */
+  forwardTonAmount?: bigint | number | string
+  /** Jetton only: forward payload — a text comment or a Cell (DEX / escrow payloads). */
+  forwardPayload?: Cell | string
+  /** Jetton only: custom payload cell (rarely needed; e.g. mintless jettons). */
+  customPayload?: Cell
+  /** Jetton only: where excess TON returns (default: this wallet). */
+  responseDestination?: string
+  /** Jetton only: query id (default random). */
+  queryId?: bigint | number
+  /** Jetton only: nanotons attached to the jetton-wallet call (default config.jettonAttachedValue + forwardTonAmount). */
+  attachedValue?: bigint | number | string
 }
+
+/** toncenter `estimateFee` source fees, nanotons. */
+export interface TonFees {
+  inFwdFee: bigint
+  storageFee: bigint
+  gasFee: bigint
+  fwdFee: bigint
+  /** Sum of the four. */
+  total: bigint
+}
+
+export type TonSimulation =
+  | { ok: true; fees: TonFees; emulated: boolean; exitCode?: number; actionSuccess?: boolean }
+  | { ok: false; fees?: TonFees; emulated: true; reason: string; exitCode?: number; aborted?: boolean }
 
 export interface TonReceipt {
   /** The body hash that was returned by sendTransaction. */

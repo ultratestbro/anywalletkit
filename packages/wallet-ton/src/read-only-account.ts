@@ -1,122 +1,213 @@
 import { NetworkError, type IWalletAccountReadOnly } from '@forgewallet/core'
 import { ed25519 } from '@noble/curves/ed25519.js'
-import { Buffer } from 'buffer'
-import { Address, Cell, SendMode, TonClient, WalletContractV5R1, beginCell, fromNano, internal, toNano, type MessageRelaxed, type OpenedContract } from '@ton/ton'
-import { createTonClient } from './client.js'
-import { CAIP2, type TonConfig, type TonReceipt, type TonSendable, type TonTransaction, type TonTransferOptions } from './types.js'
+import { Address, Cell, beginCell, internal, loadStateInit, type StateInit } from '@ton/core'
+import { commentCell, describeTransaction, type TonDescription } from './describe.js'
+import { UnsafeTransactionError } from './errors.js'
+import { TonCenter, createTonRpc, emulateExternal } from './toncenter.js'
+import {
+  DEFAULT_SEND_MODE, v5r1Address, v5r1ExternalMessage, v5r1PackUnsigned, v5r1SigningMessage, v5r1StateInit, v5r1WalletId,
+  type V5R1Message,
+} from './wallet-v5r1.js'
+import { CAIP2, type TonConfig, type TonFees, type TonReceipt, type TonSendable, type TonSimulation, type TonTransaction, type TonTransferOptions } from './types.js'
 
-const DUMMY_MESSAGE_VALUE = toNano('0.05')
 const JETTON_TRANSFER_OP = 0x0f8a7ea5
+const DEFAULT_JETTON_ATTACHED = 50_000_000n // 0.05 TON
 const DEFAULT_INDEXER = 'https://toncenter.com/api/v3'
-const SECRET_KEY_NULL = Buffer.alloc(64)
-export const SEND_MODE = SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS
+const DEFAULT_VALID_SECONDS = 60
+const MAX_VALID_SECONDS = 600
+/** PAY_GAS_SEPARATELY | IGNORE_ERRORS, the mode every action in an external carries. */
+export const SEND_MODE = DEFAULT_SEND_MODE
 
 const utf8 = (s: string | Uint8Array) => (typeof s === 'string' ? new TextEncoder().encode(s) : s)
 const hexToBytes = (h: string) => Uint8Array.from(h.match(/.{2}/g) ?? [], (b) => parseInt(b, 16))
+const big = (v: bigint | number | string) => BigInt(v)
 
 export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
   readonly chain: string
   readonly publicKey: Uint8Array
-  protected readonly _config: TonConfig
-  protected readonly _wallet: WalletContractV5R1
-  protected readonly _client: TonClient | undefined
-  protected readonly _contract: OpenedContract<WalletContractV5R1> | undefined
   readonly address: string
+  protected readonly _config: TonConfig
+  protected readonly _walletId: bigint
+  protected readonly _init: StateInit
+  protected readonly _address: Address
+  protected readonly _rpc: TonCenter | undefined
 
   constructor(publicKey: Uint8Array | string, config: TonConfig = {}) {
     this.publicKey = typeof publicKey === 'string' ? hexToBytes(publicKey) : publicKey
     this._config = config
-    this._wallet = WalletContractV5R1.create({ workchain: 0, publicKey: Buffer.from(this.publicKey) })
-    this.address = this._wallet.address.toString({ bounceable: false })
+    this._walletId = v5r1WalletId({ ...(config.walletId?.networkGlobalId !== undefined ? { networkGlobalId: config.walletId.networkGlobalId } : {}), ...(config.walletId?.subwalletNumber !== undefined ? { subwalletNumber: config.walletId.subwalletNumber } : {}) })
+    this._init = v5r1StateInit(this.publicKey, this._walletId)
+    this._address = v5r1Address(this.publicKey, { walletId: this._walletId })
+    this.address = this._address.toString({ bounceable: false, testOnly: config.network === 'testnet' })
     this.chain = CAIP2[config.network ?? 'mainnet']
-    this._client = createTonClient(config)
-    this._contract = this._client?.open(this._wallet)
+    const rpc = createTonRpc(config)
+    this._rpc = rpc ? new TonCenter(rpc) : undefined
   }
 
-  protected requireContract(what: string): OpenedContract<WalletContractV5R1> {
-    if (!this._contract) throw new NetworkError(`The wallet must be connected to a provider (ton center) to ${what}.`)
-    return this._contract
-  }
-  protected requireClient(what: string): TonClient {
-    if (!this._client) throw new NetworkError(`The wallet must be connected to a provider (ton center) to ${what}.`)
-    return this._client
+  protected requireRpc(what: string): TonCenter {
+    if (!this._rpc) throw new NetworkError(`The wallet must be connected to a provider (toncenter) to ${what}.`)
+    return this._rpc
   }
 
   async getAddress(): Promise<string> { return this.address }
 
   async getBalance(): Promise<bigint> {
-    return this.requireContract('get balances').getBalance()
+    return (await this.requireRpc('get balances').getAddressInformation(this._address)).balance
+  }
+
+  /** Current seqno — 0 until the wallet contract is deployed. Always fetched fresh. */
+  async getSeqno(): Promise<number> {
+    const rpc = this.requireRpc('read the seqno')
+    const state = await rpc.getAddressInformation(this._address)
+    if (state.state !== 'active') return 0
+    return (await rpc.runGetMethodOk(this._address, 'seqno')).stack.readNumber()
   }
 
   /** Resolve this wallet's jetton wallet for a jetton master. */
   async getJettonWalletAddress(token: string): Promise<Address> {
-    const client = this.requireClient('resolve jetton wallets')
-    const { stack } = await client.runMethod(Address.parse(token), 'get_wallet_address', [
-      { type: 'slice', cell: beginCell().storeAddress(this._wallet.address).endCell() },
+    const rpc = this.requireRpc('resolve jetton wallets')
+    const r = await rpc.runGetMethodOk(Address.parse(token), 'get_wallet_address', [
+      { type: 'slice', cell: beginCell().storeAddress(this._address).endCell() },
     ])
-    return stack.readAddress()
+    return r.stack.readAddress()
   }
 
   async getTokenBalance(token: string): Promise<bigint> {
-    const client = this.requireClient('get token balances')
-    try {
-      const jw = await this.getJettonWalletAddress(token)
-      const { stack } = await client.runMethod(jw, 'get_wallet_data', [])
-      return stack.readBigNumber()
-    } catch (e) {
-      if (e instanceof Error && e.message.includes('exit_code: -13')) return 0n // jetton wallet not deployed = never received
-      throw e
+    const rpc = this.requireRpc('get token balances')
+    const jw = await this.getJettonWalletAddress(token)
+    if ((await rpc.getAddressInformation(jw)).state !== 'active') return 0n // never received this jetton
+    return (await rpc.runGetMethodOk(jw, 'get_wallet_data')).stack.readBigNumber()
+  }
+
+  // ── Message building ──────────────────────────────────────────────────────
+
+  protected stateInitOf(src: TonTransaction['stateInit']): StateInit | undefined {
+    if (src === undefined) return undefined
+    if (typeof src === 'string') return loadStateInit(Cell.fromBase64(src).beginParse())
+    if (src instanceof Cell) return loadStateInit(src.beginParse())
+    return src
+  }
+
+  protected transactionMessage(tx: TonTransaction): V5R1Message {
+    const value = big(tx.value)
+    if (value <= 0n) throw new UnsafeTransactionError('zero-value', 'TON message value must be positive.')
+    let address: Address
+    let bounceable = true
+    let testOnly: boolean | undefined
+    if (Address.isFriendly(tx.to)) {
+      const f = Address.parseFriendly(tx.to)
+      address = f.address; bounceable = f.isBounceable; testOnly = f.isTestOnly
+    } else {
+      address = Address.parse(tx.to)
     }
+    if (address.workChain !== 0 && address.workChain !== -1) throw new UnsafeTransactionError('exotic-workchain', `Refusing to send to workchain ${address.workChain}.`)
+    const testnet = this._config.network === 'testnet'
+    if (testOnly !== undefined && testOnly !== testnet) {
+      throw new UnsafeTransactionError('network-mismatch', testOnly ? 'Test-only address on a mainnet wallet.' : 'Mainnet address on a testnet wallet.')
+    }
+    const body = tx.body instanceof Cell ? tx.body : typeof tx.body === 'string' ? (tx.body === '' ? undefined : commentCell(tx.body)) : tx.bodyBoc ? Cell.fromBase64(tx.bodyBoc) : undefined
+    const init = this.stateInitOf(tx.stateInit)
+    const message = internal({ to: address, value, bounce: tx.bounceable ?? bounceable, ...(body ? { body } : {}), ...(init ? { init } : {}) })
+    return { message, ...(tx.sendMode !== undefined ? { mode: tx.sendMode } : {}) }
   }
 
-  protected transactionMessage(tx: TonTransaction): MessageRelaxed {
-    const { isBounceable } = Address.parseFriendly(tx.to)
-    return internal({ to: tx.to, value: fromNano(BigInt(tx.value)), bounce: tx.bounceable ?? isBounceable, body: tx.body ?? '' })
-  }
-
-  protected async jettonTransferMessage(o: TonTransferOptions): Promise<MessageRelaxed> {
+  protected async jettonTransferMessage(o: TonTransferOptions): Promise<V5R1Message> {
+    const amount = big(o.amount)
+    if (amount <= 0n) throw new UnsafeTransactionError('zero-value', 'Jetton amount must be positive.')
     const recipient = Address.parse(o.recipient)
     const jw = await this.getJettonWalletAddress(o.token!)
+    const forwardTonAmount = o.forwardTonAmount !== undefined ? big(o.forwardTonAmount) : 1n
+    const forwardPayload = o.forwardPayload === undefined ? null : typeof o.forwardPayload === 'string' ? commentCell(o.forwardPayload) : o.forwardPayload
     const body = beginCell()
       .storeUint(JETTON_TRANSFER_OP, 32)
-      .storeUint(randomQueryId(), 64)
-      .storeCoins(BigInt(o.amount))
+      .storeUint(o.queryId !== undefined ? BigInt(o.queryId) : randomQueryId(), 64)
+      .storeCoins(amount)
       .storeAddress(recipient)
-      .storeAddress(this._wallet.address) // response destination (excess TON back to us)
-      .storeBit(false) // no custom payload
-      .storeCoins(1n) // forward 1 nanoton so the recipient wallet gets a notification
-      .storeMaybeRef(null)
+      .storeAddress(o.responseDestination ? Address.parse(o.responseDestination) : this._address)
+      .storeMaybeRef(o.customPayload ?? null)
+      .storeCoins(forwardTonAmount)
+      .storeMaybeRef(forwardPayload) // either-ref form: payloads always travel in a ref
       .endCell()
-    return internal({ to: jw, value: DUMMY_MESSAGE_VALUE, bounce: true, body })
+    const attached = o.attachedValue !== undefined
+      ? big(o.attachedValue)
+      : (this._config.jettonAttachedValue !== undefined ? big(this._config.jettonAttachedValue) : DEFAULT_JETTON_ATTACHED) + forwardTonAmount
+    return { message: internal({ to: jw, value: attached, bounce: true, body }) }
   }
 
-  /** Unsigned-shape transfer for fee estimation (zero secret key). */
-  protected async unsignedTransfer(message: MessageRelaxed): Promise<Cell> {
-    const contract = this.requireContract('build transfers')
-    const seqno = await contract.getSeqno()
-    return contract.createTransfer({ secretKey: SECRET_KEY_NULL, sendMode: SEND_MODE, messages: [message], seqno })
+  protected toMessages(tx: TonTransaction | TonTransaction[]): V5R1Message[] {
+    const list = Array.isArray(tx) ? tx : [tx]
+    if (list.length === 0) throw new UnsafeTransactionError('empty', 'Nothing to send.')
+    return list.map((t) => this.transactionMessage(t))
   }
 
-  /** in_fwd + storage + gas + fwd, from toncenter's estimateFee. */
-  protected async transferFee(transfer: Cell): Promise<bigint> {
-    const client = this.requireClient('quote transfers')
-    const addr = this._wallet.address
-    const { code, data } = await client.getContractState(addr)
-    const { source_fees } = await client.estimateExternalMessageFee(addr, {
-      body: transfer, initCode: code ? null : this._wallet.init.code, initData: data ? null : this._wallet.init.data, ignoreSignature: true,
+  protected validUntil(): number {
+    const seconds = this._config.validUntilSeconds ?? DEFAULT_VALID_SECONDS
+    if (!Number.isInteger(seconds) || seconds <= 0 || seconds > MAX_VALID_SECONDS) {
+      throw new UnsafeTransactionError('valid-until', `validUntilSeconds must be an integer between 1 and ${MAX_VALID_SECONDS}.`)
+    }
+    return Math.floor(Date.now() / 1000) + seconds
+  }
+
+  /** The cell to sign for `messages` at the CURRENT seqno (fetched fresh every time). */
+  protected async signingCell(messages: V5R1Message[]): Promise<{ signing: Cell; seqno: number; validUntil: number }> {
+    const seqno = await this.getSeqno()
+    const validUntil = this.validUntil()
+    return { signing: v5r1SigningMessage({ walletId: this._walletId, validUntil, seqno, messages }), seqno, validUntil }
+  }
+
+  // ── Fees / preflight ──────────────────────────────────────────────────────
+
+  /** StateInit to attach to an external when the wallet is not deployed yet. */
+  protected async initIfNeeded(): Promise<StateInit | undefined> {
+    const state = await this.requireRpc('read the account state').getAddressInformation(this._address)
+    return state.state === 'active' ? undefined : this._init
+  }
+
+  /** in_fwd + storage + gas + fwd from toncenter's estimateFee (signature ignored). */
+  async estimateFees(body: Cell): Promise<TonFees> {
+    const rpc = this.requireRpc('quote transfers')
+    const init = await this.initIfNeeded()
+    return rpc.estimateFee(this._address, { body, ...(init ? { init } : {}), ignoreSignature: true })
+  }
+
+  /**
+   * Preflight an external body: fees via estimateFee and, when
+   * `config.emulateUrl` is set, a full trace emulation whose compute/action
+   * phases decide `ok`. Never throws for a failing emulation — only for
+   * transport problems.
+   */
+  async simulateBody(body: Cell): Promise<TonSimulation> {
+    const fees = await this.estimateFees(body)
+    const url = this._config.emulateUrl
+    if (!url) return { ok: true, fees, emulated: false }
+    const init = await this.initIfNeeded()
+    const verdict = await emulateExternal(url, v5r1ExternalMessage(this._address, body, init), {
+      ...(this._config.fetch ? { fetch: this._config.fetch } : {}), ...(this._config.timeoutMs !== undefined ? { timeoutMs: this._config.timeoutMs } : {}),
     })
-    const { in_fwd_fee, storage_fee, gas_fee, fwd_fee } = source_fees
-    return BigInt(in_fwd_fee + storage_fee + gas_fee + fwd_fee)
+    if (verdict.ok) return { ok: true, fees, emulated: true, ...(verdict.exitCode !== undefined ? { exitCode: verdict.exitCode } : {}), ...(verdict.actionSuccess !== undefined ? { actionSuccess: verdict.actionSuccess } : {}) }
+    return { ok: false, fees, emulated: true, reason: verdict.reason ?? 'emulation failed', ...(verdict.exitCode !== undefined ? { exitCode: verdict.exitCode } : {}), ...(verdict.aborted !== undefined ? { aborted: verdict.aborted } : {}) }
+  }
+
+  /** Preflight a {@link TonSendable} (unsigned body, current seqno). */
+  async simulateTransaction(tx: TonSendable): Promise<TonSimulation> {
+    const body = tx instanceof Cell ? tx : v5r1PackUnsigned((await this.signingCell(this.toMessages(tx))).signing)
+    return this.simulateBody(body)
   }
 
   async quoteSendTransaction(tx: TonSendable): Promise<{ fee: bigint }> {
-    const transfer = tx instanceof Cell ? tx : await this.unsignedTransfer(this.transactionMessage(tx))
-    return { fee: await this.transferFee(transfer) }
+    const body = tx instanceof Cell ? tx : v5r1PackUnsigned((await this.signingCell(this.toMessages(tx))).signing)
+    return { fee: (await this.estimateFees(body)).total }
   }
 
   async quoteTransfer(o: TonTransferOptions): Promise<{ fee: bigint }> {
     const message = o.token ? await this.jettonTransferMessage(o) : this.transactionMessage({ to: o.recipient, value: o.amount })
-    return { fee: await this.transferFee(await this.unsignedTransfer(message)) }
+    const { signing } = await this.signingCell([message])
+    return { fee: (await this.estimateFees(v5r1PackUnsigned(signing))).total }
+  }
+
+  /** Offline description of what `tx` does — see {@link describeTransaction}. */
+  describe(tx: TonSendable): TonDescription {
+    return describeTransaction(tx, { network: this._config.network ?? 'mainnet' })
   }
 
   /**
@@ -124,17 +215,18 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
    * message body hash to the account transaction, which is then fetched.
    */
   async getTransactionReceipt(hash: string): Promise<TonReceipt | undefined> {
-    const client = this.requireClient('fetch transaction receipts')
+    const rpc = this.requireRpc('fetch transaction receipts')
     const base = this._config.indexerUrl ?? DEFAULT_INDEXER
-    const res = await fetch(`${base}/transactionsByMessage?${new URLSearchParams({ body_hash: hash, limit: '1' })}`)
+    const doFetch = this._config.fetch ?? globalThis.fetch
+    const res = await doFetch(`${base}/transactionsByMessage?${new URLSearchParams({ body_hash: hash, limit: '1' })}`, { signal: AbortSignal.timeout(this._config.timeoutMs ?? 15_000) })
     if (!res.ok) throw new NetworkError(`toncenter v3 ${res.status}`, { provider: base })
     const { transactions } = (await res.json()) as { transactions?: Array<{ account: string; hash: string; lt: string }> }
     const found = transactions?.[0]
     if (!found) return undefined
     const account = Address.parse(found.account)
     let tx
-    try { [tx] = await client.getTransactions(account, { limit: 1, hash: found.hash }) }
-    catch { [tx] = await client.getTransactions(account, { limit: 1, lt: found.lt, hash: found.hash, archival: true }) }
+    try { [tx] = await rpc.getTransactions(account, { limit: 1, hash: found.hash }) }
+    catch { [tx] = await rpc.getTransactions(account, { limit: 1, lt: found.lt, hash: found.hash, archival: true }) }
     if (!tx) return undefined
     const d = tx.description as { type: string; aborted?: boolean }
     return { hash, status: d.type === 'generic' && !d.aborted ? 1 : 0, blockNumber: tx.lt, transactionHash: tx.hash().toString('base64'), totalFees: tx.totalFees.coins, raw: tx }
