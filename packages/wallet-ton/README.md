@@ -44,6 +44,24 @@ const tk = await WalletManagerTon.fromTonMnemonic(words, { tonClient })
    and `dispose()` zeroizes it.
 5. `sendBoc` of the external (with StateInit when the wallet is not deployed).
 
+## Signers
+
+The account never holds a key. Every signature is a `signer.sign(bytes, {scheme: 'ed25519', context})`
+call: `ton-external` over the hash of the V5R1 signing cell (after the preflight, which runs on a
+zero-signed body), `ton-message` over raw message bytes (`sign()`, ton_proof). Seed wallets get a
+`LocalSigner`; a hardware wallet, MPC node or backend is wrapped with `externalSigner()` from
+`@forgewallet/core`:
+
+```ts
+const signer = externalSigner({ curve: 'ed25519', publicKey, sign: (payload, { context }) => device.sign(payload) })
+const manager = new WalletManagerTon(signer, { tonClient })
+const account = await manager.getAccount() // path 'external'; other indexes throw
+```
+
+A derivable `SeedSigner` at `m/44'/607'` yields `getAccount(i)` children; a leaf signer (including
+`fromTonMnemonic`) is one account. `WalletAccountTon.fromPrivateKey(priv, pub, path)` keeps the
+raw-key shape for callers that derive themselves.
+
 ## Describe
 
 `describeTransaction(tx)` / `account.describe(tx)` decode TON transfers (text

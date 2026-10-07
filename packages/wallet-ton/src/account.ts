@@ -1,5 +1,4 @@
-import { SignerError, zeroize, type IWalletAccount, type IWalletAccountReadOnly, type TransferResult } from '@forgewallet/core'
-import { ed25519 } from '@noble/curves/ed25519.js'
+import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@forgewallet/core'
 import { Cell } from '@ton/core'
 import { SimulationError } from './errors.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'
@@ -9,24 +8,33 @@ import type { TonConfig, TonSendable, TonTransferOptions } from './types.js'
 const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
 
 /**
- * Signing TON account on Wallet V5R1. The 32-byte ed25519 seed is the only
- * key material (zeroized by `dispose()`); noble signs the body hash, so no
- * 64-byte nacl secret key is ever built.
+ * Signing TON account on Wallet V5R1. It never holds a key: the V5R1 body is
+ * signed by `signer.sign(signingCell.hash(), {scheme: 'ed25519', context:
+ * 'ton-external'})` — a {@link LocalSigner} for seed wallets, anything else
+ * (hardware, MPC, backend) through `externalSigner()`.
  *
  * Every send runs: hard checks → fresh seqno → preflight on the zero-signed
  * body (estimateFee, emulation when configured, fee cap) → sign → broadcast.
+ * The preflight body carries a zero signature, so the signer is only asked
+ * once the transaction has passed.
  */
 export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalletAccount {
   /** seqno and fees come from the network before signing. */
   readonly needsNetwork = true
   readonly path: string
-  private _privateKey: Uint8Array | undefined
+  readonly signer: Signer
   private _readOnly: WalletAccountReadOnlyTon | undefined
 
-  constructor(privateKey: Uint8Array, publicKey: Uint8Array, path: string, config: TonConfig = {}) {
+  /** `publicKey` is the signer's 32-byte ed25519 key; the V5R1 address derives from it synchronously. */
+  constructor(signer: Signer, publicKey: Uint8Array, path: string, config: TonConfig = {}) {
     super(publicKey, config)
-    this._privateKey = privateKey
+    this.signer = requireCurve(signer, 'ed25519')
     this.path = path
+  }
+
+  /** Back-compat: wrap a raw derived key in a {@link LocalSigner} (the account takes ownership; it cannot derive). */
+  static fromPrivateKey(privateKey: Uint8Array, publicKey: Uint8Array, path: string, config: TonConfig = {}): WalletAccountTon {
+    return new WalletAccountTon(LocalSigner.fromPrivateKey('ed25519', privateKey, publicKey, path), publicKey, path, config)
   }
 
   /** Account index for the standard m/44'/607'/i' path. */
@@ -35,15 +43,10 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     return m ? Number(m[1]) : undefined
   }
 
-  private key(): Uint8Array {
-    if (!this._privateKey) throw new SignerError('This account has been disposed.')
-    return this._privateKey
-  }
-
-  /** Hex ed25519 signature over the raw message bytes. */
+  /** Hex ed25519 signature over the raw message bytes (ton_proof and the like). */
   async sign(message: string | Uint8Array): Promise<string> {
     const bytes = typeof message === 'string' ? new TextEncoder().encode(message) : message
-    return toHex(ed25519.sign(bytes, this.key()))
+    return toHex(await this.signer.sign(bytes, { scheme: 'ed25519', context: 'ton-message' }))
   }
 
   private checkMaxFee(fee: bigint, limit: bigint | number | undefined, op: string) {
@@ -55,10 +58,10 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
    * zero-signed body (ignore_chksig), so nothing is signed before it passes.
    */
   private async prepare(messages: V5R1Message[], limit: bigint | number | undefined, op: string): Promise<{ body: Cell; fee: bigint }> {
-    const key = this.key()
     const { signing } = await this.signingCell(messages)
     const fee = await this.preflight(v5r1PackUnsigned(signing), limit, op)
-    return { body: v5r1PackSigned(signing, ed25519.sign(signing.hash(), key)), fee }
+    const signature = await this.signer.sign(new Uint8Array(signing.hash()), { scheme: 'ed25519', context: 'ton-external' })
+    return { body: v5r1PackSigned(signing, signature), fee }
   }
 
   private async preflight(body: Cell, limit: bigint | number | undefined, op: string): Promise<bigint> {
@@ -113,8 +116,8 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     return this._readOnly
   }
 
+  /** Disposes the signer: a local key is zeroized, an external one is released. */
   dispose(): void {
-    zeroize(this._privateKey)
-    this._privateKey = undefined
+    this.signer.dispose()
   }
 }

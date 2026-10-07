@@ -1,5 +1,4 @@
-import { WalletManager, deriveEd25519, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
-import { ed25519 } from '@noble/curves/ed25519.js'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
 import { mnemonicToPrivateKey } from '@ton/crypto'
 import { WalletAccountTon } from './account.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'
@@ -15,12 +14,16 @@ const DEFAULT_TONAPI = 'https://tonapi.io/v2'
  * the derivation Trust Wallet and Ledger use for a BIP-39 phrase. Paths
  * may be relative to m/44'/607' ("0'") or full.
  *
+ * Built with an ed25519 `Signer` instead of a seed, the manager wraps it:
+ * - a derivable `SeedSigner` sitting at `m/44'/607'` yields `getAccount(i)` → `i'` children;
+ * - a `SeedSigner` at a leaf, or any external signer, is `getAccount(0)` (path = the
+ *   signer's path, or 'external'); other indexes/paths throw.
+ *
  * Tonkeeper-style 24-word TON mnemonics (not BIP-39) are imported with
- * {@link WalletManagerTon.fromTonMnemonic}; they yield one account.
+ * {@link WalletManagerTon.fromTonMnemonic}; they yield one account at `ton-mnemonic`.
  */
 export class WalletManagerTon extends WalletManager<WalletAccountTon, TonConfig> {
   private _seedBytes: Uint8Array | undefined
-  private _tonKey: { privateKey: Uint8Array; publicKey: Uint8Array } | undefined
 
   constructor(seedOrSigner: string | Signer, config: TonConfig = {}) {
     super(seedOrSigner, config)
@@ -39,35 +42,56 @@ export class WalletManagerTon extends WalletManager<WalletAccountTon, TonConfig>
     const privateKey = new Uint8Array(pair.secretKey.subarray(0, 32)) // nacl secret key = seed || public key
     const publicKey = new Uint8Array(pair.publicKey)
     zeroize(new Uint8Array(pair.secretKey.buffer, pair.secretKey.byteOffset, pair.secretKey.byteLength))
-    const manager = new WalletManagerTon(keySigner(privateKey, publicKey), config)
-    manager._tonKey = { privateKey, publicKey }
-    return manager
+    return new WalletManagerTon(LocalSigner.fromPrivateKey('ed25519', privateKey, publicKey, TON_MNEMONIC_PATH), config)
   }
 
   async getAccount(index = 0): Promise<WalletAccountTon> {
-    if (this._tonKey) {
-      if (index !== 0) throw new Error('A TON mnemonic yields a single account (index 0).')
-      return this.getAccountByPath(TON_MNEMONIC_PATH)
+    const external = this.externalSigner()
+    if (external && !(isSeedSigner(external) && external.path === TON_BASE_PATH)) {
+      // A leaf signer (TON mnemonic, hardware, MPC…) is exactly one account.
+      if (index !== 0) throw new SignerError(`This signer yields a single account (index 0); ${index} is not derivable from it.`)
+      return this.fromSigner(external, this.singlePath(external))
     }
     return this.getAccountByPath(`${TON_BASE_PATH}/${index}'`)
   }
 
   async getAccountByPath(path: string): Promise<WalletAccountTon> {
-    if (this._tonKey) {
-      if (path !== TON_MNEMONIC_PATH) throw new Error(`A TON mnemonic yields a single account at path '${TON_MNEMONIC_PATH}'.`)
-      const cached = this._accounts.get(path)
-      if (cached) return cached
-      const account = new WalletAccountTon(this._tonKey.privateKey, this._tonKey.publicKey, path, this._config)
-      this._accounts.set(path, account)
-      return account
+    const external = this.externalSigner()
+    if (external) {
+      const single = this.singlePath(external)
+      const full = path === single || path.startsWith('m/') ? path : `${TON_BASE_PATH}/${path}`
+      return this.fromSigner(external, full)
     }
     const full = path.startsWith('m/') ? path : `${TON_BASE_PATH}/${path}`
     const cached = this._accounts.get(full)
     if (cached) return cached
-    if (!this._seedBytes) throw new Error('External signers for TON arrive in a later phase; construct WalletManagerTon with a seed phrase.')
-    const { privateKey, publicKey } = deriveEd25519(this._seedBytes, full)
-    const account = new WalletAccountTon(privateKey, publicKey, full, this._config)
+    const signer = LocalSigner.fromSeed(this._seedBytes!, 'ed25519', full)
+    const account = new WalletAccountTon(signer, signer.publicKey, full, this._config)
     this._accounts.set(full, account)
+    return account
+  }
+
+  /** The one path a non-derivable signer answers to: its own, or 'external'. */
+  private singlePath(signer: Signer): string {
+    return isSeedSigner(signer) ? signer.path : 'external'
+  }
+
+  /** Resolve `path` against an injected signer: the signer itself, or a child when it can derive there. */
+  private async fromSigner(signer: Signer, path: string): Promise<WalletAccountTon> {
+    this.requireSigner('ed25519')
+    let leaf: Signer = signer
+    let key = this.singlePath(signer)
+    if (isSeedSigner(signer)) {
+      if (path === signer.path) key = path
+      else if (path.startsWith(`${signer.path}/`)) { leaf = await signer.derive(path.slice(signer.path.length + 1)); key = path }
+      else throw new SignerError(`This signer yields a single account at path '${signer.path}'; it cannot provide ${path}.`)
+    } else if (path !== `${TON_BASE_PATH}/0'` && path !== 'external') {
+      throw new SignerError(`An external signer yields a single account; ${path} is not derivable from it.`)
+    }
+    const cached = this._accounts.get(key)
+    if (cached) return cached
+    const account = new WalletAccountTon(leaf, await leaf.getPublicKey(), key, this._config)
+    this._accounts.set(key, account)
     return account
   }
 
@@ -89,23 +113,5 @@ export class WalletManagerTon extends WalletManager<WalletAccountTon, TonConfig>
     super.dispose()
     zeroize(this._seedBytes)
     this._seedBytes = undefined
-    if (this._tonKey) { zeroize(this._tonKey.privateKey); this._tonKey = undefined }
-  }
-}
-
-/** Minimal ed25519 Signer over a raw key, so the base WalletManager can hold a mnemonic-less wallet. */
-function keySigner(privateKey: Uint8Array, publicKey: Uint8Array): Signer {
-  let key: Uint8Array | undefined = privateKey
-  return {
-    kind: 'external',
-    curve: 'ed25519',
-    schemes: ['ed25519'],
-    async getPublicKey() { return publicKey },
-    async sign(payload, options) {
-      if (!key) throw new Error('Signer disposed.')
-      if (options?.scheme !== undefined && options.scheme !== 'ed25519') throw new Error(`Unsupported scheme ${options.scheme}`)
-      return ed25519.sign(payload, key)
-    },
-    dispose() { zeroize(key); key = undefined },
   }
 }
