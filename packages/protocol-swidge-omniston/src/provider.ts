@@ -1644,7 +1644,11 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
   return {
     name: "omniston",
     enabled: () => (opts.enabled ?? true) && trustedContracts.size > 0,
-    // TON↔TON swap settlement is same-chain by definition.
+
+    // Capability discovery comes from the provider itself, so it can run alone
+    // or inside the optional aggregator without a central capability table.
+    supportsChain: (chain: string) => cfg.supportsChain(chain),
+    supportsChainPair: (fromChain: string, toChain: string) => cfg.supports(fromChain, toChain),    // TON↔TON swap settlement is same-chain by definition.
     supportsSameChain: true,
 
     supportsRoute(from: Asset, to: Asset): boolean {

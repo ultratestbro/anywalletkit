@@ -1,37 +1,29 @@
 /**
- * @forgewallet/protocol-swidge-router
+ * @forgewallet/protocol-swidge-router — the OPTIONAL swidge aggregator.
  *
- * A "swidge" (swap+bridge) protocol: cross-chain asset delivery over a set
- * of pluggable solver networks — NEAR Intents (1Click), LI.FI, THORChain and
- * Omniston — behind one scoring router. Two surfaces are exported:
+ * Every swidge provider module runs on its own (install only
+ * `@forgewallet/protocol-swidge-lifi` and use `LifiSwidgeProtocol`). Install
+ * this package when you want one protocol that auctions a route across several
+ * providers: pass the providers you installed and it quotes them in parallel,
+ * validates every quote, scores them and executes the winner.
  *
- *  1. The engine (`CrossChainRouter` + `CrossChainProvider`s) — the low-level
- *     deposit-address / calldata execution model.
- *  2. The protocol layer (`./swidge`) — `SwidgeProtocol` subclasses that
- *     implement `@forgewallet/core`'s protocol contract on top of the engine,
- *     so the same routes are reachable through a registered account.
+ * ```ts
+ * import {RouterSwidgeProtocol} from "@forgewallet/protocol-swidge-router";
+ * import {lifiProvider} from "@forgewallet/protocol-swidge-lifi/provider";
+ * import {nearIntentsProvider} from "@forgewallet/protocol-swidge-near-intents/provider";
+ *
+ * const swidge = new RouterSwidgeProtocol(account, {
+ *   fromChain: "eip155:1",
+ *   providers: [lifiProvider({}), nearIntentsProvider({})],
+ * });
+ * ```
+ *
+ * Providers reached through a backend use `remoteProvider` (re-exported from
+ * the core package); give it `supportsChain`/`supportsChainPair` — e.g. from
+ * the provider package's `config` export — so discovery knows its coverage.
  */
-
-// ── Engine (low-level) ───────────────────────────────────────────────────────
-export * from "./types.js";
 export {CrossChainRouter} from "./router.js";
-export {crossChainRouter, setCrossChainRouter} from "./engine.js";
-export {nearIntents, lifi, thorchain, omniston} from "./config.js";
-export {nearIntentsProvider} from "./providers/nearIntents.js";
-export {thorchainProvider} from "./providers/thorchain.js";
-export {
-  omnistonProvider,
-  inMemoryQuoteStore,
-  type OmnistonQuoteStore,
-  inMemorySecretStore,
-  type HtlcSecretStore,
-  type OmnistonProviderOptions,
-  type OmnistonClientLike,
-} from "./providers/omniston.js";
-
-// ── Remote (browser → backend) provider ──────────────────────────────────────
-export {remoteProvider, type RemoteProviderOptions} from "./remote.js";
-
-// ── swidge layer ─────────────────────────────────────────────────────────
-export * from "./swidge/index.js";
+export {RouterSwidgeProtocol, type RouterSwidgeConfig} from "./swidge/router.js";
 export {RouterSwidgeProtocol as default} from "./swidge/router.js";
+export {remoteProvider, type RemoteProviderOptions} from "@forgewallet/protocol-swidge-core/remote";
+export type * from "@forgewallet/protocol-swidge-core/types";

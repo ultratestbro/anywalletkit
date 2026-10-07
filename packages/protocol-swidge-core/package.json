@@ -24,10 +24,10 @@
       "import": "./dist/errors.js",
       "require": "./dist/errors.cjs"
     },
-    "./router": {
-      "types": "./dist/router.d.ts",
-      "import": "./dist/router.js",
-      "require": "./dist/router.cjs"
+    "./validate": {
+      "types": "./dist/validate.d.ts",
+      "import": "./dist/validate.js",
+      "require": "./dist/validate.cjs"
     },
     "./remote": {
       "types": "./dist/remote.d.ts",

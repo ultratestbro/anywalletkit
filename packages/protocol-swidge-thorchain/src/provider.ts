@@ -1,3 +1,4 @@
+import {thorchain as thorCfg} from "./config.js";
 import {decodeFunctionData, encodeFunctionData} from "viem";
 import {timeoutSignal} from "@forgewallet/protocol-swidge-core/util";
 import {ccAsset, ccAssetByToken} from "@forgewallet/swidge-assets";
@@ -367,6 +368,10 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
     name: "thorchain",
     enabled: () => config.enabled ?? true,
 
+    // Capability discovery comes from the provider itself, so it can run alone
+    // or inside the optional aggregator without a central capability table.
+    supportsChain: (chain: string) => thorCfg.supportsChain(chain),
+    supportsChainPair: (fromChain: string, toChain: string) => thorCfg.supports(fromChain, toChain),
     // Inbound: EVM/Tron source → the mainnet vault. Outbound (step-2 off-ramp):
     // EVM source (Ethereum) → any THOR-supported chain. The SOURCE must be EVM
     // (router calldata) or, when opted in, Tron (send + memo); both legs must

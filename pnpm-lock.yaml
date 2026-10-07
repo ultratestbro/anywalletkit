@@ -381,18 +381,6 @@ importers:
       '@forgewallet/protocol-swidge-core':
         specifier: workspace:*
         version: link:../protocol-swidge-core
-      '@forgewallet/protocol-swidge-near-intents':
-        specifier: workspace:*
-        version: link:../protocol-swidge-near-intents
-      '@forgewallet/protocol-swidge-omniston':
-        specifier: workspace:*
-        version: link:../protocol-swidge-omniston
-      '@forgewallet/protocol-swidge-thorchain':
-        specifier: workspace:*
-        version: link:../protocol-swidge-thorchain
-      '@forgewallet/swidge-assets':
-        specifier: workspace:*
-        version: link:../swidge-assets
     devDependencies:
       '@forgewallet/conformance':
         specifier: workspace:*

@@ -1,164 +1,98 @@
-import {describe, expect, it, vi} from "vitest";
-import {CrossChainRouter} from "@forgewallet/protocol-swidge-core/router";
+import {describe, expect, it} from "vitest";
+import type {CrossChainProvider} from "@forgewallet/protocol-swidge-core/types";
+import {remoteProvider} from "@forgewallet/protocol-swidge-core/remote";
+import {CrossChainRouter} from "../src/router.js";
 import {RouterSwidgeProtocol} from "../src/swidge/router.js";
 
-describe("aggregator public contract", () => {
-  const options = {
-    fromToken: "USDT", toToken: "USDT", toChain: "eip155:42161", recipient: "0xrecipient",
-    fromTokenAmount: 100n, minAmountOut: 90n,
-  };
-  const quote = {
-    fromTokenAmount: 100n, toTokenAmount: 100n, toTokenAmountMin: 90n,
-    fees: [] as never[], expiry: Math.floor(Date.now() / 1000) + 60,
-  };
-  const external = (overrides: Record<string, unknown> = {}) => ({
-    quoteSwidge: async () => quote,
-    swidge: async () => ({id: "source", fees: [], fromTokenAmount: 100n, toTokenAmount: 100n, toTokenAmountMin: 90n}),
-    getSwidgeStatus: async () => ({status: "pending" as const}),
-    getSupportedChains: async () => [], getSupportedTokens: async () => [],
-    ...overrides,
-  });
-
-  it("rejects duplicate external module names", () => {
-    const protocol = {quoteSwidge: async () => { throw new Error(); }, swidge: async () => { throw new Error(); }, getSwidgeStatus: async () => ({status: "pending" as const}), getSupportedChains: async () => [], getSupportedTokens: async () => []};
-    expect(() => new RouterSwidgeProtocol(undefined, {fromChain: "eip155:1", router: new CrossChainRouter([]), modules: [{name: "x", protocol}, {name: "x", protocol}]})).toThrow(/duplicate/);
-  });
-
-  it("rejects malformed quotes and execution results from external modules", async () => {
-    const router = new CrossChainRouter([]);
-    const badQuote = new RouterSwidgeProtocol(undefined, {
-      fromChain: "eip155:1", router,
-      modules: [{name: "bad", protocol: external({quoteSwidge: async () => ({...quote, fees: [{type: "network", amount: -1n, token: "ETH"}]})})}],
-    });
-    await expect(badQuote.quoteSwidge(options)).rejects.toThrow(/no route/);
-
-    const badResult = new RouterSwidgeProtocol(undefined, {
-      fromChain: "eip155:1", router,
-      modules: [{name: "bad", protocol: external({swidge: async () => ({id: "", fees: [], fromTokenAmount: 100n, toTokenAmount: 100n})})}],
-    });
-    await expect(badResult.swidge(options)).rejects.toThrow(/malformed execution result/);
-  });
-
-  it("rejects malformed wrapped ids without calling a module", async () => {
-    const status = vi.fn(async () => ({status: "pending" as const}));
-    const protocol = new RouterSwidgeProtocol(undefined, {
-      fromChain: "eip155:1", router: new CrossChainRouter([]),
-      modules: [{name: "mod", protocol: external({getSwidgeStatus: status})}],
-    });
-    await expect(protocol.getSwidgeStatus("awk1.mod~mod.%ZZ")).rejects.toThrow(/malformed external-module status id/);
-    expect(status).not.toHaveBeenCalled();
-  });
-
-  it("isolates throwing route discovery hooks", async () => {
-    const protocol = new RouterSwidgeProtocol(undefined, {
-      fromChain: "eip155:1", router: new CrossChainRouter([]),
-      modules: [{name: "mod", protocol: external(), supportsRoute: () => { throw new Error("boom"); }}],
-    });
-    await expect(protocol.getSupportedTokens({fromChain: "eip155:1", toChain: "eip155:42161"})).resolves.toEqual([]);
-  });
+const provider = (name: string, overrides: Partial<CrossChainProvider> = {}): CrossChainProvider => ({
+  name,
+  enabled: () => true,
+  supportsRoute: () => true,
+  getQuote: async (params) => ({
+    provider: name, intentId: `${name}-intent`, depositAddress: "0xdeposit", depositMemo: null,
+    sourceAmount: params.amountIn, destAmount: "100", minDestAmount: "100",
+    feeUsd: 0, etaSeconds: 1, reliability: 1, validUntilMs: Date.now() + 60_000,
+  }),
+  buildDeposit: async () => ({chain: "", to: "0xdeposit", value: "0"}),
+  trackIntent: async () => ({state: "pending"}),
+  ...overrides,
 });
 
-/**
- * A module that cannot name its account is excluded from an account-bound
- * auction — correctly, since it could be wired to a different account. That
- * exclusion used to happen silently at auction time, which meant such a module
- * quoted perfectly while unbound (every display quote, every test that only
- * quotes) and disappeared the moment a wallet was attached. It is now refused
- * at construction, where the wiring mistake actually is.
- */
-describe("module account binding", () => {
-  const protocol = {
-    quoteSwidge: async () => ({fromTokenAmount: 100n, toTokenAmount: 100n, toTokenAmountMin: 90n, fees: []}),
-    swidge: async () => ({id: "source", fees: [], fromTokenAmount: 100n, toTokenAmount: 100n, toTokenAmountMin: 90n}),
-    getSwidgeStatus: async () => ({status: "pending" as const}),
-    getSupportedChains: async () => [],
-    getSupportedTokens: async () => [],
-  };
-  const account = {getAddress: async () => "0xabc", getChainId: async () => 1};
-  const config = (modules: unknown[]) => ({
-    fromChain: "eip155:1",
-    router: new CrossChainRouter([]),
-    modules: modules as never,
+describe("auction engine", () => {
+  it("rejects duplicate provider names", () => {
+    const p = provider("x");
+    expect(() => new CrossChainRouter([p, p])).toThrow(/duplicate/i);
   });
 
-  it("refuses an unbindable module on an account-bound router", () => {
-    expect(() => new RouterSwidgeProtocol(account as never, config([{name: "usdt0", protocol}]))).toThrow(
-      /must declare accountAddress/,
-    );
-  });
-
-  it("accepts it once the module names its account", () => {
-    expect(
-      () => new RouterSwidgeProtocol(account as never, config([{name: "usdt0", protocol, accountAddress: "0xabc"}])),
-    ).not.toThrow();
-  });
-
-  it("still allows account-less routers, which is all status resolution needs", () => {
-    expect(() => new RouterSwidgeProtocol(undefined, config([{name: "usdt0", protocol}]))).not.toThrow();
-  });
-});
-
-describe("module skip diagnostics", () => {
-  it("reports why a module left the auction, and cannot break routing by throwing", async () => {
-    const skips: string[] = [];
-    const protocol = {
-      quoteSwidge: async () => {
-        throw new Error("pair is not a same-token bridge route");
-      },
-      swidge: async () => ({id: "s", fees: [], fromTokenAmount: 100n, toTokenAmount: 100n, toTokenAmountMin: 90n}),
-      getSwidgeStatus: async () => ({status: "pending" as const}),
-      getSupportedChains: async () => [],
-      getSupportedTokens: async () => [],
-    };
-    const aggregate = new RouterSwidgeProtocol(undefined, {
-      fromChain: "eip155:1",
-      router: new CrossChainRouter([]),
-      modules: [{name: "usdt0", protocol}] as never,
-      onModuleSkipped: (name, reason) => {
-        skips.push(`${name}: ${reason}`);
-        throw new Error("a broken observer must not change the outcome");
-      },
-    });
-    await expect(
-      aggregate.quoteSwidge({
-        fromToken: "USDT",
-        toToken: "USDT",
-        toChain: "eip155:42161",
-        recipient: "0xrecipient",
-        fromTokenAmount: 100n,
-        minAmountOut: 90n,
+  it("keeps immediate-execution flows from selecting order-only quotes", async () => {
+    const make = (name: string, destAmount: string, depositAddress: string) => provider(name, {
+      getQuote: async (params) => ({
+        provider: name, intentId: `${name}-intent`, depositAddress, depositMemo: null,
+        sourceAmount: params.amountIn, destAmount, minDestAmount: destAmount,
+        feeUsd: 0, etaSeconds: 1, reliability: 1, validUntilMs: Date.now() + 60_000,
       }),
-    ).rejects.toThrow(/no route/);
-    expect(skips).toEqual(["usdt0: pair is not a same-token bridge route"]);
+      buildDeposit: async () => ({chain: "ton:-239", to: depositAddress, value: "100"}),
+    });
+    const router = new CrossChainRouter([make("order-only", "110", ""), make("deposit-address", "100", "EQdeposit")]);
+    const params = {
+      sourceChain: "ton:-239", sourceToken: "USDT", destChain: "eip155:1",
+      destToken: "USDC", amountIn: "100", destAddress: "0x1",
+    };
+    expect((await router.getBestQuote(params))?.provider).toBe("order-only");
+    expect((await router.getBestQuote(params, {requireImmediateExecution: true}))?.provider).toBe("deposit-address");
   });
 });
 
-describe("statusOnlyModule", () => {
-  it("resolves delivery without an account and declines every route", async () => {
-    const {statusOnlyModule} = await import("../src/swidge/bridgeAdapter.js");
-    const module = statusOnlyModule({
-      name: "usdt0",
-      status: async (hash) => ({status: "completed", transactions: [{hash, type: "destination"}]}),
-    });
-    expect(module.accountAddress).toBeUndefined();
+describe("aggregator over caller-supplied providers", () => {
+  it("needs exactly one of providers / router", () => {
+    expect(() => new RouterSwidgeProtocol(undefined, {fromChain: "eip155:1"})).toThrow(/exactly one/);
+    expect(() => new RouterSwidgeProtocol(undefined, {fromChain: "eip155:1", providers: [], router: new CrossChainRouter([])}))
+      .toThrow(/exactly one/);
+    expect(() => new RouterSwidgeProtocol(undefined, {fromChain: "eip155:1", providers: []})).not.toThrow();
+  });
 
-    const aggregate = new RouterSwidgeProtocol(undefined, {
+  it("takes capabilities from the providers themselves, honoring enabled", async () => {
+    const evmOnly = provider("evm", {
+      supportsChain: (c) => c.startsWith("eip155:"),
+      supportsChainPair: (a, b) => a.startsWith("eip155:") && b.startsWith("eip155:"),
+    });
+    const tonDark = provider("ton", {
+      enabled: () => false,
+      supportsChain: (c) => c === "ton:-239",
+      supportsChainPair: () => true,
+    });
+    const swidge = new RouterSwidgeProtocol(undefined, {fromChain: "eip155:1", providers: [evmOnly, tonDark]});
+    const chains = (await swidge.getSupportedChains()).map((c) => String(c.id));
+    expect(chains).toContain("eip155:1");
+    expect(chains).not.toContain("ton:-239");
+    expect(await swidge.getSupportedTokens({fromChain: "eip155:1", toChain: "ton:-239"})).toEqual([]);
+    expect((await swidge.getSupportedTokens({fromChain: "eip155:1", toChain: "eip155:42161"})).length).toBeGreaterThan(0);
+  });
+
+  it("a remote provider is discoverable once the caller gives it capabilities", async () => {
+    const remote = remoteProvider({name: "lifi", baseUrl: "https://example.invalid/swidge", supportsChain: (c) => c === "eip155:1"});
+    const swidge = new RouterSwidgeProtocol(undefined, {fromChain: "eip155:1", providers: [remote]});
+    expect((await swidge.getSupportedChains()).map((c) => String(c.id))).toEqual(["eip155:1"]);
+    const blind = new RouterSwidgeProtocol(undefined, {
       fromChain: "eip155:1",
-      router: new CrossChainRouter([]),
-      modules: [module],
+      providers: [remoteProvider({name: "lifi", baseUrl: "https://example.invalid/swidge"})],
     });
-    const status = await aggregate.getSwidgeStatus("awk1.mod~usdt0.0xsource");
-    expect(status.status).toBe("completed");
+    expect(await blind.getSupportedChains()).toEqual([]);
+  });
 
-    // It declines at the pair gate, before its own protocol is ever consulted.
-    await expect(
-      module.protocol.quoteSwidge({
-        fromToken: "USDT",
-        toToken: "USDT",
-        toChain: "eip155:42161",
-        recipient: "0xrecipient",
-        fromTokenAmount: 100n,
-      } as never),
-    ).rejects.toThrow(/not a same-token bridge route/);
+  it("quotes the best provider across the auction", async () => {
+    const worse = provider("worse", {
+      getQuote: async (params) => ({
+        provider: "worse", intentId: "w", depositAddress: "0xd", depositMemo: null,
+        sourceAmount: params.amountIn, destAmount: "95", minDestAmount: "95",
+        feeUsd: 0, etaSeconds: 1, reliability: 1, validUntilMs: Date.now() + 60_000,
+      }),
+    });
+    const swidge = new RouterSwidgeProtocol(undefined, {fromChain: "eip155:1", providers: [worse, provider("best")]});
+    const quote = await swidge.quoteSwidge({
+      fromToken: "USDT", toToken: "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", toChain: "eip155:42161",
+      fromTokenAmount: 100n, recipient: "0x3333333333333333333333333333333333333333",
+    });
+    expect(quote.toTokenAmountMin).toBe(100n);
   });
 });

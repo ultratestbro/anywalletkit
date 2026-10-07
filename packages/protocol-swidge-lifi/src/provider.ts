@@ -1,3 +1,4 @@
+import {lifi as lifiCfg} from "./config.js";
 import {ccAsset} from "@forgewallet/swidge-assets";
 import {timeoutSignal} from "@forgewallet/protocol-swidge-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swidge-core/types";
@@ -125,6 +126,10 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
     supportsSameChain: true,
     enabled: () => config.enabled ?? true,
 
+    // Capability discovery comes from the provider itself, so it can run alone
+    // or inside the optional aggregator without a central capability table.
+    supportsChain: (chain: string) => lifiCfg.supportsChain(chain),
+    supportsChainPair: (fromChain: string, toChain: string) => lifiCfg.supports(fromChain, toChain),
     supportsRoute(from: Asset, to: Asset): boolean {
       // EVM only: LI.FI's Solana/Tron legs come back as provider-serialized
       // transactions, which the swidge engine does not execute yet.

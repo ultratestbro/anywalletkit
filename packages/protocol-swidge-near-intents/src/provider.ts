@@ -138,6 +138,10 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
     name: "near_intents",
     enabled: () => config.enabled ?? true,
 
+    // Capability discovery comes from the provider itself, so it can run alone
+    // or inside the optional aggregator without a central capability table.
+    supportsChain: (chain: string) => cfg.supportsChain(chain),
+    supportsChainPair: (fromChain: string, toChain: string) => cfg.supports(fromChain, toChain),
     supportsRoute(from: Asset, to: Asset): boolean {
       if (!cfg.supports(from.chain, to.chain)) return false;
       // Only pairs present in the curated catalog are offered — and only those

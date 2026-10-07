@@ -1,6 +1,6 @@
 import {BaseSwidgeProtocol} from "./base.js";
 import type {CrossChainProvider, Quote, QuoteParams} from "../types.js";
-import {validQuote} from "../router.js";
+import {validQuote} from "../validate.js";
 
 /** A single-provider swidge: quoting/tracking route through one solver. The
  *  per-provider packages subclass this — the contribution unit shape. */
@@ -12,7 +12,7 @@ export abstract class SingleProviderSwidge extends BaseSwidgeProtocol {
     const to = Object.freeze({chain: snapshot.destChain, token: snapshot.destToken});
     try {
       // Standalone contribution classes must enforce the same dark flag,
-      // capability and quote-integrity boundary as CrossChainRouter. Previously
+      // capability and quote-integrity boundary as the aggregator. Previously
       // they called getQuote directly, so `enabled: false` was advisory only.
       if (!this.provider.enabled() || !this.provider.supportsRoute(from, to)) return null;
       if (snapshot.sourceChain === snapshot.destChain && this.provider.supportsSameChain !== true) return null;

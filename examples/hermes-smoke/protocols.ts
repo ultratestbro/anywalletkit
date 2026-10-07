@@ -7,10 +7,11 @@
  */
 import { createMockAccount } from '@forgewallet/conformance'
 import { Address } from '@ton/core'
-import { CrossChainRouter } from '@forgewallet/protocol-swidge-core/router'
 import { RouterSwidgeProtocol } from '@forgewallet/protocol-swidge-router/swidge/router'
 import { NearIntentsSwidgeProtocol } from '@forgewallet/protocol-swidge-near-intents/protocol'
 import { LifiSwidgeProtocol } from '@forgewallet/protocol-swidge-lifi/protocol'
+import { lifiProvider } from '@forgewallet/protocol-swidge-lifi/provider'
+import { nearIntentsProvider } from '@forgewallet/protocol-swidge-near-intents/provider'
 import { ThorchainSwidgeProtocol } from '@forgewallet/protocol-swidge-thorchain/protocol'
 import { OmnistonSwidgeProtocol } from '@forgewallet/protocol-swidge-omniston/protocol'
 import LidoProtocolEvm, { splitWithdrawalAmounts } from '@forgewallet/protocol-staking-lido-evm'
@@ -36,9 +37,11 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const swidgeCfg = { fromChain: 'eip155:1', skipAccountChainCheck: true }
 
   // swidge
-  const router = new RouterSwidgeProtocol(evm, { ...swidgeCfg, router: new CrossChainRouter([]) })
+  // The aggregator is optional and takes whichever providers the app installed.
+  const router = new RouterSwidgeProtocol(evm, { ...swidgeCfg, providers: [lifiProvider({}), nearIntentsProvider({})] })
   check('router: surface', typeof router.quoteSwidge === 'function' && typeof router.getSwidgeStatus === 'function')
-  await tolerates(check, 'router: getSupportedChains', () => router.getSupportedChains())
+  const chains = (await router.getSupportedChains()).map((c) => String(c.id))
+  check('router: capabilities come from the passed providers', chains.includes('eip155:1') && chains.includes('ton:-239'), chains.join(','))
   for (const [name, P] of [['near-intents', NearIntentsSwidgeProtocol], ['lifi', LifiSwidgeProtocol], ['thorchain', ThorchainSwidgeProtocol], ['omniston', OmnistonSwidgeProtocol]] as const) {
     const p = new (P as never as new (a: unknown, c: unknown) => { getSupportedChains(): Promise<unknown>; quoteSwidge(o: unknown): Promise<unknown> })(evm, swidgeCfg)
     check(`${name}: constructs`, typeof p.quoteSwidge === 'function')

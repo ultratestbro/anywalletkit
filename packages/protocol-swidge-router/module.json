@@ -15,6 +15,6 @@
   "conformance": "0.x",
   "repo": "https://github.com/ultratestbro/forgewallet",
   "path": "packages/protocol-swidge-router",
-  "description": "Auctions every engine provider and any external swidge module, executes the winner.",
+  "description": "Optional aggregator: auctions the swidge providers you install and pass in, executes the winner. Chains = union of our provider modules.",
   "addedAt": "2026-10-04"
 }

@@ -1,6 +1,10 @@
-// The point of the router: one registered protocol, every venue behind
-// it. Quotes are asked in parallel, validated identically, and scored on price,
-// speed and reliability — quoting still needs no account and no key.
+// The optional aggregator: install the provider modules you want, pass them in,
+// get one protocol that auctions a route across all of them. Quotes are asked in
+// parallel, validated identically, and scored on price, speed and reliability —
+// quoting still needs no account and no key.
+//
+//   npm i @forgewallet/protocol-swidge-router \
+//         @forgewallet/protocol-swidge-near-intents @forgewallet/protocol-swidge-thorchain
 //
 //   RECIPIENT=<0x…> node examples/auction-across-venues.mjs
 //
@@ -10,11 +14,9 @@
 // venue validates it, and a placeholder comes back as "no route available"
 // rather than as a validation error.
 
-import RouterSwidgeProtocol, {
-  CrossChainRouter,
-  nearIntentsProvider,
-  thorchainProvider,
-} from "@forgewallet/protocol-swidge-router";
+import RouterSwidgeProtocol from "@forgewallet/protocol-swidge-router";
+import {nearIntentsProvider} from "@forgewallet/protocol-swidge-near-intents/provider";
+import {thorchainProvider} from "@forgewallet/protocol-swidge-thorchain/provider";
 
 const recipient = process.env.RECIPIENT;
 if (!recipient) throw new Error("set RECIPIENT to the destination-chain address");
@@ -22,11 +24,10 @@ if (!recipient) throw new Error("set RECIPIENT to the destination-chain address"
 const affiliate = process.env.THORCHAIN_AFFILIATE;
 const affiliateBps = process.env.THORCHAIN_AFFILIATE_BPS;
 
-// `router` is required — there is no implicit singleton, so a browser bundle
-// only ever pulls in the venues it actually names here.
+// Only the providers named here are installed and bundled.
 const protocol = new RouterSwidgeProtocol(undefined, {
   fromChain: "eip155:1",
-  router: new CrossChainRouter([
+  providers: [
     nearIntentsProvider({
       enabled: true,
       ...(process.env.NEAR_INTENTS_JWT ? {jwt: process.env.NEAR_INTENTS_JWT} : {}),
@@ -35,7 +36,7 @@ const protocol = new RouterSwidgeProtocol(undefined, {
       enabled: true,
       ...(affiliate && affiliateBps ? {affiliate, affiliateBps} : {}),
     }),
-  ]),
+  ],
 });
 
 const options = {
@@ -59,6 +60,6 @@ if (quote.estimatedDuration) console.log("  eta          ", quote.estimatedDurat
 for (const fee of quote.fees) console.log(`  fee ${fee.type} ${fee.amount} ${fee.token}`);
 
 // Executing would be `protocol.swidge({...options, minAmountOut: quote.toTokenAmountMin})`
-// with a real account bound in place of `undefined`. Passing the floor from
+// with a real wallet account bound in place of `undefined`. Passing the floor from
 // the quote you showed the user is the whole safety story: a re-quote below it
 // is refused instead of filled at a worse rate.

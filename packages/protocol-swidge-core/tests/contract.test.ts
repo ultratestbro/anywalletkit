@@ -1,16 +1,11 @@
 import {describe, expect, it} from "vitest";
 import {SwidgeUnsupportedOperationError} from "../src/errors.js";
-import {CrossChainRouter, validQuote} from "../src/router.js";
+import {validQuote} from "../src/validate.js";
 import {remoteProvider} from "../src/remote.js";
 import {SingleProviderSwidge} from "../src/swidge/single.js";
 import type {CrossChainProvider} from "../src/types.js";
 
 describe("core public contract", () => {
-  it("rejects duplicate provider names", () => {
-    const provider = {name: "x", enabled: () => true, supportsRoute: () => false, getQuote: async () => null, buildDeposit: async () => ({chain: "", to: "", value: "0"}), trackIntent: async () => ({state: "pending" as const})};
-    expect(() => new CrossChainRouter([provider, provider])).toThrow(/duplicate/i);
-  });
-
   it("exposes typed unsupported-operation errors", () => {
     expect(new SwidgeUnsupportedOperationError("no")).toMatchObject({code: "UNSUPPORTED_OPERATION"});
   });
@@ -29,33 +24,6 @@ describe("core public contract", () => {
     expect(validQuote(quote, params, "x")).toBe(true);
     expect(validQuote({...quote, validUntilMs: 0}, params, "x")).toBe(false);
     expect(validQuote({...quote, minDestAmount: "89"}, params, "x")).toBe(false);
-  });
-
-  it("keeps immediate-execution flows from selecting order-only quotes", async () => {
-    const makeProvider = (name: string, destAmount: string, depositAddress: string): CrossChainProvider => ({
-      name,
-      enabled: () => true,
-      supportsRoute: () => true,
-      getQuote: async (params) => ({
-        provider: name, intentId: `${name}-intent`, depositAddress, depositMemo: null,
-        sourceAmount: params.amountIn, destAmount, minDestAmount: destAmount,
-        feeUsd: 0, etaSeconds: 1, reliability: 1, validUntilMs: Date.now() + 60_000,
-      }),
-      buildDeposit: async () => ({chain: "ton:-239", to: depositAddress, value: "100"}),
-      trackIntent: async () => ({state: "pending"}),
-    });
-    const router = new CrossChainRouter([
-      makeProvider("order-only", "110", ""),
-      makeProvider("deposit-address", "100", "EQdeposit"),
-    ]);
-    const params = {
-      sourceChain: "ton:-239", sourceToken: "USDT", destChain: "eip155:1",
-      destToken: "USDC", amountIn: "100", destAddress: "0x1",
-    };
-
-    expect((await router.getBestQuote(params))?.provider).toBe("order-only");
-    expect((await router.getBestQuote(params, {requireImmediateExecution: true}))?.provider)
-      .toBe("deposit-address");
   });
 
   it("fails closed for malformed status ids and disabled discovery", async () => {
