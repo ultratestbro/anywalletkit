@@ -1,4 +1,4 @@
-import { WalletManager, deriveEd25519, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
 import { WalletAccountSolana } from './account.js'
 import { WalletAccountReadOnlySolana } from './read-only-account.js'
 import type { SolanaConfig } from './types.js'
@@ -7,9 +7,14 @@ export const SOLANA_BASE_PATH = "m/44'/501'"
 const DEFAULT_BASE_FEE = 5_000n
 
 /**
- * One seed → Solana accounts at m/44'/501'/i'/0' (SLIP-10 ed25519; Phantom,
- * Solflare default). Paths may be given relative to m/44'/501' ("0'/0'")
- * or in full.
+ * One seed → Solana accounts at m/44'/501'/i'/0' (SLIP-10 ed25519; Phantom and
+ * Solflare default). Paths may be given relative to m/44'/501' ("0'/0'") or in full.
+ *
+ * Built with an ed25519 `Signer` instead of a seed, the manager wraps it:
+ * - a derivable `SeedSigner` sitting at `m/44'/501'` yields `getAccount(i)` → `i'/0'` children
+ *   (any path under the signer's path derives);
+ * - a `SeedSigner` at a leaf, or any external signer, is `getAccount(0)` (path = the
+ *   signer's path, or 'external'); other indexes/paths throw `SignerError`.
  */
 export class WalletManagerSolana extends WalletManager<WalletAccountSolana, SolanaConfig> {
   private _seedBytes: Uint8Array | undefined
@@ -28,10 +33,30 @@ export class WalletManagerSolana extends WalletManager<WalletAccountSolana, Sola
     if (!full.split('/').slice(1).every((s) => s.endsWith("'"))) throw new Error('In Solana, every child path in a derivation path must be hardened.')
     const cached = this._accounts.get(full)
     if (cached) return cached
-    if (!this._seedBytes) throw new Error('External signers for Solana arrive in a later phase; construct WalletManagerSolana with a seed phrase.')
-    const { privateKey, publicKey } = deriveEd25519(this._seedBytes, full)
-    const account = new WalletAccountSolana(privateKey, publicKey, full, this._config)
+    const external = this.externalSigner()
+    if (external) return this.fromSigner(external, full)
+    const signer = LocalSigner.fromSeed(this._seedBytes!, 'ed25519', full)
+    const account = new WalletAccountSolana(signer, signer.publicKey, full, this._config)
     this._accounts.set(full, account)
+    return account
+  }
+
+  /** Resolve `path` against an injected signer: the signer itself, or a child when it can derive there. */
+  private async fromSigner(signer: Signer, path: string): Promise<WalletAccountSolana> {
+    this.requireSigner('ed25519')
+    let leaf: Signer = signer
+    let key = 'external'
+    if (isSeedSigner(signer)) {
+      if (path === signer.path) key = path
+      else if (path.startsWith(`${signer.path}/`)) { leaf = await signer.derive(path.slice(signer.path.length + 1)); key = path }
+      else throw new SignerError(`The injected signer sits at ${signer.path}; it cannot provide ${path}.`)
+    } else if (path !== `${SOLANA_BASE_PATH}/0'/0'` && path !== 'external') {
+      throw new SignerError(`An external signer has one account; ${path} is not derivable from it.`)
+    }
+    const cached = this._accounts.get(key)
+    if (cached) return cached
+    const account = new WalletAccountSolana(leaf, await leaf.getPublicKey(), key, this._config)
+    this._accounts.set(key, account)
     return account
   }
 

@@ -1,5 +1,4 @@
-import { SignerError, zeroize, type IWalletAccount, type IWalletAccountReadOnly, type TransferResult } from '@forgewallet/core'
-import { ed25519 } from '@noble/curves/ed25519.js'
+import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@forgewallet/core'
 import { compileTransaction, getAddressDecoder, getBase64EncodedWireTransaction, type SignatureBytes, type Transaction, type TransactionMessage } from '@solana/kit'
 import { WalletAccountReadOnlySolana, type SolanaPlan } from './read-only-account.js'
 import type { SolanaConfig, SolanaFeeQuote, SolanaTransaction, SolanaTransferOptions } from './types.js'
@@ -16,27 +15,35 @@ export interface SolanaSendResult extends TransferResult {
 }
 
 /**
- * Signing Solana account. Signatures come from noble ed25519 over the compiled
- * message bytes — no WebCrypto, so it runs unchanged in Node and Hermes. The
- * key is a Uint8Array zeroized by `dispose()`.
+ * Signing Solana account. The account never touches a private key: every
+ * signature is one `signer.sign(bytes, {scheme: 'ed25519', context})` call
+ * over the compiled message bytes — a {@link LocalSigner} for seed wallets,
+ * anything else (hardware, MPC, backend) through `externalSigner()`. No
+ * WebCrypto anywhere, so it runs unchanged in Node and Hermes.
  *
  * Every broadcast goes through the same plan: hard checks (fee payer, burn
  * address, missing co-signers) → compute budget → simulation → fee guard →
- * sign → send. A failing step throws before the key is used.
+ * sign → send. A failing step throws before the signer is asked for anything.
  */
 export class WalletAccountSolana extends WalletAccountReadOnlySolana implements IWalletAccount {
   /** Blockhash and fee come from the network before signing. */
   readonly needsNetwork = true
   readonly path: string
+  /** The signer's 32-byte ed25519 public key (needed synchronously for the address). */
   readonly publicKey: Uint8Array
-  private _privateKey: Uint8Array | undefined
+  readonly signer: Signer
   private _readOnly: WalletAccountReadOnlySolana | undefined
 
-  constructor(privateKey: Uint8Array, publicKey: Uint8Array, path: string, config: SolanaConfig = {}) {
+  constructor(signer: Signer, publicKey: Uint8Array, path: string, config: SolanaConfig = {}) {
     super(addressFromPublicKey(publicKey), config)
-    this._privateKey = privateKey
+    this.signer = requireCurve(signer, 'ed25519')
     this.publicKey = publicKey
     this.path = path
+  }
+
+  /** Back-compat: wrap a raw derived key in a {@link LocalSigner} (the account takes ownership; it cannot derive). */
+  static fromPrivateKey(privateKey: Uint8Array, publicKey: Uint8Array, path: string, config: SolanaConfig = {}): WalletAccountSolana {
+    return new WalletAccountSolana(LocalSigner.fromPrivateKey('ed25519', privateKey, publicKey, path), publicKey, path, config)
   }
 
   /** Account index for the standard m/44'/501'/i'/0' path. */
@@ -45,20 +52,15 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     return m ? Number(m[1]) : undefined
   }
 
-  private key(): Uint8Array {
-    if (!this._privateKey) throw new SignerError('This account has been disposed.')
-    return this._privateKey
-  }
-
-  /** Hex ed25519 signature over the UTF-8 message. */
+  /** Hex ed25519 signature over the UTF-8 message (context `solana-offchain`). */
   async sign(message: string | Uint8Array): Promise<string> {
     const bytes = typeof message === 'string' ? new TextEncoder().encode(message) : message
-    return toHex(ed25519.sign(bytes, this.key()))
+    return toHex(await this.signer.sign(bytes, { scheme: 'ed25519', context: 'solana-offchain' }))
   }
 
   /** Add this wallet's signature to a compiled transaction (other signatures are preserved). */
-  signCompiled(tx: Transaction): Transaction {
-    const sig = ed25519.sign(tx.messageBytes as unknown as Uint8Array, this.key()) as unknown as SignatureBytes
+  async signCompiled(tx: Transaction): Promise<Transaction> {
+    const sig = (await this.signer.sign(tx.messageBytes as unknown as Uint8Array, { scheme: 'ed25519', context: 'solana-message' })) as unknown as SignatureBytes
     return { ...tx, signatures: Object.freeze({ ...tx.signatures, [this.address]: sig }) } as Transaction
   }
 
@@ -71,7 +73,7 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation.`)
   }
 
-  private signPlan(plan: SolanaPlan): Transaction {
+  private async signPlan(plan: SolanaPlan): Promise<Transaction> {
     if (plan.transaction) {
       const mine = plan.transaction.signatures[this.address]
       const alreadySigned = mine !== null && mine !== undefined && (mine as Uint8Array).some((b) => b !== 0)
@@ -82,10 +84,9 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
 
   /** Sign without broadcasting. Returns the base64 wire transaction. Simulation still runs (a reverting tx is refused). */
   async signTransaction(tx: SolanaTransaction): Promise<string> {
-    this.key()
     const plan = await this.plan(tx)
     this.maxFeeCheck(plan.quote.fee, this._config.transactionMaxFee, 'transaction')
-    return getBase64EncodedWireTransaction(this.signPlan(plan))
+    return getBase64EncodedWireTransaction(await this.signPlan(plan))
   }
 
   private async broadcast(wire: string): Promise<string> {
@@ -93,21 +94,19 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
   }
 
   async sendTransaction(tx: SolanaTransaction): Promise<SolanaSendResult> {
-    this.key()
     this.requireRpc('send transactions')
     const plan = await this.plan(tx)
     this.maxFeeCheck(plan.quote.fee, this._config.transactionMaxFee, 'transaction')
-    const hash = await this.broadcast(getBase64EncodedWireTransaction(this.signPlan(plan)))
+    const hash = await this.broadcast(getBase64EncodedWireTransaction(await this.signPlan(plan)))
     return { hash, fee: plan.quote.fee, quote: plan.quote }
   }
 
   /** SOL (no `token`), SPL or Token-2022 transfer; the recipient's ATA is created when missing. */
   async transfer(o: SolanaTransferOptions): Promise<SolanaSendResult> {
-    this.key()
     this.requireRpc('transfer tokens')
     const plan = await this.planTransfer(o)
     this.maxFeeCheck(plan.quote.fee, this._config.transferMaxFee, 'transfer')
-    const hash = await this.broadcast(getBase64EncodedWireTransaction(this.signPlan(plan)))
+    const hash = await this.broadcast(getBase64EncodedWireTransaction(await this.signPlan(plan)))
     return { hash, fee: plan.quote.fee, quote: plan.quote }
   }
 
@@ -116,8 +115,8 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     return this._readOnly
   }
 
+  /** Dispose the signer (zeroizes a local key). Idempotent. */
   dispose(): void {
-    zeroize(this._privateKey)
-    this._privateKey = undefined
+    this.signer.dispose()
   }
 }
