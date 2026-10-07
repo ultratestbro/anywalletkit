@@ -2,8 +2,7 @@
   "name": "@forgewallet/protocol-swidge-lifi",
   "type": "swidge",
   "chains": [
-    "eip155:*",
-    "solana:*"
+    "eip155:*"
   ],
   "tier": "core",
   "maintainers": [

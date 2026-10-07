@@ -126,8 +126,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
     enabled: () => config.enabled ?? true,
 
     supportsRoute(from: Asset, to: Asset): boolean {
-      // Solana/Tron serialized transaction formats are intentionally excluded:
-      // the generic account adapter cannot safely execute them.
+      // EVM only: LI.FI's Solana/Tron legs come back as provider-serialized
+      // transactions, which the swidge engine does not execute yet.
       return !!LIFI_CHAIN[from.chain] && !!LIFI_CHAIN[to.chain];
     },
 
@@ -313,7 +313,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         };
         // LI.FI reports refunds and partial fills as top-level DONE. Treating
         // those as completed would falsely claim that the destination was fully
-        // funded. Preserve explicit partial/refund lifecycle states.
+        // funded. Keep the explicit partial/refund lifecycle states.
         const state = s.substatus === "REFUNDED"
           ? "refunded"
           : s.substatus === "EXPIRED"
