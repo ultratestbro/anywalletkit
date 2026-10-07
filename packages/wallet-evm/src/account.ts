@@ -149,12 +149,19 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     await this.getChainId() // network path: know the chain so a foreign tx.chainId is refused, not broadcast
     this.assertSafeTransaction(tx)
     let gasLimit = toBigInt(tx.gasLimit)
+    let estimated: bigint | undefined
     if (this._config.simulate !== false) {
       const sim = await this.simulateTransaction(tx)
       if (!sim.ok) throw new SimulationError(sim.reason, sim.data)
-      gasLimit ??= sim.gas
+      estimated = sim.gas
     }
-    gasLimit ??= await this.gasFor(tx)
+    // A caller-supplied limit is used as is; an estimate gets headroom (default
+    // ×1.2) — estimateGas is a lower bound and state can move before inclusion.
+    if (gasLimit === undefined) {
+      estimated ??= await this.gasFor(tx)
+      const pct = BigInt(Math.round((this._config.gasHeadroom ?? 1.2) * 100))
+      gasLimit = (estimated * pct + 99n) / 100n
+    }
     const withGas: EvmTransaction = { ...tx, gasLimit }
     const { fee } = await this.quoteSendTransaction(withGas)
     if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation.`)

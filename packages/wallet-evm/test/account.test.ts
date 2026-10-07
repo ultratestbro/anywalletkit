@@ -68,7 +68,7 @@ describe('WalletAccountEvm', () => {
     const a = await m.getAccount(0)
     const res = await a.transfer({ token: USDT, recipient: SPENDER, amount: 1_000_000n })
     expect(res.hash).toBe('0x' + 'ab'.repeat(32))
-    expect(res.fee).toBe(21000n * 2_200_000_000n) // gas × maxFeePerGas, where viem estimates maxFee = baseFee × 1.2 + tip = 1.2e9 + 1e9
+    expect(res.fee).toBe(25200n * 2_200_000_000n) // (21000 × 1.2 headroom) × maxFeePerGas, where viem estimates maxFee = baseFee × 1.2 + tip = 1.2e9 + 1e9
     const tx = parseTransaction(fake.sent[0]!)
     expect(tx.to?.toLowerCase()).toBe(USDT.toLowerCase())
     expect(tx.chainId).toBe(1)

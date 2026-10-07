@@ -25,6 +25,11 @@ export interface EvmConfig {
    * (SimulationError). Default true whenever a provider is configured.
    */
   simulate?: boolean
+  /**
+   * Multiplier applied to an ESTIMATED gas limit (simulation / estimateGas)
+   * when the caller passes none. Default 1.2; 1 = no headroom.
+   */
+  gasHeadroom?: number
   /** Allow value transfers to the zero address (refused by default — UnsafeTransactionError). */
   allowBurn?: boolean
   /** Allow signing typed data whose domain names another chain (refused by default — ChainMismatchError). */

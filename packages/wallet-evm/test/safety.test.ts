@@ -203,7 +203,7 @@ describe('simulation', () => {
     await on.sendTransaction({ to: SPENDER, value: 1n })
     expect(fakeOn.calls.filter((c) => c === 'eth_call')).toHaveLength(1)
     expect(fakeOn.calls.filter((c) => c === 'eth_estimateGas')).toHaveLength(1)
-    expect(parseTransaction(fakeOn.sent[0]!).gas).toBe(21000n)
+    expect(parseTransaction(fakeOn.sent[0]!).gas).toBe(25200n) // estimate × 1.2 headroom
   })
 })
 
@@ -258,5 +258,20 @@ describe('EIP-2612 permit', () => {
 
     const b = await new WalletManagerEvm(SEED, { provider: fakeProvider({ eth_call: tokenCalls({ separator: ('0x' + 'ff'.repeat(32)) as Hex }) }).provider }).getAccount(0)
     expect(await b.getPermitInfo(USDT)).toMatchObject({ supported: false, reason: expect.stringMatching(/domain/) })
+  })
+})
+
+describe('gas headroom', () => {
+  it('estimated gas gets ×1.2 by default, gasHeadroom: 1 disables it, a caller limit is used as is', async () => {
+    const run = async (config: Record<string, unknown>, gasLimit?: bigint) => {
+      const fake = fakeProvider()
+      const a = await new WalletManagerEvm(SEED, { provider: fake.provider, ...config }).getAccount(0)
+      await a.sendTransaction({ to: SPENDER, value: 1n, ...(gasLimit !== undefined ? { gasLimit } : {}) })
+      return parseTransaction(fake.sent[0]!).gas
+    }
+    expect(await run({})).toBe(25200n)
+    expect(await run({ gasHeadroom: 1 })).toBe(21000n)
+    expect(await run({ gasHeadroom: 1.5 })).toBe(31500n)
+    expect(await run({}, 30000n)).toBe(30000n)
   })
 })
