@@ -443,10 +443,10 @@ importers:
     dependencies:
       '@bitcoinerlab/coinselect':
         specifier: ^2.0.1
-        version: 2.0.1(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(typescript@5.9.3)
+        version: 2.0.1(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(@scure/btc-signer@2.4.1)(typescript@5.9.3)
       '@bitcoinerlab/descriptors':
         specifier: ^3.2.0
-        version: 3.2.0(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(typescript@5.9.3)
+        version: 3.2.0(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(@scure/btc-signer@2.4.1)(typescript@5.9.3)
       '@bitcoinerlab/secp256k1':
         specifier: ^2.0.0
         version: 2.0.0
@@ -459,6 +459,9 @@ importers:
       '@scure/base':
         specifier: ^2.4.0
         version: 2.4.0
+      '@scure/btc-signer':
+        specifier: ^2.4.1
+        version: 2.4.1
       bitcoinjs-lib:
         specifier: ^7.0.2
         version: 7.0.2(typescript@5.9.3)
@@ -497,12 +500,18 @@ importers:
       '@forgewallet/core':
         specifier: workspace:*
         version: link:../core
+      '@solana-program/compute-budget':
+        specifier: ^0.19.0
+        version: 0.19.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
       '@solana-program/system':
         specifier: ^0.15.0
         version: 0.15.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
       '@solana-program/token':
         specifier: ^0.17.0
         version: 0.17.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
+      '@solana-program/token-2022':
+        specifier: ^0.19.0
+        version: 0.19.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))(@solana/sysvars@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
       '@solana/kit':
         specifier: ^8.4.0
         version: 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
@@ -1657,15 +1666,48 @@ packages:
   '@scure/bip39@2.4.0':
     resolution: {integrity: sha512-82dxFbZUYboyOf0AXiydsQrFQ5Q4h9mX+O2UkE91ROYmsc0BKMGZLwDmy96Jpa2+vrtoxomjUhy1RPIgH/r2nA==}
 
+  '@scure/btc-signer@2.4.1':
+    resolution: {integrity: sha512-ch6h66o9nPhEoe/KciMMUJeH2MBPB8UAJI1if35Fxl6885lKTsc9YoCRqTW0/RjI0Vv9GSg1tmKtHHODyAw81g==}
+
+  '@solana-program/compute-budget@0.19.0':
+    resolution: {integrity: sha512-YV5T0MnTM//avw46UBvWswZw3KZx+HgqohPZkH/OonEHRX4+MSO9wV/8XePEDDyu/geHtdmdEXY/HlgRGJKa8A==}
+    peerDependencies:
+      '@solana/kit': ^8.3.0
+
+  '@solana-program/record@0.5.0':
+    resolution: {integrity: sha512-Hie4a3hJhyk0ER2O+T2YQFBRB69xraIcmH/U5S/DOGv6ig3DMsPCO1Jqt6+0BZ/fS+vHouX/wededWTviLEm7A==}
+    peerDependencies:
+      '@solana/kit': ^8.3.0
+
+  '@solana-program/system@0.14.1':
+    resolution: {integrity: sha512-K6ZiIrAKoJAfcwfUdsoFvfSAxeRJaRrV7BPFTJvUVRS4m3zszN+nLcdaNMMe2F1/zTriZqC+xh+Kgw6ziGUqpQ==}
+    peerDependencies:
+      '@solana/kit': ^8.0.0
+
   '@solana-program/system@0.15.0':
     resolution: {integrity: sha512-xE08wZCyNRhOaO/XNRd9A3kSLfUrTe/BnmAHhql8uqc2eriNy2ZmnvaGRrs0m+kOSihvUbANzHljmJsTzGL5kg==}
     peerDependencies:
       '@solana/kit': ^8.3.0
 
+  '@solana-program/token-2022@0.19.0':
+    resolution: {integrity: sha512-oCCko/n8X6ote2A27HyNpCOIpksiHUnndQQ5wUr2pRm89rrfcKOvRd/zhIXW8z8tpemlPYp05XYUGFBo0GxhBg==}
+    peerDependencies:
+      '@solana/kit': ^8.3.0
+      '@solana/sysvars': ^8.0.0
+      '@solana/zk-sdk': ^0.5.1
+    peerDependenciesMeta:
+      '@solana/zk-sdk':
+        optional: true
+
   '@solana-program/token@0.17.0':
     resolution: {integrity: sha512-l7EhF3lCWXXdOllGI8qnbF4Pj7pCT/5zJTW2lPsNUQfa7G28pnFhSssHW2GCW7dzGttSHgPdJYdQRB5rvQoN9Q==}
     peerDependencies:
       '@solana/kit': ^8.3.0
+
+  '@solana-program/zk-elgamal-proof@0.4.0':
+    resolution: {integrity: sha512-bf2Q3f25xcCNaLm/MR4lwoAguJzEW2eeLdrJb6rUjMcA63qcgyJOWl6To7Bn4e+0OyWBa+J7YP2BUhi//VPz3g==}
+    peerDependencies:
+      '@solana/kit': ^8.0.0
 
   '@solana/accounts@8.4.0':
     resolution: {integrity: sha512-YklERWeG5UD2fzxR0zwWgzCVyuHRqg6eTIyGBAe8hOWIim8TYS1aPBVFAlVkSZiAXaFRxmu1E3IRfeCe/QSQmg==}
@@ -2756,6 +2798,10 @@ packages:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
 
+  micro-packed@0.11.1:
+    resolution: {integrity: sha512-agQGBnBCw8OoKQZMUxcaQPaOowdfxyEmBsq4CNAXAXCyB8KxlRG0lTl5GADJIsMEDaFb0trhXBHKYsjTWa5kuw==}
+    engines: {node: '>= 20.19.0'}
+
   mime-db@1.52.0:
     resolution: {integrity: sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==}
     engines: {node: '>= 0.6'}
@@ -3681,9 +3727,9 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@bitcoinerlab/coinselect@2.0.1(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(typescript@5.9.3)':
+  '@bitcoinerlab/coinselect@2.0.1(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(@scure/btc-signer@2.4.1)(typescript@5.9.3)':
     dependencies:
-      '@bitcoinerlab/descriptors': 3.2.0(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(typescript@5.9.3)
+      '@bitcoinerlab/descriptors': 3.2.0(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(@scure/btc-signer@2.4.1)(typescript@5.9.3)
     transitivePeerDependencies:
       - '@ledgerhq/ledger-bitcoin'
       - '@noble/curves'
@@ -3693,7 +3739,7 @@ snapshots:
       - '@scure/btc-signer'
       - typescript
 
-  '@bitcoinerlab/descriptors-core@3.2.0(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(bip32@5.0.1(typescript@5.9.3))(bitcoinjs-lib@7.0.2(typescript@5.9.3))(ecpair@3.0.2(typescript@5.9.3))':
+  '@bitcoinerlab/descriptors-core@3.2.0(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(@scure/btc-signer@2.4.1)(bip32@5.0.1(typescript@5.9.3))(bitcoinjs-lib@7.0.2(typescript@5.9.3))(ecpair@3.0.2(typescript@5.9.3))':
     dependencies:
       '@bitcoinerlab/miniscript': 2.0.0
       lodash.memoize: 4.1.2
@@ -3704,13 +3750,14 @@ snapshots:
       '@noble/hashes': 2.4.0
       '@scure/base': 2.4.0
       '@scure/bip32': 2.4.0
+      '@scure/btc-signer': 2.4.1
       bip32: 5.0.1(typescript@5.9.3)
       bitcoinjs-lib: 7.0.2(typescript@5.9.3)
       ecpair: 3.0.2(typescript@5.9.3)
 
-  '@bitcoinerlab/descriptors@3.2.0(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(typescript@5.9.3)':
+  '@bitcoinerlab/descriptors@3.2.0(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(@scure/btc-signer@2.4.1)(typescript@5.9.3)':
     dependencies:
-      '@bitcoinerlab/descriptors-core': 3.2.0(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(bip32@5.0.1(typescript@5.9.3))(bitcoinjs-lib@7.0.2(typescript@5.9.3))(ecpair@3.0.2(typescript@5.9.3))
+      '@bitcoinerlab/descriptors-core': 3.2.0(@noble/curves@2.4.0)(@noble/hashes@2.4.0)(@scure/base@2.4.0)(@scure/bip32@2.4.0)(@scure/btc-signer@2.4.1)(bip32@5.0.1(typescript@5.9.3))(bitcoinjs-lib@7.0.2(typescript@5.9.3))(ecpair@3.0.2(typescript@5.9.3))
       '@bitcoinerlab/secp256k1': 2.0.0
       bip32: 5.0.1(typescript@5.9.3)
       bitcoinjs-lib: 7.0.2(typescript@5.9.3)
@@ -4279,13 +4326,47 @@ snapshots:
     dependencies:
       '@noble/hashes': 2.4.0
 
+  '@scure/btc-signer@2.4.1':
+    dependencies:
+      '@noble/curves': 2.4.0
+      '@noble/hashes': 2.4.0
+      '@scure/base': 2.4.0
+      micro-packed: 0.11.1
+
+  '@solana-program/compute-budget@0.19.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))':
+    dependencies:
+      '@solana/kit': 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+
+  '@solana-program/record@0.5.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))':
+    dependencies:
+      '@solana-program/system': 0.15.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
+      '@solana/kit': 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+
+  '@solana-program/system@0.14.1(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))':
+    dependencies:
+      '@solana/kit': 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+
   '@solana-program/system@0.15.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))':
     dependencies:
       '@solana/kit': 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
 
+  '@solana-program/token-2022@0.19.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))(@solana/sysvars@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))':
+    dependencies:
+      '@noble/curves': 2.4.0
+      '@solana-program/record': 0.5.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
+      '@solana-program/system': 0.15.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
+      '@solana-program/zk-elgamal-proof': 0.4.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
+      '@solana/kit': 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+      '@solana/sysvars': 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+
   '@solana-program/token@0.17.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))':
     dependencies:
       '@solana-program/system': 0.15.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
+      '@solana/kit': 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+
+  '@solana-program/zk-elgamal-proof@0.4.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))':
+    dependencies:
+      '@solana-program/system': 0.14.1(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
       '@solana/kit': 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
 
   '@solana/accounts@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)':
@@ -5554,6 +5635,10 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.6.0
 
   math-intrinsics@1.1.0: {}
+
+  micro-packed@0.11.1:
+    dependencies:
+      '@scure/base': 2.4.0
 
   mime-db@1.52.0: {}
 
