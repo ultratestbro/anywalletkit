@@ -27,15 +27,27 @@ export interface TonConfig {
   transactionMaxFee?: bigint | number
   /** toncenter v3 base used for receipts (default https://toncenter.com/api/v3). */
   indexerUrl?: string
-  /** tonapi base used for fee rates (default https://tonapi.io/v2). */
+  /** tonapi base used for fee rates and (by default) emulation (default https://tonapi.io/v2). */
   tonApiUrl?: string
+  /** tonapi bearer key (sent as `Authorization: Bearer …`); also sent as X-API-Key to a toncenter-v3 emulator. */
+  tonApiKey?: string
   /**
-   * toncenter v3 trace-emulation endpoint (e.g. https://toncenter.com/api/emulate/v1/emulateTrace).
-   * When set, every send is emulated first and a failing compute/action phase
-   * throws `SimulationError` before anything is signed. Without it the preflight
-   * is `estimateFee` only (fees + the fee cap).
+   * Preflight emulation of every send (zero-signed external). Default
+   * `{kind: 'tonapi'}`: `POST {tonApiUrl}/wallet/emulate` (verdict + `risk`),
+   * falling back to `/traces/emulate`. `{kind: 'toncenter-v3', url}` posts to a
+   * toncenter `emulateTrace` endpoint instead. `false` = `estimateFee` only.
+   * A non-zero compute exit, an aborted transaction, a failed action phase or a
+   * failed FIRST-HOP internal message throws `SimulationError` before signing.
    */
+  emulate?: TonEmulateConfig
+  /** @deprecated Use `emulate: {kind: 'toncenter-v3', url}`. Still honoured when `emulate` is unset. */
   emulateUrl?: string
+  /**
+   * Allow a body whose emulated `risk.transfer_all_remaining_balance` is true
+   * (send mode 128 / CARRY_ALL_BALANCE). Refused by default — nothing this
+   * wallet builds does that, so it only ever comes from a foreign `bodyBoc`.
+   */
+  allowDrainingTransactions?: boolean
   /** Run the preflight (estimateFee + emulation when configured) before signing. Default true. */
   simulate?: boolean
   /** Seconds a signed external stays valid (default 60, max 600). */
@@ -103,9 +115,25 @@ export interface TonFees {
   total: bigint
 }
 
+export type TonEmulateConfig =
+  | { kind: 'tonapi'; url?: string }
+  | { kind: 'toncenter-v3'; url: string }
+  | false
+
+/** What a message would move out of the wallet, per tonapi's `risk`. */
+export interface TonRisk {
+  /** Nanotons leaving the wallet (value + fees the emulator attributes). */
+  ton: bigint
+  jettons: Array<{ address: string; walletAddress: string; amount: bigint; symbol?: string; decimals?: number }>
+  /** Send mode 128: the whole remaining balance goes with the message. */
+  transferAllRemainingBalance: boolean
+}
+
+export type TonSimulationSource = 'tonapi' | 'toncenter-v3' | 'estimate-only'
+
 export type TonSimulation =
-  | { ok: true; fees: TonFees; emulated: boolean; exitCode?: number; actionSuccess?: boolean }
-  | { ok: false; fees?: TonFees; emulated: true; reason: string; exitCode?: number; aborted?: boolean }
+  | { ok: true; fees: TonFees; emulated: boolean; source: TonSimulationSource; exitCode?: number; actionSuccess?: boolean; risk?: TonRisk; warnings: string[] }
+  | { ok: false; fees?: TonFees; emulated: true; source: Exclude<TonSimulationSource, 'estimate-only'>; reason: string; exitCode?: number; aborted?: boolean; risk?: TonRisk; warnings: string[] }
 
 export interface TonReceipt {
   /** The body hash that was returned by sendTransaction. */

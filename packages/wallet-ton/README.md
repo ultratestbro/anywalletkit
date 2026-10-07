@@ -11,12 +11,14 @@ import WalletManagerTon from '@forgewallet/wallet-ton'
 
 const wallet = new WalletManagerTon(seedPhrase, {
   tonClient: [{ url: 'https://toncenter.com/api/v2/jsonRPC', secretKey }],   // fails over in order
-  emulateUrl: 'https://toncenter.com/api/emulate/v1/emulateTrace',           // optional: full preflight
+  // emulate: {kind: 'tonapi'} is the default (tonapi.io/v2/wallet/emulate, then /traces/emulate);
+  // {kind: 'toncenter-v3', url} switches the emulator, false = estimateFee only.
+  tonApiKey,                                                                  // optional: Bearer key for tonapi
 })
 const account = await wallet.getAccount(0)
 
 account.describe({ to: 'UQ…', value: 100_000_000n, body: 'thanks' })         // offline: kind, items, warnings
-await account.simulateTransaction({ to: 'UQ…', value: 100_000_000n })         // fees (+ emulation verdict)
+await account.simulateTransaction({ to: 'UQ…', value: 100_000_000n })         // fees + emulation verdict + risk (what leaves the wallet)
 await account.transfer({ recipient: 'UQ…', amount: 100_000_000n })            // 0.1 TON
 await account.transfer({ token: USDT_MASTER, recipient: 'UQ…', amount: 1_000_000n, forwardPayload: 'hi' })
 await account.sendTransaction([                                               // several messages, ONE external
@@ -36,10 +38,17 @@ const tk = await WalletManagerTon.fromTonMnemonic(words, { tonClient })
    friendly-address network flag matches `config.network`, `valid_until` =
    now + `validUntilSeconds` (default 60, max 600).
 2. Fresh seqno (never cached across sends).
-3. Preflight on the zero-signed body: toncenter `estimateFee` (the fee cap),
-   and when `emulateUrl` is set a trace emulation — a non-zero compute exit,
-   an aborted transaction or a failed action phase throws `SimulationError`
-   **before signing**. `simulate: false` skips it.
+3. Preflight on the zero-signed body: toncenter `estimateFee` (the fee cap)
+   and a trace emulation — tonapi by default (`POST /v2/wallet/emulate`,
+   falling back to `/v2/traces/emulate`), or a toncenter-v3 `emulateTrace`
+   endpoint via `emulate: {kind: 'toncenter-v3', url}`. A non-zero compute exit,
+   an aborted transaction, a failed action phase or a failed **first-hop**
+   internal message (the operation would bounce) throws `SimulationError`
+   **before signing**; failures deeper in the trace are `warnings`. tonapi's
+   `risk` is returned as `risk` and a body that would carry the whole balance
+   (send mode 128) is refused with `UnsafeTransactionError('drain')` unless
+   `allowDrainingTransactions`. `emulate: false` keeps only `estimateFee`;
+   `simulate: false` skips the preflight entirely.
 4. noble ed25519 over the body hash; the 32-byte seed is the only key material
    and `dispose()` zeroizes it.
 5. `sendBoc` of the external (with StateInit when the wallet is not deployed).

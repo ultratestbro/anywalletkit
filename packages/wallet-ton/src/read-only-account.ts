@@ -3,7 +3,8 @@ import { ed25519 } from '@noble/curves/ed25519.js'
 import { Address, Cell, beginCell, internal, loadStateInit, type StateInit } from '@ton/core'
 import { commentCell, describeTransaction, type TonDescription } from './describe.js'
 import { UnsafeTransactionError } from './errors.js'
-import { TonCenter, createTonRpc, emulateExternal } from './toncenter.js'
+import { TonCenter, createTonRpc } from './toncenter.js'
+import { runEmulation } from './emulation.js'
 import {
   DEFAULT_SEND_MODE, v5r1Address, v5r1ExternalMessage, v5r1PackUnsigned, v5r1SigningMessage, v5r1StateInit, v5r1WalletId,
   type V5R1Message,
@@ -171,21 +172,24 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
   }
 
   /**
-   * Preflight an external body: fees via estimateFee and, when
-   * `config.emulateUrl` is set, a full trace emulation whose compute/action
-   * phases decide `ok`. Never throws for a failing emulation — only for
-   * transport problems.
+   * Preflight an external body: fees via estimateFee and, unless
+   * `config.emulate === false`, a trace emulation (tonapi by default, see
+   * {@link TonConfig.emulate}) whose compute/action phases — and the first-hop
+   * internal messages — decide `ok`. Never throws for a failing emulation,
+   * only for transport problems or a malformed emulator response.
    */
   async simulateBody(body: Cell): Promise<TonSimulation> {
     const fees = await this.estimateFees(body)
-    const url = this._config.emulateUrl
-    if (!url) return { ok: true, fees, emulated: false }
     const init = await this.initIfNeeded()
-    const verdict = await emulateExternal(url, v5r1ExternalMessage(this._address, body, init), {
-      ...(this._config.fetch ? { fetch: this._config.fetch } : {}), ...(this._config.timeoutMs !== undefined ? { timeoutMs: this._config.timeoutMs } : {}),
-    })
-    if (verdict.ok) return { ok: true, fees, emulated: true, ...(verdict.exitCode !== undefined ? { exitCode: verdict.exitCode } : {}), ...(verdict.actionSuccess !== undefined ? { actionSuccess: verdict.actionSuccess } : {}) }
-    return { ok: false, fees, emulated: true, reason: verdict.reason ?? 'emulation failed', ...(verdict.exitCode !== undefined ? { exitCode: verdict.exitCode } : {}), ...(verdict.aborted !== undefined ? { aborted: verdict.aborted } : {}) }
+    const outcome = await runEmulation(this._config, v5r1ExternalMessage(this._address, body, init))
+    if (!outcome) return { ok: true, fees, emulated: false, source: 'estimate-only', warnings: [] }
+    const common = {
+      fees, emulated: true as const, source: outcome.source, warnings: outcome.warnings,
+      ...(outcome.exitCode !== undefined ? { exitCode: outcome.exitCode } : {}),
+      ...(outcome.risk ? { risk: outcome.risk } : {}),
+    }
+    if (outcome.ok) return { ok: true, ...common, ...(outcome.actionSuccess !== undefined ? { actionSuccess: outcome.actionSuccess } : {}) }
+    return { ok: false, ...common, reason: outcome.reason ?? 'emulation failed', ...(outcome.aborted !== undefined ? { aborted: outcome.aborted } : {}) }
   }
 
   /** Preflight a {@link TonSendable} (unsigned body, current seqno). */

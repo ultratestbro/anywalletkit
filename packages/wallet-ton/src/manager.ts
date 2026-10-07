@@ -7,7 +7,7 @@ import type { TonConfig } from './types.js'
 export const TON_BASE_PATH = "m/44'/607'"
 /** Path label of the account a TON-native (Tonkeeper-style) mnemonic yields — there is exactly one. */
 export const TON_MNEMONIC_PATH = 'ton-mnemonic'
-const DEFAULT_TONAPI = 'https://tonapi.io/v2'
+import { DEFAULT_TONAPI } from './emulation.js'
 
 /**
  * One seed → TON accounts at m/44'/607'/i' (SLIP-10 ed25519) on Wallet V5R1 —

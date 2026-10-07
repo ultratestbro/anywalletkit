@@ -14,13 +14,29 @@ export interface FakeRpc {
   calls: string[]
   sent: Cell[]
   emulations: number
+  /** Request headers of the last emulation call. */
+  lastEmulateHeaders: Record<string, string>
+  lastEmulateUrl: string
 }
 
-export function fakeRpc(overrides: Record<string, Handler> = {}, opts: { emulate?: () => unknown; indexer?: () => unknown; failAll?: boolean } = {}): FakeRpc {
+/** A clean tonapi `MessageConsequences`: root ok, one successful child, nothing risky. */
+export function tonapiOk(extra: { risk?: Record<string, unknown>; children?: unknown[]; root?: Record<string, unknown> } = {}) {
+  return {
+    trace: {
+      transaction: { hash: 'root', account: { address: '0:00' }, success: true, aborted: false, compute_phase: { skipped: false, success: true, exit_code: 0 }, action_phase: { success: true, result_code: 0 }, ...(extra.root ?? {}) },
+      interfaces: ['wallet_v5r1'],
+      children: extra.children ?? [{ transaction: { hash: 'c1', account: { address: '0:01' }, success: true, aborted: false, compute_phase: { skipped: false, success: true, exit_code: 0 }, action_phase: { success: true, result_code: 0 } } }],
+    },
+    event: {},
+    risk: { transfer_all_remaining_balance: false, ton: 1, jettons: [], nfts: [], ...(extra.risk ?? {}) },
+  }
+}
+
+export function fakeRpc(overrides: Record<string, Handler> = {}, opts: { emulate?: () => unknown; tonapi?: () => unknown; traces?: () => unknown; walletEmulate404?: boolean; indexer?: () => unknown; failAll?: boolean } = {}): FakeRpc {
   const calls: string[] = []
   const sent: Cell[] = []
   const walletData = beginCell().storeAddress(Address.parse(JETTON_WALLET)).endCell().toBoc().toString('base64')
-  const state = { emulations: 0 }
+  const state = { emulations: 0, lastEmulateHeaders: {} as Record<string, string>, lastEmulateUrl: '' }
   const handlers: Record<string, Handler> = {
     getAddressInformation: () => ({ '@type': 'raw.fullAccountState', balance: '1000000000', state: 'active', code: '', data: '', last_transaction_id: { '@type': 'internal.transactionId', lt: '1', hash: 'AA==' }, sync_utime: 1 }),
     runGetMethod: (p) => {
@@ -37,7 +53,19 @@ export function fakeRpc(overrides: Record<string, Handler> = {}, opts: { emulate
   const f = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input)
     if (opts.failAll) throw new Error('boom')
-    if (url.includes('/emulate')) { state.emulations++; calls.push('emulate'); return json(opts.emulate ? opts.emulate() : { transactions: {} }) }
+    if (url.includes('/wallet/emulate') || url.includes('/traces/emulate') || url.includes('/emulate')) {
+      state.emulations++
+      state.lastEmulateUrl = url
+      state.lastEmulateHeaders = Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), v]))
+      if (url.includes('/wallet/emulate')) {
+        calls.push('tonapi:wallet/emulate')
+        if (opts.walletEmulate404) return json({ error: 'not found' }, 404)
+        return json(opts.tonapi ? opts.tonapi() : tonapiOk())
+      }
+      if (url.includes('/traces/emulate')) { calls.push('tonapi:traces/emulate'); return json(opts.traces ? opts.traces() : tonapiOk().trace) }
+      calls.push('emulate')
+      return json(opts.emulate ? opts.emulate() : { transactions: {} })
+    }
     if (url.includes('transactionsByMessage')) { calls.push('transactionsByMessage'); return json(opts.indexer ? opts.indexer() : { transactions: [] }) }
     const req = JSON.parse(String(init?.body)) as { method: string; params: Record<string, unknown> }
     calls.push(req.method)
@@ -45,5 +73,5 @@ export function fakeRpc(overrides: Record<string, Handler> = {}, opts: { emulate
     if (!h) return json({ ok: false, error: `unmocked ${req.method}`, code: 500 }, 500)
     try { return json({ ok: true, result: h(req.params) }) } catch (e) { return json({ ok: false, error: (e as Error).message, code: 500 }, 500) }
   }) as typeof fetch
-  return { fetch: f, calls, sent, get emulations() { return state.emulations } }
+  return { fetch: f, calls, sent, get emulations() { return state.emulations }, get lastEmulateHeaders() { return state.lastEmulateHeaders }, get lastEmulateUrl() { return state.lastEmulateUrl } }
 }

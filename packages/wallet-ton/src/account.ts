@@ -1,6 +1,6 @@
 import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@forgewallet/core'
 import { Cell } from '@ton/core'
-import { SimulationError } from './errors.js'
+import { SimulationError, UnsafeTransactionError } from './errors.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'
 import { v5r1ExternalMessage, v5r1PackSigned, v5r1PackUnsigned, type V5R1Message } from './wallet-v5r1.js'
 import type { TonConfig, TonSendable, TonTransferOptions } from './types.js'
@@ -73,6 +73,9 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     }
     const sim = await this.simulateBody(body)
     if (!sim.ok) throw new SimulationError(sim.reason, { ...(sim.exitCode !== undefined ? { exitCode: sim.exitCode } : {}), ...(sim.aborted !== undefined ? { aborted: sim.aborted } : {}) })
+    if (sim.risk?.transferAllRemainingBalance && this._config.allowDrainingTransactions !== true) {
+      throw new UnsafeTransactionError('drain', 'Refusing a message that carries the whole remaining balance (send mode 128); set allowDrainingTransactions to override.')
+    }
     this.checkMaxFee(sim.fees.total, limit, op)
     return sim.fees.total
   }
