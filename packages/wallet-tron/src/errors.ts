@@ -6,6 +6,7 @@ export type UnsafeTransactionCode =
   | 'zero-address'
   | 'fee-limit'
   | 'multi-contract'
+  | 'memo'
 
 /** A transaction failed a hard check and was not signed. */
 export class UnsafeTransactionError extends Error {

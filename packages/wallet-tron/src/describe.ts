@@ -136,6 +136,12 @@ export function describeTransaction(tx: TronTransaction, ctx: DescribeContext = 
     d = { kind: 'trx-transfer', warnings, to: toBase58Address(hex), amount: BigInt(value) }
     if (isZero(hex)) warn(warnings, 'zero-address', 'TRX would be sent to the zero address (burned).')
   }
+  // Unbuilt shapes carry the memo as a field; node-built ones as raw_data.data (handled in describeRaw).
+  const memo = !isPrebuilt(tx) ? (tx as { memo?: string }).memo : undefined
+  if (memo) {
+    d.memo = memo
+    warn(warnings, 'memo-fee', 'A memo is attached: the network charges the memo fee (1 TRX by default).')
+  }
   if (ctx.recipientExists === false && (d.kind === 'trx-transfer' || d.kind === 'trc20-transfer') && d.to) {
     warn(warnings, 'unactivated-recipient', d.kind === 'trx-transfer'
       ? `${d.to} does not exist yet: the transfer also pays the account creation fee (1.1 TRX without staked bandwidth).`

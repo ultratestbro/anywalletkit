@@ -1,5 +1,4 @@
-import { SignerError, zeroize, type IWalletAccount, type IWalletAccountReadOnly, type TransferResult } from '@forgewallet/core'
-import { secp256k1 } from '@noble/curves/secp256k1.js'
+import { LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@forgewallet/core'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { addressFromPublicKey, toHexAddress } from './address.js'
 import { describeTransaction } from './describe.js'
@@ -18,23 +17,31 @@ export interface TronTransferResult extends TransferResult {
 export const MAX_EXPIRATION_MS = 24 * 60 * 60 * 1000
 
 /**
- * Signing Tron account. Key is a Uint8Array zeroized by `dispose()`. The full node
- * builds `raw_data`; we check it, simulate it, sign `txID` (= sha256(raw_data)) with
- * secp256k1 and broadcast.
+ * Signing Tron account. The key lives in a secp256k1 {@link Signer} (a local key
+ * zeroized by `dispose()`, or an external hardware / MPC / backend signer). The
+ * full node builds `raw_data`; we check it, simulate it, have the signer sign
+ * `txID` (= sha256(raw_data)) as recoverable ECDSA (context `tron-tx`) and broadcast.
  */
 export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWalletAccount {
   /** ref block / expiration come from the node, so building needs the network. */
   readonly needsNetwork = true
   readonly path: string
+  /** Compressed secp256k1 key (33 bytes); needed synchronously for the address. */
   readonly publicKey: Uint8Array
-  private _privateKey: Uint8Array | undefined
+  readonly signer: Signer
+  private _disposed = false
   private _readOnly: WalletAccountReadOnlyTron | undefined
 
-  constructor(privateKey: Uint8Array, publicKey: Uint8Array, path: string, config: TronConfig = {}) {
+  constructor(signer: Signer, publicKey: Uint8Array, path: string, config: TronConfig = {}) {
     super(addressFromPublicKey(publicKey), config)
-    this._privateKey = privateKey
+    this.signer = requireCurve(signer, 'secp256k1')
     this.publicKey = publicKey
     this.path = path
+  }
+
+  /** Wrap a raw derived key (takes ownership; zeroized on dispose). Kept for callers that derive themselves. */
+  static fromPrivateKey(privateKey: Uint8Array, publicKey: Uint8Array, path: string, config: TronConfig = {}): WalletAccountTron {
+    return new WalletAccountTron(LocalSigner.fromPrivateKey('secp256k1', privateKey, publicKey, path), publicKey, path, config)
   }
 
   /** Account index for the standard m/44'/195'/0'/0/i path. */
@@ -43,21 +50,26 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     return m ? Number(m[1]) : undefined
   }
 
-  private key(): Uint8Array {
-    if (!this._privateKey) throw new SignerError('This account has been disposed.')
-    return this._privateKey
+  private key(): void {
+    if (this._disposed) throw new SignerError('This account has been disposed.')
+  }
+
+  /** Recoverable secp256k1 signature over a 32-byte digest from the signer: r‖s‖recovery (recovery 0/1). */
+  private async signDigest(digest: Uint8Array, context: 'tron-tx' | 'tron-message'): Promise<Uint8Array> {
+    this.key()
+    return this.signer.sign(digest, { scheme: 'ecdsa-recoverable', context })
   }
 
   /** TIP-191 message signature: 0x + r||s||(27 + recovery) hex (tronweb `signMessageV2` encoding). */
   async sign(message: string | Uint8Array): Promise<string> {
-    const sig = secp256k1.sign(hashMessage(message), this.key(), { prehash: false, format: 'recovered' })
-    return '0x' + bytesToHex(sig.slice(1)) + (27 + sig[0]!).toString(16).padStart(2, '0')
+    const sig = await this.signDigest(hashMessage(message), 'tron-message')
+    return '0x' + bytesToHex(sig.subarray(0, 64)) + (27 + sig[64]!).toString(16).padStart(2, '0')
   }
 
   /** Attach `signature: [r||s||recovery]` (recovery as 00/01, tronweb encoding). No checks — see `signTransaction`. */
-  signRaw(tx: TronRawTransaction): TronRawTransaction {
-    const sig = secp256k1.sign(hexToBytes(tx.txID), this.key(), { prehash: false, format: 'recovered', lowS: true })
-    return { ...tx, signature: [bytesToHex(sig.slice(1)) + sig[0]!.toString(16).padStart(2, '0')] }
+  async signRaw(tx: TronRawTransaction): Promise<TronRawTransaction> {
+    const sig = await this.signDigest(hexToBytes(tx.txID), 'tron-tx')
+    return { ...tx, signature: [bytesToHex(sig.subarray(0, 64)) + sig[64]!.toString(16).padStart(2, '0')] }
   }
 
   // ── Hard checks (before anything is signed) ─────────────────────────────────
@@ -110,7 +122,7 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     this.key()
     this.requireClient('sign transactions')
     const { built } = await this.prepare(tx, this._config.transactionMaxFee, 'transaction')
-    return JSON.stringify(this.signRaw(built))
+    return JSON.stringify(await this.signRaw(built))
   }
 
   private async broadcast(signed: TronRawTransaction): Promise<string> {
@@ -124,7 +136,7 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     this.requireClient('send transactions')
     const parsed: TronTransaction = typeof tx === 'string' ? (JSON.parse(tx) as TronRawTransaction) : tx
     const { built, quote } = await this.prepare(parsed, this._config.transactionMaxFee, 'transaction')
-    const signed = isPrebuilt(parsed) && parsed.signature?.length ? built : this.signRaw(built)
+    const signed = isPrebuilt(parsed) && parsed.signature?.length ? built : await this.signRaw(built)
     return { hash: await this.broadcast(signed), fee: quote.fee, activationFee: quote.activationFee, estimate: quote.estimate }
   }
 
@@ -133,7 +145,7 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     this.key()
     this.requireClient('transfer tokens')
     const { built, quote } = await this.prepare(this.asTransaction(o), this._config.transferMaxFee, 'transfer')
-    return { hash: await this.broadcast(this.signRaw(built)), fee: quote.fee, activationFee: quote.activationFee, estimate: quote.estimate }
+    return { hash: await this.broadcast(await this.signRaw(built)), fee: quote.fee, activationFee: quote.activationFee, estimate: quote.estimate }
   }
 
   toReadOnlyAccount(): IWalletAccountReadOnly {
@@ -141,8 +153,9 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     return this._readOnly
   }
 
+  /** Dispose the signer (zeroizes a local key). Idempotent. */
   dispose(): void {
-    zeroize(this._privateKey)
-    this._privateKey = undefined
+    this._disposed = true
+    this.signer.dispose()
   }
 }

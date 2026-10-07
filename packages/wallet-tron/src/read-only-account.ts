@@ -6,6 +6,7 @@ import { decodeRevertReason, encodeParameters, decodeUint, hexToText, selector }
 import { addressFromPublicKey, toBase58Address, toHexAddress } from './address.js'
 import { assertNoError, createClient } from './client.js'
 import { describeTransaction, type DescribeContext } from './describe.js'
+import { attachMemo } from './memo.js'
 import { isContractCall, isPrebuilt } from './shape.js'
 import {
   CAIP2_GENESIS, type TronConfig, type TronContractCall, type TronFeeEstimate, type TronFetch, type TronNativeTransfer,
@@ -174,11 +175,11 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
         parameter: encodeParameters(parameters), fee_limit: feeLimit, call_value: options.callValue ?? 0, visible: false,
       }, 'build a contract call')
       if (!r.transaction) throw new Error('triggersmartcontract returned no transaction')
-      return { built: r.transaction, sim }
+      return { built: tx.memo ? attachMemo(r.transaction, tx.memo) : r.transaction, sim }
     }
-    const { to, value } = tx as TronNativeTransfer
+    const { to, value, memo } = tx as TronNativeTransfer
     const built = await this.post<TronRawTransaction>('/wallet/createtransaction', { owner_address: this.addressHex, to_address: toHexAddress(to), amount: Number(BigInt(value)), visible: false }, 'build a transfer')
-    return { built }
+    return { built: memo ? attachMemo(built, memo) : built }
   }
 
   protected async buildTransaction(tx: TronTransaction): Promise<TronRawTransaction> {
@@ -329,9 +330,10 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
   }
 
   protected asTransaction(o: TronTransferOptions): TronTransaction {
+    const memo = o.memo ? { memo: o.memo } : {}
     return o.token
-      ? { contractAddress: o.token, functionSelector: 'transfer(address,uint256)', parameters: this.trc20TransferParams(o.recipient, o.amount), options: { callValue: 0 } }
-      : { to: o.recipient, value: o.amount }
+      ? { contractAddress: o.token, functionSelector: 'transfer(address,uint256)', parameters: this.trc20TransferParams(o.recipient, o.amount), options: { callValue: 0 }, ...memo }
+      : { to: o.recipient, value: o.amount, ...memo }
   }
 
   async quoteTransfer(o: TronTransferOptions): Promise<TronQuote> {

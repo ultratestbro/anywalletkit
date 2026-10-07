@@ -9,5 +9,6 @@ export {
   WalletAccountReadOnlyTron, hashMessage, recoverMessageAddress, bandwidthPoints, DEFAULT_FEE_LIMIT_SUN, FEE_LIMIT_MARGIN,
 } from './read-only-account.js'
 export { WalletAccountTron, MAX_EXPIRATION_MS, type TronTransferResult } from './account.js'
-export { WalletManagerTron, TRON_BASE_PATH } from './manager.js'
+export { WalletManagerTron, TRON_BASE_PATH, TRON_ACCOUNT_BRANCH } from './manager.js'
+export { attachMemo, encodeMemoRecord, MEMO_FIELD, MAX_MEMO_BYTES } from './memo.js'
 export { WalletManagerTron as default } from './manager.js'

@@ -23,8 +23,8 @@ export interface TronConfig {
   allowBurn?: boolean
 }
 
-/** Native TRX transfer. `value` in sun. */
-export interface TronNativeTransfer { to: string; value: bigint | number | string }
+/** Native TRX transfer. `value` in sun. `memo` → `raw_data.data` (charged the memo fee). */
+export interface TronNativeTransfer { to: string; value: bigint | number | string; memo?: string }
 
 /** Smart-contract call. */
 export interface TronContractCall {
@@ -33,6 +33,8 @@ export interface TronContractCall {
   functionSelector: string
   parameters?: Array<{ type: string; value: unknown }>
   options?: { feeLimit?: number; callValue?: number }
+  /** Attached as `raw_data.data` (e.g. a THORChain swap memo on a TRC-20 transfer). */
+  memo?: string
 }
 
 /** A transaction as the full node returns it (`/wallet/createtransaction`, `/wallet/triggersmartcontract`). */
@@ -62,6 +64,8 @@ export interface TronTransferOptions {
   token?: string
   recipient: string
   amount: bigint | number | string
+  /** Attached as `raw_data.data`; the network charges `getMemoFee` (1 TRX). */
+  memo?: string
 }
 
 /** What a transaction will cost, resource by resource. All sun values are what the SENDER burns. */

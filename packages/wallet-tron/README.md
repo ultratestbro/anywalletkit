@@ -51,3 +51,24 @@ what the sender actually pays (sun) after staked / free resources:
 - **memo** (`raw_data.data`): `getMemoFee` (1 TRX).
 
 `quoteSendTransaction` / `quoteTransfer` return `{ fee: trxBurn, activationFee, estimate }`.
+
+## Memo (`raw_data.data`)
+
+`transfer({ …, memo })`, `{ to, value, memo }` and contract calls with `memo` attach
+the text as protobuf field 10 of the node-built `raw_data`. The record is spliced at
+its canonical position (after `expiration`, before `contract`) so the `txID` we sign
+equals the one java-tron recomputes from its own re-serialization; the JSON broadcast
+carries the same bytes as `raw_data.data` (hex). The memo fee (`getMemoFee`, 1 TRX)
+and the extra bandwidth show up in `estimateFee`, and `describeTransaction` reports
+the memo with a `memo-fee` warning. Memos are capped at 512 UTF-8 bytes; attaching
+one to a transaction that already carries `raw_data.data` is refused.
+
+## Signers
+
+Accounts sign through a secp256k1 `Signer` from `@forgewallet/core`: the seed path
+uses a `LocalSigner` (zeroized on `dispose()`); `new WalletManagerTron(signer)` wraps
+an external one (hardware, MPC, backend). Transactions ask for `ecdsa-recoverable`
+over `sha256(raw_data)` with context `tron-tx`, TIP-191 messages with `tron-message`.
+A derivable `SeedSigner` at `m/44'/195'/0'/0` yields `getAccount(i)` children; any
+other signer is `getAccount(0)` only. `WalletAccountTron.fromPrivateKey(…)` keeps the
+raw-key shape.
