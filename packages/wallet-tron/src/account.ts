@@ -2,14 +2,25 @@ import { SignerError, zeroize, type IWalletAccount, type IWalletAccountReadOnly,
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { addressFromPublicKey, toHexAddress } from './address.js'
-import { DEFAULT_FEE_LIMIT_SUN, WalletAccountReadOnlyTron, hashMessage, isPrebuilt } from './read-only-account.js'
-import type { TronConfig, TronRawTransaction, TronTransaction, TronTransferOptions } from './types.js'
+import { describeTransaction } from './describe.js'
+import { SimulationError, UnsafeTransactionError } from './errors.js'
+import { WalletAccountReadOnlyTron, hashMessage } from './read-only-account.js'
+import { isPrebuilt } from './shape.js'
+import type { TronConfig, TronFeeEstimate, TronRawTransaction, TronSimulation, TronTransaction, TronTransferOptions } from './types.js'
 
-export interface TronTransferResult extends TransferResult { activationFee?: bigint }
+export interface TronTransferResult extends TransferResult {
+  /** Account creation fee included in `fee` (TRX transfer to a new account). */
+  activationFee?: bigint
+  estimate?: TronFeeEstimate
+}
+
+/** Longest expiration the node accepts for a transaction (`Constant.MAXIMUM_TIME_UNTIL_EXPIRATION`). */
+export const MAX_EXPIRATION_MS = 24 * 60 * 60 * 1000
 
 /**
  * Signing Tron account. Key is a Uint8Array zeroized by `dispose()`. The full node
- * builds `raw_data`; we sign `txID` (= sha256(raw_data)) with secp256k1 and broadcast.
+ * builds `raw_data`; we check it, simulate it, sign `txID` (= sha256(raw_data)) with
+ * secp256k1 and broadcast.
  */
 export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWalletAccount {
   /** ref block / expiration come from the node, so building needs the network. */
@@ -37,34 +48,68 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     return this._privateKey
   }
 
-  /** TIP-191 message signature: 0x + r||s||(27 + recovery) hex — tronweb v2 encoding. */
+  /** TIP-191 message signature: 0x + r||s||(27 + recovery) hex (tronweb `signMessageV2` encoding). */
   async sign(message: string | Uint8Array): Promise<string> {
     const sig = secp256k1.sign(hashMessage(message), this.key(), { prehash: false, format: 'recovered' })
     return '0x' + bytesToHex(sig.slice(1)) + (27 + sig[0]!).toString(16).padStart(2, '0')
   }
 
-  /** Attach `signature: [r||s||recovery]` (recovery as 00/01, tronweb encoding). */
+  /** Attach `signature: [r||s||recovery]` (recovery as 00/01, tronweb encoding). No checks — see `signTransaction`. */
   signRaw(tx: TronRawTransaction): TronRawTransaction {
     const sig = secp256k1.sign(hexToBytes(tx.txID), this.key(), { prehash: false, format: 'recovered', lowS: true })
     return { ...tx, signature: [bytesToHex(sig.slice(1)) + sig[0]!.toString(16).padStart(2, '0')] }
   }
 
-  private assertOwner(tx: TronRawTransaction): void {
-    const owner = tx.raw_data?.contract?.[0]?.parameter?.value?.owner_address as string | undefined
-    if (owner && toHexAddress(owner) !== this.addressHex) throw new Error('The transaction owner does not match the wallet account address.')
+  // ── Hard checks (before anything is signed) ─────────────────────────────────
+
+  /**
+   * Refuse to sign what cannot be right: a foreign owner, a missing or expired
+   * (or >24h) expiration, no ref block, more than one contract, a TRX / TRC-20
+   * transfer to the zero address (unless `allowBurn`), a `fee_limit` above
+   * `transactionMaxFee`.
+   */
+  protected assertSafe(tx: TronRawTransaction, now = Date.now()): void {
+    const contracts = tx.raw_data?.contract ?? []
+    if (contracts.length !== 1) throw new UnsafeTransactionError('multi-contract', `Expected exactly one contract in the transaction, got ${contracts.length}.`)
+    const owner = contracts[0]?.parameter?.value?.owner_address as string | undefined
+    if (!owner || toHexAddress(owner) !== this.addressHex) throw new UnsafeTransactionError('owner-mismatch', 'The transaction owner does not match the wallet account address.')
+    if (!tx.raw_data.ref_block_bytes || !tx.raw_data.ref_block_hash) throw new UnsafeTransactionError('missing-ref-block', 'The transaction has no reference block (ref_block_bytes / ref_block_hash).')
+    const exp = tx.raw_data.expiration
+    if (exp === undefined || exp <= now) throw new UnsafeTransactionError('expired', 'The transaction has no expiration or has already expired.')
+    if (exp > now + MAX_EXPIRATION_MS) throw new UnsafeTransactionError('expiration-too-far', 'The transaction expiration is more than 24 hours away.')
+    const max = this._config.transactionMaxFee
+    if (max !== undefined && tx.raw_data.fee_limit !== undefined && BigInt(tx.raw_data.fee_limit) > BigInt(max)) {
+      throw new UnsafeTransactionError('fee-limit', `fee_limit ${tx.raw_data.fee_limit} exceeds transactionMaxFee ${max}.`)
+    }
+    if (!this._config.allowBurn) {
+      const d = describeTransaction(tx, { now })
+      if (d.warnings.some((w) => w.code === 'zero-address')) throw new UnsafeTransactionError('zero-address', 'Refusing to send to the zero address (set allowBurn to override).')
+    }
   }
 
-  private async maxFeeCheck(fee: bigint, limit: bigint | number | undefined, op: string) {
+  private maxFeeCheck(fee: bigint, limit: bigint | number | undefined, op: string) {
     if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation${op === 'transfer' ? 's' : ''}.`)
   }
 
-  /** Build (via the node) and sign; returns the signed transaction JSON as a string (broadcast-ready). */
+  /** Build → hard checks → simulate → estimate → fee cap. Shared by sign / send / transfer. */
+  private async prepare(tx: TronTransaction, maxFee: bigint | number | undefined, op: string) {
+    const { built, sim: fromBuild } = await this.buildWithSimulation(tx)
+    this.assertSafe(built)
+    let sim: TronSimulation | undefined = fromBuild
+    if (this._config.simulate !== false) {
+      sim ??= await this.simulateRaw(built)
+      if (!sim.ok) throw new SimulationError(sim.reason ?? 'unknown', sim.energy)
+    }
+    const quote = await this.quoteTransaction(built, sim)
+    this.maxFeeCheck(quote.fee, maxFee, op)
+    return { built, quote }
+  }
+
+  /** Build (via the node), check, simulate and sign; returns broadcast-ready transaction JSON. */
   async signTransaction(tx: TronTransaction): Promise<string> {
     this.key()
     this.requireClient('sign transactions')
-    const built = await this.buildTransaction(tx)
-    this.assertOwner(built)
-    if (this._config.transactionMaxFee !== undefined) await this.maxFeeCheck((await this.quoteTransaction(built)).fee, this._config.transactionMaxFee, 'transaction')
+    const { built } = await this.prepare(tx, this._config.transactionMaxFee, 'transaction')
     return JSON.stringify(this.signRaw(built))
   }
 
@@ -78,36 +123,17 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     this.key()
     this.requireClient('send transactions')
     const parsed: TronTransaction = typeof tx === 'string' ? (JSON.parse(tx) as TronRawTransaction) : tx
-    let signed: TronRawTransaction
-    if (isPrebuilt(parsed) && parsed.signature?.length) signed = parsed
-    else {
-      const built = await this.buildTransaction(parsed)
-      this.assertOwner(built)
-      signed = this.signRaw(built)
-    }
-    const { fee, activationFee } = await this.quoteTransaction(signed)
-    await this.maxFeeCheck(fee, this._config.transactionMaxFee, 'transaction')
-    return { hash: await this.broadcast(signed), fee, activationFee }
+    const { built, quote } = await this.prepare(parsed, this._config.transactionMaxFee, 'transaction')
+    const signed = isPrebuilt(parsed) && parsed.signature?.length ? built : this.signRaw(built)
+    return { hash: await this.broadcast(signed), fee: quote.fee, activationFee: quote.activationFee, estimate: quote.estimate }
   }
 
   /** TRX (no `token`) or TRC-20 `transfer(address,uint256)`. */
   async transfer(o: TronTransferOptions): Promise<TronTransferResult> {
     this.key()
     this.requireClient('transfer tokens')
-    if (!o.token) {
-      const built = await this.buildTransaction({ to: o.recipient, value: o.amount })
-      const { fee, activationFee } = await this.quoteTransaction(built)
-      await this.maxFeeCheck(fee, this._config.transferMaxFee, 'transfer')
-      return { hash: await this.broadcast(this.signRaw(built)), fee, activationFee }
-    }
-    const { fee } = await this.quoteTransfer(o)
-    await this.maxFeeCheck(fee, this._config.transferMaxFee, 'transfer')
-    const built = await this.buildTransaction({
-      contractAddress: o.token, functionSelector: 'transfer(address,uint256)',
-      parameters: this.trc20TransferParams(o.recipient, o.amount),
-      options: { feeLimit: Number(fee) || DEFAULT_FEE_LIMIT_SUN, callValue: 0 },
-    })
-    return { hash: await this.broadcast(this.signRaw(built)), fee }
+    const { built, quote } = await this.prepare(this.asTransaction(o), this._config.transferMaxFee, 'transfer')
+    return { hash: await this.broadcast(this.signRaw(built)), fee: quote.fee, activationFee: quote.activationFee, estimate: quote.estimate }
   }
 
   toReadOnlyAccount(): IWalletAccountReadOnly {
