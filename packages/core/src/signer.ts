@@ -12,7 +12,7 @@
  * |----------------------|-----------|--------------------|---------------------------------|
  * | `ecdsa-recoverable`  | secp256k1 | 32-byte hash       | 65 bytes r‖s‖recovery (0 or 1)  |
  * | `ecdsa`              | secp256k1 | 32-byte hash       | 64 bytes r‖s, low-S             |
- * | `schnorr`            | secp256k1 | 32-byte message    | 64 bytes, BIP-340               |
+ * | `schnorr`            | secp256k1 | 32-byte message    | 64 bytes, BIP-340 (`tweak` → BIP-341 key-path) |
  * | `ed25519`            | ed25519   | message bytes      | 64 bytes, RFC 8032              |
  *
  * `context` is a free-form hint so a hardware/MPC signer can show the right
@@ -23,7 +23,8 @@
  * | `evm-tx`          | EVM    | ecdsa-recoverable   | keccak256 of the unsigned serialized tx   |
  * | `evm-191`         | EVM    | ecdsa-recoverable   | EIP-191 personal_sign hash                |
  * | `evm-712`         | EVM    | ecdsa-recoverable   | EIP-712 typed-data hash                   |
- * | `btc-sighash`     | BTC    | ecdsa / schnorr     | BIP-143 (p2wpkh) / BIP-341 (p2tr) sighash |
+ * | `btc-sighash`     | BTC    | ecdsa               | BIP-143 p2wpkh sighash (SIGHASH_ALL)      |
+ * | `btc-taproot-keypath` | BTC | schnorr + `tweak`  | BIP-341 p2tr key-path sighash (DEFAULT)   |
  * | `btc-message`     | BTC    | ecdsa-recoverable   | BIP-137 magic hash                        |
  * | `tron-tx`         | Tron   | ecdsa-recoverable   | sha256 of raw_data                        |
  * | `tron-message`    | Tron   | ecdsa-recoverable   | TIP-191 hash                              |
@@ -34,6 +35,7 @@
  */
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js'
+import { bytesToNumberBE, numberToBytesBE } from '@noble/curves/utils.js'
 import { deriveEd25519, deriveSecp256k1 } from './derive.js'
 import { SignerError } from './errors.js'
 import { zeroize } from './mnemonic.js'
@@ -48,6 +50,14 @@ export interface SignOptions {
   context?: string
   /** BIP-340 auxiliary randomness (32 bytes) — deterministic tests only; omit for fresh randomness. */
   aux?: Uint8Array
+  /**
+   * BIP-341 key tweak (32 bytes), `schnorr` only: the signer signs with
+   * `(even(priv) + tweak) mod n`, i.e. for the tweaked output key — taproot
+   * key-path spends (BIP-86: `tweak = taggedHash('TapTweak', xonlyPub)`).
+   * A hardware/MPC signer that tweaks internally may ignore it, but it must
+   * still produce a signature valid under the tweaked key.
+   */
+  tweak?: Uint8Array
 }
 
 export interface Signer {
@@ -103,6 +113,30 @@ function assert32(payload: Uint8Array, scheme: SignScheme): void {
   if (payload.length !== 32) throw new SignerError(`'${scheme}' signs a 32-byte digest; got ${payload.length} bytes.`)
 }
 
+function assertTweak(options: SignOptions, scheme: SignScheme): void {
+  if (options.tweak === undefined) return
+  if (scheme !== 'schnorr') throw new SignerError(`'tweak' applies to the 'schnorr' scheme only (asked for '${scheme}').`)
+  if (options.tweak.length !== 32) throw new SignerError(`'tweak' must be 32 bytes; got ${options.tweak.length}.`)
+}
+
+/**
+ * BIP-341 private-key tweak: negate `privateKey` when its public key has an odd
+ * Y (so the internal key is the even lift of its x-only form), then add `tweak`
+ * mod n. Returns a fresh buffer — the caller zeroizes it after signing.
+ */
+export function tweakSecp256k1PrivateKey(privateKey: Uint8Array, tweak: Uint8Array): Uint8Array {
+  const n = secp256k1.Point.CURVE().n
+  let d = bytesToNumberBE(privateKey)
+  if (d <= 0n || d >= n) throw new SignerError('Invalid secp256k1 private key.')
+  const P = secp256k1.Point.BASE.multiply(d)
+  if (P.toAffine().y % 2n === 1n) d = n - d
+  const t = bytesToNumberBE(tweak)
+  if (t >= n) throw new SignerError('Invalid BIP-341 tweak (not below the curve order).')
+  const tweaked = (d + t) % n
+  if (tweaked === 0n) throw new SignerError('Invalid BIP-341 tweak (zero key).')
+  return numberToBytesBE(tweaked, 32)
+}
+
 /**
  * Local key signer: the key lives in one `Uint8Array`, zeroized by `dispose()`.
  * Built from a seed (derivable) or from a raw derived key (leaf only).
@@ -152,6 +186,7 @@ export class LocalSigner implements SeedSigner {
     switch (scheme) {
       case 'ecdsa-recoverable': {
         assert32(payload, scheme)
+        assertTweak(options, scheme)
         // noble's 'recovered' format is recovery‖r‖s; the SDK contract is r‖s‖recovery.
         const sig = secp256k1.sign(payload, key, { prehash: false, format: 'recovered' })
         const out = new Uint8Array(65)
@@ -161,10 +196,19 @@ export class LocalSigner implements SeedSigner {
       }
       case 'ecdsa':
         assert32(payload, scheme)
+        assertTweak(options, scheme)
         return secp256k1.sign(payload, key, { prehash: false, format: 'compact', lowS: true })
-      case 'schnorr':
+      case 'schnorr': {
         assert32(payload, scheme)
-        return options.aux ? schnorr.sign(payload, key, options.aux) : schnorr.sign(payload, key)
+        assertTweak(options, scheme)
+        if (!options.tweak) return options.aux ? schnorr.sign(payload, key, options.aux) : schnorr.sign(payload, key)
+        const tweaked = tweakSecp256k1PrivateKey(key, options.tweak)
+        try {
+          return options.aux ? schnorr.sign(payload, tweaked, options.aux) : schnorr.sign(payload, tweaked)
+        } finally {
+          zeroize(tweaked)
+        }
+      }
       case 'ed25519':
         return ed25519.sign(payload, key)
     }
@@ -217,6 +261,7 @@ export function externalSigner(options: ExternalSignerOptions): Signer {
       if (disposed) throw new SignerError('This signer has been disposed.')
       const scheme = resolveScheme(self, opts.scheme)
       if (scheme !== 'ed25519') assert32(payload, scheme)
+      assertTweak(opts, scheme)
       const sig = await options.sign(payload, { ...opts, scheme })
       const expected = scheme === 'ecdsa-recoverable' ? 65 : 64
       if (sig.length !== expected) throw new SignerError(`External signer returned ${sig.length} bytes for '${scheme}'; expected ${expected}.`)

@@ -4,7 +4,7 @@ import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import {
-  LocalSigner, SignerError, defaultScheme, externalSigner, isSeedSigner, requireCurve, schemesFor, seedFromMnemonicSync,
+  LocalSigner, SignerError, defaultScheme, externalSigner, isSeedSigner, requireCurve, schemesFor, seedFromMnemonicSync, tweakSecp256k1PrivateKey,
 } from '../src/index.js'
 
 const SEED = seedFromMnemonicSync('test test test test test test test test test test test junk')
@@ -44,6 +44,29 @@ describe('LocalSigner — secp256k1', () => {
       'E907831F80848D1069A5371B402410364BDF1C5F8307B0084C55F1CE2DCA821525F66A4A85EA8B71E482A74F382D2CE5EBEEE8FDB2172F477DF4900D310536C0',
     )
     expect(schnorr.verify(sig, new Uint8Array(32), schnorr.getPublicKey(priv))).toBe(true)
+  })
+
+  it('schnorr with a BIP-341 tweak signs for the tweaked (taproot output) key', async () => {
+    // BIP-86 account 0, external 0 of 'abandon…about' (bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr)
+    const bip86 = seedFromMnemonicSync('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about')
+    const s = LocalSigner.fromSeed(bip86, 'secp256k1', "m/86'/0'/0'/0/0")
+    const xonly = s.publicKey.subarray(1)
+    const tweak = schnorr.utils.taggedHash('TapTweak', xonly)
+    // tweaked output key Q = even(P) + t·G, computed independently of the signer
+    const P = secp256k1.Point.fromBytes(s.publicKey)
+    const even = P.toAffine().y % 2n === 1n ? P.negate() : P
+    const Q = even.add(secp256k1.Point.BASE.multiply(BigInt('0x' + bytesToHex(tweak))))
+    const Qx = Q.toBytes(true).subarray(1)
+    // = the witness program of the BIP-86 vector address
+    expect(bytesToHex(Qx)).toBe('a60869f0dbcf1dc659c9cecbaf8050135ea9e8cdc487053f1dc6880949dc684c')
+    const sig = await s.sign(digest, { scheme: 'schnorr', context: 'btc-taproot-keypath', tweak })
+    expect(schnorr.verify(sig, digest, Qx)).toBe(true)
+    expect(schnorr.verify(sig, digest, xonly)).toBe(false)
+    // tweak is schnorr-only and must be 32 bytes
+    await expect(s.sign(digest, { scheme: 'ecdsa', tweak })).rejects.toThrow(/schnorr/)
+    await expect(s.sign(digest, { scheme: 'schnorr', tweak: new Uint8Array(31) })).rejects.toThrow(/32 bytes/)
+    expect(bytesToHex(tweakSecp256k1PrivateKey(hexToBytes('0000000000000000000000000000000000000000000000000000000000000003'), new Uint8Array(32))))
+      .toBe('0000000000000000000000000000000000000000000000000000000000000003') // 3·G has even Y → unchanged with a zero tweak
   })
 
   it('rejects ed25519 and non-32-byte digests', async () => {

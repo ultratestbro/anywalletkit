@@ -1,4 +1,4 @@
-import { WalletManager, deriveSecp256k1, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
 import { WalletAccountBtc } from './account.js'
 import { coinType, purposeFor } from './network.js'
 import { WalletAccountReadOnlyBtc } from './read-only-account.js'
@@ -9,6 +9,13 @@ import type { BtcConfig } from './types.js'
  *   p2wpkh (default): BIP-84, m/84'/0'/0'/0/i on mainnet, m/84'/1'/0'/0/i on test networks — bc1q… / tb1q…
  *   p2tr:             BIP-86, m/86'/0'/0'/0/i (key-path taproot) — bc1p… / tb1p…
  * Paths may be relative to the purpose/coin prefix ("0'/0/i") or given in full.
+ *
+ * Built with a secp256k1 `Signer` instead of a seed, the manager wraps it:
+ * - a derivable `SeedSigner` sitting at the account branch (`m/84'/0'/0'/0` or
+ *   `m/86'/0'/0'/0`, per `addressType`/`network`) yields `getAccount(i)` children;
+ * - a `SeedSigner` at a leaf, or any external signer, is `getAccount(0)` (path = the
+ *   signer's path, or 'external') with the configured address type; other
+ *   indexes/paths throw.
  */
 export class WalletManagerBtc extends WalletManager<WalletAccountBtc, BtcConfig> {
   private _seedBytes: Uint8Array | undefined
@@ -30,10 +37,30 @@ export class WalletManagerBtc extends WalletManager<WalletAccountBtc, BtcConfig>
     const full = path.startsWith('m/') ? path : `${this.basePath}/${path}`
     const cached = this._accounts.get(full)
     if (cached) return cached
-    if (!this._seedBytes) throw new Error('External signers for Bitcoin arrive in a later phase; construct WalletManagerBtc with a seed phrase.')
-    const { privateKey, publicKey } = deriveSecp256k1(this._seedBytes, full)
-    const account = new WalletAccountBtc(privateKey, publicKey, full, this._config)
+    const external = this.externalSigner()
+    if (external) return this.fromSigner(external, full)
+    const signer = LocalSigner.fromSeed(this._seedBytes!, 'secp256k1', full)
+    const account = new WalletAccountBtc(signer, signer.publicKey, full, this._config)
     this._accounts.set(full, account)
+    return account
+  }
+
+  /** Resolve `path` against an injected signer: the signer itself, or a child when it can derive there. */
+  private async fromSigner(signer: Signer, path: string): Promise<WalletAccountBtc> {
+    this.requireSigner('secp256k1')
+    let leaf: Signer = signer
+    let key = 'external'
+    if (isSeedSigner(signer)) {
+      if (path === signer.path) key = path
+      else if (path.startsWith(`${signer.path}/`)) { leaf = await signer.derive(path.slice(signer.path.length + 1)); key = path }
+      else throw new SignerError(`The injected signer sits at ${signer.path}; it cannot provide ${path}.`)
+    } else if (path !== `${this.basePath}/0'/0/0` && path !== 'external') {
+      throw new SignerError(`An external signer has one account; ${path} is not derivable from it.`)
+    }
+    const cached = this._accounts.get(key)
+    if (cached) return cached
+    const account = new WalletAccountBtc(leaf, await leaf.getPublicKey(), key, this._config)
+    this._accounts.set(key, account)
     return account
   }
 

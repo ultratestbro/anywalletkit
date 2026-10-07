@@ -1,11 +1,12 @@
-import { InsufficientFundsError, SignerError, zeroize, type IWalletAccount, type IWalletAccountReadOnly, type TransferResult } from '@forgewallet/core'
-import { Transaction } from '@scure/btc-signer'
+import { InsufficientFundsError, LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@forgewallet/core'
+import { SigHash, Transaction, p2pkh } from '@scure/btc-signer'
 import type { BTC_NETWORK } from '@scure/btc-signer/utils.js'
+import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js'
 import { hex } from '@scure/base'
 import { addressFromPublicKey, spendInfo } from './address.js'
 import { FINAL_SEQUENCE, RBF_SEQUENCE, assertSafe, describeTransaction, parseRawTransaction, type DescribeContext } from './describe.js'
 import { UnsupportedAddressTypeError } from './errors.js'
-import { signMessage } from './message.js'
+import { signMessageWith } from './message.js'
 import { networkParams } from './network.js'
 import { WalletAccountReadOnlyBtc, type SpendPlan } from './read-only-account.js'
 import type { BtcAddressType, BtcConfig, BtcNetwork, BtcSpend, BtcTransaction, BtcTransferOptions, BtcTxDescription } from './types.js'
@@ -25,9 +26,14 @@ interface Built {
 }
 
 /**
- * Signing Bitcoin account — BIP-84 p2wpkh or BIP-86 p2tr (key-path). The private key
- * is a Uint8Array zeroized by `dispose()`; btc-signer signs PSBT inputs in place
- * (taproot inputs are tweaked by it from `tapInternalKey`), so no copy of the key is made.
+ * Signing Bitcoin account — BIP-84 p2wpkh or BIP-86 p2tr (key-path). The key never
+ * enters this package: every signature is one `signer.sign(...)` call over a
+ * btc-signer-computed sighash — a {@link LocalSigner} for seed wallets, anything
+ * else (hardware, MPC, backend) through `externalSigner()`:
+ *
+ *   p2wpkh input  → `ecdsa`              over the BIP-143 sighash (SIGHASH_ALL), DER-encoded here
+ *   p2tr input    → `schnorr` + `tweak`  over the BIP-341 sighash (DEFAULT), tweak = TapTweak(xonly)
+ *   BIP-137 msg   → `ecdsa-recoverable`  over the magic hash
  *
  * Every spend is resolved to a full description ("what you sign") and run through
  * the hard safety checks (fee-rate ceiling, recipient/amount exactness, change
@@ -39,16 +45,26 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
   readonly path: string
   readonly publicKey: Uint8Array
   override readonly addressType: BtcAddressType
-  private _privateKey: Uint8Array | undefined
+  readonly signer: Signer
+  private _disposed = false
   private _readOnly: WalletAccountReadOnlyBtc | undefined
 
-  constructor(privateKey: Uint8Array, publicKey: Uint8Array, path: string, config: BtcConfig = {}) {
+  /** `publicKey` is the signer's compressed secp256k1 key (33 bytes); it is needed synchronously for the address. */
+  constructor(signer: Signer, publicKey: Uint8Array, path: string, config: BtcConfig = {}) {
     const type = config.addressType ?? 'p2wpkh'
     super(addressFromPublicKey(publicKey, networkParams(config.network ?? 'bitcoin'), type), config)
     this.addressType = type
-    this._privateKey = privateKey
+    this.signer = requireCurve(signer, 'secp256k1')
+    // Fail at construction, not mid-spend: taproot key-path needs schnorr, p2wpkh needs plain ecdsa.
+    const needed = type === 'p2tr' ? 'schnorr' : 'ecdsa'
+    if (!this.signer.schemes.includes(needed)) throw new SignerError(`A ${type} account needs a signer with the '${needed}' scheme (has: ${this.signer.schemes.join(', ')}).`)
     this.publicKey = publicKey
     this.path = path
+  }
+
+  /** Back-compat: wrap a raw derived key in a {@link LocalSigner} (the account takes ownership; it cannot derive). */
+  static fromPrivateKey(privateKey: Uint8Array, publicKey: Uint8Array, path: string, config: BtcConfig = {}): WalletAccountBtc {
+    return new WalletAccountBtc(LocalSigner.fromPrivateKey('secp256k1', privateKey, publicKey, path), publicKey, path, config)
   }
 
   /** Account index for the standard m/{84|86}'/{0|1}'/0'/0/i path. */
@@ -57,32 +73,65 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
     return m ? Number(m[1]) : undefined
   }
 
-  private key(): Uint8Array {
-    if (!this._privateKey) throw new SignerError('This account has been disposed.')
-    return this._privateKey
+  private live(): void {
+    if (this._disposed) throw new SignerError('This account has been disposed.')
   }
 
   /** BIP-137 p2wpkh signature, base64 (Electrum / Bitcoin Core encoding). Not available for taproot accounts. */
   async sign(message: string | Uint8Array): Promise<string> {
-    const key = this.key()
+    this.live()
     if (this.addressType === 'p2tr') throw new UnsupportedAddressTypeError('BIP-137 message signatures do not exist for taproot accounts (BIP-322 is not implemented).')
-    return signMessage(message, key, 'p2wpkh')
+    return signMessageWith(message, this.signer, 'p2wpkh')
+  }
+
+  /** The x-only internal key and its BIP-86 tweak (no script tree) for taproot key-path spends. */
+  private taprootKeys(): { xonly: Uint8Array; tweak: Uint8Array } {
+    const xonly = this.publicKey.length === 33 ? this.publicKey.subarray(1) : this.publicKey
+    return { xonly, tweak: schnorr.utils.taggedHash('TapTweak', xonly) }
+  }
+
+  /**
+   * Sign every input through the signer and attach the witness-ready signature:
+   * p2wpkh → `partialSig` (DER + SIGHASH_ALL), p2tr → `tapKeySig` (64 bytes, DEFAULT).
+   * btc-signer only computes the sighash and assembles the witness; it never sees a key.
+   */
+  private async signInputs(tx: Transaction, values: bigint[]): Promise<void> {
+    if (this.addressType === 'p2tr') {
+      const { tweak } = this.taprootKeys()
+      const scripts = Array.from({ length: tx.inputsLength }, () => this.scriptPubKey)
+      for (let i = 0; i < tx.inputsLength; i++) {
+        const sighash = tx.preimageWitnessV1(i, scripts, SigHash.DEFAULT, values)
+        const sig = await this.signer.sign(sighash, { scheme: 'schnorr', context: 'btc-taproot-keypath', tweak })
+        tx.updateInput(i, { tapKeySig: sig }, true)
+      }
+      return
+    }
+    const scriptCode = p2pkh(this.publicKey).script
+    for (let i = 0; i < tx.inputsLength; i++) {
+      const sighash = tx.preimageWitnessV0(i, scriptCode, SigHash.ALL, values[i]!)
+      const rs = await this.signer.sign(sighash, { scheme: 'ecdsa', context: 'btc-sighash' })
+      const der = secp256k1.Signature.fromBytes(rs, 'compact').toBytes('der')
+      const sig = new Uint8Array(der.length + 1)
+      sig.set(der, 0)
+      sig[der.length] = SigHash.ALL
+      tx.updateInput(i, { partialSig: [[this.publicKey, sig]] }, true)
+    }
   }
 
   private ctx(intended?: { to: string; value: bigint }): DescribeContext {
     return { network: this._network, ownAddress: this.address, intended, maxFeeRate: this.maxFeeRate }
   }
 
-  private buildAndSign(plan: SpendPlan, to: string, recipientValue: bigint, change: bigint, lockTime: number, rbf: boolean): Transaction {
+  private async buildAndSign(plan: SpendPlan, to: string, recipientValue: bigint, change: bigint, lockTime: number, rbf: boolean): Promise<Transaction> {
     const spend = spendInfo(this.publicKey, this._network, this.addressType)
-    const tx = new Transaction({ lockTime, lowR: true })
+    const tx = new Transaction({ lockTime })
     const sequence = rbf ? RBF_SEQUENCE : FINAL_SEQUENCE
     for (const u of plan.utxos) {
       tx.addInput({ ...spend, txid: u.txid, index: u.vout, sequence, witnessUtxo: { script: this.scriptPubKey, amount: u.value } })
     }
     tx.addOutputAddress(to, recipientValue, this._network)
     if (change > 0n) tx.addOutputAddress(this.address, change, this._network)
-    tx.sign(this.key())
+    await this.signInputs(tx, plan.utxos.map((u) => u.value))
     tx.finalize()
     return tx
   }
@@ -93,13 +142,13 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
    * recipient) and the tx is re-signed once.
    */
   protected async buildSignedTransaction(spend: BtcSpend): Promise<Built> {
-    this.key()
+    this.live()
     const plan = await this.planSpend(spend)
     const lockTime = await this.lockTimeHeight()
     const rbf = spend.rbf ?? this._config.rbf ?? true
     let change = plan.change
     let fee = plan.fee
-    let tx = this.buildAndSign(plan, spend.to, plan.amount, change, lockTime, rbf)
+    let tx = await this.buildAndSign(plan, spend.to, plan.amount, change, lockTime, rbf)
     const required = BigInt(tx.vsize) * plan.feeRate
     if (required > fee) {
       const delta = required - fee
@@ -109,7 +158,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
       }
       change = change - delta
       if (change < this.dustLimit) { fee = plan.fee + plan.change; change = 0n } else fee = required
-      tx = this.buildAndSign(plan, spend.to, plan.amount, change, lockTime, rbf)
+      tx = await this.buildAndSign(plan, spend.to, plan.amount, change, lockTime, rbf)
       if (BigInt(tx.vsize) * plan.feeRate > fee) throw new Error('Fee shortfall after output rebalance.')
     }
     const ctx = this.ctx({ to: spend.to, value: plan.amount })
@@ -157,7 +206,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
 
   /** Sign without broadcasting. Returns the raw transaction hex. Raw hex input is returned unchanged. */
   async signTransaction(tx: BtcTransaction): Promise<string> {
-    this.key()
+    this.live()
     if (typeof tx === 'string') return tx
     const { tx: built, fee } = await this.buildSignedTransaction(tx)
     this.checkMax(fee, this._config.transactionMaxFee, 'transaction')
@@ -170,7 +219,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
   }
 
   async sendTransaction(tx: BtcTransaction): Promise<TransferResult> {
-    this.key()
+    this.live()
     const client = this.requireClient('send transactions')
     let rawHex: string, hash: string, fee: bigint
     if (typeof tx === 'string') {
@@ -188,7 +237,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
   /** Native BTC only (`token` is rejected). Subject to `transferMaxFee`. */
   async transfer(o: BtcTransferOptions): Promise<TransferResult> {
     if (o.token) throw new Error('Tokens are not supported on the bitcoin blockchain.')
-    this.key()
+    this.live()
     const client = this.requireClient('transfer')
     const built = await this.buildSignedTransaction({ to: o.recipient, value: o.amount })
     this.checkMax(built.fee, this._config.transferMaxFee, 'transfer')
@@ -202,7 +251,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
   }
 
   dispose(): void {
-    zeroize(this._privateKey)
-    this._privateKey = undefined
+    this._disposed = true
+    this.signer.dispose()
   }
 }

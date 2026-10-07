@@ -3,7 +3,7 @@ export { UnsafeTransactionError, TooManyInputsError, UnsupportedAddressTypeError
 export { BlockbookClient, unconfirmedOutgoing } from './blockbook.js'
 export { EsploraClient } from './esplora.js'
 export { createClient } from './client.js'
-export { signMessage, magicHash, recoverMessagePublicKey, type SegwitType } from './message.js'
+export { signMessage, signMessageWith, encodeMessageSignature, magicHash, recoverMessagePublicKey, type SegwitType } from './message.js'
 export { selectCoins, selectAll, estimateVsize, spendableUtxos, MAX_UTXO_INPUTS, type CoinSelection, type CoinSelectOptions, type SelectionTarget } from './coinselect.js'
 export { describeTransaction, assertSafe, parseRawTransaction, DEFAULT_MAX_FEE_RATE, RBF_SEQUENCE, FINAL_SEQUENCE, type DescribeContext } from './describe.js'
 export { addressFromPublicKey, addressFromScript, decodeAddress, scriptKind, dustLimit, outputVBytes, INPUT_WEIGHT, DUST_LIMIT_P2WPKH, DUST_LIMIT_P2TR, type ScriptKind, type DecodedAddress } from './address.js'

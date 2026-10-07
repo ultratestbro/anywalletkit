@@ -10,6 +10,7 @@
 import { sha256 } from '@noble/hashes/sha2.js'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { base64 } from '@scure/base'
+import type { Signer } from '@forgewallet/core'
 
 const PREFIX = new TextEncoder().encode('\u0018Bitcoin Signed Message:\n') // the \x18 IS the varint length (24) of "Bitcoin Signed Message:\n"
 
@@ -29,15 +30,33 @@ export function magicHash(message: string | Uint8Array): Uint8Array {
 
 export type SegwitType = 'p2wpkh' | 'p2sh(p2wpkh)'
 
-export function signMessage(message: string | Uint8Array, privateKey: Uint8Array, segwitType: SegwitType | undefined = 'p2wpkh'): string {
-  // 65 bytes: recovery id || r || s
-  const sig = secp256k1.sign(magicHash(message), privateKey, { prehash: false, format: 'recovered' })
-  let flag = sig[0]!
-  if (segwitType !== undefined) { flag += 8; if (segwitType === 'p2wpkh') flag += 4 } else flag += 4 // compressed
+/** Header flag for a compressed key: +4 compressed, +8 segwit, +4 more for p2wpkh (→ 39 + recovery). */
+function headerFlag(recovery: number, segwitType: SegwitType | undefined): number {
+  let flag = recovery
+  if (segwitType !== undefined) { flag += 8; if (segwitType === 'p2wpkh') flag += 4 } else flag += 4
+  return 27 + flag
+}
+
+/** Encode `r‖s` + recovery id as a base64 BIP-137 signature. */
+export function encodeMessageSignature(rs: Uint8Array, recovery: number, segwitType: SegwitType | undefined = 'p2wpkh'): string {
+  if (rs.length !== 64 || recovery > 1) throw new Error('BIP-137: expected a 64-byte r‖s signature and a 0/1 recovery id.')
   const out = new Uint8Array(65)
-  out[0] = 27 + flag
-  out.set(sig.subarray(1), 1)
+  out[0] = headerFlag(recovery, segwitType)
+  out.set(rs, 1)
   return base64.encode(out)
+}
+
+/** Sign with a raw private key (RFC-6979 deterministic, low-S). Kept for callers that hold a key outside a Signer. */
+export function signMessage(message: string | Uint8Array, privateKey: Uint8Array, segwitType: SegwitType | undefined = 'p2wpkh'): string {
+  // noble 'recovered' = recovery id || r || s
+  const sig = secp256k1.sign(magicHash(message), privateKey, { prehash: false, format: 'recovered' })
+  return encodeMessageSignature(sig.subarray(1), sig[0]!, segwitType)
+}
+
+/** Sign through a {@link Signer} (`ecdsa-recoverable`, context `btc-message`). */
+export async function signMessageWith(message: string | Uint8Array, signer: Signer, segwitType: SegwitType | undefined = 'p2wpkh'): Promise<string> {
+  const sig = await signer.sign(magicHash(message), { scheme: 'ecdsa-recoverable', context: 'btc-message' })
+  return encodeMessageSignature(sig.subarray(0, 64), sig[64]!, segwitType)
 }
 
 /** Recover the public key (compressed unless the header says otherwise) from a BIP-137 signature, or undefined when malformed. */
