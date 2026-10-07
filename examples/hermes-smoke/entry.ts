@@ -1,7 +1,7 @@
 /**
  * Hermes smoke: derive + sign on every chain the way the SDK does, inside the
- * Hermes VM (no Node, no browser APIs). Compares against the golden
- * vectors and prints HERMES_SMOKE_OK. Bundled by run.mjs.
+ * Hermes VM (no Node, no browser APIs). Checks derivation/signing vectors and
+ * the offline safety layers, then prints HERMES_SMOKE_OK. Bundled by run.mjs.
  */
 import './shim-globals.js'
 import 'fastestsmallesttextencoderdecoder/EncoderDecoderTogether.min.js'
@@ -10,10 +10,13 @@ import { bytesToHex } from '@noble/hashes/utils.js'
 import { deriveEd25519, deriveSecp256k1, seedFromMnemonicSync } from '@forgewallet/core'
 import { derivationVectors } from '@forgewallet/conformance'
 import { WalletManagerEvm, describeTransaction, describeTypedData, encodeApprove } from '@forgewallet/wallet-evm'
-import { WalletManagerSolana } from '@forgewallet/wallet-solana'
-import { WalletManagerTon } from '@forgewallet/wallet-ton'
-import { WalletManagerTron } from '@forgewallet/wallet-tron'
-import { WalletManagerBtc } from '@forgewallet/wallet-btc'
+import { WalletManagerSolana, describeTransaction as describeSolana, ZERO_ADDRESS as SOL_ZERO } from '@forgewallet/wallet-solana'
+import { getApproveInstruction } from '@solana-program/token'
+import { appendTransactionMessageInstructions, createNoopSigner, createTransactionMessage, pipe, setTransactionMessageFeePayer, type Address } from '@solana/kit'
+import { WalletManagerTon, describeTransaction as describeTon, parseV5R1Body, v5r1SigningMessage, v5r1PackUnsigned, v5r1WalletId } from '@forgewallet/wallet-ton'
+import { beginCell, internal } from '@ton/core'
+import { WalletManagerTron, describeTransaction as describeTron, ZERO_ADDRESS as TRON_ZERO } from '@forgewallet/wallet-tron'
+import { WalletManagerBtc, selectCoins, INPUT_WEIGHT } from '@forgewallet/wallet-btc'
 import { smokeProtocols } from './protocols.js'
 
 declare const print: ((s: string) => void) | undefined
@@ -85,6 +88,38 @@ async function main() {
       eq('btc sign', await a.sign(derivationVectors.message), v.signMessage)
     }
     btc.dispose()
+  }
+  // ── Safety layers, offline (one pass; seed-independent) ───────────────────
+  {
+    const me = 'HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk' as Address
+    const msg = pipe(createTransactionMessage({ version: 0 }), (m) => setTransactionMessageFeePayer(me, m),
+      (m) => appendTransactionMessageInstructions([getApproveInstruction({ source: me, delegate: 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' as Address, owner: createNoopSigner(me), amount: 0xffffffffffffffffn })], m))
+    const d = describeSolana(msg as never, { account: me })
+    eq('solana describe approve', d.items[0]?.type === 'token-approve' && d.warnings.some((w) => w.code === 'unlimited-approve'), true)
+    const burn = describeSolana({ to: SOL_ZERO, value: 1n }, { account: me })
+    eq('solana describe burn', burn.kind === 'sol-transfer' && burn.warnings[0]?.code === 'burn-address', true)
+  }
+  {
+    const to = 'UQAockb65N9NqreZHrYfhipG94Q_gZYTBkV0mvaopLEEzOgi'
+    const bodyBoc = beginCell().storeUint(0xabcdef01, 32).endCell().toBoc().toString('base64')
+    const d = describeTon([{ to, value: 1n, body: 'hi' }, { to, value: 1n, bodyBoc }])
+    eq('ton describe', d.items[0]!.comment === 'hi' && d.warnings.some((w) => w.code === 'non-bounceable-contract-call'), true)
+    const signing = v5r1SigningMessage({ walletId: v5r1WalletId(), validUntil: 123, seqno: 9, messages: [{ message: internal({ to, value: 5n }) }] })
+    const p = parseV5R1Body(v5r1PackUnsigned(signing))
+    eq('ton v5r1 body', !!p && p.seqno === 9 && p.validUntil === 123 && p.messages.length === 1, true)
+  }
+  {
+    const ap = describeTron({ contractAddress: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', functionSelector: 'approve(address,uint256)', parameters: [{ type: 'address', value: 'TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK' }, { type: 'uint256', value: (1n << 256n) - 1n }] })
+    eq('tron describe approve', ap.kind === 'trc20-approve' && ap.warnings[0]?.code === 'unlimited-approve', true)
+    const burn = describeTron({ to: TRON_ZERO, value: 1n })
+    eq('tron describe zero-address', burn.kind === 'trx-transfer' && burn.warnings[0]?.code === 'zero-address', true)
+  }
+  {
+    const tr = new WalletManagerBtc(derivationVectors.seeds['bip39-abandon-12']!, { addressType: 'p2tr' })
+    eq('btc p2tr vector', await (await tr.getAccount(0)).getAddress(), 'bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr')
+    tr.dispose()
+    const sel = selectCoins({ utxos: [{ txid: 'a'.repeat(64), vout: 0, value: 100_000n, height: 1 }], targets: [{ value: 48_000n, vbytes: 31 }], feeRate: 10n, inputWeight: INPUT_WEIGHT.p2wpkh, changeVBytes: 31, changeDust: 294n })
+    eq('btc coinselect fee', sel.fee, 1_410n)
   }
   await smokeProtocols((what, ok, detail) => {
     if (!ok) throw new Error(`protocol check failed: ${what}${detail ? ` :: ${detail}` : ''}`)

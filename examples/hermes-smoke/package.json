@@ -37,6 +37,8 @@
   "devDependencies": {
     "@babel/core": "^7.29.7",
     "@react-native/babel-preset": "^0.87.1",
+    "@solana-program/token": "^0.17.0",
+    "@solana/kit": "^8.4.0",
     "esbuild": "^0.28.2",
     "hermes-engine-cli": "^0.12.0"
   }

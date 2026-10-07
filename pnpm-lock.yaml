@@ -117,6 +117,12 @@ importers:
       '@react-native/babel-preset':
         specifier: ^0.87.1
         version: 0.87.1(@babel/core@7.29.7)
+      '@solana-program/token':
+        specifier: ^0.17.0
+        version: 0.17.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
+      '@solana/kit':
+        specifier: ^8.4.0
+        version: 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
