@@ -1,4 +1,4 @@
-import { ReadOnlyAccountError, SignerError, zeroize, type IWalletAccount, type IWalletAccountReadOnly, type TransferResult } from '@forgewallet/core'
+import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@forgewallet/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import {
   getAddress, hashMessage, hashTypedData, hexToBytes, keccak256, serializeTransaction, zeroAddress,
@@ -23,22 +23,29 @@ function toBigInt(v: bigint | number | string | undefined): bigint | undefined {
 }
 
 /**
- * The signing EVM account. The private key lives ONLY in `_privateKey`
- * (a Uint8Array, zeroized by `dispose()`); signatures are produced with noble
- * secp256k1 over viem-computed hashes, so no hex copy of the key is ever made.
+ * The signing EVM account. It never holds a key: every signature is a
+ * `signer.sign(hash, {scheme: 'ecdsa-recoverable', context})` call over a
+ * viem-computed hash — a {@link LocalSigner} for seed wallets, anything else
+ * (hardware, Safe, MPC, backend) through `externalSigner()`.
  */
 export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalletAccount {
   readonly needsNetwork = false
   readonly path: string
   readonly publicKey: Uint8Array
-  private _privateKey: Uint8Array | undefined
+  readonly signer: Signer
   private _readOnly: WalletAccountReadOnlyEvm | undefined
 
-  constructor(privateKey: Uint8Array, publicKey: Uint8Array, path: string, config: EvmConfig = {}) {
+  /** `publicKey` is the signer's compressed secp256k1 key (33 bytes); it is needed synchronously for the address. */
+  constructor(signer: Signer, publicKey: Uint8Array, path: string, config: EvmConfig = {}) {
     super(addressFromPublicKey(publicKey), config)
-    this._privateKey = privateKey
+    this.signer = requireCurve(signer, 'secp256k1')
     this.publicKey = publicKey
     this.path = path
+  }
+
+  /** Back-compat: wrap a raw derived key in a {@link LocalSigner} (the account takes ownership; it cannot derive). */
+  static fromPrivateKey(privateKey: Uint8Array, publicKey: Uint8Array, path: string, config: EvmConfig = {}): WalletAccountEvm {
+    return new WalletAccountEvm(LocalSigner.fromPrivateKey('secp256k1', privateKey, publicKey, path), publicKey, path, config)
   }
 
   /** Account index when the path is the standard m/44'/60'/0'/0/i, else undefined. */
@@ -47,17 +54,12 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     return m ? Number(m[1]) : undefined
   }
 
-  private key(): Uint8Array {
-    if (!this._privateKey) throw new SignerError('This account has been disposed.')
-    return this._privateKey
-  }
-
-  /** Raw secp256k1 signature over a 32-byte hash, as a viem Signature (v = 27 | 28). */
-  private signHash(hash: Hex): Signature {
-    const sig = secp256k1.sign(hexToBytes(hash), this.key(), { prehash: false, format: 'recovered' })
-    const recovery = sig[0]!
-    const r = toHex(sig.slice(1, 33))
-    const s = toHex(sig.slice(33, 65))
+  /** Recoverable secp256k1 signature over a 32-byte hash from the signer, as a viem Signature (v = 27 | 28). */
+  private async signHash(hash: Hex, context: 'evm-tx' | 'evm-191' | 'evm-712'): Promise<Signature> {
+    const sig = await this.signer.sign(hexToBytes(hash), { scheme: 'ecdsa-recoverable', context })
+    const recovery = sig[64]!
+    const r = toHex(sig.slice(0, 32))
+    const s = toHex(sig.slice(32, 64))
     return { r, s, v: BigInt(27 + recovery), yParity: recovery }
   }
 
@@ -68,7 +70,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   /** EIP-191 personal_sign; returns 65-byte hex with v ∈ {27, 28} (ethers encoding). */
   async sign(message: string | Uint8Array): Promise<string> {
     const hash = hashMessage(typeof message === 'string' ? message : { raw: message })
-    return this.serializeSignature(this.signHash(hash))
+    return this.serializeSignature(await this.signHash(hash, 'evm-191'))
   }
 
   /** The account's chain when it is known without a network round-trip (config, detected earlier, or the tx itself). */
@@ -105,7 +107,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     const hash = hashTypedData({
       domain: typed.domain, types, primaryType: typed.primaryType ?? inferPrimaryType(types), message: typed.message,
     } as never)
-    return this.serializeSignature(this.signHash(hash))
+    return this.serializeSignature(await this.signHash(hash, 'evm-712'))
   }
 
   /** ethers-shaped tx → viem serializable, filling gaps from the network when there is a client. */
@@ -172,7 +174,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     }
     const prepared = await this.prepare(tx)
     const hash = keccak256(serializeTransaction(prepared))
-    return serializeTransaction(prepared, this.signHash(hash))
+    return serializeTransaction(prepared, await this.signHash(hash, 'evm-tx'))
   }
 
   private async signAndBroadcast(tx: EvmTransaction, limit: bigint | number | undefined, op: string): Promise<TransferResult> {
@@ -180,7 +182,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     const ready = await this.preflight(tx, limit, op)
     // preflight already quoted and capped the fee; prepare() only fills nonce/fees now.
     const prepared = await this.prepare(ready.tx)
-    const raw = serializeTransaction(prepared, this.signHash(keccak256(serializeTransaction(prepared))))
+    const raw = serializeTransaction(prepared, await this.signHash(keccak256(serializeTransaction(prepared)), 'evm-tx'))
     const hash = await client.sendRawTransaction({ serializedTransaction: raw as Hex })
     return { hash, fee: ready.fee }
   }
@@ -277,11 +279,10 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     return this._readOnly
   }
 
-  /** Zeroize the private key. Idempotent. */
+  /** Dispose the signer (zeroizes a local key). Idempotent. */
   dispose(): void {
-    zeroize(this._privateKey)
-    this._privateKey = undefined
+    this.signer.dispose()
   }
 }
 
-export { ReadOnlyAccountError }
+export { ReadOnlyAccountError } from '@forgewallet/core'

@@ -99,9 +99,11 @@ function keySigner(privateKey: Uint8Array, publicKey: Uint8Array): Signer {
   return {
     kind: 'external',
     curve: 'ed25519',
+    schemes: ['ed25519'],
     async getPublicKey() { return publicKey },
-    async sign(payload) {
+    async sign(payload, options) {
       if (!key) throw new Error('Signer disposed.')
+      if (options?.scheme !== undefined && options.scheme !== 'ed25519') throw new Error(`Unsupported scheme ${options.scheme}`)
       return ed25519.sign(payload, key)
     },
     dispose() { zeroize(key); key = undefined },

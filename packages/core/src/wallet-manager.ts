@@ -1,6 +1,7 @@
 import type { IWalletAccount } from './account.js'
 import type { FeeRates } from './account.js'
-import type { Signer } from './signer.js'
+import { requireCurve, type Signer, type SignerCurve } from './signer.js'
+import { SignerError } from './errors.js'
 import { getRandomSeedPhrase, isValidSeedPhrase, normalizeMnemonic } from './mnemonic.js'
 
 /**
@@ -29,6 +30,17 @@ export abstract class WalletManager<TAccount extends IWalletAccount, TConfig ext
 
   static getRandomSeedPhrase(words: 12 | 24 = 24): string {
     return getRandomSeedPhrase(words)
+  }
+
+  /** The Signer this manager was built with, if any (no mnemonic then). Chain managers decide how to turn it into accounts. */
+  protected externalSigner(): Signer | undefined {
+    return this._signer
+  }
+
+  /** The external signer, asserted to sign on `curve`; throws when the manager holds a mnemonic instead. */
+  protected requireSigner(curve: SignerCurve): Signer {
+    if (!this._signer) throw new SignerError('This manager was built from a seed phrase, not a Signer.')
+    return requireCurve(this._signer, curve)
   }
 
   /** Account `index` on the chain's standard path. Cached per index. */

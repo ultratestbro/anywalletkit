@@ -1,4 +1,4 @@
-import { WalletManager, deriveSecp256k1, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
 import { WalletAccountEvm } from './account.js'
 import { WalletAccountReadOnlyEvm } from './read-only-account.js'
 import type { EvmConfig } from './types.js'
@@ -6,9 +6,14 @@ import type { EvmConfig } from './types.js'
 export const EVM_BASE_PATH = "m/44'/60'/0'/0"
 
 /**
- * One seed → EVM accounts at m/44'/60'/0'/0/i (BIP-44, identical to
- * MetaMask / ethers defaults). The 64-byte BIP-39 seed is held for the life of
- * the manager and zeroized on `dispose()`.
+ * One seed → EVM accounts at m/44'/60'/0'/0/i (BIP-44; MetaMask / ethers
+ * default). The 64-byte BIP-39 seed is held for the life of the manager and
+ * zeroized on `dispose()`.
+ *
+ * Built with a secp256k1 `Signer` instead of a seed, the manager wraps it:
+ * - a derivable `SeedSigner` sitting at `m/44'/60'/0'/0` yields `getAccount(i)` children;
+ * - a `SeedSigner` at a leaf, or any external signer, is `getAccount(0)` (path = the
+ *   signer's path, or 'external'); other indexes/paths throw.
  */
 export class WalletManagerEvm extends WalletManager<WalletAccountEvm, EvmConfig> {
   private _seedBytes: Uint8Array | undefined
@@ -25,10 +30,30 @@ export class WalletManagerEvm extends WalletManager<WalletAccountEvm, EvmConfig>
   async getAccountByPath(path: string): Promise<WalletAccountEvm> {
     const cached = this._accounts.get(path)
     if (cached) return cached
-    if (!this._seedBytes) throw new Error('External signers for EVM arrive in a later phase; construct WalletManagerEvm with a seed phrase.')
-    const { privateKey, publicKey } = deriveSecp256k1(this._seedBytes, path)
-    const account = new WalletAccountEvm(privateKey, publicKey, path, this._config)
+    const external = this.externalSigner()
+    if (external) return this.fromSigner(external, path)
+    const signer = LocalSigner.fromSeed(this._seedBytes!, 'secp256k1', path)
+    const account = new WalletAccountEvm(signer, signer.publicKey, path, this._config)
     this._accounts.set(path, account)
+    return account
+  }
+
+  /** Resolve `path` against an injected signer: the signer itself, or a child when it can derive there. */
+  private async fromSigner(signer: Signer, path: string): Promise<WalletAccountEvm> {
+    this.requireSigner('secp256k1')
+    let leaf: Signer = signer
+    let key = 'external'
+    if (isSeedSigner(signer)) {
+      if (path === signer.path) key = path
+      else if (path.startsWith(`${signer.path}/`)) { leaf = await signer.derive(path.slice(signer.path.length + 1)); key = path }
+      else throw new SignerError(`The injected signer sits at ${signer.path}; it cannot provide ${path}.`)
+    } else if (path !== `${EVM_BASE_PATH}/0` && path !== 'external') {
+      throw new SignerError(`An external signer has one account; ${path} is not derivable from it.`)
+    }
+    const cached = this._accounts.get(key)
+    if (cached) return cached
+    const account = new WalletAccountEvm(leaf, await leaf.getPublicKey(), key, this._config)
+    this._accounts.set(key, account)
     return account
   }
 
