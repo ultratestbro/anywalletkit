@@ -1,8 +1,11 @@
 import {evmRef, isEvm, namespace} from "@forgewallet/protocol-swidge-core/util";
 
 // ── Omniston (STON.fi) — TON ↔ EVM stables, RFQ over WebSocket ───────────────
-// 2026-08 operational matrix (docs.ston.fi): Ethereum, BNB, Base, Arbitrum,
-// Avalanche, Polygon and Robinhood Chain. TRON is still marked "upcoming".
+// Operational matrix (docs.ston.fi, re-checked 2026-10-08): Ethereum, BNB,
+// Base, Arbitrum, Avalanche, Polygon, Robinhood Chain — plus TRON, X Layer
+// (196), HyperEVM (999, USDT0 only), Plasma (9745), ARC (5042) which our asset
+// catalog does not carry yet; add them here once swidge-assets lists their
+// stables. SDK 0.8.11 (chains only since 0.8.9; API v1beta8).
 const OMNISTON_EVM = new Set([1, 56, 137, 4663, 8453, 42161, 43114]);
 export const omniston = {
   enabled: () => true,
