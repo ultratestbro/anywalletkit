@@ -64,7 +64,10 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
     const res = await doFetch(`${baseUrl}/${action}`, {
       method: "POST",
       headers: {...headers, "content-type": "application/json"},
-      body: JSON.stringify({provider: name, ...body}),
+      // UnsignedTx carries bigint fields (value, gasLimit) — JSON.stringify
+      // throws on them ("Do not know how to serialize a BigInt", seen
+      // 2026-10-10 on a Solana → Base preflight). Wire them as decimal strings.
+      body: JSON.stringify({provider: name, ...body}, (_k, v) => (typeof v === "bigint" ? v.toString() : v)),
       signal: requestSignal,
     });
     if (!res.ok) {
