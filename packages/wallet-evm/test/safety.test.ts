@@ -26,6 +26,7 @@ function fakeProvider(overrides: Record<string, (params: unknown[]) => unknown> 
     eth_maxPriorityFeePerGas: () => '0x3b9aca00',
     eth_gasPrice: () => '0x6fc23ac00',
     eth_estimateGas: () => '0x5208',
+    eth_getBalance: () => '0xde0b6b3a7640000',
     eth_getTransactionCount: () => '0x7',
     eth_call: () => '0x' + '0'.repeat(64),
     eth_sendRawTransaction: (p) => { sent.push(p[0] as Hex); return '0x' + 'ab'.repeat(32) },
