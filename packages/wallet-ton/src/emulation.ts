@@ -46,8 +46,23 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === 'object' && !Array.isArray(v)
 }
 
+/**
+ * A plain value transfer to an account that does not exist yet: the chain
+ * credits the coins and leaves the account `uninit`; tonapi reports the hop as
+ * `success: true, aborted: true, compute skipped (cskip_no_state)` with no
+ * bounce phase. That is the normal shape of funding a fresh deposit address
+ * (NEAR Intents TON deposits, 2026-10-09) — not a failure. A BOUNCEABLE
+ * message to the same account bounces instead (`bounce_phase` set) and stays
+ * fatal, since the value comes back minus fees.
+ */
+function creditedUninit(tx: TonapiTx): boolean {
+  const c = tx.compute_phase
+  return tx.success === true && c?.skipped === true && c.skip_reason === 'cskip_no_state' && tx.bounce_phase === undefined && (tx.action_phase === undefined || tx.action_phase.success !== false)
+}
+
 function txFailure(tx: TonapiTx): string | undefined {
   const c = tx.compute_phase
+  if (creditedUninit(tx)) return undefined
   if (tx.aborted === true) return 'aborted'
   if (c && c.skipped !== true && typeof c.exit_code === 'number' && c.exit_code !== 0) return `compute exit_code ${c.exit_code}${c.exit_code_description ? ` (${c.exit_code_description})` : ''}`
   if (c && c.skipped === true && tx.success === false) return `compute skipped${c.skip_reason ? ` (${c.skip_reason})` : ''}`

@@ -40,6 +40,17 @@ describe('emulation via tonapi', () => {
     expect(f.sent).toHaveLength(0)
   })
 
+  it('a non-bounceable transfer that funds a nonexistent account is ok (aborted + cskip_no_state, success true)', () => {
+    // tonapi shape seen live 2026-10-09 for a TON deposit to a fresh NEAR Intents address.
+    const credited = { transaction: { hash: 'c', account: { address: '0:eac4' }, success: true, aborted: true, compute_phase: { skipped: true, skip_reason: 'cskip_no_state' }, end_status: 'uninit', orig_status: 'nonexist' } }
+    const trace = { ...tonapiOk().trace, children: [credited] }
+    expect(parseTonapiTrace(trace)).toMatchObject({ ok: true, warnings: [] })
+    // the bounceable twin bounces: still fatal
+    const bounced = { transaction: { ...credited.transaction, success: false, bounce_phase: 'TrPhaseBounceOk' } }
+    expect(parseTonapiTrace({ ...tonapiOk().trace, children: [bounced] })).toMatchObject({ ok: false })
+    expect(parseTonapiTrace({ ...tonapiOk().trace, children: [bounced] }).reason).toMatch(/internal message failed/)
+  })
+
   it('a bounced/failed child deeper than the first hop is a warning; a failed first hop is fatal', async () => {
     const deep = fakeRpc({}, { tonapi: () => tonapiOk({ children: [{ ...(tonapiOk().trace.children[0] as Record<string, unknown>), children: [failedTx('0:deep', 709)] }] }) })
     const a = await manager(deep).getAccount(0)
