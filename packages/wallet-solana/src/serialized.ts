@@ -33,6 +33,15 @@ export const JUPITER_V6_PROGRAM_ADDRESS = 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QN
  * Solana (NEAR Intents legs, seen 2026-10-09) prepends it to the deposit.
  */
 export const LIFI_TRACKING_PROGRAM_ADDRESS = '3i5JeuZuUxeKtVysUnwQNGerJP2bSMX9fTFfS4Nxe3Br'
+/**
+ * Relay Protocol's Solana depository ("Relay Bridge" in Jupiter's platform
+ * list; github.com/reservoirprotocol). LI.FI's `relaydepository` tool — its
+ * only route from Solana to HyperEVM (2026-10-09) — approves the depository
+ * as delegate on the source token account and lets it pull the amount in the
+ * same transaction; the guard verifies the delegate is spent (see
+ * {@link ParsedTokenAccount.delegatedAmount}).
+ */
+export const RELAY_DEPOSITORY_PROGRAM_ADDRESS = '99vQwtBwYtrqqD9YSXbdum3KBdxPAVxYTaQ3cfnJSrN2'
 /** Wrapped SOL mint; a "token in" of wSOL is measured on the SOL balance (aggregators unwrap it). */
 export const WSOL_MINT = 'So11111111111111111111111111111111111111112'
 
@@ -46,6 +55,7 @@ export const DEFAULT_PROGRAM_ALLOWLIST: readonly string[] = Object.freeze([
   MEMO_PROGRAM_ADDRESS,
   JUPITER_V6_PROGRAM_ADDRESS,
   LIFI_TRACKING_PROGRAM_ADDRESS,
+  RELAY_DEPOSITORY_PROGRAM_ADDRESS,
 ])
 
 /** What the caller expects the transaction to do with this wallet's balances. */
@@ -90,14 +100,22 @@ export interface ParsedTokenAccount {
   mint: Uint8Array
   owner: Uint8Array
   amount: bigint
+  /** COption<Pubkey> at offset 72: the account's current delegate, if any. */
+  delegate: Uint8Array | null
+  /** u64 at offset 121: what that delegate may still pull. */
+  delegatedAmount: bigint
 }
 
 export function parseTokenAccount(data: Uint8Array): ParsedTokenAccount | null {
   if (data.length < TOKEN_ACCOUNT_MIN_SIZE) return null
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
+  const hasDelegate = view.getUint32(72, true) === 1
   return {
     mint: data.subarray(0, 32),
     owner: data.subarray(32, 64),
-    amount: new DataView(data.buffer, data.byteOffset + 64, 8).getBigUint64(0, true),
+    amount: view.getBigUint64(64, true),
+    delegate: hasDelegate ? data.subarray(76, 108) : null,
+    delegatedAmount: view.getBigUint64(121, true),
   }
 }
 

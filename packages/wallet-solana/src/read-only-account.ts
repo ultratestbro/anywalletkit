@@ -431,18 +431,28 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       const foreign = [...new Set(description.items.map((it) => it.program ?? '<unresolved>').filter((p) => !allowed.has(p)))]
       if (foreign.length) throw new UnsafeTransactionError(`Transaction invokes programs outside the allowlist: ${foreign.join(', ')}.`, 'unknown-program', foreign)
     }
-    // 2. Authority / delegate changes are never part of a swap. Closing a token
-    //    account is routine (aggregators unwrap temporary wSOL) ONLY when the
-    //    rent comes back to this wallet.
+    // 2. Authority changes are never part of a swap. Closing a token account
+    //    is routine (aggregators unwrap temporary wSOL) ONLY when the rent
+    //    comes back to this wallet. A delegate approval is accepted ONLY on
+    //    the declared swap-input account, bounded by the declared amount, and
+    //    only if the simulation shows the delegate fully spent afterwards
+    //    (Relay's depository pulls the deposit via delegate in the same
+    //    transaction, 2026-10-09) — a lingering allowance is refused below.
+    const { expect } = guard
+    const approvals: Array<{ source: string; delegate: string }> = []
     for (const it of description.items) {
       if (it.type === 'set-authority') throw new UnsafeTransactionError(`Transaction changes an authority on ${it.account}.`, 'sets-authority', [it.account])
-      if (it.type === 'token-approve') throw new UnsafeTransactionError(`Transaction approves ${it.delegate} to spend from ${it.source}.`, 'approves-delegate', [it.delegate])
+      if (it.type === 'token-approve') {
+        if (it.unlimited || !expect.maxTokenOut || isNativeMint(expect.maxTokenOut.mint) || it.amount > expect.maxTokenOut.amount) {
+          throw new UnsafeTransactionError(`Transaction approves ${it.delegate} to spend from ${it.source}.`, 'approves-delegate', [it.delegate])
+        }
+        approvals.push({ source: it.source, delegate: it.delegate })
+      }
       if (it.type === 'close-account' && it.destination !== this.address) throw new UnsafeTransactionError(`Transaction closes ${it.account} with the rent sent to ${it.destination}.`, 'closes-account', [it.account])
     }
 
     // 3. Balances: pre-state of every writable account plus the declared ATAs,
     //    post-state from a simulation that returns those same accounts.
-    const { expect } = guard
     const me = pubkeyBytes(this.address)
     const mintAtas = async (mint: string) => Promise.all([this.ata(address(mint), this.address, TOKEN_PROGRAM_ADDRESS), this.ata(address(mint), this.address, TOKEN_2022_PROGRAM_ADDRESS)])
     const tokenInNative = expect.tokenIn !== undefined && isNativeMint(expect.tokenIn.mint)
@@ -492,6 +502,14 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     if (expect.maxTokenOut && !isNativeMint(expect.maxTokenOut.mint)) {
       tokenOutDelta = tokenDelta(tokenOutAtas)
       if (tokenOutDelta < -expect.maxTokenOut.amount) throw new UnsafeTransactionError(`Transaction takes ${-tokenOutDelta} of ${expect.maxTokenOut.mint}; at most ${expect.maxTokenOut.amount} allowed.`, 'token-out', [String(-tokenOutDelta)])
+    }
+    for (const ap of approvals) {
+      if (!tokenOutAtas.includes(ap.source)) throw new UnsafeTransactionError(`Transaction approves ${ap.delegate} to spend from ${ap.source}, which is not the swap input.`, 'approves-delegate', [ap.delegate])
+      const st = post.get(ap.source)
+      const parsed = st ? parseTokenAccount(st.data) : null
+      if (parsed && parsed.delegate !== null && parsed.delegatedAmount > 0n) {
+        throw new UnsafeTransactionError(`Transaction leaves ${ap.delegate} approved for ${parsed.delegatedAmount} on ${ap.source} after it runs.`, 'approves-delegate', [ap.delegate])
+      }
     }
     const exempt = new Set([...tokenInAtas, ...tokenOutAtas])
     for (const addr of ownedTokenAccounts) {

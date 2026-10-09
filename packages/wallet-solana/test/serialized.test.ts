@@ -4,10 +4,10 @@ import {
   getBase64EncodedWireTransaction, pipe, setTransactionMessageFeePayer, setTransactionMessageLifetimeUsingBlockhash,
   type Address, type Instruction, type Transaction, type TransactionMessage,
 } from '@solana/kit'
-import { TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, getCloseAccountInstruction, getCreateAssociatedTokenIdempotentInstruction, getSetAuthorityInstruction, AuthorityType } from '@solana-program/token'
+import { TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, getApproveInstruction, getCloseAccountInstruction, getCreateAssociatedTokenIdempotentInstruction, getSetAuthorityInstruction, AuthorityType } from '@solana-program/token'
 import { getSetComputeUnitLimitInstruction } from '@solana-program/compute-budget'
 import {
-  JUPITER_V6_PROGRAM_ADDRESS, LIFI_TRACKING_PROGRAM_ADDRESS, SimulationError, UnsafeTransactionError, WalletManagerSolana, type SerializedTxGuard, type SolanaRpc,
+  JUPITER_V6_PROGRAM_ADDRESS, LIFI_TRACKING_PROGRAM_ADDRESS, RELAY_DEPOSITORY_PROGRAM_ADDRESS, SimulationError, UnsafeTransactionError, WalletManagerSolana, type SerializedTxGuard, type SolanaRpc,
 } from '../src/index.js'
 
 const SEED = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
@@ -34,6 +34,14 @@ function tokenAccount(mint: Address, owner: Address, amount: bigint): Uint8Array
   return out
 }
 const token = (mint: Address, owner: Address, amount: bigint): State => ({ lamports: ATA_RENT, owner: TOKEN_PROGRAM_ADDRESS, data: tokenAccount(mint, owner, amount) })
+/** Same, with a live delegate (COption tag @72, pubkey @76, delegated_amount u64 @121). */
+const tokenDelegated = (mint: Address, owner: Address, amount: bigint, delegate: Address, delegated: bigint): State => {
+  const data = tokenAccount(mint, owner, amount)
+  new DataView(data.buffer).setUint32(72, 1, true)
+  data.set(pk(delegate), 76)
+  new DataView(data.buffer).setBigUint64(121, delegated, true)
+  return { lamports: ATA_RENT, owner: TOKEN_PROGRAM_ADDRESS, data }
+}
 const sys = (lamports: bigint): State => ({ lamports, owner: '11111111111111111111111111111111', data: new Uint8Array() })
 const b64 = (u8: Uint8Array) => Buffer.from(u8).toString('base64')
 const toRpcAccount = (s: State) => (s ? { lamports: s.lamports, owner: s.owner, data: [b64(s.data), 'base64'], executable: false, rentEpoch: 0n, space: BigInt(s.data.length) } : null)
@@ -154,6 +162,37 @@ describe('provider-serialized transactions', () => {
     }
     const tx = wire(jupiterLike({ writable: [usdcAta, usdtAta], usdcAta, extra: [track] }))
     await expect(a.sendSerialized(tx, guard())).resolves.toMatchObject({ hash: 'B'.repeat(87) })
+  })
+
+  it('accepts a Relay-style delegate approval on the swap input only when the simulation shows it spent', async () => {
+    // LI.FI `relaydepository` (Solana → HyperEVM, 2026-10-09): approve the
+    // depository on our USDT ATA, the program pulls the deposit in the same tx.
+    const { usdcAta, usdtAta, pre } = await setup()
+    const payer = createNoopSigner(ADDR0)
+    const relay: Instruction = { programAddress: RELAY_DEPOSITORY_PROGRAM_ADDRESS as Address, accounts: [{ address: ADDR0, role: AccountRole.WRITABLE_SIGNER }, { address: usdtAta, role: AccountRole.WRITABLE }], data: new Uint8Array(48) }
+    const approveIx = (source: Address, amount: bigint) => getApproveInstruction({ source, delegate: OTHER, owner: payer, amount })
+    const tx = (ixs: Instruction[]) => wire([getSetComputeUnitLimitInstruction({ units: 400_000 }), ...ixs])
+    const g = guard({ tokenIn: undefined, maxTokenOut: { mint: USDT, amount: 1_000_000n }, maxLamportsOut: 0n })
+    // spent in the same transaction → fine
+    const spent = fakeRpc(pre, { ...pre, [ADDR0]: sys(SOL - FEE), [usdtAta]: token(USDT, ADDR0, 0n) })
+    const a = await new WalletManagerSolana(SEED, { provider: spent.rpc }).getAccount(0)
+    await expect(a.sendSerialized(tx([approveIx(usdtAta, 1_000_000n), relay]), g)).resolves.toMatchObject({ hash: 'B'.repeat(87) })
+    // the delegate is left with an allowance → refused, nothing signed
+    const lingering = fakeRpc(pre, { ...pre, [ADDR0]: sys(SOL - FEE), [usdtAta]: tokenDelegated(USDT, ADDR0, 1_000_000n, OTHER, 1_000_000n) })
+    const b = await new WalletManagerSolana(SEED, { provider: lingering.rpc }).getAccount(0)
+    await expect(b.sendSerialized(tx([approveIx(usdtAta, 1_000_000n), relay]), g)).rejects.toMatchObject({ code: 'approves-delegate' })
+    expect(lingering.sent).toHaveLength(0)
+    // approving more than the declared input, an unlimited amount, or a non-input account → refused before any simulation
+    for (const bad of [approveIx(usdtAta, 1_000_001n), approveIx(usdtAta, 0xffffffffffffffffn), approveIx(usdcAta, 1n)]) {
+      const f = fakeRpc(pre, pre)
+      const c = await new WalletManagerSolana(SEED, { provider: f.rpc }).getAccount(0)
+      await expect(c.sendSerialized(tx([bad, relay]), g)).rejects.toMatchObject({ code: 'approves-delegate' })
+      expect(f.sent).toHaveLength(0)
+    }
+    // and without a declared token input (SOL source), any approval is refused
+    const f2 = fakeRpc(pre, pre)
+    const d = await new WalletManagerSolana(SEED, { provider: f2.rpc }).getAccount(0)
+    await expect(d.sendSerialized(tx([approveIx(usdtAta, 1n), relay]), guard({ tokenIn: undefined }))).rejects.toMatchObject({ code: 'approves-delegate' })
   })
 
   it('refuses a drain of a token account that is not part of the swap', async () => {
