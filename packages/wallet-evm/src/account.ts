@@ -28,6 +28,10 @@ function toBigInt(v: bigint | number | string | undefined): bigint | undefined {
  * viem-computed hash — a {@link LocalSigner} for seed wallets, anything else
  * (hardware, Safe, MPC, backend) through `externalSigner()`.
  */
+/** Minimum priority fee the SDK bids when the network suggests less (wei, per chain id). */
+export const MIN_PRIORITY_FEE_WEI: Readonly<Record<number, bigint>> = Object.freeze({
+  1: 50_000_000n, // Ethereum mainnet: 0.05 gwei (≈$0.01 on 100k gas) — enough to be picked up
+})
 /** How long a self-observed next nonce outranks the network's `pending` answer. */
 export const NONCE_FLOOR_TTL_MS = 90_000
 /** Simulation re-runs (and the pause between them) when a revert follows the account's own broadcast. */
@@ -156,8 +160,16 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     let maxPriorityFeePerGas = toBigInt(tx.maxPriorityFeePerGas)
     if (maxFeePerGas === undefined || maxPriorityFeePerGas === undefined) {
       const fees = await this.requireClient('read fee data').estimateFeesPerGas()
-      maxFeePerGas ??= fees.maxFeePerGas
-      maxPriorityFeePerGas ??= fees.maxPriorityFeePerGas
+      // Public mainnet nodes answer eth_maxPriorityFeePerGas with 0 when
+      // blocks are quiet. A zero-tip transaction is last in every builder's
+      // queue and gets evicted from the mempool as soon as the base fee
+      // drifts above its cap (2026-10-09: one waited 3 min, one vanished
+      // after the node had returned its hash). Floor the tip per chain when
+      // the caller did not fix it, and give the cap the same headroom.
+      const tipFloor = tx.maxPriorityFeePerGas === undefined ? (MIN_PRIORITY_FEE_WEI[chainId] ?? 0n) : 0n
+      const tip = fees.maxPriorityFeePerGas < tipFloor ? tipFloor : fees.maxPriorityFeePerGas
+      maxPriorityFeePerGas ??= tip
+      maxFeePerGas ??= fees.maxFeePerGas + (tip - fees.maxPriorityFeePerGas)
     }
     if (tx.type === 4) {
       return { ...base, type: 'eip7702', maxFeePerGas, maxPriorityFeePerGas, accessList: tx.accessList ?? [], authorizationList: (tx.authorizationList ?? []) as never }

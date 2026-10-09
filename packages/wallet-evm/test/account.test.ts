@@ -62,6 +62,26 @@ describe('WalletAccountEvm', () => {
     m.dispose(); m2.dispose()
   })
 
+  it('floors a zero priority fee on mainnet and lifts the cap by the same amount', async () => {
+    // publicnode suggested 0 wei tip twice on 2026-10-09; one tx was evicted.
+    const fake = fakeProvider({ eth_maxPriorityFeePerGas: () => '0x0' })
+    const a = await new WalletManagerEvm(SEED, { provider: fake.provider }).getAccount(0)
+    await a.sendTransaction({ to: SPENDER, value: 1n })
+    const tx = parseTransaction(fake.sent[0]!)
+    expect(tx.maxPriorityFeePerGas).toBe(50_000_000n)
+    // viem: maxFee = baseFee × 1.2 + tip → 1.2e9 + 0 before the floor, + the floor after
+    expect(tx.maxFeePerGas).toBe(1_200_000_000n + 50_000_000n)
+    // a caller-fixed tip is never raised; other chains keep the network's answer
+    const fixed = fakeProvider({ eth_maxPriorityFeePerGas: () => '0x0' })
+    const b = await new WalletManagerEvm(SEED, { provider: fixed.provider }).getAccount(0)
+    await b.sendTransaction({ to: SPENDER, value: 1n, maxPriorityFeePerGas: 0n, maxFeePerGas: 2_000_000_000n })
+    expect(parseTransaction(fixed.sent[0]!).maxPriorityFeePerGas ?? 0n).toBe(0n)
+    const l2 = fakeProvider({ eth_chainId: () => '0x2105', eth_maxPriorityFeePerGas: () => '0x0' })
+    const c = await new WalletManagerEvm(SEED, { provider: l2.provider }).getAccount(0)
+    await c.sendTransaction({ to: SPENDER, value: 1n })
+    expect(parseTransaction(l2.sent[0]!).maxPriorityFeePerGas ?? 0n).toBe(0n)
+  })
+
   it('keeps its own nonce floor across sends and retries once on "nonce too low"', async () => {
     // Live 2026-10-09 (Base): `pending` came back stale right after our
     // approval was mined; the next tx reused the nonce and every node refused it.
