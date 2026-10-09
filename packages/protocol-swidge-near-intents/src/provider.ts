@@ -70,7 +70,11 @@ function depositConfig(sourceChain: string, refundAddress: string, dry: boolean)
 const PLACEHOLDER: Record<string, string> = {
   bitcoin: "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
   ton: "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ",
-  solana: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  // NOT a token mint: with the USDC mint here, every dry quote whose ORIGIN
+  // was Solana USDC answered 500 "Internal server error" (2026-10-09) — a
+  // refund "to the asset's own mint" trips 1Click. The incinerator is a
+  // plain, valid system address.
+  solana: "1nc1nerator11111111111111111111111111111111",
   tron: "TN3W4H6rK2ce4vX9YnFQHwKENnHjoxb3m9",
   eip155: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
 };
