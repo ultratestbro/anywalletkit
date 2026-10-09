@@ -28,7 +28,7 @@ export function tonapiOk(extra: { risk?: Record<string, unknown>; children?: unk
       children: extra.children ?? [{ transaction: { hash: 'c1', account: { address: '0:01' }, success: true, aborted: false, compute_phase: { skipped: false, success: true, exit_code: 0 }, action_phase: { success: true, result_code: 0 } } }],
     },
     event: {},
-    risk: { transfer_all_remaining_balance: false, ton: 1, jettons: [], nfts: [], ...(extra.risk ?? {}) },
+    risk: { transfer_all_remaining_balance: false, ton: 10_000_000_000, jettons: [], nfts: [], ...(extra.risk ?? {}) },
   }
 }
 

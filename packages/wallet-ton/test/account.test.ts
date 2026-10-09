@@ -4,7 +4,7 @@ import { ed25519 } from '@noble/curves/ed25519.js'
 import { Buffer } from 'buffer'
 import { Address, Cell, beginCell, loadMessage, loadOutList } from '@ton/core'
 import { SimulationError, UnsafeTransactionError, WalletManagerTon, parseV5R1Body } from '../src/index.js'
-import { JETTON_WALLET, fakeRpc } from './fake-rpc.js'
+import { JETTON_WALLET, fakeRpc, tonapiOk } from './fake-rpc.js'
 
 const SEED = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 const ADDR0 = 'UQBHyu-oZVDHRYQ1-rKlGqpHy5yAqanPBirEQNMNOmfHLtaT' // vector, account 0
@@ -164,6 +164,24 @@ describe('WalletAccountTon', () => {
     const vu = parseV5R1Body(loadMessage(f.sent[0]!.beginParse()).body)!.validUntil
     expect(vu).toBeGreaterThanOrEqual(before + 120)
     expect(vu).toBeLessThanOrEqual(before + 122)
+  })
+
+  it('refuses a transfer whose value exceeds the balance before signing or emulating (IGNORE_ERRORS would drop it silently)', async () => {
+    // fake wallet holds 1 TON (getAddressInformation); ask for 2.
+    const f = fakeRpc({}, { tonapi: () => tonapiOk() })
+    const a = await manager(f, { tonApiUrl: 'http://fake-tonapi/v2' }).getAccount(0)
+    const err = await a.transfer({ recipient: RECIPIENT, amount: 2_000_000_000n }).catch((e) => e)
+    expect(err).toBeInstanceOf(UnsafeTransactionError)
+    expect(err.message).toMatch(/Insufficient TON balance/)
+    expect(f.sent).toHaveLength(0)
+    expect(f.calls).not.toContain('tonapi:wallet/emulate')
+    // …and an emulation that moves less TON than the messages carry is refused too
+    const g = fakeRpc({}, { tonapi: () => tonapiOk({ risk: { ton: 0 } }) })
+    const b = await manager(g, { tonApiUrl: 'http://fake-tonapi/v2' }).getAccount(0)
+    const err2 = await b.transfer({ recipient: RECIPIENT, amount: 500_000_000n }).catch((e) => e)
+    expect(err2).toBeInstanceOf(SimulationError)
+    expect(err2.message).toMatch(/would be dropped/)
+    expect(g.sent).toHaveLength(0)
   })
 
   it('max fees stop before broadcast', async () => {

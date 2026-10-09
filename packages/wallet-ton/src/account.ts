@@ -58,13 +58,23 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
    * zero-signed body (ignore_chksig), so nothing is signed before it passes.
    */
   private async prepare(messages: V5R1Message[], limit: bigint | number | undefined, op: string): Promise<{ body: Cell; fee: bigint }> {
+    // The wallet sends with IGNORE_ERRORS: a message whose value exceeds the
+    // balance is silently dropped by the action phase — the external still
+    // "succeeds", the seqno moves, the fee is paid and nothing leaves
+    // (2026-10-09: a 2 GRAM deposit on a 0.46 GRAM balance). Refuse up front,
+    // and again after emulation if the risk shows less TON leaving than asked.
+    const want = messages.reduce((sum, m) => sum + (m.message.info.type === 'internal' ? m.message.info.value.coins : 0n), 0n)
+    if (want > 0n) {
+      const balance = await this.getBalance()
+      if (balance < want) throw new UnsafeTransactionError('insufficient-balance', `Insufficient TON balance: the messages carry ${want} nanotons, the wallet holds ${balance} (fees come on top).`)
+    }
     const { signing } = await this.signingCell(messages)
-    const fee = await this.preflight(v5r1PackUnsigned(signing), limit, op)
+    const fee = await this.preflight(v5r1PackUnsigned(signing), limit, op, want)
     const signature = await this.signer.sign(new Uint8Array(signing.hash()), { scheme: 'ed25519', context: 'ton-external' })
     return { body: v5r1PackSigned(signing, signature), fee }
   }
 
-  private async preflight(body: Cell, limit: bigint | number | undefined, op: string): Promise<bigint> {
+  private async preflight(body: Cell, limit: bigint | number | undefined, op: string, expectedTonOut?: bigint): Promise<bigint> {
     if (this._config.simulate === false) {
       if (limit === undefined) return 0n
       const fee = (await this.estimateFees(body)).total
@@ -75,6 +85,9 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     if (!sim.ok) throw new SimulationError(sim.reason, { ...(sim.exitCode !== undefined ? { exitCode: sim.exitCode } : {}), ...(sim.aborted !== undefined ? { aborted: sim.aborted } : {}) })
     if (sim.risk?.transferAllRemainingBalance && this._config.allowDrainingTransactions !== true) {
       throw new UnsafeTransactionError('drain', 'Refusing a message that carries the whole remaining balance (send mode 128); set allowDrainingTransactions to override.')
+    }
+    if (expectedTonOut !== undefined && sim.risk && sim.risk.ton < expectedTonOut) {
+      throw new SimulationError(`The emulation shows only ${sim.risk.ton} nanotons leaving the wallet for messages carrying ${expectedTonOut}: a message would be dropped (insufficient balance for value + fees).`)
     }
     this.checkMaxFee(sim.fees.total, limit, op)
     return sim.fees.total
