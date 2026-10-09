@@ -211,6 +211,12 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     const withGas: EvmTransaction = { ...tx, gasLimit }
     const { fee } = await this.quoteSendTransaction(withGas)
     if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation.`)
+    // The node only tells us at broadcast ("insufficient funds for gas * price
+    // + value") — by then an ERC-20 approval may already be mined and paid for
+    // (Arbitrum, 2026-10-10). Refuse here, before anything is signed.
+    const need = fee + (toBigInt(tx.value) ?? 0n)
+    const balance = await this.getBalance()
+    if (balance < need) throw new UnsafeTransactionError(`Insufficient native balance for ${op}: need ${need} wei (fee ${fee} + value ${need - fee}), have ${balance}.`)
     return { tx: withGas, fee }
   }
 

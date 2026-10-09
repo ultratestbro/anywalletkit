@@ -62,6 +62,15 @@ describe('WalletAccountEvm', () => {
     m.dispose(); m2.dispose()
   })
 
+  it('refuses before signing when the native balance cannot cover fee + value', async () => {
+    // Arbitrum 2026-10-10: the node rejected the swap at broadcast after the approval had been paid.
+    const fake = fakeProvider() // 1 ETH balance
+    const a = await new WalletManagerEvm(SEED, { provider: fake.provider }).getAccount(0)
+    await expect(a.sendTransaction({ to: SPENDER, value: 1_000_000_000_000_000_000n })).rejects.toThrow(/Insufficient native balance/)
+    expect(fake.sent).toHaveLength(0)
+    await expect(a.sendTransaction({ to: SPENDER, value: 1n })).resolves.toMatchObject({ hash: '0x' + 'ab'.repeat(32) })
+  })
+
   it('floors a zero priority fee on mainnet and lifts the cap by the same amount', async () => {
     // publicnode suggested 0 wei tip twice on 2026-10-09; one tx was evicted.
     const fake = fakeProvider({ eth_maxPriorityFeePerGas: () => '0x0' })
