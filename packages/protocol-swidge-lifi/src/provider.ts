@@ -59,6 +59,17 @@ function nativeFor(chain: string, token: string): string {
 }
 /** LI.FI's documented Diamond entry point on most supported EVM networks. */
 const LIFI_DIAMOND = "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE";
+/**
+ * Chains where the Diamond lives at a different address — from
+ * github.com/lifinance/contracts `deployments/<chain>.json` (`LiFiDiamond`).
+ * On these chains ONLY that address is the entry point; the canonical one is
+ * not deployed there and is therefore not trusted.
+ */
+const LIFI_DIAMONDS: Readonly<Record<string, string>> = {
+  "eip155:4663": "0xB477751B76CF82d00a686A1232f5fCD772414Af3", // Robinhood Chain (deployments/robinhood.json, verified 2026-10-09)
+  "eip155:999": "0x0a0758d937d1059c356D4714e57F5df0239bce1A", // HyperEVM (deployments/hyperevm.json, verified 2026-10-09)
+};
+const diamondFor = (chain: string): string => LIFI_DIAMONDS[chain] ?? LIFI_DIAMOND;
 const DEFAULT_QUOTE_TTL_MS = 55_000;
 
 function normalizeAddress(value: string | undefined): string | null {
@@ -80,7 +91,7 @@ function trustedAddress(
 ): boolean {
   const normalized = normalizeAddress(address);
   if (!normalized) return false;
-  return normalizeAddress(LIFI_DIAMOND) === normalized || configured.get(chain)?.has(normalized) === true;
+  return normalizeAddress(diamondFor(chain)) === normalized || configured.get(chain)?.has(normalized) === true;
 }
 
 function trustMap(input: Readonly<Record<string, readonly string[]>> | undefined, label: string): ReadonlyMap<string, ReadonlySet<string>> {

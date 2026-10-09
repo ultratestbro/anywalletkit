@@ -95,6 +95,21 @@ describe("LI.FI provider security contract", () => {
     expect(await lifiProvider().getQuote({...PARAMS, sourceToken: "ETH", amountIn: "2000000000000000"})).toBeNull();
   });
 
+  it("trusts the chain's own Diamond on Robinhood / HyperEVM and not the canonical one there", async () => {
+    // lifinance/contracts deployments: Robinhood 0xB477…, HyperEVM 0x0a07… (2026-10-09).
+    const ROBINHOOD_DIAMOND = "0xB477751B76CF82d00a686A1232f5fCD772414Af3";
+    const robinhood = (to: string) => response({
+      action: {...response().action, fromToken: {address: "0x0000000000000000000000000000000000000000", chainId: 4663}, toToken: {address: "0x0000000000000000000000000000000000000000", chainId: 8453}, fromChainId: 4663, toChainId: 8453, fromAmount: "1000000000000000"},
+      estimate: {...response().estimate, fromAmount: "1000000000000000", approvalAddress: to},
+      transactionRequest: {...response().transactionRequest, to, value: "0x38d7ea4c68000", chainId: 4663},
+    });
+    const params = {...PARAMS, sourceChain: "eip155:4663", sourceToken: "ETH", destChain: "eip155:8453", destToken: "0x0000000000000000000000000000000000000000", amountIn: "1000000000000000"};
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(robinhood(ROBINHOOD_DIAMOND))));
+    await expect(lifiProvider().getQuote(params)).resolves.toMatchObject({txRequest: {to: ROBINHOOD_DIAMOND, chainId: 4663}});
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(robinhood(DIAMOND))));
+    await expect(lifiProvider().getQuote(params)).resolves.toBeNull();
+  });
+
   it("rejects resolver payloads without a coherent action or required chain", async () => {
     const crafted = response();
     delete (crafted as {action?: unknown}).action;
