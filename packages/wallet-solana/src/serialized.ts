@@ -42,6 +42,40 @@ export const LIFI_TRACKING_PROGRAM_ADDRESS = '3i5JeuZuUxeKtVysUnwQNGerJP2bSMX9fT
  * {@link ParsedTokenAccount.delegatedAmount}).
  */
 export const RELAY_DEPOSITORY_PROGRAM_ADDRESS = '99vQwtBwYtrqqD9YSXbdum3KBdxPAVxYTaQ3cfnJSrN2'
+/** Memo program v1 — LI.FI's Solana → Robinhood (relay) route tags with it (2026-10-09). */
+export const MEMO_V1_PROGRAM_ADDRESS = 'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo'
+/**
+ * Same-chain routers LI.FI's `jupiter` tool resolves to besides Jupiter v6
+ * (names per MyTonWallet / OISY known-program lists, 2026-10-09).
+ */
+export const DFLOW_V4_PROGRAM_ADDRESS = 'DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V27QBH'
+export const OKX_DEX_ROUTER_PROGRAM_ADDRESS = 'proVF4pMXVaYqmy4NjniPh4pqKNfMmsihgd4wdkCX3u'
+/**
+ * Mayan (LI.FI's `mayan` / `mayanMCTP` / `mayanFastMCTP` tools) — program ids
+ * from github.com/mayan-finance/swap-sdk `src/addresses.ts` (2026-10-09),
+ * plus the Wormhole core and Circle CCTP programs its routes CPI into. The
+ * owner approved widening the list on 2026-10-10; the balance proof below
+ * (SOL ceiling, token-in floor, no drain, no lingering delegate) stays the
+ * guard that actually bounds what a route may do.
+ */
+export const MAYAN_PROGRAM_ADDRESSES: readonly string[] = Object.freeze([
+  'FC4eXxkyrMPTjiYUpp4EAnkmwMbQyZ6NDCh1kfLn6vsf', // MAYAN_PROGRAM_ID
+  'BLZRi6frs4X4DNLw56V4EXai1b6QVESN1BhHBTYM9VcY', // SWIFT_PROGRAM_ID
+  'mayan34VedncxdK2XobtvWFDXQASUTBXhUVzt2kKgny', // SWIFT_V2_PROGRAM_ID
+  'dkpZqrxHFrhziEMQ931GLtfy11nFkCsfMftH9u6QwBU', // MCTP_PROGRAM_ID
+  'Gx9rivpS3YR8pBFwMuP6omYqVxunpLvLkNn7ubNyuZZ5', // FAST_MCTP_PROGRAM_ID
+  '8QJmxZcEzwuYmCPy6XqgN2sHcYCcFq6AEfBMJZZuLo5a', // AUCTION_PROGRAM_ID
+  '5VtQHnhs2pfVEr68qQsbTRwKh4JV5GTu9mBHgHFxpHeQ', // FEE_MANAGER_PROGRAM_ID
+  'B96dV3Luxzo6SokJx3xt8i5y8Mb7HRR6Eec8hCjJDT69', // SPL_UTILS_PROGRAM_ID
+  'GFRP4yXUjvcQemf2zRJN8w9sPNaDk5PyBUQdPHD1AzLp', // MPS_PROGRAM_ID
+  'D8C8iW6zmoKg5TRr8nQ7h14TMWqQX8FiBdj2ju5MF3wa', // Mayan (swap-sdk addresses.ts; LI.FI `mayan` tool, seen live)
+  'worm2ZoG2kUd4vFXhvjh93UUH596ayRfgQ2MgjNMTth', // WORMHOLE_PROGRAM_ID
+  'EtZMZM22ViKMo4r5y4Anovs3wKQ2owUmDpjygnMMcdEX', // WORMHOLE_SHIM_POST_MESSAGE_PROGRAM_ID
+  'CCTPmbSD7gX1bxKPAmg77w8oFzNFpaQiQUWD43TKaecd', // CCTP_CORE_PROGRAM_ID
+  'CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC', // CCTPV2_CORE_PROGRAM_ID
+  'CCTPiPYPc6AsJuwueEnWgSgucamXDZwBd53dQ11YiKX3', // CCTP_TOKEN_PROGRAM_ID
+  'CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe', // CCTPV2_TOKEN_PROGRAM_ID
+])
 /** Wrapped SOL mint; a "token in" of wSOL is measured on the SOL balance (aggregators unwrap it). */
 export const WSOL_MINT = 'So11111111111111111111111111111111111111112'
 
@@ -56,6 +90,10 @@ export const DEFAULT_PROGRAM_ALLOWLIST: readonly string[] = Object.freeze([
   JUPITER_V6_PROGRAM_ADDRESS,
   LIFI_TRACKING_PROGRAM_ADDRESS,
   RELAY_DEPOSITORY_PROGRAM_ADDRESS,
+  MEMO_V1_PROGRAM_ADDRESS,
+  DFLOW_V4_PROGRAM_ADDRESS,
+  OKX_DEX_ROUTER_PROGRAM_ADDRESS,
+  ...MAYAN_PROGRAM_ADDRESSES,
 ])
 
 /** What the caller expects the transaction to do with this wallet's balances. */

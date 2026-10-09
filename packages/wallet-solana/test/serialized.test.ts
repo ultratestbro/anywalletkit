@@ -195,6 +195,14 @@ describe('provider-serialized transactions', () => {
     await expect(d.sendSerialized(tx([approveIx(usdtAta, 1n), relay]), guard({ tokenIn: undefined }))).rejects.toMatchObject({ code: 'approves-delegate' })
   })
 
+  it('ships the LI.FI Solana route programs in the default allowlist (owner-approved 2026-10-10)', async () => {
+    const { DEFAULT_PROGRAM_ALLOWLIST, MAYAN_PROGRAM_ADDRESSES, DFLOW_V4_PROGRAM_ADDRESS, OKX_DEX_ROUTER_PROGRAM_ADDRESS, MEMO_V1_PROGRAM_ADDRESS } = await import('../src/index.js')
+    for (const p of [DFLOW_V4_PROGRAM_ADDRESS, OKX_DEX_ROUTER_PROGRAM_ADDRESS, MEMO_V1_PROGRAM_ADDRESS, ...MAYAN_PROGRAM_ADDRESSES]) expect(DEFAULT_PROGRAM_ALLOWLIST).toContain(p)
+    expect(new Set(DEFAULT_PROGRAM_ALLOWLIST).size).toBe(DEFAULT_PROGRAM_ALLOWLIST.length)
+    // the list is frozen: nobody can push a program in at runtime
+    expect(Object.isFrozen(DEFAULT_PROGRAM_ALLOWLIST)).toBe(true)
+  })
+
   it('refuses a drain of a token account that is not part of the swap', async () => {
     const { usdcAta, usdtAta, pre } = await setup()
     // the route delivers the USDC but also empties our USDT ATA
