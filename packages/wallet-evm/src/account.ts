@@ -28,12 +28,34 @@ function toBigInt(v: bigint | number | string | undefined): bigint | undefined {
  * viem-computed hash — a {@link LocalSigner} for seed wallets, anything else
  * (hardware, Safe, MPC, backend) through `externalSigner()`.
  */
+/** How long a self-observed next nonce outranks the network's `pending` answer. */
+export const NONCE_FLOOR_TTL_MS = 90_000
+const NONCE_TOO_LOW = /nonce too low|nonce is too low|invalid nonce|replacement transaction underpriced|already known/i
+const errorText = (e: unknown): string => {
+  const parts: string[] = []
+  for (let cur: unknown = e; cur && parts.length < 6; cur = (cur as { cause?: unknown }).cause) {
+    const o = cur as { message?: unknown; details?: unknown; shortMessage?: unknown }
+    for (const v of [o.message, o.details, o.shortMessage]) if (typeof v === 'string') parts.push(v)
+  }
+  return parts.join('\n')
+}
+
 export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalletAccount {
   readonly needsNetwork = false
   readonly path: string
   readonly publicKey: Uint8Array
   readonly signer: Signer
   private _readOnly: WalletAccountReadOnlyEvm | undefined
+  /**
+   * Next nonce this account expects after its own last broadcast, trusted for
+   * {@link NONCE_FLOOR_TTL_MS}. Public RPCs sit behind load balancers whose
+   * backends lag each other by a block: on Base (2026-10-09) `pending` came
+   * back one too low right after our approval was mined, and the swap that
+   * followed was rejected by every node with "nonce too low". The floor only
+   * ever raises the network's answer, and it expires so a dropped transaction
+   * cannot leave the account stuck on a future nonce.
+   */
+  private _nonceFloor: { next: number; at: number } | undefined
 
   /** `publicKey` is the signer's compressed secp256k1 key (33 bytes); it is needed synchronously for the address. */
   constructor(signer: Signer, publicKey: Uint8Array, path: string, config: EvmConfig = {}) {
@@ -113,7 +135,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   /** ethers-shaped tx → viem serializable, filling gaps from the network when there is a client. */
   private async prepare(tx: EvmTransaction): Promise<TransactionSerializable> {
     const chainId = tx.chainId !== undefined ? Number(tx.chainId) : await this.getChainId()
-    const nonce = tx.nonce ?? (await this.requireClient('fetch the nonce').getTransactionCount({ address: this.address, blockTag: 'pending' }))
+    const nonce = tx.nonce ?? (await this.nextNonce())
     const to = tx.to !== undefined ? getAddress(tx.to) : undefined
     const value = toBigInt(tx.value) ?? 0n
     const data = (tx.data ?? '0x') as Hex
@@ -184,14 +206,36 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     return serializeTransaction(prepared, await this.signHash(hash, 'evm-tx'))
   }
 
+  private async nextNonce(): Promise<number> {
+    const pending = await this.requireClient('fetch the nonce').getTransactionCount({ address: this.address, blockTag: 'pending' })
+    const floor = this._nonceFloor
+    if (floor && Date.now() - floor.at < NONCE_FLOOR_TTL_MS) return Math.max(pending, floor.next)
+    return pending
+  }
+
   private async signAndBroadcast(tx: EvmTransaction, limit: bigint | number | undefined, op: string): Promise<TransferResult> {
     const client = this.requireClient(op === 'transfer' ? 'transfer tokens' : 'send transactions')
     const ready = await this.preflight(tx, limit, op)
     // preflight already quoted and capped the fee; prepare() only fills nonce/fees now.
+    const broadcast = async (prepared: TransactionSerializable): Promise<Hex> => {
+      const raw = serializeTransaction(prepared, await this.signHash(keccak256(serializeTransaction(prepared)), 'evm-tx'))
+      const hash = await client.sendRawTransaction({ serializedTransaction: raw as Hex })
+      this._nonceFloor = { next: prepared.nonce! + 1, at: Date.now() }
+      return hash
+    }
     const prepared = await this.prepare(ready.tx)
-    const raw = serializeTransaction(prepared, await this.signHash(keccak256(serializeTransaction(prepared)), 'evm-tx'))
-    const hash = await client.sendRawTransaction({ serializedTransaction: raw as Hex })
-    return { hash, fee: ready.fee }
+    try {
+      return { hash: await broadcast(prepared), fee: ready.fee }
+    } catch (error) {
+      // A nonce the caller fixed is theirs to retry. Otherwise one re-read:
+      // the node that rejected us knows the real next nonce, and nothing was
+      // broadcast, so re-signing the same payload is safe.
+      const tooLow = ready.tx.nonce === undefined && NONCE_TOO_LOW.test(errorText(error))
+      if (!tooLow) throw error
+      const hinted = /next nonce (\d+)/i.exec(errorText(error))
+      this._nonceFloor = { next: Math.max(prepared.nonce! + 1, hinted ? Number(hinted[1]) : 0), at: Date.now() }
+      return { hash: await broadcast({ ...prepared, nonce: await this.nextNonce() }), fee: ready.fee }
+    }
   }
 
   async sendTransaction(tx: EvmTransaction): Promise<TransferResult> {

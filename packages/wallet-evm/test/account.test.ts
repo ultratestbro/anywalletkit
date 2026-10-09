@@ -62,6 +62,39 @@ describe('WalletAccountEvm', () => {
     m.dispose(); m2.dispose()
   })
 
+  it('keeps its own nonce floor across sends and retries once on "nonce too low"', async () => {
+    // Live 2026-10-09 (Base): `pending` came back stale right after our
+    // approval was mined; the next tx reused the nonce and every node refused it.
+    let count = 7
+    const fake = fakeProvider({ eth_getTransactionCount: () => '0x' + count.toString(16) })
+    const m = new WalletManagerEvm(SEED, { provider: fake.provider })
+    const a = await m.getAccount(0)
+    await a.sendTransaction({ to: SPENDER, value: 1n })
+    await a.sendTransaction({ to: SPENDER, value: 1n }) // RPC still says 7 → floor says 8
+    expect(fake.sent.map((r) => parseTransaction(r).nonce)).toEqual([7, 8])
+    count = 9 // the network moved ahead of the floor
+    await a.sendTransaction({ to: SPENDER, value: 1n })
+    expect(parseTransaction(fake.sent[2]!).nonce).toBe(9)
+    m.dispose()
+
+    const rejecting = fakeProvider({
+      eth_getTransactionCount: () => '0x7',
+      eth_sendRawTransaction: (p) => {
+        const nonce = parseTransaction(p[0] as Hex).nonce
+        if (nonce === 7) throw new Error('nonce too low: next nonce 9, tx nonce 7')
+        rejecting.sent.push(p[0] as Hex)
+        return '0x' + 'ab'.repeat(32)
+      },
+    })
+    const m2 = new WalletManagerEvm(SEED, { provider: rejecting.provider })
+    const a2 = await m2.getAccount(0)
+    await expect(a2.sendTransaction({ to: SPENDER, value: 1n })).resolves.toMatchObject({ hash: '0x' + 'ab'.repeat(32) })
+    expect(rejecting.sent.map((r) => parseTransaction(r).nonce)).toEqual([9])
+    // a caller-fixed nonce is never second-guessed
+    await expect(a2.sendTransaction({ to: SPENDER, value: 1n, nonce: 7 })).rejects.toThrow(/nonce too low/)
+    m2.dispose()
+  })
+
   it('transfer(ERC-20) encodes transfer(to, amount) and broadcasts a signed tx with fee = gas × feeRate', async () => {
     const fake = fakeProvider()
     const m = new WalletManagerEvm(SEED, { provider: fake.provider })
