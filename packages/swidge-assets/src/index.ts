@@ -111,6 +111,73 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         decimals: 18,
         icon: cmcIcon(12999),
       },
+      // 2026-10-09: popular majors (user-approved list) — contracts/decimals from LI.FI's token list.
+      {
+        symbol: "WBTC",
+        assetId: "nep141:eth-0x2260fac5e5542a773aa44fbcfedf7c193bc2c599.omft.near",
+        contract: "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+        decimals: 8,
+        icon: cmcIcon(3717),
+      },
+      {
+        symbol: "cbBTC",
+        assetId: "nep141:eth-0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf.omft.near",
+        contract: "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+        decimals: 8,
+        icon: cmcIcon(32994),
+      },
+      {
+        symbol: "DAI",
+        assetId: "nep141:eth-0x6b175474e89094c44da98b954eedeac495271d0f.omft.near",
+        contract: "0x6b175474e89094c44da98b954eedeac495271d0f",
+        decimals: 18,
+        icon: cmcIcon(4943),
+      },
+      {
+        symbol: "LINK",
+        assetId: "nep141:eth-0x514910771af9ca656af840dff83e8264ecf986ca.omft.near",
+        contract: "0x514910771af9ca656af840dff83e8264ecf986ca",
+        decimals: 18,
+        icon: cmcIcon(1975),
+      },
+      {
+        symbol: "UNI",
+        assetId: "nep141:eth-0x1f9840a85d5af5bf1d1762f925bdaddc4201f984.omft.near",
+        contract: "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984",
+        decimals: 18,
+        icon: cmcIcon(7083),
+      },
+      {
+        symbol: "AAVE",
+        assetId: "nep141:eth-0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9.omft.near",
+        contract: "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9",
+        decimals: 18,
+        icon: cmcIcon(7278),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "ARB",
+        assetId: "",
+        contract: "0xb50721bcf8d664c30412cfbc6cf7a15145234ad1",
+        decimals: 18,
+        icon: cmcIcon(11841),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "USDe",
+        assetId: "",
+        contract: "0x4c9edd5852cd905f086c759e8383e09bff1e68b3",
+        decimals: 18,
+        icon: cmcIcon(29470),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "PYUSD",
+        assetId: "",
+        contract: "0x6c3ea9036406852006290770bedfcaba0e23a0e8",
+        decimals: 6,
+        icon: cmcIcon(27772),
+      },
     ],
   },
   {
@@ -176,6 +243,31 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         decimals: 6,
         icon: cmcIcon(825),
       },
+      // 2026-10-09: popular majors (user-approved list) — contracts/decimals from LI.FI's token list.
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "cbBTC",
+        assetId: "",
+        contract: "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij",
+        decimals: 8,
+        icon: cmcIcon(32994),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "USDe",
+        assetId: "",
+        contract: "DEkqHyPN7GMRJ5cArtQFAWefqbZb33Hyf6s5iCwjEonT",
+        decimals: 9,
+        icon: cmcIcon(29470),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "PYUSD",
+        assetId: "",
+        contract: "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo",
+        decimals: 6,
+        icon: cmcIcon(27772),
+      },
     ],
   },
   {
@@ -215,6 +307,46 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         decimals: 6,
         icon: cmcIcon(825),
       },
+      // 2026-10-09: popular majors (user-approved list) — contracts/decimals from LI.FI's token list.
+      {
+        symbol: "cbBTC",
+        assetId: "nep141:base-0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf.omft.near",
+        contract: "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+        decimals: 8,
+        icon: cmcIcon(32994),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "DAI",
+        assetId: "",
+        contract: "0x50c5725949a6f0c72e6c4a641f24049a917db0cb",
+        decimals: 18,
+        icon: cmcIcon(4943),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "LINK",
+        assetId: "",
+        contract: "0x88fb150bdc53a65fe94dea0c9ba0a6daf8c6e196",
+        decimals: 18,
+        icon: cmcIcon(1975),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "AAVE",
+        assetId: "",
+        contract: "0x63706e401c06ac8513145b7687a14804d17f814b",
+        decimals: 18,
+        icon: cmcIcon(7278),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "USDe",
+        assetId: "",
+        contract: "0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34",
+        decimals: 18,
+        icon: cmcIcon(29470),
+      },
     ],
   },
   {
@@ -238,6 +370,78 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         decimals: 6,
         icon: cmcIcon(38517),
       },
+      // 2026-10-09: popular majors (user-approved list) — contracts/decimals from LI.FI's token list.
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "WBTC",
+        assetId: "",
+        contract: "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+        decimals: 8,
+        icon: cmcIcon(3717),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "cbBTC",
+        assetId: "",
+        contract: "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+        decimals: 8,
+        icon: cmcIcon(32994),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "DAI",
+        assetId: "",
+        contract: "0xda10009cbd5d07dd0cecc66161fc93d7c9000da1",
+        decimals: 18,
+        icon: cmcIcon(4943),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "LINK",
+        assetId: "",
+        contract: "0xf97f4df75117a78c1a5a0dbb814af92458539fb4",
+        decimals: 18,
+        icon: cmcIcon(1975),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "UNI",
+        assetId: "",
+        contract: "0xfa7f8980b0f1e64a2062791cc3b0871572f1f7f0",
+        decimals: 18,
+        icon: cmcIcon(7083),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "AAVE",
+        assetId: "",
+        contract: "0xba5ddd1f9d7f570dc94a51479a000e3bce967196",
+        decimals: 18,
+        icon: cmcIcon(7278),
+      },
+      {
+        symbol: "ARB",
+        assetId: "nep141:arb-0x912ce59144191c1204e64559fe8253a0e49e6548.omft.near",
+        contract: "0x912ce59144191c1204e64559fe8253a0e49e6548",
+        decimals: 18,
+        icon: cmcIcon(11841),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "USDe",
+        assetId: "",
+        contract: "0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34",
+        decimals: 18,
+        icon: cmcIcon(29470),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "PYUSD",
+        assetId: "",
+        contract: "0x46850ad61c2b7d64d08c9c754f45254596696984",
+        decimals: 6,
+        icon: cmcIcon(27772),
+      },
     ],
   },
   {
@@ -253,6 +457,54 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         contract: "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
         decimals: 6,
         icon: cmcIcon(825),
+      },
+      // 2026-10-09: popular majors (user-approved list) — contracts/decimals from LI.FI's token list.
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "WBTC",
+        assetId: "",
+        contract: "0x0555e30da8f98308edb960aa94c0db47230d2b9c",
+        decimals: 8,
+        icon: cmcIcon(3717),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "DAI",
+        assetId: "",
+        contract: "0xda10009cbd5d07dd0cecc66161fc93d7c9000da1",
+        decimals: 18,
+        icon: cmcIcon(4943),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "LINK",
+        assetId: "",
+        contract: "0x350a791bfc2c21f9ed5d10980dad2e2638ffa7f6",
+        decimals: 18,
+        icon: cmcIcon(1975),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "UNI",
+        assetId: "",
+        contract: "0x6fd9d7ad17242c41f7131d257212c54a0e816691",
+        decimals: 18,
+        icon: cmcIcon(7083),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "AAVE",
+        assetId: "",
+        contract: "0x76fb31fb4af56892a25e32cfc43de717950c9278",
+        decimals: 18,
+        icon: cmcIcon(7278),
+      },
+      {
+        symbol: "OP",
+        assetId: "nep245:v2_1.omni.hot.tg:10_vLAiSt9KfUGKpw5cD3vsSyNYBo7",
+        contract: "0x4200000000000000000000000000000000000042",
+        decimals: 18,
+        icon: cmcIcon(11840),
       },
     ],
   },
@@ -276,6 +528,23 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         contract: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
         decimals: 18,
         icon: cmcIcon(3408),
+      },
+      // 2026-10-09: popular majors (user-approved list) — contracts/decimals from LI.FI's token list.
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "LINK",
+        assetId: "",
+        contract: "0xf8a0bf9cf54bb92f17374d9e9a321e6a111a51bd",
+        decimals: 18,
+        icon: cmcIcon(1975),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "USDe",
+        assetId: "",
+        contract: "0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34",
+        decimals: 18,
+        icon: cmcIcon(29470),
       },
     ],
   },
@@ -305,6 +574,47 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         assetId: "",
         contract: "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb",
         decimals: 6,
+      },
+      // 2026-10-09: popular majors (user-approved list) — contracts/decimals from LI.FI's token list.
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "WBTC",
+        assetId: "",
+        contract: "0x1bfd67037b42cf73acf2047067bd4f2c47d9bfd6",
+        decimals: 8,
+        icon: cmcIcon(3717),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "DAI",
+        assetId: "",
+        contract: "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063",
+        decimals: 18,
+        icon: cmcIcon(4943),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "LINK",
+        assetId: "",
+        contract: "0x53e0bca35ec356bd5dddfebbd1fc0fd03fabad39",
+        decimals: 18,
+        icon: cmcIcon(1975),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "UNI",
+        assetId: "",
+        contract: "0xb33eaad8d922b1083446dc23f610c2567fb5180f",
+        decimals: 18,
+        icon: cmcIcon(7083),
+      },
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "AAVE",
+        assetId: "",
+        contract: "0xd6df932a45c0f255f85145f286ea0b292b21c90b",
+        decimals: 18,
+        icon: cmcIcon(7278),
       },
     ],
   },
@@ -394,6 +704,15 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         contract: "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
         decimals: 6,
         icon: cmcIcon(3408),
+      },
+      // 2026-10-09: popular majors (user-approved list) — contracts/decimals from LI.FI's token list.
+      {
+        // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
+        symbol: "USDe",
+        assetId: "",
+        contract: "0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34",
+        decimals: 18,
+        icon: cmcIcon(29470),
       },
     ],
   },
