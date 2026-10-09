@@ -189,15 +189,21 @@ describe("LI.FI provider security contract", () => {
     expect(q2).toMatchObject({txRequest: {serializedTx: WIRE, value: "0"}});
     expect(requests.at(-1)).toContain(`toToken=${SOL_NATIVE}`);
 
-    // Refusals: EVM-shaped payload on a Solana source, non-base64 data, an approval address.
+    // Refusals: EVM-shaped payload on a Solana source, non-base64 data.
     for (const bad of [
       solana({transactionRequest: {to: DIAMOND, data: "0xdeadbeef", value: "0x0", chainId: 1, gasLimit: "0x5208"}}),
       solana({transactionRequest: {data: "not base64!!"}}),
-      solana({estimate: {...solana().estimate, approvalAddress: DIAMOND}}),
     ]) {
       vi.stubGlobal("fetch", async () => new Response(JSON.stringify(bad)));
       expect(await provider.getQuote(params)).toBeNull();
     }
+    // LI.FI reports its EVM diamond as `approvalAddress` on Solana Mayan routes
+    // (live 2026-10-09). Solana has no allowances: the quote stands, and the
+    // address never reaches the txRequest.
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(solana({estimate: {...solana().estimate, approvalAddress: DIAMOND}}))));
+    const withApproval = await provider.getQuote(params);
+    expect(withApproval).toMatchObject({txRequest: {serializedTx: WIRE, value: "50000000"}});
+    expect(withApproval!.txRequest!.approvalAddress).toBeUndefined();
     // EVM routes are untouched by the Solana path.
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify(response())));
     await expect(provider.getQuote(PARAMS)).resolves.toMatchObject({txRequest: {to: DIAMOND, chainId: 1}});

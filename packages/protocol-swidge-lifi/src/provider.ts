@@ -239,7 +239,12 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         // there is no target to trust here, the balance proof replaces it.
         if (solanaSource) {
           if (!tr.data || tr.data.length < 64 || tr.data.length % 4 !== 0 || !BASE64.test(tr.data)) return null;
-          if (tr.to !== undefined || tr.value !== undefined || tr.gasLimit !== undefined || est.approvalAddress !== undefined) return null;
+          if (tr.to !== undefined || tr.value !== undefined || tr.gasLimit !== undefined) return null;
+          // `estimate.approvalAddress` is ignored for a Solana source: LI.FI
+          // returns its EVM diamond here on Mayan routes too (seen 2026-10-09,
+          // SOL → Base USDC via mayanFastMCTP), and Solana has no allowances —
+          // the account's post-state balance proof is the guard, not an
+          // approval target. It is never propagated.
         } else if (
           !isHexData(tr.data) || !normalizeAddress(tr.to) || !normalizeAddress(tr.from) ||
           tr.chainId !== expectedFromChain || !tr.value || !tr.gasLimit ||
