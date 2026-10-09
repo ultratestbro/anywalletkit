@@ -30,6 +30,9 @@ function toBigInt(v: bigint | number | string | undefined): bigint | undefined {
  */
 /** How long a self-observed next nonce outranks the network's `pending` answer. */
 export const NONCE_FLOOR_TTL_MS = 90_000
+/** Simulation re-runs (and the pause between them) when a revert follows the account's own broadcast. */
+export const SIMULATION_SETTLE_RETRIES = 3
+export const SIMULATION_SETTLE_DELAY_MS = 1_500
 const NONCE_TOO_LOW = /nonce too low|nonce is too low|invalid nonce|replacement transaction underpriced|already known/i
 const errorText = (e: unknown): string => {
   const parts: string[] = []
@@ -173,7 +176,16 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     let gasLimit = toBigInt(tx.gasLimit)
     let estimated: bigint | undefined
     if (this._config.simulate !== false) {
-      const sim = await this.simulateTransaction(tx)
+      let sim = await this.simulateTransaction(tx)
+      // A revert right behind this account's OWN broadcast is, far more often
+      // than not, a load-balanced RPC backend that has not seen that block yet
+      // (Base, 2026-10-09: approval mined, the swap's transferFrom simulated
+      // against allowance 0). Give the network a few seconds before refusing;
+      // a genuine revert still fails, just later. Cold sends are not retried.
+      for (let attempt = 0; !sim.ok && this.recentlyBroadcast() && attempt < SIMULATION_SETTLE_RETRIES; attempt++) {
+        await new Promise((r) => setTimeout(r, SIMULATION_SETTLE_DELAY_MS))
+        sim = await this.simulateTransaction(tx)
+      }
       if (!sim.ok) throw new SimulationError(sim.reason, sim.data)
       estimated = sim.gas
     }
@@ -204,6 +216,10 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     const prepared = await this.prepare(tx)
     const hash = keccak256(serializeTransaction(prepared))
     return serializeTransaction(prepared, await this.signHash(hash, 'evm-tx'))
+  }
+
+  private recentlyBroadcast(): boolean {
+    return this._nonceFloor !== undefined && Date.now() - this._nonceFloor.at < NONCE_FLOOR_TTL_MS
   }
 
   private async nextNonce(): Promise<number> {

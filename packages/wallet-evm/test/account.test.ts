@@ -95,6 +95,36 @@ describe('WalletAccountEvm', () => {
     m2.dispose()
   })
 
+  it('re-runs a reverting simulation only behind its own recent broadcast', async () => {
+    // Live 2026-10-09 (Base): approval mined, the next tx's transferFrom
+    // simulated against a lagging backend's allowance 0. (viem retries a
+    // failed request itself, so the fake is driven by a flag, not a counter.)
+    let stale = false
+    const fake = fakeProvider({ eth_call: () => { if (stale) throw Object.assign(new Error('execution reverted: TRANSFER_FROM_FAILED'), { code: 3 }); return '0x' + '0'.repeat(64) } })
+    const m = new WalletManagerEvm(SEED, { provider: fake.provider })
+    const a = await m.getAccount(0)
+    // cold account: a revert is final at once (well under one settle delay)
+    stale = true
+    let t0 = Date.now()
+    await expect(a.sendTransaction({ to: SPENDER, value: 1n })).rejects.toThrow(/TRANSFER_FROM_FAILED/)
+    expect(Date.now() - t0).toBeLessThan(1_400) // viem retries its own request a few times first
+    expect(fake.sent).toHaveLength(0)
+    // after an own broadcast: the backend catches up during the settle window
+    stale = false
+    await a.sendTransaction({ to: SPENDER, value: 1n })
+    stale = true
+    setTimeout(() => { stale = false }, 2_000)
+    t0 = Date.now()
+    await expect(a.sendTransaction({ to: SPENDER, value: 1n })).resolves.toMatchObject({ hash: '0x' + 'ab'.repeat(32) })
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(1_500)
+    expect(fake.sent).toHaveLength(2)
+    // …but a revert that never clears is still refused
+    stale = true
+    await expect(a.sendTransaction({ to: SPENDER, value: 1n })).rejects.toThrow(/TRANSFER_FROM_FAILED/)
+    expect(fake.sent).toHaveLength(2)
+    m.dispose()
+  }, 30_000)
+
   it('transfer(ERC-20) encodes transfer(to, amount) and broadcasts a signed tx with fee = gas × feeRate', async () => {
     const fake = fakeProvider()
     const m = new WalletManagerEvm(SEED, { provider: fake.provider })
