@@ -50,6 +50,8 @@ export const MEMO_V1_PROGRAM_ADDRESS = 'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxF
  */
 export const DFLOW_V4_PROGRAM_ADDRESS = 'DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V27QBH'
 export const OKX_DEX_ROUTER_PROGRAM_ADDRESS = 'proVF4pMXVaYqmy4NjniPh4pqKNfMmsihgd4wdkCX3u'
+/** Titan Exchange aggregator — LI.FI's jupiter tool routed Solana USDe → USDC through it (2026-10-10). */
+export const TITAN_PROGRAM_ADDRESS = 'T1TANpTeScyeqVzzgNViGDNrkQ6qHz9KrSBS4aNXvGT'
 /**
  * Mayan (LI.FI's `mayan` / `mayanMCTP` / `mayanFastMCTP` tools) — program ids
  * from github.com/mayan-finance/swap-sdk `src/addresses.ts` (2026-10-09),
@@ -93,6 +95,7 @@ export const DEFAULT_PROGRAM_ALLOWLIST: readonly string[] = Object.freeze([
   MEMO_V1_PROGRAM_ADDRESS,
   DFLOW_V4_PROGRAM_ADDRESS,
   OKX_DEX_ROUTER_PROGRAM_ADDRESS,
+  TITAN_PROGRAM_ADDRESS,
   ...MAYAN_PROGRAM_ADDRESSES,
 ])
 
