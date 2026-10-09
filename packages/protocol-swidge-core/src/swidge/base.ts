@@ -65,6 +65,31 @@ const ERC20_TRANSFER_ABI = [
  * "signing" alone reads as hung. Diagnostics only: a throwing observer can
  * never change the outcome.
  */
+/**
+ * Most native coin a route may charge on top of the input (bridge messaging
+ * fees), base units per chain. Above this the quote is refused even though it
+ * declared the fee — a provider bug or a hostile backend must not turn a
+ * token swap into a native drain.
+ */
+const NATIVE_FEE_CAP: Readonly<Record<string, bigint>> = Object.freeze({
+  "eip155:1": 5_000_000_000_000_000n, // 0.005 ETH
+  "eip155:137": 20_000_000_000_000_000_000n, // 20 POL
+  "eip155:56": 5_000_000_000_000_000n, // 0.005 BNB
+  "eip155:43114": 100_000_000_000_000_000n, // 0.1 AVAX
+  "eip155:999": 100_000_000_000_000_000n, // 0.1 HYPE
+});
+const DEFAULT_NATIVE_FEE_CAP = 5_000_000_000_000_000n; // 0.005 of an ETH-denominated L2
+
+function declaredNativeFee(q: {txRequest?: {nativeFee?: string}}, chain: string): bigint {
+  const raw = q.txRequest?.nativeFee;
+  if (raw === undefined) return 0n;
+  if (!/^\d+$/.test(raw)) throw new Error("swidge: quote declares a malformed native fee");
+  const fee = BigInt(raw);
+  const cap = NATIVE_FEE_CAP[chain] ?? DEFAULT_NATIVE_FEE_CAP;
+  if (fee > cap) throw new Error(`swidge: quoted native fee ${fee} exceeds the cap ${cap} for ${chain}`);
+  return fee;
+}
+
 export type SwidgeExecutionPhase = "approving" | "preflight" | "signing" | "broadcast";
 export interface SwidgeExecutionPhaseDetail {
   /** approving: which approval of how many (USDT on Ethereum needs two). */
@@ -700,8 +725,14 @@ export abstract class BaseSwidgeProtocol extends SwidgeProtocol {
         throw new Error("swidge: provider execution amount does not match the validated quote");
       }
     } else if (source.contract && this.fromChain.startsWith("eip155:")) {
-      if (executionValue !== 0n) throw new Error("swidge: token execution attempted to attach native value");
-    } else if (!unsigned.typedData && !unsigned.bodyBoc && executionValue !== BigInt(q.sourceAmount)) {
+      // Only a fee the sealed quote declared, and only up to the chain's cap.
+      const declared = declaredNativeFee(q, this.fromChain);
+      if (executionValue !== declared) {
+        throw new Error(declared === 0n
+          ? "swidge: token execution attempted to attach native value"
+          : `swidge: token execution value ${executionValue} does not match the quoted native fee ${declared}`);
+      }
+    } else if (!unsigned.typedData && !unsigned.bodyBoc && executionValue !== BigInt(q.sourceAmount) + declaredNativeFee(q, this.fromChain)) {
       throw new Error("swidge: provider execution amount does not match the validated quote");
     }
 

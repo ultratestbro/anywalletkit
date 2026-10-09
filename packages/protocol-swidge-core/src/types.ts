@@ -48,6 +48,14 @@ export interface TxRequest {
   gasLimit?: string;
   /** ERC-20 sources must approve this spender before executing. */
   approvalAddress?: string;
+  /**
+   * Native coin the route itself charges on top of the input (bridge
+   * messaging fees — Stargate/LayerZero-style), base units. A token source
+   * then sends exactly this as `value`; a native source sends input + this.
+   * Declared by the provider from the quote, sealed with it, and capped by
+   * the engine per chain.
+   */
+  nativeFee?: string;
   /** Solana: base64-serialized transaction to sign & broadcast as-is. */
   serializedTx?: string;
 }

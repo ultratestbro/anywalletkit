@@ -110,6 +110,26 @@ describe("LI.FI provider security contract", () => {
     await expect(lifiProvider().getQuote(params)).resolves.toBeNull();
   });
 
+  it("declares a bridge's native messaging fee instead of hiding it in value", async () => {
+    // Token source: the whole value is the fee (DAI Optimism → Base, 2026-10-10).
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(response({transactionRequest: {...response().transactionRequest, value: "0x2386f26fc10000"}}))));
+    const token = await lifiProvider().getQuote(PARAMS);
+    expect(token!.txRequest).toMatchObject({value: "10000000000000000", nativeFee: "10000000000000000"});
+    // Native source: value = input + fee (POL Polygon → Optimism).
+    const ZERO = "0x0000000000000000000000000000000000000000";
+    const native = response({
+      action: {...response().action, fromToken: {address: ZERO, chainId: 1}, fromAmount: "2000000000000000"},
+      estimate: {...response().estimate, fromAmount: "2000000000000000", approvalAddress: DIAMOND},
+      transactionRequest: {...response().transactionRequest, value: "0x" + (2_200_000_000_000_000n).toString(16)}, // 0.0022 ETH
+    });
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(native)));
+    const q = await lifiProvider().getQuote({...PARAMS, sourceToken: "ETH", amountIn: "2000000000000000"});
+    expect(q!.txRequest).toMatchObject({value: "2200000000000000", nativeFee: "200000000000000"});
+    // A native source whose value is BELOW the input is not a quote we can execute.
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({...native, transactionRequest: {...native.transactionRequest, value: "0x1"}})));
+    expect(await lifiProvider().getQuote({...PARAMS, sourceToken: "ETH", amountIn: "2000000000000000"})).toBeNull();
+  });
+
   it("rejects resolver payloads without a coherent action or required chain", async () => {
     const crafted = response();
     delete (crafted as {action?: unknown}).action;

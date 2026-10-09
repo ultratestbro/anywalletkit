@@ -293,13 +293,22 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           } catch {
             return null;
           }
+          // Some bridges charge a native messaging fee inside `value`: for a
+          // token source the whole value is that fee; for a native source it
+          // is whatever exceeds the input (seen 2026-10-10: DAI Optimism →
+          // Base, POL Polygon → Optimism). Declared here, sealed with the
+          // quote, bounded by the engine — never silently attached.
+          const value = BigInt(tr.value!);
+          const nativeFee = sourceIsToken ? value : value > BigInt(params.amountIn) ? value - BigInt(params.amountIn) : 0n;
+          if (!sourceIsToken && value < BigInt(params.amountIn)) return null;
           txRequest = {
             to: tr.to!,
             data: tr.data!,
-            value: BigInt(tr.value!).toString(),
+            value: value.toString(),
             chainId: tr.chainId!,
             gasLimit: BigInt(tr.gasLimit!).toString(),
             ...(sourceIsToken && est.approvalAddress ? {approvalAddress: est.approvalAddress} : {}),
+            ...(nativeFee > 0n ? {nativeFee: nativeFee.toString()} : {}),
           };
         }
 
