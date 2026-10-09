@@ -52,6 +52,8 @@ export const DFLOW_V4_PROGRAM_ADDRESS = 'DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V
 export const OKX_DEX_ROUTER_PROGRAM_ADDRESS = 'proVF4pMXVaYqmy4NjniPh4pqKNfMmsihgd4wdkCX3u'
 /** Titan Exchange aggregator — LI.FI's jupiter tool routed Solana USDe → USDC through it (2026-10-10). */
 export const TITAN_PROGRAM_ADDRESS = 'T1TANpTeScyeqVzzgNViGDNrkQ6qHz9KrSBS4aNXvGT'
+/** Relay Forwarder (relayprotocol/relay-settlement, solana-vm/programs/relay-forwarder) — LI.FI relay routes out of Solana (2026-10-10). */
+export const RELAY_FORWARDER_PROGRAM_ADDRESS = 'DPArtTLbEqa6EuXHfL5UFLBZhFjiEXWRudhvXDrjwXUr'
 /**
  * Mayan (LI.FI's `mayan` / `mayanMCTP` / `mayanFastMCTP` tools) — program ids
  * from github.com/mayan-finance/swap-sdk `src/addresses.ts` (2026-10-09),
@@ -96,6 +98,7 @@ export const DEFAULT_PROGRAM_ALLOWLIST: readonly string[] = Object.freeze([
   DFLOW_V4_PROGRAM_ADDRESS,
   OKX_DEX_ROUTER_PROGRAM_ADDRESS,
   TITAN_PROGRAM_ADDRESS,
+  RELAY_FORWARDER_PROGRAM_ADDRESS,
   ...MAYAN_PROGRAM_ADDRESSES,
 ])
 
