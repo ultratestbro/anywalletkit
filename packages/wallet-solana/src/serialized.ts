@@ -25,6 +25,14 @@ import type { SimulationResult, SolanaFeeQuote, TransactionDescription } from '.
 export const MEMO_PROGRAM_ADDRESS = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'
 /** Jupiter aggregator v6 — the router behind LI.FI's Solana legs. */
 export const JUPITER_V6_PROGRAM_ADDRESS = 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4'
+/**
+ * "LI.FI Solana Program 1" (github.com/lifinance/solana-programs, listed in
+ * Solana Explorer's verified programs). Its only instruction, `TrackV1`, logs
+ * a LI.FI transaction id against two READ-ONLY accounts (the Clock sysvar and
+ * an epoch PDA) — a memo in all but name. Every LI.FI cross-chain quote from
+ * Solana (NEAR Intents legs, seen 2026-10-09) prepends it to the deposit.
+ */
+export const LIFI_TRACKING_PROGRAM_ADDRESS = '3i5JeuZuUxeKtVysUnwQNGerJP2bSMX9fTFfS4Nxe3Br'
 /** Wrapped SOL mint; a "token in" of wSOL is measured on the SOL balance (aggregators unwrap it). */
 export const WSOL_MINT = 'So11111111111111111111111111111111111111112'
 
@@ -37,6 +45,7 @@ export const DEFAULT_PROGRAM_ALLOWLIST: readonly string[] = Object.freeze([
   COMPUTE_BUDGET_PROGRAM_ADDRESS as string,
   MEMO_PROGRAM_ADDRESS,
   JUPITER_V6_PROGRAM_ADDRESS,
+  LIFI_TRACKING_PROGRAM_ADDRESS,
 ])
 
 /** What the caller expects the transaction to do with this wallet's balances. */

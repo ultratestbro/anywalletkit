@@ -7,7 +7,7 @@ import {
 import { TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, getCloseAccountInstruction, getCreateAssociatedTokenIdempotentInstruction, getSetAuthorityInstruction, AuthorityType } from '@solana-program/token'
 import { getSetComputeUnitLimitInstruction } from '@solana-program/compute-budget'
 import {
-  JUPITER_V6_PROGRAM_ADDRESS, SimulationError, UnsafeTransactionError, WalletManagerSolana, type SerializedTxGuard, type SolanaRpc,
+  JUPITER_V6_PROGRAM_ADDRESS, LIFI_TRACKING_PROGRAM_ADDRESS, SimulationError, UnsafeTransactionError, WalletManagerSolana, type SerializedTxGuard, type SolanaRpc,
 } from '../src/index.js'
 
 const SEED = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
@@ -135,6 +135,25 @@ describe('provider-serialized transactions', () => {
     const f2 = fakeRpc(pre, post)
     const a2 = await new WalletManagerSolana(SEED, { provider: f2.rpc }).getAccount(0)
     await expect(a2.sendSerialized(tx, guard({}, { programAllowlist: [...(await import('../src/index.js')).DEFAULT_PROGRAM_ALLOWLIST, OTHER] }))).resolves.toMatchObject({ hash: 'B'.repeat(87) })
+  })
+
+  it("lets LI.FI's tracking program through by default (read-only memo-like call)", async () => {
+    // Shape of every LI.FI cross-chain quote from Solana (2026-10-09): TrackV1
+    // with the Clock sysvar + an epoch PDA, both read-only, 9 bytes of data.
+    const { usdcAta, usdtAta, pre } = await setup()
+    const post = { ...pre, [ADDR0]: sys(SOL - FEE), [usdcAta]: token(USDC, ADDR0, 990_000n) }
+    const f = fakeRpc(pre, post)
+    const a = await new WalletManagerSolana(SEED, { provider: f.rpc }).getAccount(0)
+    const track: Instruction = {
+      programAddress: LIFI_TRACKING_PROGRAM_ADDRESS as Address,
+      accounts: [
+        { address: 'SysvarC1ock11111111111111111111111111111111' as Address, role: AccountRole.READONLY },
+        { address: 'HGVc9L4uzjybCKChHS1aW2ZhEnKNVwDKtCkASVtxLnsR' as Address, role: AccountRole.READONLY },
+      ],
+      data: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9]),
+    }
+    const tx = wire(jupiterLike({ writable: [usdcAta, usdtAta], usdcAta, extra: [track] }))
+    await expect(a.sendSerialized(tx, guard())).resolves.toMatchObject({ hash: 'B'.repeat(87) })
   })
 
   it('refuses a drain of a token account that is not part of the swap', async () => {
