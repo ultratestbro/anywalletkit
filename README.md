@@ -39,6 +39,7 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | `@forgewallet/runtime-hermes` | phase 1 ✓ | one-call React Native polyfills: AbortSignal.timeout/any, subtle.digest, structuredClone + checks for getRandomValues / TextEncoder |
 | `@forgewallet/wallet-ton` | phase 2 ✓ | @ton/ton; SLIP-10 m/44'/607'/i' on WalletContractV5R1; TON + jetton transfers; noble ed25519 via the `signer` callback; toncenter failover; receipts via toncenter v3 body hash |
 | `@forgewallet/wallet-tron` | phase 2 ✓ | full-node HTTP API, no tronweb; m/44'/195'/0'/0/i; TRX + TRC-20; TIP-191 sign; fee model (bandwidth/energy/activation) |
+| `@forgewallet/wallet-near` | 2026-10-10 ✓ | JSON-RPC, hand-written borsh (byte-checked vs @near-js); SLIP-10 m/44'/397'/i' (NEAR Wallet path); implicit + named accounts; NEAR + NEP-141 (auto storage_deposit); NEP-413; preflight instead of simulation; dangerous-action guard |
 | `@forgewallet/wallet-btc` | phase 2 ✓ | bitcoinjs-lib 7; BIP-84 p2wpkh m/84'/0'/0'/0/i; @bitcoinerlab/coinselect with fixed parameters; PSBT signing; BIP-137 sign; Blockbook HTTP client with failover (electrum = extension point) |
 | `@forgewallet/protocol-swidge-core` | phase 3 ✓ | swidge engine: `BaseSwidgeProtocol` / `SingleProviderSwidge` over `SwidgeProtocol` from core, `CrossChainRouter`, remote provider, quote/execution safety rails |
 | `@forgewallet/protocol-swidge-router` | phase 3 ✓ | `RouterSwidgeProtocol`: auctions every engine provider and any external swidge module, executes the winner, resumes status |
