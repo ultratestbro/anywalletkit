@@ -37,8 +37,12 @@ Every `signTransaction` / `sendTransaction` / `transfer` goes through the same g
    deposits + fee, a named recipient exists (an implicit one may be created, for ≥ 0.002 NEAR),
    the NEP-141 balance covers an `ft_transfer`, the recipient is registered on the token or a
    `storage_deposit` rides along.
-4. **Fee estimate** (upper bound: prepaid gas counts in full; unused gas is refunded) and the
-   `transferMaxFee` / `transactionMaxFee` cap.
+4. **Fee estimate** (upper bound: prepaid gas counts in full; unused gas is refunded; a native
+   transfer that creates an implicit account adds the protocol's ~0.007 NEAR creation charge —
+   measured on mainnet, not derivable from gas) and the `transferMaxFee` / `transactionMaxFee` cap.
+
+Measured on mainnet (2026-10-10): `ft_transfer` 11.6 Tgas / 0.00041 NEAR; native transfer creating
+the recipient 15.9 Tgas / 0.0071 NEAR.
 
 `describeTransaction(tx)` tells you what a transaction does, offline: `near-transfer`,
 `ft-transfer` (recipient / amount / memo decoded from the args), `ft-storage-deposit`,

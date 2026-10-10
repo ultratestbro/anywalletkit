@@ -17,9 +17,16 @@ import {
 // lose at most, not what it will pay.
 const ACTION_RECEIPT_GAS = 2n * 108_059_500_000n
 const TRANSFER_GAS = 2n * 115_123_062_500n
-const CREATE_ACCOUNT_GAS = 2n * 3_850_000_000_000n + 2n * 101_765_125_000n // implicit account: create + full-access key
+const CREATE_ACCOUNT_GAS = 16n * 10n ** 12n // implicit account: create + full-access key + transfer; 15.9 Tgas measured on mainnet
 const FUNCTION_CALL_BASE_GAS = 2n * 2_319_861_500_000n
 const FUNCTION_CALL_PER_BYTE_GAS = 2n * 2_473_250n
+/**
+ * Creating an implicit account by transferring to it costs more than its gas:
+ * the recipient-side receipt burnt 0.00703 NEAR for 7.5 Tgas on mainnet
+ * (tx 3W8EDnjC…, 2026-10-10) — the protocol's account-creation charge. Added
+ * on top of the gas estimate whenever a native transfer creates the account.
+ */
+const IMPLICIT_ACCOUNT_CREATION_COST = 8n * 10n ** 21n // 0.008 NEAR
 /** Gas-price can rise 1% per block between quote and execution; keep a margin. */
 const GAS_PRICE_MARGIN_NUM = 11n
 const GAS_PRICE_MARGIN_DEN = 10n
@@ -191,7 +198,8 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
     const createsAccount = isTransfer && isImplicitAccountId(tx.receiverId) && !(recipientExists ?? (await this.accountExists(tx.receiverId)))
     const gas = WalletAccountReadOnlyNear.gasOf(tx.actions, createsAccount)
     const gasPrice = ((await rpc.gasPrice()) * GAS_PRICE_MARGIN_NUM) / GAS_PRICE_MARGIN_DEN
-    return { gas, gasPrice, fee: gas * gasPrice, deposit: WalletAccountReadOnlyNear.depositOf(tx.actions), createsAccount }
+    const fee = gas * gasPrice + (createsAccount ? IMPLICIT_ACCOUNT_CREATION_COST : 0n)
+    return { gas, gasPrice, fee, deposit: WalletAccountReadOnlyNear.depositOf(tx.actions), createsAccount }
   }
 
   async estimateFee(tx: NearTransaction | string): Promise<NearFeeEstimate> {

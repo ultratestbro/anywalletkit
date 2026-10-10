@@ -122,7 +122,7 @@ export interface NearFeeEstimate {
   gas: bigint
   /** yoctoNEAR per gas unit at quote time. */
   gasPrice: bigint
-  /** Upper bound of the fee in yoctoNEAR (`gas * gasPrice`). */
+  /** Upper bound of the fee in yoctoNEAR (`gas * gasPrice`, plus the account-creation charge when `createsAccount`). */
   fee: bigint
   /** yoctoNEAR the actions attach (transfer deposits + function-call deposits). */
   deposit: bigint
