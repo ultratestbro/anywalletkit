@@ -206,7 +206,13 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           url.searchParams.set("slippage", String(sentSlippage));
         }
         const res = await fetch(url, {headers: headers(apiKey()), signal: signal ?? timeoutSignal(12_000)});
-        if (!res.ok) return null;
+        if (!res.ok) {
+          // LI.FI's 404 "No available quotes for the requested transfer" and
+          // 400 validation messages are the caller's answer, not a silent null.
+          const body = (await res.json().catch(() => null)) as {message?: unknown} | null;
+          params.onRefusal?.(`lifi: ${typeof body?.message === "string" ? body.message.slice(0, 200) : `HTTP ${res.status}`}`);
+          return null;
+        }
         const q = (await res.json()) as {
           type?: string;
           id?: string;

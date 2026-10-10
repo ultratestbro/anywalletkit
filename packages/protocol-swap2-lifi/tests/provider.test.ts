@@ -290,3 +290,12 @@ describe("LI.FI per-step slippage", () => {
     expect(reason).toMatch(/^lifi: this route's minimum is 2\.02% under the quote/);
   });
 });
+
+describe("LI.FI refusals", () => {
+  it("forwards the API's own message when it has no quote", async () => {
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({message: "No available quotes for the requested transfer"}), {status: 404}));
+    let reason = "";
+    expect(await lifiProvider().getQuote({...PARAMS, onRefusal: (r: string) => { reason = r; }})).toBeNull();
+    expect(reason).toBe("lifi: No available quotes for the requested transfer");
+  });
+});
