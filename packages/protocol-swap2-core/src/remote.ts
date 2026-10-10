@@ -16,6 +16,7 @@ import {anySignal, timeoutSignal} from "./util.js";
  *   track  {provider, ref: IntentRef}             → IntentStatus
  *   notify {provider, intentId, txHash}           → {}
  *   register {provider, intentId, signature}      → {}
+ *   claim  {provider, ref: IntentRef}             → UnsignedTx | null
  *   supports {provider, from, to}                 → {supported: boolean}
  *
  * `supportsRoute`/`enabled` need a SYNC answer, so they are config: pass the
@@ -110,6 +111,12 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
     },
     async registerSignedOrder(intentId: string, signature: string): Promise<void> {
       await call<Record<string, never>>("register", {intentId, signature});
+    },
+    async buildClaim(ref: IntentRef): Promise<UnsignedTx | null> {
+      const out = await call<UnsignedTx | null | Record<string, never>>("claim", {ref});
+      // A backend without the action (older deploy) answers {} — treat as "not ready".
+      if (!out || typeof out !== "object" || !("to" in out)) return null;
+      return out as UnsignedTx;
     },
     ...(opts.supportsChain ? {supportsChain: opts.supportsChain.bind(opts)} : {}),
     ...(opts.supportsChainPair ? {supportsChainPair: opts.supportsChainPair.bind(opts)} : {}),

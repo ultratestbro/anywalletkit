@@ -85,6 +85,8 @@ export interface Quote {
 export interface IntentRef {
   intentId: string;
   sourceTxHash?: string | null;
+  /** Two-phase routes: the destination-chain claim transaction, once sent. */
+  destTxHash?: string | null;
 }
 
 /** The router's chosen quote, tagged with how it scored. */
@@ -118,6 +120,13 @@ export interface IntentStatus {
   /** Still pending, but the source deposit has been observed (PROCESSING). */
   depositReceived?: boolean;
   destTxHash?: string;
+  /**
+   * Two-phase routes (CCTP-style burn-and-mint): the delivery needs a second,
+   * user-signed transaction on the destination chain. `ready` means the
+   * provider can build it now (`buildClaim`); `state` is then
+   * "action-required". Before that the route is "pending" with `ready: false`.
+   */
+  claim?: {chain: string; ready: boolean};
 }
 
 export interface UnsignedTx {
@@ -176,6 +185,13 @@ export interface CrossChainProvider {
   notifyDeposit?(intentId: string, txHash: string): Promise<void>;
   /** Gasless typed-order providers: register the wallet's EIP-712 signature. */
   registerSignedOrder?(intentId: string, signature: string): Promise<void>;
+  /**
+   * Two-phase routes: the destination-chain transaction that completes the
+   * delivery (CCTP `receiveMessage(message, attestation)`), or `null` while
+   * the attestation is not available yet. The engine executes it through a
+   * destination-chain account (`claimSwap2`); `tx.chain` names that chain.
+   */
+  buildClaim?(ref: IntentRef): Promise<UnsignedTx | null>;
   close?(): void;
   /** Optional discovery hook for custom providers. */
   supportsChain?(caip2: string): boolean;

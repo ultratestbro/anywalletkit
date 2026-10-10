@@ -11,6 +11,8 @@ import { RouterSwap2Protocol } from '@forgewallet/protocol-swap2-router/swap2/ro
 import { NearIntentsSwap2Protocol } from '@forgewallet/protocol-swap2-near-intents/protocol'
 import { LifiSwap2Protocol } from '@forgewallet/protocol-swap2-lifi/protocol'
 import { lifiProvider } from '@forgewallet/protocol-swap2-lifi/provider'
+import { cctpProvider } from '@forgewallet/protocol-swap2-cctp/provider'
+import { CctpSwap2Protocol } from '@forgewallet/protocol-swap2-cctp/protocol'
 import { nearIntentsProvider } from '@forgewallet/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@forgewallet/protocol-swap2-thorchain/protocol'
 import { OmnistonSwap2Protocol } from '@forgewallet/protocol-swap2-omniston/protocol'
@@ -44,7 +46,7 @@ export async function smokeProtocols(check: Check): Promise<void> {
   check('router: surface', typeof router.quoteSwap2 === 'function' && typeof router.getSwap2Status === 'function')
   const chains = (await router.getSupportedChains()).map((c) => String(c.id))
   check('router: capabilities come from the passed providers', chains.includes('eip155:1') && chains.includes('ton:-239'), chains.join(','))
-  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol]] as const) {
+  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol]] as const) {
     const p = new (P as never as new (a: unknown, c: unknown) => { getSupportedChains(): Promise<unknown>; quoteSwap2(o: unknown): Promise<unknown> })(evm, swap2Cfg)
     check(`${name}: constructs`, typeof p.quoteSwap2 === 'function')
     await tolerates(check, `${name}: getSupportedChains`, () => p.getSupportedChains())
@@ -67,6 +69,11 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const jito = new (SplStakePoolProtocolSolana as never as new (a: unknown, c?: unknown) => { getApr(): Promise<number> })(sol, {})
   await tolerates(check, 'spl-stake-pool: getApr', () => jito.getApr())
   check('spl-stake-pool: base58Decode', (base58Decode('HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk') as Uint8Array).length === 32)
+
+  const cctp = cctpProvider({})
+  check('cctp: route USDC Base → Arbitrum', cctp.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:42161', token: 'USDC' }) && !cctp.supportsRoute({ chain: 'eip155:56', token: 'USDC' }, { chain: 'eip155:1', token: 'USDC' }))
+  await tolerates(check, 'cctp: getQuote (network)', () => cctp.getQuote({ sourceChain: 'eip155:8453', sourceToken: 'USDC', destChain: 'eip155:42161', destToken: 'USDC', amountIn: '10000000', destAddress: '0x000000000000000000000000000000000000dEaD' }))
+  check('cctp: claimSwap2 on the router', typeof (router as unknown as { claimSwap2?: unknown }).claimSwap2 === 'function')
 
   // lending
   const mellow = new (MellowProtocolEvm as never as new (a: unknown, c?: unknown) => { quoteSupply(o: unknown): Promise<unknown> })(evm, { preset: 'lido-earn-eth' })

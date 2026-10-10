@@ -45,6 +45,7 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | `@forgewallet/protocol-swap2-router` | phase 3 ✓ | `RouterSwap2Protocol`: auctions every engine provider and any external swap2 module, executes the winner, resumes status |
 | `@forgewallet/protocol-swap2-near-intents`, `-lifi`, `-thorchain`, `-omniston` | phase 3 ✓ | the four providers (NEAR Intents 1Click, LI.FI REST, THORChain, STON.fi Omniston), each also a standalone `Swap2Protocol` |
 | `@forgewallet/swap2-assets` | phase 3 ✓ | CAIP-19 asset registry shared by the swap2 packages |
+| `@forgewallet/protocol-swap2-cctp` | 2026-10-10 ✓ | Circle CCTP V2: native USDC burn-and-mint between 17 EVM chains, Fast / Standard by Circle's fee API, two-phase delivery (`claimSwap2` with the user's `receiveMessage`), preflight against the real contracts |
 | `@forgewallet/kit` | phase 3 ✓ | orchestrator: register chain wallets + protocol modules, accounts by CAIP-2 chain, policies (fee cap, allow/block lists, confirm) before every broadcast |
 | `@forgewallet/protocol-staking-lido-evm`, `-ssv-evm`, `-tonstakers-ton`, `-spl-stake-pool-solana` | phase 4 ✓ | `StakingProtocol` modules (two-phase withdrawals): Lido, SSV Network, Tonstakers, Jito / SPL stake pools |
 | `@forgewallet/protocol-lending-mellow-evm` | phase 4 ✓ | Mellow Core Vaults (Lido EarnETH / EarnUSD) as a `LendingProtocol` |
@@ -53,7 +54,7 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | `@forgewallet/protocol-approvals-evm` | phase 4 ✓ | token-approval discovery (ERC-20 / 721 / 1155 / Permit2 / EIP-7702), risk flags, revoke |
 
 Every protocol module ships a `module.json`; `pnpm registry` builds
-[registry/modules.json](registry/modules.json) from them (13 modules today). See
+[registry/modules.json](registry/modules.json) from them (14 modules today). See
 [registry/README.md](registry/README.md) for tiers and how to list an external module.
 
 

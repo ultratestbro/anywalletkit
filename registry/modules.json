@@ -1,7 +1,7 @@
 {
   "$schema": "./modules.schema.json",
   "generatedAt": "2026-10-10",
-  "count": 13,
+  "count": 14,
   "modules": [
     {
       "name": "@forgewallet/protocol-approvals-evm",
@@ -148,6 +148,22 @@
       "repo": "https://github.com/ultratestbro/forgewallet",
       "path": "packages/protocol-staking-tonstakers-ton",
       "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@forgewallet/protocol-swap2-cctp",
+      "type": "swap2",
+      "chains": [
+        "eip155:*"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-swap2-cctp",
+      "description": "Circle CCTP V2: native USDC burn-and-mint between EVM chains (Fast / Standard), two-phase with the user's receiveMessage claim.",
+      "addedAt": "2026-10-10"
     },
     {
       "name": "@forgewallet/protocol-swap2-lifi",

@@ -39,6 +39,7 @@ import {
   Swap2ExecutionError,
   Swap2FeeLimitError,
   Swap2QuoteError,
+  Swap2StatusError,
   Swap2UnsupportedOperationError,
   Swap2ValidationError,
 } from "../errors.js";
@@ -188,6 +189,8 @@ interface Swap2Signer {
    * funds move. Accounts without it keep the fire-and-forget behaviour.
    */
   waitForTransaction?: (hash: string) => Promise<void>;
+  /** CAIP-2 id of a @forgewallet/core account. */
+  chain?: string;
   getChainId?: () => Promise<number | bigint> | number | bigint;
   getNetwork?: () => Promise<{chainId?: number | bigint} | string> | {chainId?: number | bigint} | string;
   chainId?: number | bigint;
@@ -221,6 +224,8 @@ function decodeId(id: string): {provider: string; intentId: string; sourceTxHash
 
 async function readAccountChain(signer: Swap2Signer, configured?: string): Promise<string | number | bigint | undefined> {
   if (configured) return configured;
+  // @forgewallet/core accounts carry their CAIP-2 id directly.
+  if (typeof signer.chain === "string" && signer.chain && !signer.chain.endsWith(":unknown")) return signer.chain;
   if (typeof signer.getChainId === "function") return await signer.getChainId();
   if (typeof signer.getNetwork === "function") {
     const network = await signer.getNetwork();
@@ -911,6 +916,65 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     const provider = this.providerFor(name);
     if (!provider) throw new Error(`swap2: no swap2 found for id '${id}'`);
     return mapStatus(await provider.trackIntent(sourceTxHash == null ? {intentId} : {intentId, sourceTxHash}));
+  }
+
+  /**
+   * Two-phase routes (CCTP-style burn-and-mint): once `getSwap2Status` reports
+   * "action-required", the delivery needs a second transaction on the
+   * DESTINATION chain, signed there and paid in that chain's gas. `account` is
+   * the destination-chain account (the bound source account is not reused:
+   * the chains differ). The provider builds the claim from the attestation; it
+   * is refused when not ready, when it names another chain than the account,
+   * or when it is anything but plain EVM calldata. Returns the claim hash and
+   * the status id to keep polling with.
+   */
+  async claimSwap2(id: string, account: Swap2Account): Promise<{hash: string; chain: string; id: string}> {
+    const {provider: name, intentId, sourceTxHash} = decodeId(id);
+    const provider = this.providerFor(name);
+    if (!provider) throw new Error(`swap2: no swap2 found for id '${id}'`);
+    if (typeof provider.buildClaim !== "function") {
+      throw new Swap2UnsupportedOperationError(`swap2: provider '${name}' has no claim step`);
+    }
+    const signerCandidate = account as Partial<Swap2Signer> | undefined;
+    if (!signerCandidate || typeof signerCandidate.sendTransaction !== "function") {
+      throw new Swap2ExecutionError("swap2: claimSwap2() requires a signing account on the destination chain");
+    }
+    const signer = signerCandidate as Swap2Signer;
+    let providerEnabled = false;
+    try { providerEnabled = provider.enabled(); } catch { /* fail closed below */ }
+    if (!providerEnabled) throw new Error(`swap2: provider '${name}' is disabled`);
+    const unsigned = await provider.buildClaim(sourceTxHash == null ? {intentId} : {intentId, sourceTxHash});
+    if (!unsigned) throw new Swap2StatusError("swap2: the claim is not ready yet (attestation pending) — poll the status and retry");
+    if (!unsigned.chain || !unsigned.chain.startsWith("eip155:")) {
+      throw new Swap2UnsupportedOperationError(`swap2: claim execution is only implemented for EVM destinations (got '${unsigned.chain || "?"}')`);
+    }
+    if (!unsigned.to || !unsigned.data || !/^0x(?:[0-9a-fA-F]{2})+$/.test(unsigned.data)) {
+      throw new Error("swap2: provider returned a malformed claim transaction");
+    }
+    if (unsigned.serializedTx !== undefined || unsigned.bodyBoc !== undefined || unsigned.typedData !== undefined || unsigned.memo !== undefined || unsigned.approvalAddress !== undefined) {
+      throw new Error("swap2: claim must be plain calldata");
+    }
+    if (unsigned.value !== undefined && unsigned.value !== "0") throw new Error("swap2: a claim must not carry native value");
+    const expectedId = unsigned.chain.slice("eip155:".length);
+    if (unsigned.chainId !== undefined && String(unsigned.chainId) !== expectedId) {
+      throw new Error(`swap2: claim chainId ${unsigned.chainId} does not match ${unsigned.chain}`);
+    }
+    const actual = await readAccountChain(signer);
+    if (actual == null) throw new Error(`swap2: destination account chain identity is unavailable for ${unsigned.chain}`);
+    const actualText = typeof actual === "string" ? actual : String(actual);
+    const actualId = actualText.startsWith("eip155:") ? actualText.slice("eip155:".length) : actualText;
+    if (actualId !== expectedId) throw new Error(`swap2: claim is on ${unsigned.chain}, but the account is bound to ${actualText}`);
+    this.emitPhase("signing");
+    const sent = await signer.sendTransaction({
+      to: unsigned.to,
+      data: unsigned.data,
+      value: 0n,
+      chainId: Number(expectedId),
+      ...(unsigned.gasLimit ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
+    });
+    if (!sent.hash) throw new Swap2ExecutionError("swap2: account did not return a claim transaction hash");
+    this.emitPhase("broadcast", {hash: sent.hash});
+    return {hash: sent.hash, chain: unsigned.chain, id};
   }
 
   /** bridge() has no floor field: quote first, then bind execution
