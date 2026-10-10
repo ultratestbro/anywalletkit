@@ -78,10 +78,10 @@ describe("Omniston TON → EVM orders (live 2026-10-10 fixtures)", () => {
     expect(validQuote(q!, p, "omniston")).toBe(true);
   });
 
-  it("names a fee token for catalog assets without a 1Click id (BNB USDC) so validQuote accepts it", async () => {
+  it("names a non-empty fee token for BNB USDC (1Click id since 2026-10-11, contract before) so validQuote accepts it", async () => {
     const p = params("eip155:56", BNB_USDC);
     const q = await provider(clientFor(fresh(live.bnbUsdc.quoteUpdated))).getQuote(p);
-    expect(q?.fees?.[0]?.token).toBe(BNB_USDC);
+    expect(q?.fees?.[0]?.token).toMatch(/^(nep245:v2_1\.omni\.hot\.tg:56_|0x8ac76a51)/);
     expect(validQuote(q!, p, "omniston")).toBe(true);
   });
 
