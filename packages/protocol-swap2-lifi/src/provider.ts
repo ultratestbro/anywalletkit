@@ -178,7 +178,14 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
       const solanaSource = isSolana(params.sourceChain);
       const fromAddress = params.refundAddress ?? (solanaSource ? SOLANA_PLACEHOLDER : EVM_PLACEHOLDER);
 
-      try {
+      // LI.FI applies `slippage` to EACH step of a multi-step route (bridge +
+      // destination swap), so its minimum can sit ~2× the requested slippage
+      // under the quote (seen 2026-10-10 on 479 of 4 000 matrix quotes), and
+      // it truncates toAmountMin to a few significant digits. The engine
+      // rejects a floor below the requested one, so the quote is asked once
+      // more with the slippage scaled down to land the floor inside it.
+      let sentSlippage = params.slippageBps !== undefined ? params.slippageBps / 10_000 : undefined;
+      for (let attempt = 0; attempt < 2; attempt++) try {
         const url = new URL(`${apiBase}/quote`);
         url.searchParams.set("fromChain", fromChain);
         url.searchParams.set("toChain", toChain);
@@ -192,8 +199,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         url.searchParams.set("toAddress", toAddress);
         const integratorId = integrator().trim();
         if (integratorId) url.searchParams.set("integrator", integratorId);
-        if (params.slippageBps !== undefined) {
-          url.searchParams.set("slippage", String(params.slippageBps / 10_000));
+        if (sentSlippage !== undefined) {
+          url.searchParams.set("slippage", String(sentSlippage));
         }
         const res = await fetch(url, {headers: headers(apiKey()), signal: signal ?? timeoutSignal(12_000)});
         if (!res.ok) return null;
@@ -263,8 +270,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           !sameAddress(tr.from, fromAddress)
         ) return null;
         if (
-          params.slippageBps !== undefined &&
-          (typeof action.slippage !== "number" || Math.abs(action.slippage - params.slippageBps / 10_000) > 1e-12)
+          sentSlippage !== undefined &&
+          (typeof action.slippage !== "number" || Math.abs(action.slippage - sentSlippage) > 1e-12)
         ) return null;
 
         const sourceIsToken = fromToken !== EVM_ZERO && fromToken !== SOLANA_NATIVE;
@@ -320,6 +327,23 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         // provider's minimum cannot satisfy an exact-input execution contract.
         if (!est.toAmountMin) return null;
         const minDestAmount = est.toAmountMin;
+        if (params.slippageBps !== undefined && sentSlippage !== undefined) {
+          const dest = BigInt(est.toAmount);
+          const min = BigInt(minDestAmount);
+          if (dest > 0n && min < (dest * BigInt(10_000 - params.slippageBps)) / 10_000n) {
+            const effective = Number(((dest - min) * 1_000_000n) / dest) / 1_000_000;
+            const requested = params.slippageBps / 10_000;
+            const scaled = Math.floor(((sentSlippage * requested) / effective) * 0.995 * 1_000_000) / 1_000_000;
+            if (attempt === 0 && effective > 0 && scaled > 0) {
+              sentSlippage = scaled;
+              continue;
+            }
+            params.onRefusal?.(
+              `lifi: this route's minimum is ${(effective * 100).toFixed(2)}% under the quote (LI.FI applies slippage on every step) — more than the requested ${params.slippageBps / 100}%`,
+            );
+            return null;
+          }
+        }
         if (params.minAmountOut !== undefined && BigInt(minDestAmount) < BigInt(params.minAmountOut)) return null;
         return {
           provider: "lifi",
@@ -341,6 +365,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
       } catch {
         return null;
       }
+      return null;
     },
 
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {

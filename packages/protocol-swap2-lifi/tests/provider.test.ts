@@ -34,7 +34,7 @@ function response(overrides: Record<string, unknown> = {}) {
     estimate: {
       fromAmount: "1000000",
       toAmount: "990000",
-      toAmountMin: "980000",
+      toAmountMin: "985050",
       approvalAddress: DIAMOND,
       executionDuration: 20,
     },
@@ -65,7 +65,7 @@ describe("LI.FI provider security contract", () => {
     expect(quote).toMatchObject({
       sourceAmount: "1000000",
       destAmount: "990000",
-      minDestAmount: "980000",
+      minDestAmount: "985050",
       txRequest: {to: DIAMOND, approvalAddress: DIAMOND, chainId: 1},
     });
     expect(quote!.validUntilMs).toBeGreaterThan(before);
@@ -194,7 +194,7 @@ describe("LI.FI provider security contract", () => {
         fromAmount: "50000000", fromChainId: SOL_CHAIN, toChainId: SOL_CHAIN, slippage: 0.005,
         fromAddress: SOL_SENDER, toAddress: SOL_SENDER,
       },
-      estimate: {fromAmount: "50000000", toAmount: "990000", toAmountMin: "980000", executionDuration: 5},
+      estimate: {fromAmount: "50000000", toAmount: "990000", toAmountMin: "985050", executionDuration: 5},
       transactionRequest: {data: WIRE},
       ...overrides,
     });
@@ -208,7 +208,7 @@ describe("LI.FI provider security contract", () => {
     expect(provider.supportsRoute({chain: "solana:mainnet", token: "SOL"}, {chain: "eip155:1", token: "USDT"})).toBe(true);
     expect(provider.supportsChain!("solana:mainnet")).toBe(true);
     const quote = await provider.getQuote(params);
-    expect(quote).toMatchObject({sourceAmount: "50000000", minDestAmount: "980000", txRequest: {serializedTx: WIRE, value: "50000000"}});
+    expect(quote).toMatchObject({sourceAmount: "50000000", minDestAmount: "985050", txRequest: {serializedTx: WIRE, value: "50000000"}});
     expect(quote!.txRequest!.to).toBeUndefined();
     expect(requests[0]).toContain(`fromChain=${SOL_CHAIN}`);
     expect(requests[0]).toContain(`fromToken=${SOL_NATIVE}`);
@@ -217,7 +217,7 @@ describe("LI.FI provider security contract", () => {
     // A token source lets no native value through; a native DEST maps to the Solana sentinel.
     const usdcSource = solana({
       action: {...solana().action, fromToken: {address: SOL_USDC, chainId: SOL_CHAIN}, toToken: {address: SOL_NATIVE, chainId: SOL_CHAIN}, fromAmount: "1000000"},
-      estimate: {fromAmount: "1000000", toAmount: "50000000", toAmountMin: "49000000"},
+      estimate: {fromAmount: "1000000", toAmount: "50000000", toAmountMin: "49750000"},
     });
     vi.stubGlobal("fetch", async (url: URL) => { requests.push(String(url)); return new Response(JSON.stringify(usdcSource)); });
     const q2 = await provider.getQuote({...params, sourceToken: "USDC", destToken: "0x0000000000000000000000000000000000000000", amountIn: "1000000"});
@@ -242,5 +242,33 @@ describe("LI.FI provider security contract", () => {
     // EVM routes are untouched by the Solana path.
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify(response())));
     await expect(provider.getQuote(PARAMS)).resolves.toMatchObject({txRequest: {to: DIAMOND, chainId: 1}});
+  });
+});
+
+describe("LI.FI per-step slippage", () => {
+  it("re-quotes with a scaled slippage when the route's floor sits under the requested one", async () => {
+    const sent: string[] = [];
+    vi.stubGlobal("fetch", async (url: URL) => {
+      const slippage = Number(url.searchParams.get("slippage"));
+      sent.push(String(slippage));
+      // Two steps, slippage on each: min ≈ dest × (1 − s)².
+      const min = Math.floor(990000 * (1 - slippage) ** 2).toString();
+      const body = response();
+      return new Response(JSON.stringify({...body, action: {...body.action, slippage}, estimate: {...body.estimate, toAmountMin: min}}));
+    });
+    const quote = await lifiProvider().getQuote(PARAMS);
+    expect(sent).toHaveLength(2);
+    expect(Number(sent[1])).toBeLessThan(0.005);
+    expect(BigInt(quote!.minDestAmount)).toBeGreaterThanOrEqual(985050n);
+  });
+
+  it("refuses with a named reason when the re-quote still undercuts the floor", async () => {
+    vi.stubGlobal("fetch", async (url: URL) => {
+      const body = response();
+      return new Response(JSON.stringify({...body, action: {...body.action, slippage: Number(url.searchParams.get("slippage"))}, estimate: {...body.estimate, toAmountMin: "970000"}}));
+    });
+    let reason = "";
+    expect(await lifiProvider().getQuote({...PARAMS, onRefusal: (r: string) => { reason = r; }})).toBeNull();
+    expect(reason).toMatch(/^lifi: this route's minimum is 2\.02% under the quote/);
   });
 });
