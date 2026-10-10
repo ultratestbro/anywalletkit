@@ -636,7 +636,10 @@ export abstract class BaseSwidgeProtocol extends SwidgeProtocol {
     // raw_data.data (both TRX and TRC-20 — bifrost reads that field for
     // either contract type). Every other chain would silently drop it.
     const tronSource = this.fromChain.startsWith("tron:");
-    if (unsigned.memo && !this.fromChain.startsWith("ton:") && !tronSource) {
+    // NEAR: a NEP-141 `ft_transfer` carries `memo`; a native transfer cannot
+    // (the account refuses a memo it would otherwise drop).
+    const nearSource = this.fromChain.startsWith("near:");
+    if (unsigned.memo && !this.fromChain.startsWith("ton:") && !tronSource && !nearSource) {
       throw new Error(`swidge: deposit memo execution is not implemented for ${this.fromChain}`);
     }
     if (unsigned.data !== undefined && !this.fromChain.startsWith("eip155:")) {
@@ -688,9 +691,10 @@ export abstract class BaseSwidgeProtocol extends SwidgeProtocol {
         } else if (
           this.fromChain.startsWith("solana:") ||
           this.fromChain.startsWith("ton:") ||
-          this.fromChain.startsWith("tron:")
+          this.fromChain.startsWith("tron:") ||
+          nearSource
         ) {
-          // Solana SPL / TON jetton / Tron TRC-20 source. These official 
+          // Solana SPL / TON jetton / Tron TRC-20 / NEAR NEP-141 source. These
           // accounts expose token movement through `transfer()`; their
           // `sendTransaction({to,value})` surface is a NATIVE transfer and does
           // not recognize custom token metadata.
@@ -707,7 +711,7 @@ export abstract class BaseSwidgeProtocol extends SwidgeProtocol {
     // signer cannot encode that yet, and would otherwise silently drop it. A
     // Tron TRC-20 memo is a transaction-level field the transfer surface
     // carries explicitly (`memo`), so it is allowed through below.
-    if (tokenId && (cellBody !== undefined || (unsigned.memo !== undefined && !tronSource))) {
+    if (tokenId && (cellBody !== undefined || (unsigned.memo !== undefined && !tronSource && !nearSource))) {
       throw new Error("swidge: token deposit with memo/cell payload is not implemented");
     }
 
@@ -864,7 +868,7 @@ export abstract class BaseSwidgeProtocol extends SwidgeProtocol {
           token: tokenId,
           recipient: unsigned.to,
           amount: BigInt(q.sourceAmount),
-          ...(tronSource && unsigned.memo ? {memo: unsigned.memo} : {}),
+          ...((tronSource || nearSource) && unsigned.memo ? {memo: unsigned.memo} : {}),
         });
       } else {
         sent = await signer.sendTransaction({
@@ -876,7 +880,7 @@ export abstract class BaseSwidgeProtocol extends SwidgeProtocol {
           ...(cellBody !== undefined
             ? {body: cellBody}
             : unsigned.memo
-              ? (tronSource ? {memo: unsigned.memo} : {body: unsigned.memo})
+              ? (tronSource || nearSource ? {memo: unsigned.memo} : {body: unsigned.memo})
               : {}),
         });
       }

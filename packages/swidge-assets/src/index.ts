@@ -287,6 +287,24 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
     ],
   },
   {
+    key: "near",
+    caip2: "near:mainnet",
+    icon: chainIcon("near"),
+    label: "NEAR",
+    assets: [
+      // 1Click keys native NEAR by its wrapped id; deposits/withdrawals move NEAR itself.
+      {symbol: "NEAR", assetId: "nep141:wrap.near", decimals: 24, icon: cmcIcon(6535)},
+      {
+        symbol: "USDC",
+        assetId: "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+        contract: "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+        decimals: 6,
+        icon: cmcIcon(3408),
+      },
+      {symbol: "USDT", assetId: "nep141:usdt.tether-token.near", contract: "usdt.tether-token.near", decimals: 6, icon: cmcIcon(825)},
+    ],
+  },
+  {
     key: "base",
     caip2: "eip155:8453",
     icon: chainIcon("base"),

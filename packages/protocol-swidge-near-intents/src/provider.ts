@@ -76,6 +76,8 @@ const PLACEHOLDER: Record<string, string> = {
   // plain, valid system address.
   solana: "1nc1nerator11111111111111111111111111111111",
   tron: "TN3W4H6rK2ce4vX9YnFQHwKENnHjoxb3m9",
+  // NEAR refunds go to an account id; the registrar account always exists.
+  near: "near",
   eip155: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
 };
 
