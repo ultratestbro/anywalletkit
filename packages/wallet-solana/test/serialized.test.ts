@@ -105,8 +105,10 @@ async function setup() {
   return { usdcAta, usdtAta, otherUsdt, pre }
 }
 
-const guard = (over: Partial<SerializedTxGuard['expect']> = {}, rest: Partial<SerializedTxGuard> = {}): SerializedTxGuard => ({
-  expect: { maxLamportsOut: 20_000_000n, tokenIn: { mint: USDC, minAmount: 980_000n }, ...over },
+type ExpectOverride = { [K in keyof SerializedTxGuard['expect']]?: SerializedTxGuard['expect'][K] | undefined }
+// An explicit `tokenIn: undefined` REMOVES the default token input (a SOL source).
+const guard = (over: ExpectOverride = {}, rest: Partial<SerializedTxGuard> = {}): SerializedTxGuard => ({
+  expect: Object.fromEntries(Object.entries({ maxLamportsOut: 20_000_000n, tokenIn: { mint: USDC, minAmount: 980_000n }, ...over }).filter(([, v]) => v !== undefined)) as SerializedTxGuard['expect'],
   ...rest,
 })
 
@@ -172,7 +174,7 @@ describe('provider-serialized transactions', () => {
     const relay: Instruction = { programAddress: RELAY_DEPOSITORY_PROGRAM_ADDRESS as Address, accounts: [{ address: ADDR0, role: AccountRole.WRITABLE_SIGNER }, { address: usdtAta, role: AccountRole.WRITABLE }], data: new Uint8Array(48) }
     const approveIx = (source: Address, amount: bigint) => getApproveInstruction({ source, delegate: OTHER, owner: payer, amount })
     const tx = (ixs: Instruction[]) => wire([getSetComputeUnitLimitInstruction({ units: 400_000 }), ...ixs])
-    const g = guard({ maxTokenOut: { mint: USDT, amount: 1_000_000n }, maxLamportsOut: 0n })
+    const g = guard({ tokenIn: undefined, maxTokenOut: { mint: USDT, amount: 1_000_000n }, maxLamportsOut: 0n })
     // spent in the same transaction → fine
     const spent = fakeRpc(pre, { ...pre, [ADDR0]: sys(SOL - FEE), [usdtAta]: token(USDT, ADDR0, 0n) })
     const a = await new WalletManagerSolana(SEED, { provider: spent.rpc }).getAccount(0)
@@ -192,7 +194,7 @@ describe('provider-serialized transactions', () => {
     // and without a declared token input (SOL source), any approval is refused
     const f2 = fakeRpc(pre, pre)
     const d = await new WalletManagerSolana(SEED, { provider: f2.rpc }).getAccount(0)
-    await expect(d.sendSerialized(tx([approveIx(usdtAta, 1n), relay]), guard({}))).rejects.toMatchObject({ code: 'approves-delegate' })
+    await expect(d.sendSerialized(tx([approveIx(usdtAta, 1n), relay]), guard({ tokenIn: undefined }))).rejects.toMatchObject({ code: 'approves-delegate' })
   })
 
   it('ships the LI.FI Solana route programs in the default allowlist (owner-approved 2026-10-10)', async () => {
