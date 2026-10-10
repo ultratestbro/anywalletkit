@@ -351,7 +351,8 @@ function assertQuoteConstraints(q: Quote, options: Swap2Options): void {
   if (options.slippage !== undefined) {
     const scale = 1_000_000_000n;
     const permitted = BigInt(Math.floor(options.slippage * Number(scale)));
-    const required = (nominal * (scale - permitted) + scale - 1n) / scale;
+    // Floor, like the providers compute their minimum (see validQuote).
+    const required = (nominal * (scale - permitted)) / scale;
     if (guaranteed < required) {
       throw new Error(`swap2: quote exceeds caller slippage (${options.slippage})`);
     }

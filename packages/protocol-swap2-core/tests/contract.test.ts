@@ -24,6 +24,12 @@ describe("core public contract", () => {
     expect(validQuote(quote, params, "x")).toBe(true);
     expect(validQuote({...quote, validUntilMs: 0}, params, "x")).toBe(false);
     expect(validQuote({...quote, minDestAmount: "89"}, params, "x")).toBe(false);
+    // A provider floor computed as floor(dest × (1 − s)) passes (1Click: 99977003 @ 100 bps → 98977232).
+    const {minAmountOut: _floor, ...withoutFloor} = params;
+    const p100 = {...withoutFloor, slippageBps: 100};
+    const q100 = {...quote, sourceAmount: "100", destAmount: "99977003", minDestAmount: "98977232"};
+    expect(validQuote(q100, p100, "x")).toBe(true);
+    expect(validQuote({...q100, minDestAmount: "98977231"}, p100, "x")).toBe(false);
   });
 
   it("fails closed for malformed status ids and disabled discovery", async () => {

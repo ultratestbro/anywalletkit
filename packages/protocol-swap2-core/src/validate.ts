@@ -15,7 +15,9 @@ export function validQuote(q: Quote, params: QuoteParams, provider: string): boo
     }
     if (params.slippageBps !== undefined) {
       if (!Number.isInteger(params.slippageBps) || params.slippageBps < 0 || params.slippageBps >= 10_000) return false;
-      const required = (dest * BigInt(10_000 - params.slippageBps) + 9_999n) / 10_000n;
+      // Providers round the floor DOWN (1Click, LI.FI: floor(dest × (1 − s))).
+      // A ceil here refused nearly every slippage-bounded quote by one base unit.
+      const required = (dest * BigInt(10_000 - params.slippageBps)) / 10_000n;
       if (min < required) return false;
     }
     if (!Number.isFinite(q.etaSeconds) || q.etaSeconds < 0) return false;
