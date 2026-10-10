@@ -108,7 +108,7 @@ async function setup() {
 type ExpectOverride = { [K in keyof SerializedTxGuard['expect']]?: SerializedTxGuard['expect'][K] | undefined }
 // An explicit `tokenIn: undefined` REMOVES the default token input (a SOL source).
 const guard = (over: ExpectOverride = {}, rest: Partial<SerializedTxGuard> = {}): SerializedTxGuard => ({
-  expect: Object.fromEntries(Object.entries({ maxLamportsOut: 20_000_000n, tokenIn: { mint: USDC, minAmount: 980_000n }, ...over }).filter(([, v]) => v !== undefined)) as SerializedTxGuard['expect'],
+  expect: Object.fromEntries(Object.entries({ maxLamportsOut: 20_000_000n, tokenIn: { mint: USDC, minAmount: 980_000n }, ...over }).filter(([, v]) => v !== undefined)) as unknown as SerializedTxGuard['expect'],
   ...rest,
 })
 
