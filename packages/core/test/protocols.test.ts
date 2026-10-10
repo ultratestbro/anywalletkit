@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   ApprovalsProtocol, BridgeProtocol, FiatProtocol, LendingProtocol, NotImplementedError,
-  ReadOnlyAccountError, StakingProtocol, SwapProtocol, SwidgeProtocol,
-  type IWalletAccountReadOnly, type SwidgeQuote, type SwidgeResult,
+  ReadOnlyAccountError, StakingProtocol, SwapProtocol, Swap2Protocol,
+  type IWalletAccountReadOnly, type Swap2Quote, type Swap2Result,
 } from '../src/index.js'
 
 const readOnly: IWalletAccountReadOnly = {
@@ -19,27 +19,27 @@ const readOnly: IWalletAccountReadOnly = {
 describe('protocol base classes', () => {
   it('every base method throws NotImplementedError, never returns undefined', async () => {
     type AnyCtor = new (account: IWalletAccountReadOnly) => object
-    const bases: AnyCtor[] = [SwapProtocol, BridgeProtocol, SwidgeProtocol, LendingProtocol, StakingProtocol, ApprovalsProtocol, FiatProtocol]
+    const bases: AnyCtor[] = [SwapProtocol, BridgeProtocol, Swap2Protocol, LendingProtocol, StakingProtocol, ApprovalsProtocol, FiatProtocol]
     for (const Base of bases) {
       const p = new Base(readOnly) as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>
       const methods = Object.getOwnPropertyNames(Base.prototype).filter((m) => m !== 'constructor')
       expect(methods.length).toBeGreaterThan(0)
       for (const m of methods) {
-        if (Base === SwidgeProtocol && ['swap', 'quoteSwap', 'bridge', 'quoteBridge'].includes(m)) continue // derived, tested below
+        if (Base === Swap2Protocol && ['swap', 'quoteSwap', 'bridge', 'quoteBridge'].includes(m)) continue // derived, tested below
         await expect(p[m]!({})).rejects.toBeInstanceOf(NotImplementedError)
       }
     }
   })
 
-  it('SwidgeProtocol derives swap/bridge from swidge', async () => {
-    class Fake extends SwidgeProtocol {
-      override async quoteSwidge(): Promise<SwidgeQuote> {
+  it('Swap2Protocol derives swap/bridge from swap2', async () => {
+    class Fake extends Swap2Protocol {
+      override async quoteSwap2(): Promise<Swap2Quote> {
         return { fromTokenAmount: 100n, toTokenAmount: 90n, toTokenAmountMin: 89n, fees: [
           { type: 'network', amount: 3n, token: 'ETH' }, { type: 'protocol', amount: 2n, token: 'ETH' }, { type: 'affiliate', amount: 1n, token: 'ETH' },
         ] }
       }
-      override async swidge(): Promise<SwidgeResult> {
-        const q = await this.quoteSwidge()
+      override async swap2(): Promise<Swap2Result> {
+        const q = await this.quoteSwap2()
         return { id: 'op-1', ...q }
       }
     }

@@ -59,24 +59,24 @@ importers:
       '@forgewallet/protocol-staking-tonstakers-ton':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-tonstakers-ton
-      '@forgewallet/protocol-swidge-core':
+      '@forgewallet/protocol-swap2-core':
         specifier: workspace:*
-        version: link:../../packages/protocol-swidge-core
-      '@forgewallet/protocol-swidge-lifi':
+        version: link:../../packages/protocol-swap2-core
+      '@forgewallet/protocol-swap2-lifi':
         specifier: workspace:*
-        version: link:../../packages/protocol-swidge-lifi
-      '@forgewallet/protocol-swidge-near-intents':
+        version: link:../../packages/protocol-swap2-lifi
+      '@forgewallet/protocol-swap2-near-intents':
         specifier: workspace:*
-        version: link:../../packages/protocol-swidge-near-intents
-      '@forgewallet/protocol-swidge-omniston':
+        version: link:../../packages/protocol-swap2-near-intents
+      '@forgewallet/protocol-swap2-omniston':
         specifier: workspace:*
-        version: link:../../packages/protocol-swidge-omniston
-      '@forgewallet/protocol-swidge-router':
+        version: link:../../packages/protocol-swap2-omniston
+      '@forgewallet/protocol-swap2-router':
         specifier: workspace:*
-        version: link:../../packages/protocol-swidge-router
-      '@forgewallet/protocol-swidge-thorchain':
+        version: link:../../packages/protocol-swap2-router
+      '@forgewallet/protocol-swap2-thorchain':
         specifier: workspace:*
-        version: link:../../packages/protocol-swidge-thorchain
+        version: link:../../packages/protocol-swap2-thorchain
       '@forgewallet/runtime-hermes':
         specifier: workspace:*
         version: link:../../packages/runtime-hermes
@@ -282,11 +282,11 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
-  packages/protocol-swidge-core:
+  packages/protocol-swap2-core:
     dependencies:
-      '@forgewallet/swidge-assets':
+      '@forgewallet/swap2-assets':
         specifier: workspace:*
-        version: link:../swidge-assets
+        version: link:../swap2-assets
       viem:
         specifier: ^2.45.0
         version: 2.57.2(typescript@5.9.3)(zod@3.25.76)
@@ -304,14 +304,14 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
-  packages/protocol-swidge-lifi:
+  packages/protocol-swap2-lifi:
     dependencies:
-      '@forgewallet/protocol-swidge-core':
+      '@forgewallet/protocol-swap2-core':
         specifier: workspace:*
-        version: link:../protocol-swidge-core
-      '@forgewallet/swidge-assets':
+        version: link:../protocol-swap2-core
+      '@forgewallet/swap2-assets':
         specifier: workspace:*
-        version: link:../swidge-assets
+        version: link:../swap2-assets
     devDependencies:
       '@forgewallet/conformance':
         specifier: workspace:*
@@ -326,14 +326,14 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
-  packages/protocol-swidge-near-intents:
+  packages/protocol-swap2-near-intents:
     dependencies:
-      '@forgewallet/protocol-swidge-core':
+      '@forgewallet/protocol-swap2-core':
         specifier: workspace:*
-        version: link:../protocol-swidge-core
-      '@forgewallet/swidge-assets':
+        version: link:../protocol-swap2-core
+      '@forgewallet/swap2-assets':
         specifier: workspace:*
-        version: link:../swidge-assets
+        version: link:../swap2-assets
     devDependencies:
       '@forgewallet/conformance':
         specifier: workspace:*
@@ -348,14 +348,14 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
-  packages/protocol-swidge-omniston:
+  packages/protocol-swap2-omniston:
     dependencies:
-      '@forgewallet/protocol-swidge-core':
+      '@forgewallet/protocol-swap2-core':
         specifier: workspace:*
-        version: link:../protocol-swidge-core
-      '@forgewallet/swidge-assets':
+        version: link:../protocol-swap2-core
+      '@forgewallet/swap2-assets':
         specifier: workspace:*
-        version: link:../swidge-assets
+        version: link:../swap2-assets
       '@ston-fi/omniston-sdk':
         specifier: 0.8.11
         version: 0.8.11
@@ -385,11 +385,11 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
-  packages/protocol-swidge-router:
+  packages/protocol-swap2-router:
     dependencies:
-      '@forgewallet/protocol-swidge-core':
+      '@forgewallet/protocol-swap2-core':
         specifier: workspace:*
-        version: link:../protocol-swidge-core
+        version: link:../protocol-swap2-core
     devDependencies:
       '@forgewallet/conformance':
         specifier: workspace:*
@@ -404,14 +404,14 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
-  packages/protocol-swidge-thorchain:
+  packages/protocol-swap2-thorchain:
     dependencies:
-      '@forgewallet/protocol-swidge-core':
+      '@forgewallet/protocol-swap2-core':
         specifier: workspace:*
-        version: link:../protocol-swidge-core
-      '@forgewallet/swidge-assets':
+        version: link:../protocol-swap2-core
+      '@forgewallet/swap2-assets':
         specifier: workspace:*
-        version: link:../swidge-assets
+        version: link:../swap2-assets
       viem:
         specifier: ^2.45.0
         version: 2.57.2(typescript@5.9.3)(zod@3.25.76)
@@ -439,7 +439,7 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
-  packages/swidge-assets:
+  packages/swap2-assets:
     devDependencies:
       '@forgewallet/conformance':
         specifier: workspace:*

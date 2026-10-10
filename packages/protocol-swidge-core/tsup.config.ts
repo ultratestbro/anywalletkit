@@ -1,2 +1,0 @@
-import { defineConfig } from 'tsup'
-export default defineConfig({ entry: {"index": "./src/index.ts", "types": "./src/types.ts", "errors": "./src/errors.ts", "validate": "./src/validate.ts", "remote": "./src/remote.ts", "util": "./src/util.ts", "swidge/base": "./src/swidge/base.ts", "swidge/single": "./src/swidge/single.ts"}, format: ['esm', 'cjs'], dts: true, sourcemap: true, clean: true, target: 'es2022', platform: 'neutral', external: [/^@forgewallet\//, /^@ton\//, /^@ston-fi\//, 'viem', 'buffer'] })

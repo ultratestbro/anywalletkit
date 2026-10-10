@@ -2,7 +2,7 @@
 
 ## Adding a protocol module
 
-1. Pick the protocol type: `swap`, `bridge`, `swidge`, `lending`, `staking`,
+1. Pick the protocol type: `swap`, `bridge`, `swap2`, `lending`, `staking`,
    `approvals`, `fiat`. If none fits, open an RFC issue first (see below).
 2. Create `packages/protocol-<type>-<name>-<chain>` extending the base class
    from `@forgewallet/core`. Write it against `IWalletAccount` only — never

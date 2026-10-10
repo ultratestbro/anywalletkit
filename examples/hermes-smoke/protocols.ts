@@ -7,13 +7,13 @@
  */
 import { createMockAccount } from '@forgewallet/conformance'
 import { Address } from '@ton/core'
-import { RouterSwidgeProtocol } from '@forgewallet/protocol-swidge-router/swidge/router'
-import { NearIntentsSwidgeProtocol } from '@forgewallet/protocol-swidge-near-intents/protocol'
-import { LifiSwidgeProtocol } from '@forgewallet/protocol-swidge-lifi/protocol'
-import { lifiProvider } from '@forgewallet/protocol-swidge-lifi/provider'
-import { nearIntentsProvider } from '@forgewallet/protocol-swidge-near-intents/provider'
-import { ThorchainSwidgeProtocol } from '@forgewallet/protocol-swidge-thorchain/protocol'
-import { OmnistonSwidgeProtocol } from '@forgewallet/protocol-swidge-omniston/protocol'
+import { RouterSwap2Protocol } from '@forgewallet/protocol-swap2-router/swap2/router'
+import { NearIntentsSwap2Protocol } from '@forgewallet/protocol-swap2-near-intents/protocol'
+import { LifiSwap2Protocol } from '@forgewallet/protocol-swap2-lifi/protocol'
+import { lifiProvider } from '@forgewallet/protocol-swap2-lifi/provider'
+import { nearIntentsProvider } from '@forgewallet/protocol-swap2-near-intents/provider'
+import { ThorchainSwap2Protocol } from '@forgewallet/protocol-swap2-thorchain/protocol'
+import { OmnistonSwap2Protocol } from '@forgewallet/protocol-swap2-omniston/protocol'
 import LidoProtocolEvm, { splitWithdrawalAmounts } from '@forgewallet/protocol-staking-lido-evm'
 import SsvProtocolEvm, { MINIMAL_STAKING_AMOUNT } from '@forgewallet/protocol-staking-ssv-evm'
 import TonstakersProtocolTon, { buildStakeBody, buildUnstakeBody } from '@forgewallet/protocol-staking-tonstakers-ton'
@@ -34,17 +34,17 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const evm = createMockAccount({ chain: 'eip155:1', address: '0x000000000000000000000000000000000000dEaD' }).toReadOnlyAccount()
   const ton = createMockAccount({ chain: 'ton:-239', address: 'UQBHyu-oZVDHRYQ1-rKlGqpHy5yAqanPBirEQNMNOmfHLtaT' }).toReadOnlyAccount()
   const sol = createMockAccount({ chain: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp', address: 'HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk' }).toReadOnlyAccount()
-  const swidgeCfg = { fromChain: 'eip155:1', skipAccountChainCheck: true }
+  const swap2Cfg = { fromChain: 'eip155:1', skipAccountChainCheck: true }
 
-  // swidge
+  // swap2
   // The aggregator is optional and takes whichever providers the app installed.
-  const router = new RouterSwidgeProtocol(evm, { ...swidgeCfg, providers: [lifiProvider({}), nearIntentsProvider({})] })
-  check('router: surface', typeof router.quoteSwidge === 'function' && typeof router.getSwidgeStatus === 'function')
+  const router = new RouterSwap2Protocol(evm, { ...swap2Cfg, providers: [lifiProvider({}), nearIntentsProvider({})] })
+  check('router: surface', typeof router.quoteSwap2 === 'function' && typeof router.getSwap2Status === 'function')
   const chains = (await router.getSupportedChains()).map((c) => String(c.id))
   check('router: capabilities come from the passed providers', chains.includes('eip155:1') && chains.includes('ton:-239'), chains.join(','))
-  for (const [name, P] of [['near-intents', NearIntentsSwidgeProtocol], ['lifi', LifiSwidgeProtocol], ['thorchain', ThorchainSwidgeProtocol], ['omniston', OmnistonSwidgeProtocol]] as const) {
-    const p = new (P as never as new (a: unknown, c: unknown) => { getSupportedChains(): Promise<unknown>; quoteSwidge(o: unknown): Promise<unknown> })(evm, swidgeCfg)
-    check(`${name}: constructs`, typeof p.quoteSwidge === 'function')
+  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol]] as const) {
+    const p = new (P as never as new (a: unknown, c: unknown) => { getSupportedChains(): Promise<unknown>; quoteSwap2(o: unknown): Promise<unknown> })(evm, swap2Cfg)
+    check(`${name}: constructs`, typeof p.quoteSwap2 === 'function')
     await tolerates(check, `${name}: getSupportedChains`, () => p.getSupportedChains())
   }
 

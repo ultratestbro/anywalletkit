@@ -10,7 +10,7 @@ type Ctor<P> = new (account: IWalletAccountReadOnly | IWalletAccount, config?: a
 const SURFACE: Record<ProtocolType, { writes: string[]; reads: string[] }> = {
   swap:      { writes: ['swap'], reads: ['quoteSwap'] },
   bridge:    { writes: ['bridge'], reads: ['quoteBridge'] },
-  swidge:    { writes: ['swidge'], reads: ['quoteSwidge', 'getSwidgeStatus', 'getSupportedChains', 'getSupportedTokens'] },
+  swap2:    { writes: ['swap2'], reads: ['quoteSwap2', 'getSwap2Status', 'getSupportedChains', 'getSupportedTokens'] },
   lending:   { writes: ['supply', 'withdraw', 'borrow', 'repay'], reads: ['quoteSupply', 'quoteWithdraw', 'quoteBorrow', 'quoteRepay'] },
   staking:   { writes: ['stake', 'requestWithdrawal', 'claimWithdrawals'], reads: ['quoteStake', 'quoteRequestWithdrawal', 'quoteClaimWithdrawals', 'getWithdrawalRequests', 'getStakedBalance', 'getApr'] },
   approvals: { writes: ['revoke', 'revokeAll'], reads: ['getSupportedStandards', 'getApprovals', 'quoteRevoke'] },
@@ -33,7 +33,7 @@ export interface ProtocolSuiteOptions<P> {
   unsupported?: string[]
   /** Account factory for reads; default: the recording mock. Use a fixture-backed one for real quote checks. */
   account?: () => IWalletAccount
-  /** Constructor config, when the module requires one (e.g. swidge engines need `fromChain`). */
+  /** Constructor config, when the module requires one (e.g. swap2 engines need `fromChain`). */
   config?: unknown
 }
 

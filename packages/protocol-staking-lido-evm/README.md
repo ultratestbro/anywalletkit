@@ -6,7 +6,7 @@ the two-phase withdrawal queue, wrap/unwrap the non-rebasing wstETH form, and
 read APR and reward history.
 
 Built as the first implementation of a **proposed `StakingProtocol` type** for
-`@forgewallet/core` (which today ships swap, bridge, lending, fiat, swidge
+`@forgewallet/core` (which today ships swap, bridge, lending, fiat, swap2
 and sda — no staking). The base class in `src/staking-protocol.js` is written
 to move into `@forgewallet/core` verbatim; until the type lands
 upstream it ships inside this module. See "The proposed interface" below for

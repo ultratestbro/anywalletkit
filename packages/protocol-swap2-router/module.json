@@ -1,0 +1,20 @@
+{
+  "name": "@forgewallet/protocol-swap2-router",
+  "type": "swap2",
+  "chains": [
+    "eip155:*",
+    "solana:*",
+    "ton:-239",
+    "tron:0x2b6653dc",
+    "bip122:000000000019d6689c085ae165831e93"
+  ],
+  "tier": "core",
+  "maintainers": [
+    "@ultratestbro"
+  ],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/forgewallet",
+  "path": "packages/protocol-swap2-router",
+  "description": "Optional aggregator: auctions the swap2 providers you install and pass in, executes the winner. Chains = union of our provider modules.",
+  "addedAt": "2026-10-04"
+}

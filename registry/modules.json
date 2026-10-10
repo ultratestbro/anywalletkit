@@ -1,6 +1,6 @@
 {
   "$schema": "./modules.schema.json",
-  "generatedAt": "2026-10-07",
+  "generatedAt": "2026-10-10",
   "count": 11,
   "modules": [
     {
@@ -94,8 +94,8 @@
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-swidge-lifi",
-      "type": "swidge",
+      "name": "@forgewallet/protocol-swap2-lifi",
+      "type": "swap2",
       "chains": [
         "eip155:*",
         "solana:*"
@@ -106,13 +106,13 @@
       ],
       "conformance": "0.x",
       "repo": "https://github.com/ultratestbro/forgewallet",
-      "path": "packages/protocol-swidge-lifi",
+      "path": "packages/protocol-swap2-lifi",
       "description": "LI.FI REST cross-chain swaps and bridges (EVM calldata; Solana via guarded serialized transactions).",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-swidge-near-intents",
-      "type": "swidge",
+      "name": "@forgewallet/protocol-swap2-near-intents",
+      "type": "swap2",
       "chains": [
         "eip155:*",
         "solana:*",
@@ -126,13 +126,13 @@
       ],
       "conformance": "0.x",
       "repo": "https://github.com/ultratestbro/forgewallet",
-      "path": "packages/protocol-swidge-near-intents",
+      "path": "packages/protocol-swap2-near-intents",
       "description": "NEAR Intents (1Click) cross-chain swaps.",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-swidge-omniston",
-      "type": "swidge",
+      "name": "@forgewallet/protocol-swap2-omniston",
+      "type": "swap2",
       "chains": [
         "ton:-239",
         "eip155:*"
@@ -143,13 +143,13 @@
       ],
       "conformance": "0.x",
       "repo": "https://github.com/ultratestbro/forgewallet",
-      "path": "packages/protocol-swidge-omniston",
+      "path": "packages/protocol-swap2-omniston",
       "description": "STON.fi Omniston TON swaps and TON↔EVM orders.",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-swidge-router",
-      "type": "swidge",
+      "name": "@forgewallet/protocol-swap2-router",
+      "type": "swap2",
       "chains": [
         "eip155:*",
         "solana:*",
@@ -163,13 +163,13 @@
       ],
       "conformance": "0.x",
       "repo": "https://github.com/ultratestbro/forgewallet",
-      "path": "packages/protocol-swidge-router",
-      "description": "Optional aggregator: auctions the swidge providers you install and pass in, executes the winner. Chains = union of our provider modules.",
+      "path": "packages/protocol-swap2-router",
+      "description": "Optional aggregator: auctions the swap2 providers you install and pass in, executes the winner. Chains = union of our provider modules.",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-swidge-thorchain",
-      "type": "swidge",
+      "name": "@forgewallet/protocol-swap2-thorchain",
+      "type": "swap2",
       "chains": [
         "eip155:1",
         "eip155:43114",
@@ -183,7 +183,7 @@
       ],
       "conformance": "0.x",
       "repo": "https://github.com/ultratestbro/forgewallet",
-      "path": "packages/protocol-swidge-thorchain",
+      "path": "packages/protocol-swap2-thorchain",
       "description": "THORChain native cross-chain swaps.",
       "addedAt": "2026-10-04"
     }

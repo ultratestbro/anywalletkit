@@ -26,7 +26,7 @@ export interface HermesRuntimeReport {
 
 type AnyAbortSignal = typeof AbortSignal & { timeout?: (ms: number) => AbortSignal; any?: (signals: AbortSignal[]) => AbortSignal }
 
-/** `AbortSignal.timeout(ms)` — missing on Hermes; its absence silently broke every swidge execution once. */
+/** `AbortSignal.timeout(ms)` — missing on Hermes; its absence silently broke every swap2 execution once. */
 export function installAbortSignalTimeout(): 'native' | 'polyfilled' {
   const AS = globalThis.AbortSignal as AnyAbortSignal | undefined
   if (!AS) return 'polyfilled' // no AbortController at all: nothing sensible to patch
