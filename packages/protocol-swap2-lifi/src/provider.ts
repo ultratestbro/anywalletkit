@@ -68,6 +68,9 @@ const LIFI_DIAMOND = "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE";
 const LIFI_DIAMONDS: Readonly<Record<string, string>> = {
   "eip155:4663": "0xB477751B76CF82d00a686A1232f5fCD772414Af3", // Robinhood Chain (deployments/robinhood.json, verified 2026-10-09)
   "eip155:999": "0x0a0758d937d1059c356D4714e57F5df0239bce1A", // HyperEVM (deployments/hyperevm.json, verified 2026-10-09)
+  "eip155:143": "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37", // Monad (deployments/monad.json, verified 2026-10-11)
+  "eip155:130": "0x864b314D4C5a0399368609581d3E8933a63b9232", // Unichain (deployments/unichain.json, verified 2026-10-11)
+  "eip155:80094": "0xf909c4Ae16622898b885B89d7F839E0244851c66", // Berachain (deployments/berachain.json, verified 2026-10-11)
 };
 const diamondFor = (chain: string): string => LIFI_DIAMONDS[chain] ?? LIFI_DIAMOND;
 const DEFAULT_QUOTE_TTL_MS = 55_000;

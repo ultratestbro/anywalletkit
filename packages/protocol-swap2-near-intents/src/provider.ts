@@ -152,8 +152,10 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
       if (!cfg.supports(from.chain, to.chain)) return false;
       // Only pairs present in the curated catalog are offered — and only those
       // with a 1Click asset id (LI.FI-only chains carry an empty assetId).
+      // Both ends: a destination 1Click doesn't list (Unichain, MegaETH, …)
+      // answered "unknown asset" on every quote (589 of the 2026-10-10 matrix).
       const asset = ccAsset(from.chain, from.token);
-      return !!ccChain(from.chain) && !!asset?.assetId;
+      return !!ccChain(from.chain) && !!asset?.assetId && !!destAssetId(to.chain, to.token);
     },
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {

@@ -542,7 +542,7 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       },
       {
         symbol: "USDC",
-        assetId: "",
+        assetId: "nep245:v2_1.omni.hot.tg:56_2w93GqMcEmQFDru84j3HZZWt557r", // 1Click token list, verified 2026-10-11
         contract: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
         decimals: 18,
         icon: cmcIcon(3408),
@@ -582,7 +582,7 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       },
       {
         symbol: "USDC",
-        assetId: "",
+        assetId: "nep245:v2_1.omni.hot.tg:137_qiStmoQJDQPTebaPjgx5VBxZv6L", // 1Click token list, verified 2026-10-11
         contract: "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
         decimals: 6,
         icon: cmcIcon(3408),

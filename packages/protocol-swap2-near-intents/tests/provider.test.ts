@@ -43,3 +43,15 @@ describe("NEAR Intents provider contract", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
+
+describe("route claims cover both ends", () => {
+  const p = nearIntentsProvider({enabled: true, apiUrl: "https://near.invalid"});
+  const ZERO = "0x0000000000000000000000000000000000000000";
+  it("claims BNB / Polygon USDC destinations (1Click ids in the catalog)", () => {
+    expect(p.supportsRoute({chain: "eip155:8453", token: "USDC"}, {chain: "eip155:56", token: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d"})).toBe(true);
+    expect(p.supportsRoute({chain: "eip155:8453", token: "USDC"}, {chain: "eip155:137", token: "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359"})).toBe(true);
+  });
+  it("does not claim a destination 1Click doesn't list", () => {
+    expect(p.supportsRoute({chain: "eip155:8453", token: "USDC"}, {chain: "eip155:130", token: ZERO})).toBe(false);
+  });
+});

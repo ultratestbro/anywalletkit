@@ -110,6 +110,24 @@ describe("LI.FI provider security contract", () => {
     await expect(lifiProvider().getQuote(params)).resolves.toBeNull();
   });
 
+  it.each([
+    [143, "MON", "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37"], // Monad
+    [130, "ETH", "0x864b314D4C5a0399368609581d3E8933a63b9232"], // Unichain
+    [80094, "BERA", "0xf909c4Ae16622898b885B89d7F839E0244851c66"], // Berachain
+  ])("trusts chain %i's own Diamond (lifinance/contracts deployments, 2026-10-11)", async (chainId, native, own) => {
+    const ZERO = "0x0000000000000000000000000000000000000000";
+    const body = (to: string) => response({
+      action: {...response().action, fromToken: {address: ZERO, chainId}, toToken: {address: ZERO, chainId: 8453}, fromChainId: chainId, toChainId: 8453, fromAmount: "1000000000000000"},
+      estimate: {...response().estimate, fromAmount: "1000000000000000", approvalAddress: to},
+      transactionRequest: {...response().transactionRequest, to, value: "0x38d7ea4c68000", chainId},
+    });
+    const params = {...PARAMS, sourceChain: `eip155:${chainId}`, sourceToken: native, destChain: "eip155:8453", destToken: ZERO, amountIn: "1000000000000000"};
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(body(own))));
+    await expect(lifiProvider().getQuote(params)).resolves.toMatchObject({txRequest: {to: own, chainId}});
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(body(DIAMOND))));
+    await expect(lifiProvider().getQuote(params)).resolves.toBeNull();
+  });
+
   it("declares a bridge's native messaging fee instead of hiding it in value", async () => {
     // Token source: the whole value is the fee (DAI Optimism → Base, 2026-10-10).
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify(response({transactionRequest: {...response().transactionRequest, value: "0x2386f26fc10000"}}))));
