@@ -189,6 +189,13 @@ interface OrderSettlement {
   srcHtlcSecurityDepositUnits?: string;
   dstSecurityDepositUnits?: string;
   tradeStartDeadline: number;
+  /**
+   * Seconds after the trader creates the position before a resolver must
+   * reserve it; after that the position is withdrawable by the trader (SDK
+   * docs). The TON escrow config carries it, so the payload validator binds
+   * the built escrow to the quoted value.
+   */
+  exclusivityTimeout?: number;
   htlcHashingFunction?: string;
 }
 
@@ -338,6 +345,8 @@ export interface OmnistonProviderOptions {
     initialResolverAddress: string;
     secretHashes: readonly Uint8Array[];
     hashingFunction?: string;
+    /** The quote's `exclusivityTimeout` (seconds) the escrow config must carry. */
+    exclusivityTimeout: number;
   }) => boolean | Promise<boolean>;
   /**
    * RPC-backed proof of the destination EVM escrow. The tracking feed is only
@@ -812,6 +821,7 @@ async function validateTonEscrowPayload(
     initialResolverAddress: string;
     hashes: Uint8Array[];
     hashingFunction?: string;
+    exclusivityTimeout: number;
   },
   validateForwardPayload: NonNullable<OmnistonProviderOptions["validateTonEscrowPayload"]>,
 ): Promise<void> {
@@ -858,8 +868,15 @@ async function validateTonEscrowPayload(
     initialResolverAddress: expected.initialResolverAddress,
     secretHashes: expected.hashes.map((hash) => hash.slice()),
     ...(expected.hashingFunction ? {hashingFunction: expected.hashingFunction} : {}),
+    exclusivityTimeout: expected.exclusivityTimeout,
   });
   if (!verified) throw new Error("omniston: TON escrow forward payload failed independent semantic validation");
+}
+
+/** Fee token id: the catalog's 1Click asset id, or the on-chain contract for
+ *  assets 1Click does not list (BNB/Polygon USDC) — an empty id fails validQuote. */
+function feeToken(asset: CcAsset): string {
+  return asset.assetId || asset.contract || asset.symbol;
 }
 
 function chainCase(asset: AssetId): string {
@@ -1066,6 +1083,7 @@ function validOrderSettlement(q: OmnistonQuote): boolean {
     isPositiveInteger(v.srcHtlcSecurityDepositUnits ?? "") &&
     isPositiveInteger(v.dstSecurityDepositUnits ?? "") &&
     (v.htlcHashingFunction === "HASHING_FUNCTION_KECCAK256" || v.htlcHashingFunction === "HASHING_FUNCTION_SHA256") &&
+    Number.isSafeInteger(v.exclusivityTimeout) && v.exclusivityTimeout! > 0 &&
     isPositiveInteger(v.resolverSendsUnits) &&
     BigInt(v.resolverSendsUnits) === BigInt(q.outputUnits) + BigInt(q.protocolFeeUnits || "0") + BigInt(q.integratorFeeUnits || "0");
 }
@@ -1093,12 +1111,46 @@ function swapProtocols(v: SwapSettlement): string[] {
   return [...names];
 }
 
+/** Why an RFQ produced no usable quote — the caller turns it into a refusal. */
+interface RfqOutcome {
+  /** Number of `quoteUpdated` events seen for this RFQ. */
+  updates: number;
+  /** The first check the latest rejected update failed, if any. */
+  rejected?: string;
+  /** The stream errored (socket/SDK) before a usable quote arrived. */
+  error?: string;
+}
+
+/** The first failing check of a `quoteUpdated` event, or null when it is usable. */
+function quoteRejection(
+  q: OmnistonQuote | undefined,
+  update: {rfqId?: string},
+  acknowledgedRfqId: string | null,
+  request: QuoteRequest,
+  settlement: "order" | "swap",
+): string | null {
+  if (!q) return "empty quote";
+  if (!acknowledgedRfqId || update.rfqId !== acknowledgedRfqId || q.rfqId !== acknowledgedRfqId) return "quote for another RFQ";
+  if (!sameAsset(q.inputAsset, request.inputAsset) || !sameAsset(q.outputAsset, request.outputAsset)) return "quote assets differ from the request";
+  const requestedAmount = request.amount.$case === "inputUnits" ? request.amount.value : "";
+  if (q.inputUnits !== requestedAmount) return "quote input differs from the request";
+  if (!/^[0-9a-fA-F]{64}$/.test(q.quoteId)) return "malformed quote id";
+  if (!isPositiveInteger(q.inputUnits) || !isPositiveInteger(q.outputUnits)) return "non-positive quote amounts";
+  if (!isNonNegativeInteger(q.protocolFeeUnits) || !isNonNegativeInteger(q.integratorFeeUnits) ||
+    BigInt(q.protocolFeeUnits || "0") + BigInt(q.integratorFeeUnits || "0") > BigInt(q.outputUnits)) return "malformed quote fees";
+  if (!Number.isInteger(q.quoteTimestamp) || Math.abs(Math.floor(Date.now() / 1000) - q.quoteTimestamp) > 120) return "quote timestamp out of range";
+  if (settlement === "order" ? !validOrderSettlement(q) : !validSwapSettlement(q)) return `incomplete ${settlement} settlement data`;
+  if (!sameChainAddress(q.integratorAddress, request.integratorAddress)) return "quote integrator differs from the request";
+  return null;
+}
+
 function awaitQuote(
   stream: ObservableLike<RfqEvent>,
   request: QuoteRequest,
   signal?: AbortSignal,
   settleMs = QUOTE_SETTLE_MS,
   settlement: "order" | "swap" = "order",
+  outcome: RfqOutcome = {updates: 0},
 ): Promise<OmnistonQuote | null> {
   return new Promise((resolve) => {
     let latest: OmnistonQuote | null = null;
@@ -1129,32 +1181,14 @@ function awaitQuote(
           acknowledgedRfqId = (event as {$case: "ack"; value: {rfqId: string}}).value.rfqId || null;
         } else if (event.$case === "quoteUpdated") {
           const update = event as {rfqId?: string; value: OmnistonQuote};
-          const q = update.value;
-          const requestedAmount = request.amount.$case === "inputUnits" ? request.amount.value : "";
-          const nowSeconds = Math.floor(Date.now() / 1000);
-          const fullyValid =
-            !!q &&
-            !!acknowledgedRfqId &&
-            update.rfqId === acknowledgedRfqId &&
-            q.rfqId === acknowledgedRfqId &&
-            sameAsset(q.inputAsset, request.inputAsset) &&
-            sameAsset(q.outputAsset, request.outputAsset) &&
-            q.inputUnits === requestedAmount &&
-            /^[0-9a-fA-F]{64}$/.test(q.quoteId) &&
-            isPositiveInteger(q.inputUnits) &&
-            isPositiveInteger(q.outputUnits) &&
-            isNonNegativeInteger(q.protocolFeeUnits) &&
-            isNonNegativeInteger(q.integratorFeeUnits) &&
-            BigInt(q.protocolFeeUnits || "0") + BigInt(q.integratorFeeUnits || "0") <= BigInt(q.outputUnits) &&
-            Number.isInteger(q.quoteTimestamp) &&
-            Math.abs(nowSeconds - q.quoteTimestamp) <= 120 &&
-            (settlement === "order" ? validOrderSettlement(q) : validSwapSettlement(q)) &&
-            sameChainAddress(q.integratorAddress, request.integratorAddress);
-          if (!fullyValid) {
+          outcome.updates += 1;
+          const rejection = quoteRejection(update.value, update, acknowledgedRfqId, request, settlement);
+          if (rejection) {
+            outcome.rejected = rejection;
             latest = null;
             return;
           }
-          latest = q;
+          latest = update.value;
         } else if (event.$case === "noQuote") {
           // v1beta8 streams resolver state: null invalidates the previous
           // update, but another resolver may still publish a later quote.
@@ -1163,7 +1197,10 @@ function awaitQuote(
           if (acknowledgedRfqId && noQuote.rfqId === acknowledgedRfqId) latest = null;
         }
       },
-      error: () => finish(null),
+      error: (err) => {
+        outcome.error = String((err as {message?: unknown})?.message ?? err).slice(0, 200);
+        finish(null);
+      },
       complete: () => finish(latest),
     });
     signal?.addEventListener("abort", onAbort, {once: true});
@@ -1438,6 +1475,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
     const omni = await getClient();
     const settle = params.dry === false ? Math.min(quoteSettleMs, EXECUTION_SETTLE_MS) : quoteSettleMs;
+    const outcome: RfqOutcome = {updates: 0};
     const rfq = async (pips: number): Promise<OmnistonQuote | null> => {
       const request: QuoteRequest = {
         inputAsset,
@@ -1457,7 +1495,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       // and error out — give the socket a beat and try once more.
       for (let attempt = 0; attempt < 2; attempt++) {
         if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 300));
-        const quote = await awaitQuote(omni.requestForQuote(request), request, signal, settle, "swap");
+        const quote = await awaitQuote(omni.requestForQuote(request), request, signal, settle, "swap", outcome);
         if (quote && quote.settlementData.$case === "swap") return quote;
         if (signal?.aborted) return null;
       }
@@ -1465,7 +1503,12 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     };
 
     let q = await rfq(slippagePips);
-    if (!q) return null;
+    if (!q) {
+      if (!signal?.aborted) {
+        params.onRefusal?.(`omniston: ${outcome.error ? `RFQ failed: ${outcome.error}` : outcome.rejected ? `swap quote rejected: ${outcome.rejected}` : "no TON DEX route quoted this pair/amount"}`);
+      }
+      return null;
+    }
     let swap = q.settlementData.$case === "swap" ? q.settlementData.value : null;
     if (!swap) return null;
     // Two floors the router holds a quote to, both of which a DEX quote can
@@ -1521,8 +1564,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       minDestAmount: minOut,
       feeUsd: Number.isFinite(feeUsd) ? feeUsd : 0,
       fees: [
-        ...(q.protocolFeeUnits && q.protocolFeeUnits !== "0" ? [{type: "protocol" as const, amount: q.protocolFeeUnits, token: dest.assetId, included: true}] : []),
-        ...(q.integratorFeeUnits && q.integratorFeeUnits !== "0" ? [{type: "affiliate" as const, amount: q.integratorFeeUnits, token: dest.assetId, included: true}] : []),
+        ...(q.protocolFeeUnits && q.protocolFeeUnits !== "0" ? [{type: "protocol" as const, amount: q.protocolFeeUnits, token: feeToken(dest), included: true}] : []),
+        ...(q.integratorFeeUnits && q.integratorFeeUnits !== "0" ? [{type: "affiliate" as const, amount: q.integratorFeeUnits, token: feeToken(dest), included: true}] : []),
       ],
       etaSeconds: 30,
       reliability: 0.9,
@@ -1670,29 +1713,39 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       // Amount-flexible deposits need a static deposit address — orders don't have one.
       if (params.flex) return null;
       if (isTon(params.sourceChain) && isTon(params.destChain)) return await getSwapQuote(params, signal);
+      const refuse = (reason: string): null => {
+        params.onRefusal?.(`omniston: ${reason}`);
+        return null;
+      };
+      if (!isTon(params.sourceChain) || isTon(params.destChain) || !cfg.supports(params.sourceChain, params.destChain)) {
+        return refuse("only TON-source → EVM orders are enabled");
+      }
+      if (!trustedContracts.has(params.sourceChain) || !trustedContracts.has(params.destChain)) {
+        return refuse(`no trusted settlement contract configured for ${trustedContracts.has(params.sourceChain) ? params.destChain : params.sourceChain}`);
+      }
       if (
-        !isTon(params.sourceChain) || isTon(params.destChain) ||
-        !cfg.supports(params.sourceChain, params.destChain) ||
-        !trustedContracts.has(params.sourceChain) || !trustedContracts.has(params.destChain)
-        || typeof opts.validateTonJettonWallet !== "function"
-        || typeof opts.validateTonEscrowPayload !== "function"
-        || typeof opts.validateEvmOutputPosition !== "function"
-      ) return null;
+        typeof opts.validateTonJettonWallet !== "function" ||
+        typeof opts.validateTonEscrowPayload !== "function" ||
+        typeof opts.validateEvmOutputPosition !== "function"
+      ) return refuse("TON→EVM needs the jetton-wallet, escrow-payload and EVM output-position validators");
 
       const source = ccAsset(params.sourceChain, params.sourceToken);
       const dest = ccAssetByToken(params.destChain, params.destToken);
-      if (!source || !dest) return null;
+      if (!source || !dest) return refuse("asset is not in the catalog");
       const inputAsset = toAssetId(params.sourceChain, source);
       const outputAsset = toAssetId(params.destChain, dest);
-      if (!inputAsset || !outputAsset) return null;
+      if (!inputAsset || !outputAsset) {
+        return refuse(`cross-chain orders are token corridors only (no ${!inputAsset ? source.symbol : dest.symbol} native leg)`);
+      }
 
       // The resolver only fills the corridor up to ~$1000 a swap (stables 1:1).
       const maxUnits = decimalToUnits(maxUsdText, source.decimals);
-      if (!maxUnits || !isPositiveInteger(params.amountIn) || BigInt(params.amountIn) > maxUnits) return null;
+      if (!maxUnits || !isPositiveInteger(params.amountIn)) return refuse("invalid amount");
+      if (BigInt(params.amountIn) > maxUnits) return refuse(`amount above the ${maxUsdText} USD per-swap cap`);
 
       // Execution and tracking both need the trader's source-chain wallet.
       const trader = params.refundAddress ?? "";
-      if (!trader && !params.dry) return null;
+      if (!trader && !params.dry) return refuse("execution quote needs the trader's TON address (refundAddress)");
 
       const request: QuoteRequest = {
         inputAsset,
@@ -1704,38 +1757,49 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       if (hasIntegrator) {
         const pips = opts.integratorFeePips!;
         const address = integrator ? toChainAddress(params.destChain, integrator) : null;
-        if (!address) return null;
+        if (!address) return refuse("integrator address is not valid on the destination chain");
         request.integratorAddress = address;
         request.integratorFeePips = pips;
       }
 
       const omni = await getClient();
+      const rfq: RfqOutcome = {updates: 0};
       const q = await awaitQuote(
         omni.requestForQuote(request),
         request,
         signal,
         params.dry === false ? Math.min(quoteSettleMs, EXECUTION_SETTLE_MS) : quoteSettleMs,
+        "order",
+        rfq,
       );
-      if (!q) return null;
+      if (!q) {
+        if (signal?.aborted) return null;
+        return refuse(
+          rfq.error ? `RFQ failed: ${rfq.error}`
+            : rfq.rejected ? `resolver quote rejected: ${rfq.rejected}`
+              : "no resolver quoted this route/amount",
+        );
+      }
       const orderData = q.settlementData.$case === "order" ? q.settlementData.value : null;
-      if (!orderData) return null;
-      if (
-        !isTrusted(params.sourceChain, orderData.srcProtocolContractAddress.chain.value) ||
-        !orderData.dstProtocolContractAddress ||
-        !isTrusted(params.destChain, orderData.dstProtocolContractAddress.chain.value)
-      ) return null;
+      if (!orderData) return refuse("resolver answered without order settlement");
+      if (!isTrusted(params.sourceChain, orderData.srcProtocolContractAddress.chain.value)) {
+        return refuse(`untrusted TON settlement contract ${orderData.srcProtocolContractAddress.chain.value}`);
+      }
+      if (!orderData.dstProtocolContractAddress || !isTrusted(params.destChain, orderData.dstProtocolContractAddress.chain.value)) {
+        return refuse(`untrusted ${params.destChain} settlement contract ${orderData.dstProtocolContractAddress?.chain.value ?? "(none)"}`);
+      }
       const deadlineMs = orderData.tradeStartDeadline * 1000;
-      if (!Number.isFinite(deadlineMs) || deadlineMs <= Date.now()) return null;
+      if (!Number.isFinite(deadlineMs) || deadlineMs <= Date.now()) return refuse("quote trade-start deadline already passed");
       // An execution quote whose deadline cannot outlast signing + inclusion
       // would fund an escrow no resolver will fill.
-      if (params.dry === false && deadlineMs - Date.now() < MIN_START_HEADROOM_MS) return null;
+      if (params.dry === false && deadlineMs - Date.now() < MIN_START_HEADROOM_MS) return refuse("quote trade-start deadline too close to execute");
 
       // The advertised corridors are stable-to-stable. Bound a resolver's
       // optimistic amount before it can dominate the router auction with an
       // impossible quote; settlement remains all-or-refund within this range.
       const inputScaled = BigInt(q.inputUnits) * 10n ** BigInt(dest.decimals);
       const outputScaled = BigInt(q.outputUnits) * 10n ** BigInt(source.decimals);
-      if (outputScaled * 2n < inputScaled || outputScaled > inputScaled * 2n) return null;
+      if (outputScaled * 2n < inputScaled || outputScaled > inputScaled * 2n) return refuse("quoted output is outside 0.5x–2x of the input");
 
       await saveBuilt(q.quoteId, {quote: q, at: Date.now()});
 
@@ -1754,8 +1818,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         minDestAmount: q.outputUnits, // HTLC fills at the quoted amount or refunds
         feeUsd: Number.isFinite(feeUsd) ? feeUsd : 0,
         fees: [
-          ...(q.protocolFeeUnits && q.protocolFeeUnits !== "0" ? [{type: "protocol" as const, amount: q.protocolFeeUnits, token: dest.assetId, included: true}] : []),
-          ...(q.integratorFeeUnits && q.integratorFeeUnits !== "0" ? [{type: "affiliate" as const, amount: q.integratorFeeUnits, token: dest.assetId, included: true}] : []),
+          ...(q.protocolFeeUnits && q.protocolFeeUnits !== "0" ? [{type: "protocol" as const, amount: q.protocolFeeUnits, token: feeToken(dest), included: true}] : []),
+          ...(q.integratorFeeUnits && q.integratorFeeUnits !== "0" ? [{type: "affiliate" as const, amount: q.integratorFeeUnits, token: feeToken(dest), included: true}] : []),
         ],
         etaSeconds: 240,
         reliability: 0.9,
@@ -1873,6 +1937,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
           initialResolverAddress: initialResolver.chain.value,
           hashes,
           ...(hashingFunction ? {hashingFunction} : {}),
+          exclusivityTimeout: q.settlementData.value.exclusivityTimeout ?? 0,
         }, opts.validateTonEscrowPayload);
       } catch (error) {
         await store.clear(ref.quoteId);
