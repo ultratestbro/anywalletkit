@@ -24,6 +24,7 @@
     "@forgewallet/protocol-swidge-thorchain": "workspace:*",
     "@forgewallet/runtime-hermes": "workspace:*",
     "@forgewallet/wallet-btc": "workspace:*",
+    "@forgewallet/wallet-near": "workspace:*",
     "@forgewallet/wallet-evm": "workspace:*",
     "@forgewallet/wallet-solana": "workspace:*",
     "@forgewallet/wallet-ton": "workspace:*",

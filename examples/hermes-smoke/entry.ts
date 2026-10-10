@@ -17,6 +17,7 @@ import { WalletManagerTon, describeTransaction as describeTon, parseV5R1Body, v5
 import { beginCell, internal } from '@ton/core'
 import { WalletManagerTron, describeTransaction as describeTron, ZERO_ADDRESS as TRON_ZERO } from '@forgewallet/wallet-tron'
 import { WalletManagerBtc, selectCoins, INPUT_WEIGHT } from '@forgewallet/wallet-btc'
+import { WalletManagerNear, describeTransaction as describeNear, encodeTransaction as encodeNearTx, decodeTransaction as decodeNearTx } from '@forgewallet/wallet-near'
 import { smokeProtocols } from './protocols.js'
 
 declare const print: ((s: string) => void) | undefined
@@ -34,7 +35,7 @@ async function main() {
     for (const chain of ['evm', 'btc', 'tron'] as const) {
       for (const v of derivationVectors.vectors[chain][seedName]!.accounts) eq(`${chain} pub`, bytesToHex(deriveSecp256k1(seed, v.path).publicKey), v.publicKey)
     }
-    for (const chain of ['ton', 'solana'] as const) {
+    for (const chain of ['ton', 'solana', 'near'] as const) {
       for (const v of derivationVectors.vectors[chain][seedName]!.accounts) eq(`${chain} pub`, bytesToHex(deriveEd25519(seed, v.path).publicKey), v.publicKey)
     }
     const evm = new WalletManagerEvm(mnemonic)
@@ -74,6 +75,14 @@ async function main() {
       eq('ton sign', await a.sign(derivationVectors.message), v.signMessage)
     }
     ton.dispose()
+    const near = new WalletManagerNear(mnemonic)
+    for (const v of derivationVectors.vectors.near[seedName]!.accounts) {
+      const a = await near.getAccount(v.index)
+      eq('near address', await a.getAddress(), v.address)
+      eq('near sign', await a.sign(derivationVectors.message), v.signMessage)
+      eq('near verify', await a.verify(derivationVectors.message, v.signMessage), true)
+    }
+    near.dispose()
     const tron = new WalletManagerTron(mnemonic)
     for (const v of derivationVectors.vectors.tron[seedName]!.accounts) {
       const a = await tron.getAccount(v.index)
@@ -111,6 +120,15 @@ async function main() {
   {
     const ap = describeTron({ contractAddress: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', functionSelector: 'approve(address,uint256)', parameters: [{ type: 'address', value: 'TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK' }, { type: 'uint256', value: (1n << 256n) - 1n }] })
     eq('tron describe approve', ap.kind === 'trc20-approve' && ap.warnings[0]?.code === 'unlimited-approve', true)
+    {
+      const ft = describeNear({ receiverId: 'usdt.tether-token.near', actions: [{ functionCall: { methodName: 'ft_transfer', args: { receiver_id: 'alice.near', amount: '1500000' }, gas: 30n * 10n ** 12n, deposit: 1n } }] })
+      eq('near describe ft', ft.kind === 'ft-transfer' && ft.to === 'alice.near' && ft.amount === 1500000n, true)
+      const key = describeNear({ receiverId: 'x.near', actions: [{ addKey: { publicKey: { keyType: 'ed25519', data: new Uint8Array(32) }, accessKey: { nonce: 0n, permission: { fullAccess: {} } } } }] })
+      eq('near describe addKey', key.kind === 'add-key' && key.warnings.some((w) => w.code === 'full-access-key'), true)
+      const tx = { signerId: 'a.near', publicKey: { keyType: 'ed25519' as const, data: new Uint8Array(32).fill(1) }, nonce: 7n, receiverId: 'b.near', blockHash: new Uint8Array(32).fill(2), actions: [{ transfer: { deposit: 10n ** 24n } }] }
+      const back = decodeNearTx(encodeNearTx(tx))
+      eq('near borsh round-trip', back.nonce === 7n && back.receiverId === 'b.near' && 'transfer' in back.actions[0]! && back.actions[0].transfer.deposit === 10n ** 24n, true)
+    }
     const burn = describeTron({ to: TRON_ZERO, value: 1n })
     eq('tron describe zero-address', burn.kind === 'trx-transfer' && burn.warnings[0]?.code === 'zero-address', true)
   }

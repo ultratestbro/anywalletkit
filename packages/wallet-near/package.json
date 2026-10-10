@@ -1,0 +1,48 @@
+{
+  "name": "@forgewallet/wallet-near",
+  "version": "0.0.1",
+  "description": "NEAR wallet for the forgewallet SDK: SLIP-10 m/44'/397'/i' accounts (NEAR Wallet path), implicit and named accounts, NEAR and NEP-141 transfers over JSON-RPC, hand-written borsh, NEP-413 message signing.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "keywords": [
+    "wallet",
+    "near",
+    "nep141",
+    "nep413",
+    "slip10",
+    "ed25519",
+    "borsh"
+  ],
+  "dependencies": {
+    "@forgewallet/core": "workspace:*",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0"
+  },
+  "devDependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "vitest": "^5.0.3"
+  }
+}

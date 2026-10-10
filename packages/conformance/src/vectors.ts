@@ -1,6 +1,6 @@
 import raw from '../vectors/derivation.json'
 
-export type ChainKey = 'evm' | 'btc' | 'ton' | 'tron' | 'solana'
+export type ChainKey = 'evm' | 'btc' | 'ton' | 'tron' | 'solana' | 'near'
 
 export interface VectorAccount {
   index: number

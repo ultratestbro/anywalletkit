@@ -42,7 +42,8 @@
     "wallet-btc": "1.0.0-beta.13",
     "wallet-ton": "1.0.0-beta.12",
     "wallet-tron": "1.0.0-beta.9",
-    "wallet-solana": "1.0.0-beta.12"
+    "wallet-solana": "1.0.0-beta.12",
+    "near-seed-phrase": "reference (near-hd-key SLIP-10, m/44'/397'/i')"
   },
   "seeds": {
     "bip39-abandon-12": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
@@ -338,6 +339,62 @@
             "address": "5frqxtii9LeGq2bz3dSNokvZcEooF483MzeU24JrhcTA",
             "publicKey": "45632d6e888681237618e0716779104dbf83cd4c26b4695604e05db7aef43609",
             "signMessage": "6ce41d434ecd97aeb573a30ca30c48b1b197ae0ff54ccedc646ada1b6ba76485e0b21fcbb2c11957c52fdbd6125e8372fd53a2d7a7cbb58099730f27ebc53c0e"
+          }
+        ]
+      }
+    },
+    "near": {
+      "bip39-abandon-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/397'/0'",
+            "address": "5510e2b44cae6eb807e3e0e45d579dda058c274abcba15e5cb84636f5d1ee412",
+            "publicKey": "5510e2b44cae6eb807e3e0e45d579dda058c274abcba15e5cb84636f5d1ee412",
+            "signMessage": "ed25519:4yoWm3Gp8it5HgVkcGEM6BTpUeHRSoGRuEZMQACiuXG2mtLYPaqTpxyd4tpL5S99JG5zG8XbXLVkCVwdaoSvnSeq"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/397'/1'",
+            "address": "3b93b03253b9715213ec314eb50ecc99d25602ccb5b059f91f51d24710d54326",
+            "publicKey": "3b93b03253b9715213ec314eb50ecc99d25602ccb5b059f91f51d24710d54326",
+            "signMessage": "ed25519:66sW75YqrGKY3eub2ghCUvctRJ4Hpm7uVgZ3jKy1RSeAFL8Pm98D6u1QtjFmMbY4HUWKz7HNkXuv5ART9rre7qF2"
+          }
+        ]
+      },
+      "hardhat-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/397'/0'",
+            "address": "82b08c7cedd90d57506d15f600a268adfb5b4122fd9380b2f7714f7291d86133",
+            "publicKey": "82b08c7cedd90d57506d15f600a268adfb5b4122fd9380b2f7714f7291d86133",
+            "signMessage": "ed25519:4P6uDYFLi1BccQACMSZJkVVvZEZ6DXino36qNzDYphwFKZnukus3TuL4xbKtnNn2VahCwziKM1bRtGD3K5e4vze6"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/397'/1'",
+            "address": "9c4e7585cc9c899adc43c6646c4e9aa79adf94c9e7a5e169932f8b849c52a7fb",
+            "publicKey": "9c4e7585cc9c899adc43c6646c4e9aa79adf94c9e7a5e169932f8b849c52a7fb",
+            "signMessage": "ed25519:4NxhPGqk5GrYFGXcW1MzB7i3FfTz12467pC8n3zTXmBHhPY3gTTi4xbJdRVRWkrLjjnbLAbvJHUY1s48fNaMYErV"
+          }
+        ]
+      },
+      "bip39-abandon-24": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/397'/0'",
+            "address": "5cd11aa446d8db56ace1bd3781673e351af6481b86c4660a8acd424973f9827b",
+            "publicKey": "5cd11aa446d8db56ace1bd3781673e351af6481b86c4660a8acd424973f9827b",
+            "signMessage": "ed25519:2iHDC4KuFfzboAxzvaYjx6b3zc9qRS8CZ5t32AgdvidQvhBWekPXz5tjEAZ4RX4mnGzcfDwuQ3wngKxhtEBKRsmm"
+          },
+          {
+            "index": 1,
+            "path": "m/44'/397'/1'",
+            "address": "a0c3dfd547d0f96cd0bdd6d682c164014dd7a60e9eb3ac7a3342d36f641bdc9d",
+            "publicKey": "a0c3dfd547d0f96cd0bdd6d682c164014dd7a60e9eb3ac7a3342d36f641bdc9d",
+            "signMessage": "ed25519:4x7QtNF3WF3NFAKUQuaiZ4rzvcMBu97XdxDUZdkGLW8RkTqKN4MJSkEnGJShWhYiAVZQn463RNXyYYttc77wTUqt"
           }
         ]
       }
