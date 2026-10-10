@@ -378,9 +378,13 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
     // be THOR chains and differ.
     supportsRoute(from: Asset, to: Asset): boolean {
       const srcExec = isEvm(from.chain) || isDepositSource(from.chain);
-      return (
-        srcExec && !!THOR_CHAIN[from.chain] && !!THOR_CHAIN[to.chain] && from.chain !== to.chain
-      );
+      if (!(srcExec && !!THOR_CHAIN[from.chain] && !!THOR_CHAIN[to.chain] && from.chain !== to.chain)) return false;
+      // Asset level too: claiming a chain pair whose assets THORChain has no
+      // pool for (e.g. USDC on Solana) put the provider in every route list
+      // and then answered a silent null.
+      const fromAsset = thorAsset(from.chain, from.token) ?? thorAsset(from.chain, ccAssetByToken(from.chain, from.token)?.symbol ?? "");
+      const toAsset = destAsset(to.chain, to.token) ?? (thorAsset(to.chain, to.token) ? {asset: thorAsset(to.chain, to.token)!} : undefined);
+      return !!fromAsset && !!toAsset && fromAsset !== toAsset.asset;
     },
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
@@ -395,7 +399,10 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       const src = ccAsset(params.sourceChain, params.sourceToken);
       const fromAsset = thorAsset(params.sourceChain, params.sourceToken);
       const dst = destAsset(params.destChain, params.destToken);
-      if (!src || !fromAsset || !dst || fromAsset === dst.asset) return null;
+      if (!src || !fromAsset || !dst || fromAsset === dst.asset) {
+        params.onRefusal?.(`thorchain: no pool for ${params.sourceToken} on ${params.sourceChain} → ${params.destToken} on ${params.destChain}`);
+        return null;
+      }
 
       // THORChain amounts are universally 1e8-scaled.
       const amountIn = BigInt(params.amountIn);
@@ -404,7 +411,10 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       // THOR quotes only 1e8 units. Never send a larger high-precision source
       // amount than the amount priced by the quote (the remainder is dust the
       // memo cannot account for and may be donated to the vault).
-      if (amount1e8 * 10n ** BigInt(src.decimals) !== amountIn * 100_000_000n) return null;
+      if (amount1e8 * 10n ** BigInt(src.decimals) !== amountIn * 100_000_000n) {
+        params.onRefusal?.(`thorchain: amount has more precision than THORChain's 8 decimals — round it to 8 decimals`);
+        return null;
+      }
 
       const requestedTolerance = params.slippageBps ?? Number(TOLERANCE_BPS);
       if (!Number.isInteger(requestedTolerance) || requestedTolerance < 0 || requestedTolerance > Number(MAX_TOLERANCE_BPS)) return null;

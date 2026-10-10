@@ -19,6 +19,23 @@ describe("THORChain provider contract", () => {
     expect(thorchainProvider({tronSource: true}).supportsRoute({chain: "bitcoin:mainnet", token: "BTC"}, {chain: "eip155:1", token: "ETH"})).toBe(false);
   });
 
+  it("claims routes per asset, not per chain: no pool → not claimed, named refusal", async () => {
+    const p = thorchainProvider();
+    // THORChain has no USDC pool on Solana: the chain pair alone must not make it a candidate.
+    expect(p.supportsRoute({chain: "eip155:1", token: "USDC"}, {chain: "solana:mainnet", token: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"})).toBe(false);
+    expect(p.supportsRoute({chain: "eip155:1", token: "USDC"}, {chain: "solana:mainnet", token: "0x0000000000000000000000000000000000000000"})).toBe(true);
+    const reasons: string[] = [];
+    await expect(p.getQuote({sourceChain: "eip155:1", sourceToken: "USDC", destChain: "solana:mainnet", destToken: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", amountIn: "1000000", destAddress: "x", onRefusal: (r) => reasons.push(r)})).resolves.toBeNull();
+    expect(reasons[0]).toMatch(/no pool/);
+  });
+
+  it("names the 8-decimal precision limit instead of a silent null", async () => {
+    const reasons: string[] = [];
+    // 0.123456789012345678 ETH — finer than THORChain's 1e8 units.
+    await expect(thorchainProvider().getQuote({sourceChain: "eip155:1", sourceToken: "ETH", destChain: "bitcoin:mainnet", destToken: "0x0000000000000000000000000000000000000000", amountIn: "123456789012345678", destAddress: "bc1q", onRefusal: (r) => reasons.push(r)})).resolves.toBeNull();
+    expect(reasons[0]).toMatch(/8 decimals/);
+  });
+
   it("does not advertise tokens for an unimplemented standalone source pair", async () => {
     const protocol = new ThorchainSwap2Protocol(undefined, {fromChain: "tron:728126428"});
     await expect(protocol.getSupportedTokens({fromChain: "tron:728126428", toChain: "eip155:1"})).resolves.toEqual([]);
