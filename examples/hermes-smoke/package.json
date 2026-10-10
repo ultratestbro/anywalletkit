@@ -13,6 +13,7 @@
     "@forgewallet/protocol-approvals-evm": "workspace:*",
     "@forgewallet/protocol-lending-aave-evm": "workspace:*",
     "@forgewallet/protocol-lending-mellow-evm": "workspace:*",
+    "@forgewallet/protocol-lending-morpho-evm": "workspace:*",
     "@forgewallet/protocol-staking-lido-evm": "workspace:*",
     "@forgewallet/protocol-staking-spl-stake-pool-solana": "workspace:*",
     "@forgewallet/protocol-staking-ssv-evm": "workspace:*",

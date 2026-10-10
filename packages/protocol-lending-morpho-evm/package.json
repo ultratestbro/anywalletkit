@@ -1,0 +1,32 @@
+{
+  "name": "@forgewallet/protocol-lending-morpho-evm",
+  "version": "0.1.0",
+  "description": "Morpho for @forgewallet/wallet-evm accounts: Morpho Vaults (MetaMorpho V1 and Vault V2, ERC-4626 deposit / redeem) and Morpho Blue markets (supply, withdraw, borrow, repay, collateral) as LendingProtocols, on 10 chains. Vaults are verified against Morpho's factories, markets resolved on-chain, positions read with interest accrued like the contract does; the Morpho API only decorates (APY, listing).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "module.json"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": { "viem": "^2.57.2" },
+  "peerDependencies": { "@forgewallet/core": "workspace:*" },
+  "devDependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "@forgewallet/core": "workspace:*",
+    "@types/node": "^22",
+    "vitest": "^5.0.3"
+  },
+  "keywords": ["protocol", "lending", "morpho", "morpho-blue", "metamorpho", "vault", "erc-4626", "borrow", "evm", "lending-protocol", "forgewallet"]
+}
