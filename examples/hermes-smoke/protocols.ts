@@ -19,6 +19,7 @@ import SsvProtocolEvm, { MINIMAL_STAKING_AMOUNT } from '@forgewallet/protocol-st
 import TonstakersProtocolTon, { buildStakeBody, buildUnstakeBody } from '@forgewallet/protocol-staking-tonstakers-ton'
 import SplStakePoolProtocolSolana, { base58Decode } from '@forgewallet/protocol-staking-spl-stake-pool-solana'
 import MellowProtocolEvm, { toAsset } from '@forgewallet/protocol-lending-mellow-evm'
+import { AaveProtocolEvm, parseReserveConfiguration, rayToApyPct, AAVE_MARKETS } from '@forgewallet/protocol-lending-aave-evm'
 import ApprovalsProtocolEvm, { isRevokeCalldata, isUnlimitedAmount } from '@forgewallet/protocol-approvals-evm'
 
 type Check = (what: string, ok: boolean, detail?: string) => void
@@ -70,6 +71,12 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const mellow = new (MellowProtocolEvm as never as new (a: unknown, c?: unknown) => { quoteSupply(o: unknown): Promise<unknown> })(evm, { preset: 'lido-earn-eth' })
   await tolerates(check, 'mellow: quoteSupply', () => mellow.quoteSupply({ token: toAsset('0x0000000000000000000000000000000000000000'), amount: 1n }))
   check('mellow: toAsset', typeof toAsset('0xdAC17F958D2ee523a2206206994597C13D831ec7') === 'string')
+  const aave = new AaveProtocolEvm(evm, { chainId: 1 })
+  check('aave: constructs from the preset', aave.addressesProvider === AAVE_MARKETS[1]!.core!.addressesProvider)
+  await tolerates(check, 'aave: getMarket (no provider → NetworkError)', () => aave.getMarket())
+  const cfg = parseReserveConfiguration((7500n) | (7800n << 16n) | (6n << 48n) | (1n << 56n) | (1n << 58n))
+  check('aave: parseReserveConfiguration', cfg.ltv === 0.75 && cfg.decimals === 6 && cfg.active && cfg.borrowingEnabled)
+  check('aave: rayToApyPct', Math.abs(rayToApyPct(4n * 10n ** 25n) - 4.081) < 0.01)
 
   // approvals
   const approvals = new (ApprovalsProtocolEvm as never as new (a: unknown, c?: unknown) => { getSupportedStandards(): Promise<unknown> })(evm, {})

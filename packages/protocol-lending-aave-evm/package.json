@@ -1,0 +1,55 @@
+{
+  "name": "@forgewallet/protocol-lending-aave-evm",
+  "version": "0.1.0",
+  "description": "Aave v3 for @forgewallet/wallet-evm accounts: supply, withdraw, borrow (variable rate) and repay on any Aave v3 market, native coin through WrappedTokenGatewayV3, one-transaction supply/repay with EIP-2612 permits, reserves with rates and caps, health factor and position. Only the PoolAddressesProvider is trusted; the Pool is read on-chain and cross-checked.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "module.json"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": {
+    "viem": "^2.57.2"
+  },
+  "peerDependencies": {
+    "@forgewallet/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "@forgewallet/core": "workspace:*",
+    "@types/node": "^22",
+    "vitest": "^5.0.3"
+  },
+  "keywords": [
+    "protocol",
+    "lending",
+    "aave",
+    "aave-v3",
+    "borrow",
+    "supply",
+    "ethereum",
+    "evm",
+    "lending-protocol",
+    "forgewallet"
+  ]
+}
