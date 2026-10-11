@@ -124,6 +124,38 @@ export interface Swap2EngineConfig extends Swap2ProtocolConfig {
    * SOL juggling, priority fees. Default 20 000 000 lamports (0.02 SOL).
    */
   serializedNativeAllowance?: bigint | number | string;
+  /**
+   * Review gate: called once the live quote is built and every payload/value
+   * check has passed, BEFORE any approval or signature. It receives a copy of
+   * exactly what will be signed; throwing (the user cancelled) aborts with
+   * nothing sent. A quote that expires while the gate is open is refused
+   * before the first approval.
+   */
+  reviewExecution?: (plan: Swap2ExecutionPlan) => Promise<void> | void;
+}
+
+/** What `swap2()` is about to sign, handed to {@link Swap2EngineConfig.reviewExecution}. */
+export interface Swap2ExecutionPlan {
+  provider: string;
+  fromChain: string;
+  destChain: string;
+  destToken: string;
+  recipient: string;
+  refundAddress: string;
+  sourceAmount: bigint;
+  destAmount: bigint;
+  minDestAmount: bigint;
+  feeUsd: number;
+  etaSeconds: number;
+  validUntilMs: number;
+  /** ERC-20 approvals sent first, in order (USDT on Ethereum resets to 0 first). */
+  approvals: {token: string; spender: string; amount: bigint; chainId?: number}[];
+  /** The source leg exactly as the account will receive it. */
+  source:
+    | {kind: "call"; to: string; data?: string; value: bigint; chainId?: number; gasLimit?: bigint; memo?: string; cellBody?: boolean}
+    | {kind: "token-transfer"; token: string; recipient: string; amount: bigint; memo?: string}
+    | {kind: "serialized"; serializedTx: string}
+    | {kind: "typed-order"; typedData: string};
 }
 
 /**
@@ -746,6 +778,54 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       throw new Error("swap2: provider execution amount does not match the validated quote");
     }
 
+    const review = (this._config as Swap2EngineConfig).reviewExecution;
+    if (review) {
+      const approvals: Swap2ExecutionPlan["approvals"] = [];
+      if (unsigned.approvalAddress && source.contract) {
+        const chainId = unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {};
+        if (this.fromChain === "eip155:1" && source.symbol.toUpperCase() === "USDT") {
+          approvals.push({token: source.contract, spender: unsigned.approvalAddress, amount: 0n, ...chainId});
+        }
+        approvals.push({token: source.contract, spender: unsigned.approvalAddress, amount: BigInt(executionOptions.fromTokenAmount!), ...chainId});
+      }
+      const plan: Swap2ExecutionPlan = {
+        provider: q.provider,
+        fromChain: this.fromChain,
+        destChain: params.destChain,
+        destToken: params.destToken,
+        recipient,
+        refundAddress,
+        sourceAmount: BigInt(q.sourceAmount),
+        destAmount: BigInt(q.destAmount),
+        minDestAmount: BigInt(q.minDestAmount),
+        feeUsd: q.feeUsd,
+        etaSeconds: q.etaSeconds,
+        validUntilMs: q.validUntilMs,
+        approvals,
+        source: serialized
+          ? {kind: "serialized", serializedTx: unsigned.serializedTx!}
+          : unsigned.typedData
+            ? {kind: "typed-order", typedData: unsigned.typedData}
+            : tokenId
+              ? {kind: "token-transfer", token: tokenId, recipient: unsigned.to, amount: BigInt(q.sourceAmount), ...(unsigned.memo ? {memo: unsigned.memo} : {})}
+              : {
+                  kind: "call",
+                  to: unsigned.to,
+                  ...(unsigned.data ? {data: unsigned.data} : {}),
+                  value: BigInt(unsigned.value),
+                  ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
+                  ...(unsigned.gasLimit ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
+                  ...(unsigned.memo ? {memo: unsigned.memo} : {}),
+                  ...(cellBody !== undefined ? {cellBody: true} : {}),
+                },
+      };
+      // A frozen deep copy: nothing the reviewer does reaches the payload sent below.
+      await review(deepFreeze(structuredCloneSafe(plan)));
+      if (q.validUntilMs > 0 && q.validUntilMs <= Date.now()) {
+        throw new Swap2QuoteError("swap2: quote expired during review — nothing was signed");
+      }
+    }
+
     // ERC-20 calldata/typed-order routes need an exact allowance. Do this only
     // after every local payload/value check so a malformed build cannot leave an
     // allowance behind before failing validation.
@@ -1047,4 +1127,20 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
     return out;
   }
+}
+
+function structuredCloneSafe<T>(value: T): T {
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map((v) => structuredCloneSafe(v)) as T;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = structuredCloneSafe(v);
+  return out as T;
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object") {
+    for (const v of Object.values(value as Record<string, unknown>)) deepFreeze(v);
+    Object.freeze(value);
+  }
+  return value;
 }
