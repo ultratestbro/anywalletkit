@@ -5,6 +5,8 @@ import { WalletManagerEvm, type WalletAccountEvm } from '../src/index.js'
 describeChainModule('wallet-evm', {
   chain: 'evm',
   create: (seed) => new WalletManagerEvm(seed),
+  fromSigner: (signer) => new WalletManagerEvm(signer),
+  curve: 'secp256k1',
   publicKeyOf: async (a) => (a as WalletAccountEvm).publicKey,
 })
 
