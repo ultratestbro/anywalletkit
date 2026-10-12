@@ -36,3 +36,15 @@ export class Swap2FeeLimitError extends Swap2Error {
 export class Swap2StatusError extends Swap2Error {
   constructor(message: string, options?: ErrorOptions) { super(message, "STATUS", options); }
 }
+/** An identical swap2() is still running on this account (double tap): nothing was sent for this call. */
+export class Swap2InFlightError extends Swap2ExecutionError {}
+/** The account cannot pay the source leg's gas (approvals + main call + value); nothing was signed. */
+export class Swap2InsufficientGasError extends Swap2ExecutionError {}
+/**
+ * The source broadcast failed AFTER the transaction may have reached the node
+ * (lost response, timeout). Do NOT retry: poll `getSwap2Status(id)` / the
+ * chain for `hash`. The approval is left in place (the deposit may spend it).
+ */
+export class Swap2MaybeSentError extends Swap2ExecutionError {
+  constructor(message: string, readonly hash?: string, readonly id?: string, options?: ErrorOptions) { super(message, options); }
+}

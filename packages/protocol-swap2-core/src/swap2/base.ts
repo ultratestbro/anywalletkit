@@ -9,7 +9,8 @@
  * through the bound account. Subclasses only supply "which provider(s)".
  */
 import {Swap2Protocol} from "@forgewallet/core";
-import {encodeFunctionData} from "viem";
+import {encodeFunctionData, getAddress} from "viem";
+import {decodeCall} from "@forgewallet/tx-preview-evm";
 import type {
   Swap2Options,
   Swap2Quote,
@@ -38,6 +39,9 @@ import {
   Swap2ConfigurationError,
   Swap2ExecutionError,
   Swap2FeeLimitError,
+  Swap2InFlightError,
+  Swap2InsufficientGasError,
+  Swap2MaybeSentError,
   Swap2QuoteError,
   Swap2StatusError,
   Swap2UnsupportedOperationError,
@@ -58,6 +62,32 @@ const ERC20_TRANSFER_ABI = [
     outputs: [{type: "bool"}],
   },
 ] as const;
+const ERC20_APPROVE_ABI = [
+  {type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{name: "spender", type: "address"}, {name: "amount", type: "uint256"}], outputs: [{type: "bool"}]},
+] as const;
+const approveData = (spender: string, amount: bigint) =>
+  encodeFunctionData({abi: ERC20_APPROVE_ABI, functionName: "approve", args: [spender as `0x${string}`, amount]});
+
+/** swap2() calls running per account object, keyed by their options: a double tap must not run two swaps. */
+const IN_FLIGHT = new WeakMap<object, Set<string>>();
+const inFlightKey = (fromChain: string, o: Swap2Options) =>
+  JSON.stringify([fromChain, o.fromToken, o.toToken, o.toChain, o.recipient, o.refundAddress, o.fromTokenAmount, o.toTokenAmount, o.minAmountOut, o.slippage],
+    (_k, v) => (typeof v === "bigint" ? v.toString() : v));
+
+/**
+ * Did a failed broadcast possibly reach the node? An account that knows says
+ * so on the error (`maybeSent` + the locally computed `hash`, see
+ * @forgewallet/wallet-evm); otherwise a lost transport response (socket
+ * closed, timeout) is treated as possibly sent. A node's own JSON-RPC
+ * rejection, a refusal before signing, etc. are clean failures.
+ */
+function maybeSent(error: unknown): {hash?: string} | null {
+  for (let e = error as {maybeSent?: unknown; hash?: unknown; cause?: unknown} | undefined, i = 0; e && typeof e === "object" && i < 5; e = e.cause as typeof e, i++) {
+    if (e.maybeSent === true) return typeof e.hash === "string" && e.hash ? {hash: e.hash} : {};
+  }
+  const text = error instanceof Error ? error.message : String(error);
+  return /socket hang up|ECONNRESET|ETIMEDOUT|EPIPE|timed? ?out|request aborted|connection (?:closed|reset)/i.test(text) ? {} : null;
+}
 
 /** Our config adds the account's source chain (CAIP-2) the type omits. */
 /**
@@ -221,6 +251,9 @@ interface Swap2Signer {
    * funds move. Accounts without it keep the fire-and-forget behaviour.
    */
   waitForTransaction?: (hash: string) => Promise<void>;
+  /** EVM gas pre-check before approvals: native balance and a fee upper bound per tx. */
+  getBalance?: () => Promise<bigint | number | string>;
+  quoteSendTransaction?: (tx: {to: string; data?: string; value?: bigint; chainId?: number; gasLimit?: bigint}) => Promise<{fee: bigint}>;
   /** CAIP-2 id of a @forgewallet/core account. */
   chain?: string;
   getChainId?: () => Promise<number | bigint> | number | bigint;
@@ -594,9 +627,23 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
     const snapshot = snapshotOptions(options);
     requireExecutionFloor(snapshot);
+    // A double tap re-quotes and would run a second complete swap: refuse it
+    // while the identical call is still in flight on this account.
+    const key = inFlightKey(this.fromChain, snapshot);
+    const running = IN_FLIGHT.get(signerCandidate) ?? new Set<string>();
+    if (running.has(key)) throw new Swap2InFlightError("swap2: an identical swap is already in progress on this account — wait for its result");
+    running.add(key);
+    IN_FLIGHT.set(signerCandidate, running);
+    try {
+      return await this.executeSwap2(signerCandidate as Swap2Signer, snapshot, config);
+    } finally {
+      running.delete(key);
+    }
+  }
+
+  private async executeSwap2(signer: Swap2Signer, snapshot: Swap2Options, config?: Swap2ProtocolConfig): Promise<Swap2Result> {
     const configSnapshot = snapshotConfig(config);
     this.assertFeeConfig(configSnapshot);
-    const signer = signerCandidate as Swap2Signer;
     await this.assertAccountChain(signer);
     // Refunds land on the SOURCE chain, so the only safe default is the bound
     // account's own address — never the recipient, which may be a dest-chain
@@ -778,6 +825,21 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       throw new Error("swap2: provider execution amount does not match the validated quote");
     }
 
+    // The engine binds the build to the quote; also bind what the quote's own
+    // calldata hands out. A plain ERC-20 transfer / approval / Permit2 /
+    // operator approval may only name this account, the quoted deposit
+    // address or the declared spender/target. Aggregator calldata (a LI.FI
+    // diamond, a THORChain router) is not decoded here — the provider's
+    // target allowlist and the review screen cover it.
+    if (unsigned.data !== undefined && this.fromChain.startsWith("eip155:")) {
+      const call = decodeCall({to: unsigned.to, data: unsigned.data, value: executionValue});
+      const named = call.transfer?.to ?? call.approval?.spender;
+      const allowed = [selfAddress, q.depositAddress, unsigned.approvalAddress, unsigned.to].filter((a): a is string => !!a).map((a) => a.toLowerCase());
+      if (named && !allowed.includes(named.toLowerCase())) {
+        throw new Swap2ValidationError(`swap2: quote calldata (${call.method}) names ${getAddress(named)}, which is not this account, the deposit address or the declared spender — refused`);
+      }
+    }
+
     const review = (this._config as Swap2EngineConfig).reviewExecution;
     if (review) {
       const approvals: Swap2ExecutionPlan["approvals"] = [];
@@ -829,16 +891,17 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // ERC-20 calldata/typed-order routes need an exact allowance. Do this only
     // after every local payload/value check so a malformed build cannot leave an
     // allowance behind before failing validation.
+    const needsApproval = !!unsigned.approvalAddress && !!source.contract;
+    const zeroFirst = this.fromChain === "eip155:1" && source.symbol.toUpperCase() === "USDT";
+    const approvalAmounts = needsApproval ? [...(zeroFirst ? [0n] : []), BigInt(executionOptions.fromTokenAmount!)] : [];
+    await this.assertNativeGas(signer, unsigned, approvalAmounts, source.contract ?? undefined, !!unsigned.typedData || serialized || !!tokenId);
+
     let revokeApproval: (() => Promise<void>) | undefined;
-    if (unsigned.approvalAddress && source.contract) {
+    if (needsApproval) {
       const approve = async (amount: bigint) => {
         const sent = await signer.sendTransaction({
           to: source.contract!,
-          data: encodeFunctionData({
-            abi: [{type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{name: "spender", type: "address"}, {name: "amount", type: "uint256"}], outputs: [{type: "bool"}]}] as const,
-            functionName: "approve",
-            args: [unsigned.approvalAddress as `0x${string}`, amount],
-          }),
+          data: approveData(unsigned.approvalAddress!, amount),
           value: 0n,
           ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
         });
@@ -852,14 +915,10 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // as "nothing happened" would leave a live allowance with no callback.
       revokeApproval = async () => { await approve(0n); };
       try {
-        const zeroFirst = this.fromChain === "eip155:1" && source.symbol.toUpperCase() === "USDT";
-        const total = zeroFirst ? 2 : 1;
-        if (zeroFirst) {
-          this.emitPhase("approving", {index: 1, total});
-          await approve(0n);
+        for (const [i, amount] of approvalAmounts.entries()) {
+          this.emitPhase("approving", {index: i + 1, total: approvalAmounts.length});
+          await approve(amount);
         }
-        this.emitPhase("approving", {index: total, total});
-        await approve(BigInt(executionOptions.fromTokenAmount!));
       } catch (error) {
         await revokeApproval().catch(() => {});
         throw error;
@@ -870,7 +929,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // approval. Recheck rotating/halt-sensitive provider state only now.
     try {
       if (q.validUntilMs > 0 && q.validUntilMs <= Date.now()) {
-        throw new Error("swap2: quote expired before source broadcast");
+        throw new Swap2QuoteError("swap2: quote expired before source broadcast");
       }
       let providerStillEnabled = false;
       try { providerStillEnabled = provider.enabled(); } catch { /* fail closed below */ }
@@ -973,6 +1032,17 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       if (!sent.hash) throw new Swap2ExecutionError("swap2: account did not return a source transaction hash");
       this.emitPhase("broadcast", {hash: sent.hash});
     } catch (error) {
+      // The deposit may be in the mempool: revoking would race it, and a
+      // "clean" error invites a retry that sends a second deposit.
+      const unknown = maybeSent(error);
+      if (unknown) {
+        throw new Swap2MaybeSentError(
+          `swap2: the source transaction may have been broadcast (${error instanceof Error ? error.message.slice(0, 160) : String(error).slice(0, 160)}) — do not retry; ${unknown.hash ? `poll the status of ${unknown.hash}` : "check the account's recent transactions"}`,
+          unknown.hash,
+          unknown.hash ? encodeId(q.provider, q.intentId, unknown.hash) : undefined,
+          {cause: error},
+        );
+      }
       await revokeApproval?.().catch(() => {});
       throw error;
     }
@@ -990,6 +1060,35 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       toTokenAmountMin: BigInt(q.minDestAmount),
       ...(sent.hash ? {hash: sent.hash, transactions: [{hash: sent.hash, type: "source"}]} : {}),
     };
+  }
+
+  /**
+   * EVM: refuse before the first approval when the native balance cannot pay
+   * every approval, the main call and its value. Fees are the account's own
+   * upper bound (`quoteSendTransaction`: gas × max fee). The main call's gas
+   * comes from the quote's gas limit; without one it is estimated, which a
+   * not-yet-approved call cannot do — then only approvals + value count.
+   * Accounts without `getBalance`/`quoteSendTransaction` (and non-EVM chains,
+   * whose accounts check their own fee at send) are not checked here.
+   */
+  private async assertNativeGas(signer: Swap2Signer, unsigned: UnsignedTx, approvalAmounts: bigint[], token: string | undefined, noMainCall: boolean): Promise<void> {
+    if (!this.fromChain.startsWith("eip155:") || typeof signer.getBalance !== "function" || typeof signer.quoteSendTransaction !== "function") return;
+    const chainId = unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {};
+    const fees = await Promise.all(approvalAmounts.map(async (amount) =>
+      (await signer.quoteSendTransaction!({to: token!, data: approveData(unsigned.approvalAddress!, amount), value: 0n, ...chainId})).fee));
+    const value = noMainCall ? 0n : BigInt(unsigned.value);
+    if (!noMainCall) {
+      const main = {to: unsigned.to, ...(unsigned.data ? {data: unsigned.data} : {}), value, ...chainId, ...(unsigned.gasLimit ? {gasLimit: BigInt(unsigned.gasLimit)} : {})};
+      fees.push(await signer.quoteSendTransaction(main).then((r) => r.fee, (error) => {
+        if (approvalAmounts.length) return 0n; // estimation needs the allowance the approval creates
+        throw error;
+      }));
+    }
+    const need = fees.reduce((a, b) => a + b, 0n) + value;
+    const balance = BigInt(await signer.getBalance());
+    if (balance < need) {
+      throw new Swap2InsufficientGasError(`swap2: native balance ${balance} cannot pay this swap's gas: need ${need} (${fees.length} transaction${fees.length === 1 ? "" : "s"}${value ? ` + value ${value}` : ""}) — nothing was signed`);
+    }
   }
 
   override async getSwap2Status(id: string, _options?: Swap2StatusOptions): Promise<Swap2StatusResult> {

@@ -63,6 +63,7 @@
   },
   "dependencies": {
     "@forgewallet/swap2-assets": "workspace:*",
+    "@forgewallet/tx-preview-evm": "workspace:*",
     "viem": "^2.45.0"
   },
   "peerDependencies": {
