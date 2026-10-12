@@ -108,3 +108,25 @@ describe("aggregator over caller-supplied providers", () => {
     expect(quote.toTokenAmountMin).toBe(100n);
   });
 });
+
+describe("router dispatch snapshot", () => {
+  it("keeps every optional provider method, the claim step included", () => {
+    const calls: string[] = [];
+    const p = {
+      name: "twophase",
+      enabled: () => true,
+      supportsRoute: () => true,
+      getQuote: async () => null,
+      buildDeposit: async () => ({chain: "", to: "0x", value: "0"}),
+      trackIntent: async () => ({state: "pending" as const}),
+      preflightDeposit: async () => { calls.push("preflight"); },
+      buildClaim: async () => { calls.push("claim"); return null; },
+    };
+    const r = new CrossChainRouter([p]);
+    const got = r.getProvider("twophase")!;
+    expect(typeof got.buildClaim).toBe("function");
+    expect(typeof got.preflightDeposit).toBe("function");
+    void got.buildClaim!({intentId: "x"});
+    expect(calls).toEqual(["claim"]);
+  });
+});

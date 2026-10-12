@@ -80,6 +80,9 @@ export class CrossChainRouter {
       ...(provider.preflightDeposit ? {preflightDeposit: provider.preflightDeposit.bind(provider)} : {}),
       ...(provider.notifyDeposit ? {notifyDeposit: provider.notifyDeposit.bind(provider)} : {}),
       ...(provider.registerSignedOrder ? {registerSignedOrder: provider.registerSignedOrder.bind(provider)} : {}),
+      // Two-phase routes (CCTP): the destination claim. Missing here, the engine
+      // and the server both reported "provider 'cctp' has no claim step" (2026-10-13).
+      ...(provider.buildClaim ? {buildClaim: provider.buildClaim.bind(provider)} : {}),
       ...(provider.close ? {close: provider.close.bind(provider)} : {}),
       ...(provider.supportsChain ? {supportsChain: provider.supportsChain.bind(provider)} : {}),
       ...(provider.supportsChainPair ? {supportsChainPair: provider.supportsChainPair.bind(provider)} : {}),
