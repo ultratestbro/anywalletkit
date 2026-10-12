@@ -6,7 +6,7 @@ import {
 } from 'viem'
 import { publicKeyToAddress } from 'viem/accounts'
 import { encodeApprove, ERC20_PERMIT_ABI, PERMIT_TYPES, USDT_MAINNET } from './erc20.js'
-import { ChainMismatchError, PermitUnsupportedError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { BroadcastUnknownError, ChainMismatchError, PermitUnsupportedError, SimulationError, UnsafeTransactionError } from './errors.js'
 import { WalletAccountReadOnlyEvm, cleanTypes, inferPrimaryType, transferTransaction } from './read-only-account.js'
 import type { ApproveOptions, EvmConfig, EvmTransaction, EvmTransferOptions, PermitInfo, PermitOptions, SignedPermit, TypedDataInput } from './types.js'
 
@@ -45,6 +45,17 @@ const errorText = (e: unknown): string => {
     for (const v of [o.message, o.details, o.shortMessage]) if (typeof v === 'string') parts.push(v)
   }
   return parts.join('\n')
+}
+/** A node's own refusal (nothing entered the mempool), as opposed to a lost answer. */
+const NODE_REJECTION = /\bnonce\b|underpriced|insufficient funds|intrinsic gas|exceeds block gas limit|fee cap|\btip\b|invalid (?:sender|signature|transaction)|already known|transaction (?:type )?not supported/i
+const nodeAnswered = (e: unknown): boolean => {
+  if (NODE_REJECTION.test(errorText(e))) return true
+  // A JSON-RPC error object came back (viem maps an unexplained throw to code -1).
+  for (let cur: unknown = e, i = 0; cur && i < 6; cur = (cur as { cause?: unknown }).cause, i++) {
+    const code = (cur as { code?: unknown }).code
+    if (typeof code === 'number' && code !== -1) return true
+  }
+  return false
 }
 
 export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalletAccount {
@@ -253,7 +264,14 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     // preflight already quoted and capped the fee; prepare() only fills nonce/fees now.
     const broadcast = async (prepared: TransactionSerializable): Promise<Hex> => {
       const raw = serializeTransaction(prepared, await this.signHash(keccak256(serializeTransaction(prepared)), 'evm-tx'))
-      const hash = await client.sendRawTransaction({ serializedTransaction: raw as Hex })
+      let hash: Hex
+      try {
+        hash = await client.sendRawTransaction({ serializedTransaction: raw as Hex })
+      } catch (error) {
+        // No answer from the node: the tx may be in the mempool under this hash.
+        if (!nodeAnswered(error)) throw new BroadcastUnknownError(keccak256(raw as Hex), error)
+        throw error
+      }
       this._nonceFloor = { next: prepared.nonce! + 1, at: Date.now() }
       return hash
     }

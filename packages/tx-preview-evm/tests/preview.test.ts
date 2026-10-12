@@ -110,4 +110,20 @@ describe("previewEvmTx", () => {
     expect(p.checks.map((c) => c.code)).toEqual(["simulation-ok", "recipient-foreign"]);
     expect(p.simulation).toMatchObject({changes: [{token: "native", delta: -10n}]});
   });
+  it("passes state overrides to eth_simulateV1 and to the eth_call fallback (fund an unfunded sender)", async () => {
+    const seen: unknown[][] = [];
+    const sim = rpc({eth_simulateV1: (params) => { seen.push(params); return [{calls: [{status: "0x1", logs: []}]}]; }});
+    const stateOverrides = {[ME]: {balance: 10n ** 18n}, [USDC]: {stateDiff: {["0x" + "11".repeat(32)]: toHex(5n, {size: 32})}}};
+    await previewEvmTx({chainId: 8453, from: ME, calls: [swap], rpc: sim, own: [ME], stateOverrides});
+    expect((seen[0]![0] as {blockStateCalls: {stateOverrides: unknown}[]}).blockStateCalls[0]!.stateOverrides).toEqual({
+      [ME]: {balance: "0xde0b6b3a7640000"}, [USDC]: {stateDiff: {["0x" + "11".repeat(32)]: toHex(5n, {size: 32})}},
+    });
+    const calls: unknown[][] = [];
+    const fb = rpc({eth_call: (params) => { calls.push(params); return "0x"; }});
+    await previewEvmTx({chainId: 999, from: ME, calls: [swap], rpc: fb, own: [ME], stateOverrides});
+    expect(calls[0]![2]).toEqual({[ME]: {balance: "0xde0b6b3a7640000"}, [USDC]: {stateDiff: {["0x" + "11".repeat(32)]: toHex(5n, {size: 32})}}});
+    const none: unknown[][] = [];
+    await previewEvmTx({chainId: 999, from: ME, calls: [swap], rpc: rpc({eth_call: (params) => { none.push(params); return "0x"; }}), own: [ME]});
+    expect(none[0]).toHaveLength(2);
+  });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { decodeFunctionData, parseTransaction, type EIP1193Provider, type Hex } from 'viem'
-import { ERC20_ABI, WalletManagerEvm } from '../src/index.js'
+import { decodeFunctionData, keccak256, parseTransaction, type EIP1193Provider, type Hex } from 'viem'
+import { BroadcastUnknownError, ERC20_ABI, WalletManagerEvm } from '../src/index.js'
 
 const SEED = 'test test test test test test test test test test test junk'
 const HARDHAT0 = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
@@ -122,6 +122,19 @@ describe('WalletAccountEvm', () => {
     // a caller-fixed nonce is never second-guessed
     await expect(a2.sendTransaction({ to: SPENDER, value: 1n, nonce: 7 })).rejects.toThrow(/nonce too low/)
     m2.dispose()
+  })
+
+  it('a lost broadcast answer is "maybe sent" with the locally computed hash; a node refusal is not', async () => {
+    let raw: Hex | undefined
+    const lossy = fakeProvider({ eth_sendRawTransaction: (p) => { raw = p[0] as Hex; throw new Error('socket hang up') } })
+    const a = await new WalletManagerEvm(SEED, { provider: lossy.provider }).getAccount(0)
+    const err = await a.sendTransaction({ to: SPENDER, value: 1n }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(BroadcastUnknownError)
+    expect(err).toMatchObject({ maybeSent: true, hash: keccak256(raw!) })
+    const refusing = fakeProvider({ eth_sendRawTransaction: () => { throw Object.assign(new Error('insufficient funds for gas * price + value'), { code: -32000 }) } })
+    const b = await new WalletManagerEvm(SEED, { provider: refusing.provider }).getAccount(0)
+    const refused = await b.sendTransaction({ to: SPENDER, value: 1n }).catch((e: unknown) => e)
+    expect(refused).not.toBeInstanceOf(BroadcastUnknownError)
   })
 
   it('re-runs a reverting simulation only behind its own recent broadcast', async () => {

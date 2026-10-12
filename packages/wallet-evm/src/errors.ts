@@ -44,3 +44,19 @@ export class PermitUnsupportedError extends Error {
     this.name = 'PermitUnsupportedError'
   }
 }
+
+/**
+ * The signed transaction was handed to the node but no answer came back
+ * (timeout, connection lost, gateway error): it MAY be in the mempool. Do not
+ * re-sign it as new — watch `hash` (keccak of the signed raw tx, computed
+ * locally) instead.
+ */
+export class BroadcastUnknownError extends Error {
+  readonly maybeSent = true
+  readonly hash: `0x${string}`
+  constructor(hash: `0x${string}`, cause: unknown) {
+    super(`Broadcast outcome unknown for ${hash}: ${cause instanceof Error ? cause.message.slice(0, 200) : String(cause).slice(0, 200)}`, { cause })
+    this.name = 'BroadcastUnknownError'
+    this.hash = hash
+  }
+}

@@ -38,6 +38,27 @@ export interface PreviewInput {
   expectedApproval?: bigint;
   /** Native coin symbol and decimals for balance changes (default ETH / 18). */
   native?: {symbol: string; decimals: number};
+  /**
+   * State overrides applied to the simulated block (eth_simulateV1
+   * `stateOverrides`, eth_call's third parameter): e.g. fund the sender with a
+   * native `balance` or an ERC-20 balance via `stateDiff` on the token's
+   * balance slot, to prove a flow a not-yet-funded account will sign.
+   */
+  stateOverrides?: Record<string, {balance?: bigint; nonce?: number; code?: string; stateDiff?: Record<string, string>}>;
+}
+
+function overridesJson(o: PreviewInput["stateOverrides"]): Record<string, Record<string, unknown>> | undefined {
+  if (!o) return undefined;
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const [addr, v] of Object.entries(o)) {
+    out[addr] = {
+      ...(v.balance !== undefined ? {balance: hex(v.balance)} : {}),
+      ...(v.nonce !== undefined ? {nonce: hex(BigInt(v.nonce))} : {}),
+      ...(v.code !== undefined ? {code: v.code} : {}),
+      ...(v.stateDiff ? {stateDiff: v.stateDiff} : {}),
+    };
+  }
+  return out;
 }
 
 export interface Approval {
@@ -170,7 +191,7 @@ async function simulateV1(input: PreviewInput): Promise<Simulation | null> {
   let blocks: {calls?: SimCall[]}[];
   try {
     blocks = (await input.rpc("eth_simulateV1", [{
-      blockStateCalls: [{calls: input.calls.map((c) => ({from: input.from, to: c.to, ...(c.data ? {data: c.data} : {}), value: hex(c.value ?? 0n)}))}],
+      blockStateCalls: [{...(input.stateOverrides ? {stateOverrides: overridesJson(input.stateOverrides)} : {}), calls: input.calls.map((c) => ({from: input.from, to: c.to, ...(c.data ? {data: c.data} : {}), value: hex(c.value ?? 0n)}))}],
       traceTransfers: true,
       validation: false,
     }, "latest"])) as {calls?: SimCall[]}[];
@@ -251,7 +272,8 @@ async function callFallback(input: PreviewInput): Promise<Simulation> {
   if (input.calls.length !== 1) return {status: "unavailable", reason: "this network can't simulate a sequence of calls"};
   const c = input.calls[0]!;
   try {
-    await input.rpc("eth_call", [{from: input.from, to: c.to, ...(c.data ? {data: c.data} : {}), value: hex(c.value ?? 0n)}, "latest"]);
+    const overrides = overridesJson(input.stateOverrides);
+    await input.rpc("eth_call", [{from: input.from, to: c.to, ...(c.data ? {data: c.data} : {}), value: hex(c.value ?? 0n)}, "latest", ...(overrides ? [overrides] : [])]);
     return {status: "unavailable", reason: "the call passes, but this network can't show balance changes"};
   } catch (err) {
     const data = (err as {data?: string}).data;
