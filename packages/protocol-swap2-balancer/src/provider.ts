@@ -244,7 +244,8 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
           etaSeconds: 15,
           reliability: 0.97,
           validUntilMs: Date.now() + ttl,
-          providerData: {paths: String(paths.length), hops: String(swaps.length), minOut: minOut.toString()},
+          // Pool swap fees are inside the Vault-priced output; no fee is added on top.
+          providerData: {paths: String(paths.length), hops: String(swaps.length), minOut: minOut.toString(), poolFee: "pools"},
         };
       } catch (e) {
         return refuse(e instanceof Error ? e.message.replace(/^balancer: /, "") : String(e));

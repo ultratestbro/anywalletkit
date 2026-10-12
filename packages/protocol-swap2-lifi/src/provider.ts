@@ -352,9 +352,11 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           };
         }
 
-        const feeUsd =
-          (est.feeCosts ?? []).reduce((a, f) => a + Number(f.amountUSD ?? 0), 0) +
-          (est.gasCosts ?? []).reduce((a, g) => a + Number(g.amountUSD ?? 0), 0);
+        // Route fees only (bridge / protocol / integrator). The source
+        // transaction's gas is the network fee the wallet shows on its own line —
+        // counting it here too made LI.FI look dearer than on-chain venues whose
+        // fee excludes gas (2026-10-13).
+        const feeUsd = (est.feeCosts ?? []).reduce((a, f) => a + Number(f.amountUSD ?? 0), 0);
 
         // The optimistic output is not a safety floor. A quote without the
         // provider's minimum cannot satisfy an exact-input execution contract.

@@ -58,6 +58,8 @@ export interface UniswapProviderConfig {
 interface Route {
   /** Human description for the review / logs. */
   label: string;
+  /** The pool fee(s) the route pays — already inside the quoted output. */
+  poolFee: string;
   single?: {fee: number};
   path?: Hex;
 }
@@ -130,7 +132,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   /** Every candidate route for tokenIn → tokenOut on this chain. */
   function routes(chainId: number, caip2: string, tokenIn: Hex, tokenOut: Hex): Route[] {
     const d = deployments[chainId]!;
-    const out: Route[] = FEE_TIERS.map((fee) => ({label: `direct ${fee / 10_000}%`, single: {fee}}));
+    const out: Route[] = FEE_TIERS.map((fee) => ({label: `direct ${fee / 10_000}%`, poolFee: `${fee / 10_000}%`, single: {fee}}));
     const mids = new Set<string>();
     for (const sym of HOP_SYMBOLS) {
       const mid = sym === "WETH" ? d.weth : ccAsset(caip2, sym)?.contract;
@@ -140,7 +142,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       mids.add(m);
       for (const f1 of [100, 500, 3000]) {
         for (const f2 of [100, 500, 3000]) {
-          out.push({label: `via ${sym} ${f1 / 10_000}% → ${f2 / 10_000}%`, path: encodePacked(["address", "uint24", "address", "uint24", "address"], [tokenIn, f1, m, f2, tokenOut])});
+          out.push({label: `via ${sym} ${f1 / 10_000}% → ${f2 / 10_000}%`, poolFee: `${f1 / 10_000}% + ${f2 / 10_000}%`, path: encodePacked(["address", "uint24", "address", "uint24", "address"], [tokenIn, f1, m, f2, tokenOut])});
         }
       }
     }
@@ -253,6 +255,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           validUntilMs: Date.now() + ttl,
           providerData: {
             route: route.label,
+            poolFee: route.poolFee,
             router: d.router,
             tokenIn,
             tokenOut,
