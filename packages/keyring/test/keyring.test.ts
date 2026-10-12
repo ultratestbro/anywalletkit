@@ -233,3 +233,26 @@ describe('Keyring — secrets never leave SecretStorage', () => {
     await expect(keyring.getAccount(accounts[0]!.id, 'evm')).rejects.toMatchObject({ code: 'secret-missing' })
   })
 })
+
+describe('Keyring — adopting a pre-keyring wallet and secret reads', () => {
+  it('adopts an existing secret under its own id without writing or deleting it', async () => {
+    const { keyring, secrets } = await fresh({ evm: CHAINS.evm })
+    secrets.map.set('main', JSON.stringify({ type: 'mnemonic', mnemonic: ABANDON }))
+    const { source, accounts } = await keyring.importMnemonic(ABANDON, { adoptId: 'main', label: 'Main' })
+    expect(source.id).toBe('main')
+    expect(accounts[0]).toMatchObject({ id: 'main/0', addresses: { evm: '0x9858EfFD232B4033E47d90003D41EC34EcaEda94' } })
+    expect([...secrets.map.keys()]).toEqual(['main'])
+    await expect(keyring.importMnemonic(OTHER, { adoptId: 'main' })).rejects.toMatchObject({ code: 'invalid-input' })
+    expect(secrets.map.get('main')).toContain('abandon')
+  })
+
+  it('reads the secret once per operation (one biometric prompt), not once per index', async () => {
+    const { keyring, secrets } = await fresh({ evm: CHAINS.evm })
+    const { source } = await keyring.importMnemonic(ABANDON, { discover: { isUsed: async (_, i) => i < 4, maxIndex: 10 } })
+    expect(secrets.reads).toBe(0) // import + discovery reuse the phrase in hand
+    await keyring.addAccount(source.id)
+    expect(secrets.reads).toBe(1)
+    await keyring.discoverAccounts(source.id, { isUsed: async () => false, gapLimit: 3 })
+    expect(secrets.reads).toBe(2)
+  })
+})

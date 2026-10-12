@@ -180,7 +180,17 @@ export class Keyring {
    */
   async importMnemonic(
     mnemonic: string,
-    options: { label?: string; passphrase?: string; discover?: DiscoverOptions } = {},
+    options: {
+      label?: string
+      passphrase?: string
+      discover?: DiscoverOptions
+      /**
+       * Adopt a seed the app ALREADY keeps in SecretStorage under this id (a wallet
+       * that predates the keyring): the source takes this id and nothing is
+       * written to SecretStorage — or deleted from it if the import fails.
+       */
+      adoptId?: string
+    } = {},
   ): Promise<{ source: SourceMeta; accounts: AccountMeta[] }> {
     const phrase = normalizeMnemonic(mnemonic)
     if (!isValidSeedPhrase(phrase)) throw new KeyringError(mnemonicProblem(phrase))
@@ -194,9 +204,15 @@ export class Keyring {
       zeroize(seed)
     }
     const secret: Secret = passphrase ? { type: 'mnemonic', mnemonic: phrase, passphrase } : { type: 'mnemonic', mnemonic: phrase }
-    const result = await this.addSource({ type: 'mnemonic', label: options.label ?? this.nextLabel('Wallet'), fingerprint, ...(passphrase ? { hasPassphrase: true } : {}) }, secret, [0])
+    const result = await this.addSource(
+      { type: 'mnemonic', label: options.label ?? this.nextLabel('Wallet'), fingerprint, ...(passphrase ? { hasPassphrase: true } : {}) },
+      secret,
+      [0],
+      options.adoptId,
+    )
     if (!options.discover) return result
-    const found = await this.discoverAccounts(result.source.id, options.discover)
+    // The phrase is still in hand: discovery reuses it (no second secure-storage read / biometric prompt).
+    const found = await this.discover(this.source(result.source.id), secret, options.discover)
     return { source: result.source, accounts: [...result.accounts, ...found] }
   }
 
@@ -262,7 +278,8 @@ export class Keyring {
     const source = this.source(sourceId)
     if (source.type !== 'mnemonic') throw new KeyringError('An imported key has exactly one account — import a seed phrase to add more.', 'unsupported')
     const index = this.nextIndex(sourceId)
-    const [account] = await this.deriveAndStore(source, [index], options.name)
+    const secret = await this.secret(sourceId)
+    const [account] = await this.store(source, [{ index, addresses: await this.deriveAddresses(secret, index) }], options.name)
     return account!
   }
 
@@ -274,19 +291,24 @@ export class Keyring {
   async discoverAccounts(sourceId: string, options: DiscoverOptions): Promise<AccountMeta[]> {
     const source = this.source(sourceId)
     if (source.type !== 'mnemonic') return []
+    return this.discover(source, await this.secret(sourceId), options)
+  }
+
+  /** Discovery with the secret already read — one secure-storage read per call, not per index. */
+  private async discover(source: SourceMeta, secret: Secret, options: DiscoverOptions): Promise<AccountMeta[]> {
     const gap = options.gapLimit ?? 1
     const max = options.maxIndex ?? 20
     if (!Number.isInteger(gap) || gap < 1) throw new KeyringError('gapLimit must be a positive integer.')
-    const found: number[] = []
+    const found: { index: number; addresses: Partial<Record<ChainKey, string>> }[] = []
     let misses = 0
-    for (let index = this.nextIndex(sourceId); index <= max && misses < gap; index++) {
-      const addresses = await this.deriveAddresses(sourceId, index)
+    for (let index = this.nextIndex(source.id); index <= max && misses < gap; index++) {
+      const addresses = await this.deriveAddresses(secret, index)
       if (await options.isUsed(addresses, index)) {
-        found.push(index)
+        found.push({ index, addresses })
         misses = 0
       } else misses++
     }
-    return found.length ? this.deriveAndStore(source, found) : []
+    return found.length ? this.store(source, found) : []
   }
 
   async renameAccount(accountId: string, name: string): Promise<void> {
@@ -359,34 +381,35 @@ export class Keyring {
 
   // ---- Internals ----
 
-  private async addSource(meta: Omit<SourceMeta, 'id' | 'createdAt'>, secret: Secret, indexes: (number | null)[]): Promise<{ source: SourceMeta; accounts: AccountMeta[] }> {
+  private async addSource(meta: Omit<SourceMeta, 'id' | 'createdAt'>, secret: Secret, indexes: (number | null)[], adoptId?: string): Promise<{ source: SourceMeta; accounts: AccountMeta[] }> {
     const dupe = this._state.sources.find((s) => s.fingerprint === meta.fingerprint)
     if (dupe) throw new KeyringError(`This ${meta.type === 'mnemonic' ? 'seed phrase' : 'key'} is already in the wallet as "${dupe.label}".`, 'duplicate')
-    const source: SourceMeta = { ...meta, id: newId(), createdAt: Date.now() }
-    await this._secrets.set(source.id, JSON.stringify(secret))
+    if (adoptId !== undefined && (!/^[A-Za-z0-9_-]{1,64}$/.test(adoptId) || this._state.sources.some((s) => s.id === adoptId))) {
+      throw new KeyringError(`Cannot adopt the secret under id "${adoptId}".`, 'invalid-input')
+    }
+    const source: SourceMeta = { ...meta, id: adoptId ?? newId(), createdAt: Date.now() }
+    if (adoptId === undefined) await this._secrets.set(source.id, JSON.stringify(secret))
     try {
-      const accounts = await this.deriveAndStore(source, indexes, undefined, true)
+      const prepared: { index: number | null; addresses: Partial<Record<ChainKey, string>> }[] = []
+      for (const index of indexes) prepared.push({ index, addresses: index === null ? await this.singleAddress(secret, source.chain!) : await this.deriveAddresses(secret, index) })
+      const accounts = await this.store(source, prepared, undefined, true)
       return { source: clone(source), accounts }
     } catch (err) {
-      await this._secrets.delete(source.id).catch(() => undefined)
+      if (adoptId === undefined) await this._secrets.delete(source.id).catch(() => undefined)
       throw err
     }
   }
 
-  /** Derive addresses for `indexes` and persist the accounts (and the source when `withSource`). */
-  private async deriveAndStore(source: SourceMeta, indexes: (number | null)[], name?: string, withSource = false): Promise<AccountMeta[]> {
-    const created: AccountMeta[] = []
-    for (const index of indexes) {
-      const addresses = index === null ? await this.singleAddress(source.id, source.chain!) : await this.deriveAddresses(source.id, index)
-      created.push({
-        id: index === null ? source.id : `${source.id}/${index}`,
-        sourceId: source.id,
-        index,
-        name: name ?? '',
-        hidden: false,
-        addresses,
-      })
-    }
+  /** Persist prepared accounts (and the source when `withSource`). */
+  private async store(source: SourceMeta, prepared: { index: number | null; addresses: Partial<Record<ChainKey, string>> }[], name?: string, withSource = false): Promise<AccountMeta[]> {
+    const created: AccountMeta[] = prepared.map(({ index, addresses }) => ({
+      id: index === null ? source.id : `${source.id}/${index}`,
+      sourceId: source.id,
+      index,
+      name: name ?? '',
+      hidden: false,
+      addresses,
+    }))
     await this.mutate(async (state) => {
       if (withSource) state.sources.push(source)
       for (const a of created) {
@@ -399,9 +422,8 @@ export class Keyring {
     return clone(created)
   }
 
-  /** Addresses of seed account `index` on every registered chain. Reads the secret once. */
-  private async deriveAddresses(sourceId: string, index: number): Promise<Partial<Record<ChainKey, string>>> {
-    const secret = await this.secret(sourceId)
+  /** Addresses of seed account `index` on every registered chain. */
+  private async deriveAddresses(secret: Secret, index: number): Promise<Partial<Record<ChainKey, string>>> {
     if (secret.type !== 'mnemonic') throw new KeyringError('Only a seed phrase derives indexed accounts.', 'unsupported')
     const out: Partial<Record<ChainKey, string>> = {}
     const seed = await seedFromMnemonic(secret.mnemonic, secret.passphrase ?? '')
@@ -421,8 +443,7 @@ export class Keyring {
     return out
   }
 
-  private async singleAddress(sourceId: string, chain: ChainKey): Promise<Partial<Record<ChainKey, string>>> {
-    const secret = await this.secret(sourceId)
+  private async singleAddress(secret: Secret, chain: ChainKey): Promise<Partial<Record<ChainKey, string>>> {
     if (secret.type === 'privateKey') return { [chain]: await this.withKeyAccount(chain, hex.decode(secret.key), (a) => a.getAddress()) }
     if (secret.type === 'tonMnemonic') return { ton: await this.withTonMnemonicAccount(secret.words, (a) => a.getAddress()) }
     throw new KeyringError('A seed phrase has indexed accounts.', 'unsupported')
