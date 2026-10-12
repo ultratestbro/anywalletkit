@@ -263,20 +263,19 @@ export default class MellowProtocolEvm extends LendingProtocol {
     const [shareManager, feeManager, oracle, riskManager, assetCount] = await Promise.all([
       v.shareManager(), v.feeManager(), v.oracle(), v.riskManager(), v.getAssetCount()
     ])
-    const assets = []
-    for (let i = 0n; i < assetCount; i++) {
+    // Assets and their queues are read in parallel (order kept): sequentially
+    // this was ~100 round trips per vault, 5-11 s on a phone.
+    const range = (n) => Array.from({ length: Number(n) }, (_, i) => BigInt(i))
+    const assets = await Promise.all(range(assetCount).map(async (i) => {
       const asset = await v.assetAt(i)
-      const queueCount = await v.getQueueCount(asset)
-      const depositQueues = []
-      const redeemQueues = []
-      for (let j = 0n; j < queueCount; j++) {
+      const queues = await Promise.all(range(await v.getQueueCount(asset)).map(async (j) => {
         const q = await v.queueAt(asset, j)
         const [isDeposit, paused] = await Promise.all([v.isDepositQueue(q), v.isPausedQueue(q)])
-        const kind = await this._classifyQueue(q, isDeposit)
-        ;(isDeposit ? depositQueues : redeemQueues).push({ address: q, kind, paused })
-      }
-      assets.push({ address: asset, native: asset === NATIVE_ASSET, depositQueues, redeemQueues })
-    }
+        return { address: q, isDeposit, paused, kind: await this._classifyQueue(q, isDeposit) }
+      }))
+      const pick = (dep) => queues.filter((q) => q.isDeposit === dep).map(({ address, kind, paused }) => ({ address, kind, paused }))
+      return { address: asset, native: asset === NATIVE_ASSET, depositQueues: pick(true), redeemQueues: pick(false) }
+    }))
     const fm = this._contract(feeManager, FEE_MANAGER_ABI)
     const [depositFee, redeemFee, performanceFee, protocolFee] = await Promise.all([
       fm.depositFeeD6().catch(() => 0n), fm.redeemFeeD6().catch(() => 0n), fm.performanceFeeD6().catch(() => 0n), fm.protocolFeeD6().catch(() => 0n)
@@ -385,20 +384,24 @@ export default class MellowProtocolEvm extends LendingProtocol {
     const pendingDeposits = []
     const redeemRequests = []
     let claimableShares = 0n
-    for (const asset of data.assets) {
-      for (const q of asset.depositQueues) {
-        if (q.kind !== 'async') continue
+    const async_ = (qs) => qs.filter((q) => q.kind === 'async')
+    const [deposits, redeems] = await Promise.all([
+      Promise.all(data.assets.flatMap((asset) => async_(asset.depositQueues).map(async (q) => {
         const c = this._contract(q.address, DEPOSIT_QUEUE_ABI)
         const [req, claimable] = await Promise.all([c.requestOf(account), c.claimableOf(account).catch(() => 0n)])
-        claimableShares += BigInt(claimable)
-        if (BigInt(req.assets) > 0n) pendingDeposits.push({ token: asset.address, queue: q.address, requestedAt: Number(req.timestamp), assets: BigInt(req.assets) })
-      }
-      for (const q of asset.redeemQueues) {
-        if (q.kind !== 'async') continue
-        const reqs = await this._contract(q.address, REDEEM_QUEUE_ABI).requestsOf(account, 0n, BigInt(this._maxRedeemRequests))
-        for (const r of reqs) {
-          redeemRequests.push({ token: asset.address, queue: q.address, timestamp: Number(r.timestamp), shares: BigInt(r.shares), claimable: Boolean(r.isClaimable), assets: BigInt(r.assets) })
-        }
+        return { asset, q, req, claimable }
+      }))),
+      Promise.all(data.assets.flatMap((asset) => async_(asset.redeemQueues).map(async (q) => ({
+        asset, q, reqs: await this._contract(q.address, REDEEM_QUEUE_ABI).requestsOf(account, 0n, BigInt(this._maxRedeemRequests))
+      }))))
+    ])
+    for (const { asset, q, req, claimable } of deposits) {
+      claimableShares += BigInt(claimable)
+      if (BigInt(req.assets) > 0n) pendingDeposits.push({ token: asset.address, queue: q.address, requestedAt: Number(req.timestamp), assets: BigInt(req.assets) })
+    }
+    for (const { asset, q, reqs } of redeems) {
+      for (const r of reqs) {
+        redeemRequests.push({ token: asset.address, queue: q.address, timestamp: Number(r.timestamp), shares: BigInt(r.shares), claimable: Boolean(r.isClaimable), assets: BigInt(r.assets) })
       }
     }
     redeemRequests.sort((a, b) => b.timestamp - a.timestamp)
