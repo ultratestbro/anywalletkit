@@ -138,6 +138,14 @@ export interface LifiProviderConfig {
   trustedApprovalAddresses?: Readonly<Record<string, readonly string[]>>;
   /** Fail-closed local lifetime for the provider's documented ~60s quote window. */
   quoteTtlMs?: number;
+  /**
+   * Slippage sent when the caller names none (bps, default 50 = LI.FI's own
+   * documented default). Left unset, LI.FI picks it per request and it swings
+   * (0.9%–6% within a minute on Base ETH → Robinhood, 2026-10-12): the display
+   * quote's minimum then sits above the live one and the execution floor
+   * refuses a route that hasn't moved.
+   */
+  defaultSlippageBps?: number;
 }
 
 export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvider {
@@ -152,6 +160,10 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
   const trustedTransactionTargets = trustMap(config.trustedTransactionTargets, "transaction target");
   const trustedApprovalAddresses = trustMap(config.trustedApprovalAddresses, "approval");
   const quoteTtlMs = config.quoteTtlMs ?? DEFAULT_QUOTE_TTL_MS;
+  const defaultSlippageBps = config.defaultSlippageBps ?? 50;
+  if (!Number.isInteger(defaultSlippageBps) || defaultSlippageBps <= 0 || defaultSlippageBps >= 10_000) {
+    throw new Error("lifi: defaultSlippageBps must be an integer between 1 and 9999");
+  }
   if (!Number.isInteger(quoteTtlMs) || quoteTtlMs <= 0 || quoteTtlMs > 60_000) {
     throw new Error("lifi: quoteTtlMs must be an integer between 1 and 60000");
   }
@@ -187,7 +199,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
       // it truncates toAmountMin to a few significant digits. The engine
       // rejects a floor below the requested one, so the quote is asked once
       // more with the slippage scaled down to land the floor inside it.
-      let sentSlippage = params.slippageBps !== undefined ? params.slippageBps / 10_000 : undefined;
+      const slippageBps = params.slippageBps ?? defaultSlippageBps;
+      let sentSlippage: number | undefined = slippageBps / 10_000;
       for (let attempt = 0; attempt < 2; attempt++) try {
         const url = new URL(`${apiBase}/quote`);
         url.searchParams.set("fromChain", fromChain);
@@ -336,24 +349,27 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         // provider's minimum cannot satisfy an exact-input execution contract.
         if (!est.toAmountMin) return null;
         const minDestAmount = est.toAmountMin;
-        if (params.slippageBps !== undefined && sentSlippage !== undefined) {
+        if (sentSlippage !== undefined) {
           const dest = BigInt(est.toAmount);
           const min = BigInt(minDestAmount);
-          if (dest > 0n && min < (dest * BigInt(10_000 - params.slippageBps)) / 10_000n) {
+          if (dest > 0n && min < (dest * BigInt(10_000 - slippageBps)) / 10_000n) {
             const effective = Number(((dest - min) * 1_000_000n) / dest) / 1_000_000;
-            const requested = params.slippageBps / 10_000;
-            const scaled = Math.floor(((sentSlippage * requested) / effective) * 0.995 * 1_000_000) / 1_000_000;
+            const requested = slippageBps / 10_000;
+            const scaled: number = Math.floor(((sentSlippage * requested) / effective) * 0.995 * 1_000_000) / 1_000_000;
             if (attempt === 0 && effective > 0 && scaled > 0) {
               sentSlippage = scaled;
               continue;
             }
             params.onRefusal?.(
-              `lifi: this route's minimum is ${(effective * 100).toFixed(2)}% under the quote (LI.FI applies slippage on every step) — more than the requested ${params.slippageBps / 100}%`,
+              `lifi: this route's minimum is ${(effective * 100).toFixed(2)}% under the quote (LI.FI applies slippage on every step) — more than the requested ${slippageBps / 100}%`,
             );
             return null;
           }
         }
-        if (params.minAmountOut !== undefined && BigInt(minDestAmount) < BigInt(params.minAmountOut)) return null;
+        if (params.minAmountOut !== undefined && BigInt(minDestAmount) < BigInt(params.minAmountOut)) {
+          params.onRefusal?.(`lifi: floor breach (min=${minDestAmount} < floor=${params.minAmountOut})`);
+          return null;
+        }
         return {
           provider: "lifi",
           // Status is tracked by SOURCE TX HASH + the chain pair.

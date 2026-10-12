@@ -1,54 +1,7 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {lifiProvider} from "../src/provider.js";
 
-const DIAMOND = "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE";
-const FROM_TOKEN = "0xdAC17F958D2ee523A2206206994597C13D831ec7";
-const TO_TOKEN = "0xFd086bC7CD5C481DCC9C85EBE478A1C0b69FCbb9";
-const SENDER = "0x4444444444444444444444444444444444444444";
-const RECIPIENT = "0x3333333333333333333333333333333333333333";
-const PARAMS = {
-  sourceChain: "eip155:1",
-  sourceToken: "USDT",
-  destChain: "eip155:42161",
-  destToken: TO_TOKEN,
-  amountIn: "1000000",
-  destAddress: RECIPIENT,
-  refundAddress: SENDER,
-  slippageBps: 50,
-};
-
-function response(overrides: Record<string, unknown> = {}) {
-  return {
-    type: "lifi",
-    id: "quote-1",
-    action: {
-      fromToken: {address: FROM_TOKEN, chainId: 1},
-      toToken: {address: TO_TOKEN, chainId: 42161},
-      fromAmount: "1000000",
-      fromChainId: 1,
-      toChainId: 42161,
-      slippage: 0.005,
-      fromAddress: SENDER,
-      toAddress: RECIPIENT,
-    },
-    estimate: {
-      fromAmount: "1000000",
-      toAmount: "990000",
-      toAmountMin: "985050",
-      approvalAddress: DIAMOND,
-      executionDuration: 20,
-    },
-    transactionRequest: {
-      from: SENDER,
-      to: DIAMOND,
-      data: "0xdeadbeef",
-      value: "0x0",
-      chainId: 1,
-      gasLimit: "0x5208",
-    },
-    ...overrides,
-  };
-}
+import {DIAMOND, FROM_TOKEN, PARAMS, RECIPIENT, SENDER, TO_TOKEN, response} from "./fixtures.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -291,7 +244,30 @@ describe("LI.FI per-step slippage", () => {
   });
 });
 
+describe("LI.FI default slippage", () => {
+  it("pins the slippage when the caller names none, so the live floor matches the display quote", async () => {
+    const sent: (string | null)[] = [];
+    vi.stubGlobal("fetch", async (url: URL) => {
+      sent.push(url.searchParams.get("slippage"));
+      return new Response(JSON.stringify(response()));
+    });
+    const {slippageBps: _omit, ...noSlippage} = PARAMS;
+    expect(await lifiProvider().getQuote(noSlippage)).not.toBeNull();
+    expect(await lifiProvider({defaultSlippageBps: 100}).getQuote(noSlippage)).toBeNull(); // response echoes 0.005 ≠ the 0.01 sent
+    expect(await lifiProvider({defaultSlippageBps: 100}).getQuote(PARAMS)).not.toBeNull(); // the caller's own value wins
+    expect(sent).toEqual(["0.005", "0.01", "0.005"]);
+    expect(() => lifiProvider({defaultSlippageBps: 0})).toThrow(/defaultSlippageBps/);
+  });
+});
+
 describe("LI.FI refusals", () => {
+  it("names a quoted minimum under the caller's floor instead of a silent null", async () => {
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(response())));
+    let reason = "";
+    expect(await lifiProvider().getQuote({...PARAMS, minAmountOut: "985051", onRefusal: (r: string) => { reason = r; }})).toBeNull();
+    expect(reason).toBe("lifi: floor breach (min=985050 < floor=985051)");
+  });
+
   it("forwards the API's own message when it has no quote", async () => {
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify({message: "No available quotes for the requested transfer"}), {status: 404}));
     let reason = "";
