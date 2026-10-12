@@ -34,6 +34,10 @@ const LIFI_CHAIN: Record<string, string> = {
   "eip155:43114": "43114",
   "eip155:534352": "534352",
   "eip155:80094": "80094",
+  // 2026-10-12: zkSync Era, Celo, MegaETH (live on li.quest/v1/chains).
+  "eip155:324": "324",
+  "eip155:42220": "42220",
+  "eip155:4326": "4326",
   [LIFI_SOLANA_CAIP2]: "1151111081099710",
 };
 const CAIP2_BY_LIFI_CHAIN: Record<string, string> = Object.fromEntries(Object.entries(LIFI_CHAIN).map(([caip2, id]) => [id, caip2]));
@@ -71,6 +75,8 @@ const LIFI_DIAMONDS: Readonly<Record<string, string>> = {
   "eip155:143": "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37", // Monad (deployments/monad.json, verified 2026-10-11)
   "eip155:130": "0x864b314D4C5a0399368609581d3E8933a63b9232", // Unichain (deployments/unichain.json, verified 2026-10-11)
   "eip155:80094": "0xf909c4Ae16622898b885B89d7F839E0244851c66", // Berachain (deployments/berachain.json, verified 2026-10-11)
+  "eip155:324": "0x341e94069f53234fE6DabeF707aD424830525715", // zkSync Era (deployments/zksync.json, matches a live quote 2026-10-12)
+  "eip155:4326": "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37", // MegaETH (deployments/megaeth.json, matches a live quote 2026-10-12)
 };
 const diamondFor = (chain: string): string => LIFI_DIAMONDS[chain] ?? LIFI_DIAMOND;
 const DEFAULT_QUOTE_TTL_MS = 55_000;

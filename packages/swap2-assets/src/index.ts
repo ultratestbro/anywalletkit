@@ -929,6 +929,51 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         icon: cmcIcon(33793), // Global Dollar — the mark LI.FI serves for it
       },
     ],
+  },  {
+    // zkSync Era (ZK-rollup, native ETH). LI.FI + Uniswap v3 (cp0x addresses) + wrap;
+    // no 1Click ids. Tokens verified on-chain 2026-10-12 (symbol, decimals).
+    key: "zksync",
+    caip2: "eip155:324",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/zksync.svg",
+    label: "zkSync",
+    assets: [
+      {symbol: "ETH", assetId: "", decimals: 18, icon: cmcIcon(1027)},
+      {symbol: "WETH", assetId: "", contract: "0x5AEa5775959fBC2557Cc8789bC1bf90A239D9a91", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "USDC", assetId: "", contract: "0x1d17CBcF0D6D143135aE902365D2E5e2A16538D4", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "USDT", assetId: "", contract: "0x493257fD37EDB34451f62EDf8D2a0C418852bA4C", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "WBTC", assetId: "", contract: "0xBBeB516fb02a01611cBBE0453Fe3c580D7281011", decimals: 8, icon: cmcIcon(3717)},
+      {symbol: "ZK", assetId: "", contract: "0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E", decimals: 18, icon: cmcIcon(24091)},
+    ],
+  },
+  {
+    // Celo (Ethereum L2). CELO is native AND an ERC-20 at 0x471E… — listed by its
+    // contract, the way LI.FI and the Uniswap router see it (no wrapped native).
+    key: "celo",
+    caip2: "eip155:42220",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/celo.svg",
+    label: "Celo",
+    assets: [
+      {symbol: "CELO", assetId: "", contract: "0x471EcE3750Da237f93B8E339c536989b8978a438", decimals: 18, icon: cmcIcon(5567)},
+      {symbol: "USDC", assetId: "", contract: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "USDT", assetId: "", contract: "0x617f3112bf5397D0467D315cC709EF968D9ba546", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "USDm", assetId: "", contract: "0x765DE816845861e75A25fCA122bb6898B8B1282a", decimals: 18, icon: cmcIcon(7236)},
+      {symbol: "WETH", assetId: "", contract: "0xD221812de1BD094f35587EE8E174B07B6167D9Af", decimals: 18, icon: cmcIcon(2396)},
+    ],
+  },
+  {
+    // MegaETH (real-time Ethereum L2, native ETH). LI.FI + wrap; no 1Click ids.
+    key: "megaeth",
+    caip2: "eip155:4326",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/megaeth.svg",
+    label: "MegaETH",
+    assets: [
+      {symbol: "ETH", assetId: "", decimals: 18, icon: cmcIcon(1027)},
+      {symbol: "WETH", assetId: "", contract: "0x4200000000000000000000000000000000000006", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "USDT0", assetId: "", contract: "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "USDm", assetId: "", contract: "0xFAfDdbb3FC7688494971a79cc65DCa3EF82079E7", decimals: 18, icon: cmcIcon(7236)},
+      {symbol: "USDe", assetId: "", contract: "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", decimals: 18, icon: cmcIcon(29470)},
+      {symbol: "MEGA", assetId: "", contract: "0x28B7E77f82B25B95953825F1E3eA0E36c1c29861", decimals: 18},
+    ],
   },
 ];
 

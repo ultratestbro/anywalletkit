@@ -6,7 +6,7 @@ import {evmRef, isEvm} from "@forgewallet/protocol-swap2-core/util";
 // provider's own chain map).
 /** The catalog's Solana id; LI.FI numbers it 1151111081099710. */
 export const LIFI_SOLANA_CAIP2 = "solana:mainnet";
-const LIFI_EVM = new Set([1, 8453, 56, 137, 42161, 10, 100, 143, 130, 999, 4663, 43114, 534352, 80094]);
+const LIFI_EVM = new Set([1, 8453, 56, 137, 42161, 10, 100, 143, 130, 999, 4663, 43114, 534352, 80094, 324, 42220, 4326]);
 export const lifi = {
   enabled: () => true,
   apiKey: () => undefined,

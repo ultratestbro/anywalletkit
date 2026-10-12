@@ -114,7 +114,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const w = encodeFunctionData({abi: ROUTER_ABI, functionName: "WETH9"});
         const [rf, rw, qf, qw] = await rpc(chainId, [call(d.router, f), call(d.router, w), call(d.quoter, f), call(d.quoter, w)]);
         const addr = (r: unknown) => (typeof r === "string" && r.length >= 42 ? getAddress(`0x${r.slice(-40)}`) : null);
-        const ok = [rf, qf].every((r) => addr(r) === getAddress(d.factory)) && [rw, qw].every((r) => addr(r) === getAddress(d.weth));
+        const wrapped = d.nativeWrap === false ? getAddress(ZERO) : getAddress(d.weth);
+        const ok = [rf, qf].every((r) => addr(r) === getAddress(d.factory)) && [rw, qw].every((r) => addr(r) === wrapped);
         if (!ok) throw new Error(`uniswap: the router/quoter on chain ${chainId} do not match the pinned deployment — refusing`);
       })();
       p.catch(() => verified.delete(chainId));
@@ -167,6 +168,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       if (!src) return refuse(`unknown source token ${params.sourceToken}`);
       const nativeIn = !src.contract;
       const nativeOut = /^0x0+$/.test(params.destToken);
+      if ((nativeIn || nativeOut) && d.nativeWrap === false) return refuse("this chain's router has no wrapped native — swap the coin's ERC-20 instead");
       if (!nativeOut && !/^0x[0-9a-fA-F]{40}$/.test(params.destToken)) return refuse("destination token must be an EVM address");
       if (!/^0x[0-9a-fA-F]{40}$/.test(params.destAddress)) return refuse("recipient must be an EVM address");
       let amountIn: bigint;
