@@ -24,6 +24,18 @@ describe("auction engine", () => {
     expect(() => new CrossChainRouter([p, p])).toThrow(/duplicate/i);
   });
 
+  it("names each venue's own refusal in lastRejections, per call", async () => {
+    const seen: string[] = [];
+    const router = new CrossChainRouter([
+      provider("a", {getQuote: async (params) => { params.onRefusal?.("a: floor breach"); return null; }}),
+      provider("b", {getQuote: async (params) => { params.onRefusal?.("round it to 8 decimals"); return null; }}),
+      provider("c", {getQuote: async () => null}),
+    ]);
+    await expect(router.getBestQuote({sourceChain: "eip155:1", sourceToken: "ETH", destChain: "eip155:10", destToken: "0x0", amountIn: "1", destAddress: "0x1", onRefusal: (r) => seen.push(r)})).resolves.toBeNull();
+    expect([...router.lastRejections].sort()).toEqual(["a: floor breach", "b: round it to 8 decimals", "c: returned no quote"]);
+    expect(seen.sort()).toEqual(["a: floor breach", "round it to 8 decimals"]);
+  });
+
   it("keeps immediate-execution flows from selecting order-only quotes", async () => {
     const make = (name: string, destAmount: string, depositAddress: string) => provider(name, {
       getQuote: async (params) => ({

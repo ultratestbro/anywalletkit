@@ -36,6 +36,20 @@ describe("THORChain provider contract", () => {
     expect(reasons[0]).toMatch(/8 decimals/);
   });
 
+  it("refuses an 18-dp Max amount through swap2() before any request or signature", async () => {
+    // Edge (layer C): the standalone protocol's no-route error keeps the 8-dp reason.
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const sent: unknown[] = [];
+    const account = {getAddress: async () => "0x4444444444444444444444444444444444444444", getChainId: async () => 1, sendTransaction: async (tx: unknown) => { sent.push(tx); return {hash: "0x1"}; }};
+    await expect(new ThorchainSwap2Protocol(account, {fromChain: "eip155:1"}).swap2({
+      fromToken: "ETH", toToken: "0x0000000000000000000000000000000000000000", toChain: "bitcoin:mainnet",
+      recipient: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", fromTokenAmount: 123_456_789_012_345_678n, minAmountOut: 1n,
+    })).rejects.toThrow(/no route available.* :: thorchain: .*8 decimals/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(sent).toHaveLength(0);
+  });
+
   it("does not advertise tokens for an unimplemented standalone source pair", async () => {
     const protocol = new ThorchainSwap2Protocol(undefined, {fromChain: "tron:728126428"});
     await expect(protocol.getSupportedTokens({fromChain: "tron:728126428", toChain: "eip155:1"})).resolves.toEqual([]);

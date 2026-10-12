@@ -93,6 +93,12 @@ describe("THORNode host failover", () => {
     expect(calls).toEqual([`${PRIMARY} quote`, `${PRIMARY} inbound`, `${SECONDARY} quote`, `${SECONDARY} inbound`]);
   });
 
+  it("names a memo limit under the caller's floor instead of a silent null", async () => {
+    const reasons: string[] = [];
+    await expect(provider().getQuote({...params(), minAmountOut: "96000", onRefusal: (r) => reasons.push(r)})).resolves.toBeNull();
+    expect(reasons).toEqual(["thorchain: floor breach (limit=95000 < floor=96000, 1e8 units)"]);
+  });
+
   it("does not shop a node's business rejection to another host", async () => {
     hosts[PRIMARY]!.quote = {status: 404, body: {error: "pool does not exist"}};
     await expect(provider().getQuote(params())).resolves.toBeNull();

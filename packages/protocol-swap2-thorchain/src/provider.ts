@@ -484,7 +484,11 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
           if (chainId ? !q.router : !!q.router) return null;
           checkedMemo = verifiedMemo(q.memo, dst.asset, params.destAddress, params.refundAddress ?? "", configuredAffiliate, configuredAffiliateBps);
           if (!checkedMemo) return null;
-          if (params.minAmountOut !== undefined && checkedMemo.limit < toThorUnitsCeil(BigInt(params.minAmountOut), dst.decimals)) return null;
+          const floor1e8 = params.minAmountOut !== undefined ? toThorUnitsCeil(BigInt(params.minAmountOut), dst.decimals) : undefined;
+          if (floor1e8 !== undefined && checkedMemo.limit < floor1e8) {
+            params.onRefusal?.(`thorchain: floor breach (limit=${checkedMemo.limit} < floor=${floor1e8}, 1e8 units)`);
+            return null;
+          }
           // A quote gateway is not an authority for rotating vault/router
           // state. Bind it against a separately fetched no-store inbound
           // snapshot from the SAME host now, then repeat the check before broadcast.

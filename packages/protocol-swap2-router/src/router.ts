@@ -143,10 +143,16 @@ export class CrossChainRouter {
     // legitimately takes longer than a dry one (serverless hop + upstream
     // retries) — starving it surfaced as a terminal "no route" on execution.
     const timeoutMs = eligible.length === 1 ? SOLO_QUOTE_TIMEOUT_MS : QUOTE_TIMEOUT_MS;
-    const settled = await Promise.all(eligible.map(async (p) => {
+    // Each venue names its own refusal (per call, so concurrent quotes cannot race).
+    const refusals: (string | undefined)[] = [];
+    const settled = await Promise.all(eligible.map(async (p, i) => {
       const controller = new AbortController();
+      const own = Object.freeze({...snapshot, onRefusal: (reason: string) => {
+        refusals[i] ??= reason.startsWith(`${p.name}:`) ? reason : `${p.name}: ${reason}`;
+        try { snapshot.onRefusal?.(reason); } catch { /* diagnostics only */ }
+      }});
       try {
-        const result = await withTimeout(p.getQuote(snapshot, controller.signal), timeoutMs);
+        const result = await withTimeout(p.getQuote(own, controller.signal), timeoutMs);
         return result;
       } catch (err) {
         // A failed venue sitting out silently is indistinguishable from "no
@@ -166,7 +172,7 @@ export class CrossChainRouter {
         if (!q) {
           // A provider RETURNING null (vs throwing) was the one silent path
           // left — record it so the surfaced no-route error names the venue.
-          this._lastRejections.push(`${eligible[i]!.name}: returned no quote`);
+          this._lastRejections.push(refusals[i] ?? `${eligible[i]!.name}: returned no quote`);
           return null;
         }
         if (!validQuote(q, snapshot, eligible[i]!.name)) {
