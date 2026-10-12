@@ -1,0 +1,54 @@
+{
+  "name": "@forgewallet/keyring",
+  "version": "0.0.1",
+  "description": "Multi-account, multi-source keyring for the forgewallet SDK: many accounts from one seed, imported seeds and private keys, account discovery — secrets stay in the app's secure storage.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "keywords": [
+    "wallet",
+    "sdk",
+    "keyring",
+    "multi-account",
+    "import"
+  ],
+  "dependencies": {
+    "@forgewallet/core": "workspace:*",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
+    "@scure/bip32": "^2.4.0"
+  },
+  "devDependencies": {
+    "@forgewallet/wallet-btc": "workspace:*",
+    "@forgewallet/wallet-evm": "workspace:*",
+    "@forgewallet/wallet-near": "workspace:*",
+    "@forgewallet/wallet-solana": "workspace:*",
+    "@forgewallet/wallet-ton": "workspace:*",
+    "@forgewallet/wallet-tron": "workspace:*",
+    "viem": "^2.57.2",
+    "@ton/crypto": "^3.3.0",
+    "vitest": "^5.0.3"
+  }
+}
