@@ -1,7 +1,7 @@
 {
   "$schema": "./modules.schema.json",
   "generatedAt": "2026-10-12",
-  "count": 16,
+  "count": 17,
   "modules": [
     {
       "name": "@forgewallet/protocol-approvals-evm",
@@ -148,6 +148,30 @@
       "repo": "https://github.com/ultratestbro/forgewallet",
       "path": "packages/protocol-staking-tonstakers-ton",
       "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@forgewallet/protocol-swap2-balancer",
+      "type": "swap2",
+      "chains": [
+        "eip155:1",
+        "eip155:10",
+        "eip155:100",
+        "eip155:137",
+        "eip155:146",
+        "eip155:8453",
+        "eip155:9745",
+        "eip155:42161",
+        "eip155:43114"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-swap2-balancer",
+      "description": "Balancer v2 same-chain swaps: SOR API suggests the path, the Vault prices it on-chain (queryBatchSwap) and enforces the minimum (batchSwap limits).",
+      "addedAt": "2026-10-13"
     },
     {
       "name": "@forgewallet/protocol-swap2-cctp",
