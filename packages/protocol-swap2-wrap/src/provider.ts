@@ -21,6 +21,7 @@ export const WRAPPED_NATIVE: Readonly<Record<number, {address: `0x${string}`; sy
   324: {address: "0x5AEa5775959fBC2557Cc8789bC1bf90A239D9a91", symbol: "WETH"},
   4326: {address: "0x4200000000000000000000000000000000000006", symbol: "WETH"},
   9745: {address: "0x6100E367285b01F48D07953803A2d8dCA5D19873", symbol: "WXPL"},
+  146: {address: "0x039e2fB66102314Ce7b64Ce5Ce3E5183bc94aD38", symbol: "wS"},
   59144: {address: "0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f", symbol: "WETH"},
   8453: {address: "0x4200000000000000000000000000000000000006", symbol: "WETH"},
   42161: {address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", symbol: "WETH"},

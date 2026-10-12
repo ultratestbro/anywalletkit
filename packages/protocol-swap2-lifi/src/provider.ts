@@ -40,6 +40,7 @@ const LIFI_CHAIN: Record<string, string> = {
   "eip155:4326": "4326",
   "eip155:9745": "9745",
   "eip155:59144": "59144",
+  "eip155:146": "146",
   [LIFI_SOLANA_CAIP2]: "1151111081099710",
 };
 const CAIP2_BY_LIFI_CHAIN: Record<string, string> = Object.fromEntries(Object.entries(LIFI_CHAIN).map(([caip2, id]) => [id, caip2]));

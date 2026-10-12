@@ -657,6 +657,11 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         decimals: 6,
         icon: cmcIcon(825),
       },
+      // 2026-10-13 — LI.FI only (no 1Click id); verified on-chain.
+      {symbol: "GNO", assetId: "", contract: "0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb", decimals: 18, icon: cmcIcon(1659)},
+      {symbol: "WETH", assetId: "", contract: "0x6A023CCd1ff6F2045C3309768eAd9E68F978f6e1", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "WBTC", assetId: "", contract: "0x8e5bBbb09Ed1ebdE8674Cda39A0c169401db4252", decimals: 8, icon: cmcIcon(3717)},
+      {symbol: "EURe", assetId: "", contract: "0x420CA0f9B9b604cE0fd9C18EF134C705e5Fa3430", decimals: 18},
     ],
   },
   {
@@ -1010,6 +1015,22 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "WBTC", assetId: "", contract: "0x3aAB2285ddcDdaD8edf438C1bAB47e1a9D05a9b4", decimals: 8, icon: cmcIcon(3717)},
       {symbol: "DAI", assetId: "", contract: "0x4AF15ec2A0BD43Db75dd04E62FAA3B8EF36b00d5", decimals: 18, icon: cmcIcon(4943)},
       {symbol: "LINEA", assetId: "", contract: "0x1789e0043623282D5DCc7F213d703C6D8BAfBB04", decimals: 18},
+    ],
+  },
+  {
+    // Sonic (native S). LI.FI + wrap S↔wS; USDC is Circle-native (CCTP). No 1Click ids. Verified on-chain 2026-10-13.
+    key: "sonic",
+    caip2: "eip155:146",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/sonic.svg",
+    label: "Sonic",
+    assets: [
+      {symbol: "S", assetId: "", decimals: 18, icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/sonic.svg"},
+      {symbol: "wS", assetId: "", contract: "0x039e2fB66102314Ce7b64Ce5Ce3E5183bc94aD38", decimals: 18},
+      {symbol: "USDC", assetId: "", contract: "0x29219dd400f2Bf60E5a23d13Be72B486D4038894", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "USDT", assetId: "", contract: "0x6047828dc181963ba44974801FF68e538dA5eaF9", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "WETH", assetId: "", contract: "0x50c42dEAcD8Fc9773493ED674b675bE577f2634b", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "WBTC", assetId: "", contract: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c", decimals: 8, icon: cmcIcon(3717)},
+      {symbol: "stS", assetId: "", contract: "0xE5DA20F15420aD15DE0fa650600aFc998bbE3955", decimals: 18},
     ],
   },
 ];
