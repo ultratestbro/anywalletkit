@@ -26,7 +26,7 @@ const TRANSMITTER_ABI = parseAbi([
 const PARAMS = {sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:42161", destToken: ARB.usdc, amountIn: "10000000", destAddress: RECIPIENT, refundAddress: SENDER, slippageBps: 0};
 
 /** Fake Circle API + fake JSON-RPC behind one fetch. */
-function world(o: {fees?: unknown; allowance?: number; message?: unknown; usedNonce?: bigint; minFee?: bigint; domain?: number; transmitter?: string; head?: bigint} = {}) {
+function world(o: {fees?: unknown; allowance?: number; message?: unknown; usedNonce?: bigint; domain?: number; transmitter?: string; head?: bigint} = {}) {
   const calls: string[] = [];
   const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input);
@@ -48,9 +48,10 @@ function world(o: {fees?: unknown; allowance?: number; message?: unknown; usedNo
         const {to, data} = (body.params as [{to: string; data: Hex}])[0];
         const abi = to.toLowerCase() === TOKEN_MESSENGER_V2.toLowerCase() ? MESSENGER_ABI : TRANSMITTER_ABI;
         const {functionName} = decodeFunctionData({abi, data});
+        // Like the deployed TokenMessengerV2 (2026-10-12): no on-chain minimum fee.
+        if (functionName === "getMinFeeAmount") return new Response(JSON.stringify({jsonrpc: "2.0", id: body.id, error: {code: 3, message: "execution reverted"}}));
         const result =
           functionName === "localMessageTransmitter" ? (o.transmitter ?? MESSAGE_TRANSMITTER_V2)
-          : functionName === "getMinFeeAmount" ? (o.minFee ?? 1300n)
           : functionName === "localDomain" ? (o.domain ?? 6)
           : functionName === "usedNonces" ? (o.usedNonce ?? 0n)
           : 0n;
@@ -146,7 +147,7 @@ describe("quote", () => {
 });
 
 describe("preflight", () => {
-  it("passes against the real contracts, refuses a wrong target, a wrong domain, or an on-chain minimum fee above maxFee", async () => {
+  it("passes against the real contracts, refuses a wrong target, a wrong domain, or a Circle fee above maxFee", async () => {
     const ok = make();
     const q = (await ok.p.getQuote(PARAMS))!;
     const tx = await ok.p.buildDeposit(q);
@@ -154,10 +155,21 @@ describe("preflight", () => {
     await expect(ok.p.preflightDeposit!(q, {...tx, to: RECIPIENT})).rejects.toThrow(/not the TokenMessengerV2/);
     const wrongDomain = make({domain: 3});
     await expect(wrongDomain.p.preflightDeposit!(q, tx)).rejects.toThrow(/reports domain 3/);
-    const feeUp = make({minFee: 5000n});
-    await expect(feeUp.p.preflightDeposit!(q, tx)).rejects.toThrow(/minimum fee 5000 exceeds/);
-    const noRpc = cctpProvider({apiUrl: "https://iris.test", fetchImpl: ok.fetchImpl});
-    await expect(noRpc.preflightDeposit!(q, tx)).resolves.toBeUndefined();
+    // Quoted at 1.3 bps + 10 % buffer (1430 on 10 USDC): a bump inside the buffer passes, above it refuses.
+    expect(q.providerData!.maxFee).toBe("1430");
+    await expect(make({fees: [{finalityThreshold: 1000, minimumFee: 1.43}]}).p.preflightDeposit!(q, tx)).resolves.toBeUndefined();
+    await expect(make({fees: [{finalityThreshold: 1000, minimumFee: 5}]}).p.preflightDeposit!(q, tx)).rejects.toThrow(/fee 5000 \(5 bps\) exceeds the quoted maxFee 1430/);
+    await expect(make({fees: [{finalityThreshold: 2000, minimumFee: 0}]}).p.preflightDeposit!(q, tx)).rejects.toThrow(/no longer publishes a Fast/);
+    // The fee check needs no RPC; the contract checks do.
+    const noRpc = cctpProvider({apiUrl: "https://iris.test", fetchImpl: make({fees: [{finalityThreshold: 1000, minimumFee: 5}]}).fetchImpl});
+    await expect(noRpc.preflightDeposit!(q, tx)).rejects.toThrow(/exceeds the quoted maxFee/);
+    await expect(cctpProvider({apiUrl: "https://iris.test", fetchImpl: ok.fetchImpl}).preflightDeposit!(q, tx)).resolves.toBeUndefined();
+    // Standard pays no fee: no Iris fee read at preflight.
+    const std = make({}, {mode: "standard"});
+    const qs = (await std.p.getQuote(PARAMS))!;
+    std.calls.length = 0;
+    await expect(std.p.preflightDeposit!(qs, await std.p.buildDeposit(qs))).resolves.toBeUndefined();
+    expect(std.calls.some((u) => u.includes("/fees/"))).toBe(false);
   });
 });
 

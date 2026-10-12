@@ -18,8 +18,10 @@ import {CCTP_API, CCTP_BY_DOMAIN, CCTP_DOMAINS, FINALITY_FAST, FINALITY_STANDARD
  *    allowance covers the amount, else Standard.
  *  - `maxFee` sent on-chain is the published fee (plus a small buffer) and is
  *    the only thing that can be deducted: the guaranteed output is
- *    amount − maxFee. With an RPC for the source chain, `preflightDeposit`
- *    re-checks `getMinFeeAmount(amount) ≤ maxFee` and the transmitter's
+ *    amount − maxFee. `preflightDeposit` re-reads Circle's published fee right
+ *    before the burn (the deployed TokenMessengerV2 has no on-chain
+ *    `getMinFeeAmount`/`minFee` — both revert on Ethereum, Base, Arbitrum,
+ *    2026-10-12) and, with an RPC for the source chain, the transmitter's
  *    `localDomain()` on the very contract the calldata targets.
  *  - Everything is bound to Circle's documented contract addresses and the
  *    native USDC of each domain; a catalog USDC that is not the native one
@@ -28,7 +30,6 @@ import {CCTP_API, CCTP_BY_DOMAIN, CCTP_DOMAINS, FINALITY_FAST, FINALITY_STANDARD
 
 const TOKEN_MESSENGER_ABI = parseAbi([
   "function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken, bytes32 destinationCaller, uint256 maxFee, uint32 minFinalityThreshold)",
-  "function getMinFeeAmount(uint256 amount) view returns (uint256)",
   "function localMessageTransmitter() view returns (address)",
 ]);
 const MESSAGE_TRANSMITTER_ABI = parseAbi([
@@ -115,6 +116,10 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
     return (await res.json()) as T;
   }
 
+  /** Circle's published fee per finality threshold, in bps of the burnt amount. */
+  const feeRows = (src: CctpDomain, dst: CctpDomain, signal?: AbortSignal) =>
+    getJson<FeeRow[]>(`/v2/burn/USDC/fees/${src.domain}/${dst.domain}`, signal);
+
   /** The native USDC of a domain, cross-checked against the asset catalog when it knows the chain. */
   function usdcOf(dom: CctpDomain): string | null {
     const known = ccAsset(dom.caip2, "USDC");
@@ -179,7 +184,7 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
       if (!isAddress(recipient)) { params.onRefusal?.("destination must be an EVM address"); return null; }
 
       try {
-        const fees = await getJson<FeeRow[]>(`/v2/burn/USDC/fees/${src.domain}/${dst.domain}`, signal);
+        const fees = await feeRows(src, dst, signal);
         if (!fees || !Array.isArray(fees) || fees.length === 0) { params.onRefusal?.("Circle publishes no fee for this pair"); return null; }
         const fast = fees.find((f) => f.finalityThreshold === FINALITY_FAST);
         const standard = fees.find((f) => f.finalityThreshold === FINALITY_STANDARD);
@@ -251,25 +256,29 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
       };
     },
 
-    /** With a source RPC: the target really is CCTP for this domain and the on-chain minimum fee fits `maxFee`. */
+    /**
+     * Fast: Circle's CURRENT fee (same source and rounding as the quote, without
+     * the buffer) still fits `maxFee` — Iris would otherwise hold the burn
+     * until it times out to Standard. With a source RPC: the target really is
+     * CCTP for this domain.
+     */
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
       const parsed = parseIntent(quote.intentId);
       if (!parsed) throw new Error("cctp: malformed intent id");
       if (!same(tx.to, parsed.src.tokenMessenger)) throw new Error("cctp: deposit target is not the TokenMessengerV2 of the source domain");
+      if (parsed.threshold === FINALITY_FAST) {
+        const fast = (await feeRows(parsed.src, parsed.dst))?.find((f) => f.finalityThreshold === FINALITY_FAST);
+        if (!fast || !Number.isFinite(fast.minimumFee) || fast.minimumFee < 0) throw new Error("cctp: Circle no longer publishes a Fast Transfer fee for this pair — re-quote");
+        const minFee = feeFor(BigInt(quote.sourceAmount), fast.minimumFee, 0);
+        const maxFee = BigInt(quote.providerData?.maxFee ?? "0");
+        if (minFee > maxFee) throw new Error(`cctp: Circle's Fast Transfer fee ${minFee} (${fast.minimumFee} bps) exceeds the quoted maxFee ${maxFee} — re-quote`);
+      }
       const c = client(parsed.src.caip2);
       if (!c) return;
-      const messenger = getAddress(parsed.src.tokenMessenger);
-      const [transmitter, minFee] = await Promise.all([
-        c.readContract({address: messenger, abi: TOKEN_MESSENGER_ABI, functionName: "localMessageTransmitter"}),
-        parsed.threshold === FINALITY_FAST
-          ? c.readContract({address: messenger, abi: TOKEN_MESSENGER_ABI, functionName: "getMinFeeAmount", args: [BigInt(quote.sourceAmount)]})
-          : Promise.resolve(0n),
-      ]);
+      const transmitter = await c.readContract({address: getAddress(parsed.src.tokenMessenger), abi: TOKEN_MESSENGER_ABI, functionName: "localMessageTransmitter"});
       if (!same(transmitter, parsed.src.messageTransmitter)) throw new Error("cctp: TokenMessengerV2 does not point at the expected MessageTransmitterV2");
       const domain = await c.readContract({address: getAddress(parsed.src.messageTransmitter), abi: MESSAGE_TRANSMITTER_ABI, functionName: "localDomain"});
       if (Number(domain) !== parsed.src.domain) throw new Error(`cctp: MessageTransmitterV2 reports domain ${domain}, expected ${parsed.src.domain}`);
-      const maxFee = BigInt(quote.providerData?.maxFee ?? "0");
-      if (minFee > maxFee) throw new Error(`cctp: on-chain Fast Transfer minimum fee ${minFee} exceeds the quoted maxFee ${maxFee} — re-quote`);
     },
 
     async trackIntent(ref: IntentRef): Promise<IntentStatus> {
