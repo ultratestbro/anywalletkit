@@ -32,7 +32,8 @@
     "vitest": ">=2"
   },
   "dependencies": {
-    "@forgewallet/core": "workspace:*"
+    "@forgewallet/core": "workspace:*",
+    "@forgewallet/tx-preview-evm": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^5.0.3"

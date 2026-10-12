@@ -9,6 +9,9 @@
    against a concrete chain package.
 3. Add `module.json` (registry manifest) and a test that calls
    `describeProtocolModule()` from `@forgewallet/conformance`.
+   Swap2 modules also call `describeProtocolBehaviour()` with a recorded quote
+   fixture: it runs the module to the review gate and checks the plan (own/declared
+   recipients only, exact approvals to the declared spender, amounts = quote).
 4. Open a PR with: conformance green, the manifest, a link to one real
    transaction executed through the module, and your handle in `CODEOWNERS`.
 
