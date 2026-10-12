@@ -1,7 +1,7 @@
 {
   "$schema": "./modules.schema.json",
-  "generatedAt": "2026-10-10",
-  "count": 14,
+  "generatedAt": "2026-10-12",
+  "count": 15,
   "modules": [
     {
       "name": "@forgewallet/protocol-approvals-evm",
@@ -258,6 +258,28 @@
       "path": "packages/protocol-swap2-thorchain",
       "description": "THORChain native cross-chain swaps.",
       "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@forgewallet/protocol-swap2-uniswap",
+      "type": "swap2",
+      "chains": [
+        "eip155:1",
+        "eip155:8453",
+        "eip155:42161",
+        "eip155:10",
+        "eip155:137",
+        "eip155:56",
+        "eip155:43114"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-swap2-uniswap",
+      "description": "Uniswap v3 same-chain swaps from the contracts only (QuoterV2 + SwapRouter02): no API key, no frontend, addresses verified on-chain.",
+      "addedAt": "2026-10-12"
     }
   ]
 }
