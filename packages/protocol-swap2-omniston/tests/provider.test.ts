@@ -171,6 +171,14 @@ describe("Omniston EVM→TON signed extension", () => {
     await expect(validateEvmToTonOrderExtension(extensionFixture(), expected)).resolves.toBeUndefined();
   });
 
+  it("binds a quote id that comes without its leading zero (63 hex chars) as 32 bytes", async () => {
+    const unpadded = "4".repeat(63); // 0x0444…: on the wire without the leading 0
+    const extension = extensionFixture();
+    extension.set(hexBytes(unpadded.padStart(64, "0")), extension.length - 32);
+    await expect(validateEvmToTonOrderExtension(extension, {...expected, quoteId: unpadded})).resolves.toBeUndefined();
+    await expect(validateEvmToTonOrderExtension(extension, {...expected, quoteId: "5".repeat(63)})).rejects.toThrow(/bound to the quote id/);
+  });
+
   it("rejects a resolver-substituted signed hashlock", async () => {
     const extension = extensionFixture();
     // header32 + two 80-byte getters + field7 prefix83
@@ -272,6 +280,25 @@ describe("Omniston TON↔TON swap settlement", () => {
     expect(tx.bodyBoc).toBe(Buffer.from(payload, "hex").toString("base64"));
     expect(targets).toEqual([`${POOL}:DeDustCPMMV2`]);
     expect(client.calls.tonBuildSwap![0]).toMatchObject({quoteId: QUOTE_ID, useRecommendedSlippage: false, traderDstAddress: {chain: {$case: "ton", value: TRADER}}});
+  });
+
+  it("accepts a quote id without leading-zero padding (live: ~1 in 16 is 63 hex chars), refuses a short one", async () => {
+    const payload = await swapCell((b) => b.storeUint(0xa5a7cbf8, 32).storeUint(1, 64));
+    const run = async (quoteId: string) => {
+      const reasons: string[] = [];
+      const provider = omnistonProvider({
+        client: clientFor(swapQuote(native, jetton(USDT), "1000000000", "1419292", {quoteId}), [{targetAddress: POOL, sendAmount: "1100000000", payload}]) as never,
+        enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true,
+      });
+      const q = await provider.getQuote({sourceChain: "ton:-239", sourceToken: "GRAM", destChain: "ton:-239", destToken: USDT, amountIn: "1000000000", destAddress: TRADER, refundAddress: TRADER, dry: false, onRefusal: (r) => reasons.push(r)});
+      return {q, reasons, provider};
+    };
+    const ok = await run("82c4da72814ea8d350916b0bd38921266446ac305ff053a016fdd949c4028c3");
+    expect(ok.q).not.toBeNull();
+    await expect(ok.provider.buildDeposit(ok.q!)).resolves.toMatchObject({value: "1100000000"});
+    const bad = await run("abc123");
+    expect(bad.q).toBeNull();
+    expect(bad.reasons[0]).toMatch(/malformed quote id/);
   });
 
   it("refuses a native-input message that attaches more than the gas budget or an unrecognised target", async () => {

@@ -453,6 +453,13 @@ function encodeIntent(quoteId: string, trader: string, dest: string, srcChain: s
   return [INTENT_PREFIX, quoteId, trader, dest, srcChain, ...(kind === "swap" ? ["swap"] : [])].map(encodeURIComponent).join("|");
 }
 
+/**
+ * A quote id is a 256-bit value in hex WITHOUT leading-zero padding (live
+ * 2026-10-12: 63-char ids, ~1 in 16 quotes) — requiring exactly 64 chars
+ * refused those as "malformed quote id". Binary comparisons pad it to 32 bytes.
+ */
+const QUOTE_ID = /^[0-9a-fA-F]{48,64}$/;
+
 function decodeIntent(
   intentId: string,
 ): {quoteId: string; trader: string; dest: string; srcChain: string; kind: "order" | "swap"} | null {
@@ -460,7 +467,7 @@ function decodeIntent(
     const parts = intentId.split("|");
     if ((parts.length !== 5 && parts.length !== 6) || parts[0] !== INTENT_PREFIX) return null;
     const [, quoteId = "", trader = "", dest = "", srcChain = "", kindPart = ""] = parts.map(decodeURIComponent);
-    if (!/^[0-9a-fA-F]{64}$/.test(quoteId) || !trader || !dest || !srcChain) return null;
+    if (!QUOTE_ID.test(quoteId) || !trader || !dest || !srcChain) return null;
     if (parts.length === 6 && kindPart !== "swap") return null;
     return {quoteId, trader, dest, srcChain, kind: parts.length === 6 ? "swap" : "order"};
   } catch {
@@ -739,7 +746,7 @@ export async function validateEvmToTonOrderExtension(
     throw new Error("omniston: unexpected private TON disclosure address");
   }
   const quoteId = expected.quoteId.replace(/^0x/, "");
-  if (!/^[0-9a-fA-F]{64}$/.test(quoteId) || !sliceEqual(customData.slice(99), hexToBytes(quoteId))) {
+  if (!QUOTE_ID.test(quoteId) || !sliceEqual(customData.slice(99), hexToBytes(quoteId.padStart(64, "0")))) {
     throw new Error("omniston: EVM order extension custom data is not bound to the quote id");
   }
   if (expected.tradeStartDeadline < expected.quoteTimestamp) {
@@ -1134,7 +1141,7 @@ function quoteRejection(
   if (!sameAsset(q.inputAsset, request.inputAsset) || !sameAsset(q.outputAsset, request.outputAsset)) return "quote assets differ from the request";
   const requestedAmount = request.amount.$case === "inputUnits" ? request.amount.value : "";
   if (q.inputUnits !== requestedAmount) return "quote input differs from the request";
-  if (!/^[0-9a-fA-F]{64}$/.test(q.quoteId)) return "malformed quote id";
+  if (!QUOTE_ID.test(q.quoteId)) return "malformed quote id";
   if (!isPositiveInteger(q.inputUnits) || !isPositiveInteger(q.outputUnits)) return "non-positive quote amounts";
   if (!isNonNegativeInteger(q.protocolFeeUnits) || !isNonNegativeInteger(q.integratorFeeUnits) ||
     BigInt(q.protocolFeeUnits || "0") + BigInt(q.integratorFeeUnits || "0") > BigInt(q.outputUnits)) return "malformed quote fees";
@@ -1410,6 +1417,17 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         return pending;
       };
       webSocketTransport.reconnect = () => webSocketTransport.connect();
+      // SDK race (0.8.11): a socket read can carry a Quote response AND its
+      // subscription's `ack` notification; both are dispatched synchronously,
+      // before the SDK registers the stream consumer, so the ack is dropped
+      // and the next update errors with "quoteUpdated before ack" (live
+      // 2026-10-12: 1–3 of 4 parallel RFQs, occasionally a single one).
+      // Deliver each frame in its own macrotask so registration runs between.
+      const messages = (webSocketTransport as unknown as {messagesSubject?: {next(m: string): void}}).messagesSubject;
+      if (messages) {
+        const deliver = messages.next.bind(messages);
+        messages.next = (m: string) => { setTimeout(() => deliver(m), 0); };
+      }
       const transport = new sdk.AutoReconnectTransport({transport: webSocketTransport});
       const created = new sdk.Omniston({apiUrl, transport}) as unknown as OmnistonClientLike;
       if (generation !== clientGeneration) {
@@ -1490,9 +1508,9 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         request.integratorAddress = address;
         request.integratorFeePips = opts.integratorFeePips!;
       }
-      // A re-quote right after the previous stream unsubscribes can catch a
-      // stray event of the old RFQ inside the SDK ("quoteUpdated before ack")
-      // and error out — give the socket a beat and try once more.
+      // The SDK can still drop an ack (see getClient: frame delivery is now
+      // deferred, which removed it in live runs) — give the socket a beat and
+      // try once more.
       for (let attempt = 0; attempt < 2; attempt++) {
         if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 300));
         const quote = await awaitQuote(omni.requestForQuote(request), request, signal, settle, "swap", outcome);
@@ -1622,7 +1640,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       // forward lands in the DEX. The TON attached is gas only.
       const transfer = payload.jettonTransfer;
       if (!transfer) throw new Error("omniston: jetton-input swap message is not a jetton transfer");
-      if (sendAmount > gasCap || sendAmount > gasBudget) throw new Error("omniston: swap message attaches more TON than the quoted gas budget");
+      if (sendAmount > gasCap || sendAmount > gasBudget) throw new Error(`omniston: swap message attaches more TON than the quoted gas budget (${sendAmount} > ${gasBudget} nanoTON, cap ${gasCap}, ${protocols.join("+")})`);
       if (transfer.amount !== BigInt(q.inputUnits)) throw new Error("omniston: swap message moves a different amount than quoted");
       if (!transfer.responseDestination || !sameTonAddress(transfer.responseDestination, ref.trader)) {
         throw new Error("omniston: swap message returns excess to a wallet other than the trader");
@@ -1642,7 +1660,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       const input = BigInt(q.inputUnits);
       if (sendAmount < input) throw new Error("omniston: swap message carries less than the quoted input");
       const gas = sendAmount - input;
-      if (gas > gasCap || gas > gasBudget) throw new Error("omniston: swap message attaches more TON than the quoted gas budget");
+      if (gas > gasCap || gas > gasBudget) throw new Error(`omniston: swap message attaches more TON than the quoted gas budget (${gas} > ${gasBudget} nanoTON, cap ${gasCap}, ${protocols.join("+")})`);
       const targetValid = await opts.validateTonSwapTarget!({address: message.targetAddress, protocols});
       if (!targetValid) throw new Error("omniston: swap target is not a recognized DEX contract for the quoted protocol");
     }
