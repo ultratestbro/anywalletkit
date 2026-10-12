@@ -166,3 +166,21 @@ describe('externalSigner + helpers', () => {
     expect(() => requireCurve(s, 'secp256k1')).toThrow(SignerError)
   })
 })
+
+describe('privateKeySigner (imported key)', () => {
+  it('signs as the key, derives nothing, zeroizes the key on dispose', async () => {
+    const { privateKeySigner, LocalSigner } = await import('../src/index.js')
+    const key = new Uint8Array(32).fill(9)
+    const s = privateKeySigner('secp256k1', key)
+    expect(s.kind).toBe('key')
+    const ref = LocalSigner.fromPrivateKey('secp256k1', new Uint8Array(32).fill(9), await s.getPublicKey(), 'ref')
+    const digest = new Uint8Array(32).fill(1)
+    expect(await s.sign(digest)).toEqual(await ref.sign(digest))
+    expect('derive' in s).toBe(false)
+    s.dispose()
+    expect(key.every((b) => b === 0)).toBe(true)
+    await expect(s.sign(digest)).rejects.toThrow(/disposed/)
+    expect(() => privateKeySigner('secp256k1', new Uint8Array(31))).toThrow(/32 bytes/)
+    expect(() => privateKeySigner('secp256k1', new Uint8Array(32))).toThrow(/valid secp256k1/)
+  })
+})

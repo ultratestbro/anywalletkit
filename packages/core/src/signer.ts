@@ -3,6 +3,8 @@
  * to the network; a Signer turns bytes into signatures and nothing else.
  *
  * `kind: 'seed'` — derived locally from a mnemonic (see {@link LocalSigner}).
+ * `kind: 'key'` — one imported private key (see {@link privateKeySigner}): a single
+ * account, nothing to derive; chain managers treat it like an external signer.
  * `kind: 'external'` — a Safe, hardware wallet, MPC node or backend: the SDK
  * never sees the key and must tolerate `UserRejectedError`.
  *
@@ -61,7 +63,7 @@ export interface SignOptions {
 }
 
 export interface Signer {
-  readonly kind: 'seed' | 'external'
+  readonly kind: 'seed' | 'key' | 'external'
   /** The curve this signer signs with. Chain packages assert the one they need. */
   readonly curve: SignerCurve
   /** Schemes this signer can produce; asking for another throws `SignerError`. */
@@ -275,4 +277,29 @@ export function externalSigner(options: ExternalSignerOptions): Signer {
     },
   }
   return self
+}
+
+/**
+ * One imported private key as a Signer (`kind: 'key'`): signs with every scheme
+ * of its curve, derives nothing, zeroizes on `dispose()`. Takes ownership of
+ * `privateKey`. Chain managers give it exactly one account (index 0); any other
+ * index or path throws.
+ */
+export function privateKeySigner(curve: SignerCurve, privateKey: Uint8Array): Signer {
+  if (privateKey.length !== 32) throw new SignerError(`A ${curve} private key is 32 bytes; got ${privateKey.length}.`)
+  let publicKey: Uint8Array
+  try {
+    publicKey = curve === 'secp256k1' ? secp256k1.getPublicKey(privateKey, true) : ed25519.getPublicKey(privateKey)
+  } catch {
+    throw new SignerError(`Not a valid ${curve} private key.`)
+  }
+  const local = LocalSigner.fromPrivateKey(curve, privateKey, publicKey, 'key')
+  return {
+    kind: 'key',
+    curve,
+    schemes: local.schemes,
+    getPublicKey: () => local.getPublicKey(),
+    sign: (payload, options) => local.sign(payload, options),
+    dispose: () => local.dispose(),
+  }
 }
