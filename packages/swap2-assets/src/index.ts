@@ -686,6 +686,10 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         decimals: 6,
         icon: cmcIcon(38517),
       },
+      // 2026-10-13 — LI.FI / Uniswap only (no 1Click id); verified on-chain.
+      {symbol: "WETH", assetId: "", contract: "0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "WBTC", assetId: "", contract: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c", decimals: 8, icon: cmcIcon(3717)},
+      {symbol: "AUSD", assetId: "", contract: "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a", decimals: 6},
     ],
   },
   {
@@ -704,6 +708,9 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         decimals: 6,
         icon: cmcIcon(3408),
       },
+      // 2026-10-13 — verified on-chain.
+      {symbol: "WBTC", assetId: "", contract: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c", decimals: 8, icon: cmcIcon(3717)},
+      {symbol: "DAI", assetId: "", contract: "0x20CAb320A855b39F724131C69424240519573f81", decimals: 18, icon: cmcIcon(4943)},
     ],
   },
   {
@@ -973,6 +980,36 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "USDm", assetId: "", contract: "0xFAfDdbb3FC7688494971a79cc65DCa3EF82079E7", decimals: 18, icon: cmcIcon(7236)},
       {symbol: "USDe", assetId: "", contract: "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", decimals: 18, icon: cmcIcon(29470)},
       {symbol: "MEGA", assetId: "", contract: "0x28B7E77f82B25B95953825F1E3eA0E36c1c29861", decimals: 18},
+    ],
+  },
+  {
+    // Plasma (stablecoin L1, native XPL). LI.FI + wrap; no 1Click ids. Verified on-chain 2026-10-13.
+    key: "plasma",
+    caip2: "eip155:9745",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/plasma.svg",
+    label: "Plasma",
+    assets: [
+      {symbol: "XPL", assetId: "", decimals: 18, icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/plasma.svg"},
+      {symbol: "WXPL", assetId: "", contract: "0x6100E367285b01F48D07953803A2d8dCA5D19873", decimals: 18},
+      {symbol: "USDT0", assetId: "", contract: "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "USDe", assetId: "", contract: "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", decimals: 18, icon: cmcIcon(29470)},
+      {symbol: "WETH", assetId: "", contract: "0x9895D81bB462A195b4922ED7De0e3ACD007c32CB", decimals: 18, icon: cmcIcon(2396)},
+    ],
+  },
+  {
+    // Linea (zkEVM L2, native ETH). LI.FI + Uniswap v3 + wrap; no 1Click ids. Verified on-chain 2026-10-13.
+    key: "linea",
+    caip2: "eip155:59144",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/linea.svg",
+    label: "Linea",
+    assets: [
+      {symbol: "ETH", assetId: "", decimals: 18, icon: cmcIcon(1027)},
+      {symbol: "WETH", assetId: "", contract: "0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "USDC", assetId: "", contract: "0x176211869cA2b568f2A7D4EE941E073a821EE1ff", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "USDT", assetId: "", contract: "0xA219439258ca9da29E9Cc4cE5596924745e12B93", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "WBTC", assetId: "", contract: "0x3aAB2285ddcDdaD8edf438C1bAB47e1a9D05a9b4", decimals: 8, icon: cmcIcon(3717)},
+      {symbol: "DAI", assetId: "", contract: "0x4AF15ec2A0BD43Db75dd04E62FAA3B8EF36b00d5", decimals: 18, icon: cmcIcon(4943)},
+      {symbol: "LINEA", assetId: "", contract: "0x1789e0043623282D5DCc7F213d703C6D8BAfBB04", decimals: 18},
     ],
   },
 ];

@@ -115,7 +115,10 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const [rf, rw, qf, qw] = await rpc(chainId, [call(d.router, f), call(d.router, w), call(d.quoter, f), call(d.quoter, w)]);
         const addr = (r: unknown) => (typeof r === "string" && r.length >= 42 ? getAddress(`0x${r.slice(-40)}`) : null);
         const wrapped = d.nativeWrap === false ? getAddress(ZERO) : getAddress(d.weth);
-        const ok = [rf, qf].every((r) => addr(r) === getAddress(d.factory)) && [rw, qw].every((r) => addr(r) === wrapped);
+        const ok =
+          [rf, qf].every((r) => addr(r) === getAddress(d.factory)) &&
+          addr(rw) === wrapped &&
+          (d.quoterWeth === false || addr(qw) === wrapped);
         if (!ok) throw new Error(`uniswap: the router/quoter on chain ${chainId} do not match the pinned deployment — refusing`);
       })();
       p.catch(() => verified.delete(chainId));
