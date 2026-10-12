@@ -94,6 +94,16 @@ describe("Uniswap v3 provider", () => {
     expect(p.supportsRoute({chain: "eip155:1", token: "USDC"}, {chain: "eip155:10", token: USDT})).toBe(false);
   });
 
+  it("lives long enough for an approval to be mined, and preflight re-quotes the exact route", async () => {
+    vi.stubGlobal("fetch", rpcStub());
+    const p = uniswapProvider({rpcUrls: RPC});
+    const q = await p.getQuote({...base, sourceToken: "USDC", destToken: USDT, amountIn: "1000000"});
+    expect(q!.validUntilMs - Date.now()).toBeGreaterThan(4 * 60_000);
+    await expect(p.preflightDeposit!(q!, await p.buildDeposit(q!))).resolves.toBeUndefined();
+    vi.stubGlobal("fetch", rpcStub({byFee: {500: 900_000n}})); // the pool moved 10% against the user
+    await expect(p.preflightDeposit!(q!, await p.buildDeposit(q!))).rejects.toThrow(/price moved — the pool now pays 900000, under your minimum 995000/);
+  });
+
   it("tracks the swap by its mined receipt", async () => {
     const p = uniswapProvider({rpcUrls: RPC});
     vi.stubGlobal("fetch", rpcStub({receipt: null}));

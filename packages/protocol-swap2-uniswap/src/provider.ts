@@ -20,7 +20,10 @@ import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, UNISWAP_V3, type UniswapDeployment
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 const DEFAULT_SLIPPAGE_BPS = 50;
-const DEFAULT_TTL_MS = 30_000;
+/** The router itself enforces amountOutMinimum and the deadline, and preflight
+ *  re-quotes the exact route before broadcast — so the quote may outlive an
+ *  approval being mined (an Ethereum approve + head wait took >30 s live). */
+const DEFAULT_TTL_MS = 300_000;
 const DEFAULT_DEADLINE_S = 600;
 
 const QUOTER_ABI = parseAbi([
@@ -44,7 +47,7 @@ export interface UniswapProviderConfig {
   rpcUrls: Readonly<Record<number, readonly string[]>>;
   /** Slippage when the caller names none (bps). Default 50. */
   defaultSlippageBps?: number;
-  /** Local quote lifetime; the engine re-quotes at execution. Default 30 s. */
+  /** Local quote lifetime (must cover an approval being mined). Default 5 min. */
   quoteTtlMs?: number;
   /** Seconds the router accepts the swap after the quote (multicall deadline). Default 600. */
   deadlineSeconds?: number;
@@ -243,10 +246,39 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           etaSeconds: 15,
           reliability: 0.98,
           validUntilMs: Date.now() + ttl,
-          providerData: {route: route.label, router: d.router},
+          providerData: {
+            route: route.label,
+            router: d.router,
+            tokenIn,
+            tokenOut,
+            amountIn: amountIn.toString(),
+            minOut: minOut.toString(),
+            ...(route.single ? {fee: String(route.single.fee)} : {path: route.path!}),
+          },
         };
       } catch (e) {
         return refuse(e instanceof Error ? e.message.replace(/^uniswap: /, "") : String(e));
+      }
+    },
+
+    /**
+     * Right before broadcast (after any approval): re-quote the SAME route on
+     * chain. If the pool now pays less than the signed minimum, the swap would
+     * only revert and burn gas — refuse it here with the reason instead.
+     */
+    async preflightDeposit(quote: Quote): Promise<void> {
+      const chainId = Number(quote.intentId.split(":")[1]);
+      const d = deployments[chainId];
+      const pd = quote.providerData ?? {};
+      if (!d || !pd.amountIn || !pd.minOut || !pd.tokenIn || !pd.tokenOut) return;
+      const data = pd.fee
+        ? encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInputSingle", args: [{tokenIn: pd.tokenIn as Hex, tokenOut: pd.tokenOut as Hex, amountIn: BigInt(pd.amountIn), fee: Number(pd.fee), sqrtPriceLimitX96: 0n}]})
+        : encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInput", args: [pd.path as Hex, BigInt(pd.amountIn)]});
+      const [raw] = await rpc(chainId, [call(d.quoter, data)]);
+      if (typeof raw !== "string" || raw === "0x") throw new Error("uniswap: the pool no longer quotes this route — refresh and try again");
+      const [out] = decodeFunctionResult({abi: QUOTER_ABI, functionName: pd.fee ? "quoteExactInputSingle" : "quoteExactInput", data: raw as Hex}) as readonly [bigint];
+      if (out < BigInt(pd.minOut)) {
+        throw new Error(`uniswap: price moved — the pool now pays ${out}, under your minimum ${pd.minOut}. Nothing was sent; refresh the quote.`);
       }
     },
 
