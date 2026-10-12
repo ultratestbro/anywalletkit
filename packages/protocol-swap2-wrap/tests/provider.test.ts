@@ -1,0 +1,84 @@
+import {afterEach, describe, expect, it, vi} from "vitest";
+import {encodeAbiParameters} from "viem";
+import {describeProtocolBehaviour, describeProtocolModule} from "@forgewallet/conformance";
+import {wrapProvider, WRAPPED_NATIVE} from "../src/provider.js";
+import {WrapSwap2Protocol} from "../src/protocol.js";
+
+afterEach(() => vi.unstubAllGlobals());
+
+const WETH = WRAPPED_NATIVE[1]!.address;
+const ME = "0x4444444444444444444444444444444444444444";
+const OTHER = "0x3333333333333333333333333333333333333333";
+const RPC = {1: ["https://rpc.test"]};
+const ZERO = "0x0000000000000000000000000000000000000000";
+
+/** WETH9 on chain 1: symbol/decimals answer, receipts by status. */
+function stub(o: {symbol?: string; receipt?: string | null} = {}): typeof fetch {
+  return (async (_url: RequestInfo | URL, init?: RequestInit) => {
+    const req = JSON.parse(String(init?.body)) as {method: string; params: [{data: string}]};
+    if (req.method === "eth_getTransactionReceipt") return new Response(JSON.stringify({result: o.receipt == null ? null : {status: o.receipt}}));
+    const sel = req.params[0].data;
+    const result = sel === "0x95d89b41" ? encodeAbiParameters([{type: "string"}], [o.symbol ?? "WETH"]) : encodeAbiParameters([{type: "uint8"}], [18]);
+    return new Response(JSON.stringify({result}));
+  }) as typeof fetch;
+}
+const base = {sourceChain: "eip155:1", destChain: "eip155:1", destAddress: ME, refundAddress: ME, amountIn: "1000000000000000"};
+
+describe("wrap provider", () => {
+  it("wraps: deposit() with value, 1:1, no approval", async () => {
+    vi.stubGlobal("fetch", stub());
+    const q = await wrapProvider({rpcUrls: RPC}).getQuote({...base, sourceToken: "ETH", destToken: WETH});
+    expect(q).toMatchObject({provider: "wrap", destAmount: base.amountIn, minDestAmount: base.amountIn, txRequest: {to: WETH, data: "0xd0e30db0", value: base.amountIn}});
+    expect(q!.txRequest!.approvalAddress).toBeUndefined();
+  });
+
+  it("unwraps: withdraw(amount), no value, no approval", async () => {
+    vi.stubGlobal("fetch", stub());
+    const q = await wrapProvider({rpcUrls: RPC}).getQuote({...base, sourceToken: "WETH", destToken: ZERO});
+    expect(q!.txRequest).toMatchObject({to: WETH, value: "0", data: "0x2e1a7d4d" + BigInt(base.amountIn).toString(16).padStart(64, "0")});
+    expect(q!.txRequest!.approvalAddress).toBeUndefined();
+  });
+
+  it("refuses, by name: another pair, another recipient, a token that is not the canonical one", async () => {
+    const reasons: string[] = [];
+    const on = (r: string) => reasons.push(r);
+    vi.stubGlobal("fetch", stub());
+    const p = wrapProvider({rpcUrls: RPC});
+    await p.getQuote({...base, sourceToken: "USDC", destToken: WETH, onRefusal: on});
+    await p.getQuote({...base, sourceToken: "ETH", destToken: WETH, destAddress: OTHER, onRefusal: on});
+    await p.getQuote({...base, sourceToken: "ETH", destToken: WETH, destChain: "eip155:10", onRefusal: on});
+    vi.stubGlobal("fetch", stub({symbol: "FAKE"}));
+    await wrapProvider({rpcUrls: RPC}).getQuote({...base, sourceToken: "ETH", destToken: WETH, onRefusal: on});
+    expect(reasons).toEqual([
+      "wrap: only ETH ↔ WETH",
+      "wrap: wrapping pays the sender's own address — send the result separately",
+      "wrap: same-chain only",
+      `wrap: ${WETH} on chain 1 is not WETH — refusing`,
+    ]);
+  });
+
+  it("tracks by receipt", async () => {
+    const p = wrapProvider({rpcUrls: RPC});
+    vi.stubGlobal("fetch", stub({receipt: "0x1"}));
+    expect(await p.trackIntent({intentId: "wrap:1", sourceTxHash: "0xab"})).toEqual({state: "completed", destTxHash: "0xab"});
+    vi.stubGlobal("fetch", stub({receipt: "0x0"}));
+    expect(await p.trackIntent({intentId: "wrap:1", sourceTxHash: "0xab"})).toEqual({state: "failed"});
+  });
+});
+
+describeProtocolModule("protocol-swap2-wrap", {
+  type: "swap2",
+  Protocol: WrapSwap2Protocol,
+  config: {fromChain: "eip155:1", skipAccountChainCheck: true, rpcUrls: RPC},
+  samples: {getSupportedChains: []},
+});
+
+describeProtocolBehaviour("protocol-swap2-wrap", {
+  type: "swap2",
+  Protocol: WrapSwap2Protocol,
+  config: {fromChain: "eip155:1", rpcUrls: RPC},
+  fixtures: [
+    {name: "ETH → WETH (deposit with value)", options: {fromToken: "ETH", toToken: WETH, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 15n, minAmountOut: 10n ** 15n}, fetch: stub(), account: {address: ME}, own: [ME]},
+    {name: "WETH → ETH (withdraw)", options: {fromToken: "WETH", toToken: ZERO, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 15n, minAmountOut: 10n ** 15n}, fetch: stub(), account: {address: ME}, own: [ME], sourceToken: WETH},
+  ],
+});

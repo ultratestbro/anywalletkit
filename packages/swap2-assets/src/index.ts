@@ -932,6 +932,34 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
   },
 ];
 
+/**
+ * Wrapped native tokens (WETH9-style deposit/withdraw), verified on-chain
+ * 2026-10-12 (symbol, 18 decimals, supply, deposit()). No 1Click id: only the
+ * EVM venues route them (wrap 1:1, Uniswap, LI.FI) — NEAR Intents skips empty ids.
+ */
+const WRAPPED_NATIVE_ASSETS: Record<string, {symbol: string; contract: string; cmc: number}> = {
+  "eip155:1": {symbol: "WETH", contract: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", cmc: 2396},
+  "eip155:8453": {symbol: "WETH", contract: "0x4200000000000000000000000000000000000006", cmc: 2396},
+  "eip155:10": {symbol: "WETH", contract: "0x4200000000000000000000000000000000000006", cmc: 2396},
+  "eip155:42161": {symbol: "WETH", contract: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", cmc: 2396},
+  "eip155:130": {symbol: "WETH", contract: "0x4200000000000000000000000000000000000006", cmc: 2396},
+  "eip155:534352": {symbol: "WETH", contract: "0x5300000000000000000000000000000000000004", cmc: 2396},
+  "eip155:56": {symbol: "WBNB", contract: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", cmc: 7192},
+  "eip155:137": {symbol: "WPOL", contract: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", cmc: 28321},
+  "eip155:43114": {symbol: "WAVAX", contract: "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", cmc: 5805},
+  "eip155:100": {symbol: "WXDAI", contract: "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d", cmc: 8635},
+  "eip155:999": {symbol: "WHYPE", contract: "0x5555555555555555555555555555555555555555", cmc: 32196},
+  "eip155:80094": {symbol: "WBERA", contract: "0x6969696969696969696969696969696969696969", cmc: 24647},
+  "eip155:143": {symbol: "WMON", contract: "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A", cmc: 0},
+};
+for (const c of CC_SOURCE_CHAINS) {
+  const w = WRAPPED_NATIVE_ASSETS[c.caip2];
+  if (!w || c.assets.some((a) => a.symbol === w.symbol || a.contract?.toLowerCase() === w.contract.toLowerCase())) continue;
+  const nativeIcon = c.assets.find((a) => !a.contract)?.icon;
+  const icon = w.cmc ? cmcIcon(w.cmc) : nativeIcon;
+  c.assets.push({symbol: w.symbol, assetId: "", contract: w.contract, decimals: 18, ...(icon ? {icon} : {})});
+}
+
 export const ETH_CAIP2 = "eip155:1";
 
 /** Every non-Ethereum chain — deposit sources AND off-ramp destinations. */

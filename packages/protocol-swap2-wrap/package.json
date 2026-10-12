@@ -1,0 +1,59 @@
+{
+  "name": "@forgewallet/protocol-swap2-wrap",
+  "version": "0.0.1",
+  "description": "Wrap and unwrap the native coin (ETH\u2194WETH, BNB\u2194WBNB, POL\u2194WPOL\u2026) on 13 EVM chains as a swap2 venue: 1:1, no pool, wrapped tokens verified on-chain.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./provider": {
+      "types": "./dist/provider.d.ts",
+      "import": "./dist/provider.js",
+      "require": "./dist/provider.cjs"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.ts",
+      "import": "./dist/protocol.js",
+      "require": "./dist/protocol.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "module.json"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "dependencies": {
+    "@forgewallet/protocol-swap2-core": "workspace:*",
+    "@forgewallet/swap2-assets": "workspace:*",
+    "viem": "^2.57.2"
+  },
+  "peerDependencies": {
+    "@forgewallet/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "vitest": "^5.0.3",
+    "@forgewallet/conformance": "workspace:*",
+    "@forgewallet/core": "workspace:*"
+  },
+  "keywords": [
+    "wrap",
+    "weth",
+    "permissionless"
+  ]
+}
