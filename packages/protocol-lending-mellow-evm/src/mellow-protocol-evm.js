@@ -191,7 +191,8 @@ export default class MellowProtocolEvm extends LendingProtocol {
     const provider = config.provider ?? account?._config?.provider
     if (provider) {
       /** @private */
-      this._provider = typeof provider === 'string' ? new JsonRpcProvider(provider) : new BrowserProvider(provider)
+      // Discovery fires many reads at once; send them one per request — some gateways answer a batch member with empty data.
+      this._provider = typeof provider === 'string' ? new JsonRpcProvider(provider, undefined, { batchMaxCount: 1 }) : new BrowserProvider(provider)
     }
     /** @private */
     this._vaultData = null
@@ -235,12 +236,15 @@ export default class MellowProtocolEvm extends LendingProtocol {
    * @private
    */
   async _classifyQueue (address, isDeposit) {
+    // Only a revert says "this contract has no such method"; a transport error
+    // (rate limit, batch rejected, timeout) must not reclassify a queue.
     const probe = async (abi, fn, args) => {
       try {
         await this._contract(address, abi)[fn](...args)
         return true
-      } catch {
-        return false
+      } catch (e) {
+        if (e?.code === 'CALL_EXCEPTION' || e?.code === 'BAD_DATA') return false
+        throw e
       }
     }
     if (isDeposit) {

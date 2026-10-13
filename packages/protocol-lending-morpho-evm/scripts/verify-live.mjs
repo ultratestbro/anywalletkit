@@ -9,14 +9,17 @@ import { MorphoApi, MorphoMarketProtocolEvm, MorphoVaultProtocolEvm } from '../d
 const rpc = process.env.MORPHO_RPC ?? 'https://base-rpc.publicnode.com'
 const chainId = Number(process.env.MORPHO_CHAIN ?? 8453)
 const who = process.env.MORPHO_USER ?? '0x000000000000000000000000000000000000dEaD'
-const USDC = process.env.MORPHO_ASSET ?? '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
-const MARKET = process.env.MORPHO_MARKET ?? '0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836'
+// Asset / market default to Base's USDC vaults and cbBTC/USDC market; on another chain
+// leave them unset and the biggest listed vault / first listed market is taken from the API.
+const USDC = process.env.MORPHO_ASSET ?? (chainId === 8453 ? '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' : undefined)
+const MARKET_ENV = process.env.MORPHO_MARKET ?? (chainId === 8453 ? '0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836' : undefined)
 
 const account = createMockAccount({ chain: `eip155:${chainId}`, address: who }).toReadOnlyAccount()
 const api = new MorphoApi()
 
-console.log('--- API: listed USDC vaults')
-const vaults = await api.listVaults({ chainId, asset: USDC, first: 5 })
+console.log(USDC ? '--- API: listed vaults for ' + USDC : '--- API: listed vaults (biggest first)')
+const vaults = (await api.listVaults({ chainId, ...(USDC ? { asset: USDC } : {}), first: 5 })).filter((v) => v.listed)
+if (vaults.length === 0) throw new Error(`no listed Morpho vault on eip155:${chainId}`)
 for (const v of vaults) console.log(`  ${v.version} ${v.symbol.padEnd(12)} ${v.name.padEnd(28)} netApy ${v.netApy?.toFixed(2)}%  tvl $${((v.totalAssetsUsd ?? 0) / 1e6).toFixed(1)}M  factory ${v.factory}`)
 const top = vaults.find((v) => v.version === 'v1') ?? vaults[0]
 
@@ -27,6 +30,8 @@ console.log('  ', { version: info.version, factory: info.factory, name: info.nam
 console.log('   apy', (await vault.getApy()).toFixed(3), '% · position', await vault.getPosition())
 try { console.log('   quoteSupply', await vault.quoteSupply({ amount: 10n ** 6n })) } catch (e) { console.log('   quoteSupply →', e.name, e.message) }
 
+const MARKET = MARKET_ENV ?? (await api.listMarkets({ chainId, first: 1 }))[0]?.id
+if (!MARKET) throw new Error(`no listed Morpho market on eip155:${chainId}`)
 console.log('--- market', MARKET)
 const market = new MorphoMarketProtocolEvm(account, { chainId, market: MARKET, provider: rpc })
 const m = await market.getMarket()

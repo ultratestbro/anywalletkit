@@ -1,5 +1,5 @@
 import { NotImplementedError, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type SupplyOptions, type WithdrawOptions } from '@forgewallet/core'
-import { getAddress, isAddress, zeroAddress, type Address } from 'viem'
+import { getAddress, isAddress, type Address } from 'viem'
 import { ERC4626_ABI, FACTORY_V1_ABI, FACTORY_V2_ABI, VAULT_V1_ABI, VAULT_V2_ABI } from './abi.js'
 import { FALLBACK_GAS, MorphoBase, toAmount, type AmountOption, type MorphoBaseConfig, type Tx } from './base.js'
 import { MorphoError } from './errors.js'
@@ -88,7 +88,8 @@ export class MorphoVaultProtocolEvm extends MorphoBase<MorphoVaultConfig> {
           throw new MorphoError(`${v} is not acknowledged by any Morpho vault factory on ${this.chain.name} — refusing. Pass allowUnverifiedVault to override.`)
         }
         if (version === 'v1') {
-          const morpho = await this.read<Address>(v, VAULT_V1_ABI, 'MORPHO').catch(() => zeroAddress)
+          // A failed read must not look like a vault pointing at address zero: let the network error surface.
+          const morpho = await this.read<Address>(v, VAULT_V1_ABI, 'MORPHO')
           if (getAddress(morpho) !== getAddress(this.chain.morpho)) throw new MorphoError(`Vault ${v} points at Morpho ${morpho}, expected ${this.chain.morpho}.`)
         }
         const meta = await this.tokenMeta(getAddress(asset))

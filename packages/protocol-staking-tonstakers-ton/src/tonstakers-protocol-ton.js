@@ -103,7 +103,7 @@ function toAmount (amount) {
 async function fetchWithRetry (url) {
   let res
   for (let attempt = 0; attempt < 3; attempt++) {
-    res = await fetchWithRetry(url)
+    res = await fetch(url)
     if (res.status !== 429) return res
     await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)))
   }
