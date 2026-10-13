@@ -12,6 +12,7 @@ export type UnsafeTransactionCode =
   | 'insufficient-balance'
   | 'implicit-account-min-deposit'
   | 'no-access-key'
+  | 'storage-deposit'
 
 /** A transaction failed a hard check and was not signed. */
 export class UnsafeTransactionError extends Error {

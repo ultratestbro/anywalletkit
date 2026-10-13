@@ -25,6 +25,12 @@ export interface NearConfig {
    * SignedDelegate). Default false: they are refused with `dangerous-action`.
    */
   allowDangerousActions?: boolean
+  /**
+   * Most yoctoNEAR a token `transfer` may attach as `storage_deposit` to register the
+   * recipient (the amount comes from the token contract itself). Default 0.0125 NEAR,
+   * ten times the usual NEP-145 minimum.
+   */
+  maxStorageDeposit?: bigint | number
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────

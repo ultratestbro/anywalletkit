@@ -33,6 +33,9 @@ const GAS_PRICE_MARGIN_DEN = 10n
 
 type FtStorageBalance = { total: string; available: string } | null
 
+/** Default ceiling for a recipient's `storage_deposit` on a token transfer: 0.0125 NEAR. */
+export const MAX_STORAGE_DEPOSIT = 12_500_000_000_000_000_000_000n
+
 export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
   /** Account id: the implicit hex id of the key, or a named account bound to it. */
   readonly address: string
@@ -115,8 +118,10 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
 
   /** Minimum deposit a token contract wants for a registration (`storage_balance_bounds.min`). */
   async getStorageDepositMin(token: string): Promise<bigint> {
-    const r = await this.requireRpc('read token storage').callFunction<{ min: string; max: string | null } | null>(token, 'storage_balance_bounds', {})
-    return BigInt(r?.min ?? '1250000000000000000000')
+    const r = await this.requireRpc('read token storage').callFunction<{ min: unknown; max: unknown } | null>(token, 'storage_balance_bounds', {})
+    const min = r?.min ?? '1250000000000000000000'
+    if (typeof min !== 'string' || !/^\d{1,40}$/.test(min)) throw new UnsafeTransactionError('storage-deposit', `${token} returned a malformed storage_balance_bounds.min.`)
+    return BigInt(min)
   }
 
   // ── Building ────────────────────────────────────────────────────────────────
@@ -134,6 +139,9 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
     const registered = await this.getStorageBalance(o.token, o.recipient)
     if (registered === null) {
       const min = await this.getStorageDepositMin(o.token)
+      // The token contract names this amount; it rides on our signature, so it is capped.
+      const cap = BigInt(this._config.maxStorageDeposit ?? MAX_STORAGE_DEPOSIT)
+      if (min > cap) throw new UnsafeTransactionError('storage-deposit', `${o.token} asks ${min} yoctoNEAR to register ${o.recipient}; the cap is ${cap}.`)
       actions.push({ functionCall: { methodName: 'storage_deposit', args: { account_id: o.recipient, registration_only: true }, gas: STORAGE_DEPOSIT_GAS, deposit: min } })
     }
     actions.push({

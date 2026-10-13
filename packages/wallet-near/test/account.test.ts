@@ -13,7 +13,7 @@ const BLOCK = base58.encode(new Uint8Array(32).fill(9))
 const NEAR = 10n ** 24n
 
 /** Minimal fake node: accounts, access keys, a NEP-141 contract, gas price, send_tx capture. */
-function fakeNode(opts: { balance?: bigint; usdt?: bigint; registered?: string[]; accounts?: string[]; failOnChain?: string } = {}) {
+function fakeNode(opts: { balance?: bigint; usdt?: bigint; registered?: string[]; accounts?: string[]; failOnChain?: string; storageMin?: unknown } = {}) {
   const sent: string[] = []
   const accounts = new Set(opts.accounts ?? [ACCOUNT0, 'alice.near', USDT])
   const registered = new Set(opts.registered ?? [ACCOUNT0])
@@ -33,7 +33,7 @@ function fakeNode(opts: { balance?: bigint; usdt?: bigint; registered?: string[]
         const json = (v: unknown) => ({ result: Array.from(Buffer.from(JSON.stringify(v))), logs: [] })
         if (p.method_name === 'ft_balance_of') return json(String(args.account_id === ACCOUNT0 ? (opts.usdt ?? 10_000_000n) : 0n))
         if (p.method_name === 'storage_balance_of') return json(registered.has(args.account_id!) ? { total: '1250000000000000000000', available: '0' } : null)
-        if (p.method_name === 'storage_balance_bounds') return json({ min: '1250000000000000000000', max: '1250000000000000000000' })
+        if (p.method_name === 'storage_balance_bounds') return json({ min: opts.storageMin ?? '1250000000000000000000', max: '1250000000000000000000' })
       }
     }
     if (method === 'send_tx') {
@@ -107,6 +107,18 @@ describe('WalletAccountNear', () => {
     const b = await manager(g).getAccount(0)
     await b.transfer({ token: USDT, recipient: 'alice.near', amount: 1n })
     expect(describeTransaction(decodeSignedTransaction(fromBase64(g.sent[0]!)).transaction).methods).toEqual(['ft_transfer'])
+  })
+
+  it('caps the storage_deposit a token contract asks for, and refuses a malformed one (audit F12)', async () => {
+    const greedy = fakeNode({ storageMin: String(4n * NEAR) })
+    await expect((await manager(greedy).getAccount(0)).transfer({ token: USDT, recipient: 'alice.near', amount: 1n })).rejects.toMatchObject({ code: 'storage-deposit' })
+    expect(greedy.sent).toHaveLength(0)
+    const odd = fakeNode({ storageMin: 1e30 })
+    await expect((await manager(odd).getAccount(0)).transfer({ token: USDT, recipient: 'alice.near', amount: 1n })).rejects.toMatchObject({ code: 'storage-deposit' })
+    // a host can raise the cap deliberately
+    const raised = fakeNode({ storageMin: String(4n * NEAR) })
+    await (await manager(raised, { maxStorageDeposit: 5n * NEAR }).getAccount(0)).transfer({ token: USDT, recipient: 'alice.near', amount: 1n })
+    expect(raised.sent).toHaveLength(1)
   })
 
   it('preflight refuses: unknown named recipient, implicit account below 0.002 NEAR, insufficient NEAR, insufficient token', async () => {
