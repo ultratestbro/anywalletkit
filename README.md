@@ -54,10 +54,11 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | `@forgewallet/protocol-lending-mellow-evm` | phase 4 ✓ | Mellow Core Vaults (Lido EarnETH / EarnUSD) as a `LendingProtocol` |
 | `@forgewallet/protocol-lending-aave-evm` | 2026-10-10 ✓ | Aave v3 on 18 chains (20 markets) as a `LendingProtocol`: supply / withdraw / borrow / repay, gateway for native, EIP-2612 permits, health factor, reserves with rates and caps; Pool cross-checked against the PoolAddressesProvider |
 | `@forgewallet/protocol-lending-morpho-evm` | 2026-10-10 ✓ | Morpho on 10 chains: Vaults (MetaMorpho V1 / Vault V2, ERC-4626) and Blue markets (supply / withdraw / borrow / repay / collateral) as `LendingProtocol`s; vaults verified against the factories, state accrued like the contract, API for listing / APY only |
+| `@forgewallet/protocol-lending-kamino-solana` | 2026-10-13 ✓ | Kamino on Solana: Earn vaults (kVaults: deposit / withdraw, shares, APY) and Lend markets (supply / withdraw / borrow / repay on the wallet's obligation) as `LendingProtocol`s; Kamino's official API builds the transaction, the wallet's serialized guard proves programs and balance effects before signing; positions / rates from the API |
 | `@forgewallet/protocol-approvals-evm` | phase 4 ✓ | token-approval discovery (ERC-20 / 721 / 1155 / Permit2 / EIP-7702), risk flags, revoke |
 
 Every protocol module ships a `module.json`; `pnpm registry` builds
-[registry/modules.json](registry/modules.json) from them (14 modules today). See
+[registry/modules.json](registry/modules.json) from them (18 modules today). See
 [registry/README.md](registry/README.md) for tiers and how to list an external module.
 
 
