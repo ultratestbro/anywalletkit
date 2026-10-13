@@ -15,7 +15,8 @@ export const CAIP2_UNKNOWN = 'eip155:unknown'
 export function inferPrimaryType(types: TypedDataInput['types']): string {
   const names = Object.keys(types).filter((t) => t !== 'EIP712Domain')
   const referenced = new Set(
-    names.flatMap((n) => types[n]!.map((f) => f.type.replace(/\[.*\]$/, ''))).filter((t) => names.includes(t)),
+    // Linear: cut at the first '[' (a backtracking /\[.*\]$/ is quadratic on dApp-supplied input).
+    names.flatMap((n) => types[n]!.map((f) => { const i = f.type.indexOf('['); return i < 0 ? f.type : f.type.slice(0, i) })).filter((t) => names.includes(t)),
   )
   const roots = names.filter((n) => !referenced.has(n))
   if (roots.length !== 1) throw new Error(`Ambiguous EIP-712 primary type: ${roots.join(', ') || 'none'}. Pass primaryType.`)

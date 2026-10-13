@@ -131,9 +131,20 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     return c === 'eip155:unknown' ? undefined : Number(c.slice('eip155:'.length))
   }
 
-  /** Refusals that need no network: wrong chain, value to the zero address. */
-  private assertSafeTransaction(tx: EvmTransaction): void {
+  /**
+   * The chain to check a payload against: known already, else detected from the
+   * provider (a dApp-chosen chain id must not be signed just because detection
+   * has not run yet). Undefined only for an offline wallet with no `chainId`.
+   */
+  private async chainForChecks(): Promise<number | undefined> {
     const known = this.knownChainId()
+    if (known !== undefined || !this._client) return known
+    return this.getChainId()
+  }
+
+  /** Refusals before signing: wrong chain, value to the zero address. */
+  private async assertSafeTransaction(tx: EvmTransaction): Promise<void> {
+    const known = await this.chainForChecks()
     if (tx.chainId !== undefined && known !== undefined && Number(tx.chainId) !== known) {
       throw new ChainMismatchError(known, Number(tx.chainId))
     }
@@ -143,8 +154,8 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     }
   }
 
-  private assertSafeTypedData(typed: TypedDataInput): void {
-    const known = this.knownChainId()
+  private async assertSafeTypedData(typed: TypedDataInput): Promise<void> {
+    const known = await this.chainForChecks()
     const domainChain = typedDomainChainId(typed.domain.chainId)
     if (domainChain !== undefined && known !== undefined && domainChain !== known && !this._config.allowCrossChainTypedData) {
       throw new ChainMismatchError(known, domainChain, 'typed data')
@@ -153,7 +164,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
 
   /** EIP-712. Accepts `{domain, types, message}`; `primaryType` is inferred when absent. */
   async signTypedData(typed: TypedDataInput): Promise<string> {
-    this.assertSafeTypedData(typed)
+    await this.assertSafeTypedData(typed)
     const types = cleanTypes(typed.types)
     // viem includes `chainId` in the EIP712Domain type only when it is a
     // number. A dApp that sends it as a hex or decimal STRING (Omniston's
@@ -212,7 +223,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
    */
   private async preflight(tx: EvmTransaction, limit: bigint | number | undefined, op: string): Promise<{ tx: EvmTransaction; fee: bigint }> {
     await this.getChainId() // network path: know the chain so a foreign tx.chainId is refused, not broadcast
-    this.assertSafeTransaction(tx)
+    await this.assertSafeTransaction(tx)
     let gasLimit = toBigInt(tx.gasLimit)
     let estimated: bigint | undefined
     if (this._config.simulate !== false) {
@@ -254,7 +265,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
    * NOT run here (nothing is sent) — `sendTransaction` runs it.
    */
   async signTransaction(tx: EvmTransaction): Promise<string> {
-    this.assertSafeTransaction(tx)
+    await this.assertSafeTransaction(tx)
     if (this._config.transactionMaxFee !== undefined && this._client) {
       const { fee } = await this.quoteSendTransaction(tx)
       if (fee > BigInt(this._config.transactionMaxFee)) throw new Error('Exceeded maximum fee cost for transaction operation.')

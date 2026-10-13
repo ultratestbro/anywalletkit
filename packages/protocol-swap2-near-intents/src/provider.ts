@@ -166,7 +166,8 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
       // is just `null`), and "no route" bugs hide in exactly that silence.
       const refuse = (reason: string): null => {
         const detail = `${reason} [dry=${params.dry !== false} ${params.sourceChain}->${params.destChain} amount=${params.amountIn}]`;
-        console.warn(`near-intents: no quote — ${detail}`);
+        // Caller fields and 1Click text are untrusted: no control characters in server logs.
+        console.warn(`near-intents: no quote — ${detail.replace(/[\u0000-\u001f\u007f]/g, " ")}`);
         params.onRefusal?.(detail);
         return null;
       };

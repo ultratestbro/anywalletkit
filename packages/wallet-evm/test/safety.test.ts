@@ -132,6 +132,26 @@ describe('hard checks before signing', () => {
     m.dispose()
   })
 
+  it('signTypedData / signTransaction detect the chain before checking it — no fail-open before detection (audit F18)', async () => {
+    const fake = fakeProvider()
+    const m = new WalletManagerEvm(SEED, { provider: fake.provider })
+    const a = await m.getAccount(0)
+    const typed = { domain: { name: 'X', version: '1', chainId: 137, verifyingContract: SPENDER }, types: { Mail: [{ name: 'to', type: 'address' }] }, message: { to: OTHER } }
+    await expect(a.signTypedData(typed)).rejects.toBeInstanceOf(ChainMismatchError)
+    const fresh = await new WalletManagerEvm(SEED, { provider: fakeProvider().provider }).getAccount(0)
+    await expect(fresh.signTransaction({ to: SPENDER, value: 1n, nonce: 0, gasLimit: 21000n, maxFeePerGas: 1n, maxPriorityFeePerGas: 1n, chainId: 10 })).rejects.toBeInstanceOf(ChainMismatchError)
+    m.dispose()
+  })
+
+  it('primary-type inference is linear on hostile type strings (audit F17)', async () => {
+    const m = new WalletManagerEvm(SEED, { chainId: 1 })
+    const types = { Mail: [{ name: 'x', type: '['.repeat(200_000) }], Other: [{ name: 'y', type: 'Mail[]' }] }
+    const t0 = Date.now()
+    await expect((await m.getAccount(0)).signTypedData({ domain: { name: 'X', chainId: 1 }, types, message: {} } as never)).rejects.toThrow()
+    expect(Date.now() - t0).toBeLessThan(1_000)
+    m.dispose()
+  })
+
   it('value to the zero address is refused unless allowBurn', async () => {
     const fake = fakeProvider()
     const m = new WalletManagerEvm(SEED, { provider: fake.provider })
