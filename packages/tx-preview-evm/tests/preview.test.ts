@@ -106,6 +106,18 @@ describe("previewEvmTx", () => {
     expect(b.simulation.status === "ok" && b.simulation.changes.map((c) => `${c.symbol}:${c.delta}`)).toEqual(["ETH:-10000000000000000", "WETH:10000000000000000"]);
   });
 
+  it("pins the simulated block 1 s after the latest one (not Ethereum's +12 s default)", async () => {
+    const seen: unknown[][] = [];
+    const r = rpc({
+      eth_getBlockByNumber: () => ({number: "0x10", timestamp: "0x64"}),
+      eth_simulateV1: (params) => { seen.push(params); return [{calls: [{status: "0x1", logs: []}]}]; },
+    });
+    await previewEvmTx({chainId: 56, from: ME, calls: [swap], rpc: r, own: [ME], known: {[DIAMOND]: "LI.FI"}});
+    const [opts, tag] = seen[0] as [{blockStateCalls: {blockOverrides?: {time: string}}[]}, string];
+    expect(tag).toBe("0x10");
+    expect(opts.blockStateCalls[0]!.blockOverrides).toEqual({time: "0x65"});
+  });
+
   it("reports which call reverts and why", async () => {
     const r = rpc({eth_simulateV1: () => [{calls: [{status: "0x1", logs: []}, {status: "0x0", returnData: errString("ERC20: transfer amount exceeds balance"), logs: []}]}]});
     const p = await previewEvmTx({chainId: 8453, from: ME, calls: [approve, swap], rpc: r, own: [ME], known: {[DIAMOND]: "LI.FI"}});
@@ -117,7 +129,7 @@ describe("previewEvmTx", () => {
     const ok = rpc({eth_call: () => "0x"});
     const single = await previewEvmTx({chainId: 999, from: ME, calls: [swap], rpc: ok, own: [ME], known: {[DIAMOND]: "LI.FI"}});
     expect(single.simulation.status).toBe("unavailable");
-    expect(ok.calls).toEqual(["eth_simulateV1", "eth_call"]);
+    expect(ok.calls).toEqual(["eth_getBlockByNumber", "eth_simulateV1", "eth_call"]);
     const bad = rpc({eth_call: () => { throw Object.assign(new Error("execution reverted"), {data: errString("expired quote")}); }});
     expect((await previewEvmTx({chainId: 999, from: ME, calls: [swap], rpc: bad, own: [ME]})).simulation).toEqual({status: "reverted", callIndex: 0, reason: "expired quote"});
     const seq = await previewEvmTx({chainId: 43114, from: ME, calls: [approve, swap], rpc: rpc({}), own: [ME]});

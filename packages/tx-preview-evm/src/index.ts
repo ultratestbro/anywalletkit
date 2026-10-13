@@ -193,13 +193,28 @@ interface SimCall { status?: string; gasUsed?: string; returnData?: string; erro
 
 /** eth_simulateV1 over the whole sequence; null when the node doesn't serve it. */
 async function simulateV1(input: PreviewInput): Promise<Simulation | null> {
+  // The simulated block defaults to parent + 12 s (Ethereum's slot). On fast chains
+  // (BSC, Arbitrum, …) that is far past when the tx would land, and routes with
+  // short validity windows (e.g. OKX PMM legs inside LI.FI) revert only in the
+  // simulation. Pin the parent and place the block 1 s after it.
+  let parent: {number?: string; timestamp?: string} | null = null;
+  try {
+    parent = (await input.rpc("eth_getBlockByNumber", ["latest", false])) as {number?: string; timestamp?: string} | null;
+  } catch {
+    parent = null;
+  }
+  const pinned = parent?.number && parent.timestamp ? parent : null;
   let blocks: {calls?: SimCall[]}[];
   try {
     blocks = (await input.rpc("eth_simulateV1", [{
-      blockStateCalls: [{...(input.stateOverrides ? {stateOverrides: overridesJson(input.stateOverrides)} : {}), calls: input.calls.map((c) => ({from: input.from, to: c.to, ...(c.data ? {data: c.data} : {}), value: hex(c.value ?? 0n)}))}],
+      blockStateCalls: [{
+        ...(pinned ? {blockOverrides: {time: hex(BigInt(pinned.timestamp!) + 1n)}} : {}),
+        ...(input.stateOverrides ? {stateOverrides: overridesJson(input.stateOverrides)} : {}),
+        calls: input.calls.map((c) => ({from: input.from, to: c.to, ...(c.data ? {data: c.data} : {}), value: hex(c.value ?? 0n)})),
+      }],
       traceTransfers: true,
       validation: false,
-    }, "latest"])) as {calls?: SimCall[]}[];
+    }, pinned ? pinned.number : "latest"])) as {calls?: SimCall[]}[];
   } catch (err) {
     const code = (err as {code?: number}).code;
     const msg = err instanceof Error ? err.message : String(err);
