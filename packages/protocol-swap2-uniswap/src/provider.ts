@@ -66,6 +66,9 @@ interface Route {
 
 type RpcCall = {method: string; params: unknown[]};
 
+/** Largest JSON-RPC batch sent to one node (X Layer's public RPCs refuse more than 10). */
+const RPC_BATCH_MAX = 10;
+
 export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvider {
   const deployments = config.deployments ?? UNISWAP_V3;
   const slippageDefault = config.defaultSlippageBps ?? DEFAULT_SLIPPAGE_BPS;
@@ -80,8 +83,18 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     return deployments[id] && config.rpcUrls[id]?.length ? id : null;
   };
 
-  /** JSON-RPC batch with endpoint failover; each slot is the result or null (reverted / errored). */
+  /**
+   * JSON-RPC batch with endpoint failover; each slot is the result or null (reverted / errored).
+   * Sent in chunks of RPC_BATCH_MAX: some public nodes cap a batch (X Layer's at 10 calls).
+   */
   async function rpc(chainId: number, calls: RpcCall[], signal?: AbortSignal): Promise<(unknown | null)[]> {
+    if (calls.length <= RPC_BATCH_MAX) return rpcBatch(chainId, calls, signal);
+    const chunks: RpcCall[][] = [];
+    for (let i = 0; i < calls.length; i += RPC_BATCH_MAX) chunks.push(calls.slice(i, i + RPC_BATCH_MAX));
+    return (await Promise.all(chunks.map((c) => rpcBatch(chainId, c, signal)))).flat();
+  }
+
+  async function rpcBatch(chainId: number, calls: RpcCall[], signal?: AbortSignal): Promise<(unknown | null)[]> {
     let lastErr: unknown;
     for (const url of config.rpcUrls[chainId] ?? []) {
       try {

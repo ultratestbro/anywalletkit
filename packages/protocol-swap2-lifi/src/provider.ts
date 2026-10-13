@@ -41,6 +41,12 @@ const LIFI_CHAIN: Record<string, string> = {
   "eip155:9745": "9745",
   "eip155:59144": "59144",
   "eip155:146": "146",
+  // 2026-10-13: World Chain, Sei, Ink, Plume, X Layer (live on li.quest/v1/chains).
+  "eip155:480": "480",
+  "eip155:1329": "1329",
+  "eip155:57073": "57073",
+  "eip155:98866": "98866",
+  "eip155:196": "196",
   [LIFI_SOLANA_CAIP2]: "1151111081099710",
 };
 const CAIP2_BY_LIFI_CHAIN: Record<string, string> = Object.fromEntries(Object.entries(LIFI_CHAIN).map(([caip2, id]) => [id, caip2]));
@@ -81,6 +87,8 @@ const LIFI_DIAMONDS: Readonly<Record<string, string>> = {
   "eip155:324": "0x341e94069f53234fE6DabeF707aD424830525715", // zkSync Era (deployments/zksync.json, matches a live quote 2026-10-12)
   "eip155:9745": "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37", // Plasma (deployments/plasma.json, 2026-10-13)
   "eip155:59144": "0xDE1E598b81620773454588B85D6b5D4eEC32573e", // Linea (deployments/linea.json, 2026-10-13)
+  "eip155:57073": "0x864b314D4C5a0399368609581d3E8933a63b9232", // Ink (deployments/ink.json, 2026-10-13)
+  "eip155:98866": "0x6f5C8Bb0C5Fe4ECeAC40EE1C238EaB6bbb29761c", // Plume (deployments/plume.json, 2026-10-13)
   "eip155:4326": "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37", // MegaETH (deployments/megaeth.json, matches a live quote 2026-10-12)
 };
 const diamondFor = (chain: string): string => LIFI_DIAMONDS[chain] ?? LIFI_DIAMOND;
@@ -212,6 +220,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
       // more with the slippage scaled down to land the floor inside it.
       const slippageBps = params.slippageBps ?? defaultSlippageBps;
       let sentSlippage: number | undefined = slippageBps / 10_000;
+      let deadline: AbortSignal | undefined;
       for (let attempt = 0; attempt < 2; attempt++) try {
         const url = new URL(`${apiBase}/quote`);
         url.searchParams.set("fromChain", fromChain);
@@ -229,12 +238,17 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         if (sentSlippage !== undefined) {
           url.searchParams.set("slippage", String(sentSlippage));
         }
-        const res = await fetch(url, {headers: headers(apiKey()), signal: signal ?? timeoutSignal(12_000)});
+        deadline = signal ? undefined : timeoutSignal(12_000);
+        const res = await fetch(url, {headers: headers(apiKey()), signal: signal ?? deadline!});
         if (!res.ok) {
           // LI.FI's 404 "No available quotes for the requested transfer" and
           // 400 validation messages are the caller's answer, not a silent null.
-          const body = (await res.json().catch(() => null)) as {message?: unknown} | null;
-          params.onRefusal?.(`lifi: ${typeof body?.message === "string" ? body.message.slice(0, 200) : `HTTP ${res.status}`}`);
+          const body = (await res.json().catch(() => null)) as {message?: unknown; errors?: {filteredOut?: {reason?: unknown}[]}} | null;
+          // When every candidate route was dropped for the same reason (Sei: "wallet is not linked to
+          // the original SEI address"), that reason is the real answer — the message alone is generic.
+          const reasons = [...new Set((body?.errors?.filteredOut ?? []).map((f) => f.reason).filter((r): r is string => typeof r === "string"))];
+          const why = reasons.length === 1 ? ` (${reasons[0]!.slice(0, 200)})` : "";
+          params.onRefusal?.(`lifi: ${typeof body?.message === "string" ? body.message.slice(0, 200) : `HTTP ${res.status}`}${why}`);
           return null;
         }
         const q = (await res.json()) as {
@@ -401,6 +415,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           validUntilMs: receivedAt + quoteTtlMs,
         };
       } catch {
+        // Our own 12 s deadline (not the caller's signal): say so instead of a silent null.
+        if (deadline?.aborted) params.onRefusal?.("lifi: no quote within 12 s");
         return null;
       }
       return null;

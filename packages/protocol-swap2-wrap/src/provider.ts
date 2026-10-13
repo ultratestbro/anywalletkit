@@ -28,6 +28,12 @@ export const WRAPPED_NATIVE: Readonly<Record<number, {address: `0x${string}`; sy
   43114: {address: "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", symbol: "WAVAX"},
   80094: {address: "0x6969696969696969696969696969696969696969", symbol: "WBERA"},
   534352: {address: "0x5300000000000000000000000000000000000004", symbol: "WETH"},
+  // 2026-10-13: World Chain, Sei, Ink, Plume, X Layer — verified on-chain (symbol, decimals, supply, deposit()).
+  480: {address: "0x4200000000000000000000000000000000000006", symbol: "WETH"},
+  1329: {address: "0xE30feDd158A2e3b13e9badaeABaFc5516e95e8C7", symbol: "WSEI"},
+  57073: {address: "0x4200000000000000000000000000000000000006", symbol: "WETH"},
+  98866: {address: "0xEa237441c92CAe6FC17Caaf9a7acB3f953be4bd1", symbol: "WPLUME"},
+  196: {address: "0xe538905cf8410324e03A5A23C1c177a474D59b2b", symbol: "WOKB"},
 });
 
 const WETH_ABI = parseAbi([

@@ -115,6 +115,9 @@ const NATIVE_FEE_CAP: Readonly<Record<string, bigint>> = Object.freeze({
   "eip155:9745": 150_000_000_000_000_000_000n, // 150 XPL
   "eip155:42220": 100_000_000_000_000_000_000n, // 100 CELO
   "eip155:80094": 50_000_000_000_000_000_000n, // 50 BERA
+  "eip155:1329": 200_000_000_000_000_000_000n, // 200 SEI
+  "eip155:98866": 500_000_000_000_000_000_000n, // 500 PLUME
+  "eip155:196": 100_000_000_000_000_000n, // 0.1 OKB
 });
 const DEFAULT_NATIVE_FEE_CAP = 5_000_000_000_000_000n; // 0.005 of an ETH-denominated L2
 

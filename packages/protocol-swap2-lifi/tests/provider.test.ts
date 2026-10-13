@@ -274,4 +274,15 @@ describe("LI.FI refusals", () => {
     expect(await lifiProvider().getQuote({...PARAMS, onRefusal: (r: string) => { reason = r; }})).toBeNull();
     expect(reason).toBe("lifi: No available quotes for the requested transfer");
   });
+
+  it("names the one reason every route was filtered out for (Sei address linking)", async () => {
+    const why = "The source or destination wallet is not linked to the original SEI address, please go to https://app.sei.io/ to link you wallet.";
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({
+      message: "No available quotes for the requested transfer",
+      errors: {filteredOut: [{overallPath: "1329:SEI~1329:USDC", reason: why}, {overallPath: "1329:SEI~1329:WETH", reason: why}]},
+    }), {status: 404}));
+    let reason = "";
+    expect(await lifiProvider().getQuote({...PARAMS, onRefusal: (r: string) => { reason = r; }})).toBeNull();
+    expect(reason).toBe(`lifi: No available quotes for the requested transfer (${why})`);
+  });
 });

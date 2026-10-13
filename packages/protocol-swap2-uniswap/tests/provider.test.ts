@@ -33,6 +33,20 @@ describe("Uniswap v3 provider", () => {
     expect(inner[0]!.args[0]).toMatchObject({tokenIn: USDC, tokenOut: USDT, fee: 500, recipient: ME, amountIn: 1_000_000n, amountOutMinimum: 995_000n});
   });
 
+  it("splits a large quote batch for nodes that cap batch size (X Layer: 10 calls)", async () => {
+    const inner = rpcStub({byFee: {100: 900_000n, 500: 1_000_000n, 3000: 990_000n}});
+    let largest = 0;
+    vi.stubGlobal("fetch", (async (url: string, init?: RequestInit) => {
+      const n = (JSON.parse(String(init?.body)) as unknown[]).length;
+      largest = Math.max(largest, n);
+      if (n > 10) return new Response(JSON.stringify({jsonrpc: "2.0", error: {code: -32014, message: "too many RPC calls in batch request"}}));
+      return inner(url, init);
+    }) as typeof fetch);
+    const q = await uniswapProvider({rpcUrls: RPC}).getQuote({...base, sourceToken: "USDC", destToken: USDT, amountIn: "1000000"});
+    expect(q).toMatchObject({provider: "uniswap", destAmount: "1000000"});
+    expect(largest).toBeLessThanOrEqual(10);
+  });
+
   it("native in: the router wraps msg.value — no approval, tokenIn = WETH", async () => {
     vi.stubGlobal("fetch", rpcStub());
     const q = await uniswapProvider({rpcUrls: RPC}).getQuote({...base, sourceToken: "ETH", destToken: USDC, amountIn: "1000000000000000"});

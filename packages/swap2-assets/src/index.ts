@@ -1033,6 +1033,81 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "stS", assetId: "", contract: "0xE5DA20F15420aD15DE0fa650600aFc998bbE3955", decimals: 18},
     ],
   },
+  {
+    // World Chain (OP Stack L2, native ETH). LI.FI + Uniswap v3 + wrap + CCTP; no 1Click ids. Verified on-chain 2026-10-13.
+    key: "worldchain",
+    caip2: "eip155:480",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/world.svg",
+    label: "World Chain",
+    assets: [
+      {symbol: "ETH", assetId: "", decimals: 18, icon: cmcIcon(1027)},
+      {symbol: "WETH", assetId: "", contract: "0x4200000000000000000000000000000000000006", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "USDC", assetId: "", contract: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "WBTC", assetId: "", contract: "0x03C7054BCB39f7b2e5B2c7AcB37583e32D70Cfa3", decimals: 8, icon: cmcIcon(3717)},
+      {symbol: "WLD", assetId: "", contract: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003", decimals: 18},
+    ],
+  },
+  {
+    // Sei (EVM, native SEI). LI.FI + wrap + CCTP; no 1Click ids. Verified on-chain 2026-10-13.
+    key: "sei",
+    caip2: "eip155:1329",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/sei.svg",
+    label: "Sei",
+    assets: [
+      {symbol: "SEI", assetId: "", decimals: 18, icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/sei.svg"},
+      {symbol: "WSEI", assetId: "", contract: "0xE30feDd158A2e3b13e9badaeABaFc5516e95e8C7", decimals: 18},
+      {symbol: "USDC", assetId: "", contract: "0xe15fC38F6D8c56aF07bbCBe3BAf5708A2Bf42392", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "USDT0", assetId: "", contract: "0x9151434b16b9763660705744891fA906F660EcC5", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "WETH", assetId: "", contract: "0x160345fC359604fC6e70E3c5fAcbdE5F7A9342d8", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "WBTC", assetId: "", contract: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c", decimals: 8, icon: cmcIcon(3717)},
+    ],
+  },
+  {
+    // Ink (OP Stack L2, native ETH). LI.FI + Uniswap v3 + wrap + CCTP; no 1Click ids. Verified on-chain 2026-10-13.
+    key: "ink",
+    caip2: "eip155:57073",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/ink.svg",
+    label: "Ink",
+    assets: [
+      {symbol: "ETH", assetId: "", decimals: 18, icon: cmcIcon(1027)},
+      {symbol: "WETH", assetId: "", contract: "0x4200000000000000000000000000000000000006", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "USDC", assetId: "", contract: "0x2D270e6886d130D724215A266106e6832161EAEd", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "USDT0", assetId: "", contract: "0x0200C29006150606B650577BBE7B6248F58470c1", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "USDe", assetId: "", contract: "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", decimals: 18, icon: cmcIcon(29470)},
+      {symbol: "kBTC", assetId: "", contract: "0x73E0C0d45E048D25Fc26Fa3159b0aA04BfA4Db98", decimals: 8},
+    ],
+  },
+  {
+    // Plume (RWA chain, native PLUME). LI.FI + wrap + CCTP; no 1Click ids. Verified on-chain 2026-10-13.
+    key: "plume",
+    caip2: "eip155:98866",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/plume.svg",
+    label: "Plume",
+    assets: [
+      {symbol: "PLUME", assetId: "", decimals: 18, icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/plume.svg"},
+      {symbol: "WPLUME", assetId: "", contract: "0xEa237441c92CAe6FC17Caaf9a7acB3f953be4bd1", decimals: 18},
+      {symbol: "USDC", assetId: "", contract: "0x222365EF19F7947e5484218551B56bb3965Aa7aF", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "pUSD", assetId: "", contract: "0xdddD73F5Df1F0DC31373357beAC77545dC5A6f3F", decimals: 6},
+      {symbol: "WETH", assetId: "", contract: "0xca59cA09E5602fAe8B629DeE83FfA819741f14be", decimals: 18, icon: cmcIcon(2396)},
+    ],
+  },
+  {
+    // X Layer (OKX zkEVM, native OKB). LI.FI + Uniswap v3 + wrap + CCTP; no 1Click ids. Verified on-chain 2026-10-13.
+    // USDC is Circle's native token (the CCTP one), not the older bridged "USD Coin" at 0x74b7…. LI.FI routes only
+    // the bridged one (0 of 123 quotes for native USDC, 2026-10-13), so USDT0 leads as the swap stable here.
+    key: "xlayer",
+    caip2: "eip155:196",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/xlayer.svg",
+    label: "X Layer",
+    assets: [
+      {symbol: "OKB", assetId: "", decimals: 18, icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/xlayer.svg"},
+      {symbol: "WOKB", assetId: "", contract: "0xe538905cf8410324e03A5A23C1c177a474D59b2b", decimals: 18},
+      {symbol: "USDT0", assetId: "", contract: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "USDC", assetId: "", contract: "0xB6CEceAB302E2E4948951eE7843FC24E92933061", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "WETH", assetId: "", contract: "0x5A77f1443D16ee5761d310e38b62f77f726bC71c", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "WBTC", assetId: "", contract: "0xEA034fb02eB1808C2cc3adbC15f447B93CbE08e1", decimals: 8, icon: cmcIcon(3717)},
+    ],
+  },
 ];
 
 /**
