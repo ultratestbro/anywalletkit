@@ -6,6 +6,8 @@ import {
 } from '@solana/kit'
 import { TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, getApproveInstruction, getCloseAccountInstruction, getCreateAssociatedTokenIdempotentInstruction, getSetAuthorityInstruction, AuthorityType } from '@solana-program/token'
 import { getSetComputeUnitLimitInstruction } from '@solana-program/compute-budget'
+import { getAllocateInstruction, getAssignInstruction } from '@solana-program/system'
+import { getSyncNativeInstruction } from '@solana-program/token'
 import {
   JUPITER_V6_PROGRAM_ADDRESS, LIFI_TRACKING_PROGRAM_ADDRESS, RELAY_DEPOSITORY_PROGRAM_ADDRESS, SimulationError, UnsafeTransactionError, WalletManagerSolana, type SerializedTxGuard, type SolanaRpc,
 } from '../src/index.js'
@@ -270,6 +272,36 @@ describe('provider-serialized transactions', () => {
     await expect(run).rejects.toThrow(/InstructionError.*6001/)
     await expect(run).rejects.not.toThrow(/BigInt/)
     expect(f.sent).toHaveLength(0)
+  })
+
+  it('refuses System Assign/Allocate and Token Batch/undecodable instructions; keeps wSOL plumbing (SyncNative)', async () => {
+    const { usdcAta, pre } = await setup()
+    const post = { ...pre, [ADDR0]: sys(SOL - FEE), [usdcAta]: token(USDC, ADDR0, 990_000n) }
+    const run = async (extra: Instruction[]) => (await new WalletManagerSolana(SEED, { provider: fakeRpc(pre, post).rpc }).getAccount(0)).sendSerialized(wire(jupiterLike({ writable: [usdcAta], usdcAta, extra })), guard())
+    const me = createNoopSigner(ADDR0)
+    await expect(run([getAssignInstruction({ account: me, programAddress: OTHER })])).rejects.toMatchObject({ code: 'core-instruction' })
+    await expect(run([getAllocateInstruction({ newAccount: me, space: 8n })])).rejects.toMatchObject({ code: 'core-instruction' })
+    const batch: Instruction = { programAddress: TOKEN_PROGRAM_ADDRESS, accounts: [{ address: ADDR0, role: AccountRole.WRITABLE_SIGNER }], data: new Uint8Array([255, 1, 2]) }
+    await expect(run([batch])).rejects.toMatchObject({ code: 'core-instruction' })
+    const garbage: Instruction = { programAddress: '11111111111111111111111111111111' as Address, accounts: [{ address: ADDR0, role: AccountRole.WRITABLE_SIGNER }], data: new Uint8Array([99, 0, 0, 0]) }
+    await expect(run([garbage])).rejects.toMatchObject({ code: 'core-instruction' })
+    await expect(run([getSyncNativeInstruction({ account: WSOL_TEMP })])).resolves.toMatchObject({ hash: 'B'.repeat(87) })
+  })
+
+  it('refuses ownership and authority changes visible only in the post-state (CPI inside an allowlisted router)', async () => {
+    const { usdcAta, usdtAta, pre } = await setup()
+    const tx = wire(jupiterLike({ writable: [usdcAta, usdtAta], usdcAta }))
+    const ok = { ...pre, [ADDR0]: sys(SOL - FEE), [usdcAta]: token(USDC, ADDR0, 990_000n) }
+    const run = async (post: Record<string, State>) => (await new WalletManagerSolana(SEED, { provider: fakeRpc(pre, post).rpc }).getAccount(0)).sendSerialized(tx, guard())
+    await expect(run({ ...ok, [ADDR0]: { ...sys(SOL - FEE)!, owner: OTHER } })).rejects.toMatchObject({ code: 'wallet-owner' })
+    await expect(run({ ...ok, [ADDR0]: { ...sys(SOL - FEE)!, data: new Uint8Array(8) } })).rejects.toMatchObject({ code: 'wallet-owner' })
+    await expect(run({ ...ok, [usdtAta]: token(USDT, OTHER, 1_000_000n) })).rejects.toMatchObject({ code: 'sets-authority', details: [usdtAta] })
+    const closable = token(USDT, ADDR0, 1_000_000n)!
+    new DataView(closable.data.buffer).setUint32(129, 1, true)
+    closable.data.set(pk(OTHER), 133)
+    await expect(run({ ...ok, [usdtAta]: closable })).rejects.toMatchObject({ code: 'sets-authority' })
+    await expect(run({ ...ok, [usdtAta]: tokenDelegated(USDT, ADDR0, 1_000_000n, OTHER, 1_000_000n) })).rejects.toMatchObject({ code: 'approves-delegate' })
+    await expect(run(ok)).resolves.toMatchObject({ hash: 'B'.repeat(87) })
   })
 
   it('measures a native SOL "token in" on the lamport balance', async () => {

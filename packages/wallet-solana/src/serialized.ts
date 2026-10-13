@@ -148,7 +148,26 @@ export interface ParsedTokenAccount {
   delegate: Uint8Array | null
   /** u64 at offset 121: what that delegate may still pull. */
   delegatedAmount: bigint
+  /** COption<Pubkey> at offset 129: who may close the account, if not the owner. */
+  closeAuthority: Uint8Array | null
 }
+
+/**
+ * Core-program instructions a provider route may carry beyond the ones the
+ * guard decodes (transfers, ATA creation, approve, close): wSOL plumbing and
+ * harmless queries. Everything else from System / Token / Token-2022 — Assign,
+ * Allocate, nonce authority, Batch, Burn, UnwrapLamports, an undecodable
+ * discriminator — is refused: none belongs in a swap and several hand the
+ * wallet or a token account to someone else.
+ */
+export const SAFE_CORE_INSTRUCTIONS: Readonly<Record<string, ReadonlySet<string>>> = (() => {
+  const token = new Set(['SyncNative', 'InitializeAccount', 'InitializeAccount2', 'InitializeAccount3', 'InitializeImmutableOwner', 'Revoke', 'GetAccountDataSize', 'AmountToUiAmount', 'UiAmountToAmount'])
+  return Object.freeze({
+    [SYSTEM_PROGRAM_ADDRESS as string]: new Set(['CreateAccountWithSeed', 'TransferSolWithSeed']),
+    [TOKEN_PROGRAM_ADDRESS as string]: token,
+    [TOKEN_2022_PROGRAM_ADDRESS as string]: token,
+  })
+})()
 
 export function parseTokenAccount(data: Uint8Array): ParsedTokenAccount | null {
   if (data.length < TOKEN_ACCOUNT_MIN_SIZE) return null
@@ -160,9 +179,11 @@ export function parseTokenAccount(data: Uint8Array): ParsedTokenAccount | null {
     amount: view.getBigUint64(64, true),
     delegate: hasDelegate ? data.subarray(76, 108) : null,
     delegatedAmount: view.getBigUint64(121, true),
+    closeAuthority: view.getUint32(129, true) === 1 ? data.subarray(133, 165) : null,
   }
 }
 
 export const bytesEqual = (a: Uint8Array, b: Uint8Array): boolean => a.length === b.length && a.every((x, i) => x === b[i])
+export const optEqual = (a: Uint8Array | null, b: Uint8Array | null): boolean => (a === null || b === null ? a === b : bytesEqual(a, b))
 export const pubkeyBytes = (address: string): Uint8Array => getAddressEncoder().encode(address as never) as Uint8Array
 export const base64Bytes = (data: string): Uint8Array => getBase64Encoder().encode(data) as Uint8Array

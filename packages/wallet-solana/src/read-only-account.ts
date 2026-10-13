@@ -15,7 +15,7 @@ import {
 } from '@solana-program/token-2022'
 import { MAX_U64, ZERO_ADDRESS, decodeWireTransaction, describeTransaction, resolveCompiledAccounts } from './describe.js'
 import {
-  DEFAULT_PROGRAM_ALLOWLIST, base64Bytes, bytesEqual, isNativeMint, parseTokenAccount, pubkeyBytes, type SerializedCheck, type SerializedTxGuard,
+  DEFAULT_PROGRAM_ALLOWLIST, SAFE_CORE_INSTRUCTIONS, base64Bytes, bytesEqual, isNativeMint, optEqual, parseTokenAccount, pubkeyBytes, type SerializedCheck, type SerializedTxGuard,
 } from './serialized.js'
 import { MissingSignersError, SimulationError, UnsafeTransactionError } from './errors.js'
 import { isNativeTransfer, isSignedTransaction, isTransactionMessage } from './guards.js'
@@ -457,6 +457,10 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     const { expect } = guard
     const approvals: Array<{ source: string; delegate: string }> = []
     for (const it of description.items) {
+      const safeCore = it.program ? SAFE_CORE_INSTRUCTIONS[it.program] : undefined
+      if (it.type === 'program-call' && safeCore && !(it.instruction && safeCore.has(it.instruction))) {
+        throw new UnsafeTransactionError(`Transaction runs ${it.instruction ?? 'an undecodable instruction'} on core program ${it.program}.`, 'core-instruction', [it.program])
+      }
       if (it.type === 'set-authority') throw new UnsafeTransactionError(`Transaction changes an authority on ${it.account}.`, 'sets-authority', [it.account])
       if (it.type === 'token-approve') {
         if (it.unlimited || !expect.maxTokenOut || isNativeMint(expect.maxTokenOut.mint) || it.amount > expect.maxTokenOut.amount) {
@@ -525,6 +529,30 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       const parsed = st ? parseTokenAccount(st.data) : null
       if (parsed && parsed.delegate !== null && parsed.delegatedAmount > 0n) {
         throw new UnsafeTransactionError(`Transaction leaves ${ap.delegate} approved for ${parsed.delegatedAmount} on ${ap.source} after it runs.`, 'approves-delegate', [ap.delegate])
+      }
+    }
+    // 4. Ownership and authorities, from the simulated post-state — this also
+    //    catches changes made by CPI inside an allowlisted router, which the
+    //    top-level decoding above cannot see.
+    const walletPre = pre.get(this.address)
+    const walletPost = post.get(this.address)
+    if (!walletPost || (walletPre && (walletPost.owner !== walletPre.owner || walletPost.data.length !== walletPre.data.length))) {
+      throw new UnsafeTransactionError('Transaction changes the owner program or data of this wallet account.', 'wallet-owner', [this.address])
+    }
+    const approvedSources = new Set(approvals.map((ap) => ap.source))
+    for (const addr of watched) {
+      if (addr === this.address) continue
+      const a = pre.get(addr)
+      const b = post.get(addr)
+      const before = a ? parseTokenAccount(a.data) : null
+      const after = b ? parseTokenAccount(b.data) : null
+      if (!before || !after) continue
+      if (!bytesEqual(before.owner, after.owner)) throw new UnsafeTransactionError(`Transaction changes the owner of token account ${addr}.`, 'sets-authority', [addr])
+      if (!optEqual(before.closeAuthority, after.closeAuthority)) throw new UnsafeTransactionError(`Transaction changes who may close token account ${addr}.`, 'sets-authority', [addr])
+      const liveAfter = after.delegate !== null && after.delegatedAmount > 0n
+      const sameAllowance = optEqual(before.delegate, after.delegate) && after.delegatedAmount <= before.delegatedAmount
+      if (liveAfter && !sameAllowance && !approvedSources.has(addr)) {
+        throw new UnsafeTransactionError(`Transaction leaves a new delegate allowance on token account ${addr}.`, 'approves-delegate', [addr])
       }
     }
     const exempt = new Set([...tokenInAtas, ...tokenOutAtas])

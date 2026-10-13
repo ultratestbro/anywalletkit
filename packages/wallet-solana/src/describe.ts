@@ -144,6 +144,7 @@ function decodeOne(r: Resolved): DecodedInstruction {
         const p = parseCreateAccountInstruction(ix)
         return { type: 'create-account', program, payer: p.accounts.payer.address, newAccount: p.accounts.newAccount.address, lamports: p.data.lamports, owner: p.data.programAddress }
       }
+      return { type: 'program-call', program, accounts: r.accounts.map((a) => a.address as string), dataLength: r.data.length, instruction: SystemInstruction[t] }
     } else if (program === TOKEN_PROGRAM_ADDRESS || program === TOKEN_2022_PROGRAM_ADDRESS) {
       return decodeToken(r, ix, program)
     } else if (program === ASSOCIATED_TOKEN_PROGRAM_ADDRESS) {
@@ -194,7 +195,7 @@ function decodeToken(r: Resolved, ix: never, program: string): DecodedInstructio
     const p = is2022 ? parseCloseAccount2022(ix) : parseCloseAccountInstruction(ix)
     return { type: 'close-account', program, tokenProgram, account: p.accounts.account.address, destination: p.accounts.destination.address, owner: p.accounts.owner.address }
   }
-  return { type: 'program-call', program, accounts: r.accounts.map((a) => a.address as string), dataLength: r.data.length }
+  return { type: 'program-call', program, accounts: r.accounts.map((a) => a.address as string), dataLength: r.data.length, instruction: is2022 ? Token2022Instruction[t as Token2022Instruction] : TokenInstruction[t as TokenInstruction] }
 }
 
 /** Normalize any accepted input (except a bare `{to, value}` transfer, which is described after building). */
