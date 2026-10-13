@@ -19,6 +19,11 @@
       "import": "./dist/router.js",
       "require": "./dist/router.cjs"
     },
+    "./value": {
+      "types": "./dist/value.d.ts",
+      "import": "./dist/value.js",
+      "require": "./dist/value.cjs"
+    },
     "./swap2/router": {
       "types": "./dist/swap2/router.d.ts",
       "import": "./dist/swap2/router.js",
@@ -38,7 +43,8 @@
     "lint": "echo ok"
   },
   "dependencies": {
-    "@forgewallet/protocol-swap2-core": "workspace:*"
+    "@forgewallet/protocol-swap2-core": "workspace:*",
+    "@forgewallet/swap2-assets": "workspace:*"
   },
   "peerDependencies": {
     "@forgewallet/core": "workspace:*"

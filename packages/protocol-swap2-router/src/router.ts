@@ -15,6 +15,46 @@ import type {
 import {validQuote} from "@forgewallet/protocol-swap2-core/validate";
 
 const DEFAULT_WEIGHTS: ScoreWeights = {price: 0.6, speed: 0.3, reliability: 0.1};
+/** Quotes within 0.2% of the best net value count as the same price. */
+const DEFAULT_TIE_BAND = 0.002;
+
+export interface RouterOptions {
+  /**
+   * "price:0.6,speed:0.3,reliability:0.1" — how quotes inside the tie band
+   * (same price, within `tieBand`) are ordered. Price itself always leads.
+   */
+  weights?: string;
+  /**
+   * What a quote is worth to the user in USD: its guaranteed output minus what
+   * the route charges on top (a native bridge fee, the source gas). Return null
+   * when it cannot be priced — the auction then compares guaranteed outputs.
+   * `usdValue(prices)` builds one from a symbol → USD price map.
+   */
+  valueUsd?: (quote: Quote, params: QuoteParams) => number | null;
+  /** Fraction of the best net value inside which quotes tie on price (default 0.002). */
+  tieBand?: number;
+}
+
+/** A validated quote with its place in the auction. */
+export interface RankedQuote extends Quote {
+  /** Net USD value (`valueUsd`), or null when the auction compared raw outputs. */
+  netValueUsd: number | null;
+  /** This quote's value against the best one, 0..1 (1 = the best price). */
+  relativeValue: number;
+  /** "best": the pick (best price; faster/more reliable among equal prices). "fastest": the lowest ETA. */
+  tags: ("best" | "fastest")[];
+}
+
+/** Every validated route for one request, ranked by value. */
+export interface RouteSet {
+  quotes: RankedQuote[];
+  best: RankedQuote;
+  fastest: RankedQuote;
+  /** Providers still quoting (only non-empty in progressive `onUpdate` snapshots). */
+  pending: string[];
+  /** Why the venues that sat out did (same as `lastRejections`). */
+  rejections: string[];
+}
 // LI.FI's /quote routinely takes ~3.5s (it builds executable calldata) — 4s
 // raced it out of every round. All providers still run in parallel.
 const QUOTE_TIMEOUT_MS = 8000;
@@ -59,8 +99,15 @@ export class CrossChainRouter {
     return this._lastRejections;
   }
   private readonly weights: ScoreWeights;
+  private readonly valueUsd: RouterOptions["valueUsd"];
+  private readonly tieBand: number;
+  private readonly options: RouterOptions;
 
-  constructor(providers: CrossChainProvider[], weightsSpec?: string) {
+  constructor(providers: CrossChainProvider[], options?: string | RouterOptions) {
+    const opts: RouterOptions = typeof options === "string" ? {weights: options} : {...(options ?? {})};
+    if (opts.tieBand !== undefined && !(Number.isFinite(opts.tieBand) && opts.tieBand >= 0 && opts.tieBand < 1)) {
+      throw new Error("cross-chain router: tieBand must be a fraction in [0, 1)");
+    }
     const names = new Set<string>();
     for (const provider of providers) {
       if (typeof provider.name !== "string" || !/^[A-Za-z0-9_-]+$/.test(provider.name) || names.has(provider.name)) {
@@ -88,7 +135,17 @@ export class CrossChainRouter {
       ...(provider.supportsChainPair ? {supportsChainPair: provider.supportsChainPair.bind(provider)} : {}),
       ...(provider.supportsSameChain !== undefined ? {supportsSameChain: provider.supportsSameChain} : {}),
     }));
-    this.weights = parseWeights(weightsSpec);
+    this.weights = parseWeights(opts.weights);
+    this.valueUsd = opts.valueUsd;
+    this.tieBand = opts.tieBand ?? DEFAULT_TIE_BAND;
+    this.options = opts;
+  }
+
+  /** The same auction restricted to one provider — to execute the route a user picked. */
+  only(name: string): CrossChainRouter {
+    const provider = this.getProvider(name);
+    if (!provider) throw new Error(`cross-chain router: provider '${name}' is not registered`);
+    return new CrossChainRouter([provider], this.options);
   }
 
   getProvider(name: string): CrossChainProvider | undefined {
@@ -119,15 +176,52 @@ export class CrossChainRouter {
     });
   }
 
+  /**
+   * The auction's pick: the best price (net of native fees and gas when
+   * `valueUsd` is set; faster, then more reliable, among equal prices), or
+   * the fastest route with `prefer: "fastest"`.
+   */
   async getBestQuote(
     params: QuoteParams,
-    options?: {requireImmediateExecution?: boolean},
+    options?: {requireImmediateExecution?: boolean; prefer?: "best" | "fastest"},
   ): Promise<RoutedQuote | null> {
+    const set = await this.getQuotes(params, options);
+    if (!set) return null;
+    const pick = options?.prefer === "fastest" ? set.fastest : set.best;
+    const {netValueUsd: _n, relativeValue: _r, tags: _t, ...quote} = pick;
+    return {
+      ...quote,
+      routeScore: {
+        score: pick.relativeValue,
+        weights: this.weights,
+        candidates: set.quotes.map((q) => ({
+          provider: q.provider,
+          sourceAmount: q.sourceAmount,
+          etaSeconds: q.etaSeconds,
+          score: q.relativeValue,
+          minDestAmount: q.minDestAmount,
+          netValueUsd: q.netValueUsd,
+        })),
+      },
+    };
+  }
+
+  /**
+   * Every validated route, ranked — for a route picker that shows the best and
+   * the fastest and lets the user choose. Providers run in parallel; with
+   * `onUpdate` each one that answers re-publishes the ranked set at once (the
+   * first price shows in the time of the fastest venue, not the slowest).
+   */
+  async getQuotes(
+    params: QuoteParams,
+    options?: {requireImmediateExecution?: boolean; onUpdate?: (set: RouteSet) => void},
+  ): Promise<RouteSet | null> {
     // A public engine caller — or one provider running in the same auction —
     // must not be able to rewrite another provider's request while async quote
     // work is in flight. QuoteParams is intentionally flat, so a frozen copy is
     // a complete execution snapshot.
-    this._lastRejections = [];
+    const rejections: string[] = [];
+    this._lastRejections = rejections;
     const snapshot = Object.freeze({...params});
     const from = Object.freeze({chain: snapshot.sourceChain, token: snapshot.sourceToken});
     const to = Object.freeze({chain: snapshot.destChain, token: snapshot.destToken});
@@ -148,54 +242,55 @@ export class CrossChainRouter {
     const timeoutMs = eligible.length === 1 ? SOLO_QUOTE_TIMEOUT_MS : QUOTE_TIMEOUT_MS;
     // Each venue names its own refusal (per call, so concurrent quotes cannot race).
     const refusals: (string | undefined)[] = [];
-    const settled = await Promise.all(eligible.map(async (p, i) => {
+    const accepted: Quote[] = [];
+    const pending = new Set(eligible.map((p) => p.name));
+    const publish = () => {
+      if (!options?.onUpdate || accepted.length === 0) return;
+      const set = this.rank(accepted, snapshot, [...pending], rejections);
+      try { options.onUpdate(set); } catch { /* an observer must not break the auction */ }
+    };
+    await Promise.all(eligible.map(async (p, i) => {
       const controller = new AbortController();
       const own = Object.freeze({...snapshot, onRefusal: (reason: string) => {
         refusals[i] ??= reason.startsWith(`${p.name}:`) ? reason : `${p.name}: ${reason}`;
         try { snapshot.onRefusal?.(reason); } catch { /* diagnostics only */ }
       }});
+      let q: Quote | null = null;
       try {
-        const result = await withTimeout(p.getQuote(own, controller.signal), timeoutMs);
-        return result;
+        q = await withTimeout(p.getQuote(own, controller.signal), timeoutMs);
+        if (!q) {
+          // A provider RETURNING null (vs throwing) was the one silent path
+          // left — record it so the surfaced no-route error names the venue.
+          rejections.push(refusals[i] ?? `${p.name}: returned no quote`);
+        } else if (!validQuote(q, snapshot, p.name)) {
+          const reason = `${p.name}: rejected by validation (minDest=${q.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"}, validUntil=${q.validUntilMs}, now=${Date.now()})`;
+          rejections.push(reason);
+          console.warn(`swap2-router: ${reason}`);
+          q = null;
+        } else if (options?.requireImmediateExecution && !(q.depositAddress.length > 0 || q.txRequest !== undefined)) {
+          // Legacy deposit-address screens cannot execute order-based quotes that
+          // require a separate build/sign/register lifecycle.
+          q = null;
+        }
       } catch (err) {
         // A failed venue sitting out silently is indistinguishable from "no
         // route" — record why (surfaced through lastRejections) and say it in
         // the console (same posture as onModuleSkipped).
         const reason = `${p.name}: ${err instanceof Error ? err.message.slice(0, 160) : String(err).slice(0, 160)}`;
-        this._lastRejections.push(reason);
+        rejections.push(reason);
         console.warn(`swap2-router: quote failed — ${reason}`);
-        return null;
+        q = null;
+      } finally {
+        controller.abort();
       }
-      finally { controller.abort(); }
+      pending.delete(p.name);
+      // Provider identity is an execution security boundary. Never trust the
+      // provider field returned by an untrusted adapter; bind it to its slot.
+      if (q) accepted.push({...q, provider: p.name});
+      publish();
     }));
-    // Provider identity is an execution security boundary. Never trust the
-    // provider field returned by an untrusted adapter; bind it to its slot.
-    let quotes = settled
-      .map((q, i) => {
-        if (!q) {
-          // A provider RETURNING null (vs throwing) was the one silent path
-          // left — record it so the surfaced no-route error names the venue.
-          this._lastRejections.push(refusals[i] ?? `${eligible[i]!.name}: returned no quote`);
-          return null;
-        }
-        if (!validQuote(q, snapshot, eligible[i]!.name)) {
-          const reason = `${eligible[i]!.name}: rejected by validation (minDest=${q.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"}, validUntil=${q.validUntilMs}, now=${Date.now()})`;
-          this._lastRejections.push(reason);
-          console.warn(`swap2-router: ${reason}`);
-          return null;
-        }
-        return {...q, provider: eligible[i]!.name};
-      })
-      .filter((q): q is Quote => q !== null);
-    // Legacy deposit-address screens cannot execute order-based quotes that
-    // require a separate build/sign/register lifecycle. Keep their preview and
-    // live selection on providers that are immediately executable as returned.
-    if (options?.requireImmediateExecution) {
-      quotes = quotes.filter((q) => q.depositAddress.length > 0 || q.txRequest !== undefined);
-    }
-    if (quotes.length === 0) return null;
-
-    return this.score(quotes);
+    if (accepted.length === 0) return null;
+    return this.rank(accepted, snapshot, [], rejections);
   }
 
   async trackIntent(providerName: string, ref: IntentRef): Promise<IntentStatus> {
@@ -213,42 +308,57 @@ export class CrossChainRouter {
     for (const provider of this.providers) provider.close?.();
   }
 
-  private score(quotes: Quote[]): RoutedQuote {
-    // Exact-in: every candidate spends the same source amount, so price
-    // quality = how much lands on the destination.
-    // Optimize the guaranteed delivery, not an optimistic nominal amount.
-    const dests = quotes.map((q) => BigInt(q.minDestAmount));
-    const minDst = dests.reduce((a, b) => (b < a ? b : a));
-    const maxDst = dests.reduce((a, b) => (b > a ? b : a));
-    const etas = quotes.map((q) => q.etaSeconds);
+  /**
+   * Price first: each quote's value is its net USD (`valueUsd`) — or, when any
+   * quote cannot be priced, its guaranteed output — against the best one.
+   * Quotes within `tieBand` of the best are the same price; among those the
+   * weights order speed and reliability. A $0.01 edge no longer beats a route
+   * that lands in seconds instead of twenty minutes, and a route that charges
+   * a native bridge fee on top no longer wins on its gross output.
+   */
+  private rank(quotes: Quote[], params: QuoteParams, pending: string[], rejections: string[]): RouteSet {
+    const usd = this.valueUsd ? quotes.map((q) => {
+      try {
+        const v = this.valueUsd!(q, params);
+        return typeof v === "number" && Number.isFinite(v) ? v : null;
+      } catch { return null; }
+    }) : quotes.map(() => null);
+    const priced = usd.every((v) => v !== null);
+    let relative: number[];
+    if (priced) {
+      const values = usd as number[];
+      const max = Math.max(...values);
+      relative = values.map((v) => (max > 0 ? Math.max(0, v) / max : v >= max ? 1 : 0));
+    } else {
+      const outs = quotes.map((q) => BigInt(q.minDestAmount));
+      const max = outs.reduce((a, b) => (b > a ? b : a));
+      relative = outs.map((o) => fraction(o, max));
+    }
+    const ranked: RankedQuote[] = quotes.map((q, i) => ({
+      ...q,
+      netValueUsd: priced ? usd[i]! : null,
+      relativeValue: relative[i]!,
+      tags: [],
+    }));
+
+    const tier = ranked.filter((q) => q.relativeValue >= 1 - this.tieBand - 1e-12);
+    const etas = tier.map((q) => q.etaSeconds);
     const minEta = Math.min(...etas);
     const maxEta = Math.max(...etas);
-
     const w = this.weights;
-    const scored = quotes.map((q) => {
-      const dst = BigInt(q.minDestAmount);
-      // more delivered = higher price score
-      const priceScore = maxDst === minDst ? 1 : fraction(dst - minDst, maxDst - minDst);
-      const speedScore = maxEta === minEta ? 1 : (maxEta - q.etaSeconds) / (maxEta - minEta);
-      const score = w.price * priceScore + w.speed * speedScore + w.reliability * q.reliability;
-      return {quote: q, score};
-    });
-    scored.sort((a, b) => b.score - a.score);
+    const tieScore = (q: RankedQuote) =>
+      w.price * q.relativeValue +
+      w.speed * (maxEta === minEta ? 1 : (maxEta - q.etaSeconds) / (maxEta - minEta)) +
+      w.reliability * q.reliability;
+    const best = tier.reduce((a, b) => (tieScore(b) > tieScore(a) ? b : a));
+    const fastest = ranked.reduce((a, b) =>
+      b.etaSeconds < a.etaSeconds || (b.etaSeconds === a.etaSeconds && b.relativeValue > a.relativeValue) ? b : a);
+    best.tags.push("best");
+    fastest.tags.push("fastest");
 
-    const best = scored[0]!;
-    return {
-      ...best.quote,
-      routeScore: {
-        score: best.score,
-        weights: w,
-        candidates: scored.map((s) => ({
-          provider: s.quote.provider,
-          sourceAmount: s.quote.sourceAmount,
-          etaSeconds: s.quote.etaSeconds,
-          score: s.score,
-        })),
-      },
-    };
+    // The list reads top-down by value; the pick leads its price tier.
+    ranked.sort((a, b) => (a === best ? -1 : b === best ? 1 : b.relativeValue - a.relativeValue || a.etaSeconds - b.etaSeconds));
+    return {quotes: ranked, best, fastest, pending, rejections: [...rejections]};
   }
 }
 

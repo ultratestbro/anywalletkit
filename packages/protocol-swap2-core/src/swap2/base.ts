@@ -616,6 +616,22 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     };
   }
 
+  /** A frozen, validated copy of caller options (what every engine path works from). */
+  protected snapshotOf(options: Swap2Options): Swap2Options {
+    return snapshotOptions(options);
+  }
+
+  /** A dry route the auction already validated → the public quote, or null when the caller's floor / fee caps refuse it. */
+  protected routeQuote(q: Quote, options: Swap2Options): Swap2Quote | null {
+    try {
+      assertQuoteConstraints(q, options);
+      this.assertQuoteFeeCaps(q, options);
+      return this.toQuote(q, options);
+    } catch {
+      return null;
+    }
+  }
+
   override async quoteSwap2(options: Swap2Options): Promise<Swap2Quote> {
     const snapshot = snapshotOptions(options);
     const q = await this.resolveQuote(this.toParams(snapshot, true));

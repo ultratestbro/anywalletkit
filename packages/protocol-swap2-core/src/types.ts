@@ -94,7 +94,8 @@ export interface RoutedQuote extends Quote {
   routeScore: {
     score: number;
     weights: ScoreWeights;
-    candidates: {provider: string; sourceAmount: string; etaSeconds: number; score: number}[];
+    /** Every validated route: `score` is its value against the best (0..1). */
+    candidates: {provider: string; sourceAmount: string; etaSeconds: number; score: number; minDestAmount?: string; netValueUsd?: number | null}[];
   };
 }
 

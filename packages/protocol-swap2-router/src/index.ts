@@ -22,8 +22,9 @@
  * the core package); give it `supportsChain`/`supportsChainPair` — e.g. from
  * the provider package's `config` export — so discovery knows its coverage.
  */
-export {CrossChainRouter} from "./router.js";
-export {RouterSwap2Protocol, type RouterSwap2Config} from "./swap2/router.js";
+export {CrossChainRouter, type RouterOptions, type RankedQuote, type RouteSet} from "./router.js";
+export {usdValue} from "./value.js";
+export {RouterSwap2Protocol, type RouterSwap2Config, type Swap2Route} from "./swap2/router.js";
 export {RouterSwap2Protocol as default} from "./swap2/router.js";
 export {remoteProvider, type RemoteProviderOptions} from "@forgewallet/protocol-swap2-core/remote";
 export type * from "@forgewallet/protocol-swap2-core/types";

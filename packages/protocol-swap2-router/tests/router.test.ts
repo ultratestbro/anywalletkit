@@ -130,3 +130,85 @@ describe("router dispatch snapshot", () => {
     expect(calls).toEqual(["claim"]);
   });
 });
+
+describe("ranking, route picker, progressive quotes", () => {
+  const q = (name: string, out: string, eta: number, extra: Record<string, unknown> = {}, delayMs = 0) =>
+    provider(name, {
+      getQuote: async (params) => {
+        if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
+        return {
+          provider: name, intentId: name, depositAddress: "0xd", depositMemo: null,
+          sourceAmount: params.amountIn, destAmount: out, minDestAmount: out,
+          feeUsd: 0, etaSeconds: eta, reliability: 0.95, validUntilMs: Date.now() + 60_000, ...extra,
+        };
+      },
+    });
+  // Ethereum USDT → Arbitrum USDT (6 decimals): 1_000_000 = $1.
+  const PARAMS = {
+    sourceChain: "eip155:1", sourceToken: "USDT", destChain: "eip155:42161",
+    destToken: "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", amountIn: "100000000", destAddress: "0x3333333333333333333333333333333333333333",
+  };
+
+  it("a sliver of extra output no longer beats a route twenty times faster", async () => {
+    const router = new CrossChainRouter([q("slow", "99950000", 1200), q("fast", "99900000", 60)]);
+    const set = (await router.getQuotes(PARAMS))!;
+    expect(set.best.provider).toBe("fast"); // 0.05% apart: the same price, the faster wins
+    expect(set.fastest.provider).toBe("fast");
+    expect(set.quotes.map((x) => x.provider)).toEqual(["fast", "slow"]);
+  });
+
+  it("a real price gap still wins over speed", async () => {
+    const router = new CrossChainRouter([q("slow", "99000000", 1200), q("fast", "97000000", 60)]);
+    const set = (await router.getQuotes(PARAMS))!;
+    expect(set.best.provider).toBe("slow");
+    expect(set.best.tags).toEqual(["best"]);
+    expect(set.fastest.provider).toBe("fast");
+    expect(set.fastest.tags).toEqual(["fastest"]);
+    expect((await router.getBestQuote(PARAMS, {prefer: "fastest"}))!.provider).toBe("fast");
+  });
+
+  it("nets a native bridge fee out of the route's value (usdValue)", async () => {
+    const {usdValue} = await import("../src/value.js");
+    // "bridge" lands $1 more but charges 0.001 ETH ($3) on top of the input.
+    const router = new CrossChainRouter(
+      [q("bridge", "100000000", 60, {txRequest: {to: "0xd", data: "0x", value: "1000000000000000", nativeFee: "1000000000000000"}}), q("plain", "99000000", 60)],
+      {valueUsd: usdValue({ETH: 3000, USDT: 1})},
+    );
+    const set = (await router.getQuotes(PARAMS))!;
+    expect(set.best.provider).toBe("plain");
+    expect(set.quotes.find((x) => x.provider === "bridge")!.netValueUsd).toBeCloseTo(97, 6);
+    expect(set.best.netValueUsd).toBeCloseTo(99, 6);
+  });
+
+  it("without a price for every quote it compares guaranteed outputs", async () => {
+    const router = new CrossChainRouter([q("a", "99000000", 60), q("b", "98000000", 60)], {valueUsd: () => null});
+    const set = (await router.getQuotes(PARAMS))!;
+    expect(set.best.provider).toBe("a");
+    expect(set.best.netValueUsd).toBeNull();
+  });
+
+  it("publishes the ranked set as each provider answers — the first price does not wait for the slowest", async () => {
+    const router = new CrossChainRouter([q("quick", "98000000", 60, {}, 5), q("late", "99500000", 300, {}, 80)]);
+    const updates: {providers: string[]; pending: string[]; at: number}[] = [];
+    const t0 = Date.now();
+    const final = await router.getQuotes(PARAMS, {onUpdate: (s) => updates.push({providers: s.quotes.map((x) => x.provider), pending: s.pending, at: Date.now() - t0})});
+    expect(updates[0]).toMatchObject({providers: ["quick"], pending: ["late"]});
+    expect(updates[0]!.at).toBeLessThan(60);
+    expect(updates.at(-1)).toMatchObject({providers: ["late", "quick"], pending: []});
+    expect(final!.best.provider).toBe("late");
+  });
+
+  it("lists routes for a picker and executes the one the user chose", async () => {
+    const swap2 = new RouterSwap2Protocol(undefined, {fromChain: "eip155:1", providers: [q("slow", "99000000", 1200), q("fast", "97000000", 60)]});
+    const options = {
+      fromToken: "USDT", toToken: "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", toChain: "eip155:42161",
+      fromTokenAmount: 100_000_000n, recipient: "0x3333333333333333333333333333333333333333",
+    };
+    const routes = await swap2.quoteSwap2Routes(options);
+    expect(routes.map((r) => [r.provider, r.tags])).toEqual([["slow", ["best"]], ["fast", ["fastest"]]]);
+    expect((await swap2.using("fast").quoteSwap2(options)).toTokenAmountMin).toBe(97_000_000n);
+    expect(() => swap2.using("nope")).toThrow(/not registered/);
+    const fastFirst = new RouterSwap2Protocol(undefined, {fromChain: "eip155:1", prefer: "fastest", providers: [q("slow", "99000000", 1200), q("fast", "97000000", 60)]});
+    expect((await fastFirst.quoteSwap2(options)).toTokenAmountMin).toBe(97_000_000n);
+  });
+});
