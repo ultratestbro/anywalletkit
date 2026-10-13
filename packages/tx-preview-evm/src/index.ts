@@ -117,6 +117,11 @@ export interface TxPreview {
 const UNLIMITED = 1n << 255n;
 const NATIVE_TRACE = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+/** WETH9 `Deposit(address indexed dst, uint wad)` / `Withdrawal(address indexed src, uint wad)`: wrapping mints
+ *  and unwrapping burns without a Transfer log. */
+const WETH_DEPOSIT_TOPIC = "0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c";
+const WETH_WITHDRAWAL_TOPIC = "0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65";
+const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
 const ABI = parseAbi([
   "function approve(address spender, uint256 amount)",
@@ -208,8 +213,27 @@ async function simulateV1(input: PreviewInput): Promise<Simulation | null> {
 
   const me = lc(input.from);
   const deltas = new Map<string, bigint>();
+  // Some wrapped natives (e.g. Sonic wS) emit a mint/burn Transfer alongside
+  // Deposit/Withdrawal; the WETH9 events count only when no such Transfer did.
+  const wethDeltas = new Map<string, bigint>();
+  const mintBurn = new Set<string>();
   for (const c of calls) for (const log of c.logs ?? []) {
-    if (lc(log.topics[0] ?? "") !== TRANSFER_TOPIC || log.topics.length !== 3) continue; // ERC-721 has 4 topics
+    const topic = lc(log.topics[0] ?? "");
+    // WETH9 wrap/unwrap — counted only for contracts the caller lists as known (a
+    // look-alike event from an arbitrary contract must not show as a balance change).
+    if ((topic === WETH_DEPOSIT_TOPIC || topic === WETH_WITHDRAWAL_TOPIC) && log.topics.length === 2 && knownLabel(input.known ?? {}, lc(log.address))) {
+      if (`0x${(log.topics[1] ?? "").slice(26)}` !== me) continue;
+      let wad: bigint;
+      try {
+        wad = BigInt(log.data);
+      } catch {
+        continue;
+      }
+      const token = lc(log.address);
+      wethDeltas.set(token, (wethDeltas.get(token) ?? 0n) + (topic === WETH_DEPOSIT_TOPIC ? wad : -wad));
+      continue;
+    }
+    if (topic !== TRANSFER_TOPIC || log.topics.length !== 3) continue; // ERC-721 has 4 topics
     const from = `0x${(log.topics[1] ?? "").slice(26)}`;
     const to = `0x${(log.topics[2] ?? "").slice(26)}`;
     let amount: bigint;
@@ -221,7 +245,9 @@ async function simulateV1(input: PreviewInput): Promise<Simulation | null> {
     const token = lc(log.address) === NATIVE_TRACE ? "native" : lc(log.address);
     if (from === me) deltas.set(token, (deltas.get(token) ?? 0n) - amount);
     if (to === me) deltas.set(token, (deltas.get(token) ?? 0n) + amount);
+    if ((from === me && to === ZERO_ADDR) || (from === ZERO_ADDR && to === me)) mintBurn.add(token);
   }
+  for (const [token, d] of wethDeltas) if (!mintBurn.has(token)) deltas.set(token, (deltas.get(token) ?? 0n) + d);
   const native = input.native ?? {symbol: "ETH", decimals: 18};
   const changes: BalanceChange[] = [];
   for (const [token, delta] of deltas) {

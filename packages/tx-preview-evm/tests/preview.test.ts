@@ -85,6 +85,27 @@ describe("previewEvmTx", () => {
     expect(p.checks.find((c) => c.code === "approval-excess")).toMatchObject({status: "warn", detail: {amount: "500000000", expected: "100000000"}});
   });
 
+  it("counts WETH9 Deposit / Withdrawal from a known wrapped token, ignores look-alikes", async () => {
+    const WETH = "0x4200000000000000000000000000000000000006";
+    const DEPOSIT = "0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c";
+    const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+    const ethOut = log(NATIVE, ME, WETH, 10n ** 16n);
+    const wrapMeta = (params: unknown[]) => ((params[0] as {data: string}).data === "0x95d89b41" ? encodeAbiParameters([{type: "string"}], ["WETH"]) : toHex(18, {size: 32}));
+    const depositFrom = (token: string) => ({address: token, topics: [DEPOSIT, pad(ME)], data: toHex(10n ** 16n, {size: 32})});
+    const wrap = {to: WETH, data: "0xd0e30db0", value: 10n ** 16n};
+    const r = rpc({eth_simulateV1: () => [{calls: [{status: "0x1", logs: [ethOut, depositFrom(WETH)]}]}], eth_call: wrapMeta});
+    const p = await previewEvmTx({chainId: 8453, from: ME, calls: [wrap], rpc: r, own: [ME], known: {[WETH]: "WETH"}});
+    expect(p.simulation.status === "ok" && p.simulation.changes.map((c) => `${c.symbol}:${c.delta}`)).toEqual(["ETH:-10000000000000000", "WETH:10000000000000000"]);
+    // The same event from an unlisted contract is not a balance change.
+    const fake = rpc({eth_simulateV1: () => [{calls: [{status: "0x1", logs: [ethOut, depositFrom(STRANGER)]}]}], eth_call: wrapMeta});
+    const q = await previewEvmTx({chainId: 8453, from: ME, calls: [{...wrap, to: STRANGER}], rpc: fake, own: [ME], known: {[WETH]: "WETH"}});
+    expect(q.simulation.status === "ok" && q.simulation.changes.map((c) => c.symbol)).toEqual(["ETH"]);
+    // A wrapper that also emits a mint Transfer (Sonic wS) is counted once.
+    const both = rpc({eth_simulateV1: () => [{calls: [{status: "0x1", logs: [ethOut, depositFrom(WETH), log(WETH, "0x0000000000000000000000000000000000000000", ME, 10n ** 16n)]}]}], eth_call: wrapMeta});
+    const b = await previewEvmTx({chainId: 146, from: ME, calls: [wrap], rpc: both, own: [ME], known: {[WETH]: "WETH"}});
+    expect(b.simulation.status === "ok" && b.simulation.changes.map((c) => `${c.symbol}:${c.delta}`)).toEqual(["ETH:-10000000000000000", "WETH:10000000000000000"]);
+  });
+
   it("reports which call reverts and why", async () => {
     const r = rpc({eth_simulateV1: () => [{calls: [{status: "0x1", logs: []}, {status: "0x0", returnData: errString("ERC20: transfer amount exceeds balance"), logs: []}]}]});
     const p = await previewEvmTx({chainId: 8453, from: ME, calls: [approve, swap], rpc: r, own: [ME], known: {[DIAMOND]: "LI.FI"}});
