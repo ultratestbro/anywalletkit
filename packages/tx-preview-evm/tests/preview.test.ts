@@ -63,8 +63,8 @@ describe("previewEvmTx", () => {
     });
     const p = await previewEvmTx({chainId: 8453, from: ME, calls: [approve, swap], rpc: r, own: [ME], known: {[DIAMOND]: "LI.FI Diamond"}, expectedRecipient: ME, expectedApproval: 100_000_000n});
     expect(p.simulation).toEqual({status: "ok", gasUsed: [0xb000n, 0x4c2c0n], changes: [
-      {token: USDC, symbol: "USDC", decimals: 6, delta: -100_000_000n},
-      {token: "native", symbol: "ETH", decimals: 18, delta: 1n},
+      {token: USDC, symbol: "USDC", decimals: 6, delta: -100_000_000n, verified: false},
+      {token: "native", symbol: "ETH", decimals: 18, delta: 1n, verified: true},
     ]});
     expect(p.checks.map((c) => `${c.code}:${c.status}`)).toEqual(["contract-known:ok", "simulation-ok:ok", "recipient-own:ok", "approval-exact:ok"]);
   });
@@ -116,6 +116,18 @@ describe("previewEvmTx", () => {
     const [opts, tag] = seen[0] as [{blockStateCalls: {blockOverrides?: {time: string}}[]}, string];
     expect(tag).toBe("0x10");
     expect(opts.blockStateCalls[0]!.blockOverrides).toEqual({time: "0x65"});
+  });
+
+  it("a payable call under the ERC-20 transfer selector is a contract call: unknown contract + native value warn (audit F5)", async () => {
+    const data = encodeFunctionData({abi: parseAbi(["function transfer(address,uint256)"]), args: [ME as `0x${string}`, 1n]});
+    const r = rpc({eth_simulateV1: () => [{calls: [{status: "0x1", logs: []}]}]});
+    const p = await previewEvmTx({chainId: 1, from: ME, calls: [{to: STRANGER, data, value: 10n ** 18n}], rpc: r, own: [ME]});
+    expect(p.calls[0]!.transfer).toBeUndefined();
+    expect(p.checks.find((c) => c.code === "contract-unknown")?.status).toBe("warn");
+    expect(p.checks.find((c) => c.code === "native-value")?.status).toBe("warn");
+    // the same call to a known router keeps its green native-value tick
+    const q = await previewEvmTx({chainId: 1, from: ME, calls: [{to: DIAMOND, data, value: 1n}], rpc: r, own: [ME], known: {[DIAMOND]: "LI.FI"}});
+    expect(q.checks.find((c) => c.code === "native-value")?.status).toBe("ok");
   });
 
   it("reports which call reverts and why", async () => {

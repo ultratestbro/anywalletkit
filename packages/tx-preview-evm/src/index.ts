@@ -87,6 +87,8 @@ export interface BalanceChange {
   decimals: number | null;
   /** Signed, base units, for the sender. */
   delta: bigint;
+  /** Native, or a token the caller lists in `known`. Otherwise `symbol` is whatever the contract claims. */
+  verified: boolean;
 }
 
 export type Simulation =
@@ -173,9 +175,13 @@ export function decodeCall(call: PreviewCall, known: Record<string, string> = {}
       const spender = spenderOf(args[0]);
       return {...base, method: "setApprovalForAll", approval: {token: to, spender, spenderLabel: knownLabel(known, spender), amount: null, kind: "operator"}};
     }
+    // ERC-20 transfer/transferFrom are not payable: a call that also sends native
+    // value is something else wearing the selector, reviewed as a contract call.
     case "transfer":
+      if (value > 0n) return {...base, method: "transfer (with value)"};
       return {...base, method: "transfer", transfer: {token: to, to: lc(String(args[0])), amount: args[1] as bigint}};
     case "transferFrom":
+      if (value > 0n) return {...base, method: "transferFrom (with value)"};
       return {...base, method: "transferFrom", transfer: {token: to, to: lc(String(args[1])), amount: args[2] as bigint}};
     default:
       return base;
@@ -298,7 +304,7 @@ async function simulateV1(input: PreviewInput): Promise<Simulation | null> {
   for (const [token, delta] of deltas) {
     if (delta === 0n) continue;
     const meta = token === "native" ? native : await tokenMeta(input.rpc, token);
-    changes.push({token, symbol: meta.symbol, decimals: meta.decimals, delta});
+    changes.push({token, symbol: meta.symbol, decimals: meta.decimals, delta, verified: token === "native" || knownLabel(input.known ?? {}, token) !== null});
   }
   return {status: "ok", changes, gasUsed: calls.map((c) => BigInt(c.gasUsed ?? "0x0"))};
 }
@@ -397,6 +403,9 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
   }
 
   const nativeOut = calls.reduce((s, c) => s + c.value, 0n);
-  if (nativeOut > 0n && main.selector) checks.push({code: "native-value", status: "ok", detail: {amount: nativeOut.toString()}});
+  if (nativeOut > 0n && main.selector) {
+    // Native value into a contract nobody vouched for is a warning, not a tick.
+    checks.push({code: "native-value", status: main.label ? "ok" : "warn", detail: {amount: nativeOut.toString(), ...(main.label ? {} : {address: main.to})}});
+  }
   return checks;
 }
