@@ -47,6 +47,9 @@ importers:
       '@forgewallet/protocol-lending-aave-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-lending-aave-evm
+      '@forgewallet/protocol-lending-kamino-solana':
+        specifier: workspace:*
+        version: link:../../packages/protocol-lending-kamino-solana
       '@forgewallet/protocol-lending-mellow-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-lending-mellow-evm
