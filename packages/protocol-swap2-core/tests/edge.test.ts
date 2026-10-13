@@ -314,6 +314,17 @@ describe("edge: native-fee ceilings", () => {
     expect([log, reviewed]).toEqual([[], false]);
   });
 
+  it("non-ETH natives have their own ceiling (Sonic: a real 21.6 S bridge fee passes, 200 S + 1 does not)", async () => {
+    const onSonic = (fee: string) => {
+      let plan: Swap2ExecutionPlan | undefined;
+      const sonic = provider({getQuote: async (params) => quote(params, {txRequest: {...txRequest, chainId: 146, value: fee, nativeFee: fee}}), buildDeposit: async (q) => ({...built(q), chain: "eip155:146"})});
+      const run = protocol(sonic, account([], {getChainId: async () => 146}), {fromChain: "eip155:146", reviewExecution: (p) => { plan = p; throw new Error("stop at review"); }}).swap2(options);
+      return run.then(() => plan, (e: Error) => (plan ? plan : Promise.reject(e)));
+    };
+    await expect(onSonic("21604323626064016205")).resolves.toMatchObject({source: {value: 21_604_323_626_064_016_205n}});
+    await expect(onSonic("200000000000000000001")).rejects.toThrow(/exceeds the cap 200000000000000000000 for eip155:146/);
+  });
+
   it("a value that differs from the declared fee is refused; an in-cap declared fee is shown in the plan", async () => {
     const log: string[] = [];
     await expect(protocol(withFee("1000", "2000"), account(log)).swap2(options)).rejects.toThrow(/does not match the quoted native fee/);
