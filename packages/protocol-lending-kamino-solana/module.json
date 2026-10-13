@@ -1,0 +1,11 @@
+{
+  "name": "@forgewallet/protocol-lending-kamino-solana",
+  "type": "lending",
+  "chains": ["solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"],
+  "tier": "core",
+  "maintainers": ["@ultratestbro"],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/forgewallet",
+  "path": "packages/protocol-lending-kamino-solana",
+  "addedAt": "2026-10-13"
+}
