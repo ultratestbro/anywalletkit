@@ -37,12 +37,25 @@ export function fakeRpc(overrides: Record<string, Handler> = {}, opts: { emulate
   const sent: Cell[] = []
   const walletData = beginCell().storeAddress(Address.parse(JETTON_WALLET)).endCell().toBoc().toString('base64')
   const state = { emulations: 0, lastEmulateHeaders: {} as Record<string, string>, lastEmulateUrl: '' }
+  // A real jetton wallet reports (balance, owner, master): remember who asked the master.
+  let jettonOwner: string | undefined
+  let jettonMaster: string | undefined
+  const addrCell = (a: string) => ({ bytes: beginCell().storeAddress(Address.parse(a)).endCell().toBoc().toString('base64') })
   const handlers: Record<string, Handler> = {
     getAddressInformation: () => ({ '@type': 'raw.fullAccountState', balance: '1000000000', state: 'active', code: '', data: '', last_transaction_id: { '@type': 'internal.transactionId', lt: '1', hash: 'AA==' }, sync_utime: 1 }),
     runGetMethod: (p) => {
       if (p.method === 'seqno') return { '@type': 'smc.runResult', gas_used: 1, exit_code: 0, stack: [['num', '0x7']] }
-      if (p.method === 'get_wallet_address') return { '@type': 'smc.runResult', gas_used: 1, exit_code: 0, stack: [['cell', { bytes: walletData }]] }
-      if (p.method === 'get_wallet_data') return { '@type': 'smc.runResult', gas_used: 1, exit_code: 0, stack: [['num', '0x3e8']] }
+      if (p.method === 'get_wallet_address') {
+        jettonMaster = String(p.address)
+        const slice = (p.stack as Array<[string, string]> | undefined)?.[0]?.[1]
+        if (slice) jettonOwner = Cell.fromBase64(slice).beginParse().loadAddress().toString()
+        return { '@type': 'smc.runResult', gas_used: 1, exit_code: 0, stack: [['cell', { bytes: walletData }]] }
+      }
+      if (p.method === 'get_wallet_data') {
+        const stack: unknown[] = [['num', '0x3e8']]
+        if (jettonOwner && jettonMaster) stack.push(['cell', addrCell(jettonOwner)], ['cell', addrCell(jettonMaster)])
+        return { '@type': 'smc.runResult', gas_used: 1, exit_code: 0, stack }
+      }
       throw new Error(`unmocked get method ${String(p.method)}`)
     },
     estimateFee: () => ({ '@type': 'query.fees', source_fees: { '@type': 'fees', in_fwd_fee: 1000, storage_fee: 10, gas_fee: 2000, fwd_fee: 100 }, destination_fees: [] }),

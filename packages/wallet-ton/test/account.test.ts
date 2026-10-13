@@ -70,6 +70,24 @@ describe('WalletAccountTon', () => {
     m.dispose()
   })
 
+  it('refuses a jetton wallet whose get_wallet_data names another owner or master (audit F13)', async () => {
+    const OTHER_MASTER = new Address(0, Buffer.alloc(32, 9)).toString()
+    const cell = (a: string) => ({ bytes: beginCell().storeAddress(Address.parse(a)).endCell().toBoc().toString('base64') })
+    for (const [owner, master] of [[RECIPIENT, USDT], [ADDR0, OTHER_MASTER]] as const) {
+      const f = fakeRpc({
+        runGetMethod: (p) => {
+          if (p.method === 'seqno') return { '@type': 'smc.runResult', gas_used: 1, exit_code: 0, stack: [['num', '0x7']] }
+          if (p.method === 'get_wallet_address') return { '@type': 'smc.runResult', gas_used: 1, exit_code: 0, stack: [['cell', cell(JETTON_WALLET)]] }
+          return { '@type': 'smc.runResult', gas_used: 1, exit_code: 0, stack: [['num', '0x3e8'], ['cell', cell(owner)], ['cell', cell(master)]] }
+        },
+      })
+      const a = await manager(f).getAccount(0)
+      await expect(a.transfer({ token: USDT, recipient: RECIPIENT, amount: 1n })).rejects.toMatchObject({ code: 'jetton-wallet' })
+      await expect(a.getTokenBalance(USDT)).rejects.toMatchObject({ code: 'jetton-wallet' })
+      expect(f.sent).toHaveLength(0)
+    }
+  })
+
   it('jetton transfer: resolves the jetton wallet, 0x0f8a7ea5 body with forward payload/custom payload/response destination', async () => {
     const f = fakeRpc()
     const m = manager(f)

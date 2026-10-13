@@ -73,11 +73,28 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
     return r.stack.readAddress()
   }
 
+  /**
+   * Read a jetton wallet and prove it is ours for `token`: `get_wallet_data`
+   * must name this wallet as owner and `token` as master. The master's own
+   * `get_wallet_address` answer is not trusted on its own — a fake master could
+   * point at our real wallet of another jetton (e.g. USDT).
+   */
+  protected async jettonWalletData(token: string, jw: Address): Promise<bigint> {
+    const stack = (await this.requireRpc('read jetton wallets').runGetMethodOk(jw, 'get_wallet_data')).stack
+    const balance = stack.readBigNumber()
+    const owner = stack.readAddress()
+    const master = stack.readAddress()
+    if (!owner.equals(this._address) || !master.equals(Address.parse(token))) {
+      throw new UnsafeTransactionError('jetton-wallet', `The jetton wallet ${jw.toString()} does not belong to this wallet for ${token}.`)
+    }
+    return balance
+  }
+
   async getTokenBalance(token: string): Promise<bigint> {
     const rpc = this.requireRpc('get token balances')
     const jw = await this.getJettonWalletAddress(token)
     if ((await rpc.getAddressInformation(jw)).state !== 'active') return 0n // never received this jetton
-    return (await rpc.runGetMethodOk(jw, 'get_wallet_data')).stack.readBigNumber()
+    return this.jettonWalletData(token, jw)
   }
 
   // ── Message building ──────────────────────────────────────────────────────
@@ -117,6 +134,7 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
     if (amount <= 0n) throw new UnsafeTransactionError('zero-value', 'Jetton amount must be positive.')
     const recipient = Address.parse(o.recipient)
     const jw = await this.getJettonWalletAddress(o.token!)
+    await this.jettonWalletData(o.token!, jw)
     const forwardTonAmount = o.forwardTonAmount !== undefined ? big(o.forwardTonAmount) : 1n
     const forwardPayload = o.forwardPayload === undefined ? null : typeof o.forwardPayload === 'string' ? commentCell(o.forwardPayload) : o.forwardPayload
     const body = beginCell()
