@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { NotImplementedError, ReadOnlyAccountError, type IWalletAccount, type IWalletAccountReadOnly, type ProtocolType } from '@forgewallet/core'
 import { createMockAccount } from './mock-account.js'
+import { describeActivitySuite, type ActivityFixtureJson } from './activity-suite.js'
 
 type AnyProtocol = Record<string, unknown>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -35,6 +36,12 @@ export interface ProtocolSuiteOptions<P> {
   account?: () => IWalletAccount
   /** Constructor config, when the module requires one (e.g. swap2 engines need `fromChain`). */
   config?: unknown
+  /**
+   * Recorded transactions the module must recognize through `describeActivity` (and ones it must
+   * refuse). Required for every module in the registry: a wallet built on the SDK shows these as
+   * "Supplied USDC · Aave v3" instead of "Contract call". Load them from `fixtures/activity/*.json`.
+   */
+  activity?: { fixtures: ActivityFixtureJson[]; negatives?: ActivityFixtureJson[] }
 }
 
 /** The conformance suite every protocol module must pass. */
@@ -42,6 +49,8 @@ export function describeProtocolModule<P extends object>(name: string, o: Protoc
   const { writes, reads } = SURFACE[o.type]!
   const skip = new Set(o.notImplemented ?? [])
   const unsupported = new Set(o.unsupported ?? [])
+
+  if (o.activity) describeActivitySuite(name, { Protocol: o.Protocol, config: o.config, ...o.activity })
 
   describe(`${name}: conformance (${o.type})`, () => {
     it('implements the full surface (every method is a function)', () => {
