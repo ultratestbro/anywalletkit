@@ -25,6 +25,8 @@ history.explorerTxUrl(one.hash) // https://basescan.org/tx/0x…
 | `chainId` | — | 1, 8453, 42161, 10, 137, 56, 43114, 100, 130, 143, 999, 146, 80094, 59144, 534352, 324, 42220, 9745, 4326, 4663, 480, 1329, 57073, 98866, 196 |
 | `etherscanApiKey` | none | Without it Etherscan is never called: since 2026 `api.etherscan.io/v2` answers `Missing/Invalid API Key` to keyless requests. |
 | `etherscanUrl` | `https://api.etherscan.io/v2/api` | Point at a proxy that adds the key server-side. |
+| `blockscoutProApiKey` | none | Blockscout PRO multichain key (`proapi_…`; free tier 100K credits/day, 5 rps, one key for every Blockscout chain). Etherscan-format with `chain_id=`; tried after Etherscan, so a free Etherscan key + a free PRO key together cover Base, Arbitrum, Polygon, Optimism, Gnosis, Robinhood, Arc, Scroll, zkSync, Ink, Plume without a paid plan. Register at docs.blockscout.com/devs/pro-api. |
+| `blockscoutProUrl` / `blockscoutProRateLimit` | `https://api.blockscout.com/v2/api` / 5 | Override the endpoint (proxy) / the per-key limiter. |
 | `blockscoutUrl` | built-in table | Any Blockscout `/api/v2` root; adds or overrides the chain's entry. |
 | `etherscanCompatUrl` | built-in table (Routescan) | Keyless Etherscan-format endpoint. |
 | `fetch` | `globalThis.fetch` | Inject for tests / custom transports. |
@@ -45,6 +47,8 @@ The Etherscan v2 chainlist (`/v2/chainlist`) is fetched once per process and
 cached; when it cannot be fetched the table verified on 2026-10-14 is used.
 
 ## Chain coverage (verified with curl on 2026-10-14)
+
+With a **Blockscout PRO** key the picture below changes: every chain in Blockscout's PRO config (1, 10, 100, 130, 137, 324, 480, 534352, 4326, 4663, 5042, 8453, 42161, 42220, 57073, 98866 as of 2026-10-14; the docs say "all chains" and the backend is tried everywhere, falling through on an unsupported-chain answer) is served through one free key, including the Cloudflare-gated Base / Arbitrum / Polygon / Robinhood / Arc. Not verified live with a real key yet.
 
 Probe used for Blockscout: `GET <root>/api/v2/addresses/0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA/transactions`
 and `/api/v2/transactions`, kept only when both answer `200` JSON.

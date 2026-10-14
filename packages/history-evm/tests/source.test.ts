@@ -118,3 +118,39 @@ describe('chains without a usable backend', () => {
     expect(fetch.etherscanCalls).toBe(0)
   })
 })
+
+describe('Blockscout PRO backend', () => {
+  const ADDRESS = '0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA'
+  const empty = { status: '0', message: 'No transactions found', result: [] }
+  function proFetch(seen: string[]) {
+    return async (url: string) => {
+      seen.push(url)
+      if (url.includes('api.etherscan.io')) return { ok: true, status: 200, json: async () => ({ status: '0', message: 'NOTOK', result: 'Free API access is not supported for this chain' }), text: async () => '' }
+      if (url.includes('api.blockscout.com')) return { ok: true, status: 200, json: async () => empty, text: async () => '' }
+      return { ok: false, status: 404, json: async () => ({}), text: async () => '' }
+    }
+  }
+  it('serves a paid-only Etherscan chain (Base) through the PRO key with chain_id= and apikey=', async () => {
+    const seen: string[] = []
+    const src = createEvmHistory({ chainId: 8453, etherscanApiKey: 'free', blockscoutProApiKey: 'proapi_x', fetch: proFetch(seen) as never, rateLimit: 1000, blockscoutProRateLimit: 1000 })
+    const page = await src.listActivity(ADDRESS)
+    expect(page.backend).toBe('blockscout-pro')
+    const pro = seen.find((u) => u.includes('api.blockscout.com'))!
+    expect(pro).toContain('chain_id=8453')
+    expect(pro).toContain('apikey=proapi_x')
+    expect(pro).not.toContain('chainid=')
+  })
+  it('X Layer is no longer short-circuited when a PRO key is set', async () => {
+    const seen: string[] = []
+    const src = createEvmHistory({ chainId: 196, blockscoutProApiKey: 'proapi_x', fetch: proFetch(seen) as never, blockscoutProRateLimit: 1000 })
+    const page = await src.listActivity(ADDRESS)
+    expect(page.backend).toBe('blockscout-pro')
+    expect(seen.some((u) => u.includes('chain_id=196'))).toBe(true)
+  })
+  it('an "Unauthorized" PRO answer is classified unavailable and falls through', async () => {
+    const fetch = async (url: string) => ({ ok: true, status: 200, json: async () => (url.includes('api.blockscout.com') ? { error: 'Unauthorized' } : empty), text: async () => '' })
+    const src = createEvmHistory({ chainId: 1, blockscoutProApiKey: 'bad', fetch: fetch as never, blockscoutProRateLimit: 1000 })
+    const page = await src.listActivity(ADDRESS)
+    expect(page.backend).toBe('routescan')
+  })
+})

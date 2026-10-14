@@ -1,6 +1,7 @@
 import type { HistoryQuery } from '@forgewallet/core'
 import { BlockscoutClient } from './blockscout.js'
 import {
+  BLOCKSCOUT_PRO_API,
   BLOCKSCOUT_URLS,
   ETHERSCAN_COMPAT_URLS,
   ETHERSCAN_V2_API,
@@ -62,9 +63,10 @@ export function resetEtherscanChainlistCache(): void {
 
 /**
  * A `HistorySource` for one EVM chain. Backends, in order: Etherscan v2 (only
- * with an API key and only for chains the v2 chainlist serves) → keyless
- * Etherscan-format mirror (Routescan, where one exists) → Blockscout (where a
- * public instance exists). `prefer: 'blockscout'` moves Blockscout first.
+ * with an API key and only for chains the v2 chainlist serves) → Blockscout PRO
+ * (with its key; Etherscan-format, one key for every Blockscout chain) → keyless
+ * Etherscan-format mirror (Routescan, where one exists) → Blockscout instance
+ * (where a public one exists). `prefer: 'blockscout'` moves Blockscout first.
  */
 export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
   const { chainId } = options
@@ -77,7 +79,7 @@ export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
   const compatUrl = options.etherscanCompatUrl === null ? undefined : (options.etherscanCompatUrl ?? ETHERSCAN_COMPAT_URLS[chainId])
   const blockscoutUrl = options.blockscoutUrl === null ? undefined : (options.blockscoutUrl ?? BLOCKSCOUT_URLS[chainId])
   // No explorer API at all (and no override): answer locally, never touch the network.
-  const noExplorer = NO_EXPLORER_CHAIN_IDS.includes(chainId) && !compatUrl && !blockscoutUrl
+  const noExplorer = NO_EXPLORER_CHAIN_IDS.includes(chainId) && !compatUrl && !blockscoutUrl && !options.blockscoutProApiKey
 
   let resolved: Promise<Backend[]> | undefined
   const resolveBackends = (): Promise<Backend[]> => {
@@ -100,6 +102,20 @@ export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
           )
         }
       }
+      if (options.blockscoutProApiKey) {
+        list.push(
+          new EtherscanClient({
+            backend: 'blockscout-pro',
+            baseUrl: options.blockscoutProUrl ?? BLOCKSCOUT_PRO_API,
+            chainId,
+            chainParam: 'chain_id',
+            apiKey: options.blockscoutProApiKey,
+            fetch: fetchFn,
+            bucket: sharedBucket(`blockscout-pro:${options.blockscoutProApiKey}`, options.blockscoutProRateLimit ?? 5),
+            timeoutMs,
+          }),
+        )
+      }
       if (compatUrl) {
         list.push(new EtherscanClient({ backend: 'routescan', baseUrl: compatUrl, fetch: fetchFn, bucket: sharedBucket(`compat:${compatUrl}`, 2), timeoutMs }))
       }
@@ -114,7 +130,7 @@ export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
 
   const noBackendReason = (): string => {
     if (NO_EXPLORER_CHAIN_IDS.includes(chainId)) return `chain ${chainId} has no public explorer API (no Etherscan v2, Blockscout or Routescan)`
-    if (!apiKey) return `chain ${chainId} has no keyless explorer; pass etherscanApiKey (Etherscan v2 rejects keyless requests)`
+    if (!apiKey && !options.blockscoutProApiKey) return `chain ${chainId} has no keyless explorer; pass etherscanApiKey or blockscoutProApiKey (both have free tiers)`
     return `Etherscan v2 does not serve chain ${chainId} and no Blockscout / Routescan instance is known; pass blockscoutUrl`
   }
 

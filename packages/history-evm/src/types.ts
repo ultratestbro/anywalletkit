@@ -1,7 +1,7 @@
 import type { ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@forgewallet/core'
 
 /** Which explorer family answered. `routescan` = keyless Etherscan-format mirror. */
-export type HistoryBackend = 'etherscan' | 'routescan' | 'blockscout'
+export type HistoryBackend = 'etherscan' | 'blockscout-pro' | 'routescan' | 'blockscout'
 
 /** The subset of WHATWG `fetch` this package uses; lets tests and hosts inject their own. */
 export type FetchLike = (
@@ -20,6 +20,17 @@ export interface EvmHistoryOptions {
   etherscanApiKey?: string
   /** Override the Etherscan v2 endpoint (e.g. a proxy that adds the key server-side). Default `https://api.etherscan.io/v2/api`. */
   etherscanUrl?: string
+  /**
+   * Blockscout PRO multichain API key (`proapi_…`, free tier 100K credits/day, 5 rps, every
+   * Blockscout chain through one key). Etherscan-format (`chain_id=` instead of `chainid=`), so it
+   * covers chains where the free Etherscan key is refused (Base, Optimism, BSC, Avalanche, Gnosis,
+   * Arc, Robinhood) and ones Etherscan v2 lacks (Scroll, zkSync, Ink, Plume). Tried after Etherscan.
+   */
+  blockscoutProApiKey?: string
+  /** Override the Blockscout PRO endpoint. Default `https://api.blockscout.com/v2/api`. */
+  blockscoutProUrl?: string
+  /** Blockscout PRO requests per second (free tier: 5). Shared per key across chains. */
+  blockscoutProRateLimit?: number
   /** Blockscout instance root (`https://eth.blockscout.com`). Overrides / adds to the built-in table; `null` disables the built-in entry. */
   blockscoutUrl?: string | null
   /** Keyless Etherscan-format endpoint (Routescan style). Overrides / adds to the built-in table; `null` disables the built-in entry. */

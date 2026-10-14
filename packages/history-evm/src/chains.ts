@@ -12,6 +12,14 @@ export const SUPPORTED_CHAIN_IDS: readonly number[] = [
 
 export const ETHERSCAN_V2_API = 'https://api.etherscan.io/v2/api'
 export const ETHERSCAN_V2_CHAINLIST = 'https://api.etherscan.io/v2/chainlist'
+/** Blockscout PRO multichain API (Etherscan-format, `chain_id=` + `apikey=`); docs: https://docs.blockscout.com/devs/pro-api */
+export const BLOCKSCOUT_PRO_API = 'https://api.blockscout.com/v2/api'
+/**
+ * Chains listed in Blockscout's PRO prod config (github.com/blockscout/backend-configs pro-api/prod/chains-config.json,
+ * read 2026-10-14). The docs say "all chains"; the backend is tried for every chain when a key is set and
+ * falls through on an "unsupported chain" answer, so this list is documentation, not a gate.
+ */
+export const BLOCKSCOUT_PRO_CHAIN_IDS: readonly number[] = [1, 10, 100, 130, 137, 324, 480, 534352, 4326, 4663, 5042, 8453, 42161, 42220, 57073, 98866]
 
 /**
  * Chain ids `https://api.etherscan.io/v2/chainlist` listed on 2026-10-14 (63

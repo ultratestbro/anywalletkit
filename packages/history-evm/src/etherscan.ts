@@ -12,8 +12,10 @@ export interface EtherscanClientOptions {
   backend: HistoryBackend
   /** `https://api.etherscan.io/v2/api` or a Routescan-style mirror. */
   baseUrl: string
-  /** Added as `chainid=` (Etherscan v2 only). */
+  /** Added as `chainid=` (Etherscan v2) or `chain_id=` (Blockscout PRO), see `chainParam`. */
   chainId?: number
+  /** Query parameter name for the chain id. Default `chainid`. */
+  chainParam?: 'chainid' | 'chain_id'
   apiKey?: string
   fetch: FetchLike
   bucket: TokenBucket
@@ -30,7 +32,7 @@ interface EtherscanEnvelope {
 }
 
 /** Etherscan status "0" messages that mean "do not retry, this backend cannot serve the chain". */
-const UNAVAILABLE_PATTERNS = [/invalid api key/i, /missing.*api key/i, /free api access/i, /unsupported chainid/i, /community free api limit/i, /chain not supported/i, /upgrade.*plan/i]
+const UNAVAILABLE_PATTERNS = [/invalid api key/i, /missing.*api key/i, /free api access/i, /unsupported chain/i, /community free api limit/i, /chain not supported/i, /upgrade.*plan/i, /unauthorized/i, /proceed with api key/i, /x402/i]
 const RATE_LIMIT_PATTERNS = [/rate limit/i, /max calls per sec/i, /too many requests/i]
 const EMPTY_PATTERNS = [/no transactions found/i, /no records found/i]
 
@@ -46,7 +48,7 @@ export class EtherscanClient {
 
   url(params: Record<string, string | number | undefined>): string {
     const all: Record<string, string | number | undefined> = {}
-    if (this.o.chainId !== undefined) all['chainid'] = this.o.chainId
+    if (this.o.chainId !== undefined) all[this.o.chainParam ?? 'chainid'] = this.o.chainId
     Object.assign(all, params)
     if (this.o.apiKey) all['apikey'] = this.o.apiKey
     return `${this.o.baseUrl}${this.o.baseUrl.includes('?') ? '&' : '?'}${query(all)}`
@@ -65,6 +67,7 @@ export class EtherscanClient {
       }
       if (res.status >= 400) throw new ExplorerError(this.backend, 'http', `HTTP ${res.status}`)
       const env = (res.body ?? {}) as EtherscanEnvelope
+      if (typeof env.error === 'string' && env.error) throw new ExplorerError(this.backend, 'unavailable', env.error) // Blockscout PRO: {"error":"Unauthorized"}
       if (env.error && typeof env.error === 'object') {
         const msg = String((env.error as { message?: unknown }).message ?? 'error')
         throw new ExplorerError(this.backend, 'unavailable', msg)
