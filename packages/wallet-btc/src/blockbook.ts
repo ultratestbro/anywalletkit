@@ -4,9 +4,27 @@ import type { BlockbookTx, BtcClient, Utxo } from './types.js'
 
 const MEMPOOL_SPACE_URL = 'https://mempool.space'
 
-interface BlockbookVin { txid?: string; vout?: number; isAddress?: boolean; addresses?: string[]; value?: string }
-interface BlockbookVout { n: number; isAddress?: boolean; addresses?: string[]; value?: string }
+export interface BlockbookVin { txid?: string; vout?: number; n?: number; isAddress?: boolean; isOwn?: boolean; addresses?: string[]; value?: string }
+export interface BlockbookVout { n: number; isAddress?: boolean; isOwn?: boolean; addresses?: string[]; value?: string; spent?: boolean }
 interface BlockbookAddressTx { txid: string; blockHeight: number; vin?: BlockbookVin[]; vout?: BlockbookVout[] }
+/** A Blockbook transaction with its inputs and outputs (`/api/v2/tx/{txid}`, or one row of `?details=txs`). */
+export interface BlockbookTxDetails extends BlockbookTx {
+  vin?: BlockbookVin[]
+  vout?: BlockbookVout[]
+  value?: string
+  valueIn?: string
+}
+/** One `/api/v2/address/{a}?details=txs` page. */
+export interface BlockbookAddressPage {
+  page?: number
+  totalPages?: number
+  itemsOnPage?: number
+  address?: string
+  balance?: string
+  unconfirmedBalance?: string
+  txs?: number
+  transactions?: BlockbookTxDetails[]
+}
 
 /**
  * Pending outgoing value the way Bitcoin Core's wallet counts it: a pending tx
@@ -84,6 +102,28 @@ export class BlockbookClient implements BtcClient {
       if (page >= (data.totalPages ?? 1)) break
     }
     return items
+  }
+
+  /** One page of the address's transactions, newest first, with inputs / outputs (what the activity history reads). */
+  async getAddressPage(address: string, page = 1, pageSize = 25): Promise<BlockbookAddressPage> {
+    const data = await this.get(`/v2/address/${address}?details=txs&page=${page}&pageSize=${pageSize}`, (v): v is BlockbookAddressPage =>
+      isRecord(v) && (v.transactions === undefined || (Array.isArray(v.transactions) && v.transactions.every(BlockbookClient.isTx))))
+    const out: BlockbookAddressPage = { ...data }
+    for (const tx of out.transactions ?? []) delete (tx as { hex?: string }).hex
+    return out
+  }
+
+  /** A transaction with its inputs / outputs; undefined when Blockbook does not know it. */
+  async getTransactionDetails(txid: string): Promise<BlockbookTxDetails | undefined> {
+    try {
+      const tx = await this.get(`/v2/tx/${txid}`, (v): v is BlockbookTxDetails => BlockbookClient.isTx(v))
+      const out: BlockbookTxDetails = { ...tx }
+      delete (out as { hex?: string }).hex
+      return out
+    } catch (e) {
+      if (e instanceof NetworkError && /\b(400|404)\b/.test(e.message)) return undefined
+      throw e
+    }
   }
 
   private static isTx(v: unknown): v is BlockbookTx {

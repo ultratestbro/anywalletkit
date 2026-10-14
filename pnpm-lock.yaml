@@ -744,6 +744,9 @@ importers:
       '@forgewallet/conformance':
         specifier: workspace:*
         version: link:../conformance
+      '@forgewallet/protocol-swap2-near-intents':
+        specifier: workspace:*
+        version: link:../protocol-swap2-near-intents
       vitest:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
@@ -772,6 +775,9 @@ importers:
       '@forgewallet/conformance':
         specifier: workspace:*
         version: link:../conformance
+      '@forgewallet/protocol-staking-spl-stake-pool-solana':
+        specifier: workspace:*
+        version: link:../protocol-staking-spl-stake-pool-solana
       '@noble/curves':
         specifier: ^2.4.0
         version: 2.4.0
@@ -797,6 +803,12 @@ importers:
       '@forgewallet/conformance':
         specifier: workspace:*
         version: link:../conformance
+      '@forgewallet/protocol-staking-tonstakers-ton':
+        specifier: workspace:*
+        version: link:../protocol-staking-tonstakers-ton
+      '@forgewallet/protocol-swap2-omniston':
+        specifier: workspace:*
+        version: link:../protocol-swap2-omniston
       '@noble/curves':
         specifier: ^2.4.0
         version: 2.4.0

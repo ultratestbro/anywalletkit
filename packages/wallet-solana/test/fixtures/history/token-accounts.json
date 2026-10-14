@@ -1,0 +1,34 @@
+{
+ "token": [
+  {
+   "pubkey": "9mbNKduoGYp7CaiVEkR58zhK7CZDMDQX9yZVFVyWg5pD",
+   "mint": "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij"
+  },
+  {
+   "pubkey": "9w9udQHQE6fCKNyv6cG4jKhhvmwuqr6UwRV5R968ZE2f",
+   "mint": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs"
+  },
+  {
+   "pubkey": "7mJzF4PWv3SdovqtX8eZXgDfQAMijogzAukRsshhbVZt",
+   "mint": "DEkqHyPN7GMRJ5cArtQFAWefqbZb33Hyf6s5iCwjEonT"
+  },
+  {
+   "pubkey": "F2ZvdWL4c5eaGMzFv4FvtMG2KG41gMPMzkFfpJjiseuW",
+   "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+  },
+  {
+   "pubkey": "HFequw3FPeYbAAM3dkhN7yG8ostQSSgmfq1VsqCevffh",
+   "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+  },
+  {
+   "pubkey": "EvTykvN87o1arXqcf7wwU4Jzvo3pQrgaNfoxYfkw5gng",
+   "mint": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"
+  }
+ ],
+ "token2022": [
+  {
+   "pubkey": "GVVnUo2ksJ4PrchKNab6Aawvzz2SujFR2H8CrtZq5pMv",
+   "mint": "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo"
+  }
+ ]
+}

@@ -1,0 +1,176 @@
+{
+ "txns": [
+  {
+   "id": "24759223022",
+   "receipt_id": "8kbPRRXz2CCtn4eqBzmm17rpSzdJixB1dEhbnqvKR9v6",
+   "predecessor_account_id": "system",
+   "receiver_account_id": "fc647e203e0e099212485017b78a0e77dc330019d4b532a4d44408adc0bfd9a1",
+   "receipt_kind": "ACTION",
+   "transaction_hash": "3W8EDnjCsP1KUXykD2yhggLMfgDVJzab91pMBoXGHneC",
+   "block_timestamp": "1791624538868959304",
+   "block": {
+    "block_height": 219358965
+   },
+   "actions": [
+    {
+     "action": "TRANSFER",
+     "method": null,
+     "deposit": 492452918750000000000,
+     "fee": 0,
+     "args": null
+    }
+   ],
+   "actions_agg": {
+    "deposit": 7e+23
+   },
+   "outcomes": {
+    "status": true
+   },
+   "outcomes_agg": {
+    "transaction_fee": 7.1149895375e+21
+   },
+   "receipt_outcome": {
+    "status": true
+   }
+  },
+  {
+   "id": "24759223001",
+   "receipt_id": "2F2H26gbACwRaxpYhU9mp59uX53d4Jcw1yWLB6qCgkwd",
+   "predecessor_account_id": "fc647e203e0e099212485017b78a0e77dc330019d4b532a4d44408adc0bfd9a1",
+   "receiver_account_id": "f332f25118027ba4d74312f85dda99a9a04094393511c905bfa03d487fdf3cd7",
+   "receipt_kind": "ACTION",
+   "transaction_hash": "3W8EDnjCsP1KUXykD2yhggLMfgDVJzab91pMBoXGHneC",
+   "block_timestamp": "1791624538868959304",
+   "block": {
+    "block_height": 219358965
+   },
+   "actions": [
+    {
+     "action": "TRANSFER",
+     "method": null,
+     "deposit": 7e+23,
+     "fee": 7.03249476875e+21,
+     "args": null
+    }
+   ],
+   "actions_agg": {
+    "deposit": 7e+23
+   },
+   "outcomes": {
+    "status": true
+   },
+   "outcomes_agg": {
+    "transaction_fee": 7.1149895375e+21
+   },
+   "receipt_outcome": {
+    "status": true
+   }
+  },
+  {
+   "id": "24759220733",
+   "receipt_id": "GSZwpuuCufXV3uHK3GvZd2oBYPxZNYSohewbKktXeJuu",
+   "predecessor_account_id": "system",
+   "receiver_account_id": "fc647e203e0e099212485017b78a0e77dc330019d4b532a4d44408adc0bfd9a1",
+   "receipt_kind": "ACTION",
+   "transaction_hash": "FoAiAg2kxySfc7FadF5wPuxL3vp4aMAdfFf66Vu8Sruh",
+   "block_timestamp": "1791624483515140887",
+   "block": {
+    "block_height": 219358871
+   },
+   "actions": [
+    {
+     "action": "TRANSFER",
+     "method": null,
+     "deposit": 4.13092920823882e+22,
+     "fee": 0,
+     "args": null
+    }
+   ],
+   "actions_agg": {
+    "deposit": 1.25e+21
+   },
+   "outcomes": {
+    "status": true
+   },
+   "outcomes_agg": {
+    "transaction_fee": 411205370793300000000
+   },
+   "receipt_outcome": {
+    "status": true
+   }
+  },
+  {
+   "id": "24759220698",
+   "receipt_id": "CHEDxrusSbA8TLSoTq5YfWASoiqAKjQM3CpKJtQ8E1QN",
+   "predecessor_account_id": "fc647e203e0e099212485017b78a0e77dc330019d4b532a4d44408adc0bfd9a1",
+   "receiver_account_id": "usdt.tether-token.near",
+   "receipt_kind": "ACTION",
+   "transaction_hash": "FoAiAg2kxySfc7FadF5wPuxL3vp4aMAdfFf66Vu8Sruh",
+   "block_timestamp": "1791624483515140887",
+   "block": {
+    "block_height": 219358871
+   },
+   "actions": [
+    {
+     "action": "FUNCTION_CALL",
+     "method": "storage_deposit",
+     "deposit": 1.25e+21,
+     "fee": 359288390233800000000,
+     "args": "{\"account_id\": \"7b5d345f75f581d81ba33b1807cc922a3a523da4857678056f06deff6ff1a5a3\", \"registration_only\": true}"
+    },
+    {
+     "action": "FUNCTION_CALL",
+     "method": "ft_transfer",
+     "deposit": 1,
+     "fee": 359288390233800000000,
+     "args": "{\"amount\": \"2992760\", \"receiver_id\": \"7b5d345f75f581d81ba33b1807cc922a3a523da4857678056f06deff6ff1a5a3\"}"
+    }
+   ],
+   "actions_agg": {
+    "deposit": 1.25e+21
+   },
+   "outcomes": {
+    "status": true
+   },
+   "outcomes_agg": {
+    "transaction_fee": 411205370793300000000
+   },
+   "receipt_outcome": {
+    "status": true
+   }
+  },
+  {
+   "id": "24759216682",
+   "receipt_id": "5yf1WZeDRUS6yn8hJKoWWHoBooAuF4aucK3SDTcbUin2",
+   "predecessor_account_id": "intents.near",
+   "receiver_account_id": "fc647e203e0e099212485017b78a0e77dc330019d4b532a4d44408adc0bfd9a1",
+   "receipt_kind": "ACTION",
+   "transaction_hash": "AQAkvxyT2N2WzZ5LzwZvcw139WHG2JGAvVLqBdVYUttX",
+   "block_timestamp": "1791624392163759784",
+   "block": {
+    "block_height": 219358715
+   },
+   "actions": [
+    {
+     "action": "TRANSFER",
+     "method": null,
+     "deposit": 7.553203823134379e+23,
+     "fee": 7.03249476875e+21,
+     "args": null
+    }
+   ],
+   "actions_agg": {
+    "deposit": 0
+   },
+   "outcomes": {
+    "status": true
+   },
+   "outcomes_agg": {
+    "transaction_fee": 8.6717233243534e+21
+   },
+   "receipt_outcome": {
+    "status": true
+   }
+  }
+ ]
+}

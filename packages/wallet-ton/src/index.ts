@@ -18,4 +18,9 @@ export {
 export { WalletAccountReadOnlyTon, SEND_MODE } from './read-only-account.js'
 export { WalletAccountTon } from './account.js'
 export { WalletManagerTon, TON_BASE_PATH, TON_MNEMONIC_PATH } from './manager.js'
+export {
+  createTonHistory, mapTonapiEvent, mapToncenterTransaction, mapActions as mapTonapiActions, valueFlowTransfers, rawTonAddress, tonExplorerTxUrl, HistoryUnavailableError,
+  encodeCursor as encodeHistoryCursor, decodeCursor as decodeHistoryCursor,
+  type TonHistoryOptions, type TonHistorySource, type TonHistoryPage, type TonChainTx, type TonHistoryRaw, type TonHistoryBackend, type TonHistoryCursor, type TonapiEvent, type TonapiAction, type V3Transaction, type HistoryFetch,
+} from './history.js'
 export { WalletManagerTon as default } from './manager.js'

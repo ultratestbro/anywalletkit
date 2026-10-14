@@ -1,0 +1,92 @@
+{
+ "txns": [
+  {
+   "transaction_hash": "Fdk3i7f91T7BpnNbDSZyNDzZ84WV4VwAGdFKuqHrvXNW",
+   "block_timestamp": "1790728358930685426",
+   "signer_account_id": "bridge-mng.near",
+   "receiver_account_id": "b1633df641230892b93f42d79072025d15163cb325134220321107afc1e7c932",
+   "block": {
+    "block_height": 217848735
+   },
+   "actions": [
+    {
+     "action": "DELEGATE_ACTION",
+     "method": null,
+     "args": null
+    },
+    {
+     "action": "FUNCTION_CALL",
+     "method": "ft_transfer_call",
+     "args": "{\"msg\": \"{\\\\\\\\\\\\\\\"receiver_id\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"894bd3b61513292e3a4a2e1914160075d4a6208d36417654acd636c55ea7f009\\\\\\\\\\\\\\\"}\", \"amount\": \"20500000000000000000000000\", \"receiver_id\": \"intents.near\"}"
+    }
+   ],
+   "actions_agg": {
+    "deposit": 1,
+    "gas_attached": 300000000000000
+   },
+   "outcomes": {
+    "status": true
+   },
+   "outcomes_agg": {
+    "transaction_fee": 888747685474100000000,
+    "gas_used": 9780207104741
+   },
+   "receipts": [
+    {
+     "fts": []
+    },
+    {
+     "fts": [
+      {
+       "affected_account_id": "b1633df641230892b93f42d79072025d15163cb325134220321107afc1e7c932",
+       "involved_account_id": "intents.near",
+       "delta_amount": -2.05e+25,
+       "cause": "TRANSFER",
+       "ft_meta": {
+        "contract": "wrap.near",
+        "name": "Wrapped NEAR fungible token",
+        "symbol": "wNEAR",
+        "icon": null,
+        "decimals": 24
+       }
+      },
+      {
+       "affected_account_id": "intents.near",
+       "involved_account_id": "b1633df641230892b93f42d79072025d15163cb325134220321107afc1e7c932",
+       "delta_amount": 2.05e+25,
+       "cause": "TRANSFER",
+       "ft_meta": {
+        "contract": "wrap.near",
+        "name": "Wrapped NEAR fungible token",
+        "symbol": "wNEAR",
+        "icon": null,
+        "decimals": 24
+       }
+      }
+     ]
+    },
+    {
+     "fts": []
+    },
+    {
+     "fts": []
+    },
+    {
+     "fts": []
+    },
+    {
+     "fts": []
+    },
+    {
+     "fts": []
+    },
+    {
+     "fts": []
+    },
+    {
+     "fts": []
+    }
+   ]
+  }
+ ]
+}

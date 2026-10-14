@@ -1,0 +1,49 @@
+{
+ "event_id": "15e18e04a9ef99ca9a30178e6fa18fabdee729ffb2865bd7b669796c33e7465e",
+ "timestamp": 1788516212,
+ "lt": 101244263000001,
+ "in_progress": false,
+ "is_scam": false,
+ "actions": [
+  {
+   "type": "DepositStake",
+   "status": "ok",
+   "DepositStake": {
+    "amount": 3000000000,
+    "staker": {
+     "address": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+     "is_wallet": true
+    },
+    "pool": {
+     "address": "0:a45b17f28409229b78360e3290420f13e4fe20f90d7e2bf8c4ac6703259e22fa",
+     "is_wallet": false,
+     "name": "Tonstakers"
+    },
+    "implementation": "liquidTF"
+   }
+  },
+  {
+   "type": "JettonMint",
+   "status": "ok",
+   "JettonMint": {
+    "recipient": {
+     "address": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+     "is_wallet": true
+    },
+    "recipients_wallet": "0:75e45d424e6284068eaa0229634cf9d8b52537d77d71c98df530f141540fddb2",
+    "amount": "2602334618",
+    "jetton": {
+     "address": "0:bdf3fa8098d129b54b4f73b5bac5d1e1fd91eb054169c3916dfc8ccd536d1000",
+     "symbol": "tsTON",
+     "decimals": 9,
+     "name": "Tonstakers TON"
+    }
+   }
+  }
+ ],
+ "account": {
+  "address": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+  "is_wallet": true
+ },
+ "extra": -3514920
+}

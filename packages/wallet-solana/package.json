@@ -14,6 +14,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./history": {
+      "types": "./dist/history.d.ts",
+      "import": "./dist/history.js",
+      "require": "./dist/history.cjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -43,6 +48,7 @@
   },
   "devDependencies": {
     "@forgewallet/conformance": "workspace:*",
+    "@forgewallet/protocol-staking-spl-stake-pool-solana": "workspace:*",
     "@noble/curves": "^2.4.0",
     "vitest": "^5.0.3"
   }

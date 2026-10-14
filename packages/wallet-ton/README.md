@@ -93,3 +93,35 @@ requires `expo-crypto` (random bytes) at module load and
 `react-native-fast-pbkdf2` for the TON-mnemonic import. Install `expo-crypto`
 in the app (Expo projects already have it). BIP-39 wallets sign through noble
 ed25519 and need neither.
+
+## Activity history
+
+`createTonHistory` is the chain's `HistorySource` (`@forgewallet/core`): tonapi account events first, toncenter v3 as a reduced fallback.
+
+```ts
+import { createTonHistory } from '@forgewallet/wallet-ton/history'
+
+const history = createTonHistory({ apiKey: process.env.TONAPI_KEY })
+const page = await history.listActivity('UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq', { limit: 25 })
+const older = await history.listActivity(address, { cursor: page.cursor })
+const one = await history.getTransaction(page.items[0].hash, address)
+history.explorerTxUrl(one.hash) // https://tonviewer.com/transaction/…
+```
+
+| option | default | notes |
+|---|---|---|
+| `tonapiUrl` | `https://tonapi.io` (`testnet.tonapi.io`) | `null` disables tonapi. |
+| `apiKey` | none | tonapi Bearer key. Keyless tonapi allows ~1 request/s. |
+| `toncenterUrl` | `https://toncenter.com` (`testnet.toncenter.com`) | v3 fallback; `null` disables it. |
+| `toncenterApiKey` | none | `X-API-Key`. |
+| `network` | `mainnet` | `ton:-239` / `ton:-3`. |
+| `rateLimit` | 1 rps keyless, 10 with a key | tonapi requests per second (toncenter: 1 keyless, 10 with a key). |
+| `fetch`, `timeoutMs` | global, 15 000 | |
+
+**tonapi** (`GET /v2/accounts/{a}/events?limit=&before_lt=`, `GET /v2/accounts/{a}/events/{id}`): one event = one trace, with typed actions. `TonTransfer`, `JettonTransfer`, `JettonMint`, `JettonBurn`, `JettonSwap` (TON / jetton in and out against the DEX router), `SmartContractExec` (`ton_attached`), `DepositStake` / `WithdrawStake` (staker ↔ pool), `Subscribe`, `NftPurchase`, elections become transfers; jetton transfers carry the master as `token`, `standard: 'jetton'`, `symbol` and `decimals` from the action's jetton object. The first contract-level action is the `call`: `SmartContractExec` → `to` = contract, hex op in `data`, named op in `method`; `JettonSwap` → router / `swap`; a jetton sent to a contract with a forward payload → recipient / `jetton_transfer` with the op from tonapi's `Call: 0x…` comment; `DepositStake` → pool / `stake`, `WithdrawStakeRequest` → pool / `unstake`, `WithdrawStake` → pool / `withdraw_stake`. tonapi does not spell out the pool-token burn of an unstake request, so for those events the source fetches `/v2/events/{id}` once and turns the account's `value_flow` jetton deltas into transfers (`raw.valueFlow`). `from` is the first action's initiator, `nativeValue` the TON it sent, `fee` = `-extra` (tonapi's "what the account lost beyond its actions", so it includes forward fees the actions do not show), `status` = `pending` while `in_progress`, `failed` when every action failed, `block` = the event's `lt`, `hash` = the event id (the trace root; tonapi resolves any transaction hash of the trace to it). `is_scam` events are flagged `scam: true` (also in `raw.scam`). Addresses stay raw (`0:…`, lowercase) as tonapi returns them.
+
+**toncenter v3** (`GET /api/v3/transactions?account=&limit=&sort=desc&end_lt=`): the account's own transactions only. An external message (the wallet acted) maps its outgoing messages to TON transfers and the first op code to `call` (`data` = `opcode`, `method` = `decoded_opcode`); an incoming message maps its value and op. Jettons are not visible here, `fee` = `total_fees`, `hash` = the transaction hash in hex.
+
+**Cursor.** Base64 JSON `{ v: 1, b: 'tonapi' | 'toncenter', lt }`: an exclusive `lt` upper bound (`before_lt` for tonapi, `end_lt = lt − 1` for toncenter). A cursor from one backend resumes on the other; the backend that issued it is tried first. `since` is applied client-side and ends pagination.
+
+Fixtures in `test/fixtures/history/` were captured on 2026-10-14 from `tonapi.io` and `toncenter.com` (keyless) for the test wallet: one events page, the account-scoped events of the Tonstakers stake / unstake request / payout and of the Omniston STON.fi swap and escrow order (the same transactions as those modules' activity fixtures), the full event with `value_flow` for the unstake, and a toncenter v3 page. `test/history.test.ts` checks that the Tonstakers and Omniston modules describe the rows this source builds (`stake`, `unstake`, `claim`, `swap`, `bridge`). Note: `@forgewallet/protocol-swap2-core`'s `netTransfers` compares addresses verbatim, so `DescribeActivityContext.own` must contain the raw `0:…` form of the wallet for Omniston (Tonstakers normalizes itself).

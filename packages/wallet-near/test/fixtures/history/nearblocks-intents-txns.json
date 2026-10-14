@@ -1,0 +1,110 @@
+{
+ "txns": [
+  {
+   "id": "24710433970",
+   "receipt_id": "7VXjAu7FtXXHVcXTfcizQHYYu3A7xWsDo1E13jtpbZDz",
+   "predecessor_account_id": "b1633df641230892b93f42d79072025d15163cb325134220321107afc1e7c932",
+   "receiver_account_id": "wrap.near",
+   "receipt_kind": "ACTION",
+   "transaction_hash": "Fdk3i7f91T7BpnNbDSZyNDzZ84WV4VwAGdFKuqHrvXNW",
+   "block_timestamp": "1790728358930685426",
+   "block": {
+    "block_height": 217848735
+   },
+   "actions": [
+    {
+     "action": "FUNCTION_CALL",
+     "method": "ft_transfer_call",
+     "deposit": 1,
+     "fee": 263570153026300000000,
+     "args": "{\"msg\": \"{\\\\\\\\\\\\\\\"receiver_id\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"894bd3b61513292e3a4a2e1914160075d4a6208d36417654acd636c55ea7f009\\\\\\\\\\\\\\\"}\", \"amount\": \"20500000000000000000000000\", \"receiver_id\": \"intents.near\"}"
+    }
+   ],
+   "actions_agg": {
+    "deposit": 1
+   },
+   "outcomes": {
+    "status": true
+   },
+   "outcomes_agg": {
+    "transaction_fee": 888747685474100000000
+   },
+   "receipt_outcome": {
+    "status": true
+   }
+  },
+  {
+   "id": "24710433928",
+   "receipt_id": "DDjySZ8e3craFDJTJJ9hcnUU5PSGRygg9uJumPnGGqmW",
+   "predecessor_account_id": "bridge-mng.near",
+   "receiver_account_id": "b1633df641230892b93f42d79072025d15163cb325134220321107afc1e7c932",
+   "receipt_kind": "ACTION",
+   "transaction_hash": "Fdk3i7f91T7BpnNbDSZyNDzZ84WV4VwAGdFKuqHrvXNW",
+   "block_timestamp": "1790728358930685426",
+   "block": {
+    "block_height": 217848735
+   },
+   "actions": [
+    {
+     "action": "DELEGATE_ACTION",
+     "method": null,
+     "deposit": 0,
+     "fee": 51659488498500000000,
+     "args": null
+    },
+    {
+     "action": "FUNCTION_CALL",
+     "method": "ft_transfer_call",
+     "deposit": 1,
+     "fee": 51659488498500000000,
+     "args": "{\"msg\": \"{\\\\\\\\\\\\\\\"receiver_id\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"894bd3b61513292e3a4a2e1914160075d4a6208d36417654acd636c55ea7f009\\\\\\\\\\\\\\\"}\", \"amount\": \"20500000000000000000000000\", \"receiver_id\": \"intents.near\"}"
+    }
+   ],
+   "actions_agg": {
+    "deposit": 1
+   },
+   "outcomes": {
+    "status": true
+   },
+   "outcomes_agg": {
+    "transaction_fee": 888747685474100000000
+   },
+   "receipt_outcome": {
+    "status": true
+   }
+  },
+  {
+   "id": "24710433630",
+   "receipt_id": "CGQV7Yy9MMCc7oE2bDeXoPT2wK8B6oe4aiGEiVXNDsjt",
+   "predecessor_account_id": "bridge-mng.near",
+   "receiver_account_id": "b1633df641230892b93f42d79072025d15163cb325134220321107afc1e7c932",
+   "receipt_kind": "ACTION",
+   "transaction_hash": "FgP8cJM1nTDoUUXxNT3wyCSrT12jPF379BmQ7nci6tcR",
+   "block_timestamp": "1790728354694199399",
+   "block": {
+    "block_height": 217848728
+   },
+   "actions": [
+    {
+     "action": "TRANSFER",
+     "method": null,
+     "deposit": 0,
+     "fee": 7.03249476875e+21,
+     "args": null
+    }
+   ],
+   "actions_agg": {
+    "deposit": 0
+   },
+   "outcomes": {
+    "status": true
+   },
+   "outcomes_agg": {
+    "transaction_fee": 7.1149895375e+21
+   },
+   "receipt_outcome": {
+    "status": true
+   }
+  }
+ ]
+}
