@@ -1,12 +1,12 @@
 import type { ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@forgewallet/core'
 
-/** Which explorer family answered. `routescan` = keyless Etherscan-format mirror. */
-export type HistoryBackend = 'etherscan' | 'blockscout-pro' | 'routescan' | 'blockscout'
+/** Which explorer family answered. `routescan` = keyless Etherscan-format mirror; `alchemy` = Alchemy Transfers API + JSON-RPC. */
+export type HistoryBackend = 'etherscan' | 'blockscout-pro' | 'alchemy' | 'routescan' | 'blockscout'
 
 /** The subset of WHATWG `fetch` this package uses; lets tests and hosts inject their own. */
 export type FetchLike = (
   input: string,
-  init?: { signal?: AbortSignal; headers?: Record<string, string> },
+  init?: { method?: string; body?: string; signal?: AbortSignal; headers?: Record<string, string> },
 ) => Promise<{ ok: boolean; status: number; json(): Promise<unknown>; text(): Promise<string> }>
 
 export interface EvmHistoryOptions {
@@ -31,6 +31,21 @@ export interface EvmHistoryOptions {
   blockscoutProUrl?: string
   /** Blockscout PRO requests per second (free tier: 5). Shared per key across chains. */
   blockscoutProRateLimit?: number
+  /**
+   * Alchemy API key (free tier: 30M CU/month, no card). Enables the `alchemy` backend —
+   * `alchemy_getAssetTransfers` (120 CU) for the lists plus one JSON-RPC batch of
+   * `eth_getTransactionByHash` + `eth_getTransactionReceipt` per page for fee / status / calldata.
+   * The only free source on Base and BSC. Every network must be **enabled for the app** in the
+   * Alchemy dashboard first; otherwise the backend answers `<NETWORK> is not enabled for this app`
+   * and the source falls through to the next backend.
+   */
+  alchemyApiKey?: string
+  /** Alchemy network slug override (`base-mainnet`); default from `ALCHEMY_NETWORKS[chainId]`. Also enables the backend on chains the table does not list for the Transfers API. */
+  alchemyNetwork?: string
+  /** Override the Alchemy host template; `{network}` and `{key}` are substituted. Default `https://{network}.g.alchemy.com/v2/{key}`. */
+  alchemyUrl?: string
+  /** Alchemy requests per second (HTTP calls, a batch counts once). Default 5, shared per key across chains. */
+  alchemyRateLimit?: number
   /** Blockscout instance root (`https://eth.blockscout.com`). Overrides / adds to the built-in table; `null` disables the built-in entry. */
   blockscoutUrl?: string | null
   /** Keyless Etherscan-format endpoint (Routescan style). Overrides / adds to the built-in table; `null` disables the built-in entry. */
@@ -39,8 +54,8 @@ export interface EvmHistoryOptions {
   fetch?: FetchLike
   /** Etherscan requests per second for this key. Default 5 with a key, 1 without. Shared by every source using the same key. */
   rateLimit?: number
-  /** Try Blockscout before Etherscan when both exist (saves Etherscan quota). Default: Etherscan first. */
-  prefer?: 'etherscan' | 'blockscout'
+  /** Try Blockscout (or Alchemy) before Etherscan when both exist (saves Etherscan quota / the only free source on Base). Default: Etherscan first. */
+  prefer?: 'etherscan' | 'blockscout' | 'alchemy'
   /** Per-request timeout, ms. Default 15 000. */
   timeoutMs?: number
 }
@@ -48,11 +63,11 @@ export interface EvmHistoryOptions {
 /** The explorer rows a `ChainTx` was built from, plus the spam verdict. */
 export interface EvmHistoryRaw {
   source: HistoryBackend
-  /** The top-level transaction row (txlist / Blockscout transaction). Absent when only a token transfer to the address was indexed. */
+  /** The top-level transaction row (txlist / Blockscout transaction / Alchemy `{ tx, receipt }`). Absent when only a token transfer to the address was indexed. */
   tx?: unknown
-  /** Token transfer rows (tokentx / Blockscout token-transfers). */
+  /** Token transfer rows (tokentx / Blockscout token-transfers / Alchemy `erc20` transfers). */
   tokens: unknown[]
-  /** Internal native transfers (txlistinternal / Blockscout internal-transactions). */
+  /** Internal native transfers (txlistinternal / Blockscout internal-transactions / Alchemy `internal` transfers). */
   internal: unknown[]
   spam?: true
   /** Which rule fired: `zero-value`, `zero-value-unknown-token`, `bulk-airdrop`, `symbol-impersonation`. */

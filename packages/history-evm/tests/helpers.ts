@@ -35,7 +35,15 @@ export interface FakeOptions {
   blockscoutIntercept?: (url: URL, n: number) => { status: number; body?: unknown } | undefined
   /** Chain ids the fake `chainlist` endpoint reports (default: 1 and the fallback table). */
   chainlist?: number[]
+  /** Every Alchemy request answers the captured `<NETWORK> is not enabled for this app` envelope (HTTP 403). */
+  alchemyNotEnabled?: boolean
+  /** Drop `metadata` from the Transfers API rows (a network without `withMetadata`) so the client must fetch block timestamps. */
+  alchemyStripMetadata?: boolean
+  /** Called before every Alchemy request with the parsed JSON-RPC body; return `{status, body}` to short-circuit. */
+  alchemyIntercept?: (body: unknown, n: number) => { status: number; body?: unknown } | undefined
 }
+
+type RpcReq = { jsonrpc: string; id: number; method: string; params: unknown[] }
 
 export function etherscanRows() {
   return {
@@ -59,19 +67,67 @@ function jsonResponse(status: number, body: unknown) {
  * honour `endblock` / `offset` / `sort=desc`, the proxy module answers from the
  * captured JSON-RPC bodies, Blockscout lists page with `next_page_params`.
  */
-export function fakeFetch(opts: FakeOptions = {}): FetchLike & { calls: Recorded[]; etherscanCalls: number; blockscoutCalls: number } {
+export function fakeFetch(opts: FakeOptions = {}): FetchLike & { calls: Recorded[]; etherscanCalls: number; blockscoutCalls: number; alchemyCalls: number; alchemyBodies: unknown[] } {
   const rows = opts.etherscan ?? etherscanRows()
   const pageSize = opts.blockscoutPageSize ?? 50
   const calls: Recorded[] = []
-  let etherscanCalls = 0, blockscoutCalls = 0
+  let etherscanCalls = 0, blockscoutCalls = 0, alchemyCalls = 0
+  const alchemyBodies: unknown[] = []
 
   const bsTx = fixture<{ items: Record<string, unknown>[] }>('blockscout-eth-transactions.json').items
   const bsTt = fixture<{ items: Record<string, unknown>[] }>('blockscout-eth-token-transfers.json').items
   const bsIt = fixture<{ items: Record<string, unknown>[] }>('blockscout-eth-internal-transactions.json').items
 
-  const f = (async (input: string) => {
+  const alFrom = fixture<{ result: { transfers: Record<string, unknown>[] } }>('alchemy-base-transfers-from.json').result.transfers
+  const alTo = fixture<{ result: { transfers: Record<string, unknown>[] } }>('alchemy-base-transfers-to.json').result.transfers
+  const alTx = fixture<Record<string, { tx: Record<string, unknown>; receipt: Record<string, unknown> }>>('alchemy-base-tx-receipts.json')
+  const alTxLower: Record<string, { tx: Record<string, unknown>; receipt: Record<string, unknown> }> = {}
+  for (const [h, v] of Object.entries(alTx)) alTxLower[h.toLowerCase()] = v
+
+  const alchemyAnswer = (req: RpcReq): unknown => {
+    const ok = (result: unknown) => ({ jsonrpc: '2.0', id: req.id, result })
+    if (req.method === 'alchemy_getAssetTransfers') {
+      const p = (req.params[0] ?? {}) as Record<string, unknown>
+      const dir = typeof p['fromAddress'] === 'string' ? 'from' : typeof p['toAddress'] === 'string' ? 'to' : undefined
+      if (!dir) return { jsonrpc: '2.0', id: req.id, error: { code: -32602, message: 'fromAddress or toAddress required' } }
+      const addr = String(p['fromAddress'] ?? p['toAddress']).toLowerCase()
+      let list = addr === ADDRESS.toLowerCase() ? (dir === 'from' ? alFrom : alTo) : []
+      const cats = Array.isArray(p['category']) ? (p['category'] as string[]) : []
+      list = list.filter((t) => cats.includes(String(t['category'])))
+      const toBlock = typeof p['toBlock'] === 'string' ? parseInt(p['toBlock'], 16) : Number.MAX_SAFE_INTEGER
+      list = list.filter((t) => parseInt(String(t['blockNum']), 16) <= toBlock)
+      const max = typeof p['maxCount'] === 'string' ? parseInt(p['maxCount'], 16) : 1000
+      let page = list.slice(0, max)
+      if (opts.alchemyStripMetadata) page = page.map(({ metadata: _m, ...rest }) => rest)
+      const result: Record<string, unknown> = { transfers: page }
+      if (list.length > max) result['pageKey'] = '00000000-0000-4000-8000-' + String(alchemyCalls).padStart(12, '0')
+      return ok(result)
+    }
+    if (req.method === 'eth_getTransactionByHash') return ok(alTxLower[String(req.params[0]).toLowerCase()]?.tx ?? null)
+    if (req.method === 'eth_getTransactionReceipt') return ok(alTxLower[String(req.params[0]).toLowerCase()]?.receipt ?? null)
+    if (req.method === 'eth_getBlockByNumber') {
+      const n = parseInt(String(req.params[0]), 16)
+      return ok({ number: req.params[0], timestamp: '0x' + (1_790_000_000 + n).toString(16) })
+    }
+    if (req.method === 'eth_chainId') return ok('0x2105')
+    return { jsonrpc: '2.0', id: req.id, error: { code: -32601, message: 'Unsupported method: ' + req.method } }
+  }
+
+  const f = (async (input: string, init?: { body?: string }) => {
     calls.push({ url: input, at: Date.now() })
     const url = new URL(input)
+
+    // Alchemy is the only JSON-RPC (POST) backend; a proxy host (alchemyUrl) is routed here too.
+    if (url.hostname.endsWith('.g.alchemy.com') || init?.body) {
+      alchemyCalls++
+      const body = init?.body ? (JSON.parse(init.body) as unknown) : null
+      alchemyBodies.push(body)
+      const intercepted = opts.alchemyIntercept?.(body, alchemyCalls)
+      if (intercepted) return jsonResponse(intercepted.status, intercepted.body ?? { error: 'intercepted' })
+      if (opts.alchemyNotEnabled) return jsonResponse(403, fixture('alchemy-not-enabled.json'))
+      if (Array.isArray(body)) return jsonResponse(200, (body as RpcReq[]).map(alchemyAnswer))
+      return jsonResponse(200, alchemyAnswer(body as RpcReq))
+    }
 
     if (url.pathname === '/v2/chainlist') {
       const ids = opts.chainlist ?? [1, 8453, 42161, 10, 137, 56, 43114, 100, 130, 143, 999, 146, 80094, 59144, 42220, 9745, 4326, 4663, 480, 1329]
@@ -131,10 +187,12 @@ export function fakeFetch(opts: FakeOptions = {}): FetchLike & { calls: Recorded
       return jsonResponse(404, { message: 'Not found' })
     }
     return jsonResponse(404, { message: 'unrouted ' + input })
-  }) as FetchLike & { calls: Recorded[]; etherscanCalls: number; blockscoutCalls: number }
+  }) as FetchLike & { calls: Recorded[]; etherscanCalls: number; blockscoutCalls: number; alchemyCalls: number; alchemyBodies: unknown[] }
   Object.defineProperty(f, 'calls', { get: () => calls })
   Object.defineProperty(f, 'etherscanCalls', { get: () => etherscanCalls })
   Object.defineProperty(f, 'blockscoutCalls', { get: () => blockscoutCalls })
+  Object.defineProperty(f, 'alchemyCalls', { get: () => alchemyCalls })
+  Object.defineProperty(f, 'alchemyBodies', { get: () => alchemyBodies })
   return f
 }
 

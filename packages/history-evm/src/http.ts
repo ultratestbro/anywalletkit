@@ -35,6 +35,29 @@ export async function fetchJson(fetchFn: FetchLike, backend: string, url: string
   return { status: res.status, body }
 }
 
+/** POST a JSON body (JSON-RPC) and parse the JSON answer; same failure semantics as `fetchJson`. */
+export async function postJson(fetchFn: FetchLike, backend: string, url: string, body: unknown, timeoutMs: number): Promise<HttpJson> {
+  let res: Awaited<ReturnType<FetchLike>>
+  try {
+    const signal = timeoutSignal(timeoutMs)
+    res = await fetchFn(url, {
+      method: 'POST',
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      ...(signal ? { signal } : {}),
+    })
+  } catch (e) {
+    throw new ExplorerError(backend, 'network', e instanceof Error ? e.message : String(e))
+  }
+  let parsed: unknown
+  try {
+    parsed = await res.json()
+  } catch {
+    parsed = undefined
+  }
+  return { status: res.status, body: parsed }
+}
+
 /** `a=1&b=2` with encoded keys/values; `undefined` values are skipped. */
 export function query(params: Record<string, string | number | undefined>): string {
   const parts: string[] = []

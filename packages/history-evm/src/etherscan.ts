@@ -2,11 +2,11 @@ import { ExplorerError } from './errors.js'
 import { fetchJson, query } from './http.js'
 import type { ListPage, ListSpec } from './paginate.js'
 import type { TokenBucket } from './rate-limit.js'
+import { parseReceiptTransfers, txRowFromRpc } from './rpc-rows.js'
 import { parseBig, parseInt10, type InternalRow, type TokenRow, type TxRow } from './rows.js'
 import type { FetchLike, HistoryBackend } from './types.js'
 
-/** keccak256("Transfer(address,address,uint256)") */
-export const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+export { parseReceiptTransfers, TRANSFER_TOPIC } from './rpc-rows.js'
 
 export interface EtherscanClientOptions {
   backend: HistoryBackend
@@ -129,24 +129,7 @@ export class EtherscanClient {
       const block = (await this.call({ module: 'proxy', action: 'eth_getBlockByNumber', tag: blockHex, boolean: 'false' })) as Row | null
       if (block && typeof block['timestamp'] === 'string') time = parseInt10(block['timestamp'])
     }
-    const status: TxRow['status'] = !receipt || !blockHex ? 'pending' : receipt['status'] === '0x0' ? 'failed' : 'confirmed'
-    const row: TxRow = {
-      hash: String(tx['hash']),
-      block: blockHex ? parseInt10(blockHex) : 0,
-      time,
-      from: String(tx['from'] ?? ''),
-      to: typeof tx['to'] === 'string' && tx['to'] ? (tx['to'] as string) : null,
-      value: parseBig(tx['value']),
-      input: typeof tx['input'] === 'string' ? (tx['input'] as string) : '0x',
-      status,
-      raw: { tx, receipt },
-    }
-    if (receipt) {
-      const gasUsed = parseBig(receipt['gasUsed'])
-      const price = parseBig(receipt['effectiveGasPrice'] ?? tx['gasPrice'])
-      if (gasUsed > 0n && price > 0n) row.fee = gasUsed * price
-      if (typeof receipt['contractAddress'] === 'string' && receipt['contractAddress']) row.contractAddress = receipt['contractAddress'] as string
-    }
+    const row = txRowFromRpc(tx, receipt, time)
     return { tx: row, tokens: receipt ? parseReceiptTransfers(receipt, row) : [] }
   }
 }
@@ -207,30 +190,4 @@ export function parseInternalRow(r: Row): InternalRow | undefined {
     value: parseBig(r['value']),
     raw: r,
   }
-}
-
-/** ERC-20 `Transfer` logs (3 topics) of a receipt → token rows. 4-topic (ERC-721) transfers are skipped. */
-export function parseReceiptTransfers(receipt: Row, tx: TxRow): TokenRow[] {
-  const logs = Array.isArray(receipt['logs']) ? (receipt['logs'] as Row[]) : []
-  const out: TokenRow[] = []
-  for (const log of logs) {
-    const topics = Array.isArray(log['topics']) ? (log['topics'] as string[]) : []
-    if (topics.length !== 3 || String(topics[0]).toLowerCase() !== TRANSFER_TOPIC) continue
-    const data = typeof log['data'] === 'string' ? (log['data'] as string) : '0x'
-    out.push({
-      hash: tx.hash,
-      block: tx.block,
-      time: tx.time,
-      from: topicAddress(topics[1]!),
-      to: topicAddress(topics[2]!),
-      token: String(log['address'] ?? '').toLowerCase(),
-      amount: data.length > 2 ? parseBig(data) : 0n,
-      raw: log,
-    })
-  }
-  return out
-}
-
-function topicAddress(topic: string): string {
-  return `0x${topic.slice(-40).toLowerCase()}`
 }

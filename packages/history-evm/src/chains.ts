@@ -73,6 +73,64 @@ export const ETHERSCAN_COMPAT_URLS: Readonly<Record<number, string>> = {
 }
 
 /**
+ * Alchemy network slugs (`https://<slug>.g.alchemy.com/v2/<key>`), one per
+ * supported chain id. Verified 2026-10-14 by calling `eth_chainId` on every
+ * slug with a free-tier key: an existing slug answers either the chain id or
+ * `<NETWORK> is not enabled for this app` (a non-existent slug does not
+ * resolve). Arc 5042 is included for the Transfers API table even though it
+ * is not a wallet chain yet.
+ */
+export const ALCHEMY_NETWORKS: Readonly<Record<number, string>> = {
+  1: 'eth-mainnet',
+  8453: 'base-mainnet',
+  42161: 'arb-mainnet',
+  10: 'opt-mainnet',
+  137: 'polygon-mainnet',
+  56: 'bnb-mainnet',
+  43114: 'avax-mainnet',
+  100: 'gnosis-mainnet',
+  130: 'unichain-mainnet',
+  143: 'monad-mainnet',
+  999: 'hyperliquid-mainnet',
+  146: 'sonic-mainnet',
+  80094: 'berachain-mainnet',
+  59144: 'linea-mainnet',
+  534352: 'scroll-mainnet',
+  324: 'zksync-mainnet',
+  42220: 'celo-mainnet',
+  9745: 'plasma-mainnet',
+  4326: 'megaeth-mainnet',
+  4663: 'robinhood-mainnet',
+  480: 'worldchain-mainnet',
+  1329: 'sei-mainnet',
+  57073: 'ink-mainnet',
+  98866: 'plume-mainnet',
+  196: 'xlayer-mainnet',
+  5042: 'arc-mainnet',
+}
+
+/**
+ * Chains whose Alchemy docs page (`https://www.alchemy.com/rpc/<chain>.md`,
+ * read 2026-10-14) lists "Transfers API" under "Supported on …". The backend
+ * is only added for these unless `alchemyNetwork` is passed explicitly.
+ * "Not currently supported: … Transfers API" that day: Sonic 146, Plasma 9745,
+ * MegaETH 4326, Sei 1329, X Layer 196; Plume 98866 has no Alchemy docs page.
+ */
+export const ALCHEMY_TRANSFERS_CHAIN_IDS: readonly number[] = [
+  1, 8453, 42161, 10, 137, 56, 43114, 100, 130, 143, 999, 80094, 59144, 534352, 324, 42220, 4663, 480, 57073, 5042,
+]
+
+/**
+ * Where `alchemy_getAssetTransfers` accepts the `internal` category. Docs
+ * (alchemy-getassettransfers, 2026-10-14): "Internal transfer data is
+ * available only on Ethereum Mainnet, Polygon Mainnet, Base Mainnet, Arc
+ * Mainnet, and Arc Testnet." Verified live that day on 1 and 8453.
+ */
+export const ALCHEMY_INTERNAL_CHAIN_IDS: readonly number[] = [1, 137, 8453, 5042]
+
+export const ALCHEMY_URL_TEMPLATE = 'https://{network}.g.alchemy.com/v2/{key}'
+
+/**
  * Chains with no explorer API at all (neither Etherscan v2 nor a public
  * Blockscout / Routescan). `listActivity` returns an empty page with a
  * `note` instead of throwing. X Layer only has OKLink (own API, key required).

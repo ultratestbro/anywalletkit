@@ -1,6 +1,11 @@
 import type { HistoryQuery } from '@forgewallet/core'
+import { AlchemyClient } from './alchemy.js'
 import { BlockscoutClient } from './blockscout.js'
 import {
+  ALCHEMY_NETWORKS,
+  ALCHEMY_INTERNAL_CHAIN_IDS,
+  ALCHEMY_TRANSFERS_CHAIN_IDS,
+  ALCHEMY_URL_TEMPLATE,
   BLOCKSCOUT_PRO_API,
   BLOCKSCOUT_URLS,
   ETHERSCAN_COMPAT_URLS,
@@ -16,7 +21,7 @@ import { EtherscanClient } from './etherscan.js'
 import { defaultFetch, fetchJson } from './http.js'
 import { windowPage, type ListSpec } from './paginate.js'
 import { sharedBucket } from './rate-limit.js'
-import { buildTx, mergeRows, type InternalRow, type MergeContext, type TokenRow, type TxRow } from './rows.js'
+import { buildTx, mergeRows, type ExplorerRows, type InternalRow, type MergeContext, type TokenRow, type TxRow } from './rows.js'
 import type { EvmChainTx, EvmHistoryOptions, EvmHistoryPage, EvmHistorySource, FetchLike, HistoryBackend } from './types.js'
 
 const DEFAULT_LIMIT = 50
@@ -26,7 +31,17 @@ const DEFAULT_TIMEOUT_MS = 15_000
 interface Backend {
   readonly backend: HistoryBackend
   listSpecs(address: string): ListSpec<{ block: number }>[]
+  /** Window rows keyed by list → the three explorer lists. Default: lists are already `tx` / `tokens` / `internal`. */
+  toRows?(rows: Map<string, { block: number }[]>): Promise<ExplorerRows>
   getTransaction(hash: string): Promise<{ tx: TxRow; tokens: TokenRow[]; internal?: InternalRow[] } | undefined>
+}
+
+function defaultRows(rows: Map<string, { block: number }[]>): ExplorerRows {
+  return {
+    tx: (rows.get('tx') ?? []) as TxRow[],
+    tokens: (rows.get('tokens') ?? []) as TokenRow[],
+    internal: (rows.get('internal') ?? []) as InternalRow[],
+  }
 }
 
 // --- Etherscan v2 chainlist, fetched once per process (fallback table when it fails) ---
@@ -64,9 +79,11 @@ export function resetEtherscanChainlistCache(): void {
 /**
  * A `HistorySource` for one EVM chain. Backends, in order: Etherscan v2 (only
  * with an API key and only for chains the v2 chainlist serves) → Blockscout PRO
- * (with its key; Etherscan-format, one key for every Blockscout chain) → keyless
- * Etherscan-format mirror (Routescan, where one exists) → Blockscout instance
- * (where a public one exists). `prefer: 'blockscout'` moves Blockscout first.
+ * (with its key; Etherscan-format, one key for every Blockscout chain) → Alchemy
+ * (with its key, on chains whose Transfers API is documented or with an explicit
+ * `alchemyNetwork`) → keyless Etherscan-format mirror (Routescan, where one
+ * exists) → Blockscout instance (where a public one exists). `prefer:
+ * 'blockscout'` / `prefer: 'alchemy'` moves that backend first.
  */
 export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
   const { chainId } = options
@@ -78,8 +95,10 @@ export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
 
   const compatUrl = options.etherscanCompatUrl === null ? undefined : (options.etherscanCompatUrl ?? ETHERSCAN_COMPAT_URLS[chainId])
   const blockscoutUrl = options.blockscoutUrl === null ? undefined : (options.blockscoutUrl ?? BLOCKSCOUT_URLS[chainId])
+  const alchemyNetwork = options.alchemyNetwork ?? (ALCHEMY_TRANSFERS_CHAIN_IDS.includes(chainId) ? ALCHEMY_NETWORKS[chainId] : undefined)
+  const alchemyOn = Boolean(options.alchemyApiKey && alchemyNetwork)
   // No explorer API at all (and no override): answer locally, never touch the network.
-  const noExplorer = NO_EXPLORER_CHAIN_IDS.includes(chainId) && !compatUrl && !blockscoutUrl && !options.blockscoutProApiKey
+  const noExplorer = NO_EXPLORER_CHAIN_IDS.includes(chainId) && !compatUrl && !blockscoutUrl && !options.blockscoutProApiKey && !alchemyOn
 
   let resolved: Promise<Backend[]> | undefined
   const resolveBackends = (): Promise<Backend[]> => {
@@ -116,13 +135,28 @@ export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
           }),
         )
       }
+      if (alchemyOn) {
+        const apiKey = options.alchemyApiKey!
+        list.push(
+          new AlchemyClient({
+            network: alchemyNetwork!,
+            apiKey,
+            urlTemplate: options.alchemyUrl ?? ALCHEMY_URL_TEMPLATE,
+            internal: ALCHEMY_INTERNAL_CHAIN_IDS.includes(chainId),
+            fetch: fetchFn,
+            bucket: sharedBucket(`alchemy:${apiKey}`, options.alchemyRateLimit ?? 5),
+            timeoutMs,
+          }),
+        )
+      }
       if (compatUrl) {
         list.push(new EtherscanClient({ backend: 'routescan', baseUrl: compatUrl, fetch: fetchFn, bucket: sharedBucket(`compat:${compatUrl}`, 2), timeoutMs }))
       }
       if (blockscoutUrl) {
         list.push(new BlockscoutClient({ baseUrl: blockscoutUrl, fetch: fetchFn, bucket: sharedBucket(`blockscout:${blockscoutUrl}`, 5), timeoutMs }))
       }
-      if (options.prefer === 'blockscout') list.sort((a, b) => (a.backend === 'blockscout' ? -1 : b.backend === 'blockscout' ? 1 : 0))
+      const first = options.prefer
+      if (first === 'blockscout' || first === 'alchemy') list.sort((a, b) => (a.backend === first ? -1 : b.backend === first ? 1 : 0))
       return list
     })()
     return resolved
@@ -130,8 +164,9 @@ export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
 
   const noBackendReason = (): string => {
     if (NO_EXPLORER_CHAIN_IDS.includes(chainId)) return `chain ${chainId} has no public explorer API (no Etherscan v2, Blockscout or Routescan)`
-    if (!apiKey && !options.blockscoutProApiKey) return `chain ${chainId} has no keyless explorer; pass etherscanApiKey or blockscoutProApiKey (both have free tiers)`
-    return `Etherscan v2 does not serve chain ${chainId} and no Blockscout / Routescan instance is known; pass blockscoutUrl`
+    if (!apiKey && !options.blockscoutProApiKey && !options.alchemyApiKey) return `chain ${chainId} has no keyless explorer; pass etherscanApiKey, blockscoutProApiKey or alchemyApiKey (all have free tiers)`
+    if (options.alchemyApiKey && !alchemyOn) return `Etherscan v2 does not serve chain ${chainId}, Alchemy's Transfers API is not documented for it and no Blockscout / Routescan instance is known; pass blockscoutUrl or alchemyNetwork`
+    return `Etherscan v2 does not serve chain ${chainId} and no Blockscout / Routescan instance is known; pass blockscoutUrl or alchemyApiKey`
   }
 
   const ctxFor = (address: string, source: HistoryBackend): MergeContext => ({ chain, chainId, address, source })
@@ -156,11 +191,7 @@ export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
             win = cursor.b === backend.backend ? { lists: cursor.lists, ...(cursor.w !== undefined ? { w: cursor.w } : {}) } : cursor.w !== undefined ? { w: cursor.w, lists: {} } : undefined
           }
           const res = await windowPage(backend.listSpecs(address), win, limit)
-          const rows = {
-            tx: (res.rows.get('tx') ?? []) as TxRow[],
-            tokens: (res.rows.get('tokens') ?? []) as TokenRow[],
-            internal: (res.rows.get('internal') ?? []) as InternalRow[],
-          }
+          const rows = backend.toRows ? await backend.toRows(res.rows) : defaultRows(res.rows)
           let items = mergeRows(ctxFor(address, backend.backend), rows)
           let next = res.next
           if (query.since !== undefined) {

@@ -4,7 +4,8 @@ import { ADDRESS } from './helpers.js'
 
 /**
  * Opt-in network check: `LIVE_HISTORY=1 pnpm --filter @forgewallet/history-evm test`.
- * Hits eth.blockscout.com keyless, and Etherscan v2 when ETHERSCAN_API_KEY is set.
+ * Hits eth.blockscout.com keyless, Etherscan v2 when ETHERSCAN_API_KEY is set, and
+ * Alchemy (base-mainnet) when ALCHEMY_API_KEY is set.
  */
 const live = process.env['LIVE_HISTORY'] === '1'
 
@@ -36,6 +37,24 @@ describe.skipIf(!live)('live explorers', () => {
     expect(page.backend).toBe('etherscan')
     expect(page.items.length).toBeGreaterThan(0)
     const tx = await src.getTransaction(page.items[0]!.hash, ADDRESS)
+    expect(tx?.status).toBe(page.items[0]!.status)
+  })
+
+  it.skipIf(!process.env['ALCHEMY_API_KEY'])('Alchemy (Base, key from env): transfers + receipt batch, pages by block', async () => {
+    const src = createEvmHistory({ chainId: 8453, alchemyApiKey: process.env['ALCHEMY_API_KEY']! })
+    const page = await src.listActivity(ADDRESS, { limit: 10 })
+    expect(page.backend).toBe('alchemy')
+    expect(page.items.length).toBeGreaterThan(0)
+    expect(page.items.every((i) => i.chain === 'eip155:8453' && i.time > 1_600_000_000 && i.status !== 'pending')).toBe(true)
+    expect(page.items.some((i) => i.fee !== undefined && i.fee > 0n)).toBe(true)
+    if (page.cursor) {
+      const next = await src.listActivity(ADDRESS, { limit: 10, cursor: page.cursor })
+      expect(next.backend).toBe('alchemy')
+      const minBlock = Math.min(...page.items.map((i) => Number(i.block)))
+      for (const it of next.items) expect(Number(it.block)).toBeLessThan(minBlock)
+    }
+    const tx = await src.getTransaction(page.items[0]!.hash, ADDRESS)
+    expect(tx?.hash.toLowerCase()).toBe(page.items[0]!.hash.toLowerCase())
     expect(tx?.status).toBe(page.items[0]!.status)
   })
 
