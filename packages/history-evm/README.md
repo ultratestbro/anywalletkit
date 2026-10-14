@@ -48,7 +48,7 @@ cached; when it cannot be fetched the table verified on 2026-10-14 is used.
 
 ## Chain coverage (verified with curl on 2026-10-14)
 
-With a **Blockscout PRO** key the picture below changes: every chain in Blockscout's PRO config (1, 10, 100, 130, 137, 324, 480, 534352, 4326, 4663, 5042, 8453, 42161, 42220, 57073, 98866 as of 2026-10-14; the docs say "all chains" and the backend is tried everywhere, falling through on an unsupported-chain answer) is served through one free key, including the Cloudflare-gated Base / Arbitrum / Polygon / Robinhood / Arc. Not verified live with a real key yet.
+With a **Blockscout PRO** key (verified live with a free-tier key on 2026-10-14): served on 1, 10, 100, 130, 534352, 42220, 4326, 4663, 480, 57073, 98866, 5042 and **42161 (Arbitrum)**. "Featured" chains need the Builder plan ($49/mo): **8453 Base, 137 Polygon, 324 zkSync** (`{"error":"Featured chain … requires one of the following plans: Builder, Business, Pro"}` → classified unavailable, falls through). "Network not supported": 56, 43114, 143, 999, 146, 80094, 59144, 9745, 1329, 196, 5000, 747474, 2818, 14. Net effect with a free Etherscan key + a free PRO key: everything has a free source except **Base** (paid Etherscan or Blockscout Builder, or Alchemy's free Transfers API — no adapter yet), **BSC**, **X Layer** and **Morph**.
 
 Probe used for Blockscout: `GET <root>/api/v2/addresses/0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA/transactions`
 and `/api/v2/transactions`, kept only when both answer `200` JSON.
