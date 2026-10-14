@@ -2,9 +2,9 @@
 
 > Working name. Rename = one `sed` over `@forgewallet/`.
 
-Open-source multichain wallet SDK. One seed phrase → accounts on EVM, Bitcoin,
-TON, Tron and Solana, with a single account interface that protocol modules
-(swap, cross-chain swap, lending, staking, approvals, fiat) are written against.
+Open-source multichain wallet SDK. One seed phrase → accounts on EVM (30 networks),
+Bitcoin, TON, Tron, Solana and NEAR, with a single account interface that protocol
+modules (swap, cross-chain swap, lending, staking, approvals, fiat) are written against.
 
 **Anyone can contribute a module.** A module is accepted when it passes the
 conformance suite and names a maintainer — not when the protocol team itself
@@ -50,16 +50,42 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | `@forgewallet/protocol-swap2-wrap` | 2026-10-12 ✓ | native ↔ wrapped native (ETH↔WETH, BNB↔WBNB, POL↔WPOL, AVAX↔WAVAX, HYPE↔WHYPE… 13 EVM chains) as a same-chain swap2 venue: WETH9 `deposit()` / `withdraw()`, 1:1, no approval, sender-only, tokens verified on-chain; wrapped natives added to the asset catalog |
 | `@forgewallet/protocol-swap2-balancer` | 2026-10-13 ✓ | Balancer v2 same-chain swaps on 9 chains (the cp0x permissionless Balancer venue): the SOR API only suggests the path; the Vault prices it on-chain (`queryBatchSwap`) and `batchSwap` enforces `limits` + deadline; split and multi-hop paths, native via the Vault's ETH sentinel, preflight re-price |
 | `@forgewallet/kit` | phase 3 ✓ | orchestrator: register chain wallets + protocol modules, accounts by CAIP-2 chain, policies (fee cap, allow/block lists, confirm) before every broadcast |
+| `@forgewallet/keyring` | 2026-10-12 ✓ | many accounts from one seed plus imported seeds / private keys / Tonkeeper words, one `AccountMeta` list across chains, per-execution accounts that dispose the key after use |
+| `@forgewallet/tx-preview-evm` | 2026-10-11 ✓ | pre-sign review for EVM: decode (recipient, approvals, contract), simulate balance changes at a pinned block, verdict + refusal reasons for the review sheet |
 | `@forgewallet/protocol-staking-lido-evm`, `-ssv-evm`, `-tonstakers-ton`, `-spl-stake-pool-solana` | phase 4 ✓ | `StakingProtocol` modules (two-phase withdrawals): Lido, SSV Network, Tonstakers, Jito / SPL stake pools |
 | `@forgewallet/protocol-lending-mellow-evm` | phase 4 ✓ | Mellow Core Vaults (Lido EarnETH / EarnUSD) as a `LendingProtocol` |
 | `@forgewallet/protocol-lending-aave-evm` | 2026-10-10 ✓ | Aave v3 on 18 chains (20 markets) as a `LendingProtocol`: supply / withdraw / borrow / repay, gateway for native, EIP-2612 permits, health factor, reserves with rates and caps; Pool cross-checked against the PoolAddressesProvider |
 | `@forgewallet/protocol-lending-morpho-evm` | 2026-10-10 ✓ | Morpho on 10 chains: Vaults (MetaMorpho V1 / Vault V2, ERC-4626) and Blue markets (supply / withdraw / borrow / repay / collateral) as `LendingProtocol`s; vaults verified against the factories, state accrued like the contract, API for listing / APY only |
+| `@forgewallet/protocol-lending-kamino-solana` | 2026-10-13 ✓ | Kamino on Solana: Earn vaults (kVaults: deposit / withdraw, shares, APY) and Lend markets (supply / withdraw / borrow / repay on the wallet's obligation) as `LendingProtocol`s; Kamino's official API builds the transaction, the wallet's serialized guard proves programs and balance effects before signing (branch `feat/kamino-solana`) |
 | `@forgewallet/protocol-approvals-evm` | phase 4 ✓ | token-approval discovery (ERC-20 / 721 / 1155 / Permit2 / EIP-7702), risk flags, revoke |
+| `@forgewallet/extension-kit` + `examples/extension` | 2026-10-14 ✓ | reference Chrome (MV3) wallet assembled from the modules above: fully non-custodial, six chains, EIP-1193/6963, Solana Wallet Standard, TON Connect, Tron TIP-1193, sats-connect, NEAR wallet-selector, WalletConnect v2; vault + session + relay in the kit, reproducible release (branch `feat/extension-kit`) |
 
 Every protocol module ships a `module.json`; `pnpm registry` builds
-[registry/modules.json](registry/modules.json) from them (14 modules today). See
+[registry/modules.json](registry/modules.json) from them (18 modules today). See
 [registry/README.md](registry/README.md) for tiers and how to list an external module.
 
+
+## Planned modules
+
+Tracked on the SDK board; each lands as its own package behind the conformance gate.
+
+| Area | Next | Later |
+|---|---|---|
+| Swap & bridge | USDT0 (LayerZero OFT), Chainflip, 0x Swap API v2, Symbiosis | rhino.fi, swapdk, BOB Gateway, Velora, Orchestra; Uniswap v4 / v2 + LP positions; Balancer v3 |
+| Earn | Sky (sUSDS / SKY), Ethena (USDe → sUSDe), Euler v2, Morpho fixed-rate markets | native SOL staking, Hyperliquid exit, fiat on/off-ramp (MoonPay, Transak) |
+| Safety | `@forgewallet/receive` (quarantine receive addresses on a separate seed branch) + `@forgewallet/screening` (risk signals from shipped lists + on-device 2-hop tracing, two privacy modes); outbound recipient check + address-poisoning detector | tx-preview for Solana / TON / Tron; wallet-btc PSBT partial signing + BIP-322 |
+| Accounts | multisig: Safe (EVM), Squads (Solana), multisig-v2 (TON), account permissions (Tron), multisig2 / Sputnik (NEAR) | gasless sends (EIP-7702 + paymaster, GasFree on Tron, TON paymaster, Solana fee payer) |
+| Names | ENS, SNS `.sol`, TON DNS `.ton`, NEAR named accounts on one `NameResolver` | `.gwei` |
+| Chains | — | Cosmos / IBC, Polkadot / Asset Hub |
+
+## Tests
+
+`pnpm test` runs 827 tests across 32 packages (Node); `pnpm test:hermes` runs 185
+checks in the Hermes VM React Native ships. Beyond unit tests the swap layer is
+checked against live providers: 20,969 quote checks (8 providers, 30 chains, 340
+assets), 8,706 builds simulated to the signature, 3,408 router auctions with the
+ranking invariants (best = max net value, fastest = min ETA) and 457 real-money
+swaps; every Earn module has a read-only `verify:live` across all its markets.
 
 ## Develop
 
