@@ -1,5 +1,6 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {lifiProvider} from "../src/provider.js";
+import {lifi} from "../src/config.js";
 
 import {DIAMOND, FROM_TOKEN, PARAMS, RECIPIENT, SENDER, TO_TOKEN, response} from "./fixtures.js";
 
@@ -67,6 +68,8 @@ describe("LI.FI provider security contract", () => {
     [143, "MON", "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37"], // Monad
     [130, "ETH", "0x864b314D4C5a0399368609581d3E8933a63b9232"], // Unichain
     [80094, "BERA", "0xf909c4Ae16622898b885B89d7F839E0244851c66"], // Berachain
+    [747474, "ETH", "0xC59fe32C9549e3E8B5dCcdAbC45BD287Bd5bA2bc"], // Katana (li.quest/v1/chains, 2026-10-14)
+    [2818, "ETH", "0xF7aB42D00D2399f8A4Fba2F15466Be40709fe307"], // Morph (li.quest/v1/chains, 2026-10-14)
   ])("trusts chain %i's own Diamond (lifinance/contracts deployments, 2026-10-11)", async (chainId, native, own) => {
     const ZERO = "0x0000000000000000000000000000000000000000";
     const body = (to: string) => response({
@@ -346,5 +349,43 @@ describe("LI.FI route policy hook", () => {
     expect(await lifiProvider({chooseRoute: () => ({allowBridges: ["stargateV2"]})}).getQuote(PARAMS)).not.toBeNull();
     expect(calls).toHaveLength(3);
     expect(calls[2]).not.toMatch(/allowBridges/);
+
+describe("LI.FI chain table (2026-10-14 batch)", () => {
+  const ZERO = "0x0000000000000000000000000000000000000000";
+  const ARC_USDC = "0x3600000000000000000000000000000000000000";
+  it.each([
+    // Arc: the source is USDC through its ERC-20 interface (LI.FI's own "native" id there), pulled with value 0.
+    ["eip155:5042", 5042, "USDC", ARC_USDC, "0x0", "0xA4072583658Fae592A3506A42431cb6316a8d40b"], // own Diamond
+    ["eip155:5000", 5000, "MNT", ZERO, "0x38d7ea4c68000", DIAMOND], // canonical Diamond
+    ["eip155:747474", 747474, "ETH", ZERO, "0x38d7ea4c68000", "0xC59fe32C9549e3E8B5dCcdAbC45BD287Bd5bA2bc"], // own Diamond
+    ["eip155:2818", 2818, "ETH", ZERO, "0x38d7ea4c68000", "0xF7aB42D00D2399f8A4Fba2F15466Be40709fe307"], // own Diamond
+    ["eip155:14", 14, "FLR", ZERO, "0x38d7ea4c68000", DIAMOND], // canonical Diamond
+  ])("%s is supported, numbered %i, sources %s and trusts Diamond %s", async (caip2, chainId, symbol, fromAddress, value, diamond) => {
+    expect(lifi.supportsChain(caip2)).toBe(true);
+    expect(lifi.supports(caip2, "eip155:8453")).toBe(true);
+    const amount = fromAddress === ZERO ? "1000000000000000" : "5000000";
+    const body = (to: string) => response({
+      action: {...response().action, fromToken: {address: fromAddress, chainId}, toToken: {address: ZERO, chainId: 8453}, fromChainId: chainId, toChainId: 8453, fromAmount: amount},
+      estimate: {...response().estimate, fromAmount: amount, approvalAddress: to},
+      transactionRequest: {...response().transactionRequest, to, value, chainId},
+    });
+    let sent = "";
+    const reasons: string[] = [];
+    vi.stubGlobal("fetch", async (url: string | URL) => { sent = String(url); return new Response(JSON.stringify(body(diamond))); });
+    const params = {...PARAMS, sourceChain: caip2, sourceToken: symbol, destChain: "eip155:8453", destToken: ZERO, amountIn: amount, onRefusal: (r: string) => { reasons.push(r); }};
+    await expect(lifiProvider().getQuote(params)).resolves.toMatchObject({txRequest: {to: diamond, chainId, ...(fromAddress === ZERO ? {} : {approvalAddress: diamond})}});
+    expect(reasons).toEqual([]);
+    const q = new URL(sent).searchParams;
+    expect([q.get("fromChain"), q.get("fromToken")]).toEqual([String(chainId), fromAddress]);
+  });
+
+  it("Arc: a quote whose Diamond is not Arc's own is refused", async () => {
+    const body = response({
+      action: {...response().action, fromToken: {address: "0x3600000000000000000000000000000000000000", chainId: 5042}, toToken: {address: ZERO, chainId: 8453}, fromChainId: 5042, toChainId: 8453, fromAmount: "5000000"},
+      estimate: {...response().estimate, fromAmount: "5000000", approvalAddress: DIAMOND},
+      transactionRequest: {...response().transactionRequest, to: DIAMOND, value: "0x0", chainId: 5042},
+    });
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(body)));
+    await expect(lifiProvider().getQuote({...PARAMS, sourceChain: "eip155:5042", sourceToken: "0x3600000000000000000000000000000000000000", destChain: "eip155:8453", destToken: ZERO, amountIn: "5000000"})).resolves.toBeNull();
   });
 });

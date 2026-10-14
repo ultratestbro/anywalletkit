@@ -93,3 +93,24 @@ describeProtocolBehaviour("protocol-swap2-wrap", {
     {name: "WETH → ETH (withdraw)", options: {fromToken: "WETH", toToken: ZERO, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 15n, minAmountOut: 10n ** 15n}, fetch: stub(), account: {address: ME}, own: [ME], sourceToken: WETH},
   ],
 });
+
+describe("wrapped-native table (2026-10-14 batch)", () => {
+  it.each([
+    ["eip155:5000", 5000, "WMNT", "0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8"],
+    ["eip155:747474", 747474, "vbETH", "0xEE7D8BCFb72bC1880D0Cf19822eB0A2e6577aB62"],
+    ["eip155:2818", 2818, "WETH", "0x5300000000000000000000000000000000000011"],
+    ["eip155:14", 14, "WFLR", "0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d"],
+  ])("%s resolves to %s and is a same-chain venue once an RPC is configured", (caip2, chainId, symbol, address) => {
+    expect(WRAPPED_NATIVE[chainId]).toEqual({address, symbol});
+    const p = wrapProvider({rpcUrls: {[chainId]: ["https://rpc.test"]}});
+    expect(p.supportsChain?.(caip2)).toBe(true);
+    expect(p.supportsChainPair?.(caip2, caip2)).toBe(true);
+    expect(p.supportsChainPair?.(caip2, "eip155:1")).toBe(false);
+    expect(wrapProvider({rpcUrls: {}}).supportsChain?.(caip2)).toBe(false);
+  });
+
+  it("Arc has no wrapped native (its USDC gas token is already an ERC-20)", () => {
+    expect(WRAPPED_NATIVE[5042]).toBeUndefined();
+    expect(wrapProvider({rpcUrls: {5042: ["https://rpc.test"]}}).supportsChain?.("eip155:5042")).toBe(false);
+  });
+});

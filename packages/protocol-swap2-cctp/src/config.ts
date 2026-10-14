@@ -1,5 +1,5 @@
 // Circle CCTP V2 — mainnet domains, contracts and the native USDC each domain
-// mints. Sources (read 2026-10-10): developers.circle.com/cctp/evm-smart-contracts
+// mints. Sources (read 2026-10-10, Arc + Morph 2026-10-14): developers.circle.com/cctp/evm-smart-contracts
 // (domains + TokenMessengerV2 / MessageTransmitterV2, the same addresses on
 // every EVM chain except EDGE), developers.circle.com/stablecoins/usdc-contract-addresses
 // (native USDC). Only chains whose USDC is Circle-native are listed: CCTP
@@ -42,6 +42,12 @@ export const CCTP_DOMAINS: Readonly<Record<string, CctpDomain>> = Object.freeze(
   d(98866, 22, "Plume", "0x222365EF19F7947e5484218551B56bb3965Aa7aF"),
   d(9745, 33, "Plasma", "0x2d661C89D812261039AF9764eceaAee884f5F67F"),
   d(196, 37, "X Layer", "0xB6CEceAB302E2E4948951eE7843FC24E92933061"),
+  // 2026-10-14: Arc and Morph (developers.circle.com/cctp/evm-smart-contracts + usdc-contract-addresses; TokenMessengerV2 /
+  // MessageTransmitterV2 have code on both chains, MessageTransmitterV2.localDomain() answers 26 / 30 and
+  // TokenMessengerV2.localMessageTransmitter() points at 0x81D4…). Arc's USDC is the chain's gas token: 0x3600… is its
+  // 6-decimal ERC-20 interface, which is what CCTP burns and mints.
+  d(5042, 26, "Arc", "0x3600000000000000000000000000000000000000"),
+  d(2818, 30, "Morph", "0xCfb1186F4e93D60E60a8bDd997427D1F33bc372B"),
 ].map((x) => [x.caip2, x])));
 
 /** CCTP domain → entry. */

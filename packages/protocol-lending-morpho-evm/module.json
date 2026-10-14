@@ -1,7 +1,7 @@
 {
   "name": "@forgewallet/protocol-lending-morpho-evm",
   "type": "lending",
-  "chains": ["eip155:1", "eip155:8453", "eip155:42161", "eip155:10", "eip155:137", "eip155:130", "eip155:999", "eip155:747474", "eip155:143", "eip155:4663"],
+  "chains": ["eip155:1", "eip155:8453", "eip155:42161", "eip155:10", "eip155:137", "eip155:130", "eip155:999", "eip155:747474", "eip155:143", "eip155:4663", "eip155:14", "eip155:5042", "eip155:2818"],
   "tier": "core",
   "maintainers": ["@ultratestbro"],
   "conformance": "0.x",

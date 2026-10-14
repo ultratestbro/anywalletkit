@@ -1,7 +1,7 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {decodeFunctionData, encodeFunctionResult, encodeFunctionData, getAddress, pad, parseAbi, toHex, type Hex} from "viem";
 import {cctpProvider} from "../src/provider.js";
-import {CCTP_DOMAINS, FINALITY_FAST, FINALITY_STANDARD, MESSAGE_TRANSMITTER_V2, TOKEN_MESSENGER_V2} from "../src/config.js";
+import {CCTP_BY_DOMAIN, CCTP_DOMAINS, FINALITY_FAST, FINALITY_STANDARD, MESSAGE_TRANSMITTER_V2, TOKEN_MESSENGER_V2} from "../src/config.js";
 
 const BASE = CCTP_DOMAINS["eip155:8453"]!;
 const ARB = CCTP_DOMAINS["eip155:42161"]!;
@@ -90,6 +90,43 @@ describe("routes", () => {
     expect(p.supportsChain?.("eip155:1")).toBe(true);
     expect(p.supportsChain?.("solana:mainnet")).toBe(false);
     expect(p.supportsChainPair?.("eip155:1", "eip155:1")).toBe(false);
+  });
+});
+
+describe("domain table", () => {
+  it("every domain and chain is listed once, and every EVM entry uses the shared V2 contracts", () => {
+    const all = Object.values(CCTP_DOMAINS);
+    expect(new Set(all.map((x) => x.domain)).size).toBe(all.length);
+    expect(new Set(all.map((x) => x.chainId)).size).toBe(all.length);
+    for (const x of all) {
+      expect(x.caip2).toBe(`eip155:${x.chainId}`);
+      expect(x.usdc).toMatch(/^0x[0-9a-fA-F]{40}$/);
+      expect([x.tokenMessenger, x.messageTransmitter]).toEqual([TOKEN_MESSENGER_V2, MESSAGE_TRANSMITTER_V2]);
+      expect(CCTP_BY_DOMAIN[x.domain]).toBe(x);
+    }
+  });
+
+  it.each([
+    ["eip155:5042", 5042, 26, "Arc", "0x3600000000000000000000000000000000000000"],
+    ["eip155:2818", 2818, 30, "Morph", "0xCfb1186F4e93D60E60a8bDd997427D1F33bc372B"],
+  ])("%s is domain %i (%s), 2026-10-14", (caip2, chainId, domain, name, usdc) => {
+    expect(CCTP_DOMAINS[caip2]).toMatchObject({chainId, domain, name, usdc});
+    expect(CCTP_BY_DOMAIN[domain]!.caip2).toBe(caip2);
+    const {p} = make();
+    expect(p.supportsChain?.(caip2)).toBe(true);
+    expect(p.supportsRoute({chain: caip2, token: "USDC"}, {chain: "eip155:8453", token: BASE.usdc})).toBe(true);
+    expect(p.supportsRoute({chain: "eip155:8453", token: "USDC"}, {chain: caip2, token: usdc})).toBe(true);
+    expect(p.supportsRoute({chain: "eip155:8453", token: "USDC"}, {chain: caip2, token: "0x0000000000000000000000000000000000000000"})).toBe(false);
+  });
+
+  it("Arc ↔ Morph routes both ways; Mantle, Katana and Flare (no Circle-native USDC) do not", () => {
+    const {p} = make();
+    expect(p.supportsRoute({chain: "eip155:5042", token: "USDC"}, {chain: "eip155:2818", token: CCTP_DOMAINS["eip155:2818"]!.usdc})).toBe(true);
+    expect(p.supportsRoute({chain: "eip155:2818", token: "USDC"}, {chain: "eip155:5042", token: CCTP_DOMAINS["eip155:5042"]!.usdc})).toBe(true);
+    for (const c of ["eip155:5000", "eip155:747474", "eip155:14"]) {
+      expect(p.supportsChain?.(c)).toBe(false);
+      expect(p.supportsRoute({chain: c, token: "USDC"}, {chain: "eip155:8453", token: BASE.usdc})).toBe(false);
+    }
   });
 });
 

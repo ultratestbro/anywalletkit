@@ -48,6 +48,14 @@ const LIFI_CHAIN: Record<string, string> = {
   "eip155:57073": "57073",
   "eip155:98866": "98866",
   "eip155:196": "196",
+  // 2026-10-14: Arc, Mantle, Katana, Morph, Flare (live on li.quest/v1/chains). On Arc LI.FI's "native" is the USDC
+  // ERC-20 interface 0x3600…: a 0x0 fromToken is rewritten to it and the Diamond pulls via transferFrom (value 0), so
+  // the catalog lists Arc USDC as that token — the engine then runs the ordinary approve + call path.
+  "eip155:5042": "5042",
+  "eip155:5000": "5000",
+  "eip155:747474": "747474",
+  "eip155:2818": "2818",
+  "eip155:14": "14",
   [LIFI_SOLANA_CAIP2]: "1151111081099710",
 };
 const CAIP2_BY_LIFI_CHAIN: Record<string, string> = Object.fromEntries(Object.entries(LIFI_CHAIN).map(([caip2, id]) => [id, caip2]));
@@ -90,6 +98,11 @@ const LIFI_DIAMONDS: Readonly<Record<string, string>> = {
   "eip155:59144": "0xDE1E598b81620773454588B85D6b5D4eEC32573e", // Linea (deployments/linea.json, 2026-10-13)
   "eip155:57073": "0x864b314D4C5a0399368609581d3E8933a63b9232", // Ink (deployments/ink.json, 2026-10-13)
   "eip155:98866": "0x6f5C8Bb0C5Fe4ECeAC40EE1C238EaB6bbb29761c", // Plume (deployments/plume.json, 2026-10-13)
+  // 2026-10-14: li.quest/v1/chains `diamondAddress`, eth_getCode non-empty on each. Mantle and Flare carry the canonical
+  // 0x1231… Diamond (the default).
+  "eip155:5042": "0xA4072583658Fae592A3506A42431cb6316a8d40b", // Arc
+  "eip155:747474": "0xC59fe32C9549e3E8B5dCcdAbC45BD287Bd5bA2bc", // Katana
+  "eip155:2818": "0xF7aB42D00D2399f8A4Fba2F15466Be40709fe307", // Morph
   "eip155:4326": "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37", // MegaETH (deployments/megaeth.json, matches a live quote 2026-10-12)
 };
 const diamondFor = (chain: string): string => LIFI_DIAMONDS[chain] ?? LIFI_DIAMOND;
