@@ -34,7 +34,8 @@
     "policies"
   ],
   "dependencies": {
-    "@forgewallet/core": "workspace:*"
+    "@forgewallet/core": "workspace:*",
+    "@forgewallet/swap2-assets": "workspace:*"
   },
   "devDependencies": {
     "@forgewallet/conformance": "workspace:*",

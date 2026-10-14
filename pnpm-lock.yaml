@@ -237,6 +237,9 @@ importers:
       '@forgewallet/core':
         specifier: workspace:*
         version: link:../core
+      '@forgewallet/swap2-assets':
+        specifier: workspace:*
+        version: link:../swap2-assets
     devDependencies:
       '@forgewallet/conformance':
         specifier: workspace:*
