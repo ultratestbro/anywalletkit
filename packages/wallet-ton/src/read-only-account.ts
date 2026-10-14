@@ -136,7 +136,9 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
     const jw = await this.getJettonWalletAddress(o.token!)
     await this.jettonWalletData(o.token!, jw)
     const forwardTonAmount = o.forwardTonAmount !== undefined ? big(o.forwardTonAmount) : 1n
-    const forwardPayload = o.forwardPayload === undefined ? null : typeof o.forwardPayload === 'string' ? commentCell(o.forwardPayload) : o.forwardPayload
+    if (o.memo !== undefined && o.forwardPayload !== undefined) throw new UnsafeTransactionError('memo-and-payload', 'Pass either memo or forwardPayload, not both: a jetton transfer carries one forward payload.')
+    const payload = o.forwardPayload ?? o.memo
+    const forwardPayload = payload === undefined ? null : typeof payload === 'string' ? commentCell(payload) : payload
     const body = beginCell()
       .storeUint(JETTON_TRANSFER_OP, 32)
       .storeUint(o.queryId !== undefined ? BigInt(o.queryId) : randomQueryId(), 64)
@@ -222,7 +224,7 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
   }
 
   async quoteTransfer(o: TonTransferOptions): Promise<{ fee: bigint }> {
-    const message = o.token ? await this.jettonTransferMessage(o) : this.transactionMessage({ to: o.recipient, value: o.amount })
+    const message = o.token ? await this.jettonTransferMessage(o) : this.transactionMessage({ to: o.recipient, value: o.amount, ...(o.memo !== undefined ? { body: o.memo } : {}) })
     const { signing } = await this.signingCell([message])
     return { fee: (await this.estimateFees(v5r1PackUnsigned(signing))).total }
   }

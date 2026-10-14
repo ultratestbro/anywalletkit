@@ -95,6 +95,11 @@ export interface TonTransferOptions {
   forwardTonAmount?: bigint | number | string
   /** Jetton only: forward payload — a text comment or a Cell (DEX / escrow payloads). */
   forwardPayload?: Cell | string
+  /**
+   * Text memo (a deposit memo, an exchange tag). Jetton: sent as the forward-payload comment (TEP-74);
+   * native TON: the message comment. Cannot be combined with `forwardPayload`.
+   */
+  memo?: string
   /** Jetton only: custom payload cell (rarely needed; e.g. mintless jettons). */
   customPayload?: Cell
   /** Jetton only: where excess TON returns (default: this wallet). */

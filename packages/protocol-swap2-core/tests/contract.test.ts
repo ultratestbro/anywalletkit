@@ -273,7 +273,7 @@ describe("core public contract", () => {
     })).resolves.toMatchObject({hash: "trc20"});
     expect(transferred).toEqual([{token: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", recipient: VAULT, amount: 50_000_000n, memo: MEMO}]);
     expect(sent).toHaveLength(1);
-    // A TON jetton with a memo is still refused (the generic signer cannot forward it).
+    // A TON jetton with a memo rides the transfer surface too (forward-payload comment, TEP-74).
     const tonProvider: CrossChainProvider = {
       ...provider,
       getQuote: async (params) => ({...(await provider.getQuote(params))!, depositAddress: "EQdeposit"}),
@@ -286,8 +286,9 @@ describe("core public contract", () => {
     const tonAccount = {...account, getAddress: async () => "UQsender", getChainId: async () => "ton:-239"};
     await expect(new TonProtocol(tonAccount, {fromChain: "ton:-239"}).swap2({
       ...common, fromToken: "USDT", fromTokenAmount: 1_000_000n, minAmountOut: 1n,
-    })).rejects.toThrow(/token deposit with memo/);
-    expect(transferred).toHaveLength(1);
+    })).resolves.toMatchObject({hash: "trc20"});
+    expect(transferred).toHaveLength(2);
+    expect(transferred[1]).toMatchObject({recipient: "EQdeposit", amount: 1_000_000n, memo: MEMO});
   });
 
   it("rejects calldata execution on a non-EVM source before any send", async () => {

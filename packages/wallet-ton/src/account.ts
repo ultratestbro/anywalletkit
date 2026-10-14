@@ -122,7 +122,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   /** TON (no `token`) or jetton transfer. */
   async transfer(o: TonTransferOptions): Promise<TransferResult> {
     this.requireRpc('transfer tokens')
-    const message = o.token ? await this.jettonTransferMessage(o) : this.transactionMessage({ to: o.recipient, value: o.amount })
+    const message = o.token ? await this.jettonTransferMessage(o) : this.transactionMessage({ to: o.recipient, value: o.amount, ...(o.memo !== undefined ? { body: o.memo } : {}) })
     const { body, fee } = await this.prepare([message], this._config.transferMaxFee, 'transfer')
     return { hash: await this.broadcast(body), fee }
   }

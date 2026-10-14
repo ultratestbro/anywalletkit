@@ -111,6 +111,21 @@ describe('WalletAccountTon', () => {
     m.dispose()
   })
 
+  it('memo: a jetton transfer carries it as the forward-payload comment, a native transfer as the message comment; memo + forwardPayload is refused', async () => {
+    const f = fakeRpc()
+    const m = manager(f)
+    const a = await m.getAccount(0)
+    await a.transfer({ token: USDT, recipient: RECIPIENT, amount: 1_000_000n, memo: 'deposit-7f3a' })
+    const jetton = a.describe(verifyExternal(f.sent[0]!, a.publicKey, ADDR0).body)
+    expect(jetton.items[0]!.jetton).toMatchObject({ forwardPayload: 'comment', forwardComment: 'deposit-7f3a' })
+    await a.transfer({ recipient: RECIPIENT, amount: 1_000n, memo: 'tag-42' })
+    const native = a.describe(verifyExternal(f.sent[1]!, a.publicKey, ADDR0).body)
+    expect(JSON.stringify(native, (_, v) => (typeof v === 'bigint' ? v.toString() : v))).toContain('tag-42')
+    await expect(a.transfer({ token: USDT, recipient: RECIPIENT, amount: 1n, memo: 'a', forwardPayload: 'b' })).rejects.toMatchObject({ code: 'memo-and-payload' })
+    expect(f.sent).toHaveLength(2)
+    m.dispose()
+  })
+
   it('getTokenBalance is 0 when the jetton wallet is not deployed', async () => {
     const f = fakeRpc({
       getAddressInformation: (p) => ({ balance: '0', state: p.address === Address.parse(JETTON_WALLET).toString() ? 'uninitialized' : 'active', code: '', data: '', last_transaction_id: { lt: '0', hash: '' } }),

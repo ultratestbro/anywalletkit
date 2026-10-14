@@ -897,11 +897,11 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       }
     }
 
-    // A TON jetton transfer needs its memo as a forward payload. Our generic
-    // signer cannot encode that yet, and would otherwise silently drop it. A
-    // Tron TRC-20 memo is a transaction-level field the transfer surface
-    // carries explicitly (`memo`), so it is allowed through below.
-    if (tokenId && (cellBody !== undefined || (unsigned.memo !== undefined && !tronSource && !nearSource))) {
+    // A TON jetton transfer carries the memo as its forward-payload comment: the
+    // account's `transfer({memo})` surface places it there (TEP-74), exactly as
+    // Tron puts it in raw_data.data and NEAR in the ft_transfer memo.
+    const tonSource = this.fromChain.startsWith("ton:");
+    if (tokenId && (cellBody !== undefined || (unsigned.memo !== undefined && !tronSource && !nearSource && !tonSource))) {
       throw new Error("swap2: token deposit with memo/cell payload is not implemented");
     }
 
@@ -1174,7 +1174,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           token: tokenId,
           recipient: unsigned.to,
           amount: BigInt(q.sourceAmount),
-          ...((tronSource || nearSource) && unsigned.memo ? {memo: unsigned.memo, ...(tronSource && unsigned.memoEncoding ? {memoEncoding: unsigned.memoEncoding} : {})} : {}),
+          ...((tronSource || nearSource || tonSource) && unsigned.memo ? {memo: unsigned.memo, ...(tronSource && unsigned.memoEncoding ? {memoEncoding: unsigned.memoEncoding} : {})} : {}),
         });
       } else {
         sent = await signer.sendTransaction({
