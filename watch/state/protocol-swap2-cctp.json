@@ -1,0 +1,684 @@
+{
+ "module": "@forgewallet/protocol-swap2-cctp",
+ "sources": {
+  "usdc-ethereum": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"2a1717c756206e66\",\"impl\":null}",
+   "meta": {
+    "codeHash": "2a1717c756206e66",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:16.040Z",
+   "changedAt": "2026-10-14T15:12:16.040Z"
+  },
+  "usdc-avalanche": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"d8e2e996981b52b8\",\"impl\":null}",
+   "meta": {
+    "codeHash": "d8e2e996981b52b8",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:16.061Z",
+   "changedAt": "2026-10-14T15:12:16.061Z"
+  },
+  "token-messenger-v2-ethereum": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xa820a620f638114f3eb45df87382383322ddbc49\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x555e272506c06e7e559d57418563742afe363ec8\",\"implCodeHash\":\"98bda1aa1a7245d6\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x555e272506c06e7e559d57418563742afe363ec8",
+    "admin": "0xa820a620f638114f3eb45df87382383322ddbc49",
+    "beacon": null,
+    "implCodeHash": "98bda1aa1a7245d6"
+   },
+   "seenAt": "2026-10-14T15:12:16.127Z",
+   "changedAt": "2026-10-14T15:12:16.127Z"
+  },
+  "message-transmitter-v2-ethereum": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xb7569e9eb64eaed5c4166e510b4f6ff54ef42258\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0xa30c41865729c248067704d4db9f38385cbe1186\",\"implCodeHash\":\"e66078b40778d206\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0xa30c41865729c248067704d4db9f38385cbe1186",
+    "admin": "0xb7569e9eb64eaed5c4166e510b4f6ff54ef42258",
+    "beacon": null,
+    "implCodeHash": "e66078b40778d206"
+   },
+   "seenAt": "2026-10-14T15:12:16.132Z",
+   "changedAt": "2026-10-14T15:12:16.132Z"
+  },
+  "message-transmitter-v2-avalanche": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xdd4bfb4b809e68c0973d7eb6d160d680183c8b5c\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x8689f0a21fe82b30e8f7684902788f65d891dae6\",\"implCodeHash\":\"1aa4f01f06a90039\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x8689f0a21fe82b30e8f7684902788f65d891dae6",
+    "admin": "0xdd4bfb4b809e68c0973d7eb6d160d680183c8b5c",
+    "beacon": null,
+    "implCodeHash": "1aa4f01f06a90039"
+   },
+   "seenAt": "2026-10-14T15:12:16.163Z",
+   "changedAt": "2026-10-14T15:12:16.163Z"
+  },
+  "token-messenger-v2-avalanche": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xe4a786348cf3df7ef5dc9b28f658e22c816f723f\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x555e272506c06e7e559d57418563742afe363ec8\",\"implCodeHash\":\"98bda1aa1a7245d6\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x555e272506c06e7e559d57418563742afe363ec8",
+    "admin": "0xe4a786348cf3df7ef5dc9b28f658e22c816f723f",
+    "beacon": null,
+    "implCodeHash": "98bda1aa1a7245d6"
+   },
+   "seenAt": "2026-10-14T15:12:16.167Z",
+   "changedAt": "2026-10-14T15:12:16.167Z"
+  },
+  "usdc-op-mainnet": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"e11c9f8fcef3caf4\",\"impl\":null}",
+   "meta": {
+    "codeHash": "e11c9f8fcef3caf4",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:16.371Z",
+   "changedAt": "2026-10-14T15:12:16.371Z"
+  },
+  "token-messenger-v2-op-mainnet": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x14085cbf8634a9d279378eb3bf40240e80647681\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x555e272506c06e7e559d57418563742afe363ec8\",\"implCodeHash\":\"98bda1aa1a7245d6\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x555e272506c06e7e559d57418563742afe363ec8",
+    "admin": "0x14085cbf8634a9d279378eb3bf40240e80647681",
+    "beacon": null,
+    "implCodeHash": "98bda1aa1a7245d6"
+   },
+   "seenAt": "2026-10-14T15:12:16.376Z",
+   "changedAt": "2026-10-14T15:12:16.376Z"
+  },
+  "usdc-arbitrum": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"2806ceef5f6fb4b4\",\"impl\":null}",
+   "meta": {
+    "codeHash": "2806ceef5f6fb4b4",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:16.473Z",
+   "changedAt": "2026-10-14T15:12:16.473Z"
+  },
+  "token-messenger-v2-arbitrum": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xe825a926c4196878c898ba8b78bc3396570909be\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x555e272506c06e7e559d57418563742afe363ec8\",\"implCodeHash\":\"98bda1aa1a7245d6\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x555e272506c06e7e559d57418563742afe363ec8",
+    "admin": "0xe825a926c4196878c898ba8b78bc3396570909be",
+    "beacon": null,
+    "implCodeHash": "98bda1aa1a7245d6"
+   },
+   "seenAt": "2026-10-14T15:12:16.474Z",
+   "changedAt": "2026-10-14T15:12:16.474Z"
+  },
+  "message-transmitter-v2-op-mainnet": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x1cc76b72d180f8768a5e3d2ff8b1dfb593c1ecd3\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x1f33335414afb7305367452d00a0d024b0184ea8\",\"implCodeHash\":\"6216e07f8da855c7\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x1f33335414afb7305367452d00a0d024b0184ea8",
+    "admin": "0x1cc76b72d180f8768a5e3d2ff8b1dfb593c1ecd3",
+    "beacon": null,
+    "implCodeHash": "6216e07f8da855c7"
+   },
+   "seenAt": "2026-10-14T15:12:16.476Z",
+   "changedAt": "2026-10-14T15:12:16.476Z"
+  },
+  "message-transmitter-v2-arbitrum": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x15fb0197b0b8ae18a5f283ba8b002d4c6abb127f\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x7b93db2bc72faf642cec0adcac4f91718831a1f4\",\"implCodeHash\":\"72959d74b8574f80\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x7b93db2bc72faf642cec0adcac4f91718831a1f4",
+    "admin": "0x15fb0197b0b8ae18a5f283ba8b002d4c6abb127f",
+    "beacon": null,
+    "implCodeHash": "72959d74b8574f80"
+   },
+   "seenAt": "2026-10-14T15:12:16.548Z",
+   "changedAt": "2026-10-14T15:12:16.548Z"
+  },
+  "usdc-base": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"4b935fa5e6a80e4d\",\"impl\":null}",
+   "meta": {
+    "codeHash": "4b935fa5e6a80e4d",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:16.684Z",
+   "changedAt": "2026-10-14T15:12:16.684Z"
+  },
+  "token-messenger-v2-base": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x88acf681fb9a1dfce5ac83391991895c54cf24cc\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x555e272506c06e7e559d57418563742afe363ec8\",\"implCodeHash\":\"98bda1aa1a7245d6\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x555e272506c06e7e559d57418563742afe363ec8",
+    "admin": "0x88acf681fb9a1dfce5ac83391991895c54cf24cc",
+    "beacon": null,
+    "implCodeHash": "98bda1aa1a7245d6"
+   },
+   "seenAt": "2026-10-14T15:12:16.694Z",
+   "changedAt": "2026-10-14T15:12:16.694Z"
+  },
+  "message-transmitter-v2-base": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x19b4b317e6ea4643f1507c372630483092d0abff\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x7db629f6acc20be49a0a7565c21cc178e9ac21e3\",\"implCodeHash\":\"ef1f2243cf44f00a\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x7db629f6acc20be49a0a7565c21cc178e9ac21e3",
+    "admin": "0x19b4b317e6ea4643f1507c372630483092d0abff",
+    "beacon": null,
+    "implCodeHash": "ef1f2243cf44f00a"
+   },
+   "seenAt": "2026-10-14T15:12:16.743Z",
+   "changedAt": "2026-10-14T15:12:16.743Z"
+  },
+  "usdc-polygon": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"17ff32a7bcc2d0d4\",\"impl\":null}",
+   "meta": {
+    "codeHash": "17ff32a7bcc2d0d4",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:16.800Z",
+   "changedAt": "2026-10-14T15:12:16.800Z"
+  },
+  "token-messenger-v2-polygon": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xaf904ead44750e2e970f205e9d1e0c6ca8caa643\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x555e272506c06e7e559d57418563742afe363ec8\",\"implCodeHash\":\"98bda1aa1a7245d6\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x555e272506c06e7e559d57418563742afe363ec8",
+    "admin": "0xaf904ead44750e2e970f205e9d1e0c6ca8caa643",
+    "beacon": null,
+    "implCodeHash": "98bda1aa1a7245d6"
+   },
+   "seenAt": "2026-10-14T15:12:16.805Z",
+   "changedAt": "2026-10-14T15:12:16.805Z"
+  },
+  "message-transmitter-v2-polygon": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xcb37aa4d4be3abdadc9f7a677ba806b7ff4aea15\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0xd40518c1a3139e8f1f73f83e5de74e05c88f5ad3\",\"implCodeHash\":\"3c53ab6dc413d449\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0xd40518c1a3139e8f1f73f83e5de74e05c88f5ad3",
+    "admin": "0xcb37aa4d4be3abdadc9f7a677ba806b7ff4aea15",
+    "beacon": null,
+    "implCodeHash": "3c53ab6dc413d449"
+   },
+   "seenAt": "2026-10-14T15:12:16.808Z",
+   "changedAt": "2026-10-14T15:12:16.808Z"
+  },
+  "usdc-unichain": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"234ea8e69b84287a\",\"impl\":null}",
+   "meta": {
+    "codeHash": "234ea8e69b84287a",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:17.083Z",
+   "changedAt": "2026-10-14T15:12:17.083Z"
+  },
+  "token-messenger-v2-unichain": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x071f7189831e59f143c0f81644bdcae48492295c\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x555e272506c06e7e559d57418563742afe363ec8\",\"implCodeHash\":\"98bda1aa1a7245d6\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x555e272506c06e7e559d57418563742afe363ec8",
+    "admin": "0x071f7189831e59f143c0f81644bdcae48492295c",
+    "beacon": null,
+    "implCodeHash": "98bda1aa1a7245d6"
+   },
+   "seenAt": "2026-10-14T15:12:17.093Z",
+   "changedAt": "2026-10-14T15:12:17.093Z"
+  },
+  "message-transmitter-v2-unichain": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x1e7df13422915947c1292624dcbf83618b6e919d\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0xca8b81cc584e1480f7855bf843ce17af511ecd03\",\"implCodeHash\":\"6780ef445da54d82\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0xca8b81cc584e1480f7855bf843ce17af511ecd03",
+    "admin": "0x1e7df13422915947c1292624dcbf83618b6e919d",
+    "beacon": null,
+    "implCodeHash": "6780ef445da54d82"
+   },
+   "seenAt": "2026-10-14T15:12:17.094Z",
+   "changedAt": "2026-10-14T15:12:17.094Z"
+  },
+  "usdc-linea": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"a1d0c1663f90c1b0\",\"impl\":null}",
+   "meta": {
+    "codeHash": "a1d0c1663f90c1b0",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:17.344Z",
+   "changedAt": "2026-10-14T15:12:17.344Z"
+  },
+  "token-messenger-v2-linea": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x5b88c8f9ae99b23214d8816289a77c5e6a6d04fa\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x555e272506c06e7e559d57418563742afe363ec8\",\"implCodeHash\":\"98bda1aa1a7245d6\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x555e272506c06e7e559d57418563742afe363ec8",
+    "admin": "0x5b88c8f9ae99b23214d8816289a77c5e6a6d04fa",
+    "beacon": null,
+    "implCodeHash": "98bda1aa1a7245d6"
+   },
+   "seenAt": "2026-10-14T15:12:17.520Z",
+   "changedAt": "2026-10-14T15:12:17.520Z"
+  },
+  "message-transmitter-v2-linea": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xee13456c833dbb9d1d2d83cba09b716954d6e33c\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0xcec4e8c3bd65cf40821cb2c63deb0aabbcd9ef1b\",\"implCodeHash\":\"eb9103ce5d1dbd2c\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0xcec4e8c3bd65cf40821cb2c63deb0aabbcd9ef1b",
+    "admin": "0xee13456c833dbb9d1d2d83cba09b716954d6e33c",
+    "beacon": null,
+    "implCodeHash": "eb9103ce5d1dbd2c"
+   },
+   "seenAt": "2026-10-14T15:12:17.523Z",
+   "changedAt": "2026-10-14T15:12:17.523Z"
+  },
+  "usdc-sonic": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"05d72064abbf7f4e\",\"impl\":null}",
+   "meta": {
+    "codeHash": "05d72064abbf7f4e",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:17.573Z",
+   "changedAt": "2026-10-14T15:12:17.573Z"
+  },
+  "token-messenger-v2-sonic": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x6f2393c46ec82ecaed714d96691449b031d6d7d9\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x555e272506c06e7e559d57418563742afe363ec8\",\"implCodeHash\":\"98bda1aa1a7245d6\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x555e272506c06e7e559d57418563742afe363ec8",
+    "admin": "0x6f2393c46ec82ecaed714d96691449b031d6d7d9",
+    "beacon": null,
+    "implCodeHash": "98bda1aa1a7245d6"
+   },
+   "seenAt": "2026-10-14T15:12:17.741Z",
+   "changedAt": "2026-10-14T15:12:17.741Z"
+  },
+  "message-transmitter-v2-sonic": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x4930e0220680afcd597dab5eb1d98b0a3b623878\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x824ddd600433ce8b17ad5dd6333c883ac10a3ece\",\"implCodeHash\":\"fd5e218c05f600dd\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x824ddd600433ce8b17ad5dd6333c883ac10a3ece",
+    "admin": "0x4930e0220680afcd597dab5eb1d98b0a3b623878",
+    "beacon": null,
+    "implCodeHash": "fd5e218c05f600dd"
+   },
+   "seenAt": "2026-10-14T15:12:17.745Z",
+   "changedAt": "2026-10-14T15:12:17.745Z"
+  },
+  "token-messenger-v2-monad": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xba0db4100ddae5ebd9f3b2076c420200d4388a44\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4\",\"implCodeHash\":\"9e5e097425dfe955\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4",
+    "admin": "0xba0db4100ddae5ebd9f3b2076c420200d4388a44",
+    "beacon": null,
+    "implCodeHash": "9e5e097425dfe955"
+   },
+   "seenAt": "2026-10-14T15:12:17.917Z",
+   "changedAt": "2026-10-14T15:12:17.917Z"
+  },
+  "usdc-world-chain": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"e11c9f8fcef3caf4\",\"impl\":null}",
+   "meta": {
+    "codeHash": "e11c9f8fcef3caf4",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:18.050Z",
+   "changedAt": "2026-10-14T15:12:18.050Z"
+  },
+  "usdc-monad": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"fb5dd40f78379d50\",\"impl\":null}",
+   "meta": {
+    "codeHash": "fb5dd40f78379d50",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:18.052Z",
+   "changedAt": "2026-10-14T15:12:18.052Z"
+  },
+  "message-transmitter-v2-monad": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x3b3bdadbb27ef11b8e61aa8e7759e6b6b148ac70\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0xadf351fd4c26fd97fab86b60bf09ca795b22de26\",\"implCodeHash\":\"dfcc4c7ad402a9d9\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0xadf351fd4c26fd97fab86b60bf09ca795b22de26",
+    "admin": "0x3b3bdadbb27ef11b8e61aa8e7759e6b6b148ac70",
+    "beacon": null,
+    "implCodeHash": "dfcc4c7ad402a9d9"
+   },
+   "seenAt": "2026-10-14T15:12:18.141Z",
+   "changedAt": "2026-10-14T15:12:18.141Z"
+  },
+  "token-messenger-v2-world-chain": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xe0dc0e84d3b408bc355daed05147ac0950386fe3\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x555e272506c06e7e559d57418563742afe363ec8\",\"implCodeHash\":\"98bda1aa1a7245d6\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x555e272506c06e7e559d57418563742afe363ec8",
+    "admin": "0xe0dc0e84d3b408bc355daed05147ac0950386fe3",
+    "beacon": null,
+    "implCodeHash": "98bda1aa1a7245d6"
+   },
+   "seenAt": "2026-10-14T15:12:18.213Z",
+   "changedAt": "2026-10-14T15:12:18.213Z"
+  },
+  "message-transmitter-v2-world-chain": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x3cf0b6e1cd6ebfeca6136462b9e26305ea8f9c79\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x46fbc3739f603acb848558f5c22908aca7d535ec\",\"implCodeHash\":\"169542aaf0db491b\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x46fbc3739f603acb848558f5c22908aca7d535ec",
+    "admin": "0x3cf0b6e1cd6ebfeca6136462b9e26305ea8f9c79",
+    "beacon": null,
+    "implCodeHash": "169542aaf0db491b"
+   },
+   "seenAt": "2026-10-14T15:12:18.224Z",
+   "changedAt": "2026-10-14T15:12:18.224Z"
+  },
+  "usdc-sei": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"df52d9d82b2029e2\",\"impl\":null}",
+   "meta": {
+    "codeHash": "df52d9d82b2029e2",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:18.283Z",
+   "changedAt": "2026-10-14T15:12:18.283Z"
+  },
+  "token-messenger-v2-sei": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x0383421d7a19907a8895f305df13606299c44f68\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4\",\"implCodeHash\":\"9e5e097425dfe955\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4",
+    "admin": "0x0383421d7a19907a8895f305df13606299c44f68",
+    "beacon": null,
+    "implCodeHash": "9e5e097425dfe955"
+   },
+   "seenAt": "2026-10-14T15:12:18.337Z",
+   "changedAt": "2026-10-14T15:12:18.337Z"
+  },
+  "message-transmitter-v2-sei": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xfe337f04c133db7ef7c4704d5c955862cafc032f\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x2c6c1c5901b9c3a2cad7a6ae4f7c7e291340d286\",\"implCodeHash\":\"3367763694fc7eb1\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x2c6c1c5901b9c3a2cad7a6ae4f7c7e291340d286",
+    "admin": "0xfe337f04c133db7ef7c4704d5c955862cafc032f",
+    "beacon": null,
+    "implCodeHash": "3367763694fc7eb1"
+   },
+   "seenAt": "2026-10-14T15:12:18.368Z",
+   "changedAt": "2026-10-14T15:12:18.368Z"
+  },
+  "usdc-hyperevm": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"27230604b3a77ae7\",\"impl\":null}",
+   "meta": {
+    "codeHash": "27230604b3a77ae7",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:18.436Z",
+   "changedAt": "2026-10-14T15:12:18.436Z"
+  },
+  "token-messenger-v2-hyperevm": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xec6c5c1b27e66701e7b79747caa2322127e0d4f2\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4\",\"implCodeHash\":\"9e5e097425dfe955\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4",
+    "admin": "0xec6c5c1b27e66701e7b79747caa2322127e0d4f2",
+    "beacon": null,
+    "implCodeHash": "9e5e097425dfe955"
+   },
+   "seenAt": "2026-10-14T15:12:18.441Z",
+   "changedAt": "2026-10-14T15:12:18.441Z"
+  },
+  "message-transmitter-v2-hyperevm": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xe11c4e6efee7205325a2219771c474527210c5ab\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x17eaec8bb0d05e8da2e96ad69121fee6dd62d313\",\"implCodeHash\":\"02b0f13aba2a6786\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x17eaec8bb0d05e8da2e96ad69121fee6dd62d313",
+    "admin": "0xe11c4e6efee7205325a2219771c474527210c5ab",
+    "beacon": null,
+    "implCodeHash": "02b0f13aba2a6786"
+   },
+   "seenAt": "2026-10-14T15:12:18.585Z",
+   "changedAt": "2026-10-14T15:12:18.585Z"
+  },
+  "usdc-ink": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"bb7d3013154f7c08\",\"impl\":null}",
+   "meta": {
+    "codeHash": "bb7d3013154f7c08",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:18.659Z",
+   "changedAt": "2026-10-14T15:12:18.659Z"
+  },
+  "token-messenger-v2-ink": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x6fa54d84766061ea351935a377172125c3948464\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4\",\"implCodeHash\":\"9e5e097425dfe955\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4",
+    "admin": "0x6fa54d84766061ea351935a377172125c3948464",
+    "beacon": null,
+    "implCodeHash": "9e5e097425dfe955"
+   },
+   "seenAt": "2026-10-14T15:12:18.661Z",
+   "changedAt": "2026-10-14T15:12:18.661Z"
+  },
+  "message-transmitter-v2-ink": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x430b0a6fab1079d7a3588f2b0ff297d7b7653100\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0xed12191b4757c564e515077111a4d7f02ed4f8c7\",\"implCodeHash\":\"a62fdb19a66e4e1a\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0xed12191b4757c564e515077111a4d7f02ed4f8c7",
+    "admin": "0x430b0a6fab1079d7a3588f2b0ff297d7b7653100",
+    "beacon": null,
+    "implCodeHash": "a62fdb19a66e4e1a"
+   },
+   "seenAt": "2026-10-14T15:12:18.725Z",
+   "changedAt": "2026-10-14T15:12:18.725Z"
+  },
+  "usdc-plume": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"1730844368f4a9fe\",\"impl\":null}",
+   "meta": {
+    "codeHash": "1730844368f4a9fe",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:18.846Z",
+   "changedAt": "2026-10-14T15:12:18.846Z"
+  },
+  "usdc-plasma": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"2826dbdc7ba5aea2\",\"impl\":null}",
+   "meta": {
+    "codeHash": "2826dbdc7ba5aea2",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:18.949Z",
+   "changedAt": "2026-10-14T15:12:18.949Z"
+  },
+  "message-transmitter-v2-plasma": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xec508a7c46329a440e010b686bf9e801212ac23e\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0xd683965f427af258f5eec40f950a95a62edc8ca6\",\"implCodeHash\":\"b0d89b8c4f4aaae0\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0xd683965f427af258f5eec40f950a95a62edc8ca6",
+    "admin": "0xec508a7c46329a440e010b686bf9e801212ac23e",
+    "beacon": null,
+    "implCodeHash": "b0d89b8c4f4aaae0"
+   },
+   "seenAt": "2026-10-14T15:12:18.963Z",
+   "changedAt": "2026-10-14T15:12:18.963Z"
+  },
+  "token-messenger-v2-plasma": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x5090d63a09be08f4d3800e2ecb8ce481e0cee958\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4\",\"implCodeHash\":\"9e5e097425dfe955\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4",
+    "admin": "0x5090d63a09be08f4d3800e2ecb8ce481e0cee958",
+    "beacon": null,
+    "implCodeHash": "9e5e097425dfe955"
+   },
+   "seenAt": "2026-10-14T15:12:18.965Z",
+   "changedAt": "2026-10-14T15:12:18.965Z"
+  },
+  "usdc-x-layer": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"9456d27a78c88723\",\"impl\":null}",
+   "meta": {
+    "codeHash": "9456d27a78c88723",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:19.238Z",
+   "changedAt": "2026-10-14T15:12:19.238Z"
+  },
+  "token-messenger-v2-x-layer": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x850604b0dd6c115c7e11ae140fb6993e1c2741c7\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4\",\"implCodeHash\":\"9e5e097425dfe955\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4",
+    "admin": "0x850604b0dd6c115c7e11ae140fb6993e1c2741c7",
+    "beacon": null,
+    "implCodeHash": "9e5e097425dfe955"
+   },
+   "seenAt": "2026-10-14T15:12:19.241Z",
+   "changedAt": "2026-10-14T15:12:19.241Z"
+  },
+  "message-transmitter-v2-plume": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0xbdf4dfb9ccfa7ecf9ddb371625b95b65da184555\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x8c4e14e6c4ad45e8c0af26840eec9509145c449e\",\"implCodeHash\":\"fa374f28ad82fe68\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x8c4e14e6c4ad45e8c0af26840eec9509145c449e",
+    "admin": "0xbdf4dfb9ccfa7ecf9ddb371625b95b65da184555",
+    "beacon": null,
+    "implCodeHash": "fa374f28ad82fe68"
+   },
+   "seenAt": "2026-10-14T15:12:19.270Z",
+   "changedAt": "2026-10-14T15:12:19.270Z"
+  },
+  "token-messenger-v2-plume": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x243d5bb811c37380db706bc5ae05d98ab73c469d\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4\",\"implCodeHash\":\"9e5e097425dfe955\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0x1ccafdffbc1b7b5c499c97322f961b7d929a41b4",
+    "admin": "0x243d5bb811c37380db706bc5ae05d98ab73c469d",
+    "beacon": null,
+    "implCodeHash": "9e5e097425dfe955"
+   },
+   "seenAt": "2026-10-14T15:12:19.275Z",
+   "changedAt": "2026-10-14T15:12:19.275Z"
+  },
+  "message-transmitter-v2-x-layer": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":\"0x1eebd5213d5831e309b0bc7f873ef2799784a69e\",\"beacon\":null,\"codeHash\":\"a4ebf67f4e5991a3\",\"impl\":\"0xfbf8f9bc33ed258e804bf20a13c4d905ab77ba47\",\"implCodeHash\":\"3820de0e4032a0b1\"}",
+   "meta": {
+    "codeHash": "a4ebf67f4e5991a3",
+    "impl": "0xfbf8f9bc33ed258e804bf20a13c4d905ab77ba47",
+    "admin": "0x1eebd5213d5831e309b0bc7f873ef2799784a69e",
+    "beacon": null,
+    "implCodeHash": "3820de0e4032a0b1"
+   },
+   "seenAt": "2026-10-14T15:12:19.309Z",
+   "changedAt": "2026-10-14T15:12:19.309Z"
+  },
+  "docs-evm-contracts": {
+   "type": "http-text",
+   "value": "dea4673c44bc6b76a1cc735ad546c6d8975a4e86c9ad31574347fffa814648ee",
+   "meta": {
+    "hash": "dea4673c44bc6b76",
+    "chars": 14267
+   },
+   "seenAt": "2026-10-14T15:12:19.432Z",
+   "changedAt": "2026-10-14T15:12:19.432Z"
+  },
+  "docs-supported-chains": {
+   "type": "http-text",
+   "value": "d108b0b265f892a86718e6b83bec24a84c7e105856f43a199b57d4a798793a50",
+   "meta": {
+    "hash": "d108b0b265f892a8",
+    "chars": 3387
+   },
+   "seenAt": "2026-10-14T15:12:19.434Z",
+   "changedAt": "2026-10-14T15:12:19.434Z"
+  },
+  "evm-cctp-contracts": {
+   "type": "github-releases",
+   "value": "release-2025-10-01T154348",
+   "meta": {
+    "tag": "release-2025-10-01T154348",
+    "name": "release-2025-10-01T154348",
+    "at": "2025-10-01",
+    "url": "https://github.com/circlefin/evm-cctp-contracts/releases/tag/release-2025-10-01T154348",
+    "prerelease": false
+   },
+   "seenAt": "2026-10-14T15:12:19.617Z",
+   "changedAt": "2026-10-14T15:12:19.617Z"
+  }
+ }
+}

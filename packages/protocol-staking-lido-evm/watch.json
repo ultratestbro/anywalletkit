@@ -1,0 +1,48 @@
+{
+  "module": "@forgewallet/protocol-staking-lido-evm",
+  "sources": [
+    {
+      "id": "steth-ethereum",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0xae7ab96520de3a18e5e111b5eaab095312d7fe84",
+      "label": "Lido stETH · Ethereum"
+    },
+    {
+      "id": "wsteth-ethereum",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0",
+      "label": "Lido wstETH · Ethereum"
+    },
+    {
+      "id": "withdrawal-queue-ethereum",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0x889edc2edab5f40e902b864ad4d7ade8e412f9b1",
+      "label": "Lido WithdrawalQueueERC721 · Ethereum"
+    },
+    {
+      "id": "core",
+      "type": "github-releases",
+      "repo": "lidofinance/core",
+      "label": "Lido DAO contracts releases"
+    },
+    {
+      "id": "lido-ethereum-sdk",
+      "type": "github-releases",
+      "repo": "lidofinance/lido-ethereum-sdk",
+      "label": "Lido Ethereum SDK releases"
+    },
+    {
+      "id": "docs-deployed-contracts",
+      "type": "http-text",
+      "url": "https://docs.lido.fi/deployed-contracts/",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "Lido docs · deployed contracts"
+    }
+  ]
+}

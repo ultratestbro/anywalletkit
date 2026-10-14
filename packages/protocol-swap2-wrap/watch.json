@@ -1,0 +1,166 @@
+{
+  "module": "@forgewallet/protocol-swap2-wrap",
+  "sources": [
+    {
+      "id": "wrapper-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "label": "WETH wrapper · Ethereum"
+    },
+    {
+      "id": "wrapper-op-mainnet",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x4200000000000000000000000000000000000006",
+      "label": "WETH wrapper · OP Mainnet"
+    },
+    {
+      "id": "wrapper-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+      "label": "WBNB wrapper · BNB Chain"
+    },
+    {
+      "id": "wrapper-gnosis",
+      "type": "evm-code",
+      "chainId": 100,
+      "address": "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",
+      "label": "WXDAI wrapper · Gnosis"
+    },
+    {
+      "id": "wrapper-unichain",
+      "type": "evm-code",
+      "chainId": 130,
+      "address": "0x4200000000000000000000000000000000000006",
+      "label": "WETH wrapper · Unichain"
+    },
+    {
+      "id": "wrapper-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+      "label": "WPOL wrapper · Polygon"
+    },
+    {
+      "id": "wrapper-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
+      "label": "WMON wrapper · Monad"
+    },
+    {
+      "id": "wrapper-sonic",
+      "type": "evm-code",
+      "chainId": 146,
+      "address": "0x039e2fB66102314Ce7b64Ce5Ce3E5183bc94aD38",
+      "label": "wS wrapper · Sonic"
+    },
+    {
+      "id": "wrapper-x-layer",
+      "type": "evm-code",
+      "chainId": 196,
+      "address": "0xe538905cf8410324e03A5A23C1c177a474D59b2b",
+      "label": "WOKB wrapper · X Layer"
+    },
+    {
+      "id": "wrapper-zksync-era",
+      "type": "evm-code",
+      "chainId": 324,
+      "address": "0x5AEa5775959fBC2557Cc8789bC1bf90A239D9a91",
+      "label": "WETH wrapper · zkSync Era"
+    },
+    {
+      "id": "wrapper-world-chain",
+      "type": "evm-code",
+      "chainId": 480,
+      "address": "0x4200000000000000000000000000000000000006",
+      "label": "WETH wrapper · World Chain"
+    },
+    {
+      "id": "wrapper-hyperevm",
+      "type": "evm-code",
+      "chainId": 999,
+      "address": "0x5555555555555555555555555555555555555555",
+      "label": "WHYPE wrapper · HyperEVM"
+    },
+    {
+      "id": "wrapper-sei",
+      "type": "evm-code",
+      "chainId": 1329,
+      "address": "0xE30feDd158A2e3b13e9badaeABaFc5516e95e8C7",
+      "label": "WSEI wrapper · Sei"
+    },
+    {
+      "id": "wrapper-megaeth",
+      "type": "evm-code",
+      "chainId": 4326,
+      "address": "0x4200000000000000000000000000000000000006",
+      "label": "WETH wrapper · MegaETH"
+    },
+    {
+      "id": "wrapper-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x4200000000000000000000000000000000000006",
+      "label": "WETH wrapper · Base"
+    },
+    {
+      "id": "wrapper-plasma",
+      "type": "evm-code",
+      "chainId": 9745,
+      "address": "0x6100E367285b01F48D07953803A2d8dCA5D19873",
+      "label": "WXPL wrapper · Plasma"
+    },
+    {
+      "id": "wrapper-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+      "label": "WETH wrapper · Arbitrum"
+    },
+    {
+      "id": "wrapper-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7",
+      "label": "WAVAX wrapper · Avalanche"
+    },
+    {
+      "id": "wrapper-ink",
+      "type": "evm-code",
+      "chainId": 57073,
+      "address": "0x4200000000000000000000000000000000000006",
+      "label": "WETH wrapper · Ink"
+    },
+    {
+      "id": "wrapper-linea",
+      "type": "evm-code",
+      "chainId": 59144,
+      "address": "0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f",
+      "label": "WETH wrapper · Linea"
+    },
+    {
+      "id": "wrapper-berachain",
+      "type": "evm-code",
+      "chainId": 80094,
+      "address": "0x6969696969696969696969696969696969696969",
+      "label": "WBERA wrapper · Berachain"
+    },
+    {
+      "id": "wrapper-plume",
+      "type": "evm-code",
+      "chainId": 98866,
+      "address": "0xEa237441c92CAe6FC17Caaf9a7acB3f953be4bd1",
+      "label": "WPLUME wrapper · Plume"
+    },
+    {
+      "id": "wrapper-scroll",
+      "type": "evm-code",
+      "chainId": 534352,
+      "address": "0x5300000000000000000000000000000000000004",
+      "label": "WETH wrapper · Scroll"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "module": "@forgewallet/protocol-swap2-omniston",
+  "sources": [
+    {
+      "id": "omniston-sdk",
+      "type": "github-releases",
+      "repo": "ston-fi/omniston-sdk",
+      "label": "STON.fi Omniston SDK releases"
+    },
+    {
+      "id": "docs-omniston",
+      "type": "http-text",
+      "url": "https://docs.ston.fi/docs/developer-section/omniston",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "STON.fi docs · Omniston"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+ "module": "@forgewallet/protocol-swap2-lifi",
+ "sources": [
+  {
+   "id": "sdk",
+   "type": "github-releases",
+   "repo": "lifinance/sdk",
+   "label": "LI.FI SDK releases"
+  },
+  {
+   "id": "contracts",
+   "type": "github-releases",
+   "repo": "lifinance/contracts",
+   "label": "LI.FI Diamond contracts releases"
+  },
+  {
+   "id": "chains",
+   "type": "http-json",
+   "url": "https://li.quest/v1/chains",
+   "path": "chains",
+   "itemKey": "id",
+   "label": "LI.FI chains (li.quest/v1/chains)"
+  },
+  {
+   "id": "bridges",
+   "type": "http-json",
+   "url": "https://li.quest/v1/tools",
+   "path": "bridges",
+   "itemKey": "key",
+   "label": "LI.FI bridges (li.quest/v1/tools)"
+  },
+  {
+   "id": "exchanges",
+   "type": "http-json",
+   "url": "https://li.quest/v1/tools",
+   "path": "exchanges",
+   "itemKey": "key",
+   "label": "LI.FI exchanges (li.quest/v1/tools)"
+  },
+  {
+   "id": "docs-changelog",
+   "type": "http-text",
+   "url": "https://docs.li.fi/changelog",
+   "between": [
+    "<main",
+    "</main>"
+   ],
+   "label": "LI.FI docs \u00b7 changelog"
+  }
+ ]
+}

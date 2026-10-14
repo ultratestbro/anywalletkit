@@ -1,0 +1,59 @@
+{
+ "module": "@forgewallet/protocol-staking-tonstakers-ton",
+ "sources": {
+  "pool-mainnet": {
+   "type": "ton-code",
+   "value": "be44417503efa22e",
+   "meta": {
+    "codeHash": "be44417503efa22e",
+    "state": "active"
+   },
+   "seenAt": "2026-10-14T15:12:13.936Z",
+   "changedAt": "2026-10-14T15:10:40.300Z"
+  },
+  "tston-minter-mainnet": {
+   "type": "ton-code",
+   "value": "1a39d0e85aaf8d65",
+   "meta": {
+    "codeHash": "1a39d0e85aaf8d65",
+    "state": "active"
+   },
+   "seenAt": "2026-10-14T15:12:14.019Z",
+   "changedAt": "2026-10-14T15:10:40.347Z"
+  },
+  "site": {
+   "type": "http-text",
+   "value": "912a512e3b243dfe66a5a91fecd98043927f13d54cf9e0f4181bec82387a568b",
+   "meta": {
+    "hash": "912a512e3b243dfe",
+    "chars": 3477
+   },
+   "seenAt": "2026-10-14T15:12:13.848Z",
+   "changedAt": "2026-10-14T15:10:43.412Z"
+  },
+  "tonstakers-sdk": {
+   "type": "github-releases",
+   "value": "8d4870e5794abc66254d46d619bd38bd5c223064",
+   "meta": {
+    "tag": "commit 8d4870e",
+    "at": "2026-05-15",
+    "url": "https://github.com/tonstakers/tonstakers-sdk/commit/8d4870e5794abc66254d46d619bd38bd5c223064",
+    "note": "default branch: Multisig support (#30)"
+   },
+   "seenAt": "2026-10-14T15:12:14.634Z",
+   "changedAt": "2026-10-14T15:12:14.634Z"
+  },
+  "liquid-staking-contract": {
+   "type": "github-releases",
+   "value": "1f4e9badbed52a4cf80cc58e4bb36ed375c6c8e7",
+   "meta": {
+    "tag": "commit 1f4e9ba",
+    "at": "2024-11-28",
+    "url": "https://github.com/ton-blockchain/liquid-staking-contract/commit/1f4e9badbed52a4cf80cc58e4bb36ed375c6c8e7",
+    "note": "default branch: added audits info (#65)"
+   },
+   "seenAt": "2026-10-14T15:12:14.686Z",
+   "changedAt": "2026-10-14T15:12:14.686Z"
+  }
+ }
+}

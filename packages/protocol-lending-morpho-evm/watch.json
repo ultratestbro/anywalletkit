@@ -1,0 +1,243 @@
+{
+  "module": "@forgewallet/protocol-lending-morpho-evm",
+  "sources": [
+    {
+      "id": "morpho-blue-ethereum",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+      "label": "Morpho Blue · Ethereum"
+    },
+    {
+      "id": "vault-v1-factory-ethereum-1",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0xA9c3D3a366466Fa809d1Ae982Fb2c46E5fC41101",
+      "label": "MetaMorpho / Vault V1 factory #1 · Ethereum"
+    },
+    {
+      "id": "vault-v1-factory-ethereum-2",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0x1897A8997241C1cD4bD0698647e4EB7213535c24",
+      "label": "MetaMorpho / Vault V1 factory #2 · Ethereum"
+    },
+    {
+      "id": "vault-v2-factory-ethereum",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0xA1D94F746dEfa1928926b84fB2596c06926C0405",
+      "label": "Morpho Vault V2 factory · Ethereum"
+    },
+    {
+      "id": "morpho-blue-base",
+      "type": "evm-proxy",
+      "chainId": 8453,
+      "address": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+      "label": "Morpho Blue · Base"
+    },
+    {
+      "id": "vault-v1-factory-base-1",
+      "type": "evm-proxy",
+      "chainId": 8453,
+      "address": "0xA9c3D3a366466Fa809d1Ae982Fb2c46E5fC41101",
+      "label": "MetaMorpho / Vault V1 factory #1 · Base"
+    },
+    {
+      "id": "vault-v1-factory-base-2",
+      "type": "evm-proxy",
+      "chainId": 8453,
+      "address": "0xFf62A7c278C62eD665133147129245053Bbf5918",
+      "label": "MetaMorpho / Vault V1 factory #2 · Base"
+    },
+    {
+      "id": "vault-v2-factory-base",
+      "type": "evm-proxy",
+      "chainId": 8453,
+      "address": "0x4501125508079A99ebBebCE205DeC9593C2b5857",
+      "label": "Morpho Vault V2 factory · Base"
+    },
+    {
+      "id": "morpho-blue-arbitrum",
+      "type": "evm-proxy",
+      "chainId": 42161,
+      "address": "0x6c247b1F6182318877311737BaC0844bAa518F5e",
+      "label": "Morpho Blue · Arbitrum"
+    },
+    {
+      "id": "vault-v1-factory-arbitrum",
+      "type": "evm-proxy",
+      "chainId": 42161,
+      "address": "0x878988f5f561081deEa117717052164ea1Ef0c82",
+      "label": "MetaMorpho / Vault V1 factory · Arbitrum"
+    },
+    {
+      "id": "vault-v2-factory-arbitrum",
+      "type": "evm-proxy",
+      "chainId": 42161,
+      "address": "0x6b46fa3cc9EBF8aB230aBAc664E37F2966Bf7971",
+      "label": "Morpho Vault V2 factory · Arbitrum"
+    },
+    {
+      "id": "morpho-blue-op-mainnet",
+      "type": "evm-proxy",
+      "chainId": 10,
+      "address": "0xce95AfbB8EA029495c66020883F87aaE8864AF92",
+      "label": "Morpho Blue · OP Mainnet"
+    },
+    {
+      "id": "vault-v1-factory-op-mainnet",
+      "type": "evm-proxy",
+      "chainId": 10,
+      "address": "0x3Bb6A6A0Bc85b367EFE0A5bAc81c5E52C892839a",
+      "label": "MetaMorpho / Vault V1 factory · OP Mainnet"
+    },
+    {
+      "id": "vault-v2-factory-op-mainnet",
+      "type": "evm-proxy",
+      "chainId": 10,
+      "address": "0x6128b680b277Bf4Df80DFE9D8c55A498660870ef",
+      "label": "Morpho Vault V2 factory · OP Mainnet"
+    },
+    {
+      "id": "morpho-blue-polygon",
+      "type": "evm-proxy",
+      "chainId": 137,
+      "address": "0x1bF0c2541F820E775182832f06c0B7Fc27A25f67",
+      "label": "Morpho Blue · Polygon"
+    },
+    {
+      "id": "vault-v1-factory-polygon",
+      "type": "evm-proxy",
+      "chainId": 137,
+      "address": "0xa9c87daB340631C34BB738625C70499e29ddDC98",
+      "label": "MetaMorpho / Vault V1 factory · Polygon"
+    },
+    {
+      "id": "vault-v2-factory-polygon",
+      "type": "evm-proxy",
+      "chainId": 137,
+      "address": "0xC11a53eE9B1eCc7a068D8e40F8F17926584F97Cf",
+      "label": "Morpho Vault V2 factory · Polygon"
+    },
+    {
+      "id": "morpho-blue-unichain",
+      "type": "evm-proxy",
+      "chainId": 130,
+      "address": "0x8f5ae9CddB9f68de460C77730b018Ae7E04a140A",
+      "label": "Morpho Blue · Unichain"
+    },
+    {
+      "id": "vault-v1-factory-unichain",
+      "type": "evm-proxy",
+      "chainId": 130,
+      "address": "0xe9EdE3929F43a7062a007C3e8652e4ACa610Bdc0",
+      "label": "MetaMorpho / Vault V1 factory · Unichain"
+    },
+    {
+      "id": "morpho-blue-hyperevm",
+      "type": "evm-proxy",
+      "chainId": 999,
+      "address": "0x68e37dE8d93d3496ae143F2E900490f6280C57cD",
+      "label": "Morpho Blue · HyperEVM"
+    },
+    {
+      "id": "vault-v1-factory-hyperevm",
+      "type": "evm-proxy",
+      "chainId": 999,
+      "address": "0xec051b19d654C48c357dC974376DeB6272f24e53",
+      "label": "MetaMorpho / Vault V1 factory · HyperEVM"
+    },
+    {
+      "id": "vault-v2-factory-hyperevm",
+      "type": "evm-proxy",
+      "chainId": 999,
+      "address": "0xD7217E5687FF1071356C780b5fe4803D9D967da7",
+      "label": "Morpho Vault V2 factory · HyperEVM"
+    },
+    {
+      "id": "morpho-blue-katana",
+      "type": "evm-proxy",
+      "chainId": 747474,
+      "address": "0xD50F2DffFd62f94Ee4AEd9ca05C61d0753268aBc",
+      "label": "Morpho Blue · Katana"
+    },
+    {
+      "id": "vault-v1-factory-katana",
+      "type": "evm-proxy",
+      "chainId": 747474,
+      "address": "0x1c8De6889acee12257899BFeAa2b7e534de32E16",
+      "label": "MetaMorpho / Vault V1 factory · Katana"
+    },
+    {
+      "id": "vault-v2-factory-katana",
+      "type": "evm-proxy",
+      "chainId": 747474,
+      "address": "0xFcb8b57E56787bB29e130Fca67f3c5a1232975D1",
+      "label": "Morpho Vault V2 factory · Katana"
+    },
+    {
+      "id": "morpho-blue-monad",
+      "type": "evm-proxy",
+      "chainId": 143,
+      "address": "0xD5D960E8C380B724a48AC59E2DfF1b2CB4a1eAee",
+      "label": "Morpho Blue · Monad"
+    },
+    {
+      "id": "vault-v1-factory-monad",
+      "type": "evm-proxy",
+      "chainId": 143,
+      "address": "0x33f20973275B2F574488b18929cd7DCBf1AbF275",
+      "label": "MetaMorpho / Vault V1 factory · Monad"
+    },
+    {
+      "id": "vault-v2-factory-monad",
+      "type": "evm-proxy",
+      "chainId": 143,
+      "address": "0x8B2F922162FBb60A6a072cC784A2E4168fB0bb0c",
+      "label": "Morpho Vault V2 factory · Monad"
+    },
+    {
+      "id": "morpho-blue-robinhood-chain",
+      "type": "evm-proxy",
+      "chainId": 4663,
+      "address": "0x9D53d5E3bd5E8d4Cbfa6DB1ca238AEA02E651010",
+      "label": "Morpho Blue · Robinhood Chain"
+    },
+    {
+      "id": "vault-v2-factory-robinhood-chain",
+      "type": "evm-proxy",
+      "chainId": 4663,
+      "address": "0x0FBad98595b0186dA120E41f77C102beb49f803c",
+      "label": "Morpho Vault V2 factory · Robinhood Chain"
+    },
+    {
+      "id": "morpho-blue",
+      "type": "github-releases",
+      "repo": "morpho-org/morpho-blue",
+      "label": "Morpho Blue contracts releases"
+    },
+    {
+      "id": "sdks",
+      "type": "github-releases",
+      "repo": "morpho-org/sdks",
+      "label": "Morpho SDKs releases"
+    },
+    {
+      "id": "vault-v2",
+      "type": "github-releases",
+      "repo": "morpho-org/vault-v2",
+      "label": "Morpho Vault V2 contracts releases"
+    },
+    {
+      "id": "docs-addresses",
+      "type": "http-text",
+      "url": "https://docs.morpho.org/get-started/resources/addresses/",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "Morpho docs · deployed addresses"
+    }
+  ]
+}
