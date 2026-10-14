@@ -477,13 +477,22 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
             params.onRefusal?.(`thorchain: ${String(q.error ?? q.message).slice(0, 200)}`);
             return null;
           }
-          if (!q || !q.expected_amount_out || !q.inbound_address || !q.memo || !q.expiry) return null;
+          if (!q || !q.expected_amount_out || !q.inbound_address || !q.memo || !q.expiry) {
+            params.onRefusal?.(`thorchain: incomplete quote from ${host} (expected_amount_out / inbound_address / memo / expiry missing)`);
+            return null;
+          }
           // A router is required for EVM and must be ABSENT for a deposit
           // source: a router on a Tron quote means the venue changed its
           // execution model and a plain send would no longer settle.
-          if (chainId ? !q.router : !!q.router) return null;
+          if (chainId ? !q.router : !!q.router) {
+            params.onRefusal?.(chainId ? "thorchain: quote has no router for an EVM source" : "thorchain: quote names a router for a deposit source — execution model changed");
+            return null;
+          }
           checkedMemo = verifiedMemo(q.memo, dst.asset, params.destAddress, params.refundAddress ?? "", configuredAffiliate, configuredAffiliateBps);
-          if (!checkedMemo) return null;
+          if (!checkedMemo) {
+            params.onRefusal?.(`thorchain: memo failed verification (${String(q.memo).slice(0, 80)})`);
+            return null;
+          }
           const floor1e8 = params.minAmountOut !== undefined ? toThorUnitsCeil(BigInt(params.minAmountOut), dst.decimals) : undefined;
           if (floor1e8 !== undefined && checkedMemo.limit < floor1e8) {
             params.onRefusal?.(`thorchain: floor breach (limit=${checkedMemo.limit} < floor=${floor1e8}, 1e8 units)`);
@@ -504,12 +513,25 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
           throw error;
         }
       }
-      if (!q?.expected_amount_out || !q.inbound_address || !q.expiry || !checkedMemo || !inbounds) return null;
+      if (!q?.expected_amount_out || !q.inbound_address || !q.expiry || !checkedMemo || !inbounds) {
+        params.onRefusal?.(!inbounds ? "thorchain: inbound addresses unavailable from every node" : "thorchain: no quote from any node");
+        return null;
+      }
       const limit1e8 = checkedMemo.limit;
       const srcInbound = inbounds.find((entry) => entry.chain === THOR_CHAIN[params.sourceChain]);
       const dstInbound = inbounds.find((entry) => entry.chain === THOR_CHAIN[params.destChain]);
-      if (paused(srcInbound) || paused(dstInbound) || !sameTarget(srcInbound?.address, q.inbound_address)) return null;
-      if (chainId && !sameTarget(srcInbound?.router, q.router)) return null;
+      if (paused(srcInbound) || paused(dstInbound)) {
+        params.onRefusal?.(`thorchain: ${paused(srcInbound) ? THOR_CHAIN[params.sourceChain] : THOR_CHAIN[params.destChain]} chain is halted / paused on THORChain`);
+        return null;
+      }
+      if (!sameTarget(srcInbound?.address, q.inbound_address)) {
+        params.onRefusal?.("thorchain: quote inbound address differs from the node's current inbound (vault rotated) — retry");
+        return null;
+      }
+      if (chainId && !sameTarget(srcInbound?.router, q.router)) {
+        params.onRefusal?.("thorchain: quote router differs from the node's current router — retry");
+        return null;
+      }
       const tooSmall = belowThorMinimums(amount1e8, srcInbound, q);
       if (tooSmall) {
         params.onRefusal?.(`thorchain: ${tooSmall}`);
@@ -518,14 +540,23 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
 
       // expected_amount_out is 1e8 of the DEST asset → base units.
       const outUnits = (BigInt(q.expected_amount_out) * 10n ** BigInt(dst.decimals)) / 100000000n;
-      if (outUnits <= 0n) return null;
+      if (outUnits <= 0n) {
+        params.onRefusal?.("thorchain: expected output rounds to zero");
+        return null;
+      }
       const memoMinUnits = (limit1e8 * 10n ** BigInt(dst.decimals)) / 100_000_000n;
       const minUnits = memoMinUnits;
-      if (minUnits <= 0n || minUnits > outUnits) return null;
+      if (minUnits <= 0n || minUnits > outUnits) {
+        params.onRefusal?.(`thorchain: memo limit ${limit1e8} inconsistent with expected output ${q.expected_amount_out}`);
+        return null;
+      }
 
       const nowSeconds = Math.floor(Date.now() / 1000);
       const executionExpiry = Math.min(q.expiry, nowSeconds + 15 * 60);
-      if (!Number.isInteger(executionExpiry) || executionExpiry <= nowSeconds + 30) return null;
+      if (!Number.isInteger(executionExpiry) || executionExpiry <= nowSeconds + 30) {
+        params.onRefusal?.(`thorchain: quote expires in ${Number.isInteger(executionExpiry) ? executionExpiry - nowSeconds : "?"} s — too soon to execute`);
+        return null;
+      }
       const assetAddr = (src.contract ? src.contract : NATIVE) as `0x${string}`;
       const common = {
         provider: "thorchain",
