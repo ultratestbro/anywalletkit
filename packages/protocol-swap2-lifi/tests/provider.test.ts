@@ -359,7 +359,7 @@ describe("LI.FI chain table (2026-10-14 batch)", () => {
     ["eip155:5000", 5000, "MNT", ZERO, "0x38d7ea4c68000", DIAMOND], // canonical Diamond
     ["eip155:747474", 747474, "ETH", ZERO, "0x38d7ea4c68000", "0xC59fe32C9549e3E8B5dCcdAbC45BD287Bd5bA2bc"], // own Diamond
     ["eip155:2818", 2818, "ETH", ZERO, "0x38d7ea4c68000", "0xF7aB42D00D2399f8A4Fba2F15466Be40709fe307"], // own Diamond
-    ["eip155:14", 14, "FLR", ZERO, "0x38d7ea4c68000", DIAMOND], // canonical Diamond
+    ["eip155:14", 14, "FLR", ZERO, "0x38d7ea4c68000", "0x198FC70Dfe05E755C81e54bd67Bff3F729344B9b"], // own Diamond (canonical has no code on Flare)
   ])("%s is supported, numbered %i, sources %s and trusts Diamond %s", async (caip2, chainId, symbol, fromAddress, value, diamond) => {
     expect(lifi.supportsChain(caip2)).toBe(true);
     expect(lifi.supports(caip2, "eip155:8453")).toBe(true);

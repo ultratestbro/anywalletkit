@@ -103,6 +103,7 @@ const LIFI_DIAMONDS: Readonly<Record<string, string>> = {
   "eip155:5042": "0xA4072583658Fae592A3506A42431cb6316a8d40b", // Arc
   "eip155:747474": "0xC59fe32C9549e3E8B5dCcdAbC45BD287Bd5bA2bc", // Katana
   "eip155:2818": "0xF7aB42D00D2399f8A4Fba2F15466Be40709fe307", // Morph
+  "eip155:14": "0x198FC70Dfe05E755C81e54bd67Bff3F729344B9b", // Flare (li.quest diamondAddress 2026-10-14; the canonical 0x1231… has no code there)
   "eip155:4326": "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37", // MegaETH (deployments/megaeth.json, matches a live quote 2026-10-12)
 };
 const diamondFor = (chain: string): string => LIFI_DIAMONDS[chain] ?? LIFI_DIAMOND;
