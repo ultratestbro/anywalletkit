@@ -1,0 +1,79 @@
+{
+  "note": "Uniswap v3 multicall(bytes[]) KEKIUS → ETH (unwrapWETH9, native out via internal call; public tx)",
+  "own": [
+    "0x8e50786c540B876DF66E5C989C0D3CE604F0C25A"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0xb340feefd301fff1564f299ab18c31439131dea6b9bf3ee1658f4ee6a86e3091",
+    "time": 1791999395,
+    "status": "confirmed",
+    "address": "0x8e50786c540B876DF66E5C989C0D3CE604F0C25A",
+    "from": "0x8e50786c540B876DF66E5C989C0D3CE604F0C25A",
+    "to": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "from": "0xf0c4502bf18eAC5fAd1787e67Cc85726B023191E",
+        "to": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+        "amount": "5635197993087",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      },
+      {
+        "token": "0xAE1EDabaC9a0DDa644B2F7Ec48759d37Ab257f78",
+        "from": "0x8e50786c540B876DF66E5C989C0D3CE604F0C25A",
+        "to": "0xf0c4502bf18eAC5fAd1787e67Cc85726B023191E",
+        "amount": "856704074",
+        "standard": "erc20",
+        "symbol": "KEKIUS",
+        "decimals": 9
+      },
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "from": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+        "to": "0x0000000000000000000000000000000000000000",
+        "amount": "5635197993087",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      },
+      {
+        "token": null,
+        "from": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "to": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+        "amount": "5635197993087"
+      },
+      {
+        "token": null,
+        "from": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+        "to": "0x8e50786c540B876DF66E5C989C0D3CE604F0C25A",
+        "amount": "5635197993087"
+      }
+    ],
+    "fee": "30195535364770",
+    "call": {
+      "to": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "selector": "0xac9650d8"
+    },
+    "block": "26192277"
+  },
+  "expect": {
+    "kind": "swap",
+    "title": "Swapped KEKIUS → ETH",
+    "assetsOut": [
+      {
+        "token": "0xAE1EDabaC9a0DDa644B2F7Ec48759d37Ab257f78",
+        "amount": "856704074"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": null,
+        "amount": "5635197993087"
+      }
+    ]
+  }
+}

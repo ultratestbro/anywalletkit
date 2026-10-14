@@ -110,3 +110,14 @@ prices, APYs, and proves a supply plan with `eth_call`.
 
 2026-10-10: built, offline tests green, live read-only verification against
 Ethereum mainnet. No funded transaction through the module yet.
+
+## Activity
+
+`describeActivity(tx, { own })` labels the module's own transactions for a wallet's history, offline and synchronously:
+
+- **Recognized**: a call whose target is a known Aave v3 **Pool** or **WrappedTokenGatewayV3** — every preset market on the transaction's chain (`AAVE_MARKETS`) plus the market the instance was configured with. The 4-byte selector picks the kind: `supply` / `supplyWithPermit` / `deposit` and `depositETH` → `supply`; `withdraw` / `withdrawETH` → `withdraw`; `borrow` / `borrowETH` → `borrow`; `repay` / `repayWithPermit` / `repayWithATokens` / `repayETH` → `repay`; `setUserUseReserveAsCollateral` / `setUserEMode` → `contract`. Any other method on an Aave contract is still returned as `contract` ("Aave v3 transaction").
+- **Title** is `"<Verb> <asset>"` ("Supplied ETH", "Withdrew USDC"): the principal asset is the `address asset` argument when calldata is present, else the token that moved in the action's direction; the symbol comes from the source's transfer metadata. **Subtitle** is `"Aave v3 · <chain>"`, `counterparty` the contract called, `protocol` the package name.
+- **Assets**: `assetsIn` / `assetsOut` are the wallet's net token movements from the receipt (aToken mints and burns included, so a supply shows the aToken arriving).
+- **Null** for everything else: another protocol, a plain transfer, a chain without a market.
+
+Fixtures in `fixtures/activity/` are the test wallet's funded Base run (`depositETH` / `withdrawETH`, 2026-10-10) and run through the conformance suite's activity half; `fixtures/activity/negatives/` holds look-alikes that must yield null.

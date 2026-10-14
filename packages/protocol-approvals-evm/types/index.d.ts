@@ -1,3 +1,4 @@
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core"
 import type { Eip1193Provider, Provider } from "ethers"
 
 export type ApprovalStandard =
@@ -115,6 +116,8 @@ export interface ApprovalsProtocolEvmConfig {
   /** RPC URL or EIP-1193 provider; defaults to the account's. */
   provider?: string | Eip1193Provider
   chainId?: number
+  /** Token labels (lowercase address → symbol / decimals) for activity titles, e.g. "Approved USDC for Permit2". */
+  tokens?: Record<string, {symbol?: string; decimals?: number}>
   /** Where a cold scan starts (ideally the wallet's creation block). Default 0. */
   fromBlock?: number
   /** Pre-chunk `eth_getLogs` to this many blocks (QuickNode: 10 000). Default null: whole range, split on refusal. */
@@ -265,6 +268,11 @@ export namespace STANDARDS {
 /** Token approvals for evm accounts: discover, flag, revoke. */
 export default class ApprovalsProtocolEvm extends ApprovalsProtocol {
   constructor(account: ReadOnlyAccountLike | AccountLike, config?: ApprovalsProtocolEvmConfig)
+  /** Recognize this module's transactions for a wallet's history; null for anything else. Pure and synchronous. */
+  describeActivity(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null
   /** The raw transaction that revokes an approval; several Permit2 approvals fold into one `lockdown`. */
   buildRevokeTransaction(approval: Approval | Approval[]): RevokeTransaction
 }
+
+export declare function describeApprovalActivity(tx: ChainTx, ctx: DescribeActivityContext, options?: {tokens?: Record<string, {symbol?: string; decimals?: number}>}): ActivityItem | null
+export declare const ACTIVITY_CHAIN_NAMES: Readonly<Record<number, string>>

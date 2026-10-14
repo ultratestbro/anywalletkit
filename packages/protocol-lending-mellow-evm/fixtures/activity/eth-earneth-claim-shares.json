@@ -1,0 +1,45 @@
+{
+  "note": "Mellow Lido EarnETH: DepositQueue.claim — earnETH from an earlier async deposit (funded test 2026-09-07, etherscan.io/tx/0x1fb4e55d…)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x1fb4e55d17c8d4dce4d1596f74fc772876c7c4b99a659b73a1032fd990cb738b",
+    "time": 1788789023,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0x1db7094Ef0D994B0b62f6Cd67dB801ad194999A8",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xBBFC8683C8fE8cF73777feDE7ab9574935fea0A4",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "492159489683929",
+        "standard": "erc20",
+        "symbol": "EARNETH",
+        "decimals": 18
+      }
+    ],
+    "fee": "118962988592949",
+    "call": {
+      "to": "0x1db7094Ef0D994B0b62f6Cd67dB801ad194999A8",
+      "selector": "0x1e83409a",
+      "data": "0x1e83409a0000000000000000000000008abe813577e47415a3cd0bbc68c7abca2c4c55ba"
+    },
+    "block": "25925883"
+  },
+  "expect": {
+    "kind": "claim",
+    "title": "Claimed earnETH",
+    "assetsIn": [
+      {
+        "token": "0xBBFC8683C8fE8cF73777feDE7ab9574935fea0A4",
+        "amount": "492159489683929"
+      }
+    ],
+    "counterparty": "0x1db7094Ef0D994B0b62f6Cd67dB801ad194999A8"
+  }
+}

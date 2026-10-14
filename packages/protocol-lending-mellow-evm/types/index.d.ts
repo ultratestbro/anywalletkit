@@ -1,3 +1,4 @@
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core"
 import type {Eip1193Provider} from "ethers"
 
 export interface SupplyOptions {
@@ -130,6 +131,10 @@ export interface MellowVaultPreset {
   registryId: string
   name: string
   shareSymbol: string
+  /** The TokenizedShareManager — the ERC-20 share token. */
+  shareManager?: string
+  /** Deposit / redeem queues listed when the preset was last verified; used only to recognize past transactions offline. */
+  queues?: {deposit: string[]; redeem: string[]}
   /** Caveats known when the preset was added (e.g. a deposit whitelist). */
   note?: string
 }
@@ -152,6 +157,8 @@ export declare function toAsset(token?: string | null): string
 
 export default class MellowProtocolEvm {
   constructor(account: unknown, config?: MellowProtocolConfig)
+  /** Recognize this module's transactions for a wallet's history; null for anything else. Pure and synchronous. */
+  describeActivity(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null
   readonly vault: string
 
   getVaultData(options?: {refresh?: boolean}): Promise<VaultData>
@@ -181,3 +188,6 @@ export default class MellowProtocolEvm {
   protected _getSupplyPlan(token: string, amount: bigint, options?: {instant?: boolean}): Promise<{queue: DepositQueueInfo; approvals: Array<{to: string; data: string}>; tx: {to: string; data: string; value: bigint}; sharesOut: bigint; instant: boolean}>
   protected _getWithdrawPlan(token: string, shares: bigint): Promise<{queue: string; tx: {to: string; data: string; value: bigint}; assetsOut: bigint}>
 }
+
+export declare function describeMellowActivity(tx: ChainTx, ctx: DescribeActivityContext, instance: {chainId: number; vault?: string; shareManager?: string | null}): ActivityItem | null
+export declare const MELLOW_ACTIONS: Readonly<Record<string, {kind: ActivityItem['kind']; verb: string; principal: 'out' | 'in' | 'none'}>>

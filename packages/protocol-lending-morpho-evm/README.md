@@ -103,3 +103,14 @@ through a public RPC and the API.
 2026-10-10: built, offline tests green, live read-only verification on Base.
 No funded transaction through the module yet (plan: 5 USDC into a Base vault,
 withdraw).
+
+## Activity
+
+`describeActivity(tx, { own })` labels Morpho transactions for a wallet's history, offline and synchronously (shared by both classes through `MorphoBase`):
+
+- **Blue** is recognized **by address**: the called contract is the Morpho singleton of the transaction's chain (`MORPHO_CHAINS`, or the `morpho` this instance was configured with) and the selector is `supply` / `withdraw` / `borrow` / `repay` / `supplyCollateral` / `withdrawCollateral` (→ `supply` / `withdraw` / `borrow` / `repay`) or `setAuthorization` (→ `contract`). The principal asset is `MarketParams.loanToken` from calldata when present.
+- **Vaults** (MetaMorpho / Vault V1, Vault V2) cannot be listed offline — they come from factories and the `isMetaMorpho` / `isVaultV2` proof needs a node — so the rule is: the selector is an ERC-4626 entry point (`deposit` / `mint` → `supply`, `withdraw` / `redeem` → `withdraw`) **and** the called contract is itself the share token the receipt shows minted to (deposit) or burned from (withdraw) one of the wallet's addresses, on a chain with a Morpho deployment. The vault a `MorphoVaultProtocolEvm` instance is configured with is accepted by address alone. *Caveat:* any ERC-4626 vault on a Morpho chain satisfies the generic rule; the kit asks modules in registry order, so a module that knows a specific vault should be registered before this one.
+- **Title** `"<Verb> <asset>"` ("Deposited USDC", "Withdrew USDC"; the share token is never the principal), **subtitle** `"Morpho · <chain>"` / `"Morpho Vault · <chain>"`, `counterparty` the contract called, `protocol` the package name; `assetsIn` / `assetsOut` are the wallet's net movements (shares included).
+- **Null** otherwise.
+
+Fixtures in `fixtures/activity/` are public Base transactions (a Moonwell Flagship USDC vault `deposit` / `redeem` by one account, a Blue `supply` / `withdraw` by another; the test wallet has not run Morpho yet), `negatives/` an Aave gateway deposit and a plain USDC transfer.

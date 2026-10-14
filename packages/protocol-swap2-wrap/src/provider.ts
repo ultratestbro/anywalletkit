@@ -1,4 +1,5 @@
 import {decodeFunctionResult, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
+import {describeWrapActivity} from "./activity.js";
 import {ccAsset} from "@forgewallet/swap2-assets";
 import {evmRef, isEvm, timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
@@ -108,6 +109,7 @@ export function wrapProvider(config: WrapProviderConfig): CrossChainProvider {
 
   return {
     name: "wrap",
+    describeActivity: (tx, ctx) => describeWrapActivity(tx, ctx, wrapped),
     supportsSameChain: true,
     enabled: () => config.enabled ?? true,
     supportsChain: (caip2: string) => chainIdOf(caip2) !== null,

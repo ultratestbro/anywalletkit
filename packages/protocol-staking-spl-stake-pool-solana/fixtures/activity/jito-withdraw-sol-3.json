@@ -1,0 +1,71 @@
+{
+  "note": "Jito: WithdrawSol 0.031536 JitoSOL → 0.04112 SOL (funded test 2026-10-07, solscan.io/tx/drRYD8mx…)",
+  "own": [
+    "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "EvTykvN87o1arXqcf7wwU4Jzvo3pQrgaNfoxYfkw5gng"
+  ],
+  "tx": {
+    "chain": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    "hash": "drRYD8mxf8dU3Nw7hBUmgr55zd53sVSZi7GsAwbT2g5Hi5bTJCPwMHfMXTSx2anG3eAGdSexen7k2dBsgFEBSf8",
+    "time": 1791390021,
+    "status": "confirmed",
+    "address": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "from": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "to": "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "from": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+        "to": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "amount": "31504464",
+        "standard": "spl",
+        "symbol": "JitoSOL",
+        "decimals": 9
+      },
+      {
+        "token": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "from": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+        "to": "GSyXx6WRm2o6Qu4RWxTH17swLZKpTKQdQTS2uGcus1NF",
+        "amount": "31536",
+        "standard": "spl",
+        "symbol": "JitoSOL",
+        "decimals": 9
+      },
+      {
+        "token": null,
+        "from": "BgKUXdS29YcHCFrPm5M8oLHiTzZaMDjsebggjoaQ6KFL",
+        "to": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+        "amount": "41115752"
+      }
+    ],
+    "fee": "20000",
+    "call": {
+      "to": "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
+      "programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "ComputeBudget111111111111111111111111111111",
+        "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy"
+      ],
+      "data": "FSk3z29ZRczLhy4ycqmD7fm"
+    },
+    "block": "454274733"
+  },
+  "expect": {
+    "kind": "unstake",
+    "title": "Unstaked JitoSOL",
+    "assetsIn": [
+      {
+        "token": null,
+        "amount": "41115752"
+      }
+    ],
+    "assetsOut": [
+      {
+        "token": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "amount": "31536000"
+      }
+    ],
+    "counterparty": "Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb"
+  }
+}

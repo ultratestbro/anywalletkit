@@ -1,13 +1,14 @@
 import {
   LendingProtocol, NetworkError,
-  type BorrowOptions, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type RepayOptions,
-  type SupplyOptions, type WithdrawOptions,
+  type ActivityItem, type BorrowOptions, type ChainTx, type DescribeActivityContext, type IWalletAccount, type IWalletAccountReadOnly,
+  type LendingQuote, type LendingResult, type RepayOptions, type SupplyOptions, type WithdrawOptions,
 } from '@forgewallet/core'
 import {
   createPublicClient, custom, decodeFunctionResult, encodeFunctionData, fallback, getAddress, hexToString, http, isAddress, maxUint256, zeroAddress,
   type Abi, type Address, type EIP1193Provider, type Hex, type PublicClient, type Transport,
 } from 'viem'
 import { ADDRESSES_PROVIDER_ABI, ERC20_ABI, GATEWAY_ABI, MULTICALL3, ORACLE_ABI, POOL_ABI, VARIABLE_DEBT_ABI, VARIABLE_RATE_MODE } from './abi.js'
+import { describeAaveActivity, parseEvmChainId, presetMarkets, type ActivityMarket } from './activity.js'
 import { AaveError, toAaveError } from './errors.js'
 import { AAVE_MARKETS, type AaveMarket } from './markets.js'
 import {
@@ -188,6 +189,25 @@ export class AaveProtocolEvm extends LendingProtocol<AaveProtocolConfig> {
         this._client = createPublicClient({ transport })
       }
     }
+  }
+
+  // ---- activity ----
+
+  /**
+   * Recognize this protocol's transactions offline: a call to a known Aave v3 Pool or
+   * WrappedTokenGatewayV3 (every preset market on the transaction's chain, plus the
+   * market this instance is configured with). See `activity.ts` for the rule.
+   */
+  override describeActivity(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null {
+    const chainId = parseEvmChainId(tx.chain)
+    if (chainId === null) return null
+    const markets: ActivityMarket[] = presetMarkets(chainId)
+    if (chainId === this.chainId && !this.preset && this._expectedPool) {
+      const custom: ActivityMarket = { pool: this._expectedPool, chainName: `eip155:${chainId}` }
+      if (this._gateway) custom.wethGateway = this._gateway
+      markets.push(custom)
+    }
+    return describeAaveActivity(tx, ctx, markets)
   }
 
   // ---- plumbing ----

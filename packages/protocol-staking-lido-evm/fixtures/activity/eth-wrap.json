@@ -1,0 +1,60 @@
+{
+  "note": "Lido: wstETH wrap 0.001 stETH (funded test 2026-09-01, etherscan.io/tx/0x7e653723…)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x7e6537230ccbbcab30aa49b4e84c5a5f3dd99845e3cf1f25b8799d8dd416a9e9",
+    "time": 1788284507,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "804486507817761",
+        "standard": "erc20",
+        "symbol": "WSTETH",
+        "decimals": 18
+      },
+      {
+        "token": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+        "amount": "1000000000000000",
+        "standard": "erc20",
+        "symbol": "STETH",
+        "decimals": 18
+      }
+    ],
+    "fee": "31534945864191",
+    "call": {
+      "to": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+      "selector": "0xea598cb0",
+      "data": "0xea598cb000000000000000000000000000000000000000000000000000038d7ea4c68000"
+    },
+    "block": "25883995"
+  },
+  "expect": {
+    "kind": "wrap",
+    "title": "Wrapped stETH",
+    "assetsOut": [
+      {
+        "token": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+        "amount": "1000000000000000"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+        "amount": "804486507817761"
+      }
+    ],
+    "counterparty": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+  }
+}

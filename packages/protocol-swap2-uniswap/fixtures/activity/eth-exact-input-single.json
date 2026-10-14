@@ -1,0 +1,59 @@
+{
+  "note": "Uniswap v3 exactInputSingle USDC → SHFL on Ethereum (public tx)",
+  "own": [
+    "0xE9c00C9B0dCd5A41704cdf65a363AA88072E1B4C"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x836aa4bdae0c90e658c55594e1fc72a540984dc6efa27b4b72dd23ff5ff29857",
+    "time": 1791999551,
+    "status": "confirmed",
+    "address": "0xE9c00C9B0dCd5A41704cdf65a363AA88072E1B4C",
+    "from": "0xE9c00C9B0dCd5A41704cdf65a363AA88072E1B4C",
+    "to": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x8881562783028F5c1BCB985d2283D5E170D88888",
+        "from": "0xD0A4c8A1a14530C7C9EfDaD0BA37E8cF4204d230",
+        "to": "0xE9c00C9B0dCd5A41704cdf65a363AA88072E1B4C",
+        "amount": "2765451180270895727764",
+        "standard": "erc20",
+        "symbol": "SHFL",
+        "decimals": 18
+      },
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0xE9c00C9B0dCd5A41704cdf65a363AA88072E1B4C",
+        "to": "0xD0A4c8A1a14530C7C9EfDaD0BA37E8cF4204d230",
+        "amount": "1470201400",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "33351306239716",
+    "call": {
+      "to": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "selector": "0x04e45aaf"
+    },
+    "block": "26192290"
+  },
+  "expect": {
+    "kind": "swap",
+    "title": "Swapped USDC → SHFL",
+    "assetsOut": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "amount": "1470201400"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0x8881562783028F5c1BCB985d2283D5E170D88888",
+        "amount": "2765451180270895727764"
+      }
+    ],
+    "counterparty": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+  }
+}

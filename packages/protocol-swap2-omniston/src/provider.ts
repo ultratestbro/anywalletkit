@@ -1,4 +1,5 @@
 import {Address as TonAddress, Cell as TonCell} from "@ton/core";
+import {describeOmnistonActivity} from "./activity.js";
 import "./buffer-global.js";
 import {Buffer} from "buffer";
 import {encodeAbiParameters, getAddress, hexToBytes as viemHexToBytes, keccak256, sha256} from "viem";
@@ -1704,6 +1705,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
   return {
     name: "omniston",
+    describeActivity: describeOmnistonActivity,
     enabled: () => (opts.enabled ?? true) && trustedContracts.size > 0,
 
     // Capability discovery comes from the provider itself, so it can run alone

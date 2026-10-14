@@ -1,0 +1,63 @@
+{
+  "note": "Mellow Lido EarnETH: DepositQueue.deposit 0.001 ETH, shares minted at once (funded test 2026-09-07, etherscan.io/tx/0x6d52125d…)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x6d52125d90ffceb1e34ceb6a5f3cceaec1a3c114c38ee96971bab03a0606707d",
+    "time": 1788802283,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0xb99394f8b95d426Cb2F013B857C74aCC924b20D5",
+    "nativeValue": "1000000000000000",
+    "transfers": [
+      {
+        "token": null,
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0xb99394f8b95d426Cb2F013B857C74aCC924b20D5",
+        "amount": "1000000000000000"
+      },
+      {
+        "token": "0xBBFC8683C8fE8cF73777feDE7ab9574935fea0A4",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "983771459989537",
+        "standard": "erc20",
+        "symbol": "EARNETH",
+        "decimals": 18
+      },
+      {
+        "token": null,
+        "from": "0xb99394f8b95d426Cb2F013B857C74aCC924b20D5",
+        "to": "0x6a37725ca7f4CE81c004c955f7280d5C704a249e",
+        "amount": "1000000000000000"
+      }
+    ],
+    "fee": "120175089844206",
+    "call": {
+      "to": "0xb99394f8b95d426Cb2F013B857C74aCC924b20D5",
+      "selector": "0x1dbd773b",
+      "data": "0x1dbd773b00000000000000000000000000000000000000000000000000038d7ea4c68000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "block": "25926985"
+  },
+  "expect": {
+    "kind": "supply",
+    "title": "Deposited ETH",
+    "assetsOut": [
+      {
+        "token": null,
+        "amount": "1000000000000000"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0xBBFC8683C8fE8cF73777feDE7ab9574935fea0A4",
+        "amount": "983771459989537"
+      }
+    ],
+    "counterparty": "0xb99394f8b95d426Cb2F013B857C74aCC924b20D5"
+  }
+}

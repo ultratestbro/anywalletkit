@@ -1,3 +1,4 @@
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core"
 export interface StakeOptions {
   /** Amount in base units (wei). */
   amount: number | bigint
@@ -132,6 +133,8 @@ export declare const LIDO_ADDRESS_MAP: Record<number, {
 
 export default class LidoProtocolEvm extends StakingProtocol {
   constructor(account: StakingWalletAccount, config?: LidoProtocolConfig)
+  /** Recognize this module's transactions for a wallet's history; null for anything else. Pure and synchronous. */
+  describeActivity(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null
   wrap(options: StakeOptions): Promise<WithdrawalRequestResult>
   unwrap(options: StakeOptions): Promise<StakeResult>
   getWithdrawalEta(ids: bigint[]): Promise<Map<string, number>>
@@ -139,3 +142,6 @@ export default class LidoProtocolEvm extends StakingProtocol {
   getRewards(): Promise<RewardTotals | null>
   getRewardHistory(options?: {limit?: number}): Promise<RewardEvent[]>
 }
+
+export declare function describeLidoActivity(tx: ChainTx, ctx: DescribeActivityContext, deployment: {chainId: number; addresses: {stEth?: string; wstEth?: string; withdrawalQueue?: string}}): ActivityItem | null
+export declare const LIDO_ACTIONS: Readonly<Record<'stEth' | 'wstEth' | 'withdrawalQueue', Readonly<Record<string, {kind: ActivityItem['kind']; title: string}>>>>

@@ -75,3 +75,22 @@ Arbitrum $10 in both modes against the live API and preflights on Base.
 2026-10-10: built, tests green, live quote + preflight verified. No funded
 transfer yet (plan: $10 USDC Base → Arbitrum, Fast and Standard, with the
 claim from the phone).
+
+## Activity
+
+`describeActivity(tx, ctx)` (on the provider; the protocol class and the router
+delegate to it) recognizes both halves of a CCTP V2 transfer on every domain in
+`config.ts`, by contract + 4-byte selector:
+
+| Call | Contract | Kind | Title |
+| --- | --- | --- | --- |
+| `depositForBurn(uint256,uint32,bytes32,address,bytes32,uint256,uint32)` `0x8e0250ee` | TokenMessengerV2 | `bridge` | "Bridged USDC" |
+| `receiveMessage(bytes,bytes)` `0x57ecfd28` | MessageTransmitterV2 | `bridge` | "Received USDC via CCTP" |
+
+Assets come from the owner's net transfers (the burn leaves the wallet; the
+mint lands on the `mintRecipient` even when a relayer paid the claim).
+Subtitle `CCTP · <chain>`, counterparty = the contract called. The other leg's
+hash is only known through the kit's intent journal / Circle's attestation API,
+so `related` stays empty. Fixtures in `fixtures/activity/` are public Ethereum
+transactions (two burns, two claims) plus negatives (a LI.FI bridge, a THORChain
+deposit); the conformance suite runs them through `describeActivity`.

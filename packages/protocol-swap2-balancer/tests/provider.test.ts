@@ -4,6 +4,16 @@ import {describeProtocolBehaviour, describeProtocolModule} from "@forgewallet/co
 import {BALANCER_V2_VAULT, balancerProvider} from "../src/provider.js";
 import {BalancerSwap2Protocol} from "../src/protocol.js";
 
+import {readdirSync, readFileSync} from "node:fs";
+import {fileURLToPath} from "node:url";
+import type {ActivityFixtureJson} from "@forgewallet/conformance";
+
+// Recorded real transactions (fixtures/activity/*.json); `negative-*` must come back null.
+const fixturesDir = fileURLToPath(new URL("../fixtures/activity/", import.meta.url));
+const loadFixtures = (pick: (file: string) => boolean): ActivityFixtureJson[] =>
+  readdirSync(fixturesDir).filter((f) => f.endsWith(".json") && pick(f)).sort().map((f) => JSON.parse(readFileSync(fixturesDir + f, "utf8")) as ActivityFixtureJson);
+const activity = {fixtures: loadFixtures((f) => !f.startsWith("negative-")), negatives: loadFixtures((f) => f.startsWith("negative-"))};
+
 afterEach(() => vi.unstubAllGlobals());
 
 const WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
@@ -129,6 +139,7 @@ describe("Balancer v2 provider", () => {
 
 describeProtocolModule("protocol-swap2-balancer", {
   type: "swap2",
+  activity,
   Protocol: BalancerSwap2Protocol,
   config: {fromChain: "eip155:1", skipAccountChainCheck: true, rpcUrls: RPC},
   samples: {getSupportedChains: []},

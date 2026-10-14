@@ -124,3 +124,9 @@ staking protocols.
 npm test              # offline unit tests (node:test, stubbed EIP-1193 provider)
 npm run verify:live   # read-only checks against mainnet (views, REST, eth_call simulation)
 ```
+
+## Activity
+
+`describeActivity(tx, { own })` labels Lido transactions for a wallet's history, offline and synchronously. A transaction is Lido's when it calls one of the three contracts the instance is configured with (`stEth`, `wstEth`, `withdrawalQueue` — mainnet by default) on that chain, and the selector is: stETH `submit` → `stake` "Staked ETH"; wstETH `wrap` → `wrap` "Wrapped stETH", `unwrap` → `unwrap` "Unwrapped wstETH"; WithdrawalQueue `requestWithdrawals` / `…WithPermit` / `…WstETH` / `…WstETHWithPermit` → `unstake` "Requested withdrawal", `claimWithdrawals` / `claimWithdrawalsTo` / `claimWithdrawal` → `claim` "Claimed ETH". Selectors are computed from the signatures at module load (`LIDO_ACTIONS`). `approve` / `transfer` on stETH or wstETH are not Lido operations and yield null, as does everything else. Subtitle `"Lido · Ethereum"`, `counterparty` the contract called; `assetsIn` / `assetsOut` are the wallet's net movements from the receipt with stETH / wstETH / unstETH labelled by the module.
+
+Fixtures in `fixtures/activity/` are the test wallet's funded run (submit, wrap, unwrap, requestWithdrawalsWithPermit, claimWithdrawals; 2026-08-31 … 09-04); `negatives/` holds an SSV stake and a USDT approve.

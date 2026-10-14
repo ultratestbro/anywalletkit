@@ -23,7 +23,7 @@ import {
   type Swap2EngineConfig,
 } from "@forgewallet/protocol-swap2-core/swap2/base";
 import type {CrossChainProvider, Quote, QuoteParams} from "@forgewallet/protocol-swap2-core/types";
-import type {Swap2Options, Swap2Quote} from "@forgewallet/core";
+import type {ActivityItem, ChainTx, DescribeActivityContext, Swap2Options, Swap2Quote} from "@forgewallet/core";
 import {CrossChainRouter, type RouteSet, type RouterOptions} from "../router.js";
 
 /** One route in a picker: the public quote plus its place in the auction. */
@@ -113,6 +113,11 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
 
   protected providerFor(name: string): CrossChainProvider | undefined {
     return this.router.getProvider(name);
+  }
+
+  /** Delegates to every provider the router holds (first match wins); null with no providers. */
+  override describeActivity(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null {
+    return this.router.describeActivity(tx, ctx);
   }
 
   protected chainSupported(caip2: string): boolean {

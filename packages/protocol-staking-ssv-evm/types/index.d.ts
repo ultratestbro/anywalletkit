@@ -1,3 +1,4 @@
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core"
 export interface StakeOptions {
   /** Amount in base units (wei of SSV). */
   amount: number | bigint
@@ -135,6 +136,8 @@ export declare const SSV_ADDRESS_MAP: Record<number, {
 
 export default class SsvProtocolEvm extends StakingProtocol {
   constructor(account: StakingWalletAccount, config?: SsvProtocolConfig)
+  /** Recognize this module's transactions for a wallet's history; null for anything else. Pure and synchronous. */
+  describeActivity(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null
   stake(options: StakeOptions): Promise<StakeResult & {approveHash: string | null}>
   getTokenBalance(): Promise<bigint>
   getClaimableRewards(): Promise<bigint>
@@ -144,3 +147,6 @@ export default class SsvProtocolEvm extends StakingProtocol {
   getNetworkStats(): Promise<NetworkStats>
   getAprHistory(options?: {limit?: number}): Promise<AprSample[]>
 }
+
+export declare function describeSsvActivity(tx: ChainTx, ctx: DescribeActivityContext, deployment: {chainId: number; addresses: {network: string; ssvToken?: string; cssvToken?: string}}): ActivityItem | null
+export declare const SSV_ACTIONS: Readonly<Record<string, {kind: ActivityItem['kind']; title: string}>>

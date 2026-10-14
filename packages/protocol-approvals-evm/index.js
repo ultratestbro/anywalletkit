@@ -17,4 +17,5 @@ export { default as EtherscanLabels } from './src/labels/etherscan.js'
 export { approvalsHygienePolicy, isRevokeCalldata, isUnlimitedAmount } from './src/policies.js'
 export * as STANDARDS from './src/standards.js'
 
+export { describeApprovalActivity, CHAIN_NAMES as ACTIVITY_CHAIN_NAMES } from './src/activity.js'
 export { default } from './src/approvals-protocol-evm.js'

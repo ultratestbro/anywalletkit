@@ -1,0 +1,44 @@
+{
+  "note": "THORChain router depositWithExpiry 9.165808 USDC on Ethereum (test wallet 2026-10-10)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x26f9c864902f7867bf9d042b142df28d1d811e0cb66106dd3b12124bbee51fc4",
+    "time": 1791607511,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146",
+        "amount": "9165808",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "7702362388952",
+    "call": {
+      "to": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146",
+      "selector": "0x44bc937b"
+    },
+    "block": "26159725"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged USDC",
+    "assetsOut": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "amount": "9165808"
+      }
+    ],
+    "counterparty": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146"
+  }
+}

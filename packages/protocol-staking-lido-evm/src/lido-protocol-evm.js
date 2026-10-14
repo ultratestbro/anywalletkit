@@ -4,6 +4,7 @@ import { BrowserProvider, Contract, JsonRpcProvider, Signature, ZeroAddress, isA
 
 import StakingProtocol from './staking-protocol.js'
 import LIDO_ADDRESS_MAP from './lido-address-map.js'
+import { describeLidoActivity } from './lido-activity.js'
 
 /** @typedef {import('./staking-protocol.js').StakeOptions} StakeOptions */
 /** @typedef {import('./staking-protocol.js').StakeResult} StakeResult */
@@ -636,5 +637,18 @@ export default class LidoProtocolEvm extends StakingProtocol {
     } catch {
       return []
     }
+  }
+
+  /**
+   * Recognize this deployment's Lido transactions offline (stETH `submit`, wstETH
+   * `wrap` / `unwrap`, WithdrawalQueue `requestWithdrawals*` / `claimWithdrawals*`).
+   * See `lido-activity.js` for the rule.
+   *
+   * @param {import('@forgewallet/core').ChainTx} tx
+   * @param {import('@forgewallet/core').DescribeActivityContext} ctx
+   * @returns {import('@forgewallet/core').ActivityItem | null}
+   */
+  describeActivity (tx, ctx) {
+    return describeLidoActivity(tx, ctx, { chainId: this._chainId, addresses: this._addresses })
   }
 }

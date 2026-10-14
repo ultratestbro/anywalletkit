@@ -1,0 +1,43 @@
+{
+  "note": "CCTP V2 receiveMessage on Ethereum: 31,672.306835 USDC minted to `own` (public tx)",
+  "own": [
+    "0x2447ff8C28cAd702D74B7BA9428baFd56Ae7EBc7"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x69c0765e62b0619012831647479dd29a0c0efa7cbaf22ee4825b0dcbc8dfd480",
+    "time": 1791999467,
+    "status": "confirmed",
+    "address": "0x2447ff8C28cAd702D74B7BA9428baFd56Ae7EBc7",
+    "from": "0x54eAe1fe03d485e6b070cdAea382Aceb0570A3Be",
+    "to": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x2447ff8C28cAd702D74B7BA9428baFd56Ae7EBc7",
+        "amount": "31672306835",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "39613564127084",
+    "call": {
+      "to": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+      "selector": "0x57ecfd28"
+    },
+    "block": "26192283"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Received USDC via CCTP",
+    "assetsIn": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "amount": "31672306835"
+      }
+    ]
+  }
+}

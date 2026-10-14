@@ -4,6 +4,7 @@ import { BrowserProvider, Contract, JsonRpcProvider, ZeroAddress, getAddress, is
 import { LendingProtocol, NotImplementedError } from '@forgewallet/core'
 
 import MELLOW_ADDRESS_MAP from './mellow-address-map.js'
+import { describeMellowActivity } from './mellow-activity.js'
 
 /** @typedef {import('@forgewallet/core').SupplyOptions} SupplyOptions */
 /** @typedef {import('@forgewallet/core').SupplyResult} SupplyResult */
@@ -764,5 +765,18 @@ export default class MellowProtocolEvm extends LendingProtocol {
     const stats = await this.getStats()
     if (!stats || stats.apy === null) throw new Error('APY needs the Mellow registry (config.registry) and a listed vault.')
     return stats.apy
+  }
+
+  /**
+   * Recognize Mellow queue transactions offline (`deposit`, `cancelDepositRequest`,
+   * `claim` on deposit queues; `redeem`, `claim` on redeem queues) for the preset
+   * vaults and the vault this instance targets. See `mellow-activity.js` for the rule.
+   *
+   * @param {import('@forgewallet/core').ChainTx} tx
+   * @param {import('@forgewallet/core').DescribeActivityContext} ctx
+   * @returns {import('@forgewallet/core').ActivityItem | null}
+   */
+  describeActivity (tx, ctx) {
+    return describeMellowActivity(tx, ctx, { chainId: this._chainId, vault: this.vault, shareManager: this._preset?.shareManager ?? this._vaultData?.shareManager ?? null })
   }
 }

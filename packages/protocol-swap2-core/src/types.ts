@@ -3,6 +3,8 @@
  * delivery only, via a router over pluggable providers (NEAR Intents + others).
  * A provider can only delay/refund delivery — it can never affect vault safety.
  */
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
+
 export interface Asset {
   chain: string; // CAIP-2, e.g. "tron:728126428"
   token: string; // native-format token id/address on that chain
@@ -200,4 +202,12 @@ export interface CrossChainProvider {
   supportsChainPair?(fromChain: string, toChain: string): boolean;
   /** Explicit opt-in: provider can execute a same-chain swap. */
   supportsSameChain?: boolean;
+  /**
+   * Recognize one of this provider's own transactions in an address's history
+   * (contract + selector on EVM, settlement counterparty elsewhere) and
+   * describe it for the activity feed; null when it is not this provider's.
+   * Pure and synchronous. The single-provider protocol classes and the router
+   * delegate `describeActivity` here.
+   */
+  describeActivity?(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null;
 }

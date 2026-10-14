@@ -1,3 +1,4 @@
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core"
 import type {Address} from "@solana/addresses"
 import type {Instruction} from "@solana/instructions"
 
@@ -292,6 +293,8 @@ export declare namespace codec {
 
 export default class SplStakePoolProtocolSolana extends StakingProtocol {
   constructor(account: unknown, config?: SplStakePoolProtocolConfig)
+  /** Recognize this module's transactions for a wallet's history; null for anything else. Pure and synchronous. */
+  describeActivity(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null
   readonly pool: StakePoolConfig
   getEpochInfo(): Promise<EpochInfo>
   getStakeParams(): Promise<StakeParams>
@@ -314,3 +317,6 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
   protected _getUnstakeInstructions(poolTokens: bigint, mode: UnstakeMode): Promise<{instructions: Instruction[]; lamportsOut: bigint; feeTokens: bigint; stakeAccount: string | null; source: WithdrawSource | null}>
   protected _getClaimInstructions(ids?: bigint[]): Promise<{instructions: Instruction[]; lamports: bigint}>
 }
+
+export declare function describeStakePoolActivity(tx: ChainTx, ctx: DescribeActivityContext, instance?: {pool?: StakePoolConfig}): ActivityItem | null
+export declare const INSTRUCTION_ACTIONS: Readonly<Record<number, {kind: ActivityItem['kind']; verb: string; mode: 'deposit' | 'instant' | 'delayed'}>>

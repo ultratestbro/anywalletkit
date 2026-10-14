@@ -1,4 +1,5 @@
 import {nearIntents as cfg} from "./config.js";
+import {describeNearIntentsActivity} from "./activity.js";
 import {timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
 import {CC_DEST, ccAsset, ccAssetByToken, ccChain} from "@forgewallet/swap2-assets";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
@@ -142,6 +143,7 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
   }
   return {
     name: "near_intents",
+    describeActivity: describeNearIntentsActivity,
     enabled: () => config.enabled ?? true,
 
     // Capability discovery comes from the provider itself, so it can run alone

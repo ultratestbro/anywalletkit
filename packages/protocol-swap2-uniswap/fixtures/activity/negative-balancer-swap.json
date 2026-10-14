@@ -1,0 +1,59 @@
+{
+  "note": "Balancer Vault swap — not Uniswap",
+  "own": [
+    "0x758E83C4d9C682332994Ec12c8e0D7fE87Bd9CEc"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0xa2ca9d86a54027a826fa0461501e114fb6a5d2d0341537410fd5839c01def068",
+    "time": 1791986819,
+    "status": "confirmed",
+    "address": "0x758E83C4d9C682332994Ec12c8e0D7fE87Bd9CEc",
+    "from": "0x758E83C4d9C682332994Ec12c8e0D7fE87Bd9CEc",
+    "to": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xDEf1CA1fb7FBcDC777520aa7f396b4E015F497aB",
+        "from": "0x758E83C4d9C682332994Ec12c8e0D7fE87Bd9CEc",
+        "to": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "amount": "2200000000000000000000",
+        "standard": "erc20",
+        "symbol": "COW",
+        "decimals": 18
+      },
+      {
+        "token": "0x6810e776880C02933D47DB1b9fc05908e5386b96",
+        "from": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "to": "0x758E83C4d9C682332994Ec12c8e0D7fE87Bd9CEc",
+        "amount": "2657847411100591206",
+        "standard": "erc20",
+        "symbol": "GNO",
+        "decimals": 18
+      }
+    ],
+    "fee": "114702584973120",
+    "call": {
+      "to": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "selector": "0x52bbbe29"
+    },
+    "block": "26191230"
+  },
+  "expect": {
+    "kind": "swap",
+    "title": "Swapped COW → GNO",
+    "assetsOut": [
+      {
+        "token": "0xDEf1CA1fb7FBcDC777520aa7f396b4E015F497aB",
+        "amount": "2200000000000000000000"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0x6810e776880C02933D47DB1b9fc05908e5386b96",
+        "amount": "2657847411100591206"
+      }
+    ],
+    "counterparty": "0xBA12222222228d8Ba445958a75a0704d566BF2C8"
+  }
+}

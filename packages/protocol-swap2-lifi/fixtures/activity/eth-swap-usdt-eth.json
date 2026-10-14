@@ -1,0 +1,109 @@
+{
+  "note": "LI.FI same-chain swap USDT → ETH on Ethereum (swapTokensMultipleV3ERC20ToNative, native out via internal call, test wallet 2026-09-14)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x33e535746adc8bd431ff13856e44408c406e43140eff7c127072887e43a3849c",
+    "time": 1789392503,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "amount": "5000000",
+        "standard": "erc20",
+        "symbol": "USDT",
+        "decimals": 6
+      },
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0xC06ebbefD94032B85424D51906e2A335EFAe264B",
+        "amount": "12500",
+        "standard": "erc20",
+        "symbol": "USDT",
+        "decimals": 6
+      },
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0x17C1Ae82D99379240059940093762c5e4539aba5",
+        "amount": "4987500",
+        "standard": "erc20",
+        "symbol": "USDT",
+        "decimals": 6
+      },
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "from": "0x17C1Ae82D99379240059940093762c5e4539aba5",
+        "to": "0xC10eE9031F2a0B84766A86B55a8D90F357910fb4",
+        "amount": "1991774213366127",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      },
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "from": "0xC10eE9031F2a0B84766A86B55a8D90F357910fb4",
+        "to": "0x0000000000000000000000000000000000000000",
+        "amount": "1991774213366127",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      },
+      {
+        "token": null,
+        "from": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "to": "0xC10eE9031F2a0B84766A86B55a8D90F357910fb4",
+        "amount": "1991774213366127"
+      },
+      {
+        "token": null,
+        "from": "0xC10eE9031F2a0B84766A86B55a8D90F357910fb4",
+        "to": "0xC10eE9031F2a0B84766A86B55a8D90F357910fb4",
+        "amount": "1991774213366127"
+      },
+      {
+        "token": null,
+        "from": "0xC10eE9031F2a0B84766A86B55a8D90F357910fb4",
+        "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "amount": "1991774213366127"
+      },
+      {
+        "token": null,
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "1991774213366127"
+      }
+    ],
+    "fee": "64780514442578",
+    "call": {
+      "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+      "selector": "0x2c57e884"
+    },
+    "block": "25975998"
+  },
+  "expect": {
+    "kind": "swap",
+    "title": "Swapped USDT → ETH",
+    "assetsOut": [
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "amount": "5000000"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": null,
+        "amount": "1991774213366127"
+      }
+    ]
+  }
+}

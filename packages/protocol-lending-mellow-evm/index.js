@@ -6,4 +6,5 @@
 export { default as MELLOW_ADDRESS_MAP } from './src/mellow-address-map.js'
 export { NATIVE_ASSET, DEFAULT_REGISTRY, toAsset } from './src/mellow-protocol-evm.js'
 
+export { describeMellowActivity, MELLOW_ACTIONS } from './src/mellow-activity.js'
 export { default } from './src/mellow-protocol-evm.js'

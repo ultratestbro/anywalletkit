@@ -1,0 +1,55 @@
+{
+  "note": "WETH9 withdraw(0.00045… WETH) → ETH on Ethereum (public tx)",
+  "own": [
+    "0xddDcC1B3eF37D39aD873ff6CcA92C13bE7005b59"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x9ae0b9ee92829464a300471c5ae780a2679067214d7add15b79cc34863ed6d03",
+    "time": 1791999491,
+    "status": "confirmed",
+    "address": "0xddDcC1B3eF37D39aD873ff6CcA92C13bE7005b59",
+    "from": "0xddDcC1B3eF37D39aD873ff6CcA92C13bE7005b59",
+    "to": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "from": "0xddDcC1B3eF37D39aD873ff6CcA92C13bE7005b59",
+        "to": "0x0000000000000000000000000000000000000000",
+        "amount": "450693123457100",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      },
+      {
+        "token": null,
+        "from": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "to": "0xddDcC1B3eF37D39aD873ff6CcA92C13bE7005b59",
+        "amount": "450693123457100"
+      }
+    ],
+    "fee": "11257937862352",
+    "call": {
+      "to": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "selector": "0x2e1a7d4d"
+    },
+    "block": "26192285"
+  },
+  "expect": {
+    "kind": "unwrap",
+    "title": "Unwrapped WETH",
+    "assetsOut": [
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "amount": "450693123457100"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": null,
+        "amount": "450693123457100"
+      }
+    ]
+  }
+}

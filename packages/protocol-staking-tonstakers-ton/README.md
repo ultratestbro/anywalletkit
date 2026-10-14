@@ -133,3 +133,9 @@ Mainnet contracts (verified live): pool
 npm test              # offline unit tests (node:test, stubbed TonClient + account)
 npm run verify:live   # read-only checks against mainnet (pool getter, jetton wallet, APY, bills, message builders)
 ```
+
+## Activity
+
+`describeActivity(tx, { own })` labels Tonstakers transactions for a wallet's history, offline and synchronously, against the deployment the instance is configured with (pool + tsTON jetton master; addresses are compared in raw `wc:hex` form, so friendly and raw spellings both match). Three shapes: a message **to the pool** whose op is `OP_STAKE` 0x47d54391 (or undecoded) → `stake` "Staked GRAM" (net GRAM out — the fee reserve the pool returns is netted — tsTON minted in); a **burn** (op `OP_UNSTAKE` 0x595f07bc, read from `call.data` as hex / decimal or from `call.method`) with a tsTON jetton transfer leaving the wallet → `unstake` "Requested unstake" (the destination is the wallet's own jetton wallet, which cannot be known statically, so the jetton movement is the proof); an **incoming** message from the pool carrying GRAM (op 0x0a77535c `tonstake_pool_withdrawal` when decoded, no call of ours) → `claim` "Received unstaked GRAM". Subtitle `"Tonstakers · TON"`, `counterparty` the pool. Anything else — plain GRAM or jetton transfers, other pools — is null.
+
+Fixtures in `fixtures/activity/` are the test wallet's funded run (stake 3 GRAM, unstake 1 tsTON, the settled payout; 2026-09-04 … 10-07, amounts from tonapi events and raw transactions); `negatives/` holds a GRAM transfer in and a USD₮ jetton transfer out.

@@ -1,4 +1,5 @@
 import {decodeFunctionResult, encodeFunctionData, encodePacked, getAddress, parseAbi, type Hex} from "viem";
+import {describeUniswapActivity} from "./activity.js";
 import {ccAsset} from "@forgewallet/swap2-assets";
 import {evmRef, isEvm, timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
@@ -164,6 +165,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
 
   return {
     name: "uniswap",
+    describeActivity: (tx, ctx) => describeUniswapActivity(tx, ctx, config.deployments ?? UNISWAP_V3),
     supportsSameChain: true,
     enabled: () => config.enabled ?? true,
     supportsChain: (caip2: string) => chainIdOf(caip2) !== null,

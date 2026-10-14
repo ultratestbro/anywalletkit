@@ -139,3 +139,9 @@ LIVE_PK=0x… node scripts/verify-live.mjs 0x… https://rpc --revoke <approval 
 ## License
 
 Apache-2.0
+
+## Activity
+
+`describeActivity(tx, { own })` labels approvals and revokes for a wallet's history, offline and synchronously, on every EVM chain (`eip155:*`). Recognized by 4-byte selector on any contract (the called contract is the token): ERC-20 / ERC-721 `approve(address,uint256)` — amount 0 → `revoke`, else `approve` (ERC-721 shares the selector, so a tokenId of 0 reads as a revoke — the one case the selector cannot tell apart offline); `setApprovalForAll(address,bool)` — false → `revoke`; Permit2 `approve(address,address,uint160,uint48)` — amount 0 → `revoke`; Permit2 `lockdown` → `revoke`. Calldata is needed for the spender and the amount; with a bare selector the item is still an `approve`. Titles read "Revoked USDT for 0x6c96…1dee" / "Approved USDC for Permit2" — pass `tokens` (lowercase address → `{ symbol }`) in the config to name tokens, well-known spenders (Permit2) are named by the module. Subtitle `"Token approval · <chain>"` or `"Permit2 · <chain>"`, `counterparty` the spender, no asset movements. Everything else yields null, so protocol calls fall through to the protocol modules.
+
+Fixtures in `fixtures/activity/` are the test wallet's USDT revoke (the module's own 2026-09-14 run, `approve(spender, 0)`) and a USDC approve before a THORChain swap; `negatives/` holds a Lido submit and an SSV stake.

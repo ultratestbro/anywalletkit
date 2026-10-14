@@ -1,0 +1,45 @@
+{
+  "note": "Mellow Lido EarnUSD: RedeemQueue.claim → 5.002771 USDT (funded test 2026-09-11, etherscan.io/tx/0x16928ef7…)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x16928ef751a1ec5c77fb0e42900ee845b712d566a01fd9bb50322b71680545d7",
+    "time": 1789157315,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0x95092A7a86715246Be6395b8D514B3d60A270Cd3",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "from": "0x95092A7a86715246Be6395b8D514B3d60A270Cd3",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "5002771",
+        "standard": "erc20",
+        "symbol": "USDT",
+        "decimals": 6
+      }
+    ],
+    "fee": "16362240442640",
+    "call": {
+      "to": "0x95092A7a86715246Be6395b8D514B3d60A270Cd3",
+      "selector": "0xc12e43e6",
+      "data": "0xc12e43e60000000000000000000000008abe813577e47415a3cd0bbc68c7abca2c4c55ba00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000006a9ef557"
+    },
+    "block": "25956452"
+  },
+  "expect": {
+    "kind": "claim",
+    "title": "Claimed USDT",
+    "assetsIn": [
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "amount": "5002771"
+      }
+    ],
+    "counterparty": "0x95092A7a86715246Be6395b8D514B3d60A270Cd3"
+  }
+}

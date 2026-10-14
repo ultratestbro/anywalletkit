@@ -1,0 +1,28 @@
+{
+  "note": "Plain 0.0001 GRAM transfer received (tonviewer.com/transaction/34f78d58…) — not Tonstakers",
+  "own": [
+    "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+  ],
+  "tx": {
+    "chain": "ton:-239",
+    "hash": "34f78d583fa45f5398d3ebb5bab810ce850e2d4eb383d18cfa7e3dc52387d9d0",
+    "time": 1791634364,
+    "status": "confirmed",
+    "address": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+    "from": "0:0f7f7862ea75d56036f921593fd04988c6a90335f6cfca0c37f4371eaecbfcde",
+    "to": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+    "nativeValue": "100000",
+    "transfers": [
+      {
+        "token": null,
+        "from": "0:0f7f7862ea75d56036f921593fd04988c6a90335f6cfca0c37f4371eaecbfcde",
+        "to": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+        "amount": "100000"
+      }
+    ],
+    "block": "109042752000003"
+  },
+  "expect": {
+    "kind": "receive"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "note": "WETH9 deposit() 0.022 ETH → WETH on Ethereum (public tx)",
+  "own": [
+    "0x0d17E8cf2f81968b6F7E6F108857619B8fD105cB"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x4afa61a9d9d9eb291daf3ce6cf1fffbb8a205c2a70fbde7c0ab0f29b5ffd923f",
+    "time": 1791999575,
+    "status": "confirmed",
+    "address": "0x0d17E8cf2f81968b6F7E6F108857619B8fD105cB",
+    "from": "0x0d17E8cf2f81968b6F7E6F108857619B8fD105cB",
+    "to": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "nativeValue": "22000000000000000",
+    "transfers": [
+      {
+        "token": null,
+        "from": "0x0d17E8cf2f81968b6F7E6F108857619B8fD105cB",
+        "to": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "amount": "22000000000000000"
+      },
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x0d17E8cf2f81968b6F7E6F108857619B8fD105cB",
+        "amount": "22000000000000000",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      }
+    ],
+    "fee": "7253247495650",
+    "call": {
+      "to": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "selector": "0xd0e30db0"
+    },
+    "block": "26192292"
+  },
+  "expect": {
+    "kind": "wrap",
+    "title": "Wrapped ETH",
+    "assetsOut": [
+      {
+        "token": null,
+        "amount": "22000000000000000"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "amount": "22000000000000000"
+      }
+    ],
+    "counterparty": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+  }
+}

@@ -1,4 +1,5 @@
 import {thorchain as thorCfg} from "./config.js";
+import {describeThorchainActivity} from "./activity.js";
 import {decodeFunctionData, encodeFunctionData} from "viem";
 import {timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
 import {ccAsset, ccAssetByToken} from "@forgewallet/swap2-assets";
@@ -366,6 +367,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
   const isDepositSource = (caip2: string): boolean => tronSource && DEPOSIT_SOURCES.has(caip2);
   return {
     name: "thorchain",
+    describeActivity: describeThorchainActivity,
     enabled: () => config.enabled ?? true,
 
     // Capability discovery comes from the provider itself, so it can run alone

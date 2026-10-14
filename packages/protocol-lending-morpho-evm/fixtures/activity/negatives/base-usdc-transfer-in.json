@@ -1,0 +1,37 @@
+{
+  "note": "Plain USDC transfer received on Base (basescan.org/tx/0x40fad7c2…) — not Aave",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:8453",
+    "hash": "0x40fad7c23bd5f93e25e4d45785bf3f00e825a31a1dec336f1ff05e3f6952623f",
+    "time": 1791823909,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x2cff890f0378a11913b6129b2e97417a2c302680",
+    "to": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "from": "0x2cff890f0378a11913b6129b2e97417a2c302680",
+        "to": "0x8abe813577e47415a3cd0bbc68c7abca2c4c55ba",
+        "amount": "13968444",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "407301403696",
+    "call": {
+      "to": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "selector": "0xa9059cbb",
+      "data": "0xa9059cbb0000000000000000000000008abe813577e47415a3cd0bbc68c7abca2c4c55ba0000000000000000000000000000000000000000000000000000000000d5243c"
+    },
+    "block": "52517281"
+  },
+  "expect": {
+    "kind": "receive"
+  }
+}

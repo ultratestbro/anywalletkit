@@ -4,6 +4,7 @@ import { BrowserProvider, Contract, JsonRpcProvider } from 'ethers'
 
 import StakingProtocol from './staking-protocol.js'
 import SSV_ADDRESS_MAP from './ssv-address-map.js'
+import { describeSsvActivity } from './ssv-activity.js'
 
 /** @typedef {import('./staking-protocol.js').StakeOptions} StakeOptions */
 /** @typedef {import('./staking-protocol.js').StakeResult} StakeResult */
@@ -548,5 +549,18 @@ export default class SsvProtocolEvm extends StakingProtocol {
     } catch {
       return []
     }
+  }
+
+  /**
+   * Recognize this deployment's SSV staking transactions offline (`stake`,
+   * `requestUnstake`, `withdrawUnlocked`, `claimEthRewards` on SSVNetwork).
+   * See `ssv-activity.js` for the rule.
+   *
+   * @param {import('@forgewallet/core').ChainTx} tx
+   * @param {import('@forgewallet/core').DescribeActivityContext} ctx
+   * @returns {import('@forgewallet/core').ActivityItem | null}
+   */
+  describeActivity (tx, ctx) {
+    return describeSsvActivity(tx, ctx, { chainId: this._chainId, addresses: this._addresses })
   }
 }

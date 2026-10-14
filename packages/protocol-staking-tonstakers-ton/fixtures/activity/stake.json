@@ -1,0 +1,63 @@
+{
+  "note": "Tonstakers: stake message to the pool (op 0x47d54391) carrying 4 GRAM = 3 stake + 1 fee reserve; the reserve leftover comes back through the jetton wallet, 2.602 tsTON minted (funded test 2026-09-04, tonviewer.com/transaction/15e18e04…)",
+  "own": [
+    "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+  ],
+  "tx": {
+    "chain": "ton:-239",
+    "hash": "15e18e04a9ef99ca9a30178e6fa18fabdee729ffb2865bd7b669796c33e7465e",
+    "time": 1788516212,
+    "status": "confirmed",
+    "address": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+    "from": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+    "to": "0:a45b17f28409229b78360e3290420f13e4fe20f90d7e2bf8c4ac6703259e22fa",
+    "nativeValue": "4000000000",
+    "transfers": [
+      {
+        "token": null,
+        "from": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+        "to": "0:a45b17f28409229b78360e3290420f13e4fe20f90d7e2bf8c4ac6703259e22fa",
+        "amount": "4000000000"
+      },
+      {
+        "token": null,
+        "from": "0:75e45d424e6284068eaa0229634cf9d8b52537d77d71c98df530f141540fddb2",
+        "to": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+        "amount": "996485080"
+      },
+      {
+        "token": "0:bdf3fa8098d129b54b4f73b5bac5d1e1fd91eb054169c3916dfc8ccd536d1000",
+        "from": "0:bdf3fa8098d129b54b4f73b5bac5d1e1fd91eb054169c3916dfc8ccd536d1000",
+        "to": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+        "amount": "2602334618",
+        "standard": "jetton",
+        "symbol": "tsTON",
+        "decimals": 9
+      }
+    ],
+    "fee": "627467",
+    "call": {
+      "to": "0:a45b17f28409229b78360e3290420f13e4fe20f90d7e2bf8c4ac6703259e22fa",
+      "data": "0x47d54391",
+      "method": "tonstake_pool_deposit"
+    },
+    "block": "101244263000001"
+  },
+  "expect": {
+    "kind": "stake",
+    "title": "Staked",
+    "assetsOut": [
+      {
+        "token": null,
+        "amount": "3003514920"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0:bdf3fa8098d129b54b4f73b5bac5d1e1fd91eb054169c3916dfc8ccd536d1000",
+        "amount": "2602334618"
+      }
+    ],
+    "counterparty": "EQCkWxfyhAkim3g2DjKQQg8T5P4g-Q1-K_jErGcDJZ4i-vqR"
+  }
+}

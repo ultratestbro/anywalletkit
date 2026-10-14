@@ -1,0 +1,46 @@
+{
+  "note": "NEAR Intents withdrawal: intents.near pays 231 JAMBO to 5145548905.tg (execute_intents / ft_withdraw, public tx)",
+  "own": [
+    "5145548905.tg"
+  ],
+  "tx": {
+    "chain": "near:mainnet",
+    "hash": "RFHHj55EKMJBAU7oNUmQVVGCq2ssiNe9NKwY4g3LsQY",
+    "time": 1790728361,
+    "status": "confirmed",
+    "address": "5145548905.tg",
+    "from": "intents.near",
+    "to": "intents.near",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "jambo-1679.meme-cooking.near",
+        "from": "intents.near",
+        "to": "5145548905.tg",
+        "amount": "231000000000000000000",
+        "standard": "nep141",
+        "symbol": "JAMBO",
+        "decimals": 18
+      }
+    ],
+    "call": {
+      "to": "intents.near",
+      "method": "execute_intents",
+      "programs": [
+        "execute_intents"
+      ]
+    },
+    "block": "217848739"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Received JAMBO via NEAR Intents",
+    "assetsIn": [
+      {
+        "token": "jambo-1679.meme-cooking.near",
+        "amount": "231000000000000000000"
+      }
+    ],
+    "counterparty": "intents.near"
+  }
+}

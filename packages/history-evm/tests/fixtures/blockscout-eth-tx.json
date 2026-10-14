@@ -1,0 +1,54 @@
+{
+ "priority_fee": "3345650000000",
+ "raw_input": "0x44bc937b000000000000000000000000587c7c3ba9e47b1afd9da9a79c127ade753ac53a000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4800000000000000000000000000000000000000000000000000000000008bdbf000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000006ac9c63500000000000000000000000000000000000000000000000000000000000000963d3a415641582e555344432d3058423937454639454638373334433731393034443830303246384236424336364444394334384136453a3078384162453831333537374534373431354133434430426263363863374142436132633463353562412f3078384162453831333537374534373431354133434430426263363863374142436132633463353562413a38383838323532353900000000000000000000",
+ "is_pending_update": false,
+ "result": "success",
+ "hash": "0x26f9c864902f7867bf9d042b142df28d1d811e0cb66106dd3b12124bbee51fc4",
+ "max_fee_per_gas": "121920273",
+ "revert_reason": null,
+ "confirmation_duration": [
+  0,
+  12000.0
+ ],
+ "transaction_burnt_fee": "4356712388952",
+ "type": 2,
+ "token_transfers_overflow": false,
+ "confirmations": 32497,
+ "position": 56,
+ "max_priority_fee_per_gas": "50000000",
+ "transaction_tag": null,
+ "created_contract": null,
+ "value": "0",
+ "from": {
+  "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+  "is_contract": false,
+  "name": null
+ },
+ "gas_used": "66913",
+ "status": "ok",
+ "to": {
+  "hash": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146",
+  "is_contract": true,
+  "name": "THORChain_Router"
+ },
+ "authorization_list": [],
+ "method": "depositWithExpiry",
+ "fee": {
+  "type": "actual",
+  "value": "7702362388952"
+ },
+ "gas_limit": "98290",
+ "gas_price": "115110104",
+ "fhe_operations_count": 0,
+ "base_fee_per_gas": "65110104",
+ "timestamp": "2026-10-10T04:45:11.000000Z",
+ "nonce": 133,
+ "historic_exchange_rate": "2504.3139870176874",
+ "transaction_types": [
+  "contract_call",
+  "token_transfer"
+ ],
+ "exchange_rate": "2445.08",
+ "block_number": 26159725,
+ "has_error_in_internal_transactions": false
+}

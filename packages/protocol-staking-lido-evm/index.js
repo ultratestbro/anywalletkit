@@ -14,4 +14,5 @@ export { default as StakingProtocol, IStakingProtocol } from './src/staking-prot
 export { default as LIDO_ADDRESS_MAP } from './src/lido-address-map.js'
 export { splitWithdrawalAmounts } from './src/lido-protocol-evm.js'
 
+export { describeLidoActivity, LIDO_ACTIONS } from './src/lido-activity.js'
 export { default } from './src/lido-protocol-evm.js'

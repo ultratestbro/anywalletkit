@@ -1,4 +1,5 @@
 import {createPublicClient, encodeFunctionData, getAddress, http, isAddress, pad, parseAbi, zeroHash, type Hex} from "viem";
+import {describeCctpActivity} from "./activity.js";
 import {ccAsset} from "@forgewallet/swap2-assets";
 import {timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
@@ -156,6 +157,7 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
 
   return {
     name: "cctp",
+    describeActivity: describeCctpActivity,
     enabled: () => config.enabled ?? true,
     supportsChain: (chain: string) => cctpCfg.supportsChain(chain),
     supportsChainPair: (from: string, to: string) => cctpCfg.supports(from, to),

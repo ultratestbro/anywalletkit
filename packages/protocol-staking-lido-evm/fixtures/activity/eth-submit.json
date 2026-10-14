@@ -1,0 +1,57 @@
+{
+  "note": "Lido: stETH submit 0.001 ETH (funded test 2026-08-31, etherscan.io/tx/0x6f37fc58…)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x6f37fc58f2f29d6b563d62cf00d96e58776129a578138e1c6841d55389c16a46",
+    "time": 1788198071,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+    "nativeValue": "1000000000000000",
+    "transfers": [
+      {
+        "token": null,
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+        "amount": "1000000000000000"
+      },
+      {
+        "token": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "999999999999999",
+        "standard": "erc20",
+        "symbol": "STETH",
+        "decimals": 18
+      }
+    ],
+    "fee": "20575421551755",
+    "call": {
+      "to": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+      "selector": "0xa1903eab",
+      "data": "0xa1903eab0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "block": "25876819"
+  },
+  "expect": {
+    "kind": "stake",
+    "title": "Staked ETH",
+    "assetsOut": [
+      {
+        "token": null,
+        "amount": "1000000000000000"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+        "amount": "999999999999999"
+      }
+    ],
+    "counterparty": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84"
+  }
+}

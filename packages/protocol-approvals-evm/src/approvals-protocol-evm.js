@@ -6,6 +6,7 @@ import ApprovalsProtocol, { ApprovalsError } from './approvals-protocol.js'
 import RpcLogsSource, { mergeCandidates } from './sources/rpc-logs.js'
 import StateVerifier, { approvalId } from './state-verifier.js'
 import { EIP7702_PREFIX, ERC20_ABI, ERC721_ABI, PERMIT2_ABI, PERMIT2_ADDRESS } from './standards.js'
+import { describeApprovalActivity } from './activity.js'
 
 /** @typedef {import('./approvals-protocol.js').Approval} Approval */
 /** @typedef {import('./approvals-protocol.js').ApprovalStandard} ApprovalStandard */
@@ -303,6 +304,19 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol {
       return { ids: item.ids, error }
     }
   }
+
+  /**
+   * Recognize approvals and revokes offline on any EVM chain: ERC-20 / ERC-721
+   * `approve` (amount 0 → revoke), `setApprovalForAll`, Permit2 `approve` / `lockdown`.
+   * See `activity.js` for the rule.
+   *
+   * @param {import('@forgewallet/core').ChainTx} tx
+   * @param {import('@forgewallet/core').DescribeActivityContext} ctx
+   * @returns {import('@forgewallet/core').ActivityItem | null}
+   */
+  describeActivity (tx, ctx) {
+    return describeApprovalActivity(tx, ctx, this._config.tokens ? { tokens: this._config.tokens } : {})
+  }
 }
 
 function validate (a) {
@@ -329,4 +343,5 @@ function filterOf (options) {
     approval: (a) => (!standards || standards.has(a.standard)) &&
       (!tokens || tokens.has(a.token.toLowerCase())) && (!spenders || spenders.has(a.spender.toLowerCase()))
   }
+
 }

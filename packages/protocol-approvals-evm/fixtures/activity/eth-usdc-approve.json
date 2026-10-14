@@ -1,0 +1,29 @@
+{
+  "note": "USDC approve(THORChain router 0xd37b…7146, 9.166832 USDC) before a swap (2026-10-10, etherscan.io/tx/0xc7771691…)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0xc7771691f1c0ee56402b0945a5c8da90c1e1110d99c2194d737d9f0f55ec016e",
+    "time": 1791607487,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "nativeValue": "0",
+    "transfers": [],
+    "fee": "6168411898182",
+    "call": {
+      "to": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "selector": "0x095ea7b3",
+      "data": "0x095ea7b3000000000000000000000000d37bbe5744d730a1d98d8dc97c42f0ca46ad714600000000000000000000000000000000000000000000000000000000008bdbf0"
+    },
+    "block": "26159723"
+  },
+  "expect": {
+    "kind": "approve",
+    "title": "Approved",
+    "counterparty": "0xd37bbe5744d730a1d98d8dc97c42f0ca46ad7146"
+  }
+}

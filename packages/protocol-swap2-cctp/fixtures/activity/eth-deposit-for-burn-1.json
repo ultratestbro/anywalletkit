@@ -1,0 +1,53 @@
+{
+  "note": "CCTP V2 depositForBurn 46,530.283796 USDC on Ethereum (public tx, sender is `own`)",
+  "own": [
+    "0x1a44A6bC450d233049D629C27792c5309D9Ca12D"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0xfa884442312a1b376dc0c410b1b6d48efd01ef3413e3290a58d265e9c9982c81",
+    "time": 1791999455,
+    "status": "confirmed",
+    "address": "0x1a44A6bC450d233049D629C27792c5309D9Ca12D",
+    "from": "0x1a44A6bC450d233049D629C27792c5309D9Ca12D",
+    "to": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0x1a44A6bC450d233049D629C27792c5309D9Ca12D",
+        "to": "0xfd78EE919681417d192449715b2594ab58f5D002",
+        "amount": "46530283796",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      },
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0xfd78EE919681417d192449715b2594ab58f5D002",
+        "to": "0x0000000000000000000000000000000000000000",
+        "amount": "46530283796",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "36714914724873",
+    "call": {
+      "to": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+      "selector": "0x8e0250ee"
+    },
+    "block": "26192282"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged USDC",
+    "assetsOut": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "amount": "46530283796"
+      }
+    ],
+    "counterparty": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d"
+  }
+}

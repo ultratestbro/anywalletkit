@@ -147,3 +147,9 @@ SSVNetwork `0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1`, SSVNetworkViews
 npm test              # offline unit tests (node:test, stubbed EIP-1193 provider)
 npm run verify:live   # read-only checks against mainnet (views, API, eth_call proofs)
 ```
+
+## Activity
+
+`describeActivity(tx, { own })` labels SSV staking transactions for a wallet's history, offline and synchronously. A transaction is SSV's when it calls the `network` proxy the instance is configured with (mainnet by default) on that chain and the selector is `stake` → `stake` "Staked SSV", `requestUnstake` → `unstake` "Requested unstake", `withdrawUnlocked` → `claim` "Withdrew SSV", `claimEthRewards` → `claim` "Claimed ETH rewards" (`SSV_ACTIONS`, selectors computed from the signatures at module load). Operator / cluster management calls on the same proxy, SSV `approve`s and anything else yield null. Subtitle `"SSV Network · Ethereum"`, `counterparty` the proxy; `assetsIn` / `assetsOut` are the wallet's net movements (SSV, cSSV, ETH rewards) labelled by the module.
+
+Fixtures in `fixtures/activity/` are the test wallet's funded run (stake, requestUnstake ×2, withdrawUnlocked, claimEthRewards; 2026-09-03 … 10-07); `negatives/` holds a Lido submit and a USDT approve.

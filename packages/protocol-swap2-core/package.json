@@ -39,6 +39,11 @@
       "import": "./dist/util.js",
       "require": "./dist/util.cjs"
     },
+    "./activity": {
+      "types": "./dist/activity.d.ts",
+      "import": "./dist/activity.js",
+      "require": "./dist/activity.cjs"
+    },
     "./swap2/base": {
       "types": "./dist/swap2/base.d.ts",
       "import": "./dist/swap2/base.js",
