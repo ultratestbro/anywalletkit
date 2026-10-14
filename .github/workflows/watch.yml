@@ -18,8 +18,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build            # the canary runs each package's verify-live against dist/
       - name: run watch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -45,6 +48,22 @@ jobs:
             done
           fi
           node scripts/watch/watch.mjs --send ${{ inputs.only && format('--only {0}', inputs.only) || '' }}
+      - name: run canary
+        if: ${{ !inputs.only }}
+        continue-on-error: true   # a failing module is reported, not a reason to skip the snapshot commit
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WATCH_CHAT: ${{ secrets.TELEGRAM_WATCH_CHAT }}
+          TELEGRAM_WATCH_TOPIC: ${{ secrets.TELEGRAM_WATCH_TOPIC }}
+          EVM_RPC_URL: ${{ secrets.EVM_RPC_URL }}
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+          ARBITRUM_RPC_URL: ${{ secrets.ARBITRUM_RPC_URL }}
+          OPTIMISM_RPC_URL: ${{ secrets.OPTIMISM_RPC_URL }}
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
+          BSC_RPC_URL: ${{ secrets.BSC_RPC_URL }}
+          SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
+          TON_RPC_URL: ${{ secrets.TON_RPC_URL }}
+        run: node scripts/watch/canary.mjs --send --timeout 300
       - name: commit snapshot
         run: |
           git config user.name "module-watch"

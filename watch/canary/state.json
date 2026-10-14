@@ -1,0 +1,197 @@
+{
+ "lido": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "ssv": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "jito": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "tonstakers": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:1:core": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:1:lido": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "mellow:lido-earn-eth": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:1:etherfi": {
+  "status": "warn",
+  "note": "quoteSupply → AaveError weETH: supply cap reached (0 base units left).",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:10:core": {
+  "status": "warn",
+  "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only).",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:56:core": {
+  "status": "warn",
+  "note": "quoteSupply → AaveError Cake: the reserve is frozen (withdraw and repay only).",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:100:core": {
+  "status": "warn",
+  "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:137:core": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "mellow:lido-earn-usd": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:146:core": {
+  "status": "warn",
+  "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:1868:core": {
+  "status": "warn",
+  "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:324:core": {
+  "status": "warn",
+  "note": "quoteSupply → AaveError USDC: the reserve is frozen (withdraw and repay only).",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:1088:core": {
+  "status": "warn",
+  "note": "quoteSupply → AaveError m.DAI: the reserve is frozen (withdraw and repay only).",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:5000:core": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:8453:core": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:9745:core": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:42161:core": {
+  "status": "warn",
+  "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only).",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:42220:core": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:43114:core": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:57073:core": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:534352:core": {
+  "status": "warn",
+  "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "aave:59144:core": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "morpho:1": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "morpho:8453": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "morpho:42161": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "morpho:10": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "morpho:137": {
+  "status": "warn",
+  "note": " quoteSupply → MorphoError Compound USDC: deposits are closed right now (caps reached or the receiver is gated).",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "morpho:130": {
+  "status": "warn",
+  "note": " quoteSupply → MorphoError Gauntlet WETH: deposits are closed right now (caps reached or the receiver is gated).",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "morpho:4663": {
+  "status": "none",
+  "note": "Error: no listed Morpho vault on eip155:4663",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "morpho:999": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "morpho:143": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "morpho:747474": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "approvals:42161": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "approvals:8453": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ },
+ "approvals:1": {
+  "status": "ok",
+  "note": "",
+  "at": "2026-10-14T15:20:58.972Z"
+ }
+}
