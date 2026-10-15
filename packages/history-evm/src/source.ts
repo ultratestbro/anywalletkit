@@ -115,7 +115,7 @@ export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
               chainId,
               apiKey,
               fetch: fetchFn,
-              bucket: sharedBucket(`etherscan:${apiKey}`, options.rateLimit ?? 5),
+              bucket: sharedBucket(`etherscan:${apiKey}`, options.rateLimit ?? 3), // free tier = 3 calls/s per key, shared by every chain
               timeoutMs,
             }),
           )

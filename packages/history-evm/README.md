@@ -35,7 +35,7 @@ history.explorerTxUrl(one.hash) // https://basescan.org/tx/0x…
 | `blockscoutUrl` | built-in table | Any Blockscout `/api/v2` root; adds or overrides the chain's entry. |
 | `etherscanCompatUrl` | built-in table (Routescan) | Keyless Etherscan-format endpoint. |
 | `fetch` | `globalThis.fetch` | Inject for tests / custom transports. |
-| `rateLimit` | 5 rps with a key | Etherscan requests per second. One token bucket per key is shared by every source in the process (25 chains do not multiply the quota). Blockscout: 5 rps per host, Routescan: 2 rps. |
+| `rateLimit` | 3 rps with a key | Etherscan requests per second (free tier 3, Lite 5, Standard 10). One token bucket per key is shared by every source in the process (25 chains do not multiply the quota). Blockscout: 5 rps per host, Routescan: 2 rps. |
 | `prefer` | `'etherscan'` | `'blockscout'` tries Blockscout first to save Etherscan quota; `'alchemy'` tries Alchemy first (Base, where it is the only free one, or to spend Alchemy CU instead of Etherscan calls). |
 | `timeoutMs` | 15 000 | Per request (`AbortSignal.timeout` when the runtime has it). |
 

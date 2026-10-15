@@ -52,7 +52,7 @@ export interface EvmHistoryOptions {
   etherscanCompatUrl?: string | null
   /** Fetch implementation; defaults to `globalThis.fetch`. */
   fetch?: FetchLike
-  /** Etherscan requests per second for this key. Default 5 with a key, 1 without. Shared by every source using the same key. */
+  /** Etherscan requests per second for this key. Default 3 (the free tier's limit; Lite 5, Standard 10). Shared by every source using the same key — 25 chains do not multiply it. */
   rateLimit?: number
   /** Try Blockscout (or Alchemy) before Etherscan when both exist (saves Etherscan quota / the only free source on Base). Default: Etherscan first. */
   prefer?: 'etherscan' | 'blockscout' | 'alchemy'

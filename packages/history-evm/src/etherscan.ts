@@ -54,11 +54,12 @@ export class EtherscanClient {
     return `${this.o.baseUrl}${this.o.baseUrl.includes('?') ? '&' : '?'}${query(all)}`
   }
 
-  /** One API call with the limiter, one retry on rate limiting; classified failures. */
+  /** One API call with the limiter; rate-limit answers are retried with a backoff (free Etherscan keys count 3 calls per wall-clock second); classified failures. */
   async call(params: Record<string, string | number | undefined>): Promise<unknown> {
     const url = this.url(params)
     let lastRate: ExplorerError | undefined
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 1100 * attempt))
       await this.o.bucket.acquire()
       const res = await fetchJson(this.o.fetch, this.backend, url, this.o.timeoutMs)
       if (res.status === 429 || res.status >= 500) {
