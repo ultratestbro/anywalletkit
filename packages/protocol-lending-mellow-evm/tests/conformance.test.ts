@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describeProtocolModule, type ActivityFixtureJson } from '@forgewallet/conformance'
-import MellowProtocolEvm from '../index.js'
+import MellowProtocolEvm from '../src/index.js'
 
 const dir = fileURLToPath(new URL('../fixtures/activity/', import.meta.url))
 const load = (sub: string): ActivityFixtureJson[] =>

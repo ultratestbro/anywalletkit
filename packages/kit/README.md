@@ -26,8 +26,13 @@ const lido = await wallet.getProtocol<LidoProtocolEvm>('lido')
 wallet.dispose()                                          // zeroizes every chain's keys
 ```
 
-Policies run before anything is broadcast, in this order: fee cap (quotes first),
-allowlist, blocklist, `confirm`. Reads and offline signing are never intercepted.
+Policies run before anything is signed or broadcast, in this order: fee cap
+(quotes first, where the account can quote), allowlist, blocklist, `confirm`.
+Every write surface of an account is covered — `sendTransaction`, `transfer`,
+`signTransaction` (a module that signs and broadcasts on its own cannot skip
+them), `sign` (message signatures: `confirm` only, nothing moves) and
+chain-specific ones such as Solana's `sendSerialized`. Reads are never
+intercepted.
 
 ## Activity history
 

@@ -2,7 +2,7 @@
 // and a stake-calldata simulation via eth_call. No keys, no writes.
 //
 //   node scripts/verify-live.mjs [address] [rpcUrl]
-import LidoProtocolEvm from '../index.js'
+import LidoProtocolEvm from '../dist/index.js'
 
 const address = process.argv[2] ?? '0x8abe813577e47415a3cd0bbc68c7abca2c4c55ba'
 const rpc = process.argv[3] ?? process.env.LIVE_RPC ?? 'https://ethereum-rpc.publicnode.com'
@@ -37,8 +37,9 @@ console.log(`reward history: ${history.length} events${history[0] ? `, latest ${
 
 // Prove the stake transaction the module would broadcast actually executes:
 // eth_call it from an ETH-rich address (the beacon deposit contract).
+// (`_provider` is the module's viem public client; `call` takes `account` and answers `{ data }`.)
 const tx = await protocol._getStakeTransaction(10n ** 15n)
-const out = await protocol._provider.call({ ...tx, from: '0x00000000219ab540356cBB839Cbe05303d7705Fa' })
+const { data: out } = await protocol._provider.call({ ...tx, account: '0x00000000219ab540356cBB839Cbe05303d7705Fa' })
 console.log(`stake eth_call: ok, shares=${BigInt(out)}`)
 
 console.log('LIVE VERIFY PASSED')

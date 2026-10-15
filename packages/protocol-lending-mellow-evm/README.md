@@ -124,10 +124,14 @@ new MellowProtocolEvm(account, {
 - `withdraw` amounts are shares, the only unit known before the report; the
   quoted payout is an estimate at the latest report, after the redeem fee.
 
-## Tests
+## Build and tests
+
+TypeScript, built with `tsup` to `dist/` (ESM + CJS + types); one runtime
+dependency (viem) for the RPC client and ABI coding.
 
 ```
-npm test               # unit tests over a stubbed EIP-1193 provider (selectors of the real contracts)
+npm run build          # tsup → dist/
+npm test               # vitest: unit tests over a stubbed EIP-1193 provider (selectors of the real contracts) + conformance
 npm run verify:live    # on-chain discovery vs. the known Lido deployments, position reads, eth_call proofs — no keys
 ```
 

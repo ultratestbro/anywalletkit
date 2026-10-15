@@ -12,7 +12,7 @@ Supported on evm: ERC-20 allowances, ERC-721 per-token approvals, ERC-721 / ERC-
 npm install @forgewallet/protocol-approvals-evm
 ```
 
-Peer: `@forgewallet/core >= 1.0.0-beta.13`. Runtime dependency: `ethers` v6. Works on Node 18+, Bare (`bare.js` export) and React Native.
+Peer: `@forgewallet/core >= 1.0.0-beta.13`. Runtime dependency: `viem`. Built with tsup (ESM + CJS + types in `dist/`); works on Node 20+ and React Native.
 
 ## Usage
 
@@ -124,7 +124,8 @@ Errors are `ApprovalsError` with `reason` ∈ `account-required`, `provider-requ
 ## Verification
 
 ```bash
-npm test                                                             # 17 tests on an EIP-1193 double
+pnpm test                                                            # vitest: 17 tests on an EIP-1193 double + the conformance suite
+pnpm build && node scripts/verify-live.mjs …                        # the live script imports dist/
 node scripts/verify-live.mjs 0x… https://rpc --chain 1 --range 10000 --from 22000000 [--include-zero]
 LIVE_PK=0x… node scripts/verify-live.mjs 0x… https://rpc --revoke <approval id>   # real revoke + re-check
 ```
