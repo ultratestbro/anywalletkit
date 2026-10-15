@@ -1,19 +1,36 @@
-import { UserRejectedError, type IWalletAccount, type TransferOptions, type TransferResult } from '@forgewallet/core'
+import { UserRejectedError, type IWalletAccount, type TransferOptions } from '@forgewallet/core'
+
+/**
+ * Account methods the policies guard. Everything that produces a signature or
+ * a broadcast: the `IWalletAccount` contract (`sendTransaction`, `transfer`,
+ * `signTransaction`, `sign`) plus the chain-specific write surfaces an account
+ * may add (Solana's `sendSerialized` / `signCompiled` /
+ * `signTransactionMessage`). A module that signs and broadcasts by itself
+ * still passes through here, because it can only do so through the account.
+ */
+export type WriteMethod = 'sendTransaction' | 'transfer' | 'signTransaction' | 'sign' | 'sendSerialized' | 'signCompiled' | 'signTransactionMessage'
+
+export const GUARDED_WRITES: readonly WriteMethod[] = ['sendTransaction', 'transfer', 'signTransaction', 'sign', 'sendSerialized', 'signCompiled', 'signTransactionMessage']
+
+/** Methods whose fee the account can quote up front (`maxFee` applies). */
+const QUOTABLE: readonly WriteMethod[] = ['sendTransaction', 'transfer', 'signTransaction']
 
 /** What a policy sees before a write goes out. Amounts in base units of the chain's native token when known. */
 export interface WriteIntent {
   chain: string
   /** Account address the write originates from. */
   from: string
-  method: 'sendTransaction' | 'transfer'
+  method: WriteMethod
   /** Destination when it can be read off the call (`to` / `recipient`). */
   to?: string
   /** Token identifier for token transfers; undefined = native. */
   token?: string
   /** Amount when it can be read off the call. */
   amount?: bigint
-  /** The raw argument, for policies that need more. */
+  /** The raw argument (first argument of the call), for policies that need more. */
   raw: unknown
+  /** `sign` is a message signature: nothing moves, allow/block lists do not apply, only `confirm`. */
+  message: boolean
 }
 
 export interface Policies {
@@ -38,53 +55,61 @@ export class PolicyViolationError extends Error {
 
 const lower = (s: string | undefined) => s?.toLowerCase()
 
-function intentOf(chain: string, from: string, method: WriteIntent['method'], arg: unknown): WriteIntent {
-  const a = (arg ?? {}) as Record<string, unknown>
+function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown): WriteIntent {
+  const a = (typeof arg === 'object' && arg !== null ? arg : {}) as Record<string, unknown>
   const to = typeof a.to === 'string' ? a.to : typeof a.recipient === 'string' ? a.recipient : undefined
   const rawAmount = a.amount ?? a.value
-  const amount = typeof rawAmount === 'bigint' ? rawAmount : typeof rawAmount === 'number' || typeof rawAmount === 'string' ? BigInt(rawAmount) : undefined
-  return { chain, from, method, ...(to !== undefined ? { to } : {}), ...(typeof a.token === 'string' ? { token: a.token } : {}), ...(amount !== undefined ? { amount } : {}), raw: arg }
+  const amount = typeof rawAmount === 'bigint' ? rawAmount : typeof rawAmount === 'number' || (typeof rawAmount === 'string' && /^\d+$/.test(rawAmount)) ? BigInt(rawAmount) : undefined
+  return { chain, from, method, ...(to !== undefined ? { to } : {}), ...(typeof a.token === 'string' ? { token: a.token } : {}), ...(amount !== undefined ? { amount } : {}), raw: arg, message: method === 'sign' }
 }
 
 /**
- * Wrap an account so every write passes the policies first. Reads and signing
- * are untouched; `sendTransaction` and `transfer` become: quote → fee cap →
- * allow/block lists → confirm → original call.
+ * Wrap an account so every write passes the policies first. Reads are
+ * untouched; every method in {@link GUARDED_WRITES} that the account has
+ * becomes: quote → fee cap (where the account can quote) → allow/block lists
+ * (not for message signatures) → confirm → original call. `signTransaction`
+ * is guarded like a send: a module that signs and broadcasts on its own
+ * cannot skip the policies.
  */
 export function applyPolicies<A extends IWalletAccount>(account: A, policies: Policies): A {
-  const guard = async (method: WriteIntent['method'], arg: unknown, quote: () => Promise<{ fee: bigint }>) => {
+  const guard = async (method: WriteMethod, arg: unknown) => {
     const intent = intentOf(account.chain, await account.getAddress(), method, arg)
     const cap = policies.maxFee?.[account.chain]
-    if (cap !== undefined) {
-      const { fee } = await quote()
+    if (cap !== undefined && QUOTABLE.includes(method)) {
+      const { fee } = method === 'transfer' ? await account.quoteTransfer(arg as TransferOptions) : await account.quoteSendTransaction(arg)
       if (fee > BigInt(cap)) throw new PolicyViolationError('maxFee', `Fee ${fee} exceeds the ${account.chain} cap of ${cap}.`)
     }
-    const allow = policies.allowlist?.[account.chain]
-    if (allow && (intent.to === undefined || !allow.map(lower).includes(lower(intent.to)))) {
-      throw new PolicyViolationError('allowlist', `Destination ${intent.to ?? '(unknown)'} is not on the ${account.chain} allowlist.`)
-    }
-    const block = policies.blocklist?.[account.chain]
-    if (block && intent.to !== undefined && block.map(lower).includes(lower(intent.to))) {
-      throw new PolicyViolationError('blocklist', `Destination ${intent.to} is on the ${account.chain} blocklist.`)
+    if (!intent.message) {
+      const allow = policies.allowlist?.[account.chain]
+      if (allow && (intent.to === undefined || !allow.map(lower).includes(lower(intent.to)))) {
+        throw new PolicyViolationError('allowlist', `Destination ${intent.to ?? '(unknown)'} is not on the ${account.chain} allowlist.`)
+      }
+      const block = policies.blocklist?.[account.chain]
+      if (block && intent.to !== undefined && block.map(lower).includes(lower(intent.to))) {
+        throw new PolicyViolationError('blocklist', `Destination ${intent.to} is on the ${account.chain} blocklist.`)
+      }
     }
     if (policies.confirm && !(await policies.confirm(intent))) throw new UserRejectedError('The write was not confirmed.')
   }
+  const wrapped = new Map<WriteMethod, (...args: unknown[]) => Promise<unknown>>()
   return new Proxy(account, {
     get(target, prop, receiver) {
-      if (prop === 'sendTransaction') {
-        return async (tx: unknown): Promise<TransferResult> => {
-          await guard('sendTransaction', tx, () => target.quoteSendTransaction(tx))
-          return target.sendTransaction(tx)
-        }
-      }
-      if (prop === 'transfer') {
-        return async (o: TransferOptions): Promise<TransferResult> => {
-          await guard('transfer', o, () => target.quoteTransfer(o))
-          return target.transfer(o)
-        }
-      }
       const v = Reflect.get(target, prop, receiver)
-      return typeof v === 'function' ? v.bind(target) : v
+      if (typeof v !== 'function') return v
+      if (typeof prop === 'string' && (GUARDED_WRITES as readonly string[]).includes(prop)) {
+        const method = prop as WriteMethod
+        let fn = wrapped.get(method)
+        if (!fn) {
+          const original = v as (...args: unknown[]) => Promise<unknown>
+          fn = async (...args: unknown[]) => {
+            await guard(method, args[0])
+            return original.apply(target, args)
+          }
+          wrapped.set(method, fn)
+        }
+        return fn
+      }
+      return v.bind(target)
     },
   })
 }
