@@ -44,8 +44,8 @@ export interface EvmHistoryOptions {
   alchemyNetwork?: string
   /** Override the Alchemy host template; `{network}` and `{key}` are substituted. Default `https://{network}.g.alchemy.com/v2/{key}`. */
   alchemyUrl?: string
-  /** Alchemy requests per second (HTTP calls, a batch counts once). Default 5, shared per key across chains. */
-  alchemyRateLimit?: number
+  /** Alchemy compute units per second, shared per key across every chain (a batch costs the sum of its calls). Default 300 — the free tier's 500 CU/s with headroom. */
+  alchemyComputeUnitsPerSecond?: number
   /** Blockscout instance root (`https://eth.blockscout.com`). Overrides / adds to the built-in table; `null` disables the built-in entry. */
   blockscoutUrl?: string | null
   /** Keyless Etherscan-format endpoint (Routescan style). Overrides / adds to the built-in table; `null` disables the built-in entry. */

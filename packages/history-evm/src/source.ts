@@ -144,7 +144,7 @@ export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
             urlTemplate: options.alchemyUrl ?? ALCHEMY_URL_TEMPLATE,
             internal: ALCHEMY_INTERNAL_CHAIN_IDS.includes(chainId),
             fetch: fetchFn,
-            bucket: sharedBucket(`alchemy:${apiKey}`, options.alchemyRateLimit ?? 5),
+            bucket: sharedBucket(`alchemy:${apiKey}`, options.alchemyComputeUnitsPerSecond ?? 300),
             timeoutMs,
           }),
         )

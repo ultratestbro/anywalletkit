@@ -35,7 +35,7 @@ beforeEach(() => {
   resetSharedBuckets()
 })
 
-const base = (fetch: ReturnType<typeof fakeFetch>) => createEvmHistory({ chainId: 8453, alchemyApiKey: 'alch_test', fetch, alchemyRateLimit: 1000 })
+const base = (fetch: ReturnType<typeof fakeFetch>) => createEvmHistory({ chainId: 8453, alchemyApiKey: 'alch_test', fetch, alchemyComputeUnitsPerSecond: 1000000 })
 
 describe('Alchemy backend: requests', () => {
   it('asks both directions with external+erc20+internal on Base, desc, metadata, maxCount = limit, zero values included', async () => {
@@ -61,22 +61,22 @@ describe('Alchemy backend: requests', () => {
 
   it('omits the internal category where Alchemy does not support it (Arbitrum) and honours alchemyNetwork / alchemyUrl', async () => {
     const fetch = fakeFetch()
-    const src = createEvmHistory({ chainId: 42161, alchemyApiKey: 'k', fetch, alchemyRateLimit: 1000, alchemyNetwork: 'arb-custom', alchemyUrl: 'https://proxy.example/{network}/{key}' })
+    const src = createEvmHistory({ chainId: 42161, alchemyApiKey: 'k', fetch, alchemyComputeUnitsPerSecond: 1000000, alchemyNetwork: 'arb-custom', alchemyUrl: 'https://proxy.example/{network}/{key}' })
     await src.listActivity(ADDRESS, { limit: 5 })
     const p = (fetch.alchemyBodies[0] as { params: Record<string, unknown>[] }).params[0]!
     expect(p['category']).toEqual(['external', 'erc20'])
     expect(fetch.calls[0]!.url).toBe('https://proxy.example/arb-custom/k')
   })
 
-  it('fetches tx + receipt for every unique hash of the page in JSON-RPC batches of at most 20', async () => {
+  it('fetches tx + receipt for every unique hash of the page in JSON-RPC batches of at most 10', async () => {
     const fetch = fakeFetch()
     const page = await base(fetch).listActivity(ADDRESS, { limit: 50 })
     const batches = fetch.alchemyBodies.filter((b): b is unknown[] => Array.isArray(b))
     expect(page.items).toHaveLength(36) // 20 + 20 transfers → 36 distinct hashes
-    expect(batches.map((b) => b.length)).toEqual([20, 20, 20, 12])
+    expect(batches.map((b) => b.length)).toEqual([10, 10, 10, 10, 10, 10, 10, 2])
     const methods = new Set(batches.flat().map((r) => (r as { method: string }).method))
     expect([...methods].sort()).toEqual(['eth_getTransactionByHash', 'eth_getTransactionReceipt'])
-    expect(fetch.alchemyCalls).toBe(2 + 4)
+    expect(fetch.alchemyCalls).toBe(2 + 8)
   })
 })
 
@@ -236,7 +236,7 @@ describe('Alchemy backend: pagination', () => {
     expect(p1.backend).toBe('etherscan')
     const broken = fakeFetch({ etherscanIntercept: () => ({ status: '0', message: 'NOTOK', result: 'Free API access is not supported for this chain' }) })
     resetEtherscanChainlistCache()
-    const second = createEvmHistory({ chainId: 1, etherscanApiKey: 'k', alchemyApiKey: 'a', fetch: broken, rateLimit: 1000, alchemyRateLimit: 1000, etherscanCompatUrl: null, blockscoutUrl: null })
+    const second = createEvmHistory({ chainId: 1, etherscanApiKey: 'k', alchemyApiKey: 'a', fetch: broken, rateLimit: 1000, alchemyComputeUnitsPerSecond: 1000000, etherscanCompatUrl: null, blockscoutUrl: null })
     const p2 = await second.listActivity(ADDRESS, { limit: 10, cursor: p1.cursor! })
     expect(p2.backend).toBe('alchemy')
     const w = decodeCursor(p1.cursor!).w!
@@ -248,7 +248,7 @@ describe('Alchemy backend: pagination', () => {
 describe('Alchemy backend: failures and ordering', () => {
   it('"<NETWORK> is not enabled for this app" (HTTP 403) is unavailable: no retry, next backend', async () => {
     const fetch = fakeFetch({ alchemyNotEnabled: true })
-    const src = createEvmHistory({ chainId: 8453, alchemyApiKey: 'k', fetch, alchemyRateLimit: 1000, blockscoutUrl: 'https://bs.example' })
+    const src = createEvmHistory({ chainId: 8453, alchemyApiKey: 'k', fetch, alchemyComputeUnitsPerSecond: 1000000, blockscoutUrl: 'https://bs.example' })
     const page = await src.listActivity(ADDRESS, { limit: 5 })
     expect(page.backend).toBe('blockscout')
     expect(fetch.alchemyCalls).toBe(1)
@@ -256,18 +256,34 @@ describe('Alchemy backend: failures and ordering', () => {
 
   it('…and the reason is reported when nothing else is left', async () => {
     const fetch = fakeFetch({ alchemyNotEnabled: true })
-    const src = createEvmHistory({ chainId: 56, alchemyApiKey: 'k', fetch, alchemyRateLimit: 1000 })
+    const src = createEvmHistory({ chainId: 56, alchemyApiKey: 'k', fetch, alchemyComputeUnitsPerSecond: 1000000 })
     const err = (await src.listActivity(ADDRESS).catch((e: unknown) => e)) as HistoryUnavailableError
     expect(err).toBeInstanceOf(HistoryUnavailableError)
     expect(err.attempts).toEqual([expect.stringMatching(/^alchemy: .*BNB_MAINNET is not enabled for this app/)])
   })
 
-  it('HTTP 429 is retried once through the limiter, then served', async () => {
+  it('HTTP 429 is retried through the limiter, then served', async () => {
     const fetch = fakeFetch({ alchemyIntercept: (_b, n) => (n === 1 ? { status: 429, body: { error: 'Too Many Requests' } } : undefined) })
     const page = await base(fetch).listActivity(ADDRESS, { limit: 5 })
     expect(page.backend).toBe('alchemy')
-    expect(fetch.alchemyCalls).toBe(2 + 1 + 1) // from (429) + retry + to + one batch
+    expect(fetch.alchemyCalls).toBe(2 + 1 + 2) // from (429) + retry + to + two batches
   })
+
+  it('a 200 "exceeded its compute units per second capacity" answer is retried with backoff until served', async () => {
+    const cu = { error: { code: 429, message: 'Your app has exceeded its compute units per second capacity. If you have retries enabled, you can safely ignore this message.' } }
+    const fetch = fakeFetch({ alchemyIntercept: (_b, n) => (n <= 3 ? { status: 200, body: { jsonrpc: '2.0', id: 1, ...cu } } : undefined) })
+    const page = await base(fetch).listActivity(ADDRESS, { limit: 5 })
+    expect(page.backend).toBe('alchemy')
+    expect(fetch.alchemyCalls).toBe(3 + 1 + 1 + 2) // from ×3 refused + served + to + two batches
+  }, 15_000)
+
+  it('a rate limit that never clears gives up after four attempts', async () => {
+    const fetch = fakeFetch({ alchemyIntercept: () => ({ status: 429, body: { error: 'Too Many Requests' } }) })
+    const src = createEvmHistory({ chainId: 56, alchemyApiKey: 'k', fetch, alchemyComputeUnitsPerSecond: 1000000 })
+    const err = (await src.listActivity(ADDRESS).catch((e: unknown) => e)) as HistoryUnavailableError
+    expect(err).toBeInstanceOf(HistoryUnavailableError)
+    expect(fetch.alchemyCalls).toBe(4)
+  }, 15_000)
 
   it('a JSON-RPC 401 "Must be authenticated" and a 400 malformed answer are not retried', async () => {
     for (const [status, body] of [
@@ -276,7 +292,7 @@ describe('Alchemy backend: failures and ordering', () => {
     ] as const) {
       resetSharedBuckets()
       const fetch = fakeFetch({ alchemyIntercept: () => ({ status, body }) })
-      const src = createEvmHistory({ chainId: 8453, alchemyApiKey: 'k', fetch, alchemyRateLimit: 1000, blockscoutUrl: 'https://bs.example' })
+      const src = createEvmHistory({ chainId: 8453, alchemyApiKey: 'k', fetch, alchemyComputeUnitsPerSecond: 1000000, blockscoutUrl: 'https://bs.example' })
       const page = await src.listActivity(ADDRESS, { limit: 5 })
       expect(page.backend).toBe('blockscout')
       expect(fetch.alchemyCalls).toBe(1)
@@ -285,7 +301,7 @@ describe('Alchemy backend: failures and ordering', () => {
 
   it('default order: etherscan → blockscout-pro → alchemy → routescan → blockscout; prefer: "alchemy" moves it first', async () => {
     const fetch = fakeFetch()
-    const all = { chainId: 1, etherscanApiKey: 'e', blockscoutProApiKey: 'p', alchemyApiKey: 'a', fetch, rateLimit: 1000, blockscoutProRateLimit: 1000, alchemyRateLimit: 1000 } as const
+    const all = { chainId: 1, etherscanApiKey: 'e', blockscoutProApiKey: 'p', alchemyApiKey: 'a', fetch, rateLimit: 1000, blockscoutProRateLimit: 1000, alchemyComputeUnitsPerSecond: 1000000 } as const
     const p = await createEvmHistory(all).listActivity(ADDRESS, { limit: 5 })
     expect(p.backend).toBe('etherscan')
     expect(fetch.alchemyCalls).toBe(0)
@@ -307,7 +323,7 @@ describe('Alchemy backend: failures and ordering', () => {
 
   it('Base with only an Alchemy key is served (the chain that has no other free source)', async () => {
     const fetch = fakeFetch()
-    const page = await createEvmHistory({ chainId: 8453, alchemyApiKey: 'k', fetch, alchemyRateLimit: 1000 }).listActivity(ADDRESS, { limit: 5 })
+    const page = await createEvmHistory({ chainId: 8453, alchemyApiKey: 'k', fetch, alchemyComputeUnitsPerSecond: 1000000 }).listActivity(ADDRESS, { limit: 5 })
     expect(page.backend).toBe('alchemy')
   })
 
@@ -315,7 +331,7 @@ describe('Alchemy backend: failures and ordering', () => {
     const fetch = fakeFetch()
     await expect(createEvmHistory({ chainId: 146, alchemyApiKey: 'k', fetch }).listActivity(ADDRESS)).rejects.toThrow(/Transfers API is not documented.*alchemyNetwork/)
     expect(fetch.alchemyCalls).toBe(0)
-    const forced = await createEvmHistory({ chainId: 146, alchemyApiKey: 'k', fetch, alchemyNetwork: 'sonic-mainnet', alchemyRateLimit: 1000 }).listActivity(ADDRESS, { limit: 5 })
+    const forced = await createEvmHistory({ chainId: 146, alchemyApiKey: 'k', fetch, alchemyNetwork: 'sonic-mainnet', alchemyComputeUnitsPerSecond: 1000000 }).listActivity(ADDRESS, { limit: 5 })
     expect(forced.backend).toBe('alchemy')
     expect(fetch.calls[0]!.url).toBe('https://sonic-mainnet.g.alchemy.com/v2/k')
   })
@@ -326,7 +342,7 @@ describe('Alchemy backend: failures and ordering', () => {
     expect(quiet.items).toEqual([])
     expect(quiet.note).toMatch(/no public explorer API/)
     expect(fetch.calls).toHaveLength(0)
-    const forced = await createEvmHistory({ chainId: 196, alchemyApiKey: 'k', fetch, alchemyNetwork: 'xlayer-mainnet', alchemyRateLimit: 1000 }).listActivity(ADDRESS, { limit: 5 })
+    const forced = await createEvmHistory({ chainId: 196, alchemyApiKey: 'k', fetch, alchemyNetwork: 'xlayer-mainnet', alchemyComputeUnitsPerSecond: 1000000 }).listActivity(ADDRESS, { limit: 5 })
     expect(forced.backend).toBe('alchemy')
   })
 })

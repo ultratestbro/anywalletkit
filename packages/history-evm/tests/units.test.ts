@@ -81,6 +81,24 @@ describe('rate limiter', () => {
     expect(done[6]).toBe(400)
   })
 
+  it('charges weighted costs (compute units): a 250-unit call after a 200-unit one waits for the refill', async () => {
+    const b = new TokenBucket(300)
+    const done: number[] = []
+    const t0 = Date.now()
+    const all = Promise.all([200, 250].map((c) => b.acquire(c).then(() => done.push(Date.now() - t0))))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(done).toEqual([0])
+    await vi.advanceTimersByTimeAsync(500)
+    await all
+    expect(done).toEqual([0, 500]) // 100 left, 150 more at 300/s = 500 ms
+  })
+
+  it('clamps a cost above the burst so it still goes through', async () => {
+    const b = new TokenBucket(10)
+    await b.acquire(1_000)
+    expect(true).toBe(true)
+  })
+
   it('refills while idle', async () => {
     const b = new TokenBucket(2)
     await b.acquire()

@@ -18,8 +18,10 @@ export class TokenBucket {
     this.last = Date.now()
   }
 
-  acquire(): Promise<void> {
-    const next = this.chain.then(() => this.take())
+  /** Wait for `cost` tokens (default 1; clamped to the burst so one oversized call cannot wait forever). */
+  acquire(cost = 1): Promise<void> {
+    const n = Math.min(this.burst, Math.max(0, cost))
+    const next = this.chain.then(() => this.take(n))
     this.chain = next.catch(() => undefined)
     return next
   }
@@ -30,16 +32,16 @@ export class TokenBucket {
     this.last = now
   }
 
-  private async take(): Promise<void> {
+  private async take(n: number): Promise<void> {
     this.refill()
-    if (this.tokens >= 1) {
-      this.tokens -= 1
+    if (this.tokens >= n) {
+      this.tokens -= n
       return
     }
-    const waitMs = Math.ceil(((1 - this.tokens) / this.rate) * 1000)
+    const waitMs = Math.ceil(((n - this.tokens) / this.rate) * 1000)
     await sleep(waitMs)
     this.refill()
-    this.tokens = Math.max(0, this.tokens - 1)
+    this.tokens = Math.max(0, this.tokens - n)
   }
 }
 

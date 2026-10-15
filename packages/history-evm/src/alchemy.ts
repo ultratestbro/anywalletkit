@@ -1,7 +1,7 @@
 import { ExplorerError } from './errors.js'
 import { postJson } from './http.js'
 import type { ListPage, ListSpec } from './paginate.js'
-import type { TokenBucket } from './rate-limit.js'
+import { sleep, type TokenBucket } from './rate-limit.js'
 import { parseReceiptTransfers, txRowFromRpc } from './rpc-rows.js'
 import { parseBig, parseInt10, parseIsoSeconds, type ExplorerRows, type InternalRow, type TokenRow, type TxRow } from './rows.js'
 import type { FetchLike } from './types.js'
@@ -71,7 +71,24 @@ export interface AlchemyTransfer {
 const CATEGORIES = ['external', 'erc20'] as const
 
 /** Requests per JSON-RPC batch (Alchemy accepts far more; 20 keeps answers small and retries cheap). */
-const BATCH_SIZE = 20
+const BATCH_SIZE = 10
+/**
+ * Alchemy meters throughput in compute units per second, not HTTP calls: a
+ * batch costs the sum of its members. Published per-method costs; anything
+ * unlisted is charged the generic 26.
+ */
+const COMPUTE_UNITS: Readonly<Record<string, number>> = {
+  alchemy_getAssetTransfers: 120,
+  eth_getTransactionReceipt: 20,
+  eth_getTransactionByHash: 17,
+  eth_getBlockByNumber: 16,
+  eth_blockNumber: 10,
+}
+const DEFAULT_COMPUTE_UNITS = 26
+const costOf = (body: unknown): number =>
+  (Array.isArray(body) ? body : [body]).reduce<number>((sum, r) => sum + (COMPUTE_UNITS[String((r as { method?: unknown })?.method)] ?? DEFAULT_COMPUTE_UNITS), 0)
+/** Rate-limit answers are retried this many times in total, with exponential backoff. */
+const MAX_ATTEMPTS = 4
 
 const UNAVAILABLE_PATTERNS = [/not enabled for this app/i, /unauthorized/i, /invalid api key/i, /forbidden/i, /must be authenticated/i, /not supported/i, /unsupported method/i, /method not found/i, /does not exist/i]
 const RATE_LIMIT_PATTERNS = [/rate limit/i, /too many requests/i, /throughput/i, /capacity/i, /compute units? per second/i]
@@ -95,14 +112,18 @@ export class AlchemyClient {
   }
 
   /**
-   * POST a JSON-RPC body (single or batch) with the limiter; one retry on 429 /
-   * 5xx / rate-limit answers; key / plan refusals and "network not enabled"
+   * POST a JSON-RPC body (single or batch) with the limiter; up to three retries with
+   * backoff on 429 / 5xx / rate-limit answers (the bucket is charged in compute
+   * units); key / plan refusals and "network not enabled"
    * are `unavailable` (no retry, the source falls through).
    */
   private async post(body: unknown): Promise<unknown> {
     let retry: ExplorerError | undefined
-    for (let attempt = 0; attempt < 2; attempt++) {
-      await this.o.bucket.acquire()
+    const cost = costOf(body)
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      // Backoff before a retry: 0.5 s, 1 s, 2 s (+ jitter so concurrent chains do not retry in lockstep).
+      if (attempt > 0) await sleep(500 * 2 ** (attempt - 1) + Math.floor(Math.random() * 250))
+      await this.o.bucket.acquire(cost)
       const res = await postJson(this.o.fetch, this.backend, this.url, body, this.o.timeoutMs)
       const envelope = res.body as RpcResponse | RpcResponse[] | undefined
       // Transport-level failures first: 429 / 5xx retry once, 401 / 403 fall through.
@@ -194,7 +215,7 @@ export class AlchemyClient {
    * are de-duplicated by `uniqueId` (a self-transfer, or a swap whose legs sit
    * in both lists, appears twice), grouped by hash, and every unique hash gets
    * `eth_getTransactionByHash` + `eth_getTransactionReceipt` in one batch
-   * (≤ 20 requests per HTTP call, one retry). `erc20` rows → token rows,
+   * (≤ 10 requests per HTTP call, retried on rate limits). `erc20` rows → token rows,
    * `internal` rows → internal rows, `external` rows are the transaction's own
    * value and are already covered by the tx row (no second native transfer);
    * only when the node has no tx (dropped / reorged) is the external row
