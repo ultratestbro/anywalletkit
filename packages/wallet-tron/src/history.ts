@@ -44,6 +44,8 @@ export interface TronHistoryRaw {
   trc20: unknown[]
   /** `/wallet/gettransactioninfobyid` (single-transaction reads only). */
   info?: unknown
+  spam?: true
+  spamReason?: string
 }
 
 export interface TronChainTx extends ChainTx {
@@ -251,7 +253,8 @@ export function mapTransactionRow(chain: string, address: string, tx: TronGridTx
       to = b58(v.to_address) ?? null
       const asset = typeof v.asset_name === 'string' ? v.asset_name : undefined
       const amount = big(v.amount)
-      if (to && asset && amount > 0n) transfers.push({ token: asset, from: owner, to, amount })
+      // TRC-10 assets are known only by numeric id here (no symbol / decimals without getassetissuebyid); the amount is raw units.
+      if (to && asset && amount > 0n) transfers.push({ token: asset, from: owner, to, amount, symbol: `TRC-10 #${asset}`, decimals: 0 })
       break
     }
     case 'TriggerSmartContract': {
@@ -307,6 +310,8 @@ export function mapTransactionRow(chain: string, address: string, tx: TronGridTx
   const ts = tx.block_timestamp ?? extra.info?.blockTimeStamp ?? tx.raw_data.timestamp
   const blockNumber = tx.blockNumber ?? extra.info?.blockNumber
   const raw: TronHistoryRaw = { tx, trc20 }
+  // Unsolicited TRC-10 airdrops (the sender is a stranger, the asset a numeric id) are the chain's spam channel.
+  if (contract?.type === 'TransferAssetContract' && owner !== address && to === address) { raw.spam = true; raw.spamReason = 'trc10-airdrop' }
   if (extra.info) raw.info = extra.info
   const out: TronChainTx = { chain, hash: tx.txID, time: ts ? Math.floor(ts / 1000) : 0, status, address, from: owner, to: call?.to ?? to, nativeValue, transfers, raw }
   if (feeNum !== undefined) out.fee = BigInt(Math.trunc(feeNum))

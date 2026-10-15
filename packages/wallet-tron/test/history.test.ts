@@ -96,7 +96,8 @@ describe('createTronHistory: pages', () => {
     expect(out.time).toBe(1_791_576_861)
     expect(out.call).toBeUndefined()
     const trc10 = page.items.find((i) => i.hash.startsWith('a6ab67aeef39'))!
-    expect(trc10.transfers).toEqual([{ token: '1005114', from: toBase58Address('41afcee3a50b422fbbdb78935c242980b36f6e4a09'), to: WALLET, amount: 8_888n }])
+    expect(trc10.transfers).toEqual([{ token: '1005114', from: toBase58Address('41afcee3a50b422fbbdb78935c242980b36f6e4a09'), to: WALLET, amount: 8_888n, symbol: 'TRC-10 #1005114', decimals: 0 }])
+    expect(trc10.raw.spam, 'an inbound TRC-10 from a stranger is flagged as an airdrop').toBe(true)
     expect(trc10.nativeValue).toBe(0n)
     expect(trc10.fee).toBe(0n)
     const inbound = page.items.find((i) => i.hash.startsWith('43ef38813a2f'))!

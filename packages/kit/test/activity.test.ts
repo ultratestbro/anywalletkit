@@ -123,12 +123,12 @@ describe('describeGeneric', () => {
     expect(item.title).toBe('Revoked USDC for 0x0000…8ba3')
     expect(item.approval?.amount).toBe(0n)
   })
-  it('contract: any other call by the owner, subtitle from the known-label table or the short address, amounts attached', () => {
+  it('swap: a call by the owner that paid one asset and received another (unknown router) reads as a swap', () => {
     const router = '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD'
     const t = tx(BASE, 100, { to: router, call: { to: router, selector: '0x3593564c' }, nativeValue: 10n, transfers: [native(OWN, router, 10n), erc20(USDC_BASE, router, OWN, 25n)] })
     const labelled = describeGeneric(t, ctx, { known: { [BASE]: { [router]: 'Uniswap Universal Router' } } })
-    expect(labelled.kind).toBe('contract')
-    expect(labelled.title).toBe('Contract call')
+    expect(labelled.kind).toBe('swap')
+    expect(labelled.title).toBe('Swapped ETH → USDC')
     expect(labelled.subtitle).toBe('Uniswap Universal Router')
     expect(labelled.counterparty).toBe(router)
     expect(labelled.assetsOut).toEqual([{ token: null, amount: 10n, symbol: 'ETH', decimals: 18 }])

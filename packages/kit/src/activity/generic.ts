@@ -68,11 +68,23 @@ const NAMESPACE_NATIVES: Readonly<Record<string, NativeAsset>> = Object.freeze({
   bip122: { symbol: 'BTC', decimals: 8 }, bitcoin: { symbol: 'BTC', decimals: 8 }, near: { symbol: 'NEAR', decimals: 24 }, ton: { symbol: 'GRAM', decimals: 9 },
 })
 
+/**
+ * The wallet packages name non-EVM chains by genesis hash (CAIP-2 proper); the swap2-assets catalog
+ * and most apps use the short ids. Map the former to the latter for catalog lookups and labels.
+ */
+export const CHAIN_ALIASES: Readonly<Record<string, string>> = Object.freeze({
+  'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp': 'solana:mainnet',
+  'tron:0x2b6653dc': 'tron:728126428',
+  'bip122:000000000019d6689c085ae165831e93': 'bitcoin:mainnet',
+})
+/** The catalog's id for `chain` (itself when no alias exists). */
+export const catalogChain = (chain: string): string => CHAIN_ALIASES[chain] ?? chain
+
 /** The native coin of `chain`: options → built-in table → swap2-assets catalog → namespace default. */
 export function nativeOf(chain: string, opts: GenericDescribeOptions = {}): NativeAsset {
-  const o = opts.natives?.[chain] ?? DEFAULT_NATIVES[chain]
+  const o = opts.natives?.[chain] ?? opts.natives?.[catalogChain(chain)] ?? DEFAULT_NATIVES[chain]
   if (o) return o
-  const cat = ccAssetByToken(chain, '')
+  const cat = ccAssetByToken(catalogChain(chain), '')
   if (cat) return { symbol: cat.symbol, decimals: cat.decimals }
   return NAMESPACE_NATIVES[chain.split(':')[0]!] ?? { symbol: 'native', decimals: 18 }
 }
@@ -147,7 +159,7 @@ export function assetMetaFor(tx: ChainTx, opts: GenericDescribeOptions = {}): (t
       const n = nativeOf(tx.chain, opts)
       return { symbol: own?.symbol ?? n.symbol, decimals: own?.decimals ?? n.decimals }
     }
-    const cat = ccAssetByToken(tx.chain, token)
+    const cat = ccAssetByToken(catalogChain(tx.chain), token)
     if (!cat) return own
     return { symbol: own?.symbol ?? cat.symbol, decimals: own?.decimals ?? cat.decimals }
   }
@@ -192,6 +204,13 @@ export function titleFor(kind: ActivityKind, chain: string, assetsOut: ActivityA
       return verb
     default: return verbAssets(verb, chain, assetsOut, opts)
   }
+}
+
+/** Paid one set of assets, received a different one (gas-only native legs do not count as "paid"). */
+function looksLikeSwap(assetsOut: ActivityAsset[], assetsIn: ActivityAsset[]): boolean {
+  if (assetsOut.length === 0 || assetsIn.length === 0) return false
+  const outT = new Set(assetsOut.map((a) => a.token)), inT = new Set(assetsIn.map((a) => a.token))
+  return [...inT].some((t) => !outT.has(t)) && [...outT].some((t) => !inT.has(t))
 }
 
 const word = (data: string, i: number): string | null => (data.length >= 10 + 64 * (i + 1) ? data.slice(10 + 64 * i, 10 + 64 * (i + 1)) : null)
@@ -244,9 +263,12 @@ export function describeGeneric(tx: ChainTx, ctx: DescribeActivityContext, opts:
     return make(revoke ? 'revoke' : 'approve', title, extra)
   }
 
-  // 2. Any other call the owner made is a contract call (amounts still attached when something moved).
+  // 2. Any other call the owner made: a swap when it paid one asset and received another
+  //    (aggregators / DEXes no module claims — Jupiter, 1inch…), else a contract call.
   if (ownSender && call?.to && isContractCall(call, selector)) {
-    return make('contract', 'Contract call', { subtitle: addressLabel(opts.known, tx.chain, call.to), counterparty: call.to })
+    const extra: Partial<GenericActivityItem> = { subtitle: addressLabel(opts.known, tx.chain, call.to), counterparty: call.to }
+    if (looksLikeSwap(assetsOut, assetsIn)) return make('swap', titleFor('swap', tx.chain, assetsOut, assetsIn, opts), extra)
+    return make('contract', 'Contract call', extra)
   }
 
   // 3. Value movement.
@@ -260,13 +282,17 @@ export function describeGeneric(tx: ChainTx, ctx: DescribeActivityContext, opts:
   if (assetsIn.length > 0 && assetsOut.length === 0) {
     const first = tx.transfers.find((t) => isOwn(t.to) && !isOwn(t.from))
     const from = first?.from ?? tx.from
-    return make('receive', verbAssets('Received', tx.chain, assetsIn, opts), { counterparty: from, subtitle: addressLabel(opts.known, tx.chain, from) })
+    const item = make('receive', verbAssets('Received', tx.chain, assetsIn, opts), { counterparty: from, subtitle: addressLabel(opts.known, tx.chain, from) })
+    // Unsolicited zero-amount "receipts" (address poisoning, TRC-10 / ERC-20 dust airdrops with 0 value) are spam.
+    if (assetsIn.every((a) => a.amount === 0n)) item.spam = true
+    return item
   }
   if (assetsIn.length > 0 && assetsOut.length > 0) {
     // Both directions with no call of the owner's: something routed through a contract we do not know.
     const to = call?.to ?? tx.to
     const extra: Partial<GenericActivityItem> = {}
     if (to) { extra.counterparty = to; extra.subtitle = addressLabel(opts.known, tx.chain, to) }
+    if (looksLikeSwap(assetsOut, assetsIn)) return make('swap', titleFor('swap', tx.chain, assetsOut, assetsIn, opts), extra)
     return make(to ? 'contract' : 'unknown', to ? 'Contract call' : 'Transaction', extra)
   }
 
