@@ -59,7 +59,7 @@ try {
 if (position.shares > 0n) {
   const plan = await protocol._getWithdrawPlan(k?.redeemToken ?? position.token, position.shares / 2n)
   console.log(`withdraw half (${fmt(position.shares / 2n)} shares) → queue ${plan.queue}, ≈ ${plan.assetsOut} of ${k?.redeemToken ?? position.token}`)
-  await protocol._requireProvider().call({ from: address, to: plan.tx.to, data: plan.tx.data })
+  await protocol._requireProvider().call({ account: address, to: plan.tx.to, data: plan.tx.data })
   console.log('redeem proven with eth_call ✓')
 }
 for (const method of ['borrow', 'repay']) {
