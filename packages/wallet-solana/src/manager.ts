@@ -1,4 +1,4 @@
-import { LocalSigner, SignerError, WalletManager, isSeedSigner, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@forgewallet/core'
 import { WalletAccountSolana } from './account.js'
 import { WalletAccountReadOnlySolana } from './read-only-account.js'
 import type { SolanaConfig } from './types.js'
@@ -17,12 +17,10 @@ const DEFAULT_BASE_FEE = 5_000n
  *   signer's path, or 'external'); other indexes/paths throw `SignerError`.
  */
 export class WalletManagerSolana extends WalletManager<WalletAccountSolana, SolanaConfig> {
-  private _seedBytes: Uint8Array | undefined
-
   constructor(seedOrSigner: string | Signer, config: SolanaConfig = {}) {
     super(seedOrSigner, config)
-    if (this._seed !== undefined) this._seedBytes = seedFromMnemonicSync(this._seed)
   }
+
 
   async getAccount(index = 0): Promise<WalletAccountSolana> {
     return this.getAccountByPath(`${SOLANA_BASE_PATH}/${index}'/0'`)
@@ -35,7 +33,7 @@ export class WalletManagerSolana extends WalletManager<WalletAccountSolana, Sola
     if (cached) return cached
     const external = this.externalSigner()
     if (external) return this.fromSigner(external, full)
-    const signer = LocalSigner.fromSeed(this._seedBytes!, 'ed25519', full)
+    const signer = LocalSigner.fromSeed(this.seedBytes(), 'ed25519', full)
     const account = new WalletAccountSolana(signer, signer.publicKey, full, this._config)
     this._accounts.set(full, account)
     return account
@@ -73,9 +71,4 @@ export class WalletManagerSolana extends WalletManager<WalletAccountSolana, Sola
     return { slow: (normal * 80n) / 100n, normal, fast: (normal * 120n) / 100n }
   }
 
-  override dispose(): void {
-    super.dispose()
-    zeroize(this._seedBytes)
-    this._seedBytes = undefined
-  }
 }

@@ -1,4 +1,4 @@
-import { LocalSigner, SignerError, WalletManager, isSeedSigner, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
 import { mnemonicToPrivateKey } from '@ton/crypto'
 import { WalletAccountTon } from './account.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'
@@ -23,12 +23,10 @@ import { DEFAULT_TONAPI } from './emulation.js'
  * {@link WalletManagerTon.fromTonMnemonic}; they yield one account at `ton-mnemonic`.
  */
 export class WalletManagerTon extends WalletManager<WalletAccountTon, TonConfig> {
-  private _seedBytes: Uint8Array | undefined
-
   constructor(seedOrSigner: string | Signer, config: TonConfig = {}) {
     super(seedOrSigner, config)
-    if (this._seed !== undefined) this._seedBytes = seedFromMnemonicSync(this._seed)
   }
+
 
   /**
    * Import a TON-native mnemonic (24 words, Tonkeeper / Tonhub / MyTonWallet
@@ -65,7 +63,7 @@ export class WalletManagerTon extends WalletManager<WalletAccountTon, TonConfig>
     const full = path.startsWith('m/') ? path : `${TON_BASE_PATH}/${path}`
     const cached = this._accounts.get(full)
     if (cached) return cached
-    const signer = LocalSigner.fromSeed(this._seedBytes!, 'ed25519', full)
+    const signer = LocalSigner.fromSeed(this.seedBytes(), 'ed25519', full)
     const account = new WalletAccountTon(signer, signer.publicKey, full, this._config)
     this._accounts.set(full, account)
     return account
@@ -109,9 +107,4 @@ export class WalletManagerTon extends WalletManager<WalletAccountTon, TonConfig>
     return { slow: (normal * 80n) / 100n, normal, fast: normal }
   }
 
-  override dispose(): void {
-    super.dispose()
-    zeroize(this._seedBytes)
-    this._seedBytes = undefined
-  }
 }
