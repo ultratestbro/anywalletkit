@@ -15,12 +15,20 @@ import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuotePar
  *
  *  - getQuote: opens an RFQ stream, collects `quoteUpdated` for a short window,
  *    returns the latest quote normalized to the engine `Quote`.
- *  - buildDeposit (TON-source only): generates the HTLC secret(s), persists them
+ *  - buildDeposit (TON-source): generates the HTLC secret(s), persists them
  *    in the injectable {@link HtlcSecretStore}, asks the SDK for the escrow
  *    transfer and returns it as an `UnsignedTx` with a serialized cell body
  *    (`bodyBoc`) — NOT a text memo.
+ *  - buildDeposit (EVM-source, EVM→TON): generates the secret, asks the SDK for
+ *    the EIP-712 order (Omniston's 1inch-LOP fork), verifies every signed byte
+ *    against the quote (order fields, extension, serialized order details) and
+ *    returns a gasless typed-order `UnsignedTx`; `registerSignedOrder` hands
+ *    the wallet's signature back to Omniston. Needs `trustedEvmOrderProtocols`
+ *    plus the EVM input-position and TON output-position validators.
  *  - trackIntent: treats `orderTrack` only as a discovery hint and discloses a
- *    pending secret only after independent finalized EVM escrow validation.
+ *    pending secret only after independent finalized validation of the
+ *    counter-position (EVM escrow for TON→EVM; EVM source fill AND TON output
+ *    position for EVM→TON).
  *
  * CONSUMER CONTRACT — closing an intent is the caller's job. `trackIntent`
  * never returns a terminal refunded/failed state, not even on a reported
@@ -198,6 +206,9 @@ interface OrderSettlement {
    */
   exclusivityTimeout?: number;
   htlcHashingFunction?: string;
+  /** Fee profile the EVM order extension must mirror (EVM-source orders). */
+  protocolFeePips?: number;
+  integratorFeePips?: number;
 }
 
 /** Swap settlement — immediate DEX routes, the TON same-chain branch. */
@@ -228,6 +239,8 @@ interface OrderExecution {
   outputUnits: string;
   resolverSendsUnits: string;
   secretHash?: Uint8Array | undefined;
+  inputPositionPhase?: string | undefined;
+  inputPositionAddress?: ChainAddress | undefined;
   outputPositionPhase?: string | undefined;
   outputPositionAddress?: ChainAddress | undefined;
 }
@@ -308,6 +321,15 @@ export interface OmnistonProviderOptions {
   /** Independently trusted settlement contracts, keyed by CAIP-2 chain. */
   trustedSettlementContracts?: Readonly<Record<string, readonly string[]>>;
   /**
+   * Independently trusted EVM order protocols — the Omniston fork of the 1inch
+   * Limit Order Protocol an EVM-source order is signed against and that moves
+   * the input token on fill — keyed by CAIP-2 chain. Kept apart from
+   * `trustedSettlementContracts` because one address plays different roles on
+   * different chains (0xafCF… is the escrow factory on Ethereum and the order
+   * protocol on Polygon). EVM→TON is advertised only for chains listed here.
+   */
+  trustedEvmOrderProtocols?: Readonly<Record<string, readonly string[]>>;
+  /**
    * RPC-backed TON jetton-wallet verification. A TON-source order is rejected
    * when this hook is absent or does not prove that `walletAddress` belongs to
    * the quoted jetton master for `ownerAddress`.
@@ -373,31 +395,44 @@ export interface OmnistonProviderOptions {
     secretHash: Uint8Array;
   }) => boolean | Promise<boolean>;
   /**
-   * Reserved capability gate for EVM→TON. A future implementation must prove
-   * the finalized 1inch SrcEscrowCreated fill independently of orderTrack.
-   * Presence of this hook alone never enables the route.
+   * RPC-backed proof of the finalized EVM source position (EVM→TON). The
+   * tracking feed only hints at the address; no secret is disclosed until this
+   * hook proves — from the trusted factory's own `SrcEscrowCreated` event, the
+   * deterministic escrow address and the escrow's balances — that the
+   * trader's FULL input is locked for this hashlock under the quoted terms
+   * (owner, token, amount, resolver, deposit, timelocks, TON output amount).
    */
   validateEvmInputPosition?: (input: {
     chain: string;
     positionAddress: string;
-    settlementContract: string;
+    factoryAddress: string;
+    orderProtocolAddress: string;
     ownerAddress: string;
+    resolverAddress: string;
     inputTokenAddress: string;
     inputUnits: string;
+    resolverSendsUnits: string;
+    srcHtlcSecurityDepositUnits: string;
+    quoteTimestamp: number;
     secretHash: Uint8Array;
   }) => boolean | Promise<boolean>;
   /**
-   * Reserved capability gate for EVM→TON. It must validate a finalized TON
-   * output position, its versioned code/StateInit/getter state and jetton
-   * custody without trusting the Omniston tracking feed.
+   * Indexer/RPC-backed proof of the TON output position (EVM→TON): deployed by
+   * the trusted factory for THIS quote, pinned position/escrow code, hashlock,
+   * recipient, amount, security deposit, and a cancellation boundary still far
+   * enough away to complete. The tracking feed is only a discovery hint.
    */
   validateTonOutputPosition?: (input: {
     positionAddress: string;
     protocolAddress: string;
     outputJettonMasterAddress: string;
     recipientAddress: string;
+    quoteId: string;
+    quoteTimestamp: number;
     inputUnits: string;
     outputUnits: string;
+    resolverSendsUnits: string;
+    dstSecurityDepositUnits: string;
     secretHash: Uint8Array;
   }) => boolean | Promise<boolean>;
   /** Close an injected client when the provider closes (default: caller owns it). */
@@ -532,9 +567,13 @@ function sameAsset(a: AssetId, b: AssetId): boolean {
 function sameChainAddress(a: ChainAddress | undefined, b: ChainAddress | undefined): boolean {
   if (a === undefined || b === undefined) return a === b;
   if (a.chain.$case !== b.chain.$case) return false;
-  return a.chain.$case === "ton"
-    ? a.chain.value === b.chain.value
-    : a.chain.value.toLowerCase() === b.chain.value.toLowerCase();
+  if (a.chain.$case !== "ton") return a.chain.value.toLowerCase() === b.chain.value.toLowerCase();
+  // The SDK may echo a TON address in another notation (EQ…/UQ…/raw).
+  try {
+    return TonAddress.parse(a.chain.value).equals(TonAddress.parse(b.chain.value));
+  } catch {
+    return a.chain.value === b.chain.value;
+  }
 }
 
 function assetContract(asset: AssetId): string | null {
@@ -559,6 +598,11 @@ function sliceEqual(a: Uint8Array, b: Uint8Array): boolean {
 
 function zeroBytes(bytes: Uint8Array): boolean {
   return bytes.every((value) => value === 0);
+}
+
+/** `value` within [center - before, center + after] (seconds). */
+function within(value: bigint, center: number, before: number, after: number): boolean {
+  return value >= BigInt(center - before) && value <= BigInt(center + after);
 }
 
 const ORDER_FIELDS = [
@@ -596,9 +640,11 @@ function validEvmAddress(value: unknown): boolean {
  * profiles: signing a merely well-formed extension is not enough because the
  * resolver-controlled tail contains the actual on-chain HTLC terms.
  *
- * This closes the extension/protobuf binding gap, but does not by itself make
- * EVM→TON safe to enable. Secret disclosure additionally needs independently
- * finalized EVM source-fill and TON output-position proofs.
+ * This binds what the wallet signs to the quote; it does not by itself make
+ * the swap complete. Secret disclosure additionally needs the independently
+ * finalized EVM source-fill and TON output-position proofs (trackIntent).
+ * `dstSecurityDepositUnits` is the value the EVM deposits word carries — for a
+ * TON destination that word is 0 (the TON deposit is bound in the TON position).
  */
 export async function validateEvmToTonOrderExtension(
   extension: Uint8Array,
@@ -679,7 +725,7 @@ export async function validateEvmToTonOrderExtension(
   const quoteResolverFee = expected.protocolFeePips % 10 === 0 ? BigInt(expected.protocolFeePips / 10) : -1n;
   const resolverLow80 = BigInt(getAddress(expected.initialResolverAddress)) & ((1n << 80n) - 1n);
   if (
-    gasBump !== 0n || gasPrice !== 0n || auctionStart !== BigInt(expected.quoteTimestamp) ||
+    gasBump !== 0n || gasPrice !== 0n || !within(auctionStart, expected.quoteTimestamp, 5, 5) ||
     duration !== 1800n || initialRateBump !== 900000n ||
     points.some((point, index) => point[0] !== expectedPoints[index]![0] || point[1] !== expectedPoints[index]![1]) ||
     expected.integratorFeePips !== 0 || integratorFee !== 0n || integratorShare !== 100n ||
@@ -692,6 +738,9 @@ export async function validateEvmToTonOrderExtension(
   // BaseEscrowFactory postInteraction: exact fee/whitelist prefix followed by
   // five uint256 ExtraDataArgs words. Unknown recipients and trailing bytes are
   // rejected because the corresponding EVM→TON mapping is not public.
+  // `allowedTime` is stamped by the resolver a few seconds BEFORE the quote
+  // timestamp (live 2026-10-16: 14–18 s on every chain); the auction start is
+  // the quote timestamp (±1 s on Polygon). Both windows are bounded.
   const post = fields[7]!;
   cursor = 20;
   const integratorRecipient = post.slice(cursor, cursor + 20); cursor += 20;
@@ -710,7 +759,7 @@ export async function validateEvmToTonOrderExtension(
   if (
     !zeroBytes(integratorRecipient) || !zeroBytes(protocolRecipient) ||
     postIntegratorFee !== 0n || postIntegratorShare !== 100n || postResolverFee !== quoteResolverFee ||
-    postDiscount !== 50n || allowedTime !== BigInt(expected.quoteTimestamp) ||
+    postDiscount !== 50n || !within(allowedTime, expected.quoteTimestamp, 60, 5) ||
     postResolver !== resolverLow80 || resolverTimeDelta !== 0n
   ) {
     throw new Error("omniston: EVM post-interaction terms do not match the pinned v1beta8 profile");
@@ -766,6 +815,8 @@ function validateEvmTypedOrder(
     makingAmount: string;
     takingAmount: string;
     orderExtension: Uint8Array;
+    quoteTimestamp: number;
+    tradeStartDeadline: number;
   },
 ): asserts td is {
   domain: {verifyingContract: string; chainId: string | number};
@@ -786,10 +837,15 @@ function validateEvmTypedOrder(
   const salt = message?.salt;
   const traits = validUint256(message?.makerTraits) ? BigInt(message!.makerTraits as string) : -1n;
   const flagMask = ((1n << 56n) - 1n) << 200n;
-  // This adapter has no finalized per-fragment SrcEscrowCreated proof yet, so
-  // only a single full fill is admissible. Current live Omniston EVM→TON
-  // orders leave NO_PARTIAL_FILLS clear and are therefore rejected.
-  const requiredFlags = (1n << 255n) | (1n << 251n) | (1n << 249n); // no-partial + post-interaction + extension
+  // POST_INTERACTION + HAS_EXTENSION are mandatory and ALLOW_MULTIPLE_FILLS
+  // must be clear, so the order fills at most once; no permit2/unwrap/epoch/
+  // pre-interaction programs. Live v1beta8 orders leave NO_PARTIAL_FILLS clear
+  // (one partial fill is possible). Disclosure still requires the finalized
+  // fill to lock the FULL input, so a partial fill is never completed — it
+  // rolls back on its own timelocks.
+  const baseFlags = (1n << 251n) | (1n << 249n);
+  const flags = traits < 0n ? -1n : traits & flagMask;
+  const flagsOk = flags === baseFlags || flags === (baseFlags | (1n << 255n));
   const allowedSender = traits & ((1n << 80n) - 1n);
   const expiration = (traits >> 80n) & ((1n << 40n) - 1n);
   const series = (traits >> 160n) & ((1n << 40n) - 1n);
@@ -805,7 +861,10 @@ function validateEvmTypedOrder(
     getAddress(String(message.receiver)) !== getAddress(expected.receiver) ||
     getAddress(String(message.makerAsset)) !== getAddress(expected.makerAsset) ||
     !validUint256(salt) || (BigInt(salt as string) & ((1n << 160n) - 1n)) !== (extensionHash & ((1n << 160n) - 1n)) ||
-    traits < 0n || (traits & flagMask) !== requiredFlags || allowedSender !== 0n || expiration !== 0n || series !== 0n ||
+    // The order expires at the quote's trade-start deadline (±15 s of clock
+    // skew between the quote and the order builder), never later.
+    traits < 0n || !flagsOk || allowedSender !== 0n || series !== 0n ||
+    !within(expiration, expected.tradeStartDeadline, 15, 15) || expiration <= BigInt(expected.quoteTimestamp) ||
     !validEvmAddress(message.takerAsset) || getAddress(String(message.takerAsset)) === getAddress(expected.makerAsset) ||
     !validUint256(message.makingAmount) || BigInt(message.makingAmount as string) !== BigInt(expected.makingAmount) ||
     !validUint256(message.takingAmount) || BigInt(message.takingAmount as string) !== BigInt(expected.takingAmount)
@@ -1379,6 +1438,26 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       return false;
     }
   };
+  const trustedOrderProtocols = new Map<string, Set<string>>();
+  for (const [chain, addresses] of Object.entries(opts.trustedEvmOrderProtocols ?? {})) {
+    const normalized = new Set<string>();
+    for (const address of addresses) {
+      try {
+        if (evmRef(chain) === null) throw new Error("not an EVM chain");
+        normalized.add(getAddress(address).toLowerCase());
+      } catch {
+        throw new Error(`omniston: invalid trusted EVM order protocol for ${chain}`);
+      }
+    }
+    if (normalized.size) trustedOrderProtocols.set(chain, normalized);
+  }
+  const isTrustedOrderProtocol = (chain: string, address: string): boolean => {
+    try {
+      return trustedOrderProtocols.get(chain)?.has(getAddress(address).toLowerCase()) ?? false;
+    } catch {
+      return false;
+    }
+  };
   const store = opts.secretStore ?? inMemorySecretStore();
   const requestedMaxExecutions = opts.maxHtlcExecutions ?? DEFAULT_MAX_HTLC_EXECUTIONS;
   if (!Number.isFinite(requestedMaxExecutions) || !Number.isInteger(requestedMaxExecutions) || requestedMaxExecutions < 1) {
@@ -1451,6 +1530,16 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
   interface BuiltEntry {
     quote: OmnistonQuote;
     at: number;
+    /** EVM-source orders: what registration and tracking need after signing. */
+    evmOrder?: {
+      typedData: string;
+      orderExtension: string;
+      serializedOrderDetails: string;
+      owner: string;
+      chainCase: string;
+      /** Escrow factory the signed extension targets (trusted for the source chain). */
+      factory: string;
+    };
   }
   async function saveBuilt(quoteId: string, entry: BuiltEntry): Promise<void> {
     await quotes.save(quoteId, JSON.stringify(entry));
@@ -1478,6 +1567,20 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
    *  contract the funds land in is resolver-chosen per route). */
   const sameChainTonReady = (): boolean =>
     typeof opts.validateTonJettonWallet === "function" && typeof opts.validateTonSwapTarget === "function";
+  /** TON→EVM: the TON factory and the EVM factory are allowlisted, and the
+   *  jetton-wallet, escrow-payload and EVM output-position validators exist. */
+  const tonSourceReady = (from: string, to: string): boolean =>
+    cfg.supports(from, to) && trustedContracts.has(from) && trustedContracts.has(to) &&
+    typeof opts.validateTonJettonWallet === "function" &&
+    typeof opts.validateTonEscrowPayload === "function" &&
+    typeof opts.validateEvmOutputPosition === "function";
+  /** EVM→TON: the order protocol the wallet signs against AND the factory the
+   *  signed extension targets are allowlisted for the source chain, the TON
+   *  factory for the destination, and both finalized-position validators exist. */
+  const evmSourceReady = (from: string, to: string): boolean =>
+    cfg.supports(from, to) && trustedOrderProtocols.has(from) && trustedContracts.has(from) && trustedContracts.has(to) &&
+    typeof opts.validateEvmInputPosition === "function" &&
+    typeof opts.validateTonOutputPosition === "function";
 
   async function getSwapQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
     if (!cfg.supports(params.sourceChain, params.destChain) || !trustedContracts.has(params.sourceChain) || !sameChainTonReady()) return null;
@@ -1703,6 +1806,132 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     }
   }
 
+  /**
+   * EVM→TON: generate the HTLC secret, ask Omniston for the EIP-712 order,
+   * verify every byte the wallet is about to sign against the quote (order
+   * fields, the 1inch extension the salt commits to, the serialized order
+   * details), persist what registration needs, and hand the engine a gasless
+   * typed-order `UnsignedTx` whose `approvalAddress` is the order protocol.
+   */
+  async function buildEvmOrder(
+    ref: NonNullable<ReturnType<typeof decodeIntent>>,
+    q: OmnistonQuote,
+    settlement: OrderSettlement,
+  ): Promise<UnsignedTx> {
+    const srcChain = ref.srcChain;
+    const chainId = evmRef(srcChain);
+    const srcCase = q.inputAsset.chain.$case;
+    if (chainId === null || EVM_CASE[chainId] !== srcCase) throw new Error("omniston: source chain does not match the EVM quote");
+    const destChain = caipForChainCase(q.outputAsset.chain.$case);
+    if (q.outputAsset.chain.$case !== "ton" || !destChain) throw new Error("omniston: EVM-source orders deliver to TON only");
+    if (!trustedOrderProtocols.has(srcChain) || typeof opts.validateEvmInputPosition !== "function" || typeof opts.validateTonOutputPosition !== "function") {
+      throw new Error("omniston: EVM→TON needs a trusted order protocol and the EVM input-position and TON output-position validators");
+    }
+    let owner: string;
+    try {
+      owner = getAddress(ref.trader);
+    } catch {
+      throw new Error("omniston: trader is not an EVM address");
+    }
+    try {
+      TonAddress.parse(ref.dest);
+    } catch {
+      throw new Error("omniston: destination is not a TON address");
+    }
+    const protocol = settlement.srcProtocolContractAddress;
+    const resolver = settlement.srcInitialResolverAddress;
+    const factory = settlement.dstProtocolContractAddress;
+    const inputToken = assetContract(q.inputAsset);
+    const outputJetton = assetContract(q.outputAsset);
+    if (
+      protocol.chain.$case !== srcCase || !isTrustedOrderProtocol(srcChain, protocol.chain.value) ||
+      resolver?.chain.$case !== srcCase || !validEvmAddress(resolver.chain.value) ||
+      factory?.chain.$case !== "ton" || !isTrusted(destChain, factory.chain.value) ||
+      !inputToken || !outputJetton || !Number.isSafeInteger(settlement.protocolFeePips)
+    ) throw new Error("omniston: incomplete EVM order settlement binding in quote");
+
+    // One execution: the signed order has ALLOW_MULTIPLE_FILLS clear and the
+    // TON position commits a single hash. Persist BEFORE anything is signed.
+    const secrets = [generateSecret()];
+    const hashes = secrets.map((secret) => hashlock(secret, settlement.htlcHashingFunction));
+    await store.save(ref.quoteId, secrets.map(bytesToHex));
+    const omni = await getClient();
+    let payload: Awaited<ReturnType<OmnistonClientLike["evmBuildOrderPayload"]>>;
+    try {
+      payload = await omni.evmBuildOrderPayload({
+        quoteId: ref.quoteId,
+        ownerSrcAddress: {chain: {$case: srcCase, value: owner}} as ChainAddress,
+        traderDstAddress: {chain: {$case: "ton", value: ref.dest}},
+        htlcSecrets: {secretMode: {$case: "provided", value: {hashes}}},
+      });
+    } catch (error) {
+      await store.clear(ref.quoteId);
+      throw error;
+    }
+    try {
+      let td: unknown;
+      try {
+        td = JSON.parse(payload.typedData);
+      } catch {
+        throw new Error("omniston: malformed EVM order typed data");
+      }
+      validateSerializedOrderDetails(payload.serializedOrderDetails, {
+        quoteId: ref.quoteId,
+        outputAsset: q.outputAsset,
+        traderDstAddress: {chain: {$case: "ton", value: ref.dest}},
+        secretHashes: hashes,
+      });
+      validateEvmTypedOrder(td, {
+        chainId,
+        settlementContract: protocol.chain.value,
+        owner,
+        receiver: resolver.chain.value,
+        makerAsset: inputToken,
+        makingAmount: q.inputUnits,
+        takingAmount: settlement.resolverSendsUnits,
+        orderExtension: payload.orderExtension,
+        quoteTimestamp: q.quoteTimestamp,
+        tradeStartDeadline: settlement.tradeStartDeadline,
+      });
+      await validateEvmToTonOrderExtension(payload.orderExtension, {
+        quoteId: ref.quoteId,
+        quoteTimestamp: q.quoteTimestamp,
+        tradeStartDeadline: settlement.tradeStartDeadline,
+        protocolFeePips: settlement.protocolFeePips!,
+        integratorFeePips: settlement.integratorFeePips ?? 0,
+        initialResolverAddress: resolver.chain.value,
+        outputTokenAddress: outputJetton,
+        traderDstAddress: ref.dest,
+        takerAsset: String(td.message.takerAsset),
+        srcSecurityDepositUnits: settlement.srcHtlcSecurityDepositUnits ?? "",
+        // The TON security deposit is bound in the TON position, not in the
+        // EVM deposits word (live: 0 for every TON-destination order).
+        dstSecurityDepositUnits: "0",
+        secretHash: hashes[0]!,
+        trustedTarget: (address) => isTrusted(srcChain, address),
+      });
+    } catch (error) {
+      await store.clear(ref.quoteId);
+      throw error;
+    }
+    // The validated extension targets one trusted factory on the source chain.
+    const extensionTarget = getAddress(`0x${bytesToHex(payload.orderExtension.slice(32 + new DataView(payload.orderExtension.buffer, payload.orderExtension.byteOffset).getUint32(4, false), 32 + new DataView(payload.orderExtension.buffer, payload.orderExtension.byteOffset).getUint32(4, false) + 20))}`);
+    await saveBuilt(ref.quoteId, {
+      quote: q,
+      at: Date.now(),
+      evmOrder: {
+        typedData: payload.typedData,
+        orderExtension: bytesToHex(payload.orderExtension),
+        serializedOrderDetails: bytesToHex(payload.serializedOrderDetails ?? new Uint8Array()),
+        owner,
+        chainCase: srcCase,
+        factory: extensionTarget,
+      },
+    });
+    const orderProtocol = getAddress(protocol.chain.value);
+    return {chain: srcChain, to: orderProtocol, value: "0", chainId, approvalAddress: orderProtocol, typedData: payload.typedData};
+  }
+
   return {
     name: "omniston",
     describeActivity: describeOmnistonActivity,
@@ -1718,15 +1947,9 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       if (isTon(from.chain) && isTon(to.chain)) {
         return cfg.supports(from.chain, to.chain) && trustedContracts.has(from.chain) && sameChainTonReady();
       }
-      // EVM-source v1beta8 orders remain disabled even though the signed
-      // extension now has a strict decoder above. The public trader API does
-      // not expose the versioned TON HTLC code/ABI/StateInit commitment needed
-      // to prove the output position independently of orderTrack (audit P1).
-      return isTon(from.chain) && !isTon(to.chain) && cfg.supports(from.chain, to.chain) &&
-        trustedContracts.has(from.chain) && trustedContracts.has(to.chain) &&
-        typeof opts.validateTonJettonWallet === "function" &&
-        typeof opts.validateTonEscrowPayload === "function" &&
-        typeof opts.validateEvmOutputPosition === "function";
+      if (isTon(from.chain) && !isTon(to.chain)) return tonSourceReady(from.chain, to.chain);
+      if (!isTon(from.chain) && isTon(to.chain)) return evmSourceReady(from.chain, to.chain);
+      return false;
     },
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
@@ -1737,13 +1960,26 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         params.onRefusal?.(`omniston: ${reason}`);
         return null;
       };
-      if (!isTon(params.sourceChain) || isTon(params.destChain) || !cfg.supports(params.sourceChain, params.destChain)) {
-        return refuse("only TON-source → EVM orders are enabled");
+      const evmSource = !isTon(params.sourceChain) && isTon(params.destChain);
+      if (isTon(params.sourceChain) === isTon(params.destChain) || !cfg.supports(params.sourceChain, params.destChain)) {
+        return refuse("orders are TON↔EVM corridors only");
       }
       if (!trustedContracts.has(params.sourceChain) || !trustedContracts.has(params.destChain)) {
         return refuse(`no trusted settlement contract configured for ${trustedContracts.has(params.sourceChain) ? params.destChain : params.sourceChain}`);
       }
-      if (
+      if (evmSource) {
+        if (!trustedOrderProtocols.has(params.sourceChain)) return refuse(`no trusted EVM order protocol configured for ${params.sourceChain}`);
+        if (typeof opts.validateEvmInputPosition !== "function" || typeof opts.validateTonOutputPosition !== "function") {
+          return refuse("EVM→TON needs the EVM input-position and TON output-position validators");
+        }
+        if (params.dry === false) {
+          try {
+            TonAddress.parse(params.destAddress);
+          } catch {
+            return refuse("destination is not a TON address");
+          }
+        }
+      } else if (
         typeof opts.validateTonJettonWallet !== "function" ||
         typeof opts.validateTonEscrowPayload !== "function" ||
         typeof opts.validateEvmOutputPosition !== "function"
@@ -1765,7 +2001,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
       // Execution and tracking both need the trader's source-chain wallet.
       const trader = params.refundAddress ?? "";
-      if (!trader && !params.dry) return refuse("execution quote needs the trader's TON address (refundAddress)");
+      if (!trader && !params.dry) return refuse(`execution quote needs the trader's ${evmSource ? "EVM" : "TON"} address (refundAddress)`);
+      if (evmSource && trader && !validEvmAddress(trader)) return refuse("refundAddress is not an EVM address");
 
       const request: QuoteRequest = {
         inputAsset,
@@ -1802,8 +2039,9 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       }
       const orderData = q.settlementData.$case === "order" ? q.settlementData.value : null;
       if (!orderData) return refuse("resolver answered without order settlement");
-      if (!isTrusted(params.sourceChain, orderData.srcProtocolContractAddress.chain.value)) {
-        return refuse(`untrusted TON settlement contract ${orderData.srcProtocolContractAddress.chain.value}`);
+      const srcContract = orderData.srcProtocolContractAddress.chain.value;
+      if (evmSource ? !isTrustedOrderProtocol(params.sourceChain, srcContract) : !isTrusted(params.sourceChain, srcContract)) {
+        return refuse(evmSource ? `untrusted ${params.sourceChain} order protocol ${srcContract}` : `untrusted TON settlement contract ${srcContract}`);
       }
       if (!orderData.dstProtocolContractAddress || !isTrusted(params.destChain, orderData.dstProtocolContractAddress.chain.value)) {
         return refuse(`untrusted ${params.destChain} settlement contract ${orderData.dstProtocolContractAddress?.chain.value ?? "(none)"}`);
@@ -1868,10 +2106,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
       if (!ref.trader) throw new Error("omniston: quote was requested without a refund/source address");
       const srcCase = q.inputAsset.chain.$case;
-      if (srcCase !== "ton") {
-        await store.clear(ref.quoteId);
-        throw new Error("omniston: EVM→TON is disabled until Omniston publishes a verifiable TON output-position contract profile");
-      }
+      if (srcCase !== "ton") return await buildEvmOrder(ref, q, q.settlementData.value);
       const srcChain = ref.srcChain;
       if (!isTon(srcChain)) throw new Error("omniston: source chain does not match TON quote");
       const destCase = q.outputAsset.chain.$case;
@@ -2004,16 +2239,26 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         const outputChain = q.outputAsset.chain.$case;
         const outputCaip = caipForChainCase(outputChain);
         const factory = settlement.dstProtocolContractAddress;
+        const evmSource = q.inputAsset.chain.$case !== "ton";
+        const inputChain = q.inputAsset.chain.$case;
+        const inputCaip = caipForChainCase(inputChain);
+        const inputTokenAddress = assetContract(q.inputAsset);
+        const evmOrder = cached.evmOrder;
         await Promise.all(
           order.executions.map(async (execution) => {
             const i = execution.index;
             const secret = validIndices ? secretsHex[i] : undefined;
             const phase = execution.outputPositionPhase;
             const position = execution.outputPositionAddress;
+            const inputPosition = execution.inputPositionAddress;
             if (
               !secret || !validDisclosurePhase(phase) || !position || position.chain.$case !== outputChain ||
-              !position.chain.value || !factory || factory.chain.$case !== outputChain || !outputTokenAddress || !outputCaip ||
-              typeof opts.validateEvmOutputPosition !== "function"
+              !position.chain.value || !factory || factory.chain.$case !== outputChain || !outputTokenAddress || !outputCaip
+            ) return;
+            if (evmSource
+              ? (!evmOrder || !inputCaip || !inputTokenAddress || !inputPosition || inputPosition.chain.$case !== inputChain || !inputPosition.chain.value ||
+                !settlement.srcInitialResolverAddress || typeof opts.validateEvmInputPosition !== "function" || typeof opts.validateTonOutputPosition !== "function")
+              : typeof opts.validateEvmOutputPosition !== "function"
             ) return;
             const secretBytes = hexToBytes(secret);
             const expectedHash = hashlock(secretBytes, settlement.htlcHashingFunction);
@@ -2024,7 +2269,38 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
             ) return;
             let verified = false;
             try {
-              verified = await opts.validateEvmOutputPosition({
+              verified = evmSource
+                // EVM→TON: BOTH positions must be proven — the trader's full
+                // input locked on the EVM side for this hashlock, and the TON
+                // position the trusted factory deployed for this quote still
+                // inside its completion window — before the secret leaves.
+                ? await opts.validateEvmInputPosition!({
+                  chain: inputCaip!,
+                  positionAddress: inputPosition!.chain.value,
+                  factoryAddress: evmOrder!.factory,
+                  orderProtocolAddress: settlement.srcProtocolContractAddress.chain.value,
+                  ownerAddress: decoded.trader,
+                  resolverAddress: settlement.srcInitialResolverAddress!.chain.value,
+                  inputTokenAddress: inputTokenAddress!,
+                  inputUnits: execution.inputUnits,
+                  resolverSendsUnits: execution.resolverSendsUnits,
+                  srcHtlcSecurityDepositUnits: settlement.srcHtlcSecurityDepositUnits ?? "",
+                  quoteTimestamp: q.quoteTimestamp,
+                  secretHash: expectedHash,
+                }) && await opts.validateTonOutputPosition!({
+                  positionAddress: position.chain.value,
+                  protocolAddress: factory.chain.value,
+                  outputJettonMasterAddress: outputTokenAddress,
+                  recipientAddress: decoded.dest,
+                  quoteId: decoded.quoteId,
+                  quoteTimestamp: q.quoteTimestamp,
+                  inputUnits: execution.inputUnits,
+                  outputUnits: execution.outputUnits,
+                  resolverSendsUnits: execution.resolverSendsUnits,
+                  dstSecurityDepositUnits: settlement.dstSecurityDepositUnits ?? "",
+                  secretHash: expectedHash,
+                })
+                : await opts.validateEvmOutputPosition!({
                 chain: outputCaip,
                 positionAddress: position.chain.value,
                 factoryAddress: factory.chain.value,
@@ -2063,9 +2339,26 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       }
       return status;
     },
-    /** EVM-source execution is unavailable without an authoritative TON proof profile. */
-    async registerSignedOrder(): Promise<void> {
-      throw new Error("omniston: EVM→TON is disabled until Omniston publishes a verifiable TON output-position contract profile");
+    /** EVM→TON: hand the wallet's EIP-712 signature over the validated order to Omniston. */
+    async registerSignedOrder(intentId: string, signature: string): Promise<void> {
+      const ref = decodeIntent(intentId);
+      if (!ref) throw new Error("omniston: malformed intent id");
+      const cached = await loadBuilt(ref.quoteId);
+      const order = cached?.evmOrder;
+      if (!order) throw new Error("omniston: no signed-order context for this quote — build the order again");
+      if (!/^0x[0-9a-fA-F]{130}$/.test(signature)) throw new Error("omniston: malformed order signature");
+      const td = JSON.parse(order.typedData) as Parameters<typeof encodeTypedMessage>[0];
+      const omni = await getClient();
+      await omni.orderRegisterSignedOrder({
+        quoteId: ref.quoteId,
+        ownerSrcAddress: {chain: {$case: order.chainCase, value: order.owner}} as ChainAddress,
+        signedOrder: {order: {$case: "evmV1", value: {
+          encodedOrder: encodeTypedMessage(td),
+          signature: hexToBytes(signature),
+          orderExtension: hexToBytes(order.orderExtension),
+        }}},
+        ...(order.serializedOrderDetails ? {serializedOrderDetails: hexToBytes(order.serializedOrderDetails)} : {}),
+      });
     },
 
     close(): void {
