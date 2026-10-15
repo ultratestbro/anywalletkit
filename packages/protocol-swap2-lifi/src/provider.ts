@@ -70,6 +70,9 @@ const isSolana = (chain: string) => chain === LIFI_SOLANA_CAIP2;
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 /** Chain-aware address equality: EVM case-insensitive, Solana exact base58. */
+/** Longest execution a same-chain route may claim and still be an atomic swap (DEX routes report 0–30 s). */
+const SAME_CHAIN_MAX_SECONDS = 90;
+
 function sameChainAddress(chain: string, actual: string | undefined, expected: string): boolean {
   if (isSolana(chain)) return !!actual && BASE58.test(actual) && actual === expected;
   return sameAddress(actual, expected);
@@ -511,6 +514,16 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         }
         if (params.minAmountOut !== undefined && BigInt(minDestAmount) < BigInt(params.minAmountOut)) {
           params.onRefusal?.(`lifi: floor breach (min=${minDestAmount} < floor=${params.minAmountOut})`);
+          return null;
+        }
+        // A same-chain swap must deliver in the same transaction. LI.FI sometimes routes a
+        // same-chain pair through a solver (Relay-style intents, 2026-10: USDC → ARB on
+        // Ethereum, 625 s): the tx only takes the input and the output arrives later from the
+        // solver, so the engine's "output ≥ quoted minimum" preflight would refuse it anyway.
+        // Name it here, before anything is built.
+        const duration = est.executionDuration ?? 0;
+        if (fromChain === toChain && duration > SAME_CHAIN_MAX_SECONDS) {
+          params.onRefusal?.(`lifi: same-chain route settles asynchronously (${duration} s via ${(q as {tool?: string}).tool ?? "unknown tool"}) — a same-chain swap must deliver in the same transaction`);
           return null;
         }
         return {

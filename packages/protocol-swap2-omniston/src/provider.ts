@@ -1813,7 +1813,10 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       if (!targetValid) throw new Error("omniston: swap destination is not a recognized DEX contract for the quoted protocol");
     } else {
       // Native input: the message itself pays the DEX — value = input + gas.
-      if (payload.jettonTransfer) throw new Error("omniston: native-input swap message must not be a jetton transfer");
+      if (payload.jettonTransfer) {
+        // Name what came back so the refusal can be triaged: which protocol route, where the message goes and what the jetton transfer targets.
+        throw new Error(`omniston: native-input swap message must not be a jetton transfer (route ${protocols.join("+") || "?"}, target ${message.targetAddress}, transfer ${payload.jettonTransfer.amount} to ${payload.jettonTransfer.destination}, forwardTon ${payload.jettonTransfer.forwardTon}, value ${sendAmount})`);
+      }
       const input = BigInt(q.inputUnits);
       if (sendAmount < input) throw new Error("omniston: swap message carries less than the quoted input");
       const gas = sendAmount - input;

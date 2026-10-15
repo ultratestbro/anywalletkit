@@ -176,6 +176,12 @@ describe("LI.FI provider security contract", () => {
       sourceChain: "solana:mainnet", sourceToken: "SOL", destChain: "solana:mainnet", destToken: SOL_USDC,
       amountIn: "50000000", destAddress: SOL_SENDER, refundAddress: SOL_SENDER, slippageBps: 50,
     };
+    // Same-chain routes that settle later through a solver are refused by name before anything is built.
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(solana({tool: "relay", estimate: {fromAmount: "50000000", toAmount: "990000", toAmountMin: "985050", executionDuration: 625}}))));
+    let asyncReason = "";
+    expect(await lifiProvider().getQuote({...params, onRefusal: (r: string) => { asyncReason = r; }})).toBeNull();
+    expect(asyncReason).toBe("lifi: same-chain route settles asynchronously (625 s via relay) — a same-chain swap must deliver in the same transaction");
+
     const requests: string[] = [];
     vi.stubGlobal("fetch", async (url: URL) => { requests.push(String(url)); return new Response(JSON.stringify(solana())); });
     const provider = lifiProvider();
