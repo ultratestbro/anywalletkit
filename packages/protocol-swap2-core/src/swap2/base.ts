@@ -140,6 +140,18 @@ export interface Swap2ExecutionPhaseDetail {
   hash?: string;
 }
 
+/** EIP-712 domain with `chainId` as a number whatever notation the provider used. */
+export function normalizeTypedDomain(domain: unknown): unknown {
+  if (!domain || typeof domain !== "object") return domain;
+  const raw = (domain as {chainId?: unknown}).chainId;
+  let chainId: number | undefined;
+  if (typeof raw === "number") chainId = raw;
+  else if (typeof raw === "bigint") chainId = Number(raw);
+  else if (typeof raw === "string" && /^\d+$/.test(raw)) chainId = Number(raw);
+  else if (typeof raw === "string" && /^0x[0-9a-fA-F]+$/.test(raw)) chainId = Number(BigInt(raw));
+  return chainId === undefined || !Number.isSafeInteger(chainId) ? domain : {...(domain as object), chainId};
+}
+
 export interface Swap2EngineConfig extends Swap2ProtocolConfig {
   /** CAIP-2 of the chain the bound account lives on (the swap2 source). */
   fromChain: string;
@@ -989,8 +1001,12 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         // ethers infers the domain type and reject an explicit
         // EIP712Domain entry as an ambiguous primary type.
         const {EIP712Domain: _domain, ...types} = td.types;
+        // Providers may send the domain chainId as a hex string ("0x89");
+        // signers that build the EIP712Domain type from value types (viem)
+        // would then drop chainId from the domain and produce a signature the
+        // verifying contract rejects (Omniston order, 2026-10-16). Sign with a number.
         const signature = await signer.signTypedData({
-          domain: td.domain,
+          domain: normalizeTypedDomain(td.domain),
           types,
           ...(td.primaryType ? {primaryType: td.primaryType} : {}),
           message: td.message,

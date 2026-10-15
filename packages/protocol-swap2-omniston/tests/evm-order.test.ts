@@ -97,8 +97,8 @@ describe("Omniston EVM → TON orders (live 2026-10-16 fixtures)", () => {
   it("advertises EVM→TON only with a trusted order protocol AND both position validators", () => {
     expect(provider(clientFor(null)).supportsRoute(EVM, TON)).toBe(true);
     expect(provider(clientFor(null), {trustedEvmOrderProtocols: {}}).supportsRoute(EVM, TON)).toBe(false);
-    expect(provider(clientFor(null), {validateEvmInputPosition: undefined}).supportsRoute(EVM, TON)).toBe(false);
-    expect(provider(clientFor(null), {validateTonOutputPosition: undefined}).supportsRoute(EVM, TON)).toBe(false);
+    expect(provider(clientFor(null), {validateEvmInputPosition: undefined} as never).supportsRoute(EVM, TON)).toBe(false);
+    expect(provider(clientFor(null), {validateTonOutputPosition: undefined} as never).supportsRoute(EVM, TON)).toBe(false);
     expect(provider(clientFor(null), {trustedEvmOrderProtocols: {"eip155:1": [LOP]}}).supportsRoute(EVM, TON)).toBe(false);
     // The order-protocol table never stands in for the escrow factory table.
     expect(provider(clientFor(null), {trustedSettlementContracts: {"ton:-239": [TON_FACTORY]}}).supportsRoute(EVM, TON)).toBe(false);
@@ -130,7 +130,10 @@ describe("Omniston EVM → TON orders (live 2026-10-16 fixtures)", () => {
     const p = provider(client);
     const q = await p.getQuote(params());
     const tx = await p.buildDeposit(q!);
-    expect(tx).toEqual({chain: "eip155:8453", to: LOP, value: "0", chainId: 8453, approvalAddress: LOP, typedData: BASE.payload.typedData});
+    // The wallet signs the domain with a NUMERIC chainId (Omniston sends "0x2105").
+    const normalized = JSON.parse(BASE.payload.typedData);
+    normalized.domain.chainId = 8453;
+    expect(tx).toEqual({chain: "eip155:8453", to: LOP, value: "0", chainId: 8453, approvalAddress: LOP, typedData: JSON.stringify(normalized)});
     expect(client.calls.evmBuildOrderPayload).toEqual([{
       quoteId: quote().quoteId,
       ownerSrcAddress: {chain: {$case: "base", value: OWNER}},

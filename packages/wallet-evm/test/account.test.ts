@@ -237,3 +237,25 @@ describe('WalletAccountEvm', () => {
     m.dispose()
   })
 })
+
+describe("typed data: domain chainId notation", () => {
+  it("signs a domain whose chainId arrives as a hex string over chainId = NUMBER (what verifying contracts hash)", async () => {
+    const {recoverTypedDataAddress} = await import("viem")
+    const {typedDomainChainId} = await import("../src/account.js")
+    expect(typedDomainChainId("0x89")).toBe(137)
+    expect(typedDomainChainId("137")).toBe(137)
+    expect(typedDomainChainId(137n)).toBe(137)
+    expect(typedDomainChainId("nope")).toBeUndefined()
+    const {WalletManagerEvm} = await import("../src/index.js")
+    const manager = new WalletManagerEvm("test test test test test test test test test test test junk", {chainId: 137})
+    const account = await manager.getAccount(0)
+    const address = await account.getAddress()
+    const types = {Order: [{name: "salt", type: "uint256"}, {name: "maker", type: "address"}]}
+    const message = {salt: "1", maker: address}
+    const domain = {name: "1inch Limit Order Protocol", version: "4", chainId: "0x89", verifyingContract: "0xafCF681272AF10959736f45616eeCBC22D7095E2"}
+    const signature = (await account.signTypedData({domain, types, primaryType: "Order", message})) as `0x${string}`
+    const recovered = await recoverTypedDataAddress({domain: {...domain, chainId: 137}, types, primaryType: "Order", message, signature})
+    expect(recovered.toLowerCase()).toBe(address.toLowerCase())
+    manager.dispose()
+  })
+})

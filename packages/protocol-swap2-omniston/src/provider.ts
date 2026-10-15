@@ -1868,8 +1868,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       await store.clear(ref.quoteId);
       throw error;
     }
+    let td: unknown;
     try {
-      let td: unknown;
       try {
         td = JSON.parse(payload.typedData);
       } catch {
@@ -1916,11 +1916,16 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     }
     // The validated extension targets one trusted factory on the source chain.
     const extensionTarget = getAddress(`0x${bytesToHex(payload.orderExtension.slice(32 + new DataView(payload.orderExtension.buffer, payload.orderExtension.byteOffset).getUint32(4, false), 32 + new DataView(payload.orderExtension.buffer, payload.orderExtension.byteOffset).getUint32(4, false) + 20))}`);
+    // The SDK sends the domain chainId as a hex string ("0x2105"). Hand the
+    // wallet a numeric chainId: signers that derive the EIP712Domain type from
+    // the value types (viem) would otherwise sign a domain WITHOUT chainId and
+    // the order protocol would reject the signature (live 2026-10-16).
+    const typedData = JSON.stringify({...(td as object), domain: {...(td as {domain: object}).domain, chainId}});
     await saveBuilt(ref.quoteId, {
       quote: q,
       at: Date.now(),
       evmOrder: {
-        typedData: payload.typedData,
+        typedData,
         orderExtension: bytesToHex(payload.orderExtension),
         serializedOrderDetails: bytesToHex(payload.serializedOrderDetails ?? new Uint8Array()),
         owner,
@@ -1929,7 +1934,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       },
     });
     const orderProtocol = getAddress(protocol.chain.value);
-    return {chain: srcChain, to: orderProtocol, value: "0", chainId, approvalAddress: orderProtocol, typedData: payload.typedData};
+    return {chain: srcChain, to: orderProtocol, value: "0", chainId, approvalAddress: orderProtocol, typedData};
   }
 
   return {
