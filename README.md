@@ -87,12 +87,13 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 
 ## Tests
 
-`pnpm test` runs 827 tests across 32 packages (Node); `pnpm test:hermes` runs 185
+`pnpm test` runs 1,200+ tests across 32 packages (Node); `pnpm test:hermes` runs 185
 checks in the Hermes VM React Native ships. Beyond unit tests the swap layer is
-checked against live providers: 20,969 quote checks (8 providers, 30 chains, 340
-assets), 8,706 builds simulated to the signature, 3,408 router auctions with the
+checked against live providers: 24,587 quote checks (8 providers, 35 chains, 375
+assets), 10,444 builds simulated to the signature, 5,634 router auctions with the
 ranking invariants (best = max net value, fastest = min ETA) and 457 real-money
-swaps; every Earn module has a read-only `verify:live` across all its markets.
+swaps; every Earn module has a read-only `verify:live` across all its markets, and
+every module ships recorded real transactions its `describeActivity` must recognize.
 
 ## Develop
 

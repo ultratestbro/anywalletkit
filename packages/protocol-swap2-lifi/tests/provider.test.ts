@@ -356,6 +356,9 @@ describe("LI.FI route policy hook", () => {
     expect(calls).toHaveLength(3);
     expect(calls[2]).not.toMatch(/allowBridges/);
 
+  });
+});
+
 describe("LI.FI chain table (2026-10-14 batch)", () => {
   const ZERO = "0x0000000000000000000000000000000000000000";
   const ARC_USDC = "0x3600000000000000000000000000000000000000";
