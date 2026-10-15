@@ -17,7 +17,8 @@
     "release": "pnpm build && changeset publish",
     "test:hermes": "pnpm --filter @forgewallet/example-hermes-smoke test:hermes",
     "registry": "node scripts/build-registry.mjs",
-    "registry:check": "node scripts/build-registry.mjs && git diff --exit-code registry/modules.json"
+    "registry:check": "node scripts/build-registry.mjs && git diff --exit-code registry/modules.json",
+    "vendor": "node scripts/vendor.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",

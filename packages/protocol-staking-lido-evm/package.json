@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/protocol-staking-lido-evm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A simple package that lets @forgewallet/wallet-evm wallet accounts stake through the Lido protocol: stake, two-phase queue withdrawals (permit-first), wrap/unwrap, rewards.",
   "license": "Apache-2.0",
   "type": "module",

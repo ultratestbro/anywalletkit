@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/protocol-lending-mellow-evm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A simple package that lets @forgewallet/wallet-evm wallet accounts use Mellow Core Vaults (Lido EarnETH / EarnUSD and any vault on the same contracts): supply through the sync or async deposit queue, redeem and claim through the redeem queue, read the position, fees, oracle reports and APY.",
   "license": "Apache-2.0",
   "type": "module",

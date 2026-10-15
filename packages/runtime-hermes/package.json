@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/runtime-hermes",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "The one documented place for React Native / Hermes polyfills the forgewallet SDK relies on: AbortSignal.timeout/any, crypto.subtle.digest, TextEncoder checks, Buffer.",
   "license": "Apache-2.0",
   "type": "module",

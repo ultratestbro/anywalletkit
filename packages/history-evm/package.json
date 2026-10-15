@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/history-evm",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Activity history (HistorySource) for every EVM chain the SDK supports: Etherscan v2, Blockscout PRO and Alchemy Transfers API (API keys) with Blockscout and Routescan keyless fallbacks, merged into one ChainTx per hash with a documented spam heuristic.",
   "license": "Apache-2.0",
   "type": "module",

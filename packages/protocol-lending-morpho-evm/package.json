@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/protocol-lending-morpho-evm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Morpho for @forgewallet/wallet-evm accounts: Morpho Vaults (MetaMorpho V1 and Vault V2, ERC-4626 deposit / redeem) and Morpho Blue markets (supply, withdraw, borrow, repay, collateral) as LendingProtocols, on 10 chains. Vaults are verified against Morpho's factories, markets resolved on-chain, positions read with interest accrued like the contract does; the Morpho API only decorates (APY, listing).",
   "license": "Apache-2.0",
   "type": "module",

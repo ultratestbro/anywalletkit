@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/wallet-ton",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "TON wallet for the forgewallet SDK: SLIP-10 m/44'/607'/i' accounts on WalletContractV5R1, TON and jetton transfers, toncenter failover.",
   "license": "Apache-2.0",
   "type": "module",

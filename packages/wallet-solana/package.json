@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/wallet-solana",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Solana wallet for the forgewallet SDK: SLIP-10 m/44'/501'/i'/0' accounts, SOL and SPL transfers with ATA creation, noble ed25519 signing (no WebCrypto needed), built on @solana/kit.",
   "license": "Apache-2.0",
   "type": "module",

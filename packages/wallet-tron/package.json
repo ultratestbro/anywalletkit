@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/wallet-tron",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Tron wallet for the forgewallet SDK: BIP-32 m/44'/195'/0'/0/i accounts, TRX and TRC-20 transfers against a full-node HTTP API, no tronweb.",
   "license": "Apache-2.0",
   "type": "module",

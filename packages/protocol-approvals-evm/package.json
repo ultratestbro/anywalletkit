@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/protocol-approvals-evm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A simple package that lets @forgewallet/wallet-evm wallet accounts discover the token approvals they have granted (ERC-20 allowances, ERC-721 / ERC-1155 operators and per-token approvals, Permit2 allowances, EIP-7702 delegations), flag the risky ones, and revoke them one by one or all at once.",
   "license": "Apache-2.0",
   "type": "module",

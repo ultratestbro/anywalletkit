@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/protocol-staking-spl-stake-pool-solana",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A simple package that lets @forgewallet/wallet-solana wallet accounts stake through SPL stake pools (Jito by default): stake SOL \u2192 JitoSOL, exit instantly from the reserve or through a stake account, claim, read rates, APY and earnings.",
   "license": "Apache-2.0",
   "type": "module",
