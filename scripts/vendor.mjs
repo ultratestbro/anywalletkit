@@ -3,7 +3,7 @@
  * Vendor the SDK into a consumer as versioned tarballs, each stamped with the
  * commit it was built from.
  *
- *   node scripts/vendor.mjs --out <dir> [--consumer <package.json>] [--no-build] [pkg…]
+ *   node scripts/vendor.mjs --out <dir> [--consumer <package.json>]… [--no-build] [pkg…]
  *
  * For every workspace package (or the named ones — short names like `kit`
  * or full `@forgewallet/kit`):
@@ -15,9 +15,9 @@
  *   4. --out/manifest.json lists { commit, branch, builtAt, dirty, packages:
  *      { name: { version, file } } } — the consumer reads it to show which
  *      SDK build it runs and to tag its error reports;
- *   5. with --consumer, every `file:…/forgewallet-<name>-<old>.tgz` dependency
- *      in that package.json is pointed at the new tarball (run the consumer's
- *      install afterwards).
+ *   5. with --consumer, every `file:…/forgewallet-<name>-<old>.tgz` reference
+ *      in that package.json (dependencies and a root's pnpm.overrides) is
+ *      pointed at the new tarball (run the consumer's install afterwards).
  *
  * `dirty` is true when the working tree had uncommitted changes under
  * packages/ — such a build is not reproducible from `commit` alone and the
@@ -37,6 +37,11 @@ const opt = (name) => {
   args.splice(i, 2)
   return v
 }
+const opts = (name) => {
+  const out = []
+  for (let v = opt(name); v !== undefined; v = opt(name)) out.push(v)
+  return out
+}
 const flag = (name) => {
   const i = args.indexOf(name)
   if (i < 0) return false
@@ -45,10 +50,10 @@ const flag = (name) => {
 }
 
 const out = opt('--out')
-const consumer = opt('--consumer')
+const consumers = opts('--consumer')
 const noBuild = flag('--no-build')
 if (!out) {
-  console.error('usage: node scripts/vendor.mjs --out <dir> [--consumer <package.json>] [--no-build] [pkg…]')
+  console.error('usage: node scripts/vendor.mjs --out <dir> [--consumer <package.json>]… [--no-build] [pkg…]')
   process.exit(2)
 }
 const outDir = resolve(out)
@@ -113,19 +118,21 @@ manifest.packages = Object.fromEntries(Object.entries(manifest.packages).sort(([
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
 console.log(`manifest: ${manifestPath} (${commit.slice(0, 7)}${dirty ? ' DIRTY' : ''} on ${branch})`)
 
-if (consumer) {
+for (const consumer of consumers) {
   const consumerPath = resolve(consumer)
   const text = readFileSync(consumerPath, 'utf8')
   const json = JSON.parse(text)
   const relOut = relative(dirname(consumerPath), outDir).split('\\').join('/')
   let changed = 0
-  for (const field of ['dependencies', 'devDependencies', 'optionalDependencies']) {
-    for (const [name, spec] of Object.entries(json[field] ?? {})) {
+  // dependency tables + a root's pnpm.overrides / overrides / resolutions
+  const tables = [json.dependencies, json.devDependencies, json.optionalDependencies, json.overrides, json.resolutions, json.pnpm?.overrides].filter((t) => t && typeof t === 'object')
+  for (const table of tables) {
+    for (const [name, spec] of Object.entries(table)) {
       const entry = manifest.packages[name]
       if (!entry || typeof spec !== 'string' || !spec.startsWith('file:')) continue
       const next = `file:${relOut}/${entry.file}`
       if (spec !== next) {
-        json[field][name] = next
+        table[name] = next
         changed++
       }
     }
