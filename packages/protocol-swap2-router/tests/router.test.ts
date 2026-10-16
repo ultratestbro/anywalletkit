@@ -212,3 +212,39 @@ describe("ranking, route picker, progressive quotes", () => {
     expect((await fastFirst.quoteSwap2(options)).toTokenAmountMin).toBe(97_000_000n);
   });
 });
+
+describe("quoteValues (SDK-127): USD in / out / loss and the better alternative — information, never a refusal", () => {
+  const params = {sourceChain: "eip155:10", sourceToken: "USDT", destChain: "eip155:10", destToken: "0x01bff41798a0bcf287b996046ca68b395dbc1071", amountIn: "16779388"};
+  const prices = {USDT: 1, USDT0: 1};
+
+  it("names the Oct 16 Optimism USDT→USDT0 disaster: Uniswap −99.9 %, LI.FI the better alternative", async () => {
+    const {quoteValues} = await import("../src/value.js");
+    const v = quoteValues(prices, params, [
+      {provider: "uniswap", destAmount: "9966", providerData: {priceImpactBps: "9994"}},
+      {provider: "lifi", destAmount: "16733412"},
+    ]);
+    const uni = v.find((x) => x.provider === "uniswap")!, lifi = v.find((x) => x.provider === "lifi")!;
+    expect(uni.valueUsdIn).toBeCloseTo(16.78, 2);
+    expect(uni.valueUsdOut).toBeCloseTo(0.00997, 4);
+    expect(uni.lossPct).toBeGreaterThan(99.9);
+    expect(uni.priceImpactBps).toBe(9994);
+    expect(uni.betterAlternative).toMatchObject({provider: "lifi", destAmount: "16733412"});
+    expect(uni.betterAlternative!.byPct).toBeGreaterThan(100_000);
+    expect(lifi.lossPct).toBeCloseTo(0.27, 1);
+    expect(lifi.betterAlternative).toBeUndefined();
+  });
+
+  it("no alternative inside the tie band, null values when a price is missing, native fee netted out of the delivered value", async () => {
+    const {quoteValues} = await import("../src/value.js");
+    const close = quoteValues(prices, params, [{provider: "a", destAmount: "16700000"}, {provider: "b", destAmount: "16600000"}]);
+    expect(close.every((x) => x.betterAlternative === undefined)).toBe(true);
+    // Stables price at par without a map entry; a non-stable pair with no prices is unpriced on both sides.
+    const unpriced = quoteValues({}, {...params, sourceToken: "ETH", destToken: "0x4200000000000000000000000000000000000042"}, [{provider: "a", destAmount: "1"}]);
+    expect(unpriced[0]).toMatchObject({valueUsdIn: null, valueUsdOut: null, lossPct: null});
+    const bridged = quoteValues({USDT: 1, ETH: 2000, USDC: 1}, {sourceChain: "eip155:1", sourceToken: "USDT", destChain: "eip155:8453", destToken: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", amountIn: "100000000"}, [
+      {provider: "lifi", destAmount: "99000000", txRequest: {nativeFee: "500000000000000"}},
+    ]);
+    expect(bridged[0]!.valueUsdOut).toBeCloseTo(98, 3);
+    expect(bridged[0]!.lossPct).toBeCloseTo(2, 3);
+  });
+});
