@@ -11,6 +11,7 @@ import {
   resetEtherscanChainlistCache,
   resetSharedBuckets,
 } from '../src/index.js'
+import type { FetchLike } from '../src/index.js'
 import { ADDRESS, fakeFetch, fixture } from './helpers.js'
 
 /**
@@ -398,5 +399,51 @@ describe('Alchemy tables', () => {
     expect(parseAlchemyTransfer({ ...toRows()[0]!, category: 'erc721' })).toBeUndefined()
     expect(parseAlchemyTransfer({ ...toRows()[0]!, category: 'erc1155' })).toBeUndefined()
     expect(parseAlchemyTransfer({ hash: 1 })).toBeUndefined()
+  })
+})
+
+describe('Alchemy backend: resilience (Base has no other free backend)', () => {
+  /** Batches (arrays) are the enrichment calls; single bodies are the Transfers lists. */
+  const splitFetch = (onBatch: (n: number) => 'throw' | 'pass', onSingle: (n: number) => 'throw' | 'pass' = () => 'pass') => {
+    const inner = fakeFetch()
+    let batches = 0, singles = 0
+    const fetch: FetchLike = async (url, init) => {
+      const body = init?.body ? (JSON.parse(init.body) as unknown) : undefined
+      if (Array.isArray(body)) { if (onBatch(batches++) === 'throw') throw new Error('Aborted') }
+      else if (onSingle(singles++) === 'throw') throw new Error('Aborted')
+      return inner(url, init)
+    }
+    return { fetch, count: () => ({ batches, singles }) }
+  }
+
+  it('serves the page from the Transfers lists when every enrichment batch aborts (bare rows, no fee / status)', async () => {
+    const { fetch } = splitFetch(() => 'throw')
+    const src = createEvmHistory({ chainId: 8453, alchemyApiKey: 'alch_test', fetch, alchemyComputeUnitsPerSecond: 1000000 })
+    const page = await src.listActivity(ADDRESS, { limit: 50 })
+    expect(page.backend).toBe('alchemy')
+    expect(page.items.length).toBeGreaterThan(0)
+    const supply = page.items.find((t) => t.hash === SUPPLY)!
+    expect(supply).toBeDefined()
+    expect(supply.status).toBe('confirmed')
+    expect(supply.fee).toBeUndefined()
+    // The transfers' own data survived: parties, token legs, time.
+    expect(supply.transfers.some((x) => x.token === A_BAS_WETH)).toBe(true)
+    expect(supply.time).toBeGreaterThan(0)
+  })
+
+  it('retries a Transfers call that aborts once, then answers normally', async () => {
+    const { fetch, count } = splitFetch(() => 'pass', (n) => (n === 0 ? 'throw' : 'pass'))
+    const src = createEvmHistory({ chainId: 8453, alchemyApiKey: 'alch_test', fetch, alchemyComputeUnitsPerSecond: 1000000 })
+    const page = await src.listActivity(ADDRESS, { limit: 50 })
+    expect(page.items.length).toBeGreaterThan(0)
+    expect(page.items.find((t) => t.hash === SUPPLY)?.fee).toBeDefined()
+    expect(count().singles).toBeGreaterThanOrEqual(3) // the aborted call + its retry + the second list
+  })
+
+  it('gives up on a Transfers call that aborts every time (HistoryUnavailableError names the transport failure)', async () => {
+    const { fetch } = splitFetch(() => 'pass', () => 'throw')
+    const err = (await createEvmHistory({ chainId: 8453, alchemyApiKey: 'alch_test', fetch, alchemyComputeUnitsPerSecond: 1000000 }).listActivity(ADDRESS, { limit: 50 }).catch((e: unknown) => e)) as HistoryUnavailableError
+    expect(err).toBeInstanceOf(HistoryUnavailableError)
+    expect(err.message).toMatch(/alchemy: Aborted/)
   })
 })

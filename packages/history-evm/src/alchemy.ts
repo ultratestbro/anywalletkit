@@ -97,6 +97,8 @@ export class AlchemyClient {
   readonly backend = 'alchemy' as const
   private readonly o: AlchemyClientOptions
   readonly url: string
+  /** Last enrichment failure `toRows` absorbed (tests / diagnostics); cleared on the next successful batch. */
+  degraded: ExplorerError | undefined
 
   constructor(options: AlchemyClientOptions) {
     this.o = options
@@ -113,9 +115,9 @@ export class AlchemyClient {
 
   /**
    * POST a JSON-RPC body (single or batch) with the limiter; up to three retries with
-   * backoff on 429 / 5xx / rate-limit answers (the bucket is charged in compute
-   * units); key / plan refusals and "network not enabled"
-   * are `unavailable` (no retry, the source falls through).
+   * backoff on 429 / 5xx / rate-limit answers and on transport failures (timeout,
+   * abort, DNS — the bucket is charged in compute units); key / plan refusals and
+   * "network not enabled" are `unavailable` (no retry, the source falls through).
    */
   private async post(body: unknown): Promise<unknown> {
     let retry: ExplorerError | undefined
@@ -124,7 +126,14 @@ export class AlchemyClient {
       // Backoff before a retry: 0.5 s, 1 s, 2 s (+ jitter so concurrent chains do not retry in lockstep).
       if (attempt > 0) await sleep(500 * 2 ** (attempt - 1) + Math.floor(Math.random() * 250))
       await this.o.bucket.acquire(cost)
-      const res = await postJson(this.o.fetch, this.backend, this.url, body, this.o.timeoutMs)
+      let res: Awaited<ReturnType<typeof postJson>>
+      try {
+        res = await postJson(this.o.fetch, this.backend, this.url, body, this.o.timeoutMs)
+      } catch (e) {
+        // A timeout / abort / DNS hiccup on one call is not a verdict on the backend: retry with the same backoff.
+        if (e instanceof ExplorerError && e.kind === 'network') { retry = e; continue }
+        throw e
+      }
       const envelope = res.body as RpcResponse | RpcResponse[] | undefined
       // Transport-level failures first: 429 / 5xx retry once, 401 / 403 fall through.
       if (res.status === 429 || res.status >= 500) {
@@ -248,7 +257,20 @@ export class AlchemyClient {
     const calls: { method: string; params: unknown[] }[] = []
     for (const h of hashes) calls.push({ method: 'eth_getTransactionByHash', params: [h] }, { method: 'eth_getTransactionReceipt', params: [h] })
     for (const b of blocksMissing) calls.push({ method: 'eth_getBlockByNumber', params: [hex(b), false] })
-    const answers = calls.length > 0 ? await this.batch(calls) : []
+    // The Transfers lists already hold hash / parties / amounts / time; the batch only adds fee,
+    // status and calldata. When it fails after its own retries (a 15 s abort on a phone, a shared
+    // compute-unit bucket starved by six sibling chains) the page is still served from the
+    // transfers alone — bare rows (status confirmed, no fee) beat "History unavailable".
+    let answers: unknown[] = []
+    if (calls.length > 0) {
+      try {
+        answers = await this.batch(calls)
+        this.degraded = undefined
+      } catch (e) {
+        if (!(e instanceof ExplorerError)) throw e
+        this.degraded = e
+      }
+    }
     for (let i = 0; i < blocksMissing.length; i++) {
       const block = answers[hashes.length * 2 + i] as Row | null
       if (block && typeof block['timestamp'] === 'string') timeByBlock.set(blocksMissing[i]!, parseInt10(block['timestamp']))
