@@ -75,6 +75,22 @@ export function computeUnitLimitFromSimulation(unitsConsumed: bigint): number {
   return Math.min(CU_MAX, Math.max(CU_MIN, padded))
 }
 
+/**
+ * A simulation `err` as text. `@solana/kit` parses every JSON integer in an
+ * RPC response as a bigint, so a structured error such as
+ * `{InstructionError: [2n, {Custom: 6001n}]}` made a plain JSON.stringify
+ * throw "Do not know how to serialize a BigInt" — and that message replaced
+ * the real on-chain failure (Solana USDe → SOL via LI.FI, Oct 16 run).
+ */
+function describeSimulationErr(err: unknown): string {
+  if (typeof err === 'string') return err
+  try {
+    return JSON.stringify(err, (_k, v) => (typeof v === 'bigint' ? Number(v) : v))
+  } catch {
+    return String(err)
+  }
+}
+
 export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
   readonly address: Address
   readonly chain: string
@@ -273,7 +289,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     const rpc = this.requireRpc('simulate transactions')
     const { value } = await rpc.simulateTransaction(wire as never, { encoding: 'base64', sigVerify: false, replaceRecentBlockhash: true, commitment: this._commitment }).send()
     const logs = value.logs ?? []
-    if (value.err) return { ok: false, error: typeof value.err === 'string' ? value.err : JSON.stringify(value.err), logs }
+    if (value.err) return { ok: false, error: describeSimulationErr(value.err), logs }
     return { ok: true, unitsConsumed: value.unitsConsumed ?? 0n, logs }
   }
 
@@ -473,7 +489,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       encoding: 'base64', sigVerify: false, replaceRecentBlockhash: true, commitment: this._commitment, accounts: { addresses: watched.map(address), encoding: 'base64' },
     }).send()
     const logs = value.logs ?? []
-    if (value.err) throw new SimulationError(typeof value.err === 'string' ? value.err : JSON.stringify(value.err), logs)
+    if (value.err) throw new SimulationError(describeSimulationErr(value.err), logs)
     const postList = (value as { accounts?: Array<{ lamports: bigint | number; owner: string; data: readonly [string, string] } | null> }).accounts
     if (!postList || postList.length !== watched.length) throw new NetworkError('simulateTransaction did not return the requested post-state accounts.')
     const post = new Map<string, { lamports: bigint; owner: string; data: Uint8Array } | null>()
