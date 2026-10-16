@@ -26,7 +26,7 @@ const TRANSMITTER_ABI = parseAbi([
 const PARAMS = {sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:42161", destToken: ARB.usdc, amountIn: "10000000", destAddress: RECIPIENT, refundAddress: SENDER, slippageBps: 0};
 
 /** Fake Circle API + fake JSON-RPC behind one fetch. */
-function world(o: {fees?: unknown; allowance?: number; message?: unknown; usedNonce?: bigint; domain?: number; transmitter?: string; head?: bigint} = {}) {
+function world(o: {fees?: unknown; allowance?: number; message?: unknown; usedNonce?: bigint; domain?: number; transmitter?: string; head?: bigint; l1Head?: bigint} = {}) {
   const calls: string[] = [];
   const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input);
@@ -44,6 +44,7 @@ function world(o: {fees?: unknown; allowance?: number; message?: unknown; usedNo
       const reply = (result: unknown) => new Response(JSON.stringify({jsonrpc: "2.0", id: body.id, result}));
       if (body.method === "eth_chainId") return reply(url.includes("base") ? "0x2105" : "0xa4b1");
       if (body.method === "eth_blockNumber") return reply(toHex(o.head ?? 100n));
+      if (body.method === "eth_getBlockByNumber") return reply({number: toHex(o.head ?? 100n), ...(o.l1Head !== undefined ? {l1BlockNumber: toHex(o.l1Head)} : {})});
       if (body.method === "eth_call") {
         const {to, data} = (body.params as [{to: string; data: Hex}])[0];
         const abi = to.toLowerCase() === TOKEN_MESSENGER_V2.toLowerCase() ? MESSENGER_ABI : TRANSMITTER_ABI;
@@ -208,6 +209,10 @@ describe("track & claim (two-phase)", () => {
     expect(await expired.p.buildClaim!(ref)).toBeNull();
     expect(expired.calls.some((u) => u.includes("/v2/reattest/"))).toBe(true);
     const alive = make({message: completeMessage({decodedMessage: {sourceDomain: "6", destinationDomain: "3", nonce: NONCE, decodedMessageBody: {expirationBlock: "500"}}}), head: 60n});
+    // Arbitrum-stack destination: `block.number` is the L1 height the RPC block exposes as l1BlockNumber — the L2 height is far above the expiry.
+    const arbitrum = make({message: completeMessage({decodedMessage: {sourceDomain: "6", destinationDomain: "3", nonce: NONCE, decodedMessageBody: {expirationBlock: "26208525"}}}), head: 400_000_000n, l1Head: 23_900_000n});
+    expect(await arbitrum.p.buildClaim!(ref)).not.toBeNull();
+    expect(arbitrum.calls.some((u) => u.includes("/v2/reattest/"))).toBe(false);
     expect(await alive.p.buildClaim!(ref)).not.toBeNull();
   });
 });
