@@ -61,8 +61,9 @@ export interface QuoteValue {
   valueUsdOut: number | null;
   /** (in − out) / in × 100. Positive = the user receives less value than they pay. null when either side is unpriced. */
   lossPct: number | null;
-  /** Another provider in the same set whose delivered value beats this one by more than `betterByPct`. */
-  betterAlternative?: {provider: string; valueUsdOut: number; destAmount: string; byPct: number};
+  /** Another provider in the same set that delivers more than `betterByPct` more. Every quote of a request pays out the
+   *  same destination token, so the comparison is by delivered USD when priced and by raw `destAmount` otherwise. */
+  betterAlternative?: {provider: string; valueUsdOut: number | null; destAmount: string; byPct: number};
   /** The venue's own price impact in basis points (`providerData.priceImpactBps`), when it measures one. */
   priceImpactBps?: number;
 }
@@ -126,15 +127,18 @@ export function quoteValues(prices: Readonly<Record<string, number>>, params: Va
     if (priceImpactBps !== undefined) v.priceImpactBps = priceImpactBps;
     return v;
   });
-  // The best delivered value in the set names itself as the alternative for every quote it beats by more than betterBy %.
-  const priced = out.filter((v) => v.valueUsdOut !== null);
-  if (priced.length > 1) {
-    const top = priced.reduce((a, b) => (b.valueUsdOut! > a.valueUsdOut! ? b : a));
+  // The best delivery in the set names itself as the alternative for every quote it beats by more than betterBy %.
+  // Priced: by delivered USD (native fees netted). Unpriced: by raw destAmount — same token for every quote, so the ratio is exact.
+  const allPriced = out.length > 1 && out.every((v) => v.valueUsdOut !== null);
+  if (out.length > 1) {
+    const measure = (v: QuoteValue): number => (allPriced ? v.valueUsdOut! : Number(BigInt(quotes.find((q) => q.provider === v.provider)!.destAmount)));
+    const top = out.reduce((a, b) => (measure(b) > measure(a) ? b : a));
     const topQuote = quotes.find((q) => q.provider === top.provider)!;
     for (const v of out) {
-      if (v === top || v.valueUsdOut === null) continue;
-      const byPct = v.valueUsdOut > 0 ? ((top.valueUsdOut! - v.valueUsdOut) / v.valueUsdOut) * 100 : Infinity;
-      if (byPct > betterBy) v.betterAlternative = {provider: top.provider, valueUsdOut: top.valueUsdOut!, destAmount: topQuote.destAmount, byPct};
+      if (v === top) continue;
+      const mine = measure(v);
+      const byPct = mine > 0 ? ((measure(top) - mine) / mine) * 100 : Infinity;
+      if (byPct > betterBy) v.betterAlternative = {provider: top.provider, valueUsdOut: top.valueUsdOut, destAmount: topQuote.destAmount, byPct};
     }
   }
   return out;

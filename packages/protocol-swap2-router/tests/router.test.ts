@@ -247,4 +247,17 @@ describe("quoteValues (SDK-127): USD in / out / loss and the better alternative 
     expect(bridged[0]!.valueUsdOut).toBeCloseTo(98, 3);
     expect(bridged[0]!.lossPct).toBeCloseTo(2, 3);
   });
+
+  it("names the better alternative by raw output when the destination has no price (Oct 16 Base USDT→ENA: Uniswap 19.2 vs LI.FI 24.5)", async () => {
+    const {quoteValues} = await import("../src/value.js");
+    const v = quoteValues({USDT: 1}, {sourceChain: "eip155:8453", sourceToken: "USDT", destChain: "eip155:8453", destToken: "0x58538e6a46e07434d7e7375bc268d3cb839c0133", amountIn: "5000000"}, [
+      {provider: "lifi", destAmount: "24465933123439002301"},
+      {provider: "uniswap", destAmount: "19215651442380936685"},
+    ]);
+    const uni = v.find((x) => x.provider === "uniswap")!;
+    expect(uni.valueUsdOut).toBeNull();
+    expect(uni.betterAlternative).toMatchObject({provider: "lifi", valueUsdOut: null, destAmount: "24465933123439002301"});
+    expect(uni.betterAlternative!.byPct).toBeCloseTo(27.3, 0);
+    expect(v.find((x) => x.provider === "lifi")!.betterAlternative).toBeUndefined();
+  });
 });
