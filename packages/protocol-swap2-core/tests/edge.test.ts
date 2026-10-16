@@ -66,21 +66,155 @@ function protocol(p: CrossChainProvider, acc: unknown, config: Partial<Swap2Engi
 }
 
 describe("edge: quote expiry", () => {
-  // The engine never re-quotes on its own: an expired quote is a hard abort and
-  // the caller starts a new swap2() (which quotes afresh).
-  it("expiring while the approval is being mined aborts before the deposit and revokes the allowance", async () => {
+  // The engine re-quotes exactly once, and only when its own mined approvals
+  // pushed the quote past its TTL (SDK-128): the exact allowance is kept and
+  // spent by the second pass. Everything else is a hard abort and the caller
+  // starts a new swap2() (which quotes afresh).
+  const slow = (log: string[]) => account(log, {waitForTransaction: () => new Promise((r) => setTimeout(r, 80))});
+  const shortLived = (over: Partial<CrossChainProvider> = {}) =>
+    provider({getQuote: async (params) => quote(params, {validUntilMs: Date.now() + 40}), ...over});
+
+  it("expiring while the approval is being mined re-quotes once and spends the allowance — no revoke, no second approve", async () => {
     const log: string[] = [];
-    const slowMine = account(log, {waitForTransaction: () => new Promise((r) => setTimeout(r, 80))});
-    const p = provider({getQuote: async (params) => quote(params, {validUntilMs: Date.now() + 40})});
-    await expect(protocol(p, slowMine).swap2(options)).rejects.toThrow(/quote expired before source broadcast/);
+    const phases: string[] = [];
+    let quotes = 0;
+    const p = shortLived({getQuote: async (params) => { quotes += 1; return quote(params, {validUntilMs: Date.now() + 40}); }});
+    await protocol(p, slow(log), {onExecutionPhase: (ph) => phases.push(ph)}).swap2(options);
+    expect(log).toEqual(["approve", "deposit"]);
+    expect(quotes).toBe(2);
+    expect(phases).toEqual(["approving", "requoting", "signing", "broadcast"]);
+  });
+
+  it("the re-quote pass is not reviewed again", async () => {
+    const log: string[] = [];
+    let reviews = 0;
+    await protocol(shortLived(), slow(log), {reviewExecution: async () => { reviews += 1; }}).swap2(options);
+    expect([log, reviews]).toEqual([["approve", "deposit"], 1]);
+  });
+
+  it("a second expiry (the fresh quote also died) aborts with a typed error and revokes exactly once", async () => {
+    const log: string[] = [];
+    let quotes = 0;
+    // 1st quote: 40 ms, outlived by the 80 ms approval. 2nd: 40 ms, outlived
+    // by a slow build (an expired quote never passes validation, so it has to
+    // die between the build and the broadcast check, like the first one).
+    const p = provider({
+      getQuote: async (params) => { quotes += 1; return quote(params, {validUntilMs: Date.now() + 40}); },
+      buildDeposit: async (q) => { if (quotes === 2) await new Promise((r) => setTimeout(r, 80)); return built(q); },
+    });
+    const run = protocol(p, slow(log)).swap2(options);
+    await expect(run).rejects.toThrow(/quote expired before source broadcast/);
+    await expect(run).rejects.toBeInstanceOf(Swap2QuoteError);
+    expect(log).toEqual(["approve", "revoke"]);
+    expect(quotes).toBe(2);
+  });
+
+  it("a fresh quote with a different spender revokes the allowance and aborts", async () => {
+    const log: string[] = [];
+    let quotes = 0;
+    const other = "0x7777777777777777777777777777777777777777";
+    const p = provider({
+      getQuote: async (params) => {
+        quotes += 1;
+        return quotes === 1
+          ? quote(params, {validUntilMs: Date.now() + 40})
+          : quote(params, {txRequest: {...txRequest, to: other, approvalAddress: other}});
+      },
+    });
+    await expect(protocol(p, slow(log)).swap2(options)).rejects.toThrow(/moved the spender/);
     expect(log).toEqual(["approve", "revoke"]);
   });
 
-  // Was a GAP (low): the post-approval expiry was a plain Error.
-  it("expiry after approval is a typed Swap2QuoteError", async () => {
-    const slowMine = account([], {waitForTransaction: () => new Promise((r) => setTimeout(r, 80))});
-    const p = provider({getQuote: async (params) => quote(params, {validUntilMs: Date.now() + 40})});
-    await expect(protocol(p, slowMine).swap2(options)).rejects.toBeInstanceOf(Swap2QuoteError);
+  it("a fresh quote that no longer needs an allowance revokes and aborts", async () => {
+    const log: string[] = [];
+    let quotes = 0;
+    const p = provider({
+      getQuote: async (params) => {
+        quotes += 1;
+        return quotes === 1
+          ? quote(params, {validUntilMs: Date.now() + 40})
+          : quote(params, {txRequest: {...txRequest, approvalAddress: undefined} as never});
+      },
+    });
+    await expect(protocol(p, slow(log)).swap2(options)).rejects.toThrow(/no longer spends through an allowance/);
+    expect(log).toEqual(["approve", "revoke"]);
+  });
+
+  it("a failed re-quote (no route) revokes exactly once and surfaces the quote error", async () => {
+    const log: string[] = [];
+    let quotes = 0;
+    const p = provider({getQuote: async (params) => { quotes += 1; if (quotes > 1) return null as never; return quote(params, {validUntilMs: Date.now() + 40}); }});
+    await expect(protocol(p, slow(log)).swap2(options)).rejects.toThrow(/no route available/);
+    expect(log).toEqual(["approve", "revoke"]);
+  });
+
+  it("a failure after the re-quote pass adopted the allowance revokes exactly once", async () => {
+    const log: string[] = [];
+    let quotes = 0;
+    const p = shortLived({
+      getQuote: async (params) => { quotes += 1; return quote(params, {validUntilMs: Date.now() + 40}); },
+      preflightDeposit: async () => { if (quotes === 2) throw new Error("halted"); },
+    });
+    await expect(protocol(p, slow(log)).swap2(options)).rejects.toThrow(/halted/);
+    expect(log).toEqual(["approve", "revoke"]);
+  });
+
+  it("expiry during a slow mine with no approval at all is still a hard abort", async () => {
+    // Deposit-address route: nothing was approved, nothing to keep.
+    const p = provider({
+      getQuote: async (params) => quote(params, {txRequest: undefined, depositAddress: DEPOSIT, validUntilMs: Date.now() + 40}),
+      buildDeposit: async (q) => { await new Promise((r) => setTimeout(r, 80)); return {chain: "eip155:1", to: q.depositAddress, value: q.sourceAmount}; },
+    });
+    const log: string[] = [];
+    await expect(protocol(p, account(log)).swap2({...options, fromToken: "ETH"})).rejects.toThrow(/quote expired before source broadcast/);
+    expect(log).toEqual([]);
+  });
+});
+
+describe("edge: allowance-aware approvals (SDK-128)", () => {
+  const USDT_OPTIONS = {...options, fromToken: "USDT"};
+  const withAllowance = (log: string[], current: bigint | (() => Promise<bigint>)) =>
+    account(log, {getAllowance: typeof current === "function" ? current : async () => current});
+
+  it("mainnet USDT with a zero allowance gets a single approve(n) — no reset", async () => {
+    const log: string[] = [];
+    const plans: Swap2ExecutionPlan[] = [];
+    await protocol(provider(), withAllowance(log, 0n), {reviewExecution: async (plan) => { plans.push(plan); }}).swap2(USDT_OPTIONS);
+    expect(log).toEqual(["approve", "deposit"]);
+    expect(plans[0]!.approvals.map((a) => a.amount)).toEqual([1_000_000n]);
+  });
+
+  it("mainnet USDT with a stale non-zero allowance resets first", async () => {
+    const log: string[] = [];
+    await protocol(provider(), withAllowance(log, 5n)).swap2(USDT_OPTIONS);
+    expect(log).toEqual(["revoke", "approve", "deposit"]);
+  });
+
+  it("without getAllowance (or when the read fails) USDT is reset every time", async () => {
+    const plain: string[] = [];
+    await protocol(provider(), account(plain)).swap2(USDT_OPTIONS);
+    expect(plain).toEqual(["revoke", "approve", "deposit"]);
+    const failing: string[] = [];
+    await protocol(provider(), withAllowance(failing, async () => { throw new Error("rpc down"); })).swap2(USDT_OPTIONS);
+    expect(failing).toEqual(["revoke", "approve", "deposit"]);
+  });
+
+  it("an exact allowance already in place sends no approval, and a failure leaves it alone", async () => {
+    const log: string[] = [];
+    const plans: Swap2ExecutionPlan[] = [];
+    await protocol(provider(), withAllowance(log, 1_000_000n), {reviewExecution: async (plan) => { plans.push(plan); }}).swap2(options);
+    expect(log).toEqual(["deposit"]);
+    expect(plans[0]!.approvals).toEqual([]);
+    const failed: string[] = [];
+    const halted = provider({preflightDeposit: async () => { throw new Error("halted"); }});
+    await expect(protocol(halted, withAllowance(failed, 1_000_000n)).swap2(options)).rejects.toThrow(/halted/);
+    expect(failed).toEqual([]); // not ours to revoke
+  });
+
+  it("a non-USDT token with a different allowance is overwritten in one approve", async () => {
+    const log: string[] = [];
+    await protocol(provider(), withAllowance(log, 5n)).swap2(options);
+    expect(log).toEqual(["approve", "deposit"]);
   });
 });
 
