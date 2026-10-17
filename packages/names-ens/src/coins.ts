@@ -18,8 +18,9 @@ export function coinTypeFor(chain: string): bigint | null {
     if (!Number.isSafeInteger(id) || id <= 0 || id >= 0x80000000) return null
     return BigInt(0x80000000 + id)
   }
-  if (chain === BTC_CAIP2) return 0n
-  if (chain === SOL_CAIP2) return 501n
+  // Wallets spell these chains differently (`bitcoin:mainnet`, `solana:mainnet` in Vaulty; CAIP-2 genesis ids elsewhere): the namespace decides.
+  if (chain === BTC_CAIP2 || chain.startsWith('bip122:') || chain.startsWith('bitcoin:')) return 0n
+  if (chain === SOL_CAIP2 || chain.startsWith('solana:')) return 501n
   return null
 }
 
@@ -37,11 +38,11 @@ export function decodeAddressRecord(chain: string, raw: string, name: string): s
     return getAddress(raw)
   }
   const bytes = hex(raw)
-  if (chain === SOL_CAIP2) {
+  if (coinTypeFor(chain) === 501n) {
     if (bytes.length !== 32) throw new NameError('not-found', `${name}: malformed Solana record`, { name, chain })
     return base58(bytes)
   }
-  if (chain === BTC_CAIP2) return decodeBtcScript(bytes, name)
+  if (coinTypeFor(chain) === 0n) return decodeBtcScript(bytes, name)
   throw new NameError('unsupported', `${chain} is not a chain ENS can resolve here`, { name, chain })
 }
 

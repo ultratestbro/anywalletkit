@@ -1,20 +1,21 @@
 /**
  * What to tell the user next to a name that normalizes fine but still deserves
- * a second look: labels mixing scripts (`pаypal.eth` with a Cyrillic а), labels
- * made only of Cyrillic letters that look Latin, punycode labels.
+ * a second look: labels mixing scripts, labels made only of Cyrillic letters
+ * that look Latin, punycode labels. Explicit code-point ranges, not
+ * `\p{Script=…}` — Hermes (React Native) has no Unicode property escapes.
  */
 import type { NameWarning } from '@forgewallet/core'
 
 const SCRIPTS: Array<[string, RegExp]> = [
-  ['Latin', /\p{Script=Latin}/u],
-  ['Cyrillic', /\p{Script=Cyrillic}/u],
-  ['Greek', /\p{Script=Greek}/u],
-  ['Armenian', /\p{Script=Armenian}/u],
-  ['Hebrew', /\p{Script=Hebrew}/u],
-  ['Arabic', /\p{Script=Arabic}/u],
+  ['Latin', /[A-Za-zÀ-ɏḀ-ỿ]/],
+  ['Cyrillic', /[Ѐ-ӿԀ-ԯ]/],
+  ['Greek', /[Ͱ-Ͽἀ-῿]/],
+  ['Armenian', /[԰-֏]/],
+  ['Hebrew', /[֐-׿]/],
+  ['Arabic', /[؀-ۿݐ-ݿ]/],
 ]
-/** Cyrillic letters that render like Latin ones in common fonts. */
-const LOOKALIKE = /^[аеоруსაіјѕһԁԛԝсѕіјԁԛԝһорухаесxх0-9-]+$/u
+/** Cyrillic letters that render like Latin ones in common fonts (а е о р с у х і ј ѕ һ ԁ ԛ ԝ ѵ ԛ), plus digits and hyphen. */
+const LOOKALIKE = /^[аеорсухіјѕһԁԛԝѵү0-9-]+$/
 
 export function warningsFor(name: string): NameWarning[] {
   const out: NameWarning[] = []

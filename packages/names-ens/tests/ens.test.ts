@@ -128,6 +128,8 @@ describe('core helpers', () => {
     expect(coinTypeFor(BTC_CAIP2)).toBe(0n)
     expect(coinTypeFor(SOL_CAIP2)).toBe(501n)
     expect(coinTypeFor('ton:-239')).toBeNull()
+    expect(coinTypeFor('solana:mainnet')).toBe(501n)
+    expect(coinTypeFor('bitcoin:mainnet')).toBe(0n)
   })
   it('isNameLike', () => {
     expect(isNameLike('vitalik.eth')).toBe(true)

@@ -41,6 +41,9 @@ importers:
       '@forgewallet/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@forgewallet/names-ens':
+        specifier: workspace:*
+        version: link:../../packages/names-ens
       '@forgewallet/protocol-approvals-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-approvals-evm
