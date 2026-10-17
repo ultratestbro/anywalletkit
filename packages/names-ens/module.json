@@ -1,0 +1,17 @@
+{
+  "name": "@forgewallet/names-ens",
+  "type": "names",
+  "chains": [
+    "eip155:*",
+    "bip122:000000000019d6689c085ae165831e93",
+    "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+  ],
+  "tier": "core",
+  "maintainers": [
+    "@ultratestbro"
+  ],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/forgewallet",
+  "path": "packages/names-ens",
+  "addedAt": "2026-10-17"
+}

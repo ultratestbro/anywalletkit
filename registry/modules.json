@@ -1,7 +1,7 @@
 {
   "$schema": "./modules.schema.json",
-  "generatedAt": "2026-10-15",
-  "count": 17,
+  "generatedAt": "2026-10-17",
+  "count": 18,
   "modules": [
     {
       "name": "@forgewallet/protocol-approvals-evm",
@@ -88,6 +88,23 @@
       "repo": "https://github.com/ultratestbro/forgewallet",
       "path": "packages/protocol-lending-morpho-evm",
       "addedAt": "2026-10-10"
+    },
+    {
+      "name": "@forgewallet/names-ens",
+      "type": "names",
+      "chains": [
+        "eip155:*",
+        "bip122:000000000019d6689c085ae165831e93",
+        "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/names-ens",
+      "addedAt": "2026-10-17"
     },
     {
       "name": "@forgewallet/protocol-staking-lido-evm",

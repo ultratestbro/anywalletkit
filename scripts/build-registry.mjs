@@ -6,7 +6,7 @@ import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 const root = new URL('..', import.meta.url).pathname
-const TYPES = new Set(['swap', 'bridge', 'swap2', 'lending', 'staking', 'approvals', 'fiat'])
+const TYPES = new Set(['swap', 'bridge', 'swap2', 'lending', 'staking', 'approvals', 'fiat', 'names'])
 const TIERS = new Set(['core', 'verified', 'community', 'deprecated'])
 
 function validate(m, where) {
