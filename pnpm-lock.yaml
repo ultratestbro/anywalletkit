@@ -50,6 +50,9 @@ importers:
       '@forgewallet/protocol-lending-aave-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-lending-aave-evm
+      '@forgewallet/protocol-lending-kamino-solana':
+        specifier: workspace:*
+        version: link:../../packages/protocol-lending-kamino-solana
       '@forgewallet/protocol-lending-mellow-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-lending-mellow-evm
@@ -307,6 +310,24 @@ importers:
       '@forgewallet/core':
         specifier: workspace:*
         version: link:../core
+      '@types/node':
+        specifier: ^22
+        version: 22.20.5
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+
+  packages/protocol-lending-kamino-solana:
+    devDependencies:
+      '@forgewallet/conformance':
+        specifier: workspace:*
+        version: link:../conformance
+      '@forgewallet/core':
+        specifier: workspace:*
+        version: link:../core
+      '@forgewallet/wallet-solana':
+        specifier: workspace:*
+        version: link:../wallet-solana
       '@types/node':
         specifier: ^22
         version: 22.20.5

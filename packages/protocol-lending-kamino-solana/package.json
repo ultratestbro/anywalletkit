@@ -1,0 +1,32 @@
+{
+  "name": "@forgewallet/protocol-lending-kamino-solana",
+  "version": "0.1.0",
+  "description": "Kamino for @forgewallet/wallet-solana accounts: Kamino Earn vaults (kVaults: deposit / withdraw, shares, APY) and Kamino Lend markets (supply, withdraw, borrow, repay against an obligation) as LendingProtocols. Transactions come from Kamino's official API and are signed only after the wallet's serialized-transaction guard proves the programs and the balance changes; positions, APY and TVL from the same API.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "module.json"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "peerDependencies": { "@forgewallet/core": "workspace:*" },
+  "devDependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "@forgewallet/core": "workspace:*",
+    "@forgewallet/wallet-solana": "workspace:*",
+    "@types/node": "^22",
+    "vitest": "^5.0.3"
+  },
+  "keywords": ["protocol", "lending", "kamino", "klend", "kvault", "earn", "vault", "borrow", "solana", "lending-protocol", "forgewallet"]
+}

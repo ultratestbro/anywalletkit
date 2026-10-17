@@ -1,7 +1,7 @@
 {
   "$schema": "./modules.schema.json",
   "generatedAt": "2026-10-17",
-  "count": 18,
+  "count": 19,
   "modules": [
     {
       "name": "@forgewallet/protocol-approvals-evm",
@@ -49,6 +49,21 @@
       "repo": "https://github.com/ultratestbro/forgewallet",
       "path": "packages/protocol-lending-aave-evm",
       "addedAt": "2026-10-10"
+    },
+    {
+      "name": "@forgewallet/protocol-lending-kamino-solana",
+      "type": "lending",
+      "chains": [
+        "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-lending-kamino-solana",
+      "addedAt": "2026-10-13"
     },
     {
       "name": "@forgewallet/protocol-lending-mellow-evm",
