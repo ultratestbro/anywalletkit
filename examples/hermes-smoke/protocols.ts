@@ -45,7 +45,9 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const router = new RouterSwap2Protocol(evm, { ...swap2Cfg, providers: [lifiProvider({}), nearIntentsProvider({})] })
   check('router: surface', typeof router.quoteSwap2 === 'function' && typeof router.getSwap2Status === 'function')
   const chains = (await router.getSupportedChains()).map((c) => String(c.id))
-  check('router: capabilities come from the passed providers', chains.includes('eip155:1') && chains.includes('ton:-239'), chains.join(','))
+  // TON is a hand-suspended 1Click corridor (HOT bridge dark since 2026-10-16) and LI.FI has no Bitcoin, so
+  // Bitcoin can only have come from the near-intents provider.
+  check('router: capabilities come from the passed providers', chains.includes('eip155:1') && chains.includes('bitcoin:mainnet'), chains.join(','))
   for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol]] as const) {
     const p = new (P as never as new (a: unknown, c: unknown) => { getSupportedChains(): Promise<unknown>; quoteSwap2(o: unknown): Promise<unknown> })(evm, swap2Cfg)
     check(`${name}: constructs`, typeof p.quoteSwap2 === 'function')

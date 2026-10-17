@@ -4,15 +4,15 @@ import {nearIntentsProvider} from "../src/provider.js";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("NEAR Intents provider contract", () => {
-  it("binds TON refunds to the caller's origin-chain address", async () => {
+  it("binds non-EVM refunds to the caller's origin-chain address", async () => {
     let body: Record<string, unknown> | undefined;
     vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
       body = JSON.parse(String(init.body));
-      return new Response(JSON.stringify({quote: {depositAddress: "EQdeposit", amountIn: "1000000", amountOut: "990000", minAmountOut: "980000", deadline: new Date(Date.now() + 60_000).toISOString()}}));
+      return new Response(JSON.stringify({quote: {depositAddress: "TDeposit", amountIn: "1000000", amountOut: "990000", minAmountOut: "980000", deadline: new Date(Date.now() + 60_000).toISOString()}}));
     });
     const provider = nearIntentsProvider({enabled: true, apiUrl: "https://near.invalid"});
-    await provider.getQuote({sourceChain: "ton:-239", sourceToken: "USDT", destChain: "eip155:1", destToken: "0xdac17f958d2ee523a2206206994597c13d831ec7", amountIn: "1000000", destAddress: "0x0000000000000000000000000000000000000001", refundAddress: "UQuser", dry: false});
-    expect(body).toMatchObject({refundType: "ORIGIN_CHAIN", refundTo: "UQuser"});
+    await provider.getQuote({sourceChain: "tron:728126428", sourceToken: "USDT", destChain: "eip155:1", destToken: "0xdac17f958d2ee523a2206206994597c13d831ec7", amountIn: "1000000", destAddress: "0x0000000000000000000000000000000000000001", refundAddress: "TUser", dry: false});
+    expect(body).toMatchObject({refundType: "ORIGIN_CHAIN", refundTo: "TUser"});
   });
 
   it("rejects half-configured fees and unsafe API URLs", () => {
@@ -28,9 +28,9 @@ describe("NEAR Intents provider contract", () => {
     }})));
     const before = Date.now();
     const quote = await nearIntentsProvider({apiUrl: "https://near.invalid/"}).getQuote({
-      sourceChain: "eip155:1", sourceToken: "USDT", destChain: "ton:-239",
-      destToken: "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs", amountIn: "1000000",
-      destAddress: "UQdest", refundAddress: "0x0000000000000000000000000000000000000001", dry: false,
+      sourceChain: "eip155:1", sourceToken: "USDT", destChain: "eip155:42161",
+      destToken: "0xaf88d065e77c8cc2239327c5edb3a432268e5831", amountIn: "1000000",
+      destAddress: "0x0000000000000000000000000000000000000002", refundAddress: "0x0000000000000000000000000000000000000001", dry: false,
     });
     expect(quote!.validUntilMs).toBeGreaterThan(before);
     expect(quote!.validUntilMs).toBeLessThanOrEqual(before + 55_500);
@@ -53,5 +53,65 @@ describe("route claims cover both ends", () => {
   });
   it("does not claim a destination 1Click doesn't list", () => {
     expect(p.supportsRoute({chain: "eip155:8453", token: "USDC"}, {chain: "eip155:130", token: ZERO})).toBe(false);
+  });
+  it("claims Plasma XPL / USDT0 (nep141 omft ids, 2026-10-17 token list)", () => {
+    expect(p.supportsRoute({chain: "eip155:9745", token: "USDT0"}, {chain: "eip155:8453", token: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"})).toBe(true);
+    expect(p.supportsRoute({chain: "eip155:8453", token: "USDC"}, {chain: "eip155:9745", token: ZERO})).toBe(true);
+    expect(p.supportsChain!("eip155:9745")).toBe(true);
+  });
+});
+
+// SDK-132: corridors 1Click cannot serve are refused by name BEFORE any wire
+// call — the 2026-10-16 funded run spent 207 legs learning this the slow way.
+describe("dead corridors are refused up front", () => {
+  const p = nearIntentsProvider({enabled: true, apiUrl: "https://near.invalid"});
+  const ZERO = "0x0000000000000000000000000000000000000000";
+  const BASE_USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+  const quote = (params: Record<string, unknown>) => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const refusals: string[] = [];
+    const result = p.getQuote({
+      amountIn: "1000000", destAddress: ZERO, dry: true, onRefusal: (r: string) => refusals.push(r),
+      ...params,
+    } as never);
+    return {result, refusals, fetchSpy};
+  };
+
+  it("TON is suspended: not a declared chain, no route, named refusal, no wire call", async () => {
+    expect(p.supportsChain!("ton:-239")).toBe(false);
+    expect(p.supportsChainPair!("ton:-239", "eip155:1")).toBe(false);
+    expect(p.supportsChainPair!("eip155:8453", "ton:-239")).toBe(false);
+    expect(p.supportsRoute({chain: "ton:-239", token: "USDT"}, {chain: "eip155:8453", token: BASE_USDC})).toBe(false);
+    const {result, refusals, fetchSpy} = quote({sourceChain: "ton:-239", sourceToken: "USDT", destChain: "eip155:8453", destToken: BASE_USDC});
+    expect(await result).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(refusals[0]).toMatch(/^1Click corridor suspended: ton:-239 — .*not available/);
+  });
+
+  it("chains 1Click does not list (World Chain, Sei, Ink, Plume, X Layer) are not declared and never asked", async () => {
+    for (const chain of ["eip155:480", "eip155:1329", "eip155:57073", "eip155:98866", "eip155:196"]) {
+      expect(p.supportsChain!(chain)).toBe(false);
+    }
+    // Listed chains keep their capability — namespace alone no longer decides.
+    for (const chain of ["eip155:1", "eip155:8453", "eip155:42161", "eip155:143", "eip155:9745", "bitcoin:mainnet", "solana:mainnet", "tron:728126428"]) {
+      expect(p.supportsChain!(chain)).toBe(true);
+    }
+    const {result, refusals, fetchSpy} = quote({sourceChain: "eip155:480", sourceToken: "ETH", destChain: "eip155:8453", destToken: BASE_USDC});
+    expect(await result).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(refusals[0]).toMatch(/^1Click does not list eip155:480 \[/);
+    const dest = quote({sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:57073", destToken: ZERO});
+    expect(await dest.result).toBeNull();
+    expect(dest.fetchSpy).not.toHaveBeenCalled();
+    expect(dest.refusals[0]).toMatch(/^1Click does not list eip155:57073 \[/);
+  });
+
+  it("a catalog token without a 1Click id on a listed chain is refused by chain + token", async () => {
+    // Ethereum BNB (ERC-20) is in the catalog for LI.FI only.
+    const {result, refusals, fetchSpy} = quote({sourceChain: "eip155:1", sourceToken: "BNB", destChain: "eip155:8453", destToken: BASE_USDC});
+    expect(await result).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(refusals[0]).toMatch(/^1Click does not list eip155:1 BNB \[/);
   });
 });
