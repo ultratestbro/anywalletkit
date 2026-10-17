@@ -143,3 +143,9 @@ npm run verify:live    # reads + simulateTransaction of every shape on mainnet, 
 ## License
 
 Apache-2.0
+
+## Activity
+
+`describeActivity(tx, { own })` labels SPL Stake Pool transactions for a wallet's history, offline and synchronously. A transaction is this module's when the Stake Pool program `SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy` is among the programs it invoked (`call.programs` / `call.to`). The instruction tag — first byte of the stake-pool instruction's base58 `call.data` when the source passes it — picks the kind: `DepositSol` 14 / `DepositSolWithSlippage` 25 → `stake` "Staked SOL"; `WithdrawSol` 16 / 26 → `unstake` "Unstaked JitoSOL" (instant); `WithdrawStake` 10 / 24 → `unstake` "Requested unstake of JitoSOL" (delayed). Without data, the pool-token movement decides (minted to the wallet → stake, burned → unstake, with SOL arriving → instant). Pool tokens of every preset (`SPL_STAKE_POOL_ADDRESS_MAP`) and of the instance's pool are labelled and name the subtitle (`"Jito · Solana"`); an unknown pool on the same program is still recognized as `"SPL Stake Pool · Solana"`. `counterparty` is the pool account. Sweeping a finished delayed unstake (a Stake-program `withdraw` from a derived account) is not recognized — it carries no stake-pool instruction. `own` should contain the wallet **and** its token accounts: sources normalize SPL movements to owners, but a source that keeps token-account addresses still nets correctly when the ATA is in `own`.
+
+Fixtures in `fixtures/activity/` are the test wallet's funded Jito run (DepositSol ×2, WithdrawSol ×3; 2026-09-07 … 10-07, from `getTransaction` jsonParsed); `negatives/` holds a plain SOL transfer and a plain JitoSOL SPL transfer (shapes only).

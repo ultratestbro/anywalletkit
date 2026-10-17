@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"BNB_MAINNET is not enabled for this app. Visit this page to enable the network: https://dashboard.alchemy.com/apps/<app>/networks"}}

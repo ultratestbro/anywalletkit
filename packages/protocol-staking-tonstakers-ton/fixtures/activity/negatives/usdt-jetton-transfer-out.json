@@ -1,0 +1,36 @@
+{
+  "note": "Plain USD₮ jetton transfer sent (tonviewer.com/transaction/3e907228…) — a jetton transfer op, not a tsTON burn",
+  "own": [
+    "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+  ],
+  "tx": {
+    "chain": "ton:-239",
+    "hash": "3e90722877ab3717b7a57d397d8cf61a57deae48faca7240dae63dce325552b3",
+    "time": 1791661492,
+    "status": "confirmed",
+    "address": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+    "from": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+    "to": "0:fdb51192f5f1f7c814bbf55a1b60a86f2c442a419b616fa6a653b0a567a77992",
+    "nativeValue": "50000000",
+    "transfers": [
+      {
+        "token": "0:b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe",
+        "from": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+        "to": "0:7178bc9e9a8491e294c208d900cb447d0ff610c2316392186d2966132147f30f",
+        "amount": "13990032",
+        "standard": "jetton",
+        "symbol": "USD₮",
+        "decimals": 6
+      }
+    ],
+    "call": {
+      "to": "0:fdb51192f5f1f7c814bbf55a1b60a86f2c442a419b616fa6a653b0a567a77992",
+      "data": "0x0f8a7ea5",
+      "method": "jetton_transfer"
+    },
+    "block": "109110597000032"
+  },
+  "expect": {
+    "kind": "send"
+  }
+}

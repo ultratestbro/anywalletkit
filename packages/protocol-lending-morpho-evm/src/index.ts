@@ -16,3 +16,5 @@ export {
 } from './math.js'
 export type { MarketParams, MarketState } from './math.js'
 export { MORPHO_ABI, ERC4626_ABI, VAULT_V1_ABI, VAULT_V2_ABI, IRM_ABI, ORACLE_ABI } from './abi.js'
+export { describeMorphoActivity, presetContext, BLUE_ACTIONS, VAULT_ACTIONS, MODULE_NAME } from './activity.js'
+export type { MorphoActivityContext } from './activity.js'

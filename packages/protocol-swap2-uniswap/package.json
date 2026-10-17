@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/protocol-swap2-uniswap",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Uniswap v3 same-chain swaps straight from the contracts: on-chain QuoterV2 quotes, SwapRouter02 execution, no API, no frontend.",
   "license": "Apache-2.0",
   "type": "module",

@@ -1,0 +1,94 @@
+{
+ "event_id": "feadea0945e146bdd0e1b617c75163ecab2123547e518ed0c5609cd7421858a9",
+ "timestamp": 1788516270,
+ "lt": 101244409000012,
+ "in_progress": false,
+ "is_scam": false,
+ "actions": [
+  {
+   "type": "WithdrawStakeRequest",
+   "status": "ok",
+   "WithdrawStakeRequest": {
+    "staker": {
+     "address": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+     "is_wallet": true
+    },
+    "pool": {
+     "address": "0:a45b17f28409229b78360e3290420f13e4fe20f90d7e2bf8c4ac6703259e22fa",
+     "is_wallet": false,
+     "name": "Tonstakers"
+    },
+    "implementation": "liquidTF"
+   }
+  },
+  {
+   "type": "ContractDeploy",
+   "status": "ok",
+   "ContractDeploy": {
+    "address": "0:37cc579f84e2b5d34e81477aa6a6f3d00ae6ea61a845989d115da86d93e2e277"
+   }
+  }
+ ],
+ "value_flow": [
+  {
+   "account": {
+    "address": "0:37cc579f84e2b5d34e81477aa6a6f3d00ae6ea61a845989d115da86d93e2e277",
+    "is_wallet": true
+   },
+   "ton": 90000000,
+   "jettons": []
+  },
+  {
+   "account": {
+    "address": "0:75e45d424e6284068eaa0229634cf9d8b52537d77d71c98df530f141540fddb2",
+    "is_wallet": false
+   },
+   "ton": -2,
+   "jettons": []
+  },
+  {
+   "account": {
+    "address": "0:bdf3fa8098d129b54b4f73b5bac5d1e1fd91eb054169c3916dfc8ccd536d1000",
+    "is_wallet": false,
+    "name": "Tonstakers master"
+   },
+   "ton": -4,
+   "jettons": []
+  },
+  {
+   "account": {
+    "address": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+    "is_wallet": true
+   },
+   "ton": -95327081,
+   "jettons": [
+    {
+     "jetton": {
+      "address": "0:bdf3fa8098d129b54b4f73b5bac5d1e1fd91eb054169c3916dfc8ccd536d1000",
+      "symbol": "tsTON",
+      "decimals": 9,
+      "name": "Tonstakers TON"
+     },
+     "quantity": -1000000000
+    }
+   ]
+  },
+  {
+   "account": {
+    "address": "0:a45b17f28409229b78360e3290420f13e4fe20f90d7e2bf8c4ac6703259e22fa",
+    "is_wallet": false,
+    "name": "Tonstakers"
+   },
+   "ton": -12,
+   "jettons": []
+  },
+  {
+   "account": {
+    "address": "0:78527a5a5ea60f9678e8dc5f3fd6fd57cabd794f108bfff4b4c655e503713500",
+    "is_wallet": false
+   },
+   "ton": -37,
+   "jettons": []
+  }
+ ]
+}

@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/keyring",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Multi-account, multi-source keyring for the forgewallet SDK: many accounts from one seed, imported seeds and private keys, account discovery — secrets stay in the app's secure storage.",
   "license": "Apache-2.0",
   "type": "module",

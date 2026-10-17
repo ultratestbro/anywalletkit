@@ -1,0 +1,63 @@
+{
+  "note": "Jito: DepositSol 0.03 SOL → 0.023 JitoSOL (funded test 2026-09-07, solscan.io/tx/29dt2UNj…)",
+  "own": [
+    "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "EvTykvN87o1arXqcf7wwU4Jzvo3pQrgaNfoxYfkw5gng"
+  ],
+  "tx": {
+    "chain": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    "hash": "29dt2UNjzg1wtgF4hz7fZrua9gfUCf9inPNZHiPXVyUTjE2VsP3WmWfdTZ7xhpv84TkjhWUhxTxmkm166CJwqfNt",
+    "time": 1788788926,
+    "status": "confirmed",
+    "address": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "from": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "to": "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": null,
+        "from": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+        "to": "BgKUXdS29YcHCFrPm5M8oLHiTzZaMDjsebggjoaQ6KFL",
+        "amount": "30000000"
+      },
+      {
+        "token": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "from": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "to": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+        "amount": "23076105",
+        "standard": "spl",
+        "symbol": "JitoSOL",
+        "decimals": 9
+      }
+    ],
+    "fee": "20000",
+    "call": {
+      "to": "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
+      "programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "ComputeBudget111111111111111111111111111111",
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+        "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy"
+      ],
+      "data": "EuCaphK4A2GQAPnSB4RycXh"
+    },
+    "block": "445080562"
+  },
+  "expect": {
+    "kind": "stake",
+    "title": "Staked SOL",
+    "assetsIn": [
+      {
+        "token": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "amount": "23076105"
+      }
+    ],
+    "assetsOut": [
+      {
+        "token": null,
+        "amount": "30000000"
+      }
+    ],
+    "counterparty": "Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb"
+  }
+}

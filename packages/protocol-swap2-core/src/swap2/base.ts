@@ -93,8 +93,10 @@ function maybeSent(error: unknown): {hash?: string} | null {
 /**
  * Where an execution is, for progress UIs. A source leg can spend a minute
  * before anything is signed (two awaited ERC-20 approvals for USDT), so
- * "signing" alone reads as hung. Diagnostics only: a throwing observer can
- * never change the outcome.
+ * "signing" alone reads as hung. "requoting": the mined approvals outlived
+ * the quote's TTL and the engine is fetching a fresh quote for the same
+ * spender and amount (the allowance is kept, not revoked). Diagnostics only:
+ * a throwing observer can never change the outcome.
  */
 /**
  * Most native coin a route may charge on top of the input (bridge messaging
@@ -131,13 +133,25 @@ function declaredNativeFee(q: {txRequest?: {nativeFee?: string}}, chain: string)
   return fee;
 }
 
-export type Swap2ExecutionPhase = "approving" | "preflight" | "signing" | "broadcast";
+export type Swap2ExecutionPhase = "approving" | "requoting" | "preflight" | "signing" | "broadcast";
 export interface Swap2ExecutionPhaseDetail {
   /** approving: which approval of how many (USDT on Ethereum needs two). */
   index?: number;
   total?: number;
   /** broadcast: the source transaction hash. */
   hash?: string;
+}
+
+/** EIP-712 domain with `chainId` as a number whatever notation the provider used. */
+export function normalizeTypedDomain(domain: unknown): unknown {
+  if (!domain || typeof domain !== "object") return domain;
+  const raw = (domain as {chainId?: unknown}).chainId;
+  let chainId: number | undefined;
+  if (typeof raw === "number") chainId = raw;
+  else if (typeof raw === "bigint") chainId = Number(raw);
+  else if (typeof raw === "string" && /^\d+$/.test(raw)) chainId = Number(raw);
+  else if (typeof raw === "string" && /^0x[0-9a-fA-F]+$/.test(raw)) chainId = Number(BigInt(raw));
+  return chainId === undefined || !Number.isSafeInteger(chainId) ? domain : {...(domain as object), chainId};
 }
 
 export interface Swap2EngineConfig extends Swap2ProtocolConfig {
@@ -261,6 +275,15 @@ interface Swap2Signer {
    * funds move. Accounts without it keep the fire-and-forget behaviour.
    */
   waitForTransaction?: (hash: string) => Promise<void>;
+  /**
+   * Current ERC-20 allowance of this account for `spender`. With it the
+   * engine sends only the approvals the chain needs: none when the exact
+   * allowance is already live, a single approve(n) for mainnet USDT when the
+   * current allowance is 0 (its reset rule only bites non-zero → non-zero).
+   * Without it (or when the read fails) the engine assumes the worst and
+   * resets USDT every time.
+   */
+  getAllowance?: (token: string, spender: string) => Promise<bigint | number | string>;
   /** EVM gas pre-check before approvals: native balance and a fee upper bound per tx. */
   getBalance?: () => Promise<bigint | number | string>;
   quoteSendTransaction?: (tx: {to: string; data?: string; value?: bigint; chainId?: number; gasLimit?: bigint}) => Promise<{fee: bigint}>;
@@ -271,6 +294,19 @@ interface Swap2Signer {
   chainId?: number | bigint;
   _provider?: {getNetwork?: () => Promise<{chainId?: number | bigint}>};
   provider?: {getNetwork?: () => Promise<{chainId?: number | bigint}>};
+}
+
+/**
+ * An exact allowance the first execution pass mined before its quote
+ * expired, handed to the re-quote pass (SDK-128). The pass that adopts it
+ * owns its cleanup; until then the first pass revokes on any failure.
+ */
+interface CarriedAllowance {
+  token: string;
+  spender: string;
+  amount: bigint;
+  revoke: () => Promise<void>;
+  adopted: boolean;
 }
 
 /** Versioned provider/intent/source-hash id for durable status tracking. */
@@ -667,7 +703,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
   }
 
-  private async executeSwap2(signer: Swap2Signer, snapshot: Swap2Options, config?: Swap2ProtocolConfig): Promise<Swap2Result> {
+  private async executeSwap2(signer: Swap2Signer, snapshot: Swap2Options, config?: Swap2ProtocolConfig, carried?: CarriedAllowance): Promise<Swap2Result> {
     const configSnapshot = snapshotConfig(config);
     this.assertFeeConfig(configSnapshot);
     await this.assertAccountChain(signer);
@@ -866,16 +902,58 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       }
     }
 
-    const review = (this._config as Swap2EngineConfig).reviewExecution;
-    if (review) {
-      const approvals: Swap2ExecutionPlan["approvals"] = [];
-      if (unsigned.approvalAddress && source.contract) {
-        const chainId = unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {};
-        if (this.fromChain === "eip155:1" && source.symbol.toUpperCase() === "USDT") {
-          approvals.push({token: source.contract, spender: unsigned.approvalAddress, amount: 0n, ...chainId});
-        }
-        approvals.push({token: source.contract, spender: unsigned.approvalAddress, amount: BigInt(executionOptions.fromTokenAmount!), ...chainId});
+    // ERC-20 calldata/typed-order routes need an exact allowance. Decide the
+    // approvals now (the reviewer sees exactly what will be sent) but send
+    // them only after every local payload/value check, so a malformed build
+    // cannot leave an allowance behind before failing validation.
+    const needsApproval = !!unsigned.approvalAddress && !!source.contract;
+    const approvalAmount = needsApproval ? BigInt(executionOptions.fromTokenAmount!) : 0n;
+    const sameHex = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+    let approvalAmounts: bigint[] = [];
+    let revokeApproval: (() => Promise<void>) | undefined;
+    if (carried && !needsApproval) {
+      // The fresh quote no longer spends through an allowance: the one the
+      // first pass mined would outlive this swap with nobody to revoke it.
+      carried.adopted = true;
+      await carried.revoke().catch(() => {});
+      throw new Swap2QuoteError("swap2: the fresh quote no longer spends through an allowance — aborted, the allowance was revoked");
+    }
+    if (needsApproval && carried) {
+      // Re-quote pass: the allowance must fit the fresh quote exactly;
+      // otherwise it is revoked and the swap aborts (the caller may retry).
+      if (!sameHex(carried.token, source.contract!) || !sameHex(carried.spender, unsigned.approvalAddress!) || carried.amount !== approvalAmount) {
+        carried.adopted = true;
+        await carried.revoke().catch(() => {});
+        throw new Swap2QuoteError(`swap2: the fresh quote moved the spender to ${unsigned.approvalAddress} — aborted, the allowance for ${carried.spender} was revoked`);
       }
+      carried.adopted = true;
+      revokeApproval = carried.revoke;
+    } else if (needsApproval) {
+      // Mainnet USDT refuses non-zero → non-zero; every other token
+      // overwrites. The live allowance decides what is actually needed: the
+      // reset only when USDT holds a non-zero value, nothing at all when the
+      // exact amount is already in place (an allowance this engine did not
+      // create is left alone on failure). A failed read assumes the worst.
+      const usdtMainnet = this.fromChain === "eip155:1" && source.symbol.toUpperCase() === "USDT";
+      let current: bigint | undefined;
+      if (typeof signer.getAllowance === "function") {
+        try {
+          current = BigInt(await signer.getAllowance(source.contract!, unsigned.approvalAddress!));
+        } catch {
+          current = undefined;
+        }
+      }
+      approvalAmounts = current === approvalAmount ? [] : [...(usdtMainnet && current !== 0n ? [0n] : []), approvalAmount];
+    }
+
+    // The re-quote pass is not reviewed again: everything the reviewer
+    // committed to — source amount, spender, recipient, the caller's floor —
+    // is unchanged by construction, and the engine re-validates the rest.
+    const review = (this._config as Swap2EngineConfig).reviewExecution;
+    if (review && !carried) {
+      const chainId = unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {};
+      const approvals: Swap2ExecutionPlan["approvals"] = approvalAmounts.map((amount) =>
+        ({token: source.contract!, spender: unsigned.approvalAddress!, amount, ...chainId}));
       const plan: Swap2ExecutionPlan = {
         provider: q.provider,
         fromChain: this.fromChain,
@@ -914,16 +992,9 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       }
     }
 
-    // ERC-20 calldata/typed-order routes need an exact allowance. Do this only
-    // after every local payload/value check so a malformed build cannot leave an
-    // allowance behind before failing validation.
-    const needsApproval = !!unsigned.approvalAddress && !!source.contract;
-    const zeroFirst = this.fromChain === "eip155:1" && source.symbol.toUpperCase() === "USDT";
-    const approvalAmounts = needsApproval ? [...(zeroFirst ? [0n] : []), BigInt(executionOptions.fromTokenAmount!)] : [];
     await this.assertNativeGas(signer, unsigned, approvalAmounts, source.contract ?? undefined, !!unsigned.typedData || serialized || !!tokenId);
 
-    let revokeApproval: (() => Promise<void>) | undefined;
-    if (needsApproval) {
+    if (approvalAmounts.length) {
       const approve = async (amount: bigint) => {
         const sent = await signer.sendTransaction({
           to: source.contract!,
@@ -953,10 +1024,27 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
 
     // The quote/build step can be separated from the actual send by an ERC-20
     // approval. Recheck rotating/halt-sensitive provider state only now.
-    try {
-      if (q.validUntilMs > 0 && q.validUntilMs <= Date.now()) {
-        throw new Swap2QuoteError("swap2: quote expired before source broadcast");
+    if (q.validUntilMs > 0 && q.validUntilMs <= Date.now()) {
+      // The mined approvals outlived the quote (mainnet USDT: 50–108 s of
+      // approvals against a 55 s LI.FI / 45 s Omniston TTL, SDK-128). The
+      // allowance is exact and ours: quote once more and spend it, instead of
+      // revoking it (a third tx) and making the caller pay for the approvals
+      // again. The second pass is bound to the same spender and amount, held
+      // to the caller's floor like the first, and never re-quotes itself.
+      if (!carried && approvalAmounts.length && revokeApproval) {
+        this.emitPhase("requoting");
+        const handoff: CarriedAllowance = {token: source.contract!, spender: unsigned.approvalAddress!, amount: approvalAmount, revoke: revokeApproval, adopted: false};
+        try {
+          return await this.executeSwap2(signer, snapshot, config, handoff);
+        } catch (error) {
+          if (!handoff.adopted) await revokeApproval().catch(() => {});
+          throw error;
+        }
       }
+      await revokeApproval?.().catch(() => {});
+      throw new Swap2QuoteError("swap2: quote expired before source broadcast");
+    }
+    try {
       let providerStillEnabled = false;
       try { providerStillEnabled = provider.enabled(); } catch { /* fail closed below */ }
       if (!providerStillEnabled) throw new Error(`swap2: provider '${q.provider}' was disabled before source broadcast`);
@@ -989,8 +1077,12 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         // ethers infers the domain type and reject an explicit
         // EIP712Domain entry as an ambiguous primary type.
         const {EIP712Domain: _domain, ...types} = td.types;
+        // Providers may send the domain chainId as a hex string ("0x89");
+        // signers that build the EIP712Domain type from value types (viem)
+        // would then drop chainId from the domain and produce a signature the
+        // verifying contract rejects (Omniston order, 2026-10-16). Sign with a number.
         const signature = await signer.signTypedData({
-          domain: td.domain,
+          domain: normalizeTypedDomain(td.domain),
           types,
           ...(td.primaryType ? {primaryType: td.primaryType} : {}),
           message: td.message,

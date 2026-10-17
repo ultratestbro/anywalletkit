@@ -1,0 +1,401 @@
+{
+ "items": [
+  {
+   "block_number": 26157372,
+   "error": null,
+   "from": {
+    "hash": "0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5",
+    "is_contract": true,
+    "name": "ERC1967Proxy"
+   },
+   "gas_limit": "67178",
+   "index": 6,
+   "success": true,
+   "timestamp": "2026-10-09T20:53:59.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0xa20c6a8add0063242073e0014ab8fabcdad49d3f503dcd5970cd64797d8643fc",
+   "transaction_index": 73,
+   "type": "call",
+   "value": "989089680023743"
+  },
+  {
+   "block_number": 26156802,
+   "error": null,
+   "from": {
+    "hash": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146",
+    "is_contract": true,
+    "name": "THORChain_Router"
+   },
+   "gas_limit": "2300",
+   "index": 1,
+   "success": true,
+   "timestamp": "2026-10-09T18:59:35.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0x684af0cc43e3a9fd95732b5cd6467e5b9339f36bf5debaccb4ac7b386ce758c3",
+   "transaction_index": 59,
+   "type": "call",
+   "value": "2497770000000000"
+  },
+  {
+   "block_number": 26141665,
+   "error": null,
+   "from": {
+    "hash": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+    "is_contract": true,
+    "name": "ERC1967Proxy"
+   },
+   "gas_limit": "20865",
+   "index": 6,
+   "success": true,
+   "timestamp": "2026-10-07T16:20:35.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0x6295985370012d69571cca77eac153829ba978b0306188040a78f728661c6c17",
+   "transaction_index": 180,
+   "type": "call",
+   "value": "18829163100000"
+  },
+  {
+   "block_number": 25992532,
+   "error": null,
+   "from": {
+    "hash": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146",
+    "is_contract": true,
+    "name": "THORChain_Router"
+   },
+   "gas_limit": "2300",
+   "index": 1,
+   "success": true,
+   "timestamp": "2026-09-16T20:49:35.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0x4cb333f54740da359803dbd9020994c4b64154e73b418b4a28861214c0c6b3dc",
+   "transaction_index": 23,
+   "type": "call",
+   "value": "3803400000000000"
+  },
+  {
+   "block_number": 25975998,
+   "error": null,
+   "from": {
+    "hash": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+    "is_contract": true,
+    "name": "LiFiDiamond"
+   },
+   "gas_limit": "559612",
+   "index": 25,
+   "success": true,
+   "timestamp": "2026-09-14T13:28:23.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0x33e535746adc8bd431ff13856e44408c406e43140eff7c127072887e43a3849c",
+   "transaction_index": 115,
+   "type": "call",
+   "value": "1991774213366127"
+  },
+  {
+   "block_number": 25956445,
+   "error": null,
+   "from": {
+    "hash": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+    "is_contract": true,
+    "name": "ERC1967Proxy"
+   },
+   "gas_limit": "20865",
+   "index": 6,
+   "success": true,
+   "timestamp": "2026-09-11T20:06:59.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0x7646da998246601ce623d6383ee3cceb0c91af3b83fc533e323344d926f932bd",
+   "transaction_index": 166,
+   "type": "call",
+   "value": "6117566800000"
+  },
+  {
+   "block_number": 25902100,
+   "error": null,
+   "from": {
+    "hash": "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
+    "is_contract": true,
+    "name": "OssifiableProxy"
+   },
+   "gas_limit": "21638",
+   "index": 2,
+   "success": true,
+   "timestamp": "2026-09-04T06:16:35.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0x9e7068df0df98f5949727bc01de2602989c96f2e1db17554eaaba2d3a70848b7",
+   "transaction_index": 71,
+   "type": "call",
+   "value": "999000000000000"
+  },
+  {
+   "block_number": 25896376,
+   "error": null,
+   "from": {
+    "hash": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+    "is_contract": true,
+    "name": "ERC1967Proxy"
+   },
+   "gas_limit": "20865",
+   "index": 6,
+   "success": true,
+   "timestamp": "2026-09-03T11:07:11.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0xa8376ba7fbe829fe4d9df9a3a0fbc0c130bad4cf3aff716c8232e749a82172c2",
+   "transaction_index": 134,
+   "type": "call",
+   "value": "11434500000"
+  },
+  {
+   "block_number": 25896267,
+   "error": null,
+   "from": {
+    "hash": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+    "is_contract": true,
+    "name": "ERC1967Proxy"
+   },
+   "gas_limit": "24073",
+   "index": 6,
+   "success": true,
+   "timestamp": "2026-09-03T10:45:23.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0xe24372aca2a52359136b87d4e26c4a2f8aba85e827cb1258811600f0598b2c92",
+   "transaction_index": 59,
+   "type": "call",
+   "value": "567400000"
+  },
+  {
+   "block_number": 25881310,
+   "error": null,
+   "from": {
+    "hash": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+    "is_contract": true,
+    "name": "LiFiDiamond"
+   },
+   "gas_limit": "556651",
+   "index": 25,
+   "success": true,
+   "timestamp": "2026-09-01T08:43:23.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0x514c9a189f86b1f6aacaba80a721bf6d6f2d71481c5dbf485fb01b3ff4b75700",
+   "transaction_index": 207,
+   "type": "call",
+   "value": "813029289569864"
+  },
+  {
+   "block_number": 25502092,
+   "error": null,
+   "from": {
+    "hash": "0x0e30CeBbf03B3f683c75cf19C8D48348f41A7593",
+    "is_contract": true,
+    "name": "SafeProxy"
+   },
+   "gas_limit": "2976",
+   "index": 2,
+   "success": true,
+   "timestamp": "2026-07-10T12:08:59.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0xf7866f8f447612bf553c4b6ebe81a6bdaaafd4508fac47e8d21381bf1698ec2f",
+   "transaction_index": 321,
+   "type": "call",
+   "value": "561190000000000"
+  },
+  {
+   "block_number": 25501133,
+   "error": null,
+   "from": {
+    "hash": "0xce25a523b3962379E656FF405DA479B03fD976D7",
+    "is_contract": true,
+    "name": "SafeProxy"
+   },
+   "gas_limit": "2976",
+   "index": 2,
+   "success": true,
+   "timestamp": "2026-07-10T08:55:47.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0xd0766b09463284b68a952d142a2cf0c0f075009dab855c44a969de86c450f688",
+   "transaction_index": 320,
+   "type": "call",
+   "value": "4208400000000000"
+  },
+  {
+   "block_number": 25490723,
+   "error": null,
+   "from": {
+    "hash": "0xce25a523b3962379E656FF405DA479B03fD976D7",
+    "is_contract": true,
+    "name": "SafeProxy"
+   },
+   "gas_limit": "3013",
+   "index": 2,
+   "success": true,
+   "timestamp": "2026-07-08T22:05:23.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0x0eaa8ba52edac04deae59b3b76f78d3e44aca1a1871d2d3532a8f844a59a1a3b",
+   "transaction_index": 537,
+   "type": "call",
+   "value": "640000000000000"
+  },
+  {
+   "block_number": 25490549,
+   "error": null,
+   "from": {
+    "hash": "0xce25a523b3962379E656FF405DA479B03fD976D7",
+    "is_contract": true,
+    "name": "SafeProxy"
+   },
+   "gas_limit": "3013",
+   "index": 2,
+   "success": true,
+   "timestamp": "2026-07-08T21:30:35.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0x36023a8ba89bff86a0a492a3f094950754b9ac88cb616325da9796e854ce378e",
+   "transaction_index": 573,
+   "type": "call",
+   "value": "2000000000000000"
+  },
+  {
+   "block_number": 25482818,
+   "error": null,
+   "from": {
+    "hash": "0x03a309568632B52a7c27518B372365ab52e34778",
+    "is_contract": true,
+    "name": "SafeProxy"
+   },
+   "gas_limit": "3014",
+   "index": 2,
+   "success": true,
+   "timestamp": "2026-07-07T19:38:47.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0xaffc3578f0953b2f349404b94e73db2ed6f74561a41558ced7c2e070053c0bf0",
+   "transaction_index": 380,
+   "type": "call",
+   "value": "1827366579478354"
+  },
+  {
+   "block_number": 25482684,
+   "error": null,
+   "from": {
+    "hash": "0xce25a523b3962379E656FF405DA479B03fD976D7",
+    "is_contract": true,
+    "name": "SafeProxy"
+   },
+   "gas_limit": "2882",
+   "index": 2,
+   "success": true,
+   "timestamp": "2026-07-07T19:11:59.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0x0c6025f9ab1a965297f94286222b9e69adc49d49c2c7793d2d475f4888c3746f",
+   "transaction_index": 87,
+   "type": "call",
+   "value": "4517123115516646"
+  },
+  {
+   "block_number": 25481671,
+   "error": null,
+   "from": {
+    "hash": "0x03a309568632B52a7c27518B372365ab52e34778",
+    "is_contract": true,
+    "name": "SafeProxy"
+   },
+   "gas_limit": "3014",
+   "index": 2,
+   "success": true,
+   "timestamp": "2026-07-07T15:48:59.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0xb748c0c5459da44eb540a8545170569469db585e17d0f2b12ceb9bcdf6a023c0",
+   "transaction_index": 456,
+   "type": "call",
+   "value": "5500458181298802"
+  },
+  {
+   "block_number": 25476341,
+   "error": null,
+   "from": {
+    "hash": "0x03a309568632B52a7c27518B372365ab52e34778",
+    "is_contract": true,
+    "name": "SafeProxy"
+   },
+   "gas_limit": "3014",
+   "index": 2,
+   "success": true,
+   "timestamp": "2026-07-06T21:59:47.000000Z",
+   "to": {
+    "hash": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "is_contract": false,
+    "name": null
+   },
+   "transaction_hash": "0x2876a0dfd4aba49af902b9f7c7d0b4a35b07ff7a6e83acace750c2fa12ebea04",
+   "transaction_index": 272,
+   "type": "call",
+   "value": "1000000000000000"
+  }
+ ],
+ "next_page_params": null
+}

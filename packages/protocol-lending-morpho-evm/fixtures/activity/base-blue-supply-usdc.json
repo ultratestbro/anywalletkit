@@ -1,0 +1,45 @@
+{
+  "note": "Morpho Blue on Base: supply(MarketParams, 1446.648301 USDC) by 0xaffc…30cc — public tx, basescan.org/tx/0x68bf8ddc…",
+  "own": [
+    "0xaffc7c480c62e0ca94375df6c465afda6c9430cc"
+  ],
+  "tx": {
+    "chain": "eip155:8453",
+    "hash": "0x68bf8ddc997b2f33c4d10470fdec64d695e284d33bcd4a50a5f13010916d798b",
+    "time": 1791999445,
+    "status": "confirmed",
+    "address": "0xaffc7c480c62e0ca94375df6c465afda6c9430cc",
+    "from": "0xaffc7c480c62e0ca94375df6c465afda6c9430cc",
+    "to": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "from": "0xaffc7c480c62e0ca94375df6c465afda6c9430cc",
+        "to": "0xbbbbbbbbbb9cc5e90e3b3af64bdaf62c37eeffcb",
+        "amount": "1446648301",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "1708537528825",
+    "call": {
+      "to": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+      "selector": "0xa99aad89",
+      "data": "0xa99aad89000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000002ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec2200000000000000000000000097ff9cbd7e77348b2b8ffbb883bf29452ad1829500000000000000000000000046415998764c29ab2a25cbea6254146d50d226870000000000000000000000000000000000000000000000000aaf96eb9d0d000000000000000000000000000000000000000000000000000000000000563a19ed0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000affc7c480c62e0ca94375df6c465afda6c9430cc00000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "block": "52605049"
+  },
+  "expect": {
+    "kind": "supply",
+    "title": "Supplied USDC",
+    "assetsOut": [
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "amount": "1446648301"
+      }
+    ],
+    "counterparty": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb"
+  }
+}

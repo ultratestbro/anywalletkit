@@ -1,0 +1,70 @@
+{
+  "note": "Balancer v2 Vault batchSwap ETH (native value) → WNCG on Ethereum (public tx, 2026-10-14)",
+  "own": [
+    "0xA4a81B6915Ff619B667154ba9Bc462342AFBd7cE"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x5a82e3f6aa6bf004fad5d45512f9afff23d56b712846947ebd57555ca713ac55",
+    "time": 1791972299,
+    "status": "confirmed",
+    "address": "0xA4a81B6915Ff619B667154ba9Bc462342AFBd7cE",
+    "from": "0xA4a81B6915Ff619B667154ba9Bc462342AFBd7cE",
+    "to": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+    "nativeValue": "67058339597159290",
+    "transfers": [
+      {
+        "token": null,
+        "from": "0xA4a81B6915Ff619B667154ba9Bc462342AFBd7cE",
+        "to": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "amount": "67058339597159290"
+      },
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "amount": "67058339597159290",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      },
+      {
+        "token": "0xf203Ca1769ca8e9e8FE1DA9D147DB68B6c919817",
+        "from": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "to": "0xA4a81B6915Ff619B667154ba9Bc462342AFBd7cE",
+        "amount": "39861708347003880206316",
+        "standard": "erc20",
+        "symbol": "WNCG",
+        "decimals": 18
+      },
+      {
+        "token": null,
+        "from": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "to": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "amount": "67058339597159290"
+      }
+    ],
+    "fee": "17097454670978",
+    "call": {
+      "to": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "selector": "0x945bcec9"
+    },
+    "block": "26190026"
+  },
+  "expect": {
+    "kind": "swap",
+    "title": "Swapped ETH → WNCG",
+    "assetsOut": [
+      {
+        "token": null,
+        "amount": "67058339597159290"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0xf203Ca1769ca8e9e8FE1DA9D147DB68B6c919817",
+        "amount": "39861708347003880206316"
+      }
+    ]
+  }
+}

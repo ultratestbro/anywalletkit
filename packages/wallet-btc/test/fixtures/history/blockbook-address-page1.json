@@ -1,0 +1,208 @@
+{
+ "page": 1,
+ "totalPages": 1,
+ "itemsOnPage": 5,
+ "address": "bc1q3x8yszvcvjjxqragsh0l6j8rxnhk7pay9hnj5h",
+ "balance": "426",
+ "totalReceived": "28534",
+ "totalSent": "28108",
+ "unconfirmedBalance": "0",
+ "unconfirmedTxs": 0,
+ "txs": 4,
+ "transactions": [
+  {
+   "txid": "772b5d953e5d551860d03a30337e6d4344a631109a64255365439055b2d6989e",
+   "blockHeight": 970675,
+   "confirmations": 776,
+   "blockTime": 1791576861,
+   "fees": "418",
+   "value": "13526",
+   "valueIn": "13944",
+   "vin": [
+    {
+     "txid": "b5ff221a244e50036b470d69eb60a57d669844c41d81e9f0d700272d380cebc6",
+     "n": 0,
+     "addresses": [
+      "bc1q3x8yszvcvjjxqragsh0l6j8rxnhk7pay9hnj5h"
+     ],
+     "isAddress": true,
+     "isOwn": true,
+     "value": "9921"
+    },
+    {
+     "txid": "dbf0d04e552deed68558353517f881cb429a6f3482c77ca53f0b11eb531a16e0",
+     "vout": 1,
+     "n": 1,
+     "addresses": [
+      "bc1q3x8yszvcvjjxqragsh0l6j8rxnhk7pay9hnj5h"
+     ],
+     "isAddress": true,
+     "isOwn": true,
+     "value": "4023"
+    }
+   ],
+   "vout": [
+    {
+     "value": "13100",
+     "n": 0,
+     "spent": true,
+     "addresses": [
+      "bc1q2tnjgexneytterwu56l9d8m4eu3p7wdth42p7d"
+     ],
+     "isAddress": true
+    },
+    {
+     "value": "426",
+     "n": 1,
+     "addresses": [
+      "bc1q3x8yszvcvjjxqragsh0l6j8rxnhk7pay9hnj5h"
+     ],
+     "isAddress": true,
+     "isOwn": true
+    }
+   ]
+  },
+  {
+   "txid": "b5ff221a244e50036b470d69eb60a57d669844c41d81e9f0d700272d380cebc6",
+   "blockHeight": 970672,
+   "confirmations": 779,
+   "blockTime": 1791574645,
+   "fees": "909",
+   "value": "655388",
+   "valueIn": "656297",
+   "vin": [
+    {
+     "txid": "e39492063d83efa81d8c0c8bbf8854090da140f52d4edfd37ea70024e70c89e9",
+     "vout": 1,
+     "n": 0,
+     "addresses": [
+      "bc1qp42j7hn3lup7gck6y6eks6x2lmnp800t6gy7sk"
+     ],
+     "isAddress": true,
+     "value": "306326"
+    },
+    {
+     "txid": "c751803d22ac3a59aebbe8b512a7406cf02eb7925f7cb8378ca42aa357a31e0e",
+     "n": 1,
+     "addresses": [
+      "bc1q4mmcwa2scvhuy9p52f9vq38cyahv5ctnv2mpjg"
+     ],
+     "isAddress": true,
+     "value": "349971"
+    }
+   ],
+   "vout": [
+    {
+     "value": "9921",
+     "n": 0,
+     "spent": true,
+     "addresses": [
+      "bc1q3x8yszvcvjjxqragsh0l6j8rxnhk7pay9hnj5h"
+     ],
+     "isAddress": true,
+     "isOwn": true
+    },
+    {
+     "value": "645467",
+     "n": 1,
+     "spent": true,
+     "addresses": [
+      "bc1qp42j7hn3lup7gck6y6eks6x2lmnp800t6gy7sk"
+     ],
+     "isAddress": true
+    }
+   ]
+  },
+  {
+   "txid": "dbf0d04e552deed68558353517f881cb429a6f3482c77ca53f0b11eb531a16e0",
+   "blockHeight": 970666,
+   "confirmations": 785,
+   "blockTime": 1791568401,
+   "fees": "141",
+   "value": "14023",
+   "valueIn": "14164",
+   "vin": [
+    {
+     "txid": "d67a965da474e1113bd50c5b74a0acfed4209480ebafdf267a0763563cce3fbf",
+     "n": 0,
+     "addresses": [
+      "bc1q3x8yszvcvjjxqragsh0l6j8rxnhk7pay9hnj5h"
+     ],
+     "isAddress": true,
+     "isOwn": true,
+     "value": "14164"
+    }
+   ],
+   "vout": [
+    {
+     "value": "10000",
+     "n": 0,
+     "spent": true,
+     "addresses": [
+      "bc1q9z4fvnlfakah5n5ekdlr3wr0culqaaskenqmw0"
+     ],
+     "isAddress": true
+    },
+    {
+     "value": "4023",
+     "n": 1,
+     "spent": true,
+     "addresses": [
+      "bc1q3x8yszvcvjjxqragsh0l6j8rxnhk7pay9hnj5h"
+     ],
+     "isAddress": true,
+     "isOwn": true
+    }
+   ]
+  },
+  {
+   "txid": "d67a965da474e1113bd50c5b74a0acfed4209480ebafdf267a0763563cce3fbf",
+   "blockHeight": 970378,
+   "confirmations": 1073,
+   "blockTime": 1791399061,
+   "fees": "627",
+   "value": "14476",
+   "valueIn": "15103",
+   "vin": [
+    {
+     "txid": "d2f69226b24f0149f819a0f1f5c1ea5ddd74cbe0ce868ce0989dddfb61801b71",
+     "n": 0,
+     "addresses": [
+      "bc1qw0t6ccur3jpqjr2rwwzt8lgunp3max40hrwm7m"
+     ],
+     "isAddress": true,
+     "value": "7387"
+    },
+    {
+     "txid": "509e9cc9ee20fe64daaa50b9b1a9d26e391fecf838c72cd6198f22e35cd5639d",
+     "n": 1,
+     "addresses": [
+      "bc1qw0t6ccur3jpqjr2rwwzt8lgunp3max40hrwm7m"
+     ],
+     "isAddress": true,
+     "value": "7716"
+    }
+   ],
+   "vout": [
+    {
+     "value": "14164",
+     "n": 0,
+     "spent": true,
+     "addresses": [
+      "bc1q3x8yszvcvjjxqragsh0l6j8rxnhk7pay9hnj5h"
+     ],
+     "isAddress": true,
+     "isOwn": true
+    },
+    {
+     "value": "312",
+     "n": 1,
+     "addresses": [
+      "bc1qw0t6ccur3jpqjr2rwwzt8lgunp3max40hrwm7m"
+     ],
+     "isAddress": true
+    }
+   ]
+  }
+ ]
+}

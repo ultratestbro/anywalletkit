@@ -1,0 +1,36 @@
+{
+  "note": "1Click (NEAR Intents) deposit on TON: 13.9 USD₮ sent to a one-time deposit address — a plain jetton transfer, not recognizable offline (test wallet 2026-10-10)",
+  "own": [
+    "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+  ],
+  "tx": {
+    "chain": "ton:-239",
+    "hash": "3e90722877ab3717b7a57d397d8cf61a57deae48faca7240dae63dce325552b3",
+    "time": 1791661492,
+    "status": "confirmed",
+    "address": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+    "from": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+    "to": "EQBxeLyemkSR4pTCCNkAy0R9D_YQwjFjkhhtKWYTIUfzD2Br",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+        "from": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+        "to": "EQBxeLyemkSR4pTCCNkAy0R9D_YQwjFjkhhtKWYTIUfzD2Br",
+        "amount": "13990032",
+        "standard": "jetton",
+        "symbol": "USD₮",
+        "decimals": 6
+      }
+    ],
+    "fee": "2133848",
+    "call": {
+      "to": "EQBxeLyemkSR4pTCCNkAy0R9D_YQwjFjkhhtKWYTIUfzD2Br",
+      "method": "jetton_transfer"
+    },
+    "block": "109110597000032"
+  },
+  "expect": {
+    "kind": "send"
+  }
+}

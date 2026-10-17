@@ -12,4 +12,10 @@ export {
 } from './read-only-account.js'
 export { WalletAccountSolana, addressFromPublicKey, type SolanaSendResult } from './account.js'
 export { WalletManagerSolana, SOLANA_BASE_PATH } from './manager.js'
+export {
+  createSolanaHistory, mapTransaction as mapHistoryTransaction, nativeTransfers as historyNativeTransfers, tokenTransfers as historyTokenTransfers, callOf as historyCallOf, solanaExplorerTxUrl, HistoryUnavailableError,
+  encodeCursor as encodeHistoryCursor, decodeCursor as decodeHistoryCursor,
+  SYSTEM_PROGRAM, COMPUTE_BUDGET_PROGRAM, TOKEN_PROGRAM, TOKEN_2022_PROGRAM, ASSOCIATED_TOKEN_PROGRAM,
+  type SolanaHistoryOptions, type SolanaHistorySource, type SolanaHistoryPage, type SolanaChainTx, type SolanaHistoryRaw, type HistoryFetch, type SignatureRow,
+} from './history.js'
 export { WalletManagerSolana as default } from './manager.js'

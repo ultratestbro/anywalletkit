@@ -1,45 +1,44 @@
 {
   "name": "@forgewallet/protocol-lending-mellow-evm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A simple package that lets @forgewallet/wallet-evm wallet accounts use Mellow Core Vaults (Lido EarnETH / EarnUSD and any vault on the same contracts): supply through the sync or async deposit queue, redeem and claim through the redeem queue, read the position, fees, oracle reports and APY.",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "index.js",
-  "types": "./types/index.d.ts",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./types/index.d.ts",
-      "default": "./index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
-    "./package": {
-      "default": "./package.json"
-    }
+    "./package.json": "./package.json"
   },
   "files": [
-    "index.js",
-    "index.d.ts",
-    "src",
-    "types",
-    "module.json",
+    "dist",
     "README.md",
+    "module.json",
     "LICENSE"
   ],
   "scripts": {
-    "build": "echo \"plain ESM, nothing to build\"",
-    "typecheck": "tsc -p tsconfig.json",
-    "test": "node --test tests/*.test.js && vitest run",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "lint": "echo ok",
     "verify:live": "node scripts/verify-live.mjs"
   },
   "dependencies": {
-    "ethers": "^6.17.0"
+    "viem": "^2.57.2"
   },
   "peerDependencies": {
     "@forgewallet/core": "workspace:*"
   },
   "devDependencies": {
-    "@forgewallet/core": "workspace:*",
     "@forgewallet/conformance": "workspace:*",
+    "@forgewallet/core": "workspace:*",
+    "@types/node": "^22",
     "vitest": "^5.0.3"
   },
   "keywords": [

@@ -1125,15 +1125,17 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
     ],
   },
   {
-    // Plasma (stablecoin L1, native XPL). LI.FI + wrap; no 1Click ids. Verified on-chain 2026-10-13.
+    // Plasma (stablecoin L1, native XPL). LI.FI + wrap; 1Click lists XPL and USDT0 under the nep141 omft
+    // bridge (2026-10-17 token list; the older nep245 HOT ids are marked DEPRECATED there) — dry quotes
+    // Plasma→Base and Base→Plasma verified live. Verified on-chain 2026-10-13.
     key: "plasma",
     caip2: "eip155:9745",
     icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/plasma.svg",
     label: "Plasma",
     assets: [
-      {symbol: "XPL", assetId: "", decimals: 18, icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/plasma.svg"},
+      {symbol: "XPL", assetId: "nep141:plasma.omft.near", decimals: 18, icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/plasma.svg"},
       {symbol: "WXPL", assetId: "", contract: "0x6100E367285b01F48D07953803A2d8dCA5D19873", decimals: 18},
-      {symbol: "USDT0", assetId: "", contract: "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "USDT0", assetId: "nep141:plasma-0xb8ce59fc3717ada4c02eadf9682a9e934f625ebb.omft.near", contract: "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb", decimals: 6, icon: cmcIcon(825)},
       {symbol: "USDe", assetId: "", contract: "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", decimals: 18, icon: cmcIcon(29470)},
       {symbol: "WETH", assetId: "", contract: "0x9895D81bB462A195b4922ED7De0e3ACD007c32CB", decimals: 18, icon: cmcIcon(2396)},
       // Top tokens by market cap (CoinGecko 2026-10-13), verified on-chain (symbol, decimals), routable via LI.FI / 1Click / Omniston.
@@ -1274,6 +1276,9 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
   },
   {
     // X Layer (OKX zkEVM, native OKB). LI.FI + Uniswap v3 + wrap + CCTP; no 1Click ids. Verified on-chain 2026-10-13.
+    // 1Click does list OKB (nep245:v2_1.omni.hot.tg:196_11111111111111111111) and USDT0 (…:196_2fezDCvVYRsG8wrK6deJ2VRPiAS1)
+    // via the HOT omni-bridge, but every HOT-bridge pair answers "Quoting for this pair is not available"
+    // (2026-10-17 probe) — not mapped until that corridor quotes again. Its USDC is the bridged 0x74b7…, not ours.
     // USDC is Circle's native token (the CCTP one), not the older bridged "USD Coin" at 0x74b7…. LI.FI routes only
     // the bridged one (0 of 123 quotes for native USDC, 2026-10-13), so USDT0 leads as the swap stable here.
     key: "xlayer",

@@ -1,0 +1,39 @@
+{
+  "note": "Plain JitoSOL SPL transfer (Token program only) — moves the pool token without the stake pool program (shape only)",
+  "own": [
+    "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "EvTykvN87o1arXqcf7wwU4Jzvo3pQrgaNfoxYfkw5gng"
+  ],
+  "tx": {
+    "chain": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    "hash": "4BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+    "time": 1788787100,
+    "status": "confirmed",
+    "address": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "from": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "to": "GSyXx6WRm2o6Qu4RWxTH17swLZKpTKQdQTS2uGcus1NF",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "from": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+        "to": "GSyXx6WRm2o6Qu4RWxTH17swLZKpTKQdQTS2uGcus1NF",
+        "amount": "1000000",
+        "standard": "spl",
+        "symbol": "JitoSOL",
+        "decimals": 9
+      }
+    ],
+    "fee": "5000",
+    "call": {
+      "to": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "programs": [
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+      ]
+    },
+    "block": "445075100"
+  },
+  "expect": {
+    "kind": "send"
+  }
+}

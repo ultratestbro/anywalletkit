@@ -1,0 +1,104 @@
+{
+  "note": "LI.FI same-chain swap USDT → USDC on Ethereum (GenericSwapFacetV3 swapTokensMultipleV3ERC20ToERC20, test wallet 2026-09-01)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x1e1ceb6fc40fbe3d1599354f7272e58d406cd35762c509c91d0c3951b068ab25",
+    "time": 1788251807,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "amount": "3000000",
+        "standard": "erc20",
+        "symbol": "USDT",
+        "decimals": 6
+      },
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0xC06ebbefD94032B85424D51906e2A335EFAe264B",
+        "amount": "7500",
+        "standard": "erc20",
+        "symbol": "USDT",
+        "decimals": 6
+      },
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0xC10eE9031F2a0B84766A86B55a8D90F357910fb4",
+        "amount": "2992500",
+        "standard": "erc20",
+        "symbol": "USDT",
+        "decimals": 6
+      },
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "from": "0xC10eE9031F2a0B84766A86B55a8D90F357910fb4",
+        "to": "0x000000000004444c5dc75cB358380D2e3dE08A90",
+        "amount": "2992500",
+        "standard": "erc20",
+        "symbol": "USDT",
+        "decimals": 6
+      },
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0x000000000004444c5dc75cB358380D2e3dE08A90",
+        "to": "0xC10eE9031F2a0B84766A86B55a8D90F357910fb4",
+        "amount": "2991856",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      },
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0xC10eE9031F2a0B84766A86B55a8D90F357910fb4",
+        "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "amount": "2991856",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      },
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "2991856",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "77429143741350",
+    "call": {
+      "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+      "selector": "0x5fd9ae2e"
+    },
+    "block": "25881277"
+  },
+  "expect": {
+    "kind": "swap",
+    "title": "Swapped USDT → USDC",
+    "assetsOut": [
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "amount": "3000000"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "amount": "2991856"
+      }
+    ],
+    "counterparty": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE"
+  }
+}

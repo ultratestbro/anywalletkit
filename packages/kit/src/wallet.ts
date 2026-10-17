@@ -1,5 +1,7 @@
-import type { IWalletAccount, IWalletAccountReadOnly, Signer, WalletManager } from '@forgewallet/core'
+import type { ActivityItem, ChainTx, DescribeActivityContext, HistorySource, IWalletAccount, IWalletAccountReadOnly, Signer, WalletManager } from '@forgewallet/core'
 import { applyPolicies, type Policies } from './policies.js'
+import { buildFeed, describeSingle, type ActivityOptions, type ActivityRecognizer, type FeedAddress, type FeedItem, type HistoryFeedPage, type HistoryFeedQuery } from './activity/feed.js'
+import type { IntentJournal } from './activity/journal.js'
 
 /** A chain package's manager class. */
 export type ManagerClass<M extends WalletManager<IWalletAccount, object>, C extends object> = new (seedOrSigner: string | Signer, config: C) => M
@@ -14,7 +16,11 @@ interface ProtocolRegistration { Protocol: ProtocolClass<unknown, any>; chain: s
 
 export interface WalletOptions {
   policies?: Policies
+  /** Activity feed options: known-contract labels per chain, native coins, error hook, pending-intent TTL. */
+  activity?: ActivityOptions
 }
+
+type Describer = { describeActivity?: (tx: ChainTx, ctx: DescribeActivityContext) => ActivityItem | null }
 
 /**
  * The orchestrator. Register chain wallets by CAIP-2 namespace prefix (or exact
@@ -35,10 +41,14 @@ export class Wallet {
   private readonly _wallets = new Map<string, WalletRegistration<WalletManager<IWalletAccount, object>, object>>()
   private readonly _protocols = new Map<string, ProtocolRegistration>()
   private readonly _protocolInstances = new Map<string, unknown>()
+  private readonly _historySources = new Map<string, HistorySource>()
+  private readonly _activity: ActivityOptions
+  private _journal: IntentJournal | undefined
 
   constructor(seedOrSigner: string | Signer, options: WalletOptions = {}) {
     this._seedOrSigner = seedOrSigner
     this._policies = options.policies
+    this._activity = options.activity ?? {}
   }
 
   /**
@@ -57,6 +67,22 @@ export class Wallet {
     this._protocols.set(name, { Protocol, chain: options.chain, config: options.config })
     return this
   }
+
+  /** Register the history source of one chain (exact CAIP-2 id, one per chain). */
+  registerHistorySource(source: HistorySource): this {
+    if (this._historySources.has(source.chain)) throw new Error(`A history source is already registered for "${source.chain}".`)
+    this._historySources.set(source.chain, source)
+    return this
+  }
+
+  /** The app's intent journal (what it meant when it broadcast): `history()` folds it in. Pass `undefined` to detach. */
+  setIntentJournal(journal: IntentJournal | undefined): this {
+    this._journal = journal
+    return this
+  }
+
+  /** Chains with a registered history source. */
+  get historyChains(): string[] { return [...this._historySources.keys()] }
 
   /** Registered wallet keys. */
   get chains(): string[] { return [...this._wallets.keys()] }
@@ -96,6 +122,63 @@ export class Wallet {
     const instance = new reg.Protocol(account, reg.config)
     this._protocolInstances.set(key, instance)
     return instance as P
+  }
+
+  /** Every registered protocol module as a recognizer, in registration order; a module whose chain has no wallet is skipped (reported through `onError`). */
+  private async recognizers(index: number): Promise<ActivityRecognizer[]> {
+    const out: ActivityRecognizer[] = []
+    for (const name of this._protocols.keys()) {
+      let instance: Describer
+      try { instance = (await this.getProtocol<Describer>(name, index)) } catch (error) {
+        this._activity.onError?.({ stage: 'recognizer', module: name, error })
+        continue
+      }
+      if (typeof instance.describeActivity !== 'function') continue
+      const describe = instance.describeActivity.bind(instance)
+      out.push({ name, describe: (tx, ctx) => describe(tx, ctx) ?? null })
+    }
+    return out
+  }
+
+  /** `addresses` from the query, or account `index` on every chain with a history source. */
+  private async feedAddresses(query: HistoryFeedQuery): Promise<FeedAddress[]> {
+    if (query.addresses) return query.addresses
+    const index = query.index ?? 0
+    const out: FeedAddress[] = []
+    for (const chain of this._historySources.keys()) {
+      if (query.chains && !query.chains.includes(chain)) continue
+      try { out.push({ chain, address: await (await this.getAccount(chain, index)).getAddress() }) } catch (error) {
+        this._activity.onError?.({ stage: 'source', chain, error })
+      }
+    }
+    return out
+  }
+
+  private activityOptions(): ActivityOptions {
+    const sources = this._historySources
+    return {
+      ...this._activity,
+      explorerUrl: this._activity.explorerUrl ?? ((chain, hash) => sources.get(chain)?.explorerTxUrl(hash)),
+    }
+  }
+
+  /**
+   * The activity feed: one page across every chain with a history source, newest first.
+   * Each row is described by the first registered protocol module that recognizes it,
+   * else by the generic fallback (send / receive / self / approve / revoke / contract);
+   * the intent journal adds pending rows, inherited kinds and cross-chain joins.
+   */
+  async history(query: HistoryFeedQuery = {}): Promise<HistoryFeedPage> {
+    const addresses = await this.feedAddresses(query)
+    const input = { sources: this._historySources, addresses, recognizers: await this.recognizers(query.index ?? 0), query, opts: this.activityOptions() }
+    return buildFeed(this._journal ? { ...input, journal: this._journal } : input)
+  }
+
+  /** One transaction through the same pipeline, for a detail screen. `own` defaults to the row's own address. */
+  async describeTransaction(tx: ChainTx, own: Iterable<string> = [tx.address], index = 0): Promise<FeedItem> {
+    const set = new Set<string>()
+    for (const a of own) { set.add(a); if (a.startsWith('0x')) set.add(a.toLowerCase()) }
+    return describeSingle(tx, set, await this.recognizers(index), this._journal, this.activityOptions())
   }
 
   /** Zeroize every manager and drop protocol instances. */

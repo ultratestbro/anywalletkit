@@ -1,0 +1,61 @@
+{
+  "note": "LI.FI bridge DAI Ethereum → Base via RelayDepository facet (source leg only, test wallet 2026-10-10)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x5b0f8a7fc0e5dbef847226646bde09a1266d6aa6f86e066fe11feabf42981f8d",
+    "time": 1791606215,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "amount": "10211089000000000000",
+        "standard": "erc20",
+        "symbol": "DAI",
+        "decimals": 18
+      },
+      {
+        "token": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0xC06ebbefD94032B85424D51906e2A335EFAe264B",
+        "amount": "25527722500000000",
+        "standard": "erc20",
+        "symbol": "DAI",
+        "decimals": 18
+      },
+      {
+        "token": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0x4cD00E387622C35bDDB9b4c962C136462338BC31",
+        "amount": "10185561277500000000",
+        "standard": "erc20",
+        "symbol": "DAI",
+        "decimals": 18
+      }
+    ],
+    "fee": "14737353008472",
+    "call": {
+      "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+      "selector": "0xa3443faa"
+    },
+    "block": "26159618"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged DAI",
+    "assetsOut": [
+      {
+        "token": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+        "amount": "10211089000000000000"
+      }
+    ]
+  }
+}

@@ -1,3 +1,7 @@
 export * from './policies.js'
 export * from './wallet.js'
+export * from './activity/generic.js'
+export * from './activity/journal.js'
+export * from './activity/cursor.js'
+export * from './activity/feed.js'
 export { Wallet as default } from './wallet.js'

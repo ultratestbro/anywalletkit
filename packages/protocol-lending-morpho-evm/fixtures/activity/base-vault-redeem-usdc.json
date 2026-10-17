@@ -1,0 +1,78 @@
+{
+  "note": "Moonwell Flagship USDC on Base: redeem(87.96 mwUSDC) → 95.98 USDC by 0x0767…646c — public tx, basescan.org/tx/0x606e20cb…",
+  "own": [
+    "0x07676b9a00bb542cbe223c57786a0cfd463c646c"
+  ],
+  "tx": {
+    "chain": "eip155:8453",
+    "hash": "0x606e20cb133a7e67503a957eb4b72f6b09b9f515a264a2347dbd4073c2332c8b",
+    "time": 1791998433,
+    "status": "confirmed",
+    "address": "0x07676b9a00bb542cbe223c57786a0cfd463c646c",
+    "from": "0x07676b9a00bb542cbe223c57786a0cfd463c646c",
+    "to": "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x5e868c8c6fd597f436fbe60f1ebd5a3a07b3c320",
+        "amount": "740821029931139056",
+        "standard": "erc20",
+        "symbol": "mwUSDC",
+        "decimals": 18
+      },
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "from": "0xbbbbbbbbbb9cc5e90e3b3af64bdaf62c37eeffcb",
+        "to": "0xc1256ae5ff1cf2719d4937adb3bbccab2e00a2ca",
+        "amount": "95983810",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      },
+      {
+        "token": "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca",
+        "from": "0x07676b9a00bb542cbe223c57786a0cfd463c646c",
+        "to": "0x0000000000000000000000000000000000000000",
+        "amount": "87960496000000000000",
+        "standard": "erc20",
+        "symbol": "mwUSDC",
+        "decimals": 18
+      },
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "from": "0xc1256ae5ff1cf2719d4937adb3bbccab2e00a2ca",
+        "to": "0x07676b9a00bb542cbe223c57786a0cfd463c646c",
+        "amount": "95983810",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "2311544390487",
+    "call": {
+      "to": "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca",
+      "selector": "0xba087652",
+      "data": "0xba087652000000000000000000000000000000000000000000000004c4b27513cb2b000000000000000000000000000007676b9a00bb542cbe223c57786a0cfd463c646c00000000000000000000000007676b9a00bb542cbe223c57786a0cfd463c646c"
+    },
+    "block": "52604543"
+  },
+  "expect": {
+    "kind": "withdraw",
+    "title": "Withdrew USDC",
+    "assetsIn": [
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "amount": "95983810"
+      }
+    ],
+    "assetsOut": [
+      {
+        "token": "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca",
+        "amount": "87960496000000000000"
+      }
+    ],
+    "counterparty": "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca"
+  }
+}

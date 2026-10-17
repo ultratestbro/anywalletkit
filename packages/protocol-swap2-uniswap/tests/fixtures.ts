@@ -13,11 +13,14 @@ const QUOTER = parseAbi([
   "function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) returns (uint256, uint160, uint32, uint256)",
   "function quoteExactInput(bytes path, uint256 amountIn) returns (uint256, uint160[], uint32[], uint256)",
 ]);
+const NOMINAL_IN = 1_000_000n;
 const word = (a: string) => `0x${a.slice(2).toLowerCase().padStart(64, "0")}`;
 
 export interface StubOptions {
-  /** amountOut per fee tier for direct quotes (missing tier = no pool → revert). */
+  /** amountOut per fee tier for a NOMINAL (1e6) input on direct quotes; other inputs scale linearly (missing tier = no pool → revert). */
   byFee?: Record<number, bigint>;
+  /** Pool price impact in bps, applied to inputs of at least the nominal size (a 1/1000 probe sees the marginal rate). */
+  impactBps?: number;
   /** A wrong factory on the router: the pinned deployment no longer matches. */
   badFactory?: boolean;
   /** Receipt status for eth_getTransactionReceipt ("0x1", "0x0" or null = not mined). */
@@ -43,9 +46,11 @@ export function rpcStub(o: StubOptions = {}): typeof fetch & {urls: string[]} {
       try {
         const call = decodeFunctionData({abi: QUOTER, data});
         if (call.functionName === "quoteExactInputSingle") {
-          const fee = (call.args[0] as {fee: number}).fee;
-          const amount = byFee[fee];
-          if (amount === undefined) return {id: req.id, error: {code: 3, message: "execution reverted"}};
+          const {fee, amountIn} = call.args[0] as {fee: number; amountIn: bigint};
+          const nominal = byFee[fee];
+          if (nominal === undefined) return {id: req.id, error: {code: 3, message: "execution reverted"}};
+          let amount = (nominal * amountIn) / NOMINAL_IN;
+          if (o.impactBps && amountIn >= NOMINAL_IN) amount = (amount * BigInt(10_000 - o.impactBps)) / 10_000n;
           return {id: req.id, result: encodeAbiParameters([{type: "uint256"}, {type: "uint160"}, {type: "uint32"}, {type: "uint256"}], [amount, 0n, 1, 90_000n])};
         }
       } catch {

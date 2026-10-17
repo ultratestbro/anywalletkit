@@ -1,4 +1,4 @@
-import { LocalSigner, SignerError, WalletManager, isSeedSigner, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@forgewallet/core'
 import { WalletAccountEvm } from './account.js'
 import { WalletAccountReadOnlyEvm } from './read-only-account.js'
 import type { EvmConfig } from './types.js'
@@ -16,12 +16,10 @@ export const EVM_BASE_PATH = "m/44'/60'/0'/0"
  *   signer's path, or 'external'); other indexes/paths throw.
  */
 export class WalletManagerEvm extends WalletManager<WalletAccountEvm, EvmConfig> {
-  private _seedBytes: Uint8Array | undefined
-
   constructor(seedOrSigner: string | Signer, config: EvmConfig = {}) {
     super(seedOrSigner, config)
-    if (this._seed !== undefined) this._seedBytes = seedFromMnemonicSync(this._seed)
   }
+
 
   async getAccount(index = 0): Promise<WalletAccountEvm> {
     return this.getAccountByPath(`${EVM_BASE_PATH}/${index}`)
@@ -32,7 +30,7 @@ export class WalletManagerEvm extends WalletManager<WalletAccountEvm, EvmConfig>
     if (cached) return cached
     const external = this.externalSigner()
     if (external) return this.fromSigner(external, path)
-    const signer = LocalSigner.fromSeed(this._seedBytes!, 'secp256k1', path)
+    const signer = LocalSigner.fromSeed(this.seedBytes(), 'secp256k1', path)
     const account = new WalletAccountEvm(signer, signer.publicKey, path, this._config)
     this._accounts.set(path, account)
     return account
@@ -69,9 +67,4 @@ export class WalletManagerEvm extends WalletManager<WalletAccountEvm, EvmConfig>
     return { slow: (normal * 80n) / 100n, normal, fast: (normal * 120n) / 100n }
   }
 
-  override dispose(): void {
-    super.dispose()
-    zeroize(this._seedBytes)
-    this._seedBytes = undefined
-  }
 }

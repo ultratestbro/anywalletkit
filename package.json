@@ -19,7 +19,8 @@
     "registry": "node scripts/build-registry.mjs",
     "registry:check": "node scripts/build-registry.mjs && git diff --exit-code registry/modules.json",
     "watch": "node scripts/watch/watch.mjs",
-    "watch:baseline": "node scripts/watch/watch.mjs --baseline"
+    "watch:baseline": "node scripts/watch/watch.mjs --baseline",
+    "vendor": "node scripts/vendor.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",

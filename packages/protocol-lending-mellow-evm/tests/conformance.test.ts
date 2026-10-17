@@ -1,4 +1,14 @@
-import { describeProtocolModule } from '@forgewallet/conformance'
-import MellowProtocolEvm from '../index.js'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { describeProtocolModule, type ActivityFixtureJson } from '@forgewallet/conformance'
+import MellowProtocolEvm from '../src/index.js'
 
-describeProtocolModule('protocol-lending-mellow-evm', { type: 'lending', Protocol: MellowProtocolEvm as never, config: { preset: 'lido-earn-eth' }, notImplemented: ['borrow', 'repay', 'quoteBorrow', 'quoteRepay'] })
+const dir = fileURLToPath(new URL('../fixtures/activity/', import.meta.url))
+const load = (sub: string): ActivityFixtureJson[] =>
+  readdirSync(join(dir, sub)).filter((f) => f.endsWith('.json')).sort().map((f) => JSON.parse(readFileSync(join(dir, sub, f), 'utf8')) as ActivityFixtureJson)
+
+describeProtocolModule('protocol-lending-mellow-evm', {
+  type: 'lending', Protocol: MellowProtocolEvm as never, config: { preset: 'lido-earn-eth' }, notImplemented: ['borrow', 'repay', 'quoteBorrow', 'quoteRepay'],
+  activity: { fixtures: load('.'), negatives: load('negatives') },
+})

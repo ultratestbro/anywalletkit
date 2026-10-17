@@ -1,0 +1,76 @@
+{
+  "note": "Uniswap v3 exactInput (multi-hop path) USDC → AGRS on Ethereum (public tx)",
+  "own": [
+    "0x5a3D6148A2Afe9BC09a9C3DFFeC5c8563bA960fa"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0xd3bafc1c96b80438de52c40b0fc16d2e498938f0f428de0d6bbb51cca666f801",
+    "time": 1791998591,
+    "status": "confirmed",
+    "address": "0x5a3D6148A2Afe9BC09a9C3DFFeC5c8563bA960fa",
+    "from": "0x5a3D6148A2Afe9BC09a9C3DFFeC5c8563bA960fa",
+    "to": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "from": "0xE0554a476A092703abdB3Ef35c80e0D76d32939F",
+        "to": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+        "amount": "39347052036143176",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      },
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0x5a3D6148A2Afe9BC09a9C3DFFeC5c8563bA960fa",
+        "to": "0xE0554a476A092703abdB3Ef35c80e0D76d32939F",
+        "amount": "95996774",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      },
+      {
+        "token": "0x738865301A9b7Dd80Dc3666dD48cF034ec42bdDa",
+        "from": "0xadDd24A001243E6D446Ed8d088c82aEfF84073A3",
+        "to": "0x5a3D6148A2Afe9BC09a9C3DFFeC5c8563bA960fa",
+        "amount": "24136449423",
+        "standard": "erc20",
+        "symbol": "AGRS",
+        "decimals": 8
+      },
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "from": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+        "to": "0xadDd24A001243E6D446Ed8d088c82aEfF84073A3",
+        "amount": "39347052036143176",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      }
+    ],
+    "fee": "66356597416692",
+    "call": {
+      "to": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "selector": "0xb858183f"
+    },
+    "block": "26192211"
+  },
+  "expect": {
+    "kind": "swap",
+    "title": "Swapped USDC → AGRS",
+    "assetsOut": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "amount": "95996774"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0x738865301A9b7Dd80Dc3666dD48cF034ec42bdDa",
+        "amount": "24136449423"
+      }
+    ]
+  }
+}

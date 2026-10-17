@@ -1,0 +1,61 @@
+{
+  "note": "LI.FI Diamond NEARIntents facet on Ethereum — LI.FI's transaction, not this module's",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x8c805ecd4740292513bdfc8f176644086efd23dac6effbb82098624ebbfaa7bf",
+    "time": 1791588083,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "amount": "4138358000000000000",
+        "standard": "erc20",
+        "symbol": "LINK",
+        "decimals": 18
+      },
+      {
+        "token": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0xC06ebbefD94032B85424D51906e2A335EFAe264B",
+        "amount": "10345895000000000",
+        "standard": "erc20",
+        "symbol": "LINK",
+        "decimals": 18
+      },
+      {
+        "token": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0x263D3E199E0D248Ea11cDFFaBB46AAE27Ec5441f",
+        "amount": "4128012105000000000",
+        "standard": "erc20",
+        "symbol": "LINK",
+        "decimals": 18
+      }
+    ],
+    "fee": "23868973101694",
+    "call": {
+      "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+      "selector": "0x02631b09"
+    },
+    "block": "26158107"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged LINK",
+    "assetsOut": [
+      {
+        "token": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+        "amount": "4138358000000000000"
+      }
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+ "txID": "65a8c50053aec9bd210a92a835f90ec61d7922e1c64768dda94bbeb44a9322b5",
+ "ret": [
+  {
+   "contractRet": "SUCCESS"
+  }
+ ],
+ "raw_data": {
+  "contract": [
+   {
+    "type": "TriggerSmartContract",
+    "parameter": {
+     "value": {
+      "owner_address": "411caaf10debe9e005080672d9f46fa7a3005e271e",
+      "contract_address": "41a614f803b6fd780986a42c78ec9c7f77e6ded13c",
+      "data": "a9059cbb0000000000000000000000004d39d5c55cfeb48f44d680fcac20493635dafdee0000000000000000000000000000000000000000000000000000000284a7672f"
+     }
+    }
+   }
+  ],
+  "data": "4d4947524154453a3238323037343731",
+  "timestamp": 1791783728759
+ }
+}

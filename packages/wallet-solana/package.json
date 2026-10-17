@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/wallet-solana",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Solana wallet for the forgewallet SDK: SLIP-10 m/44'/501'/i'/0' accounts, SOL and SPL transfers with ATA creation, noble ed25519 signing (no WebCrypto needed), built on @solana/kit.",
   "license": "Apache-2.0",
   "type": "module",
@@ -13,6 +13,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./history": {
+      "types": "./dist/history.d.ts",
+      "import": "./dist/history.js",
+      "require": "./dist/history.cjs"
     },
     "./package.json": "./package.json"
   },
@@ -43,6 +48,7 @@
   },
   "devDependencies": {
     "@forgewallet/conformance": "workspace:*",
+    "@forgewallet/protocol-staking-spl-stake-pool-solana": "workspace:*",
     "@noble/curves": "^2.4.0",
     "vitest": "^5.0.3"
   }

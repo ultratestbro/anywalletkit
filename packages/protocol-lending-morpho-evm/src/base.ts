@@ -1,12 +1,13 @@
 // Plumbing both Morpho protocols share: the viem client over the account's or
 // the config's provider, sends that wait on the account's receipts, eth_call
 // proofs with Morpho reverts decoded, exact ERC-20 approvals.
-import { LendingProtocol, NetworkError, type IWalletAccount, type IWalletAccountReadOnly } from '@forgewallet/core'
+import { LendingProtocol, NetworkError, type ActivityItem, type ChainTx, type DescribeActivityContext, type IWalletAccount, type IWalletAccountReadOnly } from '@forgewallet/core'
 import {
   createPublicClient, custom, encodeFunctionData, fallback, getAddress, http,
   type Abi, type Address, type EIP1193Provider, type Hex, type PublicClient, type Transport,
 } from 'viem'
 import { ERC20_ABI } from './abi.js'
+import { describeMorphoActivity, parseEvmChainId, presetContext, type MorphoActivityContext } from './activity.js'
 import { MORPHO_CHAINS, type MorphoChain } from './chains.js'
 import { MorphoApi } from './api.js'
 import { MorphoError, toMorphoError } from './errors.js'
@@ -70,6 +71,29 @@ export abstract class MorphoBase<TConfig extends MorphoBaseConfig> extends Lendi
       const list = Array.isArray(raw) ? raw : [raw]
       if (list.length > 0) this._client = createPublicClient({ transport: list.length === 1 ? toTransport(list[0]!) : fallback(list.map(toTransport)) })
     }
+  }
+
+  /** A vault this instance targets (the vault protocol sets it); accepted by address in `describeActivity`. */
+  protected get activityVault(): string | undefined { return undefined }
+
+  /**
+   * Recognize Morpho transactions offline: Blue by the singleton's address (preset for
+   * the transaction's chain, or this instance's), vaults by ERC-4626 selector + the
+   * called contract's shares minted to / burned from the wallet. See `activity.ts`.
+   */
+  override describeActivity(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null {
+    const chainId = parseEvmChainId(tx.chain)
+    if (chainId === null) return null
+    const preset = presetContext(chainId)
+    const own = chainId === this.chainId
+    if (!preset && !own) return null
+    const m: MorphoActivityContext = preset ?? { chainName: this.chain.name }
+    if (own) {
+      m.morpho = this.chain.morpho
+      const vault = this.activityVault
+      if (vault) m.vault = vault
+    }
+    return describeMorphoActivity(tx, ctx, m)
   }
 
   protected get client(): PublicClient {

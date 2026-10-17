@@ -1,3 +1,4 @@
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
 import {BaseSwap2Protocol} from "./base.js";
 import type {CrossChainProvider, Quote, QuoteParams} from "../types.js";
 import {validQuote} from "../validate.js";
@@ -41,6 +42,10 @@ export abstract class SingleProviderSwap2 extends BaseSwap2Protocol {
   }
   protected providerFor(name: string): CrossChainProvider | undefined {
     return name === this.provider.name ? this.provider : undefined;
+  }
+  /** Activity recognition lives on the provider (shared with the router); null when it has none. */
+  override describeActivity(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null {
+    return this.provider.describeActivity?.(tx, ctx) ?? null;
   }
   protected override protocolEnabled(): boolean {
     try { return this.provider.enabled(); } catch { return false; }

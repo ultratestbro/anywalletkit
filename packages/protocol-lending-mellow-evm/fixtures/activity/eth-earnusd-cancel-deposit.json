@@ -1,0 +1,45 @@
+{
+  "note": "Mellow Lido EarnUSD: DepositQueue.cancelDepositRequest → 1 USDC back (funded test 2026-09-01, etherscan.io/tx/0x8f22a8b4…)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x8f22a8b411d3f35371bf9ffd884d5978fd0971712a54c644c01b67ce4c334969",
+    "time": 1788281759,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0xC75E7E73B25fEa8bB23EB55CC48BA55067b5be76",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0xC75E7E73B25fEa8bB23EB55CC48BA55067b5be76",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "1000000",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "44785435497329",
+    "call": {
+      "to": "0xC75E7E73B25fEa8bB23EB55CC48BA55067b5be76",
+      "selector": "0xe6720254",
+      "data": "0xe6720254"
+    },
+    "block": "25883766"
+  },
+  "expect": {
+    "kind": "withdraw",
+    "title": "Cancelled deposit of USDC",
+    "assetsIn": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "amount": "1000000"
+      }
+    ],
+    "counterparty": "0xC75E7E73B25fEa8bB23EB55CC48BA55067b5be76"
+  }
+}

@@ -1,4 +1,5 @@
-import {nearIntents as cfg} from "./config.js";
+import {nearIntents as cfg, nearIntentsChainRefusal} from "./config.js";
+import {describeNearIntentsActivity} from "./activity.js";
 import {timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
 import {CC_DEST, ccAsset, ccAssetByToken, ccChain} from "@forgewallet/swap2-assets";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
@@ -142,6 +143,7 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
   }
   return {
     name: "near_intents",
+    describeActivity: describeNearIntentsActivity,
     enabled: () => config.enabled ?? true,
 
     // Capability discovery comes from the provider itself, so it can run alone
@@ -149,9 +151,11 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
     supportsChain: (chain: string) => cfg.supportsChain(chain),
     supportsChainPair: (fromChain: string, toChain: string) => cfg.supports(fromChain, toChain),
     supportsRoute(from: Asset, to: Asset): boolean {
+      // Chain-level gate first (namespace, catalog listing, hand-suspended
+      // corridors such as TON while the HOT bridge is dark) …
       if (!cfg.supports(from.chain, to.chain)) return false;
-      // Only pairs present in the curated catalog are offered — and only those
-      // with a 1Click asset id (LI.FI-only chains carry an empty assetId).
+      // … then only pairs present in the curated catalog are offered — and only
+      // those with a 1Click asset id (LI.FI-only tokens carry an empty assetId).
       // Both ends: a destination 1Click doesn't list (Unichain, MegaETH, …)
       // answered "unknown asset" on every quote (589 of the 2026-10-10 matrix).
       const asset = ccAsset(from.chain, from.token);
@@ -168,9 +172,15 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
         params.onRefusal?.(detail);
         return null;
       };
+      // Up-front, named refusals — no wire call for a corridor 1Click cannot
+      // serve: a chain outside its list / suspended by hand, or a token the
+      // catalog carries without a 1Click asset id ("1Click does not list …").
+      const chainRefusal = nearIntentsChainRefusal(params.sourceChain) ?? nearIntentsChainRefusal(params.destChain);
+      if (chainRefusal) return refuse(chainRefusal);
       const origin = ccAsset(params.sourceChain, params.sourceToken);
+      if (!origin?.assetId) return refuse(`1Click does not list ${params.sourceChain} ${params.sourceToken}`);
       const destination = destAssetId(params.destChain, params.destToken);
-      if (!origin?.assetId || !destination) return refuse(`unknown asset (origin=${params.sourceToken}, dest=${params.destToken})`);
+      if (!destination) return refuse(`1Click does not list ${params.destChain} ${params.destToken}`);
       const dry = params.dry !== false;
       // A live quote derives the deposit address from the refund config —
       // never create one without a real refund destination.

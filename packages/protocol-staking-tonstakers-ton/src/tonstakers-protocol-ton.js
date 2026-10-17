@@ -6,6 +6,7 @@ import { TonClient } from '@ton/ton'
 
 import StakingProtocol from './staking-protocol.js'
 import TONSTAKERS_ADDRESS_MAP from './tonstakers-address-map.js'
+import { describeTonstakersActivity } from './tonstakers-activity.js'
 
 /** @typedef {import('./staking-protocol.js').StakeOptions} StakeOptions */
 /** @typedef {import('./staking-protocol.js').StakeResult} StakeResult */
@@ -616,5 +617,18 @@ export default class TonstakersProtocolTon extends StakingProtocol {
     } catch {
       return null
     }
+  }
+
+  /**
+   * Recognize this deployment's Tonstakers transactions offline: a stake message to
+   * the pool, a tsTON burn (unstake request), a withdrawal payout from the pool.
+   * See `tonstakers-activity.js` for the rule.
+   *
+   * @param {import('@forgewallet/core').ChainTx} tx
+   * @param {import('@forgewallet/core').DescribeActivityContext} ctx
+   * @returns {import('@forgewallet/core').ActivityItem | null}
+   */
+  describeActivity (tx, ctx) {
+    return describeTonstakersActivity(tx, ctx, { network: this._network, addresses: this._addresses })
   }
 }

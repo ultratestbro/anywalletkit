@@ -1,0 +1,47 @@
+{
+  "note": "NEAR Intents deposit: 20.5 wNEAR ft_transfer_call into intents.near from an implicit account (public tx via the bridge-mng.near relayer)",
+  "own": [
+    "b1633df641230892b93f42d79072025d15163cb325134220321107afc1e7c932"
+  ],
+  "tx": {
+    "chain": "near:mainnet",
+    "hash": "Fdk3i7f91T7BpnNbDSZyNDzZ84WV4VwAGdFKuqHrvXNW",
+    "time": 1790728358,
+    "status": "confirmed",
+    "address": "b1633df641230892b93f42d79072025d15163cb325134220321107afc1e7c932",
+    "from": "bridge-mng.near",
+    "to": "wrap.near",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "wrap.near",
+        "from": "b1633df641230892b93f42d79072025d15163cb325134220321107afc1e7c932",
+        "to": "intents.near",
+        "amount": "20500000000000000000000000",
+        "standard": "nep141",
+        "symbol": "wNEAR",
+        "decimals": 24
+      }
+    ],
+    "fee": "888747685474100000000",
+    "call": {
+      "to": "wrap.near",
+      "method": "ft_transfer_call",
+      "programs": [
+        "ft_transfer_call"
+      ]
+    },
+    "block": "217848735"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged wNEAR",
+    "assetsOut": [
+      {
+        "token": "wrap.near",
+        "amount": "20500000000000000000000000"
+      }
+    ],
+    "counterparty": "intents.near"
+  }
+}

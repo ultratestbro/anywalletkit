@@ -13,6 +13,7 @@ import type {
   ScoreWeights,
 } from "@forgewallet/protocol-swap2-core/types";
 import {validQuote} from "@forgewallet/protocol-swap2-core/validate";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
 
 const DEFAULT_WEIGHTS: ScoreWeights = {price: 0.6, speed: 0.3, reliability: 0.1};
 /** Quotes within 0.2% of the best net value count as the same price. */
@@ -133,6 +134,7 @@ export class CrossChainRouter {
       ...(provider.close ? {close: provider.close.bind(provider)} : {}),
       ...(provider.supportsChain ? {supportsChain: provider.supportsChain.bind(provider)} : {}),
       ...(provider.supportsChainPair ? {supportsChainPair: provider.supportsChainPair.bind(provider)} : {}),
+      ...(provider.describeActivity ? {describeActivity: provider.describeActivity.bind(provider)} : {}),
       ...(provider.supportsSameChain !== undefined ? {supportsSameChain: provider.supportsSameChain} : {}),
     }));
     this.weights = parseWeights(opts.weights);
@@ -146,6 +148,18 @@ export class CrossChainRouter {
     const provider = this.getProvider(name);
     if (!provider) throw new Error(`cross-chain router: provider '${name}' is not registered`);
     return new CrossChainRouter([provider], this.options);
+  }
+
+  /**
+   * Activity recognition across the installed providers: the first one that
+   * claims the transaction describes it. Null when none does (or none is held).
+   */
+  describeActivity(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null {
+    for (const provider of this.providers) {
+      const item = provider.describeActivity?.(tx, ctx);
+      if (item) return item;
+    }
+    return null;
   }
 
   getProvider(name: string): CrossChainProvider | undefined {

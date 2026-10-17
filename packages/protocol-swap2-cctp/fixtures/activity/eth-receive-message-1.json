@@ -1,0 +1,44 @@
+{
+  "note": "CCTP V2 receiveMessage on Ethereum: relayer claims, 10 USDC minted to `own` (mintRecipient, public tx)",
+  "own": [
+    "0x3f934F99002FeEe1b952CB60ea5444165c047252"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0xd4a89971a29ec6c6d7d394d744a627b0617fe907ba2a4413d72fbc67747f7baa",
+    "time": 1791999491,
+    "status": "confirmed",
+    "address": "0x3f934F99002FeEe1b952CB60ea5444165c047252",
+    "from": "0xB42833d6edd1241474D33ea99906fD4CBE893730",
+    "to": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x3f934F99002FeEe1b952CB60ea5444165c047252",
+        "amount": "10000000",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "38579986934502",
+    "call": {
+      "to": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+      "selector": "0x57ecfd28"
+    },
+    "block": "26192285"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Received USDC via CCTP",
+    "assetsIn": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "amount": "10000000"
+      }
+    ],
+    "counterparty": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64"
+  }
+}

@@ -124,13 +124,23 @@ new MellowProtocolEvm(account, {
 - `withdraw` amounts are shares, the only unit known before the report; the
   quoted payout is an estimate at the latest report, after the redeem fee.
 
-## Tests
+## Build and tests
+
+TypeScript, built with `tsup` to `dist/` (ESM + CJS + types); one runtime
+dependency (viem) for the RPC client and ABI coding.
 
 ```
-npm test               # unit tests over a stubbed EIP-1193 provider (selectors of the real contracts)
+npm run build          # tsup → dist/
+npm test               # vitest: unit tests over a stubbed EIP-1193 provider (selectors of the real contracts) + conformance
 npm run verify:live    # on-chain discovery vs. the known Lido deployments, position reads, eth_call proofs — no keys
 ```
 
 ## License
 
 Apache-2.0
+
+## Activity
+
+`describeActivity(tx, { own })` labels Mellow transactions for a wallet's history, offline and synchronously. Deposits and redemptions are calls on a vault's **queues** (DepositQueue / RedeemQueue), which the module normally discovers on-chain, so the offline rule is: the selector is a queue method — `deposit(uint224,address,bytes32[])` → `supply` "Deposited <asset>", `cancelDepositRequest()` → `withdraw` "Cancelled deposit of <asset>", DepositQueue `claim(address)` → `claim` "Claimed <shares>", `redeem(uint256)` → `withdraw` "Requested withdrawal of <shares>", RedeemQueue `claim(address,uint32[])` → `claim` "Claimed <asset>" — **and** either the called contract is a queue a preset listed when it was last verified (`MELLOW_ADDRESS_MAP[1][key].queues`, read on 2026-10-14) or the receipt touches a known vault / share token (a preset's `vault` / `shareManager`, or the vault this instance targets). Writes never use the recorded queues; they are for recognizing history only. Subtitle `"Mellow · Ethereum"`, `counterparty` the queue; `assetsIn` / `assetsOut` are the wallet's net movements with preset share tokens labelled (earnETH, earnUSD, …).
+
+Fixtures in `fixtures/activity/` are the test wallet's funded runs (EarnETH deposit ETH + claim shares, EarnUSD deposit USDT, redeem, claim, cancelDepositRequest; 2026-09-01 … 09-11); `negatives/` holds a Lido submit and an SSV stake.

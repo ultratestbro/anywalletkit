@@ -6,7 +6,7 @@
 // exercise the redeem path; the deposit proof needs an ETH balance).
 //
 //   node scripts/verify-live.mjs [address] [rpcUrl] [preset]
-import MellowProtocolEvm, { MELLOW_ADDRESS_MAP, NATIVE_ASSET } from '../index.js'
+import MellowProtocolEvm, { MELLOW_ADDRESS_MAP, NATIVE_ASSET } from '../dist/index.js'
 
 const address = process.argv[2] ?? '0x0000000000000000000000000000000000000001'
 const rpc = process.argv[3] ?? process.env.LIVE_RPC ?? 'https://ethereum-rpc.publicnode.com'
@@ -59,7 +59,7 @@ try {
 if (position.shares > 0n) {
   const plan = await protocol._getWithdrawPlan(k?.redeemToken ?? position.token, position.shares / 2n)
   console.log(`withdraw half (${fmt(position.shares / 2n)} shares) → queue ${plan.queue}, ≈ ${plan.assetsOut} of ${k?.redeemToken ?? position.token}`)
-  await protocol._requireProvider().call({ from: address, to: plan.tx.to, data: plan.tx.data })
+  await protocol._requireProvider().call({ account: address, to: plan.tx.to, data: plan.tx.data })
   console.log('redeem proven with eth_call ✓')
 }
 for (const method of ['borrow', 'repay']) {

@@ -1,0 +1,30 @@
+{
+ "event_id": "feadea0945e146bdd0e1b617c75163ecab2123547e518ed0c5609cd7421858a9",
+ "timestamp": 1788516270,
+ "lt": 101244409000012,
+ "in_progress": false,
+ "is_scam": false,
+ "actions": [
+  {
+   "type": "WithdrawStakeRequest",
+   "status": "ok",
+   "WithdrawStakeRequest": {
+    "staker": {
+     "address": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+     "is_wallet": true
+    },
+    "pool": {
+     "address": "0:a45b17f28409229b78360e3290420f13e4fe20f90d7e2bf8c4ac6703259e22fa",
+     "is_wallet": false,
+     "name": "Tonstakers"
+    },
+    "implementation": "liquidTF"
+   }
+  }
+ ],
+ "account": {
+  "address": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+  "is_wallet": true
+ },
+ "extra": -95327081
+}

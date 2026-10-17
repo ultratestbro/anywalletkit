@@ -1,0 +1,45 @@
+{
+  "note": "Morpho Blue on Base: withdraw(MarketParams, …) → 1446.648624 USDC by 0xaffc…30cc — public tx, basescan.org/tx/0x9dea16e4…",
+  "own": [
+    "0xaffc7c480c62e0ca94375df6c465afda6c9430cc"
+  ],
+  "tx": {
+    "chain": "eip155:8453",
+    "hash": "0x9dea16e4f1be4be09fbfd5616205b076487ad31ba30918c60b0ea8d3d9124844",
+    "time": 1791999437,
+    "status": "confirmed",
+    "address": "0xaffc7c480c62e0ca94375df6c465afda6c9430cc",
+    "from": "0xaffc7c480c62e0ca94375df6c465afda6c9430cc",
+    "to": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "from": "0xbbbbbbbbbb9cc5e90e3b3af64bdaf62c37eeffcb",
+        "to": "0xaffc7c480c62e0ca94375df6c465afda6c9430cc",
+        "amount": "1446648624",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "1376142740173",
+    "call": {
+      "to": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+      "selector": "0x5c2bea49",
+      "data": "0x5c2bea49000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000cb585250f852c6c6bf90434ab21a00f02833a4af000000000000000000000000031b2efc8d70042ac8d9f5c793c4149ec4b60fde00000000000000000000000046415998764c29ab2a25cbea6254146d50d2268700000000000000000000000000000000000000000000000008ac7230489e800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004ee601e06957d000000000000000000000000affc7c480c62e0ca94375df6c465afda6c9430cc000000000000000000000000affc7c480c62e0ca94375df6c465afda6c9430cc"
+    },
+    "block": "52605045"
+  },
+  "expect": {
+    "kind": "withdraw",
+    "title": "Withdrew USDC",
+    "assetsIn": [
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "amount": "1446648624"
+      }
+    ],
+    "counterparty": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb"
+  }
+}

@@ -69,3 +69,34 @@ silently taking more. The recipient's ATA is derived for the right program.
   `signTransaction(base64)` / `sendTransaction(base64)` decode it, run the hard
   checks, simulate, add this wallet's signature (others are preserved) and
   return / broadcast the wire. The message bytes are never altered.
+
+## Activity history
+
+`createSolanaHistory` is the chain's `HistorySource` (`@forgewallet/core`): newest-first `ChainTx` pages for an address over plain JSON-RPC, no indexer.
+
+```ts
+import { createSolanaHistory } from '@forgewallet/wallet-solana/history'
+
+const history = createSolanaHistory({ rpcUrls: ['https://api.mainnet-beta.solana.com'] })
+const page = await history.listActivity('2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW', { limit: 25 })
+const older = await history.listActivity(address, { cursor: page.cursor })
+const one = await history.getTransaction(page.items[0].hash, address)
+history.explorerTxUrl(one.hash) // https://solscan.io/tx/…
+```
+
+| option | default | notes |
+|---|---|---|
+| `rpcUrl` / `rpcUrls` | — | One or several JSON-RPC endpoints, tried in order per request (HTTP 429 / 5xx / network → next). |
+| `network` | `mainnet` | `devnet` / `testnet` switch the CAIP-2 id and add `?cluster=` to Solscan links. |
+| `rateLimit` | 5 rps | Requests per second (a JSON-RPC batch counts as one). |
+| `batchSize` | 10 | `getTransaction` calls per JSON-RPC batch (1–10). |
+| `maxTokenAccounts` | 50 | Token accounts merged into the address's history. |
+| `fetch`, `timeoutMs` | global, 15 000 | `AbortSignal.timeout` when the runtime has it. |
+
+**Endpoints.** `getTokenAccountsByOwner` (Token + Token-2022, `jsonParsed`, cached per address) → `getSignaturesForAddress` for the wallet **and each token account** → `getTransaction` (`jsonParsed`, `maxSupportedTransactionVersion: 0`, `confirmed`) in batches of ≤ 10. A transaction the node pruned still yields a row (status from the signature list, no transfers, `raw.tx === null`).
+
+**Pages and cursor.** Signatures of every list are merged by slot (newest first), deduplicated, and the page takes the top `limit` plus ties at the boundary slot, so each list's consumed rows form a prefix of what the node returned. The cursor is base64 JSON `{ v: 1, l: { <list address>: <before signature> | '' | null } }`: one `before` signature per list, `''` = not started, `null` = exhausted. The list set is frozen in the cursor; a token account created mid-pagination joins on the next fresh listing. Pagination is exact even when one transaction touches several lists.
+
+**Mapping.** Native transfers come from `preBalances`/`postBalances` with the fee added back to the payer, token transfers from `pre`/`postTokenBalances` per mint attributed to the token accounts' **owners** (`standard` = `spl` / `token2022` from `programId`, `decimals` from the balance), senders paired with receivers largest-first; a receiver without a sender is a mint (`from` = mint), a sender without a receiver a burn (`to` = mint). `fee` = `meta.fee`, `status` from `meta.err`, `block` = slot. `call.programs` lists every top-level instruction program id, then inner ones; `call.to` is the first program that is not plumbing (System, ComputeBudget, Memo, Token, Token-2022, Associated Token) and `call.data` that instruction's base58 data — what `@forgewallet/protocol-staking-spl-stake-pool-solana` reads. A transaction made only of plumbing (a SOL or SPL transfer) has no `call`; `to` is then the recipient owner. `nativeValue` is the SOL the payer sent in a plain transfer, 0 for program calls. Symbols are not resolved here (no catalog dependency); the kit fills them.
+
+Fixtures in `test/fixtures/history/` were captured on 2026-10-14 from `api.mainnet-beta.solana.com` for the test wallet: signature pages for the wallet, its JitoSOL and USDC accounts, both token-account lists, the Jito `DepositSol` (`3SmwE6qf…`, the same transaction as the stake-pool module's activity fixture), a SOL send and receive, a USDC send and a Token-2022 → USDC aggregator swap. `test/history.test.ts` checks that the row this source builds for the Jito deposit is described as `stake` by the stake-pool module.

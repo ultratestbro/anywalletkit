@@ -1,18 +1,19 @@
 'use strict'
 
 /**
- * Live check against a real chain:
+ * Live check against a real chain (build first: `pnpm build`, the script imports dist/):
  *
  *   node scripts/verify-live.mjs <address> [rpc] [--chain 1] [--from <block>] [--range 10000] [--include-zero]
  *   LIVE_PK=0x… node scripts/verify-live.mjs <address> [rpc] --revoke <approval id>
  *
  * Discovery runs on a read-only account (address + provider). With
- * `--revoke` and LIVE_PK the script sends the real revoke through an
- * ethers Wallet dressed as a wallet account and waits for the receipt.
+ * `--revoke` and LIVE_PK the script sends the real revoke through a viem
+ * local account dressed as a wallet account and waits for the receipt.
  */
-import { JsonRpcProvider, Wallet, formatUnits } from 'ethers'
+import { createPublicClient, createWalletClient, formatUnits, http } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
 
-import ApprovalsProtocolEvm from '../index.js'
+import ApprovalsProtocolEvm from '../dist/index.js'
 
 const argv = process.argv.slice(2)
 const flags = {}
@@ -52,21 +53,22 @@ if (flags.revoke) {
   if (!pk) throw new Error('--revoke needs LIVE_PK')
   const target = approvals.find((a) => a.id === flags.revoke)
   if (!target) throw new Error(`approval ${flags.revoke} not in the list above`)
-  const provider = new JsonRpcProvider(rpc)
-  const wallet = new Wallet(pk, provider)
-  if (wallet.address.toLowerCase() !== address.toLowerCase()) throw new Error(`LIVE_PK is ${wallet.address}, not ${address}`)
-  // An account adapter over an ethers Wallet: the same three methods a module calls.
+  const publicClient = createPublicClient({ transport: http(rpc) })
+  const signer = privateKeyToAccount(pk)
+  const wallet = createWalletClient({ account: signer, transport: http(rpc) })
+  if (signer.address.toLowerCase() !== address.toLowerCase()) throw new Error(`LIVE_PK is ${signer.address}, not ${address}`)
+  // An account adapter over a viem local account: the same three methods a module calls.
   const account = {
-    async getAddress () { return wallet.address },
+    async getAddress () { return signer.address },
     async quoteSendTransaction (tx) {
-      const [gas, fee] = await Promise.all([provider.estimateGas({ ...tx, from: wallet.address }), provider.getFeeData()])
-      return { fee: gas * (fee.maxFeePerGas ?? fee.gasPrice) }
+      const [gas, fees] = await Promise.all([publicClient.estimateGas({ ...tx, account: signer.address }), publicClient.estimateFeesPerGas()])
+      return { fee: gas * (fees.maxFeePerGas ?? fees.gasPrice) }
     },
     async sendTransaction (tx) {
-      const sent = await wallet.sendTransaction(tx)
-      const receipt = await sent.wait()
-      if (receipt.status !== 1) throw new Error(`reverted: ${sent.hash}`)
-      return { hash: sent.hash, fee: receipt.gasUsed * receipt.gasPrice }
+      const hash = await wallet.sendTransaction({ ...tx, chain: null })
+      const receipt = await publicClient.waitForTransactionReceipt({ hash })
+      if (receipt.status !== 'success') throw new Error(`reverted: ${hash}`)
+      return { hash, fee: receipt.gasUsed * receipt.effectiveGasPrice }
     }
   }
   const protocol = new ApprovalsProtocolEvm(account, { provider: rpc, chainId })

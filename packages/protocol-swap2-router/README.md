@@ -55,3 +55,17 @@ The same is available one level down on `CrossChainRouter#getQuotes(params, {onU
 
 `fastest` is always the lowest ETA. Every quote passes the engine's checks before it is ranked, and
 the executed route is re-validated against its sealed quote before anything is signed.
+
+## Activity
+
+The router executes through whichever provider wins, so it has no transactions
+of its own: `describeActivity(tx, ctx)` asks every installed provider in order
+and returns the first description (null when none claims the transaction, or
+when the router holds no providers). Each provider package documents what it
+recognizes (`@forgewallet/protocol-swap2-lifi` → LI.FI Diamond calls,
+`-thorchain` → router `depositWithExpiry` / `transferOut`, `-cctp` → burn and
+claim, `-uniswap` / `-balancer` / `-wrap` → the DEX router / Vault / WETH9 calls,
+`-omniston` → STON.fi router and Omniston escrow on TON, `-near-intents` → the
+`intents.near` legs). The conformance fixture here is a public WETH9 deposit
+recognized by an in-test provider, proving the delegation; the negative is a
+LI.FI swap no installed provider claims.

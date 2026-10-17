@@ -1,0 +1,78 @@
+{
+  "note": "Mellow Lido EarnUSD: DepositQueue.deposit 5 USDT → earnUSD (funded test 2026-09-07, etherscan.io/tx/0x766dd899…)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x766dd89911f77744c687b5a9a2970350107945b4df0899af59da6acba9c9eefa",
+    "time": 1788802343,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0x534d0bEb82C47cf703BFb9E959297658b65Ec8E9",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0x534d0bEb82C47cf703BFb9E959297658b65Ec8E9",
+        "amount": "5000000",
+        "standard": "erc20",
+        "symbol": "USDT",
+        "decimals": 6
+      },
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "from": "0x534d0bEb82C47cf703BFb9E959297658b65Ec8E9",
+        "to": "0x014e6DA8F283C4aF65B2AA0f201438680A004452",
+        "amount": "5000000",
+        "standard": "erc20",
+        "symbol": "USDT",
+        "decimals": 6
+      },
+      {
+        "token": "0x4Ce1ac8F43E0E5BD7A346A98aF777bF8fbeA1981",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "4849353149517043992",
+        "standard": "erc20",
+        "symbol": "EARNUSD",
+        "decimals": 18
+      },
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "from": "0x014e6DA8F283C4aF65B2AA0f201438680A004452",
+        "to": "0x77B9441d5Cb89fca435190A9B6D108ad4B00ccFd",
+        "amount": "5000000",
+        "standard": "erc20",
+        "symbol": "USDT",
+        "decimals": 6
+      }
+    ],
+    "fee": "88739985623960",
+    "call": {
+      "to": "0x534d0bEb82C47cf703BFb9E959297658b65Ec8E9",
+      "selector": "0x1dbd773b",
+      "data": "0x1dbd773b00000000000000000000000000000000000000000000000000000000004c4b40000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "block": "25926990"
+  },
+  "expect": {
+    "kind": "supply",
+    "title": "Deposited USDT",
+    "assetsOut": [
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "amount": "5000000"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0x4Ce1ac8F43E0E5BD7A346A98aF777bF8fbeA1981",
+        "amount": "4849353149517043992"
+      }
+    ],
+    "counterparty": "0x534d0bEb82C47cf703BFb9E959297658b65Ec8E9"
+  }
+}

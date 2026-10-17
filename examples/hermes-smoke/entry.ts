@@ -1,6 +1,25 @@
 /**
  * Hermes smoke: derive + sign on every chain the way the SDK does, inside the
  * Hermes VM (no Node, no browser APIs). Checks derivation/signing vectors and
+  // names-ens: ENSIP-15 normalization, warnings and record decoding run offline in the VM (no RPC calls).
+  {
+    const ens = ensResolver({ rpcUrl: 'http://127.0.0.1:1' })
+    eq('ens supports .eth', ens.supports('Vitalik.ETH'), true)
+    eq('ens supports cb.id', ens.supports('alice.cb.id'), true)
+    eq('ens leaves .sol', ens.supports('alice.sol'), false)
+    eq('ens rejects address', ens.supports('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'), false)
+    eq('ens rejects mixed script', ens.supports('p\u0430ypal.eth'), false)
+    eq('isNameLike', isNameLike('vitalik.eth') && !isNameLike('0xabc'), true)
+    eq('warn confusable', warningsFor('\u0441\u043e\u0441\u043e.eth')[0]?.code, 'confusable')
+    eq('warn punycode', warningsFor('xn--80ak6aa92e.eth')[0]?.code, 'punycode')
+    eq('warn none', warningsFor('vitalik.eth').length, 0)
+    eq('coinType base', coinTypeFor('eip155:8453'), 2147492101n)
+    eq('coinType sol', coinTypeFor('solana:mainnet'), 501n)
+    const h20 = Uint8Array.from('751e76e8199196d454941c45d1b3a323f1433bd6'.match(/.{2}/g)!, (b) => parseInt(b, 16))
+    eq('btc p2wpkh', decodeBtcScript(Uint8Array.from([0x00, 0x14, ...h20]), 'x'), 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4')
+    eq('btc p2pkh', decodeBtcScript(Uint8Array.from([0x76, 0xa9, 0x14, ...h20, 0x88, 0xac]), 'x'), '1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH')
+    eq('registry', nameResolvers([ens]).supports('nick.eth'), true)
+  }
  * the offline safety layers, then prints HERMES_SMOKE_OK. Bundled by run.mjs.
  */
 import './shim-globals.js'
@@ -19,6 +38,8 @@ import { WalletManagerTron, describeTransaction as describeTron, ZERO_ADDRESS as
 import { WalletManagerBtc, selectCoins, INPUT_WEIGHT } from '@forgewallet/wallet-btc'
 import { WalletManagerNear, describeTransaction as describeNear, encodeTransaction as encodeNearTx, decodeTransaction as decodeNearTx } from '@forgewallet/wallet-near'
 import { smokeProtocols } from './protocols.js'
+import { ensResolver, warningsFor, coinTypeFor, decodeBtcScript } from '@forgewallet/names-ens'
+import { isNameLike, nameResolvers } from '@forgewallet/core'
 
 declare const print: ((s: string) => void) | undefined
 const out = (s: string) => (typeof print === 'function' ? print(s) : console.log(s))

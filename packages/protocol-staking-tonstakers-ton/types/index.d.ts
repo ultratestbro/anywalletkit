@@ -1,3 +1,4 @@
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core"
 import type {Address, Cell} from "@ton/core"
 
 export interface StakeOptions {
@@ -163,6 +164,8 @@ export declare const TONSTAKERS_ADDRESS_MAP: Record<string, {
 
 export default class TonstakersProtocolTon extends StakingProtocol {
   constructor(account: StakingWalletAccount, config?: TonstakersProtocolConfig)
+  /** Recognize this module's transactions for a wallet's history; null for anything else. Pure and synchronous. */
+  describeActivity(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null
   getPoolData(): Promise<PoolData>
   getJettonWallet(): Promise<Address>
   getTokenBalance(): Promise<bigint>
@@ -173,3 +176,8 @@ export default class TonstakersProtocolTon extends StakingProtocol {
   claimWithdrawals(options?: ClaimWithdrawalsOptions): Promise<never>
   quoteClaimWithdrawals(options?: ClaimWithdrawalsOptions): Promise<never>
 }
+
+export declare function describeTonstakersActivity(tx: ChainTx, ctx: DescribeActivityContext, deployment: {network: string | number; addresses: {pool: string; jetton?: string}}): ActivityItem | null
+/** Raw `wc:hex` form of any TON address spelling, or null when unparsable. */
+export declare function rawAddress(address: string): string | null
+export declare const OP_WITHDRAWAL_PAYOUT: number

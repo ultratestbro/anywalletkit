@@ -1,0 +1,43 @@
+{
+  "note": "THORChain router transferOut: the Asgard vault pays 9.165808 USDC to the test wallet (destination leg, 2026-10-10)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x921c13602420a2f7cec4b072dd3e88e654ae2cf6520b8c54596b9cd73a3468ea",
+    "time": 1791607451,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x1cAAF10DEBe9E005080672d9f46FA7A3005e271E",
+    "to": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "9165808",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "164490161154500",
+    "call": {
+      "to": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146",
+      "selector": "0x574da717"
+    },
+    "block": "26159720"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Received USDC via THORChain",
+    "assetsIn": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "amount": "9165808"
+      }
+    ]
+  }
+}

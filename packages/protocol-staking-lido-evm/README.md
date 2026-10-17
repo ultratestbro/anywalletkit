@@ -7,13 +7,16 @@ read APR and reward history.
 
 Built as the first implementation of a **proposed `StakingProtocol` type** for
 `@forgewallet/core` (which today ships swap, bridge, lending, fiat, swap2
-and sda — no staking). The base class in `src/staking-protocol.js` is written
-to move into `@forgewallet/core` verbatim; until the type lands
-upstream it ships inside this module. See "The proposed interface" below for
+and sda — no staking). The base class lives in `@forgewallet/core`;
+`src/staking-protocol.ts` keeps the runtime `IStakingProtocol` marker and the
+option / result types this module documents. See "The proposed interface" below for
 why staking is not lending.
 
 The mechanics are extracted from a production wallet (web + React
 Native/Hermes) where every flow is exercised with real funds.
+
+Written in TypeScript on [viem](https://viem.sh) (the only runtime
+dependency) and built with tsup to `dist/` (ESM + CJS + `.d.ts`).
 
 ## Usage
 
@@ -121,6 +124,13 @@ staking protocols.
 ## Tests
 
 ```
-npm test              # offline unit tests (node:test, stubbed EIP-1193 provider)
-npm run verify:live   # read-only checks against mainnet (views, REST, eth_call simulation)
+pnpm build            # tsup → dist/
+pnpm test             # offline unit + conformance tests (vitest, stubbed EIP-1193 provider)
+pnpm verify:live      # read-only checks against mainnet (views, REST, eth_call simulation; needs dist/)
 ```
+
+## Activity
+
+`describeActivity(tx, { own })` labels Lido transactions for a wallet's history, offline and synchronously. A transaction is Lido's when it calls one of the three contracts the instance is configured with (`stEth`, `wstEth`, `withdrawalQueue` — mainnet by default) on that chain, and the selector is: stETH `submit` → `stake` "Staked ETH"; wstETH `wrap` → `wrap` "Wrapped stETH", `unwrap` → `unwrap` "Unwrapped wstETH"; WithdrawalQueue `requestWithdrawals` / `…WithPermit` / `…WstETH` / `…WstETHWithPermit` → `unstake` "Requested withdrawal", `claimWithdrawals` / `claimWithdrawalsTo` / `claimWithdrawal` → `claim` "Claimed ETH". Selectors are computed from the signatures at module load (`LIDO_ACTIONS`). `approve` / `transfer` on stETH or wstETH are not Lido operations and yield null, as does everything else. Subtitle `"Lido · Ethereum"`, `counterparty` the contract called; `assetsIn` / `assetsOut` are the wallet's net movements from the receipt with stETH / wstETH / unstETH labelled by the module.
+
+Fixtures in `fixtures/activity/` are the test wallet's funded run (submit, wrap, unwrap, requestWithdrawalsWithPermit, claimWithdrawals; 2026-08-31 … 09-04); `negatives/` holds an SSV stake and a USDT approve.

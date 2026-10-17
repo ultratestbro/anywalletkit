@@ -18,4 +18,5 @@ export {
   buildStakeBody, buildUnstakeBody
 } from './src/tonstakers-protocol-ton.js'
 
+export { describeTonstakersActivity, rawAddress, OP_WITHDRAWAL_PAYOUT } from './src/tonstakers-activity.js'
 export { default } from './src/tonstakers-protocol-ton.js'

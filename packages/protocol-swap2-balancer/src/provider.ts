@@ -1,4 +1,5 @@
 import {decodeFunctionData, decodeFunctionResult, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
+import {describeBalancerActivity} from "./activity.js";
 import {ccAsset} from "@forgewallet/swap2-assets";
 import {evmRef, isEvm, timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
@@ -127,6 +128,7 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
 
   return {
     name: "balancer",
+    describeActivity: describeBalancerActivity,
     supportsSameChain: true,
     enabled: () => config.enabled ?? true,
     supportsChain: (caip2: string) => chainIdOf(caip2) !== null,

@@ -1,4 +1,5 @@
 import {decodeFunctionResult, encodeFunctionData, encodePacked, getAddress, parseAbi, type Hex} from "viem";
+import {describeUniswapActivity} from "./activity.js";
 import {ccAsset} from "@forgewallet/swap2-assets";
 import {evmRef, isEvm, timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
@@ -164,6 +165,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
 
   return {
     name: "uniswap",
+    describeActivity: (tx, ctx) => describeUniswapActivity(tx, ctx, config.deployments ?? UNISWAP_V3),
     supportsSameChain: true,
     enabled: () => config.enabled ?? true,
     supportsChain: (caip2: string) => chainIdOf(caip2) !== null,
@@ -229,6 +231,33 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         if (!best) return refuse("no Uniswap v3 pool route for this pair and amount");
         const {route, out, gas} = best as {route: Route; out: bigint; gas: bigint};
 
+        // Price impact (SDK-127): a probe 1/1000 the size on the same route gives the pool's
+        // marginal rate; the full-size rate's shortfall against it is the impact. Pool fees
+        // are paid on both sides, so they cancel. Informational — the Oct 16 run swapped
+        // 16.78 USDT into 0.0099 USDT0 through an empty pool and nothing said a word.
+        let priceImpactBps: number | undefined;
+        const probeIn = amountIn / 1000n;
+        if (probeIn > 0n) {
+          try {
+            const [raw] = await rpc(
+              chainId,
+              [call(d.quoter, route.single
+                ? encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInputSingle", args: [{tokenIn, tokenOut, amountIn: probeIn, fee: route.single.fee, sqrtPriceLimitX96: 0n}]})
+                : encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInput", args: [route.path!, probeIn]}))],
+              signal,
+            );
+            if (typeof raw === "string" && raw !== "0x") {
+              const [probeOut] = decodeFunctionResult({abi: QUOTER_ABI, functionName: route.single ? "quoteExactInputSingle" : "quoteExactInput", data: raw as Hex}) as readonly [bigint];
+              if (probeOut > 0n) {
+                const ratioBps = (out * probeIn * 10_000n) / (probeOut * amountIn); // (out/amountIn) ÷ (probeOut/probeIn), in bps
+                priceImpactBps = Math.max(0, Number(10_000n - ratioBps));
+              }
+            }
+          } catch {
+            /* the quote stands; impact is information, not a gate */
+          }
+        }
+
         const bps = params.slippageBps ?? slippageDefault;
         const minOut = (out * BigInt(10_000 - bps)) / 10_000n;
         if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) {
@@ -275,6 +304,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
             amountIn: amountIn.toString(),
             minOut: minOut.toString(),
             ...(route.single ? {fee: String(route.single.fee)} : {path: route.path!}),
+            ...(priceImpactBps !== undefined ? {priceImpactBps: String(priceImpactBps)} : {}),
           },
         };
       } catch (e) {

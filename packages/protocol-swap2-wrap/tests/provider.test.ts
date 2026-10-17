@@ -4,6 +4,16 @@ import {describeProtocolBehaviour, describeProtocolModule} from "@forgewallet/co
 import {wrapProvider, WRAPPED_NATIVE} from "../src/provider.js";
 import {WrapSwap2Protocol} from "../src/protocol.js";
 
+import {readdirSync, readFileSync} from "node:fs";
+import {fileURLToPath} from "node:url";
+import type {ActivityFixtureJson} from "@forgewallet/conformance";
+
+// Recorded real transactions (fixtures/activity/*.json); `negative-*` must come back null.
+const fixturesDir = fileURLToPath(new URL("../fixtures/activity/", import.meta.url));
+const loadFixtures = (pick: (file: string) => boolean): ActivityFixtureJson[] =>
+  readdirSync(fixturesDir).filter((f) => f.endsWith(".json") && pick(f)).sort().map((f) => JSON.parse(readFileSync(fixturesDir + f, "utf8")) as ActivityFixtureJson);
+const activity = {fixtures: loadFixtures((f) => !f.startsWith("negative-")), negatives: loadFixtures((f) => f.startsWith("negative-"))};
+
 afterEach(() => vi.unstubAllGlobals());
 
 const WETH = WRAPPED_NATIVE[1]!.address;
@@ -68,6 +78,7 @@ describe("wrap provider", () => {
 
 describeProtocolModule("protocol-swap2-wrap", {
   type: "swap2",
+  activity,
   Protocol: WrapSwap2Protocol,
   config: {fromChain: "eip155:1", skipAccountChainCheck: true, rpcUrls: RPC},
   samples: {getSupportedChains: []},

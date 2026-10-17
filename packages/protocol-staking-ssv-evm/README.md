@@ -7,7 +7,7 @@ rewards, exit through the network's cooldown, and read APR and network stats.
 Built as the **second implementation of the proposed `StakingProtocol` type**
 for `@forgewallet/core` (the first is
 `protocol-staking-lido-evm`).
-staking. The base class in `src/staking-protocol.js` is the same file, written
+staking. The base class lives in `@forgewallet/core` (`src/staking-protocol.ts` here keeps the runtime `IStakingProtocol` marker and the module's own types); it is written
 to move into `@forgewallet/core` verbatim; a token-staking protocol
 with a cooldown exit fitting it unchanged is the point: the interface is not
 Lido-shaped.
@@ -101,7 +101,7 @@ token, and the withdraw call is all-or-nothing on the network side.
   the account first. The staking module reverts with bare custom errors —
   `StakeTooLow`, `UnstakeAmountExceedsBalance`, `NothingToWithdraw`,
   `NothingToClaim`, `InsufficientBalance`… — and `describeRevert` turns the
-  4-byte selector back into a named error, wherever ethers buried it
+  4-byte selector back into a named error, wherever the provider (viem) buried it
   (`error.data`, `info.error.data`, `cause`, or the message text). A user
   sees "no unstake request has finished its cooldown yet", not "execution
   reverted", and pays no gas for it.
@@ -132,7 +132,7 @@ new SsvProtocolEvm(account, {
 ```
 
 Only mainnet ships as a default deployment — deliberately. The Hoodi testnet
-addresses are listed in `src/ssv-address-map.js` for explicit configuration,
+addresses are listed in `src/ssv-address-map.ts` for explicit configuration,
 so nobody stakes against an address a default quietly supplied.
 
 Mainnet contracts (verified on-chain against the live proxy, v2.0.0):
@@ -144,6 +144,13 @@ SSVNetwork `0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1`, SSVNetworkViews
 ## Tests
 
 ```
-npm test              # offline unit tests (node:test, stubbed EIP-1193 provider)
-npm run verify:live   # read-only checks against mainnet (views, API, eth_call proofs)
+pnpm build            # TypeScript → dist/ (tsup: ESM + CJS + d.ts); built on viem
+pnpm test             # offline unit tests (vitest, stubbed EIP-1193 provider) + conformance
+pnpm verify:live      # read-only checks against mainnet (views, API, eth_call proofs; needs a build)
 ```
+
+## Activity
+
+`describeActivity(tx, { own })` labels SSV staking transactions for a wallet's history, offline and synchronously. A transaction is SSV's when it calls the `network` proxy the instance is configured with (mainnet by default) on that chain and the selector is `stake` → `stake` "Staked SSV", `requestUnstake` → `unstake` "Requested unstake", `withdrawUnlocked` → `claim` "Withdrew SSV", `claimEthRewards` → `claim` "Claimed ETH rewards" (`SSV_ACTIONS`, selectors computed from the signatures at module load). Operator / cluster management calls on the same proxy, SSV `approve`s and anything else yield null. Subtitle `"SSV Network · Ethereum"`, `counterparty` the proxy; `assetsIn` / `assetsOut` are the wallet's net movements (SSV, cSSV, ETH rewards) labelled by the module.
+
+Fixtures in `fixtures/activity/` are the test wallet's funded run (stake, requestUnstake ×2, withdrawUnlocked, claimEthRewards; 2026-09-03 … 10-07); `negatives/` holds a Lido submit and a USDT approve.

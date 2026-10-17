@@ -1,0 +1,132 @@
+{
+ "result": {
+  "status": {
+   "SuccessValue": ""
+  },
+  "transaction": {
+   "signer_id": "bridge-mng.near",
+   "receiver_id": "b1633df641230892b93f42d79072025d15163cb325134220321107afc1e7c932",
+   "hash": "Fdk3i7f91T7BpnNbDSZyNDzZ84WV4VwAGdFKuqHrvXNW",
+   "actions": [
+    {
+     "Delegate": {
+      "delegate_action": {
+       "actions": [
+        {
+         "FunctionCall": {
+          "args": "eyJyZWNlaXZlcl9pZCI6ImludGVudHMubmVhciIsImFtb3VudCI6IjIwNTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwibXNnIjoie1wicmVjZWl2ZXJfaWRcIjpcIjg5NGJkM2I2MTUxMzI5MmUzYTRhMmUxOTE0MTYwMDc1ZDRhNjIwOGQzNjQxNzY1NGFjZDYzNmM1NWVhN2YwMDlcIn0ifQ==",
+          "deposit": "1",
+          "gas": 300000000000000,
+          "method_name": "ft_transfer_call"
+         }
+        }
+       ],
+       "max_block_height": 435697556,
+       "nonce": 217848728000001,
+       "public_key": "ed25519:CwSw6VKTEaVNuF9AyKxJnemnh5Bx1bEtz41JEQczbRkM",
+       "receiver_id": "wrap.near",
+       "sender_id": "b1633df641230892b93f42d79072025d15163cb325134220321107afc1e7c932"
+      },
+      "signature": "ed25519:uLubTgsUhBJB3EoyFTkHTuAKkygHLVQZUaERqf1hvnDWZbsVxWp5jxoVyd1Z1stQswP7xkNvFiSTFEswwZjRwMD"
+     }
+    }
+   ]
+  },
+  "transaction_outcome": {
+   "outcome": {
+    "executor_id": "bridge-mng.near",
+    "tokens_burnt": "51659488498500000000",
+    "status": {
+     "SuccessReceiptId": "DDjySZ8e3craFDJTJJ9hcnUU5PSGRygg9uJumPnGGqmW"
+    },
+    "logs": []
+   }
+  },
+  "receipts_outcome": [
+   {
+    "outcome": {
+     "executor_id": "b1633df641230892b93f42d79072025d15163cb325134220321107afc1e7c932",
+     "tokens_burnt": "51659488498500000000",
+     "status": {
+      "SuccessValue": ""
+     },
+     "logs": []
+    }
+   },
+   {
+    "outcome": {
+     "executor_id": "wrap.near",
+     "tokens_burnt": "263570153026300000000",
+     "status": {
+      "SuccessReceiptId": "8Z4RBGg6oGNP28ChMjvAtFZQBj5YPrEeXc6oeNKUWBBS"
+     },
+     "logs": [
+      "Transfer 20500000000000000000000000 from b1633df641230892b93f42d79072025d15163cb325134220321107afc1e7c932 to intents.near"
+     ]
+    }
+   },
+   {
+    "outcome": {
+     "executor_id": "intents.near",
+     "tokens_burnt": "385367307599600000000",
+     "status": {
+      "SuccessValue": "IjAi"
+     },
+     "logs": [
+      "EVENT_JSON:{\"standard\":\"nep245\",\"version\":\"1.0.0\",\"event\":\"mt_mint\",\"data\":[{\"owner_id\":\"894bd3b61513292e3a4a2e1914160075d4a6208d36417654acd636c55ea7f009\",\"token_ids\":[\"nep141:wrap.near\"],\"amounts\":[\"20500000000000000000000000\"],\"memo\":\"deposit\"}]}"
+     ]
+    }
+   },
+   {
+    "outcome": {
+     "executor_id": "bridge-mng.near",
+     "tokens_burnt": "0",
+     "status": {
+      "SuccessValue": ""
+     },
+     "logs": []
+    }
+   },
+   {
+    "outcome": {
+     "executor_id": "wrap.near",
+     "tokens_burnt": "136491247851200000000",
+     "status": {
+      "SuccessValue": "IjIwNTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIg=="
+     },
+     "logs": []
+    }
+   },
+   {
+    "outcome": {
+     "executor_id": "bridge-mng.near",
+     "tokens_burnt": "0",
+     "status": {
+      "SuccessValue": ""
+     },
+     "logs": []
+    }
+   },
+   {
+    "outcome": {
+     "executor_id": "bridge-mng.near",
+     "tokens_burnt": "0",
+     "status": {
+      "SuccessValue": ""
+     },
+     "logs": []
+    }
+   },
+   {
+    "outcome": {
+     "executor_id": "bridge-mng.near",
+     "tokens_burnt": "0",
+     "status": {
+      "SuccessValue": ""
+     },
+     "logs": []
+    }
+   }
+  ]
+ }
+}

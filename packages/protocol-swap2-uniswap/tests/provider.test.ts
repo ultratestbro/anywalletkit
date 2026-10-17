@@ -33,6 +33,16 @@ describe("Uniswap v3 provider", () => {
     expect(inner[0]!.args[0]).toMatchObject({tokenIn: USDC, tokenOut: USDT, fee: 500, recipient: ME, amountIn: 1_000_000n, amountOutMinimum: 995_000n});
   });
 
+  it("reports the pool's price impact from a 1/1000 probe (SDK-127: information, not a gate)", async () => {
+    vi.stubGlobal("fetch", rpcStub({byFee: {500: 1_000_000n}, impactBps: 4300}));
+    const q = await uniswapProvider({rpcUrls: RPC}).getQuote({...base, sourceToken: "USDC", destToken: USDT, amountIn: "1000000"});
+    expect(q!.destAmount).toBe("570000");
+    expect(q!.providerData!.priceImpactBps).toBe("4300");
+    vi.stubGlobal("fetch", rpcStub({byFee: {500: 1_000_000n}}));
+    const flat = await uniswapProvider({rpcUrls: RPC}).getQuote({...base, sourceToken: "USDC", destToken: USDT, amountIn: "1000000"});
+    expect(flat!.providerData!.priceImpactBps).toBe("0");
+  });
+
   it("splits a large quote batch for nodes that cap batch size (X Layer: 10 calls)", async () => {
     const inner = rpcStub({byFee: {100: 900_000n, 500: 1_000_000n, 3000: 990_000n}});
     let largest = 0;

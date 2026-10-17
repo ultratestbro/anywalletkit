@@ -1,0 +1,42 @@
+{
+  "note": "SSV Network: claimEthRewards → 11434500000 wei (funded test 2026-09-03, etherscan.io/tx/0xa8376ba7…)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0xa8376ba7fbe829fe4d9df9a3a0fbc0c130bad4cf3aff716c8232e749a82172c2",
+    "time": 1788433631,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": null,
+        "from": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "11434500000"
+      }
+    ],
+    "fee": "13116460083964",
+    "call": {
+      "to": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+      "selector": "0x27596fce",
+      "data": "0x27596fce"
+    },
+    "block": "25896376"
+  },
+  "expect": {
+    "kind": "claim",
+    "title": "Claimed ETH rewards",
+    "assetsIn": [
+      {
+        "token": null,
+        "amount": "11434500000"
+      }
+    ],
+    "counterparty": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1"
+  }
+}

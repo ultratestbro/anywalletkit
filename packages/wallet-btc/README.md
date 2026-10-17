@@ -72,3 +72,30 @@ form; `sign()` throws `UnsupportedAddressTypeError` (BIP-322 is not implemented)
 (mempool.space, blockstream.info). Requests time out after `timeoutMs` (15 s) and
 responses are shape-checked (`NetworkError` otherwise). Pass your own object
 implementing `BtcClient` for anything else.
+
+## Activity history
+
+`createBtcHistory` is the chain's `HistorySource` (`@forgewallet/core`) over Blockbook, reusing `BlockbookClient` (`getAddressPage`, `getTransactionDetails`).
+
+```ts
+import { createBtcHistory } from '@forgewallet/wallet-btc/history'
+
+const history = createBtcHistory({ blockbookUrls: ['https://btc1.trezor.io', 'https://bitcoin.atomicwallet.io'] })
+const page = await history.listActivity('bc1q3x8yszvcvjjxqragsh0l6j8rxnhk7pay9hnj5h', { limit: 25 })
+const older = await history.listActivity(address, { cursor: page.cursor })
+const one = await history.getTransaction(page.items[0].hash, address)
+history.explorerTxUrl(one.hash) // https://mempool.space/tx/…
+```
+
+| option | default | notes |
+|---|---|---|
+| `blockbookUrl` / `blockbookUrls` | — | Blockbook roots, tried in order (Cloudflare 403, 5xx, network → next). The Trezor instances (`btc1…5.trezor.io`) sit behind a Cloudflare challenge that blocks non-browser user agents; `bitcoin.atomicwallet.io` and `blockbook.btc.zelcore.io` answered on 2026-10-14. QuickNode's Blockbook add-on speaks the same API. |
+| `network` | `bitcoin` | `testnet` / `regtest` CAIP-2 ids; mempool.space testnet links. |
+| `pageSize` | the query `limit`, ≤ 100 | Rows per Blockbook page (its max is 1000). |
+| `fetch`, `timeoutMs` | global, 15 000 | |
+
+**Endpoint.** `GET /api/v2/address/{a}?details=txs&page=&pageSize=` — Blockbook returns transactions newest first with inputs and outputs (`hex` is dropped). The cursor is base64 JSON `{ v: 1, p, s }`: the next page and the page size the pagination started with (Blockbook clamps out-of-range pages to the last one, so paging stops at `totalPages`). `since` is applied client-side; unconfirmed rows are always kept.
+
+**Mapping.** Inputs the address spent (`ownIn`) and outputs it received (`ownOut`) are summed. Spent inputs → a send: `from` = address, `to` = the first output that is not ours, `nativeValue` = what left to non-own outputs (change ignored, fee separate); every output ours → a consolidation to itself. No spent inputs → a receive: `from` = the first input address (`coinbase` when none), `nativeValue` = `ownOut`. `transfers` is that one native leg, `fee` = `fees`, `status` = `confirmed` once `confirmations ≥ 1` (else `pending`, no `block`), `block` = `blockHeight`, `raw` = the Blockbook transaction plus `ownIn` / `ownOut`.
+
+Fixtures in `test/fixtures/history/` were captured on 2026-10-14 from `bitcoin.atomicwallet.io` for the test address (its 4 transactions: two receives, two sends with change) and `GET /api/v2/tx/{txid}` of one send. No protocol module recognizes Bitcoin transactions, so there is no recognizer cross-check.

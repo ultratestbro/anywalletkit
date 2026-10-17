@@ -1,9 +1,10 @@
 // Read-only live verification against Ethereum mainnet: views, the APR API
 // and eth_call proofs of the calldata the module would broadcast. No keys,
-// no writes.
+// no writes. Run `pnpm build` first (it imports the built module).
 //
 //   node scripts/verify-live.mjs [address] [rpcUrl]
-import SsvProtocolEvm, { SSV_ADDRESS_MAP, describeRevert } from '../index.js'
+import { createPublicClient, encodeFunctionData, http, parseAbi } from 'viem'
+import SsvProtocolEvm, { SSV_ADDRESS_MAP, describeRevert } from '../dist/index.js'
 
 const address = process.argv[2] ?? '0x8abe813577e47415a3cd0bbc68c7abca2c4c55ba'
 const rpc = process.argv[3] ?? process.env.LIVE_RPC ?? 'https://ethereum-rpc.publicnode.com'
@@ -41,11 +42,17 @@ console.log(`apr history: ${history.map((s) => `${new Date(s.timestamp * 1000).t
 // Prove the calldata the module would sign, from a cSSV-rich address:
 // requestUnstake(1 wei of cSSV) and claimEthRewards() must execute in eth_call.
 const { network } = SSV_ADDRESS_MAP[1]
+const NETWORK_ABI = parseAbi([
+  'function requestUnstake(uint256 amount)',
+  'function withdrawUnlocked()',
+  'function claimEthRewards()'
+])
+const client = createPublicClient({ transport: http(rpc) })
 const rich = position.balance > 0n ? address : '0x079cdA955c283CcF2449b72897d68B1F474AA476'
 for (const [fn, args] of [['requestUnstake', [1n]], ['claimEthRewards', []]]) {
-  const data = protocol._network.interface.encodeFunctionData(fn, args)
+  const data = encodeFunctionData({ abi: NETWORK_ABI, functionName: fn, args })
   try {
-    await protocol._provider.call({ from: rich, to: network, data })
+    await client.call({ account: rich, to: network, data })
     console.log(`${fn} eth_call from ${rich.slice(0, 10)}…: ok`)
   } catch (error) {
     const described = describeRevert(error)
@@ -58,7 +65,7 @@ for (const [fn, args] of [['requestUnstake', [1n]], ['claimEthRewards', []]]) {
 // unlocked must come back as NothingToWithdraw, not an opaque revert.
 if (queue.claimableIds.length === 0) {
   try {
-    await protocol._provider.call({ from: address, to: network, data: protocol._network.interface.encodeFunctionData('withdrawUnlocked') })
+    await client.call({ account: address, to: network, data: encodeFunctionData({ abi: NETWORK_ABI, functionName: 'withdrawUnlocked' }) })
     console.log('withdrawUnlocked eth_call: ok (something was unlocked after all)')
   } catch (error) {
     const described = describeRevert(error)

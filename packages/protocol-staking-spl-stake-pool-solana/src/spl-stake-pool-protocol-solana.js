@@ -2,6 +2,7 @@
 
 import StakingProtocol from './staking-protocol.js'
 import SPL_STAKE_POOL_ADDRESS_MAP from './spl-stake-pool-address-map.js'
+import { describeStakePoolActivity } from './spl-stake-pool-activity.js'
 import {
   STAKE_ACCOUNT_SPACE,
   STAKE_POOL_PROGRAM,
@@ -789,6 +790,18 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
     const { fee } = await this._account.quoteSendTransaction(this._message(instructions))
     return BigInt(fee ?? 0)
   }
+  /**
+   * Recognize SPL Stake Pool transactions offline (DepositSol → stake, WithdrawSol /
+   * WithdrawStake → unstake), labelling this instance's pool and the known presets.
+   * See `spl-stake-pool-activity.js` for the rule.
+   *
+   * @param {import('@forgewallet/core').ChainTx} tx
+   * @param {import('@forgewallet/core').DescribeActivityContext} ctx
+   * @returns {import('@forgewallet/core').ActivityItem | null}
+   */
+  describeActivity (tx, ctx) {
+    return describeStakePoolActivity(tx, ctx, { pool: this.pool })
+  }
 }
 
 /**
@@ -818,4 +831,5 @@ export function parseDepositSol (tx, wallet, ata) {
     return { lamports, minted: post - pre }
   }
   return null
+
 }

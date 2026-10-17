@@ -1,0 +1,58 @@
+{
+  "note": "Balancer v2 Vault batchSwap BAL → USDT on Ethereum — the call this module builds (public tx, 2026-10-12)",
+  "own": [
+    "0x937D7cc16cbA02ad33ecf406F0d06E07F273CfAB"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x61f3b234425f3b79d2e0fc861ac34b1af3119a1051799027308ac83921a59fc3",
+    "time": 1791843359,
+    "status": "confirmed",
+    "address": "0x937D7cc16cbA02ad33ecf406F0d06E07F273CfAB",
+    "from": "0x937D7cc16cbA02ad33ecf406F0d06E07F273CfAB",
+    "to": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xba100000625a3754423978a60c9317c58a424e3D",
+        "from": "0x937D7cc16cbA02ad33ecf406F0d06E07F273CfAB",
+        "to": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "amount": "1056981120224985090144",
+        "standard": "erc20",
+        "symbol": "BAL",
+        "decimals": 18
+      },
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "from": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "to": "0x937D7cc16cbA02ad33ecf406F0d06E07F273CfAB",
+        "amount": "135522824",
+        "standard": "erc20",
+        "symbol": "USDT",
+        "decimals": 6
+      }
+    ],
+    "fee": "41159988891816",
+    "call": {
+      "to": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "selector": "0x945bcec9"
+    },
+    "block": "26179323"
+  },
+  "expect": {
+    "kind": "swap",
+    "title": "Swapped BAL → USDT",
+    "assetsOut": [
+      {
+        "token": "0xba100000625a3754423978a60c9317c58a424e3D",
+        "amount": "1056981120224985090144"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "amount": "135522824"
+      }
+    ]
+  }
+}

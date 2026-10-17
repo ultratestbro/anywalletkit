@@ -11,3 +11,5 @@ export {
 } from './reserve.js'
 export type { ReserveConfiguration, ReserveInfo } from './reserve.js'
 export { POOL_ABI, GATEWAY_ABI, ORACLE_ABI, ADDRESSES_PROVIDER_ABI, VARIABLE_DEBT_ABI, VARIABLE_RATE_MODE } from './abi.js'
+export { describeAaveActivity, presetMarkets, marketChainName, POOL_ACTIONS, GATEWAY_ACTIONS, MODULE_NAME } from './activity.js'
+export type { ActivityMarket } from './activity.js'

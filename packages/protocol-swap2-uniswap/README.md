@@ -1,0 +1,25 @@
+# @forgewallet/protocol-swap2-uniswap
+
+Uniswap v3 same-chain swaps as a swap2 module: QuoterV2 quotes, SwapRouter02
+`multicall(deadline, …)` execution, on the deployments in `src/addresses.ts`
+(each verified on-chain before use). Standalone through `UniswapSwap2Protocol`,
+or as one provider of the router.
+
+## Activity
+
+`describeActivity(tx, ctx)` recognizes a call into the chain's SwapRouter02
+(the deployment table, or the `deployments` override you passed) with one of
+its swap entry points — `multicall(uint256,bytes[])` `0x5ae401dc`,
+`multicall(bytes[])` `0xac9650d8`, `multicall(bytes32,bytes[])` `0x1f0464d1`,
+`exactInputSingle` `0x04e45aaf`, `exactInput` `0xb858183f`,
+`exactOutputSingle` `0x5023b4df`, `exactOutput` `0x09b81346` — as `swap`,
+"Swapped A → B" from the owner's net transfers (native legs via
+`unwrapWETH9` / `value` included). Subtitle `Uniswap v3 · <chain>`,
+counterparty = the router. Symbols come from the transfers or the swap2-assets
+catalog; unknown tokens show as a shortened address.
+
+Fixtures (`fixtures/activity/`, public Ethereum transactions, 2026-10-14 — the
+test wallet's Uniswap runs were quote-only on the matrix): `exactInputSingle`
+USDC → SHFL, `multicall(deadline)` USDC → USDT (the shape this module builds),
+`multicall(bytes[])` KEKIUS → ETH, `exactInput` USDC → AGRS; negatives: a
+Balancer Vault swap, a WETH9 deposit.

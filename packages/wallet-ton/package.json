@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/wallet-ton",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "TON wallet for the forgewallet SDK: SLIP-10 m/44'/607'/i' accounts on WalletContractV5R1, TON and jetton transfers, toncenter failover.",
   "license": "Apache-2.0",
   "type": "module",
@@ -16,6 +16,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./history": {
+      "types": "./dist/history.d.ts",
+      "import": "./dist/history.js",
+      "require": "./dist/history.cjs"
     },
     "./package.json": "./package.json"
   },
@@ -45,8 +50,10 @@
   },
   "devDependencies": {
     "@forgewallet/conformance": "workspace:*",
+    "@forgewallet/protocol-staking-tonstakers-ton": "workspace:*",
+    "@forgewallet/protocol-swap2-omniston": "workspace:*",
     "@noble/curves": "^2.4.0",
-    "vitest": "^5.0.3",
-    "@ton/ton": "^16.3.0"
+    "@ton/ton": "^16.3.0",
+    "vitest": "^5.0.3"
   }
 }

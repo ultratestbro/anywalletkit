@@ -1,0 +1,51 @@
+{
+  "note": "Omniston TON → EVM order: 1.6 USD₮ locked in the Omniston HTLC escrow (Escrow Minter), excess GRAM refunded by the escrow child (test wallet, tonapi event 2026-08-13)",
+  "own": [
+    "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+  ],
+  "tx": {
+    "chain": "ton:-239",
+    "hash": "c18547c1f6d7a0531aaa954d976f38e285026dca9950bbeac966518cf8af62c4",
+    "time": 1786649237,
+    "status": "confirmed",
+    "address": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+    "from": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+    "to": "EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+        "from": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+        "to": "EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ",
+        "amount": "1600000",
+        "standard": "jetton",
+        "symbol": "USD₮",
+        "decimals": 6
+      },
+      {
+        "token": null,
+        "from": "0:1b40c2d98f32bf31627b4771d215f39a520391710417dbdba0f94813b7bbd69e",
+        "to": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+        "amount": "169435207"
+      }
+    ],
+    "fee": "308497479",
+    "call": {
+      "to": "EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ",
+      "method": "jetton_transfer",
+      "data": "0xc0a5f0d9"
+    },
+    "block": "96571758000001"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged USD₮",
+    "assetsOut": [
+      {
+        "token": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+        "amount": "1600000"
+      }
+    ],
+    "counterparty": "EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ"
+  }
+}

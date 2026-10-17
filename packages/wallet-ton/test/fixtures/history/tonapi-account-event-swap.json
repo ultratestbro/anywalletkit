@@ -1,0 +1,39 @@
+{
+ "event_id": "72ea596844b123844b1798cdc285f361e3146e0286c79bae14918725a14ca3bd",
+ "timestamp": 1791588651,
+ "lt": 108928432000001,
+ "in_progress": false,
+ "is_scam": false,
+ "actions": [
+  {
+   "type": "JettonSwap",
+   "status": "ok",
+   "JettonSwap": {
+    "dex": "stonfi",
+    "amount_in": "",
+    "amount_out": "52333196",
+    "ton_in": 36127400000,
+    "user_wallet": {
+     "address": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+     "is_wallet": true
+    },
+    "router": {
+     "address": "0:92e1411ae546892f33b2c8a89ea90390d8ff4cfbb917a643b91e73f706fdb9d1",
+     "is_wallet": false,
+     "name": "STON.fi DEX"
+    },
+    "jetton_master_out": {
+     "address": "0:b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe",
+     "symbol": "USD₮",
+     "decimals": 6,
+     "name": "Tether USD"
+    }
+   }
+  }
+ ],
+ "account": {
+  "address": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+  "is_wallet": true
+ },
+ "extra": -5694048
+}

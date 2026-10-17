@@ -1,0 +1,27 @@
+{
+  "note": "USDT approve(spender, 0) (etherscan.io/tx/0x61437848…) — an approval, not a Lido operation",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x61437848059dfef49b9eddd5f8de7931c534438dabe25f9fd3d95ccd5e11bd25",
+    "time": 1789392371,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    "nativeValue": "0",
+    "transfers": [],
+    "fee": "7256134717660",
+    "call": {
+      "to": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "selector": "0x095ea7b3",
+      "data": "0x095ea7b30000000000000000000000006c96de32cea08842dcc4058c14d3aaad7fa41dee0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "block": "25975987"
+  },
+  "expect": {
+    "kind": "revoke"
+  }
+}

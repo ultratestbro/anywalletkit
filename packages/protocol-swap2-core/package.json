@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/protocol-swap2-core",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "",
   "license": "Apache-2.0",
   "type": "module",
@@ -38,6 +38,11 @@
       "types": "./dist/util.d.ts",
       "import": "./dist/util.js",
       "require": "./dist/util.cjs"
+    },
+    "./activity": {
+      "types": "./dist/activity.d.ts",
+      "import": "./dist/activity.js",
+      "require": "./dist/activity.cjs"
     },
     "./swap2/base": {
       "types": "./dist/swap2/base.d.ts",

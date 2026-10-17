@@ -1,4 +1,5 @@
 import {LIFI_SOLANA_CAIP2, lifi as lifiCfg} from "./config.js";
+import {describeLifiActivity} from "./activity.js";
 import {ccAsset} from "@forgewallet/swap2-assets";
 import {timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
@@ -188,6 +189,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
   }
   return {
     name: "lifi",
+    describeActivity: (tx, ctx) => describeLifiActivity(tx, ctx, (chain, address) => trustedAddress(chain, address, trustedTransactionTargets)),
     supportsSameChain: true,
     enabled: () => config.enabled ?? true,
 

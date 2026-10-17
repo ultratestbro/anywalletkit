@@ -58,6 +58,18 @@ const nodeAnswered = (e: unknown): boolean => {
   return false
 }
 
+/** EIP-712 domain chainId in any notation a dApp sends (number, bigint, decimal or hex string) → number. */
+export function typedDomainChainId(raw: unknown): number | undefined {
+  if (typeof raw === 'number') return Number.isSafeInteger(raw) ? raw : undefined
+  if (typeof raw === 'bigint') return raw <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(raw) : undefined
+  if (typeof raw === 'string' && /^\d+$/.test(raw)) return Number(raw)
+  if (typeof raw === 'string' && /^0x[0-9a-fA-F]+$/.test(raw)) {
+    const n = BigInt(raw)
+    return n <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(n) : undefined
+  }
+  return undefined
+}
+
 export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalletAccount {
   readonly needsNetwork = false
   readonly path: string
@@ -133,8 +145,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
 
   private assertSafeTypedData(typed: TypedDataInput): void {
     const known = this.knownChainId()
-    const raw = typed.domain.chainId
-    const domainChain = typeof raw === 'bigint' ? Number(raw) : typeof raw === 'number' ? raw : typeof raw === 'string' && /^\d+$/.test(raw) ? Number(raw) : undefined
+    const domainChain = typedDomainChainId(typed.domain.chainId)
     if (domainChain !== undefined && known !== undefined && domainChain !== known && !this._config.allowCrossChainTypedData) {
       throw new ChainMismatchError(known, domainChain, 'typed data')
     }
@@ -144,8 +155,14 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   async signTypedData(typed: TypedDataInput): Promise<string> {
     this.assertSafeTypedData(typed)
     const types = cleanTypes(typed.types)
+    // viem includes `chainId` in the EIP712Domain type only when it is a
+    // number. A dApp that sends it as a hex or decimal STRING (Omniston's
+    // 1inch orders: "0x89") would otherwise be signed over a domain WITHOUT
+    // chainId — a signature no verifying contract accepts.
+    const chainId = typedDomainChainId(typed.domain.chainId)
+    const domain = chainId === undefined ? typed.domain : { ...typed.domain, chainId }
     const hash = hashTypedData({
-      domain: typed.domain, types, primaryType: typed.primaryType ?? inferPrimaryType(types), message: typed.message,
+      domain, types, primaryType: typed.primaryType ?? inferPrimaryType(types), message: typed.message,
     } as never)
     return this.serializeSignature(await this.signHash(hash, 'evm-712'))
   }

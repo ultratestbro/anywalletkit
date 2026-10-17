@@ -1,4 +1,4 @@
-import { LocalSigner, NetworkError, SignerError, WalletManager, isSeedSigner, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, NetworkError, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@forgewallet/core'
 import { WalletAccountNear } from './account.js'
 import { WalletAccountReadOnlyNear } from './read-only-account.js'
 import { NearRpc, createClient } from './rpc.js'
@@ -19,12 +19,10 @@ export const NEAR_BASE_PATH = "m/44'/397'"
  * `getNamedAccount("alice.near", i)` binds account i's key to a named account.
  */
 export class WalletManagerNear extends WalletManager<WalletAccountNear, NearConfig> {
-  private _seedBytes: Uint8Array | undefined
-
   constructor(seedOrSigner: string | Signer, config: NearConfig = {}) {
     super(seedOrSigner, config)
-    if (this._seed !== undefined) this._seedBytes = seedFromMnemonicSync(this._seed)
   }
+
 
   async getAccount(index = 0): Promise<WalletAccountNear> {
     return this.getAccountByPath(`${NEAR_BASE_PATH}/${index}'`)
@@ -37,7 +35,7 @@ export class WalletManagerNear extends WalletManager<WalletAccountNear, NearConf
     if (cached) return cached
     const external = this.externalSigner()
     if (external) return this.fromSigner(external, full)
-    const signer = LocalSigner.fromSeed(this._seedBytes!, 'ed25519', full)
+    const signer = LocalSigner.fromSeed(this.seedBytes(), 'ed25519', full)
     const account = new WalletAccountNear(signer, signer.publicKey, full, this._config)
     this._accounts.set(full, account)
     return account
@@ -79,8 +77,4 @@ export class WalletManagerNear extends WalletManager<WalletAccountNear, NearConf
     return { slow: price, normal: price, fast: (price * 11n) / 10n }
   }
 
-  override dispose(): void {
-    super.dispose()
-    if (this._seedBytes) { zeroize(this._seedBytes); this._seedBytes = undefined }
-  }
 }

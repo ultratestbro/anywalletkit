@@ -1,0 +1,45 @@
+{
+  "note": "Mellow Lido EarnUSD: RedeemQueue.redeem 4.857 earnUSD (funded test 2026-09-07, etherscan.io/tx/0x1dbd461b…)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x1dbd461b33b1d696b9ee028d07841432a82316df292512d7b1c72ce568900997",
+    "time": 1788802391,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0x95092A7a86715246Be6395b8D514B3d60A270Cd3",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x4Ce1ac8F43E0E5BD7A346A98aF777bF8fbeA1981",
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0x4Ce1ac8F43E0E5BD7A346A98aF777bF8fbeA1981",
+        "amount": "4856638106677059581",
+        "standard": "erc20",
+        "symbol": "EARNUSD",
+        "decimals": 18
+      }
+    ],
+    "fee": "86830325932900",
+    "call": {
+      "to": "0x95092A7a86715246Be6395b8D514B3d60A270Cd3",
+      "selector": "0xdb006a75",
+      "data": "0xdb006a7500000000000000000000000000000000000000000000000043663ea05f1c9ffd"
+    },
+    "block": "25926994"
+  },
+  "expect": {
+    "kind": "withdraw",
+    "title": "Requested withdrawal of earnUSD",
+    "assetsOut": [
+      {
+        "token": "0x4Ce1ac8F43E0E5BD7A346A98aF777bF8fbeA1981",
+        "amount": "4856638106677059581"
+      }
+    ],
+    "counterparty": "0x95092A7a86715246Be6395b8D514B3d60A270Cd3"
+  }
+}

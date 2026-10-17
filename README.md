@@ -23,10 +23,15 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
   where the suites run. No Bare, no native modules, no polyfill magic inside packages.
   Browsers are out of scope for now (that track returns with an embedded,
   semi-custodial wallet kit later).
-- **Standard derivation.** Wallets on the standard paths resolve the same
-  addresses from the same seed, pinned by golden vectors in
-  `packages/conformance/vectors`. Migrating costs nothing in user funds.
-- **Zeroize by design.** Everything that holds a key has `dispose()`.
+- **Standard derivation per chain.** Account `i` is the address MetaMask / Rabby
+  (EVM), Phantom (Solana), Trust Wallet (TON), TronLink, BIP-84 wallets (Bitcoin)
+  and MyNearWallet derive from the same seed — the table is in
+  `@forgewallet/keyring`, the vectors in `packages/conformance/vectors`. The SDK
+  keeps these account-0 vectors pinned; each chain uses the best stack for it.
+- **Zeroize by design.** Everything that holds a key has `dispose()`. A manager
+  keeps the 64-byte seed, never the phrase (a JS string cannot be zeroized, a
+  `Uint8Array` can); the keyring reads a secret per call and disposes the
+  account after it.
 
 ## Packages
 
@@ -34,13 +39,13 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 |---|---|---|
 | `@forgewallet/core` | phase 0 | Signer / account interfaces, protocol base classes, errors, BIP-39 + BIP-32 / SLIP-10 helpers |
 | `@forgewallet/conformance` | phase 0 | Golden vectors + `describeChainModule` / `describeProtocolModule` test suites |
-| `@forgewallet/wallet-evm` | phase 1 ✓ | viem; m/44'/60'/0'/0/i; EIP-191 / EIP-712 / EIP-1559 (+ legacy, 2930, 7702 shapes); ERC-20 transfer + approve; byte-for-byte signature vectors |
+| `@forgewallet/wallet-evm` | phase 1 ✓ | viem; m/44'/60'/0'/0/i; EIP-191 / EIP-712 / EIP-1559 (+ legacy, 2930, 7702 shapes); ERC-20 transfer + approve; signatures pinned byte-for-byte by golden vectors |
 | `@forgewallet/wallet-solana` | phase 1 ✓ | @solana/kit; SLIP-10 m/44'/501'/i'/0'; SOL + SPL transfers with ATA creation; noble ed25519 signing (no WebCrypto); failover RPC |
 | `@forgewallet/runtime-hermes` | phase 1 ✓ | one-call React Native polyfills: AbortSignal.timeout/any, subtle.digest, structuredClone + checks for getRandomValues / TextEncoder |
 | `@forgewallet/wallet-ton` | phase 2 ✓ | @ton/ton; SLIP-10 m/44'/607'/i' on WalletContractV5R1; TON + jetton transfers; noble ed25519 via the `signer` callback; toncenter failover; receipts via toncenter v3 body hash |
-| `@forgewallet/wallet-tron` | phase 2 ✓ | full-node HTTP API, no tronweb; m/44'/195'/0'/0/i; TRX + TRC-20; TIP-191 sign; fee model (bandwidth/energy/activation) |
+| `@forgewallet/wallet-tron` | phase 2 ✓ | full-node HTTP API, no tronweb; m/44'/195'/0'/0/i; TRX + TRC-20; TIP-191 sign; fee model = bandwidth / energy / activation |
 | `@forgewallet/wallet-near` | 2026-10-10 ✓ | JSON-RPC, hand-written borsh (byte-checked vs @near-js); SLIP-10 m/44'/397'/i' (NEAR Wallet path); implicit + named accounts; NEAR + NEP-141 (auto storage_deposit); NEP-413; preflight instead of simulation; dangerous-action guard |
-| `@forgewallet/wallet-btc` | phase 2 ✓ | bitcoinjs-lib 7; BIP-84 p2wpkh m/84'/0'/0'/0/i; @bitcoinerlab/coinselect with fixed parameters; PSBT signing; BIP-137 sign; Blockbook HTTP client with failover (electrum = extension point) |
+| `@forgewallet/wallet-btc` | phase 2 ✓ | @scure/btc-signer; BIP-84 p2wpkh m/84'/0'/0'/0/i and BIP-86 taproot accounts; own coin selection; RBF; BIP-137 sign; Blockbook / Esplora transports with failover |
 | `@forgewallet/protocol-swap2-core` | phase 3 ✓ | swap2 engine: `BaseSwap2Protocol` / `SingleProviderSwap2` over `Swap2Protocol` from core, `CrossChainRouter`, remote provider, quote/execution safety rails |
 | `@forgewallet/protocol-swap2-router` | phase 3 ✓ | `RouterSwap2Protocol`: auctions every engine provider and any external swap2 module, executes the winner, resumes status |
 | `@forgewallet/protocol-swap2-near-intents`, `-lifi`, `-thorchain`, `-omniston` | phase 3 ✓ | the four providers (NEAR Intents 1Click, LI.FI REST, THORChain, STON.fi Omniston), each also a standalone `Swap2Protocol` |
@@ -49,15 +54,15 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | `@forgewallet/protocol-swap2-uniswap` | 2026-10-12 ✓ | Uniswap v3 straight from the contracts on 7 chains: QuoterV2 quotes (every fee tier + two-hop via WETH/USDC/USDT in one RPC batch), SwapRouter02 `multicall` execution with deadline, native in/out (wrap via value, `unwrapWETH9`), exact approvals, deployment re-verified on-chain; no API key, no frontend — the permissionless same-chain venue |
 | `@forgewallet/protocol-swap2-wrap` | 2026-10-12 ✓ | native ↔ wrapped native (ETH↔WETH, BNB↔WBNB, POL↔WPOL, AVAX↔WAVAX, HYPE↔WHYPE… 13 EVM chains) as a same-chain swap2 venue: WETH9 `deposit()` / `withdraw()`, 1:1, no approval, sender-only, tokens verified on-chain; wrapped natives added to the asset catalog |
 | `@forgewallet/protocol-swap2-balancer` | 2026-10-13 ✓ | Balancer v2 same-chain swaps on 9 chains (the cp0x permissionless Balancer venue): the SOR API only suggests the path; the Vault prices it on-chain (`queryBatchSwap`) and `batchSwap` enforces `limits` + deadline; split and multi-hop paths, native via the Vault's ETH sentinel, preflight re-price |
-| `@forgewallet/kit` | phase 3 ✓ | orchestrator: register chain wallets + protocol modules, accounts by CAIP-2 chain, policies (fee cap, allow/block lists, confirm) before every broadcast |
+| `@forgewallet/kit` | phase 3 ✓ | orchestrator: register chain wallets + protocol modules, accounts by CAIP-2 chain, policies (fee cap, allow/block lists, confirm) on every write — sends, transfers, `signTransaction`, message signatures; the activity feed (`history()`) |
 | `@forgewallet/keyring` | 2026-10-12 ✓ | many accounts from one seed plus imported seeds / private keys / Tonkeeper words, one `AccountMeta` list across chains, per-execution accounts that dispose the key after use |
 | `@forgewallet/tx-preview-evm` | 2026-10-11 ✓ | pre-sign review for EVM: decode (recipient, approvals, contract), simulate balance changes at a pinned block, verdict + refusal reasons for the review sheet |
-| `@forgewallet/protocol-staking-lido-evm`, `-ssv-evm`, `-tonstakers-ton`, `-spl-stake-pool-solana` | phase 4 ✓ | `StakingProtocol` modules (two-phase withdrawals): Lido, SSV Network, Tonstakers, Jito / SPL stake pools |
-| `@forgewallet/protocol-lending-mellow-evm` | phase 4 ✓ | Mellow Core Vaults (Lido EarnETH / EarnUSD) as a `LendingProtocol` |
+| `@forgewallet/protocol-staking-lido-evm`, `-ssv-evm`, `-tonstakers-ton`, `-spl-stake-pool-solana` | phase 4 ✓ | `StakingProtocol` modules (two-phase withdrawals): Lido, SSV Network, Tonstakers, Jito / SPL stake pools; the EVM two on viem (ported off ethers 2026-10-15) |
+| `@forgewallet/protocol-lending-mellow-evm` | phase 4 ✓ | Mellow Core Vaults (Lido EarnETH / EarnUSD) as a `LendingProtocol`; viem |
 | `@forgewallet/protocol-lending-aave-evm` | 2026-10-10 ✓ | Aave v3 on 18 chains (20 markets) as a `LendingProtocol`: supply / withdraw / borrow / repay, gateway for native, EIP-2612 permits, health factor, reserves with rates and caps; Pool cross-checked against the PoolAddressesProvider |
 | `@forgewallet/protocol-lending-morpho-evm` | 2026-10-10 ✓ | Morpho on 10 chains: Vaults (MetaMorpho V1 / Vault V2, ERC-4626) and Blue markets (supply / withdraw / borrow / repay / collateral) as `LendingProtocol`s; vaults verified against the factories, state accrued like the contract, API for listing / APY only |
-| `@forgewallet/protocol-lending-kamino-solana` | 2026-10-13 ✓ | Kamino on Solana: Earn vaults (kVaults: deposit / withdraw, shares, APY) and Lend markets (supply / withdraw / borrow / repay on the wallet's obligation) as `LendingProtocol`s; Kamino's official API builds the transaction, the wallet's serialized guard proves programs and balance effects before signing (branch `feat/kamino-solana`) |
-| `@forgewallet/protocol-approvals-evm` | phase 4 ✓ | token-approval discovery (ERC-20 / 721 / 1155 / Permit2 / EIP-7702), risk flags, revoke |
+| `@forgewallet/protocol-lending-kamino-solana` | 2026-10-13 ✓ | Kamino on Solana: Earn vaults (kVaults: deposit / withdraw, shares, APY) and Lend markets (supply / withdraw / borrow / repay on the wallet's obligation) as `LendingProtocol`s; Kamino's official API builds the transaction, the wallet's serialized guard proves programs and balance effects before signing; positions / rates from the API |
+| `@forgewallet/protocol-approvals-evm` | phase 4 ✓ | token-approval discovery (ERC-20 / 721 / 1155 / Permit2 / EIP-7702), risk flags, revoke; viem |
 | `@forgewallet/extension-kit` + `examples/extension` | 2026-10-14 ✓ | reference Chrome (MV3) wallet assembled from the modules above: fully non-custodial, six chains, EIP-1193/6963, Solana Wallet Standard, TON Connect, Tron TIP-1193, sats-connect, NEAR wallet-selector, WalletConnect v2; vault + session + relay in the kit, reproducible release (branch `feat/extension-kit`) |
 
 Every protocol module ships a `module.json`; `pnpm registry` builds
@@ -97,6 +102,33 @@ pnpm test:hermes     # the Hermes VM React Native ships: derive + sign on every 
 ```
 
 A package is not green until Node AND Hermes are.
+
+Every package is TypeScript built with tsup (ESM + CJS + `.d.ts`), and the EVM
+packages share one library, viem — there is no ethers in the tree. Two modules
+are still plain ESM with hand-written types and will be converted next:
+`protocol-staking-tonstakers-ton` and `protocol-staking-spl-stake-pool-solana`.
+
+## Versions and releases
+
+Versions move only through [changesets](.changeset): every change that touches a
+package's behaviour adds one (`pnpm changeset`), and a release applies them
+(`pnpm changeset version` → bumped `package.json`s + `CHANGELOG.md`s, then
+`pnpm release` once the packages are public on npm). The first versioned
+release (2026-10-15) took every package to 0.1.0 (the ported 0.1.x modules to
+0.2.0).
+
+Consumers that are not on npm yet take the SDK as tarballs:
+
+```sh
+node scripts/vendor.mjs --out ../app/vendor/forgewallet --consumer ../app/package.json
+```
+
+builds every package, stamps each `package.json` with
+`forgewallet: { commit, branch, builtAt, dirty }`, packs versioned tarballs,
+writes `manifest.json` next to them and repoints the consumer's `file:`
+references — so an app can always say which SDK commit it runs (`dirty` means
+the tree had uncommitted changes under `packages/` and the build is not
+reproducible from `commit` alone).
 
 ## License
 

@@ -258,6 +258,20 @@ describe('provider-serialized transactions', () => {
     expect(w.f.sent).toHaveLength(0)
   })
 
+  it('names a structured simulation error the way kit delivers it — integers as bigints — instead of dying on JSON', async () => {
+    // @solana/kit parses every JSON integer as a bigint; a plain JSON.stringify
+    // of this `err` threw "Do not know how to serialize a BigInt" and hid the
+    // real failure (Solana USDe → SOL, Oct 16 funded run).
+    const { usdcAta, pre } = await setup()
+    const f = fakeRpc(pre, pre, { simulateTransaction: () => ({ value: { err: { InstructionError: [2n, { Custom: 6001n }] }, logs: ['Program log: slippage tolerance exceeded'], accounts: null } }) })
+    const acc = await new WalletManagerSolana(SEED, { provider: f.rpc }).getAccount(0)
+    const run = acc.sendSerialized(wire(jupiterLike({ writable: [usdcAta], usdcAta })), guard())
+    await expect(run).rejects.toBeInstanceOf(SimulationError)
+    await expect(run).rejects.toThrow(/InstructionError.*6001/)
+    await expect(run).rejects.not.toThrow(/BigInt/)
+    expect(f.sent).toHaveLength(0)
+  })
+
   it('measures a native SOL "token in" on the lamport balance', async () => {
     const { usdcAta, pre } = await setup()
     // USDC → SOL: our USDC ATA is debited, SOL comes in net of the fee

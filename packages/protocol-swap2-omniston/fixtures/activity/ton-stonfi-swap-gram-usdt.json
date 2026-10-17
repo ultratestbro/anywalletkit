@@ -1,0 +1,56 @@
+{
+  "note": "STON.fi swap 36.1274 GRAM → 52.333196 USD₮ through Omniston on TON (test wallet, tonapi event 2026-10-09)",
+  "own": [
+    "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+  ],
+  "tx": {
+    "chain": "ton:-239",
+    "hash": "72ea596844b123844b1798cdc285f361e3146e0286c79bae14918725a14ca3bd",
+    "time": 1791588651,
+    "status": "confirmed",
+    "address": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+    "from": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+    "to": "EQCS4UEa5UaJLzOyyKieqQOQ2P9M-7kXpkO5HnP3Bv250cN3",
+    "nativeValue": "36127400000",
+    "transfers": [
+      {
+        "token": null,
+        "from": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+        "to": "EQCS4UEa5UaJLzOyyKieqQOQ2P9M-7kXpkO5HnP3Bv250cN3",
+        "amount": "36127400000"
+      },
+      {
+        "token": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+        "from": "EQCS4UEa5UaJLzOyyKieqQOQ2P9M-7kXpkO5HnP3Bv250cN3",
+        "to": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+        "amount": "52333196",
+        "standard": "jetton",
+        "symbol": "USD₮",
+        "decimals": 6
+      }
+    ],
+    "fee": "5694048",
+    "call": {
+      "to": "EQCS4UEa5UaJLzOyyKieqQOQ2P9M-7kXpkO5HnP3Bv250cN3",
+      "method": "swap"
+    },
+    "block": "108928432000001"
+  },
+  "expect": {
+    "kind": "swap",
+    "title": "Swapped GRAM → USD₮",
+    "assetsOut": [
+      {
+        "token": null,
+        "amount": "36127400000"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+        "amount": "52333196"
+      }
+    ],
+    "counterparty": "EQCS4UEa5UaJLzOyyKieqQOQ2P9M-7kXpkO5HnP3Bv250cN3"
+  }
+}

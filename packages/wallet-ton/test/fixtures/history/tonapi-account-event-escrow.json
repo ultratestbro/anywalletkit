@@ -1,0 +1,54 @@
+{
+ "event_id": "c18547c1f6d7a0531aaa954d976f38e285026dca9950bbeac966518cf8af62c4",
+ "timestamp": 1786649237,
+ "lt": 96571758000001,
+ "in_progress": false,
+ "is_scam": false,
+ "actions": [
+  {
+   "type": "JettonTransfer",
+   "status": "ok",
+   "JettonTransfer": {
+    "sender": {
+     "address": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+     "is_wallet": true
+    },
+    "recipient": {
+     "address": "0:1b589dd8d4780822f70cab5a6b1b56a79430b44f771994053b96e3d3e8b993a6",
+     "is_wallet": false,
+     "name": "Omniston Escrow Minter"
+    },
+    "senders_wallet": "0:fdb51192f5f1f7c814bbf55a1b60a86f2c442a419b616fa6a653b0a567a77992",
+    "recipients_wallet": "0:3beaa9dd68687d178de37e04d502ebc9bee1b303cb8b350ee20b55d9f97e57e8",
+    "amount": "1600000",
+    "comment": "Call: 0xc0a5f0d9",
+    "jetton": {
+     "address": "0:b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe",
+     "symbol": "USD₮",
+     "decimals": 6,
+     "name": "Tether USD"
+    }
+   }
+  },
+  {
+   "type": "TonTransfer",
+   "status": "ok",
+   "TonTransfer": {
+    "sender": {
+     "address": "0:1b40c2d98f32bf31627b4771d215f39a520391710417dbdba0f94813b7bbd69e",
+     "is_wallet": false
+    },
+    "recipient": {
+     "address": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+     "is_wallet": true
+    },
+    "amount": 169435207
+   }
+  }
+ ],
+ "account": {
+  "address": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+  "is_wallet": true
+ },
+ "extra": -308497479
+}

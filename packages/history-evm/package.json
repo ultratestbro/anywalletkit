@@ -1,0 +1,48 @@
+{
+  "name": "@forgewallet/history-evm",
+  "version": "0.1.0",
+  "description": "Activity history (HistorySource) for every EVM chain the SDK supports: Etherscan v2, Blockscout PRO and Alchemy Transfers API (API keys) with Blockscout and Routescan keyless fallbacks, merged into one ChainTx per hash with a documented spam heuristic.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "dependencies": {
+    "@forgewallet/swap2-assets": "workspace:*"
+  },
+  "peerDependencies": {
+    "@forgewallet/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@forgewallet/core": "workspace:*",
+    "@types/node": "^22",
+    "vitest": "^5.0.3"
+  },
+  "keywords": [
+    "history",
+    "activity",
+    "etherscan",
+    "blockscout",
+    "alchemy",
+    "evm"
+  ]
+}

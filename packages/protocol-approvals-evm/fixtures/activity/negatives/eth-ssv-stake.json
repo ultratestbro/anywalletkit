@@ -1,0 +1,46 @@
+{
+  "note": "SSV Network stake (etherscan.io/tx/0x486b1907…) — not an approval",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x486b1907324b7edc1ffa43312cd23d4c31bf477c07ffd82bdb81dfbffa78df46",
+    "time": 1788432263,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x9D65fF81a3c488d585bBfb0Bfe3c7707c7917f54",
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+        "amount": "957661000000000000",
+        "standard": "erc20",
+        "symbol": "SSV",
+        "decimals": 18
+      },
+      {
+        "token": "0xe018D31F120A637828F46aFD6c64EC099d960546",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "957661000000000000",
+        "standard": "erc20",
+        "symbol": "cSSV",
+        "decimals": 18
+      }
+    ],
+    "fee": "22522759960265",
+    "call": {
+      "to": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+      "selector": "0xa694fc3a",
+      "data": "0xa694fc3a0000000000000000000000000000000000000000000000000d4a4b9b083ed000"
+    },
+    "block": "25896262"
+  },
+  "expect": {
+    "kind": "stake"
+  }
+}

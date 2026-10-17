@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/wallet-evm",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "EVM wallet for the forgewallet SDK: BIP-32 m/44'/60'/0'/0/i accounts, EIP-191 / EIP-712 / EIP-1559 signing, ERC-20 transfer and approve, built on viem.",
   "license": "Apache-2.0",
   "type": "module",

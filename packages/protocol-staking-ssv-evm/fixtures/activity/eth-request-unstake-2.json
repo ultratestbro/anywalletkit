@@ -1,0 +1,45 @@
+{
+  "note": "SSV Network: requestUnstake 0.857661 cSSV (funded test 2026-10-07, etherscan.io/tx/0x194f09c8…)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x194f09c8f048bc432b9f4c5b7de63e0c2713450b7e7cb57de38ece6e6aa9b96f",
+    "time": 1791390047,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xe018D31F120A637828F46aFD6c64EC099d960546",
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0x0000000000000000000000000000000000000000",
+        "amount": "857661000000000000",
+        "standard": "erc20",
+        "symbol": "cSSV",
+        "decimals": 18
+      }
+    ],
+    "fee": "606147717831364",
+    "call": {
+      "to": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+      "selector": "0x23095721",
+      "data": "0x230957210000000000000000000000000000000000000000000000000be70622aab4d000"
+    },
+    "block": "26141666"
+  },
+  "expect": {
+    "kind": "unstake",
+    "title": "Requested unstake",
+    "assetsOut": [
+      {
+        "token": "0xe018D31F120A637828F46aFD6c64EC099d960546",
+        "amount": "857661000000000000"
+      }
+    ],
+    "counterparty": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1"
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "note": "LI.FI bridge AAVE via Mayan facet with a WETH dust rebate back to the sender — still \"Bridged AAVE\", not a swap (test wallet 2026-10-09)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x0949e8bc7e1ccb03837af90374432607d4a91d2bcbf1a4d2487e880bbd637391",
+    "time": 1791586679,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "amount": "83710000000000000",
+        "standard": "erc20",
+        "symbol": "AAVE",
+        "decimals": 18
+      },
+      {
+        "token": "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0xC06ebbefD94032B85424D51906e2A335EFAe264B",
+        "amount": "209275000000000",
+        "standard": "erc20",
+        "symbol": "AAVE",
+        "decimals": 18
+      },
+      {
+        "token": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+        "from": "0x59c38b6775Ded821f010DbD30eCabdCF84E04756",
+        "to": "0xBc1D9760bd6ca468CA9fB5Ff2CFbEAC35d86c973",
+        "amount": "1917770746269982311",
+        "standard": "erc20",
+        "symbol": "UNI",
+        "decimals": 18
+      },
+      {
+        "token": "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0x59c38b6775Ded821f010DbD30eCabdCF84E04756",
+        "amount": "83500725000000000",
+        "standard": "erc20",
+        "symbol": "AAVE",
+        "decimals": 18
+      },
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "from": "0xfaA318479b7755b2dBfDD34dC306cb28B420Ad12",
+        "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "amount": "5614576063386568",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      },
+      {
+        "token": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+        "from": "0xBc1D9760bd6ca468CA9fB5Ff2CFbEAC35d86c973",
+        "to": "0xfaA318479b7755b2dBfDD34dC306cb28B420Ad12",
+        "amount": "1917770746269982311",
+        "standard": "erc20",
+        "symbol": "UNI",
+        "decimals": 18
+      },
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "28072880316934",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      },
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "from": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+        "to": "0x337685fdaB40D39bd02028545a4FfA7D287cC3E2",
+        "amount": "5586500000000000",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      },
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "from": "0x337685fdaB40D39bd02028545a4FfA7D287cC3E2",
+        "to": "0x40fFE85A28DC9993541449464d7529a922142960",
+        "amount": "5586500000000000",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      }
+    ],
+    "fee": "105334540599760",
+    "call": {
+      "to": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+      "selector": "0x80c65808"
+    },
+    "block": "26157991"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged AAVE",
+    "assetsOut": [
+      {
+        "token": "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
+        "amount": "83710000000000000"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "amount": "28072880316934"
+      }
+    ]
+  }
+}

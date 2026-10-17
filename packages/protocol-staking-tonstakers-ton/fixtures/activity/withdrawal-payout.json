@@ -1,0 +1,42 @@
+{
+  "note": "Tonstakers: withdrawal payout from the pool to the wallet (op 0x0a77535c tonstake_pool_withdrawal, 1.9887 GRAM) after the round settled — no call of ours (funded test, 2026-10-07, tonviewer.com/transaction/daf22a93…)",
+  "own": [
+    "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+  ],
+  "tx": {
+    "chain": "ton:-239",
+    "hash": "daf22a93fd9466182dfbc8fd83e61878fd1d65c8667684aac9f3ef8763d7f6b1",
+    "time": 1791389986,
+    "status": "confirmed",
+    "address": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+    "from": "0:a45b17f28409229b78360e3290420f13e4fe20f90d7e2bf8c4ac6703259e22fa",
+    "to": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+    "nativeValue": "1988661261",
+    "transfers": [
+      {
+        "token": null,
+        "from": "0:a45b17f28409229b78360e3290420f13e4fe20f90d7e2bf8c4ac6703259e22fa",
+        "to": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+        "amount": "1988661261"
+      }
+    ],
+    "fee": "51868",
+    "call": {
+      "to": "0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d",
+      "data": "0x0a77535c",
+      "method": "tonstake_pool_withdrawal"
+    },
+    "block": "108431608000029"
+  },
+  "expect": {
+    "kind": "claim",
+    "title": "Received unstaked",
+    "assetsIn": [
+      {
+        "token": null,
+        "amount": "1988661261"
+      }
+    ],
+    "counterparty": "EQCkWxfyhAkim3g2DjKQQg8T5P4g-Q1-K_jErGcDJZ4i-vqR"
+  }
+}

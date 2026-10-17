@@ -1,4 +1,5 @@
 import {createPublicClient, encodeFunctionData, getAddress, http, isAddress, pad, parseAbi, zeroHash, type Hex} from "viem";
+import {describeCctpActivity} from "./activity.js";
 import {ccAsset} from "@forgewallet/swap2-assets";
 import {timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
@@ -156,6 +157,7 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
 
   return {
     name: "cctp",
+    describeActivity: describeCctpActivity,
     enabled: () => config.enabled ?? true,
     supportsChain: (chain: string) => cctpCfg.supportsChain(chain),
     supportsChainPair: (from: string, to: string) => cctpCfg.supports(from, to),
@@ -317,11 +319,21 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
         throw new Error("cctp: attested message is for another source domain");
       }
       // Fast messages expire at `expirationBlock` on the destination; an expired
-      // one needs Circle's re-attestation before it can be received.
+      // one needs Circle's re-attestation before it can be received. The
+      // transmitter compares it with `block.number`, which on Arbitrum-stack
+      // chains is the L1 (Ethereum) height, not the L2 height eth_blockNumber
+      // returns — the RPC block carries it as `l1BlockNumber` (live
+      // 2026-10-16: a Base→Arbitrum claim was held as "expired" by L2 height).
       const exp = m.decodedMessage?.decodedMessageBody?.expirationBlock;
       const c = client(parsed.dst.caip2);
       if (c && exp && /^\d+$/.test(exp) && BigInt(exp) > 0n) {
-        const head = await c.getBlockNumber().catch(() => null);
+        const head = await c.request({method: "eth_getBlockByNumber", params: ["latest", false]})
+          .then((b) => {
+            const block = b as {number?: string; l1BlockNumber?: string} | null;
+            const raw = block?.l1BlockNumber ?? block?.number;
+            return raw ? BigInt(raw) : null;
+          })
+          .catch(() => null);
         if (head !== null && head >= BigInt(exp)) {
           const nonce = m.decodedMessage?.nonce ?? m.eventNonce;
           if (nonce) await doFetch(`${api}/v2/reattest/${nonce}`, {method: "POST", signal: timeoutSignal(12_000)}).catch(() => undefined);

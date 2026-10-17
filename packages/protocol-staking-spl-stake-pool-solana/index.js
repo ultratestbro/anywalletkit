@@ -19,4 +19,5 @@ export {
   parseDepositSol, base58Decode
 } from './src/spl-stake-pool-protocol-solana.js'
 
+export { describeStakePoolActivity, INSTRUCTION_ACTIONS } from './src/spl-stake-pool-activity.js'
 export { default } from './src/spl-stake-pool-protocol-solana.js'

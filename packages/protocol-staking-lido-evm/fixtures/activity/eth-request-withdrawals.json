@@ -1,0 +1,60 @@
+{
+  "note": "Lido: WithdrawalQueue requestWithdrawalsWithPermit 0.000999 stETH → unstETH #134606 (funded test 2026-09-01, etherscan.io/tx/0xd98fd8e3…)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0xd98fd8e3cf2a87a2afb9728c038064c9098274316d2f152285cc603751c3004f",
+    "time": 1788284639,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+        "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "to": "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
+        "amount": "999000000000000",
+        "standard": "erc20",
+        "symbol": "STETH",
+        "decimals": 18
+      },
+      {
+        "token": "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "1",
+        "standard": "erc721",
+        "symbol": "unstETH",
+        "tokenId": "134606"
+      }
+    ],
+    "fee": "67103800721820",
+    "call": {
+      "to": "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
+      "selector": "0xacf41e4d",
+      "data": "0xacf41e4d00000000000000000000000000000000000000000000000000000000000000e00000000000000000000000008abe813577e47415a3cd0bbc68c7abca2c4c55ba00000000000000000000000000000000000000000000000000038c95d0217000000000000000000000000000000000000000000000000000000000006a971ced000000000000000000000000000000000000000000000000000000000000001b195778022ba0218f458edf082a3a7730e9718060075bb4f0e239ec6d6842ea083e84710e980390c7639be6b1f99a27f16a1025f23ecc61b3eeb59861a1e69412000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000038c95d0217000"
+    },
+    "block": "25884006"
+  },
+  "expect": {
+    "kind": "unstake",
+    "title": "Requested withdrawal",
+    "assetsOut": [
+      {
+        "token": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+        "amount": "999000000000000"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
+        "amount": "1"
+      }
+    ],
+    "counterparty": "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1"
+  }
+}

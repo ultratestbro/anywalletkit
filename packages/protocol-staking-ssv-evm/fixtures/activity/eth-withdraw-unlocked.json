@@ -1,0 +1,45 @@
+{
+  "note": "SSV Network: withdrawUnlocked → 0.1 SSV after the cooldown (funded test 2026-09-11, etherscan.io/tx/0x5b413106…)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x5b413106fad5244eb0acf7cd51f1c6939e619a703e84de07b5e0e647d9d51b5a",
+    "time": 1789157207,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x9D65fF81a3c488d585bBfb0Bfe3c7707c7917f54",
+        "from": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+        "to": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+        "amount": "100000000000000000",
+        "standard": "erc20",
+        "symbol": "SSV",
+        "decimals": 18
+      }
+    ],
+    "fee": "9721585872120",
+    "call": {
+      "to": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1",
+      "selector": "0x6fcd112b",
+      "data": "0x6fcd112b"
+    },
+    "block": "25956444"
+  },
+  "expect": {
+    "kind": "claim",
+    "title": "Withdrew SSV",
+    "assetsIn": [
+      {
+        "token": "0x9D65fF81a3c488d585bBfb0Bfe3c7707c7917f54",
+        "amount": "100000000000000000"
+      }
+    ],
+    "counterparty": "0xDD9BC35aE942eF0cFa76930954a156B3fF30a4E1"
+  }
+}

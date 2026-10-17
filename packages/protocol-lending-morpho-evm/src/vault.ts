@@ -58,6 +58,8 @@ export class MorphoVaultProtocolEvm extends MorphoBase<MorphoVaultConfig> {
   readonly vault: Address
   private _info: Promise<VaultInfo> | null = null
 
+  protected override get activityVault(): string { return this.vault }
+
   constructor(account: IWalletAccountReadOnly | IWalletAccount, config: MorphoVaultConfig) {
     super(account, config)
     if (!config?.vault || !isAddress(config.vault)) throw new MorphoError("'vault' must be the vault's address.")

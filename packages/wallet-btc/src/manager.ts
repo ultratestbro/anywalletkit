@@ -1,4 +1,4 @@
-import { LocalSigner, SignerError, WalletManager, isSeedSigner, seedFromMnemonicSync, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@forgewallet/core'
 import { WalletAccountBtc } from './account.js'
 import { coinType, purposeFor } from './network.js'
 import { WalletAccountReadOnlyBtc } from './read-only-account.js'
@@ -18,12 +18,10 @@ import type { BtcConfig } from './types.js'
  *   indexes/paths throw.
  */
 export class WalletManagerBtc extends WalletManager<WalletAccountBtc, BtcConfig> {
-  private _seedBytes: Uint8Array | undefined
-
   constructor(seedOrSigner: string | Signer, config: BtcConfig = {}) {
     super(seedOrSigner, config)
-    if (this._seed !== undefined) this._seedBytes = seedFromMnemonicSync(this._seed)
   }
+
 
   get basePath(): string {
     return `m/${purposeFor(this._config.addressType ?? 'p2wpkh')}'/${coinType(this._config.network ?? 'bitcoin')}'`
@@ -39,7 +37,7 @@ export class WalletManagerBtc extends WalletManager<WalletAccountBtc, BtcConfig>
     if (cached) return cached
     const external = this.externalSigner()
     if (external) return this.fromSigner(external, full)
-    const signer = LocalSigner.fromSeed(this._seedBytes!, 'secp256k1', full)
+    const signer = LocalSigner.fromSeed(this.seedBytes(), 'secp256k1', full)
     const account = new WalletAccountBtc(signer, signer.publicKey, full, this._config)
     this._accounts.set(full, account)
     return account
@@ -80,9 +78,4 @@ export class WalletManagerBtc extends WalletManager<WalletAccountBtc, BtcConfig>
     return { slow: big(slow!), normal: big(normal!), fast: big(fast!) }
   }
 
-  override dispose(): void {
-    super.dispose()
-    zeroize(this._seedBytes)
-    this._seedBytes = undefined
-  }
 }

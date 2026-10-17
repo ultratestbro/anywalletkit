@@ -1,0 +1,78 @@
+{
+  "note": "Moonwell Flagship USDC (MetaMorpho v1.1) on Base: deposit(63.978335 USDC) by 0x0767…646c — public tx, basescan.org/tx/0xbb6aa124… (the test wallet has no Morpho tx yet)",
+  "own": [
+    "0x07676b9a00bb542cbe223c57786a0cfd463c646c"
+  ],
+  "tx": {
+    "chain": "eip155:8453",
+    "hash": "0xbb6aa1241b60192b5a5dbd0aa08135346f2aef07c0f1932ae4cc044dece8af95",
+    "time": 1791999039,
+    "status": "confirmed",
+    "address": "0x07676b9a00bb542cbe223c57786a0cfd463c646c",
+    "from": "0x07676b9a00bb542cbe223c57786a0cfd463c646c",
+    "to": "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x5e868c8c6fd597f436fbe60f1ebd5a3a07b3c320",
+        "amount": "27722286601218277",
+        "standard": "erc20",
+        "symbol": "mwUSDC",
+        "decimals": 18
+      },
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "from": "0x07676b9a00bb542cbe223c57786a0cfd463c646c",
+        "to": "0xc1256ae5ff1cf2719d4937adb3bbccab2e00a2ca",
+        "amount": "63978335",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      },
+      {
+        "token": "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x07676b9a00bb542cbe223c57786a0cfd463c646c",
+        "amount": "58630317646978756396",
+        "standard": "erc20",
+        "symbol": "mwUSDC",
+        "decimals": 18
+      },
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "from": "0xc1256ae5ff1cf2719d4937adb3bbccab2e00a2ca",
+        "to": "0xbbbbbbbbbb9cc5e90e3b3af64bdaf62c37eeffcb",
+        "amount": "63978335",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "1832985270130",
+    "call": {
+      "to": "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca",
+      "selector": "0x6e553f65",
+      "data": "0x6e553f650000000000000000000000000000000000000000000000000000000003d03b5f00000000000000000000000007676b9a00bb542cbe223c57786a0cfd463c646c"
+    },
+    "block": "52604846"
+  },
+  "expect": {
+    "kind": "supply",
+    "title": "Deposited USDC",
+    "assetsOut": [
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "amount": "63978335"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca",
+        "amount": "58630317646978756396"
+      }
+    ],
+    "counterparty": "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca"
+  }
+}
