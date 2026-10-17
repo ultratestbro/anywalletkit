@@ -64,6 +64,22 @@ jobs:
           SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
           TON_RPC_URL: ${{ secrets.TON_RPC_URL }}
         run: node scripts/watch/canary.mjs --send --timeout 300
+      - name: run routes canary
+        if: ${{ !inputs.only }}
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WATCH_CHAT: ${{ secrets.TELEGRAM_WATCH_CHAT }}
+          TELEGRAM_WATCH_TOPIC: ${{ secrets.TELEGRAM_WATCH_TOPIC }}
+          EVM_RPC_URL: ${{ secrets.EVM_RPC_URL }}
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+          ARBITRUM_RPC_URL: ${{ secrets.ARBITRUM_RPC_URL }}
+          OPTIMISM_RPC_URL: ${{ secrets.OPTIMISM_RPC_URL }}
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
+          BSC_RPC_URL: ${{ secrets.BSC_RPC_URL }}
+          LIFI_API_KEY: ${{ secrets.LIFI_API_KEY }}
+          NEAR_INTENTS_JWT: ${{ secrets.NEAR_INTENTS_JWT }}
+        run: node scripts/watch/routes.mjs --send --timeout 30
       - name: commit snapshot
         run: |
           git config user.name "module-watch"

@@ -49,3 +49,7 @@ node scripts/watch/watch.mjs [--only aave,morpho] [--send] [--dry]              
 Rules for manifests: addresses and program ids must be the ones the module's source actually calls (copy them from `src/`), one entry per chain the module supports where the address differs; repos must be the protocol's official org; API URLs the ones the provider code requests. `label` is what people read in the digest — name the contract and the chain.
 
 RPC per chain comes from the same env names the matrix uses (`EVM_RPC_URL`, `BASE_RPC_URL`, … `SOLANA_RPC_URL`, `TON_RPC_URL`) with public fallbacks in `watch.mjs`.
+
+## Routes canary (`scripts/watch/routes.mjs`)
+
+One dry quote per corridor in `watch/routes.json`, straight from the provider packages (nothing built, signed or sent), every 6 hours (`routes.yml`) and after the daily watch. State in `watch/routes/state.json`; Telegram only on transitions: a corridor that **stopped quoting** (🔴) or is **quoting again** (🟢). Corridors flagged `suspended` are ones the app pauses today through the Vercel env `NEAR_INTENTS_SUSPENDED_CHAINS`; the canary builds the providers *without* that pause, so when the venue recovers the digest says "paused in the app, lift it" — drop the entry from the env and redeploy. Add a corridor = add a line to `routes.json` (`provider`, `src` / `dst` as `caip2:SYMBOL`, `amount` in source units, optional `note`).

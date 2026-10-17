@@ -1,0 +1,41 @@
+name: routes-canary
+# Every 6 hours: one dry quote per corridor in watch/routes.json straight from the
+# provider packages; Telegram only when a corridor stops quoting or comes back
+# (incl. corridors the app has paused — so the pause can be lifted). State committed.
+on:
+  schedule:
+    - cron: "40 */6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: module-watch
+jobs:
+  routes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r --filter './packages/*' build
+      - name: routes canary
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WATCH_CHAT: ${{ secrets.TELEGRAM_WATCH_CHAT }}
+          TELEGRAM_WATCH_TOPIC: ${{ secrets.TELEGRAM_WATCH_TOPIC }}
+          EVM_RPC_URL: ${{ secrets.EVM_RPC_URL }}
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+          ARBITRUM_RPC_URL: ${{ secrets.ARBITRUM_RPC_URL }}
+          OPTIMISM_RPC_URL: ${{ secrets.OPTIMISM_RPC_URL }}
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
+          BSC_RPC_URL: ${{ secrets.BSC_RPC_URL }}
+          LIFI_API_KEY: ${{ secrets.LIFI_API_KEY }}
+          NEAR_INTENTS_JWT: ${{ secrets.NEAR_INTENTS_JWT }}
+        run: node scripts/watch/routes.mjs --send --timeout 30
+      - name: commit state
+        run: |
+          git config user.name "module-watch"
+          git config user.email "module-watch@users.noreply.github.com"
+          git add watch/routes
+          git diff --cached --quiet || git commit -m "routes: $(date -u +%FT%H:%M)" && git push
