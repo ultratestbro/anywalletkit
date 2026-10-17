@@ -1,4 +1,4 @@
-import {nearIntents as cfg, nearIntentsChainRefusal} from "./config.js";
+import {nearIntents as cfg, nearIntentsChainRefusal, type NearIntentsSuspendedChains} from "./config.js";
 import {describeNearIntentsActivity} from "./activity.js";
 import {timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
 import {CC_DEST, ccAsset, ccAssetByToken, ccChain} from "@forgewallet/swap2-assets";
@@ -126,6 +126,8 @@ export interface NearIntentsProviderConfig {
   jwt?: string;
   feeRecipient?: string;
   feeBps?: number;
+  /** Corridors the app has paused (caip2 → reason): refused up front, by name, until the app lifts them. */
+  suspendedChains?: NearIntentsSuspendedChains;
 }
 
 export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): CrossChainProvider {
@@ -175,7 +177,8 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
       // Up-front, named refusals — no wire call for a corridor 1Click cannot
       // serve: a chain outside its list / suspended by hand, or a token the
       // catalog carries without a 1Click asset id ("1Click does not list …").
-      const chainRefusal = nearIntentsChainRefusal(params.sourceChain) ?? nearIntentsChainRefusal(params.destChain);
+      const paused = config.suspendedChains ?? {};
+      const chainRefusal = nearIntentsChainRefusal(params.sourceChain, paused) ?? nearIntentsChainRefusal(params.destChain, paused);
       if (chainRefusal) return refuse(chainRefusal);
       const origin = ccAsset(params.sourceChain, params.sourceToken);
       if (!origin?.assetId) return refuse(`1Click does not list ${params.sourceChain} ${params.sourceToken}`);

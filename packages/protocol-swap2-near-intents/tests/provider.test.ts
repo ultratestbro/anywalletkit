@@ -78,15 +78,26 @@ describe("dead corridors are refused up front", () => {
     return {result, refusals, fetchSpy};
   };
 
-  it("TON is suspended: not a declared chain, no route, named refusal, no wire call", async () => {
-    expect(p.supportsChain!("ton:-239")).toBe(false);
-    expect(p.supportsChainPair!("ton:-239", "eip155:1")).toBe(false);
-    expect(p.supportsChainPair!("eip155:8453", "ton:-239")).toBe(false);
-    expect(p.supportsRoute({chain: "ton:-239", token: "USDT"}, {chain: "eip155:8453", token: BASE_USDC})).toBe(false);
-    const {result, refusals, fetchSpy} = quote({sourceChain: "ton:-239", sourceToken: "USDT", destChain: "eip155:8453", destToken: BASE_USDC});
-    expect(await result).toBeNull();
+  it("a corridor the APP paused (suspendedChains) is refused by name without a wire call; the SDK itself pauses nothing", async () => {
+    // TON is listed by 1Click (ids match /v0/tokens), so the SDK keeps declaring it …
+    expect(p.supportsChain!("ton:-239")).toBe(true);
+    expect(p.supportsRoute({chain: "ton:-239", token: "USDT"}, {chain: "eip155:8453", token: BASE_USDC})).toBe(true);
+    // … and a plain provider goes to the wire for it.
+    const plain = quote({sourceChain: "ton:-239", sourceToken: "USDT", destChain: "eip155:8453", destToken: BASE_USDC});
+    await plain.result.catch(() => null);
+    expect(plain.fetchSpy).toHaveBeenCalled();
+    // The wallet pauses the venue-side outage (2026-10-16: every HOT omni-bridge asset "not available") through config …
+    const paused = nearIntentsProvider({enabled: true, apiUrl: "https://near.invalid", suspendedChains: {"ton:-239": "1Click HOT omni-bridge corridors not quoting since 2026-10-16"}});
+    const fetchSpy = vi.fn(); vi.stubGlobal("fetch", fetchSpy);
+    const refusals: string[] = [];
+    const result = await paused.getQuote({sourceChain: "ton:-239", sourceToken: "USDT", destChain: "eip155:8453", destToken: BASE_USDC, amountIn: "1000000", destAddress: ZERO, dry: true, onRefusal: (r: string) => refusals.push(r)} as never);
+    expect(result).toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(refusals[0]).toMatch(/^1Click corridor suspended: ton:-239 — .*not available/);
+    expect(refusals[0]).toMatch(/^1Click corridor paused by the app: ton:-239 — .*HOT omni-bridge/);
+    // … in either direction, and lifts it by dropping the entry — no release of the SDK.
+    const r2: string[] = [];
+    expect(await paused.getQuote({sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "ton:-239", destToken: "USDT", amountIn: "1000000", destAddress: ZERO, dry: true, onRefusal: (r: string) => r2.push(r)} as never)).toBeNull();
+    expect(r2[0]).toMatch(/paused by the app: ton:-239/);
   });
 
   it("chains 1Click does not list (World Chain, Sei, Ink, Plume, X Layer) are not declared and never asked", async () => {

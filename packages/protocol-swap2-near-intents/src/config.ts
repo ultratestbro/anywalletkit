@@ -8,26 +8,18 @@ const NEAR_INTENTS_NS = new Set([
 ]);
 
 /**
- * Corridors 1Click lists but does not quote, suspended by hand (caip2 →
- * why). Every asset on these chains reaches 1Click through the HOT omni
- * bridge (`nep245:v2_1.omni.hot.tg:…` ids) and every such pair — TON USDT/GRAM
- * ↔ anything, including TON↔TON — has answered 400 "Quoting for this pair is
- * not available" since 2026-10-16 (re-probed 2026-10-17: the ids in the
- * catalog still match the /v0/tokens list exactly, so it is not a rename).
- * Omniston carries TON meanwhile. Re-probe with a dry quote and delete the
- * entry when it quotes again. Optimism / Polygon / Avalanche / Scroll / Monad
- * ids are HOT-bridge too and answered the same on the probe; they are NOT
- * suspended here (LI.FI covers them, and the owner has not decided).
+ * Corridors the APP has paused (caip2 → why), passed in through the provider
+ * config: a venue-side degradation (1Click's HOT omni-bridge assets answering
+ * "not available" for days) is an operational switch, not SDK knowledge — the
+ * wallet flips an env var and lifts it the same way when the venue recovers.
  */
-export const NEAR_INTENTS_SUSPENDED_CHAINS: Readonly<Record<string, string>> = Object.freeze({
-  "ton:-239": "HOT omni-bridge assets answer 'Quoting for this pair is not available' since 2026-10-16",
-});
+export type NearIntentsSuspendedChains = Readonly<Record<string, string>>;
 
 /** Why a chain is refused up front, or null when 1Click can serve it. */
-export function nearIntentsChainRefusal(chain: string): string | null {
+export function nearIntentsChainRefusal(chain: string, suspended: NearIntentsSuspendedChains = {}): string | null {
   if (!NEAR_INTENTS_NS.has(namespace(chain))) return `1Click does not serve ${chain}`;
-  const suspended = NEAR_INTENTS_SUSPENDED_CHAINS[chain];
-  if (suspended) return `1Click corridor suspended: ${chain} — ${suspended}`;
+  const why = suspended[chain];
+  if (why) return `1Click corridor paused by the app: ${chain} — ${why}`;
   // A chain the catalog knows but carries no 1Click asset id for (World Chain,
   // Sei, Ink, Plume, X Layer, Unichain, MegaETH, Linea, Sonic, …) is LI.FI /
   // CCTP territory: the eip155 namespace alone used to claim it, and every
