@@ -54,16 +54,10 @@ function appFees(recipient?: string, bps?: number): {recipient: string; fee: num
  * Per-source deposit + refund config. Every live default keeps failed-swap
  * ownership on the caller's source-chain address.
  */
-function depositConfig(sourceChain: string, refundAddress: string, dry: boolean) {
-  // Zcash dry quotes: we have no placeholder t-address, but pricing works with
-  // an INTENTS-side refund (verified against the live API). Live quotes still
-  // refund to the user's own zec address (the default branch below).
-  if (sourceChain.startsWith("zcash:") && dry) {
-    return {depositType: "ORIGIN_CHAIN", refundType: "INTENTS", refundTo: "intents.near"};
-  }
-  // 1Click currently supports TON origin-chain refunds. Keep ownership with
-  // the caller; never redirect failed swaps to an integrator-owned NEAR
-  // account. Dry quotes use the chain-specific placeholder supplied above.
+function depositConfig(_sourceChain: string, refundAddress: string, _dry: boolean) {
+  // Every source refunds to the caller's own source-chain address (Zcash
+  // included — a t-address placeholder serves dry quotes since 2026-10-18).
+  // Never redirect failed swaps to an integrator-owned NEAR account.
   return {depositType: "ORIGIN_CHAIN", refundType: "ORIGIN_CHAIN", refundTo: refundAddress};
 }
 
@@ -79,6 +73,8 @@ const PLACEHOLDER: Record<string, string> = {
   tron: "TN3W4H6rK2ce4vX9YnFQHwKENnHjoxb3m9",
   // NEAR refunds go to an account id; the registrar account always exists.
   near: "near",
+  // A live transparent address (exchange hot wallet); dry quotes only.
+  zcash: "t1KfwsnwJeNRVjQGBDZhwKskpQbih2qx5Ua",
   eip155: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
 };
 

@@ -43,7 +43,8 @@
     "wallet-ton": "1.0.0-beta.12",
     "wallet-tron": "1.0.0-beta.9",
     "wallet-solana": "1.0.0-beta.12",
-    "near-seed-phrase": "reference (near-hd-key SLIP-10, m/44'/397'/i')"
+    "near-seed-phrase": "reference (near-hd-key SLIP-10, m/44'/397'/i')",
+    "wallet-zcash": "recorded from @forgewallet/wallet-zcash 0.1.0 (BIP-44 m/44'/133'/0'/0/i; keys cross-checked with viem mnemonicToAccount, t1 encoding with Blockchair)"
   },
   "seeds": {
     "bip39-abandon-12": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
@@ -395,6 +396,125 @@
             "address": "a0c3dfd547d0f96cd0bdd6d682c164014dd7a60e9eb3ac7a3342d36f641bdc9d",
             "publicKey": "a0c3dfd547d0f96cd0bdd6d682c164014dd7a60e9eb3ac7a3342d36f641bdc9d",
             "signMessage": "ed25519:4x7QtNF3WF3NFAKUQuaiZ4rzvcMBu97XdxDUZdkGLW8RkTqKN4MJSkEnGJShWhYiAVZQn463RNXyYYttc77wTUqt"
+          }
+        ]
+      }
+    },
+    "zcash": {
+      "bip39-abandon-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/133'/0'/0/0",
+            "address": "t1XVXWCvpMgBvUaed4XDqWtgQgJSu1Ghz7F",
+            "publicKey": "03db98d8f87716269ed31879aef19bdadbc869a9ea67729e36332d023b916cbcc9",
+            "signMessage": "H1UVrnckE2al1pXjQn3S5E0cXCKzbCC0bYHXXDxAV4JraMLmEC+I6BpZ4U2/TqJIQJL3EcF5IsEfJpn9Kbtcudw="
+          },
+          {
+            "index": 1,
+            "path": "m/44'/133'/0'/0/1",
+            "address": "t1aQ2b1XszNVo15BguYLbQGqETBL9QZA8Jq",
+            "publicKey": "03a68f202ac4e530cdaf1ff3d508cd55c8866049234f9f1b325338ddeb47d78f9c",
+            "signMessage": "IL6J8XpQcVsJ9WGX6KJzU5wm3rBMIk5Bn/rTS8q0t+THe9TZffkcM+tSadhHlQT9gpSwGzSqeqJrQy3yaWXteS8="
+          },
+          {
+            "index": 2,
+            "path": "m/44'/133'/0'/0/2",
+            "address": "t1gLHX58QpcZr2SfaMhc5XbxabE455KZhoA",
+            "publicKey": "02eb7f1f1d5b6ac8a9470976c5d82f34350efb119783278de4f4117c33948177d1",
+            "signMessage": "ID4PHblaSDdcJ0WReSmLEgUHAk2gcfOAw+QAl4gOrzcLFCOu1G98uG+qGQlu6EimNZU0T7ZOr8bxFNpezjKjMuw="
+          },
+          {
+            "index": 3,
+            "path": "m/44'/133'/0'/0/3",
+            "address": "t1M4FWL2VYmWy5qEuPUHrhEEcxsdkZ79xYn",
+            "publicKey": "03629cc2c4a908bc63fb3960d4e186e09efaa02e0fff6bf896097e4b67981e644e",
+            "signMessage": "H18l6wLsRWkJjwOw+ziOih6Euc4LHBE5YnmPImoQvTyQMfHgfJpxNfzUilFsc2HQB2Dd2zW7ScZSTmx4KqPx+14="
+          },
+          {
+            "index": 4,
+            "path": "m/44'/133'/0'/0/4",
+            "address": "t1QAU8388aa3G9DXnbGSverQoEoz3WeGEiy",
+            "publicKey": "032860f80fa21bdc3d5bc73eca58eb0bb958017d031edb54c50599fa4df5e48bae",
+            "signMessage": "H8pbrCgzuUObGdbPHUmpjOFOWxLGXDXOxZ6QYDpyRkiVZIwyA0UbvS7KdBzUxYNCZ0hmrHBkW2i4CKxpwe5VkeQ="
+          }
+        ]
+      },
+      "hardhat-12": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/133'/0'/0/0",
+            "address": "t1UxWM2wcKHaLeLo7rN6ivUp4CtsdqSwQh8",
+            "publicKey": "022e6151884ce09bcb6b29b93663c3ba39332cd5c94928a2f05ac10c2ee7f8d303",
+            "signMessage": "H/BFzFylAidIC3IT4FVFtedpByxtzfRyNt3ED9ufmCzoOsmYInMGrVWgz1UVoyQaeGTF4uTBcss6EsR8HK7ix50="
+          },
+          {
+            "index": 1,
+            "path": "m/44'/133'/0'/0/1",
+            "address": "t1PEKErZgWHQVA2y8CYCD2LxXSEJwGaDNsi",
+            "publicKey": "03339f5a43ca1743b69424242df95fed2164af9cb56ced5fba0f1875d3fbff2330",
+            "signMessage": "H2xTrQRLJ5YpVCqau+fHTuMI7k0dF7cWjqXyzXy3xau+ViXPp77vlc/euSl5Mhd1L0NHqc+p5X/20gMlIX96V1o="
+          },
+          {
+            "index": 2,
+            "path": "m/44'/133'/0'/0/2",
+            "address": "t1e7i8LAkvStM7SKbEZhj4TPnVj1rZ4uLBg",
+            "publicKey": "03c67464cae1d5aaf544b25d68311591219167ba631cbb0a8f9923bcce92464f59",
+            "signMessage": "IK55+G0mopRw3+SL/Ydmx4PxjhRcVvdiHZOs06HD4lolYnXNKNYRbGOr2nOOaDayaMP1vtvSZqwnfCaOyqrKsDI="
+          },
+          {
+            "index": 3,
+            "path": "m/44'/133'/0'/0/3",
+            "address": "t1fk4qa5pFeQyGDNWyCCAmqzJ743VyPhQFz",
+            "publicKey": "03927d9c52e5fc3866a435fb7dafdbafb1cc539d20befcde124f7a448c5c68b03f",
+            "signMessage": "INy7Cz709aBbRWEvWyGjERftUhC4z2V+bTLxPsx+qdkdU3VYkg2tkmrBwfLdchgCimQCOUKPQUypJ+bmY4pZzYY="
+          },
+          {
+            "index": 4,
+            "path": "m/44'/133'/0'/0/4",
+            "address": "t1bUQQ2vyE4ye7kTCZF2Y5dkAnrWxo3gxPF",
+            "publicKey": "02a82502604bf391fe7b1971d4e4b63a6bc6674af746a2b3c631444bb9db3128e9",
+            "signMessage": "IJ1K6JSlNb+rzltr3VGOtOHAcWGGLQt8KcdkeABgw49ofNBVCKvQS5Ugpkcnh3pwtCXRFFBEWIKwyyZLG57yKRg="
+          }
+        ]
+      },
+      "bip39-abandon-24": {
+        "accounts": [
+          {
+            "index": 0,
+            "path": "m/44'/133'/0'/0/0",
+            "address": "t1dUDJ62ANtmebE8drFg7g2MWYwXHQ6Xu3F",
+            "publicKey": "02210c61f823441f608327080bbbe75a1bcb197279016a0567deb51e348d415378",
+            "signMessage": "IEJtCQ4NPQYcwn+TaOkCKJ/lmyF0De8pnpP1P6oTHq9xHISl+9CYWPwvWg2mjCLrgeuIWolF5ySnw+9Io174p4o="
+          },
+          {
+            "index": 1,
+            "path": "m/44'/133'/0'/0/1",
+            "address": "t1QArW6GKrvHngPMPn9cjAk2A9rjKenbhmc",
+            "publicKey": "0254acb3741a23bae1ad025bec6a6357953117453cf0d97e406f67d9231de77ba7",
+            "signMessage": "H/kMCOcgiOB4xNQUZwjMVSPXguIKzIiXmW3o+QrJg3sodbXeY5gNmYPKRO+hEpcR07LAEWIoend4G1ha+ZKmx18="
+          },
+          {
+            "index": 2,
+            "path": "m/44'/133'/0'/0/2",
+            "address": "t1eD9JjoWnwMppWvgVbV2xZ9UhNNScPjh4C",
+            "publicKey": "035acb1744b37dbd665b1afc7fb061087d3327aa5c1570b76de8bc5f3b2eb17999",
+            "signMessage": "H+YqjDgShP9NuIAEyYrL/K7MUaQWuWKkY6Y8OnDP1vllTomf8cYLz7pdj6xXaoA+xZbeLg9WVX+Bm5l5Kg7X/TQ="
+          },
+          {
+            "index": 3,
+            "path": "m/44'/133'/0'/0/3",
+            "address": "t1NPeWksS1wHCD49e4RSjteeGx6zCq2hF2n",
+            "publicKey": "03e520cef7a15658bfc2bb631e48b2c6a8182e091e5390cc73ff3c6377e422382f",
+            "signMessage": "ILJcp2ooe3hxnZUSyr8iLhn2eIbshathjU2hpakH8X9GAUItIoZ+SkpCS+lsnyN1mfDzbUv7soVPaJDzrGUy66o="
+          },
+          {
+            "index": 4,
+            "path": "m/44'/133'/0'/0/4",
+            "address": "t1XN7c6eGuMZTusTWg8tsSm34Lwi3yvhLXv",
+            "publicKey": "02584f77e8b4ccf326589aaaaf1bcb786af01a72266528598c8526d6ce8ee7dba0",
+            "signMessage": "H4GlbZbdKkQDMLp7FbAxWcfCNdOF84qZFGZ1K+Tp/HceBtJhrwEZph+TtBQjcmH9YjwGyvDiT9SkZpzqga/Ae28="
           }
         ]
       }

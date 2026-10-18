@@ -1,7 +1,7 @@
 import type { SignerCurve } from '@forgewallet/core'
 
 /** The chains a keyring account spans. */
-export type ChainKey = 'evm' | 'solana' | 'ton' | 'tron' | 'btc' | 'near'
+export type ChainKey = 'evm' | 'solana' | 'ton' | 'tron' | 'btc' | 'near' | 'zcash'
 
 export interface ChainSpec {
   curve: SignerCurve
@@ -28,6 +28,7 @@ export const CHAIN_SPECS: Readonly<Record<ChainKey, ChainSpec>> = Object.freeze(
   tron: { curve: 'secp256k1', root: 'm', accountPath: (i) => `m/44'/195'/0'/0/${i}`, compatibleWith: 'TronLink, Trust Wallet' },
   btc: { curve: 'secp256k1', root: 'm', accountPath: (i) => `m/84'/0'/0'/0/${i}`, compatibleWith: 'native SegWit (BIP-84) wallets: Sparrow, Electrum, Trust Wallet (address index i)' },
   near: { curve: 'ed25519', root: 'm', accountPath: (i) => `m/44'/397'/${i}'`, compatibleWith: 'MyNearWallet, Meteor (implicit accounts)' },
+  zcash: { curve: 'secp256k1', root: 'm', accountPath: (i) => `m/44'/133'/0'/0/${i}`, compatibleWith: 'transparent (t1…) receivers of Zashi, YWallet, Ledger, Trezor (BIP-44 coin 133, address index i)' },
 })
 
 export const CHAIN_KEYS = Object.keys(CHAIN_SPECS) as ChainKey[]

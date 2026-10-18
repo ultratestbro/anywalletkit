@@ -12,6 +12,7 @@ const GOLDEN: Record<ChainKey, string[]> = {
   tron: ['TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH', 'TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK', 'TYJPRrdB5APNeRs4R7fYZSwW3TcrTKw2gx', 'TRhVWK5XEDkQBDevcdCWW7RW51aRncty4W', 'TT2X2yyubp7qpAWYYNE5JQWBtoZ7ikQFsY'],
   btc: ['bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu', 'bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g', 'bc1qp59yckz4ae5c4efgw2s5wfyvrz0ala7rgvuz8z', 'bc1qgl5vlg0zdl7yvprgxj9fevsc6q6x5dmcyk3cn3', 'bc1qm97vqzgj934vnaq9s53ynkyf9dgr05rargr04n'],
   near: ['5510e2b44cae6eb807e3e0e45d579dda058c274abcba15e5cb84636f5d1ee412', '3b93b03253b9715213ec314eb50ecc99d25602ccb5b059f91f51d24710d54326', '06ff7a6fae3da4d225a93da1fac0eb9adc64a33c417dd14a99a373b4bab4047a', '1554a4e6f52bbb7d4389f2f6282cbc4329a3503fa770fd5c9dd1aeb4bf2c2f1d', 'dff570730823421b60381bef2054cbfd28dfc83375edc2302c26d8161bbc192b'],
+  zcash: ['t1XVXWCvpMgBvUaed4XDqWtgQgJSu1Ghz7F', 't1aQ2b1XszNVo15BguYLbQGqETBL9QZA8Jq', 't1gLHX58QpcZr2SfaMhc5XbxabE455KZhoA', 't1M4FWL2VYmWy5qEuPUHrhEEcxsdkZ79xYn', 't1QAU8388aa3G9DXnbGSverQoEoz3WeGEiy'],
 }
 
 describe('multi-account golden vectors (i = 0..4)', () => {

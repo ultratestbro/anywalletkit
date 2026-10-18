@@ -36,6 +36,7 @@ await keyring.withAccount(next.id, 'evm', (account) => account.sendTransaction(t
 | Tron   | `m/44'/195'/0'/0/i`       | TronLink, Trust                     |
 | BTC    | `m/84'/0'/0'/0/i` (P2WPKH)| BIP-84 wallets, address index `i`   |
 | NEAR   | `m/44'/397'/i'`           | MyNearWallet, Meteor (implicit)     |
+| Zcash  | `m/44'/133'/0'/0/i`       | Zashi, YWallet, Ledger, Trezor (transparent t1… receivers) |
 
 Golden vectors for i = 0..4 are in `test/vectors.test.ts`; account 0 matches the public
 reference vectors and the chain managers' own derivation (no existing address moves).
@@ -43,7 +44,7 @@ reference vectors and the chain managers' own derivation (no existing address mo
 ## Private-key formats
 
 EVM / Tron: hex · BTC: compressed WIF or hex · Solana: base58 64-byte secret, the JSON byte
-array, or a base58 32-byte seed · TON: hex seed or 64-byte secret · NEAR: `ed25519:<base58>`.
+array, or a base58 32-byte seed · TON: hex seed or 64-byte secret · NEAR: `ed25519:<base58>` · Zcash: WIF or 32-byte hex (like BTC).
 A 64-byte ed25519 secret must match its embedded public key.
 
 Not yet: TON V4R2/V3R2 wallet versions for an imported key (V5R1 only), BTC P2TR/P2PKH

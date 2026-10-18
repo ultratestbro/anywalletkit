@@ -1,0 +1,55 @@
+{
+  "name": "@forgewallet/wallet-zcash",
+  "version": "0.1.0",
+  "description": "Zcash wallet for the forgewallet SDK: transparent t-addresses (BIP-44 coin 133), v5 transactions with ZIP-244 signature hashing, ZIP-317 fees, Blockchair / Blockbook transports. Shielded pools are out of scope.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./history": {
+      "types": "./dist/history.d.ts",
+      "import": "./dist/history.js",
+      "require": "./dist/history.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "keywords": [
+    "wallet",
+    "zcash",
+    "zec",
+    "transparent",
+    "zip-244",
+    "zip-317",
+    "blockchair",
+    "blockbook"
+  ],
+  "dependencies": {
+    "@forgewallet/core": "workspace:*",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0"
+  },
+  "devDependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "viem": "^2.44.4",
+    "vitest": "^5.0.3"
+  }
+}

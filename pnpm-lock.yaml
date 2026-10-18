@@ -113,6 +113,12 @@ importers:
       '@forgewallet/wallet-tron':
         specifier: workspace:*
         version: link:../../packages/wallet-tron
+      '@forgewallet/wallet-zcash':
+        specifier: workspace:*
+        version: link:../../packages/wallet-zcash
+      '@noble/curves':
+        specifier: ^2.4.0
+        version: 2.4.0
       '@noble/hashes':
         specifier: ^2.4.0
         version: 2.4.0
@@ -228,6 +234,9 @@ importers:
       '@forgewallet/wallet-tron':
         specifier: workspace:*
         version: link:../wallet-tron
+      '@forgewallet/wallet-zcash':
+        specifier: workspace:*
+        version: link:../wallet-zcash
       '@ton/crypto':
         specifier: ^3.3.0
         version: 3.3.0
@@ -898,6 +907,31 @@ importers:
       '@forgewallet/conformance':
         specifier: workspace:*
         version: link:../conformance
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+
+  packages/wallet-zcash:
+    dependencies:
+      '@forgewallet/core':
+        specifier: workspace:*
+        version: link:../core
+      '@noble/curves':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@scure/base':
+        specifier: ^2.4.0
+        version: 2.4.0
+    devDependencies:
+      '@forgewallet/conformance':
+        specifier: workspace:*
+        version: link:../conformance
+      viem:
+        specifier: ^2.44.4
+        version: 2.57.2(typescript@5.9.3)(zod@3.25.76)
       vitest:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))

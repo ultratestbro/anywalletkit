@@ -4,6 +4,7 @@ import { WalletManagerNear } from '@forgewallet/wallet-near'
 import { WalletManagerSolana } from '@forgewallet/wallet-solana'
 import { WalletManagerTon } from '@forgewallet/wallet-ton'
 import { WalletManagerTron } from '@forgewallet/wallet-tron'
+import { WalletManagerZcash } from '@forgewallet/wallet-zcash'
 import { Keyring, type KeyringChain, type KeyringState, type KeyringStorage, type SecretStorage, type ChainKey } from '../src/index.js'
 
 export const ABANDON = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
@@ -15,6 +16,7 @@ export const CHAINS: Record<ChainKey, KeyringChain> = {
   tron: { Manager: WalletManagerTron, config: {} },
   btc: { Manager: WalletManagerBtc, config: {} },
   near: { Manager: WalletManagerNear, config: {} },
+  zcash: { Manager: WalletManagerZcash, config: {} },
 }
 
 export class MemoryStorage implements KeyringStorage {

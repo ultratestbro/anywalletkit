@@ -194,15 +194,12 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
   },
   {
     // NEAR Intents only (LI.FI/THORChain don't route Zcash). Address-only
-    // deposits (no wallet adapter), like Bitcoin. PARKED (2026-07): routes are
-    // live (verified via 1Click) but no ZEC wallet can CONNECT (no Reown
-    // namespace, no wallet-side WC) — hidden from the pickers until the UX
-    // story is decided.
+    // deposits, like Bitcoin. Live since 2026-10-18: @forgewallet/wallet-zcash
+    // signs transparent (t1…) spends, so the wallet is its own ZEC source.
     key: "zec",
     caip2: "zcash:mainnet",
     icon: chainIcon("zcash"),
     label: "Zcash",
-    hidden: true,
     assets: [{symbol: "ZEC", assetId: "nep141:zec.omft.near", decimals: 8, icon: cmcIcon(1437)}],
   },
   {

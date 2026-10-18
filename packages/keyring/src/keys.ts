@@ -15,7 +15,7 @@ export interface ParsedKey {
 /**
  * Formats accepted per chain:
  * - EVM, Tron: 32-byte hex, with or without `0x`.
- * - BTC: WIF (compressed, mainnet `K…`/`L…` or testnet `c…`), or 32-byte hex.
+ * - BTC, Zcash: WIF (compressed, mainnet `K…`/`L…` or testnet `c…`), or 32-byte hex.
  * - Solana: base58 64-byte secret key (Phantom export), the JSON byte array
  *   (solana-keygen / Phantom "array" export), or a base58 32-byte seed.
  * - TON: hex of the 32-byte seed or the 64-byte secret key (seed ‖ public key).
@@ -33,6 +33,7 @@ export function parsePrivateKey(chain: ChainKey, input: string): ParsedKey {
       bytes = fromHex(raw, chain)
       break
     case 'btc':
+    case 'zcash':
       bytes = /^(0x)?[0-9a-fA-F]{64}$/.test(raw) ? fromHex(raw, chain) : fromWif(raw)
       break
     case 'solana':
@@ -102,8 +103,8 @@ function fromWif(raw: string): Uint8Array {
   const body = data.subarray(0, data.length - 4)
   const check = sha256(sha256(body)).subarray(0, 4)
   if (!check.every((b, i) => b === data[data.length - 4 + i])) throw new KeyringError('The WIF checksum does not match — check for a typo.')
-  if (body[0] !== 0x80 && body[0] !== 0xef) throw new KeyringError('This WIF is not a Bitcoin key.')
-  if (data.length === 37 || body[33] !== 0x01) throw new KeyringError('Uncompressed WIF keys are not supported (they cannot own SegWit or taproot addresses).')
+  if (body[0] !== 0x80 && body[0] !== 0xef) throw new KeyringError('This WIF is not a Bitcoin / Zcash key.')
+  if (data.length === 37 || body[33] !== 0x01) throw new KeyringError('Uncompressed WIF keys are not supported (they cannot own SegWit, taproot or the SDK\'s t-addresses).')
   const key = body.slice(1, 33)
   zeroize(data)
   return key

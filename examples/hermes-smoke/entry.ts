@@ -25,7 +25,8 @@
 import './shim-globals.js'
 import 'fastestsmallesttextencoderdecoder/EncoderDecoderTogether.min.js'
 import './shim-runtime.js'
-import { bytesToHex } from '@noble/hashes/utils.js'
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { deriveEd25519, deriveSecp256k1, seedFromMnemonicSync } from '@forgewallet/core'
 import { derivationVectors } from '@forgewallet/conformance'
 import { WalletManagerEvm, describeTransaction, describeTypedData, encodeApprove } from '@forgewallet/wallet-evm'
@@ -36,6 +37,7 @@ import { WalletManagerTon, describeTransaction as describeTon, parseV5R1Body, v5
 import { beginCell, internal } from '@ton/core'
 import { WalletManagerTron, describeTransaction as describeTron, ZERO_ADDRESS as TRON_ZERO } from '@forgewallet/wallet-tron'
 import { WalletManagerBtc, selectCoins, INPUT_WEIGHT } from '@forgewallet/wallet-btc'
+import { WalletManagerZcash, parseTx as parseZcashTx, txid as zcashTxid, sighashAll as zcashSighash, parseP2pkhScriptSig, conventionalFee as zcashFee, outputSize as zcashOutputSize } from '@forgewallet/wallet-zcash'
 import { WalletManagerNear, describeTransaction as describeNear, encodeTransaction as encodeNearTx, decodeTransaction as decodeNearTx } from '@forgewallet/wallet-near'
 import { smokeProtocols } from './protocols.js'
 import { ensResolver, warningsFor, coinTypeFor, decodeBtcScript } from '@forgewallet/names-ens'
@@ -45,6 +47,8 @@ declare const print: ((s: string) => void) | undefined
 const out = (s: string) => (typeof print === 'function' ? print(s) : console.log(s))
 
 let checks = 0
+/** Mainnet v5 transparent tx 7376c5f1… (block 3 521 984, 2026-10-18), 1 input / 2 outputs, fee 10 000. */
+const ZCASH_FIXTURE_HEX = '050000800a27a7265b16a537b5bd3500e8bd350001ffb855f48b8f3b2b1e3a1e31ff8484e8465661aa23c767833c3ee24384971f07010000006a47304402207ff1a36ccaa4fc96415a6cf3d49e412483b81130e50b883744a45a48d691f02502201b3f924c82fd38c42de6b6e9f298ce9d3b30879b54c8751aba526a196596dbb201210274b1b3cfb199edbd76131532f90d28fa94d552cbbb32cde3688bffd46e866c9efeffffff02e6dc8a0d000000001976a914a51a52f9c1d6da295422655017880bb0900e696e88ac7017fa00000000001976a9147f65aa1ba1b2ef40280c0ebae761b306c1315ff688ac000000'
 const eq = (what: string, a: unknown, b: unknown) => {
   if (a !== b) throw new Error(`${what}: ${String(a)} !== ${String(b)}`)
   checks++
@@ -53,7 +57,7 @@ const eq = (what: string, a: unknown, b: unknown) => {
 async function main() {
   for (const [seedName, mnemonic] of Object.entries(derivationVectors.seeds)) {
     const seed = seedFromMnemonicSync(mnemonic)
-    for (const chain of ['evm', 'btc', 'tron'] as const) {
+    for (const chain of ['evm', 'btc', 'tron', 'zcash'] as const) {
       for (const v of derivationVectors.vectors[chain][seedName]!.accounts) eq(`${chain} pub`, bytesToHex(deriveSecp256k1(seed, v.path).publicKey), v.publicKey)
     }
     for (const chain of ['ton', 'solana', 'near'] as const) {
@@ -118,6 +122,13 @@ async function main() {
       eq('btc sign', await a.sign(derivationVectors.message), v.signMessage)
     }
     btc.dispose()
+    const zec = new WalletManagerZcash(mnemonic)
+    for (const v of derivationVectors.vectors.zcash[seedName]!.accounts) {
+      const a = await zec.getAccount(v.index)
+      eq('zcash address', await a.getAddress(), v.address)
+      eq('zcash sign', await a.sign(derivationVectors.message), v.signMessage)
+    }
+    zec.dispose()
   }
   // ── Safety layers, offline (one pass; seed-independent) ───────────────────
   {
@@ -159,6 +170,15 @@ async function main() {
     tr.dispose()
     const sel = selectCoins({ utxos: [{ txid: 'a'.repeat(64), vout: 0, value: 100_000n, height: 1 }], targets: [{ value: 48_000n, vbytes: 31 }], feeRate: 10n, inputWeight: INPUT_WEIGHT.p2wpkh, changeVBytes: 31, changeDust: 294n })
     eq('btc coinselect fee', sel.fee, 1_410n)
+  }
+  {
+    // Zcash v5 / ZIP-244 in the VM: a mined mainnet transaction (block 3 521 984) round-trips, its txid matches and its signature verifies for the spent output.
+    const tx = parseZcashTx(ZCASH_FIXTURE_HEX)
+    eq('zcash txid', zcashTxid(tx), '7376c5f1aac539eb420587007c83d864d3668a3cef7f180f21960aaaa48c37cb')
+    const sig = parseP2pkhScriptSig(tx.inputs[0]!.scriptSig)!
+    const spent = [{ value: 243_604_326n, script: hexToBytes('76a9143898635cac98262fce2d990ee099d45cc775173e88ac') }]
+    eq('zcash zip-244 sighash verifies', secp256k1.verify(sig.signature, zcashSighash(tx, 0, spent), sig.publicKey, { prehash: false, format: 'der' }), true)
+    eq('zcash zip-317 fee', zcashFee([36 + 1 + tx.inputs[0]!.scriptSig.length + 4], tx.outputs.map((o) => zcashOutputSize(o.script))), 10_000n)
   }
   await smokeProtocols((what, ok, detail) => {
     if (!ok) throw new Error(`protocol check failed: ${what}${detail ? ` :: ${detail}` : ''}`)

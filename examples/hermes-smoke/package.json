@@ -34,6 +34,8 @@
     "@forgewallet/wallet-solana": "workspace:*",
     "@forgewallet/wallet-ton": "workspace:*",
     "@forgewallet/wallet-tron": "workspace:*",
+    "@forgewallet/wallet-zcash": "workspace:*",
+    "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@ton/core": "^0.63.1",
     "buffer": "^6.0.3",

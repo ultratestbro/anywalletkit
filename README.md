@@ -3,7 +3,7 @@
 > Working name. Rename = one `sed` over `@forgewallet/`.
 
 Open-source multichain wallet SDK. One seed phrase → accounts on EVM (30 networks),
-Bitcoin, TON, Tron, Solana and NEAR, with a single account interface that protocol
+Bitcoin, TON, Tron, Solana, NEAR and Zcash (transparent), with a single account interface that protocol
 modules (swap, cross-chain swap, lending, staking, approvals, fiat) are written against.
 
 **Anyone can contribute a module.** A module is accepted when it passes the
@@ -46,6 +46,7 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | `@forgewallet/wallet-tron` | phase 2 ✓ | full-node HTTP API, no tronweb; m/44'/195'/0'/0/i; TRX + TRC-20; TIP-191 sign; fee model = bandwidth / energy / activation |
 | `@forgewallet/wallet-near` | 2026-10-10 ✓ | JSON-RPC, hand-written borsh (byte-checked vs @near-js); SLIP-10 m/44'/397'/i' (NEAR Wallet path); implicit + named accounts; NEAR + NEP-141 (auto storage_deposit); NEP-413; preflight instead of simulation; dangerous-action guard |
 | `@forgewallet/wallet-btc` | phase 2 ✓ | @scure/btc-signer; BIP-84 p2wpkh m/84'/0'/0'/0/i and BIP-86 taproot accounts; own coin selection; RBF; BIP-137 sign; Blockbook / Esplora transports with failover |
+| `@forgewallet/wallet-zcash` | 2026-10-18 ✓ | transparent t1… accounts m/44'/133'/0'/0/i; v5 transactions with ZIP-244 txid/sighash (pinned by mined mainnet txs), ZIP-317 fees, ZIP-203 expiry; Blockchair / Blockbook transports; shielded pools out of scope |
 | `@forgewallet/protocol-swap2-core` | phase 3 ✓ | swap2 engine: `BaseSwap2Protocol` / `SingleProviderSwap2` over `Swap2Protocol` from core, `CrossChainRouter`, remote provider, quote/execution safety rails |
 | `@forgewallet/protocol-swap2-router` | phase 3 ✓ | `RouterSwap2Protocol`: auctions every engine provider and any external swap2 module, executes the winner, resumes status |
 | `@forgewallet/protocol-swap2-near-intents`, `-lifi`, `-thorchain`, `-omniston` | phase 3 ✓ | the four providers (NEAR Intents 1Click, LI.FI REST, THORChain, STON.fi Omniston), each also a standalone `Swap2Protocol` |

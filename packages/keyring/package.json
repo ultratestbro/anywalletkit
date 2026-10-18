@@ -47,6 +47,7 @@
     "@forgewallet/wallet-solana": "workspace:*",
     "@forgewallet/wallet-ton": "workspace:*",
     "@forgewallet/wallet-tron": "workspace:*",
+    "@forgewallet/wallet-zcash": "workspace:*",
     "viem": "^2.57.2",
     "@ton/crypto": "^3.3.0",
     "vitest": "^5.0.3"
