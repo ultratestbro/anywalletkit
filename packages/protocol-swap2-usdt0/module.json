@@ -1,0 +1,26 @@
+{
+  "name": "@forgewallet/protocol-swap2-usdt0",
+  "type": "swap2",
+  "chains": [
+    "eip155:1",
+    "eip155:10",
+    "eip155:130",
+    "eip155:137",
+    "eip155:1329",
+    "eip155:143",
+    "eip155:196",
+    "eip155:42161",
+    "eip155:4326",
+    "eip155:57073",
+    "eip155:80094",
+    "eip155:9745",
+    "eip155:999"
+  ],
+  "tier": "core",
+  "maintainers": ["@ultratestbro"],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/forgewallet",
+  "path": "packages/protocol-swap2-usdt0",
+  "description": "USDT0 — Tether's LayerZero OFT for USDT: USDT / USDT0 between 13 EVM chains in one source transaction (quoteOFT + quoteSend + send on the OFT, fee as msg.value), status from LayerZero Scan, lzReceive retry as the claim; the only direct USDT path into HyperEVM.",
+  "addedAt": "2026-10-20"
+}

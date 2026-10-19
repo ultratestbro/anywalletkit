@@ -1,0 +1,22 @@
+{
+  "note": "USDT0 Arbitrum → Ethereum routed through a third-party aggregator contract (0xf9e6…CF84 calls the OFT internally): not a direct OFT send and no delivery to `own` — the aggregator's own module describes it",
+  "own": ["0x36e8972e6227b332244fc57877fb5970175dadd0"],
+  "tx": {
+    "chain": "eip155:42161",
+    "hash": "0x5e3c6e67d2f92477379cd75fb23b5c62e0d39067faa3eacfbc764a37c4533a90",
+    "time": 1792442876,
+    "status": "confirmed",
+    "address": "0x36e8972e6227b332244fc57877fb5970175dadd0",
+    "from": "0x36e8972e6227b332244fc57877fb5970175dadd0",
+    "to": "0xf9e6D0D6f3a4Ce89384A1387a32aC124E5C3CF84",
+    "nativeValue": "0",
+    "transfers": [
+      {"token": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", "from": "0xb58d7D6e8Bea9A9a156185EC810F860C7CAa8cE8", "to": "0xf9e6D0D6f3a4Ce89384A1387a32aC124E5C3CF84", "amount": "38735044", "standard": "erc20", "symbol": "USDT0", "decimals": 6},
+      {"token": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", "from": "0xf9e6D0D6f3a4Ce89384A1387a32aC124E5C3CF84", "to": "0x0000000000000000000000000000000000000000", "amount": "38735044", "standard": "erc20", "symbol": "USDT0", "decimals": 6}
+    ],
+    "fee": "9435800304000",
+    "call": {"to": "0xf9e6D0D6f3a4Ce89384A1387a32aC124E5C3CF84", "selector": "0xd20b83bb"},
+    "block": "516395112"
+  },
+  "expect": {"kind": "bridge"}
+}

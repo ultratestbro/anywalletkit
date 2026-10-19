@@ -782,6 +782,8 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         decimals: 6,
         icon: cmcIcon(3408),
       },
+      // 2026-10-20: USDT0 (Tether's LayerZero OFT) — verified on-chain (USD₮0, 6 dec, OFT 0xc07b…3EC3 token()).
+      {symbol: "USDT0", assetId: "", contract: "0x9151434b16b9763660705744891fA906F660EcC5", decimals: 6, icon: cmcIcon(38517)},
       // 2026-10-13 — verified on-chain.
       {symbol: "WBTC", assetId: "", contract: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c", decimals: 8, icon: cmcIcon(3717)},
       {symbol: "DAI", assetId: "", contract: "0x20CAb320A855b39F724131C69424240519573f81", decimals: 18, icon: cmcIcon(4943)},
@@ -810,6 +812,8 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         decimals: 6,
         icon: cmcIcon(3408),
       },
+      // 2026-10-20: USDT0 (Tether's LayerZero OFT) — the only direct USDT path into HyperEVM; verified on-chain (USD₮0, 6 dec, OFT 0x9048…7e98 token()).
+      {symbol: "USDT0", assetId: "", contract: "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb", decimals: 6, icon: cmcIcon(38517)},
       // 2026-10-09: popular majors (user-approved list) — contracts/decimals from LI.FI's token list.
       {
         // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.

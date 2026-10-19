@@ -1,0 +1,26 @@
+{
+  "note": "USDT0 OFT send 0.1 USDT0 Arbitrum → HyperEVM (eid 30367), direct `send` on the Arbitrum OFT with the LayerZero fee as value (public tx 2026-10-19, sender is `own`)",
+  "own": ["0xF380C8817b71f1749CeBDBa278F18f5fdD2615e7"],
+  "tx": {
+    "chain": "eip155:42161",
+    "hash": "0x39041fb29f8aa78813ecfd4001830e155c53580ade3349bf0e0428feabd61277",
+    "time": 1792442401,
+    "status": "confirmed",
+    "address": "0xF380C8817b71f1749CeBDBa278F18f5fdD2615e7",
+    "from": "0xF380C8817b71f1749CeBDBa278F18f5fdD2615e7",
+    "to": "0x14E4A1B13bf7F943c8ff7C51fb60FA964A298D92",
+    "nativeValue": "4562073739297",
+    "transfers": [
+      {"token": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", "from": "0xF380C8817b71f1749CeBDBa278F18f5fdD2615e7", "to": "0x0000000000000000000000000000000000000000", "amount": "100000", "standard": "erc20", "symbol": "USDT0", "decimals": 6}
+    ],
+    "fee": "6683620334181",
+    "call": {"to": "0x14E4A1B13bf7F943c8ff7C51fb60FA964A298D92", "selector": "0xc7c7f5b3"},
+    "block": "516393235"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged USDT0",
+    "assetsOut": [{"token": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", "amount": "100000"}],
+    "counterparty": "0x14E4A1B13bf7F943c8ff7C51fb60FA964A298D92"
+  }
+}

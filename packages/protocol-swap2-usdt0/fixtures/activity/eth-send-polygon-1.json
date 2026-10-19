@@ -1,0 +1,26 @@
+{
+  "note": "USDT0 adapter send 100,788.622031 USDT Ethereum → Polygon (eid 30109): USDT locked in the OFT adapter, LayerZero fee as value (public tx 2026-10-19, sender is `own`)",
+  "own": ["0xe4A5e7E62929087F845ef5fD39Bea38EA31a7922"],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x3e59e0cef8f1b9e1b2622b831b3cf33c1565b738de2572098781ef1b30e9e9bd",
+    "time": 1792433459,
+    "status": "confirmed",
+    "address": "0xe4A5e7E62929087F845ef5fD39Bea38EA31a7922",
+    "from": "0xe4A5e7E62929087F845ef5fD39Bea38EA31a7922",
+    "to": "0x6C96dE32CEa08842dcc4058c14d3aaAD7Fa41dee",
+    "nativeValue": "5363638971269",
+    "transfers": [
+      {"token": "0xdAC17F958D2ee523a2206206994597C13D831ec7", "from": "0xe4A5e7E62929087F845ef5fD39Bea38EA31a7922", "to": "0x6C96dE32CEa08842dcc4058c14d3aaAD7Fa41dee", "amount": "100788622031", "standard": "erc20", "symbol": "USDT", "decimals": 6}
+    ],
+    "fee": "328632000000000",
+    "call": {"to": "0x6C96dE32CEa08842dcc4058c14d3aaAD7Fa41dee", "selector": "0xc7c7f5b3"},
+    "block": "26228331"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged USDT",
+    "assetsOut": [{"token": "0xdAC17F958D2ee523a2206206994597C13D831ec7", "amount": "100788622031"}],
+    "counterparty": "0x6C96dE32CEa08842dcc4058c14d3aaAD7Fa41dee"
+  }
+}
