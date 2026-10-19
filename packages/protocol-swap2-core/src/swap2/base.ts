@@ -309,17 +309,23 @@ interface CarriedAllowance {
   adopted: boolean;
 }
 
+/** Swap2 status ids are `awk1.<provider>.<intent>[.<sourceTxHash>]` (URI-encoded segments). */
+export const SWAP2_ID_PREFIX = "awk1";
+/** Ids minted before the rename (2026-10-19) still resolve; nothing new is minted with them. */
+const LEGACY_ID_PREFIXES = ["awk1"];
+
 /** Versioned provider/intent/source-hash id for durable status tracking. */
 function encodeId(provider: string, intentId: string, sourceTxHash?: string): string {
   // encodeURIComponent leaves "." unescaped, which would shift decodeId's
   // split — escape it explicitly so segments are dot-safe.
   const enc = (v: string) => encodeURIComponent(v).replace(/\./g, "%2E");
-  return `awk1.${[provider, intentId, sourceTxHash].filter((v): v is string => v != null).map(enc).join(".")}`;
+  return `${SWAP2_ID_PREFIX}.${[provider, intentId, sourceTxHash].filter((v): v is string => v != null).map(enc).join(".")}`;
 }
 function decodeId(id: string): {provider: string; intentId: string; sourceTxHash?: string} {
   try {
-    if (!id.startsWith("awk1.")) throw new Error("unsupported id version");
-    const parts = id.slice("awk1.".length).split(".");
+    const prefix = [SWAP2_ID_PREFIX, ...LEGACY_ID_PREFIXES].find((p) => id.startsWith(`${p}.`));
+    if (!prefix) throw new Error("unsupported id version");
+    const parts = id.slice(prefix.length + 1).split(".");
     if (parts.length < 2 || parts.length > 3 || !parts[0] || !parts[1]) throw new Error("invalid id shape");
     const provider = decodeURIComponent(parts[0]);
     const intentId = decodeURIComponent(parts[1]);
