@@ -326,6 +326,19 @@ describe('intent journal', () => {
     expect(item.title).toBe('Swapped USDC → ETH')
     expect((await journal.list())[0]!.status).toBe('confirmed')
   })
+  it('chain aliases: an intent journaled under the catalog id (bitcoin:mainnet) owns the row a source names by genesis hash (bip122:…)', async () => {
+    const BTC = 'bitcoin:mainnet', BIP = 'bip122:000000000019d6689c085ae165831e93'
+    const row = { ...tx(BIP, 1001, { nativeValue: 12_000n, transfers: [native(OWN, OTHER, 12_000n)] }), hash: 'btcsrc' }
+    const btc = new FakeSource(BTC, [row], 10)
+    const sources = new Map<string, HistorySource>([[BTC, btc], [ETH, new FakeSource(ETH, [], 10)]])
+    const intent = swapIntent({ id: 'swap-btc', kind: 'bridge', chain: BTC, hashes: [{ chain: BTC, hash: 'btcsrc' }], expect: { assetsOut: [{ token: null, amount: 12_000n, symbol: 'BTC', decimals: 8 }], assetsIn: [{ token: null, amount: 10n ** 15n, symbol: 'ETH', decimals: 18 }] }, protocol: '@forgewallet/protocol-swap2-near-intents', subtitle: 'NEAR Intents' })
+    const journal = createMemoryIntentJournal([intent])
+    const page = await buildFeed({ sources, addresses: [{ chain: BTC, address: OWN }, { chain: ETH, address: OWN }], recognizers: [], journal, query: {}, opts: { now: () => 2000 } })
+    // One row, the source's own chain string in the id, the intent's verdict on it — never a bare "send" next to a pending intent.
+    expect(page.items.map((i) => [i.id, i.kind, i.intentId])).toEqual([[`${BIP}:btcsrc`, 'bridge', 'swap-btc']])
+    expect(page.items[0]!.subtitle).toBe('NEAR Intents')
+    expect((await journal.list())[0]!.status).toBe('confirmed')
+  })
   it('a recognizer\'s verdict is kept (only generic items inherit), but the item still learns its intent and legs', async () => {
     const row = { ...tx(ETH, 1001, { to: lifi, call: { to: lifi, selector: '0x4666fc80' } }), hash: '0xsrc' }
     const sources = new Map<string, HistorySource>([[ETH, new FakeSource(ETH, [row], 10)], [BASE, new FakeSource(BASE, [], 10)]])

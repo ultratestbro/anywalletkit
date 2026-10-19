@@ -7,7 +7,7 @@
  */
 import type { ActivityAsset, ActivityItem, ChainTx, ChainTxStatus, DescribeActivityContext, HistoryQuery, HistorySource } from '@forgewallet/core'
 import { packCursor, sourceKey, unpackCursor, type FeedCursorState, type SourceState } from './cursor.js'
-import { describeGeneric, isSpamTx, titleFor, type GenericActivityItem, type GenericDescribeOptions } from './generic.js'
+import { catalogChain, describeGeneric, isSpamTx, titleFor, type GenericActivityItem, type GenericDescribeOptions } from './generic.js'
 import type { Intent, IntentJournal } from './journal.js'
 
 /** A protocol module as the feed sees it: a name for error reports and the pure `describeActivity`. */
@@ -89,6 +89,13 @@ const ownSetFor = (addresses: Iterable<string>): Set<string> => {
 }
 
 const txKey = (chain: string, hash: string): string => `${chain}:${hash}`
+/**
+ * Key for matching an intent leg to a chain row. Sources may name a chain by
+ * genesis hash (bip122:… for Bitcoin) while the app journals the catalog id
+ * (bitcoin:mainnet); both collapse to the catalog id here. Item ids keep the
+ * source's own chain string (cached rows must not change id).
+ */
+const matchKey = (chain: string, hash: string): string => `${catalogChain(chain)}:${hash}`
 
 /** Run the recognizers in order (first non-null wins, a throw is isolated) and fall back to the generic description. */
 export function describeWithRecognizers(tx: ChainTx, own: Set<string>, recognizers: readonly ActivityRecognizer[], opts: ActivityOptions, report?: (r: ActivityErrorReport) => void): FeedItem {
@@ -246,27 +253,29 @@ export async function buildFeed(input: FeedInput): Promise<HistoryFeedPage> {
     let intents: Intent[] = []
     try { intents = await journal.list() } catch (error) { report({ stage: 'journal', error }) }
     const byHash = new Map<string, Intent>()
-    for (const i of intents) for (const h of i.hashes) byHash.set(txKey(h.chain, h.hash), i)
+    for (const i of intents) for (const h of i.hashes) byHash.set(matchKey(h.chain, h.hash), i)
     const settle = (intent: Intent, status: ChainTxStatus) => {
       const next = status === 'failed' ? 'failed' : status === 'confirmed' ? 'confirmed' : 'pending'
       if (intent.status !== next && next !== 'pending') journalWrites.push({ ...intent, status: next })
     }
+    const candidateByMatch = new Map<string, Candidate>()
+    for (const c of candidates.values()) candidateByMatch.set(matchKey(c.item.chain, c.item.hash), c)
     for (const c of candidates.values()) {
-      const intent = byHash.get(c.item.id)
+      const intent = byHash.get(matchKey(c.item.chain, c.item.hash))
       if (!intent) continue
       c.item = applyIntent(c.item, intent, opts)
       settle(intent, c.item.status)
     }
     if (firstPage) {
-      const unmatched = intents.filter((i) => i.status !== 'confirmed' && !i.hashes.some((h) => candidates.has(txKey(h.chain, h.hash))))
+      const unmatched = intents.filter((i) => i.status !== 'confirmed' && !i.hashes.some((h) => candidateByMatch.has(matchKey(h.chain, h.hash))))
       await Promise.all(unmatched.map(async (intent) => {
         if (intent.status === 'failed') { top.push(intentItem(intent, 'failed', opts)); return }
         // The explorer may lag behind the chain: ask each leg's source for the row directly.
         const found: ChainTx[] = []
         for (const h of intent.hashes) {
-          const source = sources.get(h.chain)
+          const source = sources.get(h.chain) ?? sources.get(catalogChain(h.chain))
           if (!source) continue
-          const address = h.chain === intent.chain ? intent.address : input.addresses.find((a) => a.chain === h.chain)?.address
+          const address = catalogChain(h.chain) === catalogChain(intent.chain) ? intent.address : input.addresses.find((a) => catalogChain(a.chain) === catalogChain(h.chain))?.address
           if (!address) continue
           try {
             const tx = await source.getTransaction(h.hash, address)
@@ -276,9 +285,16 @@ export async function buildFeed(input: FeedInput): Promise<HistoryFeedPage> {
         if (found.length > 0) {
           for (const tx of found) {
             const id = txKey(tx.chain, tx.hash)
-            if (candidates.has(id)) continue
+            const existing = candidates.get(id) ?? candidateByMatch.get(matchKey(tx.chain, tx.hash))
+            if (existing) {
+              // The page already carries the row: the intent still owns it.
+              existing.item = applyIntent(existing.item, intent, opts)
+              settle(intent, existing.item.status)
+              continue
+            }
             const item = applyIntent(describeWithRecognizers(tx, ownOn(tx.chain), recognizers, opts, report), intent, opts)
             candidates.set(id, { item, tx, refs: [] })
+            candidateByMatch.set(matchKey(tx.chain, tx.hash), { item, tx, refs: [] })
             settle(intent, item.status)
           }
           return
@@ -296,7 +312,7 @@ export async function buildFeed(input: FeedInput): Promise<HistoryFeedPage> {
       if (group.length < 2) continue
       const intent = intents.find((i) => i.id === intentId)!
       const first = intent.hashes[0]
-      const base = group.find((c) => first && c.item.chain === first.chain && c.item.hash === first.hash) ?? [...group].sort((a, b) => a.item.time - b.item.time)[0]!
+      const base = group.find((c) => first && catalogChain(c.item.chain) === catalogChain(first.chain) && c.item.hash === first.hash) ?? [...group].sort((a, b) => a.item.time - b.item.time)[0]!
       const others = group.filter((c) => c !== base)
       const item: FeedItem = { ...base.item, kind: intent.kind }
       if (intent.protocol !== undefined && item.protocol === undefined) item.protocol = intent.protocol
@@ -375,7 +391,7 @@ export async function describeSingle(tx: ChainTx, own: Set<string>, recognizers:
   if (journal) {
     try {
       const intents = await journal.list()
-      const intent = intents.find((i) => i.hashes.some((h) => h.chain === tx.chain && h.hash === tx.hash))
+      const intent = intents.find((i) => i.hashes.some((h) => catalogChain(h.chain) === catalogChain(tx.chain) && h.hash === tx.hash))
       if (intent) item = applyIntent(item, intent, opts)
     } catch (error) { report({ stage: 'journal', error }) }
   }
