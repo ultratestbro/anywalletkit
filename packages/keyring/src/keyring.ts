@@ -284,6 +284,40 @@ export class Keyring {
   }
 
   /**
+   * Registered chains a seed account has no stored address for — a chain that
+   * joined the keyring after the account was created. Empty for an imported
+   * key (one chain by construction). No secret is read.
+   */
+  missingChains(accountId: string): ChainKey[] {
+    const meta = this.account(accountId)
+    if (meta.index === null) return []
+    return this.chains.filter((c) => !meta.addresses[c])
+  }
+
+  /**
+   * Derive the addresses every seed account of `sourceId` lacks (see
+   * {@link missingChains}) and store them. One secret read for the whole
+   * source; accounts that are complete are untouched. Returns the accounts
+   * that changed.
+   */
+  async completeAddresses(sourceId: string): Promise<AccountMeta[]> {
+    const source = this.source(sourceId)
+    if (source.type !== 'mnemonic') return []
+    const todo = this._state.accounts.filter((a) => a.sourceId === sourceId && a.index !== null && this.missingChains(a.id).length > 0)
+    if (todo.length === 0) return []
+    const secret = await this.secret(sourceId)
+    const derived = new Map<string, Partial<Record<ChainKey, string>>>()
+    for (const a of todo) derived.set(a.id, await this.deriveAddresses(secret, a.index!, this.missingChains(a.id)))
+    await this.mutate(async (state) => {
+      for (const a of state.accounts) {
+        const add = derived.get(a.id)
+        if (add) a.addresses = { ...a.addresses, ...add }
+      }
+    })
+    return todo.map((a) => this.getAccountMeta(a.id))
+  }
+
+  /**
    * Restore-time discovery: walk indexes above the source's highest one, add
    * every account `isUsed` says has activity, stop after `gapLimit` (default 1,
    * as MetaMask / Phantom do) unused accounts in a row or at `maxIndex`.
@@ -422,13 +456,13 @@ export class Keyring {
     return clone(created)
   }
 
-  /** Addresses of seed account `index` on every registered chain. */
-  private async deriveAddresses(secret: Secret, index: number): Promise<Partial<Record<ChainKey, string>>> {
+  /** Addresses of seed account `index` on every registered chain (or just `chains`). */
+  private async deriveAddresses(secret: Secret, index: number, chains: ChainKey[] = this.chains): Promise<Partial<Record<ChainKey, string>>> {
     if (secret.type !== 'mnemonic') throw new KeyringError('Only a seed phrase derives indexed accounts.', 'unsupported')
     const out: Partial<Record<ChainKey, string>> = {}
     const seed = await seedFromMnemonic(secret.mnemonic, secret.passphrase ?? '')
     try {
-      for (const chain of this.chains) {
+      for (const chain of chains) {
         const { Manager, config } = this.chain(chain)
         const manager = new Manager(LocalSigner.fromSeed(seed, CHAIN_SPECS[chain].curve, CHAIN_SPECS[chain].root), config ?? {})
         try {

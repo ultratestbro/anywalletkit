@@ -24,6 +24,10 @@ await keyring.previewPrivateKey('solana', key)                  // show the addr
 await keyring.importPrivateKey('solana', key)
 
 await keyring.withAccount(next.id, 'evm', (account) => account.sendTransaction(tx))
+
+// A chain registered after an account was created: derive what it lacks (one secret read per source).
+keyring.missingChains(next.id)                                   // ['zcash'] — no secret read
+await keyring.completeAddresses(next.sourceId)
 ```
 
 ## Derivation (what changes per account)

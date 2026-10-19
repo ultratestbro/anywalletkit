@@ -102,6 +102,34 @@ describe('Keyring — many accounts from one seed', () => {
     expect(JSON.parse(secrets.map.get(source.id)!)).toEqual({ type: 'mnemonic', mnemonic })
   })
 
+  it('a chain registered after the account was created is derived on demand, once per source', async () => {
+    const { keyring, storage, secrets } = await fresh({ evm: CHAINS.evm, solana: CHAINS.solana })
+    const { source, accounts } = await keyring.importMnemonic(ABANDON)
+    const second = await keyring.addAccount(source.id)
+    const imported = await keyring.importPrivateKey('evm', '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d')
+    // The app ships with more chains: the old accounts lack them, the imported key never has them.
+    const again = await Keyring.load({ storage, secrets, chains: CHAINS })
+    expect(again.missingChains(accounts[0]!.id).sort()).toEqual(['btc', 'near', 'ton', 'tron', 'zcash'])
+    expect(again.missingChains(second.id)).toHaveLength(5)
+    expect(again.missingChains(imported.account.id)).toEqual([])
+    expect(await again.completeAddresses(imported.source.id)).toEqual([])
+    const reads = secrets.reads
+    const changed = await again.completeAddresses(source.id)
+    expect(secrets.reads).toBe(reads + 1)
+    expect(changed.map((a) => a.id).sort()).toEqual([accounts[0]!.id, second.id].sort())
+    expect(again.missingChains(accounts[0]!.id)).toEqual([])
+    // Same addresses a keyring created with every chain from the start would hold.
+    const { keyring: full } = await fresh()
+    const ref = await full.importMnemonic(ABANDON)
+    expect(again.getAccountMeta(accounts[0]!.id).addresses).toEqual(ref.accounts[0]!.addresses)
+    expect(again.getAccountMeta(second.id).addresses).toEqual((await full.addAccount(ref.source.id)).addresses)
+    // Persisted: a reload sees them without a secret read; a second call is a no-op.
+    const reloaded = await Keyring.load({ storage, secrets, chains: CHAINS })
+    expect(reloaded.missingChains(second.id)).toEqual([])
+    expect(await reloaded.completeAddresses(source.id)).toEqual([])
+    expect(secrets.reads).toBe(reads + 1)
+  })
+
   it('reopens from storage with the same accounts and never reads a secret to list them', async () => {
     const { keyring, storage, secrets } = await fresh()
     const { source } = await keyring.importMnemonic(ABANDON)
