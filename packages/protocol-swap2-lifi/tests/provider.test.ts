@@ -286,3 +286,65 @@ describe("LI.FI refusals", () => {
     expect(reason).toBe(`lifi: No available quotes for the requested transfer (${why})`);
   });
 });
+
+describe("LI.FI route policy hook", () => {
+  const route = (tool: string, toAmount: string, eta: number, extra: Record<string, unknown> = {}) => ({
+    toAmount, toAmountMin: toAmount, gasCostUSD: "0.01", tags: [],
+    steps: [{type: "lifi", tool, estimate: {executionDuration: eta}, includedSteps: [{tool: "feeCollection", type: "protocol"}, {tool, type: "cross"}]}],
+    ...extra,
+  });
+  const routes = {routes: [
+    route("polymerStandard", "2992500", 1080),
+    route("stargateV2", "2990656", 96),
+    route("mayan", "2521085", 3),
+    route("twoTx", "2999999", 5, {steps: [{tool: "a", estimate: {executionDuration: 1}}, {tool: "b", estimate: {executionDuration: 1}}]}),
+    route("bad tool!", "2999999", 5),
+  ]};
+
+  function stub(onQuote: (url: URL) => Response = () => new Response(JSON.stringify(response()))) {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", async (input: URL | string, init?: RequestInit) => {
+      const url = new URL(String(input));
+      calls.push(`${init?.method ?? "GET"} ${url.pathname}${url.search}`);
+      if (url.pathname.endsWith("/advanced/routes")) return new Response(JSON.stringify(routes));
+      return onQuote(url);
+    });
+    return calls;
+  }
+
+  it("hands single-transaction candidates to the app and restricts /quote to its choice", async () => {
+    const calls = stub();
+    let seen: {tool: string; toAmount: bigint; etaSeconds: number}[] = [];
+    const quote = await lifiProvider({chooseRoute: (r) => { seen = [...r]; return {allowBridges: ["stargateV2"], denyBridges: ["mayan", "bad tool!"]}; }}).getQuote(PARAMS);
+    expect(quote).not.toBeNull();
+    expect(seen.map((r) => r.tool)).toEqual(["polymerStandard", "stargateV2", "mayan"]);
+    expect(seen[1]).toMatchObject({toAmount: 2990656n, etaSeconds: 96});
+    expect(calls[0]).toMatch(/^POST \/v1\/advanced\/routes$/);
+    const q = new URL(`https://x${calls[1]!.slice(4)}`).searchParams;
+    expect(q.getAll("allowBridges")).toEqual(["stargateV2"]);
+    expect(q.getAll("denyBridges")).toEqual(["mayan"]); // malformed tool keys never reach the URL
+  });
+
+  it("keeps LI.FI's default pick without a hook, for same-chain swaps, and when the hook passes", async () => {
+    let calls = stub();
+    await lifiProvider().getQuote(PARAMS);
+    expect(calls).toHaveLength(1);
+    calls = stub();
+    await lifiProvider({chooseRoute: () => ({allowBridges: ["x"]})}).getQuote({...PARAMS, destChain: PARAMS.sourceChain});
+    expect(calls.some((c) => c.includes("advanced"))).toBe(false);
+    calls = stub();
+    await lifiProvider({chooseRoute: () => null}).getQuote(PARAMS);
+    expect(calls[1]).not.toMatch(/allowBridges|denyBridges|order=/);
+  });
+
+  it("falls back to the default pick when the routes call fails, the hook throws, or the chosen bridge is gone", async () => {
+    vi.stubGlobal("fetch", async (input: URL | string) => String(input).includes("advanced") ? new Response("nope", {status: 500}) : new Response(JSON.stringify(response())));
+    expect(await lifiProvider({chooseRoute: () => ({allowBridges: ["stargateV2"]})}).getQuote(PARAMS)).not.toBeNull();
+    stub();
+    expect(await lifiProvider({chooseRoute: () => { throw new Error("policy bug"); }}).getQuote(PARAMS)).not.toBeNull();
+    const calls = stub((url) => url.searchParams.has("allowBridges") ? new Response(JSON.stringify({message: "No available quotes"}), {status: 404}) : new Response(JSON.stringify(response())));
+    expect(await lifiProvider({chooseRoute: () => ({allowBridges: ["stargateV2"]})}).getQuote(PARAMS)).not.toBeNull();
+    expect(calls).toHaveLength(3);
+    expect(calls[2]).not.toMatch(/allowBridges/);
+  });
+});
