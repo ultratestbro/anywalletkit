@@ -131,19 +131,16 @@ A revoke costs gas. An account with no ETH cannot revoke anything. Check the bal
 ## With policies
 
 A revoke is a signature like any other, so [policies](/concepts/policies/) see it. `confirm`
-gets `kind: 'approval'`, with the spender in `to` and `amount: 0n`. The same handler sees
-new approvals too: `approve`, `signPermit`, and EIP-2612 or Permit2 typed data. That makes it
-the place to warn about unlimited allowances before they are granted:
+gets `kind: 'revoke'`, with the spender in `to` and the full list in `revokes`. New
+approvals arrive as `kind: 'approval'`: `approve`, `signPermit`, and EIP-2612 or Permit2
+typed data. That makes `confirm` the place to warn about unlimited allowances before they are
+granted:
 
 <Snippet file="approvals/src/approvals.ts" region="policies" />
 
-:::caution[Allowlist and blocklist apply to revokes]
-`allowlist` and `blocklist` check the spender of every approval, and a revoke is an approval
-of 0. So an account cannot revoke the allowance of a spender on its blocklist, and with an
-allowlist set, it can revoke only allowlisted spenders. Permit2 `lockdown` and
-`setApprovalForAll(…, false)` are calls to the Permit2 or NFT contract, so an allowlist must
-include those contracts too.
-:::
+A revoke is not checked against the allowlist or the spender's blocklist entry, so the user
+can always take an allowance back from a spender you have blocklisted. See
+[Revokes](/concepts/policies/#revokes).
 
 ## Activity
 

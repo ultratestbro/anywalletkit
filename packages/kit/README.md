@@ -40,6 +40,14 @@ and chain-specific ones such as Tron's `signRaw`, NEAR's `signBuilt`, Solana's
 is listed in `UNGUARDED_WRITES`, so a new signing method in a chain package
 cannot bypass the policies by not being named. Reads are never intercepted.
 
+A revoke is `kind: 'revoke'`: an `approve` / `signPermit` / EIP-2612 Permit of 0,
+raw revoke calldata (`approve(spender, 0)`, `approve(0x0, tokenId)`,
+`setApprovalForAll(…, false)`, Permit2 `lockdown`, or a batch of only these) and
+`revokeDelegation()`. It skips the allowlist and the spender's blocklist entry
+(taking an allowance back from a blocklisted drainer must stay possible); the
+blocklist still applies to the contract called, the fee cap and `confirm` apply,
+and `confirm` sees `revokes: [{ token, spender }]`.
+
 ## Activity history
 
 `history()` is the wallet's activity feed: one page across every chain that has a

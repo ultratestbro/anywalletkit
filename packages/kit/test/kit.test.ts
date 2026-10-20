@@ -231,6 +231,56 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
     expect(isGuardedWrite('signer') || isGuardedWrite('sendable') || isGuardedWrite('getBalance') || isGuardedWrite('quoteTransfer')).toBe(false)
   })
 
+  it('a revoke is kind revoke: the spender\'s blocklist entry and the allowlist do not stop it, confirm still does', async () => {
+    const acc = Object.assign(evmLike(), { revokeDelegation: async () => ({ hash: 'undelegated' }) })
+    const confirm = vi.fn(async () => true)
+    const strict = applyPolicies(acc, { blocklist: { 'eip155:1': [spender] }, allowlist: { 'eip155:1': ['0x0000000000000000000000000000000000000001'] }, confirm })
+    // approve(amount 0) to a blocklisted spender, outside the allowlist: goes through
+    expect(await strict.approve({ token, spender, amount: 0n })).toEqual({ hash: `approved:${spender}` })
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'approve', kind: 'revoke', to: spender, token, amount: 0n, unlimited: false, revokes: [{ token, spender }], message: false }))
+    // a non-zero approve to the same spender is still refused
+    await expect(strict.approve({ token, spender, amount: 1n })).rejects.toBeInstanceOf(PolicyViolationError)
+    // signPermit of 0 and an EIP-2612 Permit of 0 are revokes too
+    await strict.signPermit({ token, spender, value: 0n, deadline: 1n })
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'signPermit', kind: 'revoke' }))
+    const permit0 = { domain: { name: 'USD Coin', version: '2', chainId: 1, verifyingContract: token }, types: { Permit: [] }, primaryType: 'Permit', message: { owner: 'addr', spender, value: '0', nonce: 0, deadline: '1' } }
+    await strict.signTypedData(permit0)
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'signTypedData', kind: 'revoke', to: spender, token }))
+    // EIP-7702 delegation
+    expect(await strict.revokeDelegation()).toEqual({ hash: 'undelegated' })
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'revokeDelegation', kind: 'revoke' }))
+    // confirm keeps the last word
+    await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [spender] }, confirm: async () => false }).approve({ token, spender, amount: 0n })).rejects.toBeInstanceOf(UserRejectedError)
+  })
+
+  it('revoke calldata sent raw (setApprovalForAll false, approve 0, Permit2 lockdown, a batch of them) is a revoke; anything else is not', async () => {
+    const acc = createMockAccount({ chain: 'eip155:1' })
+    const confirm = vi.fn(async () => true)
+    const strict = applyPolicies(acc, { blocklist: { 'eip155:1': [spender] }, allowlist: { 'eip155:1': ['0x0000000000000000000000000000000000000001'] }, confirm })
+    const pad = (hex: string) => hex.replace(/^0x/, '').toLowerCase().padStart(64, '0')
+    const nft = '0x0000000000000000000000000000000000000Aa7'
+    const setApprovalForAllOff = { to: nft, value: 0n, data: `0xa22cb465${pad(spender)}${pad('0')}` }
+    const approve0 = { to: token, value: 0n, data: `0x095ea7b3${pad(spender)}${pad('0')}` }
+    const lockdown = { to: permit2, value: 0n, data: `0xcc53287f${pad('20')}${pad('2')}${pad(token)}${pad(spender)}${pad(nft)}${pad(spender)}` }
+    // addresses read off calldata come back lowercase
+    const [t, sp, n] = [token, spender, nft].map((x) => x.toLowerCase())
+    await strict.sendTransaction(setApprovalForAllOff)
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'revoke', to: sp, token: nft }))
+    await strict.sendTransaction(lockdown)
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'revoke', revokes: [{ token: t, spender: sp }, { token: n, spender: sp }] }))
+    await strict.sendTransaction([approve0, lockdown] as never)
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'revoke', revokes: [{ token, spender: sp }, { token: t, spender: sp }, { token: n, spender: sp }] }))
+    expect(acc.sent).toHaveLength(3)
+    // not revokes: operator ON, a non-zero allowance, native value attached, a batch with one ordinary call
+    await expect(strict.sendTransaction({ ...setApprovalForAllOff, data: `0xa22cb465${pad(spender)}${pad('1')}` })).rejects.toBeInstanceOf(PolicyViolationError)
+    await expect(strict.sendTransaction({ ...approve0, data: `0x095ea7b3${pad(spender)}${pad('5')}` })).rejects.toBeInstanceOf(PolicyViolationError)
+    await expect(strict.sendTransaction({ ...approve0, value: 1n })).rejects.toBeInstanceOf(PolicyViolationError)
+    await expect(strict.sendTransaction([approve0, { to: spender, value: 0n, data: '0x' }] as never)).rejects.toBeInstanceOf(PolicyViolationError)
+    // the blocklist still applies to the contract a revoke calls
+    await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [permit2] } }).sendTransaction(lockdown)).rejects.toThrow(/Contract .* blocklist/)
+    await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [token] } }).sendTransaction(approve0)).rejects.toThrow(/Contract .* blocklist/)
+  })
+
   it('one check per user action: a write the outer method issues internally is not confirmed twice', async () => {
     const base = createMockAccount({ chain: 'eip155:1' })
     const acc = Object.assign(base, {

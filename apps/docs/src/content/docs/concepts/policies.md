@@ -44,6 +44,18 @@ whose name starts with `sign`, `send`, `approve`, `revoke` or `transfer` is guar
 it is listed in `UNGUARDED_WRITES` (empty today), so a new signing method in a chain
 package cannot bypass the policies. Reads (balances, quotes, receipts) are never affected.
 
+### Revokes
+
+Taking an approval back moves nothing, so a revoke is its own kind: `kind: 'revoke'`. This
+covers an `approve`, `signPermit` or EIP-2612 `Permit` of 0, the revoke calls sent as raw
+calldata (`approve(spender, 0)`, `approve(0x0, tokenId)`, `setApprovalForAll(operator, false)`,
+Permit2 `lockdown`, or a batch made only of these), and `revokeDelegation()`.
+
+A revoke skips the allowlist and the spender's blocklist entry, so the user can always take an
+allowance back from a known drainer. The blocklist still applies to the contract the revoke
+calls (the token, the NFT collection, Permit2). The fee cap and `confirm` apply as usual.
+`confirm` gets `revokes: [{ token, spender }]` to show what is being revoked.
+
 For each write the checks run in this order:
 
 1. **Fee cap.** The account quotes the fee, and anything above the cap is refused (for

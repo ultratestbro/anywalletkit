@@ -13,6 +13,7 @@ export type KnownWriteMethod =
   | 'signTypedData' | 'signPermit' | 'approve'
   | 'signRaw' | 'signNep413' | 'signBuilt'
   | 'sendSerialized' | 'signCompiled' | 'signTransactionMessage'
+  | 'revokeDelegation'
 export type WriteMethod = KnownWriteMethod | (string & {})
 
 export const GUARDED_WRITES: readonly KnownWriteMethod[] = [
@@ -20,6 +21,7 @@ export const GUARDED_WRITES: readonly KnownWriteMethod[] = [
   'signTypedData', 'signPermit', 'approve',
   'signRaw', 'signNep413', 'signBuilt',
   'sendSerialized', 'signCompiled', 'signTransactionMessage',
+  'revokeDelegation',
 ]
 /** Name prefixes that mark a write even when the method is not listed above. */
 export const GUARDED_PREFIXES: readonly string[] = ['sign', 'send', 'approve', 'revoke', 'transfer']
@@ -53,6 +55,14 @@ export type WriteKind =
   | 'typedData'
   /** A plain message signature. */
   | 'message'
+  /**
+   * Takes rights away and moves nothing: `approve` / `signPermit` / EIP-2612 Permit of 0,
+   * `approve(spender, 0)` / `approve(0x0, tokenId)` / `setApprovalForAll(operator, false)` /
+   * Permit2 `lockdown` calldata (value 0), `revokeDelegation()`. The allowlist and the
+   * spender's blocklist entry do not apply (revoking a drainer must stay possible); the
+   * blocklist still applies to the contract the revoke calls; fee cap and `confirm` apply.
+   */
+  | 'revoke'
 
 /** What a policy sees before a write goes out. Amounts in base units when known. */
 export interface WriteIntent {
@@ -71,6 +81,8 @@ export interface WriteIntent {
   unlimited?: boolean
   /** Approvals / permits: expiry as given (unix seconds). */
   deadline?: bigint
+  /** Revokes: what each one takes away (`spender` absent for a per-token NFT approval and an EIP-7702 delegation). */
+  revokes?: Array<{ token: string; spender?: string }>
   /** The raw argument (first argument of the call), for policies that need more. */
   raw: unknown
   /** True for `kind` message / typedData: allow/block lists do not apply, only `confirm`. */
@@ -112,6 +124,69 @@ function approvalIntent(base: Omit<WriteIntent, 'kind' | 'message'>, spender: st
   }
 }
 
+const SELECTOR_APPROVE = '0x095ea7b3' // approve(address,uint256) — ERC-20 allowance / ERC-721 per-token
+const SELECTOR_SET_APPROVAL_FOR_ALL = '0xa22cb465' // setApprovalForAll(address,bool)
+const SELECTOR_LOCKDOWN = '0xcc53287f' // Permit2 lockdown((address token, address spender)[])
+const ZERO_WORD = '0'.repeat(64)
+const wordAddress = (word: string) => `0x${word.slice(24)}`
+
+/**
+ * One EVM call → what it revokes, or null when it is anything else. Exact
+ * shapes only: a known selector, the exact ABI length, no native value.
+ */
+function revokeCall(call: unknown): Array<{ token: string; spender?: string }> | null {
+  const c = obj(call)
+  const to = str(c.to)
+  const data = str(c.data)?.toLowerCase()
+  const value = big(c.value)
+  if (to === undefined || data === undefined || (value !== undefined && value !== 0n) || (c.value !== undefined && value === undefined)) return null
+  const words = data.slice(10)
+  if (!/^[0-9a-f]*$/.test(words) || words.length % 64 !== 0) return null
+  const word = (i: number) => words.slice(i * 64, i * 64 + 64)
+  const selector = data.slice(0, 10)
+  if (selector === SELECTOR_APPROVE && words.length === 128) {
+    if (word(1) === ZERO_WORD) return [{ token: to, spender: wordAddress(word(0)) }] // ERC-20 allowance → 0
+    if (word(0) === ZERO_WORD) return [{ token: to }] // ERC-721 approve(0x0, tokenId)
+    return null
+  }
+  if (selector === SELECTOR_SET_APPROVAL_FOR_ALL && words.length === 128 && word(1) === ZERO_WORD) {
+    return [{ token: to, spender: wordAddress(word(0)) }]
+  }
+  if (selector === SELECTOR_LOCKDOWN && words.length >= 128) {
+    // offset (0x20), length n, then n × (token, spender)
+    if (BigInt(`0x${word(0)}`) !== 32n) return null
+    const n = Number(BigInt(`0x${word(1)}`))
+    if (n < 1 || words.length !== (2 + 2 * n) * 64) return null
+    const pairs: Array<{ token: string; spender?: string }> = []
+    for (let i = 0; i < n; i++) pairs.push({ token: wordAddress(word(2 + 2 * i)), spender: wordAddress(word(3 + 2 * i)) })
+    return pairs // the call itself goes to Permit2: revokeTargets() checks that contract
+  }
+  return null
+}
+
+function revokeIntent(base: Omit<WriteIntent, 'kind' | 'message'>, revokes: Array<{ token: string; spender?: string }>): WriteIntent {
+  const first = revokes[0]
+  return {
+    ...base, kind: 'revoke', message: false, amount: 0n, unlimited: false,
+    revokes: revokes.map(({ token, spender }) => (spender !== undefined ? { token, spender } : { token })),
+    ...(revokes.length === 1 && first?.spender !== undefined ? { to: first.spender } : {}),
+    ...(revokes.length === 1 && first !== undefined ? { token: first.token } : {}),
+  }
+}
+
+/** The contracts a revoke intent calls: token / NFT contracts, Permit2 for a lockdown. */
+function revokeTargets(intent: WriteIntent): string[] {
+  const raw = intent.raw
+  const calls = Array.isArray(raw) ? raw : [raw]
+  const out: string[] = []
+  for (const c of calls) {
+    const to = str(obj(c).to)
+    if (to !== undefined) out.push(to)
+  }
+  if (out.length === 0) for (const r of intent.revokes ?? []) out.push(r.token)
+  return out
+}
+
 /** EIP-712 input → approval intent for EIP-2612 `Permit` / Permit2, otherwise a confirm-only typed-data intent. */
 function typedDataIntent(base: Omit<WriteIntent, 'kind' | 'message'>, arg: unknown): WriteIntent {
   const a = obj(arg)
@@ -123,6 +198,7 @@ function typedDataIntent(base: Omit<WriteIntent, 'kind' | 'message'>, arg: unkno
   if (primaryType === 'Permit' && str(message.spender) !== undefined) {
     // EIP-2612 (`value`) or DAI-style (`allowed: true`, no value) permit on the verifying contract (the token).
     const amount = big(message.value)
+    if (verifying !== undefined && (amount === 0n || message.allowed === false)) return revokeIntent(base, [{ token: verifying, spender: str(message.spender)! }])
     const unlimited = message.allowed === true || unboundedAllowance(amount)
     return approvalIntent(base, str(message.spender), verifying, amount, big(message.deadline ?? message.expiry), unlimited)
   }
@@ -140,10 +216,12 @@ function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown
   switch (method) {
     case 'approve': {
       const amount = big(a.amount)
+      if (amount === 0n && str(a.token) !== undefined) return revokeIntent(base, [{ token: str(a.token)!, ...(str(a.spender) !== undefined ? { spender: str(a.spender)! } : {}) }])
       return approvalIntent(base, str(a.spender), str(a.token), amount, undefined, unboundedAllowance(amount))
     }
     case 'signPermit': {
       const amount = big(a.value ?? a.amount)
+      if (amount === 0n && str(a.token) !== undefined) return revokeIntent(base, [{ token: str(a.token)!, ...(str(a.spender) !== undefined ? { spender: str(a.spender)! } : {}) }])
       return approvalIntent(base, str(a.spender), str(a.token), amount, big(a.deadline), unboundedAllowance(amount))
     }
     case 'signTypedData':
@@ -163,6 +241,13 @@ function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown
     }
   }
   if (MESSAGE_METHODS.includes(method)) return { ...base, kind: 'message', message: true }
+  if (method === 'revokeDelegation') return revokeIntent(base, [{ token: from }])
+  if (method === 'sendTransaction' || method === 'signTransaction') {
+    // A revoke sent as raw calldata (the approvals module's setApprovalForAll / lockdown / batch path).
+    const calls = Array.isArray(arg) ? arg : [arg]
+    const found = calls.length > 0 ? calls.map(revokeCall) : [null]
+    if (found.every((r) => r !== null)) return revokeIntent(base, found.flat() as Array<{ token: string; spender?: string }>)
+  }
   const to = str(a.to) ?? str(a.recipient)
   const amount = big(a.amount ?? a.value)
   return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(typeof a.token === 'string' ? { token: a.token } : {}), ...(amount !== undefined ? { amount } : {}) }
@@ -177,7 +262,12 @@ function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown
  * broadcasts on its own cannot skip the policies. Approvals (`approve`,
  * `signPermit`, EIP-2612 / Permit2 typed data) are checked against the
  * SPENDER: a blocklisted or non-allowlisted spender is refused, and `confirm`
- * sees `kind: 'approval'` with `unlimited`.
+ * sees `kind: 'approval'` with `unlimited`. A revoke (an approval of 0, the
+ * revoke calldata the approvals module sends, `revokeDelegation`) is
+ * `kind: 'revoke'`: it skips the allowlist and the spender's blocklist entry,
+ * so a blocklisted drainer's allowance can always be taken back; the
+ * blocklist still applies to the contract called, the fee cap and `confirm`
+ * still apply.
  *
  * One check per user action: the original method runs on the unwrapped
  * account, so a write that an outer guarded method issues internally (the
@@ -201,7 +291,15 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
       const { fee } = method === 'transfer' ? await account.quoteTransfer(arg as TransferOptions) : await account.quoteSendTransaction(arg)
       for (const { c, cap } of caps) if (fee > cap) throw new PolicyViolationError('maxFee', `Fee ${fee} exceeds the ${c} cap of ${cap}.`)
     }
-    if (!intent.message) {
+    if (intent.kind === 'revoke') {
+      // Revoking takes rights away: the allowlist and the spender's listing do not apply.
+      // The contract it calls must still not be blocklisted.
+      for (const c of chains) {
+        const block = policies.blocklist?.[c]?.map(lower)
+        const hit = block && revokeTargets(intent).find((t) => block.includes(lower(t)))
+        if (hit) throw new PolicyViolationError('blocklist', `Contract ${hit} is on the ${c} blocklist.`)
+      }
+    } else if (!intent.message) {
       const what = intent.kind === 'approval' ? 'Spender' : 'Destination'
       for (const c of chains) {
         const allow = policies.allowlist?.[c]

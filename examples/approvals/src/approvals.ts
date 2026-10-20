@@ -104,11 +104,12 @@ export async function revokeRisky(wallet: Wallet): Promise<RevokeResult[]> {
 export function approvalPolicies(ask: (intent: WriteIntent, warning?: string) => Promise<boolean>): Policies {
   return {
     confirm: (intent) => {
-      if (intent.kind !== 'approval') return ask(intent)
-      // approve, signPermit, EIP-2612 and Permit2 typed data all arrive here; intent.to is the spender.
-      // amount 0 is a revoke: approvals.revoke() sends account.approve({ amount: 0 }).
-      if (intent.amount === 0n) return ask(intent)
-      if (intent.unlimited) return ask(intent, `${intent.to} could spend all of this token, now and later.`)
+      // A revoke: intent.revokes lists each { token, spender } being taken back.
+      if (intent.kind === 'revoke') return ask(intent)
+      // A new approval: approve, signPermit, EIP-2612 or Permit2 typed data; intent.to is the spender.
+      if (intent.kind === 'approval' && intent.unlimited) {
+        return ask(intent, `${intent.to} could spend all of this token, now and later.`)
+      }
       return ask(intent)
     },
   }

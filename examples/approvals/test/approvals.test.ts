@@ -26,7 +26,7 @@ describe('Approvals guide (docs) — offline', () => {
     }
   })
 
-  it('a revoke reaches confirm as an approval of 0 to the spender, and stops there when refused', async () => {
+  it('a revoke reaches confirm as kind revoke, and stops there when refused', async () => {
     const seen: WriteIntent[] = []
     const wallet = walletWithApprovals(SEED, {
       logsRpc: LOGS_RPC,
@@ -36,7 +36,25 @@ describe('Approvals guide (docs) — offline', () => {
     try {
       await expect(revokeOne(wallet, usdcApproval)).rejects.toBeInstanceOf(UserRejectedError)
       expect(seen).toHaveLength(1)
-      expect(seen[0]).toMatchObject({ kind: 'approval', method: 'approve', to: SPENDER, token: USDC, amount: 0n, unlimited: false })
+      expect(seen[0]).toMatchObject({ kind: 'revoke', method: 'approve', to: SPENDER, token: USDC, amount: 0n, revokes: [{ token: USDC, spender: SPENDER }] })
+    } finally {
+      wallet.dispose()
+    }
+  }, 30_000)
+
+  it('a blocklisted spender can still be revoked (the blocklist stops new approvals only)', async () => {
+    const seen: WriteIntent[] = []
+    const wallet = walletWithApprovals(SEED, {
+      logsRpc: LOGS_RPC,
+      cache: memoryCache(),
+      policies: { blocklist: { 'eip155:1': [SPENDER] }, confirm: async (intent) => { seen.push(intent); return false } },
+    })
+    try {
+      // past the lists, stopped only by confirm (nothing is sent offline)
+      await expect(revokeOne(wallet, usdcApproval)).rejects.toBeInstanceOf(UserRejectedError)
+      expect(seen[0]?.kind).toBe('revoke')
+      const account = await wallet.getAccount<WalletAccountEvm>('eip155:1')
+      await expect(account.approve({ token: USDC, spender: SPENDER, amount: 1n })).rejects.toThrow(/blocklist/)
     } finally {
       wallet.dispose()
     }
