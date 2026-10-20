@@ -59,7 +59,7 @@ export interface IStakingProtocol {
   claimWithdrawals(options?: ClaimWithdrawalsOptions): Promise<ClaimWithdrawalsResult>
   quoteClaimWithdrawals(options?: ClaimWithdrawalsOptions): Promise<Omit<ClaimWithdrawalsResult, 'hash'>>
   getStakedBalance(): Promise<StakedBalance>
-  /** Decimal APR, 0.03 = 3 %. */
+  /** APR in percent: 2.5 = 2.5 % (every staking module and app reads it this way). */
   getApr(): Promise<number>
 }
 
