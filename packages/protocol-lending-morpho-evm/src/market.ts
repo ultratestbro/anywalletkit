@@ -1,4 +1,4 @@
-import type { BorrowOptions, IWalletAccount, IWalletAccountReadOnly, LendingQuote, LendingResult, RepayOptions, SupplyOptions, WithdrawOptions } from '@forgewallet/core'
+import { bigintToNumber, type BorrowOptions, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type RepayOptions, type SupplyOptions, type WithdrawOptions } from '@forgewallet/core'
 import { getAddress, isAddress, isHex, zeroAddress, type Address, type Hex } from 'viem'
 import { ERC20_ABI, IRM_ABI, MORPHO_ABI, ORACLE_ABI } from './abi.js'
 import { FALLBACK_GAS, MorphoBase, toAmount, type AmountOption, type MorphoBaseConfig, type Tx } from './base.js'
@@ -131,9 +131,9 @@ export class MorphoMarketProtocolEvm extends MorphoBase<MorphoMarketConfig> {
     const borrowApy = rateToApyPct(borrowRate)
     const liquidity = state.totalSupplyAssets > state.totalBorrowAssets ? state.totalSupplyAssets - state.totalBorrowAssets : 0n
     return {
-      id, params, loan, collateral, lltv: Number(params.lltv) / 1e18, price, state, liquidity,
-      utilization: state.totalSupplyAssets === 0n ? 0 : Number(state.totalBorrowAssets) / Number(state.totalSupplyAssets),
-      borrowRate, borrowApy, supplyApy: supplyApyPct(borrowApy, state), fee: Number(state.fee) / 1e18,
+      id, params, loan, collateral, lltv: bigintToNumber(params.lltv) / 1e18, price, state, liquidity,
+      utilization: state.totalSupplyAssets === 0n ? 0 : bigintToNumber(state.totalBorrowAssets) / bigintToNumber(state.totalSupplyAssets),
+      borrowRate, borrowApy, supplyApy: supplyApyPct(borrowApy, state), fee: bigintToNumber(state.fee) / 1e18,
     }
   }
 
@@ -151,8 +151,8 @@ export class MorphoMarketProtocolEvm extends MorphoBase<MorphoMarketConfig> {
     const liquidationPrice = borrowAssets === 0n || collateral === 0n ? null : (borrowAssets * WAD * 10n ** 36n) / (collateral * info.params.lltv)
     return {
       supplyShares, supplyAssets, borrowShares, borrowAssets, collateral, collateralValue: value, maxBorrow: max,
-      healthFactor: borrowAssets === 0n ? Number.POSITIVE_INFINITY : Number(max) / Number(borrowAssets),
-      ltv: value === 0n ? (borrowAssets === 0n ? 0 : Number.POSITIVE_INFINITY) : Number(borrowAssets) / Number(value),
+      healthFactor: borrowAssets === 0n ? Number.POSITIVE_INFINITY : bigintToNumber(max) / bigintToNumber(borrowAssets),
+      ltv: value === 0n ? (borrowAssets === 0n ? 0 : Number.POSITIVE_INFINITY) : bigintToNumber(borrowAssets) / bigintToNumber(value),
       liquidationPrice,
     }
   }
@@ -264,7 +264,7 @@ export class MorphoMarketProtocolEvm extends MorphoBase<MorphoMarketConfig> {
     if (amount > pos.collateral) throw new MorphoError(`The amount exceeds the posted collateral (${pos.collateral}).`)
     const remaining = pos.collateral - amount
     const maxAfter = maxBorrow(remaining, info.price, info.params.lltv)
-    const healthAfter = pos.borrowAssets === 0n ? Number.POSITIVE_INFINITY : Number(maxAfter) / Number(pos.borrowAssets)
+    const healthAfter = pos.borrowAssets === 0n ? Number.POSITIVE_INFINITY : bigintToNumber(maxAfter) / bigintToNumber(pos.borrowAssets)
     if (pos.borrowAssets > 0n && maxAfter < pos.borrowAssets) {
       throw new MorphoError(`Withdrawing ${amount} collateral would leave the position undercollateralized (health ${healthAfter.toFixed(3)} < 1): repay first.`, 'insufficient collateral')
     }
@@ -306,7 +306,7 @@ export class MorphoMarketProtocolEvm extends MorphoBase<MorphoMarketConfig> {
     if (debtAfter > pos.maxBorrow) {
       throw new MorphoError(`Borrowing ${amount} would exceed the position's limit: max debt ${pos.maxBorrow} ${info.loan.symbol} base units at LLTV ${(info.lltv * 100).toFixed(1)}% (current debt ${pos.borrowAssets}).`, 'insufficient collateral')
     }
-    const healthAfter = Number(pos.maxBorrow) / Number(debtAfter)
+    const healthAfter = bigintToNumber(pos.maxBorrow) / bigintToNumber(debtAfter)
     return { info, tx: { to: this.chain.morpho, data: this.encode(MORPHO_ABI, 'borrow', [info.params, amount, 0n, onBehalf, receiver]), value: 0n }, healthAfter }
   }
 

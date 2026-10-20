@@ -1,3 +1,4 @@
+import {bigintToNumber, bigintToUnits} from "@forgewallet/core";
 import {ccAssetByToken, ccChain} from "@forgewallet/swap2-assets";
 import type {Quote, QuoteParams} from "@forgewallet/protocol-swap2-core/types";
 
@@ -15,7 +16,7 @@ function priceOf(prices: Readonly<Record<string, number>>, symbol: string): numb
   return PAR.test(symbol) ? 1 : null;
 }
 
-const units = (amount: string | bigint, decimals: number) => Number(BigInt(amount)) / 10 ** decimals;
+const units = (amount: string | bigint, decimals: number) => bigintToUnits(BigInt(amount), decimals);
 
 /**
  * A `valueUsd` for the router: the guaranteed output in USD, minus the native
@@ -131,7 +132,7 @@ export function quoteValues(prices: Readonly<Record<string, number>>, params: Va
   // Priced: by delivered USD (native fees netted). Unpriced: by raw destAmount — same token for every quote, so the ratio is exact.
   const allPriced = out.length > 1 && out.every((v) => v.valueUsdOut !== null);
   if (out.length > 1) {
-    const measure = (v: QuoteValue): number => (allPriced ? v.valueUsdOut! : Number(BigInt(quotes.find((q) => q.provider === v.provider)!.destAmount)));
+    const measure = (v: QuoteValue): number => (allPriced ? v.valueUsdOut! : bigintToNumber(BigInt(quotes.find((q) => q.provider === v.provider)!.destAmount)));
     const top = out.reduce((a, b) => (measure(b) > measure(a) ? b : a));
     const topQuote = quotes.find((q) => q.provider === top.provider)!;
     for (const v of out) {

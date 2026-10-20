@@ -6,6 +6,7 @@
  * what a missing polyfill looks like. Pure helpers are checked for real values.
  */
 import { createMockAccount } from '@forgewallet/conformance'
+import { bigintToNumber, bigintToUnits } from '@forgewallet/core'
 import { Address } from '@ton/core'
 import { RouterSwap2Protocol } from '@forgewallet/protocol-swap2-router/swap2/router'
 import { NearIntentsSwap2Protocol } from '@forgewallet/protocol-swap2-near-intents/protocol'
@@ -27,6 +28,9 @@ import { KaminoVaultProtocolSolana, KaminoMarketProtocolSolana, MAIN_MARKET, KLE
 import ApprovalsProtocolEvm, { isRevokeCalldata, isUnlimitedAmount } from '@forgewallet/protocol-approvals-evm'
 
 type Check = (what: string, ok: boolean, detail?: string) => void
+declare const print: ((s: string) => void) | undefined
+/** A line in the run log that is not a gate (engine quirks worth seeing next to a failure). */
+const note = (s: string) => (typeof print === 'function' ? print : console.log)(`[note] ${s}`)
 
 const runtimeError = (e: unknown) => e instanceof ReferenceError || e instanceof TypeError || e instanceof SyntaxError
 
@@ -87,24 +91,22 @@ export async function smokeProtocols(check: Check): Promise<void> {
   await tolerates(check, 'aave: getMarket (no provider → NetworkError)', () => aave.getMarket())
   const cfg = parseReserveConfiguration((7500n) | (7800n << 16n) | (6n << 48n) | (1n << 56n) | (1n << 58n))
   check('aave: parseReserveConfiguration', cfg.ltv === 0.75 && cfg.decimals === 6 && cfg.active && cfg.borrowingEnabled)
-  // Engine math the APY depends on, each checked on its own so a Hermes build that gets one of
-  // them wrong (BigInt → Number, log1p/expm1/pow near 1) names the culprit instead of the sum.
+  // Engine BigInt → Number is known-bad on some Hermes builds (Linux x64: Number(2n ** 64n) = 3·2^64),
+  // so the SDK converts through core's bigintToNumber. The raw engine results are printed for the
+  // record; the gate is the helper.
   const big = 4n * 10n ** 25n
   check(`aave: bigint ** and * (${big.toString()})`, big.toString() === '40000000000000000000000000' && big === 40000000000000000000000000n)
-  check(`aave: Number(2n**53n) (${Number(2n ** 53n)})`, Number(2n ** 53n) === 9007199254740992)
-  check(`aave: Number(2n**64n) (${Number(2n ** 64n)})`, Number(2n ** 64n) === 18446744073709551616)
-  check(`aave: Number(2n**64n + 1n) (${Number(2n ** 64n + 1n)})`, Number(2n ** 64n + 1n) === 18446744073709551616)
-  check(`aave: Number(10n**19n) (${Number(10n ** 19n)})`, Number(10n ** 19n) === 1e19)
-  check(`aave: Number(10n**20n) (${Number(10n ** 20n)})`, Number(10n ** 20n) === 1e20)
-  check(`aave: Number(big.toString()) (${Number(big.toString())})`, Number(big.toString()) === 4e25)
-  check(`aave: Number(big / 10n**18n) / 1e-18 (${Number(big / 10n ** 18n) * 1e18})`, Number(big / 10n ** 18n) * 1e18 === 4e25)
-  const ray = Number(big)
-  check(`aave: Number(4e25 ray) (${ray})`, ray === 4e25)
+  note(`engine Number(bigint): 2^53 → ${Number(2n ** 53n)}, 2^64 → ${Number(2n ** 64n)}, 1e19 → ${Number(10n ** 19n)}, 4e25 → ${Number(big)}`)
+  check(`core: bigintToNumber(2^53) (${bigintToNumber(2n ** 53n)})`, bigintToNumber(2n ** 53n) === 9007199254740992)
+  check(`core: bigintToNumber(2^64) (${bigintToNumber(2n ** 64n)})`, bigintToNumber(2n ** 64n) === 18446744073709551616)
+  check(`core: bigintToNumber(4e25) (${bigintToNumber(big)})`, bigintToNumber(big) === 4e25)
+  check(`core: bigintToNumber(-4e25) (${bigintToNumber(-big)})`, bigintToNumber(-big) === -4e25)
+  check(`core: bigintToNumber(uint256.max) (${bigintToNumber((1n << 256n) - 1n)})`, Math.abs(bigintToNumber((1n << 256n) - 1n) / 1.157920892373162e77 - 1) < 1e-12)
+  check(`core: bigintToUnits(1e20, 18) (${bigintToUnits(10n ** 20n, 18)})`, bigintToUnits(10n ** 20n, 18) === 100)
   const perSec = 0.04 / 31_536_000
-  const l = Math.log1p(perSec), e = Math.expm1(0.04), p = Math.pow(1 + perSec, 31_536_000)
+  const l = Math.log1p(perSec), e = Math.expm1(0.04)
   check(`aave: log1p(${perSec}) (${l})`, Math.abs(l / perSec - 1) < 1e-6)
   check(`aave: expm1(0.04) (${e})`, Math.abs(e - 0.0408107742) < 1e-8)
-  check(`aave: pow(1 + r/n, n) (${p})`, Math.abs(p - 1.0408107720) < 1e-6)
   const apy = rayToApyPct(4n * 10n ** 25n)
   check(`aave: rayToApyPct (${apy.toFixed(4)} ≈ 4.081)`, Math.abs(apy - 4.081) < 0.01)
   const mv = new MorphoVaultProtocolEvm(evm, { chainId: 1, vault: '0xBEEF01735c132Ada46AA9aA4c54623cAA92A64CB', api: null })

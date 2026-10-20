@@ -1,6 +1,7 @@
 // Morpho Blue maths, ported from morpho-blue `SharesMathLib`, `MathLib`,
 // `MarketParamsLib` and `Morpho._accrueInterest`, so positions and rates read
 // off-chain match what the contract computes on the next touch.
+import { bigintToNumber } from '@forgewallet/core'
 import { encodeAbiParameters, keccak256, type Address, type Hex } from 'viem'
 
 export const WAD = 10n ** 18n
@@ -57,15 +58,15 @@ export function accrue(m: MarketState, borrowRate: bigint, now: bigint): MarketS
 
 /** Per-second WAD rate → APY in percent (continuous compounding, as the Morpho UI shows). */
 export function rateToApyPct(ratePerSecond: bigint): number {
-  const r = Number(ratePerSecond) / 1e18
+  const r = bigintToNumber(ratePerSecond) / 1e18
   return (Math.exp(r * SECONDS_PER_YEAR) - 1) * 100
 }
 
 /** Supply APY = borrow APY × utilization × (1 − fee). */
 export function supplyApyPct(borrowApyPct: number, m: MarketState): number {
   if (m.totalSupplyAssets === 0n) return 0
-  const utilization = Number(m.totalBorrowAssets) / Number(m.totalSupplyAssets)
-  return borrowApyPct * utilization * (1 - Number(m.fee) / 1e18)
+  const utilization = bigintToNumber(m.totalBorrowAssets) / bigintToNumber(m.totalSupplyAssets)
+  return borrowApyPct * utilization * (1 - bigintToNumber(m.fee) / 1e18)
 }
 
 /** Loan-token value of `collateral` at the oracle price (1e36 scale), rounded down. */

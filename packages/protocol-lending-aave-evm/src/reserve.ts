@@ -1,6 +1,7 @@
 // ReserveConfigurationMap bit layout (aave-v3-origin
 // `protocol/libraries/configuration/ReserveConfiguration.sol`) and the rate
 // maths of the Aave UI (ray = 1e27, APY compounded per second).
+import { bigintToNumber } from '@forgewallet/core'
 import type { Address } from 'viem'
 
 export const RAY = 10n ** 27n
@@ -64,7 +65,7 @@ export function userFlags(data: bigint, reserveId: number): { borrowing: boolean
 
 /** Ray rate → APR in percent. */
 export function rayToAprPct(rate: bigint): number {
-  return (Number(rate) / 1e27) * 100
+  return (bigintToNumber(rate) / 1e27) * 100
 }
 
 /**
@@ -73,7 +74,7 @@ export function rayToAprPct(rate: bigint): number {
  * pow form depends on the engine's libm (Hermes on Linux drifted past 0.01 %).
  */
 export function rayToApyPct(rate: bigint): number {
-  const apr = Number(rate) / 1e27
+  const apr = bigintToNumber(rate) / 1e27
   return Math.expm1(SECONDS_PER_YEAR * Math.log1p(apr / SECONDS_PER_YEAR)) * 100
 }
 
@@ -100,5 +101,5 @@ export interface ReserveInfo extends ReserveConfiguration {
 /** Health factor as a number; Aave returns uint256.max when there is no debt → Infinity. */
 export function healthFactorToNumber(hf: bigint): number {
   if (hf >= 1n << 128n) return Number.POSITIVE_INFINITY
-  return Number(hf) / 1e18
+  return bigintToNumber(hf) / 1e18
 }

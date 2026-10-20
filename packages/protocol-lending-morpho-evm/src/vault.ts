@@ -1,4 +1,4 @@
-import { NotImplementedError, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type SupplyOptions, type WithdrawOptions } from '@forgewallet/core'
+import { NotImplementedError, bigintToNumber, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type SupplyOptions, type WithdrawOptions } from '@forgewallet/core'
 import { getAddress, isAddress, type Address } from 'viem'
 import { ERC4626_ABI, FACTORY_V1_ABI, FACTORY_V2_ABI, VAULT_V1_ABI, VAULT_V2_ABI } from './abi.js'
 import { FALLBACK_GAS, MorphoBase, toAmount, type AmountOption, type MorphoBaseConfig, type Tx } from './base.js'
@@ -102,15 +102,15 @@ export class MorphoVaultProtocolEvm extends MorphoBase<MorphoVaultConfig> {
           const [fee, timelock, cur] = await Promise.all([
             this.read<bigint>(v, VAULT_V1_ABI, 'fee').catch(() => 0n), this.read<bigint>(v, VAULT_V1_ABI, 'timelock').catch(() => 0n), this.read<Address>(v, VAULT_V1_ABI, 'curator').catch(() => null),
           ])
-          fees.performance = Number(fee) / 1e18
+          fees.performance = bigintToNumber(fee) / 1e18
           timelockSeconds = Number(timelock)
           curator = cur
         } else if (version === 'v2') {
           const [pf, mf, cur] = await Promise.all([
             this.read<bigint>(v, VAULT_V2_ABI, 'performanceFee').catch(() => 0n), this.read<bigint>(v, VAULT_V2_ABI, 'managementFee').catch(() => 0n), this.read<Address>(v, VAULT_V2_ABI, 'curator').catch(() => null),
           ])
-          fees.performance = Number(pf) / 1e18
-          fees.management = Number(mf) / 1e18
+          fees.performance = bigintToNumber(pf) / 1e18
+          fees.management = bigintToNumber(mf) / 1e18
           curator = cur
         }
         const sharePriceWad = await this.read<bigint>(v, ERC4626_ABI, 'convertToAssets', [10n ** 18n]).catch(() => 0n)
