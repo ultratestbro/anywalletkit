@@ -1,0 +1,85 @@
+---
+title: Earn
+description: Staking and lending through two shared interfaces — stake, read positions and rates, withdraw in two phases, supply and borrow.
+sidebar:
+  order: 2
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+Earn modules come in two shapes, and every module of a shape has the same methods:
+
+| Interface | Modules | Flow |
+|---|---|---|
+| `StakingProtocol` | Lido (ETH), SSV Network, Tonstakers (TON), SPL stake pools (Jito on Solana) | Stake → request a withdrawal → wait for the queue → claim |
+| `LendingProtocol` | Aave v3, Morpho, Mellow, Kamino | Supply / withdraw, and on markets that allow it, borrow / repay |
+
+This page uses Lido and Aave on Ethereum. The other modules work the same way, with
+different packages and chains (see [Packages](/getting-started/packages/#earn)). Snippets
+come from `examples/earn`, which our CI typechecks and tests.
+
+```sh
+pnpm add @anywalletkit/protocol-staking-lido-evm @anywalletkit/protocol-lending-aave-evm
+```
+
+## Set up
+
+Register each module as a protocol, bound to the chain its account lives on:
+
+<Snippet file="earn/src/earn.ts" region="setup" />
+
+Every write has a `quote…` twin that returns the gas fee without signing anything. Show it
+before the user confirms. [Policies](/concepts/policies/) apply to every write a module
+makes, because modules sign through the same account.
+
+## Staking
+
+### Stake
+
+<Snippet file="earn/src/earn.ts" region="stake" />
+
+### Position and rate
+
+<Snippet file="earn/src/earn.ts" region="position" />
+
+:::note
+Rates are percentages: `getApr()` returning `2.2` means 2.2% a year. The same holds for
+lending APYs.
+:::
+
+### Unstake: two phases
+
+Staked funds do not come back in one transaction. A withdrawal request joins the protocol's
+queue, finalizes later (hours to days, depending on the protocol), and only then can be
+claimed. The interface names the queue instead of pretending `withdraw()` returns money:
+
+<Snippet file="earn/src/earn.ts" region="unstake" />
+
+Show `pendingAmount` as "unstaking" and `claimableAmount` with a **Claim** button. Check
+the queue when the screen opens; there is nothing to watch in between.
+
+## Lending
+
+### Supply and withdraw
+
+<Snippet file="earn/src/earn.ts" region="supply" />
+
+Tokens are contract addresses; `'native'` supplies the chain's coin (ETH) through Aave's
+gateway. Where the token supports EIP-2612, the module signs a permit instead of sending a
+separate approval transaction. `amount: 'max'` withdraws or repays everything, interest
+included.
+
+### Position and health
+
+<Snippet file="earn/src/earn.ts" region="lending-position" />
+
+With debt, keep an eye on `healthFactor`: below `1.0` the position can be liquidated. Show
+it on every borrow and withdraw screen, and warn well before it gets close (for example
+under `1.5`).
+
+## Module-specific extras
+
+The shared interfaces cover what every module can do. Modules add their own methods on
+top: Lido wraps stETH into wstETH, Aave toggles collateral and lists reserves with their
+rates and caps, Morpho lists vaults, SSV reports APR history. They are listed in each
+package's API reference.

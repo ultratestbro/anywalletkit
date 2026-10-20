@@ -50,6 +50,7 @@ export default defineConfig({
       sidebar: [
         { label: 'Getting started', items: [{ label: 'Introduction', link: '/' }, { autogenerate: { directory: 'getting-started' } }] },
         { label: 'Concepts', items: [{ autogenerate: { directory: 'concepts' } }] },
+        { label: 'Guides', items: [{ autogenerate: { directory: 'guides' } }] },
       ],
     }),
   ],

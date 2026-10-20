@@ -1,0 +1,29 @@
+{
+  "name": "@forgewallet/example-swap",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The docs Swaps & bridges guide as running code: the site renders its #region blocks, CI typechecks and tests it.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@forgewallet/core": "workspace:*",
+    "@forgewallet/kit": "workspace:*",
+    "@forgewallet/protocol-swap2-cctp": "workspace:*",
+    "@forgewallet/protocol-swap2-core": "workspace:*",
+    "@forgewallet/protocol-swap2-lifi": "workspace:*",
+    "@forgewallet/protocol-swap2-near-intents": "workspace:*",
+    "@forgewallet/protocol-swap2-router": "workspace:*",
+    "@forgewallet/protocol-swap2-thorchain": "workspace:*",
+    "@forgewallet/protocol-swap2-uniswap": "workspace:*",
+    "@forgewallet/protocol-swap2-wrap": "workspace:*",
+    "@forgewallet/wallet-evm": "workspace:*"
+  },
+  "devDependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  }
+}

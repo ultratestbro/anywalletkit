@@ -1,0 +1,23 @@
+{
+  "name": "@forgewallet/example-earn",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The docs Earn guide as running code: the site renders its #region blocks, CI typechecks and tests it.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@forgewallet/core": "workspace:*",
+    "@forgewallet/kit": "workspace:*",
+    "@forgewallet/wallet-evm": "workspace:*",
+    "@forgewallet/protocol-staking-lido-evm": "workspace:*",
+    "@forgewallet/protocol-lending-aave-evm": "workspace:*"
+  },
+  "devDependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  }
+}

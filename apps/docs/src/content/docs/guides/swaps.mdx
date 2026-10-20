@@ -1,0 +1,149 @@
+---
+title: Swaps and bridges
+description: Quote every swap provider at once, let the user pick a route, execute it safely and track delivery across chains.
+sidebar:
+  order: 1
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+One interface covers same-chain swaps and cross-chain transfers. A **router** asks every
+provider you install in parallel, checks each quote the same way, ranks the routes and
+executes the one you choose. Snippets on this page come from `examples/swap`, which our CI
+typechecks and tests.
+
+## Install
+
+```sh
+pnpm add @anywalletkit/protocol-swap2-router \
+  @anywalletkit/protocol-swap2-lifi @anywalletkit/protocol-swap2-near-intents \
+  @anywalletkit/protocol-swap2-thorchain @anywalletkit/protocol-swap2-cctp \
+  @anywalletkit/protocol-swap2-uniswap @anywalletkit/protocol-swap2-wrap
+```
+
+The router bundles no provider. Only the providers you install and pass in end up in your
+app, and each provider also works on its own without the router.
+
+<Snippet file="swap/src/swap.ts" region="imports" />
+
+## 1. Pick providers
+
+<Snippet file="swap/src/swap.ts" region="providers" />
+
+| Provider | Kind | Good at |
+|---|---|---|
+| `lifi` | Aggregator API | Same-chain and cross-chain, many bridges and DEXes behind one quote |
+| `near_intents` | Intents (1Click) | Cross-chain between different ecosystems: EVM, Solana, Tron, Bitcoin, NEAR… |
+| `thorchain` | Native cross-chain | Native BTC and other L1 coins |
+| `omniston` | STON.fi | TON, and EVM ↔ TON |
+| `cctp` | Circle burn-and-mint | USDC between EVM chains, no slippage |
+| `uniswap`, `balancer` | On-chain DEX | Same-chain, priced from the contracts, no API key |
+| `wrap` | WETH9 | Native ↔ wrapped native, 1:1 |
+
+## 2. Create the router
+
+The router is bound to one account: the source of the swap. Its chain is the source chain.
+
+<Snippet file="swap/src/swap.ts" region="router" />
+
+## 3. Describe the swap
+
+<Snippet file="swap/src/swap.ts" region="options" />
+
+- `fromToken`: a token on the **source** chain, as its contract address or a catalog symbol
+  (`'USDC'`, `'ETH'`).
+- `toToken`: the token on the **destination** chain, as that chain's own id: a contract
+  address, a Solana mint or a TON jetton master. A symbol that does not exist in the catalog
+  of the destination chain leads to "no route".
+- Omit `toChain` for a same-chain swap.
+- Amounts are `bigint` in base units. Use `toTokenAmount` instead of `fromTokenAmount` for
+  exact-output swaps.
+
+## 4. Quote
+
+<Snippet file="swap/src/swap.ts" region="quote" />
+
+Show the user `toTokenAmountMin`, not `toTokenAmount`: it is what the route guarantees.
+
+## 5. Let the user pick a route
+
+<Snippet file="swap/src/swap.ts" region="routes" />
+
+Routes come back ranked by value. Two of them are tagged:
+
+- **`best`**: the highest value. Routes within 0.2% of each other count as the same price;
+  inside that band the faster and more reliable route wins.
+- **`fastest`**: the lowest estimated time.
+
+For a real USDC Ethereum → Base quote on 100 USDC, this returned four routes: CCTP
+tagged `best` (99.989 USDC guaranteed, ~3 minutes), LI.FI tagged `fastest` (99.735 USDC,
+seconds), then NEAR Intents and THORChain.
+
+Pass `valueUsd: usdValue(prices)` to the router to rank on net USD value. Gas and native
+bridge fees are then subtracted.
+
+## 6. Execute
+
+<Snippet file="swap/src/swap.ts" region="execute" />
+
+Before anything is signed, the router fetches a live quote from the chosen provider and
+checks it against what you showed:
+
+- the output is not below your `minAmountOut`;
+- the recipient, amounts and chains match the request;
+- the transaction sends exactly the quoted amount, and any transfer or approval inside it
+  names only your account, the quoted deposit address or the declared spender;
+- aggregator calls go only to that provider's audited contracts.
+
+A route that fails any check is refused, and nothing is sent. ERC-20 approvals are for the
+exact amount, never unlimited, and are revoked again if the swap fails after approving. On
+Ethereum, USDT is reset to zero first, as that token requires.
+
+### Show a review screen
+
+<Snippet file="swap/src/swap.ts" region="review" />
+
+`plan` holds exactly what will be signed: provider, amounts, guaranteed output, approvals,
+ETA and the source transaction itself.
+
+## 7. Track delivery
+
+A cross-chain swap finishes on another chain, minutes later. Poll its status with the id
+returned by `swap2()`:
+
+<Snippet file="swap/src/swap.ts" region="status" />
+
+| Status | Meaning |
+|---|---|
+| `pending` | In flight |
+| `action-required` | Two-phase route (CCTP): the user must claim on the destination chain |
+| `completed` | Delivered |
+| `refund-pending` / `refunded` | The provider is returning / has returned the funds |
+| `failed`, `expired`, `cancelled`, `partial` | Final, not delivered in full |
+
+The id is a string (`awk1.<provider>.…`). Store it with the user's activity: it is all you
+need to resume tracking after an app restart.
+
+## 8. Handle errors
+
+<Snippet file="swap/src/swap.ts" region="errors" />
+
+:::danger[Never retry a `Swap2MaybeSentError`]
+The source transaction may already be on its way. Retrying can send the money twice.
+Track the id or hash instead.
+:::
+
+## Fee caps
+
+`maxNetworkFeeBps` and `maxProtocolFeeBps` (basis points of the input) refuse routes whose
+**itemized** fees are above the cap. The check is fail-closed: a route whose provider does
+not itemize its fees is refused whenever a cap is set. With caps on, the USDC example above
+keeps only the CCTP route. To protect the user without losing routes, compare the
+guaranteed output (`toTokenAmountMin`) instead.
+
+## With the kit
+
+Register the router as a protocol and the [policies](/concepts/policies/) wrap the account
+it signs with:
+
+<Snippet file="swap/src/kit.ts" region="kit" />

@@ -48,6 +48,34 @@ importers:
         specifier: ^0.35.5
         version: 0.35.5(@types/node@24.19.2)
 
+  examples/earn:
+    dependencies:
+      '@forgewallet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@forgewallet/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@forgewallet/protocol-lending-aave-evm':
+        specifier: workspace:*
+        version: link:../../packages/protocol-lending-aave-evm
+      '@forgewallet/protocol-staking-lido-evm':
+        specifier: workspace:*
+        version: link:../../packages/protocol-staking-lido-evm
+      '@forgewallet/wallet-evm':
+        specifier: workspace:*
+        version: link:../../packages/wallet-evm
+    devDependencies:
+      '@forgewallet/conformance':
+        specifier: workspace:*
+        version: link:../../packages/conformance
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+
   examples/hermes-smoke:
     dependencies:
       '@forgewallet/conformance':
@@ -198,6 +226,52 @@ importers:
       '@forgewallet/wallet-tron':
         specifier: workspace:*
         version: link:../../packages/wallet-tron
+    devDependencies:
+      '@forgewallet/conformance':
+        specifier: workspace:*
+        version: link:../../packages/conformance
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+
+  examples/swap:
+    dependencies:
+      '@forgewallet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@forgewallet/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@forgewallet/protocol-swap2-cctp':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-cctp
+      '@forgewallet/protocol-swap2-core':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-core
+      '@forgewallet/protocol-swap2-lifi':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-lifi
+      '@forgewallet/protocol-swap2-near-intents':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-near-intents
+      '@forgewallet/protocol-swap2-router':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-router
+      '@forgewallet/protocol-swap2-thorchain':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-thorchain
+      '@forgewallet/protocol-swap2-uniswap':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-uniswap
+      '@forgewallet/protocol-swap2-wrap':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-wrap
+      '@forgewallet/wallet-evm':
+        specifier: workspace:*
+        version: link:../../packages/wallet-evm
     devDependencies:
       '@forgewallet/conformance':
         specifier: workspace:*
