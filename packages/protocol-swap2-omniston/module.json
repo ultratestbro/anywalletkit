@@ -12,6 +12,6 @@
   "conformance": "0.x",
   "repo": "https://github.com/ultratestbro/forgewallet",
   "path": "packages/protocol-swap2-omniston",
-  "description": "STON.fi Omniston TON swaps and TON\u2194EVM orders.",
+  "description": "STON.fi Omniston TON swaps and TON\u2194EVM / EVM\u2194EVM stable orders.",
   "addedAt": "2026-10-04"
 }

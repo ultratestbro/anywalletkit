@@ -1,6 +1,6 @@
 {
   "$schema": "./modules.schema.json",
-  "generatedAt": "2026-10-19",
+  "generatedAt": "2026-10-20",
   "count": 20,
   "modules": [
     {
@@ -272,7 +272,7 @@
       "conformance": "0.x",
       "repo": "https://github.com/ultratestbro/forgewallet",
       "path": "packages/protocol-swap2-omniston",
-      "description": "STON.fi Omniston TON swaps and TON↔EVM orders.",
+      "description": "STON.fi Omniston TON swaps and TON↔EVM / EVM↔EVM stable orders.",
       "addedAt": "2026-10-04"
     },
     {

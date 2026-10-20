@@ -1,0 +1,444 @@
+import "../buffer-global.js";
+import {Buffer} from "buffer";
+import {Address, Cell} from "@ton/core";
+import type {OmnistonProviderOptions} from "../provider.js";
+
+const JETTON_TRANSFER_OP = 0x0f8a7ea5;
+const ESCROW_CREATE_OP = 0xc0a5f0d9;
+const ESCROW_CONFIG_OP = 0xf2c6fa63;
+const ESCROW_EXECUTION_KECCAK_OP = 0xc8d4b428;
+const MAX_FORWARD_NANO = 2_000_000_000n;
+
+/** Audited from the active mainnet Escrow builder on 2026-08-13. These are
+ * immutable TVM code cells, not resolver-controlled addresses. A contract
+ * upgrade must deliberately update these hashes after reviewing its schema.
+ *
+ * `authorityKeys` is the optional 256-bit public key in the escrow config: the
+ * escrow code checks `CHKSIGNU` against it for its signature-gated operations
+ * (disassembly of code 9e77cb9e…, 2026-10-11). It has been the same key since
+ * the August audit, so it stays pinned. */
+export const DEFAULT_OMNISTON_TON_CODE_HASHES = {
+  escrow: ["9e77cb9e8fd7406d4e85e5f57378eb51e51b862424cf988306c783d50ade697a"],
+  execution: ["f6edbc76e6fbcd6bac573cb942401a3d9198ee9605f9403b0f5c8081259210e5"],
+  authorityKeys: ["ed210da12aa96ea42de4f2f61dc172bbaa3da86051a1b2a6f342f69a777d2770"],
+  /** EVM→TON output position: the contract the factory deploys for the
+   *  resolver's jetton lock (observed on every resolver-created position,
+   *  2026-10-15/16), and the escrow code cell it carries in its state. */
+  position: ["e4d5115a321ade7b827e38fb522c20d2f2cd46e4c6b0b5f7dd8b6b096792d77b"],
+  outputEscrow: ["d30423575384773abaad8d3c6f763898afa3d57a5693005904b7c61e95cee630"],
+} as const;
+
+/** The factory's message that installs a position's state (op of the deploy
+ *  message every resolver-created output position received, 2026-10-15). */
+const POSITION_DEPLOY_OP = "0xf240cd30";
+/** Position timelocks after deploy: withdrawal, public withdrawal, cancellation
+ *  (the EVM extension's dst timelocks 1/120/180; the position stores absolute
+ *  timestamps = deploy time + stage, with the first one rounded 1 s later). */
+const POSITION_STAGES = {publicWithdrawalAfterWithdrawal: 119n, cancellationAfterWithdrawal: 179n};
+/** Disclosure is refused this close to the position's cancellation boundary:
+ *  after it the resolver can take the jettons back while it already holds the
+ *  secret for the EVM source escrow. */
+const OUTPUT_DISCLOSURE_MARGIN_SECONDS = 45;
+
+/** Upper bound on the exclusivity window the escrow config may carry. It is
+ * how long the trader's input stays locked when no resolver reserves the
+ * position (SDK: "at the end of this period trader's position becomes
+ * available for manual withdrawal"); the live value is 300 s. */
+export const MAX_OMNISTON_EXCLUSIVITY_SECONDS = 3_600;
+
+// `exclusivityTimeout` optional: the parked web path still runs a module build
+// that predates it (validatePayload refuses when it is absent).
+type PayloadInput = Omit<Parameters<NonNullable<OmnistonProviderOptions["validateTonEscrowPayload"]>>[0], "exclusivityTimeout"> & {
+  exclusivityTimeout?: number;
+};
+
+/** Code interfaces (tonapi's by-code-hash labels) a same-chain swap message
+ *  may pay into. The resolver picks the pool/vault per route, so the check is
+ *  "a STON.fi or DeDust contract by code", not a fixed address list — seen
+ *  live: native GRAM → DeDust CPMM v2 pool, jettons → STON.fi router v2. */
+export const DEFAULT_OMNISTON_TON_SWAP_INTERFACES = [
+  "stonfi_router",
+  "stonfi_router_v2",
+  "stonfi_pool",
+  "stonfi_pool_v2",
+  "dedust_vault",
+  "dedust_v2_cpmm",
+  "dedust_pool",
+] as const;
+
+/** Proxy-TON (pTON) jetton masters STON.fi routes native TON through. A
+ *  native-input swap pays the ROUTER'S pTON wallet — a plain `jetton_wallet`
+ *  to tonapi, no DEX code interface — so such a target is accepted only when
+ *  its jetton master is pTON AND its owner carries a DEX router interface.
+ *  Seen live 2026-09-05: GRAM → USDT on StonFiV2 targeted the router's pTON
+ *  v2 wallet and the code-interface check alone refused it. */
+export const DEFAULT_OMNISTON_TON_PROXY_TON_MASTERS = [
+  "EQCM3B12QK1e4yZSf8GtBRT0aLMNyEsBc_DhVfRRtOEffLez", // pTON v1
+  "EQBnGWMCf3-FZZq1W4IWcWiGAc3PHuZ0_H-7sad2oY00o83S", // pTON v2
+] as const;
+
+export interface OmnistonTonValidationOptions {
+  fetch?: typeof fetch;
+  tonApiUrl?: string;
+  tonApiKey?: string;
+  /** Code interfaces accepted as swap targets (default: the STON.fi / DeDust set above). */
+  swapTargetInterfaces?: readonly string[];
+  /** Proxy-TON masters whose router-owned wallets may receive native input (default: pTON v1/v2). */
+  proxyTonMasters?: readonly string[];
+  escrowCodeHashes?: readonly string[];
+  executionCodeHashes?: readonly string[];
+  /** Pinned escrow authority public keys (hex, 32 bytes). */
+  authorityKeys?: readonly string[];
+  /** EVM→TON output position code hashes (default: the observed factory position). */
+  positionCodeHashes?: readonly string[];
+  /** Escrow code cells an output position may carry (default: the observed one). */
+  outputEscrowCodeHashes?: readonly string[];
+  now?: () => number;
+}
+
+export type TonOutputPositionInput = Parameters<NonNullable<OmnistonProviderOptions["validateTonOutputPosition"]>>[0];
+
+function cellFromApi(value: string): Cell {
+  const roots = Cell.fromBoc(Buffer.from(value, /^b5ee9c/i.test(value) ? "hex" : "base64"));
+  if (roots.length !== 1) throw new Error("omniston TON validator: account cell must have one root");
+  return roots[0]!;
+}
+
+/**
+ * EVM→TON output position, as the factory writes it (decoded from live
+ * resolver-created positions, 2026-10-15/16 — every field is checked in its
+ * slot, nothing is located by search):
+ *
+ *   data: phase:uint8 quoteId:bits256 factory:MsgAddressStd
+ *         jettonWallet:MsgAddressStd (the factory's wallet of the output
+ *         jetton — custody stays there) flags:bits5
+ *     ref0: owner:MsgAddressStd (resolver) jettonMaster:MsgAddressStd bits6
+ *       ref0: fee profile (constant, not security-relevant)
+ *       ref1: jettonWallet, gas, owner
+ *     ref1: hashlock:bits256 amount:Coins withdrawalAt:uint64
+ *           publicWithdrawalAt:uint64 cancellationAt:uint64
+ *       ref0: recipient:MsgAddressStd resolver:MsgAddressStd deposit:Coins
+ *       ref1: authority:(Maybe bits256) recipient:MsgAddressStd
+ *     ref2: escrow code cell
+ */
+function validateOutputPositionState(
+  data: Cell,
+  input: TonOutputPositionInput,
+  expected: {jettonWallet: string; trusted: {outputEscrow: ReadonlySet<string>; authorityKeys: ReadonlySet<string>}; nowSeconds: number},
+): {withdrawalAt: bigint} | null {
+  if (!/^[0-9a-fA-F]{48,64}$/.test(input.quoteId) || input.secretHash.length !== 32) return null;
+  if (!/^\d+$/.test(input.resolverSendsUnits) || !/^\d+$/.test(input.outputUnits) || !/^\d+$/.test(input.dstSecurityDepositUnits)) return null;
+  if (data.refs.length !== 3) return null;
+  const root = data.beginParse();
+  root.loadUint(8); // phase — not trusted for custody; the factory deploy + timelocks are
+  if (!sameHex(root.loadBuffer(32), input.quoteId.padStart(64, "0"))) return null;
+  if (!sameAddress(root.loadAddressAny(), input.protocolAddress)) return null;
+  if (!sameAddress(root.loadAddressAny(), expected.jettonWallet)) return null;
+  if (root.remainingBits !== 5 || root.remainingRefs !== 3) return null;
+
+  const parties = data.refs[0]!;
+  if (parties.refs.length !== 2) return null;
+  const partySlice = parties.beginParse();
+  if (!(partySlice.loadAddressAny() instanceof Address)) return null; // owner (resolver) — any
+  if (!sameAddress(partySlice.loadAddressAny(), input.outputJettonMasterAddress)) return null;
+  if (partySlice.remainingBits !== 6) return null;
+
+  const lock = data.refs[1]!;
+  if (lock.refs.length !== 2) return null;
+  const lockSlice = lock.beginParse();
+  if (!Buffer.from(lockSlice.loadBuffer(32)).equals(Buffer.from(input.secretHash))) return null;
+  if (lockSlice.loadCoins() < BigInt(input.resolverSendsUnits)) return null;
+  const withdrawalAt = lockSlice.loadUintBig(64);
+  const publicWithdrawalAt = lockSlice.loadUintBig(64);
+  const cancellationAt = lockSlice.loadUintBig(64);
+  if (lockSlice.remainingBits !== 0) return null; // its two refs are the terms and authority cells below
+  if (publicWithdrawalAt - withdrawalAt !== POSITION_STAGES.publicWithdrawalAfterWithdrawal) return null;
+  if (cancellationAt - withdrawalAt !== POSITION_STAGES.cancellationAfterWithdrawal) return null;
+  // Deployed after the quote (resolvers lock within minutes of the fill) and
+  // still far enough from cancellation to be completed.
+  if (withdrawalAt < BigInt(input.quoteTimestamp) - 120n || withdrawalAt > BigInt(input.quoteTimestamp) + 900n) return null;
+  if (BigInt(expected.nowSeconds + OUTPUT_DISCLOSURE_MARGIN_SECONDS) >= cancellationAt) return null;
+
+  const terms = lock.refs[0]!.beginParse();
+  if (!sameAddress(terms.loadAddressAny(), input.recipientAddress)) return null;
+  if (!(terms.loadAddressAny() instanceof Address)) return null; // resolver — any
+  if (terms.loadCoins() !== BigInt(input.dstSecurityDepositUnits) || !exactCellEnd(terms)) return null;
+
+  const authority = lock.refs[1]!.beginParse();
+  if (!authority.loadBit() || !expected.trusted.authorityKeys.has(Buffer.from(authority.loadBuffer(32)).toString("hex"))) return null;
+  if (!sameAddress(authority.loadAddressAny(), input.recipientAddress) || !exactCellEnd(authority)) return null;
+
+  if (!expected.trusted.outputEscrow.has(data.refs[2]!.hash().toString("hex"))) return null;
+  return {withdrawalAt};
+}
+
+function oneRoot(hex: string, label: string): Cell {
+  if (!/^(?:[0-9a-fA-F]{2})+$/.test(hex)) throw new Error(`omniston TON validator: malformed ${label} hex`);
+  const roots = Cell.fromBoc(Buffer.from(hex, "hex"));
+  if (roots.length !== 1) throw new Error(`omniston TON validator: ${label} must have one root`);
+  return roots[0]!;
+}
+
+function sameAddress(actual: unknown, expected: string): boolean {
+  try {
+    return actual instanceof Address && actual.equals(Address.parse(expected));
+  } catch {
+    return false;
+  }
+}
+
+function sameHex(actual: Uint8Array, expected: string): boolean {
+  const clean = expected.replace(/^0x/, "").toLowerCase();
+  return clean.length === actual.length * 2 && Buffer.from(actual).toString("hex") === clean;
+}
+
+function exactCellEnd(slice: {remainingBits: number; remainingRefs: number}): boolean {
+  return slice.remainingBits === 0 && slice.remainingRefs === 0;
+}
+
+function destinationChainId(chain: string): bigint | null {
+  const ids: Record<string, bigint> = {
+    ethereum: 1n,
+    bnb: 56n,
+    polygon: 137n,
+    robinhood: 4663n,
+    base: 8453n,
+    arbitrum: 42161n,
+    avalanche: 43114n,
+    xlayer: 196n,
+    hyperevm: 999n,
+    plasma: 9745n,
+  };
+  return ids[chain] ?? null;
+}
+
+function validatePayload(input: PayloadInput, trusted: {
+  escrow: ReadonlySet<string>;
+  execution: ReadonlySet<string>;
+  authorityKeys: ReadonlySet<string>;
+}): boolean {
+  // Read structurally so this stays type-compatible with module builds that
+  // predate the field; absent → refused below.
+  const exclusivityTimeout = (input as {exclusivityTimeout?: unknown}).exclusivityTimeout;
+  if (
+    typeof exclusivityTimeout !== "number" || !Number.isSafeInteger(exclusivityTimeout) ||
+    exclusivityTimeout < 1 || exclusivityTimeout > MAX_OMNISTON_EXCLUSIVITY_SECONDS
+  ) return false;
+  if (
+    !/^\d+$/.test(input.inputUnits) || !/^\d+$/.test(input.resolverSendsUnits) ||
+    !/^\d+$/.test(input.srcHtlcSecurityDepositUnits) || !/^[0-9a-fA-F]{48,64}$/.test(input.quoteId) ||
+    input.secretHashes.length !== 1 || input.secretHashes[0]?.length !== 32 ||
+    input.hashingFunction !== "HASHING_FUNCTION_KECCAK256"
+  ) return false;
+
+  const payload = oneRoot(input.payloadBocHex, "payload");
+  const outer = payload.beginParse();
+  if (outer.loadUint(32) !== JETTON_TRANSFER_OP) return false;
+  outer.loadUintBig(64); // query id is intentionally wallet/resolver-selected
+  if (outer.loadCoins() !== BigInt(input.inputUnits)) return false;
+  if (!sameAddress(outer.loadAddressAny(), input.protocolAddress)) return false;
+  if (!sameAddress(outer.loadAddressAny(), input.ownerAddress)) return false;
+  if (outer.loadMaybeRef() !== null) return false;
+  const forwardNano = outer.loadCoins();
+  if (forwardNano <= 0n || forwardNano > MAX_FORWARD_NANO || !outer.loadBit()) return false;
+  if (outer.remainingBits !== 0 || outer.remainingRefs !== 1) return false;
+  const embeddedForward = outer.loadRef();
+  const forward = oneRoot(input.forwardPayloadBocHex, "forward payload");
+  if (!embeddedForward.hash().equals(forward.hash())) return false;
+
+  const root = forward.beginParse();
+  if (root.loadUint(32) !== ESCROW_CREATE_OP || !sameHex(root.loadBuffer(32), input.quoteId.padStart(64, "0"))) return false;
+  if (root.loadBit() || !sameAddress(root.loadAddressAny(), input.ownerAddress)) return false;
+  const escrowForwardNano = root.loadCoins();
+  if (escrowForwardNano <= 0n || escrowForwardNano > MAX_FORWARD_NANO || root.loadBit()) return false;
+  if (root.remainingBits !== 0 || root.remainingRefs !== 4) return false;
+  const [config, escrowCode, auxiliary, flags] = [root.loadRef(), root.loadRef(), root.loadRef(), root.loadRef()];
+  if (!trusted.escrow.has(escrowCode.hash().toString("hex"))) return false;
+
+  // Escrow config, as the escrow code's deploy handler parses it (disassembly
+  // of 9e77cb9e…, 2026-10-11):
+  //   op:uint32 resolver:MsgAddressStd authority:(Maybe uint256)
+  //   exclusivity:uint64 postExclusivity:uint64 state:^Cell
+  //   destination:(Maybe ^Cell) parts:uint16
+  // On deploy the escrow stores now+exclusivity and now+exclusivity+postExclusivity
+  // as its phase boundaries. Every field is checked in its slot; nothing is
+  // compared as an opaque blob, so a protocol-side timing change shows up as a
+  // named field instead of a silent refusal.
+  const configSlice = config.beginParse();
+  if (configSlice.loadUint(32) !== ESCROW_CONFIG_OP || !sameAddress(configSlice.loadAddressAny(), input.initialResolverAddress)) return false;
+  if (!configSlice.loadBit() || !trusted.authorityKeys.has(Buffer.from(configSlice.loadBuffer(32)).toString("hex"))) return false;
+  // Bound to the quote the user accepted: the resolver cannot lengthen the
+  // window the trader's funds are locked for without a reservation.
+  if (configSlice.loadUintBig(64) !== BigInt(exclusivityTimeout)) return false;
+  // A non-zero window after exclusivity is the Dutch-auction phase ("Dutch
+  // auction starts if specified by escrow condition"); its price curve is not
+  // part of the trader quote, so only the no-auction profile is accepted.
+  if (configSlice.loadUintBig(64) !== 0n) return false;
+  if (configSlice.remainingRefs !== 2) return false;
+  const state = configSlice.loadRef();
+  if (!configSlice.loadBit()) return false; // destination is mandatory
+  const destination = configSlice.loadRef();
+  // 0 = single full fill, which is what the one-hash execution below commits to.
+  if (configSlice.loadUint(16) !== 0 || !exactCellEnd(configSlice)) return false;
+  if (state.bits.length !== 0 || state.refs.length !== 2) return false;
+  if (!trusted.execution.has(state.refs[0]!.hash().toString("hex"))) return false;
+
+  const execution = state.refs[1]!.beginParse();
+  if (
+    execution.loadUint(32) !== ESCROW_EXECUTION_KECCAK_OP ||
+    !Buffer.from(execution.loadBuffer(32)).equals(Buffer.from(input.secretHashes[0]!)) ||
+    !sameAddress(execution.loadAddressAny(), input.initialResolverAddress)
+  ) return false;
+  // Current audited escrow policy: one execution, then 120/240/300-second
+  // exclusivity, cancellation and refund boundaries.
+  if ([1n, 120n, 240n, 300n].some((expected) => execution.loadUintBig(64) !== expected)) return false;
+  if (execution.remainingBits !== 0 || execution.remainingRefs !== 1) return false;
+  const ownerData = execution.loadRef().beginParse();
+  if (!sameAddress(ownerData.loadAddressAny(), input.ownerAddress) || ownerData.loadBit()) return false;
+  if (ownerData.loadCoins() !== BigInt(input.srcHtlcSecurityDepositUnits) || !exactCellEnd(ownerData)) return false;
+
+  const destinationSlice = destination.beginParse();
+  const chainId = destinationChainId(input.destinationChain);
+  if (chainId === null || destinationSlice.loadUintBig(64) !== chainId) return false;
+  if (!sameHex(destinationSlice.loadBuffer(20), input.outputTokenAddress)) return false;
+  if (!sameHex(destinationSlice.loadBuffer(20), input.destinationAddress)) return false;
+  if (destinationSlice.loadCoins() !== BigInt(input.resolverSendsUnits) || !exactCellEnd(destinationSlice)) return false;
+
+  // These cells contain optional escrow bookkeeping. Their exact shapes and
+  // reference counts are part of the reviewed ABI; fund destinations above
+  // are never located by byte search.
+  if (auxiliary.bits.length !== 537 || auxiliary.refs.length !== 1) return false;
+  if (flags.bits.length !== 98 || flags.refs.length !== 0) return false;
+  return true;
+}
+
+export function createOmnistonTonValidators(options: OmnistonTonValidationOptions = {}): Pick<
+  OmnistonProviderOptions,
+  "validateTonJettonWallet" | "validateTonSwapTarget" | "validateTonOutputPosition"
+> & {validateTonEscrowPayload: (input: PayloadInput) => boolean | Promise<boolean>} {
+  const now = options.now ?? Date.now;
+  const swapInterfaces = new Set(options.swapTargetInterfaces ?? DEFAULT_OMNISTON_TON_SWAP_INTERFACES);
+  const proxyTonMasters = new Set(
+    (options.proxyTonMasters ?? DEFAULT_OMNISTON_TON_PROXY_TON_MASTERS).map((value) => Address.parse(value).toRawString()),
+  );
+  const request = options.fetch ?? fetch;
+  const base = (options.tonApiUrl ?? "https://tonapi.io").replace(/\/$/, "");
+  const headers = options.tonApiKey ? {Authorization: `Bearer ${options.tonApiKey}`} : undefined;
+  const get = (path: string) => request(`${base}${path}`, {...(headers ? {headers} : {}), signal: AbortSignal.timeout(5_000)});
+  /** tonapi's view of a contract: null when unreachable or not the address asked for. */
+  const readAccount = async (address: string): Promise<{interfaces: string[]; isWallet: boolean} | null> => {
+    const response = await get(`/v2/accounts/${encodeURIComponent(address)}`);
+    if (!response.ok) return null;
+    const body = await response.json() as {address?: string; interfaces?: string[]; is_wallet?: boolean};
+    if (!body.address || !sameAddress(Address.parse(body.address), address)) return null;
+    return {interfaces: body.interfaces ?? [], isWallet: body.is_wallet === true};
+  };
+  const isDexContract = (account: {interfaces: string[]; isWallet: boolean}): boolean =>
+    !account.isWallet && account.interfaces.some((name) => swapInterfaces.has(name));
+  const trusted = {
+    escrow: new Set((options.escrowCodeHashes ?? DEFAULT_OMNISTON_TON_CODE_HASHES.escrow).map((value) => value.toLowerCase())),
+    execution: new Set((options.executionCodeHashes ?? DEFAULT_OMNISTON_TON_CODE_HASHES.execution).map((value) => value.toLowerCase())),
+    authorityKeys: new Set((options.authorityKeys ?? DEFAULT_OMNISTON_TON_CODE_HASHES.authorityKeys).map((value) => value.toLowerCase())),
+    position: new Set((options.positionCodeHashes ?? DEFAULT_OMNISTON_TON_CODE_HASHES.position).map((value) => value.toLowerCase())),
+    outputEscrow: new Set((options.outputEscrowCodeHashes ?? DEFAULT_OMNISTON_TON_CODE_HASHES.outputEscrow).map((value) => value.toLowerCase())),
+  };
+  /** The factory's jetton wallet for a master, from the indexer — the same
+   *  lookup the TON-source path uses for the trader's wallet. */
+  const jettonWalletOf = async (ownerAddress: string, jettonMasterAddress: string): Promise<string | null> => {
+    const response = await get(`/v2/accounts/${encodeURIComponent(ownerAddress)}/jettons/${encodeURIComponent(jettonMasterAddress)}`);
+    if (!response.ok) return null;
+    const body = await response.json() as {wallet_address?: {address?: string}; jetton?: {address?: string}};
+    const wallet = body.wallet_address?.address;
+    if (!wallet || (body.jetton?.address !== undefined && !sameAddress(Address.parse(body.jetton.address), jettonMasterAddress))) return null;
+    return Address.parse(wallet).toString();
+  };
+
+  return {
+    async validateTonJettonWallet({ownerAddress, jettonMasterAddress, walletAddress}) {
+      try {
+        const url = `${base}/v2/accounts/${encodeURIComponent(ownerAddress)}/jettons/${encodeURIComponent(jettonMasterAddress)}`;
+        const response = await request(url, {
+          ...(headers ? {headers} : {}),
+          signal: AbortSignal.timeout(5_000),
+        });
+        if (!response.ok) return false;
+        const body = await response.json() as {
+          wallet_address?: {address?: string};
+          jetton?: {address?: string};
+        };
+        if (!sameAddress(body.wallet_address?.address ? Address.parse(body.wallet_address.address) : null, walletAddress)) return false;
+        return body.jetton?.address === undefined || sameAddress(Address.parse(body.jetton.address), jettonMasterAddress);
+      } catch {
+        return false;
+      }
+    },
+    validateTonEscrowPayload(input: PayloadInput) {
+      try {
+        return validatePayload(input, trusted);
+      } catch {
+        return false;
+      }
+    },
+    /**
+     * EVM→TON: the position the tracking feed named must be (1) an active
+     * contract with the pinned position code, (2) carrying state that binds
+     * this quote, hashlock, recipient, output jetton, amount, deposit and the
+     * pinned timelocks — still inside the completion window — with jetton
+     * custody at the factory's own wallet, and (3) deployed by the trusted
+     * factory itself (its deploy message is only sent after the factory's
+     * jetton wallet notified it of the resolver's transfer). Nothing here
+     * trusts the feed beyond the address it suggested.
+     */
+    async validateTonOutputPosition(input) {
+      try {
+        Address.parse(input.positionAddress);
+        Address.parse(input.recipientAddress);
+        const nowSeconds = Math.floor(now() / 1000);
+        if (!Number.isInteger(input.quoteTimestamp) || input.quoteTimestamp > nowSeconds + 120 || nowSeconds - input.quoteTimestamp > 6 * 60 * 60) return false;
+        const accountResponse = await get(`/v2/blockchain/accounts/${encodeURIComponent(input.positionAddress)}`);
+        if (!accountResponse.ok) return false;
+        const account = await accountResponse.json() as {address?: string; status?: string; code?: string; data?: string};
+        if (!account.address || !sameAddress(Address.parse(account.address), input.positionAddress) || account.status !== "active" || !account.code || !account.data) return false;
+        if (!trusted.position.has(cellFromApi(account.code).hash().toString("hex"))) return false;
+        const jettonWallet = await jettonWalletOf(input.protocolAddress, input.outputJettonMasterAddress);
+        if (!jettonWallet) return false;
+        const state = validateOutputPositionState(cellFromApi(account.data), input, {jettonWallet, trusted, nowSeconds});
+        if (!state) return false;
+        const txResponse = await get(`/v2/blockchain/accounts/${encodeURIComponent(input.positionAddress)}/transactions?limit=25`);
+        if (!txResponse.ok) return false;
+        const body = await txResponse.json() as {transactions?: {success?: boolean; aborted?: boolean; utime?: number; in_msg?: {source?: {address?: string}; op_code?: string}}[]};
+        return (body.transactions ?? []).some((tx) =>
+          tx.success === true && tx.aborted !== true && tx.in_msg?.op_code?.toLowerCase() === POSITION_DEPLOY_OP &&
+          !!tx.in_msg.source?.address && sameAddress(Address.parse(tx.in_msg.source.address), input.protocolAddress) &&
+          typeof tx.utime === "number" && Math.abs(Number(state.withdrawalAt) - 1 - tx.utime) <= 5);
+      } catch {
+        return false;
+      }
+    },
+    /** The contract a swap pays into must carry a recognised DEX code
+     *  interface on the indexer — an EOA, an unknown contract or a fresh
+     *  resolver-deployed proxy is refused. */
+    async validateTonSwapTarget({address}) {
+      try {
+        Address.parse(address);
+        const account = await readAccount(address);
+        if (!account || account.isWallet) return false;
+        if (isDexContract(account)) return true;
+        // Native input on STON.fi: the target is the router's proxy-TON jetton
+        // wallet. Accept it only as "pTON wallet owned by a DEX router" —
+        // both facts read from the chain, never from the quote.
+        if (!account.interfaces.includes("jetton_wallet")) return false;
+        const data = await get(`/v2/blockchain/accounts/${encodeURIComponent(address)}/methods/get_wallet_data`);
+        if (!data.ok) return false;
+        const body = await data.json() as {success?: boolean; decoded?: {owner?: string; jetton?: string}};
+        const owner = body.decoded?.owner;
+        const master = body.decoded?.jetton;
+        if (!body.success || !owner || !master || !proxyTonMasters.has(Address.parse(master).toRawString())) return false;
+        const ownerAccount = await readAccount(owner);
+        return ownerAccount !== null && isDexContract(ownerAccount);
+      } catch {
+        return false;
+      }
+    },
+  };
+}

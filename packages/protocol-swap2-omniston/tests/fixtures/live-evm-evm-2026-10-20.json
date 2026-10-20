@@ -1,0 +1,274 @@
+{
+ "capturedAt": "2026-10-20T13:15:16.643Z",
+ "note": "EVM→EVM order payloads, fixed test secret, never signed (no funds)",
+ "chains": {
+  "baseToArbitrum": {
+   "chainId": 8453,
+   "inputAsset": {
+    "chain": {
+     "$case": "base",
+     "value": {
+      "kind": {
+       "$case": "erc20",
+       "value": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+      }
+     }
+    }
+   },
+   "rfqId": "5c269077b234879a5b37a72539cbc9e7ed99da630f3506100e05853f086039b5",
+   "quoteUpdated": {
+    "rfqId": "5c269077b234879a5b37a72539cbc9e7ed99da630f3506100e05853f086039b5",
+    "quoteId": "eb1f2e39c60d7e1ecc0e4edbf6ce7f835c153999e0b661af3332226b84407124",
+    "resolverId": "EQDE_TwSRO95P4fWSeCaIqIBgVubITNHQIOicLkiYJb4mQ-r",
+    "resolverName": "Arbiter",
+    "inputAsset": {
+     "chain": {
+      "$case": "base",
+      "value": {
+       "kind": {
+        "$case": "erc20",
+        "value": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "arbitrum",
+      "value": {
+       "kind": {
+        "$case": "erc20",
+        "value": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9"
+       }
+      }
+     }
+    },
+    "inputUnits": "20000000",
+    "outputUnits": "19966674",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "5991",
+    "quoteTimestamp": 1792502117,
+    "estimatedSettlementDuration": 15,
+    "settlementData": {
+     "$case": "order",
+     "value": {
+      "srcProtocolContractAddress": {
+       "chain": {
+        "$case": "base",
+        "value": "0xe7405fAcDEDB2512e91F2886BDff13231343aF5E"
+       }
+      },
+      "srcWrappedNativeTokenAddress": {
+       "chain": {
+        "$case": "base",
+        "value": "0x4200000000000000000000000000000000000006"
+       }
+      },
+      "srcInitialResolverAddress": {
+       "chain": {
+        "$case": "base",
+        "value": "0x2b654E50C83801AC79CE3011Ff94245E2937b1B7"
+       }
+      },
+      "srcHtlcSecurityDepositAsset": {
+       "chain": {
+        "$case": "base",
+        "value": {
+         "kind": {
+          "$case": "erc20",
+          "value": "0x4200000000000000000000000000000000000006"
+         }
+        }
+       }
+      },
+      "srcHtlcSecurityDepositUnits": "600000000000000",
+      "htlcHashingFunction": "HASHING_FUNCTION_KECCAK256",
+      "dstProtocolContractAddress": {
+       "chain": {
+        "$case": "arbitrum",
+        "value": "0xafCF681272AF10959736f45616eeCBC22D7095E2"
+       }
+      },
+      "resolverSendsUnits": "19972665",
+      "dstWrappedNativeTokenAddress": {
+       "chain": {
+        "$case": "arbitrum",
+        "value": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
+       }
+      },
+      "dstSecurityDepositAsset": {
+       "chain": {
+        "$case": "arbitrum",
+        "value": {
+         "kind": {
+          "$case": "erc20",
+          "value": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
+         }
+        }
+       }
+      },
+      "dstSecurityDepositUnits": "600000000000000",
+      "tradeStartDeadline": 1792502417,
+      "exclusivityTimeout": 300,
+      "integratorFeePips": 0,
+      "protocolFeePips": 300,
+      "protocolFeeRecipientAddress": {
+       "chain": {
+        "$case": "arbitrum",
+        "value": "0x076268146B4EC6D21fc49C27586Cfa91B9079a00"
+       }
+      }
+     }
+    },
+    "gasBudget": "0",
+    "estimatedGasConsumption": "0"
+   },
+   "buildRequest": {
+    "quoteId": "eb1f2e39c60d7e1ecc0e4edbf6ce7f835c153999e0b661af3332226b84407124",
+    "ownerSrcAddress": "0x4444444444444444444444444444444444444444",
+    "traderDstAddress": "0x3333333333333333333333333333333333333333",
+    "secretHex": "1111111111111111111111111111111111111111111111111111111111111111",
+    "secretHashHex": "b569321de72d0af89c2fb48a484de3fc9343f31600ae1f3e13d633cb48cbf816"
+   },
+   "payload": {
+    "typedData": "{\"domain\":{\"name\":\"1inch Limit Order Protocol\",\"version\":\"4\",\"chainId\":\"0x2105\",\"verifyingContract\":\"0xe7405facdedb2512e91f2886bdff13231343af5e\"},\"types\":{\"EIP712Domain\":[{\"type\":\"string\",\"name\":\"name\"},{\"type\":\"string\",\"name\":\"version\"},{\"type\":\"uint256\",\"name\":\"chainId\"},{\"type\":\"address\",\"name\":\"verifyingContract\"}],\"Order\":[{\"type\":\"uint256\",\"name\":\"salt\"},{\"type\":\"address\",\"name\":\"maker\"},{\"type\":\"address\",\"name\":\"receiver\"},{\"type\":\"address\",\"name\":\"makerAsset\"},{\"type\":\"address\",\"name\":\"takerAsset\"},{\"type\":\"uint256\",\"name\":\"makingAmount\"},{\"type\":\"uint256\",\"name\":\"takingAmount\"},{\"type\":\"uint256\",\"name\":\"makerTraits\"}]},\"primaryType\":\"Order\",\"message\":{\"salt\":\"0x2dcc029b18b910c1039c3454ab2fe03c3cae30ca\",\"maker\":\"0x4444444444444444444444444444444444444444\",\"receiver\":\"0x2b654e50c83801ac79ce3011ff94245e2937b1b7\",\"makerAsset\":\"0x833589fcd6edb6e08f4c7c32d4f71b54bda02913\",\"takerAsset\":\"0xbddba5647d24c4a513f8f85e596b111b511a6e5e\",\"makingAmount\":\"0x1312d00\",\"takingAmount\":\"0x130c239\",\"makerTraits\":\"0xa0000000000000000000000a15973b598006ad76a9100000000000000000000\"}}",
+    "orderExtensionHex": "00000193000000a0000000a0000000a0000000a0000000500000000000000000aca3e2f9b61a44892926bc6c3e104192e7d1c3cd000000000000006ad769650007080dbba0050c350000640aae6000640927c0006407a1200064061a800064000064001e32013011ff94245e2937b1b7aca3e2f9b61a44892926bc6c3e104192e7d1c3cd000000000000006ad769650007080dbba0050c350000640aae6000640927c0006407a1200064061a800064000064001e32013011ff94245e2937b1b7aca3e2f9b61a44892926bc6c3e104192e7d1c3cd0000000000000000000000000000000000000000076268146b4ec6d21fc49c27586cfa91b9079a00000064001e326ad76956013011ff94245e2937b1b70000b569321de72d0af89c2fb48a484de3fc9343f31600ae1f3e13d633cb48cbf816000000000000000000000000000000000000000000000000000000000000a4b1000000000000000000000000fd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb90000000000000000000221b262dd80000000000000000000000221b262dd800000000000000000b400000078000000010000012c000000f00000007800000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000eb1f2e39c60d7e1ecc0e4edbf6ce7f835c153999e0b661af3332226b84407124",
+    "serializedOrderDetailsHex": "0ac2010a4065623166326533396336306437653165636330653465646266366365376638333563313533393939653062363631616633333332323236623834343037313234122e0a2c122a3078466430383662433743443543343831444343394338356562453437384131433062363946436262391a2c0a2a3078333333333333333333333333333333333333333333333333333333333333333333333333333333332a20b569321de72d0af89c2fb48a484de3fc9343f31600ae1f3e13d633cb48cbf816"
+   }
+  },
+  "plasmaToBase": {
+   "chainId": 9745,
+   "inputAsset": {
+    "chain": {
+     "$case": "plasma",
+     "value": {
+      "kind": {
+       "$case": "erc20",
+       "value": "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb"
+      }
+     }
+    }
+   },
+   "rfqId": "4328b9eb59a6ecd64183f487fb6f7b9ceb8cc83085379edbc4f0feec50a4118d",
+   "quoteUpdated": {
+    "rfqId": "4328b9eb59a6ecd64183f487fb6f7b9ceb8cc83085379edbc4f0feec50a4118d",
+    "quoteId": "f03f9d79e99b43f80d864fb4fd9b083ad8ac7314c93bc7007a9e97010a40c614",
+    "resolverId": "EQDE_TwSRO95P4fWSeCaIqIBgVubITNHQIOicLkiYJb4mQ-r",
+    "resolverName": "Arbiter",
+    "inputAsset": {
+     "chain": {
+      "$case": "plasma",
+      "value": {
+       "kind": {
+        "$case": "erc20",
+        "value": "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb"
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "base",
+      "value": {
+       "kind": {
+        "$case": "erc20",
+        "value": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+       }
+      }
+     }
+    },
+    "inputUnits": "20000000",
+    "outputUnits": "19956231",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "5988",
+    "quoteTimestamp": 1792502117,
+    "estimatedSettlementDuration": 18,
+    "settlementData": {
+     "$case": "order",
+     "value": {
+      "srcProtocolContractAddress": {
+       "chain": {
+        "$case": "plasma",
+        "value": "0xb5810aCfD45D85Eaa938bF90a5857295513DA7E9"
+       }
+      },
+      "srcWrappedNativeTokenAddress": {
+       "chain": {
+        "$case": "plasma",
+        "value": "0x6100E367285b01F48D07953803A2d8dCA5D19873"
+       }
+      },
+      "srcInitialResolverAddress": {
+       "chain": {
+        "$case": "plasma",
+        "value": "0x2b654E50C83801AC79CE3011Ff94245E2937b1B7"
+       }
+      },
+      "srcHtlcSecurityDepositAsset": {
+       "chain": {
+        "$case": "plasma",
+        "value": {
+         "kind": {
+          "$case": "erc20",
+          "value": "0x6100E367285b01F48D07953803A2d8dCA5D19873"
+         }
+        }
+       }
+      },
+      "srcHtlcSecurityDepositUnits": "215000000000000000",
+      "htlcHashingFunction": "HASHING_FUNCTION_KECCAK256",
+      "dstProtocolContractAddress": {
+       "chain": {
+        "$case": "base",
+        "value": "0xACa3E2F9b61a44892926bC6c3e104192E7D1c3cd"
+       }
+      },
+      "resolverSendsUnits": "19962219",
+      "dstWrappedNativeTokenAddress": {
+       "chain": {
+        "$case": "base",
+        "value": "0x4200000000000000000000000000000000000006"
+       }
+      },
+      "dstSecurityDepositAsset": {
+       "chain": {
+        "$case": "base",
+        "value": {
+         "kind": {
+          "$case": "erc20",
+          "value": "0x4200000000000000000000000000000000000006"
+         }
+        }
+       }
+      },
+      "dstSecurityDepositUnits": "600000000000000",
+      "tradeStartDeadline": 1792502417,
+      "exclusivityTimeout": 300,
+      "integratorFeePips": 0,
+      "protocolFeePips": 300,
+      "protocolFeeRecipientAddress": {
+       "chain": {
+        "$case": "base",
+        "value": "0x076268146B4EC6D21fc49C27586Cfa91B9079a00"
+       }
+      }
+     }
+    },
+    "gasBudget": "0",
+    "estimatedGasConsumption": "0"
+   },
+   "buildRequest": {
+    "quoteId": "f03f9d79e99b43f80d864fb4fd9b083ad8ac7314c93bc7007a9e97010a40c614",
+    "ownerSrcAddress": "0x4444444444444444444444444444444444444444",
+    "traderDstAddress": "0x3333333333333333333333333333333333333333",
+    "secretHex": "1111111111111111111111111111111111111111111111111111111111111111",
+    "secretHashHex": "b569321de72d0af89c2fb48a484de3fc9343f31600ae1f3e13d633cb48cbf816"
+   },
+   "payload": {
+    "typedData": "{\"domain\":{\"name\":\"1inch Limit Order Protocol\",\"version\":\"4\",\"chainId\":\"0x2611\",\"verifyingContract\":\"0xb5810acfd45d85eaa938bf90a5857295513da7e9\"},\"types\":{\"EIP712Domain\":[{\"type\":\"string\",\"name\":\"name\"},{\"type\":\"string\",\"name\":\"version\"},{\"type\":\"uint256\",\"name\":\"chainId\"},{\"type\":\"address\",\"name\":\"verifyingContract\"}],\"Order\":[{\"type\":\"uint256\",\"name\":\"salt\"},{\"type\":\"address\",\"name\":\"maker\"},{\"type\":\"address\",\"name\":\"receiver\"},{\"type\":\"address\",\"name\":\"makerAsset\"},{\"type\":\"address\",\"name\":\"takerAsset\"},{\"type\":\"uint256\",\"name\":\"makingAmount\"},{\"type\":\"uint256\",\"name\":\"takingAmount\"},{\"type\":\"uint256\",\"name\":\"makerTraits\"}]},\"primaryType\":\"Order\",\"message\":{\"salt\":\"0x920bc339fc5a0888a66a80ec3e9156e17b8e5549\",\"maker\":\"0x4444444444444444444444444444444444444444\",\"receiver\":\"0x2b654e50c83801ac79ce3011ff94245e2937b1b7\",\"makerAsset\":\"0xb8ce59fc3717ada4c02eadf9682a9e934f625ebb\",\"takerAsset\":\"0xc075c1d62098c9121306135234535bb430e0de43\",\"makingAmount\":\"0x1312d00\",\"takingAmount\":\"0x130996b\",\"makerTraits\":\"0xa0000000000000000000000a15973b891006ad76a9200000000000000000000\"}}",
+    "orderExtensionHex": "00000193000000a0000000a0000000a0000000a0000000500000000000000000d602079afa5c38f550510a2a988cbfa698fa0189000000000000006ad769660007080dbba0050c350000640aae6000640927c0006407a1200064061a800064000064001e32013011ff94245e2937b1b7d602079afa5c38f550510a2a988cbfa698fa0189000000000000006ad769660007080dbba0050c350000640aae6000640927c0006407a1200064061a800064000064001e32013011ff94245e2937b1b7d602079afa5c38f550510a2a988cbfa698fa01890000000000000000000000000000000000000000076268146b4ec6d21fc49c27586cfa91b9079a00000064001e326ad76957013011ff94245e2937b1b70000b569321de72d0af89c2fb48a484de3fc9343f31600ae1f3e13d633cb48cbf8160000000000000000000000000000000000000000000000000000000000002105000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000002fbd55c62b580000000000000000000000221b262dd800000000000000000b400000078000000010000012c000000f00000007800000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f03f9d79e99b43f80d864fb4fd9b083ad8ac7314c93bc7007a9e97010a40c614",
+    "serializedOrderDetailsHex": "0ac2010a4066303366396437396539396234336638306438363466623466643962303833616438616337333134633933626337303037613965393730313061343063363134122e1a2c122a3078383333353839664344366544623645303866346337433332443466373162353462644130323931331a2c1a2a3078333333333333333333333333333333333333333333333333333333333333333333333333333333332a20b569321de72d0af89c2fb48a484de3fc9343f31600ae1f3e13d633cb48cbf816"
+   }
+  }
+ }
+}
