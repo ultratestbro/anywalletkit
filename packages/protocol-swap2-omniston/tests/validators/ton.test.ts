@@ -293,7 +293,7 @@ describe("Omniston TON output position (EVM→TON) validator", () => {
   function stateCell(over: {
     quoteId?: string; factory?: string; jettonWallet?: string; master?: string; hashlock?: Buffer; amount?: bigint;
     withdrawalAt?: bigint; publicWithdrawalAt?: bigint; cancellationAt?: bigint; recipient?: string; deposit?: bigint; authority?: string; escrow?: Cell;
-    authorityAddress?: string | null;
+    authorityAddress?: string | null; tailBits?: number;
   } = {}): Cell {
     const withdrawalAt = over.withdrawalAt ?? BigInt(DEPLOYED_AT + 1);
     const fees = beginCell().storeAddress(new Address(0, Buffer.alloc(32, 9))).storeUint(200, 64).storeUint(0, 32).endCell();
@@ -307,7 +307,7 @@ describe("Omniston TON output position (EVM→TON) validator", () => {
       .storeRef(terms).storeRef(authority).endCell();
     return beginCell()
       .storeUint(3, 8).storeBuffer(Buffer.from(over.quoteId ?? QUOTE, "hex"))
-      .storeAddress(Address.parse(over.factory ?? FACTORY)).storeAddress(Address.parse(over.jettonWallet ?? JETTON_WALLET_OF_FACTORY)).storeUint(0, 5)
+      .storeAddress(Address.parse(over.factory ?? FACTORY)).storeAddress(Address.parse(over.jettonWallet ?? JETTON_WALLET_OF_FACTORY)).storeUint(0, over.tailBits ?? 5)
       .storeRef(parties).storeRef(lock).storeRef(over.escrow ?? escrowCode).endCell();
   }
 
@@ -346,6 +346,11 @@ describe("Omniston TON output position (EVM→TON) validator", () => {
 
   it("accepts addr_none in the authority cell — EVM-source positions carry no TON authority address (live 2026-10-20, every Base → TON order); the payout target is bound in the terms cell", async () => {
     await expect(validators(api({data: stateCell({authorityAddress: null})})).validateTonOutputPosition!(input)).resolves.toBe(true);
+  });
+
+  it("accepts the live (tag 1) root layout with a 29-bit tail — what a position looks like while it awaits completion (live 2026-10-20); a foreign tail width is refused", async () => {
+    await expect(validators(api({data: stateCell({tailBits: 29})})).validateTonOutputPosition!(input)).resolves.toBe(true);
+    await expect(validators(api({data: stateCell({tailBits: 13})})).validateTonOutputPosition!(input)).resolves.toBe(false);
   });
 
   it("refuses every state field that drifts from the quote", async () => {

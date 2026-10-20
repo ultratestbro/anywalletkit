@@ -137,7 +137,11 @@ function validateOutputPositionState(
   if (!sameHex(root.loadBuffer(32), input.quoteId.padStart(64, "0"))) { lastStateRefusal = "state#4: if (!sameHex(root.loadBuffer(32), input.quoteId.padStart(64, \"0\"))) return null;"; return null; }
   if (!sameAddress(root.loadAddressAny(), input.protocolAddress)) { lastStateRefusal = "state#5: if (!sameAddress(root.loadAddressAny(), input.protocolAddress)) return null;"; return null; }
   if (!sameAddress(root.loadAddressAny(), expected.jettonWallet)) { lastStateRefusal = "state#6: if (!sameAddress(root.loadAddressAny(), expected.jettonWallet)) return null;"; return null; }
-  if (root.remainingBits !== 5 || root.remainingRefs !== 3) { lastStateRefusal = "state#7: if (root.remainingBits !== 5 || root.remainingRefs !== 3) return null;"; return null; }
+  // Root tail: 5 bits once the position is settled or rolled back (tag 2 / 3 — the shape the
+  // fixtures were cut from), 29 bits while it is live and awaiting completion (tag 1, live
+  // 2026-10-20 on every Base → TON position; the 24 extra bits are not fund-critical — every
+  // binding field is checked in the refs below). Any other width is a foreign layout.
+  if ((root.remainingBits !== 5 && root.remainingBits !== 29) || root.remainingRefs !== 3) { lastStateRefusal = `state#7: root tail ${root.remainingBits} bits / ${root.remainingRefs} refs`; return null; }
 
   const parties = data.refs[0]!;
   if (parties.refs.length !== 2) { lastStateRefusal = "state#8: if (parties.refs.length !== 2) return null;"; return null; }
