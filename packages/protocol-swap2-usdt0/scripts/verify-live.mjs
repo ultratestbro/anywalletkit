@@ -14,6 +14,7 @@ const PUBLIC_RPC = {
   137: "https://polygon-bor-rpc.publicnode.com", 999: "https://rpc.hyperliquid.xyz/evm", 57073: "https://rpc-gel.inkonchain.com",
   80094: "https://rpc.berachain.com", 130: "https://unichain-rpc.publicnode.com", 1329: "https://sei-evm-rpc.publicnode.com",
   9745: "https://rpc.plasma.to", 143: "https://rpc.monad.xyz", 4326: "https://mainnet.megaeth.com/rpc", 196: "https://rpc.xlayer.tech",
+  5000: "https://rpc.mantle.xyz", 2818: "https://rpc.morphl2.io", 14: "https://flare-api.flare.network/ext/C/rpc",
 };
 const rpcUrls = Object.fromEntries(Object.values(USDT0_CHAINS).map((c) => [c.caip2, process.env[`RPC_${c.chainId}`] ?? PUBLIC_RPC[c.chainId]]));
 const ABI = parseAbi([

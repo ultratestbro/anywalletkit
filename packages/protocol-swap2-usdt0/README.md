@@ -1,7 +1,7 @@
 # @forgewallet/protocol-swap2-usdt0
 
 [USDT0](https://docs.usdt0.to) — Tether's USDT as a LayerZero OFT — as a swap2
-provider: USDT / USDT0 between 13 EVM chains in **one source transaction**.
+provider: USDT / USDT0 between 16 EVM chains in **one source transaction**.
 `send(SendParam, MessagingFee, refund)` on the chain's OFT with the LayerZero
 messaging fee as `msg.value`; LayerZero's DVNs verify the packet and the
 executor delivers on the destination (USDT0 minted, or USDT released from the
@@ -64,9 +64,9 @@ not from an API.
 - **Deployments** (docs.usdt0.to, every address re-read on-chain 2026-10-20):
   Ethereum (eid 30101, adapter), Arbitrum 30110, OP Mainnet 30111, Polygon
   30109, HyperEVM 30367, Ink 30339, Berachain 30362, Unichain 30320, Sei
-  30280, Plasma 30383, Monad 30390, MegaETH 30398, X Layer 30274. USDT0 is
-  also live on Conflux eSpace, Flare, Hedera, Mantle, Morph, Rootstock,
-  Stable, Tempo, HyperCore, IOTA and Stellar — not wallet chains here yet.
+  30280, Plasma 30383, Monad 30390, MegaETH 30398, X Layer 30274, Mantle 30181, Morph 30322, Flare 30295. USDT0 is also live on
+  Conflux eSpace, Hedera, Rootstock, Stable, Tempo, HyperCore, IOTA and Stellar —
+  not wallet chains here yet.
   OP's catalog `USDT` is the legacy bridged token (not the OFT); `USDT0` is.
 
 ## Tests

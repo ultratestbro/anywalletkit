@@ -114,10 +114,10 @@ const scanMessage = (status: string, extra: Record<string, unknown> = {}) => ({
 afterEach(() => vi.unstubAllGlobals());
 
 describe("config", () => {
-  it("13 deployments, 6-decimal USDT0, only Ethereum is an adapter; selectors match the ABI", () => {
-    expect(Object.keys(USDT0_CHAINS)).toHaveLength(13);
+  it("16 deployments, 6-decimal USDT0, only Ethereum is an adapter; selectors match the ABI", () => {
+    expect(Object.keys(USDT0_CHAINS)).toHaveLength(16);
     expect(Object.values(USDT0_CHAINS).filter((c) => c.adapter).map((c) => c.chainId)).toEqual([1]);
-    expect(new Set(Object.values(USDT0_CHAINS).map((c) => c.eid)).size).toBe(13);
+    expect(new Set(Object.values(USDT0_CHAINS).map((c) => c.eid)).size).toBe(16);
     expect(USDT0_SEND).toBe(toFunctionSelector("send((uint32,bytes32,uint256,uint256,bytes,bytes,bytes),(uint256,uint256),address)"));
     expect(LZ_RECEIVE).toBe(toFunctionSelector("lzReceive((uint32,bytes32,uint64),address,bytes32,bytes,bytes)"));
     expect(USDT0_STATUS_MAP.DELIVERED).toBe("completed");
