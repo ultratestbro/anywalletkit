@@ -1,0 +1,99 @@
+---
+title: Quickstart
+description: One seed phrase → accounts on seven chains, balances, a transfer, a signature and safety policies.
+sidebar:
+  order: 3
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+This page builds a wallet on Ethereum, Base, Bitcoin, Solana, TON, Tron and NEAR from one
+seed phrase. Every snippet comes from `examples/quickstart` in the SDK repository, which
+our CI compiles and runs on every change.
+
+## 1. Imports
+
+<Snippet file="quickstart/src/wallet.ts" region="imports" />
+
+## 2. Chain ids
+
+The SDK names chains with [CAIP-2](/concepts/chain-ids/) ids: one string format for every
+ecosystem.
+
+<Snippet file="quickstart/src/wallet.ts" region="chains" />
+
+## 3. A seed phrase
+
+<Snippet file="quickstart/src/wallet.ts" region="seed" />
+
+:::danger[Store it safely]
+The seed phrase is the user's money. Keep it in the platform keystore (iOS Keychain /
+Android Keystore) behind biometrics, never in plain storage, logs or analytics.
+:::
+
+## 4. Create the wallet
+
+`Wallet` is the orchestrator from `@anywalletkit/kit`. Register one chain package per
+chain (or per chain family), each with its own RPC endpoint. Managers are built lazily,
+on first use.
+
+<Snippet file="quickstart/src/wallet.ts" region="create" />
+
+:::tip
+Public endpoints are fine to start with. For production use your own RPC provider:
+every `provider` / `client` option also accepts a list, which fails over in order.
+:::
+
+## 5. Addresses
+
+<Snippet file="quickstart/src/wallet.ts" region="addresses" />
+
+Addresses are derived on the device, with no network calls. Every EVM network shares the
+same address. The default derivation paths are the common ones (MetaMask on EVM, Phantom
+on Solana and so on), so a user who imports a seed phrase from another wallet usually finds
+their funds. The paths are listed in [Packages](/getting-started/packages/#chains).
+
+## 6. Balances
+
+Amounts are always `bigint` in the chain's base units (wei, satoshi, lamports, nanotons…).
+Format them for display yourself; never do money math with floating point numbers.
+
+<Snippet file="quickstart/src/wallet.ts" region="balance" />
+
+## 7. Send
+
+Every account has the same `transfer` call on every chain. Quote the fee first, show it
+to the user, then send:
+
+<Snippet file="quickstart/src/wallet.ts" region="transfer" />
+
+`transfer` simulates the transaction before signing it. A transaction that would revert
+is refused before anything is signed.
+
+## 8. Sign a message
+
+<Snippet file="quickstart/src/wallet.ts" region="sign" />
+
+## 9. Policies
+
+Policies run before **every** signature and broadcast, including those made by
+protocol modules (swaps, staking…) through the same account. Pass them when you create
+the wallet:
+
+<Snippet file="quickstart/src/wallet.ts" region="policies" />
+
+```ts
+const wallet = createWallet(seedPhrase, policies)
+```
+
+More in [Policies](/concepts/policies/).
+
+## 10. Clean up
+
+`wallet.dispose()` overwrites the seed and every derived key in memory with zeros. Call
+it when the wallet locks or the user signs out, and build a new `Wallet` when they
+unlock.
+
+```ts
+wallet.dispose()
+```

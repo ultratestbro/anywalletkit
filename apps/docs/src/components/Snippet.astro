@@ -1,0 +1,27 @@
+---
+// Renders one `// #region <name>` block of a file in /examples. The examples run in CI,
+// so a snippet on the site is code that compiled and passed its tests.
+// Package names are shown under the public scope (the repo still uses the working name).
+import { Code } from '@astrojs/starlight/components'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+interface Props {
+  /** Path under /examples, e.g. "quickstart/src/wallet.ts". */
+  file: string
+  region: string
+  title?: string
+}
+const { file, region, title } = Astro.props
+const path = resolve(process.cwd(), '../../examples', file)
+const lines = readFileSync(path, 'utf8').split('\n')
+const start = lines.findIndex((l) => l.trim() === `// #region ${region}`)
+const end = lines.findIndex((l, i) => i > start && l.trim() === `// #endregion ${region}`)
+if (start < 0 || end < 0) throw new Error(`Snippet: region "${region}" not found in examples/${file}`)
+const body = lines.slice(start + 1, end).filter((l) => !/^\s*\/\/ #(end)?region\b/.test(l))
+const indent = Math.min(...body.filter((l) => l.trim()).map((l) => l.match(/^ */)![0].length))
+const code = body.map((l) => l.slice(indent)).join('\n').replaceAll('@forgewallet/', '@anywalletkit/').trim()
+const lang = file.split('.').pop() === 'tsx' ? 'tsx' : 'ts'
+---
+
+<Code code={code} lang={lang} title={title} />

@@ -2,7 +2,7 @@
 title: Packages
 description: Every Any Wallet Kit package, grouped by layer.
 sidebar:
-  order: 2
+  order: 4
 ---
 
 Install only what your wallet uses. Every package is published under the `@anywalletkit/` scope.

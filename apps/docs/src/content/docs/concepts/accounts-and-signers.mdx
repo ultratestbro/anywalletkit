@@ -1,0 +1,84 @@
+---
+title: Accounts and signers
+description: How Wallet, chain managers, accounts and signers fit together, and where the private key lives.
+sidebar:
+  order: 1
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+## Four pieces
+
+| Piece | Package | Job |
+|---|---|---|
+| `Wallet` | `kit` | The orchestrator. Holds one seed phrase or signer, knows which chain package serves which chain, hands out accounts wrapped in your [policies](/concepts/policies/). |
+| Chain manager (`WalletManagerEvm`, `WalletManagerSolana`…) | `wallet-*` | Derives accounts for one chain family and shares the RPC configuration between them. |
+| Account | `wallet-*` | One address on one chain: balances, fee quotes, transfers, signatures. |
+| `Signer` | `core` | The **only** place a private key exists. It turns bytes into a signature and does nothing else. |
+
+Accounts build transactions and talk to the network. The signer never touches the network
+and the account never touches the key. Because of that split, the key can live somewhere
+else entirely: a hardware wallet, an MPC node, a backend.
+
+## The account interface
+
+Every account on every chain implements the same interface (`IWalletAccount` from
+`@anywalletkit/core`). Protocol modules are written against it, which is why one swap or
+staking module works with any wallet built on the SDK.
+
+| Method | What it does |
+|---|---|
+| `chain` | The account's [CAIP-2 chain id](/concepts/chain-ids/) |
+| `getAddress()` | The address in the chain's usual format |
+| `getBalance()` / `getTokenBalance(token)` | Balance in base units, as `bigint` |
+| `quoteTransfer(options)` / `quoteSendTransaction(tx)` | The network fee, with nothing signed |
+| `transfer({ recipient, amount, token? })` | Build, check, sign and broadcast a native or token transfer |
+| `sendTransaction(tx)` | Sign and broadcast a transaction in the chain's own format |
+| `signTransaction(tx)` | Sign without broadcasting |
+| `sign(message)` / `verify(message, signature)` | Message signatures the chain's usual way (EIP-191, BIP-137, ed25519…) |
+| `getTransactionReceipt(hash)` | `{ status: 1 }` once confirmed, `{ status: 0 }` if it failed, `undefined` while pending |
+| `toReadOnlyAccount()` | The same address without signing ability |
+| `dispose()` | Overwrite this account's key material with zeros |
+
+Chain packages add chain-specific methods on top (EIP-712 typed data on EVM, jetton
+transfers on TON, PSBTs on Bitcoin…). Those are listed in each package's API reference.
+
+## Read-only accounts
+
+A read-only account can read balances, quote fees and check receipts, but has no key.
+Use one for watch-only addresses, or to pass a protocol module an account that can only
+quote. Every chain manager has `getReadOnlyAccount(address)`, and every account has
+`toReadOnlyAccount()`.
+
+## Signers
+
+There are three kinds:
+
+| `kind` | Where the key is | Made with |
+|---|---|---|
+| `seed` | Derived on the device from the seed phrase | `new Wallet(seedPhrase)` does this for you |
+| `key` | One imported private key: a single account, nothing to derive | `privateKeySigner(curve, key)` from `core` |
+| `external` | Outside the app: hardware wallet, Safe, MPC, backend | `externalSigner()` from `core` |
+
+An external signer receives exactly what it must sign (a 32-byte digest for secp256k1
+chains, message bytes for ed25519 chains) plus a `context` such as `evm-tx` or
+`solana-message`, so a device can show the right prompt.
+
+<Snippet file="quickstart/src/signer.ts" region="external" />
+
+A signer works on one curve: `secp256k1` (EVM, Bitcoin, Tron, Zcash) or `ed25519` (Solana,
+TON, NEAR). A `Wallet` built on an external signer serves the chains of that curve. An
+external signer also holds a single key, so it gives you one account (index `0`).
+
+## Disposal
+
+Everything that holds a key has `dispose()`. It overwrites the key bytes in memory with
+zeros, and the object is unusable afterwards. `wallet.dispose()` disposes every manager,
+every account and the signer. Call it when the app locks.
+
+:::caution[Seed phrases as strings]
+A JavaScript string cannot be wiped from memory. `new Wallet(seedPhrase)` keeps the phrase
+string until the wallet is garbage-collected, because chain managers are built on first use.
+Keep that window short (build the wallet, use it, dispose it), or keep the seed as bytes and
+pass the SDK a signer instead of the words.
+:::

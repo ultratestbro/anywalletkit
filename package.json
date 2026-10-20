@@ -20,7 +20,9 @@
     "registry:check": "node scripts/build-registry.mjs && git diff --exit-code registry/modules.json",
     "watch": "node scripts/watch/watch.mjs",
     "watch:baseline": "node scripts/watch/watch.mjs --baseline",
-    "vendor": "node scripts/vendor.mjs"
+    "vendor": "node scripts/vendor.mjs",
+    "test:examples": "pnpm --filter @forgewallet/example-quickstart typecheck && pnpm --filter @forgewallet/example-quickstart test",
+    "docs:build": "pnpm --filter awk-docs build"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
