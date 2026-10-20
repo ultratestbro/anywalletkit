@@ -7,7 +7,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check": "astro check"
+    "check": "astro check",
+    "deploy": "astro build && VERCEL_ORG_ID=team_5bLfb7TWy44YJd4JiMATQRlG VERCEL_PROJECT_ID=prj_m5fWV8jU8gXOYMIamSFssG7xIy2o vercel deploy dist --prod --yes"
   },
   "dependencies": {
     "@astrojs/starlight": "0.42.6",
