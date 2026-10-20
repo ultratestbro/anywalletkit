@@ -1,0 +1,167 @@
+---
+title: Approvals
+description: Find every token approval an account has granted, flag the risky ones, and revoke them one by one or all at once.
+sidebar:
+  order: 3
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+Every swap, bridge and lending deposit leaves an approval behind: a contract that may move the
+user's tokens later. The approvals module finds them, flags the risky ones and revokes them
+through the account, so the user can answer "who can spend my USDC?" in your app.
+
+| Standard | What it is | How it is revoked |
+|---|---|---|
+| `erc20` | Token allowance (`approve`) | `approve(spender, 0)` |
+| `erc721-token` | One NFT approved to one address | `approve(0x0, tokenId)` |
+| `erc721`, `erc1155` | Operator over a whole collection (`setApprovalForAll`) | `setApprovalForAll(operator, false)` |
+| `permit2` | Uniswap Permit2 allowance | Permit2 `lockdown`, several in one transaction |
+| `eip7702` | The account's EIP-7702 delegation | A type-4 transaction (`revokeDelegation`) |
+
+The module is EVM only for now. Snippets come from `examples/approvals`, which our CI
+typechecks and tests.
+
+```sh
+pnpm add @anywalletkit/protocol-approvals-evm
+```
+
+## Set up
+
+<Snippet file="approvals/src/approvals.ts" region="setup" />
+
+Discovery asks for every approval event whose owner is the account, across all contracts.
+That is an `eth_getLogs` call with no `address` filter, and **most free public RPCs refuse
+it** (publicnode, for one, answers "Please specify an address"). Use your own node or a paid
+plan for `logsRpc`, or switch discovery to an indexer (see [below](#a-faster-first-scan)).
+Revokes don't use `logsRpc`: they go out through the account's own provider.
+
+Two settings decide how long a scan takes:
+
+- **`fromBlock`.** A scan starts here. Pass the block your app created the wallet in: no
+  approval can be older. An imported wallet has no such block; use an indexer for its first
+  scan.
+- **`blockRange`.** The largest `eth_getLogs` window your RPC accepts (QuickNode: 10 000).
+  A range the node refuses is halved and retried. A block that still fails becomes a gap
+  in `coverage` instead of an error.
+
+### Cache
+
+Give the module a cache, and the next scan reads only the blocks since the last one:
+
+<Snippet file="approvals/src/approvals.ts" region="cache" />
+
+An entry is plain JSON keyed by `chainId:owner`. Store it wherever your app keeps state.
+Only complete scans are written.
+
+## List approvals
+
+<Snippet file="approvals/src/approvals.ts" region="scan" />
+
+The events only say which pairs to check. The values come from the chain as it is now:
+`allowance`, `isApprovedForAll`, `getApproved` and the Permit2 `allowance`, read in one
+Multicall3 call. Anything already used up, expired or revoked is dropped (pass
+`includeZero: true` to keep it).
+
+| Field | Meaning |
+|---|---|
+| `id` | Stable key: `chainId:standard:token:spender[:tokenId]` |
+| `token`, `spender` | The contract approved, and who may spend from it |
+| `amount` | Allowance in base units; `null` for operators and delegations |
+| `unlimited` | 2²⁵⁵ or more, or the Permit2 maximum |
+| `risks` | `unlimited`; `eoa-spender` (the spender has no code, a classic drainer sign); `expired` (Permit2, with `includeZero`) |
+| `expiration` | Unix seconds, Permit2 only |
+| `spenderLabel` | Verified contract name, when a `labels` resolver is set |
+
+`getApprovals` filters by `standards`, `tokens` and `spenders`, and takes `fromBlock` /
+`toBlock` for one-off ranges. An explicit `fromBlock` bypasses the cache.
+
+### Spender names
+
+A raw spender address means nothing to the user. `EtherscanLabels` turns verified contracts
+into their verified contract names:
+
+```ts
+import { EtherscanLabels } from '@anywalletkit/protocol-approvals-evm'
+
+config: { labels: new EtherscanLabels({ chainId: 1, baseUrl: 'https://your-proxy/etherscan' }) }
+```
+
+Keep the Etherscan key on your server: point `baseUrl` at a proxy that adds it. A label
+lookup that fails leaves `spenderLabel` empty and never fails the scan.
+
+## A faster first scan
+
+An indexer returns the whole history in one request instead of thousands of block windows.
+On a real Ethereum wallet with 11 approval events over 4 M blocks, the RPC walk took 398
+requests and 121 s at a 10 000-block window. `EtherscanSource` and `BlockscoutSource` took
+1 request and about 1 s.
+
+The indexer source also works without a seed. A read-only account needs only `getAddress()`,
+so you can audit any address:
+
+<Snippet file="approvals/src/approvals.ts" region="audit" />
+
+| Source | Key | Limits |
+|---|---|---|
+| `BlockscoutSource({ chainId })` | None; an `apiKey` from dev.blockscout.com raises the limit | Keyless instances allow about 10 requests per window. Built-in hosts: Ethereum, Optimism, Gnosis, Polygon, Base, Arbitrum, Scroll, Linea, Sepolia; others take `baseUrl` |
+| `EtherscanSource({ chainId, apiKey })` | One Etherscan V2 key for every chain | Free tier: 5 requests/s, no Base, Optimism, BNB or Avalanche. Proxy the key through `baseUrl` |
+| `RpcLogsSource` (default) | Your RPC | Address-less `eth_getLogs`, see [Set up](#set-up) |
+
+A common pattern: an indexer for an imported wallet's first scan, then the default RPC source
+with a cache for every scan after.
+
+## Revoke
+
+<Snippet file="approvals/src/approvals.ts" region="revoke" />
+
+- `quoteRevoke` returns the gas fee in wei without signing. Show it before the user confirms.
+- `revoke` sends one transaction and resolves to `{ hash, fee }`. An ERC-20 revoke goes
+  through the account's `approve({ amount: 0 })`. An EIP-7702 delegation is revoked with
+  `revokeDelegation()`.
+- `revokeAll` folds every Permit2 entry into one `lockdown` and sends the rest one by one.
+  On an account that takes a list in `sendTransaction` (ERC-4337, gasless 7702), set
+  `batch: true` and everything goes in one user operation.
+- `buildRevokeTransaction(approval)` returns the raw `{ to, data, value }` without sending,
+  for apps that build their own batches.
+
+A revoke costs gas. An account with no ETH cannot revoke anything. Check the balance against
+`quoteRevoke` first.
+
+## With policies
+
+A revoke is a signature like any other, so [policies](/concepts/policies/) see it. `confirm`
+gets `kind: 'approval'`, with the spender in `to` and `amount: 0n`. The same handler sees
+new approvals too: `approve`, `signPermit`, and EIP-2612 or Permit2 typed data. That makes it
+the place to warn about unlimited allowances before they are granted:
+
+<Snippet file="approvals/src/approvals.ts" region="policies" />
+
+:::caution[Allowlist and blocklist apply to revokes]
+`allowlist` and `blocklist` check the spender of every approval, and a revoke is an approval
+of 0. So an account cannot revoke the allowance of a spender on its blocklist, and with an
+allowlist set, it can revoke only allowlisted spenders. Permit2 `lockdown` and
+`setApprovalForAll(…, false)` are calls to the Permit2 or NFT contract, so an allowlist must
+include those contracts too.
+:::
+
+## Activity
+
+`describeActivity` recognises approve and revoke transactions in the account's history:
+"Approved USDC for Permit2", "Revoked USDC for 0x1231…". Pass `tokens` (lowercase address → symbol and
+decimals) in the config for readable titles. It runs offline on any EVM chain.
+
+## Errors
+
+Failures throw `ApprovalsError` with a `reason`:
+
+| `reason` | When |
+|---|---|
+| `provider-required` | No `provider` in the config and none on the account |
+| `account-required` | `revoke` on a read-only account |
+| `unsupported-standard` | A standard this chain cannot revoke, or an EIP-7702 revoke on an account without `revokeDelegation` |
+| `invalid-approval` | A malformed approval object |
+| `source-failed` | The indexer refused or rate-limited the request. The message says when it resets |
+
+Policy refusals arrive as `UserRejectedError` and `PolicyViolationError` from `kit`, as on
+every other write.
