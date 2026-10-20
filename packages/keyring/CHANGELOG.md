@@ -1,5 +1,19 @@
 # @forgewallet/keyring
 
+## 0.2.0
+
+### Minor Changes
+
+- e0d5520: `missingChains(accountId)` lists the registered chains a seed account has no stored address for (a chain that joined after the account was created — addresses are computed once at creation), and `completeAddresses(sourceId)` derives and stores them for every account of the source with one secret read. An imported key never has missing chains.
+- e0edbf6: `zcash` joins the keyring chains (`m/44'/133'/0'/0/i`, WIF or hex key import) and the conformance vectors (three seeds × five accounts, keys cross-checked with viem, address encoding with Blockchair).
+
+### Patch Changes
+
+- Updated dependencies [bd4ea91]
+- Updated dependencies [386615c]
+- Updated dependencies [82464d8]
+  - @forgewallet/core@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes

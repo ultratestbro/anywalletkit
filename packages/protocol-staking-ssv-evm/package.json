@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/protocol-staking-ssv-evm",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A simple package that lets @forgewallet/wallet-evm wallet accounts stake SSV through SSV Network: stake SSV → cSSV, claim ETH rewards, cooldown unstake and withdraw.",
   "license": "Apache-2.0",
   "type": "module",

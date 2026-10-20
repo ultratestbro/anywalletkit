@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The forgewallet orchestrator: one seed or signer, registered chain wallets and protocol modules, accounts by CAIP-2 chain, policies that run before anything is broadcast.",
   "license": "Apache-2.0",
   "type": "module",

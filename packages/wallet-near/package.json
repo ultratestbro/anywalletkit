@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/wallet-near",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "NEAR wallet for the forgewallet SDK: SLIP-10 m/44'/397'/i' accounts (NEAR Wallet path), implicit and named accounts, NEAR and NEP-141 transfers over JSON-RPC, hand-written borsh, NEP-413 message signing.",
   "license": "Apache-2.0",
   "type": "module",

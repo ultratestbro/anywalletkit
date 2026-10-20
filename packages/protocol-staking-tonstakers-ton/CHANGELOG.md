@@ -1,5 +1,14 @@
 # @forgewallet/protocol-staking-tonstakers-ton
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [bd4ea91]
+- Updated dependencies [386615c]
+- Updated dependencies [82464d8]
+  - @forgewallet/core@0.2.0
+
 ## 0.2.0
 
 ### Minor Changes

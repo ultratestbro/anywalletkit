@@ -1,6 +1,6 @@
 {
   "name": "@forgewallet/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Signer and account interfaces, protocol base classes, errors and key-derivation helpers for the forgewallet SDK.",
   "license": "Apache-2.0",
   "type": "module",

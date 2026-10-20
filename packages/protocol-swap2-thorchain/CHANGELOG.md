@@ -1,5 +1,21 @@
 # @forgewallet/protocol-swap2-thorchain
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [bd4ea91]
+- Updated dependencies [386615c]
+- Updated dependencies [82464d8]
+- Updated dependencies [412164a]
+- Updated dependencies [f427dec]
+- Updated dependencies [7004ecf]
+- Updated dependencies [e0edbf6]
+- Updated dependencies [29af9d6]
+  - @forgewallet/core@0.2.0
+  - @forgewallet/protocol-swap2-core@0.2.0
+  - @forgewallet/swap2-assets@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes
