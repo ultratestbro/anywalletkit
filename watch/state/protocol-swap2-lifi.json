@@ -3,9 +3,9 @@
  "sources": {
   "bridges": {
    "type": "http-json",
-   "value": "[\"across\",\"allbridge\",\"arbitrum\",\"cctp\",\"celercircle\",\"celercirclefast\",\"chainflip\",\"eco\",\"frax\",\"garden\",\"gasZipBridge\",\"glacis\",\"gnosis\",\"hyperliquidNative\",\"hyperliquidSA\",\"layerswap\",\"lifiIntents\",\"mayan\",\"mayanFastMCTP\",\"mayanMCTP\",\"mayanWH\",\"megaeth\",\"near\",\"omni\",\"paxos\",\"polygon\",\"polymer\",\"polymerStandard\",\"relaydepository\",\"smartDeposits\",\"squid\",\"stargateV2\",\"stargateV2Bus\",\"superset\",\"symbiosis\",\"unit\"]",
+   "value": "[\"across\",\"allbridge\",\"arbitrum\",\"cctp\",\"celercircle\",\"celercirclefast\",\"centrifuge\",\"chainflip\",\"eco\",\"frax\",\"garden\",\"gasZipBridge\",\"glacis\",\"gnosis\",\"hyperliquidNative\",\"hyperliquidSA\",\"layerswap\",\"lifiIntents\",\"mayan\",\"mayanFastMCTP\",\"mayanMCTP\",\"mayanWH\",\"megaeth\",\"near\",\"omni\",\"paxos\",\"polygon\",\"polymer\",\"polymerStandard\",\"relaydepository\",\"smartDeposits\",\"squid\",\"stargateV2\",\"stargateV2Bus\",\"superset\",\"symbiosis\",\"unit\"]",
    "meta": {
-    "count": 36,
+    "count": 37,
     "keys": [
      "across",
      "allbridge",
@@ -13,6 +13,7 @@
      "cctp",
      "celercircle",
      "celercirclefast",
+     "centrifuge",
      "chainflip",
      "eco",
      "frax",
@@ -45,14 +46,14 @@
      "unit"
     ]
    },
-   "seenAt": "2026-10-14T15:12:20.467Z",
-   "changedAt": "2026-10-14T15:10:51.559Z"
+   "seenAt": "2026-10-20T10:23:51.279Z",
+   "changedAt": "2026-10-20T10:23:51.279Z"
   },
   "exchanges": {
    "type": "http-json",
-   "value": "[\"1inch\",\"aftermath\",\"bebop\",\"bitget\",\"bluefin7k\",\"cetus\",\"dflow\",\"dodo\",\"eisen\",\"enso\",\"fly\",\"gluex\",\"hyperbloom\",\"hyperflow\",\"hyperliquidSpotDex\",\"hypertrade\",\"jupiter\",\"kumbaya\",\"kuru\",\"kyberswap\",\"lifiIntentsDex\",\"lifidexaggregator\",\"liquidswap\",\"merkle\",\"momentum\",\"monorail\",\"nexroute\",\"nordstern\",\"okx\",\"openocean\",\"paraswap\",\"paxosDex\",\"peach\",\"rialto\",\"soroswap\",\"sunswap\",\"supersetDex\",\"sushiswap\",\"titan\"]",
+   "value": "[\"1inch\",\"aftermath\",\"bebop\",\"bitget\",\"bluefin7k\",\"cetus\",\"dflow\",\"dodo\",\"eisen\",\"enso\",\"fly\",\"gluex\",\"hyperbloom\",\"hyperflow\",\"hyperliquidSpotDex\",\"hypertrade\",\"jupiter\",\"kumbaya\",\"kuru\",\"kyberswap\",\"lifiIntentsDex\",\"lifidexaggregator\",\"liquidswap\",\"m0Dex\",\"merkle\",\"momentum\",\"monorail\",\"nexroute\",\"nordstern\",\"okx\",\"openocean\",\"paraswap\",\"paxosDex\",\"peach\",\"rialto\",\"smartDeposits\",\"soroswap\",\"sunswap\",\"supersetDex\",\"sushiswap\",\"titan\"]",
    "meta": {
-    "count": 39,
+    "count": 41,
     "keys": [
      "1inch",
      "aftermath",
@@ -77,6 +78,7 @@
      "lifiIntentsDex",
      "lifidexaggregator",
      "liquidswap",
+     "m0Dex",
      "merkle",
      "momentum",
      "monorail",
@@ -88,6 +90,7 @@
      "paxosDex",
      "peach",
      "rialto",
+     "smartDeposits",
      "soroswap",
      "sunswap",
      "supersetDex",
@@ -95,8 +98,8 @@
      "titan"
     ]
    },
-   "seenAt": "2026-10-14T15:12:20.463Z",
-   "changedAt": "2026-10-14T15:10:51.562Z"
+   "seenAt": "2026-10-20T10:23:51.275Z",
+   "changedAt": "2026-10-20T10:23:51.275Z"
   },
   "chains": {
    "type": "http-json",
@@ -171,31 +174,31 @@
      "999"
     ]
    },
-   "seenAt": "2026-10-14T15:12:19.658Z",
+   "seenAt": "2026-10-20T10:23:50.849Z",
    "changedAt": "2026-10-14T15:10:52.085Z"
   },
   "docs-changelog": {
    "type": "http-text",
-   "value": "e00c5edb9eb1ef3f79641fc8009acfab591809f5b669641cf9168f196af6e557",
+   "value": "1cf5c18a819c0a03ce1588cb943c50abc505424dc49451b71a012ebcfab361fa",
    "meta": {
-    "hash": "e00c5edb9eb1ef3f",
-    "chars": 24485
+    "hash": "1cf5c18a819c0a03",
+    "chars": 24775
    },
-   "seenAt": "2026-10-14T15:12:20.395Z",
-   "changedAt": "2026-10-14T15:10:52.963Z"
+   "seenAt": "2026-10-20T10:23:51.415Z",
+   "changedAt": "2026-10-20T10:23:51.415Z"
   },
   "sdk": {
    "type": "github-releases",
-   "value": "@lifi/sdk@4.12.1",
+   "value": "@lifi/sdk-provider-sui@4.2.11",
    "meta": {
-    "tag": "@lifi/sdk@4.12.1",
-    "name": "@lifi/sdk@4.12.1",
-    "at": "2026-10-13",
-    "url": "https://github.com/lifinance/sdk/releases/tag/%40lifi/sdk%404.12.1",
+    "tag": "@lifi/sdk-provider-sui@4.2.11",
+    "name": "@lifi/sdk-provider-sui@4.2.11",
+    "at": "2026-10-16",
+    "url": "https://github.com/lifinance/sdk/releases/tag/%40lifi/sdk-provider-sui%404.2.11",
     "prerelease": false
    },
-   "seenAt": "2026-10-14T15:12:20.177Z",
-   "changedAt": "2026-10-14T15:12:20.177Z"
+   "seenAt": "2026-10-20T10:23:50.788Z",
+   "changedAt": "2026-10-20T10:23:50.788Z"
   },
   "contracts": {
    "type": "github-releases",
@@ -205,7 +208,7 @@
     "url": "https://github.com/lifinance/contracts/releases/tag/pre-signing-2.0-baseline",
     "note": "tags only"
    },
-   "seenAt": "2026-10-14T15:12:20.663Z",
+   "seenAt": "2026-10-20T10:23:51.034Z",
    "changedAt": "2026-10-14T15:12:20.663Z"
   }
  }

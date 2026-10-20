@@ -3,25 +3,25 @@
  "sources": {
   "docs-omniston": {
    "type": "http-text",
-   "value": "39e65387132f6faed5b618864d51dec4aaed8530b547d1ceaccb52acf8e39014",
+   "value": "cb4d3e47e9027ebb0d4878ba2743108fd2cd8385561dc6006434002457477a31",
    "meta": {
-    "hash": "39e65387132f6fae",
-    "chars": 2906
+    "hash": "cb4d3e47e9027ebb",
+    "chars": 2907
    },
-   "seenAt": "2026-10-14T15:12:22.643Z",
-   "changedAt": "2026-10-14T15:10:54.819Z"
+   "seenAt": "2026-10-20T10:24:01.247Z",
+   "changedAt": "2026-10-20T10:24:01.247Z"
   },
   "omniston-sdk": {
    "type": "github-releases",
-   "value": "6b4c4b4dd0c4a353f3e348285eafc6f1c8a64b43",
+   "value": "fdd0bfbbe3754c8025ad5438f4a9e2e6a6fd0326",
    "meta": {
-    "tag": "commit 6b4c4b4",
-    "at": "2026-10-08",
-    "url": "https://github.com/ston-fi/omniston-sdk/commit/6b4c4b4dd0c4a353f3e348285eafc6f1c8a64b43",
-    "note": "default branch: refactor(demo-app): refactor demo app"
+    "tag": "commit fdd0bfb",
+    "at": "2026-10-19",
+    "url": "https://github.com/ston-fi/omniston-sdk/commit/fdd0bfbbe3754c8025ad5438f4a9e2e6a6fd0326",
+    "note": "default branch: docs: update README"
    },
-   "seenAt": "2026-10-14T15:12:23.717Z",
-   "changedAt": "2026-10-14T15:12:23.717Z"
+   "seenAt": "2026-10-20T10:23:56.523Z",
+   "changedAt": "2026-10-20T10:23:56.523Z"
   }
  }
 }

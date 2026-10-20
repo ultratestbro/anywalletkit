@@ -11,7 +11,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-14T15:12:06.774Z",
+   "seenAt": "2026-10-20T10:23:24.196Z",
    "changedAt": "2026-10-14T15:10:30.832Z"
   },
   "vault-lido-earn-eth": {
@@ -24,7 +24,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-14T15:12:06.620Z",
+   "seenAt": "2026-10-20T10:23:24.096Z",
    "changedAt": "2026-10-14T15:10:30.850Z"
   },
   "vault-lido-conservative-earn-usd": {
@@ -37,7 +37,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-14T15:12:06.615Z",
+   "seenAt": "2026-10-20T10:23:24.183Z",
    "changedAt": "2026-10-14T15:10:30.853Z"
   },
   "vault-lido-earn-usd": {
@@ -50,7 +50,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-14T15:12:06.609Z",
+   "seenAt": "2026-10-20T10:23:24.132Z",
    "changedAt": "2026-10-14T15:10:30.853Z"
   },
   "vault-lido-strategy": {
@@ -63,7 +63,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-14T15:12:06.621Z",
+   "seenAt": "2026-10-20T10:23:24.166Z",
    "changedAt": "2026-10-14T15:10:30.854Z"
   },
   "registry-vaults": {
@@ -161,7 +161,7 @@
      "0xf785a3637Fb8DC057a2a23c925e83859Ef212c8d"
     ]
    },
-   "seenAt": "2026-10-14T15:12:06.662Z",
+   "seenAt": "2026-10-20T10:23:27.729Z",
    "changedAt": "2026-10-14T15:10:30.933Z"
   },
   "docs": {
@@ -171,20 +171,20 @@
     "hash": "bbb595e50a6c75a7",
     "chars": 1080
    },
-   "seenAt": "2026-10-14T15:12:06.748Z",
+   "seenAt": "2026-10-20T10:23:24.283Z",
    "changedAt": "2026-10-14T15:10:31.059Z"
   },
   "flexible-vaults": {
    "type": "github-releases",
-   "value": "bd4c35647b2b49f30ae31d6cbb6fe5679131926f",
+   "value": "ceccd4406511bda4b4640e40414473cab098b3d5",
    "meta": {
-    "tag": "commit bd4c356",
-    "at": "2026-10-13",
-    "url": "https://github.com/mellow-finance/flexible-vaults/commit/bd4c35647b2b49f30ae31d6cbb6fe5679131926f",
-    "note": "default branch: MellowAccountV1: audit"
+    "tag": "commit ceccd44",
+    "at": "2026-10-19",
+    "url": "https://github.com/mellow-finance/flexible-vaults/commit/ceccd4406511bda4b4640e40414473cab098b3d5",
+    "note": "default branch: stUSD json config"
    },
-   "seenAt": "2026-10-14T15:12:07.559Z",
-   "changedAt": "2026-10-14T15:10:31.403Z"
+   "seenAt": "2026-10-20T10:23:24.740Z",
+   "changedAt": "2026-10-20T10:23:24.740Z"
   }
  }
 }

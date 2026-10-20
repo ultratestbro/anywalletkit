@@ -1,0 +1,307 @@
+{
+ "date": "2026-10-20",
+ "counts": {
+  "ok": 26,
+  "fail": 1,
+  "warn": 12,
+  "none": 1
+ },
+ "transitions": [
+  {
+   "id": "aave:1:lido",
+   "module": "aave",
+   "from": "ok",
+   "to": "fail",
+   "note": " functionName: 'getPool', | sender: undefined | } | Node.js v22.23.3"
+  }
+ ],
+ "failing": [
+  {
+   "id": "aave:1:lido",
+   "status": "fail",
+   "note": " functionName: 'getPool', | sender: undefined | } | Node.js v22.23.3"
+  }
+ ],
+ "results": [
+  {
+   "id": "jito",
+   "module": "spl-stake-pool",
+   "status": "ok",
+   "ms": 2328,
+   "note": ""
+  },
+  {
+   "id": "tonstakers",
+   "module": "tonstakers",
+   "status": "ok",
+   "ms": 4143,
+   "note": ""
+  },
+  {
+   "id": "lido",
+   "module": "lido",
+   "status": "ok",
+   "ms": 4496,
+   "note": ""
+  },
+  {
+   "id": "ssv",
+   "module": "ssv",
+   "status": "ok",
+   "ms": 6306,
+   "note": ""
+  },
+  {
+   "id": "mellow:lido-earn-eth",
+   "module": "mellow",
+   "status": "ok",
+   "ms": 4332,
+   "note": ""
+  },
+  {
+   "id": "aave:1:lido",
+   "module": "aave",
+   "status": "fail",
+   "ms": 2125,
+   "note": " functionName: 'getPool', | sender: undefined | } | Node.js v22.23.3"
+  },
+  {
+   "id": "mellow:lido-earn-usd",
+   "module": "mellow",
+   "status": "ok",
+   "ms": 4831,
+   "note": ""
+  },
+  {
+   "id": "aave:1:etherfi",
+   "module": "aave",
+   "status": "warn",
+   "ms": 2382,
+   "note": "quoteSupply → AaveError weETH: supply cap reached (0 base units left)."
+  },
+  {
+   "id": "aave:1:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 4641,
+   "note": ""
+  },
+  {
+   "id": "aave:10:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 1177,
+   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:56:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 2205,
+   "note": "quoteSupply → AaveError Cake: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:100:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 2419,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:137:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 2386,
+   "note": ""
+  },
+  {
+   "id": "aave:146:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 2256,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:324:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 2420,
+   "note": "quoteSupply → AaveError USDC: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:1088:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 2376,
+   "note": "quoteSupply → AaveError m.DAI: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:1868:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 2441,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:5000:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 2405,
+   "note": ""
+  },
+  {
+   "id": "aave:8453:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 2157,
+   "note": ""
+  },
+  {
+   "id": "aave:42161:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 2257,
+   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:9745:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 2453,
+   "note": ""
+  },
+  {
+   "id": "aave:42220:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 3607,
+   "note": ""
+  },
+  {
+   "id": "aave:43114:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 2336,
+   "note": ""
+  },
+  {
+   "id": "aave:57073:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 2056,
+   "note": ""
+  },
+  {
+   "id": "aave:59144:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 2144,
+   "note": ""
+  },
+  {
+   "id": "aave:534352:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 2447,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "morpho:8453",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 7317,
+   "note": ""
+  },
+  {
+   "id": "morpho:10",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 6474,
+   "note": ""
+  },
+  {
+   "id": "morpho:137",
+   "module": "morpho",
+   "status": "warn",
+   "ms": 3527,
+   "note": " quoteSupply → MorphoError Compound USDC: deposits are closed right now (caps reached or the receiver is gated)."
+  },
+  {
+   "id": "morpho:1",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 11547,
+   "note": ""
+  },
+  {
+   "id": "morpho:42161",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 11200,
+   "note": ""
+  },
+  {
+   "id": "morpho:130",
+   "module": "morpho",
+   "status": "warn",
+   "ms": 3247,
+   "note": " quoteSupply → MorphoError Gauntlet WETH: deposits are closed right now (caps reached or the receiver is gated)."
+  },
+  {
+   "id": "morpho:4663",
+   "module": "morpho",
+   "status": "none",
+   "ms": 1791,
+   "note": "Error: no listed Morpho vault on eip155:4663"
+  },
+  {
+   "id": "morpho:747474",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 3079,
+   "note": ""
+  },
+  {
+   "id": "approvals:1",
+   "module": "approvals",
+   "status": "ok",
+   "ms": 1700,
+   "note": ""
+  },
+  {
+   "id": "morpho:143",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 4118,
+   "note": ""
+  },
+  {
+   "id": "approvals:42161",
+   "module": "approvals",
+   "status": "ok",
+   "ms": 1124,
+   "note": ""
+  },
+  {
+   "id": "approvals:8453",
+   "module": "approvals",
+   "status": "ok",
+   "ms": 2107,
+   "note": ""
+  },
+  {
+   "id": "morpho:999",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 5909,
+   "note": ""
+  },
+  {
+   "id": "kamino",
+   "module": "kamino",
+   "status": "ok",
+   "ms": 2846,
+   "note": ""
+  }
+ ]
+}
