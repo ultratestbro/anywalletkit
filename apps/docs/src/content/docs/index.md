@@ -1,8 +1,6 @@
 ---
 title: Introduction
 description: What Any Wallet Kit is, who it is for and the principles it is built on.
-sidebar:
-  order: 1
 ---
 
 Any Wallet Kit is an open-source SDK for building self-custodial multichain wallets.

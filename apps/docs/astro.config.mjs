@@ -4,6 +4,8 @@ import starlight from '@astrojs/starlight';
 
 export default defineConfig({
   site: 'https://docs.anywallet.tech',
+  // The Introduction is the home page; keep the old address working.
+  redirects: { '/getting-started/introduction/': '/' },
   integrations: [
     starlight({
       title: 'Any Wallet Kit',
@@ -31,7 +33,6 @@ export default defineConfig({
       customCss: ['./src/styles/awk.css'],
       components: {
         SiteTitle: './src/components/SiteTitle.astro',
-        Hero: './src/components/Hero.astro',
         SocialIcons: './src/components/SocialIcons.astro',
         ThemeProvider: './src/components/ThemeProvider.astro',
         ThemeSelect: './src/components/ThemeSelect.astro',
@@ -47,7 +48,7 @@ export default defineConfig({
         },
       },
       sidebar: [
-        { label: 'Getting started', items: [{ autogenerate: { directory: 'getting-started' } }] },
+        { label: 'Getting started', items: [{ label: 'Introduction', link: '/' }, { autogenerate: { directory: 'getting-started' } }] },
         { label: 'Concepts', items: [{ autogenerate: { directory: 'concepts' } }] },
       ],
     }),
