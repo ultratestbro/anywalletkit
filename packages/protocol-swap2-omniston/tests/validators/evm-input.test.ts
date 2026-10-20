@@ -109,7 +109,7 @@ describe("Omniston EVM input-position validator (EVM→TON source fill)", () => 
       ["another token", {token: STUB_TAKER_ASSET}],
       ["partial fill", {amount: 19_000_000n}],
       ["smaller safety deposit", {safetyDeposit: 1n}],
-      ["TON output amount drifted", {complementAmount: 20_000_000n}],
+      ["TON output amount below the promise", {complementAmount: 20_000_000n}],
       ["foreign timelock profile", {timelocks: timelocks([1n, 120n, 240n, 300n, 1n, 120n, 60n])}],
       ["extra immutables parameters", {parameters: "0x01"}],
       ["deployed long before the quote", {timelocks: timelocks(undefined, BigInt(QUOTE_TIME - 121))}],
@@ -141,6 +141,11 @@ describe("Omniston EVM input-position validator (EVM→TON source fill)", () => 
     const request = vi.fn(async () => { throw new Error("rpc down"); });
     await expect(createOmnistonEvmInputValidator({request})(INPUT)).resolves.toBe(false);
     await expect(validator(rpc())({...INPUT, chain: "eip155:10"})).resolves.toBe(false);
+  });
+
+  it("TON destination: a complement above the promise passes (live 2026-10-20: Omniston records 1.089 × resolverSendsUnits there)", async () => {
+    await expect(validator(rpc({complementAmount: 22_157_000n}))(INPUT)).resolves.toBe(true);
+    await expect(validator(rpc({complementAmount: 20_346_627n}))(INPUT)).resolves.toBe(false);
   });
 
   it("EVM destination: the recorded complement must name the quoted chain, token and destination deposit", async () => {

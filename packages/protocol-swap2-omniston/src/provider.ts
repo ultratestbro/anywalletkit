@@ -458,6 +458,13 @@ export interface OmnistonProviderOptions {
   }) => Promise<string | null>;
   /** Close an injected client when the provider closes (default: caller owns it). */
   closeInjectedClient?: boolean;
+  /**
+   * Diagnostics: why a poll did not disclose (`disclosure-skipped` with the gate
+   * and its fields, `validator-refused`, `validator-threw`) and when it did
+   * (`secret-disclosed`). Never carries secrets. Wire it to your logger: a
+   * silent "pending" cost a live order its 2-minute window (2026-10-20).
+   */
+  trace?: (event: string, details?: Record<string, unknown>) => void;
 }
 
 // ── Chain / asset mapping ────────────────────────────────────────────────────
@@ -2314,6 +2321,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
       const secretsHex = await store.load(decoded.quoteId);
       const cached = await loadBuilt(decoded.quoteId);
+      const trace = (event: string, details?: Record<string, unknown>) => { try { opts.trace?.(event, {quoteId: decoded.quoteId, ...details}); } catch { /* diagnostics never break tracking */ } };
+      if (!secretsHex || cached?.quote.settlementData.$case !== "order") trace("disclosure-skipped", {gate: "context", secrets: !!secretsHex, cached: !!cached, feedStatus: order.status});
       if (secretsHex && cached?.quote.settlementData.$case === "order") {
         const q = cached.quote;
         const settlement = q.settlementData.value as OrderSettlement;
@@ -2340,20 +2349,20 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
             if (
               !secret || !validDisclosurePhase(phase) || !position || position.chain.$case !== outputChain ||
               !position.chain.value || !factory || factory.chain.$case !== outputChain || !outputTokenAddress || !outputCaip
-            ) return;
+            ) { trace("disclosure-skipped", {gate: "position", index: i, phase, positionChain: position?.chain.$case, outputChain}); return; }
             if (evmSource
               ? (!evmOrder || !inputCaip || !inputTokenAddress || !inputPosition || inputPosition.chain.$case !== inputChain || !inputPosition.chain.value ||
                 !settlement.srcInitialResolverAddress || typeof opts.validateEvmInputPosition !== "function" ||
                 typeof (tonDest ? opts.validateTonOutputPosition : opts.validateEvmOutputPosition) !== "function")
               : typeof opts.validateEvmOutputPosition !== "function"
-            ) return;
+            ) { trace("disclosure-skipped", {gate: "context-fields", index: i, evmSource, evmOrder: !!evmOrder, inputPositionChain: inputPosition?.chain.$case}); return; }
             const secretBytes = hexToBytes(secret);
             const expectedHash = hashlock(secretBytes, settlement.htlcHashingFunction);
             if (
               !execution.secretHash || !bytesEqual(execution.secretHash, expectedHash) ||
               execution.inputUnits !== q.inputUnits || execution.outputUnits !== q.outputUnits ||
               execution.resolverSendsUnits !== settlement.resolverSendsUnits
-            ) return;
+            ) { trace("disclosure-skipped", {gate: "terms", index: i, hashMatches: !!execution.secretHash && bytesEqual(execution.secretHash, expectedHash), inputUnits: [execution.inputUnits, q.inputUnits], outputUnits: [execution.outputUnits, q.outputUnits], resolverSendsUnits: [execution.resolverSendsUnits, settlement.resolverSendsUnits]}); return; }
             let verified = false;
             try {
               const evmOutput = () => opts.validateEvmOutputPosition!({
@@ -2413,13 +2422,14 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
                   })
                   : await evmOutput())
                 : await evmOutput();
-            } catch {
+            } catch (error) {
               verified = false;
+              trace("validator-threw", {index: i, error: error instanceof Error ? error.message : String(error)});
             }
-            if (!verified) return;
+            if (!verified) { trace("validator-refused", {index: i, evmSource, tonDest}); return; }
             await omni
               .orderDiscloseHtlcSecret({quoteId: decoded.quoteId, executionIndex: i, secret: secretBytes})
-              .catch(() => {}); // retried on the next poll
+              .then(() => trace("secret-disclosed", {index: i}), (error) => trace("disclose-failed", {index: i, error: error instanceof Error ? error.message : String(error)})); // retried on the next poll
           }),
         );
       }

@@ -195,7 +195,12 @@ export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcR
         immutables.safetyDeposit !== safetyDeposit || immutables.parameters !== "0x" ||
         SRC_STAGES.some((expected, index) => stage(immutables.timelocks, index) !== expected) ||
         deployedAt < BigInt(input.quoteTimestamp) - 120n || deployedAt > BigInt(input.quoteTimestamp) + 900n ||
-        complement.amount !== resolverSendsUnits
+        // EVM destination: the complement is the destination escrow's amount, enforced by its CREATE2
+        // derivation — exact. TON destination: Omniston records a larger figure here (live 2026-10-20,
+        // both orders: 1.089 × resolverSendsUnits — 4 485 039 for 4 118 665, 791 340 for 726 690); the
+        // delivered amount is proven on the TON position itself (validateTonOutputPosition), so this
+        // only has to be no smaller than the promise. Strict equality blocked every EVM → TON disclosure.
+        (input.destinationChainId !== undefined ? complement.amount !== resolverSendsUnits : complement.amount < resolverSendsUnits)
       ) return false;
       // EVM destination: the complement the factory recorded must point at the
       // quoted chain, token and destination deposit (TON keeps its own terms).
