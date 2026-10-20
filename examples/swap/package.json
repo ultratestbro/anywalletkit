@@ -18,6 +18,7 @@
     "@forgewallet/protocol-swap2-router": "workspace:*",
     "@forgewallet/protocol-swap2-thorchain": "workspace:*",
     "@forgewallet/protocol-swap2-uniswap": "workspace:*",
+    "@forgewallet/protocol-swap2-usdt0": "workspace:*",
     "@forgewallet/protocol-swap2-wrap": "workspace:*",
     "@forgewallet/wallet-evm": "workspace:*"
   },

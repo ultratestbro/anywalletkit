@@ -266,6 +266,9 @@ importers:
       '@forgewallet/protocol-swap2-uniswap':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-uniswap
+      '@forgewallet/protocol-swap2-usdt0':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-usdt0
       '@forgewallet/protocol-swap2-wrap':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-wrap
@@ -834,7 +837,7 @@ importers:
         version: link:../swap2-assets
       viem:
         specifier: ^2.57.2
-        version: 2.57.2(typescript@5.9.3)(zod@3.25.76)
+        version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
       '@forgewallet/conformance':
         specifier: workspace:*
@@ -850,7 +853,7 @@ importers:
         version: 22.20.5
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-wrap:
     dependencies:

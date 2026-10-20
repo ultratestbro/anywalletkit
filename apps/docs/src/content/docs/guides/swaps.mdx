@@ -18,6 +18,7 @@ typechecks and tests.
 pnpm add @anywalletkit/protocol-swap2-router \
   @anywalletkit/protocol-swap2-lifi @anywalletkit/protocol-swap2-near-intents \
   @anywalletkit/protocol-swap2-thorchain @anywalletkit/protocol-swap2-cctp \
+  @anywalletkit/protocol-swap2-usdt0 \
   @anywalletkit/protocol-swap2-uniswap @anywalletkit/protocol-swap2-wrap
 ```
 
@@ -35,8 +36,9 @@ app, and each provider also works on its own without the router.
 | `lifi` | Aggregator API | Same-chain and cross-chain, many bridges and DEXes behind one quote |
 | `near_intents` | Intents (1Click) | Cross-chain between different ecosystems: EVM, Solana, Tron, Bitcoin, NEAR… |
 | `thorchain` | Native cross-chain | Native BTC and other L1 coins |
-| `omniston` | STON.fi | TON, and EVM ↔ TON |
+| `omniston` | STON.fi | TON swaps, TON ↔ EVM and EVM ↔ EVM stablecoin orders |
 | `cctp` | Circle burn-and-mint | USDC between EVM chains, no slippage |
+| `usdt0` | Tether's LayerZero OFT | USDT / USDT0 between 13 EVM chains in one transaction; the direct USDT path into HyperEVM |
 | `uniswap`, `balancer` | On-chain DEX | Same-chain, priced from the contracts, no API key |
 | `wrap` | WETH9 | Native ↔ wrapped native, 1:1 |
 
@@ -77,7 +79,8 @@ Routes come back ranked by value. Two of them are tagged:
 
 For a real USDC Ethereum → Base quote on 100 USDC, this returned four routes: CCTP
 tagged `best` (99.989 USDC guaranteed, ~3 minutes), LI.FI tagged `fastest` (99.735 USDC,
-seconds), then NEAR Intents and THORChain.
+seconds), then NEAR Intents and THORChain. For 25 USDT from Ethereum to USDT0 on Arbitrum,
+USDT0 came out `best` (exactly 25 guaranteed, ~17 minutes) and LI.FI `fastest`.
 
 Pass `valueUsd: usdValue(prices)` to the router to rank on net USD value. Gas and native
 bridge fees are then subtracted.
