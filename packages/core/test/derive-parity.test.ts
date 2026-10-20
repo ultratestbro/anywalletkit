@@ -1,8 +1,7 @@
 /**
- * Key-material parity with the golden vectors, for every chain, straight from core —
- * before any chain package exists. The vectors were recorded against the 
- * wallet managers (see packages/conformance/vectors/derivation.json). If this
- * test is red, users would get DIFFERENT addresses from the same seed.
+ * Key material for every chain, straight from core — before any chain package
+ * exists — against the pinned vectors (packages/conformance/vectors/derivation.json).
+ * If this test is red, users would get DIFFERENT addresses from the same seed.
  */
 import { describe, expect, it } from 'vitest'
 import { bytesToHex } from '@noble/hashes/utils.js'

@@ -15,7 +15,7 @@ export interface VectorAccount {
   signTypedData?: string
 }
 
-export interface ParityVectors {
+export interface DerivationVectors {
   generatedAt: string
   message: string
   evmTx: Record<string, unknown>
@@ -24,5 +24,5 @@ export interface ParityVectors {
   vectors: Record<ChainKey, Record<string, { accounts: VectorAccount[] }>>
 }
 
-/** Golden derivation vectors, pinned per chain. */
-export const derivationVectors = raw as unknown as ParityVectors
+/** Pinned derivation vectors: addresses, public keys and signatures per chain for three test seeds. */
+export const derivationVectors = raw as unknown as DerivationVectors

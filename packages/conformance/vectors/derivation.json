@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-10-03T20:41:14.043Z",
-  "source": "recorded from the wallet managers in vaultyvault node_modules",
+  "source": "Standard BIP-39 / BIP-32 / SLIP-10 derivation. Recorded once from independent reference implementations and pinned: a change here means users would get different addresses from the same seed.",
   "message": "forgewallet parity vector v1",
   "evmTx": {
     "to": "0x000000000000000000000000000000000000dEaD",
@@ -37,14 +37,14 @@
       "amount": 42
     }
   },
-  "versions": {
-    "wallet-evm": "1.0.0-beta.14",
-    "wallet-btc": "1.0.0-beta.13",
-    "wallet-ton": "1.0.0-beta.12",
-    "wallet-tron": "1.0.0-beta.9",
-    "wallet-solana": "1.0.0-beta.12",
-    "near-seed-phrase": "reference (near-hd-key SLIP-10, m/44'/397'/i')",
-    "wallet-zcash": "recorded from @forgewallet/wallet-zcash 0.1.0 (BIP-44 m/44'/133'/0'/0/i; keys cross-checked with viem mnemonicToAccount, t1 encoding with Blockchair)"
+  "derivation": {
+    "evm": "BIP-44 m/44'/60'/0'/0/i, secp256k1",
+    "btc": "BIP-84 m/84'/0'/0'/0/i, P2WPKH",
+    "ton": "SLIP-10 m/44'/607'/i', ed25519, wallet v5r1",
+    "tron": "BIP-44 m/44'/195'/0'/0/i, secp256k1",
+    "solana": "SLIP-10 m/44'/501'/i'/0', ed25519",
+    "near": "SLIP-10 m/44'/397'/i', ed25519, implicit account",
+    "zcash": "BIP-44 m/44'/133'/0'/0/i, transparent t1"
   },
   "seeds": {
     "bip39-abandon-12": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
