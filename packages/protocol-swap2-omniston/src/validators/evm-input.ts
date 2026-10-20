@@ -129,7 +129,14 @@ async function ethCall(request: OmnistonRpcRequest, chain: string, to: string, d
   return await request(chain, "eth_call", [{to, data}, "latest"]) as Hex;
 }
 
-export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcRequest; rpcUrls?: OmnistonRpcUrls; now?: () => number} = {}) {
+/** Diagnostics hook: every refusal names its check and the numbers it compared (never a secret). */
+export type OmnistonValidatorRefusal = (reason: string, details?: Record<string, unknown>) => void;
+
+export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcRequest; rpcUrls?: OmnistonRpcUrls; now?: () => number; onRefusal?: OmnistonValidatorRefusal} = {}) {
+  const refuse = (reason: string, details?: Record<string, unknown>): false => {
+    try { options.onRefusal?.(reason, details); } catch { /* diagnostics never break validation */ }
+    return false;
+  };
   const request: OmnistonRpcRequest = options.request ?? ((chain, method, params) => omnistonEvmRpcRequest(chain, method, params, options.rpcUrls));
   const now = options.now ?? Date.now;
   return async (input: EvmInputValidationInput): Promise<boolean> => {
@@ -140,7 +147,7 @@ export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcR
         !isAddress(input.ownerAddress) || !isAddress(input.resolverAddress) || !isAddress(input.inputTokenAddress) ||
         !Number.isInteger(input.quoteTimestamp) || input.quoteTimestamp * 1000 > now() + 120_000 ||
         now() - input.quoteTimestamp * 1000 > 6 * 60 * 60 * 1000 || input.secretHash.length !== 32
-      ) return false;
+      ) return refuse("input-shape");
       const position = getAddress(input.positionAddress);
       const factory = getAddress(input.factoryAddress);
       const owner = getAddress(input.ownerAddress);
@@ -150,7 +157,7 @@ export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcR
       const inputUnits = BigInt(input.inputUnits);
       const resolverSendsUnits = BigInt(input.resolverSendsUnits);
       const safetyDeposit = BigInt(input.srcHtlcSecurityDepositUnits);
-      if (inputUnits <= 0n || resolverSendsUnits <= 0n || safetyDeposit <= 0n) return false;
+      if (inputUnits <= 0n || resolverSendsUnits <= 0n || safetyDeposit <= 0n) return refuse("non-positive-amounts");
 
       const latest = BigInt(await request(input.chain, "eth_blockNumber", []) as string);
       const minConfirmations = OMNISTON_EVM_MIN_CONFIRMATIONS[input.chain] ?? 20n;
@@ -183,7 +190,7 @@ export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcR
         if (from === oldest) break;
         to = from - 1n;
       }
-      if (!match) return false;
+      if (!match) return refuse("no-fill-event", {factory, lookback: String(OMNISTON_EVM_LOOKBACK_BLOCKS[input.chain])});
       const {immutables, complement, log} = match;
       const deployedAt = stage(immutables.timelocks, 7);
       // What the resolver filled must be exactly what the wallet signed: the
@@ -201,7 +208,7 @@ export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcR
         // delivered amount is proven on the TON position itself (validateTonOutputPosition), so this
         // only has to be no smaller than the promise. Strict equality blocked every EVM → TON disclosure.
         (input.destinationChainId !== undefined ? complement.amount !== resolverSendsUnits : complement.amount < resolverSendsUnits)
-      ) return false;
+      ) return refuse("refused");
       // EVM destination: the complement the factory recorded must point at the
       // quoted chain, token and destination deposit (TON keeps its own terms).
       if (input.destinationChainId !== undefined && (
@@ -209,7 +216,7 @@ export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcR
         !input.destinationTokenAddress || !isAddress(input.destinationTokenAddress) ||
         uintAddress(complement.token) !== getAddress(input.destinationTokenAddress) ||
         complement.safetyDeposit !== BigInt(input.dstSecurityDepositUnits ?? "-1")
-      )) return false;
+      )) return refuse("complement-destination");
 
       // The escrow address is a function of the immutables (CREATE2 through
       // the factory): the feed's address must be that function's value.
@@ -218,7 +225,7 @@ export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcR
         functionName: "addressOfEscrowSrc",
         data: await ethCall(request, input.chain, factory, encodeFunctionData({abi: FACTORY_ABI, functionName: "addressOfEscrowSrc", args: [immutables]})),
       });
-      if (getAddress(derived) !== position) return false;
+      if (getAddress(derived) !== position) return refuse("derived-address", {derived, position});
 
       const [receipt, block, code] = await Promise.all([
         request(input.chain, "eth_getTransactionReceipt", [log.transactionHash]) as Promise<{status: Hex; blockNumber: Hex} | null>,
@@ -230,11 +237,11 @@ export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcR
         BigInt(receipt.blockNumber) !== BigInt(log.blockNumber) ||
         latest - BigInt(receipt.blockNumber) < minConfirmations ||
         BigInt(block.timestamp) !== deployedAt
-      ) return false;
+      ) return refuse("receipt-or-confirmations", {receiptStatus: receipt?.status, receiptBlock: receipt?.blockNumber, logBlock: log.blockNumber, latest: String(latest), minConfirmations: String(minConfirmations), codeLength: code ? code.length : 0, blockTimestamp: block?.timestamp, deployedAt: String(deployedAt)});
       // Still early enough to complete: the resolver must not be able to
       // cancel the source leg (and keep the TON side) once the secret is out.
       const nowSeconds = BigInt(Math.floor(now() / 1000));
-      if (nowSeconds + DISCLOSURE_MARGIN_SECONDS >= deployedAt + SRC_STAGES[SRC_CANCELLATION_STAGE]) return false;
+      if (nowSeconds + DISCLOSURE_MARGIN_SECONDS >= deployedAt + SRC_STAGES[SRC_CANCELLATION_STAGE]) return refuse("receipt-or-confirmations", {receiptStatus: receipt?.status, receiptBlock: receipt?.blockNumber, logBlock: log.blockNumber, latest: String(latest), minConfirmations: String(minConfirmations), codeLength: code ? code.length : 0, blockTimestamp: block?.timestamp, deployedAt: String(deployedAt)});
 
       const [reportedFactory, tokenBalance, nativeBalance] = await Promise.all([
         ethCall(request, input.chain, position, encodeFunctionData({abi: FACTORY_ABI, functionName: "FACTORY"}))
@@ -243,9 +250,10 @@ export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcR
           .then((data) => decodeFunctionResult({abi: FACTORY_ABI, functionName: "balanceOf", data})),
         request(input.chain, "eth_getBalance", [position, "latest"]) as Promise<Hex>,
       ]);
-      return getAddress(reportedFactory) === factory && tokenBalance >= inputUnits && BigInt(nativeBalance) >= safetyDeposit;
-    } catch {
-      return false;
+      const ok = getAddress(reportedFactory) === factory && tokenBalance >= inputUnits && BigInt(nativeBalance) >= safetyDeposit;
+      return ok || refuse("escrow-state", {reportedFactory, factory, tokenBalance: String(tokenBalance), inputUnits: String(inputUnits), nativeBalance: String(BigInt(nativeBalance)), safetyDeposit: String(safetyDeposit)});
+    } catch (error) {
+      return refuse("error", {message: error instanceof Error ? error.message : String(error)});
     }
   };
 }

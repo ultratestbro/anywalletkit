@@ -79,6 +79,8 @@ export const DEFAULT_OMNISTON_TON_PROXY_TON_MASTERS = [
 
 export interface OmnistonTonValidationOptions {
   fetch?: typeof fetch;
+  /** Diagnostics hook: every refusal of validateTonOutputPosition names its check (never a secret). */
+  onRefusal?: (reason: string, details?: Record<string, unknown>) => void;
   tonApiUrl?: string;
   tonApiKey?: string;
   /** Code interfaces accepted as swap targets (default: the STON.fi / DeDust set above). */
@@ -121,58 +123,59 @@ function cellFromApi(value: string): Cell {
  *       ref1: authority:(Maybe bits256) recipient:MsgAddressStd
  *     ref2: escrow code cell
  */
+let lastStateRefusal: string | null = null;
 function validateOutputPositionState(
   data: Cell,
   input: TonOutputPositionInput,
   expected: {jettonWallet: string; trusted: {outputEscrow: ReadonlySet<string>; authorityKeys: ReadonlySet<string>}; nowSeconds: number},
 ): {withdrawalAt: bigint} | null {
-  if (!/^[0-9a-fA-F]{48,64}$/.test(input.quoteId) || input.secretHash.length !== 32) return null;
-  if (!/^\d+$/.test(input.resolverSendsUnits) || !/^\d+$/.test(input.outputUnits) || !/^\d+$/.test(input.dstSecurityDepositUnits)) return null;
-  if (data.refs.length !== 3) return null;
+  if (!/^[0-9a-fA-F]{48,64}$/.test(input.quoteId) || input.secretHash.length !== 32) { lastStateRefusal = "state#1: if (!/^[0-9a-fA-F]{48,64}$/.test(input.quoteId) || input.secretHash.length !== 32) return null;"; return null; }
+  if (!/^\d+$/.test(input.resolverSendsUnits) || !/^\d+$/.test(input.outputUnits) || !/^\d+$/.test(input.dstSecurityDepositUnits)) { lastStateRefusal = "state#2: if (!/^\\d+$/.test(input.resolverSendsUnits) || !/^\\d+$/.test(input.outputUnits) || !/^\\d+$/.test(inp"; return null; }
+  if (data.refs.length !== 3) { lastStateRefusal = "state#3: if (data.refs.length !== 3) return null;"; return null; }
   const root = data.beginParse();
   root.loadUint(8); // phase — not trusted for custody; the factory deploy + timelocks are
-  if (!sameHex(root.loadBuffer(32), input.quoteId.padStart(64, "0"))) return null;
-  if (!sameAddress(root.loadAddressAny(), input.protocolAddress)) return null;
-  if (!sameAddress(root.loadAddressAny(), expected.jettonWallet)) return null;
-  if (root.remainingBits !== 5 || root.remainingRefs !== 3) return null;
+  if (!sameHex(root.loadBuffer(32), input.quoteId.padStart(64, "0"))) { lastStateRefusal = "state#4: if (!sameHex(root.loadBuffer(32), input.quoteId.padStart(64, \"0\"))) return null;"; return null; }
+  if (!sameAddress(root.loadAddressAny(), input.protocolAddress)) { lastStateRefusal = "state#5: if (!sameAddress(root.loadAddressAny(), input.protocolAddress)) return null;"; return null; }
+  if (!sameAddress(root.loadAddressAny(), expected.jettonWallet)) { lastStateRefusal = "state#6: if (!sameAddress(root.loadAddressAny(), expected.jettonWallet)) return null;"; return null; }
+  if (root.remainingBits !== 5 || root.remainingRefs !== 3) { lastStateRefusal = "state#7: if (root.remainingBits !== 5 || root.remainingRefs !== 3) return null;"; return null; }
 
   const parties = data.refs[0]!;
-  if (parties.refs.length !== 2) return null;
+  if (parties.refs.length !== 2) { lastStateRefusal = "state#8: if (parties.refs.length !== 2) return null;"; return null; }
   const partySlice = parties.beginParse();
-  if (!(partySlice.loadAddressAny() instanceof Address)) return null; // owner (resolver) — any
-  if (!sameAddress(partySlice.loadAddressAny(), input.outputJettonMasterAddress)) return null;
-  if (partySlice.remainingBits !== 6) return null;
+  if (!(partySlice.loadAddressAny() instanceof Address)) { lastStateRefusal = "state#9: if (!(partySlice.loadAddressAny() instanceof Address)) return null; // owner (resolver) — any"; return null; } // owner (resolver) — any
+  if (!sameAddress(partySlice.loadAddressAny(), input.outputJettonMasterAddress)) { lastStateRefusal = "state#10: if (!sameAddress(partySlice.loadAddressAny(), input.outputJettonMasterAddress)) return null;"; return null; }
+  if (partySlice.remainingBits !== 6) { lastStateRefusal = "state#11: if (partySlice.remainingBits !== 6) return null;"; return null; }
 
   const lock = data.refs[1]!;
-  if (lock.refs.length !== 2) return null;
+  if (lock.refs.length !== 2) { lastStateRefusal = "state#12: if (lock.refs.length !== 2) return null;"; return null; }
   const lockSlice = lock.beginParse();
-  if (!Buffer.from(lockSlice.loadBuffer(32)).equals(Buffer.from(input.secretHash))) return null;
-  if (lockSlice.loadCoins() < BigInt(input.resolverSendsUnits)) return null;
+  if (!Buffer.from(lockSlice.loadBuffer(32)).equals(Buffer.from(input.secretHash))) { lastStateRefusal = "state#13: if (!Buffer.from(lockSlice.loadBuffer(32)).equals(Buffer.from(input.secretHash))) return null;"; return null; }
+  if (lockSlice.loadCoins() < BigInt(input.resolverSendsUnits)) { lastStateRefusal = "state#14: if (lockSlice.loadCoins() < BigInt(input.resolverSendsUnits)) return null;"; return null; }
   const withdrawalAt = lockSlice.loadUintBig(64);
   const publicWithdrawalAt = lockSlice.loadUintBig(64);
   const cancellationAt = lockSlice.loadUintBig(64);
-  if (lockSlice.remainingBits !== 0) return null; // its two refs are the terms and authority cells below
-  if (publicWithdrawalAt - withdrawalAt !== POSITION_STAGES.publicWithdrawalAfterWithdrawal) return null;
-  if (cancellationAt - withdrawalAt !== POSITION_STAGES.cancellationAfterWithdrawal) return null;
+  if (lockSlice.remainingBits !== 0) { lastStateRefusal = "state#15: if (lockSlice.remainingBits !== 0) return null; // its two refs are the terms and authority cells be"; return null; } // its two refs are the terms and authority cells below
+  if (publicWithdrawalAt - withdrawalAt !== POSITION_STAGES.publicWithdrawalAfterWithdrawal) { lastStateRefusal = "state#16: if (publicWithdrawalAt - withdrawalAt !== POSITION_STAGES.publicWithdrawalAfterWithdrawal) return nu"; return null; }
+  if (cancellationAt - withdrawalAt !== POSITION_STAGES.cancellationAfterWithdrawal) { lastStateRefusal = "state#17: if (cancellationAt - withdrawalAt !== POSITION_STAGES.cancellationAfterWithdrawal) return null;"; return null; }
   // Deployed after the quote (resolvers lock within minutes of the fill) and
   // still far enough from cancellation to be completed.
-  if (withdrawalAt < BigInt(input.quoteTimestamp) - 120n || withdrawalAt > BigInt(input.quoteTimestamp) + 900n) return null;
-  if (BigInt(expected.nowSeconds + OUTPUT_DISCLOSURE_MARGIN_SECONDS) >= cancellationAt) return null;
+  if (withdrawalAt < BigInt(input.quoteTimestamp) - 120n || withdrawalAt > BigInt(input.quoteTimestamp) + 900n) { lastStateRefusal = "state#18: if (withdrawalAt < BigInt(input.quoteTimestamp) - 120n || withdrawalAt > BigInt(input.quoteTimestamp"; return null; }
+  if (BigInt(expected.nowSeconds + OUTPUT_DISCLOSURE_MARGIN_SECONDS) >= cancellationAt) { lastStateRefusal = "state#19: if (BigInt(expected.nowSeconds + OUTPUT_DISCLOSURE_MARGIN_SECONDS) >= cancellationAt) return null;"; return null; }
 
   const terms = lock.refs[0]!.beginParse();
-  if (!sameAddress(terms.loadAddressAny(), input.recipientAddress)) return null;
-  if (!(terms.loadAddressAny() instanceof Address)) return null; // resolver — any
-  if (terms.loadCoins() !== BigInt(input.dstSecurityDepositUnits) || !exactCellEnd(terms)) return null;
+  if (!sameAddress(terms.loadAddressAny(), input.recipientAddress)) { lastStateRefusal = "state#20: if (!sameAddress(terms.loadAddressAny(), input.recipientAddress)) return null;"; return null; }
+  if (!(terms.loadAddressAny() instanceof Address)) { lastStateRefusal = "state#21: if (!(terms.loadAddressAny() instanceof Address)) return null; // resolver — any"; return null; } // resolver — any
+  if (terms.loadCoins() !== BigInt(input.dstSecurityDepositUnits) || !exactCellEnd(terms)) { lastStateRefusal = "state#22: if (terms.loadCoins() !== BigInt(input.dstSecurityDepositUnits) || !exactCellEnd(terms)) return null"; return null; }
 
   const authority = lock.refs[1]!.beginParse();
-  if (!authority.loadBit() || !expected.trusted.authorityKeys.has(Buffer.from(authority.loadBuffer(32)).toString("hex"))) return null;
+  if (!authority.loadBit() || !expected.trusted.authorityKeys.has(Buffer.from(authority.loadBuffer(32)).toString("hex"))) { lastStateRefusal = "state#23: if (!authority.loadBit() || !expected.trusted.authorityKeys.has(Buffer.from(authority.loadBuffer(32)"; return null; }
   // Authority address: the trader's TON address on TON-source positions; `addr_none` on EVM-source
   // positions (live 2026-10-20, every Base → TON order) — the payout target is bound in the terms cell
   // above, and the pinned authority key is what the public path checks. Anything else is foreign.
   const authorityAddress = authority.loadAddressAny();
-  if ((authorityAddress !== null && !sameAddress(authorityAddress, input.recipientAddress)) || !exactCellEnd(authority)) return null;
+  if ((authorityAddress !== null && !sameAddress(authorityAddress, input.recipientAddress)) || !exactCellEnd(authority)) { lastStateRefusal = "state#24: if ((authorityAddress !== null && !sameAddress(authorityAddress, input.recipientAddress)) || !exactC"; return null; }
 
-  if (!expected.trusted.outputEscrow.has(data.refs[2]!.hash().toString("hex"))) return null;
+  if (!expected.trusted.outputEscrow.has(data.refs[2]!.hash().toString("hex"))) { lastStateRefusal = "state#25: if (!expected.trusted.outputEscrow.has(data.refs[2]!.hash().toString(\"hex\"))) return null;"; return null; }
   return {withdrawalAt};
 }
 
@@ -394,29 +397,32 @@ export function createOmnistonTonValidators(options: OmnistonTonValidationOption
      * trusts the feed beyond the address it suggested.
      */
     async validateTonOutputPosition(input) {
+      const refuse = (reason: string, details?: Record<string, unknown>): false => { try { options.onRefusal?.(reason, details); } catch { /* diagnostics never break validation */ } return false; };
+      lastStateRefusal = null;
       try {
         Address.parse(input.positionAddress);
         Address.parse(input.recipientAddress);
         const nowSeconds = Math.floor(now() / 1000);
-        if (!Number.isInteger(input.quoteTimestamp) || input.quoteTimestamp > nowSeconds + 120 || nowSeconds - input.quoteTimestamp > 6 * 60 * 60) return false;
+        if (!Number.isInteger(input.quoteTimestamp) || input.quoteTimestamp > nowSeconds + 120 || nowSeconds - input.quoteTimestamp > 6 * 60 * 60) return refuse("quote-age");
         const accountResponse = await get(`/v2/blockchain/accounts/${encodeURIComponent(input.positionAddress)}`);
-        if (!accountResponse.ok) return false;
+        if (!accountResponse.ok) return refuse("account-fetch", {status: accountResponse.status});
         const account = await accountResponse.json() as {address?: string; status?: string; code?: string; data?: string};
-        if (!account.address || !sameAddress(Address.parse(account.address), input.positionAddress) || account.status !== "active" || !account.code || !account.data) return false;
-        if (!trusted.position.has(cellFromApi(account.code).hash().toString("hex"))) return false;
+        if (!account.address || !sameAddress(Address.parse(account.address), input.positionAddress) || account.status !== "active" || !account.code || !account.data) return refuse("account-state", {status: account.status, hasCode: !!account.code, hasData: !!account.data});
+        if (!trusted.position.has(cellFromApi(account.code).hash().toString("hex"))) return refuse("position-code-hash", {hash: cellFromApi(account.code).hash().toString("hex")});
         const jettonWallet = await jettonWalletOf(input.protocolAddress, input.outputJettonMasterAddress);
-        if (!jettonWallet) return false;
+        if (!jettonWallet) return refuse("jetton-wallet");
         const state = validateOutputPositionState(cellFromApi(account.data), input, {jettonWallet, trusted, nowSeconds});
-        if (!state) return false;
+        if (!state) return refuse("state", {check: lastStateRefusal});
         const txResponse = await get(`/v2/blockchain/accounts/${encodeURIComponent(input.positionAddress)}/transactions?limit=25`);
-        if (!txResponse.ok) return false;
+        if (!txResponse.ok) return refuse("transactions-fetch", {status: txResponse.status});
         const body = await txResponse.json() as {transactions?: {success?: boolean; aborted?: boolean; utime?: number; in_msg?: {source?: {address?: string}; op_code?: string}}[]};
-        return (body.transactions ?? []).some((tx) =>
+        const deployedByFactory = (body.transactions ?? []).some((tx) =>
           tx.success === true && tx.aborted !== true && tx.in_msg?.op_code?.toLowerCase() === POSITION_DEPLOY_OP &&
           !!tx.in_msg.source?.address && sameAddress(Address.parse(tx.in_msg.source.address), input.protocolAddress) &&
           typeof tx.utime === "number" && Math.abs(Number(state.withdrawalAt) - 1 - tx.utime) <= 5);
-      } catch {
-        return false;
+        return deployedByFactory || refuse("deploy-transaction", {transactions: (body.transactions ?? []).length});
+      } catch (error) {
+        return refuse("error", {message: error instanceof Error ? error.message : String(error)});
       }
     },
     /** The contract a swap pays into must carry a recognised DEX code
