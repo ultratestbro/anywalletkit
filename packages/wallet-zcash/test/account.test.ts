@@ -18,7 +18,8 @@ describe('WalletAccountZcash', () => {
     expect(await m.getAccountByPath("0'/0/0")).toBe(a)
     for (const i of [0, 1, 4]) {
       const acc = await m.getAccount(i)
-      const viemPub = mnemonicToAccount(SEED, { path: `m/44'/133'/0'/0/${i}` }).publicKey
+      // viem types the path as `m/44'/60'/…` (EVM); it derives any BIP-32 path, so coin 133 is only a cast.
+      const viemPub = mnemonicToAccount(SEED, { path: `m/44'/133'/0'/0/${i}` as unknown as `m/44'/60'/${string}` }).publicKey
       expect(hex(acc.publicKey)).toBe(hex(secp256k1.Point.fromHex(viemPub.slice(2)).toBytes(true)))
     }
     const t = new WalletManagerZcash(SEED, { network: 'testnet' })

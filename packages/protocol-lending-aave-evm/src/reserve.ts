@@ -67,10 +67,14 @@ export function rayToAprPct(rate: bigint): number {
   return (Number(rate) / 1e27) * 100
 }
 
-/** Ray rate → APY in percent, compounded per second the way the Aave UI shows it. */
+/**
+ * Ray rate → APY in percent, compounded per second the way the Aave UI shows it.
+ * expm1(n·log1p(x)) rather than pow(1 + x, n): with x ≈ 1e-9 and n = 31 536 000 the
+ * pow form depends on the engine's libm (Hermes on Linux drifted past 0.01 %).
+ */
 export function rayToApyPct(rate: bigint): number {
   const apr = Number(rate) / 1e27
-  return (Math.pow(1 + apr / SECONDS_PER_YEAR, SECONDS_PER_YEAR) - 1) * 100
+  return Math.expm1(SECONDS_PER_YEAR * Math.log1p(apr / SECONDS_PER_YEAR)) * 100
 }
 
 export interface ReserveInfo extends ReserveConfiguration {

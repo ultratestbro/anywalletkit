@@ -30,6 +30,7 @@ const FORMATS: Record<ChainKey, (k: Uint8Array) => string[]> = {
   solana: (k) => [base58.encode(secret64(k)), JSON.stringify([...secret64(k)]), base58.encode(k)],
   ton: (k) => [hex.encode(secret64(k)), hex.encode(k)],
   near: (k) => [`ed25519:${base58.encode(secret64(k))}`],
+  zcash: (k) => [wif(k), hex.encode(k)],
 }
 
 describe('Keyring — many accounts from one seed', () => {

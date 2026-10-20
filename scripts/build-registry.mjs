@@ -33,6 +33,12 @@ for (const dir of readdirSync(join(root, 'packages'))) {
 const externalPath = join(root, 'registry', 'external.json')
 if (existsSync(externalPath)) for (const m of JSON.parse(readFileSync(externalPath, 'utf8'))) { validate(m, 'registry/external.json'); modules.push(m) }
 modules.sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name))
-const out = { $schema: './modules.schema.json', generatedAt: new Date().toISOString().slice(0, 10), count: modules.length, modules }
-writeFileSync(join(root, 'registry', 'modules.json'), JSON.stringify(out, null, 2) + '\n')
+// generatedAt moves only when the module list does, so `registry:check` (regenerate + git diff)
+// stays green on days nothing changed instead of failing on the date alone.
+const outFile = join(root, 'registry', 'modules.json')
+const previous = existsSync(outFile) ? JSON.parse(readFileSync(outFile, 'utf8')) : null
+const unchanged = previous && JSON.stringify(previous.modules) === JSON.stringify(modules)
+const generatedAt = unchanged ? previous.generatedAt : new Date().toISOString().slice(0, 10)
+const out = { $schema: './modules.schema.json', generatedAt, count: modules.length, modules }
+writeFileSync(outFile, JSON.stringify(out, null, 2) + '\n')
 console.log(`registry: ${modules.length} modules → registry/modules.json`)

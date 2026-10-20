@@ -142,11 +142,13 @@ describe("Omniston EVM → TON orders (live 2026-10-16 fixtures)", () => {
     }]);
   });
 
+  const flip = (bytes: Uint8Array, at: number) => { bytes[at] = (bytes[at] ?? 0) ^ 1; };
+
   it("refuses to hand over a payload whose signed bytes drift from the quote, and forgets the secret", async () => {
     const cases: [string, () => ReturnType<typeof payload>, RegExp][] = [
       // Any extension byte changes keccak256(extension), which the signed salt commits to — caught before the HTLC decoder.
-      ["hashlock in the extension", () => { const b = payload(); b.orderExtension[32 + 160 + 83] ^= 1; return b; }, /order fields/],
-      ["TON recipient in the extension", () => { const b = payload(); b.orderExtension[b.orderExtension.length - 131 + 34] ^= 1; return b; }, /order fields/],
+      ["hashlock in the extension", () => { const b = payload(); flip(b.orderExtension, 32 + 160 + 83); return b; }, /order fields/],
+      ["TON recipient in the extension", () => { const b = payload(); flip(b.orderExtension, b.orderExtension.length - 131 + 34); return b; }, /order fields/],
       ["maker in the typed data", () => { const b = payload(); const td = JSON.parse(b.typedData); td.message.maker = RESOLVER; b.typedData = JSON.stringify(td); return b; }, /order fields/],
       ["taking amount in the typed data", () => { const b = payload(); const td = JSON.parse(b.typedData); td.message.takingAmount = "0x1"; b.typedData = JSON.stringify(td); return b; }, /order fields/],
       ["verifying contract in the typed data", () => { const b = payload(); const td = JSON.parse(b.typedData); td.domain.verifyingContract = FACTORY; b.typedData = JSON.stringify(td); return b; }, /order fields/],
