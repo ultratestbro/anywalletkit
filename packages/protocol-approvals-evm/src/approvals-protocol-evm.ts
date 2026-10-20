@@ -75,8 +75,8 @@ interface RevokeItem { ids: string[]; tx?: RevokeTransaction; approval?: Approva
  * `isApprovedForAll`, `getApproved`, Permit2 `allowance`, the account's
  * code for EIP-7702) is what gets reported. Revokes reuse the account's own
  * methods — `approve({amount: 0})`, `sendTransaction`, `revokeDelegation` —
- * so on a policy-governed account they are subject
- * to the same rules as any other spend.
+ * so on a policy-governed account (the kit's `Wallet.getAccount(...)`) they
+ * pass the same policies as any other write.
  */
 export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsProtocolEvmConfig> {
   private readonly _provider: PublicClient | undefined

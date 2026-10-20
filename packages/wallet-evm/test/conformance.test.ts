@@ -10,10 +10,10 @@ describeChainModule('wallet-evm', {
   publicKeyOf: async (a) => (a as WalletAccountEvm).publicKey,
 })
 
-describe('wallet-evm: signature parity beyond the shared suite', () => {
+describe('wallet-evm: signatures match the pinned vectors beyond the shared suite', () => {
   for (const [seedName, mnemonic] of Object.entries(derivationVectors.seeds)) {
     for (const vec of derivationVectors.vectors.evm[seedName]!.accounts) {
-      it(`${seedName} #${vec.index}: EIP-1559 signTransaction matches the vector byte-for-byte (offline)`, async () => {
+      it(`${seedName} #${vec.index}: EIP-1559 signTransaction matches the vectors byte-for-byte (offline)`, async () => {
         const m = new WalletManagerEvm(mnemonic)
         const a = await m.getAccount(vec.index)
         const tx = derivationVectors.evmTx as { to: string; value: string; data: string; nonce: number; gasLimit: string; maxFeePerGas: string; maxPriorityFeePerGas: string; chainId: number; type: number }
@@ -21,7 +21,7 @@ describe('wallet-evm: signature parity beyond the shared suite', () => {
         expect(raw).toBe(vec.signTransaction)
         m.dispose()
       })
-      it(`${seedName} #${vec.index}: EIP-712 signTypedData matches the vector`, async () => {
+      it(`${seedName} #${vec.index}: EIP-712 signTypedData matches the vectors`, async () => {
         const m = new WalletManagerEvm(mnemonic)
         const a = await m.getAccount(vec.index)
         const sig = await a.signTypedData(derivationVectors.evmTypedData as never)

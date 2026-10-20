@@ -99,8 +99,8 @@ const sum = (fees: Swap2Fee[], type?: Swap2FeeType): bigint =>
   fees.filter((f) => type === undefined || f.type === type).reduce((acc, f) => acc + f.amount, 0n)
 
 /**
- * Swap + bridge in one. `swap` and `bridge` are derived from `swap2` exactly
- * so a swap2 module is automatically a swap and a bridge module.
+ * Swap + bridge in one. `swap` and `bridge` are derived from `swap2`, so a
+ * swap2 module is automatically a swap and a bridge module.
  */
 export class Swap2Protocol<TConfig extends Swap2ProtocolConfig = Swap2ProtocolConfig>
   extends ProtocolBase<TConfig>

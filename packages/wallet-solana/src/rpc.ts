@@ -7,7 +7,7 @@ const isRpc = (p: unknown): p is SolanaRpc => typeof p === 'object' && p !== nul
 /**
  * One Rpc, or a failover Rpc over a list: every `.method(...).send()` walks the
  * list in order until one answers; `retries` extra rounds after the first full
- * pass. A plain failover wrapper, ~30 lines.
+ * pass.
  */
 export function createRpc(config: SolanaConfig): SolanaRpc | undefined {
   const target = config.provider ?? config.rpcUrl

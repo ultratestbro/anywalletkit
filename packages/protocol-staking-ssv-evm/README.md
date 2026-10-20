@@ -4,13 +4,12 @@ A simple package that lets `@forgewallet/wallet-evm` wallet accounts stake
 through [SSV Network](https://ssv.network): stake SSV → cSSV, claim the ETH
 rewards, exit through the network's cooldown, and read APR and network stats.
 
-Built as the **second implementation of the proposed `StakingProtocol` type**
-for `@forgewallet/core` (the first is
-`protocol-staking-lido-evm`).
-staking. The base class lives in `@forgewallet/core` (`src/staking-protocol.ts` here keeps the runtime `IStakingProtocol` marker and the module's own types); it is written
-to move into `@forgewallet/core` verbatim; a token-staking protocol
-with a cooldown exit fitting it unchanged is the point: the interface is not
-Lido-shaped.
+Built as the **second implementation of the `StakingProtocol` type** in
+`@forgewallet/core` (the first is `@forgewallet/protocol-staking-lido-evm`).
+The base class lives in `@forgewallet/core` (`src/staking-protocol.ts` here
+keeps the runtime `IStakingProtocol` marker and the module's own types). A
+token-staking protocol with a cooldown exit fitting it unchanged is the point:
+the interface is not Lido-shaped.
 
 The mechanics are extracted from a production wallet (React Native/Hermes)
 where every flow is exercised with real funds.
@@ -64,7 +63,7 @@ await ssv.getStakedBalance()   // { balance: cSSV, wrappedBalance: 0n, rate: 1e1
 await ssv.getApr()             // 23.8 (percent, from SSV Network's API)
 ```
 
-SSV-specific extras beyond the proposed interface:
+SSV-specific extras beyond the interface:
 
 ```js
 await ssv.getTokenBalance()          // liquid SSV on the account
@@ -75,7 +74,7 @@ await ssv.getNetworkStats()          // { totalStaked, rewardsPool, accEthPerSha
 await ssv.getAprHistory({ limit: 7 })// daily samples with SSV/ETH prices
 ```
 
-## How it maps onto the proposed interface
+## How it maps onto the interface
 
 | `IStakingProtocol` | SSV Network |
 |---|---|

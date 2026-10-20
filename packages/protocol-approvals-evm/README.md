@@ -2,7 +2,7 @@
 
 **A simple package that lets [`@forgewallet/wallet-evm`](https://www.npmjs.com/package/@forgewallet/wallet-evm) accounts see and revoke the token approvals they have granted.**
 
-Every swap, bridge, lending and staking module *creates* approvals (ERC-20 allowances to routers, Permit2 allowances, operator approvals on NFTs). None of them takes an approval back, and a wallet built on has no way to show its user "who can spend my USD₮". This module fills that gap: it discovers what an account has granted, flags the risky grants, and revokes them through the account's own methods, so a policy-governed account stays governed.
+Every swap, bridge, lending and staking module *creates* approvals (ERC-20 allowances to routers, Permit2 allowances, operator approvals on NFTs). None of them takes an approval back. This module does: it discovers what an account has granted, flags the risky grants, and revokes them through the account's own methods, so a policy-governed account stays governed.
 
 Supported on evm: ERC-20 allowances, ERC-721 per-token approvals, ERC-721 / ERC-1155 operator approvals (`setApprovalForAll`), Uniswap Permit2 allowances, and the account's EIP-7702 delegation.
 
@@ -12,23 +12,25 @@ Supported on evm: ERC-20 allowances, ERC-721 per-token approvals, ERC-721 / ERC-
 npm install @forgewallet/protocol-approvals-evm
 ```
 
-Peer: `@forgewallet/core >= 1.0.0-beta.13`. Runtime dependency: `viem`. Built with tsup (ESM + CJS + types in `dist/`); works on Node 20+ and React Native.
+Peer: `@forgewallet/core`. Runtime dependency: `viem`. Built with tsup (ESM + CJS + types in `dist/`); works on Node 20+ and React Native.
 
 ## Usage
 
-The protocol is constructed directly:
-
 ```js
-import WalletManagerEvm from '@forgewallet/wallet-evm'
+import { Wallet } from '@forgewallet/kit'
+import { WalletManagerEvm } from '@forgewallet/wallet-evm'
 import ApprovalsProtocolEvm from '@forgewallet/protocol-approvals-evm'
 
-const wallet = new WalletManagerEvm(seed, { provider: 'https://ethereum-rpc.publicnode.com' })
-const account = await wallet.getAccount(0)
-
-const approvals = new ApprovalsProtocolEvm(account, {
-  fromBlock: 21_000_000,   // where the wallet was created — a cold scan from 0 is slow
-  blockRange: 10_000       // your RPC's eth_getLogs window (QuickNode: 10 000)
+const wallet = new Wallet(seed)
+wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: 'https://your-rpc', chainId: 1 })
+wallet.registerProtocol('approvals', ApprovalsProtocolEvm, {
+  chain: 'eip155:1',
+  config: {
+    fromBlock: 21_000_000,   // where the wallet was created — a cold scan from 0 is slow
+    blockRange: 10_000       // your RPC's eth_getLogs window (QuickNode: 10 000)
+  }
 })
+const approvals = await wallet.getProtocol('approvals')
 
 const { approvals: list, coverage } = await approvals.getApprovals()
 for (const a of list) {
@@ -42,22 +44,11 @@ await approvals.revoke(list[1])                       // account.approve({ amoun
 await approvals.revokeAll(list.filter((a) => a.risks.length))
 ```
 
-A read-only account (`WalletAccountReadOnlyEvm`, or anything with `getAddress()`) is enough for `getApprovals`; `revoke` / `revokeAll` need a full account.
+Discovery asks `eth_getLogs` for every approval event with the owner in `topic1` and **no `address` filter**; most free public RPCs refuse that. Use your own node, a paid plan, or an indexer source (below). A read-only account (anything with `getAddress()`) is enough for `getApprovals`; `revoke` / `revokeAll` need a full account.
 
-### With the policy engine
+### With policies
 
-Revokes are sent through `account.approve({amount: 0})`, `account.sendTransaction` and `account.revokeDelegation()`. Hand the module the account you get from the policy-governed wallet (not the raw wallet's) and the revokes are subject to the same rules as any other spend. The engine is default-deny, so a governed account needs rules that allow revokes. The package ships them:
-
-```js
-import { approvalsHygienePolicy } from '@forgewallet/protocol-approvals-evm/policies'
-
-wallet.registerPolicy(approvalsHygienePolicy())
-// allow-revoke:           approve with amount 0, revokeDelegation
-// allow-revoke-calldata:  sendTransaction whose data is setApprovalForAll(false), approve(…, 0) or Permit2 lockdown
-// deny-unlimited-approve: approve with amount >= 2^255
-```
-
-Conditions read `context.args`.
+Revokes are sent through `account.approve({amount: 0})`, `account.sendTransaction` and `account.revokeDelegation()`. On an account from the kit's `Wallet.getAccount(...)` they pass the wallet's policies like any other write. The kit treats them as `kind: 'revoke'`: the allowlist and the spender's blocklist entry do not apply (a blocklisted drainer's allowance can always be taken back), `confirm` and the fee cap do. `isRevokeCalldata(data)` and `isUnlimitedAmount(amount)` are exported for hosts that check calldata themselves.
 
 ## How discovery works
 
@@ -102,7 +93,7 @@ Etherscan's own "Token Approvals" page lists the **original** allowance from the
 | `revokeAll(approvals)` | full | `RevokeResult[]` — Permit2 pairs fold into one `lockdown`; with `config.batch` every calldata revoke goes out as one `sendTransaction(tx[])` (ERC-4337 / 7702 accounts); a failed item carries `error` and the run continues |
 | `buildRevokeTransaction(approval \| approvals[])` | none | `{ to, data, value }` for hosts that batch themselves |
 
-`Approval`: `{ id, standard, chainId, token, spender, amount, unlimited, tokenId?, expiration?, grantedAt?, risks }`. `id` is `chainId:standard:token:spender[:tokenId]` and is stable across scans. Approval objects are plain (structured-clone safe), which the policy engine requires.
+`Approval`: `{ id, standard, chainId, token, spender, amount, unlimited, tokenId?, expiration?, grantedAt?, risks }`. `id` is `chainId:standard:token:spender[:tokenId]` and is stable across scans. Approval objects are plain (structured-clone safe).
 
 ### Config
 
@@ -132,10 +123,9 @@ LIVE_PK=0x… node scripts/verify-live.mjs 0x… https://rpc --revoke <approval 
 
 ## Limitations
 
-- Spender labels (which protocol an address belongs to) are out of scope; the id and address are enough to revoke.
 - Discovery depends on events: an allowance granted by a contract that emits no `Approval` (rare, non-compliant tokens) is invisible. Pass it in `options.spenders` / `tokens` with a custom source if you know it.
 - Only the owner's own approvals are listed. Allowances *received* by the account are not approvals it can revoke.
-- The provider is taken from `account._config.provider` when not given — a private field, the same compromise the other community modules make.
+- The provider is taken from `account._config.provider` when not given — a private field of `@forgewallet/wallet-evm` accounts.
 
 ## License
 

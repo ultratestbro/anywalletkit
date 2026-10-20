@@ -329,8 +329,8 @@ export interface ThorchainProviderConfig {
   /**
    * Opt-in Tron SOURCE execution: a native TRX send / TRC-20 transfer to the
    * inbound vault carrying the swap memo in `raw_data.data`. Ships dark: the
-   * bound account MUST attach the memo on-chain (Tron via a prebuilt
-   * TronWeb transaction + `addUpdateData`); a memo-less send is unsettleable.
+   * bound account MUST attach the memo on-chain (`raw_data.data`); a
+   * memo-less send is unsettleable.
    */
   tronSource?: boolean;
 }

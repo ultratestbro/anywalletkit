@@ -183,7 +183,7 @@ describe("core public contract", () => {
     expect(log2).toEqual(["approve1", "approve2", "approve3"]); // zero, exact, cleanup — never the deposit
   });
 
-  it("uses the official transfer surface for a TON jetton deposit", async () => {
+  it("uses the account transfer surface for a TON jetton deposit", async () => {
     const provider: CrossChainProvider = {
       name: "token-transfer",
       enabled: () => true,

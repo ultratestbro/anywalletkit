@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Runs derive + sign for every chain inside the Hermes VM and compares with the golden vectors.",
+  "description": "Runs derive + sign for every chain inside the Hermes VM and compares with the pinned derivation vectors.",
   "scripts": {
     "test:hermes": "node run.mjs"
   },

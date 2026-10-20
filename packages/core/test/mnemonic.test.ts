@@ -7,7 +7,7 @@ describe('mnemonic + paths', () => {
     expect(getRandomSeedPhrase(24).split(' ')).toHaveLength(24)
     expect(isValidSeedPhrase(getRandomSeedPhrase())).toBe(true)
   })
-  it('normalises whitespace and case (trim + lowercase)', () => {
+  it('normalises whitespace and case', () => {
     expect(normalizeMnemonic('  Abandon  abandon\nabandon ')).toBe('abandon abandon abandon')
     expect(isValidSeedPhrase('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abouts')).toBe(false)
   })

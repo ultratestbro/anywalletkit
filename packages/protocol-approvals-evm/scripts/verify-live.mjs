@@ -8,7 +8,7 @@
  *
  * Discovery runs on a read-only account (address + provider). With
  * `--revoke` and LIVE_PK the script sends the real revoke through a viem
- * local account dressed as a wallet account and waits for the receipt.
+ * local account shaped like a wallet account and waits for the receipt.
  */
 import { createPublicClient, createWalletClient, formatUnits, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -57,7 +57,7 @@ if (flags.revoke) {
   const signer = privateKeyToAccount(pk)
   const wallet = createWalletClient({ account: signer, transport: http(rpc) })
   if (signer.address.toLowerCase() !== address.toLowerCase()) throw new Error(`LIVE_PK is ${signer.address}, not ${address}`)
-  // An account adapter over a viem local account: the same three methods a module calls.
+  // A wallet-shaped account over a viem local account: the same three methods a module calls.
   const account = {
     async getAddress () { return signer.address },
     async quoteSendTransaction (tx) {

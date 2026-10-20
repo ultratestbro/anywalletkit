@@ -27,7 +27,7 @@ export function describeChainModule<M extends WalletManager<IWalletAccount, obje
       const mnemonic = derivationVectors.seeds[seedName]!
       describe(seedName, () => {
         for (const vec of set.accounts) {
-          it(`account #${vec.index} resolves the address ${vec.address}`, async () => {
+          it(`account #${vec.index} resolves the pinned address ${vec.address}`, async () => {
             const m = await o.create(mnemonic)
             try {
               const a = await m.getAccount(vec.index)

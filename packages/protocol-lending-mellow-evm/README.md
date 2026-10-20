@@ -7,9 +7,8 @@ on the same contracts: supply through the vault's synchronous or asynchronous
 deposit queue, redeem and claim through the redeem queue, read the position,
 fees, oracle reports and APY.
 
-Built on the `LendingProtocol` type, the way
-Morpho's vaults module
-expresses ERC-4626 vaults: `supply` puts an asset into the vault, `withdraw`
+Built on the `LendingProtocol` type in `@forgewallet/core`, the way the Morpho
+module expresses ERC-4626 vaults: `supply` puts an asset into the vault, `withdraw`
 takes it out. Mellow's withdrawal is two-phase (request → oracle report →
 claim), so the module adds `getWithdrawalRequests` / `claimWithdrawals` on
 top; `borrow` / `repay` reject — a vault does not lend.

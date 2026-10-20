@@ -2,7 +2,7 @@
  * `Swap2Protocol` adapter over the cross-chain engine.
  *
  * The engine speaks in symbols + CAIP-2 chain ids and a deposit-address /
- * calldata execution model; `Swap2Protocol` speaks in provider token ids
+ * calldata execution model; core's `Swap2Protocol` speaks in provider token ids
  * bound to an account whose chain is the source. This base bridges the two:
  * it maps `Swap2Options` → the engine's `QuoteParams`, delegates quoting to a
  * provider (or the router, in the aggregator), and executes the source leg
@@ -89,7 +89,7 @@ function maybeSent(error: unknown): {hash?: string} | null {
   return /socket hang up|ECONNRESET|ETIMEDOUT|EPIPE|timed? ?out|request aborted|connection (?:closed|reset)/i.test(text) ? {} : null;
 }
 
-/** Our config adds the account's source chain (CAIP-2) the type omits. */
+/** Our config adds the account's source chain (CAIP-2) the base type omits. */
 /**
  * Where an execution is, for progress UIs. A source leg can spend a minute
  * before anything is signed (two awaited ERC-20 approvals for USDT), so
@@ -264,9 +264,8 @@ export interface SerializedExecutionExpectation {
 const DEFAULT_SERIALIZED_NATIVE_ALLOWANCE = 20_000_000n;
 
 /**
- * A bound wallet account. `@forgewallet/core` does not re-export
- * its account interfaces, so we accept it opaquely and reach the write surface
- * we need through {@link Swap2Signer}. Passing `undefined` builds a quote-only
+ * A bound wallet account, accepted opaquely: the write surface we need is
+ * reached through {@link Swap2Signer}. Passing `undefined` builds a quote-only
  * protocol (no `swap2()` execution).
  */
 export type Swap2Account = unknown;
@@ -287,7 +286,7 @@ interface Swap2Signer {
     /** Tron: 'hex' = `memo` is a binary payload in 0x-hex (default 'utf8'). */
     memoEncoding?: "utf8" | "hex";
   }): Promise<{hash?: string}>;
-  /** Official token-transfer surface used by TON/Solana/Tron accounts. */
+  /** The account's token-transfer surface, used by TON/Solana/Tron accounts. */
   transfer?: (options: {
     token: string;
     recipient: string;
@@ -349,7 +348,7 @@ interface CarriedAllowance {
 
 /** Swap2 status ids are `awk1.<provider>.<intent>[.<sourceTxHash>]` (URI-encoded segments). */
 export const SWAP2_ID_PREFIX = "awk1";
-/** Ids minted before the rename (2026-10-19) still resolve; nothing new is minted with them. */
+/** Ids minted before the 2026-10-19 prefix change still resolve; nothing new is minted with them. */
 const LEGACY_ID_PREFIXES = ["awk1"];
 
 /** Versioned provider/intent/source-hash id for durable status tracking. */
@@ -863,7 +862,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // token's base-unit amount (audit C1 — e.g. USDT source via a 1Click
     // deposit address would have sent ETH wei). EVM sources are rewritten
     // into an ERC-20 transfer(depositAddress, amount); supported non-EVM
-    // sources use the official account.transfer() token surface below.
+    // sources use the account's transfer() token surface below.
     let tokenId: string | undefined;
     if (!unsigned.data && !unsigned.bodyBoc && !unsigned.typedData && !serialized) {
       const src = ccAsset(this.fromChain, toSymbol(this.fromChain, executionOptions.fromToken));
@@ -1118,7 +1117,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         if (!td || typeof td !== "object" || !td.domain || !td.types || typeof td.types !== "object" || !td.message) {
           throw new Error("swap2: provider returned malformed typed data");
         }
-        // ethers infers the domain type and reject an explicit
+        // ethers and the account infer the domain type and reject an explicit
         // EIP712Domain entry as an ambiguous primary type.
         const {EIP712Domain: _domain, ...types} = td.types;
         // Providers may send the domain chainId as a hex string ("0x89");
@@ -1149,7 +1148,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
 
     // Execute the source leg through the bound account. Non-EVM token deposits
-    // MUST use transfer({token,recipient,amount}); passing token metadata
+    // MUST use the account's transfer({token,recipient,amount}); passing token metadata
     // to sendTransaction would be ignored and send native SOL/TON/TRX instead.
     let sent: {hash?: string};
     this.emitPhase("signing");
@@ -1319,7 +1318,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     return {hash: sent.hash, chain: unsigned.chain, id};
   }
 
-  /** bridge() has no floor field: quote first, then bind execution
+  /** The inherited bridge() has no floor field: quote first, then bind execution
    * to that quote's minimum so the inherited convenience API stays safe. */
   override async bridge(options: BridgeOptions): Promise<BridgeResult> {
     const amount = exactPositiveAmount(options.amount, "amount");

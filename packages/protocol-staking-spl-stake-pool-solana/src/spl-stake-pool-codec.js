@@ -11,7 +11,7 @@
 //    WithdrawStake(10) / WithdrawSol(16) and the ..WithSlippage variants
 //    (25 / 24 / 26), System CreateAccountWithSeed(3), Stake Deactivate(5) /
 //    Withdraw(4), the Associated Token idempotent create and the compute
-//    budget pair. Written out here rather than pulled from an SDK: the 
+//    budget pair. Written out here rather than pulled from an SDK: the
 //    Solana wallet is built on @solana/* 3.x, the published stake-pool client
 //    wants web3.js v1 and @solana-program/stake wants kit ≥5 — a second kit
 //    copy is exactly what a mobile bundle must not carry;

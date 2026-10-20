@@ -5,11 +5,10 @@ through the [Lido](https://lido.fi) protocol: stake ETH → stETH, exit through
 the two-phase withdrawal queue, wrap/unwrap the non-rebasing wstETH form, and
 read APR and reward history.
 
-Built as the first implementation of a **proposed `StakingProtocol` type** for
-`@forgewallet/core` (which today ships swap, bridge, lending, fiat, swap2
-and sda — no staking). The base class lives in `@forgewallet/core`;
+Built as the first implementation of the **`StakingProtocol` type** in
+`@forgewallet/core`. The base class lives in `@forgewallet/core`;
 `src/staking-protocol.ts` keeps the runtime `IStakingProtocol` marker and the
-option / result types this module documents. See "The proposed interface" below for
+option / result types this module documents. See "The interface" below for
 why staking is not lending.
 
 The mechanics are extracted from a production wallet (web + React
@@ -46,7 +45,7 @@ await lido.getStakedBalance() // { balance, wrappedBalance, rate, total }
 await lido.getApr()           // 2.72 (percent, 7d SMA)
 ```
 
-Lido-specific extras beyond the proposed interface:
+Lido-specific extras beyond the interface:
 
 ```js
 await lido.wrap({ amount })                 // stETH → wstETH (approve awaited + wrap)
@@ -106,7 +105,7 @@ Only mainnet ships as a default deployment — deliberately. Testnets (e.g.
 Hoodi) must be configured explicitly so nobody stakes against an unverified
 address a default quietly supplied.
 
-## The proposed interface
+## The interface
 
 `IStakingProtocol`: `stake` / `quoteStake`, `requestWithdrawal` /
 `quoteRequestWithdrawal`, `getWithdrawalRequests`, `claimWithdrawals` /

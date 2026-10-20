@@ -60,7 +60,7 @@ export class WalletManagerEvm extends WalletManager<WalletAccountEvm, EvmConfig>
     return new WalletAccountReadOnlyEvm(address, this._config)
   }
 
-  /** Fee multipliers: normal = feeRate × 1.0, fast = × 1.2. We add slow = × 0.8 for completeness. */
+  /** normal = feeRate × 1.0, fast = × 1.2, slow = × 0.8. */
   async getFeeRates(): Promise<FeeRates> {
     const probe = new WalletAccountReadOnlyEvm('0x0000000000000000000000000000000000000000', this._config)
     const normal = await probe.getFeeRate()

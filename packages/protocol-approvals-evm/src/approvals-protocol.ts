@@ -56,11 +56,9 @@ export interface AccountLike extends ReadOnlyAccountLike {
 /**
  * The approvals protocol interface — the shape a chain implementation fills.
  *
- * This base ships with the module
- * and implementations are constructed directly: `new ApprovalsProtocolEvm(account, config)`.
- * Revokes go through the account's own governed methods (`approve`,
- * `sendTransaction`, `revokeDelegation`), so an account obtained from
- * a policy engine stays governed without any core change.
+ * Revokes go through the account's own methods (`approve`, `sendTransaction`,
+ * `revokeDelegation`), so on an account from the kit's `Wallet.getAccount(...)`
+ * they pass the wallet's policies like any other write.
  */
 export class IApprovalsProtocol {
   /** The standards this implementation can discover and revoke. */

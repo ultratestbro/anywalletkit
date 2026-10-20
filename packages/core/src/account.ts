@@ -1,7 +1,5 @@
 /**
- * The account surface protocol modules are written against. Method names
- * follow the common wallet-account shape, so modules that duck-type the
- * account keep working.
+ * The account surface protocol modules are written against.
  */
 
 /** A transfer of the chain's native token or of a token on it. Amounts in base units. */

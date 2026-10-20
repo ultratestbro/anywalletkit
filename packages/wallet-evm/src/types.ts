@@ -15,8 +15,8 @@ export interface EvmConfig {
   /** Max fee (wei) for `sendTransaction` / `signTransaction`. */
   transactionMaxFee?: bigint | number
   /**
-   * Ethereum-mainnet USDT reverts a non-zero → non-zero `approve`. By default the account throws and
-   * asks the caller to approve(0) first; with this flag the account sends the
+   * Ethereum-mainnet USDT reverts a non-zero → non-zero `approve`. By default the account
+   * throws and asks the caller to approve(0) first; with this flag the account sends the
    * reset itself and waits for it before the real approval.
    */
   autoResetAllowance?: boolean

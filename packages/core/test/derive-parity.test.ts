@@ -15,7 +15,7 @@ const v = vectors.vectors as unknown as Record<'evm' | 'btc' | 'ton' | 'tron' | 
 const secp = ['evm', 'btc', 'tron'] as const
 const ed = ['ton', 'solana'] as const
 
-describe('key-material parity', () => {
+describe('key material matches the pinned derivation vectors', () => {
   for (const [seedName, mnemonic] of Object.entries(vectors.seeds)) {
     const seed = seedFromMnemonicSync(mnemonic)
     it(`${seedName}: is a valid seed phrase`, () => expect(isValidSeedPhrase(mnemonic)).toBe(true))

@@ -5,12 +5,9 @@ through [Tonstakers](https://tonstakers.com): stake GRAM → tsTON, exit
 instant / standard / best-rate, track payout bills, read rates, APY and
 earnings.
 
-Built as the **third implementation of the proposed `StakingProtocol` type**
-for `@forgewallet/core` — after
-Lido (ETH
-liquid staking) and
-SSV (token
-staking with a cooldown) — and the first one off EVM. The base class in
+Built as the **third implementation of the `StakingProtocol` type** in
+`@forgewallet/core` — after Lido (ETH liquid staking) and SSV (token staking
+with a cooldown) — and the first one off EVM. The base class in
 `src/staking-protocol.js` is the same file, byte-identical; a TON liquid
 staking protocol fitting it is the point: the type is chain-agnostic.
 
@@ -59,7 +56,7 @@ await tonstakers.getStakedBalance()   // { balance: tsTON, rate: GRAM per tsTON,
 await tonstakers.getApr()             // 12.86 (percent, tonapi)
 ```
 
-Tonstakers-specific extras beyond the proposed interface:
+Tonstakers-specific extras beyond the interface:
 
 ```js
 await tonstakers.getPoolData()         // halted, depositsOpen, balances, minter, payout collection, rates
@@ -70,7 +67,7 @@ await tonstakers.getTokenBalance()     // tsTON held
 await tonstakers.getRewards()          // earned GRAM = (rate − weighted entry rate) × tsTON
 ```
 
-## How it maps onto the proposed interface
+## How it maps onto the interface
 
 | `IStakingProtocol` | Tonstakers |
 |---|---|
@@ -93,10 +90,9 @@ GRAM value is the figure that means anything.
   sends through a connector; no payload export). Its message builders —
   op codes, fee reserves, payload layout — are ported verbatim and ride the
   account's own `sendTransaction({ to, value, body })`, which signs locally.
-- **Friendly addresses on the wire**: the wallet derives the bounce
-  flag by parsing the recipient as a *friendly* address, so the module hands
-  it `EQ…` forms — a raw `0:…` jetton-wallet address makes it throw
-  "Unknown address type". Paid for in production.
+- **Friendly addresses on the wire**: the module hands the account `EQ…`
+  forms, which carry the bounce flag; a raw `0:…` jetton-wallet address
+  carries none.
 - **Pool state is read on-chain** (`get_pool_full_data`, layout verified
   against mainnet), through the account's TonClient with failover across
   configured clients. Public toncenter nodes intermittently answer exit code

@@ -6,14 +6,9 @@ program — [Jito](https://www.jito.network) by default: stake SOL → JitoSOL,
 exit instantly from the reserve or through a stake account, claim, read
 rates, APY and earnings.
 
-Built as the **fourth implementation of the proposed `StakingProtocol` type**
-for `@forgewallet/core` — after
-Lido (ETH
-liquid staking),
-SSV (token
-staking with a cooldown) and
-Tonstakers
-(GRAM liquid staking) — and the second one off EVM. The base class in
+Built as the **fourth implementation of the `StakingProtocol` type** in
+`@forgewallet/core` — after Lido (ETH liquid staking), SSV (token staking with
+a cooldown) and Tonstakers (GRAM liquid staking) — and the second one off EVM. The base class in
 `src/staking-protocol.js` is the same file, byte-identical: the type is
 chain-agnostic, and Solana's two-shape exit (instant vs. stake account +
 epoch boundary) fits its request → queue → claim contract.

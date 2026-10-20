@@ -57,7 +57,7 @@ export interface CcChain {
 export const CC_SOURCE_CHAINS: CcChain[] = [
   {
     // Ethereum is both the vault chain AND — for the step-2 off-ramp — the
-    // SOURCE the user's own funds leave from. The
+    // SOURCE the user's own funds leave from (the wallet holds ETH/stables here). The
     // deposit UI hides it (Ethereum deposits use the direct tab, CC_OTHER_CHAINS);
     // the off-ramp uses it as the fixed source and CC_OTHER_CHAINS as the
     // destinations. 1Click asset ids follow the omft pattern (native + eth-<addr>).

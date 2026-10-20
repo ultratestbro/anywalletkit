@@ -6,8 +6,8 @@ import {
 } from 'viem'
 
 import ApprovalsProtocolEvm, {
-  ApprovalsError, RpcLogsSource, StateVerifier, approvalsHygienePolicy, isRevokeCalldata, parseApprovalLog, STANDARDS,
-  type AccountLike, type Approval, type Eip1193Provider, type FetchLike, type PolicyContext, type ReadOnlyAccountLike, type RevokeTransaction, type SpenderLabel,
+  ApprovalsError, RpcLogsSource, StateVerifier, isRevokeCalldata, isUnlimitedAmount, parseApprovalLog, STANDARDS,
+  type AccountLike, type Approval, type Eip1193Provider, type FetchLike, type ReadOnlyAccountLike, type RevokeTransaction, type SpenderLabel,
 } from '../src/index.js'
 
 const { TOPICS, PERMIT2_ADDRESS, MULTICALL3_ADDRESS, ERC20_ABI, ERC721_ABI, PERMIT2_ABI, MULTICALL3_ABI, MAX_UINT160, MAX_UINT256, SELECTORS } = STANDARDS
@@ -407,18 +407,7 @@ test('revokeAll with batch: everything with calldata becomes one sendTransaction
   assert.equal(account.approved.length, 0)
 })
 
-test('policies: approvals-hygiene allows revokes, denies unlimited approves, recognises revoke calldata', () => {
-  const policy = approvalsHygienePolicy()
-  const rule = (name: string) => policy.rules.find((r) => r.name === name)!
-  const ctx = (operation: string, ...args: unknown[]): PolicyContext => ({ operation, args, wallet: 'w', account: 0 })
-  assert.equal(rule('allow-revoke').conditions[0]!(ctx('approve', { token: USDT, spender: LIFI, amount: 0n })), true)
-  assert.equal(rule('allow-revoke').conditions[0]!(ctx('approve', { token: USDT, spender: LIFI, amount: '0' })), true)
-  assert.equal(rule('allow-revoke').conditions[0]!(ctx('approve', { token: USDT, spender: LIFI, amount: 5n })), false)
-  assert.equal(rule('allow-revoke').conditions[0]!(ctx('revokeDelegation')), true)
-  assert.equal(rule('deny-unlimited-approve').conditions[0]!(ctx('approve', { amount: MAX_UINT256 })), true)
-  assert.equal(rule('deny-unlimited-approve').conditions[0]!(ctx('approve', { amount: 1n << 255n })), true)
-  assert.equal(rule('deny-unlimited-approve').conditions[0]!(ctx('approve', { amount: (1n << 255n) - 1n })), false)
-
+test('isRevokeCalldata recognises the revoke calldata buildRevokeTransaction emits, isUnlimitedAmount the 2^255 threshold', () => {
   const protocol = new ApprovalsProtocolEvm({ async getAddress () { return OWNER } }, { provider: 'http://localhost', chainId: 1 })
   const setOff = protocol.buildRevokeTransaction(approval({ standard: 'erc721', token: NFT, spender: OPERATOR }))
   const lock = protocol.buildRevokeTransaction(approval({ standard: 'permit2', token: USDC, spender: ROUTER }))
@@ -429,12 +418,9 @@ test('policies: approvals-hygiene allows revokes, denies unlimited approves, rec
   assert.equal(isRevokeCalldata(encodeFunctionData({ abi: ERC20_ABI, functionName: 'approve', args: [LIFI, 1n] })), false)
   assert.equal(isRevokeCalldata(encodeFunctionData({ abi: ERC721_ABI, functionName: 'setApprovalForAll', args: [OPERATOR, true] })), false)
   assert.equal(isRevokeCalldata(undefined), false)
-  const calldata = rule('allow-revoke-calldata').conditions[0]!
-  assert.equal(calldata(ctx('sendTransaction', setOff)), true)
-  assert.equal(calldata(ctx('sendTransaction', [setOff, lock])), true)
-  assert.equal(calldata(ctx('sendTransaction', [setOff, { to: USDT, data: encodeFunctionData({ abi: ERC20_ABI, functionName: 'approve', args: [LIFI, 1n] }) }])), false)
-  assert.equal(calldata(ctx('sendTransaction', { to: USDT, value: 1n })), false)
-  assert.equal(approvalsHygienePolicy({ denyUnlimited: false }).rules.length, 2)
+  assert.equal(isUnlimitedAmount(MAX_UINT256), true)
+  assert.equal(isUnlimitedAmount(1n << 255n), true)
+  assert.equal(isUnlimitedAmount((1n << 255n) - 1n), false)
 })
 
 test('getSupportedStandards lists the evm set', async () => {

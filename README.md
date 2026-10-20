@@ -1,6 +1,6 @@
 # forgewallet
 
-> Working name. Rename = one `sed` over `@forgewallet/`.
+> Working name. Public name: Any Wallet Kit, npm scope `@anywalletkit/` (the rename is one `sed` over `@forgewallet/`).
 
 Open-source multichain wallet SDK. One seed phrase → accounts on EVM (30 networks),
 Bitcoin, TON, Tron, Solana, NEAR and Zcash (transparent), with a single account interface that protocol
@@ -26,8 +26,8 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Standard derivation per chain.** Account `i` is the address MetaMask / Rabby
   (EVM), Phantom (Solana), Trust Wallet (TON), TronLink, BIP-84 wallets (Bitcoin)
   and MyNearWallet derive from the same seed — the table is in
-  `@forgewallet/keyring`, the vectors in `packages/conformance/vectors`. The SDK
-  keeps these account-0 vectors pinned; each chain uses the best stack for it.
+  `@forgewallet/keyring`, the pinned vectors in `packages/conformance/vectors`.
+  Each chain uses the best stack for it.
 - **Zeroize by design.** Everything that holds a key has `dispose()`. A manager
   keeps the 64-byte seed, never the phrase (a JS string cannot be zeroized, a
   `Uint8Array` can); the keyring reads a secret per call and disposes the
@@ -71,6 +71,7 @@ Every protocol module ships a `module.json`; `pnpm registry` builds
 [registry/modules.json](registry/modules.json) from them (18 modules today). See
 [registry/README.md](registry/README.md) for tiers and how to list an external module.
 
+User documentation: [docs.anywallet.tech](https://docs.anywallet.tech) (sources in `apps/docs`).
 
 ## Planned modules
 
