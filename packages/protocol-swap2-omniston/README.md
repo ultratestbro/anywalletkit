@@ -1,9 +1,13 @@
 # @forgewallet/protocol-swap2-omniston
 
-STON.fi Omniston as a swap2 module: TON ↔ TON swaps settled on the STON.fi DEX
-and TON ↔ EVM stable orders settled through HTLC escrows (resolver Arbiter),
-over the Omniston WebSocket RFQ. Standalone through `OmnistonSwap2Protocol`,
-or as one provider of the router.
+STON.fi Omniston as a swap2 module: TON ↔ TON swaps settled on the STON.fi DEX,
+and TON ↔ EVM and EVM ↔ EVM stable orders settled through HTLC escrows
+(resolver Arbiter), over the Omniston WebSocket RFQ. Standalone through
+`OmnistonSwap2Protocol`, or as one provider of the router.
+
+EVM chains: Ethereum, BNB, Polygon, X Layer, HyperEVM, Robinhood, Base, Plasma,
+Arbitrum, Avalanche. ARC (in Omniston's matrix) waits for the asset catalog;
+TRON needs its own order path and is not wired yet.
 
 ## Routes and their gates
 
@@ -25,6 +29,31 @@ Every route is fail-closed until its allowlists and validators are configured:
   `validateEvmInputPosition` (finalized `SrcEscrowCreated` + escrow state)
   AND `validateTonOutputPosition` (factory-deployed TON position with bound
   state, inside its completion window) both pass.
+- **EVM → EVM** (gasless order, same order protocol as EVM → TON): the signed
+  extension's ExtraDataArgs name the destination chain, token and deposit and
+  are checked against the quote. The EVM recipient is NOT in anything the
+  wallet signs (it rides in the unsigned order details), so the secret is
+  disclosed only when `validateEvmInputPosition` (source fill, including the
+  destination complement) AND `validateEvmOutputPosition` (an escrow the
+  trusted factory derives from immutables that pay the recipient) both pass.
+
+## Validators
+
+`@forgewallet/protocol-swap2-omniston/validators` ships the RPC/indexer-backed
+validators every route above needs, plus the audited contract tables:
+`createOmnistonEvmOutputValidator`, `createOmnistonEvmInputValidator`,
+`createOmnistonTonValidators` (TonAPI), `AUDITED_OMNISTON_SETTLEMENT_CONTRACTS`,
+`AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS`. No deployment env is read: pass your
+own endpoints as `rpcUrls` (CAIP-2 → URLs, tried before the public fallbacks)
+and `tonApiUrl` / `tonApiKey`. On serverless also inject durable
+`secretStore` / `quoteStore` — the HTLC secret must survive to the poll that
+discloses it.
+
+The destination-escrow proof requires the escrow immutables to be found in the
+resolver's calldata AND to derive, through the trusted factory's
+`addressOfEscrowDst` (deployedAt stamped with the block timestamp), to the
+escrow address the factory announced; a decoy tuple or hidden immutables fail
+closed.
 
 ## Activity
 

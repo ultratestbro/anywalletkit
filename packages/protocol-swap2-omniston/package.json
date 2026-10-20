@@ -10,7 +10,9 @@
     "./dist/provider.js",
     "./dist/provider.cjs",
     "./dist/protocol.js",
-    "./dist/protocol.cjs"
+    "./dist/protocol.cjs",
+    "./dist/validators.js",
+    "./dist/validators.cjs"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -35,6 +37,11 @@
       "types": "./dist/protocol.d.ts",
       "import": "./dist/protocol.js",
       "require": "./dist/protocol.cjs"
+    },
+    "./validators": {
+      "types": "./dist/validators.d.ts",
+      "import": "./dist/validators.js",
+      "require": "./dist/validators.cjs"
     },
     "./package.json": "./package.json"
   },
