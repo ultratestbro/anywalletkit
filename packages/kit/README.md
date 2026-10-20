@@ -30,9 +30,15 @@ Policies run before anything is signed or broadcast, in this order: fee cap
 (quotes first, where the account can quote), allowlist, blocklist, `confirm`.
 Every write surface of an account is covered — `sendTransaction`, `transfer`,
 `signTransaction` (a module that signs and broadcasts on its own cannot skip
-them), `sign` (message signatures: `confirm` only, nothing moves) and
-chain-specific ones such as Solana's `sendSerialized`. Reads are never
-intercepted.
+them), `sign` and NEAR's `signNep413` (message signatures: `confirm` only,
+nothing moves), the approval surfaces `approve`, `signPermit` and EIP-2612 /
+Permit2 `signTypedData` (checked against the **spender**; `confirm` sees
+`kind: 'approval'` with `unlimited`), other `signTypedData` (`confirm` only),
+and chain-specific ones such as Tron's `signRaw`, NEAR's `signBuilt`, Solana's
+`sendSerialized`. The rule is deny-by-default: any account method named
+`sign*` / `send*` / `approve*` / `revoke*` / `transfer*` is guarded unless it
+is listed in `UNGUARDED_WRITES`, so a new signing method in a chain package
+cannot bypass the policies by not being named. Reads are never intercepted.
 
 ## Activity history
 

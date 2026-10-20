@@ -34,9 +34,15 @@ Address comparison ignores letter case.
 ## What is guarded
 
 Every method that produces a signature or a broadcast: `transfer`, `sendTransaction`,
-`signTransaction`, `sign`, plus chain-specific write methods (Solana's `sendSerialized`,
-`signCompiled`, `signTransactionMessage`). Reads (balances, quotes, receipts) are never
-affected.
+`signTransaction`, `sign`, the approval surfaces `approve`, `signPermit` and
+`signTypedData` (an EIP-2612 `Permit` or a Permit2 message is an approval: the lists check
+the **spender**, and `confirm` receives `kind: 'approval'` with `unlimited` and `deadline`;
+any other typed data is `kind: 'typedData'`, `confirm` only), plus chain-specific write
+methods (Tron's `signRaw`, NEAR's `signBuilt` and `signNep413`, Solana's `sendSerialized`,
+`signCompiled`, `signTransactionMessage`). The rule is deny-by-default: any account method
+whose name starts with `sign`, `send`, `approve`, `revoke` or `transfer` is guarded unless
+it is listed in `UNGUARDED_WRITES` (empty today), so a new signing method in a chain
+package cannot bypass the policies. Reads (balances, quotes, receipts) are never affected.
 
 For each write the checks run in this order:
 
