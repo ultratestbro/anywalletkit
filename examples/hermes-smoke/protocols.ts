@@ -87,6 +87,15 @@ export async function smokeProtocols(check: Check): Promise<void> {
   await tolerates(check, 'aave: getMarket (no provider → NetworkError)', () => aave.getMarket())
   const cfg = parseReserveConfiguration((7500n) | (7800n << 16n) | (6n << 48n) | (1n << 56n) | (1n << 58n))
   check('aave: parseReserveConfiguration', cfg.ltv === 0.75 && cfg.decimals === 6 && cfg.active && cfg.borrowingEnabled)
+  // Engine math the APY depends on, each checked on its own so a Hermes build that gets one of
+  // them wrong (BigInt → Number, log1p/expm1/pow near 1) names the culprit instead of the sum.
+  const ray = Number(4n * 10n ** 25n)
+  check(`aave: Number(4e25 ray) (${ray})`, ray === 4e25)
+  const perSec = 0.04 / 31_536_000
+  const l = Math.log1p(perSec), e = Math.expm1(0.04), p = Math.pow(1 + perSec, 31_536_000)
+  check(`aave: log1p(${perSec}) (${l})`, Math.abs(l / perSec - 1) < 1e-6)
+  check(`aave: expm1(0.04) (${e})`, Math.abs(e - 0.0408107742) < 1e-8)
+  check(`aave: pow(1 + r/n, n) (${p})`, Math.abs(p - 1.0408107720) < 1e-6)
   const apy = rayToApyPct(4n * 10n ** 25n)
   check(`aave: rayToApyPct (${apy.toFixed(4)} ≈ 4.081)`, Math.abs(apy - 4.081) < 0.01)
   const mv = new MorphoVaultProtocolEvm(evm, { chainId: 1, vault: '0xBEEF01735c132Ada46AA9aA4c54623cAA92A64CB', api: null })
