@@ -69,12 +69,25 @@ function encodeVarint(n: number): number[] {
   return out
 }
 
-/** The wire bytes of a memo record: tag (field 10, length-delimited = 0x52) ‖ varint(len) ‖ UTF-8. */
-export function encodeMemoRecord(memo: string): Uint8Array {
-  const utf8 = new TextEncoder().encode(memo)
-  if (utf8.length === 0) throw new UnsafeTransactionError('memo', 'A memo must not be empty.')
-  if (utf8.length > MAX_MEMO_BYTES) throw new UnsafeTransactionError('memo', `Memo is ${utf8.length} bytes; the limit is ${MAX_MEMO_BYTES}.`)
-  return Uint8Array.from([(MEMO_FIELD << 3) | 2, ...encodeVarint(utf8.length), ...utf8])
+/**
+ * How a memo string becomes `raw_data.data` bytes: 'utf8' (a text memo — THORChain, exchanges) or 'hex' (binary
+ * payloads — a Chainflip vault swap's SCALE-encoded note, given as 0x-hex).
+ */
+export type MemoEncoding = 'utf8' | 'hex'
+
+export function memoBytes(memo: string, encoding: MemoEncoding = 'utf8'): Uint8Array {
+  if (encoding === 'utf8') return new TextEncoder().encode(memo)
+  const h = memo.startsWith('0x') ? memo.slice(2) : memo
+  if (!h || h.length % 2 || /[^0-9a-f]/i.test(h)) throw new UnsafeTransactionError('memo', 'A hex memo must be non-empty, even-length hex.')
+  return hexToBytes(h.toLowerCase())
+}
+
+/** The wire bytes of a memo record: tag (field 10, length-delimited = 0x52) ‖ varint(len) ‖ the memo bytes. */
+export function encodeMemoRecord(memo: string, encoding: MemoEncoding = 'utf8'): Uint8Array {
+  const bytes = memoBytes(memo, encoding)
+  if (bytes.length === 0) throw new UnsafeTransactionError('memo', 'A memo must not be empty.')
+  if (bytes.length > MAX_MEMO_BYTES) throw new UnsafeTransactionError('memo', `Memo is ${bytes.length} bytes; the limit is ${MAX_MEMO_BYTES}.`)
+  return Uint8Array.from([(MEMO_FIELD << 3) | 2, ...encodeVarint(bytes.length), ...bytes])
 }
 
 /**
@@ -83,7 +96,7 @@ export function encodeMemoRecord(memo: string): Uint8Array {
  * A transaction that already carries a memo is refused (the node's own `data` would
  * have to be re-signed anyway and we cannot know which the caller meant).
  */
-export function attachMemo(tx: TronRawTransaction, memo: string): TronRawTransaction {
+export function attachMemo(tx: TronRawTransaction, memo: string, encoding: MemoEncoding = 'utf8'): TronRawTransaction {
   if (tx.raw_data?.data) throw new UnsafeTransactionError('memo', 'The transaction already carries a memo (raw_data.data).')
   if (tx.signature?.length) throw new UnsafeTransactionError('memo', 'Cannot attach a memo to an already signed transaction.')
   const raw = hexToBytes(tx.raw_data_hex)
@@ -94,18 +107,17 @@ export function attachMemo(tx: TronRawTransaction, memo: string): TronRawTransac
     throw new UnsafeTransactionError('memo', `raw_data_hex is not a well-formed protobuf message (${(e as Error).message}); refusing to attach a memo.`)
   }
   if (records.some((r) => r.field === MEMO_FIELD)) throw new UnsafeTransactionError('memo', 'raw_data_hex already contains field 10 (data).')
-  const record = encodeMemoRecord(memo)
+  const record = encodeMemoRecord(memo, encoding)
   const after = records.find((r) => r.field > MEMO_FIELD)
   const at = after ? after.start : raw.length
   const out = new Uint8Array(raw.length + record.length)
   out.set(raw.subarray(0, at), 0)
   out.set(record, at)
   out.set(raw.subarray(at), at + record.length)
-  const utf8 = new TextEncoder().encode(memo)
   return {
     ...tx,
     txID: bytesToHex(sha256(out)),
     raw_data_hex: bytesToHex(out),
-    raw_data: { ...tx.raw_data, data: bytesToHex(utf8) },
+    raw_data: { ...tx.raw_data, data: bytesToHex(memoBytes(memo, encoding)) },
   }
 }

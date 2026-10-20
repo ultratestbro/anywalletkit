@@ -1,0 +1,58 @@
+{
+  "note": "Uniswap SwapRouter02 — not Chainflip",
+  "own": [
+    "0x29c953a4B51D837b8460Ce54E68d652ca865FA4e"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x8d3c1764d49f6e394c5a7801f7383ef15de28df718e482d5f22443b9a84259b4",
+    "time": 1791999551,
+    "status": "confirmed",
+    "address": "0x29c953a4B51D837b8460Ce54E68d652ca865FA4e",
+    "from": "0x29c953a4B51D837b8460Ce54E68d652ca865FA4e",
+    "to": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "from": "0x3416cF6C708Da44DB2624D63ea0AAef7113527C6",
+        "to": "0x29c953a4B51D837b8460Ce54E68d652ca865FA4e",
+        "amount": "3102205605",
+        "standard": "erc20",
+        "symbol": "USDT",
+        "decimals": 6
+      },
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0x29c953a4B51D837b8460Ce54E68d652ca865FA4e",
+        "to": "0x3416cF6C708Da44DB2624D63ea0AAef7113527C6",
+        "amount": "3099608200",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "52149986728452",
+    "call": {
+      "to": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "selector": "0x5ae401dc"
+    },
+    "block": "26192290"
+  },
+  "expect": {
+    "kind": "swap",
+    "title": "Swapped USDC → USDT",
+    "assetsOut": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "amount": "3099608200"
+      }
+    ],
+    "assetsIn": [
+      {
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "amount": "3102205605"
+      }
+    ]
+  }
+}

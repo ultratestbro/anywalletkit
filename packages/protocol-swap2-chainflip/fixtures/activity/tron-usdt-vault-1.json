@@ -1,0 +1,26 @@
+{
+  "note": "Chainflip vault swap from Tron: 500 USDT transferred to the Chainflip Vault with the swap note in raw_data.data (output asset 1 = ETH, Ethereum address), 2026-10-20 (TronGrid). Chain in wallet-history form tron:0x2b6653dc",
+  "own": ["TNrfMbHWuZgm4K8saMPaXJmVpYAwZjdF4G"],
+  "tx": {
+    "chain": "tron:0x2b6653dc",
+    "hash": "f95b6feae7627e86c944f482d40824e8345023717c40a3db36c7695949db1e7a",
+    "time": 1792525257,
+    "status": "confirmed",
+    "address": "TNrfMbHWuZgm4K8saMPaXJmVpYAwZjdF4G",
+    "from": "TNrfMbHWuZgm4K8saMPaXJmVpYAwZjdF4G",
+    "to": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+    "nativeValue": "0",
+    "transfers": [
+      {"token": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", "from": "TNrfMbHWuZgm4K8saMPaXJmVpYAwZjdF4G", "to": "TEcDijvKSXcfWT7S6rd44H5vNgufm7Y4XC", "amount": "500000000", "standard": "trc20", "symbol": "USDT", "decimals": 6}
+    ],
+    "fee": "7428400",
+    "call": {"to": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", "selector": "0xa9059cbb"},
+    "block": "87284063"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged",
+    "assetsOut": [{"token": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", "amount": "500000000"}],
+    "counterparty": "TEcDijvKSXcfWT7S6rd44H5vNgufm7Y4XC"
+  }
+}

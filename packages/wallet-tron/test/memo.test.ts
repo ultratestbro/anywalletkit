@@ -3,7 +3,7 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import {
   MAX_MEMO_BYTES, UnsafeTransactionError, WalletManagerTron, attachMemo, bandwidthPoints, describeTransaction, encodeMemoRecord, selector,
-  toHexAddress, type TronFetch, type TronRawTransaction,
+  memoBytes, toHexAddress, type TronFetch, type TronRawTransaction,
 } from '../src/index.js'
 
 const SEED = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
@@ -137,5 +137,20 @@ describe('memo (raw_data.data)', () => {
     expect(raw.memo).toBe('hi')
     expect(raw.warnings.map((w) => w.code)).toEqual(['memo-fee'])
     expect(describeTransaction({ to: EXISTING, value: 1n }).memo).toBeUndefined()
+  })
+
+  it('hex encoding carries a binary memo byte-for-byte (Chainflip vault-swap notes)', () => {
+    const note = '0x0004' + '00'.repeat(20) + 'ff'
+    expect(bytesToHex(memoBytes(note, 'hex'))).toBe(note.slice(2))
+    expect(bytesToHex(memoBytes(note.slice(2).toUpperCase(), 'hex'))).toBe(note.slice(2))
+    for (const bad of ['', '0x', '0xabc', '0xzz']) expect(() => memoBytes(bad, 'hex')).toThrow(UnsafeTransactionError)
+    const tx = attachMemo(rawTx('TransferContract', { owner_address: toHexAddress(EXISTING), to_address: toHexAddress(EXISTING), amount: 1 }, RAW_TRANSFER), note, 'hex')
+    expect(tx.raw_data.data).toBe(note.slice(2))
+    const rec = bytesToHex(encodeMemoRecord(note, 'hex'))
+    expect(rec).toBe('52' + (note.length / 2 - 1).toString(16).padStart(2, '0') + note.slice(2))
+    expect(tx.raw_data_hex.indexOf(rec)).toBeLessThan(tx.raw_data_hex.indexOf(F.contract))
+    expect(tx.txID).toBe(bytesToHex(sha256(hexToBytes(tx.raw_data_hex))))
+    // the same string as utf8 is a different (longer) payload: the encoding is not guessed
+    expect(attachMemo(rawTx('TransferContract', { owner_address: toHexAddress(EXISTING), to_address: toHexAddress(EXISTING), amount: 1 }, RAW_TRANSFER), note).raw_data.data).toBe(utf8hex(note))
   })
 })
