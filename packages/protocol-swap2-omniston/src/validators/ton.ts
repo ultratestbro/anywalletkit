@@ -166,7 +166,11 @@ function validateOutputPositionState(
 
   const authority = lock.refs[1]!.beginParse();
   if (!authority.loadBit() || !expected.trusted.authorityKeys.has(Buffer.from(authority.loadBuffer(32)).toString("hex"))) return null;
-  if (!sameAddress(authority.loadAddressAny(), input.recipientAddress) || !exactCellEnd(authority)) return null;
+  // Authority address: the trader's TON address on TON-source positions; `addr_none` on EVM-source
+  // positions (live 2026-10-20, every Base → TON order) — the payout target is bound in the terms cell
+  // above, and the pinned authority key is what the public path checks. Anything else is foreign.
+  const authorityAddress = authority.loadAddressAny();
+  if ((authorityAddress !== null && !sameAddress(authorityAddress, input.recipientAddress)) || !exactCellEnd(authority)) return null;
 
   if (!expected.trusted.outputEscrow.has(data.refs[2]!.hash().toString("hex"))) return null;
   return {withdrawalAt};

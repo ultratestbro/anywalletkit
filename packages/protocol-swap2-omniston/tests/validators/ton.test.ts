@@ -293,13 +293,14 @@ describe("Omniston TON output position (EVM→TON) validator", () => {
   function stateCell(over: {
     quoteId?: string; factory?: string; jettonWallet?: string; master?: string; hashlock?: Buffer; amount?: bigint;
     withdrawalAt?: bigint; publicWithdrawalAt?: bigint; cancellationAt?: bigint; recipient?: string; deposit?: bigint; authority?: string; escrow?: Cell;
+    authorityAddress?: string | null;
   } = {}): Cell {
     const withdrawalAt = over.withdrawalAt ?? BigInt(DEPLOYED_AT + 1);
     const fees = beginCell().storeAddress(new Address(0, Buffer.alloc(32, 9))).storeUint(200, 64).storeUint(0, 32).endCell();
     const gas = beginCell().storeAddress(Address.parse(JETTON_WALLET_OF_FACTORY)).storeUint(620_000_000n, 64).storeAddress(Address.parse(RESOLVER_TON)).endCell();
     const parties = beginCell().storeAddress(Address.parse(RESOLVER_TON)).storeAddress(Address.parse(over.master ?? USDT)).storeUint(0, 6).storeRef(fees).storeRef(gas).endCell();
     const terms = beginCell().storeAddress(Address.parse(over.recipient ?? RECIPIENT)).storeAddress(Address.parse(RESOLVER_TON)).storeCoins(over.deposit ?? 500_000_000n).endCell();
-    const authority = beginCell().storeBit(true).storeBuffer(Buffer.from(over.authority ?? AUTHORITY, "hex")).storeAddress(Address.parse(over.recipient ?? RECIPIENT)).endCell();
+    const authority = beginCell().storeBit(true).storeBuffer(Buffer.from(over.authority ?? AUTHORITY, "hex")).storeAddress(over.authorityAddress === null ? null : Address.parse(over.authorityAddress ?? over.recipient ?? RECIPIENT)).endCell();
     const lock = beginCell()
       .storeBuffer(over.hashlock ?? HASHLOCK).storeCoins(over.amount ?? 10_490_741n)
       .storeUint(withdrawalAt, 64).storeUint(over.publicWithdrawalAt ?? withdrawalAt + 119n, 64).storeUint(over.cancellationAt ?? withdrawalAt + 179n, 64)
@@ -343,6 +344,10 @@ describe("Omniston TON output position (EVM→TON) validator", () => {
     await expect(validators(api()).validateTonOutputPosition!(input)).resolves.toBe(true);
   });
 
+  it("accepts addr_none in the authority cell — EVM-source positions carry no TON authority address (live 2026-10-20, every Base → TON order); the payout target is bound in the terms cell", async () => {
+    await expect(validators(api({data: stateCell({authorityAddress: null})})).validateTonOutputPosition!(input)).resolves.toBe(true);
+  });
+
   it("refuses every state field that drifts from the quote", async () => {
     const cases: [string, Cell][] = [
       ["another quote", stateCell({quoteId: "ff".repeat(32)})],
@@ -352,6 +357,7 @@ describe("Omniston TON output position (EVM→TON) validator", () => {
       ["another hashlock", stateCell({hashlock: Buffer.alloc(32, 1)})],
       ["less than the resolver must send", stateCell({amount: 10_490_740n})],
       ["another recipient", stateCell({recipient: RESOLVER_TON})],
+      ["authority address that is neither the recipient nor empty", stateCell({authorityAddress: RESOLVER_TON})],
       ["smaller security deposit", stateCell({deposit: 1n})],
       ["unknown authority key", stateCell({authority: "bb".repeat(32)})],
       ["unknown escrow code", stateCell({escrow: beginCell().storeUint(1, 8).endCell()})],
