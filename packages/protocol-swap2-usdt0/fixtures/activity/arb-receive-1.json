@@ -1,0 +1,26 @@
+{
+  "note": "USDT0 delivery on Arbitrum of 34,742.383772 USDT sent from Ethereum (LayerZero message DELIVERED, guid 0x1a938026…): the executor's tx mints USDT0 to the recipient (`own`), who signed nothing",
+  "own": ["0xC367D2D07a677cC85449cE45F85FdA8D9c3BB661"],
+  "tx": {
+    "chain": "eip155:42161",
+    "hash": "0x5d7a495bdb5642eae0c8e7f2f1f1929f2ddf2f882f776814bdb886dcc691aae5",
+    "time": 1792427394,
+    "status": "confirmed",
+    "address": "0xC367D2D07a677cC85449cE45F85FdA8D9c3BB661",
+    "from": "0x7ddb0773e979cd36ef0dc8b6e594a6ebc876e654",
+    "to": "0x31CAe3B7fB82d847621859fB1585353c5720660D",
+    "nativeValue": "0",
+    "transfers": [
+      {"token": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", "from": "0x0000000000000000000000000000000000000000", "to": "0xC367D2D07a677cC85449cE45F85FdA8D9c3BB661", "amount": "34742383772", "standard": "erc20", "symbol": "USDT0", "decimals": 6}
+    ],
+    "fee": "2784456000000",
+    "call": {"to": "0x31CAe3B7fB82d847621859fB1585353c5720660D", "selector": "0xcfc32570"},
+    "block": "516339695"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Received USDT0 via LayerZero",
+    "assetsIn": [{"token": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", "amount": "34742383772"}],
+    "counterparty": "0x14E4A1B13bf7F943c8ff7C51fb60FA964A298D92"
+  }
+}

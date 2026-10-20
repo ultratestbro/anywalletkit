@@ -1,0 +1,41 @@
+{
+  "name": "@forgewallet/protocol-swap2-usdt0",
+  "version": "0.0.0",
+  "description": "USDT0 (Tether's LayerZero OFT for USDT) for the swap2 engine: USDT / USDT0 between 13 EVM chains in one source transaction — quoteOFT + quoteSend on the OFT itself, send with the LayerZero fee as msg.value, status from LayerZero Scan, lzReceive retry of a stored payload as the claim. Bound to the deployments docs.usdt0.to lists, re-verified on-chain.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./config": { "types": "./dist/config.d.ts", "import": "./dist/config.js", "require": "./dist/config.cjs" },
+    "./provider": { "types": "./dist/provider.d.ts", "import": "./dist/provider.js", "require": "./dist/provider.cjs" },
+    "./protocol": { "types": "./dist/protocol.d.ts", "import": "./dist/protocol.js", "require": "./dist/protocol.cjs" },
+    "./activity": { "types": "./dist/activity.d.ts", "import": "./dist/activity.js", "require": "./dist/activity.cjs" },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "module.json"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": {
+    "@forgewallet/protocol-swap2-core": "workspace:*",
+    "@forgewallet/swap2-assets": "workspace:*",
+    "viem": "^2.57.2"
+  },
+  "peerDependencies": { "@forgewallet/core": "workspace:*" },
+  "devDependencies": {
+    "@types/node": "^22",
+    "vitest": "^5.0.3",
+    "@forgewallet/conformance": "workspace:*",
+    "@forgewallet/protocol-swap2-router": "workspace:*",
+    "@forgewallet/core": "workspace:*"
+  },
+  "keywords": ["swap2", "bridge", "usdt0", "usdt", "tether", "layerzero", "oft", "forgewallet"]
+}

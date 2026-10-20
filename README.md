@@ -52,6 +52,7 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | `@forgewallet/protocol-swap2-near-intents`, `-lifi`, `-thorchain`, `-omniston` | phase 3 ✓ | the four providers (NEAR Intents 1Click, LI.FI REST, THORChain, STON.fi Omniston), each also a standalone `Swap2Protocol` |
 | `@forgewallet/swap2-assets` | phase 3 ✓ | CAIP-19 asset registry shared by the swap2 packages |
 | `@forgewallet/protocol-swap2-cctp` | 2026-10-10 ✓ | Circle CCTP V2: native USDC burn-and-mint between 17 EVM chains, Fast / Standard by Circle's fee API, two-phase delivery (`claimSwap2` with the user's `receiveMessage`), preflight against the real contracts |
+| `@forgewallet/protocol-swap2-usdt0` | 2026-10-20 ✓ | USDT0 (Tether's LayerZero OFT): USDT / USDT0 between 13 EVM chains in one source transaction — `quoteOFT` + `quoteSend` on the OFT itself, `send` with the LayerZero fee as `msg.value`, approval only for the Ethereum adapter, status from LayerZero Scan, `lzReceive` retry of a stored payload as the claim; the only direct USDT path into HyperEVM; every deployment re-verified on-chain |
 | `@forgewallet/protocol-swap2-uniswap` | 2026-10-12 ✓ | Uniswap v3 straight from the contracts on 7 chains: QuoterV2 quotes (every fee tier + two-hop via WETH/USDC/USDT in one RPC batch), SwapRouter02 `multicall` execution with deadline, native in/out (wrap via value, `unwrapWETH9`), exact approvals, deployment re-verified on-chain; no API key, no frontend — the permissionless same-chain venue |
 | `@forgewallet/protocol-swap2-wrap` | 2026-10-12 ✓ | native ↔ wrapped native (ETH↔WETH, BNB↔WBNB, POL↔WPOL, AVAX↔WAVAX, HYPE↔WHYPE… 13 EVM chains) as a same-chain swap2 venue: WETH9 `deposit()` / `withdraw()`, 1:1, no approval, sender-only, tokens verified on-chain; wrapped natives added to the asset catalog |
 | `@forgewallet/protocol-swap2-balancer` | 2026-10-13 ✓ | Balancer v2 same-chain swaps on 9 chains (the cp0x permissionless Balancer venue): the SOR API only suggests the path; the Vault prices it on-chain (`queryBatchSwap`) and `batchSwap` enforces `limits` + deadline; split and multi-hop paths, native via the Vault's ETH sentinel, preflight re-price |
@@ -77,7 +78,7 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 
 | Area | Next | Later |
 |---|---|---|
-| Swap & bridge | USDT0 (LayerZero OFT), Chainflip, 0x Swap API v2, Symbiosis | rhino.fi, swapdk, BOB Gateway, Velora, Orchestra; Uniswap v4 / v2 + LP positions; Balancer v3 |
+| Swap & bridge | Chainflip, 0x Swap API v2, Symbiosis (USDT0 shipped 2026-10-20) | rhino.fi, swapdk, BOB Gateway, Velora, Orchestra; Uniswap v4 / v2 + LP positions; Balancer v3 |
 | Earn | Sky (sUSDS / SKY), Ethena (USDe → sUSDe), Euler v2, Morpho fixed-rate markets | native SOL staking, Hyperliquid exit, fiat on/off-ramp (MoonPay, Transak) |
 | Safety | `@forgewallet/receive` (quarantine receive addresses on a separate seed branch) + `@forgewallet/screening` (risk signals from shipped lists + on-device 2-hop tracing, two privacy modes); outbound recipient check + address-poisoning detector | tx-preview for Solana / TON / Tron; wallet-btc PSBT partial signing + BIP-322 |
 | Accounts | multisig: Safe (EVM), Squads (Solana), multisig-v2 (TON), account permissions (Tron), multisig2 / Sputnik (NEAR) | gasless sends (EIP-7702 + paymaster, GasFree on Tron, TON paymaster, Solana fee payer) |
