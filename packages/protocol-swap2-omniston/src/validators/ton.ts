@@ -456,3 +456,92 @@ export function createOmnistonTonValidators(options: OmnistonTonValidationOption
     },
   };
 }
+
+// ── EVM → TON delivery ───────────────────────────────────────────────────────
+
+export interface OmnistonTonDeliveryLocatorOptions {
+  fetch?: typeof fetch;
+  tonApiUrl?: string;
+  tonApiKey?: string;
+  /** Recipient events scanned per call (newest first; the delivery is recent by construction). */
+  limit?: number;
+}
+
+export interface OmnistonTonDeliveryInput {
+  /** The output position that paid out; when absent any sender of a matching transfer counts (backfills). */
+  positionAddress?: string;
+  recipientAddress: string;
+  jettonMasterAddress: string;
+  minUnits: string;
+  /** Unix seconds; events before it are not this delivery (backfills). */
+  afterTimestamp?: number;
+}
+
+interface TonapiDeliveryEvent {
+  event_id?: string;
+  timestamp?: number;
+  in_progress?: boolean;
+  actions?: Array<{
+    type?: string;
+    status?: string;
+    JettonTransfer?: {
+      sender?: {address?: string};
+      recipient?: {address?: string};
+      jetton?: {address?: string};
+      amount?: string | number;
+    };
+  }>;
+}
+
+/**
+ * Finds an Omniston TON delivery: the jetton transfer from the output position
+ * to the recipient of at least `minUnits`, in the recipient's tonapi events.
+ * Returns tonapi's `event_id` — the hash `@forgewallet/wallet-ton`'s history
+ * source gives the same event as a row, so a wallet can pair the TON receive
+ * with the swap. Feeds `omnistonProvider({locateTonDelivery})`; a server may
+ * also call it with no position to backfill rows completed before the locator
+ * existed. Never throws: null when nothing matched or tonapi did not answer.
+ */
+export function createOmnistonTonDeliveryLocator(options: OmnistonTonDeliveryLocatorOptions = {}) {
+  const request = options.fetch ?? fetch;
+  const base = (options.tonApiUrl ?? "https://tonapi.io").replace(/\/$/, "");
+  const headers = options.tonApiKey ? {Authorization: `Bearer ${options.tonApiKey}`} : undefined;
+  const limit = Math.min(100, Math.max(1, Math.floor(options.limit ?? 20)));
+  return async (input: OmnistonTonDeliveryInput): Promise<string | null> => {
+    try {
+      const recipient = Address.parse(input.recipientAddress);
+      const master = Address.parse(input.jettonMasterAddress);
+      const position = input.positionAddress ? Address.parse(input.positionAddress) : null;
+      const min = BigInt(input.minUnits);
+      if (min <= 0n) return null;
+      const since = Number.isFinite(input.afterTimestamp) ? `&start_date=${Math.max(0, Math.floor(input.afterTimestamp!))}` : "";
+      const url = `${base}/v2/accounts/${encodeURIComponent(recipient.toString())}/events?limit=${limit}${since}`;
+      const response = await request(url, {...(headers ? {headers} : {}), signal: AbortSignal.timeout(8_000)});
+      if (!response.ok) return null;
+      const body = await response.json() as {events?: TonapiDeliveryEvent[]};
+      for (const event of body.events ?? []) {
+        if (!event.event_id || event.in_progress === true) continue;
+        if (input.afterTimestamp !== undefined && typeof event.timestamp === "number" && event.timestamp < input.afterTimestamp) continue;
+        for (const action of event.actions ?? []) {
+          if (action.type !== "JettonTransfer" || action.status !== "ok") continue;
+          const t = action.JettonTransfer;
+          if (!t?.jetton?.address || !t.recipient?.address || t.amount === undefined) continue;
+          if (!sameAddress(Address.parse(t.jetton.address), master.toString())) continue;
+          if (!sameAddress(Address.parse(t.recipient.address), recipient.toString())) continue;
+          if (position && (!t.sender?.address || !sameAddress(Address.parse(t.sender.address), position.toString()))) continue;
+          let amount: bigint;
+          try {
+            amount = BigInt(t.amount);
+          } catch {
+            continue;
+          }
+          if (amount < min) continue;
+          return event.event_id.toLowerCase();
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+}

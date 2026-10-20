@@ -456,6 +456,18 @@ export interface OmnistonProviderOptions {
     tokenAddress: string;
     minUnits: string;
   }) => Promise<string | null>;
+  /**
+   * TON destination: find the delivery — the output position's jetton transfer
+   * to the recipient — so a completed EVM → TON order carries `destTxHash` in
+   * the form the TON history source uses (tonapi event id). Without it the
+   * wallet's feed cannot pair the TON receive with the swap.
+   */
+  locateTonDelivery?: (input: {
+    positionAddress: string;
+    recipientAddress: string;
+    jettonMasterAddress: string;
+    minUnits: string;
+  }) => Promise<string | null>;
   /** Close an injected client when the provider closes (default: caller owns it). */
   closeInjectedClient?: boolean;
   /**
@@ -2446,6 +2458,16 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         const hash = await opts.locateEvmDelivery({
           chain: outCaip, positionAddress: delivered.chain.value, recipientAddress: decoded.dest,
           tokenAddress: outToken, minUnits: order.executions[0]!.outputUnits,
+        }).catch(() => null);
+        if (hash) status.destTxHash = hash;
+      }
+      if (
+        status.state === "completed" && !status.destTxHash && opts.locateTonDelivery && outCase === "ton" && outToken &&
+        order.executions.length === 1 && delivered?.chain.$case === "ton" && delivered.chain.value
+      ) {
+        const hash = await opts.locateTonDelivery({
+          positionAddress: delivered.chain.value, recipientAddress: decoded.dest,
+          jettonMasterAddress: outToken, minUnits: order.executions[0]!.outputUnits,
         }).catch(() => null);
         if (hash) status.destTxHash = hash;
       }

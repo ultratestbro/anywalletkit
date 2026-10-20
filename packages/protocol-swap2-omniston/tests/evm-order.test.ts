@@ -222,6 +222,21 @@ describe("Omniston EVM → TON orders (live 2026-10-16 fixtures)", () => {
     expect(client.calls.orderTrack).toEqual([{quoteId: quote().quoteId, traderAddress: {chain: {$case: "base", value: OWNER}}}]);
   });
 
+  it("a completed TON-destination order reports the delivery the TON locator finds", async () => {
+    const locate = vi.fn(async () => "28dd10c6234062c29ed3dfec25817a870d8cfc2fc6f6bf77352dce6845a0b8c0");
+    const client = clientFor(quote(), payload(), {...snapshot({outputPositionPhase: "EXECUTION_PHASE_COMPLETED", inputPositionPhase: "EXECUTION_PHASE_COMPLETED"}), status: "TRADE_STATUS_FULLY_FILLED"});
+    const p = provider(client, {locateTonDelivery: locate});
+    const q = await p.getQuote(params());
+    await p.buildDeposit(q!);
+    await expect(p.trackIntent({intentId: q!.intentId})).resolves.toEqual({state: "completed", depositReceived: true, destTxHash: "28dd10c6234062c29ed3dfec25817a870d8cfc2fc6f6bf77352dce6845a0b8c0"});
+    expect(locate).toHaveBeenCalledWith({positionAddress: TON_POSITION, recipientAddress: TRADER_TON, jettonMasterAddress: USDT_TON, minUnits: "20344594"});
+    // A locator that finds nothing (or throws) leaves the status without a hash.
+    const none = provider(clientFor(quote(), payload(), {...snapshot({outputPositionPhase: "EXECUTION_PHASE_COMPLETED"}), status: "TRADE_STATUS_FULLY_FILLED"}), {locateTonDelivery: async () => { throw new Error("tonapi down"); }});
+    const q2 = await none.getQuote(params());
+    await none.buildDeposit(q2!);
+    await expect(none.trackIntent({intentId: q2!.intentId})).resolves.toEqual({state: "completed", depositReceived: true});
+  });
+
   it("keeps the secret when the EVM proof fails, the output is not locked, or the fill is partial", async () => {
     const run = async (snap: unknown, extra: Partial<OmnistonProviderOptions> = {}) => {
       const ton = vi.fn(async () => true);
