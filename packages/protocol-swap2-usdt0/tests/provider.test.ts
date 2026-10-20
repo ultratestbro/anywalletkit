@@ -15,6 +15,8 @@ const SRC_TX = "0x" + "ab".repeat(32);
 const GUID = ("0x" + "11".repeat(32)) as Hex;
 const PAYLOAD = ("0x" + "00".repeat(12) + RECIPIENT.slice(2) + "0000000000989680") as Hex; // to(32) + amountSD(8) = 10 USDT
 const FEE = 6_248_183_276_938n; // live quoteSend Arbitrum → HyperEVM, 10 USDT, 2026-10-20
+/** What the quote seals: FEE + 25 % headroom (the endpoint refunds the unused part). */
+const SEALED = FEE + (FEE * 2_500n) / 10_000n;
 
 const OFT_ABI = parseAbi([
   "struct SendParam { uint32 dstEid; bytes32 to; uint256 amountLD; uint256 minAmountLD; bytes extraOptions; bytes composeMsg; bytes oftCmd; }",
@@ -155,19 +157,19 @@ describe("quote", () => {
     expect(q!.sourceAmount).toBe("10000000");
     expect(q!.destAmount).toBe("10000000");
     expect(q!.minDestAmount).toBe("10000000");
-    expect(q!.txRequest).toMatchObject({to: ARB.oft, value: FEE.toString(), nativeFee: FEE.toString(), chainId: 42161, gasLimit: "450000"});
+    expect(q!.txRequest).toMatchObject({to: ARB.oft, value: SEALED.toString(), nativeFee: SEALED.toString(), chainId: 42161, gasLimit: "450000"});
     expect(q!.txRequest!.approvalAddress).toBeUndefined();
     const {functionName, args} = decodeFunctionData({abi: OFT_ABI, data: q!.txRequest!.data as Hex});
     expect(functionName).toBe("send");
     expect(args).toEqual([
       {dstEid: HYPE.eid, to: pad(RECIPIENT, {size: 32}), amountLD: 10_000_000n, minAmountLD: 10_000_000n, extraOptions: "0x", composeMsg: "0x", oftCmd: "0x"},
-      {nativeFee: FEE, lzTokenFee: 0n},
+      {nativeFee: SEALED, lzTokenFee: 0n},
       getAddress(SENDER),
     ]);
     expect(q!.fees).toEqual([]);
     expect(q!.feeUsd).toBe(0);
     expect(q!.etaSeconds).toBe(240);
-    expect(q!.providerData).toMatchObject({srcEid: "30110", dstEid: "30367", oft: ARB.oft, token: ARB.token, recipient: RECIPIENT, nativeFee: FEE.toString(), minAmountLD: "10000000"});
+    expect(q!.providerData).toMatchObject({srcEid: "30110", dstEid: "30367", oft: ARB.oft, token: ARB.token, recipient: RECIPIENT, nativeFee: SEALED.toString(), minAmountLD: "10000000"});
   });
 
   it("Ethereum source: the adapter is the approval spender; Ethereum ETA is the long one", async () => {
@@ -236,7 +238,7 @@ describe("quote", () => {
     const dry = (await p.getQuote({...noRefund, destAddress: "", dry: true}))!;
     expect(dry.providerData!.recipient).toBe("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
     const tx = await p.buildDeposit(dry);
-    expect(tx).toMatchObject({chain: "eip155:42161", to: ARB.oft, data: dry.txRequest!.data, value: FEE.toString(), chainId: 42161, gasLimit: "450000"});
+    expect(tx).toMatchObject({chain: "eip155:42161", to: ARB.oft, data: dry.txRequest!.data, value: SEALED.toString(), chainId: 42161, gasLimit: "450000"});
     expect(tx.approvalAddress).toBeUndefined();
     await expect(p.buildDeposit({...dry, intentId: "cctp:6:3:1000"})).rejects.toThrow(/no transaction request/);
   });
@@ -250,7 +252,9 @@ describe("preflight", () => {
     await expect(ok.p.preflightDeposit!(q, tx)).resolves.toBeUndefined();
     await expect(make({fee: FEE - 1n}).p.preflightDeposit!(q, tx)).resolves.toBeUndefined();
     await expect(ok.p.preflightDeposit!(q, {...tx, to: RECIPIENT})).rejects.toThrow(/not the Arbitrum OFT/);
-    await expect(make({fee: FEE + 1n}).p.preflightDeposit!(q, tx)).rejects.toThrow(/fee rose/);
+    // Inside the headroom the live fee may rise; past it the preflight refuses.
+    await expect(make({fee: SEALED}).p.preflightDeposit!(q, tx)).resolves.toBeUndefined();
+    await expect(make({fee: SEALED + 1n}).p.preflightDeposit!(q, tx)).rejects.toThrow(/fee rose/);
     await expect(ok.p.preflightDeposit!(q, {...tx, value: "1"})).rejects.toThrow(/not the quoted fee/);
     await expect(make({peer: null}).p.preflightDeposit!(q, tx)).rejects.toThrow(/no peer/);
     await expect(ok.p.preflightDeposit!({...q, providerData: {}}, tx)).rejects.toThrow(/sealed send parameters/);
@@ -305,7 +309,7 @@ describe("router", () => {
     expect(router.supportsChainPair("eip155:42161", "eip155:999")).toBe(true);
     const best = await router.getBestQuote(PARAMS);
     expect(best?.provider).toBe("usdt0");
-    expect(best?.txRequest?.nativeFee).toBe(FEE.toString());
+    expect(best?.txRequest?.nativeFee).toBe(SEALED.toString());
   });
 
   it("config guards", () => {

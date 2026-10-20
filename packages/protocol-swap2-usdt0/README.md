@@ -33,7 +33,11 @@ not from an API.
   the message with it. The contract reverts rather than deliver less.
 - **Calldata is sealed in the quote**: `send(SendParam{dstEid, to, amountLD,
   minAmountLD, extraOptions: 0x, composeMsg: 0x, oftCmd: 0x}, {nativeFee, 0},
-  refundAddress)`, `value` = `nativeFee` (declared as `txRequest.nativeFee`
+  refundAddress)`, `value` = `nativeFee` = the quoted LayerZero fee **+ 25 %
+  headroom** — the fee is paid at send time and moves with gas (live: +1.7 % in
+  a minute on Ethereum); OAppSender needs `msg.value == nativeFee` and the
+  endpoint refunds the unused part to `refundAddress` in the same transaction
+  (declared as `txRequest.nativeFee`
   so the engine caps it per chain and the router prices it). `extraOptions`
   stays empty: every deployment's `enforcedOptions` already carry the
   executor gas (type-3, `lzReceive` gas 80 000, read on-chain 2026-10-20).
@@ -46,7 +50,7 @@ not from an API.
   must be the destination OFT. A mismatch refuses the route with its reason.
 - **Preflight** (right before signing): target is the source OFT, peer still
   wired, and the *current* `quoteSend` fee still fits the sealed `value` —
-  the endpoint reverts an underpaid send, so a fee that rose means re-quote.
+  the endpoint reverts an underpaid send, so a fee past the headroom means re-quote.
 - **Tracking**: LayerZero Scan `GET /v1/messages/tx/{sourceTxHash}`, matched
   to the route's eids and the source OFT. `INFLIGHT` / `CONFIRMING` /
   `BLOCKED` → pending; `DELIVERED` → completed with the destination hash;

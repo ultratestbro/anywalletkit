@@ -57,6 +57,14 @@ const RPC_TIMEOUT_MS = 12_000;
 const SCAN_TIMEOUT_MS = 12_000;
 /** A direct `send` used ~330k gas on Arbitrum and on the Ethereum adapter (2026-10-20 receipts). */
 const GAS_SEND = "450000";
+/**
+ * The LayerZero fee is quoted at quote time but paid at send time, and it moves
+ * with source and destination gas (live: +1.7 % within a minute on Ethereum).
+ * The sealed `msg.value` carries this headroom; EndpointV2 charges the current
+ * fee and refunds the surplus to `refundAddress` (the trader) in the same
+ * transaction, so the headroom costs nothing — it only avoids a re-quote.
+ */
+const FEE_HEADROOM_BPS = 2_500n;
 /** `lzReceive` retry of a stored payload: a mint plus the endpoint bookkeeping. */
 const GAS_CLAIM = "300000";
 const ZERO_B32 = `0x${"00".repeat(32)}` as Hex;
@@ -222,7 +230,9 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
         const sp = sendParam(dst.eid, recipient, amount, received);
         const fee = await c.readContract({address: getAddress(src.oft), abi: OFT_ABI, functionName: "quoteSend", args: [sp, false]});
         if (fee.lzTokenFee !== 0n) return refuse("OFT asks for a fee in LZ token — unsupported");
-        const nativeFee = fee.nativeFee;
+        // Sealed with headroom: OAppSender requires msg.value == MessagingFee.nativeFee, the
+        // endpoint refunds whatever the current fee does not use to `refund`.
+        const nativeFee = fee.nativeFee + (fee.nativeFee * FEE_HEADROOM_BPS) / 10_000n;
         const data = encodeFunctionData({abi: OFT_ABI, functionName: "send", args: [sp, {nativeFee, lzTokenFee: 0n}, getAddress(refund)]});
         const protocolFees = feeDetails
           .filter((f) => f.feeAmountLD > 0n)
@@ -280,8 +290,9 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     /**
      * Right before signing: the target is the source OFT, the peer is still the
      * destination OFT, and the CURRENT LayerZero fee still fits the sealed
-     * `msg.value` — the endpoint reverts a send that underpays, so a fee that
-     * moved up means re-quote rather than a wasted broadcast.
+     * `msg.value` (quote + headroom) — the endpoint reverts a send that
+     * underpays, so a fee past the headroom means re-quote rather than a
+     * wasted broadcast.
      */
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
       const parsed = parseIntent(quote.intentId);
@@ -298,7 +309,7 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
       const sp = sendParam(dst.eid, pd.recipient!, BigInt(pd.amountLD!), BigInt(pd.minAmountLD!));
       const fee = await c.readContract({address: getAddress(src.oft), abi: OFT_ABI, functionName: "quoteSend", args: [sp, false]});
       const sealed = BigInt(pd.nativeFee!);
-      if (fee.nativeFee > sealed) throw new Error(`usdt0: LayerZero fee rose to ${fee.nativeFee} above the quoted ${sealed} — re-quote`);
+      if (fee.nativeFee > sealed) throw new Error(`usdt0: LayerZero fee rose to ${fee.nativeFee} above the sealed ${sealed} (quote + ${FEE_HEADROOM_BPS / 100n} % headroom) — re-quote`);
       if (BigInt(tx.value) !== sealed) throw new Error(`usdt0: transaction value ${tx.value} is not the quoted fee ${sealed}`);
     },
 
