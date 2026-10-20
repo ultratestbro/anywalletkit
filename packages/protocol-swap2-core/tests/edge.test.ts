@@ -5,7 +5,7 @@ import {describe, expect, it} from "vitest";
 import {encodeFunctionData, parseAbi} from "viem";
 import {Swap2InFlightError, Swap2InsufficientGasError, Swap2MaybeSentError, Swap2QuoteError, Swap2ValidationError} from "../src/errors.js";
 import {SingleProviderSwap2} from "../src/swap2/single.js";
-import type {Swap2EngineConfig, Swap2ExecutionPlan} from "../src/swap2/base.js";
+import {nativeDecimals, nativeUnits, type Swap2EngineConfig, type Swap2ExecutionPlan} from "../src/swap2/base.js";
 import type {CrossChainProvider, Quote, QuoteParams, UnsignedTx} from "../src/types.js";
 
 const SELF = "0x4444444444444444444444444444444444444444";
@@ -457,6 +457,40 @@ describe("edge: native-fee ceilings", () => {
     };
     await expect(onSonic("21604323626064016205")).resolves.toMatchObject({source: {value: 21_604_323_626_064_016_205n}});
     await expect(onSonic("200000000000000000001")).rejects.toThrow(/exceeds the cap 200000000000000000000 for eip155:146/);
+  });
+
+  it("Arc: the ceiling for the USDC gas token is 10 USDC in 18-decimal native units — never the ERC-20's 6", async () => {
+    // Arc accounts for gas in 18-decimal units (docs.arc.network); only the ERC-20 interface at 0x3600… is 6-decimal.
+    expect(nativeDecimals("eip155:5042")).toBe(18);
+    expect(nativeDecimals("eip155:2818")).toBe(18); // unlisted chains default to 18
+    expect(nativeUnits("eip155:5042", 10)).toBe(10_000_000_000_000_000_000n);
+    expect(nativeUnits("eip155:5042", "0.005")).toBe(5_000_000_000_000_000n);
+    expect(() => nativeUnits("eip155:5042", "1e3")).toThrow(/malformed native amount/);
+    const onArc = (fee: string) => {
+      let plan: Swap2ExecutionPlan | undefined;
+      const arc = provider({getQuote: async (params) => quote(params, {txRequest: {...txRequest, chainId: 5042, value: fee, nativeFee: fee}}), buildDeposit: async (q) => ({...built(q), chain: "eip155:5042"})});
+      const run = protocol(arc, account([], {getChainId: async () => 5042}), {fromChain: "eip155:5042", reviewExecution: (p) => { plan = p; throw new Error("stop at review"); }}).swap2(options);
+      return run.then(() => plan, (e: Error) => (plan ? plan : Promise.reject(e)));
+    };
+    // 10 USDC in 6-decimal units (10_000_000) would be a dust fee under a 6-decimal ceiling — here it is 1e-11 USDC and passes.
+    await expect(onArc("10000000")).resolves.toMatchObject({source: {value: 10_000_000n}});
+    // 9.5 USDC in native (18-decimal) units passes; 10 USDC + 1 wei is refused: the cap is 10 × 10^18, not 10 × 10^6.
+    await expect(onArc("9500000000000000000")).resolves.toMatchObject({source: {value: 9_500_000_000_000_000_000n}});
+    await expect(onArc("10000000000000000001")).rejects.toThrow(/exceeds the cap 10000000000000000000 for eip155:5042/);
+  });
+
+  it("Mantle and Flare have whole-coin ceilings (20 MNT, 1500 FLR)", async () => {
+    const on = (chainId: number, fee: string) => {
+      let plan: Swap2ExecutionPlan | undefined;
+      const p = provider({getQuote: async (params) => quote(params, {txRequest: {...txRequest, chainId, value: fee, nativeFee: fee}}), buildDeposit: async (q) => ({...built(q), chain: `eip155:${chainId}`})});
+      // Flare's catalog stable is USDT0 (its USDC is the bridged USDC.e); Mantle has a USDC.
+      const run = protocol(p, account([], {getChainId: async () => chainId}), {fromChain: `eip155:${chainId}`, reviewExecution: (pl) => { plan = pl; throw new Error("stop at review"); }}).swap2({...options, fromToken: chainId === 14 ? "USDT0" : "USDC"});
+      return run.then(() => plan, (e: Error) => (plan ? plan : Promise.reject(e)));
+    };
+    await expect(on(5000, "20000000000000000000")).resolves.toMatchObject({source: {value: 20_000_000_000_000_000_000n}});
+    await expect(on(5000, "20000000000000000001")).rejects.toThrow(/exceeds the cap 20000000000000000000 for eip155:5000/);
+    await expect(on(14, "1500000000000000000000")).resolves.toMatchObject({source: {value: 1_500_000_000_000_000_000_000n}});
+    await expect(on(14, "1500000000000000000001")).rejects.toThrow(/exceeds the cap 1500000000000000000000 for eip155:14/);
   });
 
   it("a value that differs from the declared fee is refused; an in-cap declared fee is shown in the plan", async () => {

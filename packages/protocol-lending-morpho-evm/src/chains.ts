@@ -1,5 +1,5 @@
 // Morpho deployments per chain. The Morpho (Blue) addresses are from
-// docs.morpho.org (Ethereum, Base, Arbitrum, OP, Polygon, Katana, HyperEVM) and
+// docs.morpho.org (Ethereum, Base, Arbitrum, OP, Polygon, Katana, HyperEVM; Flare, Arc, Morph added 2026-10-14) and
 // confirmed against the markets the Morpho API lists; the vault factories are
 // the factories behind every *listed* vault in the Morpho API on 2026-10-10
 // (the docs page carries no factory table). A vault that no known factory
@@ -42,6 +42,15 @@ export const MORPHO_CHAINS: Readonly<Record<number, MorphoChain>> = Object.freez
     ['0x33f20973275B2F574488b18929cd7DCBf1AbF275'], ['0x8B2F922162FBb60A6a072cC784A2E4168fB0bb0c']),
   4663: chain(4663, 'Robinhood Chain', '0x9D53d5E3bd5E8d4Cbfa6DB1ca238AEA02E651010',
     [], ['0x0FBad98595b0186dA120E41f77C102beb49f803c']),
+  // 2026-10-14: docs.morpho.org/get-started/resources/addresses (Flare, Arc, Morph tabs): Morpho + VaultV2Factory only —
+  // no MetaMorpho V1 factory is deployed there. eth_getCode: Morpho 15 582 bytes, VaultV2Factory 23 124 bytes on each,
+  // byte-for-byte the sizes of the Katana deployment; Morpho.owner() answers on all three.
+  14: chain(14, 'Flare', '0xF4346F5132e810f80a28487a79c7559d9797E8B0',
+    [], ['0x6FC83ECc0e8142635D77200e5052be8A0a9D2f42']),
+  5042: chain(5042, 'Arc', '0x34CD04070dD72b14E241112F6d83812Df5Af7fCD',
+    [], ['0x3b0eefaBfa22ec7CF2c73877ac16e78D76749f12']),
+  2818: chain(2818, 'Morph', '0xAd10d07901Dc3195c3cb5e78E061F4EA8D9B4905',
+    [], ['0x7D8BF8B276f967F7539c9e91E1a85a33fefE612B']),
 })
 
 export const MORPHO_CHAIN_IDS: readonly string[] = Object.freeze(Object.keys(MORPHO_CHAINS).map((id) => `eip155:${id}`))

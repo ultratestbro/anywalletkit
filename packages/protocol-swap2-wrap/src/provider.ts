@@ -35,6 +35,14 @@ export const WRAPPED_NATIVE: Readonly<Record<number, {address: `0x${string}`; sy
   57073: {address: "0x4200000000000000000000000000000000000006", symbol: "WETH"},
   98866: {address: "0xEa237441c92CAe6FC17Caaf9a7acB3f953be4bd1", symbol: "WPLUME"},
   196: {address: "0xe538905cf8410324e03A5A23C1c177a474D59b2b", symbol: "WOKB"},
+  // 2026-10-14: Mantle, Katana, Morph, Flare — symbol, 18 decimals, supply, deposit()/withdraw() selectors in the
+  // bytecode and eth_estimateGas of deposit() with value from a funded sender, all checked on-chain. Katana's WETH9 is
+  // Vault Bridge's vbETH (the on-chain symbol the verify step compares against; the catalog shows it as WETH).
+  // Arc has no wrapper by design: its native USDC already exposes an ERC-20 interface (docs.arc.network).
+  5000: {address: "0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8", symbol: "WMNT"},
+  747474: {address: "0xEE7D8BCFb72bC1880D0Cf19822eB0A2e6577aB62", symbol: "vbETH"},
+  2818: {address: "0x5300000000000000000000000000000000000011", symbol: "WETH"},
+  14: {address: "0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d", symbol: "WFLR"},
 });
 
 const WETH_ABI = parseAbi([

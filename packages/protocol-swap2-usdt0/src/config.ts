@@ -56,6 +56,11 @@ export const USDT0_CHAINS: Readonly<Record<string, Usdt0Chain>> = Object.freeze(
   c(143, 30390, "Monad", "0xe7cd86e13AC4309349F30B3435a9d337750fC82D", "0x9151434b16b9763660705744891fA906F660EcC5", LZ_ENDPOINT_B),
   c(4326, 30398, "MegaETH", "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb", "0x9151434b16b9763660705744891fA906F660EcC5", LZ_ENDPOINT_B),
   c(196, 30274, "X Layer", "0x779Ded0c9e1022225f8E0630b35a9b54bE713736", "0x94bcCa6BdfD6a61817aB0E960BfedE4984505554", LZ_ENDPOINT_A),
+  // 2026-10-20 (evm-chains-6 batch): docs.usdt0.to deployments, re-read on-chain (token(), approvalRequired() = false,
+  // sharedDecimals() = 6, endpoint(), peers(30110) = the Arbitrum OFT).
+  c(5000, 30181, "Mantle", "0x779Ded0c9e1022225f8E0630b35a9b54bE713736", "0xcb768e263FB1C62214E7cab4AA8d036D76dc59CC", LZ_ENDPOINT_A),
+  c(2818, 30322, "Morph", "0xe7cd86e13AC4309349F30B3435a9d337750fC82D", "0xcb768e263FB1C62214E7cab4AA8d036D76dc59CC", LZ_ENDPOINT_B),
+  c(14, 30295, "Flare", "0xe7cd86e13AC4309349F30B3435a9d337750fC82D", "0x567287d2A9829215a37e3B88843d32f9221E7588", LZ_ENDPOINT_A),
 ].map((x) => [x.caip2, x])));
 
 /** LayerZero eid → deployment. */

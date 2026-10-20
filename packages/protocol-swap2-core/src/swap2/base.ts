@@ -104,6 +104,35 @@ function maybeSent(error: unknown): {hash?: string} | null {
  * declared the fee — a provider bug or a hostile backend must not turn a
  * token swap into a native drain.
  */
+/**
+ * Base-unit precision of a chain's native coin — what `value`, `eth_getBalance`
+ * and a declared `nativeFee` are counted in. Every EVM chain the engine knows
+ * accounts for gas in 18-decimal units, Arc included: Arc's gas token is USDC,
+ * but its native accounting is 18-decimal ("the native USDC gas token uses 18
+ * decimals of precision, while the USDC ERC-20 interface uses 6" —
+ * docs.arc.network, gas-and-fees / contract-addresses, 2026-10-14). Arc is
+ * pinned here so the 6-decimal ERC-20 view can never leak into a ceiling:
+ * 10 USDC of fee headroom is 10 × 10^18 base units, not 10 × 10^6. A chain
+ * whose native accounting is genuinely not 18-decimal gets its own row and
+ * every cap below, declared in whole coins, scales with it.
+ */
+export const NATIVE_DECIMALS: Readonly<Record<string, number>> = Object.freeze({
+  "eip155:5042": 18, // Arc — USDC gas token, 18-decimal native accounting (ERC-20 view at 0x3600… is 6)
+});
+const DEFAULT_NATIVE_DECIMALS = 18;
+/** Decimals of `chain`'s native coin in base units (18 unless the chain says otherwise). */
+export function nativeDecimals(chain: string): number {
+  return NATIVE_DECIMALS[chain] ?? DEFAULT_NATIVE_DECIMALS;
+}
+/** `whole` native coins (an integer, or a decimal string such as "0.005") in `chain`'s base units. */
+export function nativeUnits(chain: string, whole: number | string): bigint {
+  const text = String(whole);
+  if (!/^\d+(\.\d+)?$/.test(text)) throw new Error(`swap2: malformed native amount '${text}'`);
+  const [int, frac = ""] = text.split(".") as [string, string?];
+  const decimals = nativeDecimals(chain);
+  if (frac.length > decimals) throw new Error(`swap2: '${text}' has more than ${decimals} fractional digits for ${chain}`);
+  return BigInt(int + frac.padEnd(decimals, "0"));
+}
 const NATIVE_FEE_CAP: Readonly<Record<string, bigint>> = Object.freeze({
   "eip155:1": 5_000_000_000_000_000n, // 0.005 ETH
   "eip155:137": 20_000_000_000_000_000_000n, // 20 POL
@@ -120,6 +149,11 @@ const NATIVE_FEE_CAP: Readonly<Record<string, bigint>> = Object.freeze({
   "eip155:1329": 200_000_000_000_000_000_000n, // 200 SEI
   "eip155:98866": 500_000_000_000_000_000_000n, // 500 PLUME
   "eip155:196": 100_000_000_000_000_000n, // 0.1 OKB
+  // 2026-10-14 batch, ~$10 each at 2026-10-14 prices; declared in whole coins so the chain's native decimals apply.
+  "eip155:5000": nativeUnits("eip155:5000", 20), // 20 MNT (≈ $0.53 each)
+  "eip155:14": nativeUnits("eip155:14", 1500), // 1500 FLR (≈ $0.0067 each)
+  "eip155:5042": nativeUnits("eip155:5042", 10), // 10 USDC — Arc's gas token, in its 18-decimal native units
+  // Katana and Morph are ETH-denominated: the 0.005 ETH default applies.
 });
 const DEFAULT_NATIVE_FEE_CAP = 5_000_000_000_000_000n; // 0.005 of an ETH-denominated L2
 

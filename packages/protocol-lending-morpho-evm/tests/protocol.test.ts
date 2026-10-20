@@ -4,6 +4,7 @@ import { NotImplementedError, ReadOnlyAccountError } from '@forgewallet/core'
 import { createMockAccount } from '@forgewallet/conformance'
 import { MorphoApi, MorphoError, MorphoMarketProtocolEvm, MorphoVaultProtocolEvm, accrue, decodeMorphoRevert, marketId, rateToApyPct, toAssetsUp, wTaylorCompounded } from '../src/index.js'
 import { ERC20_ABI, ERC4626_ABI, MORPHO_ABI } from '../src/abi.js'
+import { MORPHO_CHAINS, MORPHO_CHAIN_IDS } from '../src/chains.js'
 import { CBBTC, E6, E8, E18, FAKE_VAULT, MARKET_ID, MORPHO, OTHER, PARAMS, RATE, USDC, USER, VAULT, account, makeMorpho, setAllowance, setBalance, setPosition } from './fixture.js'
 
 const decodeSent = (tx: unknown) => {
@@ -262,3 +263,31 @@ function toErrorString(s: string): Hex {
   const len = s.length.toString(16).padStart(64, '0')
   return ('0x08c379a0' + '20'.padStart(64, '0') + len + hex.padEnd(Math.ceil(hex.length / 64) * 64, '0')) as Hex
 }
+
+describe('chain table', () => {
+  it('every chain id resolves to a Morpho singleton and is advertised in MORPHO_CHAIN_IDS', () => {
+    for (const [id, c] of Object.entries(MORPHO_CHAINS)) {
+      expect(c.chainId).toBe(Number(id))
+      expect(c.morpho).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(MORPHO_CHAIN_IDS).toContain(`eip155:${id}`)
+    }
+    expect(MORPHO_CHAIN_IDS.length).toBe(Object.keys(MORPHO_CHAINS).length)
+  })
+
+  it.each([
+    [14, 'Flare', '0xF4346F5132e810f80a28487a79c7559d9797E8B0', '0x6FC83ECc0e8142635D77200e5052be8A0a9D2f42'],
+    [5042, 'Arc', '0x34CD04070dD72b14E241112F6d83812Df5Af7fCD', '0x3b0eefaBfa22ec7CF2c73877ac16e78D76749f12'],
+    [2818, 'Morph', '0xAd10d07901Dc3195c3cb5e78E061F4EA8D9B4905', '0x7D8BF8B276f967F7539c9e91E1a85a33fefE612B'],
+    [747474, 'Katana', '0xD50F2DffFd62f94Ee4AEd9ca05C61d0753268aBc', '0xFcb8b57E56787bB29e130Fca67f3c5a1232975D1'],
+  ])('chain %i (%s) pins Morpho %s and VaultV2Factory %s (docs.morpho.org, verified on-chain 2026-10-14)', (chainId, name, morpho, v2) => {
+    const c = MORPHO_CHAINS[chainId]!
+    expect(c).toMatchObject({ chainId, name, morpho })
+    expect(c.vaultV2Factories).toContain(v2)
+    if (chainId !== 747474) expect(c.vaultV1Factories).toEqual([]) // no MetaMorpho V1 factory on the 2026-10-14 chains
+  })
+
+  it('Mantle has no Morpho deployment (not on docs.morpho.org nor in the Morpho API chain list)', () => {
+    expect(MORPHO_CHAINS[5000]).toBeUndefined()
+    expect(MORPHO_CHAIN_IDS).not.toContain('eip155:5000')
+  })
+})

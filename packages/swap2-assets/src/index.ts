@@ -1104,6 +1104,98 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
     ],
   },
   {
+    // Arc (Circle's L1, chain 5042). Native gas token = USDC. Two views of ONE balance (docs.arc.network, contract-addresses +
+    // gas-and-fees, 2026-10-14): the EVM-native view (eth_getBalance, msg.value, gas) is accounted in 18-decimal units; the
+    // ERC-20 interface at 0x3600…0000 (approve/transferFrom) uses 6 decimals. Every venue addresses USDC through the ERC-20
+    // interface — LI.FI's "native" on Arc IS 0x3600… (a 0x0 request is rewritten to it and the Diamond pulls via
+    // transferFrom with value 0), CCTP burns it — so the catalog lists USDC as that token and carries no contract-less
+    // native entry: a native (0x0) USDC with 18 decimals would route nowhere and invite the 10^12 mix-up the docs warn about.
+    // There is no WETH9-style wrapper ("There is no wrapped USDC address on Arc"); WETH is a bridged ERC-20.
+    // LI.FI + CCTP (domain 26); no 1Click ids. Verified on-chain 2026-10-14 (symbol, decimals, code).
+    key: "arc",
+    caip2: "eip155:5042",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/arc.svg",
+    label: "Arc",
+    assets: [
+      {symbol: "USDC", assetId: "", contract: "0x3600000000000000000000000000000000000000", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "EURC", assetId: "", contract: "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1", decimals: 6, icon: cmcIcon(20641)},
+      {symbol: "WETH", assetId: "", contract: "0x128cC466B61f542da60c70e3aA11c10e19B84EDB", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "cirBTC", assetId: "", contract: "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0", decimals: 8},
+    ],
+  },
+  {
+    // Mantle (OP-Stack-derived L2, native MNT). LI.FI + wrap; no 1Click ids. USDC here is the bridged "USD Coin" (not
+    // Circle-native, no CCTP). Verified on-chain 2026-10-14.
+    key: "mantle",
+    caip2: "eip155:5000",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/mantle.svg",
+    label: "Mantle",
+    assets: [
+      {symbol: "MNT", assetId: "", decimals: 18, icon: cmcIcon(27075)},
+      {symbol: "WMNT", assetId: "", contract: "0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8", decimals: 18, icon: cmcIcon(27075)},
+      {symbol: "USDC", assetId: "", contract: "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "USDT", assetId: "", contract: "0x201EBa5CC46D216Ce6DC03F6a759e8E766e956aE", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "USDT0", assetId: "", contract: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "WETH", assetId: "", contract: "0xdEAddEaDdeadDEadDEADDEAddEADDEAddead1111", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "WBTC", assetId: "", contract: "0xCAbAE6f6Ea1ecaB08Ad02fE02ce9A44F09aebfA2", decimals: 8, icon: cmcIcon(3717)},
+      {symbol: "mETH", assetId: "", contract: "0xcDA86A272531e8640cD7F1a92c01839911B90bb0", decimals: 18},
+      {symbol: "USDe", assetId: "", contract: "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", decimals: 18, icon: cmcIcon(29470)},
+      {symbol: "FBTC", assetId: "", contract: "0xC96dE26018A54D51c097160568752c4E3BD6C364", decimals: 8},
+    ],
+  },
+  {
+    // Katana (Polygon CDK / AggLayer L2, native ETH). LI.FI + wrap; no 1Click ids. The canonical tokens are Vault Bridge
+    // mints whose on-chain symbols are vbETH / vbUSDC / vbUSDT / vbWBTC; the catalog shows them as LI.FI does (WETH, USDC.e,
+    // USDT, WBTC) — vbETH is the chain's WETH9 (deposit()/withdraw(), estimateGas-checked). Verified on-chain 2026-10-14.
+    key: "katana",
+    caip2: "eip155:747474",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/katana.svg",
+    label: "Katana",
+    assets: [
+      {symbol: "ETH", assetId: "", decimals: 18, icon: cmcIcon(1027)},
+      {symbol: "WETH", assetId: "", contract: "0xEE7D8BCFb72bC1880D0Cf19822eB0A2e6577aB62", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "USDC.e", assetId: "", contract: "0x203A662b0BD271A6ed5a60EdFbd04bFce608FD36", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "USDT", assetId: "", contract: "0x2DCa96907fde857dd3D816880A0df407eeB2D2F2", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "AUSD", assetId: "", contract: "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a", decimals: 6},
+      {symbol: "WBTC", assetId: "", contract: "0x0913DA6Da4b42f538B445599b46Bb4622342Cf52", decimals: 8, icon: cmcIcon(3717)},
+      {symbol: "wstETH", assetId: "", contract: "0x7Fb4D0f51544F24F385a421Db6e7D4fC71Ad8e5C", decimals: 18, icon: cmcIcon(12409)},
+      {symbol: "KAT", assetId: "", contract: "0x7F1f4b4b29f5058fA32CC7a97141b8D7e5ABDC2d", decimals: 18},
+    ],
+  },
+  {
+    // Morph (consumer L2, native ETH). LI.FI + wrap + CCTP (domain 30; USDC at 0xCfb1… is Circle-native, 0xe34c… is the
+    // bridged USDC.e). Verified on-chain 2026-10-14.
+    key: "morph",
+    caip2: "eip155:2818",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/morph.svg",
+    label: "Morph",
+    assets: [
+      {symbol: "ETH", assetId: "", decimals: 18, icon: cmcIcon(1027)},
+      {symbol: "WETH", assetId: "", contract: "0x5300000000000000000000000000000000000011", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "USDC", assetId: "", contract: "0xCfb1186F4e93D60E60a8bDd997427D1F33bc372B", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "USDT0", assetId: "", contract: "0xe7cd86e13AC4309349F30B3435a9d337750fC82D", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "USDC.e", assetId: "", contract: "0xe34c91815d7fc18A9e2148bcD4241d0a5848b693", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "WBTC", assetId: "", contract: "0x803DcE4D3f4Ae2e17AF6C51343040dEe320C149D", decimals: 8, icon: cmcIcon(3717)},
+    ],
+  },
+  {
+    // Flare (EVM L1, native FLR). LI.FI + wrap; no 1Click ids; no Circle-native USDC (USDC.e is Stargate-bridged).
+    // USDT0's on-chain symbol is "USD₮0" (as on the other USDT0 chains). Verified on-chain 2026-10-14.
+    key: "flare",
+    caip2: "eip155:14",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/flare.svg",
+    label: "Flare",
+    assets: [
+      {symbol: "FLR", assetId: "", decimals: 18, icon: cmcIcon(7950)},
+      {symbol: "WFLR", assetId: "", contract: "0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d", decimals: 18, icon: cmcIcon(7950)},
+      {symbol: "USDT0", assetId: "", contract: "0xe7cd86e13AC4309349F30B3435a9d337750fC82D", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "USDC.e", assetId: "", contract: "0xFbDa5F676cB37624f28265A144A48B0d6e87d3b6", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "WETH", assetId: "", contract: "0x1502FA4be69d526124D453619276FacCab275d3D", decimals: 18, icon: cmcIcon(2396)},
+      {symbol: "FXRP", assetId: "", contract: "0xAd552A648C74D49E10027AB8a618A3ad4901c5bE", decimals: 6},
+      {symbol: "sFLR", assetId: "", contract: "0x12e605bc104e93B45e1aD99F9e555f659051c2BB", decimals: 18},
+    ],
+  },
+  {
     // MegaETH (real-time Ethereum L2, native ETH). LI.FI + wrap; no 1Click ids.
     key: "megaeth",
     caip2: "eip155:4326",

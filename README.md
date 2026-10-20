@@ -52,9 +52,9 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | `@forgewallet/protocol-swap2-near-intents`, `-lifi`, `-thorchain`, `-omniston` | phase 3 ✓ | the four providers (NEAR Intents 1Click, LI.FI REST, THORChain, STON.fi Omniston), each also a standalone `Swap2Protocol` |
 | `@forgewallet/swap2-assets` | phase 3 ✓ | CAIP-19 asset registry shared by the swap2 packages |
 | `@forgewallet/protocol-swap2-cctp` | 2026-10-10 ✓ | Circle CCTP V2: native USDC burn-and-mint between 17 EVM chains, Fast / Standard by Circle's fee API, two-phase delivery (`claimSwap2` with the user's `receiveMessage`), preflight against the real contracts |
-| `@forgewallet/protocol-swap2-usdt0` | 2026-10-20 ✓ | USDT0 (Tether's LayerZero OFT): USDT / USDT0 between 13 EVM chains in one source transaction — `quoteOFT` + `quoteSend` on the OFT itself, `send` with the LayerZero fee as `msg.value`, approval only for the Ethereum adapter, status from LayerZero Scan, `lzReceive` retry of a stored payload as the claim; the only direct USDT path into HyperEVM; every deployment re-verified on-chain |
+| `@forgewallet/protocol-swap2-usdt0` | 2026-10-20 ✓ | USDT0 (Tether's LayerZero OFT): USDT / USDT0 between 16 EVM chains in one source transaction — `quoteOFT` + `quoteSend` on the OFT itself, `send` with the LayerZero fee as `msg.value`, approval only for the Ethereum adapter, status from LayerZero Scan, `lzReceive` retry of a stored payload as the claim; the only direct USDT path into HyperEVM; every deployment re-verified on-chain |
 | `@forgewallet/protocol-swap2-uniswap` | 2026-10-12 ✓ | Uniswap v3 straight from the contracts on 7 chains: QuoterV2 quotes (every fee tier + two-hop via WETH/USDC/USDT in one RPC batch), SwapRouter02 `multicall` execution with deadline, native in/out (wrap via value, `unwrapWETH9`), exact approvals, deployment re-verified on-chain; no API key, no frontend — the permissionless same-chain venue |
-| `@forgewallet/protocol-swap2-wrap` | 2026-10-12 ✓ | native ↔ wrapped native (ETH↔WETH, BNB↔WBNB, POL↔WPOL, AVAX↔WAVAX, HYPE↔WHYPE… 13 EVM chains) as a same-chain swap2 venue: WETH9 `deposit()` / `withdraw()`, 1:1, no approval, sender-only, tokens verified on-chain; wrapped natives added to the asset catalog |
+| `@forgewallet/protocol-swap2-wrap` | 2026-10-12 ✓ | native ↔ wrapped native (ETH↔WETH, BNB↔WBNB, POL↔WPOL, AVAX↔WAVAX, HYPE↔WHYPE… 16 EVM chains) as a same-chain swap2 venue: WETH9 `deposit()` / `withdraw()`, 1:1, no approval, sender-only, tokens verified on-chain; wrapped natives added to the asset catalog |
 | `@forgewallet/protocol-swap2-balancer` | 2026-10-13 ✓ | Balancer v2 same-chain swaps on 9 chains (the cp0x permissionless Balancer venue): the SOR API only suggests the path; the Vault prices it on-chain (`queryBatchSwap`) and `batchSwap` enforces `limits` + deadline; split and multi-hop paths, native via the Vault's ETH sentinel, preflight re-price |
 | `@forgewallet/kit` | phase 3 ✓ | orchestrator: register chain wallets + protocol modules, accounts by CAIP-2 chain, policies (fee cap, allow/block lists, confirm) on every write — sends, transfers, `signTransaction`, message signatures; the activity feed (`history()`) |
 | `@forgewallet/keyring` | 2026-10-12 ✓ | many accounts from one seed plus imported seeds / private keys / Tonkeeper words, one `AccountMeta` list across chains, per-execution accounts that dispose the key after use |
@@ -87,12 +87,13 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 
 ## Tests
 
-`pnpm test` runs 827 tests across 32 packages (Node); `pnpm test:hermes` runs 185
+`pnpm test` runs 1,200+ tests across 32 packages (Node); `pnpm test:hermes` runs 185
 checks in the Hermes VM React Native ships. Beyond unit tests the swap layer is
-checked against live providers: 20,969 quote checks (8 providers, 30 chains, 340
-assets), 8,706 builds simulated to the signature, 3,408 router auctions with the
+checked against live providers: 24,587 quote checks (8 providers, 35 chains, 375
+assets), 10,444 builds simulated to the signature, 5,634 router auctions with the
 ranking invariants (best = max net value, fastest = min ETA) and 457 real-money
-swaps; every Earn module has a read-only `verify:live` across all its markets.
+swaps; every Earn module has a read-only `verify:live` across all its markets, and
+every module ships recorded real transactions its `describeActivity` must recognize.
 
 ## Develop
 
