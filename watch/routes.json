@@ -1,0 +1,348 @@
+{
+ "_doc": "Routes canary corridors (scripts/watch/routes.mjs): one dry quote each, per provider, no signing. `amount` is in the source token's units. `suspended`: the app pauses it today (Vercel env NEAR_INTENTS_SUSPENDED_CHAINS) — the canary probes the venue anyway so we notice when it quotes again. `note` is shown in the digest.",
+ "corridors": [
+  {
+   "id": "ni:eth-usdc>base-usdc",
+   "provider": "near_intents",
+   "src": "eip155:1:USDC",
+   "dst": "eip155:8453:USDC",
+   "amount": "100"
+  },
+  {
+   "id": "ni:base-usdc>arb-usdc",
+   "provider": "near_intents",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:42161:USDC",
+   "amount": "100"
+  },
+  {
+   "id": "ni:btc>base-usdc",
+   "provider": "near_intents",
+   "src": "bitcoin:mainnet:BTC",
+   "dst": "eip155:8453:USDC",
+   "amount": "0.002"
+  },
+  {
+   "id": "ni:sol>base-usdc",
+   "provider": "near_intents",
+   "src": "solana:mainnet:SOL",
+   "dst": "eip155:8453:USDC",
+   "amount": "0.5"
+  },
+  {
+   "id": "ni:tron-usdt>base-usdc",
+   "provider": "near_intents",
+   "src": "tron:728126428:USDT",
+   "dst": "eip155:8453:USDC",
+   "amount": "150"
+  },
+  {
+   "id": "ni:base-usdc>plasma-usdt0",
+   "provider": "near_intents",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:9745:USDT0",
+   "amount": "100"
+  },
+  {
+   "id": "ni:base-usdc>ton-usdt",
+   "provider": "near_intents",
+   "src": "eip155:8453:USDC",
+   "dst": "ton:-239:USDT",
+   "amount": "100",
+   "suspended": true,
+   "note": "HOT omni-bridge, dead since 2026-10-16 — drop ton:-239 from the NEAR_INTENTS_SUSPENDED_CHAINS env when it quotes"
+  },
+  {
+   "id": "ni:gram>ton-usdt",
+   "provider": "near_intents",
+   "src": "ton:-239:GRAM",
+   "dst": "ton:-239:USDT",
+   "amount": "20",
+   "suspended": true,
+   "note": "HOT omni-bridge, same-chain TON"
+  },
+  {
+   "id": "ni:ton-usdt>base-usdc",
+   "provider": "near_intents",
+   "src": "ton:-239:USDT",
+   "dst": "eip155:8453:USDC",
+   "amount": "100",
+   "suspended": true,
+   "note": "HOT omni-bridge"
+  },
+  {
+   "id": "ni:base-usdc>op-usdc",
+   "provider": "near_intents",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:10:USDC",
+   "amount": "100",
+   "note": "HOT omni-bridge (not suspended, LI.FI covers)"
+  },
+  {
+   "id": "ni:base-usdc>polygon-usdc",
+   "provider": "near_intents",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:137:USDC",
+   "amount": "100",
+   "note": "HOT omni-bridge"
+  },
+  {
+   "id": "ni:base-usdc>avax-usdc",
+   "provider": "near_intents",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:43114:USDC",
+   "amount": "100",
+   "note": "HOT omni-bridge"
+  },
+  {
+   "id": "ni:base-usdc>scroll-usdt",
+   "provider": "near_intents",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:534352:USDT",
+   "amount": "100",
+   "note": "HOT omni-bridge"
+  },
+  {
+   "id": "ni:base-usdc>monad-usdc",
+   "provider": "near_intents",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:143:USDC",
+   "amount": "100",
+   "note": "HOT omni-bridge"
+  },
+  {
+   "id": "ni:base-usdc>bsc-usdt",
+   "provider": "near_intents",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:56:USDT",
+   "amount": "100",
+   "note": "HOT omni-bridge ($1,000 floor seen 2026-10-17)"
+  },
+  {
+   "id": "lifi:eth-usdc>base-usdc",
+   "provider": "lifi",
+   "src": "eip155:1:USDC",
+   "dst": "eip155:8453:USDC",
+   "amount": "100"
+  },
+  {
+   "id": "lifi:base-eth>arb-eth",
+   "provider": "lifi",
+   "src": "eip155:8453:ETH",
+   "dst": "eip155:42161:ETH",
+   "amount": "0.05"
+  },
+  {
+   "id": "lifi:polygon-usdc>base-usdc",
+   "provider": "lifi",
+   "src": "eip155:137:USDC",
+   "dst": "eip155:8453:USDC",
+   "amount": "100"
+  },
+  {
+   "id": "lifi:base-usdc>base-eth",
+   "provider": "lifi",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:8453:ETH",
+   "amount": "100",
+   "note": "same-chain"
+  },
+  {
+   "id": "lifi:base-usdc>plasma-usdt0",
+   "provider": "lifi",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:9745:USDT0",
+   "amount": "100"
+  },
+  {
+   "id": "lifi:base-usdc>op-usdc",
+   "provider": "lifi",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:10:USDC",
+   "amount": "100"
+  },
+  {
+   "id": "lifi:base-usdc>worldchain-usdc",
+   "provider": "lifi",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:480:USDC",
+   "amount": "100",
+   "note": "SDK-133 thin"
+  },
+  {
+   "id": "lifi:base-usdc>sei-usdc",
+   "provider": "lifi",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:1329:USDC",
+   "amount": "100",
+   "note": "SDK-133 unreachable on Oct 16"
+  },
+  {
+   "id": "lifi:base-usdc>ink-usdc",
+   "provider": "lifi",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:57073:USDC",
+   "amount": "100",
+   "note": "SDK-133"
+  },
+  {
+   "id": "lifi:base-usdc>xlayer-usdt0",
+   "provider": "lifi",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:196:USDT0",
+   "amount": "100",
+   "note": "SDK-133 unreachable on Oct 16"
+  },
+  {
+   "id": "lifi:base-usdc>celo-usdc",
+   "provider": "lifi",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:42220:USDC",
+   "amount": "100",
+   "note": "SDK-133 unreachable on Oct 16"
+  },
+  {
+   "id": "lifi:base-usdc>gnosis-usdc",
+   "provider": "lifi",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:100:USDC",
+   "amount": "100",
+   "note": "SDK-133 first-try failures"
+  },
+  {
+   "id": "om:ton-usdt>base-usdc",
+   "provider": "omniston",
+   "src": "ton:-239:USDT",
+   "dst": "eip155:8453:USDC",
+   "amount": "20"
+  },
+  {
+   "id": "om:base-usdc>ton-usdt",
+   "provider": "omniston",
+   "src": "eip155:8453:USDC",
+   "dst": "ton:-239:USDT",
+   "amount": "20"
+  },
+  {
+   "id": "om:gram>ton-usdt",
+   "provider": "omniston",
+   "src": "ton:-239:GRAM",
+   "dst": "ton:-239:USDT",
+   "amount": "20",
+   "note": "same-chain TON"
+  },
+  {
+   "id": "om:eth-usdt>ton-usdt",
+   "provider": "omniston",
+   "src": "eip155:1:USDT",
+   "dst": "ton:-239:USDT",
+   "amount": "50"
+  },
+  {
+   "id": "th:eth-usdt>avax",
+   "provider": "thorchain",
+   "src": "eip155:1:USDT",
+   "dst": "eip155:43114:AVAX",
+   "amount": "100"
+  },
+  {
+   "id": "th:tron-usdt>eth",
+   "provider": "thorchain",
+   "src": "tron:728126428:USDT",
+   "dst": "eip155:1:ETH",
+   "amount": "100",
+   "note": "Tron deposit source (memo on-chain); BTC is not a THORChain source in our wallet"
+  },
+  {
+   "id": "th:eth>btc",
+   "provider": "thorchain",
+   "src": "eip155:1:ETH",
+   "dst": "bitcoin:mainnet:BTC",
+   "amount": "0.1"
+  },
+  {
+   "id": "cctp:eth-usdc>base-usdc",
+   "provider": "cctp",
+   "src": "eip155:1:USDC",
+   "dst": "eip155:8453:USDC",
+   "amount": "100"
+  },
+  {
+   "id": "cctp:base-usdc>arb-usdc",
+   "provider": "cctp",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:42161:USDC",
+   "amount": "100"
+  },
+  {
+   "id": "uni:base-usdc>base-eth",
+   "provider": "uniswap",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:8453:ETH",
+   "amount": "100"
+  },
+  {
+   "id": "wrap:base-eth>base-weth",
+   "provider": "wrap",
+   "src": "eip155:8453:ETH",
+   "dst": "eip155:8453:WETH",
+   "amount": "0.05"
+  },
+  {
+   "id": "bal:eth-usdc>eth-eth",
+   "provider": "balancer",
+   "src": "eip155:1:USDC",
+   "dst": "eip155:1:ETH",
+   "amount": "100"
+  }
+ ],
+ "omniston": {
+  "_doc": "Mirror of Vaulty app/src/lib/omnistonSettlement.ts (audited settlement contracts + EVM order protocols); keep in sync by hand.",
+  "trustedSettlementContracts": {
+   "ton:-239": [
+    "EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ"
+   ],
+   "eip155:1": [
+    "0xafCF681272AF10959736f45616eeCBC22D7095E2"
+   ],
+   "eip155:56": [
+    "0xafCF681272AF10959736f45616eeCBC22D7095E2"
+   ],
+   "eip155:137": [
+    "0x41A392062A4307a6961d48e30FF20bF6823715B8"
+   ],
+   "eip155:4663": [
+    "0xafCF681272AF10959736f45616eeCBC22D7095E2"
+   ],
+   "eip155:8453": [
+    "0xACa3E2F9b61a44892926bC6c3e104192E7D1c3cd"
+   ],
+   "eip155:42161": [
+    "0xafCF681272AF10959736f45616eeCBC22D7095E2"
+   ],
+   "eip155:43114": [
+    "0xafCF681272AF10959736f45616eeCBC22D7095E2"
+   ]
+  },
+  "trustedEvmOrderProtocols": {
+   "eip155:1": [
+    "0xb5810aCfD45D85Eaa938bF90a5857295513DA7E9"
+   ],
+   "eip155:56": [
+    "0xb5810aCfD45D85Eaa938bF90a5857295513DA7E9"
+   ],
+   "eip155:137": [
+    "0xafCF681272AF10959736f45616eeCBC22D7095E2"
+   ],
+   "eip155:8453": [
+    "0xe7405fAcDEDB2512e91F2886BDff13231343aF5E"
+   ],
+   "eip155:42161": [
+    "0xb5810aCfD45D85Eaa938bF90a5857295513DA7E9"
+   ],
+   "eip155:43114": [
+    "0xb5810aCfD45D85Eaa938bF90a5857295513DA7E9"
+   ]
+  }
+ }
+}

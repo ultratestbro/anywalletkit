@@ -1,0 +1,369 @@
+{
+  "module": "@forgewallet/protocol-swap2-uniswap",
+  "sources": [
+    {
+      "id": "factory-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+      "label": "Uniswap v3 Factory · Ethereum"
+    },
+    {
+      "id": "quoter-v2-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+      "label": "Uniswap QuoterV2 · Ethereum"
+    },
+    {
+      "id": "swap-router-02-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "label": "Uniswap SwapRouter02 · Ethereum"
+    },
+    {
+      "id": "factory-op-mainnet",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+      "label": "Uniswap v3 Factory · OP Mainnet"
+    },
+    {
+      "id": "quoter-v2-op-mainnet",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+      "label": "Uniswap QuoterV2 · OP Mainnet"
+    },
+    {
+      "id": "swap-router-02-op-mainnet",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "label": "Uniswap SwapRouter02 · OP Mainnet"
+    },
+    {
+      "id": "factory-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0xdB1d10011AD0Ff90774D0C6Bb92e5C5c8b4461F7",
+      "label": "Uniswap v3 Factory · BNB Chain"
+    },
+    {
+      "id": "quoter-v2-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x78D78E420Da98ad378D7799bE8f4AF69033EB077",
+      "label": "Uniswap QuoterV2 · BNB Chain"
+    },
+    {
+      "id": "swap-router-02-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0xB971eF87ede563556b2ED4b1C0b0019111Dd85d2",
+      "label": "Uniswap SwapRouter02 · BNB Chain"
+    },
+    {
+      "id": "factory-unichain",
+      "type": "evm-code",
+      "chainId": 130,
+      "address": "0x1F98400000000000000000000000000000000003",
+      "label": "Uniswap v3 Factory · Unichain"
+    },
+    {
+      "id": "quoter-v2-unichain",
+      "type": "evm-code",
+      "chainId": 130,
+      "address": "0x565AC8C7863D9bb16d07E809ff49Fe5cD467634C",
+      "label": "Uniswap QuoterV2 · Unichain"
+    },
+    {
+      "id": "swap-router-02-unichain",
+      "type": "evm-code",
+      "chainId": 130,
+      "address": "0x73855d06DE49d0fe4A9c42636Ba96c62da12FF9C",
+      "label": "Uniswap SwapRouter02 · Unichain"
+    },
+    {
+      "id": "factory-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+      "label": "Uniswap v3 Factory · Polygon"
+    },
+    {
+      "id": "quoter-v2-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+      "label": "Uniswap QuoterV2 · Polygon"
+    },
+    {
+      "id": "swap-router-02-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "label": "Uniswap SwapRouter02 · Polygon"
+    },
+    {
+      "id": "factory-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0x204FAca1764B154221e35c0d20aBb3c525710498",
+      "label": "Uniswap v3 Factory · Monad"
+    },
+    {
+      "id": "quoter-v2-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0x2d01411773c8C24805306e89a41f7855c3C4fE65",
+      "label": "Uniswap QuoterV2 · Monad"
+    },
+    {
+      "id": "swap-router-02-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0xfE31F71C1b106EAc32F1A19239c9a9A72ddfb900",
+      "label": "Uniswap SwapRouter02 · Monad"
+    },
+    {
+      "id": "factory-x-layer",
+      "type": "evm-code",
+      "chainId": 196,
+      "address": "0x4B2ab38DBF28D31D467aA8993f6c2585981D6804",
+      "label": "Uniswap v3 Factory · X Layer"
+    },
+    {
+      "id": "quoter-v2-x-layer",
+      "type": "evm-code",
+      "chainId": 196,
+      "address": "0x976183AC3d09840D243A88c0268BADb3B3e3259f",
+      "label": "Uniswap QuoterV2 · X Layer"
+    },
+    {
+      "id": "swap-router-02-x-layer",
+      "type": "evm-code",
+      "chainId": 196,
+      "address": "0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA",
+      "label": "Uniswap SwapRouter02 · X Layer"
+    },
+    {
+      "id": "factory-zksync-era",
+      "type": "evm-code",
+      "chainId": 324,
+      "address": "0x8FdA5a7a8dCA67BBcDd10F02Fa0649A937215422",
+      "label": "Uniswap v3 Factory · zkSync Era"
+    },
+    {
+      "id": "quoter-v2-zksync-era",
+      "type": "evm-code",
+      "chainId": 324,
+      "address": "0x8Cb537fc92E26d8EBBb760E632c95484b6Ea3e28",
+      "label": "Uniswap QuoterV2 · zkSync Era"
+    },
+    {
+      "id": "swap-router-02-zksync-era",
+      "type": "evm-code",
+      "chainId": 324,
+      "address": "0x99c56385daBCE3E81d8499d0b8d0257aBC07E8A3",
+      "label": "Uniswap SwapRouter02 · zkSync Era"
+    },
+    {
+      "id": "factory-world-chain",
+      "type": "evm-code",
+      "chainId": 480,
+      "address": "0x7a5028BDa40e7B173C278C5342087826455ea25a",
+      "label": "Uniswap v3 Factory · World Chain"
+    },
+    {
+      "id": "quoter-v2-world-chain",
+      "type": "evm-code",
+      "chainId": 480,
+      "address": "0x10158D43e6cc414deE1Bd1eB0EfC6a5cBCfF244c",
+      "label": "Uniswap QuoterV2 · World Chain"
+    },
+    {
+      "id": "swap-router-02-world-chain",
+      "type": "evm-code",
+      "chainId": 480,
+      "address": "0x091AD9e2e6e5eD44c1c66dB50e49A601F9f36cF6",
+      "label": "Uniswap SwapRouter02 · World Chain"
+    },
+    {
+      "id": "factory-robinhood-chain",
+      "type": "evm-code",
+      "chainId": 4663,
+      "address": "0x1f7d7550B1b028f7571E69A784071F0205FD2EfA",
+      "label": "Uniswap v3 Factory · Robinhood Chain"
+    },
+    {
+      "id": "quoter-v2-robinhood-chain",
+      "type": "evm-code",
+      "chainId": 4663,
+      "address": "0x33e885eD0Ec9bF04EcfB19341582aADCb4c8A9E7",
+      "label": "Uniswap QuoterV2 · Robinhood Chain"
+    },
+    {
+      "id": "swap-router-02-robinhood-chain",
+      "type": "evm-code",
+      "chainId": 4663,
+      "address": "0xCaf681a66D020601342297493863E78C959E5cb2",
+      "label": "Uniswap SwapRouter02 · Robinhood Chain"
+    },
+    {
+      "id": "factory-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
+      "label": "Uniswap v3 Factory · Base"
+    },
+    {
+      "id": "quoter-v2-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a",
+      "label": "Uniswap QuoterV2 · Base"
+    },
+    {
+      "id": "swap-router-02-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x2626664c2603336E57B271c5C0b26F421741e481",
+      "label": "Uniswap SwapRouter02 · Base"
+    },
+    {
+      "id": "factory-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+      "label": "Uniswap v3 Factory · Arbitrum"
+    },
+    {
+      "id": "quoter-v2-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+      "label": "Uniswap QuoterV2 · Arbitrum"
+    },
+    {
+      "id": "swap-router-02-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "label": "Uniswap SwapRouter02 · Arbitrum"
+    },
+    {
+      "id": "factory-celo",
+      "type": "evm-code",
+      "chainId": 42220,
+      "address": "0xAfE208a311B21f13EF87E33A90049fC17A7acDEc",
+      "label": "Uniswap v3 Factory · Celo"
+    },
+    {
+      "id": "quoter-v2-celo",
+      "type": "evm-code",
+      "chainId": 42220,
+      "address": "0x82825d0554fA07f7FC52Ab63c961F330fdEFa8E8",
+      "label": "Uniswap QuoterV2 · Celo"
+    },
+    {
+      "id": "swap-router-02-celo",
+      "type": "evm-code",
+      "chainId": 42220,
+      "address": "0x5615CDAb10dc425a742d643d949a7F474C01abc4",
+      "label": "Uniswap SwapRouter02 · Celo"
+    },
+    {
+      "id": "factory-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0x740b1c1de25031C31FF4fC9A62f554A55cdC1baD",
+      "label": "Uniswap v3 Factory · Avalanche"
+    },
+    {
+      "id": "quoter-v2-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0xbe0F5544EC67e9B3b2D979aaA43f18Fd87E6257F",
+      "label": "Uniswap QuoterV2 · Avalanche"
+    },
+    {
+      "id": "swap-router-02-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0xbb00FF08d01D300023C629E8fFfFcb65A5a578cE",
+      "label": "Uniswap SwapRouter02 · Avalanche"
+    },
+    {
+      "id": "factory-ink",
+      "type": "evm-code",
+      "chainId": 57073,
+      "address": "0x640887A9ba3A9C53Ed27D0F7e8246A4F933f3424",
+      "label": "Uniswap v3 Factory · Ink"
+    },
+    {
+      "id": "quoter-v2-ink",
+      "type": "evm-code",
+      "chainId": 57073,
+      "address": "0x96b572D2d880cf2Fa2563651BD23ADE6f5516652",
+      "label": "Uniswap QuoterV2 · Ink"
+    },
+    {
+      "id": "swap-router-02-ink",
+      "type": "evm-code",
+      "chainId": 57073,
+      "address": "0x177778F19E89dD1012BdBe603F144088A95C4B53",
+      "label": "Uniswap SwapRouter02 · Ink"
+    },
+    {
+      "id": "factory-linea",
+      "type": "evm-code",
+      "chainId": 59144,
+      "address": "0x31FAfd4889FA1269F7a13A66eE0fB458f27D72A9",
+      "label": "Uniswap v3 Factory · Linea"
+    },
+    {
+      "id": "quoter-v2-linea",
+      "type": "evm-code",
+      "chainId": 59144,
+      "address": "0x58EaD433eA99708604c4dD7C9b7E80c70976E202",
+      "label": "Uniswap QuoterV2 · Linea"
+    },
+    {
+      "id": "swap-router-02-linea",
+      "type": "evm-code",
+      "chainId": 59144,
+      "address": "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a",
+      "label": "Uniswap SwapRouter02 · Linea"
+    },
+    {
+      "id": "v3-periphery",
+      "type": "github-releases",
+      "repo": "Uniswap/v3-periphery",
+      "label": "Uniswap v3 periphery releases"
+    },
+    {
+      "id": "v3-core",
+      "type": "github-releases",
+      "repo": "Uniswap/v3-core",
+      "label": "Uniswap v3 core releases"
+    },
+    {
+      "id": "sdks",
+      "type": "github-releases",
+      "repo": "Uniswap/sdks",
+      "label": "Uniswap SDKs (sdk-core address map) releases"
+    },
+    {
+      "id": "docs-deployments",
+      "type": "http-text",
+      "url": "https://docs.uniswap.org/contracts/v3/reference/deployments/",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "Uniswap docs · v3 deployment addresses"
+    }
+  ]
+}

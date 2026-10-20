@@ -1,0 +1,39 @@
+{
+  "module": "@forgewallet/protocol-swap2-thorchain",
+  "sources": [
+    {
+      "id": "inbound-addresses",
+      "type": "http-json",
+      "url": "https://gateway.liquify.com/chain/thorchain_api/thorchain/inbound_addresses",
+      "itemKey": "chain",
+      "label": "THORNode inbound addresses + routers (Liquify gateway)"
+    },
+    {
+      "id": "pools",
+      "type": "http-json",
+      "url": "https://gateway.liquify.com/chain/thorchain_api/thorchain/pools",
+      "itemKey": "asset",
+      "label": "THORNode pools (Liquify gateway)"
+    },
+    {
+      "id": "docs-dev-connecting",
+      "type": "http-text",
+      "url": "https://dev.thorchain.org/concepts/connecting-to-thorchain.html",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "THORChain dev docs · connecting to THORChain"
+    },
+    {
+      "id": "docs-dev-quickstart",
+      "type": "http-text",
+      "url": "https://dev.thorchain.org/swap-guide/quickstart-guide.html",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "THORChain dev docs · swap quickstart"
+    }
+  ]
+}

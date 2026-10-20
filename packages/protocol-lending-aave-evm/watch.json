@@ -1,0 +1,433 @@
+{
+  "module": "@forgewallet/protocol-lending-aave-evm",
+  "sources": [
+    {
+      "id": "addresses-provider-ethereum-core",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+      "label": "Aave v3 PoolAddressesProvider · Ethereum core"
+    },
+    {
+      "id": "pool-ethereum-core",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+      "label": "Aave v3 Pool · Ethereum core"
+    },
+    {
+      "id": "weth-gateway-ethereum-core",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0xd01607c3C5eCABa394D8be377a08590149325722",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Ethereum core"
+    },
+    {
+      "id": "addresses-provider-ethereum-lido",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0xcfBf336fe147D643B9Cb705648500e101504B16d",
+      "label": "Aave v3 PoolAddressesProvider · Ethereum Lido"
+    },
+    {
+      "id": "pool-ethereum-lido",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0x4e033931ad43597d96D6bcc25c280717730B58B1",
+      "label": "Aave v3 Pool · Ethereum Lido"
+    },
+    {
+      "id": "weth-gateway-ethereum-lido",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x3167C452fA3fa1e5C16bB83Bc0fde4519C464299",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Ethereum Lido"
+    },
+    {
+      "id": "addresses-provider-ethereum-etherfi",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0xeBa440B438Ad808101d1c451C1C5322c90BEFCdA",
+      "label": "Aave v3 PoolAddressesProvider · Ethereum EtherFi"
+    },
+    {
+      "id": "pool-ethereum-etherfi",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0x0AA97c284e98396202b6A04024F5E2c65026F3c0",
+      "label": "Aave v3 Pool · Ethereum EtherFi"
+    },
+    {
+      "id": "weth-gateway-ethereum-etherfi",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0xf956B38F035dC9067fb827A512D3CF35202AB0Bc",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Ethereum EtherFi"
+    },
+    {
+      "id": "addresses-provider-op-mainnet",
+      "type": "evm-proxy",
+      "chainId": 10,
+      "address": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+      "label": "Aave v3 PoolAddressesProvider · OP Mainnet"
+    },
+    {
+      "id": "pool-op-mainnet",
+      "type": "evm-proxy",
+      "chainId": 10,
+      "address": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
+      "label": "Aave v3 Pool · OP Mainnet"
+    },
+    {
+      "id": "weth-gateway-op-mainnet",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x5f2508cAE9923b02316254026CD43d7902866725",
+      "label": "Aave v3 WrappedTokenGatewayV3 · OP Mainnet"
+    },
+    {
+      "id": "addresses-provider-bnb-chain",
+      "type": "evm-proxy",
+      "chainId": 56,
+      "address": "0xff75B6da14FfbbfD355Daf7a2731456b3562Ba6D",
+      "label": "Aave v3 PoolAddressesProvider · BNB Chain"
+    },
+    {
+      "id": "pool-bnb-chain",
+      "type": "evm-proxy",
+      "chainId": 56,
+      "address": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
+      "label": "Aave v3 Pool · BNB Chain"
+    },
+    {
+      "id": "weth-gateway-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x0c2C95b24529664fE55D4437D7A31175CFE6c4f7",
+      "label": "Aave v3 WrappedTokenGatewayV3 · BNB Chain"
+    },
+    {
+      "id": "addresses-provider-gnosis",
+      "type": "evm-proxy",
+      "chainId": 100,
+      "address": "0x36616cf17557639614c1cdDb356b1B83fc0B2132",
+      "label": "Aave v3 PoolAddressesProvider · Gnosis"
+    },
+    {
+      "id": "pool-gnosis",
+      "type": "evm-proxy",
+      "chainId": 100,
+      "address": "0xb50201558B00496A145fE76f7424749556E326D8",
+      "label": "Aave v3 Pool · Gnosis"
+    },
+    {
+      "id": "weth-gateway-gnosis",
+      "type": "evm-code",
+      "chainId": 100,
+      "address": "0x721B9abAb6511b46b9ee83A1aba23BDAcB004149",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Gnosis"
+    },
+    {
+      "id": "addresses-provider-polygon",
+      "type": "evm-proxy",
+      "chainId": 137,
+      "address": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+      "label": "Aave v3 PoolAddressesProvider · Polygon"
+    },
+    {
+      "id": "pool-polygon",
+      "type": "evm-proxy",
+      "chainId": 137,
+      "address": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
+      "label": "Aave v3 Pool · Polygon"
+    },
+    {
+      "id": "weth-gateway-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0xBC302053db3aA514A3c86B9221082f162B91ad63",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Polygon"
+    },
+    {
+      "id": "addresses-provider-sonic",
+      "type": "evm-proxy",
+      "chainId": 146,
+      "address": "0x5C2e738F6E27bCE0F7558051Bf90605dD6176900",
+      "label": "Aave v3 PoolAddressesProvider · Sonic"
+    },
+    {
+      "id": "pool-sonic",
+      "type": "evm-proxy",
+      "chainId": 146,
+      "address": "0x5362dBb1e601abF3a4c14c22ffEdA64042E5eAA3",
+      "label": "Aave v3 Pool · Sonic"
+    },
+    {
+      "id": "weth-gateway-sonic",
+      "type": "evm-code",
+      "chainId": 146,
+      "address": "0x061D8e131F26512348ee5FA42e2DF1bA9d6505E9",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Sonic"
+    },
+    {
+      "id": "addresses-provider-zksync-era",
+      "type": "evm-proxy",
+      "chainId": 324,
+      "address": "0x2A3948BB219D6B2Fa83D64100006391a96bE6cb7",
+      "label": "Aave v3 PoolAddressesProvider · zkSync Era"
+    },
+    {
+      "id": "pool-zksync-era",
+      "type": "evm-proxy",
+      "chainId": 324,
+      "address": "0x78e30497a3c7527d953c6B1E3541b021A98Ac43c",
+      "label": "Aave v3 Pool · zkSync Era"
+    },
+    {
+      "id": "weth-gateway-zksync-era",
+      "type": "evm-code",
+      "chainId": 324,
+      "address": "0xAE2b00D676130Bdf22582781BbBA8f4F21e8B0ff",
+      "label": "Aave v3 WrappedTokenGatewayV3 · zkSync Era"
+    },
+    {
+      "id": "addresses-provider-metis",
+      "type": "evm-proxy",
+      "chainId": 1088,
+      "address": "0xB9FABd7500B2C6781c35Dd48d54f81fc2299D7AF",
+      "label": "Aave v3 PoolAddressesProvider · Metis"
+    },
+    {
+      "id": "pool-metis",
+      "type": "evm-proxy",
+      "chainId": 1088,
+      "address": "0x90df02551bB792286e8D4f13E0e357b4Bf1D6a57",
+      "label": "Aave v3 Pool · Metis"
+    },
+    {
+      "id": "addresses-provider-soneium",
+      "type": "evm-proxy",
+      "chainId": 1868,
+      "address": "0x82405D1a189bd6cE4667809C35B37fBE136A4c5B",
+      "label": "Aave v3 PoolAddressesProvider · Soneium"
+    },
+    {
+      "id": "pool-soneium",
+      "type": "evm-proxy",
+      "chainId": 1868,
+      "address": "0xDd3d7A7d03D9fD9ef45f3E587287922eF65CA38B",
+      "label": "Aave v3 Pool · Soneium"
+    },
+    {
+      "id": "weth-gateway-soneium",
+      "type": "evm-code",
+      "chainId": 1868,
+      "address": "0x6376D4df995f32f308f2d5049a7a320943023232",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Soneium"
+    },
+    {
+      "id": "addresses-provider-mantle",
+      "type": "evm-proxy",
+      "chainId": 5000,
+      "address": "0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f",
+      "label": "Aave v3 PoolAddressesProvider · Mantle"
+    },
+    {
+      "id": "pool-mantle",
+      "type": "evm-proxy",
+      "chainId": 5000,
+      "address": "0x458F293454fE0d67EC0655f3672301301DD51422",
+      "label": "Aave v3 Pool · Mantle"
+    },
+    {
+      "id": "weth-gateway-mantle",
+      "type": "evm-code",
+      "chainId": 5000,
+      "address": "0x9C6cCAC66b1c9AbA4855e2dD284b9e16e41E06eA",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Mantle"
+    },
+    {
+      "id": "addresses-provider-base",
+      "type": "evm-proxy",
+      "chainId": 8453,
+      "address": "0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D",
+      "label": "Aave v3 PoolAddressesProvider · Base"
+    },
+    {
+      "id": "pool-base",
+      "type": "evm-proxy",
+      "chainId": 8453,
+      "address": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
+      "label": "Aave v3 Pool · Base"
+    },
+    {
+      "id": "weth-gateway-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0xa0d9C1E9E48Ca30c8d8C3B5D69FF5dc1f6DFfC24",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Base"
+    },
+    {
+      "id": "addresses-provider-plasma",
+      "type": "evm-proxy",
+      "chainId": 9745,
+      "address": "0x061D8e131F26512348ee5FA42e2DF1bA9d6505E9",
+      "label": "Aave v3 PoolAddressesProvider · Plasma"
+    },
+    {
+      "id": "pool-plasma",
+      "type": "evm-proxy",
+      "chainId": 9745,
+      "address": "0x925a2A7214Ed92428B5b1B090F80b25700095e12",
+      "label": "Aave v3 Pool · Plasma"
+    },
+    {
+      "id": "weth-gateway-plasma",
+      "type": "evm-code",
+      "chainId": 9745,
+      "address": "0x54BDcc37c4143f944A3EE51C892a6cBDF305E7a0",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Plasma"
+    },
+    {
+      "id": "addresses-provider-arbitrum",
+      "type": "evm-proxy",
+      "chainId": 42161,
+      "address": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+      "label": "Aave v3 PoolAddressesProvider · Arbitrum"
+    },
+    {
+      "id": "pool-arbitrum",
+      "type": "evm-proxy",
+      "chainId": 42161,
+      "address": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
+      "label": "Aave v3 Pool · Arbitrum"
+    },
+    {
+      "id": "weth-gateway-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x5283BEcEd7ADF6D003225C13896E536f2D4264FF",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Arbitrum"
+    },
+    {
+      "id": "addresses-provider-celo",
+      "type": "evm-proxy",
+      "chainId": 42220,
+      "address": "0x9F7Cf9417D5251C59fE94fB9147feEe1aAd9Cea5",
+      "label": "Aave v3 PoolAddressesProvider · Celo"
+    },
+    {
+      "id": "pool-celo",
+      "type": "evm-proxy",
+      "chainId": 42220,
+      "address": "0x3E59A31363E2ad014dcbc521c4a0d5757d9f3402",
+      "label": "Aave v3 Pool · Celo"
+    },
+    {
+      "id": "addresses-provider-avalanche",
+      "type": "evm-proxy",
+      "chainId": 43114,
+      "address": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+      "label": "Aave v3 PoolAddressesProvider · Avalanche"
+    },
+    {
+      "id": "pool-avalanche",
+      "type": "evm-proxy",
+      "chainId": 43114,
+      "address": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
+      "label": "Aave v3 Pool · Avalanche"
+    },
+    {
+      "id": "weth-gateway-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0x2825cE5921538d17cc15Ae00a8B24fF759C6CDaE",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Avalanche"
+    },
+    {
+      "id": "addresses-provider-ink",
+      "type": "evm-proxy",
+      "chainId": 57073,
+      "address": "0x4172E6aAEC070ACB31aaCE343A58c93E4C70f44D",
+      "label": "Aave v3 PoolAddressesProvider · Ink"
+    },
+    {
+      "id": "pool-ink",
+      "type": "evm-proxy",
+      "chainId": 57073,
+      "address": "0x2816cf15F6d2A220E789aA011D5EE4eB6c47FEbA",
+      "label": "Aave v3 Pool · Ink"
+    },
+    {
+      "id": "weth-gateway-ink",
+      "type": "evm-code",
+      "chainId": 57073,
+      "address": "0xDe090EfCD6ef4b86792e2D84E55a5fa8d49D25D2",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Ink"
+    },
+    {
+      "id": "addresses-provider-linea",
+      "type": "evm-proxy",
+      "chainId": 59144,
+      "address": "0x89502c3731F69DDC95B65753708A07F8Cd0373F4",
+      "label": "Aave v3 PoolAddressesProvider · Linea"
+    },
+    {
+      "id": "pool-linea",
+      "type": "evm-proxy",
+      "chainId": 59144,
+      "address": "0xc47b8C00b0f69a36fa203Ffeac0334874574a8Ac",
+      "label": "Aave v3 Pool · Linea"
+    },
+    {
+      "id": "weth-gateway-linea",
+      "type": "evm-code",
+      "chainId": 59144,
+      "address": "0x31A239f3e39c5D8BA6B201bA81ed584492Ae960F",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Linea"
+    },
+    {
+      "id": "addresses-provider-scroll",
+      "type": "evm-proxy",
+      "chainId": 534352,
+      "address": "0x69850D0B276776781C063771b161bd8894BCdD04",
+      "label": "Aave v3 PoolAddressesProvider · Scroll"
+    },
+    {
+      "id": "pool-scroll",
+      "type": "evm-proxy",
+      "chainId": 534352,
+      "address": "0x11fCfe756c05AD438e312a7fd934381537D3cFfe",
+      "label": "Aave v3 Pool · Scroll"
+    },
+    {
+      "id": "weth-gateway-scroll",
+      "type": "evm-code",
+      "chainId": 534352,
+      "address": "0xE79Ca44408Dae5a57eA2a9594532f1E84d2edAa4",
+      "label": "Aave v3 WrappedTokenGatewayV3 · Scroll"
+    },
+    {
+      "id": "address-book",
+      "type": "github-releases",
+      "repo": "aave-dao/aave-address-book",
+      "label": "Aave address book releases"
+    },
+    {
+      "id": "aave-v3-origin",
+      "type": "github-releases",
+      "repo": "aave-dao/aave-v3-origin",
+      "label": "Aave v3 core contracts releases"
+    },
+    {
+      "id": "docs-addresses",
+      "type": "http-text",
+      "url": "https://aave.com/docs/resources/addresses",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "Aave docs · deployed addresses"
+    }
+  ]
+}

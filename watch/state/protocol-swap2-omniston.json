@@ -1,0 +1,27 @@
+{
+ "module": "@forgewallet/protocol-swap2-omniston",
+ "sources": {
+  "docs-omniston": {
+   "type": "http-text",
+   "value": "39e65387132f6faed5b618864d51dec4aaed8530b547d1ceaccb52acf8e39014",
+   "meta": {
+    "hash": "39e65387132f6fae",
+    "chars": 2906
+   },
+   "seenAt": "2026-10-14T15:12:22.643Z",
+   "changedAt": "2026-10-14T15:10:54.819Z"
+  },
+  "omniston-sdk": {
+   "type": "github-releases",
+   "value": "6b4c4b4dd0c4a353f3e348285eafc6f1c8a64b43",
+   "meta": {
+    "tag": "commit 6b4c4b4",
+    "at": "2026-10-08",
+    "url": "https://github.com/ston-fi/omniston-sdk/commit/6b4c4b4dd0c4a353f3e348285eafc6f1c8a64b43",
+    "note": "default branch: refactor(demo-app): refactor demo app"
+   },
+   "seenAt": "2026-10-14T15:12:23.717Z",
+   "changedAt": "2026-10-14T15:12:23.717Z"
+  }
+ }
+}

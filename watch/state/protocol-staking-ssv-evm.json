@@ -1,0 +1,76 @@
+{
+ "module": "@forgewallet/protocol-staking-ssv-evm",
+ "sources": {
+  "ssv-token-ethereum": {
+   "type": "evm-code",
+   "value": "5616319396d34d32",
+   "meta": {
+    "codeHash": "5616319396d34d32",
+    "bytes": 3603
+   },
+   "seenAt": "2026-10-14T15:12:12.894Z",
+   "changedAt": "2026-10-14T15:10:38.260Z"
+  },
+  "ssv-network": {
+   "type": "github-releases",
+   "value": "v2.0.0",
+   "meta": {
+    "tag": "v2.0.0",
+    "name": "v2.0.0",
+    "at": "2026-04-28",
+    "url": "https://github.com/ssvlabs/ssv-network/releases/tag/v2.0.0",
+    "prerelease": false
+   },
+   "seenAt": "2026-10-14T15:12:13.324Z",
+   "changedAt": "2026-10-14T15:10:38.507Z"
+  },
+  "ssv-network-views-ethereum": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"f30e969f2540174e\",\"impl\":\"0xadeb99eb2307f874d72b1f814fca106f6bfaa8e9\",\"implCodeHash\":\"b1052b925c557a29\"}",
+   "meta": {
+    "codeHash": "f30e969f2540174e",
+    "impl": "0xadeb99eb2307f874d72b1f814fca106f6bfaa8e9",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "b1052b925c557a29"
+   },
+   "seenAt": "2026-10-14T15:12:12.980Z",
+   "changedAt": "2026-10-14T15:10:38.741Z"
+  },
+  "docs-smart-contracts": {
+   "type": "http-text",
+   "value": "36a4f53de97d9b633c465410ad36487bd4f7ab550c3b7bdbb04cf7165e44cad6",
+   "meta": {
+    "hash": "36a4f53de97d9b63",
+    "chars": 1573
+   },
+   "seenAt": "2026-10-14T15:12:13.194Z",
+   "changedAt": "2026-10-14T15:10:38.784Z"
+  },
+  "ssv-network-ethereum": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"f30e969f2540174e\",\"impl\":\"0xa72a8f31163d74d708664493d09167dfa13008e9\",\"implCodeHash\":\"76abd70c3df865ef\"}",
+   "meta": {
+    "codeHash": "f30e969f2540174e",
+    "impl": "0xa72a8f31163d74d708664493d09167dfa13008e9",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "76abd70c3df865ef"
+   },
+   "seenAt": "2026-10-14T15:12:12.983Z",
+   "changedAt": "2026-10-14T15:10:38.975Z"
+  },
+  "cssv-token-ethereum": {
+   "type": "evm-proxy",
+   "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"445fa29565bc2ab7\",\"impl\":null}",
+   "meta": {
+    "codeHash": "445fa29565bc2ab7",
+    "impl": null,
+    "admin": null,
+    "beacon": null
+   },
+   "seenAt": "2026-10-14T15:12:13.060Z",
+   "changedAt": "2026-10-14T15:10:39.238Z"
+  }
+ }
+}

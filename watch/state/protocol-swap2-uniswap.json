@@ -1,0 +1,530 @@
+{
+ "module": "@forgewallet/protocol-swap2-uniswap",
+ "sources": {
+  "quoter-v2-ethereum": {
+   "type": "evm-code",
+   "value": "6b7cd5cf7e8bb496",
+   "meta": {
+    "codeHash": "6b7cd5cf7e8bb496",
+    "bytes": 8273
+   },
+   "seenAt": "2026-10-14T15:12:25.101Z",
+   "changedAt": "2026-10-14T15:10:56.533Z"
+  },
+  "swap-router-02-ethereum": {
+   "type": "evm-code",
+   "value": "5e0979f7c36eac03",
+   "meta": {
+    "codeHash": "5e0979f7c36eac03",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:25.111Z",
+   "changedAt": "2026-10-14T15:10:56.555Z"
+  },
+  "factory-ethereum": {
+   "type": "evm-code",
+   "value": "56e749dfb2334045",
+   "meta": {
+    "codeHash": "56e749dfb2334045",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:25.131Z",
+   "changedAt": "2026-10-14T15:10:56.568Z"
+  },
+  "quoter-v2-op-mainnet": {
+   "type": "evm-code",
+   "value": "9c8284312173931b",
+   "meta": {
+    "codeHash": "9c8284312173931b",
+    "bytes": 8273
+   },
+   "seenAt": "2026-10-14T15:12:25.099Z",
+   "changedAt": "2026-10-14T15:10:56.580Z"
+  },
+  "swap-router-02-op-mainnet": {
+   "type": "evm-code",
+   "value": "d4e88a8bcdde9239",
+   "meta": {
+    "codeHash": "d4e88a8bcdde9239",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:25.115Z",
+   "changedAt": "2026-10-14T15:10:56.590Z"
+  },
+  "factory-op-mainnet": {
+   "type": "evm-code",
+   "value": "56e749dfb2334045",
+   "meta": {
+    "codeHash": "56e749dfb2334045",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:25.107Z",
+   "changedAt": "2026-10-14T15:10:56.610Z"
+  },
+  "quoter-v2-unichain": {
+   "type": "evm-code",
+   "value": "819513779538d9dc",
+   "meta": {
+    "codeHash": "819513779538d9dc",
+    "bytes": 10541
+   },
+   "seenAt": "2026-10-14T15:12:25.486Z",
+   "changedAt": "2026-10-14T15:10:57.086Z"
+  },
+  "factory-unichain": {
+   "type": "evm-code",
+   "value": "8a7e594ffd4bc5b1",
+   "meta": {
+    "codeHash": "8a7e594ffd4bc5b1",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:25.499Z",
+   "changedAt": "2026-10-14T15:10:57.100Z"
+  },
+  "swap-router-02-unichain": {
+   "type": "evm-code",
+   "value": "515ef786aeaeba09",
+   "meta": {
+    "codeHash": "515ef786aeaeba09",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:25.489Z",
+   "changedAt": "2026-10-14T15:10:57.112Z"
+  },
+  "quoter-v2-polygon": {
+   "type": "evm-code",
+   "value": "323eb74cc0476d7c",
+   "meta": {
+    "codeHash": "323eb74cc0476d7c",
+    "bytes": 8273
+   },
+   "seenAt": "2026-10-14T15:12:25.719Z",
+   "changedAt": "2026-10-14T15:10:57.401Z"
+  },
+  "swap-router-02-polygon": {
+   "type": "evm-code",
+   "value": "dc780caef812649b",
+   "meta": {
+    "codeHash": "dc780caef812649b",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:25.725Z",
+   "changedAt": "2026-10-14T15:10:57.413Z"
+  },
+  "factory-polygon": {
+   "type": "evm-code",
+   "value": "56e749dfb2334045",
+   "meta": {
+    "codeHash": "56e749dfb2334045",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:25.736Z",
+   "changedAt": "2026-10-14T15:10:57.437Z"
+  },
+  "swap-router-02-bnb-chain": {
+   "type": "evm-code",
+   "value": "7e94384a5e5ab8b4",
+   "meta": {
+    "codeHash": "7e94384a5e5ab8b4",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:25.469Z",
+   "changedAt": "2026-10-14T15:10:57.953Z"
+  },
+  "swap-router-02-monad": {
+   "type": "evm-code",
+   "value": "f641f8882bf31119",
+   "meta": {
+    "codeHash": "f641f8882bf31119",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:25.752Z",
+   "changedAt": "2026-10-14T15:10:58.018Z"
+  },
+  "quoter-v2-monad": {
+   "type": "evm-code",
+   "value": "6ebd18d519daec1d",
+   "meta": {
+    "codeHash": "6ebd18d519daec1d",
+    "bytes": 10541
+   },
+   "seenAt": "2026-10-14T15:12:25.734Z",
+   "changedAt": "2026-10-14T15:10:58.299Z"
+  },
+  "quoter-v2-x-layer": {
+   "type": "evm-code",
+   "value": "a5972a0430a89e22",
+   "meta": {
+    "codeHash": "a5972a0430a89e22",
+    "bytes": 10541
+   },
+   "seenAt": "2026-10-14T15:12:25.990Z",
+   "changedAt": "2026-10-14T15:10:58.418Z"
+  },
+  "factory-monad": {
+   "type": "evm-code",
+   "value": "5f62806b8c43dbee",
+   "meta": {
+    "codeHash": "5f62806b8c43dbee",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:25.765Z",
+   "changedAt": "2026-10-14T15:10:58.546Z"
+  },
+  "swap-router-02-x-layer": {
+   "type": "evm-code",
+   "value": "ba46c4c09bd548bd",
+   "meta": {
+    "codeHash": "ba46c4c09bd548bd",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:25.999Z",
+   "changedAt": "2026-10-14T15:10:58.581Z"
+  },
+  "factory-bnb-chain": {
+   "type": "evm-code",
+   "value": "7dffb1f3dc9bdbc5",
+   "meta": {
+    "codeHash": "7dffb1f3dc9bdbc5",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:25.472Z",
+   "changedAt": "2026-10-14T15:10:58.617Z"
+  },
+  "quoter-v2-bnb-chain": {
+   "type": "evm-code",
+   "value": "52869eec25f3b15f",
+   "meta": {
+    "codeHash": "52869eec25f3b15f",
+    "bytes": 8273
+   },
+   "seenAt": "2026-10-14T15:12:25.462Z",
+   "changedAt": "2026-10-14T15:10:58.694Z"
+  },
+  "factory-x-layer": {
+   "type": "evm-code",
+   "value": "3bfad8fd1adc4b4d",
+   "meta": {
+    "codeHash": "3bfad8fd1adc4b4d",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:25.997Z",
+   "changedAt": "2026-10-14T15:10:58.820Z"
+  },
+  "factory-zksync-era": {
+   "type": "evm-code",
+   "value": "8cbadddc29db76fe",
+   "meta": {
+    "codeHash": "8cbadddc29db76fe",
+    "bytes": 8288
+   },
+   "seenAt": "2026-10-14T15:12:26.437Z",
+   "changedAt": "2026-10-14T15:10:59.025Z"
+  },
+  "quoter-v2-zksync-era": {
+   "type": "evm-code",
+   "value": "789f48e07548ce0a",
+   "meta": {
+    "codeHash": "789f48e07548ce0a",
+    "bytes": 74144
+   },
+   "seenAt": "2026-10-14T15:12:26.595Z",
+   "changedAt": "2026-10-14T15:10:59.241Z"
+  },
+  "quoter-v2-world-chain": {
+   "type": "evm-code",
+   "value": "e119531c5c766617",
+   "meta": {
+    "codeHash": "e119531c5c766617",
+    "bytes": 8273
+   },
+   "seenAt": "2026-10-14T15:12:26.463Z",
+   "changedAt": "2026-10-14T15:10:59.242Z"
+  },
+  "factory-robinhood-chain": {
+   "type": "evm-code",
+   "value": "6b14bc82001eba5c",
+   "meta": {
+    "codeHash": "6b14bc82001eba5c",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:26.659Z",
+   "changedAt": "2026-10-14T15:10:59.540Z"
+  },
+  "swap-router-02-zksync-era": {
+   "type": "evm-code",
+   "value": "df2e72bc2c729990",
+   "meta": {
+    "codeHash": "df2e72bc2c729990",
+    "bytes": 167392
+   },
+   "seenAt": "2026-10-14T15:12:26.701Z",
+   "changedAt": "2026-10-14T15:10:59.587Z"
+  },
+  "swap-router-02-world-chain": {
+   "type": "evm-code",
+   "value": "2538879ddfd4856e",
+   "meta": {
+    "codeHash": "2538879ddfd4856e",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:26.485Z",
+   "changedAt": "2026-10-14T15:10:59.731Z"
+  },
+  "factory-base": {
+   "type": "evm-code",
+   "value": "4cfbd1570a7581d0",
+   "meta": {
+    "codeHash": "4cfbd1570a7581d0",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:26.743Z",
+   "changedAt": "2026-10-14T15:10:59.870Z"
+  },
+  "swap-router-02-base": {
+   "type": "evm-code",
+   "value": "17471a75bc2700a2",
+   "meta": {
+    "codeHash": "17471a75bc2700a2",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:26.963Z",
+   "changedAt": "2026-10-14T15:11:00.063Z"
+  },
+  "factory-arbitrum": {
+   "type": "evm-code",
+   "value": "56e749dfb2334045",
+   "meta": {
+    "codeHash": "56e749dfb2334045",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:26.964Z",
+   "changedAt": "2026-10-14T15:11:00.145Z"
+  },
+  "quoter-v2-base": {
+   "type": "evm-code",
+   "value": "a4f4b49709f793f9",
+   "meta": {
+    "codeHash": "a4f4b49709f793f9",
+    "bytes": 8273
+   },
+   "seenAt": "2026-10-14T15:12:26.806Z",
+   "changedAt": "2026-10-14T15:11:00.199Z"
+  },
+  "swap-router-02-arbitrum": {
+   "type": "evm-code",
+   "value": "dec742e36ee95cbf",
+   "meta": {
+    "codeHash": "dec742e36ee95cbf",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:26.964Z",
+   "changedAt": "2026-10-14T15:11:00.272Z"
+  },
+  "factory-world-chain": {
+   "type": "evm-code",
+   "value": "c7040dd3f877e6dc",
+   "meta": {
+    "codeHash": "c7040dd3f877e6dc",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:26.516Z",
+   "changedAt": "2026-10-14T15:11:00.394Z"
+  },
+  "quoter-v2-arbitrum": {
+   "type": "evm-code",
+   "value": "2932bfcaa454826d",
+   "meta": {
+    "codeHash": "2932bfcaa454826d",
+    "bytes": 8273
+   },
+   "seenAt": "2026-10-14T15:12:26.963Z",
+   "changedAt": "2026-10-14T15:11:00.395Z"
+  },
+  "quoter-v2-celo": {
+   "type": "evm-code",
+   "value": "78b86ee95d6f60a4",
+   "meta": {
+    "codeHash": "78b86ee95d6f60a4",
+    "bytes": 8273
+   },
+   "seenAt": "2026-10-14T15:12:27.108Z",
+   "changedAt": "2026-10-14T15:11:00.592Z"
+  },
+  "quoter-v2-robinhood-chain": {
+   "type": "evm-code",
+   "value": "9f8e9b16d6c88486",
+   "meta": {
+    "codeHash": "9f8e9b16d6c88486",
+    "bytes": 8273
+   },
+   "seenAt": "2026-10-14T15:12:26.690Z",
+   "changedAt": "2026-10-14T15:11:00.597Z"
+  },
+  "swap-router-02-robinhood-chain": {
+   "type": "evm-code",
+   "value": "4eb27623b2dada04",
+   "meta": {
+    "codeHash": "4eb27623b2dada04",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:26.709Z",
+   "changedAt": "2026-10-14T15:11:00.605Z"
+  },
+  "factory-avalanche": {
+   "type": "evm-code",
+   "value": "12bfa5a3bdc1bd74",
+   "meta": {
+    "codeHash": "12bfa5a3bdc1bd74",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:27.122Z",
+   "changedAt": "2026-10-14T15:11:00.606Z"
+  },
+  "swap-router-02-celo": {
+   "type": "evm-code",
+   "value": "e148de9571976629",
+   "meta": {
+    "codeHash": "e148de9571976629",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:27.201Z",
+   "changedAt": "2026-10-14T15:11:00.667Z"
+  },
+  "quoter-v2-avalanche": {
+   "type": "evm-code",
+   "value": "8028a74293efe5fe",
+   "meta": {
+    "codeHash": "8028a74293efe5fe",
+    "bytes": 8273
+   },
+   "seenAt": "2026-10-14T15:12:27.075Z",
+   "changedAt": "2026-10-14T15:11:00.746Z"
+  },
+  "swap-router-02-avalanche": {
+   "type": "evm-code",
+   "value": "a734dd55568713b0",
+   "meta": {
+    "codeHash": "a734dd55568713b0",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:27.174Z",
+   "changedAt": "2026-10-14T15:11:00.781Z"
+  },
+  "quoter-v2-ink": {
+   "type": "evm-code",
+   "value": "2e3afabf05e8e3a4",
+   "meta": {
+    "codeHash": "2e3afabf05e8e3a4",
+    "bytes": 8273
+   },
+   "seenAt": "2026-10-14T15:12:27.294Z",
+   "changedAt": "2026-10-14T15:11:00.919Z"
+  },
+  "swap-router-02-ink": {
+   "type": "evm-code",
+   "value": "913533058b853c78",
+   "meta": {
+    "codeHash": "913533058b853c78",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:27.346Z",
+   "changedAt": "2026-10-14T15:11:01.036Z"
+  },
+  "factory-celo": {
+   "type": "evm-code",
+   "value": "d50934a0ddea9370",
+   "meta": {
+    "codeHash": "d50934a0ddea9370",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:27.079Z",
+   "changedAt": "2026-10-14T15:11:01.229Z"
+  },
+  "quoter-v2-linea": {
+   "type": "evm-code",
+   "value": "bfed6471d7dd3202",
+   "meta": {
+    "codeHash": "bfed6471d7dd3202",
+    "bytes": 10541
+   },
+   "seenAt": "2026-10-14T15:12:27.665Z",
+   "changedAt": "2026-10-14T15:11:01.336Z"
+  },
+  "factory-ink": {
+   "type": "evm-code",
+   "value": "2b2284d9031ccee1",
+   "meta": {
+    "codeHash": "2b2284d9031ccee1",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:27.321Z",
+   "changedAt": "2026-10-14T15:11:01.444Z"
+  },
+  "swap-router-02-linea": {
+   "type": "evm-code",
+   "value": "bd2fea8e214c2b28",
+   "meta": {
+    "codeHash": "bd2fea8e214c2b28",
+    "bytes": 24497
+   },
+   "seenAt": "2026-10-14T15:12:27.704Z",
+   "changedAt": "2026-10-14T15:11:01.459Z"
+  },
+  "docs-deployments": {
+   "type": "http-text",
+   "value": "7cab74c37628c33b9bacb1a12aad3a047576e8b60447318fee1e3bf60c2229e8",
+   "meta": {
+    "hash": "7cab74c37628c33b",
+    "chars": 2765
+   },
+   "seenAt": "2026-10-14T15:12:28.350Z",
+   "changedAt": "2026-10-14T15:11:02.100Z"
+  },
+  "factory-linea": {
+   "type": "evm-code",
+   "value": "d0817223c191ae52",
+   "meta": {
+    "codeHash": "d0817223c191ae52",
+    "bytes": 24535
+   },
+   "seenAt": "2026-10-14T15:12:27.699Z",
+   "changedAt": "2026-10-14T15:11:02.695Z"
+  },
+  "sdks": {
+   "type": "github-releases",
+   "value": "@uniswap/universal-router-sdk@5.15.0",
+   "meta": {
+    "tag": "@uniswap/universal-router-sdk@5.15.0",
+    "name": "@uniswap/universal-router-sdk@5.15.0",
+    "at": "2026-09-30",
+    "url": "https://github.com/Uniswap/sdks/releases/tag/%40uniswap/universal-router-sdk%405.15.0",
+    "prerelease": false
+   },
+   "seenAt": "2026-10-14T15:12:28.017Z",
+   "changedAt": "2026-10-14T15:12:28.017Z"
+  },
+  "v3-core": {
+   "type": "github-releases",
+   "value": "v1.0.0",
+   "meta": {
+    "tag": "v1.0.0",
+    "url": "https://github.com/Uniswap/v3-core/releases/tag/v1.0.0",
+    "note": "tags only"
+   },
+   "seenAt": "2026-10-14T15:12:28.389Z",
+   "changedAt": "2026-10-14T15:12:28.389Z"
+  },
+  "v3-periphery": {
+   "type": "github-releases",
+   "value": "v1.3.0",
+   "meta": {
+    "tag": "v1.3.0",
+    "url": "https://github.com/Uniswap/v3-periphery/releases/tag/v1.3.0",
+    "note": "tags only"
+   },
+   "seenAt": "2026-10-14T15:12:28.415Z",
+   "changedAt": "2026-10-14T15:12:28.415Z"
+  }
+ }
+}

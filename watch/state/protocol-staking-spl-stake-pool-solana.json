@@ -1,0 +1,52 @@
+{
+ "module": "@forgewallet/protocol-staking-spl-stake-pool-solana",
+ "sources": {
+  "stake-pool": {
+   "type": "github-releases",
+   "value": "program@v2.2.0",
+   "meta": {
+    "tag": "program@v2.2.0",
+    "name": "program@v2.2.0",
+    "at": "2026-10-06",
+    "url": "https://github.com/solana-program/stake-pool/releases/tag/program%40v2.2.0",
+    "prerelease": false
+   },
+   "seenAt": "2026-10-14T15:12:12.382Z",
+   "changedAt": "2026-10-14T15:10:37.328Z"
+  },
+  "jito-stakenet": {
+   "type": "github-releases",
+   "value": "stakenet-keeper@v0.5.0",
+   "meta": {
+    "tag": "stakenet-keeper@v0.5.0",
+    "name": "stakenet-keeper@v0.5.0",
+    "at": "2026-10-06",
+    "url": "https://github.com/jito-foundation/stakenet/releases/tag/stakenet-keeper%40v0.5.0",
+    "prerelease": false
+   },
+   "seenAt": "2026-10-14T15:12:12.367Z",
+   "changedAt": "2026-10-14T15:10:37.727Z"
+  },
+  "docs-spl-stake-pool": {
+   "type": "http-text",
+   "value": "da4036da16a21d112f45ec9823edf714e9ccc8ee90cad7e79452fe8dc4da2847",
+   "meta": {
+    "hash": "da4036da16a21d11",
+    "chars": 3158
+   },
+   "seenAt": "2026-10-14T15:12:12.516Z",
+   "changedAt": "2026-10-14T15:10:37.958Z"
+  },
+  "spl-stake-pool-program": {
+   "type": "solana-program",
+   "value": "{\"authority\":\"dPpFfahSWhm5M2RB3nVaHsXfnh9ooz5bWtR3WeUguDH\",\"programData\":\"EmiU8AQkB2sswTxVB6aCmsAJftoowZGGDXuytm6X65R3\",\"slot\":429882117}",
+   "meta": {
+    "programData": "EmiU8AQkB2sswTxVB6aCmsAJftoowZGGDXuytm6X65R3",
+    "slot": 429882117,
+    "authority": "dPpFfahSWhm5M2RB3nVaHsXfnh9ooz5bWtR3WeUguDH"
+   },
+   "seenAt": "2026-10-14T15:12:12.802Z",
+   "changedAt": "2026-10-14T15:10:38.152Z"
+  }
+ }
+}

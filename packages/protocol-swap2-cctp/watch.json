@@ -1,0 +1,388 @@
+{
+ "module": "@forgewallet/protocol-swap2-cctp",
+ "sources": [
+  {
+   "id": "token-messenger-v2-ethereum",
+   "type": "evm-proxy",
+   "chainId": 1,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 Ethereum"
+  },
+  {
+   "id": "message-transmitter-v2-ethereum",
+   "type": "evm-proxy",
+   "chainId": 1,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 Ethereum"
+  },
+  {
+   "id": "usdc-ethereum",
+   "type": "evm-proxy",
+   "chainId": 1,
+   "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+   "label": "Native USDC \u00b7 Ethereum"
+  },
+  {
+   "id": "token-messenger-v2-avalanche",
+   "type": "evm-proxy",
+   "chainId": 43114,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 Avalanche"
+  },
+  {
+   "id": "message-transmitter-v2-avalanche",
+   "type": "evm-proxy",
+   "chainId": 43114,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 Avalanche"
+  },
+  {
+   "id": "usdc-avalanche",
+   "type": "evm-proxy",
+   "chainId": 43114,
+   "address": "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
+   "label": "Native USDC \u00b7 Avalanche"
+  },
+  {
+   "id": "token-messenger-v2-op-mainnet",
+   "type": "evm-proxy",
+   "chainId": 10,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 OP Mainnet"
+  },
+  {
+   "id": "message-transmitter-v2-op-mainnet",
+   "type": "evm-proxy",
+   "chainId": 10,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 OP Mainnet"
+  },
+  {
+   "id": "usdc-op-mainnet",
+   "type": "evm-proxy",
+   "chainId": 10,
+   "address": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+   "label": "Native USDC \u00b7 OP Mainnet"
+  },
+  {
+   "id": "token-messenger-v2-arbitrum",
+   "type": "evm-proxy",
+   "chainId": 42161,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 Arbitrum"
+  },
+  {
+   "id": "message-transmitter-v2-arbitrum",
+   "type": "evm-proxy",
+   "chainId": 42161,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 Arbitrum"
+  },
+  {
+   "id": "usdc-arbitrum",
+   "type": "evm-proxy",
+   "chainId": 42161,
+   "address": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+   "label": "Native USDC \u00b7 Arbitrum"
+  },
+  {
+   "id": "token-messenger-v2-base",
+   "type": "evm-proxy",
+   "chainId": 8453,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 Base"
+  },
+  {
+   "id": "message-transmitter-v2-base",
+   "type": "evm-proxy",
+   "chainId": 8453,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 Base"
+  },
+  {
+   "id": "usdc-base",
+   "type": "evm-proxy",
+   "chainId": 8453,
+   "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+   "label": "Native USDC \u00b7 Base"
+  },
+  {
+   "id": "token-messenger-v2-polygon",
+   "type": "evm-proxy",
+   "chainId": 137,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 Polygon"
+  },
+  {
+   "id": "message-transmitter-v2-polygon",
+   "type": "evm-proxy",
+   "chainId": 137,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 Polygon"
+  },
+  {
+   "id": "usdc-polygon",
+   "type": "evm-proxy",
+   "chainId": 137,
+   "address": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+   "label": "Native USDC \u00b7 Polygon"
+  },
+  {
+   "id": "token-messenger-v2-unichain",
+   "type": "evm-proxy",
+   "chainId": 130,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 Unichain"
+  },
+  {
+   "id": "message-transmitter-v2-unichain",
+   "type": "evm-proxy",
+   "chainId": 130,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 Unichain"
+  },
+  {
+   "id": "usdc-unichain",
+   "type": "evm-proxy",
+   "chainId": 130,
+   "address": "0x078D782b760474a361dDA0AF3839290b0EF57AD6",
+   "label": "Native USDC \u00b7 Unichain"
+  },
+  {
+   "id": "token-messenger-v2-linea",
+   "type": "evm-proxy",
+   "chainId": 59144,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 Linea"
+  },
+  {
+   "id": "message-transmitter-v2-linea",
+   "type": "evm-proxy",
+   "chainId": 59144,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 Linea"
+  },
+  {
+   "id": "usdc-linea",
+   "type": "evm-proxy",
+   "chainId": 59144,
+   "address": "0x176211869cA2b568f2A7D4EE941E073a821EE1ff",
+   "label": "Native USDC \u00b7 Linea"
+  },
+  {
+   "id": "token-messenger-v2-sonic",
+   "type": "evm-proxy",
+   "chainId": 146,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 Sonic"
+  },
+  {
+   "id": "message-transmitter-v2-sonic",
+   "type": "evm-proxy",
+   "chainId": 146,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 Sonic"
+  },
+  {
+   "id": "usdc-sonic",
+   "type": "evm-proxy",
+   "chainId": 146,
+   "address": "0x29219dd400f2Bf60E5a23d13Be72B486D4038894",
+   "label": "Native USDC \u00b7 Sonic"
+  },
+  {
+   "id": "token-messenger-v2-world-chain",
+   "type": "evm-proxy",
+   "chainId": 480,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 World Chain"
+  },
+  {
+   "id": "message-transmitter-v2-world-chain",
+   "type": "evm-proxy",
+   "chainId": 480,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 World Chain"
+  },
+  {
+   "id": "usdc-world-chain",
+   "type": "evm-proxy",
+   "chainId": 480,
+   "address": "0x79A02482A880bCe3F13E09da970dC34dB4cD24D1",
+   "label": "Native USDC \u00b7 World Chain"
+  },
+  {
+   "id": "token-messenger-v2-monad",
+   "type": "evm-proxy",
+   "chainId": 143,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 Monad"
+  },
+  {
+   "id": "message-transmitter-v2-monad",
+   "type": "evm-proxy",
+   "chainId": 143,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 Monad"
+  },
+  {
+   "id": "usdc-monad",
+   "type": "evm-proxy",
+   "chainId": 143,
+   "address": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "label": "Native USDC \u00b7 Monad"
+  },
+  {
+   "id": "token-messenger-v2-sei",
+   "type": "evm-proxy",
+   "chainId": 1329,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 Sei"
+  },
+  {
+   "id": "message-transmitter-v2-sei",
+   "type": "evm-proxy",
+   "chainId": 1329,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 Sei"
+  },
+  {
+   "id": "usdc-sei",
+   "type": "evm-proxy",
+   "chainId": 1329,
+   "address": "0xe15fC38F6D8c56aF07bbCBe3BAf5708A2Bf42392",
+   "label": "Native USDC \u00b7 Sei"
+  },
+  {
+   "id": "token-messenger-v2-hyperevm",
+   "type": "evm-proxy",
+   "chainId": 999,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 HyperEVM"
+  },
+  {
+   "id": "message-transmitter-v2-hyperevm",
+   "type": "evm-proxy",
+   "chainId": 999,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 HyperEVM"
+  },
+  {
+   "id": "usdc-hyperevm",
+   "type": "evm-proxy",
+   "chainId": 999,
+   "address": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+   "label": "Native USDC \u00b7 HyperEVM"
+  },
+  {
+   "id": "token-messenger-v2-ink",
+   "type": "evm-proxy",
+   "chainId": 57073,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 Ink"
+  },
+  {
+   "id": "message-transmitter-v2-ink",
+   "type": "evm-proxy",
+   "chainId": 57073,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 Ink"
+  },
+  {
+   "id": "usdc-ink",
+   "type": "evm-proxy",
+   "chainId": 57073,
+   "address": "0x2D270e6886d130D724215A266106e6832161EAEd",
+   "label": "Native USDC \u00b7 Ink"
+  },
+  {
+   "id": "token-messenger-v2-plume",
+   "type": "evm-proxy",
+   "chainId": 98866,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 Plume"
+  },
+  {
+   "id": "message-transmitter-v2-plume",
+   "type": "evm-proxy",
+   "chainId": 98866,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 Plume"
+  },
+  {
+   "id": "usdc-plume",
+   "type": "evm-proxy",
+   "chainId": 98866,
+   "address": "0x222365EF19F7947e5484218551B56bb3965Aa7aF",
+   "label": "Native USDC \u00b7 Plume"
+  },
+  {
+   "id": "token-messenger-v2-plasma",
+   "type": "evm-proxy",
+   "chainId": 9745,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 Plasma"
+  },
+  {
+   "id": "message-transmitter-v2-plasma",
+   "type": "evm-proxy",
+   "chainId": 9745,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 Plasma"
+  },
+  {
+   "id": "usdc-plasma",
+   "type": "evm-proxy",
+   "chainId": 9745,
+   "address": "0x2d661C89D812261039AF9764eceaAee884f5F67F",
+   "label": "Native USDC \u00b7 Plasma"
+  },
+  {
+   "id": "token-messenger-v2-x-layer",
+   "type": "evm-proxy",
+   "chainId": 196,
+   "address": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "label": "CCTP TokenMessengerV2 \u00b7 X Layer"
+  },
+  {
+   "id": "message-transmitter-v2-x-layer",
+   "type": "evm-proxy",
+   "chainId": 196,
+   "address": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
+   "label": "CCTP MessageTransmitterV2 \u00b7 X Layer"
+  },
+  {
+   "id": "usdc-x-layer",
+   "type": "evm-proxy",
+   "chainId": 196,
+   "address": "0xB6CEceAB302E2E4948951eE7843FC24E92933061",
+   "label": "Native USDC \u00b7 X Layer"
+  },
+  {
+   "id": "evm-cctp-contracts",
+   "type": "github-releases",
+   "repo": "circlefin/evm-cctp-contracts",
+   "label": "Circle CCTP EVM contracts releases"
+  },
+  {
+   "id": "docs-evm-contracts",
+   "type": "http-text",
+   "url": "https://developers.circle.com/cctp/evm-smart-contracts",
+   "between": [
+    "<main",
+    "</main>"
+   ],
+   "label": "Circle docs \u00b7 CCTP EVM smart contracts"
+  },
+  {
+   "id": "docs-supported-chains",
+   "type": "http-text",
+   "url": "https://developers.circle.com/cctp/cctp-supported-blockchains",
+   "between": [
+    "<main",
+    "</main>"
+   ],
+   "label": "Circle docs \u00b7 CCTP supported blockchains"
+  }
+ ]
+}

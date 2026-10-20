@@ -1,0 +1,44 @@
+{
+  "module": "@forgewallet/protocol-swap2-near-intents",
+  "sources": [
+    {
+      "id": "intents",
+      "type": "github-releases",
+      "repo": "near/intents",
+      "label": "NEAR Intents contracts releases"
+    },
+    {
+      "id": "one-click-sdk-typescript",
+      "type": "github-releases",
+      "repo": "defuse-protocol/one-click-sdk-typescript",
+      "label": "1Click TypeScript SDK releases"
+    },
+    {
+      "id": "tokens",
+      "type": "http-json",
+      "url": "https://1click.chaindefuser.com/v0/tokens",
+      "itemKey": "assetId",
+      "label": "1Click tokens (1click.chaindefuser.com/v0/tokens)"
+    },
+    {
+      "id": "docs-1click-api",
+      "type": "http-text",
+      "url": "https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "NEAR Intents docs · 1Click API"
+    },
+    {
+      "id": "docs-chain-support",
+      "type": "http-text",
+      "url": "https://docs.near-intents.org/near-intents/chain-address-support",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "NEAR Intents docs · chain & address support"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "module": "@forgewallet/protocol-staking-tonstakers-ton",
+  "sources": [
+    {
+      "id": "pool-mainnet",
+      "type": "ton-code",
+      "address": "EQCkWxfyhAkim3g2DjKQQg8T5P4g-Q1-K_jErGcDJZ4i-vqR",
+      "label": "Tonstakers liquid-staking pool · TON mainnet"
+    },
+    {
+      "id": "tston-minter-mainnet",
+      "type": "ton-code",
+      "address": "EQC98_qAmNEptUtPc7W6xdHh_ZHrBUFpw5Ft_IzNU20QAJav",
+      "label": "tsTON jetton minter · TON mainnet"
+    },
+    {
+      "id": "tonstakers-sdk",
+      "type": "github-releases",
+      "repo": "tonstakers/tonstakers-sdk",
+      "label": "Tonstakers SDK releases"
+    },
+    {
+      "id": "liquid-staking-contract",
+      "type": "github-releases",
+      "repo": "ton-blockchain/liquid-staking-contract",
+      "label": "TON liquid-staking contract (pool implementation) releases"
+    },
+    {
+      "id": "site",
+      "type": "http-text",
+      "url": "https://tonstakers.com/",
+      "label": "Tonstakers site · home"
+    }
+  ]
+}

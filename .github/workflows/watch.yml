@@ -1,0 +1,88 @@
+name: module-watch
+# Daily upstream watch: on-chain code of the contracts every module calls, official repos,
+# the API endpoints we request, docs pages. Diff → Telegram; snapshot committed back.
+on:
+  schedule:
+    - cron: "15 6 * * *"   # 06:15 UTC daily
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "comma-separated module filter (e.g. aave,morpho)"
+        required: false
+        default: ""
+permissions:
+  contents: write
+concurrency: module-watch
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build            # the canary runs each package's verify-live against dist/
+      - name: run watch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WATCH_CHAT: ${{ secrets.TELEGRAM_WATCH_CHAT }}
+          TELEGRAM_WATCH_TOPIC: ${{ secrets.TELEGRAM_WATCH_TOPIC }}
+          EVM_RPC_URL: ${{ secrets.EVM_RPC_URL }}
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+          ARBITRUM_RPC_URL: ${{ secrets.ARBITRUM_RPC_URL }}
+          OPTIMISM_RPC_URL: ${{ secrets.OPTIMISM_RPC_URL }}
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
+          BSC_RPC_URL: ${{ secrets.BSC_RPC_URL }}
+          SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
+          TON_RPC_URL: ${{ secrets.TON_RPC_URL }}
+          QUICKNODE_MULTICHAIN_BASE: ${{ secrets.QUICKNODE_MULTICHAIN_BASE }}
+        run: |
+          # One QuickNode multichain endpoint serves the other EVM chains: "<name>.%NET%.quiknode.pro/<token>/".
+          if [ -n "$QUICKNODE_MULTICHAIN_BASE" ]; then
+            for p in UNICHAIN:unichain-mainnet LINEA:linea-mainnet SONIC:sonic-mainnet ZKSYNC:zksync-mainnet HYPEREVM:hype-mainnet CELO:celo-mainnet GNOSIS:xdai PLASMA:plasma-mainnet MEGAETH:megaeth-mainnet ROBINHOOD:robinhood-mainnet MONAD:monad-mainnet SCROLL:scroll-mainnet BERACHAIN:bera-mainnet WORLDCHAIN:worldchain-mainnet SEI:sei-pacific INK:ink-mainnet XLAYER:xlayer-mainnet KATANA:katana-mainnet MANTLE:mantle-mainnet SONEIUM:soneium-mainnet; do
+              url="${QUICKNODE_MULTICHAIN_BASE/\%NET\%/${p##*:}}"
+              [ "${p%%:*}" = HYPEREVM ] && url="${url%/}/evm"   # QuickNode serves HyperEVM JSON-RPC under /evm
+              echo "${p%%:*}_RPC_URL=$url" >> "$GITHUB_ENV"
+            done
+          fi
+          node scripts/watch/watch.mjs --send ${{ inputs.only && format('--only {0}', inputs.only) || '' }}
+      - name: run canary
+        if: ${{ !inputs.only }}
+        continue-on-error: true   # a failing module is reported, not a reason to skip the snapshot commit
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WATCH_CHAT: ${{ secrets.TELEGRAM_WATCH_CHAT }}
+          TELEGRAM_WATCH_TOPIC: ${{ secrets.TELEGRAM_WATCH_TOPIC }}
+          EVM_RPC_URL: ${{ secrets.EVM_RPC_URL }}
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+          ARBITRUM_RPC_URL: ${{ secrets.ARBITRUM_RPC_URL }}
+          OPTIMISM_RPC_URL: ${{ secrets.OPTIMISM_RPC_URL }}
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
+          BSC_RPC_URL: ${{ secrets.BSC_RPC_URL }}
+          SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
+          TON_RPC_URL: ${{ secrets.TON_RPC_URL }}
+        run: node scripts/watch/canary.mjs --send --timeout 300
+      - name: run routes canary
+        if: ${{ !inputs.only }}
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WATCH_CHAT: ${{ secrets.TELEGRAM_WATCH_CHAT }}
+          TELEGRAM_WATCH_TOPIC: ${{ secrets.TELEGRAM_WATCH_TOPIC }}
+          EVM_RPC_URL: ${{ secrets.EVM_RPC_URL }}
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+          ARBITRUM_RPC_URL: ${{ secrets.ARBITRUM_RPC_URL }}
+          OPTIMISM_RPC_URL: ${{ secrets.OPTIMISM_RPC_URL }}
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
+          BSC_RPC_URL: ${{ secrets.BSC_RPC_URL }}
+          LIFI_API_KEY: ${{ secrets.LIFI_API_KEY }}
+          NEAR_INTENTS_JWT: ${{ secrets.NEAR_INTENTS_JWT }}
+        run: node scripts/watch/routes.mjs --send --timeout 30
+      - name: commit snapshot
+        run: |
+          git config user.name "module-watch"
+          git config user.email "module-watch@users.noreply.github.com"
+          git add watch/
+          git diff --cached --quiet || git commit -m "watch: snapshot $(date -u +%F)" && git push

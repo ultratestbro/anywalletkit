@@ -18,6 +18,8 @@
     "test:hermes": "pnpm --filter @forgewallet/example-hermes-smoke test:hermes",
     "registry": "node scripts/build-registry.mjs",
     "registry:check": "node scripts/build-registry.mjs && git diff --exit-code registry/modules.json",
+    "watch": "node scripts/watch/watch.mjs",
+    "watch:baseline": "node scripts/watch/watch.mjs --baseline",
     "vendor": "node scripts/vendor.mjs"
   },
   "devDependencies": {

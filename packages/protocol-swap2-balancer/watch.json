@@ -1,0 +1,100 @@
+{
+  "module": "@forgewallet/protocol-swap2-balancer",
+  "sources": [
+    {
+      "id": "vault-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "label": "Balancer v2 Vault · Ethereum"
+    },
+    {
+      "id": "vault-op-mainnet",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "label": "Balancer v2 Vault · OP Mainnet"
+    },
+    {
+      "id": "vault-gnosis",
+      "type": "evm-code",
+      "chainId": 100,
+      "address": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "label": "Balancer v2 Vault · Gnosis"
+    },
+    {
+      "id": "vault-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "label": "Balancer v2 Vault · Polygon"
+    },
+    {
+      "id": "vault-sonic",
+      "type": "evm-code",
+      "chainId": 146,
+      "address": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "label": "Balancer v2 Vault · Sonic"
+    },
+    {
+      "id": "vault-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "label": "Balancer v2 Vault · Base"
+    },
+    {
+      "id": "vault-plasma",
+      "type": "evm-code",
+      "chainId": 9745,
+      "address": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "label": "Balancer v2 Vault · Plasma"
+    },
+    {
+      "id": "vault-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "label": "Balancer v2 Vault · Arbitrum"
+    },
+    {
+      "id": "vault-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "label": "Balancer v2 Vault · Avalanche"
+    },
+    {
+      "id": "balancer-v2-monorepo",
+      "type": "github-releases",
+      "repo": "balancer/balancer-v2-monorepo",
+      "label": "Balancer v2 contracts releases"
+    },
+    {
+      "id": "b-sdk",
+      "type": "github-releases",
+      "repo": "balancer/b-sdk",
+      "label": "Balancer SDK releases"
+    },
+    {
+      "id": "docs-v2-deployments",
+      "type": "http-text",
+      "url": "https://docs-v2.balancer.fi/reference/contracts/deployment-addresses/mainnet.html",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "Balancer v2 docs · deployment addresses (mainnet)"
+    },
+    {
+      "id": "docs-vault",
+      "type": "http-text",
+      "url": "https://docs.balancer.fi/concepts/vault/",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "Balancer docs · Vault concept"
+    }
+  ]
+}

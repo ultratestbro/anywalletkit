@@ -1,0 +1,59 @@
+{
+  "module": "@forgewallet/protocol-lending-kamino-solana",
+  "sources": [
+    {
+      "id": "klend-program",
+      "type": "solana-program",
+      "programId": "KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD",
+      "label": "Kamino Lend (klend) program · Solana"
+    },
+    {
+      "id": "kvault-program",
+      "type": "solana-program",
+      "programId": "KvauGMspG5k6rtzrqqn7WNn3oZdyKqLKwK2XWQ8FLjd",
+      "label": "Kamino Vaults (kvault) program · Solana"
+    },
+    {
+      "id": "farms-program",
+      "type": "solana-program",
+      "programId": "FarmsPZpWu9i7Kky8tPN37rs2TpmMrAZrC7S7vJa91Hr",
+      "label": "Kamino Farms program · Solana"
+    },
+    {
+      "id": "klend-sdk",
+      "type": "github-releases",
+      "repo": "Kamino-Finance/klend-sdk",
+      "label": "Kamino Lend SDK releases"
+    },
+    {
+      "id": "klend",
+      "type": "github-releases",
+      "repo": "Kamino-Finance/klend",
+      "label": "Kamino Lend program releases"
+    },
+    {
+      "id": "markets",
+      "type": "http-json",
+      "url": "https://api.kamino.finance/v2/kamino-market",
+      "itemKey": "lendingMarket",
+      "label": "Kamino API · lending markets"
+    },
+    {
+      "id": "vaults",
+      "type": "http-json",
+      "url": "https://api.kamino.finance/kvaults/vaults",
+      "itemKey": "address",
+      "label": "Kamino API · kvaults"
+    },
+    {
+      "id": "docs-api",
+      "type": "http-text",
+      "url": "https://docs.kamino.finance/developers/api",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "Kamino docs · developers API"
+    }
+  ]
+}

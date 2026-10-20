@@ -1,0 +1,209 @@
+{
+ "module": "@forgewallet/protocol-approvals-evm",
+ "sources": {
+  "permit2-op-mainnet": {
+   "type": "evm-code",
+   "value": "977d1ac2e903b062",
+   "meta": {
+    "codeHash": "977d1ac2e903b062",
+    "bytes": 9152
+   },
+   "seenAt": "2026-10-14T15:12:00.753Z",
+   "changedAt": "2026-10-14T15:10:22.440Z"
+  },
+  "permit2-polygon": {
+   "type": "evm-code",
+   "value": "9d00ae84c1e424cd",
+   "meta": {
+    "codeHash": "9d00ae84c1e424cd",
+    "bytes": 9152
+   },
+   "seenAt": "2026-10-14T15:12:00.837Z",
+   "changedAt": "2026-10-14T15:10:22.456Z"
+  },
+  "permit2-base": {
+   "type": "evm-code",
+   "value": "597df4c55f25c8ef",
+   "meta": {
+    "codeHash": "597df4c55f25c8ef",
+    "bytes": 9152
+   },
+   "seenAt": "2026-10-14T15:12:00.885Z",
+   "changedAt": "2026-10-14T15:10:22.457Z"
+  },
+  "permit2-arbitrum": {
+   "type": "evm-code",
+   "value": "6f7371c60f58dcfa",
+   "meta": {
+    "codeHash": "6f7371c60f58dcfa",
+    "bytes": 9152
+   },
+   "seenAt": "2026-10-14T15:12:00.900Z",
+   "changedAt": "2026-10-14T15:10:22.457Z"
+  },
+  "permit2-gnosis": {
+   "type": "evm-code",
+   "value": "39cdf44a53c20f98",
+   "meta": {
+    "codeHash": "39cdf44a53c20f98",
+    "bytes": 9152
+   },
+   "seenAt": "2026-10-14T15:12:00.752Z",
+   "changedAt": "2026-10-14T15:10:22.458Z"
+  },
+  "permit2-ethereum": {
+   "type": "evm-code",
+   "value": "6edcbff6f4da0cef",
+   "meta": {
+    "codeHash": "6edcbff6f4da0cef",
+    "bytes": 9152
+   },
+   "seenAt": "2026-10-14T15:12:00.754Z",
+   "changedAt": "2026-10-14T15:10:22.541Z"
+  },
+  "multicall3-op-mainnet": {
+   "type": "evm-code",
+   "value": "0fb6a9dbcc4e1709",
+   "meta": {
+    "codeHash": "0fb6a9dbcc4e1709",
+    "bytes": 3808
+   },
+   "seenAt": "2026-10-14T15:12:00.915Z",
+   "changedAt": "2026-10-14T15:10:22.543Z"
+  },
+  "multicall3-gnosis": {
+   "type": "evm-code",
+   "value": "0fb6a9dbcc4e1709",
+   "meta": {
+    "codeHash": "0fb6a9dbcc4e1709",
+    "bytes": 3808
+   },
+   "seenAt": "2026-10-14T15:12:00.912Z",
+   "changedAt": "2026-10-14T15:10:22.645Z"
+  },
+  "multicall3-base": {
+   "type": "evm-code",
+   "value": "0fb6a9dbcc4e1709",
+   "meta": {
+    "codeHash": "0fb6a9dbcc4e1709",
+    "bytes": 3808
+   },
+   "seenAt": "2026-10-14T15:12:00.970Z",
+   "changedAt": "2026-10-14T15:10:22.655Z"
+  },
+  "multicall3-arbitrum": {
+   "type": "evm-code",
+   "value": "0fb6a9dbcc4e1709",
+   "meta": {
+    "codeHash": "0fb6a9dbcc4e1709",
+    "bytes": 3808
+   },
+   "seenAt": "2026-10-14T15:12:00.985Z",
+   "changedAt": "2026-10-14T15:10:22.713Z"
+  },
+  "multicall3-ethereum": {
+   "type": "evm-code",
+   "value": "0fb6a9dbcc4e1709",
+   "meta": {
+    "codeHash": "0fb6a9dbcc4e1709",
+    "bytes": 3808
+   },
+   "seenAt": "2026-10-14T15:12:00.836Z",
+   "changedAt": "2026-10-14T15:10:22.715Z"
+  },
+  "multicall3-polygon": {
+   "type": "evm-code",
+   "value": "0fb6a9dbcc4e1709",
+   "meta": {
+    "codeHash": "0fb6a9dbcc4e1709",
+    "bytes": 3808
+   },
+   "seenAt": "2026-10-14T15:12:00.972Z",
+   "changedAt": "2026-10-14T15:10:22.789Z"
+  },
+  "multicall3-scroll": {
+   "type": "evm-code",
+   "value": "0fb6a9dbcc4e1709",
+   "meta": {
+    "codeHash": "0fb6a9dbcc4e1709",
+    "bytes": 3808
+   },
+   "seenAt": "2026-10-14T15:12:01.144Z",
+   "changedAt": "2026-10-14T15:10:22.939Z"
+  },
+  "permit2-scroll": {
+   "type": "evm-code",
+   "value": "61257c37379f1399",
+   "meta": {
+    "codeHash": "61257c37379f1399",
+    "bytes": 9152
+   },
+   "seenAt": "2026-10-14T15:12:01.074Z",
+   "changedAt": "2026-10-14T15:10:23.020Z"
+  },
+  "multicall3-linea": {
+   "type": "evm-code",
+   "value": "d57a1dc2389322df",
+   "meta": {
+    "codeHash": "d57a1dc2389322df",
+    "bytes": 3808
+   },
+   "seenAt": "2026-10-14T15:12:01.444Z",
+   "changedAt": "2026-10-14T15:10:23.205Z"
+  },
+  "multicall3": {
+   "type": "github-releases",
+   "value": "v3.1.0",
+   "meta": {
+    "tag": "v3.1.0",
+    "name": "ABIs",
+    "at": "2022-03-10",
+    "url": "https://github.com/mds1/multicall3/releases/tag/v3.1.0",
+    "prerelease": false
+   },
+   "seenAt": "2026-10-14T15:12:01.598Z",
+   "changedAt": "2026-10-14T15:10:23.264Z"
+  },
+  "docs-permit2": {
+   "type": "http-text",
+   "value": "adc394d74745ecec421d46a9b6c476f90d6fe4b82dd729bfb334cb3b011c95dd",
+   "meta": {
+    "hash": "adc394d74745ecec",
+    "chars": 4581
+   },
+   "seenAt": "2026-10-14T15:12:01.798Z",
+   "changedAt": "2026-10-14T15:10:23.698Z"
+  },
+  "permit2": {
+   "type": "github-releases",
+   "value": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+   "meta": {
+    "tag": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+    "url": "https://github.com/Uniswap/permit2/releases/tag/0x000000000022D473030F116dDEE9F6B43aC78BA3",
+    "note": "tags only"
+   },
+   "seenAt": "2026-10-14T15:12:02.165Z",
+   "changedAt": "2026-10-14T15:10:23.909Z"
+  },
+  "docs-etherscan-v2": {
+   "type": "http-text",
+   "value": "afea8c4a43912960943608113c6f77eefd60951eb9f75dee2f822a027cb8c71b",
+   "meta": {
+    "hash": "afea8c4a43912960",
+    "chars": 1522
+   },
+   "seenAt": "2026-10-14T15:12:01.795Z",
+   "changedAt": "2026-10-14T15:10:24.002Z"
+  },
+  "permit2-linea": {
+   "type": "evm-code",
+   "value": "636bc147c6726ec9",
+   "meta": {
+    "codeHash": "636bc147c6726ec9",
+    "bytes": 9152
+   },
+   "seenAt": "2026-10-14T15:12:01.342Z",
+   "changedAt": "2026-10-14T15:10:24.070Z"
+  }
+ }
+}

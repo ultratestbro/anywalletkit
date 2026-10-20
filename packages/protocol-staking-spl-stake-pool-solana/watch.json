@@ -1,0 +1,33 @@
+{
+  "module": "@forgewallet/protocol-staking-spl-stake-pool-solana",
+  "sources": [
+    {
+      "id": "spl-stake-pool-program",
+      "type": "solana-program",
+      "programId": "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
+      "label": "SPL Stake Pool program · Solana"
+    },
+    {
+      "id": "stake-pool",
+      "type": "github-releases",
+      "repo": "solana-program/stake-pool",
+      "label": "SPL Stake Pool program releases"
+    },
+    {
+      "id": "jito-stakenet",
+      "type": "github-releases",
+      "repo": "jito-foundation/stakenet",
+      "label": "Jito StakeNet releases"
+    },
+    {
+      "id": "docs-spl-stake-pool",
+      "type": "http-text",
+      "url": "https://spl.solana.com/stake-pool",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "SPL docs · stake pool"
+    }
+  ]
+}
