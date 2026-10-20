@@ -42,7 +42,10 @@ Every route is fail-closed until its allowlists and validators are configured:
 `@forgewallet/protocol-swap2-omniston/validators` ships the RPC/indexer-backed
 validators every route above needs, plus the audited contract tables:
 `createOmnistonEvmOutputValidator`, `createOmnistonEvmInputValidator`,
-`createOmnistonTonValidators` (TonAPI), `AUDITED_OMNISTON_SETTLEMENT_CONTRACTS`,
+`createOmnistonTonValidators` (TonAPI), `createOmnistonEvmDeliveryLocator`
+(feeds `locateEvmDelivery`: a completed EVM-destination order then carries
+`destTxHash`, the escrow's payout to the recipient — Omniston's feed names the
+escrow, not that transaction), `AUDITED_OMNISTON_SETTLEMENT_CONTRACTS`,
 `AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS`. No deployment env is read: pass your
 own endpoints as `rpcUrls` (CAIP-2 → URLs, tried before the public fallbacks)
 and `tonApiUrl` / `tonApiKey`. On serverless also inject durable

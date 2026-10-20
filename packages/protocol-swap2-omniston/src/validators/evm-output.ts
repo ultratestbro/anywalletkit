@@ -370,3 +370,47 @@ export function createOmnistonEvmOutputValidator(options: {request?: RpcRequest;
     }
   };
 }
+
+const TRANSFER_TOPIC = keccak256(stringToHex("Transfer(address,address,uint256)"));
+const topicAddress = (address: string): Hex => `0x${getAddress(address).slice(2).toLowerCase().padStart(64, "0")}`;
+
+/**
+ * Finds an Omniston EVM delivery: the ERC-20 `Transfer` from the destination
+ * escrow to the recipient of at least `minUnits`, within the chain's lookback
+ * window. Feeds `omnistonProvider({locateEvmDelivery})` so a completed order
+ * reports the transaction that actually paid the recipient.
+ */
+export function createOmnistonEvmDeliveryLocator(options: {request?: RpcRequest; rpcUrls?: OmnistonRpcUrls} = {}) {
+  const request: RpcRequest = options.request ?? ((chain, method, params) => omnistonEvmRpcRequest(chain, method, params, options.rpcUrls));
+  return async (input: {chain: string; positionAddress: string; recipientAddress: string; tokenAddress: string; minUnits: string}): Promise<string | null> => {
+    try {
+      const lookback = OMNISTON_EVM_LOOKBACK_BLOCKS[input.chain];
+      if (!lookback || !isAddress(input.positionAddress) || !isAddress(input.recipientAddress) || !isAddress(input.tokenAddress)) return null;
+      const min = BigInt(input.minUnits);
+      const latest = BigInt(await request(input.chain, "eth_blockNumber", []) as string);
+      const oldest = latest > lookback ? latest - lookback : 0n;
+      for (let to = latest; to >= oldest;) {
+        const from = to - oldest > 4_999n ? to - 4_999n : oldest;
+        const logs = await request(input.chain, "eth_getLogs", [{
+          address: getAddress(input.tokenAddress),
+          topics: [TRANSFER_TOPIC, topicAddress(input.positionAddress), topicAddress(input.recipientAddress)],
+          fromBlock: quantity(from),
+          toBlock: quantity(to),
+        }]) as (RpcLog & {address: string})[];
+        const hit = [...logs].reverse().find((log) => {
+          try {
+            return getAddress(log.address) === getAddress(input.tokenAddress) && BigInt(log.data) >= min;
+          } catch {
+            return false;
+          }
+        });
+        if (hit) return hit.transactionHash;
+        if (from === oldest) break;
+        to = from - 1n;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+}

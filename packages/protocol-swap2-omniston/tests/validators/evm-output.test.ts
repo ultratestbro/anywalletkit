@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from "vitest";
 import {decodeFunctionData, encodeAbiParameters, encodeFunctionData, keccak256, stringToHex, type Hex} from "viem";
-import {createOmnistonEvmOutputValidator, type EvmOutputValidationInput} from "../../src/validators/evm-output.js";
+import {createOmnistonEvmDeliveryLocator, createOmnistonEvmOutputValidator, type EvmOutputValidationInput} from "../../src/validators/evm-output.js";
 
 const FACTORY = "0xafCF681272AF10959736f45616eeCBC22D7095E2";
 const POSITION = "0x1111111111111111111111111111111111111111";
@@ -202,5 +202,24 @@ describe("Omniston EVM RPC endpoints", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe("Omniston EVM delivery locator", () => {
+  const log = (amount: bigint, hash: string) => ({address: TOKEN, data: encodeAbiParameters([{type: "uint256"}], [amount]), transactionHash: hash, blockNumber: "0x60"});
+  it("returns the escrow's payout to the recipient of at least the promised amount", async () => {
+    const request = vi.fn(async (_chain: string, method: string, params: unknown[]) => {
+      if (method === "eth_blockNumber") return "0x64";
+      const filter = params[0] as {topics: string[]; address: string};
+      expect(filter.address).toBe(TOKEN);
+      expect(filter.topics[1]).toBe(`0x${POSITION.slice(2).padStart(64, "0")}`);
+      expect(filter.topics[2]).toBe(`0x${RECIPIENT.slice(2).padStart(64, "0")}`);
+      return [log(989_999n, `0x${"aa".repeat(32)}`), log(990_000n, `0x${"bb".repeat(32)}`)];
+    });
+    const locate = createOmnistonEvmDeliveryLocator({request});
+    const input = {chain: "eip155:1", positionAddress: POSITION, recipientAddress: RECIPIENT, tokenAddress: TOKEN, minUnits: "990000"};
+    await expect(locate(input)).resolves.toBe(`0x${"bb".repeat(32)}`);
+    await expect(locate({...input, minUnits: "990001"})).resolves.toBeNull();
+    await expect(locate({...input, chain: "eip155:10"})).resolves.toBeNull();
   });
 });

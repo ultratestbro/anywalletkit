@@ -444,6 +444,18 @@ export interface OmnistonProviderOptions {
     dstSecurityDepositUnits: string;
     secretHash: Uint8Array;
   }) => boolean | Promise<boolean>;
+  /**
+   * EVM destination: find the delivery transaction — the destination escrow's
+   * payout to the recipient — so a completed order carries `destTxHash`.
+   * Omniston's tracking feed names the escrow but not that transaction.
+   */
+  locateEvmDelivery?: (input: {
+    chain: string;
+    positionAddress: string;
+    recipientAddress: string;
+    tokenAddress: string;
+    minUnits: string;
+  }) => Promise<string | null>;
   /** Close an injected client when the provider closes (default: caller owns it). */
   closeInjectedClient?: boolean;
 }
@@ -2410,6 +2422,20 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       }
 
       const status = mapOrderStatus(order);
+      const delivered = order.executions[0]?.outputPositionAddress;
+      const outCase = cached?.quote.outputAsset.chain.$case;
+      const outCaip = outCase ? caipForChainCase(outCase) : null;
+      const outToken = cached ? assetContract(cached.quote.outputAsset) : null;
+      if (
+        status.state === "completed" && opts.locateEvmDelivery && outCase && outCase !== "ton" && outCaip && outToken &&
+        order.executions.length === 1 && delivered?.chain.$case === outCase && delivered.chain.value
+      ) {
+        const hash = await opts.locateEvmDelivery({
+          chain: outCaip, positionAddress: delivered.chain.value, recipientAddress: decoded.dest,
+          tokenAddress: outToken, minUnits: order.executions[0]!.outputUnits,
+        }).catch(() => null);
+        if (hash) status.destTxHash = hash;
+      }
       // A feed-only CANCELLED/FAILED signal is not on-chain invalidation of a
       // signed order. Retain secrets/context until proven completion or TTL so
       // a late valid output lock can still be completed safely.

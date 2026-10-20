@@ -213,4 +213,25 @@ describe("Omniston EVM → EVM orders (live 2026-10-20 fixtures)", () => {
     expect(q).not.toBeNull();
     await expect(p.buildDeposit(q!)).resolves.toMatchObject({chain: "eip155:9745", to: PLASMA_LOP, chainId: 9745});
   });
+
+  it("a completed EVM-destination order reports the delivery transaction the locator finds", async () => {
+    pin("baseToArbitrum");
+    const s = quoteOf("baseToArbitrum").settlementData.value;
+    const snapshot = {
+      quoteId: quoteOf("baseToArbitrum").quoteId, status: "TRADE_STATUS_FULLY_FILLED",
+      executions: [{
+        index: 0, secretHash: new Uint8Array(SECRET_HASH), inputUnits: "20000000", outputUnits: quoteOf("baseToArbitrum").outputUnits,
+        resolverSendsUnits: s.resolverSendsUnits,
+        inputPositionAddress: {chain: {$case: "base", value: SRC_POSITION}},
+        outputPositionAddress: {chain: {$case: "arbitrum", value: DST_POSITION}}, outputPositionPhase: "EXECUTION_PHASE_COMPLETED",
+      }],
+    };
+    const locate = vi.fn(async () => `0x${"cd".repeat(32)}`);
+    const client = clientFor(quoteOf("baseToArbitrum"), payloadOf("baseToArbitrum"), snapshot);
+    const p = provider(client, {locateEvmDelivery: locate});
+    const q = await p.getQuote(baseParams());
+    await p.buildDeposit(q!);
+    await expect(p.trackIntent({intentId: q!.intentId})).resolves.toEqual({state: "completed", depositReceived: true, destTxHash: `0x${"cd".repeat(32)}`});
+    expect(locate).toHaveBeenCalledWith({chain: "eip155:42161", positionAddress: DST_POSITION, recipientAddress: DEST, tokenAddress: USDT0_ARB, minUnits: quoteOf("baseToArbitrum").outputUnits});
+  });
 });
