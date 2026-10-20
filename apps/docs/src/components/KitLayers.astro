@@ -1,0 +1,85 @@
+---
+// Home: the landing's Architecture section (label | description | details), linked into the docs.
+---
+
+<section class="not-content awk-sec">
+  <div class="sec__head">
+    <div class="sec__t"><span class="kicker">01 — What's in the kit</span><h2 class="h2">One kit. Every block snaps in.</h2></div>
+    <p class="lead">Each layer is replaceable. Keys live only in the signer; modules talk only to accounts. Pick the blocks your wallet needs and nothing else.</p>
+  </div>
+
+  <div class="row">
+    <div class="row__l"><span class="kicker">L0</span><span class="row__n">Signer</span><a class="row__go" href="/concepts/accounts-and-signers/">accounts &amp; signers →</a></div>
+    <p class="row__p">The only place a key lives. Modules never touch keys. The same code runs with any signer.</p>
+    <div class="row__d"><div class="plain"><span>Local seed</span><span>Imported key</span><span>Hardware wallet</span><span>Safe (multisig)</span><span>MPC</span><span>Backend signer</span></div></div>
+  </div>
+
+  <div class="row">
+    <div class="row__l"><span class="kicker">L1</span><span class="row__n">Chains</span><a class="row__go" href="/getting-started/packages/#chains">chain packages →</a></div>
+    <p class="row__p">build → describe → simulate → sign → broadcast. One seed phrase, one account interface, every chain below.</p>
+    <div class="row__d">
+        <div class="grp"><span class="sub-k">EVM · any network</span>
+          <div class="logos22">
+            <img src="/logos/ethereum.webp" alt="Ethereum" title="Ethereum" width="22" height="22" loading="lazy" /><img src="/logos/base.webp" alt="Base" title="Base" width="22" height="22" loading="lazy" /><img src="/logos/arbitrum.webp" alt="Arbitrum" title="Arbitrum" width="22" height="22" loading="lazy" /><img src="/logos/optimism.svg" alt="Optimism" title="Optimism" width="22" height="22" loading="lazy" /><img src="/logos/polygon.svg" alt="Polygon" title="Polygon" width="22" height="22" loading="lazy" /><img src="/logos/bsc.svg" alt="BNB Chain" title="BNB Chain" width="22" height="22" loading="lazy" /><img src="/logos/avalanche.webp" alt="Avalanche" title="Avalanche" width="22" height="22" loading="lazy" /><img src="/logos/gnosis.svg" alt="Gnosis" title="Gnosis" width="22" height="22" loading="lazy" /><img src="/logos/unichain.svg" alt="Unichain" title="Unichain" width="22" height="22" loading="lazy" /><img src="/logos/monad.webp" alt="Monad" title="Monad" width="22" height="22" loading="lazy" /><img src="/logos/hyperevm.webp" alt="HyperEVM" title="HyperEVM" width="22" height="22" loading="lazy" /><img src="/logos/sonic.webp" alt="Sonic" title="Sonic" width="22" height="22" loading="lazy" /><img src="/logos/berachain.svg" alt="Berachain" title="Berachain" width="22" height="22" loading="lazy" /><img src="/logos/linea.webp" alt="Linea" title="Linea" width="22" height="22" loading="lazy" /><img src="/logos/scroll.webp" alt="Scroll" title="Scroll" width="22" height="22" loading="lazy" /><img src="/logos/zksync.webp" alt="zkSync" title="zkSync" width="22" height="22" loading="lazy" /><img src="/logos/celo.webp" alt="Celo" title="Celo" width="22" height="22" loading="lazy" /><img src="/logos/plasma.webp" alt="Plasma" title="Plasma" width="22" height="22" loading="lazy" /><img src="/logos/megaeth.webp" alt="MegaETH" title="MegaETH" width="22" height="22" loading="lazy" /><img src="/logos/robinhood.webp" alt="Robinhood Chain" title="Robinhood Chain" width="22" height="22" loading="lazy" /><img src="/logos/worldchain.svg" alt="World Chain" title="World Chain" width="22" height="22" loading="lazy" /><img src="/logos/sei.svg" alt="Sei" title="Sei" width="22" height="22" loading="lazy" /><img src="/logos/ink.svg" alt="Ink" title="Ink" width="22" height="22" loading="lazy" /><img src="/logos/plume.svg" alt="Plume" title="Plume" width="22" height="22" loading="lazy" /><img src="/logos/xlayer.svg" alt="X Layer" title="X Layer" width="22" height="22" loading="lazy" /><img src="/logos/arc.svg" alt="Arc" title="Arc" width="22" height="22" loading="lazy" /><img src="/logos/mantle.svg" alt="Mantle" title="Mantle" width="22" height="22" loading="lazy" /><img src="/logos/katana.svg" alt="Katana" title="Katana" width="22" height="22" loading="lazy" /><img src="/logos/morph.svg" alt="Morph" title="Morph" width="22" height="22" loading="lazy" /><img src="/logos/flare.svg" alt="Flare" title="Flare" width="22" height="22" loading="lazy" />
+          </div>
+        </div>
+        <div class="items">
+          <span class="item"><img src="/logos/solana.webp" alt="" width="20" height="20" loading="lazy" />Solana</span>
+          <span class="item"><img src="/logos/ton.webp" alt="" width="20" height="20" loading="lazy" />TON</span>
+          <span class="item"><img src="/logos/tron.webp" alt="" width="20" height="20" loading="lazy" />Tron</span>
+          <span class="item"><img src="/logos/bitcoin.webp" alt="" width="20" height="20" loading="lazy" />Bitcoin</span>
+          <span class="item"><img src="/logos/near.webp" alt="" width="20" height="20" loading="lazy" />NEAR</span>
+          <span class="item"><img src="/logos/zcash.webp" alt="" width="20" height="20" loading="lazy" />Zcash</span>
+        </div>
+      </div>
+  </div>
+
+  <div class="row">
+    <div class="row__l"><span class="kicker">L2</span><span class="row__n">The kit</span><a class="row__go" href="/getting-started/quickstart/">quickstart →</a></div>
+    <p class="row__p">One orchestrator. Accounts by chain id, one account interface for every module.</p>
+    <div class="row__d">
+      <div class="defs">
+        <div><b>Keyring</b><span> — Many accounts from one seed. Imports: seed, private key, Tonkeeper words.</span></div>
+        <div><b>Policies</b><span> — Fee caps, allow-lists, block-lists, a confirm hook. Run before every signature.</span></div>
+        <div><b>History</b><span> — Every send, swap and Earn op; each module labels its own transactions.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="row__l"><span class="kicker">L3</span><span class="row__n">Modules</span><a class="row__go" href="/getting-started/packages/#swaps-and-bridges">all modules →</a></div>
+    <p class="row__p">A router asks every provider in parallel and executes the best quote. Uniswap, Balancer and Wrap are priced straight from the contracts — no API.</p>
+    <div class="row__d">
+        <div class="grp"><span class="sub-k">Swap &amp; bridge</span>
+          <div class="items">
+            <span class="item"><img src="/logos/near.webp" alt="" width="20" height="20" loading="lazy" />NEAR Intents</span>
+            <span class="item"><img src="/logos/lifi.svg" alt="" width="20" height="20" loading="lazy" />LI.FI</span>
+            <span class="item"><img src="/logos/thorchain.webp" alt="" width="20" height="20" loading="lazy" />THORChain</span>
+            <span class="item"><img src="/logos/stonfi.webp" alt="" width="20" height="20" loading="lazy" />STON.fi Omniston</span>
+            <span class="item"><img src="/logos/circle.svg" alt="" width="20" height="20" loading="lazy" />Circle CCTP V2</span>
+            <span class="item"><img src="/logos/uniswap.webp" alt="" width="20" height="20" loading="lazy" />Uniswap v3</span>
+            <span class="item"><img src="/logos/balancer.webp" alt="" width="20" height="20" loading="lazy" />Balancer v2</span>
+            <span class="item"><img src="/logos/cp0x-wrap.svg" alt="" width="20" height="20" loading="lazy" />Wrap</span>
+          </div>
+        </div>
+        <div class="grp"><span class="sub-k">Earn</span>
+          <div class="items">
+            <span class="item"><img src="/logos/lido.webp" alt="" width="20" height="20" loading="lazy" />Lido</span>
+            <span class="item"><img src="/logos/aave.webp" alt="" width="20" height="20" loading="lazy" />Aave v3</span>
+            <span class="item"><img src="/logos/morpho.webp" alt="" width="20" height="20" loading="lazy" />Morpho</span>
+            <span class="item"><img src="/logos/mellow.webp" alt="" width="20" height="20" loading="lazy" />Mellow</span>
+            <span class="item"><img src="/logos/kamino.webp" alt="" width="20" height="20" loading="lazy" />Kamino</span>
+            <span class="item"><img src="/logos/jito.webp" alt="" width="20" height="20" loading="lazy" />Jito</span>
+            <span class="item"><img src="/logos/ssv.webp" alt="" width="20" height="20" loading="lazy" />SSV</span>
+          </div>
+        </div>
+        <div class="grp"><span class="sub-k">Safety tools</span><span class="plain-t">Approvals <span class="t2">— find &amp; revoke risky allowances.</span></span></div>
+      </div>
+  </div>
+
+  <div class="row">
+    <div class="row__l"><span class="kicker">Runtime</span><span class="row__n">Under everything</span><a class="row__go" href="/getting-started/installation/">installation →</a></div>
+    <p class="row__p">Tested inside the Hermes VM React Native ships before every release.</p>
+    <div class="row__d"><div class="plain"><span>React Native (Hermes) — mobile-first</span><span>Node for servers and bots</span><span>Pure TypeScript, no native deps</span></div></div>
+  </div>
+</section>

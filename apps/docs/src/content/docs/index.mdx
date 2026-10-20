@@ -16,19 +16,6 @@ hero:
         sub: $ awk why // principles
 ---
 
-import Feature from '../../components/Feature.astro'
+import KitLayers from '../../components/KitLayers.astro'
 
-<div class="awk-features">
-  <Feature title="Any chain" icon="chains" tone="cyan">
-    One seed phrase → accounts on EVM networks, Bitcoin, Solana, TON, Tron, NEAR and Zcash behind a single account interface.
-  </Feature>
-  <Feature title="Swaps & bridges" icon="swap" tone="pink">
-    A router auctions every swap provider — same-chain and cross-chain — and executes the winner with safety rails.
-  </Feature>
-  <Feature title="Earn" icon="earn" tone="green">
-    Staking and lending modules (Lido, Aave, Morpho, Kamino, Tonstakers, Jito…) on shared `StakingProtocol` / `LendingProtocol` interfaces.
-  </Feature>
-  <Feature title="Your keys, your signer" icon="key" tone="gold">
-    The key lives in a `Signer`. A local seed is one option; Safe, hardware, MPC or a backend signer are others.
-  </Feature>
-</div>
+<KitLayers />
