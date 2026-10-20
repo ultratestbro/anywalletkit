@@ -1,0 +1,115 @@
+---
+title: Transaction preview
+description: Show what an EVM transaction will do before it is signed — decoded calls, approvals, simulated balance changes and named checks for your review screen.
+sidebar:
+  order: 4
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+A review screen that shows only "to: 0x1231…" and "data: 0x095ea7b3…" asks the user to trust
+blindly. `tx-preview-evm` turns one call, or an approve → call sequence, into what the user
+needs to see before signing:
+
+- **Decoded calls.** Approvals (ERC-20 `approve` and `increaseAllowance`, Permit2 `approve`,
+  `setApprovalForAll`), token transfers, and the name of every contract you list as known.
+- **Simulated balance changes.** The whole sequence runs in one simulated block through
+  `eth_simulateV1` with transfer tracing: "-100 USDC, +0.03 ETH".
+- **Checks.** Named outcomes (`approval-unlimited`, `simulation-reverted`,
+  `recipient-foreign`…) that your app turns into its own words.
+
+Nothing is signed or sent. The module only reads, through your RPC. Snippets come from
+`examples/tx-preview`, which our CI typechecks and tests.
+
+```sh
+pnpm add @anywalletkit/tx-preview-evm
+```
+
+<Snippet file="tx-preview/src/preview.ts" region="imports" />
+
+## RPC
+
+The module takes a function `(method, params) → result`, so any transport works:
+
+<Snippet file="tx-preview/src/preview.ts" region="rpc" />
+
+Pass JSON-RPC errors through with their `code` and `data`: the module uses them to tell a
+revert from a node that has no `eth_simulateV1`.
+
+Balance changes need `eth_simulateV1`. On public endpoints we checked (October 2026) it is
+served on Ethereum, Base, Arbitrum, Optimism, Polygon and BNB Chain, and missing on
+Avalanche. Where it is missing, a single call falls back to `eth_call`, which tells pass from
+revert but shows no balance changes. A sequence can't be simulated there at all
+(`simulation.status: 'unavailable'`).
+
+## Preview a transaction
+
+<Snippet file="tx-preview/src/preview.ts" region="preview" />
+
+| Input | Meaning |
+|---|---|
+| `calls` | Run in order in one block: approvals first, then the call |
+| `own` | Every address of this user; a transfer to one of them is not "foreign" |
+| `known` | Contracts you trust → the name to show (a provider's routers, your tokens) |
+| `expectedRecipient` | Where the funds should arrive; anyone else is flagged |
+| `expectedApproval` | The allowance the flow needs; a larger approval is flagged |
+| `stateOverrides` | Simulate with a different balance, nonce or code, e.g. to preview a flow before the account is funded |
+| `native` | Symbol and decimals of the gas coin (default ETH, 18) |
+
+The result has three parts:
+
+- **`calls`.** Each call with `method`, `label`, and `approval` or `transfer` when decoded.
+  An approval's `amount` is `null` when it is unlimited (2²⁵⁵ or more) or an operator
+  approval.
+- **`simulation`.** One of three statuses:
+  - `ok`: `changes` (signed deltas in base units, with symbol and decimals) and `gasUsed`;
+  - `reverted`: `callIndex` and `reason`;
+  - `unavailable`: `reason`.
+- **`checks`.** `{ code, status: 'ok' | 'warn' | 'unknown', detail }`.
+
+Balance changes count ERC-20 `Transfer` events to and from the sender, plus native transfers.
+WETH-style `Deposit` / `Withdrawal` events count only for contracts in `known`, so a
+look-alike event from an arbitrary contract can't fake a balance change.
+
+## Turn checks into a verdict
+
+Checks are codes, not text. The wording, the language and how strict to be are your app's
+decisions:
+
+<Snippet file="tx-preview/src/preview.ts" region="verdict" />
+
+| Code | Status | Meaning |
+|---|---|---|
+| `contract-known` / `contract-unknown` | ok / warn | The contract doing the work is in `known`, or isn't |
+| `simulation-ok` | ok | Simulated; balance changes are in `simulation.changes` |
+| `simulation-reverted` | warn | It will fail; `detail.reason` says why |
+| `simulation-unavailable` | unknown | The network can't simulate it |
+| `recipient-own` / `recipient-foreign` | ok / warn | A recipient is, or isn't, one of `own` |
+| `approval-exact` | ok | Approves no more than `expectedApproval` |
+| `approval-excess` | warn | Approves more than `expectedApproval` |
+| `approval-unlimited` | warn | Unlimited allowance or operator approval |
+| `approval-unknown-spender` | warn | The spender is not in `known` |
+| `native-value` | ok | The call also sends native coin (`detail.amount`) |
+
+## Preview every write
+
+Policies call `confirm` before every write, which makes it the place to simulate. The
+`intent` carries the call as `raw`:
+
+<Snippet file="tx-preview/src/preview.ts" region="confirm" />
+
+`ask` receives the preview, or `null` for writes with nothing to simulate (message
+signatures, typed data, non-EVM chains), and shows your sheet. With this in the wallet's
+policies, no EVM transaction reaches the key without a simulation the user has seen. See
+[Policies](/concepts/policies/).
+
+## Preview a swap
+
+The swap router hands the exact plan to `reviewExecution` before the first approval. Preview
+the approvals and the source call together, the way they will run:
+
+<Snippet file="tx-preview/src/preview.ts" region="swap" />
+
+`expectedApproval: plan.sourceAmount` flags a route that asks for more than it spends. For a
+same-chain swap, `expectedRecipient` flags output going to anyone but the user. Wire it into
+the router as shown in [Swaps → Show a review screen](/guides/swaps/#show-a-review-screen).

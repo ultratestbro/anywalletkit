@@ -1,0 +1,24 @@
+{
+  "name": "@forgewallet/example-tx-preview",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The docs Transaction preview guide as running code: the site renders its #region blocks, CI typechecks and tests it.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@forgewallet/core": "workspace:*",
+    "@forgewallet/kit": "workspace:*",
+    "@forgewallet/wallet-evm": "workspace:*",
+    "@forgewallet/tx-preview-evm": "workspace:*",
+    "@forgewallet/protocol-swap2-core": "workspace:*",
+    "viem": "^2.57.2"
+  },
+  "devDependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  }
+}
