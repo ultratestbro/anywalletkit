@@ -89,7 +89,16 @@ export async function smokeProtocols(check: Check): Promise<void> {
   check('aave: parseReserveConfiguration', cfg.ltv === 0.75 && cfg.decimals === 6 && cfg.active && cfg.borrowingEnabled)
   // Engine math the APY depends on, each checked on its own so a Hermes build that gets one of
   // them wrong (BigInt → Number, log1p/expm1/pow near 1) names the culprit instead of the sum.
-  const ray = Number(4n * 10n ** 25n)
+  const big = 4n * 10n ** 25n
+  check(`aave: bigint ** and * (${big.toString()})`, big.toString() === '40000000000000000000000000' && big === 40000000000000000000000000n)
+  check(`aave: Number(2n**53n) (${Number(2n ** 53n)})`, Number(2n ** 53n) === 9007199254740992)
+  check(`aave: Number(2n**64n) (${Number(2n ** 64n)})`, Number(2n ** 64n) === 18446744073709551616)
+  check(`aave: Number(2n**64n + 1n) (${Number(2n ** 64n + 1n)})`, Number(2n ** 64n + 1n) === 18446744073709551616)
+  check(`aave: Number(10n**19n) (${Number(10n ** 19n)})`, Number(10n ** 19n) === 1e19)
+  check(`aave: Number(10n**20n) (${Number(10n ** 20n)})`, Number(10n ** 20n) === 1e20)
+  check(`aave: Number(big.toString()) (${Number(big.toString())})`, Number(big.toString()) === 4e25)
+  check(`aave: Number(big / 10n**18n) / 1e-18 (${Number(big / 10n ** 18n) * 1e18})`, Number(big / 10n ** 18n) * 1e18 === 4e25)
+  const ray = Number(big)
   check(`aave: Number(4e25 ray) (${ray})`, ray === 4e25)
   const perSec = 0.04 / 31_536_000
   const l = Math.log1p(perSec), e = Math.expm1(0.04), p = Math.pow(1 + perSec, 31_536_000)
