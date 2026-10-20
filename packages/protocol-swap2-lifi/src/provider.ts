@@ -166,6 +166,71 @@ export interface LifiProviderConfig {
    * refuses a route that hasn't moved.
    */
   defaultSlippageBps?: number;
+  /**
+   * Route policy hook. When set, a cross-chain quote first asks LI.FI's
+   * `/advanced/routes` for the candidates, hands them to this function and
+   * restricts `/quote` to what it returns (allowBridges / denyBridges /
+   * order). Returning null/undefined, or any failure of the routes call,
+   * leaves LI.FI's default pick. The policy itself (tie band, max ETA, deny
+   * list) belongs to the app; the module only carries the choice.
+   */
+  chooseRoute?: (routes: readonly LifiRouteOption[], params: QuoteParams) => LifiRouteChoice | null | undefined;
+}
+
+/** One single-transaction candidate from `/advanced/routes`, as a route policy sees it. */
+export interface LifiRouteOption {
+  /** LI.FI tool key of the bridge the route crosses with (e.g. "stargateV2"); a same-chain route carries its swap tool. */
+  tool: string;
+  toAmount: bigint;
+  toAmountMin: bigint;
+  /** LI.FI's execution-duration estimate, seconds. */
+  etaSeconds: number;
+  gasCostUsd: number;
+  /** LI.FI's own labels: RECOMMENDED, CHEAPEST, FASTEST, … */
+  tags: readonly string[];
+}
+
+/** What `/quote` is restricted to. LI.FI tool keys; an empty choice means LI.FI's default. */
+export interface LifiRouteChoice {
+  allowBridges?: readonly string[];
+  denyBridges?: readonly string[];
+  order?: "CHEAPEST" | "FASTEST";
+}
+
+const TOOL_KEY = /^[A-Za-z0-9_-]{1,64}$/;
+
+function routeOptions(body: unknown): LifiRouteOption[] {
+  const routes = (body as {routes?: unknown})?.routes;
+  if (!Array.isArray(routes)) return [];
+  const out: LifiRouteOption[] = [];
+  for (const r of routes as {toAmount?: unknown; toAmountMin?: unknown; gasCostUSD?: unknown; containsSwitchChain?: unknown; tags?: unknown; steps?: {tool?: unknown; estimate?: {executionDuration?: unknown}; includedSteps?: {tool?: unknown; type?: unknown}[]}[]}[]) {
+    // The engine executes one source transaction: multi-step routes are not candidates.
+    if (!Array.isArray(r?.steps) || r.steps.length !== 1 || r.containsSwitchChain === true) continue;
+    const step = r.steps[0]!;
+    const cross = Array.isArray(step.includedSteps) ? step.includedSteps.find((i) => i?.type === "cross")?.tool : undefined;
+    const tool = typeof cross === "string" ? cross : step.tool;
+    const eta = step.estimate?.executionDuration;
+    if (typeof tool !== "string" || !TOOL_KEY.test(tool) || typeof eta !== "number" || !Number.isFinite(eta) || eta < 0) continue;
+    if (typeof r.toAmount !== "string" || typeof r.toAmountMin !== "string" || !/^\d{1,60}$/.test(r.toAmount) || !/^\d{1,60}$/.test(r.toAmountMin)) continue;
+    out.push({
+      tool,
+      toAmount: BigInt(r.toAmount),
+      toAmountMin: BigInt(r.toAmountMin),
+      etaSeconds: eta,
+      gasCostUsd: Number(r.gasCostUSD ?? 0) || 0,
+      tags: Array.isArray(r.tags) ? r.tags.filter((t): t is string => typeof t === "string") : [],
+    });
+  }
+  return out;
+}
+
+function cleanChoice(choice: LifiRouteChoice | null | undefined): LifiRouteChoice | null {
+  if (!choice) return null;
+  const allow = (choice.allowBridges ?? []).filter((t) => TOOL_KEY.test(t));
+  const deny = (choice.denyBridges ?? []).filter((t) => TOOL_KEY.test(t));
+  const order = choice.order === "CHEAPEST" || choice.order === "FASTEST" ? choice.order : undefined;
+  if (!allow.length && !deny.length && !order) return null;
+  return {...(allow.length ? {allowBridges: allow} : {}), ...(deny.length ? {denyBridges: deny} : {}), ...(order ? {order} : {})};
 }
 
 export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvider {
@@ -223,6 +288,32 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
       const slippageBps = params.slippageBps ?? defaultSlippageBps;
       let sentSlippage: number | undefined = slippageBps / 10_000;
       let deadline: AbortSignal | undefined;
+      let choice: LifiRouteChoice | null = null;
+      if (config.chooseRoute && params.sourceChain !== params.destChain) {
+        try {
+          const res = await fetch(`${apiBase}/advanced/routes`, {
+            method: "POST",
+            headers: {...headers(apiKey()), "content-type": "application/json"},
+            body: JSON.stringify({
+              fromChainId: Number(fromChain),
+              toChainId: Number(toChain),
+              fromTokenAddress: fromToken,
+              toTokenAddress: nativeFor(params.destChain, params.destToken),
+              fromAmount: params.amountIn,
+              fromAddress,
+              toAddress: params.destAddress || fromAddress,
+              options: {slippage: slippageBps / 10_000, ...(integrator().trim() ? {integrator: integrator().trim()} : {})},
+            }),
+            signal: signal ?? timeoutSignal(8_000),
+          });
+          if (res.ok) {
+            const options = routeOptions(await res.json());
+            if (options.length) choice = cleanChoice(config.chooseRoute(options, params));
+          }
+        } catch {
+          // The policy is an optimisation: no candidates means LI.FI's default pick.
+        }
+      }
       for (let attempt = 0; attempt < 2; attempt++) try {
         const url = new URL(`${apiBase}/quote`);
         url.searchParams.set("fromChain", fromChain);
@@ -240,8 +331,17 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         if (sentSlippage !== undefined) {
           url.searchParams.set("slippage", String(sentSlippage));
         }
+        for (const t of choice?.allowBridges ?? []) url.searchParams.append("allowBridges", t);
+        for (const t of choice?.denyBridges ?? []) url.searchParams.append("denyBridges", t);
+        if (choice?.order) url.searchParams.set("order", choice.order);
         deadline = signal ? undefined : timeoutSignal(12_000);
         const res = await fetch(url, {headers: headers(apiKey()), signal: signal ?? deadline!});
+        if (!res.ok && choice) {
+          // The chosen bridge went away between the two calls: LI.FI's default pick instead.
+          choice = null;
+          attempt--;
+          continue;
+        }
         if (!res.ok) {
           // LI.FI's 404 "No available quotes for the requested transfer" and
           // 400 validation messages are the caller's answer, not a silent null.
