@@ -1,0 +1,14 @@
+---
+// Same behaviour as the landing (awk-landing src/theme.ts): dark by default, light on request,
+// the choice kept in localStorage and applied before first paint.
+---
+
+<script is:inline>
+	(() => {
+		let t = 'dark';
+		try { if (localStorage.getItem('awk-theme') === 'light') t = 'light'; } catch {}
+		document.documentElement.dataset.theme = t;
+		// Starlight's own pickers are replaced; keep the global so nothing calling it breaks.
+		window.StarlightThemeProvider = { updatePickers() {} };
+	})();
+</script>

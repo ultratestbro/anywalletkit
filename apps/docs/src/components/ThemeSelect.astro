@@ -1,0 +1,39 @@
+---
+// The landing's glass theme button instead of Starlight's dark/light/auto select.
+---
+
+<awk-theme-toggle>
+	<button class="awk-glass" type="button" aria-label="Switch to light theme" aria-pressed="false">
+		<svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5z"></path></svg>
+		<svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"></path></svg>
+	</button>
+</awk-theme-toggle>
+
+<script>
+	type Theme = 'dark' | 'light';
+	const KEY = 'awk-theme';
+	const current = (): Theme => (document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+
+	function apply(t: Theme): void {
+		document.documentElement.dataset.theme = t;
+		const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+		if (meta) meta.content = t === 'light' ? '#F5F5F3' : '#06070A';
+		document.querySelectorAll('awk-theme-toggle button').forEach((b) => {
+			b.setAttribute('aria-label', t === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
+			b.setAttribute('aria-pressed', t === 'light' ? 'true' : 'false');
+		});
+	}
+
+	class AwkThemeToggle extends HTMLElement {
+		constructor() {
+			super();
+			apply(current());
+			this.querySelector('button')?.addEventListener('click', () => {
+				const next: Theme = current() === 'light' ? 'dark' : 'light';
+				try { localStorage.setItem(KEY, next); } catch { /* private mode */ }
+				apply(next);
+			});
+		}
+	}
+	customElements.define('awk-theme-toggle', AwkThemeToggle);
+</script>

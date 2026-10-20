@@ -1,0 +1,41 @@
+---
+// The landing's liquid-glass "awk" pill (WebGL2 shader, static gradient fallback) + a "docs" tag.
+const { siteTitleHref } = Astro.locals.starlightRoute;
+---
+
+<a href={siteTitleHref} class="awk-title" aria-label="Any Wallet Kit docs — home">
+	<span class="logo"><canvas aria-hidden="true"></canvas><span class="logo__t" translate="no">awk</span></span>
+	<span class="awk-title__docs">docs</span>
+</a>
+
+<script>
+	import { LOGO_FS, fullscreenProgram } from '../scripts/shaders';
+
+	const reduced = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+	const canvas = document.querySelector<HTMLCanvasElement>('.awk-title canvas');
+	const gl = canvas?.getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false });
+	const pr = gl ? fullscreenProgram(gl, LOGO_FS) : null;
+	if (canvas && gl && pr) {
+		const uRes = gl.getUniformLocation(pr, 'uRes'), uT = gl.getUniformLocation(pr, 'uT');
+		const dpr = Math.min(window.devicePixelRatio || 1, 2);
+		canvas.width = Math.round(canvas.clientWidth * dpr);
+		canvas.height = Math.round(canvas.clientHeight * dpr);
+		gl.viewport(0, 0, canvas.width, canvas.height);
+		gl.uniform2f(uRes, canvas.width, canvas.height);
+		canvas.parentElement?.classList.add('live');
+		const draw = (t: number) => { gl.uniform1f(uT, t); gl.drawArrays(gl.TRIANGLES, 0, 3); };
+		if (reduced) draw(3.2);
+		else {
+			const t0 = performance.now();
+			let raf = 0, running = false;
+			const step = () => {
+				if (document.hidden) { running = false; return; }
+				draw((performance.now() - t0) / 1000);
+				raf = requestAnimationFrame(step);
+			};
+			const start = () => { if (running) return; running = true; raf = requestAnimationFrame(step); };
+			document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelAnimationFrame(raf); running = false; } else start(); });
+			start();
+		}
+	}
+</script>

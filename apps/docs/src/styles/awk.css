@@ -1,0 +1,165 @@
+/* Any Wallet Kit docs — landing tokens (awk-landing src/styles.css) mapped onto Starlight. */
+:root {
+  --bg: #06070A;
+  --bg-1: #0A0B0E;
+  --bg-2: #12151C;
+  --t1: #EDEEF2;
+  --t2: #A3A8B2;
+  --t3: #7C828C;
+  --t4: #9CA1AC;
+  --hl: rgba(255, 255, 255, .09);
+  --hl2: rgba(255, 255, 255, .05);
+  --chip: #1A1D24;
+  --cyan: #80D4DA;
+  --pink: #DE8CBE;
+  --gold: #E6C37E;
+  --syne: 'Syne', sans-serif;
+  --geist: 'Geist', system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, monospace;
+  --iri: linear-gradient(100deg, #F4B6DA, #FFF1B8, #B6F0D8, #A8D8F0, #C9B8F5, #F4B6DA);
+  --bg-rgb: 6, 7, 10;
+  --ink: #fff;
+  --blob-op: 1;
+
+  --sl-font: var(--geist);
+  --sl-font-mono: var(--mono);
+  --sl-color-accent-low: #10282B;
+  --sl-color-accent: #80D4DA;
+  --sl-color-accent-high: #C9F0F2;
+  --sl-color-white: var(--t1);
+  --sl-color-gray-1: #D6D8DE;
+  --sl-color-gray-2: var(--t2);
+  --sl-color-gray-3: var(--t3);
+  --sl-color-gray-4: #3B3F48;
+  --sl-color-gray-5: var(--chip);
+  --sl-color-gray-6: var(--bg-2);
+  --sl-color-black: var(--bg);
+  --sl-color-hairline: var(--hl);
+  --sl-color-hairline-light: var(--hl);
+  --sl-color-hairline-shade: var(--hl2);
+  --sl-color-bg-nav: rgba(var(--bg-rgb), .72);
+  --sl-color-bg-sidebar: transparent;
+  --sl-color-text-accent: var(--cyan);
+  --sl-nav-height: 4.25rem;
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #F5F5F3;
+  --bg-1: #EFEFED;
+  --bg-2: #ECEDEE;
+  --t1: #111216;
+  --t2: #474C55;
+  --t3: #666B74;
+  --t4: #555A63;
+  --hl: rgba(0, 0, 0, .1);
+  --hl2: rgba(0, 0, 0, .06);
+  --chip: #E2E3E6;
+  --cyan: #2C7FB0;
+  --pink: #C2508F;
+  --iri: linear-gradient(100deg, #C2508F, #B07A10, #23906C, #2C7FB0, #7559C4, #C2508F);
+  --bg-rgb: 245, 245, 243;
+  --ink: #111216;
+  --blob-op: .55;
+
+  --sl-color-accent-low: #D7E8F2;
+  --sl-color-accent: #2C7FB0;
+  --sl-color-accent-high: #164A69;
+  --sl-color-white: var(--t1);
+  --sl-color-gray-1: #24272D;
+  --sl-color-gray-2: var(--t2);
+  --sl-color-gray-3: var(--t3);
+  --sl-color-gray-4: #A9ADB5;
+  --sl-color-gray-5: var(--chip);
+  --sl-color-gray-6: var(--bg-2);
+  --sl-color-gray-7: var(--bg-1);
+  --sl-color-black: var(--bg);
+  --sl-color-text-accent: var(--cyan);
+}
+
+body {
+  background-color: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+/* The landing's background blobs: pre-blurred radial gradients, fixed behind everything. */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: var(--blob-op);
+  background:
+    radial-gradient(23vw 23vw at 17% 31%, rgba(128, 212, 218, .2), rgba(128, 212, 218, .06) 45%, transparent 72%),
+    radial-gradient(21vw 21vw at 87% 55%, rgba(222, 140, 190, .18), rgba(222, 140, 190, .05) 45%, transparent 72%),
+    radial-gradient(19vw 19vw at 47% 105%, rgba(230, 195, 126, .14), rgba(230, 195, 126, .04) 45%, transparent 72%);
+}
+::selection { background: var(--pink); color: var(--bg); }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+@keyframes awkSheen { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+
+/* ---------- header ---------- */
+.header { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom-color: var(--hl); }
+.awk-title { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--t1); }
+.awk-title .logo { position: relative; display: block; flex: none; width: 96px; height: 36px; border-radius: 999px; }
+.awk-title .logo canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block; border-radius: 999px;
+  background: linear-gradient(120deg, rgba(128, 212, 218, .35), rgba(222, 140, 190, .35), rgba(230, 195, 126, .3));
+}
+.awk-title .logo.live canvas { background: transparent; }
+.awk-title .logo__t {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding-left: .12em;
+  font-family: var(--syne); font-weight: 800; font-size: 16px; letter-spacing: .12em; text-transform: lowercase; color: var(--ink);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .45), 0 0 10px rgba(0, 0, 0, .35); pointer-events: none;
+}
+:root[data-theme='light'] .awk-title .logo__t { text-shadow: 0 1px 1px rgba(255, 255, 255, .6); }
+.awk-title__docs { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--t3); }
+.awk-title:hover .awk-title__docs { color: var(--cyan); }
+
+/* Glass round buttons (theme toggle), same as the landing's .theme / .soc. */
+.awk-glass {
+  flex: none; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: var(--t1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, .03));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -1px 0 rgba(255, 255, 255, .08), 0 8px 22px -10px rgba(0, 0, 0, .6);
+  transition: color .3s, transform .3s;
+}
+.awk-glass:hover { color: var(--cyan); transform: rotate(18deg); }
+.awk-glass svg { width: 18px; height: 18px; display: block; }
+.awk-glass .sun { display: none; }
+:root[data-theme='light'] .awk-glass { background: linear-gradient(180deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, .55)); box-shadow: inset 0 1px 0 #fff, 0 8px 22px -12px rgba(0, 0, 0, .35), 0 0 0 1px rgba(0, 0, 0, .06); }
+:root[data-theme='light'] .awk-glass .sun { display: block; }
+:root[data-theme='light'] .awk-glass .moon { display: none; }
+.social-icons a:hover { color: var(--cyan); }
+
+/* ---------- sidebar ---------- */
+.sidebar-content .top-level > li > details > summary .group-label,
+.sidebar-content .top-level > li > details > summary {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--t3);
+}
+.sidebar-content a[aria-current='page'] {
+  background: var(--chip); color: var(--t1); font-weight: 500; box-shadow: inset 2px 0 0 var(--cyan);
+}
+
+/* ---------- content ---------- */
+h1#_top {
+  font-family: var(--syne); font-weight: 600; letter-spacing: -.015em; line-height: 1.05;
+  background: var(--iri); background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: awkSheen 8s linear infinite;
+}
+.sl-markdown-content :is(h2, h3, h4) { font-family: var(--syne); font-weight: 600; letter-spacing: -.01em; }
+.sl-markdown-content a { color: var(--cyan); text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--cyan) 40%, transparent); }
+.sl-markdown-content a:hover { text-decoration-color: var(--cyan); }
+.sl-markdown-content :not(pre) > code { background: var(--chip); border: 1px solid var(--hl2); border-radius: 6px; padding: .1em .35em; }
+.sl-markdown-content table { font-size: .92em; }
+.sl-markdown-content th { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--t3); }
+.card { border-radius: 16px; border-color: var(--hl); background: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .01)); }
+.starlight-aside {
+  border-radius: 14px; border: 1px solid var(--hl); border-inline-start: 3px solid var(--sl-color-asides-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .015));
+}
+.starlight-aside--caution { --sl-color-asides-border: var(--gold); --sl-color-asides-text-accent: var(--gold); }
+:root[data-theme='light'] .starlight-aside--caution { --sl-color-asides-border: #9A6E12; --sl-color-asides-text-accent: #9A6E12; }
+.starlight-aside--note, .starlight-aside--tip { --sl-color-asides-border: var(--cyan); --sl-color-asides-text-accent: var(--cyan); }
+.starlight-aside--danger { --sl-color-asides-border: var(--pink); --sl-color-asides-text-accent: var(--pink); }
+
+@media (prefers-reduced-motion: reduce) {
+  h1#_top { animation: none; }
+}
