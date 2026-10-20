@@ -14,6 +14,8 @@ import { LifiSwap2Protocol } from '@forgewallet/protocol-swap2-lifi/protocol'
 import { lifiProvider } from '@forgewallet/protocol-swap2-lifi/provider'
 import { cctpProvider } from '@forgewallet/protocol-swap2-cctp/provider'
 import { CctpSwap2Protocol } from '@forgewallet/protocol-swap2-cctp/protocol'
+import { usdt0Provider } from '@forgewallet/protocol-swap2-usdt0/provider'
+import { Usdt0Swap2Protocol } from '@forgewallet/protocol-swap2-usdt0/protocol'
 import { nearIntentsProvider } from '@forgewallet/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@forgewallet/protocol-swap2-thorchain/protocol'
 import { OmnistonSwap2Protocol } from '@forgewallet/protocol-swap2-omniston/protocol'
@@ -53,7 +55,7 @@ export async function smokeProtocols(check: Check): Promise<void> {
   // TON is a hand-suspended 1Click corridor (HOT bridge dark since 2026-10-16) and LI.FI has no Bitcoin, so
   // Bitcoin can only have come from the near-intents provider.
   check('router: capabilities come from the passed providers', chains.includes('eip155:1') && chains.includes('bitcoin:mainnet'), chains.join(','))
-  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol]] as const) {
+  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol], ['usdt0', Usdt0Swap2Protocol]] as const) {
     const p = new (P as never as new (a: unknown, c: unknown) => { getSupportedChains(): Promise<unknown>; quoteSwap2(o: unknown): Promise<unknown> })(evm, swap2Cfg)
     check(`${name}: constructs`, typeof p.quoteSwap2 === 'function')
     await tolerates(check, `${name}: getSupportedChains`, () => p.getSupportedChains())
@@ -80,6 +82,9 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const cctp = cctpProvider({})
   check('cctp: route USDC Base → Arbitrum', cctp.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:42161', token: 'USDC' }) && !cctp.supportsRoute({ chain: 'eip155:56', token: 'USDC' }, { chain: 'eip155:1', token: 'USDC' }))
   await tolerates(check, 'cctp: getQuote (network)', () => cctp.getQuote({ sourceChain: 'eip155:8453', sourceToken: 'USDC', destChain: 'eip155:42161', destToken: 'USDC', amountIn: '10000000', destAddress: '0x000000000000000000000000000000000000dEaD' }))
+  const usdt0 = usdt0Provider({ rpcUrls: { 'eip155:42161': 'https://arbitrum-one-rpc.publicnode.com' } })
+  check('usdt0: route USDT0 Arbitrum → HyperEVM, none from BSC', usdt0.supportsRoute({ chain: 'eip155:42161', token: 'USDT0' }, { chain: 'eip155:999', token: 'USDT0' }) && !usdt0.supportsRoute({ chain: 'eip155:56', token: 'USDT' }, { chain: 'eip155:1', token: 'USDT' }))
+  await tolerates(check, 'usdt0: getQuote (network)', () => usdt0.getQuote({ sourceChain: 'eip155:42161', sourceToken: 'USDT0', destChain: 'eip155:999', destToken: 'USDT0', amountIn: '10000000', destAddress: '0x000000000000000000000000000000000000dEaD' }))
   check('cctp: claimSwap2 on the router', typeof (router as unknown as { claimSwap2?: unknown }).claimSwap2 === 'function')
 
   // lending

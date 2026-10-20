@@ -92,6 +92,9 @@ importers:
       '@forgewallet/protocol-swap2-thorchain':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-thorchain
+      '@forgewallet/protocol-swap2-usdt0':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-usdt0
       '@forgewallet/runtime-hermes':
         specifier: workspace:*
         version: link:../../packages/runtime-hermes
