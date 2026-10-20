@@ -1,0 +1,19 @@
+{
+  "note": "A plain TRC-20 USDT transfer between two wallets (no Vault): not Chainflip",
+  "own": ["TNrfMbHWuZgm4K8saMPaXJmVpYAwZjdF4G"],
+  "tx": {
+    "chain": "tron:0x2b6653dc",
+    "hash": "abababababababababababababababababababababababababababababababab",
+    "time": 1792525257,
+    "status": "confirmed",
+    "address": "TNrfMbHWuZgm4K8saMPaXJmVpYAwZjdF4G",
+    "from": "TNrfMbHWuZgm4K8saMPaXJmVpYAwZjdF4G",
+    "to": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+    "nativeValue": "0",
+    "transfers": [
+      {"token": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", "from": "TNrfMbHWuZgm4K8saMPaXJmVpYAwZjdF4G", "to": "TN3W4H6rK2ce4vX9YnFQHwKENnHjoxb3m9", "amount": "500000000", "standard": "trc20", "symbol": "USDT", "decimals": 6}
+    ],
+    "call": {"to": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", "selector": "0xa9059cbb"}
+  },
+  "expect": {"kind": "transfer"}
+}

@@ -240,8 +240,8 @@ export interface Swap2ExecutionPlan {
   approvals: {token: string; spender: string; amount: bigint; chainId?: number}[];
   /** The source leg exactly as the account will receive it. */
   source:
-    | {kind: "call"; to: string; data?: string; value: bigint; chainId?: number; gasLimit?: bigint; memo?: string; cellBody?: boolean}
-    | {kind: "token-transfer"; token: string; recipient: string; amount: bigint; memo?: string}
+    | {kind: "call"; to: string; data?: string; value: bigint; chainId?: number; gasLimit?: bigint; memo?: string; memoEncoding?: "utf8" | "hex"; cellBody?: boolean}
+    | {kind: "token-transfer"; token: string; recipient: string; amount: bigint; memo?: string; memoEncoding?: "utf8" | "hex"}
     | {kind: "serialized"; serializedTx: string}
     | {kind: "typed-order"; typedData: string};
 }
@@ -284,6 +284,8 @@ interface Swap2Signer {
     body?: string | unknown;
     /** Tron: swap memo the account must place in `raw_data.data`. */
     memo?: string;
+    /** Tron: 'hex' = `memo` is a binary payload in 0x-hex (default 'utf8'). */
+    memoEncoding?: "utf8" | "hex";
   }): Promise<{hash?: string}>;
   /** Official token-transfer surface used by TON/Solana/Tron accounts. */
   transfer?: (options: {
@@ -292,6 +294,8 @@ interface Swap2Signer {
     amount: bigint;
     /** Tron TRC-20: memo in `raw_data.data` next to the TriggerSmartContract. */
     memo?: string;
+    /** Tron: 'hex' = `memo` is a binary payload in 0x-hex (default 'utf8'). */
+    memoEncoding?: "utf8" | "hex";
   }) => Promise<{hash?: string}>;
   signTypedData?: (args: {domain: unknown; types: unknown; primaryType?: string; message: unknown}) => Promise<string>;
   /**
@@ -1013,7 +1017,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           : unsigned.typedData
             ? {kind: "typed-order", typedData: unsigned.typedData}
             : tokenId
-              ? {kind: "token-transfer", token: tokenId, recipient: unsigned.to, amount: BigInt(q.sourceAmount), ...(unsigned.memo ? {memo: unsigned.memo} : {})}
+              ? {kind: "token-transfer", token: tokenId, recipient: unsigned.to, amount: BigInt(q.sourceAmount), ...(unsigned.memo ? {memo: unsigned.memo, ...(unsigned.memoEncoding ? {memoEncoding: unsigned.memoEncoding} : {})} : {})}
               : {
                   kind: "call",
                   to: unsigned.to,
@@ -1021,7 +1025,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
                   value: BigInt(unsigned.value),
                   ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
                   ...(unsigned.gasLimit ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
-                  ...(unsigned.memo ? {memo: unsigned.memo} : {}),
+                  ...(unsigned.memo ? {memo: unsigned.memo, ...(unsigned.memoEncoding ? {memoEncoding: unsigned.memoEncoding} : {})} : {}),
                   ...(cellBody !== undefined ? {cellBody: true} : {}),
                 },
       };
@@ -1171,7 +1175,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           token: tokenId,
           recipient: unsigned.to,
           amount: BigInt(q.sourceAmount),
-          ...((tronSource || nearSource) && unsigned.memo ? {memo: unsigned.memo} : {}),
+          ...((tronSource || nearSource) && unsigned.memo ? {memo: unsigned.memo, ...(tronSource && unsigned.memoEncoding ? {memoEncoding: unsigned.memoEncoding} : {})} : {}),
         });
       } else {
         sent = await signer.sendTransaction({
@@ -1183,7 +1187,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           ...(cellBody !== undefined
             ? {body: cellBody}
             : unsigned.memo
-              ? (tronSource || nearSource ? {memo: unsigned.memo} : {body: unsigned.memo})
+              ? (tronSource ? {memo: unsigned.memo, ...(unsigned.memoEncoding ? {memoEncoding: unsigned.memoEncoding} : {})} : nearSource ? {memo: unsigned.memo} : {body: unsigned.memo})
               : {}),
         });
       }

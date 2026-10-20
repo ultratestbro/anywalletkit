@@ -145,6 +145,9 @@ export interface UnsignedTx {
   serializedTx?: string;
   /** Native-chain memo/body required by the deposit protocol. */
   memo?: string;
+  /** How `memo` becomes bytes on chains whose memo is a byte field (Tron `raw_data.data`): 'utf8' text (default) or
+   *  'hex' — a binary payload given as 0x-hex (a Chainflip vault-swap note). */
+  memoEncoding?: "utf8" | "hex";
   /**
    * TON: serialized message-body CELL (base64 BoC) — e.g. an Omniston escrow
    * payload. NOT interchangeable with `memo`: a memo is a text comment, while

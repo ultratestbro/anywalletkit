@@ -10,7 +10,7 @@ export {
 } from './read-only-account.js'
 export { WalletAccountTron, MAX_EXPIRATION_MS, type TronTransferResult } from './account.js'
 export { WalletManagerTron, TRON_BASE_PATH, TRON_ACCOUNT_BRANCH } from './manager.js'
-export { attachMemo, encodeMemoRecord, MEMO_FIELD, MAX_MEMO_BYTES } from './memo.js'
+export { attachMemo, encodeMemoRecord, memoBytes, MEMO_FIELD, MAX_MEMO_BYTES, type MemoEncoding } from './memo.js'
 export {
   createTronHistory, mapTransactionRow as mapHistoryTransactionRow, mapTrc20Only as mapHistoryTrc20Only, tronExplorerTxUrl, HistoryUnavailableError, TRANSFER_TOPIC,
   encodeCursor as encodeHistoryCursor, decodeCursor as decodeHistoryCursor,

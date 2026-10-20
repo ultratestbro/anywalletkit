@@ -1,0 +1,26 @@
+{
+  "note": "Chainflip vault swap on Ethereum: 0.433 ETH sent with xSwapNative (0xdd687345) to the Chainflip Vault, 2026-10-20 (Routescan txlist of the Vault)",
+  "own": ["0x679358eb329a85966c4c29cc6ecf1dab480bbb92"],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0xe6965ff0c76176a14a422148aa2cc688559c118bdcb61aa4df91fa25729dfa86",
+    "time": 1792525823,
+    "status": "confirmed",
+    "address": "0x679358eb329a85966c4c29cc6ecf1dab480bbb92",
+    "from": "0x679358eb329a85966c4c29cc6ecf1dab480bbb92",
+    "to": "0xF5e10380213880111522dd0efD3dbb45b9f62Bcc",
+    "nativeValue": "433000000000000000",
+    "transfers": [
+      {"token": null, "from": "0x679358eb329a85966c4c29cc6ecf1dab480bbb92", "to": "0xF5e10380213880111522dd0efD3dbb45b9f62Bcc", "amount": "433000000000000000"}
+    ],
+    "fee": "35891096938788",
+    "call": {"to": "0xF5e10380213880111522dd0efD3dbb45b9f62Bcc", "selector": "0xdd687345"},
+    "block": "26235997"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged",
+    "assetsOut": [{"token": null, "amount": "433000000000000000"}],
+    "counterparty": "0xF5e10380213880111522dd0efD3dbb45b9f62Bcc"
+  }
+}

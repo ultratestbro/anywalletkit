@@ -1,7 +1,7 @@
 {
   "$schema": "./modules.schema.json",
   "generatedAt": "2026-10-20",
-  "count": 20,
+  "count": 21,
   "modules": [
     {
       "name": "@forgewallet/protocol-approvals-evm",
@@ -223,6 +223,26 @@
       "path": "packages/protocol-swap2-cctp",
       "description": "Circle CCTP V2: native USDC burn-and-mint between EVM chains (Fast / Standard), two-phase with the user's receiveMessage claim.",
       "addedAt": "2026-10-10"
+    },
+    {
+      "name": "@forgewallet/protocol-swap2-chainflip",
+      "type": "swap2",
+      "chains": [
+        "eip155:1",
+        "eip155:42161",
+        "tron:0x2b6653dc",
+        "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+        "bip122:000000000019d6689c085ae165831e93"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-swap2-chainflip",
+      "description": "Chainflip vault swaps: native BTC / ETH / SOL / TRX and USDC / USDT across Ethereum, Arbitrum, Solana, Tron and Bitcoin via Chainflip's public backend (0 bps, no account). Sources: Ethereum, Arbitrum, Tron (USDT → the Vault with the swap in the note); the encoder's output is decoded and checked before signing; fill-or-kill refunds.",
+      "addedAt": "2026-10-20"
     },
     {
       "name": "@forgewallet/protocol-swap2-lifi",
