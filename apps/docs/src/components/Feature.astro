@@ -1,0 +1,28 @@
+---
+// A card with the landing's pearl icon (.ico: glossy disc, coloured ring and glow).
+interface Props {
+  title: string
+  icon: 'chains' | 'swap' | 'earn' | 'key'
+  /** Ring / glyph colour: one of the landing accents. */
+  tone: 'cyan' | 'pink' | 'gold' | 'green'
+}
+const { title, icon, tone } = Astro.props
+const paths: Record<Props['icon'], string> = {
+  // three linked nodes
+  chains: '<circle cx="6" cy="7" r="2.6"/><circle cx="18" cy="7" r="2.6"/><circle cx="12" cy="18" r="2.6"/><path d="M8.6 7h6.8M7.4 9.3l3.3 6.4M16.6 9.3l-3.3 6.4"/>',
+  // two opposing arrows
+  swap: '<path d="M4 8h14M14 4l4 4-4 4"/><path d="M20 16H6M10 12l-4 4 4 4"/>',
+  // rising bars + sprout line
+  earn: '<path d="M5 20v-5M10 20v-8M15 20v-6M20 20V9"/><path d="M4 11l5-5 4 3 7-6"/><path d="M16 3h4v4"/>',
+  // key
+  key: '<circle cx="8" cy="15" r="4.2"/><path d="M11 12l9-9M16.5 6.5l2.5 2.5M14 9l2 2"/>',
+}
+---
+
+<article class="awk-feature">
+  <span class={`awk-ico awk-ico--${tone}`} aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" set:html={paths[icon]} />
+  </span>
+  <h3>{title}</h3>
+  <div class="awk-feature__body"><slot /></div>
+</article>

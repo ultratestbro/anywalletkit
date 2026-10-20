@@ -6,27 +6,29 @@ hero:
   title: Any Wallet Kit
   tagline: The open multichain wallet SDK. One seed, every chain, protocol modules anyone can contribute — built for React Native first.
   actions:
-    - text: Introduction
+    - text: quickstart
+      link: /getting-started/quickstart/
+      attrs:
+        sub: $ awk init // 10 steps
+    - text: introduction
       link: /getting-started/introduction/
-      icon: right-arrow
-    - text: Packages
-      link: /getting-started/packages/
-      variant: minimal
+      attrs:
+        sub: $ awk why // principles
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import Feature from '../../components/Feature.astro'
 
-<CardGrid>
-  <Card title="Any chain" icon="seti:json">
+<div class="awk-features">
+  <Feature title="Any chain" icon="chains" tone="cyan">
     One seed phrase → accounts on EVM networks, Bitcoin, Solana, TON, Tron, NEAR and Zcash behind a single account interface.
-  </Card>
-  <Card title="Swaps & bridges" icon="random">
+  </Feature>
+  <Feature title="Swaps & bridges" icon="swap" tone="pink">
     A router auctions every swap provider — same-chain and cross-chain — and executes the winner with safety rails.
-  </Card>
-  <Card title="Earn" icon="rocket">
+  </Feature>
+  <Feature title="Earn" icon="earn" tone="green">
     Staking and lending modules (Lido, Aave, Morpho, Kamino, Tonstakers, Jito…) on shared `StakingProtocol` / `LendingProtocol` interfaces.
-  </Card>
-  <Card title="Your keys, your signer" icon="approve-check">
+  </Feature>
+  <Feature title="Your keys, your signer" icon="key" tone="gold">
     The key lives in a `Signer`. A local seed is one option; Safe, hardware, MPC or a backend signer are others.
-  </Card>
-</CardGrid>
+  </Feature>
+</div>

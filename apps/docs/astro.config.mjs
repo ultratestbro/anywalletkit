@@ -31,6 +31,7 @@ export default defineConfig({
       customCss: ['./src/styles/awk.css'],
       components: {
         SiteTitle: './src/components/SiteTitle.astro',
+        Hero: './src/components/Hero.astro',
         ThemeProvider: './src/components/ThemeProvider.astro',
         ThemeSelect: './src/components/ThemeSelect.astro',
       },

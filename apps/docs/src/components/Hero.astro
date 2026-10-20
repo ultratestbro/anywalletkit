@@ -1,0 +1,25 @@
+---
+// Splash hero with the landing's glass pill buttons (.btn: iridescent Syne label + mono caption).
+// Each action may carry `attrs: { sub: '…' }` for the caption line.
+const PAGE_TITLE_ID = '_top' // Starlight's page-title id (dist/constants.js, not exported)
+
+const { data } = Astro.locals.starlightRoute.entry
+const { title = data.title, tagline, actions = [] } = data.hero || {}
+---
+
+<div class="awk-hero">
+  <h1 id={PAGE_TITLE_ID} data-page-title set:html={title} />
+  {tagline && <p class="awk-hero__tag" set:html={tagline} />}
+  {
+    actions.length > 0 && (
+      <div class="awk-hero__cta">
+        {actions.map(({ text, link, attrs = {} }, i) => (
+          <a class="awk-btn" href={link}>
+            <span class:list={['iri', { 'iri--b': i % 2 === 1 }]}>{text}</span>
+            {typeof attrs.sub === 'string' && <small>{attrs.sub}</small>}
+          </a>
+        ))}
+      </div>
+    )
+  }
+</div>
