@@ -82,6 +82,34 @@ describe('policies', () => {
     await expect(block.transfer({ recipient: dest, amount: 1n })).rejects.toThrow(/blocklist/)
     expect(acc.sent).toHaveLength(1)
   })
+  it('rules of the chain the account was asked for apply even while the account reports eip155:unknown', async () => {
+    // An EVM account without `chainId` reports "eip155:unknown" until its first RPC call.
+    const acc = createMockAccount({ chain: 'eip155:unknown', fee: 500n })
+    const block = applyPolicies(acc, { blocklist: { 'eip155:1': [dest] } }, 'eip155:1')
+    await expect(block.transfer({ recipient: dest, amount: 1n })).rejects.toThrow(/eip155:1 blocklist/)
+    const cap = applyPolicies(acc, { maxFee: { 'eip155:1': 100n } }, 'eip155:1')
+    await expect(cap.transfer({ recipient: dest, amount: 1n })).rejects.toBeInstanceOf(PolicyViolationError)
+    expect(acc.sent).toHaveLength(0)
+  })
+  it('a mismatched account (namespace registration on another network) answers to the rules of both chains', async () => {
+    const acc = createMockAccount({ chain: 'eip155:1' })
+    const guarded = applyPolicies(acc, { blocklist: { 'eip155:8453': [dest] } }, 'eip155:8453')
+    await expect(guarded.transfer({ recipient: dest, amount: 1n })).rejects.toThrow(/eip155:8453 blocklist/)
+    const other = applyPolicies(acc, { blocklist: { 'eip155:1': [dest] } }, 'eip155:8453')
+    await expect(other.transfer({ recipient: dest, amount: 1n })).rejects.toThrow(/eip155:1 blocklist/)
+    expect(acc.sent).toHaveLength(0)
+  })
+  it('Wallet.getAccount hands the requested chain to the policies', async () => {
+    class UnknownChainManager extends WalletManager<IWalletAccount, object> {
+      async getAccount() { return createMockAccount({ chain: 'eip155:unknown' }) }
+      async getAccountByPath() { return createMockAccount({ chain: 'eip155:unknown' }) }
+      async getFeeRates() { return { slow: 0n, normal: 0n, fast: 0n } }
+    }
+    const w = new Wallet(SEED, { policies: { blocklist: { 'eip155:1': [dest] } } })
+    w.registerWallet('eip155:1', UnknownChainManager, {})
+    const eth = await w.getAccount('eip155:1')
+    await expect(eth.transfer({ recipient: dest, amount: 1n })).rejects.toBeInstanceOf(PolicyViolationError)
+  })
   it('confirm sees the intent and can reject', async () => {
     const acc = createMockAccount({ chain: 'eip155:1' })
     const confirm = vi.fn(async () => false)

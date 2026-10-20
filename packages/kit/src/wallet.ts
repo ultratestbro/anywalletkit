@@ -55,14 +55,14 @@ export class Wallet {
    * Register a chain package under a CAIP-2 key: a full chain id ("eip155:1") or a
    * namespace ("eip155", "solana", "ton", "tron", "bip122") that matches every chain id in it.
    */
-  registerWallet<M extends WalletManager<IWalletAccount, object>, C extends object>(key: string, Manager: ManagerClass<M, C>, config: C): this {
+  registerWallet<M extends WalletManager<IWalletAccount, object>, C extends object>(key: string, Manager: ManagerClass<M, C>, config: NoInfer<C>): this {
     if (this._wallets.has(key)) throw new Error(`A wallet is already registered for "${key}".`)
     this._wallets.set(key, { Manager: Manager as unknown as ManagerClass<WalletManager<IWalletAccount, object>, object>, config, manager: undefined })
     return this
   }
 
   /** Register a protocol module under a name, bound to the chain its account must come from. */
-  registerProtocol<P, C>(name: string, Protocol: ProtocolClass<P, C>, options: { chain: string; config?: C }): this {
+  registerProtocol<P, C>(name: string, Protocol: ProtocolClass<P, C>, options: { chain: string; config?: NoInfer<C> }): this {
     if (this._protocols.has(name)) throw new Error(`A protocol is already registered as "${name}".`)
     this._protocols.set(name, { Protocol, chain: options.chain, config: options.config })
     return this
@@ -108,7 +108,7 @@ export class Wallet {
   /** Account `index` on `chain`, wrapped with the wallet's policies. */
   async getAccount<A extends IWalletAccount = IWalletAccount>(chain: string, index = 0): Promise<A> {
     const account = (await this.getManager(chain).getAccount(index)) as A
-    return this._policies ? applyPolicies(account, this._policies) : account
+    return this._policies ? applyPolicies(account, this._policies, chain) : account
   }
 
   /** The protocol instance (one per name), constructed over the account of its chain. */

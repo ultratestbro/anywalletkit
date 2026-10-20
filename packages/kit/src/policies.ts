@@ -70,23 +70,34 @@ function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown
  * (not for message signatures) → confirm → original call. `signTransaction`
  * is guarded like a send: a module that signs and broadcasts on its own
  * cannot skip the policies.
+ *
+ * `chain` is the CAIP-2 id the account was asked for (`Wallet.getAccount`
+ * passes it). The rules of that id AND of `account.chain` both apply: an EVM
+ * account built without `chainId` reports "eip155:unknown" until its first
+ * RPC call, and a namespace registration can hand out an account whose RPC
+ * is on another network than the one asked for — neither may let a write
+ * slip past the rules written for the chain the app meant.
  */
-export function applyPolicies<A extends IWalletAccount>(account: A, policies: Policies): A {
+export function applyPolicies<A extends IWalletAccount>(account: A, policies: Policies, chain?: string): A {
+  const chainsOf = () => [...new Set([chain, account.chain].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
   const guard = async (method: WriteMethod, arg: unknown) => {
-    const intent = intentOf(account.chain, await account.getAddress(), method, arg)
-    const cap = policies.maxFee?.[account.chain]
-    if (cap !== undefined && QUOTABLE.includes(method)) {
+    const chains = chainsOf()
+    const intent = intentOf(chains[0] ?? account.chain, await account.getAddress(), method, arg)
+    const caps = chains.flatMap((c) => { const cap = policies.maxFee?.[c]; return cap === undefined ? [] : [{ c, cap: BigInt(cap) }] })
+    if (caps.length > 0 && QUOTABLE.includes(method)) {
       const { fee } = method === 'transfer' ? await account.quoteTransfer(arg as TransferOptions) : await account.quoteSendTransaction(arg)
-      if (fee > BigInt(cap)) throw new PolicyViolationError('maxFee', `Fee ${fee} exceeds the ${account.chain} cap of ${cap}.`)
+      for (const { c, cap } of caps) if (fee > cap) throw new PolicyViolationError('maxFee', `Fee ${fee} exceeds the ${c} cap of ${cap}.`)
     }
     if (!intent.message) {
-      const allow = policies.allowlist?.[account.chain]
-      if (allow && (intent.to === undefined || !allow.map(lower).includes(lower(intent.to)))) {
-        throw new PolicyViolationError('allowlist', `Destination ${intent.to ?? '(unknown)'} is not on the ${account.chain} allowlist.`)
-      }
-      const block = policies.blocklist?.[account.chain]
-      if (block && intent.to !== undefined && block.map(lower).includes(lower(intent.to))) {
-        throw new PolicyViolationError('blocklist', `Destination ${intent.to} is on the ${account.chain} blocklist.`)
+      for (const c of chains) {
+        const allow = policies.allowlist?.[c]
+        if (allow && (intent.to === undefined || !allow.map(lower).includes(lower(intent.to)))) {
+          throw new PolicyViolationError('allowlist', `Destination ${intent.to ?? '(unknown)'} is not on the ${c} allowlist.`)
+        }
+        const block = policies.blocklist?.[c]
+        if (block && intent.to !== undefined && block.map(lower).includes(lower(intent.to))) {
+          throw new PolicyViolationError('blocklist', `Destination ${intent.to} is on the ${c} blocklist.`)
+        }
       }
     }
     if (policies.confirm && !(await policies.confirm(intent))) throw new UserRejectedError('The write was not confirmed.')
