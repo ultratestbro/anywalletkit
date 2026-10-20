@@ -51,13 +51,20 @@ describe("createOmnistonTonDeliveryLocator", () => {
     await expect(run([])).resolves.toBeNull();
   });
 
-  it("backfill: no position matches any sender, and a start time keeps older transfers out", async () => {
+  it("backfill: no position matches any sender; the window keeps older and later transfers out and the earliest match wins", async () => {
     const older = {...live[1], event_id: "00".repeat(32), timestamp: 1792527000};
-    const request = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => events([live[1], older]));
+    // A later swap's payout to the same recipient (bigger, newer): not this order's delivery.
+    const later = {...live[1], event_id: "11".repeat(32), timestamp: 1792531000, actions: [transfer("0:" + "cc".repeat(32), "1889549")]};
+    const request = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => events([later, live[1], older]));
     const locate = createOmnistonTonDeliveryLocator({fetch: request as unknown as typeof fetch});
     await expect(locate({recipientAddress: RECIPIENT, jettonMasterAddress: USDT_MASTER, minUnits: "719485", afterTimestamp: 1792527615})).resolves.toBe(DELIVERY);
     expect(String(request.mock.calls[0]?.[0])).toContain("&start_date=1792527615");
-    await expect(locate({recipientAddress: RECIPIENT, jettonMasterAddress: USDT_MASTER, minUnits: "719485", afterTimestamp: 1792527900})).resolves.toBeNull();
+    await expect(locate({recipientAddress: RECIPIENT, jettonMasterAddress: USDT_MASTER, minUnits: "719485", afterTimestamp: 1792527615, beforeTimestamp: 1792528400})).resolves.toBe(DELIVERY);
+    expect(String(request.mock.calls[1]?.[0])).toContain("&end_date=1792528400");
+    await expect(locate({recipientAddress: RECIPIENT, jettonMasterAddress: USDT_MASTER, minUnits: "719485", afterTimestamp: 1792527900})).resolves.toBe("11".repeat(32));
+    await expect(locate({recipientAddress: RECIPIENT, jettonMasterAddress: USDT_MASTER, minUnits: "719485", afterTimestamp: 1792527900, beforeTimestamp: 1792528400})).resolves.toBeNull();
+    // Without a window (the provider's shape) the newest match is the delivery.
+    await expect(locate({recipientAddress: RECIPIENT, jettonMasterAddress: USDT_MASTER, minUnits: "719485"})).resolves.toBe("11".repeat(32));
   });
 
   it("never throws: tonapi down, malformed input, bad JSON", async () => {

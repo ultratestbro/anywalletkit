@@ -473,8 +473,10 @@ export interface OmnistonTonDeliveryInput {
   recipientAddress: string;
   jettonMasterAddress: string;
   minUnits: string;
-  /** Unix seconds; events before it are not this delivery (backfills). */
+  /** Unix seconds; events before it are not this delivery (backfills). With it set, the EARLIEST match wins — the one closest to the order, not a later swap's payout. */
   afterTimestamp?: number;
+  /** Unix seconds; events after it are not this delivery (backfills: the row's completion time plus slack). */
+  beforeTimestamp?: number;
 }
 
 interface TonapiDeliveryEvent {
@@ -515,13 +517,20 @@ export function createOmnistonTonDeliveryLocator(options: OmnistonTonDeliveryLoc
       const min = BigInt(input.minUnits);
       if (min <= 0n) return null;
       const since = Number.isFinite(input.afterTimestamp) ? `&start_date=${Math.max(0, Math.floor(input.afterTimestamp!))}` : "";
-      const url = `${base}/v2/accounts/${encodeURIComponent(recipient.toString())}/events?limit=${limit}${since}`;
+      const until = Number.isFinite(input.beforeTimestamp) ? `&end_date=${Math.max(0, Math.floor(input.beforeTimestamp!))}` : "";
+      const url = `${base}/v2/accounts/${encodeURIComponent(recipient.toString())}/events?limit=${limit}${since}${until}`;
       const response = await request(url, {...(headers ? {headers} : {}), signal: AbortSignal.timeout(8_000)});
       if (!response.ok) return null;
       const body = await response.json() as {events?: TonapiDeliveryEvent[]};
-      for (const event of body.events ?? []) {
+      // tonapi lists newest first. With a position the newest match is the delivery; a
+      // windowed backfill wants the earliest match instead (a later swap's payout to the
+      // same recipient would otherwise be taken for this one).
+      const events = [...(body.events ?? [])];
+      if (input.afterTimestamp !== undefined) events.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+      for (const event of events) {
         if (!event.event_id || event.in_progress === true) continue;
         if (input.afterTimestamp !== undefined && typeof event.timestamp === "number" && event.timestamp < input.afterTimestamp) continue;
+        if (input.beforeTimestamp !== undefined && typeof event.timestamp === "number" && event.timestamp > input.beforeTimestamp) continue;
         for (const action of event.actions ?? []) {
           if (action.type !== "JettonTransfer" || action.status !== "ok") continue;
           const t = action.JettonTransfer;
