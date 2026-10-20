@@ -38,4 +38,8 @@ jobs:
           git config user.name "module-watch"
           git config user.email "module-watch@users.noreply.github.com"
           git add watch/routes
-          git diff --cached --quiet || git commit -m "routes: $(date -u +%FT%H:%M)" && git push
+          git diff --cached --quiet && exit 0
+          git commit -m "routes: $(date -u +%FT%H:%M)"
+          # A dispatched / scheduled run checks out the SHA from trigger time; another watch run may have pushed since (both share the concurrency group, but checkout predates the wait). Rebase, then push; retry a few times.
+          for i in 1 2 3 4 5; do git pull --rebase origin main && git push && exit 0; sleep $((i * 5)); done
+          echo "could not push the snapshot after 5 attempts" >&2; exit 1
