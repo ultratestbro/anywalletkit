@@ -8,7 +8,7 @@
     "codeHash": "0048ca3ceb2fb593",
     "bytes": 24512
    },
-   "seenAt": "2026-10-20T10:23:43.334Z",
+   "seenAt": "2026-10-21T11:45:15.853Z",
    "changedAt": "2026-10-14T15:10:43.732Z"
   },
   "vault-base": {
@@ -18,7 +18,7 @@
     "codeHash": "94cd32f2fed6d1a8",
     "bytes": 24512
    },
-   "seenAt": "2026-10-20T10:23:43.369Z",
+   "seenAt": "2026-10-21T11:45:15.851Z",
    "changedAt": "2026-10-14T15:10:43.734Z"
   },
   "vault-ethereum": {
@@ -28,7 +28,7 @@
     "codeHash": "a6592ba2aa09998e",
     "bytes": 24512
    },
-   "seenAt": "2026-10-20T10:23:43.101Z",
+   "seenAt": "2026-10-21T11:45:15.854Z",
    "changedAt": "2026-10-14T15:10:43.738Z"
   },
   "vault-gnosis": {
@@ -38,7 +38,7 @@
     "codeHash": "4d802a281a865c48",
     "bytes": 24512
    },
-   "seenAt": "2026-10-20T10:23:43.242Z",
+   "seenAt": "2026-10-21T11:45:15.873Z",
    "changedAt": "2026-10-14T15:10:43.749Z"
   },
   "vault-op-mainnet": {
@@ -48,7 +48,7 @@
     "codeHash": "cc78f7925076f815",
     "bytes": 24512
    },
-   "seenAt": "2026-10-20T10:23:43.184Z",
+   "seenAt": "2026-10-21T11:45:15.852Z",
    "changedAt": "2026-10-14T15:10:43.750Z"
   },
   "vault-avalanche": {
@@ -58,7 +58,7 @@
     "codeHash": "6a6cffdfe237ac06",
     "bytes": 24512
    },
-   "seenAt": "2026-10-20T10:23:43.328Z",
+   "seenAt": "2026-10-21T11:45:15.899Z",
    "changedAt": "2026-10-14T15:10:43.952Z"
   },
   "vault-arbitrum": {
@@ -68,7 +68,7 @@
     "codeHash": "df3645721132f4b1",
     "bytes": 24512
    },
-   "seenAt": "2026-10-20T10:23:43.315Z",
+   "seenAt": "2026-10-21T11:45:15.892Z",
    "changedAt": "2026-10-14T15:10:44.011Z"
   },
   "vault-plasma": {
@@ -78,7 +78,7 @@
     "codeHash": "51316f5e4175b83a",
     "bytes": 24475
    },
-   "seenAt": "2026-10-20T10:23:43.236Z",
+   "seenAt": "2026-10-21T11:45:15.881Z",
    "changedAt": "2026-10-14T15:10:44.028Z"
   },
   "vault-sonic": {
@@ -88,7 +88,7 @@
     "codeHash": "62c9fe2e954f55ce",
     "bytes": 24512
    },
-   "seenAt": "2026-10-20T10:23:43.773Z",
+   "seenAt": "2026-10-21T11:45:16.309Z",
    "changedAt": "2026-10-14T15:10:44.041Z"
   },
   "docs-vault": {
@@ -98,7 +98,7 @@
     "hash": "28b1909decc2ffde",
     "chars": 1381
    },
-   "seenAt": "2026-10-20T10:23:43.502Z",
+   "seenAt": "2026-10-21T11:45:16.055Z",
    "changedAt": "2026-10-14T15:10:44.955Z"
   },
   "docs-v2-deployments": {
@@ -108,7 +108,7 @@
     "hash": "b7c8d5aeccc99874",
     "chars": 1509
    },
-   "seenAt": "2026-10-20T10:23:43.611Z",
+   "seenAt": "2026-10-21T11:45:15.981Z",
    "changedAt": "2026-10-14T15:10:45.021Z"
   },
   "b-sdk": {
@@ -121,7 +121,7 @@
     "url": "https://github.com/balancer/b-sdk/releases/tag/%40balancer/sdk%406.2.0",
     "prerelease": false
    },
-   "seenAt": "2026-10-20T10:23:43.550Z",
+   "seenAt": "2026-10-21T11:45:16.145Z",
    "changedAt": "2026-10-14T15:12:15.509Z"
   },
   "balancer-v2-monorepo": {
@@ -132,7 +132,7 @@
     "url": "https://github.com/balancer/balancer-v2-monorepo/releases/tag/weighted-deployment",
     "note": "tags only"
    },
-   "seenAt": "2026-10-20T10:23:43.733Z",
+   "seenAt": "2026-10-21T11:45:16.266Z",
    "changedAt": "2026-10-14T15:12:15.946Z"
   }
  }
