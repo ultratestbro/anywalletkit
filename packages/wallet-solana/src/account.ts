@@ -1,6 +1,7 @@
 import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@forgewallet/core'
 import { compileTransaction, getAddressDecoder, getBase64EncodedWireTransaction, type SignatureBytes, type Transaction, type TransactionMessage } from '@solana/kit'
 import { decodeWireTransaction } from './describe.js'
+import { MessageIsTransactionError, isSolanaTransactionPayload } from './offchain.js'
 import { WalletAccountReadOnlySolana, type SolanaPlan } from './read-only-account.js'
 import type { SerializedCheck, SerializedTxGuard } from './serialized.js'
 import type { SolanaConfig, SolanaFeeQuote, SolanaTransaction, SolanaTransferOptions } from './types.js'
@@ -54,9 +55,14 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     return m ? Number(m[1]) : undefined
   }
 
-  /** Hex ed25519 signature over the UTF-8 message (context `solana-offchain`). */
+  /**
+   * Hex ed25519 signature over the raw message bytes (UTF-8 for a string; context `solana-offchain`).
+   * Throws {@link MessageIsTransactionError} when the bytes are a Solana transaction this account
+   * would sign for (see `isSolanaTransactionPayload`): that must go through `signTransaction`.
+   */
   async sign(message: string | Uint8Array): Promise<string> {
     const bytes = typeof message === 'string' ? new TextEncoder().encode(message) : message
+    if (isSolanaTransactionPayload(bytes, this.publicKey)) throw new MessageIsTransactionError()
     return toHex(await this.signer.sign(bytes, { scheme: 'ed25519', context: 'solana-offchain' }))
   }
 

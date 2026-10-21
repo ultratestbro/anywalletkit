@@ -10,6 +10,10 @@ export {
 export {
   WalletAccountReadOnlySolana, pickPriorityPrice, computeUnitLimitFromSimulation, type MintInfo, type SolanaPlan,
 } from './read-only-account.js'
+export {
+  isSolanaTransactionPayload, classifySolanaMessage, hasSolanaOffchainHeader, isReadableText, MessageIsTransactionError, SOLANA_OFFCHAIN_MESSAGE_PREFIX,
+  type SolanaMessageKind,
+} from './offchain.js'
 export { WalletAccountSolana, addressFromPublicKey, type SolanaSendResult } from './account.js'
 export { WalletManagerSolana, SOLANA_BASE_PATH } from './manager.js'
 export {
