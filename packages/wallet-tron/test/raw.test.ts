@@ -56,7 +56,9 @@ describe('Transaction.raw codec', () => {
     const d = describeTransaction(raw, { now: NOW })
     expect(d.kind).toBe('unknown')
     expect(d.from).toBe(ME)
-    expect(d.warnings.map((w) => w.code)).toEqual(['undecoded', 'account-permission', 'undecoded'])
+    // one "not decoded" warning for the type (not one per parameter field) plus the permission warning
+    expect(d.warnings.map((w) => w.code)).toEqual(['undecoded', 'account-permission'])
+    expect(d.warnings[0]!.message).toMatch(/not decoded by the wallet/)
     // an enum the codec does not know still names itself
     const weird = bytesToHex(encodeRawData(base({ type: 'TransferContract', parameter: { value: { owner_address: toHexAddress(ME) }, type_url: 'type.googleapis.com/protocol.TransferContract' } }))).replace('0801', '0802')
     expect(() => decodeRawData(weird)).toThrow(/disagrees/)

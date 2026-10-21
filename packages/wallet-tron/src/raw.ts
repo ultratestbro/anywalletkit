@@ -386,8 +386,13 @@ export function rawMismatch(json: TronRawTransaction['raw_data'] | undefined, de
     if (a.type !== b.type) return `contract[${i}].type: JSON says ${a.type}, bytes say ${b.type}`
     const av = (a.parameter?.value ?? {}) as Record<string, unknown>
     const bv = b.parameter.value
+    // A type without a schema has no decoded counterpart for its JSON keys (votes, account_address …):
+    // only the owner is read from the bytes. Its other keys are neither compared nor shown — the
+    // description says the type is not decoded — so a JSON copy cannot make the sheet say anything.
+    const hasSchema = isDecodedContractType(b.type)
     for (const key of new Set([...Object.keys(av), ...Object.keys(bv)])) {
       if (key === 'raw_parameter_hex') continue
+      if (!hasSchema && key !== 'owner_address') continue
       if (norm(key, av[key]) !== norm(key, bv[key])) return `contract[${i}].${key}: JSON says ${JSON.stringify(av[key] ?? null)}, bytes say ${JSON.stringify(bv[key] ?? null)}`
     }
   }

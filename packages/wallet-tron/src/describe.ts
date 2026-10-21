@@ -1,6 +1,6 @@
 import { decodeAddressWord, decodeUint, encodeParameters, hexToText, selector, splitCalldata } from './abi.js'
 import { toBase58Address, toHexAddress } from './address.js'
-import { decodeRawData } from './raw.js'
+import { decodeRawData, isDecodedContractType } from './raw.js'
 import { isContractCall, isPrebuilt } from './shape.js'
 import type { TronContractCall, TronNativeTransfer, TronRawTransaction, TronTransaction, TronTxDescription, TronTxWarning } from './types.js'
 
@@ -84,7 +84,8 @@ function describeRaw(tx: TronRawTransaction, warnings: TronTxWarning[], ctx: Des
     try {
       const decoded = decodeRawData(tx.raw_data_hex)
       raw = decoded.raw_data
-      undecodedFields = [...decoded.unknownFields.map((n) => -n), ...decoded.raw_data.contract.flatMap((c) => c.undecoded)]
+      // A type without a schema is reported once as "not decoded", not field by field.
+      undecodedFields = [...decoded.unknownFields.map((n) => -n), ...decoded.raw_data.contract.flatMap((c) => (isDecodedContractType(c.type) ? c.undecoded : []))]
       // (TronDecodedRaw.raw_data is structurally a raw_data with richer contracts)
     } catch (e) {
       warn(warnings, 'raw-undecodable', `raw_data_hex is not a well-formed Transaction.raw (${(e as Error).message}); the wallet cannot say what this transaction does and will not sign it.`)
@@ -137,7 +138,13 @@ function describeRaw(tx: TronRawTransaction, warnings: TronTxWarning[], ctx: Des
       break
     default:
       d.kind = 'unknown'
-      if (contract) warn(warnings, 'undecoded', `${contract.type}: the wallet has no decoder for this contract type; only its raw parameter bytes are known.`)
+      if (!contract) break
+      if (isDecodedContractType(contract.type)) {
+        const fields = Object.entries(v).filter(([k]) => k !== 'owner_address').map(([k, x]) => `${k}=${k.endsWith('_address') ? b58(String(x)) : String(x)}`)
+        warn(warnings, 'undecoded', `${contract.type}: no summary for this contract type; decoded fields: ${fields.join(', ') || 'none'}.`)
+      } else {
+        warn(warnings, 'undecoded', `${contract.type}: this contract type is not decoded by the wallet — only its owner is known; its parameters are not shown, and the dApp's own description of them is not checked.`)
+      }
   }
   if (contract?.type === 'AccountPermissionUpdateContract') warn(warnings, 'account-permission', 'AccountPermissionUpdateContract changes which keys control this account — a signature here can hand the account to someone else.')
   if (undecodedFields.length) warn(warnings, 'undecoded', `${contract?.type ?? 'transaction'}: field(s) ${undecodedFields.map((n) => (n < 0 ? `raw.${-n}` : String(n))).join(', ')} were not decoded; the sheet cannot show their meaning.`)
