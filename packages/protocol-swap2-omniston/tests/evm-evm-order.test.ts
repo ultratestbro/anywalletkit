@@ -199,7 +199,10 @@ describe("Omniston EVM → EVM orders (live 2026-10-20 fixtures)", () => {
       chain: "eip155:8453", positionAddress: SRC_POSITION, factoryAddress: BASE_FACTORY, ownerAddress: OWNER, resolverAddress: RESOLVER, inputTokenAddress: USDC_BASE,
       destinationChainId: 42161, destinationTokenAddress: USDT0_ARB, dstSecurityDepositUnits: s.dstSecurityDepositUnits,
     }));
-    expect(output).toHaveBeenCalledWith(expect.objectContaining({chain: "eip155:42161", positionAddress: DST_POSITION, factoryAddress: ARB_FACTORY, recipientAddress: DEST, outputTokenAddress: USDT0_ARB, dstSecurityDepositUnits: s.dstSecurityDepositUnits}));
+    expect(output).toHaveBeenCalledWith(expect.objectContaining({chain: "eip155:42161", positionAddress: DST_POSITION, factoryAddress: ARB_FACTORY, recipientAddress: DEST, outputTokenAddress: USDT0_ARB, dstSecurityDepositUnits: s.dstSecurityDepositUnits,
+      // scan F12: the fee split the escrow must carry comes from the quote.
+      protocolFeeUnits: quoteOf("baseToArbitrum").protocolFeeUnits, integratorFeeUnits: "0",
+      protocolFeeRecipientAddress: "0x076268146B4EC6D21fc49C27586Cfa91B9079a00"}));
     expect(await run({validateEvmOutputPosition: () => false})).toEqual([]);
     expect(await run({validateEvmInputPosition: () => false})).toEqual([]);
     expect(await run({validateEvmOutputPosition: () => { throw new Error("rpc down"); }})).toEqual([]);

@@ -220,6 +220,9 @@ interface OrderSettlement {
   /** Fee profile the EVM order extension must mirror (EVM-source orders). */
   protocolFeePips?: number;
   integratorFeePips?: number;
+  /** Destination-chain wallet the protocol fee must be paid to (EVM-destination
+   *  orders); the EVM output validator binds the escrow's fee split to it. */
+  protocolFeeRecipientAddress?: ChainAddress;
 }
 
 /** Swap settlement — immediate DEX routes, the TON same-chain branch. */
@@ -403,6 +406,8 @@ export interface OmnistonProviderOptions {
     protocolFeeUnits: string;
     integratorFeeUnits: string;
     integratorAddress?: string;
+    /** The quote's `settlementData.protocolFeeRecipientAddress` (destination chain). */
+    protocolFeeRecipientAddress?: string;
     secretHash: Uint8Array;
   }) => boolean | Promise<boolean>;
   /**
@@ -2521,6 +2526,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
                 protocolFeeUnits: q.protocolFeeUnits ?? "0",
                 integratorFeeUnits: q.integratorFeeUnits ?? "0",
                 ...(q.integratorAddress?.chain.value ? {integratorAddress: q.integratorAddress.chain.value} : {}),
+                ...(settlement.protocolFeeRecipientAddress?.chain.value ? {protocolFeeRecipientAddress: settlement.protocolFeeRecipientAddress.chain.value} : {}),
                 secretHash: expectedHash,
               });
               // EVM source: BOTH positions must be proven before the secret

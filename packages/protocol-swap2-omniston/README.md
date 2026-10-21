@@ -36,6 +36,11 @@ Every route is fail-closed until its allowlists and validators are configured:
   disclosed only when `validateEvmInputPosition` (source fill, including the
   destination complement) AND `validateEvmOutputPosition` (an escrow the
   trusted factory derives from immutables that pay the recipient) both pass.
+  The destination escrow's fee split must be exactly the quoted protocol and
+  integrator fees, paid only to the quote's `protocolFeeRecipientAddress` /
+  integrator, its destination stages must be 1/120/180 s, and the secret is
+  not released within 45 s of its cancellation stage (refusal reasons go to
+  the validator's `onRefusal`).
 
 ## Validators
 
