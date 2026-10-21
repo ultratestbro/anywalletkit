@@ -44,7 +44,7 @@ APIs may still change before `1.0`.
 | Chains | `wallet-evm`, `wallet-btc`, `wallet-solana`, `wallet-ton`, `wallet-tron`, `wallet-near`, `wallet-zcash` | Accounts, balances, transfers, signing and fees per chain family |
 | Protocols | `protocol-swap2-*`, `protocol-staking-*`, `protocol-lending-*`, `protocol-approvals-evm` | Swaps and bridges, staking, lending, approvals |
 | Orchestration | `kit`, `keyring` | Register chains and modules, look accounts up by chain, enforce policies before every broadcast; many accounts and imported keys |
-| Data & safety | `tx-preview-evm`, `history-evm`, `names-ens` | Pre-sign transaction review, activity history, ENS names |
+| Data & safety | `tx-preview-evm`, `history-evm`, `names-ens`, `networks` | Pre-sign transaction review, activity history, ENS names, networks and custom RPCs |
 | Runtime | `runtime-hermes` | React Native / Hermes polyfills |
 
 See [Packages](/getting-started/packages/) for the full list.

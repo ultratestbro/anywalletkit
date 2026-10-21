@@ -42,6 +42,7 @@ import { WalletManagerNear, describeTransaction as describeNear, encodeTransacti
 import { smokeProtocols } from './protocols.js'
 import { ensResolver, warningsFor, coinTypeFor, decodeBtcScript } from '@forgewallet/names-ens'
 import { isNameLike, nameResolvers } from '@forgewallet/core'
+import { NetworksTable, memoryJsonStorage, parseAddChainParams, checkRpcUrl, isPrivateHost, verifyNetwork, tonGlobalIdFromBoc, BUILTIN_NETWORKS, DEFAULT_TESTNETS, isAddChainError, type NetworksState } from '@forgewallet/networks'
 
 declare const print: ((s: string) => void) | undefined
 const out = (s: string) => (typeof print === 'function' ? print(s) : console.log(s))
@@ -184,6 +185,38 @@ async function main() {
     const spent = [{ value: 243_604_326n, script: hexToBytes('76a9143898635cac98262fce2d990ee099d45cc775173e88ac') }]
     eq('zcash zip-244 sighash verifies', secp256k1.verify(sig.signature, zcashSighash(tx, 0, spent), sig.publicKey, { prehash: false, format: 'der' }), true)
     eq('zcash zip-317 fee', zcashFee([36 + 1 + tx.inputs[0]!.scriptSig.length + 4], tx.outputs.map((o) => zcashOutputSize(o.script))), 10_000n)
+  }
+  // networks: the table, the URL policy, EIP-3085 parsing and a scripted verifyNetwork run in the VM (no network calls).
+  {
+    const table = new NetworksTable(memoryJsonStorage<NetworksState>())
+    eq('networks builtin count', (await table.list()).length, BUILTIN_NETWORKS.length)
+    eq('networks testnets off', DEFAULT_TESTNETS.every((n) => !n.enabled), true)
+    await table.addRpc('eip155:8453', 'https://my.base.rpc')
+    eq('networks user rpc first', (await table.rpcUrlsFor('eip155:8453'))[0], 'https://my.base.rpc')
+    eq('networks fallback kept', (await table.rpcUrlsFor('eip155:8453')).length, 4)
+    await table.setOnlyOwnRpc('eip155:8453', true)
+    eq('networks onlyOwnRpc', (await table.rpcUrlsFor('eip155:8453')).join(','), 'https://my.base.rpc')
+    eq('networks usesUserRpc', await table.usesUserRpc('eip155:8453'), true)
+    let refused = false
+    try { await table.remove('eip155:1') } catch { refused = true }
+    eq('networks builtin undeletable', refused, true)
+    eq('url https ok', checkRpcUrl('https://rpc.example.org').ok, true)
+    eq('url http public refused', checkRpcUrl('http://rpc.example.org').ok, false)
+    eq('url http local needs opt-in', checkRpcUrl('http://192.168.1.5:8545').ok, false)
+    eq('url http local with opt-in', checkRpcUrl('http://192.168.1.5:8545', { allowHttpLocal: true }).ok, true)
+    eq('private host', isPrivateHost('172.20.0.1') && !isPrivateHost('172.32.0.1'), true)
+    const added = parseAddChainParams([{ chainId: '0x2105', chainName: 'Base', rpcUrls: ['https://mainnet.base.org'] }], { origin: 'https://app.example.org', now: () => 1 })
+    eq('eip3085 parse', !isAddChainError(added) && added.caip2 === 'eip155:8453' && typeof added.source === 'object' && added.source.origin === 'https://app.example.org', true)
+    eq('eip3085 unknown chain', isAddChainError(parseAddChainParams([{ chainId: '0x7a69', rpcUrls: ['https://x'] }])) , true)
+    eq('ton global id boc', tonGlobalIdFromBoc('te6cckEBAQEABgAACP////0sxAxZ'), -3)
+    const fetchFake = async (_url: string, init?: { body?: string }) => {
+      const method = init?.body ? (JSON.parse(init.body) as { method: string }).method : ''
+      return { ok: true, status: 200, text: async () => JSON.stringify({ jsonrpc: '2.0', id: 1, result: method === 'eth_chainId' ? '0x2105' : '0x10' }) }
+    }
+    const v = await verifyNetwork({ caip2: 'eip155:8453', family: 'evm', rpcs: ['https://x'] }, { fetch: fetchFake })
+    eq('verify evm ok', v.ok && v.tip === 16, true)
+    const bad = await verifyNetwork({ caip2: 'eip155:1', family: 'evm', rpcs: ['https://x'] }, { fetch: fetchFake })
+    eq('verify evm mismatch', !bad.ok && (bad.error ?? '').indexOf('chain-id-mismatch') === 0, true)
   }
   await smokeProtocols((what, ok, detail) => {
     if (!ok) throw new Error(`protocol check failed: ${what}${detail ? ` :: ${detail}` : ''}`)

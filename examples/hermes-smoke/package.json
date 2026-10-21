@@ -11,6 +11,7 @@
     "@forgewallet/conformance": "workspace:*",
     "@forgewallet/core": "workspace:*",
     "@forgewallet/names-ens": "workspace:*",
+    "@forgewallet/networks": "workspace:*",
     "@forgewallet/protocol-approvals-evm": "workspace:*",
     "@forgewallet/protocol-lending-aave-evm": "workspace:*",
     "@forgewallet/protocol-lending-kamino-solana": "workspace:*",

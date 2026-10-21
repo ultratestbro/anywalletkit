@@ -1,0 +1,46 @@
+{
+  "name": "@forgewallet/networks",
+  "version": "0.1.0",
+  "description": "Networks for @forgewallet wallets: the catalog of mainnets with public RPC failover lists, default testnets for every chain family, user-added networks and custom RPCs (NetworksTable over any JSON storage), per-family endpoint verification (chain id / genesis / global id must match) and the http-only-for-local-nodes URL policy. Shared by the mobile app and the extension kit.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": {
+    "@forgewallet/swap2-assets": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "vitest": "^5.0.3"
+  },
+  "keywords": [
+    "networks",
+    "rpc",
+    "testnet",
+    "caip-2",
+    "eip-3085",
+    "custom-rpc",
+    "forgewallet"
+  ]
+}
