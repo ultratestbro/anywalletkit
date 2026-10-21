@@ -126,8 +126,19 @@ export interface TronSimulation {
   constantResult?: string[] | undefined
 }
 
-export type TronTxKind = 'trx-transfer' | 'trc20-transfer' | 'trc20-approve' | 'contract-call' | 'freeze' | 'unfreeze' | 'unknown'
-export type TronTxWarningCode = 'unlimited-approve' | 'zero-address' | 'unactivated-recipient' | 'memo-fee' | 'expired'
+export type TronTxKind = 'trx-transfer' | 'trc10-transfer' | 'trc20-transfer' | 'trc20-approve' | 'contract-call' | 'freeze' | 'unfreeze' | 'unknown'
+export type TronTxWarningCode =
+  | 'unlimited-approve' | 'zero-address' | 'unactivated-recipient' | 'memo-fee' | 'expired'
+  /** Prebuilt transaction without `raw_data_hex`: described from the unsigned JSON copy, cannot be signed. */
+  | 'no-raw-hex'
+  /** `raw_data_hex` is not a well-formed Transaction.raw: nothing can be said about it. */
+  | 'raw-undecodable'
+  /** A contract type or parameter fields the wallet has no decoder for: only the raw bytes are known. */
+  | 'undecoded'
+  /** More than one contract in the transaction (the node refuses these; the wallet does too). */
+  | 'multi-contract'
+  /** AccountPermissionUpdateContract: changes who controls the account. */
+  | 'account-permission'
 export interface TronTxWarning { code: TronTxWarningCode; message: string }
 
 /** What a transaction does, decoded offline (see `describeTransaction`). Addresses are base58. */

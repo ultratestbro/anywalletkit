@@ -7,6 +7,7 @@ import { addressFromPublicKey, toBase58Address, toHexAddress } from './address.j
 import { assertNoError, createClient } from './client.js'
 import { describeTransaction, type DescribeContext } from './describe.js'
 import { attachMemo } from './memo.js'
+import { decodeRawData } from './raw.js'
 import { isContractCall, isPrebuilt } from './shape.js'
 import {
   CAIP2_GENESIS, type TronConfig, type TronContractCall, type TronFeeEstimate, type TronFetch, type TronNativeTransfer,
@@ -80,8 +81,10 @@ export function recoverMessageAddress(message: string | Uint8Array, signature: s
   } catch { return undefined }
 }
 
+/** First contract of a prebuilt transaction — from `raw_data_hex` when it decodes (the bytes are what gets signed), else from the JSON. */
 const contractOf = (tx: TronRawTransaction) => {
-  const c = tx.raw_data?.contract?.[0]
+  let c = tx.raw_data?.contract?.[0]
+  if (typeof tx.raw_data_hex === 'string' && tx.raw_data_hex.length) { try { c = decodeRawData(tx.raw_data_hex).raw_data.contract[0] } catch { /* verifyRawTransaction reports it before anything is signed */ } }
   return { type: c?.type, value: (c?.parameter?.value ?? {}) as Record<string, unknown> }
 }
 

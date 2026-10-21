@@ -3,7 +3,7 @@ import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import {
+import { encodeRawData,
   SimulationError, UnsafeTransactionError, WalletManagerTron, ZERO_ADDRESS, bandwidthPoints, describeTransaction, encodeParameters,
   hashMessage, recoverMessageAddress, selector, toHexAddress, type TronFetch, type TronRawTransaction,
 } from '../src/index.js'
@@ -23,19 +23,26 @@ function errorString(msg: string): string {
 }
 
 /**
- * Fake full node. raw_data_hex lengths mirror real sizes (134 raw bytes for a TRX
- * transfer → 268 bandwidth points, 211 for a TRC-20 transfer → 345); txID = sha256(raw_data_hex).
+ * Fake full node. raw_data_hex is real protobuf (encodeRawData) padded towards real sizes (134 raw bytes
+ * for a TRX transfer, 211 for a TRC-20 transfer; a byte more when the padding record cannot fit exactly); txID = sha256(raw_data_hex).
  */
+/** `txID` + `raw_data_hex` from a `raw_data` object; `rawBytes` pads with field 12 (`scripts`) when the encoding is shorter. */
+function seal(raw_data: TronRawTransaction['raw_data'], rawBytes = 0, nonce = 0): TronRawTransaction {
+  let hex = bytesToHex(encodeRawData(raw_data))
+  const short = rawBytes - hex.length / 2
+  if (short >= 2) hex += '62' + (short - 2).toString(16).padStart(2, '0') + nonce.toString(16).padStart(4, '0').padEnd((short - 2) * 2, '0').slice(0, (short - 2) * 2)
+  else if (short === 1) hex += '6200'
+  return { txID: bytesToHex(sha256(hexToBytes(hex))), raw_data_hex: hex, visible: false, raw_data }
+}
+
 function fakeNode(overrides: Record<string, (body: Record<string, unknown>) => unknown> = {}, opts: { resources?: Record<string, number>; params?: Array<{ key: string; value: number }> } = {}) {
   const calls: Array<{ path: string; body: Record<string, unknown> }> = []
   const broadcast: TronRawTransaction[] = []
   let n = 0
+  // Real protobuf bytes (what a node returns), padded with a `scripts` (field 12) record to the target size when that is possible.
   const rawTx = (type: string, value: Record<string, unknown>, rawBytes: number, extra: Record<string, unknown> = {}): TronRawTransaction => {
-    const raw_data_hex = ('0a02' + (++n).toString(16).padStart(4, '0')).padEnd(rawBytes * 2, 'ab')
-    return {
-      txID: bytesToHex(sha256(hexToBytes(raw_data_hex))), raw_data_hex, visible: false,
-      raw_data: { contract: [{ type, parameter: { value } }], ref_block_bytes: 'a1b2', ref_block_hash: '0011223344556677', expiration: NOW + 60_000, timestamp: NOW, ...extra },
-    }
+    const raw_data: TronRawTransaction['raw_data'] = { contract: [{ type, parameter: { value, type_url: `type.googleapis.com/protocol.${type}` } }], ref_block_bytes: 'a1b2', ref_block_hash: '0011223344556677', expiration: NOW + 60_000, timestamp: NOW, ...extra }
+    return seal(raw_data, rawBytes, ++n)
   }
   const handlers: Record<string, (body: Record<string, unknown>) => unknown> = {
     '/wallet/createtransaction': (b) => rawTx('TransferContract', { owner_address: b.owner_address, to_address: b.to_address, amount: b.amount }, 134),
@@ -117,7 +124,7 @@ describe('WalletAccountTron', () => {
     expect(res.hash).toBe(f.broadcast[0]!.txID)
     expect(res.activationFee).toBe(1_100_000n)
     expect(res.fee).toBe(1_100_000n)
-    expect(res.estimate).toMatchObject({ bandwidth: 268, energy: 0, trxBurn: 1_100_000n, breakdown: { bandwidthFree: 600, bandwidthStaked: 0, bandwidthBurn: 0n, energyBurn: 0n, memoFee: 0n, accountCreationFee: 1_100_000n, bandwidthPrice: 1000n, energyPrice: 210n } })
+    expect(res.estimate).toMatchObject({ bandwidth: bandwidthPoints(f.broadcast[0]!.raw_data_hex), energy: 0, trxBurn: 1_100_000n, breakdown: { bandwidthFree: 600, bandwidthStaked: 0, bandwidthBurn: 0n, energyBurn: 0n, memoFee: 0n, accountCreationFee: 1_100_000n, bandwidthPrice: 1000n, energyPrice: 210n } })
     m.dispose()
   })
 
@@ -132,8 +139,9 @@ describe('WalletAccountTron', () => {
     const exhausted = fakeNode({}, { resources: { freeNetLimit: 600, freeNetUsed: 600 } })
     const m2 = new WalletManagerTron(SEED, { provider: exhausted.fetch })
     const r2 = await withNow(async () => (await m2.getAccount(0)).transfer({ recipient: EXISTING, amount: 1_000_000n }))
-    expect(r2.fee).toBe(268_000n)
-    expect(r2.estimate!.breakdown.bandwidthBurn).toBe(268_000n)
+    const burn2 = BigInt(bandwidthPoints(exhausted.broadcast[0]!.raw_data_hex)) * 1000n
+    expect(r2.fee).toBe(burn2)
+    expect(r2.estimate!.breakdown.bandwidthBurn).toBe(burn2)
     m2.dispose()
 
     const staked = fakeNode({}, { resources: { freeNetLimit: 600, freeNetUsed: 600, NetLimit: 5000, NetUsed: 0 } })
@@ -162,7 +170,7 @@ describe('WalletAccountTron', () => {
     expect(f.broadcast).toHaveLength(1)
     expect(verifyTx(f.broadcast[0]!, a.publicKey)).toBe(true)
     expect(res.fee).toBe(6_300_000n)
-    expect(res.estimate).toMatchObject({ bandwidth: 345, energy: 30_000, breakdown: { energyBurn: 6_300_000n, bandwidthBurn: 0n, energyStaked: 0 } })
+    expect(res.estimate).toMatchObject({ bandwidth: bandwidthPoints(f.broadcast[0]!.raw_data_hex), energy: 30_000, breakdown: { energyBurn: 6_300_000n, bandwidthBurn: 0n, energyStaked: 0 } })
     m.dispose()
 
     const staked = fakeNode({}, { resources: { freeNetLimit: 600, freeNetUsed: 0, EnergyLimit: 20_000, EnergyUsed: 0 } })
@@ -304,7 +312,8 @@ describe('WalletAccountTron', () => {
     expect(await code(base({}, { owner_address: toHexAddress(RECIPIENT), to_address: toHexAddress(EXISTING), amount: 1 }))).toBe('owner-mismatch')
     const two = base({})
     two.raw_data.contract.push(two.raw_data.contract[0]!)
-    expect(await code(two)).toBe('multi-contract')
+    expect(await code(two)).toBe('raw-mismatch') // the JSON grew a contract the bytes do not carry
+    expect(await code(seal(two.raw_data))).toBe('multi-contract')
     expect(await code(base({}, { owner_address: a.addressHex, to_address: toHexAddress(ZERO_ADDRESS), amount: 1 }))).toBe('zero-address')
     expect(await code(base({}))).toBe('ok')
     expect(f.broadcast).toHaveLength(0)

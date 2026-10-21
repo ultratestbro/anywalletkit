@@ -3,7 +3,7 @@ import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { hexToBytes } from '@noble/hashes/utils.js'
 import { LocalSigner, SignerError, UserRejectedError, deriveSecp256k1, externalSigner, seedFromMnemonicSync } from '@forgewallet/core'
-import { TRON_ACCOUNT_BRANCH, WalletAccountTron, WalletManagerTron, addressFromPublicKey, recoverMessageAddress, type TronFetch, type TronRawTransaction } from '../src/index.js'
+import { encodeRawData, TRON_ACCOUNT_BRANCH, WalletAccountTron, WalletManagerTron, addressFromPublicKey, recoverMessageAddress, type TronFetch, type TronRawTransaction } from '../src/index.js'
 
 const SEED = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 const ADDR0 = 'TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH' // conformance vector, account 0
@@ -21,8 +21,9 @@ function fakeNode() {
   const broadcast: TronRawTransaction[] = []
   const handlers: Record<string, (b: Record<string, unknown>) => unknown> = {
     '/wallet/createtransaction': (b) => {
-      const raw_data_hex = '0a02a1b2'.padEnd(134 * 2, 'ab')
-      return { txID: Buffer.from(sha256(hexToBytes(raw_data_hex))).toString('hex'), raw_data_hex, visible: false, raw_data: { contract: [{ type: 'TransferContract', parameter: { value: { owner_address: b.owner_address, to_address: b.to_address, amount: b.amount } } }], ref_block_bytes: 'a1b2', ref_block_hash: '0011223344556677', expiration: NOW + 60_000, timestamp: NOW } }
+      const raw_data: TronRawTransaction['raw_data'] = { contract: [{ type: 'TransferContract', parameter: { value: { owner_address: b.owner_address, to_address: b.to_address, amount: b.amount }, type_url: 'type.googleapis.com/protocol.TransferContract' } }], ref_block_bytes: 'a1b2', ref_block_hash: '0011223344556677', expiration: NOW + 60_000, timestamp: NOW }
+      const raw_data_hex = Buffer.from(encodeRawData(raw_data)).toString('hex')
+      return { txID: Buffer.from(sha256(hexToBytes(raw_data_hex))).toString('hex'), raw_data_hex, visible: false, raw_data }
     },
     '/wallet/getaccount': (b) => ({ address: b.address, balance: 5_000_000 }),
     '/wallet/getaccountresource': () => ({ freeNetLimit: 600, freeNetUsed: 0 }),

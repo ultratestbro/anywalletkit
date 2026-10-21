@@ -4,6 +4,7 @@ import { addressFromPublicKey, toHexAddress } from './address.js'
 import { describeTransaction } from './describe.js'
 import { SimulationError, UnsafeTransactionError } from './errors.js'
 import { WalletAccountReadOnlyTron, hashMessage } from './read-only-account.js'
+import { verifyRawTransaction } from './raw.js'
 import { isPrebuilt } from './shape.js'
 import type { TronConfig, TronFeeEstimate, TronRawTransaction, TronSimulation, TronTransaction, TronTransferOptions } from './types.js'
 
@@ -66,9 +67,19 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     return '0x' + bytesToHex(sig.subarray(0, 64)) + (27 + sig[64]!).toString(16).padStart(2, '0')
   }
 
-  /** Attach `signature: [r||s||recovery]` (recovery as 00/01, tronweb encoding). No checks — see `signTransaction`. */
+  /**
+   * Sign a prebuilt transaction (ours or a dApp's) and attach `signature: [r||s||recovery]`
+   * (recovery as 00/01, tronweb encoding). The signature covers `sha256(raw_data_hex)`, so
+   * that is what is checked and signed: `txID` must equal it, the JSON `raw_data` must agree
+   * with the bytes field by field, and the hard checks ({@link assertSafe}) run on the bytes.
+   * A transaction whose JSON says "1 TRX to me" while the bytes say otherwise is refused
+   * (`raw-mismatch`), as is a `txID` that does not belong to the bytes (`txid-mismatch`).
+   */
   async signRaw(tx: TronRawTransaction): Promise<TronRawTransaction> {
-    const sig = await this.signDigest(hexToBytes(tx.txID), 'tron-tx')
+    this.key()
+    const verified = verifyRawTransaction(tx)
+    this.assertSafe({ ...tx, raw_data: verified.raw_data })
+    const sig = await this.signDigest(hexToBytes(verified.txID), 'tron-tx')
     return { ...tx, signature: [bytesToHex(sig.subarray(0, 64)) + sig[64]!.toString(16).padStart(2, '0')] }
   }
 
@@ -106,7 +117,8 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
   /** Build → hard checks → simulate → estimate → fee cap. Shared by sign / send / transfer. */
   private async prepare(tx: TronTransaction, maxFee: bigint | number | undefined, op: string) {
     const { built, sim: fromBuild } = await this.buildWithSimulation(tx)
-    this.assertSafe(built)
+    // A caller-supplied transaction is checked against its bytes before anything else looks at it.
+    this.assertSafe(isPrebuilt(tx) ? { ...built, raw_data: verifyRawTransaction(built).raw_data } : built)
     let sim: TronSimulation | undefined = fromBuild
     if (this._config.simulate !== false) {
       sim ??= await this.simulateRaw(built)
