@@ -9,8 +9,12 @@
  * contract parameters the wallet understands (transfers, TRC-10, smart-contract calls,
  * stake v1/v2, delegation, votes, withdrawals). Anything else is surfaced as the
  * contract's name plus the raw parameter bytes, never silently described as something
- * benign. `encodeRawData` exists so tests and tools can build byte-exact fixtures; the
- * wallet itself never re-encodes what it signs.
+ * benign. `encodeRawData` exists so tests and tools can build byte-exact fixtures.
+ *
+ * The reader is strict (scan F4): over-long or ≥ 2^32 tags, non-minimal varints, varints
+ * over 64 bits and repeated singular fields are refused, and a contract the wallet has a
+ * schema for must decode completely and re-encode to exactly its `Any.value` bytes —
+ * otherwise java-tron could read the same bytes as a different transaction than the sheet.
  */
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
@@ -22,26 +26,49 @@ import type { TronRawTransaction } from './types.js'
 
 interface Field { number: number; wire: number; value: bigint | Uint8Array }
 
-function readVarint(bytes: Uint8Array, at: number): { value: bigint; next: number } {
+/**
+ * Bytes that a strict protobuf reader would not produce or that java-tron would read
+ * differently from this codec (scan F4). The wallet refuses them rather than guess:
+ * protobuf-java keeps only the low 32 bits of an over-long tag, so a field this codec
+ * would call "unknown 536870916" is `data` to the node.
+ */
+export class NonCanonicalError extends Error {
+  constructor(message: string) { super(message); this.name = 'NonCanonicalError' }
+}
+
+/** Longest varint: 10 bytes (64 bits). Tags: 5 bytes and below 2^32, as protobuf-java reads them. */
+const MAX_VARINT_BYTES = 10
+const MAX_TAG_BYTES = 5
+
+function readVarint(bytes: Uint8Array, at: number, what: 'tag' | 'value' | 'length' = 'value'): { value: bigint; next: number } {
+  const max = what === 'tag' ? MAX_TAG_BYTES : MAX_VARINT_BYTES
   let shift = 0n
   let value = 0n
   let i = at
   for (;;) {
     if (i >= bytes.length) throw new Error('truncated varint')
     const b = bytes[i++]!
+    const n = i - at
     value |= BigInt(b & 0x7f) << shift
-    if ((b & 0x80) === 0) return { value, next: i }
+    if ((b & 0x80) === 0) {
+      // A trailing 0x00 adds nothing: the same number has a shorter encoding.
+      if (n > 1 && b === 0) throw new NonCanonicalError(`non-minimal ${what} varint`)
+      // 10th byte carries bit 63 only (0x01 = a negative int64); anything more is over 64 bits.
+      if (n === MAX_VARINT_BYTES && b > 1) throw new NonCanonicalError(`${what} varint exceeds 64 bits`)
+      if (what === 'tag' && value >= 1n << 32n) throw new NonCanonicalError('tag exceeds 32 bits')
+      return { value, next: i }
+    }
+    if (n >= max) throw new NonCanonicalError(`${what} varint longer than ${max} bytes`)
     shift += 7n
-    if (shift > 63n) throw new Error('varint too long')
   }
 }
 
-/** Every top-level field of a protobuf message, in wire order. Throws on malformed input. */
+/** Every top-level field of a protobuf message, in wire order. Throws on malformed or non-canonical input. */
 export function readFields(bytes: Uint8Array): Field[] {
   const out: Field[] = []
   let i = 0
   while (i < bytes.length) {
-    const tag = readVarint(bytes, i)
+    const tag = readVarint(bytes, i, 'tag')
     i = tag.next
     const number = Number(tag.value >> 3n)
     const wire = Number(tag.value & 7n)
@@ -50,10 +77,10 @@ export function readFields(bytes: Uint8Array): Field[] {
       case 0: { const v = readVarint(bytes, i); i = v.next; out.push({ number, wire, value: v.value }); break }
       case 1: { if (i + 8 > bytes.length) throw new Error('truncated fixed64'); out.push({ number, wire, value: bytes.subarray(i, i + 8) }); i += 8; break }
       case 2: {
-        const len = readVarint(bytes, i)
+        const len = readVarint(bytes, i, 'length')
         const start = len.next
+        if (len.value > BigInt(bytes.length - start)) throw new Error('truncated length-delimited field')
         const end = start + Number(len.value)
-        if (end > bytes.length) throw new Error('truncated length-delimited field')
         out.push({ number, wire, value: bytes.subarray(start, end) })
         i = end
         break
@@ -64,6 +91,23 @@ export function readFields(bytes: Uint8Array): Field[] {
   }
   return out
 }
+
+/**
+ * A singular field that appears twice is "last one wins" to java-tron and possibly
+ * "first one wins" to a reader — refuse. Only fields known to be singular are checked;
+ * repeated ones (`raw.auths`, `raw.contract`, `VoteWitness.votes` …) may repeat.
+ */
+function assertSingular(fields: Field[], singular: Iterable<number>, what: string): void {
+  const want = new Set(singular)
+  const seen = new Set<number>()
+  for (const f of fields) {
+    if (!want.has(f.number)) continue
+    if (seen.has(f.number)) throw new NonCanonicalError(`${what}: field ${f.number} appears more than once`)
+    seen.add(f.number)
+  }
+}
+
+const equalBytes = (a: Uint8Array, b: Uint8Array): boolean => a.length === b.length && a.every((x, i) => x === b[i])
 
 function encodeVarint(n: bigint): number[] {
   if (n < 0n) n = (1n << 64n) + n
@@ -138,7 +182,12 @@ export interface TronDecodedRaw {
   unknownFields: number[]
 }
 
-const int = (v: bigint): number | string => (v <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(v) : v.toString())
+/** int64 on the wire is two's complement: a 10-byte varint with bit 63 set is negative. */
+const signed = (v: bigint): bigint => (v >= 1n << 63n ? v - (1n << 64n) : v)
+/** JSON-shaped integer: a number while exact, else a decimal string (the node's JSON does the same). */
+const int = (v: bigint): number | string => { const s = signed(v); return s <= BigInt(Number.MAX_SAFE_INTEGER) && s >= BigInt(Number.MIN_SAFE_INTEGER) ? Number(s) : s.toString() }
+/** Number via the decimal string: Hermes mis-converts Number(bigint) at and above 2^63. */
+const num = (v: bigint): number => Number(signed(v).toString())
 const asBytes = (f: Field, what: string): Uint8Array => { if (!(f.value instanceof Uint8Array) || f.wire !== 2) throw new Error(`${what}: expected bytes`); return f.value }
 const asInt = (f: Field, what: string): bigint => { if (typeof f.value !== 'bigint') throw new Error(`${what}: expected varint`); return f.value }
 
@@ -154,6 +203,7 @@ function decodeParameter(type: string, bytes: Uint8Array): { value: Record<strin
     value.raw_parameter_hex = bytesToHex(bytes)
     return { value, undecoded: [...new Set(fields.filter((f) => f !== owner).map((f) => f.number))] }
   }
+  assertSingular(fields, Object.keys(schema).map(Number), type)
   for (const f of fields) {
     const entry = schema[f.number]
     if (!entry) { undecoded.push(f.number); continue }
@@ -165,56 +215,83 @@ function decodeParameter(type: string, bytes: Uint8Array): { value: Record<strin
       case 'string': value[name] = new TextDecoder().decode(asBytes(f, what)); break
       case 'int': value[name] = int(asInt(f, what)); break
       case 'bool': value[name] = asInt(f, what) !== 0n; break
-      case 'resource': { const r = Number(asInt(f, what)); value[name] = RESOURCES[r] ?? `RESOURCE_${r}`; break }
+      case 'resource': { const r = num(asInt(f, what)); value[name] = RESOURCES[r] ?? `RESOURCE_${r}`; break }
     }
   }
   return { value, undecoded: [...new Set(undecoded)] }
 }
+
+/** `Transaction.Contract` fields: type 1, parameter 2, provider 3, ContractName 4, Permission_id 5 — all singular. */
+const CONTRACT_FIELDS = [1, 2, 3, 4, 5]
 
 function decodeContract(bytes: Uint8Array): TronDecodedContract {
   let enumType: number | undefined
   let typeUrl: string | undefined
   let parameter: Uint8Array | undefined
   let permissionId: number | undefined
-  for (const f of readFields(bytes)) {
+  const fields = readFields(bytes)
+  assertSingular(fields, CONTRACT_FIELDS, 'Contract')
+  for (const f of fields) {
     switch (f.number) {
-      case 1: enumType = Number(asInt(f, 'Contract.type')); break
+      case 1: enumType = num(asInt(f, 'Contract.type')); break
       case 2: {
-        for (const a of readFields(asBytes(f, 'Contract.parameter'))) {
+        const any = readFields(asBytes(f, 'Contract.parameter'))
+        assertSingular(any, [1, 2], 'Contract.parameter')
+        for (const a of any) {
           if (a.number === 1) typeUrl = new TextDecoder().decode(asBytes(a, 'Any.type_url'))
           else if (a.number === 2) parameter = asBytes(a, 'Any.value')
+          else throw new Error(`Contract.parameter: unknown Any field ${a.number}`)
         }
         break
       }
-      case 5: permissionId = Number(asInt(f, 'Contract.Permission_id')); break
-      default: break // provider (3), ContractName (4): informational
+      case 5: permissionId = num(asInt(f, 'Contract.Permission_id')); break
+      case 3: case 4: break // provider, ContractName: informational
+      default: throw new Error(`Contract: unknown field ${f.number}`)
     }
   }
   const fromUrl = typeUrl?.startsWith(TYPE_URL_PREFIX) ? typeUrl.slice(TYPE_URL_PREFIX.length) : undefined
   const fromEnum = enumType !== undefined ? CONTRACT_TYPES[enumType] : undefined
   if (fromUrl && fromEnum && fromUrl !== fromEnum) throw new Error(`contract type_url ${fromUrl} disagrees with type ${fromEnum}`)
   const type = fromUrl ?? fromEnum ?? (enumType !== undefined ? `Unknown(${enumType})` : typeUrl ?? 'Unknown')
-  const { value, undecoded } = decodeParameter(type, parameter ?? new Uint8Array())
+  const paramBytes = parameter ?? new Uint8Array()
+  const { value, undecoded } = decodeParameter(type, paramBytes)
+  if (PARAMETERS[type]) {
+    // A contract the wallet decodes is decoded completely and exactly, or not at all:
+    // an unknown field could be anything to the node, and bytes that do not re-encode to
+    // themselves are bytes java-tron may read differently from this codec (scan F4).
+    if (undecoded.length) throw new Error(`${type}: field(s) ${undecoded.join(', ')} are not part of the contract`)
+    if (!equalBytes(encodeParameter(type, value), paramBytes)) throw new NonCanonicalError(`${type}: parameter bytes are not the canonical encoding of what they decode to`)
+  }
   const out: TronDecodedContract = { type, parameter: { value, type_url: typeUrl ?? `${TYPE_URL_PREFIX}${type}` }, undecoded }
   if (permissionId !== undefined) out.Permission_id = permissionId
   return out
 }
+
+/** Whether the wallet decodes this contract type field by field (otherwise only its owner and raw bytes are known). */
+export function isDecodedContractType(type: string): boolean {
+  return PARAMETERS[type] !== undefined
+}
+
+/** `Transaction.raw` fields that may appear at most once (auths 9 and contract 11 are repeated). */
+const RAW_SINGULAR = [1, 3, 4, 8, 10, 12, 14, 18]
 
 /** Decode `Transaction.raw` bytes (or hex). Throws a plain `Error` on malformed input; callers wrap it. */
 export function decodeRawData(raw: Uint8Array | string): TronDecodedRaw {
   const bytes = typeof raw === 'string' ? hexToBytes(raw.replace(/^0x/, '')) : raw
   const data: TronDecodedRaw['raw_data'] = { contract: [] }
   const unknown: number[] = []
-  for (const f of readFields(bytes)) {
+  const fields = readFields(bytes)
+  assertSingular(fields, RAW_SINGULAR, 'Transaction.raw')
+  for (const f of fields) {
     switch (f.number) {
       case 1: data.ref_block_bytes = bytesToHex(asBytes(f, 'ref_block_bytes')); break
-      case 3: data.ref_block_num = Number(asInt(f, 'ref_block_num')); break
+      case 3: data.ref_block_num = num(asInt(f, 'ref_block_num')); break
       case 4: data.ref_block_hash = bytesToHex(asBytes(f, 'ref_block_hash')); break
-      case 8: data.expiration = Number(asInt(f, 'expiration')); break
+      case 8: data.expiration = num(asInt(f, 'expiration')); break
       case 10: data.data = bytesToHex(asBytes(f, 'data')); break
       case 11: data.contract.push(decodeContract(asBytes(f, 'contract'))); break
-      case 14: data.timestamp = Number(asInt(f, 'timestamp')); break
-      case 18: data.fee_limit = Number(asInt(f, 'fee_limit')); break
+      case 14: data.timestamp = num(asInt(f, 'timestamp')); break
+      case 18: data.fee_limit = num(asInt(f, 'fee_limit')); break
       case 9: case 12: break // auths, scripts: carried by the node, nothing the wallet acts on
       default: unknown.push(f.number)
     }
@@ -335,6 +412,7 @@ export function verifyRawTransaction(tx: TronRawTransaction): VerifiedRaw {
   try {
     decoded = decodeRawData(bytes)
   } catch (e) {
+    if (e instanceof NonCanonicalError) throw new UnsafeTransactionError('raw-noncanonical', `raw_data_hex is not the canonical encoding of a Transaction.raw (${e.message}); the node could read these bytes differently from the wallet, so they are not signed.`)
     throw new UnsafeTransactionError('raw-undecodable', `raw_data_hex is not a well-formed Transaction.raw (${(e as Error).message}); refusing to sign what cannot be read.`)
   }
   const mismatch = rawMismatch(tx.raw_data, decoded.raw_data)

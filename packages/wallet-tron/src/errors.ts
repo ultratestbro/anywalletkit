@@ -13,6 +13,8 @@ export type UnsafeTransactionCode =
   | 'raw-mismatch'
   /** No `raw_data_hex`, or bytes that are not a well-formed Transaction.raw. */
   | 'raw-undecodable'
+  /** Bytes a strict protobuf reader would not produce (over-long tag, non-minimal varint, repeated singular field, parameter that does not re-encode to itself): java-tron could read them differently. */
+  | 'raw-noncanonical'
 
 /** A transaction failed a hard check and was not signed. */
 export class UnsafeTransactionError extends Error {
