@@ -18,3 +18,4 @@ export {
   type TronHistoryOptions, type TronHistorySource, type TronHistoryPage, type TronChainTx, type TronHistoryRaw, type TronHistoryCursor, type TronNetwork, type TronGridTx, type TronGridTrc20, type FullNodeTxInfo, type HistoryFetch,
 } from './history.js'
 export { WalletManagerTron as default } from './manager.js'
+export { assertNodeBuild, type ExpectedBuild } from './build-check.js'

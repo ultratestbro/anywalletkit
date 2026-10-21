@@ -15,6 +15,8 @@ export type UnsafeTransactionCode =
   | 'raw-undecodable'
   /** Bytes a strict protobuf reader would not produce (over-long tag, non-minimal varint, repeated singular field, parameter that does not re-encode to itself): java-tron could read them differently. */
   | 'raw-noncanonical'
+  /** A node-built transaction is not what was requested (type, owner, recipient, amount, contract, calldata, call value, fee limit, extra fields) — scan F7. */
+  | 'build-mismatch'
 
 /** A transaction failed a hard check and was not signed. */
 export class UnsafeTransactionError extends Error {
