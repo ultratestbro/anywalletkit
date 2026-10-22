@@ -1,0 +1,50 @@
+{
+  "name": "@forgewallet/extension-kit",
+  "version": "0.0.1",
+  "description": "Chromium (MV3) wallet-extension core for the forgewallet SDK: scrypt + AES-256-GCM vault with passkey (WebAuthn PRF) unlock, auto-locking session, dApp request router with per-origin permissions and an approval queue, signing-request checks, swap / Earn plan review, chrome.* adapters. No UI.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "keywords": [
+    "wallet",
+    "sdk",
+    "browser-extension",
+    "mv3",
+    "chrome-extension",
+    "vault",
+    "eip-1193"
+  ],
+  "dependencies": {
+    "@forgewallet/core": "workspace:*",
+    "@forgewallet/keyring": "workspace:*",
+    "@forgewallet/swap2-assets": "workspace:*",
+    "@forgewallet/protocol-swap2-core": "workspace:*",
+    "@noble/hashes": "^2.4.0"
+  },
+  "devDependencies": {
+    "@forgewallet/wallet-evm": "workspace:*",
+    "vitest": "^5.0.3",
+    "viem": "^2.57.2"
+  }
+}

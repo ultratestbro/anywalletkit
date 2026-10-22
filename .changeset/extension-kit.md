@@ -1,0 +1,5 @@
+---
+"@forgewallet/extension-kit": minor
+---
+
+First release: the core of a Chromium (MV3) wallet extension, no UI. Vault envelope v2 (scrypt N=2^17 r=8 p=1 via `@noble/hashes`, AES-256-GCM, KDF parameters bound into the DEK box's AAD, `weak-kdf` refusal, v1 PBKDF2 envelopes re-sealed on unlock, passwords ≥ 8 characters) with passkey unlock (DEK sealed under HKDF-SHA256 of the WebAuthn PRF output); `Session` with auto-lock in `chrome.storage.session`; keyring adapters; page ⇄ content script ⇄ worker relay with sender-origin checks; `RequestRouter`, `PermissionStore`, `ApprovalQueue` (3 pending per origin, one pending `connect`, WalletConnect transport notes via `setVia`); signing classification (SIWE parsing, site EIP-7702 delegations refused), `wallet_addEthereumChain` with `eth_chainId` verification and `custom` provenance; `ReviewGate`, swap and Earn plan review, `SwapTracker`; TON Connect v2 data helpers; `PhishingDetector`, `RecipientBook` (address poisoning), WebAuthn assertion verification; structural chrome adapters with in-memory twins for tests.

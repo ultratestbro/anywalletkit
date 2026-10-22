@@ -373,6 +373,34 @@ importers:
         specifier: ^2.4.0
         version: 2.4.0
 
+  packages/extension-kit:
+    dependencies:
+      '@forgewallet/core':
+        specifier: workspace:*
+        version: link:../core
+      '@forgewallet/keyring':
+        specifier: workspace:*
+        version: link:../keyring
+      '@forgewallet/protocol-swap2-core':
+        specifier: workspace:*
+        version: link:../protocol-swap2-core
+      '@forgewallet/swap2-assets':
+        specifier: workspace:*
+        version: link:../swap2-assets
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
+    devDependencies:
+      '@forgewallet/wallet-evm':
+        specifier: workspace:*
+        version: link:../wallet-evm
+      viem:
+        specifier: ^2.57.2
+        version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+
   packages/history-evm:
     dependencies:
       '@forgewallet/swap2-assets':
@@ -7166,7 +7194,7 @@ snapshots:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.0.3
       estree-walker: 3.0.3
-      magic-string: 1.4.2
+      magic-string: 1.4.3
     optionalDependencies:
       vite: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
 
@@ -7175,7 +7203,7 @@ snapshots:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.0.3
       estree-walker: 3.0.3
-      magic-string: 1.4.2
+      magic-string: 1.4.3
     optionalDependencies:
       vite: 8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
 
@@ -9014,7 +9042,7 @@ snapshots:
       chai: 6.3.0
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
-      magic-string: 1.4.2
+      magic-string: 1.4.3
       obug: 2.2.1
       picomatch: 4.0.7
       std-env: 4.3.0
@@ -9037,7 +9065,7 @@ snapshots:
       chai: 6.3.0
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
-      magic-string: 1.4.2
+      magic-string: 1.4.3
       obug: 2.2.1
       picomatch: 4.0.7
       std-env: 4.3.0
