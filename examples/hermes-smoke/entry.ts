@@ -30,7 +30,7 @@ import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { deriveEd25519, deriveSecp256k1, seedFromMnemonicSync } from '@forgewallet/core'
 import { derivationVectors } from '@forgewallet/conformance'
 import { WalletManagerEvm, describeTransaction, describeTypedData, encodeApprove } from '@forgewallet/wallet-evm'
-import { WalletManagerSolana, describeTransaction as describeSolana, ZERO_ADDRESS as SOL_ZERO } from '@forgewallet/wallet-solana'
+import { WalletManagerSolana, describeTransaction as describeSolana, ZERO_ADDRESS as SOL_ZERO, classifySolanaMessage } from '@forgewallet/wallet-solana'
 import { getApproveInstruction } from '@solana-program/token'
 import { appendTransactionMessageInstructions, createNoopSigner, createTransactionMessage, pipe, setTransactionMessageFeePayer, type Address } from '@solana/kit'
 import { WalletManagerTon, describeTransaction as describeTon, parseV5R1Body, v5r1SigningMessage, v5r1PackUnsigned, v5r1WalletId } from '@forgewallet/wallet-ton'
@@ -91,6 +91,11 @@ async function main() {
       const a = await sol.getAccount(v.index)
       eq('solana address', await a.getAddress(), v.address)
       eq('solana sign', await a.sign(derivationVectors.message), v.signMessage)
+      // scan F1/F2: a compiled legacy message naming this key as signer is refused, not signed
+      const txMsg = Uint8Array.from([1, 0, 1, 2, ...a.publicKey, ...new Uint8Array(32), ...new Uint8Array(32).fill(7), 1, 1, 1, 0, 0])
+      eq('solana message kind tx', classifySolanaMessage(txMsg, a.publicKey), 'transaction')
+      eq('solana sign refuses tx', await a.sign(txMsg).then(() => 'signed', (e: Error) => e.name), 'MessageIsTransactionError')
+      eq('solana message kind nonce', classifySolanaMessage(new Uint8Array(32).fill(0xfe), a.publicKey), 'binary')
     }
     sol.dispose()
     const ton = new WalletManagerTon(mnemonic)

@@ -191,6 +191,37 @@ const hex = (n: bigint) => `0x${n.toString(16)}`;
 
 interface SimCall { status?: string; gasUsed?: string; returnData?: string; error?: {message?: string; data?: string}; logs?: {address: string; topics: string[]; data: string}[] }
 
+/** JSON-RPC codes for "this node does not serve the method": method not found (EIP-1474), method not supported (EIP-1474 -32004). */
+const UNSUPPORTED_CODES = new Set([-32601, -32004]);
+const UNSUPPORTED_ERRORS = new Set(["MethodNotFoundRpcError", "MethodNotSupportedRpcError"]);
+/** Only the head of a node-controlled message is read: the text can be megabytes (scan F23). Both patterns are linear. */
+const TEXT_HEAD = 300;
+const UNSUPPORTED_TEXT = /\bnot (?:exist|found|available|supported|whitelisted)\b|\bunsupported method\b/i;
+const UNSUPPORTED_BODY_CODE = /"code"\s*:\s*-32(?:601|004)\b/;
+
+/**
+ * Did eth_simulateV1 fail because the node does not serve it (→ eth_call fallback)?
+ * Structured first — the JSON-RPC code or viem's typed error anywhere on the cause
+ * chain (-32601: Avalanche, Hyperliquid, MegaETH, Linea, Arc, Morph, Flare) —, then
+ * the JSON body of an HTTP error (403 + -32601: zkSync, Celo, Unichain, Sei, X Layer),
+ * then a bounded text match on the first {@link TEXT_HEAD} characters of
+ * `details` / `shortMessage` / `message` (Monad: -32000 "`validation: false` is not
+ * supported yet"). Never a regex over the whole server-supplied text.
+ */
+export function simulateUnsupported(err: unknown): boolean {
+  const texts: string[] = [];
+  let e: unknown = err;
+  for (let depth = 0; depth < 8 && typeof e === "object" && e !== null; depth++) {
+    const o = e as {code?: unknown; name?: unknown; details?: unknown; shortMessage?: unknown; message?: unknown; cause?: unknown};
+    if (typeof o.code === "number" && UNSUPPORTED_CODES.has(o.code)) return true;
+    if (typeof o.name === "string" && UNSUPPORTED_ERRORS.has(o.name)) return true;
+    for (const t of [o.details, o.shortMessage, o.message]) if (typeof t === "string") texts.push(t.slice(0, TEXT_HEAD));
+    e = o.cause;
+  }
+  if (typeof err === "string") texts.push(err.slice(0, TEXT_HEAD));
+  return texts.some((t) => UNSUPPORTED_BODY_CODE.test(t) || UNSUPPORTED_TEXT.test(t));
+}
+
 /** eth_simulateV1 over the whole sequence; null when the node doesn't serve it. */
 async function simulateV1(input: PreviewInput): Promise<Simulation | null> {
   // The simulated block defaults to parent + 12 s (Ethereum's slot). On fast chains
@@ -216,9 +247,8 @@ async function simulateV1(input: PreviewInput): Promise<Simulation | null> {
       validation: false,
     }, pinned ? pinned.number : "latest"])) as {calls?: SimCall[]}[];
   } catch (err) {
-    const code = (err as {code?: number}).code;
+    if (simulateUnsupported(err)) return null;
     const msg = err instanceof Error ? err.message : String(err);
-    if (code === -32601 || /not (exist|found|available|supported)|method.*not/i.test(msg)) return null;
     return {status: "unavailable", reason: msg.slice(0, 200)};
   }
   const calls = blocks?.[0]?.calls ?? [];

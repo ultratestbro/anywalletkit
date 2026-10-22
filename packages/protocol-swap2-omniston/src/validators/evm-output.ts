@@ -74,6 +74,26 @@ const DEPLOYED_AT_OFFSET = 224n;
 const DEPLOYED_AT_MASK = UINT32_MASK << DEPLOYED_AT_OFFSET;
 const ADDRESS_MASK = (1n << 160n) - 1n;
 
+/** Destination timelock stages (seconds after deploy, words 4–6): dst
+ *  withdrawal, dst public withdrawal, dst cancellation. Every Omniston
+ *  destination escrow sampled on Base, Arbitrum, BNB and Polygon (39/39,
+ *  2026-10-22) carries 1/120/180 — the dst half of `SRC_STAGES` in
+ *  evm-input.ts and of `POSITION_STAGES` in ton.ts. Words 0–3 (source stages)
+ *  differ by source chain (0/0/0/0 for TON-source, 1/120/240/300 for
+ *  EVM-source) and are not this escrow's to enforce. */
+const DST_STAGES = [1n, 120n, 180n] as const;
+const DST_STAGE_WORD = 4;
+const DST_CANCELLATION_STAGE = 2;
+/** Disclosure is refused this close to the destination cancellation stage: past
+ *  it the resolver can cancel this escrow and still withdraw the source leg
+ *  with the disclosed secret. Same margin as evm-input.ts and ton.ts. */
+const DISCLOSURE_MARGIN_SECONDS = 45n;
+/** `immutables.parameters` of the Omniston EscrowDst: abi(uint256 protocolFee,
+ *  uint256 integratorFee, uint256 protocolFeeRecipient, uint256
+ *  integratorFeeRecipient) — paid out of `amount` on withdrawal. */
+const FEE_PARAMETERS = [{type: "uint256"}, {type: "uint256"}, {type: "uint256"}, {type: "uint256"}] as const;
+const FEE_PARAMETERS_HEX_LENGTH = 2 + 128 * 2;
+
 /** Public fallback endpoints only; deployments pass their own via `rpcUrls`. */
 const DEFAULT_RPC_URLS: Readonly<Record<string, readonly string[]>> = {
   "eip155:1": ["https://ethereum-rpc.publicnode.com"],
@@ -138,8 +158,14 @@ export interface EvmOutputValidationInput {
   protocolFeeUnits: string;
   integratorFeeUnits: string;
   integratorAddress?: string;
+  /** The quote's `settlementData.protocolFeeRecipientAddress` (destination
+   *  chain): the only address the escrow may pay a non-zero protocol fee to. */
+  protocolFeeRecipientAddress?: string;
   secretHash: Uint8Array;
 }
+
+/** Diagnostics hook: every refusal names its check and the numbers it compared (never a secret). */
+export type OmnistonEvmOutputRefusal = (reason: string, details?: Record<string, unknown>) => void;
 
 interface RpcLog {
   data: Hex;
@@ -163,6 +189,21 @@ function uintAddress(value: bigint): string {
 
 function bytesHex(bytes: Uint8Array): Hex {
   return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function stage(timelocks: bigint, index: number): bigint {
+  return (timelocks >> BigInt(index * 32)) & UINT32_MASK;
+}
+
+/** Fee split of a destination escrow, or null when `parameters` is not the 4-word layout. */
+function decodeFeeParameters(parameters: Hex): {protocolFee: bigint; integratorFee: bigint; protocolFeeRecipient: bigint; integratorFeeRecipient: bigint} | null {
+  if (parameters.length !== FEE_PARAMETERS_HEX_LENGTH) return null;
+  try {
+    const [protocolFee, integratorFee, protocolFeeRecipient, integratorFeeRecipient] = decodeAbiParameters(FEE_PARAMETERS, parameters);
+    return {protocolFee, integratorFee, protocolFeeRecipient, integratorFeeRecipient};
+  } catch {
+    return null;
+  }
 }
 
 /** JSON-RPC over the caller's endpoints (`rpcUrls`) with public failover (reads only). */
@@ -245,7 +286,11 @@ function locateImmutables(input: Hex, secretHash: Hex): {
   }
 }
 
-export function createOmnistonEvmOutputValidator(options: {request?: RpcRequest; rpcUrls?: OmnistonRpcUrls; now?: () => number} = {}) {
+export function createOmnistonEvmOutputValidator(options: {request?: RpcRequest; rpcUrls?: OmnistonRpcUrls; now?: () => number; onRefusal?: OmnistonEvmOutputRefusal} = {}) {
+  const refuse = (reason: string, details?: Record<string, unknown>): false => {
+    try { options.onRefusal?.(reason, details); } catch { /* diagnostics never break validation */ }
+    return false;
+  };
   const request: RpcRequest = options.request ?? ((chain, method, params) => omnistonEvmRpcRequest(chain, method, params, options.rpcUrls));
   const now = options.now ?? Date.now;
   return async (input: EvmOutputValidationInput): Promise<boolean> => {
@@ -256,7 +301,7 @@ export function createOmnistonEvmOutputValidator(options: {request?: RpcRequest;
         !isAddress(input.recipientAddress) || !isAddress(input.outputTokenAddress) ||
         !Number.isInteger(input.quoteTimestamp) || input.quoteTimestamp * 1000 > now() + 120_000 ||
         now() - input.quoteTimestamp * 1000 > 6 * 60 * 60 * 1000
-      ) return false;
+      ) return refuse("input-shape");
 
       const position = getAddress(input.positionAddress);
       const factory = getAddress(input.factoryAddress);
@@ -272,7 +317,16 @@ export function createOmnistonEvmOutputValidator(options: {request?: RpcRequest;
         BigInt(input.inputUnits) <= 0n || outputUnits <= 0n || dstDeposit <= 0n ||
         resolverSendsUnits !== outputUnits + protocolFeeUnits + integratorFeeUnits ||
         input.secretHash.length !== 32
-      ) return false;
+      ) return refuse("quote-amounts", {outputUnits: String(outputUnits), resolverSendsUnits: String(resolverSendsUnits), protocolFeeUnits: String(protocolFeeUnits), integratorFeeUnits: String(integratorFeeUnits)});
+      if (protocolFeeUnits < 0n || integratorFeeUnits < 0n) return refuse("quote-amounts", {protocolFeeUnits: String(protocolFeeUnits), integratorFeeUnits: String(integratorFeeUnits)});
+      // The recipients a non-zero fee may go to come from the quote, never from
+      // the escrow: a missing quote field is a refusal, not a skipped check.
+      if (protocolFeeUnits > 0n && (!input.protocolFeeRecipientAddress || !isAddress(input.protocolFeeRecipientAddress))) {
+        return refuse("quote-missing-protocol-fee-recipient", {protocolFeeUnits: String(protocolFeeUnits)});
+      }
+      if (integratorFeeUnits > 0n && (!input.integratorAddress || !isAddress(input.integratorAddress))) {
+        return refuse("quote-missing-integrator-address", {integratorFeeUnits: String(integratorFeeUnits)});
+      }
 
       const latest = BigInt(await request(input.chain, "eth_blockNumber", []) as string);
       const minConfirmations = OMNISTON_EVM_MIN_CONFIRMATIONS[input.chain] ?? 20n;
@@ -303,7 +357,7 @@ export function createOmnistonEvmOutputValidator(options: {request?: RpcRequest;
         if (from === oldest) break;
         to = from - 1n;
       }
-      if (!matchingLog) return false;
+      if (!matchingLog) return refuse("no-escrow-event", {factory, lookback: String(OMNISTON_EVM_LOOKBACK_BLOCKS[input.chain])});
 
       const [transaction, receipt, block, code] = await Promise.all([
         request(input.chain, "eth_getTransactionByHash", [matchingLog.transactionHash]) as Promise<RpcTransaction | null>,
@@ -316,7 +370,7 @@ export function createOmnistonEvmOutputValidator(options: {request?: RpcRequest;
         BigInt(receipt.blockNumber) !== BigInt(matchingLog.blockNumber) ||
         latest - BigInt(receipt.blockNumber) < minConfirmations ||
         BigInt(block.timestamp) + 120n < BigInt(input.quoteTimestamp)
-      ) return false;
+      ) return refuse("receipt-or-confirmations", {receiptStatus: receipt?.status, receiptBlock: receipt?.blockNumber, logBlock: matchingLog.blockNumber, latest: String(latest), minConfirmations: String(minConfirmations), codeLength: code ? code.length : 0, blockTimestamp: block?.timestamp});
 
       // Resolvers deploy the destination escrow through their OWN contract, not
       // by calling the factory directly: the observed transaction targets the
@@ -337,20 +391,52 @@ export function createOmnistonEvmOutputValidator(options: {request?: RpcRequest;
       // timestamp before the CREATE2 salt is taken). Seen live on Base
       // 2026-10-20 for every Omniston destination escrow.
       const immutables = locateImmutables(transaction.input, secretHash);
-      if (!immutables) return false;
+      if (!immutables) return refuse("immutables-not-found", {transaction: matchingLog.transactionHash});
       const stamped = {...immutables, timelocks: (immutables.timelocks & ~DEPLOYED_AT_MASK) | (BigInt(block.timestamp) << DEPLOYED_AT_OFFSET)};
       const derived = decodeFunctionResult({
         abi: ESCROW_FACTORY_ABI,
         functionName: "addressOfEscrowDst",
         data: await ethCall(request, input.chain, factory, encodeFunctionData({abi: ESCROW_FACTORY_ABI, functionName: "addressOfEscrowDst", args: [stamped]})),
       });
-      if (getAddress(derived) !== position) return false;
+      if (getAddress(derived) !== position) return refuse("derived-address", {derived, position});
       if (!(
         uintAddress(immutables.maker) === recipient &&
         uintAddress(immutables.token) === token &&
         immutables.amount === resolverSendsUnits &&
         immutables.safetyDeposit === dstDeposit
-      )) return false;
+      )) return refuse("escrow-terms", {maker: uintAddress(immutables.maker), recipient, token: uintAddress(immutables.token), expectedToken: token, amount: String(immutables.amount), resolverSendsUnits: String(resolverSendsUnits), safetyDeposit: String(immutables.safetyDeposit), dstDeposit: String(dstDeposit)});
+
+      // The fee split is paid OUT of `amount` on withdrawal (scan F12): the
+      // amounts must be exactly the quoted fees, a non-zero fee may only go to
+      // the quote's recipient, and what is left must be the quoted output.
+      const fees = decodeFeeParameters(immutables.parameters);
+      if (!fees || fees.protocolFeeRecipient > ADDRESS_MASK || fees.integratorFeeRecipient > ADDRESS_MASK) {
+        return refuse("fee-parameters-shape", {parametersLength: (immutables.parameters.length - 2) / 2});
+      }
+      if (fees.protocolFee !== protocolFeeUnits || fees.integratorFee !== integratorFeeUnits || immutables.amount - fees.protocolFee - fees.integratorFee !== outputUnits) {
+        return refuse("fee-amounts", {protocolFee: String(fees.protocolFee), protocolFeeUnits: String(protocolFeeUnits), integratorFee: String(fees.integratorFee), integratorFeeUnits: String(integratorFeeUnits), amount: String(immutables.amount), outputUnits: String(outputUnits)});
+      }
+      if (fees.protocolFee > 0n && uintAddress(fees.protocolFeeRecipient) !== getAddress(input.protocolFeeRecipientAddress!)) {
+        return refuse("protocol-fee-recipient", {escrow: uintAddress(fees.protocolFeeRecipient), quote: getAddress(input.protocolFeeRecipientAddress!)});
+      }
+      // A zero integrator fee pays nothing, whatever recipient word it carries
+      // (live escrows often name one with integratorFee = 0).
+      if (fees.integratorFee > 0n && uintAddress(fees.integratorFeeRecipient) !== getAddress(input.integratorAddress!)) {
+        return refuse("integrator-fee-recipient", {escrow: uintAddress(fees.integratorFeeRecipient), quote: getAddress(input.integratorAddress!)});
+      }
+
+      // Destination stages pinned to the audited profile (withdrawal opens
+      // before cancellation), and the secret only leaves while there is still
+      // time for the maker's withdrawal to land before cancellation opens.
+      // deployedAt is the deployment block's timestamp (the factory stamps it).
+      if (DST_STAGES.some((expected, index) => stage(immutables.timelocks, DST_STAGE_WORD + index) !== expected)) {
+        return refuse("dst-timelocks", {stages: DST_STAGES.map((_, index) => String(stage(immutables.timelocks, DST_STAGE_WORD + index)))});
+      }
+      const deployedAt = BigInt(block.timestamp);
+      const nowSeconds = BigInt(Math.floor(now() / 1000));
+      if (nowSeconds + DISCLOSURE_MARGIN_SECONDS >= deployedAt + DST_STAGES[DST_CANCELLATION_STAGE]) {
+        return refuse("dst-cancellation-window", {now: String(nowSeconds), deployedAt: String(deployedAt), cancellationAt: String(deployedAt + DST_STAGES[DST_CANCELLATION_STAGE]), marginSeconds: String(DISCLOSURE_MARGIN_SECONDS)});
+      }
 
       const [reportedFactory, tokenBalance, nativeBalance] = await Promise.all([
         ethCall(request, input.chain, position, encodeFunctionData({abi: FACTORY_ABI, functionName: "FACTORY"}))
@@ -362,11 +448,12 @@ export function createOmnistonEvmOutputValidator(options: {request?: RpcRequest;
       // The escrow points back at the trusted factory, holds the output the
       // resolver promised, and carries its own safety deposit — none of which a
       // resolver can fake by merely reporting a phase.
-      return getAddress(reportedFactory) === factory &&
+      const ok = getAddress(reportedFactory) === factory &&
         tokenBalance >= resolverSendsUnits &&
         BigInt(nativeBalance) >= dstDeposit;
-    } catch {
-      return false;
+      return ok || refuse("escrow-state", {reportedFactory, factory, tokenBalance: String(tokenBalance), resolverSendsUnits: String(resolverSendsUnits), nativeBalance: String(BigInt(nativeBalance)), dstDeposit: String(dstDeposit)});
+    } catch (error) {
+      return refuse("error", {message: error instanceof Error ? error.message : String(error)});
     }
   };
 }

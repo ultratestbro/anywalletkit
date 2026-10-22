@@ -1,5 +1,6 @@
 import { decodeAddressWord, decodeUint, encodeParameters, hexToText, selector, splitCalldata } from './abi.js'
 import { toBase58Address, toHexAddress } from './address.js'
+import { decodeRawData, isDecodedContractType } from './raw.js'
 import { isContractCall, isPrebuilt } from './shape.js'
 import type { TronContractCall, TronNativeTransfer, TronRawTransaction, TronTransaction, TronTxDescription, TronTxWarning } from './types.js'
 
@@ -75,7 +76,28 @@ function describeContractCall(tx: TronContractCall, warnings: TronTxWarning[]): 
 
 function describeRaw(tx: TronRawTransaction, warnings: TronTxWarning[], ctx: DescribeContext): TronTxDescription {
   const d: TronTxDescription = { kind: 'unknown', warnings }
-  const contract = tx.raw_data?.contract?.[0]
+  // The bytes are what gets signed, so the bytes are what gets described. The JSON copy is
+  // only consulted when there are no bytes at all, and then nothing can be signed anyway.
+  let raw: TronRawTransaction['raw_data'] | undefined
+  let undecodedFields: number[] = []
+  if (typeof tx.raw_data_hex === 'string' && tx.raw_data_hex.length > 0) {
+    try {
+      const decoded = decodeRawData(tx.raw_data_hex)
+      raw = decoded.raw_data
+      // A type without a schema is reported once as "not decoded", not field by field.
+      undecodedFields = [...decoded.unknownFields.map((n) => -n), ...decoded.raw_data.contract.flatMap((c) => (isDecodedContractType(c.type) ? c.undecoded : []))]
+      // (TronDecodedRaw.raw_data is structurally a raw_data with richer contracts)
+    } catch (e) {
+      warn(warnings, 'raw-undecodable', `raw_data_hex is not a well-formed Transaction.raw (${(e as Error).message}); the wallet cannot say what this transaction does and will not sign it.`)
+      return d
+    }
+  } else {
+    raw = tx.raw_data
+    warn(warnings, 'no-raw-hex', 'The transaction carries no raw_data_hex: this description comes from the unsigned JSON copy and the wallet will not sign it.')
+  }
+  const contracts = raw?.contract ?? []
+  if (contracts.length !== 1) warn(warnings, 'multi-contract', `The transaction carries ${contracts.length} contracts; the wallet signs exactly one.`)
+  const contract = contracts[0]
   const v = (contract?.parameter?.value ?? {}) as Record<string, unknown>
   const from = b58(v.owner_address as string | undefined)
   if (from) d.from = from
@@ -86,6 +108,15 @@ function describeRaw(tx: TronRawTransaction, warnings: TronTxWarning[], ctx: Des
       d.to = toBase58Address(to)
       d.amount = BigInt((v.amount as number | string) ?? 0)
       if (isZero(to)) warn(warnings, 'zero-address', 'TRX would be sent to the zero address (burned).')
+      break
+    }
+    case 'TransferAssetContract': {
+      d.kind = 'trc10-transfer'
+      const to = toHexAddress(String(v.to_address))
+      d.to = toBase58Address(to)
+      d.amount = BigInt((v.amount as number | string) ?? 0)
+      if (typeof v.asset_name === 'string') d.token = hexToText(v.asset_name)
+      if (isZero(to)) warn(warnings, 'zero-address', 'Tokens would be sent to the zero address (burned).')
       break
     }
     case 'TriggerSmartContract': {
@@ -107,15 +138,24 @@ function describeRaw(tx: TronRawTransaction, warnings: TronTxWarning[], ctx: Des
       break
     default:
       d.kind = 'unknown'
+      if (!contract) break
+      if (isDecodedContractType(contract.type)) {
+        const fields = Object.entries(v).filter(([k]) => k !== 'owner_address').map(([k, x]) => `${k}=${k.endsWith('_address') ? b58(String(x)) : String(x)}`)
+        warn(warnings, 'undecoded', `${contract.type}: no summary for this contract type; decoded fields: ${fields.join(', ') || 'none'}.`)
+      } else {
+        warn(warnings, 'undecoded', `${contract.type}: this contract type is not decoded by the wallet — only its owner is known; its parameters are not shown, and the dApp's own description of them is not checked.`)
+      }
   }
-  if (tx.raw_data?.fee_limit !== undefined) d.feeLimit = tx.raw_data.fee_limit
-  if (tx.raw_data?.data) {
-    d.memo = hexToText(tx.raw_data.data)
+  if (contract?.type === 'AccountPermissionUpdateContract') warn(warnings, 'account-permission', 'AccountPermissionUpdateContract changes which keys control this account — a signature here can hand the account to someone else.')
+  if (undecodedFields.length) warn(warnings, 'undecoded', `${contract?.type ?? 'transaction'}: field(s) ${undecodedFields.map((n) => (n < 0 ? `raw.${-n}` : String(n))).join(', ')} were not decoded; the sheet cannot show their meaning.`)
+  if (raw?.fee_limit !== undefined) d.feeLimit = raw.fee_limit
+  if (raw?.data) {
+    d.memo = hexToText(raw.data)
     warn(warnings, 'memo-fee', 'A memo is attached: the network charges the memo fee (1 TRX by default).')
   }
-  if (tx.raw_data?.expiration !== undefined) {
-    d.expiration = tx.raw_data.expiration
-    if (tx.raw_data.expiration <= (ctx.now ?? Date.now())) warn(warnings, 'expired', 'The transaction has already expired.')
+  if (raw?.expiration !== undefined) {
+    d.expiration = raw.expiration
+    if (raw.expiration <= (ctx.now ?? Date.now())) warn(warnings, 'expired', 'The transaction has already expired.')
   }
   return d
 }

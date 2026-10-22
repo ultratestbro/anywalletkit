@@ -2,6 +2,7 @@ import "../buffer-global.js";
 import {Buffer} from "buffer";
 import {Address, Cell} from "@ton/core";
 import type {OmnistonProviderOptions} from "../provider.js";
+import type {TonSwapLeg} from "../ton-swap.js";
 
 const JETTON_TRANSFER_OP = 0x0f8a7ea5;
 const ESCROW_CREATE_OP = 0xc0a5f0d9;
@@ -325,7 +326,7 @@ function validatePayload(input: PayloadInput, trusted: {
 
 export function createOmnistonTonValidators(options: OmnistonTonValidationOptions = {}): Pick<
   OmnistonProviderOptions,
-  "validateTonJettonWallet" | "validateTonSwapTarget" | "validateTonOutputPosition"
+  "validateTonJettonWallet" | "validateTonSwapTarget" | "validateTonOutputPosition" | "validateTonSwapLeg"
 > & {validateTonEscrowPayload: (input: PayloadInput) => boolean | Promise<boolean>} {
   const now = options.now ?? Date.now;
   const swapInterfaces = new Set(options.swapTargetInterfaces ?? DEFAULT_OMNISTON_TON_SWAP_INTERFACES);
@@ -336,6 +337,50 @@ export function createOmnistonTonValidators(options: OmnistonTonValidationOption
   const base = (options.tonApiUrl ?? "https://tonapi.io").replace(/\/$/, "");
   const headers = options.tonApiKey ? {Authorization: `Bearer ${options.tonApiKey}`} : undefined;
   const get = (path: string) => request(`${base}${path}`, {...(headers ? {headers} : {}), signal: AbortSignal.timeout(5_000)});
+  /** Same, retrying tonapi's rate limit (keyless: ~1 rps) — the swap-leg
+   *  checks run a few reads back to back right after the target checks. */
+  const getRetry = async (path: string): Promise<Response> => {
+    for (let attempt = 0; ; attempt++) {
+      const response = await get(path);
+      if (response.status !== 429 || attempt >= 3) return response;
+      await new Promise((resolve) => setTimeout(resolve, 1_100 * (attempt + 1)));
+    }
+  };
+  /** A get-method's stack (tonapi), or null when the call failed. */
+  const runGet = async (address: string, method: string, args: readonly string[] = []): Promise<{type: string; cell?: string}[] | null> => {
+    const query = args.length ? `?${args.map((arg) => `args=${encodeURIComponent(arg)}`).join("&")}` : "";
+    const response = await getRetry(`/v2/blockchain/accounts/${encodeURIComponent(address)}/methods/${method}${query}`);
+    if (!response.ok) return null;
+    const body = await response.json() as {success?: boolean; exit_code?: number; stack?: {type: string; cell?: string}[]};
+    return body.success === true && (body.exit_code ?? 0) === 0 && Array.isArray(body.stack) ? body.stack : null;
+  };
+  const stackCell = (entry: {type: string; cell?: string} | undefined): Cell | null =>
+    entry && (entry.type === "cell" || entry.type === "slice") && entry.cell ? cellFromApi(entry.cell) : null;
+  /** The jetton wallet a master derives for an owner — computed by the master, not looked up. */
+  const derivedWallet = async (master: string, owner: string): Promise<Address | null> => {
+    const cell = stackCell((await runGet(master, "get_wallet_address", [Address.parse(owner).toRawString()]))?.[0]);
+    return cell ? cell.beginParse().loadAddress() : null;
+  };
+  /** get_wallet_data of a jetton wallet: owner + master, read from the wallet itself. */
+  const walletData = async (wallet: string): Promise<{owner: Address; master: Address} | null> => {
+    const stack = await runGet(wallet, "get_wallet_data");
+    const owner = stackCell(stack?.[1]);
+    const master = stackCell(stack?.[2]);
+    return owner && master ? {owner: owner.beginParse().loadAddress(), master: master.beginParse().loadAddress()} : null;
+  };
+  const accountHas = async (address: string, iface: string): Promise<boolean> => {
+    const response = await getRetry(`/v2/accounts/${encodeURIComponent(address)}`);
+    if (!response.ok) return false;
+    const body = await response.json() as {address?: string; interfaces?: string[]; is_wallet?: boolean};
+    return !!body.address && sameAddress(Address.parse(body.address), address) && body.is_wallet !== true && (body.interfaces ?? []).includes(iface);
+  };
+  /** Unordered pair equality of jetton masters (null = native GRAM). */
+  const samePair = (pool: readonly (string | null)[], leg: readonly (string | null)[]): boolean => {
+    const key = (value: string | null) => value === null ? "native" : Address.parse(value).toRawString();
+    const a = pool.map(key).sort();
+    const b = leg.map(key).sort();
+    return a.length === 2 && a[0] === b[0] && a[1] === b[1] && a[0] !== a[1];
+  };
   /** tonapi's view of a contract: null when unreachable or not the address asked for. */
   const readAccount = async (address: string): Promise<{interfaces: string[]; isWallet: boolean} | null> => {
     const response = await get(`/v2/accounts/${encodeURIComponent(address)}`);
@@ -427,6 +472,63 @@ export function createOmnistonTonValidators(options: OmnistonTonValidationOption
         return deployedByFactory || refuse("deploy-transaction", {transactions: (body.transactions ?? []).length});
       } catch (error) {
         return refuse("error", {message: error instanceof Error ? error.message : String(error)});
+      }
+    },
+    /**
+     * Scan F11: one chain fact a decoded TON swap body depends on.
+     *  - STON.fi hop: the router carries the STON.fi router interface of its
+     *    version; for native input the pTON wallet the message pays is a
+     *    proxy-TON wallet OWNED BY that router; the hop's ask wallet is the
+     *    router's own wallet of the hop's output (of a proxy-TON master for
+     *    native output), as the output's master derives it.
+     *  - DeDust pool: the pool carries the DeDust pool interface of its version
+     *    and trades exactly the hop's pair.
+     */
+    async validateTonSwapLeg(leg: TonSwapLeg) {
+      try {
+        if (leg.kind === "stonfi-router") {
+          let router = leg.router ? Address.parse(leg.router) : null;
+          if (leg.proxyTonWallet) {
+            const data = await walletData(leg.proxyTonWallet);
+            if (!data || !proxyTonMasters.has(data.master.toRawString())) return false;
+            if (router && !router.equals(data.owner)) return false;
+            router = data.owner;
+          }
+          if (!router) return false;
+          if (!await accountHas(router.toString(), leg.version === 1 ? "stonfi_router" : "stonfi_router_v2")) return false;
+          const masters = leg.outputJetton ? [leg.outputJetton] : [...proxyTonMasters];
+          for (const master of masters) {
+            const wallet = await derivedWallet(master, router.toString());
+            if (wallet && wallet.equals(Address.parse(leg.askWallet))) return true;
+          }
+          return false;
+        }
+        if (leg.version === 1) {
+          if (!await accountHas(leg.pool, "dedust_pool")) return false;
+          const stack = await runGet(leg.pool, "get_assets");
+          const assets = [stackCell(stack?.[0]), stackCell(stack?.[1])].map((cell) => {
+            if (!cell) return undefined;
+            const slice = cell.beginParse();
+            const tag = slice.loadUint(4);
+            if (tag === 0) return null;
+            if (tag !== 1) return undefined;
+            return new Address(slice.loadInt(8), slice.loadBuffer(32)).toString();
+          });
+          if (assets.some((asset) => asset === undefined)) return false;
+          return samePair(assets as (string | null)[], [leg.inputJetton, leg.outputJetton]);
+        }
+        if (!await accountHas(leg.pool, "dedust_v2_cpmm")) return false;
+        const stack = await runGet(leg.pool, "get_pool_data");
+        const assets = [stackCell(stack?.[3]), stackCell(stack?.[4])].map((cell) => {
+          if (!cell) return undefined;
+          const address = cell.beginParse().loadAddressAny();
+          if (address === null) return null;
+          return address instanceof Address ? address.toString() : undefined;
+        });
+        if (assets.some((asset) => asset === undefined)) return false;
+        return samePair(assets as (string | null)[], [leg.inputJetton, leg.outputJetton]);
+      } catch {
+        return false;
       }
     },
     /** The contract a swap pays into must carry a recognised DEX code

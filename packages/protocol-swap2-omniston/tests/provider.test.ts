@@ -218,12 +218,27 @@ describe("Omniston TON↔TON swap settlement", () => {
     return builder(beginCell()).endCell().toBoc().toString("hex");
   }
 
+  /** A DeDust CPMM v2 call in the real layout (scan F11 decodes it): the payment
+   *  payload (swap#c442500f, min out) and the payout config paying the trader. */
+  async function dedustV2Call(minOut: bigint): Promise<{payment: import("@ton/core").Cell; payout: import("@ton/core").Cell}> {
+    const {Address, beginCell} = await import("@ton/core");
+    const trader = Address.parse(TRADER);
+    const payment = beginCell().storeUint(0xc442500f, 32).storeCoins(minOut).storeUint(0, 40).storeMaybeRef(null).storeBit(false).storeBit(false).endCell();
+    const options = (b: import("@ton/core").Builder) => b.storeAddress(trader).storeCoins(0).storeMaybeRef(null).storeBit(false);
+    const payout = options(options(beginCell())).storeAddress(trader).endCell();
+    return {payment, payout};
+  }
+  async function payNative(amount: bigint, minOut: bigint): Promise<string> {
+    const {payment, payout} = await dedustV2Call(minOut);
+    return swapCell((b) => b.storeUint(0xa5a7cbf8, 32).storeUint(1, 64).storeCoins(amount).storeRef(payment).storeRef(payout));
+  }
+
   function swapQuote(input: unknown, output: unknown, inputUnits: string, outputUnits: string, extra: Record<string, unknown> = {}) {
     return {
       rfqId: "rfq1", quoteId: QUOTE_ID, inputAsset: input, outputAsset: output, inputUnits, outputUnits,
       protocolFeeUnits: "0", integratorFeeUnits: "0", quoteTimestamp: Math.floor(Date.now() / 1000), gasBudget: "100000000",
       settlementData: {$case: "swap", value: {
-        routes: [{steps: [{chunks: [{protocol: "DeDustCPMMV2", inputUnits, outputUnits}]}]}],
+        routes: [{steps: [{inputAsset: input, outputAsset: output, chunks: [{protocol: "DeDustCPMMV2", inputUnits, outputUnits}]}]}],
         minOutputAmount: String(BigInt(outputUnits) - 1000n), recommendedMinOutputAmount: String(BigInt(outputUnits) - 500n), recommendedSlippagePips: 5000,
       }},
       ...extra,
@@ -256,7 +271,7 @@ describe("Omniston TON↔TON swap settlement", () => {
 
   it("quotes native GRAM → USDT as a one-route swap and builds a DEX-bound message (input + gas)", async () => {
     const quote = swapQuote(native, jetton(USDT), "1000000000", "1419292");
-    const payload = await swapCell((b) => b.storeUint(0xa5a7cbf8, 32).storeUint(1, 64));
+    const payload = await payNative(1000000000n, 1418292n);
     const client = clientFor(quote, [{targetAddress: POOL, sendAmount: "1100000000", payload}]);
     const targets: string[] = [];
     const provider = omnistonProvider({
@@ -283,7 +298,7 @@ describe("Omniston TON↔TON swap settlement", () => {
   });
 
   it("accepts a quote id without leading-zero padding (live: ~1 in 16 is 63 hex chars), refuses a short one", async () => {
-    const payload = await swapCell((b) => b.storeUint(0xa5a7cbf8, 32).storeUint(1, 64));
+    const payload = await payNative(1000000000n, 1418292n);
     const run = async (quoteId: string) => {
       const reasons: string[] = [];
       const provider = omnistonProvider({
@@ -303,7 +318,7 @@ describe("Omniston TON↔TON swap settlement", () => {
 
   it("refuses a native-input message that attaches more than the gas budget or an unrecognised target", async () => {
     const quote = swapQuote(native, jetton(USDT), "1000000000", "1419292");
-    const payload = await swapCell((b) => b.storeUint(0xa5a7cbf8, 32).storeUint(1, 64));
+    const payload = await payNative(1000000000n, 1418292n);
     const greedy = omnistonProvider({
       client: clientFor(quote, [{targetAddress: POOL, sendAmount: "1300000000", payload}]) as never,
       enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true,
@@ -320,12 +335,14 @@ describe("Omniston TON↔TON swap settlement", () => {
   });
 
   it("jetton input must be a transfer from the trader's own wallet, for the quoted amount, refunding the trader, into a DEX", async () => {
-    const {Address} = await import("@ton/core");
+    const {Address, beginCell} = await import("@ton/core");
     const quote = swapQuote(jetton(USDT), native, "1000000", "730825926", {gasBudget: "150000000"});
+    const call = await dedustV2Call(730824926n);
     const transfer = (amount: bigint, response: string | null) => swapCell((b) => {
       b.storeUint(0x0f8a7ea5, 32).storeUint(0, 64).storeCoins(amount).storeAddress(Address.parse(POOL));
-      b.storeAddress(response ? Address.parse(response) : null).storeMaybeRef(null).storeCoins(100000000n).storeBit(0);
-      return b;
+      b.storeAddress(response ? Address.parse(response) : null).storeMaybeRef(null).storeCoins(100000000n);
+      // forward payload: DeDust CPMM v2 pay_jetton#cbc33949 to the pool
+      return b.storeBit(1).storeRef(beginCell().storeUint(0xcbc33949, 32).storeRef(call.payment).storeRef(call.payout).endCell());
     });
     const good = await transfer(1000000n, TRADER);
     const wallets: string[] = [];
@@ -355,6 +372,17 @@ describe("Omniston TON↔TON swap settlement", () => {
       const qb = await bad.getQuote(params);
       await expect(bad.buildDeposit(qb!), label).rejects.toThrow();
     }
+  });
+
+  it("refuses a body that is only an op and a query id (the pre-F11 synthetic body) as an unknown layout", async () => {
+    const quote = swapQuote(native, jetton(USDT), "1000000000", "1419292");
+    const payload = await swapCell((b) => b.storeUint(0xa5a7cbf8, 32).storeUint(1, 64));
+    const provider = omnistonProvider({
+      client: clientFor(quote, [{targetAddress: POOL, sendAmount: "1100000000", payload}]) as never,
+      enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true,
+    });
+    const q = await provider.getQuote({sourceChain: "ton:-239", sourceToken: "GRAM", destChain: "ton:-239", destToken: USDT, amountIn: "1000000000", destAddress: TRADER, refundAddress: TRADER, dry: false});
+    await expect(provider.buildDeposit(q!)).rejects.toThrow(/ton-swap-payload/);
   });
 
   it("re-quotes once at the slippage that puts the minimum on the caller's floor", async () => {

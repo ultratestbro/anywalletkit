@@ -45,6 +45,7 @@ const INPUT: EvmOutputValidationInput = {
   dstSecurityDepositUnits: "1000",
   protocolFeeUnits: "5000",
   integratorFeeUnits: "0",
+  protocolFeeRecipientAddress: "0x6666666666666666666666666666666666666666",
   secretHash: HASH,
 };
 

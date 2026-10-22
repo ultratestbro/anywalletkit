@@ -5,6 +5,9 @@ import {Buffer} from "buffer";
 import {encodeAbiParameters, getAddress, hexToBytes as viemHexToBytes, keccak256, sha256} from "viem";
 import {ccAsset, ccAssetByToken, type CcAsset} from "@forgewallet/swap2-assets";
 import {omniston as cfg} from "./config.js";
+import {checkTonSwapPayload, TonSwapPayloadError, type TonSwapCheckResult, type TonSwapLeg} from "./ton-swap.js";
+export {checkTonSwapPayload, TonSwapPayloadError, TON_SWAP_PROTOCOL_LAYOUTS} from "./ton-swap.js";
+export type {TonSwapLeg, TonSwapCheckInput, TonSwapCheckResult} from "./ton-swap.js";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
 
 /**
@@ -102,6 +105,12 @@ const DEFAULT_MAX_HTLC_EXECUTIONS = 1;
 const QUOTE_TTL_MS = 45_000;
 /** Quote/security context must outlive delayed fills and cancellation signals. */
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+/**
+ * Context entries written before intent binding (scan F3/F15) carry no bound
+ * trader/dest/srcChain/kind. They are honoured — with a `legacy-intent` trace —
+ * only while younger than this (the store TTL), then disclosure is refused.
+ */
+const LEGACY_INTENT_WINDOW_MS = 6 * 60 * 60 * 1000;
 
 // ── HTLC secret store (injectable) ───────────────────────────────────────────
 
@@ -214,6 +223,9 @@ interface OrderSettlement {
   /** Fee profile the EVM order extension must mirror (EVM-source orders). */
   protocolFeePips?: number;
   integratorFeePips?: number;
+  /** Destination-chain wallet the protocol fee must be paid to (EVM-destination
+   *  orders); the EVM output validator binds the escrow's fee split to it. */
+  protocolFeeRecipientAddress?: ChainAddress;
 }
 
 /** Swap settlement — immediate DEX routes, the TON same-chain branch. */
@@ -358,6 +370,25 @@ export interface OmnistonProviderOptions {
    * swaps are not advertised.
    */
   validateTonSwapTarget?: (input: {address: string; protocols: readonly string[]}) => Promise<boolean> | boolean;
+  /**
+   * TON↔TON swap settlement (scan F11): confirm one chain fact the decoded
+   * swap body depends on — that a STON.fi hop's ask wallet is its router's
+   * wallet of the quoted output (and, for native input, that the pTON wallet
+   * the message pays belongs to that router), or that a DeDust pool trades the
+   * quoted pair. `createOmnistonTonValidators` supplies it. When absent the
+   * decoded-body rules still apply and each skipped leg is traced as
+   * `ton-swap-payload legs-unverified`; STON.fi v1 native input (pTON v1) is
+   * refused without it.
+   */
+  validateTonSwapLeg?: (leg: TonSwapLeg) => Promise<boolean> | boolean;
+  /**
+   * TON↔TON swap settlement (scan F11): what a built swap body that fails the
+   * decoder (receiver ≠ destination, refund/excess ≠ trader, on-chain minimum
+   * below the quote, unknown layout, unverifiable leg) does. "enforce"
+   * (default) refuses the build; "report" traces `ton-swap-payload <reason>`
+   * and still builds — a rollout escape hatch, not a steady state.
+   */
+  tonSwapPayloadCheck?: "report" | "enforce";
   validateTonEscrowPayload?: (input: {
     payloadBocHex: string;
     forwardPayloadBocHex: string;
@@ -397,6 +428,8 @@ export interface OmnistonProviderOptions {
     protocolFeeUnits: string;
     integratorFeeUnits: string;
     integratorAddress?: string;
+    /** The quote's `settlementData.protocolFeeRecipientAddress` (destination chain). */
+    protocolFeeRecipientAddress?: string;
     secretHash: Uint8Array;
   }) => boolean | Promise<boolean>;
   /**
@@ -551,6 +584,31 @@ function decodeIntent(
   }
 }
 
+/**
+ * What an intentId was minted for, persisted with the quote at getQuote time
+ * (scan F3/F15). The intentId itself is an unsigned caller-supplied string: the
+ * stored copy — never the decoded one — names the trader and recipient the
+ * secret-release validators, the builders and the delivery locators check.
+ */
+interface IntentBinding {
+  trader: string;
+  dest: string;
+  srcChain: string;
+  kind: "order" | "swap";
+}
+
+/** Same address in another spelling: EVM case-insensitive, TON any notation. */
+function sameIntentAddress(a: string, b: string): boolean {
+  if (a === b) return true;
+  const evm = /^0x[0-9a-fA-F]{40}$/;
+  if (evm.test(a) || evm.test(b)) return evm.test(a) && evm.test(b) && a.toLowerCase() === b.toLowerCase();
+  try {
+    return TonAddress.parse(a).equals(TonAddress.parse(b));
+  } catch {
+    return false;
+  }
+}
+
 /** EIP-712 typed data → the ABI-encoded order struct `SignedOrderEvmV1` wants.
  *  Structs referenced in `types` become tuples, recursively. */
 export function encodeTypedMessage(td: {
@@ -621,6 +679,14 @@ function assetContract(asset: AssetId): string | null {
   if (typeof value === "string") return null;
   const kind = value.kind;
   return kind && typeof kind.value === "string" ? kind.value : null;
+}
+
+/** A route step's asset as a jetton master (null = native GRAM, undefined = not stated). */
+function stepJetton(asset: AssetId | undefined): string | null | undefined {
+  if (!asset || asset.chain.$case !== "ton" || typeof asset.chain.value === "string") return undefined;
+  const kind = asset.chain.value.kind;
+  if (kind?.$case === "native") return null;
+  return kind?.$case === "jetton" && typeof kind.value === "string" ? kind.value : undefined;
 }
 
 function readBigEndian(bytes: Uint8Array, offset: number, length: number): bigint {
@@ -1596,6 +1662,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
   interface BuiltEntry {
     quote: OmnistonQuote;
     at: number;
+    /** What the intentId was minted for (absent on entries written before scan F3/F15). */
+    bound?: IntentBinding;
     /** EVM-source orders: what registration and tracking need after signing. */
     evmOrder?: {
       typedData: string;
@@ -1624,6 +1692,74 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       await quotes.clear(quoteId);
       return undefined;
     }
+  }
+
+  type Decoded = NonNullable<ReturnType<typeof decodeIntent>>;
+  type BindResult =
+    | {ok: true; ref: Decoded; legacy: boolean}
+    | {ok: false; reason: "mismatch"; field: string}
+    | {ok: false; reason: "legacy-expired"};
+  /**
+   * Resolve the caller's intentId against the context stored for its quote:
+   * any field that differs from what getQuote bound is refused, and the
+   * returned ref carries ONLY the stored values. Pre-binding (legacy) entries
+   * fall back to the signed order's owner (EVM source) or the decoded values,
+   * for at most LEGACY_INTENT_WINDOW_MS after they were written.
+   */
+  function bindIntent(decoded: Decoded, entry: BuiltEntry): BindResult {
+    const owner = entry.evmOrder?.owner;
+    const bound = entry.bound;
+    if (bound) {
+      if (bound.kind !== decoded.kind) return {ok: false, reason: "mismatch", field: "kind"};
+      if (bound.srcChain !== decoded.srcChain) return {ok: false, reason: "mismatch", field: "srcChain"};
+      if (!sameIntentAddress(bound.trader, decoded.trader)) return {ok: false, reason: "mismatch", field: "trader"};
+      if (!sameIntentAddress(bound.dest, decoded.dest)) return {ok: false, reason: "mismatch", field: "dest"};
+      if (owner !== undefined && !sameIntentAddress(owner, bound.trader)) return {ok: false, reason: "mismatch", field: "owner"};
+      return {ok: true, legacy: false, ref: {quoteId: decoded.quoteId, trader: owner ?? bound.trader, dest: bound.dest, srcChain: bound.srcChain, kind: bound.kind}};
+    }
+    if (!Number.isFinite(entry.at) || Date.now() - entry.at > LEGACY_INTENT_WINDOW_MS) return {ok: false, reason: "legacy-expired"};
+    if (owner !== undefined && !sameIntentAddress(owner, decoded.trader)) return {ok: false, reason: "mismatch", field: "owner"};
+    return {ok: true, legacy: true, ref: {...decoded, trader: owner ?? decoded.trader}};
+  }
+  const traceFor = (quoteId: string) => (event: string, details?: Record<string, unknown>) => {
+    try { opts.trace?.(event, {quoteId, ...details}); } catch { /* diagnostics never break the flow */ }
+  };
+  /** buildDeposit / registerSignedOrder: the bound ref, or a named refusal. */
+  function requireBinding(decoded: Decoded, entry: BuiltEntry, where: string): Decoded {
+    const trace = traceFor(decoded.quoteId);
+    const bound = bindIntent(decoded, entry);
+    if (!bound.ok) {
+      if (bound.reason === "legacy-expired") {
+        trace("legacy-intent-expired", {where});
+        throw new Error("omniston: quote expired — request a fresh quote");
+      }
+      trace("intent-mismatch", {where, field: bound.field});
+      throw new Error(`omniston: intent id does not match the quote it was issued for (${bound.field})`);
+    }
+    if (bound.legacy) trace("legacy-intent", {where});
+    return bound.ref;
+  }
+
+  /**
+   * HTLC secrets for a quote: a second build of the same quoteId reuses the
+   * stored secrets (same hashlock) instead of overwriting them, so a repeated
+   * or concurrent build can never strand an order that was already signed.
+   * `created` says whether THIS call wrote them (only then may it clear them).
+   */
+  async function secretsFor(quoteId: string, count: number): Promise<{secrets: Uint8Array[]; created: boolean}> {
+    const existing = await store.load(quoteId);
+    if (existing && existing.length > 0) {
+      if (existing.length !== count || !existing.every((s) => /^[0-9a-fA-F]{64}$/.test(s))) {
+        throw new Error("omniston: stored HTLC secrets for this quote do not fit the order — request a fresh quote");
+      }
+      traceFor(quoteId)("secret-reused", {count});
+      return {secrets: existing.map(hexToBytes), created: false};
+    }
+    const secrets = Array.from({length: count}, generateSecret);
+    // Persist BEFORE anything can be signed: if the process dies after the
+    // lock, the poll path still has the preimage to disclose.
+    await store.save(quoteId, secrets.map(bytesToHex));
+    return {secrets, created: true};
   }
 
   // ── TON ↔ TON: swap settlement (immediate DEX routes, no escrow) ──────────
@@ -1739,7 +1875,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     // below asks for exactly that, never Omniston's "recommended" one, which
     // may be looser than what this quote promises).
     const minOut = swap.minOutputAmount;
-    await saveBuilt(q.quoteId, {quote: q, at: Date.now()});
+    await saveBuilt(q.quoteId, {quote: q, at: Date.now(), bound: {trader, dest: params.destAddress, srcChain: params.sourceChain, kind: "swap"}});
 
     // Fees are charged in the OUTPUT asset; only a stable output approximates
     // USD. The TON gas budget is NOT a fee: it rides on the message and the
@@ -1811,6 +1947,14 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     const inputJetton = assetContract(q.inputAsset);
     const payload = parseSwapPayload(message.payload);
 
+    const routeSteps = swap.routes.length === 1 ? swap.routes[0]!.steps : [];
+    const singleV1 = routeSteps.length === 1 && routeSteps[0]!.chunks.length === 1 && routeSteps[0]!.chunks[0]!.protocol === "StonFiV1";
+    // STON.fi v1 native input (pTON v1): the message is a jetton transfer to the
+    // ROUTER's pTON v1 wallet naming the router as destination (STON.fi SDK v1
+    // shape; seen live 2026-10-22 for GRAM→USDT from ~100 GRAM up). Native
+    // input, so the message carries input + gas.
+    const ptonV1Native = !inputJetton && !!payload.jettonTransfer && singleV1;
+
     if (inputJetton) {
       // Jetton input: a transfer from the trader's OWN jetton wallet whose
       // forward lands in the DEX. The TON attached is gas only.
@@ -1830,6 +1974,24 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       if (!walletValid) throw new Error("omniston: TON jetton wallet was not independently validated");
       const targetValid = await opts.validateTonSwapTarget!({address: transfer.destination, protocols});
       if (!targetValid) throw new Error("omniston: swap destination is not a recognized DEX contract for the quoted protocol");
+    } else if (ptonV1Native) {
+      const transfer = payload.jettonTransfer!;
+      const input = BigInt(q.inputUnits);
+      if (transfer.amount !== input) throw new Error("omniston: swap message moves a different amount than quoted");
+      if (sendAmount < input) throw new Error("omniston: swap message carries less than the quoted input");
+      const gas = sendAmount - input;
+      if (gas > gasCap || gas > gasBudget) throw new Error(`omniston: swap message attaches more TON than the quoted gas budget (${gas} > ${gasBudget} nanoTON, cap ${gasCap}, ${protocols.join("+")})`);
+      // pTON v1 forwards exactly the gas share of the value to the router (live: 0.1 of 0.1 GRAM).
+      if (transfer.forwardTon > gas) throw new Error("omniston: swap message forwards more TON than its gas");
+      if (!transfer.responseDestination || !sameTonAddress(transfer.responseDestination, ref.trader)) {
+        throw new Error("omniston: swap message returns excess to a wallet other than the trader");
+      }
+      if (typeof opts.validateTonSwapLeg !== "function") throw new Error("omniston: STON.fi v1 native input needs the validateTonSwapLeg validator (pTON v1 wallet ownership)");
+      // The pTON v1 wallet (a router-owned proxy-TON wallet) and the router it names.
+      const targetValid = await opts.validateTonSwapTarget!({address: message.targetAddress, protocols});
+      if (!targetValid) throw new Error("omniston: swap target is not a recognized DEX contract for the quoted protocol");
+      const routerValid = await opts.validateTonSwapTarget!({address: transfer.destination, protocols});
+      if (!routerValid) throw new Error("omniston: swap destination is not a recognized DEX contract for the quoted protocol");
     } else {
       // Native input: the message itself pays the DEX — value = input + gas.
       if (payload.jettonTransfer) {
@@ -1842,6 +2004,54 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       if (gas > gasCap || gas > gasBudget) throw new Error(`omniston: swap message attaches more TON than the quoted gas budget (${gas} > ${gasBudget} nanoTON, cap ${gasCap}, ${protocols.join("+")})`);
       const targetValid = await opts.validateTonSwapTarget!({address: message.targetAddress, protocols});
       if (!targetValid) throw new Error("omniston: swap target is not a recognized DEX contract for the quoted protocol");
+    }
+
+    // Scan F11: open the DEX call and bind receiver, refund/excess, minimum
+    // output and the route's contracts to the quote. The pTON v1 path is new
+    // and always enforced; elsewhere `tonSwapPayloadCheck` decides.
+    const mode = ptonV1Native ? "enforce" : (opts.tonSwapPayloadCheck ?? "enforce");
+    const trace = traceFor(ref.quoteId);
+    const payloadRefusal = (reason: string, detail: string): void => {
+      trace("ton-swap-payload", {reason, detail, mode, protocols: protocols.join("+")});
+      if (mode === "enforce") throw new Error(`omniston: ton-swap-payload ${reason} — ${detail}`);
+    };
+    let checked: TonSwapCheckResult | null = null;
+    try {
+      checked = checkTonSwapPayload({
+        payloadHex: message.payload,
+        targetAddress: message.targetAddress,
+        sendAmount,
+        trader: ref.trader,
+        dest: ref.dest,
+        inputUnits: q.inputUnits,
+        minOutputAmount: swap.minOutputAmount,
+        inputJetton,
+        outputJetton: assetContract(q.outputAsset),
+        steps: swap.routes.length === 1
+          ? routeSteps.map((step) => {
+            if (step.chunks.length !== 1) return {protocol: `split(${step.chunks.map((c) => c.protocol).join("|")})`, inputJetton: undefined, outputJetton: undefined};
+            return {protocol: step.chunks[0]!.protocol, inputJetton: stepJetton(step.inputAsset), outputJetton: stepJetton(step.outputAsset)};
+          })
+          : [{protocol: `${swap.routes.length}-routes`, inputJetton: undefined, outputJetton: undefined}],
+        integratorAddress: q.integratorAddress?.chain.$case === "ton" ? q.integratorAddress.chain.value : null,
+      });
+    } catch (error) {
+      if (error instanceof TonSwapPayloadError) payloadRefusal(error.reason, error.message);
+      else payloadRefusal("malformed", error instanceof Error ? error.message : String(error));
+    }
+    if (checked) {
+      if (typeof opts.validateTonSwapLeg !== "function") {
+        trace("ton-swap-payload", {reason: "legs-unverified", detail: "no validateTonSwapLeg hook", mode, legs: checked.legs.length});
+      } else {
+        for (const leg of checked.legs) {
+          let ok = false;
+          try { ok = await opts.validateTonSwapLeg(leg); } catch { ok = false; }
+          if (!ok) {
+            payloadRefusal("leg-unverified", `${leg.kind} v${leg.version} ${leg.kind === "dedust-pool" ? `pool ${leg.pool}` : `ask wallet ${leg.askWallet}`}`);
+            break;
+          }
+        }
+      }
     }
 
     return {
@@ -1889,9 +2099,10 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
    * typed-order `UnsignedTx` whose `approvalAddress` is the order protocol.
    */
   async function buildEvmOrder(
-    ref: NonNullable<ReturnType<typeof decodeIntent>>,
+    ref: Decoded,
     q: OmnistonQuote,
     settlement: OrderSettlement,
+    bound: IntentBinding | undefined,
   ): Promise<UnsignedTx> {
     const srcChain = ref.srcChain;
     const chainId = evmRef(srcChain);
@@ -1945,9 +2156,11 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
     // One execution: the signed order has ALLOW_MULTIPLE_FILLS clear and the
     // TON position commits a single hash. Persist BEFORE anything is signed.
-    const secrets = [generateSecret()];
+    const {secrets, created} = await secretsFor(ref.quoteId, 1);
     const hashes = secrets.map((secret) => hashlock(secret, settlement.htlcHashingFunction));
-    await store.save(ref.quoteId, secrets.map(bytesToHex));
+    // Clear only what this call created: a failed rebuild must not take the
+    // secret of an order an earlier build already handed out for signing.
+    const forget = async () => { if (created) await store.clear(ref.quoteId); };
     const omni = await getClient();
     let payload: Awaited<ReturnType<OmnistonClientLike["evmBuildOrderPayload"]>>;
     try {
@@ -1958,7 +2171,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         htlcSecrets: {secretMode: {$case: "provided", value: {hashes}}},
       });
     } catch (error) {
-      await store.clear(ref.quoteId);
+      await forget();
       throw error;
     }
     let td: unknown;
@@ -2007,7 +2220,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         trustedTarget: (address) => isTrusted(srcChain, address),
       });
     } catch (error) {
-      await store.clear(ref.quoteId);
+      await forget();
       throw error;
     }
     // The validated extension targets one trusted factory on the source chain.
@@ -2017,9 +2230,12 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     // the value types (viem) would otherwise sign a domain WITHOUT chainId and
     // the order protocol would reject the signature (live 2026-10-16).
     const typedData = JSON.stringify({...(td as object), domain: {...(td as {domain: object}).domain, chainId}});
+    // Re-save the WHOLE entry: carry the binding forward, or every later
+    // disclosure for this order would be refused as unbound.
     await saveBuilt(ref.quoteId, {
       quote: q,
       at: Date.now(),
+      ...(bound ? {bound} : {}),
       evmOrder: {
         typedData,
         orderExtension: bytesToHex(payload.orderExtension),
@@ -2163,7 +2379,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       const outputScaled = BigInt(q.outputUnits) * 10n ** BigInt(source.decimals);
       if (outputScaled * 2n < inputScaled || outputScaled > inputScaled * 2n) return refuse("quoted output is outside 0.5x–2x of the input");
 
-      await saveBuilt(q.quoteId, {quote: q, at: Date.now()});
+      await saveBuilt(q.quoteId, {quote: q, at: Date.now(), bound: {trader, dest: params.destAddress, srcChain: params.sourceChain, kind: "order"}});
 
       // Fees are charged in the OUTPUT asset; the corridor is stables, so units
       // scaled by the dest decimals approximate USD.
@@ -2198,10 +2414,11 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       if (!Number.isFinite(quote.validUntilMs) || quote.validUntilMs <= Date.now()) {
         throw new Error("omniston: quote expired — request a fresh quote");
       }
-      const ref = decodeIntent(quote.intentId);
-      if (!ref) throw new Error("omniston: malformed intent id");
-      const cached = await loadBuilt(ref.quoteId);
+      const decoded = decodeIntent(quote.intentId);
+      if (!decoded) throw new Error("omniston: malformed intent id");
+      const cached = await loadBuilt(decoded.quoteId);
       if (!cached) throw new Error("omniston: quote expired — request a fresh quote");
+      const ref = requireBinding(decoded, cached, "buildDeposit");
       const q = cached.quote;
       if (q.settlementData.$case === "swap") return await buildSwapDeposit(ref, q, q.settlementData.value);
       if (q.settlementData.$case !== "order" || q.settlementData.value.tradeStartDeadline * 1000 <= Date.now()) {
@@ -2210,7 +2427,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
       if (!ref.trader) throw new Error("omniston: quote was requested without a refund/source address");
       const srcCase = q.inputAsset.chain.$case;
-      if (srcCase !== "ton") return await buildEvmOrder(ref, q, q.settlementData.value);
+      if (srcCase !== "ton") return await buildEvmOrder(ref, q, q.settlementData.value, cached.bound);
       const srcChain = ref.srcChain;
       if (!isTon(srcChain)) throw new Error("omniston: source chain does not match TON quote");
       const destCase = q.outputAsset.chain.$case;
@@ -2219,11 +2436,10 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
       const settlement = q.settlementData;
       const hashingFunction = settlement.$case === "order" ? settlement.value.htlcHashingFunction : undefined;
-      const secrets = Array.from({length: maxExecutions}, generateSecret);
+      const {secrets, created} = await secretsFor(ref.quoteId, maxExecutions);
       const hashes = secrets.map((s) => hashlock(s, hashingFunction));
-      // Persist BEFORE anything can be signed: if the process dies after the
-      // escrow lock, the poll path still has the preimage to disclose.
-      await store.save(ref.quoteId, secrets.map(bytesToHex));
+      // Clear only what this call created (see buildEvmOrder).
+      const forget = async () => { if (created) await store.clear(ref.quoteId); };
 
       const owner: ChainAddress = {chain: {$case: "ton", value: ref.trader}};
       const omni = await getClient();
@@ -2239,27 +2455,27 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
           htlcSecrets: {secretMode: {$case: "provided", value: {hashes}}},
         });
       } catch (error) {
-        await store.clear(ref.quoteId);
+        await forget();
         throw error;
       }
       const [message, ...rest] = tx.messages;
       if (!message || rest.length > 0) {
-        await store.clear(ref.quoteId);
+        await forget();
         throw new Error(`omniston: expected exactly one escrow message, got ${tx.messages.length}`);
       }
       if (!isPositiveInteger(message.sendAmount) || BigInt(message.sendAmount) > BigInt(maxTonExecutionNano)) {
-        await store.clear(ref.quoteId);
+        await forget();
         throw new Error("omniston: resolver TON execution value exceeds the configured safety cap");
       }
       const expectedProtocol = q.settlementData.value.srcProtocolContractAddress;
       const initialResolver = q.settlementData.value.srcInitialResolverAddress;
       const jettonMaster = assetContract(q.inputAsset);
       if (expectedProtocol.chain.$case !== "ton" || initialResolver?.chain.$case !== "ton" || !jettonMaster) {
-        await store.clear(ref.quoteId);
+        await forget();
         throw new Error("omniston: incomplete TON settlement binding in quote");
       }
       if (message.jettonWalletStateInit) {
-        await store.clear(ref.quoteId);
+        await forget();
         throw new Error("omniston: deploying a resolver-provided jetton wallet is not supported");
       }
       let walletValid = false;
@@ -2272,11 +2488,11 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
           })
           : false;
       } catch (error) {
-        await store.clear(ref.quoteId);
+        await forget();
         throw error;
       }
       if (!walletValid) {
-        await store.clear(ref.quoteId);
+        await forget();
         throw new Error("omniston: TON jetton wallet was not independently validated");
       }
       try {
@@ -2299,7 +2515,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
           exclusivityTimeout: q.settlementData.value.exclusivityTimeout ?? 0,
         }, opts.validateTonEscrowPayload);
       } catch (error) {
-        await store.clear(ref.quoteId);
+        await forget();
         throw error;
       }
 
@@ -2319,21 +2535,42 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     async trackIntent(ref: IntentRef): Promise<IntentStatus> {
       const decoded = decodeIntent(ref.intentId);
       if (!decoded) throw new Error("omniston: malformed intent id");
+      // Swap settlement never discloses anything: tracked from the feed alone.
       if (decoded.kind === "swap") return await trackSwap(decoded, ref.sourceTxHash ?? null);
+      const trace = traceFor(decoded.quoteId);
+      // The secret is released only against the context stored when the quote
+      // was minted — never against trader/dest from the caller's intentId
+      // (scan F3/F15). Without a cached context (completed, TTL) this is a plain
+      // status read of the feed, exactly as before.
+      const stored = await loadBuilt(decoded.quoteId);
+      let cached: BuiltEntry | undefined;
+      let bound: Decoded = decoded;
+      if (stored) {
+        const result = bindIntent(decoded, stored);
+        if (!result.ok && result.reason === "mismatch") {
+          trace("intent-mismatch", {where: "trackIntent", field: result.field});
+          throw new Error(`omniston: intent id does not match the quote it was issued for (${result.field})`);
+        }
+        if (result.ok) {
+          if (result.legacy) trace("legacy-intent", {where: "trackIntent"});
+          cached = stored;
+          bound = result.ref;
+        } else {
+          trace("legacy-intent-expired", {where: "trackIntent"});
+        }
+      }
       const omni = await getClient();
       const order = await awaitOrder(
         omni.orderTrack({
           quoteId: decoded.quoteId,
           traderAddress:
-            toChainAddress(decoded.srcChain, decoded.trader) ??
-            ({chain: {$case: "ton", value: decoded.trader}} as ChainAddress),
+            toChainAddress(bound.srcChain, bound.trader) ??
+            ({chain: {$case: "ton", value: bound.trader}} as ChainAddress),
         }),
       );
       if (!order) return {state: "pending"};
 
       const secretsHex = await store.load(decoded.quoteId);
-      const cached = await loadBuilt(decoded.quoteId);
-      const trace = (event: string, details?: Record<string, unknown>) => { try { opts.trace?.(event, {quoteId: decoded.quoteId, ...details}); } catch { /* diagnostics never break tracking */ } };
       if (!secretsHex || cached?.quote.settlementData.$case !== "order") trace("disclosure-skipped", {gate: "context", secrets: !!secretsHex, cached: !!cached, feedStatus: order.status});
       if (secretsHex && cached?.quote.settlementData.$case === "order") {
         const q = cached.quote;
@@ -2383,7 +2620,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
                 factoryAddress: factory.chain.value,
                 quoteTimestamp: q.quoteTimestamp,
                 executionIndex: i,
-                recipientAddress: decoded.dest,
+                recipientAddress: bound.dest,
                 outputTokenAddress,
                 inputUnits: execution.inputUnits,
                 outputUnits: execution.outputUnits,
@@ -2393,6 +2630,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
                 protocolFeeUnits: q.protocolFeeUnits ?? "0",
                 integratorFeeUnits: q.integratorFeeUnits ?? "0",
                 ...(q.integratorAddress?.chain.value ? {integratorAddress: q.integratorAddress.chain.value} : {}),
+                ...(settlement.protocolFeeRecipientAddress?.chain.value ? {protocolFeeRecipientAddress: settlement.protocolFeeRecipientAddress.chain.value} : {}),
                 secretHash: expectedHash,
               });
               // EVM source: BOTH positions must be proven before the secret
@@ -2405,7 +2643,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
                   positionAddress: inputPosition!.chain.value,
                   factoryAddress: evmOrder!.factory,
                   orderProtocolAddress: settlement.srcProtocolContractAddress.chain.value,
-                  ownerAddress: decoded.trader,
+                  ownerAddress: evmOrder!.owner,
                   resolverAddress: settlement.srcInitialResolverAddress!.chain.value,
                   inputTokenAddress: inputTokenAddress!,
                   inputUnits: execution.inputUnits,
@@ -2423,7 +2661,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
                     positionAddress: position.chain.value,
                     protocolAddress: factory.chain.value,
                     outputJettonMasterAddress: outputTokenAddress,
-                    recipientAddress: decoded.dest,
+                    recipientAddress: bound.dest,
                     quoteId: decoded.quoteId,
                     quoteTimestamp: q.quoteTimestamp,
                     inputUnits: execution.inputUnits,
@@ -2456,7 +2694,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         order.executions.length === 1 && delivered?.chain.$case === outCase && delivered.chain.value
       ) {
         const hash = await opts.locateEvmDelivery({
-          chain: outCaip, positionAddress: delivered.chain.value, recipientAddress: decoded.dest,
+          chain: outCaip, positionAddress: delivered.chain.value, recipientAddress: bound.dest,
           tokenAddress: outToken, minUnits: order.executions[0]!.outputUnits,
         }).catch(() => null);
         if (hash) status.destTxHash = hash;
@@ -2466,7 +2704,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         order.executions.length === 1 && delivered?.chain.$case === "ton" && delivered.chain.value
       ) {
         const hash = await opts.locateTonDelivery({
-          positionAddress: delivered.chain.value, recipientAddress: decoded.dest,
+          positionAddress: delivered.chain.value, recipientAddress: bound.dest,
           jettonMasterAddress: outToken, minUnits: order.executions[0]!.outputUnits,
         }).catch(() => null);
         if (hash) status.destTxHash = hash;
@@ -2487,6 +2725,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       const cached = await loadBuilt(ref.quoteId);
       const order = cached?.evmOrder;
       if (!order) throw new Error("omniston: no signed-order context for this quote — build the order again");
+      // Same binding as buildDeposit: the intentId must be the one this order was built for.
+      requireBinding(ref, cached!, "registerSignedOrder");
       if (!/^0x[0-9a-fA-F]{130}$/.test(signature)) throw new Error("omniston: malformed order signature");
       const td = JSON.parse(order.typedData) as Parameters<typeof encodeTypedMessage>[0];
       const omni = await getClient();

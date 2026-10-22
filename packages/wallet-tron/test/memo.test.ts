@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import {
-  MAX_MEMO_BYTES, UnsafeTransactionError, WalletManagerTron, attachMemo, bandwidthPoints, describeTransaction, encodeMemoRecord, selector,
+  MAX_MEMO_BYTES, UnsafeTransactionError, WalletManagerTron, attachMemo, bandwidthPoints, decodeRawData, describeTransaction, encodeMemoRecord, encodeRawData, selector,
   memoBytes, toHexAddress, type TronFetch, type TronRawTransaction,
 } from '../src/index.js'
 
@@ -28,21 +28,20 @@ const F = {
   feeLimit: '90 01'.replace(' ', '') + '80ade204', // 18, varint
 }
 const RAW_TRANSFER = F.refBlockBytes + F.refBlockHash + F.expiration + F.contract + F.timestamp
-const RAW_CALL = F.refBlockBytes + F.refBlockHash + F.expiration + F.contract + F.timestamp + F.feeLimit
 
-function rawTx(type: string, value: Record<string, unknown>, raw_data_hex: string, extra: Record<string, unknown> = {}): TronRawTransaction {
-  return {
-    txID: bytesToHex(sha256(hexToBytes(raw_data_hex))), raw_data_hex, visible: false,
-    raw_data: { contract: [{ type, parameter: { value } }], ref_block_bytes: 'a1b2', ref_block_hash: '0011223344556677', expiration: NOW + 60_000, timestamp: NOW, ...extra },
-  }
+/** Without `raw_data_hex` the bytes are encoded from the JSON (what a node does); with it, the fixed layout above (splice tests only — not signable). */
+function rawTx(type: string, value: Record<string, unknown>, raw_data_hex?: string, extra: Record<string, unknown> = {}): TronRawTransaction {
+  const raw_data: TronRawTransaction['raw_data'] = { contract: [{ type, parameter: { value, type_url: `type.googleapis.com/protocol.${type}` } }], ref_block_bytes: 'a1b2', ref_block_hash: '0011223344556677', expiration: NOW + 60_000, timestamp: NOW, ...extra }
+  const hex = raw_data_hex ?? bytesToHex(encodeRawData(raw_data))
+  return { txID: bytesToHex(sha256(hexToBytes(hex))), raw_data_hex: hex, visible: false, raw_data }
 }
 
 function fakeNode() {
   const calls: Array<{ path: string; body: Record<string, unknown> }> = []
   const broadcast: TronRawTransaction[] = []
   const handlers: Record<string, (b: Record<string, unknown>) => unknown> = {
-    '/wallet/createtransaction': (b) => rawTx('TransferContract', { owner_address: b.owner_address, to_address: b.to_address, amount: b.amount }, RAW_TRANSFER),
-    '/wallet/triggersmartcontract': (b) => ({ result: { result: true }, transaction: rawTx('TriggerSmartContract', { owner_address: b.owner_address, contract_address: b.contract_address, data: selector(String(b.function_selector)) + b.parameter }, RAW_CALL, { fee_limit: b.fee_limit }) }),
+    '/wallet/createtransaction': (b) => rawTx('TransferContract', { owner_address: b.owner_address, to_address: b.to_address, amount: b.amount }),
+    '/wallet/triggersmartcontract': (b) => ({ result: { result: true }, transaction: rawTx('TriggerSmartContract', { owner_address: b.owner_address, contract_address: b.contract_address, data: selector(String(b.function_selector)) + b.parameter }, undefined, { fee_limit: b.fee_limit }) }),
     '/wallet/triggerconstantcontract': () => ({ result: { result: true }, energy_used: 30_000, constant_result: ['0'.repeat(63) + '1'] }),
     '/wallet/getaccount': (b) => ({ address: b.address, balance: 5_000_000 }),
     '/wallet/getaccountresource': () => ({ freeNetLimit: 600, freeNetUsed: 0, EnergyLimit: 0, EnergyUsed: 0 }),
@@ -121,7 +120,10 @@ describe('memo (raw_data.data)', () => {
     expect(res.estimate!.bandwidth).toBe(bandwidthPoints(sent.raw_data_hex))
     // canonical position: before contract (0x5a), after expiration (0x40)
     const hex = sent.raw_data_hex
-    expect(hex.indexOf('52' + Buffer.from([memo.length]).toString('hex'))).toBeLessThan(hex.indexOf(F.contract))
+    const contractRecord = bytesToHex(encodeRawData({ contract: sent.raw_data.contract }))
+    expect(hex.indexOf('52' + Buffer.from([memo.length]).toString('hex'))).toBeLessThan(hex.indexOf(contractRecord))
+    // the bytes a node would sign decode back to the same memo + contract
+    expect(decodeRawData(sent.raw_data_hex).raw_data).toMatchObject({ data: utf8hex(memo), contract: [{ type: 'TriggerSmartContract' }] })
     m.dispose()
   })
 
@@ -133,7 +135,7 @@ describe('memo (raw_data.data)', () => {
     expect(call.kind).toBe('trc20-transfer')
     expect(call.memo).toBe('hi')
     expect(call.warnings.map((w) => w.code)).toEqual(['memo-fee'])
-    const raw = describeTransaction(attachMemo(rawTx('TransferContract', { owner_address: toHexAddress(EXISTING), to_address: toHexAddress(EXISTING), amount: 1 }, RAW_TRANSFER), 'hi'), { now: NOW })
+    const raw = describeTransaction(attachMemo(rawTx('TransferContract', { owner_address: toHexAddress(EXISTING), to_address: toHexAddress(EXISTING), amount: 1 }), 'hi'), { now: NOW })
     expect(raw.memo).toBe('hi')
     expect(raw.warnings.map((w) => w.code)).toEqual(['memo-fee'])
     expect(describeTransaction({ to: EXISTING, value: 1n }).memo).toBeUndefined()

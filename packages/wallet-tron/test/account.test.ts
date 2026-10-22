@@ -3,7 +3,7 @@ import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import {
+import { decodeRawData, encodeRawData,
   SimulationError, UnsafeTransactionError, WalletManagerTron, ZERO_ADDRESS, bandwidthPoints, describeTransaction, encodeParameters,
   hashMessage, recoverMessageAddress, selector, toHexAddress, type TronFetch, type TronRawTransaction,
 } from '../src/index.js'
@@ -23,19 +23,38 @@ function errorString(msg: string): string {
 }
 
 /**
- * Fake full node. raw_data_hex lengths mirror real sizes (134 raw bytes for a TRX
- * transfer → 268 bandwidth points, 211 for a TRC-20 transfer → 345); txID = sha256(raw_data_hex).
+ * Fake full node. raw_data_hex is real protobuf (encodeRawData) padded towards real sizes (134 raw bytes
+ * for a TRX transfer, 211 for a TRC-20 transfer; a byte more when the padding record cannot fit exactly); txID = sha256(raw_data_hex).
  */
+/** `txID` + `raw_data_hex` from a `raw_data` object; `rawBytes` pads with field 12 (`scripts`) when the encoding is shorter. */
+function seal(raw_data: TronRawTransaction['raw_data'], rawBytes = 0, nonce = 0, padWith: 'scripts' | 'ref_block_num' = 'scripts'): TronRawTransaction {
+  let hex = bytesToHex(encodeRawData(raw_data))
+  const short = rawBytes - hex.length / 2
+  if (padWith === 'ref_block_num' && short >= 1 && short <= 11) {
+    // A node build may carry ref_block_num (field 3) but never scripts (12): pad with a varint of the right
+    // length (a record is at least 2 bytes, so a 1-byte gap becomes 2). Spliced after ref_block_bytes
+    // (field 1) to keep java-tron field order.
+    const pad = Math.max(short, 2)
+    const v = (1n << BigInt(7 * (pad - 2))) + BigInt(nonce)
+    const bytes: number[] = []
+    let x = v
+    do { let b = Number(x & 0x7fn); x >>= 7n; if (x) b |= 0x80; bytes.push(b) } while (x)
+    if (bytes.length !== pad - 1) throw new Error('padding does not fit')
+    const at = hex.startsWith('0a') ? 4 + parseInt(hex.slice(2, 4), 16) * 2 : 0
+    hex = hex.slice(0, at) + '18' + bytesToHex(Uint8Array.from(bytes)) + hex.slice(at)
+  } else if (short >= 2) hex += '62' + (short - 2).toString(16).padStart(2, '0') + nonce.toString(16).padStart(4, '0').padEnd((short - 2) * 2, '0').slice(0, (short - 2) * 2)
+  else if (short === 1) hex += '6200'
+  return { txID: bytesToHex(sha256(hexToBytes(hex))), raw_data_hex: hex, visible: false, raw_data }
+}
+
 function fakeNode(overrides: Record<string, (body: Record<string, unknown>) => unknown> = {}, opts: { resources?: Record<string, number>; params?: Array<{ key: string; value: number }> } = {}) {
   const calls: Array<{ path: string; body: Record<string, unknown> }> = []
   const broadcast: TronRawTransaction[] = []
   let n = 0
+  // Real protobuf bytes (what a node returns), padded with a `scripts` (field 12) record to the target size when that is possible.
   const rawTx = (type: string, value: Record<string, unknown>, rawBytes: number, extra: Record<string, unknown> = {}): TronRawTransaction => {
-    const raw_data_hex = ('0a02' + (++n).toString(16).padStart(4, '0')).padEnd(rawBytes * 2, 'ab')
-    return {
-      txID: bytesToHex(sha256(hexToBytes(raw_data_hex))), raw_data_hex, visible: false,
-      raw_data: { contract: [{ type, parameter: { value } }], ref_block_bytes: 'a1b2', ref_block_hash: '0011223344556677', expiration: NOW + 60_000, timestamp: NOW, ...extra },
-    }
+    const raw_data: TronRawTransaction['raw_data'] = { contract: [{ type, parameter: { value, type_url: `type.googleapis.com/protocol.${type}` } }], ref_block_bytes: 'a1b2', ref_block_hash: '0011223344556677', expiration: NOW + 60_000, timestamp: NOW, ...extra }
+    return seal(raw_data, rawBytes, ++n, 'ref_block_num')
   }
   const handlers: Record<string, (body: Record<string, unknown>) => unknown> = {
     '/wallet/createtransaction': (b) => rawTx('TransferContract', { owner_address: b.owner_address, to_address: b.to_address, amount: b.amount }, 134),
@@ -117,7 +136,7 @@ describe('WalletAccountTron', () => {
     expect(res.hash).toBe(f.broadcast[0]!.txID)
     expect(res.activationFee).toBe(1_100_000n)
     expect(res.fee).toBe(1_100_000n)
-    expect(res.estimate).toMatchObject({ bandwidth: 268, energy: 0, trxBurn: 1_100_000n, breakdown: { bandwidthFree: 600, bandwidthStaked: 0, bandwidthBurn: 0n, energyBurn: 0n, memoFee: 0n, accountCreationFee: 1_100_000n, bandwidthPrice: 1000n, energyPrice: 210n } })
+    expect(res.estimate).toMatchObject({ bandwidth: bandwidthPoints(f.broadcast[0]!.raw_data_hex), energy: 0, trxBurn: 1_100_000n, breakdown: { bandwidthFree: 600, bandwidthStaked: 0, bandwidthBurn: 0n, energyBurn: 0n, memoFee: 0n, accountCreationFee: 1_100_000n, bandwidthPrice: 1000n, energyPrice: 210n } })
     m.dispose()
   })
 
@@ -132,8 +151,9 @@ describe('WalletAccountTron', () => {
     const exhausted = fakeNode({}, { resources: { freeNetLimit: 600, freeNetUsed: 600 } })
     const m2 = new WalletManagerTron(SEED, { provider: exhausted.fetch })
     const r2 = await withNow(async () => (await m2.getAccount(0)).transfer({ recipient: EXISTING, amount: 1_000_000n }))
-    expect(r2.fee).toBe(268_000n)
-    expect(r2.estimate!.breakdown.bandwidthBurn).toBe(268_000n)
+    const burn2 = BigInt(bandwidthPoints(exhausted.broadcast[0]!.raw_data_hex)) * 1000n
+    expect(r2.fee).toBe(burn2)
+    expect(r2.estimate!.breakdown.bandwidthBurn).toBe(burn2)
     m2.dispose()
 
     const staked = fakeNode({}, { resources: { freeNetLimit: 600, freeNetUsed: 600, NetLimit: 5000, NetUsed: 0 } })
@@ -162,7 +182,7 @@ describe('WalletAccountTron', () => {
     expect(f.broadcast).toHaveLength(1)
     expect(verifyTx(f.broadcast[0]!, a.publicKey)).toBe(true)
     expect(res.fee).toBe(6_300_000n)
-    expect(res.estimate).toMatchObject({ bandwidth: 345, energy: 30_000, breakdown: { energyBurn: 6_300_000n, bandwidthBurn: 0n, energyStaked: 0 } })
+    expect(res.estimate).toMatchObject({ bandwidth: bandwidthPoints(f.broadcast[0]!.raw_data_hex), energy: 30_000, breakdown: { energyBurn: 6_300_000n, bandwidthBurn: 0n, energyStaked: 0 } })
     m.dispose()
 
     const staked = fakeNode({}, { resources: { freeNetLimit: 600, freeNetUsed: 0, EnergyLimit: 20_000, EnergyUsed: 0 } })
@@ -304,7 +324,8 @@ describe('WalletAccountTron', () => {
     expect(await code(base({}, { owner_address: toHexAddress(RECIPIENT), to_address: toHexAddress(EXISTING), amount: 1 }))).toBe('owner-mismatch')
     const two = base({})
     two.raw_data.contract.push(two.raw_data.contract[0]!)
-    expect(await code(two)).toBe('multi-contract')
+    expect(await code(two)).toBe('raw-mismatch') // the JSON grew a contract the bytes do not carry
+    expect(await code(seal(two.raw_data))).toBe('multi-contract')
     expect(await code(base({}, { owner_address: a.addressHex, to_address: toHexAddress(ZERO_ADDRESS), amount: 1 }))).toBe('zero-address')
     expect(await code(base({}))).toBe('ok')
     expect(f.broadcast).toHaveLength(0)
@@ -373,6 +394,41 @@ describe('WalletAccountTron', () => {
     expect(await a.getTransactionReceipt('zz')).toBeUndefined()
     expect(await a.getTransactionReceipt('aa')).toMatchObject({ status: 1, blockNumber: 42n, fee: 300n })
     expect((await a.getTransactionReceipt('bb'))!.status).toBe(0)
+    m.dispose()
+  })
+
+  it('scan F7: a malicious node build (other recipient, approve instead of transfer, account takeover) is refused before signing; nothing is broadcast', async () => {
+    let f: ReturnType<typeof fakeNode>
+    const evilCall = fakeNode({
+      '/wallet/triggersmartcontract': (b) => ({ result: { result: true }, transaction: f.rawTx('TriggerSmartContract', { owner_address: b.owner_address, contract_address: b.contract_address, data: selector('transfer(address,uint256)') + encodeParameters([{ type: 'address', value: RECIPIENT }, { type: 'uint256', value: 1n }]) }, 211, { fee_limit: b.fee_limit }) }),
+    })
+    f = evilCall
+    const m = new WalletManagerTron(SEED, { provider: evilCall.fetch })
+    const a = await m.getAccount(0)
+    await expect(withNow(() => a.transfer({ token: USDT, recipient: EXISTING, amount: 1n }))).rejects.toMatchObject({ code: 'build-mismatch' })
+    await expect(withNow(() => a.quoteTransfer({ token: USDT, recipient: EXISTING, amount: 1n }))).rejects.toMatchObject({ code: 'build-mismatch' })
+    // the honest call through the same node (it lies only about EXISTING) still goes through
+    await expect(withNow(() => a.transfer({ token: USDT, recipient: RECIPIENT, amount: 1n }))).resolves.toMatchObject({ hash: expect.any(String) })
+    expect(evilCall.broadcast).toHaveLength(1)
+    m.dispose()
+
+    const evilTrx = fakeNode({
+      '/wallet/createtransaction': (b) => f.rawTx('AccountPermissionUpdateContract', { owner_address: b.owner_address, raw_parameter_hex: '0a15' + String(b.owner_address) + '12050a03666f6f' }, 134),
+    })
+    f = evilTrx
+    const m2 = new WalletManagerTron(SEED, { provider: evilTrx.fetch })
+    await expect(withNow(async () => (await m2.getAccount(0)).transfer({ recipient: EXISTING, amount: 1n }))).rejects.toMatchObject({ code: 'build-mismatch' })
+    expect(evilTrx.broadcast).toHaveLength(0)
+    m2.dispose()
+  })
+
+  it('a hex memo (Chainflip vault-swap note) is spliced as raw bytes and checked against the build', async () => {
+    const f = fakeNode()
+    const m = new WalletManagerTron(SEED, { provider: f.fetch })
+    const a = await m.getAccount(0)
+    await withNow(() => a.transfer({ token: USDT, recipient: EXISTING, amount: 1n, memo: '0x00a1ff', memoEncoding: 'hex' }))
+    expect(f.broadcast[0]!.raw_data.data).toBe('00a1ff')
+    expect(decodeRawData(f.broadcast[0]!.raw_data_hex).raw_data.data).toBe('00a1ff')
     m.dispose()
   })
 

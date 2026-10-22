@@ -1,0 +1,5 @@
+---
+"@forgewallet/protocol-swap2-omniston": patch
+---
+
+TON↔TON swaps: the built message's DEX call is now decoded before the wallet signs it (scan F11). STON.fi v1/v2 (incl. pTON v1/v2 native input and v2 cross-swaps), DeDust v1 and DeDust CPMM v2 bodies must pay the destination, refund and return excess to the trader, carry an on-chain minimum at or above the quote's `minOutputAmount`, and name no referral other than the integrator; unknown layouts, unsupported protocols and split/multi-route quotes are refused as `ton-swap-payload <reason>`. New `validateTonSwapLeg` (returned by `createOmnistonTonValidators`, so spreading hosts need no change) checks on chain that each hop's ask wallet is its router's wallet of the quoted output, that a native-input pTON wallet belongs to the router, and that a DeDust pool trades the quoted pair. `tonSwapPayloadCheck: "report" | "enforce"` (default `"enforce"`; every body captured live on 2026-10-22 passes). STON.fi v1 native input (GRAM→USDT at larger sizes: a jetton transfer to the router's pTON v1 wallet) now builds instead of being refused.

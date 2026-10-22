@@ -14,7 +14,15 @@ TRON needs its own order path and is not wired yet.
 Every route is fail-closed until its allowlists and validators are configured:
 
 - **TON → TON** (DEX swap): `trustedSettlementContracts["ton:-239"]`,
-  `validateTonJettonWallet`, `validateTonSwapTarget`.
+  `validateTonJettonWallet`, `validateTonSwapTarget`. The built message's DEX
+  call is decoded in the package (STON.fi v1/v2 incl. pTON and cross-swap,
+  DeDust v1, DeDust CPMM v2): receiver = destination, refunds/excess = trader,
+  on-chain minimum ≥ the quote's, no foreign referral; unknown layouts and
+  split/multi-route quotes are refused by name. `validateTonSwapLeg`
+  (supplied by `createOmnistonTonValidators`) confirms the routers' ask
+  wallets, pTON wallet ownership and DeDust pool pairs on chain.
+  `tonSwapPayloadCheck: "report"` traces `ton-swap-payload <reason>` instead
+  of refusing (default `"enforce"`).
 - **TON → EVM** (HTLC order, the wallet pays a jetton escrow): factory
   allowlisted on both chains, `validateTonJettonWallet`,
   `validateTonEscrowPayload`, `validateEvmOutputPosition`.
@@ -36,6 +44,11 @@ Every route is fail-closed until its allowlists and validators are configured:
   disclosed only when `validateEvmInputPosition` (source fill, including the
   destination complement) AND `validateEvmOutputPosition` (an escrow the
   trusted factory derives from immutables that pay the recipient) both pass.
+  The destination escrow's fee split must be exactly the quoted protocol and
+  integrator fees, paid only to the quote's `protocolFeeRecipientAddress` /
+  integrator, its destination stages must be 1/120/180 s, and the secret is
+  not released within 45 s of its cancellation stage (refusal reasons go to
+  the validator's `onRefusal`).
 
 ## Validators
 

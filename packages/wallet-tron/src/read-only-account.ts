@@ -6,7 +6,9 @@ import { decodeRevertReason, encodeParameters, decodeUint, hexToText, selector }
 import { addressFromPublicKey, toBase58Address, toHexAddress } from './address.js'
 import { assertNoError, createClient } from './client.js'
 import { describeTransaction, type DescribeContext } from './describe.js'
-import { attachMemo } from './memo.js'
+import { assertNodeBuild } from './build-check.js'
+import { attachMemo, memoBytes } from './memo.js'
+import { decodeRawData } from './raw.js'
 import { isContractCall, isPrebuilt } from './shape.js'
 import {
   CAIP2_GENESIS, type TronConfig, type TronContractCall, type TronFeeEstimate, type TronFetch, type TronNativeTransfer,
@@ -80,8 +82,10 @@ export function recoverMessageAddress(message: string | Uint8Array, signature: s
   } catch { return undefined }
 }
 
+/** First contract of a prebuilt transaction — from `raw_data_hex` when it decodes (the bytes are what gets signed), else from the JSON. */
 const contractOf = (tx: TronRawTransaction) => {
-  const c = tx.raw_data?.contract?.[0]
+  let c = tx.raw_data?.contract?.[0]
+  if (typeof tx.raw_data_hex === 'string' && tx.raw_data_hex.length) { try { c = decodeRawData(tx.raw_data_hex).raw_data.contract[0] } catch { /* verifyRawTransaction reports it before anything is signed */ } }
   return { type: c?.type, value: (c?.parameter?.value ?? {}) as Record<string, unknown> }
 }
 
@@ -175,11 +179,19 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
         parameter: encodeParameters(parameters), fee_limit: feeLimit, call_value: options.callValue ?? 0, visible: false,
       }, 'build a contract call')
       if (!r.transaction) throw new Error('triggersmartcontract returned no transaction')
-      return { built: tx.memo ? attachMemo(r.transaction, tx.memo, tx.memoEncoding) : r.transaction, sim }
+      const built = tx.memo ? attachMemo(r.transaction, tx.memo, tx.memoEncoding) : r.transaction
+      // The node is not trusted with what it builds (scan F7): the bytes must be exactly this call.
+      assertNodeBuild(built, {
+        type: 'TriggerSmartContract', owner: this.addressHex, contract: contractAddress,
+        data: selector(functionSelector) + encodeParameters(parameters), callValue: BigInt(options.callValue ?? 0), feeLimit: BigInt(feeLimit),
+      }, tx.memo ? memoBytes(tx.memo, tx.memoEncoding) : undefined)
+      return { built, sim }
     }
     const { to, value, memo, memoEncoding } = tx as TronNativeTransfer
-    const built = await this.post<TronRawTransaction>('/wallet/createtransaction', { owner_address: this.addressHex, to_address: toHexAddress(to), amount: Number(BigInt(value)), visible: false }, 'build a transfer')
-    return { built: memo ? attachMemo(built, memo, memoEncoding) : built }
+    const node = await this.post<TronRawTransaction>('/wallet/createtransaction', { owner_address: this.addressHex, to_address: toHexAddress(to), amount: Number(BigInt(value)), visible: false }, 'build a transfer')
+    const built = memo ? attachMemo(node, memo, memoEncoding) : node
+    assertNodeBuild(built, { type: 'TransferContract', owner: this.addressHex, to, amount: BigInt(value) }, memo ? memoBytes(memo, memoEncoding) : undefined)
+    return { built }
   }
 
   protected async buildTransaction(tx: TronTransaction): Promise<TronRawTransaction> {
