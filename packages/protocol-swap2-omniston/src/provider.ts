@@ -5,6 +5,9 @@ import {Buffer} from "buffer";
 import {encodeAbiParameters, getAddress, hexToBytes as viemHexToBytes, keccak256, sha256} from "viem";
 import {ccAsset, ccAssetByToken, type CcAsset} from "@forgewallet/swap2-assets";
 import {omniston as cfg} from "./config.js";
+import {checkTonSwapPayload, TonSwapPayloadError, type TonSwapCheckResult, type TonSwapLeg} from "./ton-swap.js";
+export {checkTonSwapPayload, TonSwapPayloadError, TON_SWAP_PROTOCOL_LAYOUTS} from "./ton-swap.js";
+export type {TonSwapLeg, TonSwapCheckInput, TonSwapCheckResult} from "./ton-swap.js";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
 
 /**
@@ -367,6 +370,25 @@ export interface OmnistonProviderOptions {
    * swaps are not advertised.
    */
   validateTonSwapTarget?: (input: {address: string; protocols: readonly string[]}) => Promise<boolean> | boolean;
+  /**
+   * TON↔TON swap settlement (scan F11): confirm one chain fact the decoded
+   * swap body depends on — that a STON.fi hop's ask wallet is its router's
+   * wallet of the quoted output (and, for native input, that the pTON wallet
+   * the message pays belongs to that router), or that a DeDust pool trades the
+   * quoted pair. `createOmnistonTonValidators` supplies it. When absent the
+   * decoded-body rules still apply and each skipped leg is traced as
+   * `ton-swap-payload legs-unverified`; STON.fi v1 native input (pTON v1) is
+   * refused without it.
+   */
+  validateTonSwapLeg?: (leg: TonSwapLeg) => Promise<boolean> | boolean;
+  /**
+   * TON↔TON swap settlement (scan F11): what a built swap body that fails the
+   * decoder (receiver ≠ destination, refund/excess ≠ trader, on-chain minimum
+   * below the quote, unknown layout, unverifiable leg) does. "enforce"
+   * (default) refuses the build; "report" traces `ton-swap-payload <reason>`
+   * and still builds — a rollout escape hatch, not a steady state.
+   */
+  tonSwapPayloadCheck?: "report" | "enforce";
   validateTonEscrowPayload?: (input: {
     payloadBocHex: string;
     forwardPayloadBocHex: string;
@@ -657,6 +679,14 @@ function assetContract(asset: AssetId): string | null {
   if (typeof value === "string") return null;
   const kind = value.kind;
   return kind && typeof kind.value === "string" ? kind.value : null;
+}
+
+/** A route step's asset as a jetton master (null = native GRAM, undefined = not stated). */
+function stepJetton(asset: AssetId | undefined): string | null | undefined {
+  if (!asset || asset.chain.$case !== "ton" || typeof asset.chain.value === "string") return undefined;
+  const kind = asset.chain.value.kind;
+  if (kind?.$case === "native") return null;
+  return kind?.$case === "jetton" && typeof kind.value === "string" ? kind.value : undefined;
 }
 
 function readBigEndian(bytes: Uint8Array, offset: number, length: number): bigint {
@@ -1917,6 +1947,14 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     const inputJetton = assetContract(q.inputAsset);
     const payload = parseSwapPayload(message.payload);
 
+    const routeSteps = swap.routes.length === 1 ? swap.routes[0]!.steps : [];
+    const singleV1 = routeSteps.length === 1 && routeSteps[0]!.chunks.length === 1 && routeSteps[0]!.chunks[0]!.protocol === "StonFiV1";
+    // STON.fi v1 native input (pTON v1): the message is a jetton transfer to the
+    // ROUTER's pTON v1 wallet naming the router as destination (STON.fi SDK v1
+    // shape; seen live 2026-10-22 for GRAM→USDT from ~100 GRAM up). Native
+    // input, so the message carries input + gas.
+    const ptonV1Native = !inputJetton && !!payload.jettonTransfer && singleV1;
+
     if (inputJetton) {
       // Jetton input: a transfer from the trader's OWN jetton wallet whose
       // forward lands in the DEX. The TON attached is gas only.
@@ -1936,6 +1974,24 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       if (!walletValid) throw new Error("omniston: TON jetton wallet was not independently validated");
       const targetValid = await opts.validateTonSwapTarget!({address: transfer.destination, protocols});
       if (!targetValid) throw new Error("omniston: swap destination is not a recognized DEX contract for the quoted protocol");
+    } else if (ptonV1Native) {
+      const transfer = payload.jettonTransfer!;
+      const input = BigInt(q.inputUnits);
+      if (transfer.amount !== input) throw new Error("omniston: swap message moves a different amount than quoted");
+      if (sendAmount < input) throw new Error("omniston: swap message carries less than the quoted input");
+      const gas = sendAmount - input;
+      if (gas > gasCap || gas > gasBudget) throw new Error(`omniston: swap message attaches more TON than the quoted gas budget (${gas} > ${gasBudget} nanoTON, cap ${gasCap}, ${protocols.join("+")})`);
+      // pTON v1 forwards exactly the gas share of the value to the router (live: 0.1 of 0.1 GRAM).
+      if (transfer.forwardTon > gas) throw new Error("omniston: swap message forwards more TON than its gas");
+      if (!transfer.responseDestination || !sameTonAddress(transfer.responseDestination, ref.trader)) {
+        throw new Error("omniston: swap message returns excess to a wallet other than the trader");
+      }
+      if (typeof opts.validateTonSwapLeg !== "function") throw new Error("omniston: STON.fi v1 native input needs the validateTonSwapLeg validator (pTON v1 wallet ownership)");
+      // The pTON v1 wallet (a router-owned proxy-TON wallet) and the router it names.
+      const targetValid = await opts.validateTonSwapTarget!({address: message.targetAddress, protocols});
+      if (!targetValid) throw new Error("omniston: swap target is not a recognized DEX contract for the quoted protocol");
+      const routerValid = await opts.validateTonSwapTarget!({address: transfer.destination, protocols});
+      if (!routerValid) throw new Error("omniston: swap destination is not a recognized DEX contract for the quoted protocol");
     } else {
       // Native input: the message itself pays the DEX — value = input + gas.
       if (payload.jettonTransfer) {
@@ -1948,6 +2004,54 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       if (gas > gasCap || gas > gasBudget) throw new Error(`omniston: swap message attaches more TON than the quoted gas budget (${gas} > ${gasBudget} nanoTON, cap ${gasCap}, ${protocols.join("+")})`);
       const targetValid = await opts.validateTonSwapTarget!({address: message.targetAddress, protocols});
       if (!targetValid) throw new Error("omniston: swap target is not a recognized DEX contract for the quoted protocol");
+    }
+
+    // Scan F11: open the DEX call and bind receiver, refund/excess, minimum
+    // output and the route's contracts to the quote. The pTON v1 path is new
+    // and always enforced; elsewhere `tonSwapPayloadCheck` decides.
+    const mode = ptonV1Native ? "enforce" : (opts.tonSwapPayloadCheck ?? "enforce");
+    const trace = traceFor(ref.quoteId);
+    const payloadRefusal = (reason: string, detail: string): void => {
+      trace("ton-swap-payload", {reason, detail, mode, protocols: protocols.join("+")});
+      if (mode === "enforce") throw new Error(`omniston: ton-swap-payload ${reason} — ${detail}`);
+    };
+    let checked: TonSwapCheckResult | null = null;
+    try {
+      checked = checkTonSwapPayload({
+        payloadHex: message.payload,
+        targetAddress: message.targetAddress,
+        sendAmount,
+        trader: ref.trader,
+        dest: ref.dest,
+        inputUnits: q.inputUnits,
+        minOutputAmount: swap.minOutputAmount,
+        inputJetton,
+        outputJetton: assetContract(q.outputAsset),
+        steps: swap.routes.length === 1
+          ? routeSteps.map((step) => {
+            if (step.chunks.length !== 1) return {protocol: `split(${step.chunks.map((c) => c.protocol).join("|")})`, inputJetton: undefined, outputJetton: undefined};
+            return {protocol: step.chunks[0]!.protocol, inputJetton: stepJetton(step.inputAsset), outputJetton: stepJetton(step.outputAsset)};
+          })
+          : [{protocol: `${swap.routes.length}-routes`, inputJetton: undefined, outputJetton: undefined}],
+        integratorAddress: q.integratorAddress?.chain.$case === "ton" ? q.integratorAddress.chain.value : null,
+      });
+    } catch (error) {
+      if (error instanceof TonSwapPayloadError) payloadRefusal(error.reason, error.message);
+      else payloadRefusal("malformed", error instanceof Error ? error.message : String(error));
+    }
+    if (checked) {
+      if (typeof opts.validateTonSwapLeg !== "function") {
+        trace("ton-swap-payload", {reason: "legs-unverified", detail: "no validateTonSwapLeg hook", mode, legs: checked.legs.length});
+      } else {
+        for (const leg of checked.legs) {
+          let ok = false;
+          try { ok = await opts.validateTonSwapLeg(leg); } catch { ok = false; }
+          if (!ok) {
+            payloadRefusal("leg-unverified", `${leg.kind} v${leg.version} ${leg.kind === "dedust-pool" ? `pool ${leg.pool}` : `ask wallet ${leg.askWallet}`}`);
+            break;
+          }
+        }
+      }
     }
 
     return {

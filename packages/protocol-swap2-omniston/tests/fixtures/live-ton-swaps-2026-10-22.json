@@ -1,0 +1,2984 @@
+{
+ "capturedAt": "2026-10-22",
+ "source": "omni-ws.ston.fi tonBuildSwap, build-only (never signed or sent)",
+ "note": "trader = dest; jetton-input rows use public wallets holding the input jetton so Omniston's emulation passes",
+ "cases": [
+  {
+   "pair": "GRAM>USDT",
+   "amount": "2",
+   "protocols": "DeDustCPMMV2",
+   "trader": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "dest": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "quote": {
+    "rfqId": "c5451548b8cfdf9f436691c74b3f23ba31d747fbfba095e2fd5573142ea84521",
+    "quoteId": "6fe838236163d2a65c8c0d923373222c4e54060dbfe7c80cf72584848cf1ee1e",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "native",
+        "value": {}
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "inputUnits": "2000000000",
+    "outputUnits": "2711320",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627579,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "native",
+              "value": {}
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "DeDustCPMMV2",
+            "inputUnits": "2000000000",
+            "outputUnits": "2711320"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "2684207",
+      "recommendedMinOutputAmount": "2684207",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 102
+     }
+    },
+    "gasBudget": "100000000",
+    "estimatedGasConsumption": "5000000"
+   },
+   "buildRequest": {
+    "quoteId": "6fe838236163d2a65c8c0d923373222c4e54060dbfe7c80cf72584848cf1ee1e",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQAH4MY1EbqP7Gg2wJkoZvoCG4BYPsEG5lVBXPZn0UqXNz4y",
+     "sendAmount": "2100000000",
+     "payload": "b5ee9c7241010301008c000221a5a7cbf8f72584848cf1ee1e477359400801020019c442500f328f52f0000000000100cb80136b93afc3bbf8596405bba66c1156e3b71a44fca03f2ec7afe5826e7fff970fa04009b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d02004dae4ebf0eefe1659016ee99b0455b8edc6913f280fcbb1ebf9609b9fffe5c3ec5887710c"
+    }
+   ],
+   "expect": {
+    "layout": "dedust-v2",
+    "minOut": "2684207",
+    "legs": [
+     {
+      "kind": "dedust-pool",
+      "version": 2,
+      "pool": "EQAH4MY1EbqP7Gg2wJkoZvoCG4BYPsEG5lVBXPZn0UqXNz4y",
+      "inputJetton": null,
+      "outputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "GRAM>USDT",
+   "amount": "200",
+   "protocols": "StonFiV2",
+   "trader": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "dest": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "quote": {
+    "rfqId": "22ab7fad4d8fb3df281664d981b0293b36dcbe9a617b119605e3414bf7568fc5",
+    "quoteId": "496b34b55a1506b92f6f5a1a1198624881a30d8f73337c1b4b0c9f788bfaa7f",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "native",
+        "value": {}
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "inputUnits": "200000000000",
+    "outputUnits": "271301641",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627579,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "native",
+              "value": {}
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "StonFiV2",
+            "inputUnits": "200000000000",
+            "outputUnits": "271301641"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "268588625",
+      "recommendedMinOutputAmount": "268588625",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 108
+     }
+    },
+    "gasBudget": "220000000",
+    "estimatedGasConsumption": "20000000"
+   },
+   "buildRequest": {
+    "quoteId": "496b34b55a1506b92f6f5a1a1198624881a30d8f73337c1b4b0c9f788bfaa7f",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQCSIMGBps_qzRG3uPYhON8bucyCtu0mYdL1-u4gSz77IBa3",
+     "sendAmount": "200220000000",
+     "payload": "b5ee9c724101030100d600016601f3835db4b0c9f788bfaa7f52e90edd00080136b93afc3bbf8596405bba66c1156e3b71a44fca03f2ec7afe5826e7fff970fb0101e16664de2a801245ac4fafb1db7a01c9c477b618a94eddcbc3e8cae7435e882f0aff47c47d23f0026d7275f8777f0b2c80b774cd822adc76e3489f9407e5d8f5fcb04dcffff2e1f6004dae4ebf0eefe1659016ee99b0455b8edc6913f280fcbb1ebf9609b9fffe5c3e800000007fffffffc002005341002565180136b93afc3bbf8596405bba66c1156e3b71a44fca03f2ec7afe5826e7fff970fa000000100f7f0eec"
+    }
+   ],
+   "expect": {
+    "layout": "stonfi-v2",
+    "minOut": "268588625",
+    "legs": [
+     {
+      "kind": "stonfi-router",
+      "version": 2,
+      "router": null,
+      "proxyTonWallet": "EQCSIMGBps_qzRG3uPYhON8bucyCtu0mYdL1-u4gSz77IBa3",
+      "askWallet": "EQCSLWJ9fY7b0A5OI72wxUp27l4fRlc6GvRBeFf6PiPpH4p3",
+      "inputJetton": null,
+      "outputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "GRAM>USDT",
+   "amount": "4000",
+   "protocols": "StonFiV2",
+   "trader": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "dest": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "quote": {
+    "rfqId": "5fa48a9b242ffa01ab7e6afca3b4bfe3c4d29ad350c0c899eca8911bae8fd5e4",
+    "quoteId": "a174d67ebf5ca820a64875c3c8b7b06af8badcbcd7389f74641276a5c2b49592",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "native",
+        "value": {}
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "inputUnits": "4000000000000",
+    "outputUnits": "5414848184",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627581,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "native",
+              "value": {}
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "StonFiV2",
+            "inputUnits": "4000000000000",
+            "outputUnits": "5414848184"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "5360699703",
+      "recommendedMinOutputAmount": "5360699703",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 2169
+     }
+    },
+    "gasBudget": "220000000",
+    "estimatedGasConsumption": "20000000"
+   },
+   "buildRequest": {
+    "quoteId": "a174d67ebf5ca820a64875c3c8b7b06af8badcbcd7389f74641276a5c2b49592",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQCSIMGBps_qzRG3uPYhON8bucyCtu0mYdL1-u4gSz77IBa3",
+     "sendAmount": "4000220000000",
+     "payload": "b5ee9c724101030100d800016801f3835d641276a5c2b49592603a35294400080136b93afc3bbf8596405bba66c1156e3b71a44fca03f2ec7afe5826e7fff970fb0101e16664de2a801245ac4fafb1db7a01c9c477b618a94eddcbc3e8cae7435e882f0aff47c47d23f0026d7275f8777f0b2c80b774cd822adc76e3489f9407e5d8f5fcb04dcffff2e1f6004dae4ebf0eefe1659016ee99b0455b8edc6913f280fcbb1ebf9609b9fffe5c3e800000007fffffffc00200555013f85c93780136b93afc3bbf8596405bba66c1156e3b71a44fca03f2ec7afe5826e7fff970fa0000001002c27e59"
+    }
+   ],
+   "expect": {
+    "layout": "stonfi-v2",
+    "minOut": "5360699703",
+    "legs": [
+     {
+      "kind": "stonfi-router",
+      "version": 2,
+      "router": null,
+      "proxyTonWallet": "EQCSIMGBps_qzRG3uPYhON8bucyCtu0mYdL1-u4gSz77IBa3",
+      "askWallet": "EQCSLWJ9fY7b0A5OI72wxUp27l4fRlc6GvRBeFf6PiPpH4p3",
+      "inputJetton": null,
+      "outputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "USDT>GRAM",
+   "amount": "5",
+   "protocols": "DeDust",
+   "trader": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "dest": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "quote": {
+    "rfqId": "98fc096b36cb590463598d898554e3c788f376db491390df22e9f42395c8f1ed",
+    "quoteId": "fa18bf97175005d03a2809381379855c447651db99b2602e9e1c80926b4b2fcf",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "native",
+        "value": {}
+       }
+      }
+     }
+    },
+    "inputUnits": "5000000",
+    "outputUnits": "3681327146",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627621,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "native",
+              "value": {}
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "DeDust",
+            "inputUnits": "5000000",
+            "outputUnits": "3681327146"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "3644513875",
+      "recommendedMinOutputAmount": "3644513875",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 18
+     }
+    },
+    "gasBudget": "150000000",
+    "estimatedGasConsumption": "10000000"
+   },
+   "buildRequest": {
+    "quoteId": "fa18bf97175005d03a2809381379855c447651db99b2602e9e1c80926b4b2fcf",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQAjdEks4t5n-kvKH8qrzJqkbWczKMOOQP_-djSgJ00fZEyI",
+     "sendAmount": "150000000",
+     "payload": "b5ee9c724101040100fa0001ae0f8a7ea59e1c80926b4b2fcf34c4b4080031551c5ddaa2e8fb5c06780f3727107b28395b1eca8b3e5dd39ae8e96d71dabb0022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167c80bebc201010155e3a0d4828007cbff951bbf9e6d86d93fe8de62ac5556a37322908b5ad84d97bcc93ab14ab104d93ade534002014b0000000080115f7962c66b1d6417c35d36c2145270071b094210fcfe939997f008deb390b3e303008d3c37d7e980115f7962c66b1d6417c35d36c2145270071b094210fcfe939997f008deb390b3f0022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167e9bd5ecd0"
+    }
+   ],
+   "expect": {
+    "layout": "dedust-v1",
+    "minOut": "3644513875",
+    "legs": [
+     {
+      "kind": "dedust-pool",
+      "version": 1,
+      "pool": "EQA-X_yo3fzzbDbJ_0bzFWKqtRuZFIRa1sJsveZJ1YpViO3r",
+      "inputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "outputJetton": null,
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "USDT>GRAM",
+   "amount": "500",
+   "protocols": "StonFiV2",
+   "trader": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "dest": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "quote": {
+    "rfqId": "fde71bac8317a8d5c9d532bf9293c6cc5c10a0e4535986f87ad567565aaf02db",
+    "quoteId": "84b055ab9895fd577730471bf9541517fc154fc8fbc77224bf3c0df47f2a2bf1",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "native",
+        "value": {}
+       }
+      }
+     }
+    },
+    "inputUnits": "500000000",
+    "outputUnits": "367743165504",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627622,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "native",
+              "value": {}
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "StonFiV2",
+            "inputUnits": "500000000",
+            "outputUnits": "367743165504"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "364065733849",
+      "recommendedMinOutputAmount": "364065733849",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 200
+     }
+    },
+    "gasBudget": "260000000",
+    "estimatedGasConsumption": "12000000"
+   },
+   "buildRequest": {
+    "quoteId": "84b055ab9895fd577730471bf9541517fc154fc8fbc77224bf3c0df47f2a2bf1",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQAjdEks4t5n-kvKH8qrzJqkbWczKMOOQP_-djSgJ00fZEyI",
+     "sendAmount": "260000000",
+     "payload": "b5ee9c724101030100fc0001b00f8a7ea5bf3c0df47f2a2bf141dcd650080125c28235ca8d125e676591513d520721b1fe99f7722f4c87723ce7ee0dfb73a30022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167c81908b1010101e16664de2a801244183034d9fd59a236f71ec4271be377399056dda4cc3a5ebf5dc40967df6410022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167e00457de58b19ac75905f0d74db085149c01c6c250843f3fa4e665fc0237ace42cf800000007fffffffc0020055554c4023cd980115f7962c66b1d6417c35d36c2145270071b094210fcfe939997f008deb390b3e00000010bc4bd3d2"
+    }
+   ],
+   "expect": {
+    "layout": "stonfi-v2",
+    "minOut": "364065733849",
+    "legs": [
+     {
+      "kind": "stonfi-router",
+      "version": 2,
+      "router": "EQCS4UEa5UaJLzOyyKieqQOQ2P9M-7kXpkO5HnP3Bv250cN3",
+      "askWallet": "EQCSIMGBps_qzRG3uPYhON8bucyCtu0mYdL1-u4gSz77IBa3",
+      "inputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "outputJetton": null,
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "USDT>GRAM",
+   "amount": "10000",
+   "protocols": "StonFiV2",
+   "trader": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "dest": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "quote": {
+    "rfqId": "82a88cd7f68bd8866d36b84de90abc11423e47e479974d834df11dd566a2ebca",
+    "quoteId": "a321f7a89212a1cf30f0a095a554f2061d26d35f67107b5169201c930e4b3c57",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "native",
+        "value": {}
+       }
+      }
+     }
+    },
+    "inputUnits": "10000000000",
+    "outputUnits": "7327004782658",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627623,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "native",
+              "value": {}
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "StonFiV2",
+            "inputUnits": "10000000000",
+            "outputUnits": "7327004782658"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "7253734734832",
+      "recommendedMinOutputAmount": "7253734734832",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 3987
+     }
+    },
+    "gasBudget": "260000000",
+    "estimatedGasConsumption": "12000000"
+   },
+   "buildRequest": {
+    "quoteId": "a321f7a89212a1cf30f0a095a554f2061d26d35f67107b5169201c930e4b3c57",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQAjdEks4t5n-kvKH8qrzJqkbWczKMOOQP_-djSgJ00fZEyI",
+     "sendAmount": "260000000",
+     "payload": "b5ee9c724101030100fe0001b20f8a7ea569201c930e4b3c57502540be40080125c28235ca8d125e676591513d520721b1fe99f7722f4c87723ce7ee0dfb73a30022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167c81908b1010101e16664de2a801244183034d9fd59a236f71ec4271be377399056dda4cc3a5ebf5dc40967df6410022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167e00457de58b19ac75905f0d74db085149c01c6c250843f3fa4e665fc0237ace42cf800000007fffffffc002005760698e4483bf080115f7962c66b1d6417c35d36c2145270071b094210fcfe939997f008deb390b3e00000010d6200018"
+    }
+   ],
+   "expect": {
+    "layout": "stonfi-v2",
+    "minOut": "7253734734832",
+    "legs": [
+     {
+      "kind": "stonfi-router",
+      "version": 2,
+      "router": "EQCS4UEa5UaJLzOyyKieqQOQ2P9M-7kXpkO5HnP3Bv250cN3",
+      "askWallet": "EQCSIMGBps_qzRG3uPYhON8bucyCtu0mYdL1-u4gSz77IBa3",
+      "inputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "outputJetton": null,
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "USDT>FDUSD",
+   "amount": "5",
+   "protocols": "DeDust",
+   "trader": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "dest": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "quote": {
+    "rfqId": "98cf23a5f8508c55e8ac602fb62a5b5002179c7fd1ec87876cb09f59906e5404",
+    "quoteId": "d6795a31abbb815c20a249d20c779f188054d2301b6aa6d158b9957a98262582",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQD0Evpk4timFOHmy4Sv3l_KEUXlM-dN1_KhroTCfB2wkO89"
+       }
+      }
+     }
+    },
+    "inputUnits": "5000000",
+    "outputUnits": "8054810",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627624,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQD0Evpk4timFOHmy4Sv3l_KEUXlM-dN1_KhroTCfB2wkO89"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "DeDust",
+            "inputUnits": "5000000",
+            "outputUnits": "8054810"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "7974262",
+      "recommendedMinOutputAmount": "7974262",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 12297
+     }
+    },
+    "gasBudget": "150000000",
+    "estimatedGasConsumption": "25000000"
+   },
+   "buildRequest": {
+    "quoteId": "d6795a31abbb815c20a249d20c779f188054d2301b6aa6d158b9957a98262582",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQAjdEks4t5n-kvKH8qrzJqkbWczKMOOQP_-djSgJ00fZEyI",
+     "sendAmount": "150000000",
+     "payload": "b5ee9c724101040100f90001ae0f8a7ea558b9957a9826258234c4b4080031551c5ddaa2e8fb5c06780f3727107b28395b1eca8b3e5dd39ae8e96d71dabb0022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167c80bebc201010153e3a0d4828015554114da26650b6ffa86bca15ccd90d168a130d6f8b865e72b286a5a2440d98379ad764002014b0000000080115f7962c66b1d6417c35d36c2145270071b094210fcfe939997f008deb390b3e303008d3c37d7e980115f7962c66b1d6417c35d36c2145270071b094210fcfe939997f008deb390b3f0022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167e6e8f0041"
+    }
+   ],
+   "expect": {
+    "layout": "dedust-v1",
+    "minOut": "7974262",
+    "legs": [
+     {
+      "kind": "dedust-pool",
+      "version": 1,
+      "pool": "EQCqqgim0TMoW3_UNeUK5myGi0UJhrfFwy85WUNS0SIGzMzm",
+      "inputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "outputJetton": "EQD0Evpk4timFOHmy4Sv3l_KEUXlM-dN1_KhroTCfB2wkO89",
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "USDT>USDe",
+   "amount": "5",
+   "protocols": "StonFiV2",
+   "trader": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "dest": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "quote": {
+    "rfqId": "425ab24ef8f7b6d3456be5166882c55ee7ebfe2b04fb064389d4df605b29053b",
+    "quoteId": "24f986de04a258146c5c1cb0510d7a967f30d08d3f7c1f618391f1581cfd4da3",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQAIb6KmdfdDR7CN1GBqVJuP25iCnLKCvBlJ07Evuu2dzP5f"
+       }
+      }
+     }
+    },
+    "inputUnits": "5000000",
+    "outputUnits": "4997005",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627625,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQAIb6KmdfdDR7CN1GBqVJuP25iCnLKCvBlJ07Evuu2dzP5f"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "StonFiV2",
+            "inputUnits": "5000000",
+            "outputUnits": "4997005"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "4947035",
+      "recommendedMinOutputAmount": "4947035",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 1
+     }
+    },
+    "gasBudget": "289000000",
+    "estimatedGasConsumption": "20000000"
+   },
+   "buildRequest": {
+    "quoteId": "24f986de04a258146c5c1cb0510d7a967f30d08d3f7c1f618391f1581cfd4da3",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQAjdEks4t5n-kvKH8qrzJqkbWczKMOOQP_-djSgJ00fZEyI",
+     "sendAmount": "289000000",
+     "payload": "b5ee9c724101030100f90001ae0f8a7ea58391f1581cfd4da334c4b40800a46afff33251480ab6dab42434437a3fe464a9dbe5f525f9642ab4d2ef6eac890022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167c81c7db3810101e16664de2a800a3355059d44f0050eebe67cf45112cb17e1929b391619a893a4bc7cc30ecf4770022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167e00457de58b19ac75905f0d74db085149c01c6c250843f3fa4e665fc0237ace42cf800000007fffffffc002005134b7c5b80115f7962c66b1d6417c35d36c2145270071b094210fcfe939997f008deb390b3e000000104af0b6f6"
+    }
+   ],
+   "expect": {
+    "layout": "stonfi-v2",
+    "minOut": "4947035",
+    "legs": [
+     {
+      "kind": "stonfi-router",
+      "version": 2,
+      "router": "EQBSNX_5mSikBVttWhIaIb0f8jJU7fL6kvyyFVppd7dWRO6M",
+      "askWallet": "EQBRmqgs6ieAKHdfM-eiiJZYvwyU2ciwzUSdJePmGHZ6OwSU",
+      "inputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "outputJetton": "EQAIb6KmdfdDR7CN1GBqVJuP25iCnLKCvBlJ07Evuu2dzP5f",
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "USDT>XAUt0",
+   "amount": "20",
+   "protocols": "StonFiV2",
+   "trader": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "dest": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "quote": {
+    "rfqId": "355d56963eddab476eb9e454e4e1a23e22c4c988cce24aeb77ad4ab44213ceca",
+    "quoteId": "800ba151b4f482c7ac06a8e825691e8c2bb6df145911bc39ced9c230f7c0fbfe",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQA1R_LuQCLHlMgOo1S4G7Y7W1cd0FrAkbA10Zq7rddKxi9k"
+       }
+      }
+     }
+    },
+    "inputUnits": "20000000",
+    "outputUnits": "4821",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627626,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQA1R_LuQCLHlMgOo1S4G7Y7W1cd0FrAkbA10Zq7rddKxi9k"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "StonFiV2",
+            "inputUnits": "20000000",
+            "outputUnits": "4821"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "4773",
+      "recommendedMinOutputAmount": "4773",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 0
+     }
+    },
+    "gasBudget": "260000000",
+    "estimatedGasConsumption": "37500000"
+   },
+   "buildRequest": {
+    "quoteId": "800ba151b4f482c7ac06a8e825691e8c2bb6df145911bc39ced9c230f7c0fbfe",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQAjdEks4t5n-kvKH8qrzJqkbWczKMOOQP_-djSgJ00fZEyI",
+     "sendAmount": "260000000",
+     "payload": "b5ee9c724101030100f90001b00f8a7ea5ced9c230f7c0fbfe401312d00801069fae849f3b52ebf6166ada3dd547f29eee41576670a41ded9c833101faf76d0022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167c81908b1010101e16664de2a801c24c2f6194577d1ddb17aa639d786cde96294c6ae669cd0ece8e15750f6aa27d0022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167e00457de58b19ac75905f0d74db085149c01c6c250843f3fa4e665fc0237ace42cf800000007fffffffc002004f212a580115f7962c66b1d6417c35d36c2145270071b094210fcfe939997f008deb390b3e00000010d32cde76"
+    }
+   ],
+   "expect": {
+    "layout": "stonfi-v2",
+    "minOut": "4773",
+    "legs": [
+     {
+      "kind": "stonfi-router",
+      "version": 2,
+      "router": "EQCDT9dCT52pdfsLNW0e6qP5T3cgq7M4Ug72zkGYgP17tsWD",
+      "askWallet": "EQDhJhewyiu-ju2L1THOvDZvSxSmNXM05odnRwq6h7VRPiC5",
+      "inputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "outputJetton": "EQA1R_LuQCLHlMgOo1S4G7Y7W1cd0FrAkbA10Zq7rddKxi9k",
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "USDT>sUSDe",
+   "amount": "5",
+   "protocols": "StonFiV2",
+   "trader": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "dest": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "quote": {
+    "rfqId": "4140b1e61cf5910cc76e8ebb23aeb3f3f35aaef5fbb54ada0085d92f4d1b798",
+    "quoteId": "d55c91599461e75342f71b47ab2b5bc21c7d4629460c26845cb3f051a0cff84f",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQDQ5UUyPHrLcQJlPAczd_fjxn8SLrlNQwolBznxCdSlfQwr"
+       }
+      }
+     }
+    },
+    "inputUnits": "5000000",
+    "outputUnits": "3808065",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627627,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQAIb6KmdfdDR7CN1GBqVJuP25iCnLKCvBlJ07Evuu2dzP5f"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "StonFiV2",
+            "inputUnits": "5000000",
+            "outputUnits": "4997005"
+           }
+          ]
+         },
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQAIb6KmdfdDR7CN1GBqVJuP25iCnLKCvBlJ07Evuu2dzP5f"
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQDQ5UUyPHrLcQJlPAczd_fjxn8SLrlNQwolBznxCdSlfQwr"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "StonFiV2",
+            "inputUnits": "4997005",
+            "outputUnits": "3808065"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "3769985",
+      "recommendedMinOutputAmount": "3769985",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 1
+     }
+    },
+    "gasBudget": "678000000",
+    "estimatedGasConsumption": "40000000"
+   },
+   "buildRequest": {
+    "quoteId": "d55c91599461e75342f71b47ab2b5bc21c7d4629460c26845cb3f051a0cff84f",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQAjdEks4t5n-kvKH8qrzJqkbWczKMOOQP_-djSgJ00fZEyI",
+     "sendAmount": "678000000",
+     "payload": "b5ee9c724102050100019d0001ae0f8a7ea55cb3f051a0cff84f34c4b40800a46afff33251480ab6dab42434437a3fe464a9dbe5f525f9642ab4d2ef6eac890022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167c84add0a010101e16664de2a800a3355059d44f0050eebe67cf45112cb17e1929b391619a893a4bc7cc30ecf4770022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167e00457de58b19ac75905f0d74db085149c01c6c250843f3fa4e665fc0237ace42cf800000007fffffffc002015934c3d9a8000cafb7e1aeb694b6c81c13012e24c43b95cf99bd3c84fb900ee31e9b144096fa82e5f568100000100301e16664de2a8000ddc3487e5b11b355437c9369f5db22344f2fb4331a4753a471a5c1ab91c4def0022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167e00457de58b19ac75905f0d74db085149c01c6c250843f3fa4e665fc0237ace42cf800000007fffffffc0040051339868180115f7962c66b1d6417c35d36c2145270071b094210fcfe939997f008deb390b3e00000010519f6e42"
+    }
+   ],
+   "expect": {
+    "layout": "stonfi-v2",
+    "minOut": "3769985",
+    "legs": [
+     {
+      "kind": "stonfi-router",
+      "version": 2,
+      "router": "EQBSNX_5mSikBVttWhIaIb0f8jJU7fL6kvyyFVppd7dWRO6M",
+      "askWallet": "EQBRmqgs6ieAKHdfM-eiiJZYvwyU2ciwzUSdJePmGHZ6OwSU",
+      "inputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "outputJetton": "EQAIb6KmdfdDR7CN1GBqVJuP25iCnLKCvBlJ07Evuu2dzP5f",
+      "ok": true
+     },
+     {
+      "kind": "stonfi-router",
+      "version": 2,
+      "router": "EQAGV9vw11tKW2QOCYCXEmIdyufM3p5CfcgHcY9NiiBLfZGH",
+      "askWallet": "EQAG7hpD8tiNmqob5JtPrtkRonl9oZjSOp0jjS4NXI4m96Ba",
+      "inputJetton": "EQAIb6KmdfdDR7CN1GBqVJuP25iCnLKCvBlJ07Evuu2dzP5f",
+      "outputJetton": "EQDQ5UUyPHrLcQJlPAczd_fjxn8SLrlNQwolBznxCdSlfQwr",
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "FDUSD>USDT",
+   "amount": "5",
+   "protocols": "DeDust",
+   "trader": "UQCe8h8eE0i_P19qxahUj1H1M498iUPfG6U64s9yq6OMc1rK",
+   "dest": "UQCe8h8eE0i_P19qxahUj1H1M498iUPfG6U64s9yq6OMc1rK",
+   "quote": {
+    "rfqId": "3613c394093beb1674cf431f1840eef958d3736c8bd82ec908b7ca212b709fc8",
+    "quoteId": "a6f8c81c06e083dc14a8a068db91e63d13b8985cd0cf7a8a51ea82452c605765",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQD0Evpk4timFOHmy4Sv3l_KEUXlM-dN1_KhroTCfB2wkO89"
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "inputUnits": "5000000",
+    "outputUnits": "3027206",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627629,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQD0Evpk4timFOHmy4Sv3l_KEUXlM-dN1_KhroTCfB2wkO89"
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "DeDust",
+            "inputUnits": "5000000",
+            "outputUnits": "3027206"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "2996934",
+      "recommendedMinOutputAmount": "2996934",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 7557
+     }
+    },
+    "gasBudget": "150000000",
+    "estimatedGasConsumption": "25000000"
+   },
+   "buildRequest": {
+    "quoteId": "a6f8c81c06e083dc14a8a068db91e63d13b8985cd0cf7a8a51ea82452c605765",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCe8h8eE0i_P19qxahUj1H1M498iUPfG6U64s9yq6OMc1rK"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCe8h8eE0i_P19qxahUj1H1M498iUPfG6U64s9yq6OMc1rK"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCe8h8eE0i_P19qxahUj1H1M498iUPfG6U64s9yq6OMc1rK"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCe8h8eE0i_P19qxahUj1H1M498iUPfG6U64s9yq6OMc1rK"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQDkhB0qZFiWLtimWxgH8WQdEqAZjNEbqYMTsbV-5-FZEGp5",
+     "sendAmount": "150000000",
+     "payload": "b5ee9c724101040100f90001ae0f8a7ea551ea82452c60576534c4b4080191e74c7f86bb007c96e22406a688f766551e0c5ac039b40423b9834cab21bf890027bc87c784d22fcfd7dab16a1523d47d4ce3df2250f7c6e94eb8b3dcaae8e31cc80bebc201010153e3a0d4828015554114da26650b6ffa86bca15ccd90d168a130d6f8b865e72b286a5a2440d9832dbac64002014b000000008013de43e3c26917e7ebed58b50a91ea3ea671ef91287be374a75c59ee5574718e6303008d3c37d7e98013de43e3c26917e7ebed58b50a91ea3ea671ef91287be374a75c59ee5574718e70027bc87c784d22fcfd7dab16a1523d47d4ce3df2250f7c6e94eb8b3dcaae8e31cef6d7da48"
+    }
+   ],
+   "expect": {
+    "layout": "dedust-v1",
+    "minOut": "2996934",
+    "legs": [
+     {
+      "kind": "dedust-pool",
+      "version": 1,
+      "pool": "EQCqqgim0TMoW3_UNeUK5myGi0UJhrfFwy85WUNS0SIGzMzm",
+      "inputJetton": "EQD0Evpk4timFOHmy4Sv3l_KEUXlM-dN1_KhroTCfB2wkO89",
+      "outputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "FDUSD>USDT",
+   "amount": "50",
+   "protocols": "DeDust",
+   "trader": "UQCe8h8eE0i_P19qxahUj1H1M498iUPfG6U64s9yq6OMc1rK",
+   "dest": "UQCe8h8eE0i_P19qxahUj1H1M498iUPfG6U64s9yq6OMc1rK",
+   "quote": {
+    "rfqId": "866864a8e3e145d47ba8ac5026409802ccd22e23e43b8d32834a893b568e3fe7",
+    "quoteId": "c32561035ec0cbe541e1e1328808197010afd9d6a4dab62a24bc5e085641cada",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQD0Evpk4timFOHmy4Sv3l_KEUXlM-dN1_KhroTCfB2wkO89"
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "inputUnits": "50000000",
+    "outputUnits": "28344264",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627629,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQD0Evpk4timFOHmy4Sv3l_KEUXlM-dN1_KhroTCfB2wkO89"
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "DeDust",
+            "inputUnits": "50000000",
+            "outputUnits": "28344264"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "28060822",
+      "recommendedMinOutputAmount": "28060822",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 70758
+     }
+    },
+    "gasBudget": "150000000",
+    "estimatedGasConsumption": "25000000"
+   },
+   "buildRequest": {
+    "quoteId": "c32561035ec0cbe541e1e1328808197010afd9d6a4dab62a24bc5e085641cada",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCe8h8eE0i_P19qxahUj1H1M498iUPfG6U64s9yq6OMc1rK"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCe8h8eE0i_P19qxahUj1H1M498iUPfG6U64s9yq6OMc1rK"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCe8h8eE0i_P19qxahUj1H1M498iUPfG6U64s9yq6OMc1rK"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCe8h8eE0i_P19qxahUj1H1M498iUPfG6U64s9yq6OMc1rK"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQDkhB0qZFiWLtimWxgH8WQdEqAZjNEbqYMTsbV-5-FZEGp5",
+     "sendAmount": "150000000",
+     "payload": "b5ee9c724101040100fb0001b00f8a7ea524bc5e085641cada402faf08080191e74c7f86bb007c96e22406a688f766551e0c5ac039b40423b9834cab21bf890027bc87c784d22fcfd7dab16a1523d47d4ce3df2250f7c6e94eb8b3dcaae8e31cc80bebc201010155e3a0d4828015554114da26650b6ffa86bca15ccd90d168a130d6f8b865e72b286a5a2440d98401ac2c964002014b000000008013de43e3c26917e7ebed58b50a91ea3ea671ef91287be374a75c59ee5574718e6303008d3c37d7e98013de43e3c26917e7ebed58b50a91ea3ea671ef91287be374a75c59ee5574718e70027bc87c784d22fcfd7dab16a1523d47d4ce3df2250f7c6e94eb8b3dcaae8e31cea64c27d0"
+    }
+   ],
+   "expect": {
+    "layout": "dedust-v1",
+    "minOut": "28060822",
+    "legs": [
+     {
+      "kind": "dedust-pool",
+      "version": 1,
+      "pool": "EQCqqgim0TMoW3_UNeUK5myGi0UJhrfFwy85WUNS0SIGzMzm",
+      "inputJetton": "EQD0Evpk4timFOHmy4Sv3l_KEUXlM-dN1_KhroTCfB2wkO89",
+      "outputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "GRAM>USDT",
+   "amount": "1000",
+   "protocols": "StonFiV1",
+   "trader": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "dest": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "quote": {
+    "rfqId": "9dec1a207a99b751d19aee7d6ab3fde87a0e422304b518df73aad509db9c5a0c",
+    "quoteId": "54b651287e04986d87899f74928557abc070057440ef7d6b97a7afc8d61589c9",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "native",
+        "value": {}
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "inputUnits": "1000000000000",
+    "outputUnits": "1355473953",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627638,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "native",
+              "value": {}
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "StonFiV1",
+            "inputUnits": "1000000000000",
+            "outputUnits": "1355473953"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "1341919214",
+      "recommendedMinOutputAmount": "1341919214",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 529
+     }
+    },
+    "gasBudget": "100000000",
+    "estimatedGasConsumption": "22500000"
+   },
+   "buildRequest": {
+    "quoteId": "54b651287e04986d87899f74928557abc070057440ef7d6b97a7afc8d61589c9",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQARULUYsmJq1RiZ-YiH-IJLcAZUVkVff-KBPwEmmaQGH6aC",
+     "sendAmount": "1000100000000",
+     "payload": "b5ee9c724101020100aa0001b20f8a7ea597a7afc8d61589c95e8d4a51000800ef3b9902a271b2a01c8938a523cfe24e71847aaeb6a620001ed44a77ac0e709d0026d7275f8777f0b2c80b774cd822adc76e3489f9407e5d8f5fcb04dcffff2e1f480bebc201010097259385618009dd924373a9aad41b28cec02da9384d67363af2034fc2a7ccc067e28d4110de889ff81fdd0026d7275f8777f0b2c80b774cd822adc76e3489f9407e5d8f5fcb04dcffff2e1f50cd672da7"
+    }
+   ],
+   "expect": {
+    "layout": "stonfi-v1",
+    "minOut": "1341919214",
+    "legs": [
+     {
+      "kind": "stonfi-router",
+      "version": 1,
+      "router": "EQB3ncyBUTjZUA5EnFKR5_EnOMI9V1tTEAAPaiU71gc4TiUt",
+      "proxyTonWallet": "EQARULUYsmJq1RiZ-YiH-IJLcAZUVkVff-KBPwEmmaQGH6aC",
+      "askWallet": "EQBO7JIbnU1WoNlGdgFtScJrObHXkBp-FT5mAz8UagiG9KQR",
+      "inputJetton": null,
+      "outputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "GRAM>USDT",
+   "amount": "10000",
+   "protocols": "StonFiV1",
+   "trader": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "dest": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "quote": {
+    "rfqId": "56480b099994ec149fcb90c1b00acf3c197f48562c9d754a348aaf18a3d1f061",
+    "quoteId": "dc6b66e6389dbb5bf312ecbd85ef7f57504a63df20c3f8d625d1226405e7357",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "native",
+        "value": {}
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "inputUnits": "10000000000000",
+    "outputUnits": "13490463294",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792627641,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "native",
+              "value": {}
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "StonFiV1",
+            "inputUnits": "10000000000000",
+            "outputUnits": "13490463294"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "13355558662",
+      "recommendedMinOutputAmount": "13355558662",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 5268
+     }
+    },
+    "gasBudget": "100000000",
+    "estimatedGasConsumption": "22500000"
+   },
+   "buildRequest": {
+    "quoteId": "dc6b66e6389dbb5bf312ecbd85ef7f57504a63df20c3f8d625d1226405e7357",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQARULUYsmJq1RiZ-YiH-IJLcAZUVkVff-KBPwEmmaQGH6aC",
+     "sendAmount": "10000100000000",
+     "payload": "b5ee9c724101020100ac0001b40f8a7ea5625d1226405e7357609184e72a000800ef3b9902a271b2a01c8938a523cfe24e71847aaeb6a620001ed44a77ac0e709d0026d7275f8777f0b2c80b774cd822adc76e3489f9407e5d8f5fcb04dcffff2e1f480bebc201010099259385618009dd924373a9aad41b28cec02da9384d67363af2034fc2a7ccc067e28d4110de8a06381b4e0d0026d7275f8777f0b2c80b774cd822adc76e3489f9407e5d8f5fcb04dcffff2e1f5060cee557"
+    }
+   ],
+   "expect": {
+    "layout": "stonfi-v1",
+    "minOut": "13355558662",
+    "legs": [
+     {
+      "kind": "stonfi-router",
+      "version": 1,
+      "router": "EQB3ncyBUTjZUA5EnFKR5_EnOMI9V1tTEAAPaiU71gc4TiUt",
+      "proxyTonWallet": "EQARULUYsmJq1RiZ-YiH-IJLcAZUVkVff-KBPwEmmaQGH6aC",
+      "askWallet": "EQBO7JIbnU1WoNlGdgFtScJrObHXkBp-FT5mAz8UagiG9KQR",
+      "inputJetton": null,
+      "outputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "GRAM>USDT",
+   "amount": "2",
+   "protocols": "DeDust",
+   "trader": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "dest": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "quote": {
+    "rfqId": "9fefc072c70eaa4dbda39fd0fa040b8d3c8a03ef01a44395d421f77c0e732842",
+    "quoteId": "a5d63fad8a5a480923d284959c8f858b384e5c3c7cfaf1c921a35e05cce5297",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "native",
+        "value": {}
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "inputUnits": "2000000000",
+    "outputUnits": "2712120",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792628215,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "native",
+              "value": {}
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "DeDust",
+            "inputUnits": "2000000000",
+            "outputUnits": "2712120"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "2684999",
+      "recommendedMinOutputAmount": "2684999",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 9
+     }
+    },
+    "gasBudget": "100000000",
+    "estimatedGasConsumption": "20000000"
+   },
+   "buildRequest": {
+    "quoteId": "a5d63fad8a5a480923d284959c8f858b384e5c3c7cfaf1c921a35e05cce5297",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQDa4VOnTYlLvDJ0gZjNYm5PXfSmmtL6Vs6A_CZEtXCNICq_",
+     "sendAmount": "2100000000",
+     "payload": "b5ee9c724101030100ab00016bea06185d921a35e05cce52974773594008007cbff951bbf9e6d86d93fe8de62ac5556a37322908b5ad84d97bcc93ab14ab10328f847401014b0000000080136b93afc3bbf8596405bba66c1156e3b71a44fca03f2ec7afe5826e7fff970fa302008d3c37d7e980136b93afc3bbf8596405bba66c1156e3b71a44fca03f2ec7afe5826e7fff970fb0026d7275f8777f0b2c80b774cd822adc76e3489f9407e5d8f5fcb04dcffff2e1f6c9ac1454"
+    }
+   ],
+   "expect": {
+    "layout": "dedust-v1",
+    "minOut": "2684999",
+    "legs": [
+     {
+      "kind": "dedust-pool",
+      "version": 1,
+      "pool": "EQA-X_yo3fzzbDbJ_0bzFWKqtRuZFIRa1sJsveZJ1YpViO3r",
+      "inputJetton": null,
+      "outputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "GRAM>USDT",
+   "amount": "200",
+   "protocols": "StonFiV1",
+   "trader": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "dest": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "quote": {
+    "rfqId": "9095b14efe25a8ef36b1eec3eabbb28fe6240ddb468954db19b36ef834f0338c",
+    "quoteId": "411099f8eb15d1ac19807f0a1cd8b2124a72582b8f73cf2398ee394bfd6a8b90",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "native",
+        "value": {}
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "inputUnits": "200000000000",
+    "outputUnits": "271120476",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792628216,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "native",
+              "value": {}
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "StonFiV1",
+            "inputUnits": "200000000000",
+            "outputUnits": "271120476"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "268409272",
+      "recommendedMinOutputAmount": "268409272",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 105
+     }
+    },
+    "gasBudget": "100000000",
+    "estimatedGasConsumption": "22500000"
+   },
+   "buildRequest": {
+    "quoteId": "411099f8eb15d1ac19807f0a1cd8b2124a72582b8f73cf2398ee394bfd6a8b90",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQARULUYsmJq1RiZ-YiH-IJLcAZUVkVff-KBPwEmmaQGH6aC",
+     "sendAmount": "200100000000",
+     "payload": "b5ee9c724101020100aa0001b20f8a7ea598ee394bfd6a8b9052e90edd000800ef3b9902a271b2a01c8938a523cfe24e71847aaeb6a620001ed44a77ac0e709d0026d7275f8777f0b2c80b774cd822adc76e3489f9407e5d8f5fcb04dcffff2e1f480bebc201010097259385618009dd924373a9aad41b28cec02da9384d67363af2034fc2a7ccc067e28d4110de881fff33710026d7275f8777f0b2c80b774cd822adc76e3489f9407e5d8f5fcb04dcffff2e1f506f90b5ba"
+    }
+   ],
+   "expect": {
+    "layout": "stonfi-v1",
+    "minOut": "268409272",
+    "legs": [
+     {
+      "kind": "stonfi-router",
+      "version": 1,
+      "router": "EQB3ncyBUTjZUA5EnFKR5_EnOMI9V1tTEAAPaiU71gc4TiUt",
+      "proxyTonWallet": "EQARULUYsmJq1RiZ-YiH-IJLcAZUVkVff-KBPwEmmaQGH6aC",
+      "askWallet": "EQBO7JIbnU1WoNlGdgFtScJrObHXkBp-FT5mAz8UagiG9KQR",
+      "inputJetton": null,
+      "outputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "USDT>GRAM",
+   "amount": "5",
+   "protocols": "StonFiV2",
+   "trader": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "dest": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9",
+   "quote": {
+    "rfqId": "8e8536154724d8f808994f483276b915a06c7a87f6b46bd14c0f50c280a347a5",
+    "quoteId": "ea72e36f606eb7059151dd95d7e27840def87c651909589a930351e2b3808736",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "native",
+        "value": {}
+       }
+      }
+     }
+    },
+    "inputUnits": "5000000",
+    "outputUnits": "3681109926",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792628179,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "native",
+              "value": {}
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "StonFiV2",
+            "inputUnits": "5000000",
+            "outputUnits": "3681109926"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "3644298827",
+      "recommendedMinOutputAmount": "3644298827",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 2
+     }
+    },
+    "gasBudget": "260000000",
+    "estimatedGasConsumption": "12000000"
+   },
+   "buildRequest": {
+    "quoteId": "ea72e36f606eb7059151dd95d7e27840def87c651909589a930351e2b3808736",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCK-8sWM1jrIL4a6bYQopOAONhKEIfn9JzMv4BG9ZyFn5M9"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQAjdEks4t5n-kvKH8qrzJqkbWczKMOOQP_-djSgJ00fZEyI",
+     "sendAmount": "260000000",
+     "payload": "b5ee9c724101030100fa0001ae0f8a7ea5930351e2b380873634c4b4080125c28235ca8d125e676591513d520721b1fe99f7722f4c87723ce7ee0dfb73a30022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167c81908b1010101e16664de2a801244183034d9fd59a236f71ec4271be377399056dda4cc3a5ebf5dc40967df6410022bef2c58cd63ac82f86ba6d8428a4e00e36128421f9fd27332fe011bd672167e00457de58b19ac75905f0d74db085149c01c6c250843f3fa4e665fc0237ace42cf800000007fffffffc00200534d937964b80115f7962c66b1d6417c35d36c2145270071b094210fcfe939997f008deb390b3e00000010fe4b8024"
+    }
+   ],
+   "expect": {
+    "layout": "stonfi-v2",
+    "minOut": "3644298827",
+    "legs": [
+     {
+      "kind": "stonfi-router",
+      "version": 2,
+      "router": "EQCS4UEa5UaJLzOyyKieqQOQ2P9M-7kXpkO5HnP3Bv250cN3",
+      "askWallet": "EQCSIMGBps_qzRG3uPYhON8bucyCtu0mYdL1-u4gSz77IBa3",
+      "inputJetton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+      "outputJetton": null,
+      "ok": true
+     }
+    ]
+   }
+  },
+  {
+   "pair": "GRAM>USDT",
+   "amount": "1",
+   "protocols": "SwapCoffee",
+   "trader": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "dest": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq",
+   "quote": {
+    "rfqId": "d8b4e563a1a4454cc847d0b127cd08b2d8d267683707f5a4fdfdb57b5d2189f2",
+    "quoteId": "b92e53ef160d151a5906025507f79250a13e708eb2f48534d0d6b9080e96a04f",
+    "resolverId": "EQDV8OoP-iqaGDncSOo0dAsPpS0KY_z-d1GraV8fArOy4L1g",
+    "resolverName": "Omniston",
+    "inputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "native",
+        "value": {}
+       }
+      }
+     }
+    },
+    "outputAsset": {
+     "chain": {
+      "$case": "ton",
+      "value": {
+       "kind": {
+        "$case": "jetton",
+        "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       }
+      }
+     }
+    },
+    "inputUnits": "1000000000",
+    "outputUnits": "1357059",
+    "integratorFeeUnits": "0",
+    "protocolFeeUnits": "0",
+    "quoteTimestamp": 1792628231,
+    "estimatedSettlementDuration": 1,
+    "settlementData": {
+     "$case": "swap",
+     "value": {
+      "routes": [
+       {
+        "steps": [
+         {
+          "inputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "native",
+              "value": {}
+             }
+            }
+           }
+          },
+          "outputAsset": {
+           "chain": {
+            "$case": "ton",
+            "value": {
+             "kind": {
+              "$case": "jetton",
+              "value": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+             }
+            }
+           }
+          },
+          "chunks": [
+           {
+            "protocol": "SwapCoffee",
+            "inputUnits": "1000000000",
+            "outputUnits": "1357059"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "minOutputAmount": "1343489",
+      "recommendedMinOutputAmount": "1343489",
+      "recommendedSlippagePips": 10000,
+      "priceImpactPips": 1484
+     }
+    },
+    "gasBudget": "100000000",
+    "estimatedGasConsumption": "35000000"
+   },
+   "buildRequest": {
+    "quoteId": "b92e53ef160d151a5906025507f79250a13e708eb2f48534d0d6b9080e96a04f",
+    "transferSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "refundSrcAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "gasExcessAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "traderDstAddress": {
+     "chain": {
+      "$case": "ton",
+      "value": "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq"
+     }
+    },
+    "useRecommendedSlippage": false
+   },
+   "messages": [
+    {
+     "targetAddress": "EQDbLqT_zhxpERj0EnXG2iqr1g71ODb_Xoc74R8RzUSElKGD",
+     "sendAmount": "1200000000",
+     "payload": "b5ee9c72410103010064000169c0ffee00d0d6b9080e96a04f43b9aca00c44cf0b64eb9dedfb010c7b24a508140d86f6e07789f9383bb9b2141ea9c08ea31480014001014bffffffff80136b93afc3bbf8596405bba66c1156e3b71a44fca03f2ec7afe5826e7fff970fa6020001201768c9f2"
+    }
+   ],
+   "expect": {
+    "refused": "omniston: ton-swap-payload unsupported-ton-route (protocol SwapCoffee)"
+   }
+  }
+ ],
+ "tonapi": {
+  "/v2/accounts/EQAH4MY1EbqP7Gg2wJkoZvoCG4BYPsEG5lVBXPZn0UqXNz4y": {
+   "address": "0:07e0c63511ba8fec6836c0992866fa021b80583ec106e655415cf667d14a9737",
+   "balance": 19662047337106,
+   "last_activity": 1792628340,
+   "status": "active",
+   "interfaces": [
+    "dedust_v2_cpmm"
+   ],
+   "get_methods": [
+    "get_pool_data"
+   ],
+   "is_wallet": false
+  },
+  "/v2/blockchain/accounts/EQAH4MY1EbqP7Gg2wJkoZvoCG4BYPsEG5lVBXPZn0UqXNz4y/methods/get_pool_data": {
+   "success": true,
+   "exit_code": 0,
+   "stack": [
+    {
+     "type": "num",
+     "num": "0x2"
+    },
+    {
+     "type": "num",
+     "num": "-0x1"
+    },
+    {
+     "type": "num",
+     "num": "-0x1"
+    },
+    {
+     "type": "cell",
+     "cell": "b5ee9c72010101010024000043801622753296a04942ce33ed2272651d6eb2b2d87144beb2051628dfd9b86c43bfd0"
+    },
+    {
+     "type": "cell",
+     "cell": "b5ee9c7201010101000300000120"
+    },
+    {
+     "type": "cell",
+     "cell": "b5ee9c7201010301008f0002012001020085bff2d564daf1c07574946d9e4711c6cde06b0d49907ee15e3d17b643eb7f6fc9044008ee5427dba8971e7d59dbdff667d757ab34f9e89ed25c4b334938b982d74fbbf80085bfd889d4ca5a81250b38cfb489c99475bacacb61c512fac81458a37f66e1b10eff40007843595c5b99834631bd8eddd47c0efc14ce1d34ef9c96c0557e8e855b4a3428"
+    },
+    {
+     "type": "cell",
+     "cell": "b5ee9c7201010301008f0002012001020085bfc3c21acae2dccc1a318dec76eea3e077e0a670e9a77ce4b602abf4742ada51a1400b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe80085bfc772a13edd44b8f3eacedeffb33ebabd59a7cf44f692e2599a49c5cc16ba7ddfc0065aac9b5e380eae928db3c8e238d9bc0d61a9320fdc2bc7a2f6c87d6fedf92088"
+    },
+    {
+     "type": "null"
+    },
+    {
+     "type": "num",
+     "num": "0xa"
+    },
+    {
+     "type": "num",
+     "num": "0x631ffea61"
+    },
+    {
+     "type": "num",
+     "num": "0x11d28a23ca5f"
+    },
+    {
+     "type": "num",
+     "num": "0xa8203a15ed"
+    },
+    {
+     "type": "num",
+     "num": "0x386ee162"
+    },
+    {
+     "type": "num",
+     "num": "0x0"
+    },
+    {
+     "type": "num",
+     "num": "0x0"
+    },
+    {
+     "type": "num",
+     "num": "0x0"
+    },
+    {
+     "type": "num",
+     "num": "0xd9f8afc3b2a55db6bd0e45871056"
+    },
+    {
+     "type": "num",
+     "num": "0x0"
+    },
+    {
+     "type": "cell",
+     "cell": "b5ee9c7201010301003e0002014801020035000000000001e061b4f2207b759bfdc864e0e6eedc000d5b0894d00033000000000001dc932a6e85a2f2bd9248d7399289600d5b0894d0"
+    }
+   ],
+   "decoded": {
+    "status": 2,
+    "deposit_active": true,
+    "swap_active": true,
+    "asset_x": "0:b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe",
+    "asset_y": "",
+    "wallets_by_assets": "b5ee9c7201010301008f0002012001020085bff2d564daf1c07574946d9e4711c6cde06b0d49907ee15e3d17b643eb7f6fc9044008ee5427dba8971e7d59dbdff667d757ab34f9e89ed25c4b334938b982d74fbbf80085bfd889d4ca5a81250b38cfb489c99475bacacb61c512fac81458a37f66e1b10eff40007843595c5b99834631bd8eddd47c0efc14ce1d34ef9c96c0557e8e855b4a3428",
+    "assets_by_wallets": "b5ee9c7201010301008f0002012001020085bfc3c21acae2dccc1a318dec76eea3e077e0a670e9a77ce4b602abf4742ada51a1400b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe80085bfc772a13edd44b8f3eacedeffb33ebabd59a7cf44f692e2599a49c5cc16ba7ddfc0065aac9b5e380eae928db3c8e238d9bc0d61a9320fdc2bc7a2f6c87d6fedf92088",
+    "wallets_resolutions": null,
+    "base_fee_bps": 10,
+    "reserve_x": "26608659041",
+    "reserve_y": "19595958405727",
+    "liquidity": "722095183341",
+    "protocol_fee_x": "946790754",
+    "protocol_fee_y": "0",
+    "created_fee_x": "0",
+    "created_fee_y": "0",
+    "x_lp_fee_per_token": "4420985864756835297474987539501142",
+    "y_lp_fee_per_token": "0",
+    "rewards": "b5ee9c7201010301003e0002014801020035000000000001e061b4f2207b759bfdc864e0e6eedc000d5b0894d00033000000000001dc932a6e85a2f2bd9248d7399289600d5b0894d0"
+   }
+  },
+  "/v2/blockchain/accounts/EQCSIMGBps_qzRG3uPYhON8bucyCtu0mYdL1-u4gSz77IBa3/methods/get_wallet_data": {
+   "success": true,
+   "exit_code": 0,
+   "stack": [
+    {
+     "type": "num",
+     "num": "0x700f2365a3f7b"
+    },
+    {
+     "type": "cell",
+     "cell": "b5ee9c7201010101002400004380125c28235ca8d125e676591513d520721b1fe99f7722f4c87723ce7ee0dfb73a30"
+    },
+    {
+     "type": "cell",
+     "cell": "b5ee9c72010101010024000043800ce32c604feff0acb356ab7042ce2d10c039b9e3dcce9f8ff77634eed431a69470"
+    },
+    {
+     "type": "cell",
+     "cell": "b5ee9c7201010101002300084202cd88e6f3c2a9cf01bb003a2837ec0d92c19685ed1dbfffd94a545dcfdf0a14d9"
+    }
+   ],
+   "decoded": {
+    "balance": "1971365130944379",
+    "owner": "0:92e1411ae546892f33b2c8a89ea90390d8ff4cfbb917a643b91e73f706fdb9d1",
+    "jetton": "0:671963027f7f85659ab55b821671688601cdcf1ee674fc7fbbb1a776a18d34a3",
+    "jetton_wallet_code": "b5ee9c7201010101002300084202cd88e6f3c2a9cf01bb003a2837ec0d92c19685ed1dbfffd94a545dcfdf0a14d9"
+   }
+  },
+  "/v2/accounts/EQCS4UEa5UaJLzOyyKieqQOQ2P9M-7kXpkO5HnP3Bv250cN3": {
+   "address": "0:92e1411ae546892f33b2c8a89ea90390d8ff4cfbb917a643b91e73f706fdb9d1",
+   "balance": 226855390788,
+   "last_activity": 1792628345,
+   "status": "active",
+   "interfaces": [
+    "stonfi_router_v2"
+   ],
+   "name": "STON.fi DEX",
+   "is_scam": false,
+   "memo_required": false,
+   "get_methods": [],
+   "is_wallet": false
+  },
+  "/v2/blockchain/accounts/EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs/methods/get_wallet_address?args=0%3A92e1411ae546892f33b2c8a89ea90390d8ff4cfbb917a643b91e73f706fdb9d1": {
+   "success": true,
+   "exit_code": 0,
+   "stack": [
+    {
+     "type": "cell",
+     "cell": "b5ee9c72010101010024000043801245ac4fafb1db7a01c9c477b618a94eddcbc3e8cae7435e882f0aff47c47d23f0"
+    }
+   ],
+   "decoded": {
+    "jetton_wallet_address": "0:922d627d7d8edbd00e4e23bdb0c54a76ee5e1f46573a1af4417857fa3e23e91f"
+   }
+  },
+  "/v2/accounts/EQA-X_yo3fzzbDbJ_0bzFWKqtRuZFIRa1sJsveZJ1YpViO3r": {
+   "address": "0:3e5ffca8ddfcf36c36c9ff46f31562aab51b9914845ad6c26cbde649d58a5588",
+   "balance": 157132336,
+   "last_activity": 1792628239,
+   "status": "active",
+   "interfaces": [
+    "dedust_pool",
+    "jetton_master"
+   ],
+   "name": "DeDust Pool: TON/USDT",
+   "is_scam": false,
+   "memo_required": false,
+   "get_methods": [
+    "get_assets",
+    "get_jetton_data",
+    "get_reserves",
+    "is_stable"
+   ],
+   "is_wallet": false
+  },
+  "/v2/blockchain/accounts/EQA-X_yo3fzzbDbJ_0bzFWKqtRuZFIRa1sJsveZJ1YpViO3r/methods/get_assets": {
+   "success": true,
+   "exit_code": 0,
+   "stack": [
+    {
+     "type": "cell",
+     "cell": "b5ee9c7201010101000300000108"
+    },
+    {
+     "type": "cell",
+     "cell": "b5ee9c72010101010024000043100b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe8"
+    }
+   ],
+   "decoded": {
+    "asset0": {
+     "sum_type": "Native",
+     "native": {},
+     "jetton": {
+      "workchain_id": 0,
+      "address": "0000000000000000000000000000000000000000000000000000000000000000"
+     },
+     "extra_currency": {
+      "currency_id": 0
+     }
+    },
+    "asset1": {
+     "sum_type": "Jetton",
+     "native": {},
+     "jetton": {
+      "workchain_id": 0,
+      "address": "b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe"
+     },
+     "extra_currency": {
+      "currency_id": 0
+     }
+    }
+   }
+  },
+  "/v2/blockchain/accounts/0%3A8cdc1d7640ad5ee326527fc1ad0514f468b30dc84b0173f0e155f451b4e11f7c/methods/get_wallet_address?args=0%3A92e1411ae546892f33b2c8a89ea90390d8ff4cfbb917a643b91e73f706fdb9d1": {
+   "success": true,
+   "exit_code": 0,
+   "stack": [
+    {
+     "type": "cell",
+     "cell": "b5ee9c72010101010024000043801b560e520731cd9bc0239310657e1baefa939b3e989d93b61598cf4384f7fdc470"
+    }
+   ],
+   "decoded": {
+    "jetton_wallet_address": "0:dab07290398e6cde011c98832bf0dd77d49cd9f4c4ec9db0acc67a1c27bfee23"
+   }
+  },
+  "/v2/blockchain/accounts/0%3A671963027f7f85659ab55b821671688601cdcf1ee674fc7fbbb1a776a18d34a3/methods/get_wallet_address?args=0%3A92e1411ae546892f33b2c8a89ea90390d8ff4cfbb917a643b91e73f706fdb9d1": {
+   "success": true,
+   "exit_code": 0,
+   "stack": [
+    {
+     "type": "cell",
+     "cell": "b5ee9c72010101010024000043801244183034d9fd59a236f71ec4271be377399056dda4cc3a5ebf5dc40967df6410"
+    }
+   ],
+   "decoded": {
+    "jetton_wallet_address": "0:9220c181a6cfeacd11b7b8f62138df1bb9cc82b6ed2661d2f5faee204b3efb20"
+   }
+  },
+  "/v2/accounts/EQCqqgim0TMoW3_UNeUK5myGi0UJhrfFwy85WUNS0SIGzMzm": {
+   "address": "0:aaaa08a6d133285b7fd435e50ae66c868b450986b7c5c32f39594352d12206cc",
+   "balance": 100000000,
+   "last_activity": 1788528579,
+   "status": "active",
+   "interfaces": [
+    "dedust_pool",
+    "jetton_master"
+   ],
+   "get_methods": [
+    "get_assets",
+    "get_jetton_data",
+    "get_reserves",
+    "is_stable"
+   ],
+   "is_wallet": false
+  },
+  "/v2/blockchain/accounts/EQCqqgim0TMoW3_UNeUK5myGi0UJhrfFwy85WUNS0SIGzMzm/methods/get_assets": {
+   "success": true,
+   "exit_code": 0,
+   "stack": [
+    {
+     "type": "cell",
+     "cell": "b5ee9c72010101010024000043100b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe8"
+    },
+    {
+     "type": "cell",
+     "cell": "b5ee9c72010101010024000043100f412fa64e2d8a614e1e6cb84afde5fca1145e533e74dd7f2a1ae84c27c1db0908"
+    }
+   ],
+   "decoded": {
+    "asset0": {
+     "sum_type": "Jetton",
+     "native": {},
+     "jetton": {
+      "workchain_id": 0,
+      "address": "b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe"
+     },
+     "extra_currency": {
+      "currency_id": 0
+     }
+    },
+    "asset1": {
+     "sum_type": "Jetton",
+     "native": {},
+     "jetton": {
+      "workchain_id": 0,
+      "address": "f412fa64e2d8a614e1e6cb84afde5fca1145e533e74dd7f2a1ae84c27c1db090"
+     },
+     "extra_currency": {
+      "currency_id": 0
+     }
+    }
+   }
+  },
+  "/v2/accounts/EQBSNX_5mSikBVttWhIaIb0f8jJU7fL6kvyyFVppd7dWRO6M": {
+   "address": "0:52357ff99928a4055b6d5a121a21bd1ff23254edf2fa92fcb2155a6977b75644",
+   "balance": 23382338031,
+   "last_activity": 1792618898,
+   "status": "active",
+   "interfaces": [
+    "stonfi_router_v2"
+   ],
+   "name": "STON.fi DEX",
+   "is_scam": false,
+   "memo_required": false,
+   "get_methods": [],
+   "is_wallet": false
+  },
+  "/v2/blockchain/accounts/EQAIb6KmdfdDR7CN1GBqVJuP25iCnLKCvBlJ07Evuu2dzP5f/methods/get_wallet_address?args=0%3A52357ff99928a4055b6d5a121a21bd1ff23254edf2fa92fcb2155a6977b75644": {
+   "success": true,
+   "exit_code": 0,
+   "stack": [
+    {
+     "type": "cell",
+     "cell": "b5ee9c72010101010024000043800a3355059d44f0050eebe67cf45112cb17e1929b391619a893a4bc7cc30ecf4770"
+    }
+   ],
+   "decoded": {
+    "jetton_wallet_address": "0:519aa82cea278028775f33e7a2889658bf0c94d9c8b0cd449d25e3e618767a3b"
+   }
+  },
+  "/v2/accounts/EQCDT9dCT52pdfsLNW0e6qP5T3cgq7M4Ug72zkGYgP17tsWD": {
+   "address": "0:834fd7424f9da975fb0b356d1eeaa3f94f7720abb338520ef6ce419880fd7bb6",
+   "balance": 158712177252,
+   "last_activity": 1792628321,
+   "status": "active",
+   "interfaces": [
+    "stonfi_router_v2"
+   ],
+   "name": "STON.fi DEX",
+   "is_scam": false,
+   "memo_required": false,
+   "get_methods": [],
+   "is_wallet": false
+  },
+  "/v2/blockchain/accounts/EQA1R_LuQCLHlMgOo1S4G7Y7W1cd0FrAkbA10Zq7rddKxi9k/methods/get_wallet_address?args=0%3A834fd7424f9da975fb0b356d1eeaa3f94f7720abb338520ef6ce419880fd7bb6": {
+   "success": true,
+   "exit_code": 0,
+   "stack": [
+    {
+     "type": "cell",
+     "cell": "b5ee9c72010101010024000043801c24c2f6194577d1ddb17aa639d786cde96294c6ae669cd0ece8e15750f6aa27d0"
+    }
+   ],
+   "decoded": {
+    "jetton_wallet_address": "0:e12617b0ca2bbe8eed8bd531cebc366f4b14a6357334e68767470aba87b5513e"
+   }
+  },
+  "/v2/accounts/EQAGV9vw11tKW2QOCYCXEmIdyufM3p5CfcgHcY9NiiBLfZGH": {
+   "address": "0:0657dbf0d75b4a5b640e09809712621dcae7ccde9e427dc807718f4d8a204b7d",
+   "balance": 10000000,
+   "last_activity": 1792585625,
+   "status": "active",
+   "interfaces": [
+    "stonfi_router_v2"
+   ],
+   "name": "STON.fi DEX",
+   "is_scam": false,
+   "memo_required": false,
+   "get_methods": [],
+   "is_wallet": false
+  },
+  "/v2/blockchain/accounts/EQDQ5UUyPHrLcQJlPAczd_fjxn8SLrlNQwolBznxCdSlfQwr/methods/get_wallet_address?args=0%3A0657dbf0d75b4a5b640e09809712621dcae7ccde9e427dc807718f4d8a204b7d": {
+   "success": true,
+   "exit_code": 0,
+   "stack": [
+    {
+     "type": "cell",
+     "cell": "b5ee9c720101010100240000438000ddc3487e5b11b355437c9369f5db22344f2fb4331a4753a471a5c1ab91c4def0"
+    }
+   ],
+   "decoded": {
+    "jetton_wallet_address": "0:06ee1a43f2d88d9aaa1be49b4faed911a2797da198d23a9d238d2e0d5c8e26f7"
+   }
+  },
+  "/v2/blockchain/accounts/EQARULUYsmJq1RiZ-YiH-IJLcAZUVkVff-KBPwEmmaQGH6aC/methods/get_wallet_data": {
+   "success": true,
+   "exit_code": 0,
+   "stack": [
+    {
+     "type": "num",
+     "num": "0xd53df029d3456"
+    },
+    {
+     "type": "cell",
+     "cell": "b5ee9c72010101010024000043800ef3b9902a271b2a01c8938a523cfe24e71847aaeb6a620001ed44a77ac0e709d0"
+    },
+    {
+     "type": "cell",
+     "cell": "b5ee9c7201010101002400004380119b83aec815abdc64ca4ff835a0a29e8d1661b909602e7e1c2abe8a369c23ef90"
+    },
+    {
+     "type": "cell",
+     "cell": "b5ee9c72010101010002000000"
+    }
+   ],
+   "decoded": {
+    "balance": "3751391983907926",
+    "owner": "0:779dcc815138d9500e449c5291e7f12738c23d575b5310000f6a253bd607384e",
+    "jetton": "0:8cdc1d7640ad5ee326527fc1ad0514f468b30dc84b0173f0e155f451b4e11f7c",
+    "jetton_wallet_code": "b5ee9c72010101010002000000"
+   }
+  },
+  "/v2/accounts/EQB3ncyBUTjZUA5EnFKR5_EnOMI9V1tTEAAPaiU71gc4TiUt": {
+   "address": "0:779dcc815138d9500e449c5291e7f12738c23d575b5310000f6a253bd607384e",
+   "balance": 3464631796070,
+   "last_activity": 1792628333,
+   "status": "active",
+   "interfaces": [
+    "stonfi_router"
+   ],
+   "name": "STON.fi DEX",
+   "is_scam": false,
+   "memo_required": false,
+   "get_methods": [],
+   "is_wallet": false
+  },
+  "/v2/blockchain/accounts/EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs/methods/get_wallet_address?args=0%3A779dcc815138d9500e449c5291e7f12738c23d575b5310000f6a253bd607384e": {
+   "success": true,
+   "exit_code": 0,
+   "stack": [
+    {
+     "type": "cell",
+     "cell": "b5ee9c720101010100240000438009dd924373a9aad41b28cec02da9384d67363af2034fc2a7ccc067e28d4110de90"
+    }
+   ],
+   "decoded": {
+    "jetton_wallet_address": "0:4eec921b9d4d56a0d94676016d49c26b39b1d7901a7e153e66033f146a0886f4"
+   }
+  }
+ },
+ "tonapiNote": "tonapi responses the legs' validateTonSwapLeg reads (recorded 2026-10-22) — replayed offline by the tests"
+}
