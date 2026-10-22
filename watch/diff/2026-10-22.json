@@ -1,0 +1,46 @@
+{
+ "date": "2026-10-22",
+ "modules": 17,
+ "sources": 311,
+ "changes": [
+  {
+   "module": "@forgewallet/protocol-swap2-omniston",
+   "id": "docs-omniston",
+   "label": "STON.fi docs · Omniston",
+   "type": "http-text",
+   "what": "page text changed (2907 → 2907 chars)",
+   "link": "https://docs.ston.fi/docs/developer-section/omniston",
+   "before": {
+    "hash": "f40522993a10bf87",
+    "chars": 2907
+   },
+   "after": {
+    "hash": "eff175e4aae59b11",
+    "chars": 2907
+   }
+  },
+  {
+   "module": "@forgewallet/protocol-swap2-uniswap",
+   "id": "sdks",
+   "label": "Uniswap SDKs (sdk-core address map) releases",
+   "type": "github-releases",
+   "what": "@uniswap/liquidity-launcher-sdk@2.0.0 → @uniswap/v4-sdk@2.4.3 (2026-10-21)",
+   "link": "https://github.com/Uniswap/sdks/releases/tag/%40uniswap/v4-sdk%402.4.3",
+   "before": {
+    "tag": "@uniswap/liquidity-launcher-sdk@2.0.0",
+    "name": "@uniswap/liquidity-launcher-sdk@2.0.0",
+    "at": "2026-10-15",
+    "url": "https://github.com/Uniswap/sdks/releases/tag/%40uniswap/liquidity-launcher-sdk%402.0.0",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "@uniswap/v4-sdk@2.4.3",
+    "name": "@uniswap/v4-sdk@2.4.3",
+    "at": "2026-10-21",
+    "url": "https://github.com/Uniswap/sdks/releases/tag/%40uniswap/v4-sdk%402.4.3",
+    "prerelease": false
+   }
+  }
+ ],
+ "errors": []
+}

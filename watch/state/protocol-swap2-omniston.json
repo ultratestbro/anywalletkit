@@ -3,13 +3,13 @@
  "sources": {
   "docs-omniston": {
    "type": "http-text",
-   "value": "f40522993a10bf87716ecfff79d29c573f8af66e9481a0982aaca29d050e1031",
+   "value": "eff175e4aae59b11777c0a6fbacab6aafb46ca1e8b6651ff21f90942e4c5408d",
    "meta": {
-    "hash": "f40522993a10bf87",
+    "hash": "eff175e4aae59b11",
     "chars": 2907
    },
-   "seenAt": "2026-10-21T11:45:20.687Z",
-   "changedAt": "2026-10-21T11:45:20.687Z"
+   "seenAt": "2026-10-22T11:46:53.350Z",
+   "changedAt": "2026-10-22T11:46:53.350Z"
   },
   "omniston-sdk": {
    "type": "github-releases",
@@ -20,7 +20,7 @@
     "url": "https://github.com/ston-fi/omniston-sdk/commit/fdd0bfbbe3754c8025ad5438f4a9e2e6a6fd0326",
     "note": "default branch: docs: update README"
    },
-   "seenAt": "2026-10-21T11:45:20.864Z",
+   "seenAt": "2026-10-22T11:46:53.294Z",
    "changedAt": "2026-10-20T10:23:56.523Z"
   }
  }

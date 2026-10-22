@@ -11,7 +11,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-21T11:45:11.963Z",
+   "seenAt": "2026-10-22T11:46:43.364Z",
    "changedAt": "2026-10-14T15:10:30.832Z"
   },
   "vault-lido-earn-eth": {
@@ -24,7 +24,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-21T11:45:11.950Z",
+   "seenAt": "2026-10-22T11:46:43.258Z",
    "changedAt": "2026-10-14T15:10:30.850Z"
   },
   "vault-lido-conservative-earn-usd": {
@@ -37,7 +37,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-21T11:45:11.952Z",
+   "seenAt": "2026-10-22T11:46:43.351Z",
    "changedAt": "2026-10-14T15:10:30.853Z"
   },
   "vault-lido-earn-usd": {
@@ -50,7 +50,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-21T11:45:11.952Z",
+   "seenAt": "2026-10-22T11:46:43.279Z",
    "changedAt": "2026-10-14T15:10:30.853Z"
   },
   "vault-lido-strategy": {
@@ -63,7 +63,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-21T11:45:11.951Z",
+   "seenAt": "2026-10-22T11:46:43.298Z",
    "changedAt": "2026-10-14T15:10:30.854Z"
   },
   "registry-vaults": {
@@ -161,7 +161,7 @@
      "0xf785a3637Fb8DC057a2a23c925e83859Ef212c8d"
     ]
    },
-   "seenAt": "2026-10-21T11:45:12.093Z",
+   "seenAt": "2026-10-22T11:46:43.462Z",
    "changedAt": "2026-10-14T15:10:30.933Z"
   },
   "docs": {
@@ -171,7 +171,7 @@
     "hash": "bbb595e50a6c75a7",
     "chars": 1080
    },
-   "seenAt": "2026-10-21T11:45:12.256Z",
+   "seenAt": "2026-10-22T11:46:43.481Z",
    "changedAt": "2026-10-14T15:10:31.059Z"
   },
   "flexible-vaults": {
@@ -183,7 +183,7 @@
     "url": "https://github.com/mellow-finance/flexible-vaults/commit/9bcad572df418ac4618287bd303114b22bd13347",
     "note": "default branch: upd configs mbhBTC/mbhcbBTC"
    },
-   "seenAt": "2026-10-21T11:45:12.576Z",
+   "seenAt": "2026-10-22T11:46:43.774Z",
    "changedAt": "2026-10-21T11:45:12.576Z"
   }
  }

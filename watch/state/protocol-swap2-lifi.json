@@ -46,7 +46,7 @@
      "unit"
     ]
    },
-   "seenAt": "2026-10-21T11:45:18.813Z",
+   "seenAt": "2026-10-22T11:46:51.677Z",
    "changedAt": "2026-10-20T10:23:51.279Z"
   },
   "exchanges": {
@@ -98,7 +98,7 @@
      "titan"
     ]
    },
-   "seenAt": "2026-10-21T11:45:18.816Z",
+   "seenAt": "2026-10-22T11:46:51.675Z",
    "changedAt": "2026-10-20T10:23:51.275Z"
   },
   "chains": {
@@ -174,7 +174,7 @@
      "999"
     ]
    },
-   "seenAt": "2026-10-21T11:45:18.781Z",
+   "seenAt": "2026-10-22T11:46:51.603Z",
    "changedAt": "2026-10-14T15:10:52.085Z"
   },
   "docs-changelog": {
@@ -184,7 +184,7 @@
     "hash": "1cf5c18a819c0a03",
     "chars": 24775
    },
-   "seenAt": "2026-10-21T11:45:19.240Z",
+   "seenAt": "2026-10-22T11:46:51.846Z",
    "changedAt": "2026-10-20T10:23:51.415Z"
   },
   "sdk": {
@@ -197,7 +197,7 @@
     "url": "https://github.com/lifinance/sdk/releases/tag/%40lifi/sdk-provider-sui%404.2.11",
     "prerelease": false
    },
-   "seenAt": "2026-10-21T11:45:18.918Z",
+   "seenAt": "2026-10-22T11:46:51.584Z",
    "changedAt": "2026-10-20T10:23:50.788Z"
   },
   "contracts": {
@@ -208,7 +208,7 @@
     "url": "https://github.com/lifinance/contracts/releases/tag/pre-signing-2.0-baseline",
     "note": "tags only"
    },
-   "seenAt": "2026-10-21T11:45:18.981Z",
+   "seenAt": "2026-10-22T11:46:51.721Z",
    "changedAt": "2026-10-14T15:12:20.663Z"
   }
  }

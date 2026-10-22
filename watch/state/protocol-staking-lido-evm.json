@@ -10,7 +10,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-21T11:45:14.272Z",
+   "seenAt": "2026-10-22T11:46:45.676Z",
    "changedAt": "2026-10-14T15:10:36.807Z"
   },
   "wsteth-ethereum": {
@@ -22,7 +22,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-21T11:45:14.278Z",
+   "seenAt": "2026-10-22T11:46:45.677Z",
    "changedAt": "2026-10-14T15:10:36.807Z"
   },
   "docs-deployed-contracts": {
@@ -32,7 +32,7 @@
     "hash": "6a52b2ed4f3e2708",
     "chars": 51783
    },
-   "seenAt": "2026-10-21T11:45:14.459Z",
+   "seenAt": "2026-10-22T11:46:45.785Z",
    "changedAt": "2026-10-20T10:23:39.335Z"
   },
   "core": {
@@ -45,7 +45,7 @@
     "url": "https://github.com/lidofinance/core/releases/tag/v4.1.0",
     "prerelease": false
    },
-   "seenAt": "2026-10-21T11:45:14.540Z",
+   "seenAt": "2026-10-22T11:46:45.927Z",
    "changedAt": "2026-10-14T15:10:36.856Z"
   },
   "withdrawal-queue-ethereum": {
@@ -58,7 +58,7 @@
     "beacon": null,
     "implCodeHash": "2a65399f309b556a"
    },
-   "seenAt": "2026-10-21T11:45:14.285Z",
+   "seenAt": "2026-10-22T11:46:45.746Z",
    "changedAt": "2026-10-14T15:10:36.893Z"
   },
   "lido-ethereum-sdk": {
@@ -71,7 +71,7 @@
     "url": "https://github.com/lidofinance/lido-ethereum-sdk/releases/tag/%40lidofinance/lido-ethereum-sdk%404.11.0-alpha.1",
     "prerelease": true
    },
-   "seenAt": "2026-10-21T11:45:14.525Z",
+   "seenAt": "2026-10-22T11:46:45.948Z",
    "changedAt": "2026-10-20T10:23:37.460Z"
   }
  }
