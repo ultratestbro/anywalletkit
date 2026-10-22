@@ -1,4 +1,5 @@
 import { UserRejectedError, type IWalletAccount, type TransferOptions } from '@forgewallet/core'
+import { canonicalAddress, sendDestinations } from './destinations.js'
 
 /**
  * Account methods the policies guard — everything that produces a signature
@@ -71,8 +72,22 @@ export interface WriteIntent {
   from: string
   method: WriteMethod
   kind: WriteKind
-  /** Destination when it can be read off the call: recipient, called contract, or the SPENDER of an approval. */
+  /** Destination when it can be read off the call: recipient, called contract, or the SPENDER of an approval. Read off `to` / `recipient` as given (apps match on it); the lists use {@link WriteIntent.destinations}. */
   to?: string
+  /**
+   * Every destination the write goes to, read per chain shape (scan F16/F17): each EVM call's `to`, the
+   * NEAR `receiverId` (also of a base64 borsh transaction), Tron recipient / contract / resource receiver
+   * decoded from `raw_data_hex` (never the optional JSON copy), every TON message, the recipients and
+   * programs of decoded Solana instructions. Approvals: the spender; revokes: the contracts called;
+   * message signatures: none. The allow/block lists check all of them.
+   */
+  destinations: string[]
+  /**
+   * Part of the write could not be read (an unknown shape, undecodable bytes, a lookup-table account):
+   * `destinations` may be incomplete. With a blocklist for the chain and no `confirm` hook the write is
+   * refused; with `confirm`, the hook sees this flag and decides; an allowlist refuses it.
+   */
+  destinationUnknown: boolean
   /** Token identifier for token transfers and approvals; undefined = native. */
   token?: string
   /** Amount when it can be read off the call (allowance for approvals). */
@@ -116,7 +131,11 @@ const big = (v: unknown): bigint | undefined =>
   typeof v === 'bigint' ? v : typeof v === 'number' && Number.isFinite(v) ? BigInt(Math.trunc(v)) : typeof v === 'string' && /^(0x[0-9a-fA-F]+|\d+)$/.test(v) ? BigInt(v) : undefined
 const unboundedAllowance = (amount: bigint | undefined, max = MAX_UINT256): boolean => amount !== undefined && (amount >= 1n << 255n || amount === max)
 
-function approvalIntent(base: Omit<WriteIntent, 'kind' | 'message'>, spender: string | undefined, token: string | undefined, amount: bigint | undefined, deadline: bigint | undefined, unlimited: boolean): WriteIntent {
+/** An intent before {@link withDestinations}. */
+type DraftIntent = Omit<WriteIntent, 'destinations' | 'destinationUnknown'>
+type IntentBase = Omit<DraftIntent, 'kind' | 'message'>
+
+function approvalIntent(base: IntentBase, spender: string | undefined, token: string | undefined, amount: bigint | undefined, deadline: bigint | undefined, unlimited: boolean): DraftIntent {
   return {
     ...base, kind: 'approval', message: false,
     ...(spender !== undefined ? { to: spender } : {}), ...(token !== undefined ? { token } : {}),
@@ -164,7 +183,7 @@ function revokeCall(call: unknown): Array<{ token: string; spender?: string }> |
   return null
 }
 
-function revokeIntent(base: Omit<WriteIntent, 'kind' | 'message'>, revokes: Array<{ token: string; spender?: string }>): WriteIntent {
+function revokeIntent(base: IntentBase, revokes: Array<{ token: string; spender?: string }>): DraftIntent {
   const first = revokes[0]
   return {
     ...base, kind: 'revoke', message: false, amount: 0n, unlimited: false,
@@ -175,7 +194,7 @@ function revokeIntent(base: Omit<WriteIntent, 'kind' | 'message'>, revokes: Arra
 }
 
 /** The contracts a revoke intent calls: token / NFT contracts, Permit2 for a lockdown. */
-function revokeTargets(intent: WriteIntent): string[] {
+function revokeTargets(intent: DraftIntent): string[] {
   const raw = intent.raw
   const calls = Array.isArray(raw) ? raw : [raw]
   const out: string[] = []
@@ -208,7 +227,7 @@ export function resolvePrimaryType(typed: unknown): string {
 }
 
 /** EIP-712 input → approval intent for EIP-2612 `Permit` / Permit2, otherwise a confirm-only typed-data intent. */
-function typedDataIntent(base: Omit<WriteIntent, 'kind' | 'message'>, arg: unknown, primaryType: string): WriteIntent {
+function typedDataIntent(base: IntentBase, arg: unknown, primaryType: string): DraftIntent {
   const a = obj(arg)
   const domain = obj(a.domain)
   const message = obj(a.message)
@@ -234,7 +253,29 @@ function typedDataIntent(base: Omit<WriteIntent, 'kind' | 'message'>, arg: unkno
   return { ...base, kind: 'typedData', message: true, ...(verifying !== undefined ? { to: verifying } : {}) }
 }
 
+/**
+ * The destinations the lists check (scan F16/F17). `to` is left exactly as the call shape gave it — apps
+ * match a reviewed write on it — and the lists read this instead.
+ */
+function withDestinations(intent: DraftIntent): WriteIntent {
+  if (intent.message) return { ...intent, destinations: [], destinationUnknown: false }
+  if (intent.kind === 'approval') return { ...intent, destinations: intent.to !== undefined ? [intent.to] : [], destinationUnknown: intent.to === undefined }
+  if (intent.kind === 'revoke') return { ...intent, destinations: revokeTargets(intent), destinationUnknown: false }
+  if (intent.method === 'transfer') {
+    const r = str(obj(intent.raw).recipient) ?? str(obj(intent.raw).to)
+    return { ...intent, destinations: r !== undefined ? [r] : [], destinationUnknown: r === undefined }
+  }
+  // signRaw is Tron's prebuilt-transaction signer and signBuilt NEAR's, whatever chain id the account reports.
+  const chain = intent.method === 'signRaw' ? 'tron:' : intent.method === 'signBuilt' ? 'near:' : intent.chain
+  const d = sendDestinations(chain, intent.raw)
+  return { ...intent, destinations: d.list, destinationUnknown: d.unknown }
+}
+
 function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown): WriteIntent {
+  return withDestinations(draftIntentOf(chain, from, method, arg))
+}
+
+function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: unknown): DraftIntent {
   const base = { chain, from, method, raw: arg }
   const a = obj(arg)
   switch (method) {
@@ -315,24 +356,32 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
       const { fee } = method === 'transfer' ? await account.quoteTransfer(arg as TransferOptions) : await account.quoteSendTransaction(arg)
       for (const { c, cap } of caps) if (fee > cap) throw new PolicyViolationError('maxFee', `Fee ${fee} exceeds the ${c} cap of ${cap}.`)
     }
+    // Addresses are compared in one canonical form per chain (EVM lowercase, Tron 41-hex, TON raw), both sides (scan F17).
+    const listed = (c: string, list: string[] | undefined) => (list ? new Set(list.map((a) => canonicalAddress(c, a))) : undefined)
     if (intent.kind === 'revoke') {
       // Revoking takes rights away: the allowlist and the spender's listing do not apply.
       // The contract it calls must still not be blocklisted.
       for (const c of chains) {
-        const block = policies.blocklist?.[c]?.map(lower)
-        const hit = block && revokeTargets(intent).find((t) => block.includes(lower(t)))
+        const block = listed(c, policies.blocklist?.[c])
+        const hit = block && revokeTargets(intent).find((t) => block.has(canonicalAddress(c, t)))
         if (hit) throw new PolicyViolationError('blocklist', `Contract ${hit} is on the ${c} blocklist.`)
       }
     } else if (!intent.message) {
       const what = intent.kind === 'approval' ? 'Spender' : 'Destination'
       for (const c of chains) {
-        const allow = policies.allowlist?.[c]
-        if (allow && (intent.to === undefined || !allow.map(lower).includes(lower(intent.to)))) {
-          throw new PolicyViolationError('allowlist', `${what} ${intent.to ?? '(unknown)'} is not on the ${c} allowlist.`)
+        const allow = listed(c, policies.allowlist?.[c])
+        if (allow) {
+          const outside = intent.destinations.find((d) => !allow.has(canonicalAddress(c, d)))
+          if (outside !== undefined || intent.destinations.length === 0 || intent.destinationUnknown) {
+            throw new PolicyViolationError('allowlist', `${what} ${outside ?? '(unknown)'} is not on the ${c} allowlist.`)
+          }
         }
-        const block = policies.blocklist?.[c]
-        if (block && intent.to !== undefined && block.map(lower).includes(lower(intent.to))) {
-          throw new PolicyViolationError('blocklist', `${what} ${intent.to} is on the ${c} blocklist.`)
+        const block = listed(c, policies.blocklist?.[c])
+        if (block) {
+          const hit = intent.destinations.find((d) => block.has(canonicalAddress(c, d)))
+          if (hit !== undefined) throw new PolicyViolationError('blocklist', `${what} ${hit} is on the ${c} blocklist.`)
+          // Fail closed only when nobody else can look (scan F16); with a confirm hook it sees destinationUnknown.
+          if (intent.destinationUnknown && !policies.confirm) throw new PolicyViolationError('blocklist', `Cannot tell every destination of this ${intent.method} on ${c}, and the ${c} blocklist is on with no confirm hook to ask.`)
         }
       }
     }
