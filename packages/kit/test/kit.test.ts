@@ -188,7 +188,7 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
     await applyPolicies(acc, { confirm }).signTypedData(permit)
     expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ method: 'signTypedData', kind: 'approval', to: spender, token, amount: unlimited, unlimited: true, message: false }))
     await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [spender] } }).signTypedData(permit)).rejects.toThrow(/Spender .* blocklist/)
-    const dai = { ...permit, message: { holder: 'addr', spender, nonce: 0, expiry: 1800000000, allowed: true } }
+    const dai = { ...permit, types: { Permit: [{ name: 'holder', type: 'address' }, { name: 'spender', type: 'address' }, { name: 'nonce', type: 'uint256' }, { name: 'expiry', type: 'uint256' }, { name: 'allowed', type: 'bool' }] }, message: { holder: 'addr', spender, nonce: 0, expiry: 1800000000, allowed: true } }
     await applyPolicies(acc, { confirm }).signTypedData(dai)
     expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'approval', to: spender, unlimited: true }))
     const permit2Msg = { domain: { name: 'Permit2', chainId: 1, verifyingContract: permit2 }, types: { PermitSingle: [], PermitDetails: [] }, primaryType: 'PermitSingle', message: { details: { token, amount: ((1n << 160n) - 1n).toString(), expiration: 1800000000, nonce: 0 }, spender, sigDeadline: 1800000000 } }
@@ -243,7 +243,7 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
     // signPermit of 0 and an EIP-2612 Permit of 0 are revokes too
     await strict.signPermit({ token, spender, value: 0n, deadline: 1n })
     expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'signPermit', kind: 'revoke' }))
-    const permit0 = { domain: { name: 'USD Coin', version: '2', chainId: 1, verifyingContract: token }, types: { Permit: [] }, primaryType: 'Permit', message: { owner: 'addr', spender, value: '0', nonce: 0, deadline: '1' } }
+    const permit0 = { domain: { name: 'USD Coin', version: '2', chainId: 1, verifyingContract: token }, types: { Permit: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'nonce', type: 'uint256' }, { name: 'deadline', type: 'uint256' }] }, primaryType: 'Permit', message: { owner: 'addr', spender, value: '0', nonce: 0, deadline: '1' } }
     await strict.signTypedData(permit0)
     expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'signTypedData', kind: 'revoke', to: spender, token }))
     // EIP-7702 delegation

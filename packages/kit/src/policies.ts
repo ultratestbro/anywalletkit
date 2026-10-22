@@ -187,22 +187,46 @@ function revokeTargets(intent: WriteIntent): string[] {
   return out
 }
 
+/**
+ * The EIP-712 primary type exactly as wallet-evm's signer picks it (scan F13):
+ * the explicit `primaryType`, else the unique type no other type references
+ * (`inferPrimaryType` in wallet-evm/read-only-account.ts). Ambiguous → throws,
+ * as the signer does — the policy must never judge a different struct than the
+ * one that gets signed.
+ */
+export function resolvePrimaryType(typed: unknown): string {
+  const a = obj(typed)
+  const explicit = str(a.primaryType)
+  if (explicit !== undefined) return explicit
+  const types = obj(a.types)
+  const names = Object.keys(types).filter((t) => t !== 'EIP712Domain')
+  const fieldsOf = (n: string) => (Array.isArray(types[n]) ? (types[n] as unknown[]) : [])
+  const referenced = new Set(names.flatMap((n) => fieldsOf(n).map((f) => String(obj(f).type ?? '').replace(/\[.*\]$/, ''))).filter((t) => names.includes(t)))
+  const roots = names.filter((n) => !referenced.has(n))
+  if (roots.length !== 1) throw new Error(`Ambiguous EIP-712 primary type: ${roots.join(', ') || 'none'}. Pass primaryType.`)
+  return roots[0]!
+}
+
 /** EIP-712 input → approval intent for EIP-2612 `Permit` / Permit2, otherwise a confirm-only typed-data intent. */
-function typedDataIntent(base: Omit<WriteIntent, 'kind' | 'message'>, arg: unknown): WriteIntent {
+function typedDataIntent(base: Omit<WriteIntent, 'kind' | 'message'>, arg: unknown, primaryType: string): WriteIntent {
   const a = obj(arg)
   const domain = obj(a.domain)
   const message = obj(a.message)
   const types = obj(a.types)
-  const primaryType = str(a.primaryType) ?? Object.keys(types).find((k) => k !== 'EIP712Domain')
   const verifying = str(domain.verifyingContract)
-  if (primaryType === 'Permit' && str(message.spender) !== undefined) {
+  // Only fields DECLARED in the primary struct are signed; an undeclared `allowed: false` is not part of the permit (scan F5).
+  const declared = new Map((Array.isArray(types[primaryType]) ? (types[primaryType] as unknown[]) : []).map((f) => [str(obj(f).name) ?? '', str(obj(f).type) ?? ''] as const))
+  const field = (name: string, type?: string): unknown => (declared.has(name) && (type === undefined || declared.get(name) === type) ? message[name] : undefined)
+  const spender = str(field('spender', 'address'))
+  if (primaryType === 'Permit' && spender !== undefined) {
     // EIP-2612 (`value`) or DAI-style (`allowed: true`, no value) permit on the verifying contract (the token).
-    const amount = big(message.value)
-    if (verifying !== undefined && (amount === 0n || message.allowed === false)) return revokeIntent(base, [{ token: verifying, spender: str(message.spender)! }])
-    const unlimited = message.allowed === true || unboundedAllowance(amount)
-    return approvalIntent(base, str(message.spender), verifying, amount, big(message.deadline ?? message.expiry), unlimited)
+    const amount = big(field('value', 'uint256'))
+    const allowed = field('allowed', 'bool')
+    if (verifying !== undefined && (amount === 0n || allowed === false)) return revokeIntent(base, [{ token: verifying, spender }])
+    const unlimited = allowed === true || unboundedAllowance(amount)
+    return approvalIntent(base, spender, verifying, amount, big(field('deadline') ?? field('expiry')), unlimited)
   }
-  if (primaryType !== undefined && PERMIT2_TYPES.has(primaryType) && str(message.spender) !== undefined) {
+  if (PERMIT2_TYPES.has(primaryType) && str(message.spender) !== undefined) {
     const details = Array.isArray(message.details) ? obj(message.details[0]) : obj(message.details ?? message.permitted)
     const amount = big(details.amount)
     return approvalIntent(base, str(message.spender), str(details.token), amount, big(message.sigDeadline ?? message.deadline ?? details.expiration), unboundedAllowance(amount, MAX_UINT160))
@@ -225,7 +249,7 @@ function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown
       return approvalIntent(base, str(a.spender), str(a.token), amount, big(a.deadline), unboundedAllowance(amount))
     }
     case 'signTypedData':
-      return typedDataIntent(base, arg)
+      return typedDataIntent(base, arg, resolvePrimaryType(arg))
     case 'signBuilt': {
       // NEAR: a transaction built elsewhere, signed here — its receiver is the destination.
       const to = str(a.receiverId) ?? str(a.receiver)
@@ -325,6 +349,11 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
           const original = v as (...args: unknown[]) => Promise<unknown>
           fn = async (...args: unknown[]) => {
             await guard(prop, args[0])
+            // EIP-712 without primaryType: hand the signer the type the policy judged, so the two cannot diverge (scan F13).
+            // Same struct, same hash — only the inference is made explicit.
+            if (prop === 'signTypedData' && typeof args[0] === 'object' && args[0] !== null && str(obj(args[0]).primaryType) === undefined) {
+              return original.apply(target, [{ ...(args[0] as Record<string, unknown>), primaryType: resolvePrimaryType(args[0]) }, ...args.slice(1)])
+            }
             return original.apply(target, args)
           }
           wrapped.set(prop, fn)
