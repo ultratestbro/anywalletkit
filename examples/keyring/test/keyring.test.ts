@@ -51,7 +51,10 @@ describe('Keyring guide (docs) — offline', () => {
     expect([...secure.items.keys()][0]).toMatch(/^awk\.secret\.[0-9a-f]+$/)
     expect(secure.calls.every((o) => o.requireAuthentication)).toBe(true)
     const metadata = plain.items.get('awk.keyring')!
-    for (const word of new Set(mnemonic.split(' '))) expect(metadata).not.toMatch(new RegExp(`\\b${word}\\b`))
+    // Adjacent word pairs, not single words: metadata keys like "name", "index", "label" are BIP-39 words too.
+    const words = mnemonic.split(' ')
+    expect(metadata).not.toContain(mnemonic)
+    for (let i = 0; i + 1 < words.length; i++) expect(metadata).not.toContain(`${words[i]} ${words[i + 1]}`)
   })
 
   it('listing and managing accounts reads no secret', async () => {
