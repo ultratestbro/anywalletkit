@@ -76,7 +76,7 @@ export interface KeyringState {
 
 /** A chain package's manager class, as the kit registers it. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type KeyringManagerClass = new (seedOrSigner: string | Signer, config: any) => WalletManager<IWalletAccount, object>
+export type KeyringManagerClass = new (seedOrSigner: string | Uint8Array | Signer, config: any) => WalletManager<IWalletAccount, object>
 
 export interface KeyringChain {
   Manager: KeyringManagerClass

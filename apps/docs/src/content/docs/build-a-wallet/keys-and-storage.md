@@ -31,7 +31,13 @@ Otherwise a user who imports their MetaMask or Phantom phrase sees an empty wall
 **Rules:**
 
 - **Don't keep the phrase as a JS string longer than the onboarding screen.** A string
-  cannot be wiped from memory. Managers keep the seed bytes and wipe them in `dispose()`.
+  cannot be wiped from memory. The SDK turns a phrase into the 64-byte seed the moment it
+  gets it and keeps only the bytes; `dispose()` wipes them. Better still, keep the 64-byte
+  seed in secure storage next to the phrase and unlock with it (`new Wallet(seedBytes)`):
+  the words are then read only when the user opens "Show recovery phrase".
+- **Logging an object never shows a key.** Seeds and private keys are not properties of any
+  SDK object, so `console.log(account)`, `JSON.stringify(wallet)` or a crash report shows
+  addresses and public keys only. The conformance suite checks this for every chain.
 - **Never send the phrase or the seed anywhere.** That includes analytics, crash reports,
   logs and clipboard history.
 - **Don't let the OS screenshot the phrase screen.** Block screenshots and the app-switcher

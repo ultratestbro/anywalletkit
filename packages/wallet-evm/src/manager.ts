@@ -16,7 +16,7 @@ export const EVM_BASE_PATH = "m/44'/60'/0'/0"
  *   signer's path, or 'external'); other indexes/paths throw.
  */
 export class WalletManagerEvm extends WalletManager<WalletAccountEvm, EvmConfig> {
-  constructor(seedOrSigner: string | Signer, config: EvmConfig = {}) {
+  constructor(seedOrSigner: string | Uint8Array | Signer, config: EvmConfig = {}) {
     super(seedOrSigner, config)
   }
 
@@ -30,7 +30,7 @@ export class WalletManagerEvm extends WalletManager<WalletAccountEvm, EvmConfig>
     if (cached) return cached
     const external = this.externalSigner()
     if (external) return this.fromSigner(external, path)
-    const signer = LocalSigner.fromSeed(this.seedBytes(), 'secp256k1', path)
+    const signer = LocalSigner.leafFromSeed(this.seedBytes(), 'secp256k1', path)
     const account = new WalletAccountEvm(signer, signer.publicKey, path, this._config)
     this._accounts.set(path, account)
     return account
@@ -43,7 +43,7 @@ export class WalletManagerEvm extends WalletManager<WalletAccountEvm, EvmConfig>
     let key = 'external'
     if (isSeedSigner(signer)) {
       if (path === signer.path) key = path
-      else if (path.startsWith(`${signer.path}/`)) { leaf = await signer.derive(path.slice(signer.path.length + 1)); key = path }
+      else if (path.startsWith(`${signer.path}/`)) { leaf = await (signer.deriveLeaf ?? signer.derive).call(signer, path.slice(signer.path.length + 1)); key = path }
       else throw new SignerError(`The injected signer sits at ${signer.path}; it cannot provide ${path}.`)
     } else if (path !== `${EVM_BASE_PATH}/0` && path !== 'external') {
       throw new SignerError(`An external signer has one account; ${path} is not derivable from it.`)

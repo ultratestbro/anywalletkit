@@ -410,7 +410,7 @@ describe('intent journal', () => {
 describe('Wallet.history / describeTransaction', () => {
   const SEED = 'test test test test test test test test test test test junk'
   class FakeManager extends WalletManager<IWalletAccount, { chain: string; address: string }> {
-    constructor(seed: string | Signer, config: { chain: string; address: string }) { super(seed, config) }
+    constructor(seed: string | Uint8Array | Signer, config: { chain: string; address: string }) { super(seed, config) }
     async getAccount(index = 0) { return this.getAccountByPath(`m/${index}`) }
     async getAccountByPath(path: string) {
       let a = this._accounts.get(path)

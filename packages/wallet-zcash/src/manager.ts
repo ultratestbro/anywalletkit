@@ -18,7 +18,7 @@ export const coinType = (network: ZcashNetwork): 133 | 1 => (network === 'mainne
  * leaf or external signer is `getAccount(0)`.
  */
 export class WalletManagerZcash extends WalletManager<WalletAccountZcash, ZcashConfig> {
-  constructor(seedOrSigner: string | Signer, config: ZcashConfig = {}) {
+  constructor(seedOrSigner: string | Uint8Array | Signer, config: ZcashConfig = {}) {
     super(seedOrSigner, config)
   }
 
@@ -36,7 +36,7 @@ export class WalletManagerZcash extends WalletManager<WalletAccountZcash, ZcashC
     if (cached) return cached
     const external = this.externalSigner()
     if (external) return this.fromSigner(external, full)
-    const signer = LocalSigner.fromSeed(this.seedBytes(), 'secp256k1', full)
+    const signer = LocalSigner.leafFromSeed(this.seedBytes(), 'secp256k1', full)
     const account = new WalletAccountZcash(signer, signer.publicKey, full, this._config)
     this._accounts.set(full, account)
     return account
@@ -48,7 +48,7 @@ export class WalletManagerZcash extends WalletManager<WalletAccountZcash, ZcashC
     let key = 'external'
     if (isSeedSigner(signer)) {
       if (path === signer.path) key = path
-      else if (path.startsWith(`${signer.path}/`)) { leaf = await signer.derive(path.slice(signer.path.length + 1)); key = path }
+      else if (path.startsWith(`${signer.path}/`)) { leaf = await (signer.deriveLeaf ?? signer.derive).call(signer, path.slice(signer.path.length + 1)); key = path }
       else throw new SignerError(`The injected signer sits at ${signer.path}; it cannot provide ${path}.`)
     } else if (path !== `${this.basePath}/0'/0/0` && path !== 'external') {
       throw new SignerError(`An external signer has one account; ${path} is not derivable from it.`)

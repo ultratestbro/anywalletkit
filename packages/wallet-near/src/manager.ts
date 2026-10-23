@@ -19,7 +19,7 @@ export const NEAR_BASE_PATH = "m/44'/397'"
  * `getNamedAccount("alice.near", i)` binds account i's key to a named account.
  */
 export class WalletManagerNear extends WalletManager<WalletAccountNear, NearConfig> {
-  constructor(seedOrSigner: string | Signer, config: NearConfig = {}) {
+  constructor(seedOrSigner: string | Uint8Array | Signer, config: NearConfig = {}) {
     super(seedOrSigner, config)
   }
 
@@ -35,7 +35,7 @@ export class WalletManagerNear extends WalletManager<WalletAccountNear, NearConf
     if (cached) return cached
     const external = this.externalSigner()
     if (external) return this.fromSigner(external, full)
-    const signer = LocalSigner.fromSeed(this.seedBytes(), 'ed25519', full)
+    const signer = LocalSigner.leafFromSeed(this.seedBytes(), 'ed25519', full)
     const account = new WalletAccountNear(signer, signer.publicKey, full, this._config)
     this._accounts.set(full, account)
     return account
@@ -53,7 +53,7 @@ export class WalletManagerNear extends WalletManager<WalletAccountNear, NearConf
     let key = 'external'
     if (isSeedSigner(signer)) {
       if (path === signer.path) key = path
-      else if (path.startsWith(`${signer.path}/`)) { leaf = await signer.derive(path.slice(signer.path.length + 1)); key = path }
+      else if (path.startsWith(`${signer.path}/`)) { leaf = await (signer.deriveLeaf ?? signer.derive).call(signer, path.slice(signer.path.length + 1)); key = path }
       else throw new SignerError(`The injected signer sits at ${signer.path}; it cannot provide ${path}.`)
     } else if (path !== `${NEAR_BASE_PATH}/0'` && path !== 'external') {
       throw new SignerError(`An external signer has one account; ${path} is not derivable from it.`)

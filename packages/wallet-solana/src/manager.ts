@@ -17,7 +17,7 @@ const DEFAULT_BASE_FEE = 5_000n
  *   signer's path, or 'external'); other indexes/paths throw `SignerError`.
  */
 export class WalletManagerSolana extends WalletManager<WalletAccountSolana, SolanaConfig> {
-  constructor(seedOrSigner: string | Signer, config: SolanaConfig = {}) {
+  constructor(seedOrSigner: string | Uint8Array | Signer, config: SolanaConfig = {}) {
     super(seedOrSigner, config)
   }
 
@@ -33,7 +33,7 @@ export class WalletManagerSolana extends WalletManager<WalletAccountSolana, Sola
     if (cached) return cached
     const external = this.externalSigner()
     if (external) return this.fromSigner(external, full)
-    const signer = LocalSigner.fromSeed(this.seedBytes(), 'ed25519', full)
+    const signer = LocalSigner.leafFromSeed(this.seedBytes(), 'ed25519', full)
     const account = new WalletAccountSolana(signer, signer.publicKey, full, this._config)
     this._accounts.set(full, account)
     return account
@@ -46,7 +46,7 @@ export class WalletManagerSolana extends WalletManager<WalletAccountSolana, Sola
     let key = 'external'
     if (isSeedSigner(signer)) {
       if (path === signer.path) key = path
-      else if (path.startsWith(`${signer.path}/`)) { leaf = await signer.derive(path.slice(signer.path.length + 1)); key = path }
+      else if (path.startsWith(`${signer.path}/`)) { leaf = await (signer.deriveLeaf ?? signer.derive).call(signer, path.slice(signer.path.length + 1)); key = path }
       else throw new SignerError(`The injected signer sits at ${signer.path}; it cannot provide ${path}.`)
     } else if (path !== `${SOLANA_BASE_PATH}/0'/0'` && path !== 'external') {
       throw new SignerError(`An external signer has one account; ${path} is not derivable from it.`)

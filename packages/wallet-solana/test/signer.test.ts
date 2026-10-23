@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { getBase64Encoder, getTransactionDecoder, type Address } from '@solana/kit'
-import { LocalSigner, SignerError, UserRejectedError, externalSigner, seedFromMnemonicSync } from '@forgewallet/core'
+import { LocalSigner, SignerError, UserRejectedError, deriveEd25519, externalSigner, seedFromMnemonicSync } from '@forgewallet/core'
 import { SOLANA_BASE_PATH, WalletAccountSolana, WalletManagerSolana, type SolanaRpc } from '../src/index.js'
 
 const SEED = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
@@ -11,9 +11,8 @@ const BLOCKHASH = '9sHcv6xwn9YkB8nxTUGKDwPwNnmqVp5oAXxU8Fdkm4J6'
 
 /** The account-0 key, held OUTSIDE the SDK as a "hardware wallet" would. */
 function account0Key(): Uint8Array {
-  const s = LocalSigner.fromSeed(seedFromMnemonicSync(SEED), 'ed25519', `${SOLANA_BASE_PATH}/0'/0'`)
-  // LocalSigner never exposes its key; re-derive the raw bytes for the fake device.
-  return (s as unknown as { _privateKey: Uint8Array })._privateKey.slice()
+  // LocalSigner never exposes its key; derive the raw bytes for the fake device.
+  return deriveEd25519(seedFromMnemonicSync(SEED), `${SOLANA_BASE_PATH}/0'/0'`).privateKey
 }
 
 function hardwareWallet(reject = false) {

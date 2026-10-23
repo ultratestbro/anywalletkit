@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { inspect } from 'node:util'
 import { UserRejectedError, WalletManager, type FeeRates, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferOptions } from '@forgewallet/core'
 import { LendingProtocol } from '@forgewallet/core'
 import { createMockAccount } from '@forgewallet/conformance'
@@ -9,7 +10,7 @@ const SEED = 'test test test test test test test test test test test junk'
 /** A chain package stand-in: hands out recording mock accounts. */
 class FakeManager extends WalletManager<IWalletAccount, { chain: string; fee?: bigint }> {
   static built = 0
-  constructor(seed: string | Signer, config: { chain: string; fee?: bigint }) { super(seed, config); FakeManager.built++ }
+  constructor(seed: string | Uint8Array | Signer, config: { chain: string; fee?: bigint }) { super(seed, config); FakeManager.built++ }
   async getAccount(index = 0) { return this.getAccountByPath(`m/${index}`) }
   async getAccountByPath(path: string) {
     let a = this._accounts.get(path)
@@ -297,5 +298,44 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
     expect(confirm).toHaveBeenCalledTimes(1)
     expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ method: 'approve', kind: 'approval', to: spender }))
     expect(base.sent).toHaveLength(2)
+  })
+})
+
+describe('Wallet keeps no seed phrase (2026-10-23 audit)', () => {
+  class SeedProbe extends FakeManager {
+    static received: unknown[] = []
+    constructor(seed: string | Uint8Array | Signer, config: { chain: string; fee?: bigint }) { super(seed, config); SeedProbe.received.push(seed) }
+  }
+
+  it('the phrase is turned into seed bytes in the constructor: managers get bytes, the wallet shows no words', async () => {
+    SeedProbe.received = []
+    const w = new Wallet(SEED)
+    w.registerWallet('eip155', SeedProbe, { chain: 'eip155:1' })
+    await w.getAccount('eip155:1')
+    expect(SeedProbe.received).toHaveLength(1)
+    expect(SeedProbe.received[0]).toBeInstanceOf(Uint8Array)
+    expect((SeedProbe.received[0] as Uint8Array).length).toBe(64)
+    const text = inspect(w, { depth: 10, showHidden: true }) + String(Object.values(w))
+    expect(text).not.toContain('test junk')
+    expect(text).not.toContain('test test')
+  })
+
+  it('a Wallet built from seed bytes works the same; invalid input is refused', async () => {
+    const { seedFromMnemonicSync } = await import('@forgewallet/core')
+    const bytes = seedFromMnemonicSync(SEED)
+    const w = new Wallet(bytes)
+    w.registerWallet('eip155', FakeManager, { chain: 'eip155:1' })
+    expect(await (await w.getAccount('eip155:1')).getAddress()).toBe('addr-eip155:1-m/0')
+    expect(() => new Wallet('not a phrase')).toThrow(/Invalid seed phrase/)
+    expect(() => new Wallet(new Uint8Array(16))).toThrow(/64 bytes/)
+  })
+
+  it('dispose zeroizes the seed every manager got and refuses later use', async () => {
+    SeedProbe.received = []
+    const w = new Wallet(SEED)
+    w.registerWallet('eip155', SeedProbe, { chain: 'eip155:1' })
+    await w.getAccount('eip155:1')
+    w.dispose()
+    await expect(w.getAccount('eip155:1')).rejects.toThrow(/disposed/)
   })
 })

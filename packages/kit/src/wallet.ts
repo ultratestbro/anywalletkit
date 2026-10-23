@@ -1,10 +1,10 @@
-import type { ActivityItem, ChainTx, DescribeActivityContext, HistorySource, IWalletAccount, IWalletAccountReadOnly, Signer, WalletManager } from '@forgewallet/core'
+import { isValidSeedPhrase, normalizeMnemonic, seedFromMnemonicSync, zeroize, type ActivityItem, type ChainTx, type DescribeActivityContext, type HistorySource, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type WalletManager } from '@forgewallet/core'
 import { applyPolicies, type Policies } from './policies.js'
 import { buildFeed, describeSingle, type ActivityOptions, type ActivityRecognizer, type FeedAddress, type FeedItem, type HistoryFeedPage, type HistoryFeedQuery } from './activity/feed.js'
 import type { IntentJournal } from './activity/journal.js'
 
 /** A chain package's manager class. */
-export type ManagerClass<M extends WalletManager<IWalletAccount, object>, C extends object> = new (seedOrSigner: string | Signer, config: C) => M
+export type ManagerClass<M extends WalletManager<IWalletAccount, object>, C extends object> = new (seedOrSigner: string | Uint8Array | Signer, config: C) => M
 
 /** A protocol module's class: (account, config) → protocol. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,6 +20,12 @@ export interface WalletOptions {
   activity?: ActivityOptions
 }
 
+/**
+ * The wallet's seed, outside the object: never an own property, so logging or
+ * serializing a Wallet shows no secret. Zeroized and dropped by `dispose()`.
+ */
+const WALLET_SEEDS = new WeakMap<object, Uint8Array>()
+
 type Describer = { describeActivity?: (tx: ChainTx, ctx: DescribeActivityContext) => ActivityItem | null }
 
 /**
@@ -27,6 +33,11 @@ type Describer = { describeActivity?: (tx: ChainTx, ctx: DescribeActivityContext
  * chain id) and protocol modules by name; ask for accounts and protocols. One
  * seed phrase (or external signer) feeds every registered chain. Policies wrap
  * every account handed out. `dispose()` zeroizes everything.
+ *
+ * A seed phrase is turned into the 64-byte seed in the constructor and the
+ * string is not kept (a JS string cannot be zeroized); each chain manager gets
+ * its own copy of the bytes. Pass the seed bytes instead of the phrase to never
+ * hand the words to the SDK at all.
  *
  *   const w = new Wallet(seed, { policies: { maxFee: { 'eip155:1': 10n ** 16n } } })
  *   w.registerWallet('eip155', WalletManagerEvm, { provider: RPC })
@@ -36,7 +47,8 @@ type Describer = { describeActivity?: (tx: ChainTx, ctx: DescribeActivityContext
  *   const lido = await w.getProtocol<LidoProtocolEvm>('lido')
  */
 export class Wallet {
-  private readonly _seedOrSigner: string | Signer
+  private readonly _signer: Signer | undefined
+  private _disposed = false
   private readonly _policies: Policies | undefined
   private readonly _wallets = new Map<string, WalletRegistration<WalletManager<IWalletAccount, object>, object>>()
   private readonly _protocols = new Map<string, ProtocolRegistration>()
@@ -45,8 +57,16 @@ export class Wallet {
   private readonly _activity: ActivityOptions
   private _journal: IntentJournal | undefined
 
-  constructor(seedOrSigner: string | Signer, options: WalletOptions = {}) {
-    this._seedOrSigner = seedOrSigner
+  constructor(seedOrSigner: string | Uint8Array | Signer, options: WalletOptions = {}) {
+    if (typeof seedOrSigner === 'string') {
+      if (!isValidSeedPhrase(seedOrSigner)) throw new Error('Invalid seed phrase.')
+      WALLET_SEEDS.set(this, seedFromMnemonicSync(normalizeMnemonic(seedOrSigner)))
+    } else if (seedOrSigner instanceof Uint8Array) {
+      if (seedOrSigner.length !== 64) throw new Error(`A BIP-39 seed is 64 bytes; got ${seedOrSigner.length}.`)
+      WALLET_SEEDS.set(this, seedOrSigner.slice())
+    } else {
+      this._signer = seedOrSigner
+    }
     this._policies = options.policies
     this._activity = options.activity ?? {}
   }
@@ -100,8 +120,9 @@ export class Wallet {
 
   /** The chain package's manager (lazily constructed). */
   getManager<M extends WalletManager<IWalletAccount, object> = WalletManager<IWalletAccount, object>>(chain: string): M {
+    if (this._disposed) throw new Error('This wallet has been disposed.')
     const reg = this.registration(chain)
-    reg.manager ??= new reg.Manager(this._seedOrSigner, reg.config)
+    reg.manager ??= new reg.Manager(WALLET_SEEDS.get(this) ?? this._signer!, reg.config)
     return reg.manager as M
   }
 
@@ -185,6 +206,9 @@ export class Wallet {
   dispose(): void {
     for (const reg of this._wallets.values()) { reg.manager?.dispose(); reg.manager = undefined }
     this._protocolInstances.clear()
-    if (typeof this._seedOrSigner !== 'string') this._seedOrSigner.dispose()
+    zeroize(WALLET_SEEDS.get(this))
+    WALLET_SEEDS.delete(this)
+    this._signer?.dispose()
+    this._disposed = true
   }
 }

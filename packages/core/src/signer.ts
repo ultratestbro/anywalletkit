@@ -37,7 +37,7 @@
  */
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js'
-import { bytesToNumberBE, numberToBytesBE } from '@noble/curves/utils.js'
+import { bytesToHex, bytesToNumberBE, numberToBytesBE } from '@noble/curves/utils.js'
 import { deriveEd25519, deriveSecp256k1 } from './derive.js'
 import { SignerError } from './errors.js'
 import { zeroize } from './mnemonic.js'
@@ -82,6 +82,8 @@ export interface SeedSigner extends Signer {
   readonly path: string
   /** Derive a child along `relativePath` (e.g. "0/1"). Hardened-only for ed25519. */
   derive(relativePath: string): Promise<SeedSigner>
+  /** Like `derive`, but the child keeps only its own key (no seed copy) and cannot derive further. What managers use for accounts. */
+  deriveLeaf?(relativePath: string): Promise<Signer>
 }
 
 /** Narrowing helper. */
@@ -140,8 +142,16 @@ export function tweakSecp256k1PrivateKey(privateKey: Uint8Array, tweak: Uint8Arr
 }
 
 /**
+ * Secrets of every LocalSigner, outside the object: a key or a seed is never an
+ * own property, so `JSON.stringify`, `console.log`, `util.inspect`, crash
+ * reporters and `Object.keys` see only the public fields.
+ */
+const LOCAL_SECRETS = new WeakMap<LocalSigner, { privateKey: Uint8Array | undefined; seed: Uint8Array | undefined }>()
+
+/**
  * Local key signer: the key lives in one `Uint8Array`, zeroized by `dispose()`.
- * Built from a seed (derivable) or from a raw derived key (leaf only).
+ * Built from a seed (derivable), from a seed as a leaf (`leafFromSeed`: no seed
+ * kept), or from a raw derived key (leaf only).
  */
 export class LocalSigner implements SeedSigner {
   readonly kind = 'seed' as const
@@ -149,16 +159,13 @@ export class LocalSigner implements SeedSigner {
   readonly path: string
   readonly publicKey: Uint8Array
   readonly schemes: readonly SignScheme[]
-  private _privateKey: Uint8Array | undefined
-  private _seed: Uint8Array | undefined
 
   private constructor(curve: SignerCurve, privateKey: Uint8Array, publicKey: Uint8Array, path: string, seed?: Uint8Array) {
     this.curve = curve
-    this._privateKey = privateKey
     this.publicKey = publicKey
     this.path = path
-    this._seed = seed
     this.schemes = schemesFor(curve)
+    LOCAL_SECRETS.set(this, { privateKey, seed })
   }
 
   /** Derive the key at `path` from the 64-byte BIP-39 seed. Keeps a COPY of the seed so it can derive children. */
@@ -167,14 +174,30 @@ export class LocalSigner implements SeedSigner {
     return new LocalSigner(curve, privateKey, publicKey, path, seed.slice())
   }
 
+  /**
+   * Derive the key at `path` from the seed and keep ONLY that key: the signer
+   * cannot derive children and holds no copy of the seed. What chain managers
+   * hand to accounts, so an account never carries the master seed.
+   */
+  static leafFromSeed(seed: Uint8Array, curve: SignerCurve, path: string): LocalSigner {
+    const { privateKey, publicKey } = curve === 'secp256k1' ? deriveSecp256k1(seed, path) : deriveEd25519(seed, path)
+    return new LocalSigner(curve, privateKey, publicKey, path)
+  }
+
   /** Wrap an already-derived key. Cannot derive children. Takes ownership of `privateKey` (zeroized on dispose). */
   static fromPrivateKey(curve: SignerCurve, privateKey: Uint8Array, publicKey: Uint8Array, path: string): LocalSigner {
     return new LocalSigner(curve, privateKey, publicKey, path)
   }
 
   private key(): Uint8Array {
-    if (!this._privateKey) throw new SignerError('This signer has been disposed.')
-    return this._privateKey
+    const key = LOCAL_SECRETS.get(this)?.privateKey
+    if (!key) throw new SignerError('This signer has been disposed.')
+    return key
+  }
+
+  /** Public view only, for logs and serializers. */
+  toJSON(): { kind: 'seed'; curve: SignerCurve; path: string; publicKey: string } {
+    return { kind: this.kind, curve: this.curve, path: this.path, publicKey: bytesToHex(this.publicKey) }
   }
 
   async getPublicKey(): Promise<Uint8Array> {
@@ -218,15 +241,24 @@ export class LocalSigner implements SeedSigner {
 
   async derive(relativePath: string): Promise<LocalSigner> {
     this.key()
-    if (!this._seed) throw new SignerError('This signer was built from a bare key and cannot derive children.')
+    const seed = LOCAL_SECRETS.get(this)?.seed
+    if (!seed) throw new SignerError('This signer was built from a bare key and cannot derive children.')
     const rel = relativePath.replace(/^\/+/, '')
-    return LocalSigner.fromSeed(this._seed, this.curve, rel ? `${this.path}/${rel}` : this.path)
+    return LocalSigner.fromSeed(seed, this.curve, rel ? `${this.path}/${rel}` : this.path)
+  }
+
+  async deriveLeaf(relativePath: string): Promise<LocalSigner> {
+    this.key()
+    const seed = LOCAL_SECRETS.get(this)?.seed
+    if (!seed) throw new SignerError('This signer was built from a bare key and cannot derive children.')
+    const rel = relativePath.replace(/^\/+/, '')
+    return LocalSigner.leafFromSeed(seed, this.curve, rel ? `${this.path}/${rel}` : this.path)
   }
 
   dispose(): void {
-    zeroize(this._privateKey, this._seed)
-    this._privateKey = undefined
-    this._seed = undefined
+    const secrets = LOCAL_SECRETS.get(this)
+    zeroize(secrets?.privateKey, secrets?.seed)
+    LOCAL_SECRETS.delete(this)
   }
 }
 

@@ -23,7 +23,7 @@ import { DEFAULT_TONAPI } from './emulation.js'
  * {@link WalletManagerTon.fromTonMnemonic}; they yield one account at `ton-mnemonic`.
  */
 export class WalletManagerTon extends WalletManager<WalletAccountTon, TonConfig> {
-  constructor(seedOrSigner: string | Signer, config: TonConfig = {}) {
+  constructor(seedOrSigner: string | Uint8Array | Signer, config: TonConfig = {}) {
     super(seedOrSigner, config)
   }
 
@@ -63,7 +63,7 @@ export class WalletManagerTon extends WalletManager<WalletAccountTon, TonConfig>
     const full = path.startsWith('m/') ? path : `${TON_BASE_PATH}/${path}`
     const cached = this._accounts.get(full)
     if (cached) return cached
-    const signer = LocalSigner.fromSeed(this.seedBytes(), 'ed25519', full)
+    const signer = LocalSigner.leafFromSeed(this.seedBytes(), 'ed25519', full)
     const account = new WalletAccountTon(signer, signer.publicKey, full, this._config)
     this._accounts.set(full, account)
     return account
@@ -81,7 +81,7 @@ export class WalletManagerTon extends WalletManager<WalletAccountTon, TonConfig>
     let key = this.singlePath(signer)
     if (isSeedSigner(signer)) {
       if (path === signer.path) key = path
-      else if (path.startsWith(`${signer.path}/`)) { leaf = await signer.derive(path.slice(signer.path.length + 1)); key = path }
+      else if (path.startsWith(`${signer.path}/`)) { leaf = await (signer.deriveLeaf ?? signer.derive).call(signer, path.slice(signer.path.length + 1)); key = path }
       else throw new SignerError(`This signer yields a single account at path '${signer.path}'; it cannot provide ${path}.`)
     } else if (path !== `${TON_BASE_PATH}/0'` && path !== 'external') {
       throw new SignerError(`An external signer yields a single account; ${path} is not derivable from it.`)

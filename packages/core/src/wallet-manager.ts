@@ -4,6 +4,9 @@ import { requireCurve, type Signer, type SignerCurve } from './signer.js'
 import { SignerError } from './errors.js'
 import { getRandomSeedPhrase, isValidSeedPhrase, normalizeMnemonic, seedFromMnemonicSync, zeroize } from './mnemonic.js'
 
+/** Seeds of every manager, outside the objects (see the class comment). */
+const MANAGER_SEEDS = new WeakMap<object, Uint8Array>()
+
 /**
  * Base for chain packages. Holds either the 64-byte BIP-39 seed (local seed
  * signers derive from it) or an external Signer, derives accounts by index or
@@ -11,20 +14,26 @@ import { getRandomSeedPhrase, isValidSeedPhrase, normalizeMnemonic, seedFromMnem
  *
  * A mnemonic passed as a string is stretched to the seed bytes right here and
  * the string is not kept: JS strings cannot be zeroized, `Uint8Array`s can.
+ * A 64-byte seed passed as bytes is COPIED (the caller zeroizes its own).
  * Keep the mnemonic's own lifetime short on the calling side (read it, build
  * the manager, drop the reference) — or build from a `Signer` and never hand
  * the words to the SDK at all (see `@forgewallet/keyring`).
+ *
+ * The seed is never an own property: it lives in a module WeakMap, so logging
+ * or serializing a manager shows no secret.
  */
 export abstract class WalletManager<TAccount extends IWalletAccount, TConfig extends object = Record<string, never>> {
-  private _seedBytes: Uint8Array | undefined
   protected readonly _signer: Signer | undefined
   protected readonly _config: TConfig
   protected readonly _accounts = new Map<string, TAccount>()
 
-  constructor(seedOrSigner: string | Signer, config: TConfig) {
+  constructor(seedOrSigner: string | Uint8Array | Signer, config: TConfig) {
     if (typeof seedOrSigner === 'string') {
       if (!isValidSeedPhrase(seedOrSigner)) throw new Error('Invalid seed phrase.')
-      this._seedBytes = seedFromMnemonicSync(normalizeMnemonic(seedOrSigner))
+      MANAGER_SEEDS.set(this, seedFromMnemonicSync(normalizeMnemonic(seedOrSigner)))
+    } else if (seedOrSigner instanceof Uint8Array) {
+      if (seedOrSigner.length !== 64) throw new Error(`A BIP-39 seed is 64 bytes; got ${seedOrSigner.length}.`)
+      MANAGER_SEEDS.set(this, seedOrSigner.slice())
     } else {
       this._signer = seedOrSigner
     }
@@ -33,8 +42,9 @@ export abstract class WalletManager<TAccount extends IWalletAccount, TConfig ext
 
   /** The 64-byte seed this manager derives from; throws for a Signer-built or disposed manager. */
   protected seedBytes(): Uint8Array {
-    if (!this._seedBytes) throw new SignerError(this._signer ? 'This manager was built from a Signer, not a seed phrase.' : 'This manager has been disposed.')
-    return this._seedBytes
+    const seed = MANAGER_SEEDS.get(this)
+    if (!seed) throw new SignerError(this._signer ? 'This manager was built from a Signer, not a seed phrase.' : 'This manager has been disposed.')
+    return seed
   }
 
   static isValidSeedPhrase(seed: string): boolean {
@@ -67,7 +77,7 @@ export abstract class WalletManager<TAccount extends IWalletAccount, TConfig ext
     for (const account of this._accounts.values()) account.dispose()
     this._accounts.clear()
     this._signer?.dispose()
-    zeroize(this._seedBytes)
-    this._seedBytes = undefined
+    zeroize(MANAGER_SEEDS.get(this))
+    MANAGER_SEEDS.delete(this)
   }
 }

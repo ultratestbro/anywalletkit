@@ -32,5 +32,6 @@ chains in about twenty lines.
 - **Read-only accounts.** A watched address (no key) is useful for portfolios and for a
   "watch wallet" feature. Protocol reads like balances and approvals work on it; writes do
   not.
-- **Dispose.** Call `wallet.dispose()` when the user locks the app: it wipes the seed bytes
-  from every manager.
+- **Dispose.** Call `wallet.dispose()` when the user locks the app: it wipes the seed from
+  the wallet and from every manager, and the wallet refuses any later call. Build a new one
+  on unlock.

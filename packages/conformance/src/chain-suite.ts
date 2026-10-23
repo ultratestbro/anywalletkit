@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { privateKeySigner, type IWalletAccount, type Signer, type SignerCurve, type WalletManager } from '@forgewallet/core'
+import { deriveEd25519, deriveSecp256k1, privateKeySigner, seedFromMnemonicSync, type IWalletAccount, type Signer, type SignerCurve, type WalletManager } from '@forgewallet/core'
 import { type ChainKey, derivationVectors } from './vectors.js'
 
 export interface ChainSuiteOptions<M extends WalletManager<IWalletAccount, object>> {
@@ -62,6 +62,22 @@ export function describeChainModule<M extends WalletManager<IWalletAccount, obje
       await expect(a.sign('after dispose')).rejects.toThrow()
     })
 
+    it('no private key, seed or phrase is reachable from the manager or the account (logs, serializers, crash reports)', async () => {
+      const mnemonic = derivationVectors.seeds['bip39-abandon-12']!
+      const vec = sets['bip39-abandon-12']!.accounts[0]!
+      const seed = seedFromMnemonicSync(mnemonic)
+      const key = (CURVES[o.chain] === 'secp256k1' ? deriveSecp256k1(seed, vec.path) : deriveEd25519(seed, vec.path)).privateKey
+      const m = await o.create(mnemonic)
+      try {
+        const a = await m.getAccount(0)
+        await a.getAddress()
+        for (const root of [m, a]) {
+          const found = findSecret(root, [key, seed], mnemonic)
+          expect(found, `secret reachable at ${found}`).toBeUndefined()
+        }
+      } finally { m.dispose() }
+    })
+
     it('accounts 0..4 from one seed are distinct and stable (multi-account)', async () => {
       const m = await o.create(derivationVectors.seeds['bip39-abandon-12']!)
       try {
@@ -91,4 +107,55 @@ export function describeChainModule<M extends WalletManager<IWalletAccount, obje
       await expect(Promise.resolve().then(() => o.create('not a seed phrase at all'))).rejects.toThrow()
     })
   })
+}
+
+const CURVES: Record<ChainKey, SignerCurve> = { evm: 'secp256k1', btc: 'secp256k1', tron: 'secp256k1', zcash: 'secp256k1', solana: 'ed25519', ton: 'ed25519', near: 'ed25519' }
+
+const toHex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')
+
+/** Same bytes, or `needle` inside `hay` (a key embedded in a 64-byte ed25519 secret). */
+function containsBytes(hay: Uint8Array, needle: Uint8Array): boolean {
+  outer: for (let i = 0; i + needle.length <= hay.length; i++) {
+    for (let j = 0; j < needle.length; j++) if (hay[i + j] !== needle[j]) continue outer
+    return true
+  }
+  return false
+}
+
+/**
+ * Walks every own property (enumerable or not, string or symbol keys), Map and
+ * Set entries, and array items reachable from `root`, the way a logger, a
+ * serializer or a crash reporter would. Returns the path of the first secret
+ * found: a byte array holding a secret, or a string holding its hex or the words.
+ */
+function findSecret(root: unknown, secrets: Uint8Array[], mnemonic: string): string | undefined {
+  const hexes = secrets.map(toHex)
+  const seen = new Set<unknown>()
+  const visit = (v: unknown, path: string, depth: number): string | undefined => {
+    if (typeof v === 'string') {
+      const low = v.toLowerCase()
+      return hexes.some((h) => low.includes(h)) || v.includes(mnemonic) ? path : undefined
+    }
+    if (typeof v !== 'object' || v === null || seen.has(v) || depth > 12) return undefined
+    seen.add(v)
+    if (v instanceof Uint8Array) return secrets.some((s) => containsBytes(v, s)) ? path : undefined
+    if (ArrayBuffer.isView(v) || v instanceof ArrayBuffer) return undefined
+    if (v instanceof Map) {
+      for (const [k, x] of v) { const hit = visit(k, `${path}<key>`, depth + 1) ?? visit(x, `${path}.get(${String(k)})`, depth + 1); if (hit) return hit }
+      return undefined
+    }
+    if (v instanceof Set) {
+      for (const x of v) { const hit = visit(x, `${path}<item>`, depth + 1); if (hit) return hit }
+      return undefined
+    }
+    for (const k of Reflect.ownKeys(v)) {
+      let x: unknown
+      try { x = (v as Record<PropertyKey, unknown>)[k] } catch { continue }
+      if (typeof x === 'function') continue
+      const hit = visit(x, `${path}.${String(k)}`, depth + 1)
+      if (hit) return hit
+    }
+    return undefined
+  }
+  return visit(root, 'root', 0)
 }

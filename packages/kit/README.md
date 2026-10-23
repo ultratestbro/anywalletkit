@@ -2,7 +2,10 @@
 
 The orchestrator. Chain packages and protocol modules are registered; the kit
 hands out accounts by CAIP-2 chain id and protocols by name, all fed by one
-seed phrase or one external `Signer`, all wrapped by the same policies.
+seed phrase (or its 64-byte seed) or one external `Signer`, all wrapped by the same policies.
+The phrase is turned into seed bytes in the constructor and never kept; no seed or key is
+ever an own property of a `Wallet`, manager, account or signer, so logs and serializers show
+no secret.
 
 ```ts
 import { Wallet } from '@forgewallet/kit'
@@ -23,7 +26,7 @@ wallet.registerProtocol('lido', LidoProtocolEvm, { chain: 'eip155:1' })
 const eth = await wallet.getAccount('eip155:1')          // policies applied
 await eth.transfer({ recipient: '0x…', amount: 10n ** 15n })
 const lido = await wallet.getProtocol<LidoProtocolEvm>('lido')
-wallet.dispose()                                          // zeroizes every chain's keys
+wallet.dispose()                                          // zeroizes the seed and every chain's keys; later calls throw
 ```
 
 Policies run before anything is signed or broadcast, in this order: fee cap

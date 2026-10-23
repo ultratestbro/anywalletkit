@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { inspect } from 'node:util'
+import { bytesToHex } from 'viem'
+import { deriveSecp256k1, seedFromMnemonicSync } from '@forgewallet/core'
 import { describeChainModule, derivationVectors } from '@forgewallet/conformance'
 import { WalletManagerEvm, type WalletAccountEvm } from '../src/index.js'
 
@@ -32,4 +35,30 @@ describe('wallet-evm: signatures match the pinned vectors beyond the shared suit
       })
     }
   }
+})
+
+describe('wallet-evm: an account carries no secret in its rendering (2026-10-23 audit)', () => {
+  it('neither the private key nor the master seed shows in inspect / JSON, from a phrase or from seed bytes', async () => {
+    const phrase = derivationVectors.seeds['hardhat-12']!
+    const seed = seedFromMnemonicSync(phrase)
+    const key = deriveSecp256k1(seed, "m/44'/60'/0'/0/0").privateKey
+    for (const manager of [new WalletManagerEvm(phrase), new WalletManagerEvm(seed)]) {
+      const account = await manager.getAccount(0)
+      expect(await account.getAddress()).toBe(derivationVectors.vectors.evm['hardhat-12']!.accounts[0]!.address)
+      const seen = new WeakSet<object>()
+      const json = JSON.stringify(account, (_k, v: unknown) => {
+        if (typeof v === 'bigint') return v.toString()
+        if (typeof v === 'object' && v !== null) { if (seen.has(v)) return undefined; seen.add(v) }
+        return v
+      })
+      for (const text of [inspect(account, { depth: 10, showHidden: true }), json, inspect(manager, { depth: 10, showHidden: true })]) {
+        for (const secret of [key, seed]) {
+          expect(text.toLowerCase()).not.toContain(bytesToHex(secret).slice(2))
+          expect(text).not.toContain(Array.from(secret.slice(0, 8)).join(', '))
+          expect(text).not.toContain(Array.from(secret.slice(0, 8)).map((b, i) => `"${i}":${b}`).join(','))
+        }
+      }
+      manager.dispose()
+    }
+  })
 })
