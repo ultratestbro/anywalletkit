@@ -1,0 +1,74 @@
+---
+title: Names
+description: ENS names in the recipient field — the address for the right chain, lookalike-letter warnings, a re-check before signing, primary names and avatars.
+sidebar:
+  order: 9
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+Users type `vitalik.eth`, `jesse.base.eth` or `alice.cb.id` instead of an address. `names-ens`
+turns the name into the address **for the chain the user is sending on**, flags names written
+to look like other names, and re-checks the name right before signing.
+
+The resolver implements `NameResolver` from `core`. Solana (`.sol`), TON (`.ton`) and NEAR names
+will plug into the same interface. Snippets come from `examples/names`, which our CI typechecks
+and tests; the live run resolves real names on Ethereum and Base.
+
+```sh
+pnpm add @anywalletkit/names-ens
+```
+
+<Snippet file="names/src/names.ts" region="imports" />
+
+## Set up
+
+<Snippet file="names/src/names.ts" region="setup" />
+
+ENS lives on Ethereum mainnet, so the resolver always needs an Ethereum RPC, even when the user
+sends on Base or Arbitrum. Names that resolve off-chain (Coinbase `cb.id`, Basenames, `uni.eth`)
+go through CCIP-Read without extra setup. Results are cached for five minutes by default.
+
+## The recipient field
+
+<Snippet file="names/src/names.ts" region="recipient" />
+
+- **One chain per lookup.** `resolve(name, 'eip155:8453')` reads the name's Base address. A name
+  with no Base record is an error, `no-address-for-chain`, and **never** its Ethereum address:
+  sending to the mainnet address on another chain is how funds get lost.
+- **Bitcoin and Solana records** are read the same way: `bip122:…` and `solana:…` as the chain.
+- **Invalid names are refused before any network call**, with the reason. Names are normalized
+  per ENSIP-15, so mixed scripts like `vitаlik.eth` (a Cyrillic "а") don't resolve at all.
+- **On NEAR**, `alice.near` is the account address itself, not a name to resolve.
+
+| `NameError` code | What to tell the user |
+|---|---|
+| `invalid-name` | Not a valid name |
+| `not-found` | No one owns this name |
+| `no-address-for-chain` | The name has no address for this network |
+| `unsupported` | Names like this aren't supported yet |
+| `lookup-failed` | The lookup failed; try again (the name may exist) |
+| `changed` | The name points elsewhere now (see below) |
+
+## Review and signing
+
+<Snippet file="names/src/names.ts" region="review" />
+
+- **Show the resolved address, not only the name.** The address gets the funds.
+- **Show every warning** that comes with the result: `confusable` (Latin letters replaced by
+  lookalikes), `mixed-script`, `punycode`. Each has a sentence you can show as-is.
+- **Resolve again right before signing.** An owner can point the name somewhere else between
+  the review screen and the tap on "Send". `assertNameUnchanged` throws `changed` when that
+  happens; go back to the review screen with the new address.
+
+## Primary names and avatars
+
+<Snippet file="names/src/names.ts" region="profile" />
+
+`reverse` returns the primary name of an address only when that name resolves back to the same
+address. Anyone can set any primary name on their own address, so an unverified one proves
+nothing. L2 primary names (ENSIP-19) are read for the chain you pass.
+
+`avatar` returns a URL (https, IPFS through your gateway, or an NFT's image) and never fetches
+it. Fetch avatars through your own proxy, so the user's IP and address list don't reach
+arbitrary servers.
