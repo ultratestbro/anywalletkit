@@ -71,6 +71,8 @@ export function describeChainModule<M extends WalletManager<IWalletAccount, obje
       try {
         const a = await m.getAccount(0)
         await a.getAddress()
+        // After a signature too: anything a chain caches lazily while signing (a keypair, an encoded secret) is walked as well.
+        await a.sign('secret walk')
         for (const root of [m, a]) {
           const found = findSecret(root, [key, seed], mnemonic)
           expect(found, `secret reachable at ${found}`).toBeUndefined()
