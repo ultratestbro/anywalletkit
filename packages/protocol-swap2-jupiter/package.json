@@ -1,0 +1,86 @@
+{
+  "name": "@forgewallet/protocol-swap2-jupiter",
+  "version": "0.1.0",
+  "description": "Jupiter same-chain Solana swaps for the swap2 engine through Swap API V2's Router path (GET /swap/v2/build): Metis routing, no Jupiter swap fee, keyless or with an API key. The transaction is assembled locally from raw instructions after every instruction is vetted (Jupiter v6 + token/system/ATA plumbing only, taker the only signer, swap arguments decoded: our amount, the quoted output, our slippage, zero platform fee); the account executes it through its serialized-transaction guard and its own RPC.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js",
+      "require": "./dist/config.cjs"
+    },
+    "./codec": {
+      "types": "./dist/codec.d.ts",
+      "import": "./dist/codec.js",
+      "require": "./dist/codec.cjs"
+    },
+    "./transaction": {
+      "types": "./dist/transaction.d.ts",
+      "import": "./dist/transaction.js",
+      "require": "./dist/transaction.cjs"
+    },
+    "./provider": {
+      "types": "./dist/provider.d.ts",
+      "import": "./dist/provider.js",
+      "require": "./dist/provider.cjs"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.ts",
+      "import": "./dist/protocol.js",
+      "require": "./dist/protocol.cjs"
+    },
+    "./activity": {
+      "types": "./dist/activity.d.ts",
+      "import": "./dist/activity.js",
+      "require": "./dist/activity.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "module.json"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "dependencies": {
+    "@forgewallet/protocol-swap2-core": "workspace:*",
+    "@forgewallet/swap2-assets": "workspace:*",
+    "@scure/base": "^2.4.0",
+    "@solana/kit": "^8.4.0"
+  },
+  "peerDependencies": {
+    "@forgewallet/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "vitest": "^5.0.3",
+    "@forgewallet/conformance": "workspace:*",
+    "@forgewallet/protocol-swap2-router": "workspace:*",
+    "@forgewallet/core": "workspace:*",
+    "@forgewallet/wallet-solana": "workspace:*"
+  },
+  "keywords": [
+    "swap2",
+    "swap",
+    "jupiter",
+    "solana",
+    "dex",
+    "aggregator",
+    "forgewallet"
+  ]
+}

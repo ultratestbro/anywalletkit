@@ -1,0 +1,142 @@
+{
+  "note": "jupiter-token-to-usdc-1 \u2014 mainnet 3oAzfZPAyg\u2026 (captured 2026-10-23 via wallet-solana history; top-level programs Comput, AToken, JUP6Lk, Tokenk)",
+  "own": [
+    "Bixp6GteKycyPoZYPrDJV4Y9NGDEcMMFkdN53eueeVPp"
+  ],
+  "tx": {
+    "chain": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    "hash": "3oAzfZPAygUsBQNyZJgAfMxm14PDzHw8TDHBtDur3daZdCSLtMnTcYQjQ3kaKbYjpkCtkiGfYxpR2T1PYhJBw14d",
+    "time": 1792771673,
+    "status": "confirmed",
+    "address": "Bixp6GteKycyPoZYPrDJV4Y9NGDEcMMFkdN53eueeVPp",
+    "from": "Bixp6GteKycyPoZYPrDJV4Y9NGDEcMMFkdN53eueeVPp",
+    "to": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": null,
+        "from": "8Hb7RZDeHtJLx8GLv1HWNxb71rmX2YxeojFN4eG3BKiB",
+        "to": "4bpsvnurnL84pesBDemyno2smzZi2nSTb7CejRCGziMk",
+        "amount": "130760154"
+      },
+      {
+        "token": null,
+        "from": "8Hb7RZDeHtJLx8GLv1HWNxb71rmX2YxeojFN4eG3BKiB",
+        "to": "25KEmHMSFesLe9wuHkEexmi1k8PMPNTRPSJHZZvKGA8H",
+        "amount": "33087"
+      },
+      {
+        "token": null,
+        "from": "Bixp6GteKycyPoZYPrDJV4Y9NGDEcMMFkdN53eueeVPp",
+        "to": "25KEmHMSFesLe9wuHkEexmi1k8PMPNTRPSJHZZvKGA8H",
+        "amount": "1455353"
+      },
+      {
+        "token": null,
+        "from": "Bixp6GteKycyPoZYPrDJV4Y9NGDEcMMFkdN53eueeVPp",
+        "to": "4FSzZHEaRJEtEPeThkF27FSBuBQmVqzyu7K3ikjCbRVb",
+        "amount": "1346200"
+      },
+      {
+        "token": null,
+        "from": "Bixp6GteKycyPoZYPrDJV4Y9NGDEcMMFkdN53eueeVPp",
+        "to": "GYH1Gae1wJytMSvMvw8JVcv7nuAbxi8i9erNVbERnzXd",
+        "amount": "33087"
+      },
+      {
+        "token": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "from": "5mHTXRU1bgBDo9vUoHKkCidbFRc2mLHSgTTdQyZBjMfg",
+        "to": "Bixp6GteKycyPoZYPrDJV4Y9NGDEcMMFkdN53eueeVPp",
+        "amount": "13678960",
+        "standard": "spl",
+        "decimals": 6
+      },
+      {
+        "token": "CDmVRk8UL4yycFn1Ewqc7sALEuSLUjwcizaoPx1Tpump",
+        "from": "Bixp6GteKycyPoZYPrDJV4Y9NGDEcMMFkdN53eueeVPp",
+        "to": "2KWHzV2MXCGz2iPcv24PV2MfS5qfka77HGUvWKokXAVx",
+        "amount": "94535397192",
+        "standard": "spl",
+        "decimals": 6
+      },
+      {
+        "token": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
+        "from": "3nLR2KnqC4ZHmPbjJgZCmfKazPjyxZEeqQv77sctcs4P",
+        "to": "5mHTXRU1bgBDo9vUoHKkCidbFRc2mLHSgTTdQyZBjMfg",
+        "amount": "569014",
+        "standard": "spl",
+        "decimals": 8
+      },
+      {
+        "token": "So11111111111111111111111111111111111111112",
+        "from": "2KWHzV2MXCGz2iPcv24PV2MfS5qfka77HGUvWKokXAVx",
+        "to": "3nLR2KnqC4ZHmPbjJgZCmfKazPjyxZEeqQv77sctcs4P",
+        "amount": "130760154",
+        "standard": "spl",
+        "decimals": 9
+      },
+      {
+        "token": "So11111111111111111111111111111111111111112",
+        "from": "2KWHzV2MXCGz2iPcv24PV2MfS5qfka77HGUvWKokXAVx",
+        "to": "5cjcW9wExnJJiqgLjq7DEG75Pm6JBgE1hNv4B2vHXUW6",
+        "amount": "33087",
+        "standard": "spl",
+        "decimals": 9
+      }
+    ],
+    "fee": "3005000",
+    "block": "460505203",
+    "call": {
+      "to": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "ComputeBudget111111111111111111111111111111",
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "11111111111111111111111111111111",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "11111111111111111111111111111111",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+        "11111111111111111111111111111111",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "HpNfyc2Saw7RKkQd8nEL4khUcuPhQ7WwY1B2qjx8jxFq",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "goonuddtQRrWqqn5nFyczVKaie28f3kDkHWkHtURSLE",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+      ],
+      "data": "6fmbDS4Xx8JHg5Wg6gGjs98sh5xxy8yYabBCB8Yp2ngU2dcjqLTobyVPE3T9cb"
+    }
+  },
+  "expect": {
+    "kind": "swap",
+    "title": "Swapped",
+    "assetsIn": [
+      {
+        "token": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "amount": "13678960"
+      }
+    ],
+    "counterparty": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "assetsOut": [
+      {
+        "token": "CDmVRk8UL4yycFn1Ewqc7sALEuSLUjwcizaoPx1Tpump",
+        "amount": "94535397192"
+      }
+    ]
+  }
+}

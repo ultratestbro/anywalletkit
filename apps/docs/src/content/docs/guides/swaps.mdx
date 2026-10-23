@@ -20,7 +20,8 @@ pnpm add @anywalletkit/protocol-swap2-router \
   @anywalletkit/protocol-swap2-thorchain @anywalletkit/protocol-swap2-chainflip \
   @anywalletkit/protocol-swap2-cctp \
   @anywalletkit/protocol-swap2-usdt0 \
-  @anywalletkit/protocol-swap2-uniswap @anywalletkit/protocol-swap2-wrap
+  @anywalletkit/protocol-swap2-uniswap @anywalletkit/protocol-swap2-wrap \
+  @anywalletkit/protocol-swap2-jupiter
 ```
 
 The router bundles no provider. Only the providers you install and pass in end up in your
@@ -43,6 +44,7 @@ app, and each provider also works on its own without the router.
 | `usdt0` | Tether's LayerZero OFT | USDT / USDT0 between 16 EVM chains in one transaction; the direct USDT path into HyperEVM |
 | `uniswap`, `balancer` | On-chain DEX | Same-chain, priced from the contracts, no API key |
 | `wrap` | WETH9 | Native ↔ wrapped native, 1:1 |
+| `jupiter` | Solana aggregator (Metis) | Same-chain Solana swaps; instructions from Jupiter's `/build`, checked and assembled locally, no Jupiter fee; key optional |
 
 ## 2. Create the router
 

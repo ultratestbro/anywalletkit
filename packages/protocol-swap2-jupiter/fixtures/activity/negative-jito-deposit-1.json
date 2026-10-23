@@ -1,0 +1,52 @@
+{
+  "note": "Jito DepositSol (stake-pool program, no Jupiter) \u2014 copied from protocol-staking-spl-stake-pool-solana fixtures",
+  "own": [
+    "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "EvTykvN87o1arXqcf7wwU4Jzvo3pQrgaNfoxYfkw5gng"
+  ],
+  "tx": {
+    "chain": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    "hash": "3SmwE6qfAVYvJfrXYYYmnzeo5PSZXpwwJmMAJVcgaGoWtRRb95ztJqwx838GfU9ryvLk2Upzs271jbnZF7eSd775",
+    "time": 1788787427,
+    "status": "confirmed",
+    "address": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "from": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "to": "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": null,
+        "from": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+        "to": "EvTykvN87o1arXqcf7wwU4Jzvo3pQrgaNfoxYfkw5gng",
+        "amount": "1855569"
+      },
+      {
+        "token": null,
+        "from": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+        "to": "BgKUXdS29YcHCFrPm5M8oLHiTzZaMDjsebggjoaQ6KFL",
+        "amount": "50000000"
+      },
+      {
+        "token": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "from": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "to": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+        "amount": "38460176",
+        "standard": "spl",
+        "symbol": "JitoSOL",
+        "decimals": 9
+      }
+    ],
+    "fee": "20000",
+    "call": {
+      "to": "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
+      "programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "ComputeBudget111111111111111111111111111111",
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+        "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy"
+      ],
+      "data": "EuDr9rYPe6C13GwvXkhAywV"
+    },
+    "block": "445075831"
+  }
+}

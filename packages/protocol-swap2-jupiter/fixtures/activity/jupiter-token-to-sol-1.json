@@ -1,0 +1,112 @@
+{
+  "note": "jupiter-token-to-sol-1 \u2014 mainnet 4uTunaeq3R\u2026 (captured 2026-10-23 via wallet-solana history; top-level programs Comput, AToken, JUP6Lk, Tokenk)",
+  "own": [
+    "5Rhp29n3ByR51rDgnFGXyx2GKW27kPu4FYJSSAB9GNqZ"
+  ],
+  "tx": {
+    "chain": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    "hash": "4uTunaeq3RhJXuVB57aEeae86nABJFVFMwFNmP85cn8wuGKzk9vmnpmZM9XB1HW3XZwLpejPY2atf2ZJEKHLS24a",
+    "time": 1792771673,
+    "status": "confirmed",
+    "address": "5Rhp29n3ByR51rDgnFGXyx2GKW27kPu4FYJSSAB9GNqZ",
+    "from": "5Rhp29n3ByR51rDgnFGXyx2GKW27kPu4FYJSSAB9GNqZ",
+    "to": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": null,
+        "from": "FTC7mBdDHHVkC6VuWZGGGNb33TdJue9jeg5Xk7qx42XT",
+        "to": "5Rhp29n3ByR51rDgnFGXyx2GKW27kPu4FYJSSAB9GNqZ",
+        "amount": "38379383"
+      },
+      {
+        "token": null,
+        "from": "FTC7mBdDHHVkC6VuWZGGGNb33TdJue9jeg5Xk7qx42XT",
+        "to": "EUvpCGh4qiMtq9wKgp28f9Bjv5Xz2WJqrM83XmYAqkEq",
+        "amount": "38417"
+      },
+      {
+        "token": null,
+        "from": "FTC7mBdDHHVkC6VuWZGGGNb33TdJue9jeg5Xk7qx42XT",
+        "to": "CASRL2zkwDnppxEFQ4LgdwgR9pdz5Q8R8nEMKVZ9QoLp",
+        "amount": "9721"
+      },
+      {
+        "token": "PairUottr9sWf6REag62Y8xeFfrWSpL1F9zikNyqWLV",
+        "from": "5Rhp29n3ByR51rDgnFGXyx2GKW27kPu4FYJSSAB9GNqZ",
+        "to": "9i7SZrZCDM1wAqNVAtyDUfg5hd7G31jhsWBg7D2J2p2N",
+        "amount": "34168749887",
+        "standard": "token2022",
+        "decimals": 6
+      },
+      {
+        "token": "So11111111111111111111111111111111111111112",
+        "from": "9i7SZrZCDM1wAqNVAtyDUfg5hd7G31jhsWBg7D2J2p2N",
+        "to": "DSN3j1ykL3obAVNv7ZX49VsFCPe4LqzxHnmtLiPwY6xg",
+        "amount": "38417",
+        "standard": "spl",
+        "decimals": 9
+      },
+      {
+        "token": "So11111111111111111111111111111111111111112",
+        "from": "9i7SZrZCDM1wAqNVAtyDUfg5hd7G31jhsWBg7D2J2p2N",
+        "to": "5eHhjP8JaYkz83CWwvGU2uMUXefd3AazWGx4gpcuEEYD",
+        "amount": "9721",
+        "standard": "spl",
+        "decimals": 9
+      },
+      {
+        "token": "So11111111111111111111111111111111111111112",
+        "from": "9i7SZrZCDM1wAqNVAtyDUfg5hd7G31jhsWBg7D2J2p2N",
+        "to": "So11111111111111111111111111111111111111112",
+        "amount": "38379383",
+        "standard": "spl",
+        "decimals": 9
+      }
+    ],
+    "fee": "10601",
+    "block": "460505204",
+    "call": {
+      "to": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "ComputeBudget111111111111111111111111111111",
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "11111111111111111111111111111111",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+        "11111111111111111111111111111111",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+        "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+        "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+      ],
+      "data": "AK3jmt16EydWRC83dFVbdQNky5R7pBJa6us1jbs2PgDogpdWbDRjAYg"
+    }
+  },
+  "expect": {
+    "kind": "swap",
+    "title": "Swapped",
+    "assetsIn": [
+      {
+        "token": null,
+        "amount": "38379383"
+      }
+    ],
+    "assetsOut": [
+      {
+        "token": "PairUottr9sWf6REag62Y8xeFfrWSpL1F9zikNyqWLV",
+        "amount": "34168749887"
+      }
+    ],
+    "counterparty": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+  }
+}

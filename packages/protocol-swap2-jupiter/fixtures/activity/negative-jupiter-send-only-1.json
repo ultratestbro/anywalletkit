@@ -1,0 +1,120 @@
+{
+  "note": "negative-jupiter-send-only-1 \u2014 mainnet 5K9RzzBH2W\u2026 (captured 2026-10-23 via wallet-solana history; top-level programs Comput, AToken, JUP6Lk, 58PMEd, 111111). Jupiter runs next to another top-level program and the owner only sends (USDC out, nothing in): not called a swap.",
+  "own": [
+    "7JCe3GHwkEr3feHgtLXnmuJ1yB3A7coSeyynxTBgdG8k"
+  ],
+  "tx": {
+    "chain": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    "hash": "5K9RzzBH2Wh1AKQP5RaSsg4564WtuNP9GCfrbTjiMTAqvo9QFpUR1Cxaug8sUHc1Vr27GifHGXGrPo7iVAm7SRad",
+    "time": 1792771673,
+    "status": "confirmed",
+    "address": "7JCe3GHwkEr3feHgtLXnmuJ1yB3A7coSeyynxTBgdG8k",
+    "from": "7JCe3GHwkEr3feHgtLXnmuJ1yB3A7coSeyynxTBgdG8k",
+    "to": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": null,
+        "from": "7YcR78PKBHE5divhPVJ668kmmaDzove2d9msY9NpAJL2",
+        "to": "J7f55GM91qP8x2viJFrtMUEB5mKrUD2cpnPvzGxjc2px",
+        "amount": "16551346"
+      },
+      {
+        "token": null,
+        "from": "7YcR78PKBHE5divhPVJ668kmmaDzove2d9msY9NpAJL2",
+        "to": "DZRyJYFaNbYJKwLjwyXmstg89inYSQoFvTiTDbRLvZQY",
+        "amount": "78014"
+      },
+      {
+        "token": null,
+        "from": "7JCe3GHwkEr3feHgtLXnmuJ1yB3A7coSeyynxTBgdG8k",
+        "to": "DZRyJYFaNbYJKwLjwyXmstg89inYSQoFvTiTDbRLvZQY",
+        "amount": "1435826"
+      },
+      {
+        "token": null,
+        "from": "7JCe3GHwkEr3feHgtLXnmuJ1yB3A7coSeyynxTBgdG8k",
+        "to": "qGs8S6yAyu7meRUF17Ns1wUqsJfML7Q7cp2DsVNxKT8",
+        "amount": "1000000"
+      },
+      {
+        "token": null,
+        "from": "7JCe3GHwkEr3feHgtLXnmuJ1yB3A7coSeyynxTBgdG8k",
+        "to": "EHAAiTxcdDwQ3U4bU6YcMsQGaekdzLS3B5SmYo46kJtL",
+        "amount": "78014"
+      },
+      {
+        "token": "2YjpZRpU2tsQoDgtXwyYU6jcJgSNWf3yW1sxhPhypump",
+        "from": "J7f55GM91qP8x2viJFrtMUEB5mKrUD2cpnPvzGxjc2px",
+        "to": "5VQDw2s9XebmvZUPs1VSiQRn2vSAtS1LQ9gqWh6xh3ek",
+        "amount": "127891558579",
+        "standard": "token2022",
+        "decimals": 6
+      },
+      {
+        "token": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "from": "7JCe3GHwkEr3feHgtLXnmuJ1yB3A7coSeyynxTBgdG8k",
+        "to": "34oUrDd3BMGf2nQTSDhqSioiD6t3VMAajQnvAu8eNn9r",
+        "amount": "1740000",
+        "standard": "spl",
+        "decimals": 6
+      },
+      {
+        "token": "So11111111111111111111111111111111111111112",
+        "from": "22HUWiJaTNph96KQTKZVy2wg8KzfCems5nyW7E5H5J6w",
+        "to": "So11111111111111111111111111111111111111112",
+        "amount": "16629360",
+        "standard": "spl",
+        "decimals": 9
+      },
+      {
+        "token": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "from": "34oUrDd3BMGf2nQTSDhqSioiD6t3VMAajQnvAu8eNn9r",
+        "to": "22HUWiJaTNph96KQTKZVy2wg8KzfCems5nyW7E5H5J6w",
+        "amount": "1741824",
+        "standard": "spl",
+        "decimals": 6
+      }
+    ],
+    "fee": "105000",
+    "block": "460505203",
+    "call": {
+      "to": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "ComputeBudget111111111111111111111111111111",
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "58PMEdUAwvLytNNwCbzrYyhLoh3jpsNV4fW9dT9ibuRc",
+        "11111111111111111111111111111111",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "11111111111111111111111111111111",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "11111111111111111111111111111111",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "REALQqNEomY6cQGZJUGwywTBD2UmDT32rZcNnfxQ5N2",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "HpNfyc2Saw7RKkQd8nEL4khUcuPhQ7WwY1B2qjx8jxFq",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "11111111111111111111111111111111",
+        "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+      ],
+      "data": "6fmbDS4Xx8JHg5Wg6V6ifPbL8i8easdHwbb61WnqZpy1hJStsC52vrHShH2z3Z"
+    }
+  }
+}

@@ -10,6 +10,8 @@ export interface MockAccountOptions {
   fee?: bigint
   /** Receipt returned for any hash; default a successful one. */
   receipt?: Receipt | undefined
+  /** Also expose swap2's `sendSerializedTransaction` hook (Solana aggregator legs), recorded in `sent` with its expectation. */
+  serialized?: boolean
 }
 
 /**
@@ -45,6 +47,11 @@ export function createMockAccount(opts: MockAccountOptions = {}): IWalletAccount
     transfer: async (o): Promise<TransferResult> => { sent.push(o); return rec('transfer', [o], { hash: nextHash(), fee }) },
     toReadOnlyAccount: () => readOnly,
     dispose: () => { rec('dispose', [], undefined) },
+  }
+  if (opts.serialized) {
+    Object.assign(account, {
+      sendSerializedTransaction: async (serializedTx: string, expect: unknown): Promise<TransferResult> => { sent.push({ serializedTx, expect }); return rec('sendSerializedTransaction', [serializedTx, expect], { hash: nextHash(), fee }) },
+    })
   }
   return account
 }

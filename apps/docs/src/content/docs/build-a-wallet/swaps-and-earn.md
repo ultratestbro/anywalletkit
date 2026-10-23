@@ -9,7 +9,7 @@ sidebar:
 
 **The job:** "I have USDT on Tron, I want ETH on Base" in one screen.
 
-**In the kit:** ten providers behind one `Swap2Protocol` interface, and a router that asks
+**In the kit:** eleven providers behind one `Swap2Protocol` interface, and a router that asks
 all of them in parallel and tags the best and the fastest route. Before it signs, the engine
 checks every quote: amounts, recipient, refund address, fee caps. The full flow is in
 [Swaps and bridges](/guides/swaps/).
@@ -20,6 +20,7 @@ checks every quote: amounts, recipient, refund address, fee caps. The full flow 
 |---|---|---|
 | LI.FI | Optional; raises the rate limit, needed for an integrator fee | [li.fi](https://li.fi), [docs](https://docs.li.fi) |
 | NEAR Intents (1Click) | JWT for volume and fees | [docs.near-intents.org](https://docs.near-intents.org) |
+| Jupiter | Optional; keyless is 0.5 requests per second, a key is per organisation (keep it on your server) | [developers.jup.ag](https://developers.jup.ag/portal) |
 | THORChain, Chainflip, CCTP, USDT0, Uniswap, Balancer, Wrap | None | — |
 | STON.fi Omniston | None; EVM orders keep an HTLC secret until delivery, so a serverless backend needs a durable store | See the module README |
 

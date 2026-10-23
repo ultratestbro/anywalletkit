@@ -35,6 +35,12 @@ export interface Swap2BehaviourFixture {
   spender?: string
   /** Source token contract; omit for the native coin. */
   sourceToken?: string
+  /**
+   * Provider-serialized legs (Solana aggregators): decode what the account would be asked to sign and assert it
+   * (fee payer, signers, programs, amounts). Required when the plan's source is `serialized` — opaque bytes are not
+   * accepted unread.
+   */
+  serialized?: (serializedTx: string, own: ReadonlySet<string>) => void | Promise<void>
 }
 
 export interface ProtocolBehaviourOptions<P> {
@@ -105,6 +111,9 @@ export function describeProtocolBehaviour<P extends object>(name: string, o: Pro
           const warns = checksFor(input, calls.map((c) => decodeCall(c, known)), { status: 'unavailable', reason: 'conformance' })
             .filter((c) => WARNINGS.has(c.code)).map((c) => c.code)
           expect(warns, 'tx-preview warnings').toEqual([])
+        } else if (s.kind === 'serialized') {
+          expect(f.serialized, 'a serialized plan needs the fixture\'s `serialized` decoder').toBeTypeOf('function')
+          await f.serialized!(s.serializedTx, own)
         }
       })
 
@@ -112,13 +121,18 @@ export function describeProtocolBehaviour<P extends object>(name: string, o: Pro
         let plan: Plan | undefined
         const { account, p } = setup((x) => { plan = x })
         await p.swap2(f.options)
-        const sent = account.sent as { to?: string; data?: string; value?: bigint; token?: string; recipient?: string; amount?: bigint }[]
+        const sent = account.sent as { to?: string; data?: string; value?: bigint; token?: string; recipient?: string; amount?: bigint; serializedTx?: string }[]
         expect(sent, 'extra or missing sends').toHaveLength(plan!.approvals.length + 1)
         plan!.approvals.forEach((a, i) => expect(lc(sent[i]!.data ?? '')).toBe(approveData(a.spender, a.amount)))
         const leg = sent.at(-1)!
         const s = plan!.source
         if (s.kind === 'call') expect({ to: leg.to, data: leg.data, value: leg.value }).toEqual({ to: s.to, data: s.data, value: s.value })
         if (s.kind === 'token-transfer') expect({ token: leg.token, recipient: leg.recipient, amount: leg.amount }).toEqual({ token: s.token, recipient: s.recipient, amount: s.amount })
+        if (s.kind === 'serialized') {
+          const l = leg as { serializedTx?: string; expect?: { maxValueOut?: string } }
+          expect(l.serializedTx, 'the account executed other bytes than were reviewed').toBe(s.serializedTx)
+          expect(l.expect?.maxValueOut, 'a serialized leg goes out with the engine\'s balance expectation').toBeTypeOf('string')
+        }
       })
 
       it(`${f.name}: quoting never signs or broadcasts`, async () => {

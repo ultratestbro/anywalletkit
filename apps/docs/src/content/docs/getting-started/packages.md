@@ -53,6 +53,7 @@ inside the router.
 | `@anywalletkit/protocol-swap2-uniswap` | Uniswap v3 straight from the contracts |
 | `@anywalletkit/protocol-swap2-balancer` | Balancer v2, priced and enforced on-chain by the Vault |
 | `@anywalletkit/protocol-swap2-wrap` | Native ↔ wrapped native (ETH ↔ WETH and others) |
+| `@anywalletkit/protocol-swap2-jupiter` | Jupiter — same-chain Solana swaps; the transaction is assembled and checked locally, no Jupiter fee |
 
 ## Earn
 
