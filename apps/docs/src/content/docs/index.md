@@ -48,3 +48,9 @@ APIs may still change before `1.0`.
 | Runtime | `runtime-hermes` | React Native / Hermes polyfills |
 
 See [Packages](/getting-started/packages/) for the full list.
+
+## For AI agents
+
+The docs are also plain Markdown: [`/llms.txt`](/llms.txt) is the index,
+[`/llms-full.txt`](/llms-full.txt) is every page with its code samples in one file, and
+[`/llms-small.txt`](/llms-small.txt) is a shorter version.

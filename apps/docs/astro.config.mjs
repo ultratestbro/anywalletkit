@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightLlmsTxt from 'starlight-llms-txt';
 
 export default defineConfig({
   site: 'https://docs.anywallet.tech',
@@ -29,6 +30,14 @@ export default defineConfig({
             href: 'https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap',
           },
         },
+      ],
+      // /llms.txt, /llms-full.txt and /llms-small.txt: the docs as plain Markdown for AI agents.
+      plugins: [
+        starlightLlmsTxt({
+          projectName: 'Any Wallet Kit',
+          description:
+            'Open multichain wallet SDK in TypeScript: one seed for EVM, Solana, TON, Tron, Bitcoin, NEAR and Zcash accounts, a pluggable signer, safety policies, and protocol modules for swaps, bridges, staking and lending. Package names use the @anywalletkit npm scope; the packages are not on npm yet.',
+        }),
       ],
       customCss: ['./src/styles/awk.css'],
       components: {
