@@ -92,6 +92,16 @@ describe('policies', () => {
     await expect(cap.transfer({ recipient: dest, amount: 1n })).rejects.toBeInstanceOf(PolicyViolationError)
     expect(acc.sent).toHaveLength(0)
   })
+  it('without the asked-for chain, an eip155:unknown account learns its chain id first, and a chain that stays unknown is refused (audit F4)', async () => {
+    const lazy = Object.assign(createMockAccount({ chain: 'eip155:unknown' }), { getChainId: async () => 1 })
+    await expect(applyPolicies(lazy, { blocklist: { 'eip155:1': [dest] } }).transfer({ recipient: dest, amount: 1n })).rejects.toThrow(/eip155:1 blocklist/)
+    const blind = createMockAccount({ chain: 'eip155:unknown' })
+    await expect(applyPolicies(blind, { blocklist: { 'eip155:1': [dest] } }).transfer({ recipient: dest, amount: 1n })).rejects.toMatchObject({ policy: 'chain' })
+    expect(lazy.sent).toHaveLength(0)
+    expect(blind.sent).toHaveLength(0)
+    // No policies configured: nothing to pick, nothing refused.
+    await expect(applyPolicies(blind, {}).transfer({ recipient: dest, amount: 1n })).resolves.toBeDefined()
+  })
   it('a mismatched account (namespace registration on another network) answers to the rules of both chains', async () => {
     const acc = createMockAccount({ chain: 'eip155:1' })
     const guarded = applyPolicies(acc, { blocklist: { 'eip155:8453': [dest] } }, 'eip155:8453')

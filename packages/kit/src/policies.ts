@@ -116,8 +116,8 @@ export interface Policies {
 }
 
 export class PolicyViolationError extends Error {
-  readonly policy: 'maxFee' | 'allowlist' | 'blocklist'
-  constructor(policy: 'maxFee' | 'allowlist' | 'blocklist', message: string) {
+  readonly policy: 'maxFee' | 'allowlist' | 'blocklist' | 'chain'
+  constructor(policy: 'maxFee' | 'allowlist' | 'blocklist' | 'chain', message: string) {
     super(message)
     this.name = 'PolicyViolationError'
     this.policy = policy
@@ -348,8 +348,17 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
  */
 export function applyPolicies<A extends IWalletAccount>(account: A, policies: Policies, chain?: string): A {
   const chainsOf = () => [...new Set([chain, account.chain].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
+  const configured = [policies.maxFee, policies.allowlist, policies.blocklist].some((m) => m !== undefined && Object.keys(m).length > 0)
   const guard = async (method: WriteMethod, arg: unknown) => {
-    const chains = chainsOf()
+    let chains = chainsOf()
+    // Called without `chain` on an EVM account that has not asked its RPC yet: learn the chain id now (audit F4).
+    // If it stays unknown, per-chain rules cannot be picked — refuse instead of letting the write through unchecked.
+    if (chains.length === 0 && configured) {
+      const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
+      const ns = account.chain.split(':')[0]
+      if (account.chain.endsWith(':unknown') && typeof getChainId === 'function') chains = [`${ns}:${await getChainId.call(account)}`]
+      if (chains.length === 0) throw new PolicyViolationError('chain', `The account's chain is unknown (${account.chain}), so its policies cannot be applied.`)
+    }
     const intent = intentOf(chains[0] ?? account.chain, await account.getAddress(), method, arg)
     const caps = chains.flatMap((c) => { const cap = policies.maxFee?.[c]; return cap === undefined ? [] : [{ c, cap: BigInt(cap) }] })
     if (caps.length > 0 && QUOTABLE.includes(method)) {
