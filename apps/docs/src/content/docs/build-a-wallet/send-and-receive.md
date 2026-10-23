@@ -62,6 +62,7 @@ your `confirm` step before anything is signed.
 
 **In the kit:** `names-ens` resolves ENS names to the address for the chain you ask for,
 including L2 names and CCIP-Read (offchain) names. `.sol`, `.ton` and `.near` are planned.
+See the [Names guide](/guides/names/).
 
 **You bring:** an Ethereum mainnet RPC: resolution always starts on mainnet, whatever chain
 the user sends on.

@@ -26,7 +26,7 @@ Otherwise a user who imports their MetaMask or Phantom phrase sees an empty wall
 - **A BIP-39 passphrase or not.** The SDK uses an empty one, like every major wallet. A
   passphrase changes every address, so a user who forgets it loses the funds.
 - **Imports.** `keyring` imports a seed phrase, a single private key for one chain, and the
-  24-word TON format of Tonkeeper, Tonhub and MyTonWallet.
+  24-word TON format of Tonkeeper, Tonhub and MyTonWallet. See the [Keyring guide](/guides/keyring/).
 
 **Rules:**
 
@@ -71,4 +71,4 @@ Otherwise a user who imports their MetaMask or Phantom phrase sees an empty wall
 
 Any key that signs somewhere else works through `externalSigner()`: a hardware wallet, an
 MPC service, a Safe, or a backend signer for bots. The account behaves the same; only the
-`sign` call goes out. See [Accounts & signers](/concepts/accounts-and-signers/).
+`sign` call goes out. See [Custom signer](/guides/custom-signer/).

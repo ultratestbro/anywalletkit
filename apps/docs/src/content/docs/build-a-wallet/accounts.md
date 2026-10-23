@@ -14,7 +14,7 @@ can sign on Solana", for every account the user has.
 |---|---|
 | `wallet-*` | One package per chain family. Its manager derives accounts and knows how to read, build, sign and send on that chain |
 | `kit` | The `Wallet` object: register the chains you support, then `getAccount('eip155:8453')`. [Policies](/concepts/policies/) wrap every account it hands out |
-| `keyring` | Several accounts from one seed, plus imported seeds and keys, in one list across chains |
+| `keyring` | Several accounts from one seed, plus imported seeds and keys, in one list across chains ([guide](/guides/keyring/)) |
 
 Chains are named by [CAIP-2 ids](/concepts/chain-ids/): `eip155:1` for Ethereum,
 `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` for Solana, and so on. Register a namespace

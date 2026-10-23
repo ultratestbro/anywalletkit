@@ -14,7 +14,8 @@ wallet outages come from: a rate limit, a node that lags, a method the plan does
   retries across the list.
 - `networks` holds the catalog of mainnets, each with public RPCs to fail over through. It
   also stores the RPCs and custom networks the user adds, and `verifyNetwork()` checks that an
-  endpoint really serves the chain it claims before you trust it.
+  endpoint really serves the chain it claims before you trust it. See the
+  [Networks guide](/guides/networks/).
 
 ## What each chain package talks to
 

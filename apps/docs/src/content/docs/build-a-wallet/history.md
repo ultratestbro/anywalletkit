@@ -20,6 +20,8 @@ not raw hashes and "Contract call".
 - **The intent journal:** record what the app meant when it broadcast, and a pending swap
   shows correctly before the explorer has indexed it.
 
+The code is in the [History guide](/guides/history/).
+
 ## Sources per chain
 
 | Chain | Source the package reads | Key |
