@@ -1,0 +1,53 @@
+{
+  "name": "@forgewallet/secure-storage-react-native",
+  "version": "0.1.0",
+  "description": "Device secret storage for React Native wallets on the forgewallet SDK: every secret in the iOS Keychain behind a Secure Enclave–checked access control or under an Android Keystore key in StrongBox / TEE that needs the user for every single read. Face ID or the device passcode by default, an opt-in strict mode (current biometrics only, dies when biometrics change), this device only, never in backups, a named biometry-changed error instead of a crash, prune after reinstall and a verified migration from any older store. Implements the keyring SecretStorage.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "ios/*.swift",
+    "ios/*.podspec",
+    "android/build.gradle",
+    "android/src/main",
+    "expo-module.config.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "peerDependencies": {
+    "expo-modules-core": "*"
+  },
+  "devDependencies": {
+    "@forgewallet/keyring": "workspace:*",
+    "@types/node": "^22",
+    "vitest": "^5.0.3"
+  },
+  "keywords": [
+    "keychain",
+    "keystore",
+    "secure-enclave",
+    "strongbox",
+    "biometrics",
+    "face-id",
+    "react-native",
+    "expo",
+    "forgewallet"
+  ]
+}

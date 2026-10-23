@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["SecureStorageModule"]
+  },
+  "android": {
+    "modules": ["tech.anywallet.securestorage.SecureStorageModule"]
+  }
+}
