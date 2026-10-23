@@ -65,9 +65,12 @@ describe('Keyring over the vault', () => {
     expect(mnemonic.split(' ')).toHaveLength(12)
     expect(account.addresses.evm).toMatch(/^0x[0-9a-fA-F]{40}$/)
     expect(await vault.listSecretIds()).toEqual([source.id])
-    expect(JSON.stringify(vaultStorage.envelope)).not.toContain(mnemonic.split(' ')[0])
+    // Two words with their space: a single word can be a JSON key by chance (BIP-39 has "label", "account", "index").
+    const probe = mnemonic.split(' ').slice(0, 2).join(' ')
+    expect(JSON.stringify(vaultStorage.envelope)).not.toContain(probe)
     // metadata holds addresses only
-    expect(JSON.stringify([...area.items.values()])).not.toContain(mnemonic.split(' ')[0])
+    expect(JSON.stringify([...area.items.values()])).not.toContain(probe)
+    expect(JSON.stringify([...area.items.values()])).not.toContain(mnemonic)
 
     const second = await keyring.addAccount(source.id)
     expect(second.index).toBe(1)
