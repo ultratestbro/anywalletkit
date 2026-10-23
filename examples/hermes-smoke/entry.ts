@@ -40,6 +40,7 @@ import { WalletManagerBtc, selectCoins, INPUT_WEIGHT } from '@forgewallet/wallet
 import { WalletManagerZcash, parseTx as parseZcashTx, txid as zcashTxid, sighashAll as zcashSighash, parseP2pkhScriptSig, conventionalFee as zcashFee, outputSize as zcashOutputSize } from '@forgewallet/wallet-zcash'
 import { WalletManagerNear, describeTransaction as describeNear, encodeTransaction as encodeNearTx, decodeTransaction as decodeNearTx } from '@forgewallet/wallet-near'
 import { smokeProtocols } from './protocols.js'
+import { sealBackup, openBackup, encodeBackup, decodeBackup, isBackupError } from '@forgewallet/seed-vault'
 import { ensResolver, warningsFor, coinTypeFor, decodeBtcScript } from '@forgewallet/names-ens'
 import { isNameLike, nameResolvers } from '@forgewallet/core'
 import { NetworksTable, memoryJsonStorage, parseAddChainParams, checkRpcUrl, isPrivateHost, verifyNetwork, tonGlobalIdFromBoc, BUILTIN_NETWORKS, DEFAULT_TESTNETS, isAddChainError, type NetworksState } from '@forgewallet/networks'
@@ -217,6 +218,27 @@ async function main() {
     eq('verify evm ok', v.ok && v.tip === 16, true)
     const bad = await verifyNetwork({ caip2: 'eip155:1', family: 'evm', rpcs: ['https://x'] }, { fetch: fetchFake })
     eq('verify evm mismatch', !bad.ok && (bad.error ?? '').indexOf('chain-id-mismatch') === 0, true)
+  }
+  {
+    // seed-vault: the real default Argon2id (19 MiB × 2) and XChaCha20-Poly1305 on Hermes, a key protector, tamper refusal.
+    const secret = JSON.stringify({ type: 'mnemonic', mnemonic: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about' })
+    const meta = { type: 'mnemonic', fingerprint: '73c5da0a', label: 'Main' }
+    const kek = new Uint8Array(32).fill(5)
+    const t0 = Date.now()
+    const env = decodeBackup(encodeBackup(await sealBackup(secret, meta, [{ kind: 'password', password: 'violet harbor anchor lantern' }, { kind: 'key', id: 'passkey:x', key: kek }])))
+    const t1 = Date.now()
+    const byPw = await openBackup(env, { kind: 'password', password: 'violet harbor anchor lantern' })
+    out(`[note] seed-vault argon2id 19MiB×2: seal ${t1 - t0} ms, open ${Date.now() - t1} ms`)
+    eq('backup open by password', byPw.text(), secret)
+    byPw.dispose()
+    eq('backup dispose zeroizes', byPw.bytes.every((b) => b === 0), true)
+    eq('backup open by key', (await openBackup(env, { kind: 'key', id: 'passkey:x', key: kek })).text(), secret)
+    let wrong = ''
+    try { await openBackup(env, { kind: 'key', id: 'passkey:x', key: new Uint8Array(32).fill(6) }) } catch (e) { wrong = isBackupError(e) ? e.code : String(e) }
+    eq('backup wrong key', wrong, 'wrong-key')
+    let tampered = ''
+    try { await openBackup({ ...env, meta: { ...meta, fingerprint: 'deadbeef' } }, { kind: 'key', id: 'passkey:x', key: kek }) } catch (e) { tampered = isBackupError(e) ? e.code : String(e) }
+    eq('backup meta authenticated', tampered, 'corrupted')
   }
   await smokeProtocols((what, ok, detail) => {
     if (!ok) throw new Error(`protocol check failed: ${what}${detail ? ` :: ${detail}` : ''}`)

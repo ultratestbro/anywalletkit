@@ -32,6 +32,7 @@
     "@forgewallet/protocol-swap2-thorchain": "workspace:*",
     "@forgewallet/protocol-swap2-usdt0": "workspace:*",
     "@forgewallet/runtime-hermes": "workspace:*",
+    "@forgewallet/seed-vault": "workspace:*",
     "@forgewallet/wallet-btc": "workspace:*",
     "@forgewallet/wallet-evm": "workspace:*",
     "@forgewallet/wallet-near": "workspace:*",
