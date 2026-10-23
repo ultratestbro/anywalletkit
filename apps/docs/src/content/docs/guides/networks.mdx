@@ -1,0 +1,100 @@
+---
+title: Networks
+description: One table of networks and RPC endpoints — shipped failover lists, the user's own RPCs, testnets, sites that add chains — and how to wire it into the wallet.
+sidebar:
+  order: 8
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+`networks` is the wallet's list of networks and the endpoints to reach them:
+
+- the catalog mainnets (30 EVM networks, Solana, TON, Tron, Bitcoin, NEAR, Zcash), each with a
+  shipped list of public RPCs to fail over through;
+- default testnets, shipped switched off;
+- the RPCs and custom networks the user adds, and the ones sites add through
+  `wallet_addEthereumChain`;
+- a verifier that proves an endpoint serves the network it claims before the wallet trusts it.
+
+It is plain TypeScript with no runtime dependencies beyond the asset catalog, and runs under
+Hermes. Snippets come from `examples/networks`, which our CI typechecks and tests.
+
+```sh
+pnpm add @anywalletkit/networks
+```
+
+<Snippet file="networks/src/networks.ts" region="imports" />
+
+## The table
+
+<Snippet file="networks/src/networks.ts" region="table" />
+
+The table stores only what the user changed. The shipped lists live in the package, so an app
+update with new endpoints reaches every install, and the user's own RPCs stay on top.
+
+| Rule | Why |
+|---|---|
+| Built-in networks can't be removed; the user can add RPCs before the shipped list, or switch a network off | The fallback is always there |
+| "Only my RPC" (`setOnlyOwnRpc`) drops the shipped fallback | For users who don't want any public provider to see their addresses |
+| A custom network needs at least one RPC and gets no fallback | There is nothing to fall back to |
+| A stored custom entry for a built-in chain id is ignored | A site must not replace Ethereum's endpoints |
+| A failing user RPC is parked with the reason (`markRpc`) until it passes again | Failover skips it; the settings screen shows why |
+
+## Wire it into the wallet
+
+<Snippet file="networks/src/networks.ts" region="wallet" />
+
+`rpcUrlsForSync` answers from memory, so client factories can call it synchronously after
+`load()`. Register each EVM network on its own chain id to give it its own list.
+
+Two names for the same chain: the table names Solana `solana:mainnet`, while accounts report the
+genesis-hash form (`solana:5eykt4…`). Use the table's id when you read endpoints, and the
+account's `chain` everywhere else.
+
+## The user's own RPC
+
+<Snippet file="networks/src/networks.ts" region="user-rpc" />
+
+`checkRpcUrl` allows `https://` anywhere, and `http://` only for private addresses (`localhost`,
+`192.168.x.x`, `*.local`…) with the "allow local HTTP" setting on. Credentials in the URL are
+refused: use a keyed path or a header.
+
+`verifyNetwork` asks the endpoint who it is and compares it with the network:
+
+| Family | Identity checked | Tip |
+|---|---|---|
+| EVM | `eth_chainId` | `eth_blockNumber` |
+| Solana | genesis hash | slot |
+| TON | global id from config param 19 | masterchain seqno |
+| Tron | genesis block id | latest block |
+| Bitcoin, Zcash | genesis block | tip height |
+| NEAR | `chain_id` | latest block height |
+
+It never throws. A failure comes back with a coded reason: `chain-id-mismatch`, `url-policy`,
+`http-<status>`, `timeout`, `unreachable`… An endpoint that changes its chain id later is treated
+as an attack, not an outage.
+
+<Snippet file="networks/src/networks.ts" region="trust" />
+
+A simulation or a balance from a node you didn't ship is only as honest as that node. Say so on
+the review screen.
+
+## Testnets
+
+Testnets ship switched off: Sepolia, Base Sepolia, Arbitrum Sepolia, OP Sepolia, Polygon Amoy,
+BSC testnet, Monad testnet, Solana devnet, Bitcoin testnet4, TON testnet, Tron Nile, NEAR
+testnet. A Zcash testnet entry exists, but no public API answers for it, so the user brings a
+Blockbook. Turn one on with `table.enable(caip2, true)`, and show a clear "testnet" badge
+wherever its balances appear.
+
+## Sites that add a network
+
+<Snippet file="networks/src/networks.ts" region="add-chain" />
+
+`parseAddChainParams` turns a `wallet_addEthereumChain` request into a network, or into the
+EIP-1193 error to answer with: `-32602` for bad params, `4902` for a chain the wallet refuses.
+By default only catalog chains are accepted, and those are built in already. Pass `known` to
+let users add others. The new network records the site's origin.
+
+Never add a network silently. Show the chain id, the name, the RPC and the requesting site,
+verify the endpoint, and only then store it.
