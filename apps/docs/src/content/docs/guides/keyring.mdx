@@ -1,0 +1,139 @@
+---
+title: Keyring
+description: Many accounts from one seed, imported keys, secure storage on the device, restore with discovery, and signing that holds the key only for one call.
+sidebar:
+  order: 5
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+`keyring` is the account list of a real wallet: several seeds and imported keys, accounts 0,
+1, 2… on every chain, names, hidden accounts, the active one. It is also where the key
+handling rules live.
+
+- **Secrets go only to your secure storage**, one entry per seed or key.
+- **Everything else is public metadata**: names, addresses, flags, a fingerprint of the
+  public key. Plain storage is fine for it.
+- **The SDK holds no secret between calls.** Signing reads the secret, builds the account,
+  signs, and wipes the key when the callback ends.
+
+Snippets come from `examples/keyring`, which our CI typechecks and tests.
+
+```sh
+pnpm add @anywalletkit/keyring @anywalletkit/kit @anywalletkit/wallet-evm
+```
+
+<Snippet file="keyring/src/keyring.ts" region="imports" />
+
+## Storage
+
+The keyring takes two adapters. You write both; they are a few lines each.
+
+### Secrets
+
+<Snippet file="keyring/src/keyring.ts" region="secrets" />
+
+The protection is in the storage options, so choose them on purpose:
+
+| Option | What it does | Trade-off |
+|---|---|---|
+| Ask for authentication on every read | Face ID / fingerprint / passcode before each signature | One prompt per signing session; batch reads where you can |
+| Device only (`…THIS_DEVICE_ONLY`) | The secret never leaves the device in an OS backup | A new phone needs the recovery phrase |
+| Passcode required (`WHEN_PASSCODE_SET…`) | No secret on a device without a passcode | Users without a passcode can't create a wallet |
+
+:::caution[expo-secure-store and Face ID]
+With `requireAuthentication: true`, expo-secure-store 15 on iOS accepts **only** the
+currently enrolled biometrics (`.biometryCurrentSet`):
+
+- **No passcode fallback.** A user whose Face ID fails cannot unlock.
+- **Re-enrolling Face ID makes the item unreadable for good.** Only the recovery phrase gets
+  the wallet back.
+
+Use an access control that allows biometrics **or** the device passcode, for example
+`react-native-keychain` with `BIOMETRY_ANY_OR_DEVICE_PASSCODE`, or patch the library. Test
+"Face ID fails → passcode" and "re-enroll Face ID" on a real device before you ship.
+:::
+
+### Metadata
+
+<Snippet file="keyring/src/keyring.ts" region="metadata" />
+
+## Set up
+
+<Snippet file="keyring/src/keyring.ts" region="setup" />
+
+Register every chain the wallet supports: each seed account gets an address on each of them.
+A chain added later is filled in with `missingChains(accountId)` and
+`completeAddresses(sourceId)`, with one secret read per seed.
+
+## Create a wallet
+
+<Snippet file="keyring/src/keyring.ts" region="create" />
+
+This is the only time the phrase is handed to your code without asking. Show it on a screen
+that blocks screenshots, ask the user to confirm a few words, then let the variable go.
+
+## Restore a wallet
+
+<Snippet file="keyring/src/keyring.ts" region="restore" />
+
+A restored seed may have used accounts beyond 0. `discover` derives the next ones and asks
+your `isUsed` whether each has a balance or history, stopping after `gapLimit` unused ones in a
+row (1 is what MetaMask and Phantom do). The keyring has no indexer, so `isUsed` is yours: a
+balance read, or the [history](/build-a-wallet/history/) source of each chain.
+
+Importing the same seed twice throws `KeyringError` with `code: 'duplicate'`. The check
+compares a fingerprint of the public key, so no secret is kept for it. The same holds for the
+same key in another format.
+
+## Manage accounts
+
+<Snippet file="keyring/src/keyring.ts" region="accounts" />
+
+`listAccounts()`, `state` and `getAccountMeta()` never read a secret, so the account picker,
+the portfolio and the receive screen open without a biometric prompt.
+
+## Sign
+
+<Snippet file="keyring/src/keyring.ts" region="sign" />
+
+`withAccount` reads the secret once, builds the chain manager, runs your callback and disposes
+the key whatever happens. Accounts from the keyring are not wrapped by
+[policies](/concepts/policies/) on their own: wrap them with `applyPolicies`, as above, so fee
+caps, lists and your `confirm` step apply like on accounts from `Wallet`.
+
+Before it returns the account, the keyring checks that the address still matches the stored
+one. A changed chain config or a swapped secret fails loudly instead of signing from an
+unexpected address.
+
+## Import keys
+
+<Snippet file="keyring/src/keyring.ts" region="import" />
+
+| Source | Accounts | Formats |
+|---|---|---|
+| Seed phrase (BIP-39, optional passphrase) | 0, 1, 2… on every registered chain | 12 or 24 English words |
+| Private key | One, on one chain | EVM / Tron hex; BTC WIF or hex; Solana base58 or JSON byte array; TON hex; NEAR `ed25519:…`; Zcash WIF or hex |
+| TON 24-word mnemonic | One TON account | Tonkeeper, Tonhub, MyTonWallet |
+
+Always show the address from `previewPrivateKey` before importing: a key pasted into the
+wrong chain imports a different, empty account.
+
+## Back up and remove
+
+<Snippet file="keyring/src/keyring.ts" region="backup" />
+
+`exportSecret` returns the phrase or the key itself. Gate it behind authentication every time,
+block screenshots on that screen, and never copy it to the clipboard without a warning.
+`removeSource` deletes the accounts and the secure-storage entry.
+
+## How the key is kept in memory
+
+- **A phrase becomes the 64-byte seed** the moment the SDK gets it. A JS string cannot be wiped,
+  bytes can.
+- **No seed or key is a property of any SDK object**, so logging an account or a crash report
+  shows addresses and public keys only.
+- **Each account holds only its own key**, never the master seed, and `dispose()` wipes it.
+
+These rules are checked by the conformance suite on every chain. See
+[Keys and storage](/build-a-wallet/keys-and-storage/) for the wider picture.

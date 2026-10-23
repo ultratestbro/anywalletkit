@@ -231,6 +231,40 @@ importers:
         specifier: ^0.12.0
         version: 0.12.0
 
+  examples/keyring:
+    dependencies:
+      '@forgewallet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@forgewallet/keyring':
+        specifier: workspace:*
+        version: link:../../packages/keyring
+      '@forgewallet/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@forgewallet/wallet-evm':
+        specifier: workspace:*
+        version: link:../../packages/wallet-evm
+      '@forgewallet/wallet-solana':
+        specifier: workspace:*
+        version: link:../../packages/wallet-solana
+      '@forgewallet/wallet-ton':
+        specifier: workspace:*
+        version: link:../../packages/wallet-ton
+      '@forgewallet/wallet-tron':
+        specifier: workspace:*
+        version: link:../../packages/wallet-tron
+    devDependencies:
+      '@forgewallet/conformance':
+        specifier: workspace:*
+        version: link:../../packages/conformance
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+
   examples/quickstart:
     dependencies:
       '@forgewallet/core':
