@@ -80,14 +80,29 @@ function run(job) {
       const soft = lines.filter((l) => SOFT_FAIL.test(l) && !/no position|0 approval|none in the last|position \{ shares: 0n/.test(l));
       const expected = code !== 0 && /no listed Morpho (vault|market)/.test(out);
       const status = signal ? "timeout" : expected ? "none" : code !== 0 ? "fail" : soft.length ? "warn" : "ok";
-      const note = (status === "fail" ? lines.slice(-4).join(" | ") : soft.slice(0, 3).join(" | ")).replace(/\s+/g, " ").slice(0, 300);
+      // A failure note names the cause (viem's Details / Status lines, the error line) rather than the stack tail. URLs are cut:
+      // an RPC URL carries its API key and the note goes to Telegram and the committed state file.
+      const cause = [...new Set(lines.map((l) => l.trim()).filter((l) => /^(\w*Error: |(Details|Status|Reason|function): )/.test(l)))].slice(0, 4);
+      const note = (status === "fail" ? (cause.length ? cause : lines.slice(-4)).join(" | ") : soft.slice(0, 3).join(" | "))
+        .replace(/https?:\/\/\S+/g, "<url>").replace(/\s+/g, " ").slice(0, 300);
       done({...job, status, ms: Date.now() - t0, note});
     });
   });
 }
 const results = [];
 const queue = [...selected];
-await Promise.all(Array.from({length: 4}, async () => { for (;;) { const j = queue.shift(); if (!j) return; const r = await run(j); results.push(r); console.error(`${r.status.padEnd(7)} ${(r.ms / 1000).toFixed(1).padStart(6)}s  ${r.id}${r.note ? "  — " + r.note.slice(0, 140) : ""}`); } }));
+// One retry after 20 s for a fail / timeout: a single rate-limited or lagging RPC answer is not a module break (aave:1:lido and
+// mellow:lido-earn-* alternated ok/fail across 2026-10-20..23 and passed 8/8 locally). The first failure stays in the note.
+async function runWithRetry(job) {
+  const first = await run(job);
+  if (first.status !== "fail" && first.status !== "timeout") return first;
+  await new Promise((r) => setTimeout(r, 20_000));
+  const second = await run(job);
+  if (second.status === "fail" || second.status === "timeout") return second;
+  console.error(`retry   ${job.id} passed on the second try — first: ${first.note.slice(0, 160)}`);
+  return second;
+}
+await Promise.all(Array.from({length: 4}, async () => { for (;;) { const j = queue.shift(); if (!j) return; const r = await runWithRetry(j); results.push(r); console.error(`${r.status.padEnd(7)} ${(r.ms / 1000).toFixed(1).padStart(6)}s  ${r.id}${r.note ? "  — " + r.note.slice(0, 140) : ""}`); } }));
 
 // ── compare with the last run ──────────────────────────────────────────────
 const dir = resolve(ROOT, "watch/canary"); mkdirSync(dir, {recursive: true});

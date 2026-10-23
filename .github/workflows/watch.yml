@@ -44,6 +44,7 @@ jobs:
             for p in UNICHAIN:unichain-mainnet LINEA:linea-mainnet SONIC:sonic-mainnet ZKSYNC:zksync-mainnet HYPEREVM:hype-mainnet CELO:celo-mainnet GNOSIS:xdai PLASMA:plasma-mainnet MEGAETH:megaeth-mainnet ROBINHOOD:robinhood-mainnet MONAD:monad-mainnet SCROLL:scroll-mainnet BERACHAIN:bera-mainnet WORLDCHAIN:worldchain-mainnet SEI:sei-pacific INK:ink-mainnet XLAYER:xlayer-mainnet KATANA:katana-mainnet MANTLE:mantle-mainnet SONEIUM:soneium-mainnet; do
               url="${QUICKNODE_MULTICHAIN_BASE/\%NET\%/${p##*:}}"
               [ "${p%%:*}" = HYPEREVM ] && url="${url%/}/evm"   # QuickNode serves HyperEVM JSON-RPC under /evm
+              echo "::add-mask::$url"   # built from a secret, so Actions does not mask it on its own (the token was in the logs)
               echo "${p%%:*}_RPC_URL=$url" >> "$GITHUB_ENV"
             done
           fi
