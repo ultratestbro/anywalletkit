@@ -1,0 +1,98 @@
+---
+title: Custom signer
+description: Keep the key outside the app — a hardware wallet, an MPC node, an HSM or a signing service — and use it as any other account.
+sidebar:
+  order: 6
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+A signer is the only object that touches a private key. Accounts build transactions, talk to
+the network and hand the signer exactly the bytes to sign. Replace the signer, and the key can
+live anywhere: on a hardware wallet, in an MPC network, in an HSM, behind your own service.
+Everything else (addresses, balances, transfers, swaps, policies) works unchanged.
+
+Snippets come from `examples/signer`, which our CI typechecks and tests against the same
+addresses and signatures a seed wallet produces.
+
+<Snippet file="signer/src/signer.ts" region="imports" />
+
+## What a signer receives
+
+`externalSigner({ curve, publicKey, sign })` wraps your callback. The SDK calls `sign` with the
+payload and options, and checks the length of what comes back.
+
+| `scheme` | Curve | Payload | Return |
+|---|---|---|---|
+| `ecdsa-recoverable` | secp256k1 | 32-byte hash | 65 bytes `r‖s‖v`, `v` = 0 or 1 |
+| `ecdsa` | secp256k1 | 32-byte hash | 64 bytes `r‖s`, low-S |
+| `schnorr` | secp256k1 | 32-byte message | 64 bytes, BIP-340 (Taproot) |
+| `ed25519` | ed25519 | message bytes | 64 bytes |
+
+`options.context` says what the bytes are, so a device can show the right screen:
+
+| Context | Chain | Payload |
+|---|---|---|
+| `evm-tx`, `evm-191`, `evm-712` | EVM | Transaction hash, `personal_sign` hash, EIP-712 hash |
+| `btc-sighash`, `btc-taproot-keypath`, `btc-message` | Bitcoin | SegWit sighash, Taproot sighash (with `tweak`), BIP-137 hash |
+| `tron-tx`, `tron-message` | Tron | Transaction hash, TIP-191 hash |
+| `solana-message`, `solana-offchain` | Solana | Transaction message bytes, off-chain message |
+| `ton-external`, `ton-message` | TON | Signing-cell hash, message bytes |
+
+A signer advertises the `schemes` it can produce. By default that is the curve's main one:
+`ecdsa-recoverable` for secp256k1, `ed25519` for ed25519. Add `ecdsa` for Bitcoin SegWit
+inputs and `schnorr` for Taproot. Asking for a scheme the signer doesn't list throws
+`SignerError` before your callback runs.
+
+## A hardware wallet
+
+<Snippet file="signer/src/signer.ts" region="device" />
+
+- **Throw `UserRejectedError` when the user declines on the device.** Every module treats it as
+  "cancelled", not as a failure to retry.
+- **The app never sees a seed.** `new Wallet(signer)` takes the signer instead of a phrase.
+- **Policies still apply.** Fee caps, allowlists and your `confirm` step run before the device
+  is asked, so the screen on the phone and the screen on the device agree.
+
+## A signing service
+
+<Snippet file="signer/src/signer.ts" region="remote" />
+
+This is the shape for an MPC node, an HSM, a cloud KMS behind your proxy, or a backend signer
+for bots and treasury accounts. The service returns a signature over the bytes it is given.
+
+:::caution[A digest signer signs blindly]
+The service receives a hash. It cannot tell a payment from a drain by looking at it. Protect it
+like the key it is:
+
+- **Check before the call.** Run [policies](/concepts/policies/) and your review on the client,
+  so nothing unreviewed reaches `sign`.
+- **Authenticate every request.** Use a short-lived session token bound to the user and the
+  device, never a static key shipped in the app.
+- **Limit on the server.** Rate limits, per-account caps, and an audit log of every signature.
+- **For bots, sign on the server.** Build and check the transaction where the key is, rather
+  than accepting hashes from a client.
+:::
+
+## Several chains, two curves
+
+<Snippet file="signer/src/signer.ts" region="curves" />
+
+- **One external signer is one key.** It gives one account per chain (index 0), and it signs on
+  one curve. EVM, Bitcoin, Tron and Zcash share secp256k1; Solana, TON and NEAR use ed25519.
+  Cover both families with two signers and two wallets.
+- **The same secp256k1 key on EVM and Bitcoin gives that key's addresses on both.** A seed
+  wallet derives Bitcoin at `m/84'/0'/0'/0/0`, a different key, so the addresses differ. Tell
+  users who move from a seed wallet.
+- **Several accounts** need several keys from the device or service: one signer per path, or a
+  signer that derives (`kind: 'seed'` with `derive`). The [Keyring](/guides/keyring/) handles
+  many accounts for seed-based wallets.
+
+## Checklist
+
+- **Prove the public key matches before the first send:** sign a test message and verify it
+  with `account.verify`.
+- **Return signatures in the exact shape from the table.** The SDK rejects a wrong length or a
+  recovery id other than 0 or 1.
+- **Implement `dispose`** if your signer holds a session or a connection; `wallet.dispose()`
+  calls it.

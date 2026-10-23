@@ -76,9 +76,9 @@ Everything that holds a key has `dispose()`. It overwrites the key bytes in memo
 zeros, and the object is unusable afterwards. `wallet.dispose()` disposes every manager,
 every account and the signer. Call it when the app locks.
 
-:::caution[Seed phrases as strings]
-A JavaScript string cannot be wiped from memory. `new Wallet(seedPhrase)` keeps the phrase
-string until the wallet is garbage-collected, because chain managers are built on first use.
-Keep that window short (build the wallet, use it, dispose it), or keep the seed as bytes and
-pass the SDK a signer instead of the words.
+:::note[Seed phrases and memory]
+A JavaScript string cannot be wiped from memory, so the SDK keeps no phrase. `new Wallet(seedPhrase)`
+turns it into the 64-byte seed at once; `new Wallet(seedBytes)` skips the string entirely. No
+seed or key is a property of any SDK object, so logging a wallet or an account shows no secret.
+For a hardware wallet, MPC or a signing service, see [Custom signer](/guides/custom-signer/).
 :::

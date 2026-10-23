@@ -302,6 +302,34 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
+  examples/signer:
+    dependencies:
+      '@forgewallet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@forgewallet/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@forgewallet/wallet-btc':
+        specifier: workspace:*
+        version: link:../../packages/wallet-btc
+      '@forgewallet/wallet-evm':
+        specifier: workspace:*
+        version: link:../../packages/wallet-evm
+      '@forgewallet/wallet-solana':
+        specifier: workspace:*
+        version: link:../../packages/wallet-solana
+    devDependencies:
+      '@forgewallet/conformance':
+        specifier: workspace:*
+        version: link:../../packages/conformance
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+
   examples/swap:
     dependencies:
       '@forgewallet/core':
