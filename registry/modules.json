@@ -1,7 +1,7 @@
 {
   "$schema": "./modules.schema.json",
-  "generatedAt": "2026-10-20",
-  "count": 21,
+  "generatedAt": "2026-10-23",
+  "count": 22,
   "modules": [
     {
       "name": "@forgewallet/protocol-approvals-evm",
@@ -243,6 +243,22 @@
       "path": "packages/protocol-swap2-chainflip",
       "description": "Chainflip vault swaps: native BTC / ETH / SOL / TRX and USDC / USDT across Ethereum, Arbitrum, Solana, Tron and Bitcoin via Chainflip's public backend (0 bps, no account). Sources: Ethereum, Arbitrum, Tron (USDT → the Vault with the swap in the note); the encoder's output is decoded and checked before signing; fill-or-kill refunds.",
       "addedAt": "2026-10-20"
+    },
+    {
+      "name": "@forgewallet/protocol-swap2-jupiter",
+      "type": "swap2",
+      "chains": [
+        "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/forgewallet",
+      "path": "packages/protocol-swap2-jupiter",
+      "description": "Jupiter same-chain Solana swaps via Swap API V2 /build (Metis routing, no Jupiter fee); every instruction vetted and the swap arguments decoded before the account's serialized-transaction guard signs.",
+      "addedAt": "2026-10-23"
     },
     {
       "name": "@forgewallet/protocol-swap2-lifi",

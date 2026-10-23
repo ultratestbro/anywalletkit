@@ -19,6 +19,10 @@ import { Usdt0Swap2Protocol } from '@forgewallet/protocol-swap2-usdt0/protocol'
 import { chainflipProvider } from '@forgewallet/protocol-swap2-chainflip/provider'
 import { ChainflipSwap2Protocol } from '@forgewallet/protocol-swap2-chainflip/protocol'
 import { decodeTronNote } from '@forgewallet/protocol-swap2-chainflip/codec'
+import { jupiterProvider } from '@forgewallet/protocol-swap2-jupiter/provider'
+import { JupiterSwap2Protocol } from '@forgewallet/protocol-swap2-jupiter/protocol'
+import { decodeSwapArgs, fromBase64 as jupFromBase64 } from '@forgewallet/protocol-swap2-jupiter/codec'
+import { assembleTransaction as jupAssemble } from '@forgewallet/protocol-swap2-jupiter/transaction'
 import { nearIntentsProvider } from '@forgewallet/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@forgewallet/protocol-swap2-thorchain/protocol'
 import { OmnistonSwap2Protocol } from '@forgewallet/protocol-swap2-omniston/protocol'
@@ -58,7 +62,7 @@ export async function smokeProtocols(check: Check): Promise<void> {
   // TON is a hand-suspended 1Click corridor (HOT bridge dark since 2026-10-16) and LI.FI has no Bitcoin, so
   // Bitcoin can only have come from the near-intents provider.
   check('router: capabilities come from the passed providers', chains.includes('eip155:1') && chains.includes('bitcoin:mainnet'), chains.join(','))
-  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol], ['usdt0', Usdt0Swap2Protocol], ['chainflip', ChainflipSwap2Protocol]] as const) {
+  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol], ['usdt0', Usdt0Swap2Protocol], ['chainflip', ChainflipSwap2Protocol], ['jupiter', JupiterSwap2Protocol]] as const) {
     const p = new (P as never as new (a: unknown, c: unknown) => { getSupportedChains(): Promise<unknown>; quoteSwap2(o: unknown): Promise<unknown> })(evm, swap2Cfg)
     check(`${name}: constructs`, typeof p.quoteSwap2 === 'function')
     await tolerates(check, `${name}: getSupportedChains`, () => p.getSupportedChains())
@@ -94,6 +98,14 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const cfNote = decodeTronNote('0x0703111111111111111111111111111111111111111100890101320000008840e6c55b9ada326d211d818c34a994aeced808f5285c8fc2f5285c8fc2f5285c8fc2f50000000000000000000000000000000000016400000070d0cd75a367987344a3896a18e1510e5429ca5e88357b6c2a2e306b3877380d000000')
   check('chainflip: decodes a Tron vault-swap note', cfNote.outputAsset === 7 && cfNote.destTag === 3 && cfNote.destAddress.length === 20 && cfNote.params.minPriceX128 > 0n && !cfNote.ccm, JSON.stringify({ a: cfNote.outputAsset, t: cfNote.destTag }))
   await tolerates(check, 'chainflip: getQuote dry (network)', () => cf.getQuote({ sourceChain: 'tron:728126428', sourceToken: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', destChain: 'eip155:42161', destToken: 'USDC', amountIn: '20000000', destAddress: '0x000000000000000000000000000000000000dEaD', dry: true }))
+  const jup = jupiterProvider()
+  check('jupiter: route SOL → USDC on Solana only', jup.supportsRoute({ chain: 'solana:mainnet', token: 'SOL' }, { chain: 'solana:mainnet', token: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' }) && !jup.supportsRoute({ chain: 'solana:mainnet', token: 'SOL' }, { chain: 'eip155:1', token: 'USDC' }))
+  // live /build 2026-10-23: shared_accounts_route_v2, 25 USDC → SOL at 75 bps — u64 / u16 LE reads under Hermes
+  const jArgs = decodeSwapArgs(jupFromBase64('0ZhTk3z+2OkCQHh9AQAAAADp7kIOAAAAAEsAAAAAAAQAAAAm/AMABKEAAQAAAGsSAAIaECcCBBEAqRAABA=='))
+  check('jupiter: decodes the swap instruction arguments', jArgs.kind === 'shared_accounts_route_v2' && jArgs.inAmount === 25_000_000n && jArgs.slippageBps === 75 && jArgs.platformFeeBps === 0, JSON.stringify({ k: jArgs.kind, s: jArgs.slippageBps }))
+  const jWire = jupAssemble({ taker: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM', instructions: [{ programId: 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4', accounts: [{ pubkey: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM', isSigner: true, isWritable: true }], data: '0ZhTk3z+2OkCQHh9AQAAAADp7kIOAAAAAEsAAAAAAAQAAAAm/AMABKEAAQAAAGsSAAIaECcCBBEAqRAABA==' }], computeUnitLimit: 200_000, computeUnitPrice: 1_000n, blockhash: '9sHcv6xwn9YkB8nxTUGKDwPwNnmqVp5oAXxU8Fdkm4J6', lastValidBlockHeight: 100, addressesByLookupTableAddress: {} })
+  check('jupiter: assembles a v0 transaction (@solana/kit under Hermes)', typeof jWire === 'string' && jupFromBase64(jWire)[0] === 1 && (jupFromBase64(jWire)[65] & 0x80) === 0x80, String(jWire.length))
+  await tolerates(check, 'jupiter: getQuote dry (network)', () => jup.getQuote({ sourceChain: 'solana:mainnet', sourceToken: 'SOL', destChain: 'solana:mainnet', destToken: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', amountIn: '100000000', destAddress: '', dry: true }))
   check('cctp: claimSwap2 on the router', typeof (router as unknown as { claimSwap2?: unknown }).claimSwap2 === 'function')
 
   // lending

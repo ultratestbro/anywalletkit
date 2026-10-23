@@ -228,6 +228,44 @@ describe('provider-serialized transactions', () => {
     expect(f3.sent).toHaveLength(0)
   })
 
+  it("counts the wallet's own wrapped SOL as its SOL: unwrapping it is neutral, and it never passes for swap output", async () => {
+    // Aggregators (Jupiter /build, LI.FI) wrap into the wallet's wSOL ATA and close it at the end, which also unwraps
+    // any wSOL the wallet already held (live 2026-10-23: every large mainnet wallet probed held some).
+    const { usdcAta, usdtAta, pre } = await setup()
+    const WSOL = 'So11111111111111111111111111111111111111112' as Address
+    const [wsolAta] = await findAssociatedTokenPda({ mint: WSOL, owner: ADDR0, tokenProgram: TOKEN_PROGRAM_ADDRESS })
+    const wsol = (amount: bigint): State => ({ lamports: ATA_RENT + amount, owner: TOKEN_PROGRAM_ADDRESS, data: tokenAccount(WSOL, ADDR0, amount) })
+    const held = { ...pre, [wsolAta]: wsol(3n * SOL) }
+    const payer = createNoopSigner(ADDR0)
+    const closeWsol = getCloseAccountInstruction({ account: wsolAta, destination: ADDR0, owner: payer })
+    const tx = wire(jupiterLike({ writable: [usdcAta, usdtAta, wsolAta], usdcAta, extra: [closeWsol] }))
+
+    // SOL → USDC: the held 3 wSOL come back as SOL with the rent; USDC delivered → signed, net = fee + the new ATA's rent.
+    const unwrapped = fakeRpc(held, { ...held, [ADDR0]: sys(SOL - FEE - ATA_RENT + 3n * SOL + ATA_RENT), [wsolAta]: null, [usdcAta]: token(USDC, ADDR0, 990_000n) })
+    const a = await new WalletManagerSolana(SEED, { provider: unwrapped.rpc }).getAccount(0)
+    const res = await a.sendSerialized(tx, guard())
+    expect(res.check.lamportsDelta).toBe(-(FEE + ATA_RENT))
+    expect(res.check.watched).toContain(wsolAta)
+
+    // USDT → SOL that takes the USDT and returns nothing but the wallet's own unwrapped wSOL → slippage, nothing signed.
+    const toSol = guard({ tokenIn: { mint: WSOL, minAmount: SOL }, maxTokenOut: { mint: USDT, amount: 1_000_000n }, maxLamportsOut: 20_000_000n })
+    const robbed = fakeRpc(held, { ...held, [ADDR0]: sys(SOL - FEE + 3n * SOL + ATA_RENT), [wsolAta]: null, [usdtAta]: token(USDT, ADDR0, 0n) })
+    const b = await new WalletManagerSolana(SEED, { provider: robbed.rpc }).getAccount(0)
+    await expect(b.sendSerialized(tx, toSol)).rejects.toMatchObject({ code: 'slippage', details: [String(-FEE)] })
+    expect(robbed.sent).toHaveLength(0)
+
+    // …the honest version (1.2 SOL out through the same account) passes with the real gain.
+    const honest = fakeRpc(held, { ...held, [ADDR0]: sys(SOL - FEE + 3n * SOL + ATA_RENT + 1_200_000_000n), [wsolAta]: null, [usdtAta]: token(USDT, ADDR0, 0n) })
+    const c = await new WalletManagerSolana(SEED, { provider: honest.rpc }).getAccount(0)
+    expect((await c.sendSerialized(tx, toSol)).check.lamportsDelta).toBe(1_200_000_000n - FEE)
+
+    // Closing the wSOL account to someone else is still refused before any simulation.
+    const away = wire(jupiterLike({ writable: [usdcAta, usdtAta, wsolAta], usdcAta, extra: [getCloseAccountInstruction({ account: wsolAta, destination: OTHER, owner: payer })] }))
+    const f = fakeRpc(held, held)
+    const d = await new WalletManagerSolana(SEED, { provider: f.rpc }).getAccount(0)
+    await expect(d.sendSerialized(away, guard())).rejects.toMatchObject({ code: 'closes-account' })
+  })
+
   it('refuses a slippage breach and an over-spend of SOL', async () => {
     const { usdcAta, usdtAta, pre } = await setup()
     const f = fakeRpc(pre, { ...pre, [ADDR0]: sys(SOL - FEE), [usdcAta]: token(USDC, ADDR0, 970_000n) })

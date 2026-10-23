@@ -1,0 +1,16 @@
+{
+  "name": "@forgewallet/protocol-swap2-jupiter",
+  "type": "swap2",
+  "chains": [
+    "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+  ],
+  "tier": "core",
+  "maintainers": [
+    "@ultratestbro"
+  ],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/forgewallet",
+  "path": "packages/protocol-swap2-jupiter",
+  "description": "Jupiter same-chain Solana swaps via Swap API V2 /build (Metis routing, no Jupiter fee); every instruction vetted and the swap arguments decoded before the account's serialized-transaction guard signs.",
+  "addedAt": "2026-10-23"
+}

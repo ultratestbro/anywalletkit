@@ -7,6 +7,7 @@ import { lifiProvider } from '@forgewallet/protocol-swap2-lifi/provider'
 import { nearIntentsProvider } from '@forgewallet/protocol-swap2-near-intents/provider'
 import { thorchainProvider } from '@forgewallet/protocol-swap2-thorchain/provider'
 import { chainflipProvider } from '@forgewallet/protocol-swap2-chainflip/provider'
+import { jupiterProvider } from '@forgewallet/protocol-swap2-jupiter/provider'
 import { cctpProvider } from '@forgewallet/protocol-swap2-cctp/provider'
 import { usdt0Provider } from '@forgewallet/protocol-swap2-usdt0/provider'
 import { uniswapProvider } from '@forgewallet/protocol-swap2-uniswap/provider'
@@ -35,6 +36,8 @@ export function providers() {
     // Same-chain venues priced straight from the contracts: no API, no key.
     uniswapProvider({ rpcUrls: RPC }),
     wrapProvider({ rpcUrls: RPC }),
+    // Same-chain Solana: Jupiter's /build instructions, checked and assembled locally; apiKey optional.
+    jupiterProvider({ rpcUrls: ['https://api.mainnet-beta.solana.com'] }),
   ]
 }
 // #endregion providers

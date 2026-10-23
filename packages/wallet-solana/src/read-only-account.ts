@@ -15,7 +15,7 @@ import {
 } from '@solana-program/token-2022'
 import { MAX_U64, ZERO_ADDRESS, decodeWireTransaction, describeTransaction, resolveCompiledAccounts } from './describe.js'
 import {
-  DEFAULT_PROGRAM_ALLOWLIST, SAFE_CORE_INSTRUCTIONS, base64Bytes, bytesEqual, isNativeMint, optEqual, parseTokenAccount, pubkeyBytes, type SerializedCheck, type SerializedTxGuard,
+  DEFAULT_PROGRAM_ALLOWLIST, SAFE_CORE_INSTRUCTIONS, WSOL_MINT, base64Bytes, bytesEqual, isNativeMint, optEqual, parseTokenAccount, pubkeyBytes, type SerializedCheck, type SerializedTxGuard,
 } from './serialized.js'
 import { MissingSignersError, SimulationError, UnsafeTransactionError } from './errors.js'
 import { isNativeTransfer, isSignedTransaction, isTransactionMessage } from './guards.js'
@@ -478,8 +478,11 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     const tokenInNative = expect.tokenIn !== undefined && isNativeMint(expect.tokenIn.mint)
     const tokenInAtas = expect.tokenIn && !tokenInNative ? (await mintAtas(expect.tokenIn.mint)).map(String) : []
     const tokenOutAtas = expect.maxTokenOut && !isNativeMint(expect.maxTokenOut.mint) ? (await mintAtas(expect.maxTokenOut.mint)).map(String) : []
+    // The wallet's wrapped-SOL account: aggregators wrap into it and close it afterwards, which also unwraps whatever
+    // wSOL the wallet already held. Its lamports are the wallet's SOL, so they are counted with the wallet's own.
+    const wsolAta = String(await this.ata(address(WSOL_MINT), this.address, TOKEN_PROGRAM_ADDRESS))
     const writable = layout.accounts.filter((a) => isWritableRole(a.role) && a.address !== null).map((a) => a.address as string)
-    const pre = await this.accountStates([this.address, ...tokenInAtas, ...tokenOutAtas, ...writable])
+    const pre = await this.accountStates([this.address, wsolAta, ...tokenInAtas, ...tokenOutAtas, ...writable])
     const isTokenProgram = (owner: string) => owner === TOKEN_PROGRAM_ADDRESS || owner === TOKEN_2022_PROGRAM_ADDRESS
     const ownedTokenAccounts = writable.filter((addr) => {
       const st = pre.get(addr)
@@ -487,7 +490,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       const parsed = parseTokenAccount(st.data)
       return parsed !== null && bytesEqual(parsed.owner, me)
     })
-    const watched = [...new Set([this.address as string, ...tokenInAtas, ...tokenOutAtas, ...ownedTokenAccounts])]
+    const watched = [...new Set([this.address as string, wsolAta, ...tokenInAtas, ...tokenOutAtas, ...ownedTokenAccounts])]
 
     const { value } = await rpc.simulateTransaction(getBase64EncodedWireTransaction(transaction) as never, {
       encoding: 'base64', sigVerify: false, replaceRecentBlockhash: true, commitment: this._commitment, accounts: { addresses: watched.map(address), encoding: 'base64' },
@@ -504,7 +507,18 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     const tokenAmount = (m: Map<string, { data: Uint8Array } | null>, addr: string) => { const st = m.get(addr); return st ? (parseTokenAccount(st.data)?.amount ?? 0n) : 0n }
     const tokenDelta = (atas: readonly string[]) => atas.reduce((sum, a) => sum + tokenAmount(post, a) - tokenAmount(pre, a), 0n)
 
-    const lamportsDelta = lamports(post, this.address) - lamports(pre, this.address)
+    // Native SOL = the wallet's lamports + every wrapped-SOL token account it owns (before or after): wrapping, unwrapping
+    // and closing such an account into the wallet are then neutral, and SOL "received" is real SOL, never the wallet's own
+    // wSOL coming back.
+    const wsolPk = pubkeyBytes(WSOL_MINT)
+    const ownWsol = (st: { owner: string; data: Uint8Array } | null | undefined) => {
+      if (!st || !isTokenProgram(st.owner)) return false
+      const t = parseTokenAccount(st.data)
+      return t !== null && bytesEqual(t.owner, me) && bytesEqual(t.mint, wsolPk)
+    }
+    const nativeAccounts = watched.filter((addr) => addr !== this.address && (ownWsol(pre.get(addr)) || ownWsol(post.get(addr))))
+    const native = (m: Map<string, { lamports: bigint } | null>) => nativeAccounts.reduce((sum, a) => sum + lamports(m, a), lamports(m, this.address))
+    const lamportsDelta = native(post) - native(pre)
     const ceiling = expect.maxLamportsOut + quote.fee
     if (lamportsDelta < -ceiling) throw new UnsafeTransactionError(`Transaction spends ${-lamportsDelta} lamports; at most ${ceiling} (${expect.maxLamportsOut} + fee ${quote.fee}) allowed.`, 'lamports-out', [String(-lamportsDelta)])
 
@@ -555,7 +569,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
         throw new UnsafeTransactionError(`Transaction leaves a new delegate allowance on token account ${addr}.`, 'approves-delegate', [addr])
       }
     }
-    const exempt = new Set([...tokenInAtas, ...tokenOutAtas])
+    const exempt = new Set([...tokenInAtas, ...tokenOutAtas, ...nativeAccounts])
     for (const addr of ownedTokenAccounts) {
       if (exempt.has(addr)) continue
       const before = tokenAmount(pre, addr)

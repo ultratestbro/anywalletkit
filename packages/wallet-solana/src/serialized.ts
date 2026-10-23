@@ -125,7 +125,7 @@ export interface SerializedCheck {
   description: TransactionDescription
   simulation: Extract<SimulationResult, { ok: true }>
   quote: SolanaFeeQuote
-  /** post − pre lamports of the wallet (negative = spent), fee included. */
+  /** post − pre native SOL of the wallet (negative = spent), fee included: its lamports plus the wrapped SOL in token accounts it owns. */
   lamportsDelta: bigint
   /** post − pre of the expected token across the wallet's ATAs (undefined without `tokenIn` or for native). */
   tokenInDelta: bigint | undefined
