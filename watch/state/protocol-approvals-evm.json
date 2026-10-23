@@ -8,7 +8,7 @@
     "codeHash": "977d1ac2e903b062",
     "bytes": 9152
    },
-   "seenAt": "2026-10-22T11:46:37.508Z",
+   "seenAt": "2026-10-23T11:34:36.378Z",
    "changedAt": "2026-10-14T15:10:22.440Z"
   },
   "permit2-polygon": {
@@ -18,7 +18,7 @@
     "codeHash": "9d00ae84c1e424cd",
     "bytes": 9152
    },
-   "seenAt": "2026-10-22T11:46:37.536Z",
+   "seenAt": "2026-10-23T11:34:36.375Z",
    "changedAt": "2026-10-14T15:10:22.456Z"
   },
   "permit2-base": {
@@ -28,7 +28,7 @@
     "codeHash": "597df4c55f25c8ef",
     "bytes": 9152
    },
-   "seenAt": "2026-10-22T11:46:37.538Z",
+   "seenAt": "2026-10-23T11:34:36.409Z",
    "changedAt": "2026-10-14T15:10:22.457Z"
   },
   "permit2-arbitrum": {
@@ -38,7 +38,7 @@
     "codeHash": "6f7371c60f58dcfa",
     "bytes": 9152
    },
-   "seenAt": "2026-10-22T11:46:37.559Z",
+   "seenAt": "2026-10-23T11:34:36.424Z",
    "changedAt": "2026-10-14T15:10:22.457Z"
   },
   "permit2-gnosis": {
@@ -48,7 +48,7 @@
     "codeHash": "39cdf44a53c20f98",
     "bytes": 9152
    },
-   "seenAt": "2026-10-22T11:46:37.761Z",
+   "seenAt": "2026-10-23T11:34:36.404Z",
    "changedAt": "2026-10-14T15:10:22.458Z"
   },
   "permit2-ethereum": {
@@ -58,7 +58,7 @@
     "codeHash": "6edcbff6f4da0cef",
     "bytes": 9152
    },
-   "seenAt": "2026-10-22T11:46:37.535Z",
+   "seenAt": "2026-10-23T11:34:36.388Z",
    "changedAt": "2026-10-14T15:10:22.541Z"
   },
   "multicall3-op-mainnet": {
@@ -68,7 +68,7 @@
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-10-22T11:46:37.577Z",
+   "seenAt": "2026-10-23T11:34:36.448Z",
    "changedAt": "2026-10-14T15:10:22.543Z"
   },
   "multicall3-gnosis": {
@@ -78,7 +78,7 @@
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-10-22T11:46:37.708Z",
+   "seenAt": "2026-10-23T11:34:36.464Z",
    "changedAt": "2026-10-14T15:10:22.645Z"
   },
   "multicall3-base": {
@@ -88,7 +88,7 @@
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-10-22T11:46:37.629Z",
+   "seenAt": "2026-10-23T11:34:36.483Z",
    "changedAt": "2026-10-14T15:10:22.655Z"
   },
   "multicall3-arbitrum": {
@@ -98,7 +98,7 @@
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-10-22T11:46:37.660Z",
+   "seenAt": "2026-10-23T11:34:36.486Z",
    "changedAt": "2026-10-14T15:10:22.713Z"
   },
   "multicall3-ethereum": {
@@ -108,7 +108,7 @@
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-10-22T11:46:37.595Z",
+   "seenAt": "2026-10-23T11:34:36.443Z",
    "changedAt": "2026-10-14T15:10:22.715Z"
   },
   "multicall3-polygon": {
@@ -118,7 +118,7 @@
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-10-22T11:46:37.619Z",
+   "seenAt": "2026-10-23T11:34:36.457Z",
    "changedAt": "2026-10-14T15:10:22.789Z"
   },
   "multicall3-scroll": {
@@ -128,7 +128,7 @@
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-10-22T11:46:37.796Z",
+   "seenAt": "2026-10-23T11:34:36.715Z",
    "changedAt": "2026-10-14T15:10:22.939Z"
   },
   "permit2-scroll": {
@@ -138,7 +138,7 @@
     "codeHash": "61257c37379f1399",
     "bytes": 9152
    },
-   "seenAt": "2026-10-22T11:46:37.711Z",
+   "seenAt": "2026-10-23T11:34:36.716Z",
    "changedAt": "2026-10-14T15:10:23.020Z"
   },
   "multicall3-linea": {
@@ -148,7 +148,7 @@
     "codeHash": "d57a1dc2389322df",
     "bytes": 3808
    },
-   "seenAt": "2026-10-22T11:46:37.796Z",
+   "seenAt": "2026-10-23T11:34:36.652Z",
    "changedAt": "2026-10-14T15:10:23.205Z"
   },
   "multicall3": {
@@ -161,7 +161,7 @@
     "url": "https://github.com/mds1/multicall3/releases/tag/v3.1.0",
     "prerelease": false
    },
-   "seenAt": "2026-10-22T11:46:38.069Z",
+   "seenAt": "2026-10-23T11:34:36.892Z",
    "changedAt": "2026-10-14T15:10:23.264Z"
   },
   "docs-permit2": {
@@ -171,7 +171,7 @@
     "hash": "adc394d74745ecec",
     "chars": 4581
    },
-   "seenAt": "2026-10-22T11:46:38.457Z",
+   "seenAt": "2026-10-23T11:34:37.203Z",
    "changedAt": "2026-10-14T15:10:23.698Z"
   },
   "permit2": {
@@ -182,7 +182,7 @@
     "url": "https://github.com/Uniswap/permit2/releases/tag/0x000000000022D473030F116dDEE9F6B43aC78BA3",
     "note": "tags only"
    },
-   "seenAt": "2026-10-22T11:46:38.338Z",
+   "seenAt": "2026-10-23T11:34:37.162Z",
    "changedAt": "2026-10-14T15:10:23.909Z"
   },
   "docs-etherscan-v2": {
@@ -192,7 +192,7 @@
     "hash": "afea8c4a43912960",
     "chars": 1522
    },
-   "seenAt": "2026-10-22T11:46:38.004Z",
+   "seenAt": "2026-10-23T11:34:36.922Z",
    "changedAt": "2026-10-14T15:10:24.002Z"
   },
   "permit2-linea": {
@@ -202,7 +202,7 @@
     "codeHash": "636bc147c6726ec9",
     "bytes": 9152
    },
-   "seenAt": "2026-10-22T11:46:37.704Z",
+   "seenAt": "2026-10-23T11:34:36.535Z",
    "changedAt": "2026-10-14T15:10:24.070Z"
   }
  }

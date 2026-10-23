@@ -8,7 +8,7 @@
     "codeHash": "b5b576bcd8c9f517",
     "bytes": 5428
    },
-   "seenAt": "2026-10-22T11:46:38.823Z",
+   "seenAt": "2026-10-23T11:34:37.488Z",
    "changedAt": "2026-10-14T15:10:24.405Z"
   },
   "weth-gateway-ethereum-core": {
@@ -18,7 +18,7 @@
     "codeHash": "d0bdfd6d94577da3",
     "bytes": 5428
    },
-   "seenAt": "2026-10-22T11:46:38.705Z",
+   "seenAt": "2026-10-23T11:34:37.438Z",
    "changedAt": "2026-10-14T15:10:24.405Z"
   },
   "addresses-provider-ethereum-lido": {
@@ -30,7 +30,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:38.743Z",
+   "seenAt": "2026-10-23T11:34:37.472Z",
    "changedAt": "2026-10-14T15:10:24.418Z"
   },
   "weth-gateway-ethereum-etherfi": {
@@ -40,7 +40,7 @@
     "codeHash": "a1f6df67f836ce9b",
     "bytes": 5428
    },
-   "seenAt": "2026-10-22T11:46:38.792Z",
+   "seenAt": "2026-10-23T11:34:37.528Z",
    "changedAt": "2026-10-14T15:10:24.519Z"
   },
   "pool-ethereum-lido": {
@@ -53,7 +53,7 @@
     "beacon": null,
     "implCodeHash": "34d94162536e5adb"
    },
-   "seenAt": "2026-10-22T11:46:38.873Z",
+   "seenAt": "2026-10-23T11:34:37.552Z",
    "changedAt": "2026-10-14T15:10:24.523Z"
   },
   "addresses-provider-ethereum-core": {
@@ -65,7 +65,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:38.678Z",
+   "seenAt": "2026-10-23T11:34:37.412Z",
    "changedAt": "2026-10-14T15:10:24.558Z"
   },
   "pool-ethereum-core": {
@@ -78,7 +78,7 @@
     "beacon": null,
     "implCodeHash": "9998171167267357"
    },
-   "seenAt": "2026-10-22T11:46:38.766Z",
+   "seenAt": "2026-10-23T11:34:37.494Z",
    "changedAt": "2026-10-14T15:10:24.588Z"
   },
   "pool-ethereum-etherfi": {
@@ -91,7 +91,7 @@
     "beacon": null,
     "implCodeHash": "6afc6dcfc95c363c"
    },
-   "seenAt": "2026-10-22T11:46:38.827Z",
+   "seenAt": "2026-10-23T11:34:37.555Z",
    "changedAt": "2026-10-14T15:10:24.593Z"
   },
   "addresses-provider-op-mainnet": {
@@ -103,7 +103,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:38.907Z",
+   "seenAt": "2026-10-23T11:34:37.662Z",
    "changedAt": "2026-10-14T15:10:24.862Z"
   },
   "addresses-provider-ethereum-etherfi": {
@@ -115,7 +115,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:38.735Z",
+   "seenAt": "2026-10-23T11:34:37.589Z",
    "changedAt": "2026-10-14T15:10:24.917Z"
   },
   "addresses-provider-bnb-chain": {
@@ -127,7 +127,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:39.010Z",
+   "seenAt": "2026-10-23T11:34:37.753Z",
    "changedAt": "2026-10-14T15:10:24.922Z"
   },
   "weth-gateway-op-mainnet": {
@@ -137,7 +137,7 @@
     "codeHash": "806c7bef0fb08523",
     "bytes": 5428
    },
-   "seenAt": "2026-10-22T11:46:38.832Z",
+   "seenAt": "2026-10-23T11:34:37.701Z",
    "changedAt": "2026-10-14T15:10:24.927Z"
   },
   "pool-op-mainnet": {
@@ -150,7 +150,7 @@
     "beacon": null,
     "implCodeHash": "21822df78a48d8ab"
    },
-   "seenAt": "2026-10-22T11:46:39.024Z",
+   "seenAt": "2026-10-23T11:34:37.757Z",
    "changedAt": "2026-10-14T15:10:24.948Z"
   },
   "pool-bnb-chain": {
@@ -163,7 +163,7 @@
     "beacon": null,
     "implCodeHash": "a65eccc67282758d"
    },
-   "seenAt": "2026-10-22T11:46:39.120Z",
+   "seenAt": "2026-10-23T11:34:37.837Z",
    "changedAt": "2026-10-14T15:10:25.056Z"
   },
   "weth-gateway-bnb-chain": {
@@ -173,7 +173,7 @@
     "codeHash": "d186b12e423a9d6e",
     "bytes": 5428
    },
-   "seenAt": "2026-10-22T11:46:39.080Z",
+   "seenAt": "2026-10-23T11:34:37.813Z",
    "changedAt": "2026-10-14T15:10:25.132Z"
   },
   "addresses-provider-gnosis": {
@@ -185,7 +185,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:39.035Z",
+   "seenAt": "2026-10-23T11:34:37.762Z",
    "changedAt": "2026-10-14T15:10:25.270Z"
   },
   "pool-gnosis": {
@@ -198,7 +198,7 @@
     "beacon": null,
     "implCodeHash": "16fd7bb9249507e3"
    },
-   "seenAt": "2026-10-22T11:46:39.150Z",
+   "seenAt": "2026-10-23T11:34:37.886Z",
    "changedAt": "2026-10-14T15:10:25.403Z"
   },
   "weth-gateway-polygon": {
@@ -208,7 +208,7 @@
     "codeHash": "e22743fe5432c25c",
     "bytes": 5428
    },
-   "seenAt": "2026-10-22T11:46:39.116Z",
+   "seenAt": "2026-10-23T11:34:37.844Z",
    "changedAt": "2026-10-14T15:10:25.473Z"
   },
   "addresses-provider-polygon": {
@@ -220,7 +220,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:39.168Z",
+   "seenAt": "2026-10-23T11:34:37.920Z",
    "changedAt": "2026-10-14T15:10:25.534Z"
   },
   "weth-gateway-gnosis": {
@@ -230,7 +230,7 @@
     "codeHash": "d885340a86377935",
     "bytes": 5387
    },
-   "seenAt": "2026-10-22T11:46:39.074Z",
+   "seenAt": "2026-10-23T11:34:37.808Z",
    "changedAt": "2026-10-14T15:10:25.817Z"
   },
   "addresses-provider-zksync-era": {
@@ -242,7 +242,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:39.875Z",
+   "seenAt": "2026-10-23T11:34:38.609Z",
    "changedAt": "2026-10-14T15:10:26.149Z"
   },
   "pool-polygon": {
@@ -255,7 +255,7 @@
     "beacon": null,
     "implCodeHash": "85a4de7b2316043c"
    },
-   "seenAt": "2026-10-22T11:46:39.282Z",
+   "seenAt": "2026-10-23T11:34:38.013Z",
    "changedAt": "2026-10-14T15:10:26.177Z"
   },
   "weth-gateway-zksync-era": {
@@ -265,7 +265,7 @@
     "codeHash": "b531d83d466aa961",
     "bytes": 22176
    },
-   "seenAt": "2026-10-22T11:46:40.182Z",
+   "seenAt": "2026-10-23T11:34:38.795Z",
    "changedAt": "2026-10-14T15:10:26.344Z"
   },
   "pool-zksync-era": {
@@ -278,7 +278,7 @@
     "beacon": null,
     "implCodeHash": "46acf4c367b68966"
    },
-   "seenAt": "2026-10-22T11:46:40.190Z",
+   "seenAt": "2026-10-23T11:34:38.750Z",
    "changedAt": "2026-10-14T15:10:26.690Z"
   },
   "addresses-provider-sonic": {
@@ -290,7 +290,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:39.823Z",
+   "seenAt": "2026-10-23T11:34:38.635Z",
    "changedAt": "2026-10-14T15:10:26.847Z"
   },
   "addresses-provider-metis": {
@@ -302,7 +302,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:40.236Z",
+   "seenAt": "2026-10-23T11:34:38.832Z",
    "changedAt": "2026-10-14T15:10:27.028Z"
   },
   "weth-gateway-sonic": {
@@ -312,7 +312,7 @@
     "codeHash": "b8a5b27dca5208fd",
     "bytes": 5387
    },
-   "seenAt": "2026-10-22T11:46:40.137Z",
+   "seenAt": "2026-10-23T11:34:38.862Z",
    "changedAt": "2026-10-14T15:10:27.091Z"
   },
   "pool-sonic": {
@@ -325,7 +325,7 @@
     "beacon": null,
     "implCodeHash": "272697a34d982faf"
    },
-   "seenAt": "2026-10-22T11:46:40.198Z",
+   "seenAt": "2026-10-23T11:34:38.984Z",
    "changedAt": "2026-10-14T15:10:27.178Z"
   },
   "addresses-provider-soneium": {
@@ -337,7 +337,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:40.386Z",
+   "seenAt": "2026-10-23T11:34:39.091Z",
    "changedAt": "2026-10-14T15:10:27.191Z"
   },
   "pool-metis": {
@@ -350,7 +350,7 @@
     "beacon": null,
     "implCodeHash": "8bc8ad1179134889"
    },
-   "seenAt": "2026-10-22T11:46:40.269Z",
+   "seenAt": "2026-10-23T11:34:38.859Z",
    "changedAt": "2026-10-14T15:10:27.370Z"
   },
   "weth-gateway-soneium": {
@@ -360,7 +360,7 @@
     "codeHash": "9f493510d4a97465",
     "bytes": 5387
    },
-   "seenAt": "2026-10-22T11:46:40.513Z",
+   "seenAt": "2026-10-23T11:34:39.269Z",
    "changedAt": "2026-10-14T15:10:27.571Z"
   },
   "addresses-provider-mantle": {
@@ -372,7 +372,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:41.208Z",
+   "seenAt": "2026-10-23T11:34:40.091Z",
    "changedAt": "2026-10-14T15:10:27.647Z"
   },
   "addresses-provider-base": {
@@ -384,7 +384,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:40.836Z",
+   "seenAt": "2026-10-23T11:34:39.604Z",
    "changedAt": "2026-10-14T15:10:27.713Z"
   },
   "weth-gateway-mantle": {
@@ -394,7 +394,7 @@
     "codeHash": "83af0019dce61ca5",
     "bytes": 5365
    },
-   "seenAt": "2026-10-22T11:46:41.040Z",
+   "seenAt": "2026-10-23T11:34:40.030Z",
    "changedAt": "2026-10-14T15:10:27.755Z"
   },
   "weth-gateway-base": {
@@ -404,7 +404,7 @@
     "codeHash": "b0e9997e21798f66",
     "bytes": 5428
    },
-   "seenAt": "2026-10-22T11:46:40.593Z",
+   "seenAt": "2026-10-23T11:34:39.389Z",
    "changedAt": "2026-10-14T15:10:28.009Z"
   },
   "pool-base": {
@@ -417,7 +417,7 @@
     "beacon": null,
     "implCodeHash": "44b987979cf2e4da"
    },
-   "seenAt": "2026-10-22T11:46:40.943Z",
+   "seenAt": "2026-10-23T11:34:39.682Z",
    "changedAt": "2026-10-14T15:10:28.010Z"
   },
   "pool-soneium": {
@@ -430,7 +430,7 @@
     "beacon": null,
     "implCodeHash": "8fc264db400f31fe"
    },
-   "seenAt": "2026-10-22T11:46:40.559Z",
+   "seenAt": "2026-10-23T11:34:39.350Z",
    "changedAt": "2026-10-14T15:10:28.116Z"
   },
   "weth-gateway-plasma": {
@@ -440,7 +440,7 @@
     "codeHash": "5436029a6b6bfd44",
     "bytes": 5365
    },
-   "seenAt": "2026-10-22T11:46:40.983Z",
+   "seenAt": "2026-10-23T11:34:39.718Z",
    "changedAt": "2026-10-14T15:10:28.306Z"
   },
   "pool-plasma": {
@@ -453,7 +453,7 @@
     "beacon": null,
     "implCodeHash": "d2aec1b150df4afd"
    },
-   "seenAt": "2026-10-22T11:46:41.013Z",
+   "seenAt": "2026-10-23T11:34:39.793Z",
    "changedAt": "2026-10-14T15:10:28.306Z"
   },
   "pool-mantle": {
@@ -466,7 +466,7 @@
     "beacon": null,
     "implCodeHash": "5caae3b89295c188"
    },
-   "seenAt": "2026-10-22T11:46:41.711Z",
+   "seenAt": "2026-10-23T11:34:40.698Z",
    "changedAt": "2026-10-14T15:10:28.311Z"
   },
   "addresses-provider-plasma": {
@@ -478,7 +478,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:40.954Z",
+   "seenAt": "2026-10-23T11:34:39.699Z",
    "changedAt": "2026-10-14T15:10:28.314Z"
   },
   "addresses-provider-avalanche": {
@@ -490,7 +490,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:41.242Z",
+   "seenAt": "2026-10-23T11:34:40.074Z",
    "changedAt": "2026-10-14T15:10:28.533Z"
   },
   "addresses-provider-arbitrum": {
@@ -502,7 +502,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:41.072Z",
+   "seenAt": "2026-10-23T11:34:39.865Z",
    "changedAt": "2026-10-14T15:10:28.561Z"
   },
   "weth-gateway-avalanche": {
@@ -512,7 +512,7 @@
     "codeHash": "6ff0e736895e5bb8",
     "bytes": 5428
    },
-   "seenAt": "2026-10-22T11:46:41.275Z",
+   "seenAt": "2026-10-23T11:34:40.104Z",
    "changedAt": "2026-10-14T15:10:28.693Z"
   },
   "weth-gateway-arbitrum": {
@@ -522,7 +522,7 @@
     "codeHash": "8687cad7f6dc3b35",
     "bytes": 5428
    },
-   "seenAt": "2026-10-22T11:46:41.052Z",
+   "seenAt": "2026-10-23T11:34:39.834Z",
    "changedAt": "2026-10-14T15:10:28.716Z"
   },
   "pool-avalanche": {
@@ -535,7 +535,7 @@
     "beacon": null,
     "implCodeHash": "aa478fdede145faf"
    },
-   "seenAt": "2026-10-22T11:46:41.403Z",
+   "seenAt": "2026-10-23T11:34:40.181Z",
    "changedAt": "2026-10-14T15:10:28.957Z"
   },
   "addresses-provider-ink": {
@@ -547,7 +547,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:41.699Z",
+   "seenAt": "2026-10-23T11:34:40.579Z",
    "changedAt": "2026-10-14T15:10:29.052Z"
   },
   "pool-arbitrum": {
@@ -560,7 +560,7 @@
     "beacon": null,
     "implCodeHash": "f3b3d13e1ed0f226"
    },
-   "seenAt": "2026-10-22T11:46:41.214Z",
+   "seenAt": "2026-10-23T11:34:39.931Z",
    "changedAt": "2026-10-14T15:10:29.073Z"
   },
   "weth-gateway-ink": {
@@ -570,7 +570,7 @@
     "codeHash": "927fb30e28d86818",
     "bytes": 5387
    },
-   "seenAt": "2026-10-22T11:46:41.754Z",
+   "seenAt": "2026-10-23T11:34:40.599Z",
    "changedAt": "2026-10-14T15:10:29.230Z"
   },
   "addresses-provider-celo": {
@@ -582,7 +582,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:41.418Z",
+   "seenAt": "2026-10-23T11:34:40.016Z",
    "changedAt": "2026-10-14T15:10:29.645Z"
   },
   "addresses-provider-linea": {
@@ -594,7 +594,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:41.557Z",
+   "seenAt": "2026-10-23T11:34:40.352Z",
    "changedAt": "2026-10-14T15:10:29.681Z"
   },
   "pool-ink": {
@@ -607,7 +607,7 @@
     "beacon": null,
     "implCodeHash": "1bafe6bc87f18a10"
    },
-   "seenAt": "2026-10-22T11:46:42.029Z",
+   "seenAt": "2026-10-23T11:34:40.871Z",
    "changedAt": "2026-10-14T15:10:29.706Z"
   },
   "weth-gateway-linea": {
@@ -617,7 +617,7 @@
     "codeHash": "47e962e62d5e19f1",
     "bytes": 5565
    },
-   "seenAt": "2026-10-22T11:46:41.623Z",
+   "seenAt": "2026-10-23T11:34:40.429Z",
    "changedAt": "2026-10-14T15:10:29.801Z"
   },
   "pool-celo": {
@@ -630,7 +630,7 @@
     "beacon": null,
     "implCodeHash": "f23214faf0e485f3"
    },
-   "seenAt": "2026-10-22T11:46:41.380Z",
+   "seenAt": "2026-10-23T11:34:40.124Z",
    "changedAt": "2026-10-14T15:10:29.841Z"
   },
   "pool-linea": {
@@ -643,7 +643,7 @@
     "beacon": null,
     "implCodeHash": "c2d8fb948feeaf82"
    },
-   "seenAt": "2026-10-22T11:46:41.681Z",
+   "seenAt": "2026-10-23T11:34:40.471Z",
    "changedAt": "2026-10-14T15:10:29.880Z"
   },
   "weth-gateway-scroll": {
@@ -653,7 +653,7 @@
     "codeHash": "da4e43167395d864",
     "bytes": 5428
    },
-   "seenAt": "2026-10-22T11:46:41.885Z",
+   "seenAt": "2026-10-23T11:34:40.691Z",
    "changedAt": "2026-10-14T15:10:30.077Z"
   },
   "addresses-provider-scroll": {
@@ -665,7 +665,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-22T11:46:41.783Z",
+   "seenAt": "2026-10-23T11:34:40.660Z",
    "changedAt": "2026-10-14T15:10:30.096Z"
   },
   "pool-scroll": {
@@ -678,7 +678,7 @@
     "beacon": null,
     "implCodeHash": "8e448c7c4e302ed6"
    },
-   "seenAt": "2026-10-22T11:46:42.043Z",
+   "seenAt": "2026-10-23T11:34:40.811Z",
    "changedAt": "2026-10-14T15:10:30.201Z"
   },
   "docs-addresses": {
@@ -688,7 +688,7 @@
     "hash": "e5856ca6c1f1a3bf",
     "chars": 3286
    },
-   "seenAt": "2026-10-22T11:46:42.046Z",
+   "seenAt": "2026-10-23T11:34:41.273Z",
    "changedAt": "2026-10-20T10:23:23.932Z"
   },
   "address-book": {
@@ -701,7 +701,7 @@
     "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.74.6",
     "prerelease": false
    },
-   "seenAt": "2026-10-22T11:46:42.044Z",
+   "seenAt": "2026-10-23T11:34:40.918Z",
    "changedAt": "2026-10-21T11:45:11.082Z"
   },
   "aave-v3-origin": {
@@ -714,7 +714,7 @@
     "url": "https://github.com/aave-dao/aave-v3-origin/releases/tag/v3.7.0",
     "prerelease": false
    },
-   "seenAt": "2026-10-22T11:46:42.126Z",
+   "seenAt": "2026-10-23T11:34:41.015Z",
    "changedAt": "2026-10-14T15:10:30.412Z"
   }
  }

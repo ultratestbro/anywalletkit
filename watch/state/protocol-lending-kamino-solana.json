@@ -3,9 +3,9 @@
  "sources": {
   "markets": {
    "type": "http-json",
-   "value": "[\"256n4wx62jJM5p3CU7eZHdCTaNUubwv8wshn1GfYCQEq\",\"2XqjBVY1hQNqoihSVawnY1iXF57pp9KY9nwuh3FbFf3o\",\"2jhQAxCiHhP4kdG5YzgF6m8ZvrXVofTyMaLjzW6MH5WW\",\"3EZEy7vBTJ8Q9PWxKwdLVULRdsvVLT51rpBG3gH1TSJ5\",\"3aUnPBJLWVy62i9jPt8WpVRm6KWuo2qBaWJmEJVdYywS\",\"3hd61ZpG35tBwrmDvdmYVJoazC2mjJxHb6rEYEWs4QhH\",\"3koBPZPPV4Ag4DPWCyTdAVGxzxABWw9vEZ9vX8sjbbM2\",\"45MBhfB6SNw2rRSWzUwBqG3e9JJnS6UWvDDdQvBsUnds\",\"47tfyEG9SsdEnUm9cw5kY9BXngQGqu3LBoop9j5uTAv8\",\"4UwtBqa8DDtcWV6nWFregeMVkGdfWfiYeFxoHaR2hm9c\",\"4pEmnimmqXkx9dRbQdLCGuYu9ZhhATjhTkC9wu9ezKUc\",\"52FSGeeokLpgvgAMdqxyt5Hoc2TbUYj5b8yxrEdZ37Vf\",\"5wJeMrUYECGq41fxRESKALVcHnNX26TAWy4W98yULsua\",\"6WEGfej9B9wjxRs6t4BYpb9iCXd8CpTpJ8fVSNzHCC5y\",\"7G9hUEyKbxLdRmvNwpe5V1D23gXdcXoSuwoFRCBa2c2j\",\"7WQeTuLsFrZsgnHW7ddFdNfhfJAViqH4mvcFZPQ5zuQ9\",\"7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF\",\"8BNUWRSibVasaAmhYpBCFpGgMisGKfVAf9ho3Cmf6vjr\",\"8gRpXAAW9Acjdafzbpq5yp3f1fEsSwwkWhGyMfwFQPL7\",\"9Y7uwXgQ68mGqRtZfuFaP4hc4fxeJ7cE9zTtqTxVhfGU\",\"9tN8sAJfHU4FppipfRdByfxH9xtWSjzDBor1nwemM6FZ\",\"9wmqLq3n3KdQBbNfwqrF3PwcLgZ9edZ7hW5TsaC3o6uj\",\"AYninZeX272BYiEVZNa7wnebFVN49ncEMfNK1M1rAg4X\",\"B7a2Dmdnfg8zfZX2814d6Xo6ctxs22jnTuCcjTq5KcPD\",\"BJnbcRHqvppTyGesLzWASGKnmnF1wq9jZu6ExrjT7wvF\",\"BVJ1FvFfYuLbGX4qDNezqU6z2N3p8M2XNeGzabm86BzE\",\"Btu8835QDYgdTnMJJBSidbfQhrZzryZbMhCpty6h6Xdk\",\"ByYiZxp8QrdN9qbdtaAiePN8AAr3qvTPppNJDpf5DVJ5\",\"C7h9YnjPrDvNhe2cWWDhCu4CZEB1XTTH4RzjmsHuengV\",\"CF32kn7AY8X1bW7ZkGcHc4X9ZWTxqKGCJk6QwrQkDcdw\",\"CTthJu49dgPkCgu9TKQProuaQnkHsRPQV33sSJ96vxpG\",\"CqAoLuqWtavaVE8deBjMKe8ZfSt9ghR6Vb8nfsyabyHA\",\"DxXdAyU3kCjnyggvHmY5nAwg5cRbbmdyX3npfDMjjMek\",\"E6Tq3XV4Dgqx1QwEUT1u4goM7794sPmb1cGvr7V4Xf6J\",\"E6UUxGzgDwL44yHySozsJM1dhdnNgVXK1RtwprdwPcjV\",\"EyV4jxSMd6vpuRgrxMFem7CKRhcB4Vv6WMRDtxPQNP4\",\"F4Pn9mAvbUazDmWET5yYATTiyLHLaCRTWgGex4tiMXAs\",\"FteaGMVCLDF4eonrTiQkRQ5kby5ohwCfaMD2mNiPkZL7\",\"GBJ3bzUiMfwC9ugaF3MM68EXMDyTUb5UryRRAcVjEowd\",\"GMqmFygF5iSm5nkckYU6tieggFcR42SyjkkhK5rswFRs\",\"GVDUXFwS8uvBG35RjZv6Y8S1AkV5uASiMJ9qTUKqb5PL\",\"GZVi6AnNEwRQ4Xh3whTds5DkThp3tEs61ErAca9KLX3W\",\"H6rHXmXoCQvq8Ue81MqNh7ow5ysPa1dSozwW3PU1dDH6\",\"HMNm3ZrAvG4zKVv5zpMDA6DKduc612156RUsdAAZf4TC\",\"J21qWrb66pvEYhk24P98JYNHamxGFDcGZB4pYuSuMCBr\",\"JEHjKcf2JhU6sZTsGSAZ31XCMRcQqDkZ5rTB2cFYz7XZ\",\"SZ8MbzSojH84K41jYGUvMJDSCTCWgemh3vanWtCx181\",\"eNLm5e5KVDX2vEcCkt75PpZ2GMfXcZES3QrFshgpVzp\"]",
+   "value": "[\"256n4wx62jJM5p3CU7eZHdCTaNUubwv8wshn1GfYCQEq\",\"2XqjBVY1hQNqoihSVawnY1iXF57pp9KY9nwuh3FbFf3o\",\"2jhQAxCiHhP4kdG5YzgF6m8ZvrXVofTyMaLjzW6MH5WW\",\"3EZEy7vBTJ8Q9PWxKwdLVULRdsvVLT51rpBG3gH1TSJ5\",\"3aUnPBJLWVy62i9jPt8WpVRm6KWuo2qBaWJmEJVdYywS\",\"3hd61ZpG35tBwrmDvdmYVJoazC2mjJxHb6rEYEWs4QhH\",\"3koBPZPPV4Ag4DPWCyTdAVGxzxABWw9vEZ9vX8sjbbM2\",\"45MBhfB6SNw2rRSWzUwBqG3e9JJnS6UWvDDdQvBsUnds\",\"47tfyEG9SsdEnUm9cw5kY9BXngQGqu3LBoop9j5uTAv8\",\"4UwtBqa8DDtcWV6nWFregeMVkGdfWfiYeFxoHaR2hm9c\",\"4iRHKGsTq3e4uut6e4PfyV9AEbNuXaMu9JaSP378p9qy\",\"4pEmnimmqXkx9dRbQdLCGuYu9ZhhATjhTkC9wu9ezKUc\",\"52FSGeeokLpgvgAMdqxyt5Hoc2TbUYj5b8yxrEdZ37Vf\",\"5wJeMrUYECGq41fxRESKALVcHnNX26TAWy4W98yULsua\",\"6WEGfej9B9wjxRs6t4BYpb9iCXd8CpTpJ8fVSNzHCC5y\",\"7G9hUEyKbxLdRmvNwpe5V1D23gXdcXoSuwoFRCBa2c2j\",\"7WQeTuLsFrZsgnHW7ddFdNfhfJAViqH4mvcFZPQ5zuQ9\",\"7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF\",\"8BNUWRSibVasaAmhYpBCFpGgMisGKfVAf9ho3Cmf6vjr\",\"8gRpXAAW9Acjdafzbpq5yp3f1fEsSwwkWhGyMfwFQPL7\",\"9Y7uwXgQ68mGqRtZfuFaP4hc4fxeJ7cE9zTtqTxVhfGU\",\"9tN8sAJfHU4FppipfRdByfxH9xtWSjzDBor1nwemM6FZ\",\"9wmqLq3n3KdQBbNfwqrF3PwcLgZ9edZ7hW5TsaC3o6uj\",\"AYninZeX272BYiEVZNa7wnebFVN49ncEMfNK1M1rAg4X\",\"B7a2Dmdnfg8zfZX2814d6Xo6ctxs22jnTuCcjTq5KcPD\",\"BJnbcRHqvppTyGesLzWASGKnmnF1wq9jZu6ExrjT7wvF\",\"BVJ1FvFfYuLbGX4qDNezqU6z2N3p8M2XNeGzabm86BzE\",\"Btu8835QDYgdTnMJJBSidbfQhrZzryZbMhCpty6h6Xdk\",\"ByYiZxp8QrdN9qbdtaAiePN8AAr3qvTPppNJDpf5DVJ5\",\"C7h9YnjPrDvNhe2cWWDhCu4CZEB1XTTH4RzjmsHuengV\",\"CF32kn7AY8X1bW7ZkGcHc4X9ZWTxqKGCJk6QwrQkDcdw\",\"CTthJu49dgPkCgu9TKQProuaQnkHsRPQV33sSJ96vxpG\",\"CqAoLuqWtavaVE8deBjMKe8ZfSt9ghR6Vb8nfsyabyHA\",\"DxXdAyU3kCjnyggvHmY5nAwg5cRbbmdyX3npfDMjjMek\",\"E6Tq3XV4Dgqx1QwEUT1u4goM7794sPmb1cGvr7V4Xf6J\",\"E6UUxGzgDwL44yHySozsJM1dhdnNgVXK1RtwprdwPcjV\",\"EyV4jxSMd6vpuRgrxMFem7CKRhcB4Vv6WMRDtxPQNP4\",\"F4Pn9mAvbUazDmWET5yYATTiyLHLaCRTWgGex4tiMXAs\",\"FteaGMVCLDF4eonrTiQkRQ5kby5ohwCfaMD2mNiPkZL7\",\"GBJ3bzUiMfwC9ugaF3MM68EXMDyTUb5UryRRAcVjEowd\",\"GMqmFygF5iSm5nkckYU6tieggFcR42SyjkkhK5rswFRs\",\"GVDUXFwS8uvBG35RjZv6Y8S1AkV5uASiMJ9qTUKqb5PL\",\"GZVi6AnNEwRQ4Xh3whTds5DkThp3tEs61ErAca9KLX3W\",\"H6rHXmXoCQvq8Ue81MqNh7ow5ysPa1dSozwW3PU1dDH6\",\"HMNm3ZrAvG4zKVv5zpMDA6DKduc612156RUsdAAZf4TC\",\"J21qWrb66pvEYhk24P98JYNHamxGFDcGZB4pYuSuMCBr\",\"JEHjKcf2JhU6sZTsGSAZ31XCMRcQqDkZ5rTB2cFYz7XZ\",\"SZ8MbzSojH84K41jYGUvMJDSCTCWgemh3vanWtCx181\",\"eNLm5e5KVDX2vEcCkt75PpZ2GMfXcZES3QrFshgpVzp\"]",
    "meta": {
-    "count": 48,
+    "count": 49,
     "keys": [
      "256n4wx62jJM5p3CU7eZHdCTaNUubwv8wshn1GfYCQEq",
      "2XqjBVY1hQNqoihSVawnY1iXF57pp9KY9nwuh3FbFf3o",
@@ -17,6 +17,7 @@
      "45MBhfB6SNw2rRSWzUwBqG3e9JJnS6UWvDDdQvBsUnds",
      "47tfyEG9SsdEnUm9cw5kY9BXngQGqu3LBoop9j5uTAv8",
      "4UwtBqa8DDtcWV6nWFregeMVkGdfWfiYeFxoHaR2hm9c",
+     "4iRHKGsTq3e4uut6e4PfyV9AEbNuXaMu9JaSP378p9qy",
      "4pEmnimmqXkx9dRbQdLCGuYu9ZhhATjhTkC9wu9ezKUc",
      "52FSGeeokLpgvgAMdqxyt5Hoc2TbUYj5b8yxrEdZ37Vf",
      "5wJeMrUYECGq41fxRESKALVcHnNX26TAWy4W98yULsua",
@@ -57,8 +58,8 @@
      "eNLm5e5KVDX2vEcCkt75PpZ2GMfXcZES3QrFshgpVzp"
     ]
    },
-   "seenAt": "2026-10-22T11:46:42.407Z",
-   "changedAt": "2026-10-20T10:24:15.973Z"
+   "seenAt": "2026-10-23T11:34:41.496Z",
+   "changedAt": "2026-10-23T11:34:41.496Z"
   },
   "vaults": {
    "type": "http-json",
@@ -261,7 +262,7 @@
      "qoCFKVrNfFCJKxEaLBbXrWNpeMT2xyfUEjFqMyddheA"
     ]
    },
-   "seenAt": "2026-10-22T11:46:42.447Z",
+   "seenAt": "2026-10-23T11:34:41.939Z",
    "changedAt": "2026-10-21T11:45:11.478Z"
   },
   "farms-program": {
@@ -272,7 +273,7 @@
     "slot": 444035168,
     "authority": "CivjSDKgTpmkRNL4zYcmv9D9QqPJg6yTxBVxMGcXvMuY"
    },
-   "seenAt": "2026-10-22T11:46:42.631Z",
+   "seenAt": "2026-10-23T11:34:41.829Z",
    "changedAt": "2026-10-14T15:11:05.541Z"
   },
   "klend-program": {
@@ -283,7 +284,7 @@
     "slot": 458858791,
     "authority": "GzFgdRJXmawPhGeBsyRCDLx4jAKPsvbUqoqitzppkzkW"
    },
-   "seenAt": "2026-10-22T11:46:42.791Z",
+   "seenAt": "2026-10-23T11:34:41.886Z",
    "changedAt": "2026-10-20T10:24:15.903Z"
   },
   "docs-api": {
@@ -293,7 +294,7 @@
     "hash": "7bfab9d955c21073",
     "chars": 3826
    },
-   "seenAt": "2026-10-22T11:46:43.012Z",
+   "seenAt": "2026-10-23T11:34:42.124Z",
    "changedAt": "2026-10-14T15:11:05.961Z"
   },
   "kvault-program": {
@@ -304,7 +305,7 @@
     "slot": 456460695,
     "authority": "GzFgdRJXmawPhGeBsyRCDLx4jAKPsvbUqoqitzppkzkW"
    },
-   "seenAt": "2026-10-22T11:46:42.588Z",
+   "seenAt": "2026-10-23T11:34:41.750Z",
    "changedAt": "2026-10-14T15:11:06.433Z"
   },
   "klend": {
@@ -317,7 +318,7 @@
     "url": "https://github.com/Kamino-Finance/klend/releases/tag/release/v1.27.0",
     "prerelease": true
    },
-   "seenAt": "2026-10-22T11:46:42.415Z",
+   "seenAt": "2026-10-23T11:34:41.567Z",
    "changedAt": "2026-10-20T10:24:15.645Z"
   },
   "klend-sdk": {
@@ -329,7 +330,7 @@
     "url": "https://github.com/Kamino-Finance/klend-sdk/commit/6a26d6f1b5afb29953ffd139ee8c0c4ca5f26ce6",
     "note": "default branch: Update klend-sdk"
    },
-   "seenAt": "2026-10-22T11:46:42.968Z",
+   "seenAt": "2026-10-23T11:34:42.110Z",
    "changedAt": "2026-10-20T10:24:16.203Z"
   }
  }
