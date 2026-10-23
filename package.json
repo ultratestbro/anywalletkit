@@ -21,7 +21,7 @@
     "watch": "node scripts/watch/watch.mjs",
     "watch:baseline": "node scripts/watch/watch.mjs --baseline",
     "vendor": "node scripts/vendor.mjs",
-    "test:examples": "pnpm --filter './examples/quickstart' --filter './examples/swap' --filter './examples/earn' --filter './examples/approvals' --filter './examples/tx-preview' --filter './examples/keyring' --filter './examples/signer' -r run typecheck && pnpm --filter './examples/quickstart' --filter './examples/swap' --filter './examples/earn' --filter './examples/approvals' --filter './examples/tx-preview' --filter './examples/keyring' --filter './examples/signer' -r run test",
+    "test:examples": "pnpm --filter './examples/quickstart' --filter './examples/swap' --filter './examples/earn' --filter './examples/approvals' --filter './examples/tx-preview' --filter './examples/keyring' --filter './examples/signer' --filter './examples/history' -r run typecheck && pnpm --filter './examples/quickstart' --filter './examples/swap' --filter './examples/earn' --filter './examples/approvals' --filter './examples/tx-preview' --filter './examples/keyring' --filter './examples/signer' --filter './examples/history' -r run test",
     "docs:build": "pnpm --filter awk-docs build"
   },
   "devDependencies": {

@@ -1,0 +1,100 @@
+---
+title: History
+description: One activity feed across every chain, with titles the modules write, paging, refresh, pending rows from an intent journal, and spam hidden.
+sidebar:
+  order: 7
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+`wallet.history()` returns one activity list for the account across every chain you
+registered a source for, newest first. Each row has a title a person can read ("Received
+USDC", "Staked ETH", "Swapped USDC → ETH"), the amounts that left and arrived, a fee, and an
+explorer link.
+
+Three layers make it:
+
+1. **Sources** read the chain: one per chain id, from an explorer or the RPC.
+2. **Recognizers** turn a transaction into a row. Every registered protocol module recognizes
+   its own transactions; a generic fallback covers sends, receives, approvals and unknown
+   calls.
+3. **The intent journal** records what your app meant when it broadcast, so a swap shows as
+   one pending row before any explorer has it.
+
+Snippets come from `examples/history`, which our CI typechecks and tests.
+
+```sh
+pnpm add @anywalletkit/kit @anywalletkit/history-evm
+```
+
+<Snippet file="history/src/history.ts" region="imports" />
+
+## Set up
+
+<Snippet file="history/src/history.ts" region="setup" />
+
+| Chain | Source | Keys |
+|---|---|---|
+| EVM (one per chain id) | `createEvmHistory` from `history-evm`: Etherscan v2, Blockscout PRO, Alchemy; keyless Blockscout and Routescan as fallbacks | Etherscan v2 needs a key; a free Etherscan key plus a free Blockscout PRO key cover most networks |
+| Solana | `createSolanaHistory`: plain RPC, no indexer | Your RPC; public endpoints rate-limit fast |
+| TON | `createTonHistory`: tonapi events, toncenter v3 fallback | Keyless tonapi is about 1 request/s |
+| Tron | `createTronHistory`: TronGrid | Keyless is 1 request/s |
+| Bitcoin, NEAR, Zcash | `createBtcHistory`, `createNearHistory`, `createZcashHistory` from the chain packages | See [Build a wallet → History](/build-a-wallet/history/) |
+
+Explorer keys are secrets. On a mobile app or an extension, point the source at your own proxy
+(`etherscanUrl` and similar options) and keep the key on the server.
+
+## Pages, refresh and errors
+
+<Snippet file="history/src/history.ts" region="pages" />
+
+- **`cursor`** packs every source's position into one string. Rows stay in time order across
+  chains: a slow chain's older rows are never shown after newer ones.
+- **`since`** (unix seconds) returns only newer rows: use it for pull-to-refresh.
+- **`errors`** lists what failed in this call: a source that is down, a recognizer that threw.
+  The other chains still load, and the failed source keeps its place for the next call. Show a
+  quiet "some activity may be missing" rather than an error screen.
+- **Spam** is hidden by default: zero-value transfers and airdrops the source flags. Pass
+  `includeSpam: true` for a "hidden" tab.
+
+## Pending rows: the intent journal
+
+<Snippet file="history/src/history.ts" region="journal" />
+
+The chain alone can't say "swapped USDC → ETH via LI.FI": it shows a USDC transfer to a router.
+It can't pair a bridge's two legs on two chains, and nothing is there until the explorer
+indexes it. Record an intent right after broadcast:
+
+- **Source leg first** in `hashes`. When the swap's status reports the destination hash, `put`
+  the intent again with it appended.
+- **`expect`** holds the quote amounts, shown while the row is pending.
+- **An intent that never gets its row** is marked failed after `pendingTtl` (24 hours by
+  default).
+- **Persist the journal** (SQLite, MMKV, a file): a pending swap must survive an app restart.
+
+Earn modules and approvals don't need intents: they recognize their own transactions.
+
+## Rendering a row
+
+<Snippet file="history/src/history.ts" region="render" />
+
+| Field | Meaning |
+|---|---|
+| `kind` | `send`, `receive`, `self`, `swap`, `bridge`, `stake`, `unstake`, `claim`, `supply`, `withdraw`, `borrow`, `repay`, `approve`, `revoke`, `wrap`, `unwrap`, `contract`, `unknown` |
+| `title`, `subtitle` | Readable title, and the venue or counterparty |
+| `assetsOut`, `assetsIn` | What left and what arrived, in base units with `symbol` and `decimals` |
+| `status` | `confirmed`, `failed`, `pending` |
+| `counterparty`, `related` | The other party; the other leg of a cross-chain operation |
+| `approval` | On `approve` / `revoke` rows: token, spender, amount (`null` = unlimited) |
+| `fee`, `explorerUrl` | Network fee in the native coin; a link for the details |
+
+**Address poisoning:** scammers send tiny transfers from an address that looks like one the user
+uses, hoping the user copies it from history. Never offer "copy address" on an incoming row
+without a warning, and don't use history as the address book.
+
+## One transaction
+
+<Snippet file="history/src/history.ts" region="detail" />
+
+`describeTransaction` runs one transaction through the same recognizers and journal: use it for
+a detail screen, or for a transaction your app just got from a push notification.

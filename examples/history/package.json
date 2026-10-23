@@ -1,0 +1,26 @@
+{
+  "name": "@forgewallet/example-history",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The docs History guide as running code: the site renders its #region blocks, CI typechecks and tests it.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@forgewallet/core": "workspace:*",
+    "@forgewallet/kit": "workspace:*",
+    "@forgewallet/history-evm": "workspace:*",
+    "@forgewallet/protocol-staking-lido-evm": "workspace:*",
+    "@forgewallet/wallet-evm": "workspace:*",
+    "@forgewallet/wallet-solana": "workspace:*",
+    "@forgewallet/wallet-ton": "workspace:*",
+    "@forgewallet/wallet-tron": "workspace:*"
+  },
+  "devDependencies": {
+    "@forgewallet/conformance": "workspace:*",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  }
+}
