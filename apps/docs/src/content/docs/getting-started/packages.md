@@ -46,9 +46,10 @@ inside the router.
 | `@anywalletkit/protocol-swap2-near-intents` | NEAR Intents (1Click) — cross-chain |
 | `@anywalletkit/protocol-swap2-lifi` | LI.FI — same-chain and cross-chain |
 | `@anywalletkit/protocol-swap2-thorchain` | THORChain — native cross-chain swaps |
+| `@anywalletkit/protocol-swap2-chainflip` | Chainflip — native BTC, ETH, SOL, TRX and stablecoins between Ethereum, Arbitrum, Solana, Tron and Bitcoin; no key, 0 bps |
 | `@anywalletkit/protocol-swap2-omniston` | STON.fi Omniston — TON swaps, TON ↔ EVM and EVM ↔ EVM stablecoin orders |
 | `@anywalletkit/protocol-swap2-cctp` | Circle CCTP V2 — native USDC between EVM chains |
-| `@anywalletkit/protocol-swap2-usdt0` | USDT0 — Tether's LayerZero OFT: USDT between 13 EVM chains in one transaction |
+| `@anywalletkit/protocol-swap2-usdt0` | USDT0 — Tether's LayerZero OFT: USDT between 16 EVM chains in one transaction |
 | `@anywalletkit/protocol-swap2-uniswap` | Uniswap v3 straight from the contracts |
 | `@anywalletkit/protocol-swap2-balancer` | Balancer v2, priced and enforced on-chain by the Vault |
 | `@anywalletkit/protocol-swap2-wrap` | Native ↔ wrapped native (ETH ↔ WETH and others) |

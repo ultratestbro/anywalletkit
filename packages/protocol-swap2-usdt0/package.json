@@ -1,7 +1,7 @@
 {
   "name": "@forgewallet/protocol-swap2-usdt0",
   "version": "0.1.0",
-  "description": "USDT0 (Tether's LayerZero OFT for USDT) for the swap2 engine: USDT / USDT0 between 13 EVM chains in one source transaction — quoteOFT + quoteSend on the OFT itself, send with the LayerZero fee as msg.value, status from LayerZero Scan, lzReceive retry of a stored payload as the claim. Bound to the deployments docs.usdt0.to lists, re-verified on-chain.",
+  "description": "USDT0 (Tether's LayerZero OFT for USDT) for the swap2 engine: USDT / USDT0 between 16 EVM chains in one source transaction — quoteOFT + quoteSend on the OFT itself, send with the LayerZero fee as msg.value, status from LayerZero Scan, lzReceive retry of a stored payload as the claim. Bound to the deployments docs.usdt0.to lists, re-verified on-chain.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,

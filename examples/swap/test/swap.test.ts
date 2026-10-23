@@ -11,8 +11,8 @@ const SEED = derivationVectors.seeds['bip39-abandon-12']!
 describe('Swaps guide (docs) — offline', () => {
   it('builds the router over every provider of the guide', () => {
     const names = providers().map((p) => p.name)
-    expect(names).toEqual(expect.arrayContaining(['lifi', 'thorchain', 'cctp', 'usdt0']))
-    expect(names.length).toBe(7)
+    expect(names).toEqual(expect.arrayContaining(['lifi', 'thorchain', 'chainflip', 'cctp', 'usdt0']))
+    expect(names.length).toBe(8)
   })
 
   it('binds the router to the account chain and the kit hands it out', async () => {

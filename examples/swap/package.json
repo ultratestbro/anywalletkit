@@ -12,6 +12,7 @@
     "@forgewallet/core": "workspace:*",
     "@forgewallet/kit": "workspace:*",
     "@forgewallet/protocol-swap2-cctp": "workspace:*",
+    "@forgewallet/protocol-swap2-chainflip": "workspace:*",
     "@forgewallet/protocol-swap2-core": "workspace:*",
     "@forgewallet/protocol-swap2-lifi": "workspace:*",
     "@forgewallet/protocol-swap2-near-intents": "workspace:*",

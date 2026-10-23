@@ -6,6 +6,7 @@ import { RouterSwap2Protocol, type Swap2Route } from '@forgewallet/protocol-swap
 import { lifiProvider } from '@forgewallet/protocol-swap2-lifi/provider'
 import { nearIntentsProvider } from '@forgewallet/protocol-swap2-near-intents/provider'
 import { thorchainProvider } from '@forgewallet/protocol-swap2-thorchain/provider'
+import { chainflipProvider } from '@forgewallet/protocol-swap2-chainflip/provider'
 import { cctpProvider } from '@forgewallet/protocol-swap2-cctp/provider'
 import { usdt0Provider } from '@forgewallet/protocol-swap2-usdt0/provider'
 import { uniswapProvider } from '@forgewallet/protocol-swap2-uniswap/provider'
@@ -28,6 +29,7 @@ export function providers() {
     lifiProvider({}), // apiKey: raises LI.FI's rate limit
     nearIntentsProvider({}), // jwt: removes 1Click's fee
     thorchainProvider({}),
+    chainflipProvider(), // native BTC / SOL / TRX and stables; no key, 0 bps
     cctpProvider({ rpcUrls: { 'eip155:1': RPC[1][0], 'eip155:8453': RPC[8453][0] } }),
     usdt0Provider({ rpcUrls: { 'eip155:1': RPC[1], 'eip155:42161': RPC[42161] } }), // RPC for each source chain
     // Same-chain venues priced straight from the contracts: no API, no key.

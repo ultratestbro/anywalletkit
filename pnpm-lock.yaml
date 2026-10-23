@@ -279,6 +279,9 @@ importers:
       '@forgewallet/protocol-swap2-cctp':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-cctp
+      '@forgewallet/protocol-swap2-chainflip':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-chainflip
       '@forgewallet/protocol-swap2-core':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-core

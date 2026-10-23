@@ -9,7 +9,7 @@ sidebar:
 
 **The job:** "I have USDT on Tron, I want ETH on Base" in one screen.
 
-**In the kit:** eleven providers behind one `Swap2Protocol` interface, and a router that asks
+**In the kit:** ten providers behind one `Swap2Protocol` interface, and a router that asks
 all of them in parallel and tags the best and the fastest route. Before it signs, the engine
 checks every quote: amounts, recipient, refund address, fee caps. The full flow is in
 [Swaps and bridges](/guides/swaps/).
