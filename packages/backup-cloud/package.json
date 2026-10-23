@@ -1,0 +1,51 @@
+{
+  "name": "@forgewallet/backup-cloud",
+  "version": "0.1.0",
+  "description": "Cloud backups for React Native wallets on the forgewallet SDK: seed-vault backup files in the app's hidden iCloud Drive container, and a no-password option whose key lives in iCloud Keychain (end-to-end encrypted by Apple) while the file lives in iCloud Drive — neither alone opens it. One call to back up a keyring secret, one to list, check and restore; the fingerprint is compared before anything is written. An Expo config plugin adds the iCloud entitlements. Android (Google Drive appDataFolder, Block Store) is next.",
+  "license": "Apache-2.0",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./app.plugin.js": "./app.plugin.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "ios/*.swift",
+    "ios/*.podspec",
+    "app.plugin.js",
+    "expo-module.config.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo ok"
+  },
+  "dependencies": {
+    "@forgewallet/seed-vault": "workspace:*"
+  },
+  "peerDependencies": {
+    "expo-modules-core": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "vitest": "^5.0.3"
+  },
+  "keywords": [
+    "backup",
+    "icloud",
+    "icloud-keychain",
+    "react-native",
+    "expo",
+    "forgewallet"
+  ]
+}
