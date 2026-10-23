@@ -6,7 +6,7 @@ import {
 } from 'viem'
 
 import ApprovalsProtocolEvm, {
-  ApprovalsError, RpcLogsSource, StateVerifier, isRevokeCalldata, isUnlimitedAmount, parseApprovalLog, STANDARDS,
+  ApprovalsError, RpcLogsSource, StateVerifier, isRevokeCalldata, isRevokeTransaction, isUnlimitedAmount, parseApprovalLog, STANDARDS,
   type AccountLike, type Approval, type Eip1193Provider, type FetchLike, type ReadOnlyAccountLike, type RevokeTransaction, type SpenderLabel,
 } from '../src/index.js'
 
@@ -418,6 +418,20 @@ test('isRevokeCalldata recognises the revoke calldata buildRevokeTransaction emi
   assert.equal(isRevokeCalldata(encodeFunctionData({ abi: ERC20_ABI, functionName: 'approve', args: [LIFI, 1n] })), false)
   assert.equal(isRevokeCalldata(encodeFunctionData({ abi: ERC721_ABI, functionName: 'setApprovalForAll', args: [OPERATOR, true] })), false)
   assert.equal(isRevokeCalldata(undefined), false)
+  // Strict: trailing bytes, a dirty bool word and non-hex are refused (audit F8).
+  assert.equal(isRevokeCalldata(zero.data + '00'.repeat(32)), false)
+  assert.equal(isRevokeCalldata(setOff.data.slice(0, -2) + '02'), false)
+  assert.equal(isRevokeCalldata(zero.data.slice(0, -1) + 'z'), false)
+  assert.equal(isRevokeCalldata(lock.data + 'ab'.repeat(32)), false)
+  // The whole transaction: no value, no 7702 authorization, lockdown only to Permit2, optional token targets.
+  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data }), true)
+  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data, value: 1n }), false)
+  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data, authorizationList: [{}] }), false)
+  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data, type: 'eip7702' }), false)
+  assert.equal(isRevokeTransaction({ to: PERMIT2_ADDRESS, data: lock.data }), true)
+  assert.equal(isRevokeTransaction({ to: USDT, data: lock.data }), false)
+  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data }, { targets: [USDC] }), false)
+  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data }, { targets: [USDT.toLowerCase()] }), true)
   assert.equal(isUnlimitedAmount(MAX_UINT256), true)
   assert.equal(isUnlimitedAmount(1n << 255n), true)
   assert.equal(isUnlimitedAmount((1n << 255n) - 1n), false)

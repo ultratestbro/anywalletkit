@@ -16,7 +16,7 @@ export { default as StateVerifier } from './state-verifier.js'
 export type { StateVerifierOptions, VerifyOptions } from './state-verifier.js'
 export { default as EtherscanLabels } from './labels/etherscan.js'
 export type { EtherscanLabelsOptions, LabelCache } from './labels/etherscan.js'
-export { isRevokeCalldata, isUnlimitedAmount } from './calldata.js'
+export { isRevokeCalldata, isRevokeTransaction, isUnlimitedAmount } from './calldata.js'
 export * as STANDARDS from './standards.js'
 
 export { describeApprovalActivity, CHAIN_NAMES as ACTIVITY_CHAIN_NAMES } from './activity.js'
