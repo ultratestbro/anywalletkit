@@ -1,8 +1,8 @@
 // The "Names" guide on docs.anywallet.tech renders the #region blocks of this file.
 
 // #region imports
-import { NameError, assertNameUnchanged, isNameLike, nameResolvers, type NameResolver, type ResolvedName } from '@forgewallet/core'
-import { ensResolver } from '@forgewallet/names-ens'
+import { NameError, assertNameUnchanged, isNameLike, nameResolvers, type NameResolver, type ResolvedName } from '@anywalletkit/core'
+import { ensResolver } from '@anywalletkit/names-ens'
 // #endregion imports
 
 // #region setup

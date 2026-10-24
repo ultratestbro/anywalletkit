@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { NameError, type NameResolver } from '@forgewallet/core'
+import { NameError, type NameResolver } from '@anywalletkit/core'
 
 /**
  * What every NameResolver promises: a known name resolves to the expected

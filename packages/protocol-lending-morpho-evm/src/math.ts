@@ -1,7 +1,7 @@
 // Morpho Blue maths, ported from morpho-blue `SharesMathLib`, `MathLib`,
 // `MarketParamsLib` and `Morpho._accrueInterest`, so positions and rates read
 // off-chain match what the contract computes on the next touch.
-import { bigintToNumber } from '@forgewallet/core'
+import { bigintToNumber } from '@anywalletkit/core'
 import { encodeAbiParameters, keccak256, type Address, type Hex } from 'viem'
 
 export const WAD = 10n ** 18n

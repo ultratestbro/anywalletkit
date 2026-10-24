@@ -6,16 +6,16 @@
  *   node scripts/vendor.mjs --out <dir> [--consumer <package.json>]… [--no-build] [pkg…]
  *
  * For every workspace package (or the named ones — short names like `kit`
- * or full `@forgewallet/kit`):
+ * or full `@anywalletkit/kit`):
  *   1. `pnpm run build` (unless --no-build);
- *   2. package.json gets a `forgewallet` field { commit, branch, builtAt, dirty }
+ *   2. package.json gets an `anywalletkit` field { commit, branch, builtAt, dirty }
  *      — only for the pack, the file is restored afterwards;
- *   3. `pnpm pack` into --out as `forgewallet-<name>-<version>.tgz`; older
+ *   3. `pnpm pack` into --out as `anywalletkit-<name>-<version>.tgz`; older
  *      tarballs of the same package in --out are removed;
  *   4. --out/manifest.json lists { commit, branch, builtAt, dirty, packages:
  *      { name: { version, file } } } — the consumer reads it to show which
  *      SDK build it runs and to tag its error reports;
- *   5. with --consumer, every `file:…/forgewallet-<name>-<old>.tgz` reference
+ *   5. with --consumer, every `file:…/anywalletkit-<name>-<old>.tgz` reference
  *      in that package.json (dependencies and a root's pnpm.overrides) is
  *      pointed at the new tarball (run the consumer's install afterwards).
  *
@@ -71,7 +71,7 @@ const all = readdirSync(join(root, 'packages'))
   .map((dir) => ({ dir, pkg: JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) }))
   .filter(({ pkg }) => !pkg.private)
 
-const wanted = args.map((a) => (a.startsWith('@') ? a : `@forgewallet/${a}`))
+const wanted = args.map((a) => (a.startsWith('@') ? a : `@anywalletkit/${a}`))
 const selected = wanted.length ? all.filter(({ pkg }) => wanted.includes(pkg.name)) : all
 const missing = wanted.filter((w) => !selected.some(({ pkg }) => pkg.name === w))
 if (missing.length) {
@@ -97,7 +97,7 @@ for (const { dir, pkg } of selected) {
     process.stdout.write(`build ${pkg.name}… `)
     execFileSync('pnpm', ['run', 'build'], { cwd: dir, stdio: ['ignore', 'ignore', 'inherit'] })
   }
-  const stamped = { ...pkg, forgewallet: { commit, branch, builtAt, dirty } }
+  const stamped = { ...pkg, anywalletkit: { commit, branch, builtAt, dirty } }
   writeFileSync(pkgPath, JSON.stringify(stamped, null, 2) + '\n')
   try {
     // Drop older tarballs of this package before packing the new one.

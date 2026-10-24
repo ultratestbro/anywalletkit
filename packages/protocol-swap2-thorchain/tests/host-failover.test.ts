@@ -5,7 +5,7 @@
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {thorchainProvider} from "../src/provider.js";
-import type {QuoteParams} from "@forgewallet/protocol-swap2-core/types";
+import type {QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 
 const PRIMARY = "https://primary.invalid";
 const SECONDARY = "https://secondary.invalid";

@@ -5,18 +5,17 @@
  * - {@link quoteRoutes}: dry quotes from every provider that can serve the
  *   pair, delivered progressively (`onUpdate` fires as each venue answers), with
  *   BEST / FASTEST tags and every refusal named.
- *   TODO(844e2d7): replace with `CrossChainRouter.getQuotes` (net-USD ranking,
- *   RouteSet) once forgewallet commit 844e2d7 (feat/evm-chains-5) is merged to
- *   main — the owner's branch-merge decision. Until then this fan-out over the
- *   public `CrossChainProvider` interface ranks by output amount.
+ *   TODO: replace with `CrossChainRouter.getQuotes` (net-USD ranking,
+ *   RouteSet). Until then this fan-out over the public `CrossChainProvider`
+ *   interface ranks by output amount.
  * - {@link reviewSwapPlan}: the engine's `reviewExecution` hook — one sheet for
  *   the whole plan (approvals + source leg) BEFORE anything is signed; on
  *   approval exactly those operations are pre-approved in the {@link ReviewGate}
  *   so the reviewed account lets them through once; a decline aborts with
  *   nothing sent (`ReviewDeclined`, 4001).
  */
-import type { CrossChainProvider, Quote, QuoteParams, Swap2ExecutionPlan } from '@forgewallet/protocol-swap2-core'
-import { validQuote } from '@forgewallet/protocol-swap2-core'
+import type { CrossChainProvider, Quote, QuoteParams, Swap2ExecutionPlan } from '@anywalletkit/protocol-swap2-core'
+import { validQuote } from '@anywalletkit/protocol-swap2-core'
 import { ApprovalQueue } from './approvals.js'
 import { ReviewGate, chainTxMatcher, evmCallMatcher, type GateMatcher } from './gate.js'
 

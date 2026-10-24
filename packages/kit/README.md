@@ -1,4 +1,4 @@
-# @forgewallet/kit
+# @anywalletkit/kit
 
 The orchestrator. Chain packages and protocol modules are registered; the kit
 hands out accounts by CAIP-2 chain id and protocols by name, all fed by one
@@ -8,9 +8,9 @@ ever an own property of a `Wallet`, manager, account or signer, so logs and seri
 no secret.
 
 ```ts
-import { Wallet } from '@forgewallet/kit'
-import WalletManagerEvm from '@forgewallet/wallet-evm'
-import WalletManagerSolana from '@forgewallet/wallet-solana'
+import { Wallet } from '@anywalletkit/kit'
+import WalletManagerEvm from '@anywalletkit/wallet-evm'
+import WalletManagerSolana from '@anywalletkit/wallet-solana'
 
 const wallet = new Wallet(seedPhrase, {
   policies: {
@@ -59,7 +59,7 @@ module whose `describeActivity` recognizes it (registration order), else by the
 generic fallback. Rows the source flagged as spam are hidden unless asked for.
 
 ```ts
-import { createEvmHistory } from '@forgewallet/history-evm'
+import { createEvmHistory } from '@anywalletkit/history-evm'
 
 const wallet = new Wallet(seedPhrase, {
   activity: {
@@ -123,7 +123,7 @@ await journal.put({
   chain: 'eip155:1', address: from,        // where it started, who signed
   hashes: [{ chain: 'eip155:1', hash: depositHash }],          // source leg first; push the destination leg when the provider reports it
   expect: { assetsOut: [{ token: USDC, amount, symbol: 'USDC', decimals: 6 }], assetsIn: [{ token: null, amount: quoteOut, symbol: 'ETH', decimals: 18 }] },
-  protocol: '@forgewallet/protocol-swap2-near-intents',
+  protocol: '@anywalletkit/protocol-swap2-near-intents',
   subtitle: 'NEAR Intents',
   status: 'pending',
 })

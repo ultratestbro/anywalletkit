@@ -1,11 +1,11 @@
-# @forgewallet/networks
+# @anywalletkit/networks
 
 One table of networks for every wallet build: the catalog mainnets with their public RPC failover lists, the default testnets for every chain family, the networks and RPCs the user adds, and a verifier that proves an endpoint serves the network it claims. The mobile app and the extension kit read the same table.
 
-Pure TypeScript, no runtime dependencies beyond `@forgewallet/swap2-assets` (for `isCatalogChain`). Runs under Hermes (no `URL`, no `atob`, no `structuredClone`).
+Pure TypeScript, no runtime dependencies beyond `@anywalletkit/swap2-assets` (for `isCatalogChain`). Runs under Hermes (no `URL`, no `atob`, no `structuredClone`).
 
 ```ts
-import { NetworksTable, verifyNetwork, parseAddChainParams, checkRpcUrl } from '@forgewallet/networks'
+import { NetworksTable, verifyNetwork, parseAddChainParams, checkRpcUrl } from '@anywalletkit/networks'
 
 const table = new NetworksTable(myJsonStorage)          // AsyncStorage / chrome.storage / memoryJsonStorage()
 await table.load()                                      // once at cold start; sync readers answer builtin-only before this

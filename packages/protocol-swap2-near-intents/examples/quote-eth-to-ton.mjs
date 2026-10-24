@@ -9,7 +9,7 @@
 // venue validates it, and a placeholder comes back as "no route available"
 // rather than as a validation error.
 
-import NearIntentsSwap2Protocol from "@forgewallet/protocol-swap2-near-intents";
+import NearIntentsSwap2Protocol from "@anywalletkit/protocol-swap2-near-intents";
 
 const recipient = process.env.RECIPIENT;
 if (!recipient) throw new Error("set RECIPIENT to the destination-chain address");

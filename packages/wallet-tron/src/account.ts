@@ -1,4 +1,4 @@
-import { LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@forgewallet/core'
+import { LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { addressFromPublicKey, toHexAddress } from './address.js'
 import { describeTransaction } from './describe.js'

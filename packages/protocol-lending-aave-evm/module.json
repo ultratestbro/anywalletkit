@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-lending-aave-evm",
+  "name": "@anywalletkit/protocol-lending-aave-evm",
   "type": "lending",
   "chains": [
     "eip155:1",
@@ -26,7 +26,7 @@
     "@ultratestbro"
   ],
   "conformance": "0.x",
-  "repo": "https://github.com/ultratestbro/forgewallet",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-lending-aave-evm",
   "addedAt": "2026-10-10"
 }

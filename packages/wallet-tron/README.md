@@ -1,12 +1,12 @@
-# @forgewallet/wallet-tron
+# @anywalletkit/wallet-tron
 
 Tron accounts at `m/44'/195'/0'/0/i` (BIP-44 — the TronLink default), pinned by golden
-vectors in `@forgewallet/conformance`. No tronweb: the full-node HTTP API builds
+vectors in `@anywalletkit/conformance`. No tronweb: the full-node HTTP API builds
 `raw_data`, the account checks it, simulates it, signs `txID` with noble secp256k1
 and broadcasts.
 
 ```ts
-import WalletManagerTron from '@forgewallet/wallet-tron'
+import WalletManagerTron from '@anywalletkit/wallet-tron'
 
 const wallet = new WalletManagerTron(seedPhrase, { provider: ['https://api.trongrid.io', 'https://tron-rpc.example'], headers: { 'TRON-PRO-API-KEY': key } })
 const account = await wallet.getAccount(0)
@@ -65,7 +65,7 @@ one to a transaction that already carries `raw_data.data` is refused.
 
 ## Signers
 
-Accounts sign through a secp256k1 `Signer` from `@forgewallet/core`: the seed path
+Accounts sign through a secp256k1 `Signer` from `@anywalletkit/core`: the seed path
 uses a `LocalSigner` (zeroized on `dispose()`); `new WalletManagerTron(signer)` wraps
 an external one (hardware, MPC, backend). Transactions ask for `ecdsa-recoverable`
 over `sha256(raw_data)` with context `tron-tx`, TIP-191 messages with `tron-message`.
@@ -75,10 +75,10 @@ raw-key shape.
 
 ## Activity history
 
-`createTronHistory` is the chain's `HistorySource` (`@forgewallet/core`) over TronGrid.
+`createTronHistory` is the chain's `HistorySource` (`@anywalletkit/core`) over TronGrid.
 
 ```ts
-import { createTronHistory } from '@forgewallet/wallet-tron/history'
+import { createTronHistory } from '@anywalletkit/wallet-tron/history'
 
 const history = createTronHistory({ apiKey: process.env.TRONGRID_KEY })
 const page = await history.listActivity('TVSz6xJL2M53HDZyFTeDcGCmEDdwmU4zbv', { limit: 25 })

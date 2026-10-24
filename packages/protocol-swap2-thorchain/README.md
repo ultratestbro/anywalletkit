@@ -1,4 +1,4 @@
-# @forgewallet/protocol-swap2-thorchain
+# @anywalletkit/protocol-swap2-thorchain
 
 THORChain native cross-chain swaps as a swap2 module: EVM sources (Ethereum,
 Base, BSC, Avalanche) deposit into the THORChain router with

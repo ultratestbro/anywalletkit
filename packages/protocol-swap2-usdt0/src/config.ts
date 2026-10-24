@@ -11,7 +11,7 @@
 // Hedera (295, 30316), Mantle (5000, 30181), Morph (2818, 30322), Rootstock
 // (30, 30333), Stable (988, 30396), Tempo (4217, 30410), plus HyperCore, IOTA
 // and Stellar (non-EVM) — not wallet chains here, so not routable here.
-import {evmRef, isEvm} from "@forgewallet/protocol-swap2-core/util";
+import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
 
 export interface Usdt0Chain {
   caip2: string;

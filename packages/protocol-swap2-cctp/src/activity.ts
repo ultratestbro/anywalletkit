@@ -6,11 +6,11 @@
  * on the `mintRecipient`. Both are `bridge`; the other leg's hash is only known
  * through the kit's journal / Circle's attestation API, so `related` stays empty.
  */
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
-import {chainLabel, describeSwapLike, matchesCall} from "@forgewallet/protocol-swap2-core/activity";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
+import {chainLabel, describeSwapLike, matchesCall} from "@anywalletkit/protocol-swap2-core/activity";
 import {CCTP_DOMAINS} from "./config.js";
 
-export const CCTP_MODULE = "@forgewallet/protocol-swap2-cctp";
+export const CCTP_MODULE = "@anywalletkit/protocol-swap2-cctp";
 
 /** depositForBurn(uint256,uint32,bytes32,address,bytes32,uint256,uint32) — TokenMessengerV2 */
 export const CCTP_DEPOSIT_FOR_BURN = "0x8e0250ee";

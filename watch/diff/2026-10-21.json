@@ -4,7 +4,7 @@
  "sources": 311,
  "changes": [
   {
-   "module": "@forgewallet/protocol-lending-aave-evm",
+   "module": "@anywalletkit/protocol-lending-aave-evm",
    "id": "address-book",
    "label": "Aave address book releases",
    "type": "github-releases",
@@ -26,7 +26,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-lending-kamino-solana",
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
    "id": "vaults",
    "label": "Kamino API · kvaults",
    "type": "http-json",
@@ -429,7 +429,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-lending-mellow-evm",
+   "module": "@anywalletkit/protocol-lending-mellow-evm",
    "id": "flexible-vaults",
    "label": "Mellow Flexible (Core) Vaults contracts releases",
    "type": "github-releases",
@@ -449,7 +449,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-swap2-omniston",
+   "module": "@anywalletkit/protocol-swap2-omniston",
    "id": "docs-omniston",
    "label": "STON.fi docs · Omniston",
    "type": "http-text",

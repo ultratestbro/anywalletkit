@@ -10,10 +10,10 @@
  * counterparty: on NEAR itself, deposits into and withdrawals out of the
  * `intents.near` verifier contract (NEP-141 `ft_transfer_call` / `ft_withdraw`).
  */
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
-import {describeSwapLike} from "@forgewallet/protocol-swap2-core/activity";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
+import {describeSwapLike} from "@anywalletkit/protocol-swap2-core/activity";
 
-export const NEAR_INTENTS_MODULE = "@forgewallet/protocol-swap2-near-intents";
+export const NEAR_INTENTS_MODULE = "@anywalletkit/protocol-swap2-near-intents";
 
 /** The NEAR Intents verifier / settlement contract. */
 export const NEAR_INTENTS_CONTRACT = "intents.near";

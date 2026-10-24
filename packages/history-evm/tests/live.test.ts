@@ -3,7 +3,7 @@ import { createEvmHistory } from '../src/index.js'
 import { ADDRESS } from './helpers.js'
 
 /**
- * Opt-in network check: `LIVE_HISTORY=1 pnpm --filter @forgewallet/history-evm test`.
+ * Opt-in network check: `LIVE_HISTORY=1 pnpm --filter @anywalletkit/history-evm test`.
  * Hits eth.blockscout.com keyless, Etherscan v2 when ETHERSCAN_API_KEY is set, and
  * Alchemy (base-mainnet) when ALCHEMY_API_KEY is set.
  */

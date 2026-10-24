@@ -1,4 +1,4 @@
-import { InsufficientFundsError, LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@forgewallet/core'
+import { InsufficientFundsError, LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { DUST_LIMIT, addressFromPublicKey } from './address.js'
 import { UnsafeTransactionError, assertSafe, describeTransaction, type DescribeContext } from './describe.js'

@@ -1,4 +1,4 @@
-import { NetworkError } from '@forgewallet/core'
+import { NetworkError } from '@anywalletkit/core'
 import { BlockchairClient } from './blockchair.js'
 import { ZcashBlockbookClient } from './blockbook.js'
 import { DEFAULT_TIMEOUT_MS } from './http.js'

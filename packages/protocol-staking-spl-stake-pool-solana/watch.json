@@ -1,5 +1,5 @@
 {
-  "module": "@forgewallet/protocol-staking-spl-stake-pool-solana",
+  "module": "@anywalletkit/protocol-staking-spl-stake-pool-solana",
   "sources": [
     {
       "id": "spl-stake-pool-program",

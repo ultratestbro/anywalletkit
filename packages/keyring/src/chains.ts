@@ -1,4 +1,4 @@
-import type { SignerCurve } from '@forgewallet/core'
+import type { SignerCurve } from '@anywalletkit/core'
 
 /** The chains a keyring account spans. */
 export type ChainKey = 'evm' | 'solana' | 'ton' | 'tron' | 'btc' | 'near' | 'zcash'

@@ -1,14 +1,14 @@
 // The "History" guide on docs.anywallet.tech renders the #region blocks of this file.
 
 // #region imports
-import { Wallet, createMemoryIntentJournal, type FeedItem, type HistoryFeedPage, type Intent, type IntentJournal } from '@forgewallet/kit'
-import type { ActivityAsset, ChainTx } from '@forgewallet/core'
-import { createEvmHistory } from '@forgewallet/history-evm'
-import LidoProtocolEvm from '@forgewallet/protocol-staking-lido-evm'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
-import { WalletManagerSolana, createSolanaHistory } from '@forgewallet/wallet-solana'
-import { WalletManagerTon, createTonHistory } from '@forgewallet/wallet-ton'
-import { WalletManagerTron, createTronHistory } from '@forgewallet/wallet-tron'
+import { Wallet, createMemoryIntentJournal, type FeedItem, type HistoryFeedPage, type Intent, type IntentJournal } from '@anywalletkit/kit'
+import type { ActivityAsset, ChainTx } from '@anywalletkit/core'
+import { createEvmHistory } from '@anywalletkit/history-evm'
+import LidoProtocolEvm from '@anywalletkit/protocol-staking-lido-evm'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
+import { WalletManagerSolana, createSolanaHistory } from '@anywalletkit/wallet-solana'
+import { WalletManagerTon, createTonHistory } from '@anywalletkit/wallet-ton'
+import { WalletManagerTron, createTronHistory } from '@anywalletkit/wallet-tron'
 // #endregion imports
 
 // #region setup

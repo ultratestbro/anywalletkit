@@ -1,5 +1,5 @@
 ---
-"@forgewallet/backup-cloud": minor
+"@anywalletkit/backup-cloud": minor
 ---
 
 New package: iCloud backups of wallet secrets as seed-vault files, stored in the app's hidden iCloud Drive container.

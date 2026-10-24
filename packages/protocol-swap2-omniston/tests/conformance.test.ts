@@ -1,10 +1,10 @@
 import "../src/buffer-global.js";
-import {describeProtocolModule} from "@forgewallet/conformance";
+import {describeProtocolModule} from "@anywalletkit/conformance";
 import {OmnistonSwap2Protocol} from "../src/protocol.js";
 
 import {readdirSync, readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
-import type {ActivityFixtureJson} from "@forgewallet/conformance";
+import type {ActivityFixtureJson} from "@anywalletkit/conformance";
 
 // Recorded real transactions (fixtures/activity/*.json); `negative-*` must come back null.
 const fixturesDir = fileURLToPath(new URL("../fixtures/activity/", import.meta.url));

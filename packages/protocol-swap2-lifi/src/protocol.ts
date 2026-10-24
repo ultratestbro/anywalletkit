@@ -1,5 +1,5 @@
-import {SingleProviderSwap2} from "@forgewallet/protocol-swap2-core/swap2/single";
-import type {Swap2Account, Swap2EngineConfig} from "@forgewallet/protocol-swap2-core/swap2/base";
+import {SingleProviderSwap2} from "@anywalletkit/protocol-swap2-core/swap2/single";
+import type {Swap2Account, Swap2EngineConfig} from "@anywalletkit/protocol-swap2-core/swap2/base";
 import {lifi as lifiCfg} from "./config.js";
 import {lifiProvider, type LifiProviderConfig} from "./provider.js";
 

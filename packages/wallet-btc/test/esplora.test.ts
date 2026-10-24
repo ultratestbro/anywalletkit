@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { NetworkError } from '@forgewallet/core'
+import { NetworkError } from '@anywalletkit/core'
 import { EsploraClient, WalletManagerBtc, parseRawTransaction } from '../src/index.js'
 import { ADDR0, ADDR1, PREV_A, PREV_B, SEED, TXID_A, TXID_B, fakeBlockbook, prevTx } from './helpers.js'
 

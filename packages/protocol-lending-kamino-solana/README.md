@@ -1,6 +1,6 @@
-# @forgewallet/protocol-lending-kamino-solana
+# @anywalletkit/protocol-lending-kamino-solana
 
-[Kamino](https://kamino.com/docs) for `@forgewallet/wallet-solana` accounts, two
+[Kamino](https://kamino.com/docs) for `@anywalletkit/wallet-solana` accounts, two
 `LendingProtocol`s in one package:
 
 - **`KaminoVaultProtocolSolana`** — one Kamino Earn vault (kVault): `supply`
@@ -41,8 +41,8 @@ of Kamino's listed mints).
 ## Usage
 
 ```ts
-import WalletManagerSolana from '@forgewallet/wallet-solana'
-import { KaminoApi, KaminoVaultProtocolSolana, KaminoMarketProtocolSolana } from '@forgewallet/protocol-lending-kamino-solana'
+import WalletManagerSolana from '@anywalletkit/wallet-solana'
+import { KaminoApi, KaminoVaultProtocolSolana, KaminoMarketProtocolSolana } from '@anywalletkit/protocol-lending-kamino-solana'
 
 const account = await new WalletManagerSolana(seed, { provider: 'https://…' }).getAccount(0)
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'

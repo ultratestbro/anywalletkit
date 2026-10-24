@@ -4,7 +4,7 @@
  * (simulation + balance proof), then broadcast through the wallet's own RPC — Jupiter never lands it for us.
  * Same-chain only: Solana → Solana.
  */
-import {ccAsset, ccAssetByToken} from "@forgewallet/swap2-assets";
+import {ccAsset, ccAssetByToken} from "@anywalletkit/swap2-assets";
 
 export const JUPITER_API_DEFAULT = "https://api.jup.ag/swap/v2";
 

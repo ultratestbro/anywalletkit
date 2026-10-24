@@ -6,11 +6,11 @@
 import {
   activityBase, netTransfers, sameAddress, splitNet,
   type ActivityAsset, type ActivityItem, type ActivityKind, type ChainTx, type DescribeActivityContext,
-} from '@forgewallet/core'
+} from '@anywalletkit/core'
 import { toFunctionSelector } from 'viem'
 
 /** Registry name, as `module.json` carries it. */
-export const MODULE_NAME = '@forgewallet/protocol-staking-ssv-evm'
+export const MODULE_NAME = '@anywalletkit/protocol-staking-ssv-evm'
 
 const sel = (signature: string): string => toFunctionSelector(`function ${signature}`).toLowerCase()
 

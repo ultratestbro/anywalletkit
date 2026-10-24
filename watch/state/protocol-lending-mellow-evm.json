@@ -1,5 +1,5 @@
 {
- "module": "@forgewallet/protocol-lending-mellow-evm",
+ "module": "@anywalletkit/protocol-lending-mellow-evm",
  "sources": {
   "vault-lido-experimental-earn-usd": {
    "type": "evm-proxy",

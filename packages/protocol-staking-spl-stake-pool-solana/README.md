@@ -1,13 +1,13 @@
-# @forgewallet/protocol-staking-spl-stake-pool-solana
+# @anywalletkit/protocol-staking-spl-stake-pool-solana
 
-A simple package that lets `@forgewallet/wallet-solana` wallet accounts stake
+A simple package that lets `@anywalletkit/wallet-solana` wallet accounts stake
 through pools on the [SPL Stake Pool](https://github.com/solana-program/stake-pool)
 program — [Jito](https://www.jito.network) by default: stake SOL → JitoSOL,
 exit instantly from the reserve or through a stake account, claim, read
 rates, APY and earnings.
 
 Built as the **fourth implementation of the `StakingProtocol` type** in
-`@forgewallet/core` — after Lido (ETH liquid staking), SSV (token staking with
+`@anywalletkit/core` — after Lido (ETH liquid staking), SSV (token staking with
 a cooldown) and Tonstakers (GRAM liquid staking) — and the second one off EVM. The base class in
 `src/staking-protocol.js` is the same file, byte-identical: the type is
 chain-agnostic, and Solana's two-shape exit (instant vs. stake account +
@@ -51,8 +51,8 @@ signs.
 ## Usage
 
 ```js
-import WalletManagerSolana from '@forgewallet/wallet-solana'
-import SplStakePoolProtocolSolana from '@forgewallet/protocol-staking-spl-stake-pool-solana'
+import WalletManagerSolana from '@anywalletkit/wallet-solana'
+import SplStakePoolProtocolSolana from '@anywalletkit/protocol-staking-spl-stake-pool-solana'
 
 const wallet = new WalletManagerSolana(seed, { provider: 'https://api.mainnet-beta.solana.com' })
 const account = await wallet.getAccount(0)
@@ -95,7 +95,7 @@ new SplStakePoolProtocolSolana(account, {
 
 A read-only account (`{ getAddress }`) is enough for every view; writes need
 an account with `sendTransaction`. The module hands the account a bare
-`{ version: 0, instructions }` message — `@forgewallet/wallet-solana` sets
+`{ version: 0, instructions }` message — `@anywalletkit/wallet-solana` sets
 the blockhash lifetime and the fee-payer signer, signs and broadcasts; the
 key never enters the module.
 
@@ -118,7 +118,7 @@ Checked before any transaction is built:
 
 ## Why the instructions are hand-encoded
 
-`@forgewallet/wallet-solana` is built on `@solana/*` 3.x. The published
+`@anywalletkit/wallet-solana` is built on `@solana/*` 3.x. The published
 stake-pool client wants web3.js v1 and `@solana-program/stake` wants kit ≥ 5;
 either would put a second Solana stack into the consumer's bundle. The six
 instructions this module needs have stable, documented layouts (Stake Pool

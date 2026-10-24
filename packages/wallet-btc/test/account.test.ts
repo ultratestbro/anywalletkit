@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { InsufficientFundsError } from '@forgewallet/core'
+import { InsufficientFundsError } from '@anywalletkit/core'
 import { p2pkh, p2tr, SigHash } from '@scure/btc-signer'
 import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js'
 import { FINAL_SEQUENCE, RBF_SEQUENCE, UnsupportedAddressTypeError, WalletManagerBtc, parseRawTransaction, recoverMessagePublicKey } from '../src/index.js'

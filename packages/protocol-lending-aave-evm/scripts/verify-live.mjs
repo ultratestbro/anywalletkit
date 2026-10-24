@@ -2,7 +2,7 @@
 // Read-only check against the real Ethereum Core market: proves the ABIs
 // (struct decoding of getReserveData, oracle, gateway), the preset addresses
 // and the quote path. No key, nothing is sent. RPC: AAVE_RPC or a public node.
-import { createMockAccount } from '@forgewallet/conformance'
+import { createMockAccount } from '@anywalletkit/conformance'
 import { AaveProtocolEvm } from '../dist/index.js'
 
 const rpc = process.env.AAVE_RPC ?? 'https://ethereum-rpc.publicnode.com'

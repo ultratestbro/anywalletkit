@@ -3,7 +3,7 @@ import type { FetchLike } from './types.js'
 
 /**
  * `AbortSignal.timeout`, guarded: Hermes ships AbortController but historically
- * not `AbortSignal.timeout` (see @forgewallet/runtime-hermes). Without it the
+ * not `AbortSignal.timeout` (see @anywalletkit/runtime-hermes). Without it the
  * request simply has no client-side timeout.
  */
 function timeoutSignal(ms: number): AbortSignal | undefined {
@@ -70,6 +70,6 @@ export function query(params: Record<string, string | number | undefined>): stri
 
 export function defaultFetch(): FetchLike {
   const f = (globalThis as { fetch?: unknown }).fetch
-  if (typeof f !== 'function') throw new Error('@forgewallet/history-evm: no global fetch; pass `fetch` in the options')
+  if (typeof f !== 'function') throw new Error('@anywalletkit/history-evm: no global fetch; pass `fetch` in the options')
   return f as FetchLike
 }

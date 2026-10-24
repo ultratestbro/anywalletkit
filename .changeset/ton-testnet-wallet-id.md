@@ -1,5 +1,5 @@
 ---
-"@forgewallet/wallet-ton": minor
+"@anywalletkit/wallet-ton": minor
 ---
 
 `network: 'testnet'` now uses the testnet wallet_id (network_global_id -3), as Tonkeeper and @ton/ton do. Mainnet addresses are unchanged.

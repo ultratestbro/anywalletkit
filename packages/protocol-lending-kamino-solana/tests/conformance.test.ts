@@ -1,4 +1,4 @@
-import { describeProtocolModule } from '@forgewallet/conformance'
+import { describeProtocolModule } from '@anywalletkit/conformance'
 import { KaminoMarketProtocolSolana, KaminoVaultProtocolSolana } from '../src/index.js'
 import { USDC, VAULT, account, api, obligation } from './fixture.js'
 

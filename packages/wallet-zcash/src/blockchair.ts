@@ -5,7 +5,7 @@
  * testnet. Address dashboards carry the UTXO set (mempool included, block_id
  * -1), `raw/transaction` the hex, `push/transaction` broadcasts.
  */
-import { NetworkError } from '@forgewallet/core'
+import { NetworkError } from '@anywalletkit/core'
 import { hexToBytes } from './encoding.js'
 import { DEFAULT_TIMEOUT_MS, fetchWithTimeout, isInt, isRecord } from './http.js'
 import type { SpentOutput, Utxo, ZcashClient, ZcashTxInfo } from './types.js'

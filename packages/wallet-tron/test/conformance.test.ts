@@ -1,4 +1,4 @@
-import { describeChainModule } from '@forgewallet/conformance'
+import { describeChainModule } from '@anywalletkit/conformance'
 import { WalletManagerTron, type WalletAccountTron } from '../src/index.js'
 
 describeChainModule('wallet-tron', {

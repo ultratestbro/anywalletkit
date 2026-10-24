@@ -1,6 +1,6 @@
-# @forgewallet/protocol-approvals-evm
+# @anywalletkit/protocol-approvals-evm
 
-**A simple package that lets [`@forgewallet/wallet-evm`](https://www.npmjs.com/package/@forgewallet/wallet-evm) accounts see and revoke the token approvals they have granted.**
+**A simple package that lets [`@anywalletkit/wallet-evm`](https://www.npmjs.com/package/@anywalletkit/wallet-evm) accounts see and revoke the token approvals they have granted.**
 
 Every swap, bridge, lending and staking module *creates* approvals (ERC-20 allowances to routers, Permit2 allowances, operator approvals on NFTs). None of them takes an approval back. This module does: it discovers what an account has granted, flags the risky grants, and revokes them through the account's own methods, so a policy-governed account stays governed.
 
@@ -9,17 +9,17 @@ Supported on evm: ERC-20 allowances, ERC-721 per-token approvals, ERC-721 / ERC-
 ## Install
 
 ```bash
-npm install @forgewallet/protocol-approvals-evm
+npm install @anywalletkit/protocol-approvals-evm
 ```
 
-Peer: `@forgewallet/core`. Runtime dependency: `viem`. Built with tsup (ESM + CJS + types in `dist/`); works on Node 20+ and React Native.
+Peer: `@anywalletkit/core`. Runtime dependency: `viem`. Built with tsup (ESM + CJS + types in `dist/`); works on Node 20+ and React Native.
 
 ## Usage
 
 ```js
-import { Wallet } from '@forgewallet/kit'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
-import ApprovalsProtocolEvm from '@forgewallet/protocol-approvals-evm'
+import { Wallet } from '@anywalletkit/kit'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
+import ApprovalsProtocolEvm from '@anywalletkit/protocol-approvals-evm'
 
 const wallet = new Wallet(seed)
 wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: 'https://your-rpc', chainId: 1 })
@@ -71,7 +71,7 @@ Measured on a real wallet on Ethereum (11 approval events over 4 M blocks): `Rpc
 ### Spender labels
 
 ```js
-import ApprovalsProtocolEvm, { EtherscanLabels } from '@forgewallet/protocol-approvals-evm'
+import ApprovalsProtocolEvm, { EtherscanLabels } from '@anywalletkit/protocol-approvals-evm'
 
 const labels = new EtherscanLabels({ chainId: 1, apiKey, explorerUrl: 'https://etherscan.io' })
 const approvals = new ApprovalsProtocolEvm(account, { labels })
@@ -125,7 +125,7 @@ LIVE_PK=0x… node scripts/verify-live.mjs 0x… https://rpc --revoke <approval 
 
 - Discovery depends on events: an allowance granted by a contract that emits no `Approval` (rare, non-compliant tokens) is invisible. Pass it in `options.spenders` / `tokens` with a custom source if you know it.
 - Only the owner's own approvals are listed. Allowances *received* by the account are not approvals it can revoke.
-- The provider is taken from `account._config.provider` when not given — a private field of `@forgewallet/wallet-evm` accounts.
+- The provider is taken from `account._config.provider` when not given — a private field of `@anywalletkit/wallet-evm` accounts.
 
 ## License
 

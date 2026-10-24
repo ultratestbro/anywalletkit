@@ -5,7 +5,7 @@
 import { getAddress } from 'viem'
 import { base58check, bech32, bech32m } from '@scure/base'
 import { sha256 } from '@noble/hashes/sha256'
-import { NameError } from '@forgewallet/core'
+import { NameError } from '@anywalletkit/core'
 
 export const BTC_CAIP2 = 'bip122:000000000019d6689c085ae165831e93'
 export const SOL_CAIP2 = 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'

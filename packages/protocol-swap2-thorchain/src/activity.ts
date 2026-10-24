@@ -9,11 +9,11 @@
  * something ("Received A via THORChain"). Native sends to an inbound vault with
  * a memo (Tron, BTC) carry no router call and are not recognizable offline.
  */
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
-import {callSelector, describeSwapLike, ownerAssets} from "@forgewallet/protocol-swap2-core/activity";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
+import {callSelector, describeSwapLike, ownerAssets} from "@anywalletkit/protocol-swap2-core/activity";
 import {thorchain as thorchainCfg} from "./config.js";
 
-export const THORCHAIN_MODULE = "@forgewallet/protocol-swap2-thorchain";
+export const THORCHAIN_MODULE = "@anywalletkit/protocol-swap2-thorchain";
 
 /** depositWithExpiry(address,address,uint256,string,uint256) */
 export const THORCHAIN_DEPOSIT_WITH_EXPIRY = "0x44bc937b";

@@ -168,6 +168,6 @@ export const EXPLORER_TX_BASE: Readonly<Record<number, string>> = {
 
 export function explorerTxUrl(chainId: number, hash: string): string {
   const base = EXPLORER_TX_BASE[chainId]
-  if (!base) throw new Error(`@forgewallet/history-evm: no explorer known for chain ${chainId}`)
+  if (!base) throw new Error(`@anywalletkit/history-evm: no explorer known for chain ${chainId}`)
   return `${base}/tx/${hash}`
 }

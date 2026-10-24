@@ -1,12 +1,12 @@
 'use strict'
 
-// The StakingProtocol base class lives in @forgewallet/core (one copy for every staking
+// The StakingProtocol base class lives in @anywalletkit/core (one copy for every staking
 // module). This file keeps the runtime IStakingProtocol marker class and re-exports the base.
 
-import { NotImplementedError, StakingProtocol } from '@forgewallet/core'
+import { NotImplementedError, StakingProtocol } from '@anywalletkit/core'
 
-/** @typedef {import('@forgewallet/core').IWalletAccount} IWalletAccount */
-/** @typedef {import('@forgewallet/core').IWalletAccountReadOnly} IWalletAccountReadOnly */
+/** @typedef {import('@anywalletkit/core').IWalletAccount} IWalletAccount */
+/** @typedef {import('@anywalletkit/core').IWalletAccountReadOnly} IWalletAccountReadOnly */
 
 /**
  * @typedef {Object} StakeOptions

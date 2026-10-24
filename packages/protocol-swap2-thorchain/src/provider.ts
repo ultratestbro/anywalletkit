@@ -1,9 +1,9 @@
 import {thorchain as thorCfg} from "./config.js";
 import {describeThorchainActivity} from "./activity.js";
 import {decodeFunctionData, encodeFunctionData} from "viem";
-import {timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
-import {ccAsset, ccAssetByToken} from "@forgewallet/swap2-assets";
-import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
+import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import {ccAsset, ccAssetByToken} from "@anywalletkit/swap2-assets";
+import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 /**
  * THORChain — native L1 swaps via asgard vaults (no wrapping). Ported from

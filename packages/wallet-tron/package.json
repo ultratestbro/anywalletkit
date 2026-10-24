@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/wallet-tron",
+  "name": "@anywalletkit/wallet-tron",
   "version": "0.1.1",
-  "description": "Tron wallet for the forgewallet SDK: BIP-32 m/44'/195'/0'/0/i accounts, TRX and TRC-20 transfers against a full-node HTTP API, no tronweb.",
+  "description": "Tron wallet for Any Wallet Kit: BIP-32 m/44'/195'/0'/0/i accounts, TRX and TRC-20 transfers against a full-node HTTP API, no tronweb.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -39,13 +39,13 @@
     "secp256k1"
   ],
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@scure/base": "^2.4.0"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
     "vitest": "^5.0.3"
   }
 }

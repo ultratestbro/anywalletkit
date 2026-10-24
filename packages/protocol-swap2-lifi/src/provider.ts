@@ -1,8 +1,8 @@
 import {LIFI_SOLANA_CAIP2, lifi as lifiCfg} from "./config.js";
 import {describeLifiActivity} from "./activity.js";
-import {ccAsset} from "@forgewallet/swap2-assets";
-import {timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
-import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
+import {ccAsset} from "@anywalletkit/swap2-assets";
+import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 /**
  * LI.FI meta-aggregator — the CALLDATA execution model: the quote returns a

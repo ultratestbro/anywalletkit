@@ -194,7 +194,7 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
   },
   {
     // NEAR Intents only (LI.FI/THORChain don't route Zcash). Address-only
-    // deposits, like Bitcoin. Live since 2026-10-18: @forgewallet/wallet-zcash
+    // deposits, like Bitcoin. Live since 2026-10-18: @anywalletkit/wallet-zcash
     // signs transparent (t1…) spends, so the wallet is its own ZEC source.
     key: "zec",
     caip2: "zcash:mainnet",

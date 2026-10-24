@@ -1,11 +1,11 @@
 {
-  "name": "@forgewallet/protocol-swap2-cctp",
+  "name": "@anywalletkit/protocol-swap2-cctp",
   "type": "swap2",
   "chains": ["eip155:*"],
   "tier": "core",
   "maintainers": ["@ultratestbro"],
   "conformance": "0.x",
-  "repo": "https://github.com/ultratestbro/forgewallet",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-swap2-cctp",
   "description": "Circle CCTP V2: native USDC burn-and-mint between EVM chains (Fast / Standard), two-phase with the user's receiveMessage claim.",
   "addedAt": "2026-10-10"

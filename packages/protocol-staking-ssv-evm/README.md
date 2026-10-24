@@ -1,12 +1,12 @@
-# @forgewallet/protocol-staking-ssv-evm
+# @anywalletkit/protocol-staking-ssv-evm
 
-A simple package that lets `@forgewallet/wallet-evm` wallet accounts stake
+A simple package that lets `@anywalletkit/wallet-evm` wallet accounts stake
 through [SSV Network](https://ssv.network): stake SSV → cSSV, claim the ETH
 rewards, exit through the network's cooldown, and read APR and network stats.
 
 Built as the **second implementation of the `StakingProtocol` type** in
-`@forgewallet/core` (the first is `@forgewallet/protocol-staking-lido-evm`).
-The base class lives in `@forgewallet/core` (`src/staking-protocol.ts` here
+`@anywalletkit/core` (the first is `@anywalletkit/protocol-staking-lido-evm`).
+The base class lives in `@anywalletkit/core` (`src/staking-protocol.ts` here
 keeps the runtime `IStakingProtocol` marker and the module's own types). A
 token-staking protocol with a cooldown exit fitting it unchanged is the point:
 the interface is not Lido-shaped.
@@ -36,8 +36,8 @@ SSV-denominated stake, so it moves with SSV's price.
 ## Usage
 
 ```js
-import WalletManagerEvm from '@forgewallet/wallet-evm'
-import SsvProtocolEvm from '@forgewallet/protocol-staking-ssv-evm'
+import WalletManagerEvm from '@anywalletkit/wallet-evm'
+import SsvProtocolEvm from '@anywalletkit/protocol-staking-ssv-evm'
 
 const wallet = new WalletManagerEvm(seed, { provider: 'https://rpc.example.org' })
 const account = await wallet.getAccount(0)

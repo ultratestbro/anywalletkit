@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/kit",
+  "name": "@anywalletkit/kit",
   "version": "0.2.0",
-  "description": "The forgewallet orchestrator: one seed or signer, registered chain wallets and protocol modules, accounts by CAIP-2 chain, policies that run before anything is broadcast.",
+  "description": "The Any Wallet Kit orchestrator: one seed or signer, registered chain wallets and protocol modules, accounts by CAIP-2 chain, policies that run before anything is broadcast.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -34,11 +34,11 @@
     "policies"
   ],
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
-    "@forgewallet/swap2-assets": "workspace:*"
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/swap2-assets": "workspace:*"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
     "vitest": "^5.0.3"
   }
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { WalletManager, type ActivityItem, type ChainTx, type DescribeActivityContext, type FeeRates, type HistoryPage, type HistoryQuery, type HistorySource, type IWalletAccount, type IWalletAccountReadOnly, type Signer } from '@forgewallet/core'
-import { LendingProtocol } from '@forgewallet/core'
-import { createMockAccount } from '@forgewallet/conformance'
+import { WalletManager, type ActivityItem, type ChainTx, type DescribeActivityContext, type FeeRates, type HistoryPage, type HistoryQuery, type HistorySource, type IWalletAccount, type IWalletAccountReadOnly, type Signer } from '@anywalletkit/core'
+import { LendingProtocol } from '@anywalletkit/core'
+import { createMockAccount } from '@anywalletkit/conformance'
 import {
   InvalidCursorError, Wallet, applyIntent, buildFeed, createMemoryIntentJournal, describeGeneric, nativeOf, packCursor, unpackCursor,
   type ActivityErrorReport, type ActivityRecognizer, type Intent,
@@ -45,7 +45,7 @@ class FakeSource implements HistorySource {
   explorerTxUrl(hash: string): string { return `https://scan/${this.chain}/${hash}` }
 }
 
-const FAKE_PROTOCOL = '@forgewallet/protocol-fake'
+const FAKE_PROTOCOL = '@anywalletkit/protocol-fake'
 /** Recognizes calls to one contract. */
 const recognizerFor = (contract: string, name = 'fake'): ActivityRecognizer => ({
   name,
@@ -296,7 +296,7 @@ describe('intent journal', () => {
     id: 'swap-1', kind: 'swap', createdAt: 1000, chain: ETH, address: OWN, status: 'pending',
     hashes: [{ chain: ETH, hash: '0xsrc' }],
     expect: { assetsOut: [{ token: USDC_BASE, amount: 5_000_000n, symbol: 'USDC', decimals: 6 }], assetsIn: [{ token: null, amount: 10n ** 15n, symbol: 'ETH', decimals: 18 }] },
-    protocol: '@forgewallet/protocol-swap2-lifi', subtitle: 'LI.FI', ...over,
+    protocol: '@anywalletkit/protocol-swap2-lifi', subtitle: 'LI.FI', ...over,
   })
   const run = (sources: Map<string, HistorySource>, journal: ReturnType<typeof createMemoryIntentJournal>, query: Record<string, unknown> = {}, now = 2000) =>
     buildFeed({ sources, addresses: addresses(ETH, BASE), recognizers: [], journal, query, opts: { now: () => now } })
@@ -318,7 +318,7 @@ describe('intent journal', () => {
     expect(p2.items.map((i) => i.id)).toEqual([`${ETH}:0xsrc`, `${ETH}:${eth.rows[1]!.hash}`])
     const item = p2.items[0]!
     expect(item.kind).toBe('swap')
-    expect(item.protocol).toBe('@forgewallet/protocol-swap2-lifi')
+    expect(item.protocol).toBe('@anywalletkit/protocol-swap2-lifi')
     expect(item.subtitle).toBe('LI.FI')
     expect(item.intentId).toBe('swap-1')
     expect(item.assetsOut[0]!.amount).toBe(5_000_000n) // on-chain
@@ -331,7 +331,7 @@ describe('intent journal', () => {
     const row = { ...tx(BIP, 1001, { nativeValue: 12_000n, transfers: [native(OWN, OTHER, 12_000n)] }), hash: 'btcsrc' }
     const btc = new FakeSource(BTC, [row], 10)
     const sources = new Map<string, HistorySource>([[BTC, btc], [ETH, new FakeSource(ETH, [], 10)]])
-    const intent = swapIntent({ id: 'swap-btc', kind: 'bridge', chain: BTC, hashes: [{ chain: BTC, hash: 'btcsrc' }], expect: { assetsOut: [{ token: null, amount: 12_000n, symbol: 'BTC', decimals: 8 }], assetsIn: [{ token: null, amount: 10n ** 15n, symbol: 'ETH', decimals: 18 }] }, protocol: '@forgewallet/protocol-swap2-near-intents', subtitle: 'NEAR Intents' })
+    const intent = swapIntent({ id: 'swap-btc', kind: 'bridge', chain: BTC, hashes: [{ chain: BTC, hash: 'btcsrc' }], expect: { assetsOut: [{ token: null, amount: 12_000n, symbol: 'BTC', decimals: 8 }], assetsIn: [{ token: null, amount: 10n ** 15n, symbol: 'ETH', decimals: 18 }] }, protocol: '@anywalletkit/protocol-swap2-near-intents', subtitle: 'NEAR Intents' })
     const journal = createMemoryIntentJournal([intent])
     const page = await buildFeed({ sources, addresses: [{ chain: BTC, address: OWN }, { chain: ETH, address: OWN }], recognizers: [], journal, query: {}, opts: { now: () => 2000 } })
     // One row, the source's own chain string in the id, the intent's verdict on it — never a bare "send" next to a pending intent.
@@ -425,7 +425,7 @@ describe('Wallet.history / describeTransaction', () => {
     override describeActivity(t: ChainTx, c: DescribeActivityContext): ActivityItem | null {
       if (t.call?.to.toLowerCase() !== this._config.pool.toLowerCase()) return null
       expect(c.own.has(OWN_LC)).toBe(true)
-      return { id: `${t.chain}:${t.hash}`, chain: t.chain, hash: t.hash, time: t.time, status: t.status, kind: 'supply', protocol: '@forgewallet/protocol-lending-aave-evm', title: 'Supplied USDC', subtitle: 'Aave v3 · Base', assetsOut: [], assetsIn: [] }
+      return { id: `${t.chain}:${t.hash}`, chain: t.chain, hash: t.hash, time: t.time, status: t.status, kind: 'supply', protocol: '@anywalletkit/protocol-lending-aave-evm', title: 'Supplied USDC', subtitle: 'Aave v3 · Base', assetsOut: [], assetsIn: [] }
     }
   }
 
@@ -459,13 +459,13 @@ describe('Wallet.history / describeTransaction', () => {
     w.registerWallet('eip155', FakeManager, { chain: BASE, address: OWN })
     const src = new FakeSource(BASE, [], 10)
     w.registerHistorySource(src)
-    const journal = createMemoryIntentJournal([{ id: 'earn-1', kind: 'supply', createdAt: Math.floor(Date.now() / 1000), chain: BASE, address: OWN, status: 'pending', hashes: [{ chain: BASE, hash: '0xdep' }], protocol: '@forgewallet/protocol-lending-aave-evm', subtitle: 'Aave v3 · Base', expect: { assetsOut: [{ token: USDC_BASE, amount: 1n, symbol: 'USDC', decimals: 6 }], assetsIn: [] } }])
+    const journal = createMemoryIntentJournal([{ id: 'earn-1', kind: 'supply', createdAt: Math.floor(Date.now() / 1000), chain: BASE, address: OWN, status: 'pending', hashes: [{ chain: BASE, hash: '0xdep' }], protocol: '@anywalletkit/protocol-lending-aave-evm', subtitle: 'Aave v3 · Base', expect: { assetsOut: [{ token: USDC_BASE, amount: 1n, symbol: 'USDC', decimals: 6 }], assetsIn: [] } }])
     w.setIntentJournal(journal)
     const p1 = await w.history({ addresses: [{ chain: BASE, address: OWN }] })
     expect(p1.items.map((i) => [i.id, i.status, i.title])).toEqual([['intent:earn-1', 'pending', 'Supplied USDC']])
     const row = { ...tx(BASE, 20, { to: pool, call: { to: pool, selector: '0x617ba037' }, transfers: [erc20(USDC_BASE, OWN, pool, 1n)] }), hash: '0xdep' }
     const item = await w.describeTransaction(row)
-    expect(item).toMatchObject({ kind: 'supply', protocol: '@forgewallet/protocol-lending-aave-evm', subtitle: 'Aave v3 · Base', intentId: 'earn-1', title: 'Supplied USDC' })
+    expect(item).toMatchObject({ kind: 'supply', protocol: '@anywalletkit/protocol-lending-aave-evm', subtitle: 'Aave v3 · Base', intentId: 'earn-1', title: 'Supplied USDC' })
     w.dispose()
   })
 })

@@ -1,5 +1,5 @@
 ---
-"@forgewallet/wallet-btc": minor
+"@anywalletkit/wallet-btc": minor
 ---
 
 Before p2wpkh inputs are signed, every coin is checked against its full previous transaction. That transaction must hash to the claimed txid, and the output's amount and script must match. Otherwise the spend is refused (`UnsafeTransactionError` with code `prevout-mismatch`).

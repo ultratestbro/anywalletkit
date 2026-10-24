@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-swap2-wrap",
+  "name": "@anywalletkit/protocol-swap2-wrap",
   "type": "swap2",
   "chains": [
     "eip155:1",
@@ -35,7 +35,7 @@
     "@ultratestbro"
   ],
   "conformance": "0.x",
-  "repo": "https://github.com/ultratestbro/forgewallet",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-swap2-wrap",
   "description": "Native ↔ wrapped native (WETH9 deposit/withdraw) as a same-chain swap2 venue on every EVM chain with a pinned wrapped native; 1:1, no approval, tokens verified on-chain.",
   "addedAt": "2026-10-12"

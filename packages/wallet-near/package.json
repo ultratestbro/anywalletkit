@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/wallet-near",
+  "name": "@anywalletkit/wallet-near",
   "version": "0.1.1",
-  "description": "NEAR wallet for the forgewallet SDK: SLIP-10 m/44'/397'/i' accounts (NEAR Wallet path), implicit and named accounts, NEAR and NEP-141 transfers over JSON-RPC, hand-written borsh, NEP-413 message signing.",
+  "description": "NEAR wallet for Any Wallet Kit: SLIP-10 m/44'/397'/i' accounts (NEAR Wallet path), implicit and named accounts, NEAR and NEP-141 transfers over JSON-RPC, hand-written borsh, NEP-413 message signing.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -41,14 +41,14 @@
     "borsh"
   ],
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@scure/base": "^2.4.0"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
-    "@forgewallet/protocol-swap2-near-intents": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/protocol-swap2-near-intents": "workspace:*",
     "vitest": "^5.0.3"
   }
 }

@@ -1,7 +1,7 @@
 import { createPublicClient, http, isAddress, getAddress, type PublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
 import { normalize } from 'viem/ens'
-import { NameError, type NameResolver, type NameWarning, type ResolvedName } from '@forgewallet/core'
+import { NameError, type NameResolver, type NameWarning, type ResolvedName } from '@anywalletkit/core'
 import { coinTypeFor, decodeAddressRecord } from './coins.js'
 import { warningsFor } from './warnings.js'
 

@@ -1,4 +1,4 @@
-# @forgewallet/protocol-swap2-usdt0
+# @anywalletkit/protocol-swap2-usdt0
 
 [USDT0](https://docs.usdt0.to) — Tether's USDT as a LayerZero OFT — as a swap2
 provider: USDT / USDT0 between 16 EVM chains in **one source transaction**.
@@ -11,8 +11,8 @@ Arbitrum → HyperEVM on 2026-10-20). It is the only direct USDT path into
 HyperEVM.
 
 ```ts
-import {usdt0Provider} from "@forgewallet/protocol-swap2-usdt0/provider";
-import {RouterSwap2Protocol} from "@forgewallet/protocol-swap2-router/swap2/router";
+import {usdt0Provider} from "@anywalletkit/protocol-swap2-usdt0/provider";
+import {RouterSwap2Protocol} from "@anywalletkit/protocol-swap2-router/swap2/router";
 
 const swap2 = new RouterSwap2Protocol(arbitrumAccount, {fromChain: "eip155:42161", providers: [usdt0Provider({rpcUrls})]});
 const res = await swap2.swap2({fromToken: "USDT0", toToken: "USDT0", toChain: 999, fromTokenAmount: 10_000_000n, minAmountOut: 10_000_000n});

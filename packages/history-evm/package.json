@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/history-evm",
+  "name": "@anywalletkit/history-evm",
   "version": "0.1.1",
   "description": "Activity history (HistorySource) for every EVM chain the SDK supports: Etherscan v2, Blockscout PRO and Alchemy Transfers API (API keys) with Blockscout and Routescan keyless fallbacks, merged into one ChainTx per hash with a documented spam heuristic.",
   "license": "Apache-2.0",
@@ -27,13 +27,13 @@
     "lint": "echo ok"
   },
   "dependencies": {
-    "@forgewallet/swap2-assets": "workspace:*"
+    "@anywalletkit/swap2-assets": "workspace:*"
   },
   "peerDependencies": {
-    "@forgewallet/core": "workspace:*"
+    "@anywalletkit/core": "workspace:*"
   },
   "devDependencies": {
-    "@forgewallet/core": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
     "@types/node": "^22",
     "vitest": "^5.0.3"
   },

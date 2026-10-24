@@ -3,8 +3,8 @@
 // parallel, validated identically, and scored on price, speed and reliability —
 // quoting still needs no account and no key.
 //
-//   npm i @forgewallet/protocol-swap2-router \
-//         @forgewallet/protocol-swap2-near-intents @forgewallet/protocol-swap2-thorchain
+//   npm i @anywalletkit/protocol-swap2-router \
+//         @anywalletkit/protocol-swap2-near-intents @anywalletkit/protocol-swap2-thorchain
 //
 //   RECIPIENT=<0x…> node examples/auction-across-venues.mjs
 //
@@ -14,9 +14,9 @@
 // venue validates it, and a placeholder comes back as "no route available"
 // rather than as a validation error.
 
-import RouterSwap2Protocol from "@forgewallet/protocol-swap2-router";
-import {nearIntentsProvider} from "@forgewallet/protocol-swap2-near-intents/provider";
-import {thorchainProvider} from "@forgewallet/protocol-swap2-thorchain/provider";
+import RouterSwap2Protocol from "@anywalletkit/protocol-swap2-router";
+import {nearIntentsProvider} from "@anywalletkit/protocol-swap2-near-intents/provider";
+import {thorchainProvider} from "@anywalletkit/protocol-swap2-thorchain/provider";
 
 const recipient = process.env.RECIPIENT;
 if (!recipient) throw new Error("set RECIPIENT to the destination-chain address");

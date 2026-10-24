@@ -1,2 +1,2 @@
 import { defineConfig } from 'tsup'
-export default defineConfig({ entry: { index: 'src/index.ts', history: 'src/history.ts' }, format: ['esm', 'cjs'], dts: true, sourcemap: true, clean: true, target: 'es2022', platform: 'neutral', external: [/^@ton\//, /^@noble\//, /^@scure\//, /^@bitcoinerlab\//, 'bitcoinjs-lib', 'buffer', '@forgewallet/core'] })
+export default defineConfig({ entry: { index: 'src/index.ts', history: 'src/history.ts' }, format: ['esm', 'cjs'], dts: true, sourcemap: true, clean: true, target: 'es2022', platform: 'neutral', external: [/^@ton\//, /^@noble\//, /^@scure\//, /^@bitcoinerlab\//, 'bitcoinjs-lib', 'buffer', '@anywalletkit/core'] })

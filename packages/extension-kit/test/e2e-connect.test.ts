@@ -6,8 +6,8 @@
  * real Keyring over the Vault/Session.
  */
 import { describe, expect, it } from 'vitest'
-import { Keyring } from '@forgewallet/keyring'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
+import { Keyring } from '@anywalletkit/keyring'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
 import {
   ApprovalQueue,
   NetworksTable,

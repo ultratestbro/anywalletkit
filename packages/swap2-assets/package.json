@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/swap2-assets",
+  "name": "@anywalletkit/swap2-assets",
   "version": "0.1.1",
   "description": "",
   "license": "Apache-2.0",
@@ -29,7 +29,7 @@
   "dependencies": {},
   "devDependencies": {
     "vitest": "^5.0.3",
-    "@forgewallet/conformance": "workspace:*"
+    "@anywalletkit/conformance": "workspace:*"
   },
   "keywords": []
 }

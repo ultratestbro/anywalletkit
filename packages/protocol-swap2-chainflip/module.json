@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-swap2-chainflip",
+  "name": "@anywalletkit/protocol-swap2-chainflip",
   "type": "swap2",
   "chains": [
     "eip155:1",
@@ -13,7 +13,7 @@
     "@ultratestbro"
   ],
   "conformance": "0.x",
-  "repo": "https://github.com/ultratestbro/forgewallet",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-swap2-chainflip",
   "description": "Chainflip vault swaps: native BTC / ETH / SOL / TRX and USDC / USDT across Ethereum, Arbitrum, Solana, Tron and Bitcoin via Chainflip's public backend (0 bps, no account). Sources: Ethereum, Arbitrum, Tron (USDT \u2192 the Vault with the swap in the note); the encoder's output is decoded and checked before signing; fill-or-kill refunds.",
   "addedAt": "2026-10-20"

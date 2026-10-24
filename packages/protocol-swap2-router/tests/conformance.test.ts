@@ -1,11 +1,11 @@
 import {describe, expect, it} from "vitest";
-import {describeProtocolModule, parseActivityFixture} from "@forgewallet/conformance";
-import {activityBase, netTransfers, splitNet, type ActivityItem, type ChainTx, type DescribeActivityContext} from "@forgewallet/core";
-import type {CrossChainProvider} from "@forgewallet/protocol-swap2-core/types";
+import {describeProtocolModule, parseActivityFixture} from "@anywalletkit/conformance";
+import {activityBase, netTransfers, splitNet, type ActivityItem, type ChainTx, type DescribeActivityContext} from "@anywalletkit/core";
+import type {CrossChainProvider} from "@anywalletkit/protocol-swap2-core/types";
 import {RouterSwap2Protocol} from "../src/swap2/router.js";
 import {readdirSync, readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
-import type {ActivityFixtureJson} from "@forgewallet/conformance";
+import type {ActivityFixtureJson} from "@anywalletkit/conformance";
 
 // Recorded real transactions (fixtures/activity/*.json); `negative-*` must come back null.
 const fixturesDir = fileURLToPath(new URL("../fixtures/activity/", import.meta.url));

@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/example-names",
+  "name": "@anywalletkit/example-names",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,11 +9,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
-    "@forgewallet/names-ens": "workspace:*"
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/names-ens": "workspace:*"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3"
   }

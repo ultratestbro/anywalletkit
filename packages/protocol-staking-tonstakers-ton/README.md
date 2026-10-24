@@ -1,12 +1,12 @@
-# @forgewallet/protocol-staking-tonstakers-ton
+# @anywalletkit/protocol-staking-tonstakers-ton
 
-A simple package that lets `@forgewallet/wallet-ton` wallet accounts stake
+A simple package that lets `@anywalletkit/wallet-ton` wallet accounts stake
 through [Tonstakers](https://tonstakers.com): stake GRAM → tsTON, exit
 instant / standard / best-rate, track payout bills, read rates, APY and
 earnings.
 
 Built as the **third implementation of the `StakingProtocol` type** in
-`@forgewallet/core` — after Lido (ETH liquid staking) and SSV (token staking
+`@anywalletkit/core` — after Lido (ETH liquid staking) and SSV (token staking
 with a cooldown) — and the first one off EVM. The base class in
 `src/staking-protocol.js` is the same file, byte-identical; a TON liquid
 staking protocol fitting it is the point: the type is chain-agnostic.
@@ -32,8 +32,8 @@ to claim.
 ## Usage
 
 ```js
-import WalletManagerTon from '@forgewallet/wallet-ton'
-import TonstakersProtocolTon from '@forgewallet/protocol-staking-tonstakers-ton'
+import WalletManagerTon from '@anywalletkit/wallet-ton'
+import TonstakersProtocolTon from '@anywalletkit/protocol-staking-tonstakers-ton'
 
 const wallet = new WalletManagerTon(seed, { tonClient: { url: 'https://toncenter.com/api/v2/jsonRPC' } })
 const account = await wallet.getAccount(0)

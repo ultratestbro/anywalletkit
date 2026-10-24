@@ -10,10 +10,10 @@
  * notations all match.
  */
 import {Address} from "@ton/core";
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
-import {describeSwapLike} from "@forgewallet/protocol-swap2-core/activity";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
+import {describeSwapLike} from "@anywalletkit/protocol-swap2-core/activity";
 
-export const OMNISTON_MODULE = "@forgewallet/protocol-swap2-omniston";
+export const OMNISTON_MODULE = "@anywalletkit/protocol-swap2-omniston";
 
 /** STON.fi DEX routers (tonapi "STON.fi DEX"; v2.2 observed in the test wallet's swaps, v1 kept for older history). */
 export const STONFI_ROUTERS: readonly string[] = [

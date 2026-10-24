@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isBackupError } from '@forgewallet/seed-vault'
+import { isBackupError } from '@anywalletkit/seed-vault'
 import { backupFileName, checkBackup, iCloudDrive, iCloudKeychain, isCloudBackupError, listBackups, restoreBackup, saveBackup, type NativeBackupCloud } from '../src/index.js'
 
 /** Two "devices" can share one cloud: the drive and the keychain maps are the cloud; `signedIn` is per device. */
@@ -59,7 +59,7 @@ describe('backup-cloud', () => {
     const saved = await saveBackup({ store: iCloudDrive({ container: 'iCloud.x', native: phoneA }), keyVault: iCloudKeychain({ native: phoneA }), secret: SECRET, meta: META })
     expect(saved).toEqual({ name: 'mnemonic-1a2b3c4d.fwbackup', protectors: ['icloud-keychain'] })
     expect([...cloud.files.values()][0]!.text).not.toContain('legal')
-    expect([...cloud.keychain.keys()]).toEqual(['forgewallet.backup-keys/backup-key.mnemonic-1a2b3c4d'])
+    expect([...cloud.keychain.keys()]).toEqual(['anywalletkit.backup-keys/backup-key.mnemonic-1a2b3c4d'])
 
     const phoneB = cloud.device()
     const store = iCloudDrive({ container: 'iCloud.x', native: phoneB })
@@ -127,7 +127,7 @@ describe('backup-cloud', () => {
     cloud.files.set('WalletBackups/notes.txt', { text: 'hi', downloaded: true, modifiedAt: 1 })
     const list = await listBackups(store)
     expect(list).toHaveLength(1)
-    expect(list[0]!.error).toMatch(/Not a forgewallet backup/)
+    expect(list[0]!.error).toMatch(/Not an Any Wallet Kit backup/)
   })
 
   it('reports a signed-out device and a platform without the module', async () => {

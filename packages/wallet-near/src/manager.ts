@@ -1,4 +1,4 @@
-import { LocalSigner, NetworkError, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, NetworkError, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@anywalletkit/core'
 import { WalletAccountNear } from './account.js'
 import { WalletAccountReadOnlyNear } from './read-only-account.js'
 import { NearRpc, createClient } from './rpc.js'

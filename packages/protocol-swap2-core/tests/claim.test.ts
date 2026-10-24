@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {createMockAccount} from "@forgewallet/conformance";
+import {createMockAccount} from "@anywalletkit/conformance";
 import {Swap2StatusError, Swap2UnsupportedOperationError, Swap2ExecutionError} from "../src/errors.js";
 import {SingleProviderSwap2} from "../src/swap2/single.js";
 import type {CrossChainProvider, IntentRef, UnsignedTx} from "../src/types.js";

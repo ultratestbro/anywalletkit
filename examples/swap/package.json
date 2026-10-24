@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/example-swap",
+  "name": "@anywalletkit/example-swap",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,23 +9,23 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
-    "@forgewallet/kit": "workspace:*",
-    "@forgewallet/protocol-swap2-cctp": "workspace:*",
-    "@forgewallet/protocol-swap2-chainflip": "workspace:*",
-    "@forgewallet/protocol-swap2-core": "workspace:*",
-    "@forgewallet/protocol-swap2-jupiter": "workspace:*",
-    "@forgewallet/protocol-swap2-lifi": "workspace:*",
-    "@forgewallet/protocol-swap2-near-intents": "workspace:*",
-    "@forgewallet/protocol-swap2-router": "workspace:*",
-    "@forgewallet/protocol-swap2-thorchain": "workspace:*",
-    "@forgewallet/protocol-swap2-uniswap": "workspace:*",
-    "@forgewallet/protocol-swap2-usdt0": "workspace:*",
-    "@forgewallet/protocol-swap2-wrap": "workspace:*",
-    "@forgewallet/wallet-evm": "workspace:*"
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/kit": "workspace:*",
+    "@anywalletkit/protocol-swap2-cctp": "workspace:*",
+    "@anywalletkit/protocol-swap2-chainflip": "workspace:*",
+    "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/protocol-swap2-jupiter": "workspace:*",
+    "@anywalletkit/protocol-swap2-lifi": "workspace:*",
+    "@anywalletkit/protocol-swap2-near-intents": "workspace:*",
+    "@anywalletkit/protocol-swap2-router": "workspace:*",
+    "@anywalletkit/protocol-swap2-thorchain": "workspace:*",
+    "@anywalletkit/protocol-swap2-uniswap": "workspace:*",
+    "@anywalletkit/protocol-swap2-usdt0": "workspace:*",
+    "@anywalletkit/protocol-swap2-wrap": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3"
   }

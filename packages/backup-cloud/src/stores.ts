@@ -87,7 +87,7 @@ export function iCloudDrive(opts: ICloudDriveOptions): BackupStore {
 }
 
 export interface ICloudKeychainOptions {
-  /** Keychain service for the synced backup keys. Default "forgewallet.backup-keys". */
+  /** Keychain service for the synced backup keys. Default "anywalletkit.backup-keys". */
   service?: string
   native?: NativeBackupCloud
   /** Randomness for new keys — crypto.getRandomValues by default. */
@@ -111,7 +111,7 @@ function fromHex(s: string): Uint8Array | null {
  * honour strict (biometrics-only) mode: a synced item can't carry a biometric ACL.
  */
 export function iCloudKeychain(opts: ICloudKeychainOptions = {}): KeyVault {
-  const service = opts.service ?? 'forgewallet.backup-keys'
+  const service = opts.service ?? 'anywalletkit.backup-keys'
   const random = opts.random ?? ((n: number) => globalThis.crypto.getRandomValues(new Uint8Array(n)))
   const reason = opts.reason ?? 'Open your wallet backup'
   const vault: KeyVault = {

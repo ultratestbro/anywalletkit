@@ -1,4 +1,4 @@
-# @forgewallet/protocol-swap2-near-intents
+# @anywalletkit/protocol-swap2-near-intents
 
 NEAR Intents (1Click) cross-chain swaps as a swap2 module: the wallet sends the
 source asset to a one-time deposit address, the solver network settles on

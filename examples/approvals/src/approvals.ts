@@ -1,11 +1,11 @@
 // The "Approvals" guide on docs.anywallet.tech renders the #region blocks of this file.
 
 // #region setup
-import { Wallet, type Policies, type WriteIntent } from '@forgewallet/kit'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
+import { Wallet, type Policies, type WriteIntent } from '@anywalletkit/kit'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
 import ApprovalsProtocolEvm, {
   BlockscoutSource, type Approval, type ApprovalsCache, type CacheEntry, type RevokeResult,
-} from '@forgewallet/protocol-approvals-evm'
+} from '@anywalletkit/protocol-approvals-evm'
 
 export interface ApprovalsSetup {
   /** An RPC that answers eth_getLogs WITHOUT an address filter (your node, most paid plans). */

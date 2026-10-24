@@ -1,4 +1,4 @@
-# @forgewallet/protocol-swap2-usdt0
+# @anywalletkit/protocol-swap2-usdt0
 
 ## 0.1.0
 
@@ -19,6 +19,6 @@
 - Updated dependencies [7004ecf]
 - Updated dependencies [e0edbf6]
 - Updated dependencies [29af9d6]
-  - @forgewallet/core@0.2.0
-  - @forgewallet/protocol-swap2-core@0.2.0
-  - @forgewallet/swap2-assets@0.1.1
+  - @anywalletkit/core@0.2.0
+  - @anywalletkit/protocol-swap2-core@0.2.0
+  - @anywalletkit/swap2-assets@0.1.1

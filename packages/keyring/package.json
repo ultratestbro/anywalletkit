@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/keyring",
+  "name": "@anywalletkit/keyring",
   "version": "0.2.0",
-  "description": "Multi-account, multi-source keyring for the forgewallet SDK: many accounts from one seed, imported seeds and private keys, account discovery — secrets stay in the app's secure storage.",
+  "description": "Multi-account, multi-source keyring for Any Wallet Kit: many accounts from one seed, imported seeds and private keys, account discovery — secrets stay in the app's secure storage.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -34,20 +34,20 @@
     "import"
   ],
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@scure/base": "^2.4.0",
     "@scure/bip32": "^2.4.0"
   },
   "devDependencies": {
-    "@forgewallet/wallet-btc": "workspace:*",
-    "@forgewallet/wallet-evm": "workspace:*",
-    "@forgewallet/wallet-near": "workspace:*",
-    "@forgewallet/wallet-solana": "workspace:*",
-    "@forgewallet/wallet-ton": "workspace:*",
-    "@forgewallet/wallet-tron": "workspace:*",
-    "@forgewallet/wallet-zcash": "workspace:*",
+    "@anywalletkit/wallet-btc": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*",
+    "@anywalletkit/wallet-near": "workspace:*",
+    "@anywalletkit/wallet-solana": "workspace:*",
+    "@anywalletkit/wallet-ton": "workspace:*",
+    "@anywalletkit/wallet-tron": "workspace:*",
+    "@anywalletkit/wallet-zcash": "workspace:*",
     "viem": "^2.57.2",
     "@ton/crypto": "^3.3.0",
     "vitest": "^5.0.3"

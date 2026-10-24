@@ -1,5 +1,5 @@
 {
- "module": "@forgewallet/protocol-swap2-lifi",
+ "module": "@anywalletkit/protocol-swap2-lifi",
  "sources": {
   "bridges": {
    "type": "http-json",

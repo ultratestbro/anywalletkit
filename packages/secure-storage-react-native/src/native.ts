@@ -18,7 +18,7 @@ export interface NativeCapabilities {
 }
 
 /**
- * The native module surface (`ForgewalletSecureStorage`). Keys are opaque here;
+ * The native module surface (`AnyWalletKitSecureStorage`). Keys are opaque here;
  * slots, ids and policy live in the JS layer. Every method rejects with an
  * `ERR_FW_*` code (see errors.ts).
  */
@@ -44,6 +44,6 @@ let cached: NativeSecureStorage | null = null
 export async function loadNative(): Promise<NativeSecureStorage> {
   if (cached) return cached
   const { requireNativeModule } = await import('expo-modules-core')
-  cached = requireNativeModule<NativeSecureStorage>('ForgewalletSecureStorage')
+  cached = requireNativeModule<NativeSecureStorage>('AnyWalletKitSecureStorage')
   return cached
 }

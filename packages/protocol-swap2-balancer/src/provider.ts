@@ -1,8 +1,8 @@
 import {decodeFunctionData, decodeFunctionResult, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
 import {describeBalancerActivity} from "./activity.js";
-import {ccAsset} from "@forgewallet/swap2-assets";
-import {evmRef, isEvm, timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
-import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
+import {ccAsset} from "@anywalletkit/swap2-assets";
+import {evmRef, isEvm, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 /**
  * Balancer v2 — the cp0x permissionless Balancer venue (balancer.cp0x.com).

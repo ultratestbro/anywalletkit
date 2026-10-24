@@ -1,4 +1,4 @@
-import { SignerError } from '@forgewallet/core'
+import { SignerError } from '@anywalletkit/core'
 
 /** Refused before signing: the transaction would almost certainly destroy funds or sign on someone else's behalf. */
 export class UnsafeTransactionError extends SignerError {

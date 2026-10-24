@@ -1,10 +1,10 @@
-# @forgewallet/secure-storage-react-native
+# @anywalletkit/secure-storage-react-native
 
-Where a React Native wallet keeps its seed phrases and private keys. It plugs straight into `@forgewallet/keyring` as its `SecretStorage`:
+Where a React Native wallet keeps its seed phrases and private keys. It plugs straight into `@anywalletkit/keyring` as its `SecretStorage`:
 
 ```ts
-import { Keyring } from '@forgewallet/keyring'
-import { createSecureStorage } from '@forgewallet/secure-storage-react-native'
+import { Keyring } from '@anywalletkit/keyring'
+import { createSecureStorage } from '@anywalletkit/secure-storage-react-native'
 
 const secrets = createSecureStorage({ namespace: 'my-wallet' })
 const keyring = await Keyring.load({ storage, secrets, chains })

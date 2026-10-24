@@ -1,4 +1,4 @@
-import { decodeBackup, describeBackup, encodeBackup, openBackup, sealBackup, type BackupMeta, type KdfOptions, type OpenedBackup, type Protector } from '@forgewallet/seed-vault'
+import { decodeBackup, describeBackup, encodeBackup, openBackup, sealBackup, type BackupMeta, type KdfOptions, type OpenedBackup, type Protector } from '@anywalletkit/seed-vault'
 import { CloudBackupError } from './errors.js'
 import type { BackupStore, KeyVault } from './stores.js'
 

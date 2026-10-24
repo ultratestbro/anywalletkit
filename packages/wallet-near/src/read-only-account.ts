@@ -1,4 +1,4 @@
-import { NetworkError, type IWalletAccountReadOnly } from '@forgewallet/core'
+import { NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { base58ToBytes, bytesToBase58, ed25519Key, isImplicitAccountId, isValidAccountId, publicKeyOfImplicit, publicKeyToString } from './address.js'

@@ -14,7 +14,7 @@ import {
   type IWalletAccount,
   type Signer,
   type WalletManager,
-} from '@forgewallet/core'
+} from '@anywalletkit/core'
 import { CHAIN_SPECS, type ChainKey } from './chains.js'
 import { KeyringError } from './errors.js'
 import { formatPrivateKey, keyFingerprint, parsePrivateKey, publicKeyOf, type PrivateKeyFormat } from './keys.js'

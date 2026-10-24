@@ -20,7 +20,7 @@ const end = lines.findIndex((l, i) => i > start && l.trim() === `// #endregion $
 if (start < 0 || end < 0) throw new Error(`Snippet: region "${region}" not found in examples/${file}`)
 const body = lines.slice(start + 1, end).filter((l) => !/^\s*\/\/ #(end)?region\b/.test(l))
 const indent = Math.min(...body.filter((l) => l.trim()).map((l) => l.match(/^ */)![0].length))
-const code = body.map((l) => l.slice(indent)).join('\n').replaceAll('@forgewallet/', '@anywalletkit/').trim()
+const code = body.map((l) => l.slice(indent)).join('\n').replaceAll('@anywalletkit/', '@anywalletkit/').trim()
 const lang = file.split('.').pop() === 'tsx' ? 'tsx' : 'ts'
 ---
 

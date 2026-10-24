@@ -1,5 +1,5 @@
-import {SingleProviderSwap2} from "@forgewallet/protocol-swap2-core/swap2/single";
-import type {Swap2Account, Swap2EngineConfig} from "@forgewallet/protocol-swap2-core/swap2/base";
+import {SingleProviderSwap2} from "@anywalletkit/protocol-swap2-core/swap2/single";
+import type {Swap2Account, Swap2EngineConfig} from "@anywalletkit/protocol-swap2-core/swap2/base";
 import {nearIntents as nearIntentsCfg} from "./config.js";
 import {nearIntentsProvider, type NearIntentsProviderConfig} from "./provider.js";
 

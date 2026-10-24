@@ -1,5 +1,5 @@
 {
- "module": "@forgewallet/protocol-lending-kamino-solana",
+ "module": "@anywalletkit/protocol-lending-kamino-solana",
  "sources": {
   "markets": {
    "type": "http-json",

@@ -7,10 +7,10 @@
  * another chain through a third-party relayer and cannot be tied back offline,
  * so `related` stays empty (the kit's intent journal links the two).
  */
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
-import {calledContract, callSelector, describeSwapLike} from "@forgewallet/protocol-swap2-core/activity";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
+import {calledContract, callSelector, describeSwapLike} from "@anywalletkit/protocol-swap2-core/activity";
 
-export const LIFI_MODULE = "@forgewallet/protocol-swap2-lifi";
+export const LIFI_MODULE = "@anywalletkit/protocol-swap2-lifi";
 
 /** GenericSwapFacetV3 — same-chain swaps (`viem toFunctionSelector`, 2026-10-14). */
 export const LIFI_SAME_CHAIN_SELECTORS: ReadonlySet<string> = new Set([

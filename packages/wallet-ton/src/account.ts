@@ -1,4 +1,4 @@
-import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@forgewallet/core'
+import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
 import { Cell } from '@ton/core'
 import { SimulationError, UnsafeTransactionError } from './errors.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'

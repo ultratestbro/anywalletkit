@@ -10,7 +10,7 @@
 import { sha256 } from '@noble/hashes/sha2.js'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { base64 } from '@scure/base'
-import type { Signer } from '@forgewallet/core'
+import type { Signer } from '@anywalletkit/core'
 
 const PREFIX = new TextEncoder().encode('\u0018Bitcoin Signed Message:\n') // the \x18 IS the varint length (24) of "Bitcoin Signed Message:\n"
 

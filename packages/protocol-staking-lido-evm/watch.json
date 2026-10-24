@@ -1,5 +1,5 @@
 {
-  "module": "@forgewallet/protocol-staking-lido-evm",
+  "module": "@anywalletkit/protocol-staking-lido-evm",
   "sources": [
     {
       "id": "steth-ethereum",

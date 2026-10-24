@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/example-quickstart",
+  "name": "@anywalletkit/example-quickstart",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,17 +10,17 @@
     "start": "node --experimental-strip-types src/main.ts"
   },
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
-    "@forgewallet/kit": "workspace:*",
-    "@forgewallet/wallet-btc": "workspace:*",
-    "@forgewallet/wallet-evm": "workspace:*",
-    "@forgewallet/wallet-near": "workspace:*",
-    "@forgewallet/wallet-solana": "workspace:*",
-    "@forgewallet/wallet-ton": "workspace:*",
-    "@forgewallet/wallet-tron": "workspace:*"
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/kit": "workspace:*",
+    "@anywalletkit/wallet-btc": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*",
+    "@anywalletkit/wallet-near": "workspace:*",
+    "@anywalletkit/wallet-solana": "workspace:*",
+    "@anywalletkit/wallet-ton": "workspace:*",
+    "@anywalletkit/wallet-tron": "workspace:*"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3"
   }

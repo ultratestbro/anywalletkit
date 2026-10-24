@@ -1,4 +1,4 @@
-import { SignerError } from '@forgewallet/core'
+import { SignerError } from '@anywalletkit/core'
 import { getAddressDecoder, getCompiledTransactionMessageDecoder, getTransactionDecoder } from '@solana/kit'
 
 /**

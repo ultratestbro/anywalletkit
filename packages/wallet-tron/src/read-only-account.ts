@@ -1,4 +1,4 @@
-import { NetworkError, type IWalletAccountReadOnly } from '@forgewallet/core'
+import { NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import { hexToBytes } from '@noble/hashes/utils.js'

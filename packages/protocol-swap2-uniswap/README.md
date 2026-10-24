@@ -1,4 +1,4 @@
-# @forgewallet/protocol-swap2-uniswap
+# @anywalletkit/protocol-swap2-uniswap
 
 Uniswap v3 same-chain swaps as a swap2 module: QuoterV2 quotes, SwapRouter02
 `multicall(deadline, …)` execution, on the deployments in `src/addresses.ts`

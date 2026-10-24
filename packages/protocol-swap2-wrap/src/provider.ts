@@ -1,8 +1,8 @@
 import {decodeFunctionResult, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
 import {describeWrapActivity} from "./activity.js";
-import {ccAsset} from "@forgewallet/swap2-assets";
-import {evmRef, isEvm, timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
-import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
+import {ccAsset} from "@anywalletkit/swap2-assets";
+import {evmRef, isEvm, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 /**
  * The chain's canonical wrapped native token (WETH9-style `deposit()` /

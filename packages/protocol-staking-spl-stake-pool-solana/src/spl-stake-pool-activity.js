@@ -18,17 +18,17 @@
 // movements to owners, but a source that keeps token-account addresses still works
 // when the ATA is in `own`).
 
-import { activityBase, netTransfers, splitNet } from '@forgewallet/core'
+import { activityBase, netTransfers, splitNet } from '@anywalletkit/core'
 import { STAKE_POOL_PROGRAM } from './spl-stake-pool-codec.js'
 import SPL_STAKE_POOL_ADDRESS_MAP from './spl-stake-pool-address-map.js'
 
-/** @typedef {import('@forgewallet/core').ChainTx} ChainTx */
-/** @typedef {import('@forgewallet/core').ActivityItem} ActivityItem */
-/** @typedef {import('@forgewallet/core').DescribeActivityContext} DescribeActivityContext */
+/** @typedef {import('@anywalletkit/core').ChainTx} ChainTx */
+/** @typedef {import('@anywalletkit/core').ActivityItem} ActivityItem */
+/** @typedef {import('@anywalletkit/core').DescribeActivityContext} DescribeActivityContext */
 /** @typedef {import('./spl-stake-pool-address-map.js').StakePoolConfig} StakePoolConfig */
 
 /** Registry name, as `module.json` carries it. */
-export const MODULE_NAME = '@forgewallet/protocol-staking-spl-stake-pool-solana'
+export const MODULE_NAME = '@anywalletkit/protocol-staking-spl-stake-pool-solana'
 
 /** Instruction tag → action (program/src/instruction.rs of solana-program-library stake-pool). */
 export const INSTRUCTION_ACTIONS = Object.freeze({

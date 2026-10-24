@@ -1,7 +1,7 @@
 import {
   StakingProtocol,
   type ActivityItem, type ChainTx, type DescribeActivityContext, type IWalletAccount, type IWalletAccountReadOnly,
-} from '@forgewallet/core'
+} from '@anywalletkit/core'
 import {
   createPublicClient, custom, encodeFunctionData, http, parseAbi,
   type Address, type Hex, type PublicClient, type Transport,
@@ -211,7 +211,7 @@ export default class SsvProtocolEvm extends StakingProtocol<SsvProtocolConfig> {
   /**
    * Creates a new interface to the SSV Network staking protocol for evm blockchains.
    *
-   * @param account - The wallet account to use to interact with the protocol (a @forgewallet/wallet-evm account, or a read-only / minimal `{ getAddress }` account for views).
+   * @param account - The wallet account to use to interact with the protocol (a @anywalletkit/wallet-evm account, or a read-only / minimal `{ getAddress }` account for views).
    * @param config - The protocol's configuration.
    */
   constructor(account: StakingWalletAccount, config: SsvProtocolConfig = {}) {

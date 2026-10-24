@@ -1,4 +1,4 @@
-import type { ActivityItem, ChainTx, DescribeActivityContext, IWalletAccountReadOnly } from '@forgewallet/core'
+import type { ActivityItem, ChainTx, DescribeActivityContext, IWalletAccountReadOnly } from '@anywalletkit/core'
 import {
   compactSignatureToSignature, createPublicClient, custom, encodeFunctionData, http, isAddress, parseCompactSignature, parseSignature, zeroAddress,
   type Address, type Hex, type PublicClient,
@@ -162,7 +162,7 @@ export default class LidoProtocolEvm extends StakingProtocol<LidoProtocolConfig>
   /**
    * Creates a new interface to the Lido protocol for evm blockchains.
    *
-   * @param account - The wallet account to use to interact with the protocol (a @forgewallet/wallet-evm account, or a read-only account for views).
+   * @param account - The wallet account to use to interact with the protocol (a @anywalletkit/wallet-evm account, or a read-only account for views).
    * @param config - The protocol's configuration.
    */
   constructor(account: StakingWalletAccount, config: LidoProtocolConfig = {}) {

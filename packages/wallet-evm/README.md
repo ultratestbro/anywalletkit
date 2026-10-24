@@ -1,10 +1,10 @@
-# @forgewallet/wallet-evm
+# @anywalletkit/wallet-evm
 
-EVM accounts for the forgewallet SDK, derived at `m/44'/60'/0'/0/i` — the same
-path as MetaMask and ethers, pinned by golden vectors in `@forgewallet/conformance`.
+EVM accounts for Any Wallet Kit, derived at `m/44'/60'/0'/0/i` — the same
+path as MetaMask and ethers, pinned by golden vectors in `@anywalletkit/conformance`.
 
 ```ts
-import WalletManagerEvm from '@forgewallet/wallet-evm'
+import WalletManagerEvm from '@anywalletkit/wallet-evm'
 
 const wallet = new WalletManagerEvm(seedPhrase, { provider: ['https://rpc-a', 'https://rpc-b'] })
 const account = await wallet.getAccount(0)

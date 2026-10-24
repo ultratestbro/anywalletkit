@@ -1,4 +1,4 @@
-# @forgewallet/protocol-lending-kamino-solana
+# @anywalletkit/protocol-lending-kamino-solana
 
 ## 0.1.1
 
@@ -7,4 +7,4 @@
 - Updated dependencies [bd4ea91]
 - Updated dependencies [386615c]
 - Updated dependencies [82464d8]
-  - @forgewallet/core@0.2.0
+  - @anywalletkit/core@0.2.0

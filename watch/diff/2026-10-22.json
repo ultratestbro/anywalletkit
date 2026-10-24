@@ -4,7 +4,7 @@
  "sources": 311,
  "changes": [
   {
-   "module": "@forgewallet/protocol-swap2-omniston",
+   "module": "@anywalletkit/protocol-swap2-omniston",
    "id": "docs-omniston",
    "label": "STON.fi docs · Omniston",
    "type": "http-text",
@@ -20,7 +20,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-swap2-uniswap",
+   "module": "@anywalletkit/protocol-swap2-uniswap",
    "id": "sdks",
    "label": "Uniswap SDKs (sdk-core address map) releases",
    "type": "github-releases",

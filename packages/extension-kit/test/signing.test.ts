@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { parseTransaction, recoverMessageAddress, recoverTypedDataAddress, type Hex } from 'viem'
-import { Keyring } from '@forgewallet/keyring'
-import { WalletManagerEvm, type WalletAccountEvm } from '@forgewallet/wallet-evm'
+import { Keyring } from '@anywalletkit/keyring'
+import { WalletManagerEvm, type WalletAccountEvm } from '@anywalletkit/wallet-evm'
 import {
   ApprovalQueue,
   DEFAULT_NETWORKS,

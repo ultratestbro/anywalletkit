@@ -11,12 +11,12 @@
 import {
   activityBase, netTransfers, sameAddress, splitNet,
   type ActivityAsset, type ActivityItem, type ActivityKind, type ChainTx, type DescribeActivityContext,
-} from '@forgewallet/core'
+} from '@anywalletkit/core'
 import { toFunctionSelector } from 'viem'
 import { AAVE_MARKETS, type AaveMarket } from './markets.js'
 
 /** Registry name, as `module.json` carries it. */
-export const MODULE_NAME = '@forgewallet/protocol-lending-aave-evm'
+export const MODULE_NAME = '@anywalletkit/protocol-lending-aave-evm'
 
 interface Action {
   kind: ActivityKind

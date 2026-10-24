@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { decodeFunctionData, maxUint256, toFunctionSelector, type Hex } from 'viem'
-import { ReadOnlyAccountError } from '@forgewallet/core'
-import { createMockAccount } from '@forgewallet/conformance'
+import { ReadOnlyAccountError } from '@anywalletkit/core'
+import { createMockAccount } from '@anywalletkit/conformance'
 import { AaveProtocolEvm, AaveError, decodeAaveRevert, parseReserveConfiguration, rayToApyPct, userFlags, healthFactorToNumber, AAVE_MARKETS, listMarkets } from '../src/index.js'
 import { GATEWAY_ABI, POOL_ABI, ERC20_ABI, VARIABLE_DEBT_ABI } from '../src/abi.js'
 import {

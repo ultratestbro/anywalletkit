@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { describeNearIntentsActivity } from '@forgewallet/protocol-swap2-near-intents'
+import { describeNearIntentsActivity } from '@anywalletkit/protocol-swap2-near-intents'
 import {
   HistoryUnavailableError, createNearHistory, decodeHistoryCursor, encodeHistoryCursor, nearExplorerTxUrl, parseJsonPreservingBigInts,
   type HistoryFetch, type NearblocksFtRow, type NearblocksReceiptRow, type NearblocksTxn, type RpcTxStatus,
@@ -241,7 +241,7 @@ describe('createNearHistory: cursor, errors, keys, explorer', () => {
   })
 })
 
-describe('recognizer cross-check: @forgewallet/protocol-swap2-near-intents', () => {
+describe('recognizer cross-check: @anywalletkit/protocol-swap2-near-intents', () => {
   const own = new Set([INTENTS_USER])
 
   it('the list row for the real ft_transfer_call into intents.near is "Bridged wNEAR"', async () => {

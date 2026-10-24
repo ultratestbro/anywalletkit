@@ -56,7 +56,7 @@ class SecureStorageModule : Module() {
     get() = appContext.reactContext ?: throw Exceptions.ReactContextLost()
 
   override fun definition() = ModuleDefinition {
-    Name("ForgewalletSecureStorage")
+    Name("AnyWalletKitSecureStorage")
 
     AsyncFunction("setItem") Coroutine { namespace: String, key: String, value: String, protection: String, prompt: Map<String, String> ->
       setItem(namespace, key, value, protection, prompt)
@@ -273,7 +273,7 @@ class SecureStorageModule : Module() {
 
   // region files
 
-  private fun dir(namespace: String): File = File(context.noBackupFilesDir, "forgewallet-secure-storage/$namespace")
+  private fun dir(namespace: String): File = File(context.noBackupFilesDir, "anywalletkit-secure-storage/$namespace")
 
   private fun file(namespace: String, key: String): File {
     val name = Base64.encodeToString(key.toByteArray(Charsets.UTF_8), Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)

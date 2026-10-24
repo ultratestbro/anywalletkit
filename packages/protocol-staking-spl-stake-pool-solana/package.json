@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/protocol-staking-spl-stake-pool-solana",
+  "name": "@anywalletkit/protocol-staking-spl-stake-pool-solana",
   "version": "0.2.1",
-  "description": "A simple package that lets @forgewallet/wallet-solana wallet accounts stake through SPL stake pools (Jito by default): stake SOL \u2192 JitoSOL, exit instantly from the reserve or through a stake account, claim, read rates, APY and earnings.",
+  "description": "A simple package that lets @anywalletkit/wallet-solana wallet accounts stake through SPL stake pools (Jito by default): stake SOL \u2192 JitoSOL, exit instantly from the reserve or through a stake account, claim, read rates, APY and earnings.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "index.js",
@@ -36,13 +36,13 @@
     "@solana/instructions": "^3.0.3"
   },
   "peerDependencies": {
-    "@forgewallet/core": "workspace:*"
+    "@anywalletkit/core": "workspace:*"
   },
   "devDependencies": {
     "@solana/transaction-messages": "^3.0.3",
     "@solana/transactions": "^3.0.3",
-    "@forgewallet/core": "workspace:*",
-    "@forgewallet/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
     "vitest": "^5.0.3"
   },
   "keywords": [
@@ -54,7 +54,7 @@
     "spl-stake-pool",
     "liquid-staking",
     "staking-protocol",
-    "forgewallet",
+    "anywalletkit",
     "staking"
   ]
 }

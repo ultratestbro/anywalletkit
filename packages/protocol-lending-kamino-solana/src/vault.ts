@@ -1,4 +1,4 @@
-import { NotImplementedError, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type SupplyOptions, type WithdrawOptions } from '@forgewallet/core'
+import { NotImplementedError, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type SupplyOptions, type WithdrawOptions } from '@anywalletkit/core'
 import { WITHDRAW_ALL, type ApiVault, type ApiVaultMetrics } from './api.js'
 import { divWadUp, fromDecimalString, lessBps, mulWad, toAmount, toDecimalString, toWad, type AmountOption } from './amounts.js'
 import { KaminoBase, type KaminoBaseConfig } from './base.js'

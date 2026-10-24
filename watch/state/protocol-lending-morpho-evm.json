@@ -1,5 +1,5 @@
 {
- "module": "@forgewallet/protocol-lending-morpho-evm",
+ "module": "@anywalletkit/protocol-lending-morpho-evm",
  "sources": {
   "morpho-blue-ethereum": {
    "type": "evm-proxy",

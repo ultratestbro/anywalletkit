@@ -1,4 +1,4 @@
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core"
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core"
 import type {Address} from "@solana/addresses"
 import type {Instruction} from "@solana/instructions"
 

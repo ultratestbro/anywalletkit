@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { derivationVectors } from '@forgewallet/conformance'
-import { LocalSigner, UserRejectedError, deriveSecp256k1, privateKeySigner, seedFromMnemonicSync, SignerError } from '@forgewallet/core'
-import { WalletManagerBtc } from '@forgewallet/wallet-btc'
+import { derivationVectors } from '@anywalletkit/conformance'
+import { LocalSigner, UserRejectedError, deriveSecp256k1, privateKeySigner, seedFromMnemonicSync, SignerError } from '@anywalletkit/core'
+import { WalletManagerBtc } from '@anywalletkit/wallet-btc'
 import { walletOnDevice, walletsOnService, type Device } from '../src/signer.ts'
 
 const SEED = seedFromMnemonicSync(derivationVectors.seeds['bip39-abandon-12']!)

@@ -1,14 +1,14 @@
-# @forgewallet/wallet-solana
+# @anywalletkit/wallet-solana
 
 Solana accounts at `m/44'/501'/i'/0'` (SLIP-10 ed25519 — the Phantom / Solflare
-default), pinned by golden vectors in `@forgewallet/conformance`.
+default), pinned by golden vectors in `@anywalletkit/conformance`.
 
 Signing uses noble ed25519 over the compiled message bytes, so there is no
 WebCrypto dependency: the same code runs in Node and in React Native Hermes
 without the Ed25519 subtle polyfill.
 
 ```ts
-import WalletManagerSolana from '@forgewallet/wallet-solana'
+import WalletManagerSolana from '@anywalletkit/wallet-solana'
 
 const wallet = new WalletManagerSolana(seedPhrase, { provider: ['https://rpc-a', 'https://rpc-b'] })
 const account = await wallet.getAccount(0)
@@ -72,10 +72,10 @@ silently taking more. The recipient's ATA is derived for the right program.
 
 ## Activity history
 
-`createSolanaHistory` is the chain's `HistorySource` (`@forgewallet/core`): newest-first `ChainTx` pages for an address over plain JSON-RPC, no indexer.
+`createSolanaHistory` is the chain's `HistorySource` (`@anywalletkit/core`): newest-first `ChainTx` pages for an address over plain JSON-RPC, no indexer.
 
 ```ts
-import { createSolanaHistory } from '@forgewallet/wallet-solana/history'
+import { createSolanaHistory } from '@anywalletkit/wallet-solana/history'
 
 const history = createSolanaHistory({ rpcUrls: ['https://api.mainnet-beta.solana.com'] })
 const page = await history.listActivity('2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW', { limit: 25 })
@@ -97,6 +97,6 @@ history.explorerTxUrl(one.hash) // https://solscan.io/tx/…
 
 **Pages and cursor.** Signatures of every list are merged by slot (newest first), deduplicated, and the page takes the top `limit` plus ties at the boundary slot, so each list's consumed rows form a prefix of what the node returned. The cursor is base64 JSON `{ v: 1, l: { <list address>: <before signature> | '' | null } }`: one `before` signature per list, `''` = not started, `null` = exhausted. The list set is frozen in the cursor; a token account created mid-pagination joins on the next fresh listing. Pagination is exact even when one transaction touches several lists.
 
-**Mapping.** Native transfers come from `preBalances`/`postBalances` with the fee added back to the payer, token transfers from `pre`/`postTokenBalances` per mint attributed to the token accounts' **owners** (`standard` = `spl` / `token2022` from `programId`, `decimals` from the balance), senders paired with receivers largest-first; a receiver without a sender is a mint (`from` = mint), a sender without a receiver a burn (`to` = mint). `fee` = `meta.fee`, `status` from `meta.err`, `block` = slot. `call.programs` lists every top-level instruction program id, then inner ones; `call.to` is the first program that is not plumbing (System, ComputeBudget, Memo, Token, Token-2022, Associated Token) and `call.data` that instruction's base58 data — what `@forgewallet/protocol-staking-spl-stake-pool-solana` reads. A transaction made only of plumbing (a SOL or SPL transfer) has no `call`; `to` is then the recipient owner. `nativeValue` is the SOL the payer sent in a plain transfer, 0 for program calls. Symbols are not resolved here (no catalog dependency); the kit fills them.
+**Mapping.** Native transfers come from `preBalances`/`postBalances` with the fee added back to the payer, token transfers from `pre`/`postTokenBalances` per mint attributed to the token accounts' **owners** (`standard` = `spl` / `token2022` from `programId`, `decimals` from the balance), senders paired with receivers largest-first; a receiver without a sender is a mint (`from` = mint), a sender without a receiver a burn (`to` = mint). `fee` = `meta.fee`, `status` from `meta.err`, `block` = slot. `call.programs` lists every top-level instruction program id, then inner ones; `call.to` is the first program that is not plumbing (System, ComputeBudget, Memo, Token, Token-2022, Associated Token) and `call.data` that instruction's base58 data — what `@anywalletkit/protocol-staking-spl-stake-pool-solana` reads. A transaction made only of plumbing (a SOL or SPL transfer) has no `call`; `to` is then the recipient owner. `nativeValue` is the SOL the payer sent in a plain transfer, 0 for program calls. Symbols are not resolved here (no catalog dependency); the kit fills them.
 
 Fixtures in `test/fixtures/history/` were captured on 2026-10-14 from `api.mainnet-beta.solana.com` for the test wallet: signature pages for the wallet, its JitoSOL and USDC accounts, both token-account lists, the Jito `DepositSol` (`3SmwE6qf…`, the same transaction as the stake-pool module's activity fixture), a SOL send and receive, a USDC send and a Token-2022 → USDC aggregator swap. `test/history.test.ts` checks that the row this source builds for the Jito deposit is described as `stake` by the stake-pool module.

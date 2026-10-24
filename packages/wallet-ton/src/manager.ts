@@ -1,4 +1,4 @@
-import { LocalSigner, SignerError, WalletManager, isSeedSigner, zeroize, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, zeroize, type FeeRates, type Signer } from '@anywalletkit/core'
 import { mnemonicToPrivateKey } from '@ton/crypto'
 import { WalletAccountTon } from './account.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'

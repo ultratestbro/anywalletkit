@@ -1,4 +1,4 @@
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core"
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core"
 import type {Address, Cell} from "@ton/core"
 
 export interface StakeOptions {

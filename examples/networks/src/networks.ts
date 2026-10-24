@@ -4,10 +4,10 @@
 import {
   NetworksTable, SOLANA_CHAIN, checkRpcUrl, isAddChainError, parseAddChainParams, verifyNetwork,
   type FetchLike, type JsonStorage, type Network, type NetworksState,
-} from '@forgewallet/networks'
-import { Wallet } from '@forgewallet/kit'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
-import { WalletManagerSolana } from '@forgewallet/wallet-solana'
+} from '@anywalletkit/networks'
+import { Wallet } from '@anywalletkit/kit'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
+import { WalletManagerSolana } from '@anywalletkit/wallet-solana'
 // #endregion imports
 
 // #region table

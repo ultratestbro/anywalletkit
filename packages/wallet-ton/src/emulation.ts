@@ -14,7 +14,7 @@
  *   Risk = { transfer_all_remaining_balance, ton, jettons: [{ quantity, wallet_address: { address }, jetton: { address, symbol, decimals } }], nfts }
  */
 import type { Cell } from '@ton/core'
-import { NetworkError } from '@forgewallet/core'
+import { NetworkError } from '@anywalletkit/core'
 import { emulateExternal as emulateToncenter, type EmulationVerdict } from './toncenter.js'
 import type { TonEmulateConfig, TonRisk } from './types.js'
 

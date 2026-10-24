@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { derivationVectors } from '@forgewallet/conformance'
-import { memoryJsonStorage, type FetchLike, type NetworksState } from '@forgewallet/networks'
+import { derivationVectors } from '@anywalletkit/conformance'
+import { memoryJsonStorage, type FetchLike, type NetworksState } from '@anywalletkit/networks'
 import { addUserRpc, onAddEthereumChain, openNetworks, reviewLabel, walletOnNetworks } from '../src/networks.ts'
 
 const SEED = derivationVectors.seeds['bip39-abandon-12']!
@@ -52,10 +52,10 @@ describe('Networks guide (docs) — offline', () => {
   })
 })
 
-// A real endpoint, nothing signed: LIVE=1 pnpm --filter @forgewallet/example-networks test
+// A real endpoint, nothing signed: LIVE=1 pnpm --filter @anywalletkit/example-networks test
 describe.runIf(process.env.LIVE === '1')('Networks guide (docs) — live', () => {
   it('verifies the first shipped Base endpoint', async () => {
-    const { verifyNetwork } = await import('@forgewallet/networks')
+    const { verifyNetwork } = await import('@anywalletkit/networks')
     const table = await openNetworks(memoryJsonStorage<NetworksState>())
     const r = await verifyNetwork((await table.get('eip155:8453'))!)
     console.log(r)

@@ -1,12 +1,12 @@
 // The "Keyring" guide on docs.anywallet.tech renders the #region blocks of this file.
 
 // #region imports
-import { Keyring, type AccountMeta, type ChainKey, type KeyringState, type KeyringStorage, type SecretStorage } from '@forgewallet/keyring'
-import { applyPolicies, type Policies } from '@forgewallet/kit'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
-import { WalletManagerSolana } from '@forgewallet/wallet-solana'
-import { WalletManagerTon } from '@forgewallet/wallet-ton'
-import { WalletManagerTron } from '@forgewallet/wallet-tron'
+import { Keyring, type AccountMeta, type ChainKey, type KeyringState, type KeyringStorage, type SecretStorage } from '@anywalletkit/keyring'
+import { applyPolicies, type Policies } from '@anywalletkit/kit'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
+import { WalletManagerSolana } from '@anywalletkit/wallet-solana'
+import { WalletManagerTon } from '@anywalletkit/wallet-ton'
+import { WalletManagerTron } from '@anywalletkit/wallet-tron'
 // #endregion imports
 
 // #region secrets

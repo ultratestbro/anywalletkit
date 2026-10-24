@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { derivationVectors } from '@forgewallet/conformance'
-import LidoProtocolEvm from '@forgewallet/protocol-staking-lido-evm'
-import { AaveProtocolEvm } from '@forgewallet/protocol-lending-aave-evm'
+import { derivationVectors } from '@anywalletkit/conformance'
+import LidoProtocolEvm from '@anywalletkit/protocol-staking-lido-evm'
+import { AaveProtocolEvm } from '@anywalletkit/protocol-lending-aave-evm'
 import { lendingPosition, stakingPosition, walletWithEarn } from '../src/earn.ts'
 
 const SEED = derivationVectors.seeds['bip39-abandon-12']!
@@ -18,7 +18,7 @@ describe('Earn guide (docs) — offline', () => {
   })
 })
 
-// Mainnet reads, nothing signed: LIVE=1 pnpm --filter @forgewallet/example-earn test
+// Mainnet reads, nothing signed: LIVE=1 pnpm --filter @anywalletkit/example-earn test
 describe.runIf(process.env.LIVE === '1')('Earn guide (docs) — live reads', () => {
   it('reads the Lido position and APR, the Aave position and USDC APY', async () => {
     const wallet = walletWithEarn(SEED)

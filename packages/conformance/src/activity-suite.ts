@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ActivityItem, ActivityKind, ChainTx, IWalletAccount, IWalletAccountReadOnly } from '@forgewallet/core'
+import type { ActivityItem, ActivityKind, ChainTx, IWalletAccount, IWalletAccountReadOnly } from '@anywalletkit/core'
 import { createMockAccount } from './mock-account.js'
 
 /**

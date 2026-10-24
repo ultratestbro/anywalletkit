@@ -1,7 +1,7 @@
 /**
  * The auction engine of the optional aggregator: routes a cross-chain delivery
  * over whichever providers the caller installed and passed in. Protocol
- * modules never need it — each one runs standalone on @forgewallet/protocol-swap2-core.
+ * modules never need it — each one runs standalone on @anywalletkit/protocol-swap2-core.
  */
 import type {
   CrossChainProvider,
@@ -11,9 +11,9 @@ import type {
   QuoteParams,
   RoutedQuote,
   ScoreWeights,
-} from "@forgewallet/protocol-swap2-core/types";
-import {validQuote} from "@forgewallet/protocol-swap2-core/validate";
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
+} from "@anywalletkit/protocol-swap2-core/types";
+import {validQuote} from "@anywalletkit/protocol-swap2-core/validate";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 
 const DEFAULT_WEIGHTS: ScoreWeights = {price: 0.6, speed: 0.3, reliability: 0.1};
 /** Quotes within 0.2% of the best net value count as the same price. */

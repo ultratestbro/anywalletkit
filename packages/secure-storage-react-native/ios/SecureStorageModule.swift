@@ -24,7 +24,7 @@ import Security
  */
 public class SecureStorageModule: Module {
   public func definition() -> ModuleDefinition {
-    Name("ForgewalletSecureStorage")
+    Name("AnyWalletKitSecureStorage")
 
     AsyncFunction("setItem") { (namespace: String, key: String, value: String, protection: String, prompt: [String: String]) in
       try Self.set(service: Self.service(namespace), key: key, value: value, protection: protection)

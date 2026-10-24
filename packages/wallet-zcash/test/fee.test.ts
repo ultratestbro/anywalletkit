@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { InsufficientFundsError } from '@forgewallet/core'
+import { InsufficientFundsError } from '@anywalletkit/core'
 import { P2PKH_INPUT_SIZE, TooManyInputsError, conventionalFee, logicalActions, selectAll, selectCoins } from '../src/index.js'
 import { TXID_A, TXID_B } from './helpers.js'
 

@@ -1,20 +1,20 @@
 // The "Swaps and bridges" guide on docs.anywallet.tech renders the #region blocks of this file.
 
 // #region imports
-import type { IWalletAccount, Swap2Options } from '@forgewallet/core'
-import { RouterSwap2Protocol, type Swap2Route } from '@forgewallet/protocol-swap2-router'
-import { lifiProvider } from '@forgewallet/protocol-swap2-lifi/provider'
-import { nearIntentsProvider } from '@forgewallet/protocol-swap2-near-intents/provider'
-import { thorchainProvider } from '@forgewallet/protocol-swap2-thorchain/provider'
-import { chainflipProvider } from '@forgewallet/protocol-swap2-chainflip/provider'
-import { jupiterProvider } from '@forgewallet/protocol-swap2-jupiter/provider'
-import { cctpProvider } from '@forgewallet/protocol-swap2-cctp/provider'
-import { usdt0Provider } from '@forgewallet/protocol-swap2-usdt0/provider'
-import { uniswapProvider } from '@forgewallet/protocol-swap2-uniswap/provider'
-import { wrapProvider } from '@forgewallet/protocol-swap2-wrap/provider'
+import type { IWalletAccount, Swap2Options } from '@anywalletkit/core'
+import { RouterSwap2Protocol, type Swap2Route } from '@anywalletkit/protocol-swap2-router'
+import { lifiProvider } from '@anywalletkit/protocol-swap2-lifi/provider'
+import { nearIntentsProvider } from '@anywalletkit/protocol-swap2-near-intents/provider'
+import { thorchainProvider } from '@anywalletkit/protocol-swap2-thorchain/provider'
+import { chainflipProvider } from '@anywalletkit/protocol-swap2-chainflip/provider'
+import { jupiterProvider } from '@anywalletkit/protocol-swap2-jupiter/provider'
+import { cctpProvider } from '@anywalletkit/protocol-swap2-cctp/provider'
+import { usdt0Provider } from '@anywalletkit/protocol-swap2-usdt0/provider'
+import { uniswapProvider } from '@anywalletkit/protocol-swap2-uniswap/provider'
+import { wrapProvider } from '@anywalletkit/protocol-swap2-wrap/provider'
 import {
   Swap2FeeLimitError, Swap2InFlightError, Swap2InsufficientGasError, Swap2MaybeSentError, Swap2QuoteError,
-} from '@forgewallet/protocol-swap2-core'
+} from '@anywalletkit/protocol-swap2-core'
 // #endregion imports
 
 // #region providers

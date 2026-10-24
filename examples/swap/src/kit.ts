@@ -1,7 +1,7 @@
 // #region kit
-import { Wallet } from '@forgewallet/kit'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
-import { RouterSwap2Protocol } from '@forgewallet/protocol-swap2-router'
+import { Wallet } from '@anywalletkit/kit'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
+import { RouterSwap2Protocol } from '@anywalletkit/protocol-swap2-router'
 import { providers } from './swap.ts'
 
 export function walletWithSwaps(seedPhrase: string): Wallet {

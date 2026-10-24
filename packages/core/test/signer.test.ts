@@ -9,7 +9,7 @@ import {
 
 const SEED = seedFromMnemonicSync('test test test test test test test test test test test junk')
 const EVM0 = "m/44'/60'/0'/0/0"
-const digest = sha256(new TextEncoder().encode('forgewallet'))
+const digest = sha256(new TextEncoder().encode('anywalletkit'))
 
 describe('LocalSigner — secp256k1', () => {
   it('ecdsa-recoverable is the default: 65 bytes r‖s‖rec, recovers the public key', async () => {

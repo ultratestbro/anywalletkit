@@ -9,7 +9,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {decodeFunctionData, encodeFunctionData} from "viem";
 import {thorchainProvider} from "../src/provider.js";
-import type {Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
+import type {Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 const VAULT = "0x1111111111111111111111111111111111111111";
 const VAULT_ROTATED = "0x2222222222222222222222222222222222222222";

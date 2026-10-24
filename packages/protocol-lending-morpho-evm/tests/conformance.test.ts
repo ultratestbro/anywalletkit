@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describeProtocolModule, type ActivityFixtureJson } from '@forgewallet/conformance'
+import { describeProtocolModule, type ActivityFixtureJson } from '@anywalletkit/conformance'
 import { MorphoMarketProtocolEvm, MorphoVaultProtocolEvm } from '../src/index.js'
 import { MARKET_ID, makeMorpho, USDC, VAULT } from './fixture.js'
 

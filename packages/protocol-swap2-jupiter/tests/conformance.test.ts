@@ -1,4 +1,4 @@
-import {describeProtocolBehaviour, describeProtocolModule} from "@forgewallet/conformance";
+import {describeProtocolBehaviour, describeProtocolModule} from "@anywalletkit/conformance";
 import {expect} from "vitest";
 import {getCompiledTransactionMessageDecoder, getTransactionDecoder} from "@solana/kit";
 import {JupiterSwap2Protocol} from "../src/protocol.js";
@@ -7,7 +7,7 @@ import {fromBase64} from "../src/codec.js";
 
 import {readdirSync, readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
-import type {ActivityFixtureJson} from "@forgewallet/conformance";
+import type {ActivityFixtureJson} from "@anywalletkit/conformance";
 
 // Real mainnet transactions captured through wallet-solana history (fixtures/activity/*.json); `negative-*` → null.
 const fixturesDir = fileURLToPath(new URL("../fixtures/activity/", import.meta.url));

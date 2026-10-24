@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/protocol-lending-aave-evm",
+  "name": "@anywalletkit/protocol-lending-aave-evm",
   "version": "0.2.1",
-  "description": "Aave v3 for @forgewallet/wallet-evm accounts: supply, withdraw, borrow (variable rate) and repay on any Aave v3 market, native coin through WrappedTokenGatewayV3, one-transaction supply/repay with EIP-2612 permits, reserves with rates and caps, health factor and position. Only the PoolAddressesProvider is trusted; the Pool is read on-chain and cross-checked.",
+  "description": "Aave v3 for @anywalletkit/wallet-evm accounts: supply, withdraw, borrow (variable rate) and repay on any Aave v3 market, native coin through WrappedTokenGatewayV3, one-transaction supply/repay with EIP-2612 permits, reserves with rates and caps, health factor and position. Only the PoolAddressesProvider is trusted; the Pool is read on-chain and cross-checked.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -32,11 +32,11 @@
     "viem": "^2.57.2"
   },
   "peerDependencies": {
-    "@forgewallet/core": "workspace:*"
+    "@anywalletkit/core": "workspace:*"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
-    "@forgewallet/core": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
     "@types/node": "^22",
     "vitest": "^5.0.3"
   },
@@ -50,6 +50,6 @@
     "ethereum",
     "evm",
     "lending-protocol",
-    "forgewallet"
+    "anywalletkit"
   ]
 }

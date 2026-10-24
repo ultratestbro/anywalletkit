@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { LocalSigner, seedFromMnemonicSync } from '@forgewallet/core'
+import { LocalSigner, seedFromMnemonicSync } from '@anywalletkit/core'
 import {
   WalletAccountNear, WalletAccountReadOnlyNear, decodeAnyTransaction, decodeSignedTransaction, decodeTransaction, describeTransaction, encodeSignedTransaction,
   encodeTransaction, fromBase64, nep413Bytes, parsePublicKey, publicKeyToString, toBase64, type NearBuiltTransaction,

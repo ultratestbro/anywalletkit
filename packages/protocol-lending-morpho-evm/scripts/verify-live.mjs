@@ -3,7 +3,7 @@
 // API) is verified against the factories and described on-chain; the live
 // cbBTC/USDC market is resolved from its id, its state accrued, position read,
 // and a supply quote proven with eth_call. Nothing is sent. RPC: MORPHO_RPC.
-import { createMockAccount } from '@forgewallet/conformance'
+import { createMockAccount } from '@anywalletkit/conformance'
 import { MorphoApi, MorphoMarketProtocolEvm, MorphoVaultProtocolEvm } from '../dist/index.js'
 
 const rpc = process.env.MORPHO_RPC ?? 'https://base-rpc.publicnode.com'

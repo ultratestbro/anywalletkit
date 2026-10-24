@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { derivationVectors } from '@forgewallet/conformance'
-import { Wallet } from '@forgewallet/kit'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
-import { RouterSwap2Protocol, type Swap2Route } from '@forgewallet/protocol-swap2-router'
+import { derivationVectors } from '@anywalletkit/conformance'
+import { Wallet } from '@anywalletkit/kit'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
+import { RouterSwap2Protocol, type Swap2Route } from '@anywalletkit/protocol-swap2-router'
 import { bestQuote, providers, routePicker, swapsFor, usdcToBase } from '../src/swap.ts'
 import { walletWithSwaps } from '../src/kit.ts'
 
@@ -28,7 +28,7 @@ describe('Swaps guide (docs) — offline', () => {
   })
 })
 
-// Real providers over the network: LIVE=1 pnpm --filter @forgewallet/example-swap test
+// Real providers over the network: LIVE=1 pnpm --filter @anywalletkit/example-swap test
 describe.runIf(process.env.LIVE === '1')('Swaps guide (docs) — live quotes, nothing signed', () => {
   it('quotes USDC Ethereum → Base and lists ranked routes', async () => {
     const wallet = new Wallet(SEED)

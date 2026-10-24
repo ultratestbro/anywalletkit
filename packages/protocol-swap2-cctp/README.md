@@ -1,4 +1,4 @@
-# @forgewallet/protocol-swap2-cctp
+# @anywalletkit/protocol-swap2-cctp
 
 [Circle CCTP V2](https://developers.circle.com/cctp) as a swap2 provider:
 native USDC between EVM chains by **burn-and-mint** — no spread, no
@@ -12,8 +12,8 @@ user's own, paid in the destination chain's gas. The swap2 engine learned
 this with the package:
 
 ```ts
-import {cctpProvider} from "@forgewallet/protocol-swap2-cctp/provider";
-import {RouterSwap2Protocol} from "@forgewallet/protocol-swap2-router/swap2/router";
+import {cctpProvider} from "@anywalletkit/protocol-swap2-cctp/provider";
+import {RouterSwap2Protocol} from "@anywalletkit/protocol-swap2-router/swap2/router";
 
 const swap2 = new RouterSwap2Protocol(baseAccount, {fromChain: "eip155:8453", providers: [cctpProvider({rpcUrls})]});
 const res = await swap2.swap2({fromToken: "USDC", toToken: "USDC", toChain: 42161, fromTokenAmount: 10_000_000n, minAmountOut: 9_998_570n});

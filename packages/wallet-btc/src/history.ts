@@ -8,7 +8,7 @@
  * what left to non-own outputs (fee separate), a receive is what landed on the
  * address. The cursor is the Blockbook page number. Explorer: mempool.space.
  */
-import type { ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@forgewallet/core'
+import type { ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@anywalletkit/core'
 import { BlockbookClient, type BlockbookAddressPage, type BlockbookTxDetails } from './blockbook.js'
 import { DEFAULT_TIMEOUT_MS } from './http.js'
 import { CAIP2_GENESIS, type BtcNetwork } from './types.js'
@@ -115,10 +115,10 @@ export function decodeCursor(s: string): BtcHistoryCursor {
   try {
     parsed = JSON.parse(b64decode(s))
   } catch {
-    throw new Error('@forgewallet/wallet-btc: malformed history cursor')
+    throw new Error('@anywalletkit/wallet-btc: malformed history cursor')
   }
   const c = parsed as Partial<BtcHistoryCursor> | null
-  if (!c || c.v !== 1 || !Number.isInteger(c.p) || (c.p as number) < 1 || !Number.isInteger(c.s) || (c.s as number) < 1) throw new Error('@forgewallet/wallet-btc: malformed history cursor')
+  if (!c || c.v !== 1 || !Number.isInteger(c.p) || (c.p as number) < 1 || !Number.isInteger(c.s) || (c.s as number) < 1) throw new Error('@anywalletkit/wallet-btc: malformed history cursor')
   return { v: 1, p: c.p as number, s: c.s as number }
 }
 
@@ -171,9 +171,9 @@ export function createBtcHistory(options: BtcHistoryOptions = {}): BtcHistorySou
   const network = options.network ?? 'bitcoin'
   const chain = CAIP2_GENESIS[network]
   const urls = [...(options.blockbookUrls ?? []), ...(options.blockbookUrl ? [options.blockbookUrl] : [])]
-  if (urls.length === 0) throw new Error('@forgewallet/wallet-btc: createBtcHistory needs blockbookUrl or blockbookUrls')
+  if (urls.length === 0) throw new Error('@anywalletkit/wallet-btc: createBtcHistory needs blockbookUrl or blockbookUrls')
   const fetchFn = options.fetch ?? globalThis.fetch
-  if (typeof fetchFn !== 'function') throw new Error('@forgewallet/wallet-btc: no global fetch; pass `fetch` in the options')
+  if (typeof fetchFn !== 'function') throw new Error('@anywalletkit/wallet-btc: no global fetch; pass `fetch` in the options')
   const clients = urls.map((url) => ({ url, client: new BlockbookClient({ url }, fetchFn, options.timeoutMs ?? DEFAULT_TIMEOUT_MS) }))
 
   async function failover<T>(run: (client: BlockbookClient) => Promise<T>): Promise<T> {

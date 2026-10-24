@@ -1,4 +1,4 @@
-import { NetworkError } from '@forgewallet/core'
+import { NetworkError } from '@anywalletkit/core'
 import { BlockbookClient } from './blockbook.js'
 import { EsploraClient } from './esplora.js'
 import { DEFAULT_TIMEOUT_MS } from './http.js'

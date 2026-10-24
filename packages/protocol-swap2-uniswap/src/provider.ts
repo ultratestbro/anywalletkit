@@ -1,8 +1,8 @@
 import {decodeFunctionResult, encodeFunctionData, encodePacked, getAddress, parseAbi, type Hex} from "viem";
 import {describeUniswapActivity} from "./activity.js";
-import {ccAsset} from "@forgewallet/swap2-assets";
-import {evmRef, isEvm, timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
-import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
+import {ccAsset} from "@anywalletkit/swap2-assets";
+import {evmRef, isEvm, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
 
 /**

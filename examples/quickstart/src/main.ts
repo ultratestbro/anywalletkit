@@ -1,5 +1,5 @@
 // Runs the Quickstart against mainnet RPCs with a fresh, empty seed: addresses and balances.
-// pnpm --filter @forgewallet/example-quickstart start
+// pnpm --filter @anywalletkit/example-quickstart start
 import { addresses, createWallet, ethBalance, newSeedPhrase } from './wallet.ts'
 
 const wallet = createWallet(process.env.SEED_PHRASE ?? newSeedPhrase())

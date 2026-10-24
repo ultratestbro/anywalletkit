@@ -1,4 +1,4 @@
-import {evmRef, isEvm, namespace} from "@forgewallet/protocol-swap2-core/util";
+import {evmRef, isEvm, namespace} from "@anywalletkit/protocol-swap2-core/util";
 
 // ── THORChain — native L1 assets: BTC/ETH/BSC/BASE/Cosmos/Tron/Solana, and
 //    (2026-08, pools live) XRP/LTC/DOGE/BCH + GAIA.ATOM ──────────────────────

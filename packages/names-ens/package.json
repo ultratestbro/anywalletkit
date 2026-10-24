@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/names-ens",
+  "name": "@anywalletkit/names-ens",
   "version": "0.2.0",
-  "description": "ENS names for @forgewallet wallets: vitalik.eth / name.base.eth / alice.cb.id → the address for one chain (ENSIP-9/11 multichain, wildcard + CCIP-Read), verified primary names, avatars, lookalike warnings. Implements the core NameResolver.",
+  "description": "ENS names for Any Wallet Kit wallets: vitalik.eth / name.base.eth / alice.cb.id → the address for one chain (ENSIP-9/11 multichain, wildcard + CCIP-Read), verified primary names, avatars, lookalike warnings. Implements the core NameResolver.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -35,11 +35,11 @@
     "viem": "^2.57.2"
   },
   "peerDependencies": {
-    "@forgewallet/core": "workspace:*"
+    "@anywalletkit/core": "workspace:*"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
-    "@forgewallet/core": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
     "@types/node": "^22",
     "vitest": "^5.0.3"
   },
@@ -51,6 +51,6 @@
     "ccip-read",
     "basenames",
     "ethereum",
-    "forgewallet"
+    "anywalletkit"
   ]
 }

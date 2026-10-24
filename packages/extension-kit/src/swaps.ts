@@ -11,7 +11,7 @@
  * A tracker error leaves the record as it was (with `lastError`); a record older
  * than `giveUpAfterMs` with no progress becomes `expired` so the alarm stops.
  */
-import { SWAP2_ID_PREFIX, type IntentStatus } from '@forgewallet/protocol-swap2-core'
+import { SWAP2_ID_PREFIX, type IntentStatus } from '@anywalletkit/protocol-swap2-core'
 import type { JsonStorage } from './storage.js'
 
 export type SwapRecordStatus = IntentStatus['state'] | 'claiming'

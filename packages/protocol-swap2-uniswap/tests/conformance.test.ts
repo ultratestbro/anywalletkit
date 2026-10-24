@@ -1,10 +1,10 @@
-import {describeProtocolBehaviour, describeProtocolModule} from "@forgewallet/conformance";
+import {describeProtocolBehaviour, describeProtocolModule} from "@anywalletkit/conformance";
 import {UniswapSwap2Protocol} from "../src/protocol.js";
 import {D, ME, RPC, USDC, USDT, rpcStub} from "./fixtures.js";
 
 import {readdirSync, readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
-import type {ActivityFixtureJson} from "@forgewallet/conformance";
+import type {ActivityFixtureJson} from "@anywalletkit/conformance";
 
 // Recorded real transactions (fixtures/activity/*.json); `negative-*` must come back null.
 const fixturesDir = fileURLToPath(new URL("../fixtures/activity/", import.meta.url));

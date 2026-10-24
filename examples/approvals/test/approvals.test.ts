@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { derivationVectors } from '@forgewallet/conformance'
-import { UserRejectedError } from '@forgewallet/core'
-import type { WriteIntent } from '@forgewallet/kit'
-import type { WalletAccountEvm } from '@forgewallet/wallet-evm'
-import ApprovalsProtocolEvm, { type Approval } from '@forgewallet/protocol-approvals-evm'
+import { derivationVectors } from '@anywalletkit/conformance'
+import { UserRejectedError } from '@anywalletkit/core'
+import type { WriteIntent } from '@anywalletkit/kit'
+import type { WalletAccountEvm } from '@anywalletkit/wallet-evm'
+import ApprovalsProtocolEvm, { type Approval } from '@anywalletkit/protocol-approvals-evm'
 import { approvalPolicies, auditAddress, memoryCache, revokeOne, walletWithApprovals } from '../src/approvals.ts'
 
 const SEED = derivationVectors.seeds['bip39-abandon-12']!
@@ -95,7 +95,7 @@ describe('Approvals guide (docs) — offline', () => {
   })
 })
 
-// Mainnet reads, nothing signed: LIVE=1 pnpm --filter @forgewallet/example-approvals test
+// Mainnet reads, nothing signed: LIVE=1 pnpm --filter @anywalletkit/example-approvals test
 describe.runIf(process.env.LIVE === '1')('Approvals guide (docs) — live reads', () => {
   it('scans the recent history of an account through an RPC that serves address-less eth_getLogs', async () => {
     const approvals = new ApprovalsProtocolEvm(

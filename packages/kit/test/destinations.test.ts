@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
-import { createMockAccount } from '@forgewallet/conformance'
+import { createMockAccount } from '@anywalletkit/conformance'
 import { PolicyViolationError, applyPolicies, type WriteIntent } from '../src/index.js'
 
 // ── fixtures: byte-exact encodings built here, independent of the kit's readers ──

@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/core",
+  "name": "@anywalletkit/core",
   "version": "0.2.0",
-  "description": "Signer and account interfaces, protocol base classes, errors and key-derivation helpers for the forgewallet SDK.",
+  "description": "Signer and account interfaces, protocol base classes, errors and key-derivation helpers for Any Wallet Kit.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,

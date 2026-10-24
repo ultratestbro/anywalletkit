@@ -26,11 +26,11 @@ export function decodeCursor(s: string): PageCursor {
   try {
     parsed = JSON.parse(base64Decode(s))
   } catch {
-    throw new Error('@forgewallet/history-evm: malformed cursor')
+    throw new Error('@anywalletkit/history-evm: malformed cursor')
   }
   const c = parsed as Partial<PageCursor> | null
   if (!c || c.v !== 1 || typeof c.b !== 'string' || typeof c.lists !== 'object' || c.lists === null) {
-    throw new Error('@forgewallet/history-evm: malformed cursor')
+    throw new Error('@anywalletkit/history-evm: malformed cursor')
   }
   const out: PageCursor = { v: 1, b: c.b, lists: c.lists }
   if (typeof c.w === 'number') out.w = c.w

@@ -9,7 +9,7 @@
  * so selection is simple: largest-first accumulation until the inputs cover
  * amount + fee, change kept when it clears the dust floor.
  */
-import { InsufficientFundsError } from '@forgewallet/core'
+import { InsufficientFundsError } from '@anywalletkit/core'
 import { DUST_LIMIT } from './address.js'
 import type { Utxo } from './types.js'
 

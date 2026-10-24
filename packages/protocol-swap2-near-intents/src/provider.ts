@@ -1,8 +1,8 @@
 import {nearIntents as cfg, nearIntentsChainRefusal, type NearIntentsSuspendedChains} from "./config.js";
 import {describeNearIntentsActivity} from "./activity.js";
-import {timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
-import {CC_DEST, ccAsset, ccAssetByToken, ccChain} from "@forgewallet/swap2-assets";
-import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
+import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import {CC_DEST, ccAsset, ccAssetByToken, ccChain} from "@anywalletkit/swap2-assets";
+import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 /**
  * NEAR Intents (1Click) provider — the core route, broadest coverage. Ported

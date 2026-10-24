@@ -1,6 +1,6 @@
-# @forgewallet/protocol-lending-morpho-evm
+# @anywalletkit/protocol-lending-morpho-evm
 
-[Morpho](https://docs.morpho.org) for `@forgewallet/wallet-evm` accounts, two
+[Morpho](https://docs.morpho.org) for `@anywalletkit/wallet-evm` accounts, two
 `LendingProtocol`s in one package:
 
 - **`MorphoVaultProtocolEvm`** — a Morpho Vault (MetaMorpho / Vault V1, or Vault
@@ -27,8 +27,8 @@ config.
 ## Usage
 
 ```ts
-import WalletManagerEvm from '@forgewallet/wallet-evm'
-import { MorphoVaultProtocolEvm, MorphoMarketProtocolEvm, MorphoApi } from '@forgewallet/protocol-lending-morpho-evm'
+import WalletManagerEvm from '@anywalletkit/wallet-evm'
+import { MorphoVaultProtocolEvm, MorphoMarketProtocolEvm, MorphoApi } from '@anywalletkit/protocol-lending-morpho-evm'
 
 const account = await new WalletManagerEvm(seed, { provider: 'https://base-rpc…' }).getAccount(0)
 

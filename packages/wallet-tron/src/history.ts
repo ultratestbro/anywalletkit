@@ -11,7 +11,7 @@
  * TronGrid allows ~1 request/s per endpoint; pass `apiKey` for more.
  * `fetch` + `AbortSignal.timeout` only — Hermes-safe.
  */
-import type { ChainCall, ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@forgewallet/core'
+import type { ChainCall, ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@anywalletkit/core'
 import { toBase58Address } from './address.js'
 import { CAIP2_GENESIS } from './types.js'
 
@@ -129,10 +129,10 @@ export function decodeCursor(s: string): TronHistoryCursor {
   try {
     parsed = JSON.parse(b64decode(s))
   } catch {
-    throw new Error('@forgewallet/wallet-tron: malformed history cursor')
+    throw new Error('@anywalletkit/wallet-tron: malformed history cursor')
   }
   const c = parsed as Partial<TronHistoryCursor> | null
-  if (!c || c.v !== 1 || typeof c.w !== 'number' || !Array.isArray(c.x) || !Array.isArray(c.e)) throw new Error('@forgewallet/wallet-tron: malformed history cursor')
+  if (!c || c.v !== 1 || typeof c.w !== 'number' || !Array.isArray(c.x) || !Array.isArray(c.e)) throw new Error('@anywalletkit/wallet-tron: malformed history cursor')
   return { v: 1, w: c.w, x: c.x.filter((x): x is string => typeof x === 'string'), e: c.e.filter((x): x is 'tx' | 'trc20' => x === 'tx' || x === 'trc20') }
 }
 
@@ -356,7 +356,7 @@ export function createTronHistory(options: TronHistoryOptions = {}): TronHistory
   const chain = CAIP2_GENESIS[network] ?? CAIP2_GENESIS.mainnet!
   const apiUrl = (options.apiUrl ?? DEFAULT_URLS[network]).replace(/\/+$/, '')
   const fetchFn: HistoryFetch = options.fetch ?? ((globalThis as { fetch?: HistoryFetch }).fetch as HistoryFetch)
-  if (typeof fetchFn !== 'function') throw new Error('@forgewallet/wallet-tron: no global fetch; pass `fetch` in the options')
+  if (typeof fetchFn !== 'function') throw new Error('@anywalletkit/wallet-tron: no global fetch; pass `fetch` in the options')
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const bucket = new TokenBucket(options.rateLimit ?? (options.apiKey ? 10 : 1))
   const headers = (): Record<string, string> => ({ accept: 'application/json', ...(options.apiKey ? { 'TRON-PRO-API-KEY': options.apiKey } : {}) })

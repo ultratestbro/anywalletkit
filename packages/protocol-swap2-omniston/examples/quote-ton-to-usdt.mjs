@@ -14,7 +14,7 @@
 // venue validates it, and a placeholder comes back as "no route available"
 // rather than as a validation error.
 
-import OmnistonSwap2Protocol from "@forgewallet/protocol-swap2-omniston";
+import OmnistonSwap2Protocol from "@anywalletkit/protocol-swap2-omniston";
 
 const recipient = process.env.RECIPIENT;
 if (!recipient) throw new Error("set RECIPIENT to an EVM address");

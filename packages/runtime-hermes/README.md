@@ -1,4 +1,4 @@
-# @forgewallet/runtime-hermes
+# @anywalletkit/runtime-hermes
 
 One call, at the app entry, after `react-native-get-random-values`, `buffer` and a
 TextEncoder polyfill are in place:
@@ -9,7 +9,7 @@ import { Buffer } from 'buffer'
 global.Buffer ??= Buffer
 import 'fastestsmallesttextencoderdecoder/EncoderDecoderTogether.min.js'
 import 'react-native-url-polyfill/auto'
-import { installHermesRuntime } from '@forgewallet/runtime-hermes'
+import { installHermesRuntime } from '@anywalletkit/runtime-hermes'
 installHermesRuntime()
 ```
 

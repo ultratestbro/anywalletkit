@@ -23,7 +23,7 @@ import Security
  */
 public class BackupCloudModule: Module {
   public func definition() -> ModuleDefinition {
-    Name("ForgewalletBackupCloud")
+    Name("AnyWalletKitBackupCloud")
 
     AsyncFunction("driveStatus") { (container: String) -> [String: Any] in
       let signedIn = FileManager.default.ubiquityIdentityToken != nil

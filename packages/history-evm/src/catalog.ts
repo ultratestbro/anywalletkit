@@ -1,4 +1,4 @@
-import { ccChain } from '@forgewallet/swap2-assets'
+import { ccChain } from '@anywalletkit/swap2-assets'
 
 export interface TokenMeta {
   symbol: string

@@ -5,7 +5,7 @@
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {thorchainProvider} from "../src/provider.js";
-import type {Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
+import type {Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 const NODE = "https://thor.invalid";
 const TRON = "tron:728126428";

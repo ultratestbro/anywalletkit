@@ -1,4 +1,4 @@
-# @forgewallet/keyring
+# @anywalletkit/keyring
 
 Many accounts from many key sources, the way MetaMask, Phantom or Tonkeeper do it:
 
@@ -7,9 +7,9 @@ Many accounts from many key sources, the way MetaMask, Phantom or Tonkeeper do i
 - **a TON-native 24-word mnemonic** (Tonkeeper, Tonhub, MyTonWallet) → one TON account.
 
 ```ts
-import { Keyring } from '@forgewallet/keyring'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
-import { WalletManagerSolana } from '@forgewallet/wallet-solana'
+import { Keyring } from '@anywalletkit/keyring'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
+import { WalletManagerSolana } from '@anywalletkit/wallet-solana'
 
 const keyring = await Keyring.load({
   storage,  // KeyringStorage: names, addresses, flags — no secrets

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { inspect } from 'node:util'
 import { bytesToHex } from 'viem'
-import { deriveSecp256k1, seedFromMnemonicSync } from '@forgewallet/core'
-import { describeChainModule, derivationVectors } from '@forgewallet/conformance'
+import { deriveSecp256k1, seedFromMnemonicSync } from '@anywalletkit/core'
+import { describeChainModule, derivationVectors } from '@anywalletkit/conformance'
 import { WalletManagerEvm, type WalletAccountEvm } from '../src/index.js'
 
 describeChainModule('wallet-evm', {

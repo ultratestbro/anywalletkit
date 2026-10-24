@@ -1,4 +1,4 @@
-import { describeChainModule } from '@forgewallet/conformance'
+import { describeChainModule } from '@anywalletkit/conformance'
 import { WalletManagerBtc, type WalletAccountBtc } from '../src/index.js'
 
 describeChainModule('wallet-btc', {

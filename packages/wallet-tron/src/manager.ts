@@ -1,4 +1,4 @@
-import { LocalSigner, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@anywalletkit/core'
 import { WalletAccountTron } from './account.js'
 import { WalletAccountReadOnlyTron } from './read-only-account.js'
 import type { TronConfig } from './types.js'

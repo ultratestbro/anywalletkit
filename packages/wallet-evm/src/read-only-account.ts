@@ -1,4 +1,4 @@
-import { NetworkError, type IWalletAccountReadOnly } from '@forgewallet/core'
+import { NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import {
   BaseError, ContractFunctionRevertedError, decodeErrorResult, getAddress, hashTypedData, isHex,
   recoverMessageAddress, recoverAddress, stringToHex,

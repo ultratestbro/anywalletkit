@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-swap2-omniston",
+  "name": "@anywalletkit/protocol-swap2-omniston",
   "type": "swap2",
   "chains": [
     "ton:-239",
@@ -10,7 +10,7 @@
     "@ultratestbro"
   ],
   "conformance": "0.x",
-  "repo": "https://github.com/ultratestbro/forgewallet",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-swap2-omniston",
   "description": "STON.fi Omniston TON swaps and TON\u2194EVM / EVM\u2194EVM stable orders.",
   "addedAt": "2026-10-04"

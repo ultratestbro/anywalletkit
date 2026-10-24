@@ -1,4 +1,4 @@
-import { NetworkError } from '@forgewallet/core'
+import { NetworkError } from '@anywalletkit/core'
 
 export const DEFAULT_TIMEOUT_MS = 15_000
 

@@ -4,7 +4,7 @@
  * before any chain package is imported:
  *
  *   import 'react-native-get-random-values'            // app's job: secure randomness
- *   import { installHermesRuntime } from '@forgewallet/runtime-hermes'
+ *   import { installHermesRuntime } from '@anywalletkit/runtime-hermes'
  *   installHermesRuntime()
  *
  * Nothing here is imported by the SDK packages themselves — they stay

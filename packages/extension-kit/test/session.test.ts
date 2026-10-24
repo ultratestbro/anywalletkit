@@ -23,7 +23,7 @@ describe('Session', () => {
     expect(await session.isUnlocked()).toBe(true)
     expect(Array.from(await session.getKey())).toEqual(Array.from(DEK()))
     expect(storage.data.size).toBe(1)
-    expect(alarms.pending.get('forgewallet-session/autolock')).toBe(1_000_000 + 15 * 60_000)
+    expect(alarms.pending.get('anywalletkit-session/autolock')).toBe(1_000_000 + 15 * 60_000)
     expect(await code(session.unlock(new Uint8Array(16)))).toBe('invalid-input')
   })
 
@@ -32,7 +32,7 @@ describe('Session', () => {
     let locks = 0
     const off = session.onLock(() => locks++)
     await session.unlock(DEK())
-    alarms.fire('forgewallet-session/autolock')
+    alarms.fire('anywalletkit-session/autolock')
     await Promise.resolve()
     expect(await session.isUnlocked()).toBe(false)
     expect(locks).toBe(1)
@@ -58,7 +58,7 @@ describe('Session', () => {
     await session.unlock(DEK())
     tick(30_000)
     await session.touch()
-    expect(alarms.pending.get('forgewallet-session/autolock')).toBe(1_000_000 + 90_000)
+    expect(alarms.pending.get('anywalletkit-session/autolock')).toBe(1_000_000 + 90_000)
     tick(59_000)
     expect(await session.isUnlocked()).toBe(true)
   })

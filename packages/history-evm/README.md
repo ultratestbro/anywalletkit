@@ -1,4 +1,4 @@
-# @forgewallet/history-evm
+# @anywalletkit/history-evm
 
 `HistorySource` for every EVM chain the SDK supports. One source per chain
 (`chain = "eip155:<id>"`), backed by Etherscan v2 when you have an API key,
@@ -9,7 +9,7 @@ instance exists. Explorer rows are merged into one
 native transfers, with fee, status, call selector and a documented spam flag.
 
 ```ts
-import { createEvmHistory } from '@forgewallet/history-evm'
+import { createEvmHistory } from '@anywalletkit/history-evm'
 
 const history = createEvmHistory({ chainId: 8453, etherscanApiKey: process.env.ETHERSCAN_API_KEY })
 const page = await history.listActivity('0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA', { limit: 50 })
@@ -233,7 +233,7 @@ token row is flagged (`raw.spamReason`) when:
    characters (`U⁯S⁯DΤ`) or whose ASCII form equals a catalog symbol on this
    chain (fake "USDT" at another contract).
 
-"Catalog" = `@forgewallet/swap2-assets` (`ccChain('eip155:<id>').assets`).
+"Catalog" = `@anywalletkit/swap2-assets` (`ccChain('eip155:<id>').assets`).
 
 ## Adding a chain
 
@@ -242,11 +242,11 @@ token row is flagged (`raw.spamReason`) when:
 3. Probe a Blockscout root (`/api/v2/transactions` must be `200` JSON) → `BLOCKSCOUT_URLS`; Routescan (`https://api.routescan.io/v2/network/mainnet/evm/<id>/etherscan/api?module=account&action=txlist&address=…`) → `ETHERSCAN_COMPAT_URLS`.
 4. Alchemy: `curl -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' https://<slug>.g.alchemy.com/v2/<key>` → `ALCHEMY_NETWORKS`; `https://www.alchemy.com/rpc/<chain>.md` lists "Transfers API" → `ALCHEMY_TRANSFERS_CHAIN_IDS` (and `ALCHEMY_INTERNAL_CHAIN_IDS` when the `internal` category is documented).
 5. Nothing answers → `NO_EXPLORER_CHAIN_IDS`.
-6. Update the tables above with the date, run `pnpm --filter @forgewallet/history-evm test` (the chain-table tests enforce that every id is covered and has an Alchemy slug).
+6. Update the tables above with the date, run `pnpm --filter @anywalletkit/history-evm test` (the chain-table tests enforce that every id is covered and has an Alchemy slug).
 
 ## Tests
 
-`pnpm --filter @forgewallet/history-evm test` — no network: fixtures in
+`pnpm --filter @anywalletkit/history-evm test` — no network: fixtures in
 `tests/fixtures/` are real Etherscan v2 (`chainid=1`, captured with a key —
 keyless capture is no longer possible) and `eth.blockscout.com` responses for
 the public test wallet `0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA`, plus a

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deriveEd25519, deriveSecp256k1, privateKeySigner, seedFromMnemonicSync, type IWalletAccount, type Signer, type SignerCurve, type WalletManager } from '@forgewallet/core'
+import { deriveEd25519, deriveSecp256k1, privateKeySigner, seedFromMnemonicSync, type IWalletAccount, type Signer, type SignerCurve, type WalletManager } from '@anywalletkit/core'
 import { type ChainKey, derivationVectors } from './vectors.js'
 
 export interface ChainSuiteOptions<M extends WalletManager<IWalletAccount, object>> {

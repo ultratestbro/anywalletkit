@@ -2,7 +2,7 @@ import '../src/buffer-global.js'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describeProtocolModule, type ActivityFixtureJson } from '@forgewallet/conformance'
+import { describeProtocolModule, type ActivityFixtureJson } from '@anywalletkit/conformance'
 import TonstakersProtocolTon from '../index.js'
 
 const dir = fileURLToPath(new URL('../fixtures/activity/', import.meta.url))

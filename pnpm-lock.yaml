@@ -53,20 +53,20 @@ importers:
 
   examples/approvals:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@forgewallet/kit':
+      '@anywalletkit/kit':
         specifier: workspace:*
         version: link:../../packages/kit
-      '@forgewallet/protocol-approvals-evm':
+      '@anywalletkit/protocol-approvals-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-approvals-evm
-      '@forgewallet/wallet-evm':
+      '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../../packages/wallet-evm
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../../packages/conformance
       typescript:
@@ -78,23 +78,23 @@ importers:
 
   examples/earn:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@forgewallet/kit':
+      '@anywalletkit/kit':
         specifier: workspace:*
         version: link:../../packages/kit
-      '@forgewallet/protocol-lending-aave-evm':
+      '@anywalletkit/protocol-lending-aave-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-lending-aave-evm
-      '@forgewallet/protocol-staking-lido-evm':
+      '@anywalletkit/protocol-staking-lido-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-lido-evm
-      '@forgewallet/wallet-evm':
+      '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../../packages/wallet-evm
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../../packages/conformance
       typescript:
@@ -106,100 +106,100 @@ importers:
 
   examples/hermes-smoke:
     dependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../../packages/conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@forgewallet/names-ens':
+      '@anywalletkit/names-ens':
         specifier: workspace:*
         version: link:../../packages/names-ens
-      '@forgewallet/networks':
+      '@anywalletkit/networks':
         specifier: workspace:*
         version: link:../../packages/networks
-      '@forgewallet/protocol-approvals-evm':
+      '@anywalletkit/protocol-approvals-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-approvals-evm
-      '@forgewallet/protocol-lending-aave-evm':
+      '@anywalletkit/protocol-lending-aave-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-lending-aave-evm
-      '@forgewallet/protocol-lending-kamino-solana':
+      '@anywalletkit/protocol-lending-kamino-solana':
         specifier: workspace:*
         version: link:../../packages/protocol-lending-kamino-solana
-      '@forgewallet/protocol-lending-mellow-evm':
+      '@anywalletkit/protocol-lending-mellow-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-lending-mellow-evm
-      '@forgewallet/protocol-lending-morpho-evm':
+      '@anywalletkit/protocol-lending-morpho-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-lending-morpho-evm
-      '@forgewallet/protocol-staking-lido-evm':
+      '@anywalletkit/protocol-staking-lido-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-lido-evm
-      '@forgewallet/protocol-staking-spl-stake-pool-solana':
+      '@anywalletkit/protocol-staking-spl-stake-pool-solana':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-spl-stake-pool-solana
-      '@forgewallet/protocol-staking-ssv-evm':
+      '@anywalletkit/protocol-staking-ssv-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-ssv-evm
-      '@forgewallet/protocol-staking-tonstakers-ton':
+      '@anywalletkit/protocol-staking-tonstakers-ton':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-tonstakers-ton
-      '@forgewallet/protocol-swap2-cctp':
+      '@anywalletkit/protocol-swap2-cctp':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-cctp
-      '@forgewallet/protocol-swap2-chainflip':
+      '@anywalletkit/protocol-swap2-chainflip':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-chainflip
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-core
-      '@forgewallet/protocol-swap2-jupiter':
+      '@anywalletkit/protocol-swap2-jupiter':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-jupiter
-      '@forgewallet/protocol-swap2-lifi':
+      '@anywalletkit/protocol-swap2-lifi':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-lifi
-      '@forgewallet/protocol-swap2-near-intents':
+      '@anywalletkit/protocol-swap2-near-intents':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-near-intents
-      '@forgewallet/protocol-swap2-omniston':
+      '@anywalletkit/protocol-swap2-omniston':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-omniston
-      '@forgewallet/protocol-swap2-router':
+      '@anywalletkit/protocol-swap2-router':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-router
-      '@forgewallet/protocol-swap2-thorchain':
+      '@anywalletkit/protocol-swap2-thorchain':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-thorchain
-      '@forgewallet/protocol-swap2-usdt0':
+      '@anywalletkit/protocol-swap2-usdt0':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-usdt0
-      '@forgewallet/runtime-hermes':
+      '@anywalletkit/runtime-hermes':
         specifier: workspace:*
         version: link:../../packages/runtime-hermes
-      '@forgewallet/seed-vault':
+      '@anywalletkit/seed-vault':
         specifier: workspace:*
         version: link:../../packages/seed-vault
-      '@forgewallet/wallet-btc':
+      '@anywalletkit/wallet-btc':
         specifier: workspace:*
         version: link:../../packages/wallet-btc
-      '@forgewallet/wallet-evm':
+      '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../../packages/wallet-evm
-      '@forgewallet/wallet-near':
+      '@anywalletkit/wallet-near':
         specifier: workspace:*
         version: link:../../packages/wallet-near
-      '@forgewallet/wallet-solana':
+      '@anywalletkit/wallet-solana':
         specifier: workspace:*
         version: link:../../packages/wallet-solana
-      '@forgewallet/wallet-ton':
+      '@anywalletkit/wallet-ton':
         specifier: workspace:*
         version: link:../../packages/wallet-ton
-      '@forgewallet/wallet-tron':
+      '@anywalletkit/wallet-tron':
         specifier: workspace:*
         version: link:../../packages/wallet-tron
-      '@forgewallet/wallet-zcash':
+      '@anywalletkit/wallet-zcash':
         specifier: workspace:*
         version: link:../../packages/wallet-zcash
       '@noble/curves':
@@ -242,32 +242,32 @@ importers:
 
   examples/history:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@forgewallet/history-evm':
+      '@anywalletkit/history-evm':
         specifier: workspace:*
         version: link:../../packages/history-evm
-      '@forgewallet/kit':
+      '@anywalletkit/kit':
         specifier: workspace:*
         version: link:../../packages/kit
-      '@forgewallet/protocol-staking-lido-evm':
+      '@anywalletkit/protocol-staking-lido-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-lido-evm
-      '@forgewallet/wallet-evm':
+      '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../../packages/wallet-evm
-      '@forgewallet/wallet-solana':
+      '@anywalletkit/wallet-solana':
         specifier: workspace:*
         version: link:../../packages/wallet-solana
-      '@forgewallet/wallet-ton':
+      '@anywalletkit/wallet-ton':
         specifier: workspace:*
         version: link:../../packages/wallet-ton
-      '@forgewallet/wallet-tron':
+      '@anywalletkit/wallet-tron':
         specifier: workspace:*
         version: link:../../packages/wallet-tron
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../../packages/conformance
       typescript:
@@ -279,29 +279,29 @@ importers:
 
   examples/keyring:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@forgewallet/keyring':
+      '@anywalletkit/keyring':
         specifier: workspace:*
         version: link:../../packages/keyring
-      '@forgewallet/kit':
+      '@anywalletkit/kit':
         specifier: workspace:*
         version: link:../../packages/kit
-      '@forgewallet/wallet-evm':
+      '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../../packages/wallet-evm
-      '@forgewallet/wallet-solana':
+      '@anywalletkit/wallet-solana':
         specifier: workspace:*
         version: link:../../packages/wallet-solana
-      '@forgewallet/wallet-ton':
+      '@anywalletkit/wallet-ton':
         specifier: workspace:*
         version: link:../../packages/wallet-ton
-      '@forgewallet/wallet-tron':
+      '@anywalletkit/wallet-tron':
         specifier: workspace:*
         version: link:../../packages/wallet-tron
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../../packages/conformance
       typescript:
@@ -313,14 +313,14 @@ importers:
 
   examples/names:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@forgewallet/names-ens':
+      '@anywalletkit/names-ens':
         specifier: workspace:*
         version: link:../../packages/names-ens
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../../packages/conformance
       typescript:
@@ -332,23 +332,23 @@ importers:
 
   examples/networks:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@forgewallet/kit':
+      '@anywalletkit/kit':
         specifier: workspace:*
         version: link:../../packages/kit
-      '@forgewallet/networks':
+      '@anywalletkit/networks':
         specifier: workspace:*
         version: link:../../packages/networks
-      '@forgewallet/wallet-evm':
+      '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../../packages/wallet-evm
-      '@forgewallet/wallet-solana':
+      '@anywalletkit/wallet-solana':
         specifier: workspace:*
         version: link:../../packages/wallet-solana
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../../packages/conformance
       typescript:
@@ -360,32 +360,32 @@ importers:
 
   examples/quickstart:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@forgewallet/kit':
+      '@anywalletkit/kit':
         specifier: workspace:*
         version: link:../../packages/kit
-      '@forgewallet/wallet-btc':
+      '@anywalletkit/wallet-btc':
         specifier: workspace:*
         version: link:../../packages/wallet-btc
-      '@forgewallet/wallet-evm':
+      '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../../packages/wallet-evm
-      '@forgewallet/wallet-near':
+      '@anywalletkit/wallet-near':
         specifier: workspace:*
         version: link:../../packages/wallet-near
-      '@forgewallet/wallet-solana':
+      '@anywalletkit/wallet-solana':
         specifier: workspace:*
         version: link:../../packages/wallet-solana
-      '@forgewallet/wallet-ton':
+      '@anywalletkit/wallet-ton':
         specifier: workspace:*
         version: link:../../packages/wallet-ton
-      '@forgewallet/wallet-tron':
+      '@anywalletkit/wallet-tron':
         specifier: workspace:*
         version: link:../../packages/wallet-tron
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../../packages/conformance
       typescript:
@@ -397,23 +397,23 @@ importers:
 
   examples/signer:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@forgewallet/kit':
+      '@anywalletkit/kit':
         specifier: workspace:*
         version: link:../../packages/kit
-      '@forgewallet/wallet-btc':
+      '@anywalletkit/wallet-btc':
         specifier: workspace:*
         version: link:../../packages/wallet-btc
-      '@forgewallet/wallet-evm':
+      '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../../packages/wallet-evm
-      '@forgewallet/wallet-solana':
+      '@anywalletkit/wallet-solana':
         specifier: workspace:*
         version: link:../../packages/wallet-solana
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../../packages/conformance
       typescript:
@@ -425,50 +425,50 @@ importers:
 
   examples/swap:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@forgewallet/kit':
+      '@anywalletkit/kit':
         specifier: workspace:*
         version: link:../../packages/kit
-      '@forgewallet/protocol-swap2-cctp':
+      '@anywalletkit/protocol-swap2-cctp':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-cctp
-      '@forgewallet/protocol-swap2-chainflip':
+      '@anywalletkit/protocol-swap2-chainflip':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-chainflip
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-core
-      '@forgewallet/protocol-swap2-jupiter':
+      '@anywalletkit/protocol-swap2-jupiter':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-jupiter
-      '@forgewallet/protocol-swap2-lifi':
+      '@anywalletkit/protocol-swap2-lifi':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-lifi
-      '@forgewallet/protocol-swap2-near-intents':
+      '@anywalletkit/protocol-swap2-near-intents':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-near-intents
-      '@forgewallet/protocol-swap2-router':
+      '@anywalletkit/protocol-swap2-router':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-router
-      '@forgewallet/protocol-swap2-thorchain':
+      '@anywalletkit/protocol-swap2-thorchain':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-thorchain
-      '@forgewallet/protocol-swap2-uniswap':
+      '@anywalletkit/protocol-swap2-uniswap':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-uniswap
-      '@forgewallet/protocol-swap2-usdt0':
+      '@anywalletkit/protocol-swap2-usdt0':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-usdt0
-      '@forgewallet/protocol-swap2-wrap':
+      '@anywalletkit/protocol-swap2-wrap':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-wrap
-      '@forgewallet/wallet-evm':
+      '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../../packages/wallet-evm
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../../packages/conformance
       typescript:
@@ -480,26 +480,26 @@ importers:
 
   examples/tx-preview:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@forgewallet/kit':
+      '@anywalletkit/kit':
         specifier: workspace:*
         version: link:../../packages/kit
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-core
-      '@forgewallet/tx-preview-evm':
+      '@anywalletkit/tx-preview-evm':
         specifier: workspace:*
         version: link:../../packages/tx-preview-evm
-      '@forgewallet/wallet-evm':
+      '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../../packages/wallet-evm
       viem:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../../packages/conformance
       typescript:
@@ -511,7 +511,7 @@ importers:
 
   packages/backup-cloud:
     dependencies:
-      '@forgewallet/seed-vault':
+      '@anywalletkit/seed-vault':
         specifier: workspace:*
         version: link:../seed-vault
       expo-modules-core:
@@ -527,10 +527,10 @@ importers:
 
   packages/conformance:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
-      '@forgewallet/tx-preview-evm':
+      '@anywalletkit/tx-preview-evm':
         specifier: workspace:*
         version: link:../tx-preview-evm
     devDependencies:
@@ -555,23 +555,23 @@ importers:
 
   packages/extension-kit:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
-      '@forgewallet/keyring':
+      '@anywalletkit/keyring':
         specifier: workspace:*
         version: link:../keyring
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
       '@noble/hashes':
         specifier: ^2.4.0
         version: 2.4.0
     devDependencies:
-      '@forgewallet/wallet-evm':
+      '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../wallet-evm
       viem:
@@ -583,11 +583,11 @@ importers:
 
   packages/history-evm:
     dependencies:
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
     devDependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -599,7 +599,7 @@ importers:
 
   packages/keyring:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@noble/curves':
@@ -615,25 +615,25 @@ importers:
         specifier: ^2.4.0
         version: 2.4.0
     devDependencies:
-      '@forgewallet/wallet-btc':
+      '@anywalletkit/wallet-btc':
         specifier: workspace:*
         version: link:../wallet-btc
-      '@forgewallet/wallet-evm':
+      '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../wallet-evm
-      '@forgewallet/wallet-near':
+      '@anywalletkit/wallet-near':
         specifier: workspace:*
         version: link:../wallet-near
-      '@forgewallet/wallet-solana':
+      '@anywalletkit/wallet-solana':
         specifier: workspace:*
         version: link:../wallet-solana
-      '@forgewallet/wallet-ton':
+      '@anywalletkit/wallet-ton':
         specifier: workspace:*
         version: link:../wallet-ton
-      '@forgewallet/wallet-tron':
+      '@anywalletkit/wallet-tron':
         specifier: workspace:*
         version: link:../wallet-tron
-      '@forgewallet/wallet-zcash':
+      '@anywalletkit/wallet-zcash':
         specifier: workspace:*
         version: link:../wallet-zcash
       '@ton/crypto':
@@ -648,14 +648,14 @@ importers:
 
   packages/kit:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
       vitest:
@@ -674,10 +674,10 @@ importers:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -689,7 +689,7 @@ importers:
 
   packages/networks:
     dependencies:
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
     devDependencies:
@@ -706,10 +706,10 @@ importers:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -725,10 +725,10 @@ importers:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -740,13 +740,13 @@ importers:
 
   packages/protocol-lending-kamino-solana:
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
-      '@forgewallet/wallet-solana':
+      '@anywalletkit/wallet-solana':
         specifier: workspace:*
         version: link:../wallet-solana
       '@types/node':
@@ -762,10 +762,10 @@ importers:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -781,10 +781,10 @@ importers:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -800,10 +800,10 @@ importers:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -822,10 +822,10 @@ importers:
         specifier: ^3.0.3
         version: 3.0.3(typescript@5.9.3)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@solana/transaction-messages':
@@ -844,10 +844,10 @@ importers:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -869,10 +869,10 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       vitest:
@@ -881,20 +881,20 @@ importers:
 
   packages/protocol-swap2-balancer:
     dependencies:
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
       viem:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -906,20 +906,20 @@ importers:
 
   packages/protocol-swap2-cctp:
     dependencies:
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
       viem:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -931,7 +931,7 @@ importers:
 
   packages/protocol-swap2-chainflip:
     dependencies:
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
       '@noble/hashes':
@@ -944,13 +944,13 @@ importers:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
-      '@forgewallet/protocol-swap2-router':
+      '@anywalletkit/protocol-swap2-router':
         specifier: workspace:*
         version: link:../protocol-swap2-router
       '@types/node':
@@ -962,20 +962,20 @@ importers:
 
   packages/protocol-swap2-core:
     dependencies:
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
-      '@forgewallet/tx-preview-evm':
+      '@anywalletkit/tx-preview-evm':
         specifier: workspace:*
         version: link:../tx-preview-evm
       viem:
         specifier: ^2.45.0
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -987,10 +987,10 @@ importers:
 
   packages/protocol-swap2-jupiter:
     dependencies:
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
       '@scure/base':
@@ -1000,16 +1000,16 @@ importers:
         specifier: ^8.4.0
         version: 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
-      '@forgewallet/protocol-swap2-router':
+      '@anywalletkit/protocol-swap2-router':
         specifier: workspace:*
         version: link:../protocol-swap2-router
-      '@forgewallet/wallet-solana':
+      '@anywalletkit/wallet-solana':
         specifier: workspace:*
         version: link:../wallet-solana
       '@types/node':
@@ -1021,17 +1021,17 @@ importers:
 
   packages/protocol-swap2-lifi:
     dependencies:
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -1043,17 +1043,17 @@ importers:
 
   packages/protocol-swap2-near-intents:
     dependencies:
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -1065,10 +1065,10 @@ importers:
 
   packages/protocol-swap2-omniston:
     dependencies:
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
       '@ston-fi/omniston-sdk':
@@ -1087,10 +1087,10 @@ importers:
         specifier: ^2.45.0
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -1102,17 +1102,17 @@ importers:
 
   packages/protocol-swap2-router:
     dependencies:
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -1124,20 +1124,20 @@ importers:
 
   packages/protocol-swap2-thorchain:
     dependencies:
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
       viem:
         specifier: ^2.45.0
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -1149,20 +1149,20 @@ importers:
 
   packages/protocol-swap2-uniswap:
     dependencies:
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
       viem:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -1174,23 +1174,23 @@ importers:
 
   packages/protocol-swap2-usdt0:
     dependencies:
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
       viem:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
-      '@forgewallet/protocol-swap2-router':
+      '@anywalletkit/protocol-swap2-router':
         specifier: workspace:*
         version: link:../protocol-swap2-router
       '@types/node':
@@ -1202,20 +1202,20 @@ importers:
 
   packages/protocol-swap2-wrap:
     dependencies:
-      '@forgewallet/protocol-swap2-core':
+      '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
-      '@forgewallet/swap2-assets':
+      '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
       viem:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -1241,7 +1241,7 @@ importers:
         specifier: '*'
         version: 58.0.24(react-native@0.88.0(@babel/core@7.29.7)(react@19.3.1))(react@19.3.1)
     devDependencies:
-      '@forgewallet/keyring':
+      '@anywalletkit/keyring':
         specifier: workspace:*
         version: link:../keyring
       '@types/node':
@@ -1269,7 +1269,7 @@ importers:
 
   packages/swap2-assets:
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
       vitest:
@@ -1291,7 +1291,7 @@ importers:
 
   packages/wallet-btc:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@noble/curves':
@@ -1307,7 +1307,7 @@ importers:
         specifier: ^2.4.1
         version: 2.4.1
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
       vitest:
@@ -1316,7 +1316,7 @@ importers:
 
   packages/wallet-evm:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@noble/curves':
@@ -1326,7 +1326,7 @@ importers:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
       vitest:
@@ -1335,7 +1335,7 @@ importers:
 
   packages/wallet-near:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@noble/curves':
@@ -1348,10 +1348,10 @@ importers:
         specifier: ^2.4.0
         version: 2.4.0
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/protocol-swap2-near-intents':
+      '@anywalletkit/protocol-swap2-near-intents':
         specifier: workspace:*
         version: link:../protocol-swap2-near-intents
       vitest:
@@ -1360,7 +1360,7 @@ importers:
 
   packages/wallet-solana:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@solana-program/compute-budget':
@@ -1379,10 +1379,10 @@ importers:
         specifier: ^8.4.0
         version: 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/protocol-staking-spl-stake-pool-solana':
+      '@anywalletkit/protocol-staking-spl-stake-pool-solana':
         specifier: workspace:*
         version: link:../protocol-staking-spl-stake-pool-solana
       '@noble/curves':
@@ -1394,7 +1394,7 @@ importers:
 
   packages/wallet-ton:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@ton/core':
@@ -1407,13 +1407,13 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
-      '@forgewallet/protocol-staking-tonstakers-ton':
+      '@anywalletkit/protocol-staking-tonstakers-ton':
         specifier: workspace:*
         version: link:../protocol-staking-tonstakers-ton
-      '@forgewallet/protocol-swap2-omniston':
+      '@anywalletkit/protocol-swap2-omniston':
         specifier: workspace:*
         version: link:../protocol-swap2-omniston
       '@noble/curves':
@@ -1428,7 +1428,7 @@ importers:
 
   packages/wallet-tron:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@noble/curves':
@@ -1441,7 +1441,7 @@ importers:
         specifier: ^2.4.0
         version: 2.4.0
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
       vitest:
@@ -1450,7 +1450,7 @@ importers:
 
   packages/wallet-zcash:
     dependencies:
-      '@forgewallet/core':
+      '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
       '@noble/curves':
@@ -1463,7 +1463,7 @@ importers:
         specifier: ^2.4.0
         version: 2.4.0
     devDependencies:
-      '@forgewallet/conformance':
+      '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../conformance
       viem:

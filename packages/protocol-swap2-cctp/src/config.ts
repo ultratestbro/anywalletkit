@@ -4,7 +4,7 @@
 // every EVM chain except EDGE), developers.circle.com/stablecoins/usdc-contract-addresses
 // (native USDC). Only chains whose USDC is Circle-native are listed: CCTP
 // burns native USDC, a bridged USDC.e (BSC, Gnosis) cannot ride it.
-import {evmRef, isEvm} from "@forgewallet/protocol-swap2-core/util";
+import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
 
 export interface CctpDomain {
   caip2: string;

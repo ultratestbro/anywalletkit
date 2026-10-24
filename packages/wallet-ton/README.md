@@ -1,13 +1,13 @@
-# @forgewallet/wallet-ton
+# @anywalletkit/wallet-ton
 
 TON accounts at `m/44'/607'/i'` (SLIP-10 ed25519) on Wallet V5R1 — the
 derivation Trust Wallet and Ledger use for a BIP-39 phrase, pinned by
-golden vectors in `@forgewallet/conformance`. Runtime dependencies: `@ton/core`,
+golden vectors in `@anywalletkit/conformance`. Runtime dependencies: `@ton/core`,
 `@ton/crypto`, `buffer` (no `@ton/ton`: the V5R1 contract and the toncenter
 client are implemented here, byte-for-byte checked against `@ton/ton` in tests).
 
 ```ts
-import WalletManagerTon from '@forgewallet/wallet-ton'
+import WalletManagerTon from '@anywalletkit/wallet-ton'
 
 const wallet = new WalletManagerTon(seedPhrase, {
   tonClient: [{ url: 'https://toncenter.com/api/v2/jsonRPC', secretKey }],   // fails over in order
@@ -59,7 +59,7 @@ The account never holds a key. Every signature is a `signer.sign(bytes, {scheme:
 call: `ton-external` over the hash of the V5R1 signing cell (after the preflight, which runs on a
 zero-signed body), `ton-message` over raw message bytes (`sign()`, ton_proof). Seed wallets get a
 `LocalSigner`; a hardware wallet, MPC node or backend is wrapped with `externalSigner()` from
-`@forgewallet/core`:
+`@anywalletkit/core`:
 
 ```ts
 const signer = externalSigner({ curve: 'ed25519', publicKey, sign: (payload, { context }) => device.sign(payload) })
@@ -96,10 +96,10 @@ ed25519 and need neither.
 
 ## Activity history
 
-`createTonHistory` is the chain's `HistorySource` (`@forgewallet/core`): tonapi account events first, toncenter v3 as a reduced fallback.
+`createTonHistory` is the chain's `HistorySource` (`@anywalletkit/core`): tonapi account events first, toncenter v3 as a reduced fallback.
 
 ```ts
-import { createTonHistory } from '@forgewallet/wallet-ton/history'
+import { createTonHistory } from '@anywalletkit/wallet-ton/history'
 
 const history = createTonHistory({ apiKey: process.env.TONAPI_KEY })
 const page = await history.listActivity('UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq', { limit: 25 })
@@ -124,4 +124,4 @@ history.explorerTxUrl(one.hash) // https://tonviewer.com/transaction/…
 
 **Cursor.** Base64 JSON `{ v: 1, b: 'tonapi' | 'toncenter', lt }`: an exclusive `lt` upper bound (`before_lt` for tonapi, `end_lt = lt − 1` for toncenter). A cursor from one backend resumes on the other; the backend that issued it is tried first. `since` is applied client-side and ends pagination.
 
-Fixtures in `test/fixtures/history/` were captured on 2026-10-14 from `tonapi.io` and `toncenter.com` (keyless) for the test wallet: one events page, the account-scoped events of the Tonstakers stake / unstake request / payout and of the Omniston STON.fi swap and escrow order (the same transactions as those modules' activity fixtures), the full event with `value_flow` for the unstake, and a toncenter v3 page. `test/history.test.ts` checks that the Tonstakers and Omniston modules describe the rows this source builds (`stake`, `unstake`, `claim`, `swap`, `bridge`). Note: `@forgewallet/protocol-swap2-core`'s `netTransfers` compares addresses verbatim, so `DescribeActivityContext.own` must contain the raw `0:…` form of the wallet for Omniston (Tonstakers normalizes itself).
+Fixtures in `test/fixtures/history/` were captured on 2026-10-14 from `tonapi.io` and `toncenter.com` (keyless) for the test wallet: one events page, the account-scoped events of the Tonstakers stake / unstake request / payout and of the Omniston STON.fi swap and escrow order (the same transactions as those modules' activity fixtures), the full event with `value_flow` for the unstake, and a toncenter v3 page. `test/history.test.ts` checks that the Tonstakers and Omniston modules describe the rows this source builds (`stake`, `unstake`, `claim`, `swap`, `bridge`). Note: `@anywalletkit/protocol-swap2-core`'s `netTransfers` compares addresses verbatim, so `DescribeActivityContext.own` must contain the raw `0:…` form of the wallet for Omniston (Tonstakers normalizes itself).

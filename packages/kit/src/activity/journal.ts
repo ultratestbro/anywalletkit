@@ -9,7 +9,7 @@
  * processes; anything persistent (SQLite, AsyncStorage, a file) implements the
  * three methods. Timestamps are unix seconds, like `ChainTx.time`.
  */
-import type { ActivityAsset, ActivityKind } from '@forgewallet/core'
+import type { ActivityAsset, ActivityKind } from '@anywalletkit/core'
 
 export type IntentStatus = 'pending' | 'confirmed' | 'failed'
 
@@ -26,7 +26,7 @@ export interface Intent {
   hashes: Array<{ chain: string; hash: string }>
   /** What the app expected to leave / arrive (quote amounts), used while pending and when the recognizer saw nothing. */
   expect?: { assetsOut: ActivityAsset[]; assetsIn: ActivityAsset[] }
-  /** Registry module name that executed it, e.g. "@forgewallet/protocol-swap2-lifi". */
+  /** Registry module name that executed it, e.g. "@anywalletkit/protocol-swap2-lifi". */
   protocol?: string
   /** Venue / counterparty label, e.g. "LI.FI", "Aave v3 · Base". */
   subtitle?: string

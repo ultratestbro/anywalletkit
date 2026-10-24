@@ -1,7 +1,7 @@
 import "../src/buffer-global.js";
 import {readFileSync} from "node:fs";
 import {describe, expect, it} from "vitest";
-import {validQuote} from "@forgewallet/protocol-swap2-core/validate";
+import {validQuote} from "@anywalletkit/protocol-swap2-core/validate";
 import {omnistonProvider, type OmnistonProviderOptions} from "../src/provider.js";
 
 /**

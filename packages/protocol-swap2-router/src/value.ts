@@ -1,6 +1,6 @@
-import {bigintToNumber, bigintToUnits} from "@forgewallet/core";
-import {ccAssetByToken, ccChain} from "@forgewallet/swap2-assets";
-import type {Quote, QuoteParams} from "@forgewallet/protocol-swap2-core/types";
+import {bigintToNumber, bigintToUnits} from "@anywalletkit/core";
+import {ccAssetByToken, ccChain} from "@anywalletkit/swap2-assets";
+import type {Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 
 /** Stables priced at par when the map has no entry for them. */
 const PAR = /^(USDC|USDT|USDT0|USD₮0|DAI|USDC\.E)$/i;

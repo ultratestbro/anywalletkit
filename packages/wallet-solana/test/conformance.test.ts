@@ -1,4 +1,4 @@
-import { describeChainModule } from '@forgewallet/conformance'
+import { describeChainModule } from '@anywalletkit/conformance'
 import { WalletManagerSolana, type WalletAccountSolana } from '../src/index.js'
 
 describeChainModule('wallet-solana', {

@@ -1,4 +1,4 @@
-import { InsufficientFundsError, NetworkError, type IWalletAccountReadOnly } from '@forgewallet/core'
+import { InsufficientFundsError, NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import { DUST_LIMIT, addressFromPublicKey, decodeAddress, outputSize, type DecodedAddress } from './address.js'
 import { createClient } from './client.js'
 import { DEFAULT_MAX_FEE } from './describe.js'

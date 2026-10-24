@@ -3,12 +3,12 @@ import {describeOmnistonActivity} from "./activity.js";
 import "./buffer-global.js";
 import {Buffer} from "buffer";
 import {encodeAbiParameters, getAddress, hexToBytes as viemHexToBytes, keccak256, sha256} from "viem";
-import {ccAsset, ccAssetByToken, type CcAsset} from "@forgewallet/swap2-assets";
+import {ccAsset, ccAssetByToken, type CcAsset} from "@anywalletkit/swap2-assets";
 import {omniston as cfg} from "./config.js";
 import {checkTonSwapPayload, TonSwapPayloadError, type TonSwapCheckResult, type TonSwapLeg} from "./ton-swap.js";
 export {checkTonSwapPayload, TonSwapPayloadError, TON_SWAP_PROTOCOL_LAYOUTS} from "./ton-swap.js";
 export type {TonSwapLeg, TonSwapCheckInput, TonSwapCheckResult} from "./ton-swap.js";
-import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
+import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 /**
  * Omniston (STON.fi) — TON ↔ EVM stable corridors over a WebSocket RFQ

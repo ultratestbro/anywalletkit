@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { derivationVectors } from '@forgewallet/conformance'
-import { LocalSigner, seedFromMnemonic } from '@forgewallet/core'
+import { derivationVectors } from '@anywalletkit/conformance'
+import { LocalSigner, seedFromMnemonic } from '@anywalletkit/core'
 import { walletOnRemoteKey } from '../src/signer.ts'
 
 describe('Accounts & signers (docs) — external signer', () => {

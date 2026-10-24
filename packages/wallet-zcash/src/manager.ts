@@ -1,4 +1,4 @@
-import { LocalSigner, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@anywalletkit/core'
 import { WalletAccountZcash } from './account.js'
 import { MARGINAL_FEE } from './fee.js'
 import { WalletAccountReadOnlyZcash } from './read-only-account.js'

@@ -1,4 +1,4 @@
-import { NetworkError } from '@forgewallet/core'
+import { NetworkError } from '@anywalletkit/core'
 import type { TronConfig, TronFetch, TronProvider } from './types.js'
 
 function httpTransport(base: string, headers: Record<string, string> | undefined): TronFetch {

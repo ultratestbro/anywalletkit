@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/conformance",
+  "name": "@anywalletkit/conformance",
   "version": "0.2.0",
-  "description": "Conformance suites and golden vectors every forgewallet chain and protocol module must pass.",
+  "description": "Conformance suites and golden vectors every Any Wallet Kit chain and protocol module must pass.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -32,8 +32,8 @@
     "vitest": ">=2"
   },
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
-    "@forgewallet/tx-preview-evm": "workspace:*"
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/tx-preview-evm": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^5.0.3"

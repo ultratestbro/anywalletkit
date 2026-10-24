@@ -17,7 +17,7 @@ const MANAGER_SEEDS = new WeakMap<object, Uint8Array>()
  * A 64-byte seed passed as bytes is COPIED (the caller zeroizes its own).
  * Keep the mnemonic's own lifetime short on the calling side (read it, build
  * the manager, drop the reference) — or build from a `Signer` and never hand
- * the words to the SDK at all (see `@forgewallet/keyring`).
+ * the words to the SDK at all (see `@anywalletkit/keyring`).
  *
  * The seed is never an own property: it lives in a module WeakMap, so logging
  * or serializing a manager shows no secret.

@@ -1,11 +1,11 @@
-# @forgewallet/wallet-zcash
+# @anywalletkit/wallet-zcash
 
-Zcash **transparent** accounts for the forgewallet SDK — BIP-44 `m/44'/133'/0'/0/i`,
+Zcash **transparent** accounts for Any Wallet Kit — BIP-44 `m/44'/133'/0'/0/i`,
 `t1…` addresses (the transparent receiver Zashi, YWallet, Ledger and Trezor derive
 from the same seed). Pure `Uint8Array`, `@noble` / `@scure` only, runs in Hermes.
 
 ```ts
-import WalletManagerZcash from '@forgewallet/wallet-zcash'
+import WalletManagerZcash from '@anywalletkit/wallet-zcash'
 
 const wallet = new WalletManagerZcash(seedPhrase, {
   client: [
@@ -78,6 +78,6 @@ on the next transport).
 
 ## Activity history
 
-`createZcashHistory()` (from `@forgewallet/wallet-zcash/history`) is a `HistorySource`
+`createZcashHistory()` (from `@anywalletkit/wallet-zcash/history`) is a `HistorySource`
 over Blockchair: one transaction = one native transfer in the owner's direction;
 shielded legs appear only as the transparent value that entered or left.

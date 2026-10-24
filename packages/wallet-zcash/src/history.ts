@@ -5,7 +5,7 @@
  * ten at a time). Shielded legs of a transaction show up only as the
  * transparent value that entered or left it.
  */
-import type { ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@forgewallet/core'
+import type { ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@anywalletkit/core'
 import { BlockchairClient, blockchairTime, type BlockchairTxDashboard } from './blockchair.js'
 import { DEFAULT_TIMEOUT_MS } from './http.js'
 import { CAIP2 } from './types.js'
@@ -61,9 +61,9 @@ export function encodeCursor(c: ZcashHistoryCursor): string {
 
 export function decodeCursor(s: string): ZcashHistoryCursor {
   const m = /^1:(\d+):(\d+)$/.exec(s)
-  if (!m) throw new Error('@forgewallet/wallet-zcash: malformed history cursor')
+  if (!m) throw new Error('@anywalletkit/wallet-zcash: malformed history cursor')
   const o = Number(m[1]), size = Number(m[2])
-  if (size < 1) throw new Error('@forgewallet/wallet-zcash: malformed history cursor')
+  if (size < 1) throw new Error('@anywalletkit/wallet-zcash: malformed history cursor')
   return { v: 1, o, s: size }
 }
 
@@ -104,7 +104,7 @@ export function zcashExplorerTxUrl(hash: string): string {
 export function createZcashHistory(options: ZcashHistoryOptions = {}): ZcashHistorySource {
   const chain = CAIP2.mainnet
   const fetchFn = options.fetch ?? globalThis.fetch
-  if (typeof fetchFn !== 'function') throw new Error('@forgewallet/wallet-zcash: no global fetch; pass `fetch` in the options')
+  if (typeof fetchFn !== 'function') throw new Error('@anywalletkit/wallet-zcash: no global fetch; pass `fetch` in the options')
   const client = new BlockchairClient({ ...(options.blockchairUrl ? { url: options.blockchairUrl } : {}), ...(options.key ? { key: options.key } : {}) }, fetchFn, options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
   const wrap = async <T>(run: () => Promise<T>): Promise<T> => {
     try { return await run() } catch (e) { throw new HistoryUnavailableError(chain, e instanceof Error ? e.message : String(e)) }

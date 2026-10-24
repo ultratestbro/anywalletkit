@@ -1,4 +1,4 @@
-import type { ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@forgewallet/core'
+import type { ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@anywalletkit/core'
 
 /** Which explorer family answered. `routescan` = keyless Etherscan-format mirror; `alchemy` = Alchemy Transfers API + JSON-RPC. */
 export type HistoryBackend = 'etherscan' | 'blockscout-pro' | 'alchemy' | 'routescan' | 'blockscout'

@@ -1,5 +1,5 @@
 {
- "module": "@forgewallet/protocol-staking-ssv-evm",
+ "module": "@anywalletkit/protocol-staking-ssv-evm",
  "sources": {
   "ssv-token-ethereum": {
    "type": "evm-code",

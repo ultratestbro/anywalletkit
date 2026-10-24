@@ -2,7 +2,7 @@
 // serialized-transaction guard (programs allowlist + simulated balance
 // proof), decimals, and the expectation builders that bound what a built
 // transaction may do with the wallet's balances.
-import { LendingProtocol, type IWalletAccount, type IWalletAccountReadOnly } from '@forgewallet/core'
+import { LendingProtocol, type IWalletAccount, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import { KaminoApi } from './api.js'
 import { KaminoError } from './errors.js'
 import { KAMINO_PROGRAM_ALLOWLIST } from './programs.js'
@@ -53,7 +53,7 @@ export interface Expectation {
 
 export interface SerializedGuard { programAllowlist: readonly string[]; expect: Expectation }
 
-/** The write surface of a `@forgewallet/wallet-solana` account this module needs. */
+/** The write surface of a `@anywalletkit/wallet-solana` account this module needs. */
 interface SolanaAccountSurface {
   getAddress(): Promise<string>
   checkSerialized?(base64: string, guard: SerializedGuard): Promise<{ quote: { fee: bigint } }>
@@ -130,7 +130,7 @@ export abstract class KaminoBase<TConfig extends KaminoBaseConfig> extends Lendi
   /** Simulate the built transaction through the account's guard and return its fee; nothing is signed. */
   protected async quoteBuilt(base64: string, expect: Expectation): Promise<{ fee: bigint }> {
     const s = this.surface()
-    if (typeof s.checkSerialized !== 'function') throw new KaminoError('Quoting a Kamino transaction needs a @forgewallet/wallet-solana account (checkSerialized).')
+    if (typeof s.checkSerialized !== 'function') throw new KaminoError('Quoting a Kamino transaction needs a @anywalletkit/wallet-solana account (checkSerialized).')
     const check = await s.checkSerialized(base64, this.guard(expect))
     return { fee: BigInt(check.quote.fee) }
   }
@@ -138,7 +138,7 @@ export abstract class KaminoBase<TConfig extends KaminoBaseConfig> extends Lendi
   /** Guard, sign and broadcast the built transaction; the account refuses before signing if the proof fails. */
   protected async sendBuilt(base64: string, expect: Expectation, method: string): Promise<{ hash: string; fee: bigint }> {
     const account = this.requireSigningAccount(`${method}(options)`) as unknown as SolanaAccountSurface
-    if (typeof account.sendSerialized !== 'function') throw new KaminoError(`${method}() needs a @forgewallet/wallet-solana account (sendSerialized).`)
+    if (typeof account.sendSerialized !== 'function') throw new KaminoError(`${method}() needs a @anywalletkit/wallet-solana account (sendSerialized).`)
     const sent = await account.sendSerialized(base64, this.guard(expect))
     if (!sent?.hash) throw new KaminoError('The account returned no transaction signature.')
     return { hash: sent.hash, fee: BigInt(sent.fee ?? 0) }

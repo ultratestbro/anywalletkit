@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { derivationVectors } from '@forgewallet/conformance'
-import type { ChainTx, HistorySource } from '@forgewallet/core'
-import { Wallet } from '@forgewallet/kit'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
+import { derivationVectors } from '@anywalletkit/conformance'
+import type { ChainTx, HistorySource } from '@anywalletkit/core'
+import { Wallet } from '@anywalletkit/kit'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
 import { attachJournal, detail, firstPage, nextPage, recordSwap, refresh, row, walletWithHistory } from '../src/history.ts'
 
 const SEED = derivationVectors.seeds['bip39-abandon-12']!
@@ -86,7 +86,7 @@ describe('History guide (docs) — offline', () => {
   })
 })
 
-// Real sources, nothing signed: LIVE=1 pnpm --filter @forgewallet/example-history test
+// Real sources, nothing signed: LIVE=1 pnpm --filter @anywalletkit/example-history test
 describe.runIf(process.env.LIVE === '1')('History guide (docs) — live', () => {
   it('reads the first page of a public test address on TON and Tron through keyless sources', async () => {
     const wallet = walletWithHistory(SEED)

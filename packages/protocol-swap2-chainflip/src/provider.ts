@@ -12,9 +12,9 @@
 import {describeChainflipActivity} from "./activity.js";
 import {CF_API_DEFAULT, CF_CHAINS, CF_VAULTS, cfAsset, chainflip as cfg} from "./config.js";
 import {decodeEvmVaultCall, decodeTronNote, destAddressBytes, fromHex, minOutOf, minPriceX128For, sameBytes, tronToBytes, type CfParameters} from "./codec.js";
-import {timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
+import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import {decodeFunctionData, parseAbi, type Hex} from "viem";
-import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
+import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 const QUOTE_TTL_MS = 60_000;
 /** 50 state-chain blocks ≈ 5 min of retries before a fill-or-kill refund (the backend's recommendation). */

@@ -17,8 +17,8 @@ import {
   type ActivityKind,
   type ChainTx,
   type DescribeActivityContext,
-} from "@forgewallet/core";
-import {ccAssetByToken, ccChain} from "@forgewallet/swap2-assets";
+} from "@anywalletkit/core";
+import {ccAssetByToken, ccChain} from "@anywalletkit/swap2-assets";
 
 /** The contract a transaction invoked (EVM `to`, Solana program, TON destination), lowercase for EVM. */
 export function calledContract(tx: ChainTx): string | null {

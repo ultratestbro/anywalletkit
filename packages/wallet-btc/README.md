@@ -1,4 +1,4 @@
-# @forgewallet/wallet-btc
+# @anywalletkit/wallet-btc
 
 Bitcoin accounts on [`@scure/btc-signer`](https://github.com/paulmillr/scure-btc-signer)
 (audited by Cure53; pure `Uint8Array`, no `Buffer`, no Node shims):
@@ -12,7 +12,7 @@ Test networks use coin type `1'` (`tb1…` / `bcrt1…`). Both paths are pinned 
 official BIP-84 / BIP-86 test vectors.
 
 ```ts
-import WalletManagerBtc from '@forgewallet/wallet-btc'
+import WalletManagerBtc from '@anywalletkit/wallet-btc'
 
 const wallet = new WalletManagerBtc(seedPhrase, {
   network: 'bitcoin',
@@ -75,10 +75,10 @@ implementing `BtcClient` for anything else.
 
 ## Activity history
 
-`createBtcHistory` is the chain's `HistorySource` (`@forgewallet/core`) over Blockbook, reusing `BlockbookClient` (`getAddressPage`, `getTransactionDetails`).
+`createBtcHistory` is the chain's `HistorySource` (`@anywalletkit/core`) over Blockbook, reusing `BlockbookClient` (`getAddressPage`, `getTransactionDetails`).
 
 ```ts
-import { createBtcHistory } from '@forgewallet/wallet-btc/history'
+import { createBtcHistory } from '@anywalletkit/wallet-btc/history'
 
 const history = createBtcHistory({ blockbookUrls: ['https://btc1.trezor.io', 'https://bitcoin.atomicwallet.io'] })
 const page = await history.listActivity('bc1q3x8yszvcvjjxqragsh0l6j8rxnhk7pay9hnj5h', { limit: 25 })

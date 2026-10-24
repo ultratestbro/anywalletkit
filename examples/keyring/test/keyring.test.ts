@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { derivationVectors } from '@forgewallet/conformance'
-import { UserRejectedError } from '@forgewallet/core'
-import { KeyringError } from '@forgewallet/keyring'
+import { derivationVectors } from '@anywalletkit/conformance'
+import { UserRejectedError } from '@anywalletkit/core'
+import { KeyringError } from '@anywalletkit/keyring'
 import {
   createWallet, importKey, manageAccounts, openKeyring, plainMetadata, restoreWallet, revealSecret, removeWallet, secureSecrets, signMessage,
   type PlainStoreLike, type SecureStoreLike,

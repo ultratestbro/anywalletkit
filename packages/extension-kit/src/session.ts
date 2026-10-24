@@ -10,7 +10,7 @@
  * The popup never receives the DEK either: it asks the service worker to
  * perform operations by id.
  */
-import { zeroize } from '@forgewallet/core'
+import { zeroize } from '@anywalletkit/core'
 import { fromBase64, toBase64 } from './codec.js'
 import { VaultError } from './errors.js'
 
@@ -60,7 +60,7 @@ export class Session {
     this._storage = options.storage
     this._alarms = options.alarms
     this._autoLockMs = options.autoLockMs ?? SESSION_DEFAULT_AUTOLOCK_MS
-    const name = options.name ?? 'forgewallet-session'
+    const name = options.name ?? 'anywalletkit-session'
     this._key = name
     this._alarm = `${name}/autolock`
     this._now = options.now ?? Date.now

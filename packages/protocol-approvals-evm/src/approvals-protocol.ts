@@ -2,11 +2,11 @@ import {
   ApprovalsError, ApprovalsProtocol as CoreApprovalsProtocol, NotImplementedError,
   type ActivityItem, type Approval, type ApprovalStandard, type ApprovalsResult, type ChainTx, type DescribeActivityContext,
   type GetApprovalsOptions, type RevokeResult,
-} from '@forgewallet/core'
+} from '@anywalletkit/core'
 
 export type {
   Approval, ApprovalRisk, ApprovalStandard, ApprovalsCoverage, ApprovalsErrorReason, ApprovalsResult, GetApprovalsOptions, RevokeResult,
-} from '@forgewallet/core'
+} from '@anywalletkit/core'
 export { ApprovalsError }
 
 /** Verified contract name of a spender, when a `labels` resolver is configured. */
@@ -40,11 +40,11 @@ export type SendResult = { hash: string; fee?: bigint } | string
 /** Minimal account surface the protocol reads from. */
 export interface ReadOnlyAccountLike {
   getAddress(): Promise<string>
-  /** A @forgewallet/wallet-evm account carries its provider here; used when `config.provider` is absent. */
+  /** A @anywalletkit/wallet-evm account carries its provider here; used when `config.provider` is absent. */
   _config?: { provider?: EvmProvider }
 }
 
-/** Account surface the protocol writes through (a @forgewallet/wallet-evm account, or anything shaped like one). */
+/** Account surface the protocol writes through (a @anywalletkit/wallet-evm account, or anything shaped like one). */
 export interface AccountLike extends ReadOnlyAccountLike {
   sendTransaction(tx: RevokeTransaction | RevokeTransaction[]): Promise<SendResult>
   quoteSendTransaction?(tx: RevokeTransaction): Promise<{ fee: bigint }>

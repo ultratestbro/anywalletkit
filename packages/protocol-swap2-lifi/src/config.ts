@@ -1,4 +1,4 @@
-import {evmRef, isEvm} from "@forgewallet/protocol-swap2-core/util";
+import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
 
 // ── LI.FI — EVM calldata routes implemented by this contribution adapter ─────
 // 2026-08 sweep (li.quest/v1/chains): + Avalanche 43114, Scroll 534352,

@@ -1,4 +1,4 @@
-import { InsufficientFundsError, LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@forgewallet/core'
+import { InsufficientFundsError, LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
 import { SigHash, Transaction, p2pkh } from '@scure/btc-signer'
 import type { BTC_NETWORK } from '@scure/btc-signer/utils.js'
 import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js'

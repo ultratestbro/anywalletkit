@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { NotImplementedError, ReadOnlyAccountError, type IWalletAccount, type IWalletAccountReadOnly, type ProtocolType } from '@forgewallet/core'
+import { NotImplementedError, ReadOnlyAccountError, type IWalletAccount, type IWalletAccountReadOnly, type ProtocolType } from '@anywalletkit/core'
 import { createMockAccount } from './mock-account.js'
 import { describeActivitySuite, type ActivityFixtureJson } from './activity-suite.js'
 

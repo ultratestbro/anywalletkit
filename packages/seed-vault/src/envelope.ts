@@ -6,6 +6,7 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { BackupError } from './errors.js'
 import { canonicalJson, fromB64u, fromUtf8, toB64u, utf8 } from './encoding.js'
 
+/** Stable wire identifier: existing backups carry it — never rename. */
 export const BACKUP_FORMAT = 'forgewallet-backup'
 export const BACKUP_VERSION = 1
 
@@ -92,6 +93,7 @@ export interface OpenedBackup {
   dispose(): void
 }
 
+/** HKDF info of v1 key protectors: part of the format — never rename. */
 const KEY_INFO = utf8('forgewallet-backup v1 key protector')
 
 /** Seal `secret` (the keyring's stored string, or raw bytes) for every protector. */
@@ -338,7 +340,7 @@ function checkMeta(m: unknown): void {
 
 function checkEnvelope(raw: unknown): asserts raw is BackupEnvelope {
   const e = raw as BackupEnvelope
-  if (!e || typeof e !== 'object' || e.format !== BACKUP_FORMAT) throw new BackupError('unsupported', 'Not a forgewallet backup.')
+  if (!e || typeof e !== 'object' || e.format !== BACKUP_FORMAT) throw new BackupError('unsupported', 'Not an Any Wallet Kit backup.')
   if (e.v !== BACKUP_VERSION) throw new BackupError('unsupported', `Backup version ${String(e.v)} is not supported by this build.`)
   if (!isInt(e.createdAt) || e.createdAt < 0) throw new BackupError('invalid', 'Malformed backup (createdAt).')
   checkMeta(e.meta)

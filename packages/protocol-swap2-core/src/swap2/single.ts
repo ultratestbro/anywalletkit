@@ -1,4 +1,4 @@
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 import {BaseSwap2Protocol} from "./base.js";
 import type {CrossChainProvider, Quote, QuoteParams} from "../types.js";
 import {validQuote} from "../validate.js";

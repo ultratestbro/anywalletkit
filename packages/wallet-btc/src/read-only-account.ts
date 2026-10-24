@@ -1,4 +1,4 @@
-import { InsufficientFundsError, NetworkError, type IWalletAccountReadOnly } from '@forgewallet/core'
+import { InsufficientFundsError, NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import type { BTC_NETWORK } from '@scure/btc-signer/utils.js'
 import { INPUT_WEIGHT, decodeAddress, dustLimit, kindOfType, outputVBytes, spendInfo, type ScriptKind } from './address.js'
 import { createClient } from './client.js'

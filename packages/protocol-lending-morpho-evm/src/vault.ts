@@ -1,4 +1,4 @@
-import { NotImplementedError, bigintToNumber, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type SupplyOptions, type WithdrawOptions } from '@forgewallet/core'
+import { NotImplementedError, bigintToNumber, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type SupplyOptions, type WithdrawOptions } from '@anywalletkit/core'
 import { getAddress, isAddress, type Address } from 'viem'
 import { ERC4626_ABI, FACTORY_V1_ABI, FACTORY_V2_ABI, VAULT_V1_ABI, VAULT_V2_ABI } from './abi.js'
 import { FALLBACK_GAS, MorphoBase, toAmount, type AmountOption, type MorphoBaseConfig, type Tx } from './base.js'

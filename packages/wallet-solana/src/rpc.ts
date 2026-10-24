@@ -1,4 +1,4 @@
-import { NetworkError } from '@forgewallet/core'
+import { NetworkError } from '@anywalletkit/core'
 import { createSolanaRpc } from '@solana/kit'
 import type { SolanaConfig, SolanaRpc } from './types.js'
 

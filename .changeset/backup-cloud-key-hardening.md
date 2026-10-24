@@ -1,5 +1,5 @@
 ---
-"@forgewallet/backup-cloud": patch
+"@anywalletkit/backup-cloud": patch
 ---
 
 The iCloud Keychain backup key is now `WhenUnlocked`: never readable while the phone is locked, after-first-unlock included. Keys written by 0.1.0 are raised on their next read.

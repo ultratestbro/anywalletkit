@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {decodeFunctionData, encodeFunctionResult, getAddress, pad, parseAbi, toFunctionSelector, toHex, type Hex} from "viem";
-import {CrossChainRouter} from "@forgewallet/protocol-swap2-router";
+import {CrossChainRouter} from "@anywalletkit/protocol-swap2-router";
 import {usdt0Provider, USDT0_STATUS_MAP} from "../src/provider.js";
 import {USDT0_CHAINS, USDT0_BY_EID} from "../src/config.js";
 import {LZ_RECEIVE, USDT0_SEND} from "../src/activity.js";

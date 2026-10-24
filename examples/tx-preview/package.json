@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/example-tx-preview",
+  "name": "@anywalletkit/example-tx-preview",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,15 +9,15 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
-    "@forgewallet/kit": "workspace:*",
-    "@forgewallet/wallet-evm": "workspace:*",
-    "@forgewallet/tx-preview-evm": "workspace:*",
-    "@forgewallet/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/kit": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*",
+    "@anywalletkit/tx-preview-evm": "workspace:*",
+    "@anywalletkit/protocol-swap2-core": "workspace:*",
     "viem": "^2.57.2"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3"
   }

@@ -1,10 +1,10 @@
 /**
- * Live, opt-in (JUPITER_LIVE=1): a real /build answer → the assembled transaction → @forgewallet/wallet-solana's
+ * Live, opt-in (JUPITER_LIVE=1): a real /build answer → the assembled transaction → @anywalletkit/wallet-solana's
  * serialized-transaction guard on mainnet (program allowlist, simulation, balance proof against the quote), for a
  * well-funded public wallet. Nothing is signed. Keyless Jupiter is 0.5 RPS: the cases run one after another.
  */
 import {describe, expect, it} from "vitest";
-import {WalletAccountReadOnlySolana} from "@forgewallet/wallet-solana";
+import {WalletAccountReadOnlySolana} from "@anywalletkit/wallet-solana";
 import {jupiterProvider} from "../src/provider.js";
 import {WSOL_MINT} from "../src/config.js";
 

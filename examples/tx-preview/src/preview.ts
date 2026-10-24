@@ -1,9 +1,9 @@
 // The "Transaction preview" guide on docs.anywallet.tech renders the #region blocks of this file.
 
 // #region imports
-import { previewEvmTx, type PreviewCall, type Rpc, type TxPreview } from '@forgewallet/tx-preview-evm'
-import type { Policies, WriteIntent } from '@forgewallet/kit'
-import type { Swap2ExecutionPlan } from '@forgewallet/protocol-swap2-core'
+import { previewEvmTx, type PreviewCall, type Rpc, type TxPreview } from '@anywalletkit/tx-preview-evm'
+import type { Policies, WriteIntent } from '@anywalletkit/kit'
+import type { Swap2ExecutionPlan } from '@anywalletkit/protocol-swap2-core'
 import { encodeFunctionData, erc20Abi, formatUnits, type Hex } from 'viem'
 // #endregion imports
 

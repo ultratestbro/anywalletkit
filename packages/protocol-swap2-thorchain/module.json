@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-swap2-thorchain",
+  "name": "@anywalletkit/protocol-swap2-thorchain",
   "type": "swap2",
   "chains": [
     "eip155:1",
@@ -13,7 +13,7 @@
     "@ultratestbro"
   ],
   "conformance": "0.x",
-  "repo": "https://github.com/ultratestbro/forgewallet",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-swap2-thorchain",
   "description": "THORChain native cross-chain swaps.",
   "addedAt": "2026-10-04"

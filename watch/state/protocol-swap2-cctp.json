@@ -1,5 +1,5 @@
 {
- "module": "@forgewallet/protocol-swap2-cctp",
+ "module": "@anywalletkit/protocol-swap2-cctp",
  "sources": {
   "usdc-ethereum": {
    "type": "evm-proxy",

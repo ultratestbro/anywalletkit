@@ -1,7 +1,7 @@
 // Plumbing both Morpho protocols share: the viem client over the account's or
 // the config's provider, sends that wait on the account's receipts, eth_call
 // proofs with Morpho reverts decoded, exact ERC-20 approvals.
-import { LendingProtocol, NetworkError, type ActivityItem, type ChainTx, type DescribeActivityContext, type IWalletAccount, type IWalletAccountReadOnly } from '@forgewallet/core'
+import { LendingProtocol, NetworkError, type ActivityItem, type ChainTx, type DescribeActivityContext, type IWalletAccount, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import {
   createPublicClient, custom, encodeFunctionData, fallback, getAddress, http,
   type Abi, type Address, type EIP1193Provider, type Hex, type PublicClient, type Transport,

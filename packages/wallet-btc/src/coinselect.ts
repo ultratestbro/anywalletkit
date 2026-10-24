@@ -14,7 +14,7 @@
  * segwit weights (see address.ts). The p2wpkh input estimate assumes a 72-byte
  * DER signature, so the estimate is an upper bound for lowR signatures.
  */
-import { InsufficientFundsError } from '@forgewallet/core'
+import { InsufficientFundsError } from '@anywalletkit/core'
 import { TooManyInputsError } from './errors.js'
 import type { Utxo } from './types.js'
 

@@ -3,10 +3,10 @@
  * browser can read and sign on, with the same public RPC failover lists
  * (`mobile/lib/swap2.ts`), no API keys. A wallet build may prepend its own
  * endpoints; `wallet_addEthereumChain` may add a chain the asset catalog
- * (`@forgewallet/swap2-assets`) knows — an unknown chain id is refused, so a
+ * (`@anywalletkit/swap2-assets`) knows — an unknown chain id is refused, so a
  * site cannot point the wallet at a look-alike network.
  */
-import { ccChain } from '@forgewallet/swap2-assets'
+import { ccChain } from '@anywalletkit/swap2-assets'
 import { RELAY_ERRORS, relayError, type RelayError } from './relay.js'
 import type { JsonStorage } from './storage.js'
 
@@ -185,7 +185,7 @@ export const BTC_CHAIN = 'bitcoin:mainnet'
 export const BTC_ESPLORA: readonly string[] = Object.freeze(['https://mempool.space/api', 'https://blockstream.info/api'])
 export const NEAR_CHAIN = 'near:mainnet'
 export const NEAR_PROVIDERS: readonly string[] = Object.freeze(['https://free.rpc.fastnear.com', 'https://rpc.mainnet.near.org'])
-/** Zcash transparent (t1…) accounts over Blockchair's public API, as `@forgewallet/wallet-zcash` reads and broadcasts them. */
+/** Zcash transparent (t1…) accounts over Blockchair's public API, as `@anywalletkit/wallet-zcash` reads and broadcasts them. */
 export const ZCASH_CHAIN = 'zcash:mainnet'
 export const ZCASH_BLOCKCHAIR = 'https://api.blockchair.com/zcash'
 

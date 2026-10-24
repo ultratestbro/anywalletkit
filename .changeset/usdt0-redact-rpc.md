@@ -1,6 +1,6 @@
 ---
-"@forgewallet/protocol-swap2-usdt0": patch
-"@forgewallet/protocol-swap2-core": minor
+"@anywalletkit/protocol-swap2-usdt0": patch
+"@anywalletkit/protocol-swap2-core": minor
 ---
 
 USDT0 no longer puts raw viem transport errors into refusal reasons or preflight errors. Those errors carry `URL: …`, which includes the key of a keyed RPC.

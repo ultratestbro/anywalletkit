@@ -1,5 +1,5 @@
-import type { ChainCall, ChainTransfer } from '@forgewallet/core'
-import { sameAddress } from '@forgewallet/core'
+import type { ChainCall, ChainTransfer } from '@anywalletkit/core'
+import { sameAddress } from '@anywalletkit/core'
 import { catalogSymbols, catalogToken } from './catalog.js'
 import type { EvmChainTx, EvmHistoryRaw, HistoryBackend } from './types.js'
 

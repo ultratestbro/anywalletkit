@@ -6,7 +6,7 @@
 // account. Pass a USDC holder to see both proofs pass.
 //
 //   node scripts/verify-live.mjs [address] [rpcUrl]
-import { WalletAccountReadOnlySolana } from '@forgewallet/wallet-solana'
+import { WalletAccountReadOnlySolana } from '@anywalletkit/wallet-solana'
 import { KaminoApi, KaminoMarketProtocolSolana, KaminoVaultProtocolSolana, MAIN_MARKET } from '../dist/index.js'
 
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'

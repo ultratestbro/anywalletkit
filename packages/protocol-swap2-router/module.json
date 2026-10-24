@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-swap2-router",
+  "name": "@anywalletkit/protocol-swap2-router",
   "type": "swap2",
   "chains": [
     "eip155:*",
@@ -13,7 +13,7 @@
     "@ultratestbro"
   ],
   "conformance": "0.x",
-  "repo": "https://github.com/ultratestbro/forgewallet",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-swap2-router",
   "description": "Optional aggregator: auctions the swap2 providers you install and pass in, executes the winner. Chains = union of our provider modules.",
   "addedAt": "2026-10-04"

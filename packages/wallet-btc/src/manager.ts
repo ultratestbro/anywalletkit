@@ -1,4 +1,4 @@
-import { LocalSigner, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@anywalletkit/core'
 import { WalletAccountBtc } from './account.js'
 import { coinType, purposeFor } from './network.js'
 import { WalletAccountReadOnlyBtc } from './read-only-account.js'

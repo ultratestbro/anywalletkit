@@ -4,7 +4,7 @@ import { ed25519 } from '@noble/curves/ed25519.js'
 import { Buffer } from 'buffer'
 import { beginCell, loadMessage } from '@ton/core'
 import { WalletContractV5R1 } from '@ton/ton'
-import { LocalSigner, SignerError, UserRejectedError, externalSigner, seedFromMnemonicSync } from '@forgewallet/core'
+import { LocalSigner, SignerError, UserRejectedError, externalSigner, seedFromMnemonicSync } from '@anywalletkit/core'
 import { TON_BASE_PATH, TON_MNEMONIC_PATH, WalletAccountTon, WalletManagerTon } from '../src/index.js'
 import { fakeRpc } from './fake-rpc.js'
 

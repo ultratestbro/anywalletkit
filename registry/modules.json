@@ -4,7 +4,7 @@
   "count": 22,
   "modules": [
     {
-      "name": "@forgewallet/protocol-approvals-evm",
+      "name": "@anywalletkit/protocol-approvals-evm",
       "type": "approvals",
       "chains": [
         "eip155:*"
@@ -14,12 +14,12 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-approvals-evm",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-lending-aave-evm",
+      "name": "@anywalletkit/protocol-lending-aave-evm",
       "type": "lending",
       "chains": [
         "eip155:1",
@@ -46,12 +46,12 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-lending-aave-evm",
       "addedAt": "2026-10-10"
     },
     {
-      "name": "@forgewallet/protocol-lending-kamino-solana",
+      "name": "@anywalletkit/protocol-lending-kamino-solana",
       "type": "lending",
       "chains": [
         "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
@@ -61,12 +61,12 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-lending-kamino-solana",
       "addedAt": "2026-10-13"
     },
     {
-      "name": "@forgewallet/protocol-lending-mellow-evm",
+      "name": "@anywalletkit/protocol-lending-mellow-evm",
       "type": "lending",
       "chains": [
         "eip155:1"
@@ -76,12 +76,12 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-lending-mellow-evm",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-lending-morpho-evm",
+      "name": "@anywalletkit/protocol-lending-morpho-evm",
       "type": "lending",
       "chains": [
         "eip155:1",
@@ -103,12 +103,12 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-lending-morpho-evm",
       "addedAt": "2026-10-10"
     },
     {
-      "name": "@forgewallet/names-ens",
+      "name": "@anywalletkit/names-ens",
       "type": "names",
       "chains": [
         "eip155:*",
@@ -120,12 +120,12 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/names-ens",
       "addedAt": "2026-10-17"
     },
     {
-      "name": "@forgewallet/protocol-staking-lido-evm",
+      "name": "@anywalletkit/protocol-staking-lido-evm",
       "type": "staking",
       "chains": [
         "eip155:1"
@@ -135,12 +135,12 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-staking-lido-evm",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-staking-spl-stake-pool-solana",
+      "name": "@anywalletkit/protocol-staking-spl-stake-pool-solana",
       "type": "staking",
       "chains": [
         "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
@@ -150,12 +150,12 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-staking-spl-stake-pool-solana",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-staking-ssv-evm",
+      "name": "@anywalletkit/protocol-staking-ssv-evm",
       "type": "staking",
       "chains": [
         "eip155:1"
@@ -165,12 +165,12 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-staking-ssv-evm",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-staking-tonstakers-ton",
+      "name": "@anywalletkit/protocol-staking-tonstakers-ton",
       "type": "staking",
       "chains": [
         "ton:-239"
@@ -180,12 +180,12 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-staking-tonstakers-ton",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-swap2-balancer",
+      "name": "@anywalletkit/protocol-swap2-balancer",
       "type": "swap2",
       "chains": [
         "eip155:1",
@@ -203,13 +203,13 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-swap2-balancer",
       "description": "Balancer v2 same-chain swaps: SOR API suggests the path, the Vault prices it on-chain (queryBatchSwap) and enforces the minimum (batchSwap limits).",
       "addedAt": "2026-10-13"
     },
     {
-      "name": "@forgewallet/protocol-swap2-cctp",
+      "name": "@anywalletkit/protocol-swap2-cctp",
       "type": "swap2",
       "chains": [
         "eip155:*"
@@ -219,13 +219,13 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-swap2-cctp",
       "description": "Circle CCTP V2: native USDC burn-and-mint between EVM chains (Fast / Standard), two-phase with the user's receiveMessage claim.",
       "addedAt": "2026-10-10"
     },
     {
-      "name": "@forgewallet/protocol-swap2-chainflip",
+      "name": "@anywalletkit/protocol-swap2-chainflip",
       "type": "swap2",
       "chains": [
         "eip155:1",
@@ -239,13 +239,13 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-swap2-chainflip",
       "description": "Chainflip vault swaps: native BTC / ETH / SOL / TRX and USDC / USDT across Ethereum, Arbitrum, Solana, Tron and Bitcoin via Chainflip's public backend (0 bps, no account). Sources: Ethereum, Arbitrum, Tron (USDT → the Vault with the swap in the note); the encoder's output is decoded and checked before signing; fill-or-kill refunds.",
       "addedAt": "2026-10-20"
     },
     {
-      "name": "@forgewallet/protocol-swap2-jupiter",
+      "name": "@anywalletkit/protocol-swap2-jupiter",
       "type": "swap2",
       "chains": [
         "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
@@ -255,13 +255,13 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-swap2-jupiter",
       "description": "Jupiter same-chain Solana swaps via Swap API V2 /build (Metis routing, no Jupiter fee); every instruction vetted and the swap arguments decoded before the account's serialized-transaction guard signs.",
       "addedAt": "2026-10-23"
     },
     {
-      "name": "@forgewallet/protocol-swap2-lifi",
+      "name": "@anywalletkit/protocol-swap2-lifi",
       "type": "swap2",
       "chains": [
         "eip155:*",
@@ -272,13 +272,13 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-swap2-lifi",
       "description": "LI.FI REST cross-chain swaps and bridges (EVM calldata; Solana via guarded serialized transactions).",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-swap2-near-intents",
+      "name": "@anywalletkit/protocol-swap2-near-intents",
       "type": "swap2",
       "chains": [
         "eip155:*",
@@ -292,13 +292,13 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-swap2-near-intents",
       "description": "NEAR Intents (1Click) cross-chain swaps.",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-swap2-omniston",
+      "name": "@anywalletkit/protocol-swap2-omniston",
       "type": "swap2",
       "chains": [
         "ton:-239",
@@ -309,13 +309,13 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-swap2-omniston",
       "description": "STON.fi Omniston TON swaps and TON↔EVM / EVM↔EVM stable orders.",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-swap2-router",
+      "name": "@anywalletkit/protocol-swap2-router",
       "type": "swap2",
       "chains": [
         "eip155:*",
@@ -329,13 +329,13 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-swap2-router",
       "description": "Optional aggregator: auctions the swap2 providers you install and pass in, executes the winner. Chains = union of our provider modules.",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-swap2-thorchain",
+      "name": "@anywalletkit/protocol-swap2-thorchain",
       "type": "swap2",
       "chains": [
         "eip155:1",
@@ -349,13 +349,13 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-swap2-thorchain",
       "description": "THORChain native cross-chain swaps.",
       "addedAt": "2026-10-04"
     },
     {
-      "name": "@forgewallet/protocol-swap2-uniswap",
+      "name": "@anywalletkit/protocol-swap2-uniswap",
       "type": "swap2",
       "chains": [
         "eip155:1",
@@ -380,13 +380,13 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-swap2-uniswap",
       "description": "Uniswap v3 same-chain swaps from the contracts only (QuoterV2 + SwapRouter02): no API key, no frontend, addresses verified on-chain.",
       "addedAt": "2026-10-12"
     },
     {
-      "name": "@forgewallet/protocol-swap2-usdt0",
+      "name": "@anywalletkit/protocol-swap2-usdt0",
       "type": "swap2",
       "chains": [
         "eip155:1",
@@ -408,13 +408,13 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-swap2-usdt0",
       "description": "USDT0 — Tether's LayerZero OFT for USDT: USDT / USDT0 between 16 EVM chains in one source transaction (quoteOFT + quoteSend + send on the OFT, fee as msg.value), status from LayerZero Scan, lzReceive retry as the claim; the only direct USDT path into HyperEVM.",
       "addedAt": "2026-10-20"
     },
     {
-      "name": "@forgewallet/protocol-swap2-wrap",
+      "name": "@anywalletkit/protocol-swap2-wrap",
       "type": "swap2",
       "chains": [
         "eip155:1",
@@ -450,7 +450,7 @@
         "@ultratestbro"
       ],
       "conformance": "0.x",
-      "repo": "https://github.com/ultratestbro/forgewallet",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-swap2-wrap",
       "description": "Native ↔ wrapped native (WETH9 deposit/withdraw) as a same-chain swap2 venue on every EVM chain with a pinned wrapped native; 1:1, no approval, tokens verified on-chain.",
       "addedAt": "2026-10-12"

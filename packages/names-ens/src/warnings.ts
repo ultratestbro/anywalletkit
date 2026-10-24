@@ -4,7 +4,7 @@
  * that look Latin, punycode labels. Explicit code-point ranges, not
  * `\p{Script=…}` — Hermes (React Native) has no Unicode property escapes.
  */
-import type { NameWarning } from '@forgewallet/core'
+import type { NameWarning } from '@anywalletkit/core'
 
 const SCRIPTS: Array<[string, RegExp]> = [
   ['Latin', /[A-Za-zÀ-ɏḀ-ỿ]/],

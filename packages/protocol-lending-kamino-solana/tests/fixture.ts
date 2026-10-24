@@ -1,7 +1,7 @@
 // A Solana account that records guards instead of signing, and a fetch that
 // answers Kamino's API from canned data (shapes copied from live responses on
 // 2026-10-13).
-import type { IWalletAccount, IWalletAccountReadOnly, TransferResult } from '@forgewallet/core'
+import type { IWalletAccount, IWalletAccountReadOnly, TransferResult } from '@anywalletkit/core'
 import { SOLANA_MAINNET } from '../src/base.js'
 import type { SerializedGuard } from '../src/base.js'
 

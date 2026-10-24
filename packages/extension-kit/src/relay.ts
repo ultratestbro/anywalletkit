@@ -16,9 +16,9 @@
  */
 
 /** `chrome.runtime.connect({ name })` for content-script ports. */
-export const PORT_NAME = 'forgewallet/relay/1'
+export const PORT_NAME = 'anywalletkit/relay/1'
 /** `window.postMessage` discriminators (both directions). */
-export const PAGE_TARGET = { toContent: 'forgewallet/content', toPage: 'forgewallet/page' } as const
+export const PAGE_TARGET = { toContent: 'anywalletkit/content', toPage: 'anywalletkit/page' } as const
 
 /** CAIP-2 namespace of the provider that spoke. */
 export type RelayChain = 'eip155' | 'solana' | 'ton' | 'tron' | 'bip122' | 'near'

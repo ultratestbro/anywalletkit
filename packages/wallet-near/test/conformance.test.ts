@@ -1,4 +1,4 @@
-import { describeChainModule } from '@forgewallet/conformance'
+import { describeChainModule } from '@anywalletkit/conformance'
 import { WalletManagerNear, type WalletAccountNear } from '../src/index.js'
 
 describeChainModule('wallet-near', {

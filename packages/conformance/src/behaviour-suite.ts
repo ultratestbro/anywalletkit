@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { checksFor, decodeCall, type PreviewCall } from '@forgewallet/tx-preview-evm'
-import type { IWalletAccount } from '@forgewallet/core'
+import { checksFor, decodeCall, type PreviewCall } from '@anywalletkit/tx-preview-evm'
+import type { IWalletAccount } from '@anywalletkit/core'
 import { createMockAccount, type MockAccountOptions } from './mock-account.js'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

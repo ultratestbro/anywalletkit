@@ -1,9 +1,9 @@
 // The Accounts & signers page renders the #region blocks of this file.
 
 // #region external
-import { externalSigner, type SignOptions } from '@forgewallet/core'
-import { Wallet } from '@forgewallet/kit'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
+import { externalSigner, type SignOptions } from '@anywalletkit/core'
+import { Wallet } from '@anywalletkit/kit'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
 
 /** Your device / MPC node / backend: it holds the key, the SDK never sees it. */
 export interface RemoteKey {

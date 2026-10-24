@@ -6,7 +6,7 @@ import { Buffer } from 'buffer'
 import { Address, SendMode, beginCell, internal, toNano } from '@ton/core'
 import { WalletContractV5R1 } from '@ton/ton'
 import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto'
-import { deriveEd25519, seedFromMnemonicSync } from '@forgewallet/core'
+import { deriveEd25519, seedFromMnemonicSync } from '@anywalletkit/core'
 import {
   WalletManagerTon, v5r1Address, v5r1PackSigned, v5r1SigningMessage, v5r1StateInit, v5r1WalletId, parseV5R1Body, describeTransaction, MAX_ACTIONS,
 } from '../src/index.js'

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { NameError, assertNameUnchanged, isNameLike, nameResolvers } from '@forgewallet/core'
+import { NameError, assertNameUnchanged, isNameLike, nameResolvers } from '@anywalletkit/core'
 import { ensResolver, warningsFor, coinTypeFor, decodeBtcScript, BTC_CAIP2, SOL_CAIP2 } from '../src/index.js'
 import type { PublicClient } from 'viem'
 
@@ -154,7 +154,7 @@ describe('core helpers', () => {
 })
 
 // Conformance suite over the stubbed client.
-import { namesSuite } from '@forgewallet/conformance'
+import { namesSuite } from '@anywalletkit/conformance'
 namesSuite(
   'ens (stub)',
   () => ensResolver({ client: fakeClient({ 'vitalik.eth:60': VITALIK, 'vitalik.eth:2147492101': null }).client }),

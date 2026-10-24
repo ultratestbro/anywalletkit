@@ -1,2 +1,2 @@
 import { defineConfig } from 'tsup'
-export default defineConfig({ entry: { index: 'src/index.ts' }, format: ['esm', 'cjs'], dts: true, sourcemap: true, clean: true, target: 'es2022', platform: 'neutral', external: ['@forgewallet/core', '@forgewallet/keyring', '@forgewallet/swap2-assets', '@forgewallet/protocol-swap2-core'] })
+export default defineConfig({ entry: { index: 'src/index.ts' }, format: ['esm', 'cjs'], dts: true, sourcemap: true, clean: true, target: 'es2022', platform: 'neutral', external: ['@anywalletkit/core', '@anywalletkit/keyring', '@anywalletkit/swap2-assets', '@anywalletkit/protocol-swap2-core'] })

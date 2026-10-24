@@ -3,7 +3,7 @@
  * failover across endpoints, timeouts, api keys and response-shape checks.
  * No axios, no dataloader, no caches: one `fetch` per call.
  */
-import { NetworkError } from '@forgewallet/core'
+import { NetworkError } from '@anywalletkit/core'
 import { Buffer } from 'buffer'
 import { Address, Cell, TupleReader, loadTransaction, type StateInit, type Transaction, type TupleItem } from '@ton/core'
 import type { TonConfig, TonEndpoint, TonFees, TonProvider, TonRpc } from './types.js'

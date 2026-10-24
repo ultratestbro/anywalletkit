@@ -1,4 +1,4 @@
-# @forgewallet/protocol-swap2-jupiter
+# @anywalletkit/protocol-swap2-jupiter
 
 [Jupiter](https://developers.jup.ag/docs/swap) same-chain Solana swaps as a
 swap2 provider. It uses Swap API V2's **Router** path (`GET /swap/v2/build`):
@@ -7,8 +7,8 @@ without an API key at 0.5 requests per second. Pass `apiKey` for your plan's
 limit; the key is per organisation, so ship it on a server, not inside an app.
 
 ```ts
-import {jupiterProvider} from "@forgewallet/protocol-swap2-jupiter/provider";
-import {RouterSwap2Protocol} from "@forgewallet/protocol-swap2-router/swap2/router";
+import {jupiterProvider} from "@anywalletkit/protocol-swap2-jupiter/provider";
+import {RouterSwap2Protocol} from "@anywalletkit/protocol-swap2-router/swap2/router";
 
 const swap2 = new RouterSwap2Protocol(solanaAccount, {
   fromChain: "solana:mainnet",
@@ -18,7 +18,7 @@ const res = await swap2.swap2({fromToken: "SOL", toToken: "USDC", toChain: "sola
 ```
 
 The account must expose swap2's `sendSerializedTransaction` hook
-(`@forgewallet/wallet-solana`'s `sendSerialized` behind it): it simulates the
+(`@anywalletkit/wallet-solana`'s `sendSerialized` behind it): it simulates the
 transaction, proves the balance changes against the quote, signs, and
 broadcasts through its own RPC. Jupiter never lands the transaction.
 

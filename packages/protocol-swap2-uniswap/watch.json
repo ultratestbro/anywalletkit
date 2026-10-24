@@ -1,5 +1,5 @@
 {
-  "module": "@forgewallet/protocol-swap2-uniswap",
+  "module": "@anywalletkit/protocol-swap2-uniswap",
   "sources": [
     {
       "id": "factory-ethereum",

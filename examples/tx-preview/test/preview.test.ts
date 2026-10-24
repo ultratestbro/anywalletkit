@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { derivationVectors } from '@forgewallet/conformance'
-import { Wallet } from '@forgewallet/kit'
-import { WalletManagerEvm, type WalletAccountEvm } from '@forgewallet/wallet-evm'
-import { UserRejectedError } from '@forgewallet/core'
-import type { Rpc, TxPreview } from '@forgewallet/tx-preview-evm'
-import type { Swap2ExecutionPlan } from '@forgewallet/protocol-swap2-core'
+import { derivationVectors } from '@anywalletkit/conformance'
+import { Wallet } from '@anywalletkit/kit'
+import { WalletManagerEvm, type WalletAccountEvm } from '@anywalletkit/wallet-evm'
+import { UserRejectedError } from '@anywalletkit/core'
+import type { Rpc, TxPreview } from '@anywalletkit/tx-preview-evm'
+import type { Swap2ExecutionPlan } from '@anywalletkit/protocol-swap2-core'
 import { balanceLines, previewPolicies, previewSwap, previewWrap, verdict } from '../src/preview.ts'
 
 const SEED = derivationVectors.seeds['bip39-abandon-12']!
@@ -60,7 +60,7 @@ describe('Transaction preview guide (docs) — offline', () => {
   })
 })
 
-// Base reads through eth_simulateV1, nothing signed: LIVE=1 pnpm --filter @forgewallet/example-tx-preview test
+// Base reads through eth_simulateV1, nothing signed: LIVE=1 pnpm --filter @anywalletkit/example-tx-preview test
 describe.runIf(process.env.LIVE === '1')('Transaction preview guide (docs) — live', () => {
   it('wrapping 0.01 ETH on Base: -ETH, +WETH, simulated on an unfunded account', async () => {
     const preview = await previewWrap(ME, 10n ** 16n)

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { derivationVectors } from '@forgewallet/conformance'
-import { PolicyViolationError } from '@forgewallet/kit'
-import { UserRejectedError } from '@forgewallet/core'
+import { derivationVectors } from '@anywalletkit/conformance'
+import { PolicyViolationError } from '@anywalletkit/kit'
+import { UserRejectedError } from '@anywalletkit/core'
 import { BASE, BITCOIN, ETHEREUM, NEAR, SOLANA, TON, TRON, addresses, checkSeedPhrase, createWallet, newSeedPhrase, policies, signIn } from '../src/wallet.ts'
 
 const SEED = derivationVectors.seeds['bip39-abandon-12']!

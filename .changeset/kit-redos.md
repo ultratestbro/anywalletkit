@@ -1,5 +1,5 @@
 ---
-"@forgewallet/kit": patch
+"@anywalletkit/kit": patch
 ---
 
 Two backtracking regexes on dApp / provider input are gone:

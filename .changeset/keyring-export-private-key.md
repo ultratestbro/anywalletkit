@@ -1,5 +1,5 @@
 ---
-"@forgewallet/keyring": minor
+"@anywalletkit/keyring": minor
 ---
 
 New `keyring.exportPrivateKey(accountId, chain)` returns one account's private key on one chain, in the format that chain's wallets import:

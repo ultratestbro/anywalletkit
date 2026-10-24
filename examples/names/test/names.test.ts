@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { NameError, type NameResolver, type ResolvedName } from '@forgewallet/core'
+import { NameError, type NameResolver, type ResolvedName } from '@anywalletkit/core'
 import { beforeSigning, names, profile, readRecipient, reviewLines } from '../src/names.ts'
 
 const VITALIK = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'
@@ -54,7 +54,7 @@ describe('Names guide (docs) — offline', () => {
   })
 })
 
-// Ethereum mainnet reads: LIVE=1 pnpm --filter @forgewallet/example-names test
+// Ethereum mainnet reads: LIVE=1 pnpm --filter @anywalletkit/example-names test
 describe.runIf(process.env.LIVE === '1')('Names guide (docs) — live', () => {
   it('vitalik.eth on Ethereum, a Basename through CCIP-Read on Base, the primary name back', async () => {
     const ens = names()

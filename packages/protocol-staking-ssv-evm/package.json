@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/protocol-staking-ssv-evm",
+  "name": "@anywalletkit/protocol-staking-ssv-evm",
   "version": "0.3.0",
-  "description": "A simple package that lets @forgewallet/wallet-evm wallet accounts stake SSV through SSV Network: stake SSV → cSSV, claim ETH rewards, cooldown unstake and withdraw.",
+  "description": "A simple package that lets @anywalletkit/wallet-evm wallet accounts stake SSV through SSV Network: stake SSV → cSSV, claim ETH rewards, cooldown unstake and withdraw.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -33,11 +33,11 @@
     "viem": "^2.57.2"
   },
   "peerDependencies": {
-    "@forgewallet/core": "workspace:*"
+    "@anywalletkit/core": "workspace:*"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
-    "@forgewallet/core": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
     "@types/node": "^22",
     "vitest": "^5.0.3"
   },
@@ -49,7 +49,7 @@
     "cssv",
     "ethereum",
     "staking-protocol",
-    "forgewallet",
+    "anywalletkit",
     "staking"
   ]
 }

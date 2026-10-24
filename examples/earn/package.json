@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/example-earn",
+  "name": "@anywalletkit/example-earn",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,14 +9,14 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
-    "@forgewallet/kit": "workspace:*",
-    "@forgewallet/wallet-evm": "workspace:*",
-    "@forgewallet/protocol-staking-lido-evm": "workspace:*",
-    "@forgewallet/protocol-lending-aave-evm": "workspace:*"
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/kit": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*",
+    "@anywalletkit/protocol-staking-lido-evm": "workspace:*",
+    "@anywalletkit/protocol-lending-aave-evm": "workspace:*"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3"
   }

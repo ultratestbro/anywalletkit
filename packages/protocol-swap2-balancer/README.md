@@ -1,4 +1,4 @@
-# @forgewallet/protocol-swap2-balancer
+# @anywalletkit/protocol-swap2-balancer
 
 Balancer v2 same-chain swaps as a swap2 module: Smart Order Router paths from
 the Balancer API, `queryBatchSwap` on the Vault for the on-chain quote,

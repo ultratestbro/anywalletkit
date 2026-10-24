@@ -1,4 +1,4 @@
-import { bigintToNumber, type BorrowOptions, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type RepayOptions, type SupplyOptions, type WithdrawOptions } from '@forgewallet/core'
+import { bigintToNumber, type BorrowOptions, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type RepayOptions, type SupplyOptions, type WithdrawOptions } from '@anywalletkit/core'
 import { getAddress, isAddress, isHex, zeroAddress, type Address, type Hex } from 'viem'
 import { ERC20_ABI, IRM_ABI, MORPHO_ABI, ORACLE_ABI } from './abi.js'
 import { FALLBACK_GAS, MorphoBase, toAmount, type AmountOption, type MorphoBaseConfig, type Tx } from './base.js'

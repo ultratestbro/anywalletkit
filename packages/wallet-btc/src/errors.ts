@@ -1,4 +1,4 @@
-export { InsufficientFundsError, NetworkError, SignerError } from '@forgewallet/core'
+export { InsufficientFundsError, NetworkError, SignerError } from '@anywalletkit/core'
 
 export type UnsafeTransactionCode =
   /** Fee rate above `maxFeeRate`. */

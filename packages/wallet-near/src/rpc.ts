@@ -1,4 +1,4 @@
-import { NetworkError } from '@forgewallet/core'
+import { NetworkError } from '@anywalletkit/core'
 import { NearRpcError } from './errors.js'
 import type { NearConfig, NearFetch, NearProvider } from './types.js'
 

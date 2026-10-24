@@ -1,4 +1,4 @@
-import { NetworkError, type IWalletAccountReadOnly } from '@forgewallet/core'
+import { NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import {
   address, appendTransactionMessageInstructions, compileTransaction, compileTransactionMessage, compressTransactionMessageUsingAddressLookupTables,

@@ -1,4 +1,4 @@
-# @forgewallet/protocol-swap2-omniston
+# @anywalletkit/protocol-swap2-omniston
 
 STON.fi Omniston as a swap2 module: TON ↔ TON swaps settled on the STON.fi DEX,
 and TON ↔ EVM and EVM ↔ EVM stable orders settled through HTLC escrows
@@ -52,7 +52,7 @@ Every route is fail-closed until its allowlists and validators are configured:
 
 ## Validators
 
-`@forgewallet/protocol-swap2-omniston/validators` ships the RPC/indexer-backed
+`@anywalletkit/protocol-swap2-omniston/validators` ships the RPC/indexer-backed
 validators every route above needs, plus the audited contract tables:
 `createOmnistonEvmOutputValidator`, `createOmnistonEvmInputValidator`,
 `createOmnistonTonValidators` (TonAPI), `createOmnistonEvmDeliveryLocator`

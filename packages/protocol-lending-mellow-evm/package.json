@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/protocol-lending-mellow-evm",
+  "name": "@anywalletkit/protocol-lending-mellow-evm",
   "version": "0.3.0",
-  "description": "A simple package that lets @forgewallet/wallet-evm wallet accounts use Mellow Core Vaults (Lido EarnETH / EarnUSD and any vault on the same contracts): supply through the sync or async deposit queue, redeem and claim through the redeem queue, read the position, fees, oracle reports and APY.",
+  "description": "A simple package that lets @anywalletkit/wallet-evm wallet accounts use Mellow Core Vaults (Lido EarnETH / EarnUSD and any vault on the same contracts): supply through the sync or async deposit queue, redeem and claim through the redeem queue, read the position, fees, oracle reports and APY.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -33,11 +33,11 @@
     "viem": "^2.57.2"
   },
   "peerDependencies": {
-    "@forgewallet/core": "workspace:*"
+    "@anywalletkit/core": "workspace:*"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
-    "@forgewallet/core": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
     "@types/node": "^22",
     "vitest": "^5.0.3"
   },
@@ -52,7 +52,7 @@
     "earnusd",
     "ethereum",
     "lending-protocol",
-    "forgewallet",
+    "anywalletkit",
     "lending"
   ]
 }

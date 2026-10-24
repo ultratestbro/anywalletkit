@@ -120,7 +120,7 @@ export function base58Decode (s) {
 /**
  * @typedef {Object} SplStakePoolProtocolConfig
  * @property {string | StakePoolConfig} [pool] - A key of `SPL_STAKE_POOL_ADDRESS_MAP` ('jito' by default) or an explicit `{ name, pool, mint, symbol }` for any pool on the program.
- * @property {*} [provider] - Where reads go: a JSON-RPC URL, an array of URLs (tried in order), a `@solana/rpc` client (what `@forgewallet/wallet-solana` accounts hold), or `{ request(method, params) }`. Defaults to the account's own RPC.
+ * @property {*} [provider] - Where reads go: a JSON-RPC URL, an array of URLs (tried in order), a `@solana/rpc` client (what `@anywalletkit/wallet-solana` accounts hold), or `{ request(method, params) }`. Defaults to the account's own RPC.
  * @property {'processed' | 'confirmed' | 'finalized'} [commitment] - Read commitment (default 'confirmed').
  * @property {number} [slippageBps] - Tolerance on the quoted amount for ..WithSlippage instructions (default 50).
  * @property {number} [computeUnitLimit] - Compute budget per transaction (default 300 000).
@@ -164,7 +164,7 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
   /**
    * Creates a new interface to an SPL stake pool for Solana blockchains.
    *
-   * @param {*} account - The wallet account (a @forgewallet/wallet-solana account, or a read-only one for views).
+   * @param {*} account - The wallet account (a @anywalletkit/wallet-solana account, or a read-only one for views).
    * @param {SplStakePoolProtocolConfig} [config] - The protocol's configuration.
    */
   constructor (account, config = {}) {
@@ -795,9 +795,9 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
    * WithdrawStake → unstake), labelling this instance's pool and the known presets.
    * See `spl-stake-pool-activity.js` for the rule.
    *
-   * @param {import('@forgewallet/core').ChainTx} tx
-   * @param {import('@forgewallet/core').DescribeActivityContext} ctx
-   * @returns {import('@forgewallet/core').ActivityItem | null}
+   * @param {import('@anywalletkit/core').ChainTx} tx
+   * @param {import('@anywalletkit/core').DescribeActivityContext} ctx
+   * @returns {import('@anywalletkit/core').ActivityItem | null}
    */
   describeActivity (tx, ctx) {
     return describeStakePoolActivity(tx, ctx, { pool: this.pool })

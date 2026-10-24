@@ -3,7 +3,7 @@
  * (NOWNodes `https://zec-blockbook.nownodes.io` with an `api-key` header, any
  * self-hosted Blockbook built for Zcash). Serves testnet too.
  */
-import { NetworkError } from '@forgewallet/core'
+import { NetworkError } from '@anywalletkit/core'
 import { hexToBytes } from './encoding.js'
 import { DEFAULT_TIMEOUT_MS, fetchWithTimeout, isInt, isIntString, isRecord } from './http.js'
 import type { SpentOutput, Utxo, ZcashClient, ZcashTxInfo } from './types.js'

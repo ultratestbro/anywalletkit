@@ -1,4 +1,4 @@
-import { LocalSigner, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@anywalletkit/core'
 import { WalletAccountSolana } from './account.js'
 import { WalletAccountReadOnlySolana } from './read-only-account.js'
 import type { SolanaConfig } from './types.js'

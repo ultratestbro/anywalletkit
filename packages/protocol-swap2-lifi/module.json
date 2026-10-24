@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-swap2-lifi",
+  "name": "@anywalletkit/protocol-swap2-lifi",
   "type": "swap2",
   "chains": [
     "eip155:*",
@@ -10,7 +10,7 @@
     "@ultratestbro"
   ],
   "conformance": "0.x",
-  "repo": "https://github.com/ultratestbro/forgewallet",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-swap2-lifi",
   "description": "LI.FI REST cross-chain swaps and bridges (EVM calldata; Solana via guarded serialized transactions).",
   "addedAt": "2026-10-04"

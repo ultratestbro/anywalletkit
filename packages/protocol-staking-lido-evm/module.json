@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-staking-lido-evm",
+  "name": "@anywalletkit/protocol-staking-lido-evm",
   "type": "staking",
   "chains": [
     "eip155:1"
@@ -9,7 +9,7 @@
     "@ultratestbro"
   ],
   "conformance": "0.x",
-  "repo": "https://github.com/ultratestbro/forgewallet",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-staking-lido-evm",
   "addedAt": "2026-10-04"
 }

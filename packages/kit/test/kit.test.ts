@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { inspect } from 'node:util'
-import { UserRejectedError, WalletManager, type FeeRates, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferOptions } from '@forgewallet/core'
-import { LendingProtocol } from '@forgewallet/core'
-import { createMockAccount } from '@forgewallet/conformance'
+import { UserRejectedError, WalletManager, type FeeRates, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferOptions } from '@anywalletkit/core'
+import { LendingProtocol } from '@anywalletkit/core'
+import { createMockAccount } from '@anywalletkit/conformance'
 import { PolicyViolationError, Wallet, applyPolicies, isGuardedWrite } from '../src/index.js'
 
 const SEED = 'test test test test test test test test test test test junk'
@@ -331,7 +331,7 @@ describe('Wallet keeps no seed phrase (2026-10-23 audit)', () => {
   })
 
   it('a Wallet built from seed bytes works the same; invalid input is refused', async () => {
-    const { seedFromMnemonicSync } = await import('@forgewallet/core')
+    const { seedFromMnemonicSync } = await import('@anywalletkit/core')
     const bytes = seedFromMnemonicSync(SEED)
     const w = new Wallet(bytes)
     w.registerWallet('eip155', FakeManager, { chain: 'eip155:1' })

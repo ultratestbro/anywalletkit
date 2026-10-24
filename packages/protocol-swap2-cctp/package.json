@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-swap2-cctp",
+  "name": "@anywalletkit/protocol-swap2-cctp",
   "version": "0.1.1",
   "description": "Circle CCTP V2 for the swap2 engine: native USDC between EVM chains by burn-and-mint (Fast Transfer or Standard), attestation via Circle's Iris API, two-phase delivery with the user's own receiveMessage claim. Bound to Circle's documented contracts and native USDC per domain.",
   "license": "Apache-2.0",
@@ -24,16 +24,16 @@
     "verify:live": "node scripts/verify-live.mjs"
   },
   "dependencies": {
-    "@forgewallet/protocol-swap2-core": "workspace:*",
-    "@forgewallet/swap2-assets": "workspace:*",
+    "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/swap2-assets": "workspace:*",
     "viem": "^2.57.2"
   },
-  "peerDependencies": { "@forgewallet/core": "workspace:*" },
+  "peerDependencies": { "@anywalletkit/core": "workspace:*" },
   "devDependencies": {
     "@types/node": "^22",
     "vitest": "^5.0.3",
-    "@forgewallet/conformance": "workspace:*",
-    "@forgewallet/core": "workspace:*"
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*"
   },
-  "keywords": ["swap2", "bridge", "cctp", "circle", "usdc", "burn-and-mint", "forgewallet"]
+  "keywords": ["swap2", "bridge", "cctp", "circle", "usdc", "burn-and-mint", "anywalletkit"]
 }

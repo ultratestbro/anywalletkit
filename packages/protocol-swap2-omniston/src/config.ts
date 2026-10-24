@@ -1,4 +1,4 @@
-import {evmRef, isEvm, namespace} from "@forgewallet/protocol-swap2-core/util";
+import {evmRef, isEvm, namespace} from "@anywalletkit/protocol-swap2-core/util";
 
 // ── Omniston (STON.fi) — stable corridors over a WebSocket RFQ ───────────────
 // Operational matrix (docs.ston.fi "Supported Chains", re-checked 2026-10-20):

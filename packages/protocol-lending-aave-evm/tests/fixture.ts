@@ -1,6 +1,6 @@
 // A two-reserve Aave v3 market (USDT 6 decimals, WETH 18) with mutable state.
 import { getAddress, maxUint256, type Address } from 'viem'
-import { createMockAccount } from '@forgewallet/conformance'
+import { createMockAccount } from '@anywalletkit/conformance'
 import { ADDRESSES_PROVIDER_ABI, ERC20_ABI, GATEWAY_ABI, ORACLE_ABI, POOL_ABI, VARIABLE_DEBT_ABI } from '../src/abi.js'
 import { FakeChain, revertCustom, revertString } from './fake-chain.js'
 

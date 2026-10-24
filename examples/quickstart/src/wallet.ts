@@ -2,14 +2,14 @@
 // Keep every region self-explanatory: it is read on its own, without the rest of the file.
 
 // #region imports
-import { Wallet, type Policies } from '@forgewallet/kit'
-import { getRandomSeedPhrase, isValidSeedPhrase } from '@forgewallet/core'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
-import { WalletManagerBtc } from '@forgewallet/wallet-btc'
-import { WalletManagerSolana } from '@forgewallet/wallet-solana'
-import { WalletManagerTon } from '@forgewallet/wallet-ton'
-import { WalletManagerTron } from '@forgewallet/wallet-tron'
-import { WalletManagerNear } from '@forgewallet/wallet-near'
+import { Wallet, type Policies } from '@anywalletkit/kit'
+import { getRandomSeedPhrase, isValidSeedPhrase } from '@anywalletkit/core'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
+import { WalletManagerBtc } from '@anywalletkit/wallet-btc'
+import { WalletManagerSolana } from '@anywalletkit/wallet-solana'
+import { WalletManagerTon } from '@anywalletkit/wallet-ton'
+import { WalletManagerTron } from '@anywalletkit/wallet-tron'
+import { WalletManagerNear } from '@anywalletkit/wallet-near'
 // #endregion imports
 
 // #region chains

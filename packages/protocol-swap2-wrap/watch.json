@@ -1,5 +1,5 @@
 {
-  "module": "@forgewallet/protocol-swap2-wrap",
+  "module": "@anywalletkit/protocol-swap2-wrap",
   "sources": [
     {
       "id": "wrapper-ethereum",

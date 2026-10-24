@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { CrossChainProvider, Quote, QuoteParams, Swap2ExecutionPlan } from '@forgewallet/protocol-swap2-core'
+import type { CrossChainProvider, Quote, QuoteParams, Swap2ExecutionPlan } from '@anywalletkit/protocol-swap2-core'
 import { ApprovalQueue, ReviewDeclined, ReviewGate, encodeApproveCalldata, executionFloor, memoryApprovalWindow, planMatchers, quoteRoutes, reviewSwapPlan, swapApprovalPayload, type RouteListView, type SwapApproval } from '../src/index.js'
 
 const A = '0x9858EfFD232B4033E47d90003D41EC34EcaEda94'

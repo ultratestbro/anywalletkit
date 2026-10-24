@@ -1,4 +1,4 @@
-# @forgewallet/protocol-swap2-router
+# @anywalletkit/protocol-swap2-router
 
 The optional swap2 aggregator. Every provider module (`-lifi`, `-near-intents`, `-thorchain`,
 `-omniston`, `-cctp`, `-uniswap`, `-balancer`, `-wrap`) works on its own; install this package when
@@ -9,7 +9,7 @@ you want one protocol that auctions a route across the providers **you** pass in
 **1. One protocol, no aggregator.** Install a single provider and use its own protocol class.
 
 ```ts
-import {LifiSwap2Protocol} from "@forgewallet/protocol-swap2-lifi";
+import {LifiSwap2Protocol} from "@anywalletkit/protocol-swap2-lifi";
 const swap2 = new LifiSwap2Protocol(account, {fromChain: "eip155:1"});
 ```
 
@@ -17,7 +17,7 @@ const swap2 = new LifiSwap2Protocol(account, {fromChain: "eip155:1"});
 same way and executes the winner.
 
 ```ts
-import {RouterSwap2Protocol, usdValue} from "@forgewallet/protocol-swap2-router";
+import {RouterSwap2Protocol, usdValue} from "@anywalletkit/protocol-swap2-router";
 
 const swap2 = new RouterSwap2Protocol(account, {
   fromChain: "eip155:1",
@@ -62,7 +62,7 @@ The router executes through whichever provider wins, so it has no transactions
 of its own: `describeActivity(tx, ctx)` asks every installed provider in order
 and returns the first description (null when none claims the transaction, or
 when the router holds no providers). Each provider package documents what it
-recognizes (`@forgewallet/protocol-swap2-lifi` → LI.FI Diamond calls,
+recognizes (`@anywalletkit/protocol-swap2-lifi` → LI.FI Diamond calls,
 `-thorchain` → router `depositWithExpiry` / `transferOut`, `-cctp` → burn and
 claim, `-uniswap` / `-balancer` / `-wrap` → the DEX router / Vault / WETH9 calls,
 `-omniston` → STON.fi router and Omniston escrow on TON, `-near-intents` → the

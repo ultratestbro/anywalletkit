@@ -1,12 +1,12 @@
-# @forgewallet/protocol-staking-lido-evm
+# @anywalletkit/protocol-staking-lido-evm
 
-A simple package that lets `@forgewallet/wallet-evm` wallet accounts stake
+A simple package that lets `@anywalletkit/wallet-evm` wallet accounts stake
 through the [Lido](https://lido.fi) protocol: stake ETH → stETH, exit through
 the two-phase withdrawal queue, wrap/unwrap the non-rebasing wstETH form, and
 read APR and reward history.
 
 Built as the first implementation of the **`StakingProtocol` type** in
-`@forgewallet/core`. The base class lives in `@forgewallet/core`;
+`@anywalletkit/core`. The base class lives in `@anywalletkit/core`;
 `src/staking-protocol.ts` keeps the runtime `IStakingProtocol` marker and the
 option / result types this module documents. See "The interface" below for
 why staking is not lending.
@@ -20,8 +20,8 @@ dependency) and built with tsup to `dist/` (ESM + CJS + `.d.ts`).
 ## Usage
 
 ```js
-import WalletManagerEvm from '@forgewallet/wallet-evm'
-import LidoProtocolEvm from '@forgewallet/protocol-staking-lido-evm'
+import WalletManagerEvm from '@anywalletkit/wallet-evm'
+import LidoProtocolEvm from '@anywalletkit/protocol-staking-lido-evm'
 
 const wallet = new WalletManagerEvm(seed, { provider: 'https://rpc.example.org' })
 const account = await wallet.getAccount(0)

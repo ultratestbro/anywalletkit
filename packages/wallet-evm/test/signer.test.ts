@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { hexToBytes, recoverMessageAddress, recoverTransactionAddress, recoverTypedDataAddress, type Hex, type TransactionSerialized } from 'viem'
-import { LocalSigner, SignerError, UserRejectedError, externalSigner, seedFromMnemonicSync } from '@forgewallet/core'
+import { LocalSigner, SignerError, UserRejectedError, externalSigner, seedFromMnemonicSync } from '@anywalletkit/core'
 import { EVM_BASE_PATH, WalletAccountEvm, WalletManagerEvm } from '../src/index.js'
 
 const SEED = 'test test test test test test test test test test test junk'

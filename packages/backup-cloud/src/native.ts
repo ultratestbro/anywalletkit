@@ -4,7 +4,7 @@ export interface NativeDriveFile {
   modifiedAt: number
 }
 
-/** The `ForgewalletBackupCloud` Expo module (iOS). */
+/** The `AnyWalletKitBackupCloud` Expo module (iOS). */
 export interface NativeBackupCloud {
   driveStatus(container: string): Promise<{ signedIn: boolean; container: boolean }>
   driveList(container: string, folder: string): Promise<NativeDriveFile[]>
@@ -26,7 +26,7 @@ export async function loadNative(): Promise<NativeBackupCloud | null> {
   if (cached !== undefined) return cached
   try {
     const { requireNativeModule } = await import('expo-modules-core')
-    cached = requireNativeModule<NativeBackupCloud>('ForgewalletBackupCloud')
+    cached = requireNativeModule<NativeBackupCloud>('AnyWalletKitBackupCloud')
   } catch {
     cached = null
   }

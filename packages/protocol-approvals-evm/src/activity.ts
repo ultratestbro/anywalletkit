@@ -11,13 +11,13 @@
 // Calldata is needed to read the spender and the amount; with only the selector the
 // item is still returned as `approve`, titled without the amount verdict.
 
-import { activityBase, sameAddress, type ActivityItem, type ChainTx, type DescribeActivityContext } from '@forgewallet/core'
+import { activityBase, sameAddress, type ActivityItem, type ChainTx, type DescribeActivityContext } from '@anywalletkit/core'
 import { decodeAbiParameters, getAbiItem, toFunctionSelector, type Hex } from 'viem'
 
 import { PERMIT2_ABI, PERMIT2_ADDRESS, SELECTORS } from './standards.js'
 
 /** Registry name, as `module.json` carries it. */
-export const MODULE_NAME = '@forgewallet/protocol-approvals-evm'
+export const MODULE_NAME = '@anywalletkit/protocol-approvals-evm'
 
 /** Token labels (lowercase address → symbol / decimals) for activity titles. */
 export type ActivityTokens = Record<string, { symbol?: string; decimals?: number }>

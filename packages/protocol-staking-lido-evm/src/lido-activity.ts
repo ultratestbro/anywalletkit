@@ -6,11 +6,11 @@
 import {
   activityBase, netTransfers, sameAddress, splitNet,
   type ActivityAsset, type ActivityItem, type ActivityKind, type ChainTx, type DescribeActivityContext,
-} from '@forgewallet/core'
+} from '@anywalletkit/core'
 import { getAbiItem, parseAbi, toFunctionSelector } from 'viem'
 
 /** Registry name, as `module.json` carries it. */
-export const MODULE_NAME = '@forgewallet/protocol-staking-lido-evm'
+export const MODULE_NAME = '@anywalletkit/protocol-staking-lido-evm'
 
 const ACTIVITY_ABI = parseAbi([
   'function submit(address _referral) payable returns (uint256)',

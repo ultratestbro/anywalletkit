@@ -28,7 +28,7 @@
  * Passwords: at least {@link VAULT_MIN_PASSWORD_LENGTH} characters, enforced here
  * and not only in a UI.
  */
-import { zeroize } from '@forgewallet/core'
+import { zeroize } from '@anywalletkit/core'
 import { scryptAsync } from '@noble/hashes/scrypt.js'
 import { fromBase64, toArrayBuffer, toBase64 } from './codec.js'
 import { VaultError } from './errors.js'
@@ -119,6 +119,7 @@ export interface VaultKdfInfo {
   summary: string
 }
 
+// AAD / HKDF labels are part of the sealed format: existing vaults open only with these exact strings.
 const aadDekV1 = (kdf: VaultEnvelopeV1['kdf']) => `forgewallet-vault/1/dek/${kdf.name}/${kdf.iterations}/${kdf.salt}`
 const aadDekV2 = (kdf: VaultEnvelopeV2['kdf']) => `forgewallet-vault/2/dek/scrypt/${kdf.N}/${kdf.r}/${kdf.p}/${kdf.salt}`
 const aadPasskey = (id: string) => `forgewallet-vault/2/passkey/${id}`

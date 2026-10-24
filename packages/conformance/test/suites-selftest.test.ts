@@ -1,5 +1,5 @@
 // The suites must pass against the base classes themselves (everything notImplemented).
-import { LendingProtocol, StakingProtocol } from '@forgewallet/core'
+import { LendingProtocol, StakingProtocol } from '@anywalletkit/core'
 import { describeProtocolModule } from '../src/index.js'
 
 describeProtocolModule('LendingProtocol base', {

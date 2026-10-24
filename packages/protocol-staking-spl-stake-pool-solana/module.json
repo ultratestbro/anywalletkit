@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-staking-spl-stake-pool-solana",
+  "name": "@anywalletkit/protocol-staking-spl-stake-pool-solana",
   "type": "staking",
   "chains": [
     "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
@@ -9,7 +9,7 @@
     "@ultratestbro"
   ],
   "conformance": "0.x",
-  "repo": "https://github.com/ultratestbro/forgewallet",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-staking-spl-stake-pool-solana",
   "addedAt": "2026-10-04"
 }

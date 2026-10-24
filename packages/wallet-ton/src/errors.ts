@@ -1,4 +1,4 @@
-import { SignerError } from '@forgewallet/core'
+import { SignerError } from '@anywalletkit/core'
 
 /**
  * Refused before signing: the message would almost certainly misbehave or

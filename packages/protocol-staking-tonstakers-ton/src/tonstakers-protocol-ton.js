@@ -155,7 +155,7 @@ export default class TonstakersProtocolTon extends StakingProtocol {
   /**
    * Creates a new interface to Tonstakers for TON blockchains.
    *
-   * @param {*} account - The wallet account (a @forgewallet/wallet-ton account, or a read-only one for views).
+   * @param {*} account - The wallet account (a @anywalletkit/wallet-ton account, or a read-only one for views).
    * @param {TonstakersProtocolConfig} [config] - The protocol's configuration.
    */
   constructor (account, config = {}) {
@@ -624,9 +624,9 @@ export default class TonstakersProtocolTon extends StakingProtocol {
    * the pool, a tsTON burn (unstake request), a withdrawal payout from the pool.
    * See `tonstakers-activity.js` for the rule.
    *
-   * @param {import('@forgewallet/core').ChainTx} tx
-   * @param {import('@forgewallet/core').DescribeActivityContext} ctx
-   * @returns {import('@forgewallet/core').ActivityItem | null}
+   * @param {import('@anywalletkit/core').ChainTx} tx
+   * @param {import('@anywalletkit/core').DescribeActivityContext} ctx
+   * @returns {import('@anywalletkit/core').ActivityItem | null}
    */
   describeActivity (tx, ctx) {
     return describeTonstakersActivity(tx, ctx, { network: this._network, addresses: this._addresses })

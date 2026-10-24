@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-staking-tonstakers-ton",
+  "name": "@anywalletkit/protocol-staking-tonstakers-ton",
   "type": "staking",
   "chains": [
     "ton:-239"
@@ -9,7 +9,7 @@
     "@ultratestbro"
   ],
   "conformance": "0.x",
-  "repo": "https://github.com/ultratestbro/forgewallet",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-staking-tonstakers-ton",
   "addedAt": "2026-10-04"
 }

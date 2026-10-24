@@ -1,5 +1,5 @@
 ---
-"@forgewallet/seed-vault": minor
+"@anywalletkit/seed-vault": minor
 ---
 
 New package: encrypted backup files for wallet secrets.

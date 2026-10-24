@@ -3,8 +3,8 @@ import { base58, hex } from '@scure/base'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { mnemonicNew } from '@ton/crypto'
-import { deriveEd25519, deriveSecp256k1, seedFromMnemonicSync } from '@forgewallet/core'
-import { WalletManagerTon } from '@forgewallet/wallet-ton'
+import { deriveEd25519, deriveSecp256k1, seedFromMnemonicSync } from '@anywalletkit/core'
+import { WalletManagerTon } from '@anywalletkit/wallet-ton'
 import { CHAIN_SPECS, Keyring, KeyringError, parsePrivateKey, type ChainKey } from '../src/index.js'
 import { ABANDON, CHAINS, fresh } from './helpers.js'
 
@@ -193,7 +193,7 @@ describe('Keyring — imported private keys', () => {
     await expect(keyring.getAccount(account.id, 'solana')).rejects.toThrow(/no solana address/)
     await expect(keyring.addAccount(source.id)).rejects.toMatchObject({ code: 'unsupported' })
     const handle = await keyring.getAccount(account.id, 'evm')
-    const manager = new CHAINS.evm.Manager((await import('@forgewallet/core')).privateKeySigner('secp256k1', keyAt('evm')), {})
+    const manager = new CHAINS.evm.Manager((await import('@anywalletkit/core')).privateKeySigner('secp256k1', keyAt('evm')), {})
     await expect(manager.getAccount(1)).rejects.toThrow(/one account/)
     manager.dispose()
     handle.dispose()

@@ -3,7 +3,7 @@
  * delivery only, via a router over pluggable providers (NEAR Intents + others).
  * A provider can only delay/refund delivery — it can never affect vault safety.
  */
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 
 export interface Asset {
   chain: string; // CAIP-2, e.g. "tron:728126428"

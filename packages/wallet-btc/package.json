@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/wallet-btc",
+  "name": "@anywalletkit/wallet-btc",
   "version": "0.1.1",
-  "description": "Bitcoin wallet for the forgewallet SDK on @scure/btc-signer: BIP-84 p2wpkh and BIP-86 taproot accounts, own coin selection, RBF, Blockbook/Esplora transports.",
+  "description": "Bitcoin wallet for Any Wallet Kit on @scure/btc-signer: BIP-84 p2wpkh and BIP-86 taproot accounts, own coin selection, RBF, Blockbook/Esplora transports.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -42,14 +42,14 @@
     "esplora"
   ],
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@scure/base": "^2.4.0",
     "@scure/btc-signer": "^2.4.1"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
     "vitest": "^5.0.3"
   }
 }

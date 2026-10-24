@@ -10,7 +10,7 @@
  * for SPL / Token-2022), so programs the parser does not know still produce
  * correct movements. `fetch` + `AbortSignal.timeout` only — Hermes-safe.
  */
-import type { ChainCall, ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@forgewallet/core'
+import type { ChainCall, ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@anywalletkit/core'
 import { CAIP2_GENESIS } from './types.js'
 
 // ── Public types ─────────────────────────────────────────────────────────────
@@ -184,10 +184,10 @@ export function decodeCursor(s: string): PageCursor {
   try {
     parsed = JSON.parse(b64decode(s))
   } catch {
-    throw new Error('@forgewallet/wallet-solana: malformed history cursor')
+    throw new Error('@anywalletkit/wallet-solana: malformed history cursor')
   }
   const c = parsed as Partial<PageCursor> | null
-  if (!c || c.v !== 1 || typeof c.l !== 'object' || c.l === null) throw new Error('@forgewallet/wallet-solana: malformed history cursor')
+  if (!c || c.v !== 1 || typeof c.l !== 'object' || c.l === null) throw new Error('@anywalletkit/wallet-solana: malformed history cursor')
   return { v: 1, l: c.l }
 }
 
@@ -373,9 +373,9 @@ export function createSolanaHistory(options: SolanaHistoryOptions = {}): SolanaH
   const network = options.network ?? 'mainnet'
   const chain = CAIP2_GENESIS[network] ?? CAIP2_GENESIS.mainnet!
   const urls = [...(options.rpcUrls ?? []), ...(options.rpcUrl ? [options.rpcUrl] : [])]
-  if (urls.length === 0) throw new Error('@forgewallet/wallet-solana: createSolanaHistory needs rpcUrl or rpcUrls')
+  if (urls.length === 0) throw new Error('@anywalletkit/wallet-solana: createSolanaHistory needs rpcUrl or rpcUrls')
   const fetchFn: HistoryFetch = options.fetch ?? ((globalThis as { fetch?: HistoryFetch }).fetch as HistoryFetch)
-  if (typeof fetchFn !== 'function') throw new Error('@forgewallet/wallet-solana: no global fetch; pass `fetch` in the options')
+  if (typeof fetchFn !== 'function') throw new Error('@anywalletkit/wallet-solana: no global fetch; pass `fetch` in the options')
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const bucket = new TokenBucket(options.rateLimit ?? 5)
   const batchSize = Math.min(10, Math.max(1, Math.floor(options.batchSize ?? 10)))

@@ -1,5 +1,5 @@
 ---
-"@forgewallet/extension-kit": patch
+"@anywalletkit/extension-kit": patch
 ---
 
 `personal_sign` runs the EIP-4361 checks on the decoded bytes whenever they are valid UTF-8, not on the hex fallback shown for unprintable text. A sign-in message carrying hidden control characters is refused.

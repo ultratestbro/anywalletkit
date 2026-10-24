@@ -1,5 +1,5 @@
 {
- "module": "@forgewallet/protocol-staking-tonstakers-ton",
+ "module": "@anywalletkit/protocol-staking-tonstakers-ton",
  "sources": {
   "pool-mainnet": {
    "type": "ton-code",

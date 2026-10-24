@@ -1,13 +1,13 @@
-# @forgewallet/wallet-near
+# @anywalletkit/wallet-near
 
 NEAR accounts at `m/44'/397'/i'` (SLIP-10 ed25519 — the NEAR Wallet / `near-seed-phrase`
 path; index 0 is what every NEAR wallet derives), pinned by golden vectors in
-`@forgewallet/conformance`. No near-api-js: borsh is hand-written against the nearcore
+`@anywalletkit/conformance`. No near-api-js: borsh is hand-written against the nearcore
 schema (byte-for-byte checked against `@near-js/transactions`), the node answers JSON-RPC,
 the account signs `sha256(borsh(tx))` with noble ed25519 and broadcasts with `send_tx`.
 
 ```ts
-import WalletManagerNear from '@forgewallet/wallet-near'
+import WalletManagerNear from '@anywalletkit/wallet-near'
 
 const wallet = new WalletManagerNear(seedPhrase, { provider: ['https://free.rpc.fastnear.com', 'https://rpc.mainnet.near.org'] })
 const account = await wallet.getAccount(0)          // implicit account: 64-hex id = the public key
@@ -73,10 +73,10 @@ FastNear / a provider / your own proxy. CAIP-2: `near:mainnet` (default) or `nea
 
 ## Activity history
 
-`createNearHistory` is the chain's `HistorySource` (`@forgewallet/core`) over the nearblocks API, optionally sharpened by an archival RPC.
+`createNearHistory` is the chain's `HistorySource` (`@anywalletkit/core`) over the nearblocks API, optionally sharpened by an archival RPC.
 
 ```ts
-import { createNearHistory } from '@forgewallet/wallet-near/history'
+import { createNearHistory } from '@anywalletkit/wallet-near/history'
 
 const history = createNearHistory({ apiKey: process.env.NEARBLOCKS_KEY, rpcUrl: 'https://archival-rpc.mainnet.near.org' })
 const page = await history.listActivity('fc647e203e0e099212485017b78a0e77dc330019d4b532a4d44408adc0bfd9a1', { limit: 25 })
@@ -96,7 +96,7 @@ history.explorerTxUrl(one.hash) // https://nearblocks.io/txns/…
 
 **Lists.** `GET /v1/account/{id}/txns?per_page=&order=desc&cursor=` (receipt-level rows, asked for twice the limit since a transaction usually has a call and a refund receipt) and `GET /v1/account/{id}/ft-txns?per_page=&order=desc&cursor=` (NEP-141 movements), grouped by `transaction_hash`. nearblocks writes large yoctoNEAR values as JSON numbers; bodies go through `parseJsonPreservingBigInts`, which re-quotes 16+ digit integer literals before `JSON.parse` so they stay exact, while values nearblocks had already rounded to a double (`7e+23`) are used as-is and flag the row `raw.approximate`. `delta_amount` of NEP-141 rows is a string and always exact.
 
-**Mapping.** Receipt rows whose predecessor is `system` (gas refunds) carry no transfers. `TRANSFER` actions and `FUNCTION_CALL` deposits (other than the NEP-141 one-yoctoNEAR formality) become native transfers predecessor → receiver; the first non-transfer action of the receipt addressed to someone else becomes `call` (`to` = receiver, `method`, `programs` = every method in order). NEP-141 rows become `nep141` transfers with the contract as `token`, `symbol` / `decimals` from `ft` (an `ft_transfer_call` into `intents.near` is own → `intents.near`, what `@forgewallet/protocol-swap2-near-intents` looks for). `status` from `outcomes.status`, `fee` from `outcomes_agg.transaction_fee`, `block` = the lowest `block_height` of the group, `time` from the transaction's `block_timestamp`.
+**Mapping.** Receipt rows whose predecessor is `system` (gas refunds) carry no transfers. `TRANSFER` actions and `FUNCTION_CALL` deposits (other than the NEP-141 one-yoctoNEAR formality) become native transfers predecessor → receiver; the first non-transfer action of the receipt addressed to someone else becomes `call` (`to` = receiver, `method`, `programs` = every method in order). NEP-141 rows become `nep141` transfers with the contract as `token`, `symbol` / `decimals` from `ft` (an `ft_transfer_call` into `intents.near` is own → `intents.near`, what `@anywalletkit/protocol-swap2-near-intents` looks for). `status` from `outcomes.status`, `fee` from `outcomes_agg.transaction_fee`, `block` = the lowest `block_height` of the group, `time` from the transaction's `block_timestamp`.
 
 **Cursor.** Base64 JSON `{ v: 1, tx, ft }`: the `id` / `event_index` of the last consumed row of each list (`''` = not started, `null` = exhausted) — nearblocks' `cursor=` is a keyset, so the page can take the top `limit` transactions by block time plus ties and resume each list exactly where it stopped; a list that came back short and fully consumed is not asked again. Receipts of one transaction share the transaction's `block_timestamp`, so a transaction is never split across pages (an NEP-141 row carries its receipt's block time and may land one page later as a row of its own).
 

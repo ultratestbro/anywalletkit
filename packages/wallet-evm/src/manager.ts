@@ -1,4 +1,4 @@
-import { LocalSigner, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@forgewallet/core'
+import { LocalSigner, SignerError, WalletManager, isSeedSigner, type FeeRates, type Signer } from '@anywalletkit/core'
 import { WalletAccountEvm } from './account.js'
 import { WalletAccountReadOnlyEvm } from './read-only-account.js'
 import type { EvmConfig } from './types.js'

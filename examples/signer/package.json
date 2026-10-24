@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/example-signer",
+  "name": "@anywalletkit/example-signer",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,14 +9,14 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
-    "@forgewallet/kit": "workspace:*",
-    "@forgewallet/wallet-btc": "workspace:*",
-    "@forgewallet/wallet-evm": "workspace:*",
-    "@forgewallet/wallet-solana": "workspace:*"
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/kit": "workspace:*",
+    "@anywalletkit/wallet-btc": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*",
+    "@anywalletkit/wallet-solana": "workspace:*"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3"
   }

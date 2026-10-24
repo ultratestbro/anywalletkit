@@ -1,8 +1,8 @@
-# @forgewallet/names-ens
+# @anywalletkit/names-ens
 
-**ENS names for wallets built on the forgewallet SDK: `vitalik.eth`, `name.base.eth`, `alice.cb.id` → the address for one chain, verified primary names, avatars, and the warnings a user should see next to a name.**
+**ENS names for wallets built on Any Wallet Kit: `vitalik.eth`, `name.base.eth`, `alice.cb.id` → the address for one chain, verified primary names, avatars, and the warnings a user should see next to a name.**
 
-Implements the `NameResolver` interface from `@forgewallet/core`, so SNS (`.sol`), TON DNS (`.ton`) and NEAR accounts can sit behind the same `nameResolvers([...])` later.
+Implements the `NameResolver` interface from `@anywalletkit/core`, so SNS (`.sol`), TON DNS (`.ton`) and NEAR accounts can sit behind the same `nameResolvers([...])` later.
 
 ## What it does
 
@@ -18,8 +18,8 @@ Implements the `NameResolver` interface from `@forgewallet/core`, so SNS (`.sol`
 ## Usage
 
 ```ts
-import { ensResolver } from '@forgewallet/names-ens'
-import { assertNameUnchanged, isNameLike, NameError } from '@forgewallet/core'
+import { ensResolver } from '@anywalletkit/names-ens'
+import { assertNameUnchanged, isNameLike, NameError } from '@anywalletkit/core'
 
 const ens = ensResolver({ rpcUrl: 'https://ethereum-rpc.publicnode.com' }) // or { client } (viem PublicClient on mainnet)
 

@@ -1,6 +1,6 @@
 import {describe, expect, it} from "vitest";
-import type {CrossChainProvider} from "@forgewallet/protocol-swap2-core/types";
-import {remoteProvider} from "@forgewallet/protocol-swap2-core/remote";
+import type {CrossChainProvider} from "@anywalletkit/protocol-swap2-core/types";
+import {remoteProvider} from "@anywalletkit/protocol-swap2-core/remote";
 import {CrossChainRouter} from "../src/router.js";
 import {RouterSwap2Protocol} from "../src/swap2/router.js";
 

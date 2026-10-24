@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/wallet-zcash",
+  "name": "@anywalletkit/wallet-zcash",
   "version": "0.2.0",
-  "description": "Zcash wallet for the forgewallet SDK: transparent t-addresses (BIP-44 coin 133), v5 transactions with ZIP-244 signature hashing, ZIP-317 fees, Blockchair / Blockbook transports. Shielded pools are out of scope.",
+  "description": "Zcash wallet for Any Wallet Kit: transparent t-addresses (BIP-44 coin 133), v5 transactions with ZIP-244 signature hashing, ZIP-317 fees, Blockchair / Blockbook transports. Shielded pools are out of scope.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -42,13 +42,13 @@
     "blockbook"
   ],
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@scure/base": "^2.4.0"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
     "viem": "^2.44.4",
     "vitest": "^5.0.3"
   }

@@ -1,10 +1,10 @@
 // The "Earn" guide on docs.anywallet.tech renders the #region blocks of this file.
 
 // #region setup
-import { Wallet } from '@forgewallet/kit'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
-import LidoProtocolEvm from '@forgewallet/protocol-staking-lido-evm'
-import { AaveProtocolEvm } from '@forgewallet/protocol-lending-aave-evm'
+import { Wallet } from '@anywalletkit/kit'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
+import LidoProtocolEvm from '@anywalletkit/protocol-staking-lido-evm'
+import { AaveProtocolEvm } from '@anywalletkit/protocol-lending-aave-evm'
 
 export function walletWithEarn(seedPhrase: string): Wallet {
   const wallet = new Wallet(seedPhrase)

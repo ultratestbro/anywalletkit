@@ -1,8 +1,8 @@
 import {createPublicClient, encodeFunctionData, fallback, getAddress, http, isAddress, pad, parseAbi, type Hex} from "viem";
 import {describeUsdt0Activity} from "./activity.js";
-import {ccAsset} from "@forgewallet/swap2-assets";
-import {redactUrls, timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
-import type {Asset, CrossChainProvider, IntentRef, IntentState, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
+import {ccAsset} from "@anywalletkit/swap2-assets";
+import {redactUrls, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import type {Asset, CrossChainProvider, IntentRef, IntentState, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {LZ_SCAN_API, USDT0_BY_EID, USDT0_CHAINS, USDT0_SYMBOLS, usdt0 as usdt0Cfg, type Usdt0Chain} from "./config.js";
 
 /**

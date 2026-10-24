@@ -1,4 +1,4 @@
-# @forgewallet/seed-vault
+# @anywalletkit/seed-vault
 
 An encrypted backup file for one wallet secret: a seed phrase or a private key, exactly as the keyring stores it. One file can be opened by one or more **protectors**:
 
@@ -8,7 +8,7 @@ An encrypted backup file for one wallet secret: a seed phrase or a private key, 
 | `key` | Any ≥32-byte secret held somewhere else | A passkey PRF output, a random key in iCloud Keychain / Google Block Store, a hardware key's hmac-secret |
 
 ```ts
-import { sealBackup, openBackup, addProtector, encodeBackup, decodeBackup } from '@forgewallet/seed-vault'
+import { sealBackup, openBackup, addProtector, encodeBackup, decodeBackup } from '@anywalletkit/seed-vault'
 
 const secret = await secrets.get(sourceId)                       // the keyring's stored string
 const meta = { type: source.type, fingerprint: source.fingerprint, label: source.label }
@@ -50,6 +50,6 @@ With a native Argon2id you get under a second and can afford a stronger cost. Pa
 ## What it is not
 
 - It doesn't upload files. That is `backup-cloud`.
-- It doesn't store secrets on the device. That is `@forgewallet/secure-storage-react-native`.
+- It doesn't store secrets on the device. That is `@anywalletkit/secure-storage-react-native`.
 - It doesn't split secrets into shares (Shamir). That is planned as an extra protector kind.
 - It doesn't use keystore v3 (Ethereum JSON) files.

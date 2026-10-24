@@ -1,12 +1,12 @@
-// The StakingProtocol base class lives in @forgewallet/core (one copy for every staking
+// The StakingProtocol base class lives in @anywalletkit/core (one copy for every staking
 // module). This file keeps the runtime IStakingProtocol marker class, the module's own
 // types (the SSV-specific queue view) and re-exports the base.
 
-import { NotImplementedError, StakingProtocol } from '@forgewallet/core'
+import { NotImplementedError, StakingProtocol } from '@anywalletkit/core'
 import type {
   ClaimWithdrawalsOptions, ClaimWithdrawalsResult, StakeOptions, StakeResult, StakedBalance,
   WithdrawalRequest, WithdrawalRequestOptions, WithdrawalRequestResult,
-} from '@forgewallet/core'
+} from '@anywalletkit/core'
 
 export type {
   ClaimWithdrawalsOptions, ClaimWithdrawalsResult, StakeOptions, StakeResult, StakedBalance,

@@ -1,5 +1,5 @@
 ---
-"@forgewallet/protocol-swap2-jupiter": patch
+"@anywalletkit/protocol-swap2-jupiter": patch
 ---
 
 A swap the wallet cannot fund is refused in plain words: "not enough of the input token in the wallet (no token account for it)". The raw simulation error is kept after the wording.

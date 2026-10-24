@@ -3,12 +3,12 @@
  * ("Wrapped ETH"), `withdraw(uint256)` → `unwrap` ("Unwrapped WETH"), on the
  * wrapper the table (or the caller's override) names for the chain.
  */
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
-import {assetLabel, describeSwapLike, matchesCall, ownerAssets} from "@forgewallet/protocol-swap2-core/activity";
-import {evmRef, isEvm} from "@forgewallet/protocol-swap2-core/util";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
+import {assetLabel, describeSwapLike, matchesCall, ownerAssets} from "@anywalletkit/protocol-swap2-core/activity";
+import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
 import {WRAPPED_NATIVE} from "./provider.js";
 
-export const WRAP_MODULE = "@forgewallet/protocol-swap2-wrap";
+export const WRAP_MODULE = "@anywalletkit/protocol-swap2-wrap";
 
 /** deposit() */
 export const WETH_DEPOSIT = "0xd0e30db0";

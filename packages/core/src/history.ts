@@ -120,7 +120,7 @@ export interface ActivityItem {
   time: number
   status: ChainTxStatus
   kind: ActivityKind
-  /** Registry module name that recognized it (e.g. "@forgewallet/protocol-lending-aave-evm"); undefined for the generic fallback. */
+  /** Registry module name that recognized it (e.g. "@anywalletkit/protocol-lending-aave-evm"); undefined for the generic fallback. */
   protocol?: string
   /** Short human title, e.g. "Supplied USDC", "Swapped ETH → USDC", "Sent USDT". */
   title: string

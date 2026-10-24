@@ -1,5 +1,5 @@
 {
-  "module": "@forgewallet/protocol-approvals-evm",
+  "module": "@anywalletkit/protocol-approvals-evm",
   "sources": [
     {
       "id": "permit2-ethereum",

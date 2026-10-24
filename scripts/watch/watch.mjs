@@ -59,7 +59,7 @@ async function rpc(url, method, params) {
   if (j.error) throw new Error(j.error.message || JSON.stringify(j.error));
   return j.result;
 }
-const ghHeaders = () => ({accept: "application/vnd.github+json", "user-agent": "forgewallet-watch", ...(env.GITHUB_TOKEN ? {authorization: `Bearer ${env.GITHUB_TOKEN}`} : {})});
+const ghHeaders = () => ({accept: "application/vnd.github+json", "user-agent": "anywalletkit-watch", ...(env.GITHUB_TOKEN ? {authorization: `Bearer ${env.GITHUB_TOKEN}`} : {})});
 function canonical(v) {
   if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
   if (v && typeof v === "object") return `{${Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canonical(v[k])).join(",")}}`;
@@ -144,14 +144,14 @@ const F = {
     return {value: sha(c), meta: {hash: sha(c).slice(0, 16), count: Array.isArray(arr) ? arr.length : undefined}};
   },
   async "http-text"(s) {
-    const r = await fetch(s.url, {headers: {"user-agent": "Mozilla/5.0 forgewallet-watch", ...(s.headers ?? {})}, signal: AbortSignal.timeout(25_000)});
+    const r = await fetch(s.url, {headers: {"user-agent": "Mozilla/5.0 anywalletkit-watch", ...(s.headers ?? {})}, signal: AbortSignal.timeout(25_000)});
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const text = visibleText(await readCapped(r), s.between);
     if (text.length < 200) throw new Error(`page text too short (${text.length} chars) — selector or JS-rendered page`);
     return {value: sha(text), meta: {hash: sha(text).slice(0, 16), chars: text.length}, text};
   },
   async "rss"(s) {
-    const r = await fetch(s.url, {headers: {"user-agent": "forgewallet-watch"}, signal: AbortSignal.timeout(20_000)});
+    const r = await fetch(s.url, {headers: {"user-agent": "anywalletkit-watch"}, signal: AbortSignal.timeout(20_000)});
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const xml = await readCapped(r);
     const items = firstBlocks(xml, ["item", "entry"], 5).map((block) => {
@@ -175,7 +175,7 @@ function loadManifests() {
   if (existsSync(pend)) for (const f of readdirSync(pend)) if (f.endsWith(".watch.json")) out.push({file: resolve(pend, f), ...JSON.parse(readFileSync(resolve(pend, f), "utf8"))});
   return out.filter((m) => !ONLY || ONLY.some((o) => m.module.includes(o)));
 }
-const slug = (m) => m.replace(/^@forgewallet\//, "");
+const slug = (m) => m.replace(/^@anywalletkit\//, "");
 const stateFile = (m) => resolve(ROOT, "watch/state", `${slug(m)}.json`);
 const loadState = (m) => (existsSync(stateFile(m)) ? JSON.parse(readFileSync(stateFile(m), "utf8")) : {module: m, sources: {}});
 

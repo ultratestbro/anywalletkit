@@ -1,8 +1,8 @@
-// The StakingProtocol base class lives in @forgewallet/core (one copy for every staking
+// The StakingProtocol base class lives in @anywalletkit/core (one copy for every staking
 // module). This file keeps the runtime IStakingProtocol marker class, the option /
 // result shapes as this module documents them, and re-exports the base.
 
-import { NotImplementedError, StakingProtocol } from '@forgewallet/core'
+import { NotImplementedError, StakingProtocol } from '@anywalletkit/core'
 
 export interface StakeOptions {
   /** Amount in base units (wei). */

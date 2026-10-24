@@ -1,4 +1,4 @@
-# @forgewallet/protocol-swap2-chainflip
+# @anywalletkit/protocol-swap2-chainflip
 
 [Chainflip](https://docs.chainflip.io) vault swaps as a swap2 provider: native
 BTC / ETH / SOL / TRX and USDC / USDT between Ethereum, Arbitrum, Solana, Tron
@@ -7,8 +7,8 @@ Chainflip's public backend (`chainflip-swap.chainflip.io`). You need no broker
 account, there is no API key, and the commission is 0 bps.
 
 ```ts
-import {chainflipProvider} from "@forgewallet/protocol-swap2-chainflip/provider";
-import {RouterSwap2Protocol} from "@forgewallet/protocol-swap2-router/swap2/router";
+import {chainflipProvider} from "@anywalletkit/protocol-swap2-chainflip/provider";
+import {RouterSwap2Protocol} from "@anywalletkit/protocol-swap2-router/swap2/router";
 
 const swap2 = new RouterSwap2Protocol(tronAccount, {fromChain: "tron:728126428", providers: [chainflipProvider()]});
 const res = await swap2.swap2({fromToken: "USDT", toToken: "USDC", toChain: 42161, fromTokenAmount: 20_000_000n});

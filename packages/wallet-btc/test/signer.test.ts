@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js'
 import { SigHash, p2pkh } from '@scure/btc-signer'
-import { LocalSigner, SignerError, UserRejectedError, deriveSecp256k1, externalSigner, seedFromMnemonicSync, tweakSecp256k1PrivateKey, type SignOptions, type SignScheme } from '@forgewallet/core'
+import { LocalSigner, SignerError, UserRejectedError, deriveSecp256k1, externalSigner, seedFromMnemonicSync, tweakSecp256k1PrivateKey, type SignOptions, type SignScheme } from '@anywalletkit/core'
 import { WalletAccountBtc, WalletManagerBtc, decodeAddress, networkParams, parseRawTransaction, recoverMessagePublicKey } from '../src/index.js'
 import { ADDR0, ADDR1, SEED, fakeBlockbook, hex } from './helpers.js'
 

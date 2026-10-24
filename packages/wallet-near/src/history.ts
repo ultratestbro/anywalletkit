@@ -10,7 +10,7 @@
  * Both lists page by keyset cursor (`id` / `event_index`), merged newest-first.
  * `fetch` + `AbortSignal.timeout` only — Hermes-safe.
  */
-import type { ChainCall, ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@forgewallet/core'
+import type { ChainCall, ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@anywalletkit/core'
 import { fromBase64 } from './rpc.js'
 import { CAIP2 } from './types.js'
 
@@ -127,11 +127,11 @@ export function decodeCursor(s: string): NearHistoryCursor {
   try {
     parsed = JSON.parse(b64decode(s))
   } catch {
-    throw new Error('@forgewallet/wallet-near: malformed history cursor')
+    throw new Error('@anywalletkit/wallet-near: malformed history cursor')
   }
   const c = parsed as Partial<NearHistoryCursor> | null
   const ok = (v: unknown) => v === null || typeof v === 'string'
-  if (!c || c.v !== 1 || !ok(c.tx) || !ok(c.ft)) throw new Error('@forgewallet/wallet-near: malformed history cursor')
+  if (!c || c.v !== 1 || !ok(c.tx) || !ok(c.ft)) throw new Error('@anywalletkit/wallet-near: malformed history cursor')
   return { v: 1, tx: c.tx as string | null, ft: c.ft as string | null }
 }
 
@@ -524,7 +524,7 @@ export function createNearHistory(options: NearHistoryOptions = {}): NearHistory
   const chain = CAIP2[network] ?? CAIP2.mainnet!
   const base = (options.nearblocksUrl ?? (network === 'testnet' ? 'https://api-testnet.nearblocks.io' : 'https://api.nearblocks.io')).replace(/\/+$/, '')
   const fetchFn: HistoryFetch = options.fetch ?? ((globalThis as { fetch?: HistoryFetch }).fetch as HistoryFetch)
-  if (typeof fetchFn !== 'function') throw new Error('@forgewallet/wallet-near: no global fetch; pass `fetch` in the options')
+  if (typeof fetchFn !== 'function') throw new Error('@anywalletkit/wallet-near: no global fetch; pass `fetch` in the options')
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const bucket = new TokenBucket(options.rateLimit ?? (options.apiKey ? 5 : 0.1))
 

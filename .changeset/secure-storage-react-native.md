@@ -1,5 +1,5 @@
 ---
-"@forgewallet/secure-storage-react-native": minor
+"@anywalletkit/secure-storage-react-native": minor
 ---
 
 New package: device secret storage for React Native wallets, plugged into the keyring as its `SecretStorage`.

@@ -5,7 +5,7 @@
  * cross-chain joins). Pure over its inputs: the kit hands it sources, recognizers
  * and the journal; tests hand it fakes.
  */
-import type { ActivityAsset, ActivityItem, ChainTx, ChainTxStatus, DescribeActivityContext, HistoryQuery, HistorySource } from '@forgewallet/core'
+import type { ActivityAsset, ActivityItem, ChainTx, ChainTxStatus, DescribeActivityContext, HistoryQuery, HistorySource } from '@anywalletkit/core'
 import { packCursor, sourceKey, unpackCursor, type FeedCursorState, type SourceState } from './cursor.js'
 import { catalogChain, describeGeneric, isSpamTx, titleFor, type GenericActivityItem, type GenericDescribeOptions } from './generic.js'
 import type { Intent, IntentJournal } from './journal.js'

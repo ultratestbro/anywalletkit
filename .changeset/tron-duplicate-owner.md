@@ -1,5 +1,5 @@
 ---
-"@forgewallet/wallet-tron": patch
+"@anywalletkit/wallet-tron": patch
 ---
 
 A prebuilt transaction whose schema-less contract type (`AccountPermissionUpdateContract`, `CreateSmartContract`, …) repeats `owner_address` is refused as non-canonical.

@@ -1,4 +1,4 @@
-import type { ActivityItem, ChainTx, DescribeActivityContext } from '@forgewallet/core'
+import type { ActivityItem, ChainTx, DescribeActivityContext } from '@anywalletkit/core'
 import {
   createPublicClient, custom, encodeFunctionData, getAddress, http, isAddress, zeroAddress,
   type Address, type Hex, type PublicClient, type Transport,
@@ -85,7 +85,7 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
   private _verifier: StateVerifier | null
 
   /**
-   * @param account - A @forgewallet/wallet-evm account (or a read-only one for discovery).
+   * @param account - A @anywalletkit/wallet-evm account (or a read-only one for discovery).
    */
   constructor (account: ReadOnlyAccountLike | AccountLike, config: ApprovalsProtocolEvmConfig = {}) {
     super(account, config)

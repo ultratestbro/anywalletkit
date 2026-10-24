@@ -5,7 +5,7 @@
 //
 // Optional: NEAR_INTENTS_JWT for the rate tier tied to your 1Click key.
 
-import NearIntentsSwap2Protocol from "@forgewallet/protocol-swap2-near-intents";
+import NearIntentsSwap2Protocol from "@anywalletkit/protocol-swap2-near-intents";
 
 const protocol = new NearIntentsSwap2Protocol(undefined, {
   fromChain: "eip155:1",

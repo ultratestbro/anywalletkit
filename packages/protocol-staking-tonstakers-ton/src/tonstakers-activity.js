@@ -15,14 +15,14 @@
 // Everything else is null.
 
 import { Address } from '@ton/core'
-import { activityBase, netTransfers, splitNet } from '@forgewallet/core'
+import { activityBase, netTransfers, splitNet } from '@anywalletkit/core'
 
-/** @typedef {import('@forgewallet/core').ChainTx} ChainTx */
-/** @typedef {import('@forgewallet/core').ActivityItem} ActivityItem */
-/** @typedef {import('@forgewallet/core').DescribeActivityContext} DescribeActivityContext */
+/** @typedef {import('@anywalletkit/core').ChainTx} ChainTx */
+/** @typedef {import('@anywalletkit/core').ActivityItem} ActivityItem */
+/** @typedef {import('@anywalletkit/core').DescribeActivityContext} DescribeActivityContext */
 
 /** Registry name, as `module.json` carries it. */
-export const MODULE_NAME = '@forgewallet/protocol-staking-tonstakers-ton'
+export const MODULE_NAME = '@anywalletkit/protocol-staking-tonstakers-ton'
 
 export const OP_STAKE = 0x47d54391
 export const OP_UNSTAKE = 0x595f07bc

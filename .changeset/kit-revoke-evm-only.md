@@ -1,5 +1,5 @@
 ---
-"@forgewallet/kit": patch
+"@anywalletkit/kit": patch
 ---
 
 Policies classify a raw `sendTransaction`/`signTransaction` as a revoke only on `eip155` chains, and only for plain EVM calls.

@@ -1,11 +1,11 @@
 // The "Custom signer" guide on docs.anywallet.tech renders the #region blocks of this file.
 
 // #region imports
-import { UserRejectedError, externalSigner, type SignOptions, type SignScheme, type Signer } from '@forgewallet/core'
-import { Wallet, type Policies } from '@forgewallet/kit'
-import { WalletManagerBtc } from '@forgewallet/wallet-btc'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
-import { WalletManagerSolana } from '@forgewallet/wallet-solana'
+import { UserRejectedError, externalSigner, type SignOptions, type SignScheme, type Signer } from '@anywalletkit/core'
+import { Wallet, type Policies } from '@anywalletkit/kit'
+import { WalletManagerBtc } from '@anywalletkit/wallet-btc'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
+import { WalletManagerSolana } from '@anywalletkit/wallet-solana'
 // #endregion imports
 
 // #region device

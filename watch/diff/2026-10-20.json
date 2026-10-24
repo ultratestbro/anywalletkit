@@ -4,7 +4,7 @@
  "sources": 311,
  "changes": [
   {
-   "module": "@forgewallet/protocol-lending-aave-evm",
+   "module": "@anywalletkit/protocol-lending-aave-evm",
    "id": "address-book",
    "label": "Aave address book releases",
    "type": "github-releases",
@@ -26,7 +26,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-lending-aave-evm",
+   "module": "@anywalletkit/protocol-lending-aave-evm",
    "id": "docs-addresses",
    "label": "Aave docs · deployed addresses",
    "type": "http-text",
@@ -42,7 +42,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-lending-mellow-evm",
+   "module": "@anywalletkit/protocol-lending-mellow-evm",
    "id": "flexible-vaults",
    "label": "Mellow Flexible (Core) Vaults contracts releases",
    "type": "github-releases",
@@ -62,7 +62,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-lending-morpho-evm",
+   "module": "@anywalletkit/protocol-lending-morpho-evm",
    "id": "docs-addresses",
    "label": "Morpho docs · deployed addresses",
    "type": "http-text",
@@ -78,7 +78,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-staking-lido-evm",
+   "module": "@anywalletkit/protocol-staking-lido-evm",
    "id": "lido-ethereum-sdk",
    "label": "Lido Ethereum SDK releases",
    "type": "github-releases",
@@ -100,7 +100,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-staking-lido-evm",
+   "module": "@anywalletkit/protocol-staking-lido-evm",
    "id": "docs-deployed-contracts",
    "label": "Lido docs · deployed contracts",
    "type": "http-text",
@@ -116,7 +116,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-staking-spl-stake-pool-solana",
+   "module": "@anywalletkit/protocol-staking-spl-stake-pool-solana",
    "id": "jito-stakenet",
    "label": "Jito StakeNet releases",
    "type": "github-releases",
@@ -138,7 +138,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-swap2-lifi",
+   "module": "@anywalletkit/protocol-swap2-lifi",
    "id": "sdk",
    "label": "LI.FI SDK releases",
    "type": "github-releases",
@@ -160,7 +160,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-swap2-lifi",
+   "module": "@anywalletkit/protocol-swap2-lifi",
    "id": "exchanges",
    "label": "LI.FI exchanges (li.quest/v1/tools)",
    "type": "http-json",
@@ -258,7 +258,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-swap2-lifi",
+   "module": "@anywalletkit/protocol-swap2-lifi",
    "id": "bridges",
    "label": "LI.FI bridges (li.quest/v1/tools)",
    "type": "http-json",
@@ -349,7 +349,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-swap2-lifi",
+   "module": "@anywalletkit/protocol-swap2-lifi",
    "id": "docs-changelog",
    "label": "LI.FI docs · changelog",
    "type": "http-text",
@@ -365,7 +365,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-swap2-omniston",
+   "module": "@anywalletkit/protocol-swap2-omniston",
    "id": "omniston-sdk",
    "label": "STON.fi Omniston SDK releases",
    "type": "github-releases",
@@ -385,7 +385,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-swap2-omniston",
+   "module": "@anywalletkit/protocol-swap2-omniston",
    "id": "docs-omniston",
    "label": "STON.fi docs · Omniston",
    "type": "http-text",
@@ -401,7 +401,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-swap2-uniswap",
+   "module": "@anywalletkit/protocol-swap2-uniswap",
    "id": "sdks",
    "label": "Uniswap SDKs (sdk-core address map) releases",
    "type": "github-releases",
@@ -423,7 +423,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-lending-kamino-solana",
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
    "id": "klend",
    "label": "Kamino Lend program releases",
    "type": "github-releases",
@@ -445,7 +445,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-lending-kamino-solana",
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
    "id": "klend-program",
    "label": "Kamino Lend (klend) program · Solana",
    "type": "solana-program",
@@ -463,7 +463,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-lending-kamino-solana",
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
    "id": "markets",
    "label": "Kamino API · lending markets",
    "type": "http-json",
@@ -576,7 +576,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-lending-kamino-solana",
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
    "id": "klend-sdk",
    "label": "Kamino Lend SDK releases",
    "type": "github-releases",
@@ -596,7 +596,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-lending-kamino-solana",
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
    "id": "vaults",
    "label": "Kamino API · kvaults",
    "type": "http-json",
@@ -995,63 +995,63 @@
  ],
  "errors": [
   {
-   "module": "@forgewallet/protocol-lending-aave-evm",
+   "module": "@anywalletkit/protocol-lending-aave-evm",
    "id": "addresses-provider-soneium",
    "label": "Aave v3 PoolAddressesProvider · Soneium",
    "error": "fetch failed",
    "stale": true
   },
   {
-   "module": "@forgewallet/protocol-lending-aave-evm",
+   "module": "@anywalletkit/protocol-lending-aave-evm",
    "id": "weth-gateway-soneium",
    "label": "Aave v3 WrappedTokenGatewayV3 · Soneium",
    "error": "fetch failed",
    "stale": true
   },
   {
-   "module": "@forgewallet/protocol-lending-aave-evm",
+   "module": "@anywalletkit/protocol-lending-aave-evm",
    "id": "pool-soneium",
    "label": "Aave v3 Pool · Soneium",
    "error": "fetch failed",
    "stale": true
   },
   {
-   "module": "@forgewallet/protocol-lending-aave-evm",
+   "module": "@anywalletkit/protocol-lending-aave-evm",
    "id": "addresses-provider-ink",
    "label": "Aave v3 PoolAddressesProvider · Ink",
    "error": "fetch failed",
    "stale": true
   },
   {
-   "module": "@forgewallet/protocol-lending-aave-evm",
+   "module": "@anywalletkit/protocol-lending-aave-evm",
    "id": "weth-gateway-linea",
    "label": "Aave v3 WrappedTokenGatewayV3 · Linea",
    "error": "fetch failed",
    "stale": true
   },
   {
-   "module": "@forgewallet/protocol-lending-aave-evm",
+   "module": "@anywalletkit/protocol-lending-aave-evm",
    "id": "pool-linea",
    "label": "Aave v3 Pool · Linea",
    "error": "fetch failed",
    "stale": true
   },
   {
-   "module": "@forgewallet/protocol-lending-aave-evm",
+   "module": "@anywalletkit/protocol-lending-aave-evm",
    "id": "pool-ink",
    "label": "Aave v3 Pool · Ink",
    "error": "fetch failed",
    "stale": true
   },
   {
-   "module": "@forgewallet/protocol-lending-aave-evm",
+   "module": "@anywalletkit/protocol-lending-aave-evm",
    "id": "weth-gateway-ink",
    "label": "Aave v3 WrappedTokenGatewayV3 · Ink",
    "error": "fetch failed",
    "stale": true
   },
   {
-   "module": "@forgewallet/protocol-lending-aave-evm",
+   "module": "@anywalletkit/protocol-lending-aave-evm",
    "id": "addresses-provider-linea",
    "label": "Aave v3 PoolAddressesProvider · Linea",
    "error": "fetch failed",

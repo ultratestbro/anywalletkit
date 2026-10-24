@@ -2,7 +2,7 @@
  * The optional aggregator: one swap2 protocol that quotes every provider the
  * caller installed and passed in, in parallel, and executes the best route.
  *
- * Every provider package (`@forgewallet/protocol-swap2-lifi`, `-near-intents`,
+ * Every provider package (`@anywalletkit/protocol-swap2-lifi`, `-near-intents`,
  * `-thorchain`, `-omniston`) also works on its own through its single-provider
  * protocol class; this package is only for callers who want an auction across
  * several of them. It has no dependency on any provider: capabilities
@@ -21,9 +21,9 @@ import {
   BaseSwap2Protocol,
   type Swap2Account,
   type Swap2EngineConfig,
-} from "@forgewallet/protocol-swap2-core/swap2/base";
-import type {CrossChainProvider, Quote, QuoteParams} from "@forgewallet/protocol-swap2-core/types";
-import type {ActivityItem, ChainTx, DescribeActivityContext, Swap2Options, Swap2Quote} from "@forgewallet/core";
+} from "@anywalletkit/protocol-swap2-core/swap2/base";
+import type {CrossChainProvider, Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
+import type {ActivityItem, ChainTx, DescribeActivityContext, Swap2Options, Swap2Quote} from "@anywalletkit/core";
 import {CrossChainRouter, type RouteSet, type RouterOptions} from "../router.js";
 
 /** One route in a picker: the public quote plus its place in the auction. */

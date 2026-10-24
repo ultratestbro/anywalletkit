@@ -1,5 +1,5 @@
 {
-  "module": "@forgewallet/protocol-lending-aave-evm",
+  "module": "@anywalletkit/protocol-lending-aave-evm",
   "sources": [
     {
       "id": "addresses-provider-ethereum-core",

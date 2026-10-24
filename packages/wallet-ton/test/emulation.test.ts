@@ -1,6 +1,6 @@
 import '../src/buffer-global.js'
 import { describe, expect, it } from 'vitest'
-import { NetworkError } from '@forgewallet/core'
+import { NetworkError } from '@anywalletkit/core'
 import { SimulationError, UnsafeTransactionError, WalletManagerTon, parseTonapiRisk, parseTonapiTrace, resolveEmulate } from '../src/index.js'
 import { fakeRpc, tonapiOk } from './fake-rpc.js'
 

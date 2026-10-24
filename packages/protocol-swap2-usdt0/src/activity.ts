@@ -10,8 +10,8 @@
  *  - `lzReceive` on the LayerZero endpoint is the owner's own retry of a
  *    stored payload (`claimSwap2`).
  */
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
-import {calledContract, chainLabel, describeSwapLike, matchesCall} from "@forgewallet/protocol-swap2-core/activity";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
+import {calledContract, chainLabel, describeSwapLike, matchesCall} from "@anywalletkit/protocol-swap2-core/activity";
 import {decodeFunctionData, parseAbi, type Hex} from "viem";
 import {USDT0_BY_EID, USDT0_CHAINS, type Usdt0Chain} from "./config.js";
 
@@ -21,7 +21,7 @@ const SEND_ABI = parseAbi([
   "function send(SendParam sp, MessagingFee fee, address refundAddress)",
 ]);
 
-export const USDT0_MODULE = "@forgewallet/protocol-swap2-usdt0";
+export const USDT0_MODULE = "@anywalletkit/protocol-swap2-usdt0";
 
 /** send((uint32,bytes32,uint256,uint256,bytes,bytes,bytes),(uint256,uint256),address) — IOFT */
 export const USDT0_SEND = "0xc7c7f5b3";

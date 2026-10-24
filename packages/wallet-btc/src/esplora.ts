@@ -1,4 +1,4 @@
-import { NetworkError } from '@forgewallet/core'
+import { NetworkError } from '@anywalletkit/core'
 import { DEFAULT_TIMEOUT_MS, fetchWithTimeout, isHex64, isRecord } from './http.js'
 import type { BlockbookTx, BtcClient, Utxo } from './types.js'
 

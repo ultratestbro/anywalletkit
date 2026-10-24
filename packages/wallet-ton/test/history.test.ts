@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { createMockAccount } from '@forgewallet/conformance'
-import TonstakersProtocolTon from '@forgewallet/protocol-staking-tonstakers-ton'
-import { describeOmnistonActivity } from '@forgewallet/protocol-swap2-omniston'
-import type { ActivityItem, ChainTx } from '@forgewallet/core'
+import { createMockAccount } from '@anywalletkit/conformance'
+import TonstakersProtocolTon from '@anywalletkit/protocol-staking-tonstakers-ton'
+import { describeOmnistonActivity } from '@anywalletkit/protocol-swap2-omniston'
+import type { ActivityItem, ChainTx } from '@anywalletkit/core'
 import {
   HistoryUnavailableError, createTonHistory, decodeHistoryCursor, encodeHistoryCursor, rawTonAddress, tonExplorerTxUrl,
   type HistoryFetch, type TonapiEvent,

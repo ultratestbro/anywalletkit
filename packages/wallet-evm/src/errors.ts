@@ -1,4 +1,4 @@
-import { SignerError } from '@forgewallet/core'
+import { SignerError } from '@anywalletkit/core'
 
 /**
  * Refused before signing: the payload's chain is not the account's chain.

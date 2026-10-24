@@ -4,7 +4,7 @@
  "sources": 311,
  "changes": [
   {
-   "module": "@forgewallet/protocol-lending-kamino-solana",
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
    "id": "markets",
    "label": "Kamino API · lending markets",
    "type": "http-json",
@@ -119,7 +119,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-lending-morpho-evm",
+   "module": "@anywalletkit/protocol-lending-morpho-evm",
    "id": "sdks",
    "label": "Morpho SDKs releases",
    "type": "github-releases",
@@ -141,7 +141,7 @@
    }
   },
   {
-   "module": "@forgewallet/protocol-swap2-omniston",
+   "module": "@anywalletkit/protocol-swap2-omniston",
    "id": "docs-omniston",
    "label": "STON.fi docs · Omniston",
    "type": "http-text",

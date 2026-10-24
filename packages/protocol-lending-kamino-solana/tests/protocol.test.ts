@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { NotImplementedError, ReadOnlyAccountError } from '@forgewallet/core'
+import { NotImplementedError, ReadOnlyAccountError } from '@anywalletkit/core'
 import {
   ADDRESS_LOOKUP_TABLE_PROGRAM, FARMS_PROGRAM, KLEND_PROGRAM, KVAULT_PROGRAM, KaminoApi, KaminoError, KaminoMarketProtocolSolana, KaminoVaultProtocolSolana,
   WITHDRAW_ALL, DEFAULT_FIRST_DEPOSIT_ALLOWANCE, DEFAULT_RENT_ALLOWANCE, fromDecimalString, instructionName, lessBps, toDecimalString, toWad,

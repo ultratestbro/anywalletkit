@@ -1,5 +1,5 @@
 {
- "module": "@forgewallet/protocol-swap2-thorchain",
+ "module": "@anywalletkit/protocol-swap2-thorchain",
  "sources": {
   "docs-dev-connecting": {
    "type": "http-text",

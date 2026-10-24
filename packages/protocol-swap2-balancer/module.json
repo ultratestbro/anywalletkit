@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-swap2-balancer",
+  "name": "@anywalletkit/protocol-swap2-balancer",
   "type": "swap2",
   "chains": [
     "eip155:1",
@@ -17,7 +17,7 @@
     "@ultratestbro"
   ],
   "conformance": "0.x",
-  "repo": "https://github.com/ultratestbro/forgewallet",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-swap2-balancer",
   "description": "Balancer v2 same-chain swaps: SOR API suggests the path, the Vault prices it on-chain (queryBatchSwap) and enforces the minimum (batchSwap limits).",
   "addedAt": "2026-10-13"

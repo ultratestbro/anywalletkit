@@ -3,12 +3,12 @@
  * (one address on every chain) on a chain the module serves → `swap`,
  * "Swapped A → B" from the owner's net transfers.
  */
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
-import {chainLabel, describeSwapLike, matchesCall} from "@forgewallet/protocol-swap2-core/activity";
-import {evmRef, isEvm} from "@forgewallet/protocol-swap2-core/util";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
+import {chainLabel, describeSwapLike, matchesCall} from "@anywalletkit/protocol-swap2-core/activity";
+import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
 import {BALANCER_V2_CHAINS, BALANCER_V2_VAULT} from "./provider.js";
 
-export const BALANCER_MODULE = "@forgewallet/protocol-swap2-balancer";
+export const BALANCER_MODULE = "@anywalletkit/protocol-swap2-balancer";
 
 /** Vault swap entry points (`viem toFunctionSelector`, 2026-10-14). */
 export const BALANCER_VAULT_SELECTORS: ReadonlySet<string> = new Set([

@@ -1,7 +1,7 @@
 import {
   LendingProtocol, NotImplementedError,
   type ActivityItem, type ChainTx, type DescribeActivityContext, type IWalletAccountReadOnly,
-} from '@forgewallet/core'
+} from '@anywalletkit/core'
 import {
   BaseError, ContractFunctionRevertedError, ContractFunctionZeroDataError, ExecutionRevertedError,
   createPublicClient, custom, encodeFunctionData, getAddress, http, isAddress, zeroAddress,
@@ -38,7 +38,7 @@ export interface MellowCall { to: string; data: string; value: bigint }
 /**
  * The account surface this module uses. `getAddress` is enough for every
  * view; writes need `sendTransaction` (and `quoteSendTransaction` for fee
- * quotes). A full `@forgewallet/wallet-evm` account satisfies it.
+ * quotes). A full `@anywalletkit/wallet-evm` account satisfies it.
  */
 export interface MellowAccount {
   getAddress(): Promise<string>
@@ -288,7 +288,7 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
   /**
    * Creates a new interface to a Mellow Core Vault for evm blockchains.
    *
-   * @param account - The wallet account (a @forgewallet/wallet-evm account, or a read-only `{ getAddress }` one for views).
+   * @param account - The wallet account (a @anywalletkit/wallet-evm account, or a read-only `{ getAddress }` one for views).
    * @param config - The protocol's configuration.
    */
   constructor(account: MellowAccount, config: MellowProtocolConfig = {}) {

@@ -1,14 +1,14 @@
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
-import { createMockAccount } from '@forgewallet/conformance'
+import { createMockAccount } from '@anywalletkit/conformance'
 import { PolicyViolationError, applyPolicies, resolvePrimaryType, type WriteIntent } from '../src/index.js'
 
 /** viem is not a kit dependency; borrow the copy tx-preview-evm (a dependency of conformance) resolves, for hashTypedData only. */
 async function viem(): Promise<{ hashTypedData(typed: never): string }> {
   const fromKit = createRequire(import.meta.url)
-  const fromConformance = createRequire(fromKit.resolve('@forgewallet/conformance'))
-  const fromPreview = createRequire(fromConformance.resolve('@forgewallet/tx-preview-evm/package.json'))
+  const fromConformance = createRequire(fromKit.resolve('@anywalletkit/conformance'))
+  const fromPreview = createRequire(fromConformance.resolve('@anywalletkit/tx-preview-evm/package.json'))
   return import(pathToFileURL(fromPreview.resolve('viem')).href) as Promise<{ hashTypedData(typed: never): string }>
 }
 

@@ -1,4 +1,4 @@
-import type { IWalletAccount, IWalletAccountReadOnly, Receipt, TransferOptions, TransferResult } from '@forgewallet/core'
+import type { IWalletAccount, IWalletAccountReadOnly, Receipt, TransferOptions, TransferResult } from '@anywalletkit/core'
 
 export interface MockCall { method: string; args: unknown[] }
 

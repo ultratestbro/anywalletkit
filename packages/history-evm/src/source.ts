@@ -1,4 +1,4 @@
-import type { HistoryQuery } from '@forgewallet/core'
+import type { HistoryQuery } from '@anywalletkit/core'
 import { AlchemyClient } from './alchemy.js'
 import { BlockscoutClient } from './blockscout.js'
 import {
@@ -87,7 +87,7 @@ export function resetEtherscanChainlistCache(): void {
  */
 export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
   const { chainId } = options
-  if (!Number.isInteger(chainId) || chainId <= 0) throw new Error('@forgewallet/history-evm: chainId must be a positive integer')
+  if (!Number.isInteger(chainId) || chainId <= 0) throw new Error('@anywalletkit/history-evm: chainId must be a positive integer')
   const chain = `eip155:${chainId}`
   const fetchFn = options.fetch ?? defaultFetch()
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS

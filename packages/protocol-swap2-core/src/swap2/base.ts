@@ -8,9 +8,9 @@
  * provider (or the router, in the aggregator), and executes the source leg
  * through the bound account. Subclasses only supply "which provider(s)".
  */
-import {Swap2Protocol} from "@forgewallet/core";
+import {Swap2Protocol} from "@anywalletkit/core";
 import {encodeFunctionData, getAddress} from "viem";
-import {decodeCall} from "@forgewallet/tx-preview-evm";
+import {decodeCall} from "@anywalletkit/tx-preview-evm";
 import type {
   Swap2Options,
   Swap2Quote,
@@ -27,13 +27,13 @@ import type {
   BridgeResult,
   SwapOptions,
   SwapResult,
-} from "@forgewallet/core";
+} from "@anywalletkit/core";
 import {
   CC_SOURCE_CHAINS,
   ccAsset,
   ccAssetByToken,
   type CcChain,
-} from "@forgewallet/swap2-assets";
+} from "@anywalletkit/swap2-assets";
 import type {CrossChainProvider, IntentStatus, QuoteParams, Quote, UnsignedTx} from "../types.js";
 import {
   Swap2ConfigurationError,
@@ -77,7 +77,7 @@ const inFlightKey = (fromChain: string, o: Swap2Options) =>
 /**
  * Did a failed broadcast possibly reach the node? An account that knows says
  * so on the error (`maybeSent` + the locally computed `hash`, see
- * @forgewallet/wallet-evm); otherwise a lost transport response (socket
+ * @anywalletkit/wallet-evm); otherwise a lost transport response (socket
  * closed, timeout) is treated as possibly sent. A node's own JSON-RPC
  * rejection, a refusal before signing, etc. are clean failures.
  */
@@ -324,7 +324,7 @@ interface Swap2Signer {
   /** EVM gas pre-check before approvals: native balance and a fee upper bound per tx. */
   getBalance?: () => Promise<bigint | number | string>;
   quoteSendTransaction?: (tx: {to: string; data?: string; value?: bigint; chainId?: number; gasLimit?: bigint}) => Promise<{fee: bigint}>;
-  /** CAIP-2 id of a @forgewallet/core account. */
+  /** CAIP-2 id of a @anywalletkit/core account. */
   chain?: string;
   getChainId?: () => Promise<number | bigint> | number | bigint;
   getNetwork?: () => Promise<{chainId?: number | bigint} | string> | {chainId?: number | bigint} | string;
@@ -375,7 +375,7 @@ function decodeId(id: string): {provider: string; intentId: string; sourceTxHash
 
 async function readAccountChain(signer: Swap2Signer, configured?: string): Promise<string | number | bigint | undefined> {
   if (configured) return configured;
-  // @forgewallet/core accounts carry their CAIP-2 id directly.
+  // @anywalletkit/core accounts carry their CAIP-2 id directly.
   if (typeof signer.chain === "string" && signer.chain && !signer.chain.endsWith(":unknown")) return signer.chain;
   if (typeof signer.getChainId === "function") return await signer.getChainId();
   if (typeof signer.getNetwork === "function") {

@@ -5,10 +5,10 @@
 1. Pick the protocol type: `swap`, `bridge`, `swap2`, `lending`, `staking`,
    `approvals`, `fiat`. If none fits, open an RFC issue first (see below).
 2. Create `packages/protocol-<type>-<name>-<chain>` extending the base class
-   from `@forgewallet/core`. Write it against `IWalletAccount` only — never
+   from `@anywalletkit/core`. Write it against `IWalletAccount` only — never
    against a concrete chain package.
 3. Add `module.json` (registry manifest) and a test that calls
-   `describeProtocolModule()` from `@forgewallet/conformance`.
+   `describeProtocolModule()` from `@anywalletkit/conformance`.
    Swap2 modules also call `describeProtocolBehaviour()` with a recorded quote
    fixture: it runs the module to the review gate and checks the plan (own/declared
    recipients only, exact approvals to the declared spender, amounts = quote).

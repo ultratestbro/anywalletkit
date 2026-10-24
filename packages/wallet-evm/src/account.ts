@@ -1,4 +1,4 @@
-import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@forgewallet/core'
+import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import {
   getAddress, hashMessage, hashTypedData, hexToBytes, keccak256, serializeTransaction, zeroAddress,
@@ -416,4 +416,4 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   }
 }
 
-export { ReadOnlyAccountError } from '@forgewallet/core'
+export { ReadOnlyAccountError } from '@anywalletkit/core'

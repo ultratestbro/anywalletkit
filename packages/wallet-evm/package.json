@@ -1,7 +1,7 @@
 {
-  "name": "@forgewallet/wallet-evm",
+  "name": "@anywalletkit/wallet-evm",
   "version": "0.1.1",
-  "description": "EVM wallet for the forgewallet SDK: BIP-32 m/44'/60'/0'/0/i accounts, EIP-191 / EIP-712 / EIP-1559 signing, ERC-20 transfer and approve, built on viem.",
+  "description": "EVM wallet for Any Wallet Kit: BIP-32 m/44'/60'/0'/0/i accounts, EIP-191 / EIP-712 / EIP-1559 signing, ERC-20 transfer and approve, built on viem.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -37,12 +37,12 @@
     "erc20"
   ],
   "dependencies": {
-    "@forgewallet/core": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
     "@noble/curves": "^2.4.0",
     "viem": "^2.57.2"
   },
   "devDependencies": {
-    "@forgewallet/conformance": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
     "vitest": "^5.0.3"
   }
 }

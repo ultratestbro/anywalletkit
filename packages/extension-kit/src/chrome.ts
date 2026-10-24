@@ -19,6 +19,7 @@ export interface AlarmsLike {
   onAlarm: { addListener(callback: (alarm: { name: string }) => void): void }
 }
 
+/** Stable storage key: existing vaults live under it — never rename. */
 export const VAULT_STORAGE_KEY = 'forgewallet.vault.v1'
 
 /** The encrypted envelope in `chrome.storage.local` (survives browser restarts; ciphertext only). */

@@ -1,4 +1,4 @@
-import { describeChainModule } from '@forgewallet/conformance'
+import { describeChainModule } from '@anywalletkit/conformance'
 import { WalletManagerTon, type WalletAccountTon } from '../src/index.js'
 
 describeChainModule('wallet-ton', {

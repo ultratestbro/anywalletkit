@@ -3,12 +3,12 @@
  * (the deployment table, or the caller's override) with one of the router's
  * swap entry points → `swap`, "Swapped A → B" from the owner's net transfers.
  */
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
-import {chainLabel, describeSwapLike, matchesCall} from "@forgewallet/protocol-swap2-core/activity";
-import {evmRef, isEvm} from "@forgewallet/protocol-swap2-core/util";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
+import {chainLabel, describeSwapLike, matchesCall} from "@anywalletkit/protocol-swap2-core/activity";
+import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
 import {UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
 
-export const UNISWAP_MODULE = "@forgewallet/protocol-swap2-uniswap";
+export const UNISWAP_MODULE = "@anywalletkit/protocol-swap2-uniswap";
 
 /** SwapRouter02 entry points (`viem toFunctionSelector`, 2026-10-14). */
 export const UNISWAP_ROUTER_SELECTORS: ReadonlySet<string> = new Set([

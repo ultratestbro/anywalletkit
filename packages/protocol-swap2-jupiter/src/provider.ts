@@ -17,8 +17,8 @@ import {describeJupiterActivity} from "./activity.js";
 import {JUPITER_API_DEFAULT, JUPITER_PROGRAM, JUPITER_TX_PROGRAMS, COMPUTE_BUDGET_PROGRAM, SOLANA_CAIP2, WSOL_MINT, jupiter as cfg, jupiterMint} from "./config.js";
 import {decodeComputeBudget, decodeSwapArgs, fromBase64, minOutOf} from "./codec.js";
 import {assembleTransaction, type JupiterInstruction} from "./transaction.js";
-import {timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
-import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
+import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 const DEFAULT_SLIPPAGE_BPS = 50;
 const MAX_SLIPPAGE_BPS = 1_000;

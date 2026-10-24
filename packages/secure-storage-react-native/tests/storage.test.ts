@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { SecretStorage } from '@forgewallet/keyring'
+import type { SecretStorage } from '@anywalletkit/keyring'
 import { createSecureStorage, isSecureStorageError, type NativeCapabilities, type NativeSecureStorage, type Protection } from '../src/index.js'
 
 /** In-memory stand-in for the Expo module: counts OS prompts, can fail on cue. */

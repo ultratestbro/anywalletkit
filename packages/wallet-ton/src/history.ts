@@ -13,7 +13,7 @@
  */
 import { Address } from '@ton/core'
 import { Buffer } from 'buffer'
-import type { ChainCall, ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@forgewallet/core'
+import type { ChainCall, ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@anywalletkit/core'
 import { CAIP2 } from './types.js'
 
 // ── Public types ─────────────────────────────────────────────────────────────
@@ -103,11 +103,11 @@ export function decodeCursor(s: string): TonHistoryCursor {
   try {
     parsed = JSON.parse(Buffer.from(s, 'base64').toString('utf8'))
   } catch {
-    throw new Error('@forgewallet/wallet-ton: malformed history cursor')
+    throw new Error('@anywalletkit/wallet-ton: malformed history cursor')
   }
   const c = parsed as Partial<TonHistoryCursor> | null
   if (!c || c.v !== 1 || (c.b !== 'tonapi' && c.b !== 'toncenter') || typeof c.lt !== 'string' || !/^\d+$/.test(c.lt)) {
-    throw new Error('@forgewallet/wallet-ton: malformed history cursor')
+    throw new Error('@anywalletkit/wallet-ton: malformed history cursor')
   }
   return { v: 1, b: c.b, lt: c.lt }
 }
@@ -470,11 +470,11 @@ export function createTonHistory(options: TonHistoryOptions = {}): TonHistorySou
   const network = options.network ?? 'mainnet'
   const chain = CAIP2[network]
   const fetchFn: HistoryFetch = options.fetch ?? ((globalThis as { fetch?: HistoryFetch }).fetch as HistoryFetch)
-  if (typeof fetchFn !== 'function') throw new Error('@forgewallet/wallet-ton: no global fetch; pass `fetch` in the options')
+  if (typeof fetchFn !== 'function') throw new Error('@anywalletkit/wallet-ton: no global fetch; pass `fetch` in the options')
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const tonapiUrl = options.tonapiUrl === null ? undefined : (options.tonapiUrl ?? (network === 'testnet' ? 'https://testnet.tonapi.io' : 'https://tonapi.io')).replace(/\/+$/, '')
   const toncenterUrl = options.toncenterUrl === null ? undefined : (options.toncenterUrl ?? (network === 'testnet' ? 'https://testnet.toncenter.com' : 'https://toncenter.com')).replace(/\/+$/, '')
-  if (!tonapiUrl && !toncenterUrl) throw new Error('@forgewallet/wallet-ton: createTonHistory needs tonapi or toncenter')
+  if (!tonapiUrl && !toncenterUrl) throw new Error('@anywalletkit/wallet-ton: createTonHistory needs tonapi or toncenter')
   const tonapiBucket = new TokenBucket(options.rateLimit ?? (options.apiKey ? 10 : 1))
   const toncenterBucket = new TokenBucket(options.toncenterApiKey ? 10 : 1)
 

@@ -2,7 +2,7 @@ import {
   LendingProtocol, NetworkError,
   type ActivityItem, type BorrowOptions, type ChainTx, type DescribeActivityContext, type IWalletAccount, type IWalletAccountReadOnly,
   type LendingQuote, type LendingResult, type RepayOptions, type SupplyOptions, type WithdrawOptions,
-} from '@forgewallet/core'
+} from '@anywalletkit/core'
 import {
   createPublicClient, custom, decodeFunctionResult, encodeFunctionData, fallback, getAddress, hexToString, http, isAddress, maxUint256, zeroAddress,
   type Abi, type Address, type EIP1193Provider, type Hex, type PublicClient, type Transport,

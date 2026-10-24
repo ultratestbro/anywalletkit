@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { IntentStatus } from '@forgewallet/protocol-swap2-core'
+import type { IntentStatus } from '@anywalletkit/protocol-swap2-core'
 import { SwapTracker, SwapsStore, memoryJsonStorage, parseSwapId, type SwapRecord } from '../src/index.js'
 
 const base = { provider: 'cctp', fromChain: 'eip155:1', toChain: 'eip155:8453', fromToken: 'USDC', toToken: 'USDC', amountIn: '1000000', destAmount: '999000', recipient: '0xabc', sourceTxHash: '0xsrc' }

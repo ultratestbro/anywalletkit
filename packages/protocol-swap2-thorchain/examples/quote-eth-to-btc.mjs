@@ -10,7 +10,7 @@
 // venue validates it, and a placeholder comes back as "no route available"
 // rather than as a validation error.
 
-import ThorchainSwap2Protocol from "@forgewallet/protocol-swap2-thorchain";
+import ThorchainSwap2Protocol from "@anywalletkit/protocol-swap2-thorchain";
 
 const recipient = process.env.RECIPIENT;
 if (!recipient) throw new Error("set RECIPIENT to a Bitcoin address");

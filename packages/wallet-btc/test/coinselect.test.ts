@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { InsufficientFundsError } from '@forgewallet/core'
+import { InsufficientFundsError } from '@anywalletkit/core'
 import { INPUT_WEIGHT, TooManyInputsError, estimateVsize, selectAll, selectCoins, spendableUtxos, type Utxo } from '../src/index.js'
 
 const u = (value: bigint, txid = 'a'.repeat(64), vout = 0): Utxo => ({ txid, vout, value, height: 1 })

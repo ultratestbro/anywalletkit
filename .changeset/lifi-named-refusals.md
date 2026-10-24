@@ -1,5 +1,5 @@
 ---
-"@forgewallet/protocol-swap2-lifi": patch
+"@anywalletkit/protocol-swap2-lifi": patch
 ---
 
 Every refusal after LI.FI answers now names the check that failed. Matrix v7 found 4 silent nulls.

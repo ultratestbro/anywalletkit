@@ -600,7 +600,7 @@ interface TonapiDeliveryEvent {
 /**
  * Finds an Omniston TON delivery: the jetton transfer from the output position
  * to the recipient of at least `minUnits`, in the recipient's tonapi events.
- * Returns tonapi's `event_id` — the hash `@forgewallet/wallet-ton`'s history
+ * Returns tonapi's `event_id` — the hash `@anywalletkit/wallet-ton`'s history
  * source gives the same event as a row, so a wallet can pair the TON receive
  * with the swap. Feeds `omnistonProvider({locateTonDelivery})`; a server may
  * also call it with no position to backfill rows completed before the locator

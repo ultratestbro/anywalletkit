@@ -3,11 +3,11 @@
  * Chainflip Vault — a fixed, well-known counterparty, so the leg is recognizable offline. The destination leg is a
  * transfer from Chainflip's egress keys (rotating), tied back through the intent journal.
  */
-import type {ActivityItem, ChainTx, DescribeActivityContext} from "@forgewallet/core";
-import {describeSwapLike} from "@forgewallet/protocol-swap2-core/activity";
+import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
+import {describeSwapLike} from "@anywalletkit/protocol-swap2-core/activity";
 import {CF_VAULTS} from "./config.js";
 
-export const CHAINFLIP_MODULE = "@forgewallet/protocol-swap2-chainflip";
+export const CHAINFLIP_MODULE = "@anywalletkit/protocol-swap2-chainflip";
 
 const same = (chain: string, a: string | null | undefined, b: string) => !!a && (chain.startsWith("eip155:") ? a.toLowerCase() === b.toLowerCase() : a === b);
 

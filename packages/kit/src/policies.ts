@@ -1,4 +1,4 @@
-import { UserRejectedError, type IWalletAccount, type TransferOptions } from '@forgewallet/core'
+import { UserRejectedError, type IWalletAccount, type TransferOptions } from '@anywalletkit/core'
 import { canonicalAddress, sendDestinations } from './destinations.js'
 
 /**

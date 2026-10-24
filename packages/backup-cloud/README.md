@@ -1,6 +1,6 @@
-# @forgewallet/backup-cloud
+# @anywalletkit/backup-cloud
 
-Cloud backups for React Native wallets built on the SDK. Each seed or key becomes one encrypted [`@forgewallet/seed-vault`](../seed-vault) file in the app's hidden iCloud Drive container. The user picks how it opens:
+Cloud backups for React Native wallets built on the SDK. Each seed or key becomes one encrypted [`@anywalletkit/seed-vault`](../seed-vault) file in the app's hidden iCloud Drive container. The user picks how it opens:
 
 | Option | Where the pieces live | Who can open it |
 |---|---|---|
@@ -9,7 +9,7 @@ Cloud backups for React Native wallets built on the SDK. Each seed or key become
 | **Both** | — | Either one |
 
 ```ts
-import { iCloudDrive, iCloudKeychain, saveBackup, checkBackup, listBackups, restoreBackup } from '@forgewallet/backup-cloud'
+import { iCloudDrive, iCloudKeychain, saveBackup, checkBackup, listBackups, restoreBackup } from '@anywalletkit/backup-cloud'
 
 const store = iCloudDrive({ container: 'iCloud.com.example.wallet' })
 const keys = iCloudKeychain()
@@ -31,7 +31,7 @@ await secrets.set(id, opened.text()); opened.dispose()
 ## Setup (Expo)
 
 ```json
-["@forgewallet/backup-cloud", { "iCloudContainer": "iCloud.<your bundle id>" }]
+["@anywalletkit/backup-cloud", { "iCloudContainer": "iCloud.<your bundle id>" }]
 ```
 
 The plugin adds the iCloud Documents entitlements for **your** container. Every app has its own container, because a shared one would let apps read each other's backups.

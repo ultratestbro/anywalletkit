@@ -1,6 +1,6 @@
-import {SingleProviderSwap2} from "@forgewallet/protocol-swap2-core/swap2/single";
-import type {Swap2Account, Swap2EngineConfig} from "@forgewallet/protocol-swap2-core/swap2/base";
-import {evmRef, isEvm} from "@forgewallet/protocol-swap2-core/util";
+import {SingleProviderSwap2} from "@anywalletkit/protocol-swap2-core/swap2/single";
+import type {Swap2Account, Swap2EngineConfig} from "@anywalletkit/protocol-swap2-core/swap2/base";
+import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
 import {WRAPPED_NATIVE, wrapProvider, type WrapProviderConfig} from "./provider.js";
 
 export interface WrapSwap2Config extends Swap2EngineConfig, WrapProviderConfig {}

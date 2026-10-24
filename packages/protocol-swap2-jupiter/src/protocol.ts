@@ -1,5 +1,5 @@
-import {SingleProviderSwap2} from "@forgewallet/protocol-swap2-core/swap2/single";
-import type {Swap2Account, Swap2EngineConfig} from "@forgewallet/protocol-swap2-core/swap2/base";
+import {SingleProviderSwap2} from "@anywalletkit/protocol-swap2-core/swap2/single";
+import type {Swap2Account, Swap2EngineConfig} from "@anywalletkit/protocol-swap2-core/swap2/base";
 import {jupiter as jupCfg} from "./config.js";
 import {jupiterProvider, type JupiterProviderConfig} from "./provider.js";
 

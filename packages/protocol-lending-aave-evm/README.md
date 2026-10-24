@@ -1,11 +1,11 @@
-# @forgewallet/protocol-lending-aave-evm
+# @anywalletkit/protocol-lending-aave-evm
 
-[Aave v3](https://aave.com/docs) for `@forgewallet/wallet-evm` accounts: supply,
+[Aave v3](https://aave.com/docs) for `@anywalletkit/wallet-evm` accounts: supply,
 withdraw, borrow (variable rate) and repay on any Aave v3 market, with the reads
 a wallet screen needs — reserves with rates and caps, the account's health
 factor and borrowing power, the position. Implements core's `LendingProtocol`
 (`supply / withdraw / borrow / repay` + quotes), like
-`@forgewallet/protocol-lending-mellow-evm` does for vaults.
+`@anywalletkit/protocol-lending-mellow-evm` does for vaults.
 
 Written from the protocol's own interfaces (aave-v3-origin) and the official
 address book (bgd-labs/aave-address-book); no Aave SDK, one dependency (viem).
@@ -26,8 +26,8 @@ of sending money to the wrong contract.
 ## Usage
 
 ```ts
-import WalletManagerEvm from '@forgewallet/wallet-evm'
-import { AaveProtocolEvm } from '@forgewallet/protocol-lending-aave-evm'
+import WalletManagerEvm from '@anywalletkit/wallet-evm'
+import { AaveProtocolEvm } from '@anywalletkit/protocol-lending-aave-evm'
 
 const account = await new WalletManagerEvm(seed, { provider: 'https://…' }).getAccount(0)
 const aave = new AaveProtocolEvm(account)              // chain from the account, market 'core'

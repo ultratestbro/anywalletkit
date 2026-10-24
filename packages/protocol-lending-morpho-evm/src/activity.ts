@@ -19,12 +19,12 @@
 import {
   activityBase, netTransfers, sameAddress, splitNet,
   type ActivityAsset, type ActivityItem, type ActivityKind, type ChainTx, type DescribeActivityContext,
-} from '@forgewallet/core'
+} from '@anywalletkit/core'
 import { toFunctionSelector } from 'viem'
 import { MORPHO_CHAINS } from './chains.js'
 
 /** Registry name, as `module.json` carries it. */
-export const MODULE_NAME = '@forgewallet/protocol-lending-morpho-evm'
+export const MODULE_NAME = '@anywalletkit/protocol-lending-morpho-evm'
 
 const ZERO = '0x0000000000000000000000000000000000000000'
 const sel = (signature: string): string => toFunctionSelector(`function ${signature}`).toLowerCase()

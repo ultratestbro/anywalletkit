@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/names-ens",
+  "name": "@anywalletkit/names-ens",
   "type": "names",
   "chains": [
     "eip155:*",
@@ -11,7 +11,7 @@
     "@ultratestbro"
   ],
   "conformance": "0.x",
-  "repo": "https://github.com/ultratestbro/forgewallet",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/names-ens",
   "addedAt": "2026-10-17"
 }

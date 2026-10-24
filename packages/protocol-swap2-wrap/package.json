@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-swap2-wrap",
+  "name": "@anywalletkit/protocol-swap2-wrap",
   "version": "0.1.1",
   "description": "Wrap and unwrap the native coin (ETH\u2194WETH, BNB\u2194WBNB, POL\u2194WPOL\u2026) on 13 EVM chains as a swap2 venue: 1:1, no pool, wrapped tokens verified on-chain.",
   "license": "Apache-2.0",
@@ -38,18 +38,18 @@
     "lint": "echo ok"
   },
   "dependencies": {
-    "@forgewallet/protocol-swap2-core": "workspace:*",
-    "@forgewallet/swap2-assets": "workspace:*",
+    "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/swap2-assets": "workspace:*",
     "viem": "^2.57.2"
   },
   "peerDependencies": {
-    "@forgewallet/core": "workspace:*"
+    "@anywalletkit/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22",
     "vitest": "^5.0.3",
-    "@forgewallet/conformance": "workspace:*",
-    "@forgewallet/core": "workspace:*"
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*"
   },
   "keywords": [
     "wrap",

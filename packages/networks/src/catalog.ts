@@ -1,5 +1,5 @@
 /**
- * Builtin networks: every mainnet the asset catalog (`@forgewallet/swap2-assets`)
+ * Builtin networks: every mainnet the asset catalog (`@anywalletkit/swap2-assets`)
  * knows and a wallet package serves, with the public, CORS-open RPC failover
  * lists the mobile app and the extension share (no API keys here — a build
  * prepends its own keyed endpoints through `NetworksTable`), plus the default
@@ -7,7 +7,7 @@
  *
  * Endpoints were called on 2026-10-21 (see README for the ones that were not).
  */
-import { ccChain } from '@forgewallet/swap2-assets'
+import { ccChain } from '@anywalletkit/swap2-assets'
 import type { Network, NetworkFamily } from './types.js'
 
 const evm = (chainId: number, name: string, symbol: string, rpcs: string[], explorer?: string, kind: 'catalog' | 'testnet' = 'catalog'): Network => ({
@@ -126,7 +126,7 @@ export const CATALOG_NETWORKS: readonly Network[] = Object.freeze([...EVM_MAINNE
 
 // ---- default testnets (owner decision 6) — shipped disabled; chain ids / genesis hashes checked against the live endpoints on 2026-10-21 ----
 
-/** Solana devnet, as `@forgewallet/wallet-solana` names it (`CAIP2_GENESIS.devnet`). */
+/** Solana devnet, as `@anywalletkit/wallet-solana` names it (`CAIP2_GENESIS.devnet`). */
 export const SOLANA_DEVNET_CHAIN = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'
 /** Bitcoin testnet4 (genesis 00000000da84f2ba…, mempool.space/testnet4). `wallet-btc`'s `testnet` option (tb1…, coin type 1') serves it. */
 export const BTC_TESTNET4_CHAIN = 'bip122:00000000da84f2bafbbc53dee25a72ae'

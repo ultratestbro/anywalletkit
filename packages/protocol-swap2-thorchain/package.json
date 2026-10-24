@@ -1,5 +1,5 @@
 {
-  "name": "@forgewallet/protocol-swap2-thorchain",
+  "name": "@anywalletkit/protocol-swap2-thorchain",
   "version": "0.1.1",
   "description": "",
   "license": "Apache-2.0",
@@ -43,18 +43,18 @@
     "lint": "echo ok"
   },
   "dependencies": {
-    "@forgewallet/protocol-swap2-core": "workspace:*",
-    "@forgewallet/swap2-assets": "workspace:*",
+    "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/swap2-assets": "workspace:*",
     "viem": "^2.45.0"
   },
   "peerDependencies": {
-    "@forgewallet/core": "workspace:*"
+    "@anywalletkit/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22",
     "vitest": "^5.0.3",
-    "@forgewallet/conformance": "workspace:*",
-    "@forgewallet/core": "workspace:*"
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*"
   },
   "keywords": []
 }

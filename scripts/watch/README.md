@@ -19,7 +19,7 @@ node scripts/watch/watch.mjs [--only aave,morpho] [--send] [--dry]              
 
 ```json
 {
-  "module": "@forgewallet/protocol-lending-aave-evm",
+  "module": "@anywalletkit/protocol-lending-aave-evm",
   "sources": [
     {"id": "pool-eth-core", "type": "evm-proxy", "chainId": 1, "address": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2", "label": "Aave v3 Pool · Ethereum core"},
     {"id": "quoter-base", "type": "evm-code", "chainId": 8453, "address": "0x…", "label": "QuoterV2 · Base"},

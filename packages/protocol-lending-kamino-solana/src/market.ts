@@ -1,4 +1,4 @@
-import type { BorrowOptions, IWalletAccount, IWalletAccountReadOnly, LendingQuote, LendingResult, RepayOptions, SupplyOptions, WithdrawOptions } from '@forgewallet/core'
+import type { BorrowOptions, IWalletAccount, IWalletAccountReadOnly, LendingQuote, LendingResult, RepayOptions, SupplyOptions, WithdrawOptions } from '@anywalletkit/core'
 import { MAIN_MARKET, type ApiMarket, type ApiObligation, type ApiReserve } from './api.js'
 import { fromDecimalString, lessBps, toAmount, toDecimalString, type AmountOption } from './amounts.js'
 import { DEFAULT_FIRST_DEPOSIT_ALLOWANCE, KaminoBase, type KaminoBaseConfig } from './base.js'

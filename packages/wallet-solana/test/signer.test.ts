@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { getBase64Encoder, getTransactionDecoder, type Address } from '@solana/kit'
-import { LocalSigner, SignerError, UserRejectedError, deriveEd25519, externalSigner, seedFromMnemonicSync } from '@forgewallet/core'
+import { LocalSigner, SignerError, UserRejectedError, deriveEd25519, externalSigner, seedFromMnemonicSync } from '@anywalletkit/core'
 import { SOLANA_BASE_PATH, WalletAccountSolana, WalletManagerSolana, type SolanaRpc } from '../src/index.js'
 
 const SEED = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'

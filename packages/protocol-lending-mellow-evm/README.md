@@ -1,13 +1,13 @@
-# @forgewallet/protocol-lending-mellow-evm
+# @anywalletkit/protocol-lending-mellow-evm
 
-A simple package that lets `@forgewallet/wallet-evm` wallet accounts use
+A simple package that lets `@anywalletkit/wallet-evm` wallet accounts use
 [Mellow](https://mellow.finance) **Core Vaults** — Lido's Earn vaults
 ([EarnETH, EarnUSD, stRATEGY](https://stake.lido.fi/earn)) and any other vault
 on the same contracts: supply through the vault's synchronous or asynchronous
 deposit queue, redeem and claim through the redeem queue, read the position,
 fees, oracle reports and APY.
 
-Built on the `LendingProtocol` type in `@forgewallet/core`, the way the Morpho
+Built on the `LendingProtocol` type in `@anywalletkit/core`, the way the Morpho
 module expresses ERC-4626 vaults: `supply` puts an asset into the vault, `withdraw`
 takes it out. Mellow's withdrawal is two-phase (request → oracle report →
 claim), so the module adds `getWithdrawalRequests` / `claimWithdrawals` on
@@ -54,8 +54,8 @@ queue has `requestsOf`; signature-based queues are skipped).
 ## Usage
 
 ```js
-import WalletManagerEvm from '@forgewallet/wallet-evm'
-import MellowProtocolEvm from '@forgewallet/protocol-lending-mellow-evm'
+import WalletManagerEvm from '@anywalletkit/wallet-evm'
+import MellowProtocolEvm from '@anywalletkit/protocol-lending-mellow-evm'
 
 const wallet = new WalletManagerEvm(seed, { provider: 'https://ethereum-rpc.publicnode.com' })
 const account = await wallet.getAccount(0)

@@ -1,4 +1,4 @@
-# @forgewallet/protocol-swap2-wrap
+# @anywalletkit/protocol-swap2-wrap
 
 Wrap / unwrap the native coin as a swap2 module: WETH9 `deposit()` and
 `withdraw(uint256)` on the wrapper in `WRAPPED_NATIVE` for each chain (WETH,

@@ -10,8 +10,8 @@
 import {
   activityBase, netTransfers, sameAddress, splitNet,
   type ActivityAsset, type ActivityItem, type ActivityKind, type ChainCall, type ChainTx, type DescribeActivityContext,
-} from '@forgewallet/core'
-import { ccAssetByToken } from '@forgewallet/swap2-assets'
+} from '@anywalletkit/core'
+import { ccAssetByToken } from '@anywalletkit/swap2-assets'
 
 /** Native coin of a chain, for titles and amounts. */
 export interface NativeAsset { symbol: string; decimals: number }

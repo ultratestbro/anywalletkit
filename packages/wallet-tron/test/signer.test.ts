@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { hexToBytes } from '@noble/hashes/utils.js'
-import { LocalSigner, SignerError, UserRejectedError, deriveSecp256k1, externalSigner, seedFromMnemonicSync } from '@forgewallet/core'
+import { LocalSigner, SignerError, UserRejectedError, deriveSecp256k1, externalSigner, seedFromMnemonicSync } from '@anywalletkit/core'
 import { encodeRawData, TRON_ACCOUNT_BRANCH, WalletAccountTron, WalletManagerTron, addressFromPublicKey, recoverMessageAddress, type TronFetch, type TronRawTransaction } from '../src/index.js'
 
 const SEED = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'

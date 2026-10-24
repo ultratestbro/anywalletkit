@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { createMockAccount } from '@forgewallet/conformance'
-import SplStakePoolProtocolSolana from '@forgewallet/protocol-staking-spl-stake-pool-solana'
+import { createMockAccount } from '@anywalletkit/conformance'
+import SplStakePoolProtocolSolana from '@anywalletkit/protocol-staking-spl-stake-pool-solana'
 import {
   HistoryUnavailableError, createSolanaHistory, decodeHistoryCursor, encodeHistoryCursor, solanaExplorerTxUrl,
   TOKEN_PROGRAM, TOKEN_2022_PROGRAM, type HistoryFetch, type SignatureRow,
@@ -247,7 +247,7 @@ describe('createSolanaHistory: cursor, failover, explorer', () => {
   })
 })
 
-describe('recognizer cross-check: @forgewallet/protocol-staking-spl-stake-pool-solana', () => {
+describe('recognizer cross-check: @anywalletkit/protocol-staking-spl-stake-pool-solana', () => {
   it('the row this source builds for the real Jito deposit is described as a stake', async () => {
     const src = createSolanaHistory({ rpcUrl: 'https://rpc.example', fetch: fakeRpc().fetch, rateLimit: 10_000 })
     const tx = (await src.getTransaction(JITO_SIG, WALLET))!
@@ -256,7 +256,7 @@ describe('recognizer cross-check: @forgewallet/protocol-staking-spl-stake-pool-s
     expect(item).not.toBeNull()
     expect(item!.kind).toBe('stake')
     expect(item!.title).toBe('Staked SOL')
-    expect(item!.protocol).toBe('@forgewallet/protocol-staking-spl-stake-pool-solana')
+    expect(item!.protocol).toBe('@anywalletkit/protocol-staking-spl-stake-pool-solana')
     expect(item!.counterparty).toBe(JITO_POOL)
     expect(item!.assetsIn).toEqual([expect.objectContaining({ token: JITOSOL, amount: 38_460_176n })])
     expect(item!.assetsOut).toEqual([expect.objectContaining({ token: null, amount: 50_000_000n })])

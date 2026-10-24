@@ -1,7 +1,7 @@
 // ReserveConfigurationMap bit layout (aave-v3-origin
 // `protocol/libraries/configuration/ReserveConfiguration.sol`) and the rate
 // maths of the Aave UI (ray = 1e27, APY compounded per second).
-import { bigintToNumber } from '@forgewallet/core'
+import { bigintToNumber } from '@anywalletkit/core'
 import type { Address } from 'viem'
 
 export const RAY = 10n ** 27n

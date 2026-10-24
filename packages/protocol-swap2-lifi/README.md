@@ -1,9 +1,9 @@
-# @forgewallet/protocol-swap2-lifi
+# @anywalletkit/protocol-swap2-lifi
 
 LI.FI REST cross-chain swaps and bridges as a swap2 module: EVM calldata
 routes through the LI.FI Diamond (Solana legs via guarded serialized
 transactions). Standalone through `LifiSwap2Protocol`, or as one provider of
-`@forgewallet/protocol-swap2-router`.
+`@anywalletkit/protocol-swap2-router`.
 
 ## Activity
 

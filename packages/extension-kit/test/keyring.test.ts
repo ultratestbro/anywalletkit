@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Keyring, type KeyringState } from '@forgewallet/keyring'
-import { WalletManagerEvm } from '@forgewallet/wallet-evm'
+import { Keyring, type KeyringState } from '@anywalletkit/keyring'
+import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
 import { Session, Vault, VaultError, caip2FromChainId, chainHex, chromeKeyringStorage, memoryAlarms, memorySessionStorage, memoryVaultStorage, vaultSecretStorage, type StorageAreaLike } from '../src/index.js'
 
 const ABANDON = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'

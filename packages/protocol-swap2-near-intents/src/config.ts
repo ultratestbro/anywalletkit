@@ -1,5 +1,5 @@
-import {namespace} from "@forgewallet/protocol-swap2-core/util";
-import {ccChain} from "@forgewallet/swap2-assets";
+import {namespace} from "@anywalletkit/protocol-swap2-core/util";
+import {ccChain} from "@anywalletkit/swap2-assets";
 
 // ── NEAR Intents (1Click) — core, broadest coverage ─────────────────────────
 const NEAR_INTENTS_NS = new Set([

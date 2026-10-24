@@ -1,5 +1,5 @@
 /**
- * `@forgewallet/keyring` adapters for the extension. The keyring stores public
+ * `@anywalletkit/keyring` adapters for the extension. The keyring stores public
  * metadata (names, addresses, flags) through `KeyringStorage` and one secret per
  * key source through `SecretStorage`:
  *
@@ -13,13 +13,14 @@
  * and cannot be zeroized; the keyring reads one per operation and drops it, so
  * their lifetime is one call. The byte buffers this module owns are zeroized.
  */
-import { zeroize } from '@forgewallet/core'
-import type { KeyringState, KeyringStorage, SecretStorage } from '@forgewallet/keyring'
+import { zeroize } from '@anywalletkit/core'
+import type { KeyringState, KeyringStorage, SecretStorage } from '@anywalletkit/keyring'
 import type { StorageAreaLike } from './chrome.js'
 import { utf8 } from './codec.js'
 import type { Session } from './session.js'
 import type { Vault } from './vault.js'
 
+/** Stable storage key: existing keyrings live under it — never rename. */
 export const KEYRING_STORAGE_KEY = 'forgewallet.keyring.v1'
 
 /** Keyring metadata (no secrets) in `chrome.storage.local`. */

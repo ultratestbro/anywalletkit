@@ -1,7 +1,7 @@
-# @forgewallet/extension-kit
+# @anywalletkit/extension-kit
 
 The security-relevant core of a non-custodial Chromium (MV3) wallet extension,
-built on the forgewallet chain and protocol packages: an encrypted vault, the
+built on the Any Wallet Kit chain and protocol packages: an encrypted vault, the
 unlocked-key session with auto-lock, the dApp request router with per-origin
 permissions and an approval queue, signing-request classification, and the
 review helpers for swaps and Earn plans. No UI, no `@types/chrome`, no network
@@ -15,7 +15,7 @@ service-worker wiring, build and release pipeline are the wallet's. The Vaulty
 browser extension is one product built on it.
 
 ```sh
-pnpm add @forgewallet/extension-kit @forgewallet/core @forgewallet/keyring
+pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
 ```
 
 ## What it provides
@@ -24,7 +24,7 @@ pnpm add @forgewallet/extension-kit @forgewallet/core @forgewallet/keyring
 | --- | --- | --- |
 | Vault | `Vault`, `chromeLocalVaultStorage`, `memoryVaultStorage`, `VAULT_SCRYPT`, `VAULT_MIN_PASSWORD_LENGTH` | every secret at rest in `chrome.storage.local`, two key layers (a KEK wraps a DEK, the DEK seals each secret); passkey (WebAuthn PRF) unlock as a second wrap of the same DEK |
 | Session | `Session`, `chromeSessionStorage`, `chromeAlarms`, `SESSION_DEFAULT_AUTOLOCK_MS` | the DEK in `chrome.storage.session` with an expiry and an alarm; `getKey()` re-checks the expiry itself |
-| Keyring adapters | `chromeKeyringStorage`, `vaultSecretStorage` | `@forgewallet/keyring` metadata as plain JSON, secrets through the vault, one DEK use per call |
+| Keyring adapters | `chromeKeyringStorage`, `vaultSecretStorage` | `@anywalletkit/keyring` metadata as plain JSON, secrets through the vault, one DEK use per call |
 | Relay | `PageRequest` / `RelayRequest` shapes and guards, `stampOrigin`, `checkSenderOrigin`, `RELAY_ERRORS` | page ⇄ content script ⇄ service worker messages; the origin is the browser's (`port.sender`), never the page's |
 | Router | `RequestRouter`, `READ_METHODS`, `SIGNING_METHODS` | what a dApp may call: accounts only for connected origins, chain add / switch through the approval window, reads from the wallet's own RPCs, `eth_sign` never offered, everything else 4200 |
 | Permissions | `PermissionStore`, `CHAIN_ACCOUNT_KEYS` | per-origin accounts (EVM, Solana, TON, Tron, Bitcoin, NEAR) and chain |
@@ -78,7 +78,7 @@ import {
   Vault, Session, PermissionStore, NetworksTable, ApprovalQueue, RequestRouter,
   chromeLocalVaultStorage, chromeSessionStorage, chromeAlarms, chromeJsonStorage,
   chromeKeyringStorage, vaultSecretStorage, checkSenderOrigin, isRelayRequest, PORT_NAME,
-} from '@forgewallet/extension-kit'
+} from '@anywalletkit/extension-kit'
 
 // service worker
 const vault = new Vault({ storage: chromeLocalVaultStorage(chrome.storage.local) })
@@ -89,7 +89,7 @@ const dek = await vault.create(password)          // refuses if a vault exists o
 await vault.setSecret(dek, 'main', utf8(seedPhrase))
 await session.unlock(dek)                         // dek is zeroized here
 
-// @forgewallet/keyring on top of the vault
+// @anywalletkit/keyring on top of the vault
 const keyringStorage = chromeKeyringStorage(chrome.storage.local)
 const secrets = vaultSecretStorage(vault, session) // VaultError('locked') once the session expired
 
