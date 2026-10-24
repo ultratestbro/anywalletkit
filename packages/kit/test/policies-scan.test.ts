@@ -90,3 +90,43 @@ describe('kit policies — EIP-712 (scan F5/F13)', () => {
     expect(signed[0]).toBe(explicit)
   })
 })
+
+describe('kit policies — EVM revoke shape on other chains (scan 2026-10-23 F1)', () => {
+  const ZERO_APPROVE = `0x095ea7b3${'0'.repeat(24)}${DRAINER.slice(2).toLowerCase()}${'0'.repeat(64)}`
+  const TREASURY = { tron: 'TTreasuryAddressxxxxxxxxxxxxxxxxxx', near: 'treasury.near', solana: 'Treasury1111111111111111111111111111111111' }
+  function account(chain: string) {
+    const sent: unknown[] = []
+    const acc = Object.assign(createMockAccount({ chain, address: 'me' }), {
+      sendTransaction: async (tx: unknown) => { sent.push(tx); return { hash: 'h' } },
+      signTransaction: async (tx: unknown) => { sent.push(tx); return 'signed' },
+    })
+    return { acc, sent }
+  }
+  const cases: Array<[string, string, Record<string, unknown>]> = [
+    ['tron:728126428', TREASURY.tron, { txID: 'ab', raw_data_hex: '0a02', raw_data: { contract: [{ parameter: { value: { to_address: 'TAttacker', amount: 10n ** 12n } } }] } }],
+    ['near:mainnet', TREASURY.near, { receiverId: 'attacker.near', actions: [{ transfer: { deposit: '1000' } }] }],
+    ['solana:mainnet', TREASURY.solana, { instructions: [{ programId: '11111111111111111111111111111111', keys: [] }] }],
+  ]
+  for (const [chain, allowed, payload] of cases) {
+    it(`${chain}: a foreign payload with EVM revoke-looking to/data is a send, so the allowlist still applies`, async () => {
+      const seen: WriteIntent[] = []
+      for (const method of ['sendTransaction', 'signTransaction'] as const) {
+        const { acc, sent } = account(chain)
+        const guarded = applyPolicies(acc, { allowlist: { [chain]: [allowed] }, confirm: async (i) => { seen.push(i); return true } })
+        await expect(guarded[method]({ ...payload, to: 'x', data: ZERO_APPROVE } as never)).rejects.toBeInstanceOf(PolicyViolationError)
+        expect(sent).toHaveLength(0)
+      }
+      expect(seen.every((i) => i.kind !== 'revoke')).toBe(true)
+    })
+  }
+
+  it('EVM: a plain zero-approve is still a revoke; the same call carrying a foreign field is not', async () => {
+    const seen: WriteIntent[] = []
+    const { acc } = account('eip155:1')
+    const guarded = applyPolicies(acc, { allowlist: { 'eip155:1': [USDC] }, confirm: async (i) => { seen.push(i); return true } })
+    await guarded.sendTransaction({ to: USDC, data: ZERO_APPROVE } as never)
+    expect(seen.at(-1)).toMatchObject({ kind: 'revoke', token: USDC })
+    await expect(guarded.sendTransaction({ to: USDC, data: ZERO_APPROVE, txID: 'ab' } as never)).resolves.toBeDefined()
+    expect(seen.at(-1)?.kind).toBe('send')
+  })
+})

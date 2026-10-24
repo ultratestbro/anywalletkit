@@ -183,6 +183,15 @@ function revokeCall(call: unknown): Array<{ token: string; spender?: string }> |
   return null
 }
 
+/** Fields a non-EVM chain package signs instead of to/data/value — their presence rules out an EVM revoke. */
+const FOREIGN_PAYLOAD_FIELDS = ['txID', 'raw_data', 'raw_data_hex', 'receiverId', 'receiver', 'actions', 'messageBytes', 'signatures', 'instructions', 'serialized', 'transaction', 'message'] as const
+
+function carriesForeignPayload(call: unknown): boolean {
+  if (typeof call !== 'object' || call === null) return true
+  const c = call as Record<string, unknown>
+  return FOREIGN_PAYLOAD_FIELDS.some((k) => c[k] !== undefined)
+}
+
 function revokeIntent(base: IntentBase, revokes: Array<{ token: string; spender?: string }>): DraftIntent {
   const first = revokes[0]
   return {
@@ -307,10 +316,13 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
   }
   if (MESSAGE_METHODS.includes(method)) return { ...base, kind: 'message', message: true }
   if (method === 'revokeDelegation') return revokeIntent(base, [{ token: from }])
-  if (method === 'sendTransaction' || method === 'signTransaction') {
+  if ((method === 'sendTransaction' || method === 'signTransaction') && chain.startsWith('eip155:')) {
     // A revoke sent as raw calldata (the approvals module's setApprovalForAll / lockdown / batch path).
+    // EVM only, and only for plain EVM calls: Tron, NEAR and Solana sign other fields
+    // (txID / raw_data_hex, receiverId / actions, messageBytes / instructions), so an EVM-looking
+    // to/data riding along must never turn their write into a "revoke" that skips the lists (scan F1).
     const calls = Array.isArray(arg) ? arg : [arg]
-    const found = calls.length > 0 ? calls.map(revokeCall) : [null]
+    const found = calls.length > 0 && !calls.some(carriesForeignPayload) ? calls.map(revokeCall) : [null]
     if (found.every((r) => r !== null)) return revokeIntent(base, found.flat() as Array<{ token: string; spender?: string }>)
   }
   const to = str(a.to) ?? str(a.recipient)
