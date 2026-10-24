@@ -97,3 +97,19 @@ unlock.
 ```ts
 wallet.dispose()
 ```
+
+## Try it on a testnet
+
+The same code runs on a testnet: register the testnet's chain id with its RPC and `chainId`,
+and fund the address from a faucet.
+
+```ts
+wallet.registerWallet('eip155:11155111', WalletManagerEvm, { provider: 'https://sepolia.drpc.org', chainId: 11155111 }) // Sepolia
+const account = await wallet.getAccount('eip155:11155111')
+await account.getAddress()   // the same address as on mainnet: fund it from a Sepolia faucet
+```
+
+Base Sepolia, Arbitrum Sepolia, OP Sepolia, Polygon Amoy, BSC and Monad testnets work the same
+way. The [Networks](/guides/networks/#testnets) table ships every supported testnet (Solana
+devnet, Bitcoin testnet4, TON testnet, Tron Nile, NEAR testnet too) switched off, with its RPC
+list; show a clear "testnet" badge in the UI whenever one is on.

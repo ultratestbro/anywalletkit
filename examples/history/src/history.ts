@@ -24,7 +24,9 @@ export function walletWithHistory(seedPhrase: string, keys: HistoryKeys = {}): W
     },
   })
   // The accounts: history reads account `index` on every chain that has a source.
-  wallet.registerWallet('eip155', WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com' })
+  // One registration per EVM network, each with its own RPC (see Chain ids: one RPC per EVM network).
+  wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com', chainId: 1 })
+  wallet.registerWallet('eip155:8453', WalletManagerEvm, { provider: 'https://base-rpc.publicnode.com', chainId: 8453 })
   wallet.registerWallet('solana', WalletManagerSolana, { provider: 'https://api.mainnet-beta.solana.com' })
   wallet.registerWallet('ton', WalletManagerTon, { tonClient: { url: 'https://toncenter.com/api/v2/jsonRPC' } })
   wallet.registerWallet('tron', WalletManagerTron, { provider: 'https://api.trongrid.io' })

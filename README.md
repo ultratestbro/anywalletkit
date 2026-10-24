@@ -36,7 +36,9 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
   a backend signer are others. The SDK never *requires* a seed.
 - **Built for mobile apps.** React Native / Hermes is the primary target and the
   release gate (`pnpm test:hermes` runs every chain in the real Hermes VM); Node is
-  where the suites run. No Bare, no native modules, no polyfill magic inside packages.
+  where the suites run. Chain and protocol packages are pure TypeScript: no Bare, no native
+  modules, no polyfill magic. Native code lives only in the optional storage packages
+  (`secure-storage-react-native`, `backup-cloud`).
   Browsers are out of scope for now (that track returns with an embedded,
   semi-custodial wallet kit later).
 - **Standard derivation per chain.** Account `i` is the address MetaMask / Rabby

@@ -38,8 +38,8 @@ export function createWallet(seedPhrase: string, policies?: Policies): Wallet {
   const wallet = new Wallet(seedPhrase, policies ? { policies } : {})
 
   // One EVM registration per network: each has its own RPC.
-  wallet.registerWallet(ETHEREUM, WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com' })
-  wallet.registerWallet(BASE, WalletManagerEvm, { provider: 'https://base-rpc.publicnode.com' })
+  wallet.registerWallet(ETHEREUM, WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com', chainId: 1 })
+  wallet.registerWallet(BASE, WalletManagerEvm, { provider: 'https://base-rpc.publicnode.com', chainId: 8453 })
 
   // Other ecosystems register by namespace.
   wallet.registerWallet('bip122', WalletManagerBtc, {

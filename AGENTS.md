@@ -3,7 +3,8 @@
 A compact, exact reference for AI coding agents (Claude Code, Cursor, Codex…) building on
 Any Wallet Kit. Every name below exists in the packages; when something is not here, read
 the guides as plain text at **https://docs.anywallet.tech/llms-small.txt**, the generated API
-reference in **https://docs.anywallet.tech/llms-full.txt** (search it, it is large), or the
+reference in **https://docs.anywallet.tech/llms-full.txt** (search it, it is large), the twenty everyday
+operations at **https://docs.anywallet.tech/getting-started/api-at-a-glance/**, or the
 per-package `README.md` (shipped inside each npm package). Do not invent APIs.
 
 ## What it is
@@ -124,8 +125,8 @@ import { WalletManagerNear } from '@anywalletkit/wallet-near'
 
 const phrase = getRandomSeedPhrase(12)            // or 24; isValidSeedPhrase(words) checks wordlist + checksum
 const wallet = new Wallet(phrase, { policies })    // or new Wallet(seedBytes64) / new Wallet(signer)
-wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com' })
-wallet.registerWallet('eip155:8453', WalletManagerEvm, { provider: ['https://base-rpc.publicnode.com', 'https://mainnet.base.org'] }) // a list fails over
+wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com', chainId: 1 })
+wallet.registerWallet('eip155:8453', WalletManagerEvm, { provider: ['https://base-rpc.publicnode.com', 'https://mainnet.base.org'], chainId: 8453 }) // a list fails over
 wallet.registerWallet('solana', WalletManagerSolana, { provider: 'https://api.mainnet-beta.solana.com' })
 wallet.registerWallet('ton', WalletManagerTon, { tonClient: { url: 'https://toncenter.com/api/v2/jsonRPC' } })
 wallet.registerWallet('tron', WalletManagerTron, { provider: 'https://api.trongrid.io' })

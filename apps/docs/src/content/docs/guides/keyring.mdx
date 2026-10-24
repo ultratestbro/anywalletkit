@@ -27,13 +27,29 @@ npm install @anywalletkit/keyring @anywalletkit/kit @anywalletkit/wallet-evm
 
 ## Storage
 
-The keyring takes two adapters. You write both; they are a few lines each.
+The keyring takes two adapters: `secrets` (one entry per seed or key) and `storage` (names,
+addresses, flags).
 
 ### Secrets
 
+On a phone, use [`@anywalletkit/secure-storage-react-native`](/build-a-wallet/keys-and-storage/#key-storage):
+every secret is a Keychain item (iOS) or a Keystore-wrapped file (Android) that only Face ID /
+Touch ID / a fingerprint, with the device passcode as the fallback, opens, on every read.
+
+```ts
+import { createSecureStorage } from '@anywalletkit/secure-storage-react-native'
+const secrets = createSecureStorage({ namespace: 'my-wallet' })   // a SecretStorage
+```
+
+It is an Expo native module: it needs a development or Release build (not Expo Go) and
+`NSFaceIDUsageDescription` in `Info.plist`.
+
+**Your own adapter** (Expo Go, another store, a test): `SecretStorage` is three methods. Over
+`expo-secure-store` it looks like this:
+
 <Snippet file="keyring/src/keyring.ts" region="secrets" />
 
-The protection is in the storage options, so choose them on purpose:
+The protection is then in the storage options, so choose them on purpose:
 
 | Option | What it does | Trade-off |
 |---|---|---|
@@ -49,9 +65,10 @@ currently enrolled biometrics (`.biometryCurrentSet`):
 - **Re-enrolling Face ID makes the item unreadable for good.** Only the recovery phrase gets
   the wallet back.
 
-Use an access control that allows biometrics **or** the device passcode, for example
-`react-native-keychain` with `BIOMETRY_ANY_OR_DEVICE_PASSCODE`, or patch the library. Test
-"Face ID fails → passcode" and "re-enroll Face ID" on a real device before you ship.
+`secure-storage-react-native` allows biometrics **or** the device passcode and survives
+re-enrolment, which is why it exists. With your own adapter, use an access control that does
+the same, and test "Face ID fails → passcode" and "re-enroll Face ID" on a real device before
+you ship.
 :::
 
 ### Metadata
@@ -65,6 +82,23 @@ Use an access control that allows biometrics **or** the device passcode, for exa
 Register every chain the wallet supports: each seed account gets an address on each of them.
 A chain added later is filled in with `missingChains(accountId)` and
 `completeAddresses(sourceId)`, with one secret read per seed.
+
+### More than one EVM network
+
+`chains.evm` takes one network (one RPC and `chainId`), and an EVM address is the same on every
+network. To sign on Base, Arbitrum or any other EVM network, open one more keyring per network
+over the **same** `secrets`, with a `storage` that never saves: the main keyring owns the
+metadata.
+
+<Snippet file="keyring/src/keyring.ts" region="evm-networks" />
+
+```ts
+const base = await keyringOn({ provider: BASE_RPC, chainId: 8453 }, storage, secrets)
+await base.withAccount(accountId, 'evm', (account) => account.sign(message))   // account.chain = eip155:8453
+```
+
+Create, import, rename and remove accounts on the main keyring only, then reopen the others
+(or keep them per screen): they read the metadata on `load`.
 
 ## Create a wallet
 

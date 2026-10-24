@@ -3,7 +3,7 @@ import { derivationVectors } from '@anywalletkit/conformance'
 import { UserRejectedError } from '@anywalletkit/core'
 import { KeyringError } from '@anywalletkit/keyring'
 import {
-  createWallet, importKey, manageAccounts, openKeyring, plainMetadata, restoreWallet, revealPrivateKey, revealSecret, removeWallet, secureSecrets, signMessage,
+  createWallet, importKey, keyringOn, manageAccounts, openKeyring, plainMetadata, restoreWallet, revealPrivateKey, revealSecret, removeWallet, secureSecrets, signMessage,
   type PlainStoreLike, type SecureStoreLike,
 } from '../src/keyring.ts'
 
@@ -34,6 +34,20 @@ async function setup() {
 }
 
 describe('Keyring guide (docs) — offline', () => {
+  it('a second keyring over the same secrets signs on another EVM network with the same address, and never writes metadata', async () => {
+    const { keyring, secure, plain } = await setup()
+    const [account] = await restoreWallet(keyring, PHRASE, async () => false)
+    const before = JSON.stringify([...plain.items])
+    const base = await keyringOn({ provider: 'https://base-rpc.publicnode.com', chainId: 8453 }, plainMetadata(plain.store), secureSecrets(secure.store, { requireAuthentication: true }))
+    const onEthereum = await keyring.withAccount(account!.id, 'evm', async (a) => ({ chain: a.chain, address: await a.getAddress() }))
+    const onBase = await base.withAccount(account!.id, 'evm', async (a) => ({ chain: a.chain, address: await a.getAddress() }))
+    expect(onEthereum.chain).toBe('eip155:1')
+    expect(onBase.chain).toBe('eip155:8453')
+    expect(onBase.address).toBe(onEthereum.address)
+    expect(onBase.address).toBe(golden('evm').address)
+    expect(JSON.stringify([...plain.items])).toBe(before)
+  })
+
   it('exports one account key in the format other wallets import, and it controls the same address', async () => {
     const { keyring } = await setup()
     const [account] = await restoreWallet(keyring, PHRASE, async () => false)

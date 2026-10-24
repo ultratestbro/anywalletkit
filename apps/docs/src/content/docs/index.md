@@ -11,7 +11,8 @@ it needs and nothing else.
 
 :::note[Pre-1.0]
 The packages are on npm under [`@anywalletkit`](https://www.npmjs.com/org/anywalletkit). Versions are `0.x`:
-APIs may still change before `1.0`. The source is on [GitHub](https://github.com/ultratestbro/anywalletkit).
+APIs may still change before `1.0`. The source is on [GitHub](https://github.com/ultratestbro/anywalletkit),
+under the [Apache-2.0](https://github.com/ultratestbro/anywalletkit/blob/main/LICENSE) license.
 :::
 
 ## Who it is for
@@ -27,8 +28,10 @@ APIs may still change before `1.0`. The source is on [GitHub](https://github.com
   seed signer is one implementation; a Safe, a hardware wallet, MPC or a backend signer are
   others. The SDK never *requires* a seed.
 - **Built for mobile apps.** React Native / Hermes is the primary target and the release
-  gate: every chain is tested in the real Hermes VM. No native modules and no polyfill magic
-  inside packages — one runtime package installs what Hermes is missing.
+  gate: every chain is tested in the real Hermes VM. Chain and protocol packages are pure
+  TypeScript, with no native modules and no polyfill magic; one runtime package installs what
+  Hermes is missing. Native code lives only in the optional storage packages
+  (`secure-storage-react-native`, `backup-cloud`), which need a development build.
 - **Refusals are named, never silent.** When a quote, transaction or route cannot be used,
   you get an error that says why, not a `null`.
 - **Zeroize by design.** Everything that holds a key has `dispose()`.

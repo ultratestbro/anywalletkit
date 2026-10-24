@@ -36,7 +36,7 @@ export async function deviceSigner(device: Device, path = "m/44'/60'/0'/0/0"): P
 
 export async function walletOnDevice(device: Device, policies: Policies): Promise<Wallet> {
   const wallet = new Wallet(await deviceSigner(device), { policies }) // no seed in the app at all
-  wallet.registerWallet('eip155', WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com' })
+  wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com', chainId: 1 })
   return wallet
 }
 // #endregion device
@@ -83,8 +83,10 @@ export function walletsOnService(service: { url: string; token: string; secpKey:
       schemes: ['ecdsa-recoverable', 'ecdsa'], // EVM and BTC messages use the first, SegWit inputs the second
     }),
   )
-  evmAndBitcoin.registerWallet('eip155', WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com' })
-  evmAndBitcoin.registerWallet('bip122', WalletManagerBtc, {})
+  evmAndBitcoin.registerWallet('eip155:1', WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com', chainId: 1 })
+  evmAndBitcoin.registerWallet('bip122', WalletManagerBtc, {
+    client: { type: 'esplora-http', clientConfig: { url: 'https://mempool.space/api' } },
+  })
 
   const solana = new Wallet(remoteSigner({ ...service, curve: 'ed25519', publicKey: service.edKey }))
   solana.registerWallet('solana', WalletManagerSolana, { provider: 'https://api.mainnet-beta.solana.com' })

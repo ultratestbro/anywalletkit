@@ -65,6 +65,21 @@ export function openKeyring(storage: KeyringStorage, secrets: SecretStorage): Pr
 }
 // #endregion setup
 
+// #region evm-networks
+/**
+ * The same accounts on another EVM network. `chains.evm` takes one network, and the address is
+ * the same on all of them, so a second keyring over the same secrets signs on Base (or any EVM
+ * network) while the main one keeps the metadata.
+ */
+export function keyringOn(network: { provider: string; chainId: number }, storage: KeyringStorage, secrets: SecretStorage): Promise<Keyring> {
+  return Keyring.load({
+    storage: { load: () => storage.load(), save: async () => {} }, // read-only: the main keyring owns the metadata
+    secrets,
+    chains: { evm: { Manager: WalletManagerEvm, config: network } },
+  })
+}
+// #endregion evm-networks
+
 // #region create
 export async function createWallet(keyring: Keyring) {
   const { account, mnemonic } = await keyring.createMnemonic({ words: 12 })

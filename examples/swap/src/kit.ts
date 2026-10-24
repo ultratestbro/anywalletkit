@@ -9,7 +9,7 @@ export function walletWithSwaps(seedPhrase: string): Wallet {
     // Policies wrap the account the router signs with: swaps cannot skip them.
     policies: { maxFee: { 'eip155:1': 5_000_000_000_000_000n } },
   })
-  wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com' })
+  wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com', chainId: 1 })
   wallet.registerProtocol('swap', RouterSwap2Protocol, {
     chain: 'eip155:1',
     config: { fromChain: 'eip155:1', providers: providers() },

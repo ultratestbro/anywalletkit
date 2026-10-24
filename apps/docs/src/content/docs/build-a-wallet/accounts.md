@@ -17,8 +17,11 @@ can sign on Solana", for every account the user has.
 | `keyring` | Several accounts from one seed, plus imported seeds and keys, in one list across chains ([guide](/guides/keyring/)) |
 
 Chains are named by [CAIP-2 ids](/concepts/chain-ids/): `eip155:1` for Ethereum,
-`solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` for Solana, and so on. Register a namespace
-(`eip155`) to cover every network in it, or one chain id to give it its own RPC.
+`solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` for Solana, and so on. Register every EVM network
+under its exact id with its own RPC (`eip155:1`, `eip155:8453`, …): an EVM manager talks to the
+network of its RPC only, so one `eip155` registration would send Base transactions to Ethereum
+([Chain ids](/concepts/chain-ids/#one-rpc-per-evm-network)). Non-EVM chains have one network each
+and register by namespace (`solana`, `ton`, `tron`, `bip122`, `near`).
 
 Start with the [Quickstart](/getting-started/quickstart/): it creates accounts on seven
 chains in about twenty lines.

@@ -70,7 +70,7 @@ On the phone: create a wallet, kill the app, reopen it, and Face ID should unloc
 | Secure storage throws `not-available` in Expo Go | It is a native module: use a development or Release build |
 | `no-passcode` | The device has no passcode; the module refuses to store a secret it cannot protect |
 | TON balance needs an unlock | A TON read-only account needs the public key; store it once (see [AGENTS.md](https://github.com/ultratestbro/anywalletkit/blob/main/AGENTS.md)) |
-| Signing on Base goes to Ethereum | One EVM network per keyring / registration; load a second keyring for Base (AGENTS.md) |
+| Signing on Base goes to Ethereum | One EVM network per keyring / registration; open a second keyring for Base ([Keyring: more than one EVM network](/guides/keyring/#more-than-one-evm-network)) |
 
 :::caution[Security]
 Never paste a real recovery phrase into an agent chat, a prompt or a test. Use the public test phrase (`abandon abandon … about`) while building, then small amounts on a phone build. Read the diff the agent wrote around keys and signing: nothing should log, store or send the phrase, and every write should pass through a review step. Block screenshots on the phrase screen.
@@ -83,5 +83,5 @@ Passed on the first run: 13 min, 68 agent turns, $3.63, Claude Code (Opus 5.5) s
 The run found three gaps, now fixed in the SDK and the reference:
 
 - **TON on Metro.** `wallet-ton` needs `react-native-fast-pbkdf2` on Metro. The agent wrote a throwing stub; `runtime-hermes` now ships a working drop-in.
-- **Base on the keyring.** Signing on a second EVM network with the keyring needed a pattern; it is now in AGENTS.md.
+- **Base on the keyring.** Signing on a second EVM network with the keyring needed a pattern; it is now in the Keyring guide and AGENTS.md.
 - **TON balances.** A TON balance needs the account's public key; that pattern is in AGENTS.md too.

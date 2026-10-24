@@ -40,12 +40,26 @@ An EVM chain manager talks to **one** network: the network of its RPC. Register 
 network you support under its exact id, with its own RPC:
 
 ```ts
-wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: ETHEREUM_RPC })
-wallet.registerWallet('eip155:8453', WalletManagerEvm, { provider: BASE_RPC })
+wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: ETHEREUM_RPC, chainId: 1 })
+wallet.registerWallet('eip155:8453', WalletManagerEvm, { provider: BASE_RPC, chainId: 8453 })
 ```
 
 Registering `'eip155'` once with an Ethereum RPC and then asking for `'eip155:8453'` gives
 you an account whose transactions go to **Ethereum**. Avoid this pattern.
+
+### Pass `chainId` with every EVM registration
+
+`chainId` in the EVM config is optional, but pass it, matching the id you register under:
+
+```ts
+wallet.registerWallet('eip155:8453', WalletManagerEvm, { provider: 'https://base-rpc.publicnode.com', chainId: 8453 })
+```
+
+Without it the account learns its network from the RPC (`eth_chainId`) on first use. Until
+then `account.chain` reads `eip155:unknown`, so code that keys on it (swap2's
+`fromChain: account.chain`, policies per chain, history) has nothing to match, and offline
+signing of a transaction without its own `chainId` is impossible. With it, the chain is known
+at once and no extra RPC call is made. Non-EVM managers have one network and no `chainId`.
 
 ## Assets
 

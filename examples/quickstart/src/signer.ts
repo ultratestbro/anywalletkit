@@ -19,7 +19,7 @@ export function walletOnRemoteKey(remote: RemoteKey): Wallet {
     sign: (payload, options) => remote.sign(payload, options),
   })
   const wallet = new Wallet(signer) // no seed phrase anywhere
-  wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com' })
+  wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com', chainId: 1 })
   return wallet
 }
 // #endregion external
