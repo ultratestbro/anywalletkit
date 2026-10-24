@@ -172,3 +172,72 @@ h1#_top {
 
 /* Inline code pills never break inside a name. */
 .sl-markdown-content :not(pre) > code { white-space: nowrap; }
+
+/* ---------- reading layout (design handoff 1a: our fonts and colors, its structure) ---------- */
+:root {
+  --sl-content-width: 45rem;
+  --sl-text-h1: 2.625rem;
+  --sl-text-h2: 1.5rem;
+  --sl-text-body: 1.03rem;
+  --sl-line-height: 1.7;
+}
+.sl-markdown-content { color: var(--t2); }
+.sl-markdown-content :is(strong, h2, h3, h4) { color: var(--t1); }
+h1#_top { letter-spacing: -.025em; line-height: 1.08; }
+/* The first paragraph of a page is its lead. */
+.sl-markdown-content > p:first-child { font-size: 1.15em; line-height: 1.6; color: var(--t1); }
+/* H2 opens a section: a hairline above, room around it. */
+.sl-markdown-content .level-h2 { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--hl); }
+.sl-markdown-content h2 { letter-spacing: -.015em; }
+/* A list straight under a heading needs no rule of its own above it. */
+.sl-markdown-content :is(.sl-heading-wrapper, p) + ul > li:first-child { border-top: 0; }
+.sl-markdown-content :not(pre) > code { border: 0; border-radius: 4px; padding: .05em .35em; font-size: .86em; color: var(--t1); }
+.sl-anchor-link { opacity: 0; transition: opacity .2s; }
+.sl-heading-wrapper:hover .sl-anchor-link, .sl-anchor-link:focus-visible { opacity: .5; }
+
+/* Top-level bullet lists: rules instead of bullets. */
+.sl-markdown-content > ul { list-style: none; padding-left: 0; }
+.sl-markdown-content > ul > li { padding: .75rem 0; margin: 0; border-bottom: 1px solid var(--hl); }
+.sl-markdown-content > ul > li:first-child { border-top: 1px solid var(--hl); }
+
+/* Tables: horizontal hairlines only; the first column names the row. */
+.sl-markdown-content table { display: table; width: 100%; border-collapse: collapse; font-size: .94em; }
+.sl-markdown-content :is(th, td) { border: 0; border-bottom: 1px solid var(--hl); padding: .85rem 1rem .85rem 0; background: transparent; vertical-align: top; }
+.sl-markdown-content :is(th, td):last-child { padding-right: 0; }
+.sl-markdown-content tr:nth-child(2n) { background: transparent; }
+.sl-markdown-content td:first-child { font-weight: 600; color: var(--t1); }
+.sl-markdown-content td code { background: transparent; padding: 0; }
+.sl-markdown-content td:first-child code { color: var(--cyan); }
+
+/* Asides: a tinted block in the aside's own colour, mono title, no frame or icon. */
+.starlight-aside {
+  border: 0; border-radius: 8px;
+  background: color-mix(in srgb, var(--sl-color-asides-border) 9%, transparent);
+}
+.starlight-aside__title { font-family: var(--mono); font-size: .72rem; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+.starlight-aside__icon { display: none; }
+.starlight-aside__content { color: var(--t2); }
+
+/* Sidebar: plain items, the current page on a chip without a side stripe. */
+.sidebar-content a { font-size: .875rem; padding: .35rem .6rem; border-radius: 6px; color: var(--t2); }
+.sidebar-content a:hover { color: var(--t1); }
+.sidebar-content .group-label .large { font-family: var(--mono); font-size: .72rem; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--t3); }
+.sidebar-content a[aria-current='page'] { box-shadow: none; font-weight: 600; }
+
+/* On this page: one rule down the left, the current entry marked in cyan. */
+starlight-toc a { border-left: 1.5px solid var(--hl); padding-left: .75rem; color: var(--t3); }
+starlight-toc a:hover { color: var(--t1); }
+starlight-toc a[aria-current='true'] { border-left-color: var(--cyan); color: var(--t1); font-weight: 500; }
+
+/* Previous / next: a rule above, no cards. */
+.pagination-links a { border: 0; border-top: 1px solid var(--hl); border-radius: 0; box-shadow: none; background: transparent; padding: 1.25rem 0 0; }
+
+@media (max-width: 50rem) {
+  :root { --sl-text-h1: 2.1rem; --sl-text-h2: 1.35rem; }
+  .sidebar-content a { padding: .7rem .6rem; font-size: 1rem; min-height: 44px; display: flex; align-items: center; }
+  mobile-starlight-toc summary { min-height: 44px; }
+  .sl-markdown-content table { display: block; overflow-x: auto; }
+  .sl-markdown-content td:not(:first-child) { min-width: 13rem; }
+  /* A long address or type in running text wraps on a phone instead of widening the page. */
+  .sl-markdown-content :is(p, li) > code { white-space: normal; overflow-wrap: anywhere; }
+}
