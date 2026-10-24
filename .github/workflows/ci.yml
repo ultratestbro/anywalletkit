@@ -31,6 +31,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build          # the API reference (TypeDoc) resolves cross-package types through each package's dist
       - run: pnpm docs:build
 
   hermes:
