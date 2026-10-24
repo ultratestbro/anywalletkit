@@ -126,8 +126,7 @@ describe('SIWE checks read the bytes that get signed (scan 2026-10-23 F7)', () =
 
   it('non-sign-in messages with control bytes are unaffected (shown as hex, signable)', () => {
     const info = classify(toHex('binary\x00blob\x7f'))
-    if ('code' in info) throw new Error('refused')
-    expect(info.kind).toBe('sign-message')
+    if ('code' in info || info.kind !== 'sign-message') throw new Error('refused')
     expect(info.siwe).toBeUndefined()
   })
 })
