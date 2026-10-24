@@ -11,7 +11,7 @@ it needs and nothing else.
 
 :::caution[Pre-release]
 The SDK is not on npm yet. Package names on this site use the final `@anywalletkit/` scope;
-APIs may still change before `1.0`.
+APIs may still change before `1.0`. The source is on [GitHub](https://github.com/ultratestbro/anywalletkit).
 :::
 
 ## Who it is for

@@ -15,6 +15,7 @@ export default defineConfig({
         'Developer docs for Any Wallet Kit — the open multichain wallet SDK: one seed, every chain, a pluggable signer, protocol modules for swaps, bridges, staking and lending.',
       favicon: '/favicon.svg',
       social: [
+        { icon: 'github', label: 'GitHub', href: 'https://github.com/ultratestbro/anywalletkit' },
         { icon: 'x.com', label: 'X', href: 'https://x.com/anywalletkit' },
         { icon: 'telegram', label: 'Telegram', href: 'https://t.me/anywalletkit' },
       ],
@@ -58,7 +59,7 @@ export default defineConfig({
         starlightLlmsTxt({
           projectName: 'Any Wallet Kit',
           description:
-            'Open multichain wallet SDK in TypeScript: one seed for EVM, Solana, TON, Tron, Bitcoin, NEAR and Zcash accounts, a pluggable signer, safety policies, and protocol modules for swaps, bridges, staking and lending. Package names use the @anywalletkit npm scope; the packages are not on npm yet.',
+            'Open multichain wallet SDK in TypeScript: one seed for EVM, Solana, TON, Tron, Bitcoin, NEAR and Zcash accounts, a pluggable signer, safety policies, and protocol modules for swaps, bridges, staking and lending. Package names use the @anywalletkit npm scope; the packages are not on npm yet. Source: https://github.com/ultratestbro/anywalletkit.',
           // llms-small.txt is the guides only; llms-full.txt has the guides first and
           // the API reference after them; llms-api-reference.txt is the API alone.
           exclude: ['api/**'],

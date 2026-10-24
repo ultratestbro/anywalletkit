@@ -9,6 +9,21 @@ sidebar:
 The packages are not on npm yet. The commands below are what installation will look like.
 :::
 
+## Try it from source
+
+The source is on [GitHub](https://github.com/ultratestbro/anywalletkit). Node 20+ and pnpm 10:
+
+```sh
+git clone https://github.com/ultratestbro/anywalletkit.git
+cd anywalletkit
+pnpm install
+pnpm build
+pnpm --filter ./examples/quickstart test
+```
+
+Every snippet on this site comes from a package in [`examples/`](https://github.com/ultratestbro/anywalletkit/tree/main/examples),
+and each one runs the same way.
+
 ## Pick your packages
 
 Every wallet needs `core` and `kit`, plus one package per chain family it supports:
