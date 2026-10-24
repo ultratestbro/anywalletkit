@@ -54,6 +54,10 @@ export function usdValue(
 // Value information for the user (SDK-127): never a refusal, always a fact.
 // ---------------------------------------------------------------------------
 
+/**
+ * A quote's value in USD: what the user pays, what arrives, the loss, and a better alternative when
+ * one exists. Use it to warn before a bad-value swap.
+ */
 export interface QuoteValue {
   provider: string;
   /** USD the user pays: the source amount at the current price. null when unpriced. */
@@ -69,6 +73,7 @@ export interface QuoteValue {
   priceImpactBps?: number;
 }
 
+/** Options for quote valuation. */
 export interface QuoteValueOptions {
   /** How much more (percent of this quote's value) another provider must deliver to be named as the better alternative. Default 2. */
   betterByPct?: number;

@@ -1,3 +1,7 @@
+/**
+ * Which stage of a swap failed: configuration, input validation, quote, execution, an unsupported
+ * operation, a fee ceiling, or status tracking.
+ */
 export type Swap2ErrorCode =
   | "CONFIGURATION"
   | "VALIDATION"

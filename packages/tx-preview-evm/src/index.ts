@@ -14,14 +14,22 @@
  */
 import {decodeFunctionData, hexToString, isHex, parseAbi, type Hex} from "viem";
 
+/**
+ * Any JSON-RPC transport: `(method, params) => result`. Wrap viem, ethers or `fetch` in one line.
+ */
 export type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
 
+/** One call to preview: target, calldata and native value. */
 export interface PreviewCall {
   to: string;
   data?: string;
   value?: bigint;
 }
 
+/**
+ * What to preview: the calls (approvals first), who sends them, on which chain, and which addresses
+ * and contracts the app already knows.
+ */
 export interface PreviewInput {
   chainId: number;
   from: string;
@@ -61,6 +69,7 @@ function overridesJson(o: PreviewInput["stateOverrides"]): Record<string, Record
   return out;
 }
 
+/** An allowance a call grants: ERC-20 `approve`, Permit2, or an operator approval for all. */
 export interface Approval {
   token: string;
   spender: string;
@@ -70,6 +79,7 @@ export interface Approval {
   kind: "erc20" | "permit2" | "operator";
 }
 
+/** One call decoded: method, value, and the approval or token transfer it makes. */
 export interface DecodedCall {
   to: string;
   label: string | null;
@@ -80,6 +90,7 @@ export interface DecodedCall {
   transfer?: {token: string; to: string; amount: bigint};
 }
 
+/** How one asset's balance of the sender changes when the calls run. */
 export interface BalanceChange {
   /** Token address, or "native". */
   token: string;
@@ -91,11 +102,19 @@ export interface BalanceChange {
   verified: boolean;
 }
 
+/**
+ * The simulation result: balance changes and gas, the call that reverted and why, or why simulation
+ * was unavailable.
+ */
 export type Simulation =
   | {status: "ok"; changes: BalanceChange[]; gasUsed: bigint[]}
   | {status: "reverted"; callIndex: number; reason: string}
   | {status: "unavailable"; reason: string};
 
+/**
+ * What a check is about: whether the contract is known, the simulation outcome, who receives, and
+ * how large an approval is.
+ */
 export type CheckCode =
   | "contract-known" | "contract-unknown"
   | "simulation-ok" | "simulation-reverted" | "simulation-unavailable"
@@ -103,6 +122,7 @@ export type CheckCode =
   | "approval-exact" | "approval-excess" | "approval-unlimited" | "approval-unknown-spender"
   | "native-value";
 
+/** One item for the review screen: a code, a status, and the values to word it with. */
 export interface Check {
   code: CheckCode;
   status: "ok" | "warn" | "unknown";
@@ -110,6 +130,7 @@ export interface Check {
   detail?: Record<string, string>;
 }
 
+/** Everything a review screen needs: decoded calls, the simulation and the checks. */
 export interface TxPreview {
   calls: DecodedCall[];
   simulation: Simulation;
@@ -137,6 +158,10 @@ const PERMIT2 = "0x000000000022d473030f116ddee9f6b43ac78ba3";
 
 const lc = (a: string) => a.toLowerCase();
 
+/**
+ * Decode one call offline: ERC-20 transfer, approve, Permit2, operator approvals and known
+ * selectors.
+ */
 export function decodeCall(call: PreviewCall, known: Record<string, string> = {}): DecodedCall {
   const to = lc(call.to);
   const label = knownLabel(known, to);
@@ -358,6 +383,12 @@ async function callFallback(input: PreviewInput): Promise<Simulation> {
   }
 }
 
+/**
+ * Decode the calls, simulate them in one block with `eth_simulateV1` (falling back to `eth_call`
+ * when the node lacks it), and derive the checks.
+ *
+ * @throws Error when `calls` is empty.
+ */
 export async function previewEvmTx(input: PreviewInput): Promise<TxPreview> {
   if (!input.calls.length) throw new Error("tx-preview: no calls");
   const known = input.known ?? {};
@@ -366,6 +397,10 @@ export async function previewEvmTx(input: PreviewInput): Promise<TxPreview> {
   return {calls, simulation, checks: checksFor(input, calls, simulation)};
 }
 
+/**
+ * Derive the review checks from decoded calls and a simulation. `previewEvmTx` calls it; use it
+ * directly to re-check after your own simulation.
+ */
 export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simulation): Check[] {
   const own = new Set(input.own.map(lc));
   own.add(lc(input.from));

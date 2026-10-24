@@ -20,6 +20,7 @@ export interface ListPage<R> {
   next: unknown
 }
 
+/** @internal One paginated explorer list for the block-window merge. */
 export interface ListSpec<R extends { block: number }> {
   key: string
   /** `cursor` = this list's previous `next` (undefined on the first page); `below` = exclusive block upper bound, when set. */
@@ -34,6 +35,7 @@ export interface WindowResult {
 /** How many explorer pages a list may skip while catching up to a window set by another backend. */
 const MAX_SKIP_PAGES = 10
 
+/** @internal Merge several block-ordered lists into one page. */
 export async function windowPage(specs: ListSpec<{ block: number }>[], cursor: WindowCursor | undefined, limit: number): Promise<WindowResult> {
   const w = cursor?.w
   const fetched: { spec: ListSpec<{ block: number }>; all: { block: number }[]; rows: { block: number }[]; next: unknown; listCursor: unknown }[] = []

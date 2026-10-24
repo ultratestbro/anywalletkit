@@ -17,6 +17,10 @@ const SCRIPTS: Array<[string, RegExp]> = [
 /** Cyrillic letters that render like Latin ones in common fonts (а е о р с у х і ј ѕ һ ԁ ԛ ԝ ѵ ԛ), plus digits and hyphen. */
 const LOOKALIKE = /^[аеорсухіјѕһԁԛԝѵү0-9-]+$/
 
+/**
+ * Warnings for a normalized name: punycode labels, mixed scripts, and letters that look like Latin
+ * ones.
+ */
 export function warningsFor(name: string): NameWarning[] {
   const out: NameWarning[] = []
   for (const label of name.split('.')) {

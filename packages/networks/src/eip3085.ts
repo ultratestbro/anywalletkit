@@ -15,13 +15,16 @@ export const ADD_CHAIN_ERRORS = {
   chainNotAdded: 4902,
 } as const
 
+/** The EIP-1193 error to answer a refused `wallet_addEthereumChain` with. */
 export interface AddChainError {
   code: number
   message: string
 }
 
+/** Type guard: did {@link parseAddChainParams} refuse? */
 export const isAddChainError = (v: Network | AddChainError): v is AddChainError => 'code' in v && typeof v.code === 'number'
 
+/** Options for {@link parseAddChainParams}. */
 export interface ParseAddChainOptions {
   /** Which chain ids are acceptable; default: the asset catalog. */
   known?: (caip2: string) => boolean
@@ -30,6 +33,10 @@ export interface ParseAddChainOptions {
   now?: () => number
 }
 
+/**
+ * Turn `wallet_addEthereumChain` params into a {@link Network}, or into the EIP-1193 error to
+ * answer with (`-32602` bad params, `4902` a chain the wallet refuses).
+ */
 export function parseAddChainParams(params: unknown, opts: ParseAddChainOptions = {}): Network | AddChainError {
   const known = opts.known ?? isCatalogChain
   const p = (Array.isArray(params) ? params[0] : params) as Record<string, unknown> | undefined

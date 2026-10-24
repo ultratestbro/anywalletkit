@@ -45,6 +45,11 @@ export interface RemoteProviderOptions {
   timeoutMs?: number;
 }
 
+/**
+ * A provider that runs on your server: quotes, deposits and tracking go to `baseUrl`, so API keys
+ * and affiliate settings never ship in the app. The engine still validates every quote and
+ * transaction locally before signing.
+ */
 export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider {
   const name = opts.name;
   if (!/^[A-Za-z0-9_-]+$/.test(name)) throw new Error("swap2-remote: invalid provider name");

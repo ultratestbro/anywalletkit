@@ -48,8 +48,11 @@ export interface RankedQuote extends Quote {
 
 /** Every validated route for one request, ranked by value. */
 export interface RouteSet {
+  /** Every validated route, best first. */
   quotes: RankedQuote[];
+  /** Most delivered value (net of fees when priced) within the tie band. */
   best: RankedQuote;
+  /** Lowest ETA. */
   fastest: RankedQuote;
   /** Providers still quoting (only non-empty in progressive `onUpdate` snapshots). */
   pending: string[];
@@ -96,6 +99,7 @@ export class CrossChainRouter {
   private readonly providers: CrossChainProvider[];
   /** Why the venues of the LAST getBestQuote call sat out — for error surfaces. */
   private _lastRejections: string[] = [];
+  /** Why providers sat out the last auction, one line each. */
   get lastRejections(): readonly string[] {
     return this._lastRejections;
   }
@@ -162,26 +166,31 @@ export class CrossChainRouter {
     return null;
   }
 
+  /** A provider by name. */
   getProvider(name: string): CrossChainProvider | undefined {
     return this.providers.find((p) => p.name === name);
   }
 
+  /** True when a provider of that name is installed. */
   hasProvider(name: string): boolean {
     return this.providers.some((p) => p.name === name);
   }
 
+  /** True when that provider is installed and enabled. */
   hasEnabledProvider(name: string): boolean {
     return this.providers.some((p) => {
       try { return p.name === name && p.enabled(); } catch { return false; }
     });
   }
 
+  /** True when any enabled provider declares the chain. */
   supportsChain(caip2: string): boolean {
     return this.providers.some((p) => {
       try { return p.enabled() && !!p.supportsChain?.(caip2); } catch { return false; }
     });
   }
 
+  /** True when any enabled provider declares the chain pair. */
   supportsChainPair(fromChain: string, toChain: string): boolean {
     return this.providers.some((p) => {
       try {
@@ -307,6 +316,7 @@ export class CrossChainRouter {
     return this.rank(accepted, snapshot, [], rejections);
   }
 
+  /** Status from the named provider; `failed` when it is not installed. */
   async trackIntent(providerName: string, ref: IntentRef): Promise<IntentStatus> {
     const provider = this.getProvider(providerName);
     if (!provider) return {state: "failed"};
@@ -318,6 +328,7 @@ export class CrossChainRouter {
     await this.getProvider(providerName)?.notifyDeposit?.(intentId, txHash);
   }
 
+  /** Release every provider's resources. */
   close(): void {
     for (const provider of this.providers) provider.close?.();
   }

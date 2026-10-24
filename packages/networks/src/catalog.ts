@@ -62,11 +62,13 @@ export const EVM_MAINNETS: readonly Network[] = Object.freeze([
 // ---- non-EVM mainnets: the CAIP-2 ids the asset catalog / swap2 engine use, public endpoints only ----
 
 export const SOLANA_CHAIN = 'solana:mainnet'
+/** Shipped Solana mainnet endpoints. */
 export const SOLANA_RPCS: readonly string[] = Object.freeze(['https://solana-rpc.publicnode.com', 'https://api.mainnet-beta.solana.com'])
 export const TON_CHAIN = 'ton:-239'
 export const TON_ENDPOINTS: readonly string[] = Object.freeze(['https://ton.access.orbs.network/1/mainnet/toncenter-api-v2/jsonRPC', 'https://toncenter.com/api/v2/jsonRPC'])
 export const TRON_CHAIN = 'tron:728126428'
 export const TRON_PROVIDERS: readonly string[] = Object.freeze(['https://api.trongrid.io'])
+/** Catalog id of Bitcoin mainnet. */
 export const BTC_CHAIN = 'bitcoin:mainnet'
 export const BTC_ESPLORA: readonly string[] = Object.freeze(['https://mempool.space/api', 'https://blockstream.info/api'])
 export const NEAR_CHAIN = 'near:mainnet'
@@ -74,6 +76,7 @@ export const NEAR_PROVIDERS: readonly string[] = Object.freeze(['https://free.rp
 export const ZCASH_CHAIN = 'zcash:mainnet'
 export const ZCASH_PROVIDERS: readonly string[] = Object.freeze(['https://api.blockchair.com/zcash'])
 
+/** A non-EVM catalog chain: id, family, native currency and explorer links. */
 export interface ChainDescriptor {
   caip2: string
   key: Exclude<NetworkFamily, 'evm'>
@@ -84,6 +87,7 @@ export interface ChainDescriptor {
   explorerAddress: string
 }
 
+/** The non-EVM catalog chains. */
 export const NON_EVM_CHAINS: readonly ChainDescriptor[] = Object.freeze([
   { caip2: SOLANA_CHAIN, key: 'solana', name: 'Solana', symbol: 'SOL', decimals: 9, explorerTx: 'https://solscan.io/tx/', explorerAddress: 'https://solscan.io/account/' },
   { caip2: TON_CHAIN, key: 'ton', name: 'TON', symbol: 'GRAM', decimals: 9, explorerTx: 'https://tonviewer.com/transaction/', explorerAddress: 'https://tonviewer.com/' },
@@ -93,6 +97,7 @@ export const NON_EVM_CHAINS: readonly ChainDescriptor[] = Object.freeze([
   { caip2: ZCASH_CHAIN, key: 'zcash', name: 'Zcash', symbol: 'ZEC', decimals: 8, explorerTx: 'https://blockchair.com/zcash/transaction/', explorerAddress: 'https://blockchair.com/zcash/address/' },
 ])
 
+/** A non-EVM catalog chain by id. */
 export const nonEvmChain = (caip2: string): ChainDescriptor | undefined => NON_EVM_CHAINS.find((c) => c.caip2 === caip2)
 
 const explorerBase = (txUrl: string): string => txUrl.replace(/\/(tx|transaction|txns)\/$/, '').replace(/\/#$/, '').replace(/\/$/, '')
@@ -119,6 +124,7 @@ const NON_EVM_RPCS: Record<string, readonly string[]> = {
   [ZCASH_CHAIN]: ZCASH_PROVIDERS,
 }
 
+/** The non-EVM mainnets as networks, with their shipped endpoints. */
 export const NON_EVM_MAINNETS: readonly Network[] = Object.freeze(NON_EVM_CHAINS.map((d) => nonEvm(d, NON_EVM_RPCS[d.caip2] ?? [])))
 
 /** Every mainnet: EVM then the other families. */
@@ -149,6 +155,7 @@ const testnet = (family: Exclude<NetworkFamily, 'evm'>, caip2: string, name: str
   enabled: false,
 })
 
+/** Testnets the table ships switched off. */
 export const DEFAULT_TESTNETS: readonly Network[] = Object.freeze([
   evm(11155111, 'Sepolia', 'ETH', ['https://ethereum-sepolia-rpc.publicnode.com', 'https://sepolia.drpc.org'], 'https://sepolia.etherscan.io', 'testnet'),
   evm(84532, 'Base Sepolia', 'ETH', ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'], 'https://sepolia.basescan.org', 'testnet'),
@@ -169,6 +176,7 @@ export const DEFAULT_TESTNETS: readonly Network[] = Object.freeze([
 /** Mainnets and default testnets: what a fresh `NetworksTable` starts with. */
 export const BUILTIN_NETWORKS: readonly Network[] = Object.freeze([...CATALOG_NETWORKS, ...DEFAULT_TESTNETS])
 
+/** A built-in network (catalog mainnet or default testnet) by id. */
 export const builtinNetwork = (caip2: string): Network | undefined => BUILTIN_NETWORKS.find((n) => n.caip2 === caip2)
 
 /** `eip155:1` → `0x1`. */

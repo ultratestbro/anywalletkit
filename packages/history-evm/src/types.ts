@@ -9,6 +9,7 @@ export type FetchLike = (
   init?: { method?: string; body?: string; signal?: AbortSignal; headers?: Record<string, string> },
 ) => Promise<{ ok: boolean; status: number; json(): Promise<unknown>; text(): Promise<string> }>
 
+/** Options for {@link createEvmHistory}: the chain, explorer keys or a proxy, and limits. */
 export interface EvmHistoryOptions {
   /** EVM chain id (1, 8453, …). The source's `chain` is `eip155:<chainId>`. */
   chainId: number
@@ -80,6 +81,7 @@ export interface EvmChainTx extends ChainTx {
   raw: EvmHistoryRaw
 }
 
+/** One page of EVM history, with the backend that served it. */
 export interface EvmHistoryPage extends HistoryPage {
   items: EvmChainTx[]
   /** Which explorer served this page. */
@@ -88,6 +90,10 @@ export interface EvmHistoryPage extends HistoryPage {
   note?: string
 }
 
+/**
+ * EVM history for one chain from Etherscan v2, Blockscout or Alchemy, with keyless Blockscout and
+ * Routescan as fallbacks. Build it with {@link createEvmHistory}.
+ */
 export interface EvmHistorySource extends HistorySource {
   readonly chainId: number
   listActivity(address: string, query?: HistoryQuery): Promise<EvmHistoryPage>

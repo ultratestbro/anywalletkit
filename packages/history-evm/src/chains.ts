@@ -10,7 +10,9 @@ export const SUPPORTED_CHAIN_IDS: readonly number[] = [
   57073, 98866, 196,
 ]
 
+/** Etherscan v2 multichain API root. */
 export const ETHERSCAN_V2_API = 'https://api.etherscan.io/v2/api'
+/** Etherscan v2 list of the chains it serves. */
 export const ETHERSCAN_V2_CHAINLIST = 'https://api.etherscan.io/v2/chainlist'
 /** Blockscout PRO multichain API (Etherscan-format, `chain_id=` + `apikey=`); docs: https://docs.blockscout.com/devs/pro-api */
 export const BLOCKSCOUT_PRO_API = 'https://api.blockscout.com/v2/api'
@@ -128,6 +130,7 @@ export const ALCHEMY_TRANSFERS_CHAIN_IDS: readonly number[] = [
  */
 export const ALCHEMY_INTERNAL_CHAIN_IDS: readonly number[] = [1, 137, 8453, 5042]
 
+/** Alchemy endpoint template; `{network}` and `{key}` are filled per chain. */
 export const ALCHEMY_URL_TEMPLATE = 'https://{network}.g.alchemy.com/v2/{key}'
 
 /**
@@ -166,6 +169,11 @@ export const EXPLORER_TX_BASE: Readonly<Record<number, string>> = {
   196: 'https://www.okx.com/web3/explorer/xlayer',
 }
 
+/**
+ * Block-explorer link for a transaction on an EVM chain.
+ *
+ * @throws Error when no explorer is known for the chain.
+ */
 export function explorerTxUrl(chainId: number, hash: string): string {
   const base = EXPLORER_TX_BASE[chainId]
   if (!base) throw new Error(`@anywalletkit/history-evm: no explorer known for chain ${chainId}`)

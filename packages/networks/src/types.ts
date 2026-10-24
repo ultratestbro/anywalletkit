@@ -7,19 +7,25 @@ export type NetworkKind = 'catalog' | 'testnet' | 'custom'
 /** Who supplied the entry. A site-added network (`wallet_addEthereumChain`) carries its origin so every sheet on it can say so. */
 export type NetworkSource = 'builtin' | 'user' | { origin: string; addedAt: number }
 
+/** One network: chain id, family, native currency, endpoints, explorer, and where it came from. */
 export interface Network {
   /** CAIP-2: `eip155:11155111`, `solana:EtWT…`, `bip122:<genesis>`, `ton:-3`, `tron:nile`, `near:testnet`, `zcash:testnet`. */
   caip2: string
+  /** Chain family (`evm`, `solana`, `ton`, `tron`, `btc`, `near`, `zcash`). */
   family: NetworkFamily
+  /** Display name. */
   name: string
   /** Native currency. */
   symbol: string
+  /** Decimals of the native currency. */
   decimals: number
+  /** A catalog mainnet, a default testnet, or a custom network. */
   kind: NetworkKind
   /** Endpoints, tried in order. For a builtin entry these are the public failover list; the table prepends the user's own. */
   rpcs: string[]
   /** Explorer base URL (no trailing slash). */
   explorer?: string
+  /** Who supplied it: built in, the user, or a site (with its origin). */
   source: NetworkSource
   /** Decision 4: drop the public fallback — only the user's RPCs are used (privacy / local node). */
   onlyOwnRpc?: boolean
@@ -31,7 +37,9 @@ export interface Network {
 
 /** One JSON value under one key — the shape every small store needs (chrome.storage, AsyncStorage, memory). */
 export interface JsonStorage<T> {
+  /** The stored value, or `null` on first run. */
   get(): Promise<T | null>
+  /** Persist the value. */
   set(value: T): Promise<void>
 }
 

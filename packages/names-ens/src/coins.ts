@@ -7,7 +7,9 @@ import { base58check, bech32, bech32m } from '@scure/base'
 import { sha256 } from '@noble/hashes/sha256'
 import { NameError } from '@anywalletkit/core'
 
+/** CAIP-2 id of Bitcoin mainnet, for reading a name's BTC record. */
 export const BTC_CAIP2 = 'bip122:000000000019d6689c085ae165831e93'
+/** CAIP-2 id of Solana mainnet, for reading a name's SOL record. */
 export const SOL_CAIP2 = 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'
 
 /** ENSIP-11: EVM chains other than mainnet use `0x80000000 | chainId`. */

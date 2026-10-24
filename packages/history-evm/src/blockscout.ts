@@ -132,6 +132,7 @@ function hashOf(v: unknown): string {
   return ''
 }
 
+/** @internal Parse a Blockscout transaction item. */
 export function parseBlockscoutTx(i: Item): TxRow | undefined {
   const hash = i['hash']
   if (typeof hash !== 'string') return undefined
@@ -160,6 +161,7 @@ export function parseBlockscoutTx(i: Item): TxRow | undefined {
   return row
 }
 
+/** @internal Parse a Blockscout token-transfer item. */
 export function parseBlockscoutTokenTransfer(i: Item): TokenRow | undefined {
   const hash = i['transaction_hash'] ?? i['tx_hash']
   const token = i['token']
@@ -186,6 +188,7 @@ export function parseBlockscoutTokenTransfer(i: Item): TokenRow | undefined {
   return row
 }
 
+/** @internal Parse a Blockscout internal-transaction item. */
 export function parseBlockscoutInternal(i: Item): InternalRow | undefined {
   const hash = i['transaction_hash']
   if (typeof hash !== 'string') return undefined

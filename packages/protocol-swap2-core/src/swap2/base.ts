@@ -708,6 +708,13 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
   }
 
+  /**
+   * Ask for a quote and check it against the request (amounts, slippage floor, fee ceilings in the
+   * protocol config). Works on a read-only account.
+   *
+   * @throws {@link Swap2QuoteError} when no route answers, with the provider's own reason when it
+   * gave one.
+   */
   override async quoteSwap2(options: Swap2Options): Promise<Swap2Quote> {
     const snapshot = snapshotOptions(options);
     const q = await this.resolveQuote(this.toParams(snapshot, true));
@@ -720,6 +727,15 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     return this.toQuote(q, snapshot);
   }
 
+  /**
+   * Re-quote, check the quote, show it to `reviewExecution` when configured, send any approvals,
+   * then sign and broadcast the source leg. An identical call already in flight on the same account
+   * is refused.
+   *
+   * @throws {@link Swap2ExecutionError} for a read-only account, {@link Swap2InFlightError} for a
+   * double tap, {@link Swap2MaybeSentError} when the broadcast outcome is unknown (do not retry;
+   * track `hash`).
+   */
   override async swap2(options: Swap2Options, config?: Swap2ProtocolConfig): Promise<Swap2Result> {
     // Account first: a read-only or missing account is refused before any option is
     // validated or any network call is made (SDK protocol conformance).
@@ -1249,6 +1265,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
   }
 
+  /** Status of a swap by the id `swap2()` returned, asked from the provider that executed it. */
   override async getSwap2Status(id: string, _options?: Swap2StatusOptions): Promise<Swap2StatusResult> {
     const {provider: name, intentId, sourceTxHash} = decodeId(id);
     const provider = this.providerFor(name);
@@ -1354,6 +1371,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     return {hash: result.id, fee, tokenInAmount: result.fromTokenAmount, tokenOutAmount: result.toTokenAmount};
   }
 
+  /** Source chains this protocol can swap from. */
   override async getSupportedChains(): Promise<Swap2SupportedChain[]> {
     if (!this.protocolEnabled()) return [];
     return CC_SOURCE_CHAINS.filter((c: CcChain) => this.chainSupported(c.caip2)).map((c) => ({
@@ -1364,6 +1382,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }));
   }
 
+  /** Tokens of the asset catalog on the supported chains, optionally narrowed. */
   override async getSupportedTokens(options?: Swap2SupportedTokensOptions): Promise<Swap2SupportedToken[]> {
     const wantFrom = options?.fromChain != null ? toCaip2(options.fromChain, "") : undefined;
     const wantTo = options?.toChain != null ? toCaip2(options.toChain, "") : undefined;

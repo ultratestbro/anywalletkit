@@ -21,13 +21,16 @@ import { familyOf } from './catalog.js'
 import type { Network, VerifyResult } from './types.js'
 import { checkRpcUrl, type UrlPolicyOptions } from './url.js'
 
+/** The part of a `fetch` response the verifier reads. */
 export interface FetchResponseLike {
   ok: boolean
   status: number
   text(): Promise<string>
 }
+/** A `fetch`-compatible function; pass one to route checks through a proxy or a test double. */
 export type FetchLike = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: unknown }) => Promise<FetchResponseLike>
 
+/** Options for `verifyNetwork`: transport, timeout, which endpoint, and the URL policy. */
 export interface VerifyOptions extends UrlPolicyOptions {
   fetch?: FetchLike
   /** Per call; default 8 s. */

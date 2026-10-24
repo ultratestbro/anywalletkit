@@ -5,11 +5,13 @@
  */
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 
+/** A token on a chain, as providers see it. */
 export interface Asset {
   chain: string; // CAIP-2, e.g. "tron:728126428"
   token: string; // native-format token id/address on that chain
 }
 
+/** What the engine asks a provider to quote. Amounts are base-unit strings; exact input only. */
 export interface QuoteParams {
   /** Local-only (never serialized): called with the reason when the provider
    *  refuses to quote — a shared-instance "last refusal" field raced under
@@ -64,7 +66,9 @@ export interface TxRequest {
 
 /** A normalized quote from one provider. */
 export interface Quote {
+  /** Provider name. */
   provider: string;
+  /** Provider's id for this swap; tracked with `trackIntent`. */
   intentId: string;
   depositAddress: string; // where the user sends source funds ("" on dry quotes)
   depositMemo: string | null; // MUST accompany the deposit when present (TON)
@@ -76,8 +80,11 @@ export interface Quote {
   feeUsd: number; // normalized fee for scoring
   /** Honest itemized fees when the provider exposes base-unit amounts. */
   fees?: {type: "network" | "protocol" | "affiliate" | "other"; amount: string; token: string; included: boolean; description?: string}[];
+  /** Estimated time to delivery. */
   etaSeconds: number; // estimated settlement time
+  /** Provider's reliability hint, 0 to 1. */
   reliability: number; // 0..1 provider/route reliability hint
+  /** Quote expiry, unix milliseconds. */
   validUntilMs: number;
   /** Provider-owned, JSON-safe facts required to revalidate execution. */
   providerData?: Record<string, string>;
@@ -101,12 +108,14 @@ export interface RoutedQuote extends Quote {
   };
 }
 
+/** How the router weighs price, speed and reliability when it scores routes. */
 export interface ScoreWeights {
   price: number;
   speed: number;
   reliability: number;
 }
 
+/** A swap's state as the engine reports it; maps to `Swap2Status`. */
 export type IntentState =
   | "pending"
   | "action-required"
@@ -118,6 +127,7 @@ export type IntentState =
   | "cancelled"
   | "expired";
 
+/** A provider's answer to `trackIntent`. */
 export interface IntentStatus {
   state: IntentState;
   /** Still pending, but the source deposit has been observed (PROCESSING). */
@@ -132,6 +142,7 @@ export interface IntentStatus {
   claim?: {chain: string; ready: boolean};
 }
 
+/** A provider's source-leg transaction, before the engine checks and signs it. */
 export interface UnsignedTx {
   chain: string;
   to: string;
@@ -170,11 +181,15 @@ export interface UnsignedTx {
  * of the app references only this interface (never a specific provider).
  */
 export interface CrossChainProvider {
+  /** Provider name, unique in a router. */
   readonly name: string;
   /** Master flag — providers ship "dark" (off) until validated with real funds. */
   enabled(): boolean;
+  /** Cheap synchronous check: can this provider route `from` to `to`? No I/O. */
   supportsRoute(from: Asset, to: Asset): boolean;
+  /** A quote, or `null` with the reason passed to `params.onRefusal`. */
   getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null>;
+  /** The source-leg transaction for a quote. */
   buildDeposit(quote: Quote): Promise<UnsignedTx>;
   /**
    * Last fail-closed check after any approval and immediately before the
@@ -182,6 +197,7 @@ export interface CrossChainProvider {
    * can rotate or halt (THORChain vaults/routers) must revalidate it here.
    */
   preflightDeposit?(quote: Quote, tx: UnsignedTx): Promise<void>;
+  /** Current status of a swap. */
   trackIntent(ref: IntentRef): Promise<IntentStatus>;
   /**
    * Tell the provider the source funds were sent (tx hash / BoC). Required for

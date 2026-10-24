@@ -2,9 +2,11 @@
 export function namespace(chain: string): string {
   return chain.split(":")[0] ?? "";
 }
+/** True for an `eip155:` chain id. */
 export function isEvm(chain: string): boolean {
   return namespace(chain) === "eip155";
 }
+/** Numeric chain id of an `eip155:<id>` CAIP-2 id. */
 export function evmRef(chain: string): number {
   return Number(chain.split(":")[1] ?? "0");
 }

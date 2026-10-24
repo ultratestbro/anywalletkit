@@ -16,8 +16,14 @@ export class HistoryUnavailableError extends Error {
 /** Internal: how one backend call failed, so the source can decide between retry and fallback. */
 export type ExplorerFailureKind = 'rate-limit' | 'unavailable' | 'http' | 'network'
 
+/**
+ * One explorer backend failed: rate limit, bad key, unsupported chain, malformed answer or network
+ * error. The source tries the next backend.
+ */
 export class ExplorerError extends Error {
+  /** What went wrong. */
   readonly kind: ExplorerFailureKind
+  /** Backend that failed (`etherscan`, `blockscout`, `alchemy`…). */
   readonly backend: string
   constructor(backend: string, kind: ExplorerFailureKind, message: string) {
     super(`${backend}: ${message}`)

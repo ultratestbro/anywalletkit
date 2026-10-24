@@ -17,10 +17,12 @@ export interface PageCursor extends WindowCursor {
   b: HistoryBackend
 }
 
+/** @internal Encode a history cursor. */
 export function encodeCursor(c: PageCursor): string {
   return base64Encode(JSON.stringify(c))
 }
 
+/** @internal Decode a history cursor; throws on a malformed one. */
 export function decodeCursor(s: string): PageCursor {
   let parsed: unknown
   try {

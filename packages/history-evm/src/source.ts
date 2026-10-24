@@ -48,6 +48,10 @@ function defaultRows(rows: Map<string, { block: number }[]>): ExplorerRows {
 
 let chainlistPromise: Promise<Set<number>> | undefined
 
+/**
+ * Chain ids Etherscan v2 serves, fetched once and cached; the built-in fallback list when the
+ * chainlist cannot be read.
+ */
 export function etherscanServedChains(fetchFn: FetchLike, timeoutMs: number): Promise<Set<number>> {
   if (!chainlistPromise) {
     chainlistPromise = (async () => {

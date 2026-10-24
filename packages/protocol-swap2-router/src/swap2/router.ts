@@ -28,15 +28,22 @@ import {CrossChainRouter, type RouteSet, type RouterOptions} from "../router.js"
 
 /** One route in a picker: the public quote plus its place in the auction. */
 export interface Swap2Route {
+  /** Provider name. */
   provider: string;
+  /** The provider's quote. */
   quote: Swap2Quote;
   /** Net USD value when the router prices routes (`valueUsd`), else null. */
   netValueUsd: number | null;
   /** Value against the best route, 0..1. */
   relativeValue: number;
+  /** `best` (most value within the tie band) and/or `fastest` (lowest ETA). */
   tags: ("best" | "fastest")[];
 }
 
+/**
+ * Options for {@link RouterSwap2Protocol}: the providers (or a ready router), route preference and
+ * the engine options.
+ */
 export interface RouterSwap2Config extends Swap2EngineConfig {
   /** The providers to aggregate over. Only what the caller installs is bundled. */
   providers?: CrossChainProvider[];
@@ -55,6 +62,18 @@ export interface RouterSwap2Config extends Swap2EngineConfig {
   prefer?: "best" | "fastest";
 }
 
+/**
+ * A swap2 protocol that asks every installed provider in parallel, checks each quote the same way,
+ * and executes the chosen route. Pass exactly one of `providers` or `router`.
+ *
+ * ```ts
+ * const swap2 = new RouterSwap2Protocol(account, {
+ *   fromChain: 'eip155:1',
+ *   providers: [lifiProvider(), nearIntentsProvider(), cctpProvider()],
+ * })
+ * const quote = await swap2.quoteSwap2({ fromToken: 'USDC', toToken: 'USDC', toChain: 'eip155:8453', fromTokenAmount: 100_000_000n })
+ * ```
+ */
 export class RouterSwap2Protocol extends BaseSwap2Protocol {
   private readonly router: CrossChainRouter;
   private readonly account: Swap2Account | undefined;
@@ -128,6 +147,7 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
     return this.router.supportsChainPair(fromChain, toChain);
   }
 
+  /** Release the providers' resources (timers, sockets). */
   close(): void {
     this.router.close();
   }

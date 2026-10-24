@@ -5,6 +5,7 @@ import { NameError, type NameResolver, type NameWarning, type ResolvedName } fro
 import { coinTypeFor, decodeAddressRecord } from './coins.js'
 import { warningsFor } from './warnings.js'
 
+/** Options for `ensResolver`: an Ethereum-mainnet client or RPC URL, and caching. */
 export interface EnsResolverOptions {
   /** A viem client on Ethereum mainnet (the registry + universal resolver live there). */
   client?: PublicClient

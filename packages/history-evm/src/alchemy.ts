@@ -93,6 +93,10 @@ const MAX_ATTEMPTS = 4
 const UNAVAILABLE_PATTERNS = [/not enabled for this app/i, /unauthorized/i, /invalid api key/i, /forbidden/i, /must be authenticated/i, /not supported/i, /unsupported method/i, /method not found/i, /does not exist/i]
 const RATE_LIMIT_PATTERNS = [/rate limit/i, /too many requests/i, /throughput/i, /capacity/i, /compute units? per second/i]
 
+/**
+ * Alchemy `alchemy_getAssetTransfers` as a history backend, for chains or volumes the explorers do
+ * not cover. Needs an Alchemy key.
+ */
 export class AlchemyClient {
   readonly backend = 'alchemy' as const
   private readonly o: AlchemyClientOptions

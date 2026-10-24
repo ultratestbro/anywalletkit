@@ -116,6 +116,7 @@ function lead(tx: ChainTx, assets: ActivityAsset[]): string | undefined {
   return a ? assetLabel(tx, a) : undefined;
 }
 
+/** Labels a swap module passes when describing its own transactions in the activity feed. */
 export interface SwapActivityOptions {
   /** Registry module name (`module.json` → `name`). */
   protocol: string;

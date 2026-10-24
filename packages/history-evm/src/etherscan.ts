@@ -137,6 +137,7 @@ export class EtherscanClient {
 
 // --- row parsers (exported for tests) ---
 
+/** @internal Parse an Etherscan `txlist` row. */
 export function parseTxlistRow(r: Row): TxRow | undefined {
   const hash = r['hash']
   if (typeof hash !== 'string') return undefined
@@ -157,6 +158,7 @@ export function parseTxlistRow(r: Row): TxRow | undefined {
   return row
 }
 
+/** @internal Parse an Etherscan `tokentx` row. */
 export function parseTokentxRow(r: Row): TokenRow | undefined {
   const hash = r['hash'], token = r['contractAddress']
   if (typeof hash !== 'string' || typeof token !== 'string' || !token) return undefined
@@ -178,6 +180,7 @@ export function parseTokentxRow(r: Row): TokenRow | undefined {
   return row
 }
 
+/** @internal Parse an Etherscan `txlistinternal` row. */
 export function parseInternalRow(r: Row): InternalRow | undefined {
   const hash = r['hash']
   if (typeof hash !== 'string') return undefined

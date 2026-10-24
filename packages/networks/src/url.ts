@@ -9,8 +9,10 @@
 
 export type UrlPolicyReason = 'not-a-url' | 'scheme' | 'credentials' | 'http-not-local' | 'http-not-allowed'
 
+/** Result of `checkRpcUrl`: the normalized URL and whether it is local, or why it was refused. */
 export type UrlPolicyResult = { ok: true; url: string; local: boolean } | { ok: false; reason: UrlPolicyReason; message: string }
 
+/** URL policy options. */
 export interface UrlPolicyOptions {
   /** The Advanced toggle: accept `http://` for private addresses. Default false. */
   allowHttpLocal?: boolean

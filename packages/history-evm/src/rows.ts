@@ -27,6 +27,7 @@ export interface TxRow {
   raw: unknown
 }
 
+/** @internal A token-transfer row, explorer-neutral. */
 export interface TokenRow {
   hash: string
   block: number
@@ -42,6 +43,7 @@ export interface TokenRow {
   raw: unknown
 }
 
+/** @internal An internal-transaction row, explorer-neutral. */
 export interface InternalRow {
   hash: string
   block: number
@@ -52,6 +54,7 @@ export interface InternalRow {
   raw: unknown
 }
 
+/** @internal Normal, token and internal rows of one explorer page. */
 export interface ExplorerRows {
   tx: TxRow[]
   tokens: TokenRow[]
@@ -97,6 +100,7 @@ function hasNonAscii(symbol: string): boolean {
   return /[^\x20-\x7e]/.test(symbol)
 }
 
+/** @internal What merging explorer rows into a `ChainTx` needs. */
 export interface MergeContext {
   chain: string
   chainId: number
@@ -130,6 +134,7 @@ export function mergeRows(ctx: MergeContext, rows: ExplorerRows): EvmChainTx[] {
   return out
 }
 
+/** @internal Merge one hash's explorer rows into a `ChainTx`. */
 export function buildTx(ctx: MergeContext, hash: string, tx: TxRow | undefined, tokens: TokenRow[], internal: InternalRow[]): EvmChainTx {
   const first = tokens[0] ?? internal[0]
   const time = tx?.time || first?.time || 0

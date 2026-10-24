@@ -17,6 +17,7 @@ import { BUILTIN_NETWORKS, familyOf } from './catalog.js'
 import type { JsonStorage, Network, VerifyResult } from './types.js'
 import { checkRpcUrls, type UrlPolicyReason } from './url.js'
 
+/** Why a user RPC is parked: the error and when it was seen. */
 export interface RpcIssue {
   error: string
   at: number
@@ -25,7 +26,9 @@ export interface RpcIssue {
 
 /** What the store persists: only deltas from the builtin table, so a shipped list update reaches every install. */
 export interface NetworksState {
+  /** Format version. */
   v: 1
+  /** Accept `http://` RPCs on private addresses. */
   allowHttpLocal: boolean
   /** Per builtin caip2: the user's additions and toggles. */
   overrides: Record<string, NetworkOverride>
@@ -35,10 +38,15 @@ export interface NetworksState {
   issues: Record<string, Record<string, RpcIssue>>
 }
 
+/** What the user changed on one built-in network. */
 export interface NetworkOverride {
+  /** Endpoints tried before the shipped list. */
   userRpcs?: string[]
+  /** Use only `userRpcs`, never the shipped list. */
   onlyOwnRpc?: boolean
+  /** Read balances over the user's RPC instead of the app's server. */
   balancesViaOwnRpc?: boolean
+  /** Switched on or off by the user. */
   enabled?: boolean
 }
 
@@ -52,6 +60,11 @@ export interface NetworkEntry extends Network {
   issues: Record<string, RpcIssue>
 }
 
+/**
+ * Thrown by {@link NetworksTable} writes: a built-in network cannot be removed or replaced, the
+ * network is unknown, a URL breaks the policy, the network is invalid, or the last RPC of a custom
+ * network would be removed.
+ */
 export class NetworkError extends Error {
   constructor(readonly code: 'builtin' | 'unknown-network' | 'url-policy' | 'bad-network' | 'last-rpc', message: string, readonly reason?: UrlPolicyReason) {
     super(message)
@@ -63,6 +76,11 @@ const EMPTY: NetworksState = { v: 1, allowHttpLocal: false, overrides: {}, custo
 
 const ref = (caip2: string) => caip2.split(':')[1] ?? ''
 
+/**
+ * The wallet's networks and their endpoints: the shipped catalog and testnets plus what the user
+ * and sites added. Storage holds only the changes, so app updates with new endpoints reach every
+ * install. Call `load()` once at start; the `…Sync` readers answer from memory after that.
+ */
 export class NetworksTable {
   private _state: NetworksState | null = null
   private _loading: Promise<NetworksState> | null = null
@@ -88,6 +106,7 @@ export class NetworksTable {
 
   // ---- reads ----
 
+  /** Every network with its effective endpoints and issues. */
   async list(): Promise<NetworkEntry[]> {
     const s = await this.state()
     return this.entries(s)
@@ -98,10 +117,12 @@ export class NetworksTable {
     return this.entries(this._state ?? EMPTY)
   }
 
+  /** One network, or `null` when unknown. */
   async get(caip2: string): Promise<NetworkEntry | null> {
     return (await this.list()).find((n) => n.caip2 === caip2) ?? null
   }
 
+  /** Same as `get()` from memory. */
   getSync(caip2: string): NetworkEntry | null {
     return this.listSync().find((n) => n.caip2 === caip2) ?? null
   }
@@ -128,21 +149,25 @@ export class NetworksTable {
     return n.kind === 'custom' || n.userRpcs.some((u) => !n.issues[u])
   }
 
+  /** Same as `usesUserRpcSync()`, after loading. */
   async usesUserRpc(caip2: string): Promise<boolean> {
     await this.state()
     return this.usesUserRpcSync(caip2)
   }
 
+  /** Whether `http://` RPCs on private addresses are accepted. */
   async allowHttpLocal(): Promise<boolean> {
     return (await this.state()).allowHttpLocal
   }
 
+  /** Same as `allowHttpLocal()` from memory. */
   allowHttpLocalSync(): boolean {
     return this._state?.allowHttpLocal ?? false
   }
 
   // ---- writes ----
 
+  /** Turn the `http://` on private addresses setting on or off. */
   async setAllowHttpLocal(v: boolean): Promise<void> {
     const s = await this.state()
     await this.save({ ...s, allowHttpLocal: v })
@@ -190,26 +215,41 @@ export class NetworksTable {
     await this.save({ ...s, custom: s.custom.map((n) => (n.caip2 === caip2 ? { ...n, rpcs: urls.urls } : n)), issues })
   }
 
+  /**
+   * Add a user RPC after the existing user RPCs, before the shipped list. Check it with
+   * `checkRpcUrl` and `verifyNetwork` first.
+   *
+   * @throws {@link NetworkError} `unknown-network`, or `url-policy` for a URL the policy refuses.
+   */
   async addRpc(caip2: string, url: string): Promise<void> {
     const n = await this.get(caip2)
     if (!n) throw new NetworkError('unknown-network', `${caip2} is not in the table.`)
     await this.setRpcs(caip2, [...n.userRpcs.filter((u) => u !== url.trim()), url.trim()])
   }
 
+  /**
+   * Remove a user RPC.
+   *
+   * @throws {@link NetworkError} `unknown-network`, or `last-rpc` for the last RPC of a custom
+   * network.
+   */
   async removeRpc(caip2: string, url: string): Promise<void> {
     const n = await this.get(caip2)
     if (!n) throw new NetworkError('unknown-network', `${caip2} is not in the table.`)
     await this.setRpcs(caip2, n.userRpcs.filter((u) => u !== url))
   }
 
+  /** Switch a network on or off (testnets ship off). */
   async enable(caip2: string, enabled: boolean): Promise<void> {
     await this.patch(caip2, { enabled })
   }
 
+  /** Use only the user's RPCs for this network, dropping the shipped fallback. */
   async setOnlyOwnRpc(caip2: string, onlyOwnRpc: boolean): Promise<void> {
     await this.patch(caip2, { onlyOwnRpc })
   }
 
+  /** Read balances over the user's RPC instead of the app's server. */
   async setBalancesViaOwnRpc(caip2: string, balancesViaOwnRpc: boolean): Promise<void> {
     await this.patch(caip2, { balancesViaOwnRpc })
   }
