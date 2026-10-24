@@ -13,7 +13,7 @@ what you have to bring yourself: an RPC, an API key, a storage layer.
 | # | Part | What the user sees | Any Wallet Kit | You bring |
 |---|---|---|---|---|
 | 1 | [Keys](/build-a-wallet/keys-and-storage/) | "Create wallet", "Import seed phrase" | `core` | Nothing |
-| 2 | [Key storage](/build-a-wallet/keys-and-storage/#key-storage) | Face ID unlock, "Back up your phrase" | `extension-kit` (browser only) | Keychain / Keystore on mobile |
+| 2 | [Key storage](/build-a-wallet/keys-and-storage/#key-storage) | Face ID unlock, "Back up your phrase" | `secure-storage-react-native` (iOS Keychain, Android Keystore), `seed-vault` (encrypted backup file), `backup-cloud` (iCloud), `extension-kit` (browser) | Nothing on iOS; an Android cloud backup is planned |
 | 3 | [Accounts](/build-a-wallet/accounts/) | One address per chain, several accounts | `kit`, `keyring`, `wallet-*` | Nothing |
 | 4 | [Networks and RPC](/build-a-wallet/networks-and-rpc/) | Nothing, until it breaks | `networks` | RPC endpoints |
 | 5 | [Balances](/build-a-wallet/balances-and-prices/) | Total, list of assets | `wallet-*`, `swap2-assets` | RPC; an indexer to find tokens |

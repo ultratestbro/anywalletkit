@@ -22,7 +22,7 @@
     "watch:baseline": "node scripts/watch/watch.mjs --baseline",
     "vendor": "node scripts/vendor.mjs",
     "test:examples": "pnpm --filter './examples/quickstart' --filter './examples/swap' --filter './examples/earn' --filter './examples/approvals' --filter './examples/tx-preview' --filter './examples/keyring' --filter './examples/signer' --filter './examples/history' --filter './examples/networks' --filter './examples/names' --filter './examples/extension-kit' --filter './examples/balances' -r run typecheck && pnpm --filter './examples/quickstart' --filter './examples/swap' --filter './examples/earn' --filter './examples/approvals' --filter './examples/tx-preview' --filter './examples/keyring' --filter './examples/signer' --filter './examples/history' --filter './examples/networks' --filter './examples/names' --filter './examples/extension-kit' --filter './examples/balances' -r run test",
-    "docs:build": "node scripts/check-prompts.mjs && pnpm --filter awk-docs build",
+    "docs:build": "node scripts/check-prompts.mjs && node scripts/check-stale-docs.mjs && pnpm --filter awk-docs build",
     "pack:check": "node scripts/check-pack.mjs",
     "release:dry": "node scripts/publish.mjs --dry-run"
   },

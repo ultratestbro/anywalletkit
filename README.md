@@ -149,7 +149,7 @@ package's behaviour adds one (`pnpm changeset`), and a release applies them
 runs only in the `release` workflow, with npm provenance — see
 [RELEASING.md](RELEASING.md).
 
-For contributors: an unreleased build (a branch, not yet on npm) can be taken as tarballs:
+For contributors: a build of an unreleased branch can be taken as tarballs:
 
 ```sh
 node scripts/vendor.mjs --out ../app/vendor/anywalletkit --consumer ../app/package.json
