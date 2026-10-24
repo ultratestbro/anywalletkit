@@ -18,8 +18,7 @@ describe('parseSwapId', () => {
   it('decodes the swap2 id with and without the source hash', () => {
     expect(parseSwapId('awk1.cctp.42.0xsrc')).toEqual({ provider: 'cctp', intentId: '42', sourceTxHash: '0xsrc' })
     expect(parseSwapId('awk1.near_intents.dep%2Fosit')).toEqual({ provider: 'near_intents', intentId: 'dep/osit' })
-    // ids minted before the 2026-10-19 prefix change are still tracked
-    expect(parseSwapId('awk1.cctp.42')).toEqual({ provider: 'cctp', intentId: '42' })
+    expect(parseSwapId('xyz1.cctp.42')).toBeNull()
     expect(parseSwapId('awk2.x.y')).toBeNull()
     expect(parseSwapId('awk1.x')).toBeNull()
   })

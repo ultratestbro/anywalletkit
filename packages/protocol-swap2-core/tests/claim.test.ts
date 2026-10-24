@@ -25,8 +25,6 @@ class P extends SingleProviderSwap2 {
 }
 
 const id = "awk1.two-phase.cctp%3A6%3A3%3A1000.0xabc";
-/** Minted before the prefix rename — must keep resolving. */
-const legacyId = "awk1.two-phase.cctp%3A6%3A3%3A1000.0xabc";
 
 describe("claimSwap2 (two-phase delivery)", () => {
   it("sends the provider's claim through a destination-chain account and reports the hash", async () => {
@@ -41,13 +39,13 @@ describe("claimSwap2 (two-phase delivery)", () => {
     expect(dest.sent[0]).toMatchObject({to: CLAIM.to, data: CLAIM.data, value: 0n, chainId: 42161, gasLimit: 260000n});
   });
 
-  it("still claims ids minted under the legacy awk1 prefix", async () => {
+  it("refuses an id under any other prefix — nothing is sent", async () => {
     const prov = provider(CLAIM);
     const p = new P(prov);
     const dest = createMockAccount({chain: "eip155:42161"});
-    const out = await p.claimSwap2(legacyId, dest);
-    expect(out).toMatchObject({chain: "eip155:42161", id: legacyId});
-    expect(prov.claims).toEqual([{intentId: "cctp:6:3:1000", sourceTxHash: "0xabc"}]);
+    await expect(p.claimSwap2(`xyz1${id.slice(4)}`, dest)).rejects.toThrow(/malformed swap2 status id/);
+    expect(prov.claims).toEqual([]);
+    expect(dest.sent).toHaveLength(0);
   });
 
   it("not ready → Swap2StatusError; nothing is sent", async () => {

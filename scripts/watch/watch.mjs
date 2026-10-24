@@ -109,7 +109,13 @@ const F = {
     return {value: meta.codeHash, meta};
   },
   async "github-releases"(s) {
-    let rel = await fetchJson(`https://api.github.com/repos/${s.repo}/releases?per_page=3`, {headers: ghHeaders()});
+    // Monorepos release many packages: `tagPrefix` keeps only the tags the module cares about.
+    const prefixes = s.tagPrefix == null ? null : [].concat(s.tagPrefix);
+    let rel = await fetchJson(`https://api.github.com/repos/${s.repo}/releases?per_page=${prefixes ? 50 : 3}`, {headers: ghHeaders()});
+    if (prefixes && Array.isArray(rel)) {
+      rel = rel.filter((r) => prefixes.some((p) => r.tag_name.startsWith(p)));
+      if (!rel.length) throw new Error(`no recent release tag starts with ${prefixes.join(" | ")}`);
+    }
     if (Array.isArray(rel) && rel.length) {
       const r = rel[0];
       const meta = {tag: r.tag_name, name: r.name || r.tag_name, at: (r.published_at || "").slice(0, 10), url: r.html_url, prerelease: !!r.prerelease};

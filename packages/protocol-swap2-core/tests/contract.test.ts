@@ -46,7 +46,6 @@ describe("core public contract", () => {
     await expect(protocol.getSupportedChains()).resolves.toEqual([]);
     await expect(protocol.getSupportedTokens()).resolves.toEqual([]);
     await expect(protocol.getSwap2Status("awk1.%ZZ.intent")).rejects.toThrow(/malformed swap2 status id/);
-    await expect(protocol.getSwap2Status("awk1.%ZZ.intent")).rejects.toThrow(/malformed swap2 status id/);
     await expect(protocol.getSwap2Status("xyz1.prov.intent")).rejects.toThrow(/malformed swap2 status id/);
     await expect(protocol.quoteSwap2({fromToken: "USDT", toToken: "USDT", toChain: -1, fromTokenAmount: 1n}))
       .rejects.toThrow(/chain id must be a positive safe integer/);

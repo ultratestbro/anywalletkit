@@ -221,6 +221,14 @@
       "id": "sdks",
       "type": "github-releases",
       "repo": "morpho-org/sdks",
+      "tagPrefix": [
+        "@morpho-org/morpho-sdk-",
+        "@morpho-org/blue-sdk",
+        "@morpho-org/morpho-ts-",
+        "@morpho-org/midnight-sdk-",
+        "@morpho-org/evm-simulation-",
+        "@morpho-org/liquidity-sdk"
+      ],
       "label": "Morpho SDKs releases"
     },
     {

@@ -8,7 +8,7 @@
 
 ### Patch Changes
 
-- 412164a: Swap2 status ids are minted as `awk1.<provider>.<intent>[.<sourceTxHash>]`; ids minted under the old `awk1.` prefix still decode (`SWAP2_ID_PREFIX` exported).
+- 412164a: Swap2 status ids are minted as `awk1.<provider>.<intent>[.<sourceTxHash>]` (`SWAP2_ID_PREFIX` exported).
 - 29af9d6: EIP-712 domain `chainId` sent as a string (hex "0x89" or decimal) is now hashed as a NUMBER. viem includes `chainId` in the EIP712Domain type only for numeric values, so such typed data was signed over a domain without chainId and the verifying contract rejected the signature (Omniston EVM→TON order on Polygon, 2026-10-16: registered, never filled). `WalletAccountEvm.signTypedData` normalizes (and the cross-chain guard now recognizes hex strings), the swap2 engine normalizes before handing typed orders to any signer, and the Omniston provider returns typed data with a numeric chainId.
 - Updated dependencies [bd4ea91]
 - Updated dependencies [386615c]

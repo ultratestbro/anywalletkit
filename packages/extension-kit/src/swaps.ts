@@ -17,7 +17,7 @@ import type { JsonStorage } from './storage.js'
 export type SwapRecordStatus = IntentStatus['state'] | 'claiming'
 
 export interface SwapRecord {
-  /** swap2 id — `awk1.<provider>.<intentId>[.<sourceTxHash>]` (ids minted before 2026-10-19 carry the legacy `awk1.` prefix). */
+  /** swap2 id — `awk1.<provider>.<intentId>[.<sourceTxHash>]`. */
   id: string
   provider: string
   fromChain: string
@@ -43,13 +43,9 @@ export interface SwapRecord {
 
 export const ACTIVE_STATUSES: ReadonlySet<SwapRecordStatus> = new Set<SwapRecordStatus>(['pending', 'action-required', 'refund-pending', 'partial', 'claiming'])
 
-/** Current swap2 status-id prefix plus the legacy prefix of ids minted before 2026-10-19 (still tracked, never minted). */
-const SWAP_ID_PREFIXES = [SWAP2_ID_PREFIX, 'awk1']
-
 export function parseSwapId(id: string): { provider: string; intentId: string; sourceTxHash?: string } | null {
-  const prefix = SWAP_ID_PREFIXES.find((p) => id.startsWith(`${p}.`))
-  if (!prefix) return null
-  const parts = id.slice(prefix.length + 1).split('.')
+  if (!id.startsWith(`${SWAP2_ID_PREFIX}.`)) return null
+  const parts = id.slice(SWAP2_ID_PREFIX.length + 1).split('.')
   if (parts.length < 2 || parts.length > 3 || !parts[0] || !parts[1]) return null
   const provider = decodeURIComponent(parts[0])
   const intentId = decodeURIComponent(parts[1])

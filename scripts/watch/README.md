@@ -40,7 +40,7 @@ node scripts/watch/watch.mjs [--only aave,morpho] [--send] [--dry]              
 | `evm-code` | keccak256 of `eth_getCode` | `chainId`, `address` |
 | `solana-program` | programdata `slot` (last deploy) + upgrade `authority` | `programId` |
 | `ton-code` | sha256 of the account code cell | `address` |
-| `github-releases` | latest release tag + date (tags when the repo has no releases) | `repo` |
+| `github-releases` | latest release tag + date (tags when the repo has no releases) | `repo`, optional `tagPrefix` (string or list: in a monorepo, only releases whose tag starts with one of them count) |
 | `github-file` | blob sha of one file | `repo`, `path`, optional `ref` |
 | `http-json` | sha256 of canonical JSON; with `path` + `itemKey` the diff names added / removed items | `url`, optional `path` (dot path to an array), `itemKey`, `headers` |
 | `http-text` | sha256 of the visible text (scripts / styles / tags stripped), optionally only `between` two markers | `url`, optional `between` |
