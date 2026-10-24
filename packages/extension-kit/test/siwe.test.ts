@@ -104,3 +104,30 @@ describe('SIWE (EIP-4361) on personal_sign', () => {
     expect('code' in classifySignRequest({ network, method: 'eth_sendTransaction', params: [{ ...base, authorizationList: [] }], accounts: [ME] })).toBe(false)
   })
 })
+
+describe('SIWE checks read the bytes that get signed (scan 2026-10-23 F7)', () => {
+  const toHex = (s: string) => `0x${Buffer.from(s, 'utf8').toString('hex')}`
+  const victim = (statement: string) => msg({ domain: 'app.victim.com', uri: 'https://app.victim.com/login', statement })
+  const classify = (message: string, origin = 'https://evil.example') =>
+    classifySignRequest({ network: DEFAULT_NETWORKS[0]!, method: 'personal_sign', params: [message, ME], accounts: [ME], origin, now: NOW })
+
+  it('a cross-site sign-in hidden behind one DEL / form-feed byte is refused, not shown as an unchecked hex blob', () => {
+    for (const ctrl of ['\x7f', '\x0c', '\x00', '\x1b']) {
+      const info = classify(toHex(victim(`Sign in${ctrl}to Victim`)))
+      expect('code' in info && info.message).toMatch(/hidden control characters/)
+    }
+  })
+
+  it('the plain hex of a cross-site sign-in still gets its warning (decoded, checked)', () => {
+    const info = classify(toHex(victim('Sign in to Victim')))
+    if ('code' in info || info.kind !== 'sign-message') throw new Error('unexpected')
+    expect(info.siwe!.problems.join(' | ')).toMatch(/names app\.victim\.com but the request comes from evil\.example/)
+  })
+
+  it('non-sign-in messages with control bytes are unaffected (shown as hex, signable)', () => {
+    const info = classify(toHex('binary\x00blob\x7f'))
+    if ('code' in info) throw new Error('refused')
+    expect(info.kind).toBe('sign-message')
+    expect(info.siwe).toBeUndefined()
+  })
+})

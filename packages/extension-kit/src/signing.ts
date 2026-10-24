@@ -94,6 +94,24 @@ export function messageText(value: unknown): string {
   }
 }
 
+/**
+ * The message as the signer will sign it: hex decoded when it is valid UTF-8, whatever
+ * its printability (scan 2026-10-23 F7 — the SIWE checks must read the bytes that get
+ * signed, not the hex fallback `messageText` shows for unprintable text).
+ */
+export function decodedMessage(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  if (!HEX.test(value)) return value
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(value.slice(2).match(/../g) ?? [], (b) => Number.parseInt(b, 16)))
+  } catch {
+    return null
+  }
+}
+
+/** Control characters other than tab / newline / carriage return — never part of an honest EIP-4361 message. */
+const HIDDEN_CONTROL = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/
+
 const err = (code: number, message: string): RelayError => ({ code, message })
 
 /** Signing method + params → what the window reviews, or the error to answer with. */
@@ -110,7 +128,11 @@ export function classifySignRequest(input: { network: EvmNetwork; method: string
     if (!ours(addr)) return err(RELAY_ERRORS.unauthorized, 'personal_sign for an address this wallet does not hold.')
     if (typeof msg !== 'string') return err(RELAY_ERRORS.invalidParams, 'personal_sign expects a message string.')
     const text = messageText(msg)
-    const siwe = input.origin ? describeSiwe(text, { origin: input.origin, account: checksum(addr), chainId: input.network.chainId, ...(input.via ? { via: input.via } : {}), ...(input.now !== undefined ? { now: input.now } : {}) }) : null
+    const signed = decodedMessage(msg) ?? text
+    const siwe = input.origin ? describeSiwe(signed, { origin: input.origin, account: checksum(addr), chainId: input.network.chainId, ...(input.via ? { via: input.via } : {}), ...(input.now !== undefined ? { now: input.now } : {}) }) : null
+    // A sign-in message with hidden control characters would show as an opaque hex blob while
+    // a lenient verifier still accepts it: refuse it outright.
+    if (siwe && HIDDEN_CONTROL.test(signed)) return err(RELAY_ERRORS.invalidParams, 'This sign-in message contains hidden control characters — refused.')
     return { kind: 'sign-message', method, account: checksum(addr), text, raw: msg, ...(siwe ? { siwe } : {}) }
   }
 
