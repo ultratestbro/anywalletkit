@@ -3,7 +3,9 @@ import type { SignerCurve } from '@anywalletkit/core'
 /** The chains a keyring account spans. */
 export type ChainKey = 'evm' | 'solana' | 'ton' | 'tron' | 'btc' | 'near' | 'zcash'
 
+/** How the keyring derives one chain's accounts from a seed. */
 export interface ChainSpec {
+  /** Curve of the chain's keys: `secp256k1` or `ed25519`. */
   curve: SignerCurve
   /**
    * Where the seed signer handed to the chain manager sits. The manager derives
@@ -31,8 +33,10 @@ export const CHAIN_SPECS: Readonly<Record<ChainKey, ChainSpec>> = Object.freeze(
   zcash: { curve: 'secp256k1', root: 'm', accountPath: (i) => `m/44'/133'/0'/0/${i}`, compatibleWith: 'transparent (t1…) receivers of Zashi, YWallet, Ledger, Trezor (BIP-44 coin 133, address index i)' },
 })
 
+/** Every chain key the keyring knows, in a fixed order. */
 export const CHAIN_KEYS = Object.keys(CHAIN_SPECS) as ChainKey[]
 
+/** Type guard: true when `value` is one of {@link CHAIN_KEYS}. */
 export function isChainKey(value: string): value is ChainKey {
   return Object.prototype.hasOwnProperty.call(CHAIN_SPECS, value)
 }

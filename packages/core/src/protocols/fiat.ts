@@ -4,25 +4,42 @@ import type { IWalletAccount, IWalletAccountReadOnly } from '../account.js'
 import { NotImplementedError } from '../errors.js'
 import { ProtocolBase } from './base.js'
 
+/** State of an on-ramp or off-ramp order at the provider. */
 export type FiatTransactionStatus = 'in_progress' | 'failed' | 'completed'
+/** An order's state and its assets, from {@link IFiatProtocol.getTransactionDetail}. */
 export interface FiatTransactionDetail { status: FiatTransactionStatus; cryptoAsset: string; fiatCurrency: string }
+/** A crypto asset the provider trades, by its own code and network code. */
 export interface SupportedCryptoAsset { code: string; networkCode: string; decimals: number; name?: string }
+/** A fiat currency the provider accepts (ISO 4217 code). */
 export interface SupportedFiatCurrency { code: string; decimals: number; name?: string }
+/** A country the provider serves, and in which directions. */
 export interface SupportedCountry { code: string; isBuyAllowed: boolean; isSellAllowed: boolean; name?: string }
 
+/** What to buy, with which currency, and where the crypto goes. */
 export interface BuyCommonOptions { cryptoAsset: string; fiatCurrency: string; recipient?: string }
+/** Buy exactly `cryptoAmount` (base units). */
 export interface BuyExactCryptoAmountOptions { cryptoAmount: bigint | number; fiatAmount?: never }
+/** Spend exactly `fiatAmount` (smallest fiat unit). */
 export interface BuyWithFiatAmountOptions { fiatAmount: bigint | number; cryptoAmount?: never }
+/** An on-ramp request with an exact crypto or an exact fiat amount. */
 export type BuyOptions = BuyCommonOptions & (BuyExactCryptoAmountOptions | BuyWithFiatAmountOptions)
+/** The provider's checkout URL; open it in a browser or web view. */
 export interface BuyResult { buyUrl: string }
 
+/** What to sell, for which currency, and where a failed order refunds. */
 export interface SellCommonOptions { cryptoAsset: string; fiatCurrency: string; refundAddress?: string }
+/** Sell exactly `cryptoAmount` (base units). */
 export interface SellExactCryptoAmountOptions { cryptoAmount: bigint | number; fiatAmount?: never }
+/** Receive exactly `fiatAmount` (smallest fiat unit). */
 export interface SellForFiatAmountOptions { fiatAmount: bigint | number; cryptoAmount?: never }
+/** An off-ramp request with an exact crypto or an exact fiat amount. */
 export type SellOptions = SellCommonOptions & (SellExactCryptoAmountOptions | SellForFiatAmountOptions)
+/** The provider's checkout URL for the sale. */
 export interface SellResult { sellUrl: string }
 
+/** A provider's price for a buy or sell. */
 export interface FiatQuote {
+  /** Crypto amount, base units. */
   cryptoAmount: bigint
   /** Smallest fiat unit (cents). */
   fiatAmount: bigint
@@ -32,6 +49,10 @@ export interface FiatQuote {
   rate: string
 }
 
+/**
+ * Interface for on-ramp and off-ramp providers: quotes, a hosted checkout URL, and order status.
+ * The SDK ships no fiat module yet.
+ */
 export interface IFiatProtocol {
   quoteBuy(options: BuyOptions): Promise<FiatQuote>
   buy(options: BuyOptions): Promise<BuyResult>
@@ -43,6 +64,7 @@ export interface IFiatProtocol {
   getSupportedCountries(): Promise<SupportedCountry[]>
 }
 
+/** Base class for fiat on/off-ramp modules. */
 export class FiatProtocol<TConfig extends object = Record<string, never>>
   extends ProtocolBase<TConfig>
   implements IFiatProtocol

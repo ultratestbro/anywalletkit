@@ -15,8 +15,16 @@ export type KnownWriteMethod =
   | 'signRaw' | 'signNep413' | 'signBuilt'
   | 'sendSerialized' | 'signCompiled' | 'signTransactionMessage'
   | 'revokeDelegation'
+/**
+ * A method name the policies may see: one of {@link KnownWriteMethod}, or any other name a chain
+ * package adds.
+ */
 export type WriteMethod = KnownWriteMethod | (string & {})
 
+/**
+ * The known write methods, wrapped on every account the kit hands out. Names outside this list are
+ * still guarded when they start with one of {@link GUARDED_PREFIXES}.
+ */
 export const GUARDED_WRITES: readonly KnownWriteMethod[] = [
   'sendTransaction', 'transfer', 'signTransaction', 'sign',
   'signTypedData', 'signPermit', 'approve',
@@ -47,6 +55,10 @@ const PERMIT2_TYPES = new Set(['PermitSingle', 'PermitBatch', 'PermitTransferFro
 const MAX_UINT256 = (1n << 256n) - 1n
 const MAX_UINT160 = (1n << 160n) - 1n
 
+/**
+ * What a write does, as the policies classify it. The kind decides which rules apply: lists and fee
+ * cap for `send`, a spender check for `approval`, `confirm` only for messages.
+ */
 export type WriteKind =
   /** A transaction that moves value or calls a contract. */
   | 'send'
@@ -67,10 +79,13 @@ export type WriteKind =
 
 /** What a policy sees before a write goes out. Amounts in base units when known. */
 export interface WriteIntent {
+  /** CAIP-2 chain id of the account that writes. */
   chain: string
   /** Account address the write originates from. */
   from: string
+  /** The account method that was called. */
   method: WriteMethod
+  /** What the write does; see {@link WriteKind}. */
   kind: WriteKind
   /** Destination when it can be read off the call: recipient, called contract, or the SPENDER of an approval. Read off `to` / `recipient` as given (apps match on it); the lists use {@link WriteIntent.destinations}. */
   to?: string
@@ -104,6 +119,10 @@ export interface WriteIntent {
   message: boolean
 }
 
+/**
+ * Rules the kit checks before every signature and broadcast of an account it hands out. Keys of the
+ * per-chain records are CAIP-2 ids or namespace prefixes (`eip155`).
+ */
 export interface Policies {
   /** Per-chain fee cap in native base units; a quote above it throws before broadcast. */
   maxFee?: Record<string, bigint | number>
@@ -115,7 +134,15 @@ export interface Policies {
   confirm?: (intent: WriteIntent) => boolean | Promise<boolean>
 }
 
+/**
+ * Thrown before anything is signed when a write breaks a rule in {@link Policies}. A rejected
+ * `confirm` throws `UserRejectedError` from core instead.
+ */
 export class PolicyViolationError extends Error {
+  /**
+   * The rule that refused the write. `chain` means the account's chain id is unknown, so no rule
+   * could be matched.
+   */
   readonly policy: 'maxFee' | 'allowlist' | 'blocklist' | 'chain'
   constructor(policy: 'maxFee' | 'allowlist' | 'blocklist' | 'chain', message: string) {
     super(message)

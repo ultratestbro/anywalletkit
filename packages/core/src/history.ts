@@ -12,8 +12,11 @@
 /** A token movement inside a transaction. `token` is the chain's identifier (contract, mint, jetton master, TRC-20 contract); `null` = native coin. */
 export interface ChainTransfer {
   token: string | null
+  /** Sender of the movement. */
   from: string
+  /** Receiver of the movement. */
   to: string
+  /** Amount in base units. */
   amount: bigint
   /** Token standard when known (erc20, spl, token2022, jetton, trc20, nep141). Native transfers leave it undefined. */
   standard?: 'erc20' | 'erc721' | 'erc1155' | 'spl' | 'token2022' | 'jetton' | 'trc20' | 'nep141'
@@ -38,18 +41,22 @@ export interface ChainCall {
   method?: string
 }
 
+/** Whether a transaction is confirmed, failed (reverted) or still pending. */
 export type ChainTxStatus = 'confirmed' | 'failed' | 'pending'
 
 /** One transaction as seen from `address`, normalized across chains. */
 export interface ChainTx {
   /** CAIP-2 chain id. */
   chain: string
+  /** Transaction hash. */
   hash: string
   /** Unix seconds. */
   time: number
+  /** Whether it succeeded. */
   status: ChainTxStatus
   /** The address this history was fetched for (the wallet's own). */
   address: string
+  /** Sender (the fee payer). */
   from: string
   /** Primary destination: recipient of a transfer or the called contract. Null for contract creation / multi-destination. */
   to: string | null
@@ -67,12 +74,15 @@ export interface ChainTx {
   raw?: unknown
 }
 
+/** One page of an address's history from a {@link HistorySource}, newest first. */
 export interface HistoryPage {
+  /** Transactions, newest first. */
   items: ChainTx[]
   /** Opaque cursor for the next (older) page; absent when the source has no more. */
   cursor?: string
 }
 
+/** Paging and refresh options for {@link HistorySource.listActivity}. */
 export interface HistoryQuery {
   /** Resume from a cursor returned by a previous page. */
   cursor?: string
@@ -104,21 +114,31 @@ export type ActivityKind =
   | 'wrap' | 'unwrap'
   | 'contract' | 'unknown'
 
+/** An amount of one asset in an activity row. */
 export interface ActivityAsset {
   /** Chain token id as in `ChainTransfer.token`; null = native. */
   token: string | null
+  /** Amount in base units. */
   amount: bigint
   symbol?: string
   decimals?: number
 }
 
+/**
+ * One row of the activity feed, described for people: a kind, a title, what left and what arrived.
+ */
 export interface ActivityItem {
   /** `${chain}:${hash}` — unique across chains. */
   id: string
+  /** CAIP-2 chain id. */
   chain: string
+  /** Transaction hash. */
   hash: string
+  /** Unix seconds. */
   time: number
+  /** Whether the transaction succeeded. */
   status: ChainTxStatus
+  /** What happened, from the owner's side. */
   kind: ActivityKind
   /** Registry module name that recognized it (e.g. "@anywalletkit/protocol-lending-aave-evm"); undefined for the generic fallback. */
   protocol?: string
@@ -136,7 +156,9 @@ export interface ActivityItem {
   related?: { chain: string; hash: string }[]
   /** Source flagged it as spam / dust (unsolicited airdrop, zero-value transfer). The app hides these by default. */
   spam?: boolean
+  /** Network fee paid, native base units. */
   fee?: bigint
+  /** Link to the transaction in a block explorer. */
   explorerUrl?: string
 }
 

@@ -47,10 +47,12 @@ export abstract class WalletManager<TAccount extends IWalletAccount, TConfig ext
     return seed
   }
 
+  /** Same as the core {@link isValidSeedPhrase}. */
   static isValidSeedPhrase(seed: string): boolean {
     return isValidSeedPhrase(seed)
   }
 
+  /** Same as the core {@link getRandomSeedPhrase}. */
   static getRandomSeedPhrase(words: 12 | 24 = 24): string {
     return getRandomSeedPhrase(words)
   }
@@ -70,6 +72,7 @@ export abstract class WalletManager<TAccount extends IWalletAccount, TConfig ext
   abstract getAccount(index?: number): Promise<TAccount>
   /** Account at an explicit path. Cached per path. */
   abstract getAccountByPath(path: string): Promise<TAccount>
+  /** Current network fee rates at three speeds. */
   abstract getFeeRates(): Promise<FeeRates>
 
   /** Dispose every derived account and zeroize the seed; subclasses zeroize their own extras first, then call super. */

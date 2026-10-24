@@ -16,8 +16,10 @@ export type FeedCursorState = Record<string, SourceState>
 
 const PREFIX = 'fw1:'
 
+/** @internal Key of one (chain, address) source inside a feed cursor. */
 export const sourceKey = (chain: string, address: string): string => `${chain}|${address}`
 
+/** @internal Serialize cursor state into the opaque `fw1:` string the feed returns. */
 export function packCursor(state: FeedCursorState): string | undefined {
   const keys = Object.keys(state)
   if (keys.length === 0) return undefined
@@ -26,6 +28,10 @@ export function packCursor(state: FeedCursorState): string | undefined {
   return PREFIX + JSON.stringify(sorted)
 }
 
+/**
+ * Thrown by `history()` when the `cursor` passed back is not one the feed produced (edited,
+ * truncated or from another wallet build).
+ */
 export class InvalidCursorError extends Error {
   constructor(message = 'The cursor is not one this feed produced.') { super(message); this.name = 'InvalidCursorError' }
 }

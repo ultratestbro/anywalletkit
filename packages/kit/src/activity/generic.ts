@@ -19,6 +19,10 @@ export interface NativeAsset { symbol: string; decimals: number }
 /** Address → label, per CAIP-2 chain (EVM addresses compared case-insensitively). */
 export type KnownLabels = Record<string, Record<string, string>>
 
+/**
+ * Labels the generic describer uses when no module recognizes a transaction: known contract names,
+ * native coins, explorer links.
+ */
 export interface GenericDescribeOptions {
   /** Labels for contracts / counterparties the app trusts or names ("Uniswap v3 Router"), per chain. */
   known?: KnownLabels
@@ -34,8 +38,11 @@ export interface GenericActivityItem extends ActivityItem {
   approval?: { token: string; spender?: string; amount: bigint | null }
 }
 
+/** Selector of ERC-20 `approve(address,uint256)`. */
 export const ERC20_APPROVE = '0x095ea7b3'
+/** Selector of ERC-20 `transfer(address,uint256)`. */
 export const ERC20_TRANSFER = '0xa9059cbb'
+/** Selector of ERC-20 `transferFrom(address,address,uint256)`. */
 export const ERC20_TRANSFER_FROM = '0x23b872dd'
 /** Calls that are plain token transfers from the owner's point of view, not "contract calls". */
 const TRANSFER_SELECTORS: ReadonlySet<string> = new Set([ERC20_TRANSFER, ERC20_TRANSFER_FROM])

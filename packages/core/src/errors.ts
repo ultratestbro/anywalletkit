@@ -16,6 +16,7 @@ export class SignerError extends Error {
 
 /** A network call failed. `provider` names the endpoint so failover can skip it. */
 export class NetworkError extends Error {
+  /** Endpoint that failed, when known. */
   readonly provider: string | undefined
   constructor(message: string, options: { provider?: string; cause?: unknown } = {}) {
     super(message, options.cause !== undefined ? { cause: options.cause } : undefined)
@@ -26,7 +27,9 @@ export class NetworkError extends Error {
 
 /** The account cannot cover amount + fee. Both in base units. */
 export class InsufficientFundsError extends Error {
+  /** Amount plus fee needed, in base units. */
   readonly required: bigint
+  /** What the account holds, in base units. */
   readonly available: bigint
   constructor(required: bigint, available: bigint, token = 'native') {
     super(`Insufficient ${token}: need ${required}, have ${available}`)

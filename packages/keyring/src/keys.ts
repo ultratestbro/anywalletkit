@@ -6,7 +6,9 @@ import { zeroize } from '@anywalletkit/core'
 import { CHAIN_SPECS, type ChainKey } from './chains.js'
 import { KeyringError } from './errors.js'
 
+/** A private key read by {@link parsePrivateKey}, bound to the chain it was parsed for. */
 export interface ParsedKey {
+  /** Chain the key was parsed for. */
   chain: ChainKey
   /** The 32-byte private key (secp256k1 scalar or ed25519 seed). The caller owns and zeroizes it. */
   privateKey: Uint8Array
@@ -127,7 +129,9 @@ function ed25519Seed(bytes: Uint8Array): Uint8Array {
 /** How an exported key is written — the format other wallets import and `parsePrivateKey` reads back. */
 export type PrivateKeyFormat = 'hex' | 'wif' | 'base58' | 'near'
 
+/** A private key written for export by {@link formatPrivateKey}. */
 export interface FormattedPrivateKey {
+  /** How `value` is written. */
   format: PrivateKeyFormat
   /** The key as text. Show it once behind authentication; never log or persist it. */
   value: string

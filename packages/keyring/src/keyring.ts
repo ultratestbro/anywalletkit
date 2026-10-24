@@ -23,7 +23,9 @@ import { formatPrivateKey, keyFingerprint, parsePrivateKey, publicKeyOf, type Pr
 
 /** Public keyring metadata — names, addresses, flags. Never a secret. Plain storage is fine. */
 export interface KeyringStorage {
+  /** The stored state, or `null` on first run. */
   load(): Promise<KeyringState | null>
+  /** Persist the state after every change. */
   save(state: KeyringState): Promise<void>
 }
 
@@ -33,18 +35,28 @@ export interface KeyringStorage {
  * it and drops it right after; it never caches one.
  */
 export interface SecretStorage {
+  /**
+   * The source's secret, or `null` when it is missing (the keyring then throws `secret-missing`).
+   */
   get(sourceId: string): Promise<string | null>
+  /** Store a new source's secret. Called once, when the source is created or imported. */
   set(sourceId: string, secret: string): Promise<void>
+  /** Delete the secret when the source is removed. */
   delete(sourceId: string): Promise<void>
 }
 
 // ---- State ----
 
+/** What a source holds: a BIP-39 seed phrase, one imported private key, or TON-native 24 words. */
 export type SourceType = 'mnemonic' | 'privateKey' | 'tonMnemonic'
 
+/** One key source as stored in public metadata. Never contains the secret. */
 export interface SourceMeta {
+  /** Stable id, also the key of the source's secret in `SecretStorage`. */
   id: string
+  /** What the source holds. */
   type: SourceType
+  /** Name shown to the user. */
   label: string
   /** Duplicate check: BIP-32 master fingerprint (+ passphrase) for a seed, chain + public-key hash for a key. */
   fingerprint: string
@@ -52,25 +64,41 @@ export interface SourceMeta {
   chain?: ChainKey
   /** mnemonic: a BIP-39 passphrase is part of the secret (the flag only, never the value). */
   hasPassphrase?: boolean
+  /** Unix milliseconds when it was created or imported. */
   createdAt: number
 }
 
+/**
+ * One account as stored in public metadata: its name, flags and addresses on every chain. Reading
+ * it never touches a secret.
+ */
 export interface AccountMeta {
   /** `<sourceId>/<index>` for a seed account, `<sourceId>` for a single-key one. */
   id: string
+  /** Source the account belongs to. */
   sourceId: string
   /** BIP-44 account index; null for a single-key account. */
   index: number | null
+  /** Name shown to the user (1–64 characters). */
   name: string
+  /** Hidden accounts are left out of `listAccounts()` unless `includeHidden` is set. */
   hidden: boolean
   /** Public addresses per registered chain, computed once at creation. */
   addresses: Partial<Record<ChainKey, string>>
 }
 
+/**
+ * Everything the keyring stores through `KeyringStorage`: sources, accounts and the active account.
+ * Contains no secrets.
+ */
 export interface KeyringState {
+  /** Format version; `Keyring.load` refuses any other. */
   version: 1
+  /** Every key source. */
   sources: SourceMeta[]
+  /** Every account, hidden ones included. */
   accounts: AccountMeta[]
+  /** The account the app shows, or `null` when there is none. */
   activeAccountId: string | null
 }
 
@@ -80,13 +108,19 @@ export interface KeyringState {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type KeyringManagerClass = new (seedOrSigner: string | Uint8Array | Signer, config: any) => WalletManager<IWalletAccount, object>
 
+/** One chain registered with the keyring: the chain package's manager class and its config. */
 export interface KeyringChain {
+  /** The chain package's manager class, for example `WalletManagerEvm`. */
   Manager: KeyringManagerClass
+  /** Passed to the manager as is (RPC endpoints, network). */
   config?: object
 }
 
+/** Options for {@link Keyring.load}. */
 export interface KeyringOptions {
+  /** Where public metadata is kept. */
   storage: KeyringStorage
+  /** Where each source's secret is kept: secure storage behind biometrics. */
   secrets: SecretStorage
   /** Chains every seed account spans, e.g. `{ evm: { Manager: WalletManagerEvm, config } }`. */
   chains: Partial<Record<ChainKey, KeyringChain>>
@@ -94,7 +128,9 @@ export interface KeyringOptions {
 
 /** An account on one chain, live until `dispose()` — which zeroizes the key material it holds. */
 export interface AccountHandle<A extends IWalletAccount = IWalletAccount> {
+  /** The live account. Do not use it after `dispose()`. */
   account: A
+  /** Zeroize the key material behind the account. */
   dispose(): void
 }
 
@@ -130,6 +166,12 @@ export class Keyring {
     this._state = state
   }
 
+  /**
+   * Open the keyring: read the stored state (or start empty) and remember the chains.
+   *
+   * @throws {@link KeyringError} `invalid-input` when no chain is registered, `unsupported` for a
+   * stored state of an unknown version.
+   */
   static async load(options: KeyringOptions): Promise<Keyring> {
     if (Object.keys(options.chains).length === 0) throw new KeyringError('Register at least one chain.')
     const stored = await options.storage.load()
@@ -144,24 +186,36 @@ export class Keyring {
     return clone(this._state)
   }
 
+  /** The chains registered in {@link KeyringOptions.chains}. */
   get chains(): ChainKey[] {
     return Object.keys(this._chains) as ChainKey[]
   }
 
+  /** Every key source, without secrets. */
   listSources(): SourceMeta[] {
     return clone(this._state.sources)
   }
 
+  /**
+   * Accounts in creation order, without secrets. Hidden ones only with `includeHidden`; pass
+   * `sourceId` for one source's accounts.
+   */
   listAccounts(options: { includeHidden?: boolean; sourceId?: string } = {}): AccountMeta[] {
     return clone(
       this._state.accounts.filter((a) => (options.includeHidden || !a.hidden) && (options.sourceId === undefined || a.sourceId === options.sourceId)),
     )
   }
 
+  /**
+   * One account's metadata.
+   *
+   * @throws {@link KeyringError} `not-found` for an unknown id.
+   */
   getAccountMeta(accountId: string): AccountMeta {
     return clone(this.account(accountId))
   }
 
+  /** The account the app shows, or `null` when the keyring is empty. */
   get activeAccount(): AccountMeta | null {
     const a = this._state.accounts.find((x) => x.id === this._state.activeAccountId)
     return a ? clone(a) : null
@@ -399,6 +453,12 @@ export class Keyring {
     return found.length ? this.store(source, found) : []
   }
 
+  /**
+   * Rename an account. The name is trimmed.
+   *
+   * @throws {@link KeyringError} `invalid-input` when the name is empty or longer than 64
+   * characters.
+   */
   async renameAccount(accountId: string, name: string): Promise<void> {
     const trimmed = name.trim()
     if (!trimmed || trimmed.length > 64) throw new KeyringError('An account name is 1–64 characters.')
@@ -417,6 +477,11 @@ export class Keyring {
     })
   }
 
+  /**
+   * Make an account the active one.
+   *
+   * @throws {@link KeyringError} `unsupported` when the account is hidden.
+   */
   async setActiveAccount(accountId: string): Promise<void> {
     await this.mutate(async (state) => {
       const a = this.account(accountId)
@@ -623,6 +688,10 @@ export class Keyring {
   }
 }
 
+/**
+ * Options for {@link Keyring.discoverAccounts}: how to tell a used account and when to stop
+ * probing.
+ */
 export interface DiscoverOptions {
   /** Whether account `index` (its addresses per chain) has balance or history. The app supplies it — the SDK has no indexer. */
   isUsed: (addresses: Partial<Record<ChainKey, string>>, index: number) => Promise<boolean>

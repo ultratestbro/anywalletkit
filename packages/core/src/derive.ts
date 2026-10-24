@@ -3,9 +3,13 @@ import { hmac } from '@noble/hashes/hmac.js'
 import { sha512 } from '@noble/hashes/sha2.js'
 import { ed25519 } from '@noble/curves/ed25519.js'
 
+/** A key derived from a seed at one path. The caller owns `privateKey` and should zeroize it. */
 export interface DerivedKey {
+  /** 32-byte private key (secp256k1 scalar or ed25519 seed). */
   privateKey: Uint8Array
+  /** Compressed 33-byte secp256k1 or 32-byte ed25519 public key. */
   publicKey: Uint8Array
+  /** The path it was derived at. */
   path: string
 }
 

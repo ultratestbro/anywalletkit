@@ -42,9 +42,15 @@ import { deriveEd25519, deriveSecp256k1 } from './derive.js'
 import { SignerError } from './errors.js'
 import { zeroize } from './mnemonic.js'
 
+/**
+ * The two curves the SDK signs on: secp256k1 (EVM, Bitcoin, Tron, Zcash) and ed25519 (Solana, TON,
+ * NEAR).
+ */
 export type SignerCurve = 'secp256k1' | 'ed25519'
+/** How a payload is signed; see the scheme table in this module's summary. */
 export type SignScheme = 'ecdsa-recoverable' | 'ecdsa' | 'schnorr' | 'ed25519'
 
+/** Per-call options for {@link Signer.sign}. */
 export interface SignOptions {
   /** Defaults to {@link defaultScheme} for the signer's curve. */
   scheme?: SignScheme
@@ -62,12 +68,19 @@ export interface SignOptions {
   tweak?: Uint8Array
 }
 
+/**
+ * Turns bytes into signatures; the only object that may hold a private key. Implement it to plug in
+ * a hardware wallet, MPC or a backend, or use {@link LocalSigner}, {@link privateKeySigner} or
+ * {@link externalSigner}.
+ */
 export interface Signer {
+  /** Where the key lives: derived from a seed, one imported key, or outside the SDK. */
   readonly kind: 'seed' | 'key' | 'external'
   /** The curve this signer signs with. Chain packages assert the one they need. */
   readonly curve: SignerCurve
   /** Schemes this signer can produce; asking for another throws `SignerError`. */
   readonly schemes: readonly SignScheme[]
+  /** Compressed 33-byte secp256k1 or 32-byte ed25519 public key. */
   getPublicKey(): Promise<Uint8Array>
   /** Sign an already-hashed or already-serialised payload. Chains decide what the bytes are. */
   sign(payload: Uint8Array, options?: SignOptions): Promise<Uint8Array>
@@ -155,9 +168,13 @@ const LOCAL_SECRETS = new WeakMap<LocalSigner, { privateKey: Uint8Array | undefi
  */
 export class LocalSigner implements SeedSigner {
   readonly kind = 'seed' as const
+  /** Curve of the key. */
   readonly curve: SignerCurve
+  /** Derivation path of this key. */
   readonly path: string
+  /** Public key, available without a call. */
   readonly publicKey: Uint8Array
+  /** Every scheme a local key on this curve can produce. */
   readonly schemes: readonly SignScheme[]
 
   private constructor(curve: SignerCurve, privateKey: Uint8Array, publicKey: Uint8Array, path: string, seed?: Uint8Array) {
@@ -200,11 +217,18 @@ export class LocalSigner implements SeedSigner {
     return { kind: this.kind, curve: this.curve, path: this.path, publicKey: bytesToHex(this.publicKey) }
   }
 
+  /** The public key; same as {@link LocalSigner.publicKey}. */
   async getPublicKey(): Promise<Uint8Array> {
     this.key()
     return this.publicKey
   }
 
+  /**
+   * Sign `payload` with the requested scheme (the curve's default when omitted).
+   *
+   * @throws {@link SignerError} after `dispose()`, for a scheme this curve cannot produce, a
+   * payload of the wrong length, or a `tweak` outside `schnorr`.
+   */
   async sign(payload: Uint8Array, options: SignOptions = {}): Promise<Uint8Array> {
     const key = this.key()
     const scheme = resolveScheme(this, options.scheme)
@@ -239,6 +263,12 @@ export class LocalSigner implements SeedSigner {
     }
   }
 
+  /**
+   * A child signer at `path/relativePath` that keeps a seed copy and can derive further.
+   *
+   * @throws {@link SignerError} when this signer has no seed (built with `fromPrivateKey` or
+   * `leafFromSeed`) or was disposed.
+   */
   async derive(relativePath: string): Promise<LocalSigner> {
     this.key()
     const seed = LOCAL_SECRETS.get(this)?.seed
@@ -255,6 +285,7 @@ export class LocalSigner implements SeedSigner {
     return LocalSigner.leafFromSeed(seed, this.curve, rel ? `${this.path}/${rel}` : this.path)
   }
 
+  /** Zeroize the private key and any seed copy. Idempotent; signing afterwards throws. */
   dispose(): void {
     const secrets = LOCAL_SECRETS.get(this)
     zeroize(secrets?.privateKey, secrets?.seed)
@@ -262,13 +293,20 @@ export class LocalSigner implements SeedSigner {
   }
 }
 
+/**
+ * Options for {@link externalSigner}: the key's curve and public key, and the function that asks
+ * your backend, device or user for a signature.
+ */
 export interface ExternalSignerOptions {
+  /** Curve of the key. */
   curve: SignerCurve
+  /** The key's public key (33-byte compressed secp256k1 or 32-byte ed25519). */
   publicKey: Uint8Array
   /** Schemes the backend can produce. Defaults to the curve's default scheme only. */
   schemes?: readonly SignScheme[]
   /** Called with the resolved scheme (never undefined). Throw `UserRejectedError` when the user declines. */
   sign: (payload: Uint8Array, options: SignOptions & { scheme: SignScheme }) => Promise<Uint8Array>
+  /** Called once by the signer's `dispose()`. */
   dispose?: () => void
 }
 

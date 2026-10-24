@@ -10,6 +10,7 @@
  * letters, punycode).
  */
 
+/** Why a name lookup failed. Each code maps to one message a wallet can show. */
 export type NameErrorCode =
   /** Not a valid name for this resolver (normalization failed, bad labels). */
   | 'invalid-name'
@@ -24,6 +25,7 @@ export type NameErrorCode =
   /** Re-resolution right before signing returned a different address. */
   | 'changed'
 
+/** Thrown by name resolvers with a machine-readable {@link NameErrorCode}. */
 export class NameError extends Error {
   override readonly name = 'NameError'
   constructor(
@@ -35,7 +37,12 @@ export class NameError extends Error {
   }
 }
 
+/** Something about a name the user should see before sending to it. */
 export interface NameWarning {
+  /**
+   * `mixed-script`: letters from several scripts; `confusable`: letters that look like others
+   * (Cyrillic а for Latin a); `punycode`: an `xn--` label.
+   */
   code: 'mixed-script' | 'confusable' | 'punycode'
   /** The label the warning is about. */
   label: string
@@ -43,6 +50,7 @@ export interface NameWarning {
   message: string
 }
 
+/** A name resolved for one chain, with the warnings to show next to it. */
 export interface ResolvedName {
   /** The normalized name that was resolved. */
   name: string
@@ -52,9 +60,14 @@ export interface ResolvedName {
   address: string
   /** Which resolver answered (`ens`, `sns`, …). */
   resolver: string
+  /** Warnings to show; empty when none. */
   warnings: NameWarning[]
 }
 
+/**
+ * Turns names into addresses for one chain and back. `names-ens` implements it; {@link
+ * nameResolvers} combines several.
+ */
 export interface NameResolver {
   /** Resolver id, e.g. `ens`. */
   readonly id: string

@@ -9,6 +9,10 @@
  */
 const EXACT = 1n << 53n
 
+/**
+ * Convert a bigint to a Number, correct on every engine including Hermes. Use it for display and
+ * pricing; never for amounts you sign.
+ */
 export function bigintToNumber(value: bigint): number {
   const negative = value < 0n
   const magnitude = negative ? -value : value

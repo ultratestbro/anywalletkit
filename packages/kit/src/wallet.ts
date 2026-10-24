@@ -14,7 +14,11 @@ interface WalletRegistration<M extends WalletManager<IWalletAccount, object>, C 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface ProtocolRegistration { Protocol: ProtocolClass<unknown, any>; chain: string; config: unknown }
 
+/** Options for {@link Wallet}. */
 export interface WalletOptions {
+  /**
+   * Safety rules applied to every account and protocol the wallet hands out; see {@link Policies}.
+   */
   policies?: Policies
   /** Activity feed options: known-contract labels per chain, native coins, error hook, pending-intent TTL. */
   activity?: ActivityOptions

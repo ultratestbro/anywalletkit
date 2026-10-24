@@ -12,19 +12,30 @@ import type { Intent, IntentJournal } from './journal.js'
 
 /** A protocol module as the feed sees it: a name for error reports and the pure `describeActivity`. */
 export interface ActivityRecognizer {
+  /** Module name, used in error reports. */
   name: string
+  /**
+   * The module's `describeActivity`: an item when the module recognizes the transaction, `null`
+   * otherwise. Must be pure.
+   */
   describe(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null
 }
 
+/** One isolated failure while building a feed page. The rest of the page is still returned. */
 export interface ActivityErrorReport {
+  /** Where it failed: reading a history source, a recognizer that threw, or the intent journal. */
   stage: 'source' | 'recognizer' | 'journal'
+  /** Chain of the failing source, when it was a source. */
   chain?: string
+  /** Address of the failing source, when it was a source. */
   address?: string
   /** Recognizer name (registered protocol name) for `recognizer` failures. */
   module?: string
+  /** What was thrown. */
   error: unknown
 }
 
+/** Options for the activity feed, set once with `WalletOptions.activity`. */
 export interface ActivityOptions extends GenericDescribeOptions {
   /** Called for every isolated failure (a source that errored, a recognizer that threw, a journal write that failed). Failures also ride in `HistoryFeedPage.errors`. */
   onError?: (report: ActivityErrorReport) => void
@@ -36,8 +47,13 @@ export interface ActivityOptions extends GenericDescribeOptions {
   maxEmptyHops?: number
 }
 
+/** One (chain, address) pair the feed reads history for. */
 export interface FeedAddress { chain: string; address: string }
 
+/**
+ * Query for `wallet.history()`: which addresses and chains, the page size and the cursor from the
+ * previous page.
+ */
 export interface HistoryFeedQuery {
   /** Which (chain, address) pairs to read. Default: account `index` on every chain with a history source. */
   addresses?: FeedAddress[]
@@ -61,7 +77,9 @@ export interface FeedItem extends GenericActivityItem {
   intentId?: string
 }
 
+/** One page of the activity feed, newest first. */
 export interface HistoryFeedPage {
+  /** Rows of this page, newest first, with readable titles. */
   items: FeedItem[]
   /** Pass back to get the next (older) page; absent when every source is exhausted. */
   cursor?: string
@@ -69,6 +87,10 @@ export interface HistoryFeedPage {
   errors?: ActivityErrorReport[]
 }
 
+/**
+ * @internal Everything {@link buildFeed} reads; the kit assembles it from the wallet's
+ * registrations.
+ */
 export interface FeedInput {
   sources: ReadonlyMap<string, HistorySource>
   addresses: FeedAddress[]

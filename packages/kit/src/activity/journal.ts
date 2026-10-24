@@ -11,16 +11,27 @@
  */
 import type { ActivityAsset, ActivityKind } from '@anywalletkit/core'
 
+/**
+ * Where an intent is: `pending` until its transactions are seen, then `confirmed`, or `failed` when
+ * it waited longer than `pendingTtl` or a leg failed.
+ */
 export type IntentStatus = 'pending' | 'confirmed' | 'failed'
 
+/**
+ * One user action as the app saw it when it broadcast: kind, chain, the hashes it produced and what
+ * it expected to move. The feed shows it as a pending row and merges it into the on-chain rows once
+ * they appear.
+ */
 export interface Intent {
   /** App-chosen, unique: a UUID, or the provider's own id (1Click deposit address, LI.FI route id…). Emitted as `intent:<id>` while pending. */
   id: string
+  /** What the user did: `swap`, `bridge`, `send`, `supply`… */
   kind: ActivityKind
   /** Unix seconds when the user confirmed the action. */
   createdAt: number
   /** Chain the action started on (CAIP-2) and the wallet address that signed. */
   chain: string
+  /** Wallet address that signed. */
   address: string
   /** Every transaction hash this action produced or expects, source leg first. A cross-chain swap lists both legs once known. */
   hashes: Array<{ chain: string; hash: string }>
@@ -32,14 +43,20 @@ export interface Intent {
   subtitle?: string
   /** Other legs that are not this wallet's own transactions (a relayer's fill, a destination deposit). */
   related?: Array<{ chain: string; hash: string }>
+  /** Current state; the feed updates it as rows arrive. */
   status: IntentStatus
 }
 
+/**
+ * Storage for intents, implemented by the app (SQLite, AsyncStorage, a file). Pass it to
+ * `wallet.setIntentJournal()`; `createMemoryIntentJournal()` is the in-memory one.
+ */
 export interface IntentJournal {
   /** Every intent the app still wants in the feed (pending, and confirmed ones until the app prunes them). */
   list(): Promise<Intent[]>
   /** Insert or replace by `id`. */
   put(intent: Intent): Promise<void>
+  /** Delete by `id`; the app calls it to prune old confirmed intents. */
   remove(id: string): Promise<void>
 }
 
