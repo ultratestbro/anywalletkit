@@ -1,5 +1,14 @@
 # @anywalletkit/protocol-lending-aave-evm
 
+## 0.2.2
+
+### Patch Changes
+
+- e4083a3: npm metadata for the first public release: repository (with the package directory), homepage, bugs and publishConfig { access: public, provenance: true }; LICENSE inside every package; READMEs for core, conformance, protocol-swap2-core, swap2-assets and tx-preview-evm; descriptions for protocol-swap2-core and swap2-assets.
+- Updated dependencies [4b6d97f]
+- Updated dependencies [e4083a3]
+  - @anywalletkit/core@0.3.0
+
 ## 0.2.1
 
 ### Patch Changes

@@ -1,5 +1,23 @@
 # @anywalletkit/protocol-swap2-balancer
 
+## 0.1.2
+
+### Patch Changes
+
+- e4083a3: npm metadata for the first public release: repository (with the package directory), homepage, bugs and publishConfig { access: public, provenance: true }; LICENSE inside every package; READMEs for core, conformance, protocol-swap2-core, swap2-assets and tx-preview-evm; descriptions for protocol-swap2-core and swap2-assets.
+- Updated dependencies [4b6d97f]
+- Updated dependencies [e4083a3]
+- Updated dependencies [0d68fda]
+- Updated dependencies [6568e08]
+- Updated dependencies [06cecff]
+- Updated dependencies [24b888a]
+- Updated dependencies [bdc77c2]
+- Updated dependencies [4fcb9b6]
+- Updated dependencies [d08e37e]
+  - @anywalletkit/core@0.3.0
+  - @anywalletkit/protocol-swap2-core@0.3.0
+  - @anywalletkit/swap2-assets@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes

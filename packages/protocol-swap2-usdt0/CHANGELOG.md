@@ -1,5 +1,27 @@
 # @anywalletkit/protocol-swap2-usdt0
 
+## 0.1.1
+
+### Patch Changes
+
+- e4083a3: npm metadata for the first public release: repository (with the package directory), homepage, bugs and publishConfig { access: public, provenance: true }; LICENSE inside every package; READMEs for core, conformance, protocol-swap2-core, swap2-assets and tx-preview-evm; descriptions for protocol-swap2-core and swap2-assets.
+- d08e37e: USDT0 no longer puts raw viem transport errors into refusal reasons or preflight errors. Those errors carry `URL: …`, which includes the key of a keyed RPC.
+  
+  - **USDT0:** an RPC failure becomes `usdt0: RPC for <chain> unavailable — try again`, and any other text loses its URLs.
+  - **swap2-core:** new `redactUrls()`. Servers that forward refusal text to clients should pass it through this.
+- Updated dependencies [4b6d97f]
+- Updated dependencies [e4083a3]
+- Updated dependencies [0d68fda]
+- Updated dependencies [6568e08]
+- Updated dependencies [06cecff]
+- Updated dependencies [24b888a]
+- Updated dependencies [bdc77c2]
+- Updated dependencies [4fcb9b6]
+- Updated dependencies [d08e37e]
+  - @anywalletkit/core@0.3.0
+  - @anywalletkit/protocol-swap2-core@0.3.0
+  - @anywalletkit/swap2-assets@0.1.2
+
 ## 0.1.0
 
 ### Minor Changes

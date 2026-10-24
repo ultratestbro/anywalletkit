@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/secure-storage-react-native",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Device secret storage for React Native wallets on Any Wallet Kit: every secret in the iOS Keychain behind a Secure Enclave–checked access control or under an Android Keystore key in StrongBox / TEE that needs the user for every single read. Face ID or the device passcode by default, an opt-in strict mode (current biometrics only, dies when biometrics change), this device only, never in backups, a named biometry-changed error instead of a crash, prune after reinstall and a verified migration from any older store. Implements the keyring SecretStorage.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

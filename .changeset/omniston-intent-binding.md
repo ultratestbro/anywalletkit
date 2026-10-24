@@ -1,5 +1,0 @@
----
-"@anywalletkit/protocol-swap2-omniston": patch
----
-
-The HTLC secret is released only against the context bound when the quote was minted, never against trader/dest taken from the caller's intentId (scan F3/F15). `getQuote` now stores `trader`, `dest`, `srcChain` and `kind` with the cached quote (and the EVM order re-save carries them forward); `buildDeposit`, `registerSignedOrder` and `trackIntent` refuse an intentId whose fields differ (`omniston: intent id does not match the quote it was issued for (<field>)`, trace `intent-mismatch`) and hand only the stored values — and, for EVM-source orders, the signed order's owner — to the position validators, `orderTrack` and the delivery locators. Entries cached before this release carry no binding: they fall back to the signed owner / decoded values with a `legacy-intent` trace for at most 6 h. Status reads without a cached context (completed, expired, swap-kind) are unchanged. A second build of the same quoteId reuses the stored HTLC secret instead of overwriting it, and a failed build clears the secret only if it created it. The intentId format is unchanged.

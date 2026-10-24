@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/wallet-solana",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Solana wallet for Any Wallet Kit: SLIP-10 m/44'/501'/i'/0' accounts, SOL and SPL transfers with ATA creation, noble ed25519 signing (no WebCrypto needed), built on @solana/kit.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
