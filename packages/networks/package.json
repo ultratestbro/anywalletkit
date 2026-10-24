@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/networks",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Networks for Any Wallet Kit wallets: the catalog of mainnets with public RPC failover lists, default testnets for every chain family, user-added networks and custom RPCs (NetworksTable over any JSON storage), per-family endpoint verification (chain id / genesis / global id must match) and the http-only-for-local-nodes URL policy. Shared by the mobile app and the extension kit.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

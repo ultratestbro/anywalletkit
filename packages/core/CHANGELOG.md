@@ -1,5 +1,11 @@
 # @anywalletkit/core
 
+## 0.3.1
+
+### Patch Changes
+
+- 65c3bca: First release through npm trusted publishing: published from the release workflow over GitHub OIDC, with no npm token anywhere. No code change in this package beyond what its other changesets list.
+
 ## 0.3.0
 
 ### Minor Changes

@@ -1,5 +1,16 @@
 # @anywalletkit/protocol-swap2-core
 
+## 0.3.1
+
+### Patch Changes
+
+- 6b164bd: The engine accepts the genesis-hash chain ids the wallet packages report (`solana:5eykt…`, `tron:0x2b6653dc`, `bip122:000000000019d6689c085ae165831e93`) as `fromChain`, `toChain` and the account's chain, and maps them to the swap2 ids (`solana:mainnet`, `tron:728126428`, `bitcoin:mainnet`). Previously `fromChain: account.chain` with a Solana, Tron or Bitcoin account found no route, and the short id failed the account-chain check, so an SDK account could not swap from those chains. `swap2ChainId()` and `SWAP2_CHAIN_ALIASES` are exported.
+- 65c3bca: First release through npm trusted publishing: published from the release workflow over GitHub OIDC, with no npm token anywhere. No code change in this package beyond what its other changesets list.
+- Updated dependencies [65c3bca]
+  - @anywalletkit/core@0.3.1
+  - @anywalletkit/swap2-assets@0.1.3
+  - @anywalletkit/tx-preview-evm@0.1.2
+
 ## 0.3.0
 
 ### Minor Changes

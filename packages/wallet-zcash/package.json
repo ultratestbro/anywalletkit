@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/wallet-zcash",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Zcash wallet for Any Wallet Kit: transparent t-addresses (BIP-44 coin 133), v5 transactions with ZIP-244 signature hashing, ZIP-317 fees, Blockchair / Blockbook transports. Shielded pools are out of scope.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/wallet-ton",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "TON wallet for Any Wallet Kit: SLIP-10 m/44'/607'/i' accounts on WalletContractV5R1, TON and jetton transfers, toncenter failover.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

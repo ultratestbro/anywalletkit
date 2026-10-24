@@ -1,5 +1,15 @@
 # @anywalletkit/runtime-hermes
 
+## 0.2.0
+
+### Minor Changes
+
+- 294319e: `@anywalletkit/runtime-hermes/fast-pbkdf2`: a pure-JS drop-in for the native `react-native-fast-pbkdf2` module that `@ton/crypto-primitives` (under `wallet-ton`) requires on Metro. Resolve the module to it in `metro.config.js` and the bundle builds without a native dependency, and TON 24-word mnemonic imports work on the device instead of failing on a throwing stub.
+
+### Patch Changes
+
+- 65c3bca: First release through npm trusted publishing: published from the release workflow over GitHub OIDC, with no npm token anywhere. No code change in this package beyond what its other changesets list.
+
 ## 0.1.1
 
 ### Patch Changes

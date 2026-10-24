@@ -1,5 +1,14 @@
 # @anywalletkit/protocol-staking-lido-evm
 
+## 0.3.2
+
+### Patch Changes
+
+- 6c4f606: The account types these modules take no longer declare a public `_config`. A `wallet-evm` account keeps its RPC in a protected `_config`, so `new LidoProtocolEvm(account)` (and SSV, Mellow, Approvals) with a real `WalletAccountEvm` or `WalletAccountReadOnlyEvm` failed to type-check — only the loosely typed `wallet.registerProtocol` path compiled. The modules still pick up the account's RPC when `config.provider` is absent.
+- 65c3bca: First release through npm trusted publishing: published from the release workflow over GitHub OIDC, with no npm token anywhere. No code change in this package beyond what its other changesets list.
+- Updated dependencies [65c3bca]
+  - @anywalletkit/core@0.3.1
+
 ## 0.3.1
 
 ### Patch Changes
