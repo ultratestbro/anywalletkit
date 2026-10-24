@@ -1,11 +1,13 @@
 /**
  * Message shapes on the two hops between a dApp and the wallet:
  *
- *   page (injected provider, MAIN world)
- *     │ window.postMessage — {@link PageRequest} ⇄ {@link PageResponse} / {@link PageEvent}
- *   content script (isolated world) — stamps `location.origin`, owns the port
- *     │ chrome.runtime.connect(PORT_NAME) — {@link RelayRequest} ⇄ {@link RelayResponse} / {@link RelayEvent}
- *   service worker — trusts `port.sender` (set by the browser), never the page
+ * ```text
+ * page (injected provider, MAIN world)
+ *   │ window.postMessage — PageRequest ⇄ PageResponse / PageEvent
+ * content script (isolated world) — stamps `location.origin`, owns the port
+ *   │ chrome.runtime.connect(PORT_NAME) — RelayRequest ⇄ RelayResponse / RelayEvent
+ * service worker — trusts `port.sender` (set by the browser), never the page
+ * ```
  *
  * The page can forge anything it posts, so a page message carries no origin and
  * no identity: the content script adds the origin, and the service worker

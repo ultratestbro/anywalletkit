@@ -39,12 +39,14 @@ type Describer = { describeActivity?: (tx: ChainTx, ctx: DescribeActivityContext
  * its own copy of the bytes. Pass the seed bytes instead of the phrase to never
  * hand the words to the SDK at all.
  *
- *   const w = new Wallet(seed, { policies: { maxFee: { 'eip155:1': 10n ** 16n } } })
- *   w.registerWallet('eip155', WalletManagerEvm, { provider: RPC })
- *   w.registerWallet('solana', WalletManagerSolana, { provider: SOL_RPC })
- *   w.registerProtocol('lido', LidoProtocolEvm, { chain: 'eip155:1' })
- *   const eth = await w.getAccount('eip155:1')
- *   const lido = await w.getProtocol<LidoProtocolEvm>('lido')
+ * ```ts
+ * const w = new Wallet(seed, { policies: { maxFee: { 'eip155:1': 10n ** 16n } } })
+ * w.registerWallet('eip155', WalletManagerEvm, { provider: RPC })
+ * w.registerWallet('solana', WalletManagerSolana, { provider: SOL_RPC })
+ * w.registerProtocol('lido', LidoProtocolEvm, { chain: 'eip155:1' })
+ * const eth = await w.getAccount('eip155:1')
+ * const lido = await w.getProtocol<LidoProtocolEvm>('lido')
+ * ```
  */
 export class Wallet {
   private readonly _signer: Signer | undefined

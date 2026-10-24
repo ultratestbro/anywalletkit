@@ -3,9 +3,11 @@
  * expect. Everything the SDK needs is installed by ONE call, at app entry,
  * before any chain package is imported:
  *
- *   import 'react-native-get-random-values'            // app's job: secure randomness
- *   import { installHermesRuntime } from '@anywalletkit/runtime-hermes'
- *   installHermesRuntime()
+ * ```ts
+ * import 'react-native-get-random-values'            // app's job: secure randomness
+ * import { installHermesRuntime } from '@anywalletkit/runtime-hermes'
+ * installHermesRuntime()
+ * ```
  *
  * Nothing here is imported by the SDK packages themselves — they stay
  * polyfill-free and this package stays optional for Node and browsers.

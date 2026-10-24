@@ -31,9 +31,11 @@ interface Built {
  * btc-signer-computed sighash — a {@link LocalSigner} for seed wallets, anything
  * else (hardware, MPC, backend) through `externalSigner()`:
  *
- *   p2wpkh input  → `ecdsa`              over the BIP-143 sighash (SIGHASH_ALL), DER-encoded here
- *   p2tr input    → `schnorr` + `tweak`  over the BIP-341 sighash (DEFAULT), tweak = TapTweak(xonly)
- *   BIP-137 msg   → `ecdsa-recoverable`  over the magic hash
+ * ```text
+ * p2wpkh input  → `ecdsa`              over the BIP-143 sighash (SIGHASH_ALL), DER-encoded here
+ * p2tr input    → `schnorr` + `tweak`  over the BIP-341 sighash (DEFAULT), tweak = TapTweak(xonly)
+ * BIP-137 msg   → `ecdsa-recoverable`  over the magic hash
+ * ```
  *
  * Every spend is resolved to a full description ("what you sign") and run through
  * the hard safety checks (fee-rate ceiling, recipient/amount exactness, change

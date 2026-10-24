@@ -15,18 +15,20 @@ import {Address, Cell, type Slice} from "@ton/core";
  * `tests/fixtures/live-ton-swaps-2026-10-22.json`) and cross-checked against
  * the protocols' own SDKs; anything else is refused by name:
  *
- *   STON.fi v2   jetton_transfer → router, forward swap#6664de2a; native input
- *                as pTON v2 ton_transfer#01f3835d to the router's pTON wallet;
- *                multi-hop = cross swap: a hop's receiver is the next router
- *                and its custom payload is the next swap#6664de2a.
- *   STON.fi v1   jetton_transfer → router, forward swap#25938561; native input
- *                as a jetton_transfer to the router's pTON v1 wallet whose
- *                destination is the router (STON.fi SDK v1 shape).
- *   DeDust v1    jetton_transfer → jetton vault, forward swap#e3a0d482; native
- *                vault swap#ea06185d. SwapStep + ^SwapParams.
- *   DeDust CPMM v2  native: pay_native#a5a7cbf8 to the pool; jetton:
- *                jetton_transfer → pool, forward pay_jetton#cbc33949. Payment
- *                payload swap#c442500f + extended payout config.
+ * ```text
+ * STON.fi v2   jetton_transfer → router, forward swap#6664de2a; native input
+ *              as pTON v2 ton_transfer#01f3835d to the router's pTON wallet;
+ *              multi-hop = cross swap: a hop's receiver is the next router
+ *              and its custom payload is the next swap#6664de2a.
+ * STON.fi v1   jetton_transfer → router, forward swap#25938561; native input
+ *              as a jetton_transfer to the router's pTON v1 wallet whose
+ *              destination is the router (STON.fi SDK v1 shape).
+ * DeDust v1    jetton_transfer → jetton vault, forward swap#e3a0d482; native
+ *              vault swap#ea06185d. SwapStep + ^SwapParams.
+ * DeDust CPMM v2  native: pay_native#a5a7cbf8 to the pool; jetton:
+ *              jetton_transfer → pool, forward pay_jetton#cbc33949. Payment
+ *              payload swap#c442500f + extended payout config.
+ * ```
  *
  * The decoder is pure (no network). Facts that need the chain — that an ask
  * wallet is the router's wallet of the quoted output, that a pool trades the

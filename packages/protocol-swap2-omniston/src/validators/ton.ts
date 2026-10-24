@@ -112,17 +112,19 @@ function cellFromApi(value: string): Cell {
  * resolver-created positions, 2026-10-15/16 — every field is checked in its
  * slot, nothing is located by search):
  *
- *   data: phase:uint8 quoteId:bits256 factory:MsgAddressStd
- *         jettonWallet:MsgAddressStd (the factory's wallet of the output
- *         jetton — custody stays there) flags:bits5
- *     ref0: owner:MsgAddressStd (resolver) jettonMaster:MsgAddressStd bits6
- *       ref0: fee profile (constant, not security-relevant)
- *       ref1: jettonWallet, gas, owner
- *     ref1: hashlock:bits256 amount:Coins withdrawalAt:uint64
- *           publicWithdrawalAt:uint64 cancellationAt:uint64
- *       ref0: recipient:MsgAddressStd resolver:MsgAddressStd deposit:Coins
- *       ref1: authority:(Maybe bits256) recipient:MsgAddressStd
- *     ref2: escrow code cell
+ * ```text
+ * data: phase:uint8 quoteId:bits256 factory:MsgAddressStd
+ *       jettonWallet:MsgAddressStd (the factory's wallet of the output
+ *       jetton — custody stays there) flags:bits5
+ *   ref0: owner:MsgAddressStd (resolver) jettonMaster:MsgAddressStd bits6
+ *     ref0: fee profile (constant, not security-relevant)
+ *     ref1: jettonWallet, gas, owner
+ *   ref1: hashlock:bits256 amount:Coins withdrawalAt:uint64
+ *         publicWithdrawalAt:uint64 cancellationAt:uint64
+ *     ref0: recipient:MsgAddressStd resolver:MsgAddressStd deposit:Coins
+ *     ref1: authority:(Maybe bits256) recipient:MsgAddressStd
+ *   ref2: escrow code cell
+ * ```
  */
 let lastStateRefusal: string | null = null;
 function validateOutputPositionState(

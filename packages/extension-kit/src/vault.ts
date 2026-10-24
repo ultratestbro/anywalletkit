@@ -7,9 +7,11 @@
  * Two layers of keys, so that unlocking does not keep the password around and
  * other unlock paths (passkeys) do not re-encrypt the secrets:
  *
- *   password ──scrypt (N=2^17, r=8, p=1)──▶ KEK ──AES-256-GCM──▶ wraps the DEK   (envelope v2)
- *   passkey PRF ──HKDF-SHA256 (salt = credential id)──▶ KEK ──AES-256-GCM──▶ wraps the DEK, one box per passkey
- *   DEK (32 random bytes) ──AES-256-GCM, AAD = secret id──▶ each secret
+ * ```text
+ * password ──scrypt (N=2^17, r=8, p=1)──▶ KEK ──AES-256-GCM──▶ wraps the DEK   (envelope v2)
+ * passkey PRF ──HKDF-SHA256 (salt = credential id)──▶ KEK ──AES-256-GCM──▶ wraps the DEK, one box per passkey
+ * DEK (32 random bytes) ──AES-256-GCM, AAD = secret id──▶ each secret
+ * ```
  *
  * What the session holds while unlocked is the DEK (see {@link Session}); the
  * password and the PRF output never leave {@link Vault.create} / {@link Vault.unlock} /
