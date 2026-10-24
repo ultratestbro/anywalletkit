@@ -71,6 +71,7 @@ if (want("cctp")) providers.cctp = (await dist("protocol-swap2-cctp", "provider.
 if (want("uniswap")) providers.uniswap = (await dist("protocol-swap2-uniswap", "provider.js")).uniswapProvider({enabled: true, rpcUrls: venueRpc});
 if (want("wrap")) providers.wrap = (await dist("protocol-swap2-wrap", "provider.js")).wrapProvider({enabled: true, rpcUrls: venueRpc});
 if (want("balancer")) providers.balancer = (await dist("protocol-swap2-balancer", "provider.js")).balancerProvider({enabled: true, rpcUrls: venueRpc});
+if (want("fynd") && env.FYND_API_KEY) providers.fynd = (await dist("protocol-swap2-fynd", "provider.js")).fyndProvider({enabled: true, apiKey: env.FYND_API_KEY});
 
 // ── one dry quote per corridor ───────────────────────────────────────────────
 const parse = (s) => { const i = s.lastIndexOf(":"); return {chain: s.slice(0, i), symbol: s.slice(i + 1)}; };

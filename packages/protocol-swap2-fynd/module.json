@@ -1,0 +1,22 @@
+{
+  "name": "@anywalletkit/protocol-swap2-fynd",
+  "type": "swap2",
+  "chains": [
+    "eip155:1",
+    "eip155:56",
+    "eip155:130",
+    "eip155:137",
+    "eip155:4663",
+    "eip155:8453",
+    "eip155:42161"
+  ],
+  "tier": "core",
+  "maintainers": [
+    "@ultratestbro"
+  ],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
+  "path": "packages/protocol-swap2-fynd",
+  "description": "Fynd same-chain swaps: Propeller Heads' solver over Tycho-indexed pools, settled through TychoRouterV3; router, method, tokens, amounts, receiver and minimum checked against the request before signing. Fynd outputs are under the Fynd License.",
+  "addedAt": "2026-10-24"
+}

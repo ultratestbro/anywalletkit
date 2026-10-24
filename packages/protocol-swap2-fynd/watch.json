@@ -1,0 +1,32 @@
+{
+  "module": "@anywalletkit/protocol-swap2-fynd",
+  "sources": [
+    {
+      "id": "router-registry",
+      "type": "github-file",
+      "repo": "propeller-heads/tycho",
+      "path": "crates/tycho-execution/config/deployment_registry.json",
+      "label": "Tycho router registry (the router Fynd swaps must settle through)"
+    },
+    {
+      "id": "fynd-releases",
+      "type": "github-releases",
+      "repo": "propeller-heads/fynd",
+      "label": "Fynd releases"
+    },
+    {
+      "id": "fynd-license",
+      "type": "github-file",
+      "repo": "propeller-heads/fynd",
+      "path": "LICENSE.md",
+      "label": "Fynd License text"
+    },
+    {
+      "id": "hosted-api-docs",
+      "type": "github-file",
+      "repo": "propeller-heads/fynd",
+      "path": "docs/get-started/hosted-api.md",
+      "label": "Fynd hosted API docs (chains, limits, auth)"
+    }
+  ]
+}

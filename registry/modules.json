@@ -1,7 +1,7 @@
 {
   "$schema": "./modules.schema.json",
-  "generatedAt": "2026-10-23",
-  "count": 22,
+  "generatedAt": "2026-10-24",
+  "count": 23,
   "modules": [
     {
       "name": "@anywalletkit/protocol-approvals-evm",
@@ -243,6 +243,28 @@
       "path": "packages/protocol-swap2-chainflip",
       "description": "Chainflip vault swaps: native BTC / ETH / SOL / TRX and USDC / USDT across Ethereum, Arbitrum, Solana, Tron and Bitcoin via Chainflip's public backend (0 bps, no account). Sources: Ethereum, Arbitrum, Tron (USDT → the Vault with the swap in the note); the encoder's output is decoded and checked before signing; fill-or-kill refunds.",
       "addedAt": "2026-10-20"
+    },
+    {
+      "name": "@anywalletkit/protocol-swap2-fynd",
+      "type": "swap2",
+      "chains": [
+        "eip155:1",
+        "eip155:56",
+        "eip155:130",
+        "eip155:137",
+        "eip155:4663",
+        "eip155:8453",
+        "eip155:42161"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
+      "path": "packages/protocol-swap2-fynd",
+      "description": "Fynd same-chain swaps: Propeller Heads' solver over Tycho-indexed pools, settled through TychoRouterV3; router, method, tokens, amounts, receiver and minimum checked against the request before signing. Fynd outputs are under the Fynd License.",
+      "addedAt": "2026-10-24"
     },
     {
       "name": "@anywalletkit/protocol-swap2-jupiter",

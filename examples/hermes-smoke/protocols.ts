@@ -23,6 +23,10 @@ import { jupiterProvider } from '@anywalletkit/protocol-swap2-jupiter/provider'
 import { JupiterSwap2Protocol } from '@anywalletkit/protocol-swap2-jupiter/protocol'
 import { decodeSwapArgs, fromBase64 as jupFromBase64 } from '@anywalletkit/protocol-swap2-jupiter/codec'
 import { assembleTransaction as jupAssemble } from '@anywalletkit/protocol-swap2-jupiter/transaction'
+import { fyndProvider } from '@anywalletkit/protocol-swap2-fynd/provider'
+import { FyndSwap2Protocol } from '@anywalletkit/protocol-swap2-fynd/protocol'
+import { FYND_CHAINS, TYCHO_ROUTER_ABI, checkFyndTransaction } from '@anywalletkit/protocol-swap2-fynd/router'
+import { encodeFunctionData } from 'viem'
 import { nearIntentsProvider } from '@anywalletkit/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@anywalletkit/protocol-swap2-thorchain/protocol'
 import { OmnistonSwap2Protocol } from '@anywalletkit/protocol-swap2-omniston/protocol'
@@ -62,7 +66,7 @@ export async function smokeProtocols(check: Check): Promise<void> {
   // TON is a hand-suspended 1Click corridor (HOT bridge dark since 2026-10-16) and LI.FI has no Bitcoin, so
   // Bitcoin can only have come from the near-intents provider.
   check('router: capabilities come from the passed providers', chains.includes('eip155:1') && chains.includes('bitcoin:mainnet'), chains.join(','))
-  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol], ['usdt0', Usdt0Swap2Protocol], ['chainflip', ChainflipSwap2Protocol], ['jupiter', JupiterSwap2Protocol]] as const) {
+  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol], ['usdt0', Usdt0Swap2Protocol], ['chainflip', ChainflipSwap2Protocol], ['jupiter', JupiterSwap2Protocol], ['fynd', FyndSwap2Protocol]] as const) {
     const p = new (P as never as new (a: unknown, c: unknown) => { getSupportedChains(): Promise<unknown>; quoteSwap2(o: unknown): Promise<unknown> })(evm, swap2Cfg)
     check(`${name}: constructs`, typeof p.quoteSwap2 === 'function')
     await tolerates(check, `${name}: getSupportedChains`, () => p.getSupportedChains())
@@ -106,6 +110,15 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const jWire = jupAssemble({ taker: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM', instructions: [{ programId: 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4', accounts: [{ pubkey: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM', isSigner: true, isWritable: true }], data: '0ZhTk3z+2OkCQHh9AQAAAADp7kIOAAAAAEsAAAAAAAQAAAAm/AMABKEAAQAAAGsSAAIaECcCBBEAqRAABA==' }], computeUnitLimit: 200_000, computeUnitPrice: 1_000n, blockhash: '9sHcv6xwn9YkB8nxTUGKDwPwNnmqVp5oAXxU8Fdkm4J6', lastValidBlockHeight: 100, addressesByLookupTableAddress: {} })
   check('jupiter: assembles a v0 transaction (@solana/kit under Hermes)', typeof jWire === 'string' && jupFromBase64(jWire)[0] === 1 && (jupFromBase64(jWire)[65] & 0x80) === 0x80, String(jWire.length))
   await tolerates(check, 'jupiter: getQuote dry (network)', () => jup.getQuote({ sourceChain: 'solana:mainnet', sourceToken: 'SOL', destChain: 'solana:mainnet', destToken: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', amountIn: '100000000', destAddress: '', dry: true }))
+  const fynd = fyndProvider({ apiKey: 'smoke' })
+  check('fynd: same-chain routes on Base only', fynd.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:8453', token: '0x4200000000000000000000000000000000000006' }) && !fynd.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:1', token: 'USDC' }))
+  const fyndFee = { clientFeeBps: 0, clientFeeReceiver: '0x0000000000000000000000000000000000000000', maxClientContribution: 0n, deadline: 0n, clientSignature: '0x' } as const
+  const fyndData = encodeFunctionData({ abi: TYCHO_ROUTER_ABI, functionName: 'splitSwap', args: [10n ** 9n, '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', '0x4200000000000000000000000000000000000006', 4n * 10n ** 17n, 39n * 10n ** 16n, 3n, '0x000000000000000000000000000000000000dEaD', fyndFee as never, '0xbeef'] })
+  const fyndExpected = { chainId: 8453, tokenIn: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', tokenOut: '0x4200000000000000000000000000000000000006', amountIn: 10n ** 9n, receiver: '0x000000000000000000000000000000000000dEaD', expectedAmountOut: 4n * 10n ** 17n, minAmountOut: 39n * 10n ** 16n }
+  check('fynd: checks the Tycho router calldata (viem decode under Hermes)', checkFyndTransaction({ to: FYND_CHAINS[8453]!.router, value: 0n, data: fyndData }, fyndExpected).method === 'splitSwap')
+  let fyndRefused = false
+  try { checkFyndTransaction({ to: FYND_CHAINS[8453]!.router, value: 0n, data: fyndData }, { ...fyndExpected, receiver: '0x1111111111111111111111111111111111111111' }) } catch { fyndRefused = true }
+  check('fynd: refuses calldata paying someone else', fyndRefused)
   check('cctp: claimSwap2 on the router', typeof (router as unknown as { claimSwap2?: unknown }).claimSwap2 === 'function')
 
   // lending

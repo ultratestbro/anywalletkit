@@ -24,6 +24,7 @@
     "@anywalletkit/protocol-swap2-cctp": "workspace:*",
     "@anywalletkit/protocol-swap2-chainflip": "workspace:*",
     "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/protocol-swap2-fynd": "workspace:*",
     "@anywalletkit/protocol-swap2-jupiter": "workspace:*",
     "@anywalletkit/protocol-swap2-lifi": "workspace:*",
     "@anywalletkit/protocol-swap2-near-intents": "workspace:*",
@@ -45,6 +46,7 @@
     "@ton/core": "^0.63.1",
     "buffer": "^6.0.3",
     "fastestsmallesttextencoderdecoder": "^1.0.22",
+    "viem": "^2.57.2",
     "whatwg-url-without-unicode": "8.0.0-3"
   },
   "devDependencies": {
