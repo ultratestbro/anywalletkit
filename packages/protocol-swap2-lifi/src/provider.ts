@@ -72,6 +72,8 @@ const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$
 /** Chain-aware address equality: EVM case-insensitive, Solana exact base58. */
 /** Longest execution a same-chain route may claim and still be an atomic swap (DEX routes report 0–30 s). */
 const SAME_CHAIN_MAX_SECONDS = 90;
+/** Largest fee a bridge may take from the input itself (glacis ≈ 0.25 %, 2026-10). Above it the quote is refused, named. */
+const MAX_INPUT_FEE_BPS = 300;
 
 function sameChainAddress(chain: string, actual: string | undefined, expected: string): boolean {
   if (isSolana(chain)) return !!actual && BASE58.test(actual) && actual === expected;
@@ -286,6 +288,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
     },
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
+      /** Every refusal after LI.FI answered is named — a bare null hides which check failed (matrix v7: 4 silent nulls). */
+      const reject = (why: string): null => { params.onRefusal?.(`lifi: ${why}`); return null; };
       if (params.flex) return null; // calldata model — the amount is baked in
       const fromChain = LIFI_CHAIN[params.sourceChain];
       const toChain = LIFI_CHAIN[params.destChain];
@@ -408,22 +412,33 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         const expectedToToken = nativeFor(params.destChain, params.destToken);
         const expectedFromChain = Number(fromChain);
         const expectedToChain = Number(toChain);
-        if (
-          q.type !== "lifi" || !q.id || !action || !est?.toAmount || !est.fromAmount || !tr ||
-          action.fromChainId !== expectedFromChain || action.toChainId !== expectedToChain ||
-          action.fromToken?.chainId !== expectedFromChain || action.toToken?.chainId !== expectedToChain ||
-          !sameChainAddress(params.sourceChain, action.fromToken?.address, fromToken) ||
-          !sameChainAddress(params.destChain, action.toToken?.address, expectedToToken) ||
-          action.fromAmount !== params.amountIn || est.fromAmount !== params.amountIn ||
-          !sameChainAddress(params.sourceChain, action.fromAddress, fromAddress) ||
-          !sameChainAddress(params.destChain, action.toAddress, toAddress)
-        ) return null;
+        if (q.type !== "lifi" || !q.id || !action || !est?.toAmount || !est.fromAmount || !tr) return reject("incomplete quote (no action, estimate or transaction)");
+        const mismatch = [
+          action.fromChainId !== expectedFromChain && "source chain",
+          action.toChainId !== expectedToChain && "destination chain",
+          (action.fromToken?.chainId !== expectedFromChain || !sameChainAddress(params.sourceChain, action.fromToken?.address, fromToken)) && "source token",
+          (action.toToken?.chainId !== expectedToChain || !sameChainAddress(params.destChain, action.toToken?.address, expectedToToken)) && "destination token",
+          action.fromAmount !== params.amountIn && "amount spent",
+          !sameChainAddress(params.sourceChain, action.fromAddress, fromAddress) && "sender",
+          !sameChainAddress(params.destChain, action.toAddress, toAddress) && "recipient",
+        ].filter(Boolean);
+        if (mismatch.length) return reject(`quote does not match the request (${mismatch.join(", ")})`);
+        // The transaction spends exactly the input (action.fromAmount, checked above). Some bridges
+        // (glacis, 2026-10) take their fee from the input, so estimate.fromAmount — what is bridged —
+        // is a little lower and toAmount already reflects it. Accept a bounded input-side fee instead
+        // of a silent null; never an estimate that bridges MORE than is spent.
+        const bridged = BigInt(est.fromAmount);
+        const spent = BigInt(params.amountIn);
+        if (bridged > spent) return reject(`the estimate bridges ${est.fromAmount}, more than the ${params.amountIn} spent`);
+        if ((spent - bridged) * 10_000n > spent * BigInt(MAX_INPUT_FEE_BPS)) {
+          return reject(`the route takes ${Number(((spent - bridged) * 10_000n) / spent) / 100}% of the input as a fee (over ${MAX_INPUT_FEE_BPS / 100}%)`);
+        }
         // Source-VM execution payload. EVM: calldata to a trusted target.
         // Solana: a base64 transaction the account proves before signing —
         // there is no target to trust here, the balance proof replaces it.
         if (solanaSource) {
-          if (!tr.data || tr.data.length < 64 || tr.data.length % 4 !== 0 || !BASE64.test(tr.data)) return null;
-          if (tr.to !== undefined || tr.value !== undefined || tr.gasLimit !== undefined) return null;
+          if (!tr.data || tr.data.length < 64 || tr.data.length % 4 !== 0 || !BASE64.test(tr.data)) return reject("the Solana transaction is not base64");
+          if (tr.to !== undefined || tr.value !== undefined || tr.gasLimit !== undefined) return reject("the Solana transaction carries EVM fields");
           // `estimate.approvalAddress` is ignored for a Solana source: LI.FI
           // returns its EVM diamond here on Mayan routes too (seen 2026-10-09,
           // SOL → Base USDC via mayanFastMCTP), and Solana has no allowances —
@@ -434,17 +449,17 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           tr.chainId !== expectedFromChain || !tr.value || !tr.gasLimit ||
           !trustedAddress(params.sourceChain, tr.to, trustedTransactionTargets) ||
           !sameAddress(tr.from, fromAddress)
-        ) return null;
+        ) return reject("the transaction is malformed or targets an untrusted contract");
         if (
           sentSlippage !== undefined &&
           (typeof action.slippage !== "number" || Math.abs(action.slippage - sentSlippage) > 1e-12)
-        ) return null;
+        ) return reject("the quote ignored the requested slippage");
 
         const sourceIsToken = fromToken !== EVM_ZERO && fromToken !== SOLANA_NATIVE;
         if (solanaSource) {
           // No allowances on Solana; nothing to trust beyond the balance proof.
         } else if (sourceIsToken) {
-          if (!trustedAddress(params.sourceChain, est.approvalAddress, trustedApprovalAddresses)) return null;
+          if (!trustedAddress(params.sourceChain, est.approvalAddress, trustedApprovalAddresses)) return reject("the approval target is not a trusted LI.FI contract");
         } else if (est.approvalAddress !== undefined) {
           // LI.FI started returning an approvalAddress for NATIVE sources too
           // (seen 2026-09 on every ETH-source quote, e.g. ETH → Robinhood via
@@ -452,7 +467,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           // approval is meaningless for the native asset, so it is not a
           // reason to refuse the quote — but it must still be a trusted
           // target, and it is never propagated for a native source.
-          if (!trustedAddress(params.sourceChain, est.approvalAddress, trustedApprovalAddresses)) return null;
+          if (!trustedAddress(params.sourceChain, est.approvalAddress, trustedApprovalAddresses)) return reject("the approval target is not a trusted LI.FI contract");
         }
 
         let txRequest: NonNullable<Quote["txRequest"]>;
@@ -462,9 +477,9 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           txRequest = {serializedTx: tr.data!, value: sourceIsToken ? "0" : params.amountIn};
         } else {
           try {
-            if (BigInt(tr.value!) < 0n || BigInt(tr.gasLimit!) <= 0n) return null;
+            if (BigInt(tr.value!) < 0n || BigInt(tr.gasLimit!) <= 0n) return reject("the transaction has a negative value or no gas limit");
           } catch {
-            return null;
+            return reject("the transaction value or gas limit is not a number");
           }
           // Some bridges charge a native messaging fee inside `value`: for a
           // token source the whole value is that fee; for a native source it
@@ -473,7 +488,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           // quote, bounded by the engine — never silently attached.
           const value = BigInt(tr.value!);
           const nativeFee = sourceIsToken ? value : value > BigInt(params.amountIn) ? value - BigInt(params.amountIn) : 0n;
-          if (!sourceIsToken && value < BigInt(params.amountIn)) return null;
+          if (!sourceIsToken && value < BigInt(params.amountIn)) return reject("the transaction sends less native coin than the input");
           txRequest = {
             to: tr.to!,
             data: tr.data!,
@@ -493,7 +508,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
 
         // The optimistic output is not a safety floor. A quote without the
         // provider's minimum cannot satisfy an exact-input execution contract.
-        if (!est.toAmountMin) return null;
+        if (!est.toAmountMin) return reject("the quote has no minimum output");
         const minDestAmount = est.toAmountMin;
         if (sentSlippage !== undefined) {
           const dest = BigInt(est.toAmount);
@@ -533,7 +548,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           depositAddress: "",
           depositMemo: null,
           txRequest,
-          sourceAmount: est.fromAmount,
+          // What the wallet spends (action.fromAmount, = the input); an input-side bridge fee is inside destAmount.
+          sourceAmount: params.amountIn,
           destAmount: est.toAmount,
           minDestAmount,
           feeUsd,

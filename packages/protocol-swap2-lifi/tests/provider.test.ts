@@ -398,3 +398,37 @@ describe("LI.FI chain table (2026-10-14 batch)", () => {
     await expect(lifiProvider().getQuote({...PARAMS, sourceChain: "eip155:5042", sourceToken: "0x3600000000000000000000000000000000000000", destChain: "eip155:8453", destToken: ZERO, amountIn: "5000000"})).resolves.toBeNull();
   });
 });
+
+describe("LI.FI refusals are named; an input-side bridge fee is accepted within bounds (matrix v7 silent nulls)", () => {
+  const refusal = async (body: unknown, params: Record<string, unknown> = {}) => {
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(body)));
+    let why = "";
+    const q = await lifiProvider().getQuote({...PARAMS, ...params, onRefusal: (r: string) => { why = r; }});
+    return {q, why};
+  };
+
+  it("a bridge that takes its fee from the input (glacis: estimate.fromAmount 0.25 % under the input) is quoted, spending exactly the input", async () => {
+    const {q, why} = await refusal(response({estimate: {...response().estimate, fromAmount: "997500"}}));
+    expect(why).toBe("");
+    expect(q).toMatchObject({sourceAmount: "1000000", destAmount: "990000"});
+  });
+
+  it("an input-side fee above 3 % is refused by name", async () => {
+    const {q, why} = await refusal(response({estimate: {...response().estimate, fromAmount: "960000"}}));
+    expect(q).toBeNull();
+    expect(why).toMatch(/takes 4% of the input as a fee \(over 3%\)/);
+  });
+
+  it("an estimate that bridges more than is spent is refused by name", async () => {
+    const {q, why} = await refusal(response({estimate: {...response().estimate, fromAmount: "1000001"}}));
+    expect(q).toBeNull();
+    expect(why).toMatch(/bridges 1000001, more than the 1000000 spent/);
+  });
+
+  it("a quote that does not match the request names the fields — never a bare null", async () => {
+    const other = "0x2222222222222222222222222222222222222222";
+    const {q, why} = await refusal(response({action: {...response().action, toAddress: other, fromAmount: "999999"}}));
+    expect(q).toBeNull();
+    expect(why).toBe("lifi: quote does not match the request (amount spent, recipient)");
+  });
+});

@@ -91,6 +91,20 @@ describe("jupiter provider — live quote", () => {
     expect(reasons[0]).toMatch(/simulation fails.*insufficient funds/);
   });
 
+  it("the wallet lacking the input (Jupiter 6025 / 6024, System Program 1) is said plainly, with the raw error kept", async () => {
+    for (const [err, log, expected] of [
+      [{InstructionError: [3, {Custom: 6025}]}, "Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 failed: custom program error: 0x1789", /not enough of the input token in the wallet \(no token account for it\)/],
+      [{InstructionError: [3, {Custom: 6024}]}, "Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 failed: custom program error: 0x1788", /not enough of the input token in the wallet — simulation fails/],
+      [{InstructionError: [3, {Custom: 1}]}, "Program 11111111111111111111111111111111 failed: custom program error: 0x1", /not enough of the input token in the wallet — simulation fails/],
+      [{InstructionError: [3, {Custom: 6001}]}, "Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 failed: custom program error: 0x1771", /^jupiter: simulation fails: .*6001/],
+    ] as const) {
+      stub(rec("sol_usdc"), () => ({value: {err, logs: [log]}}));
+      const reasons: string[] = [];
+      expect(await jupiterProvider({rpcUrls: ["https://rpc.example"]}).getQuote({...SOL_USDC, onRefusal: (x) => reasons.push(x)})).toBeNull();
+      expect(reasons[0]).toMatch(expected);
+    }
+  });
+
   it("sends the API key as x-api-key", async () => {
     const seen = stub(rec("sol_usdc"));
     await jupiterProvider({apiKey: "k-test"}).getQuote({...SOL_USDC, dry: true});

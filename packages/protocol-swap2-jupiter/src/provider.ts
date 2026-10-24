@@ -145,7 +145,15 @@ export function jupiterProvider(config: JupiterProviderConfig = {}): CrossChainP
     }
     if (r?.value?.err) {
       const log = (r.value.logs ?? []).filter((l) => /error|failed|insufficient/i.test(l)).slice(-1)[0] ?? "";
-      throw new Error(`simulation fails: ${JSON.stringify(r.value.err)}${log ? ` (${log.slice(0, 160)})` : ""}`);
+      const err = JSON.stringify(r.value.err);
+      // The usual reason, said plainly: the wallet lacks the input. Confirmed 2026-10-24 by building the same
+      // USDS / LINK / WBTC → USDC swaps from an empty wallet (6025) and from real holders (built fine).
+      // Jupiter 6024 = insufficient funds, 6025 = no token account for the input; System Program 1 = not enough SOL.
+      const jupiterCode = /JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 failed/.test(log) ? /"Custom":(\d+)/.exec(err)?.[1] : undefined;
+      if (jupiterCode === "6024" || jupiterCode === "6025" || (/"Custom":1\}/.test(err) && /Program 11111111111111111111111111111111 failed/.test(log))) {
+        throw new Error(`not enough of the input token in the wallet${jupiterCode === "6025" ? " (no token account for it)" : ""} — simulation fails: ${err}`);
+      }
+      throw new Error(`simulation fails: ${err}${log ? ` (${log.slice(0, 160)})` : ""}`);
     }
     const used = r?.value?.unitsConsumed;
     return used ? Math.min(MAX_COMPUTE_UNITS, Math.ceil(used * 1.2)) : null;
