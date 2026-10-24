@@ -33,6 +33,11 @@
       "import": "./dist/validate.js",
       "require": "./dist/validate.cjs"
     },
+    "./slippage": {
+      "types": "./dist/slippage.d.ts",
+      "import": "./dist/slippage.js",
+      "require": "./dist/slippage.cjs"
+    },
     "./remote": {
       "types": "./dist/remote.d.ts",
       "import": "./dist/remote.js",

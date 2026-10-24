@@ -216,16 +216,15 @@ describe("memo canonicalization (a gateway-spelled memo is never executed)", () 
     const q = await provider.getQuote(params());
     expect(q?.minDestAmount).toBe("60981");
     expect(gw.quoteUrls.map((u) => new URL(u).searchParams.get("tolerance_bps"))).toEqual(["300", "397"]);
-    // An explicit caller slippage is never widened: the one retry keeps it,
-    // measured from the expected output after fees (liquidity_tolerance_bps),
+    // An explicit caller slippage is never widened: it is asked as
+    // liquidity_tolerance_bps (measured from the expected output after fees),
     // so the memo LIM is expected × (1 − slippage) — see fees-over-slippage.test.ts.
     gw.quoteUrls = [];
-    bodies.push({status: 400, body: {code: 3, message: "emit asset 61302 less than price limit 61597"}});
     bodies.push({status: 200, body: quoteBody(`=:b:${BTC_DEST}:59462`, {expected_amount_out: "61302"})}); // floor(61302 × 0.97)
     const explicit = await provider.getQuote(params({slippageBps: 300}));
     expect(explicit?.minDestAmount).toBe("59462");
     expect(gw.quoteUrls.map((u) => [new URL(u).searchParams.get("tolerance_bps"), new URL(u).searchParams.get("liquidity_tolerance_bps")]))
-      .toEqual([["300", null], [null, "300"]]);
+      .toEqual([[null, "300"]]);
   });
 
   it("honours the caller's output floor against the memo LIM", async () => {

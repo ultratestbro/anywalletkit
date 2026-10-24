@@ -6,3 +6,4 @@ export {isEvm, evmRef, namespace, redactUrls} from "./util.js";
 export {BaseSwap2Protocol, SWAP2_ID_PREFIX, NATIVE_DECIMALS, nativeDecimals, nativeUnits, type Swap2Account, type Swap2EngineConfig, type Swap2ExecutionPlan, type SerializedExecutionExpectation} from "./swap2/base.js";
 export {SingleProviderSwap2} from "./swap2/single.js";
 export {calledContract, callSelector, callsContract, matchesCall, chainLabel, shortAddress, assetMetaFor, assetLabel, ownerAssets, describeSwapLike, type SwapActivityOptions} from "./activity.js";
+export {suggestSlippage, slippageClassOf, type SlippageClass, type SlippageContext, type SlippageOptions, type SlippageSuggestion} from "./slippage.js";

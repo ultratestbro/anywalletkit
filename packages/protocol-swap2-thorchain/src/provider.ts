@@ -17,10 +17,10 @@ import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuotePar
  * routed yet (no memo-capable send surface).
  *
  * Safety: the MEMO and inbound vault come verbatim from the quote — we never
- * hand-build them (a wrong memo makes funds unrecoverable). A `tolerance_bps`
- * (or, when THORChain's fees exceed the caller's slippage,
- * `liquidity_tolerance_bps`) makes the quote embed an on-chain LIM, so a
- * bad-price swap refunds instead of filling.
+ * hand-build them (a wrong memo makes funds unrecoverable). The quote
+ * embeds an on-chain LIM, so a bad-price swap refunds instead of filling:
+ * `liquidity_tolerance_bps` when the caller passes a slippage (LIM = expected
+ * output after fees × (1 − slippage)), `tolerance_bps` otherwise.
  *
  * Hosts (re-verified 2026-09-16): ninerealms retired, the Liquify vanity
  * hostnames went stale; dev.thorchain.org now lists exactly two THORNode
@@ -42,17 +42,18 @@ const DEFAULT_CLIENT_ID = "anywalletkit";
 
 const NATIVE = "0x0000000000000000000000000000000000000000";
 const TOLERANCE_BPS = "300"; // 3% max slippage, embedded as an on-chain LIM
-// `tolerance_bps` is measured from the FEELESS spot output: LIM = spot × (1 −
-// tolerance), while the expected output is spot minus THORChain's fees
-// (liquidity, outbound, affiliate). When those fees exceed the tolerance the
-// node rejects the QUOTE itself ("emit asset X less than price limit Y") —
-// 500 USDC Base → BTC at 1% slippage paid ≈1.7% and never showed up. One
-// retry fixes that: with an explicit caller slippage it asks for
-// `liquidity_tolerance_bps`, which the node measures from the expected output
-// AFTER fees (LIM = expected × (1 − slippage), the same floor every other
-// provider quotes); legacy quotes without a slippage widen `tolerance_bps` to
-// what the pool needs (+buffer). Both are hard-capped here: a route whose
-// fees alone exceed the cap stays hidden, with a named reason.
+// Two ways to ask THORNode for the LIM:
+// - `liquidity_tolerance_bps` — measured from the expected output AFTER
+//   THORChain's fees (liquidity, outbound, affiliate): LIM = expected × (1 −
+//   slippage), the floor every other provider quotes and validQuote enforces.
+//   Used whenever the caller passes a slippage, in one request.
+// - `tolerance_bps` — measured from the FEELESS spot: LIM = spot × (1 −
+//   tolerance), so the room left is (tolerance − fees) and the node rejects
+//   the quote outright when fees exceed it ("emit asset X less than price
+//   limit Y"; 500 USDC Base → BTC at 1% paid ≈1.7%). Kept only for legacy
+//   quotes without a slippage, which widen it to what the pool needs.
+// Both are hard-capped: a route whose THORChain fees alone exceed the cap
+// stays hidden, with a named reason.
 const MAX_TOLERANCE_BPS = 500n;
 /** How long a quote stays executable (bounded by the memo's own expiry). */
 const QUOTE_VALIDITY_MS = 5 * 60_000;
@@ -169,6 +170,8 @@ interface ThorQuoteResponse {
   error?: string;
   /** thornode simulation rejections arrive as {code, message}. */
   message?: string;
+  /** THORChain's fees on this quote; `total_bps` includes liquidity, outbound and affiliate. */
+  fees?: {total_bps?: number};
 }
 
 /**
@@ -432,6 +435,14 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
         params.onRefusal?.(`thorchain: slippage ${String(params.slippageBps)} bps is outside 0–${MAX_TOLERANCE_BPS} bps`);
         return null;
       }
+      // An explicit slippage → `liquidity_tolerance_bps`. The node floors LIM in
+      // 1e8 units; for a destination with more than 8 decimals that floor lands
+      // a hair below expected × (1 − slippage) in base units, so ask 1 bp
+      // tighter there (never looser). 0 bp cannot carry a LIM that way: such a
+      // request goes out as `tolerance_bps` and the node's answer stands.
+      const explicitSlippage = params.slippageBps !== undefined;
+      const liquidityBps = explicitSlippage ? (dst.decimals > 8 ? requestedTolerance - 1 : requestedTolerance) : 0;
+      const limitMode = liquidityBps > 0 ? "liquidity_tolerance_bps" : "tolerance_bps";
       // `tolerance_bps` → LIM from the feeless spot output; `liquidity_tolerance_bps`
       // → LIM from the expected output after fees (the node accepts only one).
       const quoteOn = async (
@@ -471,52 +482,31 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       let inbounds: InboundAddress[] | null = null;
       for (const host of hosts) {
         try {
-          q = await quoteOn(host, String(requestedTolerance));
-          // Fees > tolerance. Usually the node rejects the quote and says so:
-          // emit = output after the outbound fee, limit = the LIM the tolerance
-          // implied from the feeless spot. With an affiliate the simulation runs
-          // before the affiliate share, so the node accepts and the memo's LIM
-          // just sits above the expected output — same problem, no rejection.
-          // At most ONE retry, on the same host; its answer is validated below
-          // exactly like a first answer (memo, floor, vault, halts).
-          let emit = 0n; // 1e8 units
-          let limit = 0n;
-          let affiliatePaid = false; // emit is already net of the affiliate share
-          const rejected = (q?.error ?? q?.message)?.match(/emit asset (\d+) less than price limit (\d+)/);
-          if (rejected) {
-            emit = BigInt(rejected[1] ?? "0");
-            limit = BigInt(rejected[2] ?? "0");
-          } else if (params.slippageBps !== undefined && configuredAffiliate && q?.memo && /^\d+$/.test(String(q.expected_amount_out))) {
-            limit = verifiedMemo(q.memo, dst.asset, params.destAddress, params.refundAddress ?? "", configuredAffiliate, configuredAffiliateBps)?.limit ?? 0n;
-            emit = BigInt(String(q.expected_amount_out));
-            affiliatePaid = true;
-          }
-          if (emit > 0n && limit > emit) {
-            // limit = spot × (1 − tolerance/10000) → spot; fees = 1 − emit/spot.
-            const spot = (limit * 10000n) / (10000n - BigInt(requestedTolerance));
-            if (params.slippageBps === undefined) {
-              // Legacy engine quotes (no requested slippage): widen the
-              // tolerance to what the pool needs.
-              const needed = 10000n - (emit * 10000n) / spot + 50n; // +0.5% buffer
-              if (needed <= MAX_TOLERANCE_BPS) q = await quoteOn(host, needed.toString());
-            } else {
-              // Everything the user pays vs the feeless spot, affiliate share
-              // included. Rounds up.
-              const affiliateBps = configuredAffiliateBps && !affiliatePaid ? BigInt(configuredAffiliateBps) : 0n;
-              const feeBps = 10000n - (emit * (10000n - affiliateBps)) / spot;
-              if (feeBps > MAX_TOLERANCE_BPS) {
-                // Dust amounts: a fixed outbound fee eats the swap.
-                params.onRefusal?.(`thorchain: THORChain fees ${(Number(feeBps) / 100).toFixed(2)}% — too expensive at this amount (cap ${Number(MAX_TOLERANCE_BPS) / 100}%)`);
-                return null;
+          if (limitMode === "liquidity_tolerance_bps") {
+            q = await quoteOn(host, String(liquidityBps), "liquidity_tolerance_bps");
+            const feeBps = Number(q?.fees?.total_bps);
+            if (Number.isFinite(feeBps) && feeBps > Number(MAX_TOLERANCE_BPS)) {
+              // Dust amounts: a fixed outbound fee eats the swap.
+              params.onRefusal?.(`thorchain: THORChain fees ${(feeBps / 100).toFixed(2)}% — too expensive at this amount (cap ${Number(MAX_TOLERANCE_BPS) / 100}%)`);
+              return null;
+            }
+          } else {
+            q = await quoteOn(host, String(requestedTolerance));
+            // Legacy quotes without a slippage: fees > tolerance makes the node
+            // reject the quote; the rejection carries the actual emit vs the
+            // limit the tolerance implied. ONE retry, on the same host, widens
+            // the tolerance to what the pool needs (+buffer), capped. An
+            // explicit 0 bp slippage is never widened — the rejection stands.
+            const rejected = (q?.error ?? q?.message)?.match(/emit asset (\d+) less than price limit (\d+)/);
+            if (rejected && !explicitSlippage) {
+              const emit = BigInt(rejected[1] ?? "0");
+              const limit = BigInt(rejected[2] ?? "0");
+              if (emit > 0n && limit > emit) {
+                // limit = spot × (1 − tolerance/10000) → spot; needed = 1 − emit/spot.
+                const spot = (limit * 10000n) / (10000n - BigInt(requestedTolerance));
+                const needed = 10000n - (emit * 10000n) / spot + 50n; // +0.5% buffer
+                if (needed <= MAX_TOLERANCE_BPS) q = await quoteOn(host, needed.toString());
               }
-              // Keep the caller's slippage, measured from the expected output
-              // after fees. The node floors LIM in 1e8 units; for a
-              // destination with more than 8 decimals that floor lands a hair
-              // below expected × (1 − slippage) in base units, so ask 1 bp
-              // tighter there (never looser). A zero result means no LIM at
-              // all — then the first answer stands (and is refused below).
-              const liquidityBps = dst.decimals > 8 ? requestedTolerance - 1 : requestedTolerance;
-              if (liquidityBps > 0) q = await quoteOn(host, String(liquidityBps), "liquidity_tolerance_bps");
             }
           }
           // Validate the node's answer BEFORE touching the network again: a
