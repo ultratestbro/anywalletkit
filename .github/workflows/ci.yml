@@ -35,9 +35,11 @@ jobs:
       - run: pnpm docs:build
 
   hermes:
-    # Derive + sign on every chain inside the Hermes VM React Native ships
-    # (react-native/sdks/hermesc/linux64-bin/hermes), bundle lowered with the RN Babel preset.
-    runs-on: ubuntu-latest
+    # Derive + sign on every chain inside the Hermes VM React Native ships, bundle lowered
+    # with the RN Babel preset. macOS: react-native ships that VM only as
+    # sdks/hermesc/osx-bin/hermes (linux64-bin has just the compiler), and on Linux the smoke
+    # fell back to hermes-engine-cli 0.12 from 2022 — not the engine apps run.
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
