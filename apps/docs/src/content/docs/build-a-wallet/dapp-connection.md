@@ -18,10 +18,11 @@ makes passes your review.
 - signing checks, including Sign-In with Ethereum (EIP-4361) messages checked against the
   asking site.
 
-The reference extension in the repository injects providers for EVM (EIP-1193 and EIP-6963
-discovery), Solana, TON Connect, Tron, Bitcoin and NEAR.
+TON Connect requests are parsed and answered by the kit too.
 
-**You bring:** the UI (popup, approval window), the store listing and its account.
+**You bring:** the providers your page script injects (EVM with EIP-1193 and EIP-6963
+discovery, Solana, TON Connect, Tron, Bitcoin, NEAR), the UI (popup, approval window), the
+store listing and its account.
 
 The code, and how to publish to the Chrome Web Store, are in the
 [Browser extension guide](/guides/extension-kit/).
