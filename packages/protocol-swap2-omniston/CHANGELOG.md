@@ -4,6 +4,7 @@
 
 ### Patch Changes
 
+- `@ston-fi/omniston-sdk` 0.8.11 → 0.8.12, which brings `ws` 8.22.0 and so clears GHSA-58qx-3vcg-4xpx (uninitialized memory disclosure) and the fragment memory-exhaustion DoS fixed after `ws` 8.20.1. The SDK's own code is unchanged in 0.8.12 (a reordered bundle); the live routes check passes on every Omniston order route.
 - 65c3bca: First release through npm trusted publishing: published from the release workflow over GitHub OIDC, with no npm token anywhere. No code change in this package beyond what its other changesets list.
 - Updated dependencies [6b164bd]
 - Updated dependencies [65c3bca]
