@@ -229,7 +229,9 @@ export function resolvePrimaryType(typed: unknown): string {
   const types = obj(a.types)
   const names = Object.keys(types).filter((t) => t !== 'EIP712Domain')
   const fieldsOf = (n: string) => (Array.isArray(types[n]) ? (types[n] as unknown[]) : [])
-  const referenced = new Set(names.flatMap((n) => fieldsOf(n).map((f) => String(obj(f).type ?? '').replace(/\[.*\]$/, ''))).filter((t) => names.includes(t)))
+  // Linear, and identical to wallet-evm's inferPrimaryType: cut at the first '['. The old /\[.*\]$/
+  // backtracked quadratically on a dApp's '[[[[…' type string and froze the wallet before any prompt (scan 2026-10-23 F10).
+  const referenced = new Set(names.flatMap((n) => fieldsOf(n).map((f) => { const t = String(obj(f).type ?? ''); const i = t.indexOf('['); return i < 0 ? t : t.slice(0, i) })).filter((t) => names.includes(t)))
   const roots = names.filter((n) => !referenced.has(n))
   if (roots.length !== 1) throw new Error(`Ambiguous EIP-712 primary type: ${roots.join(', ') || 'none'}. Pass primaryType.`)
   return roots[0]!

@@ -61,8 +61,15 @@ function base58Encode(bytes: Uint8Array): string {
 }
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+/** Far above any real wire transaction (Solana ≤ 1 232 bytes, NEAR ≤ 4 MiB): longer input is not decoded at all. */
+const MAX_BASE64_CHARS = 8 * 1024 * 1024
+
 function base64Decode(s: string): Uint8Array | null {
-  const clean = s.replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '')
+  if (s.length > MAX_BASE64_CHARS) return null
+  // Strip the padding with a linear walk: the old /=+$/ was quadratic on a long '====…A' run (scan 2026-10-23 F11).
+  let end = s.length
+  while (end > 0 && s.charCodeAt(end - 1) === 61 /* = */) end--
+  const clean = s.slice(0, end).replace(/-/g, '+').replace(/_/g, '/')
   if (!/^[A-Za-z0-9+/]*$/.test(clean) || clean.length % 4 === 1) return null
   const out: number[] = []
   let buf = 0

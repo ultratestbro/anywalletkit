@@ -130,3 +130,21 @@ describe('kit policies — EVM revoke shape on other chains (scan 2026-10-23 F1)
     expect(seen.at(-1)?.kind).toBe('send')
   })
 })
+
+describe('kit policies — hostile input stays linear (scan 2026-10-23 F10/F11)', () => {
+  it('F10: an EIP-712 field type of 200 000 "[" resolves in milliseconds, same answer as the signer', () => {
+    const types = { Mail: [{ name: 'x', type: '['.repeat(200_000) }, { name: 'p', type: 'Person[2][]' }], Person: [{ name: 'n', type: 'string' }] }
+    const t0 = performance.now()
+    expect(resolvePrimaryType({ types, domain: {}, message: {} })).toBe('Mail')
+    expect(performance.now() - t0).toBeLessThan(200)
+  })
+
+  it('F11: a serialized Solana transaction of 500 000 "=" plus one char is handled in milliseconds', async () => {
+    const { sendDestinations } = await import('../src/destinations.js')
+    const hostile = `${'='.repeat(500_000)}A`
+    const t0 = performance.now()
+    const d = sendDestinations('solana:mainnet', hostile)
+    expect(performance.now() - t0).toBeLessThan(200)
+    expect(d.unknown).toBe(true)
+  })
+})
