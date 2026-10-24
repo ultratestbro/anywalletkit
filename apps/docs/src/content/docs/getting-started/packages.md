@@ -7,8 +7,8 @@ sidebar:
 
 Install only what your wallet uses. Every package is published under the `@anywalletkit/` scope.
 
-:::caution[Pre-release]
-Packages are not on npm yet.
+:::note[Pre-1.0]
+Every package is on npm under [`@anywalletkit`](https://www.npmjs.com/org/anywalletkit), published from CI with provenance. Versions are `0.x`: a minor release may still change the API.
 :::
 
 ## Core

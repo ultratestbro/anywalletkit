@@ -9,8 +9,8 @@ behind a single account interface. Protocol modules — swaps, cross-chain swaps
 lending, token approvals — are written against that interface, so a wallet picks the blocks
 it needs and nothing else.
 
-:::caution[Pre-release]
-The SDK is not on npm yet. Package names on this site use the final `@anywalletkit/` scope;
+:::note[Pre-1.0]
+The packages are on npm under [`@anywalletkit`](https://www.npmjs.com/org/anywalletkit). Versions are `0.x`:
 APIs may still change before `1.0`. The source is on [GitHub](https://github.com/ultratestbro/anywalletkit).
 :::
 

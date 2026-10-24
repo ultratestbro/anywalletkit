@@ -5,7 +5,7 @@ Bitcoin, TON, Tron, Solana, NEAR and Zcash (transparent), with a single account 
 modules (swap, cross-chain swap, lending, staking, approvals, fiat) are written against.
 
 > **Status: pre-1.0.** Versions are `0.x`: minor releases may still change the
-> API. Not on npm yet. Documentation: **[docs.anywallet.tech](https://docs.anywallet.tech)**.
+> API. Packages: **[npmjs.com/org/anywalletkit](https://www.npmjs.com/org/anywalletkit)**, published with provenance. Documentation: **[docs.anywallet.tech](https://docs.anywallet.tech)**.
 
 ```sh
 pnpm add @anywalletkit/kit @anywalletkit/wallet-evm   # plus the chains and modules you need

@@ -5,9 +5,6 @@ sidebar:
   order: 2
 ---
 
-:::caution[Pre-release]
-The packages are not on npm yet. The commands below are what installation will look like.
-:::
 
 ## Try it from source
 
