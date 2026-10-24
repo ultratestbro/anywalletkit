@@ -1,5 +1,6 @@
 import ExpoModulesCore
 import Foundation
+import LocalAuthentication
 import Security
 
 /**
@@ -13,7 +14,12 @@ import Security
  * Keychain: synchronizable generic-password items (iCloud Keychain, end-to-end
  * encrypted by Apple). A synced item can't be ThisDeviceOnly nor carry a
  * biometric ACL, so it holds only a backup KEY — the backup file lives in
- * Drive, and neither one alone opens it.
+ * Drive, and neither one alone opens it. The key is WhenUnlocked (never
+ * readable while the phone is locked, AFU included) and this module asks for
+ * the device owner (Face ID / Touch ID / passcode) before returning it — the
+ * app can't read it silently. One confirmation covers reads for 30 s, so a
+ * multi-wallet backup or restore asks once. Files are written with complete
+ * file protection.
  */
 public class BackupCloudModule: Module {
   public func definition() -> ModuleDefinition {
@@ -47,14 +53,32 @@ public class BackupCloudModule: Module {
       try Self.coordinatedDelete(url)
     }
 
-    AsyncFunction("keychainGet") { (service: String, account: String) -> String? in
+    AsyncFunction("keychainHas") { (service: String, account: String) -> Bool in
+      // Attributes only: a synced item carries no access control, so this never prompts.
+      var query = Self.keychainQuery(service, account)
+      query[kSecReturnAttributes as String] = true
+      query[kSecMatchLimit as String] = kSecMatchLimitOne
+      let status = SecItemCopyMatching(query as CFDictionary, nil)
+      if status == errSecItemNotFound { return false }
+      guard status == errSecSuccess else { throw BackupCloudException("Keychain lookup failed (\(status)).") }
+      return true
+    }
+
+    AsyncFunction("keychainGet") { (service: String, account: String, reason: String) -> String? in
       var query = Self.keychainQuery(service, account)
       query[kSecReturnData as String] = true
       query[kSecMatchLimit as String] = kSecMatchLimitOne
+      // Nothing there → nothing to protect, no prompt.
+      var probe = Self.keychainQuery(service, account)
+      probe[kSecMatchLimit as String] = kSecMatchLimitOne
+      if SecItemCopyMatching(probe as CFDictionary, nil) == errSecItemNotFound { return nil }
+      try Self.requireDeviceOwner(reason)
       var result: CFTypeRef?
       let status = SecItemCopyMatching(query as CFDictionary, &result)
       if status == errSecItemNotFound { return nil }
       guard status == errSecSuccess, let data = result as? Data else { throw BackupCloudException("Keychain read failed (\(status)).") }
+      // Keys written by 0.1.0 were AfterFirstUnlock: raise them to WhenUnlocked (still synced).
+      SecItemUpdate(Self.keychainQuery(service, account) as CFDictionary, [kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked] as CFDictionary)
       return String(data: data, encoding: .utf8)
     }
 
@@ -63,7 +87,7 @@ public class BackupCloudModule: Module {
       SecItemDelete(query as CFDictionary)
       var add = query
       add[kSecValueData as String] = Data(value.utf8)
-      add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+      add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
       let status = SecItemAdd(add as CFDictionary, nil)
       guard status == errSecSuccess else { throw BackupCloudException("Keychain write failed (\(status)).") }
     }
@@ -120,7 +144,7 @@ public class BackupCloudModule: Module {
     var coordError: NSError?
     var writeError: Error?
     NSFileCoordinator().coordinate(writingItemAt: url, options: .forReplacing, error: &coordError) { target in
-      do { try data.write(to: target, options: .atomic) } catch { writeError = error }
+      do { try data.write(to: target, options: [.atomic, .completeFileProtection]) } catch { writeError = error }
     }
     if let e = coordError ?? writeError { throw BackupCloudException("Could not write the backup: \(e.localizedDescription)") }
   }
@@ -157,6 +181,34 @@ public class BackupCloudModule: Module {
     if let e = coordError ?? deleteError { throw BackupCloudException("Could not delete the backup: \(e.localizedDescription)") }
   }
 
+  // MARK: - Device owner
+
+  private static let authLock = NSLock()
+  private static var authorizedUntil = Date.distantPast
+  private static let authReuse: TimeInterval = 30
+
+  /** Face ID / Touch ID / passcode before a backup key leaves the keychain; one success covers 30 s. */
+  private static func requireDeviceOwner(_ reason: String) throws {
+    authLock.lock()
+    defer { authLock.unlock() }
+    if Date() < authorizedUntil { return }
+    let context = LAContext()
+    var policyError: NSError?
+    guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &policyError) else {
+      throw BackupCloudException("Set a device passcode to open wallet backups.")
+    }
+    let done = DispatchSemaphore(value: 0)
+    var outcome: Error?
+    context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason.isEmpty ? "Open your wallet backup" : reason) { ok, error in
+      if !ok { outcome = error ?? LAError(.authenticationFailed) }
+      done.signal()
+    }
+    done.wait()
+    if let e = outcome as? LAError, [.userCancel, .appCancel, .systemCancel].contains(e.code) { throw BackupCancelledException() }
+    if let e = outcome { throw BackupCloudException("Authentication failed: \(e.localizedDescription)") }
+    authorizedUntil = Date().addingTimeInterval(authReuse)
+  }
+
   // MARK: - Keychain
 
   private static func keychainQuery(_ service: String, _ account: String) -> [String: Any] {
@@ -173,6 +225,11 @@ public class BackupCloudModule: Module {
 final class NotSignedInException: Exception {
   override var code: String { "ERR_FW_ICLOUD_SIGNED_OUT" }
   override var reason: String { "Sign in to iCloud (Settings › your name) and turn on iCloud Drive." }
+}
+
+final class BackupCancelledException: Exception {
+  override var code: String { "ERR_FW_CANCELLED" }
+  override var reason: String { "The user cancelled the authentication." }
 }
 
 final class BackupCloudException: GenericException<String> {

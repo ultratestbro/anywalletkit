@@ -11,7 +11,10 @@ export interface NativeBackupCloud {
   driveWrite(container: string, folder: string, name: string, text: string): Promise<void>
   driveRead(container: string, folder: string, name: string, timeoutMs: number): Promise<string | null>
   driveDelete(container: string, folder: string, name: string): Promise<void>
-  keychainGet(service: string, account: string): Promise<string | null>
+  /** Is a synced key there — no prompt. */
+  keychainHas(service: string, account: string): Promise<boolean>
+  /** The key, after Face ID / Touch ID / passcode (one confirmation covers 30 s). */
+  keychainGet(service: string, account: string, reason: string): Promise<string | null>
   keychainSet(service: string, account: string, value: string): Promise<void>
   keychainDelete(service: string, account: string): Promise<void>
 }

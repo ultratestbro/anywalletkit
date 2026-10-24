@@ -6,8 +6,10 @@ import { backupFileName, checkBackup, iCloudDrive, iCloudKeychain, isCloudBackup
 function fakeCloud() {
   const files = new Map<string, { text: string; downloaded: boolean; modifiedAt: number }>()
   const keychain = new Map<string, string>()
+  /** Every device-owner prompt a key read asked for, with its reason. */
+  const prompts: string[] = []
   let clock = 1000
-  const device = (opts: { signedIn?: boolean; keychainSynced?: boolean } = {}): NativeBackupCloud => ({
+  const device = (opts: { signedIn?: boolean; keychainSynced?: boolean; cancelPrompt?: boolean } = {}): NativeBackupCloud => ({
     async driveStatus() {
       return { signedIn: opts.signedIn ?? true, container: true }
     },
@@ -27,8 +29,13 @@ function fakeCloud() {
     async driveDelete(_c, folder, name) {
       files.delete(`${folder}/${name}`)
     },
-    async keychainGet(service, account) {
-      if (opts.keychainSynced === false) return null
+    async keychainHas(service, account) {
+      return opts.keychainSynced !== false && keychain.has(`${service}/${account}`)
+    },
+    async keychainGet(service, account, reason) {
+      if (opts.keychainSynced === false || !keychain.has(`${service}/${account}`)) return null
+      prompts.push(reason)
+      if (opts.cancelPrompt) throw Object.assign(new Error('cancelled'), { code: 'ERR_FW_CANCELLED' })
       return keychain.get(`${service}/${account}`) ?? null
     },
     async keychainSet(service, account, value) {
@@ -38,7 +45,7 @@ function fakeCloud() {
       keychain.delete(`${service}/${account}`)
     },
   })
-  return { files, keychain, device }
+  return { files, keychain, prompts, device }
 }
 
 const SECRET = JSON.stringify({ type: 'mnemonic', mnemonic: 'legal winner thank year wave sausage worth useful legal winner thank yellow' })
@@ -130,6 +137,28 @@ describe('backup-cloud', () => {
     const err = await iCloudDrive({ container: 'iCloud.x', native: out }).list().catch((e: unknown) => e)
     expect(isCloudBackupError(err, 'signed-out')).toBe(true)
     expect(await iCloudDrive({ container: 'iCloud.x' }).status()).toEqual({ available: false, reason: 'unavailable' })
+  })
+
+  it('creating a key asks for nothing; every read of an existing key asks for the device owner', async () => {
+    const cloud = fakeCloud()
+    const d = cloud.device()
+    const store = iCloudDrive({ container: 'iCloud.x', native: d })
+    const keyVault = iCloudKeychain({ native: d, reason: 'Open your Vaulty backup' })
+    await saveBackup({ store, keyVault, secret: SECRET, meta: META })
+    expect(cloud.prompts).toEqual([])
+    await saveBackup({ store, keyVault, secret: SECRET, meta: META })
+    expect(cloud.prompts).toEqual(['Open your Vaulty backup'])
+    await restoreBackup({ store, name: backupFileName(META), keyVault })
+    expect(cloud.prompts).toHaveLength(2)
+  })
+
+  it('a cancelled Face ID / passcode sheet is a named error and opens nothing', async () => {
+    const cloud = fakeCloud()
+    const a = cloud.device()
+    await saveBackup({ store: iCloudDrive({ container: 'iCloud.x', native: a }), keyVault: iCloudKeychain({ native: a }), secret: SECRET, meta: META })
+    const b = cloud.device({ cancelPrompt: true })
+    const err = await restoreBackup({ store: iCloudDrive({ container: 'iCloud.x', native: b }), name: backupFileName(META), keyVault: iCloudKeychain({ native: b }) }).catch((e: unknown) => e)
+    expect(isCloudBackupError(err, 'cancelled')).toBe(true)
   })
 
   it('needs a password or a key vault', async () => {

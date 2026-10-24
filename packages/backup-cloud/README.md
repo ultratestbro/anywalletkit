@@ -4,7 +4,7 @@ Cloud backups for React Native wallets built on the SDK. Each seed or key become
 
 | Option | Where the pieces live | Who can open it |
 |---|---|---|
-| **iCloud Keychain** (no password) | File in iCloud Drive; its 32-byte key in iCloud Keychain (end-to-end encrypted by Apple) | This app on the user's Apple devices. Neither the file nor the key opens anything alone. |
+| **iCloud Keychain** (no password) | File in iCloud Drive; its 32-byte key in iCloud Keychain (end-to-end encrypted by Apple) | This app on the user's Apple devices, after Face ID / Touch ID / the device passcode. Neither the file nor the key opens anything alone. |
 | **Password** | File in iCloud Drive | Anyone with the backup password, on any phone (Argon2id, ≥10 characters) |
 | **Both** | — | Either one |
 
@@ -19,6 +19,12 @@ await checkBackup(store, source)                 // { present, createdAt, protec
 const opened = await restoreBackup({ store, name, keyVault: keys, expect: source })  // or { password }
 await secrets.set(id, opened.text()); opened.dispose()
 ```
+
+**Protection on the device.**
+- **The key:** `WhenUnlocked`. It is never readable while the phone is locked, after-first-unlock included. Keys written by 0.1.0 are raised to this class on their next read.
+- **Reading it:** the native module asks for the device owner (Face ID / Touch ID / passcode) before handing the key out, so app code can't read it silently. One confirmation covers 30 s, so a multi-wallet backup or restore asks once. Creating a new key asks for nothing.
+- **The file:** written with complete file protection.
+- **No strict mode:** a synced keychain item can't carry a biometric ACL, so the no-password option can't honour strict biometrics-only mode. Offer the password option to users who want that.
 
 `saveBackup` reads the file back and compares it before reporting success. `restoreBackup` refuses another wallet's backup when given `expect`. A device without the synced key gets `key-missing`, and can then use the password.
 

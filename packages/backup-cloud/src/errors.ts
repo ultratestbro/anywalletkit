@@ -1,4 +1,5 @@
 /**
+ * - `cancelled` — the user dismissed the Face ID / passcode sheet that guards a backup key.
  * - `signed-out` — no iCloud account on the device, or iCloud Drive is off.
  * - `unavailable` — this platform / build has no such store (e.g. Android today, or the entitlement is missing).
  * - `not-found` — no backup under that name.
@@ -7,7 +8,7 @@
  * - `storage` — anything else from the cloud layer.
  * Wrong password / wrong key / a corrupted file stay seed-vault `BackupError`s.
  */
-export type CloudBackupErrorCode = 'signed-out' | 'unavailable' | 'not-found' | 'key-missing' | 'mismatch' | 'storage'
+export type CloudBackupErrorCode = 'cancelled' | 'signed-out' | 'unavailable' | 'not-found' | 'key-missing' | 'mismatch' | 'storage'
 
 export class CloudBackupError extends Error {
   override readonly name = 'CloudBackupError'
@@ -28,5 +29,6 @@ export function fromNative(err: unknown): CloudBackupError {
   if (err instanceof CloudBackupError) return err
   const code = typeof err === 'object' && err !== null && 'code' in err ? String((err as { code: unknown }).code) : ''
   const message = err instanceof Error ? err.message : String(err)
-  return new CloudBackupError(code === 'ERR_FW_ICLOUD_SIGNED_OUT' ? 'signed-out' : 'storage', message, { cause: err })
+  const mapped: CloudBackupErrorCode = code === 'ERR_FW_ICLOUD_SIGNED_OUT' ? 'signed-out' : code === 'ERR_FW_CANCELLED' ? 'cancelled' : 'storage'
+  return new CloudBackupError(mapped, message, { cause: err })
 }

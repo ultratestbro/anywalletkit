@@ -22,7 +22,9 @@ export interface BackupStore {
 export interface KeyVault {
   /** Also the protector id written into the backup file. */
   readonly kind: string
+  /** The key — asks for the device owner (Face ID / passcode) first. null when there is none. */
   get(id: string): Promise<Uint8Array | null>
+  /** An existing key (asks for the device owner, as `get`) or a new one (no prompt). */
   getOrCreate(id: string): Promise<Uint8Array>
   delete(id: string): Promise<void>
 }
@@ -90,6 +92,8 @@ export interface ICloudKeychainOptions {
   native?: NativeBackupCloud
   /** Randomness for new keys — crypto.getRandomValues by default. */
   random?: (n: number) => Uint8Array
+  /** Line under Face ID when a key is read. Default "Open your wallet backup". */
+  reason?: string
 }
 
 const toHex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')
@@ -101,24 +105,30 @@ function fromHex(s: string): Uint8Array | null {
 /**
  * Backup keys in iCloud Keychain (synchronizable items, end-to-end encrypted by
  * Apple, readable by this app on the user's devices). Holds keys only — never a
- * secret: the backup file itself is in iCloud Drive.
+ * secret: the backup file itself is in iCloud Drive. Keys are WhenUnlocked, and
+ * the native module asks for the device owner before handing one out, so the
+ * no-password backup still needs Face ID or the passcode to open. It cannot
+ * honour strict (biometrics-only) mode: a synced item can't carry a biometric ACL.
  */
 export function iCloudKeychain(opts: ICloudKeychainOptions = {}): KeyVault {
   const service = opts.service ?? 'forgewallet.backup-keys'
   const random = opts.random ?? ((n: number) => globalThis.crypto.getRandomValues(new Uint8Array(n)))
+  const reason = opts.reason ?? 'Open your wallet backup'
   const vault: KeyVault = {
     kind: 'icloud-keychain',
     async get(id) {
       const n = await need(opts.native)
-      const raw = await wrap(() => n.keychainGet(service, id))
+      const raw = await wrap(() => n.keychainGet(service, id, reason))
       return raw === null ? null : fromHex(raw)
     },
     async getOrCreate(id) {
-      const existing = await vault.get(id)
-      if (existing) return existing
+      const n = await need(opts.native)
+      if (await wrap(() => n.keychainHas(service, id))) {
+        const existing = await vault.get(id)
+        if (existing) return existing
+      }
       const key = random(32)
       if (key.length !== 32) throw new CloudBackupError('storage', 'The random source returned the wrong length.')
-      const n = await need(opts.native)
       await wrap(() => n.keychainSet(service, id, toHex(key)))
       return key
     },
