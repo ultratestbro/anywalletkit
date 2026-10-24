@@ -77,5 +77,5 @@ inside the router.
 | `@anywalletkit/protocol-approvals-evm` | Discover token approvals (ERC-20 / 721 / 1155 / Permit2 / EIP-7702), flag risky ones, revoke |
 | `@anywalletkit/history-evm` | Activity history for every supported EVM chain |
 | `@anywalletkit/names-ens` | ENS names → the address for one chain |
-| `@anywalletkit/extension-kit` | The core of a Chromium (MV3) wallet extension: encrypted vault with passkey unlock, auto-locking session, dApp request router, per-origin permissions, approval queue, signing checks; no UI |
+| `@anywalletkit/extension-kit` | The core of a Chromium (MV3) wallet extension: encrypted vault with passkey unlock, auto-locking session, dApp request router, per-origin permissions, approval queue, signing checks; no UI. See the [Browser extension guide](/guides/extension-kit/) |
 | `@anywalletkit/networks` | Networks: catalog mainnets with public RPC failover lists, default testnets, user RPCs and custom networks (`NetworksTable`), per-family endpoint verification, EIP-3085 parsing |

@@ -1,0 +1,23 @@
+{
+  "name": "@anywalletkit/example-extension-kit",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The docs Extension kit guide as running code: the site renders its #region blocks, CI typechecks and tests it.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/extension-kit": "workspace:*",
+    "@anywalletkit/keyring": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*"
+  },
+  "devDependencies": {
+    "@anywalletkit/conformance": "workspace:*",
+    "typescript": "^5.9.3",
+    "viem": "^2.57.2",
+    "vitest": "^5.0.3"
+  }
+}

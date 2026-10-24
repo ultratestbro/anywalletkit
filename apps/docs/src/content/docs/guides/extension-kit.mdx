@@ -1,0 +1,194 @@
+---
+title: Browser extension
+description: A Chromium (MV3) wallet extension on extension-kit — the encrypted vault, passkey unlock, auto-lock, the dApp request router, approvals and signing checks, and publishing to the Chrome Web Store.
+sidebar:
+  order: 10
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+`extension-kit` is the security core of a non-custodial Chromium (MV3) wallet extension. It
+is a library, not an extension. You build the popup, the approval window, the injected
+provider and the release pipeline. The kit gives you the parts that must be right:
+
+- **Vault:** every secret encrypted at rest in `chrome.storage.local`. A password opens it
+  (scrypt), and a passkey can open it too (WebAuthn PRF).
+- **Session:** the unlocked key lives only in `chrome.storage.session`, with an expiry that
+  is checked on every read and an alarm that locks the wallet.
+- **Relay and router:** page → content script → service worker. The worker trusts the origin
+  the browser recorded for the port, never the one the page claims. Per-site permissions
+  decide what a site may call.
+- **Approval queue:** one approval window at a time, at most three waiting requests per
+  site, one waiting connect.
+- **Signing checks:** the signing address must be connected, typed data must be for the
+  connected chain, `eth_sign` is never offered, contract deployments and site-made EIP-7702
+  delegations are refused. Nonce and fees come from your RPC.
+
+The kit has no UI and makes no network requests of its own. It doesn't need `@types/chrome`:
+its adapters take plain objects shaped like `chrome.storage` and `chrome.alarms`, so the same
+code runs in tests with in-memory fakes. Snippets come from `examples/extension-kit`, which
+our CI typechecks and tests.
+
+```sh
+pnpm add @anywalletkit/extension-kit @anywalletkit/keyring @anywalletkit/wallet-evm
+```
+
+<Snippet file="extension-kit/src/extension.ts" region="imports" />
+
+## Open the wallet
+
+The service worker can be stopped at any moment, so it rebuilds everything from storage on
+start-up.
+
+<Snippet file="extension-kit/src/extension.ts" region="open" />
+
+The [keyring](/guides/keyring/) keeps its account list in `chrome.storage.local` as plain
+JSON: names and addresses, no secrets. Every secret read goes through the vault and needs an
+unlocked session; a locked session throws `VaultError` with the code `locked`.
+
+## Create the wallet
+
+<Snippet file="extension-kit/src/extension.ts" region="onboarding" />
+
+- `vault.create` refuses when a vault already exists. Resetting is a separate, explicit
+  `vault.destroy()`; build it as its own screen with its own warning.
+- Passwords shorter than 8 characters are refused by the vault itself.
+- `session.unlock` zeroizes the key you pass in.
+
+## Unlock: password and passkey
+
+<Snippet file="extension-kit/src/extension.ts" region="unlock" />
+
+| `VaultError` code | When |
+|---|---|
+| `wrong-password` | Wrong password, wrong passkey, or an envelope that was edited on disk. AES-GCM can't tell these apart. |
+| `locked` | A secret was read after the session locked |
+| `exists` | `create` while a vault exists |
+| `weak-kdf` | The stored KDF settings are below the floor this build accepts |
+| `invalid-input` | Empty or short password, bad key length, bad id |
+
+A passkey is a second key to the same vault, not a replacement for the password. Keep the
+password as the recovery path, and let users remove a passkey (`vault.removePasskey`).
+
+Auto-lock defaults to 15 minutes (`SESSION_DEFAULT_AUTOLOCK_MS`). Change it with
+`session.setAutoLockMs(ms)`, and call `session.touch()` when the user is active in your UI.
+
+## The request router
+
+Everything a site can ask for goes through `RequestRouter`. You give it your RPC transport,
+your approval window, and the signer for an address.
+
+<Snippet file="extension-kit/src/extension.ts" region="router" />
+
+What the router does with a request:
+
+| Request | What happens |
+|---|---|
+| `eth_chainId`, `eth_accounts` | Answered without a prompt. A site that is not connected, or a locked wallet, gets `[]` |
+| `eth_requestAccounts` | Opens the approval window (your window asks to unlock first when the wallet is locked) and stores the permission for that origin |
+| `wallet_switchEthereumChain`, `wallet_addEthereumChain` | Through the approval window; only catalog chains, https only, `eth_chainId` verified |
+| Read-only RPC (`READ_METHODS`) | Sent to your RPC for the site's chain, never to an endpoint the site chose |
+| `personal_sign`, `eth_signTypedData_v4`, `eth_sendTransaction` | Checked, reviewed in the approval window, signed, and a transaction is broadcast through your RPC |
+| Anything else | Error `4200` (unsupported method) |
+
+Errors come back as EIP-1193 codes: `4001` the user declined, `4100` unauthorized, `4900`
+disconnected, `-32002` a connect request is already waiting, `-32005` too many waiting
+requests.
+
+The signer is built for one signature and its key is wiped right after (`handle.dispose()`).
+Pass a `preview` function to `createSignHandler` to show a simulation in the approval window;
+[Transaction preview](/guides/tx-preview/) builds one.
+
+## The approval window
+
+The queue shows one request at a time. Your approval page reads the request, shows it, and
+answers with `approvals.resolve(id, value)` or `approvals.decline(id)`. Closing the window
+declines the request.
+
+<Snippet file="extension-kit/src/extension.ts" region="approval-window" />
+
+Show on every approval:
+
+- **The origin from the request** (`request.origin`), which the browser recorded. Never show
+  a name or URL the page sent about itself.
+- **`request.originWarnings`**: phishing and lookalike warnings from your `annotate` hook. The
+  router snippet wires `PhishingDetector`, which reads a list in the `eth-phishing-detect`
+  format. Ship the list inside your build; the kit never downloads it.
+- **What will happen**: for transactions, the prepared fee (`payload.prepared.maxFee`) and
+  your preview.
+
+## The relay
+
+The worker side checks the origin of every message against the port's sender:
+
+<Snippet file="extension-kit/src/extension.ts" region="port" />
+
+The content script only stamps the page's origin and forwards messages both ways:
+
+<Snippet file="extension-kit/src/extension.ts" region="content" />
+
+Your injected provider (the `window.ethereum` object, EIP-6963 announcements) posts
+`PageRequest` messages with `target: PAGE_TARGET.toContent` and listens for responses and
+events. Keep it small: it runs in the page's world, where the page can see and change it.
+
+## What you still build
+
+- The popup, the onboarding and unlock screens, and the approval page.
+- The injected providers for the chains you support.
+- The extension's content security policy: `script-src 'self'`, no remote scripts or images.
+- An allowlist of hosts your worker's `fetch` may reach.
+- A reproducible release build, and the store listing below.
+
+## Publishing to the Chrome Web Store
+
+The SDK ships no store listing. The store account is yours, and whoever controls it can push
+an update to every user of your wallet. Treat it like a signing key.
+
+**The account**
+
+- Use a dedicated Google account for publishing, not someone's personal mail.
+- Turn on 2-Step Verification with a passkey or a hardware security key, not SMS. The store
+  requires 2-Step Verification before anyone can publish or update an item
+  ([policy](https://developer.chrome.com/docs/webstore/program-policies/two-step-verification)).
+- Working as a team: invite members to the publisher with the right roles instead of sharing
+  one login ([publisher members](https://developer.chrome.com/docs/webstore/group-publishers)).
+- The developer email can't be changed after the account is created
+  ([registration](https://developer.chrome.com/docs/webstore/register)).
+
+**Identity and disclosures**
+
+- Every publisher declares whether it is a trader. A trader's legal name, phone number and
+  address are shown on the listing
+  ([trader FAQ](https://developer.chrome.com/docs/webstore/program-policies/trader-verification-faq)).
+- Verify your publisher identity. The "Established Publisher" badge comes later, on its own,
+  after a track record ([discovery](https://developer.chrome.com/docs/webstore/discovery)).
+- Fill in the Privacy tab: a single purpose, a reason for every permission, the remote code
+  declaration, the data use disclosures, and a privacy policy URL
+  ([privacy fields](https://developer.chrome.com/docs/webstore/cws-dashboard-privacy)).
+
+**The package**
+
+- Ask for as few permissions as you can. Broad host permissions (`<all_urls>`, `https://*/*`)
+  and powerful ones (`tabs`, `cookies`, `webRequest`) get a longer review
+  ([review process](https://developer.chrome.com/docs/webstore/review-process)).
+- Bundle all code. MV3 doesn't allow code loaded from outside the extension's own files
+  ([remote hosted code](https://developer.chrome.com/docs/extensions/develop/migrate/remote-hosted-code)).
+  Submit readable code: obfuscation is not allowed.
+
+**Releasing**
+
+- Publish by hand from the dashboard. Don't keep a publish token (an OAuth refresh token for
+  the [Web Store API](https://developer.chrome.com/docs/webstore/using-api)) in CI: anyone who
+  gets it can ship an update to all your users.
+- Use deferred publishing to choose when a reviewed version goes live; you have 30 days. Once
+  the item has more than 10,000 weekly users, roll out to a percentage of users first
+  ([updates](https://developer.chrome.com/docs/webstore/update)).
+- Plan for review time. Most reviews take a few days, some take a few weeks. After three
+  weeks, contact developer support.
+
+:::caution[Check the current store policy yourself]
+Store rules, review times and dashboard fields change. We checked the facts above against
+Chrome's documentation on 2026-10-24. Read the current
+[program policies](https://developer.chrome.com/docs/webstore/program-policies) before you
+submit.
+:::

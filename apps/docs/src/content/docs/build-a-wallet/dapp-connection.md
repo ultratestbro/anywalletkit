@@ -23,6 +23,9 @@ discovery), Solana, TON Connect, Tron, Bitcoin and NEAR.
 
 **You bring:** the UI (popup, approval window), the store listing and its account.
 
+The code, and how to publish to the Chrome Web Store, are in the
+[Browser extension guide](/guides/extension-kit/).
+
 **Rules:**
 
 - **Show the requesting site's origin** on every approval, from the browser, never from the
