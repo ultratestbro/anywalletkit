@@ -16,6 +16,7 @@ concurrency: module-watch
 jobs:
   watch:
     runs-on: ubuntu-latest
+    timeout-minutes: 60   # a hung source must not hold the job for the 6-hour default (scan 2026-10-23 F12)
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -24,6 +25,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build            # the canary runs each package's verify-live against dist/
       - name: run watch
+        id: watch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -50,7 +52,7 @@ jobs:
           fi
           node scripts/watch/watch.mjs --send ${{ inputs.only && format('--only {0}', inputs.only) || '' }}
       - name: run canary
-        if: ${{ !inputs.only }}
+        if: ${{ !cancelled() && !inputs.only }}   # still runs when the watch digest failed to send
         continue-on-error: true   # a failing module is reported, not a reason to skip the snapshot commit
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -66,7 +68,7 @@ jobs:
           TON_RPC_URL: ${{ secrets.TON_RPC_URL }}
         run: node scripts/watch/canary.mjs --send --timeout 300
       - name: run routes canary
-        if: ${{ !inputs.only }}
+        if: ${{ !cancelled() && !inputs.only }}
         continue-on-error: true
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -82,6 +84,8 @@ jobs:
           NEAR_INTENTS_JWT: ${{ secrets.NEAR_INTENTS_JWT }}
         run: node scripts/watch/routes.mjs --send --timeout 30
       - name: commit snapshot
+        # Only after a watch run whose digest went out: a refused / failed send keeps the old state, so tomorrow alerts again (scan F13).
+        if: ${{ !cancelled() && steps.watch.outcome == 'success' }}
         run: |
           git config user.name "module-watch"
           git config user.email "module-watch@users.noreply.github.com"

@@ -6,6 +6,7 @@ import {readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync} from "n
 import {resolve, dirname, basename} from "node:path";
 import {fileURLToPath} from "node:url";
 import {createHash} from "node:crypto";
+import {esc, firstBlocks, readCapped, safeLink, visibleText} from "./html-text.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, "../..");
@@ -65,15 +66,6 @@ function canonical(v) {
   return JSON.stringify(v);
 }
 const dig = (o, path) => (path ? path.split(".").reduce((a, k) => (a == null ? a : a[k]), o) : o);
-function visibleText(html, between) {
-  let h = html;
-  if (between?.length === 2) {
-    const a = h.indexOf(between[0]); const b = a >= 0 ? h.indexOf(between[1], a) : -1;
-    if (a >= 0 && b > a) h = h.slice(a, b);
-  }
-  return h.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<(nav|header|footer)[\s\S]*?<\/\1>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
-}
 
 // ── fetchers: each returns {value: string (what is compared), meta: object (what is shown)} ──
 const SLOT_IMPL = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
@@ -124,7 +116,7 @@ const F = {
       return {value: r.tag_name, meta};
     }
     const tags = await fetchJson(`https://api.github.com/repos/${s.repo}/tags?per_page=3`, {headers: ghHeaders()});
-    if (tags.length) return {value: tags[0].name, meta: {tag: tags[0].name, url: `https://github.com/${s.repo}/releases/tag/${tags[0].name}`, note: "tags only"}};
+    if (tags.length) return {value: tags[0].name, meta: {tag: tags[0].name, url: `https://github.com/${s.repo}/releases/tag/${encodeURIComponent(tags[0].name)}`, note: "tags only"}};
     // No releases, no tags: watch the default branch head instead (every push counts).
     const commits = await fetchJson(`https://api.github.com/repos/${s.repo}/commits?per_page=1`, {headers: ghHeaders()});
     if (!commits.length) throw new Error("no releases, tags or commits");
@@ -148,15 +140,16 @@ const F = {
   async "http-text"(s) {
     const r = await fetch(s.url, {headers: {"user-agent": "Mozilla/5.0 forgewallet-watch", ...(s.headers ?? {})}, signal: AbortSignal.timeout(25_000)});
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const text = visibleText(await r.text(), s.between);
+    const text = visibleText(await readCapped(r), s.between);
     if (text.length < 200) throw new Error(`page text too short (${text.length} chars) — selector or JS-rendered page`);
     return {value: sha(text), meta: {hash: sha(text).slice(0, 16), chars: text.length}, text};
   },
   async "rss"(s) {
     const r = await fetch(s.url, {headers: {"user-agent": "forgewallet-watch"}, signal: AbortSignal.timeout(20_000)});
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const xml = await r.text();
-    const items = [...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/\1>/g)].slice(0, 5).map((m) => {
+    const xml = await readCapped(r);
+    const items = firstBlocks(xml, ["item", "entry"], 5).map((block) => {
+      const m = [block];
       const t = m[0].match(/<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/)?.[1]?.trim() ?? "";
       const l = m[0].match(/<link[^>]*href="([^"]+)"/)?.[1] ?? m[0].match(/<link[^>]*>([\s\S]*?)<\/link>/)?.[1]?.trim() ?? "";
       return {title: t, link: l};
@@ -211,7 +204,7 @@ function describe(s, before, after) {
     default: return "changed";
   }
 }
-const linkOf = (s, after) => after.meta?.url || (s.type === "http-json" || s.type === "http-text" || s.type === "rss" ? s.url : s.type.startsWith("github") ? `https://github.com/${s.repo}` : null);
+const linkOf = (s, after) => safeLink(after.meta?.url || (s.type === "http-json" || s.type === "http-text" || s.type === "rss" ? s.url : s.type.startsWith("github") ? `https://github.com/${s.repo}` : null), s);
 
 // ── run ────────────────────────────────────────────────────────────────────
 const manifests = loadManifests();
@@ -269,7 +262,6 @@ if (!DRY && !BASELINE) {
 if (BASELINE) console.error(`baseline written for ${manifests.length} modules (${total} sources, ${errors.length} unreachable)`);
 
 // ── telegram ───────────────────────────────────────────────────────────────
-const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 async function postTelegram(html) {
   const token = env.TELEGRAM_BOT_TOKEN, chat = env.TELEGRAM_WATCH_CHAT || env.TELEGRAM_ALERTS_CHAT;
   if (!token || !chat) { console.error("telegram: TELEGRAM_BOT_TOKEN / TELEGRAM_WATCH_CHAT not set, skipping"); return false; }
@@ -294,7 +286,8 @@ if (SEND && !BASELINE) {
       for (const [err, es] of errorGroups.slice(0, 8)) h.push(es.length > 3 ? `• ${esc(err)} — ${es.length} sources (${esc(es.slice(0, 3).map((e) => e.label).join(", "))}…)` : es.map((e) => `• ${esc(slug(e.module))} · ${esc(e.label)}: ${esc(err)}`).join("\n"));
       if (errorGroups.length > 8) h.push(`• …and ${errorGroups.length - 8} more kinds`);
     }
-    await postTelegram(h.join("\n"));
+    // A digest Telegram refused must fail the job: the state commit is skipped, so the changes alert again tomorrow (scan F13).
+    if (!(await postTelegram(h.join("\n")))) process.exitCode = 1;
   }
 }
-process.exit(0);
+process.exit(process.exitCode ?? 0);
