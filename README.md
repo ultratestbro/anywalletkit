@@ -79,6 +79,15 @@ Every protocol module ships a `module.json`; `pnpm registry` builds
 
 User documentation: [docs.anywallet.tech](https://docs.anywallet.tech) (sources in `apps/docs`).
 
+## Build with AI
+
+Coding agents (Claude Code, Cursor, Codex…) get a compact, exact SDK reference in
+[AGENTS.md](AGENTS.md) and the guides as plain text at
+[docs.anywallet.tech/llms-small.txt](https://docs.anywallet.tech/llms-small.txt). Copy-paste
+prompts that build a wallet, swaps, a review sheet, Earn, accounts, a payout bot or your own
+module are in [prompts/](prompts/), with the eval results of each one; the
+[Build with AI](https://docs.anywallet.tech/build-with-ai/) docs section explains them.
+
 ## Planned modules
 
 Tracked on the SDK board; each lands as its own package behind the conformance gate.

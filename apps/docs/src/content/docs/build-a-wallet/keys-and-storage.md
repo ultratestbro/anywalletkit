@@ -49,7 +49,17 @@ Otherwise a user who imports their MetaMask or Phantom phrase sees an empty wall
 
 **In the kit:**
 
-- **Mobile:** nothing yet; a seed vault package is planned.
+- **Mobile:** `@anywalletkit/secure-storage-react-native`, an Expo module (Swift + Kotlin) that plugs
+  into `keyring` as its `SecretStorage`. Each secret is a Keychain item / Keystore-wrapped file
+  that only Face ID / Touch ID / a fingerprint, with the device passcode as the fallback, can open,
+  on every read; it never leaves the device and is unreadable while the phone is locked. It needs
+  a dev or Release build (not Expo Go) and `NSFaceIDUsageDescription` in `Info.plist`:
+
+  ```ts
+  import { createSecureStorage } from '@anywalletkit/secure-storage-react-native'
+  const secrets = createSecureStorage({ namespace: 'my-wallet' })
+  const keyring = await Keyring.load({ storage, secrets, chains })
+  ```
 - **Browser extension:** `extension-kit` has an encrypted vault (password or passkey) and a
   session that locks after 15 minutes idle. See [dApp connection](/build-a-wallet/dapp-connection/).
 
@@ -59,7 +69,7 @@ Otherwise a user who imports their MetaMask or Phantom phrase sees an empty wall
 |---|---|---|
 | iOS | [Keychain Services](https://developer.apple.com/documentation/security/keychain-services) | Use an access control that asks for Face ID **or** the device passcode, so a user whose Face ID fails is not locked out |
 | Android | [Android Keystore](https://developer.android.com/privacy-and-security/keystore) | Ask for biometrics with a device-credential fallback |
-| Expo / React Native | [`expo-secure-store`](https://docs.expo.dev/versions/latest/sdk/securestore/) with `requireAuthentication`, [`expo-local-authentication`](https://docs.expo.dev/versions/latest/sdk/local-authentication/) | One API over both platforms |
+| Expo / React Native | `@anywalletkit/secure-storage-react-native` (above); in Expo Go, [`expo-secure-store`](https://docs.expo.dev/versions/latest/sdk/securestore/) with `requireAuthentication` | One API over both platforms |
 
 **Backup:**
 
@@ -68,7 +78,9 @@ Otherwise a user who imports their MetaMask or Phantom phrase sees an empty wall
 - "Export private key" for one account goes behind the same authentication as the phrase.
   `keyring.exportPrivateKey` returns the key in the format the chain's other wallets import,
   checked against the account's address. See [Keyring](/guides/keyring/#back-up-and-remove).
-- Encrypted cloud backup (iCloud Keychain, Google Drive) is planned for the SDK.
+- Encrypted backups: `@anywalletkit/seed-vault` seals a secret into a password- or key-protected
+  file, and `@anywalletkit/backup-cloud` keeps it in the app's iCloud Drive container with the key
+  in iCloud Keychain (Android is planned).
 
 ## Keys that never touch the phone
 

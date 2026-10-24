@@ -20,6 +20,9 @@ Packages are not on npm yet.
 | `@anywalletkit/kit` | Orchestrator: one seed or signer, registered chain wallets and protocol modules, accounts by CAIP-2 chain id, policies (fee cap, allow / block lists, confirmation) before every broadcast |
 | `@anywalletkit/keyring` | Many accounts from one seed plus imported seeds and private keys, one account list across chains, per-execution accounts that dispose the key after use |
 | `@anywalletkit/runtime-hermes` | One-call React Native / Hermes polyfills the SDK relies on |
+| `@anywalletkit/secure-storage-react-native` | The keyring's secret storage on iOS / Android: Face ID, Touch ID or fingerprint with a passcode fallback on every read (Expo module) |
+| `@anywalletkit/seed-vault` | Encrypted backup file for one seed or key, opened by a password (Argon2id) or a 32-byte key |
+| `@anywalletkit/backup-cloud` | iCloud Drive backups of seed-vault files, with the key in iCloud Keychain or a password |
 
 ## Chains
 

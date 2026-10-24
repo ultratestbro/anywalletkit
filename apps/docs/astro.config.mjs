@@ -88,6 +88,7 @@ export default defineConfig({
       },
       sidebar: [
         { label: 'Getting started', items: [{ label: 'Introduction', link: '/' }, { autogenerate: { directory: 'getting-started' } }] },
+        { label: 'Build with AI', items: [{ autogenerate: { directory: 'build-with-ai' } }] },
         { label: 'Concepts', items: [{ autogenerate: { directory: 'concepts' } }] },
         { label: 'Build a wallet', items: [{ autogenerate: { directory: 'build-a-wallet' } }] },
         { label: 'Guides', items: [{ autogenerate: { directory: 'guides' } }] },

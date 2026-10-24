@@ -45,7 +45,7 @@ you install them once, at the app entry, **before anything else is imported**.
 
 ```sh
 npx expo install react-native-get-random-values
-pnpm add @anywalletkit/runtime-hermes buffer fastestsmallesttextencoderdecoder
+pnpm add @anywalletkit/runtime-hermes buffer fastestsmallesttextencoderdecoder react-native-url-polyfill
 ```
 
 Put the polyfills in their own file so nothing can be evaluated before them:
@@ -61,11 +61,14 @@ globalThis.Buffer ??= Buffer
 // 3. Hermes ships TextEncoder but no TextDecoder.
 import 'fastestsmallesttextencoderdecoder/EncoderDecoderTogether.min.js'
 
-// 4. Everything else the SDK relies on: AbortSignal.timeout / any,
+// 4. React Native's URL has no working searchParams; providers parse endpoints with it.
+import 'react-native-url-polyfill/auto'
+
+// 5. Everything else the SDK relies on: AbortSignal.timeout / any,
 //    crypto.subtle.digest, structuredClone, the Buffer.subarray fix.
-//    Each piece is installed only when it is missing.
+//    Each piece is installed only when it is missing; it throws if 1–4 are absent.
 import { installHermesRuntime } from '@anywalletkit/runtime-hermes'
-installHermesRuntime({ throwOnMissing: false })
+installHermesRuntime()
 ```
 
 ```js title="index.js"
@@ -74,6 +77,24 @@ import 'expo-router/entry' // or your AppRegistry.registerComponent(...)
 ```
 
 Point `"main"` in `package.json` at `index.js`.
+
+### TON on Metro
+
+`@anywalletkit/wallet-ton` depends on `@ton/crypto-primitives`, whose React Native build requires
+`expo-crypto` and the native `react-native-fast-pbkdf2` module. Install `expo-crypto`
+(`npx expo install expo-crypto`) and resolve the native module to the pure-JS drop-in that
+`runtime-hermes` ships:
+
+```js title="metro.config.js"
+const { getDefaultConfig } = require('expo/metro-config')
+const config = getDefaultConfig(__dirname)
+const resolveRequest = config.resolver.resolveRequest
+config.resolver.resolveRequest = (context, moduleName, platform) =>
+  moduleName === 'react-native-fast-pbkdf2'
+    ? { type: 'sourceFile', filePath: require.resolve('@anywalletkit/runtime-hermes/fast-pbkdf2') }
+    : (resolveRequest ?? context.resolveRequest)(context, moduleName, platform)
+module.exports = config
+```
 
 :::tip
 `installHermesRuntime()` returns a report of what it found (`native`, `patched`,
