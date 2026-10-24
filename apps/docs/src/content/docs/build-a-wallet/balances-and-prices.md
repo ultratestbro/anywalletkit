@@ -10,7 +10,8 @@ sidebar:
 **The job:** show what the user holds on every chain.
 
 **In the kit:** every account reads its native balance (`getBalance()`) and the token
-balances you ask for (`getTokenBalance(token)`, `getTokenBalances(tokens)`).
+balances you ask for (`getTokenBalance(token)`, `getTokenBalances(tokens)`). The code is in the
+[Balances guide](/guides/balances/).
 
 ### Finding which tokens to show
 

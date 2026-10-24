@@ -1,0 +1,97 @@
+---
+title: Balances
+description: Native and token balances on every chain, the token list behind them, exact formatting with bigint, and where a price API plugs in.
+sidebar:
+  order: 0
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+Every account reads its own balances: `getBalance()` for the network's gas coin and
+`getTokenBalance(token)` for a token contract. The wallet decides which tokens to read, formats
+the amounts and adds prices. This page builds that in a few small functions.
+
+Snippets come from `examples/balances`, which our CI typechecks and tests. The live run reads
+real balances on Base.
+
+```sh
+pnpm add @anywalletkit/kit @anywalletkit/wallet-evm @anywalletkit/networks @anywalletkit/swap2-assets
+```
+
+<Snippet file="balances/src/balances.ts" region="imports" />
+
+## One account per chain
+
+<Snippet file="balances/src/balances.ts" region="setup" />
+
+Register each EVM network on its own chain id so it gets its own RPC list. The same seed gives
+the same address on every EVM network, but the balances are separate. To take the RPC lists
+from the user's settings, see [Networks](/guides/networks/).
+
+## Which tokens to read
+
+A chain has no call that lists the tokens an address holds. The wallet keeps a list.
+
+<Snippet file="balances/src/balances.ts" region="token-list" />
+
+- **The gas coin** comes from the network table in `networks`: its symbol and decimals per
+  network. POL on Polygon, MNT on Mantle. Never hardcode "ETH".
+- **The catalog** in `swap2-assets` lists the native coin and the major tokens per chain, with
+  contract addresses and decimals. It is a short curated list, not a full token list.
+- **The user's tokens** are the ones they added by contract address. Keep them in your own
+  storage, mark them as user-added, and drop duplicates of catalog tokens.
+
+To find tokens outside the list, use a holdings indexer. [Balances and
+prices](/build-a-wallet/balances-and-prices/) lists providers per chain. Show what it finds
+behind a "hidden" filter: most unknown tokens are spam.
+
+## Read the balances
+
+<Snippet file="balances/src/balances.ts" region="read" />
+
+- **Amounts are `bigint` in base units.** 1 USDC is `1_000_000n`, 1 ETH is `10n ** 18n`.
+- **A failed read is not zero.** One token contract can revert or one RPC can time out. Keep
+  the row with its error and show "couldn't load", never `0`. A wrong zero makes users think
+  their funds are gone.
+- **Chains without tokens.** Bitcoin and Zcash accounts throw on `getTokenBalance`. Read only
+  `getBalance()` there. Solana, TON, Tron and NEAR accounts read tokens the same way as EVM:
+  an SPL mint, a jetton master, a TRC-20 contract or a NEP-141 account.
+
+## Format the amount
+
+<Snippet file="balances/src/balances.ts" region="format" />
+
+Format from the `bigint` itself. `Number(amount)` loses precision above 2⁵³, and some Hermes
+builds return wrong values above 2⁶³, so an 18-decimal balance can show a wrong number. When
+you need a `Number` for math (a USD value, a chart), use `bigintToUnits(amount, decimals)` from
+`core`. It is exact for display and pricing. Never use it for an amount you sign.
+
+## Every chain at once
+
+<Snippet file="balances/src/balances.ts" region="portfolio" />
+
+Read the chains in parallel. A chain whose RPC is down comes back with its rows marked as
+failed, and the rest of the screen still loads.
+
+**When to refresh:**
+
+- when the screen opens and when the app returns to the foreground;
+- after the user sends, once the receipt arrives. Until then, show your own pending row:
+  a balance read right after a broadcast may not include it yet;
+- on pull to refresh. Avoid fast timers: each refresh is one call per token per chain, and
+  public RPCs rate-limit quickly.
+
+## Prices
+
+The SDK has no price source. You bring a price API and call it through your server, so its key
+stays off the device. The function below takes it as a parameter.
+
+<Snippet file="balances/src/balances.ts" region="prices" />
+
+- **Look up by contract address**, never by symbol. Symbols collide, and fake tokens copy
+  real ones.
+- **No price is `null`, not $0.** Show "no price" and leave the token out of the total.
+- **Price only what the user holds.** Zero balances never reach the API.
+- **Cache** prices for a minute or more and show when a price is stale.
+
+Providers to compare are listed on [Balances and prices](/build-a-wallet/balances-and-prices/#prices).

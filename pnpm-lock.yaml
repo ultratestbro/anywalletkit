@@ -85,6 +85,34 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
+  examples/balances:
+    dependencies:
+      '@anywalletkit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@anywalletkit/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@anywalletkit/networks':
+        specifier: workspace:*
+        version: link:../../packages/networks
+      '@anywalletkit/swap2-assets':
+        specifier: workspace:*
+        version: link:../../packages/swap2-assets
+      '@anywalletkit/wallet-evm':
+        specifier: workspace:*
+        version: link:../../packages/wallet-evm
+    devDependencies:
+      '@anywalletkit/conformance':
+        specifier: workspace:*
+        version: link:../../packages/conformance
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+
   examples/earn:
     dependencies:
       '@anywalletkit/core':
