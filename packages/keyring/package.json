@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/keyring",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Multi-account, multi-source keyring for Any Wallet Kit: many accounts from one seed, imported seeds and private keys, account discovery — secrets stay in the app's secure storage.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

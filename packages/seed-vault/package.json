@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/seed-vault",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Encrypted backups of wallet secrets for Any Wallet Kit: a versioned, self-describing envelope (XChaCha20-Poly1305 under a random data key) that one or more protectors unlock — a password through Argon2id, or a 32-byte key from a passkey PRF, an iCloud Keychain / Block Store item or a hardware key. Metadata (type, fingerprint) is authenticated, nothing is logged, every key is zeroized, decode is strict and bounded. Pure TypeScript, Hermes-safe; the native Argon2 hook makes it fast on phones.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

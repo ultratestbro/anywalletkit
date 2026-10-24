@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-jupiter",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Jupiter same-chain Solana swaps for the swap2 engine through Swap API V2's Router path (GET /swap/v2/build): Metis routing, no Jupiter swap fee, keyless or with an API key. The transaction is assembled locally from raw instructions after every instruction is vetted (Jupiter v6 + token/system/ATA plumbing only, taker the only signer, swap arguments decoded: our amount, the quoted output, our slippage, zero platform fee); the account executes it through its serialized-transaction guard and its own RPC.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

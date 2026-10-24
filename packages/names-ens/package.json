@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/names-ens",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "ENS names for Any Wallet Kit wallets: vitalik.eth / name.base.eth / alice.cb.id → the address for one chain (ENSIP-9/11 multichain, wildcard + CCIP-Read), verified primary names, avatars, lookalike warnings. Implements the core NameResolver.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

@@ -1,5 +1,11 @@
 # @anywalletkit/core
 
+## 0.3.2
+
+### Patch Changes
+
+- 2975c93: README: an npm badge and an Install section (npm / pnpm / yarn, the peers to add, a link to the package on npm and to the release workflow that publishes it with provenance).
+
 ## 0.3.1
 
 ### Patch Changes

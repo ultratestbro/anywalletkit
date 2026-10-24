@@ -1,5 +1,13 @@
 # @anywalletkit/networks
 
+## 0.2.2
+
+### Patch Changes
+
+- 2975c93: README: an npm badge and an Install section (npm / pnpm / yarn, the peers to add, a link to the package on npm and to the release workflow that publishes it with provenance).
+- Updated dependencies [2975c93]
+  - @anywalletkit/swap2-assets@0.1.4
+
 ## 0.2.1
 
 ### Patch Changes

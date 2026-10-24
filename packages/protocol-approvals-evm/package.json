@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-approvals-evm",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "A simple package that lets @anywalletkit/wallet-evm wallet accounts discover the token approvals they have granted (ERC-20 allowances, ERC-721 / ERC-1155 operators and per-token approvals, Permit2 allowances, EIP-7702 delegations), flag the risky ones, and revoke them one by one or all at once.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
