@@ -25,7 +25,7 @@ const ascii = (s: string) => [...new TextEncoder().encode(s)]
 const word = (hex: string) => hex.padStart(64, '0')
 const calldata = (to: string, amount: bigint) => [...hexToBytes('a9059cbb' + word(toHexAddress(to).slice(2)) + word(amount.toString(16)))]
 
-const ENUM: Record<string, number> = { TransferContract: 1, TriggerSmartContract: 31, VoteWitnessContract: 4 }
+const ENUM: Record<string, number> = { TransferContract: 1, TriggerSmartContract: 31, VoteWitnessContract: 4, AccountPermissionUpdateContract: 46 }
 /** Contract{type, parameter: Any{type_url, value}} — every piece given as raw bytes so tests can corrupt any of them. */
 const contract = (type: string, param: number[], extra: number[] = []) =>
   [...vfield(1, ENUM[type]!), ...lfield(2, [...lfield(1, ascii(`type.googleapis.com/protocol.${type}`)), ...lfield(2, param)]), ...extra]
@@ -97,6 +97,16 @@ describe('scan F4: strict, canonical Tron protobuf', () => {
     // Any.value twice
     const twoValues = [...vfield(1, 1), ...lfield(2, [...lfield(1, ascii('type.googleapis.com/protocol.TransferContract')), ...lfield(2, transferParam(DAPP, 1)), ...lfield(2, transferParam(ATTACKER, 9))])]
     expect(code(() => verifyRawTransaction(tx(raw([twoValues]))))).toBe('raw-noncanonical')
+  })
+
+  it('refuses a repeated owner_address in a contract type it has no schema for (scan 2026-10-23 F9)', () => {
+    // java-tron takes the last owner_address: the chain would act for ATTACKER's account while every check here sees ME.
+    const twoOwners = [...lfield(1, addr(ME)), ...lfield(1, addr(ATTACKER)), ...lfield(3, [0x0a, 0x00])]
+    expect(code(() => verifyRawTransaction(tx(raw([contract('AccountPermissionUpdateContract', twoOwners)]))))).toBe('raw-noncanonical')
+    // One owner_address still decodes (shown as undecoded on the sheet, owner checked by signRaw).
+    const one = raw([contract('AccountPermissionUpdateContract', [...lfield(1, addr(ME)), ...lfield(3, [0x0a, 0x00])])])
+    expect(code(() => verifyRawTransaction(tx(one)))).toBe('ok')
+    expect(toHexAddress(decodeRawData(one).raw_data.contract[0]!.parameter.value.owner_address as string)).toBe(toHexAddress(ME))
   })
 
   it('allows the repeated fields: raw.contract, raw.auths, VoteWitness.votes', () => {

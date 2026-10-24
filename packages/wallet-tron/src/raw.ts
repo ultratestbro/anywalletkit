@@ -198,6 +198,9 @@ function decodeParameter(type: string, bytes: Uint8Array): { value: Record<strin
   const fields = readFields(bytes)
   if (!schema) {
     // Generic: field 1 is owner_address in every system contract; keep the rest as bytes for the sheet.
+    // java-tron (protobuf-java) takes the LAST occurrence of a singular field, so a second owner_address
+    // would make the chain act for another account while every check here saw ours: refuse it (scan F9).
+    assertSingular(fields, [1], type)
     const owner = fields.find((f) => f.number === 1 && f.wire === 2 && (f.value as Uint8Array).length === 21 && (f.value as Uint8Array)[0] === 0x41)
     if (owner) value.owner_address = bytesToHex(owner.value as Uint8Array)
     value.raw_parameter_hex = bytesToHex(bytes)
