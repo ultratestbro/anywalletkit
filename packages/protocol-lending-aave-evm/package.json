@@ -3,6 +3,9 @@
   "version": "0.2.1",
   "description": "Aave v3 for @anywalletkit/wallet-evm accounts: supply, withdraw, borrow (variable rate) and repay on any Aave v3 market, native coin through WrappedTokenGatewayV3, one-transaction supply/repay with EIP-2612 permits, reserves with rates and caps, health factor and position. Only the PoolAddressesProvider is trusted; the Pool is read on-chain and cross-checked.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-lending-aave-evm" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -51,5 +54,6 @@
     "evm",
     "lending-protocol",
     "anywalletkit"
-  ]
+  ],
+  "publishConfig": { "access": "public", "provenance": true }
 }

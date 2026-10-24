@@ -3,6 +3,9 @@
   "version": "0.1.1",
   "description": "Wrap and unwrap the native coin (ETH\u2194WETH, BNB\u2194WBNB, POL\u2194WPOL\u2026) on 13 EVM chains as a swap2 venue: 1:1, no pool, wrapped tokens verified on-chain.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-swap2-wrap" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -55,5 +58,6 @@
     "wrap",
     "weth",
     "permissionless"
-  ]
+  ],
+  "publishConfig": { "access": "public", "provenance": true }
 }

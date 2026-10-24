@@ -3,6 +3,9 @@
   "version": "0.2.1",
   "description": "Morpho for @anywalletkit/wallet-evm accounts: Morpho Vaults (MetaMorpho V1 and Vault V2, ERC-4626 deposit / redeem) and Morpho Blue markets (supply, withdraw, borrow, repay, collateral) as LendingProtocols, on 10 chains. Vaults are verified against Morpho's factories, markets resolved on-chain, positions read with interest accrued like the contract does; the Morpho API only decorates (APY, listing).",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-lending-morpho-evm" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -28,5 +31,6 @@
     "@types/node": "^22",
     "vitest": "^5.0.3"
   },
-  "keywords": ["protocol", "lending", "morpho", "morpho-blue", "metamorpho", "vault", "erc-4626", "borrow", "evm", "lending-protocol", "anywalletkit"]
+  "keywords": ["protocol", "lending", "morpho", "morpho-blue", "metamorpho", "vault", "erc-4626", "borrow", "evm", "lending-protocol", "anywalletkit"],
+  "publishConfig": { "access": "public", "provenance": true }
 }

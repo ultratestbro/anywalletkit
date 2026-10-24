@@ -3,6 +3,9 @@
   "version": "0.2.0",
   "description": "Multi-account, multi-source keyring for Any Wallet Kit: many accounts from one seed, imported seeds and private keys, account discovery — secrets stay in the app's secure storage.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/keyring" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -51,5 +54,6 @@
     "viem": "^2.57.2",
     "@ton/crypto": "^3.3.0",
     "vitest": "^5.0.3"
-  }
+  },
+  "publishConfig": { "access": "public", "provenance": true }
 }

@@ -3,6 +3,9 @@
   "version": "0.2.0",
   "description": "ENS names for Any Wallet Kit wallets: vitalik.eth / name.base.eth / alice.cb.id → the address for one chain (ENSIP-9/11 multichain, wildcard + CCIP-Read), verified primary names, avatars, lookalike warnings. Implements the core NameResolver.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/names-ens" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -52,5 +55,6 @@
     "basenames",
     "ethereum",
     "anywalletkit"
-  ]
+  ],
+  "publishConfig": { "access": "public", "provenance": true }
 }

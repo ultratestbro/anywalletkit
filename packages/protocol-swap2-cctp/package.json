@@ -3,6 +3,9 @@
   "version": "0.1.1",
   "description": "Circle CCTP V2 for the swap2 engine: native USDC between EVM chains by burn-and-mint (Fast Transfer or Standard), attestation via Circle's Iris API, two-phase delivery with the user's own receiveMessage claim. Bound to Circle's documented contracts and native USDC per domain.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-swap2-cctp" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -35,5 +38,6 @@
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/core": "workspace:*"
   },
-  "keywords": ["swap2", "bridge", "cctp", "circle", "usdc", "burn-and-mint", "anywalletkit"]
+  "keywords": ["swap2", "bridge", "cctp", "circle", "usdc", "burn-and-mint", "anywalletkit"],
+  "publishConfig": { "access": "public", "provenance": true }
 }

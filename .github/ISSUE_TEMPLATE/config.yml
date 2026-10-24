@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/ultratestbro/anywalletkit/security/advisories/new
+    about: Private report — never a public issue.
+  - name: Documentation
+    url: https://docs.anywallet.tech
+    about: Guides, concepts and the API reference.

@@ -3,6 +3,9 @@
   "version": "0.2.0",
   "description": "The Any Wallet Kit orchestrator: one seed or signer, registered chain wallets and protocol modules, accounts by CAIP-2 chain, policies that run before anything is broadcast.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/kit" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -40,5 +43,6 @@
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",
     "vitest": "^5.0.3"
-  }
+  },
+  "publishConfig": { "access": "public", "provenance": true }
 }

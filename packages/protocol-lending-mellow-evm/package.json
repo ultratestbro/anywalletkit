@@ -3,6 +3,9 @@
   "version": "0.3.0",
   "description": "A simple package that lets @anywalletkit/wallet-evm wallet accounts use Mellow Core Vaults (Lido EarnETH / EarnUSD and any vault on the same contracts): supply through the sync or async deposit queue, redeem and claim through the redeem queue, read the position, fees, oracle reports and APY.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-lending-mellow-evm" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -54,5 +57,6 @@
     "lending-protocol",
     "anywalletkit",
     "lending"
-  ]
+  ],
+  "publishConfig": { "access": "public", "provenance": true }
 }

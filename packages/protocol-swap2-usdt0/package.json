@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "USDT0 (Tether's LayerZero OFT for USDT) for the swap2 engine: USDT / USDT0 between 16 EVM chains in one source transaction — quoteOFT + quoteSend on the OFT itself, send with the LayerZero fee as msg.value, status from LayerZero Scan, lzReceive retry of a stored payload as the claim. Bound to the deployments docs.usdt0.to lists, re-verified on-chain.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-swap2-usdt0" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -37,5 +40,6 @@
     "@anywalletkit/protocol-swap2-router": "workspace:*",
     "@anywalletkit/core": "workspace:*"
   },
-  "keywords": ["swap2", "bridge", "usdt0", "usdt", "tether", "layerzero", "oft", "anywalletkit"]
+  "keywords": ["swap2", "bridge", "usdt0", "usdt", "tether", "layerzero", "oft", "anywalletkit"],
+  "publishConfig": { "access": "public", "provenance": true }
 }

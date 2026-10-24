@@ -3,6 +3,9 @@
   "version": "0.2.1",
   "description": "A simple package that lets @anywalletkit/wallet-solana wallet accounts stake through SPL stake pools (Jito by default): stake SOL \u2192 JitoSOL, exit instantly from the reserve or through a stake account, claim, read rates, APY and earnings.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-staking-spl-stake-pool-solana" },
   "type": "module",
   "main": "index.js",
   "types": "./types/index.d.ts",
@@ -56,5 +59,6 @@
     "staking-protocol",
     "anywalletkit",
     "staking"
-  ]
+  ],
+  "publishConfig": { "access": "public", "provenance": true }
 }

@@ -3,6 +3,9 @@
   "version": "0.2.1",
   "description": "A simple package that lets @anywalletkit/wallet-ton wallet accounts stake through Tonstakers: stake GRAM \u2192 tsTON, unstake instant / standard / best-rate, track payout bills, rates and APY.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-staking-tonstakers-ton" },
   "type": "module",
   "main": "index.js",
   "types": "./types/index.d.ts",
@@ -60,5 +63,6 @@
     "./index.js",
     "./src/buffer-global.js",
     "./src/tonstakers-protocol-ton.js"
-  ]
+  ],
+  "publishConfig": { "access": "public", "provenance": true }
 }

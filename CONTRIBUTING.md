@@ -1,38 +1,29 @@
 # Contributing
 
-## Adding a protocol module
+Thanks for your interest in Any Wallet Kit.
 
-1. Pick the protocol type: `swap`, `bridge`, `swap2`, `lending`, `staking`,
-   `approvals`, `fiat`. If none fits, open an RFC issue first (see below).
-2. Create `packages/protocol-<type>-<name>-<chain>` extending the base class
-   from `@anywalletkit/core`. Write it against `IWalletAccount` only — never
-   against a concrete chain package.
-3. Add `module.json` (registry manifest) and a test that calls
-   `describeProtocolModule()` from `@anywalletkit/conformance`.
-   Swap2 modules also call `describeProtocolBehaviour()` with a recorded quote
-   fixture: it runs the module to the review gate and checks the plan (own/declared
-   recipients only, exact approvals to the declared spender, amounts = quote).
-4. Open a PR with: conformance green, the manifest, a link to one real
-   transaction executed through the module, and your handle in `CODEOWNERS`.
+## Pull requests: not accepted yet
 
-Tiers: `community` (conformance passes) → `verified` (review + live tx) →
-`core` (maintained by the project). A module whose maintainer is unresponsive
-for 6 months is marked `deprecated` in the registry.
+The SDK is pre-1.0 and its module contribution process is not open yet. Pull requests from outside the core team are closed automatically, with a pointer back here. Please don't take it personally: when contributions open, this file will describe how a module gets in (conformance suites, a registry entry and a named maintainer).
 
-## Adding a chain module
+## Issues: welcome
 
-Same as above, extending `WalletManager` / `IWalletAccount`, plus
-`describeChainModule()` with golden vectors for at least two seeds and two
-account indexes. Derivation must be documented (path, curve, address encoding).
+- **Bug reports.** Include the package and version, where it runs (Node version, React Native / Hermes, browser), the chain, and a minimal reproduction. Never paste a seed phrase or a private key, not even a "test" one that holds funds.
+- **Requests.** A chain, a protocol module or an API you are missing. Say what you would build with it.
+- **Questions.** Check [docs.anywallet.tech](https://docs.anywallet.tech) first.
 
-## Changing `core`
+## Security
 
-New protocol type, change to the account interface, new error class: open an
-issue with the `rfc` template, 7 days of discussion, then PR.
+Vulnerabilities go through private reporting, never a public issue: see [SECURITY.md](SECURITY.md).
 
-## Local
+## Working on a fork
 
 ```sh
-pnpm install && pnpm build && pnpm test
-pnpm changeset   # one per user-visible change
+pnpm install && pnpm build
+pnpm test            # Node: every suite
+pnpm test:hermes     # the Hermes VM React Native ships
+pnpm pack:check      # every package packs as it will publish
+pnpm changeset       # one per user-visible change
 ```
+
+A change is not green until Node and Hermes both are.

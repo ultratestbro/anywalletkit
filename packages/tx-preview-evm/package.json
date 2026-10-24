@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "What an EVM transaction (or an approve → call sequence) will do before it is signed: decoded calls, approvals, transfers, simulated balance changes (eth_simulateV1 with transfer tracing, eth_call fallback) and a verdict of named checks for a review screen.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/tx-preview-evm" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -27,5 +30,6 @@
     "@types/node": "^22",
     "vitest": "^5.0.3"
   },
-  "keywords": ["evm", "transaction", "preview", "simulation", "eth_simulateV1", "approvals", "security", "anywalletkit"]
+  "keywords": ["evm", "transaction", "preview", "simulation", "eth_simulateV1", "approvals", "security", "anywalletkit"],
+  "publishConfig": { "access": "public", "provenance": true }
 }

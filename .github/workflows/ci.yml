@@ -18,6 +18,8 @@ jobs:
       - run: pnpm test
       - run: pnpm registry:check # registry/modules.json must match the manifests
       - run: pnpm test:examples  # the docs Quickstart is this code: it must compile and pass
+      - run: pnpm pack:check     # every package packs as it will publish (entry points, LICENSE, no workspace ranges)
+        if: matrix.node == 22
 
 
   docs:

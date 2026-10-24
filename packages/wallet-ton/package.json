@@ -3,6 +3,9 @@
   "version": "0.1.1",
   "description": "TON wallet for Any Wallet Kit: SLIP-10 m/44'/607'/i' accounts on WalletContractV5R1, TON and jetton transfers, toncenter failover.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/wallet-ton" },
   "type": "module",
   "sideEffects": [
     "./dist/index.js",
@@ -55,5 +58,6 @@
     "@noble/curves": "^2.4.0",
     "@ton/ton": "^16.3.0",
     "vitest": "^5.0.3"
-  }
+  },
+  "publishConfig": { "access": "public", "provenance": true }
 }

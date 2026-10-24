@@ -2,6 +2,7 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightLlmsTxt from 'starlight-llms-txt';
+import starlightTypeDoc, { typeDocSidebarGroup } from 'starlight-typedoc';
 
 export default defineConfig({
   site: 'https://docs.anywallet.tech',
@@ -11,7 +12,7 @@ export default defineConfig({
     starlight({
       title: 'Any Wallet Kit',
       description:
-        'Developer docs for Any Wallet Kit — the open multichain wallet SDK: one seed, every chain, protocol modules anyone can contribute.',
+        'Developer docs for Any Wallet Kit — the open multichain wallet SDK: one seed, every chain, a pluggable signer, protocol modules for swaps, bridges, staking and lending.',
       favicon: '/favicon.svg',
       social: [
         { icon: 'x.com', label: 'X', href: 'https://x.com/anywalletkit' },
@@ -33,10 +34,38 @@ export default defineConfig({
       ],
       // /llms.txt, /llms-full.txt and /llms-small.txt: the docs as plain Markdown for AI agents.
       plugins: [
+        // API reference: TypeDoc over every package's public entry point, written to
+        // src/content/docs/api at build time (generated, not committed).
+        starlightTypeDoc({
+          entryPoints: ['../../packages/*'],
+          output: 'api',
+          sidebar: { label: 'API reference', collapsed: true },
+          typeDoc: {
+            entryPointStrategy: 'packages',
+            packageOptions: {
+              entryPoints: ['src/index.ts'],
+              excludePrivate: true,
+              excludeInternal: true,
+              excludeExternals: true,
+            },
+            excludePrivate: true,
+            excludeInternal: true,
+            excludeExternals: true,
+            validation: { notExported: false, invalidLink: false },
+            logLevel: 'Error',
+          },
+        }),
         starlightLlmsTxt({
           projectName: 'Any Wallet Kit',
           description:
             'Open multichain wallet SDK in TypeScript: one seed for EVM, Solana, TON, Tron, Bitcoin, NEAR and Zcash accounts, a pluggable signer, safety policies, and protocol modules for swaps, bridges, staking and lending. Package names use the @anywalletkit npm scope; the packages are not on npm yet.',
+          // llms-small.txt is the guides only; llms-full.txt has the guides first and
+          // the API reference after them; llms-api-reference.txt is the API alone.
+          exclude: ['api/**'],
+          demote: ['api/**'],
+          customSets: [
+            { label: 'API reference', paths: ['api/**'], description: 'every exported class, function and type of the @anywalletkit packages, generated from the source' },
+          ],
         }),
       ],
       customCss: ['./src/styles/awk.css'],
@@ -61,6 +90,7 @@ export default defineConfig({
         { label: 'Concepts', items: [{ autogenerate: { directory: 'concepts' } }] },
         { label: 'Build a wallet', items: [{ autogenerate: { directory: 'build-a-wallet' } }] },
         { label: 'Guides', items: [{ autogenerate: { directory: 'guides' } }] },
+        typeDocSidebarGroup,
       ],
     }),
   ],

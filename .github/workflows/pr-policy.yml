@@ -1,0 +1,28 @@
+name: pr-policy
+# Outside pull requests are not accepted yet (CONTRIBUTING.md): close them with
+# a pointer to issues. Runs on pull_request_target but never checks out or runs
+# the PR's code — it only comments and closes.
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  close:
+    if: ${{ !contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { owner, repo } = context.repo
+            const number = context.payload.pull_request.number
+            await github.rest.issues.createComment({ owner, repo, issue_number: number, body: [
+              'Thanks for taking the time! Any Wallet Kit does not accept outside pull requests yet, so this one is closed automatically.',
+              '',
+              'Please open an issue instead — bug reports and module requests are welcome there. Security problems go through private vulnerability reporting (see SECURITY.md), never a public issue or PR.',
+            ].join('\n') })
+            await github.rest.pulls.update({ owner, repo, pull_number: number, state: 'closed' })

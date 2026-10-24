@@ -3,6 +3,9 @@
   "version": "0.1.1",
   "description": "Activity history (HistorySource) for every EVM chain the SDK supports: Etherscan v2, Blockscout PRO and Alchemy Transfers API (API keys) with Blockscout and Routescan keyless fallbacks, merged into one ChainTx per hash with a documented spam heuristic.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/history-evm" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -44,5 +47,6 @@
     "blockscout",
     "alchemy",
     "evm"
-  ]
+  ],
+  "publishConfig": { "access": "public", "provenance": true }
 }

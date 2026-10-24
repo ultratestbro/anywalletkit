@@ -4,15 +4,20 @@ Open-source multichain wallet SDK. One seed phrase → accounts on EVM (30 netwo
 Bitcoin, TON, Tron, Solana, NEAR and Zcash (transparent), with a single account interface that protocol
 modules (swap, cross-chain swap, lending, staking, approvals, fiat) are written against.
 
-**Anyone can contribute a module.** A module is accepted when it passes the
-conformance suite and names a maintainer — not when the protocol team itself
-shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
+> **Status: pre-1.0.** Versions are `0.x`: minor releases may still change the
+> API. Not on npm yet. Documentation: **[docs.anywallet.tech](https://docs.anywallet.tech)**.
+
+```sh
+pnpm add @anywalletkit/kit @anywalletkit/wallet-evm   # plus the chains and modules you need
+```
 
 ## Why another wallet SDK
 
-- **Open contribution model.** Tests are the gate, not trust. Modules are
-  tiered `core` / `verified` / `community`; an unmaintained module becomes
-  `deprecated` automatically, it is never silently kept or deleted.
+- **Conformance is the gate.** Every chain and protocol module passes shared
+  suites (`@anywalletkit/conformance`): derivation against pinned vectors, a
+  read-only account never writes, a quote never sends, a swap plan pays only
+  declared recipients. Modules are listed in a registry with tiers
+  (`core` / `verified` / `community`).
 - **Signer is separate from the account.** The private key lives in a `Signer`.
   The local seed signer is one implementation; a Safe, a hardware wallet, MPC or
   a backend signer are others. The SDK never *requires* a seed.
@@ -33,39 +38,39 @@ shows up. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Packages
 
-| Package | Status | What |
-|---|---|---|
-| `@anywalletkit/core` | phase 0 | Signer / account interfaces, protocol base classes, errors, BIP-39 + BIP-32 / SLIP-10 helpers |
-| `@anywalletkit/conformance` | phase 0 | Golden vectors + `describeChainModule` / `describeProtocolModule` test suites |
-| `@anywalletkit/wallet-evm` | phase 1 ✓ | viem; m/44'/60'/0'/0/i; EIP-191 / EIP-712 / EIP-1559 (+ legacy, 2930, 7702 shapes); ERC-20 transfer + approve; signatures pinned byte-for-byte by golden vectors |
-| `@anywalletkit/wallet-solana` | phase 1 ✓ | @solana/kit; SLIP-10 m/44'/501'/i'/0'; SOL + SPL transfers with ATA creation; noble ed25519 signing (no WebCrypto); failover RPC |
-| `@anywalletkit/runtime-hermes` | phase 1 ✓ | one-call React Native polyfills: AbortSignal.timeout/any, subtle.digest, structuredClone + checks for getRandomValues / TextEncoder |
-| `@anywalletkit/wallet-ton` | phase 2 ✓ | @ton/ton; SLIP-10 m/44'/607'/i' on WalletContractV5R1; TON + jetton transfers; noble ed25519 via the `signer` callback; toncenter failover; receipts via toncenter v3 body hash |
-| `@anywalletkit/wallet-tron` | phase 2 ✓ | full-node HTTP API, no tronweb; m/44'/195'/0'/0/i; TRX + TRC-20; TIP-191 sign; fee model = bandwidth / energy / activation |
-| `@anywalletkit/wallet-near` | 2026-10-10 ✓ | JSON-RPC, hand-written borsh (byte-checked vs @near-js); SLIP-10 m/44'/397'/i' (NEAR Wallet path); implicit + named accounts; NEAR + NEP-141 (auto storage_deposit); NEP-413; preflight instead of simulation; dangerous-action guard |
-| `@anywalletkit/wallet-btc` | phase 2 ✓ | @scure/btc-signer; BIP-84 p2wpkh m/84'/0'/0'/0/i and BIP-86 taproot accounts; own coin selection; RBF; BIP-137 sign; Blockbook / Esplora transports with failover |
-| `@anywalletkit/wallet-zcash` | 2026-10-18 ✓ | transparent t1… accounts m/44'/133'/0'/0/i; v5 transactions with ZIP-244 txid/sighash (pinned by mined mainnet txs), ZIP-317 fees, ZIP-203 expiry; Blockchair / Blockbook transports; shielded pools out of scope |
-| `@anywalletkit/networks` | 2026-10-21 ✓ | networks for every build: catalog mainnets with the public RPC failover lists (shared by the app and the extension), default testnets per family (off until enabled), `NetworksTable` over any JSON storage (user RPCs prepended, builtins undeletable, `onlyOwnRpc`, parked RPCs), `verifyNetwork` per family (chain id / genesis / TON global id must match, latency + tip), https-only URL policy with the local-http opt-in, EIP-3085 `parseAddChainParams` |
-| `@anywalletkit/protocol-swap2-core` | phase 3 ✓ | swap2 engine: `BaseSwap2Protocol` / `SingleProviderSwap2` over `Swap2Protocol` from core, `CrossChainRouter`, remote provider, quote/execution safety rails |
-| `@anywalletkit/protocol-swap2-router` | phase 3 ✓ | `RouterSwap2Protocol`: auctions every engine provider and any external swap2 module, executes the winner, resumes status |
-| `@anywalletkit/protocol-swap2-near-intents`, `-lifi`, `-thorchain`, `-omniston` | phase 3 ✓ | the four providers (NEAR Intents 1Click, LI.FI REST, THORChain, STON.fi Omniston), each also a standalone `Swap2Protocol` |
-| `@anywalletkit/swap2-assets` | phase 3 ✓ | CAIP-19 asset registry shared by the swap2 packages |
-| `@anywalletkit/protocol-swap2-cctp` | 2026-10-10 ✓ | Circle CCTP V2: native USDC burn-and-mint between 17 EVM chains, Fast / Standard by Circle's fee API, two-phase delivery (`claimSwap2` with the user's `receiveMessage`), preflight against the real contracts |
-| `@anywalletkit/protocol-swap2-usdt0` | 2026-10-20 ✓ | USDT0 (Tether's LayerZero OFT): USDT / USDT0 between 16 EVM chains in one source transaction — `quoteOFT` + `quoteSend` on the OFT itself, `send` with the LayerZero fee as `msg.value`, approval only for the Ethereum adapter, status from LayerZero Scan, `lzReceive` retry of a stored payload as the claim; the only direct USDT path into HyperEVM; every deployment re-verified on-chain |
-| `@anywalletkit/protocol-swap2-uniswap` | 2026-10-12 ✓ | Uniswap v3 straight from the contracts on 7 chains: QuoterV2 quotes (every fee tier + two-hop via WETH/USDC/USDT in one RPC batch), SwapRouter02 `multicall` execution with deadline, native in/out (wrap via value, `unwrapWETH9`), exact approvals, deployment re-verified on-chain; no API key, no frontend — the permissionless same-chain venue |
-| `@anywalletkit/protocol-swap2-wrap` | 2026-10-12 ✓ | native ↔ wrapped native (ETH↔WETH, BNB↔WBNB, POL↔WPOL, AVAX↔WAVAX, HYPE↔WHYPE… 16 EVM chains) as a same-chain swap2 venue: WETH9 `deposit()` / `withdraw()`, 1:1, no approval, sender-only, tokens verified on-chain; wrapped natives added to the asset catalog |
-| `@anywalletkit/protocol-swap2-balancer` | 2026-10-13 ✓ | Balancer v2 same-chain swaps on 9 chains (the cp0x permissionless Balancer venue): the SOR API only suggests the path; the Vault prices it on-chain (`queryBatchSwap`) and `batchSwap` enforces `limits` + deadline; split and multi-hop paths, native via the Vault's ETH sentinel, preflight re-price |
-| `@anywalletkit/protocol-swap2-jupiter` | 2026-10-23 ✓ | Jupiter same-chain Solana swaps through Swap API V2's Router path (`/build`, Metis routing, no Jupiter fee, keyless or `x-api-key`): every instruction vetted and the swap arguments decoded (amount, quoted out, slippage, zero platform fee) before the v0 transaction is assembled locally; compute budget re-set (simulated limit, capped price); the wallet's serialized guard proves programs and balances before signing |
-| `@anywalletkit/kit` | phase 3 ✓ | orchestrator: register chain wallets + protocol modules, accounts by CAIP-2 chain, policies (fee cap, allow/block lists, confirm) on every write — sends, transfers, `signTransaction`, message signatures; the activity feed (`history()`) |
-| `@anywalletkit/keyring` | 2026-10-12 ✓ | many accounts from one seed plus imported seeds / private keys / Tonkeeper words, one `AccountMeta` list across chains, per-execution accounts that dispose the key after use |
-| `@anywalletkit/tx-preview-evm` | 2026-10-11 ✓ | pre-sign review for EVM: decode (recipient, approvals, contract), simulate balance changes at a pinned block, verdict + refusal reasons for the review sheet |
-| `@anywalletkit/protocol-staking-lido-evm`, `-ssv-evm`, `-tonstakers-ton`, `-spl-stake-pool-solana` | phase 4 ✓ | `StakingProtocol` modules (two-phase withdrawals): Lido, SSV Network, Tonstakers, Jito / SPL stake pools; the EVM two on viem (ported off ethers 2026-10-15) |
-| `@anywalletkit/protocol-lending-mellow-evm` | phase 4 ✓ | Mellow Core Vaults (Lido EarnETH / EarnUSD) as a `LendingProtocol`; viem |
-| `@anywalletkit/protocol-lending-aave-evm` | 2026-10-10 ✓ | Aave v3 on 18 chains (20 markets) as a `LendingProtocol`: supply / withdraw / borrow / repay, gateway for native, EIP-2612 permits, health factor, reserves with rates and caps; Pool cross-checked against the PoolAddressesProvider |
-| `@anywalletkit/protocol-lending-morpho-evm` | 2026-10-10 ✓ | Morpho on 10 chains: Vaults (MetaMorpho V1 / Vault V2, ERC-4626) and Blue markets (supply / withdraw / borrow / repay / collateral) as `LendingProtocol`s; vaults verified against the factories, state accrued like the contract, API for listing / APY only |
-| `@anywalletkit/protocol-lending-kamino-solana` | 2026-10-13 ✓ | Kamino on Solana: Earn vaults (kVaults: deposit / withdraw, shares, APY) and Lend markets (supply / withdraw / borrow / repay on the wallet's obligation) as `LendingProtocol`s; Kamino's official API builds the transaction, the wallet's serialized guard proves programs and balance effects before signing; positions / rates from the API |
-| `@anywalletkit/protocol-approvals-evm` | phase 4 ✓ | token-approval discovery (ERC-20 / 721 / 1155 / Permit2 / EIP-7702), risk flags, revoke; viem |
-| `@anywalletkit/extension-kit` | 2026-10-22 ✓ | Chromium (MV3) wallet-extension core: scrypt vault with passkey (PRF) unlock, auto-locking session, dApp request router + per-origin permissions + approval queue, signing checks (SIWE, EIP-7702, address poisoning, phishing list), swap / Earn plan review, TON Connect data, chrome adapters; no UI — the extension itself is the wallet's own product |
+| Package | What |
+|---|---|
+| `@anywalletkit/core` | Signer / account interfaces, protocol base classes, errors, BIP-39 + BIP-32 / SLIP-10 helpers |
+| `@anywalletkit/conformance` | Golden vectors + `describeChainModule` / `describeProtocolModule` test suites |
+| `@anywalletkit/wallet-evm` | viem; m/44'/60'/0'/0/i; EIP-191 / EIP-712 / EIP-1559 (+ legacy, 2930, 7702 shapes); ERC-20 transfer + approve; signatures pinned byte-for-byte by golden vectors |
+| `@anywalletkit/wallet-solana` | @solana/kit; SLIP-10 m/44'/501'/i'/0'; SOL + SPL transfers with ATA creation; noble ed25519 signing (no WebCrypto); failover RPC |
+| `@anywalletkit/runtime-hermes` | one-call React Native polyfills: AbortSignal.timeout/any, subtle.digest, structuredClone + checks for getRandomValues / TextEncoder |
+| `@anywalletkit/wallet-ton` | @ton/ton; SLIP-10 m/44'/607'/i' on WalletContractV5R1; TON + jetton transfers; noble ed25519 via the `signer` callback; toncenter failover; receipts via toncenter v3 body hash |
+| `@anywalletkit/wallet-tron` | full-node HTTP API, no tronweb; m/44'/195'/0'/0/i; TRX + TRC-20; TIP-191 sign; fee model = bandwidth / energy / activation |
+| `@anywalletkit/wallet-near` | JSON-RPC, hand-written borsh (byte-checked vs @near-js); SLIP-10 m/44'/397'/i' (NEAR Wallet path); implicit + named accounts; NEAR + NEP-141 (auto storage_deposit); NEP-413; preflight instead of simulation; dangerous-action guard |
+| `@anywalletkit/wallet-btc` | @scure/btc-signer; BIP-84 p2wpkh m/84'/0'/0'/0/i and BIP-86 taproot accounts; own coin selection; RBF; BIP-137 sign; Blockbook / Esplora transports with failover |
+| `@anywalletkit/wallet-zcash` | transparent t1… accounts m/44'/133'/0'/0/i; v5 transactions with ZIP-244 txid/sighash (pinned by mined mainnet txs), ZIP-317 fees, ZIP-203 expiry; Blockchair / Blockbook transports; shielded pools out of scope |
+| `@anywalletkit/networks` | networks for every build: catalog mainnets with the public RPC failover lists (shared by the app and the extension), default testnets per family (off until enabled), `NetworksTable` over any JSON storage (user RPCs prepended, builtins undeletable, `onlyOwnRpc`, parked RPCs), `verifyNetwork` per family (chain id / genesis / TON global id must match, latency + tip), https-only URL policy with the local-http opt-in, EIP-3085 `parseAddChainParams` |
+| `@anywalletkit/protocol-swap2-core` | swap2 engine: `BaseSwap2Protocol` / `SingleProviderSwap2` over `Swap2Protocol` from core, `CrossChainRouter`, remote provider, quote/execution safety rails |
+| `@anywalletkit/protocol-swap2-router` | `RouterSwap2Protocol`: auctions every engine provider and any external swap2 module, executes the winner, resumes status |
+| `@anywalletkit/protocol-swap2-near-intents`, `-lifi`, `-thorchain`, `-omniston` | the four providers (NEAR Intents 1Click, LI.FI REST, THORChain, STON.fi Omniston), each also a standalone `Swap2Protocol` |
+| `@anywalletkit/swap2-assets` | CAIP-19 asset registry shared by the swap2 packages |
+| `@anywalletkit/protocol-swap2-cctp` | Circle CCTP V2: native USDC burn-and-mint between 17 EVM chains, Fast / Standard by Circle's fee API, two-phase delivery (`claimSwap2` with the user's `receiveMessage`), preflight against the real contracts |
+| `@anywalletkit/protocol-swap2-usdt0` | USDT0 (Tether's LayerZero OFT): USDT / USDT0 between 16 EVM chains in one source transaction — `quoteOFT` + `quoteSend` on the OFT itself, `send` with the LayerZero fee as `msg.value`, approval only for the Ethereum adapter, status from LayerZero Scan, `lzReceive` retry of a stored payload as the claim; the only direct USDT path into HyperEVM; every deployment re-verified on-chain |
+| `@anywalletkit/protocol-swap2-uniswap` | Uniswap v3 straight from the contracts on 7 chains: QuoterV2 quotes (every fee tier + two-hop via WETH/USDC/USDT in one RPC batch), SwapRouter02 `multicall` execution with deadline, native in/out (wrap via value, `unwrapWETH9`), exact approvals, deployment re-verified on-chain; no API key, no frontend — the permissionless same-chain venue |
+| `@anywalletkit/protocol-swap2-wrap` | native ↔ wrapped native (ETH↔WETH, BNB↔WBNB, POL↔WPOL, AVAX↔WAVAX, HYPE↔WHYPE… 16 EVM chains) as a same-chain swap2 venue: WETH9 `deposit()` / `withdraw()`, 1:1, no approval, sender-only, tokens verified on-chain; wrapped natives added to the asset catalog |
+| `@anywalletkit/protocol-swap2-balancer` | Balancer v2 same-chain swaps on 9 chains (the cp0x permissionless Balancer venue): the SOR API only suggests the path; the Vault prices it on-chain (`queryBatchSwap`) and `batchSwap` enforces `limits` + deadline; split and multi-hop paths, native via the Vault's ETH sentinel, preflight re-price |
+| `@anywalletkit/protocol-swap2-jupiter` | Jupiter same-chain Solana swaps through Swap API V2's Router path (`/build`, Metis routing, no Jupiter fee, keyless or `x-api-key`): every instruction vetted and the swap arguments decoded (amount, quoted out, slippage, zero platform fee) before the v0 transaction is assembled locally; compute budget re-set (simulated limit, capped price); the wallet's serialized guard proves programs and balances before signing |
+| `@anywalletkit/kit` | orchestrator: register chain wallets + protocol modules, accounts by CAIP-2 chain, policies (fee cap, allow/block lists, confirm) on every write — sends, transfers, `signTransaction`, message signatures; the activity feed (`history()`) |
+| `@anywalletkit/keyring` | many accounts from one seed plus imported seeds / private keys / Tonkeeper words, one `AccountMeta` list across chains, per-execution accounts that dispose the key after use |
+| `@anywalletkit/tx-preview-evm` | pre-sign review for EVM: decode (recipient, approvals, contract), simulate balance changes at a pinned block, verdict + refusal reasons for the review sheet |
+| `@anywalletkit/protocol-staking-lido-evm`, `-ssv-evm`, `-tonstakers-ton`, `-spl-stake-pool-solana` | `StakingProtocol` modules (two-phase withdrawals): Lido, SSV Network, Tonstakers, Jito / SPL stake pools; the EVM two on viem (ported off ethers 2026-10-15) |
+| `@anywalletkit/protocol-lending-mellow-evm` | Mellow Core Vaults (Lido EarnETH / EarnUSD) as a `LendingProtocol`; viem |
+| `@anywalletkit/protocol-lending-aave-evm` | Aave v3 on 18 chains (20 markets) as a `LendingProtocol`: supply / withdraw / borrow / repay, gateway for native, EIP-2612 permits, health factor, reserves with rates and caps; Pool cross-checked against the PoolAddressesProvider |
+| `@anywalletkit/protocol-lending-morpho-evm` | Morpho on 10 chains: Vaults (MetaMorpho V1 / Vault V2, ERC-4626) and Blue markets (supply / withdraw / borrow / repay / collateral) as `LendingProtocol`s; vaults verified against the factories, state accrued like the contract, API for listing / APY only |
+| `@anywalletkit/protocol-lending-kamino-solana` | Kamino on Solana: Earn vaults (kVaults: deposit / withdraw, shares, APY) and Lend markets (supply / withdraw / borrow / repay on the wallet's obligation) as `LendingProtocol`s; Kamino's official API builds the transaction, the wallet's serialized guard proves programs and balance effects before signing; positions / rates from the API |
+| `@anywalletkit/protocol-approvals-evm` | token-approval discovery (ERC-20 / 721 / 1155 / Permit2 / EIP-7702), risk flags, revoke; viem |
+| `@anywalletkit/extension-kit` | Chromium (MV3) wallet-extension core: scrypt vault with passkey (PRF) unlock, auto-locking session, dApp request router + per-origin permissions + approval queue, signing checks (SIWE, EIP-7702, address poisoning, phishing list), swap / Earn plan review, TON Connect data, chrome adapters; no UI — the extension itself is the wallet's own product |
 
 Every protocol module ships a `module.json`; `pnpm registry` builds
 [registry/modules.json](registry/modules.json) from them (22 modules today). See
@@ -88,13 +93,14 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 
 ## Tests
 
-`pnpm test` runs 1,200+ tests across 32 packages (Node); `pnpm test:hermes` runs 185
+`pnpm test` runs 1,800+ tests across 43 packages (Node); `pnpm test:hermes` runs 302
 checks in the Hermes VM React Native ships. Beyond unit tests the swap layer is
-checked against live providers: 24,587 quote checks (8 providers, 35 chains, 375
-assets), 10,444 builds simulated to the signature, 5,634 router auctions with the
-ranking invariants (best = max net value, fastest = min ETA) and 457 real-money
-swaps; every Earn module has a read-only `verify:live` across all its markets, and
-every module ships recorded real transactions its `describeActivity` must recognize.
+checked against live providers (running totals, October 2026): 127,168 quote checks
+(11 providers, up to 36 chains, 378 assets), 60,013 builds simulated to the
+signature, 24,155 router auctions with the ranking invariants (best = max net
+value, fastest = min ETA) and 562 real-money swaps; every Earn module has a
+read-only `verify:live` across all its markets, and every module ships recorded
+real transactions its `describeActivity` must recognize.
 
 ## Develop
 
@@ -116,12 +122,11 @@ are still plain ESM with hand-written types and will be converted next:
 
 Versions move only through [changesets](.changeset): every change that touches a
 package's behaviour adds one (`pnpm changeset`), and a release applies them
-(`pnpm changeset version` → bumped `package.json`s + `CHANGELOG.md`s, then
-`pnpm release` once the packages are public on npm). The first versioned
-release (2026-10-15) took every package to 0.1.0 (the ported 0.1.x modules to
-0.2.0).
+(`pnpm changeset version` → bumped `package.json`s + `CHANGELOG.md`s). Publishing
+runs only in the `release` workflow, with npm provenance — see
+[RELEASING.md](RELEASING.md).
 
-Consumers that are not on npm yet take the SDK as tarballs:
+Unreleased builds can be taken as tarballs:
 
 ```sh
 node scripts/vendor.mjs --out ../app/vendor/anywalletkit --consumer ../app/package.json
@@ -134,6 +139,12 @@ references — so an app can always say which SDK commit it runs (`dirty` means
 the tree had uncommitted changes under `packages/` and the build is not
 reproducible from `commit` alone).
 
+## Contributing and security
+
+Outside pull requests are not accepted yet — issues are welcome
+([CONTRIBUTING.md](CONTRIBUTING.md)). Report vulnerabilities privately:
+[SECURITY.md](SECURITY.md).
+
 ## License
 
-Apache-2.0.
+Apache-2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).

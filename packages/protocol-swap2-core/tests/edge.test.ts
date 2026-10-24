@@ -71,14 +71,19 @@ describe("edge: quote expiry", () => {
   // spent by the second pass. Everything else is a hard abort and the caller
   // starts a new swap2() (which quotes afresh).
   const slow = (log: string[]) => account(log, {waitForTransaction: () => new Promise((r) => setTimeout(r, 80))});
-  const shortLived = (over: Partial<CrossChainProvider> = {}) =>
-    provider({getQuote: async (params) => quote(params, {validUntilMs: Date.now() + 40}), ...over});
+  // The first quote dies during the 80 ms approval; the re-quote lives long
+  // enough to reach the broadcast even on a loaded CI machine.
+  const ttl = (n: number) => Date.now() + (n === 1 ? 40 : 10_000);
+  const shortLived = (over: Partial<CrossChainProvider> = {}) => {
+    let n = 0;
+    return provider({getQuote: async (params) => quote(params, {validUntilMs: ttl(++n)}), ...over});
+  };
 
   it("expiring while the approval is being mined re-quotes once and spends the allowance — no revoke, no second approve", async () => {
     const log: string[] = [];
     const phases: string[] = [];
     let quotes = 0;
-    const p = shortLived({getQuote: async (params) => { quotes += 1; return quote(params, {validUntilMs: Date.now() + 40}); }});
+    const p = shortLived({getQuote: async (params) => { quotes += 1; return quote(params, {validUntilMs: ttl(quotes)}); }});
     await protocol(p, slow(log), {onExecutionPhase: (ph) => phases.push(ph)}).swap2(options);
     expect(log).toEqual(["approve", "deposit"]);
     expect(quotes).toBe(2);
@@ -152,7 +157,7 @@ describe("edge: quote expiry", () => {
     const log: string[] = [];
     let quotes = 0;
     const p = shortLived({
-      getQuote: async (params) => { quotes += 1; return quote(params, {validUntilMs: Date.now() + 40}); },
+      getQuote: async (params) => { quotes += 1; return quote(params, {validUntilMs: ttl(quotes)}); },
       preflightDeposit: async () => { if (quotes === 2) throw new Error("halted"); },
     });
     await expect(protocol(p, slow(log)).swap2(options)).rejects.toThrow(/halted/);

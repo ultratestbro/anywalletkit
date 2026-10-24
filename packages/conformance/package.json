@@ -3,6 +3,9 @@
   "version": "0.2.0",
   "description": "Conformance suites and golden vectors every Any Wallet Kit chain and protocol module must pass.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/conformance" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -37,5 +40,6 @@
   },
   "devDependencies": {
     "vitest": "^5.0.3"
-  }
+  },
+  "publishConfig": { "access": "public", "provenance": true }
 }

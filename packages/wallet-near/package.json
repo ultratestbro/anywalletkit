@@ -3,6 +3,9 @@
   "version": "0.1.1",
   "description": "NEAR wallet for Any Wallet Kit: SLIP-10 m/44'/397'/i' accounts (NEAR Wallet path), implicit and named accounts, NEAR and NEP-141 transfers over JSON-RPC, hand-written borsh, NEP-413 message signing.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/wallet-near" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -50,5 +53,6 @@
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/protocol-swap2-near-intents": "workspace:*",
     "vitest": "^5.0.3"
-  }
+  },
+  "publishConfig": { "access": "public", "provenance": true }
 }

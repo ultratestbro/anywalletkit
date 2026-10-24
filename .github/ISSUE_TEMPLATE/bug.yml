@@ -1,0 +1,27 @@
+name: Bug report
+description: Something in an @anywalletkit package does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Never paste a seed phrase or a private key here. Security problems go to private reporting (see SECURITY.md).
+  - type: input
+    id: package
+    attributes: { label: Package and version, placeholder: "@anywalletkit/wallet-evm 0.1.1" }
+    validations: { required: true }
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime
+      options: [Node, React Native (Hermes), Browser, Other]
+    validations: { required: true }
+  - type: input
+    id: chain
+    attributes: { label: Chain(s), placeholder: "eip155:8453, solana:mainnet…" }
+  - type: textarea
+    id: what
+    attributes: { label: What happened, description: Expected vs actual, with the error message. }
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes: { label: Minimal reproduction, render: ts }

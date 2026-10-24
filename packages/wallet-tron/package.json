@@ -3,6 +3,9 @@
   "version": "0.1.1",
   "description": "Tron wallet for Any Wallet Kit: BIP-32 m/44'/195'/0'/0/i accounts, TRX and TRC-20 transfers against a full-node HTTP API, no tronweb.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/wallet-tron" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -47,5 +50,6 @@
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",
     "vitest": "^5.0.3"
-  }
+  },
+  "publishConfig": { "access": "public", "provenance": true }
 }

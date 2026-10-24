@@ -14,7 +14,7 @@
     "typecheck": "pnpm -r --filter './packages/**' run typecheck",
     "lint": "pnpm -r --filter './packages/**' run lint",
     "changeset": "changeset",
-    "release": "pnpm build && changeset publish",
+    "release": "node scripts/publish.mjs",
     "test:hermes": "pnpm --filter @anywalletkit/example-hermes-smoke test:hermes",
     "registry": "node scripts/build-registry.mjs",
     "registry:check": "node scripts/build-registry.mjs && git diff --exit-code registry/modules.json",
@@ -22,7 +22,9 @@
     "watch:baseline": "node scripts/watch/watch.mjs --baseline",
     "vendor": "node scripts/vendor.mjs",
     "test:examples": "pnpm --filter './examples/quickstart' --filter './examples/swap' --filter './examples/earn' --filter './examples/approvals' --filter './examples/tx-preview' --filter './examples/keyring' --filter './examples/signer' --filter './examples/history' --filter './examples/networks' --filter './examples/names' -r run typecheck && pnpm --filter './examples/quickstart' --filter './examples/swap' --filter './examples/earn' --filter './examples/approvals' --filter './examples/tx-preview' --filter './examples/keyring' --filter './examples/signer' --filter './examples/history' --filter './examples/networks' --filter './examples/names' -r run test",
-    "docs:build": "pnpm --filter awk-docs build"
+    "docs:build": "pnpm --filter awk-docs build",
+    "pack:check": "node scripts/check-pack.mjs",
+    "release:dry": "node scripts/publish.mjs --dry-run"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",

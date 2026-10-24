@@ -3,6 +3,9 @@
   "version": "0.2.0",
   "description": "Signer and account interfaces, protocol base classes, errors and key-derivation helpers for Any Wallet Kit.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/core" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -49,5 +52,6 @@
     "@noble/hashes": "^2.4.0",
     "@scure/bip32": "^2.4.0",
     "@scure/bip39": "^2.4.0"
-  }
+  },
+  "publishConfig": { "access": "public", "provenance": true }
 }

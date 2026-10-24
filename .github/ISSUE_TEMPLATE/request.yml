@@ -1,0 +1,11 @@
+name: Request
+description: A chain, a protocol module or an API you are missing.
+labels: [request]
+body:
+  - type: textarea
+    id: what
+    attributes: { label: What do you need, description: The chain / protocol / API, with links to its official docs. }
+    validations: { required: true }
+  - type: textarea
+    id: why
+    attributes: { label: What would you build with it }

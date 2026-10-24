@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Networks for Any Wallet Kit wallets: the catalog of mainnets with public RPC failover lists, default testnets for every chain family, user-added networks and custom RPCs (NetworksTable over any JSON storage), per-family endpoint verification (chain id / genesis / global id must match) and the http-only-for-local-nodes URL policy. Shared by the mobile app and the extension kit.",
   "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/networks" },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -42,5 +45,6 @@
     "eip-3085",
     "custom-rpc",
     "anywalletkit"
-  ]
+  ],
+  "publishConfig": { "access": "public", "provenance": true }
 }
