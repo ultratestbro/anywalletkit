@@ -9,6 +9,8 @@ export type UnsafeTransactionCode =
   | 'recipient-mismatch'
   /** A change output pays an address that is not ours. */
   | 'change-not-ours'
+  /** A coin the indexer reported does not match its previous transaction (txid, amount or script). */
+  | 'prevout-mismatch'
 
 /** A transaction failed a hard safety check and was not signed / broadcast. */
 export class UnsafeTransactionError extends Error {

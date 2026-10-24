@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { NetworkError } from '@forgewallet/core'
 import { EsploraClient, WalletManagerBtc, parseRawTransaction } from '../src/index.js'
-import { ADDR0, ADDR1, SEED, TXID_A, TXID_B, fakeBlockbook, prevTx } from './helpers.js'
+import { ADDR0, ADDR1, PREV_A, PREV_B, SEED, TXID_A, TXID_B, fakeBlockbook, prevTx } from './helpers.js'
 
 /** Fake Esplora (mempool.space / blockstream shapes). */
 function fakeEsplora(opts: { fail?: boolean; tip?: number; utxos?: Array<{ txid: string; vout: number; value: number; status: { confirmed: boolean; block_height?: number } }> } = {}) {
@@ -25,6 +25,8 @@ function fakeEsplora(opts: { fail?: boolean; tip?: number; utxos?: Array<{ txid:
     if (path === `/api/address/${ADDR0}/txs`) return json([{ txid: TXID_A, status: { confirmed: true, block_height: 800_000 } }])
     if (path === `/api/address/${ADDR0}`) return json({ chain_stats: { funded_txo_sum: 150_000, spent_txo_sum: 20_000 }, mempool_stats: { funded_txo_sum: 5_000, spent_txo_sum: 30_000 } })
     if (path === `/api/tx/${prevA.id}/hex`) return text(prevA.hex)
+    if (path === `/api/tx/${PREV_A.id}/hex`) return text(PREV_A.hex)
+    if (path === `/api/tx/${PREV_B.id}/hex`) return text(PREV_B.hex)
     if (path === `/api/tx/${TXID_A}`) return json({ txid: TXID_A, status: { confirmed: true, block_height: 849_998 }, fee: 1410 })
     if (path === `/api/tx/${TXID_B}`) return json({ txid: TXID_B, status: { confirmed: false } })
     if (path.startsWith('/api/tx/') && path.endsWith('/hex')) return text('not found', 404)

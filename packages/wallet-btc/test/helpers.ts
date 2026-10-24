@@ -4,17 +4,21 @@ import { WalletManagerBtc, parseRawTransaction } from '../src/index.js'
 export const SEED = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 export const ADDR0 = 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu' // BIP-84 test vector, account 0
 export const ADDR1 = 'bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g' // account 1
-export const TXID_A = '1'.repeat(64)
-export const TXID_B = '2'.repeat(64)
 export const hex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
 
-/** An unsigned "previous" transaction paying `outputs`, so raw-hex paths can look prevouts up. */
-export function prevTx(outputs: Array<[string, bigint]>): Transaction {
+/** An unsigned "previous" transaction paying `outputs`, so prevouts can be looked up and verified (scan F2). `salt` makes ids distinct. */
+export function prevTx(outputs: Array<[string, bigint]>, salt = 0): Transaction {
   const tx = new Transaction()
-  tx.addInput({ txid: '00'.repeat(32), index: 0 })
+  tx.addInput({ txid: '00'.repeat(32), index: salt })
   for (const [addr, amount] of outputs) tx.addOutputAddress(addr, amount)
   return tx
 }
+
+/** The default coins of account 0 are real outputs of real (unsigned) previous transactions: A:0 = 100 000 sat, B:1 = 50 000 sat. */
+export const PREV_A = prevTx([[ADDR0, 100000n]], 1)
+export const PREV_B = prevTx([[ADDR1, 7777n], [ADDR0, 50000n]], 2)
+export const TXID_A = PREV_A.id
+export const TXID_B = PREV_B.id
 
 export interface FakeBlockbookOptions {
   utxos?: Array<{ txid: string; vout: number; value: string; height: number }>
@@ -34,7 +38,7 @@ export function fakeBlockbook(opts: FakeBlockbookOptions = {}) {
     { txid: TXID_A, vout: 0, value: '100000', height: 800000 },
     { txid: TXID_B, vout: 1, value: '50000', height: 800001 },
   ]
-  const prev = new Map((opts.prevTxs ?? []).map((t) => [t.id, t]))
+  const prev = new Map([PREV_A, PREV_B, ...(opts.prevTxs ?? [])].map((t) => [t.id, t]))
   const fetchFn = (async (input: string | URL | Request) => {
     const url = String(input)
     const path = url.replace(/^https?:\/\/[^/]+/, '')

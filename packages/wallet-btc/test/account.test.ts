@@ -159,7 +159,8 @@ describe('WalletAccountBtc (p2wpkh)', () => {
   })
 
   it('dust change is folded into the fee (single output) and reported as no-change', async () => {
-    const f = fakeBlockbook({ utxos: [{ txid: TXID_A, vout: 0, value: '61350', height: 1 }] /* change ≈ 250 sats < 294 dust → folded */ })
+    const dust = prevTx([[ADDR0, 61350n]], 3)
+    const f = fakeBlockbook({ utxos: [{ txid: dust.id, vout: 0, value: '61350', height: 1 }], prevTxs: [dust] /* change ≈ 250 sats < 294 dust → folded */ })
     const m = mk(f.fetchFn)
     const a = await m.getAccount(0)
     const desc = await a.describeTransaction({ to: RECIPIENT, value: 60_000n })
@@ -207,14 +208,15 @@ describe('WalletAccountBtc (p2wpkh)', () => {
   })
 
   it('getBalance, getTransactionReceipt (mined / unconfirmed / unknown), getFeeRates', async () => {
+    const RECEIPT_TXID = '1'.repeat(64) // a tx the wallet only reads a receipt for (no prevout routing)
     const f = fakeBlockbook()
     const m = mk(f.fetchFn)
     const a = await m.getAccount(0)
     expect(await a.getBalance()).toBe(150_000n)
-    const r = await a.getTransactionReceipt(TXID_A)
-    expect(r).toMatchObject({ hash: TXID_A, status: 1, blockNumber: 800010n, confirmations: 3, fee: 1410n })
-    expect(await (await mk(fakeBlockbook({ txInfo: { txid: TXID_A, blockHeight: -1, confirmations: 0 } }).fetchFn).getAccount(0)).getTransactionReceipt(TXID_A)).toBeUndefined()
-    expect(await (await mk(fakeBlockbook({ txInfo: null }).fetchFn).getAccount(0)).getTransactionReceipt(TXID_A)).toBeUndefined()
+    const r = await a.getTransactionReceipt(RECEIPT_TXID)
+    expect(r).toMatchObject({ hash: RECEIPT_TXID, status: 1, blockNumber: 800010n, confirmations: 3, fee: 1410n })
+    expect(await (await mk(fakeBlockbook({ txInfo: { txid: RECEIPT_TXID, blockHeight: -1, confirmations: 0 } }).fetchFn).getAccount(0)).getTransactionReceipt(RECEIPT_TXID)).toBeUndefined()
+    expect(await (await mk(fakeBlockbook({ txInfo: null }).fetchFn).getAccount(0)).getTransactionReceipt(RECEIPT_TXID)).toBeUndefined()
     await expect(a.getTransactionReceipt('nope')).rejects.toThrow(/valid transaction hash/)
     expect(await m.getFeeRates()).toEqual({ slow: 10n, normal: 10n, fast: 10n })
     m.dispose()

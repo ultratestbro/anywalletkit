@@ -5,11 +5,11 @@ import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js'
 import { hex } from '@scure/base'
 import { addressFromPublicKey, spendInfo } from './address.js'
 import { FINAL_SEQUENCE, RBF_SEQUENCE, assertSafe, describeTransaction, parseRawTransaction, type DescribeContext } from './describe.js'
-import { UnsupportedAddressTypeError } from './errors.js'
+import { UnsafeTransactionError, UnsupportedAddressTypeError } from './errors.js'
 import { signMessageWith } from './message.js'
 import { networkParams } from './network.js'
 import { WalletAccountReadOnlyBtc, type SpendPlan } from './read-only-account.js'
-import type { BtcAddressType, BtcConfig, BtcNetwork, BtcSpend, BtcTransaction, BtcTransferOptions, BtcTxDescription } from './types.js'
+import type { BtcAddressType, BtcConfig, BtcNetwork, BtcSpend, BtcTransaction, BtcTransferOptions, BtcTxDescription, Utxo } from './types.js'
 
 export { addressFromPublicKey }
 
@@ -144,6 +144,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
   protected async buildSignedTransaction(spend: BtcSpend): Promise<Built> {
     this.live()
     const plan = await this.planSpend(spend)
+    await this.verifyPrevouts(plan.utxos)
     const lockTime = await this.lockTimeHeight()
     const rbf = spend.rbf ?? this._config.rbf ?? true
     let change = plan.change
@@ -171,6 +172,35 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
     if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation.`)
   }
 
+  /**
+   * BIP-143 (p2wpkh) commits each input's signature to that input's CLAIMED amount
+   * only: an indexer that understates a different coin in each of two signing
+   * sessions can combine their signatures into one valid tx whose real fee the
+   * wallet never showed (scan 2026-10-23 F2). So every p2wpkh coin is read from
+   * its full previous transaction, which must hash to the claimed txid, and its
+   * amount and script must match before anything is signed. Taproot (BIP-341)
+   * commits to every input amount and skips the extra requests.
+   */
+  private async verifyPrevouts(utxos: Utxo[]): Promise<void> {
+    if (this.addressType === 'p2tr') return
+    const client = this.requireClient('verify the coins it spends')
+    const ours = hex.encode(this.scriptPubKey)
+    const cache = new Map<string, Transaction>()
+    for (const u of utxos) {
+      let prev = cache.get(u.txid)
+      if (!prev) {
+        prev = parseRawTransaction(await client.getTransaction(u.txid))
+        if (prev.id !== u.txid) throw new UnsafeTransactionError('prevout-mismatch', `The indexer's transaction for ${u.txid} hashes to ${prev.id}.`)
+        cache.set(u.txid, prev)
+      }
+      const out = u.vout < prev.outputsLength ? prev.getOutput(u.vout) : undefined
+      if (out?.amount === undefined || out.amount !== u.value) {
+        throw new UnsafeTransactionError('prevout-mismatch', `Coin ${u.txid}:${u.vout} is worth ${out?.amount ?? 'nothing'} sat on chain, not the ${u.value} the indexer reported.`)
+      }
+      if (!out.script || hex.encode(out.script) !== ours) throw new UnsafeTransactionError('prevout-mismatch', `Coin ${u.txid}:${u.vout} does not pay this account.`)
+    }
+  }
+
   /** Prevout values of a raw tx, fetched through the client (the wire format carries none). */
   private async inputValues(tx: Transaction): Promise<bigint[]> {
     const client = this.requireClient('inspect a raw transaction')
@@ -181,7 +211,12 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
       if (!inp.txid || inp.index === undefined) throw new Error('Raw transaction input without a prevout.')
       const id = hex.encode(inp.txid)
       let prev = cache.get(id)
-      if (!prev) { prev = parseRawTransaction(await client.getTransaction(id)); cache.set(id, prev) }
+      if (!prev) {
+        prev = parseRawTransaction(await client.getTransaction(id))
+        // An unauthenticated prevout would let the indexer forge the fee this check computes (scan F2).
+        if (prev.id !== id) throw new UnsafeTransactionError('prevout-mismatch', `The indexer's transaction for ${id} hashes to ${prev.id}.`)
+        cache.set(id, prev)
+      }
       const out = prev.getOutput(inp.index)
       if (out.amount === undefined) throw new Error(`Prevout ${id}:${inp.index} not found.`)
       values.push(out.amount)
