@@ -3,6 +3,7 @@ import { WalletAccountTron } from './account.js'
 import { WalletAccountReadOnlyTron } from './read-only-account.js'
 import type { TronConfig } from './types.js'
 
+/** Base derivation path; account `i` is at `m/44'/195'/0'/0/i` (TronLink). */
 export const TRON_BASE_PATH = "m/44'/195'"
 /** The account branch `getAccount(i)` indexes: m/44'/195'/0'/0/i (TronLink default). */
 export const TRON_ACCOUNT_BRANCH = `${TRON_BASE_PATH}/0'/0`
@@ -57,6 +58,7 @@ export class WalletManagerTron extends WalletManager<WalletAccountTron, TronConf
     return account
   }
 
+  /** A read-only account for any address, with this manager's config. */
   getReadOnlyAccount(address: string): WalletAccountReadOnlyTron {
     return new WalletAccountReadOnlyTron(address, this._config)
   }

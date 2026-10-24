@@ -9,6 +9,7 @@ import { ERC20_ABI } from './erc20.js'
 import { inferPrimaryType } from './read-only-account.js'
 import type { EvmTransaction, TypedDataInput } from './types.js'
 
+/** What an EVM transaction does, read from its fields and calldata. */
 export type TxKind =
   | 'native-transfer'
   | 'erc20-transfer'
@@ -18,17 +19,35 @@ export type TxKind =
   | 'contract-deploy'
   | 'eip7702-delegation'
 
+/**
+ * Problems {@link describeTransaction} flags: an unlimited approval, value or calldata to the zero
+ * address, a chain id that is not the account's, or legacy fee fields.
+ */
 export type TxWarningCode = 'approve-unlimited' | 'to-zero-address' | 'chain-mismatch' | 'legacy-fee-fields'
+/**
+ * Problems {@link describeTypedData} flags: another chain in the domain, an expired deadline, an
+ * unlimited permit, or a permit owner that is not the account.
+ */
 export type TypedDataWarningCode = 'chain-mismatch' | 'deadline-passed' | 'approve-unlimited' | 'owner-mismatch'
 
+/** One flagged problem, with a sentence a wallet can show. */
 export interface Warning<Code extends string> {
+  /** Machine-readable code. */
   code: Code
+  /** Sentence to show the user. */
   message: string
 }
+/** A warning about a transaction. */
 export type TxWarning = Warning<TxWarningCode>
+/** A warning about typed data. */
 export type TypedDataWarning = Warning<TypedDataWarningCode>
 
+/**
+ * An EVM transaction decoded for a confirmation screen, without any network call. For simulated
+ * balance changes use `tx-preview-evm`.
+ */
 export interface TxDescription {
+  /** What it does. */
   kind: TxKind
   /** Checksummed `to`, or undefined for a deploy. */
   to: string | undefined
@@ -38,23 +57,35 @@ export interface TxDescription {
   selector: Hex | undefined
   /** ERC-20 contract for the erc20-* kinds. */
   token?: string
+  /** Token recipient for the erc20 transfer kinds. */
   recipient?: string
   /** Token amount for erc20-transfer / transferFrom / approve. */
   amount?: bigint
+  /** Spender for erc20-approve. */
   spender?: string
   /** Source account for erc20-transferFrom. */
   owner?: string
   /** Delegation targets for an EIP-7702 tx. */
   delegations?: Array<{ chainId: number; address: string }>
+  /** Chain id named by the transaction, if any. */
   chainId: number | undefined
+  /** Problems to show before signing. */
   warnings: TxWarning[]
 }
 
+/**
+ * What typed data is: an EIP-2612 permit, a Uniswap Permit2 message, a Safe transaction, or
+ * anything else.
+ */
 export type TypedDataKind = 'permit' | 'permit2' | 'safe-tx' | 'generic'
 
+/** EIP-712 typed data decoded for a confirmation screen. */
 export interface TypedDataDescription {
+  /** What it is. */
   kind: TypedDataKind
+  /** The primary type, given or inferred. */
   primaryType: string
+  /** The domain fields a user should see. */
   domain: {
     name?: string
     version?: string
@@ -63,6 +94,7 @@ export interface TypedDataDescription {
   }
   /** EIP-2612 permit fields (kind 'permit'). */
   permit?: { owner: string; spender: string; value: bigint; nonce: bigint; deadline: bigint }
+  /** Problems to show before signing. */
   warnings: TypedDataWarning[]
 }
 
@@ -83,6 +115,10 @@ function tryDecodeErc20(data: Hex) {
   }
 }
 
+/**
+ * Decode a transaction for a confirmation screen: kind, recipient or spender, amounts and warnings.
+ * Offline and synchronous. Pass the account's `chainId` to get a chain-mismatch warning.
+ */
 export function describeTransaction(tx: EvmTransaction, ctx: { chainId?: number } = {}): TxDescription {
   const warnings: TxWarning[] = []
   const to = tx.to !== undefined ? getAddress(tx.to) : undefined
@@ -150,6 +186,10 @@ function big(v: unknown): bigint | undefined {
   return undefined
 }
 
+/**
+ * Decode EIP-712 typed data for a confirmation screen. Pass the account's `chainId` and address to
+ * get chain and owner warnings.
+ */
 export function describeTypedData(typed: TypedDataInput, ctx: { chainId?: number; account?: string } = {}): TypedDataDescription {
   const warnings: TypedDataWarning[] = []
   const primaryType = typed.primaryType ?? inferPrimaryType(typed.types)

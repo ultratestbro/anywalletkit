@@ -70,10 +70,18 @@ export function typedDomainChainId(raw: unknown): number | undefined {
   return undefined
 }
 
+/**
+ * An EVM account with a signer: signs messages, typed data, permits and transactions, and sends
+ * transfers and approvals. Before signing it checks the chain id and simulates the transaction
+ * (when a provider is configured), and refuses value sent to the zero address.
+ */
 export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalletAccount {
   readonly needsNetwork = false
+  /** Derivation path, or `external` for an external signer. */
   readonly path: string
+  /** Compressed secp256k1 public key (33 bytes). */
   readonly publicKey: Uint8Array
+  /** The signer that holds the key. */
   readonly signer: Signer
   private _readOnly: WalletAccountReadOnlyEvm | undefined
   /**
@@ -405,6 +413,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     return this.sendTransaction({ to: token, value: 0n, data: encodeApprove(spender, amount) })
   }
 
+  /** The same address as a {@link WalletAccountReadOnlyEvm}. */
   toReadOnlyAccount(): IWalletAccountReadOnly {
     this._readOnly ??= new WalletAccountReadOnlyEvm(this.address, this._config)
     return this._readOnly

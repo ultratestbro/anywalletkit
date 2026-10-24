@@ -2,6 +2,7 @@ import { argsBytes, actionKey } from './borsh.js'
 import { isImplicitAccountId, isValidAccountId } from './address.js'
 import { IMPLICIT_ACCOUNT_MIN_DEPOSIT, MAX_GAS, TGAS, type NearAction, type NearFunctionCallAction, type NearTransaction, type NearTxDescription, type NearTxKind, type NearTxWarning } from './types.js'
 
+/** What an offline description can be told to sharpen its warnings. */
 export interface DescribeContext {
   /** The signing account; adds `self-transfer` and fills `from`. */
   signerId?: string
@@ -112,4 +113,9 @@ export function describeTransaction(tx: NearTransaction, ctx: DescribeContext = 
   }
 }
 
+/**
+ * True for actions that change who controls the account or its code: keys, account creation
+ * or deletion, contract deployment, staking, delegated actions. Refused unless
+ * `allowDangerousActions` is set.
+ */
 export const isDangerous = (a: NearAction): boolean => { try { return DANGEROUS_ACTIONS.has(actionKey(a)) } catch { return true } }

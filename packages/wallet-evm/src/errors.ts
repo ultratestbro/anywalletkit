@@ -7,7 +7,9 @@ import { SignerError } from '@anywalletkit/core'
  * mistake — surfaced here instead of as a reverted or stranded transaction.
  */
 export class ChainMismatchError extends SignerError {
+  /** The account's chain id. */
   readonly expected: number
+  /** The chain id the payload names. */
   readonly actual: number
   constructor(expected: number, actual: number, what = 'transaction') {
     super(`The ${what} targets chain ${actual} but this account is on chain ${expected}.`)
@@ -27,7 +29,9 @@ export class UnsafeTransactionError extends SignerError {
 
 /** `eth_call` of the transaction reverted; nothing was signed or sent. `reason` is decoded when possible. */
 export class SimulationError extends Error {
+  /** Decoded revert reason, or the node's message. */
   readonly reason: string
+  /** Raw revert data, when the node returned it. */
   readonly data: `0x${string}` | undefined
   constructor(reason: string, data?: `0x${string}`) {
     super(`Transaction simulation failed: ${reason}`)
@@ -52,7 +56,9 @@ export class PermitUnsupportedError extends Error {
  * locally) instead.
  */
 export class BroadcastUnknownError extends Error {
+  /** Always true: the transaction may be on its way. */
   readonly maybeSent = true
+  /** Hash of the signed transaction, computed locally. Watch it instead of sending again. */
   readonly hash: `0x${string}`
   constructor(hash: `0x${string}`, cause: unknown) {
     super(`Broadcast outcome unknown for ${hash}: ${cause instanceof Error ? cause.message.slice(0, 200) : String(cause).slice(0, 200)}`, { cause })

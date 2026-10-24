@@ -3,6 +3,7 @@ import { WalletAccountSolana } from './account.js'
 import { WalletAccountReadOnlySolana } from './read-only-account.js'
 import type { SolanaConfig } from './types.js'
 
+/** Base derivation path; account `i` is at `m/44'/501'/i'/0'` (Phantom, Solflare). */
 export const SOLANA_BASE_PATH = "m/44'/501'"
 const DEFAULT_BASE_FEE = 5_000n
 
@@ -58,6 +59,7 @@ export class WalletManagerSolana extends WalletManager<WalletAccountSolana, Sola
     return account
   }
 
+  /** A read-only account for any address, with this manager's config. */
   getReadOnlyAccount(address: string): WalletAccountReadOnlySolana {
     return new WalletAccountReadOnlySolana(address, this._config)
   }

@@ -1,3 +1,4 @@
+/** Bitcoin mainnet, testnet or regtest. */
 export type BtcNetwork = 'bitcoin' | 'testnet' | 'regtest'
 
 /** Address / script type the account spends from. BIP-84 p2wpkh (bc1q…) or BIP-86 p2tr (bc1p…). */
@@ -22,6 +23,7 @@ export interface BtcClient {
   getBlockHeight?(): Promise<number>
 }
 
+/** An unspent output the account can spend. */
 export interface Utxo {
   txid: string
   vout: number
@@ -31,15 +33,21 @@ export interface Utxo {
   height: number
 }
 
+/** One transport to a Bitcoin indexer: Blockbook or Esplora over HTTP. */
 export type BtcClientConfig =
   /** Trezor Blockbook REST (`https://btc1.trezor.io`, QuickNode's Blockbook add-on, …). */
   | { type: 'blockbook-http'; clientConfig: { url: string } }
   /** Esplora REST (`https://mempool.space/api`, `https://blockstream.info/api`). */
   | { type: 'esplora-http'; clientConfig: { url: string } }
 
+/**
+ * Options for a Bitcoin wallet manager or account: transports, network, address type and fee
+ * limits.
+ */
 export interface BtcConfig {
   /** One or more transports (config objects or ready `BtcClient`s). A list fails over in order. Omit for an offline (sign-only) wallet. */
   client?: BtcClientConfig | BtcClient | Array<BtcClientConfig | BtcClient>
+  /** Network; default `bitcoin` (mainnet). */
   network?: BtcNetwork
   /** p2wpkh (BIP-84, default) or p2tr (BIP-86 taproot). Changes the derivation path and the address. */
   addressType?: BtcAddressType
@@ -76,6 +84,7 @@ export interface BtcSpend {
 /** `sendTransaction` accepts a spend or an already signed raw transaction hex. */
 export type BtcTransaction = BtcSpend | string
 
+/** A Bitcoin transfer. Amount in satoshis. */
 export interface BtcTransferOptions {
   /** Not supported on Bitcoin; present for the shared account interface. */
   token?: string
@@ -83,6 +92,7 @@ export interface BtcTransferOptions {
   amount: bigint | number | string
 }
 
+/** A mined Bitcoin transaction. */
 export interface BtcReceipt {
   hash: string
   /** Always 1 once mined — a Bitcoin transaction cannot fail after inclusion. */
@@ -104,6 +114,7 @@ export interface BlockbookTx {
   blockTime?: number
 }
 
+/** The most one transaction can send (a sweep of every UTXO), after the fee. */
 export interface BtcMaxSpendableResult {
   /** Max sats one transaction can send after the fee. 0n when nothing is spendable. */
   amount: bigint
@@ -115,6 +126,7 @@ export interface BtcMaxSpendableResult {
   feeRate: bigint
 }
 
+/** Problems a described transaction is flagged with. */
 export type BtcWarning =
   /** Fee rate above `maxFeeRate` (also a hard error before signing/broadcast). */
   | 'high-fee-rate'
@@ -125,12 +137,14 @@ export type BtcWarning =
   /** Change was below dust and folded into the fee. */
   | 'no-change'
 
+/** One input of a described transaction: the UTXO it spends. */
 export interface BtcTxInputDescription {
   txid: string
   vout: number
   value: bigint
 }
 
+/** One output of a described transaction, tagged as the recipient, our change, or unknown. */
 export interface BtcTxOutputDescription {
   /** Undefined for scripts without an address form. */
   address: string | undefined
@@ -156,6 +170,7 @@ export interface BtcTxDescription {
   warnings: BtcWarning[]
 }
 
+/** CAIP-2 ids of the Bitcoin networks, by name. */
 export const CAIP2_GENESIS: Record<BtcNetwork, string> = {
   bitcoin: 'bip122:000000000019d6689c085ae165831e93',
   testnet: 'bip122:000000000933ea01ad0ee984209779ba',

@@ -44,9 +44,12 @@ interface Built {
 export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalletAccount {
   /** UTXOs, fee rate and tip height come from the network before signing. */
   readonly needsNetwork = true
+  /** Derivation path, or `external` for an external signer. */
   readonly path: string
+  /** Compressed secp256k1 public key. */
   readonly publicKey: Uint8Array
   override readonly addressType: BtcAddressType
+  /** The signer that holds the key. */
   readonly signer: Signer
   private _disposed = false
   private _readOnly: WalletAccountReadOnlyBtc | undefined
@@ -282,6 +285,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
     return { hash: txid || built.tx.id, fee: built.fee }
   }
 
+  /** The same address as a {@link WalletAccountReadOnlyBtc}. */
   toReadOnlyAccount(): IWalletAccountReadOnly {
     this._readOnly ??= new WalletAccountReadOnlyBtc(this.address, this._config)
     return this._readOnly

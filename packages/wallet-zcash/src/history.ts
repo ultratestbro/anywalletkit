@@ -10,6 +10,7 @@ import { BlockchairClient, blockchairTime, type BlockchairTxDashboard } from './
 import { DEFAULT_TIMEOUT_MS } from './http.js'
 import { CAIP2 } from './types.js'
 
+/** Options for {@link createZcashHistory}. */
 export interface ZcashHistoryOptions {
   /** Blockchair base (`https://api.blockchair.com/zcash`); optional API key. */
   blockchairUrl?: string
@@ -34,11 +35,13 @@ export interface ZcashHistoryPage extends HistoryPage {
   total?: number
 }
 
+/** Zcash transparent-address history from Blockchair. Build it with {@link createZcashHistory}. */
 export interface ZcashHistorySource extends HistorySource {
   listActivity(address: string, query?: HistoryQuery): Promise<ZcashHistoryPage>
   getTransaction(hash: string, address: string): Promise<ZcashChainTx | undefined>
 }
 
+/** The history backend failed. */
 export class HistoryUnavailableError extends Error {
   readonly chain: string
   readonly reason: string
@@ -97,10 +100,16 @@ export function mapDashboardTx(chain: string, address: string, d: BlockchairTxDa
   return out
 }
 
+/** Blockchair link for a transaction. */
 export function zcashExplorerTxUrl(hash: string): string {
   return `https://blockchair.com/zcash/transaction/${hash}`
 }
 
+/**
+ * A history source for transparent Zcash addresses backed by Blockchair (mainnet).
+ *
+ * @throws Error when no `fetch` is available.
+ */
 export function createZcashHistory(options: ZcashHistoryOptions = {}): ZcashHistorySource {
   const chain = CAIP2.mainnet
   const fetchFn = options.fetch ?? globalThis.fetch

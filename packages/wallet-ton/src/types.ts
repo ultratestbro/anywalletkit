@@ -8,8 +8,13 @@ export interface TonRpc {
   call<T = unknown>(method: string, params: Record<string, unknown>): Promise<T>
 }
 
+/** A toncenter endpoint (URL and optional key) or a ready `TonRpc`. */
 export type TonProvider = TonEndpoint | TonRpc
 
+/**
+ * Options for a TON wallet manager or account: toncenter endpoints, network, fee caps and emulation
+ * before signing.
+ */
 export interface TonConfig {
   /** toncenter endpoint(s) or `TonRpc`(s). A list fails over in order. Omit for an offline (sign-only) wallet. */
   tonClient?: TonProvider | TonProvider[]
@@ -91,9 +96,11 @@ export interface TonTransaction {
  */
 export type TonSendable = TonTransaction | TonTransaction[] | Cell
 
+/** A native TON or jetton transfer. Amount in nanotons or the jetton's base units. */
 export interface TonTransferOptions {
   /** Jetton master address. Omit for native TON. */
   token?: string
+  /** Wallet address that receives (for a jetton, its owner, not its jetton wallet). */
   recipient: string
   amount: bigint | number | string
   /** Jetton only: nanotons forwarded to the recipient with the transfer notification (default 1). */
@@ -125,6 +132,10 @@ export interface TonFees {
   total: bigint
 }
 
+/**
+ * Where to emulate a transaction before signing: tonapi, a toncenter v3 endpoint, or `false` for a
+ * fee estimate only.
+ */
 export type TonEmulateConfig =
   | { kind: 'tonapi'; url?: string }
   | { kind: 'toncenter-v3'; url: string }
@@ -139,12 +150,20 @@ export interface TonRisk {
   transferAllRemainingBalance: boolean
 }
 
+/**
+ * Which service produced a simulation; `estimate-only` means fees were estimated without emulation.
+ */
 export type TonSimulationSource = 'tonapi' | 'toncenter-v3' | 'estimate-only'
 
+/**
+ * Outcome of a simulation: the fees and, when emulated, whether the wallet transaction and its
+ * actions succeeded.
+ */
 export type TonSimulation =
   | { ok: true; fees: TonFees; emulated: boolean; source: TonSimulationSource; exitCode?: number; actionSuccess?: boolean; risk?: TonRisk; warnings: string[] }
   | { ok: false; fees?: TonFees; emulated: true; source: Exclude<TonSimulationSource, 'estimate-only'>; reason: string; exitCode?: number; aborted?: boolean; risk?: TonRisk; warnings: string[] }
 
+/** Outcome of a sent wallet transaction, found by the body hash `sendTransaction` returned. */
 export interface TonReceipt {
   /** The body hash that was returned by sendTransaction. */
   hash: string
@@ -154,9 +173,11 @@ export interface TonReceipt {
   blockNumber: bigint
   /** Account transaction hash (base64). */
   transactionHash: string
+  /** Fees of the account transaction, in nanotons. */
   totalFees: bigint
   /** The raw @ton/core Transaction. */
   raw: unknown
 }
 
+/** CAIP-2 ids of TON mainnet and testnet. */
 export const CAIP2: Record<'mainnet' | 'testnet', string> = { mainnet: 'ton:-239', testnet: 'ton:-3' }

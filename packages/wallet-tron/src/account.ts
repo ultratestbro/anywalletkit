@@ -26,9 +26,11 @@ export const MAX_EXPIRATION_MS = 24 * 60 * 60 * 1000
 export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWalletAccount {
   /** ref block / expiration come from the node, so building needs the network. */
   readonly needsNetwork = true
+  /** Derivation path, or `external` for an external signer. */
   readonly path: string
   /** Compressed secp256k1 key (33 bytes); needed synchronously for the address. */
   readonly publicKey: Uint8Array
+  /** The signer that holds the key. */
   readonly signer: Signer
   private _disposed = false
   private _readOnly: WalletAccountReadOnlyTron | undefined
@@ -160,6 +162,7 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     return { hash: await this.broadcast(await this.signRaw(built)), fee: quote.fee, activationFee: quote.activationFee, estimate: quote.estimate }
   }
 
+  /** The same address as a {@link WalletAccountReadOnlyTron}. */
   toReadOnlyAccount(): IWalletAccountReadOnly {
     this._readOnly ??= new WalletAccountReadOnlyTron(this.address, this._config)
     return this._readOnly

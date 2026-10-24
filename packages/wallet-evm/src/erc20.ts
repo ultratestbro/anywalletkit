@@ -1,5 +1,6 @@
 import { encodeFunctionData, parseAbi } from 'viem'
 
+/** The ERC-20 functions the package calls (viem ABI). */
 export const ERC20_ABI = parseAbi([
   'function balanceOf(address owner) view returns (uint256)',
   'function allowance(address owner, address spender) view returns (uint256)',
@@ -16,6 +17,7 @@ export const ERC20_PERMIT_ABI = parseAbi([
   'function DOMAIN_SEPARATOR() view returns (bytes32)',
 ])
 
+/** EIP-712 types of an EIP-2612 `Permit`. */
 export const PERMIT_TYPES = {
   Permit: [
     { name: 'owner', type: 'address' },
@@ -26,9 +28,15 @@ export const PERMIT_TYPES = {
   ],
 } as const
 
+/**
+ * Ethereum-mainnet USDT, which reverts a non-zero to non-zero `approve` (see
+ * `EvmConfig.autoResetAllowance`).
+ */
 export const USDT_MAINNET = '0xdac17f958d2ee523a2206206994597c13d831ec7'
 
+/** Calldata of ERC-20 `transfer(to, amount)`. */
 export const encodeTransfer = (to: `0x${string}`, amount: bigint) =>
   encodeFunctionData({ abi: ERC20_ABI, functionName: 'transfer', args: [to, amount] })
+/** Calldata of ERC-20 `approve(spender, amount)`. */
 export const encodeApprove = (spender: `0x${string}`, amount: bigint) =>
   encodeFunctionData({ abi: ERC20_ABI, functionName: 'approve', args: [spender, amount] })

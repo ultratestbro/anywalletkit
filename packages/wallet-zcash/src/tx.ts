@@ -45,6 +45,9 @@ export interface TxOutput {
   script: Uint8Array
 }
 
+/**
+ * A v5 (NU5) transaction with transparent inputs and outputs only, as signed and serialized here.
+ */
 export interface TransparentTxV5 {
   consensusBranchId: number
   lockTime: number

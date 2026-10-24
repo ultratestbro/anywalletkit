@@ -26,6 +26,7 @@ import {
 import { isNativeTransfer, isSignedTransaction, isTransactionMessage } from './guards.js'
 import type { DecodedInstruction, SolanaTransaction, SolanaWarning, TokenProgramKind, TransactionDescription } from './types.js'
 
+/** Largest u64; a token approval of this amount is unlimited. */
 export const MAX_U64 = 0xffffffffffffffffn
 /** The System program id doubles as the all-zero "burn" address. */
 export const ZERO_ADDRESS = SYSTEM_PROGRAM_ADDRESS as string
@@ -79,6 +80,10 @@ export interface CompiledAccounts {
   unresolved: boolean
 }
 
+/**
+ * The accounts a compiled transaction loads, in order, with roles. Lookup-table accounts resolve
+ * through `ctx` or come back as `null`, with `unresolved` set.
+ */
 export function resolveCompiledAccounts(tx: Transaction, ctx: DescribeContext = {}): CompiledAccounts {
   const compiled = getCompiledTransactionMessageDecoder().decode(tx.messageBytes) as unknown as CompiledMessage
   const { header, staticAccounts } = compiled
@@ -212,6 +217,11 @@ function normalize(tx: SolanaTransaction, ctx: DescribeContext): Normalized {
   throw new Error('Expected a transaction message, a compiled transaction or its base64 wire form.')
 }
 
+/**
+ * Decode any transaction the account accepts (transfer, message, compiled, base64) for a
+ * confirmation screen: kind, instructions and warnings. Pass the signing `account` to get fee-payer
+ * and missing-signer warnings.
+ */
 export function describeTransaction(tx: SolanaTransaction, ctx: DescribeContext = {}): TransactionDescription {
   // A bare transfer has no instructions yet: describe its intent directly.
   if (isNativeTransfer(tx)) {

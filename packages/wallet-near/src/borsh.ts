@@ -10,6 +10,7 @@ import type {
 const utf8 = new TextEncoder()
 const utf8d = new TextDecoder()
 
+/** @internal Minimal borsh encoder for NEAR transactions. */
 export class BorshWriter {
   private _buf = new Uint8Array(256)
   private _len = 0
@@ -47,6 +48,7 @@ export class BorshWriter {
   toBytes(): Uint8Array { return this._buf.slice(0, this._len) }
 }
 
+/** @internal Minimal borsh decoder for NEAR transactions. */
 export class BorshReader {
   private _pos = 0
   constructor(private readonly _buf: Uint8Array) {}
@@ -240,6 +242,7 @@ export function readAction(r: BorshReader): NearAction {
 
 // ── Transactions ─────────────────────────────────────────────────────────────
 
+/** Borsh bytes of an unsigned transaction. */
 export function encodeTransaction(tx: NearBuiltTransaction): Uint8Array {
   if (tx.blockHash.length !== 32) throw new RangeError('blockHash must be 32 bytes')
   const w = new BorshWriter()
@@ -263,6 +266,7 @@ export function readTransaction(r: BorshReader): NearBuiltTransaction {
   return { signerId, publicKey, nonce, receiverId, blockHash, actions }
 }
 
+/** Decode an unsigned transaction from borsh bytes. */
 export function decodeTransaction(bytes: Uint8Array): NearBuiltTransaction {
   const r = new BorshReader(bytes)
   const tx = readTransaction(r)
@@ -270,6 +274,7 @@ export function decodeTransaction(bytes: Uint8Array): NearBuiltTransaction {
   return tx
 }
 
+/** Borsh bytes of a signed transaction, ready to broadcast as base64. */
 export function encodeSignedTransaction(s: NearSignedTransaction): Uint8Array {
   const w = new BorshWriter()
   w.bytes(encodeTransaction(s.transaction))
@@ -277,6 +282,7 @@ export function encodeSignedTransaction(s: NearSignedTransaction): Uint8Array {
   return w.toBytes()
 }
 
+/** Decode a signed transaction from borsh bytes. */
 export function decodeSignedTransaction(bytes: Uint8Array): NearSignedTransaction {
   const r = new BorshReader(bytes)
   const transaction = readTransaction(r)

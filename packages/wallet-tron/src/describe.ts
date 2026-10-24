@@ -6,6 +6,7 @@ import type { TronContractCall, TronNativeTransfer, TronRawTransaction, TronTran
 
 /** Tron's zero address (20 zero bytes behind the 0x41 prefix). */
 export const ZERO_ADDRESS = 'T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb'
+/** The all-zero Tron address in hex; value sent there is lost. */
 export const ZERO_ADDRESS_HEX = '41' + '0'.repeat(40)
 const MAX_UINT256 = (1n << 256n) - 1n
 const UNLIMITED_THRESHOLD = 1n << 255n
@@ -16,6 +17,7 @@ const SELECTORS: Record<string, 'transfer' | 'approve' | 'transferFrom'> = {
   '23b872dd': 'transferFrom',
 }
 
+/** What an offline description can be told to sharpen its warnings. */
 export interface DescribeContext {
   /**
    * Whether the recipient account already exists on chain. Offline callers do not know;

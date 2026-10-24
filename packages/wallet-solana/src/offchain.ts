@@ -21,6 +21,7 @@ export const SOLANA_OFFCHAIN_MESSAGE_PREFIX: Uint8Array = Uint8Array.from([0xff,
 
 /** Refused before signing: the "message" is a Solana transaction this account would sign for. */
 export class MessageIsTransactionError extends SignerError {
+  /** Machine-readable code. */
   readonly code = 'message-is-transaction'
   constructor() {
     super('This message is a Solana transaction; use signTransaction so it can be reviewed.')
@@ -111,6 +112,10 @@ export function isReadableText(bytes: Uint8Array): boolean {
  */
 export type SolanaMessageKind = 'transaction' | 'offchain' | 'text' | 'binary'
 
+/**
+ * Classify bytes a site asks the wallet to sign as a message. Refuse `transaction`; show `text` and
+ * `offchain` content; warn on `binary`.
+ */
 export function classifySolanaMessage(bytes: Uint8Array, signer: string | Uint8Array): SolanaMessageKind {
   if (isSolanaTransactionPayload(bytes, signer)) return 'transaction'
   if (hasSolanaOffchainHeader(bytes)) return 'offchain'

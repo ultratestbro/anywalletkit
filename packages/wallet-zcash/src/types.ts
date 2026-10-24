@@ -1,8 +1,10 @@
+/** Zcash mainnet or testnet. */
 export type ZcashNetwork = 'mainnet' | 'testnet'
 
 /** CAIP-2 ids the SDK uses for Zcash (the swap2 catalog already names `zcash:mainnet`). */
 export const CAIP2: Record<ZcashNetwork, string> = { mainnet: 'zcash:mainnet', testnet: 'zcash:testnet' }
 
+/** An unspent transparent output the account can spend. */
 export interface Utxo {
   txid: string
   vout: number
@@ -46,12 +48,17 @@ export interface ZcashClient {
   getBlockHeight(): Promise<number>
 }
 
+/** One transport to a Zcash indexer: Blockchair or a Blockbook instance. */
 export type ZcashClientConfig =
   /** Blockchair's public REST API (`https://api.blockchair.com/zcash`; optional API key). Mainnet only. */
   | { type: 'blockchair'; clientConfig?: { url?: string; key?: string } }
   /** A Zcash Blockbook (NOWNodes `https://zec-blockbook.nownodes.io` with an `api-key` header, a self-hosted instance, …). */
   | { type: 'blockbook-http'; clientConfig: { url: string; headers?: Record<string, string> } }
 
+/**
+ * Options for a Zcash wallet manager or account: transports, network and fee limits. Transparent
+ * addresses only.
+ */
 export interface ZcashConfig {
   /** One or more transports (config objects or ready `ZcashClient`s). A list fails over in order. Omit for an offline (sign-only) wallet. */
   client?: ZcashClientConfig | ZcashClient | Array<ZcashClientConfig | ZcashClient>
@@ -92,6 +99,7 @@ export interface ZcashSpend {
 /** `sendTransaction` accepts a spend or an already signed raw transaction hex. */
 export type ZcashTransaction = ZcashSpend | string
 
+/** A transparent ZEC transfer. Amount in zatoshis. */
 export interface ZcashTransferOptions {
   /** Not supported on Zcash; present for the shared account interface. */
   token?: string
@@ -99,6 +107,7 @@ export interface ZcashTransferOptions {
   amount: bigint | number | string
 }
 
+/** A mined Zcash transaction. */
 export interface ZcashReceipt {
   hash: string
   /** Always 1 once mined — a transparent transaction cannot fail after inclusion. */
@@ -108,6 +117,7 @@ export interface ZcashReceipt {
   fee?: bigint
 }
 
+/** The most one transaction can send (a sweep of every UTXO), after the fee. */
 export interface ZcashMaxSpendableResult {
   /** Max zatoshis one transaction can send after the fee. 0n when nothing is spendable. */
   amount: bigint
@@ -117,6 +127,7 @@ export interface ZcashMaxSpendableResult {
   inputs: number
 }
 
+/** Problems a described transaction is flagged with. */
 export type ZcashWarning =
   /** Fee exceeds 10 % of the amount sent. */
   | 'fee-over-10pct-of-amount'
@@ -129,6 +140,7 @@ export type ZcashWarning =
   /** No expiry height: the transaction stays valid in mempools indefinitely. */
   | 'no-expiry'
 
+/** One input of a described transaction: the UTXO it spends. */
 export interface ZcashTxInputDescription {
   txid: string
   vout: number
@@ -136,6 +148,7 @@ export interface ZcashTxInputDescription {
   address: string | undefined
 }
 
+/** One output of a described transaction, tagged as the recipient, our change, or unknown. */
 export interface ZcashTxOutputDescription {
   /** Undefined for scripts without an address form. */
   address: string | undefined

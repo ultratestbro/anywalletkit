@@ -176,6 +176,7 @@ export interface TronDecodedContract {
   undecoded: number[]
 }
 
+/** A transaction's `raw_data`, decoded from its protobuf bytes. */
 export interface TronDecodedRaw {
   raw_data: Omit<TronRawTransaction['raw_data'], 'contract'> & { contract: TronDecodedContract[]; ref_block_num?: number }
   /** Top-level `Transaction.raw` field numbers this codec does not know. */
@@ -359,6 +360,7 @@ export function encodeRawData(raw: TronRawTransaction['raw_data'] & { ref_block_
 
 // ── verification ─────────────────────────────────────────────────────────────
 
+/** Decoded `raw_data` with the exact bytes that are signed and their hash. */
 export interface VerifiedRaw extends TronDecodedRaw {
   /** The bytes that get hashed and signed. */
   bytes: Uint8Array

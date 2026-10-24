@@ -35,7 +35,12 @@ export function transferTransaction(o: EvmTransferOptions): EvmTransaction {
   return { to: getAddress(o.token), value: 0n, data: encodeTransfer(getAddress(o.recipient), amount) }
 }
 
+/**
+ * An EVM address without a key: balances, allowances, fee quotes, simulation, receipts and
+ * signature checks. Hand it to code that should only read or quote.
+ */
 export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
+  /** Checksummed address. */
   readonly address: `0x${string}`
   protected readonly _config: EvmConfig
   protected readonly _client: PublicClient | undefined
@@ -53,36 +58,43 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
     return this._chainId !== undefined ? `eip155:${this._chainId}` : CAIP2_UNKNOWN
   }
 
+  /** The RPC client, or a `NetworkError` naming the action when the wallet is offline. */
   protected requireClient(what: string): PublicClient {
     if (!this._client) throw new NetworkError(`The wallet must be connected to a provider to ${what}.`)
     return this._client
   }
 
+  /** The checksummed address. */
   async getAddress(): Promise<string> {
     return this.address
   }
 
+  /** Chain id from the config, or asked from the RPC once and cached. */
   async getChainId(): Promise<number> {
     if (this._chainId === undefined) this._chainId = await this.requireClient('detect the chain id').getChainId()
     return this._chainId
   }
 
+  /** Native balance in wei. */
   async getBalance(): Promise<bigint> {
     return this.requireClient('read balances').getBalance({ address: this.address })
   }
 
+  /** ERC-20 `balanceOf` in the token's base units. */
   async getTokenBalance(token: string): Promise<bigint> {
     return this.requireClient('read token balances').readContract({
       address: getAddress(token), abi: ERC20_ABI, functionName: 'balanceOf', args: [this.address],
     })
   }
 
+  /** Several ERC-20 balances in parallel, keyed by the token addresses as given. */
   async getTokenBalances(tokens: string[]): Promise<Record<string, bigint>> {
     const out: Record<string, bigint> = {}
     await Promise.all(tokens.map(async (t) => { out[t] = await this.getTokenBalance(t) }))
     return out
   }
 
+  /** ERC-20 `allowance(owner, spender)` in base units. */
   async getAllowance(token: string, spender: string): Promise<bigint> {
     return this.requireClient('read allowances').readContract({
       address: getAddress(token), abi: ERC20_ABI, functionName: 'allowance', args: [this.address, getAddress(spender)],
@@ -149,10 +161,12 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
     }
   }
 
+  /** Network fee of a transfer, in wei. */
   async quoteTransfer(options: EvmTransferOptions): Promise<{ fee: bigint }> {
     return this.quoteSendTransaction(transferTransaction(options))
   }
 
+  /** The receipt, or `undefined` while the transaction is not mined. */
   async getTransactionReceipt(hash: string): Promise<EvmReceipt | undefined> {
     const client = this.requireClient('fetch transaction receipts')
     try {
@@ -167,10 +181,12 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
     }
   }
 
+  /** The transaction as the RPC returns it (viem shape). */
   async getTransactionByHash(hash: string) {
     return this.requireClient('fetch transactions').getTransaction({ hash: hash as Hex })
   }
 
+  /** True when `signature` is this address's EIP-191 signature of `message`. */
   async verify(message: string | Uint8Array, signature: string): Promise<boolean> {
     const recovered = await recoverMessageAddress({
       message: typeof message === 'string' ? message : { raw: message },
@@ -179,6 +195,7 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
     return recovered.toLowerCase() === this.address.toLowerCase()
   }
 
+  /** True when `signature` is this address's EIP-712 signature of `typed`. */
   async verifyTypedData(typed: TypedDataInput, signature: string): Promise<boolean> {
     const types = cleanTypes(typed.types)
     const hash = hashTypedData({ domain: typed.domain, types, primaryType: typed.primaryType ?? inferPrimaryType(types), message: typed.message } as never)

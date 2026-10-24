@@ -23,6 +23,10 @@ export class WalletManagerBtc extends WalletManager<WalletAccountBtc, BtcConfig>
   }
 
 
+  /**
+   * `m/84'/0'` for p2wpkh or `m/86'/0'` for p2tr on mainnet (coin type 1 on test networks); account
+   * `i` is at `basePath/0'/0/i`.
+   */
   get basePath(): string {
     return `m/${purposeFor(this._config.addressType ?? 'p2wpkh')}'/${coinType(this._config.network ?? 'bitcoin')}'`
   }
@@ -62,6 +66,7 @@ export class WalletManagerBtc extends WalletManager<WalletAccountBtc, BtcConfig>
     return account
   }
 
+  /** A read-only account for any address, with this manager's config. */
   getReadOnlyAccount(address: string): WalletAccountReadOnlyBtc {
     return new WalletAccountReadOnlyBtc(address, this._config)
   }

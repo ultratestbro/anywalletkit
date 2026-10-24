@@ -4,6 +4,10 @@ export type TronFetch = (path: string, body: unknown) => Promise<unknown>
 /** One full-node base url (e.g. "https://api.trongrid.io") or a ready transport. */
 export type TronProvider = string | TronFetch
 
+/**
+ * Options for a Tron wallet manager or account: full-node endpoints, network, fee limits and the
+ * pre-sign checks.
+ */
 export interface TronConfig {
   /** Full-node url(s) / transport(s). A list fails over in order. Omit for an offline (sign-only) wallet. */
   provider?: TronProvider | TronProvider[]
@@ -59,11 +63,17 @@ export interface TronRawTransaction {
   signature?: string[]
 }
 
+/**
+ * Anything `sendTransaction` accepts: a TRX transfer, a contract call, or a transaction prebuilt by
+ * a provider.
+ */
 export type TronTransaction = TronNativeTransfer | TronContractCall | TronRawTransaction
 
+/** A TRX or TRC-20 transfer. Amount in sun or the token's base units. */
 export interface TronTransferOptions {
   /** TRC-20 contract (base58 T… or hex 41…). Omit for native TRX. */
   token?: string
+  /** Address that receives (base58 `T…` or hex `41…`). */
   recipient: string
   amount: bigint | number | string
   /** Attached as `raw_data.data`; the network charges `getMemoFee` (1 TRX). */
@@ -97,6 +107,10 @@ export interface TronFeeBreakdown {
   energyBurn: bigint
 }
 
+/**
+ * Resources a transaction consumes and the TRX burned for what the account's free bandwidth and
+ * staked energy do not cover.
+ */
 export interface TronFeeEstimate {
   /** Bandwidth points the transaction consumes (serialized size + signature + 64-byte result reserve). */
   bandwidth: number
@@ -107,6 +121,7 @@ export interface TronFeeEstimate {
   breakdown: TronFeeBreakdown
 }
 
+/** Fee of a transaction in sun (TRX burned), with the estimate behind it. */
 export interface TronQuote {
   /** = `estimate.trxBurn`. */
   fee: bigint
@@ -126,7 +141,9 @@ export interface TronSimulation {
   constantResult?: string[] | undefined
 }
 
+/** What a Tron transaction does. */
 export type TronTxKind = 'trx-transfer' | 'trc10-transfer' | 'trc20-transfer' | 'trc20-approve' | 'contract-call' | 'freeze' | 'unfreeze' | 'unknown'
+/** Problems a Tron description is flagged with. */
 export type TronTxWarningCode =
   | 'unlimited-approve' | 'zero-address' | 'unactivated-recipient' | 'memo-fee' | 'expired'
   /** Prebuilt transaction without `raw_data_hex`: described from the unsigned JSON copy, cannot be signed. */
@@ -139,10 +156,12 @@ export type TronTxWarningCode =
   | 'multi-contract'
   /** AccountPermissionUpdateContract: changes who controls the account. */
   | 'account-permission'
+/** One flagged problem, with a sentence a wallet can show. */
 export interface TronTxWarning { code: TronTxWarningCode; message: string }
 
 /** What a transaction does, decoded offline (see `describeTransaction`). Addresses are base58. */
 export interface TronTxDescription {
+  /** What it does. */
   kind: TronTxKind
   warnings: TronTxWarning[]
   /** Sender (owner_address) when known. */
@@ -153,6 +172,7 @@ export interface TronTxDescription {
   amount?: bigint
   /** TRC-20 contract. */
   token?: string
+  /** Spender of a TRC-20 approval. */
   spender?: string
   /** Called contract (contract-call). */
   contract?: string
@@ -168,6 +188,7 @@ export interface TronTxDescription {
   expiration?: number
 }
 
+/** Outcome of a confirmed Tron transaction. */
 export interface TronReceipt {
   hash: string
   /** 1 success, 0 failed. */
@@ -178,6 +199,7 @@ export interface TronReceipt {
   raw: Record<string, unknown>
 }
 
+/** CAIP-2 ids of the Tron networks, by name. */
 export const CAIP2_GENESIS: Record<string, string> = {
   mainnet: 'tron:0x2b6653dc',
   shasta: 'tron:0x94a9059e',

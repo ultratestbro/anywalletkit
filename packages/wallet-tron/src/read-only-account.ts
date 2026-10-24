@@ -34,6 +34,10 @@ export const FEE_LIMIT_MARGIN = 1.2
 const SIGNATURE_BYTES = 65
 const RESULT_RESERVE_BYTES = 64
 const varintLen = (n: number) => (n < 128 ? 1 : n < 16_384 ? 2 : 3)
+/**
+ * Bandwidth points a transaction consumes: its serialized size with signatures plus the 64-byte
+ * result reserve.
+ */
 export function bandwidthPoints(rawDataHex: string, signatures = 1): number {
   const raw = Math.ceil(rawDataHex.replace(/^0x/, '').length / 2)
   return 1 + varintLen(raw) + raw + signatures * (1 + 1 + SIGNATURE_BYTES) + RESULT_RESERVE_BYTES
@@ -89,9 +93,14 @@ const contractOf = (tx: TronRawTransaction) => {
   return { type: c?.type, value: (c?.parameter?.value ?? {}) as Record<string, unknown> }
 }
 
+/**
+ * A Tron address without a key: TRX and TRC-20 balances, allowances, resources, fee estimates,
+ * simulation, receipts and signature checks.
+ */
 export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
   /** base58 T… */
   readonly address: string
+  /** Hex form (`41…`). */
   readonly addressHex: string
   readonly chain: string
   protected readonly _config: TronConfig
@@ -117,8 +126,10 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
     return res as T
   }
 
+  /** The base58 address. */
   async getAddress(): Promise<string> { return this.address }
 
+  /** TRX balance in sun; 0 for an account that does not exist yet. */
   async getBalance(): Promise<bigint> {
     const acc = await this.post<{ balance?: number }>('/wallet/getaccount', { address: this.addressHex, visible: false }, 'retrieve balances')
     return BigInt(acc.balance ?? 0)
@@ -133,17 +144,20 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
     )
   }
 
+  /** TRC-20 `balanceOf` in the token's base units. */
   async getTokenBalance(token: string): Promise<bigint> {
     const r = await this.constantCall(token, 'balanceOf(address)', [{ type: 'address', value: this.address }], 'retrieve token balances')
     return decodeUint(r.constant_result?.[0] ?? '0')
   }
 
+  /** Several TRC-20 balances in parallel, keyed by the tokens as given. */
   async getTokenBalances(tokens: string[]): Promise<Record<string, bigint>> {
     const out: Record<string, bigint> = {}
     await Promise.all(tokens.map(async (t) => { out[t] = await this.getTokenBalance(t) }))
     return out
   }
 
+  /** TRC-20 `allowance(owner, spender)` in base units. */
   async getAllowance(token: string, spender: string): Promise<bigint> {
     const r = await this.constantCall(token, 'allowance(address,address)', [{ type: 'address', value: this.address }, { type: 'address', value: spender }], 'read allowances')
     return decodeUint(r.constant_result?.[0] ?? '0')
@@ -348,6 +362,7 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
       : { to: o.recipient, value: o.amount, ...memo }
   }
 
+  /** Fee of a transfer in sun, including account activation when the recipient is new. */
   async quoteTransfer(o: TronTransferOptions): Promise<TronQuote> {
     this.requireClient('quote transfer operations')
     return this.quoteSendTransaction(this.asTransaction(o))
@@ -362,6 +377,7 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
     return describeTransaction(tx, { ...ctx, recipientExists: await this.accountExists(offline.to) })
   }
 
+  /** The receipt, or `undefined` while the transaction is unconfirmed. */
   async getTransactionReceipt(hash: string): Promise<TronReceipt | undefined> {
     const info = await this.post<Record<string, unknown>>('/wallet/gettransactioninfobyid', { value: hash }, 'fetch transaction receipts')
     if (!info || Object.keys(info).length === 0) return undefined

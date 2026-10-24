@@ -13,6 +13,7 @@ import { compactSize, utf8ToBytes } from './encoding.js'
 const MAGIC = 'Zcash Signed Message:\n'
 const PREFIX = utf8ToBytes(MAGIC)
 
+/** Hash of a signed message (`Zcash Signed Message:` prefix, double SHA-256). */
 export function magicHash(message: string | Uint8Array): Uint8Array {
   const msg = typeof message === 'string' ? utf8ToBytes(message) : message
   const p = compactSize(PREFIX.length), l = compactSize(msg.length)

@@ -1,3 +1,4 @@
+/** Why a transaction was refused before signing. */
 export type UnsafeTransactionCode =
   | 'signer-mismatch'
   | 'public-key-mismatch'

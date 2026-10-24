@@ -4,6 +4,7 @@ import { WalletAccountReadOnlyNear } from './read-only-account.js'
 import { NearRpc, createClient } from './rpc.js'
 import type { NearConfig, NearPublicKey } from './types.js'
 
+/** Base derivation path; account `i` is at `m/44'/397'/i'`. */
 export const NEAR_BASE_PATH = "m/44'/397'"
 
 /**
@@ -65,6 +66,7 @@ export class WalletManagerNear extends WalletManager<WalletAccountNear, NearConf
     return account
   }
 
+  /** A read-only account for any account id, with this manager's config. */
   getReadOnlyAccount(accountId: string, publicKey?: Uint8Array | NearPublicKey): WalletAccountReadOnlyNear {
     return new WalletAccountReadOnlyNear(accountId, this._config, publicKey)
   }

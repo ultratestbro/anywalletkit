@@ -10,6 +10,7 @@ import { hexToBytes } from './encoding.js'
 import { DEFAULT_TIMEOUT_MS, fetchWithTimeout, isInt, isRecord } from './http.js'
 import type { SpentOutput, Utxo, ZcashClient, ZcashTxInfo } from './types.js'
 
+/** Default Blockchair API root for Zcash. */
 export const BLOCKCHAIR_URL = 'https://api.blockchair.com/zcash'
 /** Blockchair caps the `utxo` list of an address dashboard at this many rows. */
 const UTXO_LIMIT = 1000

@@ -19,10 +19,13 @@ import { emulateExternal as emulateToncenter, type EmulationVerdict } from './to
 import type { TonEmulateConfig, TonRisk } from './types.js'
 
 const DEFAULT_TIMEOUT_MS = 15_000
+/** Default tonapi root used for emulation. */
 export const DEFAULT_TONAPI = 'https://tonapi.io/v2'
 
+/** Service an emulation came from. */
 export type EmulationSource = 'tonapi' | 'toncenter-v3'
 
+/** An emulation verdict with its source and any deeper failures. */
 export interface EmulationOutcome extends EmulationVerdict {
   source: EmulationSource
   /** Failed/bounced transactions deeper than the first hop — informational. */
@@ -160,6 +163,7 @@ export function parseTonapiConsequences(json: unknown): EmulationOutcome {
   return { ...verdict, source: 'tonapi', risk: parseTonapiRisk(json.risk) }
 }
 
+/** Options for emulating a message through tonapi or toncenter v3. */
 export interface EmulateOptions {
   fetch?: typeof fetch
   timeoutMs?: number

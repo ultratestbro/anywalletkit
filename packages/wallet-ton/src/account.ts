@@ -21,7 +21,9 @@ const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(
 export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalletAccount {
   /** seqno and fees come from the network before signing. */
   readonly needsNetwork = true
+  /** Derivation path, `ton-mnemonic`, or `external`. */
   readonly path: string
+  /** The signer that holds the key. */
   readonly signer: Signer
   private _readOnly: WalletAccountReadOnlyTon | undefined
 
@@ -127,6 +129,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     return { hash: await this.broadcast(body), fee }
   }
 
+  /** The same wallet as a {@link WalletAccountReadOnlyTon}. */
   toReadOnlyAccount(): IWalletAccountReadOnly {
     this._readOnly ??= new WalletAccountReadOnlyTon(this.publicKey, this._config)
     return this._readOnly

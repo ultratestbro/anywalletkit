@@ -7,8 +7,10 @@
 import { sha256 } from '@noble/hashes/sha2.js'
 import { BorshWriter } from './borsh.js'
 
+/** NEP-413 tag (2^31 + 413) that keeps a signed message from being a valid transaction. */
 export const NEP413_PREFIX = 2 ** 31 + 413
 
+/** A NEP-413 sign-in message, as a site asks for it. */
 export interface Nep413Payload {
   message: string
   /** 32 random bytes chosen by the verifier (replay protection). */
@@ -18,6 +20,7 @@ export interface Nep413Payload {
   callbackUrl?: string
 }
 
+/** A NEP-413 signature and the key that made it. */
 export interface Nep413Signed {
   /** Base64 of the 64-byte ed25519 signature — the encoding wallets return. */
   signature: string
@@ -26,6 +29,7 @@ export interface Nep413Signed {
   accountId: string
 }
 
+/** Borsh bytes of a NEP-413 payload, ready to hash and sign. */
 export function nep413Bytes(p: Nep413Payload): Uint8Array {
   if (p.nonce.length !== 32) throw new RangeError('NEP-413 nonce must be 32 bytes')
   const w = new BorshWriter()

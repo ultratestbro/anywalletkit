@@ -91,8 +91,14 @@ function describeSimulationErr(err: unknown): string {
   }
 }
 
+/**
+ * A Solana address without a key: balances, mint info, fee quotes, simulation, the serialized-
+ * transaction guard, receipts and signature checks.
+ */
 export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
+  /** Base58 address. */
   readonly address: Address
+  /** CAIP-2 id of the cluster. */
   readonly chain: string
   protected readonly _config: SolanaConfig
   protected readonly _rpc: SolanaRpc | undefined
@@ -112,8 +118,10 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return this._rpc
   }
 
+  /** The base58 address. */
   async getAddress(): Promise<string> { return this.address }
 
+  /** Native balance in lamports. */
   async getBalance(): Promise<bigint> {
     const { value } = await this.requireRpc('retrieve balances').getBalance(this.address, { commitment: this._commitment }).send()
     return value
@@ -156,6 +164,10 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return ata
   }
 
+  /**
+   * Balance of a mint in this wallet's associated token account, in base units; 0 when that
+   * account does not exist.
+   */
   async getTokenBalance(token: string): Promise<bigint> {
     const rpc = this.requireRpc('retrieve token balances')
     const mint = address(token)
@@ -622,6 +634,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return (await this.plan(tx)).quote
   }
 
+  /** Fee breakdown of a transfer, including the compute budget and any Token-2022 transfer fee. */
   async quoteTransfer(o: SolanaTransferOptions): Promise<SolanaFeeQuote> {
     return (await this.planTransfer(o)).quote
   }
@@ -631,6 +644,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return describeTransaction(tx, { account: this.address })
   }
 
+  /** The receipt, or `undefined` while the transaction has not landed. */
   async getTransactionReceipt(hash: string): Promise<SolanaReceipt | undefined> {
     const rpc = this.requireRpc('fetch transaction receipts')
     if (!isSignature(hash)) throw new Error('Invalid signature.')

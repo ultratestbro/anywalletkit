@@ -21,6 +21,7 @@ export type HistoryFetch = (
   init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal },
 ) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>
 
+/** Options for {@link createSolanaHistory}. */
 export interface SolanaHistoryOptions {
   /** One JSON-RPC endpoint. */
   rpcUrl?: string
@@ -28,6 +29,7 @@ export interface SolanaHistoryOptions {
   rpcUrls?: string[]
   /** `mainnet` (default), `devnet`, `testnet` — picks the CAIP-2 id and the explorer cluster. */
   network?: 'mainnet' | 'devnet' | 'testnet'
+  /** Fetch implementation; defaults to the global `fetch`. */
   fetch?: HistoryFetch
   /** RPC requests per second (a batch counts as one request). Default 5. */
   rateLimit?: number
@@ -49,14 +51,21 @@ export interface SolanaHistoryRaw {
   logs?: string[]
 }
 
+/** A `ChainTx` with the raw RPC rows it was built from. */
 export interface SolanaChainTx extends ChainTx {
   raw: SolanaHistoryRaw
 }
 
+/** One page of Solana history. */
 export interface SolanaHistoryPage extends HistoryPage {
+  /** Transactions, newest first. */
   items: SolanaChainTx[]
 }
 
+/**
+ * Solana history from JSON-RPC alone (`getSignaturesForAddress` + `getTransaction`), merged across
+ * the wallet and its token accounts. Build it with {@link createSolanaHistory}.
+ */
 export interface SolanaHistorySource extends HistorySource {
   listActivity(address: string, query?: HistoryQuery): Promise<SolanaHistoryPage>
   getTransaction(hash: string, address: string): Promise<SolanaChainTx | undefined>
@@ -66,7 +75,9 @@ export interface SolanaHistorySource extends HistorySource {
 
 /** Every configured RPC failed (or none was configured). */
 export class HistoryUnavailableError extends Error {
+  /** CAIP-2 id of the cluster. */
   readonly chain: string
+  /** Why the last endpoint failed. */
   readonly reason: string
   /** One line per endpoint tried, in order. */
   readonly attempts: readonly string[]
@@ -81,10 +92,15 @@ export class HistoryUnavailableError extends Error {
 
 // ── Program ids ──────────────────────────────────────────────────────────────
 
+/** System program id. */
 export const SYSTEM_PROGRAM = '11111111111111111111111111111111'
+/** Compute Budget program id. */
 export const COMPUTE_BUDGET_PROGRAM = 'ComputeBudget111111111111111111111111111111'
+/** SPL Token program id. */
 export const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'
+/** Token-2022 program id. */
 export const TOKEN_2022_PROGRAM = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'
+/** Associated Token Account program id. */
 export const ASSOCIATED_TOKEN_PROGRAM = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'
 const MEMO_PROGRAMS = ['MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr', 'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo']
 /** Programs that never are "the contract you called": fee/compute plumbing, memos, token plumbing. */
@@ -96,6 +112,7 @@ const DEFAULT_TIMEOUT_MS = 15_000
 
 // ── RPC shapes (only what the mapper reads) ──────────────────────────────────
 
+/** A `getSignaturesForAddress` row. */
 export interface SignatureRow {
   signature: string
   slot: number
@@ -175,10 +192,12 @@ function b64decode(s: string): string {
   return out
 }
 
+/** Encode a history page cursor. */
 export function encodeCursor(c: PageCursor): string {
   return b64encode(JSON.stringify(c))
 }
 
+/** Decode a cursor made by `encodeHistoryCursor`; throws on anything else. */
 export function decodeCursor(s: string): PageCursor {
   let parsed: unknown
   try {
@@ -329,6 +348,10 @@ export function callOf(tx: ParsedTransaction): ChainCall | undefined {
   return call
 }
 
+/**
+ * Build a `ChainTx` from a signature row and its jsonParsed `getTransaction` result (or `null` when
+ * the node no longer has it).
+ */
 export function mapTransaction(chain: string, address: string, row: SignatureRow, tx: ParsedTransaction | null): SolanaChainTx {
   const raw: SolanaHistoryRaw = { signature: row, tx }
   if (!tx || !tx.meta) {
@@ -359,6 +382,7 @@ export function mapTransaction(chain: string, address: string, row: SignatureRow
 
 // ── Source ───────────────────────────────────────────────────────────────────
 
+/** Solscan link for a transaction on the given cluster. */
 export function solanaExplorerTxUrl(hash: string, network: 'mainnet' | 'devnet' | 'testnet' = 'mainnet'): string {
   return `https://solscan.io/tx/${hash}${network === 'mainnet' ? '' : `?cluster=${network}`}`
 }

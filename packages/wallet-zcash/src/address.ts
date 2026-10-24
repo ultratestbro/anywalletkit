@@ -12,8 +12,10 @@ import type { ZcashNetwork } from './types.js'
 
 const b58 = base58check(sha256)
 
+/** Transparent address type: pay-to-pubkey-hash (`t1…`) or pay-to-script-hash (`t3…`). */
 export type ScriptKind = 'p2pkh' | 'p2sh'
 
+/** A transparent address decoded to its type and 20-byte hash. */
 export interface DecodedAddress {
   kind: ScriptKind
   /** 20-byte hash (pubkey hash or script hash). */
@@ -32,6 +34,7 @@ export function addressPrefix(network: ZcashNetwork, kind: ScriptKind): readonly
   return PREFIX[network][kind]
 }
 
+/** RIPEMD-160 of SHA-256, the hash inside a transparent address. */
 export function hash160(data: Uint8Array): Uint8Array {
   return ripemd160(sha256(data))
 }
@@ -43,12 +46,14 @@ export function scriptFor(kind: ScriptKind, hash: Uint8Array): Uint8Array {
   return Uint8Array.of(0xa9, 0x14, ...hash, 0x87)
 }
 
+/** Type of an output script; `unknown` for anything but p2pkh and p2sh. */
 export function scriptKind(script: Uint8Array): ScriptKind | 'unknown' {
   if (script.length === 25 && script[0] === 0x76 && script[1] === 0xa9 && script[2] === 0x14 && script[23] === 0x88 && script[24] === 0xac) return 'p2pkh'
   if (script.length === 23 && script[0] === 0xa9 && script[1] === 0x14 && script[22] === 0x87) return 'p2sh'
   return 'unknown'
 }
 
+/** Transparent address of a 20-byte hash. */
 export function encodeAddress(kind: ScriptKind, hash: Uint8Array, network: ZcashNetwork): string {
   if (hash.length !== 20) throw new Error('A transparent address needs a 20-byte hash')
   const [a, b] = PREFIX[network][kind]

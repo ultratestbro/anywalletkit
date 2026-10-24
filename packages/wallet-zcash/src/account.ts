@@ -40,8 +40,11 @@ interface Built {
 export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IWalletAccount {
   /** UTXOs and the tip height come from the network before signing. */
   readonly needsNetwork = true
+  /** Derivation path, or `external` for an external signer. */
   readonly path: string
+  /** Compressed secp256k1 public key. */
   readonly publicKey: Uint8Array
+  /** The signer that holds the key. */
   readonly signer: Signer
   private _disposed = false
   private _readOnly: WalletAccountReadOnlyZcash | undefined
@@ -192,6 +195,7 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
     return { hash: id || built.txid, fee: built.fee }
   }
 
+  /** The same address as a {@link WalletAccountReadOnlyZcash}. */
   toReadOnlyAccount(): IWalletAccountReadOnly {
     this._readOnly ??= new WalletAccountReadOnlyZcash(this.address, this._config)
     return this._readOnly

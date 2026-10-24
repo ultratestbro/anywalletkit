@@ -11,6 +11,7 @@ import { CAIP2_GENESIS, type BtcAddressType, type BtcClient, type BtcConfig, typ
 
 export { MAX_UTXO_INPUTS }
 
+/** A coin selection for one spend, with the recipient's script. */
 export interface SpendPlan extends CoinSelection {
   /** Sats the recipient gets (the requested value — never reduced). */
   amount: bigint
@@ -23,13 +24,16 @@ export const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).pa
 
 /** Watch-only Bitcoin account: balances, quotes, receipts, BIP-137 verification. No key. */
 export class WalletAccountReadOnlyBtc implements IWalletAccountReadOnly {
+  /** The address. */
   readonly address: string
   readonly chain: string
   /** Output script of `address`. */
   readonly scriptPubKey: Uint8Array
+  /** Script type of the address. */
   readonly scriptKind: ScriptKind
   /** p2wpkh / p2tr when the address is one we know how to spend from; undefined for other script types. */
   readonly addressType: BtcAddressType | undefined
+  /** Smallest output this address type may create, in satoshis. */
   readonly dustLimit: bigint
   protected readonly _config: BtcConfig
   protected readonly _client: BtcClient | undefined
@@ -55,10 +59,12 @@ export class WalletAccountReadOnlyBtc implements IWalletAccountReadOnly {
     return this._client
   }
 
+  /** Fee-rate ceiling in sat/vB: `BtcConfig.maxFeeRate` or {@link DEFAULT_MAX_FEE_RATE}. */
   get maxFeeRate(): number {
     return this._config.maxFeeRate ?? DEFAULT_MAX_FEE_RATE
   }
 
+  /** The address. */
   async getAddress(): Promise<string> { return this.address }
 
   /** Confirmed minus pending outgoing (Bitcoin Core wallet semantics). */
@@ -67,6 +73,7 @@ export class WalletAccountReadOnlyBtc implements IWalletAccountReadOnly {
     return unconfirmedOutgoing !== undefined ? confirmed - unconfirmedOutgoing : confirmed + unconfirmed
   }
 
+  /** Always throws: Bitcoin has no tokens. */
   async getTokenBalance(_token: string): Promise<bigint> {
     throw new Error("The 'getTokenBalance' method is not supported on the bitcoin blockchain.")
   }
@@ -109,11 +116,17 @@ export class WalletAccountReadOnlyBtc implements IWalletAccountReadOnly {
     return { ...selection, amount, recipientScript: recipient.script, recipientKind: recipient.kind }
   }
 
+  /** Fee of a spend in satoshis, from a coin selection at the current fee rate. */
   async quoteSendTransaction(tx: BtcSpend): Promise<{ fee: bigint }> {
     const { fee } = await this.planSpend(tx)
     return { fee }
   }
 
+  /**
+   * Fee of a transfer in satoshis.
+   *
+   * @throws Error when `token` is set.
+   */
   async quoteTransfer(o: BtcTransferOptions): Promise<{ fee: bigint }> {
     if (o.token) throw new Error('Tokens are not supported on the bitcoin blockchain.')
     return this.quoteSendTransaction({ to: o.recipient, value: o.amount })

@@ -16,6 +16,7 @@ export class UnsafeTransactionError extends SignerError {
 
 /** A provider-built transaction needs signatures this wallet cannot produce; signing it would strand a half-signed tx. */
 export class MissingSignersError extends SignerError {
+  /** Signer addresses the transaction still needs. */
   readonly missing: readonly string[]
   constructor(missing: readonly string[]) {
     super(`The transaction still needs signatures from ${missing.join(', ')}; this wallet can only sign for its own address.`)
@@ -26,7 +27,9 @@ export class MissingSignersError extends SignerError {
 
 /** `simulateTransaction` failed; nothing was signed or sent. `logs` are the program logs the RPC returned. */
 export class SimulationError extends Error {
+  /** The simulation error. */
   readonly reason: string
+  /** Program logs from the simulation. */
   readonly logs: readonly string[]
   constructor(reason: string, logs: readonly string[] = []) {
     super(`Transaction simulation failed: ${reason}`)

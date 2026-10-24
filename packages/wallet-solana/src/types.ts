@@ -1,5 +1,6 @@
 import type { Commitment, Rpc, SolanaRpcApi, Transaction, TransactionMessage } from '@solana/kit'
 
+/** A `@solana/kit` RPC client. */
 export type SolanaRpc = Rpc<SolanaRpcApi>
 
 /**
@@ -15,11 +16,16 @@ export interface PriorityFeeConfig {
   computeUnitLimit?: number | 'auto'
 }
 
+/**
+ * Options for a Solana wallet manager or account: endpoints, network, fee caps, compute budget and
+ * the pre-sign checks.
+ */
 export interface SolanaConfig {
   /** RPC url(s) or ready `Rpc` object(s). A list fails over in order. Omit for an offline (sign-only) wallet. */
   provider?: string | SolanaRpc | Array<string | SolanaRpc>
   /** Alias of `provider`. */
   rpcUrl?: string | string[]
+  /** Commitment for reads and confirmations. Default `confirmed`. */
   commitment?: Commitment
   /** Extra attempts across the provider list after the first failure (default 3). */
   retries?: number
@@ -58,28 +64,40 @@ export interface SolanaNativeTransfer {
  */
 export type SolanaTransaction = SolanaNativeTransfer | TransactionMessage | Transaction | string
 
+/**
+ * A native SOL or SPL / Token-2022 transfer. Amount in lamports or the token's base units. A
+ * missing recipient token account is created in the same transaction.
+ */
 export interface SolanaTransferOptions {
   /** SPL or Token-2022 mint. Omit for native SOL. */
   token?: string
+  /** Wallet address that receives (not its token account). */
   recipient: string
+  /** Amount in lamports or token base units. */
   amount: bigint | number | string
   /** Address lookup tables to compress the v0 message with. */
   lookupTables?: string[]
 }
 
+/** Outcome of a landed transaction. */
 export interface SolanaReceipt {
+  /** Transaction signature (base58). */
   hash: string
   /** 1 confirmed without error, 0 failed. */
   status: 0 | 1
   /** Slot (Solana's block height analogue). */
   blockNumber: bigint
+  /** Fee paid, in lamports. */
   fee: bigint
+  /** Unix seconds, when the node knows it. */
   blockTime: number | null
+  /** The transaction error as the RPC reports it; `null` on success. */
   err: unknown
 }
 
 /** Fee breakdown; `fee` is what the max-fee guards compare against. */
 export interface SolanaFeeQuote {
+  /** Total fee in lamports: base plus priority. */
   fee: bigint
   /** Signature fees (5 000 lamports × signers). */
   baseFee: bigint
@@ -93,10 +111,16 @@ export interface SolanaFeeQuote {
   tokenFee?: bigint
 }
 
+/** Outcome of `simulateTransaction`: compute units used and logs, or the error and logs. */
 export type SimulationResult =
   | { ok: true; unitsConsumed: bigint; logs: readonly string[] }
   | { ok: false; error: string; logs: readonly string[] }
 
+/**
+ * Problems {@link describeTransaction} flags: a program it does not know, an authority change, a
+ * closed account, a delegate approval (unlimited or not), a fee payer that is not the wallet,
+ * missing co-signers, lookup tables it could not resolve, or the burn address.
+ */
 export type SolanaWarningCode =
   | 'unknown-program'
   | 'sets-authority'
@@ -108,13 +132,21 @@ export type SolanaWarningCode =
   | 'unresolved-lookup-tables'
   | 'burn-address'
 
+/** One flagged problem, with a sentence a wallet can show. */
 export interface SolanaWarning {
+  /** Machine-readable code. */
   code: SolanaWarningCode
+  /** Sentence to show the user. */
   message: string
 }
 
+/** The classic SPL Token program or Token-2022. */
 export type TokenProgramKind = 'token' | 'token-2022'
 
+/**
+ * One instruction of a transaction, decoded where the program is known (System, Token, Token-2022,
+ * Associated Token, Compute Budget) and listed raw otherwise.
+ */
 export type DecodedInstruction =
   | { type: 'sol-transfer'; program: string; from: string; to: string; lamports: bigint }
   | { type: 'create-account'; program: string; payer: string; newAccount: string; lamports: bigint; owner: string }
@@ -127,18 +159,29 @@ export type DecodedInstruction =
   | { type: 'program-call'; program: string; accounts: readonly string[]; dataLength: number; /** System/Token(-2022) instruction name when identified (not otherwise decoded). */ instruction?: string }
   | { type: 'unknown'; program: string | null; accounts: readonly (string | null)[]; dataLength: number }
 
+/**
+ * What a transaction does overall; `mixed` when it does several things, `program-call` when it
+ * calls an unknown program.
+ */
 export type SolanaTransactionKind = 'sol-transfer' | 'spl-transfer' | 'token2022-transfer' | 'ata-create' | 'program-call' | 'mixed' | 'empty'
 
+/** A Solana transaction decoded for a confirmation screen, without any network call. */
 export interface TransactionDescription {
+  /** What it does overall. */
   kind: SolanaTransactionKind
+  /** Message version. */
   version: 'legacy' | 0 | 1
+  /** Account that pays the fee. */
   feePayer: string | undefined
   /** Required signers in message order; `signed` is known only for compiled transactions. */
   signers: Array<{ address: string; signed: boolean | undefined }>
+  /** Every instruction, decoded where possible. */
   items: DecodedInstruction[]
+  /** Problems to show before signing. */
   warnings: SolanaWarning[]
 }
 
+/** CAIP-2 ids of the Solana clusters, by name. */
 export const CAIP2_GENESIS: Record<string, string> = {
   mainnet: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
   devnet: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',

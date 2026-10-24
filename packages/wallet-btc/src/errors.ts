@@ -1,5 +1,6 @@
 export { InsufficientFundsError, NetworkError, SignerError } from '@anywalletkit/core'
 
+/** Why a spend was refused before signing. */
 export type UnsafeTransactionCode =
   /** Fee rate above `maxFeeRate`. */
   | 'fee-rate-too-high'

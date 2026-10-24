@@ -8,6 +8,7 @@ import type { SolanaConfig, SolanaFeeQuote, SolanaTransaction, SolanaTransferOpt
 
 const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
 
+/** Base58 address of a 32-byte ed25519 public key. */
 export function addressFromPublicKey(publicKey: Uint8Array): string {
   return getAddressDecoder().decode(publicKey)
 }
@@ -31,9 +32,11 @@ export interface SolanaSendResult extends TransferResult {
 export class WalletAccountSolana extends WalletAccountReadOnlySolana implements IWalletAccount {
   /** Blockhash and fee come from the network before signing. */
   readonly needsNetwork = true
+  /** Derivation path, or `external` for an external signer. */
   readonly path: string
   /** The signer's 32-byte ed25519 public key (needed synchronously for the address). */
   readonly publicKey: Uint8Array
+  /** The signer that holds the key. */
   readonly signer: Signer
   private _readOnly: WalletAccountReadOnlySolana | undefined
 
@@ -132,6 +135,7 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     return { hash, fee: check.quote.fee, quote: check.quote, check }
   }
 
+  /** The same address as a {@link WalletAccountReadOnlySolana}. */
   toReadOnlyAccount(): IWalletAccountReadOnly {
     this._readOnly ??= new WalletAccountReadOnlySolana(this.address, this._config)
     return this._readOnly

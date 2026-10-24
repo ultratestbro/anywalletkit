@@ -23,8 +23,10 @@ export type HistoryFetch = (
   init?: { method?: string; headers?: Record<string, string>; signal?: AbortSignal },
 ) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>
 
+/** Which indexer answered: tonapi events or toncenter v3 transactions. */
 export type TonHistoryBackend = 'tonapi' | 'toncenter'
 
+/** Options for `createTonHistory`: tonapi first, toncenter v3 as the fallback. */
 export interface TonHistoryOptions {
   /** tonapi root. Default `https://tonapi.io` (`https://testnet.tonapi.io` on testnet). `null` disables tonapi. */
   tonapiUrl?: string | null
@@ -63,11 +65,15 @@ export interface TonHistoryPage extends HistoryPage {
   backend?: TonHistoryBackend
 }
 
+/**
+ * TON history from tonapi events with a toncenter v3 fallback. Build it with `createTonHistory`.
+ */
 export interface TonHistorySource extends HistorySource {
   listActivity(address: string, query?: HistoryQuery): Promise<TonHistoryPage>
   getTransaction(hash: string, address: string): Promise<TonChainTx | undefined>
 }
 
+/** Every configured history backend failed (or none was configured). */
 export class HistoryUnavailableError extends Error {
   readonly chain: string
   readonly reason: string
@@ -457,6 +463,7 @@ export function mapToncenterTransaction(chain: string, address: string, row: V3T
 
 // ── Source ───────────────────────────────────────────────────────────────────
 
+/** Tonviewer link for a transaction. */
 export function tonExplorerTxUrl(hash: string, network: 'mainnet' | 'testnet' = 'mainnet'): string {
   return `https://${network === 'testnet' ? 'testnet.' : ''}tonviewer.com/transaction/${hash}`
 }

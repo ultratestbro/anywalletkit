@@ -49,6 +49,7 @@ export const MEMO_V1_PROGRAM_ADDRESS = 'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxF
  * (names per MyTonWallet / OISY known-program lists, 2026-10-09).
  */
 export const DFLOW_V4_PROGRAM_ADDRESS = 'DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V27QBH'
+/** OKX DEX router, reached through LI.FI's Solana `jupiter` tool. */
 export const OKX_DEX_ROUTER_PROGRAM_ADDRESS = 'proVF4pMXVaYqmy4NjniPh4pqKNfMmsihgd4wdkCX3u'
 /** Titan Exchange aggregator — LI.FI's jupiter tool routed Solana USDe → USDC through it (2026-10-10). */
 export const TITAN_PROGRAM_ADDRESS = 'T1TANpTeScyeqVzzgNViGDNrkQ6qHz9KrSBS4aNXvGT'
@@ -117,6 +118,7 @@ export interface SerializedTxGuard {
   programAllowlist?: readonly string[]
   /** Skip the allowlist (NOT the balance checks). */
   allowUnknownPrograms?: boolean
+  /** What the transaction may do to the wallet's balances. */
   expect: SerializedExpectation
 }
 
@@ -135,11 +137,13 @@ export interface SerializedCheck {
   watched: readonly string[]
 }
 
+/** True for every spelling of native SOL: the System program id, `0x0…`, or the wSOL mint. */
 export const isNativeMint = (mint: string): boolean => mint === ZERO_ADDRESS || /^0x0+$/.test(mint) || mint === WSOL_MINT
 
 /** The fixed prefix of an SPL / Token-2022 token account: mint, owner, amount (u64 LE at offset 64). */
 export const TOKEN_ACCOUNT_MIN_SIZE = 165
 
+/** The fixed fields of an SPL / Token-2022 token account. */
 export interface ParsedTokenAccount {
   mint: Uint8Array
   owner: Uint8Array
@@ -169,6 +173,9 @@ export const SAFE_CORE_INSTRUCTIONS: Readonly<Record<string, ReadonlySet<string>
   })
 })()
 
+/**
+ * Read mint, owner and amount from a token account's data; `null` when it is too short to be one.
+ */
 export function parseTokenAccount(data: Uint8Array): ParsedTokenAccount | null {
   if (data.length < TOKEN_ACCOUNT_MIN_SIZE) return null
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength)

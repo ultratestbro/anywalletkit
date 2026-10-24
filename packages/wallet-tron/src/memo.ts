@@ -75,6 +75,11 @@ function encodeVarint(n: number): number[] {
  */
 export type MemoEncoding = 'utf8' | 'hex'
 
+/**
+ * Bytes of a memo, from UTF-8 text or `0x` hex.
+ *
+ * @throws `UnsafeTransactionError` `memo` for invalid hex.
+ */
 export function memoBytes(memo: string, encoding: MemoEncoding = 'utf8'): Uint8Array {
   if (encoding === 'utf8') return new TextEncoder().encode(memo)
   const h = memo.startsWith('0x') ? memo.slice(2) : memo

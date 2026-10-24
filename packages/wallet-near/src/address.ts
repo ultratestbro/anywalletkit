@@ -4,6 +4,7 @@ import type { NearPublicKey } from './types.js'
 
 /** NEAR account id grammar (nearcore `AccountId`): 2–64 chars, lowercase alnum, `_`/`-` inside parts, `.` between parts. */
 const ACCOUNT_ID_RE = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/
+/** True for a valid NEAR account id: 2–64 characters of the allowed alphabet, implicit or named. */
 export function isValidAccountId(id: string): boolean {
   return id.length >= 2 && id.length <= 64 && ACCOUNT_ID_RE.test(id)
 }
@@ -24,6 +25,7 @@ export function publicKeyToString(k: NearPublicKey): string {
   return `${k.keyType}:${base58.encode(k.data)}`
 }
 
+/** Parse `ed25519:<base58>` (or bare base58) into a public key. */
 export function parsePublicKey(s: string): NearPublicKey {
   const [type, data] = s.includes(':') ? s.split(':', 2) : ['ed25519', s]
   if (type !== 'ed25519' && type !== 'secp256k1') throw new RangeError(`unknown key type ${type}`)
@@ -33,6 +35,7 @@ export function parsePublicKey(s: string): NearPublicKey {
   return { keyType: type, data: bytes }
 }
 
+/** A NEAR public key from 32 ed25519 bytes. */
 export function ed25519Key(publicKey: Uint8Array): NearPublicKey {
   if (publicKey.length !== 32) throw new RangeError('ed25519 public key must be 32 bytes')
   return { keyType: 'ed25519', data: publicKey }
@@ -44,9 +47,11 @@ export function publicKeyOfImplicit(accountId: string): Uint8Array {
   return hexToBytes(accountId)
 }
 
+/** Decode base58, optionally checking the length. */
 export function base58ToBytes(s: string, length?: number): Uint8Array {
   const b = base58.decode(s)
   if (length !== undefined && b.length !== length) throw new RangeError(`expected ${length} bytes, got ${b.length}`)
   return b
 }
+/** Encode bytes as base58. */
 export const bytesToBase58 = (b: Uint8Array): string => base58.encode(b)

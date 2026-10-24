@@ -7,11 +7,14 @@ import { Address, Cell, beginCell, type MessageRelaxed, type Slice } from '@ton/
 import { parseV5R1Body } from './wallet-v5r1.js'
 import type { TonSendable, TonTransaction } from './types.js'
 
+/** TEP-74 `transfer` op code of a jetton wallet. */
 export const JETTON_TRANSFER_OP = 0x0f8a7ea5
 const LARGE_FORWARD_NANOTON = 500_000_000n // 0.5 TON
 
+/** What one outgoing message does. */
 export type TonDescribedKind = 'ton-transfer' | 'jetton-transfer' | 'contract-call'
 
+/** Fields of a TEP-74 jetton `transfer` body. */
 export interface TonJettonDetails {
   queryId: bigint
   amount: bigint
@@ -23,6 +26,7 @@ export interface TonJettonDetails {
   hasCustomPayload: boolean
 }
 
+/** One outgoing message of a wallet transaction, decoded. */
 export interface TonDescribedMessage {
   kind: TonDescribedKind
   /** Destination as given (friendly) or raw `wc:hex`. */
@@ -40,6 +44,7 @@ export interface TonDescribedMessage {
   bodyBits: number
 }
 
+/** Problems a TON description is flagged with. */
 export type TonWarningCode =
   | 'zero-value'
   | 'non-bounceable-contract-call'
@@ -50,8 +55,13 @@ export type TonWarningCode =
   | 'exotic-workchain'
   | 'extended-actions'
 
+/** One flagged problem; `index` is the message it is about. */
 export interface TonWarning { code: TonWarningCode; message: string; index?: number }
 
+/**
+ * A TON wallet transaction decoded for a confirmation screen: each outgoing message and the
+ * warnings.
+ */
 export interface TonDescription {
   kind: TonDescribedKind | 'mixed'
   items: TonDescribedMessage[]
@@ -60,6 +70,7 @@ export interface TonDescription {
   external?: { seqno: number; validUntil: number; walletId: bigint; signed: boolean }
 }
 
+/** A message body decoded: empty, a text comment, a jetton transfer, or unknown. */
 export type DecodedBody =
   | { type: 'empty' }
   | { type: 'comment'; text: string }
@@ -67,6 +78,7 @@ export type DecodedBody =
   | { type: 'op'; op: number }
   | { type: 'unknown' }
 
+/** Decode a message body cell. */
 export function decodeBody(body: Cell): DecodedBody {
   const s = body.beginParse()
   if (s.remainingBits === 0 && s.remainingRefs === 0) return { type: 'empty' }
@@ -123,6 +135,7 @@ function bodyOf(tx: TonTransaction): Cell | undefined {
   return undefined
 }
 
+/** A text comment body (op 0 plus the text), as wallets show it. */
 export function commentCell(text: string): Cell {
   return beginCell().storeUint(0, 32).storeStringTail(text).endCell()
 }
@@ -161,6 +174,7 @@ function describeOne(
 
 const hex = (n: number) => `0x${n.toString(16).padStart(8, '0')}`
 
+/** Describe one outgoing message and push its warnings into `warnings`. */
 export function describeMessageRelaxed(i: number, m: MessageRelaxed, warnings: TonWarning[], ctx: { network?: 'mainnet' | 'testnet' } = {}): TonDescribedMessage {
   if (m.info.type !== 'internal') {
     warnings.push({ code: 'unknown-body', message: 'not an internal message', index: i })

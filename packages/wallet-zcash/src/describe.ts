@@ -6,6 +6,7 @@ import type { SpentOutput, ZcashNetwork, ZcashTxDescription, ZcashTxOutputDescri
 /** Default hard fee ceiling: 0.01 ZEC. */
 export const DEFAULT_MAX_FEE = 1_000_000n
 
+/** Why a spend was refused before signing. */
 export type UnsafeTransactionCode =
   /** Fee above `maxFee`. */
   | 'fee-too-high'
@@ -28,6 +29,7 @@ export class UnsafeTransactionError extends Error {
   }
 }
 
+/** What a description needs to tell recipient, change and unknown outputs apart. */
 export interface DescribeContext {
   network: ZcashNetwork
   /** Our own address: outputs paying it are tagged `change`. */

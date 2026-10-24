@@ -6,6 +6,7 @@ import { MAX_UTXO_INPUTS, selectAll, selectCoins, type CoinSelection } from './f
 import { recoverMessagePublicKey } from './message.js'
 import { CAIP2, type ZcashClient, type ZcashConfig, type ZcashMaxSpendableResult, type ZcashNetwork, type ZcashReceipt, type ZcashSpend, type ZcashTransferOptions } from './types.js'
 
+/** A coin selection for one spend, with the decoded recipient. */
 export interface SpendPlan extends CoinSelection {
   /** Zatoshis the recipient gets (the requested value — never reduced). */
   amount: bigint
@@ -16,10 +17,12 @@ const toBig = (v: bigint | number | string): bigint => (typeof v === 'bigint' ? 
 
 /** Watch-only Zcash account: balances, quotes, receipts, message verification. No key. */
 export class WalletAccountReadOnlyZcash implements IWalletAccountReadOnly {
+  /** The transparent address. */
   readonly address: string
   readonly chain: string
   /** The address's scriptPubKey. */
   readonly scriptPubKey: Uint8Array
+  /** Script type of the address. */
   readonly scriptKind: DecodedAddress['kind']
   protected readonly _config: ZcashConfig
   protected readonly _client: ZcashClient | undefined
@@ -41,10 +44,12 @@ export class WalletAccountReadOnlyZcash implements IWalletAccountReadOnly {
     return this._client
   }
 
+  /** Fee ceiling in zatoshis: `ZcashConfig.maxFee` or the default. */
   get maxFee(): bigint {
     return this._config.maxFee !== undefined ? toBig(this._config.maxFee) : DEFAULT_MAX_FEE
   }
 
+  /** The transparent address. */
   async getAddress(): Promise<string> { return this.address }
 
   /** Confirmed plus incoming mempool value (the transports do not expose pending spends of our own outputs). */
@@ -53,6 +58,7 @@ export class WalletAccountReadOnlyZcash implements IWalletAccountReadOnly {
     return confirmed + unconfirmed
   }
 
+  /** Always throws: Zcash has no tokens. */
   async getTokenBalance(_token: string): Promise<bigint> {
     throw new Error("The 'getTokenBalance' method is not supported on the zcash blockchain.")
   }
@@ -76,11 +82,13 @@ export class WalletAccountReadOnlyZcash implements IWalletAccountReadOnly {
     return { ...selection, amount, recipient }
   }
 
+  /** ZIP-317 fee of a spend in zatoshis. */
   async quoteSendTransaction(tx: ZcashSpend): Promise<{ fee: bigint }> {
     const { fee } = await this.planSpend(tx)
     return { fee }
   }
 
+  /** ZIP-317 fee of a transfer in zatoshis. */
   async quoteTransfer(o: ZcashTransferOptions): Promise<{ fee: bigint }> {
     if (o.token) throw new Error('Tokens are not supported on the zcash blockchain.')
     return this.quoteSendTransaction({ to: o.recipient, value: o.amount })

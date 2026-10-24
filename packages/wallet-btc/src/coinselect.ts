@@ -18,17 +18,20 @@ import { InsufficientFundsError } from '@anywalletkit/core'
 import { TooManyInputsError } from './errors.js'
 import type { Utxo } from './types.js'
 
+/** Most inputs one spend may use; above it the account asks to consolidate first. */
 export const MAX_UTXO_INPUTS = 200
 
 /** Version 4 + locktime 4 + input count 1 + output count 1 = 10 B × 4, plus segwit marker + flag (2 WU). */
 const OVERHEAD_WEIGHT = 42
 
+/** An output the selection must fund. */
 export interface SelectionTarget {
   value: bigint
   /** vbytes the output occupies (see `outputVBytes`). */
   vbytes: number
 }
 
+/** Input to {@link selectCoins}. */
 export interface CoinSelectOptions {
   utxos: Utxo[]
   targets: SelectionTarget[]
@@ -43,6 +46,7 @@ export interface CoinSelectOptions {
   maxInputs?: number
 }
 
+/** UTXOs chosen for a spend, the fee and the change. */
 export interface CoinSelection {
   utxos: Utxo[]
   fee: bigint
@@ -55,6 +59,7 @@ export interface CoinSelection {
   feeRate: bigint
 }
 
+/** Virtual size (vB) of a segwit transaction with the given inputs and outputs. */
 export function estimateVsize(inputs: number, inputWeight: number, outputVBytes: number[]): number {
   const outputWeight = outputVBytes.reduce((s, vb) => s + vb * 4, 0)
   // Count varints grow past 252 entries; one extra byte each covers up to 65535.
@@ -71,6 +76,13 @@ export function spendableUtxos(utxos: Utxo[], feeRate: bigint, inputWeight: numb
   return utxos.filter((u) => u.value > inputFee).sort(cmpUtxo)
 }
 
+/**
+ * Pick UTXOs to fund the targets at `feeRate` (sat/vB): change goes back when it is above dust,
+ * otherwise it joins the fee.
+ *
+ * @throws `InsufficientFundsError` (core) when the UTXOs cannot cover targets plus fee,
+ * `TooManyInputsError` above `maxInputs`, Error for a fee rate below 1 sat/vB.
+ */
 export function selectCoins(o: CoinSelectOptions): CoinSelection {
   if (o.feeRate < 1n) throw new Error('feeRate must be at least 1 sat/vB')
   const maxInputs = o.maxInputs ?? MAX_UTXO_INPUTS

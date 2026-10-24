@@ -77,6 +77,7 @@ export interface RawFinalOutcome {
 
 const UNKNOWN = /UNKNOWN_ACCOUNT|UNKNOWN_ACCESS_KEY|UNKNOWN_TRANSACTION|does not exist/i
 
+/** The NEAR JSON-RPC calls a wallet uses, with parsed results. */
 export class NearRpc {
   constructor(readonly fetch: NearFetch) {}
 

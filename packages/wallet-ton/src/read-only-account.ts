@@ -23,9 +23,15 @@ const utf8 = (s: string | Uint8Array) => (typeof s === 'string' ? new TextEncode
 const hexToBytes = (h: string) => Uint8Array.from(h.match(/.{2}/g) ?? [], (b) => parseInt(b, 16))
 const big = (v: bigint | number | string) => BigInt(v)
 
+/**
+ * A TON V5R1 wallet without a key: balance, jetton balances, seqno, fee estimates, emulation,
+ * receipts and signature checks.
+ */
 export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
   readonly chain: string
+  /** Ed25519 public key the wallet is derived from. */
   readonly publicKey: Uint8Array
+  /** User-friendly address. */
   readonly address: string
   protected readonly _config: TonConfig
   protected readonly _walletId: bigint
@@ -57,8 +63,10 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
     return this._rpc
   }
 
+  /** The user-friendly address. */
   async getAddress(): Promise<string> { return this.address }
 
+  /** Native balance in nanotons. */
   async getBalance(): Promise<bigint> {
     return (await this.requireRpc('get balances').getAddressInformation(this._address)).balance
   }
@@ -97,6 +105,9 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
     return balance
   }
 
+  /**
+   * Jetton balance in base units, read from this wallet's jetton wallet; 0 when it does not exist.
+   */
   async getTokenBalance(token: string): Promise<bigint> {
     const rpc = this.requireRpc('get token balances')
     const jw = await this.getJettonWalletAddress(token)
@@ -225,11 +236,13 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
     return this.simulateBody(body)
   }
 
+  /** Estimated fee of a transaction, in nanotons. */
   async quoteSendTransaction(tx: TonSendable): Promise<{ fee: bigint }> {
     const body = tx instanceof Cell ? tx : v5r1PackUnsigned((await this.signingCell(this.toMessages(tx))).signing)
     return { fee: (await this.estimateFees(body)).total }
   }
 
+  /** Estimated fee of a transfer, in nanotons. */
   async quoteTransfer(o: TonTransferOptions): Promise<{ fee: bigint }> {
     const message = o.token ? await this.jettonTransferMessage(o) : this.transactionMessage({ to: o.recipient, value: o.amount, ...(o.memo !== undefined ? { body: o.memo } : {}) })
     const { signing } = await this.signingCell([message])

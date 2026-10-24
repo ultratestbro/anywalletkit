@@ -4,6 +4,10 @@ export type NearFetch = (method: string, params: unknown) => Promise<unknown>
 /** One RPC base url (e.g. "https://free.rpc.fastnear.com") or a ready transport. */
 export type NearProvider = string | NearFetch
 
+/**
+ * Options for a NEAR wallet manager or account: RPC endpoints, network, fee caps and the
+ * pre-sign checks.
+ */
 export interface NearConfig {
   /** RPC url(s) / transport(s). A list fails over in order. Omit for an offline (sign-only) wallet. */
   provider?: NearProvider | NearProvider[]
@@ -50,6 +54,7 @@ export interface NearFunctionCallAction {
 export interface NearCreateAccountAction { createAccount: Record<string, never> }
 export interface NearDeployContractAction { deployContract: { code: Uint8Array } }
 export interface NearStakeAction { stake: { stake: bigint; publicKey: NearPublicKey } }
+/** An access key's nonce and permission (full access or a function-call key). */
 export interface NearAccessKey {
   nonce: bigint
   permission: { fullAccess: Record<string, never> } | { functionCall: { allowance?: bigint; receiverId: string; methodNames: string[] } }
@@ -69,6 +74,7 @@ export interface NearSignedDelegateAction { signedDelegate: { delegateAction: Ne
 export interface NearDeployGlobalContractAction { deployGlobalContract: { code: Uint8Array; deployMode: 'codeHash' | 'accountId' } }
 export interface NearUseGlobalContractAction { useGlobalContract: { codeHash: Uint8Array } | { accountId: string } }
 
+/** One action of a NEAR transaction. */
 export type NearAction =
   | NearCreateAccountAction
   | NearDeployContractAction
@@ -123,6 +129,7 @@ export interface NearTransferOptions {
 
 // ── Fees / preflight ────────────────────────────────────────────────────────
 
+/** Gas a transaction may burn and its cost in yoctoNEAR. */
 export interface NearFeeEstimate {
   /** Gas the transaction can burn at most (prepaid function-call gas counts in full). */
   gas: bigint
@@ -136,17 +143,20 @@ export interface NearFeeEstimate {
   createsAccount: boolean
 }
 
+/** Fee of a transaction in yoctoNEAR, with the estimate behind it. */
 export interface NearQuote {
   /** = `estimate.fee`. */
   fee: bigint
   estimate: NearFeeEstimate
 }
 
+/** Whether a transaction is expected to succeed, and why not. */
 export interface NearSimulation {
   ok: boolean
   reason?: string
 }
 
+/** An account's balance, locked stake and storage. */
 export interface NearAccountView {
   amount: bigint
   locked: bigint
@@ -155,6 +165,7 @@ export interface NearAccountView {
   available: bigint
 }
 
+/** Outcome of a NEAR transaction. */
 export interface NearReceipt {
   hash: string
   /** 1 success, 0 failed. */
@@ -168,6 +179,7 @@ export interface NearReceipt {
 
 // ── Describe ─────────────────────────────────────────────────────────────────
 
+/** What a NEAR transaction does. */
 export type NearTxKind =
   | 'near-transfer'
   | 'ft-transfer'
@@ -182,9 +194,12 @@ export type NearTxKind =
   | 'delete-account'
   | 'delegate'
   | 'global-contract'
+/** Problems a NEAR description is flagged with. */
 export type NearTxWarningCode = 'dangerous-action' | 'full-access-key' | 'zero-amount' | 'implicit-new-account' | 'self-transfer' | 'high-gas' | 'unknown-method' | 'invalid-account'
+/** One flagged problem, with a sentence a wallet can show. */
 export interface NearTxWarning { code: NearTxWarningCode; message: string }
 
+/** A NEAR transaction decoded for a confirmation screen. */
 export interface NearTxDescription {
   kind: NearTxKind
   warnings: NearTxWarning[]
@@ -211,6 +226,7 @@ export interface NearTxDescription {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
+/** CAIP-2 ids of NEAR mainnet and testnet. */
 export const CAIP2: Record<string, string> = { mainnet: 'near:mainnet', testnet: 'near:testnet' }
 
 /** 1 NEAR = 10^24 yoctoNEAR. */
@@ -225,6 +241,7 @@ export const STORAGE_PRICE_PER_BYTE = 10n ** 19n
 export const ONE_YOCTO = 1n
 /** Default gas for `ft_transfer` / `storage_deposit`. */
 export const FT_TRANSFER_GAS = 30n * TGAS
+/** Gas attached to a NEP-145 `storage_deposit` call. */
 export const STORAGE_DEPOSIT_GAS = 10n * TGAS
 /** Minimum native transfer that can create an implicit account (covers its storage). */
 export const IMPLICIT_ACCOUNT_MIN_DEPOSIT = 2n * 10n ** 21n // 0.002 NEAR

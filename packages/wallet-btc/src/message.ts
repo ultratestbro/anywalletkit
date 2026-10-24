@@ -20,6 +20,7 @@ function varint(n: number): Uint8Array {
   return Uint8Array.of(0xfe, n & 0xff, (n >> 8) & 0xff, (n >> 16) & 0xff, (n >>> 24) & 0xff)
 }
 
+/** BIP-137 hash of a message (`Bitcoin Signed Message:` prefix, double SHA-256). */
 export function magicHash(message: string | Uint8Array): Uint8Array {
   const msg = typeof message === 'string' ? new TextEncoder().encode(message) : message
   const len = varint(msg.length)
@@ -28,6 +29,7 @@ export function magicHash(message: string | Uint8Array): Uint8Array {
   return sha256(sha256(buf))
 }
 
+/** Address flavour a BIP-137 signature header is written for. */
 export type SegwitType = 'p2wpkh' | 'p2sh(p2wpkh)'
 
 /** Header flag for a compressed key: +4 compressed, +8 segwit, +4 more for p2wpkh (→ 39 + recovery). */

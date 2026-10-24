@@ -36,6 +36,10 @@ type FtStorageBalance = { total: string; available: string } | null
 /** Default ceiling for a recipient's `storage_deposit` on a token transfer: 0.0125 NEAR. */
 export const MAX_STORAGE_DEPOSIT = 12_500_000_000_000_000_000_000n
 
+/**
+ * A NEAR account without a key: balances, NEP-141 tokens and storage, fee estimates, simulation,
+ * receipts and signature checks.
+ */
 export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
   /** Account id: the implicit hex id of the key, or a named account bound to it. */
   readonly address: string
@@ -71,6 +75,7 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
     return this._rpc
   }
 
+  /** The account id. */
   async getAddress(): Promise<string> { return this.address }
 
   /** The account as the node sees it; `undefined` when it does not exist yet. */
@@ -94,6 +99,7 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
     return (await this.getAccountView())?.available ?? 0n
   }
 
+  /** True when the account exists on chain. */
   async accountExists(accountId: string): Promise<boolean> {
     return (await this.requireRpc('check an account').viewAccount(accountId)) !== undefined
   }
@@ -104,6 +110,7 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
     return BigInt(r ?? '0')
   }
 
+  /** Several NEP-141 balances in parallel, keyed by the token contracts as given. */
   async getTokenBalances(tokens: string[]): Promise<Record<string, bigint>> {
     const out: Record<string, bigint> = {}
     await Promise.all(tokens.map(async (t) => { out[t] = await this.getTokenBalance(t) }))
@@ -210,15 +217,18 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
     return { gas, gasPrice, fee, deposit: WalletAccountReadOnlyNear.depositOf(tx.actions), createsAccount }
   }
 
+  /** Gas and cost of a transaction. */
   async estimateFee(tx: NearTransaction | string): Promise<NearFeeEstimate> {
     return this.estimate(typeof tx === 'string' ? await this.buildTransaction(tx) : tx)
   }
 
+  /** Fee of a transaction in yoctoNEAR. */
   async quoteSendTransaction(tx: NearTransaction | string): Promise<NearQuote> {
     const estimate = await this.estimateFee(tx)
     return { fee: estimate.fee, estimate }
   }
 
+  /** Fee of a transfer in yoctoNEAR, for the same actions `transfer` would send. */
   async quoteTransfer(o: NearTransferOptions): Promise<NearQuote> {
     return this.quoteSendTransaction(await this.transferActions(o))
   }

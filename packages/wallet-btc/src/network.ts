@@ -5,6 +5,7 @@ import type { BtcAddressType, BtcNetwork } from './types.js'
 /** btc-signer ships mainnet + testnet; regtest only differs in the bech32 HRP. */
 export const REGTEST_NETWORK: BTC_NETWORK = Object.freeze({ bech32: 'bcrt', pubKeyHash: 0x6f, scriptHash: 0xc4, wif: 0xef })
 
+/** `@scure/btc-signer` parameters of a network. */
 export function networkParams(network: BtcNetwork): BTC_NETWORK {
   switch (network) {
     case 'bitcoin': return NETWORK

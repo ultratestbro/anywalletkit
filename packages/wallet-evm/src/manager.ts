@@ -3,6 +3,7 @@ import { WalletAccountEvm } from './account.js'
 import { WalletAccountReadOnlyEvm } from './read-only-account.js'
 import type { EvmConfig } from './types.js'
 
+/** Base derivation path of EVM accounts; account `i` is at `m/44'/60'/0'/0/i`. */
 export const EVM_BASE_PATH = "m/44'/60'/0'/0"
 
 /**

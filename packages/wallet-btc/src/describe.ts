@@ -5,12 +5,14 @@ import { dustLimit, scriptKind } from './address.js'
 import { UnsafeTransactionError } from './errors.js'
 import type { BtcTxDescription, BtcTxOutputDescription, BtcWarning } from './types.js'
 
+/** Default fee-rate ceiling, sat/vB; a spend above it is refused. */
 export const DEFAULT_MAX_FEE_RATE = 500
 /** Replace-by-fee signalling: any sequence below 0xfffffffe (BIP-125). */
 export const RBF_SEQUENCE = 0xfffffffd
 /** Opts out of RBF while still letting nLockTime apply. */
 export const FINAL_SEQUENCE = 0xfffffffe
 
+/** What a description needs to tell recipient, change and unknown outputs apart. */
 export interface DescribeContext {
   network: BTC_NETWORK
   /** Our own address: outputs paying it are tagged `change`. */

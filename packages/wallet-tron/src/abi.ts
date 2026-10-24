@@ -22,6 +22,7 @@ export function encodeParameters(params: Array<{ type: string; value: unknown }>
   }).join('')
 }
 
+/** A hex word as a bigint (empty hex is 0). */
 export function decodeUint(hex: string): bigint {
   const h = hex.replace(/^0x/, '')
   return h ? BigInt('0x' + h) : 0n

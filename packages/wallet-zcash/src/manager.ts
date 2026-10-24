@@ -22,6 +22,7 @@ export class WalletManagerZcash extends WalletManager<WalletAccountZcash, ZcashC
     super(seedOrSigner, config)
   }
 
+  /** `m/44'/133'` on mainnet (coin type 1 on testnet); account `i` is at `basePath/0'/0/i`. */
   get basePath(): string {
     return `m/44'/${coinType(this._config.network ?? 'mainnet')}'`
   }
@@ -60,6 +61,7 @@ export class WalletManagerZcash extends WalletManager<WalletAccountZcash, ZcashC
     return account
   }
 
+  /** A read-only account for any transparent address, with this manager's config. */
   getReadOnlyAccount(address: string): WalletAccountReadOnlyZcash {
     return new WalletAccountReadOnlyZcash(address, this._config)
   }

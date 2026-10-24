@@ -4,6 +4,7 @@ import { WalletAccountTon } from './account.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'
 import type { TonConfig } from './types.js'
 
+/** Base derivation path for BIP-39 seeds; account `i` is at `m/44'/607'/i'`. */
 export const TON_BASE_PATH = "m/44'/607'"
 /** Path label of the account a TON-native (Tonkeeper-style) mnemonic yields — there is exactly one. */
 export const TON_MNEMONIC_PATH = 'ton-mnemonic'

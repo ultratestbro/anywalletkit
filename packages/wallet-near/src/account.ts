@@ -24,7 +24,9 @@ export interface NearTransferResult extends TransferResult {
 export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWalletAccount {
   /** nonce / block hash come from the node, so building needs the network. */
   readonly needsNetwork = true
+  /** Derivation path, or `external` for an external signer. */
   readonly path: string
+  /** The signer that holds the key. */
   readonly signer: Signer
   private _disposed = false
   private _readOnly: WalletAccountReadOnlyNear | undefined
@@ -129,6 +131,7 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
     return { hash: await this.broadcast(await this.signBuilt(built)), fee: estimate.fee, estimate }
   }
 
+  /** The same account as a {@link WalletAccountReadOnlyNear}. */
   toReadOnlyAccount(): IWalletAccountReadOnly {
     this._readOnly ??= new WalletAccountReadOnlyNear(this.address, this._config, this.publicKey)
     return this._readOnly

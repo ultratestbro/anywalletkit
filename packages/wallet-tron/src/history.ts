@@ -17,13 +17,16 @@ import { CAIP2_GENESIS } from './types.js'
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
+/** The `fetch` shape the history source uses; pass your own for proxies or tests. */
 export type HistoryFetch = (
   input: string,
   init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal },
 ) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>
 
+/** Tron mainnet or the Shasta and Nile testnets. */
 export type TronNetwork = 'mainnet' | 'shasta' | 'nile'
 
+/** Options for {@link createTronHistory}. */
 export interface TronHistoryOptions {
   /** TronGrid-compatible root. Default by network: `https://api.trongrid.io`, `https://api.shasta.trongrid.io`, `https://nile.trongrid.io`. */
   apiUrl?: string
@@ -56,11 +59,16 @@ export interface TronHistoryPage extends HistoryPage {
   items: TronChainTx[]
 }
 
+/**
+ * Tron history from TronGrid's account endpoints (TRX and TRC-20). Build it with {@link
+ * createTronHistory}.
+ */
 export interface TronHistorySource extends HistorySource {
   listActivity(address: string, query?: HistoryQuery): Promise<TronHistoryPage>
   getTransaction(hash: string, address: string): Promise<TronChainTx | undefined>
 }
 
+/** Every configured TronGrid endpoint failed. */
 export class HistoryUnavailableError extends Error {
   readonly chain: string
   readonly reason: string
@@ -346,11 +354,13 @@ export function mapTrc20Only(chain: string, address: string, rows: TronGridTrc20
 
 // ── Source ───────────────────────────────────────────────────────────────────
 
+/** Tronscan link for a transaction. */
 export function tronExplorerTxUrl(hash: string, network: TronNetwork = 'mainnet'): string {
   const host = network === 'mainnet' ? 'tronscan.org' : `${network}.tronscan.org`
   return `https://${host}/#/transaction/${hash}`
 }
 
+/** A history source for Tron addresses backed by TronGrid or a compatible API. */
 export function createTronHistory(options: TronHistoryOptions = {}): TronHistorySource {
   const network = options.network ?? 'mainnet'
   const chain = CAIP2_GENESIS[network] ?? CAIP2_GENESIS.mainnet!

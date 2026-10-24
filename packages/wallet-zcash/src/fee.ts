@@ -19,6 +19,7 @@ export const P2PKH_STANDARD_INPUT_SIZE = 150
 export const P2PKH_STANDARD_OUTPUT_SIZE = 34
 /** Serialized size of one signed P2PKH input: prevout 36 + CompactSize 1 + scriptSig (1+73+1+33) + sequence 4. */
 export const P2PKH_INPUT_SIZE = 149
+/** Most inputs one spend may use. */
 export const MAX_UTXO_INPUTS = 200
 
 export function logicalActions(inputSizes: readonly number[], outputSizes: readonly number[]): number {
@@ -38,6 +39,7 @@ export function estimateSize(inputs: number, outputSizes: readonly number[]): nu
   return 20 + cs(inputs) + inputs * P2PKH_INPUT_SIZE + cs(outputSizes.length) + outputSizes.reduce((s, n) => s + n, 0) + 3
 }
 
+/** A spend would need more inputs than allowed; consolidate the UTXOs first. */
 export class TooManyInputsError extends Error {
   readonly maxInputs: number
   constructor(maxInputs: number) {
@@ -47,6 +49,7 @@ export class TooManyInputsError extends Error {
   }
 }
 
+/** Input to {@link selectCoins}. */
 export interface CoinSelectOptions {
   utxos: Utxo[]
   /** Zatoshis the recipient gets. */
@@ -61,6 +64,7 @@ export interface CoinSelectOptions {
   fee?: bigint
 }
 
+/** UTXOs chosen for a spend, the ZIP-317 fee and the change. */
 export interface CoinSelection {
   utxos: Utxo[]
   fee: bigint
@@ -81,6 +85,12 @@ export function spendableUtxos(utxos: Utxo[]): Utxo[] {
   return utxos.filter((u) => u.value > MARGINAL_FEE).sort(cmpUtxo)
 }
 
+/**
+ * Pick UTXOs to fund `target` at the ZIP-317 fee; change below dust joins the fee.
+ *
+ * @throws `InsufficientFundsError` (core) when the UTXOs cannot cover target plus fee,
+ * `TooManyInputsError` above `maxInputs`.
+ */
 export function selectCoins(o: CoinSelectOptions): CoinSelection {
   const maxInputs = o.maxInputs ?? MAX_UTXO_INPUTS
   const dust = o.changeDust ?? DUST_LIMIT

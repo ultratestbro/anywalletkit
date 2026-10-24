@@ -6,6 +6,10 @@
 // free, and this one was silently dropped from dist before.
 import { Buffer } from 'buffer'
 
+/**
+ * Set `globalThis.Buffer` to the `buffer` polyfill when the runtime has none (Hermes, browsers).
+ * Runs on import.
+ */
 export function installBufferGlobal(): void {
   const g = globalThis as { Buffer?: unknown }
   g.Buffer ??= Buffer

@@ -15,6 +15,7 @@ import { CAIP2_GENESIS, type BtcNetwork } from './types.js'
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
+/** Options for {@link createBtcHistory}. */
 export interface BtcHistoryOptions {
   /** One Blockbook root (`https://btc1.trezor.io`). */
   blockbookUrl?: string
@@ -29,6 +30,7 @@ export interface BtcHistoryOptions {
   pageSize?: number
 }
 
+/** What a Bitcoin `ChainTx` was built from, and the address's own totals. */
 export interface BtcHistoryRaw {
   /** The Blockbook transaction (vin / vout with addresses and values; `hex` dropped). */
   tx: BlockbookTxDetails
@@ -38,10 +40,12 @@ export interface BtcHistoryRaw {
   ownOut: bigint
 }
 
+/** A `ChainTx` with the Blockbook transaction it was built from. */
 export interface BtcChainTx extends ChainTx {
   raw: BtcHistoryRaw
 }
 
+/** One page of Bitcoin history. */
 export interface BtcHistoryPage extends HistoryPage {
   items: BtcChainTx[]
   /** Blockbook page served / total pages. */
@@ -49,11 +53,13 @@ export interface BtcHistoryPage extends HistoryPage {
   totalPages?: number
 }
 
+/** Bitcoin history from a Blockbook instance. Build it with {@link createBtcHistory}. */
 export interface BtcHistorySource extends HistorySource {
   listActivity(address: string, query?: HistoryQuery): Promise<BtcHistoryPage>
   getTransaction(hash: string, address: string): Promise<BtcChainTx | undefined>
 }
 
+/** Every configured Blockbook endpoint failed (or none was configured). */
 export class HistoryUnavailableError extends Error {
   readonly chain: string
   readonly reason: string
@@ -72,6 +78,7 @@ const MAX_PAGE_SIZE = 100
 
 // ── Cursor: the next Blockbook page, base64 JSON ─────────────────────────────
 
+/** @internal Decoded form of a Bitcoin history cursor. */
 export interface BtcHistoryCursor {
   v: 1
   /** Next page (1-based). */
@@ -163,10 +170,17 @@ export function mapBlockbookTx(chain: string, address: string, tx: BlockbookTxDe
 
 // ── Source ───────────────────────────────────────────────────────────────────
 
+/** mempool.space link for a transaction. */
 export function btcExplorerTxUrl(hash: string, network: BtcNetwork = 'bitcoin'): string {
   return `https://mempool.space/${network === 'testnet' ? 'testnet/' : ''}tx/${hash}`
 }
 
+/**
+ * A history source for Bitcoin addresses backed by Blockbook (Trezor's public instances,
+ * QuickNode's add-on, or your own).
+ *
+ * @throws Error when no Blockbook URL is given.
+ */
 export function createBtcHistory(options: BtcHistoryOptions = {}): BtcHistorySource {
   const network = options.network ?? 'bitcoin'
   const chain = CAIP2_GENESIS[network]

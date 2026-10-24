@@ -115,8 +115,10 @@ function parseStackItem(s: unknown): TupleItem {
 
 // ── Typed API ───────────────────────────────────────────────────────────────
 
+/** State of a TON account on chain. */
 export type TonAccountStatus = 'active' | 'uninitialized' | 'frozen' | 'nonexist'
 
+/** Balance, status, code and data of an account. */
 export interface TonAccountState {
   balance: bigint
   state: TonAccountStatus
@@ -125,6 +127,7 @@ export interface TonAccountState {
   lastTransaction: { lt: string; hash: string } | null
 }
 
+/** Result of a contract get-method call. */
 export interface GetMethodResult { exitCode: number; gasUsed: number; stack: TupleReader }
 
 const need = <T>(cond: unknown, what: string, value: T): T => {
@@ -136,6 +139,7 @@ const need = <T>(cond: unknown, what: string, value: T): T => {
 export class TonCenter {
   constructor(readonly rpc: TonRpc) {}
 
+  /** Balance, status, code and data of an account. */
   async getAddressInformation(address: Address): Promise<TonAccountState> {
     const r = await this.rpc.call<Record<string, unknown>>('getAddressInformation', { address: address.toString() })
     need(r && typeof r === 'object' && typeof r.balance === 'string', 'getAddressInformation', r)
@@ -150,6 +154,7 @@ export class TonCenter {
     }
   }
 
+  /** Call a contract get-method; the result carries the exit code. */
   async runGetMethod(address: Address, method: string, stack: TupleItem[] = []): Promise<GetMethodResult> {
     const r = await this.rpc.call<Record<string, unknown>>('runGetMethod', {
       address: address.toString(), method, stack: stack.map(serializeStackItem),
@@ -165,6 +170,7 @@ export class TonCenter {
     return r
   }
 
+  /** Broadcast a signed external message. */
   async sendBoc(message: Cell): Promise<void> {
     await this.rpc.call('sendBoc', { boc: message.toBoc().toString('base64') })
   }
@@ -208,6 +214,9 @@ export class TonCenter {
 
 // ── Emulation (toncenter v3 emulateTrace) ───────────────────────────────────
 
+/**
+ * Whether an emulated wallet transaction succeeded: compute exit code, abort flag, action phase.
+ */
 export interface EmulationVerdict {
   ok: boolean
   exitCode?: number

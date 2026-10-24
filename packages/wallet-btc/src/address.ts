@@ -5,6 +5,7 @@ import type { BtcAddressType } from './types.js'
 /** Output-script families btc-signer recognises (`OutScript.decode(...).type`). */
 export type ScriptKind = 'pk' | 'pkh' | 'sh' | 'wsh' | 'wpkh' | 'ms' | 'tr' | 'tr_ns' | 'tr_ms' | 'p2a' | 'unknown'
 
+/** An address decoded to its output script. */
 export interface DecodedAddress {
   script: Uint8Array
   kind: ScriptKind
@@ -24,6 +25,7 @@ export function addressFromScript(script: Uint8Array, network: BTC_NETWORK): str
   try { return Address(network).encode(OutScript.decode(script)) } catch { return undefined }
 }
 
+/** Type of an output script; `unknown` when it cannot be decoded. */
 export function scriptKind(script: Uint8Array): ScriptKind {
   try { return OutScript.decode(script).type as ScriptKind } catch { return 'unknown' }
 }
@@ -34,6 +36,7 @@ export function spendInfo(publicKey: Uint8Array, network: BTC_NETWORK, type: Btc
   return p2wpkh(publicKey, network)
 }
 
+/** Address of a compressed public key: p2wpkh (`bc1q…`) or p2tr key-path (`bc1p…`). */
 export function addressFromPublicKey(publicKey: Uint8Array, network: BTC_NETWORK, type: BtcAddressType = 'p2wpkh'): string {
   const { address } = spendInfo(publicKey, network, type)
   if (!address) throw new Error(`Could not derive a ${type} address`)
@@ -67,7 +70,9 @@ export function dustLimit(kind: ScriptKind): bigint {
   }
 }
 
+/** Smallest p2wpkh output relay policy accepts, in satoshis. */
 export const DUST_LIMIT_P2WPKH = dustLimit('wpkh')
+/** Smallest p2tr output relay policy accepts, in satoshis. */
 export const DUST_LIMIT_P2TR = dustLimit('tr')
 
 export const kindOfType = (type: BtcAddressType): ScriptKind => (type === 'p2tr' ? 'tr' : 'wpkh')

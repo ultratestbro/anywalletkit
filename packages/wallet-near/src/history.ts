@@ -21,6 +21,7 @@ export type HistoryFetch = (
   init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal },
 ) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>
 
+/** Options for {@link createNearHistory}. */
 export interface NearHistoryOptions {
   /** nearblocks root. Default `https://api.nearblocks.io` (`https://api-testnet.nearblocks.io` on testnet). */
   nearblocksUrl?: string
@@ -57,11 +58,16 @@ export interface NearHistoryPage extends HistoryPage {
   items: NearChainTx[]
 }
 
+/**
+ * NEAR history from the nearblocks API, with an archival RPC for single transactions. Build it with
+ * {@link createNearHistory}.
+ */
 export interface NearHistorySource extends HistorySource {
   listActivity(address: string, query?: HistoryQuery): Promise<NearHistoryPage>
   getTransaction(hash: string, address: string): Promise<NearChainTx | undefined>
 }
 
+/** Every configured history backend failed. */
 export class HistoryUnavailableError extends Error {
   readonly chain: string
   readonly reason: string
@@ -515,10 +521,12 @@ export function decodeFunctionCallArgs(args: string): unknown {
 
 // ── Source ───────────────────────────────────────────────────────────────────
 
+/** Nearblocks link for a transaction. */
 export function nearExplorerTxUrl(hash: string, network: 'mainnet' | 'testnet' = 'mainnet'): string {
   return `https://${network === 'testnet' ? 'testnet.' : ''}nearblocks.io/txns/${hash}`
 }
 
+/** A history source for NEAR accounts backed by nearblocks. */
 export function createNearHistory(options: NearHistoryOptions = {}): NearHistorySource {
   const network = options.network ?? 'mainnet'
   const chain = CAIP2[network] ?? CAIP2.mainnet!

@@ -17,6 +17,7 @@ export function addressFromPublicKey(compressed: Uint8Array): string {
   return b58check.encode(bytes)
 }
 
+/** True for a hex Tron address (`41` plus 20 bytes, optional `0x`). */
 export function isHexAddress(a: string): boolean {
   return /^(0x)?41[0-9a-fA-F]{40}$/.test(a)
 }
