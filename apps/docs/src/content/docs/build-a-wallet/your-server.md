@@ -18,10 +18,20 @@ for the parts that can't live in the app.
 | Notifications | Watching addresses and pushing to devices ([Notifications](/build-a-wallet/fiat-and-notifications/#notifications)) |
 | Price cache | One price API call for all users instead of one per user |
 
-**In the kit:** today, every package takes a URL you choose, so pointing it at your proxy is
-configuration. The swap engine can run behind HTTP (the remote provider in
-`protocol-swap2-core`). A deployable server with the RPC proxy and the remote swap engine is
-planned.
+**In the kit:**
+
+- **Swap backend:** `createSwap2Handler` from `@anywalletkit/protocol-swap2-core/server` runs the
+  providers on your server; the app reaches them with `remoteProvider`. It validates every
+  request, seals quotes (HMAC) and builds deposits only for quotes it sealed, and requires a
+  `guard` for authentication and rate limiting.
+- **A reference server:** [`examples/server`](https://github.com/ultratestbro/anywalletkit/tree/main/examples/server)
+  wires that handler and a JSON-RPC proxy (method allowlist, failover, no keys in errors) on
+  `node:http`, tested in CI. [Ship a wallet](/build-a-wallet/ship-a-wallet/) walks through it
+  with the app.
+- **Everything else is configuration:** every package takes the URL you choose, so pointing it at
+  your proxy needs no SDK change.
+- **Not in the kit yet:** notifications (address watching → push), a shared price cache, and a
+  durable store for Omniston's EVM → TON orders.
 
 **Rules:**
 

@@ -29,8 +29,9 @@ what you have to bring yourself: an RPC, an API key, a storage layer.
 | 15 | [dApp connection](/build-a-wallet/dapp-connection/) | "Connect wallet" on websites | `extension-kit` | WalletConnect on mobile |
 | 16 | [Buy and sell](/build-a-wallet/fiat-and-notifications/) | "Buy crypto" button | `FiatProtocol` interface only | An on-ramp provider |
 | 17 | [Notifications](/build-a-wallet/fiat-and-notifications/#notifications) | "You received 50 USDT" | Not in the SDK yet | A webhook service and push |
-| 18 | [Your server](/build-a-wallet/your-server/) | Nothing | Not in the SDK yet | Your hosting |
+| 18 | [Your server](/build-a-wallet/your-server/) | Nothing | `protocol-swap2-core/server` (swap backend), [`examples/server`](https://github.com/ultratestbro/anywalletkit/tree/main/examples/server) (RPC proxy + swaps) | Hosting, user auth, rate limits |
 
+[Ship a wallet](/build-a-wallet/ship-a-wallet/) puts the parts together end to end, with the server.
 A minimal wallet is parts 1–8. A wallet people keep using adds 10, 11 and 13. Everything
 else is what sets one wallet apart from another.
 

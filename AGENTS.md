@@ -221,6 +221,25 @@ and a `storage` whose `save` does nothing (the first keyring owns the metadata).
 `expo-secure-store` with `requireAuthentication: true` instead. `keyring.getAccount(id, chain)` returns a
 handle for repeated use; prefer `withAccount` for one-off signing.
 
+## Your server (`protocol-swap2-core/server`, `examples/server`)
+
+Keys you pay for (RPC, provider API keys, affiliate settings) stay on a server; the app talks to it.
+
+```ts
+// server (Node ≥ 20 / edge): POST /swap2/:action
+import { createSwap2Handler, Swap2HandlerError } from '@anywalletkit/protocol-swap2-core/server'
+const handle = createSwap2Handler({ providers: [lifiProvider({ apiKey })], sealSecret /* ≥ 32 bytes */, guard: (call, req) => { /* auth + per-user rate limit; throw new Swap2HandlerError(401|429, …) */ } })
+const { status, body } = await handle(action, json, req)
+
+// app: the same router, providers proxied — the engine still validates everything on the device
+import { remoteProvider } from '@anywalletkit/protocol-swap2-core/remote'
+const providers = ['lifi', 'near_intents', 'thorchain', 'chainflip'].map((name) => remoteProvider({ name, baseUrl: `${API}/swap2`, headers: { authorization: `Bearer ${token}` } }))
+```
+
+Quotes are HMAC-sealed: `build`/`preflight` refuse an unsealed, altered or expired quote. Never
+import `./server` into the app. `examples/server` adds a JSON-RPC proxy (method allowlist, failover)
+and an EIP-1193 client for it; walkthrough: https://docs.anywallet.tech/build-a-wallet/ship-a-wallet/.
+
 ## Swaps and bridges (`protocol-swap2-router`)
 
 ```ts

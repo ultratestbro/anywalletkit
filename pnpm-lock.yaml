@@ -466,6 +466,43 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
+  examples/server:
+    dependencies:
+      '@anywalletkit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@anywalletkit/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@anywalletkit/protocol-swap2-chainflip':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-chainflip
+      '@anywalletkit/protocol-swap2-core':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-core
+      '@anywalletkit/protocol-swap2-lifi':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-lifi
+      '@anywalletkit/protocol-swap2-near-intents':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-near-intents
+      '@anywalletkit/protocol-swap2-router':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-router
+      '@anywalletkit/protocol-swap2-thorchain':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-thorchain
+      '@anywalletkit/wallet-evm':
+        specifier: workspace:*
+        version: link:../../packages/wallet-evm
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+
   examples/signer:
     dependencies:
       '@anywalletkit/core':

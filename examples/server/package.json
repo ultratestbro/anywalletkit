@@ -1,0 +1,27 @@
+{
+  "name": "@anywalletkit/example-server",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A reference backend for a wallet: swap2 providers behind createSwap2Handler and a JSON-RPC proxy, on node:http. The docs render its #region blocks; CI runs it.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "start": "node --experimental-strip-types src/main.ts"
+  },
+  "dependencies": {
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/kit": "workspace:*",
+    "@anywalletkit/protocol-swap2-chainflip": "workspace:*",
+    "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/protocol-swap2-lifi": "workspace:*",
+    "@anywalletkit/protocol-swap2-near-intents": "workspace:*",
+    "@anywalletkit/protocol-swap2-router": "workspace:*",
+    "@anywalletkit/protocol-swap2-thorchain": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  }
+}

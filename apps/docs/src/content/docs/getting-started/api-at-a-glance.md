@@ -198,6 +198,16 @@ installHermesRuntime()   // first line of your entry file, before any other @any
 wallet.dispose()   // zeroizes the seed and keys; build a new Wallet on unlock
 ```
 
+## On your server
+
+**Run swap providers behind your backend** — `createSwap2Handler` from `@anywalletkit/protocol-swap2-core/server` · guide: [Ship a wallet](/build-a-wallet/ship-a-wallet/)
+
+```ts
+import { createSwap2Handler } from '@anywalletkit/protocol-swap2-core/server'
+const handle = createSwap2Handler({ providers, sealSecret, guard: (call, req) => authAndRateLimit(call, req) })
+const { status, body } = await handle(action, json, req)   // POST /swap2/:action; the app uses remoteProvider
+```
+
 ## Everything else
 
 The API reference also documents the building blocks: provider classes for each swap venue,

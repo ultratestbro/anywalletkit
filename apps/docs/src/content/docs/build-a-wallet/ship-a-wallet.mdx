@@ -1,0 +1,152 @@
+---
+title: "Ship a wallet: end to end"
+description: The whole path from an empty Expo app to a release — keys on the device, a server for RPC and swaps, review before signing, and the checklist before you publish.
+sidebar:
+  order: 13
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+The pages before this one cover each part of a wallet on its own. This one puts them in the
+order you build them, with the server in the middle: an app that holds the keys, and a small
+backend that holds every other secret. The server code is
+[`examples/server`](https://github.com/ultratestbro/anywalletkit/tree/main/examples/server),
+which CI starts and tests on every change; the app snippets come from the other `examples/`.
+
+```
+  phone (Expo, Release build)                         your server (examples/server)
+  ─────────────────────────────                       ────────────────────────────────
+  runtime-hermes                                      POST /rpc/:caip2   → keyed RPC upstreams
+  keyring + secure-storage-react-native  ── RPC ───►  POST /swap2/:action → swap providers + keys
+  wallet-* accounts, policies, tx-preview ─ swaps ─►  GET  /health
+  backup-cloud (iCloud)                               auth + rate limits (you add)
+```
+
+## 1. The app shell
+
+An Expo app with a **development or Release build** (not Expo Go: key storage is a native module).
+Install the SDK packages from npm and make Hermes complete before anything else loads:
+
+```sh
+npm install @anywalletkit/runtime-hermes @anywalletkit/kit @anywalletkit/keyring \
+  @anywalletkit/secure-storage-react-native @anywalletkit/wallet-evm @anywalletkit/wallet-solana \
+  @anywalletkit/protocol-swap2-core @anywalletkit/protocol-swap2-router @anywalletkit/tx-preview-evm \
+  buffer fastestsmallesttextencoderdecoder react-native-url-polyfill
+```
+
+```ts
+// index.ts — the very first lines
+import { installHermesRuntime } from '@anywalletkit/runtime-hermes'
+installHermesRuntime()
+```
+
+Details and the Metro settings: [Installation](/getting-started/installation/#react-native--expo).
+
+## 2. Keys on the device
+
+The seed lives in the Keychain (iOS) or the Keystore (Android), opened by Face ID / fingerprint
+with the device passcode as fallback, on every read. The keyring keeps names and addresses in
+plain storage and asks the secure storage only to sign.
+
+```ts
+import { createSecureStorage } from '@anywalletkit/secure-storage-react-native'
+const secrets = createSecureStorage({ namespace: 'my-wallet' })
+```
+
+<Snippet file="keyring/src/keyring.ts" region="setup" />
+
+<Snippet file="keyring/src/keyring.ts" region="create" />
+
+One keyring signs on one EVM network; for Base, Arbitrum and the rest open one per network over
+the same secrets ([Keyring: more than one EVM network](/guides/keyring/#more-than-one-evm-network)).
+Back the seed up: `seed-vault` seals it into an encrypted file and `backup-cloud` keeps it in the
+app's iCloud Drive container ([Keys and storage](/build-a-wallet/keys-and-storage/)).
+
+## 3. Your server
+
+Everything that needs a key you pay for, or a setting you don't want in an app bundle, runs here:
+RPC with your provider keys, and the swap providers with their API keys and affiliate settings.
+
+<Snippet file="server/src/main.ts" region="providers" />
+
+<Snippet file="server/src/server.ts" region="server" />
+
+The swap routes are `createSwap2Handler` from `@anywalletkit/protocol-swap2-core/server`: it
+validates every request, **seals** each quote (HMAC) and builds a deposit only for a quote it
+sealed itself, unchanged and not expired, so a client can't make your server prepare a
+transaction on terms no provider offered. A provider's refusal reaches the app with its reason,
+URLs stripped.
+
+The RPC proxy forwards only what a wallet needs — reads, fee data, simulation and broadcasting
+an already signed transaction — and refuses anything that signs or administers a node:
+
+<Snippet file="server/src/rpc.ts" region="rpc" />
+
+**Authentication and rate limits are yours to add**, and the example says so loudly:
+
+<Snippet file="server/src/server.ts" region="guard" />
+
+Run it anywhere Node runs; on a serverless platform call the two handlers from your route
+functions instead ([`examples/server` README](https://github.com/ultratestbro/anywalletkit/tree/main/examples/server)).
+
+## 4. RPC through the server
+
+The app never sees an RPC key: each EVM network gets an EIP-1193 provider that posts to the proxy.
+
+<Snippet file="server/src/client.ts" region="client-rpc" />
+
+Pass `chainId` with every EVM registration ([Chain ids](/concepts/chain-ids/#pass-chainid-with-every-evm-registration)).
+Balances, token lists and history work unchanged on top
+([Balances](/guides/balances/), [History](/guides/history/); explorer keys belong on the server too).
+
+## 5. Swaps through the server
+
+The app builds the same router it would build locally, but every provider is a `remoteProvider`
+pointing at your server. The engine still validates every quote and every transaction **on the
+device** before anything is signed: the server can refuse, it cannot make the app sign something
+else.
+
+<Snippet file="server/src/client.ts" region="client-swaps" />
+
+Then quote, show the routes, execute the one the user picked and follow it to the end:
+
+<Snippet file="swap/src/swap.ts" region="execute" />
+
+<Snippet file="swap/src/swap.ts" region="status" />
+
+Use the automatic slippage (`suggestSlippage`) and pass the minimum you showed: [Swaps](/guides/swaps/).
+
+## 6. Review before signing
+
+Every write goes through policies (fee caps, blocklists, a confirm step) and, for EVM, a
+simulation the user can read:
+
+<Snippet file="quickstart/src/wallet.ts" region="policies" />
+
+<Snippet file="tx-preview/src/preview.ts" region="verdict" />
+
+More in [Review and safety](/build-a-wallet/review-and-safety/) and
+[Transaction preview](/guides/tx-preview/).
+
+## 7. Connecting to dApps
+
+WalletConnect for a mobile wallet is **not in the SDK yet** (a headless dApp-request handler is
+planned). Today you bring [Reown WalletKit](https://docs.reown.com) and route its session
+requests to `kit` accounts, so every request still passes your policies and review; see
+[dApp connection](/build-a-wallet/dapp-connection/#mobile-walletconnect). For browsers,
+`extension-kit` is the core of an extension wallet.
+
+## 8. Before you publish
+
+- **Testnet first.** Run every flow on Sepolia / Base Sepolia (and Solana devnet) with the
+  [Networks](/guides/networks/#testnets) testnets on: create, restore, send, swap, a failed swap.
+- **A Release build on a real device.** Dev builds hide Hermes and Metro problems.
+- **No key in the app bundle.** Grep the built bundle for your RPC and provider keys; they must
+  only be on the server.
+- **Server secrets** in the host's secret store; `SEAL_SECRET` is ≥ 32 random bytes.
+- **Real user authentication and per-user rate limits** on the server, in a shared store.
+- **Logs without bodies or addresses next to IPs**; alerts on upstream errors, provider refusal
+  rates and 429s.
+- **Key storage checks on a device:** Face ID fails → passcode works; re-enrolled Face ID still
+  opens the wallet; the backup restores on a second phone.
+- **Small amounts first** for every swap provider you enable.
