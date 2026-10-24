@@ -40,6 +40,7 @@ import { WalletManagerBtc, selectCoins, INPUT_WEIGHT } from '@anywalletkit/walle
 import { WalletManagerZcash, parseTx as parseZcashTx, txid as zcashTxid, sighashAll as zcashSighash, parseP2pkhScriptSig, conventionalFee as zcashFee, outputSize as zcashOutputSize } from '@anywalletkit/wallet-zcash'
 import { WalletManagerNear, describeTransaction as describeNear, encodeTransaction as encodeNearTx, decodeTransaction as decodeNearTx } from '@anywalletkit/wallet-near'
 import { smokeProtocols } from './protocols.js'
+import fastPbkdf2 from '@anywalletkit/runtime-hermes/fast-pbkdf2'
 import { sealBackup, openBackup, encodeBackup, decodeBackup, isBackupError } from '@anywalletkit/seed-vault'
 import { ensResolver, warningsFor, coinTypeFor, decodeBtcScript } from '@anywalletkit/names-ens'
 import { isNameLike, nameResolvers } from '@anywalletkit/core'
@@ -57,6 +58,9 @@ const eq = (what: string, a: unknown, b: unknown) => {
 }
 
 async function main() {
+  // runtime-hermes/fast-pbkdf2: the JS drop-in Metro resolves react-native-fast-pbkdf2 to (TON 24-word mnemonics).
+  eq('fast-pbkdf2 sha-512', await fastPbkdf2.derive('d29yZA==', 'c2FsdA==', 100, 64, 'sha-512'),
+    'jqyWaRVO0QAaw1rL0CiSWdeZ5jsR5HHPyI4U2wm7fiomRC8me/6+5vb4mSpqSf+9zuE1aDtRanPEkgzC8fd2jQ==') // node:crypto pbkdf2Sync
   for (const [seedName, mnemonic] of Object.entries(derivationVectors.seeds)) {
     const seed = seedFromMnemonicSync(mnemonic)
     for (const chain of ['evm', 'btc', 'tron', 'zcash'] as const) {

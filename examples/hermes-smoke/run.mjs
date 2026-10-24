@@ -26,7 +26,7 @@ await build({
   // @ton/crypto-primitives' react-native build requires expo-crypto (random bytes) at module load and
   // react-native-fast-pbkdf2 for mnemonics — an Expo app has them; the smoke supplies stand-ins.
   // tweetnacl's optional `require('crypto')` is guarded at runtime: leave it unresolved.
-  alias: { 'expo-crypto': join(here, 'stubs/expo-crypto.ts'), 'react-native-fast-pbkdf2': join(here, 'stubs/react-native-fast-pbkdf2.ts') },
+  alias: { 'expo-crypto': join(here, 'stubs/expo-crypto.ts'), 'react-native-fast-pbkdf2': join(root, 'packages/runtime-hermes/src/fast-pbkdf2.ts') },
   external: ['crypto'],
   logLevel: 'warning',
 })

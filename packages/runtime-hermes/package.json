@@ -16,6 +16,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./fast-pbkdf2": {
+      "types": "./dist/fast-pbkdf2.d.ts",
+      "import": "./dist/fast-pbkdf2.js",
+      "require": "./dist/fast-pbkdf2.cjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [

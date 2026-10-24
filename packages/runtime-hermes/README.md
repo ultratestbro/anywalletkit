@@ -25,3 +25,24 @@ What it installs, each only when missing:
 It throws when the things only the app can provide are absent: `crypto.getRandomValues`,
 `TextEncoder`/`TextDecoder`, and a full WHATWG `URL` (React Native's built-in one has no
 working `searchParams`; providers parse endpoints and query strings with it). SDK packages never import this package themselves.
+
+## Metro: `react-native-fast-pbkdf2`
+
+`@anywalletkit/wallet-ton` pulls in `@ton/crypto-primitives`, whose React Native build requires the
+native `react-native-fast-pbkdf2` module (TON 24-word mnemonics) and `expo-crypto`. Install
+`expo-crypto`, and point Metro at the pure-JS drop-in this package ships instead of the native module:
+
+```js
+// metro.config.js
+const { getDefaultConfig } = require('expo/metro-config')
+const config = getDefaultConfig(__dirname)
+const resolveRequest = config.resolver.resolveRequest
+config.resolver.resolveRequest = (context, moduleName, platform) =>
+  moduleName === 'react-native-fast-pbkdf2'
+    ? { type: 'sourceFile', filePath: require.resolve('@anywalletkit/runtime-hermes/fast-pbkdf2') }
+    : (resolveRequest ?? context.resolveRequest)(context, moduleName, platform)
+module.exports = config
+```
+
+Same call shape as the native module (base64 in, base64 out), PBKDF2 from `@noble/hashes`.
+
