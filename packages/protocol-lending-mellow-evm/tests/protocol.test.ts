@@ -154,7 +154,7 @@ function stubProvider({
 }
 
 type SentTx = { to: string; data: Hex; value?: bigint }
-type StubAccount = MellowAccount & { sent: SentTx[] }
+type StubAccount = MellowAccount & { sent: SentTx[]; _config?: { provider?: unknown } }
 
 function stubAccount(provider: ReturnType<typeof stubProvider>, { readOnly = false }: { readOnly?: boolean } = {}): StubAccount {
   const sent: SentTx[] = []

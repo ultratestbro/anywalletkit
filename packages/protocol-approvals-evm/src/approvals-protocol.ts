@@ -41,7 +41,6 @@ export type SendResult = { hash: string; fee?: bigint } | string
 export interface ReadOnlyAccountLike {
   getAddress(): Promise<string>
   /** A @anywalletkit/wallet-evm account carries its provider here; used when `config.provider` is absent. */
-  _config?: { provider?: EvmProvider }
 }
 
 /** Account surface the protocol writes through (a @anywalletkit/wallet-evm account, or anything shaped like one). */

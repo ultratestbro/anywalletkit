@@ -40,7 +40,6 @@ export interface StakingWalletAccount {
   }): Promise<string>
   sendTransaction?(tx: LidoTx): Promise<{ hash: string; fee?: bigint }>
   quoteSendTransaction?(tx: LidoTx): Promise<{ fee: bigint }>
-  _config?: { provider?: LidoProvider }
 }
 
 type WritableStakingWalletAccount = StakingWalletAccount & { sendTransaction: NonNullable<StakingWalletAccount['sendTransaction']> }
@@ -187,7 +186,9 @@ export default class LidoProtocolEvm extends StakingProtocol<LidoProtocolConfig>
       throw new Error("'referral' must be a valid address.")
     }
 
-    const provider = config.provider ?? account?._config?.provider
+    // A wallet-evm account keeps its RPC in a protected `_config`; read it without making it part of the type
+    // (a public `_config` here made every real account fail to type-check against this interface).
+    const provider = config.provider ?? (account as { _config?: { provider?: LidoProvider } } | undefined)?._config?.provider
     if (provider) {
       this._provider = createPublicClient({
         transport: typeof provider === 'string' ? http(provider) : custom(provider),

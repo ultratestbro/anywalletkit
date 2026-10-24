@@ -81,3 +81,9 @@ export async function lendingPosition(wallet: Wallet) {
   }
 }
 // #endregion lending-position
+
+// Not rendered in the guide. Modules also construct directly over a wallet-evm account,
+// signing or read-only (apps on the keyring do this); a typed caller must compile.
+import type { WalletAccountEvm, WalletAccountReadOnlyEvm } from '@anywalletkit/wallet-evm'
+export const lidoOver = (account: WalletAccountEvm | WalletAccountReadOnlyEvm) => new LidoProtocolEvm(account)
+export const aaveOver = (account: WalletAccountEvm | WalletAccountReadOnlyEvm) => new AaveProtocolEvm(account, { market: 'core' })

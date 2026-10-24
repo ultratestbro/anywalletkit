@@ -72,6 +72,8 @@ type TypedData = Parameters<NonNullable<StakingWalletAccount['signTypedData']>>[
 type SentTx = Parameters<NonNullable<StakingWalletAccount['sendTransaction']>>[0]
 
 interface StubAccount extends StakingWalletAccount {
+  /** Where a wallet-evm account keeps its RPC (protected there); the module reads it when config.provider is absent. */
+  _config?: { provider?: unknown }
   sent: SentTx[]
   typedDataCalls: TypedData[]
 }
@@ -120,7 +122,7 @@ test('amount validation and the writable-account gate', async () => {
   await expect(protocol.stake({ amount: 1.5 })).rejects.toThrow(/bigint or a safe integer/)
   await expect(protocol.requestWithdrawal({ amount: 1n, token: 'wETH' as never })).rejects.toThrow(/'stETH' or 'wstETH'/)
 
-  const readOnly = new LidoProtocolEvm({ async getAddress() { return OWNER }, _config: { provider: stubEip1193() } })
+  const readOnly = new LidoProtocolEvm({ async getAddress() { return OWNER }, _config: { provider: stubEip1193() } } as StakingWalletAccount)
   await expect(readOnly.stake({ amount: 1n })).rejects.toThrow(/non read-only/)
 })
 

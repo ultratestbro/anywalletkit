@@ -127,7 +127,7 @@ test('amount validation and the writable-account gate', async () => {
   await assert.rejects(() => protocol.stake({ amount: 1.5 }), /bigint or a safe integer/)
   await assert.rejects(() => protocol.stake({ amount: 1n }), /StakeTooLow/)
 
-  const readOnly = new SsvProtocolEvm({ async getAddress() { return OWNER }, _config: { provider: stubEip1193() } })
+  const readOnly = new SsvProtocolEvm({ async getAddress() { return OWNER }, _config: { provider: stubEip1193() } } as ConstructorParameters<typeof SsvProtocolEvm>[0])
   await assert.rejects(() => readOnly.stake({ amount: E18 }), /non read-only/)
   await assert.rejects(() => readOnly.claimRewards(), /non read-only/)
 })

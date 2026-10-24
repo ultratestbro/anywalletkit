@@ -45,7 +45,6 @@ export interface MellowAccount {
   sendTransaction?(tx: MellowTx): Promise<{ hash: string; fee?: bigint | number | string }>
   quoteSendTransaction?(tx: MellowTx): Promise<{ fee?: bigint | number | string }>
   /** The wallet account's own provider, used when `config.provider` is absent. */
-  _config?: { provider?: EvmProvider }
 }
 
 export interface SupplyOptions {
@@ -316,7 +315,8 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
     this._referral = referral as Address
     this._maxRedeemRequests = config.maxRedeemRequests ?? 50
 
-    const provider = config.provider ?? account?._config?.provider
+    // wallet-evm keeps the RPC in a protected `_config`: read it without putting it in the account type.
+    const provider = config.provider ?? (account as { _config?: { provider?: EvmProvider } } | undefined)?._config?.provider
     if (provider) {
       // Discovery fires many reads at once; send them one per request — some gateways answer a batch member with empty data.
       this._client = createPublicClient({ transport: typeof provider === 'string' ? http(provider, { batch: false }) : custom(provider) })

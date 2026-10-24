@@ -138,7 +138,6 @@ export interface StakingWalletAccount {
   getAddress(): Promise<string>
   sendTransaction?(tx: { to: string; data?: string; value?: bigint }): Promise<{ hash: string; fee?: bigint }>
   quoteSendTransaction?(tx: { to: string; data?: string; value?: bigint }): Promise<{ fee: bigint }>
-  _config?: { provider?: unknown }
 }
 
 type WritableStakingWalletAccount = StakingWalletAccount & Required<Pick<StakingWalletAccount, 'sendTransaction'>>
@@ -237,7 +236,8 @@ export default class SsvProtocolEvm extends StakingProtocol<SsvProtocolConfig> {
     this._addresses = merged as unknown as SsvAddresses
     this._endpoints = { ...endpoints, ...config.endpoints }
 
-    const provider = config.provider ?? (account?._config?.provider as EvmProvider | undefined)
+    // wallet-evm keeps the RPC in a protected `_config`: read it without putting it in the account type.
+    const provider = config.provider ?? ((account as { _config?: { provider?: unknown } } | undefined)?._config?.provider as EvmProvider | undefined)
     if (provider) {
       this._client = createPublicClient({ transport: toTransport(provider) })
     }

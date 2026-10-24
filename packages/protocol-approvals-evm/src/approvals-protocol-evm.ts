@@ -89,7 +89,8 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
    */
   constructor (account: ReadOnlyAccountLike | AccountLike, config: ApprovalsProtocolEvmConfig = {}) {
     super(account, config)
-    const provider = config.provider ?? account?._config?.provider
+    // wallet-evm keeps the RPC in a protected `_config`: read it without putting it in the account type.
+    const provider = config.provider ?? (account as { _config?: { provider?: EvmProvider } } | undefined)?._config?.provider
     if (provider) {
       // cacheTime 0: every getBlockNumber is a real round trip (viem would
       // otherwise serve it from a 4 s cache). ethers needed `cacheTimeout: -1`

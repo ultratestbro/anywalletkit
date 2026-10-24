@@ -163,6 +163,7 @@ function stubProvider (s: Scenario, { maxRange = null, brokenBlock = null, multi
 
 type Sent = RevokeTransaction | RevokeTransaction[]
 interface StubAccount extends ReadOnlyAccountLike, Partial<Omit<AccountLike, keyof ReadOnlyAccountLike>> {
+  _config?: { provider?: unknown }
   sent: Sent[]
   approved: Array<{ token: string; spender: string; amount: bigint }>
 }
