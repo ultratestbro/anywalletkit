@@ -2,6 +2,7 @@ import {afterEach, describe, expect, it, vi} from "vitest";
 import {readFileSync} from "node:fs";
 import {chainflipProvider} from "../src/provider.js";
 import {CF_VAULTS} from "../src/config.js";
+import {validQuote} from "@anywalletkit/protocol-swap2-core";
 
 const fx = JSON.parse(readFileSync(new URL("../fixtures/encode-2026-10-20.json", import.meta.url), "utf8")).responses as Record<string, Record<string, string>>;
 const QUOTE = [{type: "REGULAR", egressAmount: "19483300", depositAmount: "20000000", estimatedDurationSeconds: 166.6, recommendedSlippageTolerancePercent: 0.5, recommendedLivePriceSlippageTolerancePercent: 1, includedFees: [{type: "NETWORK", chain: "Ethereum", asset: "USDC", amount: "500000"}, {type: "EGRESS", chain: "Arbitrum", asset: "USDC", amount: "4881"}]}];
@@ -50,6 +51,17 @@ describe("chainflip provider — Tron USDT vault swap", () => {
     expect(r4.q).toBeNull(); expect(r4.reason).toMatch(/broker takes/);
     const r5 = await refusedBy({...fx.tron_usdt!, to: "TN3W4H6rK2ce4vX9YnFQHwKENnHjoxb3m9"});
     expect(r5.q).toBeNull(); expect(r5.reason).toMatch(/not the Tron Vault/);
+  });
+  it("a floor AND a slippage: the minimum honours both (execution sends a floor under the listed quote plus the list's slippage)", async () => {
+    stub(fx.tron_usdt!);
+    const both = await chainflipProvider().getQuote({...TRON_PARAMS, dry: true, slippageBps: 10});
+    expect(BigInt(both!.minDestAmount)).toBeGreaterThanOrEqual((19_483_300n * 9_990n) / 10_000n);
+    expect(validQuote(both!, {...TRON_PARAMS, dry: true, slippageBps: 10}, "chainflip")).toBe(true);
+    // The floor alone stays the floor; a floor above the slippage minimum wins.
+    const floorOnly = await chainflipProvider().getQuote({...TRON_PARAMS, dry: true});
+    expect(BigInt(floorOnly!.minDestAmount)).toBeLessThan(19_300_000n);
+    const highFloor = await chainflipProvider().getQuote({...TRON_PARAMS, dry: true, slippageBps: 300, minAmountOut: "19400000"});
+    expect(BigInt(highFloor!.minDestAmount)).toBeGreaterThanOrEqual(19_400_000n);
   });
   it("dry quotes never encode; below-minimum amounts are refused up front", async () => {
     const seen = stub(fx.tron_usdt!);

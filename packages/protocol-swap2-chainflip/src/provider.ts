@@ -108,10 +108,14 @@ export function chainflipProvider(config: ChainflipProviderConfig = {}): CrossCh
       if (!q?.egressAmount || !/^\d+$/.test(q.egressAmount)) return refuse("quote without an egress amount");
       if (q.type && q.type !== "REGULAR") return refuse(`${q.type} quotes are not supported`);
       const expected = BigInt(q.egressAmount);
-      // Minimum: the caller's floor, else the expected output less the slippage (the caller's, else the backend's advice).
+      // Minimum: the expected output less the slippage (the caller's, else the backend's advice), or the
+      // caller's floor. A caller who names both is held to both — the engine checks the quote against
+      // each (execution sends a floor under the listed quote AND the slippage the list was quoted at).
       const slipBps = params.slippageBps ?? Math.round((q.recommendedSlippageTolerancePercent ?? 1) * 100);
       const byTolerance = (expected * BigInt(10_000 - Math.min(9_999, Math.max(0, slipBps)))) / 10_000n;
-      const minOut = params.minAmountOut !== undefined ? BigInt(params.minAmountOut) : byTolerance;
+      const callerFloor = params.minAmountOut !== undefined ? BigInt(params.minAmountOut) : undefined;
+      const minOut = callerFloor === undefined ? byTolerance
+        : params.slippageBps !== undefined && byTolerance > callerFloor ? byTolerance : callerFloor;
       if (minOut > expected) return refuse(`floor ${minOut} above the expected output ${expected}`);
       const minPriceX128 = minPriceX128For(amountIn, minOut);
       const guaranteed = minOutOf(amountIn, minPriceX128);
