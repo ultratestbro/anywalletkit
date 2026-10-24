@@ -123,3 +123,63 @@ function ed25519Seed(bytes: Uint8Array): Uint8Array {
   zeroize(bytes)
   return seed
 }
+
+/** How an exported key is written — the format other wallets import and `parsePrivateKey` reads back. */
+export type PrivateKeyFormat = 'hex' | 'wif' | 'base58' | 'near'
+
+export interface FormattedPrivateKey {
+  format: PrivateKeyFormat
+  /** The key as text. Show it once behind authentication; never log or persist it. */
+  value: string
+}
+
+/**
+ * The inverse of {@link parsePrivateKey}, in the format each chain's wallets import:
+ * - EVM: `0x` + 64 hex (MetaMask, Rabby); Tron: 64 hex (TronLink).
+ * - BTC, Zcash: compressed WIF (`K…` / `L…`; testnet `c…`). Electrum needs a `p2wpkh:` prefix to land on the same SegWit address.
+ * - Solana: base58 of the 64-byte secret key (seed ‖ public key), as Phantom exports.
+ * - NEAR: `ed25519:` + base58 of the 64-byte secret key (near-cli, MyNearWallet).
+ * - TON: hex of the 64-byte secret key (seed ‖ public key). TON wallets themselves import only 24-word phrases.
+ */
+export function formatPrivateKey(chain: ChainKey, privateKey: Uint8Array, options: { testnet?: boolean } = {}): FormattedPrivateKey {
+  if (privateKey.length !== 32) throw new KeyringError(`A ${chain} private key is 32 bytes.`)
+  switch (chain) {
+    case 'evm':
+      return { format: 'hex', value: `0x${hex.encode(privateKey)}` }
+    case 'tron':
+      return { format: 'hex', value: hex.encode(privateKey) }
+    case 'btc':
+    case 'zcash':
+      return { format: 'wif', value: toWif(privateKey, options.testnet === true) }
+    case 'solana':
+      return { format: 'base58', value: base58.encode(ed25519Secret(privateKey)) }
+    case 'near':
+      return { format: 'near', value: `ed25519:${base58.encode(ed25519Secret(privateKey))}` }
+    case 'ton':
+      return { format: 'hex', value: hex.encode(ed25519Secret(privateKey)) }
+  }
+}
+
+/** WIF: base58check(version ‖ key ‖ 0x01) — compressed, as fromWif requires. */
+function toWif(key: Uint8Array, testnet: boolean): string {
+  const body = new Uint8Array(34)
+  body[0] = testnet ? 0xef : 0x80
+  body.set(key, 1)
+  body[33] = 0x01
+  const check = sha256(sha256(body)).subarray(0, 4)
+  const data = new Uint8Array(38)
+  data.set(body, 0)
+  data.set(check, 34)
+  const out = base58.encode(data)
+  zeroize(body)
+  zeroize(data)
+  return out
+}
+
+/** seed ‖ public key — the 64-byte ed25519 secret most tools exchange. */
+function ed25519Secret(seed: Uint8Array): Uint8Array {
+  const out = new Uint8Array(64)
+  out.set(seed, 0)
+  out.set(ed25519.getPublicKey(seed), 32)
+  return out
+}

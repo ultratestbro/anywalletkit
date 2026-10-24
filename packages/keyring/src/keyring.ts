@@ -3,6 +3,8 @@ import { hex } from '@scure/base'
 import { sha256 } from '@noble/hashes/sha2.js'
 import {
   LocalSigner,
+  deriveEd25519,
+  deriveSecp256k1,
   getRandomSeedPhrase,
   isValidSeedPhrase,
   normalizeMnemonic,
@@ -15,7 +17,7 @@ import {
 } from '@forgewallet/core'
 import { CHAIN_SPECS, type ChainKey } from './chains.js'
 import { KeyringError } from './errors.js'
-import { keyFingerprint, parsePrivateKey, publicKeyOf } from './keys.js'
+import { formatPrivateKey, keyFingerprint, parsePrivateKey, publicKeyOf, type PrivateKeyFormat } from './keys.js'
 
 // ---- Storage adapters (the app implements both) ----
 
@@ -268,6 +270,58 @@ export class Keyring {
         return { type: 'privateKey', secret: secret.key, chain: secret.chain }
       case 'tonMnemonic':
         return { type: 'tonMnemonic', secret: secret.words, chain: source.chain ?? 'ton' }
+    }
+  }
+
+  /**
+   * One account's private key on one chain, in the format that chain's wallets import
+   * (see {@link formatPrivateKey}) — for "Export private key" behind biometrics, like the phrase.
+   *
+   * - Seed account: derived at the account's own path (as the chain manager derives it).
+   * - Imported key: the key itself, on its chain only.
+   * - TON-native 24 words: refused — export the words ({@link exportSecret}); TON wallets import only those.
+   *
+   * Before returning, a wallet is built from the exported key and its address must equal the
+   * account's address on that chain; otherwise nothing is returned. Reads the secret once.
+   */
+  async exportPrivateKey(accountId: string, chain: ChainKey): Promise<{ chain: ChainKey; address: string; format: PrivateKeyFormat; privateKey: string; path?: string; compatibleWith: string }> {
+    const account = this.account(accountId)
+    const source = this.source(account.sourceId)
+    const address = account.addresses[chain]
+    if (!address) throw new KeyringError(`This account has no ${chain} address.`, 'unsupported')
+    const { config } = this.chain(chain)
+    const testnet = chain === 'btc' && typeof (config as { network?: unknown } | undefined)?.network === 'string' && (config as { network: string }).network !== 'bitcoin'
+    const secret = await this.secret(account.sourceId)
+    let key: Uint8Array
+    let path: string | undefined
+    if (secret.type === 'privateKey') {
+      if (secret.chain !== chain) throw new KeyringError(`This imported key belongs to ${secret.chain}, not ${chain}.`, 'unsupported')
+      key = hex.decode(secret.key)
+    } else if (secret.type === 'tonMnemonic') {
+      throw new KeyringError('This wallet was imported from TON 24 words — export the words instead; TON wallets import only those.', 'unsupported')
+    } else {
+      if (account.index === null) throw new KeyringError('A seed account has an index.', 'invalid-input')
+      const manager = await this.seedManager(secret, chain)
+      try {
+        path = (await manager.getAccount(account.index) as IWalletAccount & { path?: string }).path ?? CHAIN_SPECS[chain].accountPath(account.index)
+      } finally {
+        manager.dispose()
+      }
+      const seed = await seedFromMnemonic(secret.mnemonic, secret.passphrase ?? '')
+      try {
+        key = (CHAIN_SPECS[chain].curve === 'secp256k1' ? deriveSecp256k1(seed, path) : deriveEd25519(seed, path)).privateKey.slice()
+      } finally {
+        zeroize(seed)
+      }
+    }
+    try {
+      // The exported key must control exactly this account's address — never hand out a wrong key.
+      const check = await this.withKeyAccount(chain, key.slice(), (a) => a.getAddress())
+      if (check !== address) throw new KeyringError(`The derived ${chain} key does not match this account's address; nothing was exported.`, 'unsupported')
+      const out = formatPrivateKey(chain, key, { testnet })
+      return { chain, address, format: out.format, privateKey: out.value, ...(path ? { path } : {}), compatibleWith: source.type === 'mnemonic' ? CHAIN_SPECS[chain].compatibleWith : 'wallets that import this key format' }
+    } finally {
+      zeroize(key)
     }
   }
 
