@@ -76,7 +76,8 @@ jobs:
           if [ -n "$NPM_TOKEN" ]; then echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc; fi
           pnpm release
       - name: Tag what was published
-        if: steps.npm.outputs.tags != ''
+        # Also after a partial failure: the versions that did reach npm get their tags.
+        if: ${{ !cancelled() && steps.npm.outputs.tags != '' }}
         env:
           TAGS: ${{ steps.npm.outputs.tags }}
         run: |

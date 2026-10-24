@@ -13,7 +13,7 @@ Packages reach npm only through the `release` workflow. Every package is publish
 2. Actions → **release** → Run workflow:
    - **mode `dry-run`** runs the full gate and then packs and `npm publish --dry-run`s every package that is not on npm yet. The gate is build, typecheck, tests, registry, examples, Hermes and `pack:check`.
    - **mode `publish`** runs the same gate. The `publish` job then waits for approval in the `npm` environment, publishes the new versions (dependencies first) and pushes one tag per package, `@anywalletkit/<name>@<version>`.
-3. Versions already on npm are skipped, so re-running after a partial failure is safe.
+3. Versions already on npm are skipped, so re-running after a partial failure is safe. A package npm refuses does not stop the run: it and the packages that depend on it are held back, everything else is published and tagged, and the run ends red with the list.
 
 Locally, `pnpm release:dry` does the same dry run (without provenance, which only exists in CI).
 
