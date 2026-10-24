@@ -172,6 +172,8 @@ h1#_top {
 
 /* Inline code pills never break inside a name. */
 .sl-markdown-content :not(pre) > code { white-space: nowrap; }
+/* One longer than the column (a contract in hex, a full signature) scrolls inside its pill. */
+.sl-markdown-content :is(p, li, dd) > code { display: inline-block; max-width: 100%; overflow-x: auto; vertical-align: bottom; }
 
 /* ---------- reading layout (design handoff 1a: our fonts and colors, its structure) ---------- */
 :root {
@@ -185,7 +187,9 @@ h1#_top {
 .sl-markdown-content :is(strong, h2, h3, h4) { color: var(--t1); }
 h1#_top { letter-spacing: -.025em; line-height: 1.08; }
 /* The first paragraph of a page is its lead. */
-.sl-markdown-content > p:first-child { font-size: 1.15em; line-height: 1.6; color: var(--t1); }
+:root:not([data-ref='api']) .sl-markdown-content > p:first-child { font-size: 1.15em; line-height: 1.6; color: var(--t1); }
+/* API pages: the source location is metadata, not a lead. */
+:root[data-ref='api'] .sl-markdown-content > p:first-child { font-family: var(--mono); font-size: .8rem; letter-spacing: .02em; color: var(--t3); }
 /* H2 opens a section: a hairline above, room around it. */
 .sl-markdown-content .level-h2 { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--hl); }
 .sl-markdown-content h2 { letter-spacing: -.015em; }

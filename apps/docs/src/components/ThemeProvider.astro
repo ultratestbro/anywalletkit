@@ -8,6 +8,8 @@
 		let t = 'dark';
 		try { if (localStorage.getItem('awk-theme') === 'light') t = 'light'; } catch {}
 		document.documentElement.dataset.theme = t;
+		// The generated API reference has no lead paragraph; its pages start with "Defined in".
+		if (location.pathname.startsWith('/api/')) document.documentElement.dataset.ref = 'api';
 		// Starlight's own pickers are replaced; keep the global so nothing calling it breaks.
 		window.StarlightThemeProvider = { updatePickers() {} };
 	})();
