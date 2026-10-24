@@ -6,7 +6,7 @@ import { UnsafeTransactionError } from './errors.js'
 import { TonCenter, createTonRpc } from './toncenter.js'
 import { runEmulation } from './emulation.js'
 import {
-  DEFAULT_SEND_MODE, v5r1Address, v5r1ExternalMessage, v5r1PackUnsigned, v5r1SigningMessage, v5r1StateInit, v5r1WalletId,
+  DEFAULT_SEND_MODE, MAINNET_GLOBAL_ID, TESTNET_GLOBAL_ID, v5r1Address, v5r1ExternalMessage, v5r1PackUnsigned, v5r1SigningMessage, v5r1StateInit, v5r1WalletId,
   type V5R1Message,
 } from './wallet-v5r1.js'
 import { CAIP2, type TonConfig, type TonFees, type TonReceipt, type TonSendable, type TonSimulation, type TonTransaction, type TonTransferOptions } from './types.js'
@@ -36,7 +36,14 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
   constructor(publicKey: Uint8Array | string, config: TonConfig = {}) {
     this.publicKey = typeof publicKey === 'string' ? hexToBytes(publicKey) : publicKey
     this._config = config
-    this._walletId = v5r1WalletId({ ...(config.walletId?.networkGlobalId !== undefined ? { networkGlobalId: config.walletId.networkGlobalId } : {}), ...(config.walletId?.subwalletNumber !== undefined ? { subwalletNumber: config.walletId.subwalletNumber } : {}) })
+    // The network_global_id inside wallet_id is the only thing that binds a signed external to one
+    // network: a testnet wallet must carry -3, or every external it signs is also valid on mainnet
+    // (same state init, address and wallet_id). It follows config.network; a contradicting override is refused.
+    const networkGlobalId = config.network === 'testnet' ? TESTNET_GLOBAL_ID : MAINNET_GLOBAL_ID
+    if (config.walletId?.networkGlobalId !== undefined && config.walletId.networkGlobalId !== networkGlobalId) {
+      throw new UnsafeTransactionError('network-mismatch', `walletId.networkGlobalId ${config.walletId.networkGlobalId} contradicts network '${config.network ?? 'mainnet'}' (expected ${networkGlobalId}): externals signed this way would be valid on the other network.`)
+    }
+    this._walletId = v5r1WalletId({ networkGlobalId, ...(config.walletId?.subwalletNumber !== undefined ? { subwalletNumber: config.walletId.subwalletNumber } : {}) })
     this._init = v5r1StateInit(this.publicKey, this._walletId)
     this._address = v5r1Address(this.publicKey, { walletId: this._walletId })
     this.address = this._address.toString({ bounceable: false, testOnly: config.network === 'testnet' })

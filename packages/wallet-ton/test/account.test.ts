@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { Buffer } from 'buffer'
 import { Address, Cell, beginCell, loadMessage, loadOutList } from '@ton/core'
-import { SimulationError, UnsafeTransactionError, WalletManagerTon, parseV5R1Body } from '../src/index.js'
+import { SimulationError, UnsafeTransactionError, WalletManagerTon, parseV5R1Body, v5r1WalletId, TESTNET_GLOBAL_ID } from '../src/index.js'
+import { WalletContractV5R1 } from '@ton/ton'
 import { JETTON_WALLET, fakeRpc, tonapiOk } from './fake-rpc.js'
 
 const SEED = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
@@ -187,6 +188,26 @@ describe('WalletAccountTon', () => {
     const slow = await manager(f, { validUntilSeconds: 601 }).getAccount(0)
     await expect(slow.sendTransaction({ to: RECIPIENT, value: 1n })).rejects.toThrow(/validUntilSeconds/)
     expect(f.sent).toHaveLength(0)
+  })
+
+  it('a testnet wallet carries the testnet wallet_id (-3): its own address, and its signed externals are not valid on mainnet (security scan F3)', async () => {
+    const main = await new WalletManagerTon(SEED).getAccount(0)
+    const f = fakeRpc()
+    const test = await manager(f, { network: 'testnet' }).getAccount(0)
+    // Same key, different wallet: wallet_id is part of the state init, so the address differs — as in @ton/ton / Tonkeeper.
+    expect(Address.parse(test.address).equals(Address.parse(main.address))).toBe(false)
+    const ref = WalletContractV5R1.create({ publicKey: Buffer.from(test.publicKey), walletId: { networkGlobalId: TESTNET_GLOBAL_ID, context: { workchain: 0, walletVersion: 'v5r1', subwalletNumber: 0 } } })
+    expect(Address.parse(test.address).equals(ref.address)).toBe(true)
+    // The signed body names the testnet wallet_id, which a mainnet contract (wallet_id for -239) rejects.
+    await test.transfer({ recipient: RECIPIENT_TESTNET, amount: 100_000_000n })
+    const msg = verifyExternal(f.sent[0]!, test.publicKey, Address.parse(test.address).toString({ bounceable: false }))
+    expect(parseV5R1Body(msg.body)!.walletId).toBe(v5r1WalletId({ networkGlobalId: TESTNET_GLOBAL_ID }))
+    expect(parseV5R1Body(msg.body)!.walletId).not.toBe(v5r1WalletId())
+    // An override that contradicts the network is refused instead of silently signing cross-network externals.
+    await expect(Promise.resolve().then(() => new WalletManagerTon(SEED, { network: 'testnet', walletId: { networkGlobalId: -239 } }).getAccount(0))).rejects.toThrow(/contradicts network/)
+    await expect(Promise.resolve().then(() => new WalletManagerTon(SEED, { walletId: { networkGlobalId: -3 } }).getAccount(0))).rejects.toThrow(/contradicts network/)
+    // Mainnet keeps the Tonkeeper address (vector).
+    expect(main.address).toBe(ADDR0)
   })
 
   it('valid_until is now + validUntilSeconds', async () => {

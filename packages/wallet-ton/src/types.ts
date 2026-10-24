@@ -54,12 +54,17 @@ export interface TonConfig {
   validUntilSeconds?: number
   /** Nanotons attached to a jetton transfer on top of `forwardTonAmount` (default 0.05 TON). */
   jettonAttachedValue?: bigint | number | string
-  /** 'mainnet' (ton:-239, default) or 'testnet' (ton:-3). Only the CAIP-2 id and address-flag checks depend on it. */
+  /**
+   * 'mainnet' (ton:-239, default) or 'testnet' (ton:-3). Sets the CAIP-2 id, the address flags and the
+   * wallet_id network (-239 / -3), so a testnet wallet has its own address and its signed messages are
+   * not valid on mainnet (as in Tonkeeper and @ton/ton).
+   */
   network?: 'mainnet' | 'testnet'
   /**
-   * V5R1 wallet_id parts. Defaults (network id -239, subwallet 0) give the
-   * addresses Tonkeeper and Tonhub derive for a key; change them only to
-   * reach a wallet that was created with different ones.
+   * V5R1 wallet_id parts. Defaults (network id from `network`, subwallet 0) give the
+   * addresses Tonkeeper and Tonhub derive for a key; change the subwallet only to
+   * reach a wallet that was created with a different one. A networkGlobalId that
+   * contradicts `network` is refused.
    */
   walletId?: { networkGlobalId?: number; subwalletNumber?: number }
 }
