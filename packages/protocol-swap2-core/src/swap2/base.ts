@@ -466,6 +466,17 @@ function exactPositiveAmount(value: number | bigint, name: string): bigint {
   return value;
 }
 
+/**
+ * floor(x × scale) that forgives binary representation error: a caller's
+ * 0.0029 is 29 bps, though 0.0029 × 10 000 is 28.999…96 in floating point
+ * (573 of the 10 001 whole-bps decimals land one short with a plain floor).
+ */
+function floorScaled(x: number, scale: number): number {
+  const v = x * scale;
+  const nearest = Math.round(v);
+  return Math.abs(v - nearest) < 1e-6 ? nearest : Math.floor(v);
+}
+
 function callerConstraints(options: Swap2Options): {minAmountOut?: bigint; slippageBps?: number} {
   let minAmountOut: bigint | undefined;
   if (options.minAmountOut !== undefined) {
@@ -484,7 +495,7 @@ function callerConstraints(options: Swap2Options): {minAmountOut?: bigint; slipp
     // Providers accept whole bps. Round down so their on-chain/API tolerance
     // can never be wider than the caller requested; the exact decimal is also
     // checked against the returned quote below.
-    slippageBps = Math.floor(options.slippage * 10_000);
+    slippageBps = floorScaled(options.slippage, 10_000);
   }
   return {
     ...(minAmountOut !== undefined ? {minAmountOut} : {}),
@@ -501,7 +512,7 @@ function assertQuoteConstraints(q: Quote, options: Swap2Options): void {
   }
   if (options.slippage !== undefined) {
     const scale = 1_000_000_000n;
-    const permitted = BigInt(Math.floor(options.slippage * Number(scale)));
+    const permitted = BigInt(floorScaled(options.slippage, Number(scale)));
     // Floor, like the providers compute their minimum (see validQuote).
     const required = (nominal * (scale - permitted)) / scale;
     if (guaranteed < required) {

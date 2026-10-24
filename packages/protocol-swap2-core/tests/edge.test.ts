@@ -508,3 +508,29 @@ describe("edge: native-fee ceilings", () => {
     expect(log).toEqual(["approve", "deposit"]);
   });
 });
+
+describe("edge: slippage decimals", () => {
+  // 0.0029 × 10 000 = 28.999…96 in floating point; a plain floor asked the
+  // venue for 28 bps while the app had quoted the route list at 29.
+  it("every whole-bps decimal reaches the provider as the same bps, and a quote floored at it passes", async () => {
+    const seen: number[] = [];
+    for (const bps of [3, 29, 48, 58, 93, 113, 249, 300]) {
+      const p = provider({
+        getQuote: async (params) => {
+          seen.push(params.slippageBps!);
+          const dest = 10n ** 18n + 7n;
+          return quote(params, {destAmount: dest.toString(), minDestAmount: ((dest * BigInt(10_000 - params.slippageBps!)) / 10_000n).toString()});
+        },
+      });
+      await protocol(p, account([])).swap2({...options, minAmountOut: 1n, slippage: bps / 10_000});
+    }
+    expect(seen).toEqual([3, 29, 48, 58, 93, 113, 249, 300]);
+  });
+
+  it("a decimal between whole bps still rounds down", async () => {
+    let seen: number | undefined;
+    const p = provider({getQuote: async (params) => { seen = params.slippageBps; return quote(params, {destAmount: "1000000", minDestAmount: "997100"}); }});
+    await protocol(p, account([])).quoteSwap2({...options, slippage: 0.00295});
+    expect(seen).toBe(29);
+  });
+});
