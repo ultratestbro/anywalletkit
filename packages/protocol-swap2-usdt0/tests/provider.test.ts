@@ -318,3 +318,36 @@ describe("router", () => {
     expect(usdt0Provider({enabled: false}).enabled()).toBe(false);
   });
 });
+
+describe("refusals never carry the RPC URL (scan 2026-10-23 F8)", () => {
+  const KEYED = "http://rpc.arb.example/qn-SECRET-TOKEN-123/";
+  const failing = (status: number) => {
+    const w = world();
+    const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.startsWith(KEYED)) return new Response("rate limited", {status});
+      return w.fetchImpl(input, init);
+    }) as typeof fetch;
+    return usdt0Provider({scanUrl: "https://scan.test", fetchImpl, rpcUrls: {...RPC, "eip155:42161": KEYED}});
+  };
+
+  it("an HTTP 429 / 500 from a keyed endpoint becomes a fixed reason in getQuote", async () => {
+    for (const status of [429, 500]) {
+      const reasons: string[] = [];
+      const q = await failing(status).getQuote({...PARAMS, onRefusal: (r) => reasons.push(r)});
+      expect(q).toBeNull();
+      expect(reasons.join(" ")).not.toMatch(/SECRET-TOKEN|rpc\.arb\.example|URL:/);
+      expect(reasons.join(" ")).toMatch(/RPC for .* unavailable/);
+    }
+  });
+
+  it("preflightDeposit throws the same fixed reason, never the URL", async () => {
+    const {p} = make();
+    const q = (await p.getQuote(PARAMS))!;
+    const tx = await p.buildDeposit(q);
+    const err = await failing(429).preflightDeposit!(q, tx).catch((e: unknown) => e as Error);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).not.toMatch(/SECRET-TOKEN|rpc\.arb\.example/);
+    expect((err as Error).message).toMatch(/RPC for .* unavailable/);
+  });
+});

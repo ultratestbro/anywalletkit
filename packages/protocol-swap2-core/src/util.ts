@@ -37,3 +37,12 @@ export function anySignal(signals: readonly AbortSignal[]): AbortSignal {
   }
   return ctrl.signal;
 }
+
+/**
+ * Remove URLs from text that may travel to a client (a refusal reason, a build error):
+ * transport errors carry the endpoint — and with a keyed RPC (QuickNode, Alchemy,
+ * Infura…) the key sits in its path (scan 2026-10-23 F8).
+ */
+export function redactUrls(text: string): string {
+  return text.replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, "<url>");
+}

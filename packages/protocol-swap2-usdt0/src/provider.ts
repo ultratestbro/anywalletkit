@@ -1,7 +1,7 @@
 import {createPublicClient, encodeFunctionData, fallback, getAddress, http, isAddress, pad, parseAbi, type Hex} from "viem";
 import {describeUsdt0Activity} from "./activity.js";
 import {ccAsset} from "@forgewallet/swap2-assets";
-import {timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
+import {redactUrls, timeoutSignal} from "@forgewallet/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentState, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@forgewallet/protocol-swap2-core/types";
 import {LZ_SCAN_API, USDT0_BY_EID, USDT0_CHAINS, USDT0_SYMBOLS, usdt0 as usdt0Cfg, type Usdt0Chain} from "./config.js";
 
@@ -103,6 +103,20 @@ function tokenMatches(chain: Usdt0Chain, symbolOrAddress: string): boolean {
   const known = ccAsset(chain.caip2, symbolOrAddress);
   // A symbol the catalog binds to another contract (OP's legacy bridged USDT) is not the OFT token.
   return !known || same(known.contract ?? "", chain.token);
+}
+
+/**
+ * A refusal / preflight error that may reach a client: an RPC transport failure
+ * becomes a fixed reason (viem's HTTP / timeout errors carry `URL: …`, and a keyed
+ * endpoint's key sits in that path — scan 2026-10-23 F8); anything else loses its URLs.
+ */
+function rpcSafeReason(err: unknown, chainName: string): string {
+  const e = err as {name?: string; shortMessage?: string; message?: string} | undefined;
+  const text = `${e?.shortMessage ?? ""}\n${e?.message ?? String(err)}`;
+  if (/HttpRequestError|TimeoutError|RpcRequestError|WebSocketRequestError/.test(String(e?.name)) || /\bURL: |HTTP request failed|request timed out|took too long to respond/i.test(text)) {
+    return `usdt0: RPC for ${chainName} unavailable — try again`;
+  }
+  return redactUrls(err instanceof Error ? err.message : String(err));
 }
 
 export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvider {
@@ -268,7 +282,7 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
           },
         };
       } catch (err) {
-        return refuse(err instanceof Error ? err.message : String(err));
+        return refuse(rpcSafeReason(err, src.name));
       }
     },
 
@@ -305,9 +319,14 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
       }
       const c = client(src.caip2);
       if (!c) throw new Error(`usdt0: no RPC for ${src.caip2}`);
-      await Promise.all([verifyChain(src), verifyPeer(src, dst)]);
       const sp = sendParam(dst.eid, pd.recipient!, BigInt(pd.amountLD!), BigInt(pd.minAmountLD!));
-      const fee = await c.readContract({address: getAddress(src.oft), abi: OFT_ABI, functionName: "quoteSend", args: [sp, false]});
+      let fee: {nativeFee: bigint};
+      try {
+        await Promise.all([verifyChain(src), verifyPeer(src, dst)]);
+        fee = await c.readContract({address: getAddress(src.oft), abi: OFT_ABI, functionName: "quoteSend", args: [sp, false]});
+      } catch (err) {
+        throw new Error(rpcSafeReason(err, src.name));
+      }
       const sealed = BigInt(pd.nativeFee!);
       if (fee.nativeFee > sealed) throw new Error(`usdt0: LayerZero fee rose to ${fee.nativeFee} above the sealed ${sealed} (quote + ${FEE_HEADROOM_BPS / 100n} % headroom) — re-quote`);
       if (BigInt(tx.value) !== sealed) throw new Error(`usdt0: transaction value ${tx.value} is not the quoted fee ${sealed}`);
