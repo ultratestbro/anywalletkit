@@ -534,3 +534,45 @@ describe("edge: slippage decimals", () => {
     expect(seen).toBe(29);
   });
 });
+
+describe("edge: genesis-hash chain ids", () => {
+  // A Solana account from @anywalletkit/wallet-solana reports `solana:5eykt…`;
+  // the swap2 catalog and providers name it `solana:mainnet`. Passing
+  // `fromChain: account.chain` used to find no route, and the short id failed
+  // the account-chain check — no SDK account could swap from Solana.
+  const SOLANA = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp";
+  const DEPOSIT_SOL = "8Ff7Wnq5FD4Yt3ZwBwnZqvSqtqQbbS9Tc8cHUq1cTAwN";
+  const solOptions = {fromToken: "SOL", toToken: "USDC", toChain: "eip155:8453", recipient: RECIPIENT, fromTokenAmount: 100_000_000n, minAmountOut: 1n};
+  const solProvider = (seen: string[]) => provider({
+    getQuote: async (params) => {
+      seen.push(params.sourceChain);
+      return quote(params, {depositAddress: DEPOSIT_SOL, txRequest: undefined, destAmount: "990000", minDestAmount: "980000"});
+    },
+    buildDeposit: async (q) => ({chain: "", to: q.depositAddress, value: q.sourceAmount}),
+  });
+
+  it("fromChain given as the account's genesis-hash id reaches providers as the swap2 id and passes the account check", async () => {
+    const seen: string[] = [];
+    let reviewed = false;
+    const acc = {chain: SOLANA, getAddress: async () => "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU", transfer: async () => { throw new Error("must not send") }, sendTransaction: async () => { throw new Error("must not send") }, sendSerializedTransaction: async () => { throw new Error("must not send") }};
+    const p = protocol(solProvider(seen), acc, {fromChain: SOLANA, reviewExecution: async () => { reviewed = true; throw new Error("stop at review"); }});
+    await expect(p.swap2(solOptions)).rejects.toThrow("stop at review");
+    expect(reviewed).toBe(true);
+    expect(new Set(seen)).toEqual(new Set(["solana:mainnet"]));
+  });
+
+  it("the short swap2 id still works with the same account", async () => {
+    const seen: string[] = [];
+    const acc = {chain: SOLANA, getAddress: async () => "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU", transfer: async () => { throw new Error("must not send") }, sendTransaction: async () => { throw new Error("must not send") }, sendSerializedTransaction: async () => { throw new Error("must not send") }};
+    const p = protocol(solProvider(seen), acc, {fromChain: "solana:mainnet", reviewExecution: async () => { throw new Error("stop at review"); }});
+    await expect(p.swap2(solOptions)).rejects.toThrow("stop at review");
+  });
+
+  it("Tron and Bitcoin genesis ids map too; a destination given by genesis id is normalized", async () => {
+    const seen: string[] = [];
+    const p = protocol(provider({getQuote: async (params) => { seen.push(`${params.sourceChain}>${params.destChain}`); return null; }}), account([]), {fromChain: "eip155:1"});
+    await expect(p.quoteSwap2({...options, toToken: "BTC", toChain: "bip122:000000000019d6689c085ae165831e93"})).rejects.toThrow();
+    await expect(p.quoteSwap2({...options, toToken: "USDT", toChain: "tron:0x2b6653dc"})).rejects.toThrow();
+    expect(seen).toEqual(["eip155:1>bitcoin:mainnet", "eip155:1>tron:728126428"]);
+  });
+});

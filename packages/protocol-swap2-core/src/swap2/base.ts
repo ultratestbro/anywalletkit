@@ -402,6 +402,19 @@ function chainType(caip2: string): string {
   return ns;
 }
 
+/**
+ * The wallet packages name non-EVM chains by genesis hash (CAIP-2 proper:
+ * `account.chain` of a Solana account is `solana:5eykt…`), while the swap2
+ * catalog and every provider use the short ids. The engine takes either.
+ */
+export const SWAP2_CHAIN_ALIASES: Readonly<Record<string, string>> = Object.freeze({
+  "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp": "solana:mainnet",
+  "tron:0x2b6653dc": "tron:728126428",
+  "bip122:000000000019d6689c085ae165831e93": "bitcoin:mainnet",
+});
+/** The swap2 id for `chain` (itself when it has no alias). */
+export const swap2ChainId = (chain: string): string => SWAP2_CHAIN_ALIASES[chain] ?? chain;
+
 /** Normalize a `toChain` (number chainId | CAIP-2 | numeric string) to CAIP-2. */
 function toCaip2(chain: string | number | undefined, fallback: string): string {
   if (chain == null || chain === "") return fallback;
@@ -417,7 +430,7 @@ function toCaip2(chain: string | number | undefined, fallback: string): string {
   if (!/^[a-z0-9]{3,8}:[-_A-Za-z0-9]{1,32}$/.test(chain)) {
     throw new Swap2ValidationError("swap2: chain must be a valid CAIP-2 identifier");
   }
-  return chain;
+  return swap2ChainId(chain);
 }
 
 /** Resolve a token ref (symbol OR on-chain address) to the engine's symbol. */
@@ -629,7 +642,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
     const expected = this.fromChain;
     const expectedId = expected.startsWith("eip155:") ? expected.slice("eip155:".length) : expected;
-    const actualText = typeof actual === "string" ? actual : String(actual);
+    const actualText = swap2ChainId(typeof actual === "string" ? actual : String(actual));
     const actualId = actualText.startsWith("eip155:") ? actualText.slice("eip155:".length) : actualText;
     if (actualId !== expectedId) {
       throw new Error(`swap2: account is bound to ${actualText}, but fromChain is ${expected}`);
