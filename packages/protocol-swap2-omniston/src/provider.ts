@@ -1741,14 +1741,41 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
   }
 
   /**
-   * HTLC secrets for a quote: a second build of the same quoteId reuses the
+   * HTLC secrets for a quote: a second build of the SAME order reuses the
    * stored secrets (same hashlock) instead of overwriting them, so a repeated
    * or concurrent build can never strand an order that was already signed.
    * `created` says whether THIS call wrote them (only then may it clear them).
+   *
+   * The quoteId is chosen by the platform, so it alone must never decide which
+   * preimage an order locks to (scan 2026-10-23 F6): secrets are stored with a
+   * hash of the order they were made for (trader, dest, chain, assets, units)
+   * and reused only for that exact order, and a secret that was disclosed is
+   * never handed to a new build.
    */
-  async function secretsFor(quoteId: string, count: number): Promise<{secrets: Uint8Array[]; created: boolean}> {
+  const bindKey = (quoteId: string) => `${quoteId}#bind`;
+  const disclosedKey = (quoteId: string) => `${quoteId}#disclosed`;
+  function orderBinding(ref: Decoded, q: OmnistonQuote): string {
+    return sha256(new TextEncoder().encode(JSON.stringify([
+      ref.quoteId, ref.trader ?? null, ref.dest ?? null, ref.srcChain ?? null,
+      q.inputUnits, q.outputUnits, JSON.stringify(q.inputAsset), JSON.stringify(q.outputAsset),
+    ]))).slice(2);
+  }
+  async function clearSecrets(quoteId: string): Promise<void> {
+    await store.clear(quoteId);
+    await store.clear(bindKey(quoteId));
+    await store.clear(disclosedKey(quoteId));
+  }
+  async function secretsFor(ref: Decoded, q: OmnistonQuote, count: number): Promise<{secrets: Uint8Array[]; created: boolean}> {
+    const quoteId = ref.quoteId;
+    const binding = orderBinding(ref, q);
     const existing = await store.load(quoteId);
     if (existing && existing.length > 0) {
+      const [boundTo] = (await store.load(bindKey(quoteId))) ?? [];
+      const disclosed = ((await store.load(disclosedKey(quoteId))) ?? []).length > 0;
+      if (boundTo !== binding || disclosed) {
+        traceFor(quoteId)("secret-reuse-refused", {disclosed, bound: boundTo !== undefined});
+        throw new Error("omniston: this quote id already belongs to another order — request a fresh quote");
+      }
       if (existing.length !== count || !existing.every((s) => /^[0-9a-fA-F]{64}$/.test(s))) {
         throw new Error("omniston: stored HTLC secrets for this quote do not fit the order — request a fresh quote");
       }
@@ -1758,8 +1785,15 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     const secrets = Array.from({length: count}, generateSecret);
     // Persist BEFORE anything can be signed: if the process dies after the
     // lock, the poll path still has the preimage to disclose.
+    await store.save(bindKey(quoteId), [binding]);
     await store.save(quoteId, secrets.map(bytesToHex));
     return {secrets, created: true};
+  }
+
+  /** A quote whose id already carries an order (secrets on file) is the platform reusing an id: refuse it. */
+  async function quoteIdInUse(quoteId: string): Promise<boolean> {
+    const existing = await store.load(quoteId);
+    return !!existing && existing.length > 0;
   }
 
   // ── TON ↔ TON: swap settlement (immediate DEX routes, no escrow) ──────────
@@ -2156,11 +2190,11 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
     // One execution: the signed order has ALLOW_MULTIPLE_FILLS clear and the
     // TON position commits a single hash. Persist BEFORE anything is signed.
-    const {secrets, created} = await secretsFor(ref.quoteId, 1);
+    const {secrets, created} = await secretsFor(ref, q, 1);
     const hashes = secrets.map((secret) => hashlock(secret, settlement.htlcHashingFunction));
     // Clear only what this call created: a failed rebuild must not take the
     // secret of an order an earlier build already handed out for signing.
-    const forget = async () => { if (created) await store.clear(ref.quoteId); };
+    const forget = async () => { if (created) await clearSecrets(ref.quoteId); };
     const omni = await getClient();
     let payload: Awaited<ReturnType<OmnistonClientLike["evmBuildOrderPayload"]>>;
     try {
@@ -2379,6 +2413,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       const outputScaled = BigInt(q.outputUnits) * 10n ** BigInt(source.decimals);
       if (outputScaled * 2n < inputScaled || outputScaled > inputScaled * 2n) return refuse("quoted output is outside 0.5x–2x of the input");
 
+      if (await quoteIdInUse(q.quoteId)) return refuse("the platform reused a quote id that already belongs to an order");
       await saveBuilt(q.quoteId, {quote: q, at: Date.now(), bound: {trader, dest: params.destAddress, srcChain: params.sourceChain, kind: "order"}});
 
       // Fees are charged in the OUTPUT asset; the corridor is stables, so units
@@ -2436,10 +2471,10 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
       const settlement = q.settlementData;
       const hashingFunction = settlement.$case === "order" ? settlement.value.htlcHashingFunction : undefined;
-      const {secrets, created} = await secretsFor(ref.quoteId, maxExecutions);
+      const {secrets, created} = await secretsFor(ref, q, maxExecutions);
       const hashes = secrets.map((s) => hashlock(s, hashingFunction));
       // Clear only what this call created (see buildEvmOrder).
-      const forget = async () => { if (created) await store.clear(ref.quoteId); };
+      const forget = async () => { if (created) await clearSecrets(ref.quoteId); };
 
       const owner: ChainAddress = {chain: {$case: "ton", value: ref.trader}};
       const omni = await getClient();
@@ -2679,7 +2714,11 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
             if (!verified) { trace("validator-refused", {index: i, evmSource, tonDest}); return; }
             await omni
               .orderDiscloseHtlcSecret({quoteId: decoded.quoteId, executionIndex: i, secret: secretBytes})
-              .then(() => trace("secret-disclosed", {index: i}), (error) => trace("disclose-failed", {index: i, error: error instanceof Error ? error.message : String(error)})); // retried on the next poll
+              .then(async () => {
+                trace("secret-disclosed", {index: i});
+                // Disclosed = known to the counterparty: never lock a new order to it (scan F6).
+                await store.save(disclosedKey(decoded.quoteId), ["1"]);
+              }, (error) => trace("disclose-failed", {index: i, error: error instanceof Error ? error.message : String(error)})); // retried on the next poll
           }),
         );
       }
@@ -2713,7 +2752,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       // signed order. Retain secrets/context until proven completion or TTL so
       // a late valid output lock can still be completed safely.
       if (status.state === "completed") {
-        await store.clear(decoded.quoteId);
+        await clearSecrets(decoded.quoteId);
         await quotes.clear(decoded.quoteId);
       }
       return status;

@@ -352,3 +352,54 @@ describe("intent binding: TON → EVM", () => {
     expect(s.calls.disclose).toEqual([{quoteId: s.quoteId, executionIndex: 0, secret: new Uint8Array(SECRET)}]);
   });
 });
+
+describe("scan 2026-10-23 F6: the platform-chosen quoteId never decides which preimage an order locks to", () => {
+  const VICTIM = "0x5555555555555555555555555555555555555555";
+  const VICTIM_DEST = "0x6666666666666666666666666666666666666666";
+
+  it("a disclosed preimage is never locked into a new order: the reused quote id is refused at quote time and at build time", async () => {
+    const s = eeSetup();
+    const q = await s.quote();
+    await s.p.buildDeposit(q!);
+    await s.p.trackIntent({intentId: q!.intentId}); // discloses; not FULLY_FILLED, so the secret stays on file
+    expect(s.client.calls.orderDiscloseHtlcSecret).toHaveLength(1);
+    expect(await s.secretStore.load(`${s.quoteId}#disclosed`)).toEqual(["1"]);
+    // The platform answers a later (victim's) request with the same quoteId: refused before any context is overwritten.
+    const refusals: string[] = [];
+    const again = await s.p.getQuote({
+      sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:42161", destToken: EE.USDT0_ARB,
+      amountIn: "20000000", destAddress: VICTIM_DEST, refundAddress: VICTIM, slippageBps: 100, dry: false,
+      onRefusal: (r) => refusals.push(r),
+    });
+    expect(again).toBeNull();
+    expect(refusals.join(" ")).toMatch(/reused a quote id/);
+    // Even for the original order, a build after disclosure gets no secret.
+    await expect(s.p.buildDeposit(q!)).rejects.toThrow(/already belongs to another order/);
+    expect(s.client.calls.evmBuildOrderPayload).toHaveLength(1);
+  });
+
+  it("a stored secret is reused only for the exact order it was made for", async () => {
+    const s = eeSetup();
+    const q = await s.quote();
+    await s.p.buildDeposit(q!);
+    // Same order again: reused (covered above). A secret on file bound to something else is refused.
+    await s.secretStore.save(`${s.quoteId}#bind`, ["00".repeat(32)]);
+    await expect(s.p.buildDeposit(q!)).rejects.toThrow(/already belongs to another order/);
+    expect(s.events.some(([e]) => e === "secret-reuse-refused")).toBe(true);
+    // A secret with no binding at all (written before this fix) is not served to a new build either.
+    await s.secretStore.clear(`${s.quoteId}#bind`);
+    await expect(s.p.buildDeposit(q!)).rejects.toThrow(/already belongs to another order/);
+    // The order's own secret is untouched by the refusals.
+    expect(await s.secretStore.load(s.quoteId)).toEqual(["11".repeat(32)]);
+  });
+
+  it("completion clears the secret together with its binding and disclosure marks", async () => {
+    const s = eeSetup(eeSnapshot("TRADE_STATUS_FULLY_FILLED", "EXECUTION_PHASE_COMPLETED"));
+    const q = await s.quote();
+    await s.p.buildDeposit(q!);
+    await s.p.trackIntent({intentId: q!.intentId});
+    expect(await s.secretStore.load(s.quoteId)).toBeUndefined();
+    expect(await s.secretStore.load(`${s.quoteId}#bind`)).toBeUndefined();
+    expect(await s.secretStore.load(`${s.quoteId}#disclosed`)).toBeUndefined();
+  });
+})
