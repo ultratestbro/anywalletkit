@@ -2,7 +2,6 @@
   "name": "@anywalletkit/swap2-assets",
   "version": "0.1.4",
   "description": "Cross-chain asset catalog for Any Wallet Kit swap2 packages: chains by CAIP-2, native coins and major stables with decimals, contracts and icons.",
-  "description": "",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
   "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },

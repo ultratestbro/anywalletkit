@@ -2,7 +2,6 @@
   "name": "@anywalletkit/protocol-swap2-core",
   "version": "0.3.2",
   "description": "The swap2 engine for Any Wallet Kit: one interface for swaps and bridges, quote binding, approvals, review gate, fee caps and status resume; providers plug in as separate packages.",
-  "description": "",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
   "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
