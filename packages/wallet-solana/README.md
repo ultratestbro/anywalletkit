@@ -1,7 +1,18 @@
 # @anywalletkit/wallet-solana
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/wallet-solana?label=npm)](https://www.npmjs.com/package/@anywalletkit/wallet-solana)
+
 Solana accounts at `m/44'/501'/i'/0'` (SLIP-10 ed25519 — the Phantom / Solflare
 default), pinned by golden vectors in `@anywalletkit/conformance`.
+
+## Install
+
+```sh
+npm install @anywalletkit/wallet-solana
+# or: pnpm add @anywalletkit/wallet-solana  ·  yarn add @anywalletkit/wallet-solana
+```
+
+On npm: [@anywalletkit/wallet-solana](https://www.npmjs.com/package/@anywalletkit/wallet-solana), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 Signing uses noble ed25519 over the compiled message bytes, so there is no
 WebCrypto dependency: the same code runs in Node and in React Native Hermes

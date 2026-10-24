@@ -1,8 +1,19 @@
 # @anywalletkit/protocol-swap2-router
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-router?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-router)
+
 The optional swap2 aggregator. Every provider module (`-lifi`, `-near-intents`, `-thorchain`,
 `-omniston`, `-cctp`, `-uniswap`, `-balancer`, `-wrap`) works on its own; install this package when
 you want one protocol that auctions a route across the providers **you** pass in. It bundles none.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-swap2-router @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-swap2-router @anywalletkit/core  ·  yarn add @anywalletkit/protocol-swap2-router @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-swap2-router](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-router), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ## Three ways to offer cross-chain swaps
 

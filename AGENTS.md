@@ -13,7 +13,17 @@ EVM (30+ networks), Solana, TON, Tron, Bitcoin, NEAR and Zcash. Protocol modules
 bridges (one router over 14 venues), staking, lending, approvals, history and names. React Native
 (Hermes) is the primary target; Node ≥ 20 works without polyfills. ESM + CJS, types included.
 
-All packages are `@anywalletkit/*`. Install only what you use.
+All packages are `@anywalletkit/*` **on npm** (https://www.npmjs.com/org/anywalletkit), published from
+CI with provenance. Install only what you use, with any package manager:
+
+```sh
+npm install @anywalletkit/kit @anywalletkit/wallet-evm        # + the chains / modules you need
+# pnpm add …  ·  yarn add …  ·  Expo: npx expo install …
+```
+
+Protocol and data packages take `@anywalletkit/core` as a peer: install it next to them. Pin versions
+exactly while the SDK is `0.x` (minor releases may change the API). Never vendor or copy SDK source
+into the app; never install from GitHub.
 
 | Need | Packages |
 |---|---|

@@ -1,10 +1,21 @@
 # @anywalletkit/protocol-swap2-jupiter
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-jupiter?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-jupiter)
+
 [Jupiter](https://developers.jup.ag/docs/swap) same-chain Solana swaps as a
 swap2 provider. It uses Swap API V2's **Router** path (`GET /swap/v2/build`):
 Metis on-chain routing, raw instructions, and no Jupiter swap fee. Quotes work
 without an API key at 0.5 requests per second. Pass `apiKey` for your plan's
 limit; the key is per organisation, so ship it on a server, not inside an app.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-swap2-jupiter @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-swap2-jupiter @anywalletkit/core  ·  yarn add @anywalletkit/protocol-swap2-jupiter @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-swap2-jupiter](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-jupiter), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ```ts
 import {jupiterProvider} from "@anywalletkit/protocol-swap2-jupiter/provider";

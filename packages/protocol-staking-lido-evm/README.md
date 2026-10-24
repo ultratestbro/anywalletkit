@@ -1,9 +1,20 @@
 # @anywalletkit/protocol-staking-lido-evm
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-staking-lido-evm?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-staking-lido-evm)
+
 A simple package that lets `@anywalletkit/wallet-evm` wallet accounts stake
 through the [Lido](https://lido.fi) protocol: stake ETH → stETH, exit through
 the two-phase withdrawal queue, wrap/unwrap the non-rebasing wstETH form, and
 read APR and reward history.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-staking-lido-evm @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-staking-lido-evm @anywalletkit/core  ·  yarn add @anywalletkit/protocol-staking-lido-evm @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-staking-lido-evm](https://www.npmjs.com/package/@anywalletkit/protocol-staking-lido-evm), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 Built as the first implementation of the **`StakingProtocol` type** in
 `@anywalletkit/core`. The base class lives in `@anywalletkit/core`;

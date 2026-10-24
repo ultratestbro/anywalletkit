@@ -1,6 +1,17 @@
 # @anywalletkit/backup-cloud
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/backup-cloud?label=npm)](https://www.npmjs.com/package/@anywalletkit/backup-cloud)
+
 Cloud backups for React Native wallets built on the SDK. Each seed or key becomes one encrypted [`@anywalletkit/seed-vault`](../seed-vault) file in the app's hidden iCloud Drive container. The user picks how it opens:
+
+## Install
+
+```sh
+npm install @anywalletkit/backup-cloud
+# or: pnpm add @anywalletkit/backup-cloud  ·  yarn add @anywalletkit/backup-cloud
+```
+
+On npm: [@anywalletkit/backup-cloud](https://www.npmjs.com/package/@anywalletkit/backup-cloud), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance. An Expo native module (`expo-modules-core` is its peer, already in every Expo app): use a development build, not Expo Go.
 
 | Option | Where the pieces live | Who can open it |
 |---|---|---|

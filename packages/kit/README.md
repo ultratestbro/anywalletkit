@@ -1,11 +1,22 @@
 # @anywalletkit/kit
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/kit?label=npm)](https://www.npmjs.com/package/@anywalletkit/kit)
+
 The orchestrator. Chain packages and protocol modules are registered; the kit
 hands out accounts by CAIP-2 chain id and protocols by name, all fed by one
 seed phrase (or its 64-byte seed) or one external `Signer`, all wrapped by the same policies.
 The phrase is turned into seed bytes in the constructor and never kept; no seed or key is
 ever an own property of a `Wallet`, manager, account or signer, so logs and serializers show
 no secret.
+
+## Install
+
+```sh
+npm install @anywalletkit/kit
+# or: pnpm add @anywalletkit/kit  ·  yarn add @anywalletkit/kit
+```
+
+On npm: [@anywalletkit/kit](https://www.npmjs.com/package/@anywalletkit/kit), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ```ts
 import { Wallet } from '@anywalletkit/kit'

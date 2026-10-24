@@ -1,8 +1,19 @@
 # @anywalletkit/protocol-staking-ssv-evm
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-staking-ssv-evm?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-staking-ssv-evm)
+
 A simple package that lets `@anywalletkit/wallet-evm` wallet accounts stake
 through [SSV Network](https://ssv.network): stake SSV → cSSV, claim the ETH
 rewards, exit through the network's cooldown, and read APR and network stats.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-staking-ssv-evm @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-staking-ssv-evm @anywalletkit/core  ·  yarn add @anywalletkit/protocol-staking-ssv-evm @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-staking-ssv-evm](https://www.npmjs.com/package/@anywalletkit/protocol-staking-ssv-evm), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 Built as the **second implementation of the `StakingProtocol` type** in
 `@anywalletkit/core` (the first is `@anywalletkit/protocol-staking-lido-evm`).

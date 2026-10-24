@@ -1,9 +1,20 @@
 # @anywalletkit/protocol-swap2-near-intents
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-near-intents?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-near-intents)
+
 NEAR Intents (1Click) cross-chain swaps as a swap2 module: the wallet sends the
 source asset to a one-time deposit address, the solver network settles on
 NEAR and delivers on the destination chain. Standalone through
 `NearIntentsSwap2Protocol`, or as one provider of the router.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-swap2-near-intents @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-swap2-near-intents @anywalletkit/core  ·  yarn add @anywalletkit/protocol-swap2-near-intents @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-swap2-near-intents](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-near-intents), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ## Activity
 

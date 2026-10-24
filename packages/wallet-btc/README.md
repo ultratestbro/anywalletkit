@@ -1,7 +1,18 @@
 # @anywalletkit/wallet-btc
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/wallet-btc?label=npm)](https://www.npmjs.com/package/@anywalletkit/wallet-btc)
+
 Bitcoin accounts on [`@scure/btc-signer`](https://github.com/paulmillr/scure-btc-signer)
 (audited by Cure53; pure `Uint8Array`, no `Buffer`, no Node shims):
+
+## Install
+
+```sh
+npm install @anywalletkit/wallet-btc
+# or: pnpm add @anywalletkit/wallet-btc  ·  yarn add @anywalletkit/wallet-btc
+```
+
+On npm: [@anywalletkit/wallet-btc](https://www.npmjs.com/package/@anywalletkit/wallet-btc), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 | `addressType` | Path | Address | Standard |
 |---|---|---|---|

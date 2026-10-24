@@ -1,6 +1,17 @@
 # @anywalletkit/secure-storage-react-native
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/secure-storage-react-native?label=npm)](https://www.npmjs.com/package/@anywalletkit/secure-storage-react-native)
+
 Where a React Native wallet keeps its seed phrases and private keys. It plugs straight into `@anywalletkit/keyring` as its `SecretStorage`:
+
+## Install
+
+```sh
+npm install @anywalletkit/secure-storage-react-native
+# or: pnpm add @anywalletkit/secure-storage-react-native  ·  yarn add @anywalletkit/secure-storage-react-native
+```
+
+On npm: [@anywalletkit/secure-storage-react-native](https://www.npmjs.com/package/@anywalletkit/secure-storage-react-native), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance. An Expo native module (`expo-modules-core` is its peer, already in every Expo app): use a development build, not Expo Go.
 
 ```ts
 import { Keyring } from '@anywalletkit/keyring'

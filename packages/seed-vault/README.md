@@ -1,6 +1,17 @@
 # @anywalletkit/seed-vault
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/seed-vault?label=npm)](https://www.npmjs.com/package/@anywalletkit/seed-vault)
+
 An encrypted backup file for one wallet secret: a seed phrase or a private key, exactly as the keyring stores it. One file can be opened by one or more **protectors**:
+
+## Install
+
+```sh
+npm install @anywalletkit/seed-vault
+# or: pnpm add @anywalletkit/seed-vault  ·  yarn add @anywalletkit/seed-vault
+```
+
+On npm: [@anywalletkit/seed-vault](https://www.npmjs.com/package/@anywalletkit/seed-vault), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 | Protector | What opens it | Use it for |
 |---|---|---|

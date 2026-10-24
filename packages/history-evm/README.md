@@ -1,5 +1,7 @@
 # @anywalletkit/history-evm
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/history-evm?label=npm)](https://www.npmjs.com/package/@anywalletkit/history-evm)
+
 `HistorySource` for every EVM chain the SDK supports. One source per chain
 (`chain = "eip155:<id>"`), backed by Etherscan v2 when you have an API key,
 Blockscout PRO and Alchemy (Transfers API) with theirs, and keyless fallbacks
@@ -7,6 +9,15 @@ Blockscout PRO and Alchemy (Transfers API) with theirs, and keyless fallbacks
 instance exists. Explorer rows are merged into one
 `ChainTx` per hash: top-level transaction, ERC-20 transfers and internal
 native transfers, with fee, status, call selector and a documented spam flag.
+
+## Install
+
+```sh
+npm install @anywalletkit/history-evm @anywalletkit/core
+# or: pnpm add @anywalletkit/history-evm @anywalletkit/core  ·  yarn add @anywalletkit/history-evm @anywalletkit/core
+```
+
+On npm: [@anywalletkit/history-evm](https://www.npmjs.com/package/@anywalletkit/history-evm), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ```ts
 import { createEvmHistory } from '@anywalletkit/history-evm'

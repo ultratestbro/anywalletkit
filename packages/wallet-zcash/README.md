@@ -1,8 +1,19 @@
 # @anywalletkit/wallet-zcash
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/wallet-zcash?label=npm)](https://www.npmjs.com/package/@anywalletkit/wallet-zcash)
+
 Zcash **transparent** accounts for Any Wallet Kit — BIP-44 `m/44'/133'/0'/0/i`,
 `t1…` addresses (the transparent receiver Zashi, YWallet, Ledger and Trezor derive
 from the same seed). Pure `Uint8Array`, `@noble` / `@scure` only, runs in Hermes.
+
+## Install
+
+```sh
+npm install @anywalletkit/wallet-zcash
+# or: pnpm add @anywalletkit/wallet-zcash  ·  yarn add @anywalletkit/wallet-zcash
+```
+
+On npm: [@anywalletkit/wallet-zcash](https://www.npmjs.com/package/@anywalletkit/wallet-zcash), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ```ts
 import WalletManagerZcash from '@anywalletkit/wallet-zcash'

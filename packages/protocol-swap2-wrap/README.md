@@ -1,9 +1,20 @@
 # @anywalletkit/protocol-swap2-wrap
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-wrap?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-wrap)
+
 Wrap / unwrap the native coin as a swap2 module: WETH9 `deposit()` and
 `withdraw(uint256)` on the wrapper in `WRAPPED_NATIVE` for each chain (WETH,
 WBNB, WPOL, WAVAX, …), verified on-chain before use. Standalone through
 `WrapSwap2Protocol`, or as one provider of the router.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-swap2-wrap @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-swap2-wrap @anywalletkit/core  ·  yarn add @anywalletkit/protocol-swap2-wrap @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-swap2-wrap](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-wrap), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ## Activity
 

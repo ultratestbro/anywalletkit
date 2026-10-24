@@ -1,11 +1,22 @@
 # @anywalletkit/protocol-lending-mellow-evm
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-lending-mellow-evm?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-lending-mellow-evm)
+
 A simple package that lets `@anywalletkit/wallet-evm` wallet accounts use
 [Mellow](https://mellow.finance) **Core Vaults** — Lido's Earn vaults
 ([EarnETH, EarnUSD, stRATEGY](https://stake.lido.fi/earn)) and any other vault
 on the same contracts: supply through the vault's synchronous or asynchronous
 deposit queue, redeem and claim through the redeem queue, read the position,
 fees, oracle reports and APY.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-lending-mellow-evm @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-lending-mellow-evm @anywalletkit/core  ·  yarn add @anywalletkit/protocol-lending-mellow-evm @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-lending-mellow-evm](https://www.npmjs.com/package/@anywalletkit/protocol-lending-mellow-evm), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 Built on the `LendingProtocol` type in `@anywalletkit/core`, the way the Morpho
 module expresses ERC-4626 vaults: `supply` puts an asset into the vault, `withdraw`

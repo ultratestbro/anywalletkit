@@ -1,5 +1,7 @@
 # @anywalletkit/extension-kit
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/extension-kit?label=npm)](https://www.npmjs.com/package/@anywalletkit/extension-kit)
+
 The security-relevant core of a non-custodial Chromium (MV3) wallet extension,
 built on the Any Wallet Kit chain and protocol packages: an encrypted vault, the
 unlocked-key session with auto-lock, the dApp request router with per-origin
@@ -8,6 +10,15 @@ review helpers for swaps and Earn plans. No UI, no `@types/chrome`, no network
 code of its own: the chrome adapters take structural objects
 (`StorageAreaLike`, `AlarmsLike`), so everything runs under Vitest with
 in-memory adapters.
+
+## Install
+
+```sh
+npm install @anywalletkit/extension-kit
+# or: pnpm add @anywalletkit/extension-kit  ·  yarn add @anywalletkit/extension-kit
+```
+
+On npm: [@anywalletkit/extension-kit](https://www.npmjs.com/package/@anywalletkit/extension-kit), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 This package is for wallet developers who build their own extension. It is a
 library, not an extension: the popup, approval windows, injected providers,

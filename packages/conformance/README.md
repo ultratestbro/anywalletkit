@@ -1,6 +1,17 @@
 # @anywalletkit/conformance
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/conformance?label=npm)](https://www.npmjs.com/package/@anywalletkit/conformance)
+
 Test suites every Any Wallet Kit chain and protocol module runs, and the pinned derivation vectors they check against.
+
+## Install
+
+```sh
+npm install -D @anywalletkit/conformance vitest
+# or: pnpm add -D @anywalletkit/conformance vitest  ·  yarn add -D @anywalletkit/conformance vitest
+```
+
+On npm: [@anywalletkit/conformance](https://www.npmjs.com/package/@anywalletkit/conformance), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance. A dev dependency for module authors; `vitest` is its peer.
 
 | Export | Checks |
 |---|---|

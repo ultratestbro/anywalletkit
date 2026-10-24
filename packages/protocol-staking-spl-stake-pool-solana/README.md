@@ -1,10 +1,21 @@
 # @anywalletkit/protocol-staking-spl-stake-pool-solana
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-staking-spl-stake-pool-solana?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-staking-spl-stake-pool-solana)
+
 A simple package that lets `@anywalletkit/wallet-solana` wallet accounts stake
 through pools on the [SPL Stake Pool](https://github.com/solana-program/stake-pool)
 program — [Jito](https://www.jito.network) by default: stake SOL → JitoSOL,
 exit instantly from the reserve or through a stake account, claim, read
 rates, APY and earnings.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-staking-spl-stake-pool-solana @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-staking-spl-stake-pool-solana @anywalletkit/core  ·  yarn add @anywalletkit/protocol-staking-spl-stake-pool-solana @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-staking-spl-stake-pool-solana](https://www.npmjs.com/package/@anywalletkit/protocol-staking-spl-stake-pool-solana), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 Built as the **fourth implementation of the `StakingProtocol` type** in
 `@anywalletkit/core` — after Lido (ETH liquid staking), SSV (token staking with

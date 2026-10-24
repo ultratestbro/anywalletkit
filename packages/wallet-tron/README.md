@@ -1,9 +1,20 @@
 # @anywalletkit/wallet-tron
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/wallet-tron?label=npm)](https://www.npmjs.com/package/@anywalletkit/wallet-tron)
+
 Tron accounts at `m/44'/195'/0'/0/i` (BIP-44 — the TronLink default), pinned by golden
 vectors in `@anywalletkit/conformance`. No tronweb: the full-node HTTP API builds
 `raw_data`, the account checks it, simulates it, signs `txID` with noble secp256k1
 and broadcasts.
+
+## Install
+
+```sh
+npm install @anywalletkit/wallet-tron
+# or: pnpm add @anywalletkit/wallet-tron  ·  yarn add @anywalletkit/wallet-tron
+```
+
+On npm: [@anywalletkit/wallet-tron](https://www.npmjs.com/package/@anywalletkit/wallet-tron), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ```ts
 import WalletManagerTron from '@anywalletkit/wallet-tron'

@@ -1,7 +1,18 @@
 # @anywalletkit/wallet-evm
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/wallet-evm?label=npm)](https://www.npmjs.com/package/@anywalletkit/wallet-evm)
+
 EVM accounts for Any Wallet Kit, derived at `m/44'/60'/0'/0/i` — the same
 path as MetaMask and ethers, pinned by golden vectors in `@anywalletkit/conformance`.
+
+## Install
+
+```sh
+npm install @anywalletkit/wallet-evm
+# or: pnpm add @anywalletkit/wallet-evm  ·  yarn add @anywalletkit/wallet-evm
+```
+
+On npm: [@anywalletkit/wallet-evm](https://www.npmjs.com/package/@anywalletkit/wallet-evm), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ```ts
 import WalletManagerEvm from '@anywalletkit/wallet-evm'

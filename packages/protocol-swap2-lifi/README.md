@@ -1,9 +1,20 @@
 # @anywalletkit/protocol-swap2-lifi
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-lifi?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-lifi)
+
 LI.FI REST cross-chain swaps and bridges as a swap2 module: EVM calldata
 routes through the LI.FI Diamond (Solana legs via guarded serialized
 transactions). Standalone through `LifiSwap2Protocol`, or as one provider of
 `@anywalletkit/protocol-swap2-router`.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-swap2-lifi @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-swap2-lifi @anywalletkit/core  ·  yarn add @anywalletkit/protocol-swap2-lifi @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-swap2-lifi](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-lifi), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ## Activity
 

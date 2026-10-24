@@ -1,6 +1,17 @@
 # @anywalletkit/protocol-swap2-fynd
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-fynd?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-fynd)
+
 [Fynd](https://docs.fynd.xyz) — Propeller Heads' DEX aggregator — as a same-chain swap2 provider for Any Wallet Kit. Exact-input swaps on Ethereum, Base, Arbitrum, BNB Chain, Polygon, Unichain and Robinhood Chain, routed over the pools Tycho indexes.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-swap2-fynd @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-swap2-fynd @anywalletkit/core  ·  yarn add @anywalletkit/protocol-swap2-fynd @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-swap2-fynd](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-fynd), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 > **Fynd License.** Quotes, routes and transactions produced by Fynd are licensed under the [Fynd License](https://github.com/propeller-heads/fynd/blob/main/LICENSE.md). In short:
 > - every swap built from a Fynd quote must settle through the Tycho router for its chain (the [router registry](https://docs.propellerheads.xyz/tycho/for-solvers/execution/contract-addresses)), with its fees intact, and must not be re-routed around it;

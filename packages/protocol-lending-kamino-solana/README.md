@@ -1,7 +1,18 @@
 # @anywalletkit/protocol-lending-kamino-solana
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-lending-kamino-solana?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-lending-kamino-solana)
+
 [Kamino](https://kamino.com/docs) for `@anywalletkit/wallet-solana` accounts, two
 `LendingProtocol`s in one package:
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-lending-kamino-solana @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-lending-kamino-solana @anywalletkit/core  ·  yarn add @anywalletkit/protocol-lending-kamino-solana @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-lending-kamino-solana](https://www.npmjs.com/package/@anywalletkit/protocol-lending-kamino-solana), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 - **`KaminoVaultProtocolSolana`** — one Kamino Earn vault (kVault): `supply`
   deposits the vault's asset for shares (staked in the vault farm, as the

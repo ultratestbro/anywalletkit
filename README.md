@@ -7,9 +7,22 @@ modules (swap, cross-chain swap, lending, staking, approvals, fiat) are written 
 > **Status: pre-1.0.** Versions are `0.x`: minor releases may still change the
 > API. Packages: **[npmjs.com/org/anywalletkit](https://www.npmjs.com/org/anywalletkit)**, published with provenance. Documentation: **[docs.anywallet.tech](https://docs.anywallet.tech)**.
 
+## Install
+
+Every package is on npm under [`@anywalletkit`](https://www.npmjs.com/org/anywalletkit), published
+from the [release workflow](RELEASING.md) with [provenance](https://docs.npmjs.com/generating-provenance-statements)
+(`npm audit signatures` verifies it). Install only what you use:
+
 ```sh
-pnpm add @anywalletkit/kit @anywalletkit/wallet-evm   # plus the chains and modules you need
+npm install @anywalletkit/kit @anywalletkit/wallet-evm   # plus the chains and modules you need
+# or: pnpm add …  ·  yarn add …
 ```
+
+[![npm](https://img.shields.io/npm/v/@anywalletkit/core?label=%40anywalletkit%2Fcore)](https://www.npmjs.com/package/@anywalletkit/core)
+[![npm](https://img.shields.io/npm/v/@anywalletkit/kit?label=%40anywalletkit%2Fkit)](https://www.npmjs.com/package/@anywalletkit/kit)
+
+Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
+[Build with AI](https://docs.anywallet.tech/build-with-ai/) prompts.
 
 ## Why another wallet SDK
 
@@ -136,7 +149,7 @@ package's behaviour adds one (`pnpm changeset`), and a release applies them
 runs only in the `release` workflow, with npm provenance — see
 [RELEASING.md](RELEASING.md).
 
-Unreleased builds can be taken as tarballs:
+For contributors: an unreleased build (a branch, not yet on npm) can be taken as tarballs:
 
 ```sh
 node scripts/vendor.mjs --out ../app/vendor/anywalletkit --consumer ../app/package.json

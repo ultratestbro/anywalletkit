@@ -1,10 +1,21 @@
 # @anywalletkit/protocol-swap2-chainflip
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-chainflip?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-chainflip)
+
 [Chainflip](https://docs.chainflip.io) vault swaps as a swap2 provider: native
 BTC / ETH / SOL / TRX and USDC / USDT between Ethereum, Arbitrum, Solana, Tron
 and Bitcoin, priced by Chainflip's JIT AMM. Quotes and encoding come from
 Chainflip's public backend (`chainflip-swap.chainflip.io`). You need no broker
 account, there is no API key, and the commission is 0 bps.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-swap2-chainflip @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-swap2-chainflip @anywalletkit/core  ·  yarn add @anywalletkit/protocol-swap2-chainflip @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-swap2-chainflip](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-chainflip), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ```ts
 import {chainflipProvider} from "@anywalletkit/protocol-swap2-chainflip/provider";

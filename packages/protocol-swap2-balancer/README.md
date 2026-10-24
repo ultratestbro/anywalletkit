@@ -1,10 +1,21 @@
 # @anywalletkit/protocol-swap2-balancer
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-balancer?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-balancer)
+
 Balancer v2 same-chain swaps as a swap2 module: Smart Order Router paths from
 the Balancer API, `queryBatchSwap` on the Vault for the on-chain quote,
 `batchSwap` execution, on the chains in `BALANCER_V2_CHAINS` (Vault `WETH()`
 verified before use). Standalone through `BalancerSwap2Protocol`, or as one
 provider of the router.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-swap2-balancer @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-swap2-balancer @anywalletkit/core  ·  yarn add @anywalletkit/protocol-swap2-balancer @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-swap2-balancer](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-balancer), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ## Activity
 

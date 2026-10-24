@@ -1,9 +1,20 @@
 # @anywalletkit/protocol-staking-tonstakers-ton
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-staking-tonstakers-ton?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-staking-tonstakers-ton)
+
 A simple package that lets `@anywalletkit/wallet-ton` wallet accounts stake
 through [Tonstakers](https://tonstakers.com): stake GRAM → tsTON, exit
 instant / standard / best-rate, track payout bills, read rates, APY and
 earnings.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-staking-tonstakers-ton @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-staking-tonstakers-ton @anywalletkit/core  ·  yarn add @anywalletkit/protocol-staking-tonstakers-ton @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-staking-tonstakers-ton](https://www.npmjs.com/package/@anywalletkit/protocol-staking-tonstakers-ton), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 Built as the **third implementation of the `StakingProtocol` type** in
 `@anywalletkit/core` — after Lido (ETH liquid staking) and SSV (token staking

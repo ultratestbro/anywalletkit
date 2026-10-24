@@ -1,7 +1,18 @@
 # @anywalletkit/runtime-hermes
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/runtime-hermes?label=npm)](https://www.npmjs.com/package/@anywalletkit/runtime-hermes)
+
 One call, at the app entry, after `react-native-get-random-values`, `buffer` and a
 TextEncoder polyfill are in place:
+
+## Install
+
+```sh
+npm install @anywalletkit/runtime-hermes buffer fastestsmallesttextencoderdecoder react-native-url-polyfill
+# or: pnpm add @anywalletkit/runtime-hermes buffer fastestsmallesttextencoderdecoder react-native-url-polyfill  ·  yarn add @anywalletkit/runtime-hermes buffer fastestsmallesttextencoderdecoder react-native-url-polyfill
+```
+
+On npm: [@anywalletkit/runtime-hermes](https://www.npmjs.com/package/@anywalletkit/runtime-hermes), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance. React Native / Hermes only; import it first in your entry file.
 
 ```ts
 import 'react-native-get-random-values'

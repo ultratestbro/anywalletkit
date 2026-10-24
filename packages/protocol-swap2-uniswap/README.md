@@ -1,9 +1,20 @@
 # @anywalletkit/protocol-swap2-uniswap
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-uniswap?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-uniswap)
+
 Uniswap v3 same-chain swaps as a swap2 module: QuoterV2 quotes, SwapRouter02
 `multicall(deadline, …)` execution, on the deployments in `src/addresses.ts`
 (each verified on-chain before use). Standalone through `UniswapSwap2Protocol`,
 or as one provider of the router.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-swap2-uniswap @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-swap2-uniswap @anywalletkit/core  ·  yarn add @anywalletkit/protocol-swap2-uniswap @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-swap2-uniswap](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-uniswap), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ## Activity
 

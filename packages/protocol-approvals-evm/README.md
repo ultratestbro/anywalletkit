@@ -1,5 +1,7 @@
 # @anywalletkit/protocol-approvals-evm
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-approvals-evm?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-approvals-evm)
+
 **A simple package that lets [`@anywalletkit/wallet-evm`](https://www.npmjs.com/package/@anywalletkit/wallet-evm) accounts see and revoke the token approvals they have granted.**
 
 Every swap, bridge, lending and staking module *creates* approvals (ERC-20 allowances to routers, Permit2 allowances, operator approvals on NFTs). None of them takes an approval back. This module does: it discovers what an account has granted, flags the risky grants, and revokes them through the account's own methods, so a policy-governed account stays governed.

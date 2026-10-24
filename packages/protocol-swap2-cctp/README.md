@@ -1,9 +1,20 @@
 # @anywalletkit/protocol-swap2-cctp
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-cctp?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-cctp)
+
 [Circle CCTP V2](https://developers.circle.com/cctp) as a swap2 provider:
 native USDC between EVM chains by **burn-and-mint** — no spread, no
 aggregator fee; Fast Transfer costs the fee Circle publishes per pair (around
 1 bps), Standard is free and waits for source finality.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-swap2-cctp @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-swap2-cctp @anywalletkit/core  ·  yarn add @anywalletkit/protocol-swap2-cctp @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-swap2-cctp](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-cctp), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 CCTP is **two-phase**. `depositForBurn` on the source chain burns the USDC;
 Circle's attestation service signs the message; `receiveMessage(message,

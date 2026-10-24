@@ -1,10 +1,21 @@
 # @anywalletkit/protocol-swap2-thorchain
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-thorchain?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-thorchain)
+
 THORChain native cross-chain swaps as a swap2 module: EVM sources (Ethereum,
 Base, BSC, Avalanche) deposit into the THORChain router with
 `depositWithExpiry(vault, asset, amount, memo, expiry)`; Tron executes as a
 native send to the inbound vault with a memo. Standalone through
 `ThorchainSwap2Protocol`, or as one provider of the router.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-swap2-thorchain @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-swap2-thorchain @anywalletkit/core  ·  yarn add @anywalletkit/protocol-swap2-thorchain @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-swap2-thorchain](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-thorchain), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ## Activity
 

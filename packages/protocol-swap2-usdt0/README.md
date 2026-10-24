@@ -1,5 +1,7 @@
 # @anywalletkit/protocol-swap2-usdt0
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-usdt0?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-usdt0)
+
 [USDT0](https://docs.usdt0.to) — Tether's USDT as a LayerZero OFT — as a swap2
 provider: USDT / USDT0 between 16 EVM chains in **one source transaction**.
 `send(SendParam, MessagingFee, refund)` on the chain's OFT with the LayerZero
@@ -9,6 +11,15 @@ Ethereum adapter). No spread, no protocol fee today — the only cost is the
 LayerZero fee in the source chain's native coin (≈ 0.0000024 ETH for
 Arbitrum → HyperEVM on 2026-10-20). It is the only direct USDT path into
 HyperEVM.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-swap2-usdt0 @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-swap2-usdt0 @anywalletkit/core  ·  yarn add @anywalletkit/protocol-swap2-usdt0 @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-swap2-usdt0](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-usdt0), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ```ts
 import {usdt0Provider} from "@anywalletkit/protocol-swap2-usdt0/provider";

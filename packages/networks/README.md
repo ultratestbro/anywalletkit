@@ -1,6 +1,17 @@
 # @anywalletkit/networks
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/networks?label=npm)](https://www.npmjs.com/package/@anywalletkit/networks)
+
 One table of networks for every wallet build: the catalog mainnets with their public RPC failover lists, the default testnets for every chain family, the networks and RPCs the user adds, and a verifier that proves an endpoint serves the network it claims. The mobile app and the extension kit read the same table.
+
+## Install
+
+```sh
+npm install @anywalletkit/networks
+# or: pnpm add @anywalletkit/networks  ·  yarn add @anywalletkit/networks
+```
+
+On npm: [@anywalletkit/networks](https://www.npmjs.com/package/@anywalletkit/networks), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 Pure TypeScript, no runtime dependencies beyond `@anywalletkit/swap2-assets` (for `isCatalogChain`). Runs under Hermes (no `URL`, no `atob`, no `structuredClone`).
 

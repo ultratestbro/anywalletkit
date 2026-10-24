@@ -1,10 +1,21 @@
 # @anywalletkit/wallet-near
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/wallet-near?label=npm)](https://www.npmjs.com/package/@anywalletkit/wallet-near)
+
 NEAR accounts at `m/44'/397'/i'` (SLIP-10 ed25519 — the NEAR Wallet / `near-seed-phrase`
 path; index 0 is what every NEAR wallet derives), pinned by golden vectors in
 `@anywalletkit/conformance`. No near-api-js: borsh is hand-written against the nearcore
 schema (byte-for-byte checked against `@near-js/transactions`), the node answers JSON-RPC,
 the account signs `sha256(borsh(tx))` with noble ed25519 and broadcasts with `send_tx`.
+
+## Install
+
+```sh
+npm install @anywalletkit/wallet-near
+# or: pnpm add @anywalletkit/wallet-near  ·  yarn add @anywalletkit/wallet-near
+```
+
+On npm: [@anywalletkit/wallet-near](https://www.npmjs.com/package/@anywalletkit/wallet-near), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ```ts
 import WalletManagerNear from '@anywalletkit/wallet-near'

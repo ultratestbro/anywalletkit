@@ -1,9 +1,20 @@
 # @anywalletkit/protocol-swap2-omniston
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-omniston?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-omniston)
+
 STON.fi Omniston as a swap2 module: TON ↔ TON swaps settled on the STON.fi DEX,
 and TON ↔ EVM and EVM ↔ EVM stable orders settled through HTLC escrows
 (resolver Arbiter), over the Omniston WebSocket RFQ. Standalone through
 `OmnistonSwap2Protocol`, or as one provider of the router.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-swap2-omniston @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-swap2-omniston @anywalletkit/core  ·  yarn add @anywalletkit/protocol-swap2-omniston @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-swap2-omniston](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-omniston), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 EVM chains: Ethereum, BNB, Polygon, X Layer, HyperEVM, Robinhood, Base, Plasma,
 Arbitrum, Avalanche. ARC (in Omniston's matrix) waits for the asset catalog;

@@ -1,6 +1,17 @@
 # @anywalletkit/names-ens
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/names-ens?label=npm)](https://www.npmjs.com/package/@anywalletkit/names-ens)
+
 **ENS names for wallets built on Any Wallet Kit: `vitalik.eth`, `name.base.eth`, `alice.cb.id` → the address for one chain, verified primary names, avatars, and the warnings a user should see next to a name.**
+
+## Install
+
+```sh
+npm install @anywalletkit/names-ens @anywalletkit/core
+# or: pnpm add @anywalletkit/names-ens @anywalletkit/core  ·  yarn add @anywalletkit/names-ens @anywalletkit/core
+```
+
+On npm: [@anywalletkit/names-ens](https://www.npmjs.com/package/@anywalletkit/names-ens), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 Implements the `NameResolver` interface from `@anywalletkit/core`, so SNS (`.sol`), TON DNS (`.ton`) and NEAR accounts can sit behind the same `nameResolvers([...])` later.
 

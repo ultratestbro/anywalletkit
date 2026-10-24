@@ -1,6 +1,17 @@
 # @anywalletkit/keyring
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/keyring?label=npm)](https://www.npmjs.com/package/@anywalletkit/keyring)
+
 Many accounts from many key sources, the way MetaMask, Phantom or Tonkeeper do it:
+
+## Install
+
+```sh
+npm install @anywalletkit/keyring
+# or: pnpm add @anywalletkit/keyring  ·  yarn add @anywalletkit/keyring
+```
+
+On npm: [@anywalletkit/keyring](https://www.npmjs.com/package/@anywalletkit/keyring), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 - **a BIP-39 seed** (created or imported, optional passphrase) → accounts 0, 1, 2… on every registered chain;
 - **an imported private key** → exactly one account on one chain;

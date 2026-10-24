@@ -1,10 +1,21 @@
 # @anywalletkit/wallet-ton
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/wallet-ton?label=npm)](https://www.npmjs.com/package/@anywalletkit/wallet-ton)
+
 TON accounts at `m/44'/607'/i'` (SLIP-10 ed25519) on Wallet V5R1 — the
 derivation Trust Wallet and Ledger use for a BIP-39 phrase, pinned by
 golden vectors in `@anywalletkit/conformance`. Runtime dependencies: `@ton/core`,
 `@ton/crypto`, `buffer` (no `@ton/ton`: the V5R1 contract and the toncenter
 client are implemented here, byte-for-byte checked against `@ton/ton` in tests).
+
+## Install
+
+```sh
+npm install @anywalletkit/wallet-ton
+# or: pnpm add @anywalletkit/wallet-ton  ·  yarn add @anywalletkit/wallet-ton
+```
+
+On npm: [@anywalletkit/wallet-ton](https://www.npmjs.com/package/@anywalletkit/wallet-ton), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 ```ts
 import WalletManagerTon from '@anywalletkit/wallet-ton'

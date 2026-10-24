@@ -1,7 +1,18 @@
 # @anywalletkit/protocol-lending-morpho-evm
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-lending-morpho-evm?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-lending-morpho-evm)
+
 [Morpho](https://docs.morpho.org) for `@anywalletkit/wallet-evm` accounts, two
 `LendingProtocol`s in one package:
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-lending-morpho-evm @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-lending-morpho-evm @anywalletkit/core  ·  yarn add @anywalletkit/protocol-lending-morpho-evm @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-lending-morpho-evm](https://www.npmjs.com/package/@anywalletkit/protocol-lending-morpho-evm), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 - **`MorphoVaultProtocolEvm`** — a Morpho Vault (MetaMorpho / Vault V1, or Vault
   V2): `supply` deposits the vault's asset for shares, `withdraw` redeems them.

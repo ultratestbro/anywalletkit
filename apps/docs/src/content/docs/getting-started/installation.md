@@ -23,10 +23,14 @@ and each one runs the same way.
 
 ## Pick your packages
 
+Every package is on npm under [`@anywalletkit`](https://www.npmjs.com/org/anywalletkit), published from
+CI with provenance (`npm audit signatures` checks it). npm, pnpm, yarn and `npx expo install` all work;
+the commands on this site use npm.
+
 Every wallet needs `core` and `kit`, plus one package per chain family it supports:
 
 ```sh
-pnpm add @anywalletkit/core @anywalletkit/kit \
+npm install @anywalletkit/core @anywalletkit/kit \
   @anywalletkit/wallet-evm @anywalletkit/wallet-solana @anywalletkit/wallet-ton \
   @anywalletkit/wallet-btc @anywalletkit/wallet-tron @anywalletkit/wallet-near
 ```
@@ -42,7 +46,7 @@ you install them once, at the app entry, **before anything else is imported**.
 
 ```sh
 npx expo install react-native-get-random-values
-pnpm add @anywalletkit/runtime-hermes buffer fastestsmallesttextencoderdecoder react-native-url-polyfill
+npm install @anywalletkit/runtime-hermes buffer fastestsmallesttextencoderdecoder react-native-url-polyfill
 ```
 
 Put the polyfills in their own file so nothing can be evaluated before them:
@@ -109,7 +113,7 @@ problems that only show up in production.
 Node 20 or newer needs no polyfills:
 
 ```sh
-pnpm add @anywalletkit/core @anywalletkit/kit @anywalletkit/wallet-evm
+npm install @anywalletkit/core @anywalletkit/kit @anywalletkit/wallet-evm
 ```
 
 All packages ship ESM and CommonJS builds with TypeScript types.

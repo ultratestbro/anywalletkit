@@ -1,11 +1,22 @@
 # @anywalletkit/protocol-lending-aave-evm
 
+[![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-lending-aave-evm?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-lending-aave-evm)
+
 [Aave v3](https://aave.com/docs) for `@anywalletkit/wallet-evm` accounts: supply,
 withdraw, borrow (variable rate) and repay on any Aave v3 market, with the reads
 a wallet screen needs — reserves with rates and caps, the account's health
 factor and borrowing power, the position. Implements core's `LendingProtocol`
 (`supply / withdraw / borrow / repay` + quotes), like
 `@anywalletkit/protocol-lending-mellow-evm` does for vaults.
+
+## Install
+
+```sh
+npm install @anywalletkit/protocol-lending-aave-evm @anywalletkit/core
+# or: pnpm add @anywalletkit/protocol-lending-aave-evm @anywalletkit/core  ·  yarn add @anywalletkit/protocol-lending-aave-evm @anywalletkit/core
+```
+
+On npm: [@anywalletkit/protocol-lending-aave-evm](https://www.npmjs.com/package/@anywalletkit/protocol-lending-aave-evm), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 Written from the protocol's own interfaces (aave-v3-origin) and the official
 address book (bgd-labs/aave-address-book); no Aave SDK, one dependency (viem).
