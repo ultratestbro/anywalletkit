@@ -127,6 +127,21 @@ wrong chain imports a different, empty account.
 block screenshots on that screen, and never copy it to the clipboard without a warning.
 `removeSource` deletes the accounts and the secure-storage entry.
 
+`exportPrivateKey(accountId, chain)` returns one account's key on one chain, for an "Export
+private key" screen. Treat it like the phrase: authenticate first, show it once.
+
+- **The format other wallets import.** EVM gets `0x` hex (MetaMask, Rabby), Tron plain hex,
+  Bitcoin and Zcash compressed WIF, Solana base58 of the 64-byte secret (Phantom), NEAR
+  `ed25519:…`. `compatibleWith` names wallets that accept it.
+- **Checked before it is returned.** The SDK builds an account from the exported key and
+  compares its address with the account's. If they differ, nothing is returned.
+- **One key, not the wallet.** It controls this account on this chain only. Say so on the
+  screen: a user who wants everything back needs the phrase.
+- **TON wallets imported from 24 TON words** are refused: Tonkeeper and other TON wallets import
+  only those words, so export them with `exportSecret` instead.
+- **Bitcoin in Electrum** needs a `p2wpkh:` prefix before the WIF to land on the same SegWit
+  address.
+
 ## How the key is kept in memory
 
 - **A phrase becomes the 64-byte seed** the moment the SDK gets it. A JS string cannot be wiped,

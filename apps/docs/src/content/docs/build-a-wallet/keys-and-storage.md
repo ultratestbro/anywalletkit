@@ -65,6 +65,9 @@ Otherwise a user who imports their MetaMask or Phantom phrase sees an empty wall
 
 - Show the phrase once, then ask the user to confirm a few of the words.
 - Never store the phrase in plain files, app storage or a screenshot.
+- "Export private key" for one account goes behind the same authentication as the phrase.
+  `keyring.exportPrivateKey` returns the key in the format the chain's other wallets import,
+  checked against the account's address. See [Keyring](/guides/keyring/#back-up-and-remove).
 - Encrypted cloud backup (iCloud Keychain, Google Drive) is planned for the SDK.
 
 ## Keys that never touch the phone

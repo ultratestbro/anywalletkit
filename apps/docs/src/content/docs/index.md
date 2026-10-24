@@ -32,9 +32,9 @@ APIs may still change before `1.0`.
 - **Refusals are named, never silent.** When a quote, transaction or route cannot be used,
   you get an error that says why, not a `null`.
 - **Zeroize by design.** Everything that holds a key has `dispose()`.
-- **Open contribution model.** A module is accepted when it passes the conformance suite and
-  names a maintainer. Modules are tiered `core` / `verified` / `community`; an unmaintained
-  module becomes `deprecated` instead of being silently kept or deleted.
+- **One bar for every module.** Each chain and protocol module passes the same conformance
+  suite before it ships. Pull requests from outside the core team are not accepted yet; when
+  contributions open, a module will get in the same way, with a named maintainer.
 
 ## How it fits together
 

@@ -125,6 +125,14 @@ export async function revealSecret(keyring: Keyring, sourceId: string, authentic
   return keyring.exportSecret(sourceId) // { type, secret, passphrase?, chain? }
 }
 
+/** "Export private key" for one account on one chain: the same gate as the phrase. */
+export async function revealPrivateKey(keyring: Keyring, accountId: string, chain: ChainKey, authenticate: () => Promise<boolean>) {
+  if (!(await authenticate())) throw new Error('Not authenticated.')
+  // Checked against the account's address before it is returned; TON 24-word wallets are refused.
+  const { privateKey, format, address, compatibleWith } = await keyring.exportPrivateKey(accountId, chain)
+  return { privateKey, format, address, compatibleWith } // e.g. format 'hex' (EVM 0x…), 'wif' (BTC)
+}
+
 export async function removeWallet(keyring: Keyring, sourceId: string) {
   await keyring.removeSource(sourceId) // its accounts, and its entry in secure storage
 }

@@ -3,7 +3,7 @@ import { derivationVectors } from '@anywalletkit/conformance'
 import { UserRejectedError } from '@anywalletkit/core'
 import { KeyringError } from '@anywalletkit/keyring'
 import {
-  createWallet, importKey, manageAccounts, openKeyring, plainMetadata, restoreWallet, revealSecret, removeWallet, secureSecrets, signMessage,
+  createWallet, importKey, manageAccounts, openKeyring, plainMetadata, restoreWallet, revealPrivateKey, revealSecret, removeWallet, secureSecrets, signMessage,
   type PlainStoreLike, type SecureStoreLike,
 } from '../src/keyring.ts'
 
@@ -34,6 +34,18 @@ async function setup() {
 }
 
 describe('Keyring guide (docs) — offline', () => {
+  it('exports one account key in the format other wallets import, and it controls the same address', async () => {
+    const { keyring } = await setup()
+    const [account] = await restoreWallet(keyring, PHRASE, async () => false)
+    await expect(revealPrivateKey(keyring, account!.id, 'evm', async () => false)).rejects.toThrow('Not authenticated.')
+    for (const chain of ['evm', 'tron', 'solana'] as const) {
+      const out = await revealPrivateKey(keyring, account!.id, chain, async () => true)
+      expect(out.address).toBe(golden(chain).address)
+      expect(await keyring.previewPrivateKey(chain, out.privateKey)).toBe(out.address)
+    }
+    expect((await revealPrivateKey(keyring, account!.id, 'evm', async () => true)).privateKey).toMatch(/^0x[0-9a-f]{64}$/)
+  })
+
   it('restores a seed: account 0 on every chain is the address other wallets show; discovery adds used accounts', async () => {
     const { keyring } = await setup()
     const used = new Set([golden('evm', 1).address])
