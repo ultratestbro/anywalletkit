@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi, onTestFinished } from 'vitest'
 import { decodeFunctionData, toFunctionSelector, type Hex } from 'viem'
 import { NotImplementedError, ReadOnlyAccountError } from '@anywalletkit/core'
 import { createMockAccount } from '@anywalletkit/conformance'
@@ -203,6 +203,10 @@ describe('market', () => {
   })
 
   it("repay: partial by assets, 'max' by shares with a 0.1 % allowance buffer", async () => {
+    // Interest accrues on Date.now(): a slow runner crossing a second between the debt read
+    // and repay('max') grew the debt by 2 units and broke the exact allowance check.
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-25T12:00:00Z') })
+    onTestFinished(() => { vi.useRealTimers() })
     const { p, acc, state } = market()
     await expect(p.repay({ amount: 'max' })).rejects.toThrow(/no debt/)
     setPosition(state, USER, { borrowAssets: 1_000n * E6, collateral: E8 })
