@@ -1,4 +1,4 @@
-import { InsufficientFundsError, LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
+import { InsufficientFundsError, LocalSigner, SignerError, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { DUST_LIMIT, addressFromPublicKey } from './address.js'
 import { UnsafeTransactionError, assertSafe, describeTransaction, type DescribeContext } from './describe.js'
@@ -155,11 +155,11 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
   }
 
   /** Sign without broadcasting. Returns the raw transaction hex. Raw hex input is returned unchanged. */
-  async signTransaction(tx: ZcashTransaction): Promise<string> {
+  async signTransaction(tx: ZcashTransaction, options: WriteOptions = {}): Promise<string> {
     this.live()
     if (typeof tx === 'string') return tx
     const built = await this.buildSignedTransaction(tx)
-    this.checkMax(built.fee, this._config.transactionMaxFee, 'transaction')
+    this.checkMax(built.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return built.hex
   }
 
@@ -168,7 +168,7 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
     return super.quoteSendTransaction(tx)
   }
 
-  async sendTransaction(tx: ZcashTransaction): Promise<TransferResult> {
+  async sendTransaction(tx: ZcashTransaction, options: WriteOptions = {}): Promise<TransferResult> {
     this.live()
     const client = this.requireClient('send transactions')
     let rawHex: string, hash: string, fee: bigint
@@ -179,18 +179,18 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
       const built = await this.buildSignedTransaction(tx)
       rawHex = built.hex; hash = built.txid; fee = built.fee
     }
-    this.checkMax(fee, this._config.transactionMaxFee, 'transaction')
+    this.checkMax(fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const id = await client.broadcast(rawHex)
     return { hash: id || hash, fee }
   }
 
   /** Native ZEC only (`token` is rejected). Subject to `transferMaxFee`. */
-  async transfer(o: ZcashTransferOptions): Promise<TransferResult> {
+  async transfer(o: ZcashTransferOptions, writeOptions: WriteOptions = {}): Promise<TransferResult> {
     if (o.token) throw new Error('Tokens are not supported on the zcash blockchain.')
     this.live()
     const client = this.requireClient('transfer')
     const built = await this.buildSignedTransaction({ to: o.recipient, value: o.amount })
-    this.checkMax(built.fee, this._config.transferMaxFee, 'transfer')
+    this.checkMax(built.fee, feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
     const id = await client.broadcast(built.hex)
     return { hash: id || built.txid, fee: built.fee }
   }

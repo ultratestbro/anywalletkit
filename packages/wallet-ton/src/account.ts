@@ -1,4 +1,4 @@
-import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
+import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { Cell } from '@ton/core'
 import { SimulationError, UnsafeTransactionError } from './errors.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'
@@ -96,12 +96,12 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   }
 
   /** Sign without broadcasting. Returns the external-message BODY as base64 BoC (pass it back to sendTransaction as a Cell). */
-  async signTransaction(tx: TonSendable): Promise<string> {
+  async signTransaction(tx: TonSendable, options: WriteOptions = {}): Promise<string> {
     if (tx instanceof Cell) {
-      await this.preflight(tx, this._config.transactionMaxFee, 'transaction')
+      await this.preflight(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
       return tx.toBoc().toString('base64')
     }
-    const { body } = await this.prepare(this.toMessages(tx), this._config.transactionMaxFee, 'transaction')
+    const { body } = await this.prepare(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return body.toBoc().toString('base64')
   }
 
@@ -113,19 +113,19 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   }
 
   /** Sign and broadcast; `hash` is the body hash (hex) — resolve it with getTransactionReceipt. */
-  async sendTransaction(tx: TonSendable): Promise<TransferResult> {
+  async sendTransaction(tx: TonSendable, options: WriteOptions = {}): Promise<TransferResult> {
     this.requireRpc('send transactions')
     const { body, fee } = tx instanceof Cell
-      ? { body: tx, fee: await this.preflight(tx, this._config.transactionMaxFee, 'transaction') }
-      : await this.prepare(this.toMessages(tx), this._config.transactionMaxFee, 'transaction')
+      ? { body: tx, fee: await this.preflight(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction') }
+      : await this.prepare(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return { hash: await this.broadcast(body), fee }
   }
 
   /** TON (no `token`) or jetton transfer. */
-  async transfer(o: TonTransferOptions): Promise<TransferResult> {
+  async transfer(o: TonTransferOptions, writeOptions: WriteOptions = {}): Promise<TransferResult> {
     this.requireRpc('transfer tokens')
     const message = o.token ? await this.jettonTransferMessage(o) : this.transactionMessage({ to: o.recipient, value: o.amount, ...(o.memo !== undefined ? { body: o.memo } : {}) })
-    const { body, fee } = await this.prepare([message], this._config.transferMaxFee, 'transfer')
+    const { body, fee } = await this.prepare([message], feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
     return { hash: await this.broadcast(body), fee }
   }
 

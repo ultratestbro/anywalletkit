@@ -1,4 +1,4 @@
-import { LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
+import { LocalSigner, SignerError, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { bytesToBase58, ed25519Key, implicitAccountId, publicKeyToString } from './address.js'
 import { decodeAnyTransaction, encodeSignedTransaction } from './borsh.js'
 import { BroadcastUnknownError, SimulationError } from './errors.js'
@@ -95,10 +95,10 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
   }
 
   /** Build, check, preflight and sign; returns the signed transaction as base64 borsh (what `send_tx` takes). */
-  async signTransaction(tx: NearTransaction | string): Promise<string> {
+  async signTransaction(tx: NearTransaction | string, options: WriteOptions = {}): Promise<string> {
     this.key()
     this.requireRpc('sign transactions')
-    const { built } = await this.prepare(tx, this._config.transactionMaxFee, 'transaction')
+    const { built } = await this.prepare(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return toBase64(encodeSignedTransaction(await this.signBuilt(built)))
   }
 
@@ -122,20 +122,20 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
    * Sign and broadcast. Accepts a transaction, or base64 borsh of an unsigned /
    * already-signed transaction (a signed one is checked, not re-signed).
    */
-  async sendTransaction(tx: NearTransaction | string): Promise<NearTransferResult> {
+  async sendTransaction(tx: NearTransaction | string, options: WriteOptions = {}): Promise<NearTransferResult> {
     this.key()
     this.requireRpc('send transactions')
     const presigned = typeof tx === 'string' ? decodeSigned(tx) : undefined
-    const { built, estimate } = await this.prepare(tx, this._config.transactionMaxFee, 'transaction')
+    const { built, estimate } = await this.prepare(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const signed = presigned ?? (await this.signBuilt(built))
     return { hash: await this.broadcast(signed), fee: estimate.fee, estimate }
   }
 
   /** Native NEAR (no `token`) or NEP-141 `ft_transfer` (with `storage_deposit` when the recipient needs it). */
-  async transfer(o: NearTransferOptions): Promise<NearTransferResult> {
+  async transfer(o: NearTransferOptions, writeOptions: WriteOptions = {}): Promise<NearTransferResult> {
     this.key()
     this.requireRpc('transfer tokens')
-    const { built, estimate } = await this.prepare(await this.transferActions(o), this._config.transferMaxFee, 'transfer')
+    const { built, estimate } = await this.prepare(await this.transferActions(o), feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
     return { hash: await this.broadcast(await this.signBuilt(built)), fee: estimate.fee, estimate }
   }
 

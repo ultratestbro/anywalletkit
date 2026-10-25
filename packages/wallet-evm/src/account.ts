@@ -1,4 +1,4 @@
-import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
+import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import {
   getAddress, hashMessage, hashTypedData, hexToBytes, keccak256, serializeTransaction, TransactionNotFoundError, zeroAddress,
@@ -280,10 +280,10 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
    * offline; the chain and zero-address refusals still apply. Simulation is
    * NOT run here (nothing is sent) — `sendTransaction` runs it.
    */
-  async signTransaction(tx: EvmTransaction): Promise<string> {
+  async signTransaction(tx: EvmTransaction, options: WriteOptions = {}): Promise<string> {
     await this.assertSafeTransaction(tx)
     const prepared = await this.prepare(tx)
-    this.capFee(prepared, this._config.transactionMaxFee, 'transaction')
+    this.capFee(prepared, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const hash = keccak256(serializeTransaction(prepared))
     return serializeTransaction(prepared, await this.signHash(hash, 'evm-tx'))
   }
@@ -361,12 +361,13 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     }
   }
 
-  async sendTransaction(tx: EvmTransaction): Promise<TransferResult> {
-    return this.signAndBroadcast(tx, this._config.transactionMaxFee, 'transaction')
+  /** Sign and broadcast; `options.maxFee` caps the signed fee on top of `transactionMaxFee`. */
+  async sendTransaction(tx: EvmTransaction, options: WriteOptions = {}): Promise<TransferResult> {
+    return this.signAndBroadcast(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
   }
 
-  async transfer(options: EvmTransferOptions): Promise<TransferResult> {
-    return this.signAndBroadcast(transferTransaction(options), this._config.transferMaxFee, 'transfer')
+  async transfer(options: EvmTransferOptions, writeOptions: WriteOptions = {}): Promise<TransferResult> {
+    return this.signAndBroadcast(transferTransaction(options), feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
   }
 
   // ── EIP-2612 permit ────────────────────────────────────────────────────────

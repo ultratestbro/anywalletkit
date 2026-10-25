@@ -1,4 +1,4 @@
-import { InsufficientFundsError, LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
+import { InsufficientFundsError, LocalSigner, SignerError, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { SigHash, Transaction, p2pkh } from '@scure/btc-signer'
 import type { BTC_NETWORK } from '@scure/btc-signer/utils.js'
 import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js'
@@ -245,11 +245,11 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
   }
 
   /** Sign without broadcasting. Returns the raw transaction hex. Raw hex input is returned unchanged. */
-  async signTransaction(tx: BtcTransaction): Promise<string> {
+  async signTransaction(tx: BtcTransaction, options: WriteOptions = {}): Promise<string> {
     this.live()
     if (typeof tx === 'string') return tx
     const { tx: built, fee } = await this.buildSignedTransaction(tx)
-    this.checkMax(fee, this._config.transactionMaxFee, 'transaction')
+    this.checkMax(fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return built.hex
   }
 
@@ -258,7 +258,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
     return super.quoteSendTransaction(tx)
   }
 
-  async sendTransaction(tx: BtcTransaction): Promise<TransferResult> {
+  async sendTransaction(tx: BtcTransaction, options: WriteOptions = {}): Promise<TransferResult> {
     this.live()
     const client = this.requireClient('send transactions')
     let rawHex: string, hash: string, fee: bigint
@@ -269,18 +269,18 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
       const built = await this.buildSignedTransaction(tx)
       rawHex = built.tx.hex; hash = built.tx.id; fee = built.fee
     }
-    this.checkMax(fee, this._config.transactionMaxFee, 'transaction')
+    this.checkMax(fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const txid = await client.broadcast(rawHex)
     return { hash: txid || hash, fee }
   }
 
   /** Native BTC only (`token` is rejected). Subject to `transferMaxFee`. */
-  async transfer(o: BtcTransferOptions): Promise<TransferResult> {
+  async transfer(o: BtcTransferOptions, writeOptions: WriteOptions = {}): Promise<TransferResult> {
     if (o.token) throw new Error('Tokens are not supported on the bitcoin blockchain.')
     this.live()
     const client = this.requireClient('transfer')
     const built = await this.buildSignedTransaction({ to: o.recipient, value: o.amount })
-    this.checkMax(built.fee, this._config.transferMaxFee, 'transfer')
+    this.checkMax(built.fee, feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
     const txid = await client.broadcast(built.tx.hex)
     return { hash: txid || built.tx.id, fee: built.fee }
   }

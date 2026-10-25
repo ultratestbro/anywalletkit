@@ -1,4 +1,4 @@
-import { UserRejectedError, type IWalletAccount, type TransferOptions } from '@anywalletkit/core'
+import { UserRejectedError, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { isConcreteChain, sameChain } from './chain-id.js'
 import { canonicalAddress, sendDestinations } from './destinations.js'
 
@@ -128,7 +128,11 @@ export interface WriteIntent {
  * checked, a destination must be on every matching allowlist, and any matching blocklist refuses.
  */
 export interface Policies {
-  /** Per-chain fee cap in native base units; a quote above it throws before broadcast. */
+  /**
+   * Per-chain fee cap in native base units. A quote above it throws before `confirm`; the cap is
+   * then handed to the account as `WriteOptions.maxFee`, so chain packages check it again on the
+   * transaction they sign (EVM: gas limit with headroom × the signed gas price).
+   */
   maxFee?: Record<string, bigint | number>
   /** Per-chain allowlist of destinations (case-insensitive) — recipients, called contracts and approval spenders. Writes to anything else throw. */
   allowlist?: Record<string, string[]>
@@ -495,6 +499,9 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
       }
     }
     if (policies.confirm && !(await policies.confirm(intent))) throw new UserRejectedError('The write was not confirmed.')
+    // The quote is an estimate: the account signs its own gas limit (with headroom) and fee fields.
+    // Hand it the tightest cap so it checks the transaction it is about to sign (audit #4).
+    return caps.length > 0 && QUOTABLE.includes(method) ? caps.reduce((a, b) => (b.cap < a.cap ? b : a)).cap : undefined
   }
   const wrapped = new Map<string, (...args: unknown[]) => Promise<unknown>>()
   return new Proxy(account, {
@@ -506,7 +513,13 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         if (!fn) {
           const original = v as (...args: unknown[]) => Promise<unknown>
           fn = async (...args: unknown[]) => {
-            await guard(prop, args[0])
+            const maxFee = await guard(prop, args[0])
+            if (maxFee !== undefined) {
+              // sendTransaction / signTransaction / transfer take WriteOptions second; a tighter caller cap stays.
+              const given = obj(args[1]) as WriteOptions
+              const tighter = given.maxFee !== undefined && BigInt(given.maxFee) < maxFee ? BigInt(given.maxFee) : maxFee
+              return original.apply(target, [args[0], { ...given, maxFee: tighter }, ...args.slice(2)])
+            }
             // EIP-712 without primaryType: hand the signer the type the policy judged, so the two cannot diverge (scan F13).
             // Same struct, same hash — only the inference is made explicit.
             if (prop === 'signTypedData' && typeof args[0] === 'object' && args[0] !== null && str(obj(args[0]).primaryType) === undefined) {

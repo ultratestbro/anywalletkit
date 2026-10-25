@@ -1,4 +1,4 @@
-import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
+import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { compileTransaction, getAddressDecoder, getBase64EncodedWireTransaction, type SignatureBytes, type Transaction, type TransactionMessage } from '@solana/kit'
 import { decodeWireTransaction } from './describe.js'
 import { MessageIsTransactionError, isSolanaTransactionPayload } from './offchain.js'
@@ -94,9 +94,9 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
   }
 
   /** Sign without broadcasting. Returns the base64 wire transaction. Simulation still runs (a reverting tx is refused). */
-  async signTransaction(tx: SolanaTransaction): Promise<string> {
+  async signTransaction(tx: SolanaTransaction, options: WriteOptions = {}): Promise<string> {
     const plan = await this.plan(tx)
-    this.maxFeeCheck(plan.quote.fee, this._config.transactionMaxFee, 'transaction')
+    this.maxFeeCheck(plan.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return getBase64EncodedWireTransaction(await this.signPlan(plan))
   }
 
@@ -104,19 +104,19 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     return this.requireRpc('send transactions').sendTransaction(wire as never, { encoding: 'base64', preflightCommitment: this._commitment }).send()
   }
 
-  async sendTransaction(tx: SolanaTransaction): Promise<SolanaSendResult> {
+  async sendTransaction(tx: SolanaTransaction, options: WriteOptions = {}): Promise<SolanaSendResult> {
     this.requireRpc('send transactions')
     const plan = await this.plan(tx)
-    this.maxFeeCheck(plan.quote.fee, this._config.transactionMaxFee, 'transaction')
+    this.maxFeeCheck(plan.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const hash = await this.broadcast(getBase64EncodedWireTransaction(await this.signPlan(plan)))
     return { hash, fee: plan.quote.fee, quote: plan.quote }
   }
 
   /** SOL (no `token`), SPL or Token-2022 transfer; the recipient's ATA is created when missing. */
-  async transfer(o: SolanaTransferOptions): Promise<SolanaSendResult> {
+  async transfer(o: SolanaTransferOptions, writeOptions: WriteOptions = {}): Promise<SolanaSendResult> {
     this.requireRpc('transfer tokens')
     const plan = await this.planTransfer(o)
-    this.maxFeeCheck(plan.quote.fee, this._config.transferMaxFee, 'transfer')
+    this.maxFeeCheck(plan.quote.fee, feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
     const hash = await this.broadcast(getBase64EncodedWireTransaction(await this.signPlan(plan)))
     return { hash, fee: plan.quote.fee, quote: plan.quote }
   }
