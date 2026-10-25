@@ -109,13 +109,14 @@ describe('second review: the chain check reads what is signed and never fails op
     expect(confirm).toHaveBeenCalledOnce()
   })
 
-  it('the chainId a transaction or a typed-data domain carries is the chain checked, without an RPC call', async () => {
+  it('the chainId a transaction carries is the chain checked, without an RPC call; a typed-data domain is the account\'s to judge', async () => {
     const { acc, getChainId } = lazy({ provider: 'https://rpc.example' })
     const g = applyPolicies(acc, { confirm: async () => true }, 'eip155:8453')
     await expect(g.signTransaction({ to: TO, value: 1n, chainId: 1 })).rejects.toMatchObject({ policy: 'chain' })
     await expect(g.signTransaction({ to: TO, value: 1n, chainId: '0x2105' })).resolves.toBeDefined()
     const typed = (chainId?: unknown) => ({ domain: { name: 'x', ...(chainId !== undefined ? { chainId } : {}) }, types: { M: [{ name: 'a', type: 'uint256' }] }, primaryType: 'M', message: { a: 1 } })
-    await expect(g.signTypedData(typed(1))).rejects.toMatchObject({ policy: 'chain' })
+    // wallet-evm refuses a foreign domain chainId itself, unless the account opts in (allowCrossChainTypedData)
+    await expect(g.signTypedData(typed(1))).resolves.toBeDefined()
     await expect(g.signTypedData(typed('8453'))).resolves.toBeDefined()
     expect(getChainId).not.toHaveBeenCalled()
   })
@@ -145,6 +146,51 @@ describe('second review: the chain check reads what is signed and never fails op
       expect(await w.getAccount('eip155:8453')).toBe(await w.getAccount('eip155:8453'))
       expect(await w.getAccount('eip155:8453')).not.toBe(await w.getAccount('eip155:1'))
     }
+  })
+})
+
+describe('third review: the account opts into cross-chain typed data; rules of every chain in play apply', () => {
+  const TO = '0x000000000000000000000000000000000000bEEF'
+  const typed = (chainId: unknown, spender = SPENDER) => ({
+    domain: { name: 'USD Coin', version: '2', chainId, verifyingContract: '0x000000000000000000000000000000000000c0de' },
+    types: { Permit: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'nonce', type: 'uint256' }, { name: 'deadline', type: 'uint256' }] },
+    primaryType: 'Permit', message: { owner: TO, spender, value: '1000000000000000000000000000000', nonce: 0, deadline: 1 },
+  })
+  const evmAccount = (chain = 'eip155:42161') => Object.assign(createMockAccount({ chain }), { signTypedData: vi.fn(async (_typed: unknown) => '0xtyped') })
+
+  it('typed data for another domain chainId is the account\'s call (allowCrossChainTypedData), not a chain mismatch', async () => {
+    const acc = evmAccount()
+    // Hyperliquid's "Exchange" domain: chainId 1337, signed from Arbitrum
+    await expect(applyPolicies(acc, { confirm: async () => true }, 'eip155:42161').signTypedData({ ...typed(1337), primaryType: 'Agent', types: { Agent: [{ name: 'source', type: 'string' }] }, message: { source: 'a' } })).resolves.toBe('0xtyped')
+  })
+
+  it('without `chain`, the account\'s own rules judge typed data whatever its domain chainId', async () => {
+    const acc = evmAccount('eip155:1')
+    await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [SPENDER] } }).signTypedData(typed(8453))).rejects.toThrow(/eip155:1 blocklist/)
+    expect(acc.signTypedData).not.toHaveBeenCalled()
+  })
+
+  it('without `chain`, a transaction for another chain id than the account\'s is refused, and the account\'s rules still apply', async () => {
+    const acc = createMockAccount({ chain: 'eip155:1' })
+    await expect(applyPolicies(acc, { maxFee: { 'eip155:1': 0n } }).sendTransaction({ to: TO, value: 1n, chainId: 8453 })).rejects.toBeInstanceOf(PolicyViolationError)
+    await expect(applyPolicies(acc, { allowlist: { 'eip155:8453': [TO] } }).sendTransaction({ to: TO, value: 1n, chainId: 8453 })).rejects.toMatchObject({ policy: 'chain' })
+    expect(acc.sent).toHaveLength(0)
+  })
+
+  it('a no-policy wallet keeps handing out the same object once the account learns its chain', async () => {
+    let chain = 'eip155:unknown'
+    const acc = Object.assign(createMockAccount({ chain: 'eip155:unknown' }), { getChainId: async () => { chain = 'eip155:1'; return 1 } })
+    Object.defineProperty(acc, 'chain', { get: () => chain })
+    class Learns extends WalletManager<IWalletAccount, Record<string, never>> {
+      async getAccount() { return this.getAccountByPath() }
+      async getAccountByPath() { return acc }
+      async getFeeRates(): Promise<FeeRates> { return { slow: 1n, normal: 1n, fast: 1n } }
+    }
+    const w = new Wallet(SEED)
+    w.registerWallet('eip155', Learns, {})
+    const a = await w.getAccount('eip155:1')
+    await acc.getChainId()
+    expect(await w.getAccount('eip155:1')).toBe(a)
   })
 })
 

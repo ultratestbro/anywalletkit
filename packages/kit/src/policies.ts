@@ -59,18 +59,19 @@ function chainIdRef(v: unknown): string | undefined {
   return undefined
 }
 
-/** The EVM network a write signs for, read off what is signed: a transaction's or a typed-data domain's chainId. */
+/** The EVM network a transaction signs for, read off it (its `chainId`), when it carries one. */
 function signedChain(ns: string, method: string, arg: unknown): string | undefined {
-  if (ns !== 'eip155') return undefined
-  const ref = method === 'sendTransaction' || method === 'signTransaction'
-    ? (Array.isArray(arg) ? undefined : chainIdRef(obj(arg).chainId))
-    : method === 'signTypedData' ? chainIdRef(obj(obj(arg).domain).chainId) : undefined
+  if (ns !== 'eip155' || (method !== 'sendTransaction' && method !== 'signTransaction') || Array.isArray(arg)) return undefined
+  const ref = chainIdRef(obj(arg).chainId)
   return ref === undefined ? undefined : `eip155:${ref}`
 }
 
-/** An off-chain signature valid on every network (a message, typed data without a domain chainId): no chain to check. */
-function chainFree(method: string, arg: unknown): boolean {
-  return MESSAGE_METHODS.includes(method) || (method === 'signTypedData' && obj(obj(arg).domain).chainId === undefined)
+/**
+ * An off-chain signature: a message valid on every network, or typed data, whose domain chainId
+ * the chain package judges (wallet-evm refuses a foreign one unless `allowCrossChainTypedData`).
+ */
+function chainFree(method: string): boolean {
+  return MESSAGE_METHODS.includes(method) || method === 'signTypedData'
 }
 
 /** An account built without any provider (wallet-evm keeps it in `_config`): it signs offline and cannot learn its chain. */
@@ -473,14 +474,15 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
   const guard = async (method: WriteMethod, arg: unknown) => {
     const ns = account.chain.split(':')[0]!
     // The network the write really goes to, before any rule, confirm or signature (audit #7): the
-    // chainId of what is signed (an EVM transaction, a typed-data domain), else the account's own.
-    // An EVM account that has not asked its RPC yet reports "eip155:unknown": learn its chain id —
-    // unless the write is an off-chain message valid on every network and no rule needs the id.
+    // chainId of an EVM transaction that carries one, and the account's own network. An EVM account
+    // that has not asked its RPC yet reports "eip155:unknown": learn its chain id — unless the write
+    // is an off-chain signature (a message; typed data, whose domain chainId the chain package
+    // judges, e.g. wallet-evm's `allowCrossChainTypedData`) and no rule needs the id.
     const signed = signedChain(ns, method, arg)
     const known = isConcreteChain(account.chain) ? account.chain : undefined
     let learned: string | undefined
     const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
-    const needed = !chainFree(method, arg) || (chain === undefined && hasRuleFor((k) => k.startsWith(`${ns}:`)))
+    const needed = !chainFree(method) || (chain === undefined && hasRuleFor((k) => k.startsWith(`${ns}:`)))
     if (signed === undefined && known === undefined && needed && typeof getChainId === 'function') {
       try {
         learned = `${ns}:${await getChainId.call(account)}`
@@ -492,14 +494,16 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     }
     // Asked for one network, signing on another (a namespace registration whose RPC is elsewhere,
     // a transaction for another chain id): confirm would show the wrong chain and the rules of the
-    // wrong chain would judge it.
-    for (const c of [signed, known, learned]) {
-      if (c !== undefined && isConcreteChain(chain) && !sameChain(chain, c)) {
-        throw new PolicyViolationError('chain', `This write signs for ${c}, not for ${chain} it was asked for; nothing was signed.`)
+    // wrong chain would judge it. Without `chain`, the account's own network is the one asked for.
+    const own = known ?? learned
+    const asked = isConcreteChain(chain) ? chain : own
+    for (const c of [signed, own]) {
+      if (c !== undefined && asked !== undefined && !sameChain(asked, c)) {
+        throw new PolicyViolationError('chain', `This write signs for ${c}, not for ${asked} it was asked for; nothing was signed.`)
       }
     }
-    const actual = signed ?? known ?? learned
-    const chains = [...new Set([chain, actual].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
+    // The rules of every network in play apply: the one asked for, the account's own, the one signed for.
+    const chains = [...new Set([chain, own, signed].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
     if (chains.length === 0 && hasRuleFor((k) => k === ns || k.startsWith(`${ns}:`))) {
       // Still unknown: the namespace's own rules need no chain id, but an exact rule of this family
       // could be the account's chain — refuse instead of letting the write through unchecked.

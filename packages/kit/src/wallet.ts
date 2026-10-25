@@ -142,14 +142,16 @@ export class Wallet {
    */
   async getAccount<A extends IWalletAccount = IWalletAccount>(chain: string, index = 0): Promise<A> {
     const account = (await this.getManager(chain).getAccount(index)) as A
+    // One wrapper per account and asked-for chain: the same object every call, as the account is.
+    let byChain = this._guarded.get(account)
+    const cached = byChain?.get(chain)
+    if (cached) return cached as A
     // No policies: still guard the network when it is not known to match.
     const matches = isConcreteChain(account.chain) && sameChain(chain, account.chain)
     if (!this._policies && (!isConcreteChain(chain) || matches)) return account
-    // One wrapper per account and asked-for chain: the same object every call, as the account is.
-    let byChain = this._guarded.get(account)
     if (!byChain) this._guarded.set(account, (byChain = new Map()))
-    let guarded = byChain.get(chain)
-    if (!guarded) byChain.set(chain, (guarded = applyPolicies(account, this._policies ?? {}, chain)))
+    const guarded = applyPolicies(account, this._policies ?? {}, chain)
+    byChain.set(chain, guarded)
     return guarded as A
   }
 
