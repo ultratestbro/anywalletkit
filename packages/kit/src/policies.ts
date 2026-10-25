@@ -70,8 +70,9 @@ export type WriteKind =
   | 'message'
   /**
    * Takes rights away and moves nothing: `approve` / `signPermit` / EIP-2612 Permit of 0,
-   * `approve(spender, 0)` / `approve(0x0, tokenId)` / `setApprovalForAll(operator, false)` /
-   * Permit2 `lockdown` calldata (value 0), `revokeDelegation()`. The allowlist and the
+   * `approve(0x0, tokenId)` / `setApprovalForAll(operator, false)` / Permit2 `lockdown`
+   * calldata (value 0), `revokeDelegation()`. Raw `approve(spender, 0)` calldata is an
+   * `approval` instead: on an ERC-721 it grants token #0. The allowlist and the
    * spender's blocklist entry do not apply (revoking a drainer must stay possible); the
    * blocklist still applies to the contract the revoke calls; fee cap and `confirm` apply.
    */
@@ -198,8 +199,11 @@ function revokeCall(call: unknown): Array<{ token: string; spender?: string }> |
   const word = (i: number) => words.slice(i * 64, i * 64 + 64)
   const selector = data.slice(0, 10)
   if (selector === SELECTOR_APPROVE && words.length === 128) {
-    if (word(1) === ZERO_WORD) return [{ token: to, spender: wordAddress(word(0)) }] // ERC-20 allowance → 0
-    if (word(0) === ZERO_WORD) return [{ token: to }] // ERC-721 approve(0x0, tokenId)
+    // ERC-721 approve(0x0, tokenId) clears the token's approval (an ERC-20 approve to 0x0 reverts).
+    // approve(spender, 0) is NOT read as a revoke: on an ERC-20 it zeroes the allowance, on an
+    // ERC-721 it approves `spender` for token #0, and the calldata cannot tell which (audit #5).
+    // An ERC-20 revoke that must skip the lists goes through the account's `approve({amount: 0})`.
+    if (word(0) === ZERO_WORD) return [{ token: to }]
     return null
   }
   if (selector === SELECTOR_SET_APPROVAL_FOR_ALL && words.length === 128 && word(1) === ZERO_WORD) {
@@ -216,6 +220,25 @@ function revokeCall(call: unknown): Array<{ token: string; spender?: string }> |
     for (let i = 0; i < n; i++) pairs.push({ token: wordAddress(word(2 + 2 * i)), spender: wordAddress(word(3 + 2 * i)) })
     return pairs // the call itself goes to Permit2: revokeTargets() checks that contract
   }
+  return null
+}
+
+/**
+ * Rights a raw EVM call grants, read off exact calldata shapes: `approve(spender, x)` with a
+ * non-zero spender (ERC-20 allowance or ERC-721 per-token approval) and
+ * `setApprovalForAll(operator, true)`. The lists check these spenders like any destination.
+ */
+function grantCall(call: unknown): { token: string; spender: string; amount: bigint } | null {
+  const c = obj(call)
+  const to = str(c.to)
+  const data = str(c.data)?.toLowerCase()
+  const value = big(c.value)
+  if (to === undefined || data === undefined || (value !== undefined && value !== 0n) || (c.value !== undefined && value === undefined)) return null
+  if (data.length !== 10 + 128 || !/^0x[0-9a-f]*$/.test(data)) return null
+  const [w0, w1] = [data.slice(10, 74), data.slice(74)]
+  if (w0 === ZERO_WORD) return null
+  if (data.startsWith(SELECTOR_APPROVE)) return { token: to, spender: wordAddress(w0), amount: BigInt(`0x${w1}`) }
+  if (data.startsWith(SELECTOR_SET_APPROVAL_FOR_ALL) && w1 !== ZERO_WORD) return { token: to, spender: wordAddress(w0), amount: MAX_UINT256 }
   return null
 }
 
@@ -306,7 +329,11 @@ function typedDataIntent(base: IntentBase, arg: unknown, primaryType: string): D
  */
 function withDestinations(intent: DraftIntent): WriteIntent {
   if (intent.message) return { ...intent, destinations: [], destinationUnknown: false }
-  if (intent.kind === 'approval') return { ...intent, destinations: intent.to !== undefined ? [intent.to] : [], destinationUnknown: intent.to === undefined }
+  if (intent.kind === 'approval') {
+    // Raw approval calldata (sendTransaction / signTransaction): the contract called is checked as well as the spender.
+    const called = intent.method === 'sendTransaction' || intent.method === 'signTransaction' ? str(obj(intent.raw).to) : undefined
+    return { ...intent, destinations: [...(called !== undefined ? [called] : []), ...(intent.to !== undefined ? [intent.to] : [])], destinationUnknown: intent.to === undefined }
+  }
   if (intent.kind === 'revoke') return { ...intent, destinations: revokeTargets(intent), destinationUnknown: false }
   if (intent.method === 'transfer') {
     const r = str(obj(intent.raw).recipient) ?? str(obj(intent.raw).to)
@@ -315,7 +342,9 @@ function withDestinations(intent: DraftIntent): WriteIntent {
   // signRaw is Tron's prebuilt-transaction signer and signBuilt NEAR's, whatever chain id the account reports.
   const chain = intent.method === 'signRaw' ? 'tron:' : intent.method === 'signBuilt' ? 'near:' : intent.chain
   const d = sendDestinations(chain, intent.raw)
-  return { ...intent, destinations: d.list, destinationUnknown: d.unknown }
+  // A batch may carry approvals among its calls: their spenders are destinations too.
+  const granted = chain.startsWith('eip155:') && Array.isArray(intent.raw) ? intent.raw.flatMap((c) => { const g = grantCall(c); return g ? [g.spender] : [] }) : []
+  return { ...intent, destinations: [...d.list, ...granted], destinationUnknown: d.unknown }
 }
 
 function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown): WriteIntent {
@@ -362,6 +391,9 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
     const calls = Array.isArray(arg) ? arg : [arg]
     const found = calls.length > 0 && !calls.some(carriesForeignPayload) ? calls.map(revokeCall) : [null]
     if (found.every((r) => r !== null)) return revokeIntent(base, found.flat() as Array<{ token: string; spender?: string }>)
+    // One raw approve / setApprovalForAll(true): an approval of the spender it names.
+    const grant = calls.length === 1 && !carriesForeignPayload(calls[0]) ? grantCall(calls[0]) : null
+    if (grant) return approvalIntent(base, grant.spender, grant.token, grant.amount, undefined, unboundedAllowance(grant.amount))
   }
   const to = str(a.to) ?? str(a.recipient)
   const amount = big(a.amount ?? a.value)
@@ -375,7 +407,8 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
  * allow/block lists (not for message signatures) → confirm → original call.
  * `signTransaction` is guarded like a send: a module that signs and
  * broadcasts on its own cannot skip the policies. Approvals (`approve`,
- * `signPermit`, EIP-2612 / Permit2 typed data) are checked against the
+ * `signPermit`, EIP-2612 / Permit2 typed data, raw `approve` /
+ * `setApprovalForAll(…, true)` calldata) are checked against the
  * SPENDER: a blocklisted or non-allowlisted spender is refused, and `confirm`
  * sees `kind: 'approval'` with `unlimited`. A revoke (an approval of 0, the
  * revoke calldata the approvals module sends, `revokeDelegation`) is

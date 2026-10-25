@@ -391,21 +391,32 @@ test('revokeAll: Permit2 pairs fold into one lockdown, others go one by one, fai
   assert.deepEqual(await protocol.revokeAll([]), [])
 })
 
-test('revokeAll with batch: everything with calldata becomes one sendTransaction(tx[]); the delegation stays separate', async () => {
+test('revokeAll with batch: calldata revokes become one sendTransaction(tx[]); ERC-20 goes through approve(0), the delegation stays separate', async () => {
+  // Raw approve(spender, 0) is an approval of the spender to the kit's policies (on an ERC-721 it
+  // grants token #0, audit 2026-10-25 #5): an account with `approve` revokes ERC-20 explicitly.
   const provider = stubProvider(scenario())
   const account = stubAccount(provider, { delegation: true })
   const protocol = new ApprovalsProtocolEvm(account, { chainId: 1, batch: true })
   const list: Approval[] = [
     { id: 'e20', standard: 'erc20', chainId: 1, token: USDT, spender: LIFI, amount: 1n, unlimited: false, risks: [] },
+    { id: 'nft', standard: 'erc721', chainId: 1, token: NFT, spender: OPERATOR, amount: null, unlimited: true, risks: [] },
     { id: 'p2', standard: 'permit2', chainId: 1, token: USDC, spender: ROUTER, amount: 1n, unlimited: false, risks: [] },
     { id: 'd', standard: 'eip7702', chainId: 1, token: OWNER, spender: LIFI, amount: null, unlimited: true, risks: [] }
   ]
   const results = await protocol.revokeAll(list)
   assert.equal(account.sent.length, 1)
   assert.ok(Array.isArray(account.sent[0]) && account.sent[0].length === 2)
-  assert.equal((account.sent[0] as RevokeTransaction[])[1]!.data.slice(0, 10), SELECTORS.approve)
-  assert.deepEqual(results.map((r) => r.ids), [['p2', 'e20'], ['d']])
-  assert.equal(account.approved.length, 0)
+  assert.deepEqual((account.sent[0] as RevokeTransaction[]).map((t) => t.data.slice(0, 10)), [SELECTORS.lockdown, SELECTORS.setApprovalForAll])
+  assert.deepEqual(results.map((r) => r.ids), [['p2', 'nft'], ['e20'], ['d']])
+  assert.deepEqual(account.approved, [{ token: USDT, spender: LIFI, amount: 0n }])
+})
+
+test('revokeAll with batch on an account without approve: the ERC-20 revoke stays in the batch as calldata', async () => {
+  const provider = stubProvider(scenario())
+  const account = stubAccount(provider, { approve: false })
+  const protocol = new ApprovalsProtocolEvm(account, { chainId: 1, batch: true })
+  await protocol.revokeAll([{ id: 'e20', standard: 'erc20', chainId: 1, token: USDT, spender: LIFI, amount: 1n, unlimited: false, risks: [] }])
+  assert.equal((account.sent[0] as RevokeTransaction[])[0]!.data.slice(0, 10), SELECTORS.approve)
 })
 
 test('isRevokeCalldata recognises the revoke calldata buildRevokeTransaction emits, isUnlimitedAmount the 2^255 threshold', () => {

@@ -267,7 +267,7 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
     await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [spender] }, confirm: async () => false }).approve({ token, spender, amount: 0n })).rejects.toBeInstanceOf(UserRejectedError)
   })
 
-  it('revoke calldata sent raw (setApprovalForAll false, approve 0, Permit2 lockdown, a batch of them) is a revoke; anything else is not', async () => {
+  it('revoke calldata sent raw (setApprovalForAll false, approve(0x0, id), Permit2 lockdown, a batch of them) is a revoke; anything else is not', async () => {
     const acc = createMockAccount({ chain: 'eip155:1' })
     const confirm = vi.fn(async () => true)
     const strict = applyPolicies(acc, { blocklist: { 'eip155:1': [spender] }, allowlist: { 'eip155:1': ['0x0000000000000000000000000000000000000001'] }, confirm })
@@ -275,6 +275,7 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
     const nft = '0x0000000000000000000000000000000000000Aa7'
     const setApprovalForAllOff = { to: nft, value: 0n, data: `0xa22cb465${pad(spender)}${pad('0')}` }
     const approve0 = { to: token, value: 0n, data: `0x095ea7b3${pad(spender)}${pad('0')}` }
+    const nftClear = { to: nft, value: 0n, data: `0x095ea7b3${pad('0')}${pad('7')}` }
     const lockdown = { to: permit2, value: 0n, data: `0xcc53287f${pad('20')}${pad('2')}${pad(token)}${pad(spender)}${pad(nft)}${pad(spender)}` }
     // addresses read off calldata come back lowercase
     const [t, sp, n] = [token, spender, nft].map((x) => x.toLowerCase())
@@ -282,9 +283,12 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
     expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'revoke', to: sp, token: nft }))
     await strict.sendTransaction(lockdown)
     expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'revoke', revokes: [{ token: t, spender: sp }, { token: n, spender: sp }] }))
-    await strict.sendTransaction([approve0, lockdown] as never)
-    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'revoke', revokes: [{ token, spender: sp }, { token: t, spender: sp }, { token: n, spender: sp }] }))
+    await strict.sendTransaction([nftClear, lockdown] as never)
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'revoke', revokes: [{ token: nft }, { token: t, spender: sp }, { token: n, spender: sp }] }))
     expect(acc.sent).toHaveLength(3)
+    // approve(spender, 0) is ambiguous (ERC-20 reset or ERC-721 grant of token #0): an approval of the spender (audit #5)
+    await expect(strict.sendTransaction(approve0)).rejects.toBeInstanceOf(PolicyViolationError)
+    await expect(strict.sendTransaction([approve0, lockdown] as never)).rejects.toBeInstanceOf(PolicyViolationError)
     // not revokes: operator ON, a non-zero allowance, native value attached, a batch with one ordinary call
     await expect(strict.sendTransaction({ ...setApprovalForAllOff, data: `0xa22cb465${pad(spender)}${pad('1')}` })).rejects.toBeInstanceOf(PolicyViolationError)
     await expect(strict.sendTransaction({ ...approve0, data: `0x095ea7b3${pad(spender)}${pad('5')}` })).rejects.toBeInstanceOf(PolicyViolationError)
@@ -292,7 +296,8 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
     await expect(strict.sendTransaction([approve0, { to: spender, value: 0n, data: '0x' }] as never)).rejects.toBeInstanceOf(PolicyViolationError)
     // the blocklist still applies to the contract a revoke calls
     await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [permit2] } }).sendTransaction(lockdown)).rejects.toThrow(/Contract .* blocklist/)
-    await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [token] } }).sendTransaction(approve0)).rejects.toThrow(/Contract .* blocklist/)
+    await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [nft] } }).sendTransaction(nftClear)).rejects.toThrow(/Contract .* blocklist/)
+    await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [token] } }).sendTransaction(approve0)).rejects.toThrow(/blocklist/)
   })
 
   it('one check per user action: a write the outer method issues internally is not confirmed twice', async () => {

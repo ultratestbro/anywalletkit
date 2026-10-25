@@ -266,9 +266,13 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
     const items: RevokeItem[] = []
     const permit2 = approvals.filter((a) => a.standard === 'permit2')
     if (permit2.length) items.push({ ids: permit2.map((a) => a.id), tx: this.buildRevokeTransaction(permit2) })
+    // ERC-20 revokes leave the batch when the account has `approve`: raw approve(spender, 0)
+    // calldata is an approval of the spender to the policy engine (it is an ERC-721 grant of
+    // token #0 too), so only the explicit `approve({amount: 0})` revokes a blocklisted spender.
+    const explicitErc20 = typeof account.approve === 'function'
     for (const a of approvals) {
       if (a.standard === 'permit2') continue
-      if (a.standard === 'eip7702') items.push({ ids: [a.id], approval: a })
+      if (a.standard === 'eip7702' || (a.standard === 'erc20' && explicitErc20)) items.push({ ids: [a.id], approval: a })
       else items.push({ ids: [a.id], tx: this.buildRevokeTransaction(a), approval: a })
     }
 

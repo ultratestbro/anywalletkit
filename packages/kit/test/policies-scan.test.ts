@@ -120,13 +120,15 @@ describe('kit policies — EVM revoke shape on other chains (scan 2026-10-23 F1)
     })
   }
 
-  it('EVM: a plain zero-approve is still a revoke; the same call carrying a foreign field is not', async () => {
+  it('EVM: a plain approve(0x0, id) is a revoke, a zero-approve of a spender is an approval (audit #5); a foreign field makes either a send', async () => {
+    const NFT_CLEAR = `0x095ea7b3${'0'.repeat(64)}${'7'.padStart(64, '0')}`
     const seen: WriteIntent[] = []
     const { acc } = account('eip155:1')
     const guarded = applyPolicies(acc, { allowlist: { 'eip155:1': [USDC] }, confirm: async (i) => { seen.push(i); return true } })
-    await guarded.sendTransaction({ to: USDC, data: ZERO_APPROVE } as never)
+    await guarded.sendTransaction({ to: USDC, data: NFT_CLEAR } as never)
     expect(seen.at(-1)).toMatchObject({ kind: 'revoke', token: USDC })
-    await expect(guarded.sendTransaction({ to: USDC, data: ZERO_APPROVE, txID: 'ab' } as never)).resolves.toBeDefined()
+    await expect(guarded.sendTransaction({ to: USDC, data: ZERO_APPROVE } as never)).rejects.toBeInstanceOf(PolicyViolationError)
+    await expect(guarded.sendTransaction({ to: USDC, data: NFT_CLEAR, txID: 'ab' } as never)).resolves.toBeDefined()
     expect(seen.at(-1)?.kind).toBe('send')
   })
 })
