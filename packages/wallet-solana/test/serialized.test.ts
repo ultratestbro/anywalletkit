@@ -133,6 +133,20 @@ describe('provider-serialized transactions', () => {
     expect(f.calls.filter((c) => c === 'simulateTransaction')).toHaveLength(1)
   })
 
+  it('sendSerialized is held to a WriteOptions maxFee (the kit passes policies.maxFee there) on the checked fee (audit 2026-10-25 post-release, L2)', async () => {
+    const { usdcAta, usdtAta, pre } = await setup()
+    const post: Record<string, State> = { ...pre, [ADDR0]: sys(SOL - FEE - ATA_RENT), [usdcAta]: token(USDC, ADDR0, 990_000n) }
+    const tx = wire(jupiterLike({ writable: [usdcAta, usdtAta], usdcAta }))
+    const f = fakeRpc(pre, post)
+    const a = await new WalletManagerSolana(SEED, { provider: f.rpc }).getAccount(0)
+    const fee = (await a.checkSerialized(tx, guard())).quote.fee
+    await expect(a.sendSerialized(tx, guard(), { maxFee: fee - 1n })).rejects.toThrow(/maximum fee/)
+    await expect((await new WalletManagerSolana(SEED, { provider: f.rpc, transactionMaxFee: fee - 1n }).getAccount(0)).sendSerialized(tx, guard(), { maxFee: fee })).rejects.toThrow(/maximum fee/)
+    expect(f.sent).toHaveLength(0)
+    await expect(a.sendSerialized(tx, guard(), { maxFee: fee })).resolves.toMatchObject({ fee })
+    expect(f.sent).toHaveLength(1)
+  })
+
   it('refuses a program outside the allowlist before touching the network', async () => {
     const { usdcAta, usdtAta, pre } = await setup()
     const f = fakeRpc(pre, pre)

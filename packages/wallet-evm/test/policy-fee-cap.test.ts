@@ -50,6 +50,18 @@ describe('kit maxFee holds for the transaction the EVM account signs', () => {
     expect(res.fee).toBe(SIGNED)
   })
 
+  it('approve is held to the cap too — directly and through the kit (audit 2026-10-25 post-release, L2)', async () => {
+    const TOKEN = '0x000000000000000000000000000000000000Cafe'
+    const { provider, sent } = fakeProvider()
+    const account = await new WalletManagerEvm(SEED, { provider, chainId: 1 }).getAccount(0)
+    const approval = { token: TOKEN, spender: TO, amount: 5n }
+    await expect(account.approve(approval, { maxFee: BETWEEN })).rejects.toThrow(/maximum fee/)
+    await expect(applyPolicies(account, { maxFee: { 'eip155:1': BETWEEN } }, 'eip155:1').approve(approval)).rejects.toThrow(/maximum fee/)
+    expect(sent).toHaveLength(0)
+    await expect(applyPolicies(account, { maxFee: { eip155: SIGNED } }, 'eip155:1').approve(approval)).resolves.toMatchObject({ fee: SIGNED })
+    expect(sent).toHaveLength(1)
+  })
+
   it('the tighter of the account config and the policy wins', async () => {
     const { provider } = fakeProvider()
     const account = await new WalletManagerEvm(SEED, { provider, chainId: 1, transactionMaxFee: SIGNED }).getAccount(0)

@@ -144,12 +144,13 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
   /**
    * Sign and broadcast a provider-built transaction (base64 wire) after
    * {@link checkSerialized} proved it only does what `guard.expect` allows.
-   * Signatures already present (other parties) are preserved.
+   * Signatures already present (other parties) are preserved. The checked fee is held to the
+   * tighter of `transactionMaxFee` and `options.maxFee`.
    */
-  async sendSerialized(base64: string, guard: SerializedTxGuard): Promise<SolanaSendResult & { check: SerializedCheck }> {
+  async sendSerialized(base64: string, guard: SerializedTxGuard, options: WriteOptions = {}): Promise<SolanaSendResult & { check: SerializedCheck }> {
     this.requireRpc('send transactions')
     const check = await this.checkSerialized(base64, guard)
-    this.maxFeeCheck(check.quote.fee, this._config.transactionMaxFee, 'transaction')
+    this.maxFeeCheck(check.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const plan: SolanaPlan = { transaction: decodeWireTransaction(base64), quote: check.quote, simulation: check.simulation, description: check.description }
     const hash = await this.broadcast(await this.signPlan(plan))
     return { hash, fee: check.quote.fee, quote: check.quote, check }

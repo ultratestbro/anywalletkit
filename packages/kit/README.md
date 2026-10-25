@@ -42,6 +42,12 @@ wallet.dispose()                                          // zeroizes the seed a
 
 Policies run before anything is signed or broadcast, in this order: fee cap
 (quotes first, where the account can quote), allowlist, blocklist, `confirm`.
+`maxFee` (native base units) is checked on the quote of `sendTransaction`,
+`signTransaction` and `transfer`, then handed to the account as
+`WriteOptions.maxFee` so it holds for what is signed; `approve` (EVM) and
+`sendSerialized` (Solana) get it the same way, checked by the account on the
+transaction it signs. Signing primitives without a fee model (`signRaw`,
+`signBuilt`, `signCompiled`, `signTransactionMessage`) carry no fee cap.
 Every write surface of an account is covered — `sendTransaction`, `transfer`,
 `signTransaction` (a module that signs and broadcasts on its own cannot skip
 them), `sign` and NEAR's `signNep413` (message signatures: `confirm` only,
@@ -55,9 +61,10 @@ is listed in `UNGUARDED_WRITES`, so a new signing method in a chain package
 cannot bypass the policies by not being named. Reads are never intercepted.
 
 A revoke is `kind: 'revoke'`: an `approve` / `signPermit` / EIP-2612 Permit of 0,
-raw revoke calldata (`approve(spender, 0)`, `approve(0x0, tokenId)`,
-`setApprovalForAll(…, false)`, Permit2 `lockdown`, or a batch of only these) and
-`revokeDelegation()`. It skips the allowlist and the spender's blocklist entry
+raw revoke calldata (`approve(0x0, tokenId)`, `setApprovalForAll(…, false)`,
+Permit2 `lockdown`, or a batch of only these) and `revokeDelegation()`. Raw
+`approve(spender, 0)` is NOT a revoke: on an ERC-721 it approves `spender` for
+token #0, so it is checked as an approval of `spender`. It skips the allowlist and the spender's blocklist entry
 (taking an allowance back from a blocklisted drainer must stay possible); the
 blocklist still applies to the contract called, the fee cap and `confirm` apply,
 and `confirm` sees `revokes: [{ token, spender }]`.
