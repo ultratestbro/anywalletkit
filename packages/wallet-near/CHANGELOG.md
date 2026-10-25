@@ -1,5 +1,12 @@
 # @anywalletkit/wallet-near
 
+## 0.1.6
+
+### Patch Changes
+
+- Updated dependencies [8aa911d]
+  - @anywalletkit/core@0.4.1
+
 ## 0.1.5
 
 ### Patch Changes

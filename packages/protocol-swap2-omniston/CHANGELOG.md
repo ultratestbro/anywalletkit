@@ -1,5 +1,16 @@
 # @anywalletkit/protocol-swap2-omniston
 
+## 0.2.5
+
+### Patch Changes
+
+- Updated dependencies [8aa911d]
+- Updated dependencies [8aa911d]
+- Updated dependencies [8aa911d]
+  - @anywalletkit/core@0.4.1
+  - @anywalletkit/protocol-swap2-core@0.4.1
+  - @anywalletkit/swap2-assets@0.1.5
+
 ## 0.2.4
 
 ### Patch Changes
