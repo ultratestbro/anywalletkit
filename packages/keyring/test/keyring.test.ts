@@ -275,6 +275,24 @@ describe('Keyring — adopting a pre-keyring wallet and secret reads', () => {
     expect(secrets.map.get('main')).toContain('abandon')
   })
 
+  it('adopts only the secret it was told about: missing, another seed or another passphrase under the id is refused', async () => {
+    // Audit 2026-10-25 (post-release), L4: the source took the id without reading it, so its addresses
+    // came from the phrase passed in while every signature would use whatever the id held.
+    const { keyring, secrets } = await fresh({ evm: CHAINS.evm })
+    await expect(keyring.importMnemonic(ABANDON, { adoptId: 'none' })).rejects.toMatchObject({ code: 'invalid-input' })
+    secrets.map.set('other', JSON.stringify({ type: 'mnemonic', mnemonic: OTHER }))
+    await expect(keyring.importMnemonic(ABANDON, { adoptId: 'other' })).rejects.toMatchObject({ code: 'invalid-input' })
+    secrets.map.set('salted', JSON.stringify({ type: 'mnemonic', mnemonic: ABANDON, passphrase: 'x' }))
+    await expect(keyring.importMnemonic(ABANDON, { adoptId: 'salted' })).rejects.toMatchObject({ code: 'invalid-input' })
+    secrets.map.set('garbage', 'not json')
+    await expect(keyring.importMnemonic(ABANDON, { adoptId: 'garbage' })).rejects.toMatchObject({ code: 'invalid-input' })
+    expect(keyring.listAccounts()).toHaveLength(0)
+    // nothing was written or deleted along the way
+    expect([...secrets.map.keys()].sort()).toEqual(['garbage', 'other', 'salted'])
+    // the right phrase + passphrase (spacing / case normalized) is adopted
+    await expect(keyring.importMnemonic(`  ${ABANDON.toUpperCase()} `, { adoptId: 'salted', passphrase: 'x' })).resolves.toMatchObject({ source: { id: 'salted' } })
+  })
+
   it('reads the secret once per operation (one biometric prompt), not once per index', async () => {
     const { keyring, secrets } = await fresh({ evm: CHAINS.evm })
     const { source } = await keyring.importMnemonic(ABANDON, { discover: { isUsed: async (_, i) => i < 4, maxIndex: 10 } })
