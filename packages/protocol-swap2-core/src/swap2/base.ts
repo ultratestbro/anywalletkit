@@ -220,7 +220,10 @@ export interface Swap2EngineConfig extends Swap2ProtocolConfig {
    * check has passed, BEFORE any approval or signature. It receives a copy of
    * exactly what will be signed; throwing (the user cancelled) aborts with
    * nothing sent. A quote that expires while the gate is open is refused
-   * before the first approval.
+   * before the first approval. When the quote expires while the engine's own
+   * approval is being mined, the engine re-quotes once; if the fresh quote
+   * differs from the reviewed one (payload, gas, a worse output) the gate is
+   * called again with `requoted: true`, and throwing then revokes the allowance.
    */
   reviewExecution?: (plan: Swap2ExecutionPlan) => Promise<void> | void;
 }
@@ -241,6 +244,12 @@ export interface Swap2ExecutionPlan {
   validUntilMs: number;
   /** ERC-20 approvals sent first, in order (USDT on Ethereum resets to 0 first). */
   approvals: {token: string; spender: string; amount: bigint; chainId?: number}[];
+  /**
+   * `true` on a second review: the first quote expired while its approval was being mined, and
+   * the fresh one differs from what was reviewed (another payload, a worse output). The allowance
+   * is already in place, so `approvals` is empty; cancelling revokes it.
+   */
+  requoted?: true;
   /** The source leg exactly as the account will receive it. */
   source:
     | {kind: "call"; to: string; data?: string; value: bigint; chainId?: number; gasLimit?: bigint; memo?: string; memoEncoding?: "utf8" | "hex"; cellBody?: boolean}
@@ -347,6 +356,18 @@ interface CarriedAllowance {
   amount: bigint;
   revoke: () => Promise<void>;
   adopted: boolean;
+  /** What the first pass's `reviewExecution` approved; the re-quote is reviewed again if it differs. */
+  reviewed?: Swap2ExecutionPlan;
+}
+
+/**
+ * What a reviewer committed to, minus what a re-quote may refresh without asking again: the
+ * timing, fee estimate and ETA, the approvals (already mined), and the expected output, which is
+ * compared separately (only a worse one asks again).
+ */
+function reviewedIdentity(plan: Swap2ExecutionPlan): string {
+  const {feeUsd: _fee, etaSeconds: _eta, validUntilMs: _valid, approvals: _approvals, destAmount: _dest, requoted: _requoted, ...pinned} = plan;
+  return JSON.stringify(pinned, (_k, v: unknown) => (typeof v === "bigint" ? v.toString() : v));
 }
 
 /** Swap2 status ids are `awk1.<provider>.<intent>[.<sourceTxHash>]` (URI-encoded segments). */
@@ -1029,11 +1050,13 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       approvalAmounts = current === approvalAmount ? [] : [...(usdtMainnet && current !== 0n ? [0n] : []), approvalAmount];
     }
 
-    // The re-quote pass is not reviewed again: everything the reviewer
-    // committed to — source amount, spender, recipient, the caller's floor —
-    // is unchanged by construction, and the engine re-validates the rest.
+    // The re-quote pass is reviewed again only when it differs from what the
+    // reviewer approved: source amount, spender and the caller's floor are
+    // pinned by construction, but the payload (calldata, deposit, memo, gas)
+    // and the output come fresh from the provider.
     const review = (this._config as Swap2EngineConfig).reviewExecution;
-    if (review && !carried) {
+    let reviewed: Swap2ExecutionPlan | undefined;
+    if (review && (!carried || carried.reviewed)) {
       const chainId = unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {};
       const approvals: Swap2ExecutionPlan["approvals"] = approvalAmounts.map((amount) =>
         ({token: source.contract!, spender: unsigned.approvalAddress!, amount, ...chainId}));
@@ -1068,10 +1091,20 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
                   ...(cellBody !== undefined ? {cellBody: true} : {}),
                 },
       };
-      // A frozen deep copy: nothing the reviewer does reaches the payload sent below.
-      await review(deepFreeze(structuredCloneSafe(plan)));
-      if (q.validUntilMs > 0 && q.validUntilMs <= Date.now()) {
-        throw new Swap2QuoteError("swap2: quote expired during review — nothing was signed");
+      const previous = carried?.reviewed;
+      if (!previous || reviewedIdentity(previous) !== reviewedIdentity(plan) || plan.destAmount < previous.destAmount) {
+        try {
+          // A frozen deep copy: nothing the reviewer does reaches the payload sent below.
+          reviewed = deepFreeze(structuredCloneSafe(previous ? {...plan, requoted: true as const} : plan));
+          await review(reviewed);
+          if (q.validUntilMs > 0 && q.validUntilMs <= Date.now()) {
+            throw new Swap2QuoteError(`swap2: quote expired during review — ${previous ? "the allowance was revoked" : "nothing was signed"}`);
+          }
+        } catch (error) {
+          // Second review: the allowance is ours and already adopted by this pass.
+          if (previous) await revokeApproval?.().catch(() => {});
+          throw error;
+        }
       }
     }
 
@@ -1116,7 +1149,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // to the caller's floor like the first, and never re-quotes itself.
       if (!carried && approvalAmounts.length && revokeApproval) {
         this.emitPhase("requoting");
-        const handoff: CarriedAllowance = {token: source.contract!, spender: unsigned.approvalAddress!, amount: approvalAmount, revoke: revokeApproval, adopted: false};
+        const handoff: CarriedAllowance = {token: source.contract!, spender: unsigned.approvalAddress!, amount: approvalAmount, revoke: revokeApproval, adopted: false, ...(reviewed ? {reviewed} : {})};
         try {
           return await this.executeSwap2(signer, snapshot, config, handoff);
         } catch (error) {
