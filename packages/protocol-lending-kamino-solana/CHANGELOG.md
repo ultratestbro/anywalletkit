@@ -1,5 +1,21 @@
 # @anywalletkit/protocol-lending-kamino-solana
 
+## 0.1.5
+
+### Patch Changes
+
+- 80d6451: Earn vault withdrawals pass the wallet's guard. `withdraw` / `quoteWithdraw` declared only the asset coming in, so the share burn out of the wallet's share account read as an undeclared drain and wallet-solana refused every withdrawal of unstaked shares (`token-drain`). The expectation now also allows exactly the shares being redeemed to leave (`maxTokenOut` on the share mint); every other outflow is still refused. Audit 2026-10-25, #1.3.
+- 07db4c1: Audit 2026-10-25, findings 16 and 17.
+  
+  - **Number() on bigints.** A real ESLint now runs on every package (`pnpm lint`, in CI): typescript-eslint's `no-floating-promises`, `await-thenable`, `no-misused-promises`, and a local `no-number-bigint` rule (`Number(x)` of a bigint is lossy above 2^53 and garbage on Hermes above 2^63). Its 92 findings are fixed: values that come from outside are range-checked as bigints before they become numbers (a typed-data or transaction `chainId`, token `decimals` in tx-preview, ABI string lengths, protobuf field numbers in Tron, an RPC nonce in extension-kit, the Permit2 lockdown count in kit's policies, Mellow's asset count); sort comparators compare bigints exactly; panic codes print the bigint; display values go through `bigintToNumber`. A `chainId` that is not a safe integer is now refused by wallet-evm before signing (`UnsafeTransactionError`), and `describeTransaction` reports it as a chain mismatch.
+  - **engines.** Every package declares `"engines": { "node": ">=20" }`.
+  - **Peers.** `expo-modules-core` in `backup-cloud` and `secure-storage-react-native` is `^58.0.0` (Expo SDK 58, the version the native modules are tested on) instead of `*`.
+- Updated dependencies [07db4c1]
+- Updated dependencies [80d6451]
+- Updated dependencies [80d6451]
+- Updated dependencies [80d6451]
+  - @anywalletkit/core@0.4.0
+
 ## 0.1.4
 
 ### Patch Changes

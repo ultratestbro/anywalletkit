@@ -1,5 +1,26 @@
 # @anywalletkit/conformance
 
+## 0.4.0
+
+### Minor Changes
+
+- 67df727: `describeProtocolModule` now catches a read or quote that signs. The check used to look only at `sent` and swallowed every error, so a quote that called `sign`, or `signTypedData` (which the recording mock does not have, so it threw), passed. Reads now run on an account wrapped by the new `watchSigning()`, and any `sign*` / `send*` / `transfer*` / `approve*` / `broadcast*` / `revoke*` call fails the suite, even when the quote then throws. The new `mustResolve` option lists reads whose sample must succeed (an error fails the suite) for modules with fixture-backed accounts. Audit 2026-10-25, finding 14.
+- 80d6451: No signing account outlives `WalletManager.dispose()`. Every chain manager awaited between its cache check and storing the account, so: an account whose build was in flight during `dispose()` was created afterwards with a live key (a child derived from an injected seed signer kept signing); concurrent `getAccount` calls for one path built two accounts and leaked the first; a signer-built manager handed out new accounts after `dispose()`. New protected `cachedAccount()` / `signerAccount()` in core build each account once, refuse after dispose, dispose an account finished late and a derived child that never became an account. All seven chain managers use them. `describeChainModule` checks the contract (one account under concurrent calls, none after dispose). Audit 2026-10-25, #3.
+
+### Patch Changes
+
+- 07db4c1: Audit 2026-10-25, findings 16 and 17.
+  
+  - **Number() on bigints.** A real ESLint now runs on every package (`pnpm lint`, in CI): typescript-eslint's `no-floating-promises`, `await-thenable`, `no-misused-promises`, and a local `no-number-bigint` rule (`Number(x)` of a bigint is lossy above 2^53 and garbage on Hermes above 2^63). Its 92 findings are fixed: values that come from outside are range-checked as bigints before they become numbers (a typed-data or transaction `chainId`, token `decimals` in tx-preview, ABI string lengths, protobuf field numbers in Tron, an RPC nonce in extension-kit, the Permit2 lockdown count in kit's policies, Mellow's asset count); sort comparators compare bigints exactly; panic codes print the bigint; display values go through `bigintToNumber`. A `chainId` that is not a safe integer is now refused by wallet-evm before signing (`UnsafeTransactionError`), and `describeTransaction` reports it as a chain mismatch.
+  - **engines.** Every package declares `"engines": { "node": ">=20" }`.
+  - **Peers.** `expo-modules-core` in `backup-cloud` and `secure-storage-react-native` is `^58.0.0` (Expo SDK 58, the version the native modules are tested on) instead of `*`.
+- Updated dependencies [07db4c1]
+- Updated dependencies [80d6451]
+- Updated dependencies [80d6451]
+- Updated dependencies [80d6451]
+  - @anywalletkit/core@0.4.0
+  - @anywalletkit/tx-preview-evm@0.1.4
+
 ## 0.3.2
 
 ### Patch Changes

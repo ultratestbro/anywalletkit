@@ -1,5 +1,27 @@
 # @anywalletkit/wallet-evm
 
+## 0.1.5
+
+### Patch Changes
+
+- 80d6451: `verifyTypedData` accepts the signatures `signTypedData` makes when the domain `chainId` is a string. Signing normalised `"0x89"` / `"137"` to the number 137 before hashing (so `chainId` is part of the domain, as a verifying contract computes it), while verifying hashed the domain as given — the account's own signature did not verify. Both now use one `typedDataHash()`. Audit 2026-10-25, #1.6.
+- 07db4c1: Audit 2026-10-25, findings 16 and 17.
+  
+  - **Number() on bigints.** A real ESLint now runs on every package (`pnpm lint`, in CI): typescript-eslint's `no-floating-promises`, `await-thenable`, `no-misused-promises`, and a local `no-number-bigint` rule (`Number(x)` of a bigint is lossy above 2^53 and garbage on Hermes above 2^63). Its 92 findings are fixed: values that come from outside are range-checked as bigints before they become numbers (a typed-data or transaction `chainId`, token `decimals` in tx-preview, ABI string lengths, protobuf field numbers in Tron, an RPC nonce in extension-kit, the Permit2 lockdown count in kit's policies, Mellow's asset count); sort comparators compare bigints exactly; panic codes print the bigint; display values go through `bigintToNumber`. A `chainId` that is not a safe integer is now refused by wallet-evm before signing (`UnsafeTransactionError`), and `describeTransaction` reports it as a chain mismatch.
+  - **engines.** Every package declares `"engines": { "node": ">=20" }`.
+  - **Peers.** `expo-modules-core` in `backup-cloud` and `secure-storage-react-native` is `^58.0.0` (Expo SDK 58, the version the native modules are tested on) instead of `*`.
+- 80d6451: No signing account outlives `WalletManager.dispose()`. Every chain manager awaited between its cache check and storing the account, so: an account whose build was in flight during `dispose()` was created afterwards with a live key (a child derived from an injected seed signer kept signing); concurrent `getAccount` calls for one path built two accounts and leaked the first; a signer-built manager handed out new accounts after `dispose()`. New protected `cachedAccount()` / `signerAccount()` in core build each account once, refuse after dispose, dispose an account finished late and a derived child that never became an account. All seven chain managers use them. `describeChainModule` checks the contract (one account under concurrent calls, none after dispose). Audit 2026-10-25, #3.
+- 80d6451: `policies.maxFee` now holds for the transaction that is signed, not only for the quote. The kit compared the cap with `quoteSendTransaction` (an EVM estimate of 21 000 gas) while the account signed its own gas limit with headroom (25 200 gas), so a 22 000 000 wei cap let a 25 200 000 wei transaction through. New `WriteOptions { maxFee }` in core is an optional second argument of `sendTransaction`, `signTransaction` and `transfer`; every chain package checks the tighter of it and its configured `transactionMaxFee` / `transferMaxFee` on what it signs (`feeLimit()` helper), and the kit passes the tightest matching policy cap through it after the quote check. A write whose quote fits but whose signed worst case does not is now refused by the account after `confirm`, with the chain package's own error (EVM: `Error('Exceeded maximum fee cost…')`), not `PolicyViolationError`. Audit 2026-10-25, #4.
+- 760ca6e: Security fixes from the 2026-10-25 audit.
+  
+  - **No second signature on failover.** A lost broadcast answer followed by `already known` from the next RPC now resolves to the hash of the transaction already sent, instead of signing a new one with the next nonce (a double payment). `nonce too low` is re-signed only after the account has checked that the rejected hash is not on the network; when that lookup fails the send ends as `BroadcastUnknownError`. `replacement transaction underpriced` is no longer retried.
+  - **The fee cap holds for what is signed.** `transferMaxFee` / `transactionMaxFee` were checked on a network quote while the caller's own `gasPrice` / `maxFeePerGas` was signed. They are now checked on the prepared transaction (gas limit × fee cap) before every signature, in `signTransaction` too, and the balance check uses the same worst-case fee. `quoteSendTransaction` prices the caller's fee fields, so the kit `maxFee` policy sees them. `TransferResult.fee` is that worst-case fee. A caller tip above the network's now lifts the fee cap with it (it used to produce a tip above the cap).
+- Updated dependencies [07db4c1]
+- Updated dependencies [80d6451]
+- Updated dependencies [80d6451]
+- Updated dependencies [80d6451]
+  - @anywalletkit/core@0.4.0
+
 ## 0.1.4
 
 ### Patch Changes

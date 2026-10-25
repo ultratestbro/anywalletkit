@@ -1,5 +1,34 @@
 # @anywalletkit/protocol-swap2-core
 
+## 0.4.0
+
+### Minor Changes
+
+- c4dc4d6: `createSwap2Handler` binds quotes and swaps to the caller (audit 2026-10-25, finding 12). A sealed quote and an intent id used to be good for any caller: one user could build another's quote, and anyone could ask about any swap (deposit addresses are public on chain), notify it or register against it.
+  
+  - Every quote's `intentId` leaves with an intent token appended (`<id>~<tag>`, HMAC under `sealSecret`); `track`, `claim`, `notify` and `register` refuse an id without a valid token (403), and the provider only ever sees its own id. The app, `remoteProvider` and the swap2 engine need no change: the swap id the engine hands out carries the token.
+  - New `subject(context)`: the authenticated user (the Sign-In with Ethereum address, not an email). Quotes are sealed for it and tokens issued to it, so another user's quote or swap id is refused (403). Without it the token is a bearer capability for that one swap.
+  - New `acceptUntokenedTrackUntil`: while moving from another backend, `track` (read-only) accepts ids without a token until that time.
+  - `guard` now runs after validation and receives the validated request (`call.request`, with the provider's own intent id), so limits can depend on what is asked.
+- ed99146: New `@anywalletkit/protocol-swap2-core/server`: `createSwap2Handler({ providers, sealSecret, guard })`, the server side of `remoteProvider`. Framework-free (`handle(action, body, context)` → `{status, body}`), it validates every field, seals quotes with HMAC-SHA256 and refuses `build` / `preflight` on an unsealed, altered or expired quote, passes a provider's named refusal through with URLs redacted, and requires a `guard` for authentication and rate limiting. WebCrypto, server-only (Node ≥ 20, edge runtimes); not part of the main entry, so apps never bundle it.
+
+### Patch Changes
+
+- 07db4c1: Audit 2026-10-25, findings 16 and 17.
+  
+  - **Number() on bigints.** A real ESLint now runs on every package (`pnpm lint`, in CI): typescript-eslint's `no-floating-promises`, `await-thenable`, `no-misused-promises`, and a local `no-number-bigint` rule (`Number(x)` of a bigint is lossy above 2^53 and garbage on Hermes above 2^63). Its 92 findings are fixed: values that come from outside are range-checked as bigints before they become numbers (a typed-data or transaction `chainId`, token `decimals` in tx-preview, ABI string lengths, protobuf field numbers in Tron, an RPC nonce in extension-kit, the Permit2 lockdown count in kit's policies, Mellow's asset count); sort comparators compare bigints exactly; panic codes print the bigint; display values go through `bigintToNumber`. A `chainId` that is not a safe integer is now refused by wallet-evm before signing (`UnsafeTransactionError`), and `describeTransaction` reports it as a chain mismatch.
+  - **engines.** Every package declares `"engines": { "node": ">=20" }`.
+  - **Peers.** `expo-modules-core` in `backup-cloud` and `secure-storage-react-native` is `^58.0.0` (Expo SDK 58, the version the native modules are tested on) instead of `*`.
+- a9a5e0a: package.json carried a second, empty `description` that overrode the real one, so npm showed the README badge line instead of the package description.
+- Updated dependencies [07db4c1]
+- Updated dependencies [80d6451]
+- Updated dependencies [a9a5e0a]
+- Updated dependencies [80d6451]
+- Updated dependencies [80d6451]
+  - @anywalletkit/core@0.4.0
+  - @anywalletkit/swap2-assets@0.1.5
+  - @anywalletkit/tx-preview-evm@0.1.4
+
 ## 0.3.2
 
 ### Patch Changes
