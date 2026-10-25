@@ -1,5 +1,6 @@
 import type {Asset, CrossChainProvider, IntentRef, Quote, QuoteParams, TxRequest, UnsignedTx} from "./types.js";
 import {redactUrls} from "./util.js";
+import {validQuote} from "./validate.js";
 
 /**
  * The server side of {@link remoteProvider}: runs real providers behind your backend so API
@@ -178,6 +179,11 @@ export function createSwap2Handler<C = unknown>(opts: Swap2HandlerOptions<C>): (
           if (quote) {
             let normalized: Quote;
             try { normalized = normalizeQuote(quote, INTENT_MAX); } catch { return fail(502, `${providerName} returned a quote this server refuses to seal`); }
+            // A seal vouches for the quote: hold it to the engine's own checks (provider, input, floor,
+            // slippage, expiry) so a client that does not re-validate cannot be handed a bad one.
+            if (!validQuote(normalized, params, providerName) || normalized.validUntilMs <= now()) {
+              return fail(502, `${providerName} returned a quote the swap engine would reject`);
+            }
             const tokened = {...normalized, intentId: `${normalized.intentId}~${await intentTag(providerName, subject, normalized.intentId)}`};
             return ok(await seal(providerName, subject, tokened));
           }
