@@ -1,6 +1,6 @@
 import { NetworkError } from '@anywalletkit/core'
 import { NearRpcError } from './errors.js'
-import type { NearConfig, NearFetch, NearProvider } from './types.js'
+import type { NearConfig, NearFetch } from './types.js'
 
 /** Base64 helpers that work in Node, browsers and Hermes (no Buffer). */
 export function toBase64(bytes: Uint8Array): string {
@@ -23,14 +23,34 @@ export function fromBase64(s: string): Uint8Array {
   return new Uint8Array((globalThis as any).Buffer.from(s, 'base64'))
 }
 
-function httpTransport(url: string, headers: Record<string, string> | undefined): NearFetch {
+/** Default per-request timeout for url providers. */
+export const DEFAULT_TIMEOUT_MS = 15_000
+
+/** A signal that aborts after `ms`: `AbortSignal.timeout` where the runtime has it, else a timer (Hermes without runtime-hermes). */
+function timeoutSignal(ms: number): AbortSignal | undefined {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(ms)
+  if (typeof AbortController === 'undefined') return undefined
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(new Error(`timed out after ${ms} ms`)), ms) as unknown as { unref?: () => void }
+  timer.unref?.()
+  return controller.signal
+}
+
+function httpTransport(url: string, headers: Record<string, string> | undefined, timeoutMs: number): NearFetch {
   let id = 0
   return async (method, params) => {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json', ...headers },
-      body: JSON.stringify({ jsonrpc: '2.0', id: String(++id), method, params }),
-    })
+    const signal = timeoutSignal(timeoutMs)
+    let res: Response
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json', ...headers },
+        body: JSON.stringify({ jsonrpc: '2.0', id: String(++id), method, params }),
+        ...(signal ? { signal } : {}),
+      })
+    } catch (e) {
+      throw new NetworkError(`${method}: ${signal?.aborted ? `no answer within ${timeoutMs} ms` : 'request failed'}`, { provider: url, cause: e })
+    }
     if (!res.ok) throw new NetworkError(`${method}: HTTP ${res.status}`, { provider: url })
     const json = (await res.json()) as { result?: unknown; error?: { name?: string; message?: string; cause?: { name?: string }; data?: unknown; code?: number } }
     if (json.error) throw new NearRpcError(method, json.error)
@@ -39,18 +59,27 @@ function httpTransport(url: string, headers: Record<string, string> | undefined)
 }
 
 /** An `error` from the node is a definitive answer (unknown account, invalid tx…) — never failed over. */
-const isDefinitive = (e: unknown) => e instanceof NearRpcError && !/TIMEOUT|INTERNAL|UNAVAILABLE|NO_SYNCED/i.test(e.errorName ?? '')
+export const isDefinitive = (e: unknown) => e instanceof NearRpcError && !/TIMEOUT|INTERNAL|UNAVAILABLE|NO_SYNCED/i.test(e.errorName ?? '')
 
-/** One transport, or a failover transport over the list. */
+/** Methods that hand a signed transaction to the network: a lost answer is ambiguous, so they are never re-sent elsewhere. */
+const BROADCAST_METHODS: ReadonlySet<string> = new Set(['send_tx', 'broadcast_tx_commit', 'broadcast_tx_async'])
+
+/**
+ * One transport, or a failover transport over the list. Reads fail over on anything but a
+ * definitive node answer; a broadcast is sent once — the account turns an unanswered one into
+ * `BroadcastUnknownError`.
+ */
 export function createClient(config: NearConfig): NearFetch | undefined {
   if (config.provider === undefined) return undefined
+  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const list = (Array.isArray(config.provider) ? config.provider : [config.provider]).map((p) =>
-    typeof p === 'string' ? httpTransport(p, config.headers) : p,
+    typeof p === 'string' ? httpTransport(p, config.headers, timeoutMs) : p,
   )
   if (list.length === 0) throw new Error("The 'provider' option cannot be set to an empty list.")
   if (list.length === 1) return list[0]!
   const attempts = list.length + (config.retries ?? 3)
   return async (method, params) => {
+    if (BROADCAST_METHODS.has(method)) return list[0]!(method, params)
     let lastError: unknown
     for (let i = 0; i < attempts; i++) {
       try { return await list[i % list.length]!(method, params) } catch (e) {

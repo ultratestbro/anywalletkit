@@ -8,6 +8,27 @@ import StakingProtocol from './staking-protocol.js'
 import TONSTAKERS_ADDRESS_MAP from './tonstakers-address-map.js'
 import { describeTonstakersActivity } from './tonstakers-activity.js'
 
+/** Default timeout for the module's REST reads: an API that never answers must not hang the caller. */
+const API_TIMEOUT_MS = 15_000
+
+/**
+ * `fetch` with a timeout: `AbortSignal.timeout` where the runtime has it, else a timer (Hermes without runtime-hermes).
+ * @param {string} url
+ * @param {number} [ms]
+ * @returns {Promise<Response>}
+ */
+async function fetchWithTimeout (url, ms = API_TIMEOUT_MS) {
+  let signal
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') signal = AbortSignal.timeout(ms)
+  else if (typeof AbortController !== 'undefined') {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(new Error(`timed out after ${ms} ms`)), ms)
+    timer.unref?.()
+    signal = controller.signal
+  }
+  return fetch(url, signal ? { signal } : {})
+}
+
 /** @typedef {import('./staking-protocol.js').StakeOptions} StakeOptions */
 /** @typedef {import('./staking-protocol.js').StakeResult} StakeResult */
 /** @typedef {import('./staking-protocol.js').WithdrawalRequestOptions} WithdrawalRequestOptions */
@@ -104,7 +125,7 @@ function toAmount (amount) {
 async function fetchWithRetry (url) {
   let res
   for (let attempt = 0; attempt < 3; attempt++) {
-    res = await fetch(url)
+    res = await fetchWithTimeout(url)
     if (res.status !== 429) return res
     await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)))
   }
@@ -586,7 +607,7 @@ export default class TonstakersProtocolTon extends StakingProtocol {
     try {
       const owner = Address.parse(await this._account.getAddress()).toRawString()
       const [res, minter, position] = await Promise.all([
-        fetch(`${this._endpoints.tonapi}/accounts/${owner}/events?limit=100`),
+        fetchWithTimeout(`${this._endpoints.tonapi}/accounts/${owner}/events?limit=100`),
         this._jettonMinter(),
         this.getStakedBalance()
       ])

@@ -15,6 +15,8 @@ export interface NearConfig {
   retries?: number
   /** Optional headers for every request (e.g. an API key). */
   headers?: Record<string, string>
+  /** Per-request timeout for url providers, in ms (default 15 000): a node that never answers fails over (reads) or ends as "maybe sent" (`send_tx`). */
+  timeoutMs?: number
   /** "mainnet" (default) | "testnet" | any CAIP-2 suffix. */
   network?: 'mainnet' | 'testnet' | string
   /** Max fee (yoctoNEAR) for `transfer`. */

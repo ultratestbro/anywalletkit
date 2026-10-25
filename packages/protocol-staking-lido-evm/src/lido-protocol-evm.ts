@@ -12,6 +12,22 @@ import StakingProtocol, {
   type WithdrawalRequestOptions, type WithdrawalRequestResult, type WithdrawalRequestsView,
 } from './staking-protocol.js'
 
+/** Default timeout for the module's REST reads (APR, rewards, queue times): an API that never answers must not hang the caller. */
+const API_TIMEOUT_MS = 15_000
+
+/** `fetch` with a timeout: `AbortSignal.timeout` where the runtime has it, else a timer (Hermes without runtime-hermes). */
+async function fetchWithTimeout(url: string, ms = API_TIMEOUT_MS): Promise<Response> {
+  let signal: AbortSignal | undefined
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') signal = AbortSignal.timeout(ms)
+  else if (typeof AbortController !== 'undefined') {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(new Error(`timed out after ${ms} ms`)), ms) as unknown as { unref?: () => void }
+    timer.unref?.()
+    signal = controller.signal
+  }
+  return fetch(url, signal ? { signal } : {})
+}
+
 /** The EIP-1193 surface the module reads the chain through when no RPC url is given. */
 export interface Eip1193Provider {
   request(args: { method: string; params?: unknown }): Promise<unknown>
@@ -481,7 +497,7 @@ export default class LidoProtocolEvm extends StakingProtocol<LidoProtocolConfig>
    * Lido's 7-day SMA staking APR, in percent.
    */
   override async getApr(): Promise<number> {
-    const res = await fetch(this._endpoints.apr as string)
+    const res = await fetchWithTimeout(this._endpoints.apr as string)
     if (!res.ok) {
       throw new Error(`Lido APR API: HTTP ${res.status}`)
     }
@@ -553,7 +569,7 @@ export default class LidoProtocolEvm extends StakingProtocol<LidoProtocolConfig>
     const out = new Map<string, number>()
     if (!ids || ids.length === 0) return out
     try {
-      const res = await fetch(`${this._endpoints.withdrawalQueueApi}/v2/request-time?ids=${ids.map(String).join(',')}`)
+      const res = await fetchWithTimeout(`${this._endpoints.withdrawalQueueApi}/v2/request-time?ids=${ids.map(String).join(',')}`)
       if (!res.ok) return out
       // Entries mirror the ids order; finalized requests carry requestInfo: null.
       const body = (await res.json()) as Array<{ requestInfo?: { finalizationIn?: unknown } | null } | null>
@@ -580,7 +596,7 @@ export default class LidoProtocolEvm extends StakingProtocol<LidoProtocolConfig>
     try {
       const value = toAmount(amount)
       const ether = `${value / 10n ** 18n}.${(value % 10n ** 18n).toString().padStart(18, '0')}`
-      const res = await fetch(`${this._endpoints.withdrawalQueueApi}/v2/request-time/calculate?amount=${ether}`)
+      const res = await fetchWithTimeout(`${this._endpoints.withdrawalQueueApi}/v2/request-time/calculate?amount=${ether}`)
       if (!res.ok) return null
       const body = (await res.json()) as { requestInfo?: { finalizationIn?: unknown } | null } | null
       const ms = body?.requestInfo?.finalizationIn
@@ -599,7 +615,7 @@ export default class LidoProtocolEvm extends StakingProtocol<LidoProtocolConfig>
   async getRewards(): Promise<RewardTotals | null> {
     try {
       const owner = await this._acct.getAddress()
-      const res = await fetch(`${this._endpoints.rewardHistory}/?address=${owner}&limit=1`)
+      const res = await fetchWithTimeout(`${this._endpoints.rewardHistory}/?address=${owner}&limit=1`)
       if (!res.ok) return null
       const body = (await res.json()) as { totals?: { ethRewards?: unknown }; averageApr?: unknown } | null
       const raw = body?.totals?.ethRewards
@@ -623,7 +639,7 @@ export default class LidoProtocolEvm extends StakingProtocol<LidoProtocolConfig>
   async getRewardHistory({ limit = 14 }: { limit?: number } = {}): Promise<RewardEvent[]> {
     try {
       const owner = await this._acct.getAddress()
-      const res = await fetch(`${this._endpoints.rewardHistory}/?address=${owner}&limit=${limit}&skip=0`)
+      const res = await fetchWithTimeout(`${this._endpoints.rewardHistory}/?address=${owner}&limit=${limit}&skip=0`)
       if (!res.ok) return []
       const body = (await res.json()) as { events?: Array<{ type?: unknown; rewards?: unknown; blockTime?: unknown; apr?: unknown }> } | null
       return (body?.events ?? [])

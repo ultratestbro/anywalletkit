@@ -1,10 +1,10 @@
 import { LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
 import { bytesToBase58, ed25519Key, implicitAccountId, publicKeyToString } from './address.js'
 import { decodeAnyTransaction, encodeSignedTransaction } from './borsh.js'
-import { SimulationError } from './errors.js'
+import { BroadcastUnknownError, SimulationError } from './errors.js'
 import { nep413Hash, type Nep413Payload, type Nep413Signed } from './nep413.js'
 import { WalletAccountReadOnlyNear, receiptOf } from './read-only-account.js'
-import { fromBase64, outcomeFailed, toBase64 } from './rpc.js'
+import { fromBase64, isDefinitive, outcomeFailed, toBase64 } from './rpc.js'
 import type { NearBuiltTransaction, NearConfig, NearFeeEstimate, NearSignedTransaction, NearTransaction, NearTransferOptions } from './types.js'
 
 export interface NearTransferResult extends TransferResult {
@@ -104,7 +104,15 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
 
   private async broadcast(signed: NearSignedTransaction): Promise<string> {
     const hash = WalletAccountReadOnlyNear.txHash(signed.transaction)
-    const outcome = await this.requireRpc('broadcast').sendTx(toBase64(encodeSignedTransaction(signed)))
+    const rpc = this.requireRpc('broadcast')
+    let outcome: Awaited<ReturnType<typeof rpc.sendTx>>
+    try {
+      outcome = await rpc.sendTx(toBase64(encodeSignedTransaction(signed)))
+    } catch (e) {
+      // A definitive refusal (invalid nonce, invalid tx…) is a clean failure; no answer or a node timeout may still land.
+      if (isDefinitive(e)) throw e
+      throw new BroadcastUnknownError(hash, e)
+    }
     const failure = outcomeFailed(outcome)
     if (failure) throw new Error(`Transaction ${hash} failed on chain: ${failure}`)
     return outcome.transaction?.hash ?? hash

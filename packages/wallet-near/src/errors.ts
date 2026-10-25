@@ -49,3 +49,20 @@ export class NearRpcError extends Error {
     this.cause = error
   }
 }
+
+/**
+ * The signed transaction was handed to the RPC but no definitive answer came back (no response, or
+ * a node timeout): it MAY be on chain. Do not sign it again (a new nonce would pay twice) — watch
+ * `hash`, computed locally.
+ */
+export class BroadcastUnknownError extends Error {
+  /** Always true: the transaction may be on its way. */
+  readonly maybeSent = true
+  /** Base58 hash of the signed transaction. */
+  readonly hash: string
+  constructor(hash: string, cause: unknown) {
+    super(`Broadcast outcome unknown for ${hash}: ${cause instanceof Error ? cause.message.slice(0, 200) : String(cause).slice(0, 200)}`, { cause })
+    this.name = 'BroadcastUnknownError'
+    this.hash = hash
+  }
+}

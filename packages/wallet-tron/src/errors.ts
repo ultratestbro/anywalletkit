@@ -40,3 +40,19 @@ export class SimulationError extends Error {
     this.energy = energy
   }
 }
+
+/**
+ * The signed transaction was handed to the network but no node answered: it MAY be on its way.
+ * Do not build and sign it again (a new `txID` would pay twice) — watch `hash` instead.
+ */
+export class BroadcastUnknownError extends Error {
+  /** Always true: the transaction may be on its way. */
+  readonly maybeSent = true
+  /** The signed transaction's `txID`. */
+  readonly hash: string
+  constructor(hash: string, cause: unknown) {
+    super(`Broadcast outcome unknown for ${hash}: ${cause instanceof Error ? cause.message.slice(0, 200) : String(cause).slice(0, 200)}`, { cause })
+    this.name = 'BroadcastUnknownError'
+    this.hash = hash
+  }
+}
