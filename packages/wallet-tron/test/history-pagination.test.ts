@@ -92,4 +92,38 @@ describe('Tron history pages: nothing lost or repeated', () => {
     expect(items).toHaveLength(451)
     expect(new Set(items.map((i) => i.hash)).size).toBe(451)
   })
+
+  it('a page size change between calls (limit 50 then 20, 100 then 25) neither repeats nor skips', async () => {
+    const rows = Array.from({ length: 200 }, (_, i) => i)
+    const tx2 = rows.filter((i) => i % 2 === 0).map((i) => txRow(`p${String(i).padStart(3, '0')}`, 100_000 - i))
+    const trc2 = rows.filter((i) => i % 2 === 1).map((i) => trcRow(`p${String(i).padStart(3, '0')}`, 100_000 - i))
+    for (const [first, rest] of [[50, 20], [100, 25], [20, 50]] as const) {
+      const a = api(tx2, trc2)
+      const source = createTronHistory({ fetch: a.fetch, rateLimit: 1e6 })
+      const seen: string[] = []
+      let page = await source.listActivity(ME, { limit: first })
+      seen.push(...page.items.map((i) => i.hash))
+      while (page.cursor) {
+        page = await source.listActivity(ME, { limit: rest, cursor: page.cursor })
+        seen.push(...page.items.map((i) => i.hash))
+      }
+      expect(seen.length, `${first} then ${rest}`).toBe(200)
+      expect(new Set(seen).size, `${first} then ${rest}: duplicates`).toBe(200)
+    }
+  })
+
+  it('an API that repeats its fingerprint (a proxy dropping the parameter) ends the list, never loops', async () => {
+    let requests = 0
+    const stuck = Array.from({ length: 30 }, (_, i) => txRow(`s${String(i).padStart(2, '0')}`, 5000))
+    const fetch: HistoryFetch = async (url) => {
+      if (++requests > 100) throw new Error('runaway pagination')
+      const trc = new URL(url).pathname.endsWith('/trc20')
+      // the same first page and the same fingerprint, whatever is asked
+      const body = trc ? { data: [], success: true, meta: {} } : { data: stuck.slice(0, 20), success: true, meta: { fingerprint: 'c2FtZQ==' } }
+      return { ok: true, status: 200, json: async () => body }
+    }
+    const page = await createTronHistory({ fetch, rateLimit: 1e6 }).listActivity(ME, { limit: 50 })
+    expect(page.items).toHaveLength(20)
+    expect(requests).toBeLessThan(10)
+  })
 })

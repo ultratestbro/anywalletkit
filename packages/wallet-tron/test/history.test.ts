@@ -112,7 +112,7 @@ describe('createTronHistory: pages', () => {
     // a shorter page: each list continues from its own position; the empty TRC-20 list is done
     const first = await source.listActivity(WALLET, { limit: 4 })
     expect(first.items.map((i) => i.hash)).toEqual(page.items.slice(0, 4).map((i) => i.hash))
-    expect(decodeHistoryCursor(first.cursor!)).toEqual({ v: 2, s: { tx: { k: 4 }, trc20: null } })
+    expect(decodeHistoryCursor(first.cursor!)).toEqual({ v: 2, n: 20, s: { tx: { k: 4 }, trc20: null } })
   })
 
   it('pages to the end without losing or repeating a transaction, across both lists', async () => {
@@ -183,13 +183,16 @@ describe('createTronHistory: getTransaction', () => {
 
 describe('createTronHistory: cursor, errors, keys, explorer', () => {
   it('cursor round-trips and rejects garbage', () => {
-    const c = encodeHistoryCursor({ v: 2, s: { tx: { f: 'ZnA=', k: 3 }, trc20: null }, t: 1_788_250_521_000, g: 2 })
-    expect(decodeHistoryCursor(c)).toEqual({ v: 2, s: { tx: { f: 'ZnA=', k: 3 }, trc20: null }, t: 1_788_250_521_000, g: 2 })
-    expect(decodeHistoryCursor(encodeHistoryCursor({ v: 2, s: { tx: { k: 0 }, trc20: { k: 1 } } }))).toEqual({ v: 2, s: { tx: { k: 0 }, trc20: { k: 1 } } })
+    const c = encodeHistoryCursor({ v: 2, n: 20, s: { tx: { f: 'ZnA=', k: 3 }, trc20: null }, t: 1_788_250_521_000, g: 2 })
+    expect(decodeHistoryCursor(c)).toEqual({ v: 2, n: 20, s: { tx: { f: 'ZnA=', k: 3 }, trc20: null }, t: 1_788_250_521_000, g: 2 })
+    expect(decodeHistoryCursor(encodeHistoryCursor({ v: 2, n: 50, s: { tx: { k: 0 }, trc20: { k: 1 } } }))).toEqual({ v: 2, n: 50, s: { tx: { k: 0 }, trc20: { k: 1 } } })
+    // the page size the positions were taken with is required and bounded
+    expect(() => decodeHistoryCursor(encodeHistoryCursor({ v: 2, s: { tx: { k: 0 }, trc20: null } } as never))).toThrow(/malformed history cursor/)
+    expect(() => decodeHistoryCursor(encodeHistoryCursor({ v: 2, n: 500, s: { tx: { k: 0 }, trc20: null } }))).toThrow(/malformed history cursor/)
     expect(() => decodeHistoryCursor('???')).toThrow(/malformed history cursor/)
     // a cursor from the time-window format (v1) is refused: start the listing again
     expect(() => decodeHistoryCursor(encodeHistoryCursor({ v: 1, w: 1, x: [], e: [] } as never))).toThrow(/malformed history cursor/)
-    expect(() => decodeHistoryCursor(encodeHistoryCursor({ v: 2, s: { tx: { k: -1 }, trc20: null } } as never))).toThrow(/malformed history cursor/)
+    expect(() => decodeHistoryCursor(encodeHistoryCursor({ v: 2, n: 20, s: { tx: { k: -1 }, trc20: null } } as never))).toThrow(/malformed history cursor/)
   })
 
   it('HTTP errors and TronGrid error bodies become HistoryUnavailableError with the attempt', async () => {

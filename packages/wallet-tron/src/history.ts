@@ -88,6 +88,8 @@ export class HistoryUnavailableError extends Error {
 const DEFAULT_LIMIT = 25
 /** Rows asked of the API per request at least, so a small `limit` does not cost one request per row. */
 const MIN_PAGE = 20
+/** Pages one list may fetch in one call; far beyond any real page (one timestamp of one address). */
+const MAX_PAGES_PER_CALL = 100
 const MAX_LIMIT = 200
 const DEFAULT_TIMEOUT_MS = 15_000
 const DEFAULT_URLS: Record<TronNetwork, string> = { mainnet: 'https://api.trongrid.io', shasta: 'https://api.shasta.trongrid.io', nile: 'https://nile.trongrid.io' }
@@ -104,6 +106,8 @@ export interface TronListPosition {
 
 export interface TronHistoryCursor {
   v: 2
+  /** Rows per API request the positions were taken with: a fingerprint's page is only the same page at the same size. */
+  n: number
   /** Per list, where its unread rows start; `null` once the list is read to the end. */
   s: { tx: TronListPosition | null; trc20: TronListPosition | null }
   /** Block timestamp (ms) whose transactions were only partly emitted; both positions point at its first row. */
@@ -158,8 +162,11 @@ export function decodeCursor(s: string): TronHistoryCursor {
     return q.f === undefined ? { k: q.k } : { f: q.f, k: q.k }
   }
   const tx = pos(c?.s?.tx), trc20 = pos(c?.s?.trc20)
-  if (!c || c.v !== 2 || tx === undefined || trc20 === undefined) throw new Error('@anywalletkit/wallet-tron: malformed history cursor')
-  const out: TronHistoryCursor = { v: 2, s: { tx, trc20 } }
+  const n = c?.n
+  if (!c || c.v !== 2 || tx === undefined || trc20 === undefined || typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > MAX_LIMIT) {
+    throw new Error('@anywalletkit/wallet-tron: malformed history cursor')
+  }
+  const out: TronHistoryCursor = { v: 2, n, s: { tx, trc20 } }
   if (typeof c.t === 'number' && typeof c.g === 'number' && Number.isInteger(c.g) && c.g > 0) { out.t = c.t; out.g = c.g }
   return out
 }
@@ -435,10 +442,16 @@ export function createTronHistory(options: TronHistoryOptions = {}): TronHistory
     let pos: TronListPosition | null = at
     let rows: T[] | undefined
     let next: string | undefined
+    const fetched = new Set<string>()
     const fill = async (): Promise<T | undefined> => {
       while (pos) {
         if (!rows) {
+          // A fingerprint this call already followed means the API is not advancing (a gateway that
+          // drops the parameter answers the first page again): the list ends here instead of looping.
+          if (pos.f !== undefined && (fetched.has(pos.f) || fetched.size >= MAX_PAGES_PER_CALL)) { pos = null; break }
+          if (pos.f !== undefined) fetched.add(pos.f)
           const page = await list<T>(path, pos.f === undefined ? params : { ...params, fingerprint: pos.f })
+          if (pos.f !== undefined && page.next === pos.f) { pos = null; break }
           rows = page.data
           next = page.next
         }
@@ -476,7 +489,9 @@ export function createTronHistory(options: TronHistoryOptions = {}): TronHistory
     async listActivity(address: string, query: HistoryQuery = {}): Promise<TronHistoryPage> {
       const limit = Math.min(MAX_LIMIT, Math.max(1, Math.floor(query.limit ?? DEFAULT_LIMIT)))
       const cursor = query.cursor ? decodeCursor(query.cursor) : undefined
-      const common: Record<string, string | number | undefined> = { limit: Math.max(limit, MIN_PAGE), order_by: 'block_timestamp,desc' }
+      // The API page size is the cursor's: its positions are offsets into pages of that size.
+      const pageSize = cursor?.n ?? Math.max(limit, MIN_PAGE)
+      const common: Record<string, string | number | undefined> = { limit: pageSize, order_by: 'block_timestamp,desc' }
       if (query.since !== undefined) common.min_timestamp = query.since * 1000
       const base = `/v1/accounts/${encodeURIComponent(address)}/transactions`
       const txs = stream<TronGridTx>(base, common, cursor ? cursor.s.tx : { k: 0 }, (r) => r.block_timestamp ?? 0)
@@ -501,13 +516,13 @@ export function createTronHistory(options: TronHistoryOptions = {}): TronHistory
         for (const [, e] of emit) items.push(e.tx ? mapTransactionRow(chain, address, e.tx, { trc20: e.trc20 }) : mapTrc20Only(chain, address, e.trc20))
         if (done + emit.length < groups.length) {
           // The block did not fit: come back to its first row and skip what was emitted.
-          return { items, cursor: encodeCursor({ v: 2, s: { tx: startTx, trc20: startTrc20 }, t, g: done + emit.length }) }
+          return { items, cursor: encodeCursor({ v: 2, n: pageSize, s: { tx: startTx, trc20: startTrc20 }, t, g: done + emit.length }) }
         }
       }
       const page: TronHistoryPage = { items }
       // Look ahead (cached pages, no extra request when the page is in hand) so the last page has no cursor.
       if (Math.max(await txs.peekTs(), await trc20.peekTs()) !== Number.NEGATIVE_INFINITY) {
-        page.cursor = encodeCursor({ v: 2, s: { tx: txs.position(), trc20: trc20.position() } })
+        page.cursor = encodeCursor({ v: 2, n: pageSize, s: { tx: txs.position(), trc20: trc20.position() } })
       }
       return page
     },
