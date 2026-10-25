@@ -1,7 +1,7 @@
 import { NotImplementedError, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type SupplyOptions, type WithdrawOptions } from '@anywalletkit/core'
 import { WITHDRAW_ALL, type ApiVault, type ApiVaultMetrics } from './api.js'
 import { divWadUp, fromDecimalString, lessBps, mulWad, toAmount, toDecimalString, toWad, type AmountOption } from './amounts.js'
-import { KaminoBase, type KaminoBaseConfig } from './base.js'
+import { KaminoBase, type Expectation, type KaminoBaseConfig } from './base.js'
 import { KaminoError } from './errors.js'
 
 export interface KaminoVaultConfig extends KaminoBaseConfig {
@@ -176,10 +176,19 @@ export class KaminoVaultProtocolSolana extends KaminoBase<KaminoVaultConfig> {
     return { base64, v, shares, expectedAssets }
   }
 
+  /**
+   * The asset comes in (within slippage), and the shares being redeemed may leave the wallet's
+   * share account — exactly those, no more (audit 2026-10-25, #1.3). Shares staked in the farm are
+   * unstaked into that account and burned in the same transaction, so the bound holds for both.
+   */
+  private withdrawExpectation(v: ApiVault, shares: bigint, expectedAssets: bigint): Expectation {
+    return { ...this.receiveExpectation(v.tokenMint, expectedAssets), maxTokenOut: { mint: v.sharesMint, amount: shares } }
+  }
+
   override async quoteWithdraw(o: KaminoVaultWithdrawOptions): Promise<VaultWithdrawQuote> {
     const me = await this.me()
     const { base64, v, shares, expectedAssets } = await this.planWithdraw(o, me)
-    const expect = this.receiveExpectation(v.tokenMint, expectedAssets)
+    const expect = this.withdrawExpectation(v, shares, expectedAssets)
     const { fee } = await this.quoteBuilt(base64, expect)
     return { fee, shares, expectedAssets, minAssets: expect.tokenIn!.minAmount }
   }
@@ -187,8 +196,8 @@ export class KaminoVaultProtocolSolana extends KaminoBase<KaminoVaultConfig> {
   override async withdraw(o: KaminoVaultWithdrawOptions): Promise<LendingResult> {
     this.requireSigningAccount('withdraw(options)')
     const me = await this.me()
-    const { base64, v, expectedAssets } = await this.planWithdraw(o, me)
-    return this.sendBuilt(base64, this.receiveExpectation(v.tokenMint, expectedAssets), 'withdraw')
+    const { base64, v, shares, expectedAssets } = await this.planWithdraw(o, me)
+    return this.sendBuilt(base64, this.withdrawExpectation(v, shares, expectedAssets), 'withdraw')
   }
 
   override async borrow(): Promise<LendingResult> { throw new NotImplementedError('borrow(options) — an Earn vault does not lend to its depositors; use KaminoMarketProtocolSolana.') }

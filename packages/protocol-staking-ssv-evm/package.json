@@ -42,6 +42,7 @@
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*",
     "@types/node": "^22",
     "vitest": "^5.0.3"
   },

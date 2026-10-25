@@ -1,4 +1,4 @@
-import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
+import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import {
   getAddress, hashMessage, hashTypedData, hexToBytes, keccak256, serializeTransaction, TransactionNotFoundError, zeroAddress,
@@ -7,8 +7,8 @@ import {
 import { publicKeyToAddress } from 'viem/accounts'
 import { encodeApprove, ERC20_PERMIT_ABI, PERMIT_TYPES, USDT_MAINNET } from './erc20.js'
 import { BroadcastUnknownError, ChainMismatchError, PermitUnsupportedError, SimulationError, UnsafeTransactionError } from './errors.js'
-import { WalletAccountReadOnlyEvm, chainIdNumber, cleanTypes, inferPrimaryType, transferTransaction } from './read-only-account.js'
-export { MIN_PRIORITY_FEE_WEI } from './read-only-account.js'
+import { WalletAccountReadOnlyEvm, chainIdNumber, transferTransaction, typedDataHash, typedDomainChainId } from './read-only-account.js'
+export { MIN_PRIORITY_FEE_WEI, typedDomainChainId } from './read-only-account.js'
 import type { ApproveOptions, EvmConfig, EvmTransaction, EvmTransferOptions, PermitInfo, PermitOptions, SignedPermit, TypedDataInput } from './types.js'
 
 const toHex = (u8: Uint8Array): Hex => `0x${Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')}`
@@ -69,17 +69,6 @@ export function maxFeeCost(tx: TransactionSerializable): bigint {
   return tx.gas * rate
 }
 
-/** EIP-712 domain chainId in any notation a dApp sends (number, bigint, decimal or hex string) → number. */
-export function typedDomainChainId(raw: unknown): number | undefined {
-  if (typeof raw === 'number') return Number.isSafeInteger(raw) ? raw : undefined
-  if (typeof raw === 'bigint') return raw <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(raw.toString()) : undefined
-  if (typeof raw === 'string' && /^\d+$/.test(raw)) return Number(raw)
-  if (typeof raw === 'string' && /^0x[0-9a-fA-F]+$/.test(raw)) {
-    const n = BigInt(raw)
-    return n <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(n.toString()) : undefined
-  }
-  return undefined
-}
 
 /**
  * An EVM account with a signer: signs messages, typed data, permits and transactions, and sends
@@ -183,17 +172,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   /** EIP-712. Accepts `{domain, types, message}`; `primaryType` is inferred when absent. */
   async signTypedData(typed: TypedDataInput): Promise<string> {
     await this.assertSafeTypedData(typed)
-    const types = cleanTypes(typed.types)
-    // viem includes `chainId` in the EIP712Domain type only when it is a
-    // number. A dApp that sends it as a hex or decimal STRING (Omniston's
-    // 1inch orders: "0x89") would otherwise be signed over a domain WITHOUT
-    // chainId — a signature no verifying contract accepts.
-    const chainId = typedDomainChainId(typed.domain.chainId)
-    const domain = chainId === undefined ? typed.domain : { ...typed.domain, chainId }
-    const hash = hashTypedData({
-      domain, types, primaryType: typed.primaryType ?? inferPrimaryType(types), message: typed.message,
-    } as never)
-    return this.serializeSignature(await this.signHash(hash, 'evm-712'))
+    return this.serializeSignature(await this.signHash(typedDataHash(typed), 'evm-712'))
   }
 
   /** ethers-shaped tx → viem serializable, filling gaps from the network when there is a client. */
@@ -280,10 +259,10 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
    * offline; the chain and zero-address refusals still apply. Simulation is
    * NOT run here (nothing is sent) — `sendTransaction` runs it.
    */
-  async signTransaction(tx: EvmTransaction): Promise<string> {
+  async signTransaction(tx: EvmTransaction, options: WriteOptions = {}): Promise<string> {
     await this.assertSafeTransaction(tx)
     const prepared = await this.prepare(tx)
-    this.capFee(prepared, this._config.transactionMaxFee, 'transaction')
+    this.capFee(prepared, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const hash = keccak256(serializeTransaction(prepared))
     return serializeTransaction(prepared, await this.signHash(hash, 'evm-tx'))
   }
@@ -361,12 +340,13 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     }
   }
 
-  async sendTransaction(tx: EvmTransaction): Promise<TransferResult> {
-    return this.signAndBroadcast(tx, this._config.transactionMaxFee, 'transaction')
+  /** Sign and broadcast; `options.maxFee` caps the signed fee on top of `transactionMaxFee`. */
+  async sendTransaction(tx: EvmTransaction, options: WriteOptions = {}): Promise<TransferResult> {
+    return this.signAndBroadcast(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
   }
 
-  async transfer(options: EvmTransferOptions): Promise<TransferResult> {
-    return this.signAndBroadcast(transferTransaction(options), this._config.transferMaxFee, 'transfer')
+  async transfer(options: EvmTransferOptions, writeOptions: WriteOptions = {}): Promise<TransferResult> {
+    return this.signAndBroadcast(transferTransaction(options), feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
   }
 
   // ── EIP-2612 permit ────────────────────────────────────────────────────────

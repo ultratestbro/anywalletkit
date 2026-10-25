@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { inspect } from 'node:util'
 import { bytesToHex } from 'viem'
-import { deriveSecp256k1, seedFromMnemonicSync } from '@anywalletkit/core'
+import { LocalSigner, deriveSecp256k1, seedFromMnemonicSync } from '@anywalletkit/core'
 import { describeChainModule, derivationVectors } from '@anywalletkit/conformance'
-import { WalletManagerEvm, type WalletAccountEvm } from '../src/index.js'
+import { EVM_BASE_PATH, WalletManagerEvm, type WalletAccountEvm } from '../src/index.js'
 
 describeChainModule('wallet-evm', {
   chain: 'evm',
@@ -60,5 +60,16 @@ describe('wallet-evm: an account carries no secret in its rendering (2026-10-23 
       }
       manager.dispose()
     }
+  })
+})
+
+describe('wallet-evm: dispose() during account creation (audit 2026-10-25, #3)', () => {
+  it('a child derived from an injected seed signer is not left signing after dispose()', async () => {
+    const seed = seedFromMnemonicSync(derivationVectors.seeds['hardhat-12']!)
+    const m = new WalletManagerEvm(LocalSigner.fromSeed(seed, 'secp256k1', EVM_BASE_PATH))
+    const pending = m.getAccount(1)
+    m.dispose()
+    const outcome = await pending.then(async (a) => a.sign('after dispose'), (e: unknown) => e)
+    expect(outcome).toBeInstanceOf(Error)
   })
 })

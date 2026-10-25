@@ -84,6 +84,7 @@ const ref = (caip2: string) => caip2.split(':')[1] ?? ''
 export class NetworksTable {
   private _state: NetworksState | null = null
   private _loading: Promise<NetworksState> | null = null
+  private _writes: Promise<unknown> = Promise.resolve()
   private readonly listeners = new Set<() => void>()
 
   constructor(private readonly storage: JsonStorage<NetworksState>, readonly builtins: readonly Network[] = BUILTIN_NETWORKS) {}
@@ -166,53 +167,44 @@ export class NetworksTable {
   }
 
   // ---- writes ----
+  // Each write is one serialized read → change → save (see `update`): two at once both land.
 
   /** Turn the `http://` on private addresses setting on or off. */
   async setAllowHttpLocal(v: boolean): Promise<void> {
-    const s = await this.state()
-    await this.save({ ...s, allowHttpLocal: v })
+    await this.update((s) => ({ ...s, allowHttpLocal: v }))
   }
 
   /** Add a custom network. Refused for a builtin caip2 (prepend RPCs with `addRpc` instead) and for RPCs outside the URL policy. */
   async add(network: Network): Promise<void> {
-    const s = await this.state()
-    if (this.builtin(network.caip2)) throw new NetworkError('builtin', `${network.caip2} is a builtin network — add your RPC to it instead.`)
-    if (!familyOf(network.caip2) || familyOf(network.caip2) !== network.family) throw new NetworkError('bad-network', `${network.caip2} does not belong to the ${network.family} family.`)
-    if (!network.name.trim() || !ref(network.caip2)) throw new NetworkError('bad-network', 'A network needs a name and a chain id.')
-    const urls = checkRpcUrls(network.rpcs, { allowHttpLocal: s.allowHttpLocal })
-    if (!urls.ok) throw new NetworkError('url-policy', urls.message, urls.reason)
-    if (urls.urls.length === 0) throw new NetworkError('bad-network', 'A custom network needs at least one RPC endpoint.')
-    const custom = s.custom.filter((n) => n.caip2 !== network.caip2)
-    custom.push({ ...network, kind: 'custom', rpcs: urls.urls })
-    const issues = { ...s.issues }
-    delete issues[network.caip2]
-    await this.save({ ...s, custom, issues })
+    await this.update((s) => {
+      if (this.builtin(network.caip2)) throw new NetworkError('builtin', `${network.caip2} is a builtin network — add your RPC to it instead.`)
+      if (!familyOf(network.caip2) || familyOf(network.caip2) !== network.family) throw new NetworkError('bad-network', `${network.caip2} does not belong to the ${network.family} family.`)
+      if (!network.name.trim() || !ref(network.caip2)) throw new NetworkError('bad-network', 'A network needs a name and a chain id.')
+      const urls = checkRpcUrls(network.rpcs, { allowHttpLocal: s.allowHttpLocal })
+      if (!urls.ok) throw new NetworkError('url-policy', urls.message, urls.reason)
+      if (urls.urls.length === 0) throw new NetworkError('bad-network', 'A custom network needs at least one RPC endpoint.')
+      const custom = s.custom.filter((n) => n.caip2 !== network.caip2)
+      custom.push({ ...network, kind: 'custom', rpcs: urls.urls })
+      const issues = { ...s.issues }
+      delete issues[network.caip2]
+      return { ...s, custom, issues }
+    })
   }
 
   /** Remove a custom network. Builtins cannot be removed (disable them instead). */
   async remove(caip2: string): Promise<void> {
-    const s = await this.state()
-    if (this.builtin(caip2)) throw new NetworkError('builtin', `${caip2} is a builtin network and cannot be removed — disable it instead.`)
-    if (!s.custom.some((n) => n.caip2 === caip2)) throw new NetworkError('unknown-network', `${caip2} is not in the table.`)
-    const issues = { ...s.issues }
-    delete issues[caip2]
-    await this.save({ ...s, custom: s.custom.filter((n) => n.caip2 !== caip2), issues })
+    await this.update((s) => {
+      if (this.builtin(caip2)) throw new NetworkError('builtin', `${caip2} is a builtin network and cannot be removed — disable it instead.`)
+      if (!s.custom.some((n) => n.caip2 === caip2)) throw new NetworkError('unknown-network', `${caip2} is not in the table.`)
+      const issues = { ...s.issues }
+      delete issues[caip2]
+      return { ...s, custom: s.custom.filter((n) => n.caip2 !== caip2), issues }
+    })
   }
 
   /** Replace the user's RPC list for a network (prepended to the builtin list; the whole list for a custom network). */
   async setRpcs(caip2: string, rpcs: readonly string[]): Promise<void> {
-    const s = await this.state()
-    const urls = checkRpcUrls(rpcs, { allowHttpLocal: s.allowHttpLocal })
-    if (!urls.ok) throw new NetworkError('url-policy', urls.message, urls.reason)
-    const issues = { ...s.issues, [caip2]: Object.fromEntries(Object.entries(s.issues[caip2] ?? {}).filter(([u]) => urls.urls.includes(u))) }
-    if (this.builtin(caip2)) {
-      await this.save({ ...s, overrides: { ...s.overrides, [caip2]: { ...s.overrides[caip2], userRpcs: urls.urls } }, issues })
-      return
-    }
-    const custom = s.custom.find((n) => n.caip2 === caip2)
-    if (!custom) throw new NetworkError('unknown-network', `${caip2} is not in the table.`)
-    if (urls.urls.length === 0) throw new NetworkError('last-rpc', 'A custom network needs at least one RPC endpoint — remove the network instead.')
-    await this.save({ ...s, custom: s.custom.map((n) => (n.caip2 === caip2 ? { ...n, rpcs: urls.urls } : n)), issues })
+    await this.update((s) => this.withRpcs(s, caip2, rpcs))
   }
 
   /**
@@ -222,9 +214,11 @@ export class NetworksTable {
    * @throws {@link NetworkError} `unknown-network`, or `url-policy` for a URL the policy refuses.
    */
   async addRpc(caip2: string, url: string): Promise<void> {
-    const n = await this.get(caip2)
-    if (!n) throw new NetworkError('unknown-network', `${caip2} is not in the table.`)
-    await this.setRpcs(caip2, [...n.userRpcs.filter((u) => u !== url.trim()), url.trim()])
+    await this.update((s) => {
+      const n = this.entries(s).find((e) => e.caip2 === caip2)
+      if (!n) throw new NetworkError('unknown-network', `${caip2} is not in the table.`)
+      return this.withRpcs(s, caip2, [...n.userRpcs.filter((u) => u !== url.trim()), url.trim()])
+    })
   }
 
   /**
@@ -234,9 +228,11 @@ export class NetworksTable {
    * network.
    */
   async removeRpc(caip2: string, url: string): Promise<void> {
-    const n = await this.get(caip2)
-    if (!n) throw new NetworkError('unknown-network', `${caip2} is not in the table.`)
-    await this.setRpcs(caip2, n.userRpcs.filter((u) => u !== url))
+    await this.update((s) => {
+      const n = this.entries(s).find((e) => e.caip2 === caip2)
+      if (!n) throw new NetworkError('unknown-network', `${caip2} is not in the table.`)
+      return this.withRpcs(s, caip2, n.userRpcs.filter((u) => u !== url))
+    })
   }
 
   /** Switch a network on or off (testnets ship off). */
@@ -256,16 +252,17 @@ export class NetworksTable {
 
   /** Record a verification result for one user RPC: a failure parks the URL (with the reason), a pass clears it. */
   async markRpc(caip2: string, url: string, result: VerifyResult, now: number = Date.now()): Promise<void> {
-    const s = await this.state()
-    const forChain = { ...(s.issues[caip2] ?? {}) }
-    if (result.ok) delete forChain[url]
-    else forChain[url] = { error: result.error ?? 'verification failed', at: now, ...(result.reported ? { reported: result.reported } : {}) }
-    await this.save({ ...s, issues: { ...s.issues, [caip2]: forChain } })
+    await this.update((s) => {
+      const forChain = { ...(s.issues[caip2] ?? {}) }
+      if (result.ok) delete forChain[url]
+      else forChain[url] = { error: result.error ?? 'verification failed', at: now, ...(result.reported ? { reported: result.reported } : {}) }
+      return { ...s, issues: { ...s.issues, [caip2]: forChain } }
+    })
   }
 
   /** Forget everything the user changed. */
   async reset(): Promise<void> {
-    await this.save({ ...EMPTY })
+    await this.update(() => ({ ...EMPTY }))
   }
 
   // ---- internals ----
@@ -275,14 +272,23 @@ export class NetworksTable {
   }
 
   private async patch(caip2: string, patch: NetworkOverride): Promise<void> {
-    const s = await this.state()
-    if (this.builtin(caip2)) {
-      await this.save({ ...s, overrides: { ...s.overrides, [caip2]: { ...s.overrides[caip2], ...patch } } })
-      return
-    }
+    await this.update((s) => {
+      if (this.builtin(caip2)) return { ...s, overrides: { ...s.overrides, [caip2]: { ...s.overrides[caip2], ...patch } } }
+      if (!s.custom.some((n) => n.caip2 === caip2)) throw new NetworkError('unknown-network', `${caip2} is not in the table.`)
+      const { userRpcs: _ignored, ...fields } = patch
+      return { ...s, custom: s.custom.map((n) => (n.caip2 === caip2 ? { ...n, ...fields } : n)) }
+    })
+  }
+
+  /** `s` with the user's RPC list of `caip2` replaced (see `setRpcs`). */
+  private withRpcs(s: NetworksState, caip2: string, rpcs: readonly string[]): NetworksState {
+    const urls = checkRpcUrls(rpcs, { allowHttpLocal: s.allowHttpLocal })
+    if (!urls.ok) throw new NetworkError('url-policy', urls.message, urls.reason)
+    const issues = { ...s.issues, [caip2]: Object.fromEntries(Object.entries(s.issues[caip2] ?? {}).filter(([u]) => urls.urls.includes(u))) }
+    if (this.builtin(caip2)) return { ...s, overrides: { ...s.overrides, [caip2]: { ...s.overrides[caip2], userRpcs: urls.urls } }, issues }
     if (!s.custom.some((n) => n.caip2 === caip2)) throw new NetworkError('unknown-network', `${caip2} is not in the table.`)
-    const { userRpcs: _ignored, ...fields } = patch
-    await this.save({ ...s, custom: s.custom.map((n) => (n.caip2 === caip2 ? { ...n, ...fields } : n)) })
+    if (urls.urls.length === 0) throw new NetworkError('last-rpc', 'A custom network needs at least one RPC endpoint — remove the network instead.')
+    return { ...s, custom: s.custom.map((n) => (n.caip2 === caip2 ? { ...n, rpcs: urls.urls } : n)), issues }
   }
 
   private entries(s: NetworksState): NetworkEntry[] {
@@ -320,9 +326,19 @@ export class NetworksTable {
     return this._loading
   }
 
-  private async save(next: NetworksState): Promise<void> {
-    this._state = next
-    await this.storage.set(next)
-    for (const fn of this.listeners) fn()
+  /**
+   * One write: read the current state, apply `change`, persist, then swap it into memory and
+   * notify. Writes queue behind each other, so each sees the last one's result; a failed save
+   * (or a refusal thrown by `change`) leaves memory as stored.
+   */
+  private update(change: (s: NetworksState) => NetworksState): Promise<void> {
+    const run = this._writes.then(async () => {
+      const next = change(await this.state())
+      await this.storage.set(next)
+      this._state = next
+      for (const fn of this.listeners) fn()
+    })
+    this._writes = run.catch(() => undefined)
+    return run
   }
 }

@@ -47,12 +47,16 @@ function fake(opts: FakeOptions = {}) {
     const max = u.searchParams.get('max_timestamp')
     const min = u.searchParams.get('min_timestamp')
     const inRange = (ts: number) => (max === null || ts <= Number(max)) && (min === null || ts >= Number(min))
-    if (m[2]) {
-      const rows = (TRC20[m[1]!] ?? []).filter((r) => inRange(r.block_timestamp)).slice(0, limit)
-      return json(200, { data: rows, success: true, meta: { at: 1, page_size: rows.length } })
+    // TronGrid pages along `meta.fingerprint` (opaque; here the offset of the next row).
+    const fp = u.searchParams.get('fingerprint')
+    const from = fp ? Number(Buffer.from(fp, 'base64').toString()) : 0
+    const paged = <T>(all: T[]) => {
+      const rows = all.slice(from, from + limit)
+      const next = from + limit < all.length ? { fingerprint: Buffer.from(String(from + limit)).toString('base64') } : {}
+      return json(200, { data: rows, success: true, meta: { at: 1, page_size: rows.length, ...next } })
     }
-    const rows = (TXS[m[1]!] ?? []).filter((r) => inRange(r.block_timestamp ?? 0)).slice(0, limit)
-    return json(200, { data: rows, success: true, meta: { at: 1, page_size: rows.length } })
+    if (m[2]) return paged((TRC20[m[1]!] ?? []).filter((r) => inRange(r.block_timestamp)))
+    return paged((TXS[m[1]!] ?? []).filter((r) => inRange(r.block_timestamp ?? 0)))
   }
   return { fetch, calls }
 }
@@ -77,13 +81,12 @@ async function allPages(source: ReturnType<typeof createTronHistory>, address: s
 }
 
 describe('createTronHistory: pages', () => {
-  it('maps the test wallet page: TRX in / out with fee, TRC-10 as token transfers, newest first, time window cursor', async () => {
+  it('maps the test wallet page: TRX in / out with fee, TRC-10 as token transfers, newest first, a position per list', async () => {
     const { source, calls } = src()
     expect(source.chain).toBe('tron:0x2b6653dc')
     const page = await source.listActivity(WALLET, { limit: 10 })
     expect(calls.map((c) => new URL(c.url).pathname)).toEqual([`/v1/accounts/${WALLET}/transactions`, `/v1/accounts/${WALLET}/transactions/trc20`])
-    // the oldest row sits at the window edge of a full `transactions` list and waits for the next page
-    expect(page.items).toHaveLength(9)
+    expect(page.items).toHaveLength(10)
     for (let i = 1; i < page.items.length; i++) expect(page.items[i - 1]!.time).toBeGreaterThanOrEqual(page.items[i]!.time)
     const out = page.items.find((i) => i.hash.startsWith('0b8adf5a1968'))!
     expect(out.from).toBe(WALLET)
@@ -104,10 +107,12 @@ describe('createTronHistory: pages', () => {
     expect(inbound.from).toBe('TX5XiRXdyz7sdFwF5mnhT1QoGCpbkncpke')
     expect(inbound.to).toBe(WALLET)
     expect(inbound.nativeValue).toBe(12_804_421n)
-    const c = decodeHistoryCursor(page.cursor!)
-    expect(c.w).toBe(1_788_250_521_000)
-    expect(c.x).toEqual(['0d2a0ec86f34' + page.items[8]!.hash.slice(12)])
-    expect(c.e).toEqual(['trc20'])
+    // the wallet has 10 transactions and no TRC-20 rows: this page is the whole history
+    expect(page.cursor).toBeUndefined()
+    // a shorter page: each list continues from its own position; the empty TRC-20 list is done
+    const first = await source.listActivity(WALLET, { limit: 4 })
+    expect(first.items.map((i) => i.hash)).toEqual(page.items.slice(0, 4).map((i) => i.hash))
+    expect(decodeHistoryCursor(first.cursor!)).toEqual({ v: 2, n: 20, s: { tx: { k: 4 }, trc20: null } })
   })
 
   it('pages to the end without losing or repeating a transaction, across both lists', async () => {
@@ -178,10 +183,16 @@ describe('createTronHistory: getTransaction', () => {
 
 describe('createTronHistory: cursor, errors, keys, explorer', () => {
   it('cursor round-trips and rejects garbage', () => {
-    const c = encodeHistoryCursor({ v: 1, w: 1_788_250_521_000, x: ['a', 'b'], e: ['trc20'] })
-    expect(decodeHistoryCursor(c)).toEqual({ v: 1, w: 1_788_250_521_000, x: ['a', 'b'], e: ['trc20'] })
+    const c = encodeHistoryCursor({ v: 2, n: 20, s: { tx: { f: 'ZnA=', k: 3 }, trc20: null }, t: 1_788_250_521_000, g: 2 })
+    expect(decodeHistoryCursor(c)).toEqual({ v: 2, n: 20, s: { tx: { f: 'ZnA=', k: 3 }, trc20: null }, t: 1_788_250_521_000, g: 2 })
+    expect(decodeHistoryCursor(encodeHistoryCursor({ v: 2, n: 50, s: { tx: { k: 0 }, trc20: { k: 1 } } }))).toEqual({ v: 2, n: 50, s: { tx: { k: 0 }, trc20: { k: 1 } } })
+    // the page size the positions were taken with is required and bounded
+    expect(() => decodeHistoryCursor(encodeHistoryCursor({ v: 2, s: { tx: { k: 0 }, trc20: null } } as never))).toThrow(/malformed history cursor/)
+    expect(() => decodeHistoryCursor(encodeHistoryCursor({ v: 2, n: 500, s: { tx: { k: 0 }, trc20: null } }))).toThrow(/malformed history cursor/)
     expect(() => decodeHistoryCursor('???')).toThrow(/malformed history cursor/)
-    expect(() => decodeHistoryCursor(encodeHistoryCursor({ v: 2 } as never))).toThrow(/malformed history cursor/)
+    // a cursor from the time-window format (v1) is refused: start the listing again
+    expect(() => decodeHistoryCursor(encodeHistoryCursor({ v: 1, w: 1, x: [], e: [] } as never))).toThrow(/malformed history cursor/)
+    expect(() => decodeHistoryCursor(encodeHistoryCursor({ v: 2, n: 20, s: { tx: { k: -1 }, trc20: null } } as never))).toThrow(/malformed history cursor/)
   })
 
   it('HTTP errors and TronGrid error bodies become HistoryUnavailableError with the attempt', async () => {

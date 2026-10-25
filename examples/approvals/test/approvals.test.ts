@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { derivationVectors } from '@anywalletkit/conformance'
 import { UserRejectedError } from '@anywalletkit/core'
 import type { WriteIntent } from '@anywalletkit/kit'
-import type { WalletAccountEvm } from '@anywalletkit/wallet-evm'
+import type { EvmProvider, WalletAccountEvm } from '@anywalletkit/wallet-evm'
 import ApprovalsProtocolEvm, { type Approval } from '@anywalletkit/protocol-approvals-evm'
 import { approvalPolicies, auditAddress, memoryCache, revokeOne, walletWithApprovals } from '../src/approvals.ts'
 
@@ -10,6 +10,25 @@ const SEED = derivationVectors.seeds['bip39-abandon-12']!
 const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
 const SPENDER = '0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE'
 const LOGS_RPC = process.env.LOGS_RPC ?? 'https://rpc.mevblocker.io'
+
+/**
+ * A deterministic Ethereum RPC for the offline tests: chain id, a block with a base fee, gas and
+ * fee answers — what a quote reads. Anything else (a send) fails loudly; nothing leaves the machine.
+ */
+const offlineRpc = {
+  request: async ({ method }: { method: string }) => {
+    const answers: Record<string, unknown> = {
+      eth_chainId: '0x1',
+      eth_blockNumber: '0x10',
+      eth_estimateGas: '0xb411',
+      eth_gasPrice: '0x3b9aca00',
+      eth_maxPriorityFeePerGas: '0x3b9aca00',
+      eth_getBlockByNumber: { number: '0x10', baseFeePerGas: '0x3b9aca00', timestamp: '0x1', hash: `0x${'11'.repeat(32)}`, transactions: [] },
+    }
+    if (!(method in answers)) throw new Error(`offline test: no ${method}`)
+    return answers[method]
+  },
+} as unknown as EvmProvider
 
 const usdcApproval: Approval = {
   id: `1:erc20:${USDC}:${SPENDER}`, standard: 'erc20', chainId: 1, token: USDC, spender: SPENDER,
@@ -30,6 +49,7 @@ describe('Approvals guide (docs) — offline', () => {
     const seen: WriteIntent[] = []
     const wallet = walletWithApprovals(SEED, {
       logsRpc: LOGS_RPC,
+      ethereumRpc: offlineRpc,
       cache: memoryCache(),
       policies: approvalPolicies(async (intent) => { seen.push(intent); return false }),
     })
@@ -46,6 +66,7 @@ describe('Approvals guide (docs) — offline', () => {
     const seen: WriteIntent[] = []
     const wallet = walletWithApprovals(SEED, {
       logsRpc: LOGS_RPC,
+      ethereumRpc: offlineRpc,
       cache: memoryCache(),
       policies: { blocklist: { 'eip155:1': [SPENDER] }, confirm: async (intent) => { seen.push(intent); return false } },
     })
@@ -64,6 +85,7 @@ describe('Approvals guide (docs) — offline', () => {
     const warnings: (string | undefined)[] = []
     const wallet = walletWithApprovals(SEED, {
       logsRpc: LOGS_RPC,
+      ethereumRpc: offlineRpc,
       cache: memoryCache(),
       policies: approvalPolicies(async (_intent, warning) => { warnings.push(warning); return false }),
     })

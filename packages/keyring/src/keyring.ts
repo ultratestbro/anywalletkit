@@ -400,10 +400,14 @@ export class Keyring {
   async addAccount(sourceId: string, options: { name?: string } = {}): Promise<AccountMeta> {
     const source = this.source(sourceId)
     if (source.type !== 'mnemonic') throw new KeyringError('An imported key has exactly one account — import a seed phrase to add more.', 'unsupported')
-    const index = this.nextIndex(sourceId)
-    const secret = await this.secret(sourceId)
-    const [account] = await this.store(source, [{ index, addresses: await this.deriveAddresses(secret, index) }], options.name)
-    return account!
+    const secret = await this.secret(sourceId) // the prompt, outside the queue
+    // Index, derivation and save in one serialized change: two calls at once cannot pick one index (audit #1.2).
+    let account: AccountMeta | undefined
+    await this.mutate(async (state) => {
+      const index = nextIndex(state, sourceId)
+      ;[account] = addAccounts(state, source, [{ index, addresses: await this.deriveAddresses(secret, index) }], options.name)
+    })
+    return clone(account!)
   }
 
   /**
@@ -458,7 +462,7 @@ export class Keyring {
     if (!Number.isInteger(gap) || gap < 1) throw new KeyringError('gapLimit must be a positive integer.')
     const found: { index: number; addresses: Partial<Record<ChainKey, string>> }[] = []
     let misses = 0
-    for (let index = this.nextIndex(source.id); index <= max && misses < gap; index++) {
+    for (let index = nextIndex(this._state, source.id); index <= max && misses < gap; index++) {
       const addresses = await this.deriveAddresses(secret, index)
       if (await options.isUsed(addresses, index)) {
         found.push({ index, addresses })
@@ -684,11 +688,6 @@ export class Keyring {
     return JSON.parse(raw) as Secret
   }
 
-  private nextIndex(sourceId: string): number {
-    const used = this._state.accounts.filter((a) => a.sourceId === sourceId && a.index !== null).map((a) => a.index!)
-    return used.length ? Math.max(...used) + 1 : 0
-  }
-
   private nextLabel(prefix: string): string {
     return `${prefix} ${this._state.sources.length + 1}`
   }
@@ -743,6 +742,13 @@ function clone<T>(value: T): T {
 }
 
 /** Add a source's prepared accounts to `state` (ids already there are skipped); the ones it made. */
+/** The next unused index of a seed source in `state` (a hidden index is never reused). */
+function nextIndex(state: KeyringState, sourceId: string): number {
+  const used = state.accounts.filter((a) => a.sourceId === sourceId && a.index !== null).map((a) => a.index!)
+  return used.length ? Math.max(...used) + 1 : 0
+}
+
+/** Add prepared accounts to `state`; returns the entries as stored (an id already present keeps its own). */
 function addAccounts(state: KeyringState, source: SourceMeta, prepared: { index: number | null; addresses: Partial<Record<ChainKey, string>> }[], name?: string): AccountMeta[] {
   const created: AccountMeta[] = prepared.map(({ index, addresses }) => ({
     id: index === null ? source.id : `${source.id}/${index}`,
@@ -752,13 +758,15 @@ function addAccounts(state: KeyringState, source: SourceMeta, prepared: { index:
     hidden: false,
     addresses,
   }))
-  for (const a of created) {
-    if (state.accounts.some((x) => x.id === a.id)) continue
+  const stored = created.map((a) => {
+    const existing = state.accounts.find((x) => x.id === a.id)
+    if (existing) return existing
     a.name ||= `Account ${state.accounts.length + 1}`
     state.accounts.push(a)
-  }
-  state.activeAccountId ??= created[0]?.id ?? null
-  return created
+    return a
+  })
+  state.activeAccountId ??= stored[0]?.id ?? null
+  return stored
 }
 
 function firstVisible(state: KeyringState): string | null {

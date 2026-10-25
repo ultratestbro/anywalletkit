@@ -1,4 +1,5 @@
-import { UserRejectedError, type IWalletAccount, type TransferOptions } from '@anywalletkit/core'
+import { UserRejectedError, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
+import { isConcreteChain, sameChain } from './chain-id.js'
 import { canonicalAddress, sendDestinations } from './destinations.js'
 
 /**
@@ -50,6 +51,35 @@ const QUOTABLE: readonly string[] = ['sendTransaction', 'transfer', 'signTransac
 /** Methods that sign an off-chain message: nothing moves, allow/block lists do not apply, only `confirm`. */
 const MESSAGE_METHODS: readonly string[] = ['sign', 'signNep413']
 
+/** A chain id as callers and dApps write it (number, bigint, decimal or 0x string) → decimal, or undefined. */
+function chainIdRef(v: unknown): string | undefined {
+  if (typeof v === 'number') return Number.isSafeInteger(v) && v >= 0 ? String(v) : undefined
+  if (typeof v === 'bigint') return v >= 0n ? v.toString() : undefined
+  if (typeof v === 'string' && /^(\d{1,30}|0x[0-9a-fA-F]{1,30})$/.test(v)) return BigInt(v).toString()
+  return undefined
+}
+
+/** The EVM network a transaction signs for, read off it (its `chainId`), when it carries one. */
+function signedChain(ns: string, method: string, arg: unknown): string | undefined {
+  if (ns !== 'eip155' || (method !== 'sendTransaction' && method !== 'signTransaction') || Array.isArray(arg)) return undefined
+  const ref = chainIdRef(obj(arg).chainId)
+  return ref === undefined ? undefined : `eip155:${ref}`
+}
+
+/**
+ * An off-chain signature: a message valid on every network, or typed data, whose domain chainId
+ * the chain package judges (wallet-evm refuses a foreign one unless `allowCrossChainTypedData`).
+ */
+function chainFree(method: string): boolean {
+  return MESSAGE_METHODS.includes(method) || method === 'signTypedData'
+}
+
+/** An account built without any provider (wallet-evm keeps it in `_config`): it signs offline and cannot learn its chain. */
+function isOffline(account: unknown): boolean {
+  const config = (account as { _config?: { provider?: unknown } })._config
+  return config !== undefined && (config.provider === undefined || (Array.isArray(config.provider) && config.provider.length === 0))
+}
+
 /** Permit2 primary types (Uniswap Permit2): an allowance or a transfer authorisation for `spender`. */
 const PERMIT2_TYPES = new Set(['PermitSingle', 'PermitBatch', 'PermitTransferFrom', 'PermitBatchTransferFrom', 'PermitWitnessTransferFrom', 'PermitBatchWitnessTransferFrom'])
 const MAX_UINT256 = (1n << 256n) - 1n
@@ -70,8 +100,9 @@ export type WriteKind =
   | 'message'
   /**
    * Takes rights away and moves nothing: `approve` / `signPermit` / EIP-2612 Permit of 0,
-   * `approve(spender, 0)` / `approve(0x0, tokenId)` / `setApprovalForAll(operator, false)` /
-   * Permit2 `lockdown` calldata (value 0), `revokeDelegation()`. The allowlist and the
+   * `approve(0x0, tokenId)` / `setApprovalForAll(operator, false)` / Permit2 `lockdown`
+   * calldata (value 0), `revokeDelegation()`. Raw `approve(spender, 0)` calldata is an
+   * `approval` instead: on an ERC-721 it grants token #0. The allowlist and the
    * spender's blocklist entry do not apply (revoking a drainer must stay possible); the
    * blocklist still applies to the contract the revoke calls; fee cap and `confirm` apply.
    */
@@ -126,7 +157,11 @@ export interface WriteIntent {
  * checked, a destination must be on every matching allowlist, and any matching blocklist refuses.
  */
 export interface Policies {
-  /** Per-chain fee cap in native base units; a quote above it throws before broadcast. */
+  /**
+   * Per-chain fee cap in native base units. A quote above it throws before `confirm`; the cap is
+   * then handed to the account as `WriteOptions.maxFee`, so chain packages check it again on the
+   * transaction they sign (EVM: gas limit with headroom × the signed gas price).
+   */
   maxFee?: Record<string, bigint | number>
   /** Per-chain allowlist of destinations (case-insensitive) — recipients, called contracts and approval spenders. Writes to anything else throw. */
   allowlist?: Record<string, string[]>
@@ -198,8 +233,11 @@ function revokeCall(call: unknown): Array<{ token: string; spender?: string }> |
   const word = (i: number) => words.slice(i * 64, i * 64 + 64)
   const selector = data.slice(0, 10)
   if (selector === SELECTOR_APPROVE && words.length === 128) {
-    if (word(1) === ZERO_WORD) return [{ token: to, spender: wordAddress(word(0)) }] // ERC-20 allowance → 0
-    if (word(0) === ZERO_WORD) return [{ token: to }] // ERC-721 approve(0x0, tokenId)
+    // ERC-721 approve(0x0, tokenId) clears the token's approval (an ERC-20 approve to 0x0 reverts).
+    // approve(spender, 0) is NOT read as a revoke: on an ERC-20 it zeroes the allowance, on an
+    // ERC-721 it approves `spender` for token #0, and the calldata cannot tell which (audit #5).
+    // An ERC-20 revoke that must skip the lists goes through the account's `approve({amount: 0})`.
+    if (word(0) === ZERO_WORD) return [{ token: to }]
     return null
   }
   if (selector === SELECTOR_SET_APPROVAL_FOR_ALL && words.length === 128 && word(1) === ZERO_WORD) {
@@ -216,6 +254,25 @@ function revokeCall(call: unknown): Array<{ token: string; spender?: string }> |
     for (let i = 0; i < n; i++) pairs.push({ token: wordAddress(word(2 + 2 * i)), spender: wordAddress(word(3 + 2 * i)) })
     return pairs // the call itself goes to Permit2: revokeTargets() checks that contract
   }
+  return null
+}
+
+/**
+ * Rights a raw EVM call grants, read off exact calldata shapes: `approve(spender, x)` with a
+ * non-zero spender (ERC-20 allowance or ERC-721 per-token approval) and
+ * `setApprovalForAll(operator, true)`. The lists check these spenders like any destination.
+ */
+function grantCall(call: unknown): { token: string; spender: string; amount: bigint } | null {
+  const c = obj(call)
+  const to = str(c.to)
+  const data = str(c.data)?.toLowerCase()
+  const value = big(c.value)
+  if (to === undefined || data === undefined || (value !== undefined && value !== 0n) || (c.value !== undefined && value === undefined)) return null
+  if (data.length !== 10 + 128 || !/^0x[0-9a-f]*$/.test(data)) return null
+  const [w0, w1] = [data.slice(10, 74), data.slice(74)]
+  if (w0 === ZERO_WORD) return null
+  if (data.startsWith(SELECTOR_APPROVE)) return { token: to, spender: wordAddress(w0), amount: BigInt(`0x${w1}`) }
+  if (data.startsWith(SELECTOR_SET_APPROVAL_FOR_ALL) && w1 !== ZERO_WORD) return { token: to, spender: wordAddress(w0), amount: MAX_UINT256 }
   return null
 }
 
@@ -306,7 +363,13 @@ function typedDataIntent(base: IntentBase, arg: unknown, primaryType: string): D
  */
 function withDestinations(intent: DraftIntent): WriteIntent {
   if (intent.message) return { ...intent, destinations: [], destinationUnknown: false }
-  if (intent.kind === 'approval') return { ...intent, destinations: intent.to !== undefined ? [intent.to] : [], destinationUnknown: intent.to === undefined }
+  if (intent.kind === 'approval') {
+    // Raw approval calldata (sendTransaction / signTransaction, one call or a one-call batch):
+    // the contract called is checked as well as the spender.
+    const raw = intent.method === 'sendTransaction' || intent.method === 'signTransaction' ? (Array.isArray(intent.raw) ? intent.raw : [intent.raw]) : []
+    const called = raw.flatMap((c) => { const to = str(obj(c).to); return to !== undefined ? [to] : [] })
+    return { ...intent, destinations: [...called, ...(intent.to !== undefined ? [intent.to] : [])], destinationUnknown: intent.to === undefined }
+  }
   if (intent.kind === 'revoke') return { ...intent, destinations: revokeTargets(intent), destinationUnknown: false }
   if (intent.method === 'transfer') {
     const r = str(obj(intent.raw).recipient) ?? str(obj(intent.raw).to)
@@ -315,7 +378,9 @@ function withDestinations(intent: DraftIntent): WriteIntent {
   // signRaw is Tron's prebuilt-transaction signer and signBuilt NEAR's, whatever chain id the account reports.
   const chain = intent.method === 'signRaw' ? 'tron:' : intent.method === 'signBuilt' ? 'near:' : intent.chain
   const d = sendDestinations(chain, intent.raw)
-  return { ...intent, destinations: d.list, destinationUnknown: d.unknown }
+  // A batch may carry approvals among its calls: their spenders are destinations too.
+  const granted = chain.startsWith('eip155:') && Array.isArray(intent.raw) ? intent.raw.flatMap((c) => { const g = grantCall(c); return g ? [g.spender] : [] }) : []
+  return { ...intent, destinations: [...d.list, ...granted], destinationUnknown: d.unknown }
 }
 
 function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown): WriteIntent {
@@ -362,6 +427,9 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
     const calls = Array.isArray(arg) ? arg : [arg]
     const found = calls.length > 0 && !calls.some(carriesForeignPayload) ? calls.map(revokeCall) : [null]
     if (found.every((r) => r !== null)) return revokeIntent(base, found.flat() as Array<{ token: string; spender?: string }>)
+    // One raw approve / setApprovalForAll(true): an approval of the spender it names.
+    const grant = calls.length === 1 && !carriesForeignPayload(calls[0]) ? grantCall(calls[0]) : null
+    if (grant) return approvalIntent(base, grant.spender, grant.token, grant.amount, undefined, unboundedAllowance(grant.amount))
   }
   const to = str(a.to) ?? str(a.recipient)
   const amount = big(a.amount ?? a.value)
@@ -375,7 +443,8 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
  * allow/block lists (not for message signatures) → confirm → original call.
  * `signTransaction` is guarded like a send: a module that signs and
  * broadcasts on its own cannot skip the policies. Approvals (`approve`,
- * `signPermit`, EIP-2612 / Permit2 typed data) are checked against the
+ * `signPermit`, EIP-2612 / Permit2 typed data, raw `approve` /
+ * `setApprovalForAll(…, true)` calldata) are checked against the
  * SPENDER: a blocklisted or non-allowlisted spender is refused, and `confirm`
  * sees `kind: 'approval'` with `unlimited`. A revoke (an approval of 0, the
  * revoke calldata the approvals module sends, `revokeDelegation`) is
@@ -390,29 +459,63 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
  * check and is not confirmed a second time.
  *
  * `chain` is the CAIP-2 id the account was asked for (`Wallet.getAccount`
- * passes it). The rules of that id AND of `account.chain` both apply: an EVM
- * account built without `chainId` reports "eip155:unknown" until its first
- * RPC call, and a namespace registration can hand out an account whose RPC
- * is on another network than the one asked for — neither may let a write
- * slip past the rules written for the chain the app meant.
+ * passes it). Before any rule or `confirm`, the account's own network is
+ * settled — an EVM account built without `chainId` reports "eip155:unknown"
+ * until its first RPC call, so `getChainId()` is asked — and a write whose
+ * account is on another network than `chain` (a namespace registration with
+ * the RPC elsewhere) is refused with `PolicyViolationError('chain')`: confirm
+ * would show one chain while the signature is for another. Short and
+ * genesis spellings of one network match (see `sameChain`). An account that
+ * cannot tell its network answers to the rules of `chain`.
  */
 export function applyPolicies<A extends IWalletAccount>(account: A, policies: Policies, chain?: string): A {
-  const chainsOf = () => [...new Set([chain, account.chain].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
   const rules = [policies.maxFee, policies.allowlist, policies.blocklist]
   const hasRuleFor = (key: (k: string) => boolean) => rules.some((m) => m !== undefined && Object.keys(m).some(key))
   const guard = async (method: WriteMethod, arg: unknown) => {
-    let chains = chainsOf()
     const ns = account.chain.split(':')[0]!
-    if (chains.length === 0 && hasRuleFor((k) => k === ns || k.startsWith(`${ns}:`))) {
-      // Called without `chain` on an EVM account that has not asked its RPC yet: learn the chain id now (audit F4).
-      const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
-      if (account.chain.endsWith(':unknown') && typeof getChainId === 'function') chains = [`${ns}:${await getChainId.call(account)}`]
-      // Still unknown: the namespace's own rules need no chain id, but an exact rule of this family
-      // could be the account's chain — refuse instead of letting the write through unchecked.
-      if (chains.length === 0 && hasRuleFor((k) => k.startsWith(`${ns}:`))) {
-        throw new PolicyViolationError('chain', `The account's chain is unknown (${account.chain}), so its policies cannot be applied.`)
+    // The network the write really goes to, before any rule, confirm or signature (audit #7): the
+    // account's own and, for an EVM transaction that carries one, its chainId. An EVM account that
+    // has not asked its RPC yet reports "eip155:unknown": learn its chain id — unless the write is
+    // an off-chain signature (a message, valid on every network; typed data, whose domain chainId
+    // the chain package judges, e.g. wallet-evm's `allowCrossChainTypedData`) and no rule needs it.
+    const signed = signedChain(ns, method, arg)
+    const known = isConcreteChain(account.chain) ? account.chain : undefined
+    const offChain = chainFree(method)
+    const exactRules = hasRuleFor((k) => k.startsWith(`${ns}:`))
+    let learned: string | undefined
+    const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
+    // A message needs no chain id at all: no list or cap applies to it.
+    const message = MESSAGE_METHODS.includes(method)
+    const needed = !offChain || (!message && !isConcreteChain(chain) && exactRules)
+    if (known === undefined && needed && typeof getChainId === 'function') {
+      try {
+        learned = `${ns}:${await getChainId.call(account)}`
+      } catch (err) {
+        // Only an account with no provider at all (it signs offline) is judged by the rules of
+        // `chain`, as before; a provider that fails is no reason to skip the check.
+        if (!isOffline(account)) throw err
       }
     }
+    const own = known ?? learned
+    if (!offChain) {
+      // Asked for one network, signing on another (a namespace registration whose RPC is elsewhere,
+      // a transaction for another chain id): confirm would show the wrong chain and the rules of
+      // the wrong chain would judge it. Without `chain`, the account's own network is the one asked.
+      const asked = isConcreteChain(chain) ? chain : own
+      for (const c of [signed, own]) {
+        if (c !== undefined && asked !== undefined && !sameChain(asked, c)) {
+          throw new PolicyViolationError('chain', `This write signs for ${c}, not for ${asked} it was asked for; nothing was signed.`)
+        }
+      }
+    }
+    // The account's network is unknown and none was asked for: the namespace's own rules need no
+    // chain id, but an exact rule of this family could be the account's — refuse rather than guess
+    // (a chainId the write carries says what is signed, not which rules the account answers to).
+    if (own === undefined && !isConcreteChain(chain) && exactRules && !message) {
+      throw new PolicyViolationError('chain', `The account's chain is unknown (${account.chain}), so its policies cannot be applied.`)
+    }
+    // The rules of every network in play apply: the one asked for, the account's own, the one signed for.
+    const chains = [...new Set([chain, own, signed].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
     // Every rule key that covers the asked-for chain or the account's own: namespace and exact ids.
     const keys = chains.length > 0 ? [...new Set(chains.flatMap(ruleKeys))] : [ns]
     const intent = intentOf(chains[0] ?? account.chain, await account.getAddress(), method, arg)
@@ -432,26 +535,30 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         if (hit) throw new PolicyViolationError('blocklist', `Contract ${hit} is on the ${k} blocklist.`)
       }
     } else if (!intent.message) {
-      const what = intent.kind === 'approval' ? 'Spender' : 'Destination'
+      // The spender of an approval, or a recipient / contract called (raw approval calldata has both).
+      const what = (d: string | undefined) => (intent.kind === 'approval' && d !== undefined && d === intent.to ? 'Spender' : 'Destination')
       // Each matching allowlist must hold every destination (their intersection); any matching blocklist refuses (their union).
       for (const k of keys) {
         const allow = listed(k, policies.allowlist?.[k])
         if (allow) {
           const outside = intent.destinations.find((d) => !allow.has(canonicalAddress(k, d)))
           if (outside !== undefined || intent.destinations.length === 0 || intent.destinationUnknown) {
-            throw new PolicyViolationError('allowlist', `${what} ${outside ?? '(unknown)'} is not on the ${k} allowlist.`)
+            throw new PolicyViolationError('allowlist', `${what(outside)} ${outside ?? '(unknown)'} is not on the ${k} allowlist.`)
           }
         }
         const block = listed(k, policies.blocklist?.[k])
         if (block) {
           const hit = intent.destinations.find((d) => block.has(canonicalAddress(k, d)))
-          if (hit !== undefined) throw new PolicyViolationError('blocklist', `${what} ${hit} is on the ${k} blocklist.`)
+          if (hit !== undefined) throw new PolicyViolationError('blocklist', `${what(hit)} ${hit} is on the ${k} blocklist.`)
           // Fail closed only when nobody else can look (scan F16); with a confirm hook it sees destinationUnknown.
           if (intent.destinationUnknown && !policies.confirm) throw new PolicyViolationError('blocklist', `Cannot tell every destination of this ${intent.method} on ${k}, and the ${k} blocklist is on with no confirm hook to ask.`)
         }
       }
     }
     if (policies.confirm && !(await policies.confirm(intent))) throw new UserRejectedError('The write was not confirmed.')
+    // The quote is an estimate: the account signs its own gas limit (with headroom) and fee fields.
+    // Hand it the tightest cap so it checks the transaction it is about to sign (audit #4).
+    return caps.length > 0 && QUOTABLE.includes(method) ? caps.reduce((a, b) => (b.cap < a.cap ? b : a)).cap : undefined
   }
   const wrapped = new Map<string, (...args: unknown[]) => Promise<unknown>>()
   return new Proxy(account, {
@@ -463,7 +570,13 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         if (!fn) {
           const original = v as (...args: unknown[]) => Promise<unknown>
           fn = async (...args: unknown[]) => {
-            await guard(prop, args[0])
+            const maxFee = await guard(prop, args[0])
+            if (maxFee !== undefined) {
+              // sendTransaction / signTransaction / transfer take WriteOptions second; a tighter caller cap stays.
+              const given = obj(args[1]) as WriteOptions
+              const tighter = given.maxFee !== undefined && BigInt(given.maxFee) < maxFee ? BigInt(given.maxFee) : maxFee
+              return original.apply(target, [args[0], { ...given, maxFee: tighter }, ...args.slice(2)])
+            }
             // EIP-712 without primaryType: hand the signer the type the policy judged, so the two cannot diverge (scan F13).
             // Same struct, same hash — only the inference is made explicit.
             if (prop === 'signTypedData' && typeof args[0] === 'object' && args[0] !== null && str(obj(args[0]).primaryType) === undefined) {

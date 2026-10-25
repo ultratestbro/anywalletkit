@@ -1,4 +1,5 @@
-import { isValidSeedPhrase, normalizeMnemonic, seedFromMnemonicSync, zeroize, type ActivityItem, type ChainTx, type DescribeActivityContext, type HistorySource, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type WalletManager } from '@anywalletkit/core'
+import { copyBytes, isValidSeedPhrase, normalizeMnemonic, seedFromMnemonicSync, zeroize, type ActivityItem, type ChainTx, type DescribeActivityContext, type HistorySource, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type WalletManager } from '@anywalletkit/core'
+import { isConcreteChain, sameChain } from './chain-id.js'
 import { applyPolicies, type Policies } from './policies.js'
 import { buildFeed, describeSingle, type ActivityOptions, type ActivityRecognizer, type FeedAddress, type FeedItem, type HistoryFeedPage, type HistoryFeedQuery } from './activity/feed.js'
 import type { IntentJournal } from './activity/journal.js'
@@ -60,6 +61,7 @@ export class Wallet {
   private readonly _protocols = new Map<string, ProtocolRegistration>()
   private readonly _protocolInstances = new Map<string, unknown>()
   private readonly _historySources = new Map<string, HistorySource>()
+  private readonly _guarded = new WeakMap<object, Map<string, IWalletAccount>>()
   private readonly _activity: ActivityOptions
   private _journal: IntentJournal | undefined
 
@@ -69,7 +71,7 @@ export class Wallet {
       WALLET_SEEDS.set(this, seedFromMnemonicSync(normalizeMnemonic(seedOrSigner)))
     } else if (seedOrSigner instanceof Uint8Array) {
       if (seedOrSigner.length !== 64) throw new Error(`A BIP-39 seed is 64 bytes; got ${seedOrSigner.length}.`)
-      WALLET_SEEDS.set(this, seedOrSigner.slice())
+      WALLET_SEEDS.set(this, copyBytes(seedOrSigner))
     } else {
       this._signer = seedOrSigner
     }
@@ -132,10 +134,25 @@ export class Wallet {
     return reg.manager as M
   }
 
-  /** Account `index` on `chain`, wrapped with the wallet's policies. */
+  /**
+   * Account `index` on `chain`, wrapped with the wallet's policies. Its writes are refused
+   * (`PolicyViolationError`, `policy: 'chain'`) when the account signs on another network than
+   * `chain` — one namespace registration with its RPC elsewhere — with or without policies; its
+   * reads (the address is the same across a family) keep working, so history and activity do.
+   */
   async getAccount<A extends IWalletAccount = IWalletAccount>(chain: string, index = 0): Promise<A> {
     const account = (await this.getManager(chain).getAccount(index)) as A
-    return this._policies ? applyPolicies(account, this._policies, chain) : account
+    // One wrapper per account and asked-for chain: the same object every call, as the account is.
+    let byChain = this._guarded.get(account)
+    const cached = byChain?.get(chain)
+    if (cached) return cached as A
+    // No policies: still guard the network when it is not known to match.
+    const matches = isConcreteChain(account.chain) && sameChain(chain, account.chain)
+    if (!this._policies && (!isConcreteChain(chain) || matches)) return account
+    if (!byChain) this._guarded.set(account, (byChain = new Map()))
+    const guarded = applyPolicies(account, this._policies ?? {}, chain)
+    byChain.set(chain, guarded)
+    return guarded as A
   }
 
   /** The protocol instance (one per name), constructed over the account of its chain. */

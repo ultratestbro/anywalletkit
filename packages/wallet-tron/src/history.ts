@@ -5,10 +5,13 @@
  * `/wallet/gettransactionbyid` + `/wallet/gettransactioninfobyid` for a single
  * transaction (exact fee, TRC-20 Transfer logs).
  *
- * Both lists page by `max_timestamp` (inclusive, ms), so a page is a time
- * window that is complete across both lists; the cursor carries the window's
- * lower edge plus the txIDs already emitted at exactly that timestamp. Keyless
- * TronGrid allows ~1 request/s per endpoint; pass `apiKey` for more.
+ * Each list is read on its own continuation (TronGrid's `meta.fingerprint`):
+ * the cursor holds, per list, the fingerprint of the page with its unread rows
+ * and how many of them were already consumed. The rows of one transaction
+ * share a block timestamp, so a timestamp's rows are read from both lists
+ * together and merged by txID; when they do not fit the page, the cursor also
+ * counts the transactions of that timestamp already emitted. Keyless TronGrid
+ * allows ~1 request/s per endpoint; pass `apiKey` for more.
  * `fetch` + `AbortSignal.timeout` only — Hermes-safe.
  */
 import type { ChainCall, ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@anywalletkit/core'
@@ -83,22 +86,34 @@ export class HistoryUnavailableError extends Error {
 }
 
 const DEFAULT_LIMIT = 25
+/** Rows asked of the API per request at least, so a small `limit` does not cost one request per row. */
+const MIN_PAGE = 20
+/** Pages one list may fetch in one call: far beyond one block timestamp of one address, a bound on a runaway API. */
+const MAX_PAGES_PER_CALL = 500
 const MAX_LIMIT = 200
 const DEFAULT_TIMEOUT_MS = 15_000
 const DEFAULT_URLS: Record<TronNetwork, string> = { mainnet: 'https://api.trongrid.io', shasta: 'https://api.shasta.trongrid.io', nile: 'https://nile.trongrid.io' }
 /** keccak256("Transfer(address,address,uint256)") */
 export const TRANSFER_TOPIC = 'ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
 
-// ── Cursor: time window, base64 JSON ─────────────────────────────────────────
+// ── Cursor: a position per list, base64 JSON ─────────────────────────────────
+
+/** Where a list's unread rows start: the page (by the fingerprint that fetched it; absent = the first page) and rows of it already consumed. */
+export interface TronListPosition {
+  f?: string
+  k: number
+}
 
 export interface TronHistoryCursor {
-  v: 1
-  /** `max_timestamp` (ms, inclusive) for the next page. */
-  w: number
-  /** txIDs already emitted at exactly `w`. */
-  x: string[]
-  /** Lists that returned their last row. */
-  e: Array<'tx' | 'trc20'>
+  v: 2
+  /** Rows per API request the positions were taken with: a fingerprint's page is only the same page at the same size. */
+  n: number
+  /** Per list, where its unread rows start; `null` once the list is read to the end. */
+  s: { tx: TronListPosition | null; trc20: TronListPosition | null }
+  /** Block timestamp (ms) whose transactions were only partly emitted; both positions point at its first row. */
+  t?: number
+  /** How many of `t`'s transactions (in txID order) were already emitted. */
+  g?: number
 }
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -140,8 +155,20 @@ export function decodeCursor(s: string): TronHistoryCursor {
     throw new Error('@anywalletkit/wallet-tron: malformed history cursor')
   }
   const c = parsed as Partial<TronHistoryCursor> | null
-  if (!c || c.v !== 1 || typeof c.w !== 'number' || !Array.isArray(c.x) || !Array.isArray(c.e)) throw new Error('@anywalletkit/wallet-tron: malformed history cursor')
-  return { v: 1, w: c.w, x: c.x.filter((x): x is string => typeof x === 'string'), e: c.e.filter((x): x is 'tx' | 'trc20' => x === 'tx' || x === 'trc20') }
+  const pos = (p: unknown): TronListPosition | null | undefined => {
+    if (p === null) return null
+    const q = p as Partial<TronListPosition> | undefined
+    if (!q || typeof q.k !== 'number' || !Number.isInteger(q.k) || q.k < 0 || (q.f !== undefined && typeof q.f !== 'string')) return undefined
+    return q.f === undefined ? { k: q.k } : { f: q.f, k: q.k }
+  }
+  const tx = pos(c?.s?.tx), trc20 = pos(c?.s?.trc20)
+  const n = c?.n
+  if (!c || c.v !== 2 || tx === undefined || trc20 === undefined || typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > MAX_LIMIT) {
+    throw new Error('@anywalletkit/wallet-tron: malformed history cursor')
+  }
+  const out: TronHistoryCursor = { v: 2, n, s: { tx, trc20 } }
+  if (typeof c.t === 'number' && typeof c.g === 'number' && Number.isInteger(c.g) && c.g > 0) { out.t = c.t; out.g = c.g }
+  return out
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -399,10 +426,63 @@ export function createTronHistory(options: TronHistoryOptions = {}): TronHistory
     return body
   }
 
-  async function list<T>(path: string, params: Record<string, string | number | undefined>): Promise<T[]> {
+  async function list<T>(path: string, params: Record<string, string | number | undefined>): Promise<{ data: T[]; next?: string }> {
     const q = Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&')
-    const body = (await request(`${path}?${q}`)) as { data?: T[] } | undefined
-    return body?.data ?? []
+    const body = (await request(`${path}?${q}`)) as { data?: T[]; meta?: { fingerprint?: unknown } } | undefined
+    const data = body?.data ?? []
+    const next = typeof body?.meta?.fingerprint === 'string' && body.meta.fingerprint && data.length > 0 ? body.meta.fingerprint : undefined
+    return next ? { data, next } : { data }
+  }
+
+  /**
+   * One list read in order from `at` (null = already read to the end), page by page along
+   * `meta.fingerprint`. `position()` is where its unread rows start, for the cursor.
+   */
+  function stream<T>(path: string, params: Record<string, string | number | undefined>, at: TronListPosition | null, ts: (row: T) => number) {
+    let pos: TronListPosition | null = at
+    let rows: T[] | undefined
+    let next: string | undefined
+    const fetched = new Set<string>()
+    const fill = async (): Promise<T | undefined> => {
+      while (pos) {
+        if (!rows) {
+          // A fingerprint this call already followed means the API is not advancing (a gateway that
+          // drops the parameter answers the first page again): the list ends here instead of looping.
+          if (pos.f !== undefined && fetched.has(pos.f)) { pos = null; break }
+          // Never end a list early on the bound: fail the call and leave the cursor where it was.
+          if (fetched.size >= MAX_PAGES_PER_CALL) throw new HistoryUnavailableError(chain, `${path}: more than ${MAX_PAGES_PER_CALL} pages in one call`)
+          if (pos.f !== undefined) fetched.add(pos.f)
+          const page = await list<T>(path, pos.f === undefined ? params : { ...params, fingerprint: pos.f })
+          if (pos.f !== undefined && page.next === pos.f) { pos = null; break }
+          rows = page.data
+          next = page.next
+        }
+        if (pos.k < rows.length) return rows[pos.k]
+        if (next === undefined) { pos = null; break }
+        pos = { f: next, k: 0 }
+        rows = undefined
+      }
+      return undefined
+    }
+    return {
+      /** Timestamp of the next unread row, or -∞ at the end. */
+      async peekTs(): Promise<number> {
+        const r = await fill()
+        return r === undefined ? Number.NEGATIVE_INFINITY : ts(r)
+      },
+      /** Consume every next row at timestamp `t`, across page boundaries. */
+      async takeAt(t: number): Promise<T[]> {
+        const out: T[] = []
+        for (let r = await fill(); r !== undefined && ts(r) === t; r = await fill()) {
+          out.push(r)
+          pos = { ...pos!, k: pos!.k + 1 }
+        }
+        return out
+      },
+      position(): TronListPosition | null {
+        return pos ? { ...pos } : null
+      },
+    }
   }
 
   return {
@@ -411,49 +491,40 @@ export function createTronHistory(options: TronHistoryOptions = {}): TronHistory
     async listActivity(address: string, query: HistoryQuery = {}): Promise<TronHistoryPage> {
       const limit = Math.min(MAX_LIMIT, Math.max(1, Math.floor(query.limit ?? DEFAULT_LIMIT)))
       const cursor = query.cursor ? decodeCursor(query.cursor) : undefined
-      const exhausted = new Set<'tx' | 'trc20'>(cursor?.e ?? [])
-      const skip = new Set(cursor?.x ?? [])
-      const common: Record<string, string | number | undefined> = { limit, order_by: 'block_timestamp,desc', max_timestamp: cursor?.w }
+      // The API page size is the cursor's: its positions are offsets into pages of that size.
+      const pageSize = cursor?.n ?? Math.max(limit, MIN_PAGE)
+      const common: Record<string, string | number | undefined> = { limit: pageSize, order_by: 'block_timestamp,desc' }
       if (query.since !== undefined) common.min_timestamp = query.since * 1000
-      const txRows = exhausted.has('tx') ? [] : await list<TronGridTx>(`/v1/accounts/${encodeURIComponent(address)}/transactions`, common)
-      const trc20Rows = exhausted.has('trc20') ? [] : await list<TronGridTrc20>(`/v1/accounts/${encodeURIComponent(address)}/transactions/trc20`, common)
-      // A list that came back full has more below its last row: the window is complete only above the newest such tail.
-      const tails: number[] = []
-      if (!exhausted.has('tx') && txRows.length >= limit) tails.push(txRows[txRows.length - 1]!.block_timestamp ?? 0)
-      if (!exhausted.has('trc20') && trc20Rows.length >= limit) tails.push(trc20Rows[trc20Rows.length - 1]!.block_timestamp)
-      const cutoff = tails.length ? Math.max(...tails) : Number.NEGATIVE_INFINITY
+      const base = `/v1/accounts/${encodeURIComponent(address)}/transactions`
+      const txs = stream<TronGridTx>(base, common, cursor ? cursor.s.tx : { k: 0 }, (r) => r.block_timestamp ?? 0)
+      const trc20 = stream<TronGridTrc20>(`${base}/trc20`, common, cursor ? cursor.s.trc20 : { k: 0 }, (r) => r.block_timestamp)
 
-      const byId = new Map<string, { ts: number; tx?: TronGridTx; trc20: TronGridTrc20[] }>()
-      for (const r of txRows) {
-        if (skip.has(r.txID)) continue
-        const e = byId.get(r.txID) ?? { ts: r.block_timestamp ?? 0, trc20: [] }
-        e.tx = r
-        byId.set(r.txID, e)
+      const items: TronChainTx[] = []
+      let resume: { t: number; g: number } | undefined = cursor?.t !== undefined ? { t: cursor.t, g: cursor.g ?? 0 } : undefined
+      while (items.length < limit) {
+        const t = Math.max(await txs.peekTs(), await trc20.peekTs())
+        if (t === Number.NEGATIVE_INFINITY) break
+        // One block timestamp at a time, from both lists: every row of a transaction shares it.
+        const startTx = txs.position(), startTrc20 = trc20.position()
+        const byId = new Map<string, { tx?: TronGridTx; trc20: TronGridTrc20[] }>()
+        for (const r of await txs.takeAt(t)) byId.set(r.txID, { ...byId.get(r.txID), tx: r, trc20: byId.get(r.txID)?.trc20 ?? [] })
+        for (const r of await trc20.takeAt(t)) { const e = byId.get(r.transaction_id) ?? { trc20: [] }; e.trc20.push(r); byId.set(r.transaction_id, e) }
+        // txID order: the same block reads the same way on every call, whatever order each list gave.
+        const groups = [...byId.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        const done = resume?.t === t ? resume.g : 0
+        resume = undefined
+        const room = limit - items.length
+        const emit = groups.slice(done, done + room)
+        for (const [, e] of emit) items.push(e.tx ? mapTransactionRow(chain, address, e.tx, { trc20: e.trc20 }) : mapTrc20Only(chain, address, e.trc20))
+        if (done + emit.length < groups.length) {
+          // The block did not fit: come back to its first row and skip what was emitted.
+          return { items, cursor: encodeCursor({ v: 2, n: pageSize, s: { tx: startTx, trc20: startTrc20 }, t, g: done + emit.length }) }
+        }
       }
-      for (const r of trc20Rows) {
-        if (skip.has(r.transaction_id)) continue
-        const e = byId.get(r.transaction_id) ?? { ts: r.block_timestamp, trc20: [] }
-        e.trc20.push(r)
-        byId.set(r.transaction_id, e)
-      }
-      let entries = [...byId.entries()].sort((a, b) => b[1].ts - a[1].ts)
-      let inWindow = entries.filter(([, e]) => e.ts > cutoff)
-      // Degenerate case: everything sits at the cutoff timestamp; emit those and remember them.
-      if (inWindow.length === 0 && entries.length > 0) inWindow = entries.filter(([, e]) => e.ts === cutoff)
-      entries = inWindow.slice(0, limit)
-      const items = entries.map(([, e]) => (e.tx ? mapTransactionRow(chain, address, e.tx, { trc20: e.trc20 }) : mapTrc20Only(chain, address, e.trc20)))
-      // A short list is finished only once every row it returned has been emitted (now or on an earlier page).
-      const emitted = new Set(entries.map(([id]) => id))
-      const done = (id: string) => emitted.has(id) || skip.has(id)
-      if (!exhausted.has('tx') && txRows.length < limit && txRows.every((r) => done(r.txID))) exhausted.add('tx')
-      if (!exhausted.has('trc20') && trc20Rows.length < limit && trc20Rows.every((r) => done(r.transaction_id))) exhausted.add('trc20')
       const page: TronHistoryPage = { items }
-      const more = exhausted.size < 2
-      if (more && entries.length > 0) {
-        const last = entries[entries.length - 1]![1].ts
-        const x = entries.filter(([, e]) => e.ts === last).map(([id]) => id)
-        if (last === cursor?.w) for (const id of skip) x.push(id)
-        page.cursor = encodeCursor({ v: 1, w: last, x, e: [...exhausted] })
+      // Look ahead (cached pages, no extra request when the page is in hand) so the last page has no cursor.
+      if (Math.max(await txs.peekTs(), await trc20.peekTs()) !== Number.NEGATIVE_INFINITY) {
+        page.cursor = encodeCursor({ v: 2, n: pageSize, s: { tx: txs.position(), trc20: trc20.position() } })
       }
       return page
     },

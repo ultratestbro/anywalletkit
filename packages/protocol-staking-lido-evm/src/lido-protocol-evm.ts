@@ -1,6 +1,6 @@
 import type { ActivityItem, ChainTx, DescribeActivityContext, IWalletAccountReadOnly } from '@anywalletkit/core'
 import {
-  compactSignatureToSignature, createPublicClient, custom, encodeFunctionData, http, isAddress, parseCompactSignature, parseSignature, zeroAddress,
+  compactSignatureToSignature, createPublicClient, custom, encodeFunctionData, fallback, http, isAddress, parseCompactSignature, parseSignature, zeroAddress,
   type Address, type Hex, type PublicClient,
 } from 'viem'
 
@@ -62,8 +62,8 @@ export interface StakingWalletAccount {
 type WritableStakingWalletAccount = StakingWalletAccount & { sendTransaction: NonNullable<StakingWalletAccount['sendTransaction']> }
 
 export interface LidoProtocolConfig {
-  /** RPC url or EIP-1193 provider; defaults to the account's provider. */
-  provider?: LidoProvider
+  /** RPC url(s) or EIP-1193 provider(s); a list fails over in order. Defaults to the account's provider. */
+  provider?: LidoProvider | LidoProvider[]
   /** Default 1. Other chains must also pass addresses and permitDomains. */
   chainId?: number
   /** Lido Rewards-Share referral forwarded to submit(). Defaults to the zero address. */
@@ -205,11 +205,12 @@ export default class LidoProtocolEvm extends StakingProtocol<LidoProtocolConfig>
 
     // A wallet-evm account keeps its RPC in a protected `_config`; read it without making it part of the type
     // (a public `_config` here made every real account fail to type-check against this interface).
-    const provider = config.provider ?? (account as { _config?: { provider?: LidoProvider } } | undefined)?._config?.provider
-    if (provider) {
-      this._provider = createPublicClient({
-        transport: typeof provider === 'string' ? http(provider) : custom(provider),
-      })
+    // A list (wallet-evm's failover config) fails over in order, as the account's own client does.
+    const provider = config.provider ?? (account as { _config?: { provider?: LidoProvider | LidoProvider[] } } | undefined)?._config?.provider
+    const list = provider === undefined ? [] : Array.isArray(provider) ? provider : [provider]
+    if (list.length > 0) {
+      const toTransport = (p: LidoProvider) => (typeof p === 'string' ? http(p) : custom(p))
+      this._provider = createPublicClient({ transport: list.length === 1 ? toTransport(list[0]!) : fallback(list.map(toTransport)) })
     }
   }
 

@@ -1,4 +1,4 @@
-import { LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
+import { LocalSigner, SignerError, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { addressFromPublicKey, toHexAddress } from './address.js'
 import { describeTransaction } from './describe.js'
@@ -133,10 +133,10 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
   }
 
   /** Build (via the node), check, simulate and sign; returns broadcast-ready transaction JSON. */
-  async signTransaction(tx: TronTransaction): Promise<string> {
+  async signTransaction(tx: TronTransaction, options: WriteOptions = {}): Promise<string> {
     this.key()
     this.requireClient('sign transactions')
-    const { built } = await this.prepare(tx, this._config.transactionMaxFee, 'transaction')
+    const { built } = await this.prepare(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return JSON.stringify(await this.signRaw(built))
   }
 
@@ -156,20 +156,20 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     return r.txid ?? signed.txID
   }
 
-  async sendTransaction(tx: TronTransaction | string): Promise<TronTransferResult> {
+  async sendTransaction(tx: TronTransaction | string, options: WriteOptions = {}): Promise<TronTransferResult> {
     this.key()
     this.requireClient('send transactions')
     const parsed: TronTransaction = typeof tx === 'string' ? (JSON.parse(tx) as TronRawTransaction) : tx
-    const { built, quote } = await this.prepare(parsed, this._config.transactionMaxFee, 'transaction')
+    const { built, quote } = await this.prepare(parsed, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const signed = isPrebuilt(parsed) && parsed.signature?.length ? built : await this.signRaw(built)
     return { hash: await this.broadcast(signed), fee: quote.fee, activationFee: quote.activationFee, estimate: quote.estimate }
   }
 
   /** TRX (no `token`) or TRC-20 `transfer(address,uint256)`. */
-  async transfer(o: TronTransferOptions): Promise<TronTransferResult> {
+  async transfer(o: TronTransferOptions, writeOptions: WriteOptions = {}): Promise<TronTransferResult> {
     this.key()
     this.requireClient('transfer tokens')
-    const { built, quote } = await this.prepare(this.asTransaction(o), this._config.transferMaxFee, 'transfer')
+    const { built, quote } = await this.prepare(this.asTransaction(o), feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
     return { hash: await this.broadcast(await this.signRaw(built)), fee: quote.fee, activationFee: quote.activationFee, estimate: quote.estimate }
   }
 

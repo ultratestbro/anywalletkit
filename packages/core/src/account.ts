@@ -63,6 +63,23 @@ export interface IWalletAccountReadOnly {
   verify(message: string | Uint8Array, signature: string): Promise<boolean>
 }
 
+/** Per-call limits of one write, on top of the account's own configuration. */
+export interface WriteOptions {
+  /**
+   * Cap on this write's worst-case network fee, in native base units. Checked by the chain
+   * package on the transaction it is about to sign (EVM: its gas limit × its own gas price), with
+   * the tighter of this and the account's configured cap winning. The kit's `policies.maxFee`
+   * passes it down.
+   */
+  maxFee?: bigint
+}
+
+/** The tighter of an account's configured fee cap and a per-call {@link WriteOptions.maxFee}. */
+export function feeLimit(configured: bigint | number | undefined, options?: WriteOptions): bigint | undefined {
+  const limits = [configured, options?.maxFee].filter((l): l is bigint | number => l !== undefined).map((l) => BigInt(l))
+  return limits.length === 0 ? undefined : limits.reduce((a, b) => (b < a ? b : a))
+}
+
 /** A read-only account plus the ability to sign and broadcast. */
 export interface IWalletAccount extends IWalletAccountReadOnly {
   /**
@@ -73,11 +90,11 @@ export interface IWalletAccount extends IWalletAccountReadOnly {
   /** Sign a message the chain's conventional way (EIP-191, BIP-137, ed25519 raw…). Returns the chain's conventional encoding (hex, base64…). */
   sign(message: string | Uint8Array): Promise<string>
   /** Sign a fully specified transaction WITHOUT broadcasting. Returns the serialised signed tx. */
-  signTransaction(tx: unknown): Promise<string>
+  signTransaction(tx: unknown, options?: WriteOptions): Promise<string>
   /** Sign and broadcast. */
-  sendTransaction(tx: unknown): Promise<TransferResult>
+  sendTransaction(tx: unknown, options?: WriteOptions): Promise<TransferResult>
   /** Native or token transfer; the account builds the transaction. */
-  transfer(options: TransferOptions): Promise<TransferResult>
+  transfer(options: TransferOptions, writeOptions?: WriteOptions): Promise<TransferResult>
   /**
    * The same address without signing ability: safe to hand to code that should only read or quote.
    */

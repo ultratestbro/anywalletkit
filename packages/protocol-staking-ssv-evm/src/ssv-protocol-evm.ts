@@ -3,7 +3,7 @@ import {
   type ActivityItem, type ChainTx, type DescribeActivityContext, type IWalletAccount, type IWalletAccountReadOnly, bigintToNumber,
 } from '@anywalletkit/core'
 import {
-  createPublicClient, custom, encodeFunctionData, http, parseAbi,
+  createPublicClient, custom, encodeFunctionData, fallback, http, parseAbi,
   type Address, type Hex, type PublicClient, type Transport,
 } from 'viem'
 
@@ -142,7 +142,9 @@ export interface Eip1193Like {
 /** RPC url or EIP-1193 provider. */
 export type EvmProvider = string | Eip1193Like
 
-function toTransport(p: EvmProvider): Transport {
+function toTransport(p: EvmProvider | EvmProvider[]): Transport {
+  // A list (wallet-evm's failover config) fails over in order, as the account's own client does.
+  if (Array.isArray(p)) return p.length === 1 ? toTransport(p[0]!) : fallback(p.map((x) => toTransport(x)))
   return typeof p === 'string' ? http(p) : custom(p)
 }
 
@@ -160,8 +162,8 @@ type WritableStakingWalletAccount = StakingWalletAccount & Required<Pick<Staking
 type QuotingStakingWalletAccount = StakingWalletAccount & Required<Pick<StakingWalletAccount, 'quoteSendTransaction'>>
 
 export interface SsvProtocolConfig {
-  /** RPC url or EIP-1193 provider to read the chain through. Defaults to the account's own provider. */
-  provider?: EvmProvider
+  /** RPC url(s) or EIP-1193 provider(s) to read the chain through; a list fails over in order. Defaults to the account's own provider. */
+  provider?: EvmProvider | EvmProvider[]
   /** The chain to operate on (default 1). Non-mainnet chains must also supply addresses (and endpoints for APR). */
   chainId?: number
   /** Override for the contract addresses. */
@@ -253,8 +255,8 @@ export default class SsvProtocolEvm extends StakingProtocol<SsvProtocolConfig> {
     this._endpoints = { ...endpoints, ...config.endpoints }
 
     // wallet-evm keeps the RPC in a protected `_config`: read it without putting it in the account type.
-    const provider = config.provider ?? ((account as { _config?: { provider?: unknown } } | undefined)?._config?.provider as EvmProvider | undefined)
-    if (provider) {
+    const provider = config.provider ?? ((account as { _config?: { provider?: unknown } } | undefined)?._config?.provider as EvmProvider | EvmProvider[] | undefined)
+    if (provider && (!Array.isArray(provider) || provider.length > 0)) {
       this._client = createPublicClient({ transport: toTransport(provider) })
     }
   }
