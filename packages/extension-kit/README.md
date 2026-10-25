@@ -33,11 +33,11 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
 
 | Area | Exports | What |
 | --- | --- | --- |
-| Vault | `Vault`, `chromeLocalVaultStorage`, `memoryVaultStorage`, `VAULT_SCRYPT`, `VAULT_MIN_PASSWORD_LENGTH` | every secret at rest in `chrome.storage.local`, two key layers (a KEK wraps a DEK, the DEK seals each secret); passkey (WebAuthn PRF) unlock as a second wrap of the same DEK |
+| Vault | `Vault`, `chromeLocalVaultStorage`, `memoryVaultStorage`, `VAULT_SCRYPT`, `VAULT_LIMITS`, `VAULT_MIN_PASSWORD_LENGTH` | every secret at rest in `chrome.storage.local`, two key layers (a KEK wraps a DEK, the DEK seals each secret); passkey (WebAuthn PRF) unlock as a second wrap of the same DEK |
 | Session | `Session`, `chromeSessionStorage`, `chromeAlarms`, `SESSION_DEFAULT_AUTOLOCK_MS` | the DEK in `chrome.storage.session` with an expiry and an alarm; `getKey()` re-checks the expiry itself |
 | Keyring adapters | `chromeKeyringStorage`, `vaultSecretStorage` | `@anywalletkit/keyring` metadata as plain JSON, secrets through the vault, one DEK use per call |
 | Relay | `PageRequest` / `RelayRequest` shapes and guards, `stampOrigin`, `checkSenderOrigin`, `RELAY_ERRORS` | page ⇄ content script ⇄ service worker messages; the origin is the browser's (`port.sender`), never the page's |
-| Router | `RequestRouter`, `READ_METHODS`, `SIGNING_METHODS` | what a dApp may call: accounts only for connected origins, chain add / switch through the approval window, reads from the wallet's own RPCs, `eth_sign` never offered, everything else 4200 |
+| Router | `RequestRouter`, `READ_METHODS`, `SIGNING_METHODS`, `toRelayError` | what a dApp may call: accounts only for connected origins, chain add / switch through the approval window, reads from the wallet's own RPCs, `eth_sign` never offered, everything else 4200 |
 | Permissions | `PermissionStore`, `CHAIN_ACCOUNT_KEYS` | per-origin accounts (EVM, Solana, TON, Tron, Bitcoin, NEAR) and chain |
 | Approvals | `ApprovalQueue`, `ReviewDeclined`, `QueueLimitError`, `APPROVALS_MAX_PENDING_PER_ORIGIN` | one approval window at a time, at most 3 pending requests per origin and one pending `connect`; transport notes (`setVia`) for WalletConnect peers |
 | Signing | `classifySignRequest`, `prepareTransaction`, `createSignHandler`, `messageText` | connected-address and chain checks, EIP-7702 delegations from sites refused, nonce / gas / fees from the wallet's RPC |
@@ -57,7 +57,11 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
   AES-256-GCM wraps a random 32-byte DEK; the DEK seals each secret under AAD
   `forgewallet-vault/secret/<id>` (boxes cannot be swapped). The DEK box's AAD
   binds the exact KDF parameters, so an envelope whose salt or cost was edited
-  on disk fails to open; `unlock` refuses sub-floor costs (`weak-kdf`). v1
+  on disk fails to open; `unlock` refuses sub-floor costs (`weak-kdf`), and
+  costs or sizes above `VAULT_LIMITS` (scrypt N ≤ 2^20, r ≤ 16, p ≤ 4; PBKDF2
+  ≤ 5 000 000 iterations; 1 000 secrets, 32 passkeys, 4 MiB) before any KDF
+  runs (`unsupported-envelope`). Writes to the envelope are serialized (one
+  `Vault` per storage area), so parallel imports keep every secret. v1
   envelopes (PBKDF2-SHA256, ≥ 600 000 iterations) still open and are re-sealed
   as v2. Passwords shorter than 8 characters are refused by the vault itself.
   Wrong password and tampering are the same failure (`wrong-password`).
@@ -67,6 +71,11 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
 - **Unlocked state.** Only the DEK is kept, in `chrome.storage.session`
   (memory-only, trusted contexts), with an expiry enforced on every read and an
   alarm that locks; key buffers this package owns are zeroized after use.
+  `unlock` / `lock` / `touch` / `getKey` run one at a time, so activity racing a
+  lock never brings the key back.
+- **Errors to pages.** `toRelayError(e, { log })` passes the wallet's own refusals
+  (EIP-1193 codes) and a node's JSON-RPC error (code, revert data) with URLs
+  removed; anything else is `-32603 Internal error` on the page and goes to `log`.
 - **Origins.** The service worker answers a relay message only when the
   content script's stamped origin equals `port.sender.origin`. Permissions are
   keyed by that origin, never by a URL a page or a WalletConnect peer claims.

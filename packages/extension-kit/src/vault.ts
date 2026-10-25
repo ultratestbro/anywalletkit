@@ -44,6 +44,27 @@ export const VAULT_SCRYPT = { N: 1 << 17, r: 8, p: 1 } as const
 export const VAULT_MIN_SCRYPT = { N: 1 << 14, r: 8, p: 1 } as const
 /** Shortest password `create` / `changePassword` accept. `unlock` takes whatever opens the vault. */
 export const VAULT_MIN_PASSWORD_LENGTH = 8
+/**
+ * Upper bounds on what an envelope (and the options) may carry, checked before any KDF runs: an
+ * envelope edited on disk must not make unlock hang (PBKDF2 iterations) or exhaust the worker's
+ * memory (scrypt N × r), and its size stays within what `chrome.storage.local` holds.
+ */
+export const VAULT_LIMITS = Object.freeze({
+  /** scrypt cost: 2^20 × 16 = 2 GiB is the most any envelope may ask for. */
+  scrypt: Object.freeze({ N: 1 << 20, r: 16, p: 4 }),
+  /** PBKDF2-SHA256 iterations (v1 envelopes). */
+  iterations: 5_000_000,
+  /** Sealed secrets in one vault. */
+  secrets: 1_000,
+  /** Registered passkeys. */
+  passkeys: 32,
+  /** Plaintext bytes of one secret (`setSecret`). */
+  secretBytes: 16 * 1024,
+  /** base64 characters of one sealed box (iv or data). */
+  boxChars: 32 * 1024,
+  /** JSON characters of the whole envelope. */
+  envelopeChars: 4 * 1024 * 1024,
+})
 const SALT_BYTES = 32
 const IV_BYTES = 12
 const DEK_BYTES = 32
@@ -128,8 +149,14 @@ const aadPasskey = (id: string) => `forgewallet-vault/2/passkey/${id}`
 const aadSecret = (id: string) => `forgewallet-vault/secret/${id}`
 const HKDF_INFO = 'forgewallet-vault/2/passkey'
 
+/**
+ * One `Vault` per storage area: writes to the envelope are serialized inside the instance, so two
+ * instances over the same area could still overwrite each other.
+ */
 export class Vault {
   private readonly _storage: VaultStorage
+  /** Every read-modify-write of the envelope runs here, one after another (a parallel write would drop the other's change). */
+  private _queue: Promise<unknown> = Promise.resolve()
   private readonly _kdf: 'scrypt' | 'pbkdf2'
   private readonly _iterations: number
   private readonly _scrypt: { N: number; r: number; p: number }
@@ -143,10 +170,11 @@ export class Vault {
     this._scrypt = options.scrypt ?? VAULT_SCRYPT
     this._onProgress = options.onProgress
     this._crypto = options.crypto ?? globalThis.crypto
-    if (!Number.isInteger(this._iterations) || this._iterations < VAULT_MIN_ITERATIONS) {
-      throw new VaultError(`PBKDF2 iterations must be an integer ≥ ${VAULT_MIN_ITERATIONS}`, 'invalid-input')
+    if (!Number.isInteger(this._iterations) || this._iterations < VAULT_MIN_ITERATIONS || this._iterations > VAULT_LIMITS.iterations) {
+      throw new VaultError(`PBKDF2 iterations must be an integer from ${VAULT_MIN_ITERATIONS} to ${VAULT_LIMITS.iterations}`, 'invalid-input')
     }
     if (!isStrongScrypt(this._scrypt)) throw new VaultError(`scrypt cost must be at least N=${VAULT_MIN_SCRYPT.N} r=${VAULT_MIN_SCRYPT.r} p=${VAULT_MIN_SCRYPT.p} (N a power of two)`, 'invalid-input')
+    if (!isBoundedScrypt(this._scrypt)) throw new VaultError(`scrypt cost must be at most N=${VAULT_LIMITS.scrypt.N} r=${VAULT_LIMITS.scrypt.r} p=${VAULT_LIMITS.scrypt.p}`, 'invalid-input')
   }
 
   async exists(): Promise<boolean> {
@@ -168,10 +196,12 @@ export class Vault {
    */
   async create(password: string): Promise<Uint8Array> {
     requirePassword(password, VAULT_MIN_PASSWORD_LENGTH)
-    if (await this.exists()) throw new VaultError('A vault already exists; unlock it or reset explicitly.', 'exists')
-    const dek = this._random(DEK_BYTES)
-    await this._storage.set(await this._sealEnvelope(password, dek, {}, [], Date.now()))
-    return dek
+    return this._exclusive(async () => {
+      if (await this.exists()) throw new VaultError('A vault already exists; unlock it or reset explicitly.', 'exists')
+      const dek = this._random(DEK_BYTES)
+      await this._write(await this._sealEnvelope(password, dek, {}, [], Date.now()))
+      return dek
+    })
   }
 
   /**
@@ -181,6 +211,10 @@ export class Vault {
    */
   async unlock(password: string): Promise<Uint8Array> {
     requirePassword(password)
+    return this._exclusive(() => this._unlock(password))
+  }
+
+  private async _unlock(password: string): Promise<Uint8Array> {
     const envelope = await this._load()
     if (isEnvelopeV1(envelope)) {
       if (envelope.kdf.iterations < VAULT_MIN_ITERATIONS) throw new VaultError(`The vault's KDF (${envelope.kdf.iterations} iterations) is below the floor this build accepts.`, 'weak-kdf')
@@ -189,7 +223,7 @@ export class Vault {
       if (this._kdf === 'scrypt') {
         // Upgrade in place: same secrets, same createdAt, scrypt-wrapped DEK.
         const next = await this._sealEnvelope(password, dek, envelope.secrets, [], envelope.createdAt)
-        await this._storage.set(isEnvelopeV2(next) ? { ...next, upgradedAt: Date.now() } : next)
+        await this._write(isEnvelopeV2(next) ? { ...next, upgradedAt: Date.now() } : next)
       }
       return dek
     }
@@ -201,15 +235,18 @@ export class Vault {
   /** Re-wrap the DEK under a new password (fresh salt, current KDF). Secrets and passkeys are untouched. */
   async changePassword(oldPassword: string, newPassword: string): Promise<void> {
     requirePassword(newPassword, VAULT_MIN_PASSWORD_LENGTH)
-    const dek = await this.unlock(oldPassword)
-    try {
-      const envelope = await this._load()
-      const passkeys = isEnvelopeV2(envelope) ? envelope.passkeys : []
-      const next = await this._sealEnvelope(newPassword, dek, envelope.secrets, passkeys, envelope.createdAt)
-      await this._storage.set(isEnvelopeV2(envelope) && envelope.upgradedAt !== undefined && isEnvelopeV2(next) ? { ...next, upgradedAt: envelope.upgradedAt } : next)
-    } finally {
-      zeroize(dek)
-    }
+    requirePassword(oldPassword)
+    return this._exclusive(async () => {
+      const dek = await this._unlock(oldPassword)
+      try {
+        const envelope = await this._load()
+        const passkeys = isEnvelopeV2(envelope) ? envelope.passkeys : []
+        const next = await this._sealEnvelope(newPassword, dek, envelope.secrets, passkeys, envelope.createdAt)
+        await this._write(isEnvelopeV2(envelope) && envelope.upgradedAt !== undefined && isEnvelopeV2(next) ? { ...next, upgradedAt: envelope.upgradedAt } : next)
+      } finally {
+        zeroize(dek)
+      }
+    })
   }
 
   // ---- passkeys (v2) ----
@@ -239,18 +276,22 @@ export class Vault {
     try {
       requireId(passkey.id)
       if (passkey.prf.length !== PRF_BYTES) throw new VaultError(`A PRF output is ${PRF_BYTES} bytes.`, 'invalid-input')
-      const envelope = await this._load()
-      if (!isEnvelopeV2(envelope)) throw new VaultError('Unlock with the password once so the vault is upgraded before adding a passkey.', 'unsupported-envelope')
-      if (envelope.passkeys.some((p) => p.id === passkey.id)) throw new VaultError('This passkey is already registered.', 'exists')
-      // Prove the DEK is the vault's before sealing it under a new key.
-      await this._requireDek(dek, envelope)
-      const key = await this._derivePasskeyKek(passkey.prf, passkey.id)
-      const entry: VaultPasskey = { id: passkey.id, label: passkey.label.slice(0, 64), createdAt: Date.now(), dek: await this._seal(key, dek, aadPasskey(passkey.id)) }
-      if (passkey.publicKey && passkey.alg !== undefined) { entry.publicKey = passkey.publicKey; entry.alg = passkey.alg }
-      await this._storage.set({ ...envelope, passkeys: [...envelope.passkeys, entry] })
+      await this._exclusive(() => this._addPasskey(dek, passkey))
     } finally {
       zeroize(passkey.prf)
     }
+  }
+
+  private async _addPasskey(dek: Uint8Array, passkey: { id: string; prf: Uint8Array; label: string; publicKey?: string | undefined; alg?: number | undefined }): Promise<void> {
+    const envelope = await this._load()
+    if (!isEnvelopeV2(envelope)) throw new VaultError('Unlock with the password once so the vault is upgraded before adding a passkey.', 'unsupported-envelope')
+    if (envelope.passkeys.some((p) => p.id === passkey.id)) throw new VaultError('This passkey is already registered.', 'exists')
+    // Prove the DEK is the vault's before sealing it under a new key.
+    await this._requireDek(dek, envelope)
+    const key = await this._derivePasskeyKek(passkey.prf, passkey.id)
+    const entry: VaultPasskey = { id: passkey.id, label: passkey.label.slice(0, 64), createdAt: Date.now(), dek: await this._seal(key, dek, aadPasskey(passkey.id)) }
+    if (passkey.publicKey && passkey.alg !== undefined) { entry.publicKey = passkey.publicKey; entry.alg = passkey.alg }
+    await this._write({ ...envelope, passkeys: [...envelope.passkeys, entry] })
   }
 
   /** Unseal the DEK with a passkey's PRF output. `wrong-password` when the box does not open, `missing` when the id is unknown. */
@@ -271,9 +312,11 @@ export class Vault {
 
   async removePasskey(id: string): Promise<void> {
     requireId(id)
-    const envelope = await this._load()
-    if (!isEnvelopeV2(envelope)) return
-    await this._storage.set({ ...envelope, passkeys: envelope.passkeys.filter((p) => p.id !== id) })
+    return this._exclusive(async () => {
+      const envelope = await this._load()
+      if (!isEnvelopeV2(envelope)) return
+      await this._write({ ...envelope, passkeys: envelope.passkeys.filter((p) => p.id !== id) })
+    })
   }
 
   // ---- secrets ----
@@ -286,10 +329,16 @@ export class Vault {
   /** Seal `secret` under the DEK as `sourceId` (overwrites an entry with the same id). */
   async setSecret(dek: Uint8Array, sourceId: string, secret: Uint8Array): Promise<void> {
     requireId(sourceId)
-    const envelope = await this._load()
+    if (secret.length > VAULT_LIMITS.secretBytes) throw new VaultError(`A secret is at most ${VAULT_LIMITS.secretBytes} bytes.`, 'invalid-input')
     const key = await this._importDek(dek)
-    const box = await this._seal(key, secret, aadSecret(sourceId))
-    await this._storage.set({ ...envelope, secrets: { ...envelope.secrets, [sourceId]: box } })
+    return this._exclusive(async () => {
+      const envelope = await this._load()
+      if (!(sourceId in envelope.secrets) && Object.keys(envelope.secrets).length >= VAULT_LIMITS.secrets) {
+        throw new VaultError(`A vault holds at most ${VAULT_LIMITS.secrets} secrets.`, 'invalid-input')
+      }
+      const box = await this._seal(key, secret, aadSecret(sourceId))
+      await this._write({ ...envelope, secrets: { ...envelope.secrets, [sourceId]: box } })
+    })
   }
 
   /** Unseal one secret. `null` when the id is unknown; the caller zeroizes the result after use. */
@@ -304,16 +353,33 @@ export class Vault {
 
   async deleteSecret(sourceId: string): Promise<void> {
     requireId(sourceId)
-    const envelope = await this._load()
-    if (!(sourceId in envelope.secrets)) return
-    const secrets = { ...envelope.secrets }
-    delete secrets[sourceId]
-    await this._storage.set({ ...envelope, secrets })
+    return this._exclusive(async () => {
+      const envelope = await this._load()
+      if (!(sourceId in envelope.secrets)) return
+      const secrets = { ...envelope.secrets }
+      delete secrets[sourceId]
+      await this._write({ ...envelope, secrets })
+    })
   }
 
   /** Remove the whole vault. The explicit destructive flow only (back up → wipe → create). */
   async destroy(): Promise<void> {
-    await this._storage.clear()
+    return this._exclusive(() => this._storage.clear())
+  }
+
+  // ---- serialized writes ----
+
+  private _exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this._queue.then(fn)
+    this._queue = run.catch(() => undefined)
+    return run
+  }
+
+  /** Store an envelope this build will open again (bounds checked before it is written). */
+  private async _write(envelope: VaultEnvelope): Promise<void> {
+    const problem = envelopeProblem(envelope)
+    if (problem) throw new VaultError(`The vault would exceed its limits (${problem}); nothing was written.`, 'invalid-input')
+    await this._storage.set(envelope)
   }
 
   // ---- crypto ----
@@ -400,6 +466,8 @@ export class Vault {
     const envelope = await this._storage.get()
     if (!envelope) throw new VaultError('No vault in this storage area.', 'missing')
     if (!isEnvelopeV1(envelope) && !isEnvelopeV2(envelope)) throw new VaultError('Unsupported vault envelope.', 'unsupported-envelope')
+    const problem = envelopeProblem(envelope)
+    if (problem) throw new VaultError(`The vault envelope is outside the limits this build opens (${problem}).`, 'unsupported-envelope')
     return envelope
   }
 }
@@ -431,6 +499,25 @@ export function isEnvelopeV2(x: unknown): x is VaultEnvelopeV2 {
 
 function isBox(x: unknown): x is SealedBox {
   return typeof x === 'object' && x !== null && typeof (x as SealedBox).iv === 'string' && typeof (x as SealedBox).data === 'string'
+}
+
+function isBoundedScrypt(c: { N: number; r: number; p: number }): boolean {
+  return c.N <= VAULT_LIMITS.scrypt.N && c.r <= VAULT_LIMITS.scrypt.r && c.p <= VAULT_LIMITS.scrypt.p
+}
+
+/** Why an envelope is outside {@link VAULT_LIMITS}, or null when it is within them. */
+function envelopeProblem(e: VaultEnvelope): string | null {
+  if (e.v === 1 && e.kdf.iterations > VAULT_LIMITS.iterations) return `PBKDF2 iterations ${e.kdf.iterations} > ${VAULT_LIMITS.iterations}`
+  if (e.v === 2 && !isBoundedScrypt(e.kdf)) return `scrypt N=${e.kdf.N} r=${e.kdf.r} p=${e.kdf.p} above N=${VAULT_LIMITS.scrypt.N} r=${VAULT_LIMITS.scrypt.r} p=${VAULT_LIMITS.scrypt.p}`
+  const secrets = Object.values(e.secrets)
+  if (secrets.length > VAULT_LIMITS.secrets) return `${secrets.length} secrets > ${VAULT_LIMITS.secrets}`
+  const passkeys = e.v === 2 ? e.passkeys : []
+  if (passkeys.length > VAULT_LIMITS.passkeys) return `${passkeys.length} passkeys > ${VAULT_LIMITS.passkeys}`
+  for (const box of [e.dek, ...secrets, ...passkeys.map((p) => p.dek)]) {
+    if (box.iv.length > VAULT_LIMITS.boxChars || box.data.length > VAULT_LIMITS.boxChars) return `a sealed box above ${VAULT_LIMITS.boxChars} characters`
+  }
+  if (JSON.stringify(e).length > VAULT_LIMITS.envelopeChars) return `envelope above ${VAULT_LIMITS.envelopeChars} characters`
+  return null
 }
 
 function isStrongScrypt(c: { N: number; r: number; p: number }): boolean {
