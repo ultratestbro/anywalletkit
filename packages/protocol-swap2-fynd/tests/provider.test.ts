@@ -176,7 +176,7 @@ describeProtocolModule("protocol-swap2-fynd", {
   type: "swap2",
   Protocol: FyndSwap2Protocol,
   config: {fromChain: "eip155:8453", skipAccountChainCheck: true, apiKey: "k"},
-  samples: {getSupportedChains: []},
+  samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
 
 describeProtocolBehaviour("protocol-swap2-fynd", {

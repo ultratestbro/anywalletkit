@@ -30,7 +30,7 @@ describeProtocolModule("protocol-swap2-chainflip", {
   activity,
   Protocol: ChainflipSwap2Protocol,
   config: {fromChain: "eip155:42161", skipAccountChainCheck: true},
-  samples: {getSupportedChains: []},
+  samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
 
 describeProtocolBehaviour("protocol-swap2-chainflip", {

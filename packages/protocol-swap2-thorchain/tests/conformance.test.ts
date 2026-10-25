@@ -17,5 +17,5 @@ describeProtocolModule("protocol-swap2-thorchain", {
   activity,
   Protocol: ThorchainSwap2Protocol,
   config: {fromChain: "eip155:1", skipAccountChainCheck: true},
-  samples: {getSupportedChains: []},
+  samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });

@@ -63,7 +63,7 @@ Then supply and withdraw a few dollars in a real vault on Base from a script, wi
 
 | Symptom | Fix |
 |---|---|
-| Conformance: "a quote/read called sendTransaction" | `quote*` methods must estimate, never send |
+| Conformance: "a quote/read called sendTransaction" or "… called sign…" | `quote*` methods must estimate, never sign or send |
 | Conformance: writes do not refuse a read-only account | Call `this.requireSigningAccount('supply')` first in every write |
 | No way to read the vault from the account | Take an RPC in the config and read with your own viem client; `wallet-evm` accounts also have `simulateTransaction` |
 | `describeActivity` sees no events | `ChainTx` has no logs field: match `call.to` / `call.selector` and `transfers` |

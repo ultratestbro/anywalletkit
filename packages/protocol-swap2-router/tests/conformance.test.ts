@@ -32,7 +32,7 @@ describeProtocolModule("protocol-swap2-router", {
   type: "swap2",
   Protocol: RouterSwap2Protocol,
   config: {fromChain: "eip155:1", skipAccountChainCheck: true, providers: [wethDescriber]},
-  samples: {getSupportedChains: []},
+  samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
   activity,
 });
 

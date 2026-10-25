@@ -16,5 +16,5 @@ describeProtocolModule("protocol-swap2-cctp", {
   activity,
   Protocol: CctpSwap2Protocol,
   config: {fromChain: "eip155:8453", skipAccountChainCheck: true},
-  samples: {getSupportedChains: []},
+  samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
