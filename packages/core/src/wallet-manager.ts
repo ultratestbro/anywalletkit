@@ -1,11 +1,13 @@
 import type { IWalletAccount } from './account.js'
 import type { FeeRates } from './account.js'
-import { requireCurve, type Signer, type SignerCurve } from './signer.js'
+import { isSeedSigner, requireCurve, type Signer, type SignerCurve } from './signer.js'
 import { SignerError } from './errors.js'
 import { copyBytes, getRandomSeedPhrase, isValidSeedPhrase, normalizeMnemonic, seedFromMnemonicSync, zeroize } from './mnemonic.js'
 
 /** Seeds of every manager, outside the objects (see the class comment). */
 const MANAGER_SEEDS = new WeakMap<object, Uint8Array>()
+/** Managers whose `dispose()` ran: kept outside the object, like the seed. */
+const DISPOSED = new WeakSet<object>()
 
 /**
  * Base for chain packages. Holds either the 64-byte BIP-39 seed (local seed
@@ -26,6 +28,7 @@ export abstract class WalletManager<TAccount extends IWalletAccount, TConfig ext
   protected readonly _signer: Signer | undefined
   protected readonly _config: TConfig
   protected readonly _accounts = new Map<string, TAccount>()
+  private readonly _pending = new Map<string, Promise<TAccount>>()
 
   constructor(seedOrSigner: string | Uint8Array | Signer, config: TConfig) {
     if (typeof seedOrSigner === 'string') {
@@ -75,8 +78,57 @@ export abstract class WalletManager<TAccount extends IWalletAccount, TConfig ext
   /** Current network fee rates at three speeds. */
   abstract getFeeRates(): Promise<FeeRates>
 
+  /**
+   * The account cached under `key`, built by `create` at most once: concurrent calls share one
+   * build. Throws once the manager is disposed; an account whose build finishes after `dispose()`
+   * is disposed itself and the call throws, so no live signing account outlives the manager.
+   */
+  protected async cachedAccount(key: string, create: () => TAccount | Promise<TAccount>): Promise<TAccount> {
+    if (DISPOSED.has(this)) throw new SignerError('This manager has been disposed.')
+    const cached = this._accounts.get(key)
+    if (cached) return cached
+    const pending = this._pending.get(key)
+    if (pending) return pending
+    const build = (async () => {
+      const account = await create()
+      if (DISPOSED.has(this)) {
+        account.dispose()
+        throw new SignerError('This manager was disposed while the account was being created.')
+      }
+      this._accounts.set(key, account)
+      return account
+    })()
+    this._pending.set(key, build)
+    try {
+      return await build
+    } finally {
+      this._pending.delete(key)
+    }
+  }
+
+  /**
+   * {@link cachedAccount} over an injected signer: the signer itself (`relativePath` undefined) or
+   * its child along `relativePath`. A child that never becomes an account is disposed.
+   */
+  protected signerAccount(key: string, signer: Signer, relativePath: string | undefined, build: (leaf: Signer, publicKey: Uint8Array) => TAccount): Promise<TAccount> {
+    return this.cachedAccount(key, async () => {
+      let leaf: Signer = signer
+      if (relativePath !== undefined) {
+        if (!isSeedSigner(signer)) throw new SignerError('This signer cannot derive children.')
+        leaf = await (signer.deriveLeaf ?? signer.derive).call(signer, relativePath)
+      }
+      try {
+        return build(leaf, await leaf.getPublicKey())
+      } catch (err) {
+        if (leaf !== signer) leaf.dispose()
+        throw err
+      }
+    })
+  }
+
   /** Dispose every derived account and zeroize the seed; subclasses zeroize their own extras first, then call super. */
   dispose(): void {
+    DISPOSED.add(this)
     for (const account of this._accounts.values()) account.dispose()
     this._accounts.clear()
     this._signer?.dispose()

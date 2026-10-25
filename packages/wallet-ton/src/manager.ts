@@ -64,10 +64,10 @@ export class WalletManagerTon extends WalletManager<WalletAccountTon, TonConfig>
     const full = path.startsWith('m/') ? path : `${TON_BASE_PATH}/${path}`
     const cached = this._accounts.get(full)
     if (cached) return cached
-    const signer = LocalSigner.leafFromSeed(this.seedBytes(), 'ed25519', full)
-    const account = new WalletAccountTon(signer, signer.publicKey, full, this._config)
-    this._accounts.set(full, account)
-    return account
+    return this.cachedAccount(full, () => {
+      const signer = LocalSigner.leafFromSeed(this.seedBytes(), 'ed25519', full)
+      return new WalletAccountTon(signer, signer.publicKey, full, this._config)
+    })
   }
 
   /** The one path a non-derivable signer answers to: its own, or 'external'. */
@@ -78,20 +78,16 @@ export class WalletManagerTon extends WalletManager<WalletAccountTon, TonConfig>
   /** Resolve `path` against an injected signer: the signer itself, or a child when it can derive there. */
   private async fromSigner(signer: Signer, path: string): Promise<WalletAccountTon> {
     this.requireSigner('ed25519')
-    let leaf: Signer = signer
+    let rel: string | undefined
     let key = this.singlePath(signer)
     if (isSeedSigner(signer)) {
       if (path === signer.path) key = path
-      else if (path.startsWith(`${signer.path}/`)) { leaf = await (signer.deriveLeaf ?? signer.derive).call(signer, path.slice(signer.path.length + 1)); key = path }
+      else if (path.startsWith(`${signer.path}/`)) { rel = path.slice(signer.path.length + 1); key = path }
       else throw new SignerError(`This signer yields a single account at path '${signer.path}'; it cannot provide ${path}.`)
     } else if (path !== `${TON_BASE_PATH}/0'` && path !== 'external') {
       throw new SignerError(`An external signer yields a single account; ${path} is not derivable from it.`)
     }
-    const cached = this._accounts.get(key)
-    if (cached) return cached
-    const account = new WalletAccountTon(leaf, await leaf.getPublicKey(), key, this._config)
-    this._accounts.set(key, account)
-    return account
+    return this.signerAccount(key, signer, rel, (leaf, publicKey) => new WalletAccountTon(leaf, publicKey, key, this._config))
   }
 
   /** Watch-only account for a public key (hex or bytes) — TON addresses derive from the key, not the other way round. */

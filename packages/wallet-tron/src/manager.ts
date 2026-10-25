@@ -33,29 +33,25 @@ export class WalletManagerTron extends WalletManager<WalletAccountTron, TronConf
     if (cached) return cached
     const external = this.externalSigner()
     if (external) return this.fromSigner(external, full)
-    const signer = LocalSigner.leafFromSeed(this.seedBytes(), 'secp256k1', full)
-    const account = new WalletAccountTron(signer, signer.publicKey, full, this._config)
-    this._accounts.set(full, account)
-    return account
+    return this.cachedAccount(full, () => {
+      const signer = LocalSigner.leafFromSeed(this.seedBytes(), 'secp256k1', full)
+      return new WalletAccountTron(signer, signer.publicKey, full, this._config)
+    })
   }
 
   /** Resolve `path` against an injected signer: the signer itself, or a child when it can derive there. */
   private async fromSigner(signer: Signer, path: string): Promise<WalletAccountTron> {
     this.requireSigner('secp256k1')
-    let leaf: Signer = signer
+    let rel: string | undefined
     let key = 'external'
     if (isSeedSigner(signer)) {
       if (path === signer.path) key = path
-      else if (path.startsWith(`${signer.path}/`)) { leaf = await (signer.deriveLeaf ?? signer.derive).call(signer, path.slice(signer.path.length + 1)); key = path }
+      else if (path.startsWith(`${signer.path}/`)) { rel = path.slice(signer.path.length + 1); key = path }
       else throw new SignerError(`The injected signer sits at ${signer.path}; it cannot provide ${path}.`)
     } else if (path !== `${TRON_ACCOUNT_BRANCH}/0` && path !== 'external') {
       throw new SignerError(`An external signer has one account; ${path} is not derivable from it.`)
     }
-    const cached = this._accounts.get(key)
-    if (cached) return cached
-    const account = new WalletAccountTron(leaf, await leaf.getPublicKey(), key, this._config)
-    this._accounts.set(key, account)
-    return account
+    return this.signerAccount(key, signer, rel, (leaf, publicKey) => new WalletAccountTron(leaf, publicKey, key, this._config))
   }
 
   /** A read-only account for any address, with this manager's config. */

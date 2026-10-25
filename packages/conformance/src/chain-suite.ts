@@ -103,6 +103,38 @@ export function describeChainModule<M extends WalletManager<IWalletAccount, obje
         expect(key.every((b) => b === 0)).toBe(true) // the key buffer is zeroized
         await expect(a.sign('after dispose')).rejects.toThrow()
       })
+
+      it('one account per path under concurrent calls; none is handed out once dispose() ran', async () => {
+        // A signer whose public key arrives later (a hardware wallet, MPC, a backend) and whose
+        // dispose() does not stop it signing: the manager itself must refuse.
+        const slow = () => {
+          const inner = privateKeySigner(curve, new Uint8Array(32).fill(9))
+          let release!: () => void
+          const gate = new Promise<void>((r) => { release = r })
+          const signer: Signer = {
+            kind: 'external', curve, schemes: inner.schemes,
+            getPublicKey: async () => { await gate; return inner.getPublicKey() },
+            sign: (payload, options) => inner.sign(payload, options),
+            dispose: () => undefined,
+          }
+          return { signer, release }
+        }
+        const one = slow()
+        const m = await fromSigner(one.signer)
+        const pair = Promise.all([m.getAccount(0), m.getAccount(0)])
+        one.release()
+        const [a, b] = await pair
+        expect(a).toBe(b)
+        m.dispose()
+
+        const two = slow()
+        const late = await fromSigner(two.signer)
+        const pending = late.getAccount(0)
+        late.dispose()
+        two.release()
+        await expect(pending).rejects.toThrow()
+        await expect(late.getAccount(0)).rejects.toThrow()
+      })
     }
 
     it('rejects an invalid seed phrase', async () => {
