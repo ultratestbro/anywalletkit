@@ -154,10 +154,14 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
     return (await this.buildSignedTransaction(tx)).desc
   }
 
-  /** Sign without broadcasting. Returns the raw transaction hex. Raw hex input is returned unchanged. */
+  /** Sign without broadcasting. Returns the raw transaction hex. Raw hex input gets the checks `sendTransaction` runs (prevouts through the client) and is returned unchanged, never re-signed. */
   async signTransaction(tx: ZcashTransaction, options: WriteOptions = {}): Promise<string> {
     this.live()
-    if (typeof tx === 'string') return tx
+    if (typeof tx === 'string') {
+      const { desc } = await this.describeRaw(tx)
+      this.checkMax(desc.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
+      return tx
+    }
     const built = await this.buildSignedTransaction(tx)
     this.checkMax(built.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return built.hex

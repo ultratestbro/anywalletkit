@@ -111,6 +111,24 @@ describe('WalletAccountZcash', () => {
     m.dispose(); m2.dispose()
   })
 
+  it('signTransaction(raw hex) runs the same checks as sendTransaction(raw) and returns the bytes unchanged', async () => {
+    // Audit 2026-10-25 (post-release), M4: raw hex came back from signTransaction unchecked.
+    const f = fakeBlockchair()
+    const a = await mk(f.fetchFn).getAccount(0)
+    const prevouts = { txs: { [TXID_A]: { outputs: [{ value: 100_000_000, script_hex: hex(a.scriptPubKey), recipient: a.address }] } } }
+    const generous = await mk(f.fetchFn, { maxFee: 5_000_000n }).getAccount(0)
+    const absurd = await generous.signTransaction({ to: RECIPIENT, value: 60_000_000n, fee: 2_000_000n })
+    const ok = await a.signTransaction({ to: RECIPIENT, value: 60_000_000n })
+    const f2 = fakeBlockchair(prevouts)
+    const b = await mk(f2.fetchFn).getAccount(0)
+    await expect(b.signTransaction(absurd)).rejects.toMatchObject({ name: 'UnsafeTransactionError', code: 'fee-too-high' })
+    await expect(b.signTransaction(ok)).resolves.toBe(ok)
+    await expect((await mk(f2.fetchFn, { transactionMaxFee: 9_999n }).getAccount(0)).signTransaction(ok)).rejects.toThrow(/maximum fee/)
+    await expect(b.signTransaction(ok, { maxFee: 9_999n })).rejects.toThrow(/maximum fee/)
+    await expect(b.signTransaction(ok, { maxFee: 10_000n })).resolves.toBe(ok)
+    expect([f.sent, f2.sent]).toEqual([[], []])
+  })
+
   it('maxFee / transferMaxFee / transactionMaxFee stop before broadcast', async () => {
     const f = fakeBlockchair()
     const a = await mk(f.fetchFn, { transferMaxFee: 5_000n }).getAccount(0)
