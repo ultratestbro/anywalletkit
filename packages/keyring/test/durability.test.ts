@@ -122,3 +122,22 @@ describe('parallel imports', () => {
     await expect(keyring.importMnemonic(ABANDON)).resolves.toBeDefined()
   })
 })
+
+describe('parallel addAccount (audit 2026-10-25, #1.2)', () => {
+  it('two accounts added at once get two indexes, and each call returns what was stored', async () => {
+    const { keyring, storage, secrets } = await fresh(evmOnly)
+    const { source } = await keyring.importMnemonic(ABANDON)
+    const [a, b, c] = await Promise.all([
+      keyring.addAccount(source.id, { name: 'Savings' }),
+      keyring.addAccount(source.id, { name: 'Trading' }),
+      keyring.addAccount(source.id),
+    ])
+    expect(new Set([a.index, b.index, c.index])).toEqual(new Set([1, 2, 3]))
+    expect(new Set([a.addresses.evm, b.addresses.evm, c.addresses.evm]).size).toBe(3)
+    for (const meta of [a, b, c]) expect(keyring.getAccountMeta(meta.id)).toEqual(meta)
+    expect([a.name, b.name]).toEqual(['Savings', 'Trading'])
+    const again = await Keyring.load({ storage, secrets, chains: evmOnly })
+    expect(again.listAccounts().map((m) => m.index)).toEqual([0, 1, 2, 3])
+    for (const meta of [a, b, c]) expect(again.getAccountMeta(meta.id).addresses.evm).toBe(meta.addresses.evm)
+  })
+})
