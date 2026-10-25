@@ -474,16 +474,17 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
   const guard = async (method: WriteMethod, arg: unknown) => {
     const ns = account.chain.split(':')[0]!
     // The network the write really goes to, before any rule, confirm or signature (audit #7): the
-    // chainId of an EVM transaction that carries one, and the account's own network. An EVM account
-    // that has not asked its RPC yet reports "eip155:unknown": learn its chain id — unless the write
-    // is an off-chain signature (a message; typed data, whose domain chainId the chain package
-    // judges, e.g. wallet-evm's `allowCrossChainTypedData`) and no rule needs the id.
+    // account's own and, for an EVM transaction that carries one, its chainId. An EVM account that
+    // has not asked its RPC yet reports "eip155:unknown": learn its chain id — unless the write is
+    // an off-chain signature (a message, valid on every network; typed data, whose domain chainId
+    // the chain package judges, e.g. wallet-evm's `allowCrossChainTypedData`) and no rule needs it.
     const signed = signedChain(ns, method, arg)
     const known = isConcreteChain(account.chain) ? account.chain : undefined
+    const offChain = chainFree(method)
+    const exactRules = hasRuleFor((k) => k.startsWith(`${ns}:`))
     let learned: string | undefined
     const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
-    const needed = !chainFree(method) || (chain === undefined && hasRuleFor((k) => k.startsWith(`${ns}:`)))
-    if (signed === undefined && known === undefined && needed && typeof getChainId === 'function') {
+    if (known === undefined && (!offChain || (chain === undefined && exactRules)) && typeof getChainId === 'function') {
       try {
         learned = `${ns}:${await getChainId.call(account)}`
       } catch (err) {
@@ -492,25 +493,26 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         if (!isOffline(account)) throw err
       }
     }
-    // Asked for one network, signing on another (a namespace registration whose RPC is elsewhere,
-    // a transaction for another chain id): confirm would show the wrong chain and the rules of the
-    // wrong chain would judge it. Without `chain`, the account's own network is the one asked for.
     const own = known ?? learned
-    const asked = isConcreteChain(chain) ? chain : own
-    for (const c of [signed, own]) {
-      if (c !== undefined && asked !== undefined && !sameChain(asked, c)) {
-        throw new PolicyViolationError('chain', `This write signs for ${c}, not for ${asked} it was asked for; nothing was signed.`)
+    if (!offChain) {
+      // Asked for one network, signing on another (a namespace registration whose RPC is elsewhere,
+      // a transaction for another chain id): confirm would show the wrong chain and the rules of
+      // the wrong chain would judge it. Without `chain`, the account's own network is the one asked.
+      const asked = isConcreteChain(chain) ? chain : own
+      for (const c of [signed, own]) {
+        if (c !== undefined && asked !== undefined && !sameChain(asked, c)) {
+          throw new PolicyViolationError('chain', `This write signs for ${c}, not for ${asked} it was asked for; nothing was signed.`)
+        }
       }
+    }
+    // The account's network is unknown and none was asked for: the namespace's own rules need no
+    // chain id, but an exact rule of this family could be the account's — refuse rather than guess
+    // (a chainId the write carries says what is signed, not which rules the account answers to).
+    if (own === undefined && !isConcreteChain(chain) && exactRules) {
+      throw new PolicyViolationError('chain', `The account's chain is unknown (${account.chain}), so its policies cannot be applied.`)
     }
     // The rules of every network in play apply: the one asked for, the account's own, the one signed for.
     const chains = [...new Set([chain, own, signed].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
-    if (chains.length === 0 && hasRuleFor((k) => k === ns || k.startsWith(`${ns}:`))) {
-      // Still unknown: the namespace's own rules need no chain id, but an exact rule of this family
-      // could be the account's chain — refuse instead of letting the write through unchecked.
-      if (chains.length === 0 && hasRuleFor((k) => k.startsWith(`${ns}:`))) {
-        throw new PolicyViolationError('chain', `The account's chain is unknown (${account.chain}), so its policies cannot be applied.`)
-      }
-    }
     // Every rule key that covers the asked-for chain or the account's own: namespace and exact ids.
     const keys = chains.length > 0 ? [...new Set(chains.flatMap(ruleKeys))] : [ns]
     const intent = intentOf(chains[0] ?? account.chain, await account.getAddress(), method, arg)

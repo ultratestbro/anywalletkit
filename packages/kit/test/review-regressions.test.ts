@@ -76,7 +76,8 @@ describe('one eip155 registration: reads on any EVM chain keep working, writes o
       const base = await w.getAccount('eip155:8453')
       expect(await base.getAddress()).toBe('0x00000000000000000000000000000000000000aa')
       await expect(base.sendTransaction({ to: SPENDER, value: 1n })).rejects.toBeInstanceOf(PolicyViolationError)
-      await expect(base.sign('hi')).rejects.toMatchObject({ policy: 'chain' })
+      // an off-chain message is valid on every network: signed, as on main (fourth review, P2)
+      await expect(base.sign('hi')).resolves.toBeDefined()
       const eth = await w.getAccount('eip155:1')
       await expect(eth.sendTransaction({ to: SPENDER, value: 1n })).resolves.toBeDefined()
     }
@@ -109,16 +110,17 @@ describe('second review: the chain check reads what is signed and never fails op
     expect(confirm).toHaveBeenCalledOnce()
   })
 
-  it('the chainId a transaction carries is the chain checked, without an RPC call; a typed-data domain is the account\'s to judge', async () => {
-    const { acc, getChainId } = lazy({ provider: 'https://rpc.example' })
+  it('a transaction is checked by its chainId and the account\'s own network; a typed-data domain is the account\'s to judge, with no RPC call', async () => {
+    const { acc, getChainId } = lazy({ provider: 'https://rpc.example', chainId: async () => 8453 })
     const g = applyPolicies(acc, { confirm: async () => true }, 'eip155:8453')
     await expect(g.signTransaction({ to: TO, value: 1n, chainId: 1 })).rejects.toMatchObject({ policy: 'chain' })
     await expect(g.signTransaction({ to: TO, value: 1n, chainId: '0x2105' })).resolves.toBeDefined()
+    expect(getChainId).toHaveBeenCalledTimes(2) // transactions learn the account's network (fourth review, P1)
     const typed = (chainId?: unknown) => ({ domain: { name: 'x', ...(chainId !== undefined ? { chainId } : {}) }, types: { M: [{ name: 'a', type: 'uint256' }] }, primaryType: 'M', message: { a: 1 } })
     // wallet-evm refuses a foreign domain chainId itself, unless the account opts in (allowCrossChainTypedData)
     await expect(g.signTypedData(typed(1))).resolves.toBeDefined()
     await expect(g.signTypedData(typed('8453'))).resolves.toBeDefined()
-    expect(getChainId).not.toHaveBeenCalled()
+    expect(getChainId).toHaveBeenCalledTimes(2)
   })
 
   it('off-chain messages valid on every network ask no RPC: sign, typed data without a chainId', async () => {
@@ -191,6 +193,34 @@ describe('third review: the account opts into cross-chain typed data; rules of e
     const a = await w.getAccount('eip155:1')
     await acc.getChainId()
     expect(await w.getAccount('eip155:1')).toBe(a)
+  })
+})
+
+describe('fourth review: a transaction\'s chainId never hides the account\'s own network; messages are not chain-checked', () => {
+  const TO = '0x000000000000000000000000000000000000bEEF'
+  it('P1: without `chain`, a lazy account learns its network even when the transaction carries a chainId', async () => {
+    const getChainId = vi.fn(async () => 1)
+    const acc = Object.assign(createMockAccount({ chain: 'eip155:unknown' }), { getChainId, _config: { provider: 'x' } })
+    await expect(applyPolicies(acc, { maxFee: { 'eip155:1': 0n } }).sendTransaction({ to: TO, value: 1n, chainId: 8453 })).rejects.toMatchObject({ policy: 'chain' })
+    expect(getChainId).toHaveBeenCalled()
+    // the same transaction for its own chain: the account's rules judge it
+    await expect(applyPolicies(acc, { maxFee: { 'eip155:1': 0n } }).sendTransaction({ to: TO, value: 1n, chainId: 1 })).rejects.toMatchObject({ policy: 'maxFee' })
+    expect(acc.sent).toHaveLength(0)
+  })
+
+  it('P1: an offline account with exact rules and no `chain` is refused even when the transaction names a chain', async () => {
+    const acc = Object.assign(createMockAccount({ chain: 'eip155:unknown' }), { _config: {}, getChainId: async () => { throw new Error('no provider') } })
+    await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [EVIL] } }).signTransaction({ to: TO, value: 1n, chainId: 8453 })).rejects.toMatchObject({ policy: 'chain' })
+  })
+
+  it('P2: messages and typed data on an account of another network sign whatever the call order; transactions do not', async () => {
+    const acc = Object.assign(createMockAccount({ chain: 'eip155:1' }), { signTypedData: async (_t: unknown) => '0xtyped' })
+    for (const policies of [{}, { confirm: async () => true }]) {
+      const g = applyPolicies(acc, policies, 'eip155:8453')
+      await expect(g.sign('Sign in to example.org')).resolves.toBeDefined()
+      await expect(g.signTypedData({ domain: { name: 'x' }, types: { M: [{ name: 'a', type: 'uint256' }] }, primaryType: 'M', message: { a: 1 } })).resolves.toBe('0xtyped')
+      await expect(g.sendTransaction({ to: TO, value: 1n })).rejects.toMatchObject({ policy: 'chain' })
+    }
   })
 })
 
