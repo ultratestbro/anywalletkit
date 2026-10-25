@@ -1,4 +1,4 @@
-import { NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
+import { NetworkError, type IWalletAccountReadOnly, bigintToNumber } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import { hexToBytes } from '@noble/hashes/utils.js'
@@ -184,10 +184,10 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
       const sim = await this.simulateCall({ contractAddress, functionSelector, parameters, options })
       let feeLimit = options.feeLimit
       if (feeLimit === undefined) {
-        const energyPrice = Number(await this.getChainParameter('getEnergyFee'))
+        const energyPrice = bigintToNumber(await this.getChainParameter('getEnergyFee'))
         feeLimit = sim.ok && sim.energy > 0 ? Math.ceil(sim.energy * energyPrice * FEE_LIMIT_MARGIN) : DEFAULT_FEE_LIMIT_SUN
         const max = this._config.transactionMaxFee
-        if (max !== undefined && feeLimit > Number(max)) feeLimit = Number(max)
+        if (max !== undefined && BigInt(feeLimit) > BigInt(max)) feeLimit = sunToJson(BigInt(max), 'transactionMaxFee')
       }
       const r = await this.post<{ transaction?: TronRawTransaction; result?: { result?: boolean } }>('/wallet/triggersmartcontract', {
         owner_address: this.addressHex, contract_address: toHexAddress(contractAddress), function_selector: functionSelector,
@@ -317,7 +317,7 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
     if ((type === 'TransferContract' || type === 'TransferAssetContract') && value.to_address) {
       creating = !(await this.accountExists(String(value.to_address)))
       if (creating) {
-        const rate = Number(params.getCreateNewAccountBandwidthRate ?? 1n)
+        const rate = bigintToNumber(params.getCreateNewAccountBandwidthRate ?? 1n)
         accountCreationFee = params.getCreateNewAccountFeeInSystemContract! + (bandwidthStaked >= bandwidth * rate ? 0n : params.getCreateAccountFee!)
       }
     }

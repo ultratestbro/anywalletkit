@@ -16,6 +16,7 @@ const EXACT = 1n << 53n
 export function bigintToNumber(value: bigint): number {
   const negative = value < 0n
   const magnitude = negative ? -value : value
+  // eslint-disable-next-line anywalletkit/no-number-bigint -- guarded: below 2^53 Number() is exact on every engine
   const n = magnitude < EXACT ? Number(magnitude) : Number(magnitude.toString())
   return negative ? -n : n
 }

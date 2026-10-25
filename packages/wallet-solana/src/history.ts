@@ -538,7 +538,7 @@ export function createSolanaHistory(options: SolanaHistoryOptions = {}): SolanaH
       const sigs = [...seen.keys()]
       const txs = await fetchTransactions(sigs)
       let items = sigs.map((s) => mapTransaction(chain, address, seen.get(s)!, txs.get(s) ?? null))
-      items.sort((a, b) => Number(b.block! - a.block!))
+      items.sort((a, b) => (b.block! > a.block! ? 1 : b.block! < a.block! ? -1 : 0))
       let more = anyLeft
       if (query.since !== undefined) {
         const since = query.since

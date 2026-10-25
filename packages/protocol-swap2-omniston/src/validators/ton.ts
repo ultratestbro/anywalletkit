@@ -3,6 +3,7 @@ import {Buffer} from "buffer";
 import {Address, Cell} from "@ton/core";
 import type {OmnistonProviderOptions} from "../provider.js";
 import type {TonSwapLeg} from "../ton-swap.js";
+import {bigintToNumber} from "@anywalletkit/core";
 
 const JETTON_TRANSFER_OP = 0x0f8a7ea5;
 const ESCROW_CREATE_OP = 0xc0a5f0d9;
@@ -470,7 +471,7 @@ export function createOmnistonTonValidators(options: OmnistonTonValidationOption
         const deployedByFactory = (body.transactions ?? []).some((tx) =>
           tx.success === true && tx.aborted !== true && tx.in_msg?.op_code?.toLowerCase() === POSITION_DEPLOY_OP &&
           !!tx.in_msg.source?.address && sameAddress(Address.parse(tx.in_msg.source.address), input.protocolAddress) &&
-          typeof tx.utime === "number" && Math.abs(Number(state.withdrawalAt) - 1 - tx.utime) <= 5);
+          typeof tx.utime === "number" && Math.abs(bigintToNumber(BigInt(state.withdrawalAt)) - 1 - tx.utime) <= 5);
         return deployedByFactory || refuse("deploy-transaction", {transactions: (body.transactions ?? []).length});
       } catch (error) {
         return refuse("error", {message: error instanceof Error ? error.message : String(error)});

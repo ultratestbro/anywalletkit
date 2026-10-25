@@ -32,13 +32,15 @@ class Reader {
   u8() { this.need(1); return this.b[this.i++]!; }
   bytes(n: number) { this.need(n); const out = this.b.slice(this.i, this.i + n); this.i += n; return out; }
   uLE(n: number): bigint { const x = this.bytes(n); let v = 0n; for (let k = n - 1; k >= 0; k--) v = (v << 8n) | BigInt(x[k]!); return v; }
+  /** Little-endian unsigned of up to 6 bytes as a number (exact: below 2^48). */
+  uNum(n: number): number { if (n > 6) throw new Error("chainflip codec: uNum takes at most 6 bytes"); const x = this.bytes(n); let v = 0; for (let k = n - 1; k >= 0; k--) v = v * 256 + x[k]!; return v; }
   /** SCALE compact integer */
   compact(): number {
     const first = this.u8();
     const mode = first & 3;
     if (mode === 0) return first >> 2;
     if (mode === 1) return ((this.u8() << 8) | first) >> 2;
-    if (mode === 2) { const rest = Number(this.uLE(3)); return ((rest << 8) | first) >>> 2; }
+    if (mode === 2) { const rest = this.uNum(3); return ((rest << 8) | first) >>> 2; }
     throw new Error("chainflip codec: big compact integers are not used here");
   }
   done() { if (this.i !== this.b.length) throw new Error(`chainflip codec: ${this.b.length - this.i} trailing bytes`); }
@@ -63,17 +65,17 @@ function readCfParameters(r: Reader, refundLen: number): CfParameters {
   const version = r.u8();
   if (version !== 1) throw new Error(`chainflip codec: cf parameters version ${version}`);
   // ccm_additional_data is `()` for non-CCM swaps: zero bytes
-  const retryDurationBlocks = Number(r.uLE(4));
+  const retryDurationBlocks = r.uNum(4);
   const refundAddress = toHex(r.bytes(refundLen));
   const minPriceX128 = r.uLE(32);
   const refundCcm = r.u8() !== 0;
   if (refundCcm) throw new Error("chainflip codec: refund CCM metadata is not expected");
-  const maxOraclePriceSlippageBps = r.u8() ? Number(r.uLE(2)) : null;
-  const dca = r.u8() ? {chunks: Number(r.uLE(4)), intervalBlocks: Number(r.uLE(4))} : null;
+  const maxOraclePriceSlippageBps = r.u8() ? r.uNum(2) : null;
+  const dca = r.u8() ? {chunks: r.uNum(4), intervalBlocks: r.uNum(4)} : null;
   const boostFeeBps = r.u8();
-  const broker = {account: toHex(r.bytes(32)), feeBps: Number(r.uLE(2))};
+  const broker = {account: toHex(r.bytes(32)), feeBps: r.uNum(2)};
   const n = r.compact();
-  const affiliates = Array.from({length: n}, () => ({account: r.u8(), feeBps: Number(r.uLE(2))}));
+  const affiliates = Array.from({length: n}, () => ({account: r.u8(), feeBps: r.uNum(2)}));
   return {version, retryDurationBlocks, refundAddress, minPriceX128, refundCcm, maxOraclePriceSlippageBps, dca, boostFeeBps, broker, affiliates};
 }
 

@@ -126,7 +126,8 @@ export function describeTransaction(tx: EvmTransaction, ctx: { chainId?: number 
   const data = (tx.data ?? '0x') as Hex
   const hasData = data.length > 2
   const selector = hasData && data.length >= 10 ? (data.slice(0, 10) as Hex) : undefined
-  const chainId = tx.chainId !== undefined ? Number(tx.chainId) : undefined
+  // An unrepresentable chainId (a bigint past 2^53) is NaN, so the chain-mismatch warning still fires.
+  const chainId = tx.chainId !== undefined ? (num(tx.chainId) ?? Number.NaN) : undefined
 
   if (chainId !== undefined && ctx.chainId !== undefined && chainId !== ctx.chainId) {
     warnings.push({ code: 'chain-mismatch', message: `Transaction targets chain ${chainId}, account is on chain ${ctx.chainId}.` })
@@ -176,7 +177,7 @@ function str(v: unknown): string | undefined {
 }
 function num(v: unknown): number | undefined {
   if (typeof v === 'number') return v
-  if (typeof v === 'bigint') return Number(v)
+  if (typeof v === 'bigint') return v >= 0n && v <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(v.toString()) : undefined
   if (typeof v === 'string' && /^\d+$/.test(v)) return Number(v)
   return undefined
 }

@@ -71,7 +71,7 @@ export function decodeMorphoRevert(data: Hex): { message: string; code?: string 
     } catch { /* fall through */ }
   }
   if (selector === '0x4e487b71') {
-    try { return { message: `panic 0x${Number(decodeErrorResult({ abi: PANIC_ABI, data }).args?.[0] ?? 0).toString(16)}` } } catch { /* fall through */ }
+    try { return { message: `panic 0x${BigInt(decodeErrorResult({ abi: PANIC_ABI, data }).args?.[0] ?? 0).toString(16)}` } } catch { /* fall through */ }
   }
   const custom = SELECTORS.get(selector)
   if (custom) return { message: `${custom.message} (${custom.name})`, code: custom.name }

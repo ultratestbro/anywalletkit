@@ -1,4 +1,4 @@
-import { NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
+import { NetworkError, type IWalletAccountReadOnly, bigintToNumber } from '@anywalletkit/core'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import {
   address, appendTransactionMessageInstructions, compileTransaction, compileTransactionMessage, compressTransactionMessageUsingAddressLookupTables,
@@ -71,7 +71,7 @@ export function pickPriorityPrice(fees: ReadonlyArray<bigint | number>, min: big
 
 /** Compute-unit limit from a simulation: ×1.1, clamped. */
 export function computeUnitLimitFromSimulation(unitsConsumed: bigint): number {
-  const padded = Number((unitsConsumed * 11n + 9n) / 10n)
+  const padded = bigintToNumber((unitsConsumed * 11n + 9n) / 10n)
   return Math.min(CU_MAX, Math.max(CU_MIN, padded))
 }
 
@@ -85,7 +85,7 @@ export function computeUnitLimitFromSimulation(unitsConsumed: bigint): number {
 function describeSimulationErr(err: unknown): string {
   if (typeof err === 'string') return err
   try {
-    return JSON.stringify(err, (_k, v) => (typeof v === 'bigint' ? Number(v) : v))
+    return JSON.stringify(err, (_k, v) => (typeof v === 'bigint' ? bigintToNumber(v) : v))
   } catch {
     return String(err)
   }
@@ -400,7 +400,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     for (const it of description.items) {
       if (it.type !== 'compute-budget') continue
       if (it.kind === 'price') price = it.value
-      if (it.kind === 'limit') limit = Number(it.value)
+      if (it.kind === 'limit') limit = bigintToNumber(it.value)
     }
     const nonBudgetIxs = description.items.filter((i) => i.type !== 'compute-budget').length
     const chargedLimit = limit ?? Math.min(CU_MAX, CU_DEFAULT_PER_INSTRUCTION * Math.max(1, nonBudgetIxs))

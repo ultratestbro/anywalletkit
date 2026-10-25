@@ -4,6 +4,7 @@ import {decodeFunctionData, encodeFunctionData} from "viem";
 import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import {ccAsset, ccAssetByToken} from "@anywalletkit/swap2-assets";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {bigintToNumber} from "@anywalletkit/core";
 
 /**
  * THORChain — native L1 swaps via asgard vaults (no wrapping). Ported from
@@ -431,7 +432,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       }
 
       const requestedTolerance = params.slippageBps ?? Number(TOLERANCE_BPS);
-      if (!Number.isInteger(requestedTolerance) || requestedTolerance < 0 || requestedTolerance > Number(MAX_TOLERANCE_BPS)) {
+      if (!Number.isInteger(requestedTolerance) || requestedTolerance < 0 || requestedTolerance > bigintToNumber(MAX_TOLERANCE_BPS)) {
         params.onRefusal?.(`thorchain: slippage ${String(params.slippageBps)} bps is outside 0–${MAX_TOLERANCE_BPS} bps`);
         return null;
       }
@@ -485,9 +486,9 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
           if (limitMode === "liquidity_tolerance_bps") {
             q = await quoteOn(host, String(liquidityBps), "liquidity_tolerance_bps");
             const feeBps = Number(q?.fees?.total_bps);
-            if (Number.isFinite(feeBps) && feeBps > Number(MAX_TOLERANCE_BPS)) {
+            if (Number.isFinite(feeBps) && feeBps > bigintToNumber(MAX_TOLERANCE_BPS)) {
               // Dust amounts: a fixed outbound fee eats the swap.
-              params.onRefusal?.(`thorchain: THORChain fees ${(feeBps / 100).toFixed(2)}% — too expensive at this amount (cap ${Number(MAX_TOLERANCE_BPS) / 100}%)`);
+              params.onRefusal?.(`thorchain: THORChain fees ${(feeBps / 100).toFixed(2)}% — too expensive at this amount (cap ${bigintToNumber(MAX_TOLERANCE_BPS) / 100}%)`);
               return null;
             }
           } else {

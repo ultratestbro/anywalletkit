@@ -26,6 +26,12 @@ import { RELAY_ERRORS, type RelayError } from './relay.js'
 import { RouterError, type RouterDeps } from './router.js'
 import { describeSiwe, type SiweInfo } from './siwe.js'
 
+/** The account nonce an RPC reported, refused when it is not a safe integer (a broken or hostile RPC). */
+const safeNonce = (n: bigint): number => {
+  if (n < 0n || n > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error(`The RPC returned an impossible nonce (${n}).`)
+  return Number(n.toString())
+}
+
 export type SignRequestInfo =
   | { kind: 'sign-message'; method: 'personal_sign'; account: string; /** Decoded text when printable, else the hex. */ text: string; /** What is actually signed (hex or utf-8 string). */ raw: string; /** Parsed Sign-In with Ethereum (EIP-4361) with the checks against the asking origin, when the text is one. */ siwe?: SiweInfo }
   | { kind: 'sign-typed-data'; method: string; account: string; /** Pretty-printed JSON. */ text: string; typedData: TypedData }
@@ -197,13 +203,13 @@ export async function prepareTransaction(deps: Pick<SignDeps, 'rpc' | 'tipFloor'
   const base = block?.baseFeePerGas != null ? big(block.baseFeePerGas) : null
   if (base === null) {
     const gasPrice = big(await deps.rpc(network, 'eth_gasPrice', []))
-    return { chainId: network.chainId, nonce: Number(big(nonceHex)), gasLimit: hex(gasLimit), gasPrice: hex(gasPrice), maxFee: (gasLimit * gasPrice).toString() }
+    return { chainId: network.chainId, nonce: safeNonce(big(nonceHex)), gasLimit: hex(gasLimit), gasPrice: hex(gasPrice), maxFee: (gasLimit * gasPrice).toString() }
   }
   const floor = deps.tipFloor?.(network.chainId) ?? MIN_TIP_WEI
   const nodeTip = await (deps.rpc(network, 'eth_maxPriorityFeePerGas', []) as Promise<string>).then(big).catch(() => 0n)
   const tip = nodeTip > floor ? nodeTip : floor
   const maxFeePerGas = base * 2n + tip
-  return { chainId: network.chainId, nonce: Number(big(nonceHex)), gasLimit: hex(gasLimit), maxFeePerGas: hex(maxFeePerGas), maxPriorityFeePerGas: hex(tip), maxFee: (gasLimit * maxFeePerGas).toString() }
+  return { chainId: network.chainId, nonce: safeNonce(big(nonceHex)), gasLimit: hex(gasLimit), maxFeePerGas: hex(maxFeePerGas), maxPriorityFeePerGas: hex(tip), maxFee: (gasLimit * maxFeePerGas).toString() }
 }
 
 /** The router's `sign` hook: classify → prepare → review → sign (→ broadcast). */

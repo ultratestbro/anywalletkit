@@ -4,6 +4,7 @@ import {ccAsset} from "@anywalletkit/swap2-assets";
 import {evmRef, isEvm, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
+import {bigintToNumber} from "@anywalletkit/core";
 
 /**
  * Uniswap v3, straight from the contracts — the permissionless swap venue.
@@ -250,7 +251,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
               const [probeOut] = decodeFunctionResult({abi: QUOTER_ABI, functionName: route.single ? "quoteExactInputSingle" : "quoteExactInput", data: raw as Hex}) as readonly [bigint];
               if (probeOut > 0n) {
                 const ratioBps = (out * probeIn * 10_000n) / (probeOut * amountIn); // (out/amountIn) ÷ (probeOut/probeIn), in bps
-                priceImpactBps = Math.max(0, Number(10_000n - ratioBps));
+                priceImpactBps = Math.max(0, bigintToNumber(10_000n - ratioBps));
               }
             }
           } catch {

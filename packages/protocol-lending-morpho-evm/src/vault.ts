@@ -103,7 +103,7 @@ export class MorphoVaultProtocolEvm extends MorphoBase<MorphoVaultConfig> {
             this.read<bigint>(v, VAULT_V1_ABI, 'fee').catch(() => 0n), this.read<bigint>(v, VAULT_V1_ABI, 'timelock').catch(() => 0n), this.read<Address>(v, VAULT_V1_ABI, 'curator').catch(() => null),
           ])
           fees.performance = bigintToNumber(fee) / 1e18
-          timelockSeconds = Number(timelock)
+          timelockSeconds = bigintToNumber(timelock)
           curator = cur
         } else if (version === 'v2') {
           const [pf, mf, cur] = await Promise.all([

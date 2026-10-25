@@ -3,6 +3,7 @@ import {describeBalancerActivity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
 import {evmRef, isEvm, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {bigintToNumber} from "@anywalletkit/core";
 
 /**
  * Balancer v2 — the cp0x permissionless Balancer venue (balancer.cp0x.com).
@@ -199,8 +200,8 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
             swaps.push({poolId: pool as Hex, assetInIndex: indexOf(p.tokens[i]!.address), assetOutIndex: indexOf(p.tokens[i + 1]!.address), amount: i === 0 ? BigInt(p.inputAmountRaw) : 0n, userData: "0x"});
           });
         }
-        const inIdx = Number(indexOf(tokenIn));
-        const outIdx = Number(indexOf(tokenOut));
+        const inIdx = bigintToNumber(indexOf(tokenIn));
+        const outIdx = bigintToNumber(indexOf(tokenOut));
         // The Vault's ETH sentinel: native in/out wraps/unwraps through its WETH.
         if (nativeIn || nativeOut) {
           const wethIdx = assets.findIndex((a) => a === getAddress(chain.weth));

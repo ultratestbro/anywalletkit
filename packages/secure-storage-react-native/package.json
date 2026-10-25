@@ -7,6 +7,7 @@
   "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
   "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/secure-storage-react-native" },
   "type": "module",
+  "engines": { "node": ">=20" },
   "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -32,10 +33,10 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "echo ok"
+    "lint": "eslint src"
   },
   "peerDependencies": {
-    "expo-modules-core": "*"
+    "expo-modules-core": "^58.0.0"
   },
   "devDependencies": {
     "@anywalletkit/keyring": "workspace:*",

@@ -42,13 +42,14 @@ function walkRecords(bytes: Uint8Array): Record_[] {
   while (i < bytes.length) {
     const start = i
     const tag = varint()
-    const field = Number(tag >> 3n)
+    if (tag >> 3n > 0x1fffffffn) throw new Error('field number out of range') // protobuf: at most 2^29 − 1
+    const field = Number((tag >> 3n).toString())
     const wire = Number(tag & 7n)
     if (field === 0) throw new Error('field 0')
     switch (wire) {
       case 0: varint(); break
       case 1: i += 8; break
-      case 2: { const len = Number(varint()); i += len; break }
+      case 2: { const len = varint(); if (len > BigInt(bytes.length - i)) throw new Error('truncated length-delimited field'); i += Number(len.toString()); break }
       case 5: i += 4; break
       default: throw new Error(`unsupported wire type ${wire}`)
     }

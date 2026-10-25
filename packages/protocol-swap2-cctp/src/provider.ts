@@ -4,6 +4,7 @@ import {ccAsset} from "@anywalletkit/swap2-assets";
 import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {CCTP_API, CCTP_BY_DOMAIN, CCTP_DOMAINS, FINALITY_FAST, FINALITY_STANDARD, cctp as cctpCfg, type CctpDomain} from "./config.js";
+import {bigintToNumber} from "@anywalletkit/core";
 
 /**
  * Circle CCTP V2 — native USDC between chains by burn-and-mint, no spread, no
@@ -200,7 +201,7 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
           if (fastOk) {
             const allowance = await getJson<{allowance?: number}>("/v2/fastBurn/USDC/allowance", signal).catch(() => null);
             // The allowance is in whole USDC; refuse Fast when it cannot cover the burn.
-            if (typeof allowance?.allowance === "number" && allowance.allowance * 1e6 < Number(amount)) fastOk = false;
+            if (typeof allowance?.allowance === "number" && allowance.allowance * 1e6 < bigintToNumber(amount)) fastOk = false;
           }
           if (fastOk) { threshold = FINALITY_FAST; bps = fast!.minimumFee; }
           else if (mode === "fast") { params.onRefusal?.(fast ? "Fast Transfer allowance is exhausted" : "Fast Transfer is not offered for this pair"); return null; }
@@ -228,7 +229,7 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
           sourceAmount: amount.toString(),
           destAmount: out.toString(),
           minDestAmount: out.toString(),
-          feeUsd: Number(maxFee) / 1e6,
+          feeUsd: bigintToNumber(maxFee) / 1e6,
           fees: maxFee > 0n ? [{type: "protocol", amount: maxFee.toString(), token: usdc, included: true, description: `Circle Fast Transfer fee (${bps} bps + ${bufferPct}% buffer, unused part is not charged)`}] : [],
           etaSeconds: eta,
           reliability: 0.99,

@@ -12,7 +12,8 @@
     "build": "pnpm -r --filter './packages/**' run build",
     "test": "pnpm -r --filter './packages/**' run test",
     "typecheck": "pnpm -r --filter './packages/**' run typecheck",
-    "lint": "pnpm -r --filter './packages/**' run lint",
+    "lint": "eslint packages/*/src",
+    "lint:rules": "node --test scripts/eslint/no-number-bigint.test.mjs",
     "changeset": "changeset",
     "release": "node scripts/publish.mjs",
     "test:hermes": "pnpm --filter @anywalletkit/example-hermes-smoke test:hermes",
@@ -30,10 +31,12 @@
     "@changesets/cli": "^3.0.3",
     "@types/node": "^22.20.5",
     "esbuild": "^0.28.2",
+    "eslint": "10.12.0",
     "fastestsmallesttextencoderdecoder": "^1.0.22",
     "hermes-engine-cli": "^0.12.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
+    "typescript-eslint": "8.71.1",
     "vitest": "^5.0.3"
   }
 }

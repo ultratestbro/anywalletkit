@@ -3,6 +3,7 @@ import {describeLifiActivity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
 import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {bigintToNumber} from "@anywalletkit/core";
 
 /**
  * LI.FI meta-aggregator — the CALLDATA execution model: the quote returns a
@@ -431,7 +432,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         const spent = BigInt(params.amountIn);
         if (bridged > spent) return reject(`the estimate bridges ${est.fromAmount}, more than the ${params.amountIn} spent`);
         if ((spent - bridged) * 10_000n > spent * BigInt(MAX_INPUT_FEE_BPS)) {
-          return reject(`the route takes ${Number(((spent - bridged) * 10_000n) / spent) / 100}% of the input as a fee (over ${MAX_INPUT_FEE_BPS / 100}%)`);
+          return reject(`the route takes ${bigintToNumber(((spent - bridged) * 10_000n) / spent) / 100}% of the input as a fee (over ${MAX_INPUT_FEE_BPS / 100}%)`);
         }
         // Source-VM execution payload. EVM: calldata to a trusted target.
         // Solana: a base64 transaction the account proves before signing —
@@ -514,7 +515,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           const dest = BigInt(est.toAmount);
           const min = BigInt(minDestAmount);
           if (dest > 0n && min < (dest * BigInt(10_000 - slippageBps)) / 10_000n) {
-            const effective = Number(((dest - min) * 1_000_000n) / dest) / 1_000_000;
+            const effective = bigintToNumber(((dest - min) * 1_000_000n) / dest) / 1_000_000;
             const requested = slippageBps / 10_000;
             const scaled: number = Math.floor(((sentSlippage * requested) / effective) * 0.995 * 1_000_000) / 1_000_000;
             if (attempt === 0 && effective > 0 && scaled > 0) {

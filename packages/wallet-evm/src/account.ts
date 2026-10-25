@@ -7,7 +7,7 @@ import {
 import { publicKeyToAddress } from 'viem/accounts'
 import { encodeApprove, ERC20_PERMIT_ABI, PERMIT_TYPES, USDT_MAINNET } from './erc20.js'
 import { BroadcastUnknownError, ChainMismatchError, PermitUnsupportedError, SimulationError, UnsafeTransactionError } from './errors.js'
-import { WalletAccountReadOnlyEvm, cleanTypes, inferPrimaryType, transferTransaction } from './read-only-account.js'
+import { WalletAccountReadOnlyEvm, chainIdNumber, cleanTypes, inferPrimaryType, transferTransaction } from './read-only-account.js'
 export { MIN_PRIORITY_FEE_WEI } from './read-only-account.js'
 import type { ApproveOptions, EvmConfig, EvmTransaction, EvmTransferOptions, PermitInfo, PermitOptions, SignedPermit, TypedDataInput } from './types.js'
 
@@ -72,11 +72,11 @@ export function maxFeeCost(tx: TransactionSerializable): bigint {
 /** EIP-712 domain chainId in any notation a dApp sends (number, bigint, decimal or hex string) → number. */
 export function typedDomainChainId(raw: unknown): number | undefined {
   if (typeof raw === 'number') return Number.isSafeInteger(raw) ? raw : undefined
-  if (typeof raw === 'bigint') return raw <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(raw) : undefined
+  if (typeof raw === 'bigint') return raw <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(raw.toString()) : undefined
   if (typeof raw === 'string' && /^\d+$/.test(raw)) return Number(raw)
   if (typeof raw === 'string' && /^0x[0-9a-fA-F]+$/.test(raw)) {
     const n = BigInt(raw)
-    return n <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(n) : undefined
+    return n <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(n.toString()) : undefined
   }
   return undefined
 }
@@ -135,7 +135,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   }
 
   private serializeSignature(sig: Signature): Hex {
-    return `0x${sig.r.slice(2)}${sig.s.slice(2)}${Number(sig.v).toString(16)}`
+    return `0x${sig.r.slice(2)}${sig.s.slice(2)}${sig.v!.toString(16)}`
   }
 
   /** EIP-191 personal_sign; returns 65-byte hex with v ∈ {27, 28} (ethers encoding). */
@@ -164,9 +164,8 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   /** Refusals before signing: wrong chain, value to the zero address. */
   private async assertSafeTransaction(tx: EvmTransaction): Promise<void> {
     const known = await this.chainForChecks()
-    if (tx.chainId !== undefined && known !== undefined && Number(tx.chainId) !== known) {
-      throw new ChainMismatchError(known, Number(tx.chainId))
-    }
+    const asked = tx.chainId !== undefined ? chainIdNumber(tx.chainId) : undefined
+    if (asked !== undefined && known !== undefined && asked !== known) throw new ChainMismatchError(known, asked)
     const value = toBigInt(tx.value) ?? 0n
     if (tx.to !== undefined && getAddress(tx.to) === zeroAddress && value > 0n && !this._config.allowBurn) {
       throw new UnsafeTransactionError('Refusing to send value to the zero address (set allowBurn to override).')
@@ -199,7 +198,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
 
   /** ethers-shaped tx → viem serializable, filling gaps from the network when there is a client. */
   private async prepare(tx: EvmTransaction): Promise<TransactionSerializable> {
-    const chainId = tx.chainId !== undefined ? Number(tx.chainId) : await this.getChainId()
+    const chainId = tx.chainId !== undefined ? chainIdNumber(tx.chainId) : await this.getChainId()
     const nonce = tx.nonce ?? (await this.nextNonce())
     const to = tx.to !== undefined ? getAddress(tx.to) : undefined
     const value = toBigInt(tx.value) ?? 0n
