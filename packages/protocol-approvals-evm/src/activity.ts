@@ -53,6 +53,13 @@ interface Recognized {
   amount: bigint | null
 }
 
+/** What `token` is, as far as this transaction and `tokens` tell: the transfers' standard when they name one, else ERC-20 when `tokens` lists it with decimals. */
+function tokenStandard (tx: ChainTx, token: string, tokens: ActivityTokens | undefined): 'erc20' | 'nft' | 'unknown' {
+  const standards = new Set(tx.transfers.filter((t) => sameAddress(t.token, token)).map((t) => t.standard))
+  if (standards.has('erc721') || standards.has('erc1155')) return 'nft'
+  return standards.has('erc20') || typeof tokens?.[token.toLowerCase()]?.decimals === 'number' ? 'erc20' : 'unknown'
+}
+
 /**
  * Describe `tx` if it is an approval or a revoke.
  *
@@ -86,7 +93,14 @@ export function describeApprovalActivity (tx: ChainTx, ctx: DescribeActivityCont
   } else if (selector === SELECTORS.approve && !isPermit2) {
     const amountWord = word(data, 1)
     const amount = amountWord !== null ? BigInt(amountWord) : null
-    r = { revoke: amount === null ? null : amount === 0n, spender: addressWord(data, 0), token: call.to, amount }
+    const spender = addressWord(data, 0)
+    // approve(0x0, id) clears an NFT approval; approve(spender, 0) resets an ERC-20 allowance but
+    // APPROVES spender for token #0 on an ERC-721: a revoke on a known ERC-20, an approval on a
+    // known NFT, and not claimed otherwise (the kit's generic description decides from its catalog).
+    const cleared = spender !== null && /^0x0{40}$/.test(spender)
+    const standard = amount === 0n && !cleared ? tokenStandard(tx, call.to, options.tokens) : undefined
+    if (standard === 'unknown') return null
+    r = { revoke: amount === null ? null : cleared || standard === 'erc20', spender, token: call.to, amount }
   } else if (selector === SELECTORS.setApprovalForAll) {
     const flag = word(data, 1)
     r = { revoke: flag === null ? null : BigInt(flag) === 0n, spender: addressWord(data, 0), token: call.to, amount: null }
