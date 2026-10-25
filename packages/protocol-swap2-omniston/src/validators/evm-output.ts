@@ -9,6 +9,7 @@ import {
   stringToHex,
   type Hex,
 } from "viem";
+import { bigintToNumber } from '@anywalletkit/core'
 
 const ESCROW_FACTORY_ABI = [
   {
@@ -271,15 +272,15 @@ function locateImmutables(input: Hex, secretHash: Hex): {
   try {
     const offset = word(7);
     if (offset % 32n !== 0n || offset < 288n || offset > 4096n) return null;
-    const lengthAt = start + Number(offset) * 2;
+    const lengthAt = start + bigintToNumber(offset) * 2; // offset ≤ 4096, checked above
     if (data.length < lengthAt + 64) return null;
     const length = BigInt(`0x${data.slice(lengthAt, lengthAt + 64)}`);
-    if (length > 1024n || data.length < lengthAt + 64 + Number(length) * 2) return null;
+    if (length > 1024n || data.length < lengthAt + 64 + bigintToNumber(length) * 2) return null;
     return {
       orderHash: `0x${data.slice(start, at)}`,
       hashlock: `0x${needle}`,
       maker: word(1), taker: word(2), token: word(3), amount: word(4), safetyDeposit: word(5), timelocks: word(6),
-      parameters: `0x${data.slice(lengthAt + 64, lengthAt + 64 + Number(length) * 2)}`,
+      parameters: `0x${data.slice(lengthAt + 64, lengthAt + 64 + bigintToNumber(length) * 2)}`,
     };
   } catch {
     return null;

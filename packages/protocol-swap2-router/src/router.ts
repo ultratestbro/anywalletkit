@@ -14,6 +14,7 @@ import type {
 } from "@anywalletkit/protocol-swap2-core/types";
 import {validQuote} from "@anywalletkit/protocol-swap2-core/validate";
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
+import {bigintToNumber} from "@anywalletkit/core";
 
 const DEFAULT_WEIGHTS: ScoreWeights = {price: 0.6, speed: 0.3, reliability: 0.1};
 /** Quotes within 0.2% of the best net value count as the same price. */
@@ -391,5 +392,5 @@ export class CrossChainRouter {
 function fraction(num: bigint, den: bigint): number {
   if (den === 0n) return 1;
   // scale to keep precision, then to float
-  return Number((num * 10_000n) / den) / 10_000;
+  return bigintToNumber((num * 10_000n) / den) / 10_000;
 }

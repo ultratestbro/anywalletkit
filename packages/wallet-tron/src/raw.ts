@@ -70,7 +70,8 @@ export function readFields(bytes: Uint8Array): Field[] {
   while (i < bytes.length) {
     const tag = readVarint(bytes, i, 'tag')
     i = tag.next
-    const number = Number(tag.value >> 3n)
+    if (tag.value >> 3n > 0x1fffffffn) throw new Error('field number out of range') // protobuf: at most 2^29 − 1
+    const number = Number((tag.value >> 3n).toString())
     const wire = Number(tag.value & 7n)
     if (number === 0) throw new Error('field 0')
     switch (wire) {
@@ -80,7 +81,7 @@ export function readFields(bytes: Uint8Array): Field[] {
         const len = readVarint(bytes, i, 'length')
         const start = len.next
         if (len.value > BigInt(bytes.length - start)) throw new Error('truncated length-delimited field')
-        const end = start + Number(len.value)
+        const end = start + Number(len.value.toString()) // ≤ the remaining bytes, checked above
         out.push({ number, wire, value: bytes.subarray(start, end) })
         i = end
         break
@@ -186,7 +187,7 @@ export interface TronDecodedRaw {
 /** int64 on the wire is two's complement: a 10-byte varint with bit 63 set is negative. */
 const signed = (v: bigint): bigint => (v >= 1n << 63n ? v - (1n << 64n) : v)
 /** JSON-shaped integer: a number while exact, else a decimal string (the node's JSON does the same). */
-const int = (v: bigint): number | string => { const s = signed(v); return s <= BigInt(Number.MAX_SAFE_INTEGER) && s >= BigInt(Number.MIN_SAFE_INTEGER) ? Number(s) : s.toString() }
+const int = (v: bigint): number | string => { const s = signed(v); return s <= BigInt(Number.MAX_SAFE_INTEGER) && s >= BigInt(Number.MIN_SAFE_INTEGER) ? Number(s.toString()) : s.toString() }
 /** Number via the decimal string: Hermes mis-converts Number(bigint) at and above 2^63. */
 const num = (v: bigint): number => Number(signed(v).toString())
 const asBytes = (f: Field, what: string): Uint8Array => { if (!(f.value instanceof Uint8Array) || f.wire !== 2) throw new Error(`${what}: expected bytes`); return f.value }

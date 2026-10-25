@@ -142,7 +142,7 @@ describeProtocolModule("protocol-swap2-balancer", {
   activity,
   Protocol: BalancerSwap2Protocol,
   config: {fromChain: "eip155:1", skipAccountChainCheck: true, rpcUrls: RPC},
-  samples: {getSupportedChains: []},
+  samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
 
 describeProtocolBehaviour("protocol-swap2-balancer", {

@@ -176,15 +176,18 @@ export interface Swap2ExecutionPhaseDetail {
   hash?: string;
 }
 
+/** A bigint chain id as a number, or undefined outside the safe range (checked before converting: Hermes mis-converts above 2^63). */
+const safeChainId = (v: bigint): number | undefined => (v >= 0n && v <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(v.toString()) : undefined);
+
 /** EIP-712 domain with `chainId` as a number whatever notation the provider used. */
 export function normalizeTypedDomain(domain: unknown): unknown {
   if (!domain || typeof domain !== "object") return domain;
   const raw = (domain as {chainId?: unknown}).chainId;
   let chainId: number | undefined;
   if (typeof raw === "number") chainId = raw;
-  else if (typeof raw === "bigint") chainId = Number(raw);
+  else if (typeof raw === "bigint") chainId = safeChainId(raw);
   else if (typeof raw === "string" && /^\d+$/.test(raw)) chainId = Number(raw);
-  else if (typeof raw === "string" && /^0x[0-9a-fA-F]+$/.test(raw)) chainId = Number(BigInt(raw));
+  else if (typeof raw === "string" && /^0x[0-9a-fA-F]+$/.test(raw)) chainId = safeChainId(BigInt(raw));
   return chainId === undefined || !Number.isSafeInteger(chainId) ? domain : {...(domain as object), chainId};
 }
 
@@ -525,7 +528,7 @@ function assertQuoteConstraints(q: Quote, options: Swap2Options): void {
   }
   if (options.slippage !== undefined) {
     const scale = 1_000_000_000n;
-    const permitted = BigInt(floorScaled(options.slippage, Number(scale)));
+    const permitted = BigInt(floorScaled(options.slippage, 1_000_000_000));
     // Floor, like the providers compute their minimum (see validQuote).
     const required = (nominal * (scale - permitted)) / scale;
     if (guaranteed < required) {

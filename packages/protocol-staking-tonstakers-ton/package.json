@@ -7,6 +7,7 @@
   "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
   "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-staking-tonstakers-ton" },
   "type": "module",
+  "engines": { "node": ">=20" },
   "main": "index.js",
   "types": "./types/index.d.ts",
   "exports": {
@@ -31,7 +32,7 @@
     "build": "echo \"plain ESM, nothing to build\"",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test tests/*.test.js && vitest run",
-    "lint": "echo ok",
+    "lint": "eslint src",
     "verify:live": "node scripts/verify-live.mjs"
   },
   "dependencies": {

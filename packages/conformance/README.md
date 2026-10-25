@@ -16,7 +16,7 @@ On npm: [@anywalletkit/conformance](https://www.npmjs.com/package/@anywalletkit/
 | Export | Checks |
 |---|---|
 | `describeChainModule` | a chain package: derivation against `derivationVectors` (several seeds and account indexes), signing, read-only accounts that never write |
-| `describeProtocolModule` | a protocol module's shape: required methods, a read-only account cannot write, a quote never sends |
+| `describeProtocolModule` | a protocol module's shape: required methods, a read-only account cannot write, a read or quote never signs or sends (any `sign*` / `send*` / `transfer` / `approve` / `broadcast*` call on the account fails it, even one the mock lacks, even when the quote then throws); reads listed in `mustResolve` must succeed with their samples |
 | `describeProtocolBehaviour` | a swap2 module run to the review gate: only own or declared recipients, approvals exactly to the declared spender, amounts equal to the quote |
 | `describeActivitySuite` | `describeActivity` recognizes the module's recorded real transactions |
 | `namesSuite` | a `NameResolver` implementation |

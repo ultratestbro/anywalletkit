@@ -4,6 +4,7 @@ import { hex } from '@scure/base'
 import { dustLimit, scriptKind } from './address.js'
 import { UnsafeTransactionError } from './errors.js'
 import type { BtcTxDescription, BtcTxOutputDescription, BtcWarning } from './types.js'
+import { bigintToNumber } from '@anywalletkit/core'
 
 /** Default fee-rate ceiling, sat/vB; a spend above it is refused. */
 export const DEFAULT_MAX_FEE_RATE = 500
@@ -61,7 +62,7 @@ export function describeTransaction(tx: Transaction, inputValues: bigint[], ctx:
   const fee = inputSum - outputSum
   const amount = outputs.filter((o) => o.role !== 'change').reduce((s, o) => s + o.value, 0n)
   const vsize = vsizeOf(tx)
-  const feeRate = vsize > 0 ? Math.round((Number(fee) / vsize) * 100) / 100 : 0
+  const feeRate = vsize > 0 ? Math.round((bigintToNumber(fee) / vsize) * 100) / 100 : 0
   if (feeRate > (ctx.maxFeeRate ?? DEFAULT_MAX_FEE_RATE)) warnings.add('high-fee-rate')
   if (amount > 0n && fee * 10n > amount) warnings.add('fee-over-10pct-of-amount')
   if (!outputs.some((o) => o.role === 'change')) warnings.add('no-change')

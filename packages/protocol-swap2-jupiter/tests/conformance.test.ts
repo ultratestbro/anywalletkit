@@ -29,7 +29,7 @@ describeProtocolModule("protocol-swap2-jupiter", {
   activity,
   Protocol: JupiterSwap2Protocol,
   config: {fromChain: "solana:mainnet", skipAccountChainCheck: true},
-  samples: {getSupportedChains: []},
+  samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
 
 describeProtocolBehaviour("protocol-swap2-jupiter", {

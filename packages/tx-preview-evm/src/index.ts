@@ -339,7 +339,9 @@ function revertReason(c: SimCall): string {
   // Error(string): 0x08c379a0 + offset + length + bytes.
   if (data && data.startsWith("0x08c379a0") && data.length >= 138) {
     try {
-      const len = Number(BigInt(`0x${data.slice(74, 138)}`));
+      const length = BigInt(`0x${data.slice(74, 138)}`);
+      if (length > BigInt(data.length)) throw new Error("length past the data");
+      const len = Number(length.toString());
       const s = hexToString(`0x${data.slice(138, 138 + len * 2)}` as Hex);
       if (s) return s;
     } catch { /* fall through */ }
@@ -353,7 +355,9 @@ async function tokenMeta(rpc: Rpc, token: string): Promise<{symbol: string | nul
   let symbol: string | null = null;
   if (sym && isHex(sym) && sym.length >= 130) {
     try {
-      const len = Number(BigInt(`0x${sym.slice(66, 130)}`));
+      const length = BigInt(`0x${sym.slice(66, 130)}`);
+      if (length > BigInt(sym.length)) throw new Error("length past the data");
+      const len = Number(length.toString());
       symbol = hexToString(`0x${sym.slice(130, 130 + len * 2)}` as Hex) || null;
     } catch { /* ignore */ }
   } else if (sym && isHex(sym) && sym.length === 66) {
@@ -363,8 +367,9 @@ async function tokenMeta(rpc: Rpc, token: string): Promise<{symbol: string | nul
   }
   let decimals: number | null = null;
   if (dec && isHex(dec) && dec.length > 2) {
-    const d = Number(BigInt(dec));
-    decimals = d <= 255 ? d : null;
+    // Compared as a bigint: Hermes turns Number(x) above 2^63 into garbage that could pass `≤ 255`.
+    const d = BigInt(dec);
+    decimals = d <= 255n ? Number(d.toString()) : null;
   }
   return {symbol, decimals};
 }

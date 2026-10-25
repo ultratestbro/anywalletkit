@@ -13,6 +13,7 @@
 import type { ChainCall, ChainTransfer, ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@anywalletkit/core'
 import { fromBase64 } from './rpc.js'
 import { CAIP2 } from './types.js'
+import { bigintToNumber } from '@anywalletkit/core'
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -240,7 +241,7 @@ function big(v: unknown, approx: { value: boolean }): bigint | undefined {
 }
 
 const nsToSeconds = (ts: unknown): number => {
-  if (typeof ts === 'string' && /^\d+$/.test(ts)) return Number(BigInt(ts) / 1_000_000_000n)
+  if (typeof ts === 'string' && /^\d+$/.test(ts)) return bigintToNumber(BigInt(ts) / 1_000_000_000n)
   if (typeof ts === 'number') return Math.floor(ts / 1e9)
   return 0
 }

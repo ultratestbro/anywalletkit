@@ -1,6 +1,6 @@
 import {
   StakingProtocol,
-  type ActivityItem, type ChainTx, type DescribeActivityContext, type IWalletAccount, type IWalletAccountReadOnly,
+  type ActivityItem, type ChainTx, type DescribeActivityContext, type IWalletAccount, type IWalletAccountReadOnly, bigintToNumber,
 } from '@anywalletkit/core'
 import {
   createPublicClient, custom, encodeFunctionData, http, parseAbi,
@@ -417,8 +417,8 @@ export default class SsvProtocolEvm extends StakingProtocol<SsvProtocolConfig> {
       return {
         id: BigInt(index),
         amount: BigInt(entry.amount),
-        timestamp: Number(unlockTime - BigInt(cooldown)),
-        unlockTime: Number(unlockTime),
+        timestamp: bigintToNumber(unlockTime - BigInt(cooldown)),
+        unlockTime: bigintToNumber(unlockTime),
         claimable: unlockTime <= now,
       }
     })
@@ -578,7 +578,7 @@ export default class SsvProtocolEvm extends StakingProtocol<SsvProtocolConfig> {
    * @returns Cooldown seconds.
    */
   async getCooldown(): Promise<number> {
-    return Number(await this._requireProvider().readContract({ address: this._addresses.views, abi: VIEWS_ABI, functionName: 'cooldownDuration' }))
+    return bigintToNumber(await this._requireProvider().readContract({ address: this._addresses.views, abi: VIEWS_ABI, functionName: 'cooldownDuration' }))
   }
 
   /**

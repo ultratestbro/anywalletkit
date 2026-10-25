@@ -13,6 +13,7 @@
     "directory": "packages/protocol-swap2-fynd"
   },
   "type": "module",
+  "engines": { "node": ">=20" },
   "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -54,7 +55,7 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "echo ok"
+    "lint": "eslint src"
   },
   "dependencies": {
     "@anywalletkit/protocol-swap2-core": "workspace:*",

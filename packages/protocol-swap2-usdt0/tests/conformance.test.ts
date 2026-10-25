@@ -54,7 +54,7 @@ describeProtocolModule("protocol-swap2-usdt0", {
   activity,
   Protocol: Usdt0Swap2Protocol,
   config: {fromChain: "eip155:42161", rpcUrls: RPC, skipAccountChainCheck: true},
-  samples: {getSupportedChains: []},
+  samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
 
 describeProtocolBehaviour("protocol-swap2-usdt0", {

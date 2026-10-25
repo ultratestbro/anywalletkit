@@ -49,7 +49,9 @@ export function decodeRevertReason(hex: string | undefined): string | undefined 
   if (!h) return undefined
   const { selector, words } = splitCalldata(h)
   if (selector === '08c379a0' && words.length >= 2) {
-    const len = Number(decodeUint(words[1]!))
+    const length = decodeUint(words[1]!)
+    if (length > BigInt(h.length)) return undefined // a length past the data: not an Error(string)
+    const len = Number(length.toString())
     const start = 8 + 64 * 2
     const bytes = h.slice(start, start + len * 2)
     try { return new TextDecoder().decode(Uint8Array.from(bytes.match(/.{2}/g) ?? [], (b) => parseInt(b, 16))) } catch { /* fall through */ }

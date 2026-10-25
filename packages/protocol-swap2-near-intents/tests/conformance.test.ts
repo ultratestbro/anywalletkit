@@ -17,7 +17,7 @@ describeProtocolModule("protocol-swap2-near-intents", {
   activity,
   Protocol: NearIntentsSwap2Protocol,
   config: {fromChain: "eip155:1", skipAccountChainCheck: true},
-  samples: {getSupportedChains: []},
+  samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
 
 // Behavioural conformance: a 1Click deposit-address quote (same shape as provider.test.ts).

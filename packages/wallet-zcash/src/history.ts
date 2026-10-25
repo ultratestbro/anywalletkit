@@ -129,7 +129,7 @@ export function createZcashHistory(options: ZcashHistoryOptions = {}): ZcashHist
       const { hashes, total } = await wrap(() => client.listTransactions(address, pageSize, offset))
       const dashboards = hashes.length ? await wrap(() => client.getTransactionDashboards(hashes)) : new Map()
       let items = hashes.map((h) => dashboards.get(h)).filter((d): d is BlockchairTxDashboard => !!d).map((d) => mapDashboardTx(chain, address, d))
-      items.sort((a, b) => (b.block === undefined ? 1 : a.block === undefined ? -1 : Number(b.block - a.block)) || b.time - a.time)
+      items.sort((a, b) => (b.block === undefined ? 1 : a.block === undefined ? -1 : (b.block > a.block ? 1 : b.block < a.block ? -1 : 0)) || b.time - a.time)
       let more = total !== undefined ? offset + hashes.length < total : hashes.length === pageSize
       if (query.since !== undefined) {
         const since = query.since

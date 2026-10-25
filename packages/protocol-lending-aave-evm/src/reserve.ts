@@ -36,12 +36,12 @@ export interface ReserveConfiguration {
 export function parseReserveConfiguration(data: bigint): ReserveConfiguration {
   const bit = (n: number) => ((data >> BigInt(n)) & 1n) === 1n
   const field = (shift: number, bits: number) => (data >> BigInt(shift)) & mask(bits)
-  const bonus = Number(field(32, 16))
+  const bonus = bigintToNumber(field(32, 16))
   return {
-    ltv: Number(field(0, 16)) / 10_000,
-    liquidationThreshold: Number(field(16, 16)) / 10_000,
+    ltv: bigintToNumber(field(0, 16)) / 10_000,
+    liquidationThreshold: bigintToNumber(field(16, 16)) / 10_000,
     liquidationBonus: bonus === 0 ? 0 : (bonus - 10_000) / 10_000,
-    decimals: Number(field(48, 8)),
+    decimals: bigintToNumber(field(48, 8)),
     active: bit(56),
     frozen: bit(57),
     borrowingEnabled: bit(58),
@@ -49,10 +49,10 @@ export function parseReserveConfiguration(data: bigint): ReserveConfiguration {
     borrowableInIsolation: bit(61),
     siloedBorrowing: bit(62),
     flashloanEnabled: bit(63),
-    reserveFactor: Number(field(64, 16)) / 10_000,
+    reserveFactor: bigintToNumber(field(64, 16)) / 10_000,
     borrowCap: field(80, 36),
     supplyCap: field(116, 36),
-    liquidationProtocolFee: Number(field(152, 16)) / 10_000,
+    liquidationProtocolFee: bigintToNumber(field(152, 16)) / 10_000,
     debtCeiling: field(212, 40),
   }
 }

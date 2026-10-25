@@ -118,7 +118,7 @@ export function decodeAaveRevert(data: Hex): { message: string; code?: string } 
   if (selector === '0x4e487b71') {
     try {
       const d = decodeErrorResult({ abi: PANIC_ABI, data })
-      return { message: `panic 0x${Number(d.args?.[0] ?? 0).toString(16)}` }
+      return { message: `panic 0x${BigInt(d.args?.[0] ?? 0).toString(16)}` }
     } catch { /* fall through */ }
   }
   const name = SELECTOR_TO_NAME.get(selector)

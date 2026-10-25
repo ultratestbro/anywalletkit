@@ -18,5 +18,5 @@ describeProtocolModule("protocol-swap2-omniston", {
   activity,
   Protocol: OmnistonSwap2Protocol,
   config: {fromChain: "eip155:1", skipAccountChainCheck: true},
-  samples: {getSupportedChains: []},
+  samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });

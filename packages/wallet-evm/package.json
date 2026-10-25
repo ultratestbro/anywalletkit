@@ -7,6 +7,7 @@
   "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
   "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/wallet-evm" },
   "type": "module",
+  "engines": { "node": ">=20" },
   "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -27,7 +28,7 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "echo 'lint: configured in phase 1'"
+    "lint": "eslint src"
   },
   "keywords": [
     "wallet",

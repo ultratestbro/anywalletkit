@@ -26,6 +26,7 @@ import {
   getProgramDerivedAddress
 } from '@solana/addresses'
 import { AccountRole } from '@solana/instructions'
+import { bigintToNumber } from '@anywalletkit/core'
 
 /** @typedef {import('@solana/addresses').Address} Address */
 /** @typedef {import('@solana/instructions').Instruction} Instruction */
@@ -136,7 +137,7 @@ export function applyFee (fee, amount) {
  * @returns {number} The fee as a percentage.
  */
 export function feePercent (fee) {
-  return fee.denominator === 0n ? 0 : (Number(fee.numerator) * 100) / Number(fee.denominator)
+  return fee.denominator === 0n ? 0 : (bigintToNumber(fee.numerator) * 100) / bigintToNumber(fee.denominator)
 }
 
 /**

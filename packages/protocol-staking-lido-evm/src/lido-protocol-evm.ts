@@ -11,6 +11,7 @@ import StakingProtocol, {
   type ClaimWithdrawalsOptions, type ClaimWithdrawalsResult, type StakeOptions, type StakeResult, type StakedBalance,
   type WithdrawalRequestOptions, type WithdrawalRequestResult, type WithdrawalRequestsView,
 } from './staking-protocol.js'
+import { bigintToNumber } from '@anywalletkit/core'
 
 /** Default timeout for the module's REST reads (APR, rewards, queue times): an API that never answers must not hang the caller. */
 const API_TIMEOUT_MS = 15_000
@@ -146,7 +147,7 @@ function toAmount(amount: number | bigint): bigint {
 function toPermitSignature(signature: string): { v: number; r: Hex; s: Hex } {
   const hex = signature as Hex
   const parsed = hex.length === 130 ? compactSignatureToSignature(parseCompactSignature(hex)) : parseSignature(hex)
-  const v = parsed.v !== undefined ? Number(parsed.v) : 27 + (parsed.yParity ?? 0)
+  const v = parsed.v !== undefined ? bigintToNumber(BigInt(parsed.v)) : 27 + (parsed.yParity ?? 0)
   return { v, r: parsed.r, s: parsed.s }
 }
 
@@ -411,12 +412,12 @@ export default class LidoProtocolEvm extends StakingProtocol<LidoProtocolConfig>
       .map((r) => ({
         id: r.id,
         amount: r.status.amountOfStETH,
-        timestamp: Number(r.status.timestamp),
+        timestamp: bigintToNumber(BigInt(r.status.timestamp)),
         claimable: r.status.isFinalized,
       }))
-      .sort((a, b) => Number(b.id - a.id))
+      .sort((a, b) => (b.id > a.id ? 1 : b.id < a.id ? -1 : 0))
     // findCheckpointHints requires ascending ids
-    const claimableIds = open.filter((r) => r.status.isFinalized).map((r) => r.id).sort((a, b) => Number(a - b))
+    const claimableIds = open.filter((r) => r.status.isFinalized).map((r) => r.id).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
     let claimableAmount = 0n
     if (claimableIds.length > 0) {
       const hints = await this._findHints(claimableIds)
@@ -444,7 +445,7 @@ export default class LidoProtocolEvm extends StakingProtocol<LidoProtocolConfig>
       const view = await this.getWithdrawalRequests()
       ids = view.claimableIds
     } else {
-      ids = ids.map((id) => BigInt(id)).sort((a, b) => Number(a - b))
+      ids = ids.map((id) => BigInt(id)).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
     }
     if (ids.length === 0) {
       throw new Error('There are no claimable withdrawal requests.')

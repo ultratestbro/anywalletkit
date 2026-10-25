@@ -5,6 +5,7 @@ import {
   type Hex, type PublicClient,
 } from 'viem'
 import { createClient } from './client.js'
+import { UnsafeTransactionError } from './errors.js'
 import { ERC20_ABI } from './erc20.js'
 import type { EvmConfig, EvmReceipt, EvmTransaction, EvmTransferOptions, SimulationResult, TypedDataInput } from './types.js'
 import { encodeTransfer } from './erc20.js'
@@ -25,6 +26,16 @@ export function usesLegacyFees(tx: EvmTransaction): boolean {
 }
 
 const toBigInt = (v: bigint | number | string | undefined): bigint | undefined => (v === undefined ? undefined : BigInt(v))
+
+/**
+ * A transaction's `chainId` as a number. Out-of-range values are refused, and a bigint is checked
+ * BEFORE it is converted: Hermes turns Number(x) above 2^63 into garbage that could match a chain.
+ */
+export function chainIdNumber(v: number | bigint): number {
+  const ok = typeof v === 'number' ? Number.isSafeInteger(v) && v >= 0 : v >= 0n && v <= BigInt(Number.MAX_SAFE_INTEGER)
+  if (!ok) throw new UnsafeTransactionError(`chainId ${String(v)} is not a valid chain id.`)
+  return typeof v === 'number' ? v : Number(v.toString())
+}
 
 /** Pick the root type of an EIP-712 `types` map when `primaryType` is not given. */
 export function inferPrimaryType(types: TypedDataInput['types']): string {
@@ -178,7 +189,7 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
   async quoteSendTransaction(tx: EvmTransaction): Promise<{ fee: bigint }> {
     const client = this.requireClient('quote send transaction operations')
     const cap = async (): Promise<bigint> => {
-      const chainId = tx.chainId !== undefined ? Number(tx.chainId) : await this.getChainId()
+      const chainId = tx.chainId !== undefined ? chainIdNumber(tx.chainId) : await this.getChainId()
       try {
         const f = await this.feeFields(tx, chainId)
         return 'gasPrice' in f ? f.gasPrice : f.maxFeePerGas
@@ -288,8 +299,8 @@ export function decodeRevert(e: unknown): { reason: string; data?: Hex } | undef
       }
       if (selector === '0x4e487b71') {
         const d = decodeErrorResult({ abi: [{ type: 'error', name: 'Panic', inputs: [{ type: 'uint256', name: 'code' }] }], data })
-        const code = Number(d.args?.[0] ?? 0)
-        return { reason: `panic 0x${code.toString(16)}: ${PANIC[code] ?? 'unknown'}`, data }
+        const raw = BigInt(d.args?.[0] ?? 0)
+        return { reason: `panic 0x${raw.toString(16)}: ${(raw <= 0xffn ? PANIC[Number(raw.toString())] : undefined) ?? 'unknown'}`, data }
       }
     } catch { /* fall through to selector */ }
     return { reason: `reverted with custom error ${selector}`, data }

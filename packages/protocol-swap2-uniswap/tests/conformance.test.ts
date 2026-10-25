@@ -18,7 +18,7 @@ describeProtocolModule("protocol-swap2-uniswap", {
   activity,
   Protocol: UniswapSwap2Protocol,
   config: {fromChain: "eip155:1", skipAccountChainCheck: true, rpcUrls: RPC},
-  samples: {getSupportedChains: []},
+  samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
 
 // Behavioural conformance on stubbed on-chain quotes: only own addresses are paid, the approval is exact.

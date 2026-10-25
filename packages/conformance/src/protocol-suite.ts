@@ -34,6 +34,11 @@ export interface ProtocolSuiteOptions<P> {
   unsupported?: string[]
   /** Account factory for reads; default: the recording mock. Use a fixture-backed one for real quote checks. */
   account?: () => IWalletAccount
+  /**
+   * Reads and quotes that must RESOLVE with their sample on `account` — an error fails the suite.
+   * Every other read is lenient (fixtures may be absent): it may throw, but it may never sign or send.
+   */
+  mustResolve?: string[]
   /** Constructor config, when the module requires one (e.g. swap2 engines need `fromChain`). */
   config?: unknown
   /**
@@ -42,6 +47,29 @@ export interface ProtocolSuiteOptions<P> {
    * "Supplied USDC · Aave v3" instead of "Contract call". Load them from `fixtures/activity/*.json`.
    */
   activity?: { fixtures: ActivityFixtureJson[]; negatives?: ActivityFixtureJson[] }
+}
+
+/** Account methods that sign or broadcast: none may run inside a read or a quote. */
+const SIGNING_METHOD = /^(sign|send|transfer|approve|broadcast|revoke)/
+
+/**
+ * Wrap `account` so that every signing or broadcasting call is recorded — including one to a
+ * method the account does not have (a quote that calls `signTypedData` on the plain mock would
+ * otherwise fail with a TypeError and look like a missing fixture).
+ */
+export function watchSigning<A extends object>(account: A): { account: A; calls: string[] } {
+  const calls: string[] = []
+  const watched = new Proxy(account, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop, target) as unknown
+      if (typeof prop !== 'string' || !SIGNING_METHOD.test(prop)) return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value
+      return (...args: unknown[]) => {
+        calls.push(prop)
+        return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).apply(target, args) : Promise.reject(new Error(`${prop} is not available here`))
+      }
+    },
+  })
+  return { account: watched, calls }
 }
 
 /** The conformance suite every protocol module must pass. */
@@ -84,17 +112,34 @@ export function describeProtocolModule<P extends object>(name: string, o: Protoc
       }
     })
 
-    it('reads and quotes never broadcast', async () => {
-      const account = o.account?.() ?? createMockAccount()
+    it('reads and quotes never sign or broadcast', async () => {
+      const base = o.account?.() ?? createMockAccount()
+      const { account, calls } = watchSigning(base)
       const p = new o.Protocol(account, o.config) as AnyProtocol
       for (const m of reads) {
         if (skip.has(m) || unsupported.has(m)) continue
         const args = o.samples?.[m]
         if (!args) continue
-        try { await (p[m] as (...a: unknown[]) => Promise<unknown>)(...args) } catch { /* fixtures may be absent; we only assert no send */ }
+        const before = calls.length
+        // Lenient: fixtures may be absent (see mustResolve) — but a signature attempt before the error still counts.
+        try { await (p[m] as (...a: unknown[]) => Promise<unknown>)(...args) } catch { /* checked below */ }
+        expect(calls.slice(before), `${m} called ${calls.slice(before).join(', ')} on the account`).toEqual([])
       }
-      const sent = (account as { sent?: unknown[] }).sent ?? []
+      const sent = (base as { sent?: unknown[] }).sent ?? []
       expect(sent, 'a quote/read called sendTransaction or transfer').toHaveLength(0)
     })
+
+    if ((o.mustResolve ?? []).length > 0) {
+      it('must-resolve reads and quotes succeed with their samples', async () => {
+        const { account, calls } = watchSigning(o.account?.() ?? createMockAccount())
+        const p = new o.Protocol(account, o.config) as AnyProtocol
+        for (const m of o.mustResolve!) {
+          const args = o.samples?.[m]
+          expect(args, `mustResolve lists ${m} without a sample`).toBeDefined()
+          await (p[m] as (...a: unknown[]) => Promise<unknown>)(...args!)
+        }
+        expect(calls, 'a must-resolve read signed or sent').toEqual([])
+      })
+    }
   })
 }

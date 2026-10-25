@@ -1,6 +1,6 @@
 import {
   LendingProtocol, NotImplementedError,
-  type ActivityItem, type ChainTx, type DescribeActivityContext, type IWalletAccountReadOnly,
+  type ActivityItem, type ChainTx, type DescribeActivityContext, type IWalletAccountReadOnly, bigintToNumber,
 } from '@anywalletkit/core'
 import {
   BaseError, ContractFunctionRevertedError, ContractFunctionZeroDataError, ExecutionRevertedError,
@@ -399,7 +399,10 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
     ])
     // Assets and their queues are read in parallel (order kept): sequentially
     // this was ~100 round trips per vault, 5-11 s on a phone.
-    const range = (n: bigint): bigint[] => Array.from({ length: Number(n) }, (_, i) => BigInt(i))
+    const range = (n: bigint): bigint[] => {
+      if (n > 256n) throw new Error(`Mellow vault reports ${n} assets; refusing to read that many.`)
+      return Array.from({ length: bigintToNumber(n) }, (_, i) => BigInt(i))
+    }
     const assets: VaultAsset[] = await Promise.all(range(assetCount).map(async (i) => {
       const asset = await client.readContract({ address: vault, abi: VAULT_ABI, functionName: 'assetAt', args: [i] })
       const queueCount = await client.readContract({ address: vault, abi: VAULT_ABI, functionName: 'getQueueCount', args: [asset] })
@@ -540,11 +543,11 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
     for (const { asset, q, req, claimable } of deposits) {
       const [timestamp, assets] = req
       claimableShares += BigInt(claimable)
-      if (BigInt(assets) > 0n) pendingDeposits.push({ token: asset.address, queue: q.address, requestedAt: Number(timestamp), assets: BigInt(assets) })
+      if (BigInt(assets) > 0n) pendingDeposits.push({ token: asset.address, queue: q.address, requestedAt: bigintToNumber(BigInt(timestamp)), assets: BigInt(assets) })
     }
     for (const { asset, q, reqs } of redeems) {
       for (const r of reqs) {
-        redeemRequests.push({ token: asset.address, queue: q.address, timestamp: Number(r.timestamp), shares: BigInt(r.shares), claimable: Boolean(r.isClaimable), assets: BigInt(r.assets) })
+        redeemRequests.push({ token: asset.address, queue: q.address, timestamp: bigintToNumber(BigInt(r.timestamp)), shares: BigInt(r.shares), claimable: Boolean(r.isClaimable), assets: BigInt(r.assets) })
       }
     }
     redeemRequests.sort((a, b) => b.timestamp - a.timestamp)

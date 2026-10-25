@@ -18,7 +18,7 @@ describeProtocolModule("protocol-swap2-lifi", {
   activity,
   Protocol: LifiSwap2Protocol,
   config: {fromChain: "eip155:1", skipAccountChainCheck: true},
-  samples: {getSupportedChains: []},
+  samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
 
 // Behavioural conformance on the recorded quote shapes (no slippage sent, as the phone does).

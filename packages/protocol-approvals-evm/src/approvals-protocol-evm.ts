@@ -13,6 +13,7 @@ import { describeApprovalActivity, type ActivityTokens } from './activity.js'
 import RpcLogsSource, { mergeCandidates, type ApprovalSource, type Candidate } from './sources/rpc-logs.js'
 import { EIP7702_PREFIX, ERC20_ABI, ERC721_ABI, PERMIT2_ABI, PERMIT2_ADDRESS } from './standards.js'
 import StateVerifier, { approvalId } from './state-verifier.js'
+import { bigintToNumber } from '@anywalletkit/core'
 
 export interface CacheEntry {
   /** Where the cached scan started. */
@@ -148,7 +149,7 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
     const cacheKey = `${chainId}:${owner.toLowerCase()}`
     const cached = options.fromBlock === undefined && this._config.cache ? await this._config.cache.get(cacheKey) : null
 
-    const toBlock = options.toBlock ?? Number(await provider.getBlockNumber())
+    const toBlock = options.toBlock ?? bigintToNumber(await provider.getBlockNumber())
     const fromBlock = options.fromBlock ?? (cached ? cached.toBlock + 1 : (this._config.fromBlock ?? 0))
     const source = this._getSource()
     const scan = toBlock >= fromBlock ? await source.collect(owner, { fromBlock, toBlock }) : { candidates: [], complete: true, gaps: [] }

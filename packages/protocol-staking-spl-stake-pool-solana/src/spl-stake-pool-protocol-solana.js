@@ -32,6 +32,7 @@ import {
   stakeActivation,
   unstakeSeed
 } from './spl-stake-pool-codec.js'
+import { bigintToNumber } from '@anywalletkit/core'
 
 /** @typedef {import('./staking-protocol.js').StakeOptions} StakeOptions */
 /** @typedef {import('./staking-protocol.js').StakeResult} StakeResult */
@@ -417,7 +418,7 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
     if (this._aprHook) return await this._aprHook()
     const [pool, epoch] = await Promise.all([this.getPoolData(), this.getEpochInfo()])
     if (pool.previousRate <= 0n) return 0
-    const perEpoch = Number(pool.rate) / Number(pool.previousRate) - 1
+    const perEpoch = bigintToNumber(pool.rate) / bigintToNumber(pool.previousRate) - 1
     const epochsPerYear = (365.25 * 86_400_000) / (epoch.slotsInEpoch * SLOT_MS)
     return perEpoch * epochsPerYear * 100
   }

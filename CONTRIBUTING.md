@@ -21,6 +21,7 @@ Vulnerabilities go through private reporting, never a public issue: see [SECURIT
 ```sh
 pnpm install && pnpm build
 pnpm test            # Node: every suite
+pnpm lint            # unawaited promises, Number() on bigints
 pnpm test:hermes     # the Hermes VM React Native ships
 pnpm pack:check      # every package packs as it will publish
 pnpm changeset       # one per user-visible change

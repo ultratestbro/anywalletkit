@@ -208,8 +208,10 @@ function revokeCall(call: unknown): Array<{ token: string; spender?: string }> |
   if (selector === SELECTOR_LOCKDOWN && words.length >= 128) {
     // offset (0x20), length n, then n × (token, spender)
     if (BigInt(`0x${word(0)}`) !== 32n) return null
-    const n = Number(BigInt(`0x${word(1)}`))
-    if (n < 1 || words.length !== (2 + 2 * n) * 64) return null
+    const count = BigInt(`0x${word(1)}`)
+    if (count < 1n || count > BigInt(words.length)) return null // bounded before it becomes a number
+    const n = Number(count.toString())
+    if (words.length !== (2 + 2 * n) * 64) return null
     const pairs: Array<{ token: string; spender?: string }> = []
     for (let i = 0; i < n; i++) pairs.push({ token: wordAddress(word(2 + 2 * i)), spender: wordAddress(word(3 + 2 * i)) })
     return pairs // the call itself goes to Permit2: revokeTargets() checks that contract

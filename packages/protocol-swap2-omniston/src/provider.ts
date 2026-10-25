@@ -9,6 +9,7 @@ import {checkTonSwapPayload, TonSwapPayloadError, type TonSwapCheckResult, type 
 export {checkTonSwapPayload, TonSwapPayloadError, TON_SWAP_PROTOCOL_LAYOUTS} from "./ton-swap.js";
 export type {TonSwapLeg, TonSwapCheckInput, TonSwapCheckResult} from "./ton-swap.js";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {bigintToNumber} from "@anywalletkit/core";
 
 /**
  * Omniston (STON.fi) — TON ↔ EVM stable corridors over a WebSocket RFQ
@@ -825,7 +826,7 @@ export async function validateEvmToTonOrderExtension(
   const auctionStart = readBigEndian(getter, cursor, 4); cursor += 4;
   const duration = readBigEndian(getter, cursor, 3); cursor += 3;
   const initialRateBump = readBigEndian(getter, cursor, 3); cursor += 3;
-  const pointCount = Number(readBigEndian(getter, cursor, 1)); cursor += 1;
+  const pointCount = bigintToNumber(readBigEndian(getter, cursor, 1)); cursor += 1;
   if (pointCount !== 5) throw new Error("omniston: unsupported EVM auction profile");
   const points: [bigint, bigint][] = [];
   for (let index = 0; index < pointCount; index++) {
@@ -836,7 +837,7 @@ export async function validateEvmToTonOrderExtension(
   const integratorShare = readBigEndian(getter, cursor, 1); cursor += 1;
   const resolverFee = readBigEndian(getter, cursor, 2); cursor += 2;
   const whitelistDiscount = readBigEndian(getter, cursor, 1); cursor += 1;
-  const getterWhitelistCount = Number(readBigEndian(getter, cursor, 1)); cursor += 1;
+  const getterWhitelistCount = bigintToNumber(readBigEndian(getter, cursor, 1)); cursor += 1;
   if (getterWhitelistCount !== 1 || cursor + getterWhitelistCount * 10 !== getter.length) {
     throw new Error("omniston: malformed EVM amount-getter whitelist");
   }
@@ -870,7 +871,7 @@ export async function validateEvmToTonOrderExtension(
   const postResolverFee = readBigEndian(post, cursor, 2); cursor += 2;
   const postDiscount = readBigEndian(post, cursor, 1); cursor += 1;
   const allowedTime = readBigEndian(post, cursor, 4); cursor += 4;
-  const whitelistCount = Number(readBigEndian(post, cursor, 1)); cursor += 1;
+  const whitelistCount = bigintToNumber(readBigEndian(post, cursor, 1)); cursor += 1;
   if (whitelistCount !== 1 || cursor + whitelistCount * 12 + 160 !== post.length) {
     throw new Error("omniston: malformed EVM post-interaction whitelist");
   }
@@ -1894,7 +1895,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       const out = BigInt(q.outputUnits);
       const floor = requiredMin(q.outputUnits);
       if (out < floor) return null;
-      const tightened = Number(((out - floor) * 1_000_000n) / out);
+      const tightened = bigintToNumber(((out - floor) * 1_000_000n) / out);
       const again = await rfq(Math.max(0, Math.min(tightened, slippagePips)));
       const againSwap = again?.settlementData.$case === "swap" ? again.settlementData.value : null;
       if (!again || !againSwap) return null;

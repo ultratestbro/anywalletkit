@@ -1,7 +1,7 @@
 import {
   LendingProtocol, NetworkError,
   type ActivityItem, type BorrowOptions, type ChainTx, type DescribeActivityContext, type IWalletAccount, type IWalletAccountReadOnly,
-  type LendingQuote, type LendingResult, type RepayOptions, type SupplyOptions, type WithdrawOptions,
+  type LendingQuote, type LendingResult, type RepayOptions, type SupplyOptions, type WithdrawOptions, bigintToNumber,
 } from '@anywalletkit/core'
 import {
   createPublicClient, custom, decodeFunctionResult, encodeFunctionData, fallback, getAddress, hexToString, http, isAddress, maxUint256, zeroAddress,
@@ -404,7 +404,7 @@ export class AaveProtocolEvm extends LendingProtocol<AaveProtocolConfig> {
         variableBorrowRate: r.currentVariableBorrowRate,
         liquidityIndex: r.liquidityIndex,
         variableBorrowIndex: r.variableBorrowIndex,
-        lastUpdateTimestamp: Number(r.lastUpdateTimestamp),
+        lastUpdateTimestamp: bigintToNumber(BigInt(r.lastUpdateTimestamp)),
         accruedToTreasury: r.accruedToTreasury,
         isolationModeTotalDebt: r.isolationModeTotalDebt,
         supplyApr: rayToAprPct(r.currentLiquidityRate),
@@ -464,8 +464,8 @@ export class AaveProtocolEvm extends LendingProtocol<AaveProtocolConfig> {
       await this.read<readonly [bigint, bigint, bigint, bigint, bigint, bigint]>(pool, POOL_ABI, 'getUserAccountData', [who])
     return {
       totalCollateralBase, totalDebtBase, availableBorrowsBase,
-      currentLiquidationThreshold: Number(lt) / 10_000,
-      ltv: Number(ltv) / 10_000,
+      currentLiquidationThreshold: bigintToNumber(lt) / 10_000,
+      ltv: bigintToNumber(ltv) / 10_000,
       healthFactorWad: hf,
       healthFactor: healthFactorToNumber(hf),
     }

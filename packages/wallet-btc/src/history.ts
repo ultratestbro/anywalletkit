@@ -211,7 +211,7 @@ export function createBtcHistory(options: BtcHistoryOptions = {}): BtcHistorySou
       const pageNo = cursor?.p ?? 1
       const data: BlockbookAddressPage = await failover((c) => c.getAddressPage(address, pageNo, pageSize))
       let items = (data.transactions ?? []).map((tx) => mapBlockbookTx(chain, address, tx))
-      items.sort((a, b) => (b.block === undefined ? 1 : a.block === undefined ? -1 : Number(b.block - a.block)) || b.time - a.time)
+      items.sort((a, b) => (b.block === undefined ? 1 : a.block === undefined ? -1 : (b.block > a.block ? 1 : b.block < a.block ? -1 : 0)) || b.time - a.time)
       const totalPages = data.totalPages ?? 1
       let more = pageNo < totalPages
       if (query.since !== undefined) {
