@@ -2,7 +2,7 @@
 
 // #region setup
 import { Wallet, type Policies, type WriteIntent } from '@anywalletkit/kit'
-import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
+import { WalletManagerEvm, type EvmConfig } from '@anywalletkit/wallet-evm'
 import ApprovalsProtocolEvm, {
   BlockscoutSource, type Approval, type ApprovalsCache, type CacheEntry, type RevokeResult,
 } from '@anywalletkit/protocol-approvals-evm'
@@ -12,11 +12,13 @@ export interface ApprovalsSetup {
   logsRpc: string
   cache: ApprovalsCache
   policies?: Policies
+  /** The account's RPC (quotes, sends). Default: a public endpoint — pass your own in production. */
+  ethereumRpc?: EvmConfig['provider']
 }
 
-export function walletWithApprovals(seedPhrase: string, { logsRpc, cache, policies }: ApprovalsSetup): Wallet {
+export function walletWithApprovals(seedPhrase: string, { logsRpc, cache, policies, ethereumRpc = 'https://ethereum-rpc.publicnode.com' }: ApprovalsSetup): Wallet {
   const wallet = new Wallet(seedPhrase, policies ? { policies } : {})
-  wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: 'https://ethereum-rpc.publicnode.com', chainId: 1 })
+  wallet.registerWallet('eip155:1', WalletManagerEvm, { provider: ethereumRpc, chainId: 1 })
   wallet.registerProtocol('approvals', ApprovalsProtocolEvm, {
     chain: 'eip155:1',
     config: {
