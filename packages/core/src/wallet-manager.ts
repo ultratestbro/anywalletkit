@@ -2,7 +2,7 @@ import type { IWalletAccount } from './account.js'
 import type { FeeRates } from './account.js'
 import { requireCurve, type Signer, type SignerCurve } from './signer.js'
 import { SignerError } from './errors.js'
-import { getRandomSeedPhrase, isValidSeedPhrase, normalizeMnemonic, seedFromMnemonicSync, zeroize } from './mnemonic.js'
+import { copyBytes, getRandomSeedPhrase, isValidSeedPhrase, normalizeMnemonic, seedFromMnemonicSync, zeroize } from './mnemonic.js'
 
 /** Seeds of every manager, outside the objects (see the class comment). */
 const MANAGER_SEEDS = new WeakMap<object, Uint8Array>()
@@ -33,7 +33,7 @@ export abstract class WalletManager<TAccount extends IWalletAccount, TConfig ext
       MANAGER_SEEDS.set(this, seedFromMnemonicSync(normalizeMnemonic(seedOrSigner)))
     } else if (seedOrSigner instanceof Uint8Array) {
       if (seedOrSigner.length !== 64) throw new Error(`A BIP-39 seed is 64 bytes; got ${seedOrSigner.length}.`)
-      MANAGER_SEEDS.set(this, seedOrSigner.slice())
+      MANAGER_SEEDS.set(this, copyBytes(seedOrSigner))
     } else {
       this._signer = seedOrSigner
     }

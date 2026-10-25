@@ -36,6 +36,14 @@ export function seedFromMnemonicSync(mnemonic: string, passphrase = ''): Uint8Ar
   return mnemonicToSeedSync(normalizeMnemonic(mnemonic), passphrase)
 }
 
+/**
+ * An independent copy of key bytes. Not `.slice()`: on a Node `Buffer` that is a view sharing the
+ * caller's memory, so zeroizing either side would change the other.
+ */
+export function copyBytes(bytes: Uint8Array): Uint8Array {
+  return new Uint8Array(bytes)
+}
+
 /** Overwrite a key buffer. Call from every `dispose()`. */
 export function zeroize(...buffers: Array<Uint8Array | undefined>): void {
   for (const b of buffers) b?.fill(0)

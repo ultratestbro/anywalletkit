@@ -100,7 +100,7 @@ const KEY_INFO = utf8('forgewallet-backup v1 key protector')
 export async function sealBackup(secret: string | Uint8Array, meta: BackupMeta, protectors: Protector[], opts: KdfOptions = {}): Promise<BackupEnvelope> {
   checkMeta(meta)
   if (protectors.length === 0) throw new BackupError('invalid', 'A backup needs at least one protector (a password or a key).')
-  const plain = typeof secret === 'string' ? utf8(secret) : secret.slice()
+  const plain = typeof secret === 'string' ? utf8(secret) : new Uint8Array(secret) // a copy, never a view (Buffer#slice shares memory)
   if (plain.length === 0) throw new BackupError('invalid', 'Nothing to back up.')
   const dek = randomBytes(32)
   try {
@@ -112,7 +112,7 @@ export async function sealBackup(secret: string | Uint8Array, meta: BackupMeta, 
     return { ...header, payload: { alg: 'xchacha20poly1305', nonce: toB64u(payloadNonce), ct: toB64u(ct) }, protectors: records }
   } finally {
     dek.fill(0)
-    if (typeof secret === 'string') plain.fill(0)
+    plain.fill(0)
   }
 }
 

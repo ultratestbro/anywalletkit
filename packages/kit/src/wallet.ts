@@ -1,4 +1,4 @@
-import { isValidSeedPhrase, normalizeMnemonic, seedFromMnemonicSync, zeroize, type ActivityItem, type ChainTx, type DescribeActivityContext, type HistorySource, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type WalletManager } from '@anywalletkit/core'
+import { copyBytes, isValidSeedPhrase, normalizeMnemonic, seedFromMnemonicSync, zeroize, type ActivityItem, type ChainTx, type DescribeActivityContext, type HistorySource, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type WalletManager } from '@anywalletkit/core'
 import { applyPolicies, type Policies } from './policies.js'
 import { buildFeed, describeSingle, type ActivityOptions, type ActivityRecognizer, type FeedAddress, type FeedItem, type HistoryFeedPage, type HistoryFeedQuery } from './activity/feed.js'
 import type { IntentJournal } from './activity/journal.js'
@@ -69,7 +69,7 @@ export class Wallet {
       WALLET_SEEDS.set(this, seedFromMnemonicSync(normalizeMnemonic(seedOrSigner)))
     } else if (seedOrSigner instanceof Uint8Array) {
       if (seedOrSigner.length !== 64) throw new Error(`A BIP-39 seed is 64 bytes; got ${seedOrSigner.length}.`)
-      WALLET_SEEDS.set(this, seedOrSigner.slice())
+      WALLET_SEEDS.set(this, copyBytes(seedOrSigner))
     } else {
       this._signer = seedOrSigner
     }

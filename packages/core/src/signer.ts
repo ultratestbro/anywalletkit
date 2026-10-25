@@ -40,7 +40,7 @@ import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js'
 import { bytesToHex, bytesToNumberBE, numberToBytesBE } from '@noble/curves/utils.js'
 import { deriveEd25519, deriveSecp256k1 } from './derive.js'
 import { SignerError } from './errors.js'
-import { zeroize } from './mnemonic.js'
+import { copyBytes, zeroize } from './mnemonic.js'
 
 /**
  * The two curves the SDK signs on: secp256k1 (EVM, Bitcoin, Tron, Zcash) and ed25519 (Solana, TON,
@@ -188,7 +188,7 @@ export class LocalSigner implements SeedSigner {
   /** Derive the key at `path` from the 64-byte BIP-39 seed. Keeps a COPY of the seed so it can derive children. */
   static fromSeed(seed: Uint8Array, curve: SignerCurve, path: string): LocalSigner {
     const { privateKey, publicKey } = curve === 'secp256k1' ? deriveSecp256k1(seed, path) : deriveEd25519(seed, path)
-    return new LocalSigner(curve, privateKey, publicKey, path, seed.slice())
+    return new LocalSigner(curve, privateKey, publicKey, path, copyBytes(seed))
   }
 
   /**
