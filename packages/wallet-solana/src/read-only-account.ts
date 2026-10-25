@@ -358,7 +358,9 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       const name = it.instruction
       if (name === undefined) throw new UnsafeTransactionError(`Transaction runs an undecodable instruction on core program ${it.program}.${hint}`, 'core-instruction', [it.program])
       const system = it.program === SYSTEM_PROGRAM_ADDRESS
-      if (system && WALLET_SYSTEM_INSTRUCTIONS.has(name) && it.accounts.includes(this.address)) {
+      // CreateAccountAllowPrefund: only the NEW account (index 0) matters; the wallet may just pay for it.
+      const touches = name === 'CreateAccountAllowPrefund' ? it.accounts[0] === this.address : it.accounts.includes(this.address)
+      if (system && WALLET_SYSTEM_INSTRUCTIONS.has(name) && touches) {
         throw new UnsafeTransactionError(`Transaction runs ${name} on an account of this wallet (${this.address}).${hint}`, 'core-instruction', [it.program])
       }
       if (!system && name === 'Batch') throw new UnsafeTransactionError(`Transaction runs a token Batch, whose inner instructions are not checked.${hint}`, 'core-instruction', [it.program])

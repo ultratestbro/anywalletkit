@@ -326,7 +326,15 @@ export class NetworksTable {
   private async state(): Promise<NetworksState> {
     if (this._state) return this._state
     this._loading ??= (async () => {
-      const stored = await this.storage.get().catch(() => null)
+      let stored: NetworksState | null
+      try {
+        stored = await this.storage.get()
+      } catch (e) {
+        // A failed read is not an empty table: that would answer builtin-only (ignoring onlyOwnRpc)
+        // and the next write would replace the user's stored RPCs. Stay unloaded; a retry reads again.
+        this._loading = null
+        throw e
+      }
       const s: NetworksState = stored && stored.v === 1
         ? { v: 1, allowHttpLocal: stored.allowHttpLocal === true, overrides: stored.overrides ?? {}, custom: Array.isArray(stored.custom) ? stored.custom : [], issues: stored.issues ?? {} }
         : { ...EMPTY }

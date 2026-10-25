@@ -283,13 +283,12 @@ export class Keyring {
       zeroize(seed)
     }
     const secret: Secret = passphrase ? { type: 'mnemonic', mnemonic: phrase, passphrase } : { type: 'mnemonic', mnemonic: phrase }
-    if (options.adoptId !== undefined) await this.assertAdoptable(options.adoptId, phrase, passphrase)
-    const result = await this.addSource(
-      { type: 'mnemonic', label: options.label ?? this.nextLabel('Wallet'), fingerprint, ...(passphrase ? { hasPassphrase: true } : {}) },
-      secret,
-      [0],
-      options.adoptId,
-    )
+    const meta = { type: 'mnemonic' as const, label: options.label ?? this.nextLabel('Wallet'), fingerprint, ...(passphrase ? { hasPassphrase: true } : {}) }
+    if (options.adoptId !== undefined) {
+      this.assertCanAdd(this._state, meta, options.adoptId) // refusals that need no secure-storage read (no prompt) first
+      await this.assertAdoptable(options.adoptId, phrase, passphrase)
+    }
+    const result = await this.addSource(meta, secret, [0], options.adoptId)
     if (!options.discover) return result
     // The phrase is still in hand: discovery reuses it (no second secure-storage read / biometric prompt).
     const found = await this.discover(this.source(result.source.id), secret, options.discover)

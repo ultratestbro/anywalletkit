@@ -293,6 +293,18 @@ describe('Keyring — adopting a pre-keyring wallet and secret reads', () => {
     await expect(keyring.importMnemonic(`  ${ABANDON.toUpperCase()} `, { adoptId: 'salted', passphrase: 'x' })).resolves.toMatchObject({ source: { id: 'salted' } })
   })
 
+  it('an adoption that is refused anyway (bad id, taken id, a phrase already here) never reads secure storage (review round)', async () => {
+    const { keyring, secrets } = await fresh({ evm: CHAINS.evm })
+    await keyring.importMnemonic(OTHER)
+    secrets.map.set('main', JSON.stringify({ type: 'mnemonic', mnemonic: ABANDON }))
+    const before = secrets.reads
+    await expect(keyring.importMnemonic(ABANDON, { adoptId: 'bad id/with slash' })).rejects.toMatchObject({ code: 'invalid-input' })
+    await expect(keyring.importMnemonic(OTHER, { adoptId: 'main' })).rejects.toMatchObject({ code: 'duplicate' })
+    expect(secrets.reads).toBe(before)
+    await keyring.importMnemonic(ABANDON, { adoptId: 'main' })
+    expect(secrets.reads).toBe(before + 1)
+  })
+
   it('reads the secret once per operation (one biometric prompt), not once per index', async () => {
     const { keyring, secrets } = await fresh({ evm: CHAINS.evm })
     const { source } = await keyring.importMnemonic(ABANDON, { discover: { isUsed: async (_, i) => i < 4, maxIndex: 10 } })

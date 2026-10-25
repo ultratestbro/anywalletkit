@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BUILTIN_NETWORKS, CATALOG_NETWORKS, DEFAULT_TESTNETS, EVM_MAINNETS, NetworkError, NetworksTable, caip2FromChainId, chainHex, checkRpcUrl, expectedIdentity,
-  familyOf, isAddChainError, isCatalogChain, isPrivateHost, memoryJsonStorage, parseAddChainParams, parseUrl, tonGlobalIdFromBoc, verifyNetwork, verifyRpcs,
+  familyOf, isAddChainError, type JsonStorage, isCatalogChain, isPrivateHost, memoryJsonStorage, parseAddChainParams, parseUrl, tonGlobalIdFromBoc, verifyNetwork, verifyRpcs,
   type FetchLike, type Network, type NetworksState,
 } from '../src/index.js'
 
@@ -92,6 +92,23 @@ describe('NetworksTable', () => {
     expect(all.length).toBe(BUILTIN_NETWORKS.length)
     expect(all.find((n) => n.caip2 === 'ton:-3')?.enabled).toBe(false)
   })
+  it('a failed storage read is not an empty table: load() rejects, nothing is written, a retry reads the stored RPCs (review round)', async () => {
+    const stored = memoryJsonStorage<NetworksState>(null)
+    await new NetworksTable(stored).addRpc('eip155:8453', 'https://my.base.rpc')
+    await new NetworksTable(stored).setOnlyOwnRpc('eip155:8453', true)
+    let broken = true
+    const flaky: JsonStorage<NetworksState> = { get: () => (broken ? Promise.reject(new Error('storage unavailable')) : stored.get()), set: (v) => stored.set(v) }
+    const t = new NetworksTable(flaky)
+    await expect(t.load()).rejects.toThrow(/storage unavailable/)
+    expect(t.loaded).toBe(false)
+    expect(() => t.rpcUrlsForSync('eip155:8453')).toThrow(expect.objectContaining({ code: 'not-loaded' }))
+    await expect(t.addRpc('eip155:1', 'https://my.eth.rpc')).rejects.toThrow(/storage unavailable/)
+    expect((await stored.get())?.overrides['eip155:8453']).toBeDefined() // the user's RPCs were not wiped
+    broken = false
+    await t.load()
+    expect(t.rpcUrlsForSync('eip155:8453')).toEqual(['https://my.base.rpc'])
+  })
+
   it('prepends user RPCs to a builtin list, keeps the public fallback unless onlyOwnRpc', async () => {
     const t = table()
     await t.addRpc('eip155:8453', 'https://my.base.rpc')

@@ -10,7 +10,7 @@ import {
 } from '@solana-program/token'
 import { getUpdateTokenGroupUpdateAuthorityInstruction, getUpdateTokenMetadataUpdateAuthorityInstruction } from '@solana-program/token-2022'
 import {
-  getAllocateInstruction, getAssignInstruction, getAuthorizeNonceAccountInstruction, getCreateAccountAllowPrefundInstruction, getCreateAccountInstruction, getTransferSolWithSeedInstruction,
+  getAllocateInstruction, getAssignInstruction, getAuthorizeNonceAccountInstruction, getCreateAccountAllowPrefundInstruction, getCreateAccountInstruction, getCreateAccountWithSeedInstruction, getTransferSolWithSeedInstruction,
   getWithdrawNonceAccountInstruction,
 } from '@solana-program/system'
 import { decodeWireTransaction, describeTransaction, WalletManagerSolana, type SolanaConfig, type SolanaRpc } from '../src/index.js'
@@ -125,6 +125,8 @@ describe('compiled and message transactions get the authority guards of sendSeri
       [[getUnwrapLamportsInstruction({ source: ata, destination: ADDR0, authority: me, amount: null })], {}],
       [[getWithdrawNonceAccountInstruction({ nonceAccount: NONCE_ACCOUNT, recipientAccount: ADDR0, nonceAuthority: me, withdrawAmount: 1n })], {}],
       [[transfer], { nonce: true }],
+      // Review round: the wallet only PAYS for a prefunded account it does not become
+      [[getCreateAccountAllowPrefundInstruction({ newAccount: createNoopSigner(FRESH), payer: me, lamports: 1n, space: 8n, programAddress: OTHER })], {}],
       // Allocate + Assign of a FRESH keypair (another signer) is how programs create accounts that already hold lamports
       [[getAllocateInstruction({ newAccount: createNoopSigner(FRESH), space: 8n }), getAssignInstruction({ account: createNoopSigner(FRESH), programAddress: OTHER })], {}],
     ]
@@ -137,6 +139,13 @@ describe('compiled and message transactions get the authority guards of sendSeri
       }
     }
     expect(f.sent.length).toBeGreaterThan(0)
+  })
+
+  it('CreateAccountWithSeed is described like CreateAccount: payer, the derived account, lamports, owner (review round)', async () => {
+    const seeded = getCreateAccountWithSeedInstruction({ payer: me, newAccount: FRESH, baseAccount: me, base: ADDR0, seed: 'stake:0', amount: 5_000_000_000n, space: 200n, programAddress: OTHER })
+    const d = describeTransaction(wire([seeded]), { account: ADDR0 })
+    expect(d.items).toEqual([expect.objectContaining({ type: 'create-account', payer: ADDR0, newAccount: FRESH, lamports: 5_000_000_000n, owner: OTHER })])
+    expect(d.warnings.map((w) => w.code)).not.toContain('unknown-program')
   })
 
   it('allowAuthorityChanges opts the general path out; sendSerialized stays strict', async () => {
