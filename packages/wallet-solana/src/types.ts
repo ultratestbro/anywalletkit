@@ -29,6 +29,8 @@ export interface SolanaConfig {
   commitment?: Commitment
   /** Extra attempts across the provider list after the first failure (default 3). */
   retries?: number
+  /** Per-request timeout for url providers, in ms (default 15 000). A send that times out is a `BroadcastUnknownError`. */
+  timeoutMs?: number
   /** Max fee (lamports, priority fee included) for `transfer`. */
   transferMaxFee?: bigint | number
   /** Max fee (lamports, priority fee included) for `sendTransaction` / `signTransaction`. */

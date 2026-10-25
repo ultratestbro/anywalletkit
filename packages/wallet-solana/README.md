@@ -90,6 +90,19 @@ silently taking more. The recipient's ATA is derived for the right program.
   checks, simulate, add this wallet's signature (others are preserved) and
   return / broadcast the wire. The message bytes are never altered.
 
+### Broadcast outcome and timeouts
+
+A url `provider` gives up after `timeoutMs` (default 15 000) per request
+(`AbortSignal.timeout`, or a timer where the runtime lacks it); a read that
+times out is a `NetworkError`. A provider list fails over with the same signed
+bytes, never a new signature. A send the node refused (preflight failure, bad
+signature) throws the node's error: nothing was forwarded, plan and sign again.
+Anything else — a timeout, a dropped connection, an HTTP error, or a refusal
+after another provider went unanswered — throws `BroadcastUnknownError`
+(`maybeSent: true`, `hash` = the signature): the transaction may land, so do
+not sign it again; watch `getTransactionReceipt(hash)` until its blockhash
+expires.
+
 ## Activity history
 
 `createSolanaHistory` is the chain's `HistorySource` (`@anywalletkit/core`): newest-first `ChainTx` pages for an address over plain JSON-RPC, no indexer.

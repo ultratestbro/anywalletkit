@@ -38,3 +38,21 @@ export class SimulationError extends Error {
     this.logs = logs
   }
 }
+
+/**
+ * The signed transaction was handed to the RPC but no definitive answer came back (no response, a
+ * timeout, a gateway error): it MAY be on chain. Do not plan and sign it again (a new blockhash is a
+ * second transaction that also lands) — watch `hash`, the signature computed locally, until the
+ * blockhash expires.
+ */
+export class BroadcastUnknownError extends Error {
+  /** Always true: the transaction may be on its way. */
+  readonly maybeSent = true
+  /** Base58 transaction signature (the fee payer's), the id to watch. */
+  readonly hash: string
+  constructor(hash: string, cause: unknown) {
+    super(`Broadcast outcome unknown for ${hash}: ${cause instanceof Error ? cause.message.slice(0, 200) : String(cause).slice(0, 200)}`, { cause })
+    this.name = 'BroadcastUnknownError'
+    this.hash = hash
+  }
+}

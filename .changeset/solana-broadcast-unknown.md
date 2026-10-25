@@ -1,0 +1,5 @@
+---
+"@anywalletkit/wallet-solana": patch
+---
+
+A Solana send whose outcome is unknown throws `BroadcastUnknownError` (`maybeSent: true`, `hash` = the transaction signature, computed locally), like EVM, Tron and NEAR. A timeout, a dropped connection, an HTTP error, an internal RPC error, or a refusal after another provider went unanswered all surfaced as generic errors, so a caller that planned again signed a second transaction with a new blockhash that could also land. A refusal from the node (a JSON-RPC answer: preflight failure, bad signature, unhealthy node) stays a clean failure. A provider list now fails over a refused broadcast too, with the same signed bytes. New `timeoutMs` in `SolanaConfig` (default 15 000 ms) bounds every request to a url provider (`AbortSignal.timeout`, a timer fallback where the runtime lacks it); a read that times out is a `NetworkError`, and a hung RPC no longer hangs the wallet. swap2 reports such a send as `Swap2MaybeSentError`. Audit 2026-10-25 (post-release), M3.
