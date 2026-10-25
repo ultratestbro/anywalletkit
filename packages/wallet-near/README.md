@@ -79,7 +79,10 @@ no NEAR cannot sign (nothing pays gas) — `simulateTransaction` reports that. A
 
 `provider` is one or more JSON-RPC urls (or custom transports); a list fails over in order,
 except for definitive node answers (unknown account, invalid transaction) which are returned
-as they are. `rpc.mainnet.near.org` is rate-limited and deprecated for production — use
+as they are. Every url request times out after `timeoutMs` (default 15 000), so a node that
+never answers fails over. `send_tx` is never re-sent to another RPC: without a definitive
+answer (no response, a node timeout) it throws `BroadcastUnknownError` with the locally
+computed `hash` — watch it, do not sign again. `rpc.mainnet.near.org` is rate-limited and deprecated for production — use
 FastNear / a provider / your own proxy. CAIP-2: `near:mainnet` (default) or `near:testnet`.
 
 ## Activity history

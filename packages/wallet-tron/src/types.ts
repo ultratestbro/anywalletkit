@@ -15,6 +15,8 @@ export interface TronConfig {
   retries?: number
   /** Optional headers for every request (e.g. `TRON-PRO-API-KEY`). */
   headers?: Record<string, string>
+  /** Per-request timeout for url providers, in ms (default 15 000): a node that never answers fails over. */
+  timeoutMs?: number
   /** Max fee (sun) for `transfer`. */
   transferMaxFee?: bigint | number
   /** Max fee (sun) for `sendTransaction` / `signTransaction`. */

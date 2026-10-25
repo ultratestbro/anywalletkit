@@ -2,7 +2,8 @@ import { LocalSigner, SignerError, requireCurve, type IWalletAccount, type IWall
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { addressFromPublicKey, toHexAddress } from './address.js'
 import { describeTransaction } from './describe.js'
-import { SimulationError, UnsafeTransactionError } from './errors.js'
+import { BroadcastUnknownError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { assertNoError } from './client.js'
 import { WalletAccountReadOnlyTron, hashMessage } from './read-only-account.js'
 import { verifyRawTransaction } from './raw.js'
 import { isPrebuilt } from './shape.js'
@@ -140,7 +141,17 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
   }
 
   private async broadcast(signed: TronRawTransaction): Promise<string> {
-    const r = await this.post<{ result?: boolean; txid?: string; code?: string; message?: string }>('/wallet/broadcasttransaction', signed, 'broadcast')
+    const client = this.requireClient('broadcast')
+    let r: { result?: boolean; txid?: string; code?: string; message?: string }
+    try {
+      r = (await client('/wallet/broadcasttransaction', signed)) as typeof r
+    } catch (e) {
+      // No node answered (timeouts, dropped connections on every provider): the bytes may be in the network.
+      throw new BroadcastUnknownError(signed.txID, e)
+    }
+    // The network already holds these bytes: an earlier attempt (a lost answer, a failed-over node) delivered them.
+    if (r?.code === 'DUP_TRANSACTION_ERROR') return signed.txID
+    assertNoError(r, 'broadcast')
     if (r.result !== true) throw new Error(`Broadcast failed: ${r.code ?? ''} ${r.message ?? ''}`.trim())
     return r.txid ?? signed.txID
   }

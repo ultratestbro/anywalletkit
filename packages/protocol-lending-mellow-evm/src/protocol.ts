@@ -14,6 +14,22 @@ import {
 import { MELLOW_ADDRESS_MAP, type MellowVaultPreset } from './address-map.js'
 import { describeMellowActivity } from './activity.js'
 
+/** Default timeout for the module's REST reads (APR, rewards, queue times): an API that never answers must not hang the caller. */
+const API_TIMEOUT_MS = 15_000
+
+/** `fetch` with a timeout: `AbortSignal.timeout` where the runtime has it, else a timer (Hermes without runtime-hermes). */
+async function fetchWithTimeout(url: string, ms = API_TIMEOUT_MS): Promise<Response> {
+  let signal: AbortSignal | undefined
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') signal = AbortSignal.timeout(ms)
+  else if (typeof AbortController !== 'undefined') {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(new Error(`timed out after ${ms} ms`)), ms) as unknown as { unref?: () => void }
+    timer.unref?.()
+    signal = controller.signal
+  }
+  return fetch(url, signal ? { signal } : {})
+}
+
 /** The vault's id for native ETH (the ERC-7528 placeholder). */
 export const NATIVE_ASSET = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
 /** Mellow's public vault registry — APY / TVL / withdrawal time (decoration only). */
@@ -833,7 +849,7 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
   async getStats(): Promise<Stats | null> {
     if (!this._registry) return null
     try {
-      const res = await fetch(this._registry)
+      const res = await fetchWithTimeout(this._registry)
       if (!res.ok) return null
       const list = (await res.json()) as RegistryEntry[]
       const entry = list.find((v) => typeof v.address === 'string' && v.address.toLowerCase() === this.vault.toLowerCase()) ??

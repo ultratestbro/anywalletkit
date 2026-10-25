@@ -28,6 +28,15 @@ const sig = await account.sign('hello')                                         
 wallet.dispose()
 ```
 
+`provider` is one or more full-node urls (or custom transports); a list fails over in order, and
+every url request times out after `timeoutMs` (default 15 000). A broadcast that meets no answer
+is re-sent as the same signed bytes (one `txID`, accepted once) to the next provider, and
+`DUP_TRANSACTION_ERROR` counts as accepted; when no node answers it throws
+`BroadcastUnknownError` with the `txID` — watch it, do not build and sign again. Sun amounts are
+read from url providers without rounding (integers above 2^53 stay exact); a custom transport
+that hands over an unsafe number is refused, and a transfer above 2^53 − 1 sun is refused before
+the node builds it.
+
 ## What happens before a signature
 
 Every `signTransaction` / `sendTransaction` / `transfer` goes through the same gate:

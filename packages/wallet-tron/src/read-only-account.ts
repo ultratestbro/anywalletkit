@@ -8,6 +8,7 @@ import { assertNoError, createClient } from './client.js'
 import { describeTransaction, type DescribeContext } from './describe.js'
 import { assertNodeBuild } from './build-check.js'
 import { attachMemo, memoBytes } from './memo.js'
+import { sunFromJson, sunToJson } from './json.js'
 import { decodeRawData } from './raw.js'
 import { isContractCall, isPrebuilt } from './shape.js'
 import {
@@ -131,8 +132,8 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
 
   /** TRX balance in sun; 0 for an account that does not exist yet. */
   async getBalance(): Promise<bigint> {
-    const acc = await this.post<{ balance?: number }>('/wallet/getaccount', { address: this.addressHex, visible: false }, 'retrieve balances')
-    return BigInt(acc.balance ?? 0)
+    const acc = await this.post<{ balance?: number | string }>('/wallet/getaccount', { address: this.addressHex, visible: false }, 'retrieve balances')
+    return sunFromJson(acc.balance, 'balance')
   }
 
   /** Read-only contract call. Returns constant_result hex strings. */
@@ -202,7 +203,7 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
       return { built, sim }
     }
     const { to, value, memo, memoEncoding } = tx as TronNativeTransfer
-    const node = await this.post<TronRawTransaction>('/wallet/createtransaction', { owner_address: this.addressHex, to_address: toHexAddress(to), amount: Number(BigInt(value)), visible: false }, 'build a transfer')
+    const node = await this.post<TronRawTransaction>('/wallet/createtransaction', { owner_address: this.addressHex, to_address: toHexAddress(to), amount: sunToJson(BigInt(value), 'transfer amount'), visible: false }, 'build a transfer')
     const built = memo ? attachMemo(node, memo, memoEncoding) : node
     assertNodeBuild(built, { type: 'TransferContract', owner: this.addressHex, to, amount: BigInt(value) }, memo ? memoBytes(memo, memoEncoding) : undefined)
     return { built }

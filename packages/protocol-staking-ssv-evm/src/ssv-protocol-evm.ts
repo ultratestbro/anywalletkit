@@ -14,6 +14,22 @@ import type {
   WithdrawalRequestOptions, WithdrawalRequestResult, WithdrawalRequestsView, SsvWithdrawalRequest,
 } from './staking-protocol.js'
 
+/** Default timeout for the module's REST reads (APR, rewards, queue times): an API that never answers must not hang the caller. */
+const API_TIMEOUT_MS = 15_000
+
+/** `fetch` with a timeout: `AbortSignal.timeout` where the runtime has it, else a timer (Hermes without runtime-hermes). */
+async function fetchWithTimeout(url: string, ms = API_TIMEOUT_MS): Promise<Response> {
+  let signal: AbortSignal | undefined
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') signal = AbortSignal.timeout(ms)
+  else if (typeof AbortController !== 'undefined') {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(new Error(`timed out after ${ms} ms`)), ms) as unknown as { unref?: () => void }
+    timer.unref?.()
+    signal = controller.signal
+  }
+  return fetch(url, signal ? { signal } : {})
+}
+
 /** SSVNetwork proxy — the staking module's writes (contracts/modules/SSVStaking.sol). */
 const NETWORK_ABI = parseAbi([
   'function stake(uint256 amount)',
@@ -483,7 +499,7 @@ export default class SsvProtocolEvm extends StakingProtocol<SsvProtocolConfig> {
     if (!url) {
       throw new Error(`'endpoints.apr' is required for chain ${this._chainId}.`)
     }
-    const res = await fetch(url)
+    const res = await fetchWithTimeout(url)
     if (!res.ok) {
       throw new Error(`SSV APR API: HTTP ${res.status}`)
     }
@@ -593,7 +609,7 @@ export default class SsvProtocolEvm extends StakingProtocol<SsvProtocolConfig> {
     try {
       const url = this._endpoints.aprHistory
       if (!url) return []
-      const res = await fetch(url)
+      const res = await fetchWithTimeout(url)
       if (!res.ok) return []
       const body = (await res.json()) as { samples?: Array<{ timestamp?: unknown; currentApr?: unknown; ssvPrice?: unknown; ethPrice?: unknown }> } | null | undefined
       const num = (v: unknown): number | null => {
