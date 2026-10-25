@@ -14,9 +14,12 @@ export interface EvmConfig {
   retries?: number
   /** Skip chain-id detection. Required for offline signing when the tx omits `chainId`. */
   chainId?: number
-  /** Max fee (wei) for `transfer`; a quote above it throws before anything is sent. */
+  /**
+   * Max fee (wei) for `transfer`: the signed transaction's gas limit × fee cap (`gasPrice` or
+   * `maxFeePerGas`) above it throws before anything is signed.
+   */
   transferMaxFee?: bigint | number
-  /** Max fee (wei) for `sendTransaction` / `signTransaction`. */
+  /** Max fee (wei) for `sendTransaction` / `signTransaction`, checked the same way on the caller's own fee fields too. */
   transactionMaxFee?: bigint | number
   /**
    * Ethereum-mainnet USDT reverts a non-zero → non-zero `approve`. By default the account

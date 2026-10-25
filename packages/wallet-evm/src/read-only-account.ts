@@ -11,6 +11,21 @@ import { encodeTransfer } from './erc20.js'
 
 export const CAIP2_UNKNOWN = 'eip155:unknown'
 
+/** Minimum priority fee the SDK bids when the network suggests less (wei, per chain id). */
+export const MIN_PRIORITY_FEE_WEI: Readonly<Record<number, bigint>> = Object.freeze({
+  1: 50_000_000n, // Ethereum mainnet: 0.05 gwei (≈$0.01 on 100k gas) — enough to be picked up
+})
+
+/** Fee fields a transaction is signed with: a legacy `gasPrice`, or the EIP-1559 cap and tip. */
+export type FeeFields = { gasPrice: bigint } | { maxFeePerGas: bigint; maxPriorityFeePerGas: bigint }
+
+/** Legacy fee fields: type 0 / 1, or a `gasPrice` without an EIP-1559 cap. */
+export function usesLegacyFees(tx: EvmTransaction): boolean {
+  return tx.type === 0 || tx.type === 1 || (tx.gasPrice !== undefined && tx.maxFeePerGas === undefined)
+}
+
+const toBigInt = (v: bigint | number | string | undefined): bigint | undefined => (v === undefined ? undefined : BigInt(v))
+
 /** Pick the root type of an EIP-712 `types` map when `primaryType` is not given. */
 export function inferPrimaryType(types: TypedDataInput['types']): string {
   const names = Object.keys(types).filter((t) => t !== 'EIP712Domain')
@@ -127,11 +142,55 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
     return this.requireClient('estimate gas').estimateGas(this.callParams(tx))
   }
 
-  /** Upper-bound fee in wei: `gas × feeRate`, where feeRate is maxFeePerGas (or gasPrice on legacy chains). */
+  /**
+   * The fee fields a send signs: the transaction's own where it sets them, the network's for the
+   * rest. One function for the quote and the signature, so a cap checked on the quote holds for
+   * what is signed.
+   */
+  protected async feeFields(tx: EvmTransaction, chainId: number): Promise<FeeFields> {
+    if (usesLegacyFees(tx)) return { gasPrice: toBigInt(tx.gasPrice) ?? (await this.requireClient('read fee data').getGasPrice()) }
+    let maxFeePerGas = toBigInt(tx.maxFeePerGas)
+    let maxPriorityFeePerGas = toBigInt(tx.maxPriorityFeePerGas)
+    if (maxFeePerGas === undefined || maxPriorityFeePerGas === undefined) {
+      const fees = await this.requireClient('read fee data').estimateFeesPerGas()
+      // Public mainnet nodes answer eth_maxPriorityFeePerGas with 0 when
+      // blocks are quiet. A zero-tip transaction is last in every builder's
+      // queue and gets evicted from the mempool as soon as the base fee
+      // drifts above its cap (2026-10-09: one waited 3 min, one vanished
+      // after the node had returned its hash). Floor the tip per chain when
+      // the caller did not fix it.
+      const tipFloor = maxPriorityFeePerGas === undefined ? (MIN_PRIORITY_FEE_WEI[chainId] ?? 0n) : 0n
+      maxPriorityFeePerGas ??= fees.maxPriorityFeePerGas < tipFloor ? tipFloor : fees.maxPriorityFeePerGas
+      // The cap is the network's base-fee headroom plus the tip actually bid,
+      // so a tip above the network's (floored, or the caller's own) lifts the
+      // cap with it instead of producing a tip above the cap.
+      const headroom = fees.maxFeePerGas > fees.maxPriorityFeePerGas ? fees.maxFeePerGas - fees.maxPriorityFeePerGas : 0n
+      maxFeePerGas ??= headroom + maxPriorityFeePerGas
+    }
+    return { maxFeePerGas, maxPriorityFeePerGas }
+  }
+
+  /**
+   * Upper-bound fee in wei: `gas × fee cap`, with the cap the transaction would be signed with —
+   * its own `gasPrice` / `maxFeePerGas` when it sets one, else the network's (`gasPrice` on chains
+   * without EIP-1559).
+   */
   async quoteSendTransaction(tx: EvmTransaction): Promise<{ fee: bigint }> {
-    this.requireClient('quote send transaction operations')
-    const [gas, feeRate] = await Promise.all([this.gasFor(tx), this.getFeeRate()])
-    return { fee: gas * feeRate }
+    const client = this.requireClient('quote send transaction operations')
+    const cap = async (): Promise<bigint> => {
+      const chainId = tx.chainId !== undefined ? Number(tx.chainId) : await this.getChainId()
+      try {
+        const f = await this.feeFields(tx, chainId)
+        return 'gasPrice' in f ? f.gasPrice : f.maxFeePerGas
+      } catch (e) {
+        // No fee fields and no EIP-1559 on this chain: the quote falls back to gasPrice, as getFeeRate does.
+        const setsFees = tx.gasPrice !== undefined || tx.maxFeePerGas !== undefined || tx.maxPriorityFeePerGas !== undefined
+        if (!setsFees) return client.getGasPrice()
+        throw e
+      }
+    }
+    const [gas, rate] = await Promise.all([this.gasFor(tx), cap()])
+    return { fee: gas * rate }
   }
 
   /**
