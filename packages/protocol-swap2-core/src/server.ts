@@ -14,6 +14,11 @@ import {redactUrls} from "./util.js";
  * - `quote` answers are sealed with HMAC-SHA256 under `sealSecret`; `build` and `preflight`
  *   refuse a quote that was not sealed here, was changed in transit, or has expired — so a
  *   client cannot make your server build a deposit for terms the provider never quoted;
+ * - every quote's `intentId` leaves with an intent token appended (`<id>~<tag>`): `track`,
+ *   `claim`, `notify` and `register` refuse an id without a valid one (403), and the provider
+ *   only ever sees its own id. With `subject`, quotes and tokens are bound to the caller, so
+ *   another user's sealed quote or swap id is refused too; without it the token is a bearer
+ *   capability for that one swap (share a transaction hash with support, not the swap id);
  * - a provider's named refusal travels in-band (`{noQuote}`) so the app can show WHY;
  * - error text crossing the boundary has URLs redacted (no upstream endpoints or keys).
  *
@@ -29,7 +34,22 @@ export interface Swap2Call {
   action: Swap2Action;
   provider: string;
   dry: boolean;
+  /**
+   * The validated request as the provider will get it — amounts, recipients, the provider's own
+   * intent id (token removed) — for limits that depend on what is asked. Not yet checked against
+   * the seal or the intent token: those run after the guard.
+   */
+  request: Swap2Request;
 }
+
+/** The validated body of each action. */
+export type Swap2Request =
+  | {params: QuoteParams}
+  | {quote: Quote; tx?: UnsignedTx}
+  | {ref: IntentRef}
+  | {intentId: string; txHash: string}
+  | {intentId: string; signature: string}
+  | {from: Asset; to: Asset};
 
 export type Swap2Action = "quote" | "build" | "preflight" | "track" | "claim" | "notify" | "register" | "supports";
 
@@ -44,6 +64,19 @@ export interface Swap2HandlerOptions<C> {
    * `context` is whatever your route passes as the third argument (the request, a session…).
    */
   guard: (call: Swap2Call, context: C) => void | Promise<void>;
+  /**
+   * Who is calling: a stable id of the authenticated user — the Sign-In with Ethereum address,
+   * not an email — or undefined. Quotes are sealed for, and intent tokens issued to, this subject:
+   * another caller's quote or swap id is refused (403). Without it, the intent token in a swap
+   * id is a bearer capability. Runs after `guard`.
+   */
+  subject?: (context: C) => string | undefined | Promise<string | undefined>;
+  /**
+   * Moving to this handler from another backend: until this time (ms since epoch), `track`
+   * accepts a swap id without an intent token, so swaps started before the move can still be
+   * followed. Read-only: `claim`, `notify` and `register` always require the token.
+   */
+  acceptUntokenedTrackUntil?: number;
   /** Clock for expiry checks (tests). */
   now?: () => number;
 }
@@ -66,6 +99,11 @@ export class Swap2HandlerError extends Error {
 const ACTIONS: ReadonlySet<string> = new Set(["quote", "build", "preflight", "track", "claim", "notify", "register", "supports"]);
 const SEAL_FIELD = "__remoteSeal";
 const SEAL_PREFIX = "swap2-remote-quote:v1:";
+const INTENT_PREFIX = "swap2-remote-intent:v1";
+/** `<provider's intent id>~<128-bit HMAC tag>`. */
+const TOKENED = /^([\s\S]+)~([0-9a-f]{32})$/;
+const INTENT_MAX = 2000;
+const WIRE_INTENT_MAX = INTENT_MAX + 33;
 
 export function createSwap2Handler<C = unknown>(opts: Swap2HandlerOptions<C>): (action: string, body: unknown, context: C) => Promise<Swap2Response> {
   if (typeof opts.guard !== "function") throw new Error("swap2-server: guard is required (authentication + rate limiting)");
@@ -79,81 +117,140 @@ export function createSwap2Handler<C = unknown>(opts: Swap2HandlerOptions<C>): (
   const now = opts.now ?? Date.now;
   const keyPromise = crypto.subtle.importKey("raw", secret as BufferSource, {name: "HMAC", hash: "SHA-256"}, false, ["sign", "verify"]);
 
-  async function mac(provider: string, quote: Quote): Promise<Uint8Array> {
-    const data = new TextEncoder().encode(SEAL_PREFIX + provider + ":" + canonical(withoutSeal(quote)));
-    return new Uint8Array(await crypto.subtle.sign("HMAC", await keyPromise, data));
+  // The subject is JSON-quoted, so it cannot run into the canonical quote that follows ("{").
+  const sealInput = (provider: string, subject: string | undefined, quote: Quote) =>
+    new TextEncoder().encode(SEAL_PREFIX + provider + ":" + (subject === undefined ? "" : JSON.stringify(subject) + ":") + canonical(withoutSeal(quote)));
+  async function seal(provider: string, subject: string | undefined, quote: Quote): Promise<Quote> {
+    const tag = new Uint8Array(await crypto.subtle.sign("HMAC", await keyPromise, sealInput(provider, subject, quote)));
+    return {...quote, providerData: {...(quote.providerData ?? {}), [SEAL_FIELD]: toHex(tag)}};
   }
-  async function seal(provider: string, quote: Quote): Promise<Quote> {
-    return {...quote, providerData: {...(quote.providerData ?? {}), [SEAL_FIELD]: toHex(await mac(provider, quote))}};
-  }
-  async function verify(provider: string, quote: Quote): Promise<boolean> {
+  async function verify(provider: string, subject: string | undefined, quote: Quote): Promise<boolean> {
     if (quote.provider !== provider) return false;
     const sealHex = quote.providerData?.[SEAL_FIELD];
     if (!sealHex || !/^[0-9a-f]{64}$/.test(sealHex)) return false;
-    const data = new TextEncoder().encode(SEAL_PREFIX + provider + ":" + canonical(withoutSeal(quote)));
-    return crypto.subtle.verify("HMAC", await keyPromise, fromHex(sealHex) as BufferSource, data); // constant-time
+    return crypto.subtle.verify("HMAC", await keyPromise, fromHex(sealHex) as BufferSource, sealInput(provider, subject, quote)); // constant-time
   }
+  /** The intent token: HMAC over (provider, subject, the provider's intent id), domain-separated from the seal. */
+  async function intentTag(provider: string, subject: string | undefined, intentId: string): Promise<string> {
+    const data = new TextEncoder().encode(JSON.stringify([INTENT_PREFIX, provider, subject ?? null, intentId]));
+    return toHex(new Uint8Array(await crypto.subtle.sign("HMAC", await keyPromise, data)).subarray(0, 16));
+  }
+  /** A swap id from the app → the provider's own id, or 403. */
+  async function untoken(provider: string, subject: string | undefined, wireId: string, action: Swap2Action): Promise<string> {
+    const m = TOKENED.exec(wireId);
+    if (!m) {
+      if (action === "track" && opts.acceptUntokenedTrackUntil !== undefined && now() < opts.acceptUntokenedTrackUntil) return wireId;
+      throw new Swap2HandlerError(403, "swap id carries no intent token from this server");
+    }
+    if (!sameHex(await intentTag(provider, subject, m[1]!), m[2]!)) {
+      throw new Swap2HandlerError(403, subject === undefined ? "swap id carries an invalid intent token" : "swap id was not issued to this caller");
+    }
+    return m[1]!;
+  }
+  /** The quote as the provider issued it: no seal, its own intent id. */
+  const forProvider = (quote: Quote): Quote => ({...stripSeal(quote), intentId: TOKENED.exec(quote.intentId)?.[1] ?? quote.intentId});
 
   return async function handle(action: string, body: unknown, context: C): Promise<Swap2Response> {
     try {
       if (!ACTIONS.has(action)) return fail(404, `unknown action '${String(action).slice(0, 40)}'`);
       const b = record(body, "body");
       const providerName = str(b.provider, "provider", 40);
-      const params = b.params as Record<string, unknown> | undefined;
-      const dry = action === "quote" && !!params && typeof params === "object" && params.dry === true;
-      await opts.guard({action: action as Swap2Action, provider: providerName, dry}, context);
+      const act = action as Swap2Action;
+      const request = validated(act, b);
+      const dry = "params" in request && request.params.dry === true;
+      // The guard sees the provider's own intent id, as the provider will.
+      const shown: Swap2Request = "ref" in request ? {ref: {...request.ref, intentId: TOKENED.exec(request.ref.intentId)?.[1] ?? request.ref.intentId}}
+        : "quote" in request ? {...request, quote: forProvider(request.quote)}
+        : "intentId" in request ? {...request, intentId: TOKENED.exec(request.intentId)?.[1] ?? request.intentId}
+        : request;
+      await opts.guard({action: act, provider: providerName, dry, request: shown}, context);
+      const subject = opts.subject ? await opts.subject(context) : undefined;
 
       const provider = byName.get(providerName);
       if (!provider) return fail(404, `unknown provider '${providerName}'`);
       if (!provider.enabled()) return fail(403, `provider '${providerName}' is disabled`);
 
-      switch (action as Swap2Action) {
+      switch (act) {
         case "quote": {
-          const params = quoteParams(b.params);
+          const {params} = request as {params: QuoteParams};
           let refusal: string | null = null; // per request: a shared field races under parallel quotes
           const quote = await provider.getQuote({...params, onRefusal: (reason) => { refusal = reason; }});
           if (quote) {
             let normalized: Quote;
-            try { normalized = normalizeQuote(quote); } catch { return fail(502, `${providerName} returned a quote this server refuses to seal`); }
-            return ok(await seal(providerName, normalized));
+            try { normalized = normalizeQuote(quote, INTENT_MAX); } catch { return fail(502, `${providerName} returned a quote this server refuses to seal`); }
+            const tokened = {...normalized, intentId: `${normalized.intentId}~${await intentTag(providerName, subject, normalized.intentId)}`};
+            return ok(await seal(providerName, subject, tokened));
           }
           if (refusal) return ok({noQuote: redactUrls(String(refusal)).slice(0, 300)});
           return ok(params.dry === false ? {noQuote: `${providerName} refused without naming a reason`} : null);
         }
         case "build":
         case "preflight": {
-          const quote = normalizeQuote(b.quote);
-          if (!(await verify(providerName, quote))) return fail(400, "quote integrity check failed");
+          const {quote, tx} = request as {quote: Quote; tx?: UnsignedTx};
+          if (!(await verify(providerName, subject, quote))) {
+            return subject === undefined ? fail(400, "quote integrity check failed") : fail(403, "quote was not sealed for this caller");
+          }
           if (quote.validUntilMs < now()) return fail(410, "quote expired: ask for a new one");
-          if (action === "build") return ok(await refused(() => provider.buildDeposit(stripSeal(quote))));
+          if (act === "build") return ok(await refused(() => provider.buildDeposit(forProvider(quote))));
           if (!provider.preflightDeposit) return ok({});
-          const tx = unsignedTx(b.tx);
-          await refused(() => provider.preflightDeposit!(stripSeal(quote), tx));
+          await refused(() => provider.preflightDeposit!(forProvider(quote), tx!));
           return ok({});
         }
         case "track":
-          return ok(await provider.trackIntent(intentRef(b.ref)));
-        case "claim":
+        case "claim": {
+          const {ref} = request as {ref: IntentRef};
+          const own = {...ref, intentId: await untoken(providerName, subject, ref.intentId, act)};
+          if (act === "track") return ok(await provider.trackIntent(own));
           if (!provider.buildClaim) return ok({});
-          return ok(await refused(() => provider.buildClaim!(intentRef(b.ref))));
-        case "notify":
-          await provider.notifyDeposit?.(str(b.intentId, "intentId", 2000), str(b.txHash, "txHash", 200));
-          return ok({});
-        case "register": {
-          if (!provider.registerSignedOrder) return fail(400, `provider '${providerName}' has no signed-order flow`);
-          const signature = str(b.signature, "signature", 302);
-          if (!/^0x[0-9a-fA-F]{2,300}$/.test(signature)) throw new Swap2HandlerError(400, "signature: not a hex signature");
-          await provider.registerSignedOrder(str(b.intentId, "intentId", 2000), signature);
+          return ok(await refused(() => provider.buildClaim!(own)));
+        }
+        case "notify": {
+          const {intentId, txHash} = request as {intentId: string; txHash: string};
+          await provider.notifyDeposit?.(await untoken(providerName, subject, intentId, act), txHash);
           return ok({});
         }
-        case "supports":
-          return ok({supported: provider.supportsRoute(asset(b.from, "from"), asset(b.to, "to"))});
+        case "register": {
+          if (!provider.registerSignedOrder) return fail(400, `provider '${providerName}' has no signed-order flow`);
+          const {intentId, signature} = request as {intentId: string; signature: string};
+          await provider.registerSignedOrder(await untoken(providerName, subject, intentId, act), signature);
+          return ok({});
+        }
+        case "supports": {
+          const {from, to} = request as {from: Asset; to: Asset};
+          return ok({supported: provider.supportsRoute(from, to)});
+        }
       }
     } catch (err) {
       if (err instanceof Swap2HandlerError) return fail(err.status, err.message);
       return fail(500, "internal error"); // never echo provider internals or upstream URLs
     }
   };
+}
+
+/** Each action's body, validated field by field before anyone (guard, provider) sees it. */
+function validated(action: Swap2Action, b: Record<string, unknown>): Swap2Request {
+  switch (action) {
+    case "quote": return {params: quoteParams(b.params)};
+    case "build": return {quote: normalizeQuote(b.quote, WIRE_INTENT_MAX)};
+    case "preflight": return {quote: normalizeQuote(b.quote, WIRE_INTENT_MAX), tx: unsignedTx(b.tx)};
+    case "track":
+    case "claim": return {ref: intentRef(b.ref)};
+    case "notify": return {intentId: str(b.intentId, "intentId", WIRE_INTENT_MAX), txHash: str(b.txHash, "txHash", 200)};
+    case "register": {
+      const signature = str(b.signature, "signature", 302);
+      if (!/^0x[0-9a-fA-F]{2,300}$/.test(signature)) throw new Swap2HandlerError(400, "signature: not a hex signature");
+      return {intentId: str(b.intentId, "intentId", WIRE_INTENT_MAX), signature};
+    }
+    case "supports": return {from: asset(b.from, "from"), to: asset(b.to, "to")};
+  }
+}
+
+/** Constant-time comparison of two lowercase hex strings. */
+function sameHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
 
 // ---- refusals -------------------------------------------------------------------------------
@@ -233,11 +330,11 @@ function quoteParams(v: unknown): QuoteParams {
 const FEE_TYPES = new Set(["network", "protocol", "affiliate", "other"]);
 
 /** Keeps only the known Quote fields, each checked: what is sealed is exactly what is verified. */
-function normalizeQuote(v: unknown): Quote {
+function normalizeQuote(v: unknown, intentMax: number): Quote {
   const q = record(v, "quote");
   const out: Quote = {
     provider: str(q.provider, "quote.provider", 40),
-    intentId: str(q.intentId, "quote.intentId", 2000),
+    intentId: str(q.intentId, "quote.intentId", intentMax),
     depositAddress: str(q.depositAddress, "quote.depositAddress", 200),
     depositMemo: q.depositMemo === null ? null : str(q.depositMemo, "quote.depositMemo", 400),
     sourceAmount: digits(q.sourceAmount, "quote.sourceAmount", 60),
@@ -314,7 +411,7 @@ function intentRef(v: unknown): IntentRef {
   const sourceTxHash = nullable(r.sourceTxHash, "ref.sourceTxHash");
   const destTxHash = nullable(r.destTxHash, "ref.destTxHash");
   return {
-    intentId: str(r.intentId, "ref.intentId", 2000),
+    intentId: str(r.intentId, "ref.intentId", WIRE_INTENT_MAX),
     ...(sourceTxHash !== undefined ? {sourceTxHash} : {}),
     ...(destTxHash !== undefined ? {destTxHash} : {}),
   };

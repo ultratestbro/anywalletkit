@@ -77,8 +77,19 @@ sealed itself, unchanged and not expired, so a client can't make your server pre
 transaction on terms no provider offered. A provider's refusal reaches the app with its reason,
 URLs stripped.
 
+Every swap id the app gets carries an **intent token** from your server: tracking, claims and
+deposit notices need it, so your server won't answer questions about swaps it didn't start
+(deposit addresses are public on chain). With per-user sign-in, pass `subject` (the user's
+Sign-In with Ethereum address, not an email): quotes and swap ids are then bound to that
+user, and another user's are refused. Without it, the swap id works like a key to that one
+swap's status, so ask users for a transaction hash, not a swap id, in support chats. Moving
+from another backend? `acceptUntokenedTrackUntil` lets swaps started there keep tracking for a
+while.
+
 The RPC proxy forwards only what a wallet needs — reads, fee data, simulation and broadcasting
-an already signed transaction — and refuses anything that signs or administers a node:
+an already signed transaction — and refuses anything that signs or administers a node. It also
+holds each call to a budget: `eth_getLogs` at most 5 000 blocks, no state or block overrides,
+answers up to 4 MiB, and a separate rate limit for expensive calls:
 
 <Snippet file="server/src/rpc.ts" region="rpc" />
 
