@@ -19,7 +19,7 @@ Pure TypeScript, no runtime dependencies beyond `@anywalletkit/swap2-assets` (fo
 import { NetworksTable, verifyNetwork, parseAddChainParams, checkRpcUrl } from '@anywalletkit/networks'
 
 const table = new NetworksTable(myJsonStorage)          // AsyncStorage / chrome.storage / memoryJsonStorage()
-await table.load()                                      // once at cold start; sync readers answer builtin-only before this
+await table.load()                                      // once at cold start; before it rpcUrlsForSync / usesUserRpcSync throw (not-loaded)
 
 await table.addRpc('eip155:8453', 'https://my.base.rpc')
 await table.rpcUrlsFor('eip155:8453')                   // ['https://my.base.rpc', 'https://base-rpc.publicnode.com', …]

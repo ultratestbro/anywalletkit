@@ -63,10 +63,10 @@ export interface NetworkEntry extends Network {
 /**
  * Thrown by {@link NetworksTable} writes: a built-in network cannot be removed or replaced, the
  * network is unknown, a URL breaks the policy, the network is invalid, or the last RPC of a custom
- * network would be removed.
+ * network would be removed; and by the sync endpoint readers before `load()` (`not-loaded`).
  */
 export class NetworkError extends Error {
-  constructor(readonly code: 'builtin' | 'unknown-network' | 'url-policy' | 'bad-network' | 'last-rpc', message: string, readonly reason?: UrlPolicyReason) {
+  constructor(readonly code: 'builtin' | 'unknown-network' | 'url-policy' | 'bad-network' | 'last-rpc' | 'not-loaded', message: string, readonly reason?: UrlPolicyReason) {
     super(message)
     this.name = 'NetworkError'
   }
@@ -94,9 +94,13 @@ export class NetworksTable {
     await this.state()
   }
 
-  /** Whether `load()` has completed — the sync readers answer builtin-only before that. */
+  /** Whether `load()` has completed — before that `listSync` / `getSync` answer builtin-only and the sync endpoint readers throw. */
   get loaded(): boolean {
     return this._state !== null
+  }
+
+  private requireLoaded(reader: string): void {
+    if (this._state === null) throw new NetworkError('not-loaded', `NetworksTable.${reader}() before load(): await table.load() once at start, or use the async reader.`)
   }
 
   /** Fires after every write (UI refresh). */
@@ -134,8 +138,13 @@ export class NetworksTable {
     return this.rpcUrlsForSync(caip2)
   }
 
-  /** `rpcUrlsFor` from memory — what a sync consumer (a viem client factory) reads; builtin list only before `load()`. */
+  /**
+   * `rpcUrlsFor` from memory — what a sync consumer (a viem client factory) reads. Throws
+   * `NetworkError('not-loaded')` before `load()`: the builtin list would ignore the user's own RPCs
+   * and their `onlyOwnRpc` choice.
+   */
   rpcUrlsForSync(caip2: string): string[] {
+    this.requireLoaded('rpcUrlsForSync')
     const n = this.getSync(caip2)
     if (!n) return []
     const healthy = n.userRpcs.filter((u) => !n.issues[u])
@@ -143,8 +152,9 @@ export class NetworksTable {
     return n.onlyOwnRpc && healthy.length ? healthy : [...healthy, ...n.builtinRpcs]
   }
 
-  /** Whether the first endpoint a consumer will use is user- or site-supplied (→ "Custom RPC — simulation not trusted"). */
+  /** Whether the first endpoint a consumer will use is user- or site-supplied (→ "Custom RPC — simulation not trusted"). Throws before `load()`. */
   usesUserRpcSync(caip2: string): boolean {
+    this.requireLoaded('usesUserRpcSync')
     const n = this.getSync(caip2)
     if (!n) return false
     return n.kind === 'custom' || n.userRpcs.some((u) => !n.issues[u])

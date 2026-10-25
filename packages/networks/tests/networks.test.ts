@@ -76,12 +76,18 @@ describe('url policy', () => {
 })
 
 describe('NetworksTable', () => {
-  it('starts with the builtin table and answers builtin-only before load', async () => {
+  it('starts with the builtin table: listSync / getSync answer builtin-only before load, the endpoint readers refuse', async () => {
     const t = table()
     expect(t.loaded).toBe(false)
+    expect(t.getSync('eip155:1')?.builtinRpcs).toEqual(['https://ethereum-rpc.publicnode.com', 'https://eth.drpc.org'])
+    // Audit 2026-10-25 (post-release), L7: before load these answered from the builtin table, so a
+    // client built at cold start used public RPCs the user had turned off (onlyOwnRpc) and the
+    // review sheet said "not a custom RPC" for a network the user had pointed at their own node.
+    expect(() => t.rpcUrlsForSync('eip155:1')).toThrow(expect.objectContaining({ name: 'NetworkError', code: 'not-loaded' }))
+    expect(() => t.usesUserRpcSync('eip155:1')).toThrow(/load\(\)/)
+    const all = await t.list()
     expect(t.rpcUrlsForSync('eip155:1')).toEqual(['https://ethereum-rpc.publicnode.com', 'https://eth.drpc.org'])
     expect(t.rpcUrlsForSync('eip155:424242')).toEqual([])
-    const all = await t.list()
     expect(t.loaded).toBe(true)
     expect(all.length).toBe(BUILTIN_NETWORKS.length)
     expect(all.find((n) => n.caip2 === 'ton:-3')?.enabled).toBe(false)
