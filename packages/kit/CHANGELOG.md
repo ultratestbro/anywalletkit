@@ -1,5 +1,15 @@
 # @anywalletkit/kit
 
+## 0.4.1
+
+### Patch Changes
+
+- 8aa911d: History no longer calls a raw `approve(spender, 0)` a revoke when it may be an NFT approval. On an ERC-20 it resets the allowance, on an ERC-721 it APPROVES `spender` for token #0; the policies already read it as an approval, while history wrote "Revoked …", so a user could believe an NFT approval was withdrawn when one was granted. The kit's generic description reads it as a `revoke` only on a known ERC-20 (a transfer marked `erc20`, or the swap2-assets catalog: USDT, USDC…), otherwise as an `approve` of the spender; `approve(0x0, id)` now reads as a `revoke` (it clears an NFT approval). `describeApprovalActivity` returns a `revoke` on a token `tokens` lists with `decimals` above 0 (or a transfer marks `erc20`), an `approve` on a known NFT, and null otherwise so the kit's catalog decides; pass `tokens` with `decimals` to keep the module's labels on ERC-20 revokes. Audit 2026-10-25 (post-release), M5.
+- 8aa911d: `policies.maxFee` reaches `approve` (EVM) and `sendSerialized` (Solana) too. It reached only `sendTransaction`, `signTransaction` and `transfer`; an approval or a provider-built Solana transaction paid whatever fee it carried. The kit now hands those two the tightest cap as `WriteOptions.maxFee` (second argument of `approve`, third of `sendSerialized`; a tighter caller cap stays), and the accounts hold it on what they sign: wallet-evm's `approve(options, writeOptions?)` passes it to each transaction it sends (the USDT reset too), wallet-solana's `sendSerialized(base64, guard, options?)` checks the proven fee against the tighter of `transactionMaxFee` and `options.maxFee`. The kit README now lists which writes the cap covers, and no longer calls raw `approve(spender, 0)` a revoke. Audit 2026-10-25 (post-release), L2.
+- Updated dependencies [8aa911d]
+  - @anywalletkit/core@0.4.1
+  - @anywalletkit/swap2-assets@0.1.5
+
 ## 0.4.0
 
 ### Minor Changes

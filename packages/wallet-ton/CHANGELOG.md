@@ -1,5 +1,12 @@
 # @anywalletkit/wallet-ton
 
+## 0.2.4
+
+### Patch Changes
+
+- Updated dependencies [8aa911d]
+  - @anywalletkit/core@0.4.1
+
 ## 0.2.3
 
 ### Patch Changes

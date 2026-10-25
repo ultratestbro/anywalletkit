@@ -1,5 +1,13 @@
 # @anywalletkit/wallet-btc
 
+## 0.2.4
+
+### Patch Changes
+
+- 8aa911d: `signTransaction(rawHex)` runs the checks `sendTransaction(rawHex)` runs (prevouts through the client, then `assertSafe`: fee-rate / fee ceiling, change that is not ours, outputs above inputs; then `transactionMaxFee` and `WriteOptions.maxFee`) and returns the bytes unchanged, never re-signed. It returned any hex as-is, so an app that "signs" one hex and broadcasts it elsewhere, or treats `signTransaction` as validation, could release a transaction `sendTransaction` would refuse. It now needs a client, as `sendTransaction(rawHex)` does. Audit 2026-10-25 (post-release), M4.
+- Updated dependencies [8aa911d]
+  - @anywalletkit/core@0.4.1
+
 ## 0.2.3
 
 ### Patch Changes
