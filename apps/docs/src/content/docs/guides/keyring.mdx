@@ -44,8 +44,9 @@ const secrets = createSecureStorage({ namespace: 'my-wallet' })   // a SecretSto
 It is an Expo native module: it needs a development or Release build (not Expo Go) and
 `NSFaceIDUsageDescription` in `Info.plist`.
 
-**Your own adapter** (Expo Go, another store, a test): `SecretStorage` is three methods. Over
-`expo-secure-store` it looks like this:
+**Your own adapter** (Expo Go, another store, a test): `SecretStorage` is three methods.
+`delete` must resolve for an id that is not there: the keyring retries an interrupted delete on
+the next load. Over `expo-secure-store` it looks like this:
 
 <Snippet file="keyring/src/keyring.ts" region="secrets" />
 
@@ -159,7 +160,9 @@ wrong chain imports a different, empty account.
 
 `exportSecret` returns the phrase or the key itself. Gate it behind authentication every time,
 block screenshots on that screen, and never copy it to the clipboard without a warning.
-`removeSource` deletes the accounts and the secure-storage entry.
+`removeSource` removes the source and its accounts from the metadata first, then deletes the
+secure-storage entry. A failed save leaves everything as it was; a delete that fails (or never
+runs because the app was killed) stays in `pendingSecretDeletes` and `Keyring.load` finishes it.
 
 `exportPrivateKey(accountId, chain)` returns one account's key on one chain, for an "Export
 private key" screen. Treat it like the phrase: authenticate first, show it once.

@@ -121,7 +121,9 @@ export interface WriteIntent {
 
 /**
  * Rules the kit checks before every signature and broadcast of an account it hands out. Keys of the
- * per-chain records are CAIP-2 ids or namespace prefixes (`eip155`).
+ * per-chain records are CAIP-2 ids or namespace prefixes (`eip155`). A namespace key covers every
+ * chain of the family, and an exact id's rules apply on top of it: every matching fee cap is
+ * checked, a destination must be on every matching allowlist, and any matching blocklist refuses.
  */
 export interface Policies {
   /** Per-chain fee cap in native base units; a quote above it throws before broadcast. */
@@ -152,6 +154,11 @@ export class PolicyViolationError extends Error {
 }
 
 const lower = (s: string | undefined) => s?.toLowerCase()
+/** The rule keys that cover `chain`: its namespace and the exact id (`eip155:1` → `eip155`, `eip155:1`). */
+const ruleKeys = (chain: string): string[] => {
+  const ns = chain.split(':')[0]!
+  return ns === chain ? [chain] : [ns, chain]
+}
 const obj = (v: unknown): Record<string, unknown> => (typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {})
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined)
 const big = (v: unknown): bigint | undefined =>
@@ -389,49 +396,56 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
  */
 export function applyPolicies<A extends IWalletAccount>(account: A, policies: Policies, chain?: string): A {
   const chainsOf = () => [...new Set([chain, account.chain].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
-  const configured = [policies.maxFee, policies.allowlist, policies.blocklist].some((m) => m !== undefined && Object.keys(m).length > 0)
+  const rules = [policies.maxFee, policies.allowlist, policies.blocklist]
+  const hasRuleFor = (key: (k: string) => boolean) => rules.some((m) => m !== undefined && Object.keys(m).some(key))
   const guard = async (method: WriteMethod, arg: unknown) => {
     let chains = chainsOf()
-    // Called without `chain` on an EVM account that has not asked its RPC yet: learn the chain id now (audit F4).
-    // If it stays unknown, per-chain rules cannot be picked — refuse instead of letting the write through unchecked.
-    if (chains.length === 0 && configured) {
+    const ns = account.chain.split(':')[0]!
+    if (chains.length === 0 && hasRuleFor((k) => k === ns || k.startsWith(`${ns}:`))) {
+      // Called without `chain` on an EVM account that has not asked its RPC yet: learn the chain id now (audit F4).
       const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
-      const ns = account.chain.split(':')[0]
       if (account.chain.endsWith(':unknown') && typeof getChainId === 'function') chains = [`${ns}:${await getChainId.call(account)}`]
-      if (chains.length === 0) throw new PolicyViolationError('chain', `The account's chain is unknown (${account.chain}), so its policies cannot be applied.`)
+      // Still unknown: the namespace's own rules need no chain id, but an exact rule of this family
+      // could be the account's chain — refuse instead of letting the write through unchecked.
+      if (chains.length === 0 && hasRuleFor((k) => k.startsWith(`${ns}:`))) {
+        throw new PolicyViolationError('chain', `The account's chain is unknown (${account.chain}), so its policies cannot be applied.`)
+      }
     }
+    // Every rule key that covers the asked-for chain or the account's own: namespace and exact ids.
+    const keys = chains.length > 0 ? [...new Set(chains.flatMap(ruleKeys))] : [ns]
     const intent = intentOf(chains[0] ?? account.chain, await account.getAddress(), method, arg)
-    const caps = chains.flatMap((c) => { const cap = policies.maxFee?.[c]; return cap === undefined ? [] : [{ c, cap: BigInt(cap) }] })
+    const caps = keys.flatMap((k) => { const cap = policies.maxFee?.[k]; return cap === undefined ? [] : [{ k, cap: BigInt(cap) }] })
     if (caps.length > 0 && QUOTABLE.includes(method)) {
       const { fee } = method === 'transfer' ? await account.quoteTransfer(arg as TransferOptions) : await account.quoteSendTransaction(arg)
-      for (const { c, cap } of caps) if (fee > cap) throw new PolicyViolationError('maxFee', `Fee ${fee} exceeds the ${c} cap of ${cap}.`)
+      for (const { k, cap } of caps) if (fee > cap) throw new PolicyViolationError('maxFee', `Fee ${fee} exceeds the ${k} cap of ${cap}.`)
     }
     // Addresses are compared in one canonical form per chain (EVM lowercase, Tron 41-hex, TON raw), both sides (scan F17).
-    const listed = (c: string, list: string[] | undefined) => (list ? new Set(list.map((a) => canonicalAddress(c, a))) : undefined)
+    const listed = (k: string, list: string[] | undefined) => (list ? new Set(list.map((a) => canonicalAddress(k, a))) : undefined)
     if (intent.kind === 'revoke') {
       // Revoking takes rights away: the allowlist and the spender's listing do not apply.
       // The contract it calls must still not be blocklisted.
-      for (const c of chains) {
-        const block = listed(c, policies.blocklist?.[c])
-        const hit = block && revokeTargets(intent).find((t) => block.has(canonicalAddress(c, t)))
-        if (hit) throw new PolicyViolationError('blocklist', `Contract ${hit} is on the ${c} blocklist.`)
+      for (const k of keys) {
+        const block = listed(k, policies.blocklist?.[k])
+        const hit = block && revokeTargets(intent).find((t) => block.has(canonicalAddress(k, t)))
+        if (hit) throw new PolicyViolationError('blocklist', `Contract ${hit} is on the ${k} blocklist.`)
       }
     } else if (!intent.message) {
       const what = intent.kind === 'approval' ? 'Spender' : 'Destination'
-      for (const c of chains) {
-        const allow = listed(c, policies.allowlist?.[c])
+      // Each matching allowlist must hold every destination (their intersection); any matching blocklist refuses (their union).
+      for (const k of keys) {
+        const allow = listed(k, policies.allowlist?.[k])
         if (allow) {
-          const outside = intent.destinations.find((d) => !allow.has(canonicalAddress(c, d)))
+          const outside = intent.destinations.find((d) => !allow.has(canonicalAddress(k, d)))
           if (outside !== undefined || intent.destinations.length === 0 || intent.destinationUnknown) {
-            throw new PolicyViolationError('allowlist', `${what} ${outside ?? '(unknown)'} is not on the ${c} allowlist.`)
+            throw new PolicyViolationError('allowlist', `${what} ${outside ?? '(unknown)'} is not on the ${k} allowlist.`)
           }
         }
-        const block = listed(c, policies.blocklist?.[c])
+        const block = listed(k, policies.blocklist?.[k])
         if (block) {
-          const hit = intent.destinations.find((d) => block.has(canonicalAddress(c, d)))
-          if (hit !== undefined) throw new PolicyViolationError('blocklist', `${what} ${hit} is on the ${c} blocklist.`)
+          const hit = intent.destinations.find((d) => block.has(canonicalAddress(k, d)))
+          if (hit !== undefined) throw new PolicyViolationError('blocklist', `${what} ${hit} is on the ${k} blocklist.`)
           // Fail closed only when nobody else can look (scan F16); with a confirm hook it sees destinationUnknown.
-          if (intent.destinationUnknown && !policies.confirm) throw new PolicyViolationError('blocklist', `Cannot tell every destination of this ${intent.method} on ${c}, and the ${c} blocklist is on with no confirm hook to ask.`)
+          if (intent.destinationUnknown && !policies.confirm) throw new PolicyViolationError('blocklist', `Cannot tell every destination of this ${intent.method} on ${k}, and the ${k} blocklist is on with no confirm hook to ask.`)
         }
       }
     }

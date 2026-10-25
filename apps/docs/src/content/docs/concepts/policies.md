@@ -24,9 +24,9 @@ const wallet = new Wallet(seedPhrase, {
 
 | Rule | Keyed by | Throws |
 |---|---|---|
-| `maxFee` | chain id → cap in native base units | `PolicyViolationError` (`policy: 'maxFee'`) |
-| `allowlist` | chain id → destinations; anything else is refused | `PolicyViolationError` (`policy: 'allowlist'`) |
-| `blocklist` | chain id → destinations that are refused | `PolicyViolationError` (`policy: 'blocklist'`) |
+| `maxFee` | chain id or namespace → cap in native base units | `PolicyViolationError` (`policy: 'maxFee'`) |
+| `allowlist` | chain id or namespace → destinations; anything else is refused | `PolicyViolationError` (`policy: 'allowlist'`) |
+| `blocklist` | chain id or namespace → destinations that are refused | `PolicyViolationError` (`policy: 'blocklist'`) |
 | `confirm` | one function for every write | `UserRejectedError` when it returns `false` |
 
 Address comparison ignores letter case.
@@ -85,6 +85,23 @@ What `confirm` receives:
 The rules of the chain id you asked for (`wallet.getAccount('eip155:1')`) **and** of the
 chain the account reports both apply. An EVM account that has not talked to its RPC yet
 reports `eip155:unknown`, and your `eip155:1` rules still cover it.
+
+A key can also be a namespace: `eip155` covers every EVM chain, `solana` every Solana
+cluster. Namespace rules and exact-id rules add up:
+
+- `maxFee`: every matching cap is checked, so the tightest one wins;
+- `allowlist`: a destination must be on **every** matching list;
+- `blocklist`: a destination on **any** matching list is refused.
+
+```ts
+policies: {
+  blocklist: { eip155: [KNOWN_SCAM_ADDRESS] },              // on every EVM chain
+  maxFee: { eip155: 10n ** 16n, 'eip155:1': 5n * 10n ** 15n }, // tighter on mainnet
+}
+```
+
+When the account cannot learn its chain id, its namespace rules still apply; an exact-id rule
+of that family refuses the write (`policy: 'chain'`) instead of guessing.
 
 ## Policies and chain-level limits
 
