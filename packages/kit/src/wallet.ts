@@ -61,6 +61,7 @@ export class Wallet {
   private readonly _protocols = new Map<string, ProtocolRegistration>()
   private readonly _protocolInstances = new Map<string, unknown>()
   private readonly _historySources = new Map<string, HistorySource>()
+  private readonly _guarded = new WeakMap<object, Map<string, IWalletAccount>>()
   private readonly _activity: ActivityOptions
   private _journal: IntentJournal | undefined
 
@@ -141,10 +142,15 @@ export class Wallet {
    */
   async getAccount<A extends IWalletAccount = IWalletAccount>(chain: string, index = 0): Promise<A> {
     const account = (await this.getManager(chain).getAccount(index)) as A
-    if (this._policies) return applyPolicies(account, this._policies, chain)
     // No policies: still guard the network when it is not known to match.
     const matches = isConcreteChain(account.chain) && sameChain(chain, account.chain)
-    return isConcreteChain(chain) && !matches ? applyPolicies(account, {}, chain) : account
+    if (!this._policies && (!isConcreteChain(chain) || matches)) return account
+    // One wrapper per account and asked-for chain: the same object every call, as the account is.
+    let byChain = this._guarded.get(account)
+    if (!byChain) this._guarded.set(account, (byChain = new Map()))
+    let guarded = byChain.get(chain)
+    if (!guarded) byChain.set(chain, (guarded = applyPolicies(account, this._policies ?? {}, chain)))
+    return guarded as A
   }
 
   /** The protocol instance (one per name), constructed over the account of its chain. */

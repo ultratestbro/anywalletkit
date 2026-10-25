@@ -25,7 +25,9 @@ describe('a one-call batch of approval calldata still checks the contract it cal
 })
 
 describe('an EVM account that cannot learn its chain id still signs offline through the policies', () => {
+  // A wallet-evm account built without provider: `_config` holds no provider, getChainId throws.
   const offline = () => Object.assign(createMockAccount({ chain: 'eip155:unknown' }), {
+    _config: {},
     getChainId: async () => { throw new Error('The wallet must be connected to a provider to detect the chain id.') },
   })
   it('sign / signTransaction with confirm only, the asked-for chain given or not', async () => {
@@ -80,3 +82,69 @@ describe('one eip155 registration: reads on any EVM chain keep working, writes o
     }
   })
 })
+
+describe('second review: the chain check reads what is signed and never fails open', () => {
+  const TO = '0x000000000000000000000000000000000000bEEF'
+  /** An eip155:unknown account; `provider` set = online (wallet-evm keeps it in `_config`). */
+  const lazy = (opts: { provider?: unknown; chainId?: () => Promise<number> }) => {
+    const getChainId = vi.fn(opts.chainId ?? (async () => 1))
+    const acc = Object.assign(createMockAccount({ chain: 'eip155:unknown' }), {
+      getChainId, signTypedData: async (_typed: unknown) => '0xtyped', _config: opts.provider === undefined ? {} : { provider: opts.provider },
+    })
+    return { acc, getChainId }
+  }
+
+  it('a provider that fails does not let a mismatch through: the write fails, confirm never sees it', async () => {
+    const confirm = vi.fn(async () => true)
+    const { acc } = lazy({ provider: 'https://rpc.example', chainId: async () => { throw new Error('fetch failed') } })
+    await expect(applyPolicies(acc, { confirm }, 'eip155:8453').sendTransaction({ to: TO, value: 1n })).rejects.toThrow(/fetch failed/)
+    expect(confirm).not.toHaveBeenCalled()
+    expect(acc.sent).toHaveLength(0)
+  })
+
+  it('no provider at all (offline signing): judged by the asked-for chain, as before', async () => {
+    const confirm = vi.fn(async () => true)
+    const { acc } = lazy({ chainId: async () => { throw new Error('The wallet must be connected to a provider to detect the chain id.') } })
+    await expect(applyPolicies(acc, { confirm }, 'eip155:1').sendTransaction({ to: TO, value: 1n })).resolves.toBeDefined()
+    expect(confirm).toHaveBeenCalledOnce()
+  })
+
+  it('the chainId a transaction or a typed-data domain carries is the chain checked, without an RPC call', async () => {
+    const { acc, getChainId } = lazy({ provider: 'https://rpc.example' })
+    const g = applyPolicies(acc, { confirm: async () => true }, 'eip155:8453')
+    await expect(g.signTransaction({ to: TO, value: 1n, chainId: 1 })).rejects.toMatchObject({ policy: 'chain' })
+    await expect(g.signTransaction({ to: TO, value: 1n, chainId: '0x2105' })).resolves.toBeDefined()
+    const typed = (chainId?: unknown) => ({ domain: { name: 'x', ...(chainId !== undefined ? { chainId } : {}) }, types: { M: [{ name: 'a', type: 'uint256' }] }, primaryType: 'M', message: { a: 1 } })
+    await expect(g.signTypedData(typed(1))).rejects.toMatchObject({ policy: 'chain' })
+    await expect(g.signTypedData(typed('8453'))).resolves.toBeDefined()
+    expect(getChainId).not.toHaveBeenCalled()
+  })
+
+  it('off-chain messages valid on every network ask no RPC: sign, typed data without a chainId', async () => {
+    const { acc, getChainId } = lazy({ provider: 'https://rpc.example', chainId: () => new Promise(() => undefined) })
+    const g = applyPolicies(acc, { confirm: async () => true }, 'eip155:8453')
+    await expect(g.sign('hi')).resolves.toBeDefined()
+    await expect(g.signTypedData({ domain: { name: 'x' }, types: { M: [{ name: 'a', type: 'uint256' }] }, primaryType: 'M', message: { a: 1 } })).resolves.toBeDefined()
+    expect(getChainId).not.toHaveBeenCalled()
+  })
+
+  it('exact rules with no chain to pick still learn the chain id for a message (as on main)', async () => {
+    const { acc, getChainId } = lazy({ provider: 'https://rpc.example' })
+    await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [EVIL] } }).sign('hi')).resolves.toBeDefined()
+    expect(getChainId).toHaveBeenCalledOnce()
+  })
+
+  it('getAccount hands out the same object for the same account and chain', async () => {
+    class Lazy extends WalletManager<IWalletAccount, Record<string, never>> {
+      async getAccount() { return this.getAccountByPath() }
+      async getAccountByPath() { const a = this._accounts.get('0') ?? lazy({ provider: 'x' }).acc; this._accounts.set('0', a); return a }
+      async getFeeRates(): Promise<FeeRates> { return { slow: 1n, normal: 1n, fast: 1n } }
+    }
+    for (const w of [new Wallet(SEED), new Wallet(SEED, { policies: { confirm: async () => true } })]) {
+      w.registerWallet('eip155', Lazy, {})
+      expect(await w.getAccount('eip155:8453')).toBe(await w.getAccount('eip155:8453'))
+      expect(await w.getAccount('eip155:8453')).not.toBe(await w.getAccount('eip155:1'))
+    }
+  })
+})
+

@@ -51,6 +51,34 @@ const QUOTABLE: readonly string[] = ['sendTransaction', 'transfer', 'signTransac
 /** Methods that sign an off-chain message: nothing moves, allow/block lists do not apply, only `confirm`. */
 const MESSAGE_METHODS: readonly string[] = ['sign', 'signNep413']
 
+/** A chain id as callers and dApps write it (number, bigint, decimal or 0x string) → decimal, or undefined. */
+function chainIdRef(v: unknown): string | undefined {
+  if (typeof v === 'number') return Number.isSafeInteger(v) && v >= 0 ? String(v) : undefined
+  if (typeof v === 'bigint') return v >= 0n ? v.toString() : undefined
+  if (typeof v === 'string' && /^(\d{1,30}|0x[0-9a-fA-F]{1,30})$/.test(v)) return BigInt(v).toString()
+  return undefined
+}
+
+/** The EVM network a write signs for, read off what is signed: a transaction's or a typed-data domain's chainId. */
+function signedChain(ns: string, method: string, arg: unknown): string | undefined {
+  if (ns !== 'eip155') return undefined
+  const ref = method === 'sendTransaction' || method === 'signTransaction'
+    ? (Array.isArray(arg) ? undefined : chainIdRef(obj(arg).chainId))
+    : method === 'signTypedData' ? chainIdRef(obj(obj(arg).domain).chainId) : undefined
+  return ref === undefined ? undefined : `eip155:${ref}`
+}
+
+/** An off-chain signature valid on every network (a message, typed data without a domain chainId): no chain to check. */
+function chainFree(method: string, arg: unknown): boolean {
+  return MESSAGE_METHODS.includes(method) || (method === 'signTypedData' && obj(obj(arg).domain).chainId === undefined)
+}
+
+/** An account built without any provider (wallet-evm keeps it in `_config`): it signs offline and cannot learn its chain. */
+function isOffline(account: unknown): boolean {
+  const config = (account as { _config?: { provider?: unknown } })._config
+  return config !== undefined && (config.provider === undefined || (Array.isArray(config.provider) && config.provider.length === 0))
+}
+
 /** Permit2 primary types (Uniswap Permit2): an allowance or a transfer authorisation for `spender`. */
 const PERMIT2_TYPES = new Set(['PermitSingle', 'PermitBatch', 'PermitTransferFrom', 'PermitBatchTransferFrom', 'PermitWitnessTransferFrom', 'PermitBatchWitnessTransferFrom'])
 const MAX_UINT256 = (1n << 256n) - 1n
@@ -444,17 +472,33 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
   const hasRuleFor = (key: (k: string) => boolean) => rules.some((m) => m !== undefined && Object.keys(m).some(key))
   const guard = async (method: WriteMethod, arg: unknown) => {
     const ns = account.chain.split(':')[0]!
-    // The network the write really goes to. An EVM account that has not asked its RPC yet reports
-    // "eip155:unknown": learn the chain id now (audit F4), before any rule, confirm or signature.
-    let actual = isConcreteChain(account.chain) ? account.chain : undefined
+    // The network the write really goes to, before any rule, confirm or signature (audit #7): the
+    // chainId of what is signed (an EVM transaction, a typed-data domain), else the account's own.
+    // An EVM account that has not asked its RPC yet reports "eip155:unknown": learn its chain id —
+    // unless the write is an off-chain message valid on every network and no rule needs the id.
+    const signed = signedChain(ns, method, arg)
+    const known = isConcreteChain(account.chain) ? account.chain : undefined
+    let learned: string | undefined
     const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
-    // An account that cannot answer (no provider: it signs offline) is judged by the rules of `chain`, as before.
-    if (actual === undefined && typeof getChainId === 'function') actual = await getChainId.call(account).then((id) => `${ns}:${id}`, () => undefined)
-    // Asked for one network, signing on another (a namespace registration whose RPC is elsewhere):
-    // confirm would show the wrong chain and the rules of the wrong chain would judge it (audit #7).
-    if (isConcreteChain(chain) && actual !== undefined && !sameChain(chain, actual)) {
-      throw new PolicyViolationError('chain', `This account signs on ${actual}, not on ${chain} it was asked for; nothing was signed.`)
+    const needed = !chainFree(method, arg) || (chain === undefined && hasRuleFor((k) => k.startsWith(`${ns}:`)))
+    if (signed === undefined && known === undefined && needed && typeof getChainId === 'function') {
+      try {
+        learned = `${ns}:${await getChainId.call(account)}`
+      } catch (err) {
+        // Only an account with no provider at all (it signs offline) is judged by the rules of
+        // `chain`, as before; a provider that fails is no reason to skip the check.
+        if (!isOffline(account)) throw err
+      }
     }
+    // Asked for one network, signing on another (a namespace registration whose RPC is elsewhere,
+    // a transaction for another chain id): confirm would show the wrong chain and the rules of the
+    // wrong chain would judge it.
+    for (const c of [signed, known, learned]) {
+      if (c !== undefined && isConcreteChain(chain) && !sameChain(chain, c)) {
+        throw new PolicyViolationError('chain', `This write signs for ${c}, not for ${chain} it was asked for; nothing was signed.`)
+      }
+    }
+    const actual = signed ?? known ?? learned
     const chains = [...new Set([chain, actual].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
     if (chains.length === 0 && hasRuleFor((k) => k === ns || k.startsWith(`${ns}:`))) {
       // Still unknown: the namespace's own rules need no chain id, but an exact rule of this family
