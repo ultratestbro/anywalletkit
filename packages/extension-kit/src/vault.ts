@@ -270,7 +270,7 @@ export class Vault {
    * Register a passkey as a second unlock path: the DEK (from the unlocked session)
    * is sealed under HKDF-SHA256(`prf`, salt = credential id). The password stays
    * the recovery path; `prf` is zeroized here. A v1 envelope must be unlocked (and
-   * thereby upgraded) first.
+   * thereby upgraded) first, and the vault must hold a secret (it proves the DEK).
    */
   async addPasskey(dek: Uint8Array, passkey: { id: string; prf: Uint8Array; label: string; publicKey?: string | undefined; alg?: number | undefined }): Promise<void> {
     try {
@@ -401,11 +401,14 @@ export class Vault {
     return { v: 2, kdf, dek: await this._seal(kek, dek, aadDekV2(kdf)), secrets, passkeys, createdAt }
   }
 
-  /** The caller's DEK must open this envelope's secrets — it is the key the password protects, not any 32 bytes. */
+  /**
+   * The caller's DEK must open this envelope's secrets — it is the key the password protects, not
+   * any 32 bytes. An empty vault has nothing to prove it with, so it is refused rather than trusted.
+   */
   private async _requireDek(dek: Uint8Array, envelope: VaultEnvelope): Promise<void> {
     const ids = Object.keys(envelope.secrets)
     const key = await this._importDek(dek)
-    if (ids.length === 0) return
+    if (ids.length === 0) throw new VaultError('Add a secret to the vault before a passkey: an empty vault cannot prove the key is its own.', 'invalid-input')
     const probe = await this._open(key, envelope.secrets[ids[0]!]!, aadSecret(ids[0]!), 'locked')
     zeroize(probe)
   }

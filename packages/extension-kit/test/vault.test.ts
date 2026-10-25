@@ -117,6 +117,22 @@ describe('Vault', () => {
     expect(isEnvelopeV1(s3.envelope)).toBe(true)
   })
 
+  it('a passkey cannot be added to an empty vault: with no secret to open, any 32 bytes would pass as the DEK', async () => {
+    // Audit 2026-10-25 (post-release), L5: _requireDek returned early on an empty vault, so a wrong key
+    // was sealed under the passkey and every later unlock by passkey handed out that wrong key.
+    const storage = memoryVaultStorage()
+    const vault = v2(storage)
+    const dek = await vault.create('pw-pw-pw-pw')
+    const id = toBase64Url(crypto.getRandomValues(new Uint8Array(16)))
+    const prf = () => crypto.getRandomValues(new Uint8Array(32))
+    expect(await code(vault.addPasskey(new Uint8Array(32).fill(7), { id, prf: prf(), label: 'x' }))).toBe('invalid-input')
+    expect(await code(vault.addPasskey(dek, { id, prf: prf(), label: 'x' }))).toBe('invalid-input')
+    expect(await vault.listPasskeys()).toEqual([])
+    await vault.setSecret(dek, 'main', SEED)
+    await vault.addPasskey(dek, { id, prf: prf(), label: 'x' })
+    expect(await vault.listPasskeys()).toHaveLength(1)
+  })
+
   it('passkeys: the DEK sealed under HKDF(PRF, credential id); unlock by PRF; wrong PRF / unknown id refused; remove; survives changePassword; needs the vault\'s own DEK', async () => {
     const storage = memoryVaultStorage()
     const vault = v2(storage)
