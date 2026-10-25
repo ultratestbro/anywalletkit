@@ -53,11 +53,12 @@ interface Recognized {
   amount: bigint | null
 }
 
-/** What `token` is, as far as this transaction and `tokens` tell: the transfers' standard when they name one, else ERC-20 when `tokens` lists it with decimals. */
+/** What `token` is, as far as this transaction and `tokens` tell: the transfers' standard when they name one, else ERC-20 when `tokens` lists it with decimals above 0 (NFT metadata often says 0). */
 function tokenStandard (tx: ChainTx, token: string, tokens: ActivityTokens | undefined): 'erc20' | 'nft' | 'unknown' {
   const standards = new Set(tx.transfers.filter((t) => sameAddress(t.token, token)).map((t) => t.standard))
   if (standards.has('erc721') || standards.has('erc1155')) return 'nft'
-  return standards.has('erc20') || typeof tokens?.[token.toLowerCase()]?.decimals === 'number' ? 'erc20' : 'unknown'
+  const decimals = tokens?.[token.toLowerCase()]?.decimals
+  return standards.has('erc20') || (typeof decimals === 'number' && decimals > 0) ? 'erc20' : 'unknown'
 }
 
 /**

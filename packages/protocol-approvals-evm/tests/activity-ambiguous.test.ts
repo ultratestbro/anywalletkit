@@ -21,6 +21,8 @@ describe('approvals activity: ambiguous approve(spender, 0)', () => {
     // unknown contract: the module does not claim it (the kit's generic description decides, see kit's tests)
     expect(describeApprovalActivity(approve(NFT, DRAINER, 0n), ctx)).toBeNull()
     expect(describeApprovalActivity(approve(NFT, DRAINER, 0n), ctx, { tokens: { [NFT.toLowerCase()]: { symbol: 'APE' } } })).toBeNull()
+    // NFT metadata often carries decimals 0: that is not proof of an ERC-20
+    expect(describeApprovalActivity(approve(NFT, DRAINER, 0n), ctx, { tokens: { [NFT.toLowerCase()]: { symbol: 'APE', decimals: 0 } } })).toBeNull()
     // a transfer marked erc721 makes it a known NFT: an approval of the spender for token #0
     const nft = approve(NFT, DRAINER, 0n, { transfers: [{ token: NFT, from: OWN, to: DRAINER, amount: 1n, standard: 'erc721', tokenId: '0' }] })
     expect(describeApprovalActivity(nft, ctx, { tokens: { [NFT.toLowerCase()]: { symbol: 'APE', decimals: 0 } } }))

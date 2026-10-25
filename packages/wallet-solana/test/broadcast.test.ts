@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getSignatureFromTransaction, getSolanaErrorFromJsonRpcError, type Address } from '@solana/kit'
+import { getSignatureFromTransaction, getSolanaErrorFromJsonRpcError, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, SolanaError, type Address } from '@solana/kit'
 import { NetworkError } from '@anywalletkit/core'
-import { decodeWireTransaction, WalletManagerSolana, type SolanaConfig, type SolanaRpc } from '../src/index.js'
+import { createRpc, decodeWireTransaction, WalletManagerSolana, type SolanaConfig, type SolanaRpc } from '../src/index.js'
 import * as solana from '../src/index.js'
 
 // Audit 2026-10-25 (post-release), M3: a lost sendTransaction answer surfaced as a generic error, so
@@ -45,6 +45,14 @@ describe('Solana broadcast outcome and RPC timeouts', () => {
     expect(f.sent).toHaveLength(2)
   })
 
+  it('an HTTP 4xx (rate limit, auth) is a refusal; a 408 / 5xx may have been forwarded (review round)', async () => {
+    const http = (statusCode: number) => new SolanaError(SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, { statusCode, message: 'x', headers: new Headers() })
+    for (const [status, name] of [[429, 'SolanaError'], [401, 'SolanaError'], [403, 'SolanaError'], [408, 'BroadcastUnknownError'], [502, 'BroadcastUnknownError'], [504, 'BroadcastUnknownError']] as const) {
+      const a = await account({ provider: fakeRpc(() => { throw http(status) }).rpc })
+      expect([status, (await a.sendTransaction({ to: OTHER, value: 1n }).catch((e: unknown) => e) as Error).name]).toEqual([status, name])
+    }
+  })
+
   it('a definitive refusal from the node stays a clean failure', async () => {
     const f = fakeRpc(() => { throw preflight() })
     const a = await account({ provider: f.rpc })
@@ -76,6 +84,16 @@ describe('Solana broadcast outcome and RPC timeouts', () => {
     // an answered send after a lost one is a success
     const ok = await account({ provider: [fakeRpc(() => { throw new TypeError('fetch failed') }).rpc, second.rpc], retries: 0 })
     await expect(ok.sendTransaction({ to: OTHER, value: 1n })).resolves.toMatchObject({ hash: 'B'.repeat(87) })
+  })
+
+  it('the Rpc createRpc returns is not a thenable and keeps kit\'s pending-request surface (review round)', async () => {
+    const settle = async (rpc: unknown) => Promise.race([(async () => rpc)(), new Promise((r) => setTimeout(() => r('HUNG'), 300))])
+    const one = createRpc({ provider: 'https://rpc.invalid' })!
+    const many = createRpc({ provider: ['https://rpc-a.invalid', 'https://rpc-b.invalid'] })!
+    expect(await settle(one)).toBe(one)
+    expect(await settle(many)).toBe(many)
+    expect(String(one)).toBe('[object Object]')
+    expect(typeof (one.getBalance(OTHER) as unknown as { reactiveStore?: unknown }).reactiveStore).toBe('function')
   })
 
   it('url providers time out: reads with NetworkError, a send with BroadcastUnknownError', async () => {

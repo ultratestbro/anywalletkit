@@ -47,14 +47,20 @@ key is used:
    (`MissingSignersError`), transfers to the System-program address are refused
    (`UnsafeTransactionError`, `allowBurn` to override). Every `sendTransaction` /
    `signTransaction` (message, kit `Transaction` or base64) also refuses the
-   drainer shapes: System `Assign` / `Allocate` (and `WithSeed`) of this wallet's
-   account, `AuthorizeNonceAccount` by this wallet, a token `SetAuthority`, a
-   `CloseAccount` whose rent goes elsewhere, an undecodable System / Token
+   drainer shapes: System `Assign` / `Allocate` / `CreateAccountAllowPrefund`
+   (and the `WithSeed` forms) of this wallet's account or a `CreateAccount` of
+   it, `AuthorizeNonceAccount` by this wallet, a token `SetAuthority` (or the
+   metadata / group update-authority handoff), a token `Batch`, lamports moved
+   to anyone but this wallet by an instruction that is not a visible transfer
+   (`CloseAccount`, `WithdrawExcessLamports`, `UnwrapLamports`,
+   `WithdrawNonceAccount`, `TransferSolWithSeed`), an undecodable System / Token
    instruction (`UnsafeTransactionError` with `code` `core-instruction`,
-   `sets-authority` or `closes-account`; `allowAuthorityChanges: true` to
-   override, e.g. for a token launch that renounces its mint authority).
-   Swap-aggregator transactions belong on `sendSerialized`, which adds a program
-   allowlist and balance proof and ignores that flag.
+   `sets-authority`, `closes-account` or `moves-lamports`;
+   `allowAuthorityChanges: true` to override, e.g. for a token launch that
+   renounces its mint authority). These are top-level checks: a program the
+   wallet signs for can still do the same by CPI. Swap-aggregator transactions
+   belong on `sendSerialized`, which adds a program allowlist and a simulated
+   balance / ownership proof and ignores that flag.
 3. **Compute budget** — by default the price is the 75th percentile of
    `getRecentPrioritizationFees` over the writable accounts (clamped by
    `minPriorityMicroLamports` / `maxPriorityMicroLamports`) and the unit limit is
@@ -96,9 +102,10 @@ A url `provider` gives up after `timeoutMs` (default 15 000) per request
 (`AbortSignal.timeout`, or a timer where the runtime lacks it); a read that
 times out is a `NetworkError`. A provider list fails over with the same signed
 bytes, never a new signature. A send the node refused (preflight failure, bad
-signature) throws the node's error: nothing was forwarded, plan and sign again.
-Anything else — a timeout, a dropped connection, an HTTP error, or a refusal
-after another provider went unanswered — throws `BroadcastUnknownError`
+signature, an HTTP 4xx such as a rate limit) throws that error: nothing was
+forwarded, plan and sign again. Anything else — a timeout, a dropped
+connection, a 408 / 5xx, or a refusal after another provider went unanswered —
+throws `BroadcastUnknownError`
 (`maybeSent: true`, `hash` = the signature): the transaction may land, so do
 not sign it again; watch `getTransactionReceipt(hash)` until its blockhash
 expires.

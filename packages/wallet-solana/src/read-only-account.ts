@@ -34,8 +34,16 @@ const CU_MIN = 1_000
 const CU_MAX = 1_400_000
 const CU_DEFAULT_PER_INSTRUCTION = 200_000
 const CORE_PROGRAMS = new Set<string>([SYSTEM_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS])
-/** System instructions that hand an account (or a nonce account's authority) of the signer to someone else. */
-const WALLET_SYSTEM_INSTRUCTIONS = new Set(['Assign', 'AssignWithSeed', 'Allocate', 'AllocateWithSeed', 'AuthorizeNonceAccount'])
+/** System instructions that hand an account (or a nonce account's authority) of the signer to a program or someone else. */
+const WALLET_SYSTEM_INSTRUCTIONS = new Set(['Assign', 'AssignWithSeed', 'Allocate', 'AllocateWithSeed', 'AuthorizeNonceAccount', 'CreateAccountAllowPrefund'])
+/** Token / Token-2022 instructions that hand an authority away (`SetAuthority` and the metadata / group interfaces). */
+const TOKEN_AUTHORITY_INSTRUCTIONS = new Set(['SetAuthority', 'UpdateTokenMetadataUpdateAuthority', 'UpdateTokenGroupUpdateAuthority'])
+/** Undecoded core instructions that move lamports, with the index of the account they go to: refused unless that is this wallet. */
+const LAMPORT_DESTINATIONS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+  [SYSTEM_PROGRAM_ADDRESS]: { WithdrawNonceAccount: 1, TransferSolWithSeed: 2 },
+  [TOKEN_PROGRAM_ADDRESS]: { CloseAccount: 1, WithdrawExcessLamports: 1, UnwrapLamports: 1 },
+  [TOKEN_2022_PROGRAM_ADDRESS]: { CloseAccount: 1, WithdrawExcessLamports: 1, UnwrapLamports: 1 },
+}
 const utf8 = (s: string) => new TextEncoder().encode(s)
 const hexToBytes = (h: string) => Uint8Array.from(h.replace(/^0x/, '').match(/.{2}/g) ?? [], (b) => parseInt(b, 16))
 const ceilDiv = (a: bigint, b: bigint) => (a + b - 1n) / b
@@ -327,11 +335,14 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
   }
 
   /**
-   * The drainer shapes a wallet never signs by default: this wallet's account reassigned or
-   * allocated, a nonce authority handed away, a token authority changed, a token account closed
-   * with the rent sent elsewhere, an undecodable System / Token instruction. Instructions whose
-   * accounts sit in unresolved lookup tables are judged by their identified name (this wallet,
-   * a signer, is always a static key). `sendSerialized` applies a stricter allowlist on top.
+   * The drainer shapes a wallet never signs by default: this wallet's account reassigned, allocated
+   * or created under a program; a nonce, token, metadata or group authority handed away; lamports
+   * moved out by an instruction the description does not show as a transfer (a token account
+   * closed, excess or wrapped lamports withdrawn, a nonce or seed account emptied) to anyone but
+   * this wallet; a token `Batch` (it can carry any of these); an undecodable System / Token
+   * instruction. Instructions whose accounts sit in unresolved lookup tables are judged by their
+   * identified name (this wallet, a signer, is always a static key). A program this wallet signs
+   * for can still do any of this by CPI; `sendSerialized` proves the outcome by simulation instead.
    */
   protected enforceAuthorities(description: TransactionDescription): void {
     const hint = ' Set allowAuthorityChanges to override.'
@@ -340,17 +351,25 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       if (it.type === 'close-account' && it.destination !== this.address) {
         throw new UnsafeTransactionError(`Transaction closes ${it.account} with the rent sent to ${it.destination}.${hint}`, 'closes-account', [it.account])
       }
+      if (it.type === 'create-account' && it.newAccount === this.address) {
+        throw new UnsafeTransactionError(`Transaction creates this wallet's own account (${this.address}) under program ${it.owner}.${hint}`, 'core-instruction', [it.program])
+      }
       if ((it.type !== 'program-call' && it.type !== 'unknown') || !it.program || !CORE_PROGRAMS.has(it.program)) continue
       const name = it.instruction
       if (name === undefined) throw new UnsafeTransactionError(`Transaction runs an undecodable instruction on core program ${it.program}.${hint}`, 'core-instruction', [it.program])
-      if (it.program === SYSTEM_PROGRAM_ADDRESS) {
-        if (WALLET_SYSTEM_INSTRUCTIONS.has(name) && it.accounts.includes(this.address)) {
-          throw new UnsafeTransactionError(`Transaction runs ${name} on an account of this wallet (${this.address}).${hint}`, 'core-instruction', [it.program])
-        }
-      } else if (name === 'SetAuthority') {
-        throw new UnsafeTransactionError(`Transaction changes an authority on ${it.accounts[0] ?? 'an unresolved account'}.${hint}`, 'sets-authority', [it.accounts[0] ?? it.program])
-      } else if (name === 'CloseAccount' && it.accounts[1] !== this.address) {
-        throw new UnsafeTransactionError(`Transaction closes ${it.accounts[0] ?? 'a token account'} with the rent sent to ${it.accounts[1] ?? 'an unresolved account'}.${hint}`, 'closes-account', [it.accounts[0] ?? it.program])
+      const system = it.program === SYSTEM_PROGRAM_ADDRESS
+      if (system && WALLET_SYSTEM_INSTRUCTIONS.has(name) && it.accounts.includes(this.address)) {
+        throw new UnsafeTransactionError(`Transaction runs ${name} on an account of this wallet (${this.address}).${hint}`, 'core-instruction', [it.program])
+      }
+      if (!system && name === 'Batch') throw new UnsafeTransactionError(`Transaction runs a token Batch, whose inner instructions are not checked.${hint}`, 'core-instruction', [it.program])
+      if (!system && TOKEN_AUTHORITY_INSTRUCTIONS.has(name)) {
+        throw new UnsafeTransactionError(`Transaction changes an authority on ${it.accounts[0] ?? 'an unresolved account'} (${name}).${hint}`, 'sets-authority', [it.accounts[0] ?? it.program])
+      }
+      const to = LAMPORT_DESTINATIONS[it.program]?.[name]
+      if (to !== undefined && it.accounts[to] !== this.address) {
+        const where = it.accounts[to] ?? 'an unresolved account'
+        if (name === 'CloseAccount') throw new UnsafeTransactionError(`Transaction closes ${it.accounts[0] ?? 'a token account'} with the rent sent to ${where}.${hint}`, 'closes-account', [it.accounts[0] ?? it.program])
+        throw new UnsafeTransactionError(`Transaction moves lamports to ${where} with ${name}.${hint}`, 'moves-lamports', [it.accounts[0] ?? it.program])
       }
     }
   }

@@ -1108,7 +1108,13 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       }
     }
 
-    await this.assertNativeGas(signer, unsigned, approvalAmounts, source.contract ?? undefined, !!unsigned.typedData || serialized || !!tokenId);
+    try {
+      await this.assertNativeGas(signer, unsigned, approvalAmounts, source.contract ?? undefined, !!unsigned.typedData || serialized || !!tokenId);
+    } catch (error) {
+      // Re-quote pass: the allowance is adopted here, nobody else revokes it.
+      if (carried) await revokeApproval?.().catch(() => {});
+      throw error;
+    }
 
     if (approvalAmounts.length) {
       const approve = async (amount: bigint) => {

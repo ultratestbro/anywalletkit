@@ -4,8 +4,15 @@ import {
   getBase64EncodedWireTransaction, pipe, setTransactionMessageFeePayer, setTransactionMessageLifetimeUsingBlockhash, setTransactionMessageLifetimeUsingDurableNonce,
   type Address, type Instruction, type Transaction, type TransactionMessage,
 } from '@solana/kit'
-import { AuthorityType, TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, getBurnCheckedInstruction, getCloseAccountInstruction, getSetAuthorityInstruction, getTransferCheckedInstruction } from '@solana-program/token'
-import { getAllocateInstruction, getAssignInstruction, getAuthorizeNonceAccountInstruction } from '@solana-program/system'
+import {
+  AuthorityType, TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, getBatchInstruction, getBurnCheckedInstruction, getCloseAccountInstruction, getSetAuthorityInstruction, getTransferCheckedInstruction,
+  getUnwrapLamportsInstruction, getWithdrawExcessLamportsInstruction,
+} from '@solana-program/token'
+import { getUpdateTokenGroupUpdateAuthorityInstruction, getUpdateTokenMetadataUpdateAuthorityInstruction } from '@solana-program/token-2022'
+import {
+  getAllocateInstruction, getAssignInstruction, getAuthorizeNonceAccountInstruction, getCreateAccountAllowPrefundInstruction, getCreateAccountInstruction, getTransferSolWithSeedInstruction,
+  getWithdrawNonceAccountInstruction,
+} from '@solana-program/system'
 import { decodeWireTransaction, describeTransaction, WalletManagerSolana, type SolanaConfig, type SolanaRpc } from '../src/index.js'
 
 // Audit 2026-10-25 (post-release), H1: `sendSerialized` refused System Assign/Allocate, token
@@ -71,6 +78,17 @@ describe('compiled and message transactions get the authority guards of sendSeri
     ['an undecodable System instruction', [{ programAddress: '11111111111111111111111111111111' as Address, accounts: [{ address: ADDR0, role: AccountRole.WRITABLE_SIGNER }], data: new Uint8Array([99, 0, 0, 0]) }], 'core-instruction'],
     ['token account owner changed', [getSetAuthorityInstruction({ owned: ata, owner: me, authorityType: AuthorityType.AccountOwner, newAuthority: OTHER })], 'sets-authority'],
     ['token account closed to someone else', [getCloseAccountInstruction({ account: ata, destination: OTHER, owner: me })], 'closes-account'],
+    // Review round (same day): shapes the first cut let through.
+    ['a token Batch (it can carry a SetAuthority)', [getBatchInstruction([getSetAuthorityInstruction({ owned: ata, owner: me, authorityType: AuthorityType.AccountOwner, newAuthority: OTHER })])], 'core-instruction'],
+    ['a token Batch carrying only a transfer', [getBatchInstruction([getTransferCheckedInstruction({ source: ata, mint: USDC, destination: otherAta, authority: me, amount: 1n, decimals: 6 })])], 'core-instruction'],
+    ['CreateAccountAllowPrefund of this wallet', [getCreateAccountAllowPrefundInstruction({ newAccount: me, payer: me, lamports: 0n, space: 0n, programAddress: OTHER })], 'core-instruction'],
+    ['CreateAccount of this wallet (a 0-lamport wallet behind a relayer)', [getCreateAccountInstruction({ newAccount: me, payer: createNoopSigner(OTHER), lamports: 1n, space: 0n, programAddress: OTHER })], 'core-instruction'],
+    ['token metadata update authority handed away', [getUpdateTokenMetadataUpdateAuthorityInstruction({ metadata: USDC, updateAuthority: me, newUpdateAuthority: OTHER })], 'sets-authority'],
+    ['token group update authority handed away', [getUpdateTokenGroupUpdateAuthorityInstruction({ group: USDC, updateAuthority: me, newUpdateAuthority: OTHER })], 'sets-authority'],
+    ['excess lamports withdrawn to someone else', [getWithdrawExcessLamportsInstruction({ source: ata, destination: OTHER, authority: me })], 'moves-lamports'],
+    ['wrapped SOL unwrapped to someone else', [getUnwrapLamportsInstruction({ source: ata, destination: OTHER, authority: me, amount: null })], 'moves-lamports'],
+    ['a nonce account withdrawn to someone else', [getWithdrawNonceAccountInstruction({ nonceAccount: NONCE_ACCOUNT, recipientAccount: OTHER, nonceAuthority: me, withdrawAmount: 1n })], 'moves-lamports'],
+    ['a seed account emptied to someone else', [getTransferSolWithSeedInstruction({ source: FRESH, baseAccount: me, destination: OTHER, amount: 1n, fromSeed: 's', fromOwner: '11111111111111111111111111111111' as Address })], 'moves-lamports'],
   ]
 
   for (const [name, ixs, code] of refused) {
@@ -103,6 +121,9 @@ describe('compiled and message transactions get the authority guards of sendSeri
       [[transfer], { lookup: [otherAta] }],
       [[getBurnCheckedInstruction({ account: ata, mint: USDC, authority: me, amount: 1n, decimals: 6 })], {}],
       [[getCloseAccountInstruction({ account: ata, destination: ADDR0, owner: me })], {}],
+      [[getWithdrawExcessLamportsInstruction({ source: ata, destination: ADDR0, authority: me })], {}],
+      [[getUnwrapLamportsInstruction({ source: ata, destination: ADDR0, authority: me, amount: null })], {}],
+      [[getWithdrawNonceAccountInstruction({ nonceAccount: NONCE_ACCOUNT, recipientAccount: ADDR0, nonceAuthority: me, withdrawAmount: 1n })], {}],
       [[transfer], { nonce: true }],
       // Allocate + Assign of a FRESH keypair (another signer) is how programs create accounts that already hold lamports
       [[getAllocateInstruction({ newAccount: createNoopSigner(FRESH), space: 8n }), getAssignInstruction({ account: createNoopSigner(FRESH), programAddress: OTHER })], {}],

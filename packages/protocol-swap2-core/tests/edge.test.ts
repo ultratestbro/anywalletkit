@@ -141,6 +141,22 @@ describe("edge: quote expiry", () => {
     expect(log).toEqual(["approve", "revoke"]);
   });
 
+  it("a gas check that fails on the re-quote pass revokes the adopted allowance (review round)", async () => {
+    // The second pass adopts the allowance, then estimates the fresh call; with no approval left to
+    // send, an estimate failure (or too little gas) was rethrown with the allowance left live.
+    for (const failure of ["estimate", "balance"] as const) {
+      const log: string[] = [];
+      const acc = account(log, {
+        waitForTransaction: () => new Promise((r) => setTimeout(r, 80)),
+        // fail only once the approval is mined, i.e. on the re-quote pass
+        getBalance: async () => (failure === "balance" && log.includes("approve") ? 0n : 10n ** 18n),
+        quoteSendTransaction: async () => { if (failure === "estimate" && log.includes("approve")) throw new Error("execution reverted"); return {fee: 1_000n}; },
+      });
+      await expect(protocol(requoted({txRequest: {...txRequest, data: "0xbadc0de5"}}), acc).swap2(options)).rejects.toThrow();
+      expect([failure, log]).toEqual([failure, ["approve", "revoke"]]);
+    }
+  });
+
   it("a fresh quote that expires during the second review revokes and aborts", async () => {
     const log: string[] = [];
     let reviews = 0;

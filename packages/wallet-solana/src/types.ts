@@ -50,11 +50,12 @@ export interface SolanaConfig {
   /** Allow transfers to the System program / all-zero address (default false). */
   allowBurn?: boolean
   /**
-   * Sign transactions that reassign or allocate this wallet's account (System `Assign` / `Allocate`,
-   * their `WithSeed` forms), hand away a nonce authority, change a token authority, close a token
-   * account with the rent sent elsewhere, or carry an undecodable System / Token instruction
-   * (default false). Applies to `sendTransaction` / `signTransaction`; `sendSerialized` refuses
-   * them regardless.
+   * Sign transactions that reassign, allocate or create this wallet's account under a program, hand
+   * away a nonce / token / metadata / group authority, run a token `Batch`, move lamports to someone
+   * else with an instruction that is not a visible transfer (`CloseAccount`, `WithdrawExcessLamports`,
+   * `UnwrapLamports`, `WithdrawNonceAccount`, `TransferSolWithSeed`), or carry an undecodable System /
+   * Token instruction (default false). Applies to `sendTransaction` / `signTransaction`;
+   * `sendSerialized` refuses them regardless.
    */
   allowAuthorityChanges?: boolean
 }
