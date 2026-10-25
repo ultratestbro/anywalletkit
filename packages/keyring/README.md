@@ -76,4 +76,9 @@ BIP-39 wordlists.
 - Duplicates are caught by that fingerprint — the same seed, the same seed + passphrase, or the
   same key in another format — without keeping anything secret around.
 - Error messages never echo words, keys or passphrases.
+- `removeSource` saves the metadata (with the id as a pending delete) before it deletes the secret,
+  so a failed save never strands a source without its key; a failed delete is retried on the next
+  `Keyring.load`. `SecretStorage.delete` must resolve for an id that is not there.
+- Parallel imports are serialized: the duplicate check and the secret write run in one queued
+  change, so the same phrase imported twice at once lands once.
 - `exportSecret()` returns the secret for a backup screen: gate it behind biometrics in the app.

@@ -41,7 +41,10 @@ export interface SecretStorage {
   get(sourceId: string): Promise<string | null>
   /** Store a new source's secret. Called once, when the source is created or imported. */
   set(sourceId: string, secret: string): Promise<void>
-  /** Delete the secret when the source is removed. */
+  /**
+   * Delete the secret when the source is removed. Must be idempotent: deleting an id that is not
+   * there resolves. The keyring retries a delete that failed (or was cut short) on the next load.
+   */
   delete(sourceId: string): Promise<void>
 }
 
@@ -100,6 +103,11 @@ export interface KeyringState {
   accounts: AccountMeta[]
   /** The account the app shows, or `null` when there is none. */
   activeAccountId: string | null
+  /**
+   * Removed sources whose secret is not deleted yet. `removeSource` writes the id here first, so
+   * a failed or interrupted delete is finished on the next `Keyring.load`.
+   */
+  pendingSecretDeletes?: string[]
 }
 
 // ---- Chains ----
@@ -176,7 +184,9 @@ export class Keyring {
     if (Object.keys(options.chains).length === 0) throw new KeyringError('Register at least one chain.')
     const stored = await options.storage.load()
     if (stored && stored.version !== 1) throw new KeyringError(`Unknown keyring state version ${String(stored.version)}.`, 'unsupported')
-    return new Keyring(options, stored ? clone(stored) : clone(EMPTY))
+    const keyring = new Keyring(options, stored ? clone(stored) : clone(EMPTY))
+    await keyring.purgeSecrets() // finish deletes a removeSource left behind
+    return keyring
   }
 
   // ---- Reads (no secrets) ----
@@ -302,15 +312,20 @@ export class Keyring {
     return { source, account: accounts[0]! }
   }
 
-  /** Remove a source, its accounts and its secret. */
+  /**
+   * Remove a source, its accounts and its secret. The metadata goes first, with the id written
+   * down as a pending delete; only then is the secret deleted. A failed save leaves everything as
+   * it was; a failed (or interrupted) delete is retried on the next `Keyring.load`.
+   */
   async removeSource(sourceId: string): Promise<void> {
     await this.mutate(async (state) => {
       this.source(sourceId)
-      await this._secrets.delete(sourceId)
       state.sources = state.sources.filter((s) => s.id !== sourceId)
       state.accounts = state.accounts.filter((a) => a.sourceId !== sourceId)
+      state.pendingSecretDeletes = [...new Set([...(state.pendingSecretDeletes ?? []), sourceId])]
       if (!state.accounts.some((a) => a.id === state.activeAccountId)) state.activeAccountId = firstVisible(state)
     })
+    await this.purgeSecrets()
   }
 
   /** The source's secret for a backup screen — gate it behind biometrics in the app. */
@@ -534,45 +549,66 @@ export class Keyring {
 
   // ---- Internals ----
 
-  private async addSource(meta: Omit<SourceMeta, 'id' | 'createdAt'>, secret: Secret, indexes: (number | null)[], adoptId?: string): Promise<{ source: SourceMeta; accounts: AccountMeta[] }> {
-    const dupe = this._state.sources.find((s) => s.fingerprint === meta.fingerprint)
+  /** Refusals before a source is added: the same secret again, or an id that cannot be adopted. */
+  private assertCanAdd(state: KeyringState, meta: Omit<SourceMeta, 'id' | 'createdAt'>, adoptId?: string): void {
+    const dupe = state.sources.find((s) => s.fingerprint === meta.fingerprint)
     if (dupe) throw new KeyringError(`This ${meta.type === 'mnemonic' ? 'seed phrase' : 'key'} is already in the wallet as "${dupe.label}".`, 'duplicate')
-    if (adoptId !== undefined && (!/^[A-Za-z0-9_-]{1,64}$/.test(adoptId) || this._state.sources.some((s) => s.id === adoptId))) {
+    // A pending delete would wipe a secret adopted under the same id.
+    if (adoptId !== undefined && (!/^[A-Za-z0-9_-]{1,64}$/.test(adoptId) || state.sources.some((s) => s.id === adoptId) || (state.pendingSecretDeletes ?? []).includes(adoptId))) {
       throw new KeyringError(`Cannot adopt the secret under id "${adoptId}".`, 'invalid-input')
-    }
-    const source: SourceMeta = { ...meta, id: adoptId ?? newId(), createdAt: Date.now() }
-    if (adoptId === undefined) await this._secrets.set(source.id, JSON.stringify(secret))
-    try {
-      const prepared: { index: number | null; addresses: Partial<Record<ChainKey, string>> }[] = []
-      for (const index of indexes) prepared.push({ index, addresses: index === null ? await this.singleAddress(secret, source.chain!) : await this.deriveAddresses(secret, index) })
-      const accounts = await this.store(source, prepared, undefined, true)
-      return { source: clone(source), accounts }
-    } catch (err) {
-      if (adoptId === undefined) await this._secrets.delete(source.id).catch(() => undefined)
-      throw err
     }
   }
 
-  /** Persist prepared accounts (and the source when `withSource`). */
-  private async store(source: SourceMeta, prepared: { index: number | null; addresses: Partial<Record<ChainKey, string>> }[], name?: string, withSource = false): Promise<AccountMeta[]> {
-    const created: AccountMeta[] = prepared.map(({ index, addresses }) => ({
-      id: index === null ? source.id : `${source.id}/${index}`,
-      sourceId: source.id,
-      index,
-      name: name ?? '',
-      hidden: false,
-      addresses,
-    }))
-    await this.mutate(async (state) => {
-      if (withSource) state.sources.push(source)
-      for (const a of created) {
-        if (state.accounts.some((x) => x.id === a.id)) continue
-        a.name ||= `Account ${state.accounts.length + 1}`
-        state.accounts.push(a)
-      }
-      state.activeAccountId ??= created[0]?.id ?? null
-    })
+  private async addSource(meta: Omit<SourceMeta, 'id' | 'createdAt'>, secret: Secret, indexes: (number | null)[], adoptId?: string): Promise<{ source: SourceMeta; accounts: AccountMeta[] }> {
+    this.assertCanAdd(this._state, meta, adoptId) // early answer, before the derivation work
+    const source: SourceMeta = { ...meta, id: adoptId ?? newId(), createdAt: Date.now() }
+    const prepared: { index: number | null; addresses: Partial<Record<ChainKey, string>> }[] = []
+    for (const index of indexes) prepared.push({ index, addresses: index === null ? await this.singleAddress(secret, source.chain!) : await this.deriveAddresses(secret, index) })
+    let wrote = false
+    let created: AccountMeta[] = []
+    try {
+      // The duplicate check and the secret write run inside the serialized change, so two
+      // imports of one phrase at once cannot both pass the check.
+      await this.mutate(async (state) => {
+        this.assertCanAdd(state, meta, adoptId)
+        if (adoptId === undefined) { await this._secrets.set(source.id, JSON.stringify(secret)); wrote = true }
+        state.sources.push(source)
+        created = addAccounts(state, source, prepared)
+      })
+    } catch (err) {
+      if (wrote) await this._secrets.delete(source.id).catch(() => undefined)
+      throw err
+    }
+    return { source: clone(source), accounts: clone(created) }
+  }
+
+  /** Persist prepared accounts of an existing source. */
+  private async store(source: SourceMeta, prepared: { index: number | null; addresses: Partial<Record<ChainKey, string>> }[], name?: string): Promise<AccountMeta[]> {
+    let created: AccountMeta[] = []
+    await this.mutate(async (state) => { created = addAccounts(state, source, prepared, name) })
     return clone(created)
+  }
+
+  /**
+   * Delete the secrets of removed sources (`pendingSecretDeletes`), then drop the ids that went.
+   * Never throws: what fails stays pending for the next load.
+   */
+  private async purgeSecrets(): Promise<void> {
+    const pending = this._state.pendingSecretDeletes ?? []
+    if (pending.length === 0) return
+    const done: string[] = []
+    for (const id of pending) {
+      try {
+        await this._secrets.delete(id)
+        done.push(id)
+      } catch { /* stays pending */ }
+    }
+    if (done.length === 0) return
+    await this.mutate(async (state) => {
+      const left = (state.pendingSecretDeletes ?? []).filter((id) => !done.includes(id))
+      if (left.length > 0) state.pendingSecretDeletes = left
+      else delete state.pendingSecretDeletes
+    }).catch(() => undefined)
   }
 
   /** Addresses of seed account `index` on every registered chain (or just `chains`). */
@@ -704,6 +740,25 @@ export interface DiscoverOptions {
 /** Deep copy of JSON-safe state (Hermes has no structuredClone). */
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
+}
+
+/** Add a source's prepared accounts to `state` (ids already there are skipped); the ones it made. */
+function addAccounts(state: KeyringState, source: SourceMeta, prepared: { index: number | null; addresses: Partial<Record<ChainKey, string>> }[], name?: string): AccountMeta[] {
+  const created: AccountMeta[] = prepared.map(({ index, addresses }) => ({
+    id: index === null ? source.id : `${source.id}/${index}`,
+    sourceId: source.id,
+    index,
+    name: name ?? '',
+    hidden: false,
+    addresses,
+  }))
+  for (const a of created) {
+    if (state.accounts.some((x) => x.id === a.id)) continue
+    a.name ||= `Account ${state.accounts.length + 1}`
+    state.accounts.push(a)
+  }
+  state.activeAccountId ??= created[0]?.id ?? null
+  return created
 }
 
 function firstVisible(state: KeyringState): string | null {
