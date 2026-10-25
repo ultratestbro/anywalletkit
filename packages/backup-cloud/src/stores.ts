@@ -35,6 +35,21 @@ async function need(native?: NativeBackupCloud): Promise<NativeBackupCloud> {
   return n
 }
 
+/**
+ * One `getOrCreate` at a time per keychain item, process-wide (any number of vault objects): two at
+ * once both saw no key, both created one, and the second overwrote the key a backup had just been
+ * sealed with. Calls run one after another (each gets its own copy of the key, so zeroizing one
+ * leaves the others intact); a failed call does not block the next.
+ */
+const creating = new Map<string, Promise<unknown>>()
+function oneAtATime<T>(item: string, fn: () => Promise<T>): Promise<T> {
+  const run = (creating.get(item) ?? Promise.resolve()).catch(() => undefined).then(fn)
+  const tail = run.catch(() => undefined)
+  creating.set(item, tail)
+  void tail.then(() => { if (creating.get(item) === tail) creating.delete(item) })
+  return run
+}
+
 async function wrap<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn()
@@ -123,14 +138,16 @@ export function iCloudKeychain(opts: ICloudKeychainOptions = {}): KeyVault {
     },
     async getOrCreate(id) {
       const n = await need(opts.native)
-      if (await wrap(() => n.keychainHas(service, id))) {
-        const existing = await vault.get(id)
-        if (existing) return existing
-      }
-      const key = random(32)
-      if (key.length !== 32) throw new CloudBackupError('storage', 'The random source returned the wrong length.')
-      await wrap(() => n.keychainSet(service, id, toHex(key)))
-      return key
+      return oneAtATime(`${service}\u0000${id}`, async () => {
+        if (await wrap(() => n.keychainHas(service, id))) {
+          const existing = await vault.get(id)
+          if (existing) return existing
+        }
+        const key = random(32)
+        if (key.length !== 32) throw new CloudBackupError('storage', 'The random source returned the wrong length.')
+        await wrap(() => n.keychainSet(service, id, toHex(key)))
+        return key
+      })
     },
     async delete(id) {
       const n = await need(opts.native)

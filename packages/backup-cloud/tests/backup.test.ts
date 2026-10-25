@@ -161,6 +161,27 @@ describe('backup-cloud', () => {
     expect(isCloudBackupError(err, 'cancelled')).toBe(true)
   })
 
+  it('concurrent getOrCreate of one key creates it once — also across two vault objects — so every backup sealed with it opens', async () => {
+    // Audit 2026-10-25 (post-release), L3: both calls saw no key, both created one, the second overwrote the first.
+    const cloud = fakeCloud()
+    const phone = cloud.device()
+    let sets = 0
+    const slow: NativeBackupCloud = { ...phone, keychainSet: async (s, a, v) => { sets += 1; await new Promise((r) => setTimeout(r, 10)); return phone.keychainSet(s, a, v) } }
+    const [a, b, c] = await Promise.all([iCloudKeychain({ native: slow }).getOrCreate('k'), iCloudKeychain({ native: slow }).getOrCreate('k'), iCloudKeychain({ native: slow }).getOrCreate('k')])
+    expect(sets).toBe(1)
+    expect(Buffer.from(b!).toString('hex')).toBe(Buffer.from(a!).toString('hex'))
+    expect(Buffer.from(c!).toString('hex')).toBe(Buffer.from(a!).toString('hex'))
+    // the returned keys are separate copies: zeroizing one (saveBackup does) leaves the others intact
+    a!.fill(0)
+    expect(b!.some((x) => x !== 0)).toBe(true)
+
+    // two saves at once (a double tap): the file that wins the race opens with the key in the keychain
+    const store = iCloudDrive({ container: 'iCloud.x', native: slow })
+    await Promise.all([1, 2].map(() => saveBackup({ store, keyVault: iCloudKeychain({ native: slow }), secret: SECRET, meta: META })))
+    const opened = await restoreBackup({ store, name: backupFileName(META), keyVault: iCloudKeychain({ native: phone }), expect: META })
+    expect(opened.text()).toBe(SECRET)
+  })
+
   it('needs a password or a key vault', async () => {
     const cloud = fakeCloud()
     const err = await saveBackup({ store: iCloudDrive({ container: 'iCloud.x', native: cloud.device() }), secret: SECRET, meta: META }).catch((e: unknown) => e)
