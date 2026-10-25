@@ -55,7 +55,8 @@ describe("swap2 server handler", () => {
     expect(seen.built).toEqual(QUOTE); // seal stripped, every field intact
     await client.preflightDeposit!(q!, {...TX, value: 0n as unknown as string});
     expect(seen.preflight![1].value).toBe("0");
-    expect(await client.trackIntent({intentId: "intent-1"})).toEqual({state: "completed", destTxHash: "0xabc"});
+    // the app tracks with the id it was given (the provider's id + this server's intent token)
+    expect(await client.trackIntent({intentId: q!.intentId})).toEqual({state: "completed", destTxHash: "0xabc"});
   });
 
   it("refuses a tampered, unsealed or expired quote before the provider sees it", async () => {
@@ -104,7 +105,7 @@ describe("swap2 server handler", () => {
     const built = await handle("build", {provider: "mock", quote: sealed}, "u");
     expect(built.status).toBe(422);
     expect(JSON.stringify(built.body)).not.toContain("SECRET");
-    expect(await handle("track", {provider: "mock", ref: {intentId: "i"}}, "u")).toEqual({status: 500, body: {error: "internal error"}});
+    expect(await handle("track", {provider: "mock", ref: {intentId: (sealed as Quote).intentId}}, "u")).toEqual({status: 500, body: {error: "internal error"}});
     // a live quote refused without a reason is said so; a display quote may be a bare null
     const silent = createSwap2Handler({providers: [mockProvider({getQuote: async () => null}).provider], sealSecret: SECRET, guard: allow});
     expect((await silent("quote", {provider: "mock", params: {...PARAMS, dry: false}}, "u")).body).toEqual({noQuote: "mock refused without naming a reason"});

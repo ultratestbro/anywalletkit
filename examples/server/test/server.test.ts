@@ -72,7 +72,9 @@ describe('reference server (docs: Ship a wallet)', () => {
     const quote = await client.getQuote(PARAMS)
     expect(quote?.providerData?.__remoteSeal).toMatch(/^[0-9a-f]{64}$/)
     expect((await client.buildDeposit(quote!)).to).toBe(QUOTE.depositAddress)
-    expect(await client.trackIntent({ intentId: 'i-1' })).toEqual({ state: 'completed' })
+    expect(quote!.intentId).toMatch(/^i-1~[0-9a-f]{32}$/) // the server's intent token rides on the id
+    expect(await client.trackIntent({ intentId: quote!.intentId })).toEqual({ state: 'completed' })
+    await expect(client.trackIntent({ intentId: 'i-1' })).rejects.toThrow(/403/)
     await expect(client.buildDeposit({ ...quote!, minDestAmount: '1' })).rejects.toThrow(/400 .*integrity/)
   })
 
