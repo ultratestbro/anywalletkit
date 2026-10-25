@@ -131,9 +131,12 @@ describe('second review: the chain check reads what is signed and never fails op
     expect(getChainId).not.toHaveBeenCalled()
   })
 
-  it('exact rules with no chain to pick still learn the chain id for a message (as on main)', async () => {
+  it('exact rules with no chain to pick: typed data learns the chain id (its lists may apply), a message signs without asking', async () => {
     const { acc, getChainId } = lazy({ provider: 'https://rpc.example' })
-    await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [EVIL] } }).sign('hi')).resolves.toBeDefined()
+    const g = applyPolicies(acc, { blocklist: { 'eip155:1': [EVIL] } })
+    await expect(g.sign('hi')).resolves.toBeDefined()
+    expect(getChainId).not.toHaveBeenCalled()
+    await expect(g.signTypedData({ domain: { name: 'x' }, types: { M: [{ name: 'a', type: 'uint256' }] }, primaryType: 'M', message: { a: 1 } })).resolves.toBeDefined()
     expect(getChainId).toHaveBeenCalledOnce()
   })
 
@@ -221,6 +224,36 @@ describe('fourth review: a transaction\'s chainId never hides the account\'s own
       await expect(g.signTypedData({ domain: { name: 'x' }, types: { M: [{ name: 'a', type: 'uint256' }] }, primaryType: 'M', message: { a: 1 } })).resolves.toBe('0xtyped')
       await expect(g.sendTransaction({ to: TO, value: 1n })).rejects.toMatchObject({ policy: 'chain' })
     }
+  })
+})
+
+describe('fifth review: off-chain signatures with exact rules and no concrete chain asked (the keyring recipe)', () => {
+  const typed = { domain: { name: 'x' }, types: { M: [{ name: 'a', type: 'uint256' }] }, primaryType: 'M', message: { a: 1 } }
+  const lazyAcc = () => {
+    const getChainId = vi.fn(async () => 1)
+    return Object.assign(createMockAccount({ chain: 'eip155:unknown' }), { getChainId, _config: { provider: 'x' }, signTypedData: async (_t: unknown) => '0xtyped' })
+  }
+  for (const asked of ['eip155:unknown', 'eip155', undefined]) {
+    it(`applyPolicies(acc, rules, ${String(asked)}): sign and signTypedData learn the chain and sign`, async () => {
+      const acc = lazyAcc()
+      const g = applyPolicies(acc, { maxFee: { 'eip155:1': 10n ** 16n }, confirm: async () => true }, asked)
+      await expect(g.sign('hi')).resolves.toBeDefined()
+      await expect(g.signTypedData(typed)).resolves.toBe('0xtyped')
+    })
+  }
+  it('a plain message is never refused for an unknown chain: no list or cap applies to it', async () => {
+    const offline = Object.assign(createMockAccount({ chain: 'eip155:unknown' }), { _config: {}, getChainId: async () => { throw new Error('no provider') } })
+    await expect(applyPolicies(offline, { blocklist: { 'eip155:1': [EVIL] } }, 'eip155').sign('hi')).resolves.toBeDefined()
+  })
+  it('Wallet.getAccount(\'eip155\') with an eip155:1 cap signs a message', async () => {
+    class Lazy extends WalletManager<IWalletAccount, Record<string, never>> {
+      async getAccount() { return this.getAccountByPath() }
+      async getAccountByPath() { const a = this._accounts.get('0') ?? lazyAcc(); this._accounts.set('0', a); return a }
+      async getFeeRates(): Promise<FeeRates> { return { slow: 1n, normal: 1n, fast: 1n } }
+    }
+    const w = new Wallet(SEED, { policies: { maxFee: { 'eip155:1': 1n } } })
+    w.registerWallet('eip155', Lazy, {})
+    await expect((await w.getAccount('eip155')).sign('hi')).resolves.toBeDefined()
   })
 })
 

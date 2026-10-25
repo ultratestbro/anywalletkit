@@ -484,7 +484,10 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     const exactRules = hasRuleFor((k) => k.startsWith(`${ns}:`))
     let learned: string | undefined
     const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
-    if (known === undefined && (!offChain || (chain === undefined && exactRules)) && typeof getChainId === 'function') {
+    // A message needs no chain id at all: no list or cap applies to it.
+    const message = MESSAGE_METHODS.includes(method)
+    const needed = !offChain || (!message && !isConcreteChain(chain) && exactRules)
+    if (known === undefined && needed && typeof getChainId === 'function') {
       try {
         learned = `${ns}:${await getChainId.call(account)}`
       } catch (err) {
@@ -508,7 +511,7 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     // The account's network is unknown and none was asked for: the namespace's own rules need no
     // chain id, but an exact rule of this family could be the account's — refuse rather than guess
     // (a chainId the write carries says what is signed, not which rules the account answers to).
-    if (own === undefined && !isConcreteChain(chain) && exactRules) {
+    if (own === undefined && !isConcreteChain(chain) && exactRules && !message) {
       throw new PolicyViolationError('chain', `The account's chain is unknown (${account.chain}), so its policies cannot be applied.`)
     }
     // The rules of every network in play apply: the one asked for, the account's own, the one signed for.
