@@ -863,6 +863,12 @@ importers:
       '@anywalletkit/wallet-solana':
         specifier: workspace:*
         version: link:../wallet-solana
+      '@solana-program/token':
+        specifier: ^0.17.0
+        version: 0.17.0(@solana/kit@8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
+      '@solana/kit':
+        specifier: ^8.4.0
+        version: 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
       '@types/node':
         specifier: ^22
         version: 22.20.5

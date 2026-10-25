@@ -101,7 +101,8 @@ describe('KaminoVaultProtocolSolana', () => {
     expect(q.expectedAssets).toBe(pos.assets)
     expect(q.minAssets).toBe(lessBps(pos.assets, 50))
     expect(lastPost(f)).toMatchObject({ url: '/ktx/kvault/withdraw', body: { wallet: USER, kvault: VAULT, amount: WITHDRAW_ALL } })
-    expect(acc.guards.at(-1)!.guard.expect).toEqual({ maxLamportsOut: DEFAULT_RENT_ALLOWANCE, tokenIn: { mint: USDC, minAmount: lessBps(pos.assets, 50) } })
+    // the redeemed shares may leave the wallet (burned), exactly those (audit 2026-10-25, #1.3)
+    expect(acc.guards.at(-1)!.guard.expect).toEqual({ maxLamportsOut: DEFAULT_RENT_ALLOWANCE, tokenIn: { mint: USDC, minAmount: lessBps(pos.assets, 50) }, maxTokenOut: { mint: SHARES, amount: 10_500_000n } })
 
     await p.withdraw({ amount: 1_062_780n })  // ≈ 1 share's worth
     expect(lastPost(f).body.amount).toBe('1')

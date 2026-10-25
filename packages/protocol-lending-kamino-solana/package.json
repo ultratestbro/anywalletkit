@@ -29,6 +29,8 @@
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/core": "workspace:*",
     "@anywalletkit/wallet-solana": "workspace:*",
+    "@solana-program/token": "^0.17.0",
+    "@solana/kit": "^8.4.0",
     "@types/node": "^22",
     "vitest": "^5.0.3"
   },
