@@ -47,6 +47,14 @@ export interface SolanaConfig {
   allowForeignFeePayer?: boolean
   /** Allow transfers to the System program / all-zero address (default false). */
   allowBurn?: boolean
+  /**
+   * Sign transactions that reassign or allocate this wallet's account (System `Assign` / `Allocate`,
+   * their `WithSeed` forms), hand away a nonce authority, change a token authority, close a token
+   * account with the rent sent elsewhere, or carry an undecodable System / Token instruction
+   * (default false). Applies to `sendTransaction` / `signTransaction`; `sendSerialized` refuses
+   * them regardless.
+   */
+  allowAuthorityChanges?: boolean
 }
 
 /** A native SOL transfer. `value` in lamports. */
@@ -157,7 +165,7 @@ export type DecodedInstruction =
   | { type: 'ata-create'; program: string; ata: string; owner: string; mint: string; payer: string; idempotent: boolean }
   | { type: 'compute-budget'; program: string; kind: 'limit' | 'price' | 'other'; value: bigint }
   | { type: 'program-call'; program: string; accounts: readonly string[]; dataLength: number; /** System/Token(-2022) instruction name when identified (not otherwise decoded). */ instruction?: string }
-  | { type: 'unknown'; program: string | null; accounts: readonly (string | null)[]; dataLength: number }
+  | { type: 'unknown'; program: string | null; accounts: readonly (string | null)[]; dataLength: number; /** System/Token(-2022) instruction name, identified from the data while some accounts sit in unresolved lookup tables. */ instruction?: string }
 
 /**
  * What a transaction does overall; `mixed` when it does several things, `program-call` when it

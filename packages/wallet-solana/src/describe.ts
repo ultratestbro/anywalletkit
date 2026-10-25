@@ -132,10 +132,23 @@ const asIx = (r: Resolved) =>
   ({ programAddress: r.programAddress as Address, accounts: r.accounts.map((a) => ({ address: (a.address ?? ZERO_ADDRESS) as Address, role: a.role })), data: r.data }) as never
 const opt = (o: unknown): string | null => (o && typeof o === 'object' && (o as { __option?: string }).__option === 'Some' ? String((o as { value: unknown }).value) : null)
 
+/** System / Token / Token-2022 instruction name from the data alone (no accounts needed); undefined when undecodable or another program. */
+function coreInstructionName(program: string, data: Uint8Array): string | undefined {
+  try {
+    if (program === SYSTEM_PROGRAM_ADDRESS) return SystemInstruction[identifySystemInstruction(data)]
+    if (program === TOKEN_PROGRAM_ADDRESS) return TokenInstruction[identifyTokenInstruction(data)]
+    if (program === TOKEN_2022_PROGRAM_ADDRESS) return Token2022Instruction[identifyToken2022Instruction(data)]
+  } catch {
+    /* undecodable */
+  }
+  return undefined
+}
+
 function decodeOne(r: Resolved): DecodedInstruction {
   const program = r.programAddress
   if (program === null || r.accounts.some((a) => a.address === null)) {
-    return { type: 'unknown', program, accounts: r.accounts.map((a) => a.address), dataLength: r.data.length }
+    const instruction = program === null ? undefined : coreInstructionName(program, r.data)
+    return { type: 'unknown', program, accounts: r.accounts.map((a) => a.address), dataLength: r.data.length, ...(instruction ? { instruction } : {}) }
   }
   const ix = asIx(r)
   try {

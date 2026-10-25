@@ -45,7 +45,16 @@ key is used:
 2. **Hard checks** — fee payer must be this wallet (`allowForeignFeePayer` to
    override), a provider transaction must not need other signatures
    (`MissingSignersError`), transfers to the System-program address are refused
-   (`UnsafeTransactionError`, `allowBurn` to override).
+   (`UnsafeTransactionError`, `allowBurn` to override). Every `sendTransaction` /
+   `signTransaction` (message, kit `Transaction` or base64) also refuses the
+   drainer shapes: System `Assign` / `Allocate` (and `WithSeed`) of this wallet's
+   account, `AuthorizeNonceAccount` by this wallet, a token `SetAuthority`, a
+   `CloseAccount` whose rent goes elsewhere, an undecodable System / Token
+   instruction (`UnsafeTransactionError` with `code` `core-instruction`,
+   `sets-authority` or `closes-account`; `allowAuthorityChanges: true` to
+   override, e.g. for a token launch that renounces its mint authority).
+   Swap-aggregator transactions belong on `sendSerialized`, which adds a program
+   allowlist and balance proof and ignores that flag.
 3. **Compute budget** — by default the price is the 75th percentile of
    `getRecentPrioritizationFees` over the writable accounts (clamped by
    `minPriorityMicroLamports` / `maxPriorityMicroLamports`) and the unit limit is
