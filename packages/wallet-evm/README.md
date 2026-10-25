@@ -46,6 +46,14 @@ Every send goes through, in order: static refusals → simulation → fee cap �
   custom-error selector. `sendTransaction` / `transfer` / `approve` simulate first and throw
   `SimulationError` instead of broadcasting a revert; `simulate: false` opts out. The estimated gas
   is reused, so the network is asked once.
+- **Fee cap.** `transferMaxFee` / `transactionMaxFee` are checked on the transaction about to be
+  signed — gas limit × its `gasPrice` / `maxFeePerGas`, fee fields you set yourself included — before
+  every signature. `quoteSendTransaction` prices the same fields, so a kit `maxFee` policy sees them too.
+- **Broadcast.** A lost answer throws `BroadcastUnknownError` with the locally computed `hash`: watch
+  it, do not send again. With several RPCs, `already known` from the next one is the same transaction
+  and resolves to its hash. `nonce too low` is re-signed with the next nonce only after the account
+  has checked that the rejected hash is not on the network; `replacement transaction underpriced` is
+  never retried.
 - **EIP-2612 permit.** `getPermitInfo(token)` reads `name/version/nonces/DOMAIN_SEPARATOR` and
   reports `supported` only when the rebuilt EIP-712 domain equals the contract's own;
   `signPermit({token, spender, value, deadline})` returns `{signature, v, r, s, nonce, deadline, typedData}`.

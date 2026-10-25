@@ -1,13 +1,14 @@
 import { LocalSigner, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import {
-  getAddress, hashMessage, hashTypedData, hexToBytes, keccak256, serializeTransaction, zeroAddress,
-  type Hex, type Signature, type TransactionSerializable,
+  getAddress, hashMessage, hashTypedData, hexToBytes, keccak256, serializeTransaction, TransactionNotFoundError, zeroAddress,
+  type Hex, type PublicClient, type Signature, type TransactionSerializable,
 } from 'viem'
 import { publicKeyToAddress } from 'viem/accounts'
 import { encodeApprove, ERC20_PERMIT_ABI, PERMIT_TYPES, USDT_MAINNET } from './erc20.js'
 import { BroadcastUnknownError, ChainMismatchError, PermitUnsupportedError, SimulationError, UnsafeTransactionError } from './errors.js'
 import { WalletAccountReadOnlyEvm, cleanTypes, inferPrimaryType, transferTransaction } from './read-only-account.js'
+export { MIN_PRIORITY_FEE_WEI } from './read-only-account.js'
 import type { ApproveOptions, EvmConfig, EvmTransaction, EvmTransferOptions, PermitInfo, PermitOptions, SignedPermit, TypedDataInput } from './types.js'
 
 const toHex = (u8: Uint8Array): Hex => `0x${Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')}`
@@ -28,16 +29,19 @@ function toBigInt(v: bigint | number | string | undefined): bigint | undefined {
  * viem-computed hash — a {@link LocalSigner} for seed wallets, anything else
  * (hardware, Safe, MPC, backend) through `externalSigner()`.
  */
-/** Minimum priority fee the SDK bids when the network suggests less (wei, per chain id). */
-export const MIN_PRIORITY_FEE_WEI: Readonly<Record<number, bigint>> = Object.freeze({
-  1: 50_000_000n, // Ethereum mainnet: 0.05 gwei (≈$0.01 on 100k gas) — enough to be picked up
-})
 /** How long a self-observed next nonce outranks the network's `pending` answer. */
 export const NONCE_FLOOR_TTL_MS = 90_000
 /** Simulation re-runs (and the pause between them) when a revert follows the account's own broadcast. */
 export const SIMULATION_SETTLE_RETRIES = 3
 export const SIMULATION_SETTLE_DELAY_MS = 1_500
-const NONCE_TOO_LOW = /nonce too low|nonce is too low|invalid nonce|replacement transaction underpriced|already known/i
+/**
+ * The nonce was taken: by a transaction the RPC's stale `pending` count did not show, or by this
+ * very transaction after a lost answer. `replacement transaction underpriced` is NOT here: another
+ * transaction of ours holds the nonce in the pool, and signing a new one beside it pays twice.
+ */
+const NONCE_TOO_LOW = /nonce too low|nonce is too low|invalid nonce/i
+/** The node already holds these exact bytes (geth / erigon, besu, nethermind, openethereum wording). */
+const ALREADY_KNOWN = /already ?known|\bknown transaction|already imported/i
 const errorText = (e: unknown): string => {
   const parts: string[] = []
   for (let cur: unknown = e; cur && parts.length < 6; cur = (cur as { cause?: unknown }).cause) {
@@ -56,6 +60,13 @@ const nodeAnswered = (e: unknown): boolean => {
     if (typeof code === 'number' && code !== -1) return true
   }
   return false
+}
+
+/** Worst-case fee of a prepared transaction: all its gas at its cap (`gasPrice`, or `maxFeePerGas`). */
+export function maxFeeCost(tx: TransactionSerializable): bigint {
+  const rate = tx.type === 'legacy' || tx.type === 'eip2930' ? tx.gasPrice : tx.maxFeePerGas
+  if (tx.gas === undefined || rate === undefined) throw new Error('Cannot bound the fee of a transaction without gas and a fee cap.')
+  return tx.gas * rate
 }
 
 /** EIP-712 domain chainId in any notation a dApp sends (number, bigint, decimal or hex string) → number. */
@@ -195,41 +206,37 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     const data = (tx.data ?? '0x') as Hex
     const gas = await this.gasFor(tx)
 
-    const legacy = tx.type === 0 || tx.type === 1 || (tx.gasPrice !== undefined && tx.maxFeePerGas === undefined)
     const base = { chainId, nonce, ...(to ? { to } : {}), value, data, gas }
-    if (legacy) {
-      const gasPrice = toBigInt(tx.gasPrice) ?? (await this.requireClient('read fee data').getGasPrice())
+    const fees = await this.feeFields(tx, chainId)
+    if ('gasPrice' in fees) {
       return tx.type === 1
-        ? { ...base, type: 'eip2930', gasPrice, accessList: tx.accessList ?? [] }
-        : { ...base, type: 'legacy', gasPrice }
-    }
-    let maxFeePerGas = toBigInt(tx.maxFeePerGas)
-    let maxPriorityFeePerGas = toBigInt(tx.maxPriorityFeePerGas)
-    if (maxFeePerGas === undefined || maxPriorityFeePerGas === undefined) {
-      const fees = await this.requireClient('read fee data').estimateFeesPerGas()
-      // Public mainnet nodes answer eth_maxPriorityFeePerGas with 0 when
-      // blocks are quiet. A zero-tip transaction is last in every builder's
-      // queue and gets evicted from the mempool as soon as the base fee
-      // drifts above its cap (2026-10-09: one waited 3 min, one vanished
-      // after the node had returned its hash). Floor the tip per chain when
-      // the caller did not fix it, and give the cap the same headroom.
-      const tipFloor = tx.maxPriorityFeePerGas === undefined ? (MIN_PRIORITY_FEE_WEI[chainId] ?? 0n) : 0n
-      const tip = fees.maxPriorityFeePerGas < tipFloor ? tipFloor : fees.maxPriorityFeePerGas
-      maxPriorityFeePerGas ??= tip
-      maxFeePerGas ??= fees.maxFeePerGas + (tip - fees.maxPriorityFeePerGas)
+        ? { ...base, type: 'eip2930', gasPrice: fees.gasPrice, accessList: tx.accessList ?? [] }
+        : { ...base, type: 'legacy', gasPrice: fees.gasPrice }
     }
     if (tx.type === 4) {
-      return { ...base, type: 'eip7702', maxFeePerGas, maxPriorityFeePerGas, accessList: tx.accessList ?? [], authorizationList: (tx.authorizationList ?? []) as never }
+      return { ...base, type: 'eip7702', ...fees, accessList: tx.accessList ?? [], authorizationList: (tx.authorizationList ?? []) as never }
     }
-    return { ...base, type: 'eip1559', maxFeePerGas, maxPriorityFeePerGas, accessList: tx.accessList ?? [] }
+    return { ...base, type: 'eip1559', ...fees, accessList: tx.accessList ?? [] }
   }
 
   /**
-   * Everything that happens before a broadcast, in order: static refusals,
-   * simulation (unless `simulate: false`), gas (taken from the simulation so
-   * `estimateGas` runs once), fee cap. Returns the tx with `gasLimit` filled.
+   * The fee cap, checked on the transaction about to be SIGNED: its gas limit × its own
+   * `gasPrice` / `maxFeePerGas`, whoever set them. A network quote is not enough — a caller's
+   * fee fields are signed as given. Returns that worst-case fee.
    */
-  private async preflight(tx: EvmTransaction, limit: bigint | number | undefined, op: string): Promise<{ tx: EvmTransaction; fee: bigint }> {
+  private capFee(prepared: TransactionSerializable, limit: bigint | number | undefined, op: string): bigint {
+    const fee = maxFeeCost(prepared)
+    if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation.`)
+    return fee
+  }
+
+  /**
+   * The checks before a send prepares the transaction, in order: static refusals,
+   * simulation (unless `simulate: false`), gas (taken from the simulation so
+   * `estimateGas` runs once). Returns the tx with `gasLimit` filled; the fee cap
+   * and the balance are checked on the prepared transaction.
+   */
+  private async preflight(tx: EvmTransaction): Promise<EvmTransaction> {
     await this.getChainId() // network path: know the chain so a foreign tx.chainId is refused, not broadcast
     await this.assertSafeTransaction(tx)
     let gasLimit = toBigInt(tx.gasLimit)
@@ -255,16 +262,18 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
       const pct = BigInt(Math.round((this._config.gasHeadroom ?? 1.2) * 100))
       gasLimit = (estimated * pct + 99n) / 100n
     }
-    const withGas: EvmTransaction = { ...tx, gasLimit }
-    const { fee } = await this.quoteSendTransaction(withGas)
-    if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation.`)
-    // The node only tells us at broadcast ("insufficient funds for gas * price
-    // + value") — by then an ERC-20 approval may already be mined and paid for
-    // (Arbitrum, 2026-10-10). Refuse here, before anything is signed.
-    const need = fee + (toBigInt(tx.value) ?? 0n)
+    return { ...tx, gasLimit }
+  }
+
+  /**
+   * The node only tells us at broadcast ("insufficient funds for gas * price
+   * + value") — by then an ERC-20 approval may already be mined and paid for
+   * (Arbitrum, 2026-10-10). Refuse here, before anything is signed.
+   */
+  private async assertCanPay(fee: bigint, value: bigint, op: string): Promise<void> {
+    const need = fee + value
     const balance = await this.getBalance()
-    if (balance < need) throw new UnsafeTransactionError(`Insufficient native balance for ${op}: need ${need} wei (fee ${fee} + value ${need - fee}), have ${balance}.`)
-    return { tx: withGas, fee }
+    if (balance < need) throw new UnsafeTransactionError(`Insufficient native balance for ${op}: need ${need} wei (fee ${fee} + value ${value}), have ${balance}.`)
   }
 
   /**
@@ -274,11 +283,8 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
    */
   async signTransaction(tx: EvmTransaction): Promise<string> {
     await this.assertSafeTransaction(tx)
-    if (this._config.transactionMaxFee !== undefined && this._client) {
-      const { fee } = await this.quoteSendTransaction(tx)
-      if (fee > BigInt(this._config.transactionMaxFee)) throw new Error('Exceeded maximum fee cost for transaction operation.')
-    }
     const prepared = await this.prepare(tx)
+    this.capFee(prepared, this._config.transactionMaxFee, 'transaction')
     const hash = keccak256(serializeTransaction(prepared))
     return serializeTransaction(prepared, await this.signHash(hash, 'evm-tx'))
   }
@@ -294,35 +300,65 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     return pending
   }
 
+  /** Sign a prepared transaction; the fee cap is checked again before every signature. */
+  private async signPrepared(prepared: TransactionSerializable, limit: bigint | number | undefined, op: string): Promise<{ raw: Hex; hash: Hex; nonce: number }> {
+    this.capFee(prepared, limit, op)
+    const raw = serializeTransaction(prepared, await this.signHash(keccak256(serializeTransaction(prepared)), 'evm-tx'))
+    return { raw, hash: keccak256(raw), nonce: prepared.nonce! }
+  }
+
+  /**
+   * Is `hash` on the network (pool or chain)? A failed lookup is not a "no": the transaction may
+   * hold the nonce, so the send ends as {@link BroadcastUnknownError} instead of a second signature.
+   */
+  private async isOnNetwork(client: PublicClient, hash: Hex, cause: unknown): Promise<boolean> {
+    try {
+      await client.getTransaction({ hash })
+      return true
+    } catch (e) {
+      if (e instanceof TransactionNotFoundError) return false
+      throw new BroadcastUnknownError(hash, cause)
+    }
+  }
+
   private async signAndBroadcast(tx: EvmTransaction, limit: bigint | number | undefined, op: string): Promise<TransferResult> {
     const client = this.requireClient(op === 'transfer' ? 'transfer tokens' : 'send transactions')
-    const ready = await this.preflight(tx, limit, op)
-    // preflight already quoted and capped the fee; prepare() only fills nonce/fees now.
-    const broadcast = async (prepared: TransactionSerializable): Promise<Hex> => {
-      const raw = serializeTransaction(prepared, await this.signHash(keccak256(serializeTransaction(prepared)), 'evm-tx'))
-      let hash: Hex
+    const checked = await this.preflight(tx)
+    const prepared = await this.prepare(checked)
+    const fee = this.capFee(prepared, limit, op)
+    await this.assertCanPay(fee, prepared.value ?? 0n, op)
+    const accepted = (hash: Hex, nonce: number): TransferResult => {
+      this._nonceFloor = { next: nonce + 1, at: Date.now() }
+      return { hash, fee }
+    }
+    const submit = async (signed: { raw: Hex; hash: Hex; nonce: number }): Promise<TransferResult> => {
       try {
-        hash = await client.sendRawTransaction({ serializedTransaction: raw as Hex })
+        return accepted(await client.sendRawTransaction({ serializedTransaction: signed.raw }), signed.nonce)
       } catch (error) {
+        // These exact bytes are in a pool already: an earlier attempt reached a
+        // node and its answer was lost (viem's fallback then hands the same
+        // bytes to the next RPC). It is the same transaction — never sign another.
+        if (ALREADY_KNOWN.test(errorText(error))) return accepted(signed.hash, signed.nonce)
         // No answer from the node: the tx may be in the mempool under this hash.
-        if (!nodeAnswered(error)) throw new BroadcastUnknownError(keccak256(raw as Hex), error)
+        if (!nodeAnswered(error)) throw new BroadcastUnknownError(signed.hash, error)
         throw error
       }
-      this._nonceFloor = { next: prepared.nonce! + 1, at: Date.now() }
-      return hash
     }
-    const prepared = await this.prepare(ready.tx)
+    const first = await this.signPrepared(prepared, limit, op)
     try {
-      return { hash: await broadcast(prepared), fee: ready.fee }
+      return await submit(first)
     } catch (error) {
-      // A nonce the caller fixed is theirs to retry. Otherwise one re-read:
-      // the node that rejected us knows the real next nonce, and nothing was
-      // broadcast, so re-signing the same payload is safe.
-      const tooLow = ready.tx.nonce === undefined && NONCE_TOO_LOW.test(errorText(error))
-      if (!tooLow) throw error
+      // A nonce the caller fixed is theirs to retry; an unknown outcome is never re-signed.
+      if (checked.nonce !== undefined || error instanceof BroadcastUnknownError || !NONCE_TOO_LOW.test(errorText(error))) throw error
+      // "nonce too low" right after a lost answer can be THIS transaction,
+      // mined in between: look for its hash before signing anything new.
+      if (await this.isOnNetwork(client, first.hash, error)) return accepted(first.hash, first.nonce)
+      // Not ours: the RPC's `pending` count was stale. The node that rejected
+      // us knows the real next nonce, and nothing of ours holds this one, so
+      // one re-sign of the same payload is safe.
       const hinted = /next nonce (\d+)/i.exec(errorText(error))
-      this._nonceFloor = { next: Math.max(prepared.nonce! + 1, hinted ? Number(hinted[1]) : 0), at: Date.now() }
-      return { hash: await broadcast({ ...prepared, nonce: await this.nextNonce() }), fee: ready.fee }
+      this._nonceFloor = { next: Math.max(first.nonce + 1, hinted ? Number(hinted[1]) : 0), at: Date.now() }
+      return submit(await this.signPrepared({ ...prepared, nonce: await this.nextNonce() }, limit, op))
     }
   }
 
