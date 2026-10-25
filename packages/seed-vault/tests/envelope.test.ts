@@ -101,8 +101,8 @@ describe('seed-vault envelope', () => {
       { kind: 'key', id: 'k', key: key(1) },
     ])
     const pw = env.protectors[0] as Extract<BackupEnvelope['protectors'][number], { kind: 'password' }>
-    const weakened = { ...env, protectors: [{ ...pw, kdf: { ...pw.kdf, t: 1 } }, env.protectors[1]!] }
-    await expectCode(openBackup(weakened, { kind: 'password', password: PASSWORD }), 'wrong-password')
+    const raised = { ...env, protectors: [{ ...pw, kdf: { ...pw.kdf, m: pw.kdf.m + 1024 } }, env.protectors[1]!] }
+    await expectCode(openBackup(raised, { kind: 'password', password: PASSWORD }), 'wrong-password')
     const k = env.protectors[1] as Extract<BackupEnvelope['protectors'][number], { kind: 'key' }>
     const renamed = { ...env, protectors: [env.protectors[0]!, { ...k, id: 'other' }] }
     await expectCode(openBackup(renamed, { kind: 'key', id: 'other', key: key(1) }), 'wrong-key')
@@ -137,6 +137,20 @@ describe('seed-vault envelope', () => {
     expect((await openBackup(env, { kind: 'password', password: PASSWORD })).text()).toBe(SECRET)
     expect(calls).toEqual([32768])
     await expectCode(sealBackup(SECRET, META, [{ kind: 'password', password: PASSWORD }], { argon2: { m: 4096, t: 1, p: 1 } }), 'invalid')
+  })
+
+  it('refuses a password protector below the sealing floor on decode and open — a cheap-to-brute-force file is not a normal backup', async () => {
+    // Audit 2026-10-25 (post-release), M1: sealing required m 19 MiB / t 2 / p 1, decode accepted m 8 KiB / t 1.
+    const env = await sealBackup(SECRET, META, [{ kind: 'password', password: PASSWORD }, { kind: 'key', id: 'k', key: key(1) }])
+    expect(describeBackup(decodeBackup(encodeBackup(env))).protectors).toHaveLength(2)
+    const pw = env.protectors[0] as Extract<BackupEnvelope['protectors'][number], { kind: 'password' }>
+    for (const kdf of [{ m: 8192, t: 1, p: 1 }, { m: 19 * 1024, t: 1, p: 1 }, { m: 19 * 1024 - 1, t: 2, p: 1 }, { m: 8, t: 1, p: 1 }]) {
+      const weak = { ...env, protectors: [{ ...pw, kdf: { ...pw.kdf, ...kdf } }, env.protectors[1]!] }
+      expect(() => decodeBackup(JSON.stringify(weak)), JSON.stringify(kdf)).toThrow(/below the minimum/)
+      await expectCode(openBackup(weak, { kind: 'password', password: PASSWORD }), 'invalid')
+      // not even through the other protector: the file as a whole is refused
+      await expectCode(openBackup(weak, { kind: 'key', id: 'k', key: key(1) }), 'invalid')
+    }
   })
 
   it('rejects malformed, foreign and dangerous files on decode', () => {
