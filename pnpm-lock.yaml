@@ -826,6 +826,9 @@ importers:
       '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
+      '@anywalletkit/wallet-evm':
+        specifier: workspace:*
+        version: link:../wallet-evm
       '@types/node':
         specifier: ^22
         version: 22.20.5
@@ -888,6 +891,9 @@ importers:
       '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
+      '@anywalletkit/wallet-evm':
+        specifier: workspace:*
+        version: link:../wallet-evm
       '@types/node':
         specifier: ^22
         version: 22.20.5
@@ -926,6 +932,9 @@ importers:
       '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
+      '@anywalletkit/wallet-evm':
+        specifier: workspace:*
+        version: link:../wallet-evm
       '@types/node':
         specifier: ^22
         version: 22.20.5
@@ -970,6 +979,9 @@ importers:
       '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
+      '@anywalletkit/wallet-evm':
+        specifier: workspace:*
+        version: link:../wallet-evm
       '@types/node':
         specifier: ^22
         version: 22.20.5

@@ -4,7 +4,7 @@ import {
 } from '@anywalletkit/core'
 import {
   BaseError, ContractFunctionRevertedError, ContractFunctionZeroDataError, ExecutionRevertedError,
-  createPublicClient, custom, encodeFunctionData, getAddress, http, isAddress, zeroAddress,
+  createPublicClient, custom, encodeFunctionData, fallback, getAddress, http, isAddress, zeroAddress,
   type Address, type Hex, type PublicClient,
 } from 'viem'
 
@@ -209,8 +209,8 @@ export interface MellowProtocolConfig {
   preset?: string
   /** The chain the vault lives on (default 1). Only used to pick presets and label errors. */
   chainId?: number
-  /** RPC url or EIP-1193 provider to read the chain through. Defaults to the account's own provider. */
-  provider?: EvmProvider
+  /** RPC url(s) or EIP-1193 provider(s) to read the chain through; a list fails over in order. Defaults to the account's own provider. */
+  provider?: EvmProvider | EvmProvider[]
   /** Mellow's vault registry URL for APY / TVL / withdrawal time (decoration). `null` disables it. */
   registry?: string | null
   /** Try the vault's synchronous deposit queue first (shares in the same transaction), fall back to the async queue (default true). */
@@ -332,10 +332,13 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
     this._maxRedeemRequests = config.maxRedeemRequests ?? 50
 
     // wallet-evm keeps the RPC in a protected `_config`: read it without putting it in the account type.
-    const provider = config.provider ?? (account as { _config?: { provider?: EvmProvider } } | undefined)?._config?.provider
-    if (provider) {
+    const provider = config.provider ?? (account as { _config?: { provider?: EvmProvider | EvmProvider[] } } | undefined)?._config?.provider
+    const list = provider === undefined ? [] : Array.isArray(provider) ? provider : [provider]
+    if (list.length > 0) {
       // Discovery fires many reads at once; send them one per request — some gateways answer a batch member with empty data.
-      this._client = createPublicClient({ transport: typeof provider === 'string' ? http(provider, { batch: false }) : custom(provider) })
+      const toTransport = (p: EvmProvider) => (typeof p === 'string' ? http(p, { batch: false }) : custom(p))
+      // A list (wallet-evm's failover config) fails over in order, as the account's own client does.
+      this._client = createPublicClient({ transport: list.length === 1 ? toTransport(list[0]!) : fallback(list.map(toTransport)) })
     }
   }
 

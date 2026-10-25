@@ -1,6 +1,6 @@
 import type { ActivityItem, ChainTx, DescribeActivityContext } from '@anywalletkit/core'
 import {
-  createPublicClient, custom, encodeFunctionData, getAddress, http, isAddress, zeroAddress,
+  createPublicClient, custom, encodeFunctionData, fallback, getAddress, http, isAddress, zeroAddress,
   type Address, type Hex, type PublicClient, type Transport,
 } from 'viem'
 
@@ -30,8 +30,8 @@ export interface ApprovalsCache {
 }
 
 export interface ApprovalsProtocolEvmConfig {
-  /** RPC URL or EIP-1193 provider; defaults to the account's. */
-  provider?: EvmProvider
+  /** RPC URL(s) or EIP-1193 provider(s); a list fails over in order. Defaults to the account's. */
+  provider?: EvmProvider | EvmProvider[]
   /** Skips the `eth_chainId` round trip when known. */
   chainId?: number
   /** Token labels (lowercase address → symbol / decimals) for activity titles, e.g. "Approved USDC for Permit2". */
@@ -62,7 +62,11 @@ const SUPPORTED: readonly ApprovalStandard[] = Object.freeze(['erc20', 'erc721',
 
 // The transports do not retry on their own: RpcLogsSource retries transient
 // failures itself (and counts requests), the way it did over ethers.
-const toTransport = (p: EvmProvider): Transport => (typeof p === 'string' ? http(p, { retryCount: 0 }) : custom(p, { retryCount: 0 }))
+const toTransport = (p: EvmProvider | EvmProvider[]): Transport => {
+  // A list (wallet-evm's failover config) fails over in order, as the account's own client does.
+  if (Array.isArray(p)) return p.length === 1 ? toTransport(p[0]!) : fallback(p.map((x) => toTransport(x)), { retryCount: 0 })
+  return typeof p === 'string' ? http(p, { retryCount: 0 }) : custom(p, { retryCount: 0 })
+}
 
 interface RevokeItem { ids: string[]; tx?: RevokeTransaction; approval?: Approval }
 
@@ -91,8 +95,8 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
   constructor (account: ReadOnlyAccountLike | AccountLike, config: ApprovalsProtocolEvmConfig = {}) {
     super(account, config)
     // wallet-evm keeps the RPC in a protected `_config`: read it without putting it in the account type.
-    const provider = config.provider ?? (account as { _config?: { provider?: EvmProvider } } | undefined)?._config?.provider
-    if (provider) {
+    const provider = config.provider ?? (account as { _config?: { provider?: EvmProvider | EvmProvider[] } } | undefined)?._config?.provider
+    if (provider && (!Array.isArray(provider) || provider.length > 0)) {
       // cacheTime 0: every getBlockNumber is a real round trip (viem would
       // otherwise serve it from a 4 s cache). ethers needed `cacheTimeout: -1`
       // for the same reason — a retried eth_getLogs must be a fresh request —
