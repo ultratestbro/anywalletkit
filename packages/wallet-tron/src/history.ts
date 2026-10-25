@@ -88,8 +88,8 @@ export class HistoryUnavailableError extends Error {
 const DEFAULT_LIMIT = 25
 /** Rows asked of the API per request at least, so a small `limit` does not cost one request per row. */
 const MIN_PAGE = 20
-/** Pages one list may fetch in one call; far beyond any real page (one timestamp of one address). */
-const MAX_PAGES_PER_CALL = 100
+/** Pages one list may fetch in one call: far beyond one block timestamp of one address, a bound on a runaway API. */
+const MAX_PAGES_PER_CALL = 500
 const MAX_LIMIT = 200
 const DEFAULT_TIMEOUT_MS = 15_000
 const DEFAULT_URLS: Record<TronNetwork, string> = { mainnet: 'https://api.trongrid.io', shasta: 'https://api.shasta.trongrid.io', nile: 'https://nile.trongrid.io' }
@@ -448,7 +448,9 @@ export function createTronHistory(options: TronHistoryOptions = {}): TronHistory
         if (!rows) {
           // A fingerprint this call already followed means the API is not advancing (a gateway that
           // drops the parameter answers the first page again): the list ends here instead of looping.
-          if (pos.f !== undefined && (fetched.has(pos.f) || fetched.size >= MAX_PAGES_PER_CALL)) { pos = null; break }
+          if (pos.f !== undefined && fetched.has(pos.f)) { pos = null; break }
+          // Never end a list early on the bound: fail the call and leave the cursor where it was.
+          if (fetched.size >= MAX_PAGES_PER_CALL) throw new HistoryUnavailableError(chain, `${path}: more than ${MAX_PAGES_PER_CALL} pages in one call`)
           if (pos.f !== undefined) fetched.add(pos.f)
           const page = await list<T>(path, pos.f === undefined ? params : { ...params, fingerprint: pos.f })
           if (pos.f !== undefined && page.next === pos.f) { pos = null; break }

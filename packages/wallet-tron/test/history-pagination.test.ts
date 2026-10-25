@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createTronHistory, type HistoryFetch, type TronGridTrc20, type TronGridTx } from '../src/index.js'
+import { HistoryUnavailableError, createTronHistory, type HistoryFetch, type TronGridTrc20, type TronGridTx } from '../src/index.js'
 
 // Audit 2026-10-25, #1.5: pages were time windows (`max_timestamp`) plus the txIDs already
 // emitted at the window edge. More rows at one timestamp than `limit` made the next request
@@ -126,4 +126,35 @@ describe('Tron history pages: nothing lost or repeated', () => {
     expect(page.items).toHaveLength(20)
     expect(requests).toBeLessThan(10)
   })
+
+  it('2100 rows at one timestamp over 20-row pages: every row, then the older ones', async () => {
+    const block = Array.from({ length: 2100 }, (_, i) => txRow(`k${String(i).padStart(4, '0')}`, 7000))
+    const older = Array.from({ length: 10 }, (_, i) => txRow(`o${i}`, 100 - i))
+    const a = api([...block, ...older], [])
+    const source = createTronHistory({ fetch: a.fetch, rateLimit: 1e6 })
+    const seen = new Set<string>()
+    let cursor: string | undefined
+    let calls = 0
+    do {
+      // the first call fixes the page size at 20 rows; later ones take 200 items at a time
+      const page = await source.listActivity(ME, { limit: cursor ? 200 : 1, ...(cursor ? { cursor } : {}) })
+      for (const i of page.items) seen.add(i.hash)
+      cursor = page.cursor
+    } while (cursor && ++calls < 3000)
+    expect(seen.size).toBe(2110)
+  }, 60_000)
+
+  it('an API handing out new fingerprints forever is an error, not a silently shortened list', async () => {
+    let n = 0
+    const fetch: HistoryFetch = async (url) => {
+      const trc = new URL(url).pathname.endsWith('/trc20')
+      if (trc) return { ok: true, status: 200, json: async () => ({ data: [], success: true, meta: {} }) }
+      const page = n++
+      const body = { data: Array.from({ length: 20 }, (_, i) => txRow(`f${page}_${i}`, 9000)), success: true, meta: { fingerprint: `fp${page + 1}` } }
+      return { ok: true, status: 200, json: async () => body }
+    }
+    await expect(createTronHistory({ fetch, rateLimit: 1e6 }).listActivity(ME, { limit: 5 })).rejects.toBeInstanceOf(HistoryUnavailableError)
+    expect(n).toBeLessThanOrEqual(501)
+  })
 })
+
