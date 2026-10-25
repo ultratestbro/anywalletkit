@@ -24,7 +24,7 @@ export interface Argon2Params {
   p: number
 }
 export const DEFAULT_ARGON2: Argon2Params = { m: 19 * 1024, t: 2, p: 1 }
-/** Below these a password backup is refused; above, a file is refused on decode (memory bomb). */
+/** Below these a password protector is refused, on seal and on decode; above, a file is refused on decode (memory bomb). */
 const ARGON2_MIN: Argon2Params = { m: 19 * 1024, t: 2, p: 1 }
 const ARGON2_MAX: Argon2Params = { m: 1024 * 1024, t: 16, p: 16 }
 
@@ -355,7 +355,8 @@ function checkEnvelope(raw: unknown): asserts raw is BackupEnvelope {
       passwords++
       if (!r.kdf || r.kdf.alg !== 'argon2id') throw new BackupError('unsupported', 'Unknown password KDF.')
       if (!isStr(r.kdf.salt, 128)) throw new BackupError('invalid', 'Malformed password salt.')
-      checkArgon2(r.kdf, { m: 8, t: 1, p: 1 }, 'Argon2 cost is out of bounds.')
+      // The sealing floor, not just sanity: this SDK never wrote less, and a cheaper file is cheaper to brute-force offline.
+      checkArgon2(r.kdf, ARGON2_MIN, 'Password protector cost is below the minimum this build accepts.')
     } else if (r.kind === 'key') {
       checkKeyId(r.id)
       if (ids.has(r.id)) throw new BackupError('invalid', `Duplicate key protector "${r.id}".`)

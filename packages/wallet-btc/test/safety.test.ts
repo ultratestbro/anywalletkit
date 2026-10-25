@@ -38,6 +38,24 @@ describe('safety checks', () => {
     m.dispose()
   })
 
+  it('signTransaction(raw hex) runs the same checks as sendTransaction(raw) and returns the bytes unchanged', async () => {
+    // Audit 2026-10-25 (post-release), M4: raw hex came back from signTransaction unchecked.
+    const prevA = prevTx([[ADDR0, 100_000n]])
+    const f = fakeBlockbook({ utxos: [{ txid: prevA.id, vout: 0, value: '100000', height: 1 }], prevTxs: [prevA] })
+    const generous = await mk(f.fetchFn, { maxFeeRate: 10_000 }).getAccount(0)
+    const absurd = await generous.signTransaction({ to: ADDR1, value: 10_000n, feeRate: 600n })
+    const ok = await generous.signTransaction({ to: ADDR1, value: 10_000n, feeRate: 20n })
+    const a = await mk(f.fetchFn).getAccount(0)
+    await expect(a.signTransaction(absurd)).rejects.toMatchObject({ name: 'UnsafeTransactionError', code: 'fee-rate-too-high' })
+    await expect(a.signTransaction(ok)).resolves.toBe(ok)
+    const fee = (await a.describeTransaction(ok)).fee
+    const capped = await mk(f.fetchFn, { transactionMaxFee: fee - 1n }).getAccount(0)
+    await expect(capped.signTransaction(ok)).rejects.toThrow(/maximum fee/)
+    await expect(a.signTransaction(ok, { maxFee: fee - 1n })).rejects.toThrow(/maximum fee/)
+    await expect(a.signTransaction(ok, { maxFee: fee })).resolves.toBe(ok)
+    expect(f.sent).toHaveLength(0)
+  })
+
   it('describeTransaction / assertSafe are pure and catch foreign outputs and change', () => {
     const tx = prevTx([[ADDR1, 60_000n], [ADDR0, 30_000n], ['bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4', 5_000n]])
     const parsed = parseRawTransaction(tx.hex)

@@ -126,6 +126,31 @@ describe("swap2 server handler", () => {
     expect(() => createSwap2Handler({providers: [provider], sealSecret: "short", guard: allow})).toThrow(/32 bytes/);
   });
 
+  it("refuses to seal a quote the engine would reject (502): a sealed quote is one the server vouches for", async () => {
+    // Audit 2026-10-25 (post-release), L1: the server sealed any well-formed quote; only SDK clients re-validated.
+    const bad: Array<Partial<Quote>> = [
+      {minDestAmount: "99950000"},              // floor above the expected amount
+      {sourceAmount: "1"},                      // another input than asked for
+      {provider: "other"},                      // another provider's quote
+      {destAmount: "0", minDestAmount: "0"},
+      {validUntilMs: Date.now() - 1},           // already expired
+      {validUntilMs: 0},                        // no expiry at all
+      {reliability: 2},
+    ]
+    for (const over of bad) {
+      const {provider} = mockProvider({getQuote: async () => ({...QUOTE, ...over})});
+      const handle = createSwap2Handler({providers: [provider], sealSecret: SECRET, guard: allow});
+      const res = await handle("quote", {provider: "mock", params: PARAMS}, "u");
+      expect([JSON.stringify(over), res.status]).toEqual([JSON.stringify(over), 502]);
+    }
+    // the caller's own floor and slippage are held too
+    const {provider} = mockProvider();
+    const handle = createSwap2Handler({providers: [provider], sealSecret: SECRET, guard: allow});
+    expect((await handle("quote", {provider: "mock", params: {...PARAMS, minAmountOut: "99850000"}}, "u")).status).toBe(502)
+    expect((await handle("quote", {provider: "mock", params: {...PARAMS, slippageBps: 5}}, "u")).status).toBe(502)
+    expect((await handle("quote", {provider: "mock", params: {...PARAMS, minAmountOut: "99800000", slippageBps: 50}}, "u")).status).toBe(200)
+  });
+
   it("refuses to seal a provider quote outside the schema (502), and answers supports from supportsRoute", async () => {
     const {provider} = mockProvider({getQuote: async () => ({...QUOTE, intentId: "x".repeat(2001)}), supportsRoute: (_f, to) => to.chain === "eip155:8453"});
     const handle = createSwap2Handler({providers: [provider], sealSecret: SECRET, guard: allow});

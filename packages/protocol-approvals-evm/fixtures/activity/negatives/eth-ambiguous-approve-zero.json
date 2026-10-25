@@ -1,0 +1,24 @@
+{
+  "note": "Synthetic: approve(0x6c96…1dee, 0) on BAYC (an ERC-721), which APPROVES the spender for token #0. The token is not known as an ERC-20, so the module does not claim it (audit 2026-10-25 post-release, M5)",
+  "own": [
+    "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x00000000000000000000000000000000000000000000000000000000000a0be0",
+    "time": 1789392371,
+    "status": "confirmed",
+    "address": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "from": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+    "to": "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D",
+    "nativeValue": "0",
+    "transfers": [],
+    "fee": "7256134717660",
+    "call": {
+      "to": "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D",
+      "selector": "0x095ea7b3",
+      "data": "0x095ea7b30000000000000000000000006c96de32cea08842dcc4058c14d3aaad7fa41dee0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "block": "25975987"
+  }
+}

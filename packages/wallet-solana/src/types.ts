@@ -29,6 +29,8 @@ export interface SolanaConfig {
   commitment?: Commitment
   /** Extra attempts across the provider list after the first failure (default 3). */
   retries?: number
+  /** Per-request timeout for url providers, in ms (default 15 000). A send that times out is a `BroadcastUnknownError`. */
+  timeoutMs?: number
   /** Max fee (lamports, priority fee included) for `transfer`. */
   transferMaxFee?: bigint | number
   /** Max fee (lamports, priority fee included) for `sendTransaction` / `signTransaction`. */
@@ -47,6 +49,15 @@ export interface SolanaConfig {
   allowForeignFeePayer?: boolean
   /** Allow transfers to the System program / all-zero address (default false). */
   allowBurn?: boolean
+  /**
+   * Sign transactions that reassign, allocate or create this wallet's account under a program, hand
+   * away a nonce / token / metadata / group authority, run a token `Batch`, move lamports to someone
+   * else with an instruction that is not a visible transfer (`CloseAccount`, `WithdrawExcessLamports`,
+   * `UnwrapLamports`, `WithdrawNonceAccount`, `TransferSolWithSeed`), or carry an undecodable System /
+   * Token instruction (default false). Applies to `sendTransaction` / `signTransaction`;
+   * `sendSerialized` refuses them regardless.
+   */
+  allowAuthorityChanges?: boolean
 }
 
 /** A native SOL transfer. `value` in lamports. */
@@ -157,7 +168,7 @@ export type DecodedInstruction =
   | { type: 'ata-create'; program: string; ata: string; owner: string; mint: string; payer: string; idempotent: boolean }
   | { type: 'compute-budget'; program: string; kind: 'limit' | 'price' | 'other'; value: bigint }
   | { type: 'program-call'; program: string; accounts: readonly string[]; dataLength: number; /** System/Token(-2022) instruction name when identified (not otherwise decoded). */ instruction?: string }
-  | { type: 'unknown'; program: string | null; accounts: readonly (string | null)[]; dataLength: number }
+  | { type: 'unknown'; program: string | null; accounts: readonly (string | null)[]; dataLength: number; /** System/Token(-2022) instruction name, identified from the data while some accounts sit in unresolved lookup tables. */ instruction?: string }
 
 /**
  * What a transaction does overall; `mixed` when it does several things, `program-call` when it

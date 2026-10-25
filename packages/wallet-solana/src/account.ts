@@ -1,8 +1,10 @@
 import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
-import { compileTransaction, getAddressDecoder, getBase64EncodedWireTransaction, type SignatureBytes, type Transaction, type TransactionMessage } from '@solana/kit'
+import { compileTransaction, getAddressDecoder, getBase64EncodedWireTransaction, getBase58Decoder, type SignatureBytes, type Transaction, type TransactionMessage } from '@solana/kit'
 import { decodeWireTransaction } from './describe.js'
+import { BroadcastUnknownError } from './errors.js'
 import { MessageIsTransactionError, isSolanaTransactionPayload } from './offchain.js'
 import { WalletAccountReadOnlySolana, type SolanaPlan } from './read-only-account.js'
+import { isDefinitive } from './rpc.js'
 import type { SerializedCheck, SerializedTxGuard } from './serialized.js'
 import type { SolanaConfig, SolanaFeeQuote, SolanaTransaction, SolanaTransferOptions } from './types.js'
 
@@ -100,15 +102,33 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     return getBase64EncodedWireTransaction(await this.signPlan(plan))
   }
 
-  private async broadcast(wire: string): Promise<string> {
-    return this.requireRpc('send transactions').sendTransaction(wire as never, { encoding: 'base64', preflightCommitment: this._commitment }).send()
+  /**
+   * Send once (the failover Rpc re-sends the same bytes, never a new signature). A refusal from the
+   * node is a clean failure; anything else may have landed and is a {@link BroadcastUnknownError}
+   * carrying the signature to watch.
+   */
+  private async broadcast(tx: Transaction): Promise<string> {
+    const rpc = this.requireRpc('send transactions')
+    const wire = getBase64EncodedWireTransaction(tx)
+    try {
+      return await rpc.sendTransaction(wire as never, { encoding: 'base64', preflightCommitment: this._commitment }).send()
+    } catch (e) {
+      if (isDefinitive(e)) throw e
+      throw new BroadcastUnknownError(this.txId(tx), e)
+    }
+  }
+
+  /** The transaction id: the fee payer's signature (the first one), base58. */
+  private txId(tx: Transaction): string {
+    const first = Object.values(tx.signatures)[0]
+    return first ? getBase58Decoder().decode(first) : ''
   }
 
   async sendTransaction(tx: SolanaTransaction, options: WriteOptions = {}): Promise<SolanaSendResult> {
     this.requireRpc('send transactions')
     const plan = await this.plan(tx)
     this.maxFeeCheck(plan.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
-    const hash = await this.broadcast(getBase64EncodedWireTransaction(await this.signPlan(plan)))
+    const hash = await this.broadcast(await this.signPlan(plan))
     return { hash, fee: plan.quote.fee, quote: plan.quote }
   }
 
@@ -117,21 +137,22 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     this.requireRpc('transfer tokens')
     const plan = await this.planTransfer(o)
     this.maxFeeCheck(plan.quote.fee, feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
-    const hash = await this.broadcast(getBase64EncodedWireTransaction(await this.signPlan(plan)))
+    const hash = await this.broadcast(await this.signPlan(plan))
     return { hash, fee: plan.quote.fee, quote: plan.quote }
   }
 
   /**
    * Sign and broadcast a provider-built transaction (base64 wire) after
    * {@link checkSerialized} proved it only does what `guard.expect` allows.
-   * Signatures already present (other parties) are preserved.
+   * Signatures already present (other parties) are preserved. The checked fee is held to the
+   * tighter of `transactionMaxFee` and `options.maxFee`.
    */
-  async sendSerialized(base64: string, guard: SerializedTxGuard): Promise<SolanaSendResult & { check: SerializedCheck }> {
+  async sendSerialized(base64: string, guard: SerializedTxGuard, options: WriteOptions = {}): Promise<SolanaSendResult & { check: SerializedCheck }> {
     this.requireRpc('send transactions')
     const check = await this.checkSerialized(base64, guard)
-    this.maxFeeCheck(check.quote.fee, this._config.transactionMaxFee, 'transaction')
+    this.maxFeeCheck(check.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const plan: SolanaPlan = { transaction: decodeWireTransaction(base64), quote: check.quote, simulation: check.simulation, description: check.description }
-    const hash = await this.broadcast(getBase64EncodedWireTransaction(await this.signPlan(plan)))
+    const hash = await this.broadcast(await this.signPlan(plan))
     return { hash, fee: check.quote.fee, quote: check.quote, check }
   }
 

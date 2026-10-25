@@ -42,7 +42,7 @@ opened.dispose()                                                 // zeroizes the
 - **Changing protectors:** `addProtector` / `removeProtector` change who can open the file without re-encrypting the secret. The last protector cannot be removed.
 - **Decoding:** `decodeBackup` is strict.
   - It refuses an unknown format, version, cipher or KDF, and it rebuilds the object from known fields only.
-  - It bounds Argon2 costs (≤ 1 GiB, t ≤ 16), so a malicious file can't exhaust the phone's memory.
+  - It bounds Argon2 costs (≤ 1 GiB, t ≤ 16), so a malicious file can't exhaust the phone's memory, and refuses a password protector below the cost this SDK seals with (19 MiB × 2), so a cheap-to-brute-force file is never taken for a normal backup.
 - **Passwords:** NFKC-normalized, so the same passphrase typed on different keyboards opens the file.
 
 ## Speed on phones

@@ -149,6 +149,17 @@ type Secret =
 
 const EMPTY: KeyringState = { version: 1, sources: [], accounts: [], activeAccountId: null }
 
+/** A stored secret as untrusted JSON: null when missing or unreadable. */
+function parseStored(raw: string | null): { type?: unknown; mnemonic?: unknown; passphrase?: unknown } | null {
+  if (raw === null) return null
+  try {
+    const v: unknown = JSON.parse(raw)
+    return v !== null && typeof v === 'object' ? (v as { type?: unknown; mnemonic?: unknown; passphrase?: unknown }) : null
+  } catch {
+    return null
+  }
+}
+
 /**
  * Many accounts from many key sources:
  * - a BIP-39 seed (generated or imported, optional passphrase) → accounts 0, 1, 2… on every chain;
@@ -253,7 +264,9 @@ export class Keyring {
       /**
        * Adopt a seed the app ALREADY keeps in SecretStorage under this id (a wallet
        * that predates the keyring): the source takes this id and nothing is
-       * written to SecretStorage — or deleted from it if the import fails.
+       * written to SecretStorage — or deleted from it if the import fails. The id
+       * is read once (one prompt) and must hold this phrase and passphrase, as
+       * `{"type":"mnemonic","mnemonic":…}`; anything else is refused.
        */
       adoptId?: string
     } = {},
@@ -270,12 +283,12 @@ export class Keyring {
       zeroize(seed)
     }
     const secret: Secret = passphrase ? { type: 'mnemonic', mnemonic: phrase, passphrase } : { type: 'mnemonic', mnemonic: phrase }
-    const result = await this.addSource(
-      { type: 'mnemonic', label: options.label ?? this.nextLabel('Wallet'), fingerprint, ...(passphrase ? { hasPassphrase: true } : {}) },
-      secret,
-      [0],
-      options.adoptId,
-    )
+    const meta = { type: 'mnemonic' as const, label: options.label ?? this.nextLabel('Wallet'), fingerprint, ...(passphrase ? { hasPassphrase: true } : {}) }
+    if (options.adoptId !== undefined) {
+      this.assertCanAdd(this._state, meta, options.adoptId) // refusals that need no secure-storage read (no prompt) first
+      await this.assertAdoptable(options.adoptId, phrase, passphrase)
+    }
+    const result = await this.addSource(meta, secret, [0], options.adoptId)
     if (!options.discover) return result
     // The phrase is still in hand: discovery reuses it (no second secure-storage read / biometric prompt).
     const found = await this.discover(this.source(result.source.id), secret, options.discover)
@@ -552,6 +565,16 @@ export class Keyring {
   }
 
   // ---- Internals ----
+
+  /**
+   * An adopted id must already hold THIS seed and passphrase: the accounts' addresses come from the
+   * phrase passed in, every signature from what the id holds. One secure-storage read (one prompt).
+   */
+  private async assertAdoptable(adoptId: string, phrase: string, passphrase: string): Promise<void> {
+    const stored = parseStored(await this._secrets.get(adoptId))
+    const same = stored !== null && stored.type === 'mnemonic' && typeof stored.mnemonic === 'string' && normalizeMnemonic(stored.mnemonic) === phrase && (stored.passphrase ?? '') === passphrase
+    if (!same) throw new KeyringError(`The secret under id "${adoptId}" is missing or is not this seed phrase and passphrase; nothing was adopted.`, 'invalid-input')
+  }
 
   /** Refusals before a source is added: the same secret again, or an id that cannot be adopted. */
   private assertCanAdd(state: KeyringState, meta: Omit<SourceMeta, 'id' | 'createdAt'>, adoptId?: string): void {

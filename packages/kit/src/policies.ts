@@ -45,8 +45,14 @@ export function isGuardedWrite(name: string): boolean {
   return GUARDED_PREFIXES.some((p) => name.startsWith(p) && name.length > p.length && /[A-Z0-9_]/.test(name[p.length]!))
 }
 
-/** Methods whose fee the account can quote up front (`maxFee` applies). */
+/** Methods whose fee the account can quote up front (`maxFee` is checked on the quote, then passed on). */
 const QUOTABLE: readonly string[] = ['sendTransaction', 'transfer', 'signTransaction']
+/**
+ * Every method that pays a fee and takes `WriteOptions`, with the argument it takes them at: the
+ * account holds `maxFee` on what it signs. `approve` (EVM) and `sendSerialized` (Solana) have no
+ * generic quote, so for them this is the only check.
+ */
+const CAPPED: Readonly<Record<string, number>> = Object.freeze({ sendTransaction: 1, transfer: 1, signTransaction: 1, approve: 1, sendSerialized: 2 })
 
 /** Methods that sign an off-chain message: nothing moves, allow/block lists do not apply, only `confirm`. */
 const MESSAGE_METHODS: readonly string[] = ['sign', 'signNep413']
@@ -558,7 +564,7 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     if (policies.confirm && !(await policies.confirm(intent))) throw new UserRejectedError('The write was not confirmed.')
     // The quote is an estimate: the account signs its own gas limit (with headroom) and fee fields.
     // Hand it the tightest cap so it checks the transaction it is about to sign (audit #4).
-    return caps.length > 0 && QUOTABLE.includes(method) ? caps.reduce((a, b) => (b.cap < a.cap ? b : a)).cap : undefined
+    return caps.length > 0 && CAPPED[method] !== undefined ? caps.reduce((a, b) => (b.cap < a.cap ? b : a)).cap : undefined
   }
   const wrapped = new Map<string, (...args: unknown[]) => Promise<unknown>>()
   return new Proxy(account, {
@@ -572,10 +578,14 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
           fn = async (...args: unknown[]) => {
             const maxFee = await guard(prop, args[0])
             if (maxFee !== undefined) {
-              // sendTransaction / signTransaction / transfer take WriteOptions second; a tighter caller cap stays.
-              const given = obj(args[1]) as WriteOptions
+              // WriteOptions sit at CAPPED[prop] (second, or third after sendSerialized's guard); a tighter caller cap stays.
+              const at = CAPPED[prop]!
+              const given = obj(args[at]) as WriteOptions
               const tighter = given.maxFee !== undefined && BigInt(given.maxFee) < maxFee ? BigInt(given.maxFee) : maxFee
-              return original.apply(target, [args[0], { ...given, maxFee: tighter }, ...args.slice(2)])
+              const next = [...args]
+              while (next.length < at) next.push(undefined)
+              next[at] = { ...given, maxFee: tighter }
+              return original.apply(target, next)
             }
             // EIP-712 without primaryType: hand the signer the type the policy judged, so the two cannot diverge (scan F13).
             // Same struct, same hash — only the inference is made explicit.

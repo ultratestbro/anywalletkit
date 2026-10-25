@@ -33,6 +33,8 @@ describe('Vault: parallel writes keep every change', () => {
     const dek = await v2(storage).create(PW)
     const vault = v2(storage)
     await vault.setSecret(dek, 'old', enc('to delete'))
+    // a secret that stays: addPasskey needs one to prove the DEK, and 'old' may be gone when it runs
+    await vault.setSecret(dek, 'keep', enc('kept'))
     const prf = () => Uint8Array.from({ length: 32 }, (_, i) => i)
     await Promise.all([
       vault.setSecret(dek, 'a', enc('secret a')),
@@ -43,7 +45,7 @@ describe('Vault: parallel writes keep every change', () => {
       vault.setSecret(dek, 'c', enc('secret c')),
     ])
     const reloaded = v2(storage)
-    expect((await reloaded.listSecretIds()).sort()).toEqual(['a', 'b', 'c'])
+    expect((await reloaded.listSecretIds()).sort()).toEqual(['a', 'b', 'c', 'keep'])
     expect((await reloaded.listPasskeys()).map((p) => p.id)).toEqual(['cred-1'])
     const again = await reloaded.unlock('new-pw-new-pw')
     expect(dec(await reloaded.getSecret(again, 'c'))).toBe('secret c')

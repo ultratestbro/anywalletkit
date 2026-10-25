@@ -124,7 +124,9 @@ export function nameResolvers(resolvers: readonly NameResolver[]): NameResolver 
  */
 export async function assertNameUnchanged(resolver: NameResolver, name: string, chain: string, expected: string): Promise<ResolvedName> {
   const fresh = await resolver.resolve(name, chain)
-  if (fresh.address.toLowerCase() !== expected.toLowerCase()) {
+  // EVM hex is case-insensitive (the checksum is only casing); base58 / base32 / bech32 forms of other chains are compared exactly.
+  const same = chain.startsWith('eip155:') ? fresh.address.toLowerCase() === expected.toLowerCase() : fresh.address === expected
+  if (!same) {
     throw new NameError('changed', `${name} now resolves to ${fresh.address}, not ${expected} — refusing to sign`, { name, chain })
   }
   return fresh

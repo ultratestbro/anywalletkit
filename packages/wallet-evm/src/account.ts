@@ -409,8 +409,11 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     }
   }
 
-  /** ERC-20 approve. Mainnet USDT non-zero → non-zero is refused or auto-reset (`autoResetAllowance`). */
-  async approve(options: ApproveOptions): Promise<TransferResult> {
+  /**
+   * ERC-20 approve. Mainnet USDT non-zero → non-zero is refused or auto-reset (`autoResetAllowance`).
+   * `writeOptions.maxFee` (and `transactionMaxFee`) holds for each transaction signed, the reset too.
+   */
+  async approve(options: ApproveOptions, writeOptions: WriteOptions = {}): Promise<TransferResult> {
     const client = this.requireClient('approve funds')
     const token = getAddress(options.token)
     const spender = getAddress(options.spender)
@@ -421,11 +424,11 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
         if (!this._config.autoResetAllowance) {
           throw new Error('USDT requires the current allowance to be reset to 0 before setting a new non-zero value. Please send an "approve" transaction with an amount of 0 first.')
         }
-        const reset = await this.sendTransaction({ to: token, value: 0n, data: encodeApprove(spender, 0n) })
+        const reset = await this.sendTransaction({ to: token, value: 0n, data: encodeApprove(spender, 0n) }, writeOptions)
         await client.waitForTransactionReceipt({ hash: reset.hash as Hex })
       }
     }
-    return this.sendTransaction({ to: token, value: 0n, data: encodeApprove(spender, amount) })
+    return this.sendTransaction({ to: token, value: 0n, data: encodeApprove(spender, amount) }, writeOptions)
   }
 
   /** The same address as a {@link WalletAccountReadOnlyEvm}. */

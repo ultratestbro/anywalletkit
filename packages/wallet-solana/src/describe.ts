@@ -12,7 +12,7 @@ import {
   isSignerRole, type AccountLookupMeta, type AccountMeta, type Address, type Instruction, type Transaction, type TransactionMessage,
 } from '@solana/kit'
 import { COMPUTE_BUDGET_PROGRAM_ADDRESS, ComputeBudgetInstruction, identifyComputeBudgetInstruction, parseSetComputeUnitLimitInstruction, parseSetComputeUnitPriceInstruction } from '@solana-program/compute-budget'
-import { SYSTEM_PROGRAM_ADDRESS, SystemInstruction, identifySystemInstruction, parseCreateAccountInstruction, parseTransferSolInstruction } from '@solana-program/system'
+import { SYSTEM_PROGRAM_ADDRESS, SystemInstruction, identifySystemInstruction, parseCreateAccountInstruction, parseCreateAccountWithSeedInstruction, parseTransferSolInstruction } from '@solana-program/system'
 import {
   ASSOCIATED_TOKEN_PROGRAM_ADDRESS, AssociatedTokenInstruction, TOKEN_PROGRAM_ADDRESS, TokenInstruction, identifyAssociatedTokenInstruction, identifyTokenInstruction,
   parseApproveCheckedInstruction, parseApproveInstruction, parseCloseAccountInstruction, parseCreateAssociatedTokenIdempotentInstruction, parseCreateAssociatedTokenInstruction,
@@ -132,10 +132,23 @@ const asIx = (r: Resolved) =>
   ({ programAddress: r.programAddress as Address, accounts: r.accounts.map((a) => ({ address: (a.address ?? ZERO_ADDRESS) as Address, role: a.role })), data: r.data }) as never
 const opt = (o: unknown): string | null => (o && typeof o === 'object' && (o as { __option?: string }).__option === 'Some' ? String((o as { value: unknown }).value) : null)
 
+/** System / Token / Token-2022 instruction name from the data alone (no accounts needed); undefined when undecodable or another program. */
+function coreInstructionName(program: string, data: Uint8Array): string | undefined {
+  try {
+    if (program === SYSTEM_PROGRAM_ADDRESS) return SystemInstruction[identifySystemInstruction(data)]
+    if (program === TOKEN_PROGRAM_ADDRESS) return TokenInstruction[identifyTokenInstruction(data)]
+    if (program === TOKEN_2022_PROGRAM_ADDRESS) return Token2022Instruction[identifyToken2022Instruction(data)]
+  } catch {
+    /* undecodable */
+  }
+  return undefined
+}
+
 function decodeOne(r: Resolved): DecodedInstruction {
   const program = r.programAddress
   if (program === null || r.accounts.some((a) => a.address === null)) {
-    return { type: 'unknown', program, accounts: r.accounts.map((a) => a.address), dataLength: r.data.length }
+    const instruction = program === null ? undefined : coreInstructionName(program, r.data)
+    return { type: 'unknown', program, accounts: r.accounts.map((a) => a.address), dataLength: r.data.length, ...(instruction ? { instruction } : {}) }
   }
   const ix = asIx(r)
   try {
@@ -148,6 +161,11 @@ function decodeOne(r: Resolved): DecodedInstruction {
       if (t === SystemInstruction.CreateAccount) {
         const p = parseCreateAccountInstruction(ix)
         return { type: 'create-account', program, payer: p.accounts.payer.address, newAccount: p.accounts.newAccount.address, lamports: p.data.lamports, owner: p.data.programAddress }
+      }
+      if (t === SystemInstruction.CreateAccountWithSeed) {
+        // The same money movement as CreateAccount: the payer funds an account the owner program controls.
+        const p = parseCreateAccountWithSeedInstruction(ix)
+        return { type: 'create-account', program, payer: p.accounts.payer.address, newAccount: p.accounts.newAccount.address, lamports: p.data.amount, owner: p.data.programAddress }
       }
       return { type: 'program-call', program, accounts: r.accounts.map((a) => a.address as string), dataLength: r.data.length, instruction: SystemInstruction[t] }
     } else if (program === TOKEN_PROGRAM_ADDRESS || program === TOKEN_2022_PROGRAM_ADDRESS) {

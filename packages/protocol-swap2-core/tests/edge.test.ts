@@ -97,6 +97,76 @@ describe("edge: quote expiry", () => {
     expect([log, reviews]).toEqual([["approve", "deposit"], 1]);
   });
 
+  // Audit 2026-10-25 (post-release), M2: the carried pass skipped the review, so a fresh quote
+  // could swap the reviewed calldata / deposit for another one behind the reviewer's back.
+  const requoted = (second: Partial<Quote>) => {
+    let n = 0;
+    return shortLived({getQuote: async (params) => { n += 1; return quote(params, n === 1 ? {validUntilMs: ttl(1)} : {validUntilMs: ttl(2), ...second}); }});
+  };
+  const sentData = (log: string[], data: string[]) => account(log, {
+    waitForTransaction: () => new Promise((r) => setTimeout(r, 80)),
+    sendTransaction: async (tx: {data?: string}) => { data.push(tx.data ?? ""); log.push(tx.data?.startsWith("0x095ea7b3") ? (tx.data.endsWith("0".repeat(64)) ? "revoke" : "approve") : "deposit"); return {hash: `0x${log.length}`}; },
+  });
+
+  it("a re-quote whose source payload changed is reviewed again before anything is signed, and the reviewed payload is sent", async () => {
+    const log: string[] = [];
+    const data: string[] = [];
+    const plans: Swap2ExecutionPlan[] = [];
+    await protocol(requoted({txRequest: {...txRequest, data: "0xbadc0de5"}}), sentData(log, data), {reviewExecution: async (plan) => { plans.push(plan); }}).swap2(options);
+    expect(plans).toHaveLength(2);
+    expect(plans[0]).toMatchObject({source: {kind: "call", data: "0xdeadbeef"}, approvals: [{spender: DIAMOND}]});
+    expect(plans[1]).toMatchObject({source: {kind: "call", data: "0xbadc0de5"}, approvals: [], requoted: true});
+    expect(plans[0]!.requoted).toBeUndefined();
+    expect(log).toEqual(["approve", "deposit"]);
+    expect(data.at(-1)).toBe("0xbadc0de5");
+  });
+
+  it("a re-quote with a worse output, another call target or another gas limit is reviewed again; a better output alone is not", async () => {
+    const run = async (second: Partial<Quote>) => {
+      let reviews = 0;
+      await protocol(requoted(second), slow([]), {reviewExecution: async () => { reviews += 1; }}).swap2(options);
+      return reviews;
+    };
+    expect(await run({destAmount: "985000"})).toBe(2);
+    expect(await run({txRequest: {...txRequest, to: DEPOSIT}})).toBe(2);
+    expect(await run({txRequest: {...txRequest, gasLimit: "900000"}})).toBe(2);
+    expect(await run({destAmount: "995000"})).toBe(1);
+  });
+
+  it("cancelling the second review revokes the allowance exactly once and sends no deposit", async () => {
+    const log: string[] = [];
+    let reviews = 0;
+    const review = async () => { reviews += 1; if (reviews === 2) throw new Error("user cancelled"); };
+    await expect(protocol(requoted({txRequest: {...txRequest, data: "0xbadc0de5"}}), slow(log), {reviewExecution: review}).swap2(options)).rejects.toThrow(/user cancelled/);
+    expect(log).toEqual(["approve", "revoke"]);
+  });
+
+  it("a gas check that fails on the re-quote pass revokes the adopted allowance (review round)", async () => {
+    // The second pass adopts the allowance, then estimates the fresh call; with no approval left to
+    // send, an estimate failure (or too little gas) was rethrown with the allowance left live.
+    for (const failure of ["estimate", "balance"] as const) {
+      const log: string[] = [];
+      const acc = account(log, {
+        waitForTransaction: () => new Promise((r) => setTimeout(r, 80)),
+        // fail only once the approval is mined, i.e. on the re-quote pass
+        getBalance: async () => (failure === "balance" && log.includes("approve") ? 0n : 10n ** 18n),
+        quoteSendTransaction: async () => { if (failure === "estimate" && log.includes("approve")) throw new Error("execution reverted"); return {fee: 1_000n}; },
+      });
+      await expect(protocol(requoted({txRequest: {...txRequest, data: "0xbadc0de5"}}), acc).swap2(options)).rejects.toThrow();
+      expect([failure, log]).toEqual([failure, ["approve", "revoke"]]);
+    }
+  });
+
+  it("a fresh quote that expires during the second review revokes and aborts", async () => {
+    const log: string[] = [];
+    let reviews = 0;
+    const review = async () => { reviews += 1; if (reviews === 2) await new Promise((r) => setTimeout(r, 80)); };
+    const p = requoted({txRequest: {...txRequest, data: "0xbadc0de5"}, validUntilMs: Date.now() + 10_000});
+    const short = provider({...p, getQuote: async (params) => { const q = await p.getQuote(params); return reviews >= 1 && q ? {...q, validUntilMs: Date.now() + 40} : q; }});
+    await expect(protocol(short, slow(log), {reviewExecution: review}).swap2(options)).rejects.toThrow(/expired during review/);
+    expect(log).toEqual(["approve", "revoke"]);
+  });
+
   it("a second expiry (the fresh quote also died) aborts with a typed error and revokes exactly once", async () => {
     const log: string[] = [];
     let quotes = 0;
