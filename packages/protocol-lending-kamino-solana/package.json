@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-lending-kamino-solana",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Kamino for @anywalletkit/wallet-solana accounts: Kamino Earn vaults (kVaults: deposit / withdraw, shares, APY) and Kamino Lend markets (supply, withdraw, borrow, repay against an obligation) as LendingProtocols. Transactions come from Kamino's official API and are signed only after the wallet's serialized-transaction guard proves the programs and the balance changes; positions, APY and TVL from the same API.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

@@ -1,5 +1,26 @@
 # @anywalletkit/keyring
 
+## 0.3.3
+
+### Patch Changes
+
+- 80d6451: Two `addAccount` calls at once no longer hand out one index twice. The next index was picked before the serialized save, so both calls derived and returned account N, and the second one's name was never stored. The index, the derivation and the save now run in one serialized change (the secret is still read once, outside it), and every add returns the metadata as stored. Audit 2026-10-25, #1.2.
+- bf2c90f: Security fixes from the 2026-10-25 audit.
+  
+  - **kit: policies keyed by namespace apply.** `maxFee` / `allowlist` / `blocklist` rules under a namespace key (`eip155`) were documented to cover every chain of the family and were ignored for `eip155:1`. Rules are now looked up by namespace and by exact id, for the asked-for chain and the account's own: every matching fee cap is checked, a destination must be on every matching allowlist, any matching blocklist refuses. An account whose chain id stays unknown gets its namespace rules; an exact-id rule of its family refuses the write (`policy: 'chain'`), and rules of other families no longer refuse it.
+  - **keyring: `removeSource` cannot lose a key.** It deleted the secret before saving the metadata, so a failed save left a source without its secret. The metadata now goes first, with the id in the new `KeyringState.pendingSecretDeletes`; the secret is deleted after, and a failed or interrupted delete is finished by `Keyring.load`. An id still pending cannot be adopted. `SecretStorage.delete` must be idempotent.
+  - **keyring: parallel imports.** The duplicate check and the secret write ran outside the serialized state change, so two imports of one phrase at once could both land. They now run inside it; the second import fails with `duplicate`, and a secret written before a failed save is removed again.
+- 07db4c1: Audit 2026-10-25, findings 16 and 17.
+  
+  - **Number() on bigints.** A real ESLint now runs on every package (`pnpm lint`, in CI): typescript-eslint's `no-floating-promises`, `await-thenable`, `no-misused-promises`, and a local `no-number-bigint` rule (`Number(x)` of a bigint is lossy above 2^53 and garbage on Hermes above 2^63). Its 92 findings are fixed: values that come from outside are range-checked as bigints before they become numbers (a typed-data or transaction `chainId`, token `decimals` in tx-preview, ABI string lengths, protobuf field numbers in Tron, an RPC nonce in extension-kit, the Permit2 lockdown count in kit's policies, Mellow's asset count); sort comparators compare bigints exactly; panic codes print the bigint; display values go through `bigintToNumber`. A `chainId` that is not a safe integer is now refused by wallet-evm before signing (`UnsafeTransactionError`), and `describeTransaction` reports it as a chain mismatch.
+  - **engines.** Every package declares `"engines": { "node": ">=20" }`.
+  - **Peers.** `expo-modules-core` in `backup-cloud` and `secure-storage-react-native` is `^58.0.0` (Expo SDK 58, the version the native modules are tested on) instead of `*`.
+- Updated dependencies [07db4c1]
+- Updated dependencies [80d6451]
+- Updated dependencies [80d6451]
+- Updated dependencies [80d6451]
+  - @anywalletkit/core@0.4.0
+
 ## 0.3.2
 
 ### Patch Changes

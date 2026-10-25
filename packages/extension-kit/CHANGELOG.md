@@ -1,5 +1,34 @@
 # @anywalletkit/extension-kit
 
+## 0.1.3
+
+### Patch Changes
+
+- 95da085: Security fixes from the 2026-10-25 audit.
+  
+  - **A lock is never undone.** A `touch()` that read the session record before a `lock()` removed it wrote it back afterwards, leaving the wallet unlocked. `unlock` / `lock` / `touch` / `getKey` / `isUnlocked` now run one at a time, and a touch writes only when no lock happened since its read.
+  - **Parallel writes keep every change.** `setSecret`, `deleteSecret`, `addPasskey`, `removePasskey`, `changePassword`, the v1 → v2 upgrade on `unlock`, `create` and `destroy` were read-modify-write without a lock, so two imports at once lost a secret. They are serialized per `Vault` (keep one `Vault` per storage area).
+  - **Internal errors stay internal.** `toRelayError` passed any error's message to the dApp page, and viem's messages carry the RPC URL (often with the provider key) and the request body. It now passes `RouterError`, `ReviewDeclined`, a core `UserRejectedError` (4001) and a node's JSON-RPC error (code, node message, revert data) with URLs removed; everything else is `-32603 Internal error`, with the error handed to the new `options.log`.
+  - **Bounded KDF and envelope.** An envelope could ask for any scrypt cost or PBKDF2 iteration count, so an edited vault hung or crashed the worker on unlock. New `VAULT_LIMITS` (scrypt N ≤ 2^20, r ≤ 16, p ≤ 4; ≤ 5 000 000 iterations; ≤ 1 000 secrets of ≤ 16 KiB, ≤ 32 passkeys, ≤ 4 MiB envelope) are checked before any KDF runs (`unsupported-envelope`), by the constructor for its options, and before every write.
+- 07db4c1: Audit 2026-10-25, findings 16 and 17.
+  
+  - **Number() on bigints.** A real ESLint now runs on every package (`pnpm lint`, in CI): typescript-eslint's `no-floating-promises`, `await-thenable`, `no-misused-promises`, and a local `no-number-bigint` rule (`Number(x)` of a bigint is lossy above 2^53 and garbage on Hermes above 2^63). Its 92 findings are fixed: values that come from outside are range-checked as bigints before they become numbers (a typed-data or transaction `chainId`, token `decimals` in tx-preview, ABI string lengths, protobuf field numbers in Tron, an RPC nonce in extension-kit, the Permit2 lockdown count in kit's policies, Mellow's asset count); sort comparators compare bigints exactly; panic codes print the bigint; display values go through `bigintToNumber`. A `chainId` that is not a safe integer is now refused by wallet-evm before signing (`UnsafeTransactionError`), and `describeTransaction` reports it as a chain mismatch.
+  - **engines.** Every package declares `"engines": { "node": ">=20" }`.
+  - **Peers.** `expo-modules-core` in `backup-cloud` and `secure-storage-react-native` is `^58.0.0` (Expo SDK 58, the version the native modules are tested on) instead of `*`.
+- Updated dependencies [80d6451]
+- Updated dependencies [bf2c90f]
+- Updated dependencies [07db4c1]
+- Updated dependencies [80d6451]
+- Updated dependencies [a9a5e0a]
+- Updated dependencies [80d6451]
+- Updated dependencies [80d6451]
+- Updated dependencies [c4dc4d6]
+- Updated dependencies [ed99146]
+  - @anywalletkit/keyring@0.3.3
+  - @anywalletkit/core@0.4.0
+  - @anywalletkit/protocol-swap2-core@0.4.0
+  - @anywalletkit/swap2-assets@0.1.5
+
 ## 0.1.2
 
 ### Patch Changes

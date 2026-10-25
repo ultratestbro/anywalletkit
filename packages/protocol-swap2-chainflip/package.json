@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-chainflip",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Chainflip vault swaps for the swap2 engine: native BTC / ETH / SOL / TRX and USDC / USDT across Ethereum, Arbitrum, Solana, Tron and Bitcoin through Chainflip's public backend (its own broker, 0 bps, no account). Sources in this release: Ethereum, Arbitrum and Tron (a plain USDT transfer to the Vault with the swap in the note — no approval, no 3.4 USDT channel fee). Every byte the encoder returns is decoded and checked before signing; fill-or-kill refunds to the sender.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
