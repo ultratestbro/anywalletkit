@@ -134,16 +134,17 @@ export class Wallet {
   }
 
   /**
-   * Account `index` on `chain`, wrapped with the wallet's policies. An account that reports another
-   * network than `chain` (one namespace registration, its RPC elsewhere) is refused here; one that
-   * learns its network lazily is checked by the policies before each write.
+   * Account `index` on `chain`, wrapped with the wallet's policies. Its writes are refused
+   * (`PolicyViolationError`, `policy: 'chain'`) when the account signs on another network than
+   * `chain` — one namespace registration with its RPC elsewhere — with or without policies; its
+   * reads (the address is the same across a family) keep working, so history and activity do.
    */
   async getAccount<A extends IWalletAccount = IWalletAccount>(chain: string, index = 0): Promise<A> {
     const account = (await this.getManager(chain).getAccount(index)) as A
-    if (isConcreteChain(chain) && isConcreteChain(account.chain) && !sameChain(chain, account.chain)) {
-      throw new Error(`Asked for an account on ${chain}, but the wallet registered for it signs on ${account.chain}. Register ${chain} with its own RPC.`)
-    }
-    return this._policies ? applyPolicies(account, this._policies, chain) : account
+    if (this._policies) return applyPolicies(account, this._policies, chain)
+    // No policies: still guard the network when it is not known to match.
+    const matches = isConcreteChain(account.chain) && sameChain(chain, account.chain)
+    return isConcreteChain(chain) && !matches ? applyPolicies(account, {}, chain) : account
   }
 
   /** The protocol instance (one per name), constructed over the account of its chain. */

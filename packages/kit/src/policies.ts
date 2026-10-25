@@ -335,9 +335,11 @@ function typedDataIntent(base: IntentBase, arg: unknown, primaryType: string): D
 function withDestinations(intent: DraftIntent): WriteIntent {
   if (intent.message) return { ...intent, destinations: [], destinationUnknown: false }
   if (intent.kind === 'approval') {
-    // Raw approval calldata (sendTransaction / signTransaction): the contract called is checked as well as the spender.
-    const called = intent.method === 'sendTransaction' || intent.method === 'signTransaction' ? str(obj(intent.raw).to) : undefined
-    return { ...intent, destinations: [...(called !== undefined ? [called] : []), ...(intent.to !== undefined ? [intent.to] : [])], destinationUnknown: intent.to === undefined }
+    // Raw approval calldata (sendTransaction / signTransaction, one call or a one-call batch):
+    // the contract called is checked as well as the spender.
+    const raw = intent.method === 'sendTransaction' || intent.method === 'signTransaction' ? (Array.isArray(intent.raw) ? intent.raw : [intent.raw]) : []
+    const called = raw.flatMap((c) => { const to = str(obj(c).to); return to !== undefined ? [to] : [] })
+    return { ...intent, destinations: [...called, ...(intent.to !== undefined ? [intent.to] : [])], destinationUnknown: intent.to === undefined }
   }
   if (intent.kind === 'revoke') return { ...intent, destinations: revokeTargets(intent), destinationUnknown: false }
   if (intent.method === 'transfer') {
@@ -446,7 +448,8 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     // "eip155:unknown": learn the chain id now (audit F4), before any rule, confirm or signature.
     let actual = isConcreteChain(account.chain) ? account.chain : undefined
     const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
-    if (actual === undefined && typeof getChainId === 'function') actual = `${ns}:${await getChainId.call(account)}`
+    // An account that cannot answer (no provider: it signs offline) is judged by the rules of `chain`, as before.
+    if (actual === undefined && typeof getChainId === 'function') actual = await getChainId.call(account).then((id) => `${ns}:${id}`, () => undefined)
     // Asked for one network, signing on another (a namespace registration whose RPC is elsewhere):
     // confirm would show the wrong chain and the rules of the wrong chain would judge it (audit #7).
     if (isConcreteChain(chain) && actual !== undefined && !sameChain(chain, actual)) {
@@ -479,20 +482,21 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         if (hit) throw new PolicyViolationError('blocklist', `Contract ${hit} is on the ${k} blocklist.`)
       }
     } else if (!intent.message) {
-      const what = intent.kind === 'approval' ? 'Spender' : 'Destination'
+      // The spender of an approval, or a recipient / contract called (raw approval calldata has both).
+      const what = (d: string | undefined) => (intent.kind === 'approval' && d !== undefined && d === intent.to ? 'Spender' : 'Destination')
       // Each matching allowlist must hold every destination (their intersection); any matching blocklist refuses (their union).
       for (const k of keys) {
         const allow = listed(k, policies.allowlist?.[k])
         if (allow) {
           const outside = intent.destinations.find((d) => !allow.has(canonicalAddress(k, d)))
           if (outside !== undefined || intent.destinations.length === 0 || intent.destinationUnknown) {
-            throw new PolicyViolationError('allowlist', `${what} ${outside ?? '(unknown)'} is not on the ${k} allowlist.`)
+            throw new PolicyViolationError('allowlist', `${what(outside)} ${outside ?? '(unknown)'} is not on the ${k} allowlist.`)
           }
         }
         const block = listed(k, policies.blocklist?.[k])
         if (block) {
           const hit = intent.destinations.find((d) => block.has(canonicalAddress(k, d)))
-          if (hit !== undefined) throw new PolicyViolationError('blocklist', `${what} ${hit} is on the ${k} blocklist.`)
+          if (hit !== undefined) throw new PolicyViolationError('blocklist', `${what(hit)} ${hit} is on the ${k} blocklist.`)
           // Fail closed only when nobody else can look (scan F16); with a confirm hook it sees destinationUnknown.
           if (intent.destinationUnknown && !policies.confirm) throw new PolicyViolationError('blocklist', `Cannot tell every destination of this ${intent.method} on ${k}, and the ${k} blocklist is on with no confirm hook to ask.`)
         }

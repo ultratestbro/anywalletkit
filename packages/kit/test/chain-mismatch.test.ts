@@ -38,11 +38,13 @@ describe('requested chain ≠ the chain the account signs on', () => {
     expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ chain: 'eip155:1' }))
   })
 
-  it('Wallet.getAccount refuses a known mismatch even without policies; a lazy one is refused at write time', async () => {
+  it('Wallet.getAccount: a known mismatch reads but never writes, even without policies; a lazy one is refused at write time', async () => {
     const plain = new Wallet(SEED)
     plain.registerWallet('eip155', OnChain, { chain: 'eip155:1' })
-    await expect(plain.getAccount('eip155:8453')).rejects.toThrow(/eip155:1.*eip155:8453|eip155:8453.*eip155:1/)
-    expect(await (await plain.getAccount('eip155:1')).getAddress()).toBeTruthy()
+    const onBase = await plain.getAccount('eip155:8453')
+    expect(await onBase.getAddress()).toBeTruthy()
+    await expect(onBase.sendTransaction(send())).rejects.toMatchObject({ policy: 'chain' })
+    await expect((await plain.getAccount('eip155:1')).sendTransaction(send())).resolves.toBeDefined()
 
     const confirm = vi.fn(async () => true)
     const guarded = new Wallet(SEED, { policies: { confirm } })
@@ -69,6 +71,6 @@ describe('requested chain ≠ the chain the account signs on', () => {
     w.registerWallet('solana', OnChain, { chain: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp' })
     const sol = await w.getAccount('solana:mainnet')
     await expect(sol.transfer({ recipient: 'x', amount: 1n })).resolves.toBeDefined()
-    await expect(w.getAccount('solana:devnet')).rejects.toThrow()
+    await expect((await w.getAccount('solana:devnet')).transfer({ recipient: 'x', amount: 1n })).rejects.toMatchObject({ policy: 'chain' })
   })
 })
