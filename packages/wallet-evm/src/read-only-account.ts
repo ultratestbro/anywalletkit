@@ -267,11 +267,35 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
 
   /** True when `signature` is this address's EIP-712 signature of `typed`. */
   async verifyTypedData(typed: TypedDataInput, signature: string): Promise<boolean> {
-    const types = cleanTypes(typed.types)
-    const hash = hashTypedData({ domain: typed.domain, types, primaryType: typed.primaryType ?? inferPrimaryType(types), message: typed.message } as never)
-    const recovered = await recoverAddress({ hash, signature: signature as Hex })
+    const recovered = await recoverAddress({ hash: typedDataHash(typed), signature: signature as Hex })
     return recovered.toLowerCase() === this.address.toLowerCase()
   }
+}
+
+/** EIP-712 domain chainId in any notation a dApp sends (number, bigint, decimal or hex string) → number. */
+export function typedDomainChainId(raw: unknown): number | undefined {
+  if (typeof raw === 'number') return Number.isSafeInteger(raw) ? raw : undefined
+  if (typeof raw === 'bigint') return raw <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(raw.toString()) : undefined
+  if (typeof raw === 'string' && /^\d+$/.test(raw)) return Number(raw)
+  if (typeof raw === 'string' && /^0x[0-9a-fA-F]+$/.test(raw)) {
+    const n = BigInt(raw)
+    return n <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(n.toString()) : undefined
+  }
+  return undefined
+}
+
+/**
+ * The EIP-712 digest `signTypedData` signs and `verifyTypedData` checks — one function, so the
+ * two cannot disagree (audit 2026-10-25, #1.6). viem includes `chainId` in the EIP712Domain type
+ * only when it is a number: a dApp that sends it as a hex or decimal STRING (Omniston's 1inch
+ * orders: "0x89") would otherwise be hashed over a domain WITHOUT chainId — a signature no
+ * verifying contract accepts.
+ */
+export function typedDataHash(typed: TypedDataInput): Hex {
+  const types = cleanTypes(typed.types)
+  const chainId = typedDomainChainId(typed.domain.chainId)
+  const domain = chainId === undefined ? typed.domain : { ...typed.domain, chainId }
+  return hashTypedData({ domain, types, primaryType: typed.primaryType ?? inferPrimaryType(types), message: typed.message } as never)
 }
 
 /** Helper for callers that pass bytes where a string is expected. */
