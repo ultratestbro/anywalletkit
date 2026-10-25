@@ -55,6 +55,13 @@ export class Session {
   private readonly _alarm: string
   private readonly _now: () => number
   private readonly _onLock = new Set<() => void>()
+  /**
+   * Every operation on the stored record runs here, one after another: a `touch` that read the
+   * record before a `lock` removed it would otherwise write it back and undo the lock.
+   */
+  private _queue: Promise<unknown> = Promise.resolve()
+  /** Bumped by every lock; a `touch` writes only when no lock happened since it read the record. */
+  private _epoch = 0
 
   constructor(options: SessionOptions) {
     this._storage = options.storage
@@ -70,22 +77,21 @@ export class Session {
   /** Store the DEK and arm the auto-lock. The caller's copy is zeroized. */
   async unlock(dek: Uint8Array): Promise<void> {
     if (dek.length !== 32) throw new VaultError('Vault key must be 32 bytes.', 'invalid-input')
-    const expiresAt = this._expiry()
-    await this._storage.set(this._key, { key: toBase64(dek), expiresAt } satisfies SessionRecord)
-    zeroize(dek)
-    await this._arm(expiresAt)
+    return this._serial(async () => {
+      const expiresAt = this._expiry()
+      await this._storage.set(this._key, { key: toBase64(dek), expiresAt } satisfies SessionRecord)
+      zeroize(dek)
+      await this._arm(expiresAt)
+    })
   }
 
   /** Forget the DEK and cancel the alarm. Safe to call when already locked. */
   async lock(): Promise<void> {
-    const was = await this._storage.get(this._key)
-    await this._storage.remove(this._key)
-    await this._alarms.clear(this._alarm)
-    if (was !== undefined && was !== null) for (const cb of this._onLock) cb()
+    return this._serial(() => this._lockNow())
   }
 
   async isUnlocked(): Promise<boolean> {
-    return (await this._read()) !== null
+    return this._serial(async () => (await this._read()) !== null)
   }
 
   /**
@@ -94,18 +100,23 @@ export class Session {
    * a missed alarm cannot keep the key alive.
    */
   async getKey(): Promise<Uint8Array> {
-    const record = await this._read()
-    if (!record) throw new VaultError('Wallet is locked.', 'locked')
-    return fromBase64(record.key)
+    return this._serial(async () => {
+      const record = await this._read()
+      if (!record) throw new VaultError('Wallet is locked.', 'locked')
+      return fromBase64(record.key)
+    })
   }
 
   /** User activity: push the auto-lock out again. No-op when locked. */
   async touch(): Promise<void> {
-    const record = await this._read()
-    if (!record) return
-    const expiresAt = this._expiry()
-    await this._storage.set(this._key, { ...record, expiresAt } satisfies SessionRecord)
-    await this._arm(expiresAt)
+    return this._serial(async () => {
+      const epoch = this._epoch
+      const record = await this._read()
+      if (!record || epoch !== this._epoch) return
+      const expiresAt = this._expiry()
+      await this._storage.set(this._key, { ...record, expiresAt } satisfies SessionRecord)
+      await this._arm(expiresAt)
+    })
   }
 
   get autoLockMs(): number {
@@ -124,6 +135,21 @@ export class Session {
     return () => this._onLock.delete(callback)
   }
 
+  private _serial<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this._queue.then(fn)
+    this._queue = run.catch(() => undefined)
+    return run
+  }
+
+  /** The lock itself; callers are already in the queue. */
+  private async _lockNow(): Promise<void> {
+    this._epoch++
+    const was = await this._storage.get(this._key)
+    await this._storage.remove(this._key)
+    await this._alarms.clear(this._alarm)
+    if (was !== undefined && was !== null) for (const cb of this._onLock) cb()
+  }
+
   private _expiry(): number {
     return this._autoLockMs > 0 ? this._now() + this._autoLockMs : Number.POSITIVE_INFINITY
   }
@@ -136,7 +162,7 @@ export class Session {
   private async _read(): Promise<SessionRecord | null> {
     const raw = (await this._storage.get(this._key)) as Partial<SessionRecord> | undefined | null
     if (!raw || typeof raw.key !== 'string' || typeof raw.expiresAt !== 'number') return null
-    if (raw.expiresAt <= this._now()) { await this.lock(); return null }
+    if (raw.expiresAt <= this._now()) { await this._lockNow(); return null }
     return raw as SessionRecord
   }
 }

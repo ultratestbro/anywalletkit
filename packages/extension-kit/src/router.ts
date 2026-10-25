@@ -16,6 +16,7 @@
  * Errors leave as {@link RouterError} (EIP-1193 codes) or {@link ReviewDeclined}
  * (4001); the service worker turns both into a `RelayResponse.error`.
  */
+import { UserRejectedError } from '@anywalletkit/core'
 import { ApprovalQueue, ReviewDeclined } from './approvals.js'
 import { DEFAULT_CHAIN, NetworksTable, caip2FromChainId, chainHex, parseAddChainParams, type EvmNetwork } from './networks.js'
 import { PermissionStore, type OriginPermission } from './permissions.js'
@@ -35,12 +36,59 @@ export class RouterError extends Error {
   }
 }
 
-/** Any error → the `RelayError` for the page. Unknown errors keep their message but never their stack. */
-export function toRelayError(e: unknown): RelayError {
-  if (e instanceof RouterError) return e.data === undefined ? { code: e.code, message: e.message } : { code: e.code, message: e.message, data: e.data }
-  if (e instanceof ReviewDeclined) return { code: e.code, message: e.message }
-  const code = typeof (e as { code?: unknown })?.code === 'number' ? (e as { code: number }).code : RELAY_ERRORS.internal
-  return { code, message: e instanceof Error ? e.message : String(e) }
+/** Options for {@link toRelayError}. */
+export interface RelayErrorOptions {
+  /** Gets every error that is NOT passed to the page, in full — the extension's own log. */
+  log?: (error: unknown) => void
+}
+
+/** EIP-1193 provider codes a wallet error may carry to the page. */
+const PROVIDER_CODES: ReadonlySet<number> = new Set([4001, 4100, 4200, 4900, 4901, 4902])
+/** A node's JSON-RPC error: execution reverted (3) or the reserved -32768…-32000 range. */
+const isNodeCode = (code: unknown): code is number => typeof code === 'number' && Number.isInteger(code) && (code === 3 || (code >= -32768 && code <= -32000))
+const URL_RE = /\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>()]+/gi
+/** A message as a page may see it: no URLs (RPC keys live in their paths and queries), one line, bounded. */
+const pageText = (text: string): string => text.replace(URL_RE, '[url]').split('\n')[0]!.slice(0, 300)
+const isHexData = (v: unknown): v is string => typeof v === 'string' && /^0x[0-9a-fA-F]*$/.test(v) && v.length <= 2 + 2 * 8192
+
+/**
+ * The node's own JSON-RPC error inside `e`, if there is one: viem's `RpcRequestError` (alone or
+ * under a typed RPC error) carries the node's code, message (`details`) and data, while its
+ * `message` adds the URL and the request body; a fetch-based transport may throw the bare
+ * `{code, message, data}` object.
+ */
+function nodeError(e: unknown): RelayError | undefined {
+  for (let cur: unknown = e, depth = 0; cur && typeof cur === 'object' && depth < 8; cur = (cur as { cause?: unknown }).cause, depth++) {
+    const o = cur as { name?: unknown; code?: unknown; details?: unknown; shortMessage?: unknown; message?: unknown; data?: unknown }
+    if (o.name === 'RpcRequestError' && isNodeCode(o.code)) {
+      const text = typeof o.details === 'string' && o.details ? o.details : typeof o.shortMessage === 'string' ? o.shortMessage : 'RPC error'
+      return { code: o.code, message: pageText(text), ...(isHexData(o.data) ? { data: o.data } : {}) }
+    }
+  }
+  if (!(e instanceof Error) && typeof e === 'object' && e !== null) {
+    const o = e as { code?: unknown; message?: unknown; data?: unknown }
+    if (isNodeCode(o.code) && typeof o.message === 'string') return { code: o.code, message: pageText(o.message), ...(isHexData(o.data) ? { data: o.data } : {}) }
+  }
+  return undefined
+}
+
+/**
+ * Any error → the `RelayError` for the page. Wallet refusals keep their EIP-1193 code
+ * ({@link RouterError}, {@link ReviewDeclined}, a core `UserRejectedError` → 4001), a node's own
+ * JSON-RPC error keeps its code and revert data; their messages lose URLs. Everything else is
+ * `-32603 Internal error` on the page and goes to `options.log` in full — transport errors name
+ * the RPC URL (often with the provider key in it) and the request.
+ */
+export function toRelayError(e: unknown, options: RelayErrorOptions = {}): RelayError {
+  if (e instanceof RouterError) return e.data === undefined ? { code: e.code, message: pageText(e.message) } : { code: e.code, message: pageText(e.message), data: e.data }
+  if (e instanceof ReviewDeclined) return { code: e.code, message: pageText(e.message) }
+  if (e instanceof UserRejectedError) return { code: RELAY_ERRORS.userRejected, message: pageText(e.message) }
+  const node = nodeError(e)
+  if (node) return node
+  const code = (e as { code?: unknown } | null)?.code
+  if (e instanceof Error && typeof code === 'number' && PROVIDER_CODES.has(code)) return { code, message: pageText(e.message) }
+  options.log?.(e)
+  return { code: RELAY_ERRORS.internal, message: 'Internal error' }
 }
 
 /** Read-only methods answered from our RPC without asking the user. */

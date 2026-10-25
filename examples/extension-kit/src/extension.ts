@@ -189,7 +189,9 @@ export function onPort({ router, ports }: WorkerParts, port: PortLike) {
     try {
       response = { kind: 'response', id: message.id, result: (await router.handle(trusted, message.chain, message.method, message.params)) ?? null }
     } catch (e) {
-      response = { kind: 'response', id: message.id, error: toRelayError(e) } // EIP-1193 code and message
+      // The page gets the EIP-1193 code and a URL-free message; anything internal is
+      // "Internal error" there, and the details stay in the extension's own log.
+      response = { kind: 'response', id: message.id, error: toRelayError(e, { log: (err) => console.error('[wallet] request failed', err) }) }
     }
     post(response)
   })

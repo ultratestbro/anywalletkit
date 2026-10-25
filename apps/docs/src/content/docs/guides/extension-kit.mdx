@@ -65,6 +65,7 @@ unlocked session; a locked session throws `VaultError` with the code `locked`.
 | `locked` | A secret was read after the session locked |
 | `exists` | `create` while a vault exists |
 | `weak-kdf` | The stored KDF settings are below the floor this build accepts |
+| `unsupported-envelope` | An envelope of an unknown shape, or one whose KDF cost or size is above `VAULT_LIMITS` (refused before any KDF runs) |
 | `invalid-input` | Empty or short password, bad key length, bad id |
 
 A passkey is a second key to the same vault, not a replacement for the password. Keep the
@@ -93,7 +94,10 @@ What the router does with a request:
 
 Errors come back as EIP-1193 codes: `4001` the user declined, `4100` unauthorized, `4900`
 disconnected, `-32002` a connect request is already waiting, `-32005` too many waiting
-requests.
+requests. A node's own error (a revert: code `3` with its data) passes through without the
+RPC URL. Anything else reaches the page as `-32603 Internal error`: pass `log` to
+`toRelayError` to keep the details in the extension's console, since transport errors name
+the RPC URL and often the provider key in it.
 
 The signer is built for one signature and its key is wiped right after (`handle.dispose()`).
 Pass a `preview` function to `createSignHandler` to show a simulation in the approval window;
