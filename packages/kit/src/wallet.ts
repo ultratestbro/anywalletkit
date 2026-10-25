@@ -1,4 +1,5 @@
 import { copyBytes, isValidSeedPhrase, normalizeMnemonic, seedFromMnemonicSync, zeroize, type ActivityItem, type ChainTx, type DescribeActivityContext, type HistorySource, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type WalletManager } from '@anywalletkit/core'
+import { isConcreteChain, sameChain } from './chain-id.js'
 import { applyPolicies, type Policies } from './policies.js'
 import { buildFeed, describeSingle, type ActivityOptions, type ActivityRecognizer, type FeedAddress, type FeedItem, type HistoryFeedPage, type HistoryFeedQuery } from './activity/feed.js'
 import type { IntentJournal } from './activity/journal.js'
@@ -132,9 +133,16 @@ export class Wallet {
     return reg.manager as M
   }
 
-  /** Account `index` on `chain`, wrapped with the wallet's policies. */
+  /**
+   * Account `index` on `chain`, wrapped with the wallet's policies. An account that reports another
+   * network than `chain` (one namespace registration, its RPC elsewhere) is refused here; one that
+   * learns its network lazily is checked by the policies before each write.
+   */
   async getAccount<A extends IWalletAccount = IWalletAccount>(chain: string, index = 0): Promise<A> {
     const account = (await this.getManager(chain).getAccount(index)) as A
+    if (isConcreteChain(chain) && isConcreteChain(account.chain) && !sameChain(chain, account.chain)) {
+      throw new Error(`Asked for an account on ${chain}, but the wallet registered for it signs on ${account.chain}. Register ${chain} with its own RPC.`)
+    }
     return this._policies ? applyPolicies(account, this._policies, chain) : account
   }
 

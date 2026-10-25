@@ -33,10 +33,10 @@ describe('Wallet (kit)', () => {
     w.registerWallet('solana:devnet', FakeManager, { chain: 'solana:devnet' })
     expect(FakeManager.built).toBe(0)
     const a = await w.getAccount('eip155:1')
-    const b = await w.getAccount('eip155:137') // namespace match
+    // namespace match, but this manager's accounts are on eip155:1: never hand one out as Polygon (audit #7)
+    await expect(w.getAccount('eip155:137')).rejects.toThrow(/signs on eip155:1/)
     expect(FakeManager.built).toBe(1)
     expect(await a.getAddress()).toBe('addr-eip155:1-m/0')
-    expect(await b.getAddress()).toBe(await a.getAddress())
     await expect(w.getAccount('ton:-239')).rejects.toThrow(/No wallet registered/)
     expect(() => w.registerWallet('eip155', FakeManager, { chain: 'x' })).toThrow(/already registered/)
     w.dispose()
@@ -102,12 +102,12 @@ describe('policies', () => {
     // No policies configured: nothing to pick, nothing refused.
     await expect(applyPolicies(blind, {}).transfer({ recipient: dest, amount: 1n })).resolves.toBeDefined()
   })
-  it('a mismatched account (namespace registration on another network) answers to the rules of both chains', async () => {
+  it('a mismatched account (namespace registration on another network) is refused before any rule or confirm (audit #7)', async () => {
     const acc = createMockAccount({ chain: 'eip155:1' })
-    const guarded = applyPolicies(acc, { blocklist: { 'eip155:8453': [dest] } }, 'eip155:8453')
-    await expect(guarded.transfer({ recipient: dest, amount: 1n })).rejects.toThrow(/eip155:8453 blocklist/)
-    const other = applyPolicies(acc, { blocklist: { 'eip155:1': [dest] } }, 'eip155:8453')
-    await expect(other.transfer({ recipient: dest, amount: 1n })).rejects.toThrow(/eip155:1 blocklist/)
+    const confirm = vi.fn(async () => true)
+    await expect(applyPolicies(acc, { blocklist: { 'eip155:8453': [dest] }, confirm }, 'eip155:8453').transfer({ recipient: dest, amount: 1n })).rejects.toMatchObject({ policy: 'chain' })
+    await expect(applyPolicies(acc, {}, 'eip155:8453').transfer({ recipient: dest, amount: 1n })).rejects.toMatchObject({ policy: 'chain' })
+    expect(confirm).not.toHaveBeenCalled()
     expect(acc.sent).toHaveLength(0)
   })
   it('Wallet.getAccount hands the requested chain to the policies', async () => {

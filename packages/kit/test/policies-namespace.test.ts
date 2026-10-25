@@ -53,12 +53,13 @@ describe('policies keyed by namespace', () => {
     expect(lazy.sent).toHaveLength(0)
   })
 
-  it('asked-for chain ≠ account.chain: the namespace rules and both exact ids apply', async () => {
+  it('asked-for chain ≠ account.chain: refused whatever the rules say (audit #7)', async () => {
     const acc = createMockAccount({ chain: 'eip155:1', fee: 500n })
-    await expect(applyPolicies(acc, { blocklist: { eip155: [DEST] } }, 'eip155:8453').sendTransaction(send())).rejects.toThrow(/eip155 blocklist/)
-    await expect(applyPolicies(acc, { allowlist: { eip155: [DEST], 'eip155:8453': [DEST], 'eip155:1': [OTHER] } }, 'eip155:8453').sendTransaction(send())).rejects.toThrow(/eip155:1 allowlist/)
-    await expect(applyPolicies(acc, { maxFee: { 'eip155:8453': 100n } }, 'eip155:8453').sendTransaction(send())).rejects.toThrow(/eip155:8453 cap/)
+    await expect(applyPolicies(acc, { blocklist: { eip155: [OTHER] } }, 'eip155:8453').sendTransaction(send())).rejects.toMatchObject({ policy: 'chain' })
+    await expect(applyPolicies(acc, { allowlist: { eip155: [DEST] } }, 'eip155:8453').sendTransaction(send())).rejects.toMatchObject({ policy: 'chain' })
     expect(acc.sent).toHaveLength(0)
+    // the asked-for chain itself: its namespace and exact rules apply as usual
+    await expect(applyPolicies(acc, { maxFee: { 'eip155:1': 100n } }, 'eip155:1').sendTransaction(send())).rejects.toThrow(/eip155:1 cap/)
   })
 
   it('revokes: a namespace blocklist still covers the contract a revoke calls', async () => {

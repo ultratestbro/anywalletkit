@@ -1,4 +1,5 @@
 export * from './policies.js'
+export { sameChain } from './chain-id.js'
 export * from './wallet.js'
 export * from './activity/generic.js'
 export * from './activity/journal.js'

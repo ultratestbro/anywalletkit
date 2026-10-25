@@ -1,4 +1,5 @@
 import { UserRejectedError, type IWalletAccount, type TransferOptions } from '@anywalletkit/core'
+import { isConcreteChain, sameChain } from './chain-id.js'
 import { canonicalAddress, sendDestinations } from './destinations.js'
 
 /**
@@ -423,23 +424,32 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
  * check and is not confirmed a second time.
  *
  * `chain` is the CAIP-2 id the account was asked for (`Wallet.getAccount`
- * passes it). The rules of that id AND of `account.chain` both apply: an EVM
- * account built without `chainId` reports "eip155:unknown" until its first
- * RPC call, and a namespace registration can hand out an account whose RPC
- * is on another network than the one asked for — neither may let a write
- * slip past the rules written for the chain the app meant.
+ * passes it). Before any rule or `confirm`, the account's own network is
+ * settled — an EVM account built without `chainId` reports "eip155:unknown"
+ * until its first RPC call, so `getChainId()` is asked — and a write whose
+ * account is on another network than `chain` (a namespace registration with
+ * the RPC elsewhere) is refused with `PolicyViolationError('chain')`: confirm
+ * would show one chain while the signature is for another. Short and
+ * genesis spellings of one network match (see `sameChain`). An account that
+ * cannot tell its network answers to the rules of `chain`.
  */
 export function applyPolicies<A extends IWalletAccount>(account: A, policies: Policies, chain?: string): A {
-  const chainsOf = () => [...new Set([chain, account.chain].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
   const rules = [policies.maxFee, policies.allowlist, policies.blocklist]
   const hasRuleFor = (key: (k: string) => boolean) => rules.some((m) => m !== undefined && Object.keys(m).some(key))
   const guard = async (method: WriteMethod, arg: unknown) => {
-    let chains = chainsOf()
     const ns = account.chain.split(':')[0]!
+    // The network the write really goes to. An EVM account that has not asked its RPC yet reports
+    // "eip155:unknown": learn the chain id now (audit F4), before any rule, confirm or signature.
+    let actual = isConcreteChain(account.chain) ? account.chain : undefined
+    const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
+    if (actual === undefined && typeof getChainId === 'function') actual = `${ns}:${await getChainId.call(account)}`
+    // Asked for one network, signing on another (a namespace registration whose RPC is elsewhere):
+    // confirm would show the wrong chain and the rules of the wrong chain would judge it (audit #7).
+    if (isConcreteChain(chain) && actual !== undefined && !sameChain(chain, actual)) {
+      throw new PolicyViolationError('chain', `This account signs on ${actual}, not on ${chain} it was asked for; nothing was signed.`)
+    }
+    const chains = [...new Set([chain, actual].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
     if (chains.length === 0 && hasRuleFor((k) => k === ns || k.startsWith(`${ns}:`))) {
-      // Called without `chain` on an EVM account that has not asked its RPC yet: learn the chain id now (audit F4).
-      const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
-      if (account.chain.endsWith(':unknown') && typeof getChainId === 'function') chains = [`${ns}:${await getChainId.call(account)}`]
       // Still unknown: the namespace's own rules need no chain id, but an exact rule of this family
       // could be the account's chain — refuse instead of letting the write through unchecked.
       if (chains.length === 0 && hasRuleFor((k) => k.startsWith(`${ns}:`))) {
