@@ -1,0 +1,130 @@
+{
+  "note": "Partial unstake: AllocateWithSeed + Split + Deactivate (mainnet 2026-10-26)",
+  "own": [
+    "BFmkRYJu3GgwhjMfoJFDzAaEzTi2YqKEhdeFULDQJ4A2"
+  ],
+  "tx": {
+    "chain": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    "hash": "4NfPuPj5VYNm93eFkJcvWLF7sxdfBo94Ewpun5ond4LJ24vP8nqhsGcAz3MRCbgVEPUxgcDEU4z9N6mAHurMz6M8",
+    "time": 1792957914,
+    "status": "confirmed",
+    "address": "BFmkRYJu3GgwhjMfoJFDzAaEzTi2YqKEhdeFULDQJ4A2",
+    "from": "BFmkRYJu3GgwhjMfoJFDzAaEzTi2YqKEhdeFULDQJ4A2",
+    "to": "Stake11111111111111111111111111111111111111",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": null,
+        "from": "HB8FgfUd4jN7LJy9fgo8E8BmE2A1JScVA3F18YYKNhhV",
+        "to": "xstQFSnKW3NBDJDALFFbbCNWku9jdQeeHeWA2XRRTNe",
+        "amount": "1020000000"
+      },
+      {
+        "token": null,
+        "from": "BFmkRYJu3GgwhjMfoJFDzAaEzTi2YqKEhdeFULDQJ4A2",
+        "to": "xstQFSnKW3NBDJDALFFbbCNWku9jdQeeHeWA2XRRTNe",
+        "amount": "1666240"
+      }
+    ],
+    "fee": "25000",
+    "block": "461382620",
+    "raw": {
+      "tx": {
+        "transaction": {
+          "message": {
+            "instructions": [
+              {
+                "programId": "ComputeBudget111111111111111111111111111111",
+                "accounts": [],
+                "data": "HMypLP",
+                "stackHeight": 1
+              },
+              {
+                "programId": "ComputeBudget111111111111111111111111111111",
+                "accounts": [],
+                "data": "3Sy41WEwNLnT",
+                "stackHeight": 1
+              },
+              {
+                "program": "system",
+                "programId": "11111111111111111111111111111111",
+                "parsed": {
+                  "type": "allocateWithSeed",
+                  "info": {
+                    "account": "xstQFSnKW3NBDJDALFFbbCNWku9jdQeeHeWA2XRRTNe",
+                    "base": "BFmkRYJu3GgwhjMfoJFDzAaEzTi2YqKEhdeFULDQJ4A2",
+                    "owner": "Stake11111111111111111111111111111111111111",
+                    "seed": "ec94722fa739fe364c29951ae46b48",
+                    "space": 200
+                  }
+                },
+                "stackHeight": 1
+              },
+              {
+                "program": "system",
+                "programId": "11111111111111111111111111111111",
+                "parsed": {
+                  "type": "transfer",
+                  "info": {
+                    "destination": "xstQFSnKW3NBDJDALFFbbCNWku9jdQeeHeWA2XRRTNe",
+                    "lamports": 1666240,
+                    "source": "BFmkRYJu3GgwhjMfoJFDzAaEzTi2YqKEhdeFULDQJ4A2"
+                  }
+                },
+                "stackHeight": 1
+              },
+              {
+                "program": "stake",
+                "programId": "Stake11111111111111111111111111111111111111",
+                "parsed": {
+                  "type": "split",
+                  "info": {
+                    "lamports": 1020000000,
+                    "newSplitAccount": "xstQFSnKW3NBDJDALFFbbCNWku9jdQeeHeWA2XRRTNe",
+                    "stakeAccount": "HB8FgfUd4jN7LJy9fgo8E8BmE2A1JScVA3F18YYKNhhV",
+                    "stakeAuthority": "BFmkRYJu3GgwhjMfoJFDzAaEzTi2YqKEhdeFULDQJ4A2"
+                  }
+                },
+                "stackHeight": 1
+              },
+              {
+                "program": "stake",
+                "programId": "Stake11111111111111111111111111111111111111",
+                "parsed": {
+                  "type": "deactivate",
+                  "info": {
+                    "clockSysvar": "SysvarC1ock11111111111111111111111111111111",
+                    "stakeAccount": "xstQFSnKW3NBDJDALFFbbCNWku9jdQeeHeWA2XRRTNe",
+                    "stakeAuthority": "BFmkRYJu3GgwhjMfoJFDzAaEzTi2YqKEhdeFULDQJ4A2"
+                  }
+                },
+                "stackHeight": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    "call": {
+      "to": "Stake11111111111111111111111111111111111111",
+      "programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "ComputeBudget111111111111111111111111111111",
+        "11111111111111111111111111111111",
+        "11111111111111111111111111111111",
+        "Stake11111111111111111111111111111111111111",
+        "Stake11111111111111111111111111111111111111"
+      ]
+    }
+  },
+  "expect": {
+    "kind": "unstake",
+    "title": "Requested unstake",
+    "assetsOut": [
+      {
+        "token": null,
+        "amount": "1666240"
+      }
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+{
+ "module": "@anywalletkit/protocol-staking-native-solana",
+ "sources": {
+  "stake-program-releases": {
+   "type": "github-releases",
+   "value": "js@v0.11.0",
+   "meta": {
+    "tag": "js@v0.11.0",
+    "name": "js@v0.11.0",
+    "at": "2026-10-16",
+    "url": "https://github.com/solana-program/stake/releases/tag/js%40v0.11.0",
+    "prerelease": false
+   },
+   "seenAt": "2026-10-25T20:21:40.591Z",
+   "changedAt": "2026-10-25T20:21:40.591Z"
+  },
+  "stake-program": {
+   "type": "solana-program",
+   "value": "{\"authority\":null,\"programData\":\"6WU8Nxarf9fudRK5atWwjLY4vFaw5UrrWhL88qz7iCMJ\",\"slot\":443232000}",
+   "meta": {
+    "programData": "6WU8Nxarf9fudRK5atWwjLY4vFaw5UrrWhL88qz7iCMJ",
+    "slot": 443232000,
+    "authority": null
+   },
+   "seenAt": "2026-10-25T20:21:40.819Z",
+   "changedAt": "2026-10-25T20:21:40.819Z"
+  },
+  "docs-stake-accounts": {
+   "type": "http-text",
+   "value": "855de8e4ce9749905a3c820d96e67312df5f0554f2d9b824b0a3529a7e1d18e4",
+   "meta": {
+    "hash": "855de8e4ce974990",
+    "chars": 6599
+   },
+   "seenAt": "2026-10-25T20:21:41.285Z",
+   "changedAt": "2026-10-25T20:21:41.285Z"
+  }
+ }
+}

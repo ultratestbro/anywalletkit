@@ -11,7 +11,7 @@ Earn modules come in two shapes, and every module of a shape has the same method
 
 | Interface | Modules | Flow |
 |---|---|---|
-| `StakingProtocol` | Lido (ETH), SSV Network, Tonstakers (TON), SPL stake pools (Jito on Solana) | Stake → request a withdrawal → wait for the queue → claim |
+| `StakingProtocol` | Lido (ETH), SSV Network, Tonstakers (TON), SPL stake pools (Jito on Solana), native SOL staking | Stake → request a withdrawal → wait for the queue → claim |
 | `LendingProtocol` | Aave v3, Morpho, Mellow, Kamino | Supply / withdraw, and on markets that allow it, borrow / repay |
 
 This page uses Lido and Aave on Ethereum. The other modules work the same way, with
@@ -76,6 +76,60 @@ included.
 With debt, keep an eye on `healthFactor`: below `1.0` the position can be liquidated. Show
 it on every borrow and withdraw screen, and warn well before it gets close (for example
 under `1.5`).
+
+## Native SOL staking
+
+`@anywalletkit/protocol-staking-native-solana` delegates SOL straight to validators through
+Solana's Stake program: no pool, no token. Your app decides which validators it offers; the
+module has no default list and refuses to start without one.
+
+```sh
+npm install @anywalletkit/protocol-staking-native-solana @anywalletkit/wallet-solana
+```
+
+### Choose the validators
+
+<Snippet file="earn/src/native-solana.ts" region="native-setup" />
+
+Each stake goes to a validator from this list (or any voting validator with
+`validators: 'any'`, when your users pick from the whole cluster). Before every delegation the
+module reads the validator live and refuses it when it is delinquent or its commission is above
+`maxCommission` (10 % unless you set it). `enrich` can attach an explorer's APR or a logo to each
+validator; the on-chain checks do not depend on it.
+
+### Stake
+
+<Snippet file="earn/src/native-solana.ts" region="native-stake" />
+
+A stake is one transaction: a new stake account at an address derived from the wallet (seed
+`stake:<i>`), initialized with the wallet as its only authority and delegated. Only the wallet
+signs, and the position can be rebuilt from the wallet address alone. The minimum is 1 SOL; the
+account also holds about 0.0017 SOL of rent, which comes back on withdrawal. The stake starts
+earning from the next epoch boundary (an epoch is about two days).
+
+### Position
+
+<Snippet file="earn/src/native-solana.ts" region="native-position" />
+
+`status` is computed from the StakeHistory sysvar the way the Stake program computes it:
+`activating`, `active`, `deactivating` or `inactive`, with `readyEpoch` / `readyAt` while it
+changes. Rewards compound into each account at every epoch boundary; `getRewards()` lists them
+per epoch.
+
+### Unstake and claim
+
+<Snippet file="earn/src/native-solana.ts" region="native-unstake" />
+
+Unstaking deactivates whole accounts and, for a partial amount, splits it off one account into
+a new one first; both parts must keep the 1 SOL minimum. The SOL can be withdrawn after the
+cool-down (the next epoch boundary). A stake deactivated in the epoch it was made is free at
+once, and `delegate({ account })` in the same epoch undoes an unstake. `merge` joins two
+compatible accounts on the same validator.
+
+:::note[Allowlist policies]
+A Solana `allowlist` must include the Stake program (`Stake11111111111111111111111111111111111111`)
+and the new stake accounts (`getStakeAccountAddress(i)`), or the kit refuses staking writes.
+:::
 
 ## Module-specific extras
 

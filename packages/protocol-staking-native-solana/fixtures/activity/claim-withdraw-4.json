@@ -1,0 +1,151 @@
+{
+  "note": "Four Withdraws in one transaction (mainnet 2026-10-26)",
+  "own": [
+    "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx"
+  ],
+  "tx": {
+    "chain": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    "hash": "BFNki563CXwgkGUfZqvB7wkfuTcAcGs4FtFVYbuQRHQUjaNKvZGi68eAdjdEipHdkX2CBvZAEzP6RQSR69xgRka",
+    "time": 1792957688,
+    "status": "confirmed",
+    "address": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx",
+    "from": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx",
+    "to": "Stake11111111111111111111111111111111111111",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": null,
+        "from": "9aMgyUWCXhMqf4AbP5pnggp1WkZtYkrCYncFQQsxXRrQ",
+        "to": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx",
+        "amount": "758517538525"
+      },
+      {
+        "token": null,
+        "from": "HokBEENBNs9KFjgpWuuYbuojbeNGWSEv6LkmMADiMPXn",
+        "to": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx",
+        "amount": "237248152436"
+      },
+      {
+        "token": null,
+        "from": "GGv5CnBVgKnR4i1ser1b1AhrhTUBwKrRrDJUNPJ9KkZH",
+        "to": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx",
+        "amount": "5385404515"
+      },
+      {
+        "token": null,
+        "from": "7ctJWHxVva2RX2vGLwqyhLbri5BXdAm4Xbya4GdsEfd8",
+        "to": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx",
+        "amount": "2864505178"
+      }
+    ],
+    "fee": "118019",
+    "block": "461381559",
+    "raw": {
+      "tx": {
+        "transaction": {
+          "message": {
+            "instructions": [
+              {
+                "programId": "ComputeBudget111111111111111111111111111111",
+                "accounts": [],
+                "data": "F9hXdZ",
+                "stackHeight": 1
+              },
+              {
+                "programId": "ComputeBudget111111111111111111111111111111",
+                "accounts": [],
+                "data": "3mhiKuxuaKy1",
+                "stackHeight": 1
+              },
+              {
+                "program": "stake",
+                "programId": "Stake11111111111111111111111111111111111111",
+                "parsed": {
+                  "type": "withdraw",
+                  "info": {
+                    "clockSysvar": "SysvarC1ock11111111111111111111111111111111",
+                    "destination": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx",
+                    "lamports": 2864505178,
+                    "stakeAccount": "7ctJWHxVva2RX2vGLwqyhLbri5BXdAm4Xbya4GdsEfd8",
+                    "stakeHistorySysvar": "SysvarStakeHistory1111111111111111111111111",
+                    "withdrawAuthority": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx"
+                  }
+                },
+                "stackHeight": 1
+              },
+              {
+                "program": "stake",
+                "programId": "Stake11111111111111111111111111111111111111",
+                "parsed": {
+                  "type": "withdraw",
+                  "info": {
+                    "clockSysvar": "SysvarC1ock11111111111111111111111111111111",
+                    "destination": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx",
+                    "lamports": 758517538525,
+                    "stakeAccount": "9aMgyUWCXhMqf4AbP5pnggp1WkZtYkrCYncFQQsxXRrQ",
+                    "stakeHistorySysvar": "SysvarStakeHistory1111111111111111111111111",
+                    "withdrawAuthority": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx"
+                  }
+                },
+                "stackHeight": 1
+              },
+              {
+                "program": "stake",
+                "programId": "Stake11111111111111111111111111111111111111",
+                "parsed": {
+                  "type": "withdraw",
+                  "info": {
+                    "clockSysvar": "SysvarC1ock11111111111111111111111111111111",
+                    "destination": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx",
+                    "lamports": 5385404515,
+                    "stakeAccount": "GGv5CnBVgKnR4i1ser1b1AhrhTUBwKrRrDJUNPJ9KkZH",
+                    "stakeHistorySysvar": "SysvarStakeHistory1111111111111111111111111",
+                    "withdrawAuthority": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx"
+                  }
+                },
+                "stackHeight": 1
+              },
+              {
+                "program": "stake",
+                "programId": "Stake11111111111111111111111111111111111111",
+                "parsed": {
+                  "type": "withdraw",
+                  "info": {
+                    "clockSysvar": "SysvarC1ock11111111111111111111111111111111",
+                    "destination": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx",
+                    "lamports": 237248152436,
+                    "stakeAccount": "HokBEENBNs9KFjgpWuuYbuojbeNGWSEv6LkmMADiMPXn",
+                    "stakeHistorySysvar": "SysvarStakeHistory1111111111111111111111111",
+                    "withdrawAuthority": "9bYQaosUERASWbx1WtD4HKHaipbHowGoY1V48F67DcFx"
+                  }
+                },
+                "stackHeight": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    "call": {
+      "to": "Stake11111111111111111111111111111111111111",
+      "programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "ComputeBudget111111111111111111111111111111",
+        "Stake11111111111111111111111111111111111111",
+        "Stake11111111111111111111111111111111111111",
+        "Stake11111111111111111111111111111111111111",
+        "Stake11111111111111111111111111111111111111"
+      ]
+    }
+  },
+  "expect": {
+    "kind": "claim",
+    "title": "Withdrew unstaked SOL",
+    "assetsIn": [
+      {
+        "token": null,
+        "amount": "1004015600654"
+      }
+    ]
+  }
+}

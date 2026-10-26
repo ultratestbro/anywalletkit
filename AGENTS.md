@@ -35,7 +35,7 @@ into the app; never install from GitHub.
 | Encrypted backup file / iCloud backup | `seed-vault`, `backup-cloud` |
 | Hermes polyfills | `runtime-hermes` |
 | Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,uniswap,balancer,wrap,jupiter,omniston,fynd}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
-| Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana}` |
+| Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana}` |
 | Safety and data | `tx-preview-evm`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks` |
 | Testing your own module | `conformance` (Vitest suites) |
 
@@ -322,6 +322,22 @@ Staking = `stake` → `requestWithdrawal` → wait → `claimWithdrawals` (two-p
 `withdraw` (+ `borrow` / `repay` where the market allows). Every write has a `quote*` twin that signs nothing.
 Other modules: SSV (`protocol-staking-ssv-evm`, default export), Tonstakers (TON), SPL stake pool / Jito
 (Solana), Mellow (EarnETH/EarnUSD), Kamino (`KaminoVaultProtocolSolana`, `KaminoMarketProtocolSolana`).
+
+Native SOL staking (`protocol-staking-native-solana`): the app lists the validators, there is no default.
+
+```ts
+import { NativeStakingProtocolSolana } from '@anywalletkit/protocol-staking-native-solana'
+wallet.registerProtocol('sol-staking', NativeStakingProtocolSolana, { chain: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
+  config: { validators: [{ voteAccount: VOTE_A, name: 'A' }, VOTE_B], maxCommission: 10 } })   // or validators: 'any'
+const s = await wallet.getProtocol<NativeStakingProtocolSolana>('sol-staking')
+await s.listValidators()                       // commission, delinquent, apr, eligible, refusals
+await s.stake({ amount: 2n * 10n ** 9n, validator: VOTE_A })   // ≥ 1 SOL; a new seed-derived stake account
+await s.getStakeAccounts()                     // status activating|active|deactivating|inactive, readyAt
+await s.requestWithdrawal({ amount })          // deactivate whole accounts, split the rest
+const q = await s.getWithdrawalRequests(); if (q.claimableIds.length) await s.claimWithdrawals({ ids: q.claimableIds })
+```
+With a Solana `allowlist` policy, staking writes go to the Stake program and to new stake accounts:
+allow `Stake11111111111111111111111111111111111111` and the addresses from `getStakeAccountAddress(i)`.
 
 ## History, names, networks
 

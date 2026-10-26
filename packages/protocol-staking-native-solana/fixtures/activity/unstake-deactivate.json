@@ -1,0 +1,59 @@
+{
+  "note": "Deactivate a whole stake account, 86 SOL (mainnet 2026-10-26)",
+  "own": [
+    "DcxpkBBkX1tuDMDg63KXFfbXb2XnMWuMjc9L7kaF91NH"
+  ],
+  "tx": {
+    "chain": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    "hash": "2ikYTnkUp5BnRsypVuY9JF5N15bsheamPuXwQEpZWWqvMG4Wkv3BMYJgStbmZpqupMhtPAjtRAnmzr6LTUncugiH",
+    "time": 1792958703,
+    "status": "confirmed",
+    "address": "DcxpkBBkX1tuDMDg63KXFfbXb2XnMWuMjc9L7kaF91NH",
+    "from": "DcxpkBBkX1tuDMDg63KXFfbXb2XnMWuMjc9L7kaF91NH",
+    "to": "Stake11111111111111111111111111111111111111",
+    "nativeValue": "0",
+    "transfers": [],
+    "fee": "106500",
+    "block": "461386343",
+    "raw": {
+      "tx": {
+        "transaction": {
+          "message": {
+            "instructions": [
+              {
+                "programId": "ComputeBudget111111111111111111111111111111",
+                "accounts": [],
+                "data": "3Jv73z5Y9SRV",
+                "stackHeight": 1
+              },
+              {
+                "program": "stake",
+                "programId": "Stake11111111111111111111111111111111111111",
+                "parsed": {
+                  "type": "deactivate",
+                  "info": {
+                    "clockSysvar": "SysvarC1ock11111111111111111111111111111111",
+                    "stakeAccount": "9eEx8iZ6ZgWiS8uri2v5PxnEDFrAN6Ky5TfWBSwtwpgd",
+                    "stakeAuthority": "DcxpkBBkX1tuDMDg63KXFfbXb2XnMWuMjc9L7kaF91NH"
+                  }
+                },
+                "stackHeight": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    "call": {
+      "to": "Stake11111111111111111111111111111111111111",
+      "programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "Stake11111111111111111111111111111111111111"
+      ]
+    }
+  },
+  "expect": {
+    "kind": "unstake",
+    "title": "Requested unstake"
+  }
+}

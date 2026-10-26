@@ -133,9 +133,15 @@ importers:
       '@anywalletkit/protocol-staking-lido-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-lido-evm
+      '@anywalletkit/protocol-staking-native-solana':
+        specifier: workspace:*
+        version: link:../../packages/protocol-staking-native-solana
       '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../../packages/wallet-evm
+      '@anywalletkit/wallet-solana':
+        specifier: workspace:*
+        version: link:../../packages/wallet-solana
     devDependencies:
       '@anywalletkit/conformance':
         specifier: workspace:*
@@ -207,6 +213,9 @@ importers:
       '@anywalletkit/protocol-staking-lido-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-lido-evm
+      '@anywalletkit/protocol-staking-native-solana':
+        specifier: workspace:*
+        version: link:../../packages/protocol-staking-native-solana
       '@anywalletkit/protocol-staking-spl-stake-pool-solana':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-spl-stake-pool-solana
@@ -935,6 +944,28 @@ importers:
       '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../wallet-evm
+      '@types/node':
+        specifier: ^22
+        version: 22.20.5
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+
+  packages/protocol-staking-native-solana:
+    dependencies:
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
+    devDependencies:
+      '@anywalletkit/conformance':
+        specifier: workspace:*
+        version: link:../conformance
+      '@anywalletkit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@anywalletkit/wallet-solana':
+        specifier: workspace:*
+        version: link:../wallet-solana
       '@types/node':
         specifier: ^22
         version: 22.20.5

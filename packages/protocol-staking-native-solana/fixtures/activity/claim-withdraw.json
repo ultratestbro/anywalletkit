@@ -1,0 +1,82 @@
+{
+  "note": "Withdraw of an inactive stake account, 1.0826 SOL (mainnet 2026-10-26)",
+  "own": [
+    "HRp88fGahAsYVLYEJCJGeUZst1bWYxsTcJ7zV7tyr8VF"
+  ],
+  "tx": {
+    "chain": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    "hash": "GAqiAFedpX51UpYMC1kw3TF4qEP7YsDKxp4SGGVHNopwvsP7RN14GdvarDWNsFz6P7X5avgu1Q9ZEVhhyes8P88",
+    "time": 1792958651,
+    "status": "confirmed",
+    "address": "HRp88fGahAsYVLYEJCJGeUZst1bWYxsTcJ7zV7tyr8VF",
+    "from": "HRp88fGahAsYVLYEJCJGeUZst1bWYxsTcJ7zV7tyr8VF",
+    "to": "Stake11111111111111111111111111111111111111",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": null,
+        "from": "HamdyjZsLVaP3Fq7ryJzTxoYL18CeWQXZsojVs8anrBG",
+        "to": "HRp88fGahAsYVLYEJCJGeUZst1bWYxsTcJ7zV7tyr8VF",
+        "amount": "1082599981"
+      }
+    ],
+    "fee": "5112",
+    "block": "461386094",
+    "raw": {
+      "tx": {
+        "transaction": {
+          "message": {
+            "instructions": [
+              {
+                "programId": "ComputeBudget111111111111111111111111111111",
+                "accounts": [],
+                "data": "Gj1q27",
+                "stackHeight": 1
+              },
+              {
+                "programId": "ComputeBudget111111111111111111111111111111",
+                "accounts": [],
+                "data": "3GAG5eogvTjV",
+                "stackHeight": 1
+              },
+              {
+                "program": "stake",
+                "programId": "Stake11111111111111111111111111111111111111",
+                "parsed": {
+                  "type": "withdraw",
+                  "info": {
+                    "clockSysvar": "SysvarC1ock11111111111111111111111111111111",
+                    "destination": "HRp88fGahAsYVLYEJCJGeUZst1bWYxsTcJ7zV7tyr8VF",
+                    "lamports": 1082599981,
+                    "stakeAccount": "HamdyjZsLVaP3Fq7ryJzTxoYL18CeWQXZsojVs8anrBG",
+                    "stakeHistorySysvar": "SysvarStakeHistory1111111111111111111111111",
+                    "withdrawAuthority": "HRp88fGahAsYVLYEJCJGeUZst1bWYxsTcJ7zV7tyr8VF"
+                  }
+                },
+                "stackHeight": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    "call": {
+      "to": "Stake11111111111111111111111111111111111111",
+      "programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "ComputeBudget111111111111111111111111111111",
+        "Stake11111111111111111111111111111111111111"
+      ]
+    }
+  },
+  "expect": {
+    "kind": "claim",
+    "title": "Withdrew unstaked SOL",
+    "assetsIn": [
+      {
+        "token": null,
+        "amount": "1082599981"
+      }
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "module": "@anywalletkit/protocol-staking-native-solana",
+  "sources": [
+    {
+      "id": "stake-program",
+      "type": "solana-program",
+      "programId": "Stake11111111111111111111111111111111111111",
+      "label": "Stake program · Solana"
+    },
+    {
+      "id": "stake-program-releases",
+      "type": "github-releases",
+      "repo": "solana-program/stake",
+      "label": "Stake program releases (Core BPF)"
+    },
+    {
+      "id": "docs-stake-accounts",
+      "type": "http-text",
+      "url": "https://solana.com/docs/references/staking/stake-accounts",
+      "between": ["<main", "</main>"],
+      "label": "Solana docs · stake accounts"
+    }
+  ]
+}

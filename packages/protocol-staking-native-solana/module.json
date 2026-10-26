@@ -1,0 +1,11 @@
+{
+  "name": "@anywalletkit/protocol-staking-native-solana",
+  "type": "staking",
+  "chains": ["solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"],
+  "tier": "core",
+  "maintainers": ["@ultratestbro"],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
+  "path": "packages/protocol-staking-native-solana",
+  "addedAt": "2026-10-26"
+}

@@ -1,0 +1,36 @@
+{
+  "note": "Plain SOL transfer (System program) — not a stake pool transaction (shape only)",
+  "own": [
+    "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "EvTykvN87o1arXqcf7wwU4Jzvo3pQrgaNfoxYfkw5gng"
+  ],
+  "tx": {
+    "chain": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    "hash": "5AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "time": 1788787000,
+    "status": "confirmed",
+    "address": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "from": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+    "to": "8yoigZfzZ1nNaadumY9uPVD118225UYHTDpmjpr2nrSa",
+    "nativeValue": "1000000",
+    "transfers": [
+      {
+        "token": null,
+        "from": "2tKRnQTAXmryVYxDNSajdZg1DfX2FbHKNboWr5EBiKhW",
+        "to": "8yoigZfzZ1nNaadumY9uPVD118225UYHTDpmjpr2nrSa",
+        "amount": "1000000"
+      }
+    ],
+    "fee": "5000",
+    "call": {
+      "to": "11111111111111111111111111111111",
+      "programs": [
+        "11111111111111111111111111111111"
+      ]
+    },
+    "block": "445075000"
+  },
+  "expect": {
+    "kind": "send"
+  }
+}

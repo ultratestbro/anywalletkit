@@ -37,6 +37,7 @@ import SplStakePoolProtocolSolana, { base58Decode } from '@anywalletkit/protocol
 import MellowProtocolEvm, { toAsset } from '@anywalletkit/protocol-lending-mellow-evm'
 import { AaveProtocolEvm, parseReserveConfiguration, rayToApyPct, AAVE_MARKETS } from '@anywalletkit/protocol-lending-aave-evm'
 import { MorphoVaultProtocolEvm, MorphoMarketProtocolEvm, marketId, accrue, MORPHO_CHAINS } from '@anywalletkit/protocol-lending-morpho-evm'
+import { NativeStakingProtocolSolana, createWithSeed as nativeCreateWithSeed, activationStatus as nativeActivation, decodeStakeAccount as nativeDecodeStake, STAKE_PROGRAM as NATIVE_STAKE_PROGRAM } from '@anywalletkit/protocol-staking-native-solana'
 import { KaminoVaultProtocolSolana, KaminoMarketProtocolSolana, MAIN_MARKET, KLEND_PROGRAM, instructionName, toDecimalString, fromDecimalString } from '@anywalletkit/protocol-lending-kamino-solana'
 import ApprovalsProtocolEvm, { isRevokeCalldata, isUnlimitedAmount } from '@anywalletkit/protocol-approvals-evm'
 
@@ -160,6 +161,18 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const km = new KaminoMarketProtocolSolana(solAcc)
   check('kamino market: Main Market by default', km.market === MAIN_MARKET)
   check('kamino: decimal strings', toDecimalString(1_500_000n, 6) === '1.5' && fromDecimalString('1.0627800342202071868', 6) === 1_062_780n && fromDecimalString('4.66e-16', 9) === 0n)
+  // native staking: seed derivation (sha256, no WebCrypto) and the bigint warm-up math run in Hermes; reads over an offline provider
+  check('native stake: create_with_seed (mainnet vector)', nativeCreateWithSeed('9bhvajVaz6ECMoa93J8p699zkrrH14hoTN1EcPVd1Pzp', 'jup:mvo9aw5k:83ed053d:0', NATIVE_STAKE_PROGRAM) === '2wv6Sys5aZyECZm94KVygYzxVQyKi9egorRBAoVEZyS9')
+  const warm = nativeActivation({ voter: 'v', stake: 50n, activationEpoch: 10n, deactivationEpoch: 0xffff_ffff_ffff_ffffn }, 12n, new Map([[10n, { effective: 100n, activating: 100n, deactivating: 0n }], [11n, { effective: 109n, activating: 91n, deactivating: 0n }]]), 0n)
+  check('native stake: warm-up math (bigint)', warm.effective === 8n && warm.activating === 42n, `${warm.effective}/${warm.activating}`)
+  const stakeBlob = Uint8Array.from(Buffer.from('AgAAAIDVIgAAAAAAf8GEAGLL6VQQ1OKW6eB1dElnCVXJG+hd4QKC9tB5S/F/wYQAYsvpVBDU4pbp4HV0SWcJVckb6F3hAoL20HlL8QAAAAAAAAAAAAAAAAAAAAB/wYQAYsvpVBDU4pbp4HV0SWcJVckb6F3hAoL20HlL8awfg/25zlUN6V1VjNx5VGHM9DdKxojsE6mEACIKeNoGACPSDAMAAAAsBAAAAAAAAP//////////AAAAAAAAAACcVzmLFQUAAAAAAAA=', 'base64'))
+  const decoded = nativeDecodeStake(stakeBlob)
+  check('native stake: decodes a mainnet stake account', decoded.delegation?.stake === 13_100_000_000n && decoded.delegation?.voter === 'CatzoSMUkTRidT5DwBxAC2pEtnwMBTpkCepHkFgZDiqb')
+  const offline = { request: async (method: string) => { if (method === 'getEpochInfo') return { epoch: 1068, slotIndex: 1, slotsInEpoch: 432000 }; throw new Error(`offline: ${method}`) } }
+  const native = new NativeStakingProtocolSolana(solAcc, { validators: ['CatzoSMUkTRidT5DwBxAC2pEtnwMBTpkCepHkFgZDiqb'], provider: offline })
+  check('native stake: epoch clock over a { request } provider', (await native.getEpochInfo()).epoch === 1068n)
+  await tolerates(check, 'native stake: getStakeAccounts (offline → Error)', () => native.getStakeAccounts())
+  await tolerates(check, 'native stake: quoteStake (offline → Error)', () => native.quoteStake({ amount: 1_000_000_000n }))
   check('kamino: instructionName', instructionName(KLEND_PROGRAM, Uint8Array.from([0xd8, 0xe0, 0xbf, 0x1b, 0xcc, 0x97, 0x66, 0xaf, 0])) === 'depositReserveLiquidityAndObligationCollateralV2')
 
   // approvals

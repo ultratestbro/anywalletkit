@@ -67,6 +67,7 @@ inside the router.
 | `@anywalletkit/protocol-staking-ssv-evm` | SSV Network | `StakingProtocol` |
 | `@anywalletkit/protocol-staking-tonstakers-ton` | Tonstakers (TON → tsTON) | `StakingProtocol` |
 | `@anywalletkit/protocol-staking-spl-stake-pool-solana` | SPL stake pools (Jito by default) | `StakingProtocol` |
+| `@anywalletkit/protocol-staking-native-solana` | Native SOL staking to the validators your app lists (Stake program) | `StakingProtocol` |
 | `@anywalletkit/protocol-lending-aave-evm` | Aave v3 | `LendingProtocol` |
 | `@anywalletkit/protocol-lending-morpho-evm` | Morpho Vaults and Blue markets | `LendingProtocol` |
 | `@anywalletkit/protocol-lending-mellow-evm` | Mellow Core Vaults (EarnETH / EarnUSD) | `LendingProtocol` |

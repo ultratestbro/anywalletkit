@@ -53,6 +53,8 @@ jobs.push({id: "lido", module: "lido", script: pkg("protocol-staking-lido-evm"),
 jobs.push({id: "ssv", module: "ssv", script: pkg("protocol-staking-ssv-evm"), args: [ADDR.eip155, rpcFor(1)]});
 jobs.push({id: "tonstakers", module: "tonstakers", script: pkg("protocol-staking-tonstakers-ton"), args: [ADDR.ton, tonRpc]});
 jobs.push({id: "jito", module: "spl-stake-pool", script: pkg("protocol-staking-spl-stake-pool-solana"), args: [ADDR.solana, solRpc]});
+// Native staking checks a wallet that holds stake accounts (the script's default), not the empty test address.
+jobs.push({id: "native-stake", module: "native-stake", script: pkg("protocol-staking-native-solana"), args: [], env: {SOLANA_RPC: solRpc}});
 for (const preset of ["lido-earn-eth", "lido-earn-usd"]) jobs.push({id: `mellow:${preset}`, module: "mellow", script: pkg("protocol-lending-mellow-evm"), args: [ADDR.eip155, rpcFor(1), preset]});
 for (const [chainId, markets] of Object.entries(AAVE)) for (const m of markets) jobs.push({id: `aave:${chainId}:${m}`, module: "aave", script: pkg("protocol-lending-aave-evm"), args: [], env: {AAVE_RPC: rpcFor(Number(chainId)), AAVE_CHAIN: chainId, AAVE_MARKET: m, AAVE_USER: ADDR.eip155}});
 for (const chainId of MORPHO) jobs.push({id: `morpho:${chainId}`, module: "morpho", script: pkg("protocol-lending-morpho-evm"), args: [], env: {MORPHO_RPC: rpcFor(chainId), MORPHO_CHAIN: String(chainId), MORPHO_USER: ADDR.eip155}});
