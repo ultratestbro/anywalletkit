@@ -161,6 +161,15 @@ function parseStored(raw: string | null): { type?: unknown; mnemonic?: unknown; 
 }
 
 /**
+ * Inside a serialized change: the source must still exist. addAccount / discovery /
+ * completeAddresses read the secret and derive before their change runs; a removeSource that ran
+ * in between would otherwise get an orphan account added back (round 3, L4).
+ */
+function requireLiveSource(state: KeyringState, sourceId: string): void {
+  if (!state.sources.some((s) => s.id === sourceId)) throw new KeyringError(`The key source ${sourceId} was removed meanwhile; nothing was added.`, 'not-found')
+}
+
+/**
  * Many accounts from many key sources:
  * - a BIP-39 seed (generated or imported, optional passphrase) → accounts 0, 1, 2… on every chain;
  * - an imported private key → exactly one account on one chain;
@@ -421,8 +430,11 @@ export class Keyring {
     // Index, derivation and save in one serialized change: two calls at once cannot pick one index (audit #1.2).
     let account: AccountMeta | undefined
     await this.mutate(async (state) => {
+      requireLiveSource(state, sourceId)
       const index = nextIndex(state, sourceId)
-      ;[account] = addAccounts(state, source, [{ index, addresses: await this.deriveAddresses(secret, index) }], options.name)
+      const addresses = await this.deriveAddresses(secret, index)
+      requireLiveSource(state, sourceId)
+      ;[account] = addAccounts(state, source, [{ index, addresses }], options.name)
     })
     return clone(account!)
   }
@@ -453,6 +465,7 @@ export class Keyring {
     const derived = new Map<string, Partial<Record<ChainKey, string>>>()
     for (const a of todo) derived.set(a.id, await this.deriveAddresses(secret, a.index!, this.missingChains(a.id)))
     await this.mutate(async (state) => {
+      requireLiveSource(state, sourceId)
       for (const a of state.accounts) {
         const add = derived.get(a.id)
         if (add) a.addresses = { ...a.addresses, ...add }
@@ -616,7 +629,10 @@ export class Keyring {
   /** Persist prepared accounts of an existing source. */
   private async store(source: SourceMeta, prepared: { index: number | null; addresses: Partial<Record<ChainKey, string>> }[], name?: string): Promise<AccountMeta[]> {
     let created: AccountMeta[] = []
-    await this.mutate(async (state) => { created = addAccounts(state, source, prepared, name) })
+    await this.mutate(async (state) => {
+      requireLiveSource(state, source.id)
+      created = addAccounts(state, source, prepared, name)
+    })
     return clone(created)
   }
 
