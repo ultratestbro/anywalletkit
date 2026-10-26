@@ -5,10 +5,13 @@
  *
  * Same-chain swaps run through GenericSwapFacet(V3): receiver, minimum, the input token and amount,
  * and the output token are in the arguments. Bridges take `ILiFi.BridgeData` as their first
- * argument: its receiver, destination chain and bridged asset are checked; a destination call
- * (the final recipient sits in calldata for another chain) and a non-EVM destination (the receiver
- * sits in facet-specific data) cannot be checked here and are refused. Anything that does not
- * decode as one of these, canonically, is refused.
+ * argument: its receiver, destination chain and bridged asset are checked, for the listed bridge
+ * entry points only; a destination call (the final recipient sits in calldata for another chain)
+ * and a non-EVM destination (the receiver sits in facet-specific data) are refused.
+ *
+ * Not checked here: a bridge's OUTPUT. The destination minimum (and for some bridges, e.g. Relay
+ * and Across, what the receiver finally gets) lives in facet-specific data, so for bridges the
+ * reviewed minimum still relies on LI.FI's API answering honestly.
  */
 
 const GENERIC_SWAPS: Readonly<Record<string, {single: boolean}>> = {
@@ -19,6 +22,79 @@ const GENERIC_SWAPS: Readonly<Record<string, {single: boolean}>> = {
   "0x5fd9ae2e": {single: false}, // swapTokensMultipleV3ERC20ToERC20
   "0x2c57e884": {single: false}, // swapTokensMultipleV3ERC20ToNative
   "0x736eac0b": {single: false}, // swapTokensMultipleV3NativeToERC20
+};
+
+/**
+ * The ABI-encoded bridge entry points of the LI.FI Diamond — `startBridgeTokensVia*` and
+ * `swapAndStartBridgeTokensVia*`, whose first argument is `ILiFi.BridgeData` — computed from the
+ * facet sources in lifinance/contracts (86c3729, 2026-10-26). Packed facets and `*Min` variants read
+ * raw calldata, not BridgeData, and are not listed: any other selector is refused.
+ */
+const BRIDGE_CALLS: Readonly<Record<string, {sourceSwaps: boolean}>> = {
+  "0x1fd8010c": {sourceSwaps: false}, // startBridgeTokensViaAcross (AcrossFacet)
+  "0x3a3f7332": {sourceSwaps: true}, // swapAndStartBridgeTokensViaAcross (AcrossFacet)
+  "0xa1f1ce43": {sourceSwaps: false}, // startBridgeTokensViaAcrossV4 (AcrossFacetV4)
+  "0x1794958f": {sourceSwaps: true}, // swapAndStartBridgeTokensViaAcrossV4 (AcrossFacetV4)
+  "0x6a90d66e": {sourceSwaps: false}, // startBridgeTokensViaAcrossV4Swap (AcrossV4SwapFacet)
+  "0x9b054bc4": {sourceSwaps: true}, // swapAndStartBridgeTokensViaAcrossV4Swap (AcrossV4SwapFacet)
+  "0x6a51e9a9": {sourceSwaps: false}, // startBridgeTokensViaAllBridge (AllBridgeFacet)
+  "0x63267469": {sourceSwaps: true}, // swapAndStartBridgeTokensViaAllBridge (AllBridgeFacet)
+  "0xc9851d0b": {sourceSwaps: false}, // startBridgeTokensViaArbitrumBridge (ArbitrumBridgeFacet)
+  "0x3cc9517b": {sourceSwaps: true}, // swapAndStartBridgeTokensViaArbitrumBridge (ArbitrumBridgeFacet)
+  "0xe0a4201c": {sourceSwaps: false}, // startBridgeTokensViaCelerCircleBridge (CelerCircleBridgeFacet)
+  "0x4f3b0759": {sourceSwaps: true}, // swapAndStartBridgeTokensViaCelerCircleBridge (CelerCircleBridgeFacet)
+  "0x0315138f": {sourceSwaps: false}, // startBridgeTokensViaCentrifuge (CentrifugeFacet)
+  "0x8fd4d4dd": {sourceSwaps: true}, // swapAndStartBridgeTokensViaCentrifuge (CentrifugeFacet)
+  "0x0ad553b3": {sourceSwaps: false}, // startBridgeTokensViaChainflip (ChainflipFacet)
+  "0xee3314a1": {sourceSwaps: true}, // swapAndStartBridgeTokensViaChainflip (ChainflipFacet)
+  "0x4004633e": {sourceSwaps: false}, // startBridgeTokensViaDeBridgeDln (DeBridgeDlnFacet)
+  "0x2c7d2db0": {sourceSwaps: true}, // swapAndStartBridgeTokensViaDeBridgeDln (DeBridgeDlnFacet)
+  "0xbff90b61": {sourceSwaps: false}, // startBridgeTokensViaEco (EcoFacet)
+  "0x762aea18": {sourceSwaps: true}, // swapAndStartBridgeTokensViaEco (EcoFacet)
+  "0x678786ea": {sourceSwaps: false}, // startBridgeTokensViaFrax (FraxFacet)
+  "0x07b8e4c7": {sourceSwaps: true}, // swapAndStartBridgeTokensViaFrax (FraxFacet)
+  "0x5f9af35d": {sourceSwaps: false}, // startBridgeTokensViaGarden (GardenFacet)
+  "0x76ad76fe": {sourceSwaps: true}, // swapAndStartBridgeTokensViaGarden (GardenFacet)
+  "0xfc5f1003": {sourceSwaps: false}, // startBridgeTokensViaGasZip (GasZipFacet)
+  "0x606326ff": {sourceSwaps: true}, // swapAndStartBridgeTokensViaGasZip (GasZipFacet)
+  "0x6f9206ba": {sourceSwaps: false}, // startBridgeTokensViaGlacis (GlacisFacet)
+  "0x9c4b6dd9": {sourceSwaps: true}, // swapAndStartBridgeTokensViaGlacis (GlacisFacet)
+  "0xf66fe519": {sourceSwaps: false}, // startBridgeTokensViaGnosisBridge (GnosisBridgeFacet)
+  "0x7bf96e0a": {sourceSwaps: true}, // swapAndStartBridgeTokensViaGnosisBridge (GnosisBridgeFacet)
+  "0xee9e98e0": {sourceSwaps: false}, // startBridgeTokensViaLayerSwap (LayerSwapFacet)
+  "0x4c279d6b": {sourceSwaps: true}, // swapAndStartBridgeTokensViaLayerSwap (LayerSwapFacet)
+  "0x7dbcf1d9": {sourceSwaps: false}, // startBridgeTokensViaLiFiIntentEscrowV2 (LiFiIntentEscrowFacetV2)
+  "0x6d21c5df": {sourceSwaps: true}, // swapAndStartBridgeTokensViaLiFiIntentEscrowV2 (LiFiIntentEscrowFacetV2)
+  "0x65782c4b": {sourceSwaps: false}, // startBridgeTokensViaM0 (M0Facet)
+  "0xb9eaf86d": {sourceSwaps: true}, // swapAndStartBridgeTokensViaM0 (M0Facet)
+  "0xb4875292": {sourceSwaps: false}, // startBridgeTokensViaMayan (MayanFacet)
+  "0x80c65808": {sourceSwaps: true}, // swapAndStartBridgeTokensViaMayan (MayanFacet)
+  "0x4213dfff": {sourceSwaps: false}, // startBridgeTokensViaMegaETHBridge (MegaETHBridgeFacet)
+  "0x22256e89": {sourceSwaps: true}, // swapAndStartBridgeTokensViaMegaETHBridge (MegaETHBridgeFacet)
+  "0x4698f032": {sourceSwaps: false}, // startBridgeTokensViaNEARIntents (NEARIntentsFacet)
+  "0x02631b09": {sourceSwaps: true}, // swapAndStartBridgeTokensViaNEARIntents (NEARIntentsFacet)
+  "0x782621d8": {sourceSwaps: false}, // startBridgeTokensViaOmniBridge (OmniBridgeFacet)
+  "0x95726782": {sourceSwaps: true}, // swapAndStartBridgeTokensViaOmniBridge (OmniBridgeFacet)
+  "0xce8a97a5": {sourceSwaps: false}, // startBridgeTokensViaOptimismBridge (OptimismBridgeFacet)
+  "0x5bb5d448": {sourceSwaps: true}, // swapAndStartBridgeTokensViaOptimismBridge (OptimismBridgeFacet)
+  "0xaf62c7d6": {sourceSwaps: false}, // startBridgeTokensViaPolygonBridge (PolygonBridgeFacet)
+  "0xb4f37581": {sourceSwaps: true}, // swapAndStartBridgeTokensViaPolygonBridge (PolygonBridgeFacet)
+  "0xf434d6ca": {sourceSwaps: false}, // startBridgeTokensViaPolymerCCTP (PolymerCCTPFacet)
+  "0x17917a4e": {sourceSwaps: true}, // swapAndStartBridgeTokensViaPolymerCCTP (PolymerCCTPFacet)
+  "0x092e8fa4": {sourceSwaps: false}, // startBridgeTokensViaRelayDepository (RelayDepositoryFacet)
+  "0xa3443faa": {sourceSwaps: true}, // swapAndStartBridgeTokensViaRelayDepository (RelayDepositoryFacet)
+  "0x3f313808": {sourceSwaps: false}, // startBridgeTokensViaSquid (SquidFacet)
+  "0xa8f66666": {sourceSwaps: true}, // swapAndStartBridgeTokensViaSquid (SquidFacet)
+  "0x14d53077": {sourceSwaps: false}, // startBridgeTokensViaStargate (StargateFacetV2)
+  "0xa6010a66": {sourceSwaps: true}, // swapAndStartBridgeTokensViaStargate (StargateFacetV2)
+  "0x0691ff78": {sourceSwaps: false}, // startBridgeTokensViaSuperset (SupersetFacet)
+  "0xf26e657f": {sourceSwaps: true}, // swapAndStartBridgeTokensViaSuperset (SupersetFacet)
+  "0xe23b7a08": {sourceSwaps: false}, // startBridgeTokensViaSymbiosis (SymbiosisFacet)
+  "0xc46059b2": {sourceSwaps: true}, // swapAndStartBridgeTokensViaSymbiosis (SymbiosisFacet)
+  "0x2541ec57": {sourceSwaps: false}, // startBridgeTokensViaThorSwap (ThorSwapFacet)
+  "0xad673d88": {sourceSwaps: true}, // swapAndStartBridgeTokensViaThorSwap (ThorSwapFacet)
+  "0x64261d58": {sourceSwaps: false}, // startBridgeTokensViaUnit (UnitFacet)
+  "0x21a3af52": {sourceSwaps: true}, // swapAndStartBridgeTokensViaUnit (UnitFacet)
 };
 
 /** What the quote promised, in the forms the calldata carries. */
@@ -121,11 +197,12 @@ export function diamondCallMismatch(data: string, e: DiamondExpectation): string
       if (minAmount < e.minOut) return `accepts ${minAmount}, below the ${e.minOut} shown`;
       return checkSteps(steps, e, e.toToken);
     }
-    // Bridge facets: (BridgeData, [SwapData[],] FacetData). BridgeData is dynamic (it holds strings), so
-    // its offset is the head size: a small multiple of 32. Bytes a packed facet would read instead put
-    // that small number where its receiver goes — no address anyone controls.
+    // Bridge facets: (BridgeData, [SwapData[],] FacetData), only the listed ABI entry points.
+    // BridgeData is dynamic (it holds strings), so its offset is the head size.
+    const bridge = BRIDGE_CALLS[selector];
+    if (!bridge) return `unknown Diamond call ${selector}`;
     const head = r.small(4);
-    if (head < 32 || head % 32 !== 0 || head > 32 * 32) return `unknown Diamond call ${selector}`;
+    if (head < (bridge.sourceSwaps ? 96 : 64) || head % 32 !== 0 || head > 32 * 32) return `unknown Diamond call ${selector}`;
     const at = 4 + head;
     // BridgeData: (txId, string bridge, string integrator, referrer, sendingAssetId, receiver, minAmount, destinationChainId, hasSourceSwaps, hasDestinationCall)
     if (r.small(at + 32) !== 320) return `unknown Diamond call ${selector}`;
@@ -140,10 +217,11 @@ export function diamondCallMismatch(data: string, e: DiamondExpectation): string
     if (hasDestinationCall) return "the route runs a call on the destination chain, whose recipient cannot be checked here";
     if (!e.evmDestination) return "the recipient on a non-EVM destination sits in bridge-specific data and cannot be checked here";
     if (!same(receiver, e.receiver)) return `pays ${receiver}, not ${e.receiver}`;
+    if (hasSourceSwaps !== bridge.sourceSwaps) return `unknown Diamond call ${selector}`;
+    // After source swaps the bridged amount is in the swapped token's units: only the swaps' input is comparable.
+    if (hasSourceSwaps) return checkSteps(swapsAt(r, 4, 4 + 32), e, sendingAssetId);
     if (minAmount === 0n || minAmount > e.amountIn) return `bridges ${minAmount}, not the ${e.amountIn} spent`;
-    if (!hasSourceSwaps) return same(sendingAssetId, e.fromToken) ? null : `bridges ${sendingAssetId}, not ${e.fromToken}`;
-    if (head < 64) return `unknown Diamond call ${selector}`;
-    return checkSteps(swapsAt(r, 4, 4 + 32), e, sendingAssetId);
+    return same(sendingAssetId, e.fromToken) ? null : `bridges ${sendingAssetId}, not ${e.fromToken}`;
   } catch (err) {
     return `the Diamond calldata does not decode (${err instanceof Error ? err.message : String(err)})`;
   }

@@ -1,5 +1,5 @@
 // Recorded-shape LI.FI /quote responses shared by the provider and behaviour tests.
-import {encodeFunctionData, parseAbi, type Hex} from "viem";
+import {encodeFunctionData, parseAbi, type Abi, type Hex} from "viem";
 export const DIAMOND = "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE";
 export const FROM_TOKEN = "0xdAC17F958D2ee523A2206206994597C13D831ec7";
 export const TO_TOKEN = "0xFd086bC7CD5C481DCC9C85EBE478A1C0b69FCbb9";
@@ -62,10 +62,12 @@ const GENERATED = new Set<string>();
 /** `transactionRequest.data` placeholder: the fixture encodes Diamond calldata that does what its `action` says. */
 export const AUTO = "auto";
 
-export const DIAMOND_ABI = parseAbi([
+// Typed loosely: viem's type-level parser does not follow an inline tuple[] in these signatures.
+export const DIAMOND_ABI: Abi = parseAbi(([
   "function swapTokensSingleV3ERC20ToERC20(bytes32 _transactionId, string _integrator, string _referrer, address _receiver, uint256 _minAmountOut, (address callTo, address approveTo, address sendingAssetId, address receivingAssetId, uint256 fromAmount, bytes callData, bool requiresDeposit) _swapData)",
-  "function startBridgeTokensViaRelay((bytes32 transactionId, string bridge, string integrator, address referrer, address sendingAssetId, address receiver, uint256 minAmount, uint256 destinationChainId, bool hasSourceSwaps, bool hasDestinationCall) _bridgeData, (bytes32 requestId, bytes32 nonEVMReceiver, bytes32 receivingAssetId, bytes signature) _relayData)",
-]);
+  "function startBridgeTokensViaRelayDepository((bytes32 transactionId, string bridge, string integrator, address referrer, address sendingAssetId, address receiver, uint256 minAmount, uint256 destinationChainId, bool hasSourceSwaps, bool hasDestinationCall) _bridgeData, (bytes32 orderId, address depositorAddress) _relayData)",
+  "function swapAndStartBridgeTokensViaRelayDepository((bytes32 transactionId, string bridge, string integrator, address referrer, address sendingAssetId, address receiver, uint256 minAmount, uint256 destinationChainId, bool hasSourceSwaps, bool hasDestinationCall) _bridgeData, (address callTo, address approveTo, address sendingAssetId, address receivingAssetId, uint256 fromAmount, bytes callData, bool requiresDeposit)[] _swapData, (bytes32 orderId, address depositorAddress) _relayData)",
+] as readonly string[]));
 const ZERO32 = `0x${"00".repeat(32)}` as Hex;
 const DEX = "0x2222222222222222222222222222222222222222";
 
@@ -82,9 +84,9 @@ export function diamondCall(
       callTo: DEX, approveTo: DEX, sendingAssetId: lower(action.fromToken.address), receivingAssetId: lower(action.toToken.address), fromAmount: BigInt(action.fromAmount), callData: "0x", requiresDeposit: true,
     }]});
   }
-  return encodeFunctionData({abi: DIAMOND_ABI, functionName: "startBridgeTokensViaRelay", args: [{
+  return encodeFunctionData({abi: DIAMOND_ABI, functionName: "startBridgeTokensViaRelayDepository", args: [{
     transactionId: ZERO32, bridge: "relay", integrator: "awk", referrer: "0x0000000000000000000000000000000000000000",
     sendingAssetId: lower(over.sendingAssetId ?? action.fromToken.address), receiver, minAmount: BigInt(estimate.fromAmount),
     destinationChainId: over.destChainId ?? BigInt(action.toChainId), hasSourceSwaps: false, hasDestinationCall: over.hasDestinationCall ?? false,
-  }, {requestId: ZERO32, nonEVMReceiver: ZERO32, receivingAssetId: ZERO32, signature: "0x"}]});
+  }, {orderId: ZERO32, depositorAddress: DEX}]});
 }

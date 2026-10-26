@@ -21,11 +21,16 @@ On npm: [@anywalletkit/protocol-swap2-lifi](https://www.npmjs.com/package/@anywa
 The quote's `action` must match the request (chains, tokens, amount, sender, recipient), the
 transaction must target the chain's LI.FI Diamond, and the Diamond **calldata** is decoded and must
 do the same: a same-chain swap (GenericSwapFacet / V3) pays the reviewed recipient at least the
-reviewed minimum, spending the input token and delivering the requested one; a bridge's
-`BridgeData` pays the reviewed recipient on the requested chain, bridging the input token (or the
-output of its source swaps). Refused, because the recipient cannot be read from the calldata: routes
-with a destination call, and EVM-source routes to a non-EVM chain (their receiver sits in
-bridge-specific data). Unknown calldata is refused.
+reviewed minimum, spending the input token and delivering the requested one; a bridge call must be
+one of LI.FI's listed `startBridgeTokensVia*` / `swapAndStartBridgeTokensVia*` entry points (packed
+calls are refused) and its `BridgeData` must name the reviewed recipient and chain and bridge the
+input token (or what its source swaps make of it). Refused, because the recipient cannot be read
+from the calldata: routes with a destination call, and EVM-source routes to a non-EVM chain.
+Unknown calldata is refused.
+
+Not checked: a bridge's output. The destination minimum — and for some bridges (Relay, Across)
+what finally reaches the recipient — sits in bridge-specific data, so on cross-chain routes the
+reviewed minimum relies on LI.FI's API (or your `apiUrl` proxy) answering honestly.
 
 ## Activity
 
