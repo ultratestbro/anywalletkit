@@ -1,7 +1,8 @@
 import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { Buffer } from 'buffer'
 import { Cell } from '@ton/core'
-import { MessageIsTransactionError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { BroadcastUnknownError, MessageIsTransactionError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { isAnsweredRefusal } from './toncenter.js'
 import { tonProofDigest, tonSignDataDigest, type TonProof, type TonProofRequest, type TonSignDataRequest, type TonSignedData } from './tonconnect.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'
 import { v5r1ExternalMessage, v5r1PackSigned, v5r1PackUnsigned, type V5R1Message } from './wallet-v5r1.js'
@@ -156,8 +157,15 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   private async broadcast(body: Cell): Promise<string> {
     const rpc = this.requireRpc('send transactions')
     const init = await this.initIfNeeded()
-    await rpc.sendBoc(v5r1ExternalMessage(this._address, body, init))
-    return body.hash().toString('hex')
+    const hash = body.hash().toString('hex')
+    try {
+      await rpc.sendBoc(v5r1ExternalMessage(this._address, body, init))
+    } catch (e) {
+      // Only a node's explicit refusal means nothing went out (round 3, M12).
+      if (isAnsweredRefusal(e)) throw e
+      throw new BroadcastUnknownError(hash, e)
+    }
+    return hash
   }
 
   /** Sign and broadcast; `hash` is the body hash (hex) — resolve it with getTransactionReceipt. */
