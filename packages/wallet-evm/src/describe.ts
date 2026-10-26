@@ -67,6 +67,11 @@ export interface TxDescription {
   owner?: string
   /** Delegation targets for an EIP-7702 tx. */
   delegations?: Array<{ chainId: number; address: string }>
+  /**
+   * For an EIP-7702 tx (kind 'eip7702-delegation'): what its call does, decoded like any other
+   * transaction — the token / spender / amount fields and the warnings are the call's.
+   */
+  call?: TxKind
   /** Chain id named by the transaction, if any. */
   chainId: number | undefined
   /** Problems to show before signing. */
@@ -142,10 +147,14 @@ export function describeTransaction(tx: EvmTransaction, ctx: { chainId?: number 
   const base = { to, value, selector, chainId, warnings }
 
   if (tx.type === 4 || (tx.authorizationList && tx.authorizationList.length > 0)) {
+    // The delegation AND the call it carries: an approve riding in a type 4 is still an approve.
+    const { type: _type, authorizationList, ...call } = tx
+    const inner = describeTransaction(call, ctx)
     return {
-      ...base,
+      ...inner,
       kind: 'eip7702-delegation',
-      delegations: (tx.authorizationList ?? []).map((a) => ({ chainId: Number(a.chainId), address: getAddress(a.address) })),
+      call: inner.kind,
+      delegations: (authorizationList ?? []).map((a) => ({ chainId: Number(a.chainId), address: getAddress(a.address) })),
     }
   }
   if (to === undefined) return { ...base, kind: 'contract-deploy' }
