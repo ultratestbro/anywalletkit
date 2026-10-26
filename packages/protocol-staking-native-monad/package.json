@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-staking-native-monad",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Native MON staking for @anywalletkit/wallet-evm accounts on Monad: delegate to the validators your app lists through the staking precompile (0x…1000). Undelegate into withdrawal slots, withdraw after the delay, claim or compound rewards, validator info with live commission and an APR estimate, positions with pending stake. Every write is simulated first; Monad's 10 MON reserve balance is respected.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
