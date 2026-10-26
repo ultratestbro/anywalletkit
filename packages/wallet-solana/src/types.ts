@@ -1,3 +1,4 @@
+import type { WriteOptions } from '@anywalletkit/core'
 import type { Commitment, Rpc, SolanaRpcApi, Transaction, TransactionMessage } from '@solana/kit'
 
 /** A `@solana/kit` RPC client. */
@@ -58,6 +59,18 @@ export interface SolanaConfig {
    * `sendSerialized` refuses them regardless.
    */
   allowAuthorityChanges?: boolean
+  /**
+   * Sign durable-nonce transactions (first instruction `AdvanceNonceAccount`), whose signature never
+   * expires: whoever holds it can broadcast it at any later time (default false). Can also be given
+   * per call in {@link SolanaWriteOptions}.
+   */
+  allowDurableNonce?: boolean
+}
+
+/** `WriteOptions` plus the per-call opt-ins of this chain. */
+export interface SolanaWriteOptions extends WriteOptions {
+  /** Sign this durable-nonce transaction (see {@link SolanaConfig.allowDurableNonce}). */
+  allowDurableNonce?: boolean
 }
 
 /** A native SOL transfer. `value` in lamports. */
@@ -142,6 +155,7 @@ export type SolanaWarningCode =
   | 'missing-signers'
   | 'unresolved-lookup-tables'
   | 'burn-address'
+  | 'durable-nonce'
 
 /** One flagged problem, with a sentence a wallet can show. */
 export interface SolanaWarning {
@@ -216,6 +230,11 @@ export interface TransactionDescription {
   items: DecodedInstruction[]
   /** Problems to show before signing. */
   warnings: SolanaWarning[]
+  /**
+   * How the transaction expires: `blockhash` (about a minute after it was built) or
+   * `durable-nonce` (first instruction AdvanceNonceAccount: the signature never expires).
+   */
+  lifetime: 'blockhash' | 'durable-nonce'
 }
 
 /** CAIP-2 ids of the Solana clusters, by name. */

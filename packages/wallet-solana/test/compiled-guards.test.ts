@@ -27,14 +27,20 @@ const TABLE = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB' as Address
 const NONCE_ACCOUNT = '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin' as Address
 const BLOCKHASH = '9sHcv6xwn9YkB8nxTUGKDwPwNnmqVp5oAXxU8Fdkm4J6'
 const me = createNoopSigner(ADDR0)
+/** What the last message() put in TABLE: the fake RPC serves it as the lookup table. */
+let tableContents: Address[] = []
 
 function fakeRpc() {
   const sent: string[] = []
   const handlers: Record<string, (...a: unknown[]) => unknown> = {
-    simulateTransaction: () => ({ value: { err: null, unitsConsumed: 50_000n, logs: [] } }),
+    simulateTransaction: (_w: unknown, cfg: unknown) => ({ value: { err: null, unitsConsumed: 50_000n, logs: [], ...((cfg as { accounts?: { addresses: unknown[] } } | undefined)?.accounts ? { accounts: (cfg as { accounts: { addresses: unknown[] } }).accounts.addresses.map(() => null) } : {}) } }), // post-state for the CPI guard (round 3)
     getFeeForMessage: () => ({ value: 5_000n }),
     getLatestBlockhash: () => ({ value: { blockhash: BLOCKHASH, lastValidBlockHeight: 100n } }),
     getRecentPrioritizationFees: () => [],
+    // jsonParsed: the lookup table message() built; base64: the CPI guard's pre-state read (round 3)
+    getMultipleAccounts: (list: unknown, cfg: unknown) => ((cfg as { encoding?: string } | undefined)?.encoding === 'base64'
+      ? { value: (list as unknown[]).map(() => null) }
+      : { value: [{ data: { parsed: { info: { addresses: tableContents }, type: 'lookupTable' }, program: 'address-lookup-table' }, owner: 'AddressLookupTab1e1111111111111111111111111', executable: false, lamports: 1n, rentEpoch: 0n, space: 0n }] }),
     sendTransaction: (wire) => { sent.push(wire as string); return 'B'.repeat(87) },
   }
   const rpc = new Proxy({} as SolanaRpc, { get: (_t, m: string) => (...args: unknown[]) => ({ send: async () => { const h = handlers[m]; if (!h) throw new Error(`unmocked ${m}`); return h(...args) } }) })
@@ -55,7 +61,7 @@ function message(instructions: Instruction[], opts: { lookup?: Address[]; nonce?
       : setTransactionMessageLifetimeUsingBlockhash({ blockhash: BLOCKHASH as never, lastValidBlockHeight: 100n }, x),
     (x) => appendTransactionMessageInstructions(instructions, x),
   ) as TransactionMessage
-  if (opts.lookup) msg = compressTransactionMessageUsingAddressLookupTables(msg as never, { [TABLE]: opts.lookup }) as never
+  if (opts.lookup) { tableContents = opts.lookup; msg = compressTransactionMessageUsingAddressLookupTables(msg as never, { [TABLE]: opts.lookup }) as never }
   return msg
 }
 const wire = (instructions: Instruction[], opts: { lookup?: Address[]; nonce?: boolean } = {}) =>
@@ -113,7 +119,7 @@ describe('compiled and message transactions get the authority guards of sendSeri
     expect(f.sent).toHaveLength(0)
   })
 
-  it('still signs the everyday shapes: transfers (also through a lookup table), burns, closes to self, durable nonces, fresh accounts', async () => {
+  it('still signs the everyday shapes: transfers (also through a lookup table), burns, closes to self, durable nonces (opted in, round 3 M9), fresh accounts', async () => {
     const { f, a } = await account()
     const transfer = getTransferCheckedInstruction({ source: ata, mint: USDC, destination: otherAta, authority: me, amount: 1n, decimals: 6 })
     const ok: Array<[Instruction[], { lookup?: Address[]; nonce?: boolean }]> = [
@@ -132,10 +138,13 @@ describe('compiled and message transactions get the authority guards of sendSeri
     ]
     for (const [ixs, opts] of ok) {
       const tx = forms(ixs, opts)
-      await expect(a.signTransaction(tx.message)).resolves.toBeTypeOf('string')
+      // A durable nonce never expires: refused unless the call opts in (round 3, M9).
+      const call = opts.nonce ? { allowDurableNonce: true } : {}
+      if (opts.nonce) await expect(a.signTransaction(tx.message)).rejects.toMatchObject({ code: 'durable-nonce' })
+      await expect(a.signTransaction(tx.message, call)).resolves.toBeTypeOf('string')
       if (!ixs.some((ix) => ix.accounts?.some((m) => m.address === FRESH))) {
-        await expect(a.sendTransaction(tx.base64)).resolves.toMatchObject({ hash: 'B'.repeat(87) })
-        await expect(a.signTransaction(tx.compiled)).resolves.toBeTypeOf('string')
+        await expect(a.sendTransaction(tx.base64, call)).resolves.toMatchObject({ hash: 'B'.repeat(87) })
+        await expect(a.signTransaction(tx.compiled, call)).resolves.toBeTypeOf('string')
       }
     }
     expect(f.sent.length).toBeGreaterThan(0)

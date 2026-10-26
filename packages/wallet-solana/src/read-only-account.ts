@@ -34,6 +34,17 @@ const CU_LIMIT_FOR_SIMULATION = 1_400_000
 const CU_MIN = 1_000
 const CU_MAX = 1_400_000
 const CU_DEFAULT_PER_INSTRUCTION = 200_000
+/** The amount of a token account holding `mint` (layout: mint 0..32, amount at 64), or undefined for anything else. */
+function tokenAmountOf(bytes: Uint8Array, mint: Address): bigint | undefined {
+  if (bytes.length < 165) return undefined
+  const expected = getAddressEncoder().encode(mint)
+  for (let k = 0; k < 32; k++) if (bytes[k] !== expected[k]) return undefined
+  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getBigUint64(64, true)
+}
+
+/** What a plan may be told per call: skip simulation, sign a durable-nonce transaction (round 3, M9). */
+export interface PlanOptions { simulate?: boolean | undefined; allowDurableNonce?: boolean | undefined }
+
 const CORE_PROGRAMS = new Set<string>([SYSTEM_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS])
 /** System instructions that hand an account (or a nonce account's authority) of the signer to a program or someone else. */
 const WALLET_SYSTEM_INSTRUCTIONS = new Set(['Assign', 'AssignWithSeed', 'Allocate', 'AllocateWithSeed', 'AuthorizeNonceAccount', 'CreateAccountAllowPrefund'])
@@ -245,36 +256,44 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
   }
 
   /**
-   * Balance of a mint in this wallet's associated token account, in base units; 0 when that
-   * account does not exist.
+   * Balance of a mint in this wallet's associated token account (Token or Token-2022, whichever
+   * owns the mint), in base units; 0 when that account does not exist or the address is not a
+   * mint. A network error throws: it is never read as a zero balance (round 3, L10).
    */
   async getTokenBalance(token: string): Promise<bigint> {
     const rpc = this.requireRpc('retrieve token balances')
     const mint = address(token)
-    const { program } = await this.getMintInfo(token).catch(() => ({ program: TOKEN_PROGRAM_ADDRESS }))
-    const ata = await this.ata(mint, this.address, program)
+    const { value } = await rpc.getAccountInfo(mint, { commitment: this._commitment, encoding: 'base64' }).send()
+    if (!value || (value.owner !== TOKEN_PROGRAM_ADDRESS && value.owner !== TOKEN_2022_PROGRAM_ADDRESS)) return 0n
+    const ata = await this.ata(mint, this.address, value.owner)
     const info = await rpc.getAccountInfo(ata, { commitment: this._commitment, encoding: 'base64' }).send()
-    if (!info.value) return 0n
-    const bal = await rpc.getTokenAccountBalance(ata, { commitment: this._commitment }).send()
-    return BigInt(bal.value.amount)
+    return info.value ? (tokenAmountOf(getBase64Encoder().encode(info.value.data[0]) as Uint8Array, mint) ?? 0n) : 0n
   }
 
-  /** Batched over getMultipleAccounts (100 per call); amount read from the token-account layout at offset 64. Legacy-program ATAs. */
+  /**
+   * Batched over getMultipleAccounts (100 addresses per call). Both programs' associated token
+   * accounts are read for every mint, so Token-2022 balances count (round 3, L10); the amount comes
+   * from the token-account layout (offset 64) of the account that holds that mint.
+   */
   async getTokenBalances(tokens: string[]): Promise<Record<string, bigint>> {
     const rpc = this.requireRpc('retrieve token balances')
     const unique = [...new Set(tokens)]
-    const atas = await Promise.all(unique.map((t) => this.ata(address(t), this.address)))
-    const out: Record<string, bigint> = {}
+    const pairs = await Promise.all(unique.map(async (t) => {
+      const mint = address(t)
+      return { token: t, mint, atas: await Promise.all([this.ata(mint, this.address, TOKEN_PROGRAM_ADDRESS), this.ata(mint, this.address, TOKEN_2022_PROGRAM_ADDRESS)]) }
+    }))
+    const all = pairs.flatMap((p) => p.atas)
+    const found = new Map<string, Uint8Array>()
     const b64 = getBase64Encoder()
-    for (let i = 0; i < atas.length; i += 100) {
-      const { value } = await rpc.getMultipleAccounts(atas.slice(i, i + 100), { commitment: this._commitment, encoding: 'base64' }).send()
+    for (let i = 0; i < all.length; i += 100) {
+      const chunk = all.slice(i, i + 100)
+      const { value } = await rpc.getMultipleAccounts(chunk, { commitment: this._commitment, encoding: 'base64' }).send()
       value.forEach((acc, j) => {
-        const token = unique[i + j]!
-        if (!acc) { out[token] = 0n; return }
-        const bytes = b64.encode(acc.data[0])
-        out[token] = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getBigUint64(64, true)
+        if (acc && (acc.owner === TOKEN_PROGRAM_ADDRESS || acc.owner === TOKEN_2022_PROGRAM_ADDRESS)) found.set(chunk[j]!, b64.encode(acc.data[0]) as Uint8Array)
       })
     }
+    const out: Record<string, bigint> = {}
+    for (const p of pairs) out[p.token] = p.atas.reduce((sum, a) => { const bytes = found.get(a); return sum + (bytes ? (tokenAmountOf(bytes, p.mint) ?? 0n) : 0n) }, 0n)
     return out
   }
 
@@ -300,6 +319,22 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return this.newMessage([ix])
   }
 
+  /**
+   * A transfer's recipient must be a wallet (round 3, M10). A token account or a mint as recipient
+   * gets an associated token account nobody can sign for, and SOL or tokens sent to a program are
+   * lost: an account owned by Token / Token-2022, or an executable one, is refused. An address with
+   * no account yet is an ordinary wallet.
+   */
+  protected async assertWalletRecipient(recipient: string): Promise<void> {
+    const rpc = this.requireRpc('check the recipient')
+    const { value } = await rpc.getAccountInfo(address(recipient), { commitment: this._commitment, encoding: 'base64' }).send()
+    if (!value) return
+    if (value.executable) throw new UnsafeTransactionError(`Recipient ${recipient} is a program, not a wallet: what is sent there is lost.`, 'recipient-not-wallet', [recipient])
+    if (value.owner === TOKEN_PROGRAM_ADDRESS || value.owner === TOKEN_2022_PROGRAM_ADDRESS) {
+      throw new UnsafeTransactionError(`Recipient ${recipient} is a token account or a mint, not a wallet: send to the owner's wallet address.`, 'recipient-not-wallet', [recipient])
+    }
+  }
+
   /** SPL / Token-2022 transfer via `transferChecked` (mint + decimals verified on chain); the recipient ATA is created when missing. */
   protected async buildTokenTransfer(token: string, recipient: string, amount: bigint | number | string): Promise<{ message: TransactionMessage; tokenFee: bigint }> {
     const amt = BigInt(amount)
@@ -307,6 +342,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     const rpc = this.requireRpc('transfer tokens')
     const mint = address(token)
     const to = address(recipient)
+    await this.assertWalletRecipient(recipient)
     const info = await this.getMintInfo(token)
     const [fromAta, toAta] = await Promise.all([this.ata(mint, this.address, info.program), this.ata(mint, to, info.program)])
     const instructions: Instruction[] = []
@@ -385,6 +421,55 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return { ok: true, unitsConsumed: value.unitsConsumed ?? 0n, logs }
   }
 
+  /**
+   * The simulation a signing path runs, which also proves what the transaction does to this wallet
+   * beyond its top-level instructions (round 3, CPI guard). Those checks cannot see what a program
+   * the wallet signs for does by CPI, so the simulation returns the post-state of this wallet and of
+   * its token accounts the transaction writes, and the guard refuses: the wallet's account handed to
+   * a program or given data, a token account's owner or close authority changed, a delegate
+   * allowance set or raised that no top-level Approve shows. `allowAuthorityChanges` skips it.
+   * One extra read (the pre-state of the written accounts); a node that does not return the
+   * post-state it was asked for is a {@link NetworkError}.
+   */
+  private async simulateGuarded(wire: string, written: readonly string[], description: TransactionDescription): Promise<SimulationResult> {
+    if (this._config.allowAuthorityChanges) return this.simulateWire(wire)
+    const rpc = this.requireRpc('simulate transactions')
+    const others = [...new Set(written.filter((a) => a !== this.address))]
+    const pre = others.length ? await this.accountStates(others) : new Map<string, { lamports: bigint; owner: string; data: Uint8Array } | null>()
+    const me = pubkeyBytes(this.address)
+    const isTokenProgram = (owner: string) => owner === TOKEN_PROGRAM_ADDRESS || owner === TOKEN_2022_PROGRAM_ADDRESS
+    const mine = others.filter((a) => {
+      const st = pre.get(a)
+      const t = st && isTokenProgram(st.owner) ? parseTokenAccount(st.data) : null
+      return t !== null && bytesEqual(t.owner, me)
+    })
+    const watched = [this.address as string, ...mine]
+    const { value } = await rpc.simulateTransaction(wire as never, {
+      encoding: 'base64', sigVerify: false, replaceRecentBlockhash: true, commitment: this._commitment, accounts: { addresses: watched.map(address), encoding: 'base64' },
+    }).send()
+    const logs = value.logs ?? []
+    if (value.err) return { ok: false, error: describeSimulationErr(value.err), logs }
+    const postList = (value as { accounts?: Array<{ owner: string; data: readonly [string, string] } | null> }).accounts
+    if (!postList || postList.length !== watched.length) throw new NetworkError('simulateTransaction did not return the requested post-state accounts.')
+    const wallet = postList[0]
+    if (wallet && (wallet.owner !== SYSTEM_PROGRAM_ADDRESS || base64Bytes(wallet.data[0]).length > 0)) {
+      throw new UnsafeTransactionError(`Transaction would ${wallet.owner !== SYSTEM_PROGRAM_ADDRESS ? `hand this wallet's account to ${wallet.owner}` : "give this wallet's account data"} (a program it signs for does it by CPI). Set allowAuthorityChanges to override.`, 'wallet-owner', [this.address])
+    }
+    const approvedOnTop = new Set(description.items.flatMap((it) => (it.type === 'token-approve' ? [it.source] : [])))
+    mine.forEach((addr, k) => {
+      const before = parseTokenAccount(pre.get(addr)!.data)!
+      const st = postList[k + 1]
+      const after = st && isTokenProgram(st.owner) ? parseTokenAccount(base64Bytes(st.data[0])) : null
+      if (!after) return // closed: lamports out are what the description and the fee guard show
+      if (!bytesEqual(before.owner, after.owner)) throw new UnsafeTransactionError(`Transaction changes the owner of token account ${addr} (by CPI). Set allowAuthorityChanges to override.`, 'sets-authority', [addr])
+      if (!optEqual(before.closeAuthority, after.closeAuthority)) throw new UnsafeTransactionError(`Transaction changes who may close token account ${addr} (by CPI). Set allowAuthorityChanges to override.`, 'sets-authority', [addr])
+      const live = after.delegate !== null && after.delegatedAmount > 0n
+      const same = optEqual(before.delegate, after.delegate) && after.delegatedAmount <= before.delegatedAmount
+      if (live && !same && !approvedOnTop.has(addr)) throw new UnsafeTransactionError(`Transaction leaves a delegate allowance on token account ${addr} that no top-level Approve shows (set by CPI). Set allowAuthorityChanges to override.`, 'approves-delegate', [addr])
+    })
+    return { ok: true, unitsConsumed: value.unitsConsumed ?? 0n, logs }
+  }
+
   /** `simulateTransaction` for any accepted input; never throws for an on-chain failure, only for transport errors. */
   async simulateTransaction(tx: SolanaTransaction): Promise<SimulationResult> {
     if (typeof tx === 'string') return this.simulateWire(tx)
@@ -393,8 +478,11 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return this.simulateWire(this.unsignedWire(msg))
   }
 
-  /** Hard checks shared by every signing path. */
-  protected enforce(description: TransactionDescription): void {
+  /** Hard checks shared by every signing path. `options` carries the per-call opt-ins ({@link SolanaWriteOptions}). */
+  protected enforce(description: TransactionDescription, options: { allowDurableNonce?: boolean | undefined } = {}): void {
+    if (description.lifetime === 'durable-nonce' && !(options.allowDurableNonce ?? this._config.allowDurableNonce)) {
+      throw new UnsafeTransactionError('Refusing a durable-nonce transaction: its signature never expires and can be broadcast at any later time. Set allowDurableNonce (config or call options) to override.', 'durable-nonce')
+    }
     const burn = description.warnings.find((w) => w.code === 'burn-address')
     if (burn && !this._config.allowBurn) throw new UnsafeTransactionError(`${burn.message} Set allowBurn to override.`)
     if (description.feePayer && description.feePayer !== this.address && !this._config.allowForeignFeePayer) {
@@ -519,10 +607,10 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
    * price + unit limit), simulation and the fee quote. Shared by quote / sign /
    * send so the network is consulted once per fact.
    */
-  protected async planMessage(input: TransactionMessage, opts: { lookupTables?: string[] | undefined; tokenFee?: bigint | undefined; simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
+  protected async planMessage(input: TransactionMessage, opts: PlanOptions & { lookupTables?: string[] | undefined; tokenFee?: bigint | undefined } = {}): Promise<SolanaPlan> {
     let msg = await this.withLookupTables(input, opts.lookupTables)
     const description = describeTransaction(msg, { account: this.address })
-    this.enforce(description)
+    this.enforce(description, opts)
 
     const policy = this.budgetPolicy()
     const explicitPrice = getTransactionMessageComputeUnitPrice(msg as never)
@@ -544,7 +632,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     if (simulate || wantAutoLimit) {
       if (price > 0n) msg = setTransactionMessageComputeUnitPrice(price, msg as never) as TransactionMessage
       const probe = wantAutoLimit ? setTransactionMessageComputeUnitLimit(CU_LIMIT_FOR_SIMULATION, msg) : msg
-      simulation = await this.simulateWire(this.unsignedWire(probe))
+      simulation = await this.simulateGuarded(this.unsignedWire(probe), this.writableAccounts(probe), description)
       if (!simulation.ok) {
         if (simulate) throw new SimulationError(simulation.error, simulation.logs)
         simulation = undefined
@@ -564,22 +652,27 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
   }
 
   /** Signer checks shared by every compiled-transaction path: this wallet must be a required signer and nobody else may still be missing. */
-  protected enforceCompiledSigners(description: TransactionDescription): void {
-    this.enforce(description)
+  protected enforceCompiledSigners(description: TransactionDescription, options: PlanOptions = {}): void {
+    this.enforce(description, options)
     if (!description.signers.some((s) => s.address === this.address)) throw new UnsafeTransactionError('This wallet is not a required signer of the transaction.')
     const missing = description.signers.filter((s) => s.signed === false && s.address !== this.address).map((s) => s.address)
     if (missing.length) throw new MissingSignersError(missing)
   }
 
   /** Plan a compiled transaction (kit `Transaction` or base64 wire): hard checks, simulation, fee quote. The bytes are never altered. */
-  protected async planCompiled(input: Transaction | string, opts: { simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
+  protected async planCompiled(input: Transaction | string, opts: PlanOptions = {}): Promise<SolanaPlan> {
     const transaction = typeof input === 'string' ? decodeWireTransaction(input) : input
     const description = describeTransaction(transaction, { account: this.address })
-    this.enforceCompiledSigners(description)
+    this.enforceCompiledSigners(description, opts)
 
     let simulation: SimulationResult | undefined
     if (this._rpc !== undefined && (opts.simulate ?? this._config.simulate) !== false) {
-      simulation = await this.simulateWire(getBase64EncodedWireTransaction(transaction))
+      // Accounts behind lookup tables are written too: resolve them so the CPI guard sees every one.
+      const tables = resolveCompiledAccounts(transaction).tables
+      const lookups = await this.lookupAddresses(tables)
+      const layout = resolveCompiledAccounts(transaction, { account: this.address, ...(lookups ? { addressesByLookupTableAddress: lookups } : {}) })
+      const written = layout.accounts.filter((a) => isWritableRole(a.role) && a.address !== null).map((a) => a.address as string)
+      simulation = await this.simulateGuarded(getBase64EncodedWireTransaction(transaction), written, description)
       if (!simulation.ok) throw new SimulationError(simulation.error, simulation.logs)
     }
     return { transaction, quote: await this.quoteCompiled(transaction, description), simulation, description }
@@ -634,7 +727,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
    * changes, balance violations), {@link MissingSignersError} or
    * {@link SimulationError}; returns the evidence otherwise. Nothing is signed.
    */
-  async checkSerialized(base64: string, guard: SerializedTxGuard): Promise<SerializedCheck> {
+  async checkSerialized(base64: string, guard: SerializedTxGuard, options: PlanOptions = {}): Promise<SerializedCheck> {
     const rpc = this.requireRpc('check provider transactions')
     const transaction = decodeWireTransaction(base64)
     const layout0 = resolveCompiledAccounts(transaction)
@@ -643,7 +736,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     const description = describeTransaction(transaction, ctx)
     const layout = resolveCompiledAccounts(transaction, ctx)
     if (layout.unresolved) throw new UnsafeTransactionError('Some accounts come from lookup tables that could not be resolved; the transaction cannot be audited.', 'unresolved-lookup-tables')
-    this.enforceCompiledSigners(description)
+    this.enforceCompiledSigners(description, options)
 
     // 1. Programs.
     if (!guard.allowUnknownPrograms) {
@@ -795,16 +888,17 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
   }
 
   /** Plan any accepted input. */
-  protected async plan(tx: SolanaTransaction, opts: { simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
+  protected async plan(tx: SolanaTransaction, opts: PlanOptions = {}): Promise<SolanaPlan> {
     if (typeof tx === 'string' || isSignedTransaction(tx)) return this.planCompiled(tx, opts)
     return this.planMessage(await this.prepareMessage(tx), { ...opts, lookupTables: isNativeTransfer(tx) ? tx.lookupTables : undefined })
   }
 
-  protected async planTransfer(o: SolanaTransferOptions, opts: { simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
+  protected async planTransfer(o: SolanaTransferOptions, opts: PlanOptions = {}): Promise<SolanaPlan> {
     if (o.token) {
       const { message, tokenFee } = await this.buildTokenTransfer(o.token, o.recipient, o.amount)
       return this.planMessage(message, { ...opts, lookupTables: o.lookupTables, tokenFee })
     }
+    await this.assertWalletRecipient(o.recipient)
     return this.planMessage(await this.buildNativeTransfer(o.recipient, o.amount), { ...opts, lookupTables: o.lookupTables })
   }
 

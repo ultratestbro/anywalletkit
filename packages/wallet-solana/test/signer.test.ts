@@ -38,7 +38,8 @@ function fakeRpc() {
     getFeeForMessage: () => ({ value: 5000n }),
     getBalance: () => ({ value: 1_000_000_000n }),
     getAccountInfo: () => ({ value: null }),
-    simulateTransaction: () => ({ value: { err: null, unitsConsumed: 20_000n, logs: [] } }),
+    getMultipleAccounts: (list: unknown) => ({ value: (list as unknown[]).map(() => null) }), // the CPI guard's pre-state read (round 3)
+    simulateTransaction: (_w: unknown, cfg: unknown) => ({ value: { err: null, unitsConsumed: 20_000n, logs: [], ...((cfg as { accounts?: { addresses: unknown[] } } | undefined)?.accounts ? { accounts: (cfg as { accounts: { addresses: unknown[] } }).accounts.addresses.map(() => null) } : {}) } }), // post-state for the CPI guard (round 3)
     sendTransaction: (wire) => { sent.push(wire as string); return 'A'.repeat(87) },
     getRecentPrioritizationFees: () => [{ prioritizationFee: 1000, slot: 1n }],
   }

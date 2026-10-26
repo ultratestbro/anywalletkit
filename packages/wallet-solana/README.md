@@ -41,7 +41,9 @@ key is used:
    `spl-transfer`, `token2022-transfer`, `ata-create`, `program-call`, `mixed`)
    plus warnings: `unknown-program`, `sets-authority`, `closes-account`,
    `approves-delegate`, `unlimited-approve`, `foreign-fee-payer`,
-   `missing-signers`, `unresolved-lookup-tables`, `burn-address`.
+   `missing-signers`, `unresolved-lookup-tables`, `burn-address`, `durable-nonce`,
+   and `lifetime`: `blockhash`, or `durable-nonce` when the first instruction is
+   `AdvanceNonceAccount` (the signature never expires).
 2. **Hard checks** — fee payer must be this wallet (`allowForeignFeePayer` to
    override), a provider transaction must not need other signatures
    (`MissingSignersError`), transfers to the System-program address are refused
@@ -61,10 +63,15 @@ key is used:
    System / Token / Stake instruction (`UnsafeTransactionError` with `code` `core-instruction`,
    `sets-authority`, `closes-account` or `moves-lamports`;
    `allowAuthorityChanges: true` to override, e.g. for a token launch that
-   renounces its mint authority). These are top-level checks: a program the
-   wallet signs for can still do the same by CPI. Swap-aggregator transactions
-   belong on `sendSerialized`, which adds a program allowlist and a simulated
-   balance / ownership proof and ignores that flag.
+   renounces its mint authority). A durable-nonce transaction is refused
+   (`code` `durable-nonce`) unless `allowDurableNonce` is set in the config or the
+   call's options. `transfer` / `quoteTransfer` refuse a recipient that is not a
+   wallet: a token account, a mint or a program (`recipient-not-wallet`); an
+   address with no account yet is a wallet. The same checks run in
+   `signCompiled` and `signTransactionMessage`. What a program the wallet signs
+   for does by CPI is proved by the simulation (step 4). Swap-aggregator
+   transactions belong on `sendSerialized`, which adds a program allowlist and a
+   simulated balance / ownership proof and ignores that flag.
 3. **Compute budget** — by default the price is the 75th percentile of
    `getRecentPrioritizationFees` over the writable accounts (clamped by
    `minPriorityMicroLamports` / `maxPriorityMicroLamports`) and the unit limit is
@@ -72,7 +79,14 @@ key is used:
    for explicit values or `priorityFee: false` to add nothing; a budget the
    caller already put in the message is kept.
 4. **Simulation** — `simulateTransaction` (`sigVerify: false`) runs before signing;
-   a failure throws `SimulationError` with the program logs. `simulate: false` disables the gate.
+   a failure throws `SimulationError` with the program logs. It also returns the
+   post-state of the wallet and of its token accounts the transaction writes
+   (one extra read for the pre-state), and refuses what CPI would do there: the
+   wallet's account handed to a program or given data (`wallet-owner`), a token
+   account's owner or close authority changed (`sets-authority`), a delegate
+   allowance no top-level Approve shows (`approves-delegate`);
+   `allowAuthorityChanges` skips this too. `simulate: false` disables the gate
+   (and the CPI proof with it).
 5. **Fee quote** — `quoteSendTransaction` / `quoteTransfer` return
    `{fee, baseFee, priorityFee, microLamports, computeUnitLimit, tokenFee?}`;
    `transferMaxFee` / `transactionMaxFee` compare against `fee`.

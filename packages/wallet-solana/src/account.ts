@@ -1,12 +1,12 @@
 import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { compileTransaction, getAddressDecoder, getBase64EncodedWireTransaction, getBase58Decoder, type SignatureBytes, type Transaction, type TransactionMessage } from '@solana/kit'
-import { decodeWireTransaction } from './describe.js'
+import { decodeWireTransaction, describeTransaction } from './describe.js'
 import { BroadcastUnknownError } from './errors.js'
 import { MessageIsTransactionError, isSolanaTransactionPayload } from './offchain.js'
 import { WalletAccountReadOnlySolana, type SolanaPlan } from './read-only-account.js'
 import { isDefinitive } from './rpc.js'
 import type { SerializedCheck, SerializedTxGuard } from './serialized.js'
-import type { SolanaConfig, SolanaFeeQuote, SolanaTransaction, SolanaTransferOptions } from './types.js'
+import type { SolanaConfig, SolanaFeeQuote, SolanaTransaction, SolanaTransferOptions, SolanaWriteOptions } from './types.js'
 
 const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
 
@@ -74,15 +74,26 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     return toHex(await this.signer.sign(bytes, { scheme: 'ed25519', context: 'solana-offchain' }))
   }
 
-  /** Add this wallet's signature to a compiled transaction (other signatures are preserved). */
-  async signCompiled(tx: Transaction): Promise<Transaction> {
-    const sig = (await this.signer.sign(tx.messageBytes as unknown as Uint8Array, { scheme: 'ed25519', context: 'solana-message' })) as unknown as SignatureBytes
-    return { ...tx, signatures: Object.freeze({ ...tx.signatures, [this.address]: sig }) } as Transaction
+  /**
+   * Add this wallet's signature to a compiled transaction (other signatures are preserved). Runs the
+   * same checks as every signing path (round 3): a drainer shape, a burn or a durable nonce is
+   * refused unless the config or `options` opt in. No simulation and no fee quote: it is a primitive.
+   */
+  async signCompiled(tx: Transaction, options: SolanaWriteOptions = {}): Promise<Transaction> {
+    this.enforce(describeTransaction(tx, { account: this.address }), options)
+    return this.signChecked(tx)
   }
 
-  /** Compile and sign a message; returns the kit `Transaction` (for callers that want to inspect or co-sign). */
-  async signTransactionMessage(msg: TransactionMessage): Promise<Transaction> {
-    return this.signCompiled(compileTransaction(msg as never) as Transaction)
+  /** Compile and sign a message; returns the kit `Transaction` (for callers that want to inspect or co-sign). Checked like {@link signCompiled}. */
+  async signTransactionMessage(msg: TransactionMessage, options: SolanaWriteOptions = {}): Promise<Transaction> {
+    this.enforce(describeTransaction(msg, { account: this.address }), options)
+    return this.signChecked(compileTransaction(msg as never) as Transaction)
+  }
+
+  /** The signature itself, for a transaction a plan has already checked. */
+  private async signChecked(tx: Transaction): Promise<Transaction> {
+    const sig = (await this.signer.sign(tx.messageBytes as unknown as Uint8Array, { scheme: 'ed25519', context: 'solana-message' })) as unknown as SignatureBytes
+    return { ...tx, signatures: Object.freeze({ ...tx.signatures, [this.address]: sig }) } as Transaction
   }
 
   private maxFeeCheck(fee: bigint, limit: bigint | number | undefined, op: string) {
@@ -93,14 +104,14 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     if (plan.transaction) {
       const mine = plan.transaction.signatures[this.address]
       const alreadySigned = mine !== null && mine !== undefined && (mine as Uint8Array).some((b) => b !== 0)
-      return alreadySigned ? plan.transaction : this.signCompiled(plan.transaction)
+      return alreadySigned ? plan.transaction : this.signChecked(plan.transaction)
     }
-    return this.signCompiled(compileTransaction(plan.message as never) as Transaction)
+    return this.signChecked(compileTransaction(plan.message as never) as Transaction)
   }
 
   /** Sign without broadcasting. Returns the base64 wire transaction. Simulation still runs (a reverting tx is refused). */
-  async signTransaction(tx: SolanaTransaction, options: WriteOptions = {}): Promise<string> {
-    const plan = await this.plan(tx)
+  async signTransaction(tx: SolanaTransaction, options: SolanaWriteOptions = {}): Promise<string> {
+    const plan = await this.plan(tx, { allowDurableNonce: options.allowDurableNonce })
     this.maxFeeCheck(plan.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return getBase64EncodedWireTransaction(await this.signPlan(plan))
   }
@@ -127,9 +138,9 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     return first ? getBase58Decoder().decode(first) : ''
   }
 
-  async sendTransaction(tx: SolanaTransaction, options: WriteOptions = {}): Promise<SolanaSendResult> {
+  async sendTransaction(tx: SolanaTransaction, options: SolanaWriteOptions = {}): Promise<SolanaSendResult> {
     this.requireRpc('send transactions')
-    const plan = await this.plan(tx)
+    const plan = await this.plan(tx, { allowDurableNonce: options.allowDurableNonce })
     this.maxFeeCheck(plan.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const hash = await this.broadcast(await this.signPlan(plan))
     return { hash, fee: plan.quote.fee, quote: plan.quote }
@@ -150,9 +161,9 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
    * Signatures already present (other parties) are preserved. The checked fee is held to the
    * tighter of `transactionMaxFee` and `options.maxFee`.
    */
-  async sendSerialized(base64: string, guard: SerializedTxGuard, options: WriteOptions = {}): Promise<SolanaSendResult & { check: SerializedCheck }> {
+  async sendSerialized(base64: string, guard: SerializedTxGuard, options: SolanaWriteOptions = {}): Promise<SolanaSendResult & { check: SerializedCheck }> {
     this.requireRpc('send transactions')
-    const check = await this.checkSerialized(base64, guard)
+    const check = await this.checkSerialized(base64, guard, { allowDurableNonce: options.allowDurableNonce })
     this.maxFeeCheck(check.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const plan: SolanaPlan = { transaction: decodeWireTransaction(base64), quote: check.quote, simulation: check.simulation, description: check.description }
     const hash = await this.broadcast(await this.signPlan(plan))
