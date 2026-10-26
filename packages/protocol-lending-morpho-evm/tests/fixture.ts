@@ -3,7 +3,7 @@
 // oracle, a MetaMorpho USDC vault acknowledged by the v1.0 factory, tokens.
 import { getAddress, maxUint256, type Abi, type Address, type Hex } from 'viem'
 import { createMockAccount } from '@anywalletkit/conformance'
-import { ERC20_ABI, ERC4626_ABI, FACTORY_V1_ABI, FACTORY_V2_ABI, IRM_ABI, MORPHO_ABI, ORACLE_ABI, VAULT_V1_ABI } from '../src/abi.js'
+import { ERC20_ABI, ERC4626_ABI, FACTORY_V1_ABI, FACTORY_V2_ABI, IRM_ABI, MORPHO_ABI, ORACLE_ABI, VAULT_V1_ABI, VAULT_V2_ABI } from '../src/abi.js'
 import { marketId, toAssetsDown, toSharesDown, toSharesUp, type MarketParams, type MarketState } from '../src/math.js'
 import { FakeChain, revertString } from './fake-chain.js'
 
@@ -18,6 +18,8 @@ export const ORACLE = getAddress('0x663BECd10daE6C4A3Dcd89F1d76c1174199639B9')
 export const IRM = getAddress('0x46415998764C29aB2a25CbeA6254146D50D22687')
 export const VAULT = getAddress('0xeE8F4eC5672F09119b96Ab6fB59C27E1b7e44b61')
 export const FAKE_VAULT = getAddress('0x00000000000000000000000000000000000000F0')
+/** A Vault V2 (the live Steakhouse High Yield USDC on Base). V2 answers 0 from every max* view. */
+export const VAULT_V2 = getAddress('0xbeeff2490FEffa212faC2f6553682C219E6a8845')
 
 export const E6 = 10n ** 6n
 export const E8 = 10n ** 8n
@@ -41,6 +43,8 @@ export interface State {
   balances: Map<string, bigint>
   authorized: Map<string, boolean>
   vault: { totalAssets: bigint; totalSupply: bigint; maxDeposit: bigint; liquid: bigint; fee: bigint; isMetaMorpho: boolean }
+  /** Vault V2 transfer gates (all open by default); its cap is `vault.maxDeposit`, enforced by reverting. */
+  v2Gates: { receiveShares: boolean; sendShares: boolean; receiveAssets: boolean; sendAssets: boolean }
   /** write fn → Morpho revert string */
   revertOn: Map<string, string>
 }
@@ -54,6 +58,7 @@ export function makeMorpho(overrides: Partial<State> = {}): { chain: FakeChain; 
     balances: new Map(),
     authorized: new Map(),
     vault: { totalAssets: 500_000n * E6, totalSupply: 500_000n * E18, maxDeposit: maxUint256, liquid: 500_000n * E6, fee: 10n ** 17n, isMetaMorpho: true },
+    v2Gates: { receiveShares: true, sendShares: true, receiveAssets: true, sendAssets: true },
     revertOn: new Map(),
     ...overrides,
   }
@@ -89,9 +94,9 @@ export function makeMorpho(overrides: Partial<State> = {}): { chain: FakeChain; 
     if (fn === 'MORPHO') return MORPHO
     throw new Error(fn)
   })
-  chain.on(FACTORY_V2, FACTORY_V2_ABI, (fn) => { if (fn === 'isVaultV2') return false; throw new Error(fn) })
+  chain.on(FACTORY_V2, FACTORY_V2_ABI, (fn, args) => { if (fn === 'isVaultV2') return (args[0] as string).toLowerCase() === VAULT_V2.toLowerCase(); throw new Error(fn) })
 
-  const vaultHandler = (fn: string, args: readonly unknown[]) => {
+  const vaultHandlerFor = (VAULT: Address) => (fn: string, args: readonly unknown[]) => {
     const v = state.vault
     const toShares = (a: bigint) => (a * (v.totalSupply + 10n ** 12n)) / (v.totalAssets + 1n) // DECIMALS_OFFSET 12 virtual shares
     const toAssets = (s: bigint) => (s * (v.totalAssets + 1n)) / (v.totalSupply + 10n ** 12n)
@@ -122,11 +127,46 @@ export function makeMorpho(overrides: Partial<State> = {}): { chain: FakeChain; 
       default: throw new Error(`vault: ${fn}`)
     }
   }
+  const vaultHandler = vaultHandlerFor(VAULT)
   const nameOf = (x: unknown) => (x as { name?: string }).name
   const extra = (abi: readonly unknown[]) => abi.filter((x) => (x as { type: string }).type === 'function' && !ERC4626_ABI.some((y) => y.type === 'function' && y.name === nameOf(x)))
   const vaultAbi = [...ERC4626_ABI, ...extra(VAULT_V1_ABI), ...extra(ERC20_ABI)] as Abi
   chain.on(VAULT, vaultAbi, vaultHandler)
   chain.on(FAKE_VAULT, vaultAbi, vaultHandler)
+
+  // Vault V2 as its source has it: max* views answer 0, the gates and the caps are enforced by
+  // reverting inside deposit / withdraw / redeem, liquidity too.
+  const v1Like = vaultHandlerFor(VAULT_V2)
+  const g = () => state.v2Gates
+  const v2Shares = (who: string) => state.balances.get(key(VAULT_V2, who)) ?? 0n
+  chain.on(VAULT_V2, [...ERC4626_ABI, ...extra(VAULT_V2_ABI), ...extra(ERC20_ABI)] as Abi, (fn, args) => {
+    const v = state.vault
+    const toAssets = (s: bigint) => (s * (v.totalAssets + 1n)) / (v.totalSupply + 10n ** 12n)
+    switch (fn) {
+      case 'maxDeposit': case 'maxMint': case 'maxWithdraw': case 'maxRedeem': return 0n
+      case 'performanceFee': return 5n * 10n ** 16n
+      case 'managementFee': return 0n
+      case 'curator': return OTHER
+      case 'canReceiveShares': return g().receiveShares
+      case 'canSendShares': return g().sendShares
+      case 'canReceiveAssets': return g().receiveAssets
+      case 'canSendAssets': return g().sendAssets
+      case 'MORPHO': case 'DECIMALS_OFFSET': case 'fee': case 'timelock': throw new Error(`vault v2 has no ${fn}`)
+      case 'deposit': {
+        if (!g().receiveShares || !g().sendAssets) revertString('CannotReceiveShares')
+        if ((args[0] as bigint) > v.maxDeposit) revertString('AbsoluteCapExceeded')
+        break
+      }
+      case 'withdraw': case 'redeem': {
+        if (!g().sendShares || !g().receiveAssets) revertString('CannotSendShares')
+        const assets = fn === 'withdraw' ? (args[0] as bigint) : toAssets(args[0] as bigint)
+        if (assets > v.liquid) revertString('TransferReverted')
+        if (fn === 'redeem' && (args[0] as bigint) > v2Shares(args[2] as string)) revertString('InsufficientBalance')
+        break
+      }
+    }
+    return v1Like(fn, args)
+  })
 
   const erc20 = (token: Address, symbol: string, decimals: number) => (fn: string, args: readonly unknown[]) => {
     switch (fn) {
