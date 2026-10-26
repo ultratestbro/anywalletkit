@@ -1,6 +1,6 @@
 import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
-import { canonicalAddress, sendDestinations } from './destinations.js'
+import { canonicalAddress, erc20Transfer, hexData, sendDestinations } from './destinations.js'
 import { snapshot } from './snapshot.js'
 
 /**
@@ -223,6 +223,9 @@ const big = (v: unknown): bigint | undefined => {
 /** An allowance given as `raw`: unlimited at or above type(uint128).max, or when it is present but unreadable (the worst case is what `confirm` must see). */
 const allowanceUnlimited = (raw: unknown, amount: bigint | undefined): boolean => (amount === undefined ? raw !== undefined : isUnlimitedAllowance(amount))
 
+/** Solana token accounts an intent pays into, whose owners {@link applyPolicies} still has to read (round 3, M1). */
+const PENDING_TOKEN_ACCOUNTS = new WeakMap<WriteIntent, string[]>()
+
 /** An intent before {@link withDestinations}. */
 type DraftIntent = Omit<WriteIntent, 'destinations' | 'destinationUnknown'>
 type IntentBase = Omit<DraftIntent, 'kind' | 'message'>
@@ -417,7 +420,9 @@ function withDestinations(intent: DraftIntent): WriteIntent {
   const d = sendDestinations(chain, intent.raw)
   // A batch may carry approvals among its calls: their spenders are destinations too.
   const granted = chain.startsWith('eip155:') && Array.isArray(intent.raw) ? intent.raw.flatMap((c) => { const g = grantCall(c); return g ? [g.spender] : [] }) : []
-  return { ...intent, destinations: [...d.list, ...granted], destinationUnknown: d.unknown }
+  const out: WriteIntent = { ...intent, destinations: [...new Set([...d.list, ...granted])], destinationUnknown: d.unknown }
+  if (d.tokenAccounts) PENDING_TOKEN_ACCOUNTS.set(out, d.tokenAccounts)
+  return out
 }
 
 function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown): WriteIntent {
@@ -479,8 +484,36 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
   const ns = chain.split(':')[0]
   const noRecipient = method !== 'transfer' && (ns === 'eip155' || ns === 'solana' || ns === 'tron' || ns === 'ton' || ns === 'near')
   const to = str(a.to) ?? (noRecipient ? undefined : str(a.recipient))
-  const amount = big(a.amount ?? a.value)
-  return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(typeof a.token === 'string' ? { token: a.token } : {}), ...(amount !== undefined ? { amount } : {}) }
+  // A token transfer in calldata moves that token, not the native value next to it (round 3, M1).
+  const move = tokenMove(ns ?? '', arg)
+  const token = move?.token ?? (typeof a.token === 'string' ? a.token : undefined)
+  const amount = move ? move.amount : big(a.amount ?? a.value)
+  return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(token !== undefined ? { token } : {}), ...(amount !== undefined ? { amount } : {}) }
+}
+
+/** One token transfer a write makes through a contract — an ERC-20 / TRC-20 `transfer`, a NEP-141 `ft_transfer(_call)` — as token and amount. */
+function tokenMove(ns: string, arg: unknown): { token: string; amount: bigint | undefined } | undefined {
+  if (Array.isArray(arg)) return undefined
+  const a = obj(arg)
+  if (ns === 'eip155') {
+    const data = hexData(a.data)
+    const t = data !== undefined ? erc20Transfer(data) : null
+    return t && str(a.to) !== undefined ? { token: str(a.to)!, amount: t.amount } : undefined
+  }
+  if (ns === 'tron' && a.functionSelector === 'transfer(address,uint256)' && Array.isArray(a.parameters) && str(a.contractAddress) !== undefined) {
+    return { token: str(a.contractAddress)!, amount: big(obj(a.parameters[1]).value) }
+  }
+  if (ns === 'near' && Array.isArray(a.actions) && a.actions.length === 1 && str(a.receiverId) !== undefined) {
+    const call = obj(obj(a.actions[0]).functionCall)
+    if (call.methodName !== 'ft_transfer' && call.methodName !== 'ft_transfer_call') return undefined
+    try {
+      const json = call.args instanceof Uint8Array ? String.fromCharCode(...call.args) : typeof call.args === 'string' ? call.args : JSON.stringify(call.args)
+      return { token: str(a.receiverId)!, amount: big(obj(JSON.parse(json)).amount) }
+    } catch {
+      return { token: str(a.receiverId)!, amount: undefined }
+    }
+  }
+  return undefined
 }
 
 /**
@@ -594,6 +627,18 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     const written = [...new Set(rules.flatMap((m) => (m ? Object.keys(m) : [])))]
     const keys = written.filter((k) => (chains.length > 0 ? chains.some((c) => ruleCovers(k, c)) : ruleCovers(k, ns)))
     const intent = intentOf(chains[0] ?? account.chain, await account.getAddress(), method, arg)
+    // An SPL transfer pays a token account: its owner is the recipient, and only the network knows
+    // it. Read through the account when a list or confirm will look; unread → unknown (round 3, M1).
+    const pending = PENDING_TOKEN_ACCOUNTS.get(intent)
+    if (pending) {
+      const judged = policies.confirm !== undefined || keys.some((k) => policies.allowlist?.[k] !== undefined || policies.blocklist?.[k] !== undefined)
+      const read = (account as { getTokenAccountOwner?: (address: string) => Promise<string | undefined> }).getTokenAccountOwner
+      for (const t of pending) {
+        let owner: string | undefined
+        if (judged && typeof read === 'function') { try { owner = await read.call(account, t) } catch { owner = undefined } }
+        if (owner === undefined) { intent.destinations.push(t); intent.destinationUnknown = true } else if (!intent.destinations.includes(owner)) intent.destinations.push(owner)
+      }
+    }
     const caps = keys.flatMap((k) => { const cap = policies.maxFee?.[k]; return cap === undefined ? [] : [{ k, cap: BigInt(cap) }] })
     // A method guarded only by its name (a chain package's internal `sign*` / `send*` helper) has no
     // fee the policies can quote or hand down: under a fee cap it is refused (round 3, review).
