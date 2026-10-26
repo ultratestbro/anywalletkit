@@ -289,9 +289,15 @@ export async function buildFeed(input: FeedInput): Promise<HistoryFeedPage> {
     try { intents = await journal.list() } catch (error) { report({ stage: 'journal', error }) }
     const byHash = new Map<string, Intent>()
     for (const i of intents) for (const h of i.hashes) byHash.set(matchKey(h.chain, h.hash), i)
+    // Every leg's status is gathered first and the intent settles once (any failed leg → failed,
+    // else any confirmed → confirmed): legs settling one by one wrote both values on every call, so
+    // a two-leg intent with one failed leg flipped between confirmed and failed (round 3, L24).
+    const legs = new Map<string, { intent: Intent; failed: boolean; confirmed: boolean }>()
     const settle = (intent: Intent, status: ChainTxStatus) => {
-      const next = status === 'failed' ? 'failed' : status === 'confirmed' ? 'confirmed' : 'pending'
-      if (intent.status !== next && next !== 'pending') journalWrites.push({ ...intent, status: next })
+      const s = legs.get(intent.id) ?? { intent, failed: false, confirmed: false }
+      if (status === 'failed') s.failed = true
+      else if (status === 'confirmed') s.confirmed = true
+      legs.set(intent.id, s)
     }
     const candidateByMatch = new Map<string, Candidate>()
     for (const c of candidates.values()) candidateByMatch.set(matchKey(c.item.chain, c.item.hash), c)
@@ -338,6 +344,11 @@ export async function buildFeed(input: FeedInput): Promise<HistoryFeedPage> {
         if (intent.createdAt + ttl < now()) { journalWrites.push({ ...intent, status: 'failed' }); top.push(intentItem(intent, 'failed', opts)) }
         else top.push(intentItem(intent, 'pending', opts))
       }))
+    }
+
+    for (const { intent, failed, confirmed } of legs.values()) {
+      const next = failed ? 'failed' : confirmed ? 'confirmed' : 'pending'
+      if (next !== 'pending' && intent.status !== next && !journalWrites.some((w) => w.id === intent.id)) journalWrites.push({ ...intent, status: next })
     }
 
     // Cross-chain join: several rows of one intent on this page → one item, source leg first.
