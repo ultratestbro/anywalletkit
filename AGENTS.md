@@ -35,7 +35,7 @@ into the app; never install from GitHub.
 | Encrypted backup file / iCloud backup | `seed-vault`, `backup-cloud` |
 | Hermes polyfills | `runtime-hermes` |
 | Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,uniswap,balancer,wrap,jupiter,omniston,fynd}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
-| Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana}` |
+| Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana,native-monad}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana}` |
 | Safety and data | `tx-preview-evm`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks` |
 | Testing your own module | `conformance` (Vitest suites) |
 
@@ -338,6 +338,21 @@ const q = await s.getWithdrawalRequests(); if (q.claimableIds.length) await s.cl
 ```
 With a Solana `allowlist` policy, staking writes go to the Stake program and to new stake accounts:
 allow `Stake11111111111111111111111111111111111111` and the addresses from `getStakeAccountAddress(i)`.
+
+Native MON staking (`protocol-staking-native-monad`, account on `eip155:143`): the app lists validator ids, there is no default list.
+
+```ts
+import { NativeStakingProtocolMonad } from '@anywalletkit/protocol-staking-native-monad'
+wallet.registerProtocol('mon-staking', NativeStakingProtocolMonad, { chain: 'eip155:143',
+  config: { validators: [{ id: 97n, name: 'A' }, 21n], defaultValidator: 97n, maxCommission: 10 } })   // or validators: 'any'
+const m = await wallet.getProtocol<NativeStakingProtocolMonad>('mon-staking')
+await m.stake({ amount: 10n ** 18n })             // delegate; active at getEpoch().activatesAtEpoch; keeps the 10 MON reserve
+await m.listPositions()                           // active, activating, unclaimedRewards per validator
+await m.requestWithdrawal({ amount, validator: 97n })   // undelegate into a free slot; id = validatorId << 8 | slot
+const w = await m.getWithdrawalRequests({ validator: 97n }); if (w.claimableIds.length) await m.claimWithdrawals({ ids: w.claimableIds })
+await m.claimRewards({ validator: 97n })          // or compound({ validator })
+```
+An `allowlist` policy sees `to` = `0x0000000000000000000000000000000000001000`: allow it, or staking is refused.
 
 ## History, names, networks
 

@@ -48,8 +48,9 @@ market allows). See [Earn](/guides/earn/).
 
 - **How long the exit takes.** Lido's withdrawal queue takes days; a Jito exit can be
   instant at a fee, or wait for the epoch; native SOL stake cools down until the next epoch
-  boundary (~2 days).
+  boundary (~2 days), and native MON stake can be withdrawn one epoch after it deactivates
+  (Monad epochs are about 4 hours).
 - **Whom they delegate to.** With native staking your app picks the validators; show each
-  one's commission and whether it is voting.
+  one's commission and whether it is voting (Solana) or in the active set (Monad).
 - **What the yield is made of**, and that it changes.
 - **The health factor** before a borrow, and what happens when it drops below 1.

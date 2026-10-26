@@ -11,7 +11,7 @@ Earn modules come in two shapes, and every module of a shape has the same method
 
 | Interface | Modules | Flow |
 |---|---|---|
-| `StakingProtocol` | Lido (ETH), SSV Network, Tonstakers (TON), SPL stake pools (Jito on Solana), native SOL staking | Stake → request a withdrawal → wait for the queue → claim |
+| `StakingProtocol` | Lido (ETH), SSV Network, Tonstakers (TON), SPL stake pools (Jito on Solana), native SOL staking, native MON staking (Monad) | Stake → request a withdrawal → wait for the queue → claim |
 | `LendingProtocol` | Aave v3, Morpho, Mellow, Kamino | Supply / withdraw, and on markets that allow it, borrow / repay |
 
 This page uses Lido and Aave on Ethereum. The other modules work the same way, with
@@ -129,6 +129,49 @@ compatible accounts on the same validator.
 :::note[Allowlist policies]
 A Solana `allowlist` must include the Stake program (`Stake11111111111111111111111111111111111111`)
 and the new stake accounts (`getStakeAccountAddress(i)`), or the kit refuses staking writes.
+:::
+
+## Native MON staking
+
+`@anywalletkit/protocol-staking-native-monad` delegates MON straight to Monad validators through
+the staking precompile (`0x…1000`): no pool, no token. Your app decides which validator ids it
+offers; the module has no default list and refuses to start without one.
+
+```sh
+npm install @anywalletkit/protocol-staking-native-monad @anywalletkit/wallet-evm
+```
+
+### Choose the validators
+
+<Snippet file="earn/src/native-monad.ts" region="monad-setup" />
+
+`validators: 'any'` lets users pick from the whole active set (`listValidators()`). Before every
+delegation the module reads the validator live and refuses it when it does not exist, is not in the
+consensus set in good standing, or charges more than `maxCommission` (10 % unless you set it; many
+validators charge 10–15 %). `enrich` can attach an explorer's APR or a logo.
+
+### Stake and position
+
+<Snippet file="earn/src/native-monad.ts" region="monad-stake" />
+
+A stake becomes active at the next epoch, or the one after when it is sent after the epoch's
+boundary block (`getEpoch().activatesAtEpoch`; epochs are about 4 hours). Monad keeps a 10 MON
+reserve on every account: a stake that would leave less is refused (`getMaxStakeable()`). Rewards
+accrue separately in `unclaimedRewards`; claim them or compound them into the stake.
+
+### Unstake and claim
+
+<Snippet file="earn/src/native-monad.ts" region="monad-unstake" />
+
+Only active stake can be undelegated. Each unstake takes a withdrawal slot (0–255 per validator)
+and can be withdrawn one epoch after the stake deactivates. The precompile withdraws one request
+per transaction, so `claimWithdrawals` may send several. After a full exit the precompile no longer
+lists the validator among the wallet's delegations: keep the `id` that `requestWithdrawal` returns,
+or pass the validator in `validators`, so the withdrawal is found again.
+
+:::note[Policies]
+Staking writes go to the precompile `0x0000000000000000000000000000000000001000`; a Monad
+`allowlist` must include it.
 :::
 
 ## Module-specific extras

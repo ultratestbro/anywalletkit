@@ -1,0 +1,38 @@
+{
+ "module": "@anywalletkit/protocol-staking-native-monad",
+ "sources": {
+  "docs-reserve-balance": {
+   "type": "http-text",
+   "value": "15015a02fd3f1c1198d5c74a9580cd531551e971396d1c565c36e5d5492b33e8",
+   "meta": {
+    "hash": "15015a02fd3f1c11",
+    "chars": 22089
+   },
+   "seenAt": "2026-10-25T21:25:12.594Z",
+   "changedAt": "2026-10-25T21:25:04.383Z"
+  },
+  "monad-bft-releases": {
+   "type": "github-releases",
+   "value": "v0.16.5",
+   "meta": {
+    "tag": "v0.16.5",
+    "name": "v0.16.5",
+    "at": "2026-10-13",
+    "url": "https://github.com/category-labs/monad-bft/releases/tag/v0.16.5",
+    "prerelease": false
+   },
+   "seenAt": "2026-10-25T21:25:12.746Z",
+   "changedAt": "2026-10-25T21:25:04.528Z"
+  },
+  "docs-staking-api": {
+   "type": "http-text",
+   "value": "4a242b2666b53c79a4ae1410fdfff03c7590de16bd792a263414ecc1635d93d7",
+   "meta": {
+    "hash": "4a242b2666b53c79",
+    "chars": 55069
+   },
+   "seenAt": "2026-10-25T21:25:12.623Z",
+   "changedAt": "2026-10-25T21:25:12.623Z"
+  }
+ }
+}

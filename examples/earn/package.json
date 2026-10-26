@@ -15,7 +15,8 @@
     "@anywalletkit/protocol-staking-lido-evm": "workspace:*",
     "@anywalletkit/protocol-lending-aave-evm": "workspace:*",
     "@anywalletkit/wallet-solana": "workspace:*",
-    "@anywalletkit/protocol-staking-native-solana": "workspace:*"
+    "@anywalletkit/protocol-staking-native-solana": "workspace:*",
+    "@anywalletkit/protocol-staking-native-monad": "workspace:*"
   },
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",

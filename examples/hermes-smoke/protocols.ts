@@ -26,7 +26,7 @@ import { assembleTransaction as jupAssemble } from '@anywalletkit/protocol-swap2
 import { fyndProvider } from '@anywalletkit/protocol-swap2-fynd/provider'
 import { FyndSwap2Protocol } from '@anywalletkit/protocol-swap2-fynd/protocol'
 import { FYND_CHAINS, TYCHO_ROUTER_ABI, checkFyndTransaction } from '@anywalletkit/protocol-swap2-fynd/router'
-import { encodeFunctionData } from 'viem'
+import { encodeFunctionData, encodeFunctionResult } from 'viem'
 import { nearIntentsProvider } from '@anywalletkit/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@anywalletkit/protocol-swap2-thorchain/protocol'
 import { OmnistonSwap2Protocol } from '@anywalletkit/protocol-swap2-omniston/protocol'
@@ -38,6 +38,7 @@ import MellowProtocolEvm, { toAsset } from '@anywalletkit/protocol-lending-mello
 import { AaveProtocolEvm, parseReserveConfiguration, rayToApyPct, AAVE_MARKETS } from '@anywalletkit/protocol-lending-aave-evm'
 import { MorphoVaultProtocolEvm, MorphoMarketProtocolEvm, marketId, accrue, MORPHO_CHAINS } from '@anywalletkit/protocol-lending-morpho-evm'
 import { NativeStakingProtocolSolana, createWithSeed as nativeCreateWithSeed, activationStatus as nativeActivation, decodeStakeAccount as nativeDecodeStake, STAKE_PROGRAM as NATIVE_STAKE_PROGRAM } from '@anywalletkit/protocol-staking-native-solana'
+import { NativeStakingProtocolMonad, packWithdrawalId as monadPack, unpackWithdrawalId as monadUnpack, commissionToPercent as monadCommission, describeRevert as monadRevert, STAKING_ABI as MONAD_STAKING_ABI } from '@anywalletkit/protocol-staking-native-monad'
 import { KaminoVaultProtocolSolana, KaminoMarketProtocolSolana, MAIN_MARKET, KLEND_PROGRAM, instructionName, toDecimalString, fromDecimalString } from '@anywalletkit/protocol-lending-kamino-solana'
 import ApprovalsProtocolEvm, { isRevokeCalldata, isUnlimitedAmount } from '@anywalletkit/protocol-approvals-evm'
 
@@ -173,6 +174,18 @@ export async function smokeProtocols(check: Check): Promise<void> {
   check('native stake: epoch clock over a { request } provider', (await native.getEpochInfo()).epoch === 1068n)
   await tolerates(check, 'native stake: getStakeAccounts (offline → Error)', () => native.getStakeAccounts())
   await tolerates(check, 'native stake: quoteStake (offline → Error)', () => native.quoteStake({ amount: 1_000_000_000n }))
+  // native Monad staking: id packing and commission math (bigint), revert mapping, and a read through viem over an offline EIP-1193 provider
+  const packed = monadPack(300n, 7)
+  check('native monad: withdrawal id packing (bigint)', packed === 300n * 256n + 7n && monadUnpack(packed).validatorId === 300n && monadUnpack(packed).withdrawId === 7)
+  check('native monad: commission 1e18 → percent', monadCommission(15n * 10n ** 16n) === 15)
+  check('native monad: revert in plain words', /not ready yet/.test(monadRevert(new Error('execution reverted: withdrawal not ready')).message))
+  const epochResult = encodeFunctionResult({ abi: MONAD_STAKING_ABI, functionName: 'getEpoch', result: [2332n, false] })
+  const monadOffline = { request: async ({ method }: { method: string }) => { if (method === 'eth_chainId') return '0x8f'; if (method === 'eth_call') return epochResult; throw new Error(`offline: ${method}`) } }
+  const monadAcc = createMockAccount({ chain: 'eip155:143', address: '0x000000000000000000000000000000000000dEaD' })
+  const monad = new NativeStakingProtocolMonad(monadAcc, { validators: [97n], provider: monadOffline })
+  const monadEpoch = await monad.getEpoch()
+  check('native monad: getEpoch over viem + EIP-1193', monadEpoch.epoch === 2332n && monadEpoch.activatesAtEpoch === 2333n)
+  await tolerates(check, 'native monad: quoteStake (offline → Error)', () => monad.quoteStake({ amount: 10n ** 18n }))
   check('kamino: instructionName', instructionName(KLEND_PROGRAM, Uint8Array.from([0xd8, 0xe0, 0xbf, 0x1b, 0xcc, 0x97, 0x66, 0xaf, 0])) === 'depositReserveLiquidityAndObligationCollateralV2')
 
   // approvals

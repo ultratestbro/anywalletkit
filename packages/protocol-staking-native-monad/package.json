@@ -1,0 +1,39 @@
+{
+  "name": "@anywalletkit/protocol-staking-native-monad",
+  "version": "0.0.0",
+  "description": "Native MON staking for @anywalletkit/wallet-evm accounts on Monad: delegate to the validators your app lists through the staking precompile (0x…1000). Undelegate into withdrawal slots, withdraw after the delay, claim or compound rewards, validator info with live commission and an APR estimate, positions with pending stake. Every write is simulated first; Monad's 10 MON reserve balance is respected.",
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-staking-native-monad" },
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "module.json", "LICENSE"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": { "viem": "^2.57.2" },
+  "peerDependencies": { "@anywalletkit/core": "workspace:*" },
+  "devDependencies": {
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/history-evm": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*",
+    "@types/node": "^22",
+    "vitest": "^5.0.3"
+  },
+  "keywords": ["protocol", "staking", "monad", "mon", "native-staking", "delegation", "validator", "staking-protocol", "anywalletkit"],
+  "publishConfig": { "access": "public", "provenance": true }
+}

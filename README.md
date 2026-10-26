@@ -82,6 +82,7 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 | `@anywalletkit/tx-preview-evm` | pre-sign review for EVM: decode (recipient, approvals, contract), simulate balance changes at a pinned block, verdict + refusal reasons for the review sheet |
 | `@anywalletkit/protocol-staking-lido-evm`, `-ssv-evm`, `-tonstakers-ton`, `-spl-stake-pool-solana` | `StakingProtocol` modules (two-phase withdrawals): Lido, SSV Network, Tonstakers, Jito / SPL stake pools; the EVM two on viem (ported off ethers 2026-10-15) |
 | `@anywalletkit/protocol-staking-native-solana` | native SOL staking through the Stake program to the validators the app lists (fail-closed: no list, no module; commission cap and delinquency checked at every delegation); seed-derived stake accounts only the wallet signs, statuses computed from StakeHistory like the program, partial unstake by split, claim, re-delegate, merge |
+| `@anywalletkit/protocol-staking-native-monad` | native MON staking through Monad's staking precompile to the validator ids the app lists (fail-closed: no list, no module; live commission cap and active-set check at every delegation); withdrawal slots, claim / compound rewards, Monad's 10 MON reserve respected, every write simulated first |
 | `@anywalletkit/protocol-lending-mellow-evm` | Mellow Core Vaults (Lido EarnETH / EarnUSD) as a `LendingProtocol`; viem |
 | `@anywalletkit/protocol-lending-aave-evm` | Aave v3 on 18 chains (20 markets) as a `LendingProtocol`: supply / withdraw / borrow / repay, gateway for native, EIP-2612 permits, health factor, reserves with rates and caps; Pool cross-checked against the PoolAddressesProvider |
 | `@anywalletkit/protocol-lending-morpho-evm` | Morpho on 10 chains: Vaults (MetaMorpho V1 / Vault V2, ERC-4626) and Blue markets (supply / withdraw / borrow / repay / collateral) as `LendingProtocol`s; vaults verified against the factories, state accrued like the contract, API for listing / APY only |
@@ -90,7 +91,7 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 | `@anywalletkit/extension-kit` | Chromium (MV3) wallet-extension core: scrypt vault with passkey (PRF) unlock, auto-locking session, dApp request router + per-origin permissions + approval queue, signing checks (SIWE, EIP-7702, address poisoning, phishing list), swap / Earn plan review, TON Connect data, chrome adapters; no UI — the extension itself is the wallet's own product |
 
 Every protocol module ships a `module.json`; `pnpm registry` builds
-[registry/modules.json](registry/modules.json) from them (24 modules today). See
+[registry/modules.json](registry/modules.json) from them (25 modules today). See
 [registry/README.md](registry/README.md) for tiers and how to list an external module.
 
 User documentation: [docs.anywallet.tech](https://docs.anywallet.tech) (sources in `apps/docs`).

@@ -19,6 +19,7 @@
     "@anywalletkit/protocol-lending-morpho-evm": "workspace:*",
     "@anywalletkit/protocol-staking-lido-evm": "workspace:*",
     "@anywalletkit/protocol-staking-native-solana": "workspace:*",
+    "@anywalletkit/protocol-staking-native-monad": "workspace:*",
     "@anywalletkit/protocol-staking-spl-stake-pool-solana": "workspace:*",
     "@anywalletkit/protocol-staking-ssv-evm": "workspace:*",
     "@anywalletkit/protocol-staking-tonstakers-ton": "workspace:*",

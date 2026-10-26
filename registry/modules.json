@@ -1,7 +1,7 @@
 {
   "$schema": "./modules.schema.json",
-  "generatedAt": "2026-10-25",
-  "count": 24,
+  "generatedAt": "2026-10-26",
+  "count": 25,
   "modules": [
     {
       "name": "@anywalletkit/protocol-approvals-evm",
@@ -138,6 +138,22 @@
       "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-staking-lido-evm",
       "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@anywalletkit/protocol-staking-native-monad",
+      "type": "staking",
+      "chains": [
+        "eip155:143",
+        "eip155:10143"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
+      "path": "packages/protocol-staking-native-monad",
+      "addedAt": "2026-10-26"
     },
     {
       "name": "@anywalletkit/protocol-staking-native-solana",

@@ -1,0 +1,94 @@
+{
+  "note": "claimRewards sent straight to the staking precompile (Monad mainnet, block 116573249)",
+  "own": [
+    "0xb672f04bb730f3952571dbb72bba3e20b4fd7310"
+  ],
+  "tx": {
+    "chain": "eip155:143",
+    "hash": "0x3739a4b2537f60e71e12566b12c95f92fd0d8845f2a8aa14fdc0a57ff71447d3",
+    "time": 1792962603,
+    "status": "confirmed",
+    "address": "0xb672f04bb730f3952571dbb72bba3e20b4fd7310",
+    "from": "0xb672f04bb730f3952571dbb72bba3e20b4fd7310",
+    "to": "0x0000000000000000000000000000000000001000",
+    "nativeValue": "0",
+    "transfers": [],
+    "block": "116573249",
+    "raw": {
+      "source": "etherscan",
+      "tokens": [],
+      "internal": [],
+      "tx": {
+        "tx": {
+          "type": "0x0",
+          "chainId": "0x8f",
+          "nonce": "0x3c9",
+          "gasPrice": "0x17bfac7c00",
+          "gas": "0x493e0",
+          "to": "0x0000000000000000000000000000000000001000",
+          "value": "0x0",
+          "input": "0xa76e2ca50000000000000000000000000000000000000000000000000000000000000061",
+          "r": "0xeb8b3ea04390c52fb98672125265f1adf468af6033278a4f29749a24343cad55",
+          "s": "0x5c3239680da66c9018aad3e12199edcc96e3d2f166890769de6cd8c02729f8df",
+          "v": "0x142",
+          "hash": "0x3739a4b2537f60e71e12566b12c95f92fd0d8845f2a8aa14fdc0a57ff71447d3",
+          "blockHash": "0x88eaf13a65a0ab7fb528dce46c06c53b9738247a641be8b8b9c65aa978d09407",
+          "blockNumber": "0x6f2c441",
+          "transactionIndex": "0xb",
+          "from": "0xb672f04bb730f3952571dbb72bba3e20b4fd7310",
+          "blockTimestamp": "0x6ade702b"
+        },
+        "receipt": {
+          "type": "0x0",
+          "status": "0x1",
+          "cumulativeGasUsed": "0x5aded6",
+          "logs": [
+            {
+              "address": "0x0000000000000000000000000000000000001000",
+              "topics": [
+                "0xcb607e6b63c89c95f6ae24ece9fe0e38a7971aa5ed956254f1df47490921727b",
+                "0x0000000000000000000000000000000000000000000000000000000000000061",
+                "0x000000000000000000000000b672f04bb730f3952571dbb72bba3e20b4fd7310"
+              ],
+              "data": "0x000000000000000000000000000000000000000000000011cf75b438ee6511e1000000000000000000000000000000000000000000000000000000000000091c",
+              "blockHash": "0x88eaf13a65a0ab7fb528dce46c06c53b9738247a641be8b8b9c65aa978d09407",
+              "blockNumber": "0x6f2c441",
+              "blockTimestamp": "0x6ade702b",
+              "transactionHash": "0x3739a4b2537f60e71e12566b12c95f92fd0d8845f2a8aa14fdc0a57ff71447d3",
+              "transactionIndex": "0xb",
+              "logIndex": "0x33",
+              "removed": false
+            }
+          ],
+          "logsBloom": "0x00000000000000000000000000000000000000202000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000020000000000000400000000000000000000000000400000000000000000000000000000000000000000000000000000400000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000100000040400000000000000000000000000000000000000000000000000",
+          "transactionHash": "0x3739a4b2537f60e71e12566b12c95f92fd0d8845f2a8aa14fdc0a57ff71447d3",
+          "transactionIndex": "0xb",
+          "blockHash": "0x88eaf13a65a0ab7fb528dce46c06c53b9738247a641be8b8b9c65aa978d09407",
+          "blockNumber": "0x6f2c441",
+          "gasUsed": "0x493e0",
+          "effectiveGasPrice": "0x17bfac7c00",
+          "from": "0xb672f04bb730f3952571dbb72bba3e20b4fd7310",
+          "to": "0x0000000000000000000000000000000000001000",
+          "contractAddress": null
+        }
+      }
+    },
+    "fee": "30600000000000000",
+    "call": {
+      "to": "0x0000000000000000000000000000000000001000",
+      "selector": "0xa76e2ca5",
+      "data": "0xa76e2ca50000000000000000000000000000000000000000000000000000000000000061"
+    }
+  },
+  "expect": {
+    "kind": "claim",
+    "title": "Claimed staking rewards",
+    "assetsIn": [
+      {
+        "token": null,
+        "amount": "328543701947799376353"
+      }
+    ],
+    "counterparty": "0x0000000000000000000000000000000000001000"
+  }
+}

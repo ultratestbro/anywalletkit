@@ -1,0 +1,23 @@
+{
+  "module": "@anywalletkit/protocol-staking-native-monad",
+  "sources": [
+    {
+      "id": "docs-staking-api",
+      "type": "http-text",
+      "url": "https://docs.monad.xyz/reference/staking/api.md",
+      "label": "Monad docs · staking precompile API"
+    },
+    {
+      "id": "docs-reserve-balance",
+      "type": "http-text",
+      "url": "https://docs.monad.xyz/developer-essentials/reserve-balance.md",
+      "label": "Monad docs · reserve balance"
+    },
+    {
+      "id": "monad-bft-releases",
+      "type": "github-releases",
+      "repo": "category-labs/monad-bft",
+      "label": "Monad client releases (monad-bft)"
+    }
+  ]
+}
