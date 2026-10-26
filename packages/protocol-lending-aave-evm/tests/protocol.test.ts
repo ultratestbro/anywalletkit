@@ -348,9 +348,25 @@ describe('revert decoding', () => {
     expect(decodeAaveRevert('0xdeadbeef')).toEqual({ message: 'reverted with custom error 0xdeadbeef' })
   })
 })
+
 describe('round 3: max with permit / native max withdraw', () => {
-  // Audit 2026-10-25 round 3, M20: withdraw('max') through the WETH gateway approved exactly the aWETH held at planning; the
-  // gateway pulls the balance at execution, which interest has grown, and transferFrom fails.
+  // Audit 2026-10-25 round 3, M19: repay('max') on the permit road sent repayWithPermit(asset,
+  // uint256.max, …): the Pool calls permit(owner, pool, amount, …) with that amount, the signature
+  // covered `pulled`, so the permit reverted every time.
+  it("repay('max') with a permit passes the permitted amount, not uint256.max", async () => {
+    const pa = permitAccount()
+    const ctx = make({ acc: pa })
+    setBalance(ctx.state, V_USDT, USER, 1_000n * E6)
+    await ctx.p.repay({ token: USDT, amount: 'max' })
+    const pulled = 1_001n * E6 + 1n
+    expect((pa.permits[0] as { value: bigint }).value).toBe(pulled)
+    const sent = decodeSent(pa.sent[0])
+    expect(sent.fn).toBe('repayWithPermit')
+    expect(sent.args.slice(0, 4)).toEqual([USDT, pulled, 2n, USER])
+  })
+
+  // Audit 2026-10-25 round 3, M20: withdraw('max') through the WETH gateway approved exactly the
+  // aWETH held at planning; the gateway pulls the balance at execution, which interest has grown, and transferFrom fails.
   it("native withdraw('max') approves the held aWETH plus 0.1 % headroom", async () => {
     const { p, acc, state } = make()
     setBalance(state, A_WETH, USER, 2n * E18)

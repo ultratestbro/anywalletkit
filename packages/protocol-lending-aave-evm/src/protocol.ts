@@ -704,7 +704,9 @@ export class AaveProtocolEvm extends LendingProtocol<AaveProtocolConfig> {
       if (sign) {
         const permit = await this.permitFor(asset, pulled, market.pool)
         if (permit) {
-          const data = this.encode(POOL_ABI, 'repayWithPermit', [asset, amount, VARIABLE_RATE_MODE, onBehalfOf, permit.deadline, permit.v, permit.r, permit.s])
+          // The Pool calls permit(owner, pool, amount, …) with the amount it is given: it must be the
+          // one signed (`pulled`), never uint256.max. Aave repays at most the debt.
+          const data = this.encode(POOL_ABI, 'repayWithPermit', [asset, pulled, VARIABLE_RATE_MODE, onBehalfOf, permit.deadline, permit.v, permit.r, permit.s])
           return { reserve, native, approvals: [], tx: { to: market.pool, data, value: 0n }, debt, all, permit: true, withATokens: false }
         }
       } else if (await this.canPermit(asset)) {
