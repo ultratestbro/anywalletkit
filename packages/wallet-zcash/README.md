@@ -43,10 +43,13 @@ wallet.dispose()
 A **v5 transaction** (ZIP-225) with transparent inputs and outputs and empty
 Sapling / Orchard bundles. Ids and signature hashes follow **ZIP-244**: BLAKE2b-256
 digests personalized with the consensus branch id, so a signature is only valid under
-the upgrade it was made for. The branch id comes from the tip height
-(`branchIdForHeight`: NU5 → NU6 → NU6.1 → NU6.3 "Ironwood", active since block
-3 428 143) or from `consensusBranchId` in the config when a new upgrade activates
-before the package learns its id.
+the upgrade it was made for. The branch id is the one in force at tip + 1, the block
+the transaction lands in (`branchIdForHeight`: NU5 → NU6 → NU6.1 → NU6.3 "Ironwood",
+active since block 3 428 143), or `consensusBranchId` from the config when a new
+upgrade activates before the package learns its id. On testnet and regtest, whose
+upgrades activate at other heights, `consensusBranchId` is required. The expiry is
+tip + 1 + `expiryDelta`; without a tip nothing is signed (a transaction with expiry 0
+never expires).
 
 Fees are **ZIP-317**: `5000 zatoshis × max(2, logical actions)`, logical actions =
 `max(⌈Σ input bytes / 150⌉, ⌈Σ output bytes / 34⌉)` — a 1-in-2-out spend pays
@@ -84,8 +87,11 @@ the P2PKH address.
 | `blockchair` | `https://api.blockchair.com/zcash` | public, CORS, UTXOs incl. mempool, raw tx, `push/transaction`; optional `key`; mainnet only |
 | `blockbook-http` | any Zcash Blockbook (NOWNodes `zec-blockbook.nownodes.io`, self-hosted) | `/api/v2/{address,utxo,tx,sendtx}`; `headers` for API keys; testnet too |
 
-A list fails over in order; a node's *rejection* of a broadcast is final (not retried
-on the next transport).
+A list fails over in order; a node's *refusal* of a broadcast is final (not retried on
+the next transport) unless an endpoint before it never answered. A broadcast with no
+definitive answer (no response, a timeout, a 5xx, an HTML 502) throws
+`BroadcastUnknownError` (`maybeSent`, `hash` = the txid computed before sending): do
+not spend the coins again. "Already in the mempool / block chain" returns the txid.
 
 ## Activity history
 

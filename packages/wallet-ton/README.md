@@ -56,10 +56,18 @@ const tk = await WalletManagerTon.fromTonMnemonic(words, { tonClient })
    an aborted transaction, a failed action phase or a failed **first-hop**
    internal message (the operation would bounce) throws `SimulationError`
    **before signing**; failures deeper in the trace are `warnings`. tonapi's
-   `risk` is returned as `risk` and a body that would carry the whole balance
-   (send mode 128) is refused with `UnsafeTransactionError('drain')` unless
-   `allowDrainingTransactions`. `emulate: false` keeps only `estimateFee`;
-   `simulate: false` skips the preflight entirely.
+   `risk` is returned as `risk`. A message with send mode 128 (the whole
+   remaining balance) or 32 (the account destroyed once empty) is refused with
+   `UnsafeTransactionError('drain')` unless `allowDrainingTransactions` — checked
+   locally before any emulation, prebuilt bodies too, and again on tonapi's risk.
+   `describeTransaction` shows each message's `mode`. `emulate: false` keeps only
+   `estimateFee`; `simulate: false` skips the preflight entirely (not the mode check).
+   A jetton transfer's recipient and response destination get the same network
+   (test-only flag) and workchain checks as a native transfer.
+   A broadcast with no definitive answer (no response, a timeout, a non-JSON body)
+   throws `BroadcastUnknownError` (`maybeSent`, `hash` = the body hash): do not sign
+   again (the next seqno would pay twice); a node's `ok: false` stays a `NetworkError`.
+   A custom `TonRpc` should mark refusals `answered: true` (`isAnsweredRefusal`).
 4. noble ed25519 over the body hash; the 32-byte seed is the only key material
    and `dispose()` zeroizes it.
 5. `sendBoc` of the external (with StateInit when the wallet is not deployed).
