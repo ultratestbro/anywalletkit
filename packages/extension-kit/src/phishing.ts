@@ -59,6 +59,15 @@ export class PhishingDetector {
   }
 
   /**
+   * Why `hostOrOrigin` must be refused outright, or `null`: a host on the blocklist (or under a
+   * listed domain) and not on the allowlist. Lookalikes and punycode only warn ({@link check}).
+   * Wire it as `ApprovalQueueOptions.refuse` and `RouterDeps.refuse`.
+   */
+  refusal(hostOrOrigin: string): string | null {
+    return this.check(hostOrOrigin).blocked ? 'This site is on the wallet\'s phishing list; the wallet refuses its requests.' : null
+  }
+
+  /**
    * `metamask.io-login.com`, `app-uniswap.com`, `uniswap.org.evil.net`: a known site's name used as (part of) a label
    * of a host that is not that site. Names shorter than 5 characters are skipped (too many honest matches).
    */

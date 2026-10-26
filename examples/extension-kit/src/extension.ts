@@ -121,8 +121,9 @@ export function createRouter(wallet: WalletParts, options: WorkerOptions) {
   const { keyring, session } = wallet
   const local = options.chrome.storage.local
   const phishing = new PhishingDetector(options.phishing)
-  // Warnings about the asking site ride along with every approval request.
-  const approvals = new ApprovalQueue(options.window, undefined, { annotate: (origin) => phishing.check(origin).warnings })
+  // A site on the shipped phishing list is refused (4100) before any window opens; lookalikes and
+  // punycode only add warnings to the sheet.
+  const approvals = new ApprovalQueue(options.window, undefined, { annotate: (origin) => phishing.check(origin).warnings, refuse: (origin) => phishing.refusal(origin) })
   const ports = new Map<string, Set<(message: RelayToContent) => void>>()
 
   // Signing: the account lives only for one signature, then its key is wiped.
@@ -142,6 +143,7 @@ export function createRouter(wallet: WalletParts, options: WorkerOptions) {
     permissions: new PermissionStore(chromeJsonStorage<PermissionsState>(local, 'my-wallet.permissions')),
     networks: new NetworksTable(chromeJsonStorage<EvmNetwork[]>(local, 'my-wallet.networks')),
     approvals,
+    refuse: (origin) => phishing.refusal(origin), // reads and an earlier permission included
     // A locked wallet shows no accounts; eth_requestAccounts then opens the window to unlock.
     accounts: async () => {
       const address = keyring.activeAccount?.addresses.evm

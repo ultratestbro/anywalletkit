@@ -185,6 +185,15 @@ describe('extension-kit guide', () => {
     expect(lastRequest().originWarnings).toEqual(['The address looks like app.uniswap.org but is not that site.'])
   })
 
+  it('a site on the shipped phishing list is refused (4100) before any window opens', async () => {
+    const { worker, windows } = await setup()
+    const page = connectPage(worker, 'https://evil.example')
+    const ids = [page.send('eth_requestAccounts'), page.send('eth_chainId')]
+    await flush()
+    for (const id of ids) expect(page.answer(id)?.error?.code).toBe(4100)
+    expect([...windows.open.values()]).toEqual([])
+  })
+
   it('auto-lock: the alarm locks the session', async () => {
     const { chrome, wallet } = await setup()
     expect(await wallet.session.isUnlocked()).toBe(true)

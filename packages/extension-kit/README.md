@@ -46,7 +46,7 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
 | Swaps | `quoteRoutes`, `reviewSwapPlan`, `executionFloor`, `SwapsStore`, `SwapTracker`, `parseSwapId` | progressive quotes over swap2 providers, one review sheet per plan, pending swaps resumed across worker restarts |
 | Earn | `reviewEarnPlan`, `earnPlanMatchers` | one sheet for an Earn module's plan (approvals + call) |
 | TON Connect | `parseConnectRequest`, `parseSendTransaction`, `parseSignData`, `tonProofMessage`, `tonSignDataMessage` | the pure-data half of TON Connect v2 (the digests `ton_proof` and `signData` sign, to verify them); the account signs with `signTonProof` / `signTonConnectData` (wallet-ton) — `sign()` refuses 32-byte digests |
-| Phishing | `PhishingDetector` | MetaMask `eth-phishing-detect` list format, shipped with the build (never fetched at runtime), fuzzy lookalikes, brand-in-label, punycode |
+| Phishing | `PhishingDetector` | MetaMask `eth-phishing-detect` list format, shipped with the build (never fetched at runtime); a listed site is refused (`refusal` → `refuse` on `ApprovalQueue` and `RequestRouter`, 4100, no window); fuzzy lookalikes, brand-in-label, punycode warn |
 | SIWE | `parseSiwe`, `siweProblems`, `describeSiwe` | EIP-4361 sign-in messages: domain vs. the asking site, address, chain, expiry, nonce (warnings) |
 | Address poisoning | `lookalikeOf`, `RecipientBook` | warns when a new recipient imitates one the user confirmed |
 | WebAuthn | `verifyAssertion`, `approvalChallenge`, `derToRaw`, `rawToDer` | ES256 assertion check for "passkey on every signature"; the worker never trusts the page's word |

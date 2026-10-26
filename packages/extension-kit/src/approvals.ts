@@ -51,6 +51,15 @@ export class QueueLimitError extends Error {
   }
 }
 
+/** The origin is refused before any window opens (the shipped phishing list); EIP-1193 4100. */
+export class OriginRefused extends Error {
+  readonly code = RELAY_ERRORS.unauthorized
+  constructor(message: string) {
+    super(message)
+    this.name = 'OriginRefused'
+  }
+}
+
 export const APPROVALS_MAX_PENDING_PER_ORIGIN = 3
 
 export interface ApprovalRequest<P = unknown> {
@@ -70,6 +79,12 @@ export interface ApprovalRequest<P = unknown> {
 export interface ApprovalQueueOptions {
   /** Called for every request's origin; the lines are shown on the sheet (e.g. the shipped phishing list's verdict). */
   annotate?: (origin: string) => string[]
+  /**
+   * Called for every request's origin before anything is queued: a reason refuses the request with
+   * {@link OriginRefused} (4100) and no window opens. Wire `PhishingDetector.refusal` here — a
+   * warning on the sheet is one click away from a signature.
+   */
+  refuse?: (origin: string) => string | null | undefined
   /** Requests one origin may have waiting (current + queued). Default {@link APPROVALS_MAX_PENDING_PER_ORIGIN}. */
   maxPendingPerOrigin?: number
 }
@@ -100,6 +115,9 @@ export class ApprovalQueue {
 
   /** Enqueue and wait for the user's answer. Refuses (never queues) past the per-origin limits. */
   request<T = unknown>(input: Omit<ApprovalRequest, 'id' | 'createdAt' | 'originWarnings' | 'via'>): Promise<T> {
+    let refused: string | null | undefined
+    try { refused = this.options.refuse?.(input.origin) } catch (e) { refused = `The wallet could not check this site (${e instanceof Error ? e.message : String(e)}).` }
+    if (refused) return Promise.reject(new OriginRefused(refused))
     const sameOrigin = [...(this._current ? [this._current] : []), ...this._waiting].filter((p) => p.request.origin === input.origin)
     if (input.kind === 'connect' && sameOrigin.some((p) => p.request.kind === 'connect')) {
       return Promise.reject(new QueueLimitError(RELAY_ERRORS.resourceUnavailable, 'A connect request from this site is already waiting for your answer.'))

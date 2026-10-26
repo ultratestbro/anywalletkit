@@ -115,9 +115,11 @@ Show on every approval:
 
 - **The origin from the request** (`request.origin`), which the browser recorded. Never show
   a name or URL the page sent about itself.
-- **`request.originWarnings`**: phishing and lookalike warnings from your `annotate` hook. The
+- **`request.originWarnings`**: lookalike and punycode warnings from your `annotate` hook. The
   router snippet wires `PhishingDetector`, which reads a list in the `eth-phishing-detect`
-  format. Ship the list inside your build; the kit never downloads it.
+  format. Ship the list inside your build; the kit never downloads it. A site ON the list
+  never reaches the sheet: `refuse: (origin) => phishing.refusal(origin)` on the queue and
+  the router answers it with 4100 before any window opens.
 - **What will happen**: for transactions, the prepared fee (`payload.prepared.maxFee`) and
   your preview.
 
