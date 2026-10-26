@@ -13,7 +13,7 @@ import { TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, getCreateAssociatedToken
 import {
   TOKEN_2022_PROGRAM_ADDRESS, getMintDecoder, getTransferCheckedInstruction as getTransferChecked2022Instruction, getTransferCheckedWithFeeInstruction,
 } from '@solana-program/token-2022'
-import { MAX_U64, ZERO_ADDRESS, decodeWireTransaction, describeTransaction, resolveCompiledAccounts } from './describe.js'
+import { MAX_U64, STAKE_PROGRAM_ADDRESS, ZERO_ADDRESS, decodeWireTransaction, describeTransaction, resolveCompiledAccounts } from './describe.js'
 import {
   DEFAULT_PROGRAM_ALLOWLIST, SAFE_CORE_INSTRUCTIONS, WSOL_MINT, base64Bytes, bytesEqual, isNativeMint, optEqual, parseTokenAccount, pubkeyBytes, type SerializedCheck, type SerializedTxGuard,
 } from './serialized.js'
@@ -38,6 +38,10 @@ const CORE_PROGRAMS = new Set<string>([SYSTEM_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADD
 const WALLET_SYSTEM_INSTRUCTIONS = new Set(['Assign', 'AssignWithSeed', 'Allocate', 'AllocateWithSeed', 'AuthorizeNonceAccount', 'CreateAccountAllowPrefund'])
 /** Token / Token-2022 instructions that hand an authority away (`SetAuthority` and the metadata / group interfaces). */
 const TOKEN_AUTHORITY_INSTRUCTIONS = new Set(['SetAuthority', 'UpdateTokenMetadataUpdateAuthority', 'UpdateTokenGroupUpdateAuthority'])
+/** A Stake account's space: AllocateWithSeed of exactly this, owned by Stake, is how a pre-funded seed slot is taken back. */
+const STAKE_ACCOUNT_SPACE = 200n
+/** `Pubkey::default()`: an Initialize lockup with this custodian has none. */
+const NO_CUSTODIAN = '11111111111111111111111111111111'
 /** Undecoded core instructions that move lamports, with the index of the account they go to: refused unless that is this wallet. */
 const LAMPORT_DESTINATIONS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   [SYSTEM_PROGRAM_ADDRESS]: { WithdrawNonceAccount: 1, TransferSolWithSeed: 2 },
@@ -346,7 +350,14 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
    */
   protected enforceAuthorities(description: TransactionDescription): void {
     const hint = ' Set allowAuthorityChanges to override.'
+    const settled = this.ownStakeAccounts(description)
     for (const it of description.items) {
+      if (it.type === 'create-account' && it.owner === STAKE_PROGRAM_ADDRESS && it.payer === this.address && !settled.has(it.newAccount)) {
+        // An uninitialized stake account takes Initialize from anyone: funding one is handing it over
+        // unless this same message makes this wallet its staker and withdrawer.
+        throw new UnsafeTransactionError(`Transaction funds stake account ${it.newAccount} without making this wallet its staker and withdrawer.${hint}`, 'sets-authority', [it.newAccount])
+      }
+      if ((it.type === 'program-call' || it.type === 'unknown') && it.program === STAKE_PROGRAM_ADDRESS) { this.enforceStake(it, hint); continue }
       if (it.type === 'set-authority') throw new UnsafeTransactionError(`Transaction changes an authority on ${it.account}.${hint}`, 'sets-authority', [it.account])
       if (it.type === 'close-account' && it.destination !== this.address) {
         throw new UnsafeTransactionError(`Transaction closes ${it.account} with the rent sent to ${it.destination}.${hint}`, 'closes-account', [it.account])
@@ -360,7 +371,11 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       const system = it.program === SYSTEM_PROGRAM_ADDRESS
       // CreateAccountAllowPrefund: only the NEW account (index 0) matters; the wallet may just pay for it.
       const touches = name === 'CreateAccountAllowPrefund' ? it.accounts[0] === this.address : it.accounts.includes(this.address)
-      if (system && WALLET_SYSTEM_INSTRUCTIONS.has(name) && touches) {
+      // Taking back a seed slot someone pre-funded (native staking): this wallet's own seed account
+      // becomes a 200-byte Stake account that this message initializes for, or splits into from, this wallet.
+      const seedSlot = it.type === 'program-call' && name === 'AllocateWithSeed' && it.withSeed !== undefined && it.withSeed.base === this.address &&
+        it.withSeed.owner === STAKE_PROGRAM_ADDRESS && it.withSeed.space === STAKE_ACCOUNT_SPACE && it.accounts[0] !== undefined && settled.has(it.accounts[0])
+      if (system && WALLET_SYSTEM_INSTRUCTIONS.has(name) && touches && !seedSlot) {
         throw new UnsafeTransactionError(`Transaction runs ${name} on an account of this wallet (${this.address}).${hint}`, 'core-instruction', [it.program])
       }
       if (!system && name === 'Batch') throw new UnsafeTransactionError(`Transaction runs a token Batch, whose inner instructions are not checked.${hint}`, 'core-instruction', [it.program])
@@ -373,6 +388,55 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
         if (name === 'CloseAccount') throw new UnsafeTransactionError(`Transaction closes ${it.accounts[0] ?? 'a token account'} with the rent sent to ${where}.${hint}`, 'closes-account', [it.accounts[0] ?? it.program])
         throw new UnsafeTransactionError(`Transaction moves lamports to ${where} with ${name}.${hint}`, 'moves-lamports', [it.accounts[0] ?? it.program])
       }
+    }
+  }
+
+  /**
+   * Stake accounts this message leaves to this wallet: initialized with this wallet as staker and
+   * withdrawer and no lockup, or the destination of a Split this wallet signs (a split copies the
+   * source's authorities).
+   */
+  private ownStakeAccounts(description: TransactionDescription): Set<string> {
+    const own = new Set<string>()
+    for (const it of description.items) {
+      if ((it.type !== 'program-call' && it.type !== 'unknown') || it.program !== STAKE_PROGRAM_ADDRESS || !it.stake) continue
+      const target = it.accounts[it.stake.name === 'Split' ? 1 : 0]
+      if (!target) continue
+      const s = it.stake
+      if (s.name === 'Split' && it.accounts[2] === this.address) own.add(target)
+      const unlocked = (s.lockupTimestamp ?? 0n) === 0n && (s.lockupEpoch ?? 0n) === 0n && (s.custodian === undefined || s.custodian === NO_CUSTODIAN || s.custodian === this.address)
+      if ((s.name === 'Initialize' || s.name === 'InitializeChecked') && s.staker === this.address && s.withdrawer === this.address && unlocked) own.add(target)
+    }
+    return own
+  }
+
+  /**
+   * A Stake instruction this wallet signs for must not hand a stake account, or its lamports, to
+   * anyone else: `Authorize*` to another key, `Withdraw` to another recipient, `SetLockup*` with a
+   * foreign custodian or a lockup. An undecodable Stake instruction that names this wallet is refused.
+   */
+  private enforceStake(it: Extract<TransactionDescription['items'][number], { type: 'program-call' | 'unknown' }>, hint: string): void {
+    const me = this.address
+    const at = (n: number) => it.accounts[n] ?? undefined
+    const s = it.stake
+    const account = at(0) ?? 'an unresolved stake account'
+    if (!s) {
+      if (it.accounts.includes(me)) throw new UnsafeTransactionError(`Transaction runs an undecodable Stake instruction that names this wallet.${hint}`, 'core-instruction', [it.program ?? STAKE_PROGRAM_ADDRESS])
+      return
+    }
+    // The account that authorizes, by instruction: the authority itself, or the seed base for *WithSeed.
+    const signer = s.name === 'AuthorizeWithSeed' || s.name === 'AuthorizeCheckedWithSeed' ? at(1) : s.name === 'Withdraw' ? at(4) : s.name === 'SetLockup' || s.name === 'SetLockupChecked' ? at(1) : at(2)
+    if (signer !== me) return
+    if (s.name === 'Authorize' || s.name === 'AuthorizeWithSeed' || s.name === 'AuthorizeChecked' || s.name === 'AuthorizeCheckedWithSeed') {
+      if (s.newAuthority !== me) throw new UnsafeTransactionError(`Transaction makes ${s.newAuthority ?? 'an unresolved account'} the ${s.authorityType ?? ''} authority of stake account ${account}.${hint}`, 'sets-authority', [account])
+    }
+    if (s.name === 'Withdraw' && at(1) !== me) {
+      throw new UnsafeTransactionError(`Transaction withdraws ${s.lamports ?? 0n} lamports from stake account ${account} to ${at(1) ?? 'an unresolved account'}.${hint}`, 'moves-lamports', [account])
+    }
+    if (s.name === 'SetLockup' || s.name === 'SetLockupChecked') {
+      const foreign = s.custodian !== undefined && s.custodian !== me
+      const locks = (s.lockupTimestamp ?? 0n) !== 0n || (s.lockupEpoch ?? 0n) !== 0n
+      if (foreign || locks) throw new UnsafeTransactionError(`Transaction sets a lockup${foreign ? ` with custodian ${s.custodian}` : ''} on stake account ${account}.${hint}`, 'sets-authority', [account])
     }
   }
 

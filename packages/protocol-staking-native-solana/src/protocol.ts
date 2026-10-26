@@ -253,8 +253,8 @@ function explainTakeover(e: unknown, instructions: readonly Instruction[], maxAc
   if (!takeover || !/AllocateWithSeed/.test(e instanceof Error ? e.message : String(e))) return e
   return Object.assign(new Error(
     `No empty stake-account slot is left: the free ones (of ${maxAccounts}) hold SOL someone sent there, and taking one over needs `
-    + 'AllocateWithSeed, which this wallet refuses to sign. Raise maxAccounts for new slots, claim or merge accounts to free some, '
-    + 'or allow the wallet to sign it (wallet-solana: allowAuthorityChanges).',
+    + 'AllocateWithSeed, which this wallet refuses to sign (a current wallet-solana signs it when the same transaction initializes the account for the wallet). '
+    + 'Raise maxAccounts for new slots, or claim or merge accounts to free some.',
   ), { cause: e })
 }
 

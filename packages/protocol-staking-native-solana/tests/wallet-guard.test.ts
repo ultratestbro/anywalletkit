@@ -42,14 +42,13 @@ describe("wallet-solana's signing checks, default config", () => {
     expect(account.sent).toHaveLength(6)
   })
 
-  it('refuse taking over a pre-funded slot (AllocateWithSeed), and the module says why', async () => {
+  it('take over a pre-funded slot (Transfer + AllocateWithSeed + Initialize): dust in every slot cannot block staking (audit 2026-10-26, finding 3)', async () => {
     const node = new FakeNode()
-    node.accounts.set(createWithSeed(WALLET, 'stake:0', STAKE_PROGRAM), { lamports: 890_880n, owner: SYSTEM_PROGRAM, data: new Uint8Array() })
+    const slot = createWithSeed(WALLET, 'stake:0', STAKE_PROGRAM)
+    node.accounts.set(slot, { lamports: 890_880n, owner: SYSTEM_PROGRAM, data: new Uint8Array() })
     const { p, account } = guarded({ maxAccounts: 1 }, node)
-    await expect(p.quoteStake({ amount: SOL })).rejects.toThrow(/No empty stake-account slot is left.*allowAuthorityChanges/)
-    await expect(p.stake({ amount: SOL })).rejects.toThrow(/No empty stake-account slot is left/)
-    expect(account.sent).toHaveLength(0)
-    // With an empty slot left, nothing needs taking over.
-    expect((await guarded({ maxAccounts: 2 }, node).p.quoteStake({ amount: SOL })).stakeAccount).toBe(createWithSeed(WALLET, 'stake:1', STAKE_PROGRAM))
+    expect((await p.quoteStake({ amount: SOL })).stakeAccount).toBe(slot)
+    await p.stake({ amount: SOL })
+    expect(account.sent).toHaveLength(1)
   })
 })

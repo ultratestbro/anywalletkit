@@ -8,11 +8,14 @@
  * supplied are reported as unresolved rather than guessed.
  */
 import {
-  AccountRole, getBase64Encoder, getCompiledTransactionMessageDecoder, getTransactionDecoder,
+  AccountRole, getAddressDecoder, getBase64Encoder, getCompiledTransactionMessageDecoder, getTransactionDecoder,
   isSignerRole, type AccountLookupMeta, type AccountMeta, type Address, type Instruction, type Transaction, type TransactionMessage,
 } from '@solana/kit'
 import { COMPUTE_BUDGET_PROGRAM_ADDRESS, ComputeBudgetInstruction, identifyComputeBudgetInstruction, parseSetComputeUnitLimitInstruction, parseSetComputeUnitPriceInstruction } from '@solana-program/compute-budget'
-import { SYSTEM_PROGRAM_ADDRESS, SystemInstruction, identifySystemInstruction, parseCreateAccountInstruction, parseCreateAccountWithSeedInstruction, parseTransferSolInstruction } from '@solana-program/system'
+import {
+  SYSTEM_PROGRAM_ADDRESS, SystemInstruction, identifySystemInstruction, parseAllocateWithSeedInstruction, parseAssignWithSeedInstruction, parseCreateAccountInstruction,
+  parseCreateAccountWithSeedInstruction, parseTransferSolInstruction,
+} from '@solana-program/system'
 import {
   ASSOCIATED_TOKEN_PROGRAM_ADDRESS, AssociatedTokenInstruction, TOKEN_PROGRAM_ADDRESS, TokenInstruction, identifyAssociatedTokenInstruction, identifyTokenInstruction,
   parseApproveCheckedInstruction, parseApproveInstruction, parseCloseAccountInstruction, parseCreateAssociatedTokenIdempotentInstruction, parseCreateAssociatedTokenInstruction,
@@ -24,7 +27,66 @@ import {
   parseSetAuthorityInstruction as parseSetAuthority2022, parseTransferCheckedInstruction as parseTransferChecked2022, parseTransferCheckedWithFeeInstruction, parseTransferInstruction as parseTransfer2022,
 } from '@solana-program/token-2022'
 import { isNativeTransfer, isSignedTransaction, isTransactionMessage } from './guards.js'
-import type { DecodedInstruction, SolanaTransaction, SolanaWarning, TokenProgramKind, TransactionDescription } from './types.js'
+import type { DecodedInstruction, SeedAccountDetails, SolanaTransaction, SolanaWarning, StakeInstructionDetails, StakeInstructionName, TokenProgramKind, TransactionDescription } from './types.js'
+
+/** The native Stake program. */
+export const STAKE_PROGRAM_ADDRESS = 'Stake11111111111111111111111111111111111111'
+
+const STAKE_NAMES: readonly StakeInstructionName[] = [
+  'Initialize', 'Authorize', 'DelegateStake', 'Split', 'Withdraw', 'Deactivate', 'SetLockup', 'Merge',
+  'AuthorizeWithSeed', 'InitializeChecked', 'AuthorizeChecked', 'AuthorizeCheckedWithSeed', 'SetLockupChecked',
+  'GetMinimumDelegation', 'DeactivateDelinquent', 'Redelegate', 'MoveStake', 'MoveLamports',
+]
+
+/** bincode reader for Stake instruction data (little-endian, `Option` = 0/1 byte, `String` = u64 length). */
+class StakeReader {
+  private i = 0
+  private readonly view: DataView
+  constructor(private readonly b: Uint8Array) { this.view = new DataView(b.buffer, b.byteOffset, b.byteLength) }
+  private need(n: number) { if (this.i + n > this.b.length) throw new RangeError('truncated') }
+  u8(): number { this.need(1); return this.b[this.i++]! }
+  u32(): number { this.need(4); const v = this.view.getUint32(this.i, true); this.i += 4; return v }
+  u64(): bigint { this.need(8); const v = this.view.getBigUint64(this.i, true); this.i += 8; return v }
+  i64(): bigint { this.need(8); const v = this.view.getBigInt64(this.i, true); this.i += 8; return v }
+  key(): string { this.need(32); const k = getAddressDecoder().decode(this.b.subarray(this.i, this.i + 32)); this.i += 32; return k }
+  string(): void { const n = this.u64(); if (n > 32n) throw new RangeError('seed too long'); const len = Number(n.toString()) /* ≤ 32 */; this.need(len); this.i += len }
+  option<T>(read: () => T): T | undefined { const tag = this.u8(); if (tag > 1) throw new RangeError('bad option'); return tag === 1 ? read() : undefined }
+  authority(): 'staker' | 'withdrawer' { const t = this.u32(); if (t > 1) throw new RangeError('bad StakeAuthorize'); return t === 0 ? 'staker' : 'withdrawer' }
+}
+
+/** A Stake instruction's name and what it sets, or undefined when the data does not decode. */
+export function decodeStakeInstruction(data: Uint8Array, accounts: readonly (string | null)[]): StakeInstructionDetails | undefined {
+  const at = (n: number) => accounts[n] ?? undefined
+  const set = (o: { [K in keyof StakeInstructionDetails]?: StakeInstructionDetails[K] | undefined }): StakeInstructionDetails =>
+    Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as unknown as StakeInstructionDetails
+  try {
+    const r = new StakeReader(data)
+    const tag = r.u32()
+    const name = STAKE_NAMES[tag]
+    if (!name) return undefined
+    switch (name) {
+      case 'Initialize': return { name, staker: r.key(), withdrawer: r.key(), lockupTimestamp: r.i64(), lockupEpoch: r.u64(), custodian: r.key() }
+      case 'Authorize': return { name, newAuthority: r.key(), authorityType: r.authority() }
+      case 'AuthorizeWithSeed': { const newAuthority = r.key(); const authorityType = r.authority(); r.string(); r.key(); return { name, newAuthority, authorityType } }
+      case 'AuthorizeChecked': return set({ name, authorityType: r.authority(), newAuthority: at(3) })
+      case 'AuthorizeCheckedWithSeed': { const authorityType = r.authority(); r.string(); r.key(); return set({ name, authorityType, newAuthority: at(3) }) }
+      case 'InitializeChecked': return set({ name, staker: at(2), withdrawer: at(3) })
+      case 'Split': case 'Withdraw': case 'MoveStake': case 'MoveLamports': return { name, lamports: r.u64() }
+      case 'SetLockup': return set({ name, lockupTimestamp: r.option(() => r.i64()), lockupEpoch: r.option(() => r.u64()), custodian: r.option(() => r.key()) })
+      case 'SetLockupChecked': return set({ name, lockupTimestamp: r.option(() => r.i64()), lockupEpoch: r.option(() => r.u64()), custodian: at(2) })
+      default: return { name }
+    }
+  } catch {
+    return undefined
+  }
+}
+
+/** AllocateWithSeed / AssignWithSeed details, from the official parsers. */
+function seedAccountDetails(ix: never, t: SystemInstruction): SeedAccountDetails | undefined {
+  if (t === SystemInstruction.AllocateWithSeed) { const d = parseAllocateWithSeedInstruction(ix).data; return { base: d.base, seed: d.seed, owner: d.programAddress, space: d.space } }
+  if (t === SystemInstruction.AssignWithSeed) { const d = parseAssignWithSeedInstruction(ix).data; return { base: d.base, seed: d.seed, owner: d.programAddress } }
+  return undefined
+}
 
 /** Largest u64; a token approval of this amount is unlimited. */
 export const MAX_U64 = 0xffffffffffffffffn
@@ -147,8 +209,15 @@ function coreInstructionName(program: string, data: Uint8Array): string | undefi
 function decodeOne(r: Resolved): DecodedInstruction {
   const program = r.programAddress
   if (program === null || r.accounts.some((a) => a.address === null)) {
-    const instruction = program === null ? undefined : coreInstructionName(program, r.data)
-    return { type: 'unknown', program, accounts: r.accounts.map((a) => a.address), dataLength: r.data.length, ...(instruction ? { instruction } : {}) }
+    const accounts = r.accounts.map((a) => a.address)
+    const stake = program === STAKE_PROGRAM_ADDRESS ? decodeStakeInstruction(r.data, accounts) : undefined
+    const instruction = stake?.name ?? (program === null ? undefined : coreInstructionName(program, r.data))
+    return { type: 'unknown', program, accounts, dataLength: r.data.length, ...(instruction ? { instruction } : {}), ...(stake ? { stake } : {}) }
+  }
+  if (program === STAKE_PROGRAM_ADDRESS) {
+    const accounts = r.accounts.map((a) => a.address as string)
+    const stake = decodeStakeInstruction(r.data, accounts)
+    return { type: 'program-call', program, accounts, dataLength: r.data.length, ...(stake ? { instruction: stake.name, stake } : {}) }
   }
   const ix = asIx(r)
   try {
@@ -167,7 +236,9 @@ function decodeOne(r: Resolved): DecodedInstruction {
         const p = parseCreateAccountWithSeedInstruction(ix)
         return { type: 'create-account', program, payer: p.accounts.payer.address, newAccount: p.accounts.newAccount.address, lamports: p.data.amount, owner: p.data.programAddress }
       }
-      return { type: 'program-call', program, accounts: r.accounts.map((a) => a.address as string), dataLength: r.data.length, instruction: SystemInstruction[t] }
+      let withSeed: SeedAccountDetails | undefined
+      try { withSeed = seedAccountDetails(ix, t) } catch { /* malformed: the guard refuses it by name */ }
+      return { type: 'program-call', program, accounts: r.accounts.map((a) => a.address as string), dataLength: r.data.length, instruction: SystemInstruction[t], ...(withSeed ? { withSeed } : {}) }
     } else if (program === TOKEN_PROGRAM_ADDRESS || program === TOKEN_2022_PROGRAM_ADDRESS) {
       return decodeToken(r, ix, program)
     } else if (program === ASSOCIATED_TOKEN_PROGRAM_ADDRESS) {
