@@ -61,6 +61,8 @@ export function verdict(preview: TxPreview): Verdict {
         raise('danger'); lines.push(`${d.label ?? d.spender} could spend ALL of this token, now and later.`); break
       case 'approval-excess':
         raise('warn'); lines.push(`Approves ${d.amount}, but the swap needs only ${d.expected}.`); break
+      case 'approval-unchecked':
+        raise('warn'); lines.push(`Approves ${d.amount} to ${d.label ?? d.spender}; nothing says how much is needed.`); break
       case 'approval-unknown-spender':
         raise('warn'); lines.push(`Unknown spender ${d.spender}.`); break
       case 'contract-unknown':

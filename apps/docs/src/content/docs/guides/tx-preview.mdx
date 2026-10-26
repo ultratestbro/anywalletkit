@@ -80,16 +80,17 @@ decisions:
 
 | Code | Status | Meaning |
 |---|---|---|
-| `contract-known` / `contract-unknown` | ok / warn | The contract doing the work is in `known`, or isn't |
+| `contract-known` / `contract-unknown` | ok / warn | A contract a call goes to is in `known`, or isn't — one per target, every call but approvals (a transfer-shaped call included) |
 | `simulation-ok` | ok | Simulated; balance changes are in `simulation.changes` |
 | `simulation-reverted` | warn | It will fail; `detail.reason` says why |
 | `simulation-unavailable` | unknown | The network can't simulate it |
 | `recipient-own` / `recipient-foreign` | ok / warn | A recipient is, or isn't, one of `own` |
 | `approval-exact` | ok | Approves no more than `expectedApproval` |
+| `approval-unchecked` | unknown | A bounded approval and no `expectedApproval` to compare it with |
 | `approval-excess` | warn | Approves more than `expectedApproval` |
-| `approval-unlimited` | warn | Unlimited allowance or operator approval |
+| `approval-unlimited` | warn | Unlimited allowance (≥ 2^128 − 1) or operator approval |
 | `approval-unknown-spender` | warn | The spender is not in `known` |
-| `native-value` | ok | The call also sends native coin (`detail.amount`) |
+| `native-value` | ok / warn | A call sends native coin into a contract (`detail.amount`, per call); warn when that contract is not in `known` (`detail.address`) |
 
 ## Preview every write
 
