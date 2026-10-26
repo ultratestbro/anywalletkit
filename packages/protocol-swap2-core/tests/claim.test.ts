@@ -34,8 +34,9 @@ describe("claimSwap2 (two-phase delivery)", () => {
     const p = new P(prov);
     const dest = createMockAccount({chain: "eip155:42161"});
     const out = await p.claimSwap2(id, dest);
-    expect(out).toMatchObject({chain: "eip155:42161", id});
     expect(out.hash).toMatch(/^0x/);
+    // The id to keep polling names the claim (round 3, M27): the old id plus the claim hash.
+    expect(out).toMatchObject({chain: "eip155:42161", id: `${id}.${out.hash}`});
     expect(prov.claims).toEqual([{intentId: "cctp:6:3:1000", sourceTxHash: "0xabc"}]);
     expect(dest.sent).toHaveLength(1);
     expect(dest.sent[0]).toMatchObject({to: CLAIM.to, data: CLAIM.data, value: 0n, chainId: 42161, gasLimit: 260000n});

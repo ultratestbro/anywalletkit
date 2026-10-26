@@ -392,24 +392,31 @@ function reviewedIdentity(plan: Swap2ExecutionPlan): string {
 export const SWAP2_ID_PREFIX = "awk1";
 
 /** Versioned provider/intent/source-hash id for durable status tracking. */
-function encodeId(provider: string, intentId: string, sourceTxHash?: string): string {
+/**
+ * `awk1.<provider>.<intentId>[.<sourceTxHash>[.<destTxHash>]]`. The destination claim's hash rides
+ * in the id `claimSwap2` returns, so a provider without a destination RPC can still tell the
+ * delivery completed (round 3, M27).
+ */
+function encodeId(provider: string, intentId: string, sourceTxHash?: string, destTxHash?: string): string {
   // encodeURIComponent leaves "." unescaped, which would shift decodeId's
   // split — escape it explicitly so segments are dot-safe.
   const enc = (v: string) => encodeURIComponent(v).replace(/\./g, "%2E");
-  return `${SWAP2_ID_PREFIX}.${[provider, intentId, sourceTxHash].filter((v): v is string => v != null).map(enc).join(".")}`;
+  const parts = [provider, intentId, ...(sourceTxHash != null ? [sourceTxHash, ...(destTxHash != null ? [destTxHash] : [])] : [])];
+  return `${SWAP2_ID_PREFIX}.${parts.map(enc).join(".")}`;
 }
-function decodeId(id: string): {provider: string; intentId: string; sourceTxHash?: string} {
+function decodeId(id: string): {provider: string; intentId: string; sourceTxHash?: string; destTxHash?: string} {
   try {
     if (!id.startsWith(`${SWAP2_ID_PREFIX}.`)) throw new Error("unsupported id version");
     const parts = id.slice(SWAP2_ID_PREFIX.length + 1).split(".");
-    if (parts.length < 2 || parts.length > 3 || !parts[0] || !parts[1]) throw new Error("invalid id shape");
+    if (parts.length < 2 || parts.length > 4 || !parts[0] || !parts[1]) throw new Error("invalid id shape");
     const provider = decodeURIComponent(parts[0]);
     const intentId = decodeURIComponent(parts[1]);
     const sourceTxHash = parts[2] ? decodeURIComponent(parts[2]) : undefined;
-    if (!/^[A-Za-z0-9_-]+$/.test(provider) || !intentId || (parts[2] !== undefined && !sourceTxHash)) {
+    const destTxHash = parts[3] ? decodeURIComponent(parts[3]) : undefined;
+    if (!/^[A-Za-z0-9_-]+$/.test(provider) || !intentId || (parts[2] !== undefined && !sourceTxHash) || (parts[3] !== undefined && !destTxHash)) {
       throw new Error("invalid id contents");
     }
-    return {provider, intentId, ...(sourceTxHash ? {sourceTxHash} : {})};
+    return {provider, intentId, ...(sourceTxHash ? {sourceTxHash} : {}), ...(destTxHash ? {destTxHash} : {})};
   } catch {
     throw new Swap2ValidationError("swap2: malformed swap2 status id");
   }
@@ -1420,10 +1427,10 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
 
   /** Status of a swap by the id `swap2()` returned, asked from the provider that executed it. */
   override async getSwap2Status(id: string, _options?: Swap2StatusOptions): Promise<Swap2StatusResult> {
-    const {provider: name, intentId, sourceTxHash} = decodeId(id);
+    const {provider: name, intentId, sourceTxHash, destTxHash} = decodeId(id);
     const provider = this.providerFor(name);
     if (!provider) throw new Error(`swap2: no swap2 found for id '${id}'`);
-    return mapStatus(await provider.trackIntent(sourceTxHash == null ? {intentId} : {intentId, sourceTxHash}));
+    return mapStatus(await provider.trackIntent({intentId, ...(sourceTxHash != null ? {sourceTxHash} : {}), ...(destTxHash != null ? {destTxHash} : {})}));
   }
 
   /**
@@ -1495,7 +1502,8 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     });
     if (!sent.hash) throw new Swap2ExecutionError("swap2: account did not return a claim transaction hash");
     this.emitPhase("broadcast", {hash: sent.hash});
-    return {hash: sent.hash, chain: unsigned.chain, id};
+    // The id to keep polling names the claim, so the status can complete without a destination RPC (round 3, M27).
+    return {hash: sent.hash, chain: unsigned.chain, id: encodeId(name, intentId, sourceTxHash, sent.hash)};
   }
 
   /** The inherited bridge() has no floor field: quote first, then bind execution
