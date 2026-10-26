@@ -78,19 +78,24 @@ const inFlightKey = (fromChain: string, o: Swap2Options) =>
   JSON.stringify([fromChain, o.fromToken, o.toToken, o.toChain, o.recipient, o.refundAddress, o.fromTokenAmount, o.toTokenAmount, o.minAmountOut, o.slippage],
     (_k, v) => (typeof v === "bigint" ? v.toString() : v));
 
+/** A lost transport answer, in a message, an error code or an error name (Node / undici / React Native / browsers). */
+const LOST_ANSWER = /socket hang up|ECONNRESET|ECONNABORTED|ETIMEDOUT|EPIPE|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|UND_ERR_[A-Z_]+|timed? ?out|TimeoutError|request aborted|AbortError|connection (?:closed|reset)|fetch failed|failed to fetch|network request failed|other side closed/i;
+
 /**
- * Did a failed broadcast possibly reach the node? An account that knows says
- * so on the error (`maybeSent` + the locally computed `hash`, see
- * @anywalletkit/wallet-evm); otherwise a lost transport response (socket
- * closed, timeout) is treated as possibly sent. A node's own JSON-RPC
- * rejection, a refusal before signing, etc. are clean failures.
+ * Did a failed broadcast possibly reach the node? Every chain package says so on its error
+ * (`BroadcastUnknownError`: `maybeSent` + the locally computed `hash`), anywhere in the cause
+ * chain. A node's explicit refusal (`answered: true`) is a clean failure. Otherwise a lost
+ * transport answer — in the message, code or name of any error in the chain (`fetch failed` with
+ * an `UND_ERR_*` cause, React Native's `Network request failed`, `ECONNRESET`, a `TimeoutError`) —
+ * is treated as possibly sent (round 3, M12). A refusal before signing is a clean failure.
  */
 function maybeSent(error: unknown): {hash?: string} | null {
-  for (let e = error as {maybeSent?: unknown; hash?: unknown; cause?: unknown} | undefined, i = 0; e && typeof e === "object" && i < 5; e = e.cause as typeof e, i++) {
-    if (e.maybeSent === true) return typeof e.hash === "string" && e.hash ? {hash: e.hash} : {};
-  }
-  const text = error instanceof Error ? error.message : String(error);
-  return /socket hang up|ECONNRESET|ETIMEDOUT|EPIPE|timed? ?out|request aborted|connection (?:closed|reset)/i.test(text) ? {} : null;
+  const chain: Array<{maybeSent?: unknown; hash?: unknown; answered?: unknown; message?: unknown; code?: unknown; name?: unknown}> = [];
+  for (let e = error as {cause?: unknown} | undefined, i = 0; e && typeof e === "object" && i < 6; e = e.cause as typeof e, i++) chain.push(e as never);
+  for (const e of chain) if (e.maybeSent === true) return typeof e.hash === "string" && e.hash ? {hash: e.hash} : {};
+  if (chain.some((e) => e.answered === true)) return null;
+  const texts = chain.length ? chain.map((e) => [e.message, e.code, e.name].filter((x) => typeof x === "string").join(" ")) : [String(error)];
+  return texts.some((t) => LOST_ANSWER.test(t)) ? {} : null;
 }
 
 /** Our config adds the account's source chain (CAIP-2) the base type omits. */
