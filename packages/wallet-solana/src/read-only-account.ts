@@ -40,6 +40,11 @@ const WALLET_SYSTEM_INSTRUCTIONS = new Set(['Assign', 'AssignWithSeed', 'Allocat
 const TOKEN_AUTHORITY_INSTRUCTIONS = new Set(['SetAuthority', 'UpdateTokenMetadataUpdateAuthority', 'UpdateTokenGroupUpdateAuthority'])
 /** A Stake account's space: AllocateWithSeed of exactly this, owned by Stake, is how a pre-funded seed slot is taken back. */
 const STAKE_ACCOUNT_SPACE = 200n
+/**
+ * What the wallet may put into a stake account it only splits into (its authorities are the split
+ * source's, which the guard cannot read): the account's rent reserve, with margin — never real money.
+ */
+const SPLIT_PREFUND_CAP = 5_000_000n
 /** `Pubkey::default()`: an Initialize lockup with this custodian has none. */
 const NO_CUSTODIAN = '11111111111111111111111111111111'
 /** Undecoded core instructions that move lamports, with the index of the account they go to: refused unless that is this wallet. */
@@ -398,12 +403,21 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
    */
   private ownStakeAccounts(description: TransactionDescription): Set<string> {
     const own = new Set<string>()
+    // Lamports this wallet puts into each account in this message.
+    const funded = new Map<string, bigint>()
+    const fund = (to: string, lamports: bigint) => funded.set(to, (funded.get(to) ?? 0n) + lamports)
+    for (const it of description.items) {
+      if (it.type === 'create-account' && it.payer === this.address) fund(it.newAccount, it.lamports)
+      if (it.type === 'sol-transfer' && it.from === this.address) fund(it.to, it.lamports)
+    }
     for (const it of description.items) {
       if ((it.type !== 'program-call' && it.type !== 'unknown') || it.program !== STAKE_PROGRAM_ADDRESS || !it.stake) continue
       const target = it.accounts[it.stake.name === 'Split' ? 1 : 0]
       if (!target) continue
       const s = it.stake
-      if (s.name === 'Split' && it.accounts[2] === this.address) own.add(target)
+      // A split copies the SOURCE's authorities (anyone may Initialize a stake account naming this
+      // wallet as staker and another withdrawer): its destination is this wallet's only up to rent.
+      if (s.name === 'Split' && it.accounts[2] === this.address && (funded.get(target) ?? 0n) <= SPLIT_PREFUND_CAP) own.add(target)
       const unlocked = (s.lockupTimestamp ?? 0n) === 0n && (s.lockupEpoch ?? 0n) === 0n && (s.custodian === undefined || s.custodian === NO_CUSTODIAN || s.custodian === this.address)
       if ((s.name === 'Initialize' || s.name === 'InitializeChecked') && s.staker === this.address && s.withdrawer === this.address && unlocked) own.add(target)
     }
@@ -411,9 +425,11 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
   }
 
   /**
-   * A Stake instruction this wallet signs for must not hand a stake account, or its lamports, to
+   * A Stake instruction that names this wallet must not hand a stake account, or its lamports, to
    * anyone else: `Authorize*` to another key, `Withdraw` to another recipient, `SetLockup*` with a
-   * foreign custodian or a lockup. An undecodable Stake instruction that names this wallet is refused.
+   * foreign custodian or a lockup. The program takes its authorities from any signer of the
+   * instruction and has two account layouts, so the wallet's position is not what decides: if it is
+   * in the instruction at all, the instruction is judged. An undecodable one is refused.
    */
   private enforceStake(it: Extract<TransactionDescription['items'][number], { type: 'program-call' | 'unknown' }>, hint: string): void {
     const me = this.address
@@ -424,9 +440,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       if (it.accounts.includes(me)) throw new UnsafeTransactionError(`Transaction runs an undecodable Stake instruction that names this wallet.${hint}`, 'core-instruction', [it.program ?? STAKE_PROGRAM_ADDRESS])
       return
     }
-    // The account that authorizes, by instruction: the authority itself, or the seed base for *WithSeed.
-    const signer = s.name === 'AuthorizeWithSeed' || s.name === 'AuthorizeCheckedWithSeed' ? at(1) : s.name === 'Withdraw' ? at(4) : s.name === 'SetLockup' || s.name === 'SetLockupChecked' ? at(1) : at(2)
-    if (signer !== me) return
+    if (!it.accounts.includes(me)) return
     if (s.name === 'Authorize' || s.name === 'AuthorizeWithSeed' || s.name === 'AuthorizeChecked' || s.name === 'AuthorizeCheckedWithSeed') {
       if (s.newAuthority !== me) throw new UnsafeTransactionError(`Transaction makes ${s.newAuthority ?? 'an unresolved account'} the ${s.authorityType ?? ''} authority of stake account ${account}.${hint}`, 'sets-authority', [account])
     }

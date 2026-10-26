@@ -101,4 +101,33 @@ describe('the Solana guard reads Stake-program instructions', () => {
     expect(d.items[0]).toMatchObject({ type: 'program-call', instruction: 'Authorize', stake: { name: 'Authorize', newAuthority: ATTACKER, authorityType: 'withdrawer' } })
     expect(d.items[1]).toMatchObject({ instruction: 'Withdraw', stake: { name: 'Withdraw', lamports: 5_000_000_000n } })
   })
+
+  describe('review round: the wallet\'s position in the instruction does not decide', () => {
+    it('the current account layout (no sysvars) and the wallet at another index are judged too', () => {
+      // Authorize [stake, authority]; Withdraw [stake, recipient, authority]; AuthorizeChecked [stake, old, new]
+      expect(refused([ix(STAKE, [[STAKE0, W], [WALLET, RS]], cat(u32(1), key(ATTACKER), u32(1)))])).toBe('sets-authority')
+      expect(refused([ix(STAKE, [[STAKE0, W], [CLOCK, R], [VOTE, R], [WALLET, RS]], cat(u32(1), key(ATTACKER), u32(1)))])).toBe('sets-authority')
+      expect(refused([ix(STAKE, [[STAKE0, W], [ATTACKER, W], [WALLET, RS]], cat(u32(4), u64(5_000_000_000n)))])).toBe('moves-lamports')
+      expect(refused([ix(STAKE, [[STAKE0, W], [WALLET, RS], [ATTACKER, RS]], cat(u32(10), u32(1)))])).toBe('sets-authority')
+      expect(refused([ix(STAKE, [[STAKE0, W], [VOTE, R], [WALLET, RS]], cat(u32(6), new Uint8Array([1]), u64(7_258_118_400n), new Uint8Array([0]), new Uint8Array([0])))])).toBe('sets-authority')
+      expect(refused([ix(STAKE, [[STAKE0, W], [WALLET, RS], [ATTACKER, RS]], cat(u32(12), new Uint8Array([0]), new Uint8Array([0])))])).toBe('sets-authority')
+      // to the wallet itself, in either layout: signed
+      expect(refused([ix(STAKE, [[STAKE0, W], [WALLET, RS]], cat(u32(1), key(WALLET), u32(1)))])).toBe('signed')
+      expect(refused([ix(STAKE, [[STAKE0, W], [WALLET, W], [WALLET, RS]], cat(u32(4), u64(1n)))])).toBe('signed')
+    })
+
+    it('InitializeChecked in the current layout makes the wallet staker and withdrawer', () => {
+      const checked = (staker: Address, withdrawer: Address) => ix(STAKE, [[SLOT, W], [staker, R], [withdrawer, RS]], u32(9))
+      expect(refused([createWithSeed(SLOT, 2_282_880n), checked(WALLET, WALLET)])).toBe('signed')
+      expect(refused([createWithSeed(SLOT, 2_282_880n), checked(ATTACKER, WALLET)])).toBe('sets-authority')
+      const legacy = ix(STAKE, [[SLOT, W], [RENT, R], [WALLET, R], [WALLET, RS]], u32(9))
+      expect(refused([createWithSeed(SLOT, 2_282_880n), legacy])).toBe('signed')
+    })
+
+    it('a split destination is the wallet\'s only up to its rent: real money into it is refused', () => {
+      expect(refused([createWithSeed(SLOT, 2_282_880n), split(SLOT)])).toBe('signed')
+      expect(refused([createWithSeed(SLOT, 100_000_000_000n), split(SLOT)])).toBe('sets-authority')
+      expect(refused([transfer(SLOT, 100_000_000_000n), allocateWithSeed(SLOT), split(SLOT)])).toBe('core-instruction')
+    })
+  })
 })
