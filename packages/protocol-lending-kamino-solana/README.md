@@ -63,7 +63,9 @@ const api = new KaminoApi()
 const vaults = (await api.listVaults()).filter((v) => v.tokenMint === USDC).sort((a, b) => Number(b.sharesIssued - a.sharesIssued))
 
 // Earn vault
-const vault = new KaminoVaultProtocolSolana(account, { vault: vaults[0].address })
+// `asset`: the API's answer must name it, and deposits need it (or a `token` per call). The vault's
+// address, program and shares mint (the PDA ["shares", vault]) are checked too, before anything is built.
+const vault = new KaminoVaultProtocolSolana(account, { vault: vaults[0].address, asset: USDC })
 await vault.getVault()                       // asset, shares, APY (net, %), fees, TVL, minimums, allocations
 await vault.quoteSupply({ amount: 5_000_000n })   // { fee, expectedShares } — built, proven, not signed
 await vault.supply({ amount: 5_000_000n })        // { hash, fee }
