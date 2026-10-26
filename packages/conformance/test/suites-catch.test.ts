@@ -28,6 +28,15 @@ describe('the protocol suite catches signing in reads', () => {
     expect(r.passed).toBe(false)
     expect(r.output).toMatch(/\bsign\b/)
   })
+  // Audit 2026-10-25 round 3, L25: the activity suite's purity check looked at `sent` only, so a
+  // describeActivity that signed on the side passed.
+  it('a pure describeActivity passes the activity suite; one that signs fails it', () => {
+    const pure = run('PureActivity.suite.ts')
+    expect(pure.passed, pure.output).toBe(true)
+    const signs = run('SignsInDescribe.suite.ts')
+    expect(signs.passed).toBe(false)
+    expect(signs.output).toMatch(/\bsign\b/)
+  })
   it('a failing quote is tolerated by default, and fails when the module lists it in mustResolve', () => {
     expect(run('QuoteThrows.suite.ts').passed).toBe(true)
     const strict = run('QuoteThrowsMustResolve.suite.ts')

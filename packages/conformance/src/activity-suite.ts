@@ -37,6 +37,9 @@ export function parseActivityFixture(f: ActivityFixtureJson): { tx: ChainTx; own
   return { tx, own: new Set(f.own.flatMap((a) => (a.startsWith('0x') ? [a, a.toLowerCase()] : [a]))) }
 }
 
+/** Account methods that sign or send: describing a transaction must call none of them. */
+const WRITE_METHOD = /^(sign|send|transfer)/
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Ctor<P> = new (account: IWalletAccountReadOnly | IWalletAccount, config?: any) => P
 
@@ -61,9 +64,12 @@ export function describeActivitySuite<P extends object>(name: string, o: Activit
 
     for (const [i, f] of o.fixtures.entries()) {
       it(`recognizes fixture ${i + 1}${f.note ? `: ${f.note}` : ''}`, () => {
-        const p = new o.Protocol(createMockAccount(), o.config) as { describeActivity: (tx: ChainTx, ctx: { own: Set<string> }) => ActivityItem | null }
+        const account = createMockAccount()
+        const p = new o.Protocol(account, o.config) as { describeActivity: (tx: ChainTx, ctx: { own: Set<string> }) => ActivityItem | null }
         const { tx, own } = parseActivityFixture(f)
         const item = p.describeActivity(tx, { own })
+        const writes = account.calls.filter((c) => WRITE_METHOD.test(c.method)).map((c) => c.method)
+        expect(writes, `describeActivity called ${writes.join(', ')} on the account`).toEqual([])
         expect(item, 'describeActivity returned null for a fixture this module must recognize').not.toBeNull()
         const a = item as ActivityItem
         expect(a.kind).toBe(f.expect.kind)
@@ -100,6 +106,9 @@ export function describeActivitySuite<P extends object>(name: string, o: Activit
       }
       expect(p.describeActivity(tx, { own: new Set(['0x000000000000000000000000000000000000dead']) })).toBeNull()
       expect(((account as { sent?: unknown[] }).sent ?? []).length).toBe(0)
+      // Not only sends: describing must not sign anything either (it used to check `sent` alone).
+      const writes = account.calls.filter((c) => WRITE_METHOD.test(c.method)).map((c) => c.method)
+      expect(writes, `describeActivity called ${writes.join(', ')} on the account`).toEqual([])
     })
   })
 }
