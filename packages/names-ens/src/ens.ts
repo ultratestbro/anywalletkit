@@ -68,12 +68,12 @@ export function ensResolver(opts: EnsResolverOptions): NameResolver {
     return true
   }
 
-  const resolve = async (input: string, chain: string): Promise<ResolvedName> => {
+  const resolve = async (input: string, chain: string, options?: { fresh?: boolean }): Promise<ResolvedName> => {
     const { name, warnings } = normalized(input)
     const coinType = coinTypeFor(chain)
     if (coinType === null) throw new NameError('unsupported', `ENS has no address record type for ${chain}`, { name, chain })
     const key = `r:${name}:${chain}`
-    const hit = recall<ResolvedName>(key)
+    const hit = options?.fresh ? undefined : recall<ResolvedName>(key) // `fresh`: the signing-time check, never cached
     if (hit) return hit
     let raw: string | null
     try {
