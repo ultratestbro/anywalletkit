@@ -94,6 +94,8 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
    * cannot leave the account stuck on a future nonce.
    */
   private _nonceFloor: { next: number; at: number } | undefined
+  /** Tail of this account's send queue: prepare → sign → submit runs one send at a time. */
+  private _sendTail: Promise<unknown> = Promise.resolve()
 
   /** `publicKey` is the signer's compressed secp256k1 key (33 bytes); it is needed synchronously for the address. */
   constructor(signer: Signer, publicKey: Uint8Array, path: string, config: EvmConfig = {}) {
@@ -299,7 +301,18 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     }
   }
 
-  private async signAndBroadcast(tx: EvmTransaction, limit: bigint | number | undefined, op: string): Promise<TransferResult> {
+  /**
+   * One send at a time per account: two sends started together would both read the same `pending`
+   * nonce before either is broadcast, and the second would replace (or be refused for) the first.
+   * A failed send does not block the next.
+   */
+  private signAndBroadcast(tx: EvmTransaction, limit: bigint | number | undefined, op: string): Promise<TransferResult> {
+    const run = this._sendTail.then(() => this.signAndBroadcastNow(tx, limit, op))
+    this._sendTail = run.then(() => undefined, () => undefined)
+    return run
+  }
+
+  private async signAndBroadcastNow(tx: EvmTransaction, limit: bigint | number | undefined, op: string): Promise<TransferResult> {
     const client = this.requireClient(op === 'transfer' ? 'transfer tokens' : 'send transactions')
     const checked = await this.preflight(tx)
     const prepared = await this.prepare(checked)
