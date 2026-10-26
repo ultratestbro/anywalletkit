@@ -9,6 +9,12 @@ export interface SourceState {
   c?: string
   /** Rows at the head of that page already emitted. */
   n: number
+  /**
+   * Id (`chain:hash`) of the last row of that page already emitted. When the page comes back
+   * shifted (new transactions landed at the head), the feed skips through this row instead of
+   * counting `n`, so nothing is shown twice.
+   */
+  l?: string
 }
 
 /** Source key → state; a key that is absent is exhausted. */
@@ -46,10 +52,11 @@ export function unpackCursor(cursor: string | undefined): FeedCursorState | unde
   const out: FeedCursorState = {}
   for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
     if (!v || typeof v !== 'object') throw new InvalidCursorError()
-    const s = v as { c?: unknown; n?: unknown }
+    const s = v as { c?: unknown; n?: unknown; l?: unknown }
     if (typeof s.n !== 'number' || !Number.isInteger(s.n) || s.n < 0) throw new InvalidCursorError()
     if (s.c !== undefined && typeof s.c !== 'string') throw new InvalidCursorError()
-    out[k] = s.c === undefined ? { n: s.n } : { c: s.c, n: s.n }
+    if (s.l !== undefined && (typeof s.l !== 'string' || s.l.length > 256)) throw new InvalidCursorError()
+    out[k] = { ...(s.c === undefined ? {} : { c: s.c }), n: s.n, ...(s.l === undefined ? {} : { l: s.l }) }
   }
   return out
 }

@@ -30,6 +30,13 @@ export interface GenericDescribeOptions {
   natives?: Record<string, NativeAsset>
   /** Explorer URL for an item (the kit passes the chain's `HistorySource.explorerTxUrl`). */
   explorerUrl?: (chain: string, hash: string) => string | undefined
+  /**
+   * The app's own token list (custom tokens the user added, `@anywalletkit/tokens`): ERC-20s
+   * outside the swap2-assets catalog. Used for symbols and decimals, and to know an `approve(x, 0)`
+   * on such a token is an ERC-20 revoke. Without it an unlisted token's approval reads as
+   * "Approved 0x1234…".
+   */
+  tokens?: (chain: string, token: string) => { symbol: string; decimals: number } | undefined
 }
 
 /** What the generic fallback adds to an `ActivityItem`. */
@@ -166,17 +173,17 @@ export function assetMetaFor(tx: ChainTx, opts: GenericDescribeOptions = {}): (t
       const n = nativeOf(tx.chain, opts)
       return { symbol: own?.symbol ?? n.symbol, decimals: own?.decimals ?? n.decimals }
     }
-    const cat = ccAssetByToken(catalogChain(tx.chain), token)
+    const cat = ccAssetByToken(catalogChain(tx.chain), token) ?? opts.tokens?.(tx.chain, token)
     if (!cat) return own
     return { symbol: own?.symbol ?? cat.symbol, decimals: own?.decimals ?? cat.decimals }
   }
 }
 
-/** Is `token` an ERC-20? The transfers' standard when they name one, else the swap2-assets catalog. */
-function isKnownErc20(tx: ChainTx, token: string): boolean {
+/** Is `token` an ERC-20? The transfers' standard when they name one, else the swap2-assets catalog, else the app's token list. */
+function isKnownErc20(tx: ChainTx, token: string, opts: GenericDescribeOptions = {}): boolean {
   const standards = new Set(tx.transfers.filter((t) => sameAddress(t.token, token)).map((t) => t.standard))
   if (standards.has('erc721') || standards.has('erc1155')) return false
-  return standards.has('erc20') || ccAssetByToken(catalogChain(tx.chain), token) !== undefined
+  return standards.has('erc20') || ccAssetByToken(catalogChain(tx.chain), token) !== undefined || opts.tokens?.(tx.chain, token) !== undefined
 }
 
 /** Title label for an asset: symbol, the native coin, or a shortened token id. */
@@ -268,7 +275,7 @@ export function describeGeneric(tx: ChainTx, ctx: DescribeActivityContext, opts:
     const amount = amountWord !== null ? BigInt(`0x${amountWord}`) : undefined
     // approve(0x0, id) clears an NFT approval; approve(spender, 0) resets an ERC-20 allowance but
     // APPROVES spender for token #0 on an ERC-721, so it is a revoke only on a known ERC-20.
-    const revoke = (spenderWord !== null && /^0+$/.test(spenderWord)) || (amount === 0n && isKnownErc20(tx, call.to))
+    const revoke = (spenderWord !== null && /^0+$/.test(spenderWord)) || (amount === 0n && isKnownErc20(tx, call.to, opts))
     const tokenLabel = meta(call.to)?.symbol ?? knownLabel(opts.known, tx.chain, call.to) ?? shortAddress(call.to)
     const spenderLabel = spender ? addressLabel(opts.known, tx.chain, spender) : undefined
     const title = `${revoke ? 'Revoked' : 'Approved'} ${tokenLabel}${spenderLabel ? ` for ${spenderLabel}` : ''}`

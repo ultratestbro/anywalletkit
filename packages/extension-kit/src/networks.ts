@@ -152,8 +152,28 @@ export class NetworksTable {
 }
 
 /**
+ * A private / local host (localhost, *.local, 127/8, 10/8, 172.16/12, 192.168/16, 169.254/16,
+ * IPv6 loopback / unique-local / link-local): a site must not point the wallet's RPC reads at
+ * the user's own network. Same list as `isPrivateHost` in @anywalletkit/networks, plus link-local.
+ */
+function isPrivateRpcHost(url: string): boolean {
+  const m = /^https:\/\/(?:[^@/?#]*@)?(\[[^\]]+\]|[^:/?#]+)/i.exec(url)
+  if (!m) return true
+  const h = m[1]!.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '')
+  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h === '0.0.0.0') return true
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(h)
+  if (v4) {
+    const a = Number(v4[1]), b = Number(v4[2])
+    return a === 127 || a === 10 || a === 0 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254)
+  }
+  if (h.includes(':')) return h === '::1' || h === '::' || /^f[cd]/.test(h) || /^fe[89ab]/.test(h)
+  return false
+}
+
+/**
  * EIP-3085 `wallet_addEthereumChain` parameter → {@link EvmNetwork}, or the error
- * to answer with. https RPC urls only; the chain id must be in the catalog.
+ * to answer with. Public https RPC urls only (a private / local host is dropped); the chain id
+ * must be in the catalog.
  */
 export function parseAddChainParams(params: unknown, known: (caip2: string) => boolean = isCatalogChain): EvmNetwork | RelayError {
   const p = (Array.isArray(params) ? params[0] : params) as Record<string, unknown> | undefined
@@ -161,8 +181,8 @@ export function parseAddChainParams(params: unknown, known: (caip2: string) => b
   const caip2 = caip2FromChainId(p.chainId)
   if (!caip2) return relayError(RELAY_ERRORS.invalidParams, 'chainId must be a 0x-prefixed hex string.')
   if (!known(caip2)) return relayError(RELAY_ERRORS.chainNotAdded, `Chain ${String(p.chainId)} is not in this wallet's catalog.`)
-  const rpcs = Array.isArray(p.rpcUrls) ? p.rpcUrls.filter((u): u is string => typeof u === 'string' && /^https:\/\/[^\s/?#]+/i.test(u)) : []
-  if (rpcs.length === 0) return relayError(RELAY_ERRORS.invalidParams, 'rpcUrls must contain at least one https URL.')
+  const rpcs = Array.isArray(p.rpcUrls) ? p.rpcUrls.filter((u): u is string => typeof u === 'string' && /^https:\/\/[^\s/?#]+/i.test(u) && !isPrivateRpcHost(u)) : []
+  if (rpcs.length === 0) return relayError(RELAY_ERRORS.invalidParams, 'rpcUrls must contain at least one public https URL (a site cannot add a private / local endpoint).')
   const name = typeof p.chainName === 'string' && p.chainName.trim() ? p.chainName.trim().slice(0, 64) : caip2
   const currency = p.nativeCurrency as { symbol?: unknown; decimals?: unknown } | undefined
   if (currency && currency.decimals !== undefined && currency.decimals !== 18) return relayError(RELAY_ERRORS.invalidParams, 'nativeCurrency.decimals must be 18.')

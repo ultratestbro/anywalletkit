@@ -120,6 +120,8 @@ export type CheckCode =
   | "simulation-ok" | "simulation-reverted" | "simulation-unavailable"
   | "recipient-own" | "recipient-foreign"
   | "approval-exact" | "approval-excess" | "approval-unlimited" | "approval-unknown-spender"
+  /** A bounded approval with no `expectedApproval` to compare it with: neither "exact" nor "excess" can be said. */
+  | "approval-unchecked"
   | "native-value";
 
 /** One item for the review screen: a code, a status, and the values to word it with. */
@@ -137,7 +139,11 @@ export interface TxPreview {
   checks: Check[];
 }
 
-const UNLIMITED = 1n << 255n;
+/**
+ * The smallest allowance treated as unlimited: type(uint128).max, the SDK-wide threshold. Every
+ * "infinite approval" sentinel in use (uint256, uint160, uint128 max, 2^255) reaches it.
+ */
+const UNLIMITED = (1n << 128n) - 1n;
 const NATIVE_TRACE = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 /** WETH9 `Deposit(address indexed dst, uint wad)` / `Withdrawal(address indexed src, uint wad)`: wrapping mints
@@ -184,7 +190,7 @@ export function decodeCall(call: PreviewCall, known: Record<string, string> = {}
         if (to !== PERMIT2) return {...base, method: "approve"};
         const amount = args[2] as bigint;
         const spender = spenderOf(args[1]);
-        return {...base, method: "approve (Permit2)", approval: {token: lc(String(args[0])), spender, spenderLabel: knownLabel(known, spender), amount: amount >= (1n << 159n) ? null : amount, kind: "permit2"}};
+        return {...base, method: "approve (Permit2)", approval: {token: lc(String(args[0])), spender, spenderLabel: knownLabel(known, spender), amount: amount >= UNLIMITED ? null : amount, kind: "permit2"}};
       }
       const amount = args[1] as bigint;
       const spender = spenderOf(args[0]);
@@ -411,13 +417,17 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
   own.add(lc(input.from));
   const checks: Check[] = [];
 
-  // The contract that does the work: the last call (approvals precede it).
+  // Every call is a contract the user is trusting — transfer-shaped ones included (a contract can
+  // wear the selector): one check per target. Approvals are the exception: what they risk is the
+  // spender and the amount, which the approval checks below cover.
   const main = calls[calls.length - 1]!;
-  const target = main.transfer ? null : main;
-  if (target && main.selector) {
-    checks.push(target.label
-      ? {code: "contract-known", status: "ok", detail: {label: target.label, address: target.to}}
-      : {code: "contract-unknown", status: "warn", detail: {address: target.to}});
+  const seenTargets = new Set<string>();
+  for (const c of calls) {
+    if (!c.selector || c.approval || seenTargets.has(lc(c.to))) continue;
+    seenTargets.add(lc(c.to));
+    checks.push(c.label
+      ? {code: "contract-known", status: "ok", detail: {label: c.label, address: c.to}}
+      : {code: "contract-unknown", status: "warn", detail: {address: c.to}});
   }
 
   if (sim.status === "ok") checks.push({code: "simulation-ok", status: "ok"});
@@ -438,14 +448,14 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
     const detail: Record<string, string> = {token: a.token, spender: a.spender, ...(a.spenderLabel ? {label: a.spenderLabel} : {}), ...(a.amount !== null ? {amount: a.amount.toString()} : {})};
     if (!a.spenderLabel) checks.push({code: "approval-unknown-spender", status: "warn", detail});
     if (a.amount === null) checks.push({code: "approval-unlimited", status: "warn", detail});
-    else if (input.expectedApproval !== undefined && a.amount > input.expectedApproval) checks.push({code: "approval-excess", status: "warn", detail: {...detail, expected: input.expectedApproval.toString()}});
+    else if (input.expectedApproval === undefined) checks.push({code: "approval-unchecked", status: "unknown", detail});
+    else if (a.amount > input.expectedApproval) checks.push({code: "approval-excess", status: "warn", detail: {...detail, expected: input.expectedApproval.toString()}});
     else checks.push({code: "approval-exact", status: "ok", detail});
   }
 
-  const nativeOut = calls.reduce((s, c) => s + c.value, 0n);
-  if (nativeOut > 0n && main.selector) {
-    // Native value into a contract nobody vouched for is a warning, not a tick.
-    checks.push({code: "native-value", status: main.label ? "ok" : "warn", detail: {amount: nativeOut.toString(), ...(main.label ? {} : {address: main.to})}});
+  // Native value per call into a contract: into one nobody vouched for it is a warning, not a tick.
+  for (const c of calls) {
+    if (c.value > 0n && c.selector) checks.push({code: "native-value", status: c.label ? "ok" : "warn", detail: {amount: c.value.toString(), ...(c.label ? {} : {address: c.to})}});
   }
   return checks;
 }

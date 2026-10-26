@@ -15,7 +15,7 @@
  */
 import { BUILTIN_NETWORKS, familyOf } from './catalog.js'
 import type { JsonStorage, Network, VerifyResult } from './types.js'
-import { checkRpcUrls, type UrlPolicyReason } from './url.js'
+import { checkRpcUrl, checkRpcUrls, type UrlPolicyReason } from './url.js'
 
 /** Why a user RPC is parked: the error and when it was seen. */
 export interface RpcIssue {
@@ -302,6 +302,17 @@ export class NetworksTable {
   }
 
   private entries(s: NetworksState): NetworkEntry[] {
+    // With "Allow http for local nodes" off, a plain-http local RPC stored while it was on is parked
+    // (skipped, with the reason) instead of still being used; turning the setting on again restores it.
+    const parked = (urls: readonly string[], stored: Record<string, RpcIssue> | undefined): Record<string, RpcIssue> => {
+      if (s.allowHttpLocal) return stored ?? {}
+      const out = { ...(stored ?? {}) }
+      for (const u of urls) {
+        const r = checkRpcUrl(u, { allowHttpLocal: false })
+        if (!r.ok && r.reason === 'http-not-allowed') out[u] = { error: 'http:// on a local address while "Allow http for local nodes" is off', at: 0 }
+      }
+      return out
+    }
     const out: NetworkEntry[] = this.builtins.map((b) => {
       const o = s.overrides[b.caip2] ?? {}
       const userRpcs = o.userRpcs ?? []
@@ -313,12 +324,12 @@ export class NetworksTable {
         enabled: o.enabled ?? b.enabled,
         userRpcs,
         builtinRpcs: [...b.rpcs],
-        issues: s.issues[b.caip2] ?? {},
+        issues: parked(userRpcs, s.issues[b.caip2]),
       }
     })
     for (const c of s.custom) {
       if (this.builtin(c.caip2)) continue // a stored custom entry for a shipped chain is ignored: a site must not replace Ethereum's endpoints
-      out.push({ ...c, kind: 'custom', rpcs: [...c.rpcs], userRpcs: [...c.rpcs], builtinRpcs: [], issues: s.issues[c.caip2] ?? {} })
+      out.push({ ...c, kind: 'custom', rpcs: [...c.rpcs], userRpcs: [...c.rpcs], builtinRpcs: [], issues: parked(c.rpcs, s.issues[c.caip2]) })
     }
     return out
   }

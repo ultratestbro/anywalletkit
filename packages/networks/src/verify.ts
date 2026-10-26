@@ -46,10 +46,14 @@ const BTC_GENESIS: Record<string, string> = {
   'bitcoin:mainnet': '000000000019d6689c085ae165831e93',
   'bitcoin:testnet': '000000000933ea01ad0ee984209779ba',
   'bitcoin:testnet4': '00000000da84f2bafbbc53dee25a72ae',
+  // Every signet shares one genesis block (the challenge differs); regtest's is fixed in Bitcoin Core.
+  'bitcoin:signet': '00000008819873e925422c1ff0f99f7c',
+  'bitcoin:regtest': '0f9188f13cb7b2c71f2a335e3a4fc328',
 }
 const ZCASH_GENESIS: Record<string, string> = {
   'zcash:mainnet': '00040fe8ec8471911baa1db1266ea15d',
   'zcash:testnet': '05a60a92d99d85997cce3b87616c089f',
+  'zcash:regtest': '029f11d80ef9765602235e1bc9727e3e', // zcashd chainparams (CRegTestParams)
 }
 const SOLANA_GENESIS: Record<string, string> = {
   'solana:mainnet': '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
@@ -71,8 +75,9 @@ export function expectedIdentity(caip2: string): { family: string; value: string
       const tail = TRON_GENESIS_TAIL[r] ?? (/^0x[0-9a-f]{8}$/i.test(r) ? r.slice(2).toLowerCase() : /^\d+$/.test(r) ? Number(r).toString(16).padStart(8, '0') : null)
       return tail ? { family, value: tail } : null
     }
-    case 'btc': return { family, value: BTC_GENESIS[caip2] ?? (caip2.startsWith('bip122:') ? r.toLowerCase() : '') }
-    case 'zcash': return { family, value: ZCASH_GENESIS[caip2] ?? '' }
+    // An empty expected genesis would let any endpoint through: a network we cannot identify is not verifiable.
+    case 'btc': { const v = BTC_GENESIS[caip2] ?? (caip2.startsWith('bip122:') ? r.toLowerCase() : ''); return v ? { family, value: v } : null }
+    case 'zcash': { const v = ZCASH_GENESIS[caip2]; return v ? { family, value: v } : null }
     case 'near': return { family, value: r }
     default: return null
   }
