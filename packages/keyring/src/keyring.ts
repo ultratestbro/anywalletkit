@@ -276,10 +276,12 @@ export class Keyring {
     const passphrase = options.passphrase ?? ''
     const seed = await seedFromMnemonic(phrase, passphrase)
     let fingerprint: string
+    const master = HDKey.fromMasterSeed(seed)
     try {
       // A hash of the master PUBLIC key: stable per seed + passphrase, reveals nothing about the secret.
-      fingerprint = `bip32:${hex.encode(sha256(HDKey.fromMasterSeed(seed).publicKey!)).slice(0, 32)}`
+      fingerprint = `bip32:${hex.encode(sha256(master.publicKey!)).slice(0, 32)}`
     } finally {
+      master.wipePrivateData() // the master private key must not outlive the fingerprint
       zeroize(seed)
     }
     const secret: Secret = passphrase ? { type: 'mnemonic', mnemonic: phrase, passphrase } : { type: 'mnemonic', mnemonic: phrase }
@@ -391,7 +393,9 @@ export class Keyring {
       }
       const seed = await seedFromMnemonic(secret.mnemonic, secret.passphrase ?? '')
       try {
-        key = (CHAIN_SPECS[chain].curve === 'secp256k1' ? deriveSecp256k1(seed, path) : deriveEd25519(seed, path)).privateKey.slice()
+        const derived = CHAIN_SPECS[chain].curve === 'secp256k1' ? deriveSecp256k1(seed, path) : deriveEd25519(seed, path)
+        key = derived.privateKey.slice()
+        zeroize(derived.privateKey)
       } finally {
         zeroize(seed)
       }
