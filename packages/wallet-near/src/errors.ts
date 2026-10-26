@@ -1,3 +1,5 @@
+import { SignerError } from '@anywalletkit/core'
+
 /** Why a transaction was refused before signing. */
 export type UnsafeTransactionCode =
   | 'signer-mismatch'
@@ -22,6 +24,20 @@ export class UnsafeTransactionError extends Error {
     super(message)
     this.name = 'UnsafeTransactionError'
     this.code = code
+  }
+}
+
+/**
+ * `sign()` refused a 32-byte message: NEAR signs a transaction (and a delegate action, and a NEP-413
+ * message) as ed25519 over a 32-byte sha256, so a signature over 32 raw bytes may be a valid
+ * transaction signature — an AddKey that hands the account over. Off-chain messages go through
+ * `signNep413`; transactions through `signTransaction` / `sendTransaction`, where they are reviewed.
+ */
+export class MessageIsTransactionError extends SignerError {
+  readonly code = 'message-is-transaction'
+  constructor() {
+    super('A 32-byte message has the shape of a NEAR transaction hash and is not signed; use signNep413 for off-chain messages, or signTransaction so it can be reviewed.')
+    this.name = 'MessageIsTransactionError'
   }
 }
 

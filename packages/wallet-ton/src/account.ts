@@ -1,6 +1,8 @@
 import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
+import { Buffer } from 'buffer'
 import { Cell } from '@ton/core'
-import { SimulationError, UnsafeTransactionError } from './errors.js'
+import { MessageIsTransactionError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { tonProofDigest, tonSignDataDigest, type TonProof, type TonProofRequest, type TonSignDataRequest, type TonSignedData } from './tonconnect.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'
 import { v5r1ExternalMessage, v5r1PackSigned, v5r1PackUnsigned, type V5R1Message } from './wallet-v5r1.js'
 import type { TonConfig, TonSendable, TonTransferOptions } from './types.js'
@@ -45,10 +47,45 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     return m ? Number(m[1]) : undefined
   }
 
-  /** Hex ed25519 signature over the raw message bytes (ton_proof and the like). */
+  /**
+   * Hex ed25519 signature over the raw message bytes. A 32-byte message — string or bytes — is
+   * refused with {@link MessageIsTransactionError}: the wallet contract checks a transfer's
+   * signature over the 32-byte hash of its signing cell, so those bytes could be one. TON Connect
+   * goes through {@link signTonProof} and {@link signTonConnectData}.
+   */
   async sign(message: string | Uint8Array): Promise<string> {
     const bytes = typeof message === 'string' ? new TextEncoder().encode(message) : message
+    if (bytes.length === 32) throw new MessageIsTransactionError()
     return toHex(await this.signer.sign(bytes, { scheme: 'ed25519', context: 'ton-message' }))
+  }
+
+  /**
+   * TON Connect `ton_proof` for this wallet's address: the `proof` object of the connect reply. The
+   * digest is built here (0xffff ‖ "ton-connect" ‖ …), so no request can turn it into a transfer.
+   * `domain` is the host the wallet saw the request come from.
+   */
+  async signTonProof(request: TonProofRequest): Promise<TonProof> {
+    const digest = tonProofDigest(this._address, request)
+    const signature = await this.signer.sign(digest, { scheme: 'ed25519', context: 'ton-proof' })
+    return {
+      timestamp: request.timestamp,
+      domain: { lengthBytes: new TextEncoder().encode(request.domain).length, value: request.domain },
+      payload: request.payload,
+      signature: Buffer.from(signature).toString('base64'),
+    }
+  }
+
+  /** TON Connect `signData` (text / binary) for this wallet's address: the reply the dApp gets. */
+  async signTonConnectData(request: TonSignDataRequest): Promise<TonSignedData> {
+    const digest = tonSignDataDigest(this._address, request)
+    const signature = await this.signer.sign(digest, { scheme: 'ed25519', context: 'ton-sign-data' })
+    return {
+      signature: Buffer.from(signature).toString('base64'),
+      address: this._address.toRawString(),
+      timestamp: request.timestamp,
+      domain: request.domain,
+      payload: request.payload.type === 'text' ? { type: 'text', text: request.payload.text } : { type: 'binary', bytes: request.payload.bytes },
+    }
   }
 
   private checkMaxFee(fee: bigint, limit: bigint | number | undefined, op: string) {

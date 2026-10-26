@@ -1,7 +1,7 @@
 import { LocalSigner, SignerError, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { bytesToBase58, ed25519Key, implicitAccountId, publicKeyToString } from './address.js'
 import { decodeAnyTransaction, encodeSignedTransaction } from './borsh.js'
-import { BroadcastUnknownError, SimulationError } from './errors.js'
+import { BroadcastUnknownError, MessageIsTransactionError, SimulationError } from './errors.js'
 import { nep413Hash, type Nep413Payload, type Nep413Signed } from './nep413.js'
 import { WalletAccountReadOnlyNear, receiptOf } from './read-only-account.js'
 import { fromBase64, isDefinitive, outcomeFailed, toBase64 } from './rpc.js'
@@ -62,9 +62,15 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
     return this.signer.sign(bytes, { scheme: 'ed25519', context })
   }
 
-  /** Raw ed25519 signature over the message bytes, as NEAR tooling prints it: "ed25519:<base58>". */
+  /**
+   * Raw ed25519 signature over the message bytes, as NEAR tooling prints it: "ed25519:<base58>".
+   * A 32-byte message — string or bytes — is refused with {@link MessageIsTransactionError}: a NEAR
+   * transaction is signed over its 32-byte sha256, so those bytes could be one. Sites asking a
+   * wallet to sign a message use {@link signNep413}.
+   */
   async sign(message: string | Uint8Array): Promise<string> {
     const bytes = typeof message === 'string' ? new TextEncoder().encode(message) : message
+    if (bytes.length === 32) throw new MessageIsTransactionError()
     return `ed25519:${bytesToBase58(await this.signBytes(bytes, 'near-message'))}`
   }
 

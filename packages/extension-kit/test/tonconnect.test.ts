@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { sha256 } from '@noble/hashes/sha2.js'
+import { WalletManagerTon } from '@anywalletkit/wallet-ton'
 import { ReviewDeclined, TONCONNECT_ERRORS, TonConnectError, parseConnectRequest, parseRawAddress, parseSendTransaction, parseSignData, proofDomain, tonConnectErrorCode, tonProofMessage, tonSignDataMessage } from '../src/index.js'
 
 const RAW = '0:' + 'ab'.repeat(32)
@@ -50,6 +51,23 @@ describe('TON Connect protocol mapping', () => {
     expect(Array.from(sd)).toEqual(Array.from(sha256(inner2)))
     expect(code(() => parseRawAddress('EQCfriendly'))).toBe(TONCONNECT_ERRORS.unknown)
     expect(proofDomain('https://app.example:8443/path')).toBe('app.example:8443')
+  })
+
+  it('a wallet-ton account signs exactly these digests with signTonProof / signTonConnectData (audit round 3, H1)', async () => {
+    const m = new WalletManagerTon('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about')
+    const a = await m.getAccount(0)
+    const hex = (b64: string) => Array.from(atob(b64), (c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
+    const text = await a.signTonConnectData({ domain: 'app.example', timestamp: 1_700_000_000, payload: { type: 'text', text: 'hi' } })
+    const address = parseRawAddress(text.address)
+    expect(await a.verify(tonSignDataMessage({ address, domain: 'app.example', timestamp: 1_700_000_000, payload: { type: 'text', text: 'hi' } }), hex(text.signature))).toBe(true)
+    const bin = await a.signTonConnectData({ domain: 'app.example', timestamp: 1_700_000_000, payload: { type: 'binary', bytes: 'AQID' } })
+    expect(await a.verify(tonSignDataMessage({ address, domain: 'app.example', timestamp: 1_700_000_000, payload: { type: 'binary', bytes: 'AQID' } }), hex(bin.signature))).toBe(true)
+    const digest = tonProofMessage({ address, domain: 'app.example', timestamp: 1_700_000_000, payload: 'nonce' })
+    const proof = await a.signTonProof({ domain: 'app.example', timestamp: 1_700_000_000, payload: 'nonce' })
+    expect(await a.verify(digest, hex(proof.signature))).toBe(true)
+    // the digest itself is refused by sign(): 32 raw bytes could be a transfer's cell hash
+    await expect(a.sign(digest)).rejects.toMatchObject({ name: 'MessageIsTransactionError' })
+    m.dispose()
   })
 
   it('maps relay errors to TON Connect codes', () => {

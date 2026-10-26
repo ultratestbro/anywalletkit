@@ -13,7 +13,7 @@ import { canonicalAddress, sendDestinations } from './destinations.js'
 export type KnownWriteMethod =
   | 'sendTransaction' | 'transfer' | 'signTransaction' | 'sign'
   | 'signTypedData' | 'signPermit' | 'approve'
-  | 'signRaw' | 'signNep413' | 'signBuilt'
+  | 'signRaw' | 'signNep413' | 'signBuilt' | 'signTonProof' | 'signTonConnectData'
   | 'sendSerialized' | 'signCompiled' | 'signTransactionMessage'
   | 'revokeDelegation'
 /**
@@ -29,7 +29,7 @@ export type WriteMethod = KnownWriteMethod | (string & {})
 export const GUARDED_WRITES: readonly KnownWriteMethod[] = [
   'sendTransaction', 'transfer', 'signTransaction', 'sign',
   'signTypedData', 'signPermit', 'approve',
-  'signRaw', 'signNep413', 'signBuilt',
+  'signRaw', 'signNep413', 'signBuilt', 'signTonProof', 'signTonConnectData',
   'sendSerialized', 'signCompiled', 'signTransactionMessage',
   'revokeDelegation',
 ]
@@ -55,7 +55,7 @@ const QUOTABLE: readonly string[] = ['sendTransaction', 'transfer', 'signTransac
 const CAPPED: Readonly<Record<string, number>> = Object.freeze({ sendTransaction: 1, transfer: 1, signTransaction: 1, approve: 1, sendSerialized: 2 })
 
 /** Methods that sign an off-chain message: nothing moves, allow/block lists do not apply, only `confirm`. */
-const MESSAGE_METHODS: readonly string[] = ['sign', 'signNep413']
+const MESSAGE_METHODS: readonly string[] = ['sign', 'signNep413', 'signTonProof', 'signTonConnectData']
 
 /** A chain id as callers and dApps write it (number, bigint, decimal or 0x string) → decimal, or undefined. */
 function chainIdRef(v: unknown): string | undefined {

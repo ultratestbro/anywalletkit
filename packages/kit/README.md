@@ -50,8 +50,8 @@ transaction it signs. Signing primitives without a fee model (`signRaw`,
 `signBuilt`, `signCompiled`, `signTransactionMessage`) carry no fee cap.
 Every write surface of an account is covered — `sendTransaction`, `transfer`,
 `signTransaction` (a module that signs and broadcasts on its own cannot skip
-them), `sign` and NEAR's `signNep413` (message signatures: `confirm` only,
-nothing moves), the approval surfaces `approve`, `signPermit` and EIP-2612 /
+them), `sign`, NEAR's `signNep413` and TON's `signTonProof` /
+`signTonConnectData` (message signatures: `confirm` only, nothing moves), the approval surfaces `approve`, `signPermit` and EIP-2612 /
 Permit2 `signTypedData` (checked against the **spender**; `confirm` sees
 `kind: 'approval'` with `unlimited`), other `signTypedData` (`confirm` only),
 and chain-specific ones such as Tron's `signRaw`, NEAR's `signBuilt`, Solana's

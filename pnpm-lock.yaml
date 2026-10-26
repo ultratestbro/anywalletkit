@@ -703,6 +703,9 @@ importers:
       '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../wallet-evm
+      '@anywalletkit/wallet-ton':
+        specifier: workspace:*
+        version: link:../wallet-ton
       viem:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
@@ -1619,6 +1622,9 @@ importers:
       '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
       '@ton/core':
         specifier: ^0.63.1
         version: 0.63.1(@ton/crypto@3.3.0)
