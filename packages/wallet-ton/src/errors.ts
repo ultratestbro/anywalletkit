@@ -23,7 +23,7 @@ export class UnsafeTransactionError extends SignerError {
 export class MessageIsTransactionError extends SignerError {
   readonly code = 'message-is-transaction'
   constructor() {
-    super('A 32-byte message has the shape of a TON transaction hash and is not signed; use signTonProof / signTonConnectData for TON Connect, or signTransaction so it can be reviewed.')
+    super('This message has the shape of a transaction (a 32-byte TON hash, or bytes naming this key as a Solana signer) and is not signed; use signTonProof / signTonConnectData for TON Connect, or signTransaction so it can be reviewed.')
     this.name = 'MessageIsTransactionError'
   }
 }

@@ -67,12 +67,14 @@ const concat = (...parts: Uint8Array[]) => { const out = new Uint8Array(parts.re
 
 function checkCommon(address: TonAddressParts, domain: unknown, timestamp: unknown): void {
   if (address.hash.length !== 32) throw new RangeError('TON address hash must be 32 bytes.')
+  if (!Number.isInteger(address.workChain)) throw new TypeError('TON address workChain must be an integer.')
   if (typeof domain !== 'string' || domain.length === 0) throw new TypeError('TON Connect domain must be a non-empty string.')
   if (typeof timestamp !== 'number' || !Number.isSafeInteger(timestamp) || timestamp < 0) throw new TypeError('TON Connect timestamp must be a non-negative integer (unix seconds).')
 }
 
-/** Standard base64 (padding optional), strictly: a malformed `bytes` is refused, not half-decoded. */
-function base64Bytes(s: string): Uint8Array {
+/** Standard base64 (padding optional, ASCII whitespace ignored as `atob` does), strictly: a malformed `bytes` is refused, not half-decoded. */
+function base64Bytes(raw: string): Uint8Array {
+  const s = raw.replace(/[\t\n\f\r ]/g, '')
   if (!/^[A-Za-z0-9+/]*={0,2}$/.test(s) || s.replace(/=+$/, '').length % 4 === 1) throw new TypeError('signData binary payload must be base64.')
   return new Uint8Array(Buffer.from(s, 'base64'))
 }

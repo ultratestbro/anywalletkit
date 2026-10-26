@@ -36,7 +36,7 @@ export class UnsafeTransactionError extends Error {
 export class MessageIsTransactionError extends SignerError {
   readonly code = 'message-is-transaction'
   constructor() {
-    super('A 32-byte message has the shape of a NEAR transaction hash and is not signed; use signNep413 for off-chain messages, or signTransaction so it can be reviewed.')
+    super('This message has the shape of a transaction (a 32-byte NEAR hash, or bytes naming this key as a Solana signer) and is not signed; use signNep413 for off-chain messages, or signTransaction so it can be reviewed.')
     this.name = 'MessageIsTransactionError'
   }
 }

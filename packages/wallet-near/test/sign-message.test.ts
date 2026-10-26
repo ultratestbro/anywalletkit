@@ -13,6 +13,11 @@ const KEY = new Uint8Array(32).fill(0x42)
 const PUB = ed25519.getPublicKey(KEY)
 const MessageIsTransactionError = (near as unknown as { MessageIsTransactionError?: new () => Error }).MessageIsTransactionError
 
+/** A legacy Solana message: `key` pays and sends 1 SOL (System transfer) — what a Solana wallet on the same key would sign. */
+const solanaTransfer = (key: Uint8Array) => Uint8Array.from([
+  1, 0, 1, 2, ...key, ...new Uint8Array(32), ...new Uint8Array(32).fill(9), 1, 1, 2, 0, 0, 12, 2, 0, 0, 0, 0, 0xca, 0x9a, 0x3b, 0, 0, 0, 0,
+])
+
 describe('NEAR sign() never signs a transaction hash', () => {
   it('exports MessageIsTransactionError', () => {
     expect(MessageIsTransactionError).toBeTypeOf('function')
@@ -36,6 +41,15 @@ describe('NEAR sign() never signs a transaction hash', () => {
       const sig = await a.sign(m)
       expect(ed25519.verify(base58.decode(sig.slice('ed25519:'.length)), typeof m === 'string' ? new TextEncoder().encode(m) : m, PUB)).toBe(true)
     }
+  })
+
+  it('refuses bytes naming its key as a Solana signer: one external ed25519 key may be a Solana wallet too (review round)', async () => {
+    const asked: Uint8Array[] = []
+    const signer = externalSigner({ curve: 'ed25519', publicKey: PUB, sign: async (payload) => { asked.push(payload); return ed25519.sign(payload, KEY) } })
+    const a = await new WalletManagerNear(signer).getAccount()
+    await expect(a.sign(solanaTransfer(PUB))).rejects.toMatchObject({ name: 'MessageIsTransactionError' })
+    expect(asked).toHaveLength(0)
+    expect(await a.sign(solanaTransfer(new Uint8Array(32).fill(5)))).toMatch(/^ed25519:/)
   })
 
   it('signNep413 stays the way to sign an off-chain message (its own 32-byte digest, NEP-413 prefixed)', async () => {

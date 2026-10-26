@@ -37,7 +37,13 @@ payload and options, and checks the length of what comes back.
 | `btc-sighash`, `btc-taproot-keypath`, `btc-message` | Bitcoin | SegWit sighash, Taproot sighash (with `tweak`), BIP-137 hash |
 | `tron-tx`, `tron-message` | Tron | Transaction hash, TIP-191 hash |
 | `solana-message`, `solana-offchain` | Solana | Transaction message bytes, off-chain message |
-| `ton-external`, `ton-message` | TON | Signing-cell hash, message bytes |
+| `ton-external`, `ton-message` | TON | Signing-cell hash, message bytes (never 32 bytes) |
+| `ton-proof`, `ton-sign-data` | TON | TON Connect `ton_proof` digest, `signData` digest |
+| `near-tx`, `near-message`, `near-nep413` | NEAR | sha256 of the transaction, message bytes (never 32 bytes), NEP-413 digest |
+
+One ed25519 key behind several chains (an external signer registered for Solana, TON and NEAR)
+is guarded across them: TON and NEAR `sign()` refuse bytes that name the key as a Solana signer,
+and Solana `sign()` on an external key refuses 32-byte messages (a TON or NEAR transaction digest).
 
 A signer advertises the `schemes` it can produce. By default that is the curve's main one:
 `ecdsa-recoverable` for secp256k1, `ed25519` for ed25519. Add `ecdsa` for Bitcoin SegWit

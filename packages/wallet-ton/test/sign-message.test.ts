@@ -21,6 +21,11 @@ const u64 = (n: number, le: boolean) => { const b = new Uint8Array(8); new DataV
 const cat = (...p: Uint8Array[]) => Uint8Array.from(p.flatMap((x) => [...x]))
 const unbase64 = (s: string) => new Uint8Array(Buffer.from(s, 'base64'))
 
+/** A legacy Solana message: `key` pays and sends 1 SOL (System transfer) — what a Solana wallet on the same key would sign. */
+const solanaTransfer = (key: Uint8Array) => Uint8Array.from([
+  1, 0, 1, 2, ...key, ...new Uint8Array(32), ...new Uint8Array(32).fill(9), 1, 1, 2, 0, 0, 12, 2, 0, 0, 0, 0, 0xca, 0x9a, 0x3b, 0, 0, 0, 0,
+])
+
 function hardwareWallet() {
   const asked: Uint8Array[] = []
   const signer = externalSigner({ curve: 'ed25519', publicKey: HW_PUB, sign: async (payload) => { asked.push(payload); return ed25519.sign(payload, HW_KEY) } })
@@ -54,6 +59,14 @@ describe('TON sign() never signs a transaction hash', () => {
     }
   })
 
+  it('refuses bytes naming its key as a Solana signer: one external ed25519 key may be a Solana wallet too (review round)', async () => {
+    const { signer, asked } = hardwareWallet()
+    const a = await new WalletManagerTon(signer).getAccount()
+    await expect(a.sign(solanaTransfer(HW_PUB))).rejects.toMatchObject({ name: 'MessageIsTransactionError' })
+    expect(asked).toHaveLength(0)
+    expect(await a.sign(solanaTransfer(new Uint8Array(32).fill(5)))).toMatch(/^[0-9a-f]{128}$/) // another key's transaction is just bytes
+  })
+
   it('signTonProof signs the TON Connect ton_proof digest for its own address, and returns the proof object', async () => {
     const m = new WalletManagerTon(SEED)
     const a = await m.getAccount(0)
@@ -78,6 +91,10 @@ describe('TON sign() never signs a transaction hash', () => {
     expect(ed25519.verify(unbase64(text.signature), digestOf('txt', te.encode('hi')), a.publicKey)).toBe(true)
     const bin = await a.signTonConnectData({ domain: 'app.example', timestamp: 1_700_000_000, payload: { type: 'binary', bytes: 'AQID' } })
     expect(ed25519.verify(unbase64(bin.signature), digestOf('bin', new Uint8Array([1, 2, 3])), a.publicKey)).toBe(true)
+    // base64 with whitespace decodes as atob would (review round)
+    const wrapped = await a.signTonConnectData({ domain: 'app.example', timestamp: 1_700_000_000, payload: { type: 'binary', bytes: 'AQ\nID' } })
+    expect(ed25519.verify(unbase64(wrapped.signature), digestOf('bin', new Uint8Array([1, 2, 3])), a.publicKey)).toBe(true)
+    expect(() => ton.tonProofDigest({ workchain: 0, hash: addr.hash } as never, { domain: 'app.example', timestamp: 1, payload: '' })).toThrow(/workChain/)
     m.dispose()
   })
 

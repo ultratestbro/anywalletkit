@@ -7,6 +7,15 @@ import { WalletAccountReadOnlyNear, receiptOf } from './read-only-account.js'
 import { fromBase64, isDefinitive, outcomeFailed, toBase64 } from './rpc.js'
 import type { NearBuiltTransaction, NearConfig, NearFeeEstimate, NearSignedTransaction, NearTransaction, NearTransferOptions } from './types.js'
 
+/** Does `bytes` carry `key` anywhere? A Solana transaction names each signer's 32-byte key. */
+const carriesKey = (bytes: Uint8Array, key: Uint8Array): boolean => {
+  outer: for (let i = 0; i + key.length <= bytes.length; i++) {
+    for (let j = 0; j < key.length; j++) if (bytes[i + j] !== key[j]) continue outer
+    return true
+  }
+  return false
+}
+
 export interface NearTransferResult extends TransferResult {
   estimate?: NearFeeEstimate
 }
@@ -65,12 +74,14 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
   /**
    * Raw ed25519 signature over the message bytes, as NEAR tooling prints it: "ed25519:<base58>".
    * A 32-byte message — string or bytes — is refused with {@link MessageIsTransactionError}: a NEAR
-   * transaction is signed over its 32-byte sha256, so those bytes could be one. Sites asking a
-   * wallet to sign a message use {@link signNep413}.
+   * transaction is signed over its 32-byte sha256, so those bytes could be one. Bytes that carry
+   * this account's public key are refused as well: one ed25519 key (an external signer) may also be
+   * a Solana wallet, and a Solana transaction names its signer's key. Sites asking a wallet to sign
+   * a message use {@link signNep413}.
    */
   async sign(message: string | Uint8Array): Promise<string> {
     const bytes = typeof message === 'string' ? new TextEncoder().encode(message) : message
-    if (bytes.length === 32) throw new MessageIsTransactionError()
+    if (bytes.length === 32 || carriesKey(bytes, this.publicKey.data)) throw new MessageIsTransactionError()
     return `ed25519:${bytesToBase58(await this.signBytes(bytes, 'near-message'))}`
   }
 

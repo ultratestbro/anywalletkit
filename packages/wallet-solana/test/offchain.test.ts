@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ed25519 } from '@noble/curves/ed25519.js'
+import { externalSigner } from '@anywalletkit/core'
 import {
   appendTransactionMessageInstructions, compileTransaction, compressTransactionMessageUsingAddressLookupTables, createNoopSigner, createTransactionMessage,
   getTransactionEncoder, pipe, setTransactionMessageFeePayer, setTransactionMessageLifetimeUsingBlockhash,
@@ -149,5 +150,20 @@ describe('WalletAccountSolana.sign', () => {
     }
     const text = Uint8Array.from(Buffer.from(await a.sign('hello'), 'hex'))
     expect(ed25519.verify(text, new TextEncoder().encode('hello'), a.publicKey)).toBe(true)
+  })
+
+  it('an external ed25519 key refuses 32-byte messages: it may also be a TON / NEAR wallet, whose transactions sign a 32-byte digest (round 3 H1, review)', async () => {
+    const key = new Uint8Array(32).fill(0x42)
+    const asked: Uint8Array[] = []
+    const signer = externalSigner({ curve: 'ed25519', publicKey: ed25519.getPublicKey(key), sign: async (p) => { asked.push(p); return ed25519.sign(p, key) } })
+    const ext = await new WalletManagerSolana(signer).getAccount()
+    expect(ext.path).toBe('external')
+    await expect(ext.sign(new Uint8Array(32).fill(1))).rejects.toBeInstanceOf(MessageIsTransactionError)
+    await expect(ext.sign('x'.repeat(32))).rejects.toBeInstanceOf(MessageIsTransactionError)
+    expect(asked).toHaveLength(0)
+    expect(await ext.sign('x'.repeat(33))).toMatch(/^[0-9a-f]{128}$/)
+    // a seed account's key is Solana's alone: 32-byte nonces still sign
+    const seed = await new WalletManagerSolana(SEED).getAccount(0)
+    expect(await seed.sign(new Uint8Array(32).fill(1))).toMatch(/^[0-9a-f]{128}$/)
   })
 })

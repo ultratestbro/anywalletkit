@@ -9,6 +9,15 @@ import type { TonConfig, TonSendable, TonTransferOptions } from './types.js'
 
 const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
 
+/** Does `bytes` carry `key` anywhere? A Solana transaction names each signer's 32-byte key. */
+const carriesKey = (bytes: Uint8Array, key: Uint8Array): boolean => {
+  outer: for (let i = 0; i + key.length <= bytes.length; i++) {
+    for (let j = 0; j < key.length; j++) if (bytes[i + j] !== key[j]) continue outer
+    return true
+  }
+  return false
+}
+
 /**
  * Signing TON account on Wallet V5R1. It never holds a key: the V5R1 body is
  * signed by `signer.sign(signingCell.hash(), {scheme: 'ed25519', context:
@@ -50,12 +59,14 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   /**
    * Hex ed25519 signature over the raw message bytes. A 32-byte message — string or bytes — is
    * refused with {@link MessageIsTransactionError}: the wallet contract checks a transfer's
-   * signature over the 32-byte hash of its signing cell, so those bytes could be one. TON Connect
-   * goes through {@link signTonProof} and {@link signTonConnectData}.
+   * signature over the 32-byte hash of its signing cell, so those bytes could be one. Bytes that
+   * carry this account's public key are refused as well: one ed25519 key (an external signer) may
+   * also be a Solana wallet, and a Solana transaction names its signer's key. TON Connect goes
+   * through {@link signTonProof} and {@link signTonConnectData}.
    */
   async sign(message: string | Uint8Array): Promise<string> {
     const bytes = typeof message === 'string' ? new TextEncoder().encode(message) : message
-    if (bytes.length === 32) throw new MessageIsTransactionError()
+    if (bytes.length === 32 || carriesKey(bytes, this.publicKey)) throw new MessageIsTransactionError()
     return toHex(await this.signer.sign(bytes, { scheme: 'ed25519', context: 'ton-message' }))
   }
 

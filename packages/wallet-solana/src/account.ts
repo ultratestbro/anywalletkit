@@ -64,10 +64,13 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
    * Hex ed25519 signature over the raw message bytes (UTF-8 for a string; context `solana-offchain`).
    * Throws {@link MessageIsTransactionError} when the bytes are a Solana transaction this account
    * would sign for (see `isSolanaTransactionPayload`): that must go through `signTransaction`.
+   * On an external signer (`path` 'external') a 32-byte message is refused too: the same ed25519
+   * key may also be a TON or NEAR wallet, whose transactions are signed over a 32-byte digest.
    */
   async sign(message: string | Uint8Array): Promise<string> {
     const bytes = typeof message === 'string' ? new TextEncoder().encode(message) : message
     if (isSolanaTransactionPayload(bytes, this.publicKey)) throw new MessageIsTransactionError()
+    if (this.path === 'external' && bytes.length === 32) throw new MessageIsTransactionError('An external ed25519 key may also sign TON or NEAR transactions, whose signatures cover a 32-byte digest; a 32-byte message is not signed.')
     return toHex(await this.signer.sign(bytes, { scheme: 'ed25519', context: 'solana-offchain' }))
   }
 
