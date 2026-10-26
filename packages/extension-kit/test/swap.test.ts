@@ -83,7 +83,7 @@ const plan: Swap2ExecutionPlan = {
   approvals: [{ token: USDC, spender: '0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae', amount: 1_000_000n }],
   source: { kind: 'call', to: '0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae', data: '0xdeadbeef', value: 0n },
 }
-const meta = { origin: 'chrome-extension://x', providerLabel: 'LI.FI', fromSymbol: 'USDC', fromDecimals: 6, toSymbol: 'USDC', toDecimals: 6, fromChainName: 'Ethereum', toChainName: 'Base', own: [A] }
+const meta = { origin: 'chrome-extension://x', account: A, providerLabel: 'LI.FI', fromSymbol: 'USDC', fromDecimals: 6, toSymbol: 'USDC', toDecimals: 6, fromChainName: 'Ethereum', toChainName: 'Base', own: [A] }
 
 describe('reviewSwapPlan', () => {
   it('builds the sheet payload and, on approval, pre-approves exactly the plan operations', async () => {
@@ -102,10 +102,10 @@ describe('reviewSwapPlan', () => {
     await p
     expect(gate.pending).toBe(2)
     // the approval, then the leg — each once, in any order, nothing else
-    expect(gate.consume({ kind: 'evm-tx', caip2: 'eip155:1', to: USDC, data: encodeApproveCalldata(plan.approvals[0]!.spender, 1_000_000n), value: 0n })).toBe(true)
-    expect(gate.consume({ kind: 'evm-tx', caip2: 'eip155:1', to: '0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae', data: '0xdeadbeef', value: 1n })).toBe(false) // different value
-    expect(gate.consume({ kind: 'evm-tx', caip2: 'eip155:1', to: '0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae', data: '0xDEADBEEF', value: 0n })).toBe(true)
-    expect(gate.consume({ kind: 'evm-tx', caip2: 'eip155:1', to: '0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae', data: '0xdeadbeef', value: 0n })).toBe(false) // spent
+    expect(gate.consume({ kind: 'evm-tx', account: A, caip2: 'eip155:1', to: USDC, data: encodeApproveCalldata(plan.approvals[0]!.spender, 1_000_000n), value: 0n })).toBe(true)
+    expect(gate.consume({ kind: 'evm-tx', account: A, caip2: 'eip155:1', to: '0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae', data: '0xdeadbeef', value: 1n })).toBe(false) // different value
+    expect(gate.consume({ kind: 'evm-tx', account: A, caip2: 'eip155:1', to: '0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae', data: '0xDEADBEEF', value: 0n })).toBe(true)
+    expect(gate.consume({ kind: 'evm-tx', account: A, caip2: 'eip155:1', to: '0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae', data: '0xdeadbeef', value: 0n })).toBe(false) // spent
   })
 
   it('decline → ReviewDeclined, nothing pre-approved; foreign recipient and oversized approval are warned', async () => {
@@ -147,7 +147,7 @@ describe('execution gate with a stub engine', () => {
     // the reviewed account: a send passes only with a pre-approval
     const account = {
       sendTransaction: vi.fn(async (tx: { to: string; data?: string; value: bigint }) => {
-        if (!gate.consume({ kind: 'evm-tx', caip2: 'eip155:1', to: tx.to, ...(tx.data ? { data: tx.data } : {}), value: tx.value })) throw new Error('not reviewed')
+        if (!gate.consume({ kind: 'evm-tx', account: A, caip2: 'eip155:1', to: tx.to, ...(tx.data ? { data: tx.data } : {}), value: tx.value })) throw new Error('not reviewed')
         signed.push(tx.to)
         return { hash: `0x${signed.length}` }
       }),

@@ -23,6 +23,6 @@ describe('ReviewGate', () => {
     expect(gate.consume({ kind: 'solana-serialized', serializedTx: 'AQ==' })).toBe(true)
     gate.preApprove([() => true])
     gate.clear()
-    expect(gate.consume({ kind: 'evm-typed-data', caip2: 'eip155:1' })).toBe(false)
+    expect(gate.consume({ kind: 'evm-typed-data', caip2: 'eip155:1', typedDataHash: '0x00' })).toBe(false)
   })
 })

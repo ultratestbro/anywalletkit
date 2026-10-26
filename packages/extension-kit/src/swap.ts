@@ -16,8 +16,10 @@
  */
 import type { CrossChainProvider, Quote, QuoteParams, Swap2ExecutionPlan } from '@anywalletkit/protocol-swap2-core'
 import { validQuote } from '@anywalletkit/protocol-swap2-core'
+import { typedDataHash } from '@anywalletkit/wallet-evm'
 import { ApprovalQueue } from './approvals.js'
-import { ReviewGate, chainTxMatcher, evmCallMatcher, type GateMatcher } from './gate.js'
+import { ReviewGate, chainTxMatcher, evmCallMatcher, typedDataMatcher, type GateMatcher } from './gate.js'
+import type { TypedData } from './signing.js'
 
 export interface RouteView {
   provider: string
@@ -123,6 +125,8 @@ export function executionFloor(minDestAmount: bigint): bigint {
 export interface SwapReviewMeta {
   /** Who runs the flow (the wallet's origin). */
   origin: string
+  /** The account that signs the plan: the gate passes the plan's operations for this account only. */
+  account: string
   providerLabel: string
   fromSymbol: string
   fromDecimals: number
@@ -154,7 +158,8 @@ export interface SwapApproval {
     | { kind: 'call'; to: string; data?: string; value: string; deposit?: string }
     | { kind: 'token-transfer'; token: string; recipient: string; amount: string; memo?: string }
     | { kind: 'serialized' }
-    | { kind: 'typed-order' }
+    /** The EIP-712 order the account signs (gasless routes): `typedData` to render, `text` pretty JSON. */
+    | { kind: 'typed-order'; typedData: TypedData; text: string }
   checks: { status: 'ok' | 'warn' | 'unknown'; label: string }[]
 }
 
@@ -188,7 +193,8 @@ export function swapApprovalPayload(plan: Swap2ExecutionPlan, meta: SwapReviewMe
     source = { kind: 'serialized' }
     checks.push({ status: 'ok', label: 'Balance changes are proven before signing (SDK guard)' })
   } else {
-    source = { kind: 'typed-order' }
+    const typedData = parseTypedOrder(s.typedData)
+    source = { kind: 'typed-order', typedData, text: JSON.stringify(typedData, null, 2) }
     checks.push({ status: 'ok', label: 'Signed order — no transaction is sent from your wallet' })
   }
   for (const a of plan.approvals) checks.push(a.amount > plan.sourceAmount ? { status: 'warn', label: 'Approval is larger than this swap needs' } : { status: 'ok', label: 'Approval is exactly the amount needed' })
@@ -202,6 +208,12 @@ export function swapApprovalPayload(plan: Swap2ExecutionPlan, meta: SwapReviewMe
     approvals: plan.approvals.map((a) => ({ token: a.token, spender: a.spender, amount: a.amount.toString() })),
     source, checks,
   }
+}
+
+function parseTypedOrder(json: string): TypedData {
+  const t = JSON.parse(json) as TypedData
+  if (!t || typeof t !== 'object' || !t.domain || typeof t.domain !== 'object' || !t.types || typeof t.types !== 'object' || !t.message || typeof t.message !== 'object') throw new Error('The swap order is not EIP-712 typed data.')
+  return t
 }
 
 /** Matchers for exactly the operations the plan will perform, in the engine's order. */
@@ -219,17 +231,20 @@ export function planMatchers(plan: Swap2ExecutionPlan): GateMatcher[] {
   } else if (s.kind === 'serialized') {
     m.push((op) => op.kind === 'solana-serialized' && op.serializedTx === s.serializedTx)
   } else {
-    m.push((op) => op.kind === 'evm-typed-data' && op.caip2 === plan.fromChain)
+    // The order itself, by the EIP-712 digest the account will sign (the engine's domain / type clean-up does not change it).
+    m.push(typedDataMatcher({ caip2: plan.fromChain, typedDataHash: typedDataHash(parseTypedOrder(s.typedData) as Parameters<typeof typedDataHash>[0]) }))
   }
   return m
 }
 
 /** The engine's `reviewExecution`: one sheet for the plan; approve → pre-approve exactly its operations; decline → nothing sent. */
 export function reviewSwapPlan(approvals: ApprovalQueue, gate: ReviewGate, meta: SwapReviewMeta): (plan: Swap2ExecutionPlan) => Promise<void> {
+  if (typeof meta.account !== 'string' || !meta.account) throw new TypeError('reviewSwapPlan needs meta.account: the gate passes the plan for that account only.')
   return async (plan) => {
+    const matchers = planMatchers(plan) // a plan that cannot be matched is refused before the sheet
     const payload = swapApprovalPayload(plan, meta)
     await approvals.request({ origin: meta.origin, chain: plan.fromChain, kind: 'swap', payload })
     gate.clear()
-    gate.preApprove(planMatchers(plan), Math.max(60_000, plan.validUntilMs - Date.now() + 5 * 60_000))
+    gate.preApprove(matchers, Math.max(60_000, plan.validUntilMs - Date.now() + 5 * 60_000), meta.account)
   }
 }
