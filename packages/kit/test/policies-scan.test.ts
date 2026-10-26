@@ -36,7 +36,7 @@ describe('kit policies — EIP-712 (scan F5/F13)', () => {
     const seen: WriteIntent[] = []
     await applyPolicies(acc, { confirm: async (i) => { seen.push(i); return true } }).signTypedData(exploit)
     expect(seen[0]).toMatchObject({ kind: 'approval', to: DRAINER, token: USDC, amount: MAX, unlimited: true })
-    expect(signed[0]).toBe(exploit) // forwarded untouched (primaryType was explicit)
+    expect(signed[0]).toStrictEqual(exploit) // forwarded untouched (primaryType was explicit); a copy since round 3 M2, so compared by content
   })
 
   it('F5: revoke only from declared fields of the declared type — value uint256 0, or DAI allowed bool false', async () => {
@@ -87,7 +87,7 @@ describe('kit policies — EIP-712 (scan F5/F13)', () => {
     expect(signed).toHaveLength(0)
     const explicit = { ...ambiguous, primaryType: 'B' }
     expect(await applyPolicies(acc, { confirm }).signTypedData(explicit)).toBe('0xsig')
-    expect(signed[0]).toBe(explicit)
+    expect(signed[0]).toStrictEqual(explicit) // untouched content; the signer gets the snapshot copy (round 3, M2)
   })
 })
 

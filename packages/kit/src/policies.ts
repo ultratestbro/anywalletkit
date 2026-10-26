@@ -1,6 +1,7 @@
 import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
 import { canonicalAddress, sendDestinations } from './destinations.js'
+import { snapshot } from './snapshot.js'
 
 /**
  * Account methods the policies guard — everything that produces a signature
@@ -634,7 +635,8 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         }
       }
     }
-    if (policies.confirm && !(await policies.confirm(intent))) throw new UserRejectedError('The write was not confirmed.')
+    // confirm gets its own copy of the argument: whatever it edits is not what gets signed (round 3, M2).
+    if (policies.confirm && !(await policies.confirm({ ...intent, raw: snapshot(intent.raw) }))) throw new UserRejectedError('The write was not confirmed.')
     // The quote is an estimate: the account signs its own gas limit (with headroom) and fee fields.
     // Hand it the tightest cap so it checks the transaction it is about to sign (audit #4).
     return caps.length > 0 && CAPPED[method] !== undefined ? caps.reduce((a, b) => (b.cap < a.cap ? b : a)).cap : undefined
@@ -654,7 +656,9 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         let fn = wrapped.get(prop)
         if (!fn) {
           const original = v as (...args: unknown[]) => Promise<unknown>
-          fn = async (...args: unknown[]) => {
+          fn = async (...given: unknown[]) => {
+            // One copy, taken before anything is judged, is what the rules see and what gets signed (round 3, M2).
+            const args = snapshot(given)
             const maxFee = await guard(prop, args[0])
             if (maxFee !== undefined) {
               // WriteOptions sit at CAPPED[prop] (second, or third after sendSerialized's guard); a tighter caller cap stays.
