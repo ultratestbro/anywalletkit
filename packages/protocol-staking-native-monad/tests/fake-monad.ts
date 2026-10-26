@@ -1,6 +1,13 @@
-import { decodeFunctionData, encodeFunctionResult, zeroAddress, type Hex } from 'viem'
+import { decodeFunctionData, encodeFunctionResult, parseAbi, zeroAddress, type Hex } from 'viem'
 import { STAKING_ABI } from '../src/abi.js'
 import { STAKING_PRECOMPILE } from '../src/constants.js'
+
+const MULTICALL3 = '0xca11bde05977b3631167028862be2a173976ca11'
+const MULTICALL_ABI = parseAbi([
+  'struct Call3 { address target; bool allowFailure; bytes callData; }',
+  'struct Result { bool success; bytes returnData; }',
+  'function aggregate3(Call3[] calls) payable returns (Result[] returnData)',
+])
 
 // An in-memory Monad node behind EIP-1193: eth_chainId, blocks, and eth_call to the staking
 // precompile answered from a small model, with the precompile's real revert strings.
@@ -22,6 +29,10 @@ export class FakeMonad {
   withdrawals = new Map<string, { amount: bigint; epoch: bigint }>() // `${valId}:${address}:${id}`
   consensus: bigint[] = []
   calls: Array<{ fn: string; args: readonly unknown[]; value?: bigint }> = []
+  /** Whether a Multicall3 is deployed here (a chain without one makes the module fall back). */
+  multicall = true
+  /** eth_calls that went through Multicall3. */
+  multicallCalls = 0
   /** Force a revert reason for a function (as if the chain changed between the read and the call). */
   revertOn = new Map<string, string>()
   pageSize = 2
@@ -131,6 +142,16 @@ export class FakeMonad {
       }
       case 'eth_call': {
         const call = p[0] as { to?: string; data?: Hex; from?: string; value?: string }
+        if (call.to?.toLowerCase() === MULTICALL3 && this.multicall) {
+          // Multicall3 aggregate3 over the precompile: one eth_call, each inner call recorded as usual.
+          this.multicallCalls++
+          const { args } = decodeFunctionData({ abi: MULTICALL_ABI, data: call.data! })
+          const results = (args![0] as Array<{ target: string; allowFailure: boolean; callData: Hex }>).map((c) => {
+            if (c.target.toLowerCase() !== STAKING_PRECOMPILE) throw new Error(`multicall to ${c.target}`)
+            return { success: true, returnData: this.staking(c.callData, MULTICALL3, 0n) }
+          })
+          return encodeFunctionResult({ abi: MULTICALL_ABI, functionName: 'aggregate3', result: results })
+        }
         if (call.to?.toLowerCase() !== STAKING_PRECOMPILE) throw new Error(`eth_call to ${call.to}`)
         return this.staking(call.data!, call.from ?? zeroAddress, call.value ? BigInt(call.value) : 0n)
       }

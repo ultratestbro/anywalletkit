@@ -25,6 +25,8 @@ const NETWORK_TTL_MS = 10 * 60_000
 const BLOCK_TIME_SAMPLE = 50_000n
 /** Gap scan: stop after this many empty withdrawal slots past the last used one. */
 export const WITHDRAW_SCAN_GAP = 32
+/** The canonical Multicall3 (deployed on Monad mainnet). */
+const MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11' as const
 /** Validator reads kept before expired ones are swept. */
 const VALIDATOR_CACHE_MAX = 512
 
@@ -53,11 +55,15 @@ export interface NativeStakingMonadConfig {
   /** Highest withdrawal id used and scanned (default 255). */
   maxWithdrawId?: number
   /**
-   * How pending withdrawals are found per validator: `'gap'` (default) reads slots from 0 and stops
-   * 32 empty slots past the last used one (this module always takes the lowest free slot, other wallets
-   * count up too); `'full'` reads every slot up to `maxWithdrawId` (256 calls per validator).
+   * How pending withdrawals are found per validator. `'multicall'` (default) reads every slot up to
+   * `maxWithdrawId` in ONE `eth_call` through Multicall3 (falling back to `'full'` when that call
+   * fails); `'full'` reads every slot one call each (256 per validator); `'gap'` reads from 0 and
+   * stops 32 empty slots past the last used one — cheaper, but it misses a pending slot above a run
+   * of claimed ones (withdrawals 0–39 with 0–35 claimed: 36–39 are not found).
    */
-  withdrawScan?: 'gap' | 'full'
+  withdrawScan?: 'multicall' | 'gap' | 'full'
+  /** Multicall3 for the `'multicall'` scan (default the canonical 0xcA11…CA11, deployed on Monad). */
+  multicallAddress?: `0x${string}`
   /** Adds data to validators (APR, names) from an explorer or the app's backend. */
   enrich?: ValidatorEnricher
 }
@@ -216,7 +222,8 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
   private readonly client: PublicClient | undefined
   private readonly concurrency: number
   private chainChecked: Promise<MonadChainId> | undefined
-  readonly withdrawScan: 'gap' | 'full'
+  readonly withdrawScan: 'multicall' | 'gap' | 'full'
+  private readonly multicallAddress: `0x${string}`
   private readonly validatorCache = new Map<bigint, { at: number; value: Promise<ValidatorTuple> }>()
   private consensusCache: { at: number; value: Promise<bigint[]> } | undefined
   private networkCache: { at: number; value: Promise<MonadNetworkStats> } | undefined
@@ -254,8 +261,9 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
     this.maxWithdrawId = config.maxWithdrawId ?? MAX_WITHDRAW_ID
     if (!Number.isInteger(this.maxWithdrawId) || this.maxWithdrawId < 0 || this.maxWithdrawId > MAX_WITHDRAW_ID) throw new Error(`maxWithdrawId must be an integer from 0 to ${MAX_WITHDRAW_ID}.`)
 
-    this.withdrawScan = config.withdrawScan ?? 'gap'
-    if (this.withdrawScan !== 'gap' && this.withdrawScan !== 'full') throw new Error("withdrawScan must be 'gap' or 'full'.")
+    this.withdrawScan = config.withdrawScan ?? 'multicall'
+    if (this.withdrawScan !== 'multicall' && this.withdrawScan !== 'gap' && this.withdrawScan !== 'full') throw new Error("withdrawScan must be 'multicall', 'gap' or 'full'.")
+    this.multicallAddress = config.multicallAddress ?? MULTICALL3
 
     this.concurrency = config.concurrency ?? DEFAULT_CONCURRENCY
     if (!Number.isInteger(this.concurrency) || this.concurrency < 1) throw new Error('concurrency must be a positive integer.')
@@ -566,8 +574,29 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
     return null
   }
 
-  /** Used slots of one validator: every slot (`'full'`), or until 32 empty ones past the last used (`'gap'`). */
+  /**
+   * Every slot 0…maxWithdrawId of one validator in one eth_call through Multicall3, or null when that
+   * call fails (no Multicall3 on this chain, an RPC that refuses it): the caller then reads them one by one.
+   */
+  private async allSlots(id: bigint, me: Address): Promise<Array<{ amount: bigint; withdrawEpoch: bigint }> | null> {
+    const contracts = Array.from({ length: this.maxWithdrawId + 1 }, (_, w) => ({ address: this.stakingAddress, abi: STAKING_ABI, functionName: 'getWithdrawalRequest' as const, args: [id, me, w] as const }))
+    try {
+      const rows = await this.rpc().multicall({ contracts: contracts as never, multicallAddress: this.multicallAddress, allowFailure: false, batchSize: 0 })
+      return (rows as unknown as Array<readonly [bigint, bigint, bigint]>).map(([amount, , withdrawEpoch]) => ({ amount, withdrawEpoch }))
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Used slots of one validator: all of them in one Multicall3 read (`'multicall'`, falling back to
+   * `'full'`), every slot one call each (`'full'`), or until 32 empty ones past the last used (`'gap'`).
+   */
   private async usedSlots(id: bigint, me: Address): Promise<Array<{ withdrawId: number; amount: bigint; withdrawEpoch: bigint }>> {
+    if (this.withdrawScan === 'multicall') {
+      const all = await this.allSlots(id, me)
+      if (all) return all.flatMap((r, withdrawId) => (r.amount === 0n ? [] : [{ withdrawId, ...r }]))
+    }
     const used: Array<{ withdrawId: number; amount: bigint; withdrawEpoch: bigint }> = []
     let last = -1
     for (let start = 0; start <= this.maxWithdrawId; start += this.concurrency) {
