@@ -7,7 +7,7 @@
   "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
   "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-staking-tonstakers-ton" },
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22" },
   "main": "index.js",
   "types": "./types/index.d.ts",
   "exports": {

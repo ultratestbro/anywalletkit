@@ -7,7 +7,7 @@
   "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
   "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/wallet-ton" },
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22" },
   "sideEffects": [
     "./dist/index.js",
     "./dist/index.cjs"

@@ -11,7 +11,7 @@ An Expo (React Native, expo-router) app. It creates or imports a 12-word phrase 
 
 ## Before you start
 
-- Node 20+, and a Mac with Xcode (or an Android SDK / EAS) for the phone build.
+- Node 22+, and a Mac with Xcode (or an Android SDK / EAS) for the phone build.
 - An empty folder. The agent runs `create-expo-app` itself.
 - No keys: the public RPCs in the reference are enough to start. Put your own endpoints in the config file before you ship.
 

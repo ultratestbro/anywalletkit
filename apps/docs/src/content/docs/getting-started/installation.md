@@ -8,7 +8,7 @@ sidebar:
 
 ## Try it from source
 
-The source is on [GitHub](https://github.com/ultratestbro/anywalletkit). Node 20+ and pnpm 10:
+The source is on [GitHub](https://github.com/ultratestbro/anywalletkit). Node 22+ and pnpm 10:
 
 ```sh
 git clone https://github.com/ultratestbro/anywalletkit.git
@@ -110,7 +110,7 @@ problems that only show up in production.
 
 ## Node
 
-Node 20 or newer needs no polyfills:
+Node 22 or newer needs no polyfills. Run a patched release: Node 20 no longer gets security fixes, and the October 2026 fixes are in 22.23.4, 24.22.1 and 26.12.1.
 
 ```sh
 npm install @anywalletkit/core @anywalletkit/kit @anywalletkit/wallet-evm

@@ -7,7 +7,7 @@
   "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
   "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-lending-morpho-evm" },
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22" },
   "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

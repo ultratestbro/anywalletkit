@@ -16,7 +16,7 @@ A standalone npm package, `@acme/protocol-lending-erc4626-evm`.
 
 ## Before you start
 
-Node 20+ and an empty folder. The module lives in **your own repository and npm scope**: the SDK repository does not accept pull requests yet. External modules are listed through the registry's `external.json`.
+Node 22+ and an empty folder. The module lives in **your own repository and npm scope**: the SDK repository does not accept pull requests yet. External modules are listed through the registry's `external.json`.
 
 ## The prompt
 

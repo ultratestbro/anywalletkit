@@ -7,7 +7,7 @@
   "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
   "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/runtime-hermes" },
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22" },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
