@@ -109,3 +109,35 @@ describe("unlisted tokens", () => {
     expect(resolveAsset("eip155:1", "PEPE", {allowUnlisted: true, decimals: 18})).toBeUndefined();
   });
 });
+
+// Audit 2026-10-25 round 3, L18: one EVM contract address, deployed the same way on several chains,
+// should have one `decimals`. Exceptions are listed here, each read from the contract on chain.
+describe("one EVM address, one decimals", () => {
+  /** Same address, different decimals — verified with eth_call decimals() on 2026-10-26. */
+  const VERIFIED_EXCEPTIONS: Record<string, Record<string, number>> = {
+    // USD1: 6 on Monad, 18 on Plume (same 2 491-byte proxy code, different implementations).
+    "0x111111d2bf19e43c34263401e0cad979ed1cdb61": {"eip155:143": 6, "eip155:98866": 18},
+  };
+
+  it("every contract has one decimals across EVM chains, except the verified exceptions", () => {
+    const seen = new Map<string, Array<{chain: string; decimals: number}>>();
+    for (const c of CC_SOURCE_CHAINS) {
+      if (!c.caip2.startsWith("eip155:")) continue;
+      for (const a of c.assets) {
+        if (!a.contract) continue;
+        const k = a.contract.toLowerCase();
+        seen.set(k, [...(seen.get(k) ?? []), {chain: c.caip2, decimals: a.decimals}]);
+      }
+    }
+    const mismatched: string[] = [];
+    for (const [address, uses] of seen) {
+      const exception = VERIFIED_EXCEPTIONS[address];
+      if (exception) {
+        for (const u of uses) expect(u.decimals, `${address} on ${u.chain}`).toBe(exception[u.chain]);
+        continue;
+      }
+      if (new Set(uses.map((u) => u.decimals)).size > 1) mismatched.push(`${address}: ${uses.map((u) => `${u.chain}=${u.decimals}`).join(", ")}`);
+    }
+    expect(mismatched).toEqual([]);
+  });
+});
