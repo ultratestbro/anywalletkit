@@ -1,4 +1,5 @@
 import '../src/buffer-global.js'
+import { mnemonicNew } from '@ton/crypto'
 import { describe, expect, it } from 'vitest'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { Buffer } from 'buffer'
@@ -107,9 +108,8 @@ describe('WalletManagerTon with an external signer', () => {
   })
 
   it('fromTonMnemonic is a LocalSigner leaf at ton-mnemonic', async () => {
-    const m = await WalletManagerTon.fromTonMnemonic(
-      'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art',
-    )
+    // A real TON mnemonic: the BIP-39 phrase this test used is refused since round 3 (L3).
+    const m = await WalletManagerTon.fromTonMnemonic(await mnemonicNew(24))
     const a = await m.getAccount()
     expect(a.path).toBe(TON_MNEMONIC_PATH)
     expect(a.signer).toBeInstanceOf(LocalSigner)
