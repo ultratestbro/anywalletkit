@@ -1,5 +1,5 @@
 import { LocalSigner, SignerError, WalletManager, isSeedSigner, zeroize, type FeeRates, type Signer } from '@anywalletkit/core'
-import { mnemonicToPrivateKey } from '@ton/crypto'
+import { mnemonicToPrivateKey, mnemonicValidate } from '@ton/crypto'
 import { WalletAccountTon } from './account.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'
 import type { TonConfig } from './types.js'
@@ -37,6 +37,8 @@ export class WalletManagerTon extends WalletManager<WalletAccountTon, TonConfig>
   static async fromTonMnemonic(words: string[] | string, config: TonConfig = {}): Promise<WalletManagerTon> {
     const list = (Array.isArray(words) ? words : words.trim().split(/\s+/)).map((w) => w.toLowerCase())
     if (list.length !== 24) throw new Error('A TON mnemonic has 24 words.')
+    // TON mnemonics carry their own check: a typo (or a BIP-39 phrase) would derive another, empty wallet.
+    if (!(await mnemonicValidate(list))) throw new Error('Not a valid TON mnemonic: check the words (a typo would open a different, empty wallet).')
     const pair = await mnemonicToPrivateKey(list)
     const privateKey = new Uint8Array(pair.secretKey.subarray(0, 32)) // nacl secret key = seed || public key
     const publicKey = new Uint8Array(pair.publicKey)

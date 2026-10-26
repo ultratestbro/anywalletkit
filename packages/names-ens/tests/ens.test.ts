@@ -167,3 +167,19 @@ namesSuite(
     foreign: 'alice.sol',
   },
 )
+
+// Audit 2026-10-25 round 3, M5: assertNameUnchanged went through the 5-minute cache, so a name
+// re-pointed after the user typed it passed the signing-time check.
+describe('ensResolver: the signing-time check is never served from the cache', () => {
+  it('a name re-pointed within the TTL is refused by assertNameUnchanged', async () => {
+    const records: Record<string, string | null> = { 'pay.eth:60': VITALIK.toLowerCase() }
+    const { client, calls } = fakeClient(records)
+    const r = ensResolver({ client, cacheTtlMs: 60 * 60_000 })
+    const typed = await r.resolve('pay.eth', 'eip155:1')
+    records['pay.eth:60'] = '0x2222222222222222222222222222222222222222'
+    expect((await r.resolve('pay.eth', 'eip155:1')).address).toBe(typed.address) // display: cached
+    await expect(assertNameUnchanged(nameResolvers([r]), 'pay.eth', 'eip155:1', typed.address)).rejects.toMatchObject({ code: 'changed' })
+    expect(calls.filter((c) => c.startsWith('addr pay.eth')).length).toBe(2)
+    expect((await r.resolve('pay.eth', 'eip155:1')).address).toBe('0x2222222222222222222222222222222222222222') // the fresh answer is cached
+  })
+})

@@ -73,8 +73,12 @@ export interface NameResolver {
   readonly id: string
   /** Cheap shape check: does this resolver serve names like this one? No I/O. */
   supports(name: string): boolean
-  /** Name → address for `chain`. Throws `NameError`; never falls back to another chain's record. */
-  resolve(name: string, chain: string): Promise<ResolvedName>
+  /**
+   * Name → address for `chain`. Throws `NameError`; never falls back to another chain's record.
+   * `fresh: true` must bypass any cache: the signing-time check ({@link assertNameUnchanged}) asks
+   * that way, and a cached answer would let a re-pointed name through.
+   */
+  resolve(name: string, chain: string, options?: { fresh?: boolean }): Promise<ResolvedName>
   /** Address → primary name, verified by forward resolution; `null` when there is none or it does not match. */
   reverse(address: string, chain: string): Promise<string | null>
   /** Avatar URL (https / ipfs / resolved NFT image) or `null`. Wallets should fetch it through their own proxy. */
@@ -99,10 +103,10 @@ export function nameResolvers(resolvers: readonly NameResolver[]): NameResolver 
   return {
     id: 'registry',
     supports: (name) => pick(name) !== undefined,
-    async resolve(name, chain) {
+    async resolve(name, chain, options) {
       const r = pick(name)
       if (!r) throw new NameError('unsupported', `No resolver serves ${name}`, { name, chain })
-      return r.resolve(name, chain)
+      return options ? r.resolve(name, chain, options) : r.resolve(name, chain)
     },
     async reverse(address, chain) {
       for (const r of resolvers) {
@@ -123,7 +127,7 @@ export function nameResolvers(resolvers: readonly NameResolver[]): NameResolver 
  * Returns the fresh resolution so the wallet can show it.
  */
 export async function assertNameUnchanged(resolver: NameResolver, name: string, chain: string, expected: string): Promise<ResolvedName> {
-  const fresh = await resolver.resolve(name, chain)
+  const fresh = await resolver.resolve(name, chain, { fresh: true }) // never from a cache: the name may have moved since it was typed
   // EVM hex is case-insensitive (the checksum is only casing); base58 / base32 / bech32 forms of other chains are compared exactly.
   const same = chain.startsWith('eip155:') ? fresh.address.toLowerCase() === expected.toLowerCase() : fresh.address === expected
   if (!same) {

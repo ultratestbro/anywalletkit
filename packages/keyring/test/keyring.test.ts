@@ -243,6 +243,9 @@ describe('Keyring — TON-native mnemonic (Tonkeeper)', () => {
     expect(await keyring.withAccount(account.id, 'ton', (a) => a.getAddress())).toBe(expected)
     await expect(keyring.importTonMnemonic(words)).rejects.toMatchObject({ code: 'duplicate' })
     await expect(keyring.importTonMnemonic('one two')).rejects.toThrow(/24 words/)
+    // Round 3, L3: 24 words that fail the TON check (a BIP-39 phrase here) are refused, not imported as another wallet.
+    await expect(keyring.importTonMnemonic(`${'abandon '.repeat(23)}art`)).rejects.toThrow(/not a valid TON mnemonic/i)
+    expect(keyring.listAccounts()).toHaveLength(1)
   })
 })
 
