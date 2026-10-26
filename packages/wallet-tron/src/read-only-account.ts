@@ -1,4 +1,4 @@
-import { NetworkError, type IWalletAccountReadOnly, bigintToNumber } from '@anywalletkit/core'
+import { NetworkError, feeLimit as feeLimit_, type IWalletAccountReadOnly, bigintToNumber } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import { hexToBytes } from '@noble/hashes/utils.js'
@@ -174,10 +174,10 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
 
   /**
    * Ask the node for `raw_data`. Contract calls are simulated first so `fee_limit`
-   * can be derived from the energy they need (×1.2, capped at `transactionMaxFee`)
-   * when the caller gives none; the simulation rides along so nobody pays for a second one.
+   * can be derived from the energy they need (×1.2, capped at `transactionMaxFee` and the call's
+   * `cap`) when the caller gives none; the simulation rides along so nobody pays for a second one.
    */
-  protected async buildWithSimulation(tx: TronTransaction): Promise<{ built: TronRawTransaction; sim?: TronSimulation }> {
+  protected async buildWithSimulation(tx: TronTransaction, cap?: bigint | number): Promise<{ built: TronRawTransaction; sim?: TronSimulation }> {
     if (isPrebuilt(tx)) return { built: tx }
     if (isContractCall(tx)) {
       const { contractAddress, functionSelector, parameters = [], options = {} } = tx
@@ -186,8 +186,8 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
       if (feeLimit === undefined) {
         const energyPrice = bigintToNumber(await this.getChainParameter('getEnergyFee'))
         feeLimit = sim.ok && sim.energy > 0 ? Math.ceil(sim.energy * energyPrice * FEE_LIMIT_MARGIN) : DEFAULT_FEE_LIMIT_SUN
-        const max = this._config.transactionMaxFee
-        if (max !== undefined && BigInt(feeLimit) > BigInt(max)) feeLimit = sunToJson(BigInt(max), 'transactionMaxFee')
+        const max = feeLimit_(this._config.transactionMaxFee, cap === undefined ? {} : { maxFee: BigInt(cap) })
+        if (max !== undefined && BigInt(feeLimit) > max) feeLimit = sunToJson(max, 'fee cap')
       }
       const r = await this.post<{ transaction?: TronRawTransaction; result?: { result?: boolean } }>('/wallet/triggersmartcontract', {
         owner_address: this.addressHex, contract_address: toHexAddress(contractAddress), function_selector: functionSelector,
