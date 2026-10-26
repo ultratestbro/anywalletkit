@@ -114,8 +114,60 @@ export function probeUrl(): 'native' | 'partial' | 'missing' {
 export function installStructuredClone(): 'native' | 'polyfilled' {
   const g = globalThis as { structuredClone?: unknown }
   if (typeof g.structuredClone === 'function') return 'native'
-  g.structuredClone = <T>(v: T): T => (v === undefined ? v : (JSON.parse(JSON.stringify(v, (_k, x) => (typeof x === 'bigint' ? `${x}n` : x)), (_k, x) => (typeof x === 'string' && /^\d+n$/.test(x) ? BigInt(x.slice(0, -1)) : x)) as T))
+  g.structuredClone = <T>(v: T): T => cloneStructured(v, new Map()) as T
   return 'polyfilled'
+}
+
+class DataCloneError extends Error {
+  constructor(what: string) { super(`${what} could not be cloned.`); this.name = 'DataCloneError' }
+}
+
+/**
+ * The structured-clone algorithm for the types the SDK passes around: primitives (bigint included),
+ * Date, RegExp, ArrayBuffer, typed arrays, DataView, Map, Set, arrays, plain objects (own enumerable
+ * string keys), Error. Shared references and cycles are kept. Functions and symbols throw
+ * DataCloneError, as the native one does.
+ */
+function cloneStructured(v: unknown, seen: Map<object, unknown>): unknown {
+  if (typeof v === 'function') throw new DataCloneError('A function')
+  if (typeof v === 'symbol') throw new DataCloneError('A symbol')
+  if (v === null || typeof v !== 'object') return v
+  const done = seen.get(v)
+  if (done !== undefined) return done
+  if (v instanceof Date) { const d = new Date(v.getTime()); seen.set(v, d); return d }
+  if (v instanceof RegExp) { const r = new RegExp(v.source, v.flags); seen.set(v, r); return r }
+  if (v instanceof ArrayBuffer) { const b = v.slice(0); seen.set(v, b); return b }
+  if (ArrayBuffer.isView(v)) {
+    const buffer = cloneStructured(v.buffer, seen) as ArrayBuffer
+    const out = v instanceof DataView
+      ? new DataView(buffer, v.byteOffset, v.byteLength)
+      : new (v.constructor as new (b: ArrayBuffer, o: number, l: number) => ArrayBufferView)(buffer, v.byteOffset, (v as unknown as { length: number }).length)
+    seen.set(v, out)
+    return out
+  }
+  if (v instanceof Map) {
+    const m = new Map()
+    seen.set(v, m)
+    for (const [k, x] of v) m.set(cloneStructured(k, seen), cloneStructured(x, seen))
+    return m
+  }
+  if (v instanceof Set) {
+    const s = new Set()
+    seen.set(v, s)
+    for (const x of v) s.add(cloneStructured(x, seen))
+    return s
+  }
+  if (v instanceof Error) {
+    const e = new Error(v.message)
+    e.name = v.name
+    seen.set(v, e)
+    if ('cause' in v) (e as { cause?: unknown }).cause = cloneStructured((v as { cause?: unknown }).cause, seen)
+    return e
+  }
+  const out: Record<string, unknown> | unknown[] = Array.isArray(v) ? new Array(v.length) : {}
+  seen.set(v, out)
+  for (const k of Object.keys(v)) (out as Record<string, unknown>)[k] = cloneStructured((v as Record<string, unknown>)[k], seen)
+  return out
 }
 
 /**

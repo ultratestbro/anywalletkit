@@ -284,6 +284,17 @@ async function main() {
     try { await openBackup({ ...env, meta: { ...meta, fingerprint: 'deadbeef' } }, { kind: 'key', id: 'passkey:x', key: kek }) } catch (e) { tampered = isBackupError(e) ? e.code : String(e) }
     eq('backup meta authenticated', tampered, 'corrupted')
   }
+  // runtime-hermes structuredClone polyfill (round 3, L21): bigints of both signs, look-alike strings,
+  // typed arrays, Map and Date survive the VM's clone (the JSON trick broke each of them).
+  {
+    const src = { n: -5n, s: '100n', b: Uint8Array.of(1, 2), m: new Map([['k', 3n]]), d: new Date(5) }
+    const c = structuredClone(src)
+    eq('structuredClone -5n', c.n, -5n)
+    eq('structuredClone "100n"', c.s, '100n')
+    eq('structuredClone bytes', c.b instanceof Uint8Array && c.b !== src.b && c.b[1] === 2, true)
+    eq('structuredClone map', c.m instanceof Map && c.m.get('k') === 3n, true)
+    eq('structuredClone date', c.d instanceof Date && c.d.getTime() === 5, true)
+  }
   await smokeProtocols((what, ok, detail) => {
     if (!ok) throw new Error(`protocol check failed: ${what}${detail ? ` :: ${detail}` : ''}`)
     checks++
