@@ -121,7 +121,9 @@ Show on every approval:
   never reaches the sheet: `refuse: (origin) => phishing.refusal(origin)` on the queue and
   the router answers it with 4100 before any window opens.
 - **What will happen**: for transactions, the prepared fee (`payload.prepared.maxFee`) and
-  your preview.
+  your preview. The nonce on the sheet is a guess; the one signed is read after the approval.
+  When the network's fee outgrew the shown cap while the sheet was open, the same transaction
+  comes back with `payload.repriced: true` and the new numbers: say the fee went up.
 
 ## The relay
 
