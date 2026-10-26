@@ -34,6 +34,14 @@ const CU_LIMIT_FOR_SIMULATION = 1_400_000
 const CU_MIN = 1_000
 const CU_MAX = 1_400_000
 const CU_DEFAULT_PER_INSTRUCTION = 200_000
+/** The amount of a token account holding `mint` (layout: mint 0..32, amount at 64), or undefined for anything else. */
+function tokenAmountOf(bytes: Uint8Array, mint: Address): bigint | undefined {
+  if (bytes.length < 165) return undefined
+  const expected = getAddressEncoder().encode(mint)
+  for (let k = 0; k < 32; k++) if (bytes[k] !== expected[k]) return undefined
+  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getBigUint64(64, true)
+}
+
 /** What a plan may be told per call: skip simulation, sign a durable-nonce transaction (round 3, M9). */
 export interface PlanOptions { simulate?: boolean | undefined; allowDurableNonce?: boolean | undefined }
 
@@ -229,36 +237,44 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
   }
 
   /**
-   * Balance of a mint in this wallet's associated token account, in base units; 0 when that
-   * account does not exist.
+   * Balance of a mint in this wallet's associated token account (Token or Token-2022, whichever
+   * owns the mint), in base units; 0 when that account does not exist or the address is not a
+   * mint. A network error throws: it is never read as a zero balance (round 3, L10).
    */
   async getTokenBalance(token: string): Promise<bigint> {
     const rpc = this.requireRpc('retrieve token balances')
     const mint = address(token)
-    const { program } = await this.getMintInfo(token).catch(() => ({ program: TOKEN_PROGRAM_ADDRESS }))
-    const ata = await this.ata(mint, this.address, program)
+    const { value } = await rpc.getAccountInfo(mint, { commitment: this._commitment, encoding: 'base64' }).send()
+    if (!value || (value.owner !== TOKEN_PROGRAM_ADDRESS && value.owner !== TOKEN_2022_PROGRAM_ADDRESS)) return 0n
+    const ata = await this.ata(mint, this.address, value.owner)
     const info = await rpc.getAccountInfo(ata, { commitment: this._commitment, encoding: 'base64' }).send()
-    if (!info.value) return 0n
-    const bal = await rpc.getTokenAccountBalance(ata, { commitment: this._commitment }).send()
-    return BigInt(bal.value.amount)
+    return info.value ? (tokenAmountOf(getBase64Encoder().encode(info.value.data[0]) as Uint8Array, mint) ?? 0n) : 0n
   }
 
-  /** Batched over getMultipleAccounts (100 per call); amount read from the token-account layout at offset 64. Legacy-program ATAs. */
+  /**
+   * Batched over getMultipleAccounts (100 addresses per call). Both programs' associated token
+   * accounts are read for every mint, so Token-2022 balances count (round 3, L10); the amount comes
+   * from the token-account layout (offset 64) of the account that holds that mint.
+   */
   async getTokenBalances(tokens: string[]): Promise<Record<string, bigint>> {
     const rpc = this.requireRpc('retrieve token balances')
     const unique = [...new Set(tokens)]
-    const atas = await Promise.all(unique.map((t) => this.ata(address(t), this.address)))
-    const out: Record<string, bigint> = {}
+    const pairs = await Promise.all(unique.map(async (t) => {
+      const mint = address(t)
+      return { token: t, mint, atas: await Promise.all([this.ata(mint, this.address, TOKEN_PROGRAM_ADDRESS), this.ata(mint, this.address, TOKEN_2022_PROGRAM_ADDRESS)]) }
+    }))
+    const all = pairs.flatMap((p) => p.atas)
+    const found = new Map<string, Uint8Array>()
     const b64 = getBase64Encoder()
-    for (let i = 0; i < atas.length; i += 100) {
-      const { value } = await rpc.getMultipleAccounts(atas.slice(i, i + 100), { commitment: this._commitment, encoding: 'base64' }).send()
+    for (let i = 0; i < all.length; i += 100) {
+      const chunk = all.slice(i, i + 100)
+      const { value } = await rpc.getMultipleAccounts(chunk, { commitment: this._commitment, encoding: 'base64' }).send()
       value.forEach((acc, j) => {
-        const token = unique[i + j]!
-        if (!acc) { out[token] = 0n; return }
-        const bytes = b64.encode(acc.data[0])
-        out[token] = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getBigUint64(64, true)
+        if (acc && (acc.owner === TOKEN_PROGRAM_ADDRESS || acc.owner === TOKEN_2022_PROGRAM_ADDRESS)) found.set(chunk[j]!, b64.encode(acc.data[0]) as Uint8Array)
       })
     }
+    const out: Record<string, bigint> = {}
+    for (const p of pairs) out[p.token] = p.atas.reduce((sum, a) => { const bytes = found.get(a); return sum + (bytes ? (tokenAmountOf(bytes, p.mint) ?? 0n) : 0n) }, 0n)
     return out
   }
 
