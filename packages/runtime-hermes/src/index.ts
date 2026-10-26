@@ -24,6 +24,8 @@ export interface HermesRuntimeReport {
   /** WHATWG URL: RN ships a partial one (no working searchParams); providers parse endpoints with it. */
   url: 'native' | 'partial' | 'missing'
   structuredClone: 'native' | 'polyfilled'
+  /** `globalThis.isSecureContext`, which @solana/kit requires before it touches `crypto.subtle` (every PDA). */
+  secureContext: 'native' | 'polyfilled' | 'insecure'
 }
 
 type AnyAbortSignal = typeof AbortSignal & { timeout?: (ms: number) => AbortSignal; any?: (signals: AbortSignal[]) => AbortSignal }
@@ -117,6 +119,24 @@ export function installStructuredClone(): 'native' | 'polyfilled' {
 }
 
 /**
+ * `globalThis.isSecureContext = true` when the VM has no such flag. @solana/kit refuses
+ * `crypto.subtle` outside a secure context, so every program-derived address — associated token
+ * accounts, token metadata accounts — threw under Hermes. A browser sets the flag itself (and an
+ * http page's `false` is left alone: 'insecure'); an app's JS VM is not a web page and has none.
+ */
+export function installSecureContext(): 'native' | 'polyfilled' | 'insecure' {
+  const g = globalThis as { isSecureContext?: boolean }
+  if (g.isSecureContext === true) return 'native'
+  if (g.isSecureContext === false) return 'insecure'
+  try {
+    Object.defineProperty(globalThis, 'isSecureContext', { value: true, configurable: true, writable: false, enumerable: false })
+  } catch {
+    g.isSecureContext = true
+  }
+  return 'polyfilled'
+}
+
+/**
  * Install everything and report. Throws for the two things only the APP can
  * provide (secure randomness, TextEncoder) — a wallet must not run without them.
  */
@@ -127,6 +147,7 @@ export function installHermesRuntime(options: { throwOnMissing?: boolean } = {})
     abortSignalAny: installAbortSignalAny(),
     subtleDigest: installSubtleDigest(),
     structuredClone: installStructuredClone(),
+    secureContext: installSecureContext(),
     textEncoder: typeof globalThis.TextEncoder === 'function' && typeof globalThis.TextDecoder === 'function' ? 'native' : 'missing',
     getRandomValues: typeof globalThis.crypto?.getRandomValues === 'function' ? 'native' : 'missing',
     url: probeUrl(),

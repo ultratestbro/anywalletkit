@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { installAbortSignalAny, installAbortSignalTimeout, installBufferSubarrayFix, installHermesRuntime, installSubtleDigest } from '../src/index.js'
+import { installAbortSignalAny, installAbortSignalTimeout, installBufferSubarrayFix, installHermesRuntime, installSecureContext, installSubtleDigest } from '../src/index.js'
 
 const AS = AbortSignal as unknown as { timeout?: unknown; any?: unknown }
 const origTimeout = AS.timeout
@@ -57,6 +57,22 @@ describe('runtime-hermes', () => {
     } finally { g.Buffer = real }
   })
 
+  it('isSecureContext: set when the VM has none (Hermes), kept when true, an explicit false left alone', () => {
+    const g = globalThis as { isSecureContext?: boolean }
+    const before = Object.getOwnPropertyDescriptor(globalThis, 'isSecureContext')
+    try {
+      delete g.isSecureContext
+      expect(installSecureContext()).toBe('polyfilled')
+      expect(g.isSecureContext).toBe(true)
+      expect(installSecureContext()).toBe('native')
+      Object.defineProperty(globalThis, 'isSecureContext', { value: false, configurable: true })
+      expect(installSecureContext()).toBe('insecure')
+      expect(g.isSecureContext).toBe(false)
+    } finally {
+      delete g.isSecureContext
+      if (before) Object.defineProperty(globalThis, 'isSecureContext', before)
+    }
+  })
   it('installHermesRuntime returns a full report in Node', () => {
     const r = installHermesRuntime()
     expect(r.getRandomValues).toBe('native')
