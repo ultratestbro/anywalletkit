@@ -153,6 +153,47 @@ function readAddressItem (reader) {
  */
 
 /**
+ * The TON network id ('-239' / '-3') an account is on: its CAIP-2 `chain`, else wallet-ton's
+ * `network` config. `undefined` when the account does not say.
+ *
+ * @param {*} account - The account.
+ * @returns {string | undefined} The network id.
+ */
+function networkOf (account) {
+  const chain = account?.chain
+  if (typeof chain === 'string' && /^ton:-?\d+$/.test(chain)) return chain.slice(4)
+  const n = account?._config?.network
+  if (n === 'testnet') return '-3'
+  if (n === 'mainnet') return '-239'
+  return undefined
+}
+
+/**
+ * A @ton/ton TonClient for whatever the config holds: a TonClient as is; a toncenter endpoint
+ * `{ url, secretKey }`; or a wallet-ton `TonRpc` (`call(method, params)`), driven through an HTTP
+ * adapter that hands TonClient's JSON-RPC calls to it.
+ *
+ * @param {*} c - A TonClient, an endpoint or a TonRpc.
+ * @returns {TonClient} The client.
+ */
+function toTonClient (c) {
+  if (c instanceof TonClient) return c
+  const url = c?.url ?? c?.endpoint
+  if (typeof url === 'string') return new TonClient({ endpoint: url, apiKey: c.secretKey ?? c.apiKey })
+  if (typeof c?.call === 'function') {
+    return new TonClient({
+      endpoint: 'https://tonrpc.invalid/jsonRPC', // never fetched: the adapter answers
+      httpAdapter: async (req) => {
+        const { method, params } = JSON.parse(typeof req.data === 'string' ? req.data : '{}')
+        const result = await c.call(method, params)
+        return { data: { ok: true, result }, status: 200, statusText: 'OK', headers: {}, config: req }
+      }
+    })
+  }
+  throw new Error('tonClient / provider must be a TonClient, a toncenter endpoint { url, secretKey } or a TonRpc { call(method, params) }.')
+}
+
+/**
  * Tonstakers liquid staking for TON wallet accounts.
  *
  * Tonstakers is the largest liquid-staking pool on The Open Network: the pool
@@ -182,7 +223,13 @@ export default class TonstakersProtocolTon extends StakingProtocol {
   constructor (account, config = {}) {
     super(account)
 
-    const network = String(config.network ?? '-239')
+    // The account's network decides (a testnet wallet must not stake into the mainnet pool); an
+    // explicit config.network that contradicts it is refused.
+    const accountNetwork = networkOf(account)
+    const network = String(config.network ?? accountNetwork ?? '-239')
+    if (accountNetwork !== undefined && network !== accountNetwork) {
+      throw new Error(`The account is on TON ${accountNetwork === '-3' ? 'testnet' : 'mainnet'} (${accountNetwork}); the protocol was configured for network ${network}.`)
+    }
     const defaults = TONSTAKERS_ADDRESS_MAP[network]
     if (!defaults && !config.addresses?.pool) {
       throw new Error(`No default Tonstakers deployment for network ${network}: pass 'addresses' explicitly.`)
@@ -203,10 +250,9 @@ export default class TonstakersProtocolTon extends StakingProtocol {
     /** @private */
     this._endpoints = { ...endpoints, ...config.endpoints }
 
-    const source = config.tonClient ?? account?._tonClient ?? account?._config?.tonClient
+    const source = config.tonClient ?? account?._tonClient ?? account?._config?.tonClient ?? account?._config?.provider
     /** @private */
-    this._clients = (Array.isArray(source) ? source : source ? [source] : [])
-      .map((c) => (c instanceof TonClient ? c : new TonClient({ endpoint: c.url ?? c.endpoint, apiKey: c.secretKey ?? c.apiKey })))
+    this._clients = (Array.isArray(source) ? source : source ? [source] : []).map(toTonClient)
   }
 
   /** @private */
