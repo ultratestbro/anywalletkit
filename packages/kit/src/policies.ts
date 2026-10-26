@@ -435,7 +435,11 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
     const grant = calls.length === 1 && !carriesForeignPayload(calls[0]) ? grantCall(calls[0]) : null
     if (grant) return approvalIntent(base, grant.spender, grant.token, grant.amount, undefined, unboundedAllowance(grant.amount))
   }
-  const to = str(a.to) ?? str(a.recipient)
+  // An EVM, Solana or Tron transaction never goes to a `recipient` field (`transfer` options do):
+  // showing it would name a destination the signed transaction does not have (round 3, H2).
+  const ns = chain.split(':')[0]
+  const noRecipient = method !== 'transfer' && (ns === 'eip155' || ns === 'solana' || ns === 'tron')
+  const to = str(a.to) ?? (noRecipient ? undefined : str(a.recipient))
   const amount = big(a.amount ?? a.value)
   return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(typeof a.token === 'string' ? { token: a.token } : {}), ...(amount !== undefined ? { amount } : {}) }
 }
