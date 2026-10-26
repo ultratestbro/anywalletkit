@@ -1,7 +1,7 @@
 import { Transaction } from '@scure/btc-signer'
 import type { BTC_NETWORK } from '@scure/btc-signer/utils.js'
 import { hex } from '@scure/base'
-import { dustLimit, scriptKind } from './address.js'
+import { decodeAddress, dustLimit, scriptKind } from './address.js'
 import { UnsafeTransactionError } from './errors.js'
 import type { BtcTxDescription, BtcTxOutputDescription, BtcWarning } from './types.js'
 import { bigintToNumber } from '@anywalletkit/core'
@@ -45,15 +45,22 @@ export function describeTransaction(tx: Transaction, inputValues: bigint[], ctx:
   })
   const outputs: BtcTxOutputDescription[] = []
   const warnings = new Set<BtcWarning>()
+  // Outputs are matched by scriptPubKey, the recipient first: a transfer to oneself pays our own
+  // script twice (recipient + change), and an uppercase bech32 address is the same script (round 3, L9).
+  const scriptOf = (address: string): string | undefined => { try { return hex.encode(decodeAddress(address, ctx.network).script) } catch { return undefined } }
+  const ownScript = scriptOf(ctx.ownAddress)
+  const intendedScript = ctx.intended ? scriptOf(ctx.intended.to) : undefined
+  let recipientSeen = false
   for (let i = 0; i < tx.outputsLength; i++) {
     const out = tx.getOutput(i)
     const value = out.amount ?? 0n
     const address = tx.getOutputAddress(i, ctx.network)
-    const role: BtcTxOutputDescription['role'] =
-      address !== undefined && address === ctx.ownAddress ? 'change'
-      : ctx.intended === undefined ? 'recipient'
-      : address !== undefined && address === ctx.intended.to && value === ctx.intended.value ? 'recipient'
-      : 'unknown'
+    const script = out.script ? hex.encode(out.script) : undefined
+    const mine = script !== undefined && script === ownScript
+    let role: BtcTxOutputDescription['role']
+    if (ctx.intended === undefined) role = mine ? 'change' : 'recipient'
+    else if (!recipientSeen && script !== undefined && script === intendedScript && value === ctx.intended.value) { role = 'recipient'; recipientSeen = true }
+    else role = mine ? 'change' : 'unknown'
     if (out.script && value < dustLimit(scriptKind(out.script))) warnings.add('dust-output')
     outputs.push({ address, value, role })
   }
