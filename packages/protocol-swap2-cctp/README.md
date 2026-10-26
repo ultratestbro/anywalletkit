@@ -31,7 +31,8 @@ const res = await swap2.swap2({fromToken: "USDC", toToken: "USDC", toChain: 4216
 // … poll …
 const status = await swap2.getSwap2Status(res.id);   // "pending" → "action-required" once Circle attested
 if (status.status === "action-required") {
-  const {hash} = await swap2.claimSwap2(res.id, arbitrumAccount);   // receiveMessage on Arbitrum, signed there
+  const claimed = await swap2.claimSwap2(res.id, arbitrumAccount);   // receiveMessage on Arbitrum, signed there
+  await swap2.getSwap2Status(claimed.id);   // this id carries the claim hash: "completed" even without an Arbitrum RPC
 }
 ```
 
@@ -40,6 +41,15 @@ single-provider); providers opt in with `buildClaim(ref)`, which returns the
 destination transaction or `null` while the attestation is pending.
 `IntentStatus.claim = {chain, ready}` tells the app which chain the claim
 lives on. The remote provider forwards it as the `claim` action.
+
+The engine sends a claim only to a contract the provider declares for that chain
+(`claimTargets`; CCTP: its MessageTransmitter) and refuses calldata that moves the
+account's tokens or grants an allowance. A remote stub takes the list from the app,
+never from the server:
+
+```ts
+remoteProvider({name: "cctp", baseUrl, claimTargets: cctpClaimTargets})   // cctpClaimTargets from this package
+```
 
 ## What the provider does
 
