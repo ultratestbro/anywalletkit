@@ -1,5 +1,5 @@
 import { NetworkError } from '@anywalletkit/core'
-import { DEFAULT_TIMEOUT_MS, fetchWithTimeout, isHex64, isRecord } from './http.js'
+import { DEFAULT_TIMEOUT_MS, fetchWithTimeout, isHex64, isRecord, refusal, refusedStatus } from './http.js'
 import type { BlockbookTx, BtcClient, Utxo } from './types.js'
 
 interface EsploraStats { funded_txo_sum: number; spent_txo_sum: number }
@@ -34,7 +34,12 @@ export class EsploraClient implements BtcClient {
   private async request(path: string, init?: RequestInit): Promise<Response> {
     const url = `${this.base}${path}`
     const res = await fetchWithTimeout(this.fetchFn, url, init, this.timeoutMs, this.base)
-    if (!res.ok) throw new NetworkError(`Esplora request failed: ${res.status} ${res.statusText} (${url})`, { provider: this.base })
+    if (!res.ok) {
+      // A 4xx (not 408) is the server refusing: nothing was taken. A 5xx may have been forwarded (round 3, M12).
+      const reason = refusedStatus(res.status) ? (await res.text().catch(() => '')).slice(0, 200) : ''
+      const err = new NetworkError(`Esplora request failed: ${res.status} ${res.statusText} (${url})${reason ? `: ${reason}` : ''}`, { provider: this.base })
+      throw refusedStatus(res.status) ? refusal(err) : err
+    }
     return res
   }
 

@@ -1,7 +1,7 @@
 import { NetworkError } from '@anywalletkit/core'
 import { BlockbookClient } from './blockbook.js'
 import { EsploraClient } from './esplora.js'
-import { DEFAULT_TIMEOUT_MS } from './http.js'
+import { DEFAULT_TIMEOUT_MS, isAnsweredRefusal, refusal } from './http.js'
 import type { BtcClient, BtcClientConfig, BtcConfig } from './types.js'
 
 const isClient = (c: unknown): c is BtcClient => typeof c === 'object' && c !== null && typeof (c as BtcClient).listUnspent === 'function'
@@ -27,13 +27,16 @@ export function createClient(config: BtcConfig): BtcClient | undefined {
   const attempts = list.length + (config.retries ?? 3)
   const call = (method: (typeof METHODS)[number]) => async (...args: unknown[]) => {
     let last: unknown
+    let answered = true
     for (let i = 0; i < attempts; i++) {
       const c = list[i % list.length]! as unknown as Record<string, ((...a: unknown[]) => Promise<unknown>) | undefined>
       const fn = c[method]
       if (!fn) continue // optional method this transport lacks — try the next one
-      try { return await fn.apply(c, args) } catch (e) { last = e }
+      try { return await fn.apply(c, args) } catch (e) { last = e; answered &&= isAnsweredRefusal(e) }
     }
-    throw new NetworkError(`All BTC clients failed for ${method}`, { cause: last })
+    // Refused everywhere is a refusal; one endpoint that never answered may have taken it (round 3, M12).
+    const err = new NetworkError(`All BTC clients failed for ${method}`, { cause: last })
+    throw answered && last !== undefined ? refusal(err) : err
   }
   const out = {} as Record<(typeof METHODS)[number], (...args: unknown[]) => Promise<unknown>>
   for (const m of METHODS) out[m] = call(m)
