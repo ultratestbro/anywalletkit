@@ -2113,14 +2113,14 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         return {state: "completed", depositReceived: true, ...(progress.outgoingTxHash ? {destTxHash: progress.outgoingTxHash} : {})};
       case "TRADE_STATUS_PARTIALLY_FILLED":
         // One route, so a partial fill means the DEX returned the rest to the
-        // trader; the trade is over either way.
+        // trader: the trade is over, and partial — not completed (round 3, L16).
         await quotes.clear(decoded.quoteId);
-        return {state: "completed", depositReceived: true, ...(progress.outgoingTxHash ? {destTxHash: progress.outgoingTxHash} : {})};
+        return {state: "partial", depositReceived: true, ...(progress.outgoingTxHash ? {destTxHash: progress.outgoingTxHash} : {})};
       case "TRADE_STATUS_CANCELLED":
       case "TRADE_STATUS_FAILED":
-        // A failed DEX swap bounces the input back to the trader on-chain.
+        // A failed DEX swap bounces the input back to the trader on-chain: refunded (round 3, L16).
         await quotes.clear(decoded.quoteId);
-        return {state: "failed", depositReceived: true};
+        return {state: "refunded", depositReceived: true};
       default:
         return {state: "pending", depositReceived: true};
     }

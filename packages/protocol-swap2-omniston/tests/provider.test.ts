@@ -443,7 +443,11 @@ describe("Omniston TON↔TON swap settlement", () => {
     expect(await make(null).trackIntent({intentId})).toEqual({state: "pending"});
     expect(await make(null).trackIntent({intentId, sourceTxHash: "abc"})).toEqual({state: "pending"});
     expect(await make({status: "TRADE_STATUS_FULLY_FILLED", outgoingTxHash: "0xdead"}).trackIntent({intentId, sourceTxHash: "abc"})).toEqual({state: "completed", depositReceived: true, destTxHash: "0xdead"});
-    expect(await make({status: "TRADE_STATUS_FAILED"}).trackIntent({intentId, sourceTxHash: "abc"})).toEqual({state: "failed", depositReceived: true});
+    // Audit 2026-10-25 round 3, L16: a partial fill is partial, and a failed or cancelled DEX swap
+    // bounced the input back to the trader — refunded, not failed (it pinned "failed" before).
+    expect(await make({status: "TRADE_STATUS_PARTIALLY_FILLED", outgoingTxHash: "0xdead"}).trackIntent({intentId, sourceTxHash: "abc"})).toEqual({state: "partial", depositReceived: true, destTxHash: "0xdead"});
+    expect(await make({status: "TRADE_STATUS_FAILED"}).trackIntent({intentId, sourceTxHash: "abc"})).toEqual({state: "refunded", depositReceived: true});
+    expect(await make({status: "TRADE_STATUS_CANCELLED"}).trackIntent({intentId, sourceTxHash: "abc"})).toEqual({state: "refunded", depositReceived: true});
     expect(await make({status: "TRADE_STATUS_IN_PROGRESS"}).trackIntent({intentId, sourceTxHash: "abc"})).toEqual({state: "pending", depositReceived: true});
   });
 });
