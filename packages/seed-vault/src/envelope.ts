@@ -109,7 +109,7 @@ export async function sealBackup(secret: string | Uint8Array, meta: BackupMeta, 
     const ct = xchacha20poly1305(dek, payloadNonce, payloadAad(header)).encrypt(plain)
     const records: ProtectorRecord[] = []
     for (const p of protectors) records.push(await wrap(dek, p, opts, records))
-    return { ...header, payload: { alg: 'xchacha20poly1305', nonce: toB64u(payloadNonce), ct: toB64u(ct) }, protectors: records }
+    return openable({ ...header, payload: { alg: 'xchacha20poly1305', nonce: toB64u(payloadNonce), ct: toB64u(ct) }, protectors: records })
   } finally {
     dek.fill(0)
     plain.fill(0)
@@ -152,7 +152,7 @@ export async function addProtector(envelope: BackupEnvelope, unlock: Unlock, pro
   const dek = await unwrap(envelope, unlock, opts)
   try {
     const kept = envelope.protectors.filter((r) => !sameProtector(r, protector))
-    return { ...envelope, protectors: [...kept, await wrap(dek, protector, opts, kept)] }
+    return openable({ ...envelope, protectors: [...kept, await wrap(dek, protector, opts, kept)] })
   } finally {
     dek.fill(0)
   }
@@ -181,6 +181,20 @@ export function describeBackup(envelope: BackupEnvelope): {
   }
 }
 
+/** The largest backup file decodeBackup reads. */
+const MAX_BACKUP_CHARS = 256 * 1024
+
+/**
+ * What sealBackup / addProtector hand out must pass the checks openBackup and decodeBackup run: a
+ * key-protector label past 256 characters or a file past {@link MAX_BACKUP_CHARS} used to seal fine
+ * and then never open (round 3, L6).
+ */
+function openable(envelope: BackupEnvelope): BackupEnvelope {
+  checkEnvelope(envelope)
+  if (JSON.stringify(envelope).length > MAX_BACKUP_CHARS) throw new BackupError('invalid', `This backup would be too large to open later (over ${MAX_BACKUP_CHARS / 1024} KB): the secret is too big.`)
+  return envelope
+}
+
 export function encodeBackup(envelope: BackupEnvelope): string {
   checkEnvelope(envelope)
   return JSON.stringify(envelope)
@@ -188,7 +202,7 @@ export function encodeBackup(envelope: BackupEnvelope): string {
 
 /** Parse and validate a backup file. Unknown formats, versions, algorithms or out-of-bounds costs are refused. */
 export function decodeBackup(text: string): BackupEnvelope {
-  if (typeof text !== 'string' || text.length > 256 * 1024) throw new BackupError('invalid', 'Not a backup file (empty or too large).')
+  if (typeof text !== 'string' || text.length > MAX_BACKUP_CHARS) throw new BackupError('invalid', 'Not a backup file (empty or too large).')
   let raw: unknown
   try {
     raw = JSON.parse(text)
@@ -225,6 +239,7 @@ async function wrap(dek: Uint8Array, p: Protector, opts: KdfOptions, existing: P
     return { ...descriptor, ...seal(kek, dek, descriptor) }
   }
   checkKeyId(p.id)
+  if (p.label !== undefined && (typeof p.label !== 'string' || p.label.length > 256)) throw new BackupError('invalid', 'A key protector label is at most 256 characters.')
   if (!(p.key instanceof Uint8Array) || p.key.length < 32) throw new BackupError('invalid', 'A key protector needs at least 32 bytes of key material.')
   const salt = randomBytes(16)
   const descriptor = { kind: 'key' as const, id: p.id, ...(p.label ? { label: p.label } : {}), salt: toB64u(salt) }
