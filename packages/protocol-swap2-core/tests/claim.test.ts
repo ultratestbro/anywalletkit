@@ -16,6 +16,8 @@ function provider(claim: UnsignedTx | null | (() => never), name = "two-phase"):
     buildDeposit: async () => { throw new Error("unused"); },
     trackIntent: async () => ({state: "action-required", claim: {chain: "eip155:42161", ready: true}}),
     async buildClaim(ref) { claims.push(ref); return typeof claim === "function" ? claim() : claim; },
+    // A provider with a claim step declares the contracts its claims may call (round 3, M24).
+    claimTargets: () => [CLAIM.to],
   };
 }
 

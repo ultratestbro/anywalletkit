@@ -37,6 +37,12 @@ export interface RemoteProviderOptions {
   supportsChainPair?: (fromChain: string, toChain: string) => boolean;
   /** Explicit opt-in when the backend can execute same-chain swaps. */
   supportsSameChain?: boolean;
+  /**
+   * The contracts this provider's claims may call, per chain (e.g. `cctpClaimTargets` from
+   * `@anywalletkit/protocol-swap2-cctp`). The app's list, not the server's: without it the engine
+   * refuses claims from this stub (round 3, M24).
+   */
+  claimTargets?: (chain: string) => readonly string[];
   /** Defaults to globalThis.fetch — injectable for tests. */
   fetchImpl?: typeof fetch;
   /** Extra headers (e.g. auth) attached to every call. */
@@ -126,5 +132,6 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
     ...(opts.supportsChain ? {supportsChain: opts.supportsChain.bind(opts)} : {}),
     ...(opts.supportsChainPair ? {supportsChainPair: opts.supportsChainPair.bind(opts)} : {}),
     ...(opts.supportsSameChain !== undefined ? {supportsSameChain: opts.supportsSameChain} : {}),
+    ...(opts.claimTargets ? {claimTargets: opts.claimTargets} : {}),
   };
 }

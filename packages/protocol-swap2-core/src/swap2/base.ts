@@ -1467,6 +1467,19 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     if (unsigned.chainId !== undefined && String(unsigned.chainId) !== expectedId) {
       throw new Error(`swap2: claim chainId ${unsigned.chainId} does not match ${unsigned.chain}`);
     }
+    // Only a contract the provider declares for this chain, and nothing that moves this account's
+    // tokens or grants an allowance (the source leg's decodeCall refusals) — round 3, M24.
+    if (typeof provider.claimTargets !== "function") {
+      throw new Swap2UnsupportedOperationError(`swap2: provider '${name}' declares no claimTargets — a claim may only call contracts the provider names for its chain`);
+    }
+    const targets = provider.claimTargets(unsigned.chain).map((a) => a.toLowerCase());
+    if (!targets.includes(unsigned.to.toLowerCase())) {
+      throw new Swap2ValidationError(`swap2: claim target ${unsigned.to} is not a contract '${name}' declares for ${unsigned.chain} — refused`);
+    }
+    const claimCall = decodeCall({to: unsigned.to, data: unsigned.data, value: 0n});
+    if (claimCall.transfer || claimCall.approval) {
+      throw new Swap2ValidationError(`swap2: claim calldata (${claimCall.method}) moves tokens or grants an allowance — refused`);
+    }
     const actual = await readAccountChain(signer);
     if (actual == null) throw new Error(`swap2: destination account chain identity is unavailable for ${unsigned.chain}`);
     const actualText = typeof actual === "string" ? actual : String(actual);
