@@ -98,9 +98,13 @@ export interface TypedDataDescription {
   warnings: TypedDataWarning[]
 }
 
-/** Unlimited-approval heuristic: the canonical max or anything in the top bit range. */
+/**
+ * Unlimited-approval heuristic: type(uint128).max or more, the SDK-wide threshold (core's
+ * UNLIMITED_ALLOWANCE). Every "infinite approval" sentinel in use — uint256 (maxUint256), uint160
+ * (Permit2), uint128 max, 2^255 — reaches it; 2^255 − 1 used to slip under the old top-bit check.
+ */
 export function isUnlimitedAmount(amount: bigint): boolean {
-  return amount === maxUint256 || amount >= 2n ** 255n
+  return amount >= (maxUint256 >> 128n)
 }
 
 function toBig(v: bigint | number | string | undefined): bigint {
