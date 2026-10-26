@@ -965,7 +965,10 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         throw new Error("swap2: provider build does not match the validated quote transaction");
       }
     } else if (!unsigned.bodyBoc && !unsigned.typedData) {
-      if (!q.depositAddress || unsigned.to !== q.depositAddress || (unsigned.memo ?? null) !== q.depositMemo) {
+      // A deposit-address quote commits the address and the memo only: the build may not add
+      // calldata, a spender or a serialized transaction the quote never had (round 3, L15).
+      if (!q.depositAddress || unsigned.to !== q.depositAddress || (unsigned.memo ?? null) !== q.depositMemo ||
+        unsigned.data !== undefined || unsigned.approvalAddress !== undefined || unsigned.serializedTx !== undefined) {
         throw new Error("swap2: provider build does not match the validated quote deposit");
       }
     }
