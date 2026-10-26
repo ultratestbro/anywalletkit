@@ -27,6 +27,12 @@ export const isAddChainError = (v: Network | AddChainError): v is AddChainError 
 /** Options for {@link parseAddChainParams}. */
 export interface ParseAddChainOptions {
   /** Which chain ids are acceptable; default: the asset catalog. */
+  /**
+   * Accept RPCs on private / local addresses (localhost, 10.x, 192.168.x, *.local…) — https or
+   * http — from a site. Default false: a page must not point the wallet at the user's own network.
+   * Pass the user's "Allow http for local nodes" setting.
+   */
+  allowHttpLocal?: boolean
   known?: (caip2: string) => boolean
   /** Site origin — recorded as the network's `source` so every sheet on it says who supplied the RPC. */
   origin?: string
@@ -45,9 +51,10 @@ export function parseAddChainParams(params: unknown, opts: ParseAddChainOptions 
   if (!caip2) return { code: ADD_CHAIN_ERRORS.invalidParams, message: 'chainId must be a 0x-prefixed hex string.' }
   if (!known(caip2)) return { code: ADD_CHAIN_ERRORS.chainNotAdded, message: `Chain ${String(p.chainId)} is not in this wallet's catalog.` }
   const rpcs = Array.isArray(p.rpcUrls)
-    ? p.rpcUrls.filter((u): u is string => typeof u === 'string').map((u) => checkRpcUrl(u)).flatMap((r) => (r.ok ? [r.url] : []))
+    ? p.rpcUrls.filter((u): u is string => typeof u === 'string').map((u) => checkRpcUrl(u, { allowHttpLocal: opts.allowHttpLocal === true }))
+      .flatMap((r) => (r.ok && (!r.local || opts.allowHttpLocal === true) ? [r.url] : []))
     : []
-  if (rpcs.length === 0) return { code: ADD_CHAIN_ERRORS.invalidParams, message: 'rpcUrls must contain at least one https URL.' }
+  if (rpcs.length === 0) return { code: ADD_CHAIN_ERRORS.invalidParams, message: 'rpcUrls must contain at least one public https URL (a site cannot add a private / local endpoint unless the user allows local nodes).' }
   const name = typeof p.chainName === 'string' && p.chainName.trim() ? p.chainName.trim().slice(0, 64) : caip2
   const currency = p.nativeCurrency as { symbol?: unknown; decimals?: unknown } | undefined
   if (currency && currency.decimals !== undefined && currency.decimals !== 18) return { code: ADD_CHAIN_ERRORS.invalidParams, message: 'nativeCurrency.decimals must be 18.' }
