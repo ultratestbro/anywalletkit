@@ -315,9 +315,60 @@ export interface ExternalSignerOptions {
   dispose?: () => void
 }
 
+const sameBytes = (a: Uint8Array, b: Uint8Array): boolean => a.length === b.length && a.every((x, i) => x === b[i])
+
+/** The x-only key a BIP-340 signature verifies under: the key's even lift, plus `tweak` (BIP-341). */
+function schnorrKey(publicKey: Uint8Array, tweak: Uint8Array | undefined): Uint8Array {
+  let P = secp256k1.Point.fromBytes(publicKey)
+  if (P.y % 2n === 1n) P = P.negate()
+  if (tweak) {
+    const t = bytesToNumberBE(tweak)
+    if (t >= secp256k1.Point.CURVE().n) throw new SignerError('Invalid BIP-341 tweak (not below the curve order).')
+    if (t > 0n) P = P.add(secp256k1.Point.BASE.multiply(t))
+  }
+  return P.toBytes(true).subarray(1)
+}
+
+/** Throws unless `sig` is a signature of `payload` by `publicKey` under `scheme` (recoverable: and recovers to it). */
+function verifyExternalSignature(scheme: SignScheme, payload: Uint8Array, sig: Uint8Array, publicKey: Uint8Array, tweak?: Uint8Array): void {
+  let ok = false
+  try {
+    switch (scheme) {
+      case 'ecdsa':
+        ok = secp256k1.verify(sig, payload, publicKey, { prehash: false })
+        break
+      case 'ecdsa-recoverable': {
+        ok = secp256k1.verify(sig.subarray(0, 64), payload, publicKey, { prehash: false })
+        if (ok) {
+          const recovered = new Uint8Array(65)
+          recovered[0] = sig[64]!
+          recovered.set(sig.subarray(0, 64), 1)
+          const key = secp256k1.recoverPublicKey(recovered, payload, { prehash: false })
+          if (!sameBytes(secp256k1.Point.fromBytes(key).toBytes(true), secp256k1.Point.fromBytes(publicKey).toBytes(true))) {
+            throw new SignerError(`External signer returned a recovery id that recovers to another key ('${scheme}').`)
+          }
+        }
+        break
+      }
+      case 'schnorr':
+        ok = schnorr.verify(sig, payload, schnorrKey(publicKey, tweak))
+        break
+      case 'ed25519':
+        ok = ed25519.verify(sig, payload, publicKey)
+        break
+    }
+  } catch (e) {
+    if (e instanceof SignerError) throw e
+    ok = false
+  }
+  if (!ok) throw new SignerError(`External signer returned a signature that does not verify against its public key ('${scheme}').`)
+}
+
 /**
  * Wrap a signing callback (hardware wallet, Safe, MPC, backend) as a Signer.
- * The SDK validates the scheme against `schemes` and the result length; the
+ * The SDK validates the scheme against `schemes`, the result length, and the
+ * signature itself against `publicKey` (a recoverable one must also recover to
+ * it; a tweaked schnorr one must verify under the tweaked output key); the
  * callback owns everything else.
  */
 export function externalSigner(options: ExternalSignerOptions): Signer {
@@ -343,6 +394,10 @@ export function externalSigner(options: ExternalSignerOptions): Signer {
       const expected = scheme === 'ecdsa-recoverable' ? 65 : 64
       if (sig.length !== expected) throw new SignerError(`External signer returned ${sig.length} bytes for '${scheme}'; expected ${expected}.`)
       if (scheme === 'ecdsa-recoverable' && sig[64]! > 1) throw new SignerError(`External signer returned recovery id ${sig[64]}; expected 0 or 1.`)
+      // A backend answering with another key's signature (or bytes of the right length) must not
+      // get through: the chain would reject the transaction, or a recoverable signature would
+      // name another sender.
+      verifyExternalSignature(scheme, payload, sig, options.publicKey, opts.tweak)
       return sig
     },
     dispose() {
