@@ -59,6 +59,41 @@ export const DEFAULT_COMPUTE_UNIT_PRICE = 50_000n
 export const DEFAULT_SLIPPAGE_BPS = 50
 /** Seed-derived stake accounts tracked per wallet for delayed exits. */
 export const DEFAULT_UNSTAKE_SLOTS = 8
+/**
+ * Slot addresses someone else pre-funded (System-owned SOL at a predictable seed address, where
+ * CreateAccountWithSeed then fails) are skipped; the scan goes this many indexes past the tracked
+ * slots before it gives up.
+ */
+export const MAX_PREFUNDED_SLOTS = 32
+/** Per-call RPC timeout (ms). */
+export const DEFAULT_RPC_TIMEOUT_MS = 15_000
+
+/**
+ * Runs `call(signal)` with a deadline: after `ms` the signal aborts and the result is a transport
+ * error, whether or not the provider honours the signal (the next endpoint then gets its turn). A
+ * plain timer, not `AbortSignal.timeout`: Node does not keep the process alive for the latter, so a
+ * silent endpoint would end a script with the read still pending instead of timing it out.
+ *
+ * @param {(signal: AbortSignal) => Promise<any>} call - The call, given the abort signal.
+ * @param {number} ms - The deadline.
+ * @param {string} method - The RPC method, for the message.
+ * @returns {Promise<any>} The call's result.
+ */
+function withTimeout (call, ms, method) {
+  const controller = new AbortController()
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      controller.abort()
+      reject(new Error(`${method}: the RPC did not answer within ${ms} ms (timed out).`))
+    }, ms)
+    let pending
+    try { pending = Promise.resolve(call(controller.signal)) } catch (e) { pending = Promise.reject(e) }
+    pending.then(
+      (v) => { clearTimeout(timer); resolve(v) },
+      (e) => { clearTimeout(timer); reject(e) }
+    )
+  })
+}
 /** Slot time used to project the epoch boundary. */
 const SLOT_MS = 400
 
@@ -127,6 +162,7 @@ export function base58Decode (s) {
  * @property {number} [computeUnitLimit] - Compute budget per transaction (default 300 000).
  * @property {bigint | number} [computeUnitPrice] - Priority fee in micro-lamports per unit (default 50 000).
  * @property {number} [unstakeSlots] - Delayed-exit stake accounts tracked per wallet (default 8).
+ * @property {number} [timeoutMs] - Per-call RPC timeout in ms (default 15 000); a silent endpoint gives way to the next.
  * @property {() => Promise<number>} [apr] - Hook returning the APY in percent from a provider's figure (Jito's stats, Sanctum, …); without it `getApr` estimates from the pool's last two epochs.
  */
 
@@ -193,6 +229,8 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
     this._computeUnitPrice = BigInt(config.computeUnitPrice ?? DEFAULT_COMPUTE_UNIT_PRICE)
     /** @private */
     this._unstakeSlots = config.unstakeSlots ?? DEFAULT_UNSTAKE_SLOTS
+    /** @private Per-call RPC timeout: a silent endpoint must not hang a read, and the next one must get its turn. */
+    this._timeoutMs = config.timeoutMs ?? DEFAULT_RPC_TIMEOUT_MS
     /** @private */
     this._aprHook = config.apr
   }
@@ -222,27 +260,32 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
     }
     let lastError
     for (const provider of this._providers) {
+      const ms = this._timeoutMs
       try {
         if (typeof provider === 'string') {
-          const res = await fetch(provider, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
-          })
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          const body = await res.json()
+          const body = await withTimeout(async (signal) => {
+            const res = await fetch(provider, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+              signal
+            })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            return await res.json()
+          }, ms, method)
           if (body.error) {
             if (body.error.code === 429 || /rate|limit|too many/i.test(String(body.error.message))) throw new Error(body.error.message)
             throw Object.assign(new Error(`${method}: ${body.error.message}`), { final: true })
           }
           return body.result
         }
-        if (typeof provider.request === 'function') {
-          return await provider.request(method, params)
+        // A @solana/kit Rpc (the account's own, or a failover proxy over one) answers EVERY property
+        // with a method — `request` included — so it is told apart by a real RPC method, first.
+        if (typeof provider.getBalance === 'function' && typeof provider[method] === 'function') {
+          return await withTimeout((signal) => provider[method](...params).send({ abortSignal: signal }), ms, method)
         }
-        if (typeof provider[method] === 'function') {
-          // @solana/rpc client (or a failover proxy over one): positional params, then .send()
-          return await provider[method](...params).send()
+        if (typeof provider.request === 'function') {
+          return await withTimeout(() => provider.request(method, params), ms, method)
         }
         throw Object.assign(new Error('Unsupported provider: expected a URL, a @solana/rpc client or { request(method, params) }.'), { final: true })
       } catch (error) {
@@ -488,34 +531,48 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
    * The account's delayed-exit slots: seed-derived stake accounts, decoded.
    *
    * @protected
-   * @returns {Promise<{ wallet: string, epoch: bigint, slots: Array<{ index: number, address: string, lamports: bigint, status: StakeActivation, deactivationEpoch: bigint | null } | null>, freeIndex: number | null }>} Slots (null where empty) and the first free one.
+   * @returns {Promise<{ wallet: string, epoch: bigint, slots: Array<{ index: number, address: string, lamports: bigint, status: StakeActivation, deactivationEpoch: bigint | null } | null>, freeIndex: number | null, prefunded: number[] }>} Slots (null where empty), the first free one, and the indexes skipped because someone pre-funded their address.
    */
   async _getUnstakeSlots () {
     const wallet = await this._address()
-    const addresses = await Promise.all(Array.from({ length: this._unstakeSlots }, (_, i) => findUnstakeAccount(wallet, this.pool.name, i)))
-    const [accounts, epochInfo] = await Promise.all([this._getAccounts(addresses), this.getEpochInfo()])
+    const epochInfo = await this.getEpochInfo()
     const slots = []
+    const prefunded = []
     let freeIndex = null
-    for (let i = 0; i < addresses.length; i++) {
-      const a = accounts[i]
-      if (!a) {
-        if (freeIndex === null) freeIndex = i
-        slots.push(null)
-        continue
+    let usable = 0
+    let next = 0
+    const bound = this._unstakeSlots + MAX_PREFUNDED_SLOTS
+    // `unstakeSlots` usable indexes: a pre-funded address (SOL someone sent to the predictable seed
+    // address; CreateAccountWithSeed fails there) does not count and the scan goes on past it.
+    while (usable < this._unstakeSlots && next < bound) {
+      const indexes = Array.from({ length: Math.min(this._unstakeSlots - usable, bound - next) }, (_, k) => next + k)
+      next += indexes.length
+      const addresses = await Promise.all(indexes.map((i) => findUnstakeAccount(wallet, this.pool.name, i)))
+      const accounts = await this._getAccounts(addresses)
+      for (let k = 0; k < indexes.length; k++) {
+        const i = indexes[k]
+        const a = accounts[k]
+        if (!a) {
+          usable++
+          if (freeIndex === null) freeIndex = i
+          slots.push(null)
+          continue
+        }
+        if (a.owner !== STAKE_PROGRAM) { prefunded.push(i); slots.push(null); continue }
+        usable++
+        const data = decodeStakeAccount(fromBase64(a.data[0]))
+        if (data.state === 'uninitialized') { slots.push(null); continue }
+        const status = stakeActivation(data, epochInfo.epoch)
+        slots.push({
+          index: i,
+          address: addresses[k],
+          lamports: BigInt(a.lamports),
+          status,
+          deactivationEpoch: data.delegation && data.delegation.deactivationEpoch !== U64_MAX ? data.delegation.deactivationEpoch : null
+        })
       }
-      if (a.owner !== STAKE_PROGRAM) { slots.push(null); continue } // something else parked on our seed address
-      const data = decodeStakeAccount(fromBase64(a.data[0]))
-      if (data.state === 'uninitialized') { slots.push(null); continue }
-      const status = stakeActivation(data, epochInfo.epoch)
-      slots.push({
-        index: i,
-        address: addresses[i],
-        lamports: BigInt(a.lamports),
-        status,
-        deactivationEpoch: data.delegation && data.delegation.deactivationEpoch !== U64_MAX ? data.delegation.deactivationEpoch : null
-      })
     }
-    return { wallet, epoch: epochInfo.epoch, slots, freeIndex }
+    return { wallet, epoch: epochInfo.epoch, slots, freeIndex, prefunded }
   }
 
   /**
@@ -555,8 +612,13 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
     if (q.lamports < pool.minimumStakeLamports) {
       throw new Error(`A delayed exit must be worth at least ${pool.minimumStakeLamports} lamports (the stake program's minimum delegation plus rent) — use the instant mode for less.`)
     }
-    const { freeIndex } = await this._getUnstakeSlots()
-    if (freeIndex === null) throw new Error(`All ${this._unstakeSlots} delayed-exit slots are in use — claim a finished exit first.`)
+    const { freeIndex, prefunded } = await this._getUnstakeSlots()
+    if (freeIndex === null) {
+      if (prefunded.length >= MAX_PREFUNDED_SLOTS) {
+        throw new Error(`No delayed-exit slot is free: ${prefunded.length} slot addresses hold SOL someone else sent there (they cannot hold an exit) — use the instant mode, or raise unstakeSlots.`)
+      }
+      throw new Error(`All ${this._unstakeSlots} delayed-exit slots are in use — claim a finished exit first.`)
+    }
     const listAccount = await this._getAccount(pool.state.validatorList)
     if (!listAccount) throw new Error('Validator list account not found.')
     const { validators } = decodeValidatorList(fromBase64(listAccount.data[0]))

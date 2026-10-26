@@ -106,13 +106,28 @@ const big = (x: unknown): bigint => (x === null || x === undefined ? 0n : BigInt
 const str = (x: unknown): string => (x === null || x === undefined ? '0' : String(x))
 
 export class KaminoApi {
-  constructor(private readonly endpoint: string = KAMINO_API, private readonly fetchImpl: typeof fetch = fetch) {}
+  /** `timeoutMs` bounds each call (default 15 s): a silent API must not hang a read or a write's build. */
+  constructor(private readonly endpoint: string = KAMINO_API, private readonly fetchImpl: typeof fetch = fetch, private readonly timeoutMs = 15_000) {}
 
   private async request<T>(path: string, body?: unknown): Promise<T> {
-    const res = await this.fetchImpl(`${this.endpoint}${path}`, body === undefined
-      ? { headers: { accept: 'application/json' } }
-      : { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body) })
-    const text = await res.text()
+    // A plain timer, not AbortSignal.timeout: Node does not keep the process alive for the latter,
+    // so a silent API would leave the call pending instead of timing it out.
+    const controller = new AbortController()
+    const signal = controller.signal
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => { controller.abort(); reject(new KaminoError(`Kamino API ${path} did not answer within ${this.timeoutMs} ms.`)) }, this.timeoutMs)
+    })
+    const call = async () => {
+      const res = await this.fetchImpl(`${this.endpoint}${path}`, body === undefined
+        ? { headers: { accept: 'application/json' }, signal }
+        : { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body), signal })
+      return { res, text: await res.text() }
+    }
+    // Raced as well: a fetch implementation that ignores the signal still gives way.
+    const { res, text } = await Promise.race([call(), timedOut])
+      .catch((e: unknown) => { throw signal.aborted ? new KaminoError(`Kamino API ${path} did not answer within ${this.timeoutMs} ms.`) : e })
+      .finally(() => clearTimeout(timer))
     let json: unknown = null
     try { json = text ? JSON.parse(text) : null } catch { /* non-JSON body */ }
     if (!res.ok) {

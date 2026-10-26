@@ -20,6 +20,16 @@ export function findProgramAddress(seeds: readonly Uint8Array[], programId: stri
   throw new Error('No program address found for these seeds.')
 }
 
+/**
+ * The vanilla (plain lending) obligation of `user` in `market`: `[tag 0, id 0, user, market,
+ * default key, default key]` under klend — the one `/ktx/klend/*` deposits go through. Other
+ * obligation kinds (Multiply, Leverage…) live at other addresses.
+ */
+export function vanillaObligation(user: string, market: string, klendProgram = 'KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD'): string {
+  const zero = new Uint8Array(32)
+  return findProgramAddress([Uint8Array.of(0), Uint8Array.of(0), base58.decode(user), base58.decode(market), zero, zero], klendProgram)
+}
+
 /** A kVault's shares mint: `["shares", vault]` under the kVault program. */
 export function vaultSharesMint(vault: string, kvaultProgram: string): string {
   return findProgramAddress([new TextEncoder().encode('shares'), base58.decode(vault)], kvaultProgram)

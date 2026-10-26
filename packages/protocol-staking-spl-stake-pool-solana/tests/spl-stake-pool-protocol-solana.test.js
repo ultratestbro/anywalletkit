@@ -435,3 +435,30 @@ test('_rpc fails over on transport errors but not on node-side rejections', asyn
   assert.equal((await p.getEpochInfo()).epoch, 1030n)
   await assert.rejects(() => p._rpc('getBalance', [HOLDER]), /boom/)
 })
+
+// Audit 2026-10-25 round 3, M30: the delayed-exit slot addresses are predictable (wallet + seed).
+// Anyone could send a little SOL to all eight of them: CreateAccountWithSeed then fails on each, and
+// the module said "all slots are in use" — delayed exits blocked for ~0.007 SOL. Pre-funded
+// addresses (System-owned) are now skipped without counting against the tracked slots, the scan
+// goes on past them (bounded), and only beyond the bound does it refuse, naming the cause.
+test('delayed exit: pre-funded slot addresses are skipped, the exit lands past them and is listed', async () => {
+  const prefunded = { data: new Uint8Array(0), lamports: 890_880n, owner: codec.SYSTEM_PROGRAM }
+  const poisoned = {}
+  for (let i = 0; i < 8; i++) poisoned[await codec.findUnstakeAccount(HOLDER, 'Jito', i)] = prefunded
+  const account = stubAccount()
+  const r = await protocolFor(withPosition({ accounts: poisoned }), account).requestWithdrawal({ amount: SOL })
+  const slot8 = await codec.findUnstakeAccount(HOLDER, 'Jito', 8)
+  assert.equal(r.stakeAccount, slot8)
+  assert.equal(account.sent[0].instructions[2].accounts[1].address, slot8)
+
+  const withExit = { ...poisoned, [slot8]: { data: stakeAccount({ authority: HOLDER, stake: SOL, deactivationEpoch: EPOCH - 1n }), lamports: SOL + RENT } }
+  const { requests } = await protocolFor(withPosition({ accounts: withExit })).getWithdrawalRequests()
+  assert.deepEqual(requests.map((q) => q.id), [8n])
+})
+
+test('delayed exit: refused with the cause named only when pre-funded addresses exhaust the bound', async () => {
+  const prefunded = { data: new Uint8Array(0), lamports: 890_880n, owner: codec.SYSTEM_PROGRAM }
+  const many = {}
+  for (let i = 0; i < 8 + 32; i++) many[await codec.findUnstakeAccount(HOLDER, 'Jito', i)] = prefunded
+  await assert.rejects(() => protocolFor(withPosition({ accounts: many })).requestWithdrawal({ amount: SOL }), /40 slot addresses hold SOL someone else sent there.*instant/)
+})

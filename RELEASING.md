@@ -11,11 +11,12 @@ Packages reach npm only through the `release` workflow. Every package is publish
    git commit -am "chore: release" && git push
    ```
 2. Actions → **release** → Run workflow:
-   - **mode `dry-run`** runs the full gate and then packs and `npm publish --dry-run`s every package that is not on npm yet. The gate is build, typecheck, tests, registry, examples, Hermes and `pack:check`.
-   - **mode `publish`** runs the same gate. The `publish` job then waits for approval in the `npm` environment, publishes the new versions (dependencies first) and pushes one tag per package, `@anywalletkit/<name>@<version>`.
+   - **mode `dry-run`** runs the full gate, packs every package that is not on npm yet and `npm publish --dry-run`s the packed tarballs. The gate is build, typecheck, tests, registry, examples, Hermes and `pack:check`.
+   - **mode `publish`** runs the same gate and packs. The `publish` job then waits for approval in the `npm` environment and publishes the packed tarballs (dependencies first); the `tag` job pushes one tag per published package, `@anywalletkit/<name>@<version>`.
+   - Privileges are split: install, build and pack run in the `pack` job with a read-only token; the `publish` job holds the OIDC token and runs no install and no build — only `npm publish <tarball> --provenance --ignore-scripts` over the `pack` job's artifact; only the `tag` job can push. No checkout keeps its credentials.
 3. Versions already on npm are skipped, so re-running after a partial failure is safe. A package npm refuses does not stop the run: it and the packages that depend on it are held back, everything else is published and tagged, and the run ends red with the list.
 
-Locally, `pnpm release:dry` does the same dry run (without provenance, which only exists in CI).
+Locally, `pnpm release:dry` does the same dry run (without provenance, which only exists in CI). The two halves the workflow runs are `node scripts/publish.mjs --pack-only --out <dir>` and `node scripts/publish.mjs --from <dir> [--dry-run]`.
 
 ## One-time setup
 

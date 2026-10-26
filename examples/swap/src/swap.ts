@@ -127,18 +127,25 @@ export async function waitForDelivery(
   swaps: RouterSwap2Protocol,
   id: string,
   destinationAccount: () => Promise<IWalletAccount>,
+  { intervalMs = 10_000, timeoutMs = 2 * 60 * 60_000 }: { intervalMs?: number; timeoutMs?: number } = {},
 ) {
-  for (;;) {
+  const deadline = Date.now() + timeoutMs
+  let claimed = false
+  while (Date.now() < deadline) {
     const { status, transactions } = await swaps.getSwap2Status(id)
-    if (status === 'action-required') {
+    if (status === 'action-required' && !claimed) {
       // Two-phase routes (CCTP): the mint is a transaction on the DESTINATION chain,
-      // signed by the user's account there and paid in that chain's gas.
-      await swaps.claimSwap2(id, await destinationAccount())
+      // signed by the user's account there and paid in that chain's gas. Once: the
+      // provider says 'action-required' until it sees the mint, so keep polling the
+      // id the claim returns (it carries the claim hash) instead of claiming again.
+      id = (await swaps.claimSwap2(id, await destinationAccount())).id
+      claimed = true
     } else if (DONE.has(status)) {
       return { status, transactions }
     }
-    await new Promise((r) => setTimeout(r, 10_000))
+    await new Promise((r) => setTimeout(r, intervalMs))
   }
+  throw new Error(`Swap ${id} not settled within ${Math.ceil(timeoutMs / 1000)} s: keep its id and check again later.`)
 }
 // #endregion status
 

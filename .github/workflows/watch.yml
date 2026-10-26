@@ -46,6 +46,8 @@ jobs:
           SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
           TON_RPC_URL: ${{ secrets.TON_RPC_URL }}
           QUICKNODE_MULTICHAIN_BASE: ${{ secrets.QUICKNODE_MULTICHAIN_BASE }}
+          # The dispatch input goes in through env, never into the script text (shell injection).
+          ONLY: ${{ inputs.only }}
         run: |
           # One QuickNode multichain endpoint serves the other EVM chains: "<name>.%NET%.quiknode.pro/<token>/".
           if [ -n "$QUICKNODE_MULTICHAIN_BASE" ]; then
@@ -56,7 +58,12 @@ jobs:
               echo "${p%%:*}_RPC_URL=$url" >> "$GITHUB_ENV"
             done
           fi
-          node scripts/watch/watch.mjs --send ${{ inputs.only && format('--only {0}', inputs.only) || '' }}
+          set --
+          if [ -n "$ONLY" ]; then
+            case "$ONLY" in *[!a-z0-9,_-]*) echo "only: lowercase letters, digits, ',', '_' and '-'" >&2; exit 1 ;; esac
+            set -- --only "$ONLY"
+          fi
+          node scripts/watch/watch.mjs --send "$@"
       - name: run canary
         if: ${{ !cancelled() && !inputs.only }}   # still runs when the watch digest failed to send
         continue-on-error: true   # a failing module is reported, not a reason to skip the snapshot commit
@@ -108,6 +115,11 @@ jobs:
       - run: rm -rf watch
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with: { name: watch-snapshot, path: watch/ }
+      - name: take only snapshot data from the artifact
+        # The artifact was written by a job that ran third-party code (npm deps, verify-live). What
+        # the watch looks at (addresses.json, routes.json) is reviewed in git: restore it from the
+        # checkout, and accept nothing but data files (no links, no other paths, bounded size).
+        run: node scripts/watch/accept-snapshot.mjs
       - name: commit snapshot
         run: |
           git config user.name "module-watch"

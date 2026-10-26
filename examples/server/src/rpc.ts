@@ -135,10 +135,14 @@ export function createRpcProxy(opts: RpcProxyOptions) {
       methods.push(method)
     }
     await hooks.charge?.(methods)
+    // Forward the request that was checked, not the bytes that came in: with a duplicated key
+    // ({"method":"eth_call", …, "method":"eth_sendRawTransaction"}) a parser that keeps the other
+    // occurrence would run a method the allowlist never saw.
+    const checked = JSON.stringify(payload)
     for (const url of urls) {
       try {
         const res = await doFetch(url, {
-          method: 'POST', headers: { 'content-type': 'application/json' }, body: rawBody,
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: checked,
           signal: AbortSignal.timeout(timeoutMs),
         })
         if (res.status >= 500) { await res.body?.cancel(); continue } // the next upstream
