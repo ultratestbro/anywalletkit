@@ -323,18 +323,22 @@ function solanaDestinations(arg: unknown): Destinations {
       const b = base64Decode(arg)
       return b ? fromIxList(solanaWireInstructions(b)) : UNKNOWN
     }
+    // wallet-solana's own order (guards.ts): a compiled transaction has messageBytes AND signatures,
+    // a native transfer has `to` AND `value`, a message has `instructions`. An object that fits two
+    // of these is not judged by either reading (round 3, H2).
     const a = obj(arg)
-    if (a.messageBytes instanceof Uint8Array) return fromIxList(solanaMessageInstructions(a.messageBytes))
-    if (Array.isArray(a.instructions)) {
-      return fromIxList(a.instructions.map((raw) => {
-        const ix = obj(raw)
-        const data = ix.data instanceof Uint8Array ? ix.data : new Uint8Array()
-        const accounts = Array.isArray(ix.accounts) ? ix.accounts.map((acc) => str(obj(acc).address)) : []
-        return { program: str(ix.programAddress), accounts, data }
-      }))
-    }
-    const to = str(a.to) ?? str(a.recipient)
-    return to !== undefined ? known([to]) : UNKNOWN
+    const compiled = 'messageBytes' in a && 'signatures' in a
+    const native = 'to' in a && 'value' in a
+    const message = Array.isArray(a.instructions)
+    if (Number(compiled) + Number(native) + Number(message) !== 1) return UNKNOWN
+    if (compiled) return a.messageBytes instanceof Uint8Array ? fromIxList(solanaMessageInstructions(a.messageBytes)) : UNKNOWN
+    if (native) { const to = str(a.to); return to !== undefined ? known([to]) : UNKNOWN }
+    return fromIxList((a.instructions as unknown[]).map((raw) => {
+      const ix = obj(raw)
+      const data = ix.data instanceof Uint8Array ? ix.data : new Uint8Array()
+      const accounts = Array.isArray(ix.accounts) ? ix.accounts.map((acc) => str(obj(acc).address)) : []
+      return { program: str(ix.programAddress), accounts, data }
+    }))
   } catch {
     return UNKNOWN
   }
@@ -347,25 +351,47 @@ function tronDestinations(arg: unknown): Destinations {
   if (typeof arg === 'string') {
     try { a = obj(JSON.parse(arg)) } catch { return UNKNOWN }
   } else a = obj(arg)
-  // A prebuilt transaction: only the signed bytes count, never the JSON copy next to them (scan F17).
-  if (typeof a.raw_data_hex === 'string') return tronRawDestinations(a.raw_data_hex)
-  if (a.raw_data !== undefined || a.txID !== undefined) return UNKNOWN
-  const to = str(a.contractAddress) ?? str(a.to) ?? str(a.recipient)
+  // wallet-tron's own order (shape.ts): prebuilt when `txID` is a string, a contract call when
+  // `functionSelector` is, otherwise a TRX send to `to`. Fields of another shape riding along make
+  // the reading ambiguous (round 3, H2).
+  const prebuilt = typeof a.txID === 'string'
+  const call = typeof a.functionSelector === 'string'
+  const foreign = (...keys: string[]) => keys.some((k) => a[k] !== undefined)
+  if (prebuilt) {
+    // Only the signed bytes count, never the JSON copy next to them (scan F17).
+    if (call || foreign('to', 'contractAddress', 'value')) return UNKNOWN
+    return typeof a.raw_data_hex === 'string' ? tronRawDestinations(a.raw_data_hex) : UNKNOWN
+  }
+  if (foreign('raw_data', 'raw_data_hex', 'txID')) return UNKNOWN
+  if (call) {
+    if (foreign('to', 'value')) return UNKNOWN
+    const c = str(a.contractAddress)
+    return c !== undefined ? known([c]) : UNKNOWN
+  }
+  if (foreign('contractAddress')) return UNKNOWN
+  const to = str(a.to)
   return to !== undefined ? known([to]) : UNKNOWN
 }
 
 function nearDestinations(arg: unknown): Destinations {
   if (typeof arg === 'string') { const r = nearReceiverOfBorsh(arg); return r ? known([r]) : UNKNOWN }
-  const a = obj(arg)
-  const to = str(a.receiverId) ?? str(a.receiver) ?? str(a.recipient)
+  // wallet-near builds from `receiverId` and nothing else (round 3, review).
+  const to = str(obj(arg).receiverId)
   return to !== undefined ? known([to]) : UNKNOWN
 }
 
 function tonDestinations(arg: unknown): Destinations {
   if (Array.isArray(arg)) return arg.length ? known(arg.map((m) => str(obj(m).to))) : UNKNOWN
-  const a = obj(arg)
-  const to = str(a.to) ?? str(a.recipient)
+  // wallet-ton builds from `to` and nothing else (round 3, review).
+  const to = str(obj(arg).to)
   return to !== undefined ? known([to]) : UNKNOWN // a Cell (prebuilt external) is not read here
+}
+
+/** EVM: the transaction goes to `to` and nowhere else — no `to` is a contract deployment (round 3, H2). */
+function evmDestinations(arg: unknown): Destinations {
+  if (Array.isArray(arg)) return arg.length ? known(arg.map((c) => str(obj(c).to))) : UNKNOWN
+  const to = str(obj(arg).to)
+  return to !== undefined ? known([to]) : UNKNOWN
 }
 
 function evmLikeDestinations(arg: unknown): Destinations {
@@ -382,6 +408,7 @@ export function sendDestinations(chain: string, arg: unknown): Destinations {
     case 'near': return nearDestinations(arg)
     case 'ton': return tonDestinations(arg)
     case 'solana': return solanaDestinations(arg)
+    case 'eip155': return evmDestinations(arg)
     default: return evmLikeDestinations(arg)
   }
 }

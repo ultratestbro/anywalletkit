@@ -5,7 +5,7 @@ import { describeTransaction } from './describe.js'
 import { BroadcastUnknownError, SimulationError, UnsafeTransactionError } from './errors.js'
 import { assertNoError } from './client.js'
 import { WalletAccountReadOnlyTron, hashMessage } from './read-only-account.js'
-import { verifyRawTransaction } from './raw.js'
+import { isDecodedContractType, verifyRawTransaction } from './raw.js'
 import { isPrebuilt } from './shape.js'
 import type { TronConfig, TronFeeEstimate, TronRawTransaction, TronSimulation, TronTransaction, TronTransferOptions } from './types.js'
 
@@ -14,6 +14,12 @@ export interface TronTransferResult extends TransferResult {
   activationFee?: bigint
   estimate?: TronFeeEstimate
 }
+
+/**
+ * Contract types the wallet has no field decoder for but signs anyway: they move nothing and change
+ * no rights. A `VoteWitnessContract` re-assigns the account's votes (Stake 2.0 voting dApps).
+ */
+const UNDECODED_BUT_SAFE: ReadonlySet<string> = new Set(['VoteWitnessContract'])
 
 /** Longest expiration the node accepts for a transaction (`Constant.MAXIMUM_TIME_UNTIL_EXPIRATION`). */
 export const MAX_EXPIRATION_MS = 24 * 60 * 60 * 1000
@@ -92,13 +98,21 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
    * Refuse to sign what cannot be right: a foreign owner, a missing or expired
    * (or >24h) expiration, no ref block, more than one contract, a TRX / TRC-20
    * transfer to the zero address (unless `allowBurn`), a `fee_limit` above
-   * `transactionMaxFee`.
+   * `transactionMaxFee`, an `AccountPermissionUpdateContract` (unless
+   * `allowPermissionChanges`), a contract type the wallet cannot decode (unless
+   * `allowUndecodedContracts`; `VoteWitnessContract` only re-assigns votes and passes).
    */
   protected assertSafe(tx: TronRawTransaction, now = Date.now()): void {
     const contracts = tx.raw_data?.contract ?? []
     if (contracts.length !== 1) throw new UnsafeTransactionError('multi-contract', `Expected exactly one contract in the transaction, got ${contracts.length}.`)
     const owner = contracts[0]?.parameter?.value?.owner_address as string | undefined
     if (!owner || toHexAddress(owner) !== this.addressHex) throw new UnsafeTransactionError('owner-mismatch', 'The transaction owner does not match the wallet account address.')
+    const type = String(contracts[0]!.type)
+    if (type === 'AccountPermissionUpdateContract') {
+      if (this._config.allowPermissionChanges !== true) throw new UnsafeTransactionError('permission-change', 'AccountPermissionUpdateContract changes which keys control this account: signing it can hand the account to someone else. Set allowPermissionChanges to sign one.')
+    } else if (!isDecodedContractType(type) && !UNDECODED_BUT_SAFE.has(type) && this._config.allowUndecodedContracts !== true) {
+      throw new UnsafeTransactionError('undecoded-contract', `The wallet cannot decode a ${type}, so it cannot tell what it does (some of these move TRX or tokens). Set allowUndecodedContracts to sign one.`)
+    }
     if (!tx.raw_data.ref_block_bytes || !tx.raw_data.ref_block_hash) throw new UnsafeTransactionError('missing-ref-block', 'The transaction has no reference block (ref_block_bytes / ref_block_hash).')
     const exp = tx.raw_data.expiration
     if (exp === undefined || exp <= now) throw new UnsafeTransactionError('expired', 'The transaction has no expiration or has already expired.')

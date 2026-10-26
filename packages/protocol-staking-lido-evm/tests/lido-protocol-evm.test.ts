@@ -16,6 +16,8 @@ const erc20 = parseAbi([
   'function isStakingPaused() view returns (bool)',
   'function getCurrentStakeLimit() view returns (uint256)',
   'function submit(address _referral) payable returns (uint256)',
+  'function balanceOf(address _account) view returns (uint256)',
+  'function isPaused() view returns (bool)',
 ])
 const queueAbi = parseAbi([
   'function requestWithdrawals(uint256[] _amounts, address _owner) returns (uint256[])',
@@ -39,7 +41,7 @@ const SIG = '0x' + '12'.repeat(32) + '34'.repeat(32) + '1b'
 type Eip1193 = { request(args: { method: string; params?: unknown }): Promise<unknown> }
 
 /** Minimal EIP-1193 provider answering the calls this module makes. */
-function stubEip1193({ allowance = 0n }: { allowance?: bigint } = {}): Eip1193 {
+function stubEip1193({ allowance = 0n, balance = 10_000n * E18, paused = false }: { allowance?: bigint; balance?: bigint; paused?: boolean } = {}): Eip1193 {
   return {
     async request({ method, params }) {
       if (method === 'eth_chainId') return '0x1'
@@ -57,6 +59,12 @@ function stubEip1193({ allowance = 0n }: { allowance?: bigint } = {}): Eip1193 {
         }
         if (sel === selector(erc20, 'getCurrentStakeLimit')) {
           return encodeFunctionResult({ abi: erc20, functionName: 'getCurrentStakeLimit', result: 150000n * E18 })
+        }
+        if (sel === selector(erc20, 'balanceOf')) {
+          return encodeFunctionResult({ abi: erc20, functionName: 'balanceOf', result: balance })
+        }
+        if (sel === selector(erc20, 'isPaused')) {
+          return encodeFunctionResult({ abi: erc20, functionName: 'isPaused', result: paused })
         }
         if (sel === selector(queueAbi, 'getWithdrawalRequests')) {
           return encodeFunctionResult({ abi: queueAbi, functionName: 'getWithdrawalRequests', result: [] })
@@ -189,4 +197,40 @@ test('an empty queue reads back as an empty view', async () => {
 test('claimWithdrawals refuses when nothing is claimable', async () => {
   const protocol = new LidoProtocolEvm(stubAccount(stubEip1193()))
   await expect(protocol.claimWithdrawals()).rejects.toThrow(/no claimable/)
+})
+
+// Audit 2026-10-25 round 3, H10: the permit leg swallowed every error, the broadcast's included, and
+// went on to approve + a second request — twice the stETH queued when both land. A refused confirm
+// turned into an approval sheet; an impossible request still paid for an approval.
+test('a send error on the permit leg is not a fallback: "maybe sent" goes up, nothing else is signed', async () => {
+  const account = stubAccount(stubEip1193())
+  const lost = Object.assign(new Error('Broadcast outcome unknown'), { name: 'BroadcastUnknownError', maybeSent: true, hash: '0x' + 'cd'.repeat(32) })
+  account.sendTransaction = async (tx) => { account.sent.push(tx); throw lost }
+  await expect(new LidoProtocolEvm(account).requestWithdrawal({ amount: E18 })).rejects.toBe(lost)
+  expect(account.sent.length).toBe(1)
+})
+
+test('a declined permit (UserRejectedError) or a policy refusal is not a fallback to approve', async () => {
+  for (const name of ['UserRejectedError', 'PolicyViolationError']) {
+    const err = Object.assign(new Error('no'), { name })
+    const account = stubAccount(stubEip1193(), { signTypedData: () => { throw err } })
+    await expect(new LidoProtocolEvm(account).requestWithdrawal({ amount: E18 })).rejects.toBe(err)
+    expect(account.sent.length).toBe(0)
+  }
+})
+
+test('before an approval: the balance must cover the request and the queue must not be paused', async () => {
+  const failingPermit = { signTypedData: () => { throw new Error('token has no permit') } }
+  const poor = stubAccount(stubEip1193({ balance: E18 - 1n }), failingPermit)
+  await expect(new LidoProtocolEvm(poor).requestWithdrawal({ amount: E18 })).rejects.toThrow(/balance/)
+  expect(poor.sent.length).toBe(0)
+  const paused = stubAccount(stubEip1193({ paused: true }), failingPermit)
+  await expect(new LidoProtocolEvm(paused).requestWithdrawal({ amount: E18 })).rejects.toThrow(/paused/)
+  expect(paused.sent.length).toBe(0)
+})
+
+test('a tail under the 100 wei minimum is evened out with the chunk before it', () => {
+  expect(splitWithdrawalAmounts(1000n * E18 + 50n, 1000n * E18)).toEqual([1000n * E18 - 50n, 100n])
+  expect(splitWithdrawalAmounts(2000n * E18 + 1n, 1000n * E18)).toEqual([1000n * E18, 1000n * E18 - 99n, 100n])
+  expect(splitWithdrawalAmounts(2000n * E18, 1000n * E18)).toEqual([1000n * E18, 1000n * E18])
 })

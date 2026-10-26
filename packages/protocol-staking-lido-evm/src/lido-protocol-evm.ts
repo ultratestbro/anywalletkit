@@ -125,7 +125,23 @@ export function splitWithdrawalAmounts(amount: bigint, cap: bigint): bigint[] {
     rest -= cap
   }
   amounts.push(rest)
+  // The queue refuses a request under 100 wei: a short tail borrows from the chunk before it.
+  const last = amounts.length - 1
+  const deficit = last > 0 ? MIN_WITHDRAWAL_AMOUNT - amounts[last]! : 0n
+  if (deficit > 0n && amounts[last - 1]! - deficit >= MIN_WITHDRAWAL_AMOUNT) {
+    amounts[last - 1] = amounts[last - 1]! - deficit
+    amounts[last] = MIN_WITHDRAWAL_AMOUNT
+  }
   return amounts
+}
+
+/** WithdrawalQueue `MIN_STETH_WITHDRAWAL_AMOUNT` (100 wei). */
+const MIN_WITHDRAWAL_AMOUNT = 100n
+
+/** Errors that end a write rather than send it down another path: a "no" from the user or the policies. */
+const isRefusal = (e: unknown): boolean => {
+  const name = (e as { name?: unknown } | null)?.name
+  return name === 'UserRejectedError' || name === 'PolicyViolationError'
 }
 
 /** Normalizes and validates an amount option. */
@@ -344,17 +360,33 @@ export default class LidoProtocolEvm extends StakingProtocol<LidoProtocolConfig>
     const amounts = splitWithdrawalAmounts(value, info.cap)
     const queueAddress = this._addresses.withdrawalQueue as string
 
+    // Only "the permit does not work here" falls back to approve + request: the user declining, the
+    // policies refusing and anything the broadcast throws (it may have been sent) end the call
+    // (round 3, H10).
+    let permitData: Hex | undefined
     try {
       const permit = await this._signPermit(info, owner, value)
       const data = encodeFunctionData({ abi: WITHDRAWAL_QUEUE_ABI, functionName: info.permitFn, args: [amounts, owner as Address, permit] })
       // Prove the permit executes before broadcasting — a bad signature must
       // fall back, not burn gas.
       await provider.call({ account: owner as Address, to: queueAddress as Address, data })
-      const result = await account.sendTransaction({ to: queueAddress, data })
-      return { ...(result as StakeResult), approveHash: null }
-    } catch {
-      // fall through to approve + request
+      permitData = data
+    } catch (e) {
+      if (isRefusal(e)) throw e
     }
+    if (permitData !== undefined) {
+      const result = await account.sendTransaction({ to: queueAddress, data: permitData })
+      return { ...(result as StakeResult), approveHash: null }
+    }
+
+    // An approval for a request the queue would refuse is a fee for nothing.
+    const [balance, paused] = await Promise.all([
+      provider.readContract({ address: info.address as Address, abi: info.abi, functionName: 'balanceOf', args: [owner as Address] }) as Promise<bigint>,
+      provider.readContract({ address: queueAddress as Address, abi: WITHDRAWAL_QUEUE_ABI, functionName: 'isPaused' }) as Promise<boolean>,
+    ])
+    if (paused) throw new Error('The Lido withdrawal queue is paused; nothing was approved or requested.')
+    if (balance < value) throw new Error(`The ${token} balance (${balance}) is below the requested ${value}; nothing was approved or requested.`)
+    if (value < MIN_WITHDRAWAL_AMOUNT) throw new Error(`A Lido withdrawal request is at least ${MIN_WITHDRAWAL_AMOUNT} wei; nothing was approved or requested.`)
 
     let approveHash: string | null = null
     let approveFee = 0n

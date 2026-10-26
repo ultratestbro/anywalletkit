@@ -36,7 +36,7 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
 | Vault | `Vault`, `chromeLocalVaultStorage`, `memoryVaultStorage`, `VAULT_SCRYPT`, `VAULT_LIMITS`, `VAULT_MIN_PASSWORD_LENGTH` | every secret at rest in `chrome.storage.local`, two key layers (a KEK wraps a DEK, the DEK seals each secret); passkey (WebAuthn PRF) unlock as a second wrap of the same DEK |
 | Session | `Session`, `chromeSessionStorage`, `chromeAlarms`, `SESSION_DEFAULT_AUTOLOCK_MS` | the DEK in `chrome.storage.session` with an expiry and an alarm; `getKey()` re-checks the expiry itself |
 | Keyring adapters | `chromeKeyringStorage`, `vaultSecretStorage` | `@anywalletkit/keyring` metadata as plain JSON, secrets through the vault, one DEK use per call |
-| Relay | `PageRequest` / `RelayRequest` shapes and guards, `stampOrigin`, `checkSenderOrigin`, `RELAY_ERRORS` | page ⇄ content script ⇄ service worker messages; the origin is the browser's (`port.sender`), never the page's |
+| Relay | `PageRequest` / `RelayRequest` shapes and guards, `pageRequestFrom`, `stampOrigin`, `checkSenderOrigin`, `RELAY_ERRORS` | page ⇄ content script ⇄ service worker messages; the content script takes only messages the page window itself posted (`pageRequestFrom(event, window)`: an iframe's `parent.postMessage` is not the site), and the origin is the browser's (`port.sender`), never the page's |
 | Router | `RequestRouter`, `READ_METHODS`, `SIGNING_METHODS`, `toRelayError` | what a dApp may call: accounts only for connected origins, chain add / switch through the approval window, reads from the wallet's own RPCs, `eth_sign` never offered, everything else 4200 |
 | Permissions | `PermissionStore`, `CHAIN_ACCOUNT_KEYS` | per-origin accounts (EVM, Solana, TON, Tron, Bitcoin, NEAR) and chain |
 | Approvals | `ApprovalQueue`, `ReviewDeclined`, `QueueLimitError`, `APPROVALS_MAX_PENDING_PER_ORIGIN` | one approval window at a time, at most 3 pending requests per origin and one pending `connect`; transport notes (`setVia`) for WalletConnect peers |
@@ -45,7 +45,7 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
 | Review gate | `ReviewGate`, `evmCallMatcher`, `chainTxMatcher` | after one sheet reviewed a whole plan, exactly those operations pass once within a TTL |
 | Swaps | `quoteRoutes`, `reviewSwapPlan`, `executionFloor`, `SwapsStore`, `SwapTracker`, `parseSwapId` | progressive quotes over swap2 providers, one review sheet per plan, pending swaps resumed across worker restarts |
 | Earn | `reviewEarnPlan`, `earnPlanMatchers` | one sheet for an Earn module's plan (approvals + call) |
-| TON Connect | `parseConnectRequest`, `parseSendTransaction`, `parseSignData`, `tonProofMessage`, `tonSignDataMessage` | the pure-data half of TON Connect v2 (the bytes `ton_proof` and `signData` sign) |
+| TON Connect | `parseConnectRequest`, `parseSendTransaction`, `parseSignData`, `tonProofMessage`, `tonSignDataMessage` | the pure-data half of TON Connect v2 (the digests `ton_proof` and `signData` sign, to verify them); the account signs with `signTonProof` / `signTonConnectData` (wallet-ton) — `sign()` refuses 32-byte digests |
 | Phishing | `PhishingDetector` | MetaMask `eth-phishing-detect` list format, shipped with the build (never fetched at runtime), fuzzy lookalikes, brand-in-label, punycode |
 | SIWE | `parseSiwe`, `siweProblems`, `describeSiwe` | EIP-4361 sign-in messages: domain vs. the asking site, address, chain, expiry, nonce (warnings) |
 | Address poisoning | `lookalikeOf`, `RecipientBook` | warns when a new recipient imitates one the user confirmed |
@@ -76,8 +76,11 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
 - **Errors to pages.** `toRelayError(e, { log })` passes the wallet's own refusals
   (EIP-1193 codes) and a node's JSON-RPC error (code, revert data) with URLs
   removed; anything else is `-32603 Internal error` on the page and goes to `log`.
-- **Origins.** The service worker answers a relay message only when the
-  content script's stamped origin equals `port.sender.origin`. Permissions are
+- **Origins.** The content script relays only what the page window itself
+  posted (`pageRequestFrom`: `event.source` is the page, `event.origin` its
+  origin), so an ad or embed in an iframe cannot speak as the site. The
+  service worker answers a relay message only when the content script's
+  stamped origin equals `port.sender.origin`. Permissions are
   keyed by that origin, never by a URL a page or a WalletConnect peer claims.
 - **Requests.** Everything that reveals accounts or moves funds goes through
   the approval queue; blind signing (`eth_sign`) is not offered; typed data for

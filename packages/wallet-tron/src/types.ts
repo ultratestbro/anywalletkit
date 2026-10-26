@@ -27,6 +27,17 @@ export interface TronConfig {
   simulate?: boolean
   /** Allow TRX / TRC-20 transfers to the zero address (default false — refused as a burn). */
   allowBurn?: boolean
+  /**
+   * Sign an `AccountPermissionUpdateContract` (default false — refused): it changes which keys
+   * control the account, so one signature can hand the account to someone else.
+   */
+  allowPermissionChanges?: boolean
+  /**
+   * Sign contract types the wallet has no decoder for (default false — refused, except
+   * `VoteWitnessContract`): nothing can be shown about them, and some move TRX or tokens
+   * (ParticipateAssetIssue, Exchange*, MarketSellAsset, CreateSmartContract with a call value).
+   */
+  allowUndecodedContracts?: boolean
 }
 
 /** Native TRX transfer. `value` in sun. `memo` → `raw_data.data` (charged the memo fee). */

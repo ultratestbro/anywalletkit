@@ -53,8 +53,12 @@ key is used:
    metadata / group update-authority handoff), a token `Batch`, lamports moved
    to anyone but this wallet by an instruction that is not a visible transfer
    (`CloseAccount`, `WithdrawExcessLamports`, `UnwrapLamports`,
-   `WithdrawNonceAccount`, `TransferSolWithSeed`), an undecodable System / Token
-   instruction (`UnsafeTransactionError` with `code` `core-instruction`,
+   `WithdrawNonceAccount`, `TransferSolWithSeed`), a Stake-program instruction this
+   wallet signs that hands a stake account over (`Authorize*` to another key, a
+   `Withdraw` to anyone else, a `SetLockup*` with a foreign custodian or a lockup), a
+   stake account the wallet funds that the same transaction does not initialize
+   (or split into) with this wallet as staker and withdrawer, an undecodable
+   System / Token / Stake instruction (`UnsafeTransactionError` with `code` `core-instruction`,
    `sets-authority`, `closes-account` or `moves-lamports`;
    `allowAuthorityChanges: true` to override, e.g. for a token launch that
    renounces its mint authority). These are top-level checks: a program the

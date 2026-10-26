@@ -404,6 +404,8 @@ venue contracts), quote before every write, log hashes and addresses only, call 
 - One EVM registration per network; an account's transactions go to its manager's RPC.
 - A swap's `toToken` is the **destination** chain's token id (or symbol); `fromToken` the source's.
 - `Swap2MaybeSentError` means "maybe broadcast": never auto-retry a swap or a transfer.
+- TON and NEAR `sign()` refuse a 32-byte message (`MessageIsTransactionError`: it could be a transaction
+  hash). TON Connect: `signTonProof` / `signTonConnectData`; NEAR dApps and Intents: `signNep413`.
 - Public RPCs rate-limit; production apps pass their own endpoints (each `provider` accepts a list).
 
 ## Security rules (non-negotiable)

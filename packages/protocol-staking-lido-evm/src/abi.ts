@@ -33,6 +33,7 @@ export const WITHDRAWAL_QUEUE_ABI = parseAbi([
   'function findCheckpointHints(uint256[] _requestIds, uint256 _firstIndex, uint256 _lastIndex) view returns (uint256[])',
   'function getClaimableEther(uint256[] _requestIds, uint256[] _hints) view returns (uint256[])',
   'function claimWithdrawals(uint256[] _requestIds, uint256[] _hints)',
+  'function isPaused() view returns (bool)',
 ])
 
 /** EIP-2612 permit typed-data types, as the stETH / wstETH tokens verify them. */

@@ -4,11 +4,12 @@ import {
   ADDRESS_LOOKUP_TABLE_PROGRAM, FARMS_PROGRAM, KLEND_PROGRAM, KVAULT_PROGRAM, KaminoApi, KaminoError, KaminoMarketProtocolSolana, KaminoVaultProtocolSolana,
   WITHDRAW_ALL, DEFAULT_FIRST_DEPOSIT_ALLOWANCE, DEFAULT_RENT_ALLOWANCE, fromDecimalString, instructionName, lessBps, toDecimalString, toWad,
 } from '../src/index.js'
-import { MARKET, PYUSD, SHARES, SOL, SOL_RESERVE, TX, USDC, USDC_RESERVE, USER, VAULT, account, api, obligation } from './fixture.js'
+import { FARM, vaultRow, MARKET, PYUSD, SHARES, SOL, SOL_RESERVE, TX, USDC, USDC_RESERVE, USER, VAULT, account, api, obligation } from './fixture.js'
 
+const vaultRowOf = () => structuredClone(vaultRow) as typeof vaultRow & Record<string, unknown>
 const vault = (acc = account(), extra: Record<string, unknown> = {}) => {
   const f = api()
-  return { f, acc, p: new KaminoVaultProtocolSolana(acc, { vault: VAULT, fetch: f.fetch, ...extra }) }
+  return { f, acc, p: new KaminoVaultProtocolSolana(acc, { vault: VAULT, fetch: f.fetch, asset: USDC, ...extra }) }
 }
 const market = (acc = account(), extra: Record<string, unknown> = {}) => {
   const f = api()
@@ -46,17 +47,17 @@ describe('KaminoVaultProtocolSolana', () => {
     expect(v.fees).toEqual({ performanceBps: 500, managementBps: 0 })
     expect(v.totalAssets).toBe(80_843_116_919n + 19_873_153_911_276n)
     expect(v.allocations.map((a) => a.reserve)).toEqual([USDC_RESERVE])
-    expect(v.farm).toBe('7D8C5pDFxug58L9zkwK7bCiDg4kD4AygzbcZUmf5usHS')
+    expect(v.farm).toBe(FARM)
     expect(await p.getApy()).toBeCloseTo(4.5155, 3)
   })
 
   it('quoteSupply builds the deposit through the API in token units and proves it through the guard without sending', async () => {
-    const { p, f, acc } = vault()
+    const { p, f, acc } = vault(account(), { skipFarm: false })
     const q = await p.quoteSupply({ amount: 1_500_000n })
     expect(q.fee).toBe(7_500n)
     expect(q.expectedShares).toBe(fromDecimalString('1.5', 6) * 10n ** 18n / toWad('1.0627800342202071868') + 1n)
     expect(lastPost(f)).toMatchObject({ url: '/ktx/kvault/deposit', body: { wallet: USER, kvault: VAULT, amount: '1.5' } })
-    expect(lastPost(f).body).not.toHaveProperty('skipFarm')
+    expect(lastPost(f).body).toMatchObject({ skipFarm: false })
     expect(acc.sent).toHaveLength(0)
     const g = acc.guards[0]!
     expect(g.method).toBe('check')
@@ -223,5 +224,53 @@ describe('KaminoApi', () => {
     expect(await a.getVaultPosition(USER, VAULT)).toEqual({ vaultAddress: VAULT, stakedShares: '0', unstakedShares: '0', totalShares: '0' })
     f.routes.set('/kvaults/users', { status: 500, body: { error: 'boom' } })
     await expect(a.getVaultPosition(USER, VAULT)).rejects.toThrow(/500/)
+  })
+})
+
+// Audit 2026-10-25 round 3, H7: the vault's mints came from api.kamino.finance unchecked. An answer
+// naming the wallet's USDT as the "shares mint" made withdraw('max') allow every USDT out, and a
+// supply without `token` deposited whatever asset the API named.
+describe('Kamino vault: the API cannot choose the mints', () => {
+  const USDT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
+  const lying = (state: Record<string, unknown>, top: Record<string, unknown> = {}) => {
+    const { f, acc, p } = vault()
+    f.vault = { ...vaultRowOf(), ...top, state: { ...vaultRowOf().state, ...state } }
+    f.position = { stakedShares: '0', unstakedShares: '10', totalShares: '10' }
+    return { f, acc, p }
+  }
+  it('a shares mint the vault program would not derive is refused before anything is built', async () => {
+    const { f, acc, p } = lying({ sharesMint: USDT })
+    await expect(p.getVault()).rejects.toThrow(/shares mint .* is not the vault's/)
+    await expect(p.withdraw({ amount: 'max' })).rejects.toThrow(KaminoError)
+    expect(f.requests.some((r) => r.url.startsWith('/ktx/'))).toBe(false)
+    expect(acc.guards).toHaveLength(0)
+  })
+  it('another vault, another program or another asset than configured is refused', async () => {
+    await expect(lying({}, { address: USER }).p.getVault()).rejects.toThrow(/describes/)
+    await expect(lying({}, { programId: KLEND_PROGRAM }).p.getVault()).rejects.toThrow(/not the kVault program/)
+    await expect(lying({ tokenMint: PYUSD }).p.supply({ amount: 1_000_000n })).rejects.toThrow(/not the configured/)
+  })
+  it('supply names its asset: without token or a configured asset nothing is deposited', async () => {
+    const f = api()
+    const p = new KaminoVaultProtocolSolana(account(), { vault: VAULT, fetch: f.fetch })
+    await expect(p.supply({ amount: 1_000_000n })).rejects.toThrow(/Name the asset/)
+    await expect(p.quoteSupply({ token: USDC, amount: 1_500_000n })).resolves.toBeDefined()
+  })
+  it('the API\'s mint decimals must be the chain\'s', async () => {
+    await expect(lying({ sharesMintDecimals: 9 }).p.getVault()).rejects.toThrow(/decimals/)
+  })
+})
+
+// Review of round 3 H7: staked in the farm, the shares never reach the wallet, so the guard could
+// only bound the spend — an API transaction that just transferred the deposit away passed.
+describe('Kamino vault: shares stay in the wallet by default, where the guard proves them', () => {
+  it('supply asks for skipFarm and requires the shares to arrive; skipFarm: false opts into the farm', async () => {
+    const { p, f, acc } = vault()
+    const q = await p.quoteSupply({ amount: 1_500_000n })
+    expect(lastPost(f).body).toMatchObject({ skipFarm: true })
+    expect(acc.guards.at(-1)!.guard.expect.tokenIn).toEqual({ mint: SHARES, minAmount: lessBps(q.expectedShares, 50) })
+    const farm = vault(account(), { skipFarm: false })
+    await farm.p.quoteSupply({ amount: 1_500_000n })
+    expect(farm.acc.guards.at(-1)!.guard.expect.tokenIn).toBeUndefined()
   })
 })

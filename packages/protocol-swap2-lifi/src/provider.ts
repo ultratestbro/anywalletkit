@@ -1,5 +1,6 @@
 import {LIFI_SOLANA_CAIP2, lifi as lifiCfg} from "./config.js";
 import {describeLifiActivity} from "./activity.js";
+import {diamondCallMismatch} from "./calldata.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
 import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
@@ -299,7 +300,12 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
       if (!fromToken) return null;
 
       const solanaSource = isSolana(params.sourceChain);
-      const fromAddress = params.refundAddress ?? (solanaSource ? SOLANA_PLACEHOLDER : EVM_PLACEHOLDER);
+      // The placeholders price a dry quote; a live one is built for real addresses only (round 3, H8).
+      const dry = params.dry !== false;
+      const fromAddress = params.refundAddress || (dry ? (solanaSource ? SOLANA_PLACEHOLDER : EVM_PLACEHOLDER) : "");
+      const toAddress = params.destAddress || (dry ? fromAddress : "");
+      if (!fromAddress) return reject("a live quote needs the sender's address");
+      if (!toAddress) return reject("a live quote needs a recipient");
 
       // LI.FI applies `slippage` to EACH step of a multi-step route (bridge +
       // destination swap), so its minimum can sit ~2× the requested slippage
@@ -323,7 +329,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
               toTokenAddress: nativeFor(params.destChain, params.destToken),
               fromAmount: params.amountIn,
               fromAddress,
-              toAddress: params.destAddress || fromAddress,
+              toAddress,
               options: {slippage: slippageBps / 10_000, ...(integrator().trim() ? {integrator: integrator().trim()} : {})},
             }),
             signal: signal ?? timeoutSignal(8_000),
@@ -346,7 +352,6 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         url.searchParams.set("toToken", nativeFor(params.destChain, params.destToken));
         url.searchParams.set("fromAmount", params.amountIn);
         url.searchParams.set("fromAddress", fromAddress);
-        const toAddress = params.destAddress || fromAddress;
         url.searchParams.set("toAddress", toAddress);
         const integratorId = integrator().trim();
         if (integratorId) url.searchParams.set("integrator", integratorId);
@@ -541,6 +546,15 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         if (fromChain === toChain && duration > SAME_CHAIN_MAX_SECONDS) {
           params.onRefusal?.(`lifi: same-chain route settles asynchronously (${duration} s via ${(q as {tool?: string}).tool ?? "unknown tool"}) — a same-chain swap must deliver in the same transaction`);
           return null;
+        }
+        // The calldata is what gets signed: it must pay the reviewed recipient at least the reviewed
+        // minimum, in the requested tokens (round 3, H9).
+        if (!solanaSource) {
+          const why = diamondCallMismatch(tr.data!, {
+            fromToken, toToken: expectedToToken, amountIn: BigInt(params.amountIn), receiver: toAddress, minOut: BigInt(minDestAmount),
+            destChainId: BigInt(toChain), sameChain: fromChain === toChain, evmDestination: !isSolana(params.destChain),
+          });
+          if (why) return reject(`the transaction does not match the quote: ${why}`);
         }
         return {
           provider: "lifi",

@@ -48,6 +48,7 @@
   },
   "devDependencies": {
     "@anywalletkit/wallet-evm": "workspace:*",
+    "@anywalletkit/wallet-ton": "workspace:*",
     "vitest": "^5.0.3",
     "viem": "^2.57.2"
   },

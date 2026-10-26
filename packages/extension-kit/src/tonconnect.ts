@@ -3,6 +3,12 @@
  * the bytes `ton_proof` and `signData` sign, error codes. The wallet side (keys,
  * sheet, broadcast) lives in the extension; nothing here touches a key.
  *
+ * To SIGN, use `WalletAccountTon.signTonProof` / `signTonConnectData` (wallet-ton):
+ * they build the same digests from the request and the account's own address.
+ * `account.sign()` refuses these 32-byte digests — 32 raw bytes may as well be the
+ * hash of a transfer — so the functions here are for checking a proof, not for
+ * feeding `sign()`.
+ *
  * ton_proof (docs.ton.org/develop/dapps/ton-connect/sign):
  *   message = sha256(0xffff ‖ "ton-connect" ‖ sha256(
  *     "ton-proof-item-v2/" ‖ workchain:int32BE ‖ address_hash:32 ‖
@@ -101,7 +107,7 @@ const uint64LE = (n: number) => { const b = new Uint8Array(8); new DataView(b.bu
 const uint64BE = (n: number) => { const b = new Uint8Array(8); new DataView(b.buffer).setBigUint64(0, BigInt(n), false); return b }
 const concat = (...parts: Uint8Array[]) => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let o = 0; for (const p of parts) { out.set(p, o); o += p.length } return out }
 
-/** The bytes a wallet signs for `ton_proof` (already hashed — sign them raw with ed25519). */
+/** The 32-byte digest a wallet signs for `ton_proof` — to verify a proof; sign with `WalletAccountTon.signTonProof`. */
 export function tonProofMessage(input: { address: TonAddressParts; domain: string; timestamp: number; payload: string }): Uint8Array {
   if (input.address.hash.length !== 32) throw new TonConnectError(TONCONNECT_ERRORS.unknown, 'address hash must be 32 bytes')
   const domain = utf8(input.domain)
@@ -109,7 +115,7 @@ export function tonProofMessage(input: { address: TonAddressParts; domain: strin
   return sha256(concat(new Uint8Array([0xff, 0xff]), utf8('ton-connect'), sha256(inner)))
 }
 
-/** The bytes a wallet signs for `signData` (text / binary). */
+/** The 32-byte digest a wallet signs for `signData` (text / binary) — to verify; sign with `WalletAccountTon.signTonConnectData`. */
 export function tonSignDataMessage(input: { address: TonAddressParts; domain: string; timestamp: number; payload: TonSignDataPayload }): Uint8Array {
   if (input.address.hash.length !== 32) throw new TonConnectError(TONCONNECT_ERRORS.unknown, 'address hash must be 32 bytes')
   const domain = utf8(input.domain)

@@ -23,8 +23,8 @@ export const SOLANA_OFFCHAIN_MESSAGE_PREFIX: Uint8Array = Uint8Array.from([0xff,
 export class MessageIsTransactionError extends SignerError {
   /** Machine-readable code. */
   readonly code = 'message-is-transaction'
-  constructor() {
-    super('This message is a Solana transaction; use signTransaction so it can be reviewed.')
+  constructor(message = 'This message is a Solana transaction; use signTransaction so it can be reviewed.') {
+    super(message)
     this.name = 'MessageIsTransactionError'
   }
 }

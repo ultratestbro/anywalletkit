@@ -55,6 +55,7 @@
   },
   "devDependencies": {
     "@types/node": "^22",
+    "viem": "^2.57.2",
     "vitest": "^5.0.3",
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/core": "workspace:*"

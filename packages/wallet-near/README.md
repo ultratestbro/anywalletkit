@@ -25,7 +25,7 @@ const account = await wallet.getAccount(0)          // implicit account: 64-hex 
 await account.transfer({ recipient: 'alice.near', amount: 10n ** 24n })                              // 1 NEAR (yocto)
 await account.transfer({ token: 'usdt.tether-token.near', recipient: 'alice.near', amount: 1_000_000n, memo: 'rent' }) // NEP-141
 await account.sendTransaction({ receiverId: 'wrap.near', actions: [{ functionCall: { methodName: 'near_deposit', args: {}, gas: 30n * 10n ** 12n, deposit: 10n ** 24n } }] })
-const sig = await account.sign('hello')             // "ed25519:<base58>" over the raw bytes
+const sig = await account.sign('hello')             // "ed25519:<base58>" over the raw bytes; 32 bytes are refused (MessageIsTransactionError: a tx hash)
 const nep413 = await account.signNep413({ message, nonce, recipient: 'intents.near' }) // what NEAR Intents / dApps ask for
 const named = await wallet.getNamedAccount('alice.near') // same key, bound to a named account
 wallet.dispose()

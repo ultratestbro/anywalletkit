@@ -68,7 +68,8 @@ const tk = await WalletManagerTon.fromTonMnemonic(words, { tonClient })
 
 The account never holds a key. Every signature is a `signer.sign(bytes, {scheme: 'ed25519', context})`
 call: `ton-external` over the hash of the V5R1 signing cell (after the preflight, which runs on a
-zero-signed body), `ton-message` over raw message bytes (`sign()`, ton_proof). Seed wallets get a
+zero-signed body), `ton-message` over raw message bytes (`sign()`), `ton-proof` / `ton-sign-data`
+over the TON Connect digests (`signTonProof`, `signTonConnectData`). Seed wallets get a
 `LocalSigner`; a hardware wallet, MPC node or backend is wrapped with `externalSigner()` from
 `@anywalletkit/core`:
 
@@ -81,6 +82,21 @@ const account = await manager.getAccount() // path 'external'; other indexes thr
 A derivable `SeedSigner` at `m/44'/607'` yields `getAccount(i)` children; a leaf signer (including
 `fromTonMnemonic`) is one account. `WalletAccountTon.fromPrivateKey(priv, pub, path)` keeps the
 raw-key shape for callers that derive themselves.
+
+## Messages and TON Connect
+
+`sign(message)` is a hex ed25519 signature over the raw bytes. A 32-byte message — bytes or a
+string that encodes to 32 bytes — is refused with `MessageIsTransactionError`: the wallet contract
+checks a transfer's signature over the 32-byte hash of its signing cell, so 32 raw bytes may be a
+transfer. TON Connect has its own methods, which build the digest from the request and the
+account's own address (0xffff ‖ "ton-connect…", never a cell hash):
+
+```ts
+const proof = await account.signTonProof({ domain: 'app.example', timestamp, payload })  // the `proof` of a ton_proof reply
+const reply = await account.signTonConnectData({ domain: 'app.example', timestamp, payload: { type: 'text', text } }) // signData (text | binary)
+```
+
+`domain` is the host the wallet saw the request come from, never the dApp's own claim.
 
 ## Describe
 

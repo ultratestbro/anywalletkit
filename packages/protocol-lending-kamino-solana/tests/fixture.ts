@@ -10,7 +10,9 @@ export const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
 export const SOL = 'So11111111111111111111111111111111111111112'
 export const PYUSD = '2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo'
 export const VAULT = 'HDsayqAsDWy3QvANGqh2yNraqcD8Fnjgh73Mhb3WRS5E'
-export const SHARES = 'CKTEDx5z19CntAB9B66AxuS98S1NuCgMvfpsew7TQwi'
+// The vault's shares mint as the kVault program derives it: ["shares", VAULT].
+export const SHARES = '7D8C5pDFxug58L9zkwK7bCiDg4kD4AygzbcZUmf5usHS'
+export const FARM = 'CKTEDx5z19CntAB9B66AxuS98S1NuCgMvfpsew7TQwi'
 export const MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF'
 export const USDC_RESERVE = 'D6q6wuQSrifJKZYpR1M8R4YawnLDtDsMmWM1NbBmgJ59'
 export const USDC_RESERVE_SMALL = 'AWnKJ9dsiHcoDCThxE5E93ikDTAXkApoNwrKM2tp9KFJ'
@@ -70,7 +72,7 @@ export const vaultRow = {
     name: 'Steakhouse USDC', tokenMint: USDC, tokenMintDecimals: 6, tokenProgram: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
     sharesMint: SHARES, sharesMintDecimals: 6, tokenAvailable: '80843116919', sharesIssued: '18699216460837',
     minDepositAmount: '1000', minWithdrawAmount: '1000', performanceFeeBps: 500, managementFeeBps: 0,
-    vaultFarm: '7D8C5pDFxug58L9zkwK7bCiDg4kD4AygzbcZUmf5usHS', vaultLookupTable: '9p2oT9J6BojHigd3V5qXzrwsQf4dtgMgLxtrzLVR3rwu',
+    vaultFarm: FARM, vaultLookupTable: '9p2oT9J6BojHigd3V5qXzrwsQf4dtgMgLxtrzLVR3rwu',
     vaultAllocationStrategy: [
       { reserve: USDC_RESERVE, targetAllocationWeight: 9000, tokenAllocationCap: '1000000000000000', ctokenAllocation: '12345' },
       { reserve: USDC_RESERVE_SMALL, targetAllocationWeight: 0, tokenAllocationCap: '1000000000000000', ctokenAllocation: '1' },
@@ -112,6 +114,8 @@ export interface FakeApi {
   routes: Map<string, { status: number; body: unknown }>
   position: { stakedShares: string; unstakedShares: string; totalShares: string } | null
   obligations: unknown
+  /** What `/kvaults/vaults/<VAULT>` answers (default: the recorded row). */
+  vault?: unknown
 }
 
 export function api(): FakeApi {
@@ -128,7 +132,7 @@ export function api(): FakeApi {
       if (path === '/v2/kamino-market') return reply(200, markets)
       if (path === `/kamino-market/${MARKET}/reserves/metrics`) return reply(200, reserves)
       if (path === '/kvaults/vaults') return reply(200, [vaultRow])
-      if (path === `/kvaults/vaults/${VAULT}`) return reply(200, vaultRow)
+      if (path === `/kvaults/vaults/${VAULT}`) return reply(200, f.vault ?? vaultRow)
       if (path === `/kvaults/vaults/${VAULT}/metrics`) return reply(200, vaultMetrics)
       if (path === `/kvaults/users/${USER}/positions/${VAULT}`) return f.position ? reply(200, { vaultAddress: VAULT, ...f.position }) : reply(404, { metadata: 'Account could not be found' })
       if (path === `/kamino-market/${MARKET}/users/${USER}/obligations`) return reply(200, f.obligations)

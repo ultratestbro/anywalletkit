@@ -1,11 +1,22 @@
 import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
+import { Buffer } from 'buffer'
 import { Cell } from '@ton/core'
-import { SimulationError, UnsafeTransactionError } from './errors.js'
+import { MessageIsTransactionError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { tonProofDigest, tonSignDataDigest, type TonProof, type TonProofRequest, type TonSignDataRequest, type TonSignedData } from './tonconnect.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'
 import { v5r1ExternalMessage, v5r1PackSigned, v5r1PackUnsigned, type V5R1Message } from './wallet-v5r1.js'
 import type { TonConfig, TonSendable, TonTransferOptions } from './types.js'
 
 const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
+
+/** Does `bytes` carry `key` anywhere? A Solana transaction names each signer's 32-byte key. */
+const carriesKey = (bytes: Uint8Array, key: Uint8Array): boolean => {
+  outer: for (let i = 0; i + key.length <= bytes.length; i++) {
+    for (let j = 0; j < key.length; j++) if (bytes[i + j] !== key[j]) continue outer
+    return true
+  }
+  return false
+}
 
 /**
  * Signing TON account on Wallet V5R1. It never holds a key: the V5R1 body is
@@ -45,10 +56,47 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     return m ? Number(m[1]) : undefined
   }
 
-  /** Hex ed25519 signature over the raw message bytes (ton_proof and the like). */
+  /**
+   * Hex ed25519 signature over the raw message bytes. A 32-byte message — string or bytes — is
+   * refused with {@link MessageIsTransactionError}: the wallet contract checks a transfer's
+   * signature over the 32-byte hash of its signing cell, so those bytes could be one. Bytes that
+   * carry this account's public key are refused as well: one ed25519 key (an external signer) may
+   * also be a Solana wallet, and a Solana transaction names its signer's key. TON Connect goes
+   * through {@link signTonProof} and {@link signTonConnectData}.
+   */
   async sign(message: string | Uint8Array): Promise<string> {
     const bytes = typeof message === 'string' ? new TextEncoder().encode(message) : message
+    if (bytes.length === 32 || carriesKey(bytes, this.publicKey)) throw new MessageIsTransactionError()
     return toHex(await this.signer.sign(bytes, { scheme: 'ed25519', context: 'ton-message' }))
+  }
+
+  /**
+   * TON Connect `ton_proof` for this wallet's address: the `proof` object of the connect reply. The
+   * digest is built here (0xffff ‖ "ton-connect" ‖ …), so no request can turn it into a transfer.
+   * `domain` is the host the wallet saw the request come from.
+   */
+  async signTonProof(request: TonProofRequest): Promise<TonProof> {
+    const digest = tonProofDigest(this._address, request)
+    const signature = await this.signer.sign(digest, { scheme: 'ed25519', context: 'ton-proof' })
+    return {
+      timestamp: request.timestamp,
+      domain: { lengthBytes: new TextEncoder().encode(request.domain).length, value: request.domain },
+      payload: request.payload,
+      signature: Buffer.from(signature).toString('base64'),
+    }
+  }
+
+  /** TON Connect `signData` (text / binary) for this wallet's address: the reply the dApp gets. */
+  async signTonConnectData(request: TonSignDataRequest): Promise<TonSignedData> {
+    const digest = tonSignDataDigest(this._address, request)
+    const signature = await this.signer.sign(digest, { scheme: 'ed25519', context: 'ton-sign-data' })
+    return {
+      signature: Buffer.from(signature).toString('base64'),
+      address: this._address.toRawString(),
+      timestamp: request.timestamp,
+      domain: request.domain,
+      payload: request.payload.type === 'text' ? { type: 'text', text: request.payload.text } : { type: 'binary', bytes: request.payload.bytes },
+    }
   }
 
   private checkMaxFee(fee: bigint, limit: bigint | number | undefined, op: string) {
@@ -59,7 +107,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
    * Checks → seqno → preflight → signed body. The preflight runs on the
    * zero-signed body (ignore_chksig), so nothing is signed before it passes.
    */
-  private async prepare(messages: V5R1Message[], limit: bigint | number | undefined, op: string): Promise<{ body: Cell; fee: bigint }> {
+  private async signMessages(messages: V5R1Message[], limit: bigint | number | undefined, op: string): Promise<{ body: Cell; fee: bigint }> {
     // The wallet sends with IGNORE_ERRORS: a message whose value exceeds the
     // balance is silently dropped by the action phase — the external still
     // "succeeds", the seqno moves, the fee is paid and nothing leaves
@@ -101,7 +149,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
       await this.preflight(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
       return tx.toBoc().toString('base64')
     }
-    const { body } = await this.prepare(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction')
+    const { body } = await this.signMessages(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return body.toBoc().toString('base64')
   }
 
@@ -117,7 +165,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     this.requireRpc('send transactions')
     const { body, fee } = tx instanceof Cell
       ? { body: tx, fee: await this.preflight(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction') }
-      : await this.prepare(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction')
+      : await this.signMessages(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return { hash: await this.broadcast(body), fee }
   }
 
@@ -125,7 +173,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   async transfer(o: TonTransferOptions, writeOptions: WriteOptions = {}): Promise<TransferResult> {
     this.requireRpc('transfer tokens')
     const message = o.token ? await this.jettonTransferMessage(o) : this.transactionMessage({ to: o.recipient, value: o.amount, ...(o.memo !== undefined ? { body: o.memo } : {}) })
-    const { body, fee } = await this.prepare([message], feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
+    const { body, fee } = await this.signMessages([message], feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
     return { hash: await this.broadcast(body), fee }
   }
 

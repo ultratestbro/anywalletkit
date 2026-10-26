@@ -3,12 +3,23 @@ import { WITHDRAW_ALL, type ApiVault, type ApiVaultMetrics } from './api.js'
 import { divWadUp, fromDecimalString, lessBps, mulWad, toAmount, toDecimalString, toWad, type AmountOption } from './amounts.js'
 import { KaminoBase, type Expectation, type KaminoBaseConfig } from './base.js'
 import { KaminoError } from './errors.js'
+import { vaultSharesMint } from './pda.js'
+import { KVAULT_PROGRAM } from './programs.js'
 
 export interface KaminoVaultConfig extends KaminoBaseConfig {
   /** The Earn vault (kVault) address. */
   vault: string
-  /** Keep the shares in the wallet instead of staking them in the vault farm (default false — staked, as the Kamino app does). */
+  /**
+   * Keep the shares in the wallet (default true). The guard then proves the shares arrive. With
+   * `false` they are staked in the vault farm, as the Kamino app does: they never reach the wallet,
+   * so the guard can only bound what leaves it, and the deposit's destination relies on the API.
+   */
   skipFarm?: boolean
+  /**
+   * The mint the vault takes and pays out. The API's answer must name it; `supply` needs it here or
+   * as its `token`, so a changed API answer cannot make the wallet deposit another asset.
+   */
+  asset?: string
 }
 
 export interface KaminoVaultSupplyOptions extends Omit<SupplyOptions, 'token'> { token?: string }
@@ -55,7 +66,7 @@ export interface VaultWithdrawQuote extends LendingQuote { shares: bigint; expec
 
 /**
  * A Kamino Earn vault (kVault) as a `LendingProtocol`: `supply` deposits the
- * vault's asset for shares (staked in the vault farm unless `skipFarm`),
+ * vault's asset for shares (kept in the wallet; staked in the vault farm with `skipFarm: false`),
  * `withdraw` redeems shares for the asset; `borrow` / `repay` reject, a vault
  * does not lend to its depositors.
  *
@@ -75,10 +86,36 @@ export class KaminoVaultProtocolSolana extends KaminoBase<KaminoVaultConfig> {
     this.vault = config.vault
   }
 
-  /** The vault's static state (cached per instance). */
+  /** Shares stay in the wallet unless the app opts into the farm (round 3 review: only then can the guard prove them). */
+  private get skipFarm(): boolean {
+    return this._config.skipFarm !== false
+  }
+
+  /**
+   * The vault's static state (cached per instance), checked against what the API cannot choose: it is
+   * this vault, on the kVault program, its shares mint is the one the program derives for it, and it
+   * takes the configured asset. Mint decimals come from the chain when the account can read them
+   * (round 3, H7: a changed `sharesMint` turned the withdraw guard into a pass for any token).
+   */
   protected state(): Promise<ApiVault> {
-    if (!this._vault) this._vault = this.api.getVault(this.vault).catch((e) => { this._vault = null; throw e })
+    if (!this._vault) this._vault = this.api.getVault(this.vault).then((v) => this.verified(v)).catch((e) => { this._vault = null; throw e })
     return this._vault
+  }
+
+  private async verified(v: ApiVault): Promise<ApiVault> {
+    const refuse = (what: string) => { throw new KaminoError(`Kamino's answer for vault ${this.vault} does not hold up: ${what}.`) }
+    if (v.address !== this.vault) refuse(`it describes ${v.address}`)
+    if (v.programId !== KVAULT_PROGRAM) refuse(`program ${v.programId} is not the kVault program`)
+    const shares = vaultSharesMint(this.vault, KVAULT_PROGRAM)
+    if (v.sharesMint !== shares) refuse(`shares mint ${v.sharesMint} is not the vault's (${shares})`)
+    if (v.tokenMint === v.sharesMint) refuse('the asset is the shares mint')
+    const asset = this._config.asset
+    if (asset !== undefined && v.tokenMint !== asset) refuse(`it takes ${v.tokenMint}, not the configured ${asset}`)
+    if (typeof this.surface().getMintInfo === 'function') {
+      const [td, sd] = await Promise.all([this.decimals(v.tokenMint), this.decimals(v.sharesMint)])
+      if (td !== v.tokenMintDecimals || sd !== v.sharesMintDecimals) refuse(`mint decimals ${v.tokenMintDecimals} / ${v.sharesMintDecimals} are ${td} / ${sd} on chain`)
+    }
+    return v
   }
 
   private info(v: ApiVault, m: ApiVaultMetrics): VaultInfo {
@@ -130,17 +167,20 @@ export class KaminoVaultProtocolSolana extends KaminoBase<KaminoVaultConfig> {
 
   private async plan(o: KaminoVaultSupplyOptions, me: string): Promise<{ base64: string; v: ApiVault; amount: bigint; expectedShares: bigint }> {
     const amount = toAmount(o.amount)
+    // What the wallet deposits is named by the caller, never only by the API.
+    const token = o.token ?? this._config.asset
+    if (token === undefined) throw new KaminoError(`Name the asset to deposit: pass 'token' or set 'asset' in the vault config.`)
     const [v, m] = await Promise.all([this.state(), this.api.getVaultMetrics(this.vault)])
-    if (o.token && o.token !== v.tokenMint) throw new KaminoError(`Vault ${this.vault} takes ${symbolOf(v)} (${v.tokenMint}), not ${o.token}.`)
+    if (token !== v.tokenMint) throw new KaminoError(`Vault ${this.vault} takes ${symbolOf(v)} (${v.tokenMint}), not ${token}.`)
     if (amount < v.minDepositAmount) throw new KaminoError(`Deposit below the vault minimum: ${amount} < ${v.minDepositAmount} base units.`)
-    const base64 = await this.api.buildVaultDeposit({ wallet: me, kvault: this.vault, amount: toDecimalString(amount, v.tokenMintDecimals), skipFarm: this._config.skipFarm, memo: this.memo() })
+    const base64 = await this.api.buildVaultDeposit({ wallet: me, kvault: this.vault, amount: toDecimalString(amount, v.tokenMintDecimals), skipFarm: this.skipFarm, memo: this.memo() })
     return { base64, v, amount, expectedShares: this.assetsToShares(amount, v, toWad(m.tokensPerShare)) }
   }
 
   private supplyExpectation(v: ApiVault, amount: bigint, expectedShares: bigint) {
     const e = this.spendExpectation(v.tokenMint, amount)
     // Shares that stay in the wallet are proven in; staked shares land in the farm, so only the spend is bounded.
-    return this._config.skipFarm ? { ...e, tokenIn: { mint: v.sharesMint, minAmount: lessBps(expectedShares, this.slippageBps) } } : e
+    return this.skipFarm ? { ...e, tokenIn: { mint: v.sharesMint, minAmount: lessBps(expectedShares, this.slippageBps) } } : e
   }
 
   override async quoteSupply(o: KaminoVaultSupplyOptions): Promise<VaultSupplyQuote> {

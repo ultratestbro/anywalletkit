@@ -24,6 +24,11 @@
     "lint": "eslint src",
     "verify:live": "node scripts/verify-live.mjs"
   },
+  "dependencies": {
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0"
+  },
   "peerDependencies": { "@anywalletkit/core": "workspace:*" },
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",

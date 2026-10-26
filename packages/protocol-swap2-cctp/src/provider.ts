@@ -183,7 +183,9 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
       if (!/^\d+$/.test(params.amountIn)) return null;
       const amount = BigInt(params.amountIn);
       if (amount <= 0n) return null;
-      const recipient = params.destAddress || EVM_PLACEHOLDER;
+      // The placeholder prices a dry quote; a live one without a recipient would mint to it (round 3, H8).
+      const recipient = params.destAddress || (params.dry !== false ? EVM_PLACEHOLDER : "");
+      if (!recipient) { params.onRefusal?.("a live quote needs a recipient"); return null; }
       if (!isAddress(recipient)) { params.onRefusal?.("destination must be an EVM address"); return null; }
 
       try {

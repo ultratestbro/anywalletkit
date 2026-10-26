@@ -224,9 +224,13 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
       if (!/^\d+$/.test(params.amountIn)) return refuse("amount must be a base-unit integer");
       const amount = BigInt(params.amountIn);
       if (amount <= 0n) return refuse("amount must be positive");
-      const recipient = params.destAddress || EVM_PLACEHOLDER;
+      // The placeholder prices a dry quote; a live one without addresses would send there (round 3, H8).
+      const dry = params.dry !== false;
+      const recipient = params.destAddress || (dry ? EVM_PLACEHOLDER : "");
+      if (!recipient) return refuse("a live quote needs a recipient");
       if (!isAddress(recipient)) return refuse("destination must be an EVM address");
-      const refund = params.refundAddress || EVM_PLACEHOLDER;
+      const refund = params.refundAddress || (dry ? EVM_PLACEHOLDER : "");
+      if (!refund) return refuse("a live quote needs a refund address");
       if (!isAddress(refund)) return refuse("refund address must be an EVM address");
       const c = client(src.caip2);
       if (!c) return refuse(`no RPC configured for ${src.caip2}`);

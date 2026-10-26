@@ -14,6 +14,20 @@ export class UnsafeTransactionError extends SignerError {
   }
 }
 
+/**
+ * `sign()` refused a 32-byte message: the wallet contract checks a transfer's signature over the
+ * 32-byte hash of its signing cell, so a signature over 32 raw bytes may authorise one. TON Connect
+ * proofs and signData go through `signTonProof` / `signTonConnectData`; transactions through
+ * `signTransaction` / `sendTransaction`, where they are reviewed.
+ */
+export class MessageIsTransactionError extends SignerError {
+  readonly code = 'message-is-transaction'
+  constructor() {
+    super('This message has the shape of a transaction (a 32-byte TON hash, or bytes naming this key as a Solana signer) and is not signed; use signTonProof / signTonConnectData for TON Connect, or signTransaction so it can be reviewed.')
+    this.name = 'MessageIsTransactionError'
+  }
+}
+
 /** Emulation of the external message failed (non-zero compute exit, aborted, action phase failed); nothing was signed or sent. */
 export class SimulationError extends Error {
   readonly exitCode: number | undefined

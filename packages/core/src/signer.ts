@@ -33,7 +33,12 @@
  * | `solana-message`  | Solana | ed25519             | compiled transaction message bytes        |
  * | `solana-offchain` | Solana | ed25519             | off-chain message bytes                   |
  * | `ton-external`    | TON    | ed25519             | hash of the V5R1 signing cell             |
- * | `ton-message`     | TON    | ed25519             | message bytes (ton_proof etc.)            |
+ * | `ton-message`     | TON    | ed25519             | message bytes (never 32 bytes)            |
+ * | `ton-proof`       | TON    | ed25519             | TON Connect ton_proof digest              |
+ * | `ton-sign-data`   | TON    | ed25519             | TON Connect signData digest               |
+ * | `near-tx`         | NEAR   | ed25519             | sha256(borsh(transaction))                |
+ * | `near-message`    | NEAR   | ed25519             | message bytes (never 32 bytes)            |
+ * | `near-nep413`     | NEAR   | ed25519             | NEP-413 digest                            |
  */
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js'

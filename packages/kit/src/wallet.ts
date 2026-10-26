@@ -1,6 +1,6 @@
 import { copyBytes, isValidSeedPhrase, normalizeMnemonic, seedFromMnemonicSync, zeroize, type ActivityItem, type ChainTx, type DescribeActivityContext, type HistorySource, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type WalletManager } from '@anywalletkit/core'
 import { isConcreteChain, sameChain } from './chain-id.js'
-import { applyPolicies, type Policies } from './policies.js'
+import { applyPolicies, guardReturned, isSignerLike, type Policies } from './policies.js'
 import { buildFeed, describeSingle, type ActivityOptions, type ActivityRecognizer, type FeedAddress, type FeedItem, type HistoryFeedPage, type HistoryFeedQuery } from './activity/feed.js'
 import type { IntentJournal } from './activity/journal.js'
 
@@ -30,6 +30,11 @@ export interface WalletOptions {
  * serializing a Wallet shows no secret. Zeroized and dropped by `dispose()`.
  */
 const WALLET_SEEDS = new WeakMap<object, Uint8Array>()
+/**
+ * What `getManager` hands out of a manager: its public reads and account getters, nothing else —
+ * not its seed or signer accessors, not its account cache, not `dispose` (the wallet owns it).
+ */
+const MANAGER_SURFACE: ReadonlySet<string> = new Set(['getAccount', 'getAccountByPath', 'getNamedAccount', 'getReadOnlyAccount', 'getFeeRates', 'basePath'])
 
 type Describer = { describeActivity?: (tx: ChainTx, ctx: DescribeActivityContext) => ActivityItem | null }
 
@@ -62,6 +67,7 @@ export class Wallet {
   private readonly _protocolInstances = new Map<string, unknown>()
   private readonly _historySources = new Map<string, HistorySource>()
   private readonly _guarded = new WeakMap<object, Map<string, IWalletAccount>>()
+  private readonly _guardedManagers = new WeakMap<object, object>()
   private readonly _activity: ActivityOptions
   private _journal: IntentJournal | undefined
 
@@ -126,12 +132,48 @@ export class Wallet {
     throw new Error(`No wallet registered for chain "${chain}" (registered: ${this.chains.join(', ') || 'none'}).`)
   }
 
-  /** The chain package's manager (lazily constructed). */
-  getManager<M extends WalletManager<IWalletAccount, object> = WalletManager<IWalletAccount, object>>(chain: string): M {
+  /** The chain package's manager, unguarded (lazily constructed). */
+  private manager(chain: string): WalletManager<IWalletAccount, object> {
     if (this._disposed) throw new Error('This wallet has been disposed.')
     const reg = this.registration(chain)
     reg.manager ??= new reg.Manager(WALLET_SEEDS.get(this) ?? this._signer!, reg.config)
-    return reg.manager as M
+    return reg.manager
+  }
+
+  /**
+   * The chain package's manager (lazily constructed), behind the wallet's policies: every account
+   * it hands out (`getAccount`, `getAccountByPath`, `getNamedAccount`…) is wrapped as
+   * {@link getAccount} wraps it, and its seed and signer accessors (`seedBytes`, `externalSigner`,
+   * `_`-prefixed state) are not reachable through it (round 3, H3).
+   */
+  getManager<M extends WalletManager<IWalletAccount, object> = WalletManager<IWalletAccount, object>>(chain: string): M {
+    const manager = this.manager(chain)
+    let guarded = this._guardedManagers.get(manager)
+    if (!guarded) {
+      const surface = (prop: string | symbol) => typeof prop === 'string' && MANAGER_SURFACE.has(prop)
+      guarded = new Proxy(manager, {
+        get: (target, prop, receiver) => {
+          if (!surface(prop)) return undefined
+          const v = Reflect.get(target, prop, target)
+          if (isSignerLike(v)) return undefined
+          if (typeof v !== 'function') return v
+          const method = v as (...args: unknown[]) => unknown
+          return (...args: unknown[]) => guardReturned(method.apply(target, args), (a) => (a as object) === target ? receiver : this.guard(a, chain))
+        },
+        has: (_target, prop) => surface(prop),
+        getOwnPropertyDescriptor: (target, prop) => {
+          const d = Reflect.getOwnPropertyDescriptor(target, prop)
+          return d && !d.configurable ? d : undefined
+        },
+        ownKeys: (target) => Reflect.ownKeys(target).filter((k) => !Reflect.getOwnPropertyDescriptor(target, k)?.configurable),
+        set: () => false,
+        defineProperty: () => false,
+        deleteProperty: () => false,
+        setPrototypeOf: () => false,
+      })
+      this._guardedManagers.set(manager, guarded)
+    }
+    return guarded as M
   }
 
   /**
@@ -141,7 +183,11 @@ export class Wallet {
    * reads (the address is the same across a family) keep working, so history and activity do.
    */
   async getAccount<A extends IWalletAccount = IWalletAccount>(chain: string, index = 0): Promise<A> {
-    const account = (await this.getManager(chain).getAccount(index)) as A
+    return this.guard((await this.manager(chain).getAccount(index)) as A, chain)
+  }
+
+  /** `account` behind the wallet's policies for `chain` — one wrapper per account and chain. */
+  private guard<A extends IWalletAccount>(account: A, chain: string): A {
     // One wrapper per account and asked-for chain: the same object every call, as the account is.
     let byChain = this._guarded.get(account)
     const cached = byChain?.get(chain)

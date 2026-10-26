@@ -17,6 +17,7 @@ export {
 } from './describe.js'
 export { WalletAccountReadOnlyTon, SEND_MODE } from './read-only-account.js'
 export { WalletAccountTon } from './account.js'
+export { tonProofDigest, tonSignDataDigest, type TonProof, type TonProofRequest, type TonSignDataPayload, type TonSignDataRequest, type TonSignedData, type TonAddressParts } from './tonconnect.js'
 export { WalletManagerTon, TON_BASE_PATH, TON_MNEMONIC_PATH } from './manager.js'
 export {
   createTonHistory, mapTonapiEvent, mapToncenterTransaction, mapActions as mapTonapiActions, valueFlowTransfers, rawTonAddress, tonExplorerTxUrl, HistoryUnavailableError,

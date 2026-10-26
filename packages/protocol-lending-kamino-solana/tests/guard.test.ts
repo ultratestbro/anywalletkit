@@ -21,6 +21,7 @@ const ATA_RENT = 2_039_280n
 const SOL = 1_000_000_000n
 const ONE_SHARE = 1_000_000n
 const ASSETS = 1_062_780n // 1 share × tokensPerShare 1.06278…
+const MINTS = { [SHARES]: 6, [USDC]: 6 }
 
 type State = { lamports: bigint; owner: string; data: Uint8Array } | null
 const pk = (a: string) => getAddressEncoder().encode(a as Address) as Uint8Array
@@ -44,7 +45,13 @@ function fakeRpc(pre: Record<string, State>, post: Record<string, State>) {
       return { value: { err: null, unitsConsumed: 200_000n, logs: [], accounts: addrs.map((a) => toRpc(post[a] ?? null)) } }
     },
     getFeeForMessage: () => ({ value: FEE }),
-    getAccountInfo: () => ({ value: null }),
+    // SPL mints (decimals at byte 44): the module checks the API's decimals against them.
+    getAccountInfo: (a) => {
+      const decimals = (MINTS as Record<string, number>)[a as string]
+      if (decimals === undefined) return { value: null }
+      const data = new Uint8Array(82); data[44] = decimals; data[45] = 1
+      return { value: { lamports: 1n, owner: TOKEN_PROGRAM_ADDRESS, data: [Buffer.from(data).toString('base64'), 'base64'], executable: false, rentEpoch: 0n, space: 82n } }
+    },
     sendTransaction: (w) => { sent.push(w as string); return 'S'.repeat(87) },
   }
   const rpc = new Proxy({} as SolanaRpc, { get: (_t, m: string) => (...args: unknown[]) => ({ send: async () => { const h = handlers[m]; if (!h) throw new Error(`unmocked ${m}`); return h(...args) } }) })

@@ -17,21 +17,40 @@ const SHORT_IDS: Readonly<Record<string, string>> = Object.freeze({
   'bitcoin:regtest': 'bip122:0f9188f13cb7b2c71f2a335e3a4fc328',
 })
 
+/** Namespaces catalogs spell differently from the accounts: `bitcoin` (catalog ids) is `bip122`. */
+const NAMESPACE_ALIASES: Readonly<Record<string, string>> = Object.freeze({ bitcoin: 'bip122' })
+
+/** The namespace accounts report for `ns` (`bitcoin` → `bip122`). */
+export function canonicalNamespace(ns: string): string {
+  return NAMESPACE_ALIASES[ns] ?? ns
+}
+
 /** The id an account of this network reports (Tron and EVM references in one numeric form). */
 function canonicalChainId(chain: string): string {
-  const id = SHORT_IDS[chain] ?? chain
+  const id = SHORT_IDS[chain] ?? SHORT_IDS[chain.toLowerCase()] ?? chain
   const i = id.indexOf(':')
-  const ns = id.slice(0, i)
+  if (i < 0) return canonicalNamespace(id)
+  const ns = canonicalNamespace(id.slice(0, i))
   const ref = id.slice(i + 1)
-  if (ns === 'eip155' && /^\d{1,30}$/.test(ref)) return `eip155:${BigInt(ref)}`
+  if (ns === 'eip155' && /^(\d{1,30}|0x[0-9a-f]{1,30})$/i.test(ref)) return `eip155:${BigInt(ref)}`
   if (ns === 'tron' && /^\d{1,30}$/.test(ref)) return `tron:0x${BigInt(ref).toString(16).padStart(8, '0')}`
   if (ns === 'tron' && /^0x[0-9a-f]{1,30}$/i.test(ref)) return `tron:0x${BigInt(ref).toString(16).padStart(8, '0')}`
-  return id
+  return `${ns}:${ref}`
 }
 
 /** Do two CAIP-2 ids name the same network (`solana:mainnet` = `solana:5eykt…`, `tron:728126428` = `tron:0x2b6653dc`)? */
 export function sameChain(a: string, b: string): boolean {
   return canonicalChainId(a) === canonicalChainId(b)
+}
+
+/**
+ * Does the policy key `key` cover `chain`? A bare namespace (`eip155`, `bitcoin`) covers every
+ * network of its family; a full id covers its network in any spelling (`solana:mainnet` covers
+ * `solana:5eykt…`, `tron:728126428` covers `tron:0x2b6653dc`).
+ */
+export function ruleCovers(key: string, chain: string): boolean {
+  if (!key.includes(':')) return canonicalNamespace(key) === canonicalNamespace(chain.split(':')[0]!)
+  return chain.includes(':') && sameChain(key, chain)
 }
 
 /** Is `chain` a full CAIP-2 id with a known reference (not a bare namespace, not `…:unknown`)? */

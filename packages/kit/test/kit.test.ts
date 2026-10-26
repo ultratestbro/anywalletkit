@@ -247,6 +247,23 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
     expect(isGuardedWrite('signer') || isGuardedWrite('sendable') || isGuardedWrite('getBalance') || isGuardedWrite('quoteTransfer')).toBe(false)
   })
 
+  it('TON Connect proofs and signData are message signatures: confirm decides, lists do not apply (audit round 3, H1)', async () => {
+    const acc = Object.assign(createMockAccount({ chain: 'ton:-239' }), {
+      signTonProof: async (_request: unknown) => ({ signature: 'proof' }),
+      signTonConnectData: async (_request: unknown) => ({ signature: 'data' }),
+    })
+    const request = { domain: 'app.example', timestamp: 1, payload: 'nonce' }
+    const confirm = vi.fn(async () => true)
+    const ok = applyPolicies(acc, { allowlist: { 'ton:-239': ['EQ-only-this'] }, confirm }, 'ton:-239')
+    expect(await ok.signTonProof(request)).toEqual({ signature: 'proof' })
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'signTonProof', kind: 'message', message: true, raw: request }))
+    expect(await ok.signTonConnectData({ ...request, payload: { type: 'text', text: 'hi' } })).toEqual({ signature: 'data' })
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'signTonConnectData', kind: 'message', message: true }))
+    const refuse = applyPolicies(acc, { confirm: async () => false }, 'ton:-239')
+    await expect(refuse.signTonProof(request)).rejects.toBeInstanceOf(UserRejectedError)
+    await expect(refuse.signTonConnectData(request)).rejects.toBeInstanceOf(UserRejectedError)
+  })
+
   it('a revoke is kind revoke: the spender\'s blocklist entry and the allowlist do not stop it, confirm still does', async () => {
     const acc = Object.assign(evmLike(), { revokeDelegation: async () => ({ hash: 'undelegated' }) })
     const confirm = vi.fn(async () => true)

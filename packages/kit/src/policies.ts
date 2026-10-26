@@ -1,5 +1,5 @@
 import { UserRejectedError, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
-import { isConcreteChain, sameChain } from './chain-id.js'
+import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
 import { canonicalAddress, sendDestinations } from './destinations.js'
 
 /**
@@ -13,7 +13,7 @@ import { canonicalAddress, sendDestinations } from './destinations.js'
 export type KnownWriteMethod =
   | 'sendTransaction' | 'transfer' | 'signTransaction' | 'sign'
   | 'signTypedData' | 'signPermit' | 'approve'
-  | 'signRaw' | 'signNep413' | 'signBuilt'
+  | 'signRaw' | 'signNep413' | 'signBuilt' | 'signTonProof' | 'signTonConnectData'
   | 'sendSerialized' | 'signCompiled' | 'signTransactionMessage'
   | 'revokeDelegation'
 /**
@@ -29,7 +29,7 @@ export type WriteMethod = KnownWriteMethod | (string & {})
 export const GUARDED_WRITES: readonly KnownWriteMethod[] = [
   'sendTransaction', 'transfer', 'signTransaction', 'sign',
   'signTypedData', 'signPermit', 'approve',
-  'signRaw', 'signNep413', 'signBuilt',
+  'signRaw', 'signNep413', 'signBuilt', 'signTonProof', 'signTonConnectData',
   'sendSerialized', 'signCompiled', 'signTransactionMessage',
   'revokeDelegation',
 ]
@@ -55,7 +55,7 @@ const QUOTABLE: readonly string[] = ['sendTransaction', 'transfer', 'signTransac
 const CAPPED: Readonly<Record<string, number>> = Object.freeze({ sendTransaction: 1, transfer: 1, signTransaction: 1, approve: 1, sendSerialized: 2 })
 
 /** Methods that sign an off-chain message: nothing moves, allow/block lists do not apply, only `confirm`. */
-const MESSAGE_METHODS: readonly string[] = ['sign', 'signNep413']
+const MESSAGE_METHODS: readonly string[] = ['sign', 'signNep413', 'signTonProof', 'signTonConnectData']
 
 /** A chain id as callers and dApps write it (number, bigint, decimal or 0x string) → decimal, or undefined. */
 function chainIdRef(v: unknown): string | undefined {
@@ -161,6 +161,9 @@ export interface WriteIntent {
  * per-chain records are CAIP-2 ids or namespace prefixes (`eip155`). A namespace key covers every
  * chain of the family, and an exact id's rules apply on top of it: every matching fee cap is
  * checked, a destination must be on every matching allowlist, and any matching blocklist refuses.
+ * An id matches its network in any spelling: `solana:mainnet` = `solana:5eykt…`,
+ * `tron:728126428` = `tron:mainnet` = `tron:0x2b6653dc`, `bitcoin:mainnet` = `bip122:0000…`,
+ * `eip155:0x1` = `eip155:1`; the `bitcoin` namespace is `bip122`.
  */
 export interface Policies {
   /**
@@ -195,11 +198,6 @@ export class PolicyViolationError extends Error {
 }
 
 const lower = (s: string | undefined) => s?.toLowerCase()
-/** The rule keys that cover `chain`: its namespace and the exact id (`eip155:1` → `eip155`, `eip155:1`). */
-const ruleKeys = (chain: string): string[] => {
-  const ns = chain.split(':')[0]!
-  return ns === chain ? [chain] : [ns, chain]
-}
 const obj = (v: unknown): Record<string, unknown> => (typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {})
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined)
 const big = (v: unknown): bigint | undefined =>
@@ -411,7 +409,7 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
       return typedDataIntent(base, arg, resolvePrimaryType(arg))
     case 'signBuilt': {
       // NEAR: a transaction built elsewhere, signed here — its receiver is the destination.
-      const to = str(a.receiverId) ?? str(a.receiver)
+      const to = str(a.receiverId)
       return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}) }
     }
     case 'signRaw': {
@@ -437,7 +435,11 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
     const grant = calls.length === 1 && !carriesForeignPayload(calls[0]) ? grantCall(calls[0]) : null
     if (grant) return approvalIntent(base, grant.spender, grant.token, grant.amount, undefined, unboundedAllowance(grant.amount))
   }
-  const to = str(a.to) ?? str(a.recipient)
+  // An EVM, Solana or Tron transaction never goes to a `recipient` field (`transfer` options do):
+  // showing it would name a destination the signed transaction does not have (round 3, H2).
+  const ns = chain.split(':')[0]
+  const noRecipient = method !== 'transfer' && (ns === 'eip155' || ns === 'solana' || ns === 'tron' || ns === 'ton' || ns === 'near')
+  const to = str(a.to) ?? (noRecipient ? undefined : str(a.recipient))
   const amount = big(a.amount ?? a.value)
   return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(typeof a.token === 'string' ? { token: a.token } : {}), ...(amount !== undefined ? { amount } : {}) }
 }
@@ -474,6 +476,31 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
  * genesis spellings of one network match (see `sameChain`). An account that
  * cannot tell its network answers to the rules of `chain`.
  */
+/** A signing account — what {@link applyPolicies} wraps: it has an address, a chain and a write method. */
+export function isSigningAccount(v: unknown): v is IWalletAccount {
+  const a = v as Record<string, unknown> | null
+  return typeof a === 'object' && a !== null && typeof a.getAddress === 'function' && typeof a.chain === 'string' &&
+    (typeof a.sign === 'function' || typeof a.sendTransaction === 'function' || typeof a.transfer === 'function')
+}
+
+/** A `Signer` (`sign(bytes)` signs anything, unchecked): never handed out through a policy wrapper. */
+export function isSignerLike(v: unknown): boolean {
+  const s = v as Record<string, unknown> | null
+  return typeof s === 'object' && s !== null && typeof s.sign === 'function' && typeof s.curve === 'string'
+}
+
+/**
+ * What a method behind a policy wrapper returns: a signing account comes back wrapped (`wrap`), a
+ * signer not at all; a promise is mapped the same way once it settles. Anything else is as is.
+ */
+export function guardReturned(value: unknown, wrap: (account: IWalletAccount) => unknown): unknown {
+  const map = (v: unknown) => {
+    if (isSignerLike(v)) throw new PolicyViolationError('chain', 'A signer is not handed out through a policy-guarded object.')
+    return isSigningAccount(v) ? wrap(v) : v
+  }
+  return value instanceof Promise ? value.then(map) : map(value)
+}
+
 export function applyPolicies<A extends IWalletAccount>(account: A, policies: Policies, chain?: string): A {
   const rules = [policies.maxFee, policies.allowlist, policies.blocklist]
   const hasRuleFor = (key: (k: string) => boolean) => rules.some((m) => m !== undefined && Object.keys(m).some(key))
@@ -487,7 +514,7 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     const signed = signedChain(ns, method, arg)
     const known = isConcreteChain(account.chain) ? account.chain : undefined
     const offChain = chainFree(method)
-    const exactRules = hasRuleFor((k) => k.startsWith(`${ns}:`))
+    const exactRules = hasRuleFor((k) => k.includes(':') && canonicalNamespace(k.split(':')[0]!) === canonicalNamespace(ns))
     let learned: string | undefined
     const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
     // A message needs no chain id at all: no list or cap applies to it.
@@ -522,10 +549,18 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     }
     // The rules of every network in play apply: the one asked for, the account's own, the one signed for.
     const chains = [...new Set([chain, own, signed].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
-    // Every rule key that covers the asked-for chain or the account's own: namespace and exact ids.
-    const keys = chains.length > 0 ? [...new Set(chains.flatMap(ruleKeys))] : [ns]
+    // Every rule key that covers the asked-for chain or the account's own: its namespace and its
+    // exact id, in whichever spelling the app wrote them (`solana:mainnet`, `tron:728126428`,
+    // `bitcoin` for `bip122` — round 3, H4).
+    const written = [...new Set(rules.flatMap((m) => (m ? Object.keys(m) : [])))]
+    const keys = written.filter((k) => (chains.length > 0 ? chains.some((c) => ruleCovers(k, c)) : ruleCovers(k, ns)))
     const intent = intentOf(chains[0] ?? account.chain, await account.getAddress(), method, arg)
     const caps = keys.flatMap((k) => { const cap = policies.maxFee?.[k]; return cap === undefined ? [] : [{ k, cap: BigInt(cap) }] })
+    // A method guarded only by its name (a chain package's internal `sign*` / `send*` helper) has no
+    // fee the policies can quote or hand down: under a fee cap it is refused (round 3, review).
+    if (caps.length > 0 && !(GUARDED_WRITES as readonly string[]).includes(method)) {
+      throw new PolicyViolationError('maxFee', `${method} has no fee the ${caps[0]!.k} cap can be checked against; nothing was signed.`)
+    }
     if (caps.length > 0 && QUOTABLE.includes(method)) {
       const { fee } = method === 'transfer' ? await account.quoteTransfer(arg as TransferOptions) : await account.quoteSendTransaction(arg)
       for (const { k, cap } of caps) if (fee > cap) throw new PolicyViolationError('maxFee', `Fee ${fee} exceeds the ${k} cap of ${cap}.`)
@@ -567,10 +602,16 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     return caps.length > 0 && CAPPED[method] !== undefined ? caps.reduce((a, b) => (b.cap < a.cap ? b : a)).cap : undefined
   }
   const wrapped = new Map<string, (...args: unknown[]) => Promise<unknown>>()
-  return new Proxy(account, {
+  const handler: ProxyHandler<A> = {
     get(target, prop, receiver) {
-      const v = Reflect.get(target, prop, receiver)
-      if (typeof v !== 'function') return v
+      // The signer signs whatever it is handed: reaching it would skip every rule (round 3, H3).
+      if (prop === 'signer') return undefined
+      // Getters run on the account itself, so none of them sees this wrapper.
+      const v = Reflect.get(target, prop, target)
+      if (isSignerLike(v)) return undefined
+      // Modules read the account's RPC from `_config`: a copy, so nobody writes the account's settings through it.
+      if (prop === '_config') return readOnlyConfig(v)
+      if (typeof v !== 'function' || prop === 'constructor') return v
       if (typeof prop === 'string' && isGuardedWrite(prop)) {
         let fn = wrapped.get(prop)
         if (!fn) {
@@ -598,7 +639,39 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         }
         return fn
       }
-      return v.bind(target)
+      // Reads run on the account itself. An account they hand back (NEAR's `withAccountId`, the
+      // same key bound to a named account) answers to the same policies; the account itself comes
+      // back as this wrapper (round 3, H3).
+      const method = v as (...args: unknown[]) => unknown
+      return (...args: unknown[]) => guardReturned(method.apply(target, args), (a) => (a === target ? receiver : applyPolicies(a, policies, chain)))
     },
-  })
+    // The same view through descriptors and key listings: no signer, guarded methods, a copied `_config`.
+    getOwnPropertyDescriptor(target, prop) {
+      const d = Reflect.getOwnPropertyDescriptor(target, prop)
+      if (!d || !d.configurable || !('value' in d)) return d
+      if (prop === 'signer' || isSignerLike(d.value)) return undefined
+      return { ...d, value: handler.get!(target, prop, proxy) }
+    },
+    ownKeys(target) {
+      return Reflect.ownKeys(target).filter((k) => {
+        const d = Reflect.getOwnPropertyDescriptor(target, k)
+        return !d?.configurable || (k !== 'signer' && !isSignerLike(d.value))
+      })
+    },
+    // Nothing is written to the account through its wrapper: not its methods, not its settings.
+    set: () => false,
+    defineProperty: () => false,
+    deleteProperty: () => false,
+    setPrototypeOf: () => false,
+  }
+  const proxy = new Proxy(account, handler)
+  return proxy
+}
+
+/** A shallow copy of an account's `_config` (its provider list copied too), or the value as it is. */
+function readOnlyConfig(v: unknown): unknown {
+  if (typeof v !== 'object' || v === null) return v
+  const c = { ...(v as Record<string, unknown>) }
+  if (Array.isArray(c.provider)) c.provider = [...(c.provider as unknown[])]
+  return Object.freeze(c)
 }

@@ -50,8 +50,8 @@ transaction it signs. Signing primitives without a fee model (`signRaw`,
 `signBuilt`, `signCompiled`, `signTransactionMessage`) carry no fee cap.
 Every write surface of an account is covered — `sendTransaction`, `transfer`,
 `signTransaction` (a module that signs and broadcasts on its own cannot skip
-them), `sign` and NEAR's `signNep413` (message signatures: `confirm` only,
-nothing moves), the approval surfaces `approve`, `signPermit` and EIP-2612 /
+them), `sign`, NEAR's `signNep413` and TON's `signTonProof` /
+`signTonConnectData` (message signatures: `confirm` only, nothing moves), the approval surfaces `approve`, `signPermit` and EIP-2612 /
 Permit2 `signTypedData` (checked against the **spender**; `confirm` sees
 `kind: 'approval'` with `unlimited`), other `signTypedData` (`confirm` only),
 and chain-specific ones such as Tron's `signRaw`, NEAR's `signBuilt`, Solana's
@@ -59,6 +59,15 @@ and chain-specific ones such as Tron's `signRaw`, NEAR's `signBuilt`, Solana's
 `sign*` / `send*` / `approve*` / `revoke*` / `transfer*` is guarded unless it
 is listed in `UNGUARDED_WRITES`, so a new signing method in a chain package
 cannot bypass the policies by not being named. Reads are never intercepted.
+Nothing hands out a way around the wrapper: its `signer` is hidden, an account
+a method returns (NEAR's `withAccountId`) comes back under the same policies,
+and `wallet.getManager(chain)` hands out guarded accounts (`getAccount`,
+`getAccountByPath`, `getNamedAccount`) and no seed or signer accessors. The
+wrappers hide the signer from descriptors and key listings too, refuse writes
+to the account (`_config` reads as a frozen copy), and under a `maxFee` rule
+refuse a `sign*` / `send*` helper the policies cannot quote. The boundary is
+what the wallet hands out: the `Wallet` object itself is the app's — give
+modules and dApp bridges accounts, managers or protocols, never the `Wallet`.
 
 A revoke is `kind: 'revoke'`: an `approve` / `signPermit` / EIP-2612 Permit of 0,
 raw revoke calldata (`approve(0x0, tokenId)`, `setApprovalForAll(…, false)`,

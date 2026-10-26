@@ -88,9 +88,10 @@ Amounts are lamports (bigint). Without `provider` in the config, reads go to the
   a custodian, never changes an authority, and never acts on an account whose SOL another address
   withdraws (a `discover`ed account the wallet only manages).
 - Seed slots: someone can send dust to a `stake:<i>` address before the wallet uses it. Empty slots
-  are used first. When only pre-funded ones are left, taking one over needs Transfer +
-  AllocateWithSeed, which `wallet-solana` refuses to sign by default (`allowAuthorityChanges`); the
-  module then says so, and `maxAccounts` (up to 100) opens new slots. Every write the module builds
+  are used first. When only pre-funded ones are left, one is taken over with Transfer +
+  AllocateWithSeed + Initialize; `wallet-solana` signs that by default because the same transaction
+  makes the wallet the account's staker and withdrawer (a wallet that refuses it gets an error that
+  says so; `maxAccounts`, up to 100, opens new slots). Every write the module builds
   is tested against `wallet-solana`'s signing checks with the default config.
 - StakeHistory from an RPC node that has not reached the current epoch is refused, so statuses are
   never computed from a stale sysvar.

@@ -2,7 +2,7 @@ import {afterEach, describe, expect, it, vi} from "vitest";
 import {lifiProvider} from "../src/provider.js";
 import {lifi} from "../src/config.js";
 
-import {DIAMOND, FROM_TOKEN, PARAMS, RECIPIENT, SENDER, TO_TOKEN, response} from "./fixtures.js";
+import {DIAMOND, FROM_TOKEN, PARAMS, RECIPIENT, SENDER, TO_TOKEN, diamondCall, response} from "./fixtures.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -430,5 +430,79 @@ describe("LI.FI refusals are named; an input-side bridge fee is accepted within 
     const {q, why} = await refusal(response({action: {...response().action, toAddress: other, fromAmount: "999999"}}));
     expect(q).toBeNull();
     expect(why).toBe("lifi: quote does not match the request (amount spent, recipient)");
+  });
+});
+
+// Audit 2026-10-25 round 3, H8: the placeholder (vitalik.eth) stood in for a missing sender / recipient
+// on live quotes too, so a blank recipient became the refundee and the payee.
+describe("LI.FI placeholders are for dry quotes only", () => {
+  it("a live quote without a sender or recipient is refused before LI.FI is asked; a dry one is priced", async () => {
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (input: string | URL) => { asked.push(String(input)); return new Response(JSON.stringify(response())); });
+    const reasons: string[] = [];
+    const onRefusal = (r: string) => { reasons.push(r); };
+    expect(await lifiProvider().getQuote({...PARAMS, dry: false, destAddress: "", onRefusal})).toBeNull();
+    expect(await lifiProvider().getQuote({...PARAMS, dry: false, refundAddress: "", onRefusal})).toBeNull();
+    expect(reasons).toEqual(["lifi: a live quote needs a recipient", "lifi: a live quote needs the sender's address"]);
+    expect(asked).toHaveLength(0);
+    const {refundAddress: _refund, ...noRefund} = PARAMS;
+    await lifiProvider().getQuote({...noRefund, dry: true, destAddress: ""});
+    expect(new URL(asked[0]!).searchParams.get("fromAddress")).toBe("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+  });
+});
+
+// Audit 2026-10-25 round 3, H9: only the Diamond address, sender, chain, value and gas were checked.
+// An answer whose action said "to the user, at least 99.5" could carry calldata paying an attacker
+// with a minimum of 1, and the engine approved the Diamond and signed it.
+describe("LI.FI Diamond calldata does what the quote says", () => {
+  const ATTACKER = "0x9999999999999999999999999999999999999999";
+  const sameChain = {...PARAMS, destChain: "eip155:1", destToken: TO_TOKEN};
+  const sameChainBody = (data?: (action: never, estimate: never) => string) => {
+    const base = response({action: {...response().action, toToken: {address: TO_TOKEN, chainId: 1}, toChainId: 1}});
+    return data ? {...base, transactionRequest: {...(base.transactionRequest as object), data: data(base.action as never, base.estimate as never)}} : base;
+  };
+  const quoteWith = async (body: unknown, params: typeof PARAMS = PARAMS) => {
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(body)));
+    const reasons: string[] = [];
+    const q = await lifiProvider().getQuote({...params, onRefusal: (r: string) => { reasons.push(r); }});
+    return {q, reasons};
+  };
+
+  it("a same-chain swap pays the reviewed recipient at least the reviewed minimum, in the requested tokens", async () => {
+    expect((await quoteWith(sameChainBody(), sameChain)).q).not.toBeNull();
+    for (const [over, why] of [
+      [{receiver: ATTACKER}, /pays 0x9999/],
+      [{minOut: 1n}, /accepts 1, below/],
+    ] as const) {
+      const r = await quoteWith(sameChainBody((a, e) => diamondCall(a, e, over)), sameChain);
+      expect(r.q).toBeNull();
+      expect(r.reasons.join()).toMatch(why);
+    }
+  });
+
+  it("a bridge pays the reviewed recipient on the requested chain, bridging the input token, with no destination call", async () => {
+    expect((await quoteWith(response())).q).not.toBeNull();
+    const body = (over: Parameters<typeof diamondCall>[2]) => {
+      const base = response();
+      return {...base, transactionRequest: {...(base.transactionRequest as object), data: diamondCall(base.action as never, base.estimate as never, over)}};
+    };
+    for (const [over, why] of [
+      [{receiver: ATTACKER}, /pays 0x9999/],
+      [{destChainId: 10n}, /bridges to chain 10/],
+      [{sendingAssetId: ATTACKER}, /bridges 0x9999/],
+      [{hasDestinationCall: true}, /call on the destination chain/],
+    ] as const) {
+      const r = await quoteWith(body(over));
+      expect(r.q).toBeNull();
+      expect(r.reasons.join()).toMatch(why);
+    }
+  });
+
+  it("calldata that decodes as nothing known is refused", async () => {
+    const base = response();
+    for (const data of ["0xdeadbeef", "0x4666fc80" + "00".repeat(64), "0x12345678" + "00".repeat(31) + "07" + "00".repeat(64)]) {
+      const r = await quoteWith({...base, transactionRequest: {...(base.transactionRequest as object), data}});
+      expect([data.slice(0, 10), r.q]).toEqual([data.slice(0, 10), null]);
+    }
   });
 });
