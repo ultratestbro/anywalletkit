@@ -3,6 +3,8 @@ import { MAIN_MARKET, type ApiMarket, type ApiObligation, type ApiReserve } from
 import { fromDecimalString, lessBps, toAmount, toDecimalString, type AmountOption } from './amounts.js'
 import { DEFAULT_FIRST_DEPOSIT_ALLOWANCE, KaminoBase, type KaminoBaseConfig } from './base.js'
 import { KaminoError } from './errors.js'
+import { vanillaObligation } from './pda.js'
+import { KLEND_PROGRAM } from './programs.js'
 
 export interface KaminoMarketConfig extends KaminoBaseConfig {
   /** The lending market (default: Kamino's Main Market). */
@@ -112,10 +114,20 @@ export class KaminoMarketProtocolSolana extends KaminoBase<KaminoMarketConfig> {
     return { base64, reserve }
   }
 
-  /** A wallet without an obligation here pays the rent of one on its first deposit. */
+  /**
+   * A wallet without its vanilla obligation here pays the rent of one on its first deposit. Only
+   * that obligation counts (a Multiply one does not hold a plain deposit), and an API failure is a
+   * refusal: guessing "first deposit" would widen what the transaction may spend.
+   */
   private async firstDepositExtra(me: string): Promise<bigint> {
-    const obligations = await this.api.getUserObligations(this.market, me).catch(() => [])
-    return obligations.length === 0 ? this.firstDepositAllowance : 0n
+    let obligations: ApiObligation[]
+    try {
+      obligations = await this.api.getUserObligations(this.market, me)
+    } catch (e) {
+      throw new KaminoError(`Kamino: could not tell whether ${me} already has an obligation on market ${this.market} (${e instanceof Error ? e.message : String(e)}); try again.`)
+    }
+    const vanilla = vanillaObligation(me, this.market, KLEND_PROGRAM)
+    return obligations.some((o) => o.obligation === vanilla) ? 0n : this.firstDepositAllowance
   }
 
   /** Resolve 'max' against the position's supplied / borrowed total for the mint. */

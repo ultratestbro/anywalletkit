@@ -12,3 +12,4 @@ export {
 } from './programs.js'
 export { toAmount, toDecimalString, fromDecimalString, toWad, mulWad, divWadUp, lessBps, WAD } from './amounts.js'
 export type { AmountOption } from './amounts.js'
+export { vanillaObligation, vaultSharesMint, findProgramAddress } from './pda.js'
