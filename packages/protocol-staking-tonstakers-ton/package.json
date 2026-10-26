@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-staking-tonstakers-ton",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "A simple package that lets @anywalletkit/wallet-ton wallet accounts stake through Tonstakers: stake GRAM \u2192 tsTON, unstake instant / standard / best-rate, track payout bills, rates and APY.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

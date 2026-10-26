@@ -1,5 +1,21 @@
 # @anywalletkit/extension-kit
 
+## 0.1.5
+
+### Patch Changes
+
+- 9dfb5bb: New `pageRequestFrom(event, window)`: a content script's message listener takes a request only when the page window itself posted it (`event.source` is the page and `event.origin` its origin). Without it an iframe on the page (an ad, an embed) could `parent.postMessage` a request that was stamped with the site's origin and shown in the approval window as the site. The example extension's content script uses it.
+- a354990: TON and NEAR `sign()` refuse a 32-byte message with `MessageIsTransactionError`: both chains sign transactions over a 32-byte digest (the V5R1 signing-cell hash, sha256(borsh(tx))), so a "message" of those bytes was a valid transaction signature the policies treated as harmless. TON accounts gain `signTonProof` and `signTonConnectData`, which build the TON Connect digests from the request and their own address; the kit treats both as message signatures. extension-kit's `tonProofMessage` / `tonSignDataMessage` are documented as verification helpers.
+- Updated dependencies [6dde4e4]
+- Updated dependencies [b08c01a]
+- Updated dependencies [e9cc028]
+- Updated dependencies [a354990]
+- Updated dependencies [0d0e46e]
+  - @anywalletkit/swap2-assets@0.2.0
+  - @anywalletkit/core@0.5.0
+  - @anywalletkit/protocol-swap2-core@0.5.0
+  - @anywalletkit/keyring@0.3.5
+
 ## 0.1.4
 
 ### Patch Changes

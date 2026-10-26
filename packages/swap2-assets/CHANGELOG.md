@@ -1,5 +1,15 @@
 # @anywalletkit/swap2-assets
 
+## 0.2.0
+
+### Minor Changes
+
+- 0d0e46e: Swaps of tokens the catalog does not list (a user's own tokens, named by EVM contract or Solana mint), opt-in with `allowUnlistedTokens: true` on the engine and on `createSwap2Handler`; off by default, nothing changes without it. The engine reads the source token's decimals with the account's `getTokenInfo` (cached; a disagreeing `fromTokenDecimals` is refused) and sends them as `QuoteParams.sourceDecimals`; approvals go to the named token for the exact amount and the quoted spender, with the same value binding as catalog tokens. LI.FI, Uniswap, Balancer and Fynd resolve the source with the new `sourceAssetOf(params)`; providers with their own asset lists keep refusing. `swap2-assets` adds `isTokenAddress`, `unlistedAsset`, `isUnlisted`, `resolveAsset` (catalog first, always) and `catalogChainId`.
+
+### Patch Changes
+
+- 6dde4e4: Catalog: LDO, SKY and COW on Ethereum, LDO and COW on Arbitrum, COW on Base. Each contract was checked on chain (symbol, decimals, name) and routed both ways through the swap2 providers (LI.FI on every chain, plus Uniswap and Balancer on Ethereum) before it was listed. SKY on Arbitrum and LDO on Optimism were left out: no route, or too thin.
+
 ## 0.1.5
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @anywalletkit/conformance
 
+## 0.4.2
+
+### Patch Changes
+
+- Updated dependencies [b08c01a]
+- Updated dependencies [a354990]
+  - @anywalletkit/core@0.5.0
+
 ## 0.4.1
 
 ### Patch Changes

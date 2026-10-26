@@ -1,5 +1,22 @@
 # @anywalletkit/protocol-swap2-lifi
 
+## 0.2.6
+
+### Patch Changes
+
+- 3f3c4fd: Bridge calldata must use one of LI.FI's ABI-encoded bridge entry points (`startBridgeTokensVia*` / `swapAndStartBridgeTokensVia*`, computed from the facet sources): a packed call whose bytes merely look like a `BridgeData` is refused. Routes with source swaps are no longer refused for comparing the bridged amount (the swapped token) with the input. The README states what is not checked: a bridge's output minimum lives in bridge-specific data.
+- 6857b7f: LI.FI quotes are checked against their Diamond calldata, not only the `action` / `estimate` beside it: a same-chain swap must pay the reviewed recipient at least the reviewed minimum in the requested tokens, a bridge's `BridgeData` must pay the reviewed recipient on the requested chain, bridging the input token. Routes with a destination call, EVM-source routes to a non-EVM chain (their receiver cannot be read here) and calldata that decodes as nothing known are refused.
+- e9cc028: A blank `recipient` / `refundAddress` (`""` from an empty input) is treated as omitted: the swap goes to, and refunds to, the account itself, and the review shows that address. CCTP, USDT0 and LI.FI use their placeholder address only for dry quotes; a live quote without a recipient or refund address is refused instead of being built to the placeholder.
+- 0d0e46e: Swaps of tokens the catalog does not list (a user's own tokens, named by EVM contract or Solana mint), opt-in with `allowUnlistedTokens: true` on the engine and on `createSwap2Handler`; off by default, nothing changes without it. The engine reads the source token's decimals with the account's `getTokenInfo` (cached; a disagreeing `fromTokenDecimals` is refused) and sends them as `QuoteParams.sourceDecimals`; approvals go to the named token for the exact amount and the quoted spender, with the same value binding as catalog tokens. LI.FI, Uniswap, Balancer and Fynd resolve the source with the new `sourceAssetOf(params)`; providers with their own asset lists keep refusing. `swap2-assets` adds `isTokenAddress`, `unlistedAsset`, `isUnlisted`, `resolveAsset` (catalog first, always) and `catalogChainId`.
+- Updated dependencies [6dde4e4]
+- Updated dependencies [b08c01a]
+- Updated dependencies [e9cc028]
+- Updated dependencies [a354990]
+- Updated dependencies [0d0e46e]
+  - @anywalletkit/swap2-assets@0.2.0
+  - @anywalletkit/core@0.5.0
+  - @anywalletkit/protocol-swap2-core@0.5.0
+
 ## 0.2.5
 
 ### Patch Changes

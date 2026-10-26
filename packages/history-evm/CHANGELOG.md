@@ -1,5 +1,16 @@
 # @anywalletkit/history-evm
 
+## 0.1.7
+
+### Patch Changes
+
+- Updated dependencies [6dde4e4]
+- Updated dependencies [b08c01a]
+- Updated dependencies [a354990]
+- Updated dependencies [0d0e46e]
+  - @anywalletkit/swap2-assets@0.2.0
+  - @anywalletkit/core@0.5.0
+
 ## 0.1.6
 
 ### Patch Changes

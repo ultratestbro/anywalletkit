@@ -1,5 +1,21 @@
 # @anywalletkit/kit
 
+## 0.4.2
+
+### Patch Changes
+
+- 8286c28: The policies read a transaction's destination from the field the chain package builds it from: Tron is prebuilt only with a `txID` and a contract call only with a `functionSelector` (otherwise a TRX send to `to`); Solana follows wallet-solana's order (wire, compiled `messageBytes` + `signatures`, `{ to, value }`, `instructions`); EVM is `to` only, so a transaction without `to` (a deployment) has an unknown destination. A shape that fits two readings is unknown, so an allowlisted field riding next to a drainer no longer passes the allowlist.
+- f08b92f: No signing path around the policies: the policy wrapper hides the account's `signer`, wraps accounts its methods return (NEAR's `withAccountId`) with the same policies, and `wallet.getManager(chain)` now hands out guarded accounts (`getAccount`, `getAccountByPath`, `getNamedAccount`) and hides the manager's seed and signer accessors. The internal helpers that sign in wallet-btc, wallet-zcash and wallet-ton are named `sign*` (`signSpend`, `signPlan`, `signMessages`), so the kit guards them like every other signing method.
+- cd8ee9a: Policy keys match their network in any spelling: rules under `solana:mainnet`, `tron:728126428` / `tron:mainnet`, `bitcoin:mainnet` or `eip155:0x1` now apply to accounts that report `solana:5eykt…`, `tron:0x2b6653dc`, `bip122:…`, `eip155:1` (they were silently skipped), and the `bitcoin` namespace covers `bip122`.
+- c0f6103: Policy wrappers close the reflective ways around them: the signer is hidden from property descriptors and key listings, writes to a guarded account (methods, settings) are refused, `_config` reads as a frozen copy, and `getManager` exposes only `getAccount`, `getAccountByPath`, `getNamedAccount`, `getReadOnlyAccount`, `getFeeRates` and `basePath`. Under a `maxFee` rule, a `sign*` / `send*` method the policies cannot quote (a chain package's internal helper) is refused. TON and NEAR destinations come only from the field the package builds from (`to`, `receiverId`).
+- a354990: TON and NEAR `sign()` refuse a 32-byte message with `MessageIsTransactionError`: both chains sign transactions over a 32-byte digest (the V5R1 signing-cell hash, sha256(borsh(tx))), so a "message" of those bytes was a valid transaction signature the policies treated as harmless. TON accounts gain `signTonProof` and `signTonConnectData`, which build the TON Connect digests from the request and their own address; the kit treats both as message signatures. extension-kit's `tonProofMessage` / `tonSignDataMessage` are documented as verification helpers.
+- Updated dependencies [6dde4e4]
+- Updated dependencies [b08c01a]
+- Updated dependencies [a354990]
+- Updated dependencies [0d0e46e]
+  - @anywalletkit/swap2-assets@0.2.0
+  - @anywalletkit/core@0.5.0
+
 ## 0.4.1
 
 ### Patch Changes

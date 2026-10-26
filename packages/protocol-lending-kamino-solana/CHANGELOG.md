@@ -1,5 +1,18 @@
 # @anywalletkit/protocol-lending-kamino-solana
 
+## 0.2.0
+
+### Minor Changes
+
+- fa29c4e: Kamino vault deposits keep the shares in the wallet by default (`skipFarm` now defaults to `true`), so the guard proves the shares arrive. Staked in the vault farm the shares never reach the wallet and the guard could only bound what leaves it: an API transaction that simply transferred the deposit elsewhere passed. Pass `skipFarm: false` to stake in the farm as the Kamino app does, knowing that leg relies on the API.
+
+### Patch Changes
+
+- 431196e: The vault's description from the Kamino API is checked before it shapes the wallet guard: it must be the configured vault on the kVault program, its shares mint must be the PDA the program derives (`["shares", vault]`), its asset must be the configured `asset` (new option), and its mint decimals must match the chain when the account can read mints. `supply` needs the asset named (`token` or `asset`), so a changed API answer can no longer make the wallet deposit another token or let a withdraw move any token out.
+- Updated dependencies [b08c01a]
+- Updated dependencies [a354990]
+  - @anywalletkit/core@0.5.0
+
 ## 0.1.6
 
 ### Patch Changes

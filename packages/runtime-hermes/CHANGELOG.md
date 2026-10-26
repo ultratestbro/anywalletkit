@@ -1,5 +1,11 @@
 # @anywalletkit/runtime-hermes
 
+## 0.3.0
+
+### Minor Changes
+
+- 6bfee57: `installSecureContext()` (run by `installHermesRuntime`, reported as `secureContext`): sets `globalThis.isSecureContext = true` when the VM has no such flag. `@solana/kit` refuses `crypto.subtle` outside a secure context, so every program-derived address — associated token accounts, token metadata accounts — threw under Hermes. A browser's own value is kept.
+
 ## 0.2.2
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @anywalletkit/wallet-tron
 
+## 0.3.2
+
+### Patch Changes
+
+- a817739: `signRaw`, `sendTransaction` and `signTransaction` refuse an `AccountPermissionUpdateContract` (it can hand the account's keys to someone else) unless `allowPermissionChanges: true`, and refuse contract types the wallet cannot decode unless `allowUndecodedContracts: true` (`VoteWitnessContract`, which only re-assigns votes, is still signed). New `UnsafeTransactionError` codes: `permission-change`, `undecoded-contract`.
+- Updated dependencies [b08c01a]
+- Updated dependencies [a354990]
+  - @anywalletkit/core@0.5.0
+
 ## 0.3.1
 
 ### Patch Changes

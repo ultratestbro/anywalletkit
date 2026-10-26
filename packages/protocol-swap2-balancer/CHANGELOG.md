@@ -1,5 +1,19 @@
 # @anywalletkit/protocol-swap2-balancer
 
+## 0.1.7
+
+### Patch Changes
+
+- 0d0e46e: Swaps of tokens the catalog does not list (a user's own tokens, named by EVM contract or Solana mint), opt-in with `allowUnlistedTokens: true` on the engine and on `createSwap2Handler`; off by default, nothing changes without it. The engine reads the source token's decimals with the account's `getTokenInfo` (cached; a disagreeing `fromTokenDecimals` is refused) and sends them as `QuoteParams.sourceDecimals`; approvals go to the named token for the exact amount and the quoted spender, with the same value binding as catalog tokens. LI.FI, Uniswap, Balancer and Fynd resolve the source with the new `sourceAssetOf(params)`; providers with their own asset lists keep refusing. `swap2-assets` adds `isTokenAddress`, `unlistedAsset`, `isUnlisted`, `resolveAsset` (catalog first, always) and `catalogChainId`.
+- Updated dependencies [6dde4e4]
+- Updated dependencies [b08c01a]
+- Updated dependencies [e9cc028]
+- Updated dependencies [a354990]
+- Updated dependencies [0d0e46e]
+  - @anywalletkit/swap2-assets@0.2.0
+  - @anywalletkit/core@0.5.0
+  - @anywalletkit/protocol-swap2-core@0.5.0
+
 ## 0.1.6
 
 ### Patch Changes

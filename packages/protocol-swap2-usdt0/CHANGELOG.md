@@ -1,5 +1,19 @@
 # @anywalletkit/protocol-swap2-usdt0
 
+## 0.1.6
+
+### Patch Changes
+
+- e9cc028: A blank `recipient` / `refundAddress` (`""` from an empty input) is treated as omitted: the swap goes to, and refunds to, the account itself, and the review shows that address. CCTP, USDT0 and LI.FI use their placeholder address only for dry quotes; a live quote without a recipient or refund address is refused instead of being built to the placeholder.
+- Updated dependencies [6dde4e4]
+- Updated dependencies [b08c01a]
+- Updated dependencies [e9cc028]
+- Updated dependencies [a354990]
+- Updated dependencies [0d0e46e]
+  - @anywalletkit/swap2-assets@0.2.0
+  - @anywalletkit/core@0.5.0
+  - @anywalletkit/protocol-swap2-core@0.5.0
+
 ## 0.1.5
 
 ### Patch Changes

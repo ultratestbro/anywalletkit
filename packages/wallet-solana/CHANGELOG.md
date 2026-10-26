@@ -1,5 +1,20 @@
 # @anywalletkit/wallet-solana
 
+## 0.2.0
+
+### Minor Changes
+
+- b08c01a: `getTokenInfo(mint)`: decimals, symbol, name, supply and holder-relevant flags read from the chain, for tokens a user adds by address. Name and symbol come from the Token-2022 metadata extension, else the Metaplex metadata account. Flags: a live mint or freeze authority, and the Token-2022 extensions that let someone move any balance (permanent delegate), tax transfers (non-zero transfer fee), run a hook, freeze new accounts, pause transfers or make the token non-transferable. Anything that is not an initialized Token / Token-2022 mint throws `NotATokenError`. Checked against mainnet USDC, PYUSD, BONK, JUP and a fee-bearing Token-2022 mint.
+
+### Patch Changes
+
+- cc63ef0: The Stake guard judges every Stake instruction that names the wallet, whatever the wallet's position: the Stake program takes authorities from any signer and has a layout without sysvars (`[stake, authority]`, `[stake, recipient, authority]`), so an `Authorize` / `Withdraw` / `SetLockup` with the wallet at another index is no longer signed. The `Checked` forms read the new authority, staker and withdrawer in both layouts. A stake account the wallet only splits into is accepted with at most 0.005 SOL of the wallet's funding (its rent), since a split copies the source's authorities.
+- 3f10000: wallet-solana's signing guard reads the Stake program: it refuses a Stake `Authorize*` to another key, a `Withdraw` to anyone but the wallet, a `SetLockup*` with a foreign custodian or a lockup, and funding a stake account that the same transaction does not initialize (or split into) with the wallet as staker and withdrawer (`allowAuthorityChanges` overrides). It now signs taking back a pre-funded seed slot (`AllocateWithSeed` of a 200-byte Stake account the same transaction initializes for the wallet), so dust sent to every `stake:<i>` address no longer blocks native staking. `describeTransaction` names Stake instructions and what they set (`stake`, `withSeed` on program-call items); `decodeStakeInstruction` and `STAKE_PROGRAM_ADDRESS` are exported.
+- 2d9fe4b: One external ed25519 key registered for several chains can no longer be made to sign another chain's transaction as a "message": TON and NEAR `sign()` refuse bytes that carry the account's public key (a Solana transaction names its signer's key), and Solana `sign()` on an external signer refuses 32-byte messages (a TON or NEAR transaction digest). TON Connect `signData` binary payloads accept whitespace in their base64, as `atob` does, and a non-integer `workChain` is refused.
+- Updated dependencies [b08c01a]
+- Updated dependencies [a354990]
+  - @anywalletkit/core@0.5.0
+
 ## 0.1.6
 
 ### Patch Changes
