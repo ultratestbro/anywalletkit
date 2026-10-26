@@ -63,3 +63,18 @@ describe("2026-10-14 batch: Arc, Mantle, Katana, Morph, Flare", () => {
     expect(ccAsset("eip155:5000", "USDC")!.contract).toBe("0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9"); // bridged "USD Coin", not CCTP
   });
 });
+
+describe("2026-10-26: LDO, SKY, COW", () => {
+  it.each([
+    ["eip155:1", "LDO", "0x5a98fcbea516cf06857215779fd812ca3bef1b32"],
+    ["eip155:1", "SKY", "0x56072c95faa701256059aa122697b133aded9279"],
+    ["eip155:1", "COW", "0xdef1ca1fb7fbcdc777520aa7f396b4e015f497ab"],
+    ["eip155:42161", "LDO", "0x13ad51ed4f1b7e9dc168d8a00cb3f4ddd85efa60"],
+    ["eip155:42161", "COW", "0xcb8b5cd20bdcaea9a010ac1f8d835824f5c87a04"],
+    ["eip155:8453", "COW", "0xc694a91e6b071bf030a18bd3053a7fe09b6dae69"],
+    ["eip155:100", "COW", "0x177127622c4a00f3d409b75571e12cb3c8973d3c"],
+  ])("%s %s is pinned to %s (18 decimals) and found by its contract", (caip2, symbol, contract) => {
+    expect(ccAsset(caip2, symbol)).toMatchObject({contract, decimals: 18});
+    expect(ccAssetByToken(caip2, contract)!.symbol).toBe(symbol);
+  });
+});

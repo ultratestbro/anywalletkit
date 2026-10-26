@@ -183,6 +183,11 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "USDS", assetId: "", contract: "0xdc035d45d973e3ec169d2276ddab16f1e407384f", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/39926/large/usds.webp?1726666683"},
       {symbol: "wBETH", assetId: "", contract: "0xa2e3356610840701bdf5611a53974510ae27e2e1", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/30061/large/wbeth-icon.png?1696528983"},
       {symbol: "weETH", assetId: "", contract: "0xcd5fe23c85820f7b72d0926fc9b05b43e359b7ee", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33033/large/weETH.png?1701438396"},
+      // 2026-10-26: Lido, Sky and CoW governance tokens (owner request). Verified on-chain (symbol, decimals, name);
+      // not in the 1Click registry, routed by the EVM venues: LI.FI bought and sold $100 both ways at under 1 %.
+      {symbol: "LDO", assetId: "", contract: "0x5a98fcbea516cf06857215779fd812ca3bef1b32", decimals: 18, icon: cmcIcon(8000)},
+      {symbol: "SKY", assetId: "", contract: "0x56072c95faa701256059aa122697b133aded9279", decimals: 18, icon: cmcIcon(33038)},
+      {symbol: "COW", assetId: "", contract: "0xdef1ca1fb7fbcdc777520aa7f396b4e015f497ab", decimals: 18, icon: cmcIcon(19269)},
     ],
   },
   {
@@ -393,6 +398,9 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "ENA", assetId: "", contract: "0x58538e6a46e07434d7e7375bc268d3cb839c0133", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/36530/large/ethena.png?1711701436"},
       {symbol: "MORPHO", assetId: "", contract: "0xbaa5cc21fd487b8fcc2f632f3f4e8d37262a0842", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/29837/large/Morpho-token-icon.png?1726771230"},
       {symbol: "sUSDe", assetId: "", contract: "0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33669/large/sUSDe-Symbol-Color.png?1716307680"},
+      // 2026-10-26: Lido, Sky and CoW governance tokens (owner request). Verified on-chain (symbol, decimals, name);
+      // not in the 1Click registry, routed by the EVM venues: LI.FI bought $100 at under 1 % and sold it back at ~1.6 % (thinner than on Ethereum).
+      {symbol: "COW", assetId: "", contract: "0xc694a91e6b071bf030a18bd3053a7fe09b6dae69", decimals: 18, icon: cmcIcon(19269)},
     ],
   },
   {
@@ -494,6 +502,10 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "USDG", assetId: "", contract: "0x004b506865409877c9fa29bfb1eba929984b9bbc", decimals: 6, icon: "https://coin-images.coingecko.com/coins/images/51281/large/GDN_USDG_Token_200x200.png?1730484111"},
       {symbol: "ENA", assetId: "", contract: "0x58538e6a46e07434d7e7375bc268d3cb839c0133", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/36530/large/ethena.png?1711701436"},
       {symbol: "USDY", assetId: "", contract: "0x35e050d3c0ec2d29d269a8ecea763a183bdf9a9d", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/31700/large/usdy_%281%29.png?1696530524"},
+      // 2026-10-26: Lido, Sky and CoW governance tokens (owner request). Verified on-chain (symbol, decimals, name);
+      // not in the 1Click registry, routed by the EVM venues: LI.FI bought and sold $100 both ways at under 1 %.
+      {symbol: "LDO", assetId: "", contract: "0x13ad51ed4f1b7e9dc168d8a00cb3f4ddd85efa60", decimals: 18, icon: cmcIcon(8000)},
+      {symbol: "COW", assetId: "", contract: "0xcb8b5cd20bdcaea9a010ac1f8d835824f5c87a04", decimals: 18, icon: cmcIcon(19269)},
     ],
   },
   {
