@@ -17,7 +17,7 @@ import type { ValidatorConfig } from './validators.js'
 /** Registry name, as `module.json` carries it. */
 export const MODULE_NAME = '@anywalletkit/protocol-staking-native-solana'
 
-type Action = 'stake' | 'unstake' | 'claim' | 'delegate' | 'merge' | 'other'
+type Action = 'stake' | 'unstake' | 'claim' | 'delegate' | 'merge' | 'authorize' | 'other'
 
 const TITLES: Record<Action, { kind: ActivityItem['kind']; title: string }> = {
   stake: { kind: 'stake', title: 'Staked SOL' },
@@ -25,6 +25,7 @@ const TITLES: Record<Action, { kind: ActivityItem['kind']; title: string }> = {
   claim: { kind: 'claim', title: 'Withdrew unstaked SOL' },
   delegate: { kind: 'stake', title: 'Delegated stake' },
   merge: { kind: 'stake', title: 'Merged stake accounts' },
+  authorize: { kind: 'contract', title: 'Changed stake authority' },
   other: { kind: 'contract', title: 'Stake account update' },
 }
 
@@ -39,16 +40,35 @@ function parsedStakeInstructions(tx: ChainTx): ParsedIx[] | null {
   return stake.length > 0 ? stake : null
 }
 
-function fromParsed(ixs: ParsedIx[]): { action: Action; vote: string | null } {
+/** What a parsed instruction says beyond its type: where a Withdraw went, who an Authorize hands the account to. */
+interface Detail { destination?: string; newAuthority?: string; authorityType?: string }
+
+const AUTHORIZE_TYPES = new Set(['authorize', 'authorizeChecked', 'authorizeWithSeed', 'authorizeCheckedWithSeed'])
+
+function fromParsed(ixs: ParsedIx[]): { action: Action; vote: string | null; detail: Detail } {
   const types = new Set(ixs.map((ix) => ix.parsed!.type!))
   const delegate = ixs.find((ix) => ix.parsed!.type === 'delegate')
   const vote = typeof delegate?.parsed?.info?.voteAccount === 'string' ? delegate.parsed.info.voteAccount : null
-  if (delegate && (types.has('initialize') || types.has('initializeChecked'))) return { action: 'stake', vote }
-  if (types.has('withdraw')) return { action: 'claim', vote: null }
-  if (types.has('deactivate') || types.has('deactivateDelinquent')) return { action: 'unstake', vote: null }
-  if (delegate) return { action: 'delegate', vote }
-  if (types.has('merge')) return { action: 'merge', vote: null }
-  return { action: 'other', vote: null }
+  const str = (v: unknown) => (typeof v === 'string' ? v : undefined)
+  if (delegate && (types.has('initialize') || types.has('initializeChecked'))) return { action: 'stake', vote, detail: {} }
+  if (types.has('withdraw')) {
+    const destination = str(ixs.find((ix) => ix.parsed!.type === 'withdraw')?.parsed?.info?.destination)
+    return { action: 'claim', vote: null, detail: destination ? { destination } : {} }
+  }
+  const auth = ixs.find((ix) => AUTHORIZE_TYPES.has(ix.parsed!.type!))
+  if (auth && !types.has('deactivate') && !delegate) {
+    const info = auth.parsed!.info ?? {}
+    const detail: Detail = {}
+    const newAuthority = str(info.newAuthority)
+    const authorityType = str(info.authorityType)
+    if (newAuthority) detail.newAuthority = newAuthority
+    if (authorityType) detail.authorityType = authorityType
+    return { action: 'authorize', vote: null, detail }
+  }
+  if (types.has('deactivate') || types.has('deactivateDelinquent')) return { action: 'unstake', vote: null, detail: {} }
+  if (delegate) return { action: 'delegate', vote, detail: {} }
+  if (types.has('merge')) return { action: 'merge', vote: null, detail: {} }
+  return { action: 'other', vote: null, detail: {} }
 }
 
 function fromTag(tag: number | null): Action | null {
@@ -58,6 +78,7 @@ function fromTag(tag: number | null): Action | null {
     case STAKE_IX.deactivate: case STAKE_IX.split: case STAKE_IX.deactivateDelinquent: return 'unstake'
     case STAKE_IX.delegate: return 'delegate'
     case STAKE_IX.merge: return 'merge'
+    case STAKE_IX.authorize: return 'authorize'
     case null: return null
     default: return 'other'
   }
@@ -79,8 +100,9 @@ export function describeNativeStakeActivity(tx: ChainTx, ctx: DescribeActivityCo
   const { assetsIn, assetsOut } = splitNet(netTransfers(tx, ctx.own), (token) => (token === null ? { symbol: 'SOL', decimals: 9 } : undefined))
   let action: Action | null = null
   let vote: string | null = null
+  let detail: Detail = {}
   const parsed = parsedStakeInstructions(tx)
-  if (parsed) ({ action, vote } = fromParsed(parsed))
+  if (parsed) ({ action, vote, detail } = fromParsed(parsed))
   if (action === null && typeof call.data === 'string' && call.data.length > 0) {
     try { action = fromTag(stakeInstructionTag(base58Decode(call.data))) } catch { action = null }
     // A Split is an unstake only with the Deactivate that follows it (one more Stake instruction).
@@ -92,12 +114,28 @@ export function describeNativeStakeActivity(tx: ChainTx, ctx: DescribeActivityCo
     action = solIn && !solOut ? 'claim' : solOut && !solIn ? 'stake' : 'other'
   }
 
-  const { kind, title } = TITLES[action]
+  const { kind } = TITLES[action]
+  let { title } = TITLES[action]
   const name = vote ? validators.find((v) => v.voteAccount === vote)?.name ?? short(vote) : null
+  let subtitle = name ? `Native staking · ${name}` : 'Native staking · Solana'
+  let counterparty = vote ?? STAKE_PROGRAM
+  // Lamports leaving to someone else, or the account handed to someone else, must not read like routine upkeep.
+  if (action === 'claim' && detail.destination && !ctx.own.has(detail.destination)) {
+    title = `Withdrew unstaked SOL to ${short(detail.destination)}`
+    subtitle = 'Native staking · to an address that is not one of your addresses'
+    counterparty = detail.destination
+  }
+  if (action === 'authorize') {
+    if (detail.authorityType) title = `Changed stake authority (${detail.authorityType.toLowerCase()})`
+    if (detail.newAuthority) {
+      counterparty = detail.newAuthority
+      if (!ctx.own.has(detail.newAuthority)) subtitle = 'Native staking · the new authority is not one of your addresses'
+    }
+  }
   return activityBase(tx, kind, title, {
     protocol: MODULE_NAME,
-    subtitle: name ? `Native staking · ${name}` : 'Native staking · Solana',
-    counterparty: vote ?? STAKE_PROGRAM,
+    subtitle,
+    counterparty,
     assetsIn,
     assetsOut,
   })
