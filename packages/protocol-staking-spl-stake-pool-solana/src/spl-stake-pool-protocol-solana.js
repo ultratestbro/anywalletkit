@@ -59,6 +59,12 @@ export const DEFAULT_COMPUTE_UNIT_PRICE = 50_000n
 export const DEFAULT_SLIPPAGE_BPS = 50
 /** Seed-derived stake accounts tracked per wallet for delayed exits. */
 export const DEFAULT_UNSTAKE_SLOTS = 8
+/**
+ * Slot addresses someone else pre-funded (System-owned SOL at a predictable seed address, where
+ * CreateAccountWithSeed then fails) are skipped; the scan goes this many indexes past the tracked
+ * slots before it gives up.
+ */
+export const MAX_PREFUNDED_SLOTS = 32
 /** Per-call RPC timeout (ms). */
 export const DEFAULT_RPC_TIMEOUT_MS = 15_000
 
@@ -517,34 +523,48 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
    * The account's delayed-exit slots: seed-derived stake accounts, decoded.
    *
    * @protected
-   * @returns {Promise<{ wallet: string, epoch: bigint, slots: Array<{ index: number, address: string, lamports: bigint, status: StakeActivation, deactivationEpoch: bigint | null } | null>, freeIndex: number | null }>} Slots (null where empty) and the first free one.
+   * @returns {Promise<{ wallet: string, epoch: bigint, slots: Array<{ index: number, address: string, lamports: bigint, status: StakeActivation, deactivationEpoch: bigint | null } | null>, freeIndex: number | null, prefunded: number[] }>} Slots (null where empty), the first free one, and the indexes skipped because someone pre-funded their address.
    */
   async _getUnstakeSlots () {
     const wallet = await this._address()
-    const addresses = await Promise.all(Array.from({ length: this._unstakeSlots }, (_, i) => findUnstakeAccount(wallet, this.pool.name, i)))
-    const [accounts, epochInfo] = await Promise.all([this._getAccounts(addresses), this.getEpochInfo()])
+    const epochInfo = await this.getEpochInfo()
     const slots = []
+    const prefunded = []
     let freeIndex = null
-    for (let i = 0; i < addresses.length; i++) {
-      const a = accounts[i]
-      if (!a) {
-        if (freeIndex === null) freeIndex = i
-        slots.push(null)
-        continue
+    let usable = 0
+    let next = 0
+    const bound = this._unstakeSlots + MAX_PREFUNDED_SLOTS
+    // `unstakeSlots` usable indexes: a pre-funded address (SOL someone sent to the predictable seed
+    // address; CreateAccountWithSeed fails there) does not count and the scan goes on past it.
+    while (usable < this._unstakeSlots && next < bound) {
+      const indexes = Array.from({ length: Math.min(this._unstakeSlots - usable, bound - next) }, (_, k) => next + k)
+      next += indexes.length
+      const addresses = await Promise.all(indexes.map((i) => findUnstakeAccount(wallet, this.pool.name, i)))
+      const accounts = await this._getAccounts(addresses)
+      for (let k = 0; k < indexes.length; k++) {
+        const i = indexes[k]
+        const a = accounts[k]
+        if (!a) {
+          usable++
+          if (freeIndex === null) freeIndex = i
+          slots.push(null)
+          continue
+        }
+        if (a.owner !== STAKE_PROGRAM) { prefunded.push(i); slots.push(null); continue }
+        usable++
+        const data = decodeStakeAccount(fromBase64(a.data[0]))
+        if (data.state === 'uninitialized') { slots.push(null); continue }
+        const status = stakeActivation(data, epochInfo.epoch)
+        slots.push({
+          index: i,
+          address: addresses[k],
+          lamports: BigInt(a.lamports),
+          status,
+          deactivationEpoch: data.delegation && data.delegation.deactivationEpoch !== U64_MAX ? data.delegation.deactivationEpoch : null
+        })
       }
-      if (a.owner !== STAKE_PROGRAM) { slots.push(null); continue } // something else parked on our seed address
-      const data = decodeStakeAccount(fromBase64(a.data[0]))
-      if (data.state === 'uninitialized') { slots.push(null); continue }
-      const status = stakeActivation(data, epochInfo.epoch)
-      slots.push({
-        index: i,
-        address: addresses[i],
-        lamports: BigInt(a.lamports),
-        status,
-        deactivationEpoch: data.delegation && data.delegation.deactivationEpoch !== U64_MAX ? data.delegation.deactivationEpoch : null
-      })
     }
-    return { wallet, epoch: epochInfo.epoch, slots, freeIndex }
+    return { wallet, epoch: epochInfo.epoch, slots, freeIndex, prefunded }
   }
 
   /**
@@ -584,8 +604,13 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
     if (q.lamports < pool.minimumStakeLamports) {
       throw new Error(`A delayed exit must be worth at least ${pool.minimumStakeLamports} lamports (the stake program's minimum delegation plus rent) — use the instant mode for less.`)
     }
-    const { freeIndex } = await this._getUnstakeSlots()
-    if (freeIndex === null) throw new Error(`All ${this._unstakeSlots} delayed-exit slots are in use — claim a finished exit first.`)
+    const { freeIndex, prefunded } = await this._getUnstakeSlots()
+    if (freeIndex === null) {
+      if (prefunded.length >= MAX_PREFUNDED_SLOTS) {
+        throw new Error(`No delayed-exit slot is free: ${prefunded.length} slot addresses hold SOL someone else sent there (they cannot hold an exit) — use the instant mode, or raise unstakeSlots.`)
+      }
+      throw new Error(`All ${this._unstakeSlots} delayed-exit slots are in use — claim a finished exit first.`)
+    }
     const listAccount = await this._getAccount(pool.state.validatorList)
     if (!listAccount) throw new Error('Validator list account not found.')
     const { validators } = decodeValidatorList(fromBase64(listAccount.data[0]))
