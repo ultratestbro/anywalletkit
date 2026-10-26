@@ -133,7 +133,6 @@ export function newRequestId(): string {
   return crypto.randomUUID()
 }
 
-/** The content script's stamp: {@link PageRequest} + the page origin. */
 /** What a content script's `message` listener receives (structural `MessageEvent`). */
 export interface PageMessageEvent { data: unknown; origin: string; source: unknown }
 /** The page window the content script shares (structural `window`). */
@@ -150,6 +149,7 @@ export function pageRequestFrom(event: PageMessageEvent, page: PageWindow): Page
   return isPageRequest(event.data) ? event.data : null
 }
 
+/** The content script's stamp: {@link PageRequest} + the page origin. */
 export function stampOrigin(request: PageRequest, origin: string): RelayRequest {
   const { id, chain, method } = request
   return 'params' in request ? { kind: 'request', id, origin, chain, method, params: request.params } : { kind: 'request', id, origin, chain, method }

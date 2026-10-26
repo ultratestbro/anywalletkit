@@ -293,13 +293,35 @@ describe('review 2026-10-26 regressions', () => {
     expect((await p.getValidator(7n)).apr).toBeNull()
   })
 
-  it('gap scan: slots are read until 32 empty ones past the last used one; a full scan reads all 256', async () => {
+  // Audit 2026-10-25 round 3, NS-6: the default scan was 'gap', which stops 32 empty slots past the
+  // last used one, so a pending slot above a run of claimed ones was never found (this test pinned
+  // that as expected: slot 200 "only a full scan finds it"). The default now reads every slot in one
+  // Multicall3 eth_call; 'gap' stays as an explicit, documented trade-off.
+  it('default scan: every slot in one Multicall3 call finds a pending slot far above the last used one', async () => {
+    const node = new FakeMonad()
+    Object.assign(node.delegator(97n), { stake: 5n * MON })
+    node.withdrawal(97n, 3, MON, 2330n)
+    node.withdrawal(97n, 30, MON, 2330n)
+    node.withdrawal(97n, 200, MON, 2330n)
+    const w = await setup({}, node).p.getWithdrawalRequests({ validator: 97n })
+    expect(w.requests.map((r) => r.withdrawId).sort((a, b) => a - b)).toEqual([3, 30, 200])
+    expect(node.multicallCalls).toBe(1)
+    // No Multicall3 on the chain: the same answer, one call per slot.
+    node.multicall = false
+    node.calls.length = 0
+    const fallback = await setup({}, node).p.getWithdrawalRequests({ validator: 97n })
+    expect(fallback.requests.map((r) => r.withdrawId).sort((a, b) => a - b)).toEqual([3, 30, 200])
+    expect(node.calls.filter((c) => c.fn === 'getWithdrawalRequest')).toHaveLength(256)
+    node.multicall = true
+  })
+
+  it("'gap' (opt-in) reads until 32 empty slots past the last used one; 'full' reads all 256", async () => {
     const node = new FakeMonad()
     Object.assign(node.delegator(97n), { stake: 5n * MON })
     node.withdrawal(97n, 3, MON, 2330n)
     node.withdrawal(97n, 30, MON, 2330n) // within 32 empty slots of slot 3: found
-    node.withdrawal(97n, 200, MON, 2330n) // far past the window: only a full scan finds it
-    const gap = setup({}, node)
+    node.withdrawal(97n, 200, MON, 2330n) // far past the window: 'gap' misses it (documented)
+    const gap = setup({ withdrawScan: 'gap' }, node)
     const w = await gap.p.getWithdrawalRequests({ validator: 97n })
     expect(w.requests.map((r) => r.withdrawId).sort((a, b) => a - b)).toEqual([3, 30])
     expect(node.calls.filter((c) => c.fn === 'getWithdrawalRequest').length).toBeLessThan(80)
@@ -308,7 +330,7 @@ describe('review 2026-10-26 regressions', () => {
     expect(full.requests.map((r) => r.withdrawId).sort((a, b) => a - b)).toEqual([3, 30, 200])
     expect(node.calls.filter((c) => c.fn === 'getWithdrawalRequest')).toHaveLength(256)
     node.calls.length = 0
-    await setup({}, node).p.getWithdrawalRequests({ validator: 21n }) // nothing there at all
+    await setup({ withdrawScan: 'gap' }, node).p.getWithdrawalRequests({ validator: 21n }) // nothing there at all
     expect(node.calls.filter((c) => c.fn === 'getWithdrawalRequest').length).toBeLessThanOrEqual(36)
   })
 
