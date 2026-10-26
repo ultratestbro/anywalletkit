@@ -127,8 +127,10 @@ once, and `delegate({ account })` in the same epoch undoes an unstake. `merge` j
 compatible accounts on the same validator.
 
 :::note[Allowlist policies]
-A Solana `allowlist` must include the Stake program (`Stake11111111111111111111111111111111111111`)
-and the new stake accounts (`getStakeAccountAddress(i)`), or the kit refuses staking writes.
+A Solana `allowlist` checks each Stake instruction by whom it pays or empowers. Allow the
+wallet's own address (staker, withdrawer, withdrawal recipient), the stake accounts
+(`getStakeAccountAddress(i)`) and the vote accounts of the validators you list, or the kit
+refuses staking writes. Allowlisting the Stake program itself opens nothing.
 :::
 
 ## Native MON staking

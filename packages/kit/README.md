@@ -44,10 +44,12 @@ Policies run before anything is signed or broadcast, in this order: fee cap
 (quotes first, where the account can quote), allowlist, blocklist, `confirm`.
 `maxFee` (native base units) is checked on the quote of `sendTransaction`,
 `signTransaction` and `transfer`, then handed to the account as
-`WriteOptions.maxFee` so it holds for what is signed; `approve` (EVM) and
-`sendSerialized` (Solana) get it the same way, checked by the account on the
-transaction it signs. Signing primitives without a fee model (`signRaw`,
-`signBuilt`, `signCompiled`, `signTransactionMessage`) carry no fee cap.
+`WriteOptions.maxFee` so it holds for what is signed; `approve` (EVM),
+`sendSerialized` (Solana), `signRaw` (Tron), `revokeDelegation` and swap2's
+`sendSerializedTransaction` hook get it the same way, checked by the account on
+the transaction it signs. Under a cap, a write that pays a fee but has nowhere
+to take one (`signBuilt`, `signCompiled`, `signTransactionMessage`) is refused;
+off-chain signatures are not capped.
 Every write surface of an account is covered — `sendTransaction`, `transfer`,
 `signTransaction` (a module that signs and broadcasts on its own cannot skip
 them), `sign`, NEAR's `signNep413` and TON's `signTonProof` /
@@ -68,6 +70,26 @@ to the account (`_config` reads as a frozen copy), and under a `maxFee` rule
 refuse a `sign*` / `send*` helper the policies cannot quote. The boundary is
 what the wallet hands out: the `Wallet` object itself is the app's — give
 modules and dApp bridges accounts, managers or protocols, never the `Wallet`.
+
+The lists check every destination a write names (`intent.destinations`), not
+only the contract it calls: the recipient or spender inside standard token calls
+(ERC-20 / 721 / 1155 transfers, `approve`, `increaseAllowance`,
+`setApprovalForAll`, Permit2 `approve`, an on-chain EIP-2612 `permit`, ERC-677
+`transferAndCall`), TRC-20 calls (by `parameters` and inside `raw_data_hex`),
+NEAR `ft_transfer(_call)` / `nft_transfer(_call)` / `storage_deposit` /
+`deleteAccount` (also in base64 borsh), TON jetton and NFT transfers (destination
+and excess receiver), the owner of the token account an SPL transfer pays
+(read through the account's `getTokenAccountOwner`, only when a list or `confirm`
+applies), and whom a Solana Stake instruction pays or empowers. An allowlist must
+hold all of them. When part of a write cannot be read, the intent says
+`destinationUnknown`: an allowlist refuses it, and so does a blocklist with no
+`confirm` hook. `transfer` is judged by `recipient`, the field every chain pays.
+An approval is `unlimited` at type(uint128).max or above (core's
+`isUnlimitedAllowance`), and when its amount cannot be read; a Permit2 batch
+lists every token in `intent.approvals`. The checks and the signature use one
+copy of the arguments, taken before the first check, and `confirm` gets its own:
+a getter, a `confirm` hook or a timer cannot change what is signed after it was
+judged.
 
 A revoke is `kind: 'revoke'`: an `approve` / `signPermit` / EIP-2612 Permit of 0,
 raw revoke calldata (`approve(0x0, tokenId)`, `setApprovalForAll(…, false)`,

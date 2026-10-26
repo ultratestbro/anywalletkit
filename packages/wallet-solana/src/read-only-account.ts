@@ -3,7 +3,7 @@ import { ed25519 } from '@noble/curves/ed25519.js'
 import {
   address, appendTransactionMessageInstructions, compileTransaction, compileTransactionMessage, compressTransactionMessageUsingAddressLookupTables,
   createNoopSigner, createTransactionMessage, fetchAddressesForLookupTables, getAddressEncoder, getBase64Decoder, getBase64EncodedWireTransaction,
-  getBase64Encoder, getCompiledTransactionMessageDecoder, getCompiledTransactionMessageEncoder, getProgramDerivedAddress, getTransactionMessageComputeUnitLimit,
+  getAddressDecoder, getBase64Encoder, getCompiledTransactionMessageDecoder, getCompiledTransactionMessageEncoder, getProgramDerivedAddress, getTransactionMessageComputeUnitLimit,
   getTransactionMessageComputeUnitPrice, isSignature, isSignerRole, isTransactionMessageWithBlockhashLifetime, isTransactionMessageWithDurableNonceLifetime,
   isWritableRole, pipe, setTransactionMessageComputeUnitLimit, setTransactionMessageComputeUnitPrice, setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash, type Address, type Instruction, type Transaction, type TransactionMessage,
@@ -171,6 +171,25 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       }
     }
     return out
+  }
+
+  /**
+   * The owner of a Token / Token-2022 token account — whom an SPL transfer into it pays — or
+   * undefined when the address holds no initialized token account (a wallet, a mint, nothing).
+   * Network errors throw. The kit's policies read SPL transfer recipients through it.
+   */
+  async getTokenAccountOwner(tokenAccount: string): Promise<string | undefined> {
+    let at: Address
+    try { at = address(tokenAccount) } catch { return undefined }
+    const rpc = this.requireRpc('read token accounts')
+    const info = await rpc.getAccountInfo(at, { commitment: this._commitment, encoding: 'base64' }).send()
+    const v = info.value
+    if (!v || (v.owner !== TOKEN_PROGRAM_ADDRESS && v.owner !== TOKEN_2022_PROGRAM_ADDRESS)) return undefined
+    const bytes = getBase64Encoder().encode(v.data[0]) as Uint8Array
+    // Account layout: mint 0..32, owner 32..64, state at 108 (0 = uninitialized). Token-2022 tags
+    // an extended account at 165 (2 = Account; a mint with extensions carries 1 there).
+    if (bytes.length < 165 || (bytes.length > 165 && bytes[165] !== 2) || bytes[108] === 0) return undefined
+    return getAddressDecoder().decode(bytes.subarray(32, 64))
   }
 
   /**

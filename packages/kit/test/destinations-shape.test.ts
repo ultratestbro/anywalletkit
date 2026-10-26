@@ -35,7 +35,8 @@ describe('destinations follow the field the chain package builds from', () => {
     const plain = await judged('tron:0x2b6653dc', TRON_ALLOWED, { to: TRON_DRAINER, value: 1 })
     expect(plain.intent).toMatchObject({ destinations: [TRON_DRAINER], destinationUnknown: false })
     expect(plain.error).toMatchObject({ policy: 'allowlist' })
-    const call = await judged('tron:0x2b6653dc', TRON_ALLOWED, { contractAddress: TRON_ALLOWED, functionSelector: 'transfer(address,uint256)', parameters: [] })
+    // A call with no recipient parameter goes to its contract (a `transfer` names its recipient in `parameters`: round 3, M1).
+    const call = await judged('tron:0x2b6653dc', TRON_ALLOWED, { contractAddress: TRON_ALLOWED, functionSelector: 'deposit()', parameters: [] })
     expect(call.intent).toMatchObject({ destinations: [TRON_ALLOWED], destinationUnknown: false })
     expect(call.error).toBeUndefined()
   })

@@ -1,6 +1,7 @@
-import { UserRejectedError, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
+import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
-import { canonicalAddress, sendDestinations } from './destinations.js'
+import { canonicalAddress, erc20Transfer, hexData, sendDestinations } from './destinations.js'
+import { snapshot } from './snapshot.js'
 
 /**
  * Account methods the policies guard — everything that produces a signature
@@ -15,7 +16,7 @@ export type KnownWriteMethod =
   | 'signTypedData' | 'signPermit' | 'approve'
   | 'signRaw' | 'signNep413' | 'signBuilt' | 'signTonProof' | 'signTonConnectData'
   | 'sendSerialized' | 'signCompiled' | 'signTransactionMessage'
-  | 'revokeDelegation'
+  | 'revokeDelegation' | 'sendSerializedTransaction'
 /**
  * A method name the policies may see: one of {@link KnownWriteMethod}, or any other name a chain
  * package adds.
@@ -31,7 +32,7 @@ export const GUARDED_WRITES: readonly KnownWriteMethod[] = [
   'signTypedData', 'signPermit', 'approve',
   'signRaw', 'signNep413', 'signBuilt', 'signTonProof', 'signTonConnectData',
   'sendSerialized', 'signCompiled', 'signTransactionMessage',
-  'revokeDelegation',
+  'revokeDelegation', 'sendSerializedTransaction',
 ]
 /** Name prefixes that mark a write even when the method is not listed above. */
 export const GUARDED_PREFIXES: readonly string[] = ['sign', 'send', 'approve', 'revoke', 'transfer']
@@ -49,13 +50,19 @@ export function isGuardedWrite(name: string): boolean {
 const QUOTABLE: readonly string[] = ['sendTransaction', 'transfer', 'signTransaction']
 /**
  * Every method that pays a fee and takes `WriteOptions`, with the argument it takes them at: the
- * account holds `maxFee` on what it signs. `approve` (EVM) and `sendSerialized` (Solana) have no
- * generic quote, so for them this is the only check.
+ * account holds `maxFee` on what it signs. `approve` (EVM), `sendSerialized` (Solana), `signRaw`
+ * (Tron), `revokeDelegation` (EIP-7702) and swap2's `sendSerializedTransaction` hook have no
+ * generic quote, so for them this is the only check (round 3, M8).
  */
-const CAPPED: Readonly<Record<string, number>> = Object.freeze({ sendTransaction: 1, transfer: 1, signTransaction: 1, approve: 1, sendSerialized: 2 })
+const CAPPED: Readonly<Record<string, number>> = Object.freeze({
+  sendTransaction: 1, transfer: 1, signTransaction: 1, approve: 1, sendSerialized: 2,
+  signRaw: 1, revokeDelegation: 0, sendSerializedTransaction: 2,
+})
 
 /** Methods that sign an off-chain message: nothing moves, allow/block lists do not apply, only `confirm`. */
 const MESSAGE_METHODS: readonly string[] = ['sign', 'signNep413', 'signTonProof', 'signTonConnectData']
+/** Off-chain signatures pay no fee: a fee cap does not apply to them. */
+const FEE_FREE: readonly string[] = [...MESSAGE_METHODS, 'signTypedData', 'signPermit']
 
 /** A chain id as callers and dApps write it (number, bigint, decimal or 0x string) → decimal, or undefined. */
 function chainIdRef(v: unknown): string | undefined {
@@ -89,7 +96,6 @@ function isOffline(account: unknown): boolean {
 /** Permit2 primary types (Uniswap Permit2): an allowance or a transfer authorisation for `spender`. */
 const PERMIT2_TYPES = new Set(['PermitSingle', 'PermitBatch', 'PermitTransferFrom', 'PermitBatchTransferFrom', 'PermitWitnessTransferFrom', 'PermitBatchWitnessTransferFrom'])
 const MAX_UINT256 = (1n << 256n) - 1n
-const MAX_UINT160 = (1n << 160n) - 1n
 
 /**
  * What a write does, as the policies classify it. The kind decides which rules apply: lists and fee
@@ -144,8 +150,17 @@ export interface WriteIntent {
   token?: string
   /** Amount when it can be read off the call (allowance for approvals). */
   amount?: bigint
-  /** Approvals: the allowance is unbounded (uint256 / uint160 max, 2^255 and above, or a DAI-style `allowed`). */
+  /**
+   * Approvals: the allowance is unbounded — type(uint128).max or above (`isUnlimitedAllowance` in
+   * core), a DAI-style `allowed`, or an amount the policies cannot read (the worst case is shown).
+   * For a Permit2 batch: any of its entries.
+   */
   unlimited?: boolean
+  /**
+   * Approvals: every token the write grants, one entry each (a Permit2 batch carries several).
+   * `token` / `amount` above are set only when there is exactly one.
+   */
+  approvals?: Array<{ token?: string; amount?: bigint; unlimited: boolean }>
   /** Approvals / permits: expiry as given (unix seconds). */
   deadline?: bigint
   /** Revokes: what each one takes away (`spender` absent for a per-token NFT approval and an EIP-7702 delegation). */
@@ -200,9 +215,22 @@ export class PolicyViolationError extends Error {
 const lower = (s: string | undefined) => s?.toLowerCase()
 const obj = (v: unknown): Record<string, unknown> => (typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {})
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined)
-const big = (v: unknown): bigint | undefined =>
-  typeof v === 'bigint' ? v : typeof v === 'number' && Number.isFinite(v) ? BigInt(Math.trunc(v)) : typeof v === 'string' && /^(0x[0-9a-fA-F]+|\d+)$/.test(v) ? BigInt(v) : undefined
-const unboundedAllowance = (amount: bigint | undefined, max = MAX_UINT256): boolean => amount !== undefined && (amount >= 1n << 255n || amount === max)
+/**
+ * A uint as the signer reads it. wallet-evm and viem pass strings and numbers through BigInt(), so
+ * ' 0x…', '0X…', '0b…', '0o…' and surrounding whitespace are numbers there and must be here too
+ * (round 3, M3). A non-integer number or anything else is unreadable (undefined).
+ */
+const big = (v: unknown): bigint | undefined => {
+  if (typeof v === 'bigint') return v
+  if (typeof v === 'number') return Number.isInteger(v) ? BigInt(v) : undefined
+  if (typeof v === 'string' && v.length <= 300) { try { return BigInt(v) } catch { return undefined } }
+  return undefined
+}
+/** An allowance given as `raw`: unlimited at or above type(uint128).max, or when it is present but unreadable (the worst case is what `confirm` must see). */
+const allowanceUnlimited = (raw: unknown, amount: bigint | undefined): boolean => (amount === undefined ? raw !== undefined : isUnlimitedAllowance(amount))
+
+/** Solana token accounts an intent pays into, whose owners {@link applyPolicies} still has to read (round 3, M1). */
+const PENDING_TOKEN_ACCOUNTS = new WeakMap<WriteIntent, string[]>()
 
 /** An intent before {@link withDestinations}. */
 type DraftIntent = Omit<WriteIntent, 'destinations' | 'destinationUnknown'>
@@ -350,13 +378,23 @@ function typedDataIntent(base: IntentBase, arg: unknown, primaryType: string): D
     const amount = big(field('value', 'uint256'))
     const allowed = field('allowed', 'bool')
     if (verifying !== undefined && (amount === 0n || allowed === false)) return revokeIntent(base, [{ token: verifying, spender }])
-    const unlimited = allowed === true || unboundedAllowance(amount)
+    // No uint256 `value` the policies can read and no DAI `allowed: true`: the grant is unknown, so the worst case (round 3, M3).
+    const unlimited = allowed === true || amount === undefined || isUnlimitedAllowance(amount)
     return approvalIntent(base, spender, verifying, amount, big(field('deadline') ?? field('expiry')), unlimited)
   }
   if (PERMIT2_TYPES.has(primaryType) && str(message.spender) !== undefined) {
-    const details = Array.isArray(message.details) ? obj(message.details[0]) : obj(message.details ?? message.permitted)
-    const amount = big(details.amount)
-    return approvalIntent(base, str(message.spender), str(details.token), amount, big(message.sigDeadline ?? message.deadline ?? details.expiration), unboundedAllowance(amount, MAX_UINT160))
+    // Every entry: `details` (allowance permits) or `permitted` (transfer permits), one or a batch (round 3, M3).
+    const field = message.details !== undefined ? message.details : message.permitted
+    const entries = (Array.isArray(field) ? field : field !== undefined ? [field] : []).map(obj)
+    const approvals = entries.map((d) => {
+      const amount = big(d.amount)
+      return { ...(str(d.token) !== undefined ? { token: str(d.token)! } : {}), ...(amount !== undefined ? { amount } : {}), unlimited: allowanceUnlimited(d.amount, amount) }
+    })
+    const one = approvals.length === 1 ? approvals[0] : undefined
+    const expiry = big(message.sigDeadline ?? message.deadline ?? (one ? entries[0]!.expiration : undefined))
+    // No entry at all: nothing tells what is granted, so the worst case.
+    const unlimited = approvals.length === 0 || approvals.some((a) => a.unlimited)
+    return { ...approvalIntent(base, str(message.spender), one?.token, one?.amount, expiry, unlimited), approvals }
   }
   return { ...base, kind: 'typedData', message: true, ...(verifying !== undefined ? { to: verifying } : {}) }
 }
@@ -376,15 +414,21 @@ function withDestinations(intent: DraftIntent): WriteIntent {
   }
   if (intent.kind === 'revoke') return { ...intent, destinations: revokeTargets(intent), destinationUnknown: false }
   if (intent.method === 'transfer') {
-    const r = str(obj(intent.raw).recipient) ?? str(obj(intent.raw).to)
-    return { ...intent, destinations: r !== undefined ? [r] : [], destinationUnknown: r === undefined }
+    // Every chain package pays `recipient` and reads nothing else; a `to` that names another
+    // address makes the call ambiguous (round 3, M4).
+    const r = str(obj(intent.raw).recipient)
+    const to = str(obj(intent.raw).to)
+    const conflicting = r !== undefined && to !== undefined && canonicalAddress(intent.chain, to) !== canonicalAddress(intent.chain, r)
+    return { ...intent, destinations: r !== undefined ? [r] : [], destinationUnknown: r === undefined || conflicting }
   }
   // signRaw is Tron's prebuilt-transaction signer and signBuilt NEAR's, whatever chain id the account reports.
   const chain = intent.method === 'signRaw' ? 'tron:' : intent.method === 'signBuilt' ? 'near:' : intent.chain
   const d = sendDestinations(chain, intent.raw)
   // A batch may carry approvals among its calls: their spenders are destinations too.
   const granted = chain.startsWith('eip155:') && Array.isArray(intent.raw) ? intent.raw.flatMap((c) => { const g = grantCall(c); return g ? [g.spender] : [] }) : []
-  return { ...intent, destinations: [...d.list, ...granted], destinationUnknown: d.unknown }
+  const out: WriteIntent = { ...intent, destinations: [...new Set([...d.list, ...granted])], destinationUnknown: d.unknown }
+  if (d.tokenAccounts) PENDING_TOKEN_ACCOUNTS.set(out, d.tokenAccounts)
+  return out
 }
 
 function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown): WriteIntent {
@@ -398,12 +442,12 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
     case 'approve': {
       const amount = big(a.amount)
       if (amount === 0n && str(a.token) !== undefined) return revokeIntent(base, [{ token: str(a.token)!, ...(str(a.spender) !== undefined ? { spender: str(a.spender)! } : {}) }])
-      return approvalIntent(base, str(a.spender), str(a.token), amount, undefined, unboundedAllowance(amount))
+      return approvalIntent(base, str(a.spender), str(a.token), amount, undefined, allowanceUnlimited(a.amount, amount))
     }
     case 'signPermit': {
       const amount = big(a.value ?? a.amount)
       if (amount === 0n && str(a.token) !== undefined) return revokeIntent(base, [{ token: str(a.token)!, ...(str(a.spender) !== undefined ? { spender: str(a.spender)! } : {}) }])
-      return approvalIntent(base, str(a.spender), str(a.token), amount, big(a.deadline), unboundedAllowance(amount))
+      return approvalIntent(base, str(a.spender), str(a.token), amount, big(a.deadline), allowanceUnlimited(a.value ?? a.amount, amount))
     }
     case 'signTypedData':
       return typedDataIntent(base, arg, resolvePrimaryType(arg))
@@ -411,6 +455,12 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
       // NEAR: a transaction built elsewhere, signed here — its receiver is the destination.
       const to = str(a.receiverId)
       return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}) }
+    }
+    case 'transfer': {
+      // The recipient the chain package pays, never `to` (round 3, M4).
+      const to = str(a.recipient)
+      const amount = big(a.amount)
+      return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(typeof a.token === 'string' ? { token: a.token } : {}), ...(amount !== undefined ? { amount } : {}) }
     }
     case 'signRaw': {
       // Tron raw transaction: the first contract's `to_address` / `amount` when present (TransferContract / TRC-20 calls name the contract).
@@ -433,15 +483,43 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
     if (found.every((r) => r !== null)) return revokeIntent(base, found.flat() as Array<{ token: string; spender?: string }>)
     // One raw approve / setApprovalForAll(true): an approval of the spender it names.
     const grant = calls.length === 1 && !carriesForeignPayload(calls[0]) ? grantCall(calls[0]) : null
-    if (grant) return approvalIntent(base, grant.spender, grant.token, grant.amount, undefined, unboundedAllowance(grant.amount))
+    if (grant) return approvalIntent(base, grant.spender, grant.token, grant.amount, undefined, isUnlimitedAllowance(grant.amount))
   }
   // An EVM, Solana or Tron transaction never goes to a `recipient` field (`transfer` options do):
   // showing it would name a destination the signed transaction does not have (round 3, H2).
   const ns = chain.split(':')[0]
   const noRecipient = method !== 'transfer' && (ns === 'eip155' || ns === 'solana' || ns === 'tron' || ns === 'ton' || ns === 'near')
   const to = str(a.to) ?? (noRecipient ? undefined : str(a.recipient))
-  const amount = big(a.amount ?? a.value)
-  return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(typeof a.token === 'string' ? { token: a.token } : {}), ...(amount !== undefined ? { amount } : {}) }
+  // A token transfer in calldata moves that token, not the native value next to it (round 3, M1).
+  const move = tokenMove(ns ?? '', arg)
+  const token = move?.token ?? (typeof a.token === 'string' ? a.token : undefined)
+  const amount = move ? move.amount : big(a.amount ?? a.value)
+  return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(token !== undefined ? { token } : {}), ...(amount !== undefined ? { amount } : {}) }
+}
+
+/** One token transfer a write makes through a contract — an ERC-20 / TRC-20 `transfer`, a NEP-141 `ft_transfer(_call)` — as token and amount. */
+function tokenMove(ns: string, arg: unknown): { token: string; amount: bigint | undefined } | undefined {
+  if (Array.isArray(arg)) return undefined
+  const a = obj(arg)
+  if (ns === 'eip155') {
+    const data = hexData(a.data)
+    const t = data !== undefined ? erc20Transfer(data) : null
+    return t && str(a.to) !== undefined ? { token: str(a.to)!, amount: t.amount } : undefined
+  }
+  if (ns === 'tron' && a.functionSelector === 'transfer(address,uint256)' && Array.isArray(a.parameters) && str(a.contractAddress) !== undefined) {
+    return { token: str(a.contractAddress)!, amount: big(obj(a.parameters[1]).value) }
+  }
+  if (ns === 'near' && Array.isArray(a.actions) && a.actions.length === 1 && str(a.receiverId) !== undefined) {
+    const call = obj(obj(a.actions[0]).functionCall)
+    if (call.methodName !== 'ft_transfer' && call.methodName !== 'ft_transfer_call') return undefined
+    try {
+      const json = call.args instanceof Uint8Array ? String.fromCharCode(...call.args) : typeof call.args === 'string' ? call.args : JSON.stringify(call.args)
+      return { token: str(a.receiverId)!, amount: big(obj(JSON.parse(json)).amount) }
+    } catch {
+      return { token: str(a.receiverId)!, amount: undefined }
+    }
+  }
+  return undefined
 }
 
 /**
@@ -555,10 +633,23 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     const written = [...new Set(rules.flatMap((m) => (m ? Object.keys(m) : [])))]
     const keys = written.filter((k) => (chains.length > 0 ? chains.some((c) => ruleCovers(k, c)) : ruleCovers(k, ns)))
     const intent = intentOf(chains[0] ?? account.chain, await account.getAddress(), method, arg)
+    // An SPL transfer pays a token account: its owner is the recipient, and only the network knows
+    // it. Read through the account when a list or confirm will look; unread → unknown (round 3, M1).
+    const pending = PENDING_TOKEN_ACCOUNTS.get(intent)
+    if (pending) {
+      const judged = policies.confirm !== undefined || keys.some((k) => policies.allowlist?.[k] !== undefined || policies.blocklist?.[k] !== undefined)
+      const read = (account as { getTokenAccountOwner?: (address: string) => Promise<string | undefined> }).getTokenAccountOwner
+      for (const t of pending) {
+        let owner: string | undefined
+        if (judged && typeof read === 'function') { try { owner = await read.call(account, t) } catch { owner = undefined } }
+        if (owner === undefined) { intent.destinations.push(t); intent.destinationUnknown = true } else if (!intent.destinations.includes(owner)) intent.destinations.push(owner)
+      }
+    }
     const caps = keys.flatMap((k) => { const cap = policies.maxFee?.[k]; return cap === undefined ? [] : [{ k, cap: BigInt(cap) }] })
-    // A method guarded only by its name (a chain package's internal `sign*` / `send*` helper) has no
-    // fee the policies can quote or hand down: under a fee cap it is refused (round 3, review).
-    if (caps.length > 0 && !(GUARDED_WRITES as readonly string[]).includes(method)) {
+    // A write that pays a fee but has nowhere to take a cap — a method guarded only by its name (a
+    // chain package's internal `sign*` / `send*` helper), NEAR's signBuilt, Solana's signCompiled /
+    // signTransactionMessage — is refused under a fee cap rather than signed unchecked (round 3, review and M8).
+    if (caps.length > 0 && CAPPED[method] === undefined && !FEE_FREE.includes(method)) {
       throw new PolicyViolationError('maxFee', `${method} has no fee the ${caps[0]!.k} cap can be checked against; nothing was signed.`)
     }
     if (caps.length > 0 && QUOTABLE.includes(method)) {
@@ -596,7 +687,8 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         }
       }
     }
-    if (policies.confirm && !(await policies.confirm(intent))) throw new UserRejectedError('The write was not confirmed.')
+    // confirm gets its own copy of the argument: whatever it edits is not what gets signed (round 3, M2).
+    if (policies.confirm && !(await policies.confirm({ ...intent, raw: snapshot(intent.raw) }))) throw new UserRejectedError('The write was not confirmed.')
     // The quote is an estimate: the account signs its own gas limit (with headroom) and fee fields.
     // Hand it the tightest cap so it checks the transaction it is about to sign (audit #4).
     return caps.length > 0 && CAPPED[method] !== undefined ? caps.reduce((a, b) => (b.cap < a.cap ? b : a)).cap : undefined
@@ -616,7 +708,9 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         let fn = wrapped.get(prop)
         if (!fn) {
           const original = v as (...args: unknown[]) => Promise<unknown>
-          fn = async (...args: unknown[]) => {
+          fn = async (...given: unknown[]) => {
+            // One copy, taken before anything is judged, is what the rules see and what gets signed (round 3, M2).
+            const args = snapshot(given)
             const maxFee = await guard(prop, args[0])
             if (maxFee !== undefined) {
               // WriteOptions sit at CAPPED[prop] (second, or third after sendSerialized's guard); a tighter caller cap stays.

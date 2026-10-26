@@ -95,9 +95,9 @@ Amounts are lamports (bigint). Without `provider` in the config, reads go to the
   is tested against `wallet-solana`'s signing checks with the default config.
 - StakeHistory from an RPC node that has not reached the current epoch is refused, so statuses are
   never computed from a stale sysvar.
-- With a Solana `allowlist` policy, staking writes go to the Stake program and to new stake
-  accounts: allow `Stake11111111111111111111111111111111111111` and the addresses from
-  `getStakeAccountAddress(i)`.
+- With a Solana `allowlist` policy, the kit checks each Stake instruction by whom it pays or
+  empowers: allow the wallet's own address, the stake accounts (`getStakeAccountAddress(i)`) and
+  the vote accounts of the validators you list. Allowlisting the Stake program itself opens nothing.
 
 ## Testing
 
