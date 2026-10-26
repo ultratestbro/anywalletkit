@@ -402,6 +402,55 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return { ok: true, unitsConsumed: value.unitsConsumed ?? 0n, logs }
   }
 
+  /**
+   * The simulation a signing path runs, which also proves what the transaction does to this wallet
+   * beyond its top-level instructions (round 3, CPI guard). Those checks cannot see what a program
+   * the wallet signs for does by CPI, so the simulation returns the post-state of this wallet and of
+   * its token accounts the transaction writes, and the guard refuses: the wallet's account handed to
+   * a program or given data, a token account's owner or close authority changed, a delegate
+   * allowance set or raised that no top-level Approve shows. `allowAuthorityChanges` skips it.
+   * One extra read (the pre-state of the written accounts); a node that does not return the
+   * post-state it was asked for is a {@link NetworkError}.
+   */
+  private async simulateGuarded(wire: string, written: readonly string[], description: TransactionDescription): Promise<SimulationResult> {
+    if (this._config.allowAuthorityChanges) return this.simulateWire(wire)
+    const rpc = this.requireRpc('simulate transactions')
+    const others = [...new Set(written.filter((a) => a !== this.address))]
+    const pre = others.length ? await this.accountStates(others) : new Map<string, { lamports: bigint; owner: string; data: Uint8Array } | null>()
+    const me = pubkeyBytes(this.address)
+    const isTokenProgram = (owner: string) => owner === TOKEN_PROGRAM_ADDRESS || owner === TOKEN_2022_PROGRAM_ADDRESS
+    const mine = others.filter((a) => {
+      const st = pre.get(a)
+      const t = st && isTokenProgram(st.owner) ? parseTokenAccount(st.data) : null
+      return t !== null && bytesEqual(t.owner, me)
+    })
+    const watched = [this.address as string, ...mine]
+    const { value } = await rpc.simulateTransaction(wire as never, {
+      encoding: 'base64', sigVerify: false, replaceRecentBlockhash: true, commitment: this._commitment, accounts: { addresses: watched.map(address), encoding: 'base64' },
+    }).send()
+    const logs = value.logs ?? []
+    if (value.err) return { ok: false, error: describeSimulationErr(value.err), logs }
+    const postList = (value as { accounts?: Array<{ owner: string; data: readonly [string, string] } | null> }).accounts
+    if (!postList || postList.length !== watched.length) throw new NetworkError('simulateTransaction did not return the requested post-state accounts.')
+    const wallet = postList[0]
+    if (wallet && (wallet.owner !== SYSTEM_PROGRAM_ADDRESS || base64Bytes(wallet.data[0]).length > 0)) {
+      throw new UnsafeTransactionError(`Transaction would ${wallet.owner !== SYSTEM_PROGRAM_ADDRESS ? `hand this wallet's account to ${wallet.owner}` : "give this wallet's account data"} (a program it signs for does it by CPI). Set allowAuthorityChanges to override.`, 'wallet-owner', [this.address])
+    }
+    const approvedOnTop = new Set(description.items.flatMap((it) => (it.type === 'token-approve' ? [it.source] : [])))
+    mine.forEach((addr, k) => {
+      const before = parseTokenAccount(pre.get(addr)!.data)!
+      const st = postList[k + 1]
+      const after = st && isTokenProgram(st.owner) ? parseTokenAccount(base64Bytes(st.data[0])) : null
+      if (!after) return // closed: lamports out are what the description and the fee guard show
+      if (!bytesEqual(before.owner, after.owner)) throw new UnsafeTransactionError(`Transaction changes the owner of token account ${addr} (by CPI). Set allowAuthorityChanges to override.`, 'sets-authority', [addr])
+      if (!optEqual(before.closeAuthority, after.closeAuthority)) throw new UnsafeTransactionError(`Transaction changes who may close token account ${addr} (by CPI). Set allowAuthorityChanges to override.`, 'sets-authority', [addr])
+      const live = after.delegate !== null && after.delegatedAmount > 0n
+      const same = optEqual(before.delegate, after.delegate) && after.delegatedAmount <= before.delegatedAmount
+      if (live && !same && !approvedOnTop.has(addr)) throw new UnsafeTransactionError(`Transaction leaves a delegate allowance on token account ${addr} that no top-level Approve shows (set by CPI). Set allowAuthorityChanges to override.`, 'approves-delegate', [addr])
+    })
+    return { ok: true, unitsConsumed: value.unitsConsumed ?? 0n, logs }
+  }
+
   /** `simulateTransaction` for any accepted input; never throws for an on-chain failure, only for transport errors. */
   async simulateTransaction(tx: SolanaTransaction): Promise<SimulationResult> {
     if (typeof tx === 'string') return this.simulateWire(tx)
@@ -564,7 +613,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     if (simulate || wantAutoLimit) {
       if (price > 0n) msg = setTransactionMessageComputeUnitPrice(price, msg as never) as TransactionMessage
       const probe = wantAutoLimit ? setTransactionMessageComputeUnitLimit(CU_LIMIT_FOR_SIMULATION, msg) : msg
-      simulation = await this.simulateWire(this.unsignedWire(probe))
+      simulation = await this.simulateGuarded(this.unsignedWire(probe), this.writableAccounts(probe), description)
       if (!simulation.ok) {
         if (simulate) throw new SimulationError(simulation.error, simulation.logs)
         simulation = undefined
@@ -599,7 +648,12 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
 
     let simulation: SimulationResult | undefined
     if (this._rpc !== undefined && (opts.simulate ?? this._config.simulate) !== false) {
-      simulation = await this.simulateWire(getBase64EncodedWireTransaction(transaction))
+      // Accounts behind lookup tables are written too: resolve them so the CPI guard sees every one.
+      const tables = resolveCompiledAccounts(transaction).tables
+      const lookups = await this.lookupAddresses(tables)
+      const layout = resolveCompiledAccounts(transaction, { account: this.address, ...(lookups ? { addressesByLookupTableAddress: lookups } : {}) })
+      const written = layout.accounts.filter((a) => isWritableRole(a.role) && a.address !== null).map((a) => a.address as string)
+      simulation = await this.simulateGuarded(getBase64EncodedWireTransaction(transaction), written, description)
       if (!simulation.ok) throw new SimulationError(simulation.error, simulation.logs)
     }
     return { transaction, quote: await this.quoteCompiled(transaction, description), simulation, description }

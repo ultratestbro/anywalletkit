@@ -15,11 +15,12 @@ const BroadcastUnknownError = (solana as unknown as { BroadcastUnknownError?: ne
 function fakeRpc(send: (wire: string) => unknown) {
   const sent: string[] = []
   const handlers: Record<string, (...a: unknown[]) => unknown> = {
-    simulateTransaction: () => ({ value: { err: null, unitsConsumed: 50_000n, logs: [] } }),
+    simulateTransaction: (_w: unknown, cfg: unknown) => ({ value: { err: null, unitsConsumed: 50_000n, logs: [], ...((cfg as { accounts?: { addresses: unknown[] } } | undefined)?.accounts ? { accounts: (cfg as { accounts: { addresses: unknown[] } }).accounts.addresses.map(() => null) } : {}) } }), // post-state for the CPI guard (round 3)
     getFeeForMessage: () => ({ value: 5_000n }),
     getLatestBlockhash: () => ({ value: { blockhash: BLOCKHASH, lastValidBlockHeight: 100n } }),
     getBalance: () => ({ value: 1n }),
     getAccountInfo: () => ({ value: null }), // transfer() checks its recipient is a wallet (round 3, M10)
+    getMultipleAccounts: (list: unknown) => ({ value: (list as unknown[]).map(() => null) }), // the CPI guard's pre-state read (round 3)
     sendTransaction: (wire) => { sent.push(wire as string); return send(wire as string) },
   }
   const rpc = new Proxy({} as SolanaRpc, { get: (_t, m: string) => (...args: unknown[]) => ({ send: async () => { const h = handlers[m]; if (!h) throw new Error(`unmocked ${m}`); return h(...args) } }) })

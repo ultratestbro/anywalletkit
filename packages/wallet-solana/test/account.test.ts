@@ -47,8 +47,9 @@ function fakeRpc(overrides: Record<string, (...a: unknown[]) => unknown> = {}) {
     getBalance: () => ({ value: 1_000_000_000n }),
     getAccountInfo: (addr) => (addr === USDC ? account(TOKEN_PROGRAM_ADDRESS, legacyMint) : addr === FEE_MINT ? account(TOKEN_2022_PROGRAM_ADDRESS, feeMint) : { value: null }),
     getEpochInfo: () => ({ epoch: 500n, absoluteSlot: 1n, blockHeight: 1n, slotIndex: 0n, slotsInEpoch: 1n, transactionCount: null }),
-    getMultipleAccounts: () => ({ value: [{ data: { parsed: { info: { addresses: [RECIPIENT, OTHER] }, type: 'lookupTable' }, program: 'address-lookup-table' }, owner: 'AddressLookupTab1e1111111111111111111111111', executable: false, lamports: 1n, rentEpoch: 0n, space: 0n }] }),
-    simulateTransaction: () => ({ value: { err: null, unitsConsumed: 20_000n, logs: ['Program log: ok'] } }),
+    // jsonParsed: the lookup table; base64: the CPI guard's pre-state read of the written accounts (none exist here)
+    getMultipleAccounts: (list, cfg) => ((cfg as { encoding?: string } | undefined)?.encoding === 'base64' ? { value: (list as unknown[]).map(() => null) } : { value: [{ data: { parsed: { info: { addresses: [RECIPIENT, OTHER] }, type: 'lookupTable' }, program: 'address-lookup-table' }, owner: 'AddressLookupTab1e1111111111111111111111111', executable: false, lamports: 1n, rentEpoch: 0n, space: 0n }] }),
+    simulateTransaction: (_w, cfg) => ({ value: { err: null, unitsConsumed: 20_000n, logs: ['Program log: ok'], ...((cfg as { accounts?: { addresses: unknown[] } } | undefined)?.accounts ? { accounts: (cfg as { accounts: { addresses: unknown[] } }).accounts.addresses.map(() => null) } : {}) } }), // post-state for the CPI guard (round 3)
     sendTransaction: (wire) => { sent.push(wire as string); return 'A'.repeat(87) },
     getRecentPrioritizationFees: () => [{ prioritizationFee: 0, slot: 1n }, { prioritizationFee: 7000, slot: 2n }],
     ...overrides,
