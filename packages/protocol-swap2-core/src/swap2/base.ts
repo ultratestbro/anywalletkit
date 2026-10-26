@@ -475,8 +475,15 @@ function toCaip2(chain: string | number | undefined, fallback: string): string {
   return swap2ChainId(chain);
 }
 
+/** An empty token ref would resolve to the native coin (round 3, M25): it is refused instead. */
+function nonEmptyRef(ref: string, side: string): string {
+  if (typeof ref !== "string" || ref.trim() === "") throw new Swap2ValidationError(`swap2: ${side} token must not be empty (pass the symbol or the contract address)`);
+  return ref;
+}
+
 /** Resolve a token ref (symbol OR on-chain address) to the engine's symbol. */
 function toSymbol(caip2: string, ref: string): string {
+  nonEmptyRef(ref, "source");
   const byToken = ref.startsWith("0x") || ref.length > 20 ? ccAssetByToken(caip2, ref) : undefined;
   if (byToken) return byToken.symbol;
   if (ccAsset(caip2, ref)) return ref; // already a symbol we know
@@ -485,6 +492,7 @@ function toSymbol(caip2: string, ref: string): string {
 
 /** Resolve a dest token ref to the engine's dest address (zero = native). */
 function toDestAddress(caip2: string, ref: string, allowUnlisted = false): string {
+  nonEmptyRef(ref, "destination");
   if (ref.startsWith("0x")) return ref;
   const asset = ccAssetByToken(caip2, ref) ?? ccAsset(caip2, ref);
   if (!asset) {
@@ -1538,7 +1546,9 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       if ((wantFrom || wantTo) && c.caip2 !== wantFrom && c.caip2 !== wantTo) continue;
       for (const a of c.assets) {
         out.push({
-          token: a.assetId,
+          // What quoteSwap2 takes back: the contract, or the symbol of the native coin — never the
+          // provider-specific assetId, which is "" for most catalog entries (round 3, M25).
+          token: a.contract ?? a.symbol,
           chain: c.caip2,
           symbol: a.symbol,
           decimals: a.decimals,
