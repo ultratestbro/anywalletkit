@@ -1,5 +1,5 @@
 import { UserRejectedError, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
-import { isConcreteChain, sameChain } from './chain-id.js'
+import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
 import { canonicalAddress, sendDestinations } from './destinations.js'
 
 /**
@@ -161,6 +161,9 @@ export interface WriteIntent {
  * per-chain records are CAIP-2 ids or namespace prefixes (`eip155`). A namespace key covers every
  * chain of the family, and an exact id's rules apply on top of it: every matching fee cap is
  * checked, a destination must be on every matching allowlist, and any matching blocklist refuses.
+ * An id matches its network in any spelling: `solana:mainnet` = `solana:5eykt…`,
+ * `tron:728126428` = `tron:mainnet` = `tron:0x2b6653dc`, `bitcoin:mainnet` = `bip122:0000…`,
+ * `eip155:0x1` = `eip155:1`; the `bitcoin` namespace is `bip122`.
  */
 export interface Policies {
   /**
@@ -195,11 +198,6 @@ export class PolicyViolationError extends Error {
 }
 
 const lower = (s: string | undefined) => s?.toLowerCase()
-/** The rule keys that cover `chain`: its namespace and the exact id (`eip155:1` → `eip155`, `eip155:1`). */
-const ruleKeys = (chain: string): string[] => {
-  const ns = chain.split(':')[0]!
-  return ns === chain ? [chain] : [ns, chain]
-}
 const obj = (v: unknown): Record<string, unknown> => (typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {})
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined)
 const big = (v: unknown): bigint | undefined =>
@@ -487,7 +485,7 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     const signed = signedChain(ns, method, arg)
     const known = isConcreteChain(account.chain) ? account.chain : undefined
     const offChain = chainFree(method)
-    const exactRules = hasRuleFor((k) => k.startsWith(`${ns}:`))
+    const exactRules = hasRuleFor((k) => k.includes(':') && canonicalNamespace(k.split(':')[0]!) === canonicalNamespace(ns))
     let learned: string | undefined
     const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
     // A message needs no chain id at all: no list or cap applies to it.
@@ -522,8 +520,11 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     }
     // The rules of every network in play apply: the one asked for, the account's own, the one signed for.
     const chains = [...new Set([chain, own, signed].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
-    // Every rule key that covers the asked-for chain or the account's own: namespace and exact ids.
-    const keys = chains.length > 0 ? [...new Set(chains.flatMap(ruleKeys))] : [ns]
+    // Every rule key that covers the asked-for chain or the account's own: its namespace and its
+    // exact id, in whichever spelling the app wrote them (`solana:mainnet`, `tron:728126428`,
+    // `bitcoin` for `bip122` — round 3, H4).
+    const written = [...new Set(rules.flatMap((m) => (m ? Object.keys(m) : [])))]
+    const keys = written.filter((k) => (chains.length > 0 ? chains.some((c) => ruleCovers(k, c)) : ruleCovers(k, ns)))
     const intent = intentOf(chains[0] ?? account.chain, await account.getAddress(), method, arg)
     const caps = keys.flatMap((k) => { const cap = policies.maxFee?.[k]; return cap === undefined ? [] : [{ k, cap: BigInt(cap) }] })
     if (caps.length > 0 && QUOTABLE.includes(method)) {
