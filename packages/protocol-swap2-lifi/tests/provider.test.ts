@@ -121,6 +121,12 @@ describe("LI.FI provider security contract", () => {
     await expect(lifiProvider().getQuote(PARAMS)).resolves.toBeNull();
   });
 
+  // Audit 2026-10-25 round 3, L17: status INVALID (LI.FI cannot process the transaction) stayed pending forever.
+  it("status INVALID is failed, not pending", async () => {
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({status: "INVALID"})));
+    await expect(lifiProvider().trackIntent({intentId: "lifi:1:42161", sourceTxHash: "0xsource"})).resolves.toMatchObject({state: "failed"});
+  });
+
   it("uses the configured API base and preserves LI.FI refund lifecycle substatuses", async () => {
     const seen: string[] = [];
     const substatuses = ["REFUNDED", "EXPIRED", "NOT_PROCESSABLE_REFUND_NEEDED", "REFUND_IN_PROGRESS", "PARTIAL"];

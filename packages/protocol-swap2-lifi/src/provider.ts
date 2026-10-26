@@ -614,6 +614,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         const map: Record<string, IntentStatus["state"]> = {
           DONE: "completed",
           FAILED: "failed",
+          // LI.FI cannot process the transaction: it never completes (round 3, L17).
+          INVALID: "failed",
           PENDING: "pending",
           NOT_FOUND: "pending",
         };
