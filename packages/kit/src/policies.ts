@@ -376,8 +376,12 @@ function withDestinations(intent: DraftIntent): WriteIntent {
   }
   if (intent.kind === 'revoke') return { ...intent, destinations: revokeTargets(intent), destinationUnknown: false }
   if (intent.method === 'transfer') {
-    const r = str(obj(intent.raw).recipient) ?? str(obj(intent.raw).to)
-    return { ...intent, destinations: r !== undefined ? [r] : [], destinationUnknown: r === undefined }
+    // Every chain package pays `recipient` and reads nothing else; a `to` that names another
+    // address makes the call ambiguous (round 3, M4).
+    const r = str(obj(intent.raw).recipient)
+    const to = str(obj(intent.raw).to)
+    const conflicting = r !== undefined && to !== undefined && canonicalAddress(intent.chain, to) !== canonicalAddress(intent.chain, r)
+    return { ...intent, destinations: r !== undefined ? [r] : [], destinationUnknown: r === undefined || conflicting }
   }
   // signRaw is Tron's prebuilt-transaction signer and signBuilt NEAR's, whatever chain id the account reports.
   const chain = intent.method === 'signRaw' ? 'tron:' : intent.method === 'signBuilt' ? 'near:' : intent.chain
@@ -411,6 +415,12 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
       // NEAR: a transaction built elsewhere, signed here — its receiver is the destination.
       const to = str(a.receiverId)
       return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}) }
+    }
+    case 'transfer': {
+      // The recipient the chain package pays, never `to` (round 3, M4).
+      const to = str(a.recipient)
+      const amount = big(a.amount)
+      return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(typeof a.token === 'string' ? { token: a.token } : {}), ...(amount !== undefined ? { amount } : {}) }
     }
     case 'signRaw': {
       // Tron raw transaction: the first contract's `to_address` / `amount` when present (TransferContract / TRC-20 calls name the contract).
