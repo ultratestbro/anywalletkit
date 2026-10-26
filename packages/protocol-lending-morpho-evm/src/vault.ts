@@ -1,6 +1,6 @@
 import { NotImplementedError, bigintToNumber, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type SupplyOptions, type WithdrawOptions } from '@anywalletkit/core'
 import { getAddress, isAddress, type Address } from 'viem'
-import { ERC4626_ABI, FACTORY_V1_ABI, FACTORY_V2_ABI, VAULT_V1_ABI, VAULT_V2_ABI } from './abi.js'
+import { ERC20_ABI, ERC4626_ABI, FACTORY_V1_ABI, FACTORY_V2_ABI, VAULT_V1_ABI, VAULT_V2_ABI } from './abi.js'
 import { FALLBACK_GAS, MorphoBase, toAmount, type AmountOption, type MorphoBaseConfig, type Tx } from './base.js'
 import { MorphoError } from './errors.js'
 import type { ApiVault } from './api.js'
@@ -50,9 +50,12 @@ export interface VaultPosition {
  *
  * The vault is identified on-chain: one of the chain's Morpho vault factories
  * must acknowledge it (`isMetaMorpho` / `isVaultV2`), its `asset()` must be the
- * token supplied, and deposits / withdrawals are checked against `maxDeposit`
- * / `maxWithdraw` (caps, liquidity, V2 gates) before anything is sent, then
- * proven with `eth_call`. APY and TVL come from the Morpho API as decoration.
+ * token supplied, and deposits / withdrawals are checked before anything is
+ * sent, then proven with `eth_call`: a V1 vault against `maxDeposit` /
+ * `maxWithdraw` (caps, liquidity); a V2 vault — whose max* views answer 0 for
+ * everyone — against its transfer gates, with the `eth_call` proof deciding
+ * caps and liquidity (V2 enforces them by reverting). APY and TVL come from
+ * the Morpho API as decoration.
  */
 export class MorphoVaultProtocolEvm extends MorphoBase<MorphoVaultConfig> {
   readonly vault: Address
@@ -123,12 +126,23 @@ export class MorphoVaultProtocolEvm extends MorphoBase<MorphoVaultConfig> {
   /** Shares, their current value, and what is withdrawable right now. */
   async getPosition(): Promise<VaultPosition> {
     const me = await this.me()
-    const [shares, withdrawable] = await Promise.all([
-      this.read<bigint>(this.vault, ERC4626_ABI, 'balanceOf', [me]),
-      this.read<bigint>(this.vault, ERC4626_ABI, 'maxWithdraw', [me]).catch(() => 0n),
-    ])
+    const info = await this.getVault()
+    const shares = await this.read<bigint>(this.vault, ERC4626_ABI, 'balanceOf', [me])
     const assets = shares > 0n ? await this.read<bigint>(this.vault, ERC4626_ABI, 'convertToAssets', [shares]) : 0n
-    return { shares, assets, withdrawable }
+    if (info.version !== 'v2') {
+      const withdrawable = await this.read<bigint>(this.vault, ERC4626_ABI, 'maxWithdraw', [me]).catch(() => 0n)
+      return { shares, assets, withdrawable }
+    }
+    // V2's maxWithdraw is always 0. Redeeming everything, simulated, says whether all of it can
+    // leave now; otherwise the vault's idle assets are what certainly can.
+    if (shares === 0n) return { shares, assets, withdrawable: 0n }
+    try {
+      await this.client.call({ account: me, to: this.vault, data: this.encode(ERC4626_ABI, 'redeem', [shares, me, me]) })
+      return { shares, assets, withdrawable: assets }
+    } catch {
+      const idle = await this.read<bigint>(info.asset.address, ERC20_ABI, 'balanceOf', [this.vault]).catch(() => 0n)
+      return { shares, assets, withdrawable: idle < assets ? idle : assets }
+    }
   }
 
   /** The vault's API record (name, APY, TVL, listed) — null without API or when the API does not know the vault. */
@@ -159,15 +173,23 @@ export class MorphoVaultProtocolEvm extends MorphoBase<MorphoVaultConfig> {
     const amount = toAmount(o.amount)
     const info = await this.assertAsset(o.token)
     const receiver = o.onBehalfOf ? getAddress(o.onBehalfOf) : await this.me()
-    const max = await this.read<bigint>(this.vault, ERC4626_ABI, 'maxDeposit', [receiver])
-    if (max < amount) {
-      throw new MorphoError(max === 0n
-        ? `${info.name}: deposits are closed right now (caps reached or the receiver is gated).`
-        : `${info.name}: at most ${max} ${info.asset.symbol} base units can be deposited right now.`, 'ExceededMaxDeposit')
-    }
     if (info.version === 'v2') {
-      const ok = await this.read<boolean>(this.vault, VAULT_V2_ABI, 'canReceiveShares', [receiver]).catch(() => true)
-      if (!ok) throw new MorphoError(`${info.name}: ${receiver} is not allowed to receive this vault's shares (gated vault).`, 'CannotReceiveShares')
+      // V2 answers 0 from maxDeposit for everyone; its gates are readable, its caps revert inside
+      // deposit, which the eth_call proof before sending catches.
+      const me = await this.me()
+      const [receive, send] = await Promise.all([
+        this.read<boolean>(this.vault, VAULT_V2_ABI, 'canReceiveShares', [receiver]).catch(() => true),
+        this.read<boolean>(this.vault, VAULT_V2_ABI, 'canSendAssets', [me]).catch(() => true),
+      ])
+      if (!receive) throw new MorphoError(`${info.name}: ${receiver} is not allowed to receive this vault's shares (gated vault).`, 'CannotReceiveShares')
+      if (!send) throw new MorphoError(`${info.name}: ${me} is not allowed to send assets to this vault (gated vault).`, 'CannotSendAssets')
+    } else {
+      const max = await this.read<bigint>(this.vault, ERC4626_ABI, 'maxDeposit', [receiver])
+      if (max < amount) {
+        throw new MorphoError(max === 0n
+          ? `${info.name}: deposits are closed right now (caps reached or the receiver is gated).`
+          : `${info.name}: at most ${max} ${info.asset.symbol} base units can be deposited right now.`, 'ExceededMaxDeposit')
+      }
     }
     const [approvals, sharesOut] = await Promise.all([
       this.approvals(info.asset.address, this.vault, amount),
@@ -205,8 +227,9 @@ export class MorphoVaultProtocolEvm extends MorphoBase<MorphoVaultConfig> {
       ])
       if (!sendShares || !recvAssets) throw new MorphoError(`${info.name}: this gated vault refuses the withdrawal for ${!sendShares ? me : to}.`)
     }
+    const v2 = info.version === 'v2' // max* views answer 0: liquidity is left to the eth_call proof
     if (o.amount === 'max') {
-      const maxRedeem = await this.read<bigint>(this.vault, ERC4626_ABI, 'maxRedeem', [me]).catch(() => pos.shares)
+      const maxRedeem = v2 ? pos.shares : await this.read<bigint>(this.vault, ERC4626_ABI, 'maxRedeem', [me]).catch(() => pos.shares)
       if (maxRedeem < pos.shares) {
         throw new MorphoError(`${info.name}: only ${pos.withdrawable} of ${pos.assets} ${info.asset.symbol} base units are withdrawable right now (vault liquidity) — withdraw that amount, or wait.`, 'ExceededMaxRedeem')
       }
@@ -214,7 +237,7 @@ export class MorphoVaultProtocolEvm extends MorphoBase<MorphoVaultConfig> {
     }
     const amount = toAmount(o.amount)
     if (amount > pos.assets) throw new MorphoError(`${info.name}: the amount exceeds the position (${pos.assets} base units).`)
-    if (amount > pos.withdrawable) throw new MorphoError(`${info.name}: only ${pos.withdrawable} base units are withdrawable right now (vault liquidity).`, 'ExceededMaxWithdraw')
+    if (!v2 && amount > pos.withdrawable) throw new MorphoError(`${info.name}: only ${pos.withdrawable} base units are withdrawable right now (vault liquidity).`, 'ExceededMaxWithdraw')
     return { info, tx: { to: this.vault, data: this.encode(ERC4626_ABI, 'withdraw', [amount, to, me]), value: 0n }, assetsOut: amount, all: false }
   }
 

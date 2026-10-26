@@ -684,6 +684,13 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
         await this._requireProvider().call({ account: (await this._acct.getAddress()) as Address, to: plan.tx.to as Address, data: plan.tx.data as Hex, value: plan.tx.value })
       } catch {
         plan = await this._getSupplyPlan(token, value, { instant: false })
+        // The async queue pulls the tokens itself: it needs its own allowance (the one just mined
+        // was for the sync queue).
+        for (const approval of plan.approvals) {
+          const sent = await this._sendAndWait(approval)
+          approveHashes.push(sent.hash)
+          fee += sent.fee
+        }
       }
     }
     const sent = await this._send(plan.tx)

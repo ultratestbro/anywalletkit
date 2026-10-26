@@ -583,8 +583,9 @@ export class AaveProtocolEvm extends LendingProtocol<AaveProtocolConfig> {
     const amount = all ? maxUint256 : toAmount(o.amount)
     if (!all && amount > held) throw new AaveError(`${reserve.symbol}: the amount exceeds the supplied balance (${held}).`, 'NotEnoughAvailableUserBalance')
     if (native) {
-      // The gateway burns the account's aWETH: it needs an allowance on them.
-      const approvals = await this.approvals(reserve.aToken, market.wethGateway!, all ? held : amount)
+      // The gateway burns the account's aWETH: it needs an allowance on them. For 'max' it pulls the
+      // balance at execution, which interest has grown since `held` was read: leave 0.1 % headroom.
+      const approvals = await this.approvals(reserve.aToken, market.wethGateway!, all ? held + held / 1000n + 1n : amount)
       const tx: Tx = { to: market.wethGateway!, data: this.encode(GATEWAY_ABI, 'withdrawETH', [market.pool, amount, to]), value: 0n }
       if (approvals.length > 0) tx.gasLimit = FALLBACK_GAS.withdraw
       return { reserve, native, approvals, tx, amount: all ? held : amount, all }
@@ -703,7 +704,9 @@ export class AaveProtocolEvm extends LendingProtocol<AaveProtocolConfig> {
       if (sign) {
         const permit = await this.permitFor(asset, pulled, market.pool)
         if (permit) {
-          const data = this.encode(POOL_ABI, 'repayWithPermit', [asset, amount, VARIABLE_RATE_MODE, onBehalfOf, permit.deadline, permit.v, permit.r, permit.s])
+          // The Pool calls permit(owner, pool, amount, …) with the amount it is given: it must be the
+          // one signed (`pulled`), never uint256.max. Aave repays at most the debt.
+          const data = this.encode(POOL_ABI, 'repayWithPermit', [asset, pulled, VARIABLE_RATE_MODE, onBehalfOf, permit.deadline, permit.v, permit.r, permit.s])
           return { reserve, native, approvals: [], tx: { to: market.pool, data, value: 0n }, debt, all, permit: true, withATokens: false }
         }
       } else if (await this.canPermit(asset)) {

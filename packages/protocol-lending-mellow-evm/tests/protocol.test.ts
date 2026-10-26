@@ -249,10 +249,16 @@ describe('supply', () => {
     const r = await p.supply({ token: USDT, amount: 10_000_000n })
     expect(r.instant).toBe(false)
     expect(getAddress(r.queue)).toBe(Q.usdtAsync)
-    expect(account.sent.length).toBe(3) // approve 0, approve amount, deposit
-    expect(decode(erc20Abi, account.sent[0]!.data)[1]).toBe(0n)
-    expect(decode(erc20Abi, account.sent[1]!.data)[1]).toBe(10_000_000n)
-    expect(getAddress(account.sent[2]!.to)).toBe(Q.usdtAsync)
+    // Audit 2026-10-25 round 3, M21: the approvals went to the SYNC queue; after the fallback the
+    // async queue — the one that pulls the tokens — got none, and the deposit reverted. This test
+    // used to pin three sends (approve 0, approve, deposit) without looking at the spender.
+    const sent = account.sent.map((t) => ({ to: getAddress(t.to), args: getAddress(t.to) === USDT ? decode(erc20Abi, t.data) : null }))
+    expect(sent).toEqual([
+      { to: USDT, args: [Q.usdtSync, 0n] }, { to: USDT, args: [Q.usdtSync, 10_000_000n] }, // for the sync proof
+      { to: USDT, args: [Q.usdtAsync, 0n] }, { to: USDT, args: [Q.usdtAsync, 10_000_000n] }, // for the queue that takes the deposit
+      { to: Q.usdtAsync, args: null },
+    ])
+    expect(r.approveHashes).toHaveLength(4)
     // A quote cannot prove the sync deposit while the allowance is still pending:
     // it stays optimistic on a fresh report and turns async on a stale one.
     const quote = await p.quoteSupply({ token: USDT, amount: 10_000_000n })

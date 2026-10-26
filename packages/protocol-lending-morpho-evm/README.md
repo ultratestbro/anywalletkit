@@ -71,9 +71,12 @@ await market.withdrawCollateral({ amount: 'max' })
   (`isMetaMorpho` / `isVaultV2`) whether they created the address, and a V1
   vault's `MORPHO()` must be the chain's singleton. An unknown address is
   refused unless `allowUnverifiedVault: true`.
-- **Vault limits.** Deposits are checked against `maxDeposit` (caps, V2 gates),
+- **Vault limits.** V1: deposits are checked against `maxDeposit` (caps),
   withdrawals against `maxWithdraw` / `maxRedeem` (vault liquidity) — the error
-  says how much *is* possible right now. V2 transfer gates are read too.
+  says how much *is* possible right now. V2 answers 0 from every max* view, so
+  its transfer gates are read (`canReceiveShares` / `canSendAssets` in,
+  `canSendShares` / `canReceiveAssets` out) and caps and liquidity are left to
+  the `eth_call` proof that runs before every send.
 - **Market identity.** An id is resolved with `idToMarketParams`; params are
   hashed to the id and the market must exist (`lastUpdate ≠ 0`). The golden
   test derives the live Base cbBTC/USDC id from its params.

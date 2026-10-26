@@ -67,6 +67,11 @@ export interface TxDescription {
   owner?: string
   /** Delegation targets for an EIP-7702 tx. */
   delegations?: Array<{ chainId: number; address: string }>
+  /**
+   * For an EIP-7702 tx (kind 'eip7702-delegation'): what its call does, decoded like any other
+   * transaction — the token / spender / amount fields and the warnings are the call's.
+   */
+  call?: TxKind
   /** Chain id named by the transaction, if any. */
   chainId: number | undefined
   /** Problems to show before signing. */
@@ -142,10 +147,14 @@ export function describeTransaction(tx: EvmTransaction, ctx: { chainId?: number 
   const base = { to, value, selector, chainId, warnings }
 
   if (tx.type === 4 || (tx.authorizationList && tx.authorizationList.length > 0)) {
+    // The delegation AND the call it carries: an approve riding in a type 4 is still an approve.
+    const { type: _type, authorizationList, ...call } = tx
+    const inner = describeTransaction(call, ctx)
     return {
-      ...base,
+      ...inner,
       kind: 'eip7702-delegation',
-      delegations: (tx.authorizationList ?? []).map((a) => ({ chainId: Number(a.chainId), address: getAddress(a.address) })),
+      call: inner.kind,
+      delegations: (authorizationList ?? []).map((a) => ({ chainId: Number(a.chainId), address: getAddress(a.address) })),
     }
   }
   if (to === undefined) return { ...base, kind: 'contract-deploy' }
@@ -179,6 +188,7 @@ function num(v: unknown): number | undefined {
   if (typeof v === 'number') return v
   if (typeof v === 'bigint') return v >= 0n && v <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(v.toString()) : undefined
   if (typeof v === 'string' && /^\d+$/.test(v)) return Number(v)
+  if (typeof v === 'string' && /^0x[0-9a-fA-F]+$/.test(v)) return num(BigInt(v)) // dApps send the domain chainId in hex too
   return undefined
 }
 function big(v: unknown): bigint | undefined {
@@ -207,6 +217,8 @@ export function describeTypedData(typed: TypedDataInput, ctx: { chainId?: number
   const m = typed.message
   const fields = new Set((typed.types[primaryType] ?? []).map((f) => f.name))
   const isPermit = primaryType === 'Permit' && ['owner', 'spender', 'value', 'nonce', 'deadline'].every((f) => fields.has(f))
+  // DAI-style permit: all-or-nothing `allowed` instead of a value, `holder` / `expiry` (0 = never).
+  const isDaiPermit = primaryType === 'Permit' && ['holder', 'spender', 'nonce', 'expiry', 'allowed'].every((f) => fields.has(f))
 
   if (isPermit) {
     const owner = str(m.owner) ?? ''
@@ -221,10 +233,26 @@ export function describeTypedData(typed: TypedDataInput, ctx: { chainId?: number
     }
     return { kind: 'permit', primaryType, domain, permit: { owner, spender, value, nonce, deadline }, warnings }
   }
+  if (isDaiPermit) {
+    const owner = str(m.holder) ?? ''
+    const spender = str(m.spender) ?? ''
+    const allowed = m.allowed === true || m.allowed === 'true'
+    const value = allowed ? maxUint256 : 0n
+    const nonce = big(m.nonce) ?? 0n
+    const deadline = big(m.expiry) ?? 0n
+    if (allowed) warnings.push({ code: 'approve-unlimited', message: `Unlimited permit: ${spender} may spend any amount.` })
+    if (deadline !== 0n && deadline < BigInt(Math.floor(Date.now() / 1000))) warnings.push({ code: 'deadline-passed', message: 'Permit deadline is already in the past.' })
+    if (ctx.account && owner.toLowerCase() !== ctx.account.toLowerCase()) {
+      warnings.push({ code: 'owner-mismatch', message: `Permit holder ${owner} is not this account.` })
+    }
+    return { kind: 'permit', primaryType, domain, permit: { owner, spender, value, nonce, deadline }, warnings }
+  }
   if (PERMIT2_TYPES.has(primaryType)) {
-    const details = m.details as Record<string, unknown> | Array<Record<string, unknown>> | undefined
+    // AllowanceTransfer carries `details`, SignatureTransfer `permitted` (one or a list).
+    const details = (m.details ?? m.permitted) as Record<string, unknown> | Array<Record<string, unknown>> | undefined
     const list = Array.isArray(details) ? details : details ? [details] : []
-    // Permit2 amounts are uint160: its "unlimited" is that type's max.
+    // AllowanceTransfer amounts are uint160: its "unlimited" is that type's max (SignatureTransfer's
+    // uint256 max is above it too).
     for (const item of list) {
       const amount = big(item.amount)
       if (amount !== undefined && amount >= 2n ** 160n - 1n) { warnings.push({ code: 'approve-unlimited', message: 'Unlimited Permit2 allowance.' }); break }

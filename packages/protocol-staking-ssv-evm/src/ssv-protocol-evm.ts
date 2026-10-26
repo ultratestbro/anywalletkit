@@ -331,6 +331,8 @@ export default class SsvProtocolEvm extends StakingProtocol<SsvProtocolConfig> {
     }
     const provider = this._requireProvider()
     const owner = (await account.getAddress()) as Address
+    // Before any approval: with too little SSV the approve would be paid for and left behind.
+    await this._assertSsvBalance(owner, value)
 
     let approveHash: string | null = null
     let approveFee = 0n
@@ -363,6 +365,7 @@ export default class SsvProtocolEvm extends StakingProtocol<SsvProtocolConfig> {
    */
   override async quoteStake({ amount }: StakeOptions): Promise<Omit<StakeResult, 'hash'>> {
     const value = toAmount(amount)
+    await this._assertSsvBalance((await this.account.getAddress()) as Address, value)
     const { fee } = await this._requireQuotable('quoteStake(options)').quoteSendTransaction(this._networkCall('stake', [value]))
     return { fee }
   }
@@ -511,6 +514,13 @@ export default class SsvProtocolEvm extends StakingProtocol<SsvProtocolConfig> {
       throw new Error('SSV APR API: unexpected response shape.')
     }
     return apr
+  }
+
+  private async _assertSsvBalance(owner: Address, value: bigint): Promise<void> {
+    const held = BigInt(await this._requireProvider().readContract({
+      address: this._addresses.ssvToken, abi: ERC20_ABI, functionName: 'balanceOf', args: [owner],
+    }))
+    if (held < value) throw new Error(`The account holds ${held} SSV base units, ${value} needed to stake.`)
   }
 
   // ---- SSV-specific extras (not part of the proposed staking interface) ----
