@@ -409,7 +409,7 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
       return typedDataIntent(base, arg, resolvePrimaryType(arg))
     case 'signBuilt': {
       // NEAR: a transaction built elsewhere, signed here — its receiver is the destination.
-      const to = str(a.receiverId) ?? str(a.receiver)
+      const to = str(a.receiverId)
       return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}) }
     }
     case 'signRaw': {
@@ -438,7 +438,7 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
   // An EVM, Solana or Tron transaction never goes to a `recipient` field (`transfer` options do):
   // showing it would name a destination the signed transaction does not have (round 3, H2).
   const ns = chain.split(':')[0]
-  const noRecipient = method !== 'transfer' && (ns === 'eip155' || ns === 'solana' || ns === 'tron')
+  const noRecipient = method !== 'transfer' && (ns === 'eip155' || ns === 'solana' || ns === 'tron' || ns === 'ton' || ns === 'near')
   const to = str(a.to) ?? (noRecipient ? undefined : str(a.recipient))
   const amount = big(a.amount ?? a.value)
   return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(typeof a.token === 'string' ? { token: a.token } : {}), ...(amount !== undefined ? { amount } : {}) }
@@ -556,6 +556,11 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     const keys = written.filter((k) => (chains.length > 0 ? chains.some((c) => ruleCovers(k, c)) : ruleCovers(k, ns)))
     const intent = intentOf(chains[0] ?? account.chain, await account.getAddress(), method, arg)
     const caps = keys.flatMap((k) => { const cap = policies.maxFee?.[k]; return cap === undefined ? [] : [{ k, cap: BigInt(cap) }] })
+    // A method guarded only by its name (a chain package's internal `sign*` / `send*` helper) has no
+    // fee the policies can quote or hand down: under a fee cap it is refused (round 3, review).
+    if (caps.length > 0 && !(GUARDED_WRITES as readonly string[]).includes(method)) {
+      throw new PolicyViolationError('maxFee', `${method} has no fee the ${caps[0]!.k} cap can be checked against; nothing was signed.`)
+    }
     if (caps.length > 0 && QUOTABLE.includes(method)) {
       const { fee } = method === 'transfer' ? await account.quoteTransfer(arg as TransferOptions) : await account.quoteSendTransaction(arg)
       for (const { k, cap } of caps) if (fee > cap) throw new PolicyViolationError('maxFee', `Fee ${fee} exceeds the ${k} cap of ${cap}.`)
@@ -597,13 +602,16 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     return caps.length > 0 && CAPPED[method] !== undefined ? caps.reduce((a, b) => (b.cap < a.cap ? b : a)).cap : undefined
   }
   const wrapped = new Map<string, (...args: unknown[]) => Promise<unknown>>()
-  return new Proxy(account, {
+  const handler: ProxyHandler<A> = {
     get(target, prop, receiver) {
       // The signer signs whatever it is handed: reaching it would skip every rule (round 3, H3).
       if (prop === 'signer') return undefined
-      const v = Reflect.get(target, prop, receiver)
+      // Getters run on the account itself, so none of them sees this wrapper.
+      const v = Reflect.get(target, prop, target)
       if (isSignerLike(v)) return undefined
-      if (typeof v !== 'function') return v
+      // Modules read the account's RPC from `_config`: a copy, so nobody writes the account's settings through it.
+      if (prop === '_config') return readOnlyConfig(v)
+      if (typeof v !== 'function' || prop === 'constructor') return v
       if (typeof prop === 'string' && isGuardedWrite(prop)) {
         let fn = wrapped.get(prop)
         if (!fn) {
@@ -637,5 +645,33 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
       const method = v as (...args: unknown[]) => unknown
       return (...args: unknown[]) => guardReturned(method.apply(target, args), (a) => (a === target ? receiver : applyPolicies(a, policies, chain)))
     },
-  })
+    // The same view through descriptors and key listings: no signer, guarded methods, a copied `_config`.
+    getOwnPropertyDescriptor(target, prop) {
+      const d = Reflect.getOwnPropertyDescriptor(target, prop)
+      if (!d || !d.configurable || !('value' in d)) return d
+      if (prop === 'signer' || isSignerLike(d.value)) return undefined
+      return { ...d, value: handler.get!(target, prop, proxy) }
+    },
+    ownKeys(target) {
+      return Reflect.ownKeys(target).filter((k) => {
+        const d = Reflect.getOwnPropertyDescriptor(target, k)
+        return !d?.configurable || (k !== 'signer' && !isSignerLike(d.value))
+      })
+    },
+    // Nothing is written to the account through its wrapper: not its methods, not its settings.
+    set: () => false,
+    defineProperty: () => false,
+    deleteProperty: () => false,
+    setPrototypeOf: () => false,
+  }
+  const proxy = new Proxy(account, handler)
+  return proxy
+}
+
+/** A shallow copy of an account's `_config` (its provider list copied too), or the value as it is. */
+function readOnlyConfig(v: unknown): unknown {
+  if (typeof v !== 'object' || v === null) return v
+  const c = { ...(v as Record<string, unknown>) }
+  if (Array.isArray(c.provider)) c.provider = [...(c.provider as unknown[])]
+  return Object.freeze(c)
 }

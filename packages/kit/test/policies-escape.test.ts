@@ -97,4 +97,65 @@ describe('no signing path around the policy proxy', () => {
     expect(confirm).toHaveBeenCalledTimes(6)
     w.dispose()
   })
+
+  describe('review round: no way around the wrappers by reflection, writes or unknown helpers', () => {
+    it('descriptors, key listings and writes show no signer and change nothing', () => {
+      const raw = namedAccount()
+      const guarded = applyPolicies(raw, { confirm: async () => false }, 'near:mainnet') as unknown as Record<string, unknown>
+      expect(Object.getOwnPropertyDescriptor(guarded, 'signer')).toBeUndefined()
+      expect(Object.keys(guarded)).not.toContain('signer')
+      expect(Reflect.ownKeys(guarded)).not.toContain('signer')
+      // an own method's descriptor is the guarded one
+      const own = Object.getOwnPropertyDescriptor(guarded, 'sign')!.value as (m: string) => Promise<unknown>
+      return expect(own('hi')).rejects.toBeInstanceOf(UserRejectedError).then(() => {
+        expect(() => { guarded.signer = SIGNER }).toThrow(TypeError)
+        expect(() => { guarded.sign = async () => 'forged' }).toThrow(TypeError)
+        expect(() => Object.defineProperty(guarded, 'sign', { value: async () => 'forged' })).toThrow(TypeError)
+        expect(() => { delete guarded.sign }).toThrow(TypeError)
+        expect((raw as unknown as { signer: unknown }).signer).toBe(SIGNER)
+      })
+    })
+
+    it('_config reads as a frozen copy', () => {
+      const raw = Object.assign(createMockAccount({ chain: 'eip155:1' }), { _config: { provider: ['https://rpc.example'], simulate: true } })
+      const guarded = applyPolicies(raw, {}, 'eip155:1') as unknown as { _config: { provider: string[]; simulate: boolean } }
+      expect(guarded._config.provider).toEqual(['https://rpc.example'])
+      expect(() => { guarded._config.simulate = false }).toThrow(TypeError)
+      guarded._config.provider.push('https://evil.example')
+      expect(raw._config).toEqual({ provider: ['https://rpc.example'], simulate: true })
+    })
+
+    it('under a fee cap, a sign* helper the policies cannot quote is refused', async () => {
+      const raw = Object.assign(createMockAccount({ chain: 'eip155:1' }), { signPrepared: async () => '0xsigned', signHash: async () => '0xsig' })
+      const guarded = applyPolicies(raw, { maxFee: { 'eip155:1': 1n } }, 'eip155:1')
+      await expect(guarded.signPrepared()).rejects.toMatchObject({ policy: 'maxFee' })
+      await expect(guarded.signHash()).rejects.toMatchObject({ policy: 'maxFee' })
+      // the public, fee-checked surface still works
+      await guarded.sign('hi')
+    })
+
+    it('getManager exposes only the public reads and account getters', async () => {
+      const w = new Wallet(PHRASE, { policies: { confirm: async () => false } })
+      w.registerWallet('near', FakeManager, {})
+      const m = w.getManager<FakeManager>('near:mainnet') as unknown as Record<string, unknown>
+      for (const k of ['cachedAccount', 'signerAccount', 'seedBytes', 'externalSigner', 'dispose', '_accounts', '_signer', '_config']) {
+        expect([k, m[k]]).toEqual([k, undefined])
+        expect([k, Object.getOwnPropertyDescriptor(m, k)]).toEqual([k, undefined])
+      }
+      expect(Reflect.ownKeys(m)).toEqual([])
+      expect(() => { m.getAccount = async () => null }).toThrow(TypeError)
+      // the prototype's methods, called on the wrapper, reach none of the manager's state
+      const proto = Object.getPrototypeOf(m) as { cachedAccount: (k: string, f: () => unknown) => Promise<unknown> }
+      await expect(proto.cachedAccount.call(m, 'm/0', () => ({}))).rejects.toThrow()
+      w.dispose()
+    })
+
+    it('TON and NEAR: only the field the package builds from is the destination', async () => {
+      const ton = createMockAccount({ chain: 'ton:-239' })
+      await expect(applyPolicies(ton, { allowlist: { 'ton:-239': ['EQ-allowed'] } }, 'ton:-239').sendTransaction({ to: new String('EQ-drainer'), value: 1n, recipient: 'EQ-allowed' } as never)).rejects.toMatchObject({ policy: 'allowlist' })
+      const near = createMockAccount({ chain: 'near:mainnet' })
+      await expect(applyPolicies(near, { allowlist: { 'near:mainnet': ['ok.near'] } }, 'near:mainnet').sendTransaction({ receiverId: new String('drainer.near'), receiver: 'ok.near', actions: [] } as never)).rejects.toMatchObject({ policy: 'allowlist' })
+      expect(ton.sent.length + near.sent.length).toBe(0)
+    })
+  })
 })

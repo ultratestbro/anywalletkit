@@ -30,8 +30,11 @@ export interface WalletOptions {
  * serializing a Wallet shows no secret. Zeroized and dropped by `dispose()`.
  */
 const WALLET_SEEDS = new WeakMap<object, Uint8Array>()
-/** Manager members that hand out key material: not reachable through `getManager` (protected in TS, callable in JS). */
-const MANAGER_SECRETS: ReadonlySet<string> = new Set(['seedBytes', 'externalSigner', 'requireSigner', 'signer'])
+/**
+ * What `getManager` hands out of a manager: its public reads and account getters, nothing else —
+ * not its seed or signer accessors, not its account cache, not `dispose` (the wallet owns it).
+ */
+const MANAGER_SURFACE: ReadonlySet<string> = new Set(['getAccount', 'getAccountByPath', 'getNamedAccount', 'getReadOnlyAccount', 'getFeeRates', 'basePath'])
 
 type Describer = { describeActivity?: (tx: ChainTx, ctx: DescribeActivityContext) => ActivityItem | null }
 
@@ -147,15 +150,26 @@ export class Wallet {
     const manager = this.manager(chain)
     let guarded = this._guardedManagers.get(manager)
     if (!guarded) {
+      const surface = (prop: string | symbol) => typeof prop === 'string' && MANAGER_SURFACE.has(prop)
       guarded = new Proxy(manager, {
         get: (target, prop, receiver) => {
-          if (typeof prop === 'string' && (prop.startsWith('_') || MANAGER_SECRETS.has(prop))) return undefined
-          const v = Reflect.get(target, prop, receiver)
+          if (!surface(prop)) return undefined
+          const v = Reflect.get(target, prop, target)
           if (isSignerLike(v)) return undefined
           if (typeof v !== 'function') return v
           const method = v as (...args: unknown[]) => unknown
           return (...args: unknown[]) => guardReturned(method.apply(target, args), (a) => (a as object) === target ? receiver : this.guard(a, chain))
         },
+        has: (_target, prop) => surface(prop),
+        getOwnPropertyDescriptor: (target, prop) => {
+          const d = Reflect.getOwnPropertyDescriptor(target, prop)
+          return d && !d.configurable ? d : undefined
+        },
+        ownKeys: (target) => Reflect.ownKeys(target).filter((k) => !Reflect.getOwnPropertyDescriptor(target, k)?.configurable),
+        set: () => false,
+        defineProperty: () => false,
+        deleteProperty: () => false,
+        setPrototypeOf: () => false,
       })
       this._guardedManagers.set(manager, guarded)
     }

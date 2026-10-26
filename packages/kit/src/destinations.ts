@@ -375,15 +375,15 @@ function tronDestinations(arg: unknown): Destinations {
 
 function nearDestinations(arg: unknown): Destinations {
   if (typeof arg === 'string') { const r = nearReceiverOfBorsh(arg); return r ? known([r]) : UNKNOWN }
-  const a = obj(arg)
-  const to = str(a.receiverId) ?? str(a.receiver) ?? str(a.recipient)
+  // wallet-near builds from `receiverId` and nothing else (round 3, review).
+  const to = str(obj(arg).receiverId)
   return to !== undefined ? known([to]) : UNKNOWN
 }
 
 function tonDestinations(arg: unknown): Destinations {
   if (Array.isArray(arg)) return arg.length ? known(arg.map((m) => str(obj(m).to))) : UNKNOWN
-  const a = obj(arg)
-  const to = str(a.to) ?? str(a.recipient)
+  // wallet-ton builds from `to` and nothing else (round 3, review).
+  const to = str(obj(arg).to)
   return to !== undefined ? known([to]) : UNKNOWN // a Cell (prebuilt external) is not read here
 }
 
