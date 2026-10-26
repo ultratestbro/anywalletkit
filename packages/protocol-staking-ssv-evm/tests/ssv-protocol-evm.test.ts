@@ -237,3 +237,14 @@ test('getStakedBalance reports cSSV 1:1 and getTokenBalance the liquid SSV', asy
   assert.equal(await protocol.getTokenBalance(), 5n * E18)
   assert.equal(await protocol.getCooldown(), Number(COOLDOWN))
 })
+
+// Audit 2026-10-25 round 3, L14: stake approved the network for the amount before checking the SSV
+// balance; with too little SSV the approval went out (gas paid, an allowance left behind) and only
+// then the stake proof failed.
+test('stake with too little SSV is refused before any approval is sent', async () => {
+  const account = stubAccount(stubEip1193({ allowance: 0n })) // the stub holds 5 SSV
+  const protocol = new SsvProtocolEvm(account)
+  await assert.rejects(() => protocol.stake({ amount: 6n * E18 }), /holds 5000000000000000000 SSV base units, 6000000000000000000 needed/)
+  assert.equal(account.sent.length, 0)
+  await assert.rejects(() => protocol.quoteStake({ amount: 6n * E18 }), /needed/)
+})
