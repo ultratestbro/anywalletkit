@@ -31,13 +31,11 @@ describe('reference server guard', () => {
 
   it('a swap request without the token is refused before its body is read', async () => {
     const url = await start(base)
-    let sent = 0
-    const body = new ReadableStream<Uint8Array>({
-      pull(c) { if (sent >= 2_000_000) { c.close(); return } sent += 100_000; c.enqueue(new Uint8Array(100_000).fill(0x20)) },
-    })
-    const res = await fetch(`${url}/swap2/quote`, { method: 'POST', headers: { 'content-type': 'application/json' }, body, duplex: 'half' } as RequestInit)
-    expect(res.status).toBe(401)
-    expect(sent).toBeLessThan(2_000_000) // answered before the 2 MB body was consumed
+    // Past the 3 MB the swap route reads: a server that reads first answers 413 (it hit the cap),
+    // one that checks the token first answers 401 without reading.
+    const body = new Uint8Array(4 * 1024 * 1024).fill(0x20)
+    const res = await fetch(`${url}/swap2/quote`, { method: 'POST', headers: { 'content-type': 'application/json' }, body }).catch(() => null)
+    expect(res?.status).toBe(401)
   })
 
   it('behind a proxy, callerKey decides who is rate-limited (not the proxy address)', async () => {
