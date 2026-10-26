@@ -3,10 +3,12 @@ import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { DUST_LIMIT, addressFromPublicKey } from './address.js'
 import { UnsafeTransactionError, assertSafe, describeTransaction, type DescribeContext } from './describe.js'
 import { bytesToHex } from './encoding.js'
+import { BroadcastUnknownError } from './errors.js'
+import { isAlreadyKnown, isAnsweredRefusal } from './http.js'
 import { signMessageWith } from './message.js'
 import { WalletAccountReadOnlyZcash, type SpendPlan } from './read-only-account.js'
 import { FINAL_SEQUENCE, branchIdForHeight, p2pkhScriptSig, parseTx, serializeTx, sighashAll, txid as txidOf, type TransparentTxV5 } from './tx.js'
-import type { SpentOutput, ZcashConfig, ZcashNetwork, ZcashSpend, ZcashTransaction, ZcashTransferOptions, ZcashTxDescription } from './types.js'
+import type { SpentOutput, ZcashClient, ZcashConfig, ZcashNetwork, ZcashSpend, ZcashTransaction, ZcashTransferOptions, ZcashTxDescription } from './types.js'
 
 export { addressFromPublicKey }
 
@@ -184,8 +186,7 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
       rawHex = built.hex; hash = built.txid; fee = built.fee
     }
     this.checkMax(fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
-    const id = await client.broadcast(rawHex)
-    return { hash: id || hash, fee }
+    return { hash: await this.broadcast(client, rawHex, hash), fee }
   }
 
   /** Native ZEC only (`token` is rejected). Subject to `transferMaxFee`. */
@@ -195,8 +196,22 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
     const client = this.requireClient('transfer')
     const built = await this.signSpend({ to: o.recipient, value: o.amount })
     this.checkMax(built.fee, feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
-    const id = await client.broadcast(built.hex)
-    return { hash: id || built.txid, fee: built.fee }
+    return { hash: await this.broadcast(client, built.hex, built.txid), fee: built.fee }
+  }
+
+  /**
+   * Send once through the client. Only a node's refusal means nothing went out; "already in the
+   * mempool / block chain" means an earlier attempt delivered it; anything else may have landed and
+   * is a {@link BroadcastUnknownError} with the txid computed before sending (round 3, M12).
+   */
+  private async broadcast(client: ZcashClient, rawHex: string, txid: string): Promise<string> {
+    try {
+      return (await client.broadcast(rawHex)) || txid
+    } catch (e) {
+      if (isAlreadyKnown(e)) return txid
+      if (isAnsweredRefusal(e)) throw e
+      throw new BroadcastUnknownError(txid, e)
+    }
   }
 
   /** The same address as a {@link WalletAccountReadOnlyZcash}. */

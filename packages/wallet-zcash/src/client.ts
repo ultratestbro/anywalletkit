@@ -1,7 +1,7 @@
 import { NetworkError } from '@anywalletkit/core'
 import { BlockchairClient } from './blockchair.js'
 import { ZcashBlockbookClient } from './blockbook.js'
-import { DEFAULT_TIMEOUT_MS } from './http.js'
+import { DEFAULT_TIMEOUT_MS, isAnsweredRefusal } from './http.js'
 import type { ZcashClient, ZcashClientConfig, ZcashConfig } from './types.js'
 
 const isClient = (c: unknown): c is ZcashClient => typeof c === 'object' && c !== null && typeof (c as ZcashClient).listUnspent === 'function'
@@ -19,8 +19,9 @@ const METHODS = ['connect', 'close', 'getBalance', 'listUnspent', 'getTransactio
 
 /**
  * One client, or a failover client over the list: each call walks the list in
- * order, `retries` extra rounds. A node's rejection of a broadcast (plain
- * Error) is final — only transport failures (NetworkError) move on.
+ * order, `retries` extra rounds. A node's refusal of a broadcast is final when
+ * no endpoint before it went silent; after a silent one the transaction may be
+ * out, so the result is "maybe sent" (round 3, M12). Transport failures move on.
  */
 export function createClient(config: ZcashConfig): ZcashClient | undefined {
   if (config.client === undefined) return undefined
@@ -31,10 +32,17 @@ export function createClient(config: ZcashConfig): ZcashClient | undefined {
   const attempts = list.length + (config.retries ?? 3)
   const call = (method: (typeof METHODS)[number]) => async (...args: unknown[]) => {
     let last: unknown
+    let silent = false
     for (let i = 0; i < attempts; i++) {
       const c = list[i % list.length]! as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>
       try { return await c[method]!.apply(c, args) } catch (e) {
-        if (method === 'broadcast' && !(e instanceof NetworkError)) throw e
+        if (method === 'broadcast') {
+          if (isAnsweredRefusal(e)) {
+            if (!silent) throw e
+            throw new NetworkError('A Zcash client refused the broadcast after another never answered: it may be out', { cause: e })
+          }
+          silent = true
+        }
         last = e
       }
     }

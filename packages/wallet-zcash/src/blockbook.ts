@@ -5,7 +5,7 @@
  */
 import { NetworkError } from '@anywalletkit/core'
 import { hexToBytes } from './encoding.js'
-import { DEFAULT_TIMEOUT_MS, fetchWithTimeout, isInt, isIntString, isRecord } from './http.js'
+import { DEFAULT_TIMEOUT_MS, fetchWithTimeout, isInt, isIntString, isRecord, refusal, refusedStatus } from './http.js'
 import type { SpentOutput, Utxo, ZcashClient, ZcashTxInfo } from './types.js'
 
 export interface BlockbookVin { txid?: string; vout?: number; n?: number; isAddress?: boolean; addresses?: string[]; value?: string }
@@ -40,7 +40,12 @@ export class ZcashBlockbookClient implements ZcashClient {
   private async get<T>(path: string, check: (v: unknown) => v is T): Promise<T> {
     const url = `${this.base}/api${path}`
     const res = await fetchWithTimeout(this.fetchFn, url, { headers: this.headers }, this.timeoutMs, this.base)
-    if (!res.ok) throw new NetworkError(`Blockbook request failed: ${res.status} ${res.statusText} (${url})`, { provider: this.base })
+    if (!res.ok) {
+      // A 4xx (not 408) is the server refusing: nothing was taken. A 5xx may have been forwarded (round 3, M12).
+      const reason = refusedStatus(res.status) ? (await res.text().catch(() => '')).slice(0, 200) : ''
+      const err = new NetworkError(`Blockbook request failed: ${res.status} ${res.statusText} (${url})${reason ? `: ${reason}` : ''}`, { provider: this.base })
+      throw refusedStatus(res.status) ? refusal(err) : err
+    }
     let body: unknown
     try { body = await res.json() } catch (e) { throw new NetworkError(`Blockbook returned non-JSON for ${url}`, { provider: this.base, cause: e }) }
     if (!check(body)) throw new NetworkError(`Blockbook returned an unexpected shape for ${url}`, { provider: this.base })
@@ -93,7 +98,7 @@ export class ZcashBlockbookClient implements ZcashClient {
 
   async broadcast(rawTx: string): Promise<string> {
     const data = await this.get(`/v2/sendtx/${rawTx}`, (v): v is { result?: string; error?: { message?: string } | string } => isRecord(v))
-    if (data.error) throw new Error(`Broadcast rejected: ${typeof data.error === 'string' ? data.error : data.error.message ?? 'broadcast failed'}`)
+    if (data.error) throw refusal(new Error(`Broadcast rejected: ${typeof data.error === 'string' ? data.error : data.error.message ?? 'broadcast failed'}`))
     if (!data.result) throw new NetworkError('Blockbook returned no txid', { provider: this.base })
     return data.result
   }
