@@ -69,22 +69,28 @@ export const MAX_PREFUNDED_SLOTS = 32
 export const DEFAULT_RPC_TIMEOUT_MS = 15_000
 
 /**
- * `promise`, or a transport error once `signal` aborts (a provider that ignores the signal still
- * lets the caller move on to the next endpoint).
+ * Runs `call(signal)` with a deadline: after `ms` the signal aborts and the result is a transport
+ * error, whether or not the provider honours the signal (the next endpoint then gets its turn). A
+ * plain timer, not `AbortSignal.timeout`: Node does not keep the process alive for the latter, so a
+ * silent endpoint would end a script with the read still pending instead of timing it out.
  *
- * @param {Promise<any>} promise - The call.
- * @param {AbortSignal} signal - Its timeout signal.
+ * @param {(signal: AbortSignal) => Promise<any>} call - The call, given the abort signal.
+ * @param {number} ms - The deadline.
  * @param {string} method - The RPC method, for the message.
  * @returns {Promise<any>} The call's result.
  */
-function withTimeout (promise, signal, method) {
+function withTimeout (call, ms, method) {
+  const controller = new AbortController()
   return new Promise((resolve, reject) => {
-    const onAbort = () => reject(new Error(`${method}: the RPC did not answer in time (timed out).`))
-    if (signal.aborted) return onAbort()
-    signal.addEventListener('abort', onAbort, { once: true })
-    promise.then(
-      (v) => { signal.removeEventListener('abort', onAbort); resolve(v) },
-      (e) => { signal.removeEventListener('abort', onAbort); reject(signal.aborted ? new Error(`${method}: the RPC did not answer in time (timed out).`) : e) }
+    const timer = setTimeout(() => {
+      controller.abort()
+      reject(new Error(`${method}: the RPC did not answer within ${ms} ms (timed out).`))
+    }, ms)
+    let pending
+    try { pending = Promise.resolve(call(controller.signal)) } catch (e) { pending = Promise.reject(e) }
+    pending.then(
+      (v) => { clearTimeout(timer); resolve(v) },
+      (e) => { clearTimeout(timer); reject(e) }
     )
   })
 }
@@ -254,17 +260,19 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
     }
     let lastError
     for (const provider of this._providers) {
-      const signal = AbortSignal.timeout(this._timeoutMs)
+      const ms = this._timeoutMs
       try {
         if (typeof provider === 'string') {
-          const res = await withTimeout(fetch(provider, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-            signal
-          }), signal, method)
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          const body = await res.json()
+          const body = await withTimeout(async (signal) => {
+            const res = await fetch(provider, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+              signal
+            })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            return await res.json()
+          }, ms, method)
           if (body.error) {
             if (body.error.code === 429 || /rate|limit|too many/i.test(String(body.error.message))) throw new Error(body.error.message)
             throw Object.assign(new Error(`${method}: ${body.error.message}`), { final: true })
@@ -274,10 +282,10 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
         // A @solana/kit Rpc (the account's own, or a failover proxy over one) answers EVERY property
         // with a method — `request` included — so it is told apart by a real RPC method, first.
         if (typeof provider.getBalance === 'function' && typeof provider[method] === 'function') {
-          return await withTimeout(provider[method](...params).send({ abortSignal: signal }), signal, method)
+          return await withTimeout((signal) => provider[method](...params).send({ abortSignal: signal }), ms, method)
         }
         if (typeof provider.request === 'function') {
-          return await withTimeout(provider.request(method, params), signal, method)
+          return await withTimeout(() => provider.request(method, params), ms, method)
         }
         throw Object.assign(new Error('Unsupported provider: expected a URL, a @solana/rpc client or { request(method, params) }.'), { final: true })
       } catch (error) {
