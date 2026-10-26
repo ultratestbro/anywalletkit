@@ -7,7 +7,7 @@ import {
 import { publicKeyToAddress } from 'viem/accounts'
 import { encodeApprove, ERC20_PERMIT_ABI, PERMIT_TYPES, USDT_MAINNET } from './erc20.js'
 import { BroadcastUnknownError, ChainMismatchError, PermitUnsupportedError, SimulationError, UnsafeTransactionError } from './errors.js'
-import { WalletAccountReadOnlyEvm, chainIdNumber, transferTransaction, typedDataHash, typedDomainChainId } from './read-only-account.js'
+import { WalletAccountReadOnlyEvm, assertTxShape, chainIdNumber, transferTransaction, typedDataHash, typedDomainChainId } from './read-only-account.js'
 export { MIN_PRIORITY_FEE_WEI, typedDomainChainId } from './read-only-account.js'
 import type { ApproveOptions, EvmConfig, EvmTransaction, EvmTransferOptions, PermitInfo, PermitOptions, SignedPermit, TypedDataInput } from './types.js'
 
@@ -179,6 +179,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
 
   /** ethers-shaped tx → viem serializable, filling gaps from the network when there is a client. */
   private async prepare(tx: EvmTransaction): Promise<TransactionSerializable> {
+    assertTxShape(tx)
     const chainId = tx.chainId !== undefined ? chainIdNumber(tx.chainId) : await this.getChainId()
     const nonce = tx.nonce ?? (await this.nextNonce())
     const to = tx.to !== undefined ? getAddress(tx.to) : undefined
@@ -188,6 +189,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
 
     const base = { chainId, nonce, ...(to ? { to } : {}), value, data, gas }
     const fees = await this.feeFields(tx, chainId)
+    if ('gasPrice' in fees && tx.type === 4) throw new Error('An EIP-7702 (type 4) transaction takes EIP-1559 fee fields, and this chain answered with a legacy gas price.')
     if ('gasPrice' in fees) {
       return tx.type === 1
         ? { ...base, type: 'eip2930', gasPrice: fees.gasPrice, accessList: tx.accessList ?? [] }

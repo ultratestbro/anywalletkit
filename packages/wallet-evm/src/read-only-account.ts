@@ -21,6 +21,16 @@ export const MIN_PRIORITY_FEE_WEI: Readonly<Record<number, bigint>> = Object.fre
 /** Fee fields a transaction is signed with: a legacy `gasPrice`, or the EIP-1559 cap and tip. */
 export type FeeFields = { gasPrice: bigint } | { maxFeePerGas: bigint; maxPriorityFeePerGas: bigint }
 
+/**
+ * Refuses shapes that would silently lose meaning: authorizations on a transaction that is not
+ * type 4 (they would be dropped), and a type 4 with `gasPrice` (it would become a legacy
+ * transaction without them).
+ */
+export function assertTxShape(tx: EvmTransaction): void {
+  if (tx.authorizationList?.length && tx.type !== 4) throw new Error('authorizationList needs a type 4 (EIP-7702) transaction; it would be dropped otherwise.')
+  if (tx.type === 4 && tx.gasPrice !== undefined) throw new Error('An EIP-7702 (type 4) transaction takes EIP-1559 fee fields (maxFeePerGas / maxPriorityFeePerGas), not gasPrice.')
+}
+
 /** Legacy fee fields: type 0 / 1, or a `gasPrice` without an EIP-1559 cap. */
 export function usesLegacyFees(tx: EvmTransaction): boolean {
   return tx.type === 0 || tx.type === 1 || (tx.gasPrice !== undefined && tx.maxFeePerGas === undefined)
@@ -180,13 +190,18 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
     return client.getGasPrice()
   }
 
-  /** Calldata/value/to in the shape viem's `call` / `estimateGas` take. */
+  /**
+   * Calldata/value/to in the shape viem's `call` / `estimateGas` take — with an EIP-7702
+   * transaction's authorizations, so the dry run executes the delegate's code, not the account's.
+   */
   protected callParams(tx: EvmTransaction) {
+    assertTxShape(tx)
     return {
       account: this.address,
       ...(tx.to !== undefined ? { to: getAddress(tx.to) } : {}),
       ...(tx.value !== undefined ? { value: BigInt(tx.value) } : {}),
       ...(tx.data !== undefined ? { data: tx.data as Hex } : {}),
+      ...(tx.authorizationList?.length ? { authorizationList: tx.authorizationList as never } : {}),
     }
   }
 
