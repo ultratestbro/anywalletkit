@@ -91,4 +91,20 @@ describe("chainflip status", () => {
     expect(await t("bb")).toEqual({state: "completed", depositReceived: true, destTxHash: "0xdest"});
     expect(await t("cc")).toEqual({state: "refunded", depositReceived: true});
   });
+
+  // Audit 2026-10-25 round 3, M26: a fill-or-kill refund was reported as completed. Built on the
+  // response shape the provider already reads (swapEgress / refundEgress), not checked live.
+  it("a COMPLETED swap that only refunded is refunded; swapped and refunded in part is partial", async () => {
+    const answers: Record<string, unknown> = {
+      rr: {state: "COMPLETED", refundEgress: {txRef: "r"}},
+      pp: {state: "COMPLETED", swapEgress: {txRef: "0xdest"}, refundEgress: {txRef: "r"}},
+      ok: {state: "COMPLETED", swapEgress: {txRef: "0xdest"}},
+    };
+    stub({}, (id) => (answers[id] ? new Response(JSON.stringify(answers[id])) : new Response("{}", {status: 404})));
+    const p = chainflipProvider();
+    const t = (h: string) => p.trackIntent({intentId: "cfvault:tron:728126428", sourceTxHash: h});
+    expect(await t("rr")).toEqual({state: "refunded", depositReceived: true});
+    expect(await t("pp")).toEqual({state: "partial", depositReceived: true, destTxHash: "0xdest"});
+    expect(await t("ok")).toEqual({state: "completed", depositReceived: true, destTxHash: "0xdest"});
+  });
 });

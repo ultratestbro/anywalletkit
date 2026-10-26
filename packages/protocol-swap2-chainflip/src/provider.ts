@@ -222,7 +222,13 @@ export function chainflipProvider(config: ChainflipProviderConfig = {}): CrossCh
         if (!r.ok) return {state: "pending"};
         const s = (r.body ?? {}) as {state?: string; swapEgress?: {txRef?: string}; refundEgress?: {txRef?: string}; fallbackEgress?: {txRef?: string}; deposit?: {txRef?: string}};
         const egress = s.swapEgress?.txRef;
-        if (s.state === "COMPLETED" || (s.state === "SENT" && egress)) return {state: "completed", depositReceived: true, ...(egress ? {destTxHash: egress} : {})};
+        const refunded = !!(s.refundEgress || s.fallbackEgress);
+        if (s.state === "COMPLETED" || (s.state === "SENT" && egress)) {
+          // Fill-or-kill: only a refund went out → refunded; swapped in part and refunded the rest → partial (round 3, M26).
+          if (!s.swapEgress && refunded) return {state: "refunded", depositReceived: true};
+          if (s.swapEgress && refunded) return {state: "partial", depositReceived: true, ...(egress ? {destTxHash: egress} : {})};
+          return {state: "completed", depositReceived: true, ...(egress ? {destTxHash: egress} : {})};
+        }
         if (s.state === "FAILED") return s.refundEgress || s.fallbackEgress ? {state: "refunded", depositReceived: true} : {state: "failed", depositReceived: true};
         const received = s.state === "RECEIVING" || s.state === "SWAPPING" || s.state === "SENDING" || s.state === "SENT";
         return {state: "pending", depositReceived: received};
