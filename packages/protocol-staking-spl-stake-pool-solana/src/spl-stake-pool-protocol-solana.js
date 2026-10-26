@@ -59,6 +59,29 @@ export const DEFAULT_COMPUTE_UNIT_PRICE = 50_000n
 export const DEFAULT_SLIPPAGE_BPS = 50
 /** Seed-derived stake accounts tracked per wallet for delayed exits. */
 export const DEFAULT_UNSTAKE_SLOTS = 8
+/** Per-call RPC timeout (ms). */
+export const DEFAULT_RPC_TIMEOUT_MS = 15_000
+
+/**
+ * `promise`, or a transport error once `signal` aborts (a provider that ignores the signal still
+ * lets the caller move on to the next endpoint).
+ *
+ * @param {Promise<any>} promise - The call.
+ * @param {AbortSignal} signal - Its timeout signal.
+ * @param {string} method - The RPC method, for the message.
+ * @returns {Promise<any>} The call's result.
+ */
+function withTimeout (promise, signal, method) {
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(new Error(`${method}: the RPC did not answer in time (timed out).`))
+    if (signal.aborted) return onAbort()
+    signal.addEventListener('abort', onAbort, { once: true })
+    promise.then(
+      (v) => { signal.removeEventListener('abort', onAbort); resolve(v) },
+      (e) => { signal.removeEventListener('abort', onAbort); reject(signal.aborted ? new Error(`${method}: the RPC did not answer in time (timed out).`) : e) }
+    )
+  })
+}
 /** Slot time used to project the epoch boundary. */
 const SLOT_MS = 400
 
@@ -127,6 +150,7 @@ export function base58Decode (s) {
  * @property {number} [computeUnitLimit] - Compute budget per transaction (default 300 000).
  * @property {bigint | number} [computeUnitPrice] - Priority fee in micro-lamports per unit (default 50 000).
  * @property {number} [unstakeSlots] - Delayed-exit stake accounts tracked per wallet (default 8).
+ * @property {number} [timeoutMs] - Per-call RPC timeout in ms (default 15 000); a silent endpoint gives way to the next.
  * @property {() => Promise<number>} [apr] - Hook returning the APY in percent from a provider's figure (Jito's stats, Sanctum, …); without it `getApr` estimates from the pool's last two epochs.
  */
 
@@ -193,6 +217,8 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
     this._computeUnitPrice = BigInt(config.computeUnitPrice ?? DEFAULT_COMPUTE_UNIT_PRICE)
     /** @private */
     this._unstakeSlots = config.unstakeSlots ?? DEFAULT_UNSTAKE_SLOTS
+    /** @private Per-call RPC timeout: a silent endpoint must not hang a read, and the next one must get its turn. */
+    this._timeoutMs = config.timeoutMs ?? DEFAULT_RPC_TIMEOUT_MS
     /** @private */
     this._aprHook = config.apr
   }
@@ -222,13 +248,15 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
     }
     let lastError
     for (const provider of this._providers) {
+      const signal = AbortSignal.timeout(this._timeoutMs)
       try {
         if (typeof provider === 'string') {
-          const res = await fetch(provider, {
+          const res = await withTimeout(fetch(provider, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
-          })
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+            signal
+          }), signal, method)
           if (!res.ok) throw new Error(`HTTP ${res.status}`)
           const body = await res.json()
           if (body.error) {
@@ -237,12 +265,13 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
           }
           return body.result
         }
-        if (typeof provider.request === 'function') {
-          return await provider.request(method, params)
+        // A @solana/kit Rpc (the account's own, or a failover proxy over one) answers EVERY property
+        // with a method — `request` included — so it is told apart by a real RPC method, first.
+        if (typeof provider.getBalance === 'function' && typeof provider[method] === 'function') {
+          return await withTimeout(provider[method](...params).send({ abortSignal: signal }), signal, method)
         }
-        if (typeof provider[method] === 'function') {
-          // @solana/rpc client (or a failover proxy over one): positional params, then .send()
-          return await provider[method](...params).send()
+        if (typeof provider.request === 'function') {
+          return await withTimeout(provider.request(method, params), signal, method)
         }
         throw Object.assign(new Error('Unsupported provider: expected a URL, a @solana/rpc client or { request(method, params) }.'), { final: true })
       } catch (error) {
