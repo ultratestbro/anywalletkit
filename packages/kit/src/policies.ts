@@ -476,6 +476,31 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
  * genesis spellings of one network match (see `sameChain`). An account that
  * cannot tell its network answers to the rules of `chain`.
  */
+/** A signing account — what {@link applyPolicies} wraps: it has an address, a chain and a write method. */
+export function isSigningAccount(v: unknown): v is IWalletAccount {
+  const a = v as Record<string, unknown> | null
+  return typeof a === 'object' && a !== null && typeof a.getAddress === 'function' && typeof a.chain === 'string' &&
+    (typeof a.sign === 'function' || typeof a.sendTransaction === 'function' || typeof a.transfer === 'function')
+}
+
+/** A `Signer` (`sign(bytes)` signs anything, unchecked): never handed out through a policy wrapper. */
+export function isSignerLike(v: unknown): boolean {
+  const s = v as Record<string, unknown> | null
+  return typeof s === 'object' && s !== null && typeof s.sign === 'function' && typeof s.curve === 'string'
+}
+
+/**
+ * What a method behind a policy wrapper returns: a signing account comes back wrapped (`wrap`), a
+ * signer not at all; a promise is mapped the same way once it settles. Anything else is as is.
+ */
+export function guardReturned(value: unknown, wrap: (account: IWalletAccount) => unknown): unknown {
+  const map = (v: unknown) => {
+    if (isSignerLike(v)) throw new PolicyViolationError('chain', 'A signer is not handed out through a policy-guarded object.')
+    return isSigningAccount(v) ? wrap(v) : v
+  }
+  return value instanceof Promise ? value.then(map) : map(value)
+}
+
 export function applyPolicies<A extends IWalletAccount>(account: A, policies: Policies, chain?: string): A {
   const rules = [policies.maxFee, policies.allowlist, policies.blocklist]
   const hasRuleFor = (key: (k: string) => boolean) => rules.some((m) => m !== undefined && Object.keys(m).some(key))
@@ -574,7 +599,10 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
   const wrapped = new Map<string, (...args: unknown[]) => Promise<unknown>>()
   return new Proxy(account, {
     get(target, prop, receiver) {
+      // The signer signs whatever it is handed: reaching it would skip every rule (round 3, H3).
+      if (prop === 'signer') return undefined
       const v = Reflect.get(target, prop, receiver)
+      if (isSignerLike(v)) return undefined
       if (typeof v !== 'function') return v
       if (typeof prop === 'string' && isGuardedWrite(prop)) {
         let fn = wrapped.get(prop)
@@ -603,7 +631,11 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         }
         return fn
       }
-      return v.bind(target)
+      // Reads run on the account itself. An account they hand back (NEAR's `withAccountId`, the
+      // same key bound to a named account) answers to the same policies; the account itself comes
+      // back as this wrapper (round 3, H3).
+      const method = v as (...args: unknown[]) => unknown
+      return (...args: unknown[]) => guardReturned(method.apply(target, args), (a) => (a === target ? receiver : applyPolicies(a, policies, chain)))
     },
   })
 }

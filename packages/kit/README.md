@@ -59,6 +59,10 @@ and chain-specific ones such as Tron's `signRaw`, NEAR's `signBuilt`, Solana's
 `sign*` / `send*` / `approve*` / `revoke*` / `transfer*` is guarded unless it
 is listed in `UNGUARDED_WRITES`, so a new signing method in a chain package
 cannot bypass the policies by not being named. Reads are never intercepted.
+Nothing hands out a way around the wrapper: its `signer` is hidden, an account
+a method returns (NEAR's `withAccountId`) comes back under the same policies,
+and `wallet.getManager(chain)` hands out guarded accounts (`getAccount`,
+`getAccountByPath`, `getNamedAccount`) and no seed or signer accessors.
 
 A revoke is `kind: 'revoke'`: an `approve` / `signPermit` / EIP-2612 Permit of 0,
 raw revoke calldata (`approve(0x0, tokenId)`, `setApprovalForAll(…, false)`,

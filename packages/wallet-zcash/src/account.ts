@@ -103,7 +103,7 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
     }
   }
 
-  protected async buildSignedTransaction(spend: ZcashSpend): Promise<Built> {
+  protected async signSpend(spend: ZcashSpend): Promise<Built> {
     this.live()
     const plan = await this.planSpend(spend)
     const params = await this.chainParams()
@@ -151,7 +151,7 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
   /** "What you sign": the fully resolved spend (signed, NOT broadcast) or a caller's raw hex. */
   async describeTransaction(tx: ZcashTransaction): Promise<ZcashTxDescription> {
     if (typeof tx === 'string') return (await this.describeRaw(tx)).desc
-    return (await this.buildSignedTransaction(tx)).desc
+    return (await this.signSpend(tx)).desc
   }
 
   /** Sign without broadcasting. Returns the raw transaction hex. Raw hex input gets the checks `sendTransaction` runs (prevouts through the client) and is returned unchanged, never re-signed. */
@@ -162,7 +162,7 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
       this.checkMax(desc.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
       return tx
     }
-    const built = await this.buildSignedTransaction(tx)
+    const built = await this.signSpend(tx)
     this.checkMax(built.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return built.hex
   }
@@ -180,7 +180,7 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
       const { tx: parsed, desc } = await this.describeRaw(tx)
       rawHex = tx; hash = txidOf(parsed); fee = desc.fee
     } else {
-      const built = await this.buildSignedTransaction(tx)
+      const built = await this.signSpend(tx)
       rawHex = built.hex; hash = built.txid; fee = built.fee
     }
     this.checkMax(fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
@@ -193,7 +193,7 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
     if (o.token) throw new Error('Tokens are not supported on the zcash blockchain.')
     this.live()
     const client = this.requireClient('transfer')
-    const built = await this.buildSignedTransaction({ to: o.recipient, value: o.amount })
+    const built = await this.signSpend({ to: o.recipient, value: o.amount })
     this.checkMax(built.fee, feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
     const id = await client.broadcast(built.hex)
     return { hash: id || built.txid, fee: built.fee }
