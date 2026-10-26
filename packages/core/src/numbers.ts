@@ -25,3 +25,15 @@ export function bigintToNumber(value: bigint): number {
 export function bigintToUnits(value: bigint, decimals: number): number {
   return bigintToNumber(value) / 10 ** decimals
 }
+
+/**
+ * The smallest allowance treated as unlimited across the SDK: type(uint128).max. It is far above
+ * any token's supply in base units, and every "infinite approval" sentinel in use (uint256,
+ * uint160, uint128 max, 2^255) reaches it.
+ */
+export const UNLIMITED_ALLOWANCE = (1n << 128n) - 1n
+
+/** True for an allowance a spender can treat as unlimited (≥ type(uint128).max). */
+export function isUnlimitedAllowance(amount: bigint): boolean {
+  return amount >= UNLIMITED_ALLOWANCE
+}

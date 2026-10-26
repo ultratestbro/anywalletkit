@@ -1,4 +1,4 @@
-import { UserRejectedError, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
+import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
 import { canonicalAddress, sendDestinations } from './destinations.js'
 
@@ -89,7 +89,6 @@ function isOffline(account: unknown): boolean {
 /** Permit2 primary types (Uniswap Permit2): an allowance or a transfer authorisation for `spender`. */
 const PERMIT2_TYPES = new Set(['PermitSingle', 'PermitBatch', 'PermitTransferFrom', 'PermitBatchTransferFrom', 'PermitWitnessTransferFrom', 'PermitBatchWitnessTransferFrom'])
 const MAX_UINT256 = (1n << 256n) - 1n
-const MAX_UINT160 = (1n << 160n) - 1n
 
 /**
  * What a write does, as the policies classify it. The kind decides which rules apply: lists and fee
@@ -144,8 +143,17 @@ export interface WriteIntent {
   token?: string
   /** Amount when it can be read off the call (allowance for approvals). */
   amount?: bigint
-  /** Approvals: the allowance is unbounded (uint256 / uint160 max, 2^255 and above, or a DAI-style `allowed`). */
+  /**
+   * Approvals: the allowance is unbounded — type(uint128).max or above (`isUnlimitedAllowance` in
+   * core), a DAI-style `allowed`, or an amount the policies cannot read (the worst case is shown).
+   * For a Permit2 batch: any of its entries.
+   */
   unlimited?: boolean
+  /**
+   * Approvals: every token the write grants, one entry each (a Permit2 batch carries several).
+   * `token` / `amount` above are set only when there is exactly one.
+   */
+  approvals?: Array<{ token?: string; amount?: bigint; unlimited: boolean }>
   /** Approvals / permits: expiry as given (unix seconds). */
   deadline?: bigint
   /** Revokes: what each one takes away (`spender` absent for a per-token NFT approval and an EIP-7702 delegation). */
@@ -200,9 +208,19 @@ export class PolicyViolationError extends Error {
 const lower = (s: string | undefined) => s?.toLowerCase()
 const obj = (v: unknown): Record<string, unknown> => (typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {})
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined)
-const big = (v: unknown): bigint | undefined =>
-  typeof v === 'bigint' ? v : typeof v === 'number' && Number.isFinite(v) ? BigInt(Math.trunc(v)) : typeof v === 'string' && /^(0x[0-9a-fA-F]+|\d+)$/.test(v) ? BigInt(v) : undefined
-const unboundedAllowance = (amount: bigint | undefined, max = MAX_UINT256): boolean => amount !== undefined && (amount >= 1n << 255n || amount === max)
+/**
+ * A uint as the signer reads it. wallet-evm and viem pass strings and numbers through BigInt(), so
+ * ' 0x…', '0X…', '0b…', '0o…' and surrounding whitespace are numbers there and must be here too
+ * (round 3, M3). A non-integer number or anything else is unreadable (undefined).
+ */
+const big = (v: unknown): bigint | undefined => {
+  if (typeof v === 'bigint') return v
+  if (typeof v === 'number') return Number.isInteger(v) ? BigInt(v) : undefined
+  if (typeof v === 'string' && v.length <= 300) { try { return BigInt(v) } catch { return undefined } }
+  return undefined
+}
+/** An allowance given as `raw`: unlimited at or above type(uint128).max, or when it is present but unreadable (the worst case is what `confirm` must see). */
+const allowanceUnlimited = (raw: unknown, amount: bigint | undefined): boolean => (amount === undefined ? raw !== undefined : isUnlimitedAllowance(amount))
 
 /** An intent before {@link withDestinations}. */
 type DraftIntent = Omit<WriteIntent, 'destinations' | 'destinationUnknown'>
@@ -350,13 +368,23 @@ function typedDataIntent(base: IntentBase, arg: unknown, primaryType: string): D
     const amount = big(field('value', 'uint256'))
     const allowed = field('allowed', 'bool')
     if (verifying !== undefined && (amount === 0n || allowed === false)) return revokeIntent(base, [{ token: verifying, spender }])
-    const unlimited = allowed === true || unboundedAllowance(amount)
+    // No uint256 `value` the policies can read and no DAI `allowed: true`: the grant is unknown, so the worst case (round 3, M3).
+    const unlimited = allowed === true || amount === undefined || isUnlimitedAllowance(amount)
     return approvalIntent(base, spender, verifying, amount, big(field('deadline') ?? field('expiry')), unlimited)
   }
   if (PERMIT2_TYPES.has(primaryType) && str(message.spender) !== undefined) {
-    const details = Array.isArray(message.details) ? obj(message.details[0]) : obj(message.details ?? message.permitted)
-    const amount = big(details.amount)
-    return approvalIntent(base, str(message.spender), str(details.token), amount, big(message.sigDeadline ?? message.deadline ?? details.expiration), unboundedAllowance(amount, MAX_UINT160))
+    // Every entry: `details` (allowance permits) or `permitted` (transfer permits), one or a batch (round 3, M3).
+    const field = message.details !== undefined ? message.details : message.permitted
+    const entries = (Array.isArray(field) ? field : field !== undefined ? [field] : []).map(obj)
+    const approvals = entries.map((d) => {
+      const amount = big(d.amount)
+      return { ...(str(d.token) !== undefined ? { token: str(d.token)! } : {}), ...(amount !== undefined ? { amount } : {}), unlimited: allowanceUnlimited(d.amount, amount) }
+    })
+    const one = approvals.length === 1 ? approvals[0] : undefined
+    const expiry = big(message.sigDeadline ?? message.deadline ?? (one ? entries[0]!.expiration : undefined))
+    // No entry at all: nothing tells what is granted, so the worst case.
+    const unlimited = approvals.length === 0 || approvals.some((a) => a.unlimited)
+    return { ...approvalIntent(base, str(message.spender), one?.token, one?.amount, expiry, unlimited), approvals }
   }
   return { ...base, kind: 'typedData', message: true, ...(verifying !== undefined ? { to: verifying } : {}) }
 }
@@ -402,12 +430,12 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
     case 'approve': {
       const amount = big(a.amount)
       if (amount === 0n && str(a.token) !== undefined) return revokeIntent(base, [{ token: str(a.token)!, ...(str(a.spender) !== undefined ? { spender: str(a.spender)! } : {}) }])
-      return approvalIntent(base, str(a.spender), str(a.token), amount, undefined, unboundedAllowance(amount))
+      return approvalIntent(base, str(a.spender), str(a.token), amount, undefined, allowanceUnlimited(a.amount, amount))
     }
     case 'signPermit': {
       const amount = big(a.value ?? a.amount)
       if (amount === 0n && str(a.token) !== undefined) return revokeIntent(base, [{ token: str(a.token)!, ...(str(a.spender) !== undefined ? { spender: str(a.spender)! } : {}) }])
-      return approvalIntent(base, str(a.spender), str(a.token), amount, big(a.deadline), unboundedAllowance(amount))
+      return approvalIntent(base, str(a.spender), str(a.token), amount, big(a.deadline), allowanceUnlimited(a.value ?? a.amount, amount))
     }
     case 'signTypedData':
       return typedDataIntent(base, arg, resolvePrimaryType(arg))
@@ -443,7 +471,7 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
     if (found.every((r) => r !== null)) return revokeIntent(base, found.flat() as Array<{ token: string; spender?: string }>)
     // One raw approve / setApprovalForAll(true): an approval of the spender it names.
     const grant = calls.length === 1 && !carriesForeignPayload(calls[0]) ? grantCall(calls[0]) : null
-    if (grant) return approvalIntent(base, grant.spender, grant.token, grant.amount, undefined, unboundedAllowance(grant.amount))
+    if (grant) return approvalIntent(base, grant.spender, grant.token, grant.amount, undefined, isUnlimitedAllowance(grant.amount))
   }
   // An EVM, Solana or Tron transaction never goes to a `recipient` field (`transfer` options do):
   // showing it would name a destination the signed transaction does not have (round 3, H2).
