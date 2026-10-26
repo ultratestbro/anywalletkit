@@ -521,13 +521,28 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
   }
 
   /**
-   * The wallet's delegations (every validator it has stake with), with pending stake and unclaimed
-   * rewards. `validator.apr` is filled only once `getNetworkStats()` has run (it costs ~200 reads).
+   * Validators to look at for positions: the wallet's delegations, the configured list, the ones this
+   * instance unstaked from, and `extra`. getDelegations drops a validator once the stake there is
+   * zero, while rewards earned there can still wait to be claimed (round 3, NS-7).
    */
-  async listPositions(): Promise<DelegatorPosition[]> {
+  private async positionIds(me: Address, extra: readonly (bigint | number)[] = []): Promise<bigint[]> {
+    const set = new Set(await this.delegatedIds(me))
+    if (this.validators !== 'any') for (const v of this.validators) set.add(v.id)
+    for (const v of this.unstakedFrom) set.add(v)
+    for (const v of extra) set.add(toValidatorId(v))
+    return [...set]
+  }
+
+  /**
+   * The wallet's positions — every validator it has stake with, plus the configured ones, the ones it
+   * unstaked from and `options.validators` — with pending stake and unclaimed rewards; a validator with
+   * nothing there is left out. `validator.apr` is filled only once `getNetworkStats()` has run (it
+   * costs ~200 reads).
+   */
+  async listPositions(options: { validators?: readonly (bigint | number)[] } = {}): Promise<DelegatorPosition[]> {
     const me = await this.me()
     await this.chain()
-    const ids = await this.delegatedIds(me)
+    const ids = await this.positionIds(me, options.validators)
     const extra = await this.enrich(ids)
     const rows = await pool(ids, this.concurrency, (id) => this.positionFor(me, id, extra[String(id)]))
     return rows.filter((p) => p.active > 0n || p.activating > 0n || p.activatingNext > 0n || p.unclaimedRewards > 0n)
