@@ -583,8 +583,9 @@ export class AaveProtocolEvm extends LendingProtocol<AaveProtocolConfig> {
     const amount = all ? maxUint256 : toAmount(o.amount)
     if (!all && amount > held) throw new AaveError(`${reserve.symbol}: the amount exceeds the supplied balance (${held}).`, 'NotEnoughAvailableUserBalance')
     if (native) {
-      // The gateway burns the account's aWETH: it needs an allowance on them.
-      const approvals = await this.approvals(reserve.aToken, market.wethGateway!, all ? held : amount)
+      // The gateway burns the account's aWETH: it needs an allowance on them. For 'max' it pulls the
+      // balance at execution, which interest has grown since `held` was read: leave 0.1 % headroom.
+      const approvals = await this.approvals(reserve.aToken, market.wethGateway!, all ? held + held / 1000n + 1n : amount)
       const tx: Tx = { to: market.wethGateway!, data: this.encode(GATEWAY_ABI, 'withdrawETH', [market.pool, amount, to]), value: 0n }
       if (approvals.length > 0) tx.gasLimit = FALLBACK_GAS.withdraw
       return { reserve, native, approvals, tx, amount: all ? held : amount, all }

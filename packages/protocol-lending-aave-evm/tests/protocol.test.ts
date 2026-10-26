@@ -348,3 +348,13 @@ describe('revert decoding', () => {
     expect(decodeAaveRevert('0xdeadbeef')).toEqual({ message: 'reverted with custom error 0xdeadbeef' })
   })
 })
+describe('round 3: max with permit / native max withdraw', () => {
+  // Audit 2026-10-25 round 3, M20: withdraw('max') through the WETH gateway approved exactly the aWETH held at planning; the
+  // gateway pulls the balance at execution, which interest has grown, and transferFrom fails.
+  it("native withdraw('max') approves the held aWETH plus 0.1 % headroom", async () => {
+    const { p, acc, state } = make()
+    setBalance(state, A_WETH, USER, 2n * E18)
+    await p.withdraw({ token: 'native', amount: 'max' })
+    expect(decodeSent(acc.sent[0])).toMatchObject({ to: A_WETH, fn: 'approve', args: [GATEWAY, 2n * E18 + (2n * E18) / 1000n + 1n] })
+  })
+})
