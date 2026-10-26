@@ -17,6 +17,12 @@ export interface ServerOptions {
   allowedOrigin?: string
   /** Requests per minute per caller and bucket; `rpcHeavy` counts each expensive RPC call (eth_getLogs, eth_call…). */
   limits?: { live: number; display: number; status: number; rpc: number; rpcHeavy?: number }
+  /**
+   * Who a request counts against for rate limits. Default: the socket's address — behind a proxy
+   * that is the proxy's, the same for everyone. Pass a key you trust: the signed-in user's id, or
+   * the client IP from a header only your proxy can set.
+   */
+  callerKey?: (req: IncomingMessage) => string
   fetchImpl?: typeof fetch
 }
 
@@ -52,6 +58,8 @@ export function createRateLimiter({ windowMs = 60_000, now = Date.now }: { windo
  * and rate-limits per user, in a shared store (Redis, Upstash), not in this process's memory.
  */
 function makeGuard(opts: ServerOptions) {
+  // An empty token would equal an empty Authorization header: every request would pass.
+  if (typeof opts.apiToken !== 'string' || opts.apiToken.trim() === '') throw new Error('apiToken must be a non-empty string (an empty one lets every request through).')
   const token = Buffer.from(opts.apiToken)
   const limits = { rpcHeavy: 60, ...(opts.limits ?? { live: 30, display: 240, status: 120, rpc: 600 }) }
   const limiter = createRateLimiter()
@@ -59,9 +67,11 @@ function makeGuard(opts: ServerOptions) {
   const authenticate = (req: IncomingMessage): string => {
     const got = Buffer.from(String(req.headers.authorization ?? '').replace(/^Bearer /, ''))
     if (got.length !== token.length || !timingSafeEqual(got, token)) throw new Swap2HandlerError(401, 'unauthorized')
-    return req.socket.remoteAddress ?? 'unknown' // the caller key; per USER in production
+    return opts.callerKey ? opts.callerKey(req) : (req.socket.remoteAddress ?? 'unknown') // the caller key; per USER in production
   }
   return {
+    /** The token check alone: run it before reading a body. */
+    authenticate,
     swap2: (call: Swap2Call, req: IncomingMessage) => {
       const caller = authenticate(req)
       // Display quotes (route list, every keystroke) get their own, larger bucket so they never
@@ -98,6 +108,7 @@ export function createServer(opts: ServerOptions): Server {
 
       const swap = /^\/swap2\/([a-z]+)$/.exec(url.pathname)
       if (swap) {
+        guard.authenticate(req) // before reading (and parsing) up to 3 MB from anyone
         const raw = await readBody(req, 3 * 1024 * 1024) // a Solana / TON payload can be ~2 MB
         let body: unknown
         try { body = JSON.parse(raw) } catch { return send(res, 400, { error: 'invalid JSON' }) }
