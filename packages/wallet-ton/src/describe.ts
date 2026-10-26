@@ -4,7 +4,7 @@
  * flags the classic mistakes before any key is touched.
  */
 import { Address, Cell, beginCell, type MessageRelaxed, type Slice } from '@ton/core'
-import { parseV5R1Body } from './wallet-v5r1.js'
+import { DEFAULT_SEND_MODE, parseV5R1Body } from './wallet-v5r1.js'
 import type { TonSendable, TonTransaction } from './types.js'
 
 /** TEP-74 `transfer` op code of a jetton wallet. */
@@ -42,6 +42,11 @@ export interface TonDescribedMessage {
   jetton?: TonJettonDetails
   hasStateInit: boolean
   bodyBits: number
+  /**
+   * Send mode the wallet sends the message with (IGNORE_ERRORS is always added for an external).
+   * 128 carries the whole remaining balance, 32 destroys the account when it is left empty.
+   */
+  mode?: number
 }
 
 /** Problems a TON description is flagged with. */
@@ -54,6 +59,8 @@ export type TonWarningCode =
   | 'mainnet-address'
   | 'exotic-workchain'
   | 'extended-actions'
+  | 'carries-all-balance'
+  | 'destroys-account'
 
 /** One flagged problem; `index` is the message it is about. */
 export interface TonWarning { code: TonWarningCode; message: string; index?: number }
@@ -174,6 +181,24 @@ function describeOne(
 
 const hex = (n: number) => `0x${n.toString(16).padStart(8, '0')}`
 
+/** SendMode.IGNORE_ERRORS: the V5R1 wallet always adds it to an external's messages. */
+const IGNORE_ERRORS = 2
+/** The mode a message given as {@link TonTransaction} is sent with: its `sendMode` or the default, plus IGNORE_ERRORS. */
+export function sendModeOf(sendMode: number | undefined): number {
+  return (sendMode ?? DEFAULT_SEND_MODE) | IGNORE_ERRORS
+}
+/** The drain modes in `mode`: 128 carries the whole remaining balance, 32 destroys the account once it is empty. */
+export function drainModes(mode: number): Array<'carries-all-balance' | 'destroys-account'> {
+  return [...((mode & 128) !== 0 ? ['carries-all-balance' as const] : []), ...((mode & 32) !== 0 ? ['destroys-account' as const] : [])]
+}
+
+function withMode(i: number, item: TonDescribedMessage, mode: number, warnings: TonWarning[]): TonDescribedMessage {
+  for (const code of drainModes(mode)) {
+    warnings.push({ code, message: code === 'carries-all-balance' ? 'send mode 128: the message carries the whole remaining balance' : 'send mode 32: the wallet account is destroyed once it is empty', index: i })
+  }
+  return { ...item, mode }
+}
+
 /** Describe one outgoing message and push its warnings into `warnings`. */
 export function describeMessageRelaxed(i: number, m: MessageRelaxed, warnings: TonWarning[], ctx: { network?: 'mainnet' | 'testnet' } = {}): TonDescribedMessage {
   if (m.info.type !== 'internal') {
@@ -198,7 +223,7 @@ export function describeTransaction(tx: TonSendable, ctx: { network?: 'mainnet' 
       return { kind: 'contract-call', items, warnings }
     }
     external = { seqno: parsed.seqno, validUntil: parsed.validUntil, walletId: parsed.walletId, signed: parsed.signed }
-    parsed.messages.forEach((m, i) => items.push(describeMessageRelaxed(i, m.message, warnings, ctx)))
+    parsed.messages.forEach((m, i) => items.push(withMode(i, describeMessageRelaxed(i, m.message, warnings, ctx), m.mode, warnings)))
   } else {
     const list = Array.isArray(tx) ? tx : [tx]
     list.forEach((t, i) => {
@@ -210,7 +235,7 @@ export function describeTransaction(tx: TonSendable, ctx: { network?: 'mainnet' 
       }
       let body: Cell | undefined
       try { body = bodyOf(t) } catch { warnings.push({ code: 'unknown-body', message: 'bodyBoc is not a valid BoC', index: i }) }
-      items.push(describeOne(i, to, BigInt(t.value), body, t.stateInit !== undefined, t.bounceable, warnings, ctx))
+      items.push(withMode(i, describeOne(i, to, BigInt(t.value), body, t.stateInit !== undefined, t.bounceable, warnings, ctx), sendModeOf(t.sendMode), warnings))
     })
   }
   const kinds = new Set(items.map((x) => x.kind))
