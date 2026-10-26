@@ -44,7 +44,10 @@ Every `signTransaction` / `sendTransaction` / `transfer` goes through the same g
 1. **Hard checks** (`UnsafeTransactionError`, with a `code`): exactly one contract; `owner_address`
    is this account; `ref_block_bytes` / `ref_block_hash` present; `expiration` in the future and
    at most 24 h away; no TRX / TRC-20 transfer to the zero address unless `allowBurn: true`;
-   `fee_limit` ≤ `transactionMaxFee` when set.
+   `fee_limit` ≤ `transactionMaxFee` when set; no `AccountPermissionUpdateContract` (it hands the
+   account's keys over) unless `allowPermissionChanges: true` (`permission-change`); no contract type
+   the wallet cannot decode unless `allowUndecodedContracts: true` (`undecoded-contract`;
+   `VoteWitnessContract` only re-assigns votes and is signed). The same checks run in `signRaw`.
 2. **Simulation** (`SimulationError`, off with `simulate: false`): contract calls run through
    `/wallet/triggerconstantcontract` and the revert reason is ABI-decoded (`Error(string)`,
    `Panic`); TRX transfers check that the balance covers amount + fees.

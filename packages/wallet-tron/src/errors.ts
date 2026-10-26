@@ -16,6 +16,10 @@ export type UnsafeTransactionCode =
   | 'raw-undecodable'
   /** Bytes a strict protobuf reader would not produce (over-long tag, non-minimal varint, repeated singular field, parameter that does not re-encode to itself): java-tron could read them differently. */
   | 'raw-noncanonical'
+  /** An AccountPermissionUpdateContract, refused unless `allowPermissionChanges`. */
+  | 'permission-change'
+  /** A contract type the wallet has no decoder for, refused unless `allowUndecodedContracts`. */
+  | 'undecoded-contract'
   /** A node-built transaction is not what was requested (type, owner, recipient, amount, contract, calldata, call value, fee limit, extra fields) — scan F7. */
   | 'build-mismatch'
 
