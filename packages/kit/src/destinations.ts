@@ -384,6 +384,48 @@ const TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'
 const TOKEN_2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'
 /** Programs that move nothing to anyone: compute budget, memo, associated-token-account creation (rent only). */
 const ATA_PROGRAM = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'
+const STAKE = 'Stake11111111111111111111111111111111111111'
+const SYSVAR_CLOCK = 'SysvarC1ock11111111111111111111111111111111'
+const SYSVAR_RENT = 'SysvarRent111111111111111111111111111111111'
+
+/**
+ * A Stake-program instruction → whom it gives stake, lamports or authority (NS-2): Withdraw its
+ * recipient, Authorize* the new authority, Initialize* staker and withdrawer (and a custodian),
+ * SetLockup* the custodian, DelegateStake the vote account, Split / Move* the destination account,
+ * Merge the account merged into. Deactivate and the read-only ones name nobody. Checked forms are
+ * read in both account layouts (with or without the CLOCK / RENT sysvar), as wallet-solana's
+ * decodeStakeInstruction reads them. Unknown tags, truncated data and the retired Redelegate are unknown.
+ */
+function stakeIxDestinations(ix: SolIx): Array<string | undefined> {
+  const d = ix.data
+  const at = (n: number) => ix.accounts[n]
+  const keyAt = (offset: number) => (d.length >= offset + 32 ? base58Encode(d.subarray(offset, offset + 32)) : undefined)
+  if (d.length < 4) return [undefined]
+  const tag = d[0]! | (d[1]! << 8) | (d[2]! << 16) | (d[3]! << 24)
+  switch (tag) {
+    case 0: { // Initialize(Authorized { staker, withdrawer }, Lockup { unix_timestamp, epoch, custodian })
+      if (d.length < 116) return [undefined]
+      const custodian = keyAt(84)
+      return [keyAt(4), keyAt(36), ...(custodian !== SYSTEM ? [custodian] : [])]
+    }
+    case 1: case 8: return [keyAt(4)] // Authorize / AuthorizeWithSeed: new authority first in the data
+    case 2: return [at(1)] // DelegateStake: the vote account
+    case 3: case 4: case 16: case 17: return [at(1)] // Split / Withdraw / MoveStake / MoveLamports: the account paid
+    case 5: case 13: case 14: return [] // Deactivate, GetMinimumDelegation, DeactivateDelinquent
+    case 6: { // SetLockup(LockupArgs { Option<i64>, Option<u64>, Option<Pubkey> })
+      let i = 4
+      for (const size of [8, 8]) { if (d[i] === undefined) return [undefined]; i += d[i] === 1 ? 1 + size : 1 }
+      if (d[i] === undefined) return [undefined]
+      return d[i] === 1 ? [keyAt(i + 1)] : []
+    }
+    case 7: return [at(0)] // Merge: the destination stake account
+    case 9: { const legacy = at(1) === SYSVAR_RENT; return [at(legacy ? 2 : 1), at(legacy ? 3 : 2)] } // InitializeChecked
+    case 10: return [at(at(1) === SYSVAR_CLOCK ? 3 : 2)] // AuthorizeChecked
+    case 11: return [at(at(2) === SYSVAR_CLOCK ? 3 : 2)] // AuthorizeCheckedWithSeed
+    case 12: return at(2) !== undefined ? [at(2)] : [] // SetLockupChecked: the new custodian when given
+    default: return [undefined]
+  }
+}
 const SOLANA_NEUTRAL = new Set(['ComputeBudget111111111111111111111111111111', 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr', 'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo', ATA_PROGRAM])
 
 interface SolIx { program: string | undefined; accounts: Array<string | undefined>; data: Uint8Array }
@@ -404,6 +446,7 @@ function solanaIxDestinations(ix: SolIx, tokenAccounts: string[]): Array<string 
     if (disc === 4) return [] // AdvanceNonceAccount
     return [undefined] // Assign / Allocate / nonce authority changes: not something a destination list can judge
   }
+  if (ix.program === STAKE) return stakeIxDestinations(ix)
   if (ix.program === TOKEN || ix.program === TOKEN_2022) {
     const pay = (account: string | undefined) => { if (account === undefined) return [undefined]; tokenAccounts.push(account); return [] }
     switch (d[0]) {
