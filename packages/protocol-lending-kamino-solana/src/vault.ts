@@ -9,7 +9,11 @@ import { KVAULT_PROGRAM } from './programs.js'
 export interface KaminoVaultConfig extends KaminoBaseConfig {
   /** The Earn vault (kVault) address. */
   vault: string
-  /** Keep the shares in the wallet instead of staking them in the vault farm (default false — staked, as the Kamino app does). */
+  /**
+   * Keep the shares in the wallet (default true). The guard then proves the shares arrive. With
+   * `false` they are staked in the vault farm, as the Kamino app does: they never reach the wallet,
+   * so the guard can only bound what leaves it, and the deposit's destination relies on the API.
+   */
   skipFarm?: boolean
   /**
    * The mint the vault takes and pays out. The API's answer must name it; `supply` needs it here or
@@ -62,7 +66,7 @@ export interface VaultWithdrawQuote extends LendingQuote { shares: bigint; expec
 
 /**
  * A Kamino Earn vault (kVault) as a `LendingProtocol`: `supply` deposits the
- * vault's asset for shares (staked in the vault farm unless `skipFarm`),
+ * vault's asset for shares (kept in the wallet; staked in the vault farm with `skipFarm: false`),
  * `withdraw` redeems shares for the asset; `borrow` / `repay` reject, a vault
  * does not lend to its depositors.
  *
@@ -80,6 +84,11 @@ export class KaminoVaultProtocolSolana extends KaminoBase<KaminoVaultConfig> {
     super(account, config)
     if (typeof config?.vault !== 'string' || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(config.vault)) throw new KaminoError("'vault' must be the Earn vault's address.")
     this.vault = config.vault
+  }
+
+  /** Shares stay in the wallet unless the app opts into the farm (round 3 review: only then can the guard prove them). */
+  private get skipFarm(): boolean {
+    return this._config.skipFarm !== false
   }
 
   /**
@@ -164,14 +173,14 @@ export class KaminoVaultProtocolSolana extends KaminoBase<KaminoVaultConfig> {
     const [v, m] = await Promise.all([this.state(), this.api.getVaultMetrics(this.vault)])
     if (token !== v.tokenMint) throw new KaminoError(`Vault ${this.vault} takes ${symbolOf(v)} (${v.tokenMint}), not ${token}.`)
     if (amount < v.minDepositAmount) throw new KaminoError(`Deposit below the vault minimum: ${amount} < ${v.minDepositAmount} base units.`)
-    const base64 = await this.api.buildVaultDeposit({ wallet: me, kvault: this.vault, amount: toDecimalString(amount, v.tokenMintDecimals), skipFarm: this._config.skipFarm, memo: this.memo() })
+    const base64 = await this.api.buildVaultDeposit({ wallet: me, kvault: this.vault, amount: toDecimalString(amount, v.tokenMintDecimals), skipFarm: this.skipFarm, memo: this.memo() })
     return { base64, v, amount, expectedShares: this.assetsToShares(amount, v, toWad(m.tokensPerShare)) }
   }
 
   private supplyExpectation(v: ApiVault, amount: bigint, expectedShares: bigint) {
     const e = this.spendExpectation(v.tokenMint, amount)
     // Shares that stay in the wallet are proven in; staked shares land in the farm, so only the spend is bounded.
-    return this._config.skipFarm ? { ...e, tokenIn: { mint: v.sharesMint, minAmount: lessBps(expectedShares, this.slippageBps) } } : e
+    return this.skipFarm ? { ...e, tokenIn: { mint: v.sharesMint, minAmount: lessBps(expectedShares, this.slippageBps) } } : e
   }
 
   override async quoteSupply(o: KaminoVaultSupplyOptions): Promise<VaultSupplyQuote> {

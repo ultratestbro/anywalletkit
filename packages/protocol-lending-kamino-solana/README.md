@@ -15,8 +15,9 @@ npm install @anywalletkit/protocol-lending-kamino-solana @anywalletkit/core
 On npm: [@anywalletkit/protocol-lending-kamino-solana](https://www.npmjs.com/package/@anywalletkit/protocol-lending-kamino-solana), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
 - **`KaminoVaultProtocolSolana`** — one Kamino Earn vault (kVault): `supply`
-  deposits the vault's asset for shares (staked in the vault farm, as the
-  Kamino app does, unless `skipFarm`), `withdraw` redeems shares for the
+  deposits the vault's asset for shares (kept in the wallet, where the guard
+  proves they arrive; `skipFarm: false` stakes them in the vault farm as the
+  Kamino app does, and that leg then relies on the API), `withdraw` redeems shares for the
   asset. The simplest Earn product; `borrow` / `repay` reject.
 - **`KaminoMarketProtocolSolana`** — one Kamino Lend market (the Main Market
   by default): `supply` / `withdraw` post and take collateral on the wallet's
@@ -94,7 +95,7 @@ reserves) resolves to the deepest one by supplied value; pin another with
 | `slippageBps` | 50 | floor on what the wallet must receive (withdraw, borrow); ceiling on a repay |
 | `rentAllowanceLamports` | 0.01 SOL | SOL a transaction may spend beyond the amount |
 | `memo` | — | SPL memo the API adds |
-| vault: `vault`, `skipFarm` | — / false | the kVault; keep shares in the wallet |
+| vault: `vault`, `asset`, `skipFarm` | — / — / true | the kVault; the asset it must take; keep shares in the wallet (`false`: stake them in the farm, guard proves only the spend) |
 | market: `market`, `reserves`, `firstDepositAllowanceLamports` | Main Market / — / 0.045 SOL | |
 
 ## Verify

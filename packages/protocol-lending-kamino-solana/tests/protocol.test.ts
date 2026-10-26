@@ -52,12 +52,12 @@ describe('KaminoVaultProtocolSolana', () => {
   })
 
   it('quoteSupply builds the deposit through the API in token units and proves it through the guard without sending', async () => {
-    const { p, f, acc } = vault()
+    const { p, f, acc } = vault(account(), { skipFarm: false })
     const q = await p.quoteSupply({ amount: 1_500_000n })
     expect(q.fee).toBe(7_500n)
     expect(q.expectedShares).toBe(fromDecimalString('1.5', 6) * 10n ** 18n / toWad('1.0627800342202071868') + 1n)
     expect(lastPost(f)).toMatchObject({ url: '/ktx/kvault/deposit', body: { wallet: USER, kvault: VAULT, amount: '1.5' } })
-    expect(lastPost(f).body).not.toHaveProperty('skipFarm')
+    expect(lastPost(f).body).toMatchObject({ skipFarm: false })
     expect(acc.sent).toHaveLength(0)
     const g = acc.guards[0]!
     expect(g.method).toBe('check')
@@ -258,5 +258,19 @@ describe('Kamino vault: the API cannot choose the mints', () => {
   })
   it('the API\'s mint decimals must be the chain\'s', async () => {
     await expect(lying({ sharesMintDecimals: 9 }).p.getVault()).rejects.toThrow(/decimals/)
+  })
+})
+
+// Review of round 3 H7: staked in the farm, the shares never reach the wallet, so the guard could
+// only bound the spend — an API transaction that just transferred the deposit away passed.
+describe('Kamino vault: shares stay in the wallet by default, where the guard proves them', () => {
+  it('supply asks for skipFarm and requires the shares to arrive; skipFarm: false opts into the farm', async () => {
+    const { p, f, acc } = vault()
+    const q = await p.quoteSupply({ amount: 1_500_000n })
+    expect(lastPost(f).body).toMatchObject({ skipFarm: true })
+    expect(acc.guards.at(-1)!.guard.expect.tokenIn).toEqual({ mint: SHARES, minAmount: lessBps(q.expectedShares, 50) })
+    const farm = vault(account(), { skipFarm: false })
+    await farm.p.quoteSupply({ amount: 1_500_000n })
+    expect(farm.acc.guards.at(-1)!.guard.expect.tokenIn).toBeUndefined()
   })
 })
