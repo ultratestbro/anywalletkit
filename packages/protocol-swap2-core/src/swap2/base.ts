@@ -325,9 +325,10 @@ interface Swap2Signer {
   /**
    * Execute a provider-built transaction the account cannot rebuild (a swap
    * aggregator's serialized Solana tx). The account owns the proof: it must
-   * refuse anything beyond `expect` before signing.
+   * refuse anything beyond `expect` before signing. Behind the kit's policies it also receives
+   * `{ maxFee }` (the policy fee cap), to hold the transaction it signs to.
    */
-  sendSerializedTransaction?: (serializedTx: string, expect: SerializedExecutionExpectation) => Promise<{hash?: string}>;
+  sendSerializedTransaction?: (serializedTx: string, expect: SerializedExecutionExpectation, options?: {maxFee?: bigint | number}) => Promise<{hash?: string}>;
   /**
    * Wait until a transaction this account sent is INCLUDED (and succeeded).
    * Used between an ERC-20 approval and the deposit that spends it: a signer

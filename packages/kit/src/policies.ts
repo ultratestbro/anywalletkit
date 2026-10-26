@@ -16,7 +16,7 @@ export type KnownWriteMethod =
   | 'signTypedData' | 'signPermit' | 'approve'
   | 'signRaw' | 'signNep413' | 'signBuilt' | 'signTonProof' | 'signTonConnectData'
   | 'sendSerialized' | 'signCompiled' | 'signTransactionMessage'
-  | 'revokeDelegation'
+  | 'revokeDelegation' | 'sendSerializedTransaction'
 /**
  * A method name the policies may see: one of {@link KnownWriteMethod}, or any other name a chain
  * package adds.
@@ -32,7 +32,7 @@ export const GUARDED_WRITES: readonly KnownWriteMethod[] = [
   'signTypedData', 'signPermit', 'approve',
   'signRaw', 'signNep413', 'signBuilt', 'signTonProof', 'signTonConnectData',
   'sendSerialized', 'signCompiled', 'signTransactionMessage',
-  'revokeDelegation',
+  'revokeDelegation', 'sendSerializedTransaction',
 ]
 /** Name prefixes that mark a write even when the method is not listed above. */
 export const GUARDED_PREFIXES: readonly string[] = ['sign', 'send', 'approve', 'revoke', 'transfer']
@@ -50,13 +50,19 @@ export function isGuardedWrite(name: string): boolean {
 const QUOTABLE: readonly string[] = ['sendTransaction', 'transfer', 'signTransaction']
 /**
  * Every method that pays a fee and takes `WriteOptions`, with the argument it takes them at: the
- * account holds `maxFee` on what it signs. `approve` (EVM) and `sendSerialized` (Solana) have no
- * generic quote, so for them this is the only check.
+ * account holds `maxFee` on what it signs. `approve` (EVM), `sendSerialized` (Solana), `signRaw`
+ * (Tron), `revokeDelegation` (EIP-7702) and swap2's `sendSerializedTransaction` hook have no
+ * generic quote, so for them this is the only check (round 3, M8).
  */
-const CAPPED: Readonly<Record<string, number>> = Object.freeze({ sendTransaction: 1, transfer: 1, signTransaction: 1, approve: 1, sendSerialized: 2 })
+const CAPPED: Readonly<Record<string, number>> = Object.freeze({
+  sendTransaction: 1, transfer: 1, signTransaction: 1, approve: 1, sendSerialized: 2,
+  signRaw: 1, revokeDelegation: 0, sendSerializedTransaction: 2,
+})
 
 /** Methods that sign an off-chain message: nothing moves, allow/block lists do not apply, only `confirm`. */
 const MESSAGE_METHODS: readonly string[] = ['sign', 'signNep413', 'signTonProof', 'signTonConnectData']
+/** Off-chain signatures pay no fee: a fee cap does not apply to them. */
+const FEE_FREE: readonly string[] = [...MESSAGE_METHODS, 'signTypedData', 'signPermit']
 
 /** A chain id as callers and dApps write it (number, bigint, decimal or 0x string) → decimal, or undefined. */
 function chainIdRef(v: unknown): string | undefined {
@@ -640,9 +646,10 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
       }
     }
     const caps = keys.flatMap((k) => { const cap = policies.maxFee?.[k]; return cap === undefined ? [] : [{ k, cap: BigInt(cap) }] })
-    // A method guarded only by its name (a chain package's internal `sign*` / `send*` helper) has no
-    // fee the policies can quote or hand down: under a fee cap it is refused (round 3, review).
-    if (caps.length > 0 && !(GUARDED_WRITES as readonly string[]).includes(method)) {
+    // A write that pays a fee but has nowhere to take a cap — a method guarded only by its name (a
+    // chain package's internal `sign*` / `send*` helper), NEAR's signBuilt, Solana's signCompiled /
+    // signTransactionMessage — is refused under a fee cap rather than signed unchecked (round 3, review and M8).
+    if (caps.length > 0 && CAPPED[method] === undefined && !FEE_FREE.includes(method)) {
       throw new PolicyViolationError('maxFee', `${method} has no fee the ${caps[0]!.k} cap can be checked against; nothing was signed.`)
     }
     if (caps.length > 0 && QUOTABLE.includes(method)) {

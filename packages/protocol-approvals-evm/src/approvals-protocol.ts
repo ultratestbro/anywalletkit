@@ -1,7 +1,7 @@
 import {
   ApprovalsError, ApprovalsProtocol as CoreApprovalsProtocol, NotImplementedError,
   type ActivityItem, type Approval, type ApprovalStandard, type ApprovalsResult, type ChainTx, type DescribeActivityContext,
-  type GetApprovalsOptions, type RevokeResult,
+  type GetApprovalsOptions, type RevokeResult, type WriteOptions,
 } from '@anywalletkit/core'
 
 export type {
@@ -48,7 +48,8 @@ export interface AccountLike extends ReadOnlyAccountLike {
   sendTransaction(tx: RevokeTransaction | RevokeTransaction[]): Promise<SendResult>
   quoteSendTransaction?(tx: RevokeTransaction): Promise<{ fee: bigint }>
   approve?(options: { token: string; spender: string; amount: bigint }): Promise<SendResult>
-  revokeDelegation?(): Promise<SendResult>
+  /** Clears an EIP-7702 delegation. Behind the kit's policies it receives `{ maxFee }` (the policy cap) to hold the transaction to. */
+  revokeDelegation?(options?: WriteOptions): Promise<SendResult>
   quoteRevokeDelegation?(): Promise<{ fee: bigint }>
 }
 

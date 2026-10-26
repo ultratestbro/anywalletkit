@@ -50,7 +50,7 @@ export function createMockAccount(opts: MockAccountOptions = {}): IWalletAccount
   }
   if (opts.serialized) {
     Object.assign(account, {
-      sendSerializedTransaction: async (serializedTx: string, expect: unknown): Promise<TransferResult> => { sent.push({ serializedTx, expect }); return rec('sendSerializedTransaction', [serializedTx, expect], { hash: nextHash(), fee }) },
+      sendSerializedTransaction: async (serializedTx: string, expect: unknown, options?: unknown): Promise<TransferResult> => { sent.push({ serializedTx, expect }); return rec('sendSerializedTransaction', options === undefined ? [serializedTx, expect] : [serializedTx, expect, options], { hash: nextHash(), fee }) },
     })
   }
   return account
