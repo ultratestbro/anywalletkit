@@ -32,7 +32,7 @@ export interface SessionAlarms {
 export interface SessionOptions {
   storage: SessionStorage
   alarms: SessionAlarms
-  /** Lock this long after the last `touch` / `unlock`. Default 15 min; 0 disables the timer (lock only on browser exit or explicit lock). */
+  /** Lock this long after the last `touch` / `unlock`. Default 15 min; 0 disables the timer (lock only on browser exit or explicit lock; stored as `expiresAt: null`). */
   autoLockMs?: number
   /** Storage key and alarm name prefix. */
   name?: string
@@ -42,7 +42,8 @@ export interface SessionOptions {
 
 interface SessionRecord {
   key: string
-  expiresAt: number
+  /** When the auto-lock fires (ms since epoch); `null` = no auto-lock. Never `Infinity`: chrome.storage stores JSON. */
+  expiresAt: number | null
 }
 
 export const SESSION_DEFAULT_AUTOLOCK_MS = 15 * 60_000
@@ -150,21 +151,34 @@ export class Session {
     if (was !== undefined && was !== null) for (const cb of this._onLock) cb()
   }
 
-  private _expiry(): number {
-    return this._autoLockMs > 0 ? this._now() + this._autoLockMs : Number.POSITIVE_INFINITY
+  private _expiry(): number | null {
+    return this._autoLockMs > 0 ? this._now() + this._autoLockMs : null
   }
 
-  private async _arm(expiresAt: number): Promise<void> {
-    if (Number.isFinite(expiresAt)) await this._alarms.schedule(this._alarm, expiresAt)
+  private async _arm(expiresAt: number | null): Promise<void> {
+    if (expiresAt !== null) await this._alarms.schedule(this._alarm, expiresAt)
     else await this._alarms.clear(this._alarm)
   }
 
+  /** The stored record, or `null` when locked. A record that is there but unreadable locks the wallet (removed, listeners told). */
   private async _read(): Promise<SessionRecord | null> {
-    const raw = (await this._storage.get(this._key)) as Partial<SessionRecord> | undefined | null
-    if (!raw || typeof raw.key !== 'string' || typeof raw.expiresAt !== 'number') return null
-    if (raw.expiresAt <= this._now()) { await this._lockNow(); return null }
-    return raw as SessionRecord
+    const raw = await this._storage.get(this._key)
+    if (raw === undefined || raw === null) return null
+    const r = raw as Partial<SessionRecord>
+    const expiryOk = r.expiresAt === null || (typeof r.expiresAt === 'number' && Number.isFinite(r.expiresAt))
+    if (typeof raw !== 'object' || typeof r.key !== 'string' || !expiryOk || !isKey(r.key)) { await this._lockNow(); return null }
+    if (r.expiresAt !== null && r.expiresAt! <= this._now()) { await this._lockNow(); return null }
+    return r as SessionRecord
   }
+}
+
+/** A stored DEK: base64 of exactly 32 bytes (the decoded copy is wiped). */
+function isKey(text: string): boolean {
+  let bytes: Uint8Array
+  try { bytes = fromBase64(text) } catch { return false }
+  const ok = bytes.length === 32
+  zeroize(bytes)
+  return ok
 }
 
 /** In-memory `chrome.storage.session` stand-in. */

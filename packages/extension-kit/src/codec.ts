@@ -24,3 +24,17 @@ export function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   copy.set(bytes)
   return copy.buffer
 }
+
+/**
+ * {@link toArrayBuffer} for a secret (a key, a password, a plaintext): `fn` gets the copy, which is
+ * zero-filled afterwards whatever happens. WebCrypto copies its input when called, so wiping after
+ * the returned promise settles is safe.
+ */
+export async function withSecretBuffer<T>(bytes: Uint8Array, fn: (buffer: ArrayBuffer) => Promise<T>): Promise<T> {
+  const buffer = toArrayBuffer(bytes)
+  try {
+    return await fn(buffer)
+  } finally {
+    new Uint8Array(buffer).fill(0)
+  }
+}

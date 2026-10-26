@@ -25,6 +25,8 @@ export interface EarnPlan {
 
 export interface EarnReviewMeta {
   origin: string
+  /** The account that sends the plan: the gate passes its calls for this account only. */
+  account: string
   /** 'Aave v3', 'Morpho', … */
   module: string
   /** 'Supply', 'Withdraw', 'Borrow', 'Repay', 'Stake', … */
@@ -66,6 +68,7 @@ export function earnApprovalPayload(plan: EarnPlan, meta: EarnReviewMeta): EarnA
 
 /** One sheet for the plan; approve → pre-approve exactly its calls; decline → ReviewDeclined, nothing sent. */
 export async function reviewEarnPlan(approvals: ApprovalQueue, gate: ReviewGate, meta: EarnReviewMeta, plan: EarnPlan): Promise<void> {
+  if (typeof meta.account !== 'string' || !meta.account) throw new TypeError('reviewEarnPlan needs meta.account: the gate passes the plan for that account only.')
   await approvals.request({ origin: meta.origin, chain: meta.network.caip2, kind: 'earn', payload: earnApprovalPayload(plan, meta) })
-  gate.preApprove(earnPlanMatchers(meta.network, plan), 10 * 60_000)
+  gate.preApprove(earnPlanMatchers(meta.network, plan), 10 * 60_000, meta.account)
 }

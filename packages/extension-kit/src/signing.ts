@@ -13,6 +13,15 @@
  * (Vaulty's `evmFees`), legacy `gasPrice` where a chain has no base fee, gas =
  * the page's limit or `eth_estimateGas` × 1.2.
  *
+ * The nonce the sheet shows is a guess: the one signed is read AFTER the
+ * approval, under a per-account lock that also covers the broadcast, and is
+ * never below the wallet's own next nonce (a node may not see the previous
+ * send yet). Two requests reviewed at once therefore get consecutive nonces.
+ * The fee caps signed are the ones shown, unless the network outgrew them
+ * while the sheet was open (EIP-1559: base fee + tip above the shown cap;
+ * legacy: a higher gas price) — then the user is asked again with the new
+ * numbers (`repriced: true`).
+ *
  * The review payload ({@link SignApproval}) carries what the window shows: the
  * classified request, the prepared fields, the fee, and the preview the wallet
  * attached (tx-preview-evm: decode, simulation, balance changes, checks). Only
@@ -61,6 +70,8 @@ export interface SignApproval {
   request: SignRequestInfo
   network: EvmNetwork
   prepared?: PreparedTx
+  /** A second sheet for the same transaction: the network's fee outgrew the cap the first one showed. */
+  repriced?: true
   /** What the wallet attached (tx-preview-evm `TxPreview`, typed-data description…). */
   preview: unknown
 }
@@ -190,6 +201,30 @@ const hex = (n: bigint) => `0x${n.toString(16)}`
 const big = (v: unknown): bigint => BigInt(v as string)
 const MIN_TIP_WEI = 100_000_000n // 0.1 gwei
 
+type Fees = { base: bigint; tip: bigint } | { gasPrice: bigint }
+
+/** The network's fee right now: base fee + floored tip, or the legacy gas price. */
+async function readFees(deps: Pick<SignDeps, 'rpc' | 'tipFloor'>, network: EvmNetwork, block?: { baseFeePerGas?: string | null } | null): Promise<Fees> {
+  const b = block === undefined ? ((await deps.rpc(network, 'eth_getBlockByNumber', ['latest', false])) as { baseFeePerGas?: string | null } | null) : block
+  const base = b?.baseFeePerGas != null ? big(b.baseFeePerGas) : null
+  if (base === null) return { gasPrice: big(await deps.rpc(network, 'eth_gasPrice', [])) }
+  const floor = deps.tipFloor?.(network.chainId) ?? MIN_TIP_WEI
+  const nodeTip = await (deps.rpc(network, 'eth_maxPriorityFeePerGas', []) as Promise<string>).then(big).catch(() => 0n)
+  return { base, tip: nodeTip > floor ? nodeTip : floor }
+}
+
+function withFees(chainId: number, nonce: number, gasLimit: bigint, fees: Fees): PreparedTx {
+  if ('gasPrice' in fees) return { chainId, nonce, gasLimit: hex(gasLimit), gasPrice: hex(fees.gasPrice), maxFee: (gasLimit * fees.gasPrice).toString() }
+  const maxFeePerGas = fees.base * 2n + fees.tip
+  return { chainId, nonce, gasLimit: hex(gasLimit), maxFeePerGas: hex(maxFeePerGas), maxPriorityFeePerGas: hex(fees.tip), maxFee: (gasLimit * maxFeePerGas).toString() }
+}
+
+/** True when `shown` can no longer pay for inclusion at `now` (the user must see the new numbers). */
+function outgrown(shown: PreparedTx, now: Fees): boolean {
+  if ('gasPrice' in now) return shown.gasPrice === undefined || now.gasPrice > big(shown.gasPrice)
+  return shown.maxFeePerGas === undefined || now.base + now.tip > big(shown.maxFeePerGas)
+}
+
 /** Nonce, gas, fees from the wallet's RPC. */
 export async function prepareTransaction(deps: Pick<SignDeps, 'rpc' | 'tipFloor'>, network: EvmNetwork, from: string, tx: { to: string; value: string; data: string | null; gas: string | null }): Promise<PreparedTx> {
   const call = { from, to: tx.to, value: hex(BigInt(tx.value)), ...(tx.data ? { data: tx.data } : {}) }
@@ -200,20 +235,23 @@ export async function prepareTransaction(deps: Pick<SignDeps, 'rpc' | 'tipFloor'
   ])
   const estimated = big(gasHex)
   const gasLimit = tx.gas ? estimated : (estimated * 120n + 99n) / 100n
-  const base = block?.baseFeePerGas != null ? big(block.baseFeePerGas) : null
-  if (base === null) {
-    const gasPrice = big(await deps.rpc(network, 'eth_gasPrice', []))
-    return { chainId: network.chainId, nonce: safeNonce(big(nonceHex)), gasLimit: hex(gasLimit), gasPrice: hex(gasPrice), maxFee: (gasLimit * gasPrice).toString() }
-  }
-  const floor = deps.tipFloor?.(network.chainId) ?? MIN_TIP_WEI
-  const nodeTip = await (deps.rpc(network, 'eth_maxPriorityFeePerGas', []) as Promise<string>).then(big).catch(() => 0n)
-  const tip = nodeTip > floor ? nodeTip : floor
-  const maxFeePerGas = base * 2n + tip
-  return { chainId: network.chainId, nonce: safeNonce(big(nonceHex)), gasLimit: hex(gasLimit), maxFeePerGas: hex(maxFeePerGas), maxPriorityFeePerGas: hex(tip), maxFee: (gasLimit * maxFeePerGas).toString() }
+  return withFees(network.chainId, safeNonce(big(nonceHex)), gasLimit, await readFees(deps, network, block))
 }
 
 /** The router's `sign` hook: classify → prepare → review → sign (→ broadcast). */
 export function createSignHandler(deps: SignDeps): NonNullable<RouterDeps['sign']> {
+  // Per chain + account: the tail of the sign-and-broadcast queue and the next nonce this worker
+  // handed out. Memory only — a restarted service worker starts again from the node's count.
+  const tails = new Map<string, Promise<unknown>>()
+  const nextNonce = new Map<string, number>()
+  const serial = <T>(key: string, fn: () => Promise<T>): Promise<T> => {
+    const run = (tails.get(key) ?? Promise.resolve()).then(fn, fn)
+    const tail = run.then(() => undefined, () => undefined)
+    tails.set(key, tail)
+    void tail.then(() => { if (tails.get(key) === tail) tails.delete(key) })
+    return run
+  }
+
   return async ({ origin, network, method, params, accounts }) => {
     const via = deps.approvals.viaFor(origin)
     const info = classifySignRequest({ network, method, params, accounts, origin, ...(via ? { via } : {}) })
@@ -224,6 +262,37 @@ export function createSignHandler(deps: SignDeps): NonNullable<RouterDeps['sign'
     const payload: SignApproval = { request: info, network, ...(prepared ? { prepared } : {}), preview }
     await deps.approvals.request({ origin, chain: network.caip2, kind: info.kind, payload })
 
+    if (info.kind === 'send-transaction') {
+      const key = `${network.caip2}|${lc(info.account)}`
+      return serial(key, async () => {
+        let shown = prepared!
+        for (;;) {
+          const [nonceHex, fees] = await Promise.all([deps.rpc(network, 'eth_getTransactionCount', [info.account, 'pending']), readFees(deps, network)])
+          const local = nextNonce.get(key) ?? 0
+          const nodeNonce = safeNonce(big(nonceHex))
+          const nonce = nodeNonce > local ? nodeNonce : local
+          if (outgrown(shown, fees)) {
+            shown = withFees(network.chainId, nonce, big(shown.gasLimit), fees)
+            await deps.approvals.request({ origin, chain: network.caip2, kind: info.kind, payload: { ...payload, prepared: shown, repriced: true } })
+            continue // the network may have moved again while the second sheet was open
+          }
+          const handle = await deps.signerFor(info.account, network)
+          let raw: string
+          try {
+            raw = await handle.signer.signTransaction({
+              chainId: shown.chainId, nonce, to: info.tx.to, value: BigInt(info.tx.value), data: info.tx.data ?? '0x', gasLimit: BigInt(shown.gasLimit),
+              ...(shown.gasPrice !== undefined ? { gasPrice: BigInt(shown.gasPrice) } : { maxFeePerGas: BigInt(shown.maxFeePerGas!), maxPriorityFeePerGas: BigInt(shown.maxPriorityFeePerGas!) }),
+            })
+          } finally {
+            handle.dispose()
+          }
+          const hash = await deps.rpc(network, 'eth_sendRawTransaction', [raw])
+          nextNonce.set(key, nonce + 1)
+          return hash
+        }
+      })
+    }
+
     const handle = await deps.signerFor(info.account, network)
     try {
       switch (info.kind) {
@@ -231,14 +300,6 @@ export function createSignHandler(deps: SignDeps): NonNullable<RouterDeps['sign'
           return await handle.signer.signMessage(HEX.test(info.raw) ? Uint8Array.from(info.raw.slice(2).match(/../g) ?? [], (b) => Number.parseInt(b, 16)) : info.raw)
         case 'sign-typed-data':
           return await handle.signer.signTypedData(info.typedData)
-        case 'send-transaction': {
-          const p = prepared!
-          const raw = await handle.signer.signTransaction({
-            chainId: p.chainId, nonce: p.nonce, to: info.tx.to, value: BigInt(info.tx.value), data: info.tx.data ?? '0x', gasLimit: BigInt(p.gasLimit),
-            ...(p.gasPrice !== undefined ? { gasPrice: BigInt(p.gasPrice) } : { maxFeePerGas: BigInt(p.maxFeePerGas!), maxPriorityFeePerGas: BigInt(p.maxPriorityFeePerGas!) }),
-          })
-          return await deps.rpc(network, 'eth_sendRawTransaction', [raw])
-        }
       }
     } finally {
       handle.dispose()

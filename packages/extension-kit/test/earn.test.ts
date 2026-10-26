@@ -4,12 +4,13 @@ import { ApprovalQueue, DEFAULT_NETWORKS, ReviewDeclined, ReviewGate, earnPlanMa
 const ETH = DEFAULT_NETWORKS[0]!
 const USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
 const POOL = '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2'
+const SELF = '0x9858EfFD232B4033E47d90003D41EC34EcaEda94'
 const flush = () => new Promise((r) => setTimeout(r, 0))
 const plan: EarnPlan = {
   approvals: [{ to: USDC, data: `0x095ea7b3${POOL.slice(2).toLowerCase().padStart(64, '0')}${(1_000_000n).toString(16).padStart(64, '0')}`, value: '0' }],
   tx: { to: POOL, data: '0x617ba037deadbeef', value: '0' },
 }
-const meta = { origin: 'chrome-extension://x', module: 'Aave v3', action: 'Supply', network: ETH, facts: [{ k: 'Asset', v: '1 USDC' }, { k: 'APY', v: '4.1 %' }] }
+const meta = { origin: 'chrome-extension://x', account: SELF, module: 'Aave v3', action: 'Supply', network: ETH, facts: [{ k: 'Asset', v: '1 USDC' }, { k: 'APY', v: '4.1 %' }] }
 
 describe('reviewEarnPlan', () => {
   it('a module deposit signs only after the sheet is approved, and only the plan passes', async () => {
@@ -20,7 +21,7 @@ describe('reviewEarnPlan', () => {
     // the reviewed account the module writes through: passes only pre-approved calls
     const account = {
       sendTransaction: vi.fn(async (tx: { to: string; data?: string; value: bigint }) => {
-        if (!gate.consume({ kind: 'evm-tx', caip2: ETH.caip2, to: tx.to, ...(tx.data ? { data: tx.data } : {}), value: tx.value })) throw new Error('not reviewed')
+        if (!gate.consume({ kind: 'evm-tx', account: SELF, caip2: ETH.caip2, to: tx.to, ...(tx.data ? { data: tx.data } : {}), value: tx.value })) throw new Error('not reviewed')
         sent.push(tx.to)
         return { hash: `0x${sent.length}`, fee: 1n }
       }),

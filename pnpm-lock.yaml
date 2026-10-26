@@ -711,13 +711,13 @@ importers:
       '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
+      '@anywalletkit/wallet-evm':
+        specifier: workspace:*
+        version: link:../wallet-evm
       '@noble/hashes':
         specifier: ^2.4.0
         version: 2.4.0
     devDependencies:
-      '@anywalletkit/wallet-evm':
-        specifier: workspace:*
-        version: link:../wallet-evm
       '@anywalletkit/wallet-ton':
         specifier: workspace:*
         version: link:../wallet-ton

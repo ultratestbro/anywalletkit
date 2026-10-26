@@ -43,10 +43,10 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
 | Signing | `classifySignRequest`, `prepareTransaction`, `createSignHandler`, `messageText` | connected-address and chain checks, EIP-7702 delegations from sites refused, nonce / gas / fees from the wallet's RPC |
 | Networks | `NetworksTable`, `DEFAULT_NETWORKS`, `parseAddChainParams`, Solana / TON / Tron endpoints | EVM networks with public RPC failover lists; `wallet_addEthereumChain` only for catalog chains, https only, `eth_chainId` verified, site-supplied RPCs stamped `custom` |
 | Review gate | `ReviewGate`, `evmCallMatcher`, `chainTxMatcher` | after one sheet reviewed a whole plan, exactly those operations pass once within a TTL |
-| Swaps | `quoteRoutes`, `reviewSwapPlan`, `executionFloor`, `SwapsStore`, `SwapTracker`, `parseSwapId` | progressive quotes over swap2 providers, one review sheet per plan, pending swaps resumed across worker restarts |
-| Earn | `reviewEarnPlan`, `earnPlanMatchers` | one sheet for an Earn module's plan (approvals + call) |
+| Swaps | `quoteRoutes`, `reviewSwapPlan`, `executionFloor`, `SwapsStore`, `SwapTracker`, `parseSwapId` | progressive quotes over swap2 providers, one review sheet per plan (a gasless order is shown and matched by its EIP-712 hash), pre-approvals bound to the reviewing account (`meta.account`), pending swaps resumed across worker restarts |
+| Earn | `reviewEarnPlan`, `earnPlanMatchers` | one sheet for an Earn module's plan (approvals + call), bound to `meta.account` |
 | TON Connect | `parseConnectRequest`, `parseSendTransaction`, `parseSignData`, `tonProofMessage`, `tonSignDataMessage` | the pure-data half of TON Connect v2 (the digests `ton_proof` and `signData` sign, to verify them); the account signs with `signTonProof` / `signTonConnectData` (wallet-ton) — `sign()` refuses 32-byte digests |
-| Phishing | `PhishingDetector` | MetaMask `eth-phishing-detect` list format, shipped with the build (never fetched at runtime), fuzzy lookalikes, brand-in-label, punycode |
+| Phishing | `PhishingDetector` | MetaMask `eth-phishing-detect` list format, shipped with the build (never fetched at runtime); a listed site is refused (`refusal` → `refuse` on `ApprovalQueue` and `RequestRouter`, 4100, no window); fuzzy lookalikes, brand-in-label, punycode warn |
 | SIWE | `parseSiwe`, `siweProblems`, `describeSiwe` | EIP-4361 sign-in messages: domain vs. the asking site, address, chain, expiry, nonce (warnings) |
 | Address poisoning | `lookalikeOf`, `RecipientBook` | warns when a new recipient imitates one the user confirmed |
 | WebAuthn | `verifyAssertion`, `approvalChallenge`, `derToRaw`, `rawToDer` | ES256 assertion check for "passkey on every signature"; the worker never trusts the page's word |

@@ -44,10 +44,10 @@
     "@anywalletkit/keyring": "workspace:*",
     "@anywalletkit/swap2-assets": "workspace:*",
     "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*",
     "@noble/hashes": "^2.4.0"
   },
   "devDependencies": {
-    "@anywalletkit/wallet-evm": "workspace:*",
     "@anywalletkit/wallet-ton": "workspace:*",
     "vitest": "^5.0.3",
     "viem": "^2.57.2"

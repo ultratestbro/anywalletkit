@@ -126,6 +126,11 @@ export interface RouterDeps {
   /** The review flow for signing methods. Absent → 4200. */
   sign?(input: { origin: string; network: EvmNetwork; method: string; params: unknown[]; accounts: string[] }): Promise<unknown>
   defaultChain?: string
+  /**
+   * A reason to refuse every request from `origin` (reads, `eth_accounts`, an earlier permission
+   * included) with 4100, or nothing. Wire `PhishingDetector.refusal`.
+   */
+  refuse?(origin: string): string | null | undefined
 }
 
 export class RequestRouter {
@@ -139,6 +144,8 @@ export class RequestRouter {
   }
 
   async handle(origin: string, chain: RelayChain, method: string, rawParams: unknown): Promise<unknown> {
+    const refused = this.deps.refuse?.(origin)
+    if (refused) throw new RouterError(RELAY_ERRORS.unauthorized, refused)
     if (chain !== 'eip155') throw new RouterError(RELAY_ERRORS.unsupportedMethod, `${chain} providers are not available yet.`)
     const params = Array.isArray(rawParams) ? rawParams : rawParams === undefined ? [] : [rawParams]
     const network = await this.chainFor(origin)

@@ -17,7 +17,7 @@ import type { JsonStorage } from './storage.js'
 export type SwapRecordStatus = IntentStatus['state'] | 'claiming'
 
 export interface SwapRecord {
-  /** swap2 id — `awk1.<provider>.<intentId>[.<sourceTxHash>]`. */
+  /** swap2 id — `awk1.<provider>.<intentId>[.<sourceTxHash>[.<claimTxHash>]]`. */
   id: string
   provider: string
   fromChain: string
@@ -43,25 +43,33 @@ export interface SwapRecord {
 
 export const ACTIVE_STATUSES: ReadonlySet<SwapRecordStatus> = new Set<SwapRecordStatus>(['pending', 'action-required', 'refund-pending', 'partial', 'claiming'])
 
-export function parseSwapId(id: string): { provider: string; intentId: string; sourceTxHash?: string } | null {
+/** `awk1.<provider>.<intentId>[.<sourceTxHash>[.<claimTxHash>]]` — the 4th segment is on the id `claimSwap2` returns. */
+export function parseSwapId(id: string): { provider: string; intentId: string; sourceTxHash?: string; destTxHash?: string } | null {
   if (!id.startsWith(`${SWAP2_ID_PREFIX}.`)) return null
   const parts = id.slice(SWAP2_ID_PREFIX.length + 1).split('.')
-  if (parts.length < 2 || parts.length > 3 || !parts[0] || !parts[1]) return null
+  if (parts.length < 2 || parts.length > 4 || !parts[0] || !parts[1]) return null
   const provider = decodeURIComponent(parts[0])
   const intentId = decodeURIComponent(parts[1])
   const sourceTxHash = parts[2] ? decodeURIComponent(parts[2]) : undefined
-  return sourceTxHash ? { provider, intentId, sourceTxHash } : { provider, intentId }
+  const destTxHash = parts[3] ? decodeURIComponent(parts[3]) : undefined
+  if (destTxHash && !sourceTxHash) return null
+  return { provider, intentId, ...(sourceTxHash ? { sourceTxHash } : {}), ...(destTxHash ? { destTxHash } : {}) }
 }
 
 export class SwapsStore {
   private _records: SwapRecord[] | null = null
   private readonly _listeners = new Set<() => void>()
+  /**
+   * add / update / remove run here one after another, each reading the list inside its turn: an
+   * alarm tick's update that read the list before a new swap was added would otherwise write the
+   * old list back and drop the swap.
+   */
+  private _queue: Promise<unknown> = Promise.resolve()
 
   constructor(private readonly storage: JsonStorage<SwapRecord[]>) {}
 
   async list(): Promise<SwapRecord[]> {
-    this._records ??= (await this.storage.get()) ?? []
-    return [...this._records].sort((a, b) => b.createdAt - a.createdAt)
+    return [...(await this._all())].sort((a, b) => b.createdAt - a.createdAt)
   }
 
   async get(id: string): Promise<SwapRecord | null> {
@@ -72,28 +80,45 @@ export class SwapsStore {
     return (await this.list()).filter((r) => ACTIVE_STATUSES.has(r.status))
   }
 
-  async add(record: SwapRecord): Promise<void> {
-    const all = (await this.list()).filter((r) => r.id !== record.id)
-    await this.write([...all, record])
+  add(record: SwapRecord): Promise<void> {
+    return this._serial(async () => {
+      const all = (await this._all()).filter((r) => r.id !== record.id)
+      await this.write([...all, record])
+    })
   }
 
-  async update(id: string, patch: Partial<SwapRecord>): Promise<SwapRecord | null> {
-    const all = await this.list()
-    const i = all.findIndex((r) => r.id === id)
-    if (i < 0) return null
-    const next = { ...all[i]!, ...patch, updatedAt: patch.updatedAt ?? Date.now() }
-    all[i] = next
-    await this.write(all)
-    return next
+  update(id: string, patch: Partial<SwapRecord>): Promise<SwapRecord | null> {
+    return this._serial(async () => {
+      const all = [...(await this._all())]
+      const i = all.findIndex((r) => r.id === id)
+      if (i < 0) return null
+      const next = { ...all[i]!, ...patch, updatedAt: patch.updatedAt ?? Date.now() }
+      all[i] = next
+      await this.write(all)
+      return next
+    })
   }
 
-  async remove(id: string): Promise<void> {
-    await this.write((await this.list()).filter((r) => r.id !== id))
+  remove(id: string): Promise<void> {
+    return this._serial(async () => {
+      await this.write((await this._all()).filter((r) => r.id !== id))
+    })
   }
 
   onChange(listener: () => void): () => void {
     this._listeners.add(listener)
     return () => this._listeners.delete(listener)
+  }
+
+  private async _all(): Promise<SwapRecord[]> {
+    this._records ??= (await this.storage.get()) ?? []
+    return this._records
+  }
+
+  private _serial<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this._queue.then(fn, fn)
+    this._queue = run.then(() => undefined, () => undefined)
+    return run
   }
 
   private async write(records: SwapRecord[]): Promise<void> {

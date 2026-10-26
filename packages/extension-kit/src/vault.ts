@@ -32,7 +32,7 @@
  */
 import { zeroize } from '@anywalletkit/core'
 import { scryptAsync } from '@noble/hashes/scrypt.js'
-import { fromBase64, toArrayBuffer, toBase64 } from './codec.js'
+import { fromBase64, toArrayBuffer, toBase64, withSecretBuffer } from './codec.js'
 import { VaultError } from './errors.js'
 
 /** PBKDF2-SHA256 iterations (v1 envelopes): OWASP 2023 floor for SHA-256; anything lower is refused. */
@@ -415,7 +415,13 @@ export class Vault {
 
   private async _derivePbkdf2(password: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {
     const subtle = this._crypto.subtle
-    const material = await subtle.importKey('raw', toArrayBuffer(new TextEncoder().encode(password.normalize('NFKC'))), 'PBKDF2', false, ['deriveKey'])
+    const pw = new TextEncoder().encode(password.normalize('NFKC'))
+    let material: CryptoKey
+    try {
+      material = await withSecretBuffer(pw, (b) => subtle.importKey('raw', b, 'PBKDF2', false, ['deriveKey']))
+    } finally {
+      zeroize(pw)
+    }
     return subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt: toArrayBuffer(salt), iterations }, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
   }
 
@@ -428,7 +434,7 @@ export class Vault {
       zeroize(pw)
     }
     try {
-      return await this._crypto.subtle.importKey('raw', toArrayBuffer(raw), { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
+      return await withSecretBuffer(raw, (b) => this._crypto.subtle.importKey('raw', b, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']))
     } finally {
       zeroize(raw)
     }
@@ -437,18 +443,18 @@ export class Vault {
   /** HKDF-SHA256(ikm = PRF output, salt = credential id bytes, info) → AES-256-GCM key. */
   private async _derivePasskeyKek(prf: Uint8Array, credentialId: string): Promise<CryptoKey> {
     const subtle = this._crypto.subtle
-    const ikm = await subtle.importKey('raw', toArrayBuffer(prf), 'HKDF', false, ['deriveKey'])
+    const ikm = await withSecretBuffer(prf, (b) => subtle.importKey('raw', b, 'HKDF', false, ['deriveKey']))
     return subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: toArrayBuffer(fromBase64Url(credentialId)), info: toArrayBuffer(new TextEncoder().encode(HKDF_INFO)) }, ikm, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
   }
 
   private async _importDek(dek: Uint8Array): Promise<CryptoKey> {
     if (dek.length !== DEK_BYTES) throw new VaultError('Vault key must be 32 bytes.', 'invalid-input')
-    return this._crypto.subtle.importKey('raw', toArrayBuffer(dek), { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
+    return withSecretBuffer(dek, (b) => this._crypto.subtle.importKey('raw', b, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']))
   }
 
   private async _seal(key: CryptoKey, plaintext: Uint8Array, aad: string): Promise<SealedBox> {
     const iv = this._random(IV_BYTES)
-    const ct = await this._crypto.subtle.encrypt({ name: 'AES-GCM', iv: toArrayBuffer(iv), additionalData: toArrayBuffer(new TextEncoder().encode(aad)) }, key, toArrayBuffer(plaintext))
+    const ct = await withSecretBuffer(plaintext, (b) => this._crypto.subtle.encrypt({ name: 'AES-GCM', iv: toArrayBuffer(iv), additionalData: toArrayBuffer(new TextEncoder().encode(aad)) }, key, b))
     return { iv: toBase64(iv), data: toBase64(new Uint8Array(ct)) }
   }
 
