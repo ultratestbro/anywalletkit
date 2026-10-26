@@ -6,7 +6,7 @@ import { MessageIsTransactionError, isSolanaTransactionPayload } from './offchai
 import { WalletAccountReadOnlySolana, type SolanaPlan } from './read-only-account.js'
 import { isDefinitive } from './rpc.js'
 import type { SerializedCheck, SerializedTxGuard } from './serialized.js'
-import type { SolanaConfig, SolanaFeeQuote, SolanaTransaction, SolanaTransferOptions } from './types.js'
+import type { SolanaConfig, SolanaFeeQuote, SolanaTransaction, SolanaTransferOptions, SolanaWriteOptions } from './types.js'
 
 const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
 
@@ -99,8 +99,8 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
   }
 
   /** Sign without broadcasting. Returns the base64 wire transaction. Simulation still runs (a reverting tx is refused). */
-  async signTransaction(tx: SolanaTransaction, options: WriteOptions = {}): Promise<string> {
-    const plan = await this.plan(tx)
+  async signTransaction(tx: SolanaTransaction, options: SolanaWriteOptions = {}): Promise<string> {
+    const plan = await this.plan(tx, { allowDurableNonce: options.allowDurableNonce })
     this.maxFeeCheck(plan.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return getBase64EncodedWireTransaction(await this.signPlan(plan))
   }
@@ -127,9 +127,9 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     return first ? getBase58Decoder().decode(first) : ''
   }
 
-  async sendTransaction(tx: SolanaTransaction, options: WriteOptions = {}): Promise<SolanaSendResult> {
+  async sendTransaction(tx: SolanaTransaction, options: SolanaWriteOptions = {}): Promise<SolanaSendResult> {
     this.requireRpc('send transactions')
-    const plan = await this.plan(tx)
+    const plan = await this.plan(tx, { allowDurableNonce: options.allowDurableNonce })
     this.maxFeeCheck(plan.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const hash = await this.broadcast(await this.signPlan(plan))
     return { hash, fee: plan.quote.fee, quote: plan.quote }
@@ -150,9 +150,9 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
    * Signatures already present (other parties) are preserved. The checked fee is held to the
    * tighter of `transactionMaxFee` and `options.maxFee`.
    */
-  async sendSerialized(base64: string, guard: SerializedTxGuard, options: WriteOptions = {}): Promise<SolanaSendResult & { check: SerializedCheck }> {
+  async sendSerialized(base64: string, guard: SerializedTxGuard, options: SolanaWriteOptions = {}): Promise<SolanaSendResult & { check: SerializedCheck }> {
     this.requireRpc('send transactions')
-    const check = await this.checkSerialized(base64, guard)
+    const check = await this.checkSerialized(base64, guard, { allowDurableNonce: options.allowDurableNonce })
     this.maxFeeCheck(check.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const plan: SolanaPlan = { transaction: decodeWireTransaction(base64), quote: check.quote, simulation: check.simulation, description: check.description }
     const hash = await this.broadcast(await this.signPlan(plan))

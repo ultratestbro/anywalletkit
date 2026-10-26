@@ -34,6 +34,9 @@ const CU_LIMIT_FOR_SIMULATION = 1_400_000
 const CU_MIN = 1_000
 const CU_MAX = 1_400_000
 const CU_DEFAULT_PER_INSTRUCTION = 200_000
+/** What a plan may be told per call: skip simulation, sign a durable-nonce transaction (round 3, M9). */
+export interface PlanOptions { simulate?: boolean | undefined; allowDurableNonce?: boolean | undefined }
+
 const CORE_PROGRAMS = new Set<string>([SYSTEM_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS])
 /** System instructions that hand an account (or a nonce account's authority) of the signer to a program or someone else. */
 const WALLET_SYSTEM_INSTRUCTIONS = new Set(['Assign', 'AssignWithSeed', 'Allocate', 'AllocateWithSeed', 'AuthorizeNonceAccount', 'CreateAccountAllowPrefund'])
@@ -374,8 +377,11 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return this.simulateWire(this.unsignedWire(msg))
   }
 
-  /** Hard checks shared by every signing path. */
-  protected enforce(description: TransactionDescription): void {
+  /** Hard checks shared by every signing path. `options` carries the per-call opt-ins ({@link SolanaWriteOptions}). */
+  protected enforce(description: TransactionDescription, options: { allowDurableNonce?: boolean | undefined } = {}): void {
+    if (description.lifetime === 'durable-nonce' && !(options.allowDurableNonce ?? this._config.allowDurableNonce)) {
+      throw new UnsafeTransactionError('Refusing a durable-nonce transaction: its signature never expires and can be broadcast at any later time. Set allowDurableNonce (config or call options) to override.', 'durable-nonce')
+    }
     const burn = description.warnings.find((w) => w.code === 'burn-address')
     if (burn && !this._config.allowBurn) throw new UnsafeTransactionError(`${burn.message} Set allowBurn to override.`)
     if (description.feePayer && description.feePayer !== this.address && !this._config.allowForeignFeePayer) {
@@ -500,10 +506,10 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
    * price + unit limit), simulation and the fee quote. Shared by quote / sign /
    * send so the network is consulted once per fact.
    */
-  protected async planMessage(input: TransactionMessage, opts: { lookupTables?: string[] | undefined; tokenFee?: bigint | undefined; simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
+  protected async planMessage(input: TransactionMessage, opts: PlanOptions & { lookupTables?: string[] | undefined; tokenFee?: bigint | undefined } = {}): Promise<SolanaPlan> {
     let msg = await this.withLookupTables(input, opts.lookupTables)
     const description = describeTransaction(msg, { account: this.address })
-    this.enforce(description)
+    this.enforce(description, opts)
 
     const policy = this.budgetPolicy()
     const explicitPrice = getTransactionMessageComputeUnitPrice(msg as never)
@@ -545,18 +551,18 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
   }
 
   /** Signer checks shared by every compiled-transaction path: this wallet must be a required signer and nobody else may still be missing. */
-  protected enforceCompiledSigners(description: TransactionDescription): void {
-    this.enforce(description)
+  protected enforceCompiledSigners(description: TransactionDescription, options: PlanOptions = {}): void {
+    this.enforce(description, options)
     if (!description.signers.some((s) => s.address === this.address)) throw new UnsafeTransactionError('This wallet is not a required signer of the transaction.')
     const missing = description.signers.filter((s) => s.signed === false && s.address !== this.address).map((s) => s.address)
     if (missing.length) throw new MissingSignersError(missing)
   }
 
   /** Plan a compiled transaction (kit `Transaction` or base64 wire): hard checks, simulation, fee quote. The bytes are never altered. */
-  protected async planCompiled(input: Transaction | string, opts: { simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
+  protected async planCompiled(input: Transaction | string, opts: PlanOptions = {}): Promise<SolanaPlan> {
     const transaction = typeof input === 'string' ? decodeWireTransaction(input) : input
     const description = describeTransaction(transaction, { account: this.address })
-    this.enforceCompiledSigners(description)
+    this.enforceCompiledSigners(description, opts)
 
     let simulation: SimulationResult | undefined
     if (this._rpc !== undefined && (opts.simulate ?? this._config.simulate) !== false) {
@@ -615,7 +621,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
    * changes, balance violations), {@link MissingSignersError} or
    * {@link SimulationError}; returns the evidence otherwise. Nothing is signed.
    */
-  async checkSerialized(base64: string, guard: SerializedTxGuard): Promise<SerializedCheck> {
+  async checkSerialized(base64: string, guard: SerializedTxGuard, options: PlanOptions = {}): Promise<SerializedCheck> {
     const rpc = this.requireRpc('check provider transactions')
     const transaction = decodeWireTransaction(base64)
     const layout0 = resolveCompiledAccounts(transaction)
@@ -624,7 +630,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     const description = describeTransaction(transaction, ctx)
     const layout = resolveCompiledAccounts(transaction, ctx)
     if (layout.unresolved) throw new UnsafeTransactionError('Some accounts come from lookup tables that could not be resolved; the transaction cannot be audited.', 'unresolved-lookup-tables')
-    this.enforceCompiledSigners(description)
+    this.enforceCompiledSigners(description, options)
 
     // 1. Programs.
     if (!guard.allowUnknownPrograms) {
@@ -776,12 +782,12 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
   }
 
   /** Plan any accepted input. */
-  protected async plan(tx: SolanaTransaction, opts: { simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
+  protected async plan(tx: SolanaTransaction, opts: PlanOptions = {}): Promise<SolanaPlan> {
     if (typeof tx === 'string' || isSignedTransaction(tx)) return this.planCompiled(tx, opts)
     return this.planMessage(await this.prepareMessage(tx), { ...opts, lookupTables: isNativeTransfer(tx) ? tx.lookupTables : undefined })
   }
 
-  protected async planTransfer(o: SolanaTransferOptions, opts: { simulate?: boolean | undefined } = {}): Promise<SolanaPlan> {
+  protected async planTransfer(o: SolanaTransferOptions, opts: PlanOptions = {}): Promise<SolanaPlan> {
     if (o.token) {
       const { message, tokenFee } = await this.buildTokenTransfer(o.token, o.recipient, o.amount)
       return this.planMessage(message, { ...opts, lookupTables: o.lookupTables, tokenFee })

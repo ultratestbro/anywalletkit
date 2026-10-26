@@ -113,7 +113,7 @@ describe('compiled and message transactions get the authority guards of sendSeri
     expect(f.sent).toHaveLength(0)
   })
 
-  it('still signs the everyday shapes: transfers (also through a lookup table), burns, closes to self, durable nonces, fresh accounts', async () => {
+  it('still signs the everyday shapes: transfers (also through a lookup table), burns, closes to self, durable nonces (opted in, round 3 M9), fresh accounts', async () => {
     const { f, a } = await account()
     const transfer = getTransferCheckedInstruction({ source: ata, mint: USDC, destination: otherAta, authority: me, amount: 1n, decimals: 6 })
     const ok: Array<[Instruction[], { lookup?: Address[]; nonce?: boolean }]> = [
@@ -132,10 +132,13 @@ describe('compiled and message transactions get the authority guards of sendSeri
     ]
     for (const [ixs, opts] of ok) {
       const tx = forms(ixs, opts)
-      await expect(a.signTransaction(tx.message)).resolves.toBeTypeOf('string')
+      // A durable nonce never expires: refused unless the call opts in (round 3, M9).
+      const call = opts.nonce ? { allowDurableNonce: true } : {}
+      if (opts.nonce) await expect(a.signTransaction(tx.message)).rejects.toMatchObject({ code: 'durable-nonce' })
+      await expect(a.signTransaction(tx.message, call)).resolves.toBeTypeOf('string')
       if (!ixs.some((ix) => ix.accounts?.some((m) => m.address === FRESH))) {
-        await expect(a.sendTransaction(tx.base64)).resolves.toMatchObject({ hash: 'B'.repeat(87) })
-        await expect(a.signTransaction(tx.compiled)).resolves.toBeTypeOf('string')
+        await expect(a.sendTransaction(tx.base64, call)).resolves.toMatchObject({ hash: 'B'.repeat(87) })
+        await expect(a.signTransaction(tx.compiled, call)).resolves.toBeTypeOf('string')
       }
     }
     expect(f.sent.length).toBeGreaterThan(0)

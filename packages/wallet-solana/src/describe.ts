@@ -325,7 +325,7 @@ export function describeTransaction(tx: SolanaTransaction, ctx: DescribeContext 
     const items: DecodedInstruction[] = [{ type: 'sol-transfer', program: SYSTEM_PROGRAM_ADDRESS, from: ctx.account ?? '', to: tx.to, lamports: BigInt(tx.value) }]
     const warnings: SolanaWarning[] = []
     if (tx.to === ZERO_ADDRESS) warnings.push({ code: 'burn-address', message: 'Recipient is the System program (all-zero) address; funds sent there are lost.' })
-    return { kind: 'sol-transfer', version: 0, feePayer: ctx.account, signers: ctx.account ? [{ address: ctx.account, signed: undefined }] : [], items, warnings }
+    return { kind: 'sol-transfer', version: 0, feePayer: ctx.account, signers: ctx.account ? [{ address: ctx.account, signed: undefined }] : [], items, warnings, lifetime: 'blockhash' }
   }
   const n = normalize(tx, ctx)
   const items = n.instructions.map(decodeOne)
@@ -335,6 +335,9 @@ export function describeTransaction(tx: SolanaTransaction, ctx: DescribeContext 
   if (ctx.account && n.feePayer && n.feePayer !== ctx.account) warn('foreign-fee-payer', `Fee payer ${n.feePayer} is not this wallet.`)
   const missing = n.signers.filter((s) => s.signed === false && s.address !== ctx.account).map((s) => s.address)
   if (missing.length) warn('missing-signers', `Still unsigned by ${missing.join(', ')}.`)
+  // The runtime treats a transaction whose FIRST instruction is AdvanceNonceAccount as durable-nonce: no expiry (round 3, M9).
+  const lifetime = isAdvanceNonce(n.instructions[0]) ? 'durable-nonce' : 'blockhash'
+  if (lifetime === 'durable-nonce') warn('durable-nonce', 'Uses a durable nonce: the signature does not expire and can be broadcast at any later time, until the nonce account advances.')
   for (const it of items) {
     if (it.type === 'unknown' || it.type === 'program-call') warn('unknown-program', `Instruction for ${it.program ?? 'an unresolved program'} could not be decoded.`)
     if (it.type === 'set-authority') warn('sets-authority', `Changes an authority on ${it.account}.`)
@@ -347,7 +350,13 @@ export function describeTransaction(tx: SolanaTransaction, ctx: DescribeContext 
       warn('burn-address', 'A transfer targets the System program (all-zero) address; funds sent there are lost.')
     }
   }
-  return { kind: classify(items), version: n.version, feePayer: n.feePayer, signers: n.signers, items, warnings }
+  return { kind: classify(items), version: n.version, feePayer: n.feePayer, signers: n.signers, items, warnings, lifetime }
+}
+
+/** System AdvanceNonceAccount (4, u32 LE). */
+function isAdvanceNonce(ix: Resolved | undefined): boolean {
+  if (!ix || ix.programAddress !== SYSTEM_PROGRAM_ADDRESS) return false
+  try { return identifySystemInstruction(ix.data) === SystemInstruction.AdvanceNonceAccount } catch { return false }
 }
 
 function classify(items: DecodedInstruction[]): TransactionDescription['kind'] {
