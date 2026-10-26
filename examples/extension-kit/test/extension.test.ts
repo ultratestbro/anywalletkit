@@ -47,7 +47,8 @@ function fakeWindows(): WindowsLike & { open: Map<number, string>; userClose(id:
 /** Page ⇄ content script ⇄ worker over in-process "ports"; `origin` is what the browser records. */
 function connectPage(worker: ReturnType<typeof createRouter>, origin: string, claimed = origin) {
   const toPage: unknown[] = []
-  const pageListeners: Array<(d: unknown) => void> = []
+  const pageListeners: Array<(e: { data: unknown; origin: string; source: unknown }) => void> = []
+  const page = { location: { origin: claimed } }
   const workerSide: Array<(m: unknown) => void> = []
   const contentSide: Array<(m: unknown) => void> = []
   const workerPort: PortLike = {
@@ -57,7 +58,7 @@ function connectPage(worker: ReturnType<typeof createRouter>, origin: string, cl
     onDisconnect: { addListener: () => undefined },
   }
   startContentScript({
-    origin: claimed,
+    page,
     addPageListener: (cb) => { pageListeners.push(cb) },
     postToPage: (m) => { toPage.push(m) },
     connect: (name) => {
@@ -70,7 +71,15 @@ function connectPage(worker: ReturnType<typeof createRouter>, origin: string, cl
     toPage,
     send(method: string, params?: unknown) {
       const id = newRequestId()
-      for (const l of pageListeners) l({ target: PAGE_TARGET.toContent, id, chain: 'eip155', method, ...(params === undefined ? {} : { params }) })
+      const data = { target: PAGE_TARGET.toContent, id, chain: 'eip155', method, ...(params === undefined ? {} : { params }) }
+      for (const l of pageListeners) l({ data, origin: claimed, source: page })
+      return id
+    },
+    /** An iframe on the page posting the same request to its parent (round 3, H6). */
+    sendFromFrame(method: string, frameOrigin: string, params?: unknown) {
+      const id = newRequestId()
+      const data = { target: PAGE_TARGET.toContent, id, chain: 'eip155', method, ...(params === undefined ? {} : { params }) }
+      for (const l of pageListeners) l({ data, origin: frameOrigin, source: { location: { origin: frameOrigin } } })
       return id
     },
     answer(id: string) { return toPage.find((m) => isPageResponse(m) && m.id === id) as { result?: unknown; error?: { code: number } } | undefined },
@@ -120,6 +129,15 @@ describe('extension-kit guide', () => {
     const { page, windows } = await connected()
     expect([...windows.open.values()]).toEqual([])
     expect(page.events()).toEqual([['connect', { chainId: '0x1' }], ['accountsChanged', [ADDRESS]]])
+  })
+
+  it('a request an iframe posts to the page is never relayed as the site (round 3, H6)', async () => {
+    const s = await setup()
+    const page = connectPage(s.worker, SITE)
+    const id = page.sendFromFrame('eth_requestAccounts', 'https://ads.example')
+    await flush()
+    expect(s.window.shown.size).toBe(0)
+    expect(page.answer(id)).toBeUndefined()
   })
 
   it('personal_sign: reviewed in the popup, signed by the keyring account', async () => {

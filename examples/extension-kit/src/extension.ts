@@ -5,9 +5,9 @@
 import {
   ApprovalQueue, NetworksTable, PAGE_TARGET, PORT_NAME, PermissionStore, PhishingDetector, RequestRouter, Session, Vault,
   checkSenderOrigin, chromeAlarms, chromeJsonStorage, chromeKeyringStorage, chromeLocalVaultStorage,
-  chromeSessionStorage, createSignHandler, isPageRequest, isRelayRequest, isRelayToContent, stampOrigin,
+  chromeSessionStorage, createSignHandler, isRelayRequest, isRelayToContent, pageRequestFrom, stampOrigin,
   toRelayError, vaultSecretStorage,
-  type AlarmsLike, type ApprovalRequest, type ApprovalWindow, type EvmNetwork, type EvmSigner, type PermissionsState,
+  type AlarmsLike, type ApprovalRequest, type PageMessageEvent, type PageWindow, type ApprovalWindow, type EvmNetwork, type EvmSigner, type PermissionsState,
   type PortSender, type RelayResponse, type RelayToContent, type StorageAreaLike,
 } from '@anywalletkit/extension-kit'
 import { Keyring } from '@anywalletkit/keyring'
@@ -201,8 +201,10 @@ export function onPort({ router, ports }: WorkerParts, port: PortLike) {
 
 /** The parts of the content script's world it uses. */
 export interface ContentLike {
-  origin: string
-  addPageListener(callback: (data: unknown) => void): void
+  /** The page window (`window`); its origin is the one stamped. */
+  page: PageWindow
+  /** `window.addEventListener('message', …)`: the whole event, so its source and origin can be checked. */
+  addPageListener(callback: (event: PageMessageEvent) => void): void
   postToPage(message: unknown): void
   connect(name: string): Pick<PortLike, 'postMessage' | 'onMessage'>
 }
@@ -211,8 +213,10 @@ export interface ContentLike {
 /** Content script: stamps the page's origin and forwards both ways. It holds no wallet logic. */
 export function startContentScript(env: ContentLike) {
   const port = env.connect(PORT_NAME)
-  env.addPageListener((data) => {
-    if (isPageRequest(data)) port.postMessage(stampOrigin(data, env.origin))
+  env.addPageListener((event) => {
+    // Only what the page itself posted: an iframe's parent.postMessage is not the site speaking.
+    const request = pageRequestFrom(event, env.page)
+    if (request) port.postMessage(stampOrigin(request, env.page.location.origin))
   })
   port.onMessage.addListener((message) => {
     if (!isRelayToContent(message)) return

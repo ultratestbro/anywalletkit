@@ -134,6 +134,22 @@ export function newRequestId(): string {
 }
 
 /** The content script's stamp: {@link PageRequest} + the page origin. */
+/** What a content script's `message` listener receives (structural `MessageEvent`). */
+export interface PageMessageEvent { data: unknown; origin: string; source: unknown }
+/** The page window the content script shares (structural `window`). */
+export interface PageWindow { location: { origin: string } }
+
+/**
+ * The page's own request, or `null`. A content script must take only messages the page itself
+ * posted — `event.source` is the page window and `event.origin` its origin — or an iframe on the
+ * page (an ad, an embed) would have its `parent.postMessage` stamped with the site's origin and
+ * shown in the approval window as the site (round 3, H6).
+ */
+export function pageRequestFrom(event: PageMessageEvent, page: PageWindow): PageRequest | null {
+  if (event.source !== page || event.origin !== page.location.origin) return null
+  return isPageRequest(event.data) ? event.data : null
+}
+
 export function stampOrigin(request: PageRequest, origin: string): RelayRequest {
   const { id, chain, method } = request
   return 'params' in request ? { kind: 'request', id, origin, chain, method, params: request.params } : { kind: 'request', id, origin, chain, method }
