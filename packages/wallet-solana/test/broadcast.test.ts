@@ -19,6 +19,7 @@ function fakeRpc(send: (wire: string) => unknown) {
     getFeeForMessage: () => ({ value: 5_000n }),
     getLatestBlockhash: () => ({ value: { blockhash: BLOCKHASH, lastValidBlockHeight: 100n } }),
     getBalance: () => ({ value: 1n }),
+    getAccountInfo: () => ({ value: null }), // transfer() checks its recipient is a wallet (round 3, M10)
     sendTransaction: (wire) => { sent.push(wire as string); return send(wire as string) },
   }
   const rpc = new Proxy({} as SolanaRpc, { get: (_t, m: string) => (...args: unknown[]) => ({ send: async () => { const h = handlers[m]; if (!h) throw new Error(`unmocked ${m}`); return h(...args) } }) })

@@ -284,6 +284,22 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return this.newMessage([ix])
   }
 
+  /**
+   * A transfer's recipient must be a wallet (round 3, M10). A token account or a mint as recipient
+   * gets an associated token account nobody can sign for, and SOL or tokens sent to a program are
+   * lost: an account owned by Token / Token-2022, or an executable one, is refused. An address with
+   * no account yet is an ordinary wallet.
+   */
+  protected async assertWalletRecipient(recipient: string): Promise<void> {
+    const rpc = this.requireRpc('check the recipient')
+    const { value } = await rpc.getAccountInfo(address(recipient), { commitment: this._commitment, encoding: 'base64' }).send()
+    if (!value) return
+    if (value.executable) throw new UnsafeTransactionError(`Recipient ${recipient} is a program, not a wallet: what is sent there is lost.`, 'recipient-not-wallet', [recipient])
+    if (value.owner === TOKEN_PROGRAM_ADDRESS || value.owner === TOKEN_2022_PROGRAM_ADDRESS) {
+      throw new UnsafeTransactionError(`Recipient ${recipient} is a token account or a mint, not a wallet: send to the owner's wallet address.`, 'recipient-not-wallet', [recipient])
+    }
+  }
+
   /** SPL / Token-2022 transfer via `transferChecked` (mint + decimals verified on chain); the recipient ATA is created when missing. */
   protected async buildTokenTransfer(token: string, recipient: string, amount: bigint | number | string): Promise<{ message: TransactionMessage; tokenFee: bigint }> {
     const amt = BigInt(amount)
@@ -291,6 +307,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     const rpc = this.requireRpc('transfer tokens')
     const mint = address(token)
     const to = address(recipient)
+    await this.assertWalletRecipient(recipient)
     const info = await this.getMintInfo(token)
     const [fromAta, toAta] = await Promise.all([this.ata(mint, this.address, info.program), this.ata(mint, to, info.program)])
     const instructions: Instruction[] = []
@@ -792,6 +809,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       const { message, tokenFee } = await this.buildTokenTransfer(o.token, o.recipient, o.amount)
       return this.planMessage(message, { ...opts, lookupTables: o.lookupTables, tokenFee })
     }
+    await this.assertWalletRecipient(o.recipient)
     return this.planMessage(await this.buildNativeTransfer(o.recipient, o.amount), { ...opts, lookupTables: o.lookupTables })
   }
 

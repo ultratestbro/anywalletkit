@@ -131,7 +131,8 @@ describe('WalletAccountSolana', () => {
     expect(d.items.find((i) => i.type === 'token-transfer')).toMatchObject({ tokenProgram: 'token', mint: USDC, decimals: 6, amount: 1n, authority: ADDR0 })
     expect(d.warnings).toEqual([])
 
-    const present = fakeRpc({ getAccountInfo: (addr) => (addr === USDC ? { value: { data: [legacyMint, 'base64'], owner: TOKEN_PROGRAM_ADDRESS } } : { value: { data: ['', 'base64'], owner: TOKEN_PROGRAM_ADDRESS } }) })
+    // The recipient's ATA exists (a token account); the recipient itself is a wallet with no account (round 3, M10 checks it).
+    const present = fakeRpc({ getAccountInfo: (addr) => (addr === USDC ? { value: { data: [legacyMint, 'base64'], owner: TOKEN_PROGRAM_ADDRESS } } : addr === RECIPIENT ? { value: null } : { value: { data: ['', 'base64'], owner: TOKEN_PROGRAM_ADDRESS } }) })
     const w2 = await wallet(present)
     await w2.a.transfer({ token: USDC, recipient: RECIPIENT, amount: 1n })
     expect(describeTransaction(present.sent[0]!).items.some((i) => i.type === 'ata-create')).toBe(false)
