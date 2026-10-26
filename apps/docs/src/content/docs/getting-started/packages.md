@@ -83,4 +83,5 @@ inside the router.
 | `@anywalletkit/history-evm` | Activity history for every supported EVM chain |
 | `@anywalletkit/names-ens` | ENS names → the address for one chain |
 | `@anywalletkit/extension-kit` | The core of a Chromium (MV3) wallet extension: encrypted vault with passkey unlock, auto-locking session, dApp request router, per-origin permissions, approval queue, signing checks; no UI. See the [Browser extension guide](/guides/extension-kit/) |
+| `@anywalletkit/tokens` | Tokens users add by address: read from the chain (EVM, Solana incl. Token-2022), look-alike and issuer-power warnings, `TokensTable` over any JSON storage. See [Custom tokens](/guides/tokens/) |
 | `@anywalletkit/networks` | Networks: catalog mainnets with public RPC failover lists, default testnets, user RPCs and custom networks (`NetworksTable`), per-family endpoint verification, EIP-3085 parsing |

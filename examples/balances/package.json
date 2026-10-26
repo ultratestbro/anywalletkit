@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "The docs Balances guide as running code: the site renders its #region blocks, CI typechecks and tests it.",
+  "description": "The docs Balances and Custom tokens guides as running code: the site renders their #region blocks, CI typechecks and tests them.",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
@@ -13,7 +13,10 @@
     "@anywalletkit/kit": "workspace:*",
     "@anywalletkit/networks": "workspace:*",
     "@anywalletkit/swap2-assets": "workspace:*",
-    "@anywalletkit/wallet-evm": "workspace:*"
+    "@anywalletkit/wallet-evm": "workspace:*",
+    "@anywalletkit/tokens": "workspace:*",
+    "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/protocol-swap2-router": "workspace:*"
   },
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",

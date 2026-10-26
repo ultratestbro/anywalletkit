@@ -1,0 +1,57 @@
+{
+  "name": "@anywalletkit/tokens",
+  "version": "0.0.0",
+  "description": "Tokens users add themselves, at their own risk: read a token's decimals, symbol, name and holder-relevant facts from the chain (EVM contracts, Solana mints incl. Token-2022 extensions), a risk assessment that flags look-alikes of known tokens and issuer powers, and a persistent list (TokensTable over any JSON storage) that apps show beside the swap catalog and can swap through the engines that accept unlisted tokens.",
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/tokens" },
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": {
+    "@anywalletkit/swap2-assets": "workspace:*"
+  },
+  "peerDependencies": {
+    "@anywalletkit/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*",
+    "@anywalletkit/wallet-solana": "workspace:*",
+    "@types/node": "^22",
+    "vitest": "^5.0.3"
+  },
+  "keywords": [
+    "tokens",
+    "custom-tokens",
+    "erc20",
+    "spl",
+    "token-2022",
+    "scam",
+    "anywalletkit"
+  ],
+  "publishConfig": { "access": "public", "provenance": true }
+}

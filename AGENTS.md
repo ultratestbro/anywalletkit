@@ -36,7 +36,7 @@ into the app; never install from GitHub.
 | Hermes polyfills | `runtime-hermes` |
 | Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,uniswap,balancer,wrap,jupiter,omniston,fynd}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
 | Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana,native-monad}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana}` |
-| Safety and data | `tx-preview-evm`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks` |
+| Safety and data | `tx-preview-evm`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks`, `tokens` |
 | Testing your own module | `conformance` (Vitest suites) |
 
 ## Chain ids (CAIP-2)
@@ -158,6 +158,10 @@ the account does not hold fails this way, so an empty wallet cannot quote token 
 
 Token lists: `builtinNetwork(catalogId)` (`networks`) gives the native symbol/decimals (TON's coin is
 GRAM since 2026); `ccChain(catalogId)?.assets` (`swap2-assets`) lists catalog tokens `{ symbol, decimals, contract }`.
+Tokens the user adds by address (EVM, Solana): `inspectToken(account, address)` (`tokens`) → `{ listed }` or
+`{ info, assessment, token }` (`getTokenInfo` on the account; `NotATokenError` for a non-token), `TokensTable` keeps
+them, and the swap engine takes them only with `allowUnlistedTokens: true` (`swapSource(token)` → `fromToken` +
+`fromTokenDecimals`; LI.FI / Uniswap / Balancer / Fynd / Jupiter quote them, no USD value).
 
 ## Policies (run before every signature, including protocol modules)
 

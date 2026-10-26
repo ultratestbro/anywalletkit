@@ -2,7 +2,7 @@
 title: Swaps and bridges
 description: Quote every swap provider at once, let the user pick a route, execute it safely and track delivery across chains.
 sidebar:
-  order: 1
+  order: 2
 ---
 
 import Snippet from '../../../components/Snippet.astro'
@@ -62,6 +62,8 @@ The router is bound to one account: the source of the swap. Its chain is the sou
 - `toToken`: the token on the **destination** chain, as that chain's own id: a contract
   address, a Solana mint or a TON jetton master. A symbol that does not exist in the catalog
   of the destination chain leads to "no route".
+- Tokens outside the catalog (the user's own) need `allowUnlistedTokens` on the engine: see
+  [Custom tokens](/guides/tokens/#swap-it).
 - Omit `toChain` for a same-chain swap.
 - Amounts are `bigint` in base units. Use `toTokenAmount` instead of `fromTokenAmount` for
   exact-output swaps.

@@ -29,8 +29,8 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { deriveEd25519, deriveSecp256k1, seedFromMnemonicSync } from '@anywalletkit/core'
 import { derivationVectors } from '@anywalletkit/conformance'
-import { WalletManagerEvm, describeTransaction, describeTypedData, encodeApprove } from '@anywalletkit/wallet-evm'
-import { WalletManagerSolana, describeTransaction as describeSolana, ZERO_ADDRESS as SOL_ZERO, classifySolanaMessage } from '@anywalletkit/wallet-solana'
+import { WalletManagerEvm, WalletAccountReadOnlyEvm, describeTransaction, describeTypedData, encodeApprove } from '@anywalletkit/wallet-evm'
+import { WalletManagerSolana, WalletAccountReadOnlySolana, describeTransaction as describeSolana, ZERO_ADDRESS as SOL_ZERO, classifySolanaMessage, type SolanaRpc } from '@anywalletkit/wallet-solana'
 import { getApproveInstruction } from '@solana-program/token'
 import { appendTransactionMessageInstructions, createNoopSigner, createTransactionMessage, pipe, setTransactionMessageFeePayer, type Address } from '@solana/kit'
 import { WalletManagerTon, describeTransaction as describeTon, parseV5R1Body, v5r1SigningMessage, v5r1PackUnsigned, v5r1WalletId } from '@anywalletkit/wallet-ton'
@@ -44,6 +44,8 @@ import fastPbkdf2 from '@anywalletkit/runtime-hermes/fast-pbkdf2'
 import { sealBackup, openBackup, encodeBackup, decodeBackup, isBackupError } from '@anywalletkit/seed-vault'
 import { ensResolver, warningsFor, coinTypeFor, decodeBtcScript } from '@anywalletkit/names-ens'
 import { isNameLike, nameResolvers } from '@anywalletkit/core'
+import { TokensTable, assessToken, foldSymbol, inspectToken, memoryJsonStorage as tokensStorage, type TokensState } from '@anywalletkit/tokens'
+import { isTokenAddress, resolveAsset } from '@anywalletkit/swap2-assets'
 import { NetworksTable, memoryJsonStorage, parseAddChainParams, checkRpcUrl, isPrivateHost, verifyNetwork, tonGlobalIdFromBoc, BUILTIN_NETWORKS, DEFAULT_TESTNETS, isAddChainError, type NetworksState } from '@anywalletkit/networks'
 
 declare const print: ((s: string) => void) | undefined
@@ -190,6 +192,44 @@ async function main() {
     const spent = [{ value: 243_604_326n, script: hexToBytes('76a9143898635cac98262fce2d990ee099d45cc775173e88ac') }]
     eq('zcash zip-244 sighash verifies', secp256k1.verify(sig.signature, zcashSighash(tx, 0, spent), sig.publicKey, { prehash: false, format: 'der' }), true)
     eq('zcash zip-317 fee', zcashFee([36 + 1 + tx.inputs[0]!.scriptSig.length + 4], tx.outputs.map((o) => zcashOutputSize(o.script))), 10_000n)
+  }
+  // tokens a user adds: look-alike folding (no String.normalize needed), the table, the catalog helpers, and token info
+  // decoded by wallet-evm (bytes32 symbol, UTF-8 by hand) and wallet-solana (USDC's mainnet mint bytes, PDA via subtle digest) over offline providers.
+  {
+    eq('tokens fold look-alikes', [foldSymbol('USD\u0421'), foldSymbol('\uFF35\uFF33\uFF24\uFF23'), foldSymbol('U$D\u20AE'), foldSymbol('US\u200BDC')].join(','), 'USDC,USDC,USDT,USDC')
+    const fake = { address: '0x6982508145454Ce325dDbE47a25d4ec3d2311933', standard: 'erc20', decimals: 18, symbol: 'USD\u0421', name: 'x', flags: [] as never[] }
+    eq('tokens impersonation is danger', assessToken(fake, 'eip155:1').level, 'danger')
+    eq('tokens base58 mint check', isTokenAddress('solana:mainnet', 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263') && !isTokenAddress('solana:mainnet', '11111111111111111111111111111111'), true)
+    eq('tokens catalog wins', resolveAsset('eip155:1', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', { allowUnlisted: true, decimals: 18 })?.decimals, 6)
+    const word = (v: bigint) => v.toString(16).padStart(64, '0')
+    const evmNode = { request: async ({ method, params }: { method: string; params?: unknown[] }) => {
+      if (method === 'eth_chainId') return '0x1'
+      if (method === 'eth_getCode') return '0x6080'
+      if (method === 'eth_getStorageAt') return '0x' + '0'.repeat(64)
+      if (method === 'eth_call') {
+        const sel = String((params![0] as { data: string }).data).slice(0, 10)
+        if (sel === '0x313ce567') return '0x' + word(18n)
+        if (sel === '0x95d89b41') return '0x' + '4d4b52'.padEnd(64, '0')                                 // bytes32 "MKR"
+        if (sel === '0x06fdde03') return '0x' + word(32n) + word(3n) + 'e282ae'.padEnd(64, '0')        // string "₮"
+        if (sel === '0x18160ddd') return '0x' + word(10n ** 24n)
+      }
+      throw new Error('offline: ' + method)
+    } }
+    const evmInfo = await new WalletAccountReadOnlyEvm('0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA', { provider: evmNode as never, chainId: 1 }).getTokenInfo('0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2')
+    eq('evm token info (bytes32 symbol, UTF-8 name)', `${evmInfo.symbol}|${evmInfo.name}|${evmInfo.decimals}|${evmInfo.totalSupply}`, 'MKR|\u20AE|18|1000000000000000000000000')
+    const USDC_MINT = 'AQAAAJj+huiNm+Lqi8HMpIeLKYjCQPUrhCS/tA7Rot3LXhmbbCqgDFWAGwAGAQEAAABicKqKWcWUBbRShshncubNEm6bil06OFNtN/e0FOi2Zw=='
+    const solRpc = new Proxy({} as SolanaRpc, { get: (_t, m: string) => (...args: unknown[]) => ({ send: async () => {
+      if (m !== 'getAccountInfo') throw new Error('offline: ' + m)
+      return { value: String(args[0]) === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' ? { data: [USDC_MINT, 'base64'], owner: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', executable: false, lamports: 1n, rentEpoch: 0n, space: 82n } : null }
+    } }) })
+    const sol = new WalletAccountReadOnlySolana('9bhvajVaz6ECMoa93J8p699zkrrH14hoTN1EcPVd1Pzp', { provider: solRpc })
+    const solInfo = await sol.getTokenInfo('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')
+    eq('solana token info (USDC mint bytes)', `${solInfo.standard}|${solInfo.decimals}|${solInfo.flags.join('+')}`, 'spl|6|mint-authority+freeze-authority')
+    const table = new TokensTable(tokensStorage<TokensState>())
+    await table.load()
+    const found = await inspectToken({ chain: 'eip155:1', getTokenInfo: async () => ({ ...fake, symbol: 'PEPE', name: 'Pepe' }) }, '0x6982508145454Ce325dDbE47a25d4ec3d2311933')
+    if (!found.listed) await table.add(found.token)
+    eq('tokens table add + list', table.list('eip155:1').map((t) => t.symbol).join(','), 'PEPE')
   }
   // networks: the table, the URL policy, EIP-3085 parsing and a scripted verifyNetwork run in the VM (no network calls).
   {

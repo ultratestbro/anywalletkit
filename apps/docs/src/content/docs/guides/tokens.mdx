@@ -1,0 +1,86 @@
+---
+title: Custom tokens
+description: "Let users add a token by its address, at their own risk: read it from the chain, warn about look-alikes and issuer powers, keep the list, show balances and swap it."
+sidebar:
+  order: 1
+---
+
+import Snippet from '../../../components/Snippet.astro'
+
+The swap catalog in `swap2-assets` is a short curated list. Users hold other tokens too. This page
+lets them add one by its address — an EVM contract or a Solana mint — see its balance and swap
+it. The wallet reads everything about the token from the chain and tells the user what it found
+before anything is saved.
+
+Snippets come from [`examples/balances`](https://github.com/ultratestbro/anywalletkit/tree/main/examples/balances),
+which our CI typechecks and tests. `packages/tokens/scripts/verify-live.mjs` runs the same steps
+on Ethereum and Solana mainnet.
+
+```sh
+npm install @anywalletkit/tokens @anywalletkit/protocol-swap2-router
+```
+
+<Snippet file="balances/src/custom-tokens.ts" region="imports" />
+
+## Look the token up
+
+<Snippet file="balances/src/custom-tokens.ts" region="inspect" />
+
+`inspectToken` asks the account's chain package (`getTokenInfo` in `wallet-evm` and
+`wallet-solana`) for the token's decimals, symbol, name and supply. An address that is not a
+token — a wallet, an NFT collection, a plain contract — throws `NotATokenError`. A token the
+catalog already lists comes back as `{ listed }`: nothing to add.
+
+The assessment lists every warning, worst first. A user token is never "safe": the floor is
+`caution`.
+
+| Code | Level | Meaning |
+|---|---|---|
+| `unlisted` | caution | Always. Anyone can deploy a token with any name and logo. |
+| `impersonation` | danger | Its symbol reads as a catalog token of the same chain, or as a native coin or major stablecoin anywhere. Look-alike letters (Cyrillic С, `$` for S, `₮`, fullwidth, invisible characters) are folded first. |
+| `permanent-delegate` | danger | Solana Token-2022: the issuer can move or burn the user's tokens. |
+| `transfer-hook` | danger | Token-2022: a program of the issuer's choosing runs on every transfer and can block selling. |
+| `non-transferable` | danger | It cannot be sent or swapped. |
+| `upgradeable` | caution | An EVM proxy: the owner can replace the code (USDC is one too). |
+| `mint-authority`, `freeze-authority` | caution | Solana: the issuer can mint more, or freeze balances. |
+| `transfer-fee`, `default-frozen`, `pausable` | caution | Token-2022 extensions. |
+| `odd-characters`, `no-symbol`, `zero-supply`, `unusual-decimals` | caution | What the token reports about itself. |
+
+Show the symbol and the name as the token reports them, next to the address. Never let a user
+token borrow a catalog token's icon: match icons by address, not by symbol.
+
+## Keep the list
+
+<Snippet file="balances/src/custom-tokens.ts" region="table" />
+
+`TokensTable` stores the list in any JSON storage the app has (`AsyncStorage`, `chrome.storage`,
+memory in tests). Load it once at start; reads are then synchronous. Writes queue behind each
+other, and a failed save leaves the list as it was. A failed read leaves the table unloaded
+instead of empty, so a later write cannot erase the user's tokens. Entries are keyed by chain
+and address; Solana is stored under the catalog's `solana:mainnet` whichever id the account
+reports.
+
+The rows feed the token list of the [Balances](/guides/balances/) guide, marked `source: 'user'`.
+Balances are read with the same `getTokenBalance(address)` as catalog tokens.
+
+## Swap it
+
+<Snippet file="balances/src/custom-tokens.ts" region="swap" />
+
+- **Opt in per engine.** `allowUnlistedTokens: true` lets the swap engine take a token outside
+  the catalog. It is off by default.
+- **Decimals come from the chain.** The engine reads them once with `getTokenInfo`. A
+  `fromTokenDecimals` that disagrees is refused.
+- **Which providers answer.** LI.FI, Uniswap, Balancer, Fynd and Jupiter trade any token.
+  NEAR Intents, THORChain, Chainflip, Omniston, CCTP and USDT0 only trade their own lists, so
+  they stay out of these routes.
+- **Approvals.** The approval goes to the token the user named, for exactly the amount, to the
+  spender the quote declares — the same checks as catalog tokens.
+- **No USD value.** A user token has no price in the router, so the loss warning cannot judge
+  the route. Show the amounts in and out.
+- **Destination tokens.** An EVM destination was always an address. A Solana destination mint
+  outside the catalog needs the same flag.
+
+**Server.** With a remote swap engine, set `allowUnlistedTokens: true` on
+`createSwap2Handler` too. Otherwise the server drops the token's decimals, and providers refuse
+the unlisted source.

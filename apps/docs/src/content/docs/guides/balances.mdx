@@ -39,7 +39,9 @@ A chain has no call that lists the tokens an address holds. The wallet keeps a l
 - **The catalog** in `swap2-assets` lists the native coin and the major tokens per chain, with
   contract addresses and decimals. It is a short curated list, not a full token list.
 - **The user's tokens** are the ones they added by contract address. Keep them in your own
-  storage, mark them as user-added, and drop duplicates of catalog tokens.
+  storage, mark them as user-added, and drop duplicates of catalog tokens. [Custom
+  tokens](/guides/tokens/) does this with `@anywalletkit/tokens`: it reads the token from the
+  chain and warns about look-alikes before it is saved.
 
 To find tokens outside the list, use a holdings indexer. [Balances and
 prices](/build-a-wallet/balances-and-prices/) lists providers per chain. Show what it finds

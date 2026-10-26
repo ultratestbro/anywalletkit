@@ -49,7 +49,9 @@
     "buffer": "^6.0.3",
     "fastestsmallesttextencoderdecoder": "^1.0.22",
     "viem": "^2.57.2",
-    "whatwg-url-without-unicode": "8.0.0-3"
+    "whatwg-url-without-unicode": "8.0.0-3",
+    "@anywalletkit/tokens": "workspace:*",
+    "@anywalletkit/swap2-assets": "workspace:*"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
