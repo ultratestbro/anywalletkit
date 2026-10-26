@@ -980,19 +980,50 @@ export class NativeStakingProtocolSolana extends StakingProtocol<NativeStakingCo
   }
 }
 
+/** Pools up to this many accounts are searched exhaustively (2^n subsets); larger ones greedily. */
+export const EXHAUSTIVE_UNSTAKE_ACCOUNTS = 16
+
 /**
- * Picks the accounts an unstake of `amount` deactivates: an exact match, else whole accounts plus at
- * most one split. Every account is tried as the split source, with whole accounts taken largest first
- * from the rest while what remains can still be split (≥ `min` off the source, ≥ `min` left on it).
- * The plan with the fewest steps wins. Returns null when no plan respects the minimum delegation.
+ * Picks the accounts an unstake of `amount` deactivates: some accounts whole plus at most one split
+ * (≥ `min` taken off the source, ≥ `min` left on it), with the fewest steps. Up to
+ * {@link EXHAUSTIVE_UNSTAKE_ACCOUNTS} accounts every subset is tried, so a plan is found whenever one
+ * exists; larger pools fall back to a greedy search (largest first). Returns null when no plan
+ * respects the minimum delegation.
  */
 export function planUnstakeSteps<A extends { delegated: bigint; address: string }>(pool: readonly A[], amount: bigint, min: bigint): { whole: A[]; split: { source: A; lamports: bigint } | null } | null {
   const exact = pool.find((a) => a.delegated === amount)
   if (exact) return { whole: [exact], split: null }
   const desc = [...pool].sort((a, b) => (b.delegated > a.delegated ? 1 : b.delegated < a.delegated ? -1 : 0))
-  let best: { whole: A[]; split: { source: A; lamports: bigint } | null } | null = null
-  const better = (p: NonNullable<typeof best>) => !best || p.whole.length + (p.split ? 1 : 0) < best.whole.length + (best.split ? 1 : 0)
-  // Whole accounts only.
+  return desc.length <= EXHAUSTIVE_UNSTAKE_ACCOUNTS ? planExhaustive(desc, amount, min) : planGreedy(desc, amount, min)
+}
+
+type UnstakePlan<A> = { whole: A[]; split: { source: A; lamports: bigint } | null }
+const stepsOf = (p: UnstakePlan<unknown>) => p.whole.length + (p.split ? 1 : 0)
+
+/** Every subset as the whole accounts; the rest, if any, split from the largest account left out. */
+function planExhaustive<A extends { delegated: bigint }>(desc: readonly A[], amount: bigint, min: bigint): UnstakePlan<A> | null {
+  let best: UnstakePlan<A> | null = null
+  const n = desc.length
+  for (let mask = 0; mask < 1 << n; mask++) {
+    let sum = 0n
+    let count = 0
+    for (let i = 0; i < n; i++) if (mask & (1 << i)) { sum += desc[i]!.delegated; count++ }
+    if (sum > amount || (best && count >= stepsOf(best))) continue
+    if (sum !== amount && (amount - sum < min || (best && count + 1 >= stepsOf(best)))) continue
+    const whole = desc.filter((_, i) => mask & (1 << i))
+    if (sum === amount) { best = { whole, split: null }; continue }
+    const rest = amount - sum
+    // `desc` is largest first: the first account left out that can give `rest` keeps the most behind.
+    const source = desc.find((a, i) => !(mask & (1 << i)) && a.delegated - rest >= min)
+    if (source) best = { whole, split: { source, lamports: rest } }
+  }
+  return best
+}
+
+/** The pre-round-3 search, for pools too large to enumerate: may miss a plan, never returns a wrong one. */
+function planGreedy<A extends { delegated: bigint }>(desc: readonly A[], amount: bigint, min: bigint): UnstakePlan<A> | null {
+  let best: UnstakePlan<A> | null = null
+  const better = (p: UnstakePlan<A>) => !best || stepsOf(p) < stepsOf(best)
   {
     let rest = amount
     const whole: A[] = []
