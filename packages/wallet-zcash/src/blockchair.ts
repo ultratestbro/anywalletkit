@@ -7,7 +7,7 @@
  */
 import { NetworkError } from '@anywalletkit/core'
 import { hexToBytes } from './encoding.js'
-import { DEFAULT_TIMEOUT_MS, fetchWithTimeout, isInt, isRecord } from './http.js'
+import { DEFAULT_TIMEOUT_MS, fetchWithTimeout, isInt, isRecord, refusal, refusedStatus } from './http.js'
 import type { SpentOutput, Utxo, ZcashClient, ZcashTxInfo } from './types.js'
 
 /** Default Blockchair API root for Zcash. */
@@ -166,12 +166,15 @@ export class BlockchairClient implements ZcashClient {
     const url = this.url('push/transaction')
     const res = await fetchWithTimeout(this.fetchFn, url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body }, this.timeoutMs, this.base)
     let env: Partial<Envelope<{ transaction_hash?: string } | null>> = {}
-    try { env = (await res.json()) as typeof env } catch { /* handled below */ }
+    let parsed = false
+    try { env = (await res.json()) as typeof env; parsed = true } catch { /* handled below */ }
     const hash = env.data?.transaction_hash
     if (hash) return hash
-    const reason = env.context?.error ?? `${res.status} ${res.statusText}`
-    // A rejected transaction is the node's verdict, not a transport failure — a plain Error (not NetworkError), so failover does not retry it elsewhere.
-    throw new Error(`Broadcast rejected: ${reason}`)
+    const reason = env.context?.error
+    // The node's verdict — an error it gave, with a 4xx (not 408) or a 200 — is a refusal: nothing was
+    // taken. A proxy's HTML 502, a 5xx, a timeout or an unreadable body may have been (round 3, M12).
+    if (parsed && reason && (res.ok || refusedStatus(res.status))) throw refusal(new Error(`Broadcast rejected: ${reason}`))
+    throw new NetworkError(`Blockchair broadcast: no answer to rely on (${res.status} ${res.statusText})`, { provider: this.base })
   }
 
   async getBlockHeight(): Promise<number> {

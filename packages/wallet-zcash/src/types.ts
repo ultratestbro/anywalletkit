@@ -73,14 +73,15 @@ export interface ZcashConfig {
   transactionMaxFee?: bigint | number
   /** Hard fee ceiling in zatoshis for any transaction this account signs or broadcasts (default 1 000 000 = 0.01 ZEC). */
   maxFee?: bigint | number
-  /** Blocks after the tip at which an unmined transaction expires (ZIP-203; default 40, the zcashd/Zebra default). 0 = never. */
+  /** Blocks after the next block (tip + 1) at which an unmined transaction expires (ZIP-203; default 40, the zcashd/Zebra default). 0 = never. */
   expiryDelta?: number
   /** Set nLockTime to the tip height so the transaction cannot be mined into a reorged block (default true). */
   antiFeeSniping?: boolean
   /**
-   * Consensus branch id to sign under. Default: picked from the tip height
-   * (`branchIdForHeight`) — set this when a network upgrade activates before
-   * the package learns its id.
+   * Consensus branch id to sign under. Default on mainnet: the one in force at
+   * tip + 1 (`branchIdForHeight`) — set this when a network upgrade activates
+   * before the package learns its id. Required on testnet and regtest, whose
+   * upgrades activate at other heights.
    */
   consensusBranchId?: number
   /** Coin-selection input cap (default 200). */

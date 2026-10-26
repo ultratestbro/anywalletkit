@@ -1,10 +1,12 @@
 import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { Buffer } from 'buffer'
 import { Cell } from '@ton/core'
-import { MessageIsTransactionError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { BroadcastUnknownError, MessageIsTransactionError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { isAnsweredRefusal } from './toncenter.js'
 import { tonProofDigest, tonSignDataDigest, type TonProof, type TonProofRequest, type TonSignDataRequest, type TonSignedData } from './tonconnect.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'
-import { v5r1ExternalMessage, v5r1PackSigned, v5r1PackUnsigned, type V5R1Message } from './wallet-v5r1.js'
+import { parseV5R1Body, v5r1ExternalMessage, v5r1PackSigned, v5r1PackUnsigned, type V5R1Message } from './wallet-v5r1.js'
+import { drainModes, sendModeOf } from './describe.js'
 import type { TonConfig, TonSendable, TonTransferOptions } from './types.js'
 
 const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
@@ -107,7 +109,24 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
    * Checks → seqno → preflight → signed body. The preflight runs on the
    * zero-signed body (ignore_chksig), so nothing is signed before it passes.
    */
+  /**
+   * Refuse send modes that drain the wallet — 128 (the whole remaining balance) and 32 (the account
+   * destroyed once empty) — unless `allowDrainingTransactions`. Checked locally, before any seqno or
+   * emulation, so it holds with `simulate: false` too (round 3, M11); the emulation check stays.
+   */
+  private assertNoDrain(modes: number[]): void {
+    if (this._config.allowDrainingTransactions === true) return
+    const found = modes.flatMap(drainModes)
+    if (found.length) throw new UnsafeTransactionError('drain', `Refusing a message with send mode ${found.includes('carries-all-balance') ? '128 (it carries the whole remaining balance)' : '32 (it destroys the wallet account once empty)'}; set allowDrainingTransactions to override.`)
+  }
+
+  /** The send modes of a prebuilt V5R1 body; an unreadable body is left to the emulation and the node. */
+  private bodyModes(body: Cell): number[] {
+    return parseV5R1Body(body)?.messages.map((m) => m.mode) ?? []
+  }
+
   private async signMessages(messages: V5R1Message[], limit: bigint | number | undefined, op: string): Promise<{ body: Cell; fee: bigint }> {
+    this.assertNoDrain(messages.map((m) => sendModeOf(m.mode)))
     // The wallet sends with IGNORE_ERRORS: a message whose value exceeds the
     // balance is silently dropped by the action phase — the external still
     // "succeeds", the seqno moves, the fee is paid and nothing leaves
@@ -146,6 +165,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   /** Sign without broadcasting. Returns the external-message BODY as base64 BoC (pass it back to sendTransaction as a Cell). */
   async signTransaction(tx: TonSendable, options: WriteOptions = {}): Promise<string> {
     if (tx instanceof Cell) {
+      this.assertNoDrain(this.bodyModes(tx))
       await this.preflight(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
       return tx.toBoc().toString('base64')
     }
@@ -156,13 +176,21 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   private async broadcast(body: Cell): Promise<string> {
     const rpc = this.requireRpc('send transactions')
     const init = await this.initIfNeeded()
-    await rpc.sendBoc(v5r1ExternalMessage(this._address, body, init))
-    return body.hash().toString('hex')
+    const hash = body.hash().toString('hex')
+    try {
+      await rpc.sendBoc(v5r1ExternalMessage(this._address, body, init))
+    } catch (e) {
+      // Only a node's explicit refusal means nothing went out (round 3, M12).
+      if (isAnsweredRefusal(e)) throw e
+      throw new BroadcastUnknownError(hash, e)
+    }
+    return hash
   }
 
   /** Sign and broadcast; `hash` is the body hash (hex) — resolve it with getTransactionReceipt. */
   async sendTransaction(tx: TonSendable, options: WriteOptions = {}): Promise<TransferResult> {
     this.requireRpc('send transactions')
+    if (tx instanceof Cell) this.assertNoDrain(this.bodyModes(tx))
     const { body, fee } = tx instanceof Cell
       ? { body: tx, fee: await this.preflight(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction') }
       : await this.signMessages(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction')

@@ -41,11 +41,17 @@ export function tonCenterEndpoint(endpoint: TonEndpoint, opts: { fetch?: typeof 
       }
       if (!res.ok || json.ok !== true) {
         const detail = typeof json.error === 'string' ? json.error : JSON.stringify(json.error ?? json)
-        throw new NetworkError(`${method}: ${detail} (HTTP ${res.status})`, { provider: url })
+        // The node answered and said no: a definitive refusal, not a lost request.
+        throw Object.assign(new NetworkError(`${method}: ${detail} (HTTP ${res.status})`, { provider: url }), { answered: true })
       }
       return json.result as T
     },
   }
+}
+
+/** An endpoint answered with a refusal (`ok: false`): nothing was taken. A thrown fetch, a timeout or a non-JSON body may have been. */
+export function isAnsweredRefusal(e: unknown): boolean {
+  return (e as { answered?: unknown } | null)?.answered === true
 }
 
 /** One RPC, or a failover RPC walking the configured list (`retries` extra rounds after the first full pass). */
@@ -61,10 +67,13 @@ export function createTonRpc(config: TonConfig): TonRpc | undefined {
   return {
     async call<T>(method: string, params: Record<string, unknown>): Promise<T> {
       let lastError: unknown
+      let answered = true
       for (let i = 0; i < attempts; i++) {
-        try { return await list[i % list.length]!.call<T>(method, params) } catch (e) { lastError = e }
+        try { return await list[i % list.length]!.call<T>(method, params) } catch (e) { lastError = e; answered &&= isAnsweredRefusal(e) }
       }
-      throw new NetworkError(`All TON endpoints failed for ${method}`, { cause: lastError })
+      // Refused everywhere is a refusal; one endpoint that never answered may have taken it.
+      const err = new NetworkError(`All TON endpoints failed for ${method}`, { cause: lastError })
+      throw answered ? Object.assign(err, { answered: true }) : err
     },
   }
 }

@@ -1,4 +1,5 @@
-import { DUST_LIMIT, addressFromScript, outputSize, scriptKind } from './address.js'
+import { DUST_LIMIT, addressFromScript, decodeAddress, outputSize, scriptKind } from './address.js'
+import { bytesToHex } from './encoding.js'
 import { conventionalFee } from './fee.js'
 import { serializeTx, txid as txidOf, type TransparentTxV5 } from './tx.js'
 import type { SpentOutput, ZcashNetwork, ZcashTxDescription, ZcashTxOutputDescription, ZcashWarning } from './types.js'
@@ -18,6 +19,8 @@ export type UnsafeTransactionCode =
   | 'recipient-mismatch'
   /** A change output pays an address that is not ours. */
   | 'change-not-ours'
+  /** Off mainnet without a configured `consensusBranchId`: the branch id cannot be known. */
+  | 'unknown-branch-id'
 
 /** A transaction failed a hard safety check and was not signed / broadcast. */
 export class UnsafeTransactionError extends Error {
@@ -50,13 +53,20 @@ export function describeTransaction(tx: TransparentTxV5, spent: SpentOutput[], c
   const inputs = tx.inputs.map((i, k) => ({ txid: i.txid, vout: i.vout, value: spent[k]!.value, address: addressFromScript(spent[k]!.script, ctx.network) }))
   const outputs: ZcashTxOutputDescription[] = []
   const warnings = new Set<ZcashWarning>()
+  // Outputs are matched by script, the recipient first: a transfer to oneself pays our own script
+  // twice, recipient and change (round 3, L9).
+  const scriptOf = (address: string): string | undefined => { try { return bytesToHex(decodeAddress(address, ctx.network).script) } catch { return undefined } }
+  const ownScript = scriptOf(ctx.ownAddress)
+  const intendedScript = ctx.intended ? scriptOf(ctx.intended.to) : undefined
+  let recipientSeen = false
   for (const o of tx.outputs) {
     const address = addressFromScript(o.script, ctx.network)
-    const role: ZcashTxOutputDescription['role'] =
-      address !== undefined && address === ctx.ownAddress ? 'change'
-      : ctx.intended === undefined ? 'recipient'
-      : address !== undefined && address === ctx.intended.to && o.value === ctx.intended.value ? 'recipient'
-      : 'unknown'
+    const script = bytesToHex(o.script)
+    const mine = script === ownScript
+    let role: ZcashTxOutputDescription['role']
+    if (ctx.intended === undefined) role = mine ? 'change' : 'recipient'
+    else if (!recipientSeen && script === intendedScript && o.value === ctx.intended.value) { role = 'recipient'; recipientSeen = true }
+    else role = mine ? 'change' : 'unknown'
     if (scriptKind(o.script) !== 'unknown' && o.value < DUST_LIMIT) warnings.add('dust-output')
     outputs.push({ address, value: o.value, role })
   }

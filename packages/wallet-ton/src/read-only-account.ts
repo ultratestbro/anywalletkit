@@ -124,23 +124,33 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
     return src
   }
 
-  protected transactionMessage(tx: TonTransaction): V5R1Message {
-    const value = big(tx.value)
-    if (value <= 0n) throw new UnsafeTransactionError('zero-value', 'TON message value must be positive.')
+  /**
+   * A destination address with the checks every payment gets: workchain 0 or -1, and a friendly
+   * address's test-only flag matching the wallet's network. Used for a native message's `to` and a
+   * jetton transfer's recipient and response destination (round 3, L8).
+   */
+  protected checkedAddress(to: string): { address: Address; bounceable: boolean } {
     let address: Address
     let bounceable = true
     let testOnly: boolean | undefined
-    if (Address.isFriendly(tx.to)) {
-      const f = Address.parseFriendly(tx.to)
+    if (Address.isFriendly(to)) {
+      const f = Address.parseFriendly(to)
       address = f.address; bounceable = f.isBounceable; testOnly = f.isTestOnly
     } else {
-      address = Address.parse(tx.to)
+      address = Address.parse(to)
     }
     if (address.workChain !== 0 && address.workChain !== -1) throw new UnsafeTransactionError('exotic-workchain', `Refusing to send to workchain ${address.workChain}.`)
     const testnet = this._config.network === 'testnet'
     if (testOnly !== undefined && testOnly !== testnet) {
       throw new UnsafeTransactionError('network-mismatch', testOnly ? 'Test-only address on a mainnet wallet.' : 'Mainnet address on a testnet wallet.')
     }
+    return { address, bounceable }
+  }
+
+  protected transactionMessage(tx: TonTransaction): V5R1Message {
+    const value = big(tx.value)
+    if (value <= 0n) throw new UnsafeTransactionError('zero-value', 'TON message value must be positive.')
+    const { address, bounceable } = this.checkedAddress(tx.to)
     const body = tx.body instanceof Cell ? tx.body : typeof tx.body === 'string' ? (tx.body === '' ? undefined : commentCell(tx.body)) : tx.bodyBoc ? Cell.fromBase64(tx.bodyBoc) : undefined
     const init = this.stateInitOf(tx.stateInit)
     const message = internal({ to: address, value, bounce: tx.bounceable ?? bounceable, ...(body ? { body } : {}), ...(init ? { init } : {}) })
@@ -150,7 +160,8 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
   protected async jettonTransferMessage(o: TonTransferOptions): Promise<V5R1Message> {
     const amount = big(o.amount)
     if (amount <= 0n) throw new UnsafeTransactionError('zero-value', 'Jetton amount must be positive.')
-    const recipient = Address.parse(o.recipient)
+    const recipient = this.checkedAddress(o.recipient).address
+    const response = o.responseDestination ? this.checkedAddress(o.responseDestination).address : undefined
     const jw = await this.getJettonWalletAddress(o.token!)
     await this.jettonWalletData(o.token!, jw)
     const forwardTonAmount = o.forwardTonAmount !== undefined ? big(o.forwardTonAmount) : 1n
@@ -162,7 +173,7 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
       .storeUint(o.queryId !== undefined ? BigInt(o.queryId) : randomQueryId(), 64)
       .storeCoins(amount)
       .storeAddress(recipient)
-      .storeAddress(o.responseDestination ? Address.parse(o.responseDestination) : this._address)
+      .storeAddress(response ?? this._address)
       .storeMaybeRef(o.customPayload ?? null)
       .storeCoins(forwardTonAmount)
       .storeMaybeRef(forwardPayload) // either-ref form: payloads always travel in a ref

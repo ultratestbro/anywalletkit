@@ -60,6 +60,14 @@ current tip (`antiFeeSniping`, default on when the transport can report the heig
 
 ## Safety checks
 
+A broadcast with no definitive answer (fetch threw, a timeout, a 5xx or 408, an
+unreadable body) throws `BroadcastUnknownError` (`maybeSent`, `hash` = the txid computed
+before sending): the transaction may be in the mempool, so do not build another spend.
+A node's refusal (4xx with a reason, an error body) stays an error marked answered
+(`isAnsweredRefusal`); with several clients it is a refusal only when every one refused.
+"Already in the mempool / block chain" returns the txid. A custom `BtcClient` should
+mark refusals `answered: true`. Outputs are matched to recipient and change by script.
+
 Before signing **and** before broadcasting — also for caller-supplied raw hex —
 every transaction is resolved into a `BtcTxDescription` and must pass:
 

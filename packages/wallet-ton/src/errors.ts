@@ -39,3 +39,20 @@ export class SimulationError extends Error {
     this.aborted = details.aborted ?? false
   }
 }
+
+/**
+ * The external message was handed to the network but no definitive answer came back (no response,
+ * a timeout, a non-JSON body): it MAY be on chain. Do not sign again (the next seqno would pay
+ * twice) — watch `hash`, the body hash `sendTransaction` returns.
+ */
+export class BroadcastUnknownError extends Error {
+  /** Always true: the transaction may be on its way. */
+  readonly maybeSent = true
+  /** Hex hash of the signed body. */
+  readonly hash: string
+  constructor(hash: string, cause: unknown) {
+    super(`Broadcast outcome unknown for ${hash}: ${cause instanceof Error ? cause.message.slice(0, 200) : String(cause).slice(0, 200)}`, { cause })
+    this.name = 'BroadcastUnknownError'
+    this.hash = hash
+  }
+}

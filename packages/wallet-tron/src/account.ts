@@ -83,13 +83,17 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
    * with the bytes field by field, and the hard checks ({@link assertSafe}) run on the bytes.
    * A transaction whose JSON says "1 TRX to me" while the bytes say otherwise is refused
    * (`raw-mismatch`), as is a `txID` that does not belong to the bytes (`txid-mismatch`).
+   * `fee_limit` is held to the tighter of `transactionMaxFee` and `options.maxFee` (round 3, M8).
+   * Signatures already on the transaction (a multisig co-signer's) are kept; ours is added once (L11).
    */
-  async signRaw(tx: TronRawTransaction): Promise<TronRawTransaction> {
+  async signRaw(tx: TronRawTransaction, options: WriteOptions = {}): Promise<TronRawTransaction> {
     this.key()
     const verified = verifyRawTransaction(tx)
-    this.assertSafe({ ...tx, raw_data: verified.raw_data })
+    this.assertSafe({ ...tx, raw_data: verified.raw_data }, Date.now(), options.maxFee)
     const sig = await this.signDigest(hexToBytes(verified.txID), 'tron-tx')
-    return { ...tx, signature: [bytesToHex(sig.subarray(0, 64)) + sig[64]!.toString(16).padStart(2, '0')] }
+    const mine = bytesToHex(sig.subarray(0, 64)) + sig[64]!.toString(16).padStart(2, '0')
+    const others = (tx.signature ?? []).filter((s) => s.toLowerCase() !== mine)
+    return { ...tx, signature: [...others, mine] }
   }
 
   // ── Hard checks (before anything is signed) ─────────────────────────────────
@@ -98,11 +102,11 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
    * Refuse to sign what cannot be right: a foreign owner, a missing or expired
    * (or >24h) expiration, no ref block, more than one contract, a TRX / TRC-20
    * transfer to the zero address (unless `allowBurn`), a `fee_limit` above
-   * `transactionMaxFee`, an `AccountPermissionUpdateContract` (unless
+   * `transactionMaxFee` or the call's cap (`limit`), an `AccountPermissionUpdateContract` (unless
    * `allowPermissionChanges`), a contract type the wallet cannot decode (unless
    * `allowUndecodedContracts`; `VoteWitnessContract` only re-assigns votes and passes).
    */
-  protected assertSafe(tx: TronRawTransaction, now = Date.now()): void {
+  protected assertSafe(tx: TronRawTransaction, now = Date.now(), limit?: bigint | number): void {
     const contracts = tx.raw_data?.contract ?? []
     if (contracts.length !== 1) throw new UnsafeTransactionError('multi-contract', `Expected exactly one contract in the transaction, got ${contracts.length}.`)
     const owner = contracts[0]?.parameter?.value?.owner_address as string | undefined
@@ -117,9 +121,9 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     const exp = tx.raw_data.expiration
     if (exp === undefined || exp <= now) throw new UnsafeTransactionError('expired', 'The transaction has no expiration or has already expired.')
     if (exp > now + MAX_EXPIRATION_MS) throw new UnsafeTransactionError('expiration-too-far', 'The transaction expiration is more than 24 hours away.')
-    const max = this._config.transactionMaxFee
-    if (max !== undefined && tx.raw_data.fee_limit !== undefined && BigInt(tx.raw_data.fee_limit) > BigInt(max)) {
-      throw new UnsafeTransactionError('fee-limit', `fee_limit ${tx.raw_data.fee_limit} exceeds transactionMaxFee ${max}.`)
+    const max = feeLimit(this._config.transactionMaxFee, limit === undefined ? {} : { maxFee: BigInt(limit) })
+    if (max !== undefined && tx.raw_data.fee_limit !== undefined && BigInt(tx.raw_data.fee_limit) > max) {
+      throw new UnsafeTransactionError('fee-limit', `fee_limit ${tx.raw_data.fee_limit} exceeds the fee cap of ${max}.`)
     }
     if (!this._config.allowBurn) {
       const d = describeTransaction(tx, { now })
@@ -133,9 +137,10 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
 
   /** Build → hard checks → simulate → estimate → fee cap. Shared by sign / send / transfer. */
   private async prepare(tx: TronTransaction, maxFee: bigint | number | undefined, op: string) {
-    const { built, sim: fromBuild } = await this.buildWithSimulation(tx)
+    // The fee_limit the SDK derives for its own call is capped by the caller's cap too (round 3, M8).
+    const { built, sim: fromBuild } = await this.buildWithSimulation(tx, maxFee)
     // A caller-supplied transaction is checked against its bytes before anything else looks at it.
-    this.assertSafe(isPrebuilt(tx) ? { ...built, raw_data: verifyRawTransaction(built).raw_data } : built)
+    this.assertSafe(isPrebuilt(tx) ? { ...built, raw_data: verifyRawTransaction(built).raw_data } : built, Date.now(), maxFee)
     let sim: TronSimulation | undefined = fromBuild
     if (this._config.simulate !== false) {
       sim ??= await this.simulateRaw(built)
@@ -143,6 +148,13 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     }
     const quote = await this.quoteTransaction(built, sim)
     this.maxFeeCheck(quote.fee, maxFee, op)
+    // What the signed transaction may burn at worst: fee_limit of energy, plus the bandwidth, memo and
+    // activation fees fee_limit does not cover. That is what the cap must hold (round 3, M8).
+    if (maxFee !== undefined && built.raw_data.fee_limit !== undefined) {
+      const other = quote.fee - quote.estimate.breakdown.energyBurn
+      const worst = BigInt(built.raw_data.fee_limit) + other
+      if (worst > BigInt(maxFee)) throw new UnsafeTransactionError('fee-limit', `fee_limit ${built.raw_data.fee_limit} plus ${other} sun of bandwidth, memo and activation fees can burn ${worst}, above the fee cap of ${maxFee}.`)
+    }
     return { built, quote }
   }
 

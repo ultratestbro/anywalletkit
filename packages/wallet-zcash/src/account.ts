@@ -1,12 +1,14 @@
-import { InsufficientFundsError, LocalSigner, SignerError, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
+import { InsufficientFundsError, LocalSigner, NetworkError, SignerError, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { DUST_LIMIT, addressFromPublicKey } from './address.js'
 import { UnsafeTransactionError, assertSafe, describeTransaction, type DescribeContext } from './describe.js'
 import { bytesToHex } from './encoding.js'
+import { BroadcastUnknownError } from './errors.js'
+import { isAlreadyKnown, isAnsweredRefusal } from './http.js'
 import { signMessageWith } from './message.js'
 import { WalletAccountReadOnlyZcash, type SpendPlan } from './read-only-account.js'
 import { FINAL_SEQUENCE, branchIdForHeight, p2pkhScriptSig, parseTx, serializeTx, sighashAll, txid as txidOf, type TransparentTxV5 } from './tx.js'
-import type { SpentOutput, ZcashConfig, ZcashNetwork, ZcashSpend, ZcashTransaction, ZcashTransferOptions, ZcashTxDescription } from './types.js'
+import type { SpentOutput, ZcashClient, ZcashConfig, ZcashNetwork, ZcashSpend, ZcashTransaction, ZcashTransferOptions, ZcashTxDescription } from './types.js'
 
 export { addressFromPublicKey }
 
@@ -83,13 +85,27 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
     return { network: this._network, ownAddress: this.address, intended, maxFee: this.maxFee }
   }
 
-  /** Lock time + expiry + branch id from the tip (or the config override). */
+  /**
+   * Lock time, expiry and branch id for a transaction that lands in the next block (round 3, L7):
+   * expiry = tip + 1 + `expiryDelta`, the branch id in force at tip + 1 (mainnet table; off mainnet
+   * `consensusBranchId` must be configured — testnet and regtest activate upgrades at other heights).
+   * Without a tip nothing is signed when the expiry, anti-fee-sniping or the branch id need it: a
+   * transaction signed with expiry 0 never expires.
+   */
   private async chainParams(): Promise<{ lockTime: number; expiryHeight: number; consensusBranchId: number }> {
-    const tip = await this.tipHeight()
     const delta = this._config.expiryDelta ?? DEFAULT_EXPIRY_DELTA
-    const consensusBranchId = this._config.consensusBranchId ?? branchIdForHeight(tip)
-    const lockTime = tip !== undefined && this._config.antiFeeSniping !== false ? tip : 0
-    const expiryHeight = tip !== undefined && delta > 0 ? tip + delta : 0
+    const configured = this._config.consensusBranchId
+    if (configured === undefined && this._network !== 'mainnet') {
+      throw new UnsafeTransactionError('unknown-branch-id', `On ${this._network} the consensus branch id depends on that network's upgrade heights; set consensusBranchId in the config.`)
+    }
+    const antiSnipe = this._config.antiFeeSniping !== false
+    const needTip = delta > 0 || antiSnipe || configured === undefined
+    const tip = needTip ? await this.tipHeight() : undefined
+    if (needTip && tip === undefined) throw new NetworkError('The Zcash chain tip is unknown, so the expiry height and the branch id cannot be set; nothing was signed.')
+    const next = tip === undefined ? undefined : tip + 1
+    const consensusBranchId = configured ?? branchIdForHeight(next)
+    const lockTime = tip !== undefined && antiSnipe ? tip : 0
+    const expiryHeight = next !== undefined && delta > 0 ? next + delta : 0
     return { lockTime, expiryHeight, consensusBranchId }
   }
 
@@ -184,8 +200,7 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
       rawHex = built.hex; hash = built.txid; fee = built.fee
     }
     this.checkMax(fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
-    const id = await client.broadcast(rawHex)
-    return { hash: id || hash, fee }
+    return { hash: await this.broadcast(client, rawHex, hash), fee }
   }
 
   /** Native ZEC only (`token` is rejected). Subject to `transferMaxFee`. */
@@ -195,8 +210,22 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
     const client = this.requireClient('transfer')
     const built = await this.signSpend({ to: o.recipient, value: o.amount })
     this.checkMax(built.fee, feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
-    const id = await client.broadcast(built.hex)
-    return { hash: id || built.txid, fee: built.fee }
+    return { hash: await this.broadcast(client, built.hex, built.txid), fee: built.fee }
+  }
+
+  /**
+   * Send once through the client. Only a node's refusal means nothing went out; "already in the
+   * mempool / block chain" means an earlier attempt delivered it; anything else may have landed and
+   * is a {@link BroadcastUnknownError} with the txid computed before sending (round 3, M12).
+   */
+  private async broadcast(client: ZcashClient, rawHex: string, txid: string): Promise<string> {
+    try {
+      return (await client.broadcast(rawHex)) || txid
+    } catch (e) {
+      if (isAlreadyKnown(e)) return txid
+      if (isAnsweredRefusal(e)) throw e
+      throw new BroadcastUnknownError(txid, e)
+    }
   }
 
   /** The same address as a {@link WalletAccountReadOnlyZcash}. */

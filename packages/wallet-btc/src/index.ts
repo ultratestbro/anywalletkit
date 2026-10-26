@@ -1,5 +1,6 @@
 export * from './types.js'
-export { UnsafeTransactionError, TooManyInputsError, UnsupportedAddressTypeError, type UnsafeTransactionCode } from './errors.js'
+export { UnsafeTransactionError, TooManyInputsError, UnsupportedAddressTypeError, BroadcastUnknownError, type UnsafeTransactionCode } from './errors.js'
+export { isAnsweredRefusal } from './http.js'
 export { BlockbookClient, unconfirmedOutgoing, type BlockbookTxDetails, type BlockbookAddressPage, type BlockbookVin, type BlockbookVout } from './blockbook.js'
 export { EsploraClient } from './esplora.js'
 export { createClient } from './client.js'

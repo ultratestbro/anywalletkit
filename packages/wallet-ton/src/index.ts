@@ -4,7 +4,7 @@ export { installBufferGlobal }
 export * from './types.js'
 export * from './errors.js'
 export { createTonClient } from './client.js'
-export { TonCenter, createTonRpc, tonCenterEndpoint, emulateExternal, parseEmulation, type TonAccountState, type TonAccountStatus, type GetMethodResult, type EmulationVerdict } from './toncenter.js'
+export { TonCenter, createTonRpc, tonCenterEndpoint, isAnsweredRefusal, emulateExternal, parseEmulation, type TonAccountState, type TonAccountStatus, type GetMethodResult, type EmulationVerdict } from './toncenter.js'
 export { emulateViaTonapi, parseTonapiConsequences, parseTonapiTrace, parseTonapiRisk, runEmulation, resolveEmulate, DEFAULT_TONAPI, type EmulationOutcome, type EmulationSource, type EmulateOptions } from './emulation.js'
 export {
   V5R1_CODE_HEX, V5R1_OP, MAINNET_GLOBAL_ID, TESTNET_GLOBAL_ID, DEFAULT_SEND_MODE, MAX_ACTIONS,

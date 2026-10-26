@@ -55,7 +55,7 @@ describe('WalletAccountZcash', () => {
     expect(res.fee).toBe(10_000n)
     expect(tx.consensusBranchId).toBe(0x37a5165b)
     expect(tx.lockTime).toBe(f.tip)
-    expect(tx.expiryHeight).toBe(f.tip + 40)
+    expect(tx.expiryHeight).toBe(f.tip + 1 + 40) // counted from the block it lands in (round 3, L7)
     expect(tx.inputs.map((i) => `${i.txid}:${i.vout}`)).toEqual([`${TXID_A}:0`])
     const outs = tx.outputs.map((o) => ({ addr: decodeAddress(RECIPIENT, 'mainnet').script, value: o.value, script: hex(o.script) }))
     expect(outs[0]!.value).toBe(60_000_000n)

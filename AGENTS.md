@@ -154,7 +154,9 @@ Errors: `core` has `InsufficientFundsError`, `UserRejectedError`, `ReadOnlyAccou
 `SignerError`; `wallet-evm` adds `SimulationError` (the transfer would revert — `quoteTransfer` of a token
 the account does not hold fails this way, so an empty wallet cannot quote token fees),
 `ChainMismatchError`, `UnsafeTransactionError` and `BroadcastUnknownError` (sent, no answer from the node:
-`.hash` may still land — treat as pending, never resend).
+`.hash` may still land — treat as pending, never resend). Every chain package has its own
+`BroadcastUnknownError` with `maybeSent: true` and `.hash` (wallet-evm, -solana, -near, -tron, -ton, -btc,
+-zcash): only a node's explicit refusal is a plain error.
 
 Token lists: `builtinNetwork(catalogId)` (`networks`) gives the native symbol/decimals (TON's coin is
 GRAM since 2026); `ccChain(catalogId)?.assets` (`swap2-assets`) lists catalog tokens `{ symbol, decimals, contract }`.

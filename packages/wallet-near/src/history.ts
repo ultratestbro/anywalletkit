@@ -96,6 +96,12 @@ export interface NearHistoryCursor {
   tx: string | null
   /** `/ft-txns`: `event_index` of the last consumed row; '' = not started; null = exhausted. */
   ft: string | null
+  /**
+   * Transactions already emitted that have rows on the next page: a transaction with more receipt
+   * rows than a page goes out with the rows that fit, and the rest are consumed without emitting it
+   * again (round 3, M13).
+   */
+  skip?: string[]
 }
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -139,7 +145,8 @@ export function decodeCursor(s: string): NearHistoryCursor {
   const c = parsed as Partial<NearHistoryCursor> | null
   const ok = (v: unknown) => v === null || typeof v === 'string'
   if (!c || c.v !== 1 || !ok(c.tx) || !ok(c.ft)) throw new Error('@anywalletkit/wallet-near: malformed history cursor')
-  return { v: 1, tx: c.tx as string | null, ft: c.ft as string | null }
+  if (c.skip !== undefined && (!Array.isArray(c.skip) || c.skip.length > 4 || !c.skip.every((h) => typeof h === 'string'))) throw new Error('@anywalletkit/wallet-near: malformed history cursor')
+  return { v: 1, tx: c.tx as string | null, ft: c.ft as string | null, ...(c.skip?.length ? { skip: c.skip } : {}) }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -583,32 +590,63 @@ export function createNearHistory(options: NearHistoryOptions = {}): NearHistory
       const cursor = query.cursor ? decodeCursor(query.cursor) : { v: 1 as const, tx: '', ft: '' }
       const acct = encodeURIComponent(address)
       // Receipt rows come ~2 per transaction (the call and its refund), so the receipt list is asked for twice the limit.
-      const perPage = Math.min(MAX_LIMIT, limit * 2)
-      const txRows: NearblocksReceiptRow[] = cursor.tx === null ? [] : (((await get(`/v1/account/${acct}/txns?per_page=${perPage}&order=desc${cursor.tx ? `&cursor=${encodeURIComponent(cursor.tx)}` : ''}`)) as { txns?: NearblocksReceiptRow[] } | undefined)?.txns ?? [])
-      const ftRows: NearblocksFtRow[] = cursor.ft === null ? [] : (((await get(`/v1/account/${acct}/ft-txns?per_page=${limit}&order=desc${cursor.ft ? `&cursor=${encodeURIComponent(cursor.ft)}` : ''}`)) as { txns?: NearblocksFtRow[] } | undefined)?.txns ?? [])
+      // Each list is asked for one row more than it uses: that row tells whether the page's last transaction goes on (round 3, M13).
+      const perPage = Math.min(MAX_LIMIT - 1, limit * 2)
+      const ftPer = Math.min(MAX_LIMIT - 1, limit)
+      const txFetched: NearblocksReceiptRow[] = cursor.tx === null ? [] : (((await get(`/v1/account/${acct}/txns?per_page=${perPage + 1}&order=desc${cursor.tx ? `&cursor=${encodeURIComponent(cursor.tx)}` : ''}`)) as { txns?: NearblocksReceiptRow[] } | undefined)?.txns ?? [])
+      const ftFetched: NearblocksFtRow[] = cursor.ft === null ? [] : (((await get(`/v1/account/${acct}/ft-txns?per_page=${ftPer + 1}&order=desc${cursor.ft ? `&cursor=${encodeURIComponent(cursor.ft)}` : ''}`)) as { txns?: NearblocksFtRow[] } | undefined)?.txns ?? [])
+      // Rows of a transaction an earlier page already emitted (it had more rows than a page) are consumed silently.
+      const skip = new Set(cursor.skip ?? [])
+      const leading = (rows: Array<{ transaction_hash: string }>) => { let n = 0; while (n < rows.length && skip.has(rows[n]!.transaction_hash)) n++; return n }
+      const txSkipped = leading(txFetched)
+      const ftSkipped = leading(ftFetched)
+      const txAll = txFetched.slice(txSkipped)
+      const ftAll = ftFetched.slice(ftSkipped)
+      const txRows = txAll.slice(0, perPage)
+      const ftRows = ftAll.slice(0, ftPer)
+      // A list that came back full goes on past this page, whatever was skipped.
+      const txMore = txFetched.length > perPage
+      const ftMore = ftFetched.length > ftPer
       // Global order by the transaction's block time; emit the top `limit` hashes plus ties, so each list's consumed rows are a prefix.
       const key = (r: { block_timestamp: string | number }) => BigInt(typeof r.block_timestamp === 'string' ? r.block_timestamp : Math.trunc(r.block_timestamp))
       const all = [...txRows.map((r) => ({ k: key(r), h: r.transaction_hash })), ...ftRows.map((r) => ({ k: key(r), h: r.transaction_hash }))]
       all.sort((a, b) => (a.k > b.k ? -1 : a.k < b.k ? 1 : 0))
+      // A transaction whose rows go on past the page (the lookahead row is the same transaction) waits
+      // for the next page, whole, so it is emitted once (round 3, M13). When it is all this page has
+      // (more rows than a page), it goes out with the rows that fit and the next cursor skips the rest.
+      const cut = new Set<string>()
+      // The lookahead row when there is one; after skipped rows there may be none, and the last transaction may go on.
+      const goesOnPast = (rows: Array<{ transaction_hash: string }>, all: Array<{ transaction_hash: string }>, per: number, more: boolean) => {
+        const last = rows[rows.length - 1]
+        if (!more || !last) return
+        const next = all[per]
+        if (next === undefined || next.transaction_hash === last.transaction_hash) cut.add(last.transaction_hash)
+      }
+      goesOnPast(txRows, txAll, perPage, txMore)
+      goesOnPast(ftRows, ftAll, ftPer, ftMore)
+      const partial = all.length > 0 && all.every((e) => cut.has(e.h)) ? [...cut] : []
+      if (partial.length) cut.clear()
       const chosen = new Set<string>()
       let boundary: bigint | undefined
       for (const e of all) {
-        if (chosen.has(e.h)) continue
+        if (chosen.has(e.h) || cut.has(e.h)) continue
         if (chosen.size >= limit && boundary !== undefined && e.k < boundary) break
         chosen.add(e.h)
         if (chosen.size === limit) boundary = e.k
       }
-      // Consumed = the prefix of each list whose hashes were chosen; a list is exhausted once it came back short and fully consumed.
-      const consume = <T extends { transaction_hash: string }>(rows: T[], asked: number, wasAt: string | null, pos: (r: T) => string): { used: T[]; next: string | null } => {
+      // Consumed = the skipped rows, then the prefix of each list whose hashes were chosen; a list is
+      // exhausted once nothing lies past the page and it was fully consumed.
+      const consume = <T extends { transaction_hash: string }>(fetched: T[], skipped: number, rows: T[], more: boolean, wasAt: string | null, pos: (r: T) => string): { used: T[]; next: string | null } => {
         if (wasAt === null) return { used: [], next: null }
         let n = 0
         while (n < rows.length && chosen.has(rows[n]!.transaction_hash)) n++
         const used = rows.slice(0, n)
-        if (rows.length < asked && n === rows.length) return { used, next: null }
-        return { used, next: n > 0 ? pos(used[n - 1]!) : wasAt }
+        if (!more && n === rows.length) return { used, next: null }
+        const last = n > 0 ? used[n - 1] : skipped > 0 ? fetched[skipped - 1] : undefined
+        return { used, next: last ? pos(last) : wasAt }
       }
-      const txC = consume(txRows, perPage, cursor.tx, (r) => r.id)
-      const ftC = consume(ftRows, limit, cursor.ft, (r) => r.event_index)
+      const txC = consume(txFetched, txSkipped, txRows, txMore, cursor.tx, (r) => r.id)
+      const ftC = consume(ftFetched, ftSkipped, ftRows, ftMore, cursor.ft, (r) => r.event_index)
       const nextTx = txC.next, nextFt = ftC.next
       const groups = new Map<string, { receipts: NearblocksReceiptRow[]; ft: NearblocksFtRow[] }>()
       for (const h of chosen) groups.set(h, { receipts: [], ft: [] })
@@ -623,7 +661,10 @@ export function createNearHistory(options: NearHistoryOptions = {}): NearHistory
         items = items.filter((t) => t.time >= since)
       }
       const page: NearHistoryPage = { items }
-      if (more) page.cursor = encodeCursor({ v: 1, tx: nextTx, ft: nextFt })
+      // Emitted in part, or skipped through to the page's end: its remaining rows come next and are skipped.
+      const goesOn = (fetched: Array<{ transaction_hash: string }>, skipped: number, rows: unknown[]) => (rows.length === 0 && skipped > 0 && skipped === fetched.length ? [fetched[skipped - 1]!.transaction_hash] : [])
+      const nextSkip = [...new Set([...partial, ...goesOn(txFetched, txSkipped, txRows), ...goesOn(ftFetched, ftSkipped, ftRows)])]
+      if (more) page.cursor = encodeCursor({ v: 1, tx: nextTx, ft: nextFt, ...(nextSkip.length ? { skip: nextSkip } : {}) })
       return page
     },
 

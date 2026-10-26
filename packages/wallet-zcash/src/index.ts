@@ -3,6 +3,8 @@ export { UnsafeTransactionError, assertSafe, describeTransaction, DEFAULT_MAX_FE
 export { BlockchairClient, BLOCKCHAIR_URL, blockchairTime, type BlockchairTxDashboard } from './blockchair.js'
 export { ZcashBlockbookClient, type BlockbookTxDetails, type BlockbookVin, type BlockbookVout } from './blockbook.js'
 export { createClient } from './client.js'
+export { BroadcastUnknownError } from './errors.js'
+export { isAnsweredRefusal } from './http.js'
 export { magicHash, signMessageWith, encodeMessageSignature, recoverMessagePublicKey } from './message.js'
 export { selectCoins, selectAll, spendableUtxos, conventionalFee, logicalActions, estimateSize, TooManyInputsError, MARGINAL_FEE, GRACE_ACTIONS, P2PKH_INPUT_SIZE, MAX_UTXO_INPUTS, type CoinSelection, type CoinSelectOptions } from './fee.js'
 export {
