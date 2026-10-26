@@ -1,10 +1,11 @@
-import { NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
+import { NetworkError, NotATokenError, type IWalletAccountReadOnly, type TokenFlag, type TokenInfo } from '@anywalletkit/core'
 import {
   BaseError, ContractFunctionRevertedError, decodeErrorResult, getAddress, hashTypedData, isHex,
   recoverMessageAddress, recoverAddress, stringToHex,
   type Hex, type PublicClient,
 } from 'viem'
 import { createClient } from './client.js'
+import { TOKEN_INFO_SELECTORS, PROXY_SLOTS, decodeTokenString } from './token-info.js'
 import { UnsafeTransactionError } from './errors.js'
 import { ERC20_ABI } from './erc20.js'
 import type { EvmConfig, EvmReceipt, EvmTransaction, EvmTransferOptions, SimulationResult, TypedDataInput } from './types.js'
@@ -125,6 +126,48 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
     return this.requireClient('read allowances').readContract({
       address: getAddress(token), abi: ERC20_ABI, functionName: 'allowance', args: [this.address, getAddress(spender)],
     })
+  }
+
+  /**
+   * An ERC-20's decimals, symbol, name and total supply, read from the contract, and `upgradeable`
+   * when it sits behind an EIP-1967 / EIP-1822 / beacon / ZeppelinOS proxy. `bytes32` symbols (MKR
+   * style) are decoded. Throws {@link NotATokenError} when there is no contract at the address or it
+   * has no `decimals()` (an NFT, a wallet, a plain contract).
+   */
+  async getTokenInfo(token: string): Promise<TokenInfo> {
+    let address: Hex
+    try {
+      address = getAddress(token)
+    } catch {
+      throw new NotATokenError(token, 'not an EVM address')
+    }
+    const client = this.requireClient('read token info')
+    const read = async (data: Hex): Promise<Hex | undefined> => {
+      try {
+        return (await client.call({ to: address, data })).data
+      } catch (e) {
+        if (e instanceof BaseError && e.walk((x) => x instanceof ContractFunctionRevertedError || /revert/i.test((x as Error).message ?? ''))) return undefined
+        throw e
+      }
+    }
+    const code = await client.getCode({ address })
+    if (!code || code === '0x') throw new NotATokenError(address, 'no contract code')
+    if (/^0xef0100[0-9a-f]{40}$/i.test(code)) throw new NotATokenError(address, 'it is an account with an EIP-7702 delegation')
+    const [decimalsHex, symbolHex, nameHex, supplyHex, slots] = await Promise.all([
+      read(TOKEN_INFO_SELECTORS.decimals), read(TOKEN_INFO_SELECTORS.symbol), read(TOKEN_INFO_SELECTORS.name), read(TOKEN_INFO_SELECTORS.totalSupply),
+      Promise.all(PROXY_SLOTS.map((slot) => client.getStorageAt({ address, slot }).catch(() => undefined))),
+    ])
+    if (!decimalsHex || decimalsHex.length < 66) throw new NotATokenError(address, 'it has no decimals()')
+    const decimals = BigInt(decimalsHex.slice(0, 66))
+    if (decimals > 255n) throw new NotATokenError(address, `decimals() returned ${decimals}`)
+    const flags: TokenFlag[] = []
+    if (slots.some((v) => v !== undefined && /[1-9a-f]/i.test(v.slice(2)))) flags.push('upgradeable')
+    const totalSupply = supplyHex && supplyHex.length >= 66 ? BigInt(supplyHex.slice(0, 66)) : undefined
+    return {
+      address, standard: 'erc20', decimals: Number(decimals.toString()),
+      symbol: decodeTokenString(symbolHex), name: decodeTokenString(nameHex),
+      ...(totalSupply !== undefined ? { totalSupply } : {}), flags,
+    }
   }
 
   /** Current fee rate: maxFeePerGas, falling back to gasPrice. */

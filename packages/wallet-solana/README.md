@@ -91,6 +91,25 @@ q.tokenFee     // Token-2022 transfer fee withheld by the mint (0 for plain SPL)
 `transferCheckedWithFee` so a changed fee makes the transaction fail instead of
 silently taking more. The recipient's ATA is derived for the right program.
 
+### Token info
+
+`getTokenInfo(mint)` reads a mint from the chain, for a token the user adds by
+address: `{ standard: 'spl' | 'spl-token-2022', decimals, symbol, name,
+totalSupply, flags }`. Name and symbol come from the Token-2022 metadata
+extension, else the Metaplex metadata account (`""` when there is neither);
+anyone can name a token "USDC", so only the address identifies it. `flags` lists
+what a holder should know: `mint-authority`, `freeze-authority`, and the
+Token-2022 extensions `permanent-delegate` (someone can move or burn any
+balance), `transfer-fee` (non-zero), `transfer-hook`, `non-transferable`,
+`default-frozen`, `pausable`. An address that is not an initialized Token /
+Token-2022 mint throws `NotATokenError`.
+
+```ts
+const pyusd = await account.getTokenInfo('2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo')
+// { standard: 'spl-token-2022', decimals: 6, symbol: 'PYUSD', name: 'PayPal USD',
+//   flags: ['mint-authority', 'freeze-authority', 'permanent-delegate'], … }
+```
+
 ### Versioned transactions and provider wires
 
 * `transfer({..., lookupTables: [table]})` / `sendTransaction({to, value, lookupTables})`

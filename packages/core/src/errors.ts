@@ -54,3 +54,14 @@ export class ReadOnlyAccountError extends Error {
     this.name = 'ReadOnlyAccountError'
   }
 }
+
+/** The address is not a token on this chain (no contract, not a mint, no ERC-20 surface). */
+export class NotATokenError extends Error {
+  /** The address that was checked. */
+  readonly address: string
+  constructor(address: string, reason: string) {
+    super(`${address} is not a token on this chain: ${reason}`)
+    this.name = 'NotATokenError'
+    this.address = address
+  }
+}

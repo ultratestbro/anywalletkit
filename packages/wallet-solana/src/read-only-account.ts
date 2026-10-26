@@ -1,9 +1,9 @@
-import { NetworkError, type IWalletAccountReadOnly, bigintToNumber } from '@anywalletkit/core'
+import { NetworkError, NotATokenError, type IWalletAccountReadOnly, type TokenInfo, bigintToNumber } from '@anywalletkit/core'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import {
   address, appendTransactionMessageInstructions, compileTransaction, compileTransactionMessage, compressTransactionMessageUsingAddressLookupTables,
   createNoopSigner, createTransactionMessage, fetchAddressesForLookupTables, getAddressEncoder, getBase64Decoder, getBase64EncodedWireTransaction,
-  getBase64Encoder, getCompiledTransactionMessageDecoder, getCompiledTransactionMessageEncoder, getTransactionMessageComputeUnitLimit,
+  getBase64Encoder, getCompiledTransactionMessageDecoder, getCompiledTransactionMessageEncoder, getProgramDerivedAddress, getTransactionMessageComputeUnitLimit,
   getTransactionMessageComputeUnitPrice, isSignature, isSignerRole, isTransactionMessageWithBlockhashLifetime, isTransactionMessageWithDurableNonceLifetime,
   isWritableRole, pipe, setTransactionMessageComputeUnitLimit, setTransactionMessageComputeUnitPrice, setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash, type Address, type Instruction, type Transaction, type TransactionMessage,
@@ -20,6 +20,7 @@ import {
 import { MissingSignersError, SimulationError, UnsafeTransactionError } from './errors.js'
 import { isNativeTransfer, isSignedTransaction, isTransactionMessage } from './guards.js'
 import { createRpc } from './rpc.js'
+import { METAPLEX_METADATA_PROGRAM, parseMetaplexMetadata, parseMint } from './token-info.js'
 import {
   CAIP2_GENESIS, type SimulationResult, type SolanaConfig, type SolanaFeeQuote, type SolanaReceipt, type SolanaRpc, type SolanaTransaction,
   type SolanaTransferOptions, type TransactionDescription,
@@ -170,6 +171,46 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       }
     }
     return out
+  }
+
+  /**
+   * Decimals, symbol, name, supply and the holder-relevant flags of a mint, read from the chain: a
+   * live mint or freeze authority, and the Token-2022 extensions that let someone take, tax, hook,
+   * freeze or pause holders' tokens. Name and symbol come from the Token-2022 metadata extension,
+   * else from the Metaplex metadata account ("" when there is neither). Throws
+   * {@link NotATokenError} when the address is not an initialized Token / Token-2022 mint.
+   */
+  async getTokenInfo(token: string): Promise<TokenInfo> {
+    let mint: Address
+    try {
+      mint = address(token)
+    } catch {
+      throw new NotATokenError(token, 'not a base58 Solana address')
+    }
+    const rpc = this.requireRpc('read token info')
+    const info = await rpc.getAccountInfo(mint, { commitment: this._commitment, encoding: 'base64' }).send()
+    if (!info.value) throw new NotATokenError(mint, 'no account at this address')
+    const program = info.value.owner
+    const token2022 = program === TOKEN_2022_PROGRAM_ADDRESS
+    if (program !== TOKEN_PROGRAM_ADDRESS && !token2022) throw new NotATokenError(mint, `the account belongs to ${program}, not a token program`)
+    const parsed = parseMint(getBase64Encoder().encode(info.value.data[0]) as Uint8Array, token2022)
+    if (!parsed) throw new NotATokenError(mint, 'the account is not an initialized mint')
+    let name = parsed.name
+    let symbol = parsed.symbol
+    if (name === undefined || symbol === undefined) {
+      const mintBytes = getAddressEncoder().encode(mint) as Uint8Array
+      const [pda] = await getProgramDerivedAddress({
+        programAddress: address(METAPLEX_METADATA_PROGRAM),
+        seeds: [utf8('metadata'), getAddressEncoder().encode(address(METAPLEX_METADATA_PROGRAM)), mintBytes],
+      })
+      const meta = await rpc.getAccountInfo(pda, { commitment: this._commitment, encoding: 'base64' }).send()
+      const fields = meta.value && meta.value.owner === METAPLEX_METADATA_PROGRAM
+        ? parseMetaplexMetadata(getBase64Encoder().encode(meta.value.data[0]) as Uint8Array, mintBytes)
+        : null
+      name = fields?.name ?? ''
+      symbol = fields?.symbol ?? ''
+    }
+    return { address: mint, standard: token2022 ? 'spl-token-2022' : 'spl', decimals: parsed.decimals, symbol, name, totalSupply: parsed.supply, flags: parsed.flags }
   }
 
   /** Token-2022 transfer fee for `amount` under `info` (0 for plain mints). */

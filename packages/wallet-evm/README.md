@@ -29,6 +29,15 @@ wallet.dispose()                                                                
 Offline signing: omit `provider`, pass `chainId` (or put it on the tx) and call
 `signTransaction` with every field set — nothing touches the network.
 
+## Token info
+
+`getTokenInfo(address)` reads an ERC-20 from its contract: `{ address, standard: 'erc20', decimals,
+symbol, name, totalSupply, flags }`. `bytes32` symbols (MKR) are decoded; text that is not UTF-8 is
+`''`. `flags` holds `upgradeable` when the address is an EIP-1967 / EIP-1822 / beacon / ZeppelinOS
+proxy. No code, an EIP-7702-delegated account or no `decimals()` (an NFT, a plain contract) throws
+`NotATokenError`; RPC failures are thrown as they are. `@anywalletkit/tokens` builds the "add a
+token" flow on it.
+
 ## Safety layer
 
 Every send goes through, in order: static refusals → simulation → fee cap → sign → broadcast.

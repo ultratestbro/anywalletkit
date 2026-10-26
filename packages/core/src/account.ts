@@ -41,6 +41,51 @@ export interface FeeRates {
 }
 
 /**
+ * A fact about a token that matters to whoever holds it, read from the chain:
+ * - `upgradeable`: an EVM proxy (EIP-1967 / EIP-1822 / beacon); its owner can replace the code.
+ * - `mint-authority`: someone can still mint more (Solana).
+ * - `freeze-authority`: someone can freeze holders' token accounts (Solana).
+ * - `permanent-delegate`: someone can move or burn anyone's balance (Token-2022).
+ * - `transfer-fee`: every transfer pays a fee to the mint (Token-2022).
+ * - `transfer-hook`: a program of the mint's choosing runs on every transfer (Token-2022).
+ * - `non-transferable`: holders cannot move it (Token-2022).
+ * - `default-frozen`: new token accounts start frozen (Token-2022).
+ * - `pausable`: someone can pause every transfer (Token-2022).
+ */
+export type TokenFlag =
+  | 'upgradeable'
+  | 'mint-authority'
+  | 'freeze-authority'
+  | 'permanent-delegate'
+  | 'transfer-fee'
+  | 'transfer-hook'
+  | 'non-transferable'
+  | 'default-frozen'
+  | 'pausable'
+
+/**
+ * What a chain package reads about a token from the chain itself, never from a list. `symbol` and
+ * `name` are whatever the token says about itself: anyone can deploy a token called "USDC", so
+ * they never identify it — the address does.
+ */
+export interface TokenInfo {
+  /** The token's address (contract, mint) in the chain's canonical form. */
+  address: string
+  /** `erc20`, `spl` or `spl-token-2022`. */
+  standard: string
+  /** Base-unit decimals. */
+  decimals: number
+  /** As the token reports it (may be empty). */
+  symbol: string
+  /** As the token reports it (may be empty). */
+  name: string
+  /** Total supply in base units, when the token reports it. */
+  totalSupply?: bigint
+  /** Holder-relevant facts read from the chain; empty when none apply. */
+  flags: TokenFlag[]
+}
+
+/**
  * Anything that can be read about an address without a key: balances, quotes,
  * receipts. Protocol modules constructed with a read-only account may only quote.
  */
@@ -53,6 +98,12 @@ export interface IWalletAccountReadOnly {
   getBalance(): Promise<bigint>
   /** Balance of a token (contract, mint, jetton master) in its base units. */
   getTokenBalance(token: string): Promise<bigint>
+  /**
+   * Decimals, symbol, name, supply and holder-relevant {@link TokenFlag}s of a token, read from the
+   * chain. Throws {@link NotATokenError} when the address is not a token there. Chain packages that
+   * cannot read token metadata leave it out.
+   */
+  getTokenInfo?(token: string): Promise<TokenInfo>
   /** Network fee the transaction would pay, in native base units. Nothing is signed. */
   quoteSendTransaction(tx: unknown): Promise<{ fee: bigint }>
   /** Network fee a {@link TransferOptions} transfer would pay, in native base units. */
