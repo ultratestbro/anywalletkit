@@ -1,5 +1,14 @@
 # @anywalletkit/networks
 
+## 0.2.6
+
+### Patch Changes
+
+- eec3745: Three gaps in the networks table closed. `verifyNetwork` checks the genesis of `bitcoin:signet`, `bitcoin:regtest` and `zcash:regtest` (it passed any endpoint for them — the expected genesis was empty) and refuses a UTXO network it cannot identify instead of waving it through. `parseAddChainParams` drops private / local RPC hosts (localhost, 10.x, 192.168.x, *.local…) even over https unless `allowHttpLocal` is passed — a site must not point the wallet at the user's own network. And turning "Allow http for local nodes" off parks the `http://` local RPCs stored while it was on (skipped, with the reason) instead of still using them; turning it on again restores them.
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [398129f]
+  - @anywalletkit/swap2-assets@0.2.1
+
 ## 0.2.5
 
 ### Patch Changes

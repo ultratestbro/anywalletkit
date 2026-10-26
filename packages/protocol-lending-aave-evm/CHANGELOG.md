@@ -1,5 +1,19 @@
 # @anywalletkit/protocol-lending-aave-evm
 
+## 0.2.8
+
+### Patch Changes
+
+- 9e4bcd2: `withdraw({token: 'native', amount: 'max'})` approves the gateway for the held aWETH plus 0.1 % (+1). The approval was exactly the balance read at planning, while the WETH gateway pulls the balance at execution — grown by interest in between — so `transferFrom` failed.
+- 9e4bcd2: `repay({amount: 'max'})` on the permit road works. It sent `repayWithPermit(asset, uint256.max, …)`; the Pool calls `permit(owner, pool, amount, …)` with the amount it is given while the signature covered the debt plus 0.1 %, so the permit failed and the repay reverted every time. The permitted amount is now passed; Aave repays at most the debt.
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.2.7
 
 ### Patch Changes

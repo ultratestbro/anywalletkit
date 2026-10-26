@@ -1,5 +1,50 @@
 # @anywalletkit/extension-kit
 
+## 0.2.0
+
+### Minor Changes
+
+- f2de8b6: A site on the shipped phishing list is now refused, not only warned about. `PhishingDetector.refusal(origin)` gives the reason for a listed host; `ApprovalQueueOptions.refuse` and `RouterDeps.refuse` take it and answer every request from that origin with EIP-1193 4100 (`OriginRefused` at the queue) before any approval window opens — reads, `eth_accounts` and an earlier permission included. Lookalikes and punycode still only warn. Wire both hooks; without them the behaviour is unchanged.
+- f2de8b6: `eth_sendTransaction` takes the nonce after the review, not before. Two requests waiting at once used to show and sign the same nonce, so the second replaced the first or was refused. The nonce is now read after the approval under a per-account lock that also covers the broadcast, and never below the wallet's own next nonce. The fee caps signed are the ones shown; when the network outgrew them while the sheet was open (EIP-1559: base fee + tip above the shown cap; legacy: a higher gas price), the user is asked again with the new numbers (`SignApproval.repriced: true`).
+- f2de8b6: The swap gate checks the order itself and the account. A gasless swap's sheet said "Signed order" without the order, and its pre-approval let any EIP-712 data on the chain through once — another order or a Permit, for any account.
+  
+  - `SwapApproval.source` for a typed order carries `typedData` (parsed) and `text` (pretty JSON) for the sheet.
+  - `GatedOp` `evm-typed-data` requires `typedDataHash` — `typedDataHash(typed)` from `@anywalletkit/wallet-evm` (now exported), the digest the account signs; `planMatchers` compares it (`typedDataMatcher`). A plan whose order cannot be hashed is refused before the sheet opens.
+  - `ReviewGate.preApprove(matchers, ttlMs, account)` binds pre-approvals to an account; a bound one passes only an op whose new `account` field names it. `SwapReviewMeta.account` and `EarnReviewMeta.account` are required and `reviewSwapPlan` / `reviewEarnPlan` always bind — pass the account in the ops your reviewed account builds.
+  - `@anywalletkit/wallet-evm` is now a dependency of extension-kit.
+
+### Patch Changes
+
+- eec3745: `wallet_addEthereumChain` drops private / local RPC hosts (localhost, *.local, 10.x, 172.16–31.x, 192.168.x, 169.254.x, IPv6 loopback / unique-local / link-local) even over https: a page could otherwise point the extension's RPC reads at the user's router or LAN services.
+- f2de8b6: `Session` with `autoLockMs: 0` ("no auto-lock") stays unlocked in Chrome. The record stored `expiresAt: Infinity`; chrome.storage keeps JSON, Infinity became `null`, and the next read took the wallet for locked right after unlock. "No auto-lock" is now stored as `expiresAt: null`. A stored record that is there but unreadable (wrong types, a key that is not 32 bytes) now locks the wallet: it is removed and `onLock` listeners run.
+- f2de8b6: `SwapsStore` writes one after another. `add`, `update` and `remove` read the list, changed it and wrote it back with no ordering, so an alarm tick's `update` that read the list before a just-executed swap was added wrote the old list back: the new swap vanished and was never tracked. They now run in a queue (as `PermissionStore` does), each reading the list inside its turn. `parseSwapId` also reads the id `claimSwap2` returns, whose 4th segment is the claim hash (`destTxHash`).
+- f2de8b6: The vault wipes the copies it hands to WebCrypto. Every input went through a fresh `ArrayBuffer` copy (`toArrayBuffer`), and the copies of the password, the scrypt KEK, the DEK, the passkey PRF output and each sealed plaintext (the recovery phrase) stayed in memory. They now go through `withSecretBuffer`, which zero-fills the copy once the call settles (WebCrypto copies its input when called); the PBKDF2 password bytes are wiped too.
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [f2de8b6]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+- Updated dependencies [b55aa5d]
+- Updated dependencies [b55aa5d]
+- Updated dependencies [b55aa5d]
+- Updated dependencies [b55aa5d]
+- Updated dependencies [b55aa5d]
+- Updated dependencies [f743c06]
+- Updated dependencies [9e4bcd2]
+- Updated dependencies [9e4bcd2]
+- Updated dependencies [9e4bcd2]
+- Updated dependencies [9e4bcd2]
+- Updated dependencies [eec3745]
+  - @anywalletkit/core@0.6.0
+  - @anywalletkit/keyring@0.3.6
+  - @anywalletkit/wallet-evm@0.3.0
+  - @anywalletkit/protocol-swap2-core@0.6.0
+  - @anywalletkit/swap2-assets@0.2.1
+
 ## 0.1.5
 
 ### Patch Changes

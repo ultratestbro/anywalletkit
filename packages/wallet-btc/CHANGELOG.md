@@ -1,5 +1,22 @@
 # @anywalletkit/wallet-btc
 
+## 0.3.0
+
+### Minor Changes
+
+- 143065c: A broadcast with no definitive answer (fetch threw, a timeout, a 5xx or 408, an unreadable body) now throws `BroadcastUnknownError` (`maybeSent: true`, `hash` = the txid computed before sending) instead of a plain `NetworkError`: the transaction may be in the mempool, and building another spend would use other coins or replace it. A node's refusal (HTTP 4xx with a reason, or an error body) stays an error, marked answered (`isAnsweredRefusal`); with several clients it is a refusal only when every one refused. "Already in the mempool / block chain" returns the txid. A custom `BtcClient` should mark node refusals `answered: true`, otherwise its failures count as "maybe sent".
+
+### Patch Changes
+
+- 143065c: Outputs are matched to the recipient and to the change by script, recipient first. A transfer to oneself and (BTC) a recipient written in uppercase bech32 are no longer refused at signing.
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.2.5
 
 ### Patch Changes

@@ -1,5 +1,18 @@
 # @anywalletkit/core
 
+## 0.6.0
+
+### Minor Changes
+
+- f743c06: `externalSigner` verifies every signature against the signer's `publicKey` before returning it: ECDSA (compact and recoverable — a recoverable one must also recover to the key), BIP-340 schnorr (under the tweaked output key when a `tweak` is passed) and ed25519. A backend that answered with another key's signature, or bytes of the right length, used to get through: the chain rejected the transaction, or a recoverable signature named another sender. Such a result now throws `SignerError`.
+- d82e140: Approval intents report what a signature really grants. Permit2 `PermitBatch` / `PermitBatchTransferFrom` list every token in the new `intent.approvals` (and are `unlimited` when any entry is); amounts are read with the signer's BigInt() rules, so `' 0x…'`, `'0X…'` and `'0b…'` spellings count; an amount the policies cannot read is reported as unlimited. Unlimited is now one SDK-wide threshold, type(uint128).max and above: core exports `UNLIMITED_ALLOWANCE` and `isUnlimitedAllowance`.
+
+### Patch Changes
+
+- f743c06: Derivation paths are parsed strictly and derivation leaves no key material behind. `parsePath` read segments with `parseInt`, so `1.9'`, `0x10'`, `1e3'` were taken as other indexes; a segment is now a plain decimal index below 2^31, and `'` / `h` mark hardened on both curves (secp256k1 used to go through @scure/bip32's own parser, which refused `h`). `deriveSecp256k1` derives step by step and wipes the master and every intermediate node; SLIP-10 `deriveEd25519` zeroes its HMAC outputs, parent keys, chain codes and input blocks. The keyring wipes the BIP-32 master it builds for a seed's fingerprint and the derived buffer behind an exported key.
+- f743c06: `assertNameUnchanged` — the signing-time check that a name still points where it pointed when it was typed — now asks for a fresh resolution (`resolve(name, chain, { fresh: true })`). It went through the resolver's cache (ENS: 5 minutes), so a name re-pointed in between passed. `NameResolver.resolve` takes the optional `{ fresh }` (a caching resolver must bypass its cache for it), `nameResolvers` passes it on, and the ENS resolver honours it (the fresh answer then refreshes the cache).
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+
 ## 0.5.0
 
 ### Minor Changes

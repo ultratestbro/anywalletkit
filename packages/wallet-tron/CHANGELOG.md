@@ -1,5 +1,21 @@
 # @anywalletkit/wallet-tron
 
+## 0.4.0
+
+### Minor Changes
+
+- 143065c: The fee cap now holds for what a Tron transaction may really burn: its `fee_limit` of energy plus the bandwidth, memo and activation fees `fee_limit` does not cover must stay within the tighter of `transactionMaxFee` / `transferMaxFee` and `WriteOptions.maxFee` (`UnsafeTransactionError` `fee-limit` otherwise). The `fee_limit` the SDK derives for its own contract calls is capped by that cap, and `signRaw` takes `WriteOptions` and checks `fee_limit` against them. `signRaw` keeps signatures already on the transaction (a multisig co-signer's) and adds its own once, instead of replacing them.
+
+### Patch Changes
+
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.3.2
 
 ### Patch Changes

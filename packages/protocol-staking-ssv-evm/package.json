@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-staking-ssv-evm",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "A simple package that lets @anywalletkit/wallet-evm wallet accounts stake SSV through SSV Network: stake SSV → cSSV, claim ETH rewards, cooldown unstake and withdraw.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

@@ -1,5 +1,30 @@
 # @anywalletkit/kit
 
+## 0.5.0
+
+### Minor Changes
+
+- d82e140: Approval intents report what a signature really grants. Permit2 `PermitBatch` / `PermitBatchTransferFrom` list every token in the new `intent.approvals` (and are `unlimited` when any entry is); amounts are read with the signer's BigInt() rules, so `' 0x…'`, `'0X…'` and `'0b…'` spellings count; an amount the policies cannot read is reported as unlimited. Unlimited is now one SDK-wide threshold, type(uint128).max and above: core exports `UNLIMITED_ALLOWANCE` and `isUnlimitedAllowance`.
+- d82e140: The policies now see who a write really pays, not only the contract it calls. Recipients and spenders inside standard token calls are destinations: ERC-20 / 721 / 1155 transfers, approve, increaseAllowance, setApprovalForAll, Permit2 approve, an on-chain EIP-2612 permit, ERC-677 transferAndCall; TRC-20 calls (by `parameters` and inside `raw_data_hex`); NEAR `ft_transfer(_call)`, `nft_transfer(_call)`, `storage_deposit` for another account and `deleteAccount` (object and base64 borsh); TON jetton / NFT transfers and burns (destination and excess receiver, from a Cell or `bodyBoc`); SPL transfers, whose recipient is the token account's owner. An allowlist must hold the contract and the recipient. The intent of a single token transfer names its token and amount. wallet-solana gains `getTokenAccountOwner(address)`, which the policies use to read SPL recipients only when a list or `confirm` applies; an owner they cannot read makes the write `destinationUnknown`.
+- d82e140: `policies.maxFee` now reaches Tron's `signRaw` (second argument), an account's `revokeDelegation` (its only argument) and swap2's `sendSerializedTransaction` hook (third argument) as `{ maxFee }`, and the hook / approvals types say so. Under a fee cap, a write that pays a fee but cannot take one (NEAR `signBuilt`, Solana `signCompiled` / `signTransactionMessage`, name-guarded helpers) is refused instead of signed unchecked; off-chain signatures (messages, typed data, permits) are not affected. The conformance mock records the hook's options.
+- d82e140: Solana Stake-program instructions are judged by whom they pay or empower, not by the program id: Withdraw names its recipient, Authorize* the new authority, Initialize* the staker, withdrawer and any custodian, SetLockup* the custodian, DelegateStake the vote account, Split / MoveStake / MoveLamports the destination account and Merge the account merged into. Allowlisting `Stake11111111111111111111111111111111111111` no longer lets a Withdraw or Authorize to a foreign address through: allowlist the wallet, the stake accounts and the vote accounts instead.
+- d82e140: `transfer` intents now name `recipient`, the only field every chain package pays, instead of `to ?? recipient`. A call that also passes a different `to` is reported with `destinationUnknown: true`, so an allowlist refuses it and a blocklist without a `confirm` hook refuses it.
+
+### Patch Changes
+
+- eec3745: Activity descriptions take the app's own token list: `GenericDescribeOptions.tokens(chain, token)` returns `{ symbol, decimals }` for tokens outside the swap2-assets catalog (custom tokens from `@anywalletkit/tokens`). An approval of such a token used to read "Approved 0x1234…", and `approve(spender, 0)` on it was not recognised as a revoke.
+- eec3745: `history()` pagination no longer skips or repeats rows. The merge sorted equal timestamps by chain and hash instead of each source's own order and counted a page as consumed up to the furthest row shown, so with same-second transactions a row was skipped for good or shown twice; a transaction landing at the head between two calls repeated a row; and a transfer between two own addresses on one chain showed twice when it sat on different pages of the two histories. The pages are now merged k-way, each in its source's order (only a prefix of a page is ever consumed), the cursor remembers the last row each page gave (`l`, older cursors still work), and a transaction sent from another own address the feed reads is shown from that address's history only.
+- eec3745: A multi-leg intent settles once per `history()` call, the same way every time: any failed leg → failed, else any confirmed leg → confirmed. Each leg used to settle the journal on its own from the status read at the start of the call, so with one leg confirmed and another failed the journal flipped between the two on every call.
+- d82e140: Policy-guarded writes now judge and sign one deep copy of their arguments, taken before any check, and `confirm` gets its own copy. A getter that answers differently later, a `confirm` hook that edits `intent.raw`, or code that edits the caller's object during an await can no longer change what is signed after it was checked. The account receives a copy, not the caller's object.
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+  - @anywalletkit/swap2-assets@0.2.1
+
 ## 0.4.2
 
 ### Patch Changes

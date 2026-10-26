@@ -1,5 +1,23 @@
 # @anywalletkit/wallet-zcash
 
+## 0.3.0
+
+### Minor Changes
+
+- 143065c: A broadcast with no definitive answer (fetch threw, a timeout, a 5xx, an unreadable body such as a proxy's HTML 502) now throws `BroadcastUnknownError` (`maybeSent: true`, `hash` = the txid computed before sending). Blockchair used to call such a 502 "Broadcast rejected", a final verdict. A node's refusal (an error it gave, with a 4xx or a 200) stays an error, marked answered (`isAnsweredRefusal`). In failover, a refusal after an endpoint that never answered is "maybe sent". "Already in the mempool / block chain" returns the txid.
+- 143065c: With the chain tip unknown, a transaction is no longer signed with expiry 0 (never expires): nothing is signed when the expiry, anti-fee-sniping or the branch id need the tip. The expiry is counted from the block the transaction lands in (tip + 1 + `expiryDelta`), and the branch id is the one in force at tip + 1. On testnet and regtest, whose upgrades activate at other heights, `consensusBranchId` must be configured (`UnsafeTransactionError` `unknown-branch-id`).
+
+### Patch Changes
+
+- 143065c: Outputs are matched to the recipient and to the change by script, recipient first. A transfer to oneself and (BTC) a recipient written in uppercase bech32 are no longer refused at signing.
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.2.6
 
 ### Patch Changes

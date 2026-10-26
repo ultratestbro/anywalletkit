@@ -1,5 +1,22 @@
 # @anywalletkit/protocol-staking-native-monad
 
+## 0.2.0
+
+### Minor Changes
+
+- f5315d6: Pending withdrawals are found in every slot. The default `'gap'` scan stopped 32 empty slots past the last used one, so a pending slot above a run of claimed ones (withdrawals 0–39 with 0–35 claimed) was never listed or claimed. The new default `withdrawScan: 'multicall'` reads every slot up to `maxWithdrawId` in one `eth_call` through Multicall3 (deployed on Monad; `multicallAddress` to override), falling back to one call per slot when that fails. `'gap'` stays as an explicit, documented trade-off. (Finding the slots from `Undelegate` logs was not an option: the Monad RPC caps `eth_getLogs` at 1 000 blocks, about 7 minutes.)
+- f5315d6: Rewards left at a validator after a full exit stay visible. Positions came from `getDelegations` only, which drops a validator once the wallet's stake there is zero, so unclaimed rewards there vanished from `listPositions` / `getStakedBalance`. Positions now come from the delegations, the configured validators, the ones this instance unstaked from, and the new `listPositions({ validators })`; a validator with rewards > 0 is kept.
+
+### Patch Changes
+
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.1.1
 
 ### Patch Changes

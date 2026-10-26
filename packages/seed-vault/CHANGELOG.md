@@ -1,5 +1,12 @@
 # @anywalletkit/seed-vault
 
+## 0.2.5
+
+### Patch Changes
+
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- f743c06: `sealBackup` and `addProtector` refuse what `openBackup` / `decodeBackup` would refuse later: a key protector label over 256 characters, or a secret large enough to push the file past the 256 KB the decoder reads. Such backups used to seal fine and fail only at restore time.
+
 ## 0.2.4
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @anywalletkit/runtime-hermes
 
+## 0.3.1
+
+### Patch Changes
+
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- 4b5922a: The `structuredClone` polyfill is a real recursive clone. It was a JSON round trip with a bigint marker: `-5n` came back as the string `"-5n"`, the string `"100n"` as the bigint `100n`, and `Uint8Array`, `Date`, `Map`, `Set` as plain objects or strings. It now clones primitives (bigint included), Date, RegExp, ArrayBuffer, typed arrays, DataView, Map, Set, Error, arrays and plain objects, keeps shared references and cycles, and throws `DataCloneError` on functions and symbols, as the native one does.
+
 ## 0.3.0
 
 ### Minor Changes

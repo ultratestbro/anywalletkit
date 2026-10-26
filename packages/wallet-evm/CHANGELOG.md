@@ -1,5 +1,31 @@
 # @anywalletkit/wallet-evm
 
+## 0.3.0
+
+### Minor Changes
+
+- f2de8b6: The swap gate checks the order itself and the account. A gasless swap's sheet said "Signed order" without the order, and its pre-approval let any EIP-712 data on the chain through once — another order or a Permit, for any account.
+  
+  - `SwapApproval.source` for a typed order carries `typedData` (parsed) and `text` (pretty JSON) for the sheet.
+  - `GatedOp` `evm-typed-data` requires `typedDataHash` — `typedDataHash(typed)` from `@anywalletkit/wallet-evm` (now exported), the digest the account signs; `planMatchers` compares it (`typedDataMatcher`). A plan whose order cannot be hashed is refused before the sheet opens.
+  - `ReviewGate.preApprove(matchers, ttlMs, account)` binds pre-approvals to an account; a bound one passes only an op whose new `account` field names it. `SwapReviewMeta.account` and `EarnReviewMeta.account` are required and `reviewSwapPlan` / `reviewEarnPlan` always bind — pass the account in the ops your reviewed account builds.
+  - `@anywalletkit/wallet-evm` is now a dependency of extension-kit.
+- 9e4bcd2: EIP-7702 (type 4) transactions are simulated and gas-estimated with their `authorizationList`, so the dry run executes the delegate's code instead of the account's own. A type 4 with `gasPrice` (or on a chain that answers with a legacy gas price) is refused instead of silently becoming a legacy transaction without its authorizations, and an `authorizationList` on a transaction that is not type 4 is refused instead of dropped (`assertTxShape`, exported).
+
+### Patch Changes
+
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- 9e4bcd2: `describeTransaction` decodes the call inside an EIP-7702 (type 4) transaction. It returned only the delegation, so an `approve(spender, max)` riding in the calldata showed no spender, amount or `approve-unlimited` warning. The kind stays `eip7702-delegation`; the new `call` field says what the call is, and its token / spender / amount fields and warnings are filled as for any transaction.
+- 9e4bcd2: `describeTypedData` reads more of what dApps send: a hex domain `chainId` (it was dropped, and with it the chain-mismatch warning); Permit2 SignatureTransfer messages (`PermitTransferFrom` / `PermitBatchTransferFrom`, amounts under `permitted`) are flagged `approve-unlimited` at the max amount like AllowanceTransfer ones; a DAI-style permit (`holder`, `expiry`, `allowed`) is a `permit` — `allowed: true` an unlimited approval, `allowed: false` a revoke, `expiry` 0 no deadline — instead of `generic`.
+- 9e4bcd2: Sends from one account go out one at a time. Two `sendTransaction` / `transfer` calls started together both read the `pending` nonce before either was broadcast and signed the same nonce: the second replaced the first or was refused. Prepare → sign → submit now runs in a per-account queue (the nonce floor then covers the next send); a failed send does not block the next.
+- eec3745: `isUnlimitedAmount` (and so `describeTransaction` / `describeTypedData`'s `approve-unlimited`) uses the SDK-wide threshold, type(uint128).max: `approve(spender, 2^255 − 1)` and Permit2's uint160 max were described as bounded approvals.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.2.0
 
 ### Minor Changes

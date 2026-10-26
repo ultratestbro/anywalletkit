@@ -1,5 +1,23 @@
 # @anywalletkit/wallet-ton
 
+## 0.3.0
+
+### Minor Changes
+
+- 143065c: A broadcast with no definitive answer (no response, a timeout, a non-JSON body such as a proxy's HTML 502) now throws `BroadcastUnknownError` (`maybeSent: true`, `hash` = the signed body hash) instead of a plain `NetworkError`: the message may be on chain, and signing again would use the next seqno and pay twice. A node's explicit refusal (`ok: false`) stays a `NetworkError`; with several endpoints, the error is a refusal only when every one refused. New `isAnsweredRefusal(error)`; a custom `TonRpc` should mark node refusals `answered: true`, otherwise its failures count as "maybe sent".
+- 143065c: Send modes that drain the wallet — 128 (the whole remaining balance) and 32 (the account destroyed once empty) — are now refused locally, before any seqno or emulation, unless `allowDrainingTransactions` is set; before, only a tonapi emulation reporting the risk caught them, so `simulate: false` signed them. Prebuilt signed bodies are checked too. `describeTransaction` shows each message's `mode` and warns `carries-all-balance` / `destroys-account`. A jetton transfer's recipient and response destination now get the network (test-only flag) and workchain checks a native transfer has.
+
+### Patch Changes
+
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- f743c06: `WalletManagerTon.fromTonMnemonic` (and so `Keyring.importTonMnemonic`) checks the phrase with @ton/crypto's `mnemonicValidate`. Any 24 words were taken: a typo, or a BIP-39 phrase pasted into the TON-mnemonic import, opened a different, empty wallet. Such a phrase is now refused ("Not a valid TON mnemonic").
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.2.5
 
 ### Patch Changes

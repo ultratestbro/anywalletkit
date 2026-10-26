@@ -1,5 +1,18 @@
 # @anywalletkit/protocol-lending-mellow-evm
 
+## 0.3.7
+
+### Patch Changes
+
+- 9e4bcd2: `supply` that falls back from the sync deposit queue to the async one (the sync proof reverts on a stale report after the approval was mined) now approves the async queue too. The approvals went to the sync queue only; the async queue, which pulls the tokens itself, had no allowance and the deposit reverted.
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.3.6
 
 ### Patch Changes

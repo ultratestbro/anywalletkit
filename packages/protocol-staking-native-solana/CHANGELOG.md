@@ -1,5 +1,20 @@
 # @anywalletkit/protocol-staking-native-solana
 
+## 0.1.2
+
+### Patch Changes
+
+- f5315d6: Activity says when a stake account's SOL or control leaves the wallet. A Withdraw to another address read "Withdrew unstaked SOL" like a claim to the wallet; it is now "Withdrew unstaked SOL to Ab12…Cd34" with the address as counterparty and the subtitle saying it is not one of the wallet's addresses. An Authorize (`authorize`, `authorizeChecked`, …) is "Changed stake authority (staker / withdrawer)" with the new authority as counterparty, flagged when it is not the wallet's, instead of a neutral "Stake account update".
+- d82e140: README: with a Solana allowlist, allow the wallet, the stake accounts and the listed validators' vote accounts; the kit now checks each Stake instruction by whom it pays or empowers, so allowlisting the Stake program opens nothing.
+- f5315d6: `unstake` finds a plan whenever one exists. `planUnstakeSteps` picked whole accounts greedily and refused amounts with a valid plan (accounts 1.1 / 1.8 / 2.1 / 2.3 SOL, minimum 1, unstake 4: 1.1 + 1.8 whole and 1.1 split off 2.1). Pools of up to 16 accounts are now searched exhaustively for the plan with the fewest steps; larger ones keep the greedy search.
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.1.1
 
 ### Patch Changes

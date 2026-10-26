@@ -1,5 +1,20 @@
 # @anywalletkit/keyring
 
+## 0.3.6
+
+### Patch Changes
+
+- f743c06: Derivation paths are parsed strictly and derivation leaves no key material behind. `parsePath` read segments with `parseInt`, so `1.9'`, `0x10'`, `1e3'` were taken as other indexes; a segment is now a plain decimal index below 2^31, and `'` / `h` mark hardened on both curves (secp256k1 used to go through @scure/bip32's own parser, which refused `h`). `deriveSecp256k1` derives step by step and wipes the master and every intermediate node; SLIP-10 `deriveEd25519` zeroes its HMAC outputs, parent keys, chain codes and input blocks. The keyring wipes the BIP-32 master it builds for a seed's fingerprint and the derived buffer behind an exported key.
+- f743c06: A key source removed while `addAccount`, `discoverAccounts` or `completeAddresses` was reading its secret no longer gets an account added back. The change used to run after the removal and saved an orphan account (which could become the active one); it now checks, inside the serialized change, that the source still exists and refuses with `not-found`.
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- f743c06: `WalletManagerTon.fromTonMnemonic` (and so `Keyring.importTonMnemonic`) checks the phrase with @ton/crypto's `mnemonicValidate`. Any 24 words were taken: a typo, or a BIP-39 phrase pasted into the TON-mnemonic import, opened a different, empty wallet. Such a phrase is now refused ("Not a valid TON mnemonic").
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.3.5
 
 ### Patch Changes

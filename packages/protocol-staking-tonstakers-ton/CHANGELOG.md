@@ -1,5 +1,18 @@
 # @anywalletkit/protocol-staking-tonstakers-ton
 
+## 0.2.8
+
+### Patch Changes
+
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- 4b5922a: The default client works with every documented account config, and the network follows the account. An account configured with `provider` (wallet-ton's alias of `tonClient`) had no client ("must be initialized with a tonClient"); a wallet-ton `TonRpc` was wrapped as `TonClient({ endpoint: undefined })` and failed on every call — it is now driven through an HTTP adapter that hands TonClient's JSON-RPC calls to it. The network comes from the account (`chain` / wallet-ton `network`): a testnet account used to stake into the mainnet pool; a `config.network` that contradicts the account is refused.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.2.7
 
 ### Patch Changes

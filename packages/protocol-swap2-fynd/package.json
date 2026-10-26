@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-fynd",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Fynd (Propeller Heads) same-chain swaps for Any Wallet Kit: exact-input routes across the pools Tycho indexes on Ethereum, Base, Arbitrum, BNB Chain, Polygon, Unichain and Robinhood Chain, settled through TychoRouterV3 with the transaction checked against the request before signing.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

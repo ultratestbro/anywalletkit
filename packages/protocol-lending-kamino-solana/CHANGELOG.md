@@ -1,5 +1,19 @@
 # @anywalletkit/protocol-lending-kamino-solana
 
+## 0.2.1
+
+### Patch Changes
+
+- 4b5922a: Kamino API calls time out (`timeoutMs`, default 15 s; also the third argument of `KaminoApi`). A silent API hung every read and every write's build step.
+- 4b5922a: The first-deposit allowance (SOL the guard lets a Lend deposit spend on the obligation's rent, 0.045 SOL by default) is granted only when the wallet's vanilla obligation in the market does not exist. It used to be granted whenever the obligations API failed — a guess that widened what the transaction may take — and withheld whenever any obligation existed, a Multiply one included, although the deposit goes through the vanilla one. An API failure now refuses the deposit; `vanillaObligation(user, market)` (exported) derives the obligation the program uses.
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.2.0
 
 ### Minor Changes

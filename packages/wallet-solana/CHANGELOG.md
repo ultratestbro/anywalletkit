@@ -1,5 +1,26 @@
 # @anywalletkit/wallet-solana
 
+## 0.3.0
+
+### Minor Changes
+
+- d82e140: The policies now see who a write really pays, not only the contract it calls. Recipients and spenders inside standard token calls are destinations: ERC-20 / 721 / 1155 transfers, approve, increaseAllowance, setApprovalForAll, Permit2 approve, an on-chain EIP-2612 permit, ERC-677 transferAndCall; TRC-20 calls (by `parameters` and inside `raw_data_hex`); NEAR `ft_transfer(_call)`, `nft_transfer(_call)`, `storage_deposit` for another account and `deleteAccount` (object and base64 borsh); TON jetton / NFT transfers and burns (destination and excess receiver, from a Cell or `bodyBoc`); SPL transfers, whose recipient is the token account's owner. An allowlist must hold the contract and the recipient. The intent of a single token transfer names its token and amount. wallet-solana gains `getTokenAccountOwner(address)`, which the policies use to read SPL recipients only when a list or `confirm` applies; an owner they cannot read makes the write `destinationUnknown`.
+- 86ae0ee: The simulation every send already runs now also guards against what a program the wallet signs for does by CPI, which the top-level checks cannot see. It returns the post-state of the wallet and of its token accounts the transaction writes, and the transaction is refused (`UnsafeTransactionError`) when the wallet's account would be handed to a program or given data (`wallet-owner`), a token account's owner or close authority changes (`sets-authority`), or a delegate allowance appears that no top-level Approve shows (`approves-delegate`). `allowAuthorityChanges` skips it. It costs one extra read per simulated send; a node that does not return the requested post-state is a `NetworkError`. Accounts behind lookup tables in a compiled transaction are resolved for it.
+- 86ae0ee: Durable-nonce transactions (first instruction `AdvanceNonceAccount`) never expire, so whoever holds the signature can broadcast it months later. They are now refused by default on every signing path (`sendTransaction`, `signTransaction`, `quoteSendTransaction`, `sendSerialized`, message, compiled or wire form) unless `allowDurableNonce: true` is set in the config or in the call's options (new `SolanaWriteOptions`). `describeTransaction` reports `lifetime: 'blockhash' | 'durable-nonce'` and a `durable-nonce` warning.
+- 86ae0ee: `transfer` (and `quoteTransfer`) refuse a recipient that is not a wallet: an account owned by Token / Token-2022 (a token account or a mint) or an executable program. An SPL transfer used to derive the recipient's associated token account from such an address and lock the tokens; SOL sent to a program or a mint is lost. An address with no account yet is still an ordinary wallet. The refusal is `UnsafeTransactionError` with code `recipient-not-wallet`.
+- 86ae0ee: `signCompiled` and `signTransactionMessage` now run the same checks as every other signing path: a drainer shape (an authority handed away, the wallet reassigned…), a burn or a durable nonce is refused unless the config or the new `options` argument (`SolanaWriteOptions`) opts in. They stay primitives: no simulation and no fee quote.
+- 86ae0ee: `getTokenBalances` reads both programs' associated token accounts, so Token-2022 balances are no longer 0, and only counts an account that holds that mint. `getTokenBalance` reads the mint's program directly: a network error now throws instead of falling back to the legacy program and answering 0; an address that is not a mint is still a 0 balance.
+
+### Patch Changes
+
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.2.0
 
 ### Minor Changes

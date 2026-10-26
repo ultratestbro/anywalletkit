@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/wallet-btc",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "Bitcoin wallet for Any Wallet Kit on @scure/btc-signer: BIP-84 p2wpkh and BIP-86 taproot accounts, own coin selection, RBF, Blockbook/Esplora transports.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

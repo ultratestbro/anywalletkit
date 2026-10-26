@@ -1,5 +1,29 @@
 # @anywalletkit/protocol-swap2-core
 
+## 0.6.0
+
+### Minor Changes
+
+- b55aa5d: `claimSwap2` now returns a status id that carries the claim transaction's hash (`awk1.<provider>.<intent>.<sourceHash>.<claimHash>`), and `getSwap2Status` passes it to the provider as `destTxHash`. A two-phase route (CCTP) whose provider has no destination RPC used to stay "action-required" after the claim; it now completes. Older ids keep working.
+- b55aa5d: `claimSwap2` now calls only a contract the provider declares for the destination chain (new `CrossChainProvider.claimTargets(chain)`; CCTP: its MessageTransmitter), and refuses claim calldata that moves the account's tokens or grants an allowance. A provider with a claim step must declare its targets; a remote provider stub takes them from the app (`remoteProvider({ claimTargets })`, e.g. `cctpClaimTargets` from `@anywalletkit/protocol-swap2-cctp`), never from the server. The router passes them through.
+- b55aa5d: `getSupportedTokens()` now gives each token's contract address (the symbol for a native coin) as `token`, the identifier `quoteSwap2` / `swap2` take back. It used to give the provider-specific `assetId`, which is `""` for most catalog entries, and an empty token resolved to the native coin. An empty or blank `fromToken` / `toToken` is now refused with `Swap2ValidationError`.
+
+### Patch Changes
+
+- d82e140: `policies.maxFee` now reaches Tron's `signRaw` (second argument), an account's `revokeDelegation` (its only argument) and swap2's `sendSerializedTransaction` hook (third argument) as `{ maxFee }`, and the hook / approvals types say so. Under a fee cap, a write that pays a fee but cannot take one (NEAR `signBuilt`, Solana `signCompiled` / `signTransactionMessage`, name-guarded helpers) is refused instead of signed unchecked; off-chain signatures (messages, typed data, permits) are not affected. The conformance mock records the hook's options.
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- b55aa5d: On a deposit-address route (a quote without `txRequest`), the provider's build may no longer carry calldata, a spender (`approvalAddress`) or a serialized transaction the quote never had; such a build is refused before anything is approved or sent.
+- b55aa5d: A deposit whose broadcast answer was lost is reported as `Swap2MaybeSentError` (no approval revoke, no retry) in more shapes: every chain package's `BroadcastUnknownError` anywhere in the cause chain, undici's `fetch failed` with an `UND_ERR_*` cause, React Native's `Network request failed`, an error code only on the cause (`ECONNRESET`…), a `TimeoutError`. A node's explicit refusal (`answered: true`) stays a clean failure even when its message mentions a timeout.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+- Updated dependencies [eec3745]
+  - @anywalletkit/core@0.6.0
+  - @anywalletkit/swap2-assets@0.2.1
+  - @anywalletkit/tx-preview-evm@0.2.0
+
 ## 0.5.0
 
 ### Minor Changes

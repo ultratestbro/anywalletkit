@@ -1,5 +1,19 @@
 # @anywalletkit/protocol-staking-spl-stake-pool-solana
 
+## 0.2.8
+
+### Patch Changes
+
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- 4b5922a: Delayed exits can no longer be blocked by pre-funding the slot addresses. They are predictable (wallet + seed), and SOL sent to one makes `CreateAccountWithSeed` fail there, so a few lamports sent to all eight made every delayed exit "slots are in use". Pre-funded addresses are now skipped without counting against `unstakeSlots`, the scan continues past them (up to `MAX_PREFUNDED_SLOTS` = 32 more indexes), exits placed past them are listed and claimable, and only beyond that bound is the exit refused, naming the cause and pointing to the instant mode.
+- 4b5922a: Every RPC call has a timeout (`timeoutMs`, default 15 s): a silent endpoint used to hang the read for as long as the socket stayed open, and the next endpoint never got its turn. The account's own `@solana/kit` Rpc (the default provider) is now called as a kit Rpc: it answers every property with a method, `request` included, so it was taken for an EIP-1193-style `{ request }` and the read returned a pending-request object instead of the result.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.2.7
 
 ### Patch Changes

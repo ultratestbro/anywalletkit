@@ -1,5 +1,18 @@
 # @anywalletkit/names-ens
 
+## 0.2.7
+
+### Patch Changes
+
+- f743c06: `assertNameUnchanged` — the signing-time check that a name still points where it pointed when it was typed — now asks for a fresh resolution (`resolve(name, chain, { fresh: true })`). It went through the resolver's cache (ENS: 5 minutes), so a name re-pointed in between passed. `NameResolver.resolve` takes the optional `{ fresh }` (a caching resolver must bypass its cache for it), `nameResolvers` passes it on, and the ENS resolver honours it (the fresh answer then refreshes the cache).
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+  - @anywalletkit/core@0.6.0
+
 ## 0.2.6
 
 ### Patch Changes

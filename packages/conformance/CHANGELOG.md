@@ -1,5 +1,21 @@
 # @anywalletkit/conformance
 
+## 0.4.3
+
+### Patch Changes
+
+- eec3745: The activity suite checks that `describeActivity` neither sends nor signs: it looked at `sent` only, so a module that signed something while describing a transaction passed. Every fixture run and the purity check now refuse any `sign*` / `send*` / `transfer` call on the account.
+- d82e140: `policies.maxFee` now reaches Tron's `signRaw` (second argument), an account's `revokeDelegation` (its only argument) and swap2's `sendSerializedTransaction` hook (third argument) as `{ maxFee }`, and the hook / approvals types say so. Under a fee cap, a write that pays a fee but cannot take one (NEAR `signBuilt`, Solana `signCompiled` / `signTransactionMessage`, name-guarded helpers) is refused instead of signed unchecked; off-chain signatures (messages, typed data, permits) are not affected. The conformance mock records the hook's options.
+- 398129f: Node 20 is no longer supported: `engines.node` is now `>=22`. Node 20 reached end of life in April 2026 and gets no security fixes, including the October 2026 release (Brotli decoder, `dns.resolve`, TLS hostname checks; fixed in 22.23.4, 24.22.1 and 26.12.1). CI tests on Node 22 and 24 and refuses to run on an unpatched Node.
+- Updated dependencies [f743c06]
+- Updated dependencies [f743c06]
+- Updated dependencies [d82e140]
+- Updated dependencies [f743c06]
+- Updated dependencies [398129f]
+- Updated dependencies [eec3745]
+  - @anywalletkit/core@0.6.0
+  - @anywalletkit/tx-preview-evm@0.2.0
+
 ## 0.4.2
 
 ### Patch Changes
