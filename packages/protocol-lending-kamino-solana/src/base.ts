@@ -36,6 +36,8 @@ export interface KaminoBaseConfig {
   api?: string | KaminoApi
   /** fetch implementation for the API (default global fetch). */
   fetch?: typeof fetch
+  /** Per-call timeout for the API, in ms (default 15 000). Ignored when `api` is a prepared client. */
+  timeoutMs?: number
   /** Tolerance on what the wallet must receive on withdrawals / borrows, in basis points (default 50). */
   slippageBps?: number
   /** SOL the transaction may spend on rent and fees beyond the amount (default 0.01 SOL). */
@@ -70,7 +72,7 @@ export abstract class KaminoBase<TConfig extends KaminoBaseConfig> extends Lendi
   constructor(account: IWalletAccountReadOnly | IWalletAccount, config: TConfig) {
     super(account, config ?? ({} as TConfig))
     const c = this._config
-    this.api = c.api instanceof KaminoApi ? c.api : new KaminoApi(c.api, c.fetch)
+    this.api = c.api instanceof KaminoApi ? c.api : new KaminoApi(c.api, c.fetch, c.timeoutMs)
     this.slippageBps = c.slippageBps ?? 50
     if (!Number.isInteger(this.slippageBps) || this.slippageBps < 0 || this.slippageBps > 5_000) throw new KaminoError("'slippageBps' must be an integer between 0 and 5000.")
     this.rentAllowance = c.rentAllowanceLamports === undefined ? DEFAULT_RENT_ALLOWANCE : BigInt(c.rentAllowanceLamports)
