@@ -1516,3 +1516,92 @@ export function ccAssetByToken(caip2: string, token: string): CcAsset | undefine
     isNative ? !a.contract : (a.contract ?? "").toLowerCase() === want || a.assetId === token,
   );
 }
+
+// ── Tokens the catalog does not list ─────────────────────────────────────────
+
+/**
+ * A token the catalog does not list, named only by its contract (EVM) or mint (Solana) — a token
+ * the user added at their own risk. `symbol` is the address itself: an unlisted token never claims
+ * a catalog symbol, so "USDC" always means the catalog's USDC.
+ */
+export interface UnlistedAsset extends CcAsset {
+  unlisted: true;
+  contract: string;
+}
+
+const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+/** Solana's System program: the "native SOL" placeholder some venues use, never a mint. */
+const SOLANA_SYSTEM = "11111111111111111111111111111111";
+
+/** Byte length of a base58 string (leading '1's are zero bytes). */
+function base58Length(s: string): number {
+  const bytes: number[] = [];
+  for (const ch of s) {
+    let carry = B58.indexOf(ch);
+    if (carry < 0) return -1;
+    for (let i = 0; i < bytes.length; i++) {
+      carry += bytes[i]! * 58;
+      bytes[i] = carry & 0xff;
+      carry >>= 8;
+    }
+    while (carry > 0) {
+      bytes.push(carry & 0xff);
+      carry >>= 8;
+    }
+  }
+  let zeros = 0;
+  while (zeros < s.length && s[zeros] === "1") zeros++;
+  return zeros + bytes.length;
+}
+
+/**
+ * Whether `ref` can name a token on `caip2` by address: a non-zero EVM contract address on an
+ * `eip155` chain, or a 32-byte base58 mint on Solana. Other chain families are not supported.
+ */
+export function isTokenAddress(caip2: string, ref: string): boolean {
+  if (caip2.startsWith("eip155:")) return EVM_ADDRESS.test(ref) && !/^0x0{40}$/.test(ref);
+  if (caip2.startsWith("solana:")) return BASE58.test(ref) && ref !== SOLANA_SYSTEM && base58Length(ref) === 32;
+  return false;
+}
+
+/**
+ * An {@link UnlistedAsset} for `contract` on `caip2`, or undefined when the address is malformed,
+ * the chain family is not supported, the catalog already lists it, or `decimals` is not an integer
+ * from 0 to 77.
+ */
+export function unlistedAsset(caip2: string, contract: string, decimals: number): UnlistedAsset | undefined {
+  if (!isTokenAddress(caip2, contract) || ccAssetByToken(caip2, contract)) return undefined;
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 77) return undefined;
+  return {symbol: contract, assetId: "", contract, decimals, unlisted: true};
+}
+
+/** Whether an asset is an {@link UnlistedAsset}. */
+export function isUnlisted(asset: CcAsset | undefined): asset is UnlistedAsset {
+  return !!asset && (asset as Partial<UnlistedAsset>).unlisted === true;
+}
+
+/**
+ * The asset a swap names by `ref` (a catalog symbol, a contract / mint, or '' for the native coin):
+ * the catalog's entry first, always. With `allowUnlisted` and `decimals`, an address the catalog does
+ * not know becomes an {@link UnlistedAsset}; otherwise undefined.
+ */
+export function resolveAsset(caip2: string, ref: string, opts: {allowUnlisted?: boolean; decimals?: number} = {}): CcAsset | undefined {
+  const listed = ccAsset(caip2, ref) ?? (ref === "" || /^0x0+$/.test(ref) || isTokenAddress(caip2, ref) ? ccAssetByToken(caip2, ref) : undefined);
+  if (listed) return listed;
+  if (!opts.allowUnlisted || opts.decimals === undefined) return undefined;
+  return unlistedAsset(caip2, ref, opts.decimals);
+}
+
+/** Chain ids accounts report that the catalog keys differently (genesis-hash CAIP-2 → catalog key). */
+export const CATALOG_CHAIN_ALIASES: Readonly<Record<string, string>> = Object.freeze({
+  "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp": "solana:mainnet",
+  "tron:0x2b6653dc": "tron:728126428",
+  "bip122:000000000019d6689c085ae165831e93": "bitcoin:mainnet",
+});
+
+/** The catalog's key for a chain id (itself when it has no alias). */
+export function catalogChainId(caip2: string): string {
+  return CATALOG_CHAIN_ALIASES[caip2] ?? caip2;
+}

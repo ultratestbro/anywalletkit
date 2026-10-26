@@ -32,6 +32,12 @@ export interface Swap2CommonOptions {
    * `'USDC'`.
    */
   fromToken: string
+  /**
+   * Decimals of `fromToken` when it is a token the swap catalog does not list (named by its
+   * contract or mint). Engines that accept unlisted tokens read it from the chain when it is left
+   * out; listed tokens ignore it.
+   */
+  fromTokenDecimals?: number
   /** Token on the destination chain, in the same forms. */
   toToken: string
   /** Destination chain. Omitted = same-chain swap. */

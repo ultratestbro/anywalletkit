@@ -18,7 +18,13 @@ export interface QuoteParams {
    *  concurrent quotes, so the reason rides per-call. */
   onRefusal?: (reason: string) => void;
   sourceChain: string; // CAIP-2
-  sourceToken: string; // token SYMBOL on source (resolved via the asset catalog)
+  sourceToken: string; // token SYMBOL on source (resolved via the asset catalog), or an unlisted token's contract / mint
+  /**
+   * Set only for a source token the catalog does not list: `sourceToken` is then its contract
+   * (EVM) or mint (Solana) and this its decimals. Providers that can trade any token resolve it with
+   * `resolveAsset(chain, sourceToken, {allowUnlisted: true, decimals})`; the others refuse it.
+   */
+  sourceDecimals?: number;
   destChain: string; // CAIP-2 (the vault's chain)
   destToken: string; // ERC-20 address on dest (zero address = native ETH)
   amountIn: string; // what the user sends on source (base units, EXACT_INPUT)

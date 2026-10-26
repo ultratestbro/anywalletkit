@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {CC_SOURCE_CHAINS, ccAsset, ccAssetByToken, ccChain} from "../src/index.js";
+import {CC_SOURCE_CHAINS, ccAsset, ccAssetByToken, ccChain, isTokenAddress, isUnlisted, resolveAsset, unlistedAsset} from "../src/index.js";
 
 const EVM = /^0x[0-9a-fA-F]{40}$/;
 
@@ -76,5 +76,36 @@ describe("2026-10-26: LDO, SKY, COW", () => {
   ])("%s %s is pinned to %s (18 decimals) and found by its contract", (caip2, symbol, contract) => {
     expect(ccAsset(caip2, symbol)).toMatchObject({contract, decimals: 18});
     expect(ccAssetByToken(caip2, contract)!.symbol).toBe(symbol);
+  });
+});
+
+describe("unlisted tokens", () => {
+  const PEPE = "0x6982508145454ce325ddbe47a25d4ec3d2311933";
+  const BONK = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
+  it("isTokenAddress: EVM contracts and Solana mints only", () => {
+    expect(isTokenAddress("eip155:1", PEPE)).toBe(true);
+    expect(isTokenAddress("eip155:1", "0x0000000000000000000000000000000000000000")).toBe(false);
+    expect(isTokenAddress("eip155:1", "0x123")).toBe(false);
+    expect(isTokenAddress("solana:mainnet", BONK)).toBe(true);
+    expect(isTokenAddress("solana:mainnet", "11111111111111111111111111111111")).toBe(false); // System program, the native placeholder
+    expect(isTokenAddress("solana:mainnet", "1111111111111111111111111111111111")).toBe(false); // 34 zero bytes, not 32
+    expect(isTokenAddress("solana:mainnet", "0OIl" + BONK.slice(4))).toBe(false); // not base58
+    expect(isTokenAddress("ton:-239", "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs")).toBe(false);
+  });
+  it("resolveAsset: the catalog always wins; unlisted needs allowUnlisted and decimals", () => {
+    expect(resolveAsset("eip155:1", "USDC")!.contract).toBe("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48");
+    expect(resolveAsset("eip155:1", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", {allowUnlisted: true, decimals: 18})).toMatchObject({symbol: "USDC", decimals: 6});
+    expect(resolveAsset("eip155:1", "")!.symbol).toBe("ETH");
+    expect(resolveAsset("eip155:1", PEPE)).toBeUndefined();
+    expect(resolveAsset("eip155:1", PEPE, {allowUnlisted: true})).toBeUndefined();
+    const pepe = resolveAsset("eip155:1", PEPE, {allowUnlisted: true, decimals: 18});
+    expect(pepe).toEqual({symbol: PEPE, assetId: "", contract: PEPE, decimals: 18, unlisted: true});
+    expect(isUnlisted(pepe)).toBe(true);
+    expect(isUnlisted(ccAsset("eip155:1", "USDC"))).toBe(false);
+    expect(resolveAsset("solana:mainnet", BONK, {allowUnlisted: true, decimals: 5})).toMatchObject({contract: BONK, decimals: 5, unlisted: true});
+    expect(unlistedAsset("eip155:1", PEPE, 78)).toBeUndefined();
+    expect(unlistedAsset("eip155:1", PEPE, 1.5)).toBeUndefined();
+    // an unlisted token can never be reached by a symbol, even one it might report
+    expect(resolveAsset("eip155:1", "PEPE", {allowUnlisted: true, decimals: 18})).toBeUndefined();
   });
 });

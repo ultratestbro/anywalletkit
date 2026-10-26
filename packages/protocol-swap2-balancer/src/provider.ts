@@ -1,7 +1,6 @@
 import {decodeFunctionData, decodeFunctionResult, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
 import {describeBalancerActivity} from "./activity.js";
-import {ccAsset} from "@anywalletkit/swap2-assets";
-import {evmRef, isEvm, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import {evmRef, isEvm, timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {bigintToNumber} from "@anywalletkit/core";
 
@@ -146,7 +145,7 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
       const chainId = chainIdOf(params.sourceChain);
       if (chainId === null) return refuse(`no Balancer v2 Vault or RPC for ${params.sourceChain}`);
       const chain = BALANCER_V2_CHAINS[chainId]!;
-      const src = ccAsset(params.sourceChain, params.sourceToken);
+      const src = sourceAssetOf(params);
       if (!src) return refuse(`unknown source token ${params.sourceToken}`);
       const nativeIn = !src.contract;
       const nativeOut = /^0x0+$/.test(params.destToken);

@@ -1,8 +1,7 @@
 import {LIFI_SOLANA_CAIP2, lifi as lifiCfg} from "./config.js";
 import {describeLifiActivity} from "./activity.js";
 import {diamondCallMismatch} from "./calldata.js";
-import {ccAsset} from "@anywalletkit/swap2-assets";
-import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import {timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {bigintToNumber} from "@anywalletkit/core";
 
@@ -153,8 +152,9 @@ function trustMap(input: Readonly<Record<string, readonly string[]>> | undefined
 }
 
 /** LI.FI token id on the source chain: contract, or the chain's native id. */
-function lifiToken(sourceChain: string, symbol: string): string | null {
-  const asset = ccAsset(sourceChain, symbol);
+function lifiToken(params: Pick<QuoteParams, "sourceChain" | "sourceToken" | "sourceDecimals">): string | null {
+  const sourceChain = params.sourceChain;
+  const asset = sourceAssetOf(params);
   if (!asset) return null;
   if (asset.contract) return asset.contract;
   return isSolana(sourceChain) ? SOLANA_NATIVE : EVM_ZERO;
@@ -296,7 +296,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
       const fromChain = LIFI_CHAIN[params.sourceChain];
       const toChain = LIFI_CHAIN[params.destChain];
       if (!fromChain || !toChain) return null;
-      const fromToken = lifiToken(params.sourceChain, params.sourceToken);
+      const fromToken = lifiToken(params);
       if (!fromToken) return null;
 
       const solanaSource = isSolana(params.sourceChain);

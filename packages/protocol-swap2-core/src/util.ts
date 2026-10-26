@@ -1,3 +1,5 @@
+import {resolveAsset, type CcAsset} from "@anywalletkit/swap2-assets";
+import type {QuoteParams} from "./types.js";
 /** Shared CAIP-2 helpers. Contribution packages never read deployment env. */
 export function namespace(chain: string): string {
   return chain.split(":")[0] ?? "";
@@ -47,4 +49,15 @@ export function anySignal(signals: readonly AbortSignal[]): AbortSignal {
  */
 export function redactUrls(text: string): string {
   return text.replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, "<url>");
+}
+
+/**
+ * The source asset a provider is asked to sell: the catalog's entry for `params.sourceToken`, or —
+ * only when the engine sent `sourceDecimals` (an unlisted token the user added) — an unlisted asset
+ * named by its contract / mint. Providers that can trade any token use this instead of the catalog
+ * lookup; the others keep refusing what the catalog does not list.
+ */
+export function sourceAssetOf(params: Pick<QuoteParams, "sourceChain" | "sourceToken" | "sourceDecimals">): CcAsset | undefined {
+  const decimals = params.sourceDecimals;
+  return resolveAsset(params.sourceChain, params.sourceToken, decimals === undefined ? {} : {allowUnlisted: true, decimals});
 }

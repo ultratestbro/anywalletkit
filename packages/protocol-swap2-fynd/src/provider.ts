@@ -1,6 +1,5 @@
 import {getAddress} from "viem";
-import {ccAsset} from "@anywalletkit/swap2-assets";
-import {evmRef, isEvm, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import {evmRef, isEvm, timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {describeFyndActivity} from "./activity.js";
 import {FYND_CHAINS, checkFyndTransaction} from "./router.js";
@@ -129,7 +128,7 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
       const chainId = chainIdOf(params.sourceChain);
       if (chainId === null) return refuse(`Fynd is not configured for ${params.sourceChain}`);
       const ep = endpoint(chainId)!;
-      const src = ccAsset(params.sourceChain, params.sourceToken);
+      const src = sourceAssetOf(params);
       if (!src) return refuse(`unknown source token ${params.sourceToken}`);
       const tokenIn = src.contract ? getAddress(src.contract) : ZERO;
       const nativeOut = /^0x0+$/.test(params.destToken);

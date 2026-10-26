@@ -78,6 +78,13 @@ export interface Swap2HandlerOptions<C> {
    * followed. Read-only: `claim`, `notify` and `register` always require the token.
    */
   acceptUntokenedTrackUntil?: number;
+  /**
+   * Quote tokens the swap catalog does not list (`params.sourceToken` an EVM contract or Solana
+   * mint, with `params.sourceDecimals`), for apps whose users add their own tokens. Off by default:
+   * `sourceDecimals` is then dropped and the providers refuse an unlisted source. Destination tokens
+   * are addresses either way.
+   */
+  allowUnlistedTokens?: boolean;
   /** Clock for expiry checks (tests). */
   now?: () => number;
 }
@@ -157,7 +164,7 @@ export function createSwap2Handler<C = unknown>(opts: Swap2HandlerOptions<C>): (
       const b = record(body, "body");
       const providerName = str(b.provider, "provider", 40);
       const act = action as Swap2Action;
-      const request = validated(act, b);
+      const request = validated(act, b, opts.allowUnlistedTokens === true);
       const dry = "params" in request && request.params.dry === true;
       // The guard sees the provider's own intent id, as the provider will.
       const shown: Swap2Request = "ref" in request ? {ref: {...request.ref, intentId: TOKENED.exec(request.ref.intentId)?.[1] ?? request.ref.intentId}}
@@ -234,9 +241,9 @@ export function createSwap2Handler<C = unknown>(opts: Swap2HandlerOptions<C>): (
 }
 
 /** Each action's body, validated field by field before anyone (guard, provider) sees it. */
-function validated(action: Swap2Action, b: Record<string, unknown>): Swap2Request {
+function validated(action: Swap2Action, b: Record<string, unknown>, allowUnlisted: boolean): Swap2Request {
   switch (action) {
-    case "quote": return {params: quoteParams(b.params)};
+    case "quote": return {params: quoteParams(b.params, allowUnlisted)};
     case "build": return {quote: normalizeQuote(b.quote, WIRE_INTENT_MAX)};
     case "preflight": return {quote: normalizeQuote(b.quote, WIRE_INTENT_MAX), tx: unsignedTx(b.tx)};
     case "track":
@@ -310,8 +317,10 @@ function bool(v: unknown, field: string): boolean | undefined {
   return v;
 }
 
-function quoteParams(v: unknown): QuoteParams {
+function quoteParams(v: unknown, allowUnlisted = false): QuoteParams {
   const p = record(v, "params");
+  const sourceDecimals = !allowUnlisted || p.sourceDecimals === undefined ? undefined : num(p.sourceDecimals, "params.sourceDecimals", 0, 77);
+  if (sourceDecimals !== undefined && !Number.isInteger(sourceDecimals)) bad("params.sourceDecimals", "expected an integer");
   const slippage = p.slippageBps === undefined ? undefined : num(p.slippageBps, "params.slippageBps", 0, 10_000);
   if (slippage !== undefined && !Number.isInteger(slippage)) bad("params.slippageBps", "expected an integer");
   const refundAddress = optStr(p.refundAddress, "params.refundAddress", 120);
@@ -321,6 +330,7 @@ function quoteParams(v: unknown): QuoteParams {
   return {
     sourceChain: str(p.sourceChain, "params.sourceChain", 64),
     sourceToken: str(p.sourceToken, "params.sourceToken", 64),
+    ...(sourceDecimals !== undefined ? {sourceDecimals} : {}),
     destChain: str(p.destChain, "params.destChain", 64),
     destToken: str(p.destToken, "params.destToken", 120),
     amountIn: digits(p.amountIn, "params.amountIn", 40),

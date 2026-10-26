@@ -108,7 +108,7 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
    * picks with `using(route.provider).swap2(...)`.
    */
   async quoteSwap2Routes(options: Swap2Options, opts?: {onUpdate?: (routes: Swap2Route[], pending: string[]) => void}): Promise<Swap2Route[]> {
-    const snapshot = this.snapshotOf(options);
+    const snapshot = await this.prepareOptions(this.snapshotOf(options));
     const view = (set: RouteSet): Swap2Route[] =>
       set.quotes.flatMap((q) => {
         const quote = this.routeQuote(q, snapshot);

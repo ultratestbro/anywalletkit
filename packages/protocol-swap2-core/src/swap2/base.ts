@@ -32,6 +32,10 @@ import {
   CC_SOURCE_CHAINS,
   ccAsset,
   ccAssetByToken,
+  isTokenAddress,
+  isUnlisted,
+  resolveAsset,
+  type CcAsset,
   type CcChain,
 } from "@anywalletkit/swap2-assets";
 import type {CrossChainProvider, IntentStatus, QuoteParams, Quote, UnsignedTx} from "../types.js";
@@ -226,6 +230,15 @@ export interface Swap2EngineConfig extends Swap2ProtocolConfig {
    * called again with `requoted: true`, and throwing then revokes the allowance.
    */
   reviewExecution?: (plan: Swap2ExecutionPlan) => Promise<void> | void;
+  /**
+   * Accept tokens the swap catalog does not list, named by their contract (EVM) or mint (Solana):
+   * tokens the user added at their own risk. Off by default. The source token's decimals are read
+   * with the account's `getTokenInfo` (a `fromTokenDecimals` that disagrees is refused); an account
+   * without it must be given `fromTokenDecimals`. Only providers that trade any token (LI.FI,
+   * Uniswap, Balancer, Fynd, Jupiter) quote them, and they have no USD value: the router cannot
+   * judge their price, so show the user the amounts.
+   */
+  allowUnlistedTokens?: boolean;
 }
 
 /** What `swap2()` is about to sign, handed to {@link Swap2EngineConfig.reviewExecution}. */
@@ -466,10 +479,11 @@ function toSymbol(caip2: string, ref: string): string {
 }
 
 /** Resolve a dest token ref to the engine's dest address (zero = native). */
-function toDestAddress(caip2: string, ref: string): string {
+function toDestAddress(caip2: string, ref: string, allowUnlisted = false): string {
   if (ref.startsWith("0x")) return ref;
   const asset = ccAssetByToken(caip2, ref) ?? ccAsset(caip2, ref);
   if (!asset) {
+    if (allowUnlisted && isTokenAddress(caip2, ref)) return ref;
     throw new Error(`swap2: unknown destination token '${ref}' on ${caip2}`);
   }
   return asset.contract ?? ZERO;
@@ -648,6 +662,49 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     return this.chainSupported(fromChain) && this.chainSupported(toChain);
   }
 
+  private unlistedAllowed(): boolean {
+    return (this._config as Swap2EngineConfig).allowUnlistedTokens === true;
+  }
+
+  /** The source asset the options name: the catalog's, or (allowUnlistedTokens) an unlisted one with its decimals. */
+  protected sourceAsset(options: Swap2Options): CcAsset | undefined {
+    const decimals = options.fromTokenDecimals;
+    return resolveAsset(this.fromChain, toSymbol(this.fromChain, options.fromToken), {
+      allowUnlisted: this.unlistedAllowed(),
+      ...(decimals !== undefined ? {decimals} : {}),
+    });
+  }
+
+  private readonly unlistedDecimals = new Map<string, number>();
+
+  /**
+   * Options ready to quote: with `allowUnlistedTokens`, an unlisted source token gets its decimals,
+   * read from the chain through the account (cached per token) — a caller's `fromTokenDecimals` that
+   * disagrees is refused. Listed tokens and every option otherwise pass through unchanged.
+   */
+  protected async prepareOptions(options: Swap2Options): Promise<Swap2Options> {
+    if (!this.unlistedAllowed()) return options;
+    const ref = toSymbol(this.fromChain, options.fromToken);
+    if (resolveAsset(this.fromChain, ref) || !isTokenAddress(this.fromChain, ref)) return options;
+    const key = ref.startsWith("0x") ? ref.toLowerCase() : ref;
+    let decimals = this.unlistedDecimals.get(key);
+    if (decimals === undefined) {
+      const reader = this._account as {getTokenInfo?: (token: string) => Promise<{decimals: number}>} | undefined;
+      if (typeof reader?.getTokenInfo !== "function") {
+        if (options.fromTokenDecimals === undefined) {
+          throw new Swap2ValidationError(`swap2: '${ref}' is not in the catalog — pass fromTokenDecimals, or use an account that can read token info`);
+        }
+        return options;
+      }
+      decimals = (await reader.getTokenInfo(ref)).decimals;
+      this.unlistedDecimals.set(key, decimals);
+    }
+    if (options.fromTokenDecimals !== undefined && options.fromTokenDecimals !== decimals) {
+      throw new Swap2ValidationError(`swap2: fromTokenDecimals ${options.fromTokenDecimals} does not match the token's ${decimals}`);
+    }
+    return snapshotOptions({...options, fromTokenDecimals: decimals});
+  }
+
   /** Swap2Options → the engine's QuoteParams (exact-in only). */
   protected toParams(given: Swap2Options, dry: boolean): QuoteParams {
     const options = withoutBlankAddresses(given);
@@ -657,11 +714,13 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     const destChain = toCaip2(options.toChain, this.fromChain);
     const constraints = callerConstraints(options);
     const amountIn = exactPositiveAmount(options.fromTokenAmount, "fromTokenAmount");
+    const source = this.sourceAsset(options);
     const params: QuoteParams = {
       sourceChain: this.fromChain,
-      sourceToken: toSymbol(this.fromChain, options.fromToken),
+      sourceToken: isUnlisted(source) ? source.contract : toSymbol(this.fromChain, options.fromToken),
+      ...(isUnlisted(source) ? {sourceDecimals: source.decimals} : {}),
       destChain,
-      destToken: toDestAddress(destChain, options.toToken),
+      destToken: toDestAddress(destChain, options.toToken, this.unlistedAllowed()),
       amountIn: amountIn.toString(),
       destAddress: options.recipient ?? "",
       dry,
@@ -726,7 +785,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
   }
 
   protected assertQuoteFeeCaps(q: Quote, options: Swap2Options, config?: Swap2ProtocolConfig): void {
-    const source = ccAsset(this.fromChain, toSymbol(this.fromChain, options.fromToken));
+    const source = this.sourceAsset(options);
     if (!source) throw new Error(`swap2: unknown source token '${options.fromToken}' on ${this.fromChain}`);
     const token = source.contract ?? source.assetId;
     const fees = q.fees?.map((fee) => ({...fee, amount: BigInt(fee.amount)} as Swap2Fee));
@@ -778,7 +837,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
    * gave one.
    */
   override async quoteSwap2(options: Swap2Options): Promise<Swap2Quote> {
-    const snapshot = snapshotOptions(options);
+    const snapshot = await this.prepareOptions(snapshotOptions(options));
     const q = await this.resolveQuote(this.toParams(snapshot, true));
     if (!q) {
       const detail = this.noRouteDetail();
@@ -833,7 +892,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // A blank field ("" from an empty input) is no address at all: this account, never a provider's placeholder (round 3, H8).
     const recipient = blankToUndefined(snapshot.recipient) ?? selfAddress;
     const refundAddress = blankToUndefined(snapshot.refundAddress) ?? selfAddress;
-    const executionOptions = snapshotOptions({...snapshot, recipient, refundAddress});
+    const executionOptions = await this.prepareOptions(snapshotOptions({...snapshot, recipient, refundAddress}));
     const params = this.toParams(executionOptions, false);
     const resolved = await this.resolveQuote(params);
     if (!resolved) {
@@ -941,7 +1000,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // sources use the account's transfer() token surface below.
     let tokenId: string | undefined;
     if (!unsigned.data && !unsigned.bodyBoc && !unsigned.typedData && !serialized) {
-      const src = ccAsset(this.fromChain, toSymbol(this.fromChain, executionOptions.fromToken));
+      const src = this.sourceAsset(executionOptions);
       if (src?.contract) {
         if (this.fromChain.startsWith("eip155:")) {
           unsigned = {
@@ -984,7 +1043,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // Bind the value presented to the signer to the already validated quote.
     // Native deposits and the amount handed to transfer() must carry the exact
     // input amount; EVM token execution must never attach native value.
-    const source = ccAsset(this.fromChain, toSymbol(this.fromChain, executionOptions.fromToken));
+    const source = this.sourceAsset(executionOptions);
     if (!source) throw new Error(`swap2: unknown source token '${executionOptions.fromToken}' on ${this.fromChain}`);
     const executionValue = BigInt(unsigned.value);
     if (serialized) {

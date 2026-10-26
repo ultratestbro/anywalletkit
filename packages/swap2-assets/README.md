@@ -19,6 +19,8 @@ import { CC_SOURCE_CHAINS, ccChain, ccAsset, ccAssetByToken, displaySymbol } fro
 ccAsset('eip155:8453', 'USDC') // { symbol, assetId, decimals, contract, icon }
 ```
 
+Tokens the catalog does not list (a user's own, named by address): `isTokenAddress(chain, ref)` accepts an EVM contract or a Solana mint, `unlistedAsset(chain, contract, decimals)` builds an `UnlistedAsset` whose symbol is the address itself, and `resolveAsset(chain, ref, { allowUnlisted, decimals })` always returns the catalog's entry first. `catalogChainId` maps ids accounts report (`solana:5eykt4…`) to the catalog's keys.
+
 No dependencies — usable in an app, a server and a worker alike.
 
 

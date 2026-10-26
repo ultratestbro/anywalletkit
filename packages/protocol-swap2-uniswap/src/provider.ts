@@ -1,7 +1,7 @@
 import {decodeFunctionResult, encodeFunctionData, encodePacked, getAddress, parseAbi, type Hex} from "viem";
 import {describeUniswapActivity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
-import {evmRef, isEvm, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import {evmRef, isEvm, timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
 import {bigintToNumber} from "@anywalletkit/core";
@@ -185,7 +185,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       const chainId = chainIdOf(params.sourceChain);
       if (chainId === null) return refuse(`no Uniswap v3 deployment or RPC for ${params.sourceChain}`);
       const d = deployments[chainId]!;
-      const src = ccAsset(params.sourceChain, params.sourceToken);
+      const src = sourceAssetOf(params);
       if (!src) return refuse(`unknown source token ${params.sourceToken}`);
       const nativeIn = !src.contract;
       const nativeOut = /^0x0+$/.test(params.destToken);
