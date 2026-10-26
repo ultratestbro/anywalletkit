@@ -1,4 +1,4 @@
-import { InsufficientFundsError, LocalSigner, SignerError, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
+import { InsufficientFundsError, LocalSigner, NetworkError, SignerError, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { DUST_LIMIT, addressFromPublicKey } from './address.js'
 import { UnsafeTransactionError, assertSafe, describeTransaction, type DescribeContext } from './describe.js'
@@ -85,13 +85,27 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
     return { network: this._network, ownAddress: this.address, intended, maxFee: this.maxFee }
   }
 
-  /** Lock time + expiry + branch id from the tip (or the config override). */
+  /**
+   * Lock time, expiry and branch id for a transaction that lands in the next block (round 3, L7):
+   * expiry = tip + 1 + `expiryDelta`, the branch id in force at tip + 1 (mainnet table; off mainnet
+   * `consensusBranchId` must be configured — testnet and regtest activate upgrades at other heights).
+   * Without a tip nothing is signed when the expiry, anti-fee-sniping or the branch id need it: a
+   * transaction signed with expiry 0 never expires.
+   */
   private async chainParams(): Promise<{ lockTime: number; expiryHeight: number; consensusBranchId: number }> {
-    const tip = await this.tipHeight()
     const delta = this._config.expiryDelta ?? DEFAULT_EXPIRY_DELTA
-    const consensusBranchId = this._config.consensusBranchId ?? branchIdForHeight(tip)
-    const lockTime = tip !== undefined && this._config.antiFeeSniping !== false ? tip : 0
-    const expiryHeight = tip !== undefined && delta > 0 ? tip + delta : 0
+    const configured = this._config.consensusBranchId
+    if (configured === undefined && this._network !== 'mainnet') {
+      throw new UnsafeTransactionError('unknown-branch-id', `On ${this._network} the consensus branch id depends on that network's upgrade heights; set consensusBranchId in the config.`)
+    }
+    const antiSnipe = this._config.antiFeeSniping !== false
+    const needTip = delta > 0 || antiSnipe || configured === undefined
+    const tip = needTip ? await this.tipHeight() : undefined
+    if (needTip && tip === undefined) throw new NetworkError('The Zcash chain tip is unknown, so the expiry height and the branch id cannot be set; nothing was signed.')
+    const next = tip === undefined ? undefined : tip + 1
+    const consensusBranchId = configured ?? branchIdForHeight(next)
+    const lockTime = tip !== undefined && antiSnipe ? tip : 0
+    const expiryHeight = next !== undefined && delta > 0 ? next + delta : 0
     return { lockTime, expiryHeight, consensusBranchId }
   }
 

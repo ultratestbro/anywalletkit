@@ -19,6 +19,8 @@ export type UnsafeTransactionCode =
   | 'recipient-mismatch'
   /** A change output pays an address that is not ours. */
   | 'change-not-ours'
+  /** Off mainnet without a configured `consensusBranchId`: the branch id cannot be known. */
+  | 'unknown-branch-id'
 
 /** A transaction failed a hard safety check and was not signed / broadcast. */
 export class UnsafeTransactionError extends Error {
