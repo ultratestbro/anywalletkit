@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {decodeFunctionData, encodeFunctionResult, encodeFunctionData, getAddress, pad, parseAbi, toHex, type Hex} from "viem";
-import {cctpProvider} from "../src/provider.js";
+import {cctpClaimTargets, cctpProvider} from "../src/provider.js";
 import {CCTP_BY_DOMAIN, CCTP_DOMAINS, FINALITY_FAST, FINALITY_STANDARD, MESSAGE_TRANSMITTER_V2, TOKEN_MESSENGER_V2} from "../src/config.js";
 
 const BASE = CCTP_DOMAINS["eip155:8453"]!;
@@ -238,6 +238,13 @@ describe("track & claim (two-phase)", () => {
     expect(functionName).toBe("receiveMessage");
     expect(args).toEqual([MESSAGE, ATTESTATION]);
     expect(tx!.data).toBe(encodeFunctionData({abi: TRANSMITTER_ABI, functionName: "receiveMessage", args: [MESSAGE, ATTESTATION]}));
+  });
+
+  it("declares its MessageTransmitter as the only claim target (round 3, M24)", () => {
+    expect(cctpClaimTargets("eip155:42161")).toEqual([MESSAGE_TRANSMITTER_V2]);
+    expect(make({message: completeMessage()}).p.claimTargets!("eip155:42161")).toEqual([MESSAGE_TRANSMITTER_V2]);
+    expect(cctpClaimTargets("eip155:999999")).toEqual([]);
+    expect(cctpClaimTargets("__proto__")).toEqual([]);
   });
 
   it("refuses an attestation for another route; an expired Fast message is re-attested and not claimable yet", async () => {

@@ -220,6 +220,13 @@ export interface CrossChainProvider {
    * destination-chain account (`claimSwap2`); `tx.chain` names that chain.
    */
   buildClaim?(ref: IntentRef): Promise<UnsignedTx | null>;
+  /**
+   * The contracts a claim from {@link buildClaim} may call on `chain` (CAIP-2) — CCTP's
+   * MessageTransmitter. `claimSwap2` refuses a claim to anything else, and a provider with a claim
+   * step must declare them (round 3, M24). Kept on the client: for a remote provider this is the
+   * app's list, never the server's.
+   */
+  claimTargets?(chain: string): readonly string[];
   close?(): void;
   /** Optional discovery hook for custom providers. */
   supportsChain?(caip2: string): boolean;

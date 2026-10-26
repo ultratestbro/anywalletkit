@@ -78,19 +78,24 @@ const inFlightKey = (fromChain: string, o: Swap2Options) =>
   JSON.stringify([fromChain, o.fromToken, o.toToken, o.toChain, o.recipient, o.refundAddress, o.fromTokenAmount, o.toTokenAmount, o.minAmountOut, o.slippage],
     (_k, v) => (typeof v === "bigint" ? v.toString() : v));
 
+/** A lost transport answer, in a message, an error code or an error name (Node / undici / React Native / browsers). */
+const LOST_ANSWER = /socket hang up|ECONNRESET|ECONNABORTED|ETIMEDOUT|EPIPE|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|UND_ERR_[A-Z_]+|timed? ?out|TimeoutError|request aborted|AbortError|connection (?:closed|reset)|fetch failed|failed to fetch|network request failed|other side closed/i;
+
 /**
- * Did a failed broadcast possibly reach the node? An account that knows says
- * so on the error (`maybeSent` + the locally computed `hash`, see
- * @anywalletkit/wallet-evm); otherwise a lost transport response (socket
- * closed, timeout) is treated as possibly sent. A node's own JSON-RPC
- * rejection, a refusal before signing, etc. are clean failures.
+ * Did a failed broadcast possibly reach the node? Every chain package says so on its error
+ * (`BroadcastUnknownError`: `maybeSent` + the locally computed `hash`), anywhere in the cause
+ * chain. A node's explicit refusal (`answered: true`) is a clean failure. Otherwise a lost
+ * transport answer — in the message, code or name of any error in the chain (`fetch failed` with
+ * an `UND_ERR_*` cause, React Native's `Network request failed`, `ECONNRESET`, a `TimeoutError`) —
+ * is treated as possibly sent (round 3, M12). A refusal before signing is a clean failure.
  */
 function maybeSent(error: unknown): {hash?: string} | null {
-  for (let e = error as {maybeSent?: unknown; hash?: unknown; cause?: unknown} | undefined, i = 0; e && typeof e === "object" && i < 5; e = e.cause as typeof e, i++) {
-    if (e.maybeSent === true) return typeof e.hash === "string" && e.hash ? {hash: e.hash} : {};
-  }
-  const text = error instanceof Error ? error.message : String(error);
-  return /socket hang up|ECONNRESET|ETIMEDOUT|EPIPE|timed? ?out|request aborted|connection (?:closed|reset)/i.test(text) ? {} : null;
+  const chain: Array<{maybeSent?: unknown; hash?: unknown; answered?: unknown; message?: unknown; code?: unknown; name?: unknown}> = [];
+  for (let e = error as {cause?: unknown} | undefined, i = 0; e && typeof e === "object" && i < 6; e = e.cause as typeof e, i++) chain.push(e as never);
+  for (const e of chain) if (e.maybeSent === true) return typeof e.hash === "string" && e.hash ? {hash: e.hash} : {};
+  if (chain.some((e) => e.answered === true)) return null;
+  const texts = chain.length ? chain.map((e) => [e.message, e.code, e.name].filter((x) => typeof x === "string").join(" ")) : [String(error)];
+  return texts.some((t) => LOST_ANSWER.test(t)) ? {} : null;
 }
 
 /** Our config adds the account's source chain (CAIP-2) the base type omits. */
@@ -388,24 +393,31 @@ function reviewedIdentity(plan: Swap2ExecutionPlan): string {
 export const SWAP2_ID_PREFIX = "awk1";
 
 /** Versioned provider/intent/source-hash id for durable status tracking. */
-function encodeId(provider: string, intentId: string, sourceTxHash?: string): string {
+/**
+ * `awk1.<provider>.<intentId>[.<sourceTxHash>[.<destTxHash>]]`. The destination claim's hash rides
+ * in the id `claimSwap2` returns, so a provider without a destination RPC can still tell the
+ * delivery completed (round 3, M27).
+ */
+function encodeId(provider: string, intentId: string, sourceTxHash?: string, destTxHash?: string): string {
   // encodeURIComponent leaves "." unescaped, which would shift decodeId's
   // split — escape it explicitly so segments are dot-safe.
   const enc = (v: string) => encodeURIComponent(v).replace(/\./g, "%2E");
-  return `${SWAP2_ID_PREFIX}.${[provider, intentId, sourceTxHash].filter((v): v is string => v != null).map(enc).join(".")}`;
+  const parts = [provider, intentId, ...(sourceTxHash != null ? [sourceTxHash, ...(destTxHash != null ? [destTxHash] : [])] : [])];
+  return `${SWAP2_ID_PREFIX}.${parts.map(enc).join(".")}`;
 }
-function decodeId(id: string): {provider: string; intentId: string; sourceTxHash?: string} {
+function decodeId(id: string): {provider: string; intentId: string; sourceTxHash?: string; destTxHash?: string} {
   try {
     if (!id.startsWith(`${SWAP2_ID_PREFIX}.`)) throw new Error("unsupported id version");
     const parts = id.slice(SWAP2_ID_PREFIX.length + 1).split(".");
-    if (parts.length < 2 || parts.length > 3 || !parts[0] || !parts[1]) throw new Error("invalid id shape");
+    if (parts.length < 2 || parts.length > 4 || !parts[0] || !parts[1]) throw new Error("invalid id shape");
     const provider = decodeURIComponent(parts[0]);
     const intentId = decodeURIComponent(parts[1]);
     const sourceTxHash = parts[2] ? decodeURIComponent(parts[2]) : undefined;
-    if (!/^[A-Za-z0-9_-]+$/.test(provider) || !intentId || (parts[2] !== undefined && !sourceTxHash)) {
+    const destTxHash = parts[3] ? decodeURIComponent(parts[3]) : undefined;
+    if (!/^[A-Za-z0-9_-]+$/.test(provider) || !intentId || (parts[2] !== undefined && !sourceTxHash) || (parts[3] !== undefined && !destTxHash)) {
       throw new Error("invalid id contents");
     }
-    return {provider, intentId, ...(sourceTxHash ? {sourceTxHash} : {})};
+    return {provider, intentId, ...(sourceTxHash ? {sourceTxHash} : {}), ...(destTxHash ? {destTxHash} : {})};
   } catch {
     throw new Swap2ValidationError("swap2: malformed swap2 status id");
   }
@@ -471,8 +483,15 @@ function toCaip2(chain: string | number | undefined, fallback: string): string {
   return swap2ChainId(chain);
 }
 
+/** An empty token ref would resolve to the native coin (round 3, M25): it is refused instead. */
+function nonEmptyRef(ref: string, side: string): string {
+  if (typeof ref !== "string" || ref.trim() === "") throw new Swap2ValidationError(`swap2: ${side} token must not be empty (pass the symbol or the contract address)`);
+  return ref;
+}
+
 /** Resolve a token ref (symbol OR on-chain address) to the engine's symbol. */
 function toSymbol(caip2: string, ref: string): string {
+  nonEmptyRef(ref, "source");
   const byToken = ref.startsWith("0x") || ref.length > 20 ? ccAssetByToken(caip2, ref) : undefined;
   if (byToken) return byToken.symbol;
   if (ccAsset(caip2, ref)) return ref; // already a symbol we know
@@ -481,6 +500,7 @@ function toSymbol(caip2: string, ref: string): string {
 
 /** Resolve a dest token ref to the engine's dest address (zero = native). */
 function toDestAddress(caip2: string, ref: string, allowUnlisted = false): string {
+  nonEmptyRef(ref, "destination");
   if (ref.startsWith("0x")) return ref;
   const asset = ccAssetByToken(caip2, ref) ?? ccAsset(caip2, ref);
   if (!asset) {
@@ -946,7 +966,10 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         throw new Error("swap2: provider build does not match the validated quote transaction");
       }
     } else if (!unsigned.bodyBoc && !unsigned.typedData) {
-      if (!q.depositAddress || unsigned.to !== q.depositAddress || (unsigned.memo ?? null) !== q.depositMemo) {
+      // A deposit-address quote commits the address and the memo only: the build may not add
+      // calldata, a spender or a serialized transaction the quote never had (round 3, L15).
+      if (!q.depositAddress || unsigned.to !== q.depositAddress || (unsigned.memo ?? null) !== q.depositMemo ||
+        unsigned.data !== undefined || unsigned.approvalAddress !== undefined || unsigned.serializedTx !== undefined) {
         throw new Error("swap2: provider build does not match the validated quote deposit");
       }
     }
@@ -1408,10 +1431,10 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
 
   /** Status of a swap by the id `swap2()` returned, asked from the provider that executed it. */
   override async getSwap2Status(id: string, _options?: Swap2StatusOptions): Promise<Swap2StatusResult> {
-    const {provider: name, intentId, sourceTxHash} = decodeId(id);
+    const {provider: name, intentId, sourceTxHash, destTxHash} = decodeId(id);
     const provider = this.providerFor(name);
     if (!provider) throw new Error(`swap2: no swap2 found for id '${id}'`);
-    return mapStatus(await provider.trackIntent(sourceTxHash == null ? {intentId} : {intentId, sourceTxHash}));
+    return mapStatus(await provider.trackIntent({intentId, ...(sourceTxHash != null ? {sourceTxHash} : {}), ...(destTxHash != null ? {destTxHash} : {})}));
   }
 
   /**
@@ -1455,6 +1478,19 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     if (unsigned.chainId !== undefined && String(unsigned.chainId) !== expectedId) {
       throw new Error(`swap2: claim chainId ${unsigned.chainId} does not match ${unsigned.chain}`);
     }
+    // Only a contract the provider declares for this chain, and nothing that moves this account's
+    // tokens or grants an allowance (the source leg's decodeCall refusals) — round 3, M24.
+    if (typeof provider.claimTargets !== "function") {
+      throw new Swap2UnsupportedOperationError(`swap2: provider '${name}' declares no claimTargets — a claim may only call contracts the provider names for its chain`);
+    }
+    const targets = provider.claimTargets(unsigned.chain).map((a) => a.toLowerCase());
+    if (!targets.includes(unsigned.to.toLowerCase())) {
+      throw new Swap2ValidationError(`swap2: claim target ${unsigned.to} is not a contract '${name}' declares for ${unsigned.chain} — refused`);
+    }
+    const claimCall = decodeCall({to: unsigned.to, data: unsigned.data, value: 0n});
+    if (claimCall.transfer || claimCall.approval) {
+      throw new Swap2ValidationError(`swap2: claim calldata (${claimCall.method}) moves tokens or grants an allowance — refused`);
+    }
     const actual = await readAccountChain(signer);
     if (actual == null) throw new Error(`swap2: destination account chain identity is unavailable for ${unsigned.chain}`);
     const actualText = typeof actual === "string" ? actual : String(actual);
@@ -1470,7 +1506,8 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     });
     if (!sent.hash) throw new Swap2ExecutionError("swap2: account did not return a claim transaction hash");
     this.emitPhase("broadcast", {hash: sent.hash});
-    return {hash: sent.hash, chain: unsigned.chain, id};
+    // The id to keep polling names the claim, so the status can complete without a destination RPC (round 3, M27).
+    return {hash: sent.hash, chain: unsigned.chain, id: encodeId(name, intentId, sourceTxHash, sent.hash)};
   }
 
   /** The inherited bridge() has no floor field: quote first, then bind execution
@@ -1534,7 +1571,9 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       if ((wantFrom || wantTo) && c.caip2 !== wantFrom && c.caip2 !== wantTo) continue;
       for (const a of c.assets) {
         out.push({
-          token: a.assetId,
+          // What quoteSwap2 takes back: the contract, or the symbol of the native coin — never the
+          // provider-specific assetId, which is "" for most catalog entries (round 3, M25).
+          token: a.contract ?? a.symbol,
           chain: c.caip2,
           symbol: a.symbol,
           decimals: a.decimals,

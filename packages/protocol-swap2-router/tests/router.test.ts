@@ -121,10 +121,13 @@ describe("router dispatch snapshot", () => {
       trackIntent: async () => ({state: "pending" as const}),
       preflightDeposit: async () => { calls.push("preflight"); },
       buildClaim: async () => { calls.push("claim"); return null; },
+      claimTargets: () => ["0x81d40f21f12a8f0e3252bccb954d722d4c464b64"],
     };
     const r = new CrossChainRouter([p]);
     const got = r.getProvider("twophase")!;
     expect(typeof got.buildClaim).toBe("function");
+    // The claim's allowed contracts travel with it, or the engine refuses every claim (round 3, M24).
+    expect(got.claimTargets!("eip155:42161")).toEqual(["0x81d40f21f12a8f0e3252bccb954d722d4c464b64"]);
     expect(typeof got.preflightDeposit).toBe("function");
     void got.buildClaim!({intentId: "x"});
     expect(calls).toEqual(["claim"]);

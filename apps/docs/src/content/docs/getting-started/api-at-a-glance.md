@@ -145,7 +145,7 @@ Pass the minimum you showed; add `slippage` (a decimal) to bound the re-quote.
 
 ```ts
 const { status, transactions } = await swaps.getSwap2Status(id)
-if (status === 'action-required') await swaps.claimSwap2(id, destinationAccount)   // CCTP mint
+if (status === 'action-required') ({ id } = await swaps.claimSwap2(id, destinationAccount))   // CCTP mint; keep polling the returned id
 ```
 
 **15. Stake, lend, withdraw** — [`AaveProtocolEvm`](/api/anywalletkit/protocol-lending-aave-evm/classes/aaveprotocolevm/), [Lido](/api/anywalletkit/protocol-staking-lido-evm/classes/default/) · guide: [Earn](/guides/earn/)

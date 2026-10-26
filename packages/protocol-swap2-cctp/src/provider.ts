@@ -93,6 +93,15 @@ function feeFor(amount: bigint, bps: number, bufferPct: number): bigint {
   return fee + (fee * BigInt(Math.round(bufferPct * 100)) + 9_999n) / 10_000n;
 }
 
+/**
+ * The contracts a CCTP claim may call on `chain`: its MessageTransmitter (`receiveMessage`). Pass it
+ * as `claimTargets` to a remote provider stub so the app, not the server, decides (round 3, M24).
+ */
+export function cctpClaimTargets(chain: string): readonly string[] {
+  const d = Object.prototype.hasOwnProperty.call(CCTP_DOMAINS, chain) ? CCTP_DOMAINS[chain] : undefined;
+  return d ? [d.messageTransmitter] : [];
+}
+
 export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvider {
   config = Object.freeze({...config});
   const api = (config.apiUrl ?? CCTP_API).replace(/\/+$/, "");
@@ -158,6 +167,7 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
 
   return {
     name: "cctp",
+    claimTargets: cctpClaimTargets,
     describeActivity: describeCctpActivity,
     enabled: () => config.enabled ?? true,
     supportsChain: (chain: string) => cctpCfg.supportsChain(chain),
