@@ -340,8 +340,9 @@ await s.getStakeAccounts()                     // status activating|active|deact
 await s.requestWithdrawal({ amount })          // deactivate whole accounts, split the rest
 const q = await s.getWithdrawalRequests(); if (q.claimableIds.length) await s.claimWithdrawals({ ids: q.claimableIds })
 ```
-With a Solana `allowlist` policy, staking writes go to the Stake program and to new stake accounts:
-allow `Stake11111111111111111111111111111111111111` and the addresses from `getStakeAccountAddress(i)`.
+With a Solana `allowlist` policy, each Stake instruction is checked by whom it pays or empowers: allow the
+wallet's own address, the stake accounts (`getStakeAccountAddress(i)`) and the vote accounts of the listed
+validators. Allowlisting the Stake program itself opens nothing.
 
 Native MON staking (`protocol-staking-native-monad`, account on `eip155:143`): the app lists validator ids, there is no default list.
 
