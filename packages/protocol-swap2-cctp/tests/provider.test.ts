@@ -253,3 +253,14 @@ describe("track & claim (two-phase)", () => {
     expect(await alive.p.buildClaim!(ref)).not.toBeNull();
   });
 });
+
+// Audit 2026-10-25 round 3, H8: a live quote with a blank recipient minted to the placeholder (vitalik.eth).
+describe("CCTP placeholder is for dry quotes only", () => {
+  it("a live quote without a recipient is refused; a dry one is still priced", async () => {
+    const {p} = make()
+    const reasons: string[] = []
+    expect(await p.getQuote({...PARAMS, dry: false, destAddress: "", onRefusal: (r: string) => { reasons.push(r) }})).toBeNull()
+    expect(reasons).toEqual(["a live quote needs a recipient"])
+    expect(await p.getQuote({...PARAMS, dry: true, destAddress: ""})).not.toBeNull()
+  })
+})

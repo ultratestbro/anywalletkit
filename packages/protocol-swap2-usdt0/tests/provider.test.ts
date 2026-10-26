@@ -351,3 +351,15 @@ describe("refusals never carry the RPC URL (scan 2026-10-23 F8)", () => {
     expect((err as Error).message).toMatch(/RPC for .* unavailable/);
   });
 });
+
+// Audit 2026-10-25 round 3, H8: a live quote with a blank recipient or refund sent to the placeholder.
+describe("USDT0 placeholders are for dry quotes only", () => {
+  it("a live quote without a recipient or refund address is refused", async () => {
+    const {p} = make()
+    const reasons: string[] = []
+    const onRefusal = (r: string) => { reasons.push(r) }
+    expect(await p.getQuote({...PARAMS, dry: false, destAddress: "", onRefusal})).toBeNull()
+    expect(await p.getQuote({...PARAMS, dry: false, refundAddress: "", onRefusal})).toBeNull()
+    expect(reasons).toEqual(["a live quote needs a recipient", "a live quote needs a refund address"])
+  })
+})

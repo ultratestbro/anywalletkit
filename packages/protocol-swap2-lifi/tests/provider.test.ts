@@ -432,3 +432,21 @@ describe("LI.FI refusals are named; an input-side bridge fee is accepted within 
     expect(why).toBe("lifi: quote does not match the request (amount spent, recipient)");
   });
 });
+
+// Audit 2026-10-25 round 3, H8: the placeholder (vitalik.eth) stood in for a missing sender / recipient
+// on live quotes too, so a blank recipient became the refundee and the payee.
+describe("LI.FI placeholders are for dry quotes only", () => {
+  it("a live quote without a sender or recipient is refused before LI.FI is asked; a dry one is priced", async () => {
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (input: string | URL) => { asked.push(String(input)); return new Response(JSON.stringify(response())); });
+    const reasons: string[] = [];
+    const onRefusal = (r: string) => { reasons.push(r); };
+    expect(await lifiProvider().getQuote({...PARAMS, dry: false, destAddress: "", onRefusal})).toBeNull();
+    expect(await lifiProvider().getQuote({...PARAMS, dry: false, refundAddress: "", onRefusal})).toBeNull();
+    expect(reasons).toEqual(["lifi: a live quote needs a recipient", "lifi: a live quote needs the sender's address"]);
+    expect(asked).toHaveLength(0);
+    const {refundAddress: _refund, ...noRefund} = PARAMS;
+    await lifiProvider().getQuote({...noRefund, dry: true, destAddress: ""});
+    expect(new URL(asked[0]!).searchParams.get("fromAddress")).toBe("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+  });
+});

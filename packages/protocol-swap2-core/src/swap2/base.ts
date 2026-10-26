@@ -589,6 +589,19 @@ function mapStatus(s: IntentStatus): Swap2StatusResult {
     : {status};
 }
 
+/** `""` / whitespace → undefined: an empty input field names no address. */
+function blankToUndefined(v: string | undefined): string | undefined {
+  return typeof v === "string" && v.trim() === "" ? undefined : v;
+}
+
+/** The options with blank `recipient` / `refundAddress` dropped (they default to the account). */
+function withoutBlankAddresses(o: Swap2Options): Swap2Options {
+  const {recipient, refundAddress, ...rest} = o;
+  const r = blankToUndefined(recipient);
+  const f = blankToUndefined(refundAddress);
+  return {...rest, ...(r !== undefined ? {recipient: r} : {}), ...(f !== undefined ? {refundAddress: f} : {})} as Swap2Options;
+}
+
 /**
  * Abstract swap2 protocol backed by the engine. Concrete subclasses bind
  * either a single provider (contribution-shaped) or the router (aggregator).
@@ -636,7 +649,8 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
   }
 
   /** Swap2Options → the engine's QuoteParams (exact-in only). */
-  protected toParams(options: Swap2Options, dry: boolean): QuoteParams {
+  protected toParams(given: Swap2Options, dry: boolean): QuoteParams {
+    const options = withoutBlankAddresses(given);
     if (options.fromTokenAmount == null) {
       throw new Swap2UnsupportedOperationError("swap2: exact-out swap2 is not supported by the engine");
     }
@@ -816,8 +830,9 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // address (a TON-source swap with an EVM recipient would otherwise hand the
     // provider an EVM string as the TON refund/trader wallet).
     const selfAddress = await signer.getAddress();
-    const recipient = snapshot.recipient ?? selfAddress;
-    const refundAddress = snapshot.refundAddress ?? selfAddress;
+    // A blank field ("" from an empty input) is no address at all: this account, never a provider's placeholder (round 3, H8).
+    const recipient = blankToUndefined(snapshot.recipient) ?? selfAddress;
+    const refundAddress = blankToUndefined(snapshot.refundAddress) ?? selfAddress;
     const executionOptions = snapshotOptions({...snapshot, recipient, refundAddress});
     const params = this.toParams(executionOptions, false);
     const resolved = await this.resolveQuote(params);

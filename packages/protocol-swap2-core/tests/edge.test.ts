@@ -646,3 +646,22 @@ describe("edge: genesis-hash chain ids", () => {
     expect(seen).toEqual(["eip155:1>bitcoin:mainnet", "eip155:1>tron:728126428"]);
   });
 });
+
+// Audit 2026-10-25 round 3, H8: `recipient: ""` (an empty input field) slipped past `?? self`, so a
+// provider filled in its placeholder (vitalik.eth) and minted there while the review showed "".
+describe("edge: an empty recipient or refund address is this account", () => {
+  it("swap2 and the quotes never hand a provider a blank address; the review shows the account's own", async () => {
+    const seen: QuoteParams[] = [];
+    const plans: Swap2ExecutionPlan[] = [];
+    const p = provider({getQuote: async (params) => { seen.push(params); return quote(params); }});
+    const log: string[] = [];
+    const swaps = protocol(p, account(log), {reviewExecution: async (plan) => { plans.push(plan); }});
+    for (const blank of ["", "  "]) {
+      await swaps.swap2({...options, recipient: blank, refundAddress: blank});
+      await swaps.quoteSwap2({...options, recipient: blank, refundAddress: blank})
+    }
+    expect(seen.filter((s) => s.dry === false).map((s) => [s.destAddress, s.refundAddress])).toEqual([[SELF, SELF], [SELF, SELF]])
+    expect(seen.filter((s) => s.dry === true).every((s) => s.destAddress === "" && s.refundAddress === undefined)).toBe(true)
+    expect(plans.map((x) => (x as unknown as {recipient: string}).recipient)).toEqual([SELF, SELF])
+  });
+});
