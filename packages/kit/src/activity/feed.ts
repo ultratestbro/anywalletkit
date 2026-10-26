@@ -201,6 +201,8 @@ interface Fetched {
   failed: boolean
   /** State to carry when the source failed (unchanged). */
   prior: SourceState
+  /** Indexes of rows another fetched source owns (sent from that source's address): consumed here, shown there. */
+  silent?: Set<number>
 }
 
 const byTimeDesc = (a: { time: number; chain: string; hash: string }, b: { time: number; chain: string; hash: string }): number =>
@@ -243,6 +245,11 @@ export async function buildFeed(input: FeedInput): Promise<HistoryFeedPage> {
         if (cursor !== undefined) q.cursor = cursor
         if (query.since !== undefined) q.since = query.since
         const page = await source.listActivity(t.address, q)
+        // The last row this page gave before: skip through it (the page may have shifted since).
+        if (prior.l !== undefined && hops === 0 && cursor === prior.c) {
+          const at = page.items.findIndex((r) => txKey(r.chain, r.hash) === prior.l)
+          if (at >= 0) skip = at + 1
+        }
         const rows = page.items.slice(skip)
         if (rows.length === 0 && page.cursor !== undefined && hops < maxHops) { cursor = page.cursor; skip = 0; hops++; continue }
         const out: Fetched = { key, chain: t.chain, address: t.address, rows, skip, failed: false, prior }
@@ -256,10 +263,16 @@ export async function buildFeed(input: FeedInput): Promise<HistoryFeedPage> {
     }
   }))
 
-  // 3. Describe every row once (two own addresses on a chain may both see one tx).
+  // 3. Describe every row once (two own addresses on a chain may both see one tx). A transaction
+  //    sent from another own address this feed also reads is that address's row: its history always
+  //    lists it, so here it is consumed silently (on another page it would otherwise show twice).
+  const norm = (chain: string, a: string) => (chain.startsWith('eip155:') ? a.toLowerCase() : a)
+  const senderSource = new Map(fetched.map((f) => [`${f.chain}|${norm(f.chain, f.address)}`, f.key]))
   const candidates = new Map<string, Candidate>()
   for (const f of fetched) {
     f.rows.forEach((tx, index) => {
+      const owner = tx.from !== undefined ? senderSource.get(`${tx.chain}|${norm(tx.chain, tx.from)}`) : undefined
+      if (owner !== undefined && owner !== f.key) { (f.silent ??= new Set()).add(index); return }
       const id = txKey(tx.chain, tx.hash)
       const existing = candidates.get(id)
       if (existing) { existing.refs.push({ key: f.key, index }); return }
@@ -352,31 +365,54 @@ export async function buildFeed(input: FeedInput): Promise<HistoryFeedPage> {
     }
   }
 
-  // 5. Merge newest-first; walk until `limit` visible items, remembering how far into each page we got.
-  const sorted = [...candidates.values()].sort((a, b) => byTimeDesc(a.item, b.item))
+  // 5. Merge newest-first: a k-way merge of the fetched pages, each kept in its source's own order
+  //    (equal timestamps stay as the source lists them), so what a page gives up is always a prefix
+  //    — no row skipped, none emitted twice. A row two pages list waits until both have reached it.
   const visible = (c: Candidate) => !c.suppressed && (query.includeSpam === true || c.item.spam !== true)
-  let walked: Candidate[] = []
+  interface Head { f: Fetched; i: number }
+  const heads: Head[] = fetched.filter((f) => !f.failed && f.rows.length > 0).map((f) => ({ f, i: 0 }))
+  const headOf = new Map(heads.map((h) => [h.f.key, h]))
+  const at = (h: Head): Candidate => candidates.get(txKey(h.f.rows[h.i]!.chain, h.f.rows[h.i]!.hash))!
+  const live = (h: Head) => h.i < h.f.rows.length
+  // Rows found outside any page (an intent's leg looked up directly) merge by time.
+  const loose = [...candidates.values()].filter((c) => c.refs.length === 0).sort((x, y) => byTimeDesc(x.item, y.item))
+  // A page used up that has more: nothing older than its last row may follow (its next page could fill the gap).
+  const boundaryOf = (h: Head): number => (!live(h) && h.f.next !== undefined ? h.f.rows[h.f.rows.length - 1]!.time : -Infinity)
+  const walked: Candidate[] = []
+  const emitted = new Set<Candidate>()
+  const consumed = new Map<string, number>()
   let emittedCount = 0
-  for (const c of sorted) {
-    if (emittedCount >= limit) break
+  for (let steps = 0; emittedCount < limit && steps < 100_000; steps++) {
+    for (const h of heads) while (live(h) && h.f.silent?.has(h.i)) { h.i++; consumed.set(h.f.key, h.i) }
+    let best: Head | undefined
+    for (const h of heads) if (live(h) && (!best || at(h).item.time > at(best).item.time)) best = h
+    const boundary = Math.max(-Infinity, ...heads.map(boundaryOf))
+    const next = loose[0]
+    if (next && (!best || next.item.time > at(best).item.time)) {
+      if (next.item.time < boundary) break
+      loose.shift()
+      if (!emitted.has(next)) { emitted.add(next); walked.push(next); if (visible(next)) emittedCount++ }
+      continue
+    }
+    if (!best) break
+    // A shared row: first let every other page that lists it reach it.
+    let h = best
+    for (let guard = 0; guard < heads.length; guard++) {
+      const c = at(h)
+      const blocker = c.refs.map((r) => ({ r, o: headOf.get(r.key) })).find(({ r, o }) => o !== undefined && o !== h && live(o) && o.i < r.index)?.o
+      if (!blocker) break
+      h = blocker
+    }
+    const c = at(h)
+    if (c.item.time < boundary) break
+    for (const r of c.refs) {
+      const o = headOf.get(r.key)
+      if (o && live(o) && o.i === r.index) { o.i++; consumed.set(o.f.key, o.i) }
+    }
+    if (emitted.has(c)) continue
+    emitted.add(c)
     walked.push(c)
     if (visible(c)) emittedCount++
-  }
-  // Fully consumed pages that have more: nothing older than their last row may be emitted from another source (its next page could fill the gap).
-  const consumedOf = (walk: Candidate[]): Map<string, number> => {
-    const m = new Map<string, number>()
-    for (const c of walk) for (const r of c.refs) m.set(r.key, Math.max(m.get(r.key) ?? 0, r.index + 1))
-    return m
-  }
-  let consumed = consumedOf(walked)
-  let boundary = -Infinity
-  for (const f of fetched) {
-    if (f.failed || f.next === undefined || f.rows.length === 0) continue
-    if ((consumed.get(f.key) ?? 0) >= f.rows.length) boundary = Math.max(boundary, f.rows[f.rows.length - 1]!.time)
-  }
-  if (boundary > -Infinity) {
-    const cut = walked.findIndex((c) => c.item.time < boundary)
-    if (cut >= 0) { walked = walked.slice(0, cut); consumed = consumedOf(walked) }
   }
   const items = [...top.sort((a, b) => b.time - a.time), ...walked.filter(visible).map((c) => c.item)]
 
@@ -388,7 +424,8 @@ export async function buildFeed(input: FeedInput): Promise<HistoryFeedPage> {
     if (n >= f.rows.length) {
       if (f.next !== undefined) next[f.key] = { c: f.next, n: 0 }
     } else {
-      next[f.key] = f.pageCursor === undefined ? { n: f.skip + n } : { c: f.pageCursor, n: f.skip + n }
+      const last = n > 0 ? txKey(f.rows[n - 1]!.chain, f.rows[n - 1]!.hash) : f.prior.l !== undefined && f.pageCursor === f.prior.c ? f.prior.l : undefined
+      next[f.key] = { ...(f.pageCursor === undefined ? {} : { c: f.pageCursor }), n: f.skip + n, ...(last !== undefined ? { l: last } : {}) }
     }
   }
 
