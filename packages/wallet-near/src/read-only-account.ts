@@ -2,7 +2,7 @@ import { NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { base58ToBytes, bytesToBase58, ed25519Key, isImplicitAccountId, isValidAccountId, publicKeyOfImplicit, publicKeyToString } from './address.js'
-import { decodeAnyTransaction, encodeSignedTransaction, encodeTransaction } from './borsh.js'
+import { ACTION_TAG, decodeAnyTransaction, encodeSignedTransaction, encodeTransaction, isPlainObject } from './borsh.js'
 import { describeTransaction, isDangerous, type DescribeContext } from './describe.js'
 import { SimulationError, UnsafeTransactionError } from './errors.js'
 import { NearRpc, createClient, failureOf, fromBase64, outcomeFailed, type RawFinalOutcome } from './rpc.js'
@@ -165,6 +165,7 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
   /** Fill `signerId` / `publicKey` / `nonce` / `blockHash` (the last two from the node when missing). */
   async buildTransaction(tx: NearTransaction | string): Promise<NearBuiltTransaction> {
     if (typeof tx === 'string') return canonicalTransaction(tx)
+    assertWellFormed(tx)
     const signerId = tx.signerId ?? this.address
     const publicKey = tx.publicKey ?? this.publicKey
     let nonce = tx.nonce
@@ -289,7 +290,7 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
     if (tx.publicKey.keyType !== this.publicKey.keyType || !equalBytes(tx.publicKey.data, this.publicKey.data)) throw new UnsafeTransactionError('public-key-mismatch', 'The transaction public key is not this account\'s key.')
     if (!tx.actions.length) throw new UnsafeTransactionError('no-actions', 'The transaction has no actions.')
     if (!isValidAccountId(tx.receiverId)) throw new UnsafeTransactionError('invalid-account', `"${tx.receiverId}" is not a valid NEAR account id.`)
-    assertNames(tx.actions)
+    assertWellFormed(tx)
     if (tx.blockHash.length !== 32) throw new UnsafeTransactionError('missing-block-hash', 'The transaction has no 32-byte block hash.')
     if (tx.nonce <= 0n) throw new UnsafeTransactionError('missing-nonce', 'The transaction nonce must be positive.')
     if (!this._config.allowDangerousActions) {
@@ -350,6 +351,33 @@ export function parseSignature(signature: string): Uint8Array {
 /** Method names the wallet signs: ASCII letters, digits and '_', read the same byte for byte by every decoder (scan 2026-10-27 F7). */
 const METHOD_NAME = /^[A-Za-z0-9_]{1,256}$/
 
+/**
+ * An object transaction has exactly the shape the encoder writes, before it is built or signed (also
+ * `signBuilt`): every action one known key; a function call's `methodName` a string of the method
+ * grammar, `args` bytes, a string or a plain object, `gas` / `deposit` bigints; every account id and
+ * method name well formed. What the policies read is then what gets encoded (scan 2026-10-27 F6, F28).
+ */
+export function assertWellFormed(tx: Pick<NearBuiltTransaction, 'receiverId' | 'actions'>): void {
+  if (!Array.isArray(tx.actions)) throw new UnsafeTransactionError('malformed-action', 'actions must be an array.')
+  assertShape(tx.actions)
+  assertNames(tx.actions)
+}
+
+function assertShape(actions: NearAction[], depth = 0): void {
+  for (const a of actions) {
+    const keys = typeof a === 'object' && a !== null ? Object.keys(a) : []
+    if (keys.length !== 1 || !Object.prototype.hasOwnProperty.call(ACTION_TAG, keys[0]!)) {
+      throw new UnsafeTransactionError('malformed-action', `An action must have exactly one known key (has: ${keys.join(', ') || 'none'}).`)
+    }
+    if ('functionCall' in a) {
+      const f = a.functionCall as { args?: unknown; gas?: unknown; deposit?: unknown }
+      if (!(f.args instanceof Uint8Array) && typeof f.args !== 'string' && !isPlainObject(f.args)) throw new UnsafeTransactionError('malformed-action', 'Function-call args must be bytes, a string or a plain object.')
+      if ((f.gas !== undefined && typeof f.gas !== 'bigint') || (f.deposit !== undefined && typeof f.deposit !== 'bigint')) throw new UnsafeTransactionError('malformed-action', 'Function-call gas and deposit must be bigints.')
+    }
+    if ('signedDelegate' in a && depth === 0) assertShape(a.signedDelegate.delegateAction.actions, depth + 1)
+  }
+}
+
 /** Every account id and method name the actions carry (a delegated action's too) is well formed (scan 2026-10-27 F7, F16). */
 function assertNames(actions: NearAction[], depth = 0): void {
   const account = (id: unknown) => {
@@ -392,7 +420,7 @@ function canonicalTransaction(b64: string): NearBuiltTransaction {
   const again = decoded.signature ? encodeSignedTransaction({ transaction: decoded.transaction, signature: decoded.signature }) : encodeTransaction(decoded.transaction)
   if (!equalBytes(again, bytes)) throw new UnsafeTransactionError('non-canonical', 'This borsh transaction does not re-encode to the same bytes, so what was reviewed may not be what gets signed.')
   if (!isValidAccountId(decoded.transaction.signerId) || !isValidAccountId(decoded.transaction.receiverId)) throw new UnsafeTransactionError('invalid-account', 'The transaction names an invalid NEAR account id.')
-  assertNames(decoded.transaction.actions)
+  assertWellFormed(decoded.transaction)
   return decoded.transaction
 }
 

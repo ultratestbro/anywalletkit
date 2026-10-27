@@ -303,14 +303,18 @@ const NEAR_RECIPIENT_ARG: Readonly<Record<string, string>> = {
 /**
  * The recipient a function call's args name, read off the bytes wallet-near signs: objects go
  * through JSON.stringify first, exactly as wallet-near encodes them (a `toJSON` cannot show one
- * receiver and sign another). `storage_deposit` without `account_id` deposits for the caller.
+ * receiver and sign another). `storage_deposit` without `account_id` deposits for the caller —
+ * only in the object form: near-sdk also takes positional args (`["attacker.near", false]`), so
+ * args that are not one plain JSON object are unknown (scan 2026-10-27 F29).
  */
 function nearArgRecipient(method: string, args: unknown): Array<string | undefined> {
   const key = own(NEAR_RECIPIENT_ARG, method)
   if (!key) return []
   try {
     const json = args instanceof Uint8Array ? ascii(args) : typeof args === 'string' ? args : JSON.stringify(args)
-    const parsed = obj(JSON.parse(json))
+    const value: unknown = JSON.parse(json)
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return [undefined]
+    const parsed = value as Record<string, unknown>
     if (parsed[key] === undefined && method === 'storage_deposit') return []
     return [str(parsed[key])]
   } catch {
@@ -321,11 +325,15 @@ function nearArgRecipient(method: string, args: unknown): Array<string | undefin
 /** One NEAR action → who it pays besides the transaction's receiver: token recipients, the deleted account's beneficiary, a delegated action's receivers. */
 function nearActionRecipients(action: unknown, depth = 0): Array<string | undefined> {
   const a = obj(action)
+  // wallet-near encodes an action object's one key; with two (a deleteAccount next to a functionCall)
+  // this reader and the encoder could each take another (scan 2026-10-27 F6).
+  if (Object.keys(a).length !== 1) return [undefined]
   const call = obj(a.functionCall)
   if (a.functionCall !== undefined) {
+    // A non-string name is ToString'd by the encoder (['ft_transfer'] → 'ft_transfer'): unknown here (F6, F28).
     const method = str(call.methodName)
-    if (method !== undefined && !NEAR_METHOD.test(method)) return [undefined]
-    return nearArgRecipient(method ?? '', call.args)
+    if (method === undefined || !NEAR_METHOD.test(method)) return [undefined]
+    return nearArgRecipient(method, call.args)
   }
   if (a.deleteAccount !== undefined) return [str(obj(a.deleteAccount).beneficiaryId)]
   if (a.signedDelegate !== undefined) {

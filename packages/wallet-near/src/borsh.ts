@@ -119,16 +119,27 @@ export const ACTION_TAG = {
 } as const
 export type NearActionKey = keyof typeof ACTION_TAG
 
+/** The one key an action object has. Two keys (a deleteAccount next to a functionCall) is no action: whichever a reader picks, another reader may pick the other (scan 2026-10-27 F6). */
 export function actionKey(a: NearAction): NearActionKey {
-  const k = Object.keys(a)[0] as NearActionKey | undefined
-  if (!k || !(k in ACTION_TAG)) throw new RangeError(`unknown action ${k}`)
+  const keys = typeof a === 'object' && a !== null ? Object.keys(a) : []
+  if (keys.length !== 1) throw new RangeError(`an action must have exactly one key (has: ${keys.join(', ') || 'none'})`)
+  const k = keys[0] as NearActionKey
+  if (!Object.prototype.hasOwnProperty.call(ACTION_TAG, k)) throw new RangeError(`unknown action ${k}`)
   return k
 }
 
-/** Function-call args as bytes: raw bytes pass through; objects / strings become UTF-8 JSON / UTF-8. */
+/** A plain `{…}` object: not an array, not a class instance. */
+export function isPlainObject(v: unknown): v is Record<string, unknown> {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return false
+  const proto = Object.getPrototypeOf(v)
+  return proto === Object.prototype || proto === null
+}
+
+/** Function-call args as bytes: raw bytes pass through; plain objects / strings become UTF-8 JSON / UTF-8. Anything else throws. */
 export function argsBytes(args: Uint8Array | Record<string, unknown> | string): Uint8Array {
   if (args instanceof Uint8Array) return args
   if (typeof args === 'string') return utf8.encode(args)
+  if (!isPlainObject(args)) throw new TypeError('function-call args must be bytes, a string or a plain object')
   return utf8.encode(JSON.stringify(args))
 }
 
@@ -186,6 +197,9 @@ export function writeAction(w: BorshWriter, a: NearAction): void {
     case 'deployContract': w.vecU8((a as { deployContract: { code: Uint8Array } }).deployContract.code); return
     case 'functionCall': {
       const f = (a as { functionCall: { methodName: string; args: Uint8Array | Record<string, unknown> | string; gas?: bigint; deposit?: bigint } }).functionCall
+      // TextEncoder would ToString a non-string (['ft_transfer'] → 'ft_transfer') (scan 2026-10-27 F28).
+      if (typeof f.methodName !== 'string') throw new TypeError('functionCall.methodName must be a string')
+      if ((f.gas !== undefined && typeof f.gas !== 'bigint') || (f.deposit !== undefined && typeof f.deposit !== 'bigint')) throw new TypeError('functionCall gas and deposit must be bigints')
       w.string(f.methodName).vecU8(argsBytes(f.args)).u64(f.gas ?? 30n * 10n ** 12n).u128(f.deposit ?? 0n)
       return
     }

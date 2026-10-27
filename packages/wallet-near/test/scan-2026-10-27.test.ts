@@ -43,3 +43,27 @@ describe('scan 2026-10-27 G5 (F7, F8, F16): a base64 NEAR transaction is signed 
     expect(encodeTransaction(built)).toEqual(bytes)
   })
 })
+
+describe('scan 2026-10-27 G6 (F6, F28): object transactions are validated before they are encoded or signed', () => {
+  const ft = (fc: Record<string, unknown>) => ({ receiverId: USDT, actions: [{ functionCall: { methodName: 'ft_transfer', args: { receiver_id: 'friend.near', amount: '1' }, gas: 30n * 10n ** 12n, deposit: 1n, ...fc } }] })
+  const bad = [
+    ['methodName array', ft({ methodName: ['ft_transfer'] })],
+    ['methodName missing', ft({ methodName: undefined })],
+    ['args array', ft({ args: ['friend.near', '1'] })],
+    ['args number', ft({ args: 5 })],
+    ['gas number', ft({ gas: 30_000_000_000_000 })],
+    ['deposit string', ft({ deposit: '1' })],
+    ['two keys', { receiverId: USDT, actions: [{ deleteAccount: { beneficiaryId: 'attacker.near' }, functionCall: { methodName: 'ft_balance_of', args: {}, gas: 1n, deposit: 0n } }] }],
+    ['no key', { receiverId: USDT, actions: [{}] }],
+  ] as const
+  it('sendTransaction, signTransaction and signBuilt refuse each malformed shape', async () => {
+    const f = fakeNode()
+    const a = await manager(f).getAccount(0)
+    for (const [name, tx] of bad) {
+      await expect(a.sendTransaction(tx as never), name).rejects.toThrow()
+      await expect(a.signTransaction(tx as never), name).rejects.toThrow()
+      const built = { signerId: ACCOUNT0, publicKey: a.publicKey, nonce: 7n, blockHash: new Uint8Array(32).fill(9), ...tx }
+      await expect(a.signBuilt(built as never), name).rejects.toMatchObject({ name: 'UnsafeTransactionError' })
+    }
+  })
+})

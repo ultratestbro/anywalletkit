@@ -3,7 +3,7 @@ import { bytesToBase58, ed25519Key, implicitAccountId, publicKeyToString } from 
 import { decodeAnyTransaction, encodeSignedTransaction } from './borsh.js'
 import { BroadcastUnknownError, MessageIsTransactionError, SimulationError } from './errors.js'
 import { nep413Hash, type Nep413Payload, type Nep413Signed } from './nep413.js'
-import { WalletAccountReadOnlyNear, receiptOf } from './read-only-account.js'
+import { WalletAccountReadOnlyNear, assertWellFormed, receiptOf } from './read-only-account.js'
 import { fromBase64, isDefinitive, outcomeFailed, toBase64 } from './rpc.js'
 import type { NearBuiltTransaction, NearConfig, NearFeeEstimate, NearSignedTransaction, NearTransaction, NearTransferOptions } from './types.js'
 
@@ -93,6 +93,7 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
 
   /** Sign a fully built transaction. No checks — see `signTransaction`. */
   async signBuilt(tx: NearBuiltTransaction): Promise<NearSignedTransaction> {
+    assertWellFormed(tx)
     const sig = await this.#signBytes(WalletAccountReadOnlyNear.hashOf(tx), 'near-tx')
     return { transaction: tx, signature: { keyType: 'ed25519', data: sig } }
   }

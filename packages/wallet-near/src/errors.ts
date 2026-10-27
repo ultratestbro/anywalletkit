@@ -18,6 +18,7 @@ export type UnsafeTransactionCode =
   | 'storage-deposit'
   | 'non-canonical'
   | 'invalid-method'
+  | 'malformed-action'
 
 /** A transaction failed a hard check and was not signed. */
 export class UnsafeTransactionError extends Error {

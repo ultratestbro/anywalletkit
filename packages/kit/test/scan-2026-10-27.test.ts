@@ -151,3 +151,32 @@ describe('scan 2026-10-27 G5 (F7, F8, F16): a NEAR method name the kit reads as 
     expect(seen.destinationUnknown).toBe(true)
   })
 })
+
+describe('scan 2026-10-27 G6 (F6, F28, F29): NEAR object actions the kit cannot read as wallet-near encodes them are unknown', () => {
+  const near = () => createMockAccount({ chain: 'near:mainnet', address: 'alice.near' })
+  const allow = { allowlist: { near: ['usdt.tether-token.near', 'dex.near'] } }
+  const confirmed = async (tx: unknown) => {
+    let seen: Record<string, unknown> = {}
+    await applyPolicies(near(), { confirm: async (i) => { seen = i as never; return true } }, 'near:mainnet').sendTransaction(tx as never)
+    return seen
+  }
+  it('a non-string methodName (an array that ToString makes "ft_transfer")', async () => {
+    const tx = { receiverId: 'usdt.tether-token.near', actions: [{ functionCall: { methodName: ['ft_transfer'], args: { receiver_id: 'attacker.near', amount: '1000000' }, gas: 1n, deposit: 1n } }] }
+    await expect(applyPolicies(near(), allow, 'near:mainnet').sendTransaction(tx as never)).rejects.toMatchObject({ policy: 'allowlist' })
+    expect((await confirmed(tx)).destinationUnknown).toBe(true)
+  })
+  it('an action object with two keys (deleteAccount next to a harmless functionCall)', async () => {
+    const tx = { receiverId: 'usdt.tether-token.near', actions: [{ deleteAccount: { beneficiaryId: 'attacker.near' }, functionCall: { methodName: 'ft_balance_of', args: {}, gas: 1n, deposit: 0n } }] }
+    await expect(applyPolicies(near(), allow, 'near:mainnet').sendTransaction(tx as never)).rejects.toMatchObject({ policy: 'allowlist' })
+    expect((await confirmed(tx)).destinationUnknown).toBe(true)
+  })
+  it('storage_deposit with positional array args names a beneficiary: unknown, not "for the caller"', async () => {
+    for (const args of [['attacker.near', false], JSON.stringify(['attacker.near', false]), new TextEncoder().encode('["attacker.near",false]')]) {
+      const tx = { receiverId: 'dex.near', actions: [{ functionCall: { methodName: 'storage_deposit', args, gas: 1n, deposit: 10n ** 22n } }] }
+      await expect(applyPolicies(near(), allow, 'near:mainnet').sendTransaction(tx as never)).rejects.toMatchObject({ policy: 'allowlist' })
+      expect((await confirmed(tx)).destinationUnknown).toBe(true)
+    }
+    // Control: the documented object form without account_id deposits for the caller.
+    expect((await confirmed({ receiverId: 'dex.near', actions: [{ functionCall: { methodName: 'storage_deposit', args: { registration_only: true }, gas: 1n, deposit: 1n } }] })).destinationUnknown).toBe(false)
+  })
+})
