@@ -7,7 +7,7 @@ import {
 import { publicKeyToAddress } from 'viem/accounts'
 import { encodeApprove, ERC20_PERMIT_ABI, PERMIT_TYPES, USDT_MAINNET } from './erc20.js'
 import { BroadcastUnknownError, ChainMismatchError, PermitUnsupportedError, SimulationError, UnsafeTransactionError } from './errors.js'
-import { WalletAccountReadOnlyEvm, assertTxShape, chainIdNumber, transferTransaction, typedDataHash, typedDomainChainId } from './read-only-account.js'
+import { WalletAccountReadOnlyEvm, assertTxShape, canonicalData, chainIdNumber, transferTransaction, typedDataHash, typedDomainChainId } from './read-only-account.js'
 export { MIN_PRIORITY_FEE_WEI, typedDomainChainId } from './read-only-account.js'
 import type { ApproveOptions, EvmConfig, EvmTransaction, EvmTransferOptions, PermitInfo, PermitOptions, SignedPermit, TypedDataInput } from './types.js'
 
@@ -184,7 +184,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     const nonce = tx.nonce ?? (await this.nextNonce())
     const to = tx.to !== undefined ? getAddress(tx.to) : undefined
     const value = toBigInt(tx.value) ?? 0n
-    const data = (tx.data ?? '0x') as Hex
+    const data = canonicalData(tx.data) ?? '0x'
     const gas = await this.gasFor(tx)
 
     const base = { chainId, nonce, ...(to ? { to } : {}), value, data, gas }

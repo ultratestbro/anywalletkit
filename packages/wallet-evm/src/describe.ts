@@ -6,7 +6,7 @@
  */
 import { decodeFunctionData, getAddress, maxUint256, zeroAddress, type Hex } from 'viem'
 import { ERC20_ABI } from './erc20.js'
-import { inferPrimaryType } from './read-only-account.js'
+import { canonicalData, inferPrimaryType } from './read-only-account.js'
 import type { EvmTransaction, TypedDataInput } from './types.js'
 
 /** What an EVM transaction does, read from its fields and calldata. */
@@ -132,7 +132,7 @@ export function describeTransaction(tx: EvmTransaction, ctx: { chainId?: number 
   const warnings: TxWarning[] = []
   const to = tx.to !== undefined ? getAddress(tx.to) : undefined
   const value = toBig(tx.value)
-  const data = (tx.data ?? '0x') as Hex
+  const data = canonicalData(tx.data) ?? '0x'
   const hasData = data.length > 2
   const selector = hasData && data.length >= 10 ? (data.slice(0, 10) as Hex) : undefined
   // An unrepresentable chainId (a bigint past 2^53) is NaN, so the chain-mismatch warning still fires.

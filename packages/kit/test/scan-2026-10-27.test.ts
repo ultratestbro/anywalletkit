@@ -240,3 +240,16 @@ describe('scan 2026-10-27 G9 (F26): the signRaw intent comes from the signed byt
     expect(seen).toMatchObject({ to: usdt, token: usdt, amount: 10n ** 30n })
   })
 })
+
+describe('scan 2026-10-27 G10 (F12): non-canonical EVM calldata is unknown', () => {
+  const USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
+  const ATTACKER = '000000000000000000000000000000000000dead'
+  const transferCalldata = 'a9059cbb' + ATTACKER.padStart(64, '0') + 'f'.repeat(64)
+  it('1x / prefix-less / odd-length data is refused by an allowlist of the token and a blocklist without confirm', async () => {
+    for (const data of ['1x' + transferCalldata, transferCalldata, '0x' + '95ea7b3' + ATTACKER.padStart(64, '0') + 'f'.repeat(64)]) {
+      const tx = { to: USDC, chainId: 1, gasLimit: 100_000n, data }
+      await expect(applyPolicies(createMockAccount({ chain: 'eip155:1' }), { allowlist: { 'eip155:1': [USDC] } }, 'eip155:1').signTransaction(tx)).rejects.toMatchObject({ policy: 'allowlist' })
+      await expect(applyPolicies(createMockAccount({ chain: 'eip155:1' }), { blocklist: { 'eip155:1': ['0x' + '11'.repeat(20)] } }, 'eip155:1').signTransaction(tx)).rejects.toMatchObject({ policy: 'blocklist' })
+    }
+  })
+})

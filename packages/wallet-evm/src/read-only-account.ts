@@ -1,5 +1,6 @@
 import { NetworkError, NotATokenError, type IWalletAccountReadOnly, type TokenFlag, type TokenInfo } from '@anywalletkit/core'
 import {
+  bytesToHex,
   BaseError, ContractFunctionRevertedError, decodeErrorResult, getAddress, hashTypedData, isHex,
   recoverMessageAddress, recoverAddress, stringToHex,
   type Hex, type PublicClient,
@@ -29,6 +30,28 @@ export type FeeFields = { gasPrice: bigint } | { maxFeePerGas: bigint; maxPriori
 export function assertTxShape(tx: EvmTransaction): void {
   if (tx.authorizationList?.length && tx.type !== 4) throw new Error('authorizationList needs a type 4 (EIP-7702) transaction; it would be dropped otherwise.')
   if (tx.type === 4 && tx.gasPrice !== undefined) throw new Error('An EIP-7702 (type 4) transaction takes EIP-1559 fee fields (maxFeePerGas / maxPriorityFeePerGas), not gasPrice.')
+  canonicalData(tx.data)
+  if (tx.accessList !== undefined) {
+    if (!Array.isArray(tx.accessList)) throw new UnsafeTransactionError('accessList must be an array.')
+    for (const entry of tx.accessList) {
+      getAddress(entry.address)
+      if (!Array.isArray(entry.storageKeys) || entry.storageKeys.some((k) => typeof k !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(k))) {
+        throw new UnsafeTransactionError('Every accessList storage key must be 32 bytes of 0x-hex.')
+      }
+    }
+  }
+}
+
+/**
+ * Calldata as the wallet signs it: bytes, or 0x-hex of whole bytes. viem's hexToBytes drops any two
+ * leading characters and pads an odd length, so '1x…' or an odd-length string would be signed as other
+ * bytes than the ones a policy or a review screen read (scan 2026-10-27 F12).
+ */
+export function canonicalData(data: unknown): Hex | undefined {
+  if (data === undefined) return undefined
+  if (data instanceof Uint8Array) return bytesToHex(data)
+  if (typeof data === 'string' && /^0x([0-9a-fA-F]{2})*$/.test(data)) return data as Hex
+  throw new UnsafeTransactionError('Transaction data must be bytes or 0x-prefixed hex of whole bytes.')
 }
 
 /** Legacy fee fields: type 0 / 1, or a `gasPrice` without an EIP-1559 cap. */
@@ -200,7 +223,7 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
       account: this.address,
       ...(tx.to !== undefined ? { to: getAddress(tx.to) } : {}),
       ...(tx.value !== undefined ? { value: BigInt(tx.value) } : {}),
-      ...(tx.data !== undefined ? { data: tx.data as Hex } : {}),
+      ...(tx.data !== undefined ? { data: canonicalData(tx.data)! } : {}),
       ...(tx.authorizationList?.length ? { authorizationList: tx.authorizationList as never } : {}),
     }
   }

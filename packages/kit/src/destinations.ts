@@ -879,9 +879,15 @@ function tonDestinations(arg: unknown): Destinations {
   return known(tonMessageDestinations(arg))
 }
 
+/** Calldata a signer reads as written: bytes, or 0x-hex of whole bytes (viem reads '1x…' or an odd length as other bytes — scan 2026-10-27 F12). */
+function canonicalCalldata(v: unknown): boolean {
+  return v instanceof Uint8Array || (typeof v === 'string' && /^0x([0-9a-fA-F]{2})*$/.test(v))
+}
+
 /** One EVM call: the contract it calls, and the recipient or spender a standard token call names in its calldata (round 3, M1). */
 function evmCallDestinations(call: unknown): Array<string | undefined> {
   const c = obj(call)
+  if (c.data !== undefined && !canonicalCalldata(c.data)) return [str(c.to), undefined]
   const data = hexData(c.data)
   const r = data !== undefined ? calldataRecipients(data) : null
   return [str(c.to), ...(r ? r.list.map((w) => `0x${w}`) : []), ...(r?.bad ? [undefined] : [])]
