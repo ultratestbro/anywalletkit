@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/@anywalletkit/backup-cloud?label=npm)](https://www.npmjs.com/package/@anywalletkit/backup-cloud)
 
-Cloud backups for React Native wallets built on the SDK. Each seed or key becomes one encrypted [`@anywalletkit/seed-vault`](../seed-vault) file in the app's hidden iCloud Drive container. The user picks how it opens:
+Cloud backups for React Native wallets built on the SDK. Each seed or key becomes one encrypted [`@anywalletkit/seed-vault`](../seed-vault/README.md) file in the app's hidden iCloud Drive container. The user picks how it opens:
 
 ## Install
 

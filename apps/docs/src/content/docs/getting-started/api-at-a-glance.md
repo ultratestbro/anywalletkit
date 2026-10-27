@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-The [API reference](/api/readme/) lists every exported class, function and type: about two thousand
+The [API reference](/api/) lists every exported class, function and type: about two thousand
 pages, most of them for module authors. These are the operations an app actually calls. The
 snippets come from [`examples/`](https://github.com/ultratestbro/anywalletkit/tree/main/examples),
 which CI type-checks and tests on every change; the storage and backup ones from the package

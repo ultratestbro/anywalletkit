@@ -3,11 +3,13 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import starlightTypeDoc, { typeDocSidebarGroup } from 'starlight-typedoc';
+import starlightLinksValidator from 'starlight-links-validator';
 
 export default defineConfig({
   site: 'https://docs.anywallet.tech',
-  // The Introduction is the home page; keep the old address working.
-  redirects: { '/getting-started/introduction/': '/' },
+  // The Introduction is the home page; keep the old addresses working
+  // (/api/readme/ was the API index until the package pages moved to /api/<scope>/<pkg>/).
+  redirects: { '/getting-started/introduction/': '/', '/api/readme/': '/api/' },
   integrations: [
     starlight({
       title: 'Any Wallet Kit',
@@ -33,6 +35,9 @@ export default defineConfig({
       ],
       // /llms.txt, /llms-full.txt and /llms-small.txt: the docs as plain Markdown for AI agents.
       plugins: [
+        // Fails the build (locally and on Vercel) on any internal link or anchor that
+        // points nowhere, generated API pages included.
+        starlightLinksValidator(),
         // API reference: TypeDoc over every package's public entry point, written to
         // src/content/docs/api at build time (generated, not committed).
         starlightTypeDoc({
@@ -41,6 +46,11 @@ export default defineConfig({
           sidebar: { label: 'API reference', collapsed: true },
           typeDoc: {
             entryPointStrategy: 'packages',
+            // starlight-typedoc deletes every */README.md it finds (readme: 'none'), and
+            // that is the file name typedoc-plugin-markdown gives each package's page in
+            // packages mode: all 47 package pages were gone and /api/readme/ linked to 404s.
+            entryFileName: 'index.md',
+            name: 'API reference',
             packageOptions: {
               entryPoints: ['src/index.ts'],
               excludePrivate: true,
