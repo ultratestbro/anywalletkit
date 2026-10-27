@@ -17,6 +17,8 @@ export const PROXY_SLOTS: readonly Hex[] = [
 ]
 
 const MAX_TEXT = 128
+/** Bytes of a symbol() / name() answer that are read: offset and length words, then 4 bytes per character. */
+const MAX_READ = 64 + MAX_TEXT * 4
 /** Strict UTF-8 → string, '' for any malformed sequence. Hand-written: Hermes polyfills of TextDecoder may ignore `fatal`. */
 function utf8(bytes: Uint8Array): string {
   let out = ''
@@ -47,14 +49,18 @@ function utf8(bytes: Uint8Array): string {
  * trailing zero bytes cut. Anything else, or bytes that are not UTF-8, is ''. Capped at 128 characters.
  */
 export function decodeTokenString(hex: Hex | undefined): string {
-  if (!hex || hex === '0x') return ''
-  const b = hexToBytes(hex)
+  if (!hex || hex === '0x' || hex.length % 2 !== 0) return ''
+  // Only the bytes a 128-character answer can use are read: the offset and length words, then at most
+  // 4 bytes per character. A contract can return megabytes, and decoding them all froze the thread
+  // (scan 2026-10-27 F21).
+  const total = (hex.length - 2) / 2
+  const b = hexToBytes(hex.slice(0, 2 + 2 * Math.min(total, MAX_READ)) as Hex)
   let out = ''
-  if (b.length === 32) {
+  if (total === 32) {
     let end = 32
     while (end > 0 && b[end - 1] === 0) end--
     out = utf8(b.subarray(0, end))
-  } else if (b.length >= 64) {
+  } else if (total >= 64) {
     const word = (at: number) => {
       let v = 0n
       for (let i = at; i < at + 32; i++) v = (v << 8n) | BigInt(b[i]!)
@@ -64,12 +70,17 @@ export function decodeTokenString(hex: Hex | undefined): string {
     if (offset + 32n <= BigInt(b.length)) {
       const o = Number(offset.toString()) // below b.length: small
       const len = word(o)
-      if (BigInt(o) + 32n + len <= BigInt(b.length)) {
-        const n = Number(len.toString()) // at most b.length: small
+      if (BigInt(o) + 32n + len <= BigInt(total)) {
+        // The string's first MAX_TEXT × 4 bytes, cut back to a UTF-8 character boundary.
+        let n = Math.min(Number(len < BigInt(MAX_READ) ? len.toString() : MAX_READ), MAX_TEXT * 4, b.length - (o + 32))
+        if (BigInt(n) < len) while (n > 0 && (b[o + 32 + n]! & 0xc0) === 0x80) n--
         out = utf8(b.subarray(o + 32, o + 32 + n))
       }
     }
   }
-  out = out.replace(/\0+$/g, '')
+  // Trailing NULs, cut by a linear walk: /\0+$/ was quadratic on a long NUL run before one other byte (F21).
+  let end = out.length
+  while (end > 0 && out.charCodeAt(end - 1) === 0) end--
+  out = out.slice(0, end)
   return out.length > MAX_TEXT ? out.slice(0, MAX_TEXT) : out
 }

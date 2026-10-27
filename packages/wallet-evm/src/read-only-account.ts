@@ -79,13 +79,31 @@ export function chainIdNumber(v: number | bigint | string): number {
 /** Pick the root type of an EIP-712 `types` map when `primaryType` is not given. */
 export function inferPrimaryType(types: TypedDataInput['types']): string {
   const names = Object.keys(types).filter((t) => t !== 'EIP712Domain')
+  assertTypedDataSize(types, names)
+  const known = new Set(names)
   const referenced = new Set(
-    // Linear: cut at the first '[' (a backtracking /\[.*\]$/ is quadratic on dApp-supplied input).
-    names.flatMap((n) => types[n]!.map((f) => { const i = f.type.indexOf('['); return i < 0 ? f.type : f.type.slice(0, i) })).filter((t) => names.includes(t)),
+    // Linear: cut at the first '[' (a backtracking /\[.*\]$/ is quadratic on dApp-supplied input), and
+    // a Set lookup, not names.includes() per field (scan 2026-10-27 F24).
+    names.flatMap((n) => types[n]!.map((f) => { const i = f.type.indexOf('['); return i < 0 ? f.type : f.type.slice(0, i) })).filter((t) => known.has(t)),
   )
   const roots = names.filter((n) => !referenced.has(n))
   if (roots.length !== 1) throw new Error(`Ambiguous EIP-712 primary type: ${roots.join(', ') || 'none'}. Pass primaryType.`)
   return roots[0]!
+}
+
+/** Far above any real EIP-712 payload (Seaport: a dozen types, under a hundred fields). */
+export const MAX_TYPED_DATA_TYPES = 256
+export const MAX_TYPED_DATA_FIELDS = 4096
+
+/** A dApp's typed data with more types or fields than any real one is refused before anything walks it (scan 2026-10-27 F24). */
+export function assertTypedDataSize(types: Record<string, unknown>, names = Object.keys(types)): void {
+  if (names.length > MAX_TYPED_DATA_TYPES) throw new UnsafeTransactionError(`Typed data declares ${names.length} types; at most ${MAX_TYPED_DATA_TYPES} are read.`)
+  let fields = 0
+  for (const n of names) {
+    const f = types[n]
+    fields += Array.isArray(f) ? f.length : 0
+    if (fields > MAX_TYPED_DATA_FIELDS) throw new UnsafeTransactionError(`Typed data declares more than ${MAX_TYPED_DATA_FIELDS} fields across its types.`)
+  }
 }
 
 /** Strip `EIP712Domain` (ethers rejects it; viem tolerates it — normalise). */
@@ -381,6 +399,7 @@ export function typedDataHash(typed: TypedDataInput): Hex {
   const types = cleanTypes(typed.types)
   const chainId = typedDomainChainId(typed.domain.chainId)
   const domain = chainId === undefined ? typed.domain : { ...typed.domain, chainId }
+  assertTypedDataSize(types)
   const primaryType = typed.primaryType ?? inferPrimaryType(types)
   assertCanonicalNumbers(types, primaryType, typed.message, 0)
   return hashTypedData({ domain, types, primaryType, message: typed.message } as never)

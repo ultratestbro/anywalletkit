@@ -312,3 +312,13 @@ describe('scan 2026-10-27 G13 (F19): a Zcash recipient that is not plain base58 
     await expect(applyPolicies(createMockAccount({ chain: 'zcash:mainnet' }), { allowlist: { zcash: [T1] } }, 'zcash:mainnet').transfer({ recipient: T1.toLowerCase(), amount: 1n })).rejects.toMatchObject({ policy: 'allowlist' })
   })
 })
+
+describe('scan 2026-10-27 G14 (F24): EIP-712 primary-type inference is bounded', () => {
+  it('20 000 types and 20 000 fields without primaryType are refused quickly', async () => {
+    const types: Record<string, Array<{ name: string; type: string }>> = {}
+    for (let i = 0; i < 20_000; i++) types[`T${i}`] = [{ name: 'f', type: `T${i + 1}` }]
+    const t0 = performance.now()
+    await expect(applyPolicies(Object.assign(createMockAccount(), { signTypedData: async (_typed: unknown) => '0x' }), { confirm: async () => true }, 'eip155:1').signTypedData!({ domain: {}, types, message: {} } as never)).rejects.toThrow(/types/)
+    expect(performance.now() - t0).toBeLessThan(200)
+  })
+})

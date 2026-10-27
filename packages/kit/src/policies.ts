@@ -114,6 +114,9 @@ function isOffline(account: unknown): boolean {
 }
 
 /** Permit2 primary types (Uniswap Permit2): an allowance or a transfer authorisation for `spender`. */
+/** The same bounds as wallet-evm's typed-data reader (MAX_TYPED_DATA_TYPES / MAX_TYPED_DATA_FIELDS). */
+const MAX_TYPED_DATA_TYPES = 256
+const MAX_TYPED_DATA_FIELDS = 4096
 const PERMIT2_TYPES = new Set(['PermitSingle', 'PermitBatch', 'PermitTransferFrom', 'PermitBatchTransferFrom', 'PermitWitnessTransferFrom', 'PermitBatchWitnessTransferFrom'])
 const MAX_UINT256 = (1n << 256n) - 1n
 
@@ -383,9 +386,15 @@ export function resolvePrimaryType(typed: unknown): string {
   const types = obj(a.types)
   const names = Object.keys(types).filter((t) => t !== 'EIP712Domain')
   const fieldsOf = (n: string) => (Array.isArray(types[n]) ? (types[n] as unknown[]) : [])
+  // Bounded like wallet-evm's: no real payload has more (scan 2026-10-27 F24).
+  if (names.length > MAX_TYPED_DATA_TYPES || names.reduce((sum, n) => sum + fieldsOf(n).length, 0) > MAX_TYPED_DATA_FIELDS) {
+    throw new Error(`Typed data with more than ${MAX_TYPED_DATA_TYPES} types or ${MAX_TYPED_DATA_FIELDS} fields is not read.`)
+  }
+  const known = new Set(names)
   // Linear, and identical to wallet-evm's inferPrimaryType: cut at the first '['. The old /\[.*\]$/
-  // backtracked quadratically on a dApp's '[[[[…' type string and froze the wallet before any prompt (scan 2026-10-23 F10).
-  const referenced = new Set(names.flatMap((n) => fieldsOf(n).map((f) => { const t = String(obj(f).type ?? ''); const i = t.indexOf('['); return i < 0 ? t : t.slice(0, i) })).filter((t) => names.includes(t)))
+  // backtracked quadratically on a dApp's '[[[[…' type string and froze the wallet before any prompt (scan 2026-10-23 F10);
+  // a Set lookup per field, not names.includes() (scan 2026-10-27 F24).
+  const referenced = new Set(names.flatMap((n) => fieldsOf(n).map((f) => { const t = String(obj(f).type ?? ''); const i = t.indexOf('['); return i < 0 ? t : t.slice(0, i) })).filter((t) => known.has(t)))
   const roots = names.filter((n) => !referenced.has(n))
   if (roots.length !== 1) throw new Error(`Ambiguous EIP-712 primary type: ${roots.join(', ') || 'none'}. Pass primaryType.`)
   return roots[0]!

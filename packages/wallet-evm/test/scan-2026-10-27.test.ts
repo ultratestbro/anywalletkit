@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { WalletManagerEvm, describeTransaction, describeTypedData } from '../src/index.js'
+import { WalletManagerEvm, describeTransaction, describeTypedData, inferPrimaryType } from '../src/index.js'
+import { decodeTokenString } from '../src/token-info.js'
 
 // 2026-10-27 key/signing scan: the exploit inputs from the report, refused before anything is signed.
 
@@ -106,5 +107,33 @@ describe('scan 2026-10-27 G12 (F23): approve() is for ERC-20 tokens only', () =>
     const erc20 = provider((data) => (data.startsWith('0x313ce567') ? '0x' + '6'.padStart(64, '0') : '0x' + '0'.repeat(64)))
     await (await new WalletManagerEvm(SEED, { provider: erc20.provider as never }).getAccount(0)).approve({ token: USDC, spender: ATTACKER, amount: 0n })
     expect(erc20.sent).toHaveLength(1)
+  })
+})
+
+describe('scan 2026-10-27 G14 (F21, F24): token strings and typed data cannot freeze the thread', () => {
+  it('a name() of 1 MB of NULs then "a" decodes in well under 100 ms', () => {
+    const len = 1_000_000 + 1
+    const hex = ('0x' + (32).toString(16).padStart(64, '0') + len.toString(16).padStart(64, '0') + '00'.repeat(1_000_000) + '61' + '00'.repeat(31)) as `0x${string}`
+    const t0 = performance.now()
+    const out = decodeTokenString(hex)
+    expect(performance.now() - t0).toBeLessThan(100)
+    expect(out.length).toBeLessThanOrEqual(128)
+    // An ordinary ABI string and a bytes32 still decode.
+    const usdc = '0x' + (32).toString(16).padStart(64, '0') + (4).toString(16).padStart(64, '0') + Buffer.from('USDC').toString('hex').padEnd(64, '0')
+    expect(decodeTokenString(usdc as `0x${string}`)).toBe('USDC')
+    expect(decodeTokenString(('0x' + Buffer.from('MKR').toString('hex').padEnd(64, '0')) as `0x${string}`)).toBe('MKR')
+    // A long name is cut at 128 characters, not dropped.
+    const long = 'x'.repeat(300)
+    expect(decodeTokenString(('0x' + (32).toString(16).padStart(64, '0') + (300).toString(16).padStart(64, '0') + Buffer.from(long).toString('hex').padEnd(640, '0')) as `0x${string}`)).toBe('x'.repeat(128))
+  })
+
+  it('typed data with 20 000 types and 20 000 fields is refused quickly, not inferred quadratically', async () => {
+    const types: Record<string, Array<{ name: string; type: string }>> = {}
+    for (let i = 0; i < 20_000; i++) types[`T${i}`] = [{ name: 'f', type: `T${i + 1}` }]
+    const t0 = performance.now()
+    expect(() => inferPrimaryType(types)).toThrow(/types/)
+    const a = await new WalletManagerEvm(SEED, { chainId: 1 }).getAccount(0)
+    await expect(a.signTypedData({ domain: { chainId: 1 }, types, message: {} } as never)).rejects.toThrow()
+    expect(performance.now() - t0).toBeLessThan(200)
   })
 })
