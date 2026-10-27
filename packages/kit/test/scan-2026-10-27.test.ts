@@ -39,3 +39,42 @@ describe('scan 2026-10-27 G1 (F1): internal signing helpers behind the policy wr
     }
   })
 })
+
+const TON = 'ton:-239'
+const TON_SELF = `0:${'11'.repeat(32)}`
+const TON_TREASURY = `0:${'aa'.repeat(32)}`
+const TON_ATTACKER = `0:${'bb'.repeat(32)}`
+const TON_USDT = `0:${'cc'.repeat(32)}`
+const TON_FAKE_MASTER = `0:${'dd'.repeat(32)}`
+
+describe('scan 2026-10-27 G2 (F3, F5, F9): TON jetton transfer() is judged on everything that receives TON', () => {
+  const tonAccount = () => createMockAccount({ chain: TON, address: TON_SELF })
+
+  it('an attacker responseDestination is a destination: allowlist and blocklist refuse it', async () => {
+    const exploit = { token: TON_USDT, recipient: TON_TREASURY, amount: 1n, attachedValue: 500_000_000_000n, responseDestination: TON_ATTACKER }
+    const a = tonAccount()
+    await expect(applyPolicies(a, { allowlist: { ton: [TON_TREASURY, TON_USDT] } }, TON).transfer(exploit)).rejects.toMatchObject({ policy: 'allowlist' })
+    await expect(applyPolicies(a, { blocklist: { ton: [TON_ATTACKER] } }, TON).transfer(exploit)).rejects.toMatchObject({ policy: 'blocklist' })
+    expect(a.sent).toHaveLength(0)
+  })
+
+  it('the jetton master is a destination: a fake master is refused under an allowlist', async () => {
+    const a = tonAccount()
+    const exploit = { token: TON_FAKE_MASTER, recipient: TON_TREASURY, amount: 1n, attachedValue: 500_000_000_000n }
+    await expect(applyPolicies(a, { allowlist: { ton: [TON_TREASURY] } }, TON).transfer(exploit)).rejects.toMatchObject({ policy: 'allowlist' })
+    expect(a.sent).toHaveLength(0)
+  })
+
+  it('a forward or custom payload cell cannot be read: destinationUnknown; confirm sees attachedValue and forwardTonAmount', async () => {
+    const a = tonAccount()
+    const cell = { bits: { length: 0, at: () => false }, refs: [] }
+    for (const extra of [{ forwardPayload: cell }, { customPayload: cell }]) {
+      await expect(applyPolicies(a, { allowlist: { ton: [TON_TREASURY, TON_USDT] } }, TON).transfer({ token: TON_USDT, recipient: TON_TREASURY, amount: 1n, ...extra })).rejects.toMatchObject({ policy: 'allowlist' })
+    }
+    let seen: Record<string, unknown> = {}
+    await applyPolicies(a, { allowlist: { ton: [TON_TREASURY, TON_USDT] }, confirm: async (i) => { seen = i as never; return true } }, TON)
+      .transfer({ token: TON_USDT, recipient: TON_TREASURY, amount: 1n, responseDestination: TON_SELF, attachedValue: 60_000_000n, forwardTonAmount: 10_000_000n, memo: 'invoice 7' } as never)
+    expect(seen).toMatchObject({ destinations: [TON_TREASURY, TON_USDT], destinationUnknown: false, attachedValue: 60_000_000n, forwardTonAmount: 10_000_000n })
+    expect(a.sent).toHaveLength(1)
+  })
+})

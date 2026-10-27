@@ -95,7 +95,7 @@ describe('WalletAccountTon', () => {
     const a = await m.getAccount(0)
     const res = await a.transfer({
       token: USDT, recipient: RECIPIENT, amount: 1_000_000n,
-      forwardTonAmount: 5n, forwardPayload: 'thanks', queryId: 42n, responseDestination: RECIPIENT,
+      forwardTonAmount: 5n, forwardPayload: 'thanks', queryId: 42n, responseDestination: RECIPIENT, allowForeignResponseDestination: true,
     })
     expect(res.hash).toMatch(/^[0-9a-f]{64}$/)
     const msg = verifyExternal(f.sent[0]!, a.publicKey, ADDR0)

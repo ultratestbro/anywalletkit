@@ -67,7 +67,13 @@ The lists check every destination a write names, not only the contract it calls:
 
 An allowlist must hold **all** of them. When part of a write cannot be read, the intent has
 `destinationUnknown: true`: an allowlist refuses it, and so does a blocklist without a
-`confirm` hook. `transfer` is judged by `recipient`, the field every chain pays.
+`confirm` hook. `transfer` is judged by `recipient`, the field every chain pays. A TON jetton
+`transfer` also spends TON, so it is judged on the jetton master (it names the contract that
+receives `attachedValue`) and on a `responseDestination` other than the wallet itself (it gets
+the excess); a forward or custom payload cell makes it `destinationUnknown`, and `confirm`
+receives `attachedValue` and `forwardTonAmount`. wallet-ton itself refuses a foreign
+`responseDestination` unless `allowForeignResponseDestination` is set, and more than
+`maxJettonAttachedValue` (1 TON by default) attached.
 
 The checks and the signature work from one copy of the arguments, taken before the first check,
 and `confirm` gets a copy of its own: nothing can change what is signed after it was judged.

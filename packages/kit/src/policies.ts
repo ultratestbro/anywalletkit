@@ -173,6 +173,14 @@ export interface WriteIntent {
   approvals?: Array<{ token?: string; amount?: bigint; unlimited: boolean }>
   /** Approvals / permits: expiry as given (unix seconds). */
   deadline?: bigint
+  /**
+   * TON jetton `transfer()`: nanotons attached to the jetton-wallet call. The jetton wallet keeps
+   * the gas, forwards `forwardTonAmount` to the recipient and returns the rest to the response
+   * destination. Undefined when the caller did not set it (the wallet's default applies).
+   */
+  attachedValue?: bigint
+  /** TON jetton `transfer()`: nanotons forwarded to the recipient with the transfer notification, when set. */
+  forwardTonAmount?: bigint
   /** Revokes: what each one takes away (`spender` absent for a per-token NFT approval and an EIP-7702 delegation). */
   revokes?: Array<{ token: string; spender?: string }>
   /** The raw argument (first argument of the call), for policies that need more. */
@@ -427,10 +435,12 @@ function withDestinations(intent: DraftIntent): WriteIntent {
   if (intent.method === 'transfer') {
     // Every chain package pays `recipient` and reads nothing else; a `to` that names another
     // address makes the call ambiguous (round 3, M4).
-    const r = str(obj(intent.raw).recipient)
-    const to = str(obj(intent.raw).to)
+    const a = obj(intent.raw)
+    const r = str(a.recipient)
+    const to = str(a.to)
     const conflicting = r !== undefined && to !== undefined && canonicalAddress(intent.chain, to) !== canonicalAddress(intent.chain, r)
-    return { ...intent, destinations: r !== undefined ? [r] : [], destinationUnknown: r === undefined || conflicting }
+    const jetton = intent.chain.startsWith('ton:') && a.token !== undefined ? tonJettonTransfer(intent.chain, intent.from, a) : { list: [], unknown: false }
+    return { ...intent, destinations: [...(r !== undefined ? [r] : []), ...jetton.list], destinationUnknown: r === undefined || conflicting || jetton.unknown }
   }
   // signRaw is Tron's prebuilt-transaction signer and signBuilt NEAR's, whatever chain id the account reports.
   const chain = intent.method === 'signRaw' ? 'tron:' : intent.method === 'signBuilt' ? 'near:' : intent.chain
@@ -440,6 +450,28 @@ function withDestinations(intent: DraftIntent): WriteIntent {
   const out: WriteIntent = { ...intent, destinations: [...new Set([...d.list, ...granted])], destinationUnknown: d.unknown }
   if (d.tokenAccounts) PENDING_TOKEN_ACCOUNTS.set(out, d.tokenAccounts)
   return out
+}
+
+/**
+ * What else a TON jetton `transfer()` pays besides its recipient (scan 2026-10-27 F3, F5, F9). The
+ * master the caller names decides which contract receives `attachedValue` (a fake master returns an
+ * attacker's contract as "the jetton wallet"), and the response destination receives the excess,
+ * unless it is the wallet itself. A forward or custom payload cell is acted on by the recipient (a
+ * DEX swaps and pays whoever it names) and is not read here; a text forward payload is a comment.
+ */
+function tonJettonTransfer(chain: string, from: string, a: Record<string, unknown>): { list: string[]; unknown: boolean } {
+  const list: string[] = []
+  let unknown = false
+  const token = str(a.token)
+  if (token === undefined) unknown = true
+  else list.push(token)
+  if (a.responseDestination !== undefined) {
+    const response = str(a.responseDestination)
+    if (response === undefined) unknown = true
+    else if (canonicalAddress(chain, response) !== canonicalAddress(chain, from)) list.push(response)
+  }
+  if (a.customPayload !== undefined || (a.forwardPayload !== undefined && typeof a.forwardPayload !== 'string')) unknown = true
+  return { list, unknown }
 }
 
 function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown): WriteIntent {
@@ -471,7 +503,14 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
       // The recipient the chain package pays, never `to` (round 3, M4).
       const to = str(a.recipient)
       const amount = big(a.amount)
-      return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(typeof a.token === 'string' ? { token: a.token } : {}), ...(amount !== undefined ? { amount } : {}) }
+      // A TON jetton transfer also spends TON: what confirm must show next to the jetton amount (scan 2026-10-27 F3).
+      const ton = chain.startsWith('ton:') && a.token !== undefined
+      const attachedValue = ton ? big(a.attachedValue) : undefined
+      const forwardTonAmount = ton ? big(a.forwardTonAmount) : undefined
+      return {
+        ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(typeof a.token === 'string' ? { token: a.token } : {}), ...(amount !== undefined ? { amount } : {}),
+        ...(attachedValue !== undefined ? { attachedValue } : {}), ...(forwardTonAmount !== undefined ? { forwardTonAmount } : {}),
+      }
     }
     case 'signRaw': {
       // Tron raw transaction: the first contract's `to_address` / `amount` when present (TransferContract / TRC-20 calls name the contract).

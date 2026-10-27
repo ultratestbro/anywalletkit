@@ -60,6 +60,12 @@ export interface TonConfig {
   /** Nanotons attached to a jetton transfer on top of `forwardTonAmount` (default 0.05 TON). */
   jettonAttachedValue?: bigint | number | string
   /**
+   * Most nanotons a jetton `transfer()` may attach to the jetton-wallet call, `forwardTonAmount`
+   * included (default 1 TON). The contract that receives them is the one the jetton master names,
+   * so a fake master gets all of it: the cap bounds what such a call can cost.
+   */
+  maxJettonAttachedValue?: bigint | number | string
+  /**
    * 'mainnet' (ton:-239, default) or 'testnet' (ton:-3). Sets the CAIP-2 id, the address flags and the
    * wallet_id network (-239 / -3), so a testnet wallet has its own address and its signed messages are
    * not valid on mainnet (as in Tonkeeper and @ton/ton).
@@ -114,8 +120,14 @@ export interface TonTransferOptions {
   memo?: string
   /** Jetton only: custom payload cell (rarely needed; e.g. mintless jettons). */
   customPayload?: Cell
-  /** Jetton only: where excess TON returns (default: this wallet). */
+  /**
+   * Jetton only: where excess TON returns (default: this wallet). Another address is refused
+   * unless `allowForeignResponseDestination` is set: it receives TON the policies' recipient
+   * check never sees.
+   */
   responseDestination?: string
+  /** Jetton only: let `responseDestination` be another address than this wallet. Off by default. */
+  allowForeignResponseDestination?: boolean
   /** Jetton only: query id (default random). */
   queryId?: bigint | number
   /** Jetton only: nanotons attached to the jetton-wallet call (default config.jettonAttachedValue + forwardTonAmount). */

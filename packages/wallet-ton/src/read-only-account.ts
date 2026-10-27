@@ -13,6 +13,7 @@ import { CAIP2, type TonConfig, type TonFees, type TonReceipt, type TonSendable,
 
 const JETTON_TRANSFER_OP = 0x0f8a7ea5
 const DEFAULT_JETTON_ATTACHED = 50_000_000n // 0.05 TON
+const DEFAULT_MAX_JETTON_ATTACHED = 1_000_000_000n // 1 TON
 const DEFAULT_INDEXER = 'https://toncenter.com/api/v3'
 const DEFAULT_VALID_SECONDS = 60
 const MAX_VALID_SECONDS = 600
@@ -162,9 +163,23 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
     if (amount <= 0n) throw new UnsafeTransactionError('zero-value', 'Jetton amount must be positive.')
     const recipient = this.checkedAddress(o.recipient).address
     const response = o.responseDestination ? this.checkedAddress(o.responseDestination).address : undefined
+    // The excess of attachedValue goes to the response destination: another address than this wallet
+    // is paid TON that a recipient check never sees (scan 2026-10-27 F3).
+    if (response && !response.equals(this._address) && o.allowForeignResponseDestination !== true) {
+      throw new UnsafeTransactionError('foreign-response-destination', `The excess TON of this jetton transfer would go to ${response.toString()}, not to this wallet; pass allowForeignResponseDestination to allow it.`)
+    }
+    const forwardTon = o.forwardTonAmount !== undefined ? big(o.forwardTonAmount) : 1n
+    const attached = o.attachedValue !== undefined
+      ? big(o.attachedValue)
+      : (this._config.jettonAttachedValue !== undefined ? big(this._config.jettonAttachedValue) : DEFAULT_JETTON_ATTACHED) + forwardTon
+    // The jetton master the caller names picks the contract that receives this (scan 2026-10-27 F5, F9).
+    const maxAttached = this._config.maxJettonAttachedValue !== undefined ? big(this._config.maxJettonAttachedValue) : DEFAULT_MAX_JETTON_ATTACHED
+    if (attached > maxAttached || forwardTon > attached) {
+      throw new UnsafeTransactionError('attached-value', `A jetton transfer may attach at most ${maxAttached} nanotons, forwardTonAmount included (asked: ${attached}, forward ${forwardTon}); raise config.maxJettonAttachedValue if this is intended.`)
+    }
     const jw = await this.getJettonWalletAddress(o.token!)
     await this.jettonWalletData(o.token!, jw)
-    const forwardTonAmount = o.forwardTonAmount !== undefined ? big(o.forwardTonAmount) : 1n
+    const forwardTonAmount = forwardTon
     if (o.memo !== undefined && o.forwardPayload !== undefined) throw new UnsafeTransactionError('memo-and-payload', 'Pass either memo or forwardPayload, not both: a jetton transfer carries one forward payload.')
     const payload = o.forwardPayload ?? o.memo
     const forwardPayload = payload === undefined ? null : typeof payload === 'string' ? commentCell(payload) : payload
@@ -178,9 +193,6 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
       .storeCoins(forwardTonAmount)
       .storeMaybeRef(forwardPayload) // either-ref form: payloads always travel in a ref
       .endCell()
-    const attached = o.attachedValue !== undefined
-      ? big(o.attachedValue)
-      : (this._config.jettonAttachedValue !== undefined ? big(this._config.jettonAttachedValue) : DEFAULT_JETTON_ATTACHED) + forwardTonAmount
     return { message: internal({ to: jw, value: attached, bounce: true, body }) }
   }
 
