@@ -71,3 +71,23 @@ describe('scan 2026-10-27 G3 (F2, F4): wallet-ton signs only a body the policies
     m.dispose()
   })
 })
+
+describe('scan 2026-10-27 G4 (F18): only strict raw or CRC-checked friendly TON addresses are paid', () => {
+  it('+0:, a leading space, 0.0: and a suffix are refused for a message, a transfer and a jetton recipient', async () => {
+    const f = fakeRpc()
+    const m = new WalletManagerTon(SEED, { tonClient: ENDPOINT, fetch: f.fetch })
+    const a = await m.getAccount(0)
+    const hex = 'ab'.repeat(32)
+    for (const to of [`+0:${hex}`, ` 0:${hex}`, `0.0:${hex}`, `0:${hex}:x`]) {
+      await expect(a.sendTransaction({ to, value: 1n })).rejects.toMatchObject({ code: 'address' })
+      await expect(a.transfer({ recipient: to, amount: 1n })).rejects.toMatchObject({ code: 'address' })
+      await expect(a.transfer({ token: USDT, recipient: to, amount: 1n })).rejects.toMatchObject({ code: 'address' })
+    }
+    // A friendly address with a broken checksum is refused too.
+    await expect(a.transfer({ recipient: RECIPIENT.slice(0, -1) + (RECIPIENT.endsWith('i') ? 'j' : 'i'), amount: 1n })).rejects.toThrow()
+    expect(f.sent).toHaveLength(0)
+    await a.transfer({ recipient: `0:${hex}`, amount: 1n })
+    expect(f.sent).toHaveLength(1)
+    m.dispose()
+  })
+})

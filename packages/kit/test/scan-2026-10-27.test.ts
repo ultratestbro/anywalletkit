@@ -106,3 +106,26 @@ describe('scan 2026-10-27 G3 (F2, F4): a TON body the kit cannot read the way th
     expect(seen.destinationUnknown).toBe(true)
   })
 })
+
+describe('scan 2026-10-27 G4 (F18): a TON address in a loose spelling is not a known destination', () => {
+  const hex = 'ab'.repeat(32)
+  const loose = [`+0:${hex}`, ` 0:${hex}`, `0.0:${hex}`, `0:${hex}:x`, `0:${hex} `]
+  it('the blocklist cannot be dodged with +0:, a space, 0.0: or a suffix', async () => {
+    for (const to of loose) {
+      const a = createMockAccount({ chain: TON, address: TON_SELF })
+      await expect(applyPolicies(a, { blocklist: { ton: [`0:${hex}`] } }, TON).sendTransaction({ to, value: 1n } as never)).rejects.toMatchObject({ policy: 'blocklist' })
+      await expect(applyPolicies(a, { blocklist: { ton: [`0:${hex}`] } }, TON).transfer({ recipient: to, amount: 1n })).rejects.toMatchObject({ policy: 'blocklist' })
+      let seen: Record<string, unknown> = {}
+      await applyPolicies(a, { confirm: async (i) => { seen = i as never; return true } }, TON).transfer({ recipient: to, amount: 1n })
+      expect([to, seen.destinationUnknown]).toEqual([to, true])
+    }
+  })
+  it('the strict raw and friendly forms stay known', async () => {
+    let seen: Record<string, unknown> = {}
+    const a = createMockAccount({ chain: TON, address: TON_SELF })
+    await applyPolicies(a, { confirm: async (i) => { seen = i as never; return true } }, TON).transfer({ recipient: `-1:${hex}`, amount: 1n })
+    expect(seen.destinationUnknown).toBe(false)
+    await applyPolicies(a, { confirm: async (i) => { seen = i as never; return true } }, TON).transfer({ recipient: 'UQAockb65N9NqreZHrYfhipG94Q_gZYTBkV0mvaopLEEzOgi', amount: 1n })
+    expect(seen.destinationUnknown).toBe(false)
+  })
+})

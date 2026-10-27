@@ -1,6 +1,6 @@
 import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
-import { canonicalAddress, erc20Transfer, hexData, sendDestinations } from './destinations.js'
+import { canonicalAddress, erc20Transfer, hexData, sendDestinations, tonRawAddress } from './destinations.js'
 import { snapshot } from './snapshot.js'
 
 /**
@@ -475,7 +475,11 @@ function tonJettonTransfer(chain: string, from: string, a: Record<string, unknow
 }
 
 function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown): WriteIntent {
-  return withDestinations(draftIntentOf(chain, from, method, arg))
+  const intent = withDestinations(draftIntentOf(chain, from, method, arg))
+  // TON: a destination in a spelling the lists cannot compare ('+0:…', ' 0:…', '0.0:…') is not a
+  // known one, whatever the chain package makes of it (scan 2026-10-27 F18).
+  if (canonicalNamespace(chain.split(':')[0]!) === 'ton' && intent.destinations.some((d) => tonRawAddress(d) === null)) intent.destinationUnknown = true
+  return intent
 }
 
 function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: unknown): DraftIntent {

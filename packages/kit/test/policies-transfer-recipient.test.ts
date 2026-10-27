@@ -8,6 +8,7 @@ import { applyPolicies, type WriteIntent } from '../src/index.js'
 
 const ALLOWED = '0x000000000000000000000000000000000000beef'
 const DRAINER = '0x000000000000000000000000000000000000dead'
+const [EVM_ALLOWED, EVM_DRAINER] = [ALLOWED, DRAINER]
 
 async function seen(chain: string, options: Record<string, unknown>): Promise<WriteIntent> {
   let intent: WriteIntent | undefined
@@ -19,6 +20,8 @@ async function seen(chain: string, options: Record<string, unknown>): Promise<Wr
 describe('transfer: the recipient the chain package pays is the one judged and shown', () => {
   for (const chain of ['eip155:1', 'solana:mainnet', 'tron:mainnet', 'ton:mainnet', 'near:mainnet', 'bip122:000000000019d6689c085ae165831e93']) {
     it(`${chain}: intent.to is the recipient; a different \`to\` makes the destination unknown`, async () => {
+      // TON compares raw addresses only: an EVM-style placeholder there is no TON address (scan 2026-10-27 F18).
+      const [DRAINER, ALLOWED] = chain.startsWith('ton:') ? [`0:${'de'.repeat(32)}`, `0:${'be'.repeat(32)}`] : [EVM_DRAINER, EVM_ALLOWED]
       const both = await seen(chain, { recipient: DRAINER, to: ALLOWED, amount: 1n })
       expect(both.to).toBe(DRAINER)
       expect(both.destinations).toEqual([DRAINER])

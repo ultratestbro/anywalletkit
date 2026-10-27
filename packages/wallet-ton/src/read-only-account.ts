@@ -14,6 +14,8 @@ import { CAIP2, type TonConfig, type TonFees, type TonReceipt, type TonSendable,
 const JETTON_TRANSFER_OP = 0x0f8a7ea5
 const DEFAULT_JETTON_ATTACHED = 50_000_000n // 0.05 TON
 const DEFAULT_MAX_JETTON_ATTACHED = 1_000_000_000n // 1 TON
+/** The one raw spelling the wallet pays: workchain digits, a colon, 64 hex digits. */
+const RAW_ADDRESS = /^-?\d+:[0-9a-fA-F]{64}$/
 const DEFAULT_INDEXER = 'https://toncenter.com/api/v3'
 const DEFAULT_VALID_SECONDS = 60
 const MAX_VALID_SECONDS = 600
@@ -134,11 +136,14 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
     let address: Address
     let bounceable = true
     let testOnly: boolean | undefined
-    if (Address.isFriendly(to)) {
-      const f = Address.parseFriendly(to)
+    if (typeof to === 'string' && Address.isFriendly(to)) {
+      const f = Address.parseFriendly(to) // checks the CRC
       address = f.address; bounceable = f.isBounceable; testOnly = f.isTestOnly
-    } else {
+    } else if (typeof to === 'string' && RAW_ADDRESS.test(to)) {
       address = Address.parse(to)
+    } else {
+      // @ton/core also parses '+0:…', ' 0:…', '0.0:…' and '0:…:x' as 0:…, spellings a blocklist does not match (scan 2026-10-27 F18).
+      throw new UnsafeTransactionError('address', `${JSON.stringify(to)} is not a TON address in a strict form (raw wc:hex, or a friendly address with its checksum).`)
     }
     if (address.workChain !== 0 && address.workChain !== -1) throw new UnsafeTransactionError('exotic-workchain', `Refusing to send to workchain ${address.workChain}.`)
     const testnet = this._config.network === 'testnet'
