@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-cctp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Circle CCTP V2 for the swap2 engine: native USDC between EVM chains by burn-and-mint (Fast Transfer or Standard), attestation via Circle's Iris API, two-phase delivery with the user's own receiveMessage claim. Bound to Circle's documented contracts and native USDC per domain.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

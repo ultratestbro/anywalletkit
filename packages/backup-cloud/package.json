@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/backup-cloud",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Cloud backups for React Native wallets on Any Wallet Kit: seed-vault backup files in the app's hidden iCloud Drive container, and a no-password option whose key lives in iCloud Keychain (end-to-end encrypted by Apple) while the file lives in iCloud Drive — neither alone opens it. One call to back up a keyring secret, one to list, check and restore; the fingerprint is compared before anything is written. An Expo config plugin adds the iCloud entitlements. Android (Google Drive appDataFolder, Block Store) is next.",
   "license": "Apache-2.0",
   "engines": { "node": ">=22" },

@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/wallet-evm",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "EVM wallet for Any Wallet Kit: BIP-32 m/44'/60'/0'/0/i accounts, EIP-191 / EIP-712 / EIP-1559 signing, ERC-20 transfer and approve, built on viem.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

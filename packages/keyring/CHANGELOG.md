@@ -1,5 +1,13 @@
 # @anywalletkit/keyring
 
+## 0.3.7
+
+### Patch Changes
+
+- eb14cb5: npm metadata: every package has a description and the `anywalletkit` keyword. The LI.FI, NEAR Intents, Omniston and THORChain packages had an empty description, so npm showed the README badge markdown in its place, and 24 packages were missing from a `keywords:anywalletkit` search. `pnpm pack:check` now refuses a package without either.
+- Updated dependencies [eb14cb5]
+  - @anywalletkit/core@0.6.1
+
 ## 0.3.6
 
 ### Patch Changes

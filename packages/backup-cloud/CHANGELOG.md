@@ -1,5 +1,12 @@
 # @anywalletkit/backup-cloud
 
+## 0.2.6
+
+### Patch Changes
+
+- Updated dependencies [b1350b4]
+  - @anywalletkit/seed-vault@0.2.6
+
 ## 0.2.5
 
 ### Patch Changes

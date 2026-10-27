@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-staking-tonstakers-ton
 
+## 0.2.9
+
+### Patch Changes
+
+- Updated dependencies [eb14cb5]
+  - @anywalletkit/core@0.6.1
+
 ## 0.2.8
 
 ### Patch Changes

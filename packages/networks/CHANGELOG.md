@@ -1,5 +1,12 @@
 # @anywalletkit/networks
 
+## 0.2.7
+
+### Patch Changes
+
+- Updated dependencies [eb14cb5]
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.2.6
 
 ### Patch Changes

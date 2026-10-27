@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-staking-lido-evm
 
+## 0.3.8
+
+### Patch Changes
+
+- Updated dependencies [eb14cb5]
+  - @anywalletkit/core@0.6.1
+
 ## 0.3.7
 
 ### Patch Changes

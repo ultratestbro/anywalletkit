@@ -1,5 +1,15 @@
 # @anywalletkit/wallet-ton
 
+## 0.3.1
+
+### Patch Changes
+
+- b1350b4: Every type a public signature uses is exported, so the API reference documents it and apps can name it: the provider config types (`LifiSwap2Config`, `BalancerSwap2Config`, `NearIntentsSwap2Config`, `FyndSwap2Config`, …), the explorer client options in history-evm (`EtherscanClientOptions`, `AlchemyClientOptions`, `BlockscoutClientOptions`), `Swap2ExecutionPhase`, the Omniston client shapes, and the row / view types the chain packages already expose through their methods. Type-only additions, plus the account-meta role constants of native SOL staking (`READONLY`, `WRITABLE`, …). Renames on export: Aave and Morpho activity `Action` → `AaveActivityAction` / `MorphoActivityAction`; conformance `ProtocolCtor` / `WriteProtocolCtor`; history-evm `RawRow`.
+- eb14cb5: npm metadata: every package has a description and the `anywalletkit` keyword. The LI.FI, NEAR Intents, Omniston and THORChain packages had an empty description, so npm showed the README badge markdown in its place, and 24 packages were missing from a `keywords:anywalletkit` search. `pnpm pack:check` now refuses a package without either.
+- 5392d40: `@noble/curves` is a dependency. The read-only account imports `@noble/curves/ed25519.js` at runtime, but the package listed it only under `devDependencies`, so an app that did not install it itself (or get it hoisted from another package) failed with "Cannot find module '@noble/curves/ed25519.js'" on import. `pnpm pack:check` now refuses any package whose shipped JavaScript imports a package it does not declare as a dependency, peer or optional dependency.
+- Updated dependencies [eb14cb5]
+  - @anywalletkit/core@0.6.1
+
 ## 0.3.0
 
 ### Minor Changes

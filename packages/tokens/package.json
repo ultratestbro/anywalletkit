@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/tokens",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Tokens users add themselves, at their own risk: read a token's decimals, symbol, name and holder-relevant facts from the chain (EVM contracts, Solana mints incl. Token-2022 extensions), a risk assessment that flags look-alikes of known tokens and issuer powers, and a persistent list (TokensTable over any JSON storage) that apps show beside the swap catalog and can swap through the engines that accept unlisted tokens.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

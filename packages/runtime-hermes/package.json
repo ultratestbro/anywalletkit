@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/runtime-hermes",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "The one documented place for React Native / Hermes polyfills Any Wallet Kit relies on: AbortSignal.timeout/any, crypto.subtle.digest, TextEncoder checks, Buffer.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
