@@ -6,11 +6,14 @@
  *   - LICENSE, README.md and package.json are inside;
  *   - every file `main` / `module` / `types` / `exports` points at is inside;
  *   - repository.url + directory match this repo (npm provenance checks them),
- *     publishConfig.access = public and provenance = true.
+ *     publishConfig.access = public and provenance = true;
+ *   - every package the shipped JavaScript imports is a dependency, peer or
+ *     optional dependency (a devDependency is not installed for consumers).
  * Run after `pnpm build`. Exit 1 on the first package with a problem list.
  */
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { builtinModules } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -24,6 +27,27 @@ let packed = 0
 const targets = (node, acc = []) => {
   if (typeof node === 'string') acc.push(node)
   else if (node && typeof node === 'object') for (const v of Object.values(node)) targets(v, acc)
+  return acc
+}
+
+const BUILTINS = new Set(builtinModules)
+const SPEC = String.raw`["']((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*(?:\/[\w.-]+)*)["']`
+// Static imports/re-exports start a line in tsup output; error messages that
+// quote `import 'x'` do not, so they are not counted.
+const IMPORT = new RegExp(String.raw`^(?:import|export)\b[^;'"]*?\bfrom\s*${SPEC}|^import\s*${SPEC}|\b(?:require|import)\s*\(\s*${SPEC}\s*\)`, 'gm')
+const packageOf = (spec) => spec.split('/').slice(0, spec.startsWith('@') ? 2 : 1).join('/')
+// Bare specifiers the shipped .js / .cjs / .mjs files import, by package name.
+const importedPackages = (dir, acc = new Set()) => {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name)
+    if (e.isDirectory()) importedPackages(p, acc)
+    else if (/\.(c|m)?js$/.test(e.name)) {
+      for (const m of readFileSync(p, 'utf8').matchAll(IMPORT)) {
+        const spec = m[1] ?? m[2] ?? m[3]
+        if (!spec.startsWith('node:') && !BUILTINS.has(packageOf(spec))) acc.add(packageOf(spec))
+      }
+    }
+  }
   return acc
 }
 
@@ -53,6 +77,13 @@ for (const dir of readdirSync(join(root, 'packages')).sort()) {
   if (pkg.repository?.directory !== `packages/${dir}`) bad.push(`repository.directory = ${pkg.repository?.directory}`)
   if (pkg.publishConfig?.access !== 'public' || pkg.publishConfig?.provenance !== true) bad.push('publishConfig must be { access: public, provenance: true }')
   if (pkg.private) bad.push('private: true')
+  const unpacked = join(out, dir)
+  mkdirSync(unpacked)
+  execFileSync('tar', ['-xzf', tgz, '-C', unpacked])
+  const declared = new Set([pkg.name, ...['dependencies', 'peerDependencies', 'optionalDependencies'].flatMap((f) => Object.keys(pkg[f] ?? {}))])
+  for (const name of importedPackages(join(unpacked, 'package'))) {
+    if (!declared.has(name)) bad.push(`imports ${name} but does not declare it as a dependency${pkg.devDependencies?.[name] ? ' (only a devDependency)' : ''}`)
+  }
   if (bad.length) problems.push(`${where}:\n  - ${bad.join('\n  - ')}`)
   packed++
 }

@@ -44,6 +44,7 @@
   ],
   "dependencies": {
     "@anywalletkit/core": "workspace:*",
+    "@noble/curves": "^2.4.0",
     "@solana-program/compute-budget": "^0.19.0",
     "@solana-program/system": "^0.15.0",
     "@solana-program/token": "^0.17.0",
@@ -53,7 +54,6 @@
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/protocol-staking-spl-stake-pool-solana": "workspace:*",
-    "@noble/curves": "^2.4.0",
     "vitest": "^5.0.3"
   },
   "publishConfig": { "access": "public", "provenance": true }
