@@ -1,7 +1,7 @@
 export * from './types.js'
 export * from './errors.js'
 export { addressFromPublicKey, toHexAddress, toBase58Address, isHexAddress } from './address.js'
-export { selector, encodeParameters, decodeUint, decodeAddressWord, splitCalldata, decodeRevertReason, hexToText } from './abi.js'
+export { selector, encodeParameters, encodeCall, decodeUint, decodeAddressWord, splitCalldata, decodeRevertReason, hexToText } from './abi.js'
 export { createClient } from './client.js'
 export { isPrebuilt, isContractCall } from './shape.js'
 export { describeTransaction, ZERO_ADDRESS, ZERO_ADDRESS_HEX, type DescribeContext } from './describe.js'

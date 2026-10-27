@@ -2,7 +2,7 @@ import { NetworkError, feeLimit as feeLimit_, type IWalletAccountReadOnly, bigin
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import { hexToBytes } from '@noble/hashes/utils.js'
-import { decodeRevertReason, encodeParameters, decodeUint, hexToText, selector } from './abi.js'
+import { decodeRevertReason, encodeCall, encodeParameters, decodeUint, hexToText, selector } from './abi.js'
 import { addressFromPublicKey, toBase58Address, toHexAddress } from './address.js'
 import { assertNoError, createClient } from './client.js'
 import { describeTransaction, type DescribeContext } from './describe.js'
@@ -181,6 +181,8 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
     if (isPrebuilt(tx)) return { built: tx }
     if (isContractCall(tx)) {
       const { contractAddress, functionSelector, parameters = [], options = {} } = tx
+      // The calldata the node is asked for and checked against: parameters that match the signature, one word each (scan 2026-10-27 F14).
+      const data = encodeCall(functionSelector, parameters)
       const sim = await this.simulateCall({ contractAddress, functionSelector, parameters, options })
       let feeLimit = options.feeLimit
       if (feeLimit === undefined) {
@@ -191,14 +193,14 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
       }
       const r = await this.post<{ transaction?: TronRawTransaction; result?: { result?: boolean } }>('/wallet/triggersmartcontract', {
         owner_address: this.addressHex, contract_address: toHexAddress(contractAddress), function_selector: functionSelector,
-        parameter: encodeParameters(parameters), fee_limit: feeLimit, call_value: options.callValue ?? 0, visible: false,
+        parameter: data.slice(8), fee_limit: feeLimit, call_value: options.callValue ?? 0, visible: false,
       }, 'build a contract call')
       if (!r.transaction) throw new Error('triggersmartcontract returned no transaction')
       const built = tx.memo ? attachMemo(r.transaction, tx.memo, tx.memoEncoding) : r.transaction
       // The node is not trusted with what it builds (scan F7): the bytes must be exactly this call.
       assertNodeBuild(built, {
         type: 'TriggerSmartContract', owner: this.addressHex, contract: contractAddress,
-        data: selector(functionSelector) + encodeParameters(parameters), callValue: BigInt(options.callValue ?? 0), feeLimit: BigInt(feeLimit),
+        data, callValue: BigInt(options.callValue ?? 0), feeLimit: BigInt(feeLimit),
       }, tx.memo ? memoBytes(tx.memo, tx.memoEncoding) : undefined)
       return { built, sim }
     }
@@ -219,7 +221,7 @@ export class WalletAccountReadOnlyTron implements IWalletAccountReadOnly {
   protected async simulateCall(tx: TronContractCall): Promise<TronSimulation> {
     return this.constantSimulation({
       owner_address: this.addressHex, contract_address: toHexAddress(tx.contractAddress), function_selector: tx.functionSelector,
-      parameter: encodeParameters(tx.parameters ?? []), call_value: tx.options?.callValue ?? 0, visible: false,
+      parameter: encodeCall(tx.functionSelector, tx.parameters ?? []).slice(8), call_value: tx.options?.callValue ?? 0, visible: false,
     })
   }
 
