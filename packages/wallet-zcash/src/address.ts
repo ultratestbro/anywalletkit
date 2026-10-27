@@ -62,7 +62,10 @@ export function encodeAddress(kind: ScriptKind, hash: Uint8Array, network: Zcash
 
 /** Decode and validate a transparent address for `network`; throws a message that names the problem. */
 export function decodeAddress(address: string, network: ZcashNetwork): DecodedAddress {
-  const a = address.trim()
+  // Never trimmed: a policy reads the string as given, so ' t1…' or 't1…\uFEFF' must not quietly become
+  // the address it compared against (scan 2026-10-27 F19).
+  if (typeof address !== 'string' || /\s/.test(address)) throw new Error(`Invalid Zcash address: it carries whitespace or an invisible character (${JSON.stringify(address)}).`)
+  const a = address
   if (/^u1|^utest/i.test(a)) throw new Error(`Unified address (${a.slice(0, 6)}…) — shielded receivers are not supported; use a transparent t-address.`)
   if (/^zs1|^ztestsapling/i.test(a)) throw new Error('Sapling shielded address (zs1…) — this wallet sends to transparent t-addresses only.')
   if (/^zc/i.test(a) && a.length > 90) throw new Error('Sprout address (zc…) — the Sprout pool is deprecated; use a transparent t-address.')

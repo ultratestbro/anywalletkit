@@ -508,6 +508,9 @@ function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown
   // TON: a destination in a spelling the lists cannot compare ('+0:…', ' 0:…', '0.0:…') is not a
   // known one, whatever the chain package makes of it (scan 2026-10-27 F18).
   if (canonicalNamespace(chain.split(':')[0]!) === 'ton' && intent.destinations.some((d) => tonRawAddress(d) === null)) intent.destinationUnknown = true
+  // Zcash: a recipient that is not plain base58 (padded with a space or U+FEFF) is not a known one, however
+  // the chain package would read it (scan 2026-10-27 F19).
+  if (chain.startsWith('zcash:') && intent.destinations.some((d) => !/^[1-9A-HJ-NP-Za-km-z]+$/.test(d))) intent.destinationUnknown = true
   return intent
 }
 

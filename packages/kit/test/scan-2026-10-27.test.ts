@@ -285,3 +285,30 @@ describe('scan 2026-10-27 G12 (F20): approve({ amount: 0 }) is a revoke only on 
     expect(seen.kind).toBe('revoke')
   })
 })
+
+describe('scan 2026-10-27 G13 (F13): a Stake instruction whose layout-deciding account is unresolved is unknown', () => {
+  const STAKE = 'Stake11111111111111111111111111111111111111'
+  const SA = 'BQcdHdAQW1hczDbBi9hiegXPR7MzRYNM4gYHBJLjHCkS'
+  const ME = '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin'
+  const DRAINER = 'DRpbCBMxVnDK7maPM5tGv6MvB3v1sRMC86PZ8okm21hy'
+  const u32 = (v: number) => [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >>> 24) & 0xff]
+  it('AuthorizeChecked with the Clock slot from a lookup table: the blocklisted new authority cannot hide behind the wallet', async () => {
+    // The Clock account sits in a lookup table: no address here.
+    const tx = { instructions: [{ programAddress: STAKE, accounts: [{ address: SA }, { lookupTableAddress: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', addressIndex: 0 }, { address: ME }, { address: DRAINER }], data: Uint8Array.from([...u32(10), ...u32(1)]) }] }
+    const sol = () => createMockAccount({ chain: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp', address: ME })
+    await expect(applyPolicies(sol(), { blocklist: { solana: [DRAINER] } }, 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp').sendTransaction(tx as never)).rejects.toMatchObject({ policy: 'blocklist' })
+    await expect(applyPolicies(sol(), { allowlist: { solana: [ME, SA] } }, 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp').sendTransaction(tx as never)).rejects.toMatchObject({ policy: 'allowlist' })
+  })
+})
+
+describe('scan 2026-10-27 G13 (F19): a Zcash recipient that is not plain base58 is unknown', () => {
+  const T1 = 't1Ju9gpPpCwUZgjiNnCMGxfyLL4TQLK8W5B'
+  it('a blocklisted address padded with U+FEFF or a space is refused by the blocklist; case is not folded', async () => {
+    for (const recipient of [T1 + '﻿', ' ' + T1, T1 + ' ']) {
+      await expect(applyPolicies(createMockAccount({ chain: 'zcash:mainnet' }), { blocklist: { zcash: [T1] } }, 'zcash:mainnet').transfer({ recipient, amount: 1n })).rejects.toMatchObject({ policy: 'blocklist' })
+    }
+    await expect(applyPolicies(createMockAccount({ chain: 'zcash:mainnet' }), { blocklist: { zcash: [T1] } }, 'zcash:mainnet').transfer({ recipient: T1, amount: 1n })).rejects.toMatchObject({ policy: 'blocklist' })
+    // base58 is case-sensitive: another case is another address, not the listed one.
+    await expect(applyPolicies(createMockAccount({ chain: 'zcash:mainnet' }), { allowlist: { zcash: [T1] } }, 'zcash:mainnet').transfer({ recipient: T1.toLowerCase(), amount: 1n })).rejects.toMatchObject({ policy: 'allowlist' })
+  })
+})

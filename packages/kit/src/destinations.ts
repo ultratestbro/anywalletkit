@@ -130,6 +130,8 @@ export function canonicalAddress(chain: string, address: string): string {
   const ns = chain.split(':')[0]
   if (ns === 'tron') return tronHexAddress(address) ?? address.toLowerCase()
   if (ns === 'ton') return tonRawAddress(address) ?? address.toLowerCase()
+  // Zcash transparent addresses are base58: case-sensitive, compared exactly (scan 2026-10-27 F19).
+  if (ns === 'zcash') return address
   return address.toLowerCase()
 }
 
@@ -517,9 +519,10 @@ function stakeIxDestinations(ix: SolIx): Array<string | undefined> {
       return d[i] === 1 ? [keyAt(i + 1)] : []
     }
     case 7: return [at(0)] // Merge: the destination stake account
-    case 9: { const legacy = at(1) === SYSVAR_RENT; return [at(legacy ? 2 : 1), at(legacy ? 3 : 2)] } // InitializeChecked
-    case 10: return [at(at(1) === SYSVAR_CLOCK ? 3 : 2)] // AuthorizeChecked
-    case 11: return [at(at(2) === SYSVAR_CLOCK ? 3 : 2)] // AuthorizeCheckedWithSeed
+    // The sysvar that decides the layout may sit in a lookup table: then the slots are unknown (scan 2026-10-27 F13).
+    case 9: { if (at(1) === undefined) return [undefined]; const legacy = at(1) === SYSVAR_RENT; return [at(legacy ? 2 : 1), at(legacy ? 3 : 2)] } // InitializeChecked
+    case 10: return at(1) === undefined ? [undefined] : [at(at(1) === SYSVAR_CLOCK ? 3 : 2)] // AuthorizeChecked
+    case 11: return at(2) === undefined ? [undefined] : [at(at(2) === SYSVAR_CLOCK ? 3 : 2)] // AuthorizeCheckedWithSeed
     case 12: return at(2) !== undefined ? [at(2)] : [] // SetLockupChecked: the new custodian when given
     default: return [undefined]
   }

@@ -65,6 +65,10 @@ const SYSVAR_RENT = 'SysvarRent111111111111111111111111111111111'
  */
 export function decodeStakeInstruction(data: Uint8Array, accounts: readonly (string | null)[]): StakeInstructionDetails | undefined {
   const at = (n: number) => accounts[n] ?? undefined
+  // Which layout an instruction uses (with or without a sysvar) is read off one account. When that account
+  // is unresolved (a lookup-table entry), the layout is unknown: the accounts it decides are left
+  // undefined, so a guard refuses rather than reading the wrong slot (scan 2026-10-27 F13).
+  const layout = (n: number, sysvar: string): boolean | undefined => (accounts[n] == null ? undefined : accounts[n] === sysvar)
   const set = (o: { [K in keyof StakeInstructionDetails]?: StakeInstructionDetails[K] | undefined }): StakeInstructionDetails =>
     Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as unknown as StakeInstructionDetails
   try {
@@ -76,9 +80,9 @@ export function decodeStakeInstruction(data: Uint8Array, accounts: readonly (str
       case 'Initialize': return { name, staker: r.key(), withdrawer: r.key(), lockupTimestamp: r.i64(), lockupEpoch: r.u64(), custodian: r.key() }
       case 'Authorize': return { name, newAuthority: r.key(), authorityType: r.authority() }
       case 'AuthorizeWithSeed': { const newAuthority = r.key(); const authorityType = r.authority(); r.string(); r.key(); return { name, newAuthority, authorityType } }
-      case 'AuthorizeChecked': return set({ name, authorityType: r.authority(), newAuthority: at(at(1) === SYSVAR_CLOCK ? 3 : 2) })
-      case 'AuthorizeCheckedWithSeed': { const authorityType = r.authority(); r.string(); r.key(); return set({ name, authorityType, newAuthority: at(at(2) === SYSVAR_CLOCK ? 3 : 2) }) }
-      case 'InitializeChecked': { const legacy = at(1) === SYSVAR_RENT; return set({ name, staker: at(legacy ? 2 : 1), withdrawer: at(legacy ? 3 : 2) }) }
+      case 'AuthorizeChecked': { const clock = layout(1, SYSVAR_CLOCK); return set({ name, authorityType: r.authority(), newAuthority: clock === undefined ? undefined : at(clock ? 3 : 2) }) }
+      case 'AuthorizeCheckedWithSeed': { const authorityType = r.authority(); r.string(); r.key(); const clock = layout(2, SYSVAR_CLOCK); return set({ name, authorityType, newAuthority: clock === undefined ? undefined : at(clock ? 3 : 2) }) }
+      case 'InitializeChecked': { const legacy = layout(1, SYSVAR_RENT); return set({ name, staker: legacy === undefined ? undefined : at(legacy ? 2 : 1), withdrawer: legacy === undefined ? undefined : at(legacy ? 3 : 2) }) }
       case 'Split': case 'Withdraw': case 'MoveStake': case 'MoveLamports': return { name, lamports: r.u64() }
       case 'SetLockup': return set({ name, lockupTimestamp: r.option(() => r.i64()), lockupEpoch: r.option(() => r.u64()), custodian: r.option(() => r.key()) })
       case 'SetLockupChecked': return set({ name, lockupTimestamp: r.option(() => r.i64()), lockupEpoch: r.option(() => r.u64()), custodian: at(2) })
