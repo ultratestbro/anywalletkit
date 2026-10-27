@@ -1,6 +1,6 @@
 import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
-import { canonicalAddress, erc20Transfer, hexData, sendDestinations, tonRawAddress, tronCallData } from './destinations.js'
+import { canonicalAddress, erc20Transfer, hexData, sendDestinations, tonRawAddress, tronCallData, tronRawIntent } from './destinations.js'
 import { snapshot } from './snapshot.js'
 
 /**
@@ -517,12 +517,10 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
       }
     }
     case 'signRaw': {
-      // Tron raw transaction: the first contract's `to_address` / `amount` when present (TransferContract / TRC-20 calls name the contract).
-      const first = obj((obj(a.raw_data).contract as unknown[] | undefined)?.[0])
-      const value = obj(obj(first.parameter).value)
-      const to = str(value.to_address) ?? str(value.contract_address)
-      const amount = big(value.amount)
-      return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(amount !== undefined ? { amount } : {}) }
+      // Tron raw transaction: what the signed bytes (raw_data_hex) pay, never the JSON copy — a vote's JSON
+      // could say "1 TRX to the merchant" (scan 2026-10-27 F26). TRC-20 calls name the contract, with the token amount.
+      const r = tronRawIntent(a.raw_data_hex)
+      return { ...base, kind: 'send', message: false, ...(r.to !== undefined ? { to: r.to } : {}), ...(r.token !== undefined ? { token: r.token } : {}), ...(r.amount !== undefined ? { amount: r.amount } : {}) }
     }
   }
   if (MESSAGE_METHODS.includes(method)) return { ...base, kind: 'message', message: true }

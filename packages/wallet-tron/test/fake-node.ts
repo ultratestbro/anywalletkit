@@ -4,6 +4,9 @@ import { encodeRawData, selector, toHexAddress, type TronFetch, type TronRawTran
 
 export const NOW = 1_800_000_000_000
 export const RECIPIENT = 'TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK' // account 1 — "new" account in the fake node
+/** The fake chain's head block (its low 16 bits are a1b2) and the hash part of its block ids. */
+export const HEAD_BLOCK = 0x3fa1b2
+export const REF_BLOCK_HASH = '0011223344556677'
 
 /**
  * Fake full node. raw_data_hex is real protobuf (encodeRawData) padded towards real sizes (134 raw bytes
@@ -48,6 +51,10 @@ export function fakeNode(overrides: Record<string, (body: Record<string, unknown
     '/wallet/getchainparameters': () => ({ chainParameter: [{ key: 'getTransactionFee', value: 1000 }, { key: 'getEnergyFee', value: 210 }, { key: 'getMemoFee', value: 1_000_000 }, { key: 'getCreateAccountFee', value: 100_000 }, { key: 'getCreateNewAccountFeeInSystemContract', value: 1_000_000 }, ...(opts.params ?? [])] }),
     '/wallet/broadcasttransaction': (b) => { broadcast.push(b as unknown as TronRawTransaction); return { result: true, txid: b.txID } },
     '/wallet/gettransactioninfobyid': () => ({}),
+    // The fake chain: its head's low 16 bits are the a1b2 every build references, and every block id
+    // carries 0011223344556677 at bytes 8..16 (the ref_block_hash of those builds).
+    '/wallet/getnowblock': () => ({ block_header: { raw_data: { number: HEAD_BLOCK } } }),
+    '/wallet/getblockbynum': (b) => ({ blockID: Number(b.num).toString(16).padStart(16, '0') + REF_BLOCK_HASH + '0'.repeat(32) }),
     ...overrides,
   }
   const fetch: TronFetch = async (path, body) => { const b = body as Record<string, unknown>; calls.push({ path, body: b }); const h = handlers[path]; if (!h) throw new Error(`unmocked ${path}`); return h(b) }

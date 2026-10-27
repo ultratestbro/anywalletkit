@@ -38,6 +38,13 @@ export interface TronConfig {
    * (ParticipateAssetIssue, Exchange*, MarketSellAsset, CreateSmartContract with a call value).
    */
   allowUndecodedContracts?: boolean
+  /**
+   * Sign for a non-mainnet network without a provider (default false — refused). A Tron transaction
+   * is bound to its network only by its reference block, and the key is the same on every network:
+   * offline, the wallet cannot tell a mainnet reference block from a testnet one, so a "testnet"
+   * signature could move mainnet funds.
+   */
+  allowOfflineTestnetSigning?: boolean
 }
 
 /** Native TRX transfer. `value` in sun. `memo` → `raw_data.data` (charged the memo fee). */

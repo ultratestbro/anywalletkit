@@ -42,14 +42,21 @@ the node builds it.
 Every `signTransaction` / `sendTransaction` / `transfer` goes through the same gate:
 
 1. **Hard checks** (`UnsafeTransactionError`, with a `code`): exactly one contract; `owner_address`
-   is this account; `ref_block_bytes` / `ref_block_hash` present; `expiration` in the future and
+   is this account; `ref_block_bytes` / `ref_block_hash` present and, with a provider, the reference
+   block a block of the configured network (`ref-block-mismatch`; a Tron signature is bound to its
+   network only by that block) — offline, only a mainnet account signs unless
+   `allowOfflineTestnetSigning: true` (`offline-network`); `raw_data.data` at most 512 bytes (`memo`);
+   `expiration` in the future and
    at most 24 h away; no TRX / TRC-20 transfer to the zero address unless `allowBurn: true`;
    `fee_limit` ≤ the tighter of `transactionMaxFee` and `WriteOptions.maxFee`, and `fee_limit` plus the
    bandwidth / memo / activation fees it does not cover within that cap (`fee-limit`); no `AccountPermissionUpdateContract` (it hands the
    account's keys over) unless `allowPermissionChanges: true` (`permission-change`); no contract type
    the wallet cannot decode unless `allowUndecodedContracts: true` (`undecoded-contract`;
    `VoteWitnessContract` only re-assigns votes and is signed). The same checks run in `signRaw`, which
-   takes `WriteOptions` and keeps signatures already on the transaction (a multisig co-signer's).
+   takes `WriteOptions` and keeps signatures already on the transaction (a multisig co-signer's): under
+   a fee cap it prices the bytes through the provider and refuses a contract call without `fee_limit`,
+   or any transaction when there is no provider to price it. Contract-call parameters must match the
+   `functionSelector` signature and encode one ABI word each (`encodeCall`).
 2. **Simulation** (`SimulationError`, off with `simulate: false`): contract calls run through
    `/wallet/triggerconstantcontract` and the revert reason is ABI-decoded (`Error(string)`,
    `Panic`); TRX transfers check that the balance covers amount + fees.

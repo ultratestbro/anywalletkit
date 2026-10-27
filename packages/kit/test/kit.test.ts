@@ -236,9 +236,11 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
     expect(await refuse.signerName()).toBe('read')
     const confirm = vi.fn(async () => true)
     const ok = applyPolicies(acc, { confirm, blocklist: { 'tron:mainnet': ['41abc'] } })
-    // The JSON copy is never the destination (scan F17): without raw_data_hex the confirm hook decides, told the destination is unknown.
+    // The JSON copy is never the destination (scan F17) nor what confirm is shown (scan 2026-10-27 F26): without
+    // raw_data_hex the confirm hook decides, told the destination is unknown and given no recipient.
     await ok.signRaw(raw)
-    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'signRaw', to: '41abc', destinations: [], destinationUnknown: true }))
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'signRaw', destinations: [], destinationUnknown: true }))
+    expect(((confirm.mock.calls.at(-1) as unknown[] | undefined)?.[0] as { to?: string }).to).toBeUndefined()
     await expect(applyPolicies(acc, { blocklist: { 'tron:mainnet': ['41abc'] } }).signRaw(raw)).rejects.toThrow(/blocklist/)
     await ok.signBuilt({ receiverId: 'bob.near' })
     expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'signBuilt', kind: 'send', to: 'bob.near', message: false }))

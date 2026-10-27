@@ -47,6 +47,7 @@
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/wallet-btc": "workspace:*",
     "@anywalletkit/wallet-near": "workspace:*",
+    "@anywalletkit/wallet-tron": "workspace:*",
     "@anywalletkit/wallet-ton": "workspace:*",
     "@anywalletkit/wallet-zcash": "workspace:*",
     "vitest": "^5.0.3"

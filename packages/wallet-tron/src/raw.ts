@@ -379,6 +379,13 @@ const norm = (key: string, v: unknown): string => {
   return s.replace(/^0x/, '').toLowerCase()
 }
 
+/**
+ * Field names the decoded contract types carry (who is paid, how much, which contract is called…),
+ * owner aside. A type without a schema has none of them, so a JSON copy that names one is describing
+ * a payment its bytes do not make (scan 2026-10-27 F26).
+ */
+const SCHEMA_KEYS: ReadonlySet<string> = new Set(Object.values(PARAMETERS).flatMap((fields) => Object.values(fields).map(([name]) => name)).filter((n) => n !== 'owner_address'))
+
 /** First material difference between the dApp's JSON `raw_data` and what the bytes say, or `null`. */
 export function rawMismatch(json: TronRawTransaction['raw_data'] | undefined, decoded: TronDecodedRaw['raw_data']): string | null {
   if (!json) return null
@@ -393,12 +400,16 @@ export function rawMismatch(json: TronRawTransaction['raw_data'] | undefined, de
     const av = (a.parameter?.value ?? {}) as Record<string, unknown>
     const bv = b.parameter.value
     // A type without a schema has no decoded counterpart for its JSON keys (votes, account_address …):
-    // only the owner is read from the bytes. Its other keys are neither compared nor shown — the
-    // description says the type is not decoded — so a JSON copy cannot make the sheet say anything.
+    // only the owner is read from the bytes. Its own keys are neither compared nor shown — the
+    // description says the type is not decoded — but a key that names a payment (to_address, amount,
+    // contract_address …) is refused: a confirm sheet or policy reading the JSON would show it.
     const hasSchema = isDecodedContractType(b.type)
     for (const key of new Set([...Object.keys(av), ...Object.keys(bv)])) {
       if (key === 'raw_parameter_hex') continue
-      if (!hasSchema && key !== 'owner_address') continue
+      if (!hasSchema && key !== 'owner_address') {
+        if (SCHEMA_KEYS.has(key) && av[key] !== undefined) return `contract[${i}].${key}: the JSON names it, but a ${b.type} carries no such field`
+        continue
+      }
       if (norm(key, av[key]) !== norm(key, bv[key])) return `contract[${i}].${key}: JSON says ${JSON.stringify(av[key] ?? null)}, bytes say ${JSON.stringify(bv[key] ?? null)}`
     }
   }

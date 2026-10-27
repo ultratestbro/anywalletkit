@@ -3,6 +3,10 @@ export type UnsafeTransactionCode =
   | 'expired'
   | 'expiration-too-far'
   | 'missing-ref-block'
+  /** The reference block (TaPoS) is not a block of the network the account is configured for (scan 2026-10-27 F22). */
+  | 'ref-block-mismatch'
+  /** A non-mainnet account without a provider cannot check its reference block; refused unless `allowOfflineTestnetSigning`. */
+  | 'offline-network'
   | 'owner-mismatch'
   | 'zero-address'
   | 'fee-limit'

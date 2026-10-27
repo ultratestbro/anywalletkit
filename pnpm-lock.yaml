@@ -820,6 +820,9 @@ importers:
       '@anywalletkit/wallet-ton':
         specifier: workspace:*
         version: link:../wallet-ton
+      '@anywalletkit/wallet-tron':
+        specifier: workspace:*
+        version: link:../wallet-tron
       '@anywalletkit/wallet-zcash':
         specifier: workspace:*
         version: link:../wallet-zcash

@@ -7,7 +7,8 @@ import { assertNoError } from './client.js'
 import { WalletAccountReadOnlyTron, hashMessage } from './read-only-account.js'
 import { isDecodedContractType, verifyRawTransaction } from './raw.js'
 import { isPrebuilt } from './shape.js'
-import type { TronConfig, TronFeeEstimate, TronRawTransaction, TronSimulation, TronTransaction, TronTransferOptions } from './types.js'
+import { MAX_MEMO_BYTES } from './memo.js'
+import { CAIP2_GENESIS, type TronConfig, type TronFeeEstimate, type TronRawTransaction, type TronSimulation, type TronTransaction, type TronTransferOptions } from './types.js'
 
 export interface TronTransferResult extends TransferResult {
   /** Account creation fee included in `fee` (TRX transfer to a new account). */
@@ -23,6 +24,13 @@ const UNDECODED_BUT_SAFE: ReadonlySet<string> = new Set(['VoteWitnessContract'])
 
 /** Longest expiration the node accepts for a transaction (`Constant.MAXIMUM_TIME_UNTIL_EXPIRATION`). */
 export const MAX_EXPIRATION_MS = 24 * 60 * 60 * 1000
+/** Contract types that burn energy, which only `fee_limit` bounds. */
+const ENERGY_CONTRACTS: ReadonlySet<string> = new Set(['TriggerSmartContract', 'CreateSmartContract'])
+/** Tron mainnet's CAIP-2 id. */
+const MAINNET = CAIP2_GENESIS.mainnet!
+/** A reference block up to this many blocks ahead of the node's head is waited for, not refused. */
+const REF_BLOCK_AHEAD = 64
+const BLOCK_MS = 3_000
 
 /**
  * Signing Tron account. The key lives in a secp256k1 {@link Signer} (a local key
@@ -89,11 +97,70 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
   async signRaw(tx: TronRawTransaction, options: WriteOptions = {}): Promise<TronRawTransaction> {
     this.key()
     const verified = verifyRawTransaction(tx)
-    this.assertSafe({ ...tx, raw_data: verified.raw_data }, Date.now(), options.maxFee)
+    const checked = { ...tx, raw_data: verified.raw_data }
+    this.assertSafe(checked, Date.now(), options.maxFee)
+    // The checks prepare() runs for what this wallet builds, here for a dApp's prebuilt bytes (scan 2026-10-27 F22, F25).
+    await this.assertRefBlock(checked)
+    const cap = feeLimit(this._config.transactionMaxFee, options)
+    if (cap !== undefined) await this.assertWorstFee(checked, cap)
+    return this.#signVerified(tx)
+  }
+
+  /** Sign bytes every check has already passed (prepare(), or signRaw above). */
+  async #signVerified(tx: TronRawTransaction): Promise<TronRawTransaction> {
+    const verified = verifyRawTransaction(tx)
     const sig = await this.#signDigest(hexToBytes(verified.txID), 'tron-tx')
     const mine = bytesToHex(sig.subarray(0, 64)) + sig[64]!.toString(16).padStart(2, '0')
     const others = (tx.signature ?? []).filter((s) => s.toLowerCase() !== mine)
     return { ...tx, signature: [...others, mine] }
+  }
+
+  /**
+   * A Tron transaction is bound to its network only by its reference block (TaPoS), and the key is
+   * the same on every network. With a provider, the block at `ref_block_bytes` (the latest one with
+   * those low 16 bits) must have the `ref_block_hash` the transaction names; offline, only a mainnet
+   * account signs, unless `allowOfflineTestnetSigning` (scan 2026-10-27 F22, F27).
+   */
+  protected async assertRefBlock(tx: TronRawTransaction): Promise<void> {
+    const refBytes = String(tx.raw_data.ref_block_bytes ?? '')
+    const refHash = String(tx.raw_data.ref_block_hash ?? '').toLowerCase()
+    if (!/^[0-9a-fA-F]{4}$/.test(refBytes) || !/^[0-9a-f]{16}$/.test(refHash)) throw new UnsafeTransactionError('missing-ref-block', 'The reference block must be 2 bytes of ref_block_bytes and 8 bytes of ref_block_hash.')
+    if (!this._client) {
+      if (this.chain === MAINNET || this._config.allowOfflineTestnetSigning === true) return
+      throw new UnsafeTransactionError('offline-network', `Without a provider this ${this.chain} account cannot check that the reference block is on its network, and a mainnet reference block would make the signature valid on mainnet. Connect a provider, or set allowOfflineTestnetSigning.`)
+    }
+    const low = parseInt(refBytes, 16)
+    for (let attempt = 0; ; attempt++) {
+      const now = await this.post<{ block_header?: { raw_data?: { number?: number } } }>('/wallet/getnowblock', {}, 'check the reference block')
+      const head = now.block_header?.raw_data?.number
+      if (typeof head !== 'number' || !Number.isSafeInteger(head) || head < 0) throw new UnsafeTransactionError('ref-block-mismatch', 'The node did not report its head block, so the reference block cannot be checked.')
+      const behind = (((head - low) % 65536) + 65536) % 65536
+      // A reference block a few blocks ahead of this node (another node built the transaction): wait for it.
+      if (behind > 65536 - REF_BLOCK_AHEAD && attempt < 2) { await new Promise((r) => setTimeout(r, BLOCK_MS)); continue }
+      const num = head - behind
+      const block = await this.post<{ blockID?: string }>('/wallet/getblockbynum', { num }, 'check the reference block')
+      const id = typeof block.blockID === 'string' ? block.blockID.toLowerCase() : ''
+      if (id.length !== 64 || id.slice(16, 32) !== refHash) {
+        throw new UnsafeTransactionError('ref-block-mismatch', `The reference block ${refBytes}/${refHash} is not block ${num} of ${this.chain}: the transaction belongs to another network, where this signature would be valid too.`)
+      }
+      return
+    }
+  }
+
+  /**
+   * What prebuilt bytes may burn at worst, held to `cap`: fee_limit of energy, plus the bandwidth,
+   * memo and activation fees fee_limit does not cover — the bound prepare() applies (round 3, M8). A
+   * contract call without fee_limit, or no provider to price the rest, is refused (scan 2026-10-27 F25).
+   */
+  protected async assertWorstFee(tx: TronRawTransaction, cap: bigint): Promise<void> {
+    const type = String(tx.raw_data.contract?.[0]?.type)
+    if (ENERGY_CONTRACTS.has(type) && tx.raw_data.fee_limit === undefined) throw new UnsafeTransactionError('fee-limit', `A ${type} without fee_limit cannot be held to the fee cap of ${cap}.`)
+    if (!this._client) throw new UnsafeTransactionError('fee-limit', `Without a provider the fees of this transaction cannot be priced against the fee cap of ${cap}; nothing was signed.`)
+    // Energy is bounded by fee_limit itself: no simulation needed for the bound.
+    const estimate = await this.estimateRaw(tx, { ok: true, energy: 0 })
+    const other = estimate.trxBurn - estimate.breakdown.energyBurn
+    const worst = BigInt(tx.raw_data.fee_limit ?? 0) + other
+    if (worst > cap) throw new UnsafeTransactionError('fee-limit', `fee_limit ${tx.raw_data.fee_limit ?? 0} plus ${other} sun of bandwidth, memo and activation fees can burn ${worst}, above the fee cap of ${cap}.`)
   }
 
   // ── Hard checks (before anything is signed) ─────────────────────────────────
@@ -118,6 +185,8 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
       throw new UnsafeTransactionError('undecoded-contract', `The wallet cannot decode a ${type}, so it cannot tell what it does (some of these move TRX or tokens). Set allowUndecodedContracts to sign one.`)
     }
     if (!tx.raw_data.ref_block_bytes || !tx.raw_data.ref_block_hash) throw new UnsafeTransactionError('missing-ref-block', 'The transaction has no reference block (ref_block_bytes / ref_block_hash).')
+    // Memos are paid per transaction and bandwidth per byte: a dApp's oversized data is refused (scan 2026-10-27 F25).
+    if (tx.raw_data.data !== undefined && String(tx.raw_data.data).replace(/^0x/, '').length / 2 > MAX_MEMO_BYTES) throw new UnsafeTransactionError('memo', `raw_data.data is longer than ${MAX_MEMO_BYTES} bytes.`)
     const exp = tx.raw_data.expiration
     if (exp === undefined || exp <= now) throw new UnsafeTransactionError('expired', 'The transaction has no expiration or has already expired.')
     if (exp > now + MAX_EXPIRATION_MS) throw new UnsafeTransactionError('expiration-too-far', 'The transaction expiration is more than 24 hours away.')
@@ -140,7 +209,13 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     // The fee_limit the SDK derives for its own call is capped by the caller's cap too (round 3, M8).
     const { built, sim: fromBuild } = await this.buildWithSimulation(tx, maxFee)
     // A caller-supplied transaction is checked against its bytes before anything else looks at it.
-    this.assertSafe(isPrebuilt(tx) ? { ...built, raw_data: verifyRawTransaction(built).raw_data } : built, Date.now(), maxFee)
+    const checked = isPrebuilt(tx) ? { ...built, raw_data: verifyRawTransaction(built).raw_data } : built
+    this.assertSafe(checked, Date.now(), maxFee)
+    // The node's build and a caller's prebuilt bytes alike: the reference block is on this network (scan 2026-10-27 F22, F27).
+    await this.assertRefBlock(checked)
+    if (maxFee !== undefined && ENERGY_CONTRACTS.has(String(checked.raw_data.contract?.[0]?.type)) && checked.raw_data.fee_limit === undefined) {
+      throw new UnsafeTransactionError('fee-limit', `A contract call without fee_limit cannot be held to the fee cap of ${maxFee}.`)
+    }
     let sim: TronSimulation | undefined = fromBuild
     if (this._config.simulate !== false) {
       sim ??= await this.simulateRaw(built)
@@ -163,7 +238,7 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     this.key()
     this.requireClient('sign transactions')
     const { built } = await this.prepare(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
-    return JSON.stringify(await this.signRaw(built))
+    return JSON.stringify(await this.#signVerified(built))
   }
 
   private async broadcast(signed: TronRawTransaction): Promise<string> {
@@ -187,7 +262,7 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     this.requireClient('send transactions')
     const parsed: TronTransaction = typeof tx === 'string' ? (JSON.parse(tx) as TronRawTransaction) : tx
     const { built, quote } = await this.prepare(parsed, feeLimit(this._config.transactionMaxFee, options), 'transaction')
-    const signed = isPrebuilt(parsed) && parsed.signature?.length ? built : await this.signRaw(built)
+    const signed = isPrebuilt(parsed) && parsed.signature?.length ? built : await this.#signVerified(built)
     return { hash: await this.broadcast(signed), fee: quote.fee, activationFee: quote.activationFee, estimate: quote.estimate }
   }
 
@@ -196,7 +271,7 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     this.key()
     this.requireClient('transfer tokens')
     const { built, quote } = await this.prepare(this.asTransaction(o), feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
-    return { hash: await this.broadcast(await this.signRaw(built)), fee: quote.fee, activationFee: quote.activationFee, estimate: quote.estimate }
+    return { hash: await this.broadcast(await this.#signVerified(built)), fee: quote.fee, activationFee: quote.activationFee, estimate: quote.estimate }
   }
 
   /** The same address as a {@link WalletAccountReadOnlyTron}. */

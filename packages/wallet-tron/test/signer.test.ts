@@ -29,6 +29,9 @@ function fakeNode() {
     '/wallet/getaccountresource': () => ({ freeNetLimit: 600, freeNetUsed: 0 }),
     '/wallet/getchainparameters': () => ({ chainParameter: [{ key: 'getTransactionFee', value: 1000 }, { key: 'getEnergyFee', value: 210 }] }),
     '/wallet/broadcasttransaction': (b) => { broadcast.push(b as unknown as TronRawTransaction); return { result: true, txid: b.txID } },
+    // The chain the builds above reference (ref_block_bytes a1b2, ref_block_hash 0011223344556677).
+    '/wallet/getnowblock': () => ({ block_header: { raw_data: { number: 0x3fa1b2 } } }),
+    '/wallet/getblockbynum': (b) => ({ blockID: Number(b.num).toString(16).padStart(16, '0') + '0011223344556677' + '0'.repeat(32) }),
   }
   const fetch: TronFetch = async (path, body) => { const h = handlers[path]; if (!h) throw new Error(`unmocked ${path}`); return h(body as Record<string, unknown>) }
   return { fetch, broadcast }

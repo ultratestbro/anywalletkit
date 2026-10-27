@@ -205,3 +205,38 @@ describe('scan 2026-10-27 G8 (F10, F17): Tron calls are judged by the selector b
     expect(seen.destinationUnknown).toBe(true)
   })
 })
+
+/** A mock Tron account with signRaw (the kit guards it; the mock signs nothing). */
+const tronSigner = (address: string) => Object.assign(createMockAccount({ chain: 'tron:0x2b6653dc', address }), { signRaw: async (tx: unknown) => tx })
+
+describe('scan 2026-10-27 G9 (F26): the signRaw intent comes from the signed bytes, never the JSON copy', () => {
+  it('a VoteWitnessContract whose JSON says "1 TRX to the merchant" shows no payment', async () => {
+    const { encodeRawData } = await import('@anywalletkit/wallet-tron')
+    const owner = '41' + '11'.repeat(20)
+    const raw_data = { contract: [{ type: 'VoteWitnessContract', parameter: { value: { owner_address: owner }, type_url: 'type.googleapis.com/protocol.VoteWitnessContract' } }], ref_block_bytes: 'a1b2', ref_block_hash: '0011223344556677', expiration: 1, timestamp: 1 }
+    const hex = Array.from(encodeRawData(raw_data as never), (b) => b.toString(16).padStart(2, '0')).join('')
+    const merchant = '41' + '22'.repeat(20)
+    const lying = { txID: '00'.repeat(32), raw_data_hex: hex, raw_data: { ...raw_data, contract: [{ ...raw_data.contract[0], parameter: { ...raw_data.contract[0]!.parameter, value: { owner_address: owner, to_address: merchant, amount: 1_000_000 } } }] } }
+    let seen: Record<string, unknown> = {}
+    await applyPolicies(tronSigner(owner), { confirm: async (i) => { seen = i as never; return true } }, 'tron:0x2b6653dc').signRaw(lying)
+    expect(seen.to).toBeUndefined()
+    expect(seen.amount).toBeUndefined()
+  })
+
+  it('a TransferContract and a TRC-20 call read to / amount / token off raw_data_hex', async () => {
+    const { encodeRawData } = await import('@anywalletkit/wallet-tron')
+    const owner = '41' + '11'.repeat(20), to = '41' + '33'.repeat(20), usdt = '41' + 'a6'.repeat(20)
+    const hexOf = (raw: unknown) => Array.from(encodeRawData(raw as never), (b) => b.toString(16).padStart(2, '0')).join('')
+    const base = { ref_block_bytes: 'a1b2', ref_block_hash: '0011223344556677', expiration: 1, timestamp: 1 }
+    const trx = { ...base, contract: [{ type: 'TransferContract', parameter: { value: { owner_address: owner, to_address: to, amount: 2 ** 60 }, type_url: 'type.googleapis.com/protocol.TransferContract' } }] }
+    let seen: Record<string, unknown> = {}
+    const guarded = applyPolicies(tronSigner(owner), { confirm: async (i) => { seen = i as never; return true } }, 'tron:0x2b6653dc')
+    // The JSON copy is omitted on purpose: only the bytes speak.
+    await guarded.signRaw({ txID: '00'.repeat(32), raw_data_hex: hexOf(trx) })
+    expect(seen).toMatchObject({ to, amount: 2n ** 60n })
+    const data = 'a9059cbb' + to.slice(2).padStart(64, '0') + (10n ** 30n).toString(16).padStart(64, '0')
+    const call = { ...base, contract: [{ type: 'TriggerSmartContract', parameter: { value: { owner_address: owner, contract_address: usdt, data }, type_url: 'type.googleapis.com/protocol.TriggerSmartContract' } }] }
+    await guarded.signRaw({ txID: '00'.repeat(32), raw_data_hex: hexOf(call) })
+    expect(seen).toMatchObject({ to: usdt, token: usdt, amount: 10n ** 30n })
+  })
+})

@@ -213,6 +213,32 @@ class Reader {
     this.i += n
     return out
   }
+  /** A varint as a bigint: amounts pass 2^53. */
+  varintBig(): bigint {
+    let v = 0n
+    for (let n = 0; n < 10; n++) {
+      if (this.i >= this.b.length) throw new Error('truncated varint')
+      const byte = this.b[this.i++]!
+      v |= BigInt(byte & 0x7f) << BigInt(7 * n)
+      if ((byte & 0x80) === 0) return v
+    }
+    throw new Error('varint too long')
+  }
+  /** {@link fields} with varint values as bigints. */
+  fieldsBig(): Array<[number, number, Uint8Array | bigint]> {
+    const out: Array<[number, number, Uint8Array | bigint]> = []
+    while (!this.done) {
+      const tag = this.varint()
+      const number = Math.floor(tag / 8)
+      const wire = tag % 8
+      if (wire === 0) out.push([number, wire, this.varintBig()])
+      else if (wire === 2) out.push([number, wire, this.bytes(this.varint())])
+      else if (wire === 1) out.push([number, wire, this.bytes(8)])
+      else if (wire === 5) out.push([number, wire, this.bytes(4)])
+      else throw new Error(`wire type ${wire}`)
+    }
+    return out
+  }
   /** Protobuf fields: `[number, wire, value]` with length-delimited values as bytes. */
   fields(): Array<[number, number, Uint8Array | number]> {
     const out: Array<[number, number, Uint8Array | number]> = []
@@ -284,6 +310,58 @@ export function tronRawDestinations(rawHex: string): Destinations {
     return known(out)
   } catch {
     return UNKNOWN
+  }
+}
+
+/**
+ * What a Tron `raw_data_hex` pays, for the intent: a TransferContract's recipient and amount, a TRC-10
+ * transfer's asset too, a TriggerSmartContract's contract with the TRC-20 amount its calldata moves (or
+ * its call value). Read off the bytes the signature covers, never the JSON copy next to them (scan
+ * 2026-10-27 F26); empty for any other contract, more than one, or bytes that do not decode.
+ */
+export function tronRawIntent(rawHex: unknown): { to?: string; amount?: bigint; token?: string } {
+  if (typeof rawHex !== 'string') return {}
+  try {
+    const bytes = fromHex(rawHex)
+    if (!bytes) return {}
+    const contracts = new Reader(bytes).fields().filter(([n, w]) => n === 11 && w === 2)
+    if (contracts.length !== 1) return {}
+    let enumType: number | undefined
+    let typeUrl: string | undefined
+    let param: Uint8Array | undefined
+    for (const [cn, cw, cv] of new Reader(contracts[0]![2] as Uint8Array).fields()) {
+      if (cn === 1 && cw === 0) enumType = cv as number
+      else if (cn === 2 && cw === 2) {
+        for (const [an, aw, av] of new Reader(cv as Uint8Array).fields()) {
+          if (an === 1 && aw === 2) typeUrl = ascii(av as Uint8Array)
+          else if (an === 2 && aw === 2) param = av as Uint8Array
+        }
+      }
+    }
+    const type = typeUrl?.split('.').pop() ?? (enumType !== undefined ? TRON_TYPE_BY_ENUM[enumType] : undefined)
+    if (!param) return {}
+    const f = new Reader(param).fieldsBig()
+    const address = (n: number) => { const v = f.find(([fn, fw]) => fn === n && fw === 2)?.[2]; return v instanceof Uint8Array && v.length === 21 ? toHex(v) : undefined }
+    const int = (n: number) => { const v = f.find(([fn, fw]) => fn === n && fw === 0)?.[2]; return typeof v === 'bigint' ? v : undefined }
+    const opt = (o: { to?: string | undefined; amount?: bigint | undefined; token?: string | undefined }) => ({
+      ...(o.to !== undefined ? { to: o.to } : {}), ...(o.amount !== undefined ? { amount: o.amount } : {}), ...(o.token !== undefined ? { token: o.token } : {}),
+    })
+    if (type === 'TransferContract') return opt({ to: address(2), amount: int(3) })
+    if (type === 'TransferAssetContract') {
+      const asset = f.find(([fn, fw]) => fn === 1 && fw === 2)?.[2]
+      return opt({ to: address(3), amount: int(4), token: asset instanceof Uint8Array ? ascii(asset) : undefined })
+    }
+    if (type === 'TriggerSmartContract') {
+      const contract = address(2)
+      const data = f.find(([fn, fw]) => fn === 4 && fw === 2)?.[2]
+      const t = data instanceof Uint8Array ? erc20Transfer(`0x${toHex(data)}`) : null
+      if (t && contract !== undefined) return opt({ to: contract, token: contract, amount: t.amount })
+      const callValue = int(3)
+      return opt({ to: contract, amount: callValue !== undefined && callValue > 0n ? callValue : undefined })
+    }
+    return {}
+  } catch {
+    return {}
   }
 }
 

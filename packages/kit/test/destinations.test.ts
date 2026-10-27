@@ -102,11 +102,11 @@ describe('kit policies — destinations per chain shape (scan F16/F17)', () => {
     await expect(signRaw({ txID: 'x', raw_data_hex: 'zz' })).rejects.toThrow(/Cannot tell every destination/)
   })
 
-  it('Tron: intent.to stays as the call shape gave it; destinations come from the bytes', async () => {
+  it('Tron signRaw: intent.to, amount and destinations all come from the signed bytes, not the JSON copy (scan 2026-10-27 F26)', async () => {
     const seen: WriteIntent[] = []
     const acc = applyPolicies(account('tron:0x2b6653dc'), { confirm: async (i) => { seen.push(i); return true } })
     await (acc as unknown as { signRaw(t: unknown): Promise<unknown> }).signRaw({ txID: 'x', raw_data_hex: tronRaw('transfer', DRAINER_HEX), raw_data: { contract: [{ parameter: { value: { to_address: FRIEND_HEX, amount: 5 } } }] } })
-    expect(seen[0]).toMatchObject({ to: FRIEND_HEX, amount: 5n, destinations: [DRAINER_HEX], destinationUnknown: false })
+    expect(seen[0]).toMatchObject({ to: DRAINER_HEX, amount: 1_000_000n, destinations: [DRAINER_HEX], destinationUnknown: false })
   })
 
   it('TON: every message of a sendTransaction array is a destination; friendly and raw forms compare equal', async () => {
