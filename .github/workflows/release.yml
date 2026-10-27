@@ -117,8 +117,8 @@ jobs:
         with: { name: release-tarballs, path: release-tarballs/ }
       - id: npm
         env:
-          # Only for a first release before the packages have trusted publishers
-          # (RELEASING.md); leave the secret unset afterwards and npm uses OIDC.
+          # The publish credential until trusted publishing is on (RELEASING.md:
+          # a 30-day granular token, rotated); with the secret unset npm uses OIDC.
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ -n "$NPM_TOKEN" ]; then echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc; fi
