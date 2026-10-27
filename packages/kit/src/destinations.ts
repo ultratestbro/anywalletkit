@@ -288,6 +288,12 @@ export function tronRawDestinations(rawHex: string): Destinations {
 // ── NEAR: borsh Transaction / SignedTransaction prefix ───────────────────────
 
 const NEAR_ACCOUNT = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/
+/**
+ * A method name this reader takes at face value: ASCII letters, digits and '_', which every decoder
+ * reads the same. Anything else (a BOM in front of 'ft_transfer', read here as 'ï»¿ft_transfer') is
+ * unknown, whatever the chain package would make of it (scan 2026-10-27 F7, F8, F16).
+ */
+const NEAR_METHOD = /^[A-Za-z0-9_]{1,256}$/
 
 /** Function calls whose JSON args name who receives tokens (NEP-141 / NEP-171) or storage (NEP-145), and the arg that names them (round 3, M1). */
 const NEAR_RECIPIENT_ARG: Readonly<Record<string, string>> = {
@@ -316,7 +322,11 @@ function nearArgRecipient(method: string, args: unknown): Array<string | undefin
 function nearActionRecipients(action: unknown, depth = 0): Array<string | undefined> {
   const a = obj(action)
   const call = obj(a.functionCall)
-  if (a.functionCall !== undefined) return nearArgRecipient(str(call.methodName) ?? '', call.args)
+  if (a.functionCall !== undefined) {
+    const method = str(call.methodName)
+    if (method !== undefined && !NEAR_METHOD.test(method)) return [undefined]
+    return nearArgRecipient(method ?? '', call.args)
+  }
   if (a.deleteAccount !== undefined) return [str(obj(a.deleteAccount).beneficiaryId)]
   if (a.signedDelegate !== undefined) {
     if (depth > 0) return [undefined]
@@ -345,7 +355,7 @@ function nearBorshDestinations(b64: string): Destinations {
     switch (u8()) {
       case 0: return [] // CreateAccount
       case 1: bytes(); return [] // DeployContract
-      case 2: { const method = string(256); const args = bytes(); skip(8 + 16); return nearArgRecipient(method, args) } // FunctionCall
+      case 2: { const method = string(256); const args = bytes(); skip(8 + 16); return NEAR_METHOD.test(method) ? nearArgRecipient(method, args) : [undefined] } // FunctionCall
       case 3: skip(16); return [] // Transfer: to the receiver
       case 4: skip(16); publicKey(); return [] // Stake
       case 5: { // AddKey

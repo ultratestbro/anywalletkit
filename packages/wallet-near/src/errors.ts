@@ -16,6 +16,8 @@ export type UnsafeTransactionCode =
   | 'implicit-account-min-deposit'
   | 'no-access-key'
   | 'storage-deposit'
+  | 'non-canonical'
+  | 'invalid-method'
 
 /** A transaction failed a hard check and was not signed. */
 export class UnsafeTransactionError extends Error {

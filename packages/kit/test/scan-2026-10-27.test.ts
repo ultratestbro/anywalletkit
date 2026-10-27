@@ -129,3 +129,25 @@ describe('scan 2026-10-27 G4 (F18): a TON address in a loose spelling is not a k
     expect(seen.destinationUnknown).toBe(false)
   })
 })
+
+describe('scan 2026-10-27 G5 (F7, F8, F16): a NEAR method name the kit reads as non-ASCII is unknown', () => {
+  it('base64 borsh with EF BB BF + ft_transfer to drainer.near is refused under the allowlist', async () => {
+    const { encodeTransaction, toBase64 } = await import('@anywalletkit/wallet-near')
+    const tx = toBase64(encodeTransaction({
+      signerId: 'alice.near', publicKey: { keyType: 'ed25519', data: new Uint8Array(32).fill(1) }, nonce: 7n, receiverId: 'usdt.tether-token.near', blockHash: new Uint8Array(32).fill(9),
+      actions: [{ functionCall: { methodName: '﻿ft_transfer', args: { receiver_id: 'drainer.near', amount: '1000000' }, gas: 30n * 10n ** 12n, deposit: 1n } }],
+    }))
+    const near = () => createMockAccount({ chain: 'near:mainnet', address: 'alice.near' })
+    await expect(applyPolicies(near(), { allowlist: { near: ['usdt.tether-token.near', 'friend.near'] } }, 'near:mainnet').sendTransaction(tx as never)).rejects.toMatchObject({ policy: 'allowlist' })
+    let seen: Record<string, unknown> = {}
+    await applyPolicies(near(), { confirm: async (i) => { seen = i as never; return true } }, 'near:mainnet').sendTransaction(tx as never)
+    expect(seen.destinationUnknown).toBe(true)
+  })
+
+  it('an object action with a non-ASCII method name is unknown too', async () => {
+    let seen: Record<string, unknown> = {}
+    const tx = { receiverId: 'usdt.tether-token.near', actions: [{ functionCall: { methodName: '﻿ft_transfer', args: { receiver_id: 'drainer.near', amount: '1' }, gas: 1n, deposit: 1n } }] }
+    await applyPolicies(createMockAccount({ chain: 'near:mainnet', address: 'alice.near' }), { confirm: async (i) => { seen = i as never; return true } }, 'near:mainnet').sendTransaction(tx as never)
+    expect(seen.destinationUnknown).toBe(true)
+  })
+})

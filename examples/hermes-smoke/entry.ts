@@ -38,7 +38,7 @@ import { beginCell, internal } from '@ton/core'
 import { WalletManagerTron, describeTransaction as describeTron, ZERO_ADDRESS as TRON_ZERO } from '@anywalletkit/wallet-tron'
 import { WalletManagerBtc, selectCoins, INPUT_WEIGHT } from '@anywalletkit/wallet-btc'
 import { WalletManagerZcash, parseTx as parseZcashTx, txid as zcashTxid, sighashAll as zcashSighash, parseP2pkhScriptSig, conventionalFee as zcashFee, outputSize as zcashOutputSize } from '@anywalletkit/wallet-zcash'
-import { WalletManagerNear, describeTransaction as describeNear, encodeTransaction as encodeNearTx, decodeTransaction as decodeNearTx } from '@anywalletkit/wallet-near'
+import { WalletManagerNear, describeTransaction as describeNear, encodeTransaction as encodeNearTx, decodeTransaction as decodeNearTx, toBase64 as nearToBase64 } from '@anywalletkit/wallet-near'
 import { smokeProtocols } from './protocols.js'
 import fastPbkdf2 from '@anywalletkit/runtime-hermes/fast-pbkdf2'
 import { sealBackup, openBackup, encodeBackup, decodeBackup, isBackupError } from '@anywalletkit/seed-vault'
@@ -173,6 +173,16 @@ async function main() {
       const tx = { signerId: 'a.near', publicKey: { keyType: 'ed25519' as const, data: new Uint8Array(32).fill(1) }, nonce: 7n, receiverId: 'b.near', blockHash: new Uint8Array(32).fill(2), actions: [{ transfer: { deposit: 10n ** 24n } }] }
       const back = decodeNearTx(encodeNearTx(tx))
       eq('near borsh round-trip', back.nonce === 7n && back.receiverId === 'b.near' && 'transfer' in back.actions[0]! && back.actions[0].transfer.deposit === 10n ** 24n, true)
+      // Hermes' TextDecoder (the RN polyfill) must keep a BOM, and a BOM'd method name is refused (scan 2026-10-27 F7/F8).
+      const bom = { ...tx, receiverId: 'usdt.tether-token.near', actions: [{ functionCall: { methodName: '\uFEFFft_transfer', args: { receiver_id: 'drainer.near', amount: '1' }, gas: 30n * 10n ** 12n, deposit: 1n } }] }
+      const bomBack = decodeNearTx(encodeNearTx(bom)).actions[0]!
+      eq('near borsh keeps a BOM', 'functionCall' in bomBack && bomBack.functionCall.methodName === '\uFEFFft_transfer', true)
+      const nm = new WalletManagerNear(derivationVectors.seeds['bip39-abandon-12']!)
+      const na = await nm.getAccount(0)
+      let refused = ''
+      try { await na.buildTransaction(nearToBase64(encodeNearTx({ ...bom, signerId: na.address, publicKey: na.publicKey }))) } catch (e) { refused = (e as { code?: string }).code ?? String(e) }
+      eq('near BOM method refused', refused === 'invalid-method' || refused === 'non-canonical', true)
+      nm.dispose()
     }
     const burn = describeTron({ to: TRON_ZERO, value: 1n })
     eq('tron describe zero-address', burn.kind === 'trx-transfer' && burn.warnings[0]?.code === 'zero-address', true)

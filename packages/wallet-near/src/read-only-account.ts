@@ -2,7 +2,7 @@ import { NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { base58ToBytes, bytesToBase58, ed25519Key, isImplicitAccountId, isValidAccountId, publicKeyOfImplicit, publicKeyToString } from './address.js'
-import { decodeAnyTransaction, encodeTransaction } from './borsh.js'
+import { decodeAnyTransaction, encodeSignedTransaction, encodeTransaction } from './borsh.js'
 import { describeTransaction, isDangerous, type DescribeContext } from './describe.js'
 import { SimulationError, UnsafeTransactionError } from './errors.js'
 import { NearRpc, createClient, failureOf, fromBase64, outcomeFailed, type RawFinalOutcome } from './rpc.js'
@@ -164,7 +164,7 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
 
   /** Fill `signerId` / `publicKey` / `nonce` / `blockHash` (the last two from the node when missing). */
   async buildTransaction(tx: NearTransaction | string): Promise<NearBuiltTransaction> {
-    if (typeof tx === 'string') return decodeAnyTransaction(fromBase64(tx)).transaction
+    if (typeof tx === 'string') return canonicalTransaction(tx)
     const signerId = tx.signerId ?? this.address
     const publicKey = tx.publicKey ?? this.publicKey
     let nonce = tx.nonce
@@ -289,6 +289,7 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
     if (tx.publicKey.keyType !== this.publicKey.keyType || !equalBytes(tx.publicKey.data, this.publicKey.data)) throw new UnsafeTransactionError('public-key-mismatch', 'The transaction public key is not this account\'s key.')
     if (!tx.actions.length) throw new UnsafeTransactionError('no-actions', 'The transaction has no actions.')
     if (!isValidAccountId(tx.receiverId)) throw new UnsafeTransactionError('invalid-account', `"${tx.receiverId}" is not a valid NEAR account id.`)
+    assertNames(tx.actions)
     if (tx.blockHash.length !== 32) throw new UnsafeTransactionError('missing-block-hash', 'The transaction has no 32-byte block hash.')
     if (tx.nonce <= 0n) throw new UnsafeTransactionError('missing-nonce', 'The transaction nonce must be positive.')
     if (!this._config.allowDangerousActions) {
@@ -344,6 +345,55 @@ export function parseSignature(signature: string): Uint8Array {
     return Uint8Array.from(hex.match(/.{2}/g)!, (b) => parseInt(b, 16))
   }
   return base58ToBytes(s, 64)
+}
+
+/** Method names the wallet signs: ASCII letters, digits and '_', read the same byte for byte by every decoder (scan 2026-10-27 F7). */
+const METHOD_NAME = /^[A-Za-z0-9_]{1,256}$/
+
+/** Every account id and method name the actions carry (a delegated action's too) is well formed (scan 2026-10-27 F7, F16). */
+function assertNames(actions: NearAction[], depth = 0): void {
+  const account = (id: unknown) => {
+    if (typeof id !== 'string' || !isValidAccountId(id)) throw new UnsafeTransactionError('invalid-account', `${JSON.stringify(id)} is not a valid NEAR account id.`)
+  }
+  const method = (name: unknown) => {
+    if (typeof name !== 'string' || !METHOD_NAME.test(name)) throw new UnsafeTransactionError('invalid-method', `${JSON.stringify(name)} is not a method name this wallet signs (ASCII letters, digits, '_').`)
+  }
+  for (const a of actions) {
+    if ('functionCall' in a) method(a.functionCall.methodName)
+    else if ('deleteAccount' in a) account(a.deleteAccount.beneficiaryId)
+    else if ('addKey' in a && 'functionCall' in a.addKey.accessKey.permission) {
+      const p = a.addKey.accessKey.permission.functionCall
+      account(p.receiverId)
+      for (const m of p.methodNames) method(m)
+    } else if ('useGlobalContract' in a && 'accountId' in a.useGlobalContract) account(a.useGlobalContract.accountId)
+    else if ('signedDelegate' in a) {
+      const d = a.signedDelegate.delegateAction
+      account(d.senderId)
+      account(d.receiverId)
+      if (depth > 0) throw new UnsafeTransactionError('unknown-action', 'A delegated action inside a delegated action is not signed.')
+      assertNames(d.actions, depth + 1)
+    }
+  }
+}
+
+/**
+ * A base64 borsh transaction (unsigned, or signed elsewhere), decoded only when it re-encodes to the
+ * exact bytes given: a lossy or loose decode would sign something else than the bytes the policies
+ * read, as wallet-tron's raw check refuses (scan 2026-10-27 F7, F8).
+ */
+function canonicalTransaction(b64: string): NearBuiltTransaction {
+  const bytes = fromBase64(b64)
+  let decoded: ReturnType<typeof decodeAnyTransaction>
+  try {
+    decoded = decodeAnyTransaction(bytes)
+  } catch (e) {
+    throw new UnsafeTransactionError('non-canonical', `Not a borsh NEAR transaction: ${(e as Error).message}`)
+  }
+  const again = decoded.signature ? encodeSignedTransaction({ transaction: decoded.transaction, signature: decoded.signature }) : encodeTransaction(decoded.transaction)
+  if (!equalBytes(again, bytes)) throw new UnsafeTransactionError('non-canonical', 'This borsh transaction does not re-encode to the same bytes, so what was reviewed may not be what gets signed.')
+  if (!isValidAccountId(decoded.transaction.signerId) || !isValidAccountId(decoded.transaction.receiverId)) throw new UnsafeTransactionError('invalid-account', 'The transaction names an invalid NEAR account id.')
+  assertNames(decoded.transaction.actions)
+  return decoded.transaction
 }
 
 function equalBytes(a: Uint8Array, b: Uint8Array): boolean {

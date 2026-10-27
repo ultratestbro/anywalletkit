@@ -8,7 +8,9 @@ import type {
 } from './types.js'
 
 const utf8 = new TextEncoder()
-const utf8d = new TextDecoder()
+// Strict: invalid UTF-8 throws and a leading U+FEFF is kept, not dropped. A lossy decode let a
+// method name read 'ï»¿ft_transfer' to the policies and re-encode as 'ft_transfer' (scan 2026-10-27 F8).
+const utf8d = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
 
 /** @internal Minimal borsh encoder for NEAR transactions. */
 export class BorshWriter {
@@ -72,7 +74,12 @@ export class BorshReader {
   bytes(n: number): Uint8Array { this.need(n); const out = this._buf.slice(this._pos, this._pos + n); this._pos += n; return out }
   vecU8(): Uint8Array { return this.bytes(this.u32()) }
   string(): string { return utf8d.decode(this.vecU8()) }
-  option<T>(read: () => T): T | undefined { return this.u8() === 0 ? undefined : read() }
+  option<T>(read: () => T): T | undefined {
+    const tag = this.u8()
+    if (tag === 0) return undefined
+    if (tag !== 1) throw new RangeError(`borsh: option tag ${tag}`)
+    return read()
+  }
   done(): void { if (this.remaining !== 0) throw new RangeError(`borsh: ${this.remaining} trailing bytes`) }
 }
 
@@ -216,6 +223,13 @@ export function writeAction(w: BorshWriter, a: NearAction): void {
   }
 }
 
+/** A global-contract mode byte: 0 or 1, nothing else re-encodes to the same bytes. */
+function mode(r: BorshReader): 0 | 1 {
+  const m = r.u8()
+  if (m !== 0 && m !== 1) throw new RangeError(`borsh: unknown global-contract mode ${m}`)
+  return m
+}
+
 export function readAction(r: BorshReader): NearAction {
   const tag = r.u8()
   switch (tag) {
@@ -234,8 +248,8 @@ export function readAction(r: BorshReader): NearAction {
     case 6: return { deleteKey: { publicKey: readPublicKey(r) } }
     case 7: return { deleteAccount: { beneficiaryId: r.string() } }
     case 8: { const delegateAction = readDelegateAction(r); return { signedDelegate: { delegateAction, signature: readSignature(r) } } }
-    case 9: { const code = r.vecU8(); const m = r.u8(); return { deployGlobalContract: { code, deployMode: m === 0 ? 'codeHash' : 'accountId' } } }
-    case 10: { const m = r.u8(); return { useGlobalContract: m === 0 ? { codeHash: r.bytes(32) } : { accountId: r.string() } } }
+    case 9: { const code = r.vecU8(); const m = mode(r); return { deployGlobalContract: { code, deployMode: m === 0 ? 'codeHash' : 'accountId' } } }
+    case 10: { const m = mode(r); return { useGlobalContract: m === 0 ? { codeHash: r.bytes(32) } : { accountId: r.string() } } }
     default: throw new RangeError(`borsh: unknown action tag ${tag}`)
   }
 }
