@@ -183,7 +183,7 @@ export function describeTransaction(tx: EvmTransaction, ctx: { chainId?: number 
   return { ...base, kind: 'contract-call' }
 }
 
-const PERMIT2_TYPES = new Set(['PermitSingle', 'PermitBatch', 'PermitTransferFrom', 'PermitBatchTransferFrom', 'PermitWitnessTransferFrom'])
+const PERMIT2_TYPES = new Set(['PermitSingle', 'PermitBatch', 'PermitTransferFrom', 'PermitBatchTransferFrom', 'PermitWitnessTransferFrom', 'PermitBatchWitnessTransferFrom'])
 
 function str(v: unknown): string | undefined {
   return typeof v === 'string' ? v : undefined
@@ -195,11 +195,15 @@ function num(v: unknown): number | undefined {
   if (typeof v === 'string' && /^0x[0-9a-fA-F]+$/.test(v)) return num(BigInt(v)) // dApps send the domain chainId in hex too
   return undefined
 }
+/** A uint as the signer reads it: viem passes strings and numbers through BigInt() (scan 2026-10-27 F11). */
 function big(v: unknown): bigint | undefined {
   if (typeof v === 'bigint') return v
-  if (typeof v === 'number' || (typeof v === 'string' && /^(0x[0-9a-fA-F]+|\d+)$/.test(v))) return BigInt(v)
+  if (typeof v === 'number') return Number.isInteger(v) ? BigInt(v) : undefined
+  if (typeof v === 'string' && v.length <= 300) { try { return BigInt(v) } catch { return undefined } }
   return undefined
 }
+/** An amount that is there but cannot be read is shown as the worst case: unlimited. */
+const amountOrMax = (v: unknown): bigint => (v === undefined ? 0n : big(v) ?? maxUint256)
 
 /**
  * Decode EIP-712 typed data for a confirmation screen. Pass the account's `chainId` and address to
@@ -227,7 +231,7 @@ export function describeTypedData(typed: TypedDataInput, ctx: { chainId?: number
   if (isPermit) {
     const owner = str(m.owner) ?? ''
     const spender = str(m.spender) ?? ''
-    const value = big(m.value) ?? 0n
+    const value = amountOrMax(m.value)
     const nonce = big(m.nonce) ?? 0n
     const deadline = big(m.deadline) ?? 0n
     if (isUnlimitedAmount(value)) warnings.push({ code: 'approve-unlimited', message: `Unlimited permit: ${spender} may spend any amount.` })
@@ -258,7 +262,7 @@ export function describeTypedData(typed: TypedDataInput, ctx: { chainId?: number
     // AllowanceTransfer amounts are uint160: its "unlimited" is that type's max (SignatureTransfer's
     // uint256 max is above it too).
     for (const item of list) {
-      const amount = big(item.amount)
+      const amount = item.amount === undefined ? undefined : amountOrMax(item.amount)
       if (amount !== undefined && amount >= 2n ** 160n - 1n) { warnings.push({ code: 'approve-unlimited', message: 'Unlimited Permit2 allowance.' }); break }
     }
     const deadline = big(m.sigDeadline) ?? big(m.deadline)

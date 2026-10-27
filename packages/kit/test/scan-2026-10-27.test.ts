@@ -253,3 +253,12 @@ describe('scan 2026-10-27 G10 (F12): non-canonical EVM calldata is unknown', () 
     }
   })
 })
+
+describe('scan 2026-10-27 G11 (F30): a present but unreadable EVM chainId is refused', () => {
+  it('an offline eip155:1 account with chainId "0b10001001" is refused (wallet-evm would sign for chain 137)', async () => {
+    const offline = Object.assign(createMockAccount({ chain: 'eip155:unknown' }), { _config: {}, getChainId: async () => { throw new Error('no provider') } })
+    const tx = { to: '0x' + '11'.repeat(20), chainId: '0b10001001', value: 1n, gasLimit: 21_000n }
+    await expect(applyPolicies(offline, { allowlist: { 'eip155:1': ['0x' + '11'.repeat(20)] } }, 'eip155:1').signTransaction(tx)).rejects.toMatchObject({ policy: 'chain' })
+    await expect(applyPolicies(offline, { confirm: async () => true }, 'eip155:1').signTransaction(tx)).rejects.toMatchObject({ policy: 'chain' })
+  })
+})

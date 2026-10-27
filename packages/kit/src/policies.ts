@@ -78,14 +78,22 @@ const FEE_FREE: readonly string[] = [...MESSAGE_METHODS, 'signTypedData', 'signP
 function chainIdRef(v: unknown): string | undefined {
   if (typeof v === 'number') return Number.isSafeInteger(v) && v >= 0 ? String(v) : undefined
   if (typeof v === 'bigint') return v >= 0n ? v.toString() : undefined
-  if (typeof v === 'string' && /^(\d{1,30}|0x[0-9a-fA-F]{1,30})$/.test(v)) return BigInt(v).toString()
+  // The grammar wallet-evm's chainIdNumber accepts (decimal or 0x-hex, within 2^53).
+  if (typeof v === 'string' && /^(\d{1,16}|0x[0-9a-fA-F]{1,14})$/.test(v) && BigInt(v) <= BigInt(Number.MAX_SAFE_INTEGER)) return BigInt(v).toString()
   return undefined
 }
 
-/** The EVM network a transaction signs for, read off it (its `chainId`), when it carries one. */
+/**
+ * The EVM network a transaction signs for, read off it (its `chainId`), when it carries one. A chainId
+ * that is there but not a chain id these rules read ('0b10001001', ' 137') is refused: wallet-evm
+ * refuses it too, and treating it as absent let an offline account sign for another chain under
+ * the rules of the one asked for (scan 2026-10-27 F30).
+ */
 function signedChain(ns: string, method: string, arg: unknown): string | undefined {
   if (ns !== 'eip155' || (method !== 'sendTransaction' && method !== 'signTransaction') || Array.isArray(arg)) return undefined
-  const ref = chainIdRef(obj(arg).chainId)
+  const raw = obj(arg).chainId
+  const ref = chainIdRef(raw)
+  if (raw !== undefined && ref === undefined) throw new PolicyViolationError('chain', `chainId ${JSON.stringify(String(raw)).slice(0, 40)} is not a chain id; nothing was signed.`)
   return ref === undefined ? undefined : `eip155:${ref}`
 }
 

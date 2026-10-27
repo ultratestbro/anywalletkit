@@ -64,11 +64,16 @@ const toBigInt = (v: bigint | number | string | undefined): bigint | undefined =
 /**
  * A transaction's `chainId` as a number. Out-of-range values are refused, and a bigint is checked
  * BEFORE it is converted: Hermes turns Number(x) above 2^63 into garbage that could match a chain.
+ * A string must be decimal or 0x-hex: '0b10001001' or ' 137' (which BigInt reads as 137) is refused,
+ * so this reads exactly what the kit's policies read (scan 2026-10-27 F30).
  */
-export function chainIdNumber(v: number | bigint): number {
-  const ok = typeof v === 'number' ? Number.isSafeInteger(v) && v >= 0 : v >= 0n && v <= BigInt(Number.MAX_SAFE_INTEGER)
-  if (!ok) throw new UnsafeTransactionError(`chainId ${String(v)} is not a valid chain id.`)
-  return typeof v === 'number' ? v : Number(v.toString())
+export function chainIdNumber(v: number | bigint | string): number {
+  let n: bigint | undefined
+  if (typeof v === 'number') n = Number.isSafeInteger(v) && v >= 0 ? BigInt(v) : undefined
+  else if (typeof v === 'bigint') n = v
+  else if (typeof v === 'string' && /^(\d{1,16}|0x[0-9a-fA-F]{1,14})$/.test(v)) n = BigInt(v)
+  if (n === undefined || n < 0n || n > BigInt(Number.MAX_SAFE_INTEGER)) throw new UnsafeTransactionError(`chainId ${String(v)} is not a valid chain id.`)
+  return Number(n.toString())
 }
 
 /** Pick the root type of an EIP-712 `types` map when `primaryType` is not given. */
@@ -376,7 +381,34 @@ export function typedDataHash(typed: TypedDataInput): Hex {
   const types = cleanTypes(typed.types)
   const chainId = typedDomainChainId(typed.domain.chainId)
   const domain = chainId === undefined ? typed.domain : { ...typed.domain, chainId }
-  return hashTypedData({ domain, types, primaryType: typed.primaryType ?? inferPrimaryType(types), message: typed.message } as never)
+  const primaryType = typed.primaryType ?? inferPrimaryType(types)
+  assertCanonicalNumbers(types, primaryType, typed.message, 0)
+  return hashTypedData({ domain, types, primaryType, message: typed.message } as never)
+}
+
+/**
+ * Every uintN / intN in the signed struct (nested structs and arrays included) is a bigint, a safe
+ * integer, or a decimal / 0x-hex string. viem passes strings through BigInt(), which also reads
+ * ' 115…', '0X…' and '0b…': a review screen that reads less would show such a permit as 0 while it
+ * signs the maximum (scan 2026-10-27 F11).
+ */
+function assertCanonicalNumbers(types: TypedDataInput['types'], type: string, value: unknown, depth: number): void {
+  if (depth > 16) throw new UnsafeTransactionError('Typed data nests deeper than 16 levels.')
+  const array = /^(.*)\[(\d*)\]$/.exec(type)
+  if (array) {
+    if (Array.isArray(value)) for (const v of value) assertCanonicalNumbers(types, array[1]!, v, depth + 1)
+    return
+  }
+  const fields = types[type]
+  if (fields) {
+    if (typeof value !== 'object' || value === null) return
+    for (const f of fields) assertCanonicalNumbers(types, f.type, (value as Record<string, unknown>)[f.name], depth + 1)
+    return
+  }
+  if (!/^u?int\d*$/.test(type) || value === undefined) return
+  const ok = typeof value === 'bigint' || (typeof value === 'number' && Number.isSafeInteger(value)) ||
+    (typeof value === 'string' && /^(-?\d{1,78}|0x[0-9a-fA-F]{1,64})$/.test(value))
+  if (!ok) throw new UnsafeTransactionError(`Typed data ${type} value ${JSON.stringify(String(value)).slice(0, 80)} is not a canonical number (a bigint, an integer, or a decimal / 0x string).`)
 }
 
 /** Helper for callers that pass bytes where a string is expected. */
