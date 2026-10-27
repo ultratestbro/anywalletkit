@@ -56,7 +56,7 @@ export interface Expectation {
 export interface SerializedGuard { programAllowlist: readonly string[]; expect: Expectation }
 
 /** The write surface of a `@anywalletkit/wallet-solana` account this module needs. */
-interface SolanaAccountSurface {
+export interface SolanaAccountSurface {
   getAddress(): Promise<string>
   checkSerialized?(base64: string, guard: SerializedGuard): Promise<{ quote: { fee: bigint } }>
   sendSerialized?(base64: string, guard: SerializedGuard): Promise<{ hash: string; fee: bigint }>

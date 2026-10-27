@@ -13,3 +13,4 @@ export {
 export { toAmount, toDecimalString, fromDecimalString, toWad, mulWad, divWadUp, lessBps, WAD } from './amounts.js'
 export type { AmountOption } from './amounts.js'
 export { vanillaObligation, vaultSharesMint, findProgramAddress } from './pda.js'
+export type { SolanaAccountSurface } from './base.js'

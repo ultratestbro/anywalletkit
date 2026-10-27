@@ -174,8 +174,8 @@ const isHexOp = (s: unknown): s is string => typeof s === 'string' && /^0x[0-9a-
 
 // ── tonapi shapes (what the mapper reads) ────────────────────────────────────
 
-interface TonapiAccount { address: string; is_wallet?: boolean; is_scam?: boolean; name?: string }
-interface TonapiJetton { address: string; symbol?: string; decimals?: number; name?: string }
+export interface TonapiAccount { address: string; is_wallet?: boolean; is_scam?: boolean; name?: string }
+export interface TonapiJetton { address: string; symbol?: string; decimals?: number; name?: string }
 export interface TonapiAction {
   type: string
   status: 'ok' | 'failed' | string
@@ -194,7 +194,7 @@ export interface TonapiEvent {
   value_flow?: Array<{ account: TonapiAccount; ton: number; jettons?: Array<{ jetton: TonapiJetton; quantity: number | string }> }>
 }
 
-interface MappedActions {
+export interface MappedActions {
   transfers: ChainTransfer[]
   call?: ChainCall
   /** Who initiated the event as far as the first action tells. */
@@ -395,7 +395,7 @@ export function mapTonapiEvent(chain: string, address: string, own: string, even
 
 // ── toncenter v3 shapes ──────────────────────────────────────────────────────
 
-interface V3Message {
+export interface V3Message {
   source?: string | null
   destination?: string | null
   value?: string | null

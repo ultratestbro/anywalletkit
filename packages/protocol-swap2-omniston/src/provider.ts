@@ -160,24 +160,24 @@ export function inMemorySecretStore(): HtlcSecretStore {
 
 // ── Minimal structural view of the SDK client (injectable for tests) ─────────
 
-interface ObservableLike<T> {
+export interface ObservableLike<T> {
   subscribe(observer: {next?: (value: T) => void; error?: (err: unknown) => void; complete?: () => void}): {unsubscribe(): void};
 }
 
 /** Self-contained structural SDK types. Keeping these local prevents the
  * optional Omniston peer from leaking into every consumer's declaration graph. */
-interface AssetId {
+export interface AssetId {
   chain: {
     $case: string;
     value: string | {kind?: {$case: string; value?: unknown}};
   };
 }
 
-interface ChainAddress {
+export interface ChainAddress {
   chain: {$case: string; value: string};
 }
 
-interface QuoteRequest {
+export interface QuoteRequest {
   inputAsset: AssetId;
   outputAsset: AssetId;
   amount: {$case: string; value: string};
@@ -186,7 +186,7 @@ interface QuoteRequest {
   integratorFeePips?: number;
 }
 
-interface OmnistonQuote {
+export interface OmnistonQuote {
   rfqId: string;
   quoteId: string;
   inputAsset: AssetId;
@@ -205,7 +205,7 @@ interface OmnistonQuote {
 }
 
 /** Order settlement (HTLC / escrow) — the cross-chain branch. */
-interface OrderSettlement {
+export interface OrderSettlement {
   srcProtocolContractAddress: ChainAddress;
   dstProtocolContractAddress?: ChainAddress;
   srcInitialResolverAddress?: ChainAddress;
@@ -230,7 +230,7 @@ interface OrderSettlement {
 }
 
 /** Swap settlement — immediate DEX routes, the TON same-chain branch. */
-interface SwapSettlement {
+export interface SwapSettlement {
   routes: {steps: {inputAsset?: AssetId; outputAsset?: AssetId; chunks: {protocol: string; inputUnits: string; outputUnits: string}[]}[]}[];
   minOutputAmount: string;
   recommendedMinOutputAmount?: string;
@@ -238,20 +238,20 @@ interface SwapSettlement {
   priceImpactPips?: number | undefined;
 }
 
-type RfqEvent =
+export type RfqEvent =
   | {$case: "ack"; value: {rfqId: string}}
   | {$case: "quoteUpdated"; rfqId?: string; value: OmnistonQuote}
   | {$case: "noQuote"; rfqId?: string; value: unknown}
   | {$case: string; value?: unknown};
 
-interface EscrowMessage {
+export interface EscrowMessage {
   targetAddress: string;
   sendAmount: string;
   payload: string; // hex-encoded cell BoC
   jettonWalletStateInit?: string | undefined;
 }
 
-interface OrderExecution {
+export interface OrderExecution {
   index: number;
   inputUnits: string;
   outputUnits: string;
@@ -263,14 +263,14 @@ interface OrderExecution {
   outputPositionAddress?: ChainAddress | undefined;
 }
 
-interface OrderSnapshot {
+export interface OrderSnapshot {
   status: string;
   executions: OrderExecution[];
 }
 
-type OrderEvent = {$case: "order"; value: OrderSnapshot} | {$case: string; value?: unknown};
+export type OrderEvent = {$case: "order"; value: OrderSnapshot} | {$case: string; value?: unknown};
 
-type SwapTrackEvent =
+export type SwapTrackEvent =
   | {$case: "awaitingTransfer"; value?: unknown}
   | {$case: "progress"; value: {status: string; outgoingTxHash?: string}}
   | {$case: string; value?: unknown};

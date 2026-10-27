@@ -24,7 +24,7 @@ import type { TronRawTransaction } from './types.js'
 
 // ── wire ─────────────────────────────────────────────────────────────────────
 
-interface Field { number: number; wire: number; value: bigint | Uint8Array }
+export interface Field { number: number; wire: number; value: bigint | Uint8Array }
 
 /**
  * Bytes that a strict protobuf reader would not produce or that java-tron would read

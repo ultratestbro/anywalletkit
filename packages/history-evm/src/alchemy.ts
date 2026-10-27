@@ -5,6 +5,7 @@ import { sleep, type TokenBucket } from './rate-limit.js'
 import { parseReceiptTransfers, txRowFromRpc } from './rpc-rows.js'
 import { parseBig, parseInt10, parseIsoSeconds, type ExplorerRows, type InternalRow, type TokenRow, type TxRow } from './rows.js'
 import type { FetchLike } from './types.js'
+import type { RawRow as Row } from './rpc-rows.js'
 
 /**
  * Alchemy backend: `alchemy_getAssetTransfers` (Transfers API) for the address
@@ -35,7 +36,6 @@ export interface AlchemyClientOptions {
   timeoutMs: number
 }
 
-type Row = Record<string, unknown>
 
 interface RpcError {
   code?: unknown

@@ -12,3 +12,4 @@ export { activatesAtEpoch, withdrawableAtEpoch, packWithdrawalId, unpackWithdraw
 export { createReadClient, pool, paginate, DEFAULT_TIMEOUT_MS, DEFAULT_CONCURRENCY } from './rpc.js'
 export type { MonadProvider, Eip1193Provider } from './rpc.js'
 export * from './constants.js'
+export type { NormalizedValidators } from './validators.js'

@@ -6,13 +6,14 @@ import { parseBig, parseInt10, type TokenRow, type TxRow } from './rows.js'
  * backend (whose Transfers API has no fee / status / input of its own).
  */
 
-type Row = Record<string, unknown>
+/** An untyped JSON object as an explorer or RPC returns it, before parsing. */
+export type RawRow = Record<string, unknown>
 
 /** keccak256("Transfer(address,address,uint256)") */
 export const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
 
 /** `time` = unix seconds already known from elsewhere (transfer metadata, block); 0 when unknown. */
-export function txRowFromRpc(tx: Row, receipt: Row | null | undefined, time: number): TxRow {
+export function txRowFromRpc(tx: RawRow, receipt: RawRow | null | undefined, time: number): TxRow {
   const blockHex = (receipt?.['blockNumber'] ?? tx['blockNumber']) as string | null | undefined
   const status: TxRow['status'] = !receipt || !blockHex ? 'pending' : receipt['status'] === '0x0' ? 'failed' : 'confirmed'
   const row: TxRow = {
@@ -36,8 +37,8 @@ export function txRowFromRpc(tx: Row, receipt: Row | null | undefined, time: num
 }
 
 /** ERC-20 `Transfer` logs (3 topics) of a receipt → token rows. 4-topic (ERC-721) transfers are skipped. */
-export function parseReceiptTransfers(receipt: Row, tx: TxRow): TokenRow[] {
-  const logs = Array.isArray(receipt['logs']) ? (receipt['logs'] as Row[]) : []
+export function parseReceiptTransfers(receipt: RawRow, tx: TxRow): TokenRow[] {
+  const logs = Array.isArray(receipt['logs']) ? (receipt['logs'] as RawRow[]) : []
   const out: TokenRow[] = []
   for (const log of logs) {
     const topics = Array.isArray(log['topics']) ? (log['topics'] as string[]) : []

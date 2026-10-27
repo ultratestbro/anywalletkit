@@ -14,3 +14,4 @@ export {
 export type { Argon2Params, Argon2idImpl, BackupEnvelope, BackupMeta, KdfOptions, OpenedBackup, Protector, ProtectorRecord, Unlock } from './envelope.js'
 export { BackupError, isBackupError } from './errors.js'
 export type { BackupErrorCode } from './errors.js'
+export type { Sealed } from './envelope.js'

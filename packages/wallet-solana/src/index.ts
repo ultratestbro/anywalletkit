@@ -23,3 +23,6 @@ export {
   type SolanaHistoryOptions, type SolanaHistorySource, type SolanaHistoryPage, type SolanaChainTx, type SolanaHistoryRaw, type HistoryFetch, type SignatureRow,
 } from './history.js'
 export { WalletManagerSolana as default } from './manager.js'
+export type { CompiledMessage } from './describe.js'
+export type { PageCursor, ParsedInstruction, ParsedTransaction, TokenBalance } from './history.js'
+export type { PlanOptions } from './read-only-account.js'

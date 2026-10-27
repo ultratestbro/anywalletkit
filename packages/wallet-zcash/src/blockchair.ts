@@ -17,9 +17,9 @@ const UTXO_LIMIT = 1000
 
 interface BlockchairUtxo { block_id: number; transaction_hash: string; index: number; value: number }
 interface BlockchairAddress { balance: number; unspent_output_count?: number; transaction_count?: number }
-interface BlockchairTxRow { block_id: number; hash: string; time?: string; fee?: number; input_count?: number; output_count?: number }
-interface BlockchairOutput { index: number; value: number; script_hex: string; recipient?: string }
-interface BlockchairInput extends BlockchairOutput { transaction_hash: string; spending_index?: number; spending_sequence?: number }
+export interface BlockchairTxRow { block_id: number; hash: string; time?: string; fee?: number; input_count?: number; output_count?: number }
+export interface BlockchairOutput { index: number; value: number; script_hex: string; recipient?: string }
+export interface BlockchairInput extends BlockchairOutput { transaction_hash: string; spending_index?: number; spending_sequence?: number }
 export interface BlockchairTxDashboard { transaction: BlockchairTxRow; inputs: BlockchairInput[]; outputs: BlockchairOutput[] }
 interface Envelope<T> { data: T; context: { code: number; state?: number; error?: string } }
 

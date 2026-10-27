@@ -121,7 +121,7 @@ export interface SignatureRow {
   memo?: string | null
 }
 
-interface ParsedInstruction {
+export interface ParsedInstruction {
   programId: string
   program?: string
   parsed?: unknown
@@ -129,7 +129,7 @@ interface ParsedInstruction {
   accounts?: string[]
 }
 
-interface TokenBalance {
+export interface TokenBalance {
   accountIndex: number
   mint: string
   owner?: string
@@ -137,7 +137,7 @@ interface TokenBalance {
   uiTokenAmount: { amount: string; decimals: number }
 }
 
-interface ParsedTransaction {
+export interface ParsedTransaction {
   slot: number
   blockTime?: number | null
   version?: unknown
@@ -159,7 +159,7 @@ interface ParsedTransaction {
 
 // ── Cursor: per-list `before` signatures, base64 JSON ────────────────────────
 
-interface PageCursor {
+export interface PageCursor {
   v: 1
   /** list address → `before` signature; `null` = exhausted. */
   l: Record<string, string | null>

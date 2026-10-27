@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ActivityItem, ActivityKind, ChainTx, IWalletAccount, IWalletAccountReadOnly } from '@anywalletkit/core'
 import { createMockAccount } from './mock-account.js'
+import type { ProtocolCtor as Ctor } from './ctor.js'
 
 /**
  * Activity fixtures: recorded real transactions a module must recognize through
@@ -41,7 +42,6 @@ export function parseActivityFixture(f: ActivityFixtureJson): { tx: ChainTx; own
 const WRITE_METHOD = /^(sign|send|transfer)/
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Ctor<P> = new (account: IWalletAccountReadOnly | IWalletAccount, config?: any) => P
 
 export interface ActivitySuiteOptions<P> {
   Protocol: Ctor<P>

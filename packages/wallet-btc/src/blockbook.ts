@@ -6,7 +6,7 @@ const MEMPOOL_SPACE_URL = 'https://mempool.space'
 
 export interface BlockbookVin { txid?: string; vout?: number; n?: number; isAddress?: boolean; isOwn?: boolean; addresses?: string[]; value?: string }
 export interface BlockbookVout { n: number; isAddress?: boolean; isOwn?: boolean; addresses?: string[]; value?: string; spent?: boolean }
-interface BlockbookAddressTx { txid: string; blockHeight: number; vin?: BlockbookVin[]; vout?: BlockbookVout[] }
+export interface BlockbookAddressTx { txid: string; blockHeight: number; vin?: BlockbookVin[]; vout?: BlockbookVout[] }
 /** A Blockbook transaction with its inputs and outputs (`/api/v2/tx/{txid}`, or one row of `?details=txs`). */
 export interface BlockbookTxDetails extends BlockbookTx {
   vin?: BlockbookVin[]

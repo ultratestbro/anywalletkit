@@ -66,7 +66,7 @@ export type Protector =
 /** What opens a backup: a password, or the key behind one `key` protector. */
 export type Unlock = { kind: 'password'; password: string } | { kind: 'key'; id: string; key: Uint8Array }
 
-interface Sealed {
+export interface Sealed {
   nonce: string
   ct: string
 }

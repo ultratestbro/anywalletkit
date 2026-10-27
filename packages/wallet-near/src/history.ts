@@ -406,7 +406,7 @@ export function mapNearblocksTxn(chain: string, address: string, txn: Nearblocks
 
 // ── RPC refinement ───────────────────────────────────────────────────────────
 
-interface RpcAction {
+export interface RpcAction {
   Transfer?: { deposit: string }
   FunctionCall?: { method_name: string; args: string; deposit: string; gas?: number }
   Delegate?: { delegate_action: { sender_id: string; receiver_id: string; actions: RpcAction[] } }

@@ -19,3 +19,6 @@ export {
 } from './history.js'
 export { WalletManagerTron as default } from './manager.js'
 export { assertNodeBuild, type ExpectedBuild } from './build-check.js'
+export type { Contract, TronListPosition } from './history.js'
+export type { Field } from './raw.js'
+export type { ConstantCallResponse, Resources } from './read-only-account.js'

@@ -18,3 +18,5 @@ export {
   type BtcHistoryOptions, type BtcHistorySource, type BtcHistoryPage, type BtcChainTx, type BtcHistoryRaw, type BtcHistoryCursor,
 } from './history.js'
 export { WalletManagerBtc as default } from './manager.js'
+export type { Built } from './account.js'
+export type { BlockbookAddressTx } from './blockbook.js'

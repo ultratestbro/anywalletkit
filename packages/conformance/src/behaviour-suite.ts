@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { checksFor, decodeCall, type PreviewCall } from '@anywalletkit/tx-preview-evm'
 import type { IWalletAccount } from '@anywalletkit/core'
 import { createMockAccount, type MockAccountOptions } from './mock-account.js'
+import type { WriteProtocolCtor as Ctor } from './ctor.js'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Ctor<P> = new (account: IWalletAccount, config?: any) => P
 
 /** The swap2 engine's review plan (structural copy of `Swap2ExecutionPlan`; conformance does not depend on swap2-core). */
 interface Plan {

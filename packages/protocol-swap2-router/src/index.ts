@@ -29,3 +29,4 @@ export {RouterSwap2Protocol, type RouterSwap2Config, type Swap2Route} from "./sw
 export {RouterSwap2Protocol as default} from "./swap2/router.js";
 export {remoteProvider, type RemoteProviderOptions} from "@anywalletkit/protocol-swap2-core/remote";
 export type * from "@anywalletkit/protocol-swap2-core/types";
+export type { ValueParams, ValueQuote } from "./value.js"

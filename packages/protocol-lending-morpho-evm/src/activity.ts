@@ -30,7 +30,7 @@ const ZERO = '0x0000000000000000000000000000000000000000'
 const sel = (signature: string): string => toFunctionSelector(`function ${signature}`).toLowerCase()
 const MARKET_PARAMS = '(address,address,address,address,uint256)'
 
-interface Action { kind: ActivityKind; verb: string; principal: 'out' | 'in' | 'none' }
+export interface Action { kind: ActivityKind; verb: string; principal: 'out' | 'in' | 'none' }
 
 /** Morpho Blue (IMorpho). */
 export const BLUE_ACTIONS: Readonly<Record<string, Action>> = Object.freeze({

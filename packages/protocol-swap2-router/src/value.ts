@@ -79,8 +79,8 @@ export interface QuoteValueOptions {
   betterByPct?: number;
 }
 
-type ValueParams = Pick<QuoteParams, "sourceChain" | "sourceToken" | "destChain" | "destToken" | "amountIn">;
-type ValueQuote = Pick<Quote, "provider" | "destAmount"> & Partial<Pick<Quote, "txRequest" | "providerData">>;
+export type ValueParams = Pick<QuoteParams, "sourceChain" | "sourceToken" | "destChain" | "destToken" | "amountIn">;
+export type ValueQuote = Pick<Quote, "provider" | "destAmount"> & Partial<Pick<Quote, "txRequest" | "providerData">>;
 
 /** The catalog asset for a token given as a contract / asset id (the wire form) or as a symbol (what apps pass for the source). */
 function assetFor(chain: string, token: string) {

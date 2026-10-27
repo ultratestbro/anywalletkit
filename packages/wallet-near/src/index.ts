@@ -19,3 +19,5 @@ export {
   type NearHistoryOptions, type NearHistorySource, type NearHistoryPage, type NearChainTx, type NearHistoryRaw, type NearHistoryCursor, type NearblocksReceiptRow, type NearblocksFtRow, type NearblocksTxn, type RpcTxStatus, type HistoryFetch,
 } from './history.js'
 export { WalletManagerNear as default } from './manager.js'
+export type { NearblocksAction, RpcAction } from './history.js'
+export type { RawAccessKeyView, RawAccountView, RawFinalOutcome } from './rpc.js'

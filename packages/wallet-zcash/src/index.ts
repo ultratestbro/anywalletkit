@@ -23,3 +23,5 @@ export {
   type ZcashHistoryOptions, type ZcashHistorySource, type ZcashHistoryPage, type ZcashChainTx, type ZcashHistoryRaw, type ZcashHistoryCursor,
 } from './history.js'
 export { WalletManagerZcash as default } from './manager.js'
+export type { Built } from './account.js'
+export type { BlockchairInput, BlockchairOutput, BlockchairTxRow } from './blockchair.js'

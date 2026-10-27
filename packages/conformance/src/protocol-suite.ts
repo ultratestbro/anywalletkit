@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { NotImplementedError, ReadOnlyAccountError, type IWalletAccount, type IWalletAccountReadOnly, type ProtocolType } from '@anywalletkit/core'
 import { createMockAccount } from './mock-account.js'
 import { describeActivitySuite, type ActivityFixtureJson } from './activity-suite.js'
+import type { ProtocolCtor as Ctor } from './ctor.js'
 
 type AnyProtocol = Record<string, unknown>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Ctor<P> = new (account: IWalletAccountReadOnly | IWalletAccount, config?: any) => P
 
 /** Method names per protocol type: [writes, reads]. Writes must refuse a read-only account. */
 const SURFACE: Record<ProtocolType, { writes: string[]; reads: string[] }> = {

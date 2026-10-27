@@ -19,7 +19,7 @@ export function addressFor(publicKey: Uint8Array, network: BtcNetwork | BTC_NETW
   return addressFromPublicKey(publicKey, typeof network === 'string' ? networkParams(network) : network, type)
 }
 
-interface Built {
+export interface Built {
   tx: Transaction
   fee: bigint
   plan: SpendPlan

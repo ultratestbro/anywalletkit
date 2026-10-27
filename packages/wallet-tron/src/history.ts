@@ -229,7 +229,7 @@ const wordToAddress = (word: string): string => toBase58Address('41' + word.slic
 
 // ── TronGrid shapes ──────────────────────────────────────────────────────────
 
-interface Contract {
+export interface Contract {
   type: string
   parameter: { value: Record<string, unknown> }
 }

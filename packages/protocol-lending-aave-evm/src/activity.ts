@@ -18,7 +18,7 @@ import { AAVE_MARKETS, type AaveMarket } from './markets.js'
 /** Registry name, as `module.json` carries it. */
 export const MODULE_NAME = '@anywalletkit/protocol-lending-aave-evm'
 
-interface Action {
+export interface Action {
   kind: ActivityKind
   verb: string
   /** Which side of the net transfers holds the principal asset. */

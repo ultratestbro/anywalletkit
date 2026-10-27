@@ -133,7 +133,7 @@ function fromMessage(msg: TransactionMessage): Normalized {
   return { version: msg.version, feePayer, signers: [...signers.keys()].map((address) => ({ address, signed: undefined })), instructions, unresolvedLookups: false }
 }
 
-interface CompiledMessage {
+export interface CompiledMessage {
   version: 'legacy' | 0 | 1
   header: { numSignerAccounts: number; numReadonlySignerAccounts: number; numReadonlyNonSignerAccounts: number }
   staticAccounts: Address[]

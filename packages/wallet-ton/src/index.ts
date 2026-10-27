@@ -25,3 +25,4 @@ export {
   type TonHistoryOptions, type TonHistorySource, type TonHistoryPage, type TonChainTx, type TonHistoryRaw, type TonHistoryBackend, type TonHistoryCursor, type TonapiEvent, type TonapiAction, type V3Transaction, type HistoryFetch,
 } from './history.js'
 export { WalletManagerTon as default } from './manager.js'
+export type { MappedActions, TonapiAccount, TonapiJetton, V3Message } from './history.js'

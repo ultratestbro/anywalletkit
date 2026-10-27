@@ -52,9 +52,9 @@ const PARAM_DEFAULTS: Record<string, bigint> = {
   getCreateNewAccountBandwidthRate: 1n,
 }
 
-interface Resources { freeNetLimit?: number; freeNetUsed?: number; NetLimit?: number; NetUsed?: number; EnergyLimit?: number; EnergyUsed?: number }
+export interface Resources { freeNetLimit?: number; freeNetUsed?: number; NetLimit?: number; NetUsed?: number; EnergyLimit?: number; EnergyUsed?: number }
 interface ChainParam { key: string; value?: number }
-interface ConstantCallResponse {
+export interface ConstantCallResponse {
   Error?: string
   constant_result?: string[]
   energy_used?: number

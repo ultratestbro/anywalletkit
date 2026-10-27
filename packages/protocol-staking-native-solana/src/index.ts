@@ -17,3 +17,4 @@ export type { Instruction, AccountMeta, Role, StakeAccountData, StakeAccountKind
 export { RpcClient, RpcError, DEFAULT_TIMEOUT_MS } from './rpc.js'
 export type { SolanaRpcSource, RpcClientOptions } from './rpc.js'
 export * from './constants.js'
+export { READONLY, READONLY_SIGNER, WRITABLE, WRITABLE_SIGNER } from './codec.js'

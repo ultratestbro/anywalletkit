@@ -7,3 +7,4 @@ export {BaseSwap2Protocol, SWAP2_ID_PREFIX, SWAP2_CHAIN_ALIASES, swap2ChainId, N
 export {SingleProviderSwap2} from "./swap2/single.js";
 export {calledContract, callSelector, callsContract, matchesCall, chainLabel, shortAddress, assetMetaFor, assetLabel, ownerAssets, describeSwapLike, type SwapActivityOptions} from "./activity.js";
 export {suggestSlippage, slippageClassOf, type SlippageClass, type SlippageContext, type SlippageOptions, type SlippageSuggestion} from "./slippage.js";
+export type { Swap2ExecutionPhase, Swap2ExecutionPhaseDetail } from "./swap2/base.js"
