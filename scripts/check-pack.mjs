@@ -7,6 +7,7 @@
  *   - every file `main` / `module` / `types` / `exports` points at is inside;
  *   - repository.url + directory match this repo (npm provenance checks them),
  *     publishConfig.access = public and provenance = true;
+ *   - a description, and "anywalletkit" among the keywords;
  *   - every package the shipped JavaScript imports is a dependency, peer or
  *     optional dependency (a devDependency is not installed for consumers).
  * Run after `pnpm build`. Exit 1 on the first package with a problem list.
@@ -77,6 +78,10 @@ for (const dir of readdirSync(join(root, 'packages')).sort()) {
   if (pkg.repository?.directory !== `packages/${dir}`) bad.push(`repository.directory = ${pkg.repository?.directory}`)
   if (pkg.publishConfig?.access !== 'public' || pkg.publishConfig?.provenance !== true) bad.push('publishConfig must be { access: public, provenance: true }')
   if (pkg.private) bad.push('private: true')
+  // npm shows the README's first line (a badge) when description is empty, and
+  // `keywords:anywalletkit` is how the packages are found on npm.
+  if (!pkg.description?.trim()) bad.push('empty description')
+  if (!pkg.keywords?.includes('anywalletkit')) bad.push('keywords must include "anywalletkit"')
   const unpacked = join(out, dir)
   mkdirSync(unpacked)
   execFileSync('tar', ['-xzf', tgz, '-C', unpacked])

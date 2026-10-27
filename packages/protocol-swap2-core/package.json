@@ -94,6 +94,8 @@
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/core": "workspace:*"
   },
-  "keywords": [],
+  "keywords": [
+    "anywalletkit"
+  ],
   "publishConfig": { "access": "public", "provenance": true }
 }

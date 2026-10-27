@@ -35,6 +35,12 @@
     "vitest": "^5.0.3",
     "@anywalletkit/conformance": "workspace:*"
   },
-  "keywords": [],
+  "keywords": [
+    "swap2",
+    "assets",
+    "caip-19",
+    "token-list",
+    "anywalletkit"
+  ],
   "publishConfig": { "access": "public", "provenance": true }
 }

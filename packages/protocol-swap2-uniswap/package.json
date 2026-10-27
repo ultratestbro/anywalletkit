@@ -58,7 +58,8 @@
   "keywords": [
     "uniswap",
     "swap",
-    "permissionless"
+    "permissionless",
+    "anywalletkit"
   ],
   "publishConfig": { "access": "public", "provenance": true }
 }

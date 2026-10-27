@@ -40,7 +40,8 @@
     "tron",
     "trc20",
     "bip32",
-    "secp256k1"
+    "secp256k1",
+    "anywalletkit"
   ],
   "dependencies": {
     "@anywalletkit/core": "workspace:*",

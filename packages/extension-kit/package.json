@@ -37,7 +37,8 @@
     "mv3",
     "chrome-extension",
     "vault",
-    "eip-1193"
+    "eip-1193",
+    "anywalletkit"
   ],
   "dependencies": {
     "@anywalletkit/core": "workspace:*",

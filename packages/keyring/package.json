@@ -35,7 +35,8 @@
     "sdk",
     "keyring",
     "multi-account",
-    "import"
+    "import",
+    "anywalletkit"
   ],
   "dependencies": {
     "@anywalletkit/core": "workspace:*",

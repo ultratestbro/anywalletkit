@@ -38,7 +38,8 @@
     "bip32",
     "eip1559",
     "eip712",
-    "erc20"
+    "erc20",
+    "anywalletkit"
   ],
   "dependencies": {
     "@anywalletkit/core": "workspace:*",

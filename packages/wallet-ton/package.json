@@ -44,7 +44,8 @@
     "jetton",
     "slip10",
     "ed25519",
-    "v5r1"
+    "v5r1",
+    "anywalletkit"
   ],
   "dependencies": {
     "@anywalletkit/core": "workspace:*",

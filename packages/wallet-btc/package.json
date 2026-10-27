@@ -43,7 +43,8 @@
     "taproot",
     "psbt",
     "blockbook",
-    "esplora"
+    "esplora",
+    "anywalletkit"
   ],
   "dependencies": {
     "@anywalletkit/core": "workspace:*",

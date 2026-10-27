@@ -40,7 +40,8 @@
     "solana",
     "slip10",
     "ed25519",
-    "spl-token"
+    "spl-token",
+    "anywalletkit"
   ],
   "dependencies": {
     "@anywalletkit/core": "workspace:*",

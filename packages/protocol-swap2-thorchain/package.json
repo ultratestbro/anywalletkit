@@ -1,7 +1,7 @@
 {
   "name": "@anywalletkit/protocol-swap2-thorchain",
   "version": "0.1.8",
-  "description": "",
+  "description": "THORChain native cross-chain swaps for Any Wallet Kit: EVM deposits into the THORChain router and Tron sends to the inbound vault with a memo; standalone or as a provider of the swap2 router.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
   "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
@@ -60,6 +60,14 @@
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/core": "workspace:*"
   },
-  "keywords": [],
+  "keywords": [
+    "swap2",
+    "swap",
+    "thorchain",
+    "cross-chain",
+    "evm",
+    "tron",
+    "anywalletkit"
+  ],
   "publishConfig": { "access": "public", "provenance": true }
 }

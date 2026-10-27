@@ -42,7 +42,8 @@
     "nep413",
     "slip10",
     "ed25519",
-    "borsh"
+    "borsh",
+    "anywalletkit"
   ],
   "dependencies": {
     "@anywalletkit/core": "workspace:*",

@@ -46,7 +46,8 @@
     "bitcoin",
     "ton",
     "tron",
-    "solana"
+    "solana",
+    "anywalletkit"
   ],
   "dependencies": {
     "@noble/curves": "^2.4.0",

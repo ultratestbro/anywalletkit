@@ -39,7 +39,8 @@
     "hermes",
     "polyfill",
     "abortsignal",
-    "webcrypto"
+    "webcrypto",
+    "anywalletkit"
   ],
   "dependencies": {
     "@noble/hashes": "^2.4.0"

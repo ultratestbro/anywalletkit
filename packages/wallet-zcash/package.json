@@ -43,7 +43,8 @@
     "zip-244",
     "zip-317",
     "blockchair",
-    "blockbook"
+    "blockbook",
+    "anywalletkit"
   ],
   "dependencies": {
     "@anywalletkit/core": "workspace:*",

@@ -1,7 +1,7 @@
 {
   "name": "@anywalletkit/protocol-swap2-lifi",
   "version": "0.2.7",
-  "description": "",
+  "description": "LI.FI cross-chain swaps and bridges for Any Wallet Kit: EVM routes through the LI.FI Diamond and guarded Solana transactions, standalone or as a provider of the swap2 router.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
   "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
@@ -60,6 +60,14 @@
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/core": "workspace:*"
   },
-  "keywords": [],
+  "keywords": [
+    "swap2",
+    "swap",
+    "bridge",
+    "lifi",
+    "evm",
+    "solana",
+    "anywalletkit"
+  ],
   "publishConfig": { "access": "public", "provenance": true }
 }

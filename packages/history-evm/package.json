@@ -47,7 +47,8 @@
     "etherscan",
     "blockscout",
     "alchemy",
-    "evm"
+    "evm",
+    "anywalletkit"
   ],
   "publishConfig": { "access": "public", "provenance": true }
 }
