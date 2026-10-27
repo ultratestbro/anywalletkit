@@ -101,7 +101,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
    * p2wpkh → `partialSig` (DER + SIGHASH_ALL), p2tr → `tapKeySig` (64 bytes, DEFAULT).
    * btc-signer only computes the sighash and assembles the witness; it never sees a key.
    */
-  private async signInputs(tx: Transaction, values: bigint[]): Promise<void> {
+  async #signInputs(tx: Transaction, values: bigint[]): Promise<void> {
     if (this.addressType === 'p2tr') {
       const { tweak } = this.taprootKeys()
       const scripts = Array.from({ length: tx.inputsLength }, () => this.scriptPubKey)
@@ -128,7 +128,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
     return { network: this._network, ownAddress: this.address, intended, maxFeeRate: this.maxFeeRate }
   }
 
-  private async signPlan(plan: SpendPlan, to: string, recipientValue: bigint, change: bigint, lockTime: number, rbf: boolean): Promise<Transaction> {
+  async #signPlan(plan: SpendPlan, to: string, recipientValue: bigint, change: bigint, lockTime: number, rbf: boolean): Promise<Transaction> {
     const spend = spendInfo(this.publicKey, this._network, this.addressType)
     const tx = new Transaction({ lockTime })
     const sequence = rbf ? RBF_SEQUENCE : FINAL_SEQUENCE
@@ -137,7 +137,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
     }
     tx.addOutputAddress(to, recipientValue, this._network)
     if (change > 0n) tx.addOutputAddress(this.address, change, this._network)
-    await this.signInputs(tx, plan.utxos.map((u) => u.value))
+    await this.#signInputs(tx, plan.utxos.map((u) => u.value))
     tx.finalize()
     return tx
   }
@@ -147,7 +147,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
    * signed vsize somehow needs more, the difference comes out of change (never the
    * recipient) and the tx is re-signed once.
    */
-  protected async signSpend(spend: BtcSpend): Promise<Built> {
+  async #signSpend(spend: BtcSpend): Promise<Built> {
     this.live()
     const plan = await this.planSpend(spend)
     await this.verifyPrevouts(plan.utxos)
@@ -155,7 +155,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
     const rbf = spend.rbf ?? this._config.rbf ?? true
     let change = plan.change
     let fee = plan.fee
-    let tx = await this.signPlan(plan, spend.to, plan.amount, change, lockTime, rbf)
+    let tx = await this.#signPlan(plan, spend.to, plan.amount, change, lockTime, rbf)
     const required = BigInt(tx.vsize) * plan.feeRate
     if (required > fee) {
       const delta = required - fee
@@ -165,7 +165,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
       }
       change = change - delta
       if (change < this.dustLimit) { fee = plan.fee + plan.change; change = 0n } else fee = required
-      tx = await this.signPlan(plan, spend.to, plan.amount, change, lockTime, rbf)
+      tx = await this.#signPlan(plan, spend.to, plan.amount, change, lockTime, rbf)
       if (BigInt(tx.vsize) * plan.feeRate > fee) throw new Error('Fee shortfall after output rebalance.')
     }
     const ctx = this.ctx({ to: spend.to, value: plan.amount })
@@ -242,7 +242,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
   /** "What you sign": the fully resolved spend (signed, NOT broadcast) or a caller's raw hex. */
   async describeTransaction(tx: BtcTransaction): Promise<BtcTxDescription> {
     if (typeof tx === 'string') return (await this.describeRaw(tx)).desc
-    return (await this.signSpend(tx)).desc
+    return (await this.#signSpend(tx)).desc
   }
 
   /** Sign without broadcasting. Returns the raw transaction hex. Raw hex input gets the checks `sendTransaction` runs (prevouts through the client) and is returned unchanged, never re-signed. */
@@ -253,7 +253,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
       this.checkMax(desc.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
       return tx
     }
-    const { tx: built, fee } = await this.signSpend(tx)
+    const { tx: built, fee } = await this.#signSpend(tx)
     this.checkMax(fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return built.hex
   }
@@ -271,7 +271,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
       const { tx: parsed, desc } = await this.describeRaw(tx)
       rawHex = tx; hash = parsed.id; fee = desc.fee
     } else {
-      const built = await this.signSpend(tx)
+      const built = await this.#signSpend(tx)
       rawHex = built.tx.hex; hash = built.tx.id; fee = built.fee
     }
     this.checkMax(fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
@@ -283,7 +283,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
     if (o.token) throw new Error('Tokens are not supported on the bitcoin blockchain.')
     this.live()
     const client = this.requireClient('transfer')
-    const built = await this.signSpend({ to: o.recipient, value: o.amount })
+    const built = await this.#signSpend({ to: o.recipient, value: o.amount })
     this.checkMax(built.fee, feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
     return { hash: await this.broadcast(client, built.tx.hex, built.tx.id), fee: built.fee }
   }

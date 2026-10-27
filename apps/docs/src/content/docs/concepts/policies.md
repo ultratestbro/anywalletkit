@@ -39,10 +39,12 @@ Every method that produces a signature or a broadcast: `transfer`, `sendTransact
 the **spender**, and `confirm` receives `kind: 'approval'` with `unlimited` and `deadline`;
 any other typed data is `kind: 'typedData'`, `confirm` only), plus chain-specific write
 methods (Tron's `signRaw`, NEAR's `signBuilt` and `signNep413`, Solana's `sendSerialized`,
-`signCompiled`, `signTransactionMessage`, swap2's `sendSerializedTransaction`). The rule is deny-by-default: any account method
-whose name starts with `sign`, `send`, `approve`, `revoke` or `transfer` is guarded unless
-it is listed in `UNGUARDED_WRITES` (empty today), so a new signing method in a chain
-package cannot bypass the policies. Reads (balances, quotes, receipts) are never affected.
+`signCompiled`, `signTransactionMessage`, swap2's `sendSerializedTransaction`). The rule is deny-by-default: any other account
+method whose name starts with `sign`, `send`, `approve`, `revoke` or `transfer` is refused
+behind the wrapper (`PolicyViolationError`, `policy: 'method'`) unless it is listed in
+`UNGUARDED_WRITES` (only NEAR's `transferActions`, which signs nothing), so a new signing
+method in a chain package cannot bypass the policies. Reads (balances, quotes, receipts)
+are never affected.
 
 ### Destinations
 

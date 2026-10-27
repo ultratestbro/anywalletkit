@@ -66,7 +66,7 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
     if (this._disposed) throw new SignerError('This account has been disposed.')
   }
 
-  private async signBytes(bytes: Uint8Array, context: 'near-tx' | 'near-message' | 'near-nep413'): Promise<Uint8Array> {
+  async #signBytes(bytes: Uint8Array, context: 'near-tx' | 'near-message' | 'near-nep413'): Promise<Uint8Array> {
     this.key()
     return this.signer.sign(bytes, { scheme: 'ed25519', context })
   }
@@ -82,18 +82,18 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
   async sign(message: string | Uint8Array): Promise<string> {
     const bytes = typeof message === 'string' ? new TextEncoder().encode(message) : message
     if (bytes.length === 32 || carriesKey(bytes, this.publicKey.data)) throw new MessageIsTransactionError()
-    return `ed25519:${bytesToBase58(await this.signBytes(bytes, 'near-message'))}`
+    return `ed25519:${bytesToBase58(await this.#signBytes(bytes, 'near-message'))}`
   }
 
   /** NEP-413 off-chain message (what NEAR Intents and dApps ask wallets to sign). */
   async signNep413(payload: Nep413Payload): Promise<Nep413Signed> {
-    const sig = await this.signBytes(nep413Hash(payload), 'near-nep413')
+    const sig = await this.#signBytes(nep413Hash(payload), 'near-nep413')
     return { signature: toBase64(sig), publicKey: publicKeyToString(this.publicKey), accountId: this.address }
   }
 
   /** Sign a fully built transaction. No checks — see `signTransaction`. */
   async signBuilt(tx: NearBuiltTransaction): Promise<NearSignedTransaction> {
-    const sig = await this.signBytes(WalletAccountReadOnlyNear.hashOf(tx), 'near-tx')
+    const sig = await this.#signBytes(WalletAccountReadOnlyNear.hashOf(tx), 'near-tx')
     return { transaction: tx, signature: { keyType: 'ed25519', data: sig } }
   }
 

@@ -117,7 +117,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   }
 
   /** Recoverable secp256k1 signature over a 32-byte hash from the signer, as a viem Signature (v = 27 | 28). */
-  private async signHash(hash: Hex, context: 'evm-tx' | 'evm-191' | 'evm-712'): Promise<Signature> {
+  async #signHash(hash: Hex, context: 'evm-tx' | 'evm-191' | 'evm-712'): Promise<Signature> {
     const sig = await this.signer.sign(hexToBytes(hash), { scheme: 'ecdsa-recoverable', context })
     const recovery = sig[64]!
     const r = toHex(sig.slice(0, 32))
@@ -132,7 +132,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   /** EIP-191 personal_sign; returns 65-byte hex with v ∈ {27, 28} (ethers encoding). */
   async sign(message: string | Uint8Array): Promise<string> {
     const hash = hashMessage(typeof message === 'string' ? message : { raw: message })
-    return this.serializeSignature(await this.signHash(hash, 'evm-191'))
+    return this.serializeSignature(await this.#signHash(hash, 'evm-191'))
   }
 
   /** The account's chain when it is known without a network round-trip (config, detected earlier, or the tx itself). */
@@ -174,7 +174,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   /** EIP-712. Accepts `{domain, types, message}`; `primaryType` is inferred when absent. */
   async signTypedData(typed: TypedDataInput): Promise<string> {
     await this.assertSafeTypedData(typed)
-    return this.serializeSignature(await this.signHash(typedDataHash(typed), 'evm-712'))
+    return this.serializeSignature(await this.#signHash(typedDataHash(typed), 'evm-712'))
   }
 
   /** ethers-shaped tx → viem serializable, filling gaps from the network when there is a client. */
@@ -268,7 +268,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     const prepared = await this.prepare(tx)
     this.capFee(prepared, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const hash = keccak256(serializeTransaction(prepared))
-    return serializeTransaction(prepared, await this.signHash(hash, 'evm-tx'))
+    return serializeTransaction(prepared, await this.#signHash(hash, 'evm-tx'))
   }
 
   private recentlyBroadcast(): boolean {
@@ -283,9 +283,9 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   }
 
   /** Sign a prepared transaction; the fee cap is checked again before every signature. */
-  private async signPrepared(prepared: TransactionSerializable, limit: bigint | number | undefined, op: string): Promise<{ raw: Hex; hash: Hex; nonce: number }> {
+  async #signPrepared(prepared: TransactionSerializable, limit: bigint | number | undefined, op: string): Promise<{ raw: Hex; hash: Hex; nonce: number }> {
     this.capFee(prepared, limit, op)
-    const raw = serializeTransaction(prepared, await this.signHash(keccak256(serializeTransaction(prepared)), 'evm-tx'))
+    const raw = serializeTransaction(prepared, await this.#signHash(keccak256(serializeTransaction(prepared)), 'evm-tx'))
     return { raw, hash: keccak256(raw), nonce: prepared.nonce! }
   }
 
@@ -308,13 +308,13 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
    * nonce before either is broadcast, and the second would replace (or be refused for) the first.
    * A failed send does not block the next.
    */
-  private signAndBroadcast(tx: EvmTransaction, limit: bigint | number | undefined, op: string): Promise<TransferResult> {
-    const run = this._sendTail.then(() => this.signAndBroadcastNow(tx, limit, op))
+  #signAndBroadcast(tx: EvmTransaction, limit: bigint | number | undefined, op: string): Promise<TransferResult> {
+    const run = this._sendTail.then(() => this.#signAndBroadcastNow(tx, limit, op))
     this._sendTail = run.then(() => undefined, () => undefined)
     return run
   }
 
-  private async signAndBroadcastNow(tx: EvmTransaction, limit: bigint | number | undefined, op: string): Promise<TransferResult> {
+  async #signAndBroadcastNow(tx: EvmTransaction, limit: bigint | number | undefined, op: string): Promise<TransferResult> {
     const client = this.requireClient(op === 'transfer' ? 'transfer tokens' : 'send transactions')
     const checked = await this.preflight(tx)
     const prepared = await this.prepare(checked)
@@ -337,7 +337,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
         throw error
       }
     }
-    const first = await this.signPrepared(prepared, limit, op)
+    const first = await this.#signPrepared(prepared, limit, op)
     try {
       return await submit(first)
     } catch (error) {
@@ -351,17 +351,17 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
       // one re-sign of the same payload is safe.
       const hinted = /next nonce (\d+)/i.exec(errorText(error))
       this._nonceFloor = { next: Math.max(first.nonce + 1, hinted ? Number(hinted[1]) : 0), at: Date.now() }
-      return submit(await this.signPrepared({ ...prepared, nonce: await this.nextNonce() }, limit, op))
+      return submit(await this.#signPrepared({ ...prepared, nonce: await this.nextNonce() }, limit, op))
     }
   }
 
   /** Sign and broadcast; `options.maxFee` caps the signed fee on top of `transactionMaxFee`. */
   async sendTransaction(tx: EvmTransaction, options: WriteOptions = {}): Promise<TransferResult> {
-    return this.signAndBroadcast(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
+    return this.#signAndBroadcast(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
   }
 
   async transfer(options: EvmTransferOptions, writeOptions: WriteOptions = {}): Promise<TransferResult> {
-    return this.signAndBroadcast(transferTransaction(options), feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
+    return this.#signAndBroadcast(transferTransaction(options), feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
   }
 
   // ── EIP-2612 permit ────────────────────────────────────────────────────────

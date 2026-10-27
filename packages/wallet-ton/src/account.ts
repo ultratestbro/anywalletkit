@@ -125,7 +125,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     return parseV5R1Body(body)?.messages.map((m) => m.mode) ?? []
   }
 
-  private async signMessages(messages: V5R1Message[], limit: bigint | number | undefined, op: string): Promise<{ body: Cell; fee: bigint }> {
+  async #signMessages(messages: V5R1Message[], limit: bigint | number | undefined, op: string): Promise<{ body: Cell; fee: bigint }> {
     this.assertNoDrain(messages.map((m) => sendModeOf(m.mode)))
     // The wallet sends with IGNORE_ERRORS: a message whose value exceeds the
     // balance is silently dropped by the action phase — the external still
@@ -169,7 +169,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
       await this.preflight(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
       return tx.toBoc().toString('base64')
     }
-    const { body } = await this.signMessages(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction')
+    const { body } = await this.#signMessages(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return body.toBoc().toString('base64')
   }
 
@@ -193,7 +193,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     if (tx instanceof Cell) this.assertNoDrain(this.bodyModes(tx))
     const { body, fee } = tx instanceof Cell
       ? { body: tx, fee: await this.preflight(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction') }
-      : await this.signMessages(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction')
+      : await this.#signMessages(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction')
     return { hash: await this.broadcast(body), fee }
   }
 
@@ -201,7 +201,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   async transfer(o: TonTransferOptions, writeOptions: WriteOptions = {}): Promise<TransferResult> {
     this.requireRpc('transfer tokens')
     const message = o.token ? await this.jettonTransferMessage(o) : this.transactionMessage({ to: o.recipient, value: o.amount, ...(o.memo !== undefined ? { body: o.memo } : {}) })
-    const { body, fee } = await this.signMessages([message], feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
+    const { body, fee } = await this.#signMessages([message], feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
     return { hash: await this.broadcast(body), fee }
   }
 

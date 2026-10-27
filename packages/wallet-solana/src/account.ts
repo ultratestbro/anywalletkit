@@ -81,17 +81,17 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
    */
   async signCompiled(tx: Transaction, options: SolanaWriteOptions = {}): Promise<Transaction> {
     this.enforce(describeTransaction(tx, { account: this.address }), options)
-    return this.signChecked(tx)
+    return this.#signChecked(tx)
   }
 
   /** Compile and sign a message; returns the kit `Transaction` (for callers that want to inspect or co-sign). Checked like {@link signCompiled}. */
   async signTransactionMessage(msg: TransactionMessage, options: SolanaWriteOptions = {}): Promise<Transaction> {
     this.enforce(describeTransaction(msg, { account: this.address }), options)
-    return this.signChecked(compileTransaction(msg as never) as Transaction)
+    return this.#signChecked(compileTransaction(msg as never) as Transaction)
   }
 
   /** The signature itself, for a transaction a plan has already checked. */
-  private async signChecked(tx: Transaction): Promise<Transaction> {
+  async #signChecked(tx: Transaction): Promise<Transaction> {
     const sig = (await this.signer.sign(tx.messageBytes as unknown as Uint8Array, { scheme: 'ed25519', context: 'solana-message' })) as unknown as SignatureBytes
     return { ...tx, signatures: Object.freeze({ ...tx.signatures, [this.address]: sig }) } as Transaction
   }
@@ -100,20 +100,20 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation.`)
   }
 
-  private async signPlan(plan: SolanaPlan): Promise<Transaction> {
+  async #signPlan(plan: SolanaPlan): Promise<Transaction> {
     if (plan.transaction) {
       const mine = plan.transaction.signatures[this.address]
       const alreadySigned = mine !== null && mine !== undefined && (mine as Uint8Array).some((b) => b !== 0)
-      return alreadySigned ? plan.transaction : this.signChecked(plan.transaction)
+      return alreadySigned ? plan.transaction : this.#signChecked(plan.transaction)
     }
-    return this.signChecked(compileTransaction(plan.message as never) as Transaction)
+    return this.#signChecked(compileTransaction(plan.message as never) as Transaction)
   }
 
   /** Sign without broadcasting. Returns the base64 wire transaction. Simulation still runs (a reverting tx is refused). */
   async signTransaction(tx: SolanaTransaction, options: SolanaWriteOptions = {}): Promise<string> {
     const plan = await this.plan(tx, { allowDurableNonce: options.allowDurableNonce })
     this.maxFeeCheck(plan.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
-    return getBase64EncodedWireTransaction(await this.signPlan(plan))
+    return getBase64EncodedWireTransaction(await this.#signPlan(plan))
   }
 
   /**
@@ -142,7 +142,7 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     this.requireRpc('send transactions')
     const plan = await this.plan(tx, { allowDurableNonce: options.allowDurableNonce })
     this.maxFeeCheck(plan.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
-    const hash = await this.broadcast(await this.signPlan(plan))
+    const hash = await this.broadcast(await this.#signPlan(plan))
     return { hash, fee: plan.quote.fee, quote: plan.quote }
   }
 
@@ -151,7 +151,7 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     this.requireRpc('transfer tokens')
     const plan = await this.planTransfer(o)
     this.maxFeeCheck(plan.quote.fee, feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
-    const hash = await this.broadcast(await this.signPlan(plan))
+    const hash = await this.broadcast(await this.#signPlan(plan))
     return { hash, fee: plan.quote.fee, quote: plan.quote }
   }
 
@@ -166,7 +166,7 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     const check = await this.checkSerialized(base64, guard, { allowDurableNonce: options.allowDurableNonce })
     this.maxFeeCheck(check.quote.fee, feeLimit(this._config.transactionMaxFee, options), 'transaction')
     const plan: SolanaPlan = { transaction: decodeWireTransaction(base64), quote: check.quote, simulation: check.simulation, description: check.description }
-    const hash = await this.broadcast(await this.signPlan(plan))
+    const hash = await this.broadcast(await this.#signPlan(plan))
     return { hash, fee: check.quote.fee, quote: check.quote, check }
   }
 

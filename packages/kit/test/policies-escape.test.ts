@@ -86,15 +86,14 @@ describe('no signing path around the policy proxy', () => {
     expect((near as unknown as { signer?: unknown }).signer).toBeUndefined()
     const viaManager = await w.getManager<WalletManagerNear>('near:mainnet').getNamedAccount('alice.near')
     await expect(viaManager.sign('x')).rejects.toBeInstanceOf(UserRejectedError)
-    // protected / private helpers that sign are named sign*, so the proxy guards them
-    const btc = await w.getAccount('bip122:000000000019d6689c085ae165831e93') as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>
-    await expect(btc.signSpend!({ to: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh', value: 1000n })).rejects.toBeInstanceOf(UserRejectedError)
-    await expect(btc.signPlan!({})).rejects.toBeInstanceOf(UserRejectedError)
-    const zec = await w.getAccount('zcash:mainnet') as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>
-    await expect(zec.signSpend!({ to: 't1abc', value: 1000n })).rejects.toBeInstanceOf(UserRejectedError)
-    const ton = await w.getAccount('ton:-239') as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>
-    await expect(ton.signMessages!([], undefined, 'transaction')).rejects.toBeInstanceOf(UserRejectedError)
-    expect(confirm).toHaveBeenCalledTimes(6)
+    // The signing helpers are #private methods: there is nothing the proxy could hand out (scan 2026-10-27 F1).
+    const btc = await w.getAccount('bip122:000000000019d6689c085ae165831e93') as unknown as Record<string, unknown>
+    const zec = await w.getAccount('zcash:mainnet') as unknown as Record<string, unknown>
+    const ton = await w.getAccount('ton:-239') as unknown as Record<string, unknown>
+    for (const [a, name] of [[btc, 'signSpend'], [btc, 'signPlan'], [btc, 'signInputs'], [zec, 'signSpend'], [zec, 'signInputs'], [ton, 'signMessages']] as const) {
+      expect([name, typeof a[name]]).toEqual([name, 'undefined'])
+    }
+    expect(confirm).toHaveBeenCalledTimes(2)
     w.dispose()
   })
 
@@ -125,11 +124,11 @@ describe('no signing path around the policy proxy', () => {
       expect(raw._config).toEqual({ provider: ['https://rpc.example'], simulate: true })
     })
 
-    it('under a fee cap, a sign* helper the policies cannot quote is refused', async () => {
+    it('a sign* helper outside the known write surface is refused, under a fee cap too', async () => {
       const raw = Object.assign(createMockAccount({ chain: 'eip155:1' }), { signPrepared: async () => '0xsigned', signHash: async () => '0xsig' })
       const guarded = applyPolicies(raw, { maxFee: { 'eip155:1': 1n } }, 'eip155:1')
-      await expect(guarded.signPrepared()).rejects.toMatchObject({ policy: 'maxFee' })
-      await expect(guarded.signHash()).rejects.toMatchObject({ policy: 'maxFee' })
+      await expect(guarded.signPrepared()).rejects.toMatchObject({ policy: 'method' })
+      await expect(guarded.signHash()).rejects.toMatchObject({ policy: 'method' })
       // the public, fee-checked surface still works
       await guarded.sign('hi')
     })

@@ -65,14 +65,14 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
   }
 
   /** Recoverable secp256k1 signature over a 32-byte digest from the signer: r‖s‖recovery (recovery 0/1). */
-  private async signDigest(digest: Uint8Array, context: 'tron-tx' | 'tron-message'): Promise<Uint8Array> {
+  async #signDigest(digest: Uint8Array, context: 'tron-tx' | 'tron-message'): Promise<Uint8Array> {
     this.key()
     return this.signer.sign(digest, { scheme: 'ecdsa-recoverable', context })
   }
 
   /** TIP-191 message signature: 0x + r||s||(27 + recovery) hex (tronweb `signMessageV2` encoding). */
   async sign(message: string | Uint8Array): Promise<string> {
-    const sig = await this.signDigest(hashMessage(message), 'tron-message')
+    const sig = await this.#signDigest(hashMessage(message), 'tron-message')
     return '0x' + bytesToHex(sig.subarray(0, 64)) + (27 + sig[64]!).toString(16).padStart(2, '0')
   }
 
@@ -90,7 +90,7 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     this.key()
     const verified = verifyRawTransaction(tx)
     this.assertSafe({ ...tx, raw_data: verified.raw_data }, Date.now(), options.maxFee)
-    const sig = await this.signDigest(hexToBytes(verified.txID), 'tron-tx')
+    const sig = await this.#signDigest(hexToBytes(verified.txID), 'tron-tx')
     const mine = bytesToHex(sig.subarray(0, 64)) + sig[64]!.toString(16).padStart(2, '0')
     const others = (tx.signature ?? []).filter((s) => s.toLowerCase() !== mine)
     return { ...tx, signature: [...others, mine] }

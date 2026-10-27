@@ -5,11 +5,13 @@ import { snapshot } from './snapshot.js'
 
 /**
  * Account methods the policies guard — everything that produces a signature
- * or a broadcast. The known surface is listed; on top of it any method whose
- * name starts with `sign`, `send`, `approve`, `revoke` or `transfer` (camelCase
- * boundary) is guarded too, so a chain package that adds a new signing method
- * cannot slip past the rules by not being named here. Opting a method out is
- * an explicit, reviewed entry in {@link UNGUARDED_WRITES}.
+ * or a broadcast. The known surface is listed; any other method whose name
+ * starts with `sign`, `send`, `approve`, `revoke` or `transfer` (camelCase
+ * boundary) is refused outright behind the wrapper: the policies cannot read
+ * what an unlisted method signs (a chain package's internal helper takes its
+ * recipient somewhere the rules never look — scan 2026-10-27 F1), so a new
+ * signing method must be listed here, with its intent, before it is reachable.
+ * Opting a method out is an explicit, reviewed entry in {@link UNGUARDED_WRITES}.
  */
 export type KnownWriteMethod =
   | 'sendTransaction' | 'transfer' | 'signTransaction' | 'sign'
@@ -34,16 +36,24 @@ export const GUARDED_WRITES: readonly KnownWriteMethod[] = [
   'sendSerialized', 'signCompiled', 'signTransactionMessage',
   'revokeDelegation', 'sendSerializedTransaction',
 ]
-/** Name prefixes that mark a write even when the method is not listed above. */
+/** Name prefixes that mark a write even when the method is not listed above (such a method is refused). */
 export const GUARDED_PREFIXES: readonly string[] = ['sign', 'send', 'approve', 'revoke', 'transfer']
-/** Explicit, reviewed opt-outs (none today). A name here is NOT guarded even if it matches a prefix. */
-export const UNGUARDED_WRITES: readonly string[] = []
+/**
+ * Explicit, reviewed opt-outs. A name here is NOT guarded even if it matches a prefix.
+ * `transferActions` (NEAR) builds the actions of a transfer and signs nothing.
+ */
+export const UNGUARDED_WRITES: readonly string[] = ['transferActions']
 
-/** Is `name` a method the policies wrap? Reads (`get…`, `quote…`, `describe…`) never match. */
+/** Is `name` a method the policies wrap (or, outside {@link GUARDED_WRITES}, refuse)? Reads (`get…`, `quote…`, `describe…`) never match. */
 export function isGuardedWrite(name: string): boolean {
   if (UNGUARDED_WRITES.includes(name)) return false
   if ((GUARDED_WRITES as readonly string[]).includes(name)) return true
   return GUARDED_PREFIXES.some((p) => name.startsWith(p) && name.length > p.length && /[A-Z0-9_]/.test(name[p.length]!))
+}
+
+/** A write by its name only: not in {@link GUARDED_WRITES}, so nothing reads what it signs. */
+function isUnlistedWrite(name: string): boolean {
+  return isGuardedWrite(name) && !(GUARDED_WRITES as readonly string[]).includes(name)
 }
 
 /** Methods whose fee the account can quote up front (`maxFee` is checked on the quote, then passed on). */
@@ -202,10 +212,11 @@ export interface Policies {
 export class PolicyViolationError extends Error {
   /**
    * The rule that refused the write. `chain` means the account's chain id is unknown, so no rule
-   * could be matched.
+   * could be matched. `method` means the method is not part of the write surface the policies
+   * can read (see {@link GUARDED_WRITES}).
    */
-  readonly policy: 'maxFee' | 'allowlist' | 'blocklist' | 'chain'
-  constructor(policy: 'maxFee' | 'allowlist' | 'blocklist' | 'chain', message: string) {
+  readonly policy: 'maxFee' | 'allowlist' | 'blocklist' | 'chain' | 'method'
+  constructor(policy: 'maxFee' | 'allowlist' | 'blocklist' | 'chain' | 'method', message: string) {
     super(message)
     this.name = 'PolicyViolationError'
     this.policy = policy
@@ -646,9 +657,9 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
       }
     }
     const caps = keys.flatMap((k) => { const cap = policies.maxFee?.[k]; return cap === undefined ? [] : [{ k, cap: BigInt(cap) }] })
-    // A write that pays a fee but has nowhere to take a cap — a method guarded only by its name (a
-    // chain package's internal `sign*` / `send*` helper), NEAR's signBuilt, Solana's signCompiled /
-    // signTransactionMessage — is refused under a fee cap rather than signed unchecked (round 3, review and M8).
+    // A listed write that pays a fee but has nowhere to take a cap — NEAR's signBuilt, Solana's
+    // signCompiled / signTransactionMessage — is refused under a fee cap rather than signed unchecked
+    // (round 3, review and M8). Methods guarded only by their name never get here: they are refused.
     if (caps.length > 0 && CAPPED[method] === undefined && !FEE_FREE.includes(method)) {
       throw new PolicyViolationError('maxFee', `${method} has no fee the ${caps[0]!.k} cap can be checked against; nothing was signed.`)
     }
@@ -706,6 +717,12 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
       if (typeof v !== 'function' || prop === 'constructor') return v
       if (typeof prop === 'string' && isGuardedWrite(prop)) {
         let fn = wrapped.get(prop)
+        if (!fn && isUnlistedWrite(prop)) {
+          // A chain package's internal helper (BTC signPlan pays its second argument while the plan
+          // names another address): no intent the rules could judge, so it is not callable here (scan 2026-10-27 F1).
+          fn = async () => { throw new PolicyViolationError('method', `${prop} is not a write the policies can check; nothing was signed.`) }
+          wrapped.set(prop, fn)
+        }
         if (!fn) {
           const original = v as (...args: unknown[]) => Promise<unknown>
           fn = async (...given: unknown[]) => {
