@@ -262,3 +262,26 @@ describe('scan 2026-10-27 G11 (F30): a present but unreadable EVM chainId is ref
     await expect(applyPolicies(offline, { confirm: async () => true }, 'eip155:1').signTransaction(tx)).rejects.toMatchObject({ policy: 'chain' })
   })
 })
+
+describe('scan 2026-10-27 G12 (F20): approve({ amount: 0 }) is a revoke only on a known ERC-20', () => {
+  const NFT = '0x' + '77'.repeat(20)
+  const DRAINER = '0x' + 'dd'.repeat(20)
+  const USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
+  const evm = (getTokenInfo?: (t: string) => Promise<unknown>) => Object.assign(createMockAccount({ chain: 'eip155:1' }), { approve: async (o: unknown) => ({ hash: '0x1', fee: 0n, o }) }, getTokenInfo ? { getTokenInfo } : {})
+  it('on an unknown token (an ERC-721) it is an approval of the spender: the blocklist and allowlist apply', async () => {
+    const notToken = async () => { throw new Error('it has no decimals()') }
+    await expect(applyPolicies(evm(notToken), { blocklist: { 'eip155:1': [DRAINER] } }, 'eip155:1').approve!({ token: NFT, spender: DRAINER, amount: 0n })).rejects.toMatchObject({ policy: 'blocklist' })
+    await expect(applyPolicies(evm(), { allowlist: { 'eip155:1': [NFT] } }, 'eip155:1').approve!({ token: NFT, spender: DRAINER, amount: 0n })).rejects.toMatchObject({ policy: 'allowlist' })
+    let seen: Record<string, unknown> = {}
+    await applyPolicies(evm(notToken), { confirm: async (i) => { seen = i as never; return true } }, 'eip155:1').approve!({ token: NFT, spender: DRAINER, amount: 0n })
+    expect(seen).toMatchObject({ kind: 'approval', to: DRAINER, amount: 0n })
+  })
+  it('on a catalogued ERC-20 (USDC), or one the account reads as ERC-20, it stays a revoke a blocklisted drainer cannot block', async () => {
+    let seen: Record<string, unknown> = {}
+    await applyPolicies(evm(), { blocklist: { 'eip155:1': [DRAINER] }, confirm: async (i) => { seen = i as never; return true } }, 'eip155:1').approve!({ token: USDC, spender: DRAINER, amount: 0n })
+    expect(seen.kind).toBe('revoke')
+    const custom = '0x' + 'cc'.repeat(20)
+    await applyPolicies(evm(async () => ({ standard: 'erc20', decimals: 18 })), { blocklist: { 'eip155:1': [DRAINER] }, confirm: async (i) => { seen = i as never; return true } }, 'eip155:1').approve!({ token: custom, spender: DRAINER, amount: 0n })
+    expect(seen.kind).toBe('revoke')
+  })
+})

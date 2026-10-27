@@ -1,11 +1,14 @@
 import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import {
-  getAddress, hashMessage, hashTypedData, hexToBytes, keccak256, serializeTransaction, TransactionNotFoundError, zeroAddress,
+  BaseError, ContractFunctionRevertedError, getAddress, hashMessage, hashTypedData, hexToBytes, keccak256, serializeTransaction, TransactionNotFoundError, zeroAddress,
   type Hex, type PublicClient, type Signature, type TransactionSerializable,
 } from 'viem'
 import { publicKeyToAddress } from 'viem/accounts'
 import { encodeApprove, ERC20_PERMIT_ABI, PERMIT_TYPES, USDT_MAINNET } from './erc20.js'
+
+/** ERC-165 interface id of ERC-721. */
+const ERC721_INTERFACE = '80ac58cd'
 import { BroadcastUnknownError, ChainMismatchError, PermitUnsupportedError, SimulationError, UnsafeTransactionError } from './errors.js'
 import { WalletAccountReadOnlyEvm, assertTxShape, canonicalData, chainIdNumber, transferTransaction, typedDataHash, typedDomainChainId } from './read-only-account.js'
 export { MIN_PRIORITY_FEE_WEI, typedDomainChainId } from './read-only-account.js'
@@ -433,6 +436,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     const token = getAddress(options.token)
     const spender = getAddress(options.spender)
     const amount = BigInt(options.amount)
+    await this.#assertErc20(client, token)
     if (amount > 0n && (await this.getChainId()) === 1 && token.toLowerCase() === USDT_MAINNET) {
       const current = await this.getAllowance(token, spender)
       if (current > 0n) {
@@ -444,6 +448,25 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
       }
     }
     return this.sendTransaction({ to: token, value: 0n, data: encodeApprove(spender, amount) }, writeOptions)
+  }
+
+  /**
+   * `approve` is the ERC-20 allowance call: on an ERC-721, approve(spender, n) approves token #n, so
+   * approve({ amount: 0 }) would grant token #0 while reading as a revoke (scan 2026-10-27 F23). A
+   * token that reports ERC-721 through ERC-165, or has no decimals(), is refused.
+   */
+  async #assertErc20(client: PublicClient, token: Hex): Promise<void> {
+    const read = async (data: Hex): Promise<Hex | undefined> => {
+      try {
+        return (await client.call({ to: token, data })).data
+      } catch (e) {
+        if (e instanceof BaseError && e.walk((x) => x instanceof ContractFunctionRevertedError || /revert/i.test((x as Error).message ?? ''))) return undefined
+        throw e
+      }
+    }
+    const [erc721, decimals] = await Promise.all([read(`0x01ffc9a7${ERC721_INTERFACE.padEnd(64, '0')}`), read('0x313ce567')])
+    if (erc721 !== undefined && /^0x0{63}1$/.test(erc721.slice(0, 66))) throw new UnsafeTransactionError(`${token} is an ERC-721: approve() is for ERC-20 tokens (on an NFT it would approve a token id).`)
+    if (decimals === undefined || decimals.length < 66) throw new UnsafeTransactionError(`${token} has no decimals(), so it is not an ERC-20 token approve() can be used on.`)
   }
 
   /** The same address as a {@link WalletAccountReadOnlyEvm}. */

@@ -2,6 +2,8 @@ import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type Tran
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
 import { canonicalAddress, erc20Transfer, hexData, sendDestinations, tonRawAddress, tronCallData, tronRawIntent } from './destinations.js'
 import { snapshot } from './snapshot.js'
+import { ccAssetByToken } from '@anywalletkit/swap2-assets'
+import { catalogChain } from './activity/generic.js'
 
 /**
  * Account methods the policies guard — everything that produces a signature
@@ -482,21 +484,41 @@ function tonJettonTransfer(chain: string, from: string, a: Record<string, unknow
   return { list, unknown }
 }
 
-function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown): WriteIntent {
-  const intent = withDestinations(draftIntentOf(chain, from, method, arg))
+/** What {@link intentOf} needs to know beyond the arguments: whether an `approve` of 0 is on a known ERC-20. */
+interface IntentContext { erc20?: boolean }
+
+/**
+ * Is `approve({ token, amount: 0 })` on an ERC-20? On an ERC-721, approve(spender, 0) APPROVES token
+ * #0, so it is a revoke only on a token the swap2-assets catalog lists or the account reads as an
+ * ERC-20 (`getTokenInfo`); anything else is an approval of the spender (scan 2026-10-27 F20, the
+ * raw-calldata rule of audit #5).
+ */
+async function approveRevokesErc20(chain: string, method: WriteMethod, arg: unknown, account: unknown): Promise<boolean> {
+  const a = obj(arg)
+  const token = str(a.token)
+  if (method !== 'approve' || !chain.startsWith('eip155:') || token === undefined || big(a.amount) !== 0n) return false
+  if (ccAssetByToken(catalogChain(chain), token) !== undefined) return true
+  const read = (account as { getTokenInfo?: (t: string) => Promise<{ standard?: unknown }> }).getTokenInfo
+  if (typeof read !== 'function') return false
+  try { return (await read.call(account, token)).standard === 'erc20' } catch { return false }
+}
+
+function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown, ctx: IntentContext = {}): WriteIntent {
+  const intent = withDestinations(draftIntentOf(chain, from, method, arg, ctx))
   // TON: a destination in a spelling the lists cannot compare ('+0:…', ' 0:…', '0.0:…') is not a
   // known one, whatever the chain package makes of it (scan 2026-10-27 F18).
   if (canonicalNamespace(chain.split(':')[0]!) === 'ton' && intent.destinations.some((d) => tonRawAddress(d) === null)) intent.destinationUnknown = true
   return intent
 }
 
-function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: unknown): DraftIntent {
+function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: unknown, ctx: IntentContext = {}): DraftIntent {
   const base = { chain, from, method, raw: arg }
   const a = obj(arg)
   switch (method) {
     case 'approve': {
       const amount = big(a.amount)
-      if (amount === 0n && str(a.token) !== undefined) return revokeIntent(base, [{ token: str(a.token)!, ...(str(a.spender) !== undefined ? { spender: str(a.spender)! } : {}) }])
+      // A revoke only on a known ERC-20; on anything else approve(spender, 0) may grant NFT #0 (scan 2026-10-27 F20).
+      if (amount === 0n && str(a.token) !== undefined && ctx.erc20 === true) return revokeIntent(base, [{ token: str(a.token)!, ...(str(a.spender) !== undefined ? { spender: str(a.spender)! } : {}) }])
       return approvalIntent(base, str(a.spender), str(a.token), amount, undefined, allowanceUnlimited(a.amount, amount))
     }
     case 'signPermit': {
@@ -695,7 +717,8 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     // `bitcoin` for `bip122` — round 3, H4).
     const written = [...new Set(rules.flatMap((m) => (m ? Object.keys(m) : [])))]
     const keys = written.filter((k) => (chains.length > 0 ? chains.some((c) => ruleCovers(k, c)) : ruleCovers(k, ns)))
-    const intent = intentOf(chains[0] ?? account.chain, await account.getAddress(), method, arg)
+    const judged = chains[0] ?? account.chain
+    const intent = intentOf(judged, await account.getAddress(), method, arg, { erc20: await approveRevokesErc20(judged, method, arg, account) })
     // An SPL transfer pays a token account: its owner is the recipient, and only the network knows
     // it. Read through the account when a list or confirm will look; unread → unknown (round 3, M1).
     const pending = PENDING_TOKEN_ACCOUNTS.get(intent)

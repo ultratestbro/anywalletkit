@@ -268,10 +268,11 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
   })
 
   it('a revoke is kind revoke: the spender\'s blocklist entry and the allowlist do not stop it, confirm still does', async () => {
-    const acc = Object.assign(evmLike(), { revokeDelegation: async () => ({ hash: 'undelegated' }) })
+    // The account reads the token as an ERC-20: approve(0) on it is a revoke (on an NFT it would grant #0 — scan 2026-10-27 F20).
+    const acc = Object.assign(evmLike(), { revokeDelegation: async () => ({ hash: 'undelegated' }), getTokenInfo: async () => ({ standard: 'erc20', decimals: 6 }) })
     const confirm = vi.fn(async () => true)
     const strict = applyPolicies(acc, { blocklist: { 'eip155:1': [spender] }, allowlist: { 'eip155:1': ['0x0000000000000000000000000000000000000001'] }, confirm })
-    // approve(amount 0) to a blocklisted spender, outside the allowlist: goes through
+    // approve(amount 0) of an ERC-20 to a blocklisted spender, outside the allowlist: goes through
     expect(await strict.approve({ token, spender, amount: 0n })).toEqual({ hash: `approved:${spender}` })
     expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'approve', kind: 'revoke', to: spender, token, amount: 0n, unlimited: false, revokes: [{ token, spender }], message: false }))
     // a non-zero approve to the same spender is still refused

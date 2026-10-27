@@ -75,3 +75,36 @@ describe('scan 2026-10-27 G11 (F11, F30): typed-data amounts and chain ids read 
     await expect(a.signTransaction({ to: USDC, chainId: '0x89' as never, ...FEES })).resolves.toMatch(/^0x02/)
   })
 })
+
+describe('scan 2026-10-27 G12 (F23): approve() is for ERC-20 tokens only', () => {
+  const NFT = '0x' + '77'.repeat(20)
+  /** A minimal EIP-1193 provider; `call` answers eth_call by calldata. */
+  const provider = (call: (data: string) => unknown) => {
+    const sent: string[] = []
+    const h: Record<string, (p: unknown[]) => unknown> = {
+      eth_chainId: () => '0x1', eth_blockNumber: () => '0x10', eth_maxPriorityFeePerGas: () => '0x1', eth_gasPrice: () => '0x2', eth_estimateGas: () => '0x5208',
+      eth_getTransactionCount: () => '0x0', eth_getBalance: () => '0xde0b6b3a7640000',
+      eth_getBlockByNumber: () => ({ number: '0x10', baseFeePerGas: '0x1', gasLimit: '0x1c9c380', gasUsed: '0x0', timestamp: '0x1', hash: '0x' + '11'.repeat(32), parentHash: '0x' + '22'.repeat(32), transactions: [], miner: '0x' + '00'.repeat(20), difficulty: '0x0', extraData: '0x', logsBloom: '0x' + '00'.repeat(256), nonce: '0x0000000000000000', receiptsRoot: '0x' + '00'.repeat(32), sha3Uncles: '0x' + '00'.repeat(32), size: '0x0', stateRoot: '0x' + '00'.repeat(32), totalDifficulty: '0x0', transactionsRoot: '0x' + '00'.repeat(32), uncles: [], mixHash: '0x' + '00'.repeat(32) }),
+      eth_call: (p) => call(String((p[0] as { data?: string; input?: string }).data ?? (p[0] as { input?: string }).input)),
+      eth_sendRawTransaction: (p) => { sent.push(String(p[0])); return '0x' + 'ab'.repeat(32) },
+    }
+    return { sent, provider: { request: async ({ method, params }: { method: string; params?: unknown[] }) => { const f = h[method]; if (!f) throw new Error(`unmocked ${method}`); return f(params ?? []) } } }
+  }
+  const revert = () => { throw Object.assign(new Error('execution reverted'), { code: 3 }) }
+  const TRUE = '0x' + '0'.repeat(63) + '1'
+
+  it('approve({ amount: 0 }) on an ERC-721 (ERC-165 0x80ac58cd, no decimals) is refused; nothing is sent', async () => {
+    const node = provider((data) => (data.startsWith('0x01ffc9a7') && data.includes('80ac58cd') ? TRUE : data.startsWith('0x313ce567') ? revert() : '0x' + '0'.repeat(64)))
+    const a = await new WalletManagerEvm(SEED, { provider: node.provider as never }).getAccount(0)
+    await expect(a.approve({ token: NFT, spender: ATTACKER, amount: 0n })).rejects.toThrow(/ERC-721|ERC-20/)
+    expect(node.sent).toHaveLength(0)
+  })
+
+  it('a contract without decimals() is refused; an ERC-20 is approved', async () => {
+    const none = provider((data) => (data.startsWith('0x313ce567') ? revert() : '0x' + '0'.repeat(64)))
+    await expect((await new WalletManagerEvm(SEED, { provider: none.provider as never }).getAccount(0)).approve({ token: NFT, spender: ATTACKER, amount: 0n })).rejects.toThrow(/decimals/)
+    const erc20 = provider((data) => (data.startsWith('0x313ce567') ? '0x' + '6'.padStart(64, '0') : '0x' + '0'.repeat(64)))
+    await (await new WalletManagerEvm(SEED, { provider: erc20.provider as never }).getAccount(0)).approve({ token: USDC, spender: ATTACKER, amount: 0n })
+    expect(erc20.sent).toHaveLength(1)
+  })
+})

@@ -64,7 +64,8 @@ describe('policies keyed by namespace', () => {
 
   it('revokes: a namespace blocklist still covers the contract a revoke calls', async () => {
     const approved: unknown[] = []
-    const acc = Object.assign(createMockAccount({ chain: 'eip155:1' }), { approve: async (o: unknown) => { approved.push(o); return { hash: '0xrevoked', fee: 1n } } })
+    // The account reads the token as an ERC-20, so approve(0) is a revoke (scan 2026-10-27 F20).
+    const acc = Object.assign(createMockAccount({ chain: 'eip155:1' }), { approve: async (o: unknown) => { approved.push(o); return { hash: '0xrevoked', fee: 1n } }, getTokenInfo: async () => ({ standard: 'erc20', decimals: 18 }) })
     const token = '0x0000000000000000000000000000000000000Abc'
     await expect(applyPolicies(acc, { blocklist: { eip155: [token] } }).approve({ token, spender: DEST, amount: 0n })).rejects.toThrow(/eip155 blocklist/)
     // the spender being listed does not stop a revoke

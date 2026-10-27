@@ -35,14 +35,21 @@ describe('ambiguous approve(spender, 0) calldata is not a revoke', () => {
     expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'approval', to: DRAINER.toLowerCase(), token: NFT, amount: 0n, unlimited: false }))
   })
 
-  it('unambiguous revokes still skip the spender\'s listing: setApprovalForAll(false), approve(0x0, id), explicit approve({amount: 0})', async () => {
+  it('unambiguous revokes still skip the spender\'s listing: setApprovalForAll(false), approve(0x0, id), approve({amount: 0}) on an ERC-20', async () => {
     const approved: unknown[] = []
-    const acc = Object.assign(createMockAccount({ chain: 'eip155:1' }), { approve: async (o: unknown) => { approved.push(o); return { hash: '0xrevoked', fee: 1n } } })
+    const ERC20 = '0x0000000000000000000000000000000000000E20'
+    const acc = Object.assign(createMockAccount({ chain: 'eip155:1' }), {
+      approve: async (o: unknown) => { approved.push(o); return { hash: '0xrevoked', fee: 1n } },
+      getTokenInfo: async (t: string) => { if (t !== ERC20) throw new Error('it has no decimals()'); return { standard: 'erc20', decimals: 18 } },
+    })
     const guarded = applyPolicies(acc, { blocklist: { 'eip155:1': [DRAINER] }, allowlist: { 'eip155:1': ['0x0000000000000000000000000000000000000001'] }, confirm: async () => true })
     await guarded.sendTransaction({ to: NFT, value: 0n, data: `0xa22cb465${pad(DRAINER)}${pad('0')}` })
     await guarded.sendTransaction({ to: NFT, value: 0n, data: `0x095ea7b3${pad('0')}${pad('7')}` })
-    await guarded.approve({ token: NFT, spender: DRAINER, amount: 0n })
+    await guarded.approve({ token: ERC20, spender: DRAINER, amount: 0n })
     expect(acc.sent).toHaveLength(2)
+    expect(approved).toHaveLength(1)
+    // On the NFT, approve({amount: 0}) grants token #0: it is checked on its spender (scan 2026-10-27 F20).
+    await expect(guarded.approve({ token: NFT, spender: DRAINER, amount: 0n })).rejects.toMatchObject({ name: 'PolicyViolationError' })
     expect(approved).toHaveLength(1)
   })
 

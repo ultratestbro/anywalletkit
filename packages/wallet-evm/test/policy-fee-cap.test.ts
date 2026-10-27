@@ -23,7 +23,8 @@ function fakeProvider() {
     eth_estimateGas: () => '0x5208', // 21 000
     eth_getBalance: () => '0xde0b6b3a7640000',
     eth_getTransactionCount: () => '0x7',
-    eth_call: () => '0x',
+    // decimals() answers (the token is an ERC-20 approve() accepts); everything else is empty.
+    eth_call: (p: unknown[]) => (String((p[0] as { data?: string }).data).startsWith('0x313ce567') ? '0x' + '12'.padStart(64, '0') : '0x'),
     eth_sendRawTransaction: (p) => { sent.push(p[0] as Hex); return '0x' + 'ab'.repeat(32) },
   }
   const provider = { request: async ({ method, params }: { method: string; params?: unknown }) => handlers[method]!((params as unknown[]) ?? []) } as unknown as EIP1193Provider
