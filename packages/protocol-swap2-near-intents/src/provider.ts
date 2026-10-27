@@ -322,6 +322,7 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
         };
         const map: Record<string, IntentStatus["state"]> = {
           PENDING_DEPOSIT: "pending",
+          KNOWN_DEPOSIT_TX: "pending",
           INCOMPLETE_DEPOSIT: "pending",
           PROCESSING: "pending",
           SUCCESS: "completed",
@@ -329,7 +330,10 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
           REFUNDED: "refunded",
         };
         const state = map[s.status ?? "PENDING_DEPOSIT"] ?? "pending";
-        const depositReceived = s.status === "PROCESSING" || s.status === "INCOMPLETE_DEPOSIT";
+        // KNOWN_DEPOSIT_TX: 1Click has the deposit tx (submitted, not yet
+        // credited). Counted as received so a caller with no source hash of
+        // its own does not expire a swap that is already on its way.
+        const depositReceived = s.status === "KNOWN_DEPOSIT_TX" || s.status === "PROCESSING" || s.status === "INCOMPLETE_DEPOSIT";
         const destTx = txHashOf(s.swapDetails?.destinationChainTxHashes?.[0]);
         return {state, depositReceived, ...(destTx ? {destTxHash: destTx} : {})};
       } catch {

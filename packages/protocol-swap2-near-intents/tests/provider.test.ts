@@ -42,6 +42,20 @@ describe("NEAR Intents provider contract", () => {
     await expect(nearIntentsProvider().trackIntent({intentId: "near1click:%ZZ|"})).rejects.toThrow(/malformed intent id/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it("maps every 1Click status, a known deposit tx counting as received", async () => {
+    const track = async (status: string) => {
+      vi.stubGlobal("fetch", async () => new Response(JSON.stringify({status, swapDetails: {destinationChainTxHashes: []}})));
+      return nearIntentsProvider({apiUrl: "https://near.invalid"}).trackIntent({intentId: "near1click:0xdeposit|"});
+    };
+    expect(await track("PENDING_DEPOSIT")).toEqual({state: "pending", depositReceived: false});
+    expect(await track("KNOWN_DEPOSIT_TX")).toEqual({state: "pending", depositReceived: true});
+    expect(await track("INCOMPLETE_DEPOSIT")).toEqual({state: "pending", depositReceived: true});
+    expect(await track("PROCESSING")).toEqual({state: "pending", depositReceived: true});
+    expect(await track("SUCCESS")).toEqual({state: "completed", depositReceived: false});
+    expect(await track("REFUNDED")).toEqual({state: "refunded", depositReceived: false});
+    expect(await track("FAILED")).toEqual({state: "failed", depositReceived: false});
+  });
 });
 
 describe("route claims cover both ends", () => {
