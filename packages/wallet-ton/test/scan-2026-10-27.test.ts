@@ -43,3 +43,31 @@ describe('scan 2026-10-27 G2 (F3, F9): jetton transfer() response destination an
     narrow.dispose()
   })
 })
+
+const TRANSFER_TO_ATTACKER = 'te6ccgEBAQEAVwAAqg+KfqUAAAAAAAAAB0O5rKAIAXd3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3AC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7uwgI='
+const WITH_HASHES = 'te6ccgEBAQEAeQAQqgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPin6lAAAAAAAAAAdDuaygCAF3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3dwAu7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7sIC'
+const JETTON_WALLET = `0:${'ee'.repeat(32)}`
+
+describe('scan 2026-10-27 G3 (F2, F4): wallet-ton signs only a body the policies could read', () => {
+  it('a bodyBoc that does not re-encode byte-for-byte (with_hashes) is refused; the canonical one is signed', async () => {
+    const f = fakeRpc()
+    const m = new WalletManagerTon(SEED, { tonClient: ENDPOINT, fetch: f.fetch })
+    const a = await m.getAccount(0)
+    await expect(a.sendTransaction({ to: JETTON_WALLET, value: 50_000_000n, bodyBoc: WITH_HASHES })).rejects.toMatchObject({ code: 'non-canonical-boc' })
+    await expect(a.signTransaction({ to: JETTON_WALLET, value: 50_000_000n, bodyBoc: WITH_HASHES })).rejects.toMatchObject({ code: 'non-canonical-boc' })
+    expect(f.sent).toHaveLength(0)
+    await a.sendTransaction({ to: JETTON_WALLET, value: 50_000_000n, bodyBoc: TRANSFER_TO_ATTACKER })
+    expect(f.sent).toHaveLength(1)
+    m.dispose()
+  })
+
+  it('a body that is neither a string nor a Cell is refused, not replaced by bodyBoc', async () => {
+    const f = fakeRpc()
+    const m = new WalletManagerTon(SEED, { tonClient: ENDPOINT, fetch: f.fetch })
+    const a = await m.getAccount(0)
+    const fake = { bits: { length: 0, at: () => false } }
+    await expect(a.sendTransaction({ to: JETTON_WALLET, value: 50_000_000n, body: fake as never, bodyBoc: TRANSFER_TO_ATTACKER })).rejects.toMatchObject({ code: 'body' })
+    expect(f.sent).toHaveLength(0)
+    m.dispose()
+  })
+})

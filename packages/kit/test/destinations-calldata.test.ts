@@ -170,11 +170,11 @@ const NFT_BOC = 'te6cckEBAQEAMQAAXV/MPRQAAAAAAAAAAIAQcHBwcHBwcHBwcHBwcHBwcHBwcHB
 const BURN_BOC = 'te6cckEBAQEAMQAAXVlfB7wAAAAAAAAAABBYAQcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHSCeEKg=='
 const COMMENT_BOC = 'te6cckEBAQEACAAADAAAAABoaeh7Muk='
 
-/** A Cell-shaped body (what @ton/core hands over: `bits.length`, `bits.at(i)`), built bit by bit here. */
+/** A Cell-shaped body (what @ton/core hands over: `bits.length`, `bits.at(i)`, `refs`, `hash()`, `toBoc()`), built bit by bit here. */
 function cell(...parts: Array<[bigint, number]>) {
   const bits: boolean[] = []
   for (const [v, n] of parts) for (let k = n - 1; k >= 0; k--) bits.push(((v >> BigInt(k)) & 1n) === 1n)
-  return { bits: { length: bits.length, at: (i: number) => bits[i]! } }
+  return { bits: { length: bits.length, at: (i: number) => bits[i]! }, refs: [], hash: () => new Uint8Array(32), toBoc: () => new Uint8Array(0) }
 }
 const std = (raw: string): Array<[bigint, number]> => [[0b100n, 3], [0n, 8], [BigInt(`0x${raw.split(':')[1]}`), 256]]
 

@@ -3,7 +3,9 @@
  * {@link TonSendable} (or a prebuilt V5R1 body) into human-checkable items and
  * flags the classic mistakes before any key is touched.
  */
+import { Buffer } from 'buffer'
 import { Address, Cell, beginCell, type MessageRelaxed, type Slice } from '@ton/core'
+import { UnsafeTransactionError } from './errors.js'
 import { DEFAULT_SEND_MODE, parseV5R1Body } from './wallet-v5r1.js'
 import type { TonSendable, TonTransaction } from './types.js'
 
@@ -135,11 +137,41 @@ function parseTo(to: string): { to: string; bounceable: boolean; testOnly?: bool
   return { to: a.toRawString(), bounceable: true, workchain: a.workChain }
 }
 
-function bodyOf(tx: TonTransaction): Cell | undefined {
+/** The forms @ton/core writes a BoC in (index or not, CRC or not). */
+const BOC_FORMS = [{ idx: false, crc32: true }, { idx: false, crc32: false }, { idx: true, crc32: true }, { idx: true, crc32: false }] as const
+
+/**
+ * A base64 BoC as its single root Cell, only when @ton/core writes that Cell back byte-for-byte in
+ * one of its forms. Anything it parses but would not write (a with_hashes cell whose hash area other
+ * readers take for data, a level mask on an ordinary cell, extra roots) is refused, so every reader
+ * of the string sees the cell that gets signed (scan 2026-10-27 F2, F4).
+ */
+export function canonicalBocCell(b64: string, what = 'bodyBoc'): Cell {
+  if (!/^[A-Za-z0-9+/_-]+={0,2}$/.test(b64)) throw new UnsafeTransactionError('non-canonical-boc', `${what} is not a base64 string.`)
+  const bytes = Buffer.from(b64, 'base64')
+  let roots: Cell[]
+  try { roots = Cell.fromBoc(bytes) } catch { throw new UnsafeTransactionError('non-canonical-boc', `${what} is not a valid BoC.`) }
+  const cell = roots.length === 1 ? roots[0]! : undefined
+  if (!cell || !BOC_FORMS.some((form) => Buffer.from(cell.toBoc(form)).equals(bytes))) {
+    throw new UnsafeTransactionError('non-canonical-boc', `${what} is not a canonical single-root BoC: its bytes do not round-trip, so what was reviewed may not be what is signed.`)
+  }
+  return cell
+}
+
+/**
+ * The body a message is built with: a Cell, a text comment, or a canonical `bodyBoc`. A `body` that is
+ * neither a string nor a Cell is refused rather than replaced by `bodyBoc` (scan 2026-10-27 F4).
+ */
+export function messageBody(tx: TonTransaction): Cell | undefined {
   if (tx.body instanceof Cell) return tx.body
   if (typeof tx.body === 'string') return tx.body === '' ? undefined : commentCell(tx.body)
-  if (tx.bodyBoc) return Cell.fromBase64(tx.bodyBoc)
-  return undefined
+  if (tx.body !== undefined) throw new UnsafeTransactionError('body', 'A message body must be a Cell or a string (a text comment).')
+  if (tx.bodyBoc !== undefined && typeof tx.bodyBoc !== 'string') throw new UnsafeTransactionError('body', 'bodyBoc must be a base64 string.')
+  return tx.bodyBoc ? canonicalBocCell(tx.bodyBoc) : undefined
+}
+
+function bodyOf(tx: TonTransaction): Cell | undefined {
+  return messageBody(tx)
 }
 
 /** A text comment body (op 0 plus the text), as wallets show it. */

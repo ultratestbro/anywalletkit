@@ -630,7 +630,12 @@ function bitReader(bit: (i: number) => boolean, length: number): BitReader {
   }
 }
 
-/** The root cell of a base64 BoC (data bits only), or undefined when the bytes are not a plain BoC. */
+/**
+ * The root cell of a base64 BoC (data bits only), or undefined when the bytes are not a plain BoC.
+ * Only the layout this reader models is read: one root, and no cell up to the root with stored
+ * hashes (d1 & 0x10, whose hash area @ton/core skips and this reader would take for data) or a
+ * level mask. Anything else is unknown (scan 2026-10-27 F2).
+ */
 function bocRootReader(b64: string): BitReader | undefined {
   const b = base64Decode(b64)
   if (!b || b.length < 6 || b[0] !== 0xb5 || b[1] !== 0xee || b[2] !== 0x9c || b[3] !== 0x72) return undefined
@@ -645,7 +650,7 @@ function bocRootReader(b64: string): BitReader | undefined {
     const roots = int(size)
     int(size) // absent
     int(offBytes) // total cells size
-    if (roots < 1) return undefined
+    if (roots !== 1) return undefined
     const root = int(size)
     i += (roots - 1) * size
     if (flags & 0x80) i += cells * offBytes // index
@@ -653,6 +658,7 @@ function bocRootReader(b64: string): BitReader | undefined {
       if (i + 2 > b.length) return undefined
       const d1 = b[i++]!
       const d2 = b[i++]!
+      if (d1 & 0x10 || d1 >> 5 !== 0) return undefined // stored hashes or a level mask: not modelled here
       const len = Math.ceil(d2 / 2)
       if (i + len > b.length) return undefined
       const data = b.subarray(i, i + len)
@@ -675,9 +681,14 @@ function bocRootReader(b64: string): BitReader | undefined {
   return undefined
 }
 
-/** A TON Cell (as @ton/core builds it): read through its `bits`. Anything else undefined. */
+/**
+ * A TON Cell (as @ton/core builds it): read through its `bits`. Anything else undefined — also an
+ * object with Cell-like `bits` but no Cell methods, which wallet-ton refuses (scan 2026-10-27 F4).
+ */
 function cellReader(v: unknown): BitReader | undefined {
-  const bits = obj(obj(v).bits) as { length?: unknown; at?: unknown }
+  const c = obj(v)
+  if (typeof c.toBoc !== 'function' || typeof c.hash !== 'function' || !Array.isArray(c.refs)) return undefined
+  const bits = obj(c.bits) as { length?: unknown; at?: unknown }
   if (typeof bits.at !== 'function' || typeof bits.length !== 'number' || bits.length > 1023) return undefined
   const at = bits.at as (i: number) => boolean
   return bitReader((k) => at.call(bits, k) === true, bits.length)

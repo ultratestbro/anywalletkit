@@ -1,7 +1,7 @@
 import { NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { Address, Cell, beginCell, internal, loadStateInit, type StateInit } from '@ton/core'
-import { commentCell, describeTransaction, type TonDescription } from './describe.js'
+import { commentCell, describeTransaction, messageBody, type TonDescription } from './describe.js'
 import { UnsafeTransactionError } from './errors.js'
 import { TonCenter, createTonRpc } from './toncenter.js'
 import { runEmulation } from './emulation.js'
@@ -152,7 +152,7 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
     const value = big(tx.value)
     if (value <= 0n) throw new UnsafeTransactionError('zero-value', 'TON message value must be positive.')
     const { address, bounceable } = this.checkedAddress(tx.to)
-    const body = tx.body instanceof Cell ? tx.body : typeof tx.body === 'string' ? (tx.body === '' ? undefined : commentCell(tx.body)) : tx.bodyBoc ? Cell.fromBase64(tx.bodyBoc) : undefined
+    const body = messageBody(tx)
     const init = this.stateInitOf(tx.stateInit)
     const message = internal({ to: address, value, bounce: tx.bounceable ?? bounceable, ...(body ? { body } : {}), ...(init ? { init } : {}) })
     return { message, ...(tx.sendMode !== undefined ? { mode: tx.sendMode } : {}) }

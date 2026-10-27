@@ -78,3 +78,31 @@ describe('scan 2026-10-27 G2 (F3, F5, F9): TON jetton transfer() is judged on ev
     expect(a.sent).toHaveLength(1)
   })
 })
+
+// A TEP-74 transfer of 1 jetton to TON_ATTACKER (response TON_ATTACKER), as @ton/core serialises it, and
+// the same cell with the with_hashes flag (d1 | 0x10) and a zero hash area in front of its data.
+const TRANSFER_TO_ATTACKER = 'te6ccgEBAQEAVwAAqg+KfqUAAAAAAAAAB0O5rKAIAXd3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3AC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7uwgI='
+const WITH_HASHES = 'te6ccgEBAQEAeQAQqgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPin6lAAAAAAAAAAdDuaygCAF3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3dwAu7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7sIC'
+const TON_JETTON_WALLET = `0:${'ee'.repeat(32)}`
+
+describe('scan 2026-10-27 G3 (F2, F4): a TON body the kit cannot read the way the signer does is unknown', () => {
+  const send = (policies: Parameters<typeof applyPolicies>[1], tx: unknown) => applyPolicies(createMockAccount({ chain: TON, address: TON_SELF }), policies, TON).sendTransaction(tx as never)
+
+  it('the canonical transfer names the attacker (control)', async () => {
+    await expect(send({ blocklist: { ton: [TON_ATTACKER] } }, { to: TON_JETTON_WALLET, value: 50_000_000n, bodyBoc: TRANSFER_TO_ATTACKER })).rejects.toMatchObject({ policy: 'blocklist' })
+  })
+
+  it('a with_hashes BoC hiding the transfer is refused by the allowlist and by a blocklist without confirm', async () => {
+    const tx = { to: TON_JETTON_WALLET, value: 50_000_000n, bodyBoc: WITH_HASHES }
+    await expect(send({ allowlist: { ton: [TON_JETTON_WALLET] } }, tx)).rejects.toMatchObject({ policy: 'allowlist' })
+    await expect(send({ blocklist: { ton: [TON_ATTACKER] } }, tx)).rejects.toMatchObject({ policy: 'blocklist' })
+  })
+
+  it('a Cell-shaped body that is not a Cell is unknown, whatever bodyBoc says', async () => {
+    const tx = { to: TON_JETTON_WALLET, value: 50_000_000n, body: { bits: { length: 0, at: () => false } }, bodyBoc: TRANSFER_TO_ATTACKER }
+    await expect(send({ allowlist: { ton: [TON_JETTON_WALLET] } }, tx)).rejects.toMatchObject({ policy: 'allowlist' })
+    let seen: Record<string, unknown> = {}
+    await send({ confirm: async (i) => { seen = i as never; return true } }, tx)
+    expect(seen.destinationUnknown).toBe(true)
+  })
+})
