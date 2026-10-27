@@ -1,6 +1,6 @@
 import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
-import { canonicalAddress, erc20Transfer, hexData, sendDestinations, tonRawAddress } from './destinations.js'
+import { canonicalAddress, erc20Transfer, hexData, sendDestinations, tonRawAddress, tronCallData } from './destinations.js'
 import { snapshot } from './snapshot.js'
 
 /**
@@ -560,8 +560,11 @@ function tokenMove(ns: string, arg: unknown): { token: string; amount: bigint | 
     const t = data !== undefined ? erc20Transfer(data) : null
     return t && str(a.to) !== undefined ? { token: str(a.to)!, amount: t.amount } : undefined
   }
-  if (ns === 'tron' && a.functionSelector === 'transfer(address,uint256)' && Array.isArray(a.parameters) && str(a.contractAddress) !== undefined) {
-    return { token: str(a.contractAddress)!, amount: big(obj(a.parameters[1]).value) }
+  if (ns === 'tron' && str(a.contractAddress) !== undefined) {
+    // The calldata the node signs, by its selector bytes (scan 2026-10-27 F10): a colliding signature text is the same transfer.
+    const data = tronCallData(a.functionSelector, a.parameters)
+    const t = data !== undefined ? erc20Transfer(data) : null
+    return t ? { token: str(a.contractAddress)!, amount: t.amount } : undefined
   }
   if (ns === 'near' && Array.isArray(a.actions) && a.actions.length === 1 && str(a.receiverId) !== undefined) {
     const call = obj(obj(a.actions[0]).functionCall)

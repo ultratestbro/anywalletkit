@@ -1,3 +1,5 @@
+import { keccak_256 } from '@noble/hashes/sha3.js'
+
 /**
  * Where a write goes, read off every transaction shape the chain packages
  * accept (scan F16/F17) — not only `to` / `recipient`. The allow/block lists
@@ -568,11 +570,66 @@ function solanaDestinations(arg: unknown): Destinations {
 
 // ── per chain ────────────────────────────────────────────────────────────────
 
-/** TRC-20 / TRC-721 calls by their exact `functionSelector`: the index of the parameter that receives the tokens or the allowance. */
-const TRON_CALL_RECIPIENT: Readonly<Record<string, number>> = {
-  'transfer(address,uint256)': 0, 'approve(address,uint256)': 0, 'increaseAllowance(address,uint256)': 0,
-  'transferFrom(address,address,uint256)': 1, 'safeTransferFrom(address,address,uint256)': 1, 'safeTransferFrom(address,address,uint256,bytes)': 1,
-  'setApprovalForAll(address,bool)': 0,
+/** `uintN` / `intN` → [signed, bits] as wallet-tron reads the type; `uint` / `int` are 256. */
+function abiIntType(type: string): [signed: boolean, bits: number] | undefined {
+  const m = /^(u?)int([1-9]\d*)?$/.exec(type)
+  if (!m) return undefined
+  const bits = m[2] === undefined ? 256 : Number(m[2])
+  return bits >= 8 && bits <= 256 && bits % 8 === 0 ? [m[1] === '', bits] : undefined
+}
+
+/** One Tron ABI argument as wallet-tron encodes it (exactly one word), or undefined when it would refuse it. */
+function abiWord(type: string, value: unknown): string | undefined {
+  if (type === 'address') {
+    const h = typeof value === 'string' ? tronHexAddress(value) : null
+    return h === null ? undefined : h.slice(2).padStart(64, '0')
+  }
+  const int = abiIntType(type)
+  if (int) {
+    let v: bigint
+    if (typeof value === 'bigint') v = value
+    else if (typeof value === 'number' && Number.isSafeInteger(value)) v = BigInt(value)
+    else if (typeof value === 'string' && /^(-?\d{1,78}|0x[0-9a-fA-F]{1,64})$/.test(value)) v = BigInt(value)
+    else return undefined
+    const [signed, bits] = int
+    const min = signed ? -(1n << BigInt(bits - 1)) : 0n
+    const max = signed ? (1n << BigInt(bits - 1)) - 1n : (1n << BigInt(bits)) - 1n
+    if (v < min || v > max) return undefined
+    return (v < 0n ? (1n << 256n) + v : v).toString(16).padStart(64, '0')
+  }
+  if (type === 'bool') return typeof value === 'boolean' ? (value ? '1' : '0').padStart(64, '0') : undefined
+  if (type === 'bytes32') return typeof value === 'string' && /^(0x)?([0-9a-fA-F]{2}){0,32}$/.test(value) ? value.replace(/^0x/, '').toLowerCase().padEnd(64, '0') : undefined
+  return undefined
+}
+
+const abiType = (t: string) => (t === 'uint' ? 'uint256' : t === 'int' ? 'int256' : t)
+
+/**
+ * A Tron contract call's calldata exactly as wallet-tron encodes and the node signs it: the first 4
+ * bytes of keccak256(functionSelector) — the text as given — then one word per parameter, the
+ * parameters matching the signature. Undefined when wallet-tron would not encode it so. Another text
+ * with the same 4 bytes calls the same function, so the kit reads the bytes, never the text (scan
+ * 2026-10-27 F10, F17), and decodes recipients from these words as for EVM calldata.
+ */
+export function tronCallData(functionSelector: unknown, parameters: unknown): string | undefined {
+  if (typeof functionSelector !== 'string' || functionSelector.length > 256) return undefined
+  const m = /^[A-Za-z_$][A-Za-z0-9_$]*\(([A-Za-z0-9,]*)\)$/.exec(functionSelector)
+  if (!m) return undefined
+  const types = m[1] === '' ? [] : m[1]!.split(',')
+  const params = parameters === undefined ? [] : parameters
+  if (!Array.isArray(params) || params.length !== types.length) return undefined
+  let words = ''
+  for (let i = 0; i < types.length; i++) {
+    const p = obj(params[i])
+    const type = str(p.type)
+    if (type === undefined || abiType(type) !== abiType(types[i]!)) return undefined
+    const w = abiWord(type, p.value)
+    if (w === undefined) return undefined
+    words += w
+  }
+  // ASCII only (checked above): its UTF-8 bytes are its char codes.
+  const selector = keccak_256(Uint8Array.from(functionSelector, (ch) => ch.charCodeAt(0))).subarray(0, 4)
+  return `0x${toHex(selector)}${words}`
 }
 
 function tronDestinations(arg: unknown): Destinations {
@@ -596,12 +653,13 @@ function tronDestinations(arg: unknown): Destinations {
     if (foreign('to', 'value')) return UNKNOWN
     const c = str(a.contractAddress)
     if (c === undefined) return UNKNOWN
-    // A TRC-20 call names its recipient or spender in `parameters` (round 3, M1). The selector is
-    // hashed as written, so only the exact signature counts; the address must be typed `address`.
-    const at = own(TRON_CALL_RECIPIENT, str(a.functionSelector)!)
-    if (at === undefined) return known([c])
-    const p = obj(Array.isArray(a.parameters) ? a.parameters[at] : undefined)
-    return known([c, p.type === 'address' ? str(p.value) : undefined])
+    // A TRC-20 call names its recipient or spender in its calldata (round 3, M1), read off the bytes
+    // the node signs: the selector the signature text hashes to, one word per parameter (scan 2026-10-27 F10, F14, F17).
+    const data = tronCallData(a.functionSelector, a.parameters)
+    if (data === undefined) return UNKNOWN
+    const r = calldataRecipients(data)
+    if (!r) return known([c])
+    return known([c, ...r.list.map((w) => `41${w}`), ...(r.bad ? [undefined] : [])])
   }
   if (foreign('contractAddress')) return UNKNOWN
   const to = str(a.to)

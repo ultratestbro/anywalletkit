@@ -180,3 +180,28 @@ describe('scan 2026-10-27 G6 (F6, F28, F29): NEAR object actions the kit cannot 
     expect((await confirmed({ receiverId: 'dex.near', actions: [{ functionCall: { methodName: 'storage_deposit', args: { registration_only: true }, gas: 1n, deposit: 1n } }] })).destinationUnknown).toBe(false)
   })
 })
+
+describe('scan 2026-10-27 G8 (F10, F17): Tron calls are judged by the selector bytes the node hashes, not the signature text', () => {
+  const TRON = 'tron:0x2b6653dc'
+  const USDT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
+  const ATTACKER = 'TN3W4H6rK2ce4vX9YnFQHwKENnHjoxb3m9'
+  const tron = () => createMockAccount({ chain: TRON, address: 'TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH' })
+  // A public 4byte.directory collision: keccak256 of this text starts with a9059cbb, transfer(address,uint256).
+  const collision = { contractAddress: USDT, functionSelector: 'join_tg_invmru_haha_fd06787(address,bool)', parameters: [{ type: 'address', value: ATTACKER }, { type: 'bool', value: true }] }
+
+  it('a colliding signature text is read as the transfer it signs: the blocklist sees the recipient', async () => {
+    await expect(applyPolicies(tron(), { blocklist: { tron: [ATTACKER] } }, TRON).sendTransaction(collision as never)).rejects.toMatchObject({ policy: 'blocklist' })
+    await expect(applyPolicies(tron(), { allowlist: { tron: [USDT] } }, TRON).sendTransaction(collision as never)).rejects.toMatchObject({ policy: 'allowlist' })
+    let seen: Record<string, unknown> = {}
+    await applyPolicies(tron(), { confirm: async (i) => { seen = i as never; return true } }, TRON).sendTransaction(collision as never)
+    expect(seen).toMatchObject({ token: USDT, amount: 1n, destinationUnknown: false })
+    expect(seen.destinations).toHaveLength(2) // the token contract and the recipient the calldata names
+  })
+
+  it('parameters that do not encode one strict word each are unknown', async () => {
+    const shifted = { contractAddress: USDT, functionSelector: 'transfer(address,uint256)', parameters: [{ type: 'bytes32', value: '00'.repeat(32) + 'ff'.repeat(32) }, { type: 'uint256', value: 1n }] }
+    let seen: Record<string, unknown> = {}
+    await applyPolicies(tron(), { confirm: async (i) => { seen = i as never; return true } }, TRON).sendTransaction(shifted as never)
+    expect(seen.destinationUnknown).toBe(true)
+  })
+})
