@@ -84,10 +84,13 @@ export interface RemoteProviderOptions {
 export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider {
   const name = opts.name;
   if (!/^[A-Za-z0-9_-]+$/.test(name)) throw new Error("swap2-remote: invalid provider name");
-  const baseUrl = opts.baseUrl.replace(/\/+$/, "");
+  // Trimmed first: a URL parser drops leading spaces and tabs, so " http://host" would reach http (scan 2026-10-28 review).
+  const baseUrl = opts.baseUrl.trim().replace(/\/+$/, "");
   if (!baseUrl) throw new Error("swap2-remote: baseUrl is required");
-  // A same-origin path inherits the page's scheme; an absolute URL must be https.
-  if (/^[a-z][a-z0-9+.-]*:/i.test(baseUrl) && !/^https:\/\//i.test(baseUrl) && opts.allowInsecureBaseUrl !== true) {
+  // A same-origin path ("/api/swap2") inherits the page's scheme; an absolute URL must be https, and a
+  // scheme-relative one ("//host/…") names another origin without saying how to reach it.
+  const insecure = /^[a-z][a-z0-9+.-]*:/i.test(baseUrl) ? !/^https:\/\//i.test(baseUrl) : /^[\\/]{2}/.test(baseUrl);
+  if (insecure && opts.allowInsecureBaseUrl !== true) {
     throw new Error("swap2-remote: baseUrl must be https:// or a same-origin path (allowInsecureBaseUrl for local development)");
   }
   const supportsRoute = opts.supportsRoute;

@@ -295,6 +295,15 @@ describe("scan 2026-10-27 modules G4 (F4): typed data from a provider is signed 
     expect(() => remoteProvider({name: "x", baseUrl: "http://localhost:3000/api/v2/swap2", allowInsecureBaseUrl: true})).not.toThrow();
   });
 
+  it("remoteProvider: a baseUrl with leading spaces or no scheme (//host) is not a way around https (2026-10-28 review)", () => {
+    for (const baseUrl of [" http://api.example.com/swap2", "\thttp://x/swap2", "//api.example.com/swap2", "\\\\api.example.com/swap2"]) {
+      expect(() => remoteProvider({name: "x", baseUrl}), JSON.stringify(baseUrl)).toThrow(/must be https:\/\/ or a same-origin path/);
+    }
+    expect(() => remoteProvider({name: "x", baseUrl: "  https://api.example.com/swap2  "})).not.toThrow();
+    expect(() => remoteProvider({name: "x", baseUrl: "/api/swap2"})).not.toThrow();
+    expect(() => remoteProvider({name: "x", baseUrl: "//localhost:3000/swap2", allowInsecureBaseUrl: true})).not.toThrow();
+  });
+
   it("verifyBuild: the provider's own check of the build runs on the client before anything is approved", async () => {
     const t = typedAccount();
     const r = typedRemote(order(), LOP, {verifyBuild: () => "salt does not commit the order extension"});

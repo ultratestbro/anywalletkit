@@ -327,10 +327,10 @@ function validatePayload(input: PayloadInput, trusted: {
   return true;
 }
 
-export function createOmnistonTonValidators(options: OmnistonTonValidationOptions = {}): Pick<
+export function createOmnistonTonValidators(options: OmnistonTonValidationOptions = {}): Required<Pick<
   OmnistonProviderOptions,
   "validateTonJettonWallet" | "validateTonSwapTarget" | "validateTonOutputPosition" | "validateTonSwapLeg"
-> & {validateTonEscrowPayload: (input: PayloadInput) => boolean | Promise<boolean>} {
+>> & {validateTonEscrowPayload: (input: PayloadInput) => boolean | Promise<boolean>} {
   const now = options.now ?? Date.now;
   const swapInterfaces = new Set(options.swapTargetInterfaces ?? DEFAULT_OMNISTON_TON_SWAP_INTERFACES);
   const proxyTonMasters = new Set(

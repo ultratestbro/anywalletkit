@@ -21,10 +21,12 @@ On npm: [@anywalletkit/protocol-swap2-thorchain](https://www.npmjs.com/package/@
 
 The router an EVM-source swap calls and approves must be one of `THORCHAIN_ROUTERS` (Ethereum, BSC, Avalanche,
 Base; `trustedRouters` adds one, e.g. during a router migration), and the inbound vault the router pays must be
-reported by a second THORNode — another operator — both when the quote is taken and right before broadcast. A
-disagreeing or silent second node refuses the swap. The defaults are two public nodes of different operators
-(Liquify's gateway and the IBS team's node, both checked on 2026-10-28); with one `nodeUrl` of your own, name a
-second source in `confirmNodeUrl`. Node URLs must be `https:` (`allowInsecureNodeUrl` for local development).
+reported by a second THORNode (any node other than the one that quoted) both when the quote is taken and right
+before broadcast. A disagreeing node, or no second node answering, refuses the swap. The defaults are two public
+nodes of different operators (Liquify's gateway and the IBS team's node, both checked on 2026-10-28); with one
+`nodeUrl` of your own, the defaults confirm it unless `confirmNodeUrl` names another node (pick one of another
+operator; a local mock needs a second mock there). Node URLs must be `https:` (`allowInsecureNodeUrl` for local
+development).
 
 Behind `remoteProvider`, the app checks the backend's build itself: `remoteProvider({name: "thorchain", baseUrl,
 ...thorchainPins()})` pins the routers and runs `verifyBuild` on the client — the vault in the router call confirmed

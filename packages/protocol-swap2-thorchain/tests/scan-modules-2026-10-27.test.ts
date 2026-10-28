@@ -72,11 +72,19 @@ describe("THORChain: router pinned, vault confirmed by a second node (scan 2026-
     await expect(p.preflightDeposit!(quote, tx)).resolves.toBeUndefined();
   });
 
-  it("one configured node is one source: quotes are refused unless confirmNodeUrl names another", async () => {
+  it("one configured node: a second must answer — the default public nodes confirm, or confirmNodeUrl; none reachable → refused", async () => {
     const reasons: string[] = [];
+    // The public defaults are unreachable here (the stub answers 404 for every host it does not list).
     await expect(thorchainProvider({nodeUrl: PRIMARY}).getQuote(params((r) => reasons.push(r)))).resolves.toBeNull();
     expect(reasons).toEqual([expect.stringMatching(/no second node answered/)]);
     await expect(thorchainProvider({nodeUrl: PRIMARY, confirmNodeUrl: SECONDARY}).getQuote(params())).resolves.not.toBeNull();
+    // With a default public node reachable and agreeing, it confirms a custom nodeUrl on its own.
+    const LIQUIFY = "https://gateway.liquify.com/chain/thorchain_api";
+    nodes[LIQUIFY] = {vault: VAULT, router: ROUTER, up: true};
+    await expect(thorchainProvider({nodeUrl: PRIMARY}).getQuote(params())).resolves.not.toBeNull();
+    // …and refuses when it reports another vault.
+    nodes[LIQUIFY] = {vault: "0x7777777777777777777777777777777777777777", router: ROUTER, up: true};
+    await expect(thorchainProvider({nodeUrl: PRIMARY}).getQuote(params())).resolves.toBeNull();
   });
 
   it("trustedRouters extends the pins (a migration before a release); http nodes are refused", async () => {
