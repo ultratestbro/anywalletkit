@@ -1,5 +1,34 @@
 # @anywalletkit/extension-kit
 
+## 0.3.0
+
+### Minor Changes
+
+- f1a46e4: Text and calldata from a page, a client or an API are bounded before anything parses them. extension-kit: an error message is cut to its first line within 1 KB before its URLs are taken out (the URL regex has a bounded scheme), and a request's `method` must be a method name — letters, digits and `_`, at most 128 (`isRelayMethod`, `RELAY_METHOD_MAX`) — or the relay drops it and the router answers -32600 without echoing it. swap2-core: `redactUrls` is linear whatever the text (it also catches a URL right after `_` or glued to a long word now), and the server cuts a provider's refusal or error before redacting it. Balancer: `preflightDeposit` decodes and prices only the quote's own batch — a client's different `tx.data` is refused before it is decoded — with at most `BALANCER_MAX_SWAPS` (16) hops and no pool `userData`, and a longer SOR route is refused at the quote. Fynd: `preflightDeposit` simulates only the quote's own transaction (target, calldata, value), a refusal names the transaction target only when it is an address, and protocol names from the API are cut to 40 characters.
+  
+  **Breaking:** extension-kit drops a relay request whose `method` is not a method name (answer it with -32600 in your injected provider); Balancer `preflightDeposit` refuses calldata that is not the quote's own batch, and Fynd's a transaction whose target, calldata or value differs from the quote's. Upgrade notes: https://docs.anywallet.tech/getting-started/upgrading/.
+- c2d8c1f: `Vault.rotateVaultKey(password)` replaces the vault key after a suspected compromise: a fresh DEK, every secret re-sealed under it and the DEK wrapped under the password with a fresh salt, written as one envelope (a failure leaves the old vault as it was; `rotatedAt` records when). It returns the new DEK — hand it to `session.unlock`, which overwrites the old one in `chrome.storage.session`. Passkeys are dropped, because their boxes hold the old DEK and cannot be re-wrapped without their PRF output; register them again. `setSecret` now refuses (`locked`) a DEK that does not open the vault's secrets, so a stale session cannot seal a new secret under a retired key. `changePassword` is unchanged and documented as not enough after a compromise (it re-wraps the same DEK).
+  
+  **Breaking:** `setSecret` refuses (`locked`) a DEK that does not open the vault's secrets. An empty vault has nothing to check it against and accepts any DEK. Upgrade notes: https://docs.anywallet.tech/getting-started/upgrading/.
+- 5de7e66: Token symbols and ENS lookups are checked the way users meet them. tokens: a symbol and name are trimmed and cut (`tokenText`, `TOKEN_SYMBOL_MAX` = 32, `TOKEN_NAME_MAX` = 128 code points) before they are stored **or assessed** — "USDC" + 124 spaces + "X" is stored as "USDC" and flagged as impersonation; `foldSymbol` is a confusables skeleton (ASCII `l` / `1` / `|` → I, `0` → O, `rn` → m, `cl` → d, `vv` → w, accents dropped), so "DAl" reads as DAI and "USDl" as USD1; letters that pass for Latin ones (Cyrillic, Greek, Armenian, Cherokee, Canadian syllabics, small capitals, letterlike, enclosed and math letters) or characters that hide in text (zero-width, bidi) in a symbol are `odd-characters` at `danger`; emoji, CJK and accented Latin stay a `caution`. names-ens: the client built from `rpcUrl` asks CCIP-Read gateways only over https on public hosts and refuses redirects (`ensCcipRequest` / `ensCcipRead` — pass `ccipRead: ensCcipRead` when you bring your own client); `avatar` returns the avatar record itself, filtered the same way (`avatarUrl`), and no longer resolves NFT avatars, so nothing is fetched to decide. networks: `isPrivateHost` knows link-local, CGNAT, benchmark and multicast ranges, every IPv4 spelling a URL parser accepts (`127.1`, `2130706433`, `0x7f.0.0.1`), the IPv4 inside mapped and NAT64 IPv6, IPv6 zones and `*.internal` / `*.home.arpa` / `*.lan`; new `isPublicHttpsUrl`; both also in `@anywalletkit/networks/url`, which does not load the catalog. extension-kit: `wallet_addEthereumChain` keeps a site's RPC URL only when `isPublicHttpsUrl` passes it, so `https://2130706433/` or `https://100.64.0.1/` no longer points the wallet's reads at the user's network.
+  
+  **Breaking:** stored token symbols are cut to 32 characters (on load too); names-ens `avatar` returns only an https URL on a public host or an `ipfs://` one (NFT, `http://`, `data:`, `ipns://` and `ar://` avatars come back `null`), and a host's own ENS client should get `ccipRead: ensCcipRead`; `isPrivateHost` treats more hosts as private. Upgrade notes: https://docs.anywallet.tech/getting-started/upgrading/.
+
+### Patch Changes
+
+- Updated dependencies [c59c8cc]
+- Updated dependencies [f1a46e4]
+- Updated dependencies [5de7e66]
+- Updated dependencies [418fea1]
+- Updated dependencies [28c7d3a]
+- Updated dependencies [a4ceb50]
+- Updated dependencies [0e43992]
+  - @anywalletkit/protocol-swap2-core@0.7.0
+  - @anywalletkit/networks@0.3.0
+  - @anywalletkit/wallet-evm@0.4.1
+  - @anywalletkit/keyring@0.3.7
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.2.2
 
 ### Patch Changes

@@ -1,5 +1,31 @@
 # @anywalletkit/protocol-swap2-router
 
+## 0.3.0
+
+### Minor Changes
+
+- 418fea1: A remote provider's addresses come from the app, never from its backend. `remoteProvider` takes `callTargets(chain)` / `spenders(chain)` — the provider package's pins, spread in: `lifiPins`, `fyndPins`, `uniswapPins`, `chainflipPins`, `cctpPins` (with its `claimTargets`), `usdt0Pins`, `balancerPins`, `wrapPins` — and an optional `verifyQuote(params, quote)` that runs the provider's own check on the client (`fyndPins` carries `fyndVerifyQuote`: `checkFyndTransaction` against the app's request). The stub is marked `remote: true`; the engine then lets its EVM routes call only pinned targets and approve only pinned spenders. **Fail closed: a remote stub without pins gets no EVM calldata route or approval** — the router and the single-provider path drop such a quote with the reason (`remotePinRefusal`), deposit-address routes need no pins. Wire the pins in every app that proxies providers through `createSwap2Handler`.
+  
+  For every provider, a token call in a swap's calldata must move the source token, at most the swap amount, to this account, the deposit address of a deposit-address route, or the declared spender (for a remote stub: the pins); `setApprovalForAll` and Permit2 `approve` are never a swap's main call, and `transferFrom` is refused. Before, `{to: USDC, data: approve(attacker, MAX), approvalAddress: attacker}` from a backend, or `cbBTC.transfer(attacker, all)` with `depositAddress = attacker`, passed because the allowlist was the response's own addresses. The router's provider snapshot now keeps the remote marker and the pins (dropped there, execution through the router took a remote stub for a local provider).
+  
+  **Breaking:** a `remoteProvider` without `callTargets` / `spenders` gets no calldata route on EVM — spread the provider's pins (`lifiPins`, `fyndPins`, …); swap calldata may only move the source token, by at most the input; an operator or Permit2 approval or a `transferFrom` as the swap call is refused. Upgrade notes: https://docs.anywallet.tech/getting-started/upgrading/.
+- a4ceb50: A TON cell-body deposit (`bodyBoc`) is bound to the swap on the client instead of being sent as the build said. The message may attach the input plus at most `tonGasCeiling` nanoTON of gas (new engine option, default 1 TON; live Omniston swaps attach 0.1–0.7) — a jetton source the ceiling alone. A jetton source's body must be a TEP-74 transfer of exactly the input, from this account's own jetton wallet (the account's `getJettonWalletAddress`; an account without it cannot execute such a swap), with the excess returning to this account. The decoded body reaches `reviewExecution` (`cellBodyDecoded`, next to `cellBody: true`). **A remote stub's cell body is refused unless the app gave it `verifyBuild`**, and a remote native-source body must go to a pinned `callTargets` address when the app pins any. Before, `{to: attacker, value: <whole balance>, bodyBoc}` or a transfer of the whole jetton balance to the attacker from the user's own jetton wallet went to the account untouched. `verifyBuild` now also receives the request the quote answered, and may be async; the router keeps a stub's `verifiesBuilds` flag. `tonRawAddress` (friendly/raw TON address comparison without @ton/core) is exported.
+  
+  Omniston: `omnistonVerifyBuild({validateTonSwapTarget, validateTonSwapLeg, integratorAddress})` is the app's check of a remote TON swap build — `checkTonSwapPayload` against the app's own request plus the app's DEX validators; swap quotes carry `providerData.routeSteps` for it. A TON → EVM escrow body cannot be checked on the client and is refused by the helper.
+  
+  **Breaking:** a jetton-source TON swap needs a signer with `getJettonWalletAddress`; a TON transaction carrying more than the input plus `tonGasCeiling` (1 TON) is refused; a remote cell body needs `verifyBuild`. Upgrade notes: https://docs.anywallet.tech/getting-started/upgrading/.
+
+### Patch Changes
+
+- Updated dependencies [c59c8cc]
+- Updated dependencies [f1a46e4]
+- Updated dependencies [418fea1]
+- Updated dependencies [28c7d3a]
+- Updated dependencies [a4ceb50]
+- Updated dependencies [0e43992]
+  - @anywalletkit/protocol-swap2-core@0.7.0
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.2.8
 
 ### Patch Changes

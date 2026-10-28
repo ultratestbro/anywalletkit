@@ -1,5 +1,24 @@
 # @anywalletkit/protocol-swap2-jupiter
 
+## 0.3.0
+
+### Minor Changes
+
+- 17f9993: `/build`'s setup, cleanup and other instructions are decoded and must each be an exact shape a swap needs: `CreateIdempotent` of the taker's own token account paid by the taker, one System `Transfer` of exactly the input into the taker's wSOL account (SOL source only), `SyncNative` on that account, `CloseAccount` of it back to the taker, `InitializeAccount3` for the taker. Any other System, Token, Token-2022 or Associated Token instruction, and any Jupiter instruction besides the decoded swap, refuses the quote. Before, such instructions passed on their program and signer alone, and a System transfer of a few hundredths of a SOL to a third party or a `TransferChecked` out of the destination account fit inside the balance proof's slack.
+  
+  **Breaking:** a `/build` transaction with an instruction outside the expected shapes is refused. Upgrade notes: https://docs.anywallet.tech/getting-started/upgrading/.
+
+### Patch Changes
+
+- Updated dependencies [c59c8cc]
+- Updated dependencies [f1a46e4]
+- Updated dependencies [418fea1]
+- Updated dependencies [28c7d3a]
+- Updated dependencies [a4ceb50]
+- Updated dependencies [0e43992]
+  - @anywalletkit/protocol-swap2-core@0.7.0
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.2.7
 
 ### Patch Changes

@@ -1,5 +1,30 @@
 # @anywalletkit/protocol-approvals-evm
 
+## 0.5.0
+
+### Minor Changes
+
+- b449d15: Revokes are classified by the token's standard. `revoke()` and `revokeAll()` ask an `'erc20'` approval's token for ERC-165 (`supportsInterface(0x80ac58cd)`) before sending `approve(spender, 0)`, and refuse (`invalid-approval`) when it is an ERC-721 — there that call approves the spender for token #0; a token without ERC-165 is revoked as before, and a failed read sends nothing (`source-failed`). `isRevokeTransaction(tx, { targets })` takes the scan's approvals, a map from address to standard, or bare addresses (`RevokeTargets`): `approve(spender, 0)` is a revoke only on an ERC-20 target, `approve(0x0, id)` and `setApprovalForAll(operator, false)` on an NFT or bare-address target, and **without `targets` only a Permit2 `lockdown` is a revoke** (an `approve(x, 0)` without targets used to pass).
+  
+  **Breaking:** `isRevokeTransaction` without `targets` is true only for a Permit2 `lockdown`, and a bare-address target no longer makes `approve(x, 0)` a revoke; `revoke()` / `revokeAll()` refuse an `'erc20'` revoke of an ERC-721 (`invalid-approval`) after an ERC-165 read through the protocol's provider (`provider-required` without one, `source-failed` when the read fails); `buildRevokeTransaction()` does not check, so run your own ERC-165 read before you batch its output. Upgrade notes: https://docs.anywallet.tech/getting-started/upgrading/.
+
+### Patch Changes
+
+- 0e43992: Follow-ups from a review of the modules-scan fixes against the code (2026-10-28).
+  - **CCIP-Read is off** in every viem client the SDK creates: wallet-evm, approvals and the protocol modules. names-ens keeps its own filtered one. A contract's `OffchainLookup` revert no longer makes the device fetch URLs it names, LAN addresses included. Two cases were reachable: an approvals scan calls every contract that emitted an Approval naming the user, spam tokens included, and wallet-evm reads tokens the user added.
+  - **networks:** `isPrivateHost` treats a host that is not printable ASCII as private. A URL parser maps `127.0.0.１`, `127。0。0。1` and `ｒｏｕｔｅｒ.ｌａｎ` to 127.0.0.1 and router.lan (IDNA), so these got past `isPublicHttpsUrl`. Names in other scripts arrive as punycode and stay public. 6to4 addresses (`2002::/16`) carry their IPv4.
+  - **tokens:**
+    - The look-alike danger rule now also covers more lettering: Roman numerals, small capitals from Latin Extended-D/E, enclosed letters of the supplement (🅤), Tifinagh, Vai, Deseret, Osage, Lycian, Carian, Old Italic, Warang Citi and Georgian's look-alike letters.
+    - It now covers more characters that hide: C0 and C1 controls, line breaks inside a symbol, the braille blank, interlinear annotation, tag characters (ASCII smuggling) and astral format controls.
+    - It reads the stored symbol as well as the raw head, so leading spaces cannot push a look-alike out.
+    - Fewer false alarms: ™ ℠ ℗, the tag-sequence flag emoji and ZWNJ in Persian or Indic spelling stay a caution.
+    - `foldSymbol` drops spaces after NFKD, so "USDC´" reads as USDC.
+  - **names-ens:** `ipfsGateway` may be an origin (`/ipfs/<cid>` is appended, as before the fix) or a prefix ending in `/ipfs/`.
+  - **approvals:** `isRevokeTransaction` never throws, and `targets` may also be a plain object or `[address, standard]` pairs.
+  - **mellow:** `claimWithdrawals` claims only on pinned redeem queues, like every other queue call.
+  - **swap2-core:** `remoteProvider` trims `baseUrl` and refuses a scheme-relative one (`//host`). A leading space or `//` used to get past the https check.
+  - **omniston:** `createOmnistonTonValidators()` declares the validators it always returns as required, so `omnistonVerifyBuild({ ...createOmnistonTonValidators() })` typechecks.
+
 ## 0.4.7
 
 ### Patch Changes

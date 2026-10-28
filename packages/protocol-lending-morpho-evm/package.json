@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-lending-morpho-evm",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "Morpho for @anywalletkit/wallet-evm accounts: Morpho Vaults (MetaMorpho V1 and Vault V2, ERC-4626 deposit / redeem) and Morpho Blue markets (supply, withdraw, borrow, repay, collateral) as LendingProtocols, on 10 chains. Vaults are verified against Morpho's factories, markets resolved on-chain, positions read with interest accrued like the contract does; the Morpho API only decorates (APY, listing).",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

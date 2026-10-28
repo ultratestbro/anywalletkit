@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/tx-preview-evm",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "What an EVM transaction (or an approve → call sequence) will do before it is signed: decoded calls, approvals, transfers, simulated balance changes (eth_simulateV1 with transfer tracing, eth_call fallback) and a verdict of named checks for a review screen.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

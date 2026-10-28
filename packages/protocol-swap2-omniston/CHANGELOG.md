@@ -1,5 +1,44 @@
 # @anywalletkit/protocol-swap2-omniston
 
+## 0.3.0
+
+### Minor Changes
+
+- c07728c: A reused quote id can no longer rebind an order after its HTLC secret exists. `trackIntent` discloses a secret only when the context it is checked against is the exact order the secret was locked to (its stored binding of trader, destination, chain, assets and units) — a context rewritten under the same quote id after the secret was made gets nothing. A fresh quote's context is claimed instead of overwritten, in the order and the TON-swap paths alike: another user's quote under a held id is refused, the same user's re-quote refreshes it. `OmnistonQuoteStore` takes an optional atomic `claim(quoteId, json)` (create-if-absent; the in-memory store has one) — **give your durable store one**, or claiming falls back to check-then-save. The TON-source build re-saves its bound context, as the EVM build does.
+- 28c7d3a: The engine signs a provider's EIP-712 payload only when it is the swap's own order: a Limit Order Protocol `Order` whose `domain.verifyingContract` is the settlement contract the swap approves (for a remote stub, a pinned spender), on the source chain, with this account as `maker`, the source token as `makerAsset` and exactly the input as `makingAmount` (hex or decimal). A `Permit`, `PermitSingle`, `PermitBatch`, `PermitTransferFrom*` or any other `primaryType` is refused before anything is approved or signed — a backend's build could hand the wallet an EIP-2612 permit to itself and the engine signed and posted it. `remoteProvider` takes `verifyBuild(quote, tx)` (the provider's own check of a build, run on the client) and **refuses an absolute `baseUrl` that is not `https:`** (a same-origin path is fine; `allowInsecureBaseUrl: true` for local development). Omniston exports `omnistonPins(trustedEvmOrderProtocols)` — the app's audited order protocols as the remote stub's spenders — and `validateEvmTypedOrder`.
+  
+  **Breaking:** `remoteProvider` refuses a `baseUrl` that is not https — a same-origin path is fine, `allowInsecureBaseUrl` is for local development; typed data is signed only when it is the swap's own `Order`. Upgrade notes: https://docs.anywallet.tech/getting-started/upgrading/.
+- a4ceb50: A TON cell-body deposit (`bodyBoc`) is bound to the swap on the client instead of being sent as the build said. The message may attach the input plus at most `tonGasCeiling` nanoTON of gas (new engine option, default 1 TON; live Omniston swaps attach 0.1–0.7) — a jetton source the ceiling alone. A jetton source's body must be a TEP-74 transfer of exactly the input, from this account's own jetton wallet (the account's `getJettonWalletAddress`; an account without it cannot execute such a swap), with the excess returning to this account. The decoded body reaches `reviewExecution` (`cellBodyDecoded`, next to `cellBody: true`). **A remote stub's cell body is refused unless the app gave it `verifyBuild`**, and a remote native-source body must go to a pinned `callTargets` address when the app pins any. Before, `{to: attacker, value: <whole balance>, bodyBoc}` or a transfer of the whole jetton balance to the attacker from the user's own jetton wallet went to the account untouched. `verifyBuild` now also receives the request the quote answered, and may be async; the router keeps a stub's `verifiesBuilds` flag. `tonRawAddress` (friendly/raw TON address comparison without @ton/core) is exported.
+  
+  Omniston: `omnistonVerifyBuild({validateTonSwapTarget, validateTonSwapLeg, integratorAddress})` is the app's check of a remote TON swap build — `checkTonSwapPayload` against the app's own request plus the app's DEX validators; swap quotes carry `providerData.routeSteps` for it. A TON → EVM escrow body cannot be checked on the client and is refused by the helper.
+  
+  **Breaking:** a jetton-source TON swap needs a signer with `getJettonWalletAddress`; a TON transaction carrying more than the input plus `tonGasCeiling` (1 TON) is refused; a remote cell body needs `verifyBuild`. Upgrade notes: https://docs.anywallet.tech/getting-started/upgrading/.
+
+### Patch Changes
+
+- 0e43992: Follow-ups from a review of the modules-scan fixes against the code (2026-10-28).
+  - **CCIP-Read is off** in every viem client the SDK creates: wallet-evm, approvals and the protocol modules. names-ens keeps its own filtered one. A contract's `OffchainLookup` revert no longer makes the device fetch URLs it names, LAN addresses included. Two cases were reachable: an approvals scan calls every contract that emitted an Approval naming the user, spam tokens included, and wallet-evm reads tokens the user added.
+  - **networks:** `isPrivateHost` treats a host that is not printable ASCII as private. A URL parser maps `127.0.0.１`, `127。0。0。1` and `ｒｏｕｔｅｒ.ｌａｎ` to 127.0.0.1 and router.lan (IDNA), so these got past `isPublicHttpsUrl`. Names in other scripts arrive as punycode and stay public. 6to4 addresses (`2002::/16`) carry their IPv4.
+  - **tokens:**
+    - The look-alike danger rule now also covers more lettering: Roman numerals, small capitals from Latin Extended-D/E, enclosed letters of the supplement (🅤), Tifinagh, Vai, Deseret, Osage, Lycian, Carian, Old Italic, Warang Citi and Georgian's look-alike letters.
+    - It now covers more characters that hide: C0 and C1 controls, line breaks inside a symbol, the braille blank, interlinear annotation, tag characters (ASCII smuggling) and astral format controls.
+    - It reads the stored symbol as well as the raw head, so leading spaces cannot push a look-alike out.
+    - Fewer false alarms: ™ ℠ ℗, the tag-sequence flag emoji and ZWNJ in Persian or Indic spelling stay a caution.
+    - `foldSymbol` drops spaces after NFKD, so "USDC´" reads as USDC.
+  - **names-ens:** `ipfsGateway` may be an origin (`/ipfs/<cid>` is appended, as before the fix) or a prefix ending in `/ipfs/`.
+  - **approvals:** `isRevokeTransaction` never throws, and `targets` may also be a plain object or `[address, standard]` pairs.
+  - **mellow:** `claimWithdrawals` claims only on pinned redeem queues, like every other queue call.
+  - **swap2-core:** `remoteProvider` trims `baseUrl` and refuses a scheme-relative one (`//host`). A leading space or `//` used to get past the https check.
+  - **omniston:** `createOmnistonTonValidators()` declares the validators it always returns as required, so `omnistonVerifyBuild({ ...createOmnistonTonValidators() })` typechecks.
+- Updated dependencies [c59c8cc]
+- Updated dependencies [f1a46e4]
+- Updated dependencies [418fea1]
+- Updated dependencies [28c7d3a]
+- Updated dependencies [a4ceb50]
+- Updated dependencies [0e43992]
+  - @anywalletkit/protocol-swap2-core@0.7.0
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.2.8
 
 ### Patch Changes

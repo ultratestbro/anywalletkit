@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-omniston",
-  "version": "0.2.8",
+  "version": "0.3.0",
   "description": "STON.fi Omniston for Any Wallet Kit: TON swaps on the STON.fi DEX and TON ↔ EVM / EVM ↔ EVM stable orders through HTLC escrows, over the Omniston RFQ; standalone or as a provider of the swap2 router.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
