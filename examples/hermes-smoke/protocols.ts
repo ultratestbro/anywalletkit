@@ -30,6 +30,8 @@ import { encodeFunctionData, encodeFunctionResult } from 'viem'
 import { nearIntentsProvider } from '@anywalletkit/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@anywalletkit/protocol-swap2-thorchain/protocol'
 import { OmnistonSwap2Protocol } from '@anywalletkit/protocol-swap2-omniston/protocol'
+import { createOmnistonTonValidators } from '@anywalletkit/protocol-swap2-omniston/validators'
+import escrowLive from '../../packages/protocol-swap2-omniston/tests/fixtures/live-2026-10-10.json'
 import LidoProtocolEvm, { splitWithdrawalAmounts } from '@anywalletkit/protocol-staking-lido-evm'
 import SsvProtocolEvm, { MINIMAL_STAKING_AMOUNT } from '@anywalletkit/protocol-staking-ssv-evm'
 import TonstakersProtocolTon, { buildStakeBody, buildUnstakeBody } from '@anywalletkit/protocol-staking-tonstakers-ton'
@@ -237,6 +239,17 @@ export async function smokeProtocols(check: Check): Promise<void> {
     const t0 = Date.now()
     const out = redactUrls('a.'.repeat(32_768) + ' https://rpc.example/v2/KEY')
     check('swap2: redactUrls linear on 64 KB', Date.now() - t0 < 1_000 && out.endsWith(' <url>') && !out.includes('KEY'))
+  }
+  {
+    // 2026-10-28: a remote TON → EVM Omniston order is checked on the device — the live escrow (USDT on TON → USDC on Base) passes, another destination does not
+    const c = (escrowLive as unknown as { baseUsdc: { quoteUpdated: { value: { inputUnits: string; outputAsset: { chain: { value: { kind: { value: string } } } }; settlementData: { value: { resolverSendsUnits: string } } } }; escrowRequest: { ownerSrcAddress: { chain: { value: string } }; traderDstAddress: { chain: { value: string } } }; escrowResponse: { messages: Array<{ payload: string }> } } }).baseUsdc
+    const v = createOmnistonTonValidators()
+    const expectation = {
+      payloadBocHex: c.escrowResponse.messages[0]!.payload, ownerAddress: c.escrowRequest.ownerSrcAddress.chain.value, inputUnits: c.quoteUpdated.value.inputUnits,
+      destinationChain: 'eip155:8453', destinationAddress: c.escrowRequest.traderDstAddress.chain.value, outputTokenAddress: c.quoteUpdated.value.outputAsset.chain.value.kind.value,
+      minResolverSendsUnits: c.quoteUpdated.value.settlementData.value.resolverSendsUnits,
+    }
+    check('omniston: TON → EVM escrow verified on the device', v.verifyTonEscrowBuild(expectation) === null && v.verifyTonEscrowBuild({ ...expectation, destinationAddress: '0x' + '99'.repeat(20) }) !== null)
   }
   check('approvals: isRevokeCalldata', isRevokeCalldata('0x095ea7b3' + '0'.repeat(24) + 'beef'.padStart(40, '0') + '0'.repeat(64)) === true)
   check('approvals: isUnlimitedAmount', isUnlimitedAmount((1n << 256n) - 1n) === true && isUnlimitedAmount(5n) === false)

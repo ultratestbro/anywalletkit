@@ -79,11 +79,10 @@ A permit, or any other message from a provider, is refused.
 - **Jetton source.** It must be a plain TEP-74 transfer of exactly the input to your own jetton
   wallet, so **the TON signer must have `getJettonWalletAddress`**.
 - **Server-built bodies.** A TON cell body built by your server is refused unless the app checks it
-  (`verifyBuild`; for Omniston, `omnistonVerifyBuild`). `omnistonVerifyBuild` checks TON → TON swap
-  bodies only. A TON → EVM escrow body cannot be checked on the device and is refused. Through a remote
-  Omniston those routes still quote but never build. Run Omniston in the app for TON → EVM, or keep
-  those routes out with `supportsRoute: (from, to) => !(from.chain.startsWith('ton:') && to.chain.startsWith('eip155:'))`
-  on the Omniston stub.
+  (`verifyBuild`; for Omniston, `omnistonVerifyBuild({...createOmnistonTonValidators()})`). It checks
+  TON → TON swap bodies and, from omniston 0.3.1, TON → EVM escrow bodies too (`verifyTonEscrowBuild`).
+  On 0.3.0 a remote TON → EVM build was refused: upgrade to 0.3.1, and if you turned the route off with
+  a `supportsRoute` filter, turn it back on.
 
 #### Omniston quote store
 

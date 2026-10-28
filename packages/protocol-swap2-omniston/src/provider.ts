@@ -1,3 +1,4 @@
+import type {TonEscrowBuildExpectation} from "./validators/ton.js";
 import {Address as TonAddress, Cell as TonCell} from "@ton/core";
 import {describeOmnistonActivity} from "./activity.js";
 import "./buffer-global.js";
@@ -1571,24 +1572,52 @@ export function omnistonPins(trustedEvmOrderProtocols: Readonly<Record<string, r
 }
 
 /**
- * The app's check of a remote Omniston TON swap build, for `remoteProvider({name: "omniston", baseUrl, verifyBuild:
- * omnistonVerifyBuild({validateTonSwapTarget, validateTonSwapLeg})})` (scan 2026-10-27 modules, F7/F13/F18/F19): the
- * body is opened with `checkTonSwapPayload` against the app's own request — receiver, refund / excess to the trader,
- * the on-chain minimum, the input — and the DEX it pays is confirmed with the app's validators (the same hooks the
- * provider takes; `createOmnistonTonValidators` builds them). Any other cell body (a TON → EVM escrow) cannot be
- * checked without the quote's settlement data and is refused; EVM typed orders pass through to the engine's own
- * order checks. The reason it fails, or null.
+ * The app's check of a remote Omniston TON build, for `remoteProvider({name: "omniston", baseUrl, verifyBuild:
+ * omnistonVerifyBuild({...createOmnistonTonValidators()})})` (scan 2026-10-27 modules, F7/F13/F18/F19):
+ * - a TON → TON swap body is opened with `checkTonSwapPayload` against the app's own request — receiver, refund /
+ *   excess to the trader, the on-chain minimum, the input — and the DEX it pays is confirmed with the app's
+ *   validators (`validateTonSwapTarget`, `validateTonSwapLeg`);
+ * - a TON → EVM escrow body (an Omniston order from TON) goes to `verifyTonEscrowBuild` with what the app knows: the
+ *   input, the trader's TON address, the destination chain, address and token, and the quote's minimum delivery.
+ * EVM typed orders pass through to the engine's own order checks. The reason it fails, or null.
  */
 export function omnistonVerifyBuild(hooks: {
   validateTonSwapTarget: (input: {address: string; protocols: readonly string[]}) => Promise<boolean> | boolean;
   validateTonSwapLeg?: (leg: TonSwapLeg) => Promise<boolean> | boolean;
+  /**
+   * The app's check of a TON → EVM escrow body (`createOmnistonTonValidators().verifyTonEscrowBuild`). Without it a
+   * TON → EVM build is refused.
+   */
+  verifyTonEscrowBuild?: (input: TonEscrowBuildExpectation) => string | null | Promise<string | null>;
   /** The integrator your backend's Omniston provider uses: the only referral a body may name. */
   integratorAddress?: string | null;
 }): (quote: Quote, tx: UnsignedTx, params?: QuoteParams) => Promise<string | null> {
   return async (quote, tx, params) => {
     if (tx.bodyBoc === undefined) return null;
     if (!params) return "the request this quote answered is unknown";
-    if (quote.providerData?.settlement !== "swap") return "only TON swap bodies can be checked on the client";
+    if (quote.providerData?.settlement !== "swap") {
+      // A TON → EVM order: the escrow the trader funds, checked against the app's request (scan 2026-10-27 follow-up:
+      // remote TON → EVM was refused outright because only swap bodies could be opened on the client).
+      if (params.sourceChain.startsWith("ton:") && params.destChain.startsWith("eip155:")) {
+        if (!hooks.verifyTonEscrowBuild) return "a TON → EVM escrow body needs verifyTonEscrowBuild (createOmnistonTonValidators)";
+        if (!params.refundAddress) return "the trader's TON address (refundAddress) is unknown";
+        const floor = [quote.minDestAmount, params.minAmountOut ?? "0"].filter((v) => /^\d{1,80}$/.test(v)).map((v) => BigInt(v)).reduce((a, b) => (a > b ? a : b), 0n);
+        try {
+          return await hooks.verifyTonEscrowBuild({
+            payloadBocHex: Buffer.from(tx.bodyBoc, "base64").toString("hex"),
+            ownerAddress: params.refundAddress,
+            inputUnits: quote.sourceAmount,
+            destinationChain: params.destChain,
+            destinationAddress: params.destAddress,
+            outputTokenAddress: params.destToken,
+            minResolverSendsUnits: floor.toString(),
+          });
+        } catch {
+          return "the escrow body could not be checked";
+        }
+      }
+      return "only TON swap and TON → EVM escrow bodies can be checked on the client";
+    }
     let steps: Array<{protocol: string; inputJetton?: string | null; outputJetton?: string | null}>;
     try { steps = JSON.parse(quote.providerData.routeSteps ?? "") as typeof steps; } catch { return "the quote carries no route steps"; }
     if (!Array.isArray(steps) || steps.length === 0) return "the quote carries no route steps";

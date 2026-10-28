@@ -34,12 +34,14 @@ Every route is fail-closed until its allowlists and validators are configured:
   wallets, pTON wallet ownership and DeDust pool pairs on chain.
   `tonSwapPayloadCheck: "report"` traces `ton-swap-payload <reason>` instead
   of refusing (default `"enforce"`).
-  Behind `remoteProvider`, the app checks the built swap itself:
-  `remoteProvider({name: "omniston", baseUrl, verifyBuild: omnistonVerifyBuild({validateTonSwapTarget,
-  validateTonSwapLeg})})` opens the body with `checkTonSwapPayload` against the app's own request
-  (receiver, refund, on-chain minimum, input; the quote carries `routeSteps`) and asks the app's
-  validators about the DEX it pays. Without `verifyBuild` the engine refuses remote cell bodies; a
-  TON → EVM escrow body cannot be checked on the client and is refused by this helper.
+  Behind `remoteProvider`, the app checks the built body itself:
+  `remoteProvider({name: "omniston", baseUrl, verifyBuild: omnistonVerifyBuild({...createOmnistonTonValidators()})})`.
+  A TON → TON swap body is opened with `checkTonSwapPayload` against the app's own request (receiver,
+  refund, on-chain minimum, input; the quote carries `routeSteps`) and the DEX it pays is confirmed with
+  the app's validators. A TON → EVM escrow body goes to `verifyTonEscrowBuild`: the jetton amount, the
+  trader as owner, the destination chain, address and token and the quote's minimum delivery come from
+  the app, the protocol contract from `trustedProtocolAddresses`, and the escrow code, authority key and
+  timelocks are the audited ones. Without `verifyBuild` the engine refuses remote cell bodies.
 - **TON → EVM** (HTLC order, the wallet pays a jetton escrow): factory
   allowlisted on both chains, `validateTonJettonWallet`,
   `validateTonEscrowPayload`, `validateEvmOutputPosition`.

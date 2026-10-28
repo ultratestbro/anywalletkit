@@ -200,7 +200,8 @@ describe("remote TON cell bodies need the app's own check (scan 2026-10-27 modul
     expect(await verify(quote, tx, params)).toBeNull();
     expect(await verify({...quote, minDestAmount: "999999999999"} as Quote, tx, params)).toMatch(/min/i);
     expect(await verify(quote, tx, {...params, destAddress: TON_ATTACKER, refundAddress: TON_ATTACKER})).toMatch(/receiver|refund|trader|dest/i);
-    expect(await verify({...quote, providerData: {settlement: "escrow"}} as unknown as Quote, tx, params)).toMatch(/only TON swap bodies/);
+    // Not a swap body and not TON → EVM (these params are TON → TON): nothing on the client can open it.
+    expect(await verify({...quote, providerData: {settlement: "escrow"}} as unknown as Quote, tx, params)).toMatch(/only TON swap and TON → EVM escrow bodies/);
     expect(await verify(quote, tx, undefined)).toMatch(/request this quote answered is unknown/);
   });
 });
@@ -292,6 +293,90 @@ describe("Omniston: a reused quote id cannot rebind an order after its secret ex
       expect(await s.quote(), `atomic=${atomic}`).not.toBeNull();
       vi.useRealTimers();
       vi.restoreAllMocks();
+    }
+  });
+});
+
+// ── Follow-up (2026-10-28): remote TON → EVM works again — the escrow body is checked on the client ──────────────────
+// G5 made a remote TON cell body need the app's own check, and omnistonVerifyBuild could only open TON → TON swap
+// bodies: every TON → EVM order through a remote stub was refused, so the route went dark in apps on 0.3.0. The live
+// TON → EVM escrows captured on 2026-10-10 (USDT on TON → USDC on Base and on BNB) must pass, and the same bodies
+// against another destination, owner, amount, chain, floor or protocol pin must not.
+import {createOmnistonTonValidators} from "../src/validators/index.js";
+
+type EscrowLive = {quoteUpdated: {value: {inputUnits: string; outputAsset: {chain: {value: {kind: {value: string}}}}; settlementData: {value: {resolverSendsUnits: string}}}};
+  escrowRequest: {ownerSrcAddress: {chain: {value: string}}; traderDstAddress: {chain: {value: string}}}; escrowResponse: {messages: Array<{targetAddress: string; sendAmount: string; payload: string}>}};
+const escrowLive = JSON.parse(readFileSync(new URL("./fixtures/live-2026-10-10.json", import.meta.url), "utf8")) as Record<"baseUsdc" | "bnbUsdc", EscrowLive>;
+const escrowCases = ([["baseUsdc", "eip155:8453"], ["bnbUsdc", "eip155:56"]] as const).map(([key, chain]) => {
+  const c = escrowLive[key];
+  return {
+    key, chain, message: c.escrowResponse.messages[0]!,
+    expect: {
+      payloadBocHex: c.escrowResponse.messages[0]!.payload, ownerAddress: c.escrowRequest.ownerSrcAddress.chain.value, inputUnits: c.quoteUpdated.value.inputUnits,
+      destinationChain: chain as string, destinationAddress: c.escrowRequest.traderDstAddress.chain.value, outputTokenAddress: c.quoteUpdated.value.outputAsset.chain.value.kind.value,
+      minResolverSendsUnits: c.quoteUpdated.value.settlementData.value.resolverSendsUnits,
+    },
+  };
+});
+
+describe("remote TON → EVM: the escrow body is checked on the client (2026-10-28 follow-up to F18/F19)", () => {
+  const v = createOmnistonTonValidators();
+
+  it("the live TON → EVM escrows (Base and BNB) pass with what the app knows", () => {
+    for (const c of escrowCases) expect(v.verifyTonEscrowBuild(c.expect), c.key).toBeNull();
+  });
+
+  it("another destination, owner, amount, chain, token, a floor above the delivery, or an untrusted protocol: refused", () => {
+    const c = escrowCases[0]!;
+    const no = (patch: Partial<typeof c.expect>) => v.verifyTonEscrowBuild({...c.expect, ...patch});
+    expect(no({destinationAddress: ATTACKER})).toMatch(/not this swap's/);
+    expect(no({ownerAddress: TON_ATTACKER})).toMatch(/not this swap's/);
+    expect(no({inputUnits: "5000001"})).toMatch(/moves 5000000, not the 5000001/);
+    expect(no({destinationChain: "eip155:1"})).toMatch(/not this swap's/);
+    expect(no({destinationChain: "eip155:10"})).toMatch(/not this swap's/);
+    expect(no({outputTokenAddress: ATTACKER})).toMatch(/not this swap's/);
+    expect(no({minResolverSendsUnits: (BigInt(c.expect.minResolverSendsUnits) + 1n).toString()})).toMatch(/bound to deliver .* under the quote's minimum/);
+    expect(no({payloadBocHex: "b5ee9c72"})).toMatch(/not an Omniston escrow transfer/);
+    expect(createOmnistonTonValidators({trustedProtocolAddresses: [TON_ATTACKER]}).verifyTonEscrowBuild(c.expect)).toMatch(/not an Omniston protocol contract this app trusts/);
+    expect(createOmnistonTonValidators({escrowCodeHashes: ["00".repeat(32)]}).verifyTonEscrowBuild(c.expect)).toMatch(/audited escrow/);
+  });
+
+  it("end to end: a remote Omniston stub's TON → EVM order is built and sent; without the escrow check it is refused", async () => {
+    for (const c of escrowCases) {
+      const [toChainId] = [Number(c.chain.slice(7))];
+      const stubFor = (verifyBuild: Parameters<typeof remoteProvider>[0]["verifyBuild"]) => {
+        const fetchImpl = (async (url: string, init: {body: string}) => {
+          const action = String(url).split("/").at(-1);
+          const body = JSON.parse(init.body) as {params?: QuoteParams};
+          const reply = (x: unknown) => new Response(JSON.stringify(x), {status: 200, headers: {"content-type": "application/json"}});
+          // An order quote carries no providerData, as the provider sends it.
+          if (action === "quote") return reply({provider: "omniston", intentId: "omniston:order", depositAddress: "", depositMemo: null, sourceAmount: body.params!.amountIn,
+            destAmount: c.expect.minResolverSendsUnits, minDestAmount: c.expect.minResolverSendsUnits, feeUsd: 0, etaSeconds: 60, reliability: 1, validUntilMs: Date.now() + 60_000});
+          if (action === "build") return reply({chain: "ton:-239", to: c.message.targetAddress, value: c.message.sendAmount, bodyBoc: b64(c.message.payload)});
+          return reply({});
+        }) as unknown as typeof fetch;
+        return remoteProvider({name: "omniston", baseUrl: "https://backend.example/api/v2/swap2", fetchImpl, ...(verifyBuild ? {verifyBuild} : {})});
+      };
+      const runWith = (provider: CrossChainProvider) => {
+        const sent: unknown[] = [];
+        const account = {
+          getAddress: async () => c.expect.ownerAddress, waitForTransaction: async () => {},
+          sendTransaction: async (tx: unknown) => { sent.push(tx); return {hash: `h${sent.length}`}; },
+          getJettonWalletAddress: async () => Address.parse(c.message.targetAddress),
+        };
+        class P extends SingleProviderSwap2 { protected readonly provider = provider; protected chainSupported(): boolean { return true; } }
+        const p = new P(account as never, {fromChain: "ton:-239", skipAccountChainCheck: true, decodeTonBody: (boc: string) => Cell.fromBase64(boc)} as never);
+        const swap = () => p.swap2({fromToken: "USDT", toToken: c.expect.outputTokenAddress, toChain: toChainId, recipient: c.expect.destinationAddress,
+          fromTokenAmount: BigInt(c.expect.inputUnits), minAmountOut: BigInt(c.expect.minResolverSendsUnits)});
+        return {sent, swap};
+      };
+      const ok = runWith(stubFor(omnistonVerifyBuild({...createOmnistonTonValidators()})));
+      await ok.swap();
+      expect(ok.sent, c.key).toHaveLength(1);
+      // The validators without the escrow check (an app wiring them one by one): refused, nothing sent.
+      const partial = runWith(stubFor(omnistonVerifyBuild({validateTonSwapTarget: () => true})));
+      await expect(partial.swap()).rejects.toThrow(/needs verifyTonEscrowBuild/);
+      expect(partial.sent).toHaveLength(0);
     }
   });
 });

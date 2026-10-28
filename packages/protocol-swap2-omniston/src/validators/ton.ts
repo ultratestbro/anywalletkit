@@ -4,6 +4,7 @@ import {Address, Cell} from "@ton/core";
 import type {OmnistonProviderOptions} from "../provider.js";
 import type {TonSwapLeg} from "../ton-swap.js";
 import {bigintToNumber} from "@anywalletkit/core";
+import {AUDITED_OMNISTON_SETTLEMENT_CONTRACTS} from "./settlement.js";
 
 const JETTON_TRANSFER_OP = 0x0f8a7ea5;
 const ESCROW_CREATE_OP = 0xc0a5f0d9;
@@ -97,6 +98,11 @@ export interface OmnistonTonValidationOptions {
   positionCodeHashes?: readonly string[];
   /** Escrow code cells an output position may carry (default: the observed one). */
   outputEscrowCodeHashes?: readonly string[];
+  /**
+   * The Omniston protocol contracts a TON → EVM escrow transfer may pay (`verifyTonEscrowBuild`). Default: the audited
+   * `AUDITED_OMNISTON_SETTLEMENT_CONTRACTS["ton:-239"]`.
+   */
+  trustedProtocolAddresses?: readonly string[];
   now?: () => number;
 }
 
@@ -212,6 +218,12 @@ function exactCellEnd(slice: {remainingBits: number; remainingRefs: number}): bo
 }
 
 function destinationChainId(chain: string): bigint | null {
+  // The client knows the chain as CAIP-2 (`eip155:8453`), the provider as Omniston's name (`base`): both resolve.
+  const caip2 = /^eip155:([0-9]{1,10})$/.exec(chain);
+  if (caip2) {
+    const id = BigInt(caip2[1]!);
+    return [1n, 56n, 137n, 4663n, 8453n, 42161n, 43114n, 196n, 999n, 9745n].includes(id) ? id : null;
+  }
   const ids: Record<string, bigint> = {
     ethereum: 1n,
     bnb: 56n,
@@ -225,6 +237,80 @@ function destinationChainId(chain: string): bigint | null {
     plasma: 9745n,
   };
   return ids[chain] ?? null;
+}
+
+/** What a TON → EVM escrow build must carry, as the app knows it (`verifyTonEscrowBuild`). */
+export interface TonEscrowBuildExpectation {
+  /** The message body: the jetton transfer that funds the escrow, hex. */
+  payloadBocHex: string;
+  /** The trader's TON address: the jetton transfer's excess and the escrow's owner (refunds go there). */
+  ownerAddress: string;
+  /** The exact jetton amount the swap sells. */
+  inputUnits: string;
+  /** The destination chain, CAIP-2 (`eip155:8453`) or Omniston's name (`base`). */
+  destinationChain: string;
+  /** The trader's address on the destination chain. */
+  destinationAddress: string;
+  /** The ERC-20 the trader receives there. */
+  outputTokenAddress: string;
+  /** The least the resolver may be bound to deliver: the quote's minimum (and the app's own floor). */
+  minResolverSendsUnits: string;
+}
+
+/**
+ * The fields of a TON → EVM escrow body the app cannot know in advance — chosen by the server and the resolver: the
+ * quote id, the resolver, the hashlock, the exclusivity window, the resolver's deposit and what it sends — read from
+ * the body itself, in the layout `validatePayload` checks, plus the transfer's destination and amount. Throws when
+ * the body is not that layout.
+ */
+function readTonEscrowBody(payloadBocHex: string): {
+  amount: bigint; protocolAddress: string; forwardPayloadBocHex: string; quoteId: string; initialResolverAddress: string;
+  exclusivityTimeout: number; secretHash: Uint8Array; depositUnits: string; resolverSendsUnits: string;
+} {
+  const outer = oneRoot(payloadBocHex, "payload").beginParse();
+  if (outer.loadUint(32) !== JETTON_TRANSFER_OP) throw new Error("not a jetton transfer");
+  outer.loadUintBig(64);
+  const amount = outer.loadCoins();
+  const protocol = outer.loadAddressAny();
+  if (!(protocol instanceof Address)) throw new Error("no protocol address");
+  outer.loadAddressAny();
+  if (outer.loadMaybeRef() !== null) throw new Error("custom payload");
+  outer.loadCoins();
+  if (!outer.loadBit() || outer.remainingRefs !== 1) throw new Error("no forward payload");
+  const forward = outer.loadRef();
+  const root = forward.beginParse();
+  if (root.loadUint(32) !== ESCROW_CREATE_OP) throw new Error("not an escrow create");
+  const quoteId = Buffer.from(root.loadBuffer(32)).toString("hex");
+  root.loadBit(); root.loadAddressAny(); root.loadCoins(); root.loadBit();
+  if (root.remainingRefs !== 4) throw new Error("escrow refs");
+  const config = root.loadRef().beginParse();
+  if (config.loadUint(32) !== ESCROW_CONFIG_OP) throw new Error("escrow config");
+  const resolver = config.loadAddressAny();
+  if (!(resolver instanceof Address)) throw new Error("no resolver");
+  if (config.loadBit()) config.loadBuffer(32);
+  const exclusivity = config.loadUintBig(64);
+  config.loadUintBig(64);
+  if (config.remainingRefs !== 2) throw new Error("escrow config refs");
+  const state = config.loadRef();
+  if (!config.loadBit()) throw new Error("no destination");
+  const destination = config.loadRef().beginParse();
+  if (state.refs.length !== 2) throw new Error("escrow state");
+  const execution = state.refs[1]!.beginParse();
+  execution.loadUint(32);
+  const secretHash = new Uint8Array(execution.loadBuffer(32));
+  execution.loadAddressAny();
+  for (let i = 0; i < 4; i++) execution.loadUintBig(64);
+  const ownerData = execution.loadRef().beginParse();
+  ownerData.loadAddressAny(); ownerData.loadBit();
+  const deposit = ownerData.loadCoins();
+  destination.loadUintBig(64); destination.loadBuffer(20); destination.loadBuffer(20);
+  const resolverSends = destination.loadCoins();
+  if (exclusivity > BigInt(MAX_OMNISTON_EXCLUSIVITY_SECONDS)) throw new Error("exclusivity");
+  return {
+    amount, protocolAddress: protocol.toString(), forwardPayloadBocHex: Buffer.from(forward.toBoc()).toString("hex"), quoteId,
+    initialResolverAddress: resolver.toString(), exclusivityTimeout: Number(exclusivity.toString()), // bounded above
+    secretHash, depositUnits: deposit.toString(), resolverSendsUnits: resolverSends.toString(),
+  };
 }
 
 function validatePayload(input: PayloadInput, trusted: {
@@ -330,7 +416,10 @@ function validatePayload(input: PayloadInput, trusted: {
 export function createOmnistonTonValidators(options: OmnistonTonValidationOptions = {}): Required<Pick<
   OmnistonProviderOptions,
   "validateTonJettonWallet" | "validateTonSwapTarget" | "validateTonOutputPosition" | "validateTonSwapLeg"
->> & {validateTonEscrowPayload: (input: PayloadInput) => boolean | Promise<boolean>} {
+>> & {
+  validateTonEscrowPayload: (input: PayloadInput) => boolean | Promise<boolean>;
+  verifyTonEscrowBuild: (input: TonEscrowBuildExpectation) => string | null;
+} {
   const now = options.now ?? Date.now;
   const swapInterfaces = new Set(options.swapTargetInterfaces ?? DEFAULT_OMNISTON_TON_SWAP_INTERFACES);
   const proxyTonMasters = new Set(
@@ -401,6 +490,7 @@ export function createOmnistonTonValidators(options: OmnistonTonValidationOption
     position: new Set((options.positionCodeHashes ?? DEFAULT_OMNISTON_TON_CODE_HASHES.position).map((value) => value.toLowerCase())),
     outputEscrow: new Set((options.outputEscrowCodeHashes ?? DEFAULT_OMNISTON_TON_CODE_HASHES.outputEscrow).map((value) => value.toLowerCase())),
   };
+  const trustedProtocols = new Set((options.trustedProtocolAddresses ?? AUDITED_OMNISTON_SETTLEMENT_CONTRACTS["ton:-239"] ?? []).map((value) => Address.parse(value).toRawString()));
   /** The factory's jetton wallet for a master, from the indexer — the same
    *  lookup the TON-source path uses for the trader's wallet. */
   const jettonWalletOf = async (ownerAddress: string, jettonMasterAddress: string): Promise<string | null> => {
@@ -437,6 +527,42 @@ export function createOmnistonTonValidators(options: OmnistonTonValidationOption
       } catch {
         return false;
       }
+    },
+    /**
+     * The app's own check of a TON → EVM escrow build behind `remoteProvider` (through `omnistonVerifyBuild`): the
+     * structural check `validateTonEscrowPayload` runs on the server, with every field that decides where the
+     * trader's money goes taken from the app — the jetton amount, the owner the excess and refunds go to, the
+     * destination chain, address and token, a delivery of at least `minResolverSendsUnits`, and a protocol contract
+     * from `trustedProtocolAddresses`. The fields the server and the resolver choose (quote id, resolver, hashlock,
+     * exclusivity, deposit) are read from the body and held to the same pins and bounds: audited escrow and
+     * execution code, authority key, one execution, the reviewed timelocks, no Dutch auction. A reason, or `null`.
+     */
+    verifyTonEscrowBuild(input: TonEscrowBuildExpectation): string | null {
+      let body: ReturnType<typeof readTonEscrowBody>;
+      try {
+        body = readTonEscrowBody(input.payloadBocHex);
+      } catch {
+        return "the escrow body is not an Omniston escrow transfer";
+      }
+      if (!trustedProtocols.has(Address.parse(body.protocolAddress).toRawString())) return `the escrow transfer pays ${body.protocolAddress}, not an Omniston protocol contract this app trusts`;
+      if (!/^\d{1,40}$/.test(input.inputUnits) || body.amount !== BigInt(input.inputUnits)) return `the escrow transfer moves ${body.amount}, not the ${input.inputUnits} this swap sells`;
+      if (!/^\d{1,80}$/.test(input.minResolverSendsUnits) || BigInt(body.resolverSendsUnits) < BigInt(input.minResolverSendsUnits)) {
+        return `the resolver is bound to deliver ${body.resolverSendsUnits}, under the quote's minimum ${input.minResolverSendsUnits}`;
+      }
+      let ok = false;
+      try {
+        ok = validatePayload({
+          payloadBocHex: input.payloadBocHex, forwardPayloadBocHex: body.forwardPayloadBocHex, quoteId: body.quoteId,
+          inputUnits: input.inputUnits, resolverSendsUnits: body.resolverSendsUnits, srcHtlcSecurityDepositUnits: body.depositUnits,
+          protocolAddress: body.protocolAddress, ownerAddress: input.ownerAddress, destinationChain: input.destinationChain,
+          destinationAddress: input.destinationAddress, outputTokenAddress: input.outputTokenAddress,
+          initialResolverAddress: body.initialResolverAddress, secretHashes: [body.secretHash], hashingFunction: "HASHING_FUNCTION_KECCAK256",
+          exclusivityTimeout: body.exclusivityTimeout,
+        }, trusted);
+      } catch {
+        ok = false;
+      }
+      return ok ? null : "the escrow body is not this swap's (owner, destination chain, address or token) or not the audited escrow (code, authority, timelocks)";
     },
     /**
      * EVM→TON: the position the tracking feed named must be (1) an active
