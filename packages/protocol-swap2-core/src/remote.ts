@@ -58,6 +58,16 @@ export interface RemoteProviderOptions {
    * auction. The backend runs the same check, but the backend is what this guards against.
    */
   verifyQuote?: (params: QuoteParams, quote: Quote) => string | null;
+  /**
+   * The provider's own check of a build on the client — a typed order, a cell body — against the quote it was built
+   * for: the reason it fails, or null. A build it refuses is never approved or signed.
+   */
+  verifyBuild?: (quote: Quote, tx: UnsignedTx) => string | null;
+  /**
+   * Allow a non-https absolute `baseUrl` (local development only). Quotes, builds and typed orders travel this
+   * channel; over plain http anyone on the path can rewrite them (scan 2026-10-27 modules, F4).
+   */
+  allowInsecureBaseUrl?: boolean;
   /** Defaults to globalThis.fetch — injectable for tests. */
   fetchImpl?: typeof fetch;
   /** Extra headers (e.g. auth) attached to every call. */
@@ -76,6 +86,10 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
   if (!/^[A-Za-z0-9_-]+$/.test(name)) throw new Error("swap2-remote: invalid provider name");
   const baseUrl = opts.baseUrl.replace(/\/+$/, "");
   if (!baseUrl) throw new Error("swap2-remote: baseUrl is required");
+  // A same-origin path inherits the page's scheme; an absolute URL must be https.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(baseUrl) && !/^https:\/\//i.test(baseUrl) && opts.allowInsecureBaseUrl !== true) {
+    throw new Error("swap2-remote: baseUrl must be https:// or a same-origin path (allowInsecureBaseUrl for local development)");
+  }
   const supportsRoute = opts.supportsRoute;
   const enabled = opts.enabled;
   const headers = Object.freeze({...opts.headers});
@@ -130,7 +144,13 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
       return out;
     },
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
-      return call<UnsignedTx>("build", {quote});
+      const tx = await call<UnsignedTx>("build", {quote});
+      if (opts.verifyBuild) {
+        let refusal: string | null;
+        try { refusal = opts.verifyBuild(quote, tx); } catch (e) { refusal = e instanceof Error ? e.message : String(e); }
+        if (refusal) throw new Error(`${name}: the build fails this app's own check — ${refusal.slice(0, 240)}`);
+      }
+      return tx;
     },
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
       await call<Record<string, never>>("preflight", {quote, tx});

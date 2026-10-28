@@ -197,6 +197,8 @@ export interface RemotePins {
    * fails, or null.
    */
   verifyQuote?(params: QuoteParams, quote: Quote): string | null;
+  /** A client-side check of a remote build (typed order, cell body) against its quote: the reason it fails, or null. */
+  verifyBuild?(quote: Quote, tx: UnsignedTx): string | null;
 }
 
 /**

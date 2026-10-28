@@ -8,7 +8,7 @@ import {omniston as cfg} from "./config.js";
 import {checkTonSwapPayload, TonSwapPayloadError, type TonSwapCheckResult, type TonSwapLeg} from "./ton-swap.js";
 export {checkTonSwapPayload, TonSwapPayloadError, TON_SWAP_PROTOCOL_LAYOUTS} from "./ton-swap.js";
 export type {TonSwapLeg, TonSwapCheckInput, TonSwapCheckResult} from "./ton-swap.js";
-import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {bigintToNumber} from "@anywalletkit/core";
 
 /**
@@ -935,7 +935,14 @@ export async function validateEvmToTonOrderExtension(
   }
 }
 
-function validateEvmTypedOrder(
+/**
+ * The EVM order checks the provider runs on every build, exported so an app that holds the quote's settlement data
+ * can run them itself (scan 2026-10-27 modules, F4): the 1inch Limit Order Protocol v4 domain on the settlement
+ * contract and chain, the exact Order schema, this owner as maker, the resolver as receiver, the input asset and
+ * amount, single-fill traits, the salt committing the order extension and the expiry at the trade-start deadline.
+ * Throws when any of it does not hold.
+ */
+export function validateEvmTypedOrder(
   td: unknown,
   expected: {
     chainId: number;
@@ -1534,6 +1541,17 @@ function mapOrderStatus(order: OrderSnapshot): IntentStatus {
 }
 
 // ── Provider ─────────────────────────────────────────────────────────────────
+
+/**
+ * The app's side of `remoteProvider({name: "omniston", baseUrl, ...omnistonPins(trustedEvmOrderProtocols)})`: the
+ * audited order-protocol contracts per EVM chain — the list the provider's `trustedEvmOrderProtocols` takes — are the
+ * only spenders, and so the only EIP-712 verifying contracts, a remote typed order may name (scan 2026-10-27 modules,
+ * F4). Omniston's EVM orders call no contract from the wallet: there are no call targets.
+ */
+export function omnistonPins(trustedEvmOrderProtocols: Readonly<Record<string, readonly string[]>>): RemotePins {
+  const byChain = new Map(Object.entries(trustedEvmOrderProtocols).map(([chain, list]): [string, readonly string[]] => [chain, list.map((a) => getAddress(a))]));
+  return Object.freeze({callTargets: (): readonly string[] => [], spenders: (chain: string): readonly string[] => byChain.get(chain) ?? []});
+}
 
 export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChainProvider {
   opts = Object.freeze({...opts});

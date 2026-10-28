@@ -200,6 +200,39 @@ export function normalizeTypedDomain(domain: unknown): unknown {
   return chainId === undefined || !Number.isSafeInteger(chainId) ? domain : {...(domain as object), chainId};
 }
 
+/**
+ * Bind a provider's EIP-712 payload to the swap before anything is approved or signed (scan 2026-10-27 modules, F4):
+ * only a Limit Order Protocol `Order` for the settlement contract the swap approves, on the source chain, from this
+ * account, selling exactly the swap's input of the source token. A `Permit*` or any other typed message a backend
+ * chose — an allowance to anyone, signed off-chain — is refused.
+ */
+function assertTypedOrder(typedData: string, approvalAddress: string | undefined, e: {self: string; token: string | undefined; amount: string; chainId: number | null}): void {
+  const fail = (why: string) => new Swap2ValidationError(`swap2: typed order refused — ${why}`);
+  let parsed: unknown;
+  try { parsed = JSON.parse(typedData); } catch { throw fail("the typed data is not JSON"); }
+  if (!parsed || typeof parsed !== "object") throw fail("the typed data is not an object");
+  const td = parsed as {domain?: {verifyingContract?: unknown}; types?: Record<string, unknown>; primaryType?: unknown; message?: Record<string, unknown>};
+  const primary = td.primaryType;
+  if (typeof primary !== "string" || !primary) throw fail("it names no primaryType");
+  if (/^permit/i.test(primary)) throw fail(`${primary} is a token approval, not an order`);
+  if (primary !== "Order") throw fail(`primaryType ${primary} is not an order this engine signs`);
+  const fields = td.types?.Order;
+  const has = (name: string, type: string) => Array.isArray(fields) && fields.some((f: {name?: unknown; type?: unknown} | null) => f?.name === name && f?.type === type);
+  if (!has("maker", "address") || !has("makerAsset", "address") || !has("makingAmount", "uint256")) throw fail("the Order type has no maker / makerAsset / makingAmount");
+  const verifying = td.domain?.verifyingContract;
+  if (!approvalAddress || typeof verifying !== "string" || verifying.toLowerCase() !== approvalAddress.toLowerCase()) {
+    throw fail(`verifyingContract ${String(verifying)} is not the settlement contract the swap approves`);
+  }
+  if (e.chainId !== null && (normalizeTypedDomain(td.domain) as {chainId?: unknown} | undefined)?.chainId !== e.chainId) throw fail("the domain chainId is not the source chain");
+  const m = td.message ?? {};
+  if (String(m.maker ?? "").toLowerCase() !== e.self.toLowerCase()) throw fail("the maker is not this account");
+  if (!e.token || String(m.makerAsset ?? "").toLowerCase() !== e.token.toLowerCase()) throw fail("the makerAsset is not the source token");
+  // uint256 fields come as decimal or 0x-hex strings (Omniston sends hex, live 2026-10-16).
+  const raw = m.makingAmount;
+  const making = typeof raw === "string" && /^(?:0x[0-9a-fA-F]{1,64}|[0-9]{1,78})$/.test(raw) ? BigInt(raw) : typeof raw === "number" && Number.isSafeInteger(raw) ? BigInt(raw) : null;
+  if (making === null || making !== BigInt(e.amount)) throw fail(`makingAmount ${String(raw)} is not the swap's ${e.amount}`);
+}
+
 export interface Swap2EngineConfig extends Swap2ProtocolConfig {
   /** CAIP-2 of the chain the bound account lives on (the swap2 source). */
   fromChain: string;
@@ -1106,6 +1139,10 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     const pinnedSpenders = remote ? pins(provider.spenders?.(this.fromChain)) : [];
     if (remote && unsigned.approvalAddress && !pinnedSpenders.includes(unsigned.approvalAddress.toLowerCase())) {
       throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' asks to approve ${unsigned.approvalAddress} on ${this.fromChain}, which the app did not pin as a spender (remoteProvider spenders) — refused`);
+    }
+    if (unsigned.typedData !== undefined) {
+      const chainId = this.fromChain.startsWith("eip155:") ? Number(this.fromChain.slice("eip155:".length)) : null;
+      assertTypedOrder(unsigned.typedData, unsigned.approvalAddress, {self: selfAddress, token: source.contract ?? undefined, amount: q.sourceAmount, chainId});
     }
     if (unsigned.data !== undefined && this.fromChain.startsWith("eip155:")) {
       const call = decodeCall({to: unsigned.to, data: unsigned.data, value: executionValue});

@@ -191,3 +191,112 @@ describe("scan 2026-10-27 modules G3: a remote provider's addresses come from th
     expect(remotePinRefusal({name: "x", remote: true, ...diamondPins}, {txRequest: {to: DIAMOND, data: "0x01", approvalAddress: DIAMOND}} as unknown as Quote, "eip155:1")).toBeNull();
   });
 });
+
+// ── G4 (F4): an EIP-712 payload is signed only when it is the swap's own order ─────────────────────────────────────────
+const LOP = "0xb5810aCfD45D85Eaa938bF90a5857295513DA7E9";
+const ORDER_TYPE = [
+  {name: "salt", type: "uint256"}, {name: "maker", type: "address"}, {name: "receiver", type: "address"}, {name: "makerAsset", type: "address"},
+  {name: "takerAsset", type: "address"}, {name: "makingAmount", type: "uint256"}, {name: "takingAmount", type: "uint256"}, {name: "makerTraits", type: "uint256"},
+];
+const order = (over: {domain?: Record<string, unknown>; message?: Record<string, unknown>; primaryType?: string; types?: Record<string, unknown>} = {}) => JSON.stringify({
+  domain: {name: "1inch Limit Order Protocol", version: "4", chainId: "0x1", verifyingContract: LOP, ...over.domain},
+  types: over.types ?? {EIP712Domain: [], Order: ORDER_TYPE},
+  primaryType: over.primaryType ?? "Order",
+  message: {salt: "0x1", maker: SELF, receiver: "0x2b654e50c83801ac79ce3011ff94245e2937b1b7", makerAsset: USDC, takerAsset: USDT, makingAmount: "0xf4240", takingAmount: "990000", makerTraits: "0x0", ...over.message},
+});
+const permit = JSON.stringify({
+  domain: {name: "USD Coin", version: "2", chainId: 1, verifyingContract: USDC},
+  types: {Permit: [{name: "owner", type: "address"}, {name: "spender", type: "address"}, {name: "value", type: "uint256"}, {name: "nonce", type: "uint256"}, {name: "deadline", type: "uint256"}]},
+  primaryType: "Permit",
+  message: {owner: SELF, spender: ATTACKER, value: MAX.toString(), nonce: "0", deadline: MAX.toString()},
+});
+/** Records sends, signatures and registrations. */
+function typedAccount() {
+  const sent: unknown[] = [], signed: unknown[] = [];
+  return {sent, signed, account: {
+    getAddress: async () => SELF, getChainId: async () => 1, getAllowance: async () => 0n, waitForTransaction: async () => {},
+    sendTransaction: async (tx: unknown) => { sent.push(tx); return {hash: `0x${sent.length}`}; },
+    signTypedData: async (td: unknown) => { signed.push(td); return "0x" + "11".repeat(65); },
+  }};
+}
+const typedLocal = (typedData: string, approvalAddress: string | null = LOP, registered: string[] = []): CrossChainProvider => ({
+  name: "scan", enabled: () => true, supportsRoute: () => true, trackIntent: async () => ({state: "pending"}),
+  getQuote: async (params) => g3quote(params, {}),
+  buildDeposit: async () => ({chain: "eip155:1", to: LOP, value: "0", chainId: 1, ...(approvalAddress ? {approvalAddress} : {}), typedData}),
+  registerSignedOrder: async (_id, sig) => { registered.push(sig); },
+});
+function typedRemote(typedData: string, approvalAddress: string, opts: Partial<RemoteProviderOptions> = {}) {
+  const registered: unknown[] = [];
+  const fetchImpl = (async (url: string, init: {body: string}) => {
+    const action = String(url).split("/").at(-1);
+    const body = JSON.parse(init.body) as {params?: QuoteParams};
+    const reply = (v: unknown) => new Response(JSON.stringify(v), {status: 200, headers: {"content-type": "application/json"}});
+    if (action === "quote") return reply(g3quote(body.params!, {}));
+    if (action === "build") return reply({chain: "eip155:1", to: LOP, value: "0", chainId: 1, approvalAddress, typedData});
+    if (action === "register") { registered.push(body); return reply({}); }
+    return reply({});
+  }) as unknown as typeof fetch;
+  return {registered, provider: remoteProvider({name: "scan", baseUrl: "https://backend.example/api/v2/swap2", fetchImpl, callTargets: () => [], spenders: () => [LOP], ...opts})};
+}
+
+describe("scan 2026-10-27 modules G4 (F4): typed data from a provider is signed only when it is the swap's own order", () => {
+  it("a remote build whose typedData is an EIP-2612 Permit to the attacker is refused; nothing approved, signed or registered", async () => {
+    const t = typedAccount();
+    const r = typedRemote(permit, LOP);
+    await expect(g3protocol(r.provider, t.account).swap2(g3options)).rejects.toThrow(/typed order refused — Permit is a token approval/);
+    expect([t.sent, t.signed, r.registered]).toEqual([[], [], []]);
+    // …and with the permit's own token as the "settlement contract": not a spender the app pinned.
+    const u = typedAccount();
+    await expect(g3protocol(typedRemote(permit, USDC).provider, u.account).swap2(g3options)).rejects.toThrow(/did not pin as a spender/);
+    expect([u.sent, u.signed]).toEqual([[], []]);
+  });
+
+  it("refuses Permit2 permits, other typed messages and orders that are not this swap's", async () => {
+    const permitSingle = JSON.parse(permit) as Record<string, unknown>;
+    const cases: Array<[string, string, string | null, RegExp]> = [
+      ["PermitSingle", JSON.stringify({...permitSingle, primaryType: "PermitSingle", types: {PermitSingle: []}}), LOP, /PermitSingle is a token approval/],
+      ["another primary type", order({primaryType: "Swap", types: {Swap: ORDER_TYPE}}), LOP, /primaryType Swap is not an order/],
+      ["maker", order({message: {maker: ATTACKER}}), LOP, /maker is not this account/],
+      ["maker asset", order({message: {makerAsset: USDT}}), LOP, /makerAsset is not the source token/],
+      ["making amount", order({message: {makingAmount: "0xf4241"}}), LOP, /makingAmount 0xf4241 is not the swap's 1000000/],
+      ["verifying contract", order({domain: {verifyingContract: ATTACKER}}), LOP, /verifyingContract .* is not the settlement contract/],
+      ["no spender declared", order(), null, /verifyingContract .* is not the settlement contract/],
+      ["chain id", order({domain: {chainId: "0x2105"}}), LOP, /chainId is not the source chain/],
+      ["schema without the fields", order({types: {Order: [{name: "salt", type: "uint256"}]}}), LOP, /no maker \/ makerAsset \/ makingAmount/],
+    ];
+    for (const [what, td, approval, why] of cases) {
+      const t = typedAccount();
+      const registered: string[] = [];
+      const outcome = await g3protocol(typedLocal(td, approval, registered), t.account).swap2(g3options).then(() => "RESOLVED", (e: Error) => e.message);
+      if (outcome === "RESOLVED") throw new Error(`case '${what}' was not refused`);
+      expect(outcome, what).toMatch(why);
+      expect([t.sent, t.signed, registered], what).toEqual([[], [], []]);
+    }
+  });
+
+  it("the swap's own order is approved for the input, signed and registered (hex or decimal amounts)", async () => {
+    for (const makingAmount of ["0xf4240", "1000000"]) {
+      const t = typedAccount();
+      const registered: string[] = [];
+      await g3protocol(typedLocal(order({message: {makingAmount}}), LOP, registered), t.account).swap2(g3options);
+      expect(t.sent.map((x) => (x as {data?: string}).data?.toLowerCase())).toEqual([approveData(LOP, 1_000_000n).toLowerCase()]);
+      expect(t.signed).toHaveLength(1);
+      expect(registered).toHaveLength(1);
+    }
+  });
+
+  it("remoteProvider: an absolute baseUrl must be https (a same-origin path, or the dev flag, otherwise)", () => {
+    expect(() => remoteProvider({name: "x", baseUrl: "http://backend.example/swap2"})).toThrow(/must be https/);
+    expect(() => remoteProvider({name: "x", baseUrl: "ws://backend.example/swap2"})).toThrow(/must be https/);
+    expect(() => remoteProvider({name: "x", baseUrl: "/api/v2/swap2"})).not.toThrow();
+    expect(() => remoteProvider({name: "x", baseUrl: "https://backend.example/swap2"})).not.toThrow();
+    expect(() => remoteProvider({name: "x", baseUrl: "http://localhost:3000/api/v2/swap2", allowInsecureBaseUrl: true})).not.toThrow();
+  });
+
+  it("verifyBuild: the provider's own check of the build runs on the client before anything is approved", async () => {
+    const t = typedAccount();
+    const r = typedRemote(order(), LOP, {verifyBuild: () => "salt does not commit the order extension"});
+    await expect(g3protocol(r.provider, t.account).swap2(g3options)).rejects.toThrow(/the build fails this app's own check — salt does not commit/);
+    expect([t.sent, t.signed, r.registered]).toEqual([[], [], []]);
+  });
+});

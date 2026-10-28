@@ -48,6 +48,13 @@ Every route is fail-closed until its allowlists and validators are configured:
   `validateEvmInputPosition` (finalized `SrcEscrowCreated` + escrow state)
   AND `validateTonOutputPosition` (factory-deployed TON position with bound
   state, inside its completion window) both pass.
+  Behind `remoteProvider` the order is built on your server, so the app pins
+  the order protocols itself: `remoteProvider({name: "omniston", baseUrl,
+  ...omnistonPins(trustedEvmOrderProtocols)})` — the same audited table. The
+  engine then signs only an `Order` whose verifying contract is a pinned
+  spender, whose maker is this account and that sells exactly the swap's input
+  of the source token; a `Permit` or any other typed message is refused.
+  `validateEvmTypedOrder` is exported for apps that hold the settlement data.
 - **EVM → EVM** (gasless order, same order protocol as EVM → TON): the signed
   extension's ExtraDataArgs name the destination chain, token and deposit and
   are checked against the quote. The EVM recipient is NOT in anything the
