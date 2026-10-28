@@ -19,7 +19,10 @@ export interface EnsResolverOptions {
   rpcUrl?: string
   /** Cache TTL for resolutions, reverse lookups and avatars. Default 5 min. */
   cacheTtlMs?: number
-  /** IPFS gateway for `ipfs://` avatars. Default ipfs.io. Point it at your own proxy to keep users' IPs private. */
+  /**
+   * IPFS gateway for `ipfs://` avatars: an origin (`https://gw.example`, `/ipfs/<cid>` is appended, as viem did) or a
+   * prefix ending in `/ipfs/`. Default `https://ipfs.io/ipfs/`. Point it at your own proxy to keep users' IPs private.
+   */
   ipfsGateway?: string
   /** TLDs this resolver should leave to others (`sol`, `near`, `ton` …). Default: those three plus `t.me`. */
   foreignTlds?: readonly string[]
@@ -85,8 +88,14 @@ export function avatarUrl(record: string | null | undefined, ipfsGateway = 'http
   const r = typeof record === 'string' ? record.trim() : ''
   if (!r || r.length > 2048) return null
   const ipfs = /^ipfs:\/\/(?:ipfs\/)?([A-Za-z0-9]{10,100}(?:\/[A-Za-z0-9._~%-]+)*)$/.exec(r)
-  if (ipfs) return `${ipfsGateway}${ipfs[1]}`
+  if (ipfs) return `${ipfsPrefix(ipfsGateway)}${ipfs[1]}`
   return isPublicHttpsUrl(r) ? r : null
+}
+
+/** The path a CID follows on `gateway`, given as an origin or as a prefix ending in `/ipfs/`. */
+function ipfsPrefix(gateway: string): string {
+  const g = gateway.replace(/\/+$/, '')
+  return /\/ipfs$/i.test(g) ? `${g}/` : `${g}/ipfs/`
 }
 
 /** Names ENS can serve: `.eth` and any DNS name (cb.id, uni.eth subnames, imported DNS). */

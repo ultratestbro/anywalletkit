@@ -21,6 +21,16 @@ describe('isPrivateHost: every spelling of a private address (scan 2026-10-27 mo
     for (const h of ['2001:4860:4860::8888', '::ffff:8.8.8.8', '64:ff9b::808:808']) expect(isPrivateHost(h), h).toBe(false)
   })
 
+  it('a host that is not printable ASCII is private: a URL parser maps it to ASCII (127.0.0.１, ｒｏｕｔｅｒ.ｌａｎ); 6to4 carries its IPv4', () => {
+    for (const h of ['127.0.0.\uFF11', '127\u30020\u30020\u30021', '127.0.0.\u00AD1', '\uFF52\uFF4F\uFF55\uFF54\uFF45\uFF52.\uFF4C\uFF41\uFF4E', 'b\u00FCcher.example', '2002:7f00:1::', '2002:c0a8:101::1']) {
+      expect(isPrivateHost(h), h).toBe(true)
+    }
+    for (const u of ['https://127.0.0.\uFF11/', 'https://127\u30020\u30020\u30021/x', 'https://\uFF52\uFF4F\uFF55\uFF54\uFF45\uFF52.\uFF4C\uFF41\uFF4E/']) expect(isPublicHttpsUrl(u), u).toBe(false)
+    // What a WHATWG URL parser does with them (Node): the reason the test above matters.
+    expect(new URL('https://127.0.0.\uFF11/').hostname).toBe('127.0.0.1')
+    for (const h of ['xn--bcher-kva.example', '2002:808:808::']) expect(isPrivateHost(h), h).toBe(false)
+  })
+
   it('private names; public names stay public', () => {
     for (const h of ['localhost', 'LOCALHOST.', 'a.localhost', 'printer.local', 'db.internal', 'nas.home.arpa', 'router.lan']) expect(isPrivateHost(h), h).toBe(true)
     for (const h of ['example.com', 'eth.llamarpc.com', '123.com', 'lan.example', 'internal.example.org']) expect(isPrivateHost(h), h).toBe(false)

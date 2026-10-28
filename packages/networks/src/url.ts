@@ -110,11 +110,16 @@ const PRIVATE_NAME = /(?:^|\.)(?:localhost|local|internal|home\.arpa|lan)$/
  * URL parser accepts (`127.1`, `2130706433`, `0x7f.0.0.1`): 0/8, 10/8, 100.64/10, 127/8, 169.254/16,
  * 172.16/12, 192.0.0/24, 192.168/16, 198.18/15, multicast and reserved; a numeric host that is no valid
  * IPv4 counts as private too. IPv6: unspecified, loopback, unique-local, link-local, multicast, and the
- * IPv4 inside a mapped (`::ffff:…`), compatible or NAT64 (`64:ff9b::`) address (scan 2026-10-27 modules, F37).
+ * IPv4 inside a mapped (`::ffff:…`), compatible, NAT64 (`64:ff9b::`) or 6to4 (`2002::`) address; and any host
+ * that is not printable ASCII, which a URL parser would map to one of these (scan 2026-10-27 modules, F37).
  * A public name that resolves to a private address (DNS rebinding) is not caught here.
  */
 export function isPrivateHost(host: string): boolean {
   let h = host.toLowerCase().trim()
+  // Not printable ASCII: a URL parser maps fullwidth digits, ideographic full stops and ignorable characters to
+  // ASCII (IDNA), so `127.0.0.１` or `ｒｏｕｔｅｒ.ｌａｎ` reaches 127.0.0.1 or router.lan. A name in another script
+  // arrives as punycode (`xn--…`), which is ASCII.
+  if (!/^[\x21-\x7e]+$/.test(h)) return true
   if (h.startsWith('[') && h.endsWith(']')) h = h.slice(1, -1)
   if (h.includes('%')) return true // an IPv6 zone: link-local by construction
   h = h.replace(/\.$/, '')
@@ -125,6 +130,7 @@ export function isPrivateHost(host: string): boolean {
     const zeroUntil = (n: number) => g.slice(0, n).every((x) => x === 0)
     if (zeroUntil(8) || (zeroUntil(7) && g[7] === 1)) return true
     if ((g[0]! & 0xfe00) === 0xfc00 || (g[0]! & 0xffc0) === 0xfe80 || (g[0]! & 0xff00) === 0xff00) return true
+    if (g[0] === 0x2002) return privateV4(g[1]! * 65536 + g[2]!) // 6to4: the IPv4 in groups 2–3
     const embedded = zeroUntil(5) && g[5] === 0xffff ? true : zeroUntil(6) ? true : g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0)
     return embedded ? privateV4(g[6]! * 65536 + g[7]!) : false
   }

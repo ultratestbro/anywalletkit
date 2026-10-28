@@ -98,6 +98,12 @@ describe('avatars are the record, filtered — nothing is fetched to decide (sca
     }
   })
 
+  it('the IPFS gateway may be an origin (as viem took it) or a /ipfs/ prefix', () => {
+    const cid = 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG'
+    for (const gw of ['https://gw.example', 'https://gw.example/', 'https://gw.example/ipfs', 'https://gw.example/ipfs/']) expect(avatarUrl(`ipfs://${cid}`, gw), gw).toBe(`https://gw.example/ipfs/${cid}`)
+    expect(avatarUrl(`ipfs://${cid}`)).toBe(`https://ipfs.io/ipfs/${cid}`)
+  })
+
   it('the resolver reads the avatar text record and filters it; viem\'s getEnsAvatar is not called', async () => {
     const getEnsAvatar = vi.fn()
     const getEnsText = vi.fn(async ({ name }: { name: string }) => ({ 'a.eth': 'https://192.168.1.1/x.png', 'b.eth': 'https://example.org/b.png' } as Record<string, string>)[name] ?? null)
