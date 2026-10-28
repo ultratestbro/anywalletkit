@@ -1097,6 +1097,8 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // target allowlist and the review screen cover it.
     if (unsigned.data !== undefined && this.fromChain.startsWith("eip155:")) {
       const call = decodeCall({to: unsigned.to, data: unsigned.data, value: executionValue});
+      // Calldata that is not hex bytes cannot be judged: refused, not passed as a plain call (scan 2026-10-27 modules F3).
+      if (call.undecodable) throw new Swap2ValidationError("swap2: quote calldata is not hex bytes — refused");
       const named = call.transfer?.to ?? call.approval?.spender;
       const allowed = [selfAddress, q.depositAddress, unsigned.approvalAddress, unsigned.to].filter((a): a is string => !!a).map((a) => a.toLowerCase());
       if (named && !allowed.includes(named.toLowerCase())) {
@@ -1488,6 +1490,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       throw new Swap2ValidationError(`swap2: claim target ${unsigned.to} is not a contract '${name}' declares for ${unsigned.chain} — refused`);
     }
     const claimCall = decodeCall({to: unsigned.to, data: unsigned.data, value: 0n});
+    if (claimCall.undecodable) throw new Swap2ValidationError("swap2: claim calldata is not hex bytes — refused");
     if (claimCall.transfer || claimCall.approval) {
       throw new Swap2ValidationError(`swap2: claim calldata (${claimCall.method}) moves tokens or grants an allowance — refused`);
     }

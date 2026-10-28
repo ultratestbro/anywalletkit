@@ -12,7 +12,7 @@
  *
  * Nothing here signs or sends. The RPC is the caller's.
  */
-import {decodeFunctionData, hexToString, isHex, parseAbi, type Hex} from "viem";
+import {hexToString, isHex, type Hex} from "viem";
 
 /**
  * Any JSON-RPC transport: `(method, params) => result`. Wrap viem, ethers or `fetch` in one line.
@@ -88,6 +88,8 @@ export interface DecodedCall {
   value: bigint;
   approval?: Approval;
   transfer?: {token: string; to: string; amount: bigint};
+  /** The calldata is not hex bytes: nothing can be said about what it does (a warning, never a plain call). */
+  undecodable?: true;
 }
 
 /** How one asset's balance of the sender changes when the calls run. */
@@ -122,7 +124,9 @@ export type CheckCode =
   | "approval-exact" | "approval-excess" | "approval-unlimited" | "approval-unknown-spender"
   /** A bounded approval with no `expectedApproval` to compare it with: neither "exact" nor "excess" can be said. */
   | "approval-unchecked"
-  | "native-value";
+  | "native-value"
+  /** Calldata that is not hex bytes: what it grants or moves cannot be read. */
+  | "calldata-undecodable";
 
 /** One item for the review screen: a code, a status, and the values to word it with. */
 export interface Check {
@@ -152,68 +156,74 @@ const WETH_DEPOSIT_TOPIC = "0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2
 const WETH_WITHDRAWAL_TOPIC = "0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65";
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
-const ABI = parseAbi([
-  "function approve(address spender, uint256 amount)",
-  "function increaseAllowance(address spender, uint256 addedValue)",
-  "function transfer(address to, uint256 amount)",
-  "function transferFrom(address from, address to, uint256 amount)",
-  "function setApprovalForAll(address operator, bool approved)",
-  "function approve(address token, address spender, uint160 amount, uint48 expiration)",
-]);
 const PERMIT2 = "0x000000000022d473030f116ddee9f6b43ac78ba3";
+
+/**
+ * The calls whose arguments name who receives tokens or an allowance, by selector. They are read
+ * word by word the way the EVM reads calldata, not with a strict ABI decoder: a token contract
+ * built with Solidity below 0.5 zero-pads calldata that is too short and takes any non-zero word
+ * as `true`, and a selector may be written in either letter case. A strict decoder threw on those
+ * and the approval vanished from the review while the contract still executed it (scan 2026-10-27
+ * modules F3, F14, F17).
+ */
+const SELECTOR = {
+  approve: "0x095ea7b3", // approve(address spender, uint256 amount)
+  increaseAllowance: "0x39509351", // increaseAllowance(address spender, uint256 addedValue)
+  transfer: "0xa9059cbb", // transfer(address to, uint256 amount)
+  transferFrom: "0x23b872dd", // transferFrom(address from, address to, uint256 amount)
+  setApprovalForAll: "0xa22cb465", // setApprovalForAll(address operator, bool approved)
+  permit2Approve: "0x87517c45", // Permit2 approve(address token, address spender, uint160 amount, uint48 expiration)
+} as const;
 
 const lc = (a: string) => a.toLowerCase();
 
 /**
  * Decode one call offline: ERC-20 transfer, approve, Permit2, operator approvals and known
- * selectors.
+ * selectors. Calldata that is not hex bytes is `undecodable` (a warning in {@link checksFor}),
+ * never a plain call.
  */
 export function decodeCall(call: PreviewCall, known: Record<string, string> = {}): DecodedCall {
   const to = lc(call.to);
   const label = knownLabel(known, to);
   const value = call.value ?? 0n;
-  const data = call.data && call.data !== "0x" ? (call.data as Hex) : null;
-  const base: DecodedCall = {to, label, selector: data ? data.slice(0, 10) : null, method: data ? data.slice(0, 10) : "transfer (native)", value};
-  if (!data) return base;
-  let decoded: {functionName: string; args?: readonly unknown[]};
-  try {
-    decoded = decodeFunctionData({abi: ABI, data});
-  } catch {
-    return base;
+  const raw = typeof call.data === "string" && call.data !== "" && call.data.toLowerCase() !== "0x" ? call.data : null;
+  if (raw === null) return {to, label, selector: null, method: "transfer (native)", value};
+  const data = raw.toLowerCase();
+  if (!/^0x([0-9a-f]{2})*$/.test(data)) {
+    return {to, label, selector: data.slice(0, 10), method: "undecodable calldata", value, undecodable: true};
   }
-  const args = decoded.args ?? [];
-  const spenderOf = (s: unknown) => lc(String(s));
-  switch (decoded.functionName) {
-    case "approve": {
-      if (args.length === 4) {
-        // Permit2's own approve(token, spender, amount, expiration).
-        if (to !== PERMIT2) return {...base, method: "approve"};
-        const amount = args[2] as bigint;
-        const spender = spenderOf(args[1]);
-        return {...base, method: "approve (Permit2)", approval: {token: lc(String(args[0])), spender, spenderLabel: knownLabel(known, spender), amount: amount >= UNLIMITED ? null : amount, kind: "permit2"}};
-      }
-      const amount = args[1] as bigint;
-      const spender = spenderOf(args[0]);
-      return {...base, method: "approve", approval: {token: to, spender, spenderLabel: knownLabel(known, spender), amount: amount >= UNLIMITED ? null : amount, kind: "erc20"}};
+  const selector = data.slice(0, 10);
+  const base: DecodedCall = {to, label, selector, method: selector, value};
+  // Word i of the arguments as the EVM reads it: past the end of the calldata, zeros.
+  const word = (i: number) => data.slice(10 + 64 * i, 10 + 64 * (i + 1)).padEnd(64, "0");
+  const uint = (i: number) => BigInt(`0x${word(i)}`);
+  const address = (i: number) => `0x${word(i).slice(24)}`;
+  const cap = (amount: bigint) => (amount >= UNLIMITED ? null : amount);
+  switch (selector) {
+    case SELECTOR.permit2Approve: {
+      // Permit2's own approve(token, spender, amount, expiration), at whatever address the chain's
+      // Permit2 lives (zkSync Era's is not the CREATE2 one) — every such call is read as one (F29).
+      const spender = address(1);
+      return {...base, method: to === PERMIT2 ? "approve (Permit2)" : "approve (Permit2 signature)", approval: {token: address(0), spender, spenderLabel: knownLabel(known, spender), amount: cap(uint(2)), kind: "permit2"}};
     }
-    case "increaseAllowance": {
-      const amount = args[1] as bigint;
-      const spender = spenderOf(args[0]);
-      return {...base, method: "increaseAllowance", approval: {token: to, spender, spenderLabel: knownLabel(known, spender), amount: amount >= UNLIMITED ? null : amount, kind: "erc20"}};
+    case SELECTOR.approve:
+    case SELECTOR.increaseAllowance: {
+      const spender = address(0);
+      return {...base, method: selector === SELECTOR.approve ? "approve" : "increaseAllowance", approval: {token: to, spender, spenderLabel: knownLabel(known, spender), amount: cap(uint(1)), kind: "erc20"}};
     }
-    case "setApprovalForAll": {
-      if (args[1] !== true) return {...base, method: "setApprovalForAll (revoke)"};
-      const spender = spenderOf(args[0]);
+    case SELECTOR.setApprovalForAll: {
+      if (uint(1) === 0n) return {...base, method: "setApprovalForAll (revoke)"};
+      const spender = address(0);
       return {...base, method: "setApprovalForAll", approval: {token: to, spender, spenderLabel: knownLabel(known, spender), amount: null, kind: "operator"}};
     }
     // ERC-20 transfer/transferFrom are not payable: a call that also sends native
     // value is something else wearing the selector, reviewed as a contract call.
-    case "transfer":
+    case SELECTOR.transfer:
       if (value > 0n) return {...base, method: "transfer (with value)"};
-      return {...base, method: "transfer", transfer: {token: to, to: lc(String(args[0])), amount: args[1] as bigint}};
-    case "transferFrom":
+      return {...base, method: "transfer", transfer: {token: to, to: address(0), amount: uint(1)}};
+    case SELECTOR.transferFrom:
       if (value > 0n) return {...base, method: "transferFrom (with value)"};
-      return {...base, method: "transferFrom", transfer: {token: to, to: lc(String(args[1])), amount: args[2] as bigint}};
+      return {...base, method: "transferFrom", transfer: {token: to, to: address(1), amount: uint(2)}};
     default:
       return base;
   }
@@ -452,6 +462,8 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
     else if (a.amount > input.expectedApproval) checks.push({code: "approval-excess", status: "warn", detail: {...detail, expected: input.expectedApproval.toString()}});
     else checks.push({code: "approval-exact", status: "ok", detail});
   }
+
+  for (const c of calls) if (c.undecodable) checks.push({code: "calldata-undecodable", status: "warn", detail: {address: c.to}});
 
   // Native value per call into a contract: into one nobody vouched for it is a warning, not a tick.
   for (const c of calls) {
