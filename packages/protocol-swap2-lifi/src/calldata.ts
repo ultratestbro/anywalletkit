@@ -14,15 +14,24 @@
  * reviewed minimum still relies on LI.FI's API answering honestly.
  */
 
-const GENERIC_SWAPS: Readonly<Record<string, {single: boolean}>> = {
+/**
+ * The V3 entry points move one asset kind in and one out, and check the minimum against THAT kind's balance: a
+ * `*ToNative` call measures the Diamond's native balance, so a minimum written in USDC units is enforced in wei
+ * (scan 2026-10-27 modules, F20). Each selector is bound to the kinds it moves; `swapTokensGeneric` moves any.
+ */
+type Kind = "native" | "erc20";
+const GENERIC_SWAPS: Readonly<Record<string, {single: boolean; from?: Kind; to?: Kind}>> = {
   "0x4630a0d8": {single: false}, // swapTokensGeneric
-  "0x4666fc80": {single: true}, // swapTokensSingleV3ERC20ToERC20
-  "0x733214a3": {single: true}, // swapTokensSingleV3ERC20ToNative
-  "0xaf7060fd": {single: true}, // swapTokensSingleV3NativeToERC20
-  "0x5fd9ae2e": {single: false}, // swapTokensMultipleV3ERC20ToERC20
-  "0x2c57e884": {single: false}, // swapTokensMultipleV3ERC20ToNative
-  "0x736eac0b": {single: false}, // swapTokensMultipleV3NativeToERC20
+  "0x4666fc80": {single: true, from: "erc20", to: "erc20"}, // swapTokensSingleV3ERC20ToERC20
+  "0x733214a3": {single: true, from: "erc20", to: "native"}, // swapTokensSingleV3ERC20ToNative
+  "0xaf7060fd": {single: true, from: "native", to: "erc20"}, // swapTokensSingleV3NativeToERC20
+  "0x5fd9ae2e": {single: false, from: "erc20", to: "erc20"}, // swapTokensMultipleV3ERC20ToERC20
+  "0x2c57e884": {single: false, from: "erc20", to: "native"}, // swapTokensMultipleV3ERC20ToNative
+  "0x736eac0b": {single: false, from: "native", to: "erc20"}, // swapTokensMultipleV3NativeToERC20
 };
+/** The most a bridge may keep from the input as its own fee when there are no source swaps, in basis points. */
+const BRIDGE_INPUT_FEE_MAX_BPS = 100n;
+const kindOf = (asset: string): Kind => (/^0x0{40}$/i.test(asset) ? "native" : "erc20");
 
 /**
  * The ABI-encoded bridge entry points of the LI.FI Diamond — `startBridgeTokensVia*` and
@@ -116,7 +125,7 @@ export interface DiamondExpectation {
   evmDestination: boolean;
 }
 
-interface SwapStep {sendingAssetId: string; receivingAssetId: string; fromAmount: bigint}
+interface SwapStep {sendingAssetId: string; receivingAssetId: string; fromAmount: bigint; requiresDeposit: boolean}
 
 class Reader {
   private readonly b: Uint8Array;
@@ -154,10 +163,11 @@ const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 /** SwapData tuple at `at`: (callTo, approveTo, sendingAssetId, receivingAssetId, fromAmount, callData, requiresDeposit). */
 function swapAt(r: Reader, at: number): SwapStep {
   r.address(at); r.address(at + 32);
-  const step = {sendingAssetId: r.address(at + 64), receivingAssetId: r.address(at + 96), fromAmount: r.word(at + 128)};
+  const step = {sendingAssetId: r.address(at + 64), receivingAssetId: r.address(at + 96), fromAmount: r.word(at + 128), requiresDeposit: false};
   const bytesAt = at + r.small(at + 160);
   r.small(bytesAt); // length within the calldata
-  r.bool(at + 192);
+  // The Diamond pulls `fromAmount` of `sendingAssetId` from the user for every step that requires a deposit.
+  step.requiresDeposit = r.bool(at + 192);
   return step;
 }
 
@@ -170,11 +180,26 @@ function swapsAt(r: Reader, base: number, head: number): SwapStep[] {
   return Array.from({length: n}, (_, i) => swapAt(r, items + r.small(items + 32 * i)));
 }
 
+/**
+ * Every step, not only the ends (scan 2026-10-27 modules, F21–F23): the Diamond pulls `fromAmount` from the user for
+ * each step that requires a deposit, so only steps that spend the source token may, and together at most the input —
+ * a middle step depositing DAI under a leftover allowance is refused. The steps chain: each spends what the one before
+ * delivered (a fee step on the input sends and receives the same asset).
+ */
 function checkSteps(steps: SwapStep[], e: DiamondExpectation, finalAsset: string): string | null {
   const first = steps[0]!;
   const last = steps[steps.length - 1]!;
   if (!same(first.sendingAssetId, e.fromToken)) return `spends ${first.sendingAssetId}, not ${e.fromToken}`;
   if (first.fromAmount === 0n || first.fromAmount > e.amountIn) return `swaps ${first.fromAmount}, not the ${e.amountIn} spent`;
+  let deposited = 0n;
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i]!;
+    if (i > 0 && !same(step.sendingAssetId, steps[i - 1]!.receivingAssetId)) return `step ${i} spends ${step.sendingAssetId}, which step ${i - 1} does not deliver`;
+    if (!step.requiresDeposit) continue;
+    if (!same(step.sendingAssetId, e.fromToken)) return `step ${i} pulls ${step.sendingAssetId} from the wallet, not the input ${e.fromToken}`;
+    deposited += step.fromAmount;
+  }
+  if (deposited > e.amountIn) return `the steps pull ${deposited} from the wallet, more than the ${e.amountIn} spent`;
   if (!same(last.receivingAssetId, finalAsset)) return `delivers ${last.receivingAssetId}, not ${finalAsset}`;
   return null;
 }
@@ -195,6 +220,10 @@ export function diamondCallMismatch(data: string, e: DiamondExpectation): string
       const steps = generic.single ? [swapAt(r, 4 + r.small(4 + 160))] : swapsAt(r, 4, 4 + 160);
       if (!e.evmDestination || !same(receiver, e.receiver)) return `pays ${receiver}, not ${e.receiver}`;
       if (minAmount < e.minOut) return `accepts ${minAmount}, below the ${e.minOut} shown`;
+      if (generic.from && kindOf(e.fromToken) !== generic.from) return `${selector} swaps from ${generic.from === "native" ? "the native coin" : "a token"}, but the input is ${kindOf(e.fromToken) === "native" ? "the native coin" : "a token"}`;
+      if (generic.to && (kindOf(e.toToken) !== generic.to || kindOf(steps[steps.length - 1]!.receivingAssetId) !== generic.to)) {
+        return `${selector} delivers ${generic.to === "native" ? "the native coin" : "a token"}, but the output is ${kindOf(e.toToken) === "native" ? "the native coin" : "a token"} — its minimum would be counted in the wrong asset`;
+      }
       return checkSteps(steps, e, e.toToken);
     }
     // Bridge facets: (BridgeData, [SwapData[],] FacetData), only the listed ABI entry points.
@@ -219,8 +248,15 @@ export function diamondCallMismatch(data: string, e: DiamondExpectation): string
     if (!same(receiver, e.receiver)) return `pays ${receiver}, not ${e.receiver}`;
     if (hasSourceSwaps !== bridge.sourceSwaps) return `unknown Diamond call ${selector}`;
     // After source swaps the bridged amount is in the swapped token's units: only the swaps' input is comparable.
-    if (hasSourceSwaps) return checkSteps(swapsAt(r, 4, 4 + 32), e, sendingAssetId);
-    if (minAmount === 0n || minAmount > e.amountIn) return `bridges ${minAmount}, not the ${e.amountIn} spent`;
+    if (hasSourceSwaps) {
+      // The swapped amount is the facet's own (it replaces minAmount after the swaps); a zero is a route that bridges nothing.
+      if (minAmount === 0n) return "bridges nothing after the source swaps";
+      return checkSteps(swapsAt(r, 4, 4 + 32), e, sendingAssetId);
+    }
+    // Without source swaps the Diamond pulls minAmount: the input, or the input less a bridge's own fee (Glacis takes
+    // 0.25 %, matrix v7). Anything further below leaves the rest of the allowance behind for the next call to take
+    // (scan 2026-10-27 modules, F22): a minAmount of 1 is refused.
+    if (minAmount > e.amountIn || minAmount * 10_000n < e.amountIn * (10_000n - BRIDGE_INPUT_FEE_MAX_BPS)) return `bridges ${minAmount}, not the ${e.amountIn} spent`;
     return same(sendingAssetId, e.fromToken) ? null : `bridges ${sendingAssetId}, not ${e.fromToken}`;
   } catch (err) {
     return `the Diamond calldata does not decode (${err instanceof Error ? err.message : String(err)})`;

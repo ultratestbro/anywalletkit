@@ -28,6 +28,14 @@ input token (or what its source swaps make of it). Refused, because the recipien
 from the calldata: routes with a destination call, and EVM-source routes to a non-EVM chain.
 Unknown calldata is refused.
 
+Every swap step is read, not only the ends: each must spend what the step before delivered, only
+steps that spend the input token may pull from the wallet (`requiresDeposit`), and together at most
+the input — a middle step pulling DAI under an old allowance is refused. The V3 entry points are
+bound to the asset kinds they move (`*ToNative` only for a native output, `*ToERC20` for a token,
+`NativeTo*` / `ERC20To*` for the matching input), since each counts its minimum in its own asset. A
+bridge without source swaps must bridge the input, less at most a 1 % bridge fee. `apiUrl` must be
+`https:` (`allowInsecureApiUrl` for local development).
+
 Not checked: a bridge's output. The destination minimum — and for some bridges (Relay, Across)
 what finally reaches the recipient — sits in bridge-specific data, so on cross-chain routes the
 reviewed minimum relies on LI.FI's API (or your `apiUrl` proxy) answering honestly.

@@ -170,8 +170,13 @@ function headers(key: string | undefined): Record<string, string> {
 /** Explicit constructor configuration; no deployment environment is read. */
 export interface LifiProviderConfig {
   enabled?: boolean;
-  /** LI.FI REST base URL. Explicitly injectable for proxies and tests. */
+  /** LI.FI REST base URL. Explicitly injectable for proxies and tests; must be https unless `allowInsecureApiUrl`. */
   apiUrl?: string;
+  /**
+   * Allow an `http:` `apiUrl` (local development only): the quotes and the Diamond calldata travel it, and over plain
+   * http anyone on the path rewrites them (scan 2026-10-27 modules, F20).
+   */
+  allowInsecureApiUrl?: boolean;
   apiKey?: string;
   integrator?: string;
   /** Additional audited LI.FI entry points for networks whose Diamond differs. */
@@ -260,8 +265,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
   const apiKey = () => config.apiKey;
   const integrator = () => config.integrator ?? "";
   const parsedApiUrl = new URL(config.apiUrl ?? DEFAULT_LIFI_BASE);
-  if (parsedApiUrl.protocol !== "https:" && parsedApiUrl.protocol !== "http:") {
-    throw new Error("lifi: apiUrl must use http or https");
+  if (parsedApiUrl.protocol !== "https:" && !(parsedApiUrl.protocol === "http:" && config.allowInsecureApiUrl === true)) {
+    throw new Error("lifi: apiUrl must use https (allowInsecureApiUrl for local development)");
   }
   const apiBase = parsedApiUrl.toString().replace(/\/$/, "");
   const trustedTransactionTargets = trustMap(config.trustedTransactionTargets, "transaction target");

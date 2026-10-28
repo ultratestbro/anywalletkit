@@ -145,7 +145,10 @@ describe("LI.FI provider security contract", () => {
   });
 
   it("rejects non-HTTP API endpoints", () => {
-    expect(() => lifiProvider({apiUrl: "file:///tmp/lifi"})).toThrow(/http or https/);
+    expect(() => lifiProvider({apiUrl: "file:///tmp/lifi"})).toThrow(/must use https/);
+    // Plain http too (scan 2026-10-27 modules, F20): quotes and calldata travel it. Local development opts in.
+    expect(() => lifiProvider({apiUrl: "http://li.quest/v1"})).toThrow(/must use https/);
+    expect(() => lifiProvider({apiUrl: "http://localhost:8787/v1", allowInsecureApiUrl: true})).not.toThrow();
     expect(() => lifiProvider({trustedTransactionTargets: {"eip155:1": ["invalid"]}})).toThrow(/invalid transaction target/);
   });
 
