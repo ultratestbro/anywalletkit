@@ -17,7 +17,7 @@ export const DEFAULT_CONCURRENCY = 6
 export function createReadClient(providers: MonadProvider[], timeoutMs = DEFAULT_TIMEOUT_MS): PublicClient | undefined {
   if (providers.length === 0) return undefined
   const one = (p: MonadProvider): Transport => (typeof p === 'string' ? http(p, { timeout: timeoutMs, retryCount: 2 }) : custom(p))
-  return createPublicClient({ transport: providers.length === 1 ? one(providers[0]!) : fallback(providers.map(one)) })
+  return createPublicClient({ transport: providers.length === 1 ? one(providers[0]!) : fallback(providers.map(one)), ccipRead: false })
 }
 
 /** Maps `items` with at most `limit` calls in flight, keeping the order. */

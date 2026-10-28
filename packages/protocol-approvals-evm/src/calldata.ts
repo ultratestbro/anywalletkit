@@ -39,6 +39,7 @@ export function isRevokeCalldata (data: string | undefined): boolean {
 export type RevokeTargets =
   | Iterable<{ token: string; standard: ApprovalStandard | string }>
   | ReadonlyMap<string, ApprovalStandard | string>
+  | Readonly<Record<string, ApprovalStandard | string>>
   | Iterable<string>
 
 const NFT_STANDARDS: ReadonlySet<string> = new Set(['erc721', 'erc721-token', 'erc1155'])
@@ -83,7 +84,11 @@ export function isRevokeTransaction (
   return standards.has('erc20') && !nft
 }
 
-/** The standards `targets` give for `to` (empty: listed without one), or `null` when `to` is not listed. */
+/**
+ * The standards `targets` give for `to` (empty: listed without one), or `null` when `to` is not listed. Takes
+ * `{token, standard}` entries, bare addresses, `[address, standard]` pairs, a `Map` (or any iterable of pairs) and a
+ * plain object from address to standard; anything else lists nothing. Never throws: a revoke check must not.
+ */
 function standardsOf (targets: RevokeTargets, to: string): Set<string> | null {
   let listed = false
   const out = new Set<string>()
@@ -92,7 +97,20 @@ function standardsOf (targets: RevokeTargets, to: string): Set<string> | null {
     listed = true
     if (typeof standard === 'string') out.add(standard)
   }
-  if (targets instanceof Map) for (const [token, standard] of targets) add(token, standard)
-  else for (const t of targets as Iterable<unknown>) typeof t === 'string' ? add(t, undefined) : add((t as { token?: unknown })?.token, (t as { standard?: unknown })?.standard)
+  try {
+    const t = targets as unknown
+    if (t === null || typeof t !== 'object') return null
+    if (typeof (t as Iterable<unknown>)[Symbol.iterator] !== 'function') {
+      for (const [token, standard] of Object.entries(t as Record<string, unknown>)) add(token, standard)
+    } else {
+      for (const e of t as Iterable<unknown>) {
+        if (typeof e === 'string') add(e, undefined)
+        else if (Array.isArray(e)) add(e[0], e[1])
+        else if (e !== null && typeof e === 'object') add((e as { token?: unknown }).token, (e as { standard?: unknown }).standard)
+      }
+    }
+  } catch {
+    return null
+  }
   return listed ? out : null
 }

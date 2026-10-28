@@ -4,7 +4,7 @@
 // and isRevokeTransaction classifies approve / setApprovalForAll by the target's standard. EIP-1193 doubles only.
 import assert from 'node:assert/strict'
 import { describe, test } from 'vitest'
-import { decodeFunctionData, encodeAbiParameters, encodeFunctionData, getAddress, zeroAddress, type Hex } from 'viem'
+import { decodeFunctionData, encodeAbiParameters, encodeErrorResult, encodeFunctionData, getAddress, parseAbi, zeroAddress, type Hex } from 'viem'
 
 import ApprovalsProtocolEvm, { ApprovalsError, STANDARDS, isRevokeTransaction, type Approval } from '../src/index.js'
 
@@ -78,6 +78,32 @@ describe("an 'erc20' revoke of an ERC-721 is refused (scan 2026-10-27 modules, F
   })
 })
 
+describe('approvals calls contracts with CCIP-Read off (scan 2026-10-27 modules, F37 class)', () => {
+  test("a token answering the ERC-165 probe with an OffchainLookup to the user's router makes no request; the revoke goes ahead", async () => {
+    const OFFCHAIN_LOOKUP = parseAbi(['error OffchainLookup(address sender, string[] urls, bytes callData, bytes4 callbackFunction, bytes extraData)'])
+    const SPAM = getAddress('0x5555555555555555555555555555555555555555')
+    const lookup = encodeErrorResult({ abi: OFFCHAIN_LOOKUP, errorName: 'OffchainLookup', args: [SPAM, ['http://192.168.1.1/{sender}/{data}.json'], '0x', '0x12345678', '0x'] })
+    const fetched: string[] = []
+    const realFetch = globalThis.fetch
+    globalThis.fetch = (async (url: string) => { fetched.push(String(url)); return new Response('{"data":"0x"}', { headers: { 'content-type': 'application/json' } }) }) as typeof fetch
+    try {
+      const spamRpc = {
+        async request ({ method, params }: { method: string; params?: unknown }): Promise<unknown> {
+          if (method === 'eth_chainId') return '0x1'
+          if ((params as Array<{ data: string }>)[0]!.data.startsWith('0x12345678')) return encodeAbiParameters([{ type: 'bool' }], [true]) // the callback: "an ERC-721"
+          throw Object.assign(new Error('execution reverted'), { code: 3, data: lookup })
+        },
+      }
+      const acc = account()
+      const p = new ApprovalsProtocolEvm(acc as never, { chainId: 1, provider: spamRpc })
+      assert.deepEqual(await p.revoke(erc20(SPAM)), { hash: HASH, fee: 1n })
+      assert.deepEqual(fetched, [])
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+})
+
 describe('isRevokeTransaction reads approve by the target standard (scan 2026-10-27 modules, F31)', () => {
   const approveZero = (spender: string) => ({ to: NFT, data: encodeFunctionData({ abi: ERC20_ABI, functionName: 'approve', args: [spender as Hex, 0n] }) })
   const clear = (id: bigint, to = NFT) => ({ to, data: encodeFunctionData({ abi: ERC721_ABI, functionName: 'approve', args: [zeroAddress, id] }) })
@@ -93,6 +119,17 @@ describe('isRevokeTransaction reads approve by the target standard (scan 2026-10
     // A scan that reports the contract under both standards does not make the call safe.
     assert.equal(isRevokeTransaction(approveZero(ATTACKER), { targets: [...nft, ...asErc20] }), false)
     assert.equal(isRevokeTransaction(approveZero(ATTACKER), { targets: asErc20 }), true)
+  })
+
+  test('targets in every shape — Map, plain object, pairs — and nothing a caller passes makes it throw', () => {
+    const zero = { to: USDT, data: encodeFunctionData({ abi: ERC20_ABI, functionName: 'approve', args: [ATTACKER as Hex, 0n] }) }
+    assert.equal(isRevokeTransaction(zero, { targets: new Map([[USDT.toLowerCase(), 'erc20']]) }), true)
+    assert.equal(isRevokeTransaction(zero, { targets: { [USDT]: 'erc20' } }), true)
+    assert.equal(isRevokeTransaction(zero, { targets: [[USDT, 'erc20']] as never }), true)
+    assert.equal(isRevokeTransaction(zero, { targets: { [USDT]: 'erc721' } }), false)
+    for (const bad of [null, 42, 'x', [null, 7, {}], { [Symbol.iterator]: () => { throw new Error('boom') } }]) {
+      assert.equal(isRevokeTransaction(zero, { targets: bad as never }), false)
+    }
   })
 
   test('approve(0x0, id) and setApprovalForAll(x, false) are revokes on NFT targets; an ERC-20 target takes neither but approve(0x0, 0)', () => {

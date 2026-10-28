@@ -133,7 +133,7 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     const urls = typeof raw === "string" ? [raw] : [...(raw ?? [])];
     if (urls.length === 0) return null;
     const opts = {timeout: RPC_TIMEOUT_MS, ...(config.fetchImpl ? {fetchFn: config.fetchImpl} : {})} as never;
-    return createPublicClient({transport: urls.length === 1 ? http(urls[0], opts) : fallback(urls.map((u) => http(u, opts)))});
+    return createPublicClient({transport: urls.length === 1 ? http(urls[0], opts) : fallback(urls.map((u) => http(u, opts))), ccipRead: false});
   };
 
   /** Once per chain: the OFT really is the OFT of the listed token with the listed approval mode. */

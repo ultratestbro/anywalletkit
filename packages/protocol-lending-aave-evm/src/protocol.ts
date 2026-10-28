@@ -186,7 +186,7 @@ export class AaveProtocolEvm extends LendingProtocol<AaveProtocolConfig> {
       const list = Array.isArray(raw) ? raw : [raw]
       if (list.length > 0) {
         const transport = list.length === 1 ? toTransport(list[0]!) : fallback(list.map(toTransport))
-        this._client = createPublicClient({ transport })
+        this._client = createPublicClient({ transport, ccipRead: false })
       }
     }
   }

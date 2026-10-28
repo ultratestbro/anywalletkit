@@ -12,5 +12,7 @@ export function createClient(config: EvmConfig): PublicClient | undefined {
   if (list.length === 0) return undefined
   const retryCount = config.retries ?? 3
   const transport = list.length === 1 ? toTransport(list[0]!) : fallback(list.map(toTransport), { retryCount })
-  return createPublicClient({ transport })
+  // No CCIP-Read: a contract's OffchainLookup revert (a token the user added, an airdropped one) must not make the
+  // device fetch the URLs it names, LAN addresses included (scan 2026-10-27 modules, F37 class).
+  return createPublicClient({ transport, ccipRead: false })
 }

@@ -101,7 +101,9 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
       // otherwise serve it from a 4 s cache). ethers needed `cacheTimeout: -1`
       // for the same reason — a retried eth_getLogs must be a fresh request —
       // and viem does not de-duplicate requests at all.
-      this._provider = createPublicClient({ transport: toTransport(provider), cacheTime: 0 })
+      // ccipRead off: the scan and the ERC-165 probe call contracts that emitted an Approval naming the user (spam
+      // tokens included); their OffchainLookup must not make the device fetch URLs (scan 2026-10-27 modules, F37 class).
+      this._provider = createPublicClient({ transport: toTransport(provider), cacheTime: 0, ccipRead: false })
     }
     this._chainId = config.chainId ?? null
     this._source = config.source ?? null

@@ -69,7 +69,7 @@ export abstract class MorphoBase<TConfig extends MorphoBaseConfig> extends Lendi
     const raw = config.provider ?? (account as unknown as { _config?: { provider?: EvmProvider | EvmProvider[] } })?._config?.provider
     if (raw !== undefined) {
       const list = Array.isArray(raw) ? raw : [raw]
-      if (list.length > 0) this._client = createPublicClient({ transport: list.length === 1 ? toTransport(list[0]!) : fallback(list.map(toTransport)) })
+      if (list.length > 0) this._client = createPublicClient({ transport: list.length === 1 ? toTransport(list[0]!) : fallback(list.map(toTransport)), ccipRead: false })
     }
   }
 

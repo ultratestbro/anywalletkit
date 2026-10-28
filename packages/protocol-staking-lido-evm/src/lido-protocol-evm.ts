@@ -226,7 +226,7 @@ export default class LidoProtocolEvm extends StakingProtocol<LidoProtocolConfig>
     const list = provider === undefined ? [] : Array.isArray(provider) ? provider : [provider]
     if (list.length > 0) {
       const toTransport = (p: LidoProvider) => (typeof p === 'string' ? http(p) : custom(p))
-      this._provider = createPublicClient({ transport: list.length === 1 ? toTransport(list[0]!) : fallback(list.map(toTransport)) })
+      this._provider = createPublicClient({ transport: list.length === 1 ? toTransport(list[0]!) : fallback(list.map(toTransport)), ccipRead: false })
     }
   }
 

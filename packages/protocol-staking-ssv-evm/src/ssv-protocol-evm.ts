@@ -257,7 +257,7 @@ export default class SsvProtocolEvm extends StakingProtocol<SsvProtocolConfig> {
     // wallet-evm keeps the RPC in a protected `_config`: read it without putting it in the account type.
     const provider = config.provider ?? ((account as { _config?: { provider?: unknown } } | undefined)?._config?.provider as EvmProvider | EvmProvider[] | undefined)
     if (provider && (!Array.isArray(provider) || provider.length > 0)) {
-      this._client = createPublicClient({ transport: toTransport(provider) })
+      this._client = createPublicClient({ transport: toTransport(provider), ccipRead: false })
     }
   }
 

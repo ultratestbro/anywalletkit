@@ -118,7 +118,7 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
 
   const client = (caip2: string) => {
     const url = rpcUrls[caip2];
-    return url ? createPublicClient({transport: http(url, {fetchOptions: {}, ...(config.fetchImpl ? {fetchFn: config.fetchImpl} : {})} as never)}) : null;
+    return url ? createPublicClient({transport: http(url, {fetchOptions: {}, ...(config.fetchImpl ? {fetchFn: config.fetchImpl} : {})} as never), ccipRead: false}) : null;
   };
 
   async function getJson<T>(path: string, signal?: AbortSignal): Promise<T | null> {
