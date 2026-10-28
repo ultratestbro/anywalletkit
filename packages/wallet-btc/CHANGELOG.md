@@ -1,5 +1,11 @@
 # @anywalletkit/wallet-btc
 
+## 0.3.2
+
+### Patch Changes
+
+- 4df03a5: The internal signing helpers (BTC `signPlan` / `signInputs` / `signSpend`, Zcash `signInputs` / `signSpend`, EVM `signHash` / `signPrepared` / `signAndBroadcast`, NEAR `signBytes`, Solana `signChecked` / `signPlan`, TON `signMessages`, Tron `signDigest`) are `#private` methods. They were private only in TypeScript, so code holding an account could call them at runtime and skip the checks the public methods run on what they sign.
+
 ## 0.3.1
 
 ### Patch Changes

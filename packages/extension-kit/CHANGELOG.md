@@ -1,5 +1,17 @@
 # @anywalletkit/extension-kit
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [4df03a5]
+- Updated dependencies [ef0aae1]
+- Updated dependencies [60c1999]
+- Updated dependencies [e6d0d39]
+- Updated dependencies [9684dab]
+  - @anywalletkit/wallet-evm@0.4.0
+  - @anywalletkit/keyring@0.3.7
+
 ## 0.2.1
 
 ### Patch Changes

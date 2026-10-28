@@ -1,5 +1,15 @@
 # @anywalletkit/wallet-zcash
 
+## 0.4.0
+
+### Minor Changes
+
+- b8a91d6: Solana: `decodeStakeInstruction` no longer guesses an `AuthorizeChecked`, `AuthorizeCheckedWithSeed` or `InitializeChecked` layout when the account that decides it (the Clock or Rent sysvar slot) is unresolved, e.g. loaded from an address lookup table: the new authority (or staker / withdrawer) is left undefined, so the stake guard refuses (`sets-authority`) instead of reading the wallet's own slot as the new authority; the kit marks such an instruction `destinationUnknown`. Zcash: `decodeAddress` refuses an address carrying whitespace or an invisible character (U+FEFF, NBSP…) instead of trimming it, and the kit compares Zcash addresses exactly (base58 is case-sensitive) and marks a recipient that is not plain base58 `destinationUnknown`.
+
+### Patch Changes
+
+- 4df03a5: The internal signing helpers (BTC `signPlan` / `signInputs` / `signSpend`, Zcash `signInputs` / `signSpend`, EVM `signHash` / `signPrepared` / `signAndBroadcast`, NEAR `signBytes`, Solana `signChecked` / `signPlan`, TON `signMessages`, Tron `signDigest`) are `#private` methods. They were private only in TypeScript, so code holding an account could call them at runtime and skip the checks the public methods run on what they sign.
+
 ## 0.3.1
 
 ### Patch Changes

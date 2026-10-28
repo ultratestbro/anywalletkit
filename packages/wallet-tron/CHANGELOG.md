@@ -1,5 +1,16 @@
 # @anywalletkit/wallet-tron
 
+## 0.5.0
+
+### Minor Changes
+
+- 012a296: Contract-call parameters encode to exactly one 32-byte word each, and must match the `functionSelector` signature in count and type (new export `encodeCall`). `uintN` / `intN` are range-checked for N (negative `uint` refused) and take a bigint, a safe integer or a decimal / `0x` string (no whitespace, `0b`, `0o`); `bytes32` is at most 32 bytes of even-length hex; `bool` must be `true` or `false`; `address` must be a string. Before, a `bytes32` or an oversized uint could emit several words and shift every argument after it, so the contract decoded other arguments than the ones the policies read.
+- a72efa7: Tron `signRaw` runs what `prepare()` runs for the wallet's own builds. With a provider, the reference block must be a block of the configured network (`/wallet/getnowblock` + `/wallet/getblockbynum`, code `ref-block-mismatch`), also for node builds and prebuilt `sendTransaction` input; offline, a non-mainnet account refuses to sign unless the new config `allowOfflineTestnetSigning` is set (code `offline-network`). Under a fee cap, the bytes are priced (fee_limit + bandwidth, memo and activation fees) and refused above the cap, a contract call without `fee_limit` is refused, and so is any transaction without a provider to price it. `raw_data.data` above 512 bytes is refused (code `memo`). For contract types without a schema, a JSON copy that names a payment field (`to_address`, `amount`, `contract_address`…) is `raw-mismatch`. In the kit, the `signRaw` intent's `to`, `amount` and `token` are read off `raw_data_hex` (TransferContract, TRC-10, TRC-20 calls), never the JSON copy.
+
+### Patch Changes
+
+- 4df03a5: The internal signing helpers (BTC `signPlan` / `signInputs` / `signSpend`, Zcash `signInputs` / `signSpend`, EVM `signHash` / `signPrepared` / `signAndBroadcast`, NEAR `signBytes`, Solana `signChecked` / `signPlan`, TON `signMessages`, Tron `signDigest`) are `#private` methods. They were private only in TypeScript, so code holding an account could call them at runtime and skip the checks the public methods run on what they sign.
+
 ## 0.4.1
 
 ### Patch Changes

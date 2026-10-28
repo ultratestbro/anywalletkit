@@ -1,5 +1,18 @@
 # @anywalletkit/wallet-evm
 
+## 0.4.0
+
+### Minor Changes
+
+- ef0aae1: EVM transaction `data` must be bytes or `0x`-prefixed hex of whole bytes; anything else (`'1x…'`, no prefix, `0X`, an odd length, non-hex) is refused with `UnsafeTransactionError` before simulation, description and signing, and every `accessList` storage key must be 32 bytes of `0x`-hex. viem's `hexToBytes` drops any two leading characters and pads odd lengths, so such data was signed as different calldata than the policies and `describeTransaction` read. New export `canonicalData`. In the kit, non-canonical calldata makes the write `destinationUnknown`.
+- 60c1999: EIP-712: `signTypedData` refuses a uintN / intN field (nested structs and arrays included) that is not a bigint, a safe integer, or a decimal / `0x`-hex string; viem would have passed `' 115…'`, `'0X…'` or `'0b…'` through `BigInt()` and signed the maximum. `describeTypedData` reads amounts the way the signer does and shows a present but unreadable permit amount as unlimited, never as 0; `PermitBatchWitnessTransferFrom` is recognised as Permit2. A transaction `chainId` string must be decimal or `0x`-hex within 2^53 in wallet-evm (`chainIdNumber`), and the kit refuses a present but unreadable `chainId` (`PolicyViolationError`, `policy: 'chain'`) instead of treating it as absent.
+- e6d0d39: `approve({ amount: 0 })` is a revoke only on an ERC-20. wallet-evm's `approve` refuses a token that reports ERC-721 through ERC-165 (`0x80ac58cd`) or has no `decimals()` (`UnsafeTransactionError`), since on an NFT approve(spender, n) approves token #n. The kit classifies `approve({ amount: 0 })` as `kind: 'revoke'` only when the token is in the swap2-assets catalog or the account's `getTokenInfo` reads it as `erc20`; otherwise it is an approval of the spender and the allowlist and blocklist apply.
+
+### Patch Changes
+
+- 4df03a5: The internal signing helpers (BTC `signPlan` / `signInputs` / `signSpend`, Zcash `signInputs` / `signSpend`, EVM `signHash` / `signPrepared` / `signAndBroadcast`, NEAR `signBytes`, Solana `signChecked` / `signPlan`, TON `signMessages`, Tron `signDigest`) are `#private` methods. They were private only in TypeScript, so code holding an account could call them at runtime and skip the checks the public methods run on what they sign.
+- 9684dab: Availability: a token's `name()` / `symbol()` answer is read only as far as a 128-character string needs (the offset and length words, then 4 bytes per character, cut back to a UTF-8 boundary), and trailing NULs are cut by a linear walk; a megabyte of NULs before one other byte no longer freezes `getTokenInfo`. EIP-712 primary-type inference uses a set, and typed data declaring more than 256 types or 4096 fields is refused before it is walked, in wallet-evm (`inferPrimaryType`, `typedDataHash`; new exports `assertTypedDataSize`, `MAX_TYPED_DATA_TYPES`, `MAX_TYPED_DATA_FIELDS`) and in the kit's `resolvePrimaryType`.
+
 ## 0.3.1
 
 ### Patch Changes

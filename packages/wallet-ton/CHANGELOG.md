@@ -1,5 +1,17 @@
 # @anywalletkit/wallet-ton
 
+## 0.4.0
+
+### Minor Changes
+
+- 1b249be: Jetton `transfer()` refuses a `responseDestination` other than the wallet itself (`UnsafeTransactionError` code `foreign-response-destination`) unless the new option `allowForeignResponseDestination` is set, and refuses attaching more than `maxJettonAttachedValue` nanotons (new config, default 1 TON, `forwardTonAmount` included; code `attached-value`). Both received TON that the caller's recipient check never saw.
+- 9419c27: A message's `bodyBoc` is signed only when it is a plain single-root BoC (`UnsafeTransactionError` code `non-canonical-boc` otherwise): the generic magic, one root, no absent cells, and no cell that stores its hashes (`with_hashes`), has a level mask or is exotic, the layouts another reader may parse differently from @ton/core. The bytes are not required to round-trip: real provider BoCs order their cells differently from @ton/core. A `body` that is neither a string nor a `Cell` is refused (code `body`) instead of being replaced by `bodyBoc`. New exports `canonicalBocCell`, `messageBody`.
+- 9df17da: TON addresses are paid only in a strict form: raw `wc:hex` (64 hex digits) or a friendly address with a valid checksum. wallet-ton refuses anything else with `UnsafeTransactionError` code `address`; @ton/core alone also accepted `'+0:…'`, `' 0:…'`, `'0.0:…'` and `'0:…:x'` as `0:…`. In the kit, a TON destination in any other spelling makes the write `destinationUnknown`, so a blocklist cannot be dodged with one.
+
+### Patch Changes
+
+- 4df03a5: The internal signing helpers (BTC `signPlan` / `signInputs` / `signSpend`, Zcash `signInputs` / `signSpend`, EVM `signHash` / `signPrepared` / `signAndBroadcast`, NEAR `signBytes`, Solana `signChecked` / `signPlan`, TON `signMessages`, Tron `signDigest`) are `#private` methods. They were private only in TypeScript, so code holding an account could call them at runtime and skip the checks the public methods run on what they sign.
+
 ## 0.3.1
 
 ### Patch Changes

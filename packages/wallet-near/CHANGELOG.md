@@ -1,5 +1,16 @@
 # @anywalletkit/wallet-near
 
+## 0.2.0
+
+### Minor Changes
+
+- cff44a8: NEAR: a base64 borsh transaction is signed only when it re-encodes to the exact bytes given (`UnsafeTransactionError` code `non-canonical`). Borsh strings decode strictly (invalid UTF-8 throws, a leading U+FEFF is kept instead of dropped), an Option tag other than 0/1 and an unknown global-contract mode byte are refused, and every method name a transaction carries must be ASCII letters, digits and `_` (code `invalid-method`; access-key method lists and delegated actions included), every account id it names valid (code `invalid-account`). In the kit, a NEAR function call whose method name is not plain ASCII makes the write `destinationUnknown`. A BOM in front of `ft_transfer` read as an unknown method to the policies and was signed as a clean `ft_transfer` to the attacker.
+- 7900e03: NEAR object transactions are validated before they are built or signed, `signBuilt` included (`UnsafeTransactionError` code `malformed-action` / `invalid-method`): every action object has exactly one known key, a function call's `methodName` is a string of the method grammar, `args` are bytes, a string or a plain object (not an array or a class instance), and `gas` / `deposit` are bigints. The borsh encoder refuses the same shapes. In the kit, an action object with more than one key, a non-string `methodName`, and `ft_transfer` / `nft_transfer` / `storage_deposit` args that are not one plain JSON object make the write `destinationUnknown`. New exports `assertWellFormed`, `isPlainObject`.
+
+### Patch Changes
+
+- 4df03a5: The internal signing helpers (BTC `signPlan` / `signInputs` / `signSpend`, Zcash `signInputs` / `signSpend`, EVM `signHash` / `signPrepared` / `signAndBroadcast`, NEAR `signBytes`, Solana `signChecked` / `signPlan`, TON `signMessages`, Tron `signDigest`) are `#private` methods. They were private only in TypeScript, so code holding an account could call them at runtime and skip the checks the public methods run on what they sign.
+
 ## 0.1.9
 
 ### Patch Changes
