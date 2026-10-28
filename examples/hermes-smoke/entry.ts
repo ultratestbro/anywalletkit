@@ -213,6 +213,11 @@ async function main() {
     eq('tokens symbol cut before assessing', tokenText(`USDC${' '.repeat(124)}X`, TOKEN_SYMBOL_MAX), 'USDC')
     eq('tokens fold ascii and accents', [foldSymbol('DAl'), foldSymbol('USDl'), foldSymbol('\u00D0AI'), foldSymbol('USD\u00C7')].join(','), 'DAI,USDI,DAI,USDC')
     eq('tokens cyrillic symbol is danger', assessToken({ ...fake, symbol: '\u0420\u0415\u0420\u0415' }).risks.some((r) => r.code === 'odd-characters' && r.level === 'danger'), true)
+    eq('tokens emoji symbol is a caution', assessToken({ ...fake, symbol: 'PEPE\u{1F438}' }).risks.find((r) => r.code === 'odd-characters')?.level, 'caution')
+    // 2026-10-28 review: hiding controls and tag characters, more look-alike blocks (astral too), ™ a caution, fold after NFKD
+    const level = (symbol: string) => assessToken({ ...fake, symbol }).risks.find((r) => r.code === 'odd-characters')?.level
+    eq('tokens hiding and look-alike rules', [level('US\u0000DC'), level('US\u{E0041}DC'), level('\u216FE\u216FE'), level('USD\u{10415}'), level('\u{1F164}\u{1F162}\u{1F153}\u{1F152}'), level('PEPE\u2122'), level('\u0645\u06CC\u200C\u0634\u0648\u062F')].join(','), 'danger,danger,danger,danger,danger,caution,caution')
+    eq('tokens fold sees spacing accents', foldSymbol('USDC\u00B4'), 'USDC')
     eq('tokens base58 mint check', isTokenAddress('solana:mainnet', 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263') && !isTokenAddress('solana:mainnet', '11111111111111111111111111111111'), true)
     eq('tokens catalog wins', resolveAsset('eip155:1', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', { allowUnlisted: true, decimals: 18 })?.decimals, 6)
     const word = (v: bigint) => v.toString(16).padStart(64, '0')
@@ -267,6 +272,8 @@ async function main() {
     // scan 2026-10-27 modules F37: every IPv4 spelling, CGNAT / link-local, mapped IPv6; gateway and avatar URLs
     eq('private host spellings', ['127.1', '2130706433', '0x7f.0.0.1', '100.64.0.1', '169.254.169.254', '::ffff:127.0.0.1', 'fe80::1%en0'].every(isPrivateHost) && !isPrivateHost('8.8.8.8') && !isPrivateHost('2001:4860:4860::8888'), true)
     eq('public https url', isPublicHttpsUrl('https://gw.example/{sender}/{data}.json') && !isPublicHttpsUrl('http://192.168.1.1/x') && !isPublicHttpsUrl('https://{data}.example/'), true)
+    eq('private host idna and 6to4', isPrivateHost('127.0.0.\uFF11') && isPrivateHost('127\u30020\u30020\u30021') && isPrivateHost('2002:7f00:1::') && !isPrivateHost('xn--bcher-kva.example'), true)
+    eq('ens avatar ipfs gateway origin', avatarUrl('ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG', 'https://gw.example'), 'https://gw.example/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')
     eq('ens avatar filtered', [avatarUrl('https://192.168.1.1/a.png'), avatarUrl('https://example.org/a.png')].join(','), ',https://example.org/a.png')
     const added = parseAddChainParams([{ chainId: '0x2105', chainName: 'Base', rpcUrls: ['https://mainnet.base.org'] }], { origin: 'https://app.example.org', now: () => 1 })
     eq('eip3085 parse', !isAddChainError(added) && added.caip2 === 'eip155:8453' && typeof added.source === 'object' && added.source.origin === 'https://app.example.org', true)
