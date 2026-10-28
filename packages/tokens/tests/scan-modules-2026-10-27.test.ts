@@ -51,14 +51,35 @@ describe('the fold is a confusables skeleton; another script is danger (scan 202
     expect(foldSymbol('0KB')).toBe(foldSymbol('OKB'))
   })
 
-  it('Cyrillic, Greek, Cherokee, math letters, emoji or invisible characters in a symbol are danger; Latin accents only caution', () => {
-    for (const symbol of ['РЕРЕ' /* Cyrillic */, 'ΑΒΓ', 'ᏚᎪᎷ' /* Cherokee */, '𝐏𝐄𝐏𝐄', 'PEPE🐸', 'PE​PE']) {
-      const r = risk(info({ symbol }), 'odd-characters')
-      expect(r?.level, symbol).toBe('danger')
+  it('letters that pass for Latin and characters that hide are danger; emoji, CJK and accents a caution (owner decision 2026-10-28)', () => {
+    for (const symbol of ['РЕРЕ' /* Cyrillic */, 'ΑΒΓ', 'ᏚᎪᎷ' /* Cherokee */, 'ᗅᑭᗴ' /* Canadian syllabics */, 'ᴜsᴅᴄ' /* small capitals */, '𝐏𝐄𝐏𝐄', 'ℂℍ𝕀ℕ', 'ⓊⓈⒹ',
+      'PE\u200BPE', 'PE\u202EPE' /* bidi override */, '\uFEFFPEPE']) {
+      expect(risk(info({ symbol }), 'odd-characters')?.level, symbol).toBe('danger')
     }
-    expect(risk(info({ symbol: 'CAFÉ' }), 'odd-characters')?.level).toBe('caution')
-    expect(risk(info({ symbol: 'PE PE' }), 'odd-characters')?.level).toBe('caution') // a space inside the symbol
+    for (const symbol of ['PEPE🐸', '猫币', 'LOVE❤\uFE0F' /* variation selector */, 'FAM👨\u200D👩\u200D👧' /* emoji joiner */, 'CAFÉ', 'PE PE', 'NUÑEZ']) {
+      expect(risk(info({ symbol }), 'odd-characters')?.level, symbol).toBe('caution')
+    }
     expect(risk(info({ name: 'Pépé' }), 'odd-characters')?.level).toBe('caution')
+    expect(risk(info({ name: 'Pe\u200Bpe' }), 'odd-characters')?.level).toBe('caution') // the name is shown next to the symbol, not as it
     expect(risk(info(), 'odd-characters')).toBeUndefined()
+  })
+
+  it('the review of 2026-10-28: controls, line breaks, blanks and tag characters hide; more look-alike blocks; ™ is not one', () => {
+    const danger = (symbol: string) => expect(risk(info({ symbol }), 'odd-characters')?.level, JSON.stringify(symbol)).toBe('danger')
+    const caution = (symbol: string) => expect(risk(info({ symbol }), 'odd-characters')?.level, JSON.stringify(symbol)).toBe('caution')
+    // hiding: C0 / C1 controls, a line break inside, braille blank, interlinear annotation, tag characters (ASCII smuggling), astral format controls
+    for (const symbol of ['US\u0000DC', 'PE\u0085PE', 'PE\nPE', 'PE\u2028PE', 'USDC\u2800', 'PE\uFFF9PE', 'US\uDB40\uDC41DC', 'PE\uDB40\uDD00PE', 'PE\uD834\uDD73PE', 'PE\uD82F\uDCA0PE']) danger(symbol)
+    // look-alike blocks: Roman numerals, Latin Extended-D small capitals, enclosed supplement, Tifinagh, Vai, Deseret, Osage, Old Italic, Warang Citi, Georgian look-alikes
+    for (const symbol of ['\u216FE\u216FE', 'U\uA731DC', '\uA731OL', '\uD83C\uDD64\uD83C\uDD62\uD83C\uDD53\uD83C\uDD52', '\u2D54KB', 'W\uA557TC', 'USD\uD801\uDC15', '\uD801\uDCC2KB', 'W\uD800\uDF01TC', '\uD806\uDCA0ET', '\u10BDOL']) danger(symbol)
+    // leading spaces do not push a look-alike out of what is checked
+    danger(`${' '.repeat(200)}РЕРЕ`)
+    danger(`${'\u3000'.repeat(200)}ΑΒΓ`)
+    // emoji stay a caution: ™ and the tag-sequence flags; Persian spelling with ZWNJ; Georgian that passes for nothing
+    for (const symbol of ['PEPE™', 'PEPE\u2122\uFE0F', 'PEPE\u2120', 'GB\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F', '\u0645\u06CC\u200C\u0634\u0648\u062F', '\u10E5\u10D0\u10E0\u10D7']) caution(symbol)
+    // a stray ZWNJ next to Latin letters still hides
+    danger('PE\u200CPE')
+    // a spacing accent folds away: "USDC´" is USDC
+    expect(risk(info({ symbol: 'USDC\u00B4' }), 'impersonation')).toBeDefined()
+    expect(risk(info({ symbol: 'US\u0000DC' }), 'impersonation')).toBeDefined() // fold sees through the control too
   })
 })

@@ -81,8 +81,13 @@ const CONFUSABLES: Readonly<Record<string, string>> = {
 const PAIRS: ReadonlyArray<[RegExp, string]> = [[/rn/g, 'm'], [/cl/g, 'd'], [/vv|VV/g, 'W']]
 /** Combining marks: an accent over a Latin letter reads as the letter. */
 const MARKS = /[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff\u20d0-\u20ff\ufe20-\ufe2f]/g
-/** Zero-width, bidi and other invisible format characters. */
-const INVISIBLE = /[­͏؜ᅟᅠ឴឵᠋-᠏​-‏‪-‮⁠-⁯ㅤ︀-️﻿ﾠ]/g
+/**
+ * Characters a reader does not see: zero-width, bidi and other format characters, C0 / C1 controls,
+ * fillers and blank glyphs (Hangul fillers, U+2800 braille blank), interlinear annotation, and the
+ * astral ones — tag characters (ASCII smuggling), variation selectors 17–256, musical and shorthand
+ * format controls. Explicit ranges: Hermes has no Unicode property escapes.
+ */
+const INVISIBLE = /[\x00-\x08\x0E-\x1F\x7F-\x9F\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u2800\u3164\uFE00-\uFE0F\uFEFF\uFFA0\uFFF9-\uFFFB]|\uDB40[\uDC00-\uDC7F\uDD00-\uDDEF]|\uD834[\uDD59\uDD73-\uDD7A]|\uD82F[\uDCA0-\uDCA3]/g
 
 /**
  * A symbol folded the way a reader sees it — a confusables skeleton in the spirit of UTS #39: invisible
@@ -91,8 +96,10 @@ const INVISIBLE = /[­͏؜ᅟᅠ឴឵᠋-᠏​-‏‪-‮⁠-⁯ㅤ︀-️﻿�
  * case. Only the first {@link TOKEN_SYMBOL_MAX} code points are read (scan 2026-10-27 modules, F36).
  */
 export function foldSymbol(text: string): string {
-  let s = tokenText(text, TOKEN_SYMBOL_MAX).replace(INVISIBLE, '').replace(/\s+/g, '')
+  let s = tokenText(text, TOKEN_SYMBOL_MAX).replace(INVISIBLE, '')
   if (typeof s.normalize === 'function') s = s.normalize('NFKD').replace(MARKS, '')
+  // After NFKD: a spacing accent (´ ¨ ¸ ‾) decomposes into a space and a mark.
+  s = s.replace(/\s+/g, '')
   // Fullwidth ASCII by hand too: some Hermes builds ship without String.prototype.normalize.
   s = s.replace(/[\uFF01-\uFF5E]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
   for (const [re, to] of PAIRS) s = s.replace(re, to)
@@ -126,14 +133,30 @@ function lookalikeOf(folded: string, chain: string | undefined): string | undefi
 }
 
 const PLAIN = /^[\x20-\x7E]*$/
-/** Latin letters beyond ASCII (accented, extended) and fullwidth ASCII. */
-const LATIN = /^[À-ÖØ-öø-ɏḀ-ỿ！-～]$/
+/**
+ * Letters that pass for Latin ones, by block (the whole block, as for Cyrillic): IPA and spacing
+ * modifier letters, Greek, Cyrillic, Armenian, Cherokee, Canadian syllabics, runic, phonetic letters
+ * and small capitals (also Latin Extended-D / E), letterlike symbols (ℂ ℍ ℕ — not ™ ℠ ℗), Roman
+ * numerals, enclosed letters and digits (Ⓤ ①, 🅤), Coptic, Tifinagh, Lisu, Vai, mathematical letters
+ * (𝐔) and the astral Deseret, Osage, Lycian, Carian, Old Italic and Warang Citi; for Georgian, a living
+ * script, only its look-alike letters (Ⴝ ყ ჿ Ჽ ⴭ…). Explicit ranges: Hermes has no Unicode property
+ * escapes. Emoji, CJK, Arabic, Hebrew, Thai and accented Latin are not here: a caution, not a danger.
+ */
+const LOOKALIKE_LETTERS = /[\u0250-\u02FF\u0370-\u03FF\u0400-\u052F\u0530-\u058F\u10B9\u10BD\u10C7\u10CD\u10E7\u10FD\u10FF\u13A0-\u13FF\u1400-\u167F\u16A0-\u16FF\u1C80-\u1C8F\u1C95\u1CB7\u1CBD\u1CBF\u1D00-\u1DBF\u1F00-\u1FFF\u2100-\u2116\u2118-\u211F\u2121\u2123-\u214F\u2160-\u2188\u2460-\u24FF\u2C80-\u2CFF\u2D2D\u2D30-\u2D7F\u2DE0-\u2DFF\uA4D0-\uA4FF\uA500-\uA63F\uA640-\uA69F\uA720-\uA7FF\uAB30-\uABBF]|\uD835[\uDC00-\uDFFF]|\uD83C[\uDD10-\uDD69]|\uD801[\uDC00-\uDC4F\uDCB0-\uDCFF]|\uD800[\uDE80-\uDEDF\uDF00-\uDF2F]|\uD806[\uDCA0-\uDCFF]/
+/**
+ * What hides inside text: {@link INVISIBLE} without the joiner and the variation selectors 1–16
+ * emoji are built with.
+ */
+const HIDING = /[\x00-\x08\x0E-\x1F\x7F-\x9F\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B\u200C\u200E\u200F\u202A-\u202E\u2060-\u206F\u2800\u3164\uFEFF\uFFA0\uFFF9-\uFFFB]|\uDB40[\uDC00-\uDC7F\uDD00-\uDDEF]|\uD834[\uDD59\uDD73-\uDD7A]|\uD82F[\uDCA0-\uDCA3]/
+/** A line break inside a symbol: what follows it is on a line a one-line label does not show. */
+const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/
+/** Emoji built from tag characters (the England, Scotland and Wales flags) are emoji, not hidden text. */
+const EMOJI_TAG_SEQUENCE = /\uD83C\uDFF4(?:\uDB40[\uDC20-\uDC7E])+\uDB40\uDC7F/g
+/** Zero-width non-joiner between two non-ASCII characters is spelling (Persian, Indic scripts), not hiding. */
+const SPELLING_ZWNJ = /([^\x00-\x7F])\u200C(?=[^\x00-\x7F])/g
+/** Letters that pass for Latin ones, or characters that hide, in `text`. */
+const passesOrHides = (text: string): boolean => LOOKALIKE_LETTERS.test(text) || HIDING.test(text.replace(EMOJI_TAG_SEQUENCE, '').replace(SPELLING_ZWNJ, '$1'))
 
-/** `true` when a symbol has a character that is neither printable ASCII nor a Latin letter: another script, an emoji, an invisible character. */
-function outsideLatin(symbol: string): boolean {
-  for (const ch of symbol) if (!(ch >= ' ' && ch <= '~') && !LATIN.test(ch)) return true
-  return false
-}
 
 /**
  * Warnings for a token read with `getTokenInfo`, for a token the wallet's list does not include.
@@ -153,11 +176,15 @@ export function assessToken(info: TokenInfo, chain?: string): TokenAssessment {
   if (lookalike) {
     risks.push({ code: 'impersonation', level: 'danger', message: `It calls itself ${JSON.stringify(symbol)}, like ${lookalike}, but it is a different token at a different address.` })
   }
-  if (outsideLatin(info.symbol.slice(0, 4 * TOKEN_SYMBOL_MAX))) {
-    // Another script in a symbol is how a token passes for a known one (scan 2026-10-27 modules, F36).
-    risks.push({ code: 'odd-characters', level: 'danger', message: 'Its symbol uses characters outside the Latin alphabet (Cyrillic, Greek, invisible ones…), which can pass for the letters of another token.' })
+  // The raw head (what a host showing the raw symbol shows) and the stored symbol (what this wallet shows):
+  // leading spaces must not push the look-alike out of the part that is checked.
+  const head = info.symbol.slice(0, 4 * TOKEN_SYMBOL_MAX)
+  if (passesOrHides(head) || passesOrHides(symbol) || LINE_BREAK.test(symbol)) {
+    // Letters of another alphabet that pass for Latin ones, or characters that hide, are how a token passes for a
+    // known one (scan 2026-10-27 modules, F36). Emoji, CJK and accented Latin stay a caution (owner decision 2026-10-28).
+    risks.push({ code: 'odd-characters', level: 'danger', message: 'Its symbol uses letters of another alphabet that pass for Latin ones (Cyrillic, Greek…) or characters that hide in text.' })
   } else if (!PLAIN.test(symbol) || /\s/.test(symbol) || !PLAIN.test(name) || name !== name.replace(INVISIBLE, '')) {
-    risks.push({ code: 'odd-characters', level: 'caution', message: 'Its symbol or name uses characters that can look like other letters, spaces inside the symbol, or invisible ones.' })
+    risks.push({ code: 'odd-characters', level: 'caution', message: 'Its symbol or name uses unusual characters (emoji, other scripts, accents), spaces inside the symbol, or invisible ones.' })
   }
   if (!symbol) risks.push({ code: 'no-symbol', level: 'caution', message: 'The token reports no symbol.' })
   if (info.totalSupply === 0n) risks.push({ code: 'zero-supply', level: 'caution', message: 'Nothing has been minted.' })
