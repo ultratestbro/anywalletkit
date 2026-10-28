@@ -42,13 +42,39 @@ export function anySignal(signals: readonly AbortSignal[]): AbortSignal {
   return ctrl.signal;
 }
 
+/** Longest URL scheme taken out (`https`, `wss`, `git+ssh`…): a letter and up to 31 of `[A-Za-z0-9+.-]`. */
+const SCHEME_MAX = 32;
+const isLetter = (c: number): boolean => (c >= 97 && c <= 122) || (c >= 65 && c <= 90);
+const isSchemeChar = (c: number): boolean => isLetter(c) || (c >= 48 && c <= 57) || c === 43 || c === 45 || c === 46;
+/** What ends a URL in text: `\s` as regexes define it, and `"` `'` `<` `>`. */
+const endsUrl = (c: number): boolean =>
+  c === 34 || c === 39 || c === 60 || c === 62 || (c >= 9 && c <= 13) || c === 32 || c === 0xa0 || c === 0x1680 ||
+  (c >= 0x2000 && c <= 0x200a) || c === 0x2028 || c === 0x2029 || c === 0x202f || c === 0x205f || c === 0x3000 || c === 0xfeff;
+
 /**
  * Remove URLs from text that may travel to a client (a refusal reason, a build error):
  * transport errors carry the endpoint — and with a keyed RPC (QuickNode, Alchemy,
- * Infura…) the key sits in its path (scan 2026-10-23 F8).
+ * Infura…) the key sits in its path (scan 2026-10-23 F8). What `/[a-z][a-z0-9+.-]{0,31}:\/\/[^\s"'<>]+/gi`
+ * would replace, found from each `://` instead of tried at every position: linear in the length of
+ * `text` whatever an API or a client puts in it ("a.a.a…" made the regex this replaced quadratic;
+ * scan 2026-10-27 modules, F34). A URL glued to a word loses its last 32 scheme characters and the rest.
  */
 export function redactUrls(text: string): string {
-  return text.replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, "<url>");
+  let out = "";
+  let done = 0; // text[0, done) is in `out`
+  for (let at = text.indexOf("://"); at !== -1; at = text.indexOf("://", at + 3)) {
+    let start = at;
+    while (start > done && at - start < SCHEME_MAX && isSchemeChar(text.charCodeAt(start - 1))) start--;
+    while (start < at && !isLetter(text.charCodeAt(start))) start++;
+    if (start === at) continue; // no scheme: not a URL (and its tail is not scanned, so "://://…" stays linear)
+    let end = at + 3;
+    while (end < text.length && !endsUrl(text.charCodeAt(end))) end++;
+    if (end === at + 3) continue; // nothing after "://"
+    out += `${text.slice(done, start)}<url>`;
+    done = end;
+    at = end - 3;
+  }
+  return done === 0 ? text : out + text.slice(done);
 }
 
 /**

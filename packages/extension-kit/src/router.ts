@@ -20,7 +20,7 @@ import { UserRejectedError } from '@anywalletkit/core'
 import { ApprovalQueue, ReviewDeclined } from './approvals.js'
 import { DEFAULT_CHAIN, NetworksTable, caip2FromChainId, chainHex, parseAddChainParams, type EvmNetwork } from './networks.js'
 import { PermissionStore, type OriginPermission } from './permissions.js'
-import { RELAY_ERRORS, type RelayChain, type RelayError } from './relay.js'
+import { RELAY_ERRORS, isRelayMethod, type RelayChain, type RelayError } from './relay.js'
 
 export class RouterError extends Error {
   readonly code: number
@@ -46,9 +46,16 @@ export interface RelayErrorOptions {
 const PROVIDER_CODES: ReadonlySet<number> = new Set([4001, 4100, 4200, 4900, 4901, 4902])
 /** A node's JSON-RPC error: execution reverted (3) or the reserved -32768…-32000 range. */
 const isNodeCode = (code: unknown): code is number => typeof code === 'number' && Number.isInteger(code) && (code === 3 || (code >= -32768 && code <= -32000))
-const URL_RE = /\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>()]+/gi
-/** A message as a page may see it: no URLs (RPC keys live in their paths and queries), one line, bounded. */
-const pageText = (text: string): string => text.replace(URL_RE, '[url]').split('\n')[0]!.slice(0, 300)
+/**
+ * A URL in an error message. The scheme is bounded, so a long run of scheme characters (a node's
+ * or a page's own text) costs a constant per position instead of a scan to the end of the string;
+ * there is no `\b`, so a URL glued to a word is still caught (scan 2026-10-27 modules, F5).
+ */
+const URL_RE = /[a-z][a-z0-9+.-]{0,31}:\/\/[^\s"'<>()]+/gi
+/** How much of a message is read at all: the page sees 300 characters of its first line. */
+const PAGE_TEXT_WINDOW = 1024
+/** A message as a page may see it: no URLs (RPC keys live in their paths and queries), one line, bounded — bounded before the regex runs. */
+const pageText = (text: string): string => text.slice(0, PAGE_TEXT_WINDOW).split('\n', 1)[0]!.replace(URL_RE, '[url]').slice(0, 300)
 const isHexData = (v: unknown): v is string => typeof v === 'string' && /^0x[0-9a-fA-F]*$/.test(v) && v.length <= 2 + 2 * 8192
 
 /**
@@ -146,6 +153,8 @@ export class RequestRouter {
   async handle(origin: string, chain: RelayChain, method: string, rawParams: unknown): Promise<unknown> {
     const refused = this.deps.refuse?.(origin)
     if (refused) throw new RouterError(RELAY_ERRORS.unauthorized, refused)
+    // Only a method name is echoed back in the refusals below, never whatever text the page sent.
+    if (!isRelayMethod(method)) throw new RouterError(RELAY_ERRORS.invalidRequest, 'The request has no valid method name.')
     if (chain !== 'eip155') throw new RouterError(RELAY_ERRORS.unsupportedMethod, `${chain} providers are not available yet.`)
     const params = Array.isArray(rawParams) ? rawParams : rawParams === undefined ? [] : [rawParams]
     const network = await this.chainFor(origin)

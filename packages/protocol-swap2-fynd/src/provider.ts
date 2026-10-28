@@ -69,6 +69,11 @@ interface FyndOrderQuote {
 }
 
 const uint = (v: unknown): bigint | null => (typeof v === "string" && /^\d+$/.test(v) ? BigInt(v) : null);
+/** A protocol name from the API as it may appear in a refusal or the quote: at most 40 characters (scan 2026-10-27 modules, F34). */
+const protocolName = (p: string): string => (p.length > 40 ? `${p.slice(0, 40)}…` : p);
+/** Hex or an address, compared without case (length first: the client's side may be a megabyte). */
+const sameText = (a: string, b: string): boolean => a.length === b.length && a.toLowerCase() === b.toLowerCase();
+const sameAmount = (a: string, b: string): boolean => /^\d{1,80}$/.test(a) && /^\d{1,80}$/.test(b) && BigInt(a) === BigInt(b);
 
 export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
   const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
@@ -198,7 +203,7 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
       }
       const allProtocols = [...new Set((q.route?.swaps ?? []).map((s) => s.protocol).filter((p): p is string => typeof p === "string"))];
       const banned = allProtocols.find(isExcluded);
-      if (banned) return refuse(`the route goes through ${banned}, which this wallet excludes`);
+      if (banned) return refuse(`the route goes through ${protocolName(banned)}, which this wallet excludes`);
       // Native input needs no allowance: the exact transaction can be executed
       // against the latest block right now, so a route that would revert never
       // enters the auction. (ERC-20 input is simulated in preflightDeposit,
@@ -207,12 +212,12 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
         try {
           await rpc(chainId, "eth_call", [{from: sender, to: tx.to, data: tx.data, value: `0x${value.toString(16)}`}, "latest", {[sender]: {balance: `0x${(value + 10n ** 18n).toString(16)}`}}]);
         } catch (e) {
-          if ((e as {rpc?: boolean}).rpc) return refuse(`the route does not execute on-chain right now (simulation reverted via ${allProtocols.join(", ") || "?"})`);
+          if ((e as {rpc?: boolean}).rpc) return refuse(`the route does not execute on-chain right now (simulation reverted via ${allProtocols.slice(0, 6).map(protocolName).join(", ") || "?"})`);
           // no RPC answered: the router still enforces the minimum
         }
       }
       const gas = uint(q.gas_estimate) ?? 0n;
-      const protocols = allProtocols.slice(0, 6);
+      const protocols = allProtocols.slice(0, 6).map(protocolName);
       return {
         provider: "fynd",
         intentId: `fynd:${chainId}`,
@@ -246,13 +251,21 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
       };
     },
 
-    /** Simulate the exact transaction at the latest block (allowance already in place); refuse when it would revert. */
+    /**
+     * Simulate the exact transaction at the latest block (allowance already in place); refuse when it would revert.
+     * Only the quote's own transaction is simulated: behind a backend `tx` is the client's and only the quote is
+     * sealed, so a client's call (any target, a megabyte of calldata) never reaches this RPC (scan 2026-10-27 modules, F24).
+     */
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
       const chainId = Number(quote.intentId.split(":")[1]);
       const sender = quote.providerData?.sender;
       if (!FYND_CHAINS[chainId] || !config.rpcUrls?.[chainId]?.length || !tx.data || !sender) return;
+      const quoted = quote.txRequest;
+      if (!quoted?.to || !quoted.data || !sameText(tx.to, quoted.to) || !sameText(tx.data, quoted.data) || !sameAmount(tx.value || "0", quoted.value ?? "0")) {
+        throw new Error("fynd: the transaction is not the quoted swap. Nothing was sent; refresh the quote.");
+      }
       try {
-        await rpc(chainId, "eth_call", [{from: sender, to: tx.to, data: tx.data, value: `0x${BigInt(tx.value || "0").toString(16)}`}, "latest"]);
+        await rpc(chainId, "eth_call", [{from: sender, to: quoted.to, data: quoted.data, value: `0x${BigInt(quoted.value ?? "0").toString(16)}`}, "latest"]);
       } catch (e) {
         if ((e as {rpc?: boolean}).rpc) {
           throw new Error(`fynd: the swap would revert now (${e instanceof Error ? e.message.slice(0, 120) : "revert"}) — the price moved past your minimum. Nothing was sent; refresh the quote.`);

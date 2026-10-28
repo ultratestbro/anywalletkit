@@ -194,7 +194,7 @@ export function createSwap2Handler<C = unknown>(opts: Swap2HandlerOptions<C>): (
             const tokened = {...normalized, intentId: `${normalized.intentId}~${await intentTag(providerName, subject, normalized.intentId)}`};
             return ok(await seal(providerName, subject, tokened));
           }
-          if (refusal) return ok({noQuote: redactUrls(String(refusal)).slice(0, 300)});
+          if (refusal) return ok({noQuote: clientText(String(refusal))});
           return ok(params.dry === false ? {noQuote: `${providerName} refused without naming a reason`} : null);
         }
         case "build":
@@ -274,14 +274,17 @@ async function refused<T>(fn: () => Promise<T>): Promise<T> {
     return await fn();
   } catch (err) {
     if (err instanceof Error && /^[a-z0-9_-]+: \S/i.test(err.message)) {
-      throw new Swap2HandlerError(422, redactUrls(err.message).slice(0, 300));
+      throw new Swap2HandlerError(422, clientText(err.message));
     }
     throw err;
   }
 }
 
+/** What a client is shown of a provider's text: cut before the URL pass runs (scan 2026-10-27 modules, F34), no URLs, 300 characters. */
+const clientText = (text: string): string => redactUrls(text.slice(0, 2_048)).slice(0, 300);
+
 const ok = (body: unknown): Swap2Response => ({status: 200, body: body === undefined ? null : body});
-const fail = (status: number, error: string): Swap2Response => ({status, body: {error: redactUrls(error).slice(0, 300)}});
+const fail = (status: number, error: string): Swap2Response => ({status, body: {error: clientText(error)}});
 
 // ---- validation (the limits mirror a production backend's schema) --------------------------
 

@@ -108,9 +108,18 @@ const CHAINS: ReadonlySet<string> = new Set<RelayChain>(['eip155', 'solana', 'to
 
 const isRecord = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null
 const isId = (x: unknown): x is string => typeof x === 'string' && x.length > 0 && x.length <= 64
+/** Longest method name a request may carry. */
+export const RELAY_METHOD_MAX = 128
+/**
+ * A method name as the providers spell them (`eth_sendTransaction`, `signAndSendTransaction`,
+ * `tron_requestAccounts`): letters, digits and `_`, at most {@link RELAY_METHOD_MAX}. Anything else
+ * is dropped at the relay, so a megabyte "method" never reaches a regex, a log or an error message
+ * (scan 2026-10-27 modules, F5).
+ */
+export const isRelayMethod = (x: unknown): x is string => typeof x === 'string' && x.length > 0 && x.length <= RELAY_METHOD_MAX && /^[A-Za-z0-9_]+$/.test(x)
 
 export function isPageRequest(x: unknown): x is PageRequest {
-  return isRecord(x) && x.target === PAGE_TARGET.toContent && isId(x.id) && CHAINS.has(x.chain as string) && typeof x.method === 'string'
+  return isRecord(x) && x.target === PAGE_TARGET.toContent && isId(x.id) && CHAINS.has(x.chain as string) && isRelayMethod(x.method)
 }
 
 export function isPageResponse(x: unknown): x is PageResponse {
@@ -122,7 +131,7 @@ export function isPageEvent(x: unknown): x is PageEvent {
 }
 
 export function isRelayRequest(x: unknown): x is RelayRequest {
-  return isRecord(x) && x.kind === 'request' && isId(x.id) && typeof x.origin === 'string' && CHAINS.has(x.chain as string) && typeof x.method === 'string'
+  return isRecord(x) && x.kind === 'request' && isId(x.id) && typeof x.origin === 'string' && CHAINS.has(x.chain as string) && isRelayMethod(x.method)
 }
 
 export function isRelayToContent(x: unknown): x is RelayToContent {

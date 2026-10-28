@@ -2,6 +2,8 @@
 // provider + account only — no network, no keys; every refusal asserts that nothing was sent.
 import {describe, expect, it} from "vitest";
 import {Swap2ValidationError} from "../src/errors.js";
+import {createSwap2Handler} from "../src/server.js";
+import {redactUrls} from "../src/util.js";
 import {SingleProviderSwap2} from "../src/swap2/single.js";
 import type {Swap2EngineConfig} from "../src/swap2/base.js";
 import type {CrossChainProvider, Quote, QuoteParams, UnsignedTx} from "../src/types.js";
@@ -298,5 +300,65 @@ describe("scan 2026-10-27 modules G4 (F4): typed data from a provider is signed 
     const r = typedRemote(order(), LOP, {verifyBuild: () => "salt does not commit the order extension"});
     await expect(g3protocol(r.provider, t.account).swap2(g3options)).rejects.toThrow(/the build fails this app's own check — salt does not commit/);
     expect([t.sent, t.signed, r.registered]).toEqual([[], [], []]);
+  });
+});
+
+// G11 (F34): `redactUrls` ran an unbounded-scheme regex from every word boundary, and the server ran it over a provider's
+// whole refusal or error before cutting it to 300 characters — text an API controls ("a.a.a…") cost quadratic time.
+describe("scan 2026-10-27 modules G11 (F34): text a client sees is cut before the URL pass, and the pass is linear", () => {
+  const KEYED = "https://base-mainnet.example-rpc.io/v2/sk_live_9f8e7d6c5b4a";
+  const timed = async <T>(fn: () => T | Promise<T>): Promise<{value: T; ms: number}> => {
+    const t0 = performance.now();
+    const value = await fn();
+    return {value, ms: performance.now() - t0};
+  };
+  const PARAMS: QuoteParams = {sourceChain: "eip155:1", sourceToken: "USDC", destChain: "eip155:1", destToken: USDC, amountIn: "1000000", destAddress: SELF, refundAddress: SELF, dry: false};
+  function handlerWith(text: string) {
+    const provider: CrossChainProvider = {
+      name: "mock", enabled: () => true, supportsRoute: () => true,
+      getQuote: async (params) => { params.onRefusal?.(`mock: ${text}`); return null; },
+      buildDeposit: async () => { throw new Error(`mock: ${text}`); },
+      trackIntent: async () => ({state: "pending"}),
+    };
+    return createSwap2Handler({providers: [provider], sealSecret: "s".repeat(32), guard: () => {}});
+  }
+
+  it("64 KB of scheme characters: redactUrls and the server's refusal well under 100 ms (was quadratic)", async () => {
+    const text = "a.".repeat(32_768);
+    expect((await timed(() => redactUrls(text))).ms).toBeLessThan(100);
+    const {value, ms} = await timed(() => handlerWith(text)("quote", {provider: "mock", params: PARAMS}, null));
+    expect(ms).toBeLessThan(100);
+    expect(((value.body as {noQuote: string}).noQuote).length).toBeLessThanOrEqual(300);
+  });
+
+  it("1 MB inputs of every hostile shape: well under 100 ms, refusals and build errors at most 300 characters, no URL", async () => {
+    for (const text of ["a.".repeat(500_000), "a".repeat(1_000_000), "a://".repeat(250_000), "://".repeat(333_333), "a:// ".repeat(200_000), `${"x".repeat(999_000)} ${KEYED}`]) {
+      expect((await timed(() => redactUrls(text))).ms).toBeLessThan(100);
+      const handle = handlerWith(text);
+      const refusal = await timed(() => handle("quote", {provider: "mock", params: PARAMS}, null));
+      expect(refusal.ms).toBeLessThan(100);
+      expect((refusal.value.body as {noQuote: string}).noQuote.length).toBeLessThanOrEqual(300);
+      expect(JSON.stringify(refusal.value.body)).not.toContain("sk_live");
+    }
+  });
+
+  it("replaces exactly what the bounded regex would, on 20 000 random strings (seeded)", () => {
+    const REFERENCE = /[a-z][a-z0-9+.-]{0,31}:\/\/[^\s"'<>]+/gi;
+    const alphabet = ["a", "Z", "h", "s", "1", ".", "+", "-", ":", "/", "//", "://", " ", "\n", "\u00a0", '"', "'", "<", ">", "(", "é", "_", "https://k.example/v2/KEY"];
+    let seed = 0x5eed;
+    const rand = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    for (let n = 0; n < 20_000; n++) {
+      let text = "";
+      for (let len = Math.floor(rand() * 48); len > 0; len--) text += alphabet[Math.floor(rand() * alphabet.length)];
+      if (n % 7 === 0) text = `${"w".repeat(Math.floor(rand() * 40))}${text}`; // long words before a scheme
+      expect(redactUrls(text), JSON.stringify(text)).toBe(text.replace(REFERENCE, "<url>"));
+    }
+  });
+
+  it("URLs still go: keyed RPC URLs, one glued to a long word, one cut by the window", async () => {
+    expect(redactUrls(`no RPC answered (${KEYED})`)).toBe("no RPC answered (<url>"); // a URL runs to whitespace or a quote, as before
+    expect(redactUrls(`${"w".repeat(40)}${KEYED} failed`)).toMatch(/<url> failed$/);
+    const cut = await handlerWith(`${"z ".repeat(1_010)}${KEYED}`)("quote", {provider: "mock", params: PARAMS}, null);
+    expect(JSON.stringify(cut.body)).not.toContain("sk_live");
   });
 });

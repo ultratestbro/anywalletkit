@@ -92,7 +92,8 @@ const routerToken = (t: string) => (sameAddress(t, ZERO) ? ROUTER_NATIVE : t);
 export function checkFyndTransaction(tx: EncodedTx, expected: ExpectedSwap): {method: "singleSwap" | "sequentialSwap" | "splitSwap"} {
   const chain = FYND_CHAINS[expected.chainId];
   if (!chain) throw new FyndTransactionError(`chain ${expected.chainId} has no pinned Tycho router`);
-  if (!sameAddress(tx.to, chain.router)) throw new FyndTransactionError(`the transaction targets ${tx.to}, not the Tycho router on ${chain.name}`);
+  // `tx.to` is the API's: named in the refusal only when it is an address (scan 2026-10-27 modules, F34).
+  if (!sameAddress(tx.to, chain.router)) throw new FyndTransactionError(`the transaction targets ${/^0x[0-9a-fA-F]{40}$/.test(tx.to) ? tx.to : "something that is not an address"}, not the Tycho router on ${chain.name}`);
   if (sameAddress(expected.receiver, ZERO) || sameAddress(expected.receiver, chain.router)) throw new FyndTransactionError("invalid receiver");
   if (expected.amountIn <= 0n || expected.minAmountOut <= 0n || expected.minAmountOut > expected.expectedAmountOut) {
     throw new FyndTransactionError("invalid quote amounts");

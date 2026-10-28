@@ -23,6 +23,8 @@ const DEFAULT_API = "https://api-v3.balancer.fi/";
 const DEFAULT_SLIPPAGE_BPS = 50;
 const DEFAULT_TTL_MS = 300_000;
 const DEFAULT_DEADLINE_S = 600;
+/** Most pool hops one batch may carry: the SOR's splits are a handful; a batch past this is refused at quote and at preflight. */
+export const BALANCER_MAX_SWAPS = 16;
 
 /** Chains where the v2 Vault is live, with the SOR API name and the Vault's WETH() (verified on-chain 2026-10-13). */
 export const BALANCER_V2_CHAINS: Readonly<Record<number, {api: string; weth: `0x${string}`}>> = Object.freeze({
@@ -200,6 +202,7 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
             swaps.push({poolId: pool as Hex, assetInIndex: indexOf(p.tokens[i]!.address), assetOutIndex: indexOf(p.tokens[i + 1]!.address), amount: i === 0 ? BigInt(p.inputAmountRaw) : 0n, userData: "0x"});
           });
         }
+        if (swaps.length > BALANCER_MAX_SWAPS) return refuse(`the SOR route has ${swaps.length} pool hops, more than ${BALANCER_MAX_SWAPS}`);
         const inIdx = bigintToNumber(indexOf(tokenIn));
         const outIdx = bigintToNumber(indexOf(tokenOut));
         // The Vault's ETH sentinel: native in/out wraps/unwraps through its WETH.
@@ -255,14 +258,25 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
       }
     },
 
-    /** Re-price the exact signed batch right before broadcast; refuse when the pools now pay under the minimum. */
+    /**
+     * Re-price the exact signed batch right before broadcast; refuse when the pools now pay under the minimum.
+     * Only the quote's own batch is decoded and priced: behind a backend, `tx` is the client's and only the
+     * quote is sealed, so a client's batch (any size, any pools) never reaches the decoder or the RPC
+     * (scan 2026-10-27 modules, F24).
+     */
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
       const chainId = Number(quote.intentId.split(":")[1]);
       const minOut = quote.providerData?.minOut;
       if (!BALANCER_V2_CHAINS[chainId] || !minOut || !tx.data) return;
-      const call = decodeFunctionData({abi: VAULT_ABI, data: tx.data as Hex});
+      const quoted = quote.txRequest?.data;
+      if (!quoted || tx.data.length !== quoted.length || tx.data.toLowerCase() !== quoted.toLowerCase()) {
+        throw new Error("balancer: the transaction is not the quoted batch. Nothing was sent; refresh the quote.");
+      }
+      const call = decodeFunctionData({abi: VAULT_ABI, data: quoted as Hex});
       if (call.functionName !== "batchSwap") throw new Error("balancer: the transaction is not a Vault batchSwap");
       const [, swaps, assets, funds, limits] = call.args;
+      if (swaps.length === 0 || swaps.length > BALANCER_MAX_SWAPS) throw new Error(`balancer: the batch has ${swaps.length} pool hops, not 1–${BALANCER_MAX_SWAPS}`);
+      if (swaps.some((step) => step.userData !== "0x")) throw new Error("balancer: the batch carries pool userData this module never sends");
       const outIdx = limits.findIndex((l) => l < 0n);
       const deltas = await query(chainId, swaps, assets, funds);
       const out = -deltas[outIdx]!;
