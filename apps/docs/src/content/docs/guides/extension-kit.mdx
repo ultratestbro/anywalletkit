@@ -62,7 +62,7 @@ unlocked session; a locked session throws `VaultError` with the code `locked`.
 | `VaultError` code | When |
 |---|---|
 | `wrong-password` | Wrong password, wrong passkey, or an envelope that was edited on disk. AES-GCM can't tell these apart. |
-| `locked` | A secret was read after the session locked |
+| `locked` | A secret was read after the session locked, or `setSecret` got a key that does not open the vault (one `rotateVaultKey` retired) |
 | `exists` | `create` while a vault exists |
 | `weak-kdf` | The stored KDF settings are below the floor this build accepts |
 | `unsupported-envelope` | An envelope of an unknown shape, or one whose KDF cost or size is above `VAULT_LIMITS` (refused before any KDF runs) |
@@ -70,6 +70,22 @@ unlocked session; a locked session throws `VaultError` with the code `locked`.
 
 A passkey is a second key to the same vault, not a replacement for the password. Keep the
 password as the recovery path, and let users remove a passkey (`vault.removePasskey`).
+
+`changePassword` re-wraps the same vault key, and removing a passkey does not take back a key
+it already opened. After a suspected compromise (a copied browser profile, a leaked session, a
+lost passkey), offer **re-key the vault**: `vault.rotateVaultKey(password)` makes a new vault key,
+re-seals every secret under it and writes the vault once, so a failure leaves the old one as it
+was. Hand the key it returns to `session.unlock`, which replaces the old one. Passkeys are
+dropped, because they wrap the old key; ask the user to add them again. The old key opens
+nothing in the new vault, and `setSecret` refuses it.
+
+```ts
+await session.unlock(await vault.rotateVaultKey(password))
+```
+
+The relay drops a request whose `method` is not a method name (letters, digits and `_`, at most
+128 characters, `isRelayMethod`). Reject such a request in your injected provider with `-32600`,
+so the page gets an answer.
 
 Auto-lock defaults to 15 minutes (`SESSION_DEFAULT_AUTOLOCK_MS`). Change it with
 `session.setAutoLockMs(ms)`, and call `session.touch()` when the user is active in your UI.

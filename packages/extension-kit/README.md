@@ -36,7 +36,7 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
 | Vault | `Vault`, `chromeLocalVaultStorage`, `memoryVaultStorage`, `VAULT_SCRYPT`, `VAULT_LIMITS`, `VAULT_MIN_PASSWORD_LENGTH` | every secret at rest in `chrome.storage.local`, two key layers (a KEK wraps a DEK, the DEK seals each secret); passkey (WebAuthn PRF) unlock as a second wrap of the same DEK |
 | Session | `Session`, `chromeSessionStorage`, `chromeAlarms`, `SESSION_DEFAULT_AUTOLOCK_MS` | the DEK in `chrome.storage.session` with an expiry and an alarm; `getKey()` re-checks the expiry itself |
 | Keyring adapters | `chromeKeyringStorage`, `vaultSecretStorage` | `@anywalletkit/keyring` metadata as plain JSON, secrets through the vault, one DEK use per call |
-| Relay | `PageRequest` / `RelayRequest` shapes and guards, `pageRequestFrom`, `stampOrigin`, `checkSenderOrigin`, `RELAY_ERRORS` | page ⇄ content script ⇄ service worker messages; the content script takes only messages the page window itself posted (`pageRequestFrom(event, window)`: an iframe's `parent.postMessage` is not the site), and the origin is the browser's (`port.sender`), never the page's |
+| Relay | `PageRequest` / `RelayRequest` shapes and guards, `isRelayMethod`, `pageRequestFrom`, `stampOrigin`, `checkSenderOrigin`, `RELAY_ERRORS` | page ⇄ content script ⇄ service worker messages; the content script takes only messages the page window itself posted (`pageRequestFrom(event, window)`: an iframe's `parent.postMessage` is not the site), and the origin is the browser's (`port.sender`), never the page's |
 | Router | `RequestRouter`, `READ_METHODS`, `SIGNING_METHODS`, `toRelayError` | what a dApp may call: accounts only for connected origins, chain add / switch through the approval window, reads from the wallet's own RPCs, `eth_sign` never offered, everything else 4200 |
 | Permissions | `PermissionStore`, `CHAIN_ACCOUNT_KEYS` | per-origin accounts (EVM, Solana, TON, Tron, Bitcoin, NEAR) and chain |
 | Approvals | `ApprovalQueue`, `ReviewDeclined`, `QueueLimitError`, `APPROVALS_MAX_PENDING_PER_ORIGIN` | one approval window at a time, at most 3 pending requests per origin and one pending `connect`; transport notes (`setVia`) for WalletConnect peers |
@@ -68,6 +68,12 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
   `create` never overwrites; reset is an explicit `destroy()`.
 - **Passkeys.** A passkey wraps the same DEK under HKDF-SHA256(PRF output,
   salt = credential id); the password stays the recovery path.
+- **Re-keying.** `changePassword` re-wraps the same DEK, and `removePasskey`
+  does not take back a DEK the passkey already unwrapped. After a suspected
+  compromise, `rotateVaultKey(password)` makes a fresh DEK, re-seals every
+  secret, drops the passkeys (register them again) and writes one envelope;
+  hand the returned DEK to `session.unlock`, which replaces the old one.
+  `setSecret` refuses a DEK that does not open the vault's secrets.
 - **Unlocked state.** Only the DEK is kept, in `chrome.storage.session`
   (memory-only, trusted contexts), with an expiry enforced on every read and an
   alarm that locks; key buffers this package owns are zeroized after use.

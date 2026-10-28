@@ -110,6 +110,8 @@ export interface VaultEnvelopeV2 {
   createdAt: number
   /** When a v1 envelope was re-sealed as v2. */
   upgradedAt?: number
+  /** When {@link Vault.rotateVaultKey} last replaced the DEK. */
+  rotatedAt?: number
 }
 
 export type VaultEnvelope = VaultEnvelopeV1 | VaultEnvelopeV2
@@ -232,7 +234,12 @@ export class Vault {
     return this._open(kek, envelope.dek, aadDekV2(envelope.kdf), 'wrong-password')
   }
 
-  /** Re-wrap the DEK under a new password (fresh salt, current KDF). Secrets and passkeys are untouched. */
+  /**
+   * Re-wrap the DEK under a new password (fresh salt, current KDF). Secrets and passkeys are untouched —
+   * and so is the DEK: after a suspected compromise (a copied profile, a leaked session, a lost passkey)
+   * this is not enough, because whoever holds the DEK still opens every secret, old and new. Use
+   * {@link Vault.rotateVaultKey} then.
+   */
   async changePassword(oldPassword: string, newPassword: string): Promise<void> {
     requirePassword(newPassword, VAULT_MIN_PASSWORD_LENGTH)
     requirePassword(oldPassword)
@@ -245,6 +252,46 @@ export class Vault {
         await this._write(isEnvelopeV2(envelope) && envelope.upgradedAt !== undefined && isEnvelopeV2(next) ? { ...next, upgradedAt: envelope.upgradedAt } : next)
       } finally {
         zeroize(dek)
+      }
+    })
+  }
+
+  /**
+   * Replace the DEK (scan 2026-10-27 modules, F30): a fresh random DEK, every secret re-sealed under it,
+   * the DEK wrapped under `password` with a fresh salt — written as one envelope, so a failure leaves the
+   * old vault as it was. Returns the new DEK: hand it to `session.unlock(dek)`, which overwrites the old
+   * one in `chrome.storage.session`. A DEK copied before the rotation opens nothing in the new envelope,
+   * and {@link Vault.setSecret} refuses it, so a stale session cannot seal new secrets under it.
+   *
+   * Passkeys are dropped — their boxes hold the old DEK and cannot be re-wrapped without their PRF
+   * output — and must be registered again ({@link Vault.addPasskey} with the new DEK).
+   */
+  async rotateVaultKey(password: string): Promise<Uint8Array> {
+    requirePassword(password)
+    return this._exclusive(async () => {
+      const oldDek = await this._unlock(password)
+      const dek = this._random(DEK_BYTES)
+      try {
+        const envelope = await this._load()
+        const [oldKey, newKey] = await Promise.all([this._importDek(oldDek), this._importDek(dek)])
+        const secrets: Record<string, SealedBox> = {}
+        for (const [id, box] of Object.entries(envelope.secrets)) {
+          const plaintext = await this._open(oldKey, box, aadSecret(id), 'locked')
+          try {
+            secrets[id] = await this._seal(newKey, plaintext, aadSecret(id))
+          } finally {
+            zeroize(plaintext)
+          }
+        }
+        const next = await this._sealEnvelope(password, dek, secrets, [], envelope.createdAt)
+        const upgradedAt = isEnvelopeV2(envelope) ? envelope.upgradedAt : undefined
+        await this._write(isEnvelopeV2(next) ? { ...next, ...(upgradedAt !== undefined ? { upgradedAt } : {}), rotatedAt: Date.now() } : next)
+        return dek
+      } catch (e) {
+        zeroize(dek)
+        throw e
+      } finally {
+        zeroize(oldDek)
       }
     })
   }
@@ -310,6 +357,7 @@ export class Vault {
     }
   }
 
+  /** Forget one passkey's box. A DEK that passkey already unwrapped stays valid: after a lost or compromised passkey, {@link Vault.rotateVaultKey}. */
   async removePasskey(id: string): Promise<void> {
     requireId(id)
     return this._exclusive(async () => {
@@ -326,13 +374,17 @@ export class Vault {
     return envelope ? Object.keys(envelope.secrets) : []
   }
 
-  /** Seal `secret` under the DEK as `sourceId` (overwrites an entry with the same id). */
+  /**
+   * Seal `secret` under the DEK as `sourceId` (overwrites an entry with the same id). The DEK must open the
+   * vault's secrets (`locked` otherwise): a key retired by {@link Vault.rotateVaultKey} never seals a new one.
+   */
   async setSecret(dek: Uint8Array, sourceId: string, secret: Uint8Array): Promise<void> {
     requireId(sourceId)
     if (secret.length > VAULT_LIMITS.secretBytes) throw new VaultError(`A secret is at most ${VAULT_LIMITS.secretBytes} bytes.`, 'invalid-input')
     const key = await this._importDek(dek)
     return this._exclusive(async () => {
       const envelope = await this._load()
+      if (Object.keys(envelope.secrets).length > 0) await this._requireDek(dek, envelope)
       if (!(sourceId in envelope.secrets) && Object.keys(envelope.secrets).length >= VAULT_LIMITS.secrets) {
         throw new VaultError(`A vault holds at most ${VAULT_LIMITS.secrets} secrets.`, 'invalid-input')
       }

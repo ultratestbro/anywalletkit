@@ -135,7 +135,8 @@ describe('Vault: KDF cost and envelope size are bounded before any KDF runs', ()
     expect(await code(vault.setSecret(dek, 'huge', new Uint8Array(VAULT_LIMITS.secretBytes + 1)))).toBe('invalid-input')
     await vault.setSecret(dek, 'one', enc('x'))
     const full = structuredClone(storage.envelope) as VaultEnvelopeV2
-    full.secrets = Object.fromEntries(Array.from({ length: VAULT_LIMITS.secrets }, (_, i) => [`s${i}`, full.secrets.one!]))
+    // `one` stays a real box (setSecret proves the DEK on the vault's first secret); the copies fill it to the cap.
+    full.secrets = { one: full.secrets.one!, ...Object.fromEntries(Array.from({ length: VAULT_LIMITS.secrets - 1 }, (_, i) => [`s${i}`, full.secrets.one!])) }
     storage.envelope = full // at the cap
     expect(await code(vault.setSecret(dek, 'one-more', enc('x')))).toBe('invalid-input')
     await expect(vault.setSecret(dek, 's0', enc('overwrite is fine'))).resolves.toBeUndefined()
