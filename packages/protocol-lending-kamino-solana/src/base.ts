@@ -1,10 +1,13 @@
 // Plumbing both Kamino protocols share: the API client, the account's
-// serialized-transaction guard (programs allowlist + simulated balance
-// proof), decimals, and the expectation builders that bound what a built
-// transaction may do with the wallet's balances.
+// serialized-transaction guard (programs allowlist, the operation's
+// instruction rules and a simulated balance proof), chain reads, decimals,
+// and the expectation builders that bound what a built transaction may do
+// with the wallet's balances.
 import { LendingProtocol, type IWalletAccount, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import { KaminoApi } from './api.js'
+import type { ChainAccount } from './chain.js'
 import { KaminoError } from './errors.js'
+import type { InstructionRule } from './policy.js'
 import { KAMINO_PROGRAM_ALLOWLIST } from './programs.js'
 
 export const SOLANA_MAINNET = 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'
@@ -49,18 +52,20 @@ export interface KaminoBaseConfig {
 /** What the guard proves before signing (mirrors wallet-solana's `SerializedExpectation`). */
 export interface Expectation {
   maxLamportsOut: bigint
-  tokenIn?: { mint: string; minAmount: bigint }
+  tokenIn?: { mint: string; minAmount: bigint; maxAmount?: bigint }
   maxTokenOut?: { mint: string; amount: bigint }
 }
 
-export interface SerializedGuard { programAllowlist: readonly string[]; expect: Expectation }
+export interface SerializedGuard { programAllowlist: readonly string[]; instructions: readonly InstructionRule[]; expect: Expectation }
 
-/** The write surface of a `@anywalletkit/wallet-solana` account this module needs. */
+/** The surface of a `@anywalletkit/wallet-solana` account this module needs. */
 export interface SolanaAccountSurface {
   getAddress(): Promise<string>
   checkSerialized?(base64: string, guard: SerializedGuard): Promise<{ quote: { fee: bigint } }>
   sendSerialized?(base64: string, guard: SerializedGuard): Promise<{ hash: string; fee: bigint }>
   getMintInfo?(mint: string): Promise<{ decimals: number }>
+  /** Raw accounts in the order asked (wallet-solana 0.4+): the chain state the API's figures are checked against. */
+  getAccountInfos?(addresses: readonly string[]): Promise<Array<ChainAccount | null>>
 }
 
 export abstract class KaminoBase<TConfig extends KaminoBaseConfig> extends LendingProtocol<TConfig> {
@@ -113,35 +118,50 @@ export abstract class KaminoBase<TConfig extends KaminoBaseConfig> extends Lendi
     return p
   }
 
-  protected guard(expect: Expectation): SerializedGuard {
-    return { programAllowlist: KAMINO_PROGRAM_ALLOWLIST, expect }
+  protected guard(expect: Expectation, instructions: readonly InstructionRule[]): SerializedGuard {
+    if (!instructions.length) throw new KaminoError('A Kamino transaction is checked against the instructions its operation takes; none were given.')
+    return { programAllowlist: KAMINO_PROGRAM_ALLOWLIST, instructions, expect }
+  }
+
+  /** Accounts from the chain through the wallet's RPC, in the order asked (null where none exists). */
+  protected async readChain(addresses: readonly string[]): Promise<Array<ChainAccount | null>> {
+    const s = this.surface()
+    if (typeof s.getAccountInfos !== 'function') throw new KaminoError('Kamino checks the API against the chain: it needs a @anywalletkit/wallet-solana account (getAccountInfos).')
+    const out = await s.getAccountInfos(addresses)
+    if (!Array.isArray(out) || out.length !== addresses.length) throw new KaminoError('The account returned a different number of accounts than asked.')
+    return out
   }
 
   /** The wallet sends `amount` of `mint` (SOL counts on the lamport side) and may lose rent on top. */
   protected spendExpectation(mint: string, amount: bigint, extraLamports = 0n): Expectation {
+    if (amount <= 0n) throw new KaminoError(`Refusing a transaction that spends ${amount} of ${mint}: the amount must be positive.`)
     const rent = this.rentAllowance + extraLamports
     return mint === WSOL_MINT ? { maxLamportsOut: amount + rent } : { maxLamportsOut: rent, maxTokenOut: { mint, amount } }
   }
 
-  /** The wallet must receive at least `expected × (1 − slippage)` of `mint`; rent is the only SOL it may lose. */
-  protected receiveExpectation(mint: string, expected: bigint, extraLamports = 0n): Expectation {
+  /**
+   * The wallet must receive at least `expected × (1 − slippage)` of `mint` (and at most `max`, when
+   * given); rent is the only SOL it may lose.
+   */
+  protected receiveExpectation(mint: string, expected: bigint, extraLamports = 0n, max?: bigint): Expectation {
+    if (expected <= 0n) throw new KaminoError(`Refusing a transaction that should pay out ${expected} of ${mint}: the amount must be positive.`)
     const min = (expected * BigInt(10_000 - this.slippageBps)) / 10_000n
-    return { maxLamportsOut: this.rentAllowance + extraLamports, tokenIn: { mint, minAmount: min } }
+    return { maxLamportsOut: this.rentAllowance + extraLamports, tokenIn: { mint, minAmount: min, ...(max !== undefined ? { maxAmount: max } : {}) } }
   }
 
   /** Simulate the built transaction through the account's guard and return its fee; nothing is signed. */
-  protected async quoteBuilt(base64: string, expect: Expectation): Promise<{ fee: bigint }> {
+  protected async quoteBuilt(base64: string, expect: Expectation, instructions: readonly InstructionRule[]): Promise<{ fee: bigint }> {
     const s = this.surface()
     if (typeof s.checkSerialized !== 'function') throw new KaminoError('Quoting a Kamino transaction needs a @anywalletkit/wallet-solana account (checkSerialized).')
-    const check = await s.checkSerialized(base64, this.guard(expect))
+    const check = await s.checkSerialized(base64, this.guard(expect, instructions))
     return { fee: BigInt(check.quote.fee) }
   }
 
   /** Guard, sign and broadcast the built transaction; the account refuses before signing if the proof fails. */
-  protected async sendBuilt(base64: string, expect: Expectation, method: string): Promise<{ hash: string; fee: bigint }> {
+  protected async sendBuilt(base64: string, expect: Expectation, instructions: readonly InstructionRule[], method: string): Promise<{ hash: string; fee: bigint }> {
     const account = this.requireSigningAccount(`${method}(options)`) as unknown as SolanaAccountSurface
     if (typeof account.sendSerialized !== 'function') throw new KaminoError(`${method}() needs a @anywalletkit/wallet-solana account (sendSerialized).`)
-    const sent = await account.sendSerialized(base64, this.guard(expect))
+    const sent = await account.sendSerialized(base64, this.guard(expect, instructions))
     if (!sent?.hash) throw new KaminoError('The account returned no transaction signature.')
     return { hash: sent.hash, fee: BigInt(sent.fee ?? 0) }
   }

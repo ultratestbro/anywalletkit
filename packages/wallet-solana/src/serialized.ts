@@ -19,6 +19,7 @@ import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system'
 import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token'
 import { TOKEN_2022_PROGRAM_ADDRESS } from '@solana-program/token-2022'
 import { ZERO_ADDRESS } from './describe.js'
+import { UnsafeTransactionError } from './errors.js'
 import type { SimulationResult, SolanaFeeQuote, TransactionDescription } from './types.js'
 
 /** Memo program (v2) — swap aggregators tag routes with it. */
@@ -103,14 +104,38 @@ export const DEFAULT_PROGRAM_ALLOWLIST: readonly string[] = Object.freeze([
   ...MAYAN_PROGRAM_ADDRESSES,
 ])
 
-/** What the caller expects the transaction to do with this wallet's balances. */
+/**
+ * What the caller expects the transaction to do with this wallet's balances. Every bound is a
+ * non-negative bigint; anything else is refused before the network is consulted (a negative
+ * minimum would read as permission to lose that much — scan 2026-10-27 modules, F10/F11).
+ */
 export interface SerializedExpectation {
   /** Most lamports the wallet may lose, fee excluded (the swap input for a SOL source; rent/fee slack for a token source). */
   maxLamportsOut: bigint
-  /** Token the wallet must RECEIVE (same-chain swaps): the mint and the quoted minimum. Native SOL is `11111111111111111111111111111111`, `0x0…` or the wSOL mint. */
-  tokenIn?: { mint: string; minAmount: bigint }
+  /**
+   * Token the wallet must RECEIVE (same-chain swaps): the mint and the quoted minimum. Native SOL is
+   * `11111111111111111111111111111111`, `0x0…` or the wSOL mint. `maxAmount`, when set, is the most
+   * it may receive: a builder that hands over more than was asked did something else (a bigger borrow).
+   */
+  tokenIn?: { mint: string; minAmount: bigint; maxAmount?: bigint }
   /** Token the wallet may SEND and the most it may lose of it (the swap input for a token source). */
   maxTokenOut?: { mint: string; amount: bigint }
+}
+
+/**
+ * One instruction shape a provider transaction may carry (see {@link SerializedTxGuard.instructions}):
+ * the program, the first bytes of its data (an Anchor discriminator, an SPL tag), and the accounts it
+ * must pass at given positions.
+ */
+export interface SerializedInstructionRule {
+  /** Program the instruction calls. */
+  program: string
+  /** Hex the instruction data starts with (case-insensitive); omitted = any data. */
+  data?: string
+  /** Exact length of the instruction data in bytes, for fixed layouts. */
+  dataLength?: number
+  /** Accounts by position in the instruction: this address, or one of these. Lookup-table accounts are resolved first. */
+  accounts?: Readonly<Record<number, string | readonly string[]>>
 }
 
 export interface SerializedTxGuard {
@@ -118,8 +143,85 @@ export interface SerializedTxGuard {
   programAllowlist?: readonly string[]
   /** Skip the allowlist (NOT the balance checks). */
   allowUnknownPrograms?: boolean
+  /**
+   * Every top-level instruction must match one of these rules, or the transaction is refused
+   * (`unexpected-instruction`). For callers that know the exact instructions an operation takes —
+   * a lending deposit, say — where an extra withdrawal plus a transfer signed by the same key would
+   * otherwise pass as long as the net balances hold (scan 2026-10-27 modules, F1).
+   */
+  instructions?: readonly SerializedInstructionRule[]
   /** What the transaction may do to the wallet's balances. */
   expect: SerializedExpectation
+}
+
+/** An account as `getMultipleAccounts` returns it: owner program, lamports and raw data. */
+export interface SolanaAccountData {
+  owner: string
+  lamports: bigint
+  data: Uint8Array
+}
+
+/** Refuse an expectation with a bound that is not a non-negative bigint. */
+export function assertExpectation(expect: SerializedExpectation): void {
+  const bad = (what: string, v: unknown) => {
+    if (typeof v !== 'bigint' || v < 0n) throw new UnsafeTransactionError(`The guard's ${what} must be a non-negative bigint, got ${typeof v === 'bigint' ? v : typeof v}.`, 'invalid-expectation', [what])
+  }
+  if (!expect || typeof expect !== 'object') throw new UnsafeTransactionError('The guard has no expectation.', 'invalid-expectation')
+  bad('maxLamportsOut', expect.maxLamportsOut)
+  if (expect.tokenIn !== undefined) {
+    bad('tokenIn.minAmount', expect.tokenIn.minAmount)
+    if (expect.tokenIn.maxAmount !== undefined) {
+      bad('tokenIn.maxAmount', expect.tokenIn.maxAmount)
+      if (expect.tokenIn.maxAmount < expect.tokenIn.minAmount) throw new UnsafeTransactionError("The guard's tokenIn.maxAmount is below its minAmount.", 'invalid-expectation', ['tokenIn.maxAmount'])
+    }
+  }
+  if (expect.maxTokenOut !== undefined) bad('maxTokenOut.amount', expect.maxTokenOut.amount)
+}
+
+const hexOf = (data: Uint8Array): string => Array.from(data, (b) => b.toString(16).padStart(2, '0')).join('')
+
+/** Check rules up front: a malformed one is the caller's mistake, never a silent "matches anything". */
+function normalizeRules(rules: readonly SerializedInstructionRule[]): Array<{ program: string; data: string; dataLength: number | undefined; accounts: Array<[number, readonly string[]]> }> {
+  if (!Array.isArray(rules) || rules.length === 0) throw new TypeError('guard.instructions must be a non-empty list of rules.')
+  return rules.map((r) => {
+    if (!r || typeof r.program !== 'string' || !r.program) throw new TypeError('Every instruction rule names its program.')
+    const data = (r.data ?? '').toLowerCase()
+    if (!/^(?:[0-9a-f]{2})*$/.test(data)) throw new TypeError(`Instruction rule data '${r.data}' is not hex.`)
+    if (r.dataLength !== undefined && (!Number.isInteger(r.dataLength) || r.dataLength < data.length / 2)) throw new TypeError(`Instruction rule dataLength ${r.dataLength} is not a byte count of at least the data prefix.`)
+    const accounts = Object.entries(r.accounts ?? {}).map(([k, v]): [number, readonly string[]] => {
+      const at = Number(k)
+      if (!Number.isInteger(at) || at < 0) throw new TypeError(`Instruction rule account position '${k}' is not an index.`)
+      const list = typeof v === 'string' ? [v] : v
+      if (!Array.isArray(list) || list.length === 0 || list.some((a) => typeof a !== 'string' || !a)) throw new TypeError(`Instruction rule account ${k} names no address.`)
+      return [at, list]
+    })
+    return { program: r.program, data, dataLength: r.dataLength, accounts }
+  })
+}
+
+/**
+ * The first top-level instruction no rule allows, or undefined when every one matches. Instructions
+ * are read from the compiled message with lookup-table accounts resolved (`resolveCompiledAccounts`).
+ */
+export function unexpectedInstruction(
+  compiled: { instructions: ReadonlyArray<{ programAddressIndex: number; accountIndices?: readonly number[]; data?: ArrayLike<number> }> },
+  accounts: ReadonlyArray<{ address: string | null }>,
+  rules: readonly SerializedInstructionRule[],
+): { index: number; program: string; data: string } | undefined {
+  const allowed = normalizeRules(rules)
+  for (let i = 0; i < compiled.instructions.length; i++) {
+    const ix = compiled.instructions[i]!
+    const program = accounts[ix.programAddressIndex]?.address ?? '<unresolved>'
+    const bytes = ix.data ? Uint8Array.from(ix.data) : new Uint8Array()
+    const hex = hexOf(bytes)
+    const passed = (ix.accountIndices ?? []).map((j) => accounts[j]?.address ?? null)
+    const ok = allowed.some((r) => r.program === program
+      && hex.startsWith(r.data)
+      && (r.dataLength === undefined || bytes.length === r.dataLength)
+      && r.accounts.every(([at, want]) => { const got = passed[at]; return got !== null && got !== undefined && want.includes(got) }))
+    if (!ok) return { index: i, program, data: hex.slice(0, 16) }
+  }
+  return undefined
 }
 
 /** What the guard proved before signing. */

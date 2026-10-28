@@ -4,8 +4,18 @@ import {
   ADDRESS_LOOKUP_TABLE_PROGRAM, FARMS_PROGRAM, KLEND_PROGRAM, KVAULT_PROGRAM, KaminoApi, KaminoError, KaminoMarketProtocolSolana, KaminoVaultProtocolSolana,
   WITHDRAW_ALL, DEFAULT_FIRST_DEPOSIT_ALLOWANCE, DEFAULT_RENT_ALLOWANCE, fromDecimalString, instructionName, lessBps, toDecimalString, toWad,
 } from '../src/index.js'
-import { FARM, vaultRow, MARKET, PYUSD, SHARES, SOL, SOL_RESERVE, TX, USDC, USDC_RESERVE, USER, VAULT, account, api, obligation } from './fixture.js'
+import { divWadUp, WAD } from '../src/amounts.js'
+import { FARM, vaultRow, MARKET, PYUSD, SHARES, SOL, SOL_RESERVE, TX, USDC, USDC_RESERVE, USER, VAULT, account as bare, api, obligation } from './fixture.js'
+import { CHAIN_TPS, OBLIGATION, SHARES_ATA, USER_STATE, defaultChain, farmUserAccount, obligationAccount, tokenAccount } from './chain-fixture.js'
+import { SF } from '../src/chain.js'
 
+/** The fake account reading the recorded vault and market from its chain map (chain-fixture.ts). */
+const account = (opts: Parameters<typeof bare>[0] = {}) => bare({ accounts: defaultChain(), ...opts })
+/** The recorded obligation on chain too: 5.000123 USDC and 0.5 SOL deposited, 1.25 USDC borrowed (cTokens redeem 1:1). */
+const withObligation = (acc: ReturnType<typeof account>) => acc.accounts.set(OBLIGATION, obligationAccount({
+  deposits: [{ reserve: USDC_RESERVE, ctokens: 5_000_123n }, { reserve: SOL_RESERVE, ctokens: 500_000_000n }],
+  borrows: [{ reserve: USDC_RESERVE, borrowedSf: 1_250_000n * SF }],
+}))
 const vaultRowOf = () => structuredClone(vaultRow) as typeof vaultRow & Record<string, unknown>
 const vault = (acc = account(), extra: Record<string, unknown> = {}) => {
   const f = api()
@@ -55,6 +65,8 @@ describe('KaminoVaultProtocolSolana', () => {
     const { p, f, acc } = vault(account(), { skipFarm: false })
     const q = await p.quoteSupply({ amount: 1_500_000n })
     expect(q.fee).toBe(7_500n)
+    // Priced at the chain's rate (the vault's state and its reserve), which the API's agrees with.
+    expect(q.expectedShares).toBe(divWadUp(fromDecimalString('1.5', 6), CHAIN_TPS))
     expect(q.expectedShares).toBe(fromDecimalString('1.5', 6) * 10n ** 18n / toWad('1.0627800342202071868') + 1n)
     expect(lastPost(f)).toMatchObject({ url: '/ktx/kvault/deposit', body: { wallet: USER, kvault: VAULT, amount: '1.5' } })
     expect(lastPost(f).body).toMatchObject({ skipFarm: false })
@@ -64,6 +76,9 @@ describe('KaminoVaultProtocolSolana', () => {
     expect(g.base64).toBe(TX)
     expect(g.guard.programAllowlist).toEqual(expect.arrayContaining([KLEND_PROGRAM, KVAULT_PROGRAM, FARMS_PROGRAM, ADDRESS_LOOKUP_TABLE_PROGRAM]))
     expect(g.guard.expect).toEqual({ maxLamportsOut: DEFAULT_RENT_ALLOWANCE, maxTokenOut: { mint: USDC, amount: 1_500_000n } })
+    // The deposit is pinned to this vault and the wallet's accounts; with the farm, staking into this farm's user state.
+    expect(g.guard.instructions).toContainEqual(expect.objectContaining({ program: KVAULT_PROGRAM, data: 'f223c68952e1f2b6', accounts: expect.objectContaining({ 0: USER, 1: VAULT, 5: SHARES }) }))
+    expect(g.guard.instructions).toContainEqual(expect.objectContaining({ program: FARMS_PROGRAM, data: 'ceb0ca12c8d1b36c', accounts: expect.objectContaining({ 1: USER_STATE, 2: FARM }) }))
   })
 
   it('supply signs through sendSerialized with the same guard; skipFarm proves the shares arrive', async () => {
@@ -97,13 +112,18 @@ describe('KaminoVaultProtocolSolana', () => {
     expect(pos.stakedShares).toBe(10_000_000n)
     expect(pos.assets).toBe(10_500_000n * toWad('1.0627800342202071868') / 10n ** 18n)
 
+    // Writes take the position from the chain: the shares account and the farm stake.
+    acc.accounts.set(SHARES_ATA, tokenAccount(SHARES, USER, 500_000n))
+    acc.accounts.set(USER_STATE, farmUserAccount({ staked: 10_000_000n }))
+    const assets = 10_500_000n * CHAIN_TPS / WAD
     const q = await p.quoteWithdraw({ amount: 'max' })
     expect(q.shares).toBe(10_500_000n)
-    expect(q.expectedAssets).toBe(pos.assets)
-    expect(q.minAssets).toBe(lessBps(pos.assets, 50))
-    expect(lastPost(f)).toMatchObject({ url: '/ktx/kvault/withdraw', body: { wallet: USER, kvault: VAULT, amount: WITHDRAW_ALL } })
+    expect(q.expectedAssets).toBe(assets)
+    expect(q.minAssets).toBe(lessBps(assets, 50))
+    expect(lastPost(f)).toMatchObject({ url: '/ktx/kvault/withdraw', body: { wallet: USER, kvault: VAULT, amount: '10.5' } }) // every share, by count (WITHDRAW_ALL overflows the API now)
+    expect(lastPost(f).body.amount).not.toBe(WITHDRAW_ALL)
     // the redeemed shares may leave the wallet (burned), exactly those (audit 2026-10-25, #1.3)
-    expect(acc.guards.at(-1)!.guard.expect).toEqual({ maxLamportsOut: DEFAULT_RENT_ALLOWANCE, tokenIn: { mint: USDC, minAmount: lessBps(pos.assets, 50) }, maxTokenOut: { mint: SHARES, amount: 10_500_000n } })
+    expect(acc.guards.at(-1)!.guard.expect).toEqual({ maxLamportsOut: DEFAULT_RENT_ALLOWANCE, tokenIn: { mint: USDC, minAmount: lessBps(assets, 50) }, maxTokenOut: { mint: SHARES, amount: 10_500_000n } })
 
     await p.withdraw({ amount: 1_062_780n })  // ≈ 1 share's worth
     expect(lastPost(f).body.amount).toBe('1')
@@ -156,7 +176,8 @@ describe('KaminoMarketProtocolSolana', () => {
     expect(q.reserve).toBe(USDC_RESERVE)
     expect(lastPost(f)).toMatchObject({ url: '/ktx/klend/deposit', body: { wallet: USER, market: MARKET, reserve: USDC_RESERVE, amount: '5' } })
     expect(acc.guards.at(-1)!.guard.expect).toEqual({ maxLamportsOut: DEFAULT_RENT_ALLOWANCE + DEFAULT_FIRST_DEPOSIT_ALLOWANCE, maxTokenOut: { mint: USDC, amount: 5_000_000n } })
-    f.obligations = [obligation]
+    expect(acc.guards.at(-1)!.guard.instructions).toContainEqual(expect.objectContaining({ program: KLEND_PROGRAM, data: 'd8e0bf1bcc9766af', accounts: expect.objectContaining({ 0: USER, 1: OBLIGATION, 2: MARKET, 4: USDC_RESERVE, 5: USDC }) }))
+    withObligation(acc)
     await p.supply({ token: USDC, amount: 5_000_000n })
     expect(acc.guards.at(-1)!.guard.expect.maxLamportsOut).toBe(DEFAULT_RENT_ALLOWANCE)
     expect(acc.sent).toHaveLength(1)
@@ -164,7 +185,7 @@ describe('KaminoMarketProtocolSolana', () => {
 
   it('a SOL deposit is bounded on the lamport side', async () => {
     const { p, f, acc } = market()
-    f.obligations = [obligation]
+    withObligation(acc)
     await p.quoteSupply({ token: SOL, amount: 10n ** 9n })
     expect(lastPost(f).body).toMatchObject({ reserve: SOL_RESERVE, amount: '1' })
     expect(acc.guards.at(-1)!.guard.expect).toEqual({ maxLamportsOut: 10n ** 9n + DEFAULT_RENT_ALLOWANCE })
@@ -173,6 +194,7 @@ describe('KaminoMarketProtocolSolana', () => {
   it('reads obligations into per-mint totals and resolves max against them', async () => {
     const { p, f, acc } = market()
     f.obligations = [obligation]
+    withObligation(acc)
     const pos = await p.getPosition()
     expect(pos.obligations[0]!.obligation).toBe('zncEB2kLmREYgbVG6aPS6D6NamMjDskXM5pwh5Ejmeu')
     expect(pos.supplied).toEqual({ [USDC]: 5_000_123n, [SOL]: 500_000_000n })
@@ -187,6 +209,8 @@ describe('KaminoMarketProtocolSolana', () => {
     const b = await p.quoteBorrow({ token: USDC, amount: 1_000_000n })
     expect(lastPost(f).url).toBe('/ktx/klend/borrow')
     expect(b.minReceived).toBe(995_000n)
+    // and no more than asked: a bigger borrow is debt the user did not choose
+    expect(acc.guards.at(-1)!.guard.expect.tokenIn).toEqual({ mint: USDC, minAmount: 995_000n, maxAmount: 1_000_000n })
 
     await p.repay({ token: USDC, amount: 'max' })
     expect(lastPost(f)).toMatchObject({ url: '/ktx/klend/repay', body: { amount: '1.25' } })
@@ -203,9 +227,9 @@ describe('KaminoMarketProtocolSolana', () => {
     expect(f.requests).toHaveLength(0)
   })
 
-  it('falls back to known decimals when the account cannot read mints', async () => {
-    const { p, f } = market(account({ mintInfo: false }))
-    f.obligations = [obligation]
+  it('an account that cannot read mints still writes: the reserve on chain carries the decimals', async () => {
+    const { p, f, acc } = market(account({ mintInfo: false }))
+    withObligation(acc)
     await p.quoteSupply({ token: USDC, amount: 1_000_000n })
     expect(lastPost(f).body.amount).toBe('1')
   })

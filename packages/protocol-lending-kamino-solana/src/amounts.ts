@@ -19,12 +19,18 @@ export function toDecimalString(amount: bigint, decimals: number): string {
   return frac ? `${whole}.${frac}` : whole
 }
 
-/** Decimal string → base units, rounded down (the API reports decimals; the chain counts base units). */
+/**
+ * Decimal string → base units, rounded down (the API reports decimals; the chain counts base units).
+ * Every figure the API reports — amounts, rates, prices — is non-negative, so a sign is refused: a
+ * negative deposit or `tokensPerShare` turned the guard's minimum into permission to drain (scan
+ * 2026-10-27 modules, F10/F11).
+ */
 export function fromDecimalString(value: string | number, decimals: number): bigint {
   const s = String(value).trim()
-  const m = /^(-?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(s)
-  if (!m) throw new KaminoError(`Not a decimal number: ${s}`)
-  let [, sign, whole = '', frac = '', exp] = m
+  if (/^[-+]/.test(s)) throw new KaminoError(`Kamino reported a signed figure (${s.slice(0, 40)}); every amount and rate it reports is positive.`)
+  const m = /^(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(s)
+  if (!m) throw new KaminoError(`Not a decimal number: ${s.slice(0, 40)}`)
+  let [, whole = '', frac = '', exp] = m
   if (exp) {
     // Normalize scientific notation ("4.6e-16") into plain digits.
     const e = Number(exp)
@@ -35,8 +41,7 @@ export function fromDecimalString(value: string | number, decimals: number): big
     else { whole = digits.slice(0, point); frac = digits.slice(point) }
   }
   const scaled = (whole || '0') + (frac + '0'.repeat(decimals)).slice(0, decimals)
-  const out = BigInt(scaled.replace(/^0+(?=\d)/, ''))
-  return sign ? -out : out
+  return BigInt(scaled.replace(/^0+(?=\d)/, ''))
 }
 
 /** Fixed-point helper: `value` (decimal string) scaled by 1e18. */

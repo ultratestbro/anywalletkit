@@ -9,7 +9,11 @@ import { fromDecimalString } from './amounts.js'
 export const KAMINO_API = 'https://api.kamino.finance'
 /** Kamino's Main Market. */
 export const MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF'
-/** The decimal string that means "every share" on /ktx/kvault/withdraw. */
+/**
+ * u64::MAX as a decimal share count. @deprecated The API scales `amount` by the shares' decimals and
+ * now refuses this as above u64 (2026-10-28, `DECIMAL_TO_LAMPORTS_OVERFLOW`); `withdraw({ amount: 'max' })`
+ * passes the wallet's exact share count, read from the chain, instead.
+ */
 export const WITHDRAW_ALL = '18446744073709551615'
 
 export interface ApiMarket {
@@ -216,7 +220,7 @@ export class KaminoApi {
     }))
     const coll = (info.collateral ?? {}) as Record<string, unknown>, debt = (info.debt ?? {}) as Record<string, unknown>
     return {
-      obligation: String(row.loanId ?? row.obligation ?? row.address ?? ''), market: String(row.marketId ?? market), user: String(row.user ?? ''),
+      obligation: String(row.obligationAddress ?? row.loanId ?? row.obligation ?? row.address ?? ''), market: String(row.marketId ?? market), user: String(row.user ?? ''),
       elevationGroup: num(row.elevationGroup), deposits: legs(coll.deposits ?? row.deposits), borrows: legs(debt.borrows ?? row.borrows),
       currentLtv: num(info.currentLtv), maxLtv: info.maxLtv === null || info.maxLtv === undefined ? null : num(info.maxLtv), liquidationLtv: num(info.liquidationLtv),
       raw: row,
@@ -240,7 +244,7 @@ export class KaminoApi {
 
   /** Base64 unsigned v0 transaction: deposit `amount` (decimal, token units) into an Earn vault. */
   buildVaultDeposit(p: KtxVaultDeposit): Promise<string> { return this.ktx('/ktx/kvault/deposit', strip(p)) }
-  /** Base64 unsigned v0 transaction: redeem `amount` SHARES (decimal) — {@link WITHDRAW_ALL} for every share. */
+  /** Base64 unsigned v0 transaction: redeem `amount` SHARES (decimal). */
   buildVaultWithdraw(p: KtxVaultWithdraw): Promise<string> { return this.ktx('/ktx/kvault/withdraw', strip(p)) }
   buildLendDeposit(p: KtxLend): Promise<string> { return this.ktx('/ktx/klend/deposit', strip(p)) }
   buildLendWithdraw(p: KtxLend): Promise<string> { return this.ktx('/ktx/klend/withdraw', strip(p)) }

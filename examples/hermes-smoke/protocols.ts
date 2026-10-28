@@ -39,7 +39,11 @@ import { AaveProtocolEvm, parseReserveConfiguration, rayToApyPct, AAVE_MARKETS }
 import { MorphoVaultProtocolEvm, MorphoMarketProtocolEvm, marketId, accrue, MORPHO_CHAINS } from '@anywalletkit/protocol-lending-morpho-evm'
 import { NativeStakingProtocolSolana, createWithSeed as nativeCreateWithSeed, activationStatus as nativeActivation, decodeStakeAccount as nativeDecodeStake, STAKE_PROGRAM as NATIVE_STAKE_PROGRAM } from '@anywalletkit/protocol-staking-native-solana'
 import { NativeStakingProtocolMonad, packWithdrawalId as monadPack, unpackWithdrawalId as monadUnpack, commissionToPercent as monadCommission, describeRevert as monadRevert, STAKING_ABI as MONAD_STAKING_ABI } from '@anywalletkit/protocol-staking-native-monad'
-import { KaminoVaultProtocolSolana, KaminoMarketProtocolSolana, MAIN_MARKET, KLEND_PROGRAM, instructionName, toDecimalString, fromDecimalString } from '@anywalletkit/protocol-lending-kamino-solana'
+import {
+  KaminoVaultProtocolSolana, KaminoMarketProtocolSolana, MAIN_MARKET, KLEND_PROGRAM, KVAULT_PROGRAM, instructionName, toDecimalString, fromDecimalString,
+  decodeVault, decodeReserve, decodeObligation, vaultTokensPerShareWad, debtNow, farmUserState, plumbing, associatedTokenAddress,
+} from '@anywalletkit/protocol-lending-kamino-solana'
+import { unexpectedInstruction } from '@anywalletkit/wallet-solana'
 import ApprovalsProtocolEvm, { isRevokeCalldata, isUnlimitedAmount } from '@anywalletkit/protocol-approvals-evm'
 
 type Check = (what: string, ok: boolean, detail?: string) => void
@@ -187,6 +191,40 @@ export async function smokeProtocols(check: Check): Promise<void> {
   check('native monad: getEpoch over viem + EIP-1193', monadEpoch.epoch === 2332n && monadEpoch.activatesAtEpoch === 2333n)
   await tolerates(check, 'native monad: quoteStake (offline → Error)', () => monad.quoteStake({ amount: 10n ** 18n }))
   check('kamino: instructionName', instructionName(KLEND_PROGRAM, Uint8Array.from([0xd8, 0xe0, 0xbf, 0x1b, 0xcc, 0x97, 0x66, 0xaf, 0])) === 'depositReserveLiquidityAndObligationCollateralV2')
+  // Kamino chain reads (scan 2026-10-27 modules, G2): u64 / u128 / u256 fields out of account bytes, the vault's share price
+  // and a debt with interest — all bigint, the u128 and u256 values above 2^64 — plus the farm PDA (live vector) and the rule check.
+  const SF = 1n << 60n
+  const kamAcc = (owner: string, disc: string, size: number, fill: (v: DataView) => void) => {
+    const data = new Uint8Array(size)
+    for (let i = 0; i < 8; i++) data[i] = parseInt(disc.slice(i * 2, i * 2 + 2), 16)
+    const v = new DataView(data.buffer)
+    fill(v)
+    return { owner, lamports: 1n, data }
+  }
+  const u128 = (v: DataView, o: number, x: bigint) => { v.setBigUint64(o, x & 0xffff_ffff_ffff_ffffn, true); v.setBigUint64(o + 8, x >> 64n, true) }
+  const vaultBytes = kamAcc(KVAULT_PROGRAM, 'e4c452a562d2eb98', 62_552, (v) => {
+    v.setBigUint64(112, 6n, true); v.setBigUint64(216, 6n, true); v.setBigUint64(224, 500n, true); v.setBigUint64(232, 1000n, true)
+    for (let i = 0; i < 32; i++) v.setUint8(312 + i, 7)
+    v.setBigUint64(312 + 1104, 1000n, true)
+  })
+  const kVault = decodeVault('HDsayqAsDWy3QvANGqh2yNraqcD8Fnjgh73Mhb3WRS5E', vaultBytes)
+  const kReserveAddr = kVault.allocations[0]!.reserve
+  const kReserve = decodeReserve(kReserveAddr, kamAcc(KLEND_PROGRAM, '2bf2ccca1af73b7f', 8_624, (v) => {
+    v.setBigUint64(224, 3000n, true); u128(v, 232, 1000n * SF); v.setBigUint64(272, 6n, true); u128(v, 296, (3n * SF) / 2n); v.setBigUint64(2592, 2000n, true)
+  }))
+  const kTps = vaultTokensPerShareWad(kVault, new Map([[kReserveAddr, kReserve]]))
+  check(`kamino: vault share price from chain bytes (${kTps})`, kTps === 25n * 10n ** 17n && kReserve.totalLiquiditySf === 4000n * SF)
+  const kOb = decodeObligation('EnxJnydiZPsyQx2ZmXdg7vfggsRLQWpogz19cP6R9SPb', kamAcc(KLEND_PROGRAM, 'a8ce8d6a584caca7', 3_344, (v) => {
+    for (let i = 0; i < 32; i++) v.setUint8(1208 + i, 7)
+    u128(v, 1208 + 32, SF); u128(v, 1208 + 88, 1000n * SF)
+  }))
+  check(`kamino: debt with the reserve's borrow rate (u256) (${debtNow(kOb, kReserve, kReserveAddr)})`, debtNow(kOb, kReserve, kReserveAddr) === 1500n)
+  check('kamino: farm user-state PDA (live vector)', farmUserState('9FVjHqduhDPMVqvu3cXiEBjU6nvxvGdCCLRwd9WpVRZj', 'HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk') === '3QZ4o2qDKytc2uq1Gs3wV5xD2241MWNC7t7SUSKfUu36')
+  const TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'
+  const wsolAta = associatedTokenAddress('HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk', 'So11111111111111111111111111111111111111112', TOKEN)
+  const rules = plumbing('HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk', wsolAta)
+  const sync = (account: string, data: Uint8Array) => unexpectedInstruction({ instructions: [{ programAddressIndex: 0, accountIndices: [1], data }] }, [{ address: TOKEN }, { address: account }], rules)
+  check('wallet-solana: instruction rules (SyncNative on our wSOL only)', sync(wsolAta, Uint8Array.of(0x11)) === undefined && sync('Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS', Uint8Array.of(0x11))?.index === 0 && sync(wsolAta, Uint8Array.of(0x03))?.index === 0)
 
   // approvals
   const approvals = new (ApprovalsProtocolEvm as never as new (a: unknown, c?: unknown) => { getSupportedStandards(): Promise<unknown> })(evm, {})

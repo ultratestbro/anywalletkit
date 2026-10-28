@@ -1,10 +1,12 @@
 import { NotImplementedError, type IWalletAccount, type IWalletAccountReadOnly, type LendingQuote, type LendingResult, type SupplyOptions, type WithdrawOptions } from '@anywalletkit/core'
-import { WITHDRAW_ALL, type ApiVault, type ApiVaultMetrics } from './api.js'
+import type { ApiVault, ApiVaultMetrics } from './api.js'
 import { divWadUp, fromDecimalString, lessBps, mulWad, toAmount, toDecimalString, toWad, type AmountOption } from './amounts.js'
-import { KaminoBase, type Expectation, type KaminoBaseConfig } from './base.js'
+import { KaminoBase, WSOL_MINT, type Expectation, type KaminoBaseConfig } from './base.js'
+import { decodeFarmUser, decodeReserve, decodeVault, tokenAmount, vaultTokensPerShareWad, withinTolerance, type ReserveChain, type VaultChain } from './chain.js'
 import { KaminoError } from './errors.js'
-import { vaultSharesMint } from './pda.js'
-import { KVAULT_PROGRAM } from './programs.js'
+import { associatedTokenAddress, farmUserState, vaultSharesMint } from './pda.js'
+import { vaultRules, type InstructionRule } from './policy.js'
+import { KVAULT_PROGRAM, TOKEN_2022_PROGRAM, TOKEN_PROGRAM } from './programs.js'
 
 export interface KaminoVaultConfig extends KaminoBaseConfig {
   /** The Earn vault (kVault) address. */
@@ -12,7 +14,8 @@ export interface KaminoVaultConfig extends KaminoBaseConfig {
   /**
    * Keep the shares in the wallet (default true). The guard then proves the shares arrive. With
    * `false` they are staked in the vault farm, as the Kamino app does: they never reach the wallet,
-   * so the guard can only bound what leaves it, and the deposit's destination relies on the API.
+   * so the guard can only bound what leaves it; the instruction rules pin the stake to this vault's
+   * farm (from the chain) and the wallet's own farm state.
    */
   skipFarm?: boolean
   /**
@@ -64,6 +67,19 @@ export interface VaultPosition {
 export interface VaultSupplyQuote extends LendingQuote { expectedShares: bigint }
 export interface VaultWithdrawQuote extends LendingQuote { shares: bigint; expectedAssets: bigint; minAssets: bigint }
 
+/** The vault and the wallet's place in it as the chain has them; the bounds of a write come from here. */
+interface VaultOnChain {
+  state: VaultChain
+  /** Assets per share (token units, WAD) from the vault's state and its reserves. */
+  tokensPerShareWad: bigint
+  tokenAta: string
+  sharesAtas: readonly string[]
+  farm: { farm: string; userState: string } | null
+  /** Shares in the wallet's shares account(s) and staked in the vault farm. */
+  unstaked: bigint
+  staked: bigint
+}
+
 /**
  * A Kamino Earn vault (kVault) as a `LendingProtocol`: `supply` deposits the
  * vault's asset for shares (kept in the wallet; staked in the vault farm with `skipFarm: false`),
@@ -71,10 +87,13 @@ export interface VaultWithdrawQuote extends LendingQuote { shares: bigint; expec
  * does not lend to its depositors.
  *
  * The transaction comes from Kamino's API and is signed only after the
- * wallet's guard proves it calls only the Kamino / token programs and moves
- * exactly the declared balances (the deposit out, the asset in at the quoted
- * minimum, no other token account touched). Rates, TVL and positions are the
- * API's.
+ * wallet's guard proves it carries only the instructions the operation takes,
+ * on this vault and the wallet's own accounts, and moves exactly the declared
+ * balances (the deposit out, the asset in at the minimum, no other token
+ * account touched). The bounds come from the chain: the share price from the
+ * vault's state and its reserves, the position from the wallet's shares
+ * account and farm stake; the API's price must agree with it. Reads
+ * (`getVault`, `getPosition`, APY, TVL) are the API's.
  */
 export class KaminoVaultProtocolSolana extends KaminoBase<KaminoVaultConfig> {
   readonly vault: string
@@ -165,16 +184,61 @@ export class KaminoVaultProtocolSolana extends KaminoBase<KaminoVaultConfig> {
     return rescale(divWadUp(assets, tokensPerShareWad), v.tokenMintDecimals, v.sharesMintDecimals)
   }
 
-  private async plan(o: KaminoVaultSupplyOptions, me: string): Promise<{ base64: string; v: ApiVault; amount: bigint; expectedShares: bigint }> {
+  /**
+   * What a write's bounds are computed from, read from the chain (scan 2026-10-27 modules, F2/F11/F12):
+   * the vault's state and the reserves it invests in give the share price, the wallet's shares
+   * account and farm state its position. The API must describe the same vault — mints, decimals —
+   * and quote a `tokensPerShare` within 1% of the chain's; a lying rate is refused, never used.
+   */
+  private async onChain(me: string, v: ApiVault, m: ApiVaultMetrics): Promise<VaultOnChain> {
+    const refuse = (what: string): never => { throw new KaminoError(`Kamino's answer for vault ${this.vault} does not match the chain: ${what}.`) }
+    const state = decodeVault(this.vault, (await this.readChain([this.vault]))[0] ?? null)
+    if (state.tokenMint !== v.tokenMint || state.sharesMint !== v.sharesMint) refuse(`mints ${v.tokenMint} / ${v.sharesMint} are ${state.tokenMint} / ${state.sharesMint} on chain`)
+    if (state.tokenDecimals !== v.tokenMintDecimals || state.sharesDecimals !== v.sharesMintDecimals) refuse(`decimals ${v.tokenMintDecimals} / ${v.sharesMintDecimals} are ${state.tokenDecimals} / ${state.sharesDecimals} on chain`)
+    const invested = state.allocations.filter((a) => a.ctokens > 0n).map((a) => a.reserve)
+    const sharesAtas = [associatedTokenAddress(me, state.sharesMint, TOKEN_PROGRAM), associatedTokenAddress(me, state.sharesMint, TOKEN_2022_PROGRAM)]
+    const userState = state.farm ? farmUserState(state.farm, me) : null
+    const accs = await this.readChain([...invested, ...sharesAtas, ...(userState ? [userState] : [])])
+    const reserves = new Map<string, ReserveChain>()
+    invested.forEach((r, i) => {
+      const reserve = decodeReserve(r, accs[i] ?? null)
+      if (reserve.mint !== state.tokenMint) refuse(`its reserve ${r} lends ${reserve.mint}`)
+      reserves.set(r, reserve)
+    })
+    const tokensPerShareWad = vaultTokensPerShareWad(state, reserves)
+    const quoted = toWad(m.tokensPerShare)
+    if (quoted <= 0n) refuse(`tokensPerShare ${m.tokensPerShare} is not positive`)
+    if (!withinTolerance(quoted, tokensPerShareWad)) refuse(`tokensPerShare ${m.tokensPerShare} is ${toDecimalString(tokensPerShareWad, 18)} on chain`)
+    const unstaked = sharesAtas.reduce((sum, a, i) => sum + tokenAmount(accs[invested.length + i] ?? null, state.sharesMint, me), 0n)
+    const farmAcc = userState ? accs[invested.length + 2] ?? null : null
+    const stake = userState && farmAcc ? decodeFarmUser(userState, farmAcc) : null
+    const staked = stake && stake.owner === me && stake.farm === state.farm ? stake.staked : 0n
+    return {
+      state, tokensPerShareWad, sharesAtas, tokenAta: associatedTokenAddress(me, state.tokenMint, state.tokenProgram),
+      farm: state.farm && userState ? { farm: state.farm, userState } : null, unstaked, staked,
+    }
+  }
+
+  private rules(op: 'deposit' | 'withdraw', me: string, c: VaultOnChain): readonly InstructionRule[] {
+    return vaultRules(op, {
+      me, vault: this.vault, mint: c.state.tokenMint, sharesMint: c.state.sharesMint, tokenAta: c.tokenAta, sharesAtas: c.sharesAtas, farm: c.farm,
+      wsolAta: associatedTokenAddress(me, WSOL_MINT, TOKEN_PROGRAM),
+    }, { stake: !this.skipFarm })
+  }
+
+  private async plan(o: KaminoVaultSupplyOptions, me: string): Promise<{ base64: string; v: ApiVault; amount: bigint; expectedShares: bigint; rules: readonly InstructionRule[] }> {
     const amount = toAmount(o.amount)
     // What the wallet deposits is named by the caller, never only by the API.
     const token = o.token ?? this._config.asset
     if (token === undefined) throw new KaminoError(`Name the asset to deposit: pass 'token' or set 'asset' in the vault config.`)
     const [v, m] = await Promise.all([this.state(), this.api.getVaultMetrics(this.vault)])
     if (token !== v.tokenMint) throw new KaminoError(`Vault ${this.vault} takes ${symbolOf(v)} (${v.tokenMint}), not ${token}.`)
-    if (amount < v.minDepositAmount) throw new KaminoError(`Deposit below the vault minimum: ${amount} < ${v.minDepositAmount} base units.`)
+    const c = await this.onChain(me, v, m)
+    if (amount < c.state.minDeposit) throw new KaminoError(`Deposit below the vault minimum: ${amount} < ${c.state.minDeposit} base units.`)
+    const expectedShares = this.assetsToShares(amount, v, c.tokensPerShareWad)
+    if (expectedShares <= 0n) throw new KaminoError(`A deposit of ${amount} base units buys no shares of vault ${this.vault}.`)
     const base64 = await this.api.buildVaultDeposit({ wallet: me, kvault: this.vault, amount: toDecimalString(amount, v.tokenMintDecimals), skipFarm: this.skipFarm, memo: this.memo() })
-    return { base64, v, amount, expectedShares: this.assetsToShares(amount, v, toWad(m.tokensPerShare)) }
+    return { base64, v, amount, expectedShares, rules: this.rules('deposit', me, c) }
   }
 
   private supplyExpectation(v: ApiVault, amount: bigint, expectedShares: bigint) {
@@ -185,35 +249,38 @@ export class KaminoVaultProtocolSolana extends KaminoBase<KaminoVaultConfig> {
 
   override async quoteSupply(o: KaminoVaultSupplyOptions): Promise<VaultSupplyQuote> {
     const me = await this.me()
-    const { base64, v, amount, expectedShares } = await this.plan(o, me)
-    const { fee } = await this.quoteBuilt(base64, this.supplyExpectation(v, amount, expectedShares))
+    const { base64, v, amount, expectedShares, rules } = await this.plan(o, me)
+    const { fee } = await this.quoteBuilt(base64, this.supplyExpectation(v, amount, expectedShares), rules)
     return { fee, expectedShares }
   }
 
   override async supply(o: KaminoVaultSupplyOptions): Promise<LendingResult> {
     this.requireSigningAccount('supply(options)')
     const me = await this.me()
-    const { base64, v, amount, expectedShares } = await this.plan(o, me)
-    return this.sendBuilt(base64, this.supplyExpectation(v, amount, expectedShares), 'supply')
+    const { base64, v, amount, expectedShares, rules } = await this.plan(o, me)
+    return this.sendBuilt(base64, this.supplyExpectation(v, amount, expectedShares), rules, 'supply')
   }
 
-  private async planWithdraw(o: KaminoVaultWithdrawOptions, me: string): Promise<{ base64: string; v: ApiVault; shares: bigint; expectedAssets: bigint }> {
-    const [v, m, position] = await Promise.all([this.state(), this.api.getVaultMetrics(this.vault), this.getPosition()])
+  private async planWithdraw(o: KaminoVaultWithdrawOptions, me: string): Promise<{ base64: string; v: ApiVault; shares: bigint; expectedAssets: bigint; rules: readonly InstructionRule[] }> {
+    const [v, m] = await Promise.all([this.state(), this.api.getVaultMetrics(this.vault)])
     if (o.token && o.token !== v.tokenMint) throw new KaminoError(`Vault ${this.vault} pays out ${symbolOf(v)} (${v.tokenMint}), not ${o.token}.`)
-    if (position.shares === 0n) throw new KaminoError(`No position in vault ${this.vault} for ${me}.`)
-    const tps = toWad(m.tokensPerShare)
+    const c = await this.onChain(me, v, m)
+    const held = c.unstaked + c.staked
+    if (held === 0n) throw new KaminoError(`No position in vault ${this.vault} for ${me}.`)
+    const tps = c.tokensPerShareWad
     let shares: bigint, amountArg: string
-    if (o.amount === 'max') { shares = position.shares; amountArg = WITHDRAW_ALL }
+    // Every share, by count: what the chain holds is what the guard lets go (the API refuses u64::MAX as a decimal now).
+    if (o.amount === 'max') { shares = held; amountArg = toDecimalString(held, v.sharesMintDecimals) }
     else {
       const assets = toAmount(o.amount)
       shares = this.assetsToShares(assets, v, tps)
-      if (shares > position.shares) throw new KaminoError(`Withdrawal exceeds the position: ${assets} asset units need ${shares} shares, the wallet holds ${position.shares}.`)
+      if (shares > held) throw new KaminoError(`Withdrawal exceeds the position: ${assets} asset units need ${shares} shares, the wallet holds ${held}.`)
       amountArg = toDecimalString(shares, v.sharesMintDecimals)
     }
     const expectedAssets = this.sharesToAssets(shares, v, tps)
-    if (expectedAssets < v.minWithdrawAmount) throw new KaminoError(`Withdrawal below the vault minimum: ${expectedAssets} < ${v.minWithdrawAmount} base units.`)
+    if (expectedAssets < c.state.minWithdraw) throw new KaminoError(`Withdrawal below the vault minimum: ${expectedAssets} < ${c.state.minWithdraw} base units.`)
     const base64 = await this.api.buildVaultWithdraw({ wallet: me, kvault: this.vault, amount: amountArg, memo: this.memo() })
-    return { base64, v, shares, expectedAssets }
+    return { base64, v, shares, expectedAssets, rules: this.rules('withdraw', me, c) }
   }
 
   /**
@@ -227,17 +294,17 @@ export class KaminoVaultProtocolSolana extends KaminoBase<KaminoVaultConfig> {
 
   override async quoteWithdraw(o: KaminoVaultWithdrawOptions): Promise<VaultWithdrawQuote> {
     const me = await this.me()
-    const { base64, v, shares, expectedAssets } = await this.planWithdraw(o, me)
+    const { base64, v, shares, expectedAssets, rules } = await this.planWithdraw(o, me)
     const expect = this.withdrawExpectation(v, shares, expectedAssets)
-    const { fee } = await this.quoteBuilt(base64, expect)
+    const { fee } = await this.quoteBuilt(base64, expect, rules)
     return { fee, shares, expectedAssets, minAssets: expect.tokenIn!.minAmount }
   }
 
   override async withdraw(o: KaminoVaultWithdrawOptions): Promise<LendingResult> {
     this.requireSigningAccount('withdraw(options)')
     const me = await this.me()
-    const { base64, v, shares, expectedAssets } = await this.planWithdraw(o, me)
-    return this.sendBuilt(base64, this.withdrawExpectation(v, shares, expectedAssets), 'withdraw')
+    const { base64, v, shares, expectedAssets, rules } = await this.planWithdraw(o, me)
+    return this.sendBuilt(base64, this.withdrawExpectation(v, shares, expectedAssets), rules, 'withdraw')
   }
 
   override async borrow(): Promise<LendingResult> { throw new NotImplementedError('borrow(options) — an Earn vault does not lend to its depositors; use KaminoMarketProtocolSolana.') }

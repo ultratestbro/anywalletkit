@@ -10,8 +10,9 @@ import {
 import { TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda } from '@solana-program/token'
 import { WalletManagerSolana, type SolanaRpc } from '@anywalletkit/wallet-solana'
 import { KaminoVaultProtocolSolana } from '../src/index.js'
-import { KVAULT_PROGRAM } from '../src/programs.js'
-import { SHARES, USDC, VAULT, api } from './fixture.js'
+import { KLEND_PROGRAM, KVAULT_PROGRAM } from '../src/programs.js'
+import { SHARES, USDC, USDC_RESERVE, VAULT, api } from './fixture.js'
+import { defaultChain } from './chain-fixture.js'
 
 const SEED = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 const ME = 'HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk' as Address
@@ -58,11 +59,18 @@ function fakeRpc(pre: Record<string, State>, post: Record<string, State>) {
   return { rpc, sent }
 }
 
-/** A kvault `withdraw` touching the wallet's share and USDC accounts, as /ktx/kvault/withdraw builds it. */
+/** A kvault `withdraw` laid out as /ktx/kvault/withdraw builds it (user, vault, …, the wallet's USDC and shares accounts, the mints), extra writable accounts after. */
 function withdrawTx(sharesAta: Address, usdcAta: Address, extra: Address[] = []): string {
+  const w = (address: string) => ({ address: address as Address, role: AccountRole.WRITABLE })
+  const r = (address: string) => ({ address: address as Address, role: AccountRole.READONLY })
   const ix = {
     programAddress: KVAULT_PROGRAM as Address,
-    accounts: [{ address: ME, role: AccountRole.WRITABLE_SIGNER }, ...[sharesAta, usdcAta, ...extra].map((address) => ({ address, role: AccountRole.WRITABLE }))],
+    accounts: [
+      // global config, token vault, base vault authority: the live transaction's (2026-10-28)
+      { address: ME, role: AccountRole.WRITABLE_SIGNER }, w(VAULT), r('BKyTcUe6daNG8HbgBix2ugdRHbykG2dK9hPBBqhUyoEX'), w('CKTEDx5z19CntAB9B66AxuS98S1NuCgMvfpsew7TQwi'),
+      r('AyY6VCkHfTWdFs7SqBbu6AnCqLUhgzVHBzW3WcJu5Jc8'), w(usdcAta), w(USDC), w(sharesAta), w(SHARES), r(TOKEN_PROGRAM_ADDRESS), r(TOKEN_PROGRAM_ADDRESS), r(KLEND_PROGRAM),
+      ...extra.map(w),
+    ],
     data: Uint8Array.from([0xb7, 0x12, 0x46, 0x9c, 0x94, 0x6d, 0xa1, 0x22, 1, 0, 0, 0, 0, 0, 0, 0]),
   }
   const msg = pipe(
@@ -78,7 +86,9 @@ async function setup(post: (a: { sharesAta: Address; usdcAta: Address; otherAta:
   const [sharesAta] = await findAssociatedTokenPda({ mint: SHARES as Address, owner: ME, tokenProgram: TOKEN_PROGRAM_ADDRESS })
   const [usdcAta] = await findAssociatedTokenPda({ mint: USDC as Address, owner: ME, tokenProgram: TOKEN_PROGRAM_ADDRESS })
   const [otherAta] = await findAssociatedTokenPda({ mint: OTHER_MINT, owner: ME, tokenProgram: TOKEN_PROGRAM_ADDRESS })
-  const pre = { [ME]: sys(SOL), [sharesAta]: tokenAccount(SHARES, ONE_SHARE), [usdcAta]: tokenAccount(USDC, 0n), [otherAta]: tokenAccount(OTHER_MINT, 500n) }
+  // The vault and its reserve as the chain has them (the module prices the shares from these).
+  const chain = defaultChain()
+  const pre = { [ME]: sys(SOL), [VAULT]: chain.get(VAULT)!, [USDC_RESERVE]: chain.get(USDC_RESERVE)!, [sharesAta]: tokenAccount(SHARES, ONE_SHARE), [usdcAta]: tokenAccount(USDC, 0n), [otherAta]: tokenAccount(OTHER_MINT, 500n) }
   const rpc = fakeRpc(pre, { ...pre, ...post({ sharesAta, usdcAta, otherAta }) })
   const kamino = api()
   kamino.routes.set(`/kvaults/users/${ME}/positions/${VAULT}`, { status: 200, body: { vaultAddress: VAULT, stakedShares: '0', unstakedShares: '1', totalShares: '1' } })

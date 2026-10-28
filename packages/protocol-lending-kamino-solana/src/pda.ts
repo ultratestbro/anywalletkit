@@ -34,3 +34,13 @@ export function vanillaObligation(user: string, market: string, klendProgram = '
 export function vaultSharesMint(vault: string, kvaultProgram: string): string {
   return findProgramAddress([new TextEncoder().encode('shares'), base58.decode(vault)], kvaultProgram)
 }
+
+/** The associated token account of `owner` for `mint` under a token program (classic Token or Token-2022). */
+export function associatedTokenAddress(owner: string, mint: string, tokenProgram: string): string {
+  return findProgramAddress([base58.decode(owner), base58.decode(tokenProgram), base58.decode(mint)], 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+}
+
+/** A farm's state for one staker: `["user", farm, owner]` under the farms program (checked against mainnet user states, 2026-10-28). */
+export function farmUserState(farm: string, owner: string, farmsProgram = 'FarmsPZpWu9i7Kky8tPN37rs2TpmMrAZrC7S7vJa91Hr'): string {
+  return findProgramAddress([new TextEncoder().encode('user'), base58.decode(farm), base58.decode(owner)], farmsProgram)
+}

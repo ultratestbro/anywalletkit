@@ -2,8 +2,9 @@
 // writes: markets, reserves and vaults read; then the exact transactions the
 // module would sign for the given wallet — an Earn vault deposit and a Lend
 // deposit — are built by the API and run through the wallet's serialized
-// guard (program allowlist + simulation with balance proof) as a read-only
-// account. Pass a USDC holder to see both proofs pass.
+// guard (program allowlist, the operation's instruction rules, bounds read from
+// the chain, simulation with balance proof) as a read-only account. Pass a USDC
+// holder to see both proofs pass.
 //
 //   node scripts/verify-live.mjs [address] [rpcUrl]
 import { WalletAccountReadOnlySolana } from '@anywalletkit/wallet-solana'
@@ -26,7 +27,7 @@ const usdcVaults = vaults.filter((v) => v.tokenMint === USDC).sort((a, b) => Num
 console.log(`vaults: ${vaults.length}; USDC vaults by shares: ${usdcVaults.map((v) => `${v.name} (${v.address.slice(0, 6)}…)`).join(' · ')}`)
 
 const account = new WalletAccountReadOnlySolana(address, { provider: rpc })
-const vault = new KaminoVaultProtocolSolana(account, { vault: STEAKHOUSE_USDC })
+const vault = new KaminoVaultProtocolSolana(account, { vault: STEAKHOUSE_USDC, asset: USDC })
 const info = await vault.getVault()
 console.log(`vault ${info.name}: ${info.asset.symbol} apy ${info.apy.toFixed(2)}% (7d ${info.apy7d.toFixed(2)}%) tvl $${(Number(info.totalAssets) / 1e6 / 1e6).toFixed(1)}M holders ${info.holders} fees perf ${info.fees.performanceBps} bps, farm ${info.farm ?? 'none'}`)
 const position = await vault.getPosition()

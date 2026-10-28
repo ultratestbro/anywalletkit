@@ -12,5 +12,11 @@ export {
 } from './programs.js'
 export { toAmount, toDecimalString, fromDecimalString, toWad, mulWad, divWadUp, lessBps, WAD } from './amounts.js'
 export type { AmountOption } from './amounts.js'
-export { vanillaObligation, vaultSharesMint, findProgramAddress } from './pda.js'
+export { vanillaObligation, vaultSharesMint, findProgramAddress, associatedTokenAddress, farmUserState } from './pda.js'
+export {
+  decodeVault, decodeReserve, decodeObligation, decodeFarmUser, vaultTokensPerShareWad, depositedLiquidity, debtNow, CHAIN_TOLERANCE_BPS,
+} from './chain.js'
+export type { ChainAccount, VaultChain, ReserveChain, ObligationChain } from './chain.js'
+export { marketRules, vaultRules, plumbing, IX } from './policy.js'
+export type { InstructionRule, MarketRuleAccounts, VaultRuleAccounts } from './policy.js'
 export type { SolanaAccountSurface } from './base.js'

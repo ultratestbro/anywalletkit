@@ -4,6 +4,7 @@
 import type { IWalletAccount, IWalletAccountReadOnly, TransferResult } from '@anywalletkit/core'
 import { SOLANA_MAINNET } from '../src/base.js'
 import type { SerializedGuard } from '../src/base.js'
+import type { ChainAccount } from '../src/chain.js'
 
 export const USER = 'KUMtRazMP7vwvc2kthnGZ9Cq6ZsGRiYC97snMYepNx9'
 export const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
@@ -27,9 +28,12 @@ export interface FakeAccount extends IWalletAccount {
   checkSerialized(base64: string, guard: SerializedGuard): Promise<{ quote: { fee: bigint } }>
   sendSerialized(base64: string, guard: SerializedGuard): Promise<{ hash: string; fee: bigint }>
   getMintInfo(mint: string): Promise<{ decimals: number }>
+  /** What getAccountInfos answers from (chain-fixture.ts builds the accounts); tests change it in place. */
+  accounts: Map<string, ChainAccount>
+  getAccountInfos(addresses: readonly string[]): Promise<Array<ChainAccount | null>>
 }
 
-export function account(opts: { chain?: string; address?: string; mintInfo?: boolean } = {}): FakeAccount {
+export function account(opts: { chain?: string; address?: string; mintInfo?: boolean; accounts?: Map<string, ChainAccount> } = {}): FakeAccount {
   const calls: FakeAccount['calls'] = [], sent: unknown[] = [], guards: FakeAccount['guards'] = []
   const rec = <T>(method: string, args: unknown[], value: T): T => { calls.push({ method, args }); return value }
   const address = opts.address ?? USER
@@ -44,9 +48,11 @@ export function account(opts: { chain?: string; address?: string; mintInfo?: boo
     getTransactionReceipt: async (hash) => rec('getTransactionReceipt', [hash], { hash, status: 1 as const }),
     verify: async () => true,
   }
+  const accounts = opts.accounts ?? new Map<string, ChainAccount>()
   const acc: FakeAccount = {
     ...readOnly,
-    calls, sent, guards,
+    calls, sent, guards, accounts,
+    getAccountInfos: async (addresses) => rec('getAccountInfos', [addresses], addresses.map((a) => accounts.get(a) ?? null)),
     needsNetwork: true,
     sign: async () => 'sig',
     signTransaction: async () => 'signed',

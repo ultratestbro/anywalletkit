@@ -132,6 +132,22 @@ const pyusd = await account.getTokenInfo('2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsF
   `signTransaction(base64)` / `sendTransaction(base64)` decode it, run the hard
   checks, simulate, add this wallet's signature (others are preserved) and
   return / broadcast the wire. The message bytes are never altered.
+* `sendSerialized(base64, guard)` / `checkSerialized(base64, guard)` prove a
+  provider-built wire before signing: the program allowlist, the hard checks,
+  and a simulated balance proof against `guard.expect` (`maxLamportsOut`,
+  `tokenIn: {mint, minAmount, maxAmount?}`, `maxTokenOut`). Every bound must
+  be a non-negative bigint (`invalid-expectation` otherwise, before any RPC
+  call); `tokenIn.maxAmount` refuses a wire that pays the wallet more than
+  asked (`token-in-excess`). A module that knows the exact instructions its
+  operation takes passes `guard.instructions`: every top-level instruction
+  must match one rule — program, data prefix (`data`, hex), optional exact
+  `dataLength`, and the accounts at given positions, compared after lookup
+  tables are resolved — or the wire is refused (`unexpected-instruction`).
+  Net balances alone let a deposit that also withdraws collateral and
+  transfers it away pass; the rules do not.
+* `getAccountInfos(addresses)` reads raw accounts (owner, lamports, data) in
+  the order asked, `null` where none exists, for modules that check a
+  provider's figures against chain state.
 
 ### Broadcast outcome and timeouts
 

@@ -15,7 +15,8 @@ import {
 } from '@solana-program/token-2022'
 import { MAX_U64, STAKE_PROGRAM_ADDRESS, ZERO_ADDRESS, decodeWireTransaction, describeTransaction, resolveCompiledAccounts } from './describe.js'
 import {
-  DEFAULT_PROGRAM_ALLOWLIST, SAFE_CORE_INSTRUCTIONS, WSOL_MINT, base64Bytes, bytesEqual, isNativeMint, optEqual, parseTokenAccount, pubkeyBytes, type SerializedCheck, type SerializedTxGuard,
+  DEFAULT_PROGRAM_ALLOWLIST, SAFE_CORE_INSTRUCTIONS, WSOL_MINT, assertExpectation, base64Bytes, bytesEqual, isNativeMint, optEqual, parseTokenAccount, pubkeyBytes, unexpectedInstruction,
+  type SerializedCheck, type SerializedTxGuard, type SolanaAccountData,
 } from './serialized.js'
 import { MissingSignersError, SimulationError, UnsafeTransactionError } from './errors.js'
 import { isNativeTransfer, isSignedTransaction, isTransactionMessage } from './guards.js'
@@ -706,6 +707,15 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     return byTable as unknown as Record<string, readonly string[]>
   }
 
+  /**
+   * Raw accounts in the order asked (null where none exists), batched 100 per `getMultipleAccounts`:
+   * for modules that check a provider's figures against the chain state they claim to describe.
+   */
+  async getAccountInfos(addresses: readonly string[]): Promise<Array<SolanaAccountData | null>> {
+    const states = await this.accountStates(addresses)
+    return addresses.map((a) => { const st = states.get(a); return st ? { owner: st.owner, lamports: st.lamports, data: st.data } : null })
+  }
+
   private async accountStates(addresses: readonly string[]): Promise<Map<string, { lamports: bigint; owner: string; data: Uint8Array } | null>> {
     const rpc = this.requireRpc('read accounts')
     const out = new Map<string, { lamports: bigint; owner: string; data: Uint8Array } | null>()
@@ -728,6 +738,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
    * {@link SimulationError}; returns the evidence otherwise. Nothing is signed.
    */
   async checkSerialized(base64: string, guard: SerializedTxGuard, options: PlanOptions = {}): Promise<SerializedCheck> {
+    assertExpectation(guard?.expect)
     const rpc = this.requireRpc('check provider transactions')
     const transaction = decodeWireTransaction(base64)
     const layout0 = resolveCompiledAccounts(transaction)
@@ -743,6 +754,11 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       const allowed = new Set(guard.programAllowlist ?? DEFAULT_PROGRAM_ALLOWLIST)
       const foreign = [...new Set(description.items.map((it) => it.program ?? '<unresolved>').filter((p) => !allowed.has(p)))]
       if (foreign.length) throw new UnsafeTransactionError(`Transaction invokes programs outside the allowlist: ${foreign.join(', ')}.`, 'unknown-program', foreign)
+    }
+    // 1b. Instructions, when the caller knows the exact shapes its operation takes.
+    if (guard.instructions !== undefined) {
+      const odd = unexpectedInstruction(layout.compiled, layout.accounts, guard.instructions)
+      if (odd) throw new UnsafeTransactionError(`Instruction ${odd.index} (${odd.program}, data ${odd.data || 'empty'}…) is not one this operation takes.`, 'unexpected-instruction', [odd.program])
     }
     // 2. Authority changes are never part of a swap. Closing a token account
     //    is routine (aggregators unwrap temporary wSOL) ONLY when the rent
@@ -824,9 +840,11 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       if (tokenInNative) {
         // Receiving SOL: the net change must cover the minimum after the allowed spend.
         if (lamportsDelta < expect.tokenIn.minAmount - ceiling) throw new UnsafeTransactionError(`Transaction yields ${lamportsDelta} lamports net; at least ${expect.tokenIn.minAmount - ceiling} expected.`, 'slippage', [String(lamportsDelta)])
+        if (expect.tokenIn.maxAmount !== undefined && lamportsDelta > expect.tokenIn.maxAmount) throw new UnsafeTransactionError(`Transaction yields ${lamportsDelta} lamports net; at most ${expect.tokenIn.maxAmount} expected.`, 'token-in-excess', [String(lamportsDelta)])
       } else {
         tokenInDelta = tokenDelta(tokenInAtas)
         if (tokenInDelta < expect.tokenIn.minAmount) throw new UnsafeTransactionError(`Transaction delivers ${tokenInDelta} of ${expect.tokenIn.mint}; at least ${expect.tokenIn.minAmount} expected.`, 'slippage', [String(tokenInDelta)])
+        if (expect.tokenIn.maxAmount !== undefined && tokenInDelta > expect.tokenIn.maxAmount) throw new UnsafeTransactionError(`Transaction delivers ${tokenInDelta} of ${expect.tokenIn.mint}; at most ${expect.tokenIn.maxAmount} expected.`, 'token-in-excess', [String(tokenInDelta)])
       }
     }
     let tokenOutDelta: bigint | undefined

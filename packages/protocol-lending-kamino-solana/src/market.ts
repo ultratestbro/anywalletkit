@@ -1,10 +1,12 @@
 import type { BorrowOptions, IWalletAccount, IWalletAccountReadOnly, LendingQuote, LendingResult, RepayOptions, SupplyOptions, WithdrawOptions } from '@anywalletkit/core'
 import { MAIN_MARKET, type ApiMarket, type ApiObligation, type ApiReserve } from './api.js'
 import { fromDecimalString, lessBps, toAmount, toDecimalString, type AmountOption } from './amounts.js'
-import { DEFAULT_FIRST_DEPOSIT_ALLOWANCE, KaminoBase, type KaminoBaseConfig } from './base.js'
+import { DEFAULT_FIRST_DEPOSIT_ALLOWANCE, KaminoBase, WSOL_MINT, type KaminoBaseConfig } from './base.js'
+import { debtNow, decodeObligation, decodeReserve, depositedLiquidity, withinTolerance, type ObligationChain, type ReserveChain } from './chain.js'
 import { KaminoError } from './errors.js'
-import { vanillaObligation } from './pda.js'
-import { KLEND_PROGRAM } from './programs.js'
+import { associatedTokenAddress, vanillaObligation } from './pda.js'
+import { marketRules, type InstructionRule } from './policy.js'
+import { KLEND_PROGRAM, TOKEN_PROGRAM } from './programs.js'
 
 export interface KaminoMarketConfig extends KaminoBaseConfig {
   /** The lending market (default: Kamino's Main Market). */
@@ -39,6 +41,16 @@ export interface MarketPosition {
 
 export interface MarketQuote extends LendingQuote { reserve: string; minReceived?: bigint }
 
+type LendKind = 'deposit' | 'withdraw' | 'borrow' | 'repay'
+
+/** The reserve and the wallet's vanilla obligation as the chain has them, plus what the operation may carry. */
+interface Prepared {
+  reserve: ReserveInfo
+  chain: { reserve: ReserveChain; obligation: ObligationChain | null; obligationAddress: string }
+  amount: bigint
+  rules: readonly InstructionRule[]
+}
+
 /**
  * A Kamino Lend market as a `LendingProtocol`: `supply` deposits a reserve's
  * token as collateral on the wallet's obligation, `withdraw` takes it back,
@@ -46,7 +58,11 @@ export interface MarketQuote extends LendingQuote { reserve: string; minReceived
  *
  * Tokens are named by mint. The first deposit creates the obligation (plus
  * user metadata and a per-user lookup table) and costs their rent, which the
- * guard allows once; every transaction is proven before signing.
+ * guard allows once; every transaction is proven before signing: only the
+ * instructions the operation takes, on the wallet's vanilla obligation, the
+ * resolved reserve and the wallet's own token account. The reserve is checked
+ * on chain, and 'max' amounts and the first-deposit allowance come from the
+ * obligation's on-chain state.
  */
 export class KaminoMarketProtocolSolana extends KaminoBase<KaminoMarketConfig> {
   readonly market: string
@@ -107,101 +123,147 @@ export class KaminoMarketProtocolSolana extends KaminoBase<KaminoMarketConfig> {
     return { obligations, supplied, borrowed }
   }
 
-  private async lend(kind: 'deposit' | 'withdraw' | 'borrow' | 'repay', me: string, mint: string, amount: bigint): Promise<{ base64: string; reserve: ReserveInfo }> {
+  /**
+   * The reserve and the wallet's vanilla obligation from the chain (scan 2026-10-27 modules, F1/F6/F10):
+   * the reserve must be this market's and lend the token, 'max' comes from the obligation, and the
+   * instruction rules pin the operation to that obligation, reserve and the wallet's token account.
+   */
+  private async prepare(kind: LendKind, me: string, mint: string, amount: AmountOption): Promise<Prepared> {
     const reserve = await this.resolveReserve(mint)
-    const p = { wallet: me, market: this.market, reserve: reserve.reserve, amount: toDecimalString(amount, await this.decimals(mint)), memo: this.memo() }
-    const base64 = kind === 'deposit' ? await this.api.buildLendDeposit(p) : kind === 'withdraw' ? await this.api.buildLendWithdraw(p) : kind === 'borrow' ? await this.api.buildLendBorrow(p) : await this.api.buildLendRepay(p)
-    return { base64, reserve }
+    const obligationAddress = vanillaObligation(me, this.market, KLEND_PROGRAM)
+    const [r, o] = await this.readChain([reserve.reserve, obligationAddress])
+    const onChain = decodeReserve(reserve.reserve, r ?? null)
+    if (onChain.lendingMarket !== this.market) throw new KaminoError(`Reserve ${reserve.reserve} belongs to market ${onChain.lendingMarket} on chain, not ${this.market}.`)
+    if (onChain.mint !== mint) throw new KaminoError(`Reserve ${reserve.reserve} lends ${onChain.mint} on chain, not ${mint}.`)
+    const obligation = o ? decodeObligation(obligationAddress, o) : null
+    if (obligation && (obligation.owner !== me || obligation.lendingMarket !== this.market)) throw new KaminoError(`Obligation ${obligationAddress} is not ${me}'s on market ${this.market}.`)
+    const chain = { reserve: onChain, obligation, obligationAddress }
+    const value = amount === 'max' ? await this.resolveMax(kind === 'withdraw' ? 'supplied' : 'borrowed', me, mint, reserve.reserve, chain) : toAmount(amount)
+    const rules = marketRules(kind, {
+      me, market: this.market, obligation: obligationAddress, reserve: reserve.reserve, mint,
+      ata: associatedTokenAddress(me, mint, onChain.tokenProgram), wsolAta: associatedTokenAddress(me, WSOL_MINT, TOKEN_PROGRAM),
+    })
+    return { reserve, chain, amount: value, rules }
+  }
+
+  private build(kind: LendKind, me: string, p: Prepared): Promise<string> {
+    const params = { wallet: me, market: this.market, reserve: p.reserve.reserve, amount: toDecimalString(p.amount, p.chain.reserve.decimals), memo: this.memo() }
+    return kind === 'deposit' ? this.api.buildLendDeposit(params) : kind === 'withdraw' ? this.api.buildLendWithdraw(params) : kind === 'borrow' ? this.api.buildLendBorrow(params) : this.api.buildLendRepay(params)
+  }
+
+  /** A wallet without its vanilla obligation here (on chain) pays the rent of one on its first deposit. */
+  private firstDepositExtra(p: Prepared): bigint {
+    return p.chain.obligation ? 0n : this.firstDepositAllowance
   }
 
   /**
-   * A wallet without its vanilla obligation here pays the rent of one on its first deposit. Only
-   * that obligation counts (a Multiply one does not hold a plain deposit), and an API failure is a
-   * refusal: guessing "first deposit" would widen what the transaction may spend.
+   * 'max' from the chain: what the vanilla obligation holds in, or owes to, this reserve (debt with the
+   * interest the reserve has accrued). When the API reports a figure for that obligation it must agree
+   * within 1%: an inflated debt or a negative deposit is refused (scan 2026-10-27 modules, F6/F10).
    */
-  private async firstDepositExtra(me: string): Promise<bigint> {
-    let obligations: ApiObligation[]
-    try {
-      obligations = await this.api.getUserObligations(this.market, me)
-    } catch (e) {
-      throw new KaminoError(`Kamino: could not tell whether ${me} already has an obligation on market ${this.market} (${e instanceof Error ? e.message : String(e)}); try again.`)
+  private async resolveMax(side: 'supplied' | 'borrowed', me: string, mint: string, reserve: string, c: Prepared['chain']): Promise<bigint> {
+    const o = c.obligation
+    const amount = !o ? 0n : side === 'supplied' ? depositedLiquidity(o, c.reserve, reserve) : debtNow(o, c.reserve, reserve)
+    if (amount <= 0n) throw new KaminoError(`Nothing ${side} in ${mint} on market ${this.market}.`)
+    const reported = await this.reported(side, me, mint, c.obligationAddress, c.reserve.decimals)
+    if (reported !== undefined) {
+      // The API counts per mint; the obligation may hold the mint in more than one reserve.
+      const legs = side === 'supplied' ? o!.deposits : o!.borrows
+      const others = [...new Set(legs.map((l) => l.reserve).filter((r) => r !== reserve))]
+      let perMint = amount
+      if (others.length) {
+        const accs = await this.readChain(others)
+        others.forEach((r, i) => {
+          const rc = decodeReserve(r, accs[i] ?? null)
+          if (rc.mint === mint) perMint += side === 'supplied' ? depositedLiquidity(o!, rc, r) : debtNow(o!, rc, r)
+        })
+      }
+      if (!withinTolerance(reported, perMint)) throw new KaminoError(`Kamino reports ${reported} base units ${side} in ${mint}; obligation ${c.obligationAddress} has ${perMint} on chain.`)
     }
-    const vanilla = vanillaObligation(me, this.market, KLEND_PROGRAM)
-    return obligations.some((o) => o.obligation === vanilla) ? 0n : this.firstDepositAllowance
+    return amount
   }
 
-  /** Resolve 'max' against the position's supplied / borrowed total for the mint. */
-  private async resolveMax(amount: AmountOption, mint: string, side: 'supplied' | 'borrowed'): Promise<bigint> {
-    if (amount !== 'max') return toAmount(amount)
-    const total = (await this.getPosition())[side][mint] ?? 0n
-    if (total === 0n) throw new KaminoError(`Nothing ${side} in ${mint} on market ${this.market}.`)
-    return total
+  /** The API's figure for one leg of the wallet's vanilla obligation; undefined when it reports none. */
+  private async reported(side: 'supplied' | 'borrowed', me: string, mint: string, obligation: string, decimals: number): Promise<bigint | undefined> {
+    const row = (await this.api.getUserObligations(this.market, me)).find((x) => x.obligation === obligation)
+    const legs = (side === 'supplied' ? row?.deposits : row?.borrows)?.filter((l) => l.mint === mint) ?? []
+    if (!legs.length) return undefined
+    return legs.reduce((sum, l) => sum + fromDecimalString(l.amount, decimals), 0n)
   }
 
   override async quoteSupply(o: SupplyOptions): Promise<MarketQuote> {
     const me = await this.me()
-    const amount = toAmount(o.amount)
-    const [{ base64, reserve }, extra] = await Promise.all([this.lend('deposit', me, o.token, amount), this.firstDepositExtra(me)])
-    const { fee } = await this.quoteBuilt(base64, this.spendExpectation(o.token, amount, extra))
-    return { fee, reserve: reserve.reserve }
+    const p = await this.prepare('deposit', me, o.token, o.amount)
+    const base64 = await this.build('deposit', me, p)
+    const { fee } = await this.quoteBuilt(base64, this.spendExpectation(o.token, p.amount, this.firstDepositExtra(p)), p.rules)
+    return { fee, reserve: p.reserve.reserve }
   }
 
   override async supply(o: SupplyOptions): Promise<LendingResult> {
     this.requireSigningAccount('supply(options)')
     const me = await this.me()
-    const amount = toAmount(o.amount)
-    const [{ base64 }, extra] = await Promise.all([this.lend('deposit', me, o.token, amount), this.firstDepositExtra(me)])
-    return this.sendBuilt(base64, this.spendExpectation(o.token, amount, extra), 'supply')
+    const p = await this.prepare('deposit', me, o.token, o.amount)
+    const base64 = await this.build('deposit', me, p)
+    return this.sendBuilt(base64, this.spendExpectation(o.token, p.amount, this.firstDepositExtra(p)), p.rules, 'supply')
   }
 
   override async quoteWithdraw(o: KaminoMarketWithdrawOptions): Promise<MarketQuote> {
     const me = await this.me()
-    const amount = await this.resolveMax(o.amount, o.token, 'supplied')
-    const { base64, reserve } = await this.lend('withdraw', me, o.token, amount)
-    const expect = this.receiveExpectation(o.token, amount)
-    const { fee } = await this.quoteBuilt(base64, expect)
-    return { fee, reserve: reserve.reserve, minReceived: expect.tokenIn!.minAmount }
+    const p = await this.prepare('withdraw', me, o.token, o.amount)
+    const base64 = await this.build('withdraw', me, p)
+    const expect = this.receiveExpectation(o.token, p.amount)
+    const { fee } = await this.quoteBuilt(base64, expect, p.rules)
+    return { fee, reserve: p.reserve.reserve, minReceived: expect.tokenIn!.minAmount }
   }
 
   override async withdraw(o: KaminoMarketWithdrawOptions): Promise<LendingResult> {
     this.requireSigningAccount('withdraw(options)')
     const me = await this.me()
-    const amount = await this.resolveMax(o.amount, o.token, 'supplied')
-    const { base64 } = await this.lend('withdraw', me, o.token, amount)
-    return this.sendBuilt(base64, this.receiveExpectation(o.token, amount), 'withdraw')
+    const p = await this.prepare('withdraw', me, o.token, o.amount)
+    const base64 = await this.build('withdraw', me, p)
+    return this.sendBuilt(base64, this.receiveExpectation(o.token, p.amount), p.rules, 'withdraw')
+  }
+
+  /** A borrow pays out at most what was asked: a bigger one is debt the user did not choose. */
+  private borrowExpectation(mint: string, amount: bigint) {
+    return this.receiveExpectation(mint, amount, 0n, amount)
   }
 
   override async quoteBorrow(o: BorrowOptions): Promise<MarketQuote> {
     const me = await this.me()
-    const amount = toAmount(o.amount)
-    const { base64, reserve } = await this.lend('borrow', me, o.token, amount)
-    const expect = this.receiveExpectation(o.token, amount)
-    const { fee } = await this.quoteBuilt(base64, expect)
-    return { fee, reserve: reserve.reserve, minReceived: expect.tokenIn!.minAmount }
+    const p = await this.prepare('borrow', me, o.token, o.amount)
+    const base64 = await this.build('borrow', me, p)
+    const expect = this.borrowExpectation(o.token, p.amount)
+    const { fee } = await this.quoteBuilt(base64, expect, p.rules)
+    return { fee, reserve: p.reserve.reserve, minReceived: expect.tokenIn!.minAmount }
   }
 
   override async borrow(o: BorrowOptions): Promise<LendingResult> {
     this.requireSigningAccount('borrow(options)')
     const me = await this.me()
-    const amount = toAmount(o.amount)
-    const { base64 } = await this.lend('borrow', me, o.token, amount)
-    return this.sendBuilt(base64, this.receiveExpectation(o.token, amount), 'borrow')
+    const p = await this.prepare('borrow', me, o.token, o.amount)
+    const base64 = await this.build('borrow', me, p)
+    return this.sendBuilt(base64, this.borrowExpectation(o.token, p.amount), p.rules, 'borrow')
+  }
+
+  /** Interest accrues between the quote and the block: allow the slippage tolerance on top of the debt read. */
+  private repayExpectation(mint: string, amount: bigint) {
+    return this.spendExpectation(mint, amount + (amount - lessBps(amount, this.slippageBps)))
   }
 
   override async quoteRepay(o: KaminoMarketRepayOptions): Promise<MarketQuote> {
     const me = await this.me()
-    const amount = await this.resolveMax(o.amount, o.token, 'borrowed')
-    const { base64, reserve } = await this.lend('repay', me, o.token, amount)
-    // Interest accrues between the quote and the block: allow the slippage tolerance on top of the debt read.
-    const { fee } = await this.quoteBuilt(base64, this.spendExpectation(o.token, amount + (amount - lessBps(amount, this.slippageBps))))
-    return { fee, reserve: reserve.reserve }
+    const p = await this.prepare('repay', me, o.token, o.amount)
+    const base64 = await this.build('repay', me, p)
+    const { fee } = await this.quoteBuilt(base64, this.repayExpectation(o.token, p.amount), p.rules)
+    return { fee, reserve: p.reserve.reserve }
   }
 
   override async repay(o: KaminoMarketRepayOptions): Promise<LendingResult> {
     this.requireSigningAccount('repay(options)')
     const me = await this.me()
-    const amount = await this.resolveMax(o.amount, o.token, 'borrowed')
-    const { base64 } = await this.lend('repay', me, o.token, amount)
-    return this.sendBuilt(base64, this.spendExpectation(o.token, amount + (amount - lessBps(amount, this.slippageBps))), 'repay')
+    const p = await this.prepare('repay', me, o.token, o.amount)
+    const base64 = await this.build('repay', me, p)
+    return this.sendBuilt(base64, this.repayExpectation(o.token, p.amount), p.rules, 'repay')
   }
 }
