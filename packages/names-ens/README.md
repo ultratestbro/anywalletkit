@@ -52,6 +52,10 @@ await assertNameUnchanged(ens, 'vitalik.eth', 'eip155:1', addressShownToUser)
 
 Options: `client` / `rpcUrl` (mainnet; required), `cacheTtlMs`, `ipfsGateway` (point it at your proxy), `foreignTlds` (TLDs left to other resolvers; default `sol`, `near`, `ton`, `me`).
 
+Offchain names (CCIP-Read, EIP-3668) make the device fetch gateway URLs that the name's resolver chooses. The client built from `rpcUrl` asks only https gateways on public hosts (`ensCcipRead`: no `http://`, no localhost / LAN / link-local / CGNAT address in any spelling, redirects refused). **If you pass your own `client`, create it with `ccipRead: ensCcipRead`** (or `ccipRead: false`), or viem's default fetches whatever URL a resolver names, `http://192.168.1.1/…` included.
+
+`avatar` returns the `avatar` text record when it is an https URL on a public host, or an `ipfs://` one through `ipfsGateway` (`avatarUrl(record, gateway)` is the same filter). NFT avatars (`eip155:1/erc721:…`) come back `null`: resolving one means fetching the metadata URL its issuer chose. Nothing is fetched to decide.
+
 ## Tests
 
 `pnpm test` — 15 unit tests over a stubbed client plus the conformance `namesSuite`. `pnpm verify:live` — mainnet via a public RPC: vitalik.eth forward / reverse / avatar, `jesse.base.eth` through CCIP-Read on the Base coin type, a name without a Base record, unregistered and invalid names.

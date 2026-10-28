@@ -1,0 +1,8 @@
+---
+"@anywalletkit/tokens": minor
+"@anywalletkit/names-ens": minor
+"@anywalletkit/networks": minor
+"@anywalletkit/extension-kit": patch
+---
+
+Token symbols and ENS lookups are checked the way users meet them. tokens: a symbol and name are trimmed and cut (`tokenText`, `TOKEN_SYMBOL_MAX` = 32, `TOKEN_NAME_MAX` = 128 code points) before they are stored **or assessed** — "USDC" + 124 spaces + "X" is stored as "USDC" and flagged as impersonation; `foldSymbol` is a confusables skeleton (ASCII `l` / `1` / `|` → I, `0` → O, `rn` → m, `cl` → d, `vv` → w, accents dropped), so "DAl" reads as DAI and "USDl" as USD1; another script, math letters, emoji or invisible characters in a symbol are `odd-characters` at `danger`. names-ens: the client built from `rpcUrl` asks CCIP-Read gateways only over https on public hosts and refuses redirects (`ensCcipRequest` / `ensCcipRead` — pass `ccipRead: ensCcipRead` when you bring your own client); `avatar` returns the avatar record itself, filtered the same way (`avatarUrl`), and no longer resolves NFT avatars, so nothing is fetched to decide. networks: `isPrivateHost` knows link-local, CGNAT, benchmark and multicast ranges, every IPv4 spelling a URL parser accepts (`127.1`, `2130706433`, `0x7f.0.0.1`), the IPv4 inside mapped and NAT64 IPv6, IPv6 zones and `*.internal` / `*.home.arpa` / `*.lan`; new `isPublicHttpsUrl`; both also exported from `@anywalletkit/networks/url`, which does not load the catalog. extension-kit: `wallet_addEthereumChain` keeps a site's RPC URL only when `isPublicHttpsUrl` passes it, so `https://2130706433/` or `https://100.64.0.1/` no longer points the wallet's reads at the user's network.

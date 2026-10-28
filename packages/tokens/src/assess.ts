@@ -41,6 +41,25 @@ const FLAG_RISKS: Readonly<Record<TokenFlag, { level: TokenRiskLevel; message: s
   'pausable': { level: 'caution', message: 'The issuer can pause every transfer.' },
 }
 
+/** Longest symbol the wallet stores and assesses (code points); a longer one is cut, after trimming, before anything reads it. */
+export const TOKEN_SYMBOL_MAX = 32
+/** Longest name the wallet stores (code points). */
+export const TOKEN_NAME_MAX = 128
+
+/**
+ * A symbol or name as the wallet keeps and shows it: trimmed, cut to `max` code points, trimmed again —
+ * so "USDC" + 124 spaces + "X" is stored, shown and assessed as "USDC" (scan 2026-10-27 modules, F28).
+ */
+export function tokenText(text: string, max: number): string {
+  let out = ''
+  let n = 0
+  for (const ch of text.trim()) {
+    if (n++ >= max) break
+    out += ch
+  }
+  return out.trim()
+}
+
 /** Letters that render like Latin capitals (Cyrillic, Greek) and currency signs used as letters. */
 const CONFUSABLES: Readonly<Record<string, string>> = {
   'А': 'A', 'В': 'B', 'Е': 'E', 'К': 'K', 'М': 'M', 'Н': 'H', 'О': 'O', 'Р': 'P', 'С': 'C', 'Т': 'T', 'Х': 'X', 'У': 'Y', 'І': 'I', 'Ј': 'J', 'Ѕ': 'S', 'Ԁ': 'D',
@@ -48,16 +67,35 @@ const CONFUSABLES: Readonly<Record<string, string>> = {
   'Α': 'A', 'Β': 'B', 'Ε': 'E', 'Ζ': 'Z', 'Η': 'H', 'Ι': 'I', 'Κ': 'K', 'Μ': 'M', 'Ν': 'N', 'Ο': 'O', 'Ρ': 'P', 'Τ': 'T', 'Υ': 'Y', 'Χ': 'X',
   'α': 'A', 'ε': 'E', 'ι': 'I', 'κ': 'K', 'ν': 'V', 'ο': 'O', 'ρ': 'P', 'τ': 'T', 'υ': 'U', 'χ': 'X',
   '$': 'S', '₮': 'T', '€': 'E', '¢': 'C', '₿': 'B', 'Ξ': 'E',
+  // ASCII and Latin look-alikes of I and O (UTS #39 confusables): "DAl" reads as DAI, "USDl" as USD1.
+  'l': 'I', '1': 'I', '|': 'I', 'ı': 'I', 'ł': 'I', 'ǀ': 'I', '0': 'O', 'ø': 'O', 'Ø': 'O',
+  // Latin letters without a decomposition, and Latin-1 accented letters for runtimes without String.prototype.normalize.
+  'Ð': 'D', 'ð': 'D', 'Đ': 'D', 'đ': 'D', 'Ħ': 'H', 'ħ': 'H', 'Ŧ': 'T', 'ŧ': 'T', 'ß': 'B', 'Þ': 'P', 'þ': 'P', 'Ŋ': 'N', 'ŋ': 'N',
+  'À': 'A', 'Á': 'A', 'Â': 'A', 'Ã': 'A', 'Ä': 'A', 'Å': 'A', 'à': 'A', 'á': 'A', 'â': 'A', 'ã': 'A', 'ä': 'A', 'å': 'A',
+  'Ç': 'C', 'ç': 'C', 'È': 'E', 'É': 'E', 'Ê': 'E', 'Ë': 'E', 'è': 'E', 'é': 'E', 'ê': 'E', 'ë': 'E',
+  'Ì': 'I', 'Í': 'I', 'Î': 'I', 'Ï': 'I', 'ì': 'I', 'í': 'I', 'î': 'I', 'ï': 'I', 'Ñ': 'N', 'ñ': 'N',
+  'Ò': 'O', 'Ó': 'O', 'Ô': 'O', 'Õ': 'O', 'Ö': 'O', 'ò': 'O', 'ó': 'O', 'ô': 'O', 'õ': 'O', 'ö': 'O',
+  'Ù': 'U', 'Ú': 'U', 'Û': 'U', 'Ü': 'U', 'ù': 'U', 'ú': 'U', 'û': 'U', 'ü': 'U', 'Ý': 'Y', 'ý': 'Y', 'ÿ': 'Y',
 }
+/** Letter pairs that read as one letter (UTS #39): rn → m, cl → d, vv → w. */
+const PAIRS: ReadonlyArray<[RegExp, string]> = [[/rn/g, 'm'], [/cl/g, 'd'], [/vv|VV/g, 'W']]
+/** Combining marks: an accent over a Latin letter reads as the letter. */
+const MARKS = /[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff\u20d0-\u20ff\ufe20-\ufe2f]/g
 /** Zero-width, bidi and other invisible format characters. */
 const INVISIBLE = /[­͏؜ᅟᅠ឴឵᠋-᠏​-‏‪-‮⁠-⁯ㅤ︀-️﻿ﾠ]/g
 
-/** A symbol folded the way a reader sees it: invisible characters gone, compatibility forms unified, look-alikes mapped, upper case. */
+/**
+ * A symbol folded the way a reader sees it — a confusables skeleton in the spirit of UTS #39: invisible
+ * characters and spaces gone, compatibility forms unified and accents dropped (NFKD), look-alike letters
+ * mapped (Cyrillic, Greek, currency signs, and ASCII l / 1 / | → I, 0 → O; rn → m, cl → d, vv → w), upper
+ * case. Only the first {@link TOKEN_SYMBOL_MAX} code points are read (scan 2026-10-27 modules, F36).
+ */
 export function foldSymbol(text: string): string {
-  let s = text.replace(INVISIBLE, '').replace(/\s+/g, '')
-  if (typeof s.normalize === 'function') s = s.normalize('NFKC')
+  let s = tokenText(text, TOKEN_SYMBOL_MAX).replace(INVISIBLE, '').replace(/\s+/g, '')
+  if (typeof s.normalize === 'function') s = s.normalize('NFKD').replace(MARKS, '')
   // Fullwidth ASCII by hand too: some Hermes builds ship without String.prototype.normalize.
   s = s.replace(/[\uFF01-\uFF5E]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+  for (const [re, to] of PAIRS) s = s.replace(re, to)
   let out = ''
   for (const ch of s) out += CONFUSABLES[ch] ?? ch
   return out.toUpperCase()
@@ -88,6 +126,14 @@ function lookalikeOf(folded: string, chain: string | undefined): string | undefi
 }
 
 const PLAIN = /^[\x20-\x7E]*$/
+/** Latin letters beyond ASCII (accented, extended) and fullwidth ASCII. */
+const LATIN = /^[À-ÖØ-öø-ɏḀ-ỿ！-～]$/
+
+/** `true` when a symbol has a character that is neither printable ASCII nor a Latin letter: another script, an emoji, an invisible character. */
+function outsideLatin(symbol: string): boolean {
+  for (const ch of symbol) if (!(ch >= ' ' && ch <= '~') && !LATIN.test(ch)) return true
+  return false
+}
 
 /**
  * Warnings for a token read with `getTokenInfo`, for a token the wallet's list does not include.
@@ -98,15 +144,22 @@ const PLAIN = /^[\x20-\x7E]*$/
  */
 export function assessToken(info: TokenInfo, chain?: string): TokenAssessment {
   const risks: TokenRisk[] = [{ code: 'unlisted', level: 'caution', message: "Not in the wallet's token list. Anyone can create a token with any name and logo: check the address with the project itself." }]
-  const folded = foldSymbol(info.symbol)
-  const lookalike = lookalikeOf(folded, chain)
+  // What the wallet stores and shows (trimmed, cut to TOKEN_SYMBOL_MAX), and the whole text a UI that does
+  // not cut it would show: a look-alike in either is one (scan 2026-10-27 modules, F28).
+  const symbol = tokenText(info.symbol, TOKEN_SYMBOL_MAX)
+  const name = tokenText(info.name, TOKEN_NAME_MAX)
+  const whole = info.symbol.slice(0, 4 * TOKEN_SYMBOL_MAX).replace(/\s+/g, '')
+  const lookalike = lookalikeOf(foldSymbol(symbol), chain) ?? lookalikeOf(foldSymbol(whole), chain)
   if (lookalike) {
-    risks.push({ code: 'impersonation', level: 'danger', message: `It calls itself ${JSON.stringify(info.symbol)}, like ${lookalike}, but it is a different token at a different address.` })
+    risks.push({ code: 'impersonation', level: 'danger', message: `It calls itself ${JSON.stringify(symbol)}, like ${lookalike}, but it is a different token at a different address.` })
   }
-  if (!PLAIN.test(info.symbol) || !PLAIN.test(info.name) || info.symbol !== info.symbol.replace(INVISIBLE, '') || info.name !== info.name.replace(INVISIBLE, '')) {
-    risks.push({ code: 'odd-characters', level: 'caution', message: 'Its symbol or name uses characters that can look like other letters, or invisible ones.' })
+  if (outsideLatin(info.symbol.slice(0, 4 * TOKEN_SYMBOL_MAX))) {
+    // Another script in a symbol is how a token passes for a known one (scan 2026-10-27 modules, F36).
+    risks.push({ code: 'odd-characters', level: 'danger', message: 'Its symbol uses characters outside the Latin alphabet (Cyrillic, Greek, invisible ones…), which can pass for the letters of another token.' })
+  } else if (!PLAIN.test(symbol) || /\s/.test(symbol) || !PLAIN.test(name) || name !== name.replace(INVISIBLE, '')) {
+    risks.push({ code: 'odd-characters', level: 'caution', message: 'Its symbol or name uses characters that can look like other letters, spaces inside the symbol, or invisible ones.' })
   }
-  if (!info.symbol.trim()) risks.push({ code: 'no-symbol', level: 'caution', message: 'The token reports no symbol.' })
+  if (!symbol) risks.push({ code: 'no-symbol', level: 'caution', message: 'The token reports no symbol.' })
   if (info.totalSupply === 0n) risks.push({ code: 'zero-supply', level: 'caution', message: 'Nothing has been minted.' })
   if (info.decimals > 24) risks.push({ code: 'unusual-decimals', level: 'caution', message: `It uses ${info.decimals} decimals; amounts may display oddly.` })
   for (const flag of info.flags) {

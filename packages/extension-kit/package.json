@@ -43,6 +43,7 @@
   "dependencies": {
     "@anywalletkit/core": "workspace:*",
     "@anywalletkit/keyring": "workspace:*",
+    "@anywalletkit/networks": "workspace:*",
     "@anywalletkit/swap2-assets": "workspace:*",
     "@anywalletkit/protocol-swap2-core": "workspace:*",
     "@anywalletkit/wallet-evm": "workspace:*",

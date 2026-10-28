@@ -1,6 +1,6 @@
 import type { IWalletAccountReadOnly, TokenFlag, TokenInfo } from '@anywalletkit/core'
 import { catalogChainId, ccAssetByToken, isTokenAddress, type CcAsset } from '@anywalletkit/swap2-assets'
-import { assessToken, type TokenAssessment } from './assess.js'
+import { TOKEN_NAME_MAX, TOKEN_SYMBOL_MAX, assessToken, tokenText, type TokenAssessment } from './assess.js'
 
 /** One JSON value under one key — the shape every small store needs (AsyncStorage, chrome.storage, memory). */
 export interface JsonStorage<T> {
@@ -69,7 +69,7 @@ function validEntry(t: unknown): UserToken | null {
   if (typeof e.symbol !== 'string' || typeof e.name !== 'string' || typeof e.standard !== 'string' || typeof e.addedAt !== 'number') return null
   if (!Array.isArray(e.flags) || !e.flags.every((f) => typeof f === 'string' && FLAGS.has(f))) return null
   return {
-    chain: e.chain, address: e.address, symbol: e.symbol.slice(0, 128), name: e.name.slice(0, 128), decimals: e.decimals,
+    chain: e.chain, address: e.address, symbol: tokenText(e.symbol, TOKEN_SYMBOL_MAX), name: tokenText(e.name, TOKEN_NAME_MAX), decimals: e.decimals,
     standard: e.standard, flags: [...e.flags] as TokenFlag[], addedAt: e.addedAt,
   }
 }
@@ -105,11 +105,14 @@ export async function inspectToken(
   if (listed) return { listed }
   if (typeof account.getTokenInfo !== 'function') throw new TokensError('unsupported-chain', `This ${account.chain} account cannot read token info.`)
   const info = await account.getTokenInfo(ref)
+  // What is stored is what is assessed: trimmed and cut first (scan 2026-10-27 modules, F28).
+  const symbol = tokenText(info.symbol, TOKEN_SYMBOL_MAX)
+  const name = tokenText(info.name, TOKEN_NAME_MAX)
   const token: UserToken = {
-    chain, address: info.address, symbol: info.symbol.slice(0, 128), name: info.name.slice(0, 128), decimals: info.decimals,
+    chain, address: info.address, symbol, name, decimals: info.decimals,
     standard: info.standard, flags: [...info.flags], addedAt: now(),
   }
-  return { info, assessment: assessToken(info, chain), token }
+  return { info, assessment: assessToken({ ...info, symbol, name }, chain), token }
 }
 
 /**

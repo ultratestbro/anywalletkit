@@ -44,7 +44,7 @@ import {
   decodeVault, decodeReserve, decodeObligation, vaultTokensPerShareWad, debtNow, farmUserState, plumbing, associatedTokenAddress,
 } from '@anywalletkit/protocol-lending-kamino-solana'
 import { unexpectedInstruction } from '@anywalletkit/wallet-solana'
-import { tonRawAddress } from '@anywalletkit/protocol-swap2-core'
+import { redactUrls, tonRawAddress } from '@anywalletkit/protocol-swap2-core'
 import ApprovalsProtocolEvm, { isRevokeCalldata, isUnlimitedAmount } from '@anywalletkit/protocol-approvals-evm'
 
 type Check = (what: string, ok: boolean, detail?: string) => void
@@ -232,6 +232,12 @@ export async function smokeProtocols(check: Check): Promise<void> {
   // approvals
   const approvals = new (ApprovalsProtocolEvm as never as new (a: unknown, c?: unknown) => { getSupportedStandards(): Promise<unknown> })(evm, {})
   await tolerates(check, 'approvals: getSupportedStandards', () => approvals.getSupportedStandards())
+  {
+    // scan 2026-10-27 modules F34: redactUrls is linear on Hermes too (the regex it replaced was quadratic on "a.a.a…")
+    const t0 = Date.now()
+    const out = redactUrls('a.'.repeat(32_768) + ' https://rpc.example/v2/KEY')
+    check('swap2: redactUrls linear on 64 KB', Date.now() - t0 < 1_000 && out.endsWith(' <url>') && !out.includes('KEY'))
+  }
   check('approvals: isRevokeCalldata', isRevokeCalldata('0x095ea7b3' + '0'.repeat(24) + 'beef'.padStart(40, '0') + '0'.repeat(64)) === true)
   check('approvals: isUnlimitedAmount', isUnlimitedAmount((1n << 256n) - 1n) === true && isUnlimitedAmount(5n) === false)
 }

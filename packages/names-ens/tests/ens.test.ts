@@ -17,7 +17,7 @@ function fakeClient(records: Record<string, string | null>, reverse: Record<stri
       calls.push(`name ${address} ${coinType ?? 60n}`)
       return reverse[`${address.toLowerCase()}:${coinType ?? 60n}`] ?? null
     }),
-    getEnsAvatar: vi.fn(async ({ name }: { name: string }) => avatars[name] ?? null),
+    getEnsText: vi.fn(async ({ name, key }: { name: string; key: string }) => (key === 'avatar' ? avatars[name] ?? null : null)),
   } as unknown as PublicClient
   return { client, calls }
 }

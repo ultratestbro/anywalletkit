@@ -59,7 +59,9 @@ Rules the table enforces:
 
 ## URL policy (owner decision 2)
 
-`checkRpcUrl(url, { allowHttpLocal })`: `https://` anywhere; `http://` only for private addresses — `localhost`, `127/8`, `10/8`, `172.16/12`, `192.168/16`, `*.local`, IPv6 loopback / ULA / link-local — **and** only with `allowHttpLocal` (the Advanced toggle, stored in the table). No credentials in the URL. `parseAddChainParams` never grants the local exception to a site.
+`checkRpcUrl(url, { allowHttpLocal })`: `https://` anywhere; `http://` only for private addresses — `localhost`, `*.local`, `*.internal`, `*.home.arpa`, `*.lan`, 0/8, 10/8, 100.64/10, `127/8`, 169.254/16, `172.16/12`, `192.168/16`, 198.18/15, IPv4 written any way a URL parser reads it (`127.1`, `2130706433`, `0x7f.0.0.1`), IPv6 loopback / ULA / link-local / multicast and the IPv4 inside a mapped or NAT64 address — **and** only with `allowHttpLocal` (the Advanced toggle, stored in the table). No credentials in the URL. `parseAddChainParams` never grants the local exception to a site.
+
+`isPrivateHost(host)` is that test on its own, and `isPublicHttpsUrl(url)` the one for URLs a wallet fetches on someone else's word (ENS gateways, avatars): https, no credentials, a public host. Both are also in `@anywalletkit/networks/url`, which does not load the catalog. A public name that resolves to a private address (DNS rebinding) is not caught by a host test.
 
 ## `verifyNetwork(network, { rpc?, fetch?, allowHttpLocal?, timeoutMs? })`
 

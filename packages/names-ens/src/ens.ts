@@ -1,13 +1,19 @@
-import { createPublicClient, http, isAddress, getAddress, type PublicClient } from 'viem'
+import { createPublicClient, http, isAddress, getAddress, type CcipRequestParameters, type Hex, type PublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
 import { normalize } from 'viem/ens'
 import { NameError, type NameResolver, type NameWarning, type ResolvedName } from '@anywalletkit/core'
+import { isPublicHttpsUrl } from '@anywalletkit/networks/url'
 import { coinTypeFor, decodeAddressRecord } from './coins.js'
 import { warningsFor } from './warnings.js'
 
 /** Options for `ensResolver`: an Ethereum-mainnet client or RPC URL, and caching. */
 export interface EnsResolverOptions {
-  /** A viem client on Ethereum mainnet (the registry + universal resolver live there). */
+  /**
+   * A viem client on Ethereum mainnet (the registry + universal resolver live there). Create it with
+   * `ccipRead: ensCcipRead` (or `ccipRead: false`): with viem's default, a name's offchain resolver
+   * chooses URLs the user's device fetches — `http://192.168.1.1/…` included. A client built from
+   * `rpcUrl` has it already.
+   */
   client?: PublicClient
   /** …or a mainnet RPC URL to build one from. One of the two is required. */
   rpcUrl?: string
@@ -23,9 +29,69 @@ interface Entry<T> { value: T; expires: number }
 
 export class EnsNameError extends NameError {}
 
+/**
+ * EIP-3668 (CCIP-Read) lookups as a wallet may make them (scan 2026-10-27 modules, F37): a name's
+ * offchain resolver picks the gateway URLs, and the device fetches them, so only https URLs on a public
+ * host are asked — no `http://`, no localhost / LAN / link-local / CGNAT address in any spelling, no
+ * placeholder in the host — and a redirect is refused (`redirect: 'error'`; React Native's fetch cannot
+ * refuse one, so a redirect's final URL is checked after the fact there). Same protocol as viem's own:
+ * GET with `{data}` in the URL, POST `{data, sender}` otherwise, a hex `data` answer.
+ */
+export async function ensCcipRequest({ data, sender, urls, requestOptions }: CcipRequestParameters): Promise<Hex> {
+  const signal = requestOptions?.signal ?? undefined
+  let error: Error = new EnsNameError('lookup-failed', 'The offchain resolver names no gateway this wallet asks.')
+  for (const template of urls) {
+    if (signal?.aborted) throw signal.reason ?? new Error('aborted')
+    const url = template.replace('{sender}', sender.toLowerCase()).replace('{data}', data)
+    if (!isPublicHttpsUrl(template) || !isPublicHttpsUrl(url)) {
+      error = new EnsNameError('lookup-failed', 'The offchain resolver names a gateway that is not https on a public host; it was not asked.')
+      continue
+    }
+    const post = !template.includes('{data}')
+    try {
+      const res = await fetch(url, {
+        method: post ? 'POST' : 'GET',
+        redirect: 'error',
+        ...(post ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data, sender }) } : {}),
+        ...(signal ? { signal } : {}),
+      })
+      if (res.redirected || (typeof res.url === 'string' && res.url !== '' && !isPublicHttpsUrl(res.url))) {
+        error = new EnsNameError('lookup-failed', 'The offchain gateway redirected; the answer was not used.')
+        continue
+      }
+      const json = (res.headers.get('content-type') ?? '').startsWith('application/json')
+      const result: unknown = json ? ((await res.json()) as { data?: unknown } | null)?.data : await res.text()
+      if (!res.ok) { error = new EnsNameError('lookup-failed', `The offchain gateway answered HTTP ${res.status}.`); continue }
+      if (typeof result !== 'string' || !/^0x[0-9a-fA-F]*$/.test(result)) { error = new EnsNameError('lookup-failed', 'The offchain gateway answered something that is not hex data.'); continue }
+      return result as Hex
+    } catch (e) {
+      if (signal?.aborted) throw e
+      error = e instanceof Error ? e : new Error(String(e))
+    }
+  }
+  throw error
+}
+
+/** viem's `ccipRead` option with {@link ensCcipRequest}: `createPublicClient({ chain: mainnet, transport, ccipRead: ensCcipRead })`. */
+export const ensCcipRead = Object.freeze({ request: ensCcipRequest })
+
+/**
+ * An `avatar` text record as a URL an app may load: an https URL on a public host as written, or an
+ * `ipfs://` one through `ipfsGateway`. Anything else — an NFT reference (resolving it means fetching the
+ * NFT's metadata URL, which its issuer chooses), `http://`, `data:`, a private host — is `null`: nothing
+ * is fetched to decide (scan 2026-10-27 modules, F37).
+ */
+export function avatarUrl(record: string | null | undefined, ipfsGateway = 'https://ipfs.io/ipfs/'): string | null {
+  const r = typeof record === 'string' ? record.trim() : ''
+  if (!r || r.length > 2048) return null
+  const ipfs = /^ipfs:\/\/(?:ipfs\/)?([A-Za-z0-9]{10,100}(?:\/[A-Za-z0-9._~%-]+)*)$/.exec(r)
+  if (ipfs) return `${ipfsGateway}${ipfs[1]}`
+  return isPublicHttpsUrl(r) ? r : null
+}
+
 /** Names ENS can serve: `.eth` and any DNS name (cb.id, uni.eth subnames, imported DNS). */
 export function ensResolver(opts: EnsResolverOptions): NameResolver {
-  const client = opts.client ?? (opts.rpcUrl ? createPublicClient({ chain: mainnet, transport: http(opts.rpcUrl) }) : null)
+  const client = opts.client ?? (opts.rpcUrl ? createPublicClient({ chain: mainnet, transport: http(opts.rpcUrl), ccipRead: ensCcipRead }) : null)
   if (!client) throw new Error('names-ens: pass a mainnet client or rpcUrl')
   const ttl = opts.cacheTtlMs ?? 5 * 60_000
   const ipfs = opts.ipfsGateway ?? 'https://ipfs.io/ipfs/'
@@ -120,8 +186,8 @@ export function ensResolver(opts: EnsResolverOptions): NameResolver {
     const hit = recall<string | null>(key)
     if (hit !== undefined) return hit
     try {
-      const url = await client.getEnsAvatar({ name, assetGatewayUrls: { ipfs } })
-      return remember(key, url ?? null)
+      // The record itself, filtered — not viem's getEnsAvatar, which fetches whatever URL the record or an NFT's metadata names.
+      return remember(key, avatarUrl(await client.getEnsText({ name, key: 'avatar' }), ipfs))
     } catch {
       return remember(key, null)
     }

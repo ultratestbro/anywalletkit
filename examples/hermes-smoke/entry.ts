@@ -42,11 +42,11 @@ import { WalletManagerNear, describeTransaction as describeNear, encodeTransacti
 import { smokeProtocols } from './protocols.js'
 import fastPbkdf2 from '@anywalletkit/runtime-hermes/fast-pbkdf2'
 import { sealBackup, openBackup, encodeBackup, decodeBackup, isBackupError } from '@anywalletkit/seed-vault'
-import { ensResolver, warningsFor, coinTypeFor, decodeBtcScript } from '@anywalletkit/names-ens'
+import { avatarUrl, ensResolver, warningsFor, coinTypeFor, decodeBtcScript } from '@anywalletkit/names-ens'
 import { isNameLike, nameResolvers } from '@anywalletkit/core'
-import { TokensTable, assessToken, foldSymbol, inspectToken, memoryJsonStorage as tokensStorage, type TokensState } from '@anywalletkit/tokens'
+import { TOKEN_SYMBOL_MAX, TokensTable, assessToken, foldSymbol, inspectToken, memoryJsonStorage as tokensStorage, tokenText, type TokensState } from '@anywalletkit/tokens'
 import { isTokenAddress, resolveAsset } from '@anywalletkit/swap2-assets'
-import { NetworksTable, memoryJsonStorage, parseAddChainParams, checkRpcUrl, isPrivateHost, verifyNetwork, tonGlobalIdFromBoc, BUILTIN_NETWORKS, DEFAULT_TESTNETS, isAddChainError, type NetworksState } from '@anywalletkit/networks'
+import { NetworksTable, memoryJsonStorage, parseAddChainParams, checkRpcUrl, isPrivateHost, isPublicHttpsUrl, verifyNetwork, tonGlobalIdFromBoc, BUILTIN_NETWORKS, DEFAULT_TESTNETS, isAddChainError, type NetworksState } from '@anywalletkit/networks'
 
 declare const print: ((s: string) => void) | undefined
 const out = (s: string) => (typeof print === 'function' ? print(s) : console.log(s))
@@ -209,6 +209,10 @@ async function main() {
     eq('tokens fold look-alikes', [foldSymbol('USD\u0421'), foldSymbol('\uFF35\uFF33\uFF24\uFF23'), foldSymbol('U$D\u20AE'), foldSymbol('US\u200BDC')].join(','), 'USDC,USDC,USDT,USDC')
     const fake = { address: '0x6982508145454Ce325dDbE47a25d4ec3d2311933', standard: 'erc20', decimals: 18, symbol: 'USD\u0421', name: 'x', flags: [] as never[] }
     eq('tokens impersonation is danger', assessToken(fake, 'eip155:1').level, 'danger')
+    // scan 2026-10-27 modules F28/F36: what is stored is what is assessed; ASCII and accented look-alikes; another script is danger
+    eq('tokens symbol cut before assessing', tokenText(`USDC${' '.repeat(124)}X`, TOKEN_SYMBOL_MAX), 'USDC')
+    eq('tokens fold ascii and accents', [foldSymbol('DAl'), foldSymbol('USDl'), foldSymbol('\u00D0AI'), foldSymbol('USD\u00C7')].join(','), 'DAI,USDI,DAI,USDC')
+    eq('tokens cyrillic symbol is danger', assessToken({ ...fake, symbol: '\u0420\u0415\u0420\u0415' }).risks.some((r) => r.code === 'odd-characters' && r.level === 'danger'), true)
     eq('tokens base58 mint check', isTokenAddress('solana:mainnet', 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263') && !isTokenAddress('solana:mainnet', '11111111111111111111111111111111'), true)
     eq('tokens catalog wins', resolveAsset('eip155:1', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', { allowUnlisted: true, decimals: 18 })?.decimals, 6)
     const word = (v: bigint) => v.toString(16).padStart(64, '0')
@@ -260,6 +264,10 @@ async function main() {
     eq('url http local needs opt-in', checkRpcUrl('http://192.168.1.5:8545').ok, false)
     eq('url http local with opt-in', checkRpcUrl('http://192.168.1.5:8545', { allowHttpLocal: true }).ok, true)
     eq('private host', isPrivateHost('172.20.0.1') && !isPrivateHost('172.32.0.1'), true)
+    // scan 2026-10-27 modules F37: every IPv4 spelling, CGNAT / link-local, mapped IPv6; gateway and avatar URLs
+    eq('private host spellings', ['127.1', '2130706433', '0x7f.0.0.1', '100.64.0.1', '169.254.169.254', '::ffff:127.0.0.1', 'fe80::1%en0'].every(isPrivateHost) && !isPrivateHost('8.8.8.8') && !isPrivateHost('2001:4860:4860::8888'), true)
+    eq('public https url', isPublicHttpsUrl('https://gw.example/{sender}/{data}.json') && !isPublicHttpsUrl('http://192.168.1.1/x') && !isPublicHttpsUrl('https://{data}.example/'), true)
+    eq('ens avatar filtered', [avatarUrl('https://192.168.1.1/a.png'), avatarUrl('https://example.org/a.png')].join(','), ',https://example.org/a.png')
     const added = parseAddChainParams([{ chainId: '0x2105', chainName: 'Base', rpcUrls: ['https://mainnet.base.org'] }], { origin: 'https://app.example.org', now: () => 1 })
     eq('eip3085 parse', !isAddChainError(added) && added.caip2 === 'eip155:8453' && typeof added.source === 'object' && added.source.origin === 'https://app.example.org', true)
     eq('eip3085 unknown chain', isAddChainError(parseAddChainParams([{ chainId: '0x7a69', rpcUrls: ['https://x'] }])) , true)

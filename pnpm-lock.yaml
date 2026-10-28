@@ -708,6 +708,9 @@ importers:
       '@anywalletkit/keyring':
         specifier: workspace:*
         version: link:../keyring
+      '@anywalletkit/networks':
+        specifier: workspace:*
+        version: link:../networks
       '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../protocol-swap2-core
@@ -832,6 +835,9 @@ importers:
 
   packages/names-ens:
     dependencies:
+      '@anywalletkit/networks':
+        specifier: workspace:*
+        version: link:../networks
       '@noble/hashes':
         specifier: ^1.8.0
         version: 1.8.0

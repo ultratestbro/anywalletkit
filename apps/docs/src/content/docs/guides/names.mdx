@@ -69,6 +69,13 @@ go through CCIP-Read without extra setup. Results are cached for five minutes by
 address. Anyone can set any primary name on their own address, so an unverified one proves
 nothing. L2 primary names (ENSIP-19) are read for the chain you pass.
 
-`avatar` returns a URL (https, IPFS through your gateway, or an NFT's image) and never fetches
-it. Fetch avatars through your own proxy, so the user's IP and address list don't reach
-arbitrary servers.
+`avatar` returns the name's avatar record when it is an https URL on a public host, or an IPFS
+one through your gateway, and never fetches it. NFT avatars come back `null`: resolving one
+would fetch the metadata URL the NFT's issuer chose. Fetch avatars through your own proxy, so
+the user's IP and address list don't reach arbitrary servers.
+
+Offchain names (CCIP-Read) make the device fetch gateway URLs the name's resolver chooses. The
+resolver built from `rpcUrl` asks only https gateways on public hosts and refuses redirects. If
+you pass your own viem `client`, create it with `ccipRead: ensCcipRead` from
+`@anywalletkit/names-ens` (or `ccipRead: false`): viem's default would fetch any URL, a router's
+admin page on the user's network included.

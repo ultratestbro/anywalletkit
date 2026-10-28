@@ -37,10 +37,10 @@ await swaps.quoteSwap2Routes({ ...swapSource(token), toToken: 'USDC', fromTokenA
 
 `inspectToken` calls the account's `getTokenInfo(address)` (`wallet-evm`, `wallet-solana`): decimals, symbol, name, supply and holder-relevant flags. A wallet, an NFT or a plain contract throws `NotATokenError`. `assessToken(info, chain)` then lists every warning, worst first:
 
-- **danger**: `impersonation` (the symbol reads as a catalog token of the same chain, or as a native coin or major stablecoin anywhere, after folding Cyrillic / Greek look-alikes, `$` → S, `₮` → T, fullwidth and invisible characters), `permanent-delegate`, `transfer-hook`, `non-transferable`;
+- **danger**: `impersonation` (the symbol reads as a catalog token of the same chain, or as a native coin or major stablecoin anywhere, after folding Cyrillic / Greek look-alikes, `$` → S, `₮` → T, ASCII `l` / `1` / `|` → I and `0` → O, `rn` → m, `cl` → d, `vv` → w, accents, fullwidth and invisible characters), `odd-characters` when the symbol has characters outside the Latin alphabet (another script, math letters, emoji, invisible ones), `permanent-delegate`, `transfer-hook`, `non-transferable`;
 - **caution**: `unlisted` (always), `upgradeable`, `mint-authority`, `freeze-authority`, `transfer-fee`, `default-frozen`, `pausable`, `odd-characters`, `no-symbol`, `zero-supply`, `unusual-decimals`.
 
-A user token's symbol and name are what the token says about itself: display them next to the address, never identify the token by them.
+A user token's symbol and name are what the token says about itself: display them next to the address, never identify the token by them. Both are trimmed and cut (`tokenText`: symbol `TOKEN_SYMBOL_MAX` = 32, name `TOKEN_NAME_MAX` = 128 code points) before they are stored or assessed, so what is shown is what was checked.
 
 ## TokensTable
 

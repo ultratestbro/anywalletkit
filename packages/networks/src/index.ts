@@ -1,6 +1,6 @@
 export type { Network, NetworkFamily, NetworkKind, NetworkSource, JsonStorage, VerifyResult } from './types.js'
 export { memoryJsonStorage } from './types.js'
-export { checkRpcUrl, checkRpcUrls, isPrivateHost, parseUrl, type UrlPolicyOptions, type UrlPolicyReason, type UrlPolicyResult } from './url.js'
+export { checkRpcUrl, checkRpcUrls, isPrivateHost, isPublicHttpsUrl, parseUrl, type UrlPolicyOptions, type UrlPolicyReason, type UrlPolicyResult } from './url.js'
 export {
   EVM_MAINNETS, NON_EVM_MAINNETS, NON_EVM_CHAINS, CATALOG_NETWORKS, DEFAULT_TESTNETS, BUILTIN_NETWORKS,
   SOLANA_CHAIN, SOLANA_RPCS, TON_CHAIN, TON_ENDPOINTS, TRON_CHAIN, TRON_PROVIDERS, BTC_CHAIN, BTC_ESPLORA, NEAR_CHAIN, NEAR_PROVIDERS, ZCASH_CHAIN, ZCASH_PROVIDERS,

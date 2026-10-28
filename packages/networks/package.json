@@ -18,6 +18,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./url": {
+      "types": "./dist/url.d.ts",
+      "import": "./dist/url.js",
+      "require": "./dist/url.cjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [

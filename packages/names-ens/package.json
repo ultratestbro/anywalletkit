@@ -34,6 +34,7 @@
     "verify:live": "node scripts/verify-live.mjs"
   },
   "dependencies": {
+    "@anywalletkit/networks": "workspace:*",
     "@noble/hashes": "^1.8.0",
     "@scure/base": "^1.2.6",
     "viem": "^2.57.2"

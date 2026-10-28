@@ -25,6 +25,7 @@ import {
   memoryJsonStorage,
   memorySessionStorage,
   memoryVaultStorage,
+  parseAddChainParams,
   toRelayError,
   type EvmNetwork,
   type PermissionsState,
@@ -207,5 +208,15 @@ describe('Vault.rotateVaultKey (scan 2026-10-27 modules, F30)', () => {
     expect(await code(vault.unlockWithPasskey('cred-1', Uint8Array.from(prf)))).toBe('missing')
     await vault.addPasskey(next, { id: 'cred-1', prf: Uint8Array.from(prf), label: 'Touch ID' })
     expect(Array.from(await vault.unlockWithPasskey('cred-1', Uint8Array.from(prf)))).toEqual(Array.from(next))
+  })
+})
+
+// The same host test for RPC URLs a site adds (F37's classifier): every IPv4 spelling, CGNAT, mapped IPv6.
+describe('wallet_addEthereumChain keeps only public https RPCs (scan 2026-10-27 modules, F37)', () => {
+  it('numeric, CGNAT, mapped-IPv6 and *.internal hosts are dropped; a public one stays', () => {
+    for (const url of ['https://2130706433', 'https://127.1:8545', 'https://0x7f.0.0.1', 'https://100.64.0.1', 'https://[::ffff:127.0.0.1]', 'https://[::ffff:c0a8:101]', 'https://node.internal', 'https://user:pw@eth.example', 'http://eth.example']) {
+      expect(parseAddChainParams({ chainId: '0x1', rpcUrls: [url] }), url).toMatchObject({ code: -32602 })
+    }
+    expect(parseAddChainParams({ chainId: '0x1', rpcUrls: ['https://2130706433', 'https://eth.example/v2'] })).toMatchObject({ rpcs: ['https://eth.example/v2'] })
   })
 })

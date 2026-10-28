@@ -46,29 +46,103 @@ export function parseUrl(input: string): { scheme: string; host: string; port: n
   return { scheme: m[1]!.toLowerCase(), host, port, hasCredentials, rest: m[3] ?? '' }
 }
 
-const ipv4 = (host: string): number[] | null => {
-  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
-  if (!m) return null
-  const parts = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])]
-  return parts.every((n) => n <= 255) ? parts : null
+/**
+ * An IPv4 literal as a URL parser reads it — 1 to 4 dot-separated parts, each decimal, octal (`0…`)
+ * or hex (`0x…`), the last filling the remaining bytes (`127.1`, `2130706433`, `0x7f000001`,
+ * `0177.0.0.1` are all 127.0.0.1) — as its 32-bit value; `null` when it is not one.
+ */
+function ipv4Value(host: string): number | null {
+  const parts = host.split('.')
+  if (parts.length > 1 && parts[parts.length - 1] === '') parts.pop()
+  if (parts.length === 0 || parts.length > 4) return null
+  const values: number[] = []
+  for (const p of parts) {
+    let v: number
+    if (/^0x[0-9a-f]{0,8}$/i.test(p)) v = p.length === 2 ? 0 : parseInt(p.slice(2), 16)
+    else if (/^0[0-7]{1,11}$/.test(p)) v = parseInt(p, 8)
+    else if (/^(?:0|[1-9][0-9]{0,9})$/.test(p)) v = Number(p)
+    else return null
+    values.push(v)
+  }
+  const last = values.pop()!
+  if (values.some((v) => v > 255) || last >= 256 ** (4 - values.length)) return null
+  return values.reduce((sum, v, i) => sum + v * 256 ** (3 - i), 0) + last
 }
 
-/** localhost, 127/8, 10/8, 172.16/12, 192.168/16, `*.local`, IPv6 loopback / unique-local / link-local. */
-export function isPrivateHost(host: string): boolean {
-  const h = host.toLowerCase()
-  if (h === 'localhost' || h.endsWith('.localhost') || h === '0.0.0.0') return true
-  if (h.endsWith('.local')) return true
-  const v4 = ipv4(h)
+/** A host whose last label is a number (or `0x…`) is an IPv4 literal to a URL parser, valid or not. */
+const looksNumeric = (host: string): boolean => /^(?:0x[0-9a-f]*|[0-9]+)$/i.test(host.replace(/\.$/, '').split('.').pop() ?? '')
+
+/** 0/8, 10/8, 100.64/10 (CGNAT), 127/8, 169.254/16 (link-local), 172.16/12, 192.0.0/24, 192.168/16, 198.18/15, 224/4 and above. */
+function privateV4(v: number): boolean {
+  const a = Math.floor(v / 2 ** 24), b = Math.floor(v / 2 ** 16) % 256, c = Math.floor(v / 2 ** 8) % 256
+  return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 0 && c === 0) || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19))
+}
+
+/** An IPv6 literal (no brackets, no zone) as eight 16-bit groups, an embedded IPv4 tail included; `null` when it is not one. */
+function ipv6Groups(host: string): number[] | null {
+  let h = host
+  let tail: number[] = []
+  const v4 = /^(.*:)(\d{1,3}(?:\.\d{1,3}){3})$/.exec(h)
   if (v4) {
-    const [a, b] = v4 as [number, number, number, number]
-    return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
+    const v = ipv4Value(v4[2]!)
+    if (v === null || !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(v4[2]!)) return null
+    tail = [Math.floor(v / 65536), v % 65536]
+    h = v4[1]!.endsWith('::') ? v4[1]! : v4[1]!.slice(0, -1)
   }
+  const halves = h.split('::')
+  if (halves.length > 2) return null
+  const groups = (part: string) => (part === '' ? [] : part.split(':'))
+  const head = groups(halves[0]!), rest = halves.length === 2 ? groups(halves[1]!) : []
+  if ([...head, ...rest].some((g) => !/^[0-9a-f]{1,4}$/i.test(g))) return null
+  const known = head.length + rest.length + tail.length
+  if (halves.length === 1 ? known !== 8 : known > 7) return null
+  const zeros = halves.length === 2 ? Array<number>(8 - known).fill(0) : []
+  return [...head.map((g) => parseInt(g, 16)), ...zeros, ...rest.map((g) => parseInt(g, 16)), ...tail]
+}
+
+/** Private DNS names: localhost, `*.localhost`, `*.local` (mDNS), `*.internal`, `*.home.arpa`, `*.lan`. */
+const PRIVATE_NAME = /(?:^|\.)(?:localhost|local|internal|home\.arpa|lan)$/
+
+/**
+ * A host the wallet must not be pointed at from outside: the user's own machine or network.
+ * Names: localhost, `*.localhost`, `*.local`, `*.internal`, `*.home.arpa`, `*.lan`. IPv4 in every form a
+ * URL parser accepts (`127.1`, `2130706433`, `0x7f.0.0.1`): 0/8, 10/8, 100.64/10, 127/8, 169.254/16,
+ * 172.16/12, 192.0.0/24, 192.168/16, 198.18/15, multicast and reserved; a numeric host that is no valid
+ * IPv4 counts as private too. IPv6: unspecified, loopback, unique-local, link-local, multicast, and the
+ * IPv4 inside a mapped (`::ffff:…`), compatible or NAT64 (`64:ff9b::`) address (scan 2026-10-27 modules, F37).
+ * A public name that resolves to a private address (DNS rebinding) is not caught here.
+ */
+export function isPrivateHost(host: string): boolean {
+  let h = host.toLowerCase().trim()
+  if (h.startsWith('[') && h.endsWith(']')) h = h.slice(1, -1)
+  if (h.includes('%')) return true // an IPv6 zone: link-local by construction
+  h = h.replace(/\.$/, '')
+  if (!h) return true
   if (h.includes(':')) {
-    if (h === '::1' || h === '::') return true
-    const first = h.split(':')[0]!
-    return /^f[cd][0-9a-f]{0,2}$/.test(first) || /^fe[89ab][0-9a-f]?$/.test(first)
+    const g = ipv6Groups(h)
+    if (!g) return true
+    const zeroUntil = (n: number) => g.slice(0, n).every((x) => x === 0)
+    if (zeroUntil(8) || (zeroUntil(7) && g[7] === 1)) return true
+    if ((g[0]! & 0xfe00) === 0xfc00 || (g[0]! & 0xffc0) === 0xfe80 || (g[0]! & 0xff00) === 0xff00) return true
+    const embedded = zeroUntil(5) && g[5] === 0xffff ? true : zeroUntil(6) ? true : g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0)
+    return embedded ? privateV4(g[6]! * 65536 + g[7]!) : false
+  }
+  if (PRIVATE_NAME.test(h)) return true
+  if (looksNumeric(h)) {
+    const v = ipv4Value(h)
+    return v === null || privateV4(v)
   }
   return false
+}
+
+/**
+ * A URL the wallet may fetch from the user's device on behalf of someone else (an ENS gateway, an avatar):
+ * https, no credentials, and a public host — no `{…}` template in it, nothing {@link isPrivateHost} names.
+ */
+export function isPublicHttpsUrl(url: string): boolean {
+  const p = parseUrl(url)
+  return p !== null && p.scheme === 'https' && !p.hasCredentials && !/[{}]/.test(p.host) && !isPrivateHost(p.host)
 }
 
 /** Apply the policy to one endpoint URL. */
