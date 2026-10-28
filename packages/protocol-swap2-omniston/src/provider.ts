@@ -136,6 +136,13 @@ export interface OmnistonQuoteStore {
   save(quoteId: string, valueJson: string): void | Promise<void>;
   load(quoteId: string): string | undefined | Promise<string | undefined>;
   clear(quoteId: string): void | Promise<void>;
+  /**
+   * Save only if nothing is stored under `quoteId` yet, atomically (Redis `SET NX`, a KV conditional put): true when
+   * this call wrote it. A quote id is the platform's choice, so a context must never be overwritten by another user's
+   * quote under the same id (scan 2026-10-27 modules, F27). Without it the provider checks then saves — fine for one
+   * process, racy across instances.
+   */
+  claim?(quoteId: string, valueJson: string): boolean | Promise<boolean>;
 }
 
 /** Default quote store — long-lived processes and tests only. */
@@ -145,6 +152,7 @@ export function inMemoryQuoteStore(): OmnistonQuoteStore {
     save: (id, v) => void map.set(id, v),
     load: (id) => map.get(id),
     clear: (id) => void map.delete(id),
+    claim: (id, v) => { if (map.has(id)) return false; map.set(id, v); return true; },
   };
 }
 
@@ -1766,6 +1774,32 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
   async function saveBuilt(quoteId: string, entry: BuiltEntry): Promise<void> {
     await quotes.save(quoteId, JSON.stringify(entry));
   }
+  /**
+   * A fresh quote's context, saved only if the quote id is new or already holds THIS context (same trader, dest,
+   * chain, kind): a platform reusing an id for another user's quote never rebinds a context (scan 2026-10-27 modules,
+   * F27). Atomic with the store's `claim`; check-then-save otherwise.
+   */
+  async function claimBuilt(quoteId: string, entry: BuiltEntry): Promise<boolean> {
+    const json = JSON.stringify(entry);
+    if (typeof quotes.claim === "function") {
+      if (await quotes.claim(quoteId, json)) return true;
+    } else if (!(await quotes.load(quoteId))) {
+      await quotes.save(quoteId, json);
+      return true;
+    }
+    const existing = await loadBuilt(quoteId);
+    if (!existing) {
+      // Expired (cleared by loadBuilt): the id is free again.
+      if (typeof quotes.claim === "function") return await quotes.claim(quoteId, json);
+      await quotes.save(quoteId, json);
+      return true;
+    }
+    const a = existing.bound, b = entry.bound;
+    const same = !!a && !!b && a.kind === b.kind && a.srcChain === b.srcChain && sameIntentAddress(a.trader, b.trader) && sameIntentAddress(a.dest, b.dest);
+    if (!same) return false;
+    await quotes.save(quoteId, json);
+    return true;
+  }
   async function loadBuilt(quoteId: string): Promise<BuiltEntry | undefined> {
     const raw = await quotes.load(quoteId);
     if (!raw) return undefined;
@@ -1997,7 +2031,10 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     // below asks for exactly that, never Omniston's "recommended" one, which
     // may be looser than what this quote promises).
     const minOut = swap.minOutputAmount;
-    await saveBuilt(q.quoteId, {quote: q, at: Date.now(), bound: {trader, dest: params.destAddress, srcChain: params.sourceChain, kind: "swap"}});
+    if (!(await claimBuilt(q.quoteId, {quote: q, at: Date.now(), bound: {trader, dest: params.destAddress, srcChain: params.sourceChain, kind: "swap"}}))) {
+      traceFor(q.quoteId)("quote-id-reused", {kind: "swap"});
+      return null;
+    }
 
     // Fees are charged in the OUTPUT asset; only a stable output approximates
     // USD. The TON gas budget is NOT a fee: it rides on the message and the
@@ -2499,7 +2536,9 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       if (outputScaled * 2n < inputScaled || outputScaled > inputScaled * 2n) return refuse("quoted output is outside 0.5x–2x of the input");
 
       if (await quoteIdInUse(q.quoteId)) return refuse("the platform reused a quote id that already belongs to an order");
-      await saveBuilt(q.quoteId, {quote: q, at: Date.now(), bound: {trader, dest: params.destAddress, srcChain: params.sourceChain, kind: "order"}});
+      if (!(await claimBuilt(q.quoteId, {quote: q, at: Date.now(), bound: {trader, dest: params.destAddress, srcChain: params.sourceChain, kind: "order"}}))) {
+        return refuse("the platform reused a quote id that already holds another user's quote");
+      }
 
       // Fees are charged in the OUTPUT asset; the corridor is stables, so units
       // scaled by the dest decimals approximate USD.
@@ -2639,6 +2678,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         throw error;
       }
 
+      // Re-save the WHOLE entry with its binding, as the EVM build does: the context disclosure is checked against.
+      await saveBuilt(ref.quoteId, {quote: q, at: Date.now(), ...(cached.bound ? {bound: cached.bound} : {})});
       return {
         chain: srcChain,
         to: message.targetAddress,
@@ -2690,8 +2731,18 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       );
       if (!order) return {state: "pending"};
 
-      const secretsHex = await store.load(decoded.quoteId);
+      let secretsHex = await store.load(decoded.quoteId);
       if (!secretsHex || cached?.quote.settlementData.$case !== "order") trace("disclosure-skipped", {gate: "context", secrets: !!secretsHex, cached: !!cached, feedStatus: order.status});
+      // The secrets were locked to one order (trader, dest, chain, assets, units): the context they are disclosed
+      // against must be that order — never a context rebound under a reused quote id after they were made (scan
+      // 2026-10-27 modules, F27).
+      if (secretsHex && cached?.quote.settlementData.$case === "order") {
+        const [lockedTo] = (await store.load(bindKey(decoded.quoteId))) ?? [];
+        if (lockedTo !== orderBinding(bound, cached.quote)) {
+          trace("disclosure-skipped", {gate: "binding", bound: lockedTo !== undefined, feedStatus: order.status});
+          secretsHex = undefined;
+        }
+      }
       if (secretsHex && cached?.quote.settlementData.$case === "order") {
         const q = cached.quote;
         const settlement = q.settlementData.value as OrderSettlement;

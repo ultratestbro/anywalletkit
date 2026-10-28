@@ -87,7 +87,11 @@ escrow, not that transaction), `AUDITED_OMNISTON_SETTLEMENT_CONTRACTS`,
 own endpoints as `rpcUrls` (CAIP-2 → URLs, tried before the public fallbacks)
 and `tonApiUrl` / `tonApiKey`. On serverless also inject durable
 `secretStore` / `quoteStore` — the HTLC secret must survive to the poll that
-discloses it.
+discloses it. Give the quote store a `claim` (an atomic create-if-absent: Redis
+`SET NX`, a conditional KV put): the platform picks quote ids, and a context is
+never rebound to another user's quote under the same id. A secret is disclosed
+only against the exact order it was locked to (its stored binding), so even a
+rebound context gets nothing.
 
 The destination-escrow proof requires the escrow immutables to be found in the
 resolver's calldata AND to derive, through the trusted factory's

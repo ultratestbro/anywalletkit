@@ -4,7 +4,7 @@
 // amounts, lowercase addresses, hex chain ids — and the same orders with another maker must not.
 import "../src/buffer-global.js";
 import {readFileSync} from "node:fs";
-import {describe, expect, it} from "vitest";
+import {afterEach, describe, expect, it} from "vitest";
 import {SingleProviderSwap2} from "@anywalletkit/protocol-swap2-core/swap2/single";
 import type {CrossChainProvider, Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 import {omnistonPins, validateEvmTypedOrder} from "../src/provider.js";
@@ -202,5 +202,96 @@ describe("remote TON cell bodies need the app's own check (scan 2026-10-27 modul
     expect(await verify(quote, tx, {...params, destAddress: TON_ATTACKER, refundAddress: TON_ATTACKER})).toMatch(/receiver|refund|trader|dest/i);
     expect(await verify({...quote, providerData: {settlement: "escrow"}} as unknown as Quote, tx, params)).toMatch(/only TON swap bodies/);
     expect(await verify(quote, tx, undefined)).toMatch(/request this quote answered is unknown/);
+  });
+});
+
+// ── G10 (F27): a reused quote id cannot rebind an order's context after its HTLC secret exists ─────────────────────────
+import {keccak256} from "viem";
+import {vi} from "vitest";
+import {inMemoryQuoteStore, inMemorySecretStore, omnistonProvider, type OmnistonQuoteStore} from "../src/provider.js";
+
+const G10_SECRET = Buffer.from("11".repeat(32), "hex");
+const ee = JSON.parse(readFileSync(new URL("./fixtures/live-evm-evm-2026-10-20.json", import.meta.url), "utf8")).chains.baseToArbitrum;
+const EE = {OWNER: "0x4444444444444444444444444444444444444444", DEST: "0x3333333333333333333333333333333333333333", LOP: "0xe7405fAcDEDB2512e91F2886BDff13231343aF5E",
+  BASE_FACTORY: "0xACa3E2F9b61a44892926bC6c3e104192E7D1c3cd", ARB_FACTORY: "0xafCF681272AF10959736f45616eeCBC22D7095E2", USDT0_ARB: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+  SRC_POSITION: "0x0CD4d5758313baAdB792c51175B383Bb64Ea6909", DST_POSITION: "0x1111111111111111111111111111111111111111"};
+const ATTACKER_EVM = "0x9999999999999999999999999999999999999999";
+const enc = (parts: string[]) => parts.map(encodeURIComponent).join("|");
+const observable = <T,>(events: T[]) => ({subscribe(o: {next: (e: T) => void; complete?: () => void}) { for (const e of events) o.next(e); o.complete?.(); return {unsubscribe() {}}; }});
+const eeQuote = () => structuredClone(ee.quoteUpdated);
+const snapshot = () => ({
+  quoteId: eeQuote().quoteId, status: "ORDER_STATUS_ACTIVE",
+  executions: [{index: 0, secretHash: new Uint8Array(Buffer.from(keccak256(G10_SECRET).slice(2), "hex")), inputUnits: "20000000", outputUnits: eeQuote().outputUnits,
+    resolverSendsUnits: eeQuote().settlementData.value.resolverSendsUnits, inputPositionAddress: {chain: {$case: "base", value: EE.SRC_POSITION}},
+    outputPositionAddress: {chain: {$case: "arbitrum", value: EE.DST_POSITION}}, outputPositionPhase: "EXECUTION_PHASE_READY_FOR_PRIVATE_COMPLETION"}],
+});
+/** An async KV over the in-memory store (every call a separate turn), with or without an atomic claim. */
+function asyncStore(atomic: boolean): OmnistonQuoteStore & {raw: OmnistonQuoteStore} {
+  const raw = inMemoryQuoteStore();
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  return {
+    raw,
+    save: async (id, v) => { await tick(); raw.save(id, v); },
+    load: async (id) => { await tick(); return raw.load(id); },
+    clear: async (id) => { await tick(); raw.clear(id); },
+    ...(atomic ? {claim: async (id: string, v: string) => { await tick(); return raw.claim!(id, v); }} : {}),
+  };
+}
+function g10Setup(quoteStore: OmnistonQuoteStore) {
+  vi.useFakeTimers({toFake: ["Date"], now: (eeQuote().quoteTimestamp + 5) * 1000});
+  vi.spyOn(crypto, "getRandomValues").mockImplementation(((array: Uint8Array) => { array.set(G10_SECRET.subarray(0, array.length)); return array; }) as never);
+  const calls: Record<string, unknown[]> = {};
+  const client = {
+    requestForQuote() { const q = eeQuote(); return observable([{$case: "ack", value: {rfqId: q.rfqId}}, {$case: "quoteUpdated", rfqId: q.rfqId, value: q}]); },
+    async evmBuildOrderPayload() { return {typedData: ee.payload.typedData as string, orderExtension: new Uint8Array(Buffer.from(ee.payload.orderExtensionHex, "hex")), serializedOrderDetails: new Uint8Array(Buffer.from(ee.payload.serializedOrderDetailsHex, "hex"))}; },
+    async orderRegisterSignedOrder() {},
+    orderTrack() { return observable([{$case: "order", value: snapshot()}]); },
+    async orderDiscloseHtlcSecret(request: unknown) { (calls.disclose ??= []).push(request); },
+    tonBuildEscrowTransfer() { throw new Error("not used"); },
+  };
+  const events: string[] = [];
+  const p = omnistonProvider({
+    client: client as never, quoteSettleMs: 0, maxHtlcExecutions: 1,
+    trustedSettlementContracts: {"eip155:8453": [EE.BASE_FACTORY], "eip155:42161": [EE.ARB_FACTORY]}, trustedEvmOrderProtocols: {"eip155:8453": [EE.LOP]},
+    validateEvmInputPosition: async () => true, validateEvmOutputPosition: async () => true,
+    secretStore: inMemorySecretStore(), quoteStore, trace: (event, d) => events.push(`${event}${d?.gate ? `:${d.gate}` : ""}`),
+  });
+  const quote = (dest = EE.DEST, owner = EE.OWNER) => p.getQuote({sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:42161", destToken: EE.USDT0_ARB, amountIn: "20000000", destAddress: dest, refundAddress: owner, slippageBps: 100, dry: false});
+  return {p, calls, events, quote, quoteId: eeQuote().quoteId as string};
+}
+
+describe("Omniston: a reused quote id cannot rebind an order after its secret exists (scan 2026-10-27 modules, F27)", () => {
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+  it("the race won anyway: an attacker context saved after the victim's secret gets no disclosure (async store)", async () => {
+    const store = asyncStore(false);
+    const s = g10Setup(store);
+    const q = await s.quote();
+    await s.p.buildDeposit(q!);
+    // The attacker's quote under the same id lands after the victim's build created and locked the secret.
+    const victim = JSON.parse((await store.load(s.quoteId))!) as {bound: Record<string, string>};
+    await store.save(s.quoteId, JSON.stringify({...victim, bound: {...victim.bound, dest: ATTACKER_EVM}}));
+    await s.p.trackIntent({intentId: enc(["omn1", s.quoteId, EE.OWNER, ATTACKER_EVM, "eip155:8453"]), sourceTxHash: null} as never);
+    expect(s.calls.disclose ?? []).toHaveLength(0);
+    expect(s.events).toContain("disclosure-skipped:binding");
+    // The victim's own context still discloses once restored.
+    await store.save(s.quoteId, JSON.stringify(victim));
+    await s.p.trackIntent({intentId: q!.intentId, sourceTxHash: null} as never);
+    expect(s.calls.disclose ?? []).toHaveLength(1);
+  });
+
+  it("claiming the quote id: another user's quote under a held id is refused; the same user's re-quote refreshes it", async () => {
+    for (const atomic of [true, false]) {
+      const store = asyncStore(atomic);
+      const s = g10Setup(store);
+      expect(await s.quote(), `atomic=${atomic}`).not.toBeNull();
+      // The platform answers another user with the same quote id: refused, the stored context untouched.
+      const before = await store.load(s.quoteId);
+      expect(await s.quote(ATTACKER_EVM, ATTACKER_EVM), `atomic=${atomic}`).toBeNull();
+      expect(await store.load(s.quoteId)).toBe(before);
+      expect(await s.quote(), `atomic=${atomic}`).not.toBeNull();
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
   });
 });
