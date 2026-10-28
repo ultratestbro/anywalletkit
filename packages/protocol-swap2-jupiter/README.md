@@ -41,6 +41,13 @@ after all of the following hold:
 - the instructions call only Jupiter v6 (`JUP6Lkb…`) and the plumbing a swap
   needs: compute budget, System, SPL Token / Token-2022, Associated Token;
 - the taker is the only signer, and there is no tip instruction;
+- every instruction besides the swap is one of the exact shapes a swap needs:
+  CreateIdempotent of the taker's own token account (the taker pays), a System
+  transfer of exactly the input into the taker's wSOL account (SOL source only,
+  once), SyncNative on that account, CloseAccount of it back to the taker, an
+  account initialized for the taker. Any other System / Token / Token-2022 /
+  Associated Token instruction — a transfer elsewhere, a TransferChecked, a
+  second Jupiter call — refuses the quote;
 - the swap instruction is `route_v2` or `shared_accounts_route_v2` (ExactIn),
   and its own arguments — the ones the program enforces on-chain — say exactly
   our input amount, the quoted output in the answer, our slippage, and 0 bps

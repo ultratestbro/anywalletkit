@@ -14,7 +14,8 @@
  * balance proof against the quote) and broadcasts it through its own RPC.
  */
 import {describeJupiterActivity} from "./activity.js";
-import {JUPITER_API_DEFAULT, JUPITER_PROGRAM, JUPITER_TX_PROGRAMS, COMPUTE_BUDGET_PROGRAM, SOLANA_CAIP2, WSOL_MINT, jupiter as cfg, jupiterMint} from "./config.js";
+import {ATA_PROGRAM, JUPITER_API_DEFAULT, JUPITER_PROGRAM, JUPITER_TX_PROGRAMS, COMPUTE_BUDGET_PROGRAM, SOLANA_CAIP2, SYSTEM_PROGRAM, TOKEN_PROGRAM, WSOL_MINT, jupiter as cfg, jupiterMint} from "./config.js";
+import {address, getAddressEncoder, getProgramDerivedAddress} from "@solana/kit";
 import {decodeComputeBudget, decodeSwapArgs, fromBase64, minOutOf} from "./codec.js";
 import {assembleTransaction, type JupiterInstruction} from "./transaction.js";
 import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
@@ -106,8 +107,46 @@ export function jupiterProvider(config: JupiterProviderConfig = {}): CrossChainP
     throw last;
   };
 
+  /**
+   * The setup / cleanup / other instructions /build may carry, by exact shape (scan 2026-10-27 modules, F32/F33):
+   * creating the taker's own ATAs, funding the taker's wSOL account with exactly the input (a SOL source), syncing and
+   * closing it back to the taker. Anything else — a System transfer elsewhere, a token transfer, a second Jupiter call —
+   * is refused; the wallet's balance proof alone let a few hundredths of a SOL and the slippage band leave per swap.
+   */
+  const shapeRefusal = (ix: JupiterInstruction, want: {taker: string; inputMint: string; amountIn: bigint; wsolAta: string}): string | null => {
+    const data = fromBase64(ix.data ?? "");
+    const acc = (i: number) => ix.accounts[i]?.pubkey;
+    if (ix.programId === ATA_PROGRAM) {
+      // CreateIdempotent: [payer, ata, owner, mint, system, token program] — the taker pays for its own account.
+      if (data.length !== 1 || data[0] !== 1) return "an associated-token instruction other than CreateIdempotent";
+      if (acc(0) !== want.taker || acc(2) !== want.taker) return "an associated token account for someone else";
+      return null;
+    }
+    if (ix.programId === SYSTEM_PROGRAM) {
+      // Transfer: u32 LE 2 + u64 lamports, [from, to] — only the input, into the taker's own wSOL account.
+      if (data.length !== 12 || data[0] !== 2 || data[1] !== 0 || data[2] !== 0 || data[3] !== 0) return "a System instruction other than Transfer";
+      if (want.inputMint !== WSOL_MINT) return "a SOL transfer on a token-source swap";
+      const lamports = new DataView(data.buffer, data.byteOffset + 4, 8).getBigUint64(0, true);
+      if (acc(0) !== want.taker || acc(1) !== want.wsolAta) return `a SOL transfer to ${acc(1)}, not the taker's wSOL account`;
+      if (lamports !== want.amountIn) return `a SOL transfer of ${lamports}, not the ${want.amountIn} input`;
+      return null;
+    }
+    if (ix.programId === TOKEN_PROGRAM) {
+      if (data.length === 1 && data[0] === 17) return acc(0) === want.wsolAta ? null : "SyncNative on another account"; // SyncNative
+      if (data.length === 1 && data[0] === 9) { // CloseAccount: [account, destination, owner]
+        return acc(0) === want.wsolAta && acc(1) === want.taker && acc(2) === want.taker ? null : "a CloseAccount that is not the taker's wSOL account back to the taker";
+      }
+      if (data.length === 33 && data[0] === 18) { // InitializeAccount3(owner): an account the taker owns
+        return bytesEqual(data.subarray(1), getAddressEncoder().encode(address(want.taker))) ? null : "a token account initialized for someone else";
+      }
+      return `a Token instruction (tag ${data[0] ?? "none"}) the swap does not need`;
+    }
+    if (ix.programId === JUPITER_PROGRAM) return "a second Jupiter instruction";
+    return `instruction for program ${ix.programId}`;
+  };
+
   /** Every instruction the API returned, checked; returns the ordered list to assemble and the suggested unit price. */
-  const vet = (b: BuildResponse, want: {taker: string; inputMint: string; outputMint: string; amountIn: bigint; slippageBps: number}): {instructions: JupiterInstruction[]; price: bigint; quotedOut: bigint} => {
+  const vet = (b: BuildResponse, want: {taker: string; inputMint: string; outputMint: string; amountIn: bigint; slippageBps: number; wsolAta: string}): {instructions: JupiterInstruction[]; price: bigint; quotedOut: bigint} => {
     if (b.swapMode && b.swapMode !== "ExactIn") throw new Error(`swap mode ${b.swapMode}`);
     if (b.inputMint !== want.inputMint || b.outputMint !== want.outputMint) throw new Error("the answer names other mints");
     if (b.inAmount !== want.amountIn.toString()) throw new Error(`the answer spends ${b.inAmount}, not ${want.amountIn}`);
@@ -127,9 +166,17 @@ export function jupiterProvider(config: JupiterProviderConfig = {}): CrossChainP
       if (d.price !== undefined) price = d.price;
     }
     const instructions = [...(b.setupInstructions ?? []), b.swapInstruction, ...(b.cleanupInstruction ? [b.cleanupInstruction] : []), ...(b.otherInstructions ?? [])];
+    let funded = false;
     for (const ix of instructions) {
       if (!JUPITER_TX_PROGRAMS.has(ix.programId) || ix.programId === COMPUTE_BUDGET_PROGRAM) throw new Error(`instruction for program ${ix.programId}`);
       for (const a of ix.accounts) if (a.isSigner && a.pubkey !== want.taker) throw new Error(`instruction needs signer ${a.pubkey}`);
+      if (ix === b.swapInstruction) continue;
+      const why = shapeRefusal(ix, want);
+      if (why) throw new Error(why);
+      if (ix.programId === SYSTEM_PROGRAM) {
+        if (funded) throw new Error("a second SOL transfer");
+        funded = true;
+      }
     }
     return {instructions, price: price > maxPrice ? maxPrice : price, quotedOut: args.quotedOutAmount};
   };
@@ -207,7 +254,8 @@ export function jupiterProvider(config: JupiterProviderConfig = {}): CrossChainP
       if (!b.outAmount || !/^\d+$/.test(b.outAmount)) return refuse("answer without an output amount");
 
       let vetted: ReturnType<typeof vet>;
-      try { vetted = vet(b, {taker, inputMint, outputMint, amountIn, slippageBps}); } catch (e) { return refuse((e as Error).message); }
+      const [wsolAta] = await getProgramDerivedAddress({programAddress: address(ATA_PROGRAM), seeds: [getAddressEncoder().encode(address(taker)), getAddressEncoder().encode(address(TOKEN_PROGRAM)), getAddressEncoder().encode(address(WSOL_MINT))]});
+      try { vetted = vet(b, {taker, inputMint, outputMint, amountIn, slippageBps, wsolAta}); } catch (e) { return refuse((e as Error).message); }
       const minOut = minOutOf(vetted.quotedOut, slippageBps);
       if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) {
         return refuse(`guaranteed ${minOut} is below the floor ${params.minAmountOut} at ${slippageBps} bps`);
@@ -273,4 +321,10 @@ export function jupiterProvider(config: JupiterProviderConfig = {}): CrossChainP
       }
     },
   };
+}
+
+function bytesEqual(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
