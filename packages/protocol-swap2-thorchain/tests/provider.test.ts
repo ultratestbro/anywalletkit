@@ -9,7 +9,10 @@ describe("THORChain provider contract", () => {
   it("rejects half-configured affiliates", () => {
     expect(() => thorchainProvider({affiliate: "t"})).toThrow(/configured together/);
     expect(() => thorchainProvider({affiliate: "bad:name", affiliateBps: "10"})).toThrow(/memo characters/);
-    expect(() => thorchainProvider({nodeUrl: "file:///tmp/thor"})).toThrow(/http or https/);
+    expect(() => thorchainProvider({nodeUrl: "file:///tmp/thor"})).toThrow(/must use https/);
+    // Plain http too (scan 2026-10-27 modules, F15): the vault and router come from these answers.
+    expect(() => thorchainProvider({nodeUrl: "http://thor.invalid"})).toThrow(/must use https/);
+    expect(() => thorchainProvider({nodeUrl: "http://localhost:1317", allowInsecureNodeUrl: true})).not.toThrow();
   });
 
   it("keeps the Tron source dark unless opted in", () => {

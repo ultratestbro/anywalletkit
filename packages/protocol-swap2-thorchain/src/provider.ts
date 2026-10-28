@@ -3,7 +3,7 @@ import {describeThorchainActivity} from "./activity.js";
 import {decodeFunctionData, encodeFunctionData} from "viem";
 import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import {ccAsset, ccAssetByToken} from "@anywalletkit/swap2-assets";
-import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {bigintToNumber} from "@anywalletkit/core";
 
 /**
@@ -23,21 +23,35 @@ import {bigintToNumber} from "@anywalletkit/core";
  * `liquidity_tolerance_bps` when the caller passes a slippage (LIM = expected
  * output after fees × (1 − slippage)), `tolerance_bps` otherwise.
  *
- * Hosts (re-verified 2026-09-16): ninerealms retired, the Liquify vanity
- * hostnames went stale; dev.thorchain.org now lists exactly two THORNode
- * entries — Liquify's public GATEWAY (50k req/day per IP; x-client-id
- * identifies us for a bump) and thornode.thorchain.network (no DNS today, kept
- * as the documented fallback in case it returns). Hosts are tried in order and
- * a quote is only ever bound to an inbound snapshot from the SAME host, so a
- * lagging secondary can never be compared against a primary's vault. The
- * list is an explicit constructor option (`nodeUrl`, one or many); this
- * package never reads deployment environment values.
+ * Hosts (re-verified 2026-10-28): two public THORNodes of different operators —
+ * Liquify's public GATEWAY (50k req/day per IP; x-client-id identifies us for a
+ * bump) and the IBS team's node. Nine Realms retired its hosts, the Liquify
+ * vanity hostname serves an expired certificate and thornode.thorchain.network
+ * no longer resolves. Hosts are tried in order for the quote, and a quote is
+ * bound to an inbound snapshot from the SAME host; the source vault and router
+ * must then be confirmed by a SECOND host (scan 2026-10-27 modules, F15): one
+ * node's answer is not an authority over where the funds go. The list is an
+ * explicit constructor option (`nodeUrl`, one or many, plus `confirmNodeUrl`);
+ * this package never reads deployment environment values.
  */
 
 const HOSTS = [
   "https://gateway.liquify.com/chain/thorchain_api",
-  "https://thornode.thorchain.network",
+  "https://thorchain.ibs.team/api",
 ];
+
+/**
+ * THORChain's EVM routers (`depositWithExpiry`), the only contracts an EVM-source swap may call and approve (scan
+ * 2026-10-27 modules, F15). Reported identically on 2026-10-28 by both default nodes (two operators) and by every
+ * October quote-matrix build. A router migration needs a release or `trustedRouters`; until then a quote naming
+ * another router is refused, never followed.
+ */
+export const THORCHAIN_ROUTERS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  "eip155:1": Object.freeze(["0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146"]),
+  "eip155:56": Object.freeze(["0xb30eC53F98ff5947EDe720D32aC2da7e52A5f56b"]),
+  "eip155:43114": Object.freeze(["0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"]),
+  "eip155:8453": Object.freeze(["0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"]),
+});
 
 const DEFAULT_CLIENT_ID = "anywalletkit";
 
@@ -261,20 +275,6 @@ async function inboundAddressesOn(host: string, clientId: string): Promise<Inbou
   return res.body as InboundAddress[];
 }
 
-/** Pre-broadcast re-check: any live host is an acceptable authority — a
- *  disagreeing secondary fails closed, which is the safe direction. */
-async function inboundAddresses(hosts: string[], clientId: string): Promise<InboundAddress[] | null> {
-  for (const host of hosts) {
-    try {
-      return await inboundAddressesOn(host, clientId);
-    } catch (error) {
-      if (error instanceof HostUnavailable) continue;
-      throw error;
-    }
-  }
-  return null;
-}
-
 function paused(entry: InboundAddress | undefined): boolean {
   return !entry || entry.halted === true || entry.global_trading_paused === true || entry.chain_trading_paused === true;
 }
@@ -337,6 +337,16 @@ export interface ThorchainProviderConfig {
    * hosts. Quote + inbound snapshot always come from the same host.
    */
   nodeUrl?: string | string[];
+  /**
+   * Nodes that confirm the source vault and router a quote names (scan 2026-10-27 modules, F15): another host must
+   * report the same before a quote is used and again right before broadcast; a disagreeing or silent second source
+   * refuses. Default: the other `nodeUrl` hosts, else the default public nodes. Name a node of another operator.
+   */
+  confirmNodeUrl?: string | string[];
+  /** Routers to trust besides {@link THORCHAIN_ROUTERS}, per CAIP-2 chain (a router migration before a release). */
+  trustedRouters?: Readonly<Record<string, readonly string[]>>;
+  /** Allow `http:` node URLs (local development only): the vault and router a swap pays come from them. */
+  allowInsecureNodeUrl?: boolean;
   /** Optional gateway identification; defaults to a neutral module name. */
   clientId?: string;
   /**
@@ -346,6 +356,75 @@ export interface ThorchainProviderConfig {
    * memo-less send is unsettleable.
    */
   tronSource?: boolean;
+}
+
+/**
+ * The app's side of a remote THORChain stub (scan 2026-10-27 modules, F15): `remoteProvider({name: "thorchain",
+ * baseUrl, ...thorchainPins()})`. The pinned routers are the only call targets and spenders, and `verifyBuild` checks
+ * the build on the client: the vault in the router call (or the Tron deposit's recipient) confirmed by two THORNodes
+ * of different operators, the source asset and exact input, and the memo's asset, destination, refund and limit
+ * against the app's own request. Pass the affiliate your backend's provider uses (the memo must carry exactly it).
+ */
+export function thorchainPins(opts: {
+  nodeUrl?: string | string[];
+  affiliate?: string;
+  affiliateBps?: string;
+  trustedRouters?: Readonly<Record<string, readonly string[]>>;
+  clientId?: string;
+} = {}): RemotePins & {verifyBuild(quote: Quote, tx: UnsignedTx, params?: QuoteParams): Promise<string | null>} {
+  const nodes = [...new Set((Array.isArray(opts.nodeUrl) ? opts.nodeUrl : opts.nodeUrl ? opts.nodeUrl.split(",") : HOSTS).map((h) => h.trim().replace(/\/$/, "")).filter(Boolean))];
+  for (const n of nodes) if (!/^https:\/\//i.test(n)) throw new Error("thorchain: thorchainPins nodeUrl must use https");
+  const clientId = opts.clientId?.trim() || DEFAULT_CLIENT_ID;
+  const routersFor = (chain: string): readonly string[] => [...(THORCHAIN_ROUTERS[chain] ?? []), ...(opts.trustedRouters?.[chain] ?? [])];
+  return Object.freeze({
+    callTargets: routersFor,
+    spenders: routersFor,
+    async verifyBuild(quote: Quote, tx: UnsignedTx, params?: QuoteParams): Promise<string | null> {
+      if (!params) return "the request this quote answered is unknown";
+      const src = ccAsset(params.sourceChain, params.sourceToken);
+      const dst = destAsset(params.destChain, params.destToken);
+      if (!src || !dst) return "unknown source or destination asset";
+      const chainId = CHAIN_ID[params.sourceChain];
+      let vault: string, memo: string, router: string | undefined;
+      if (chainId) {
+        if (!tx.data) return "no router calldata";
+        let args: readonly unknown[] | undefined;
+        try {
+          const d = decodeFunctionData({abi: ROUTER_ABI, data: tx.data as `0x${string}`});
+          if (d.functionName !== "depositWithExpiry") return `${d.functionName} is not depositWithExpiry`;
+          args = d.args;
+        } catch { return "the router calldata does not decode"; }
+        if (!args || args.length !== 5) return "the router calldata does not decode";
+        router = tx.to;
+        if (!routersFor(params.sourceChain).some((r) => sameTarget(r, router))) return `router ${tx.to} is not pinned`;
+        vault = String(args[0]);
+        const asset = String(args[1]);
+        if (!sameTarget(asset, src.contract ?? NATIVE)) return `the router call moves ${asset}, not the source asset`;
+        if (BigInt(args[2] as bigint) !== BigInt(quote.sourceAmount)) return `the router call moves ${String(args[2])}, not the ${quote.sourceAmount} input`;
+        memo = String(args[3]);
+      } else {
+        // A deposit source (Tron): a plain send of the input to the vault with the memo.
+        if (!tx.memo || tx.value !== quote.sourceAmount) return "the deposit is not a send of the input with a memo";
+        vault = tx.to;
+        memo = tx.memo;
+      }
+      const checked = verifiedMemo(memo, dst.asset, params.destAddress, params.refundAddress ?? "", opts.affiliate ?? "", opts.affiliateBps ?? "");
+      if (!checked) return `the memo does not pay ${params.destAddress} in ${dst.asset} with this app's refund and affiliate`;
+      if ((checked.limit * 10n ** BigInt(dst.decimals)) / 100_000_000n < BigInt(quote.minDestAmount)) return `the memo's limit ${checked.limit} is below the quoted minimum`;
+      // Two nodes of different operators must report this vault (and router), trading open.
+      let agreeing = 0;
+      for (const host of nodes) {
+        let entries: InboundAddress[];
+        try { entries = await inboundAddressesOn(host, clientId); } catch (error) { if (error instanceof HostUnavailable) continue; throw error; }
+        const entry = entries.find((e) => e.chain === THOR_CHAIN[params.sourceChain]);
+        if (paused(entry)) return `${THOR_CHAIN[params.sourceChain]} is halted / paused`;
+        if (!sameTarget(entry?.address, vault)) return `a THORNode reports another inbound vault than ${vault}`;
+        if (router !== undefined && !sameTarget(entry?.router, router)) return "a THORNode reports another router";
+        if (++agreeing >= 2) return null;
+      }
+      return "two THORNodes could not confirm the inbound vault";
+    },
+  });
 }
 
 export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossChainProvider {
@@ -360,9 +439,46 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
     } catch {
       throw new Error("thorchain: nodeUrl must be an absolute http(s) URL");
     }
-    if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("thorchain: nodeUrl must use http or https");
+    if (url.protocol !== "https:" && !(url.protocol === "http:" && config.allowInsecureNodeUrl === true)) {
+      throw new Error("thorchain: nodeUrl must use https (allowInsecureNodeUrl for local development)");
+    }
     return url.toString().replace(/\/$/, "");
   }))];
+  const parseHosts = (input: string | string[] | undefined): string[] => (Array.isArray(input) ? input : (input ?? "").split(","))
+    .map((h) => h.trim()).filter(Boolean).map((h) => {
+      let url: URL;
+      try { url = new URL(h); } catch { throw new Error("thorchain: confirmNodeUrl must be an absolute https URL"); }
+      if (url.protocol !== "https:" && !(url.protocol === "http:" && config.allowInsecureNodeUrl === true)) throw new Error("thorchain: confirmNodeUrl must use https");
+      return url.toString().replace(/\/$/, "");
+    });
+  const confirmHosts = [...new Set([...parseHosts(config.confirmNodeUrl), ...hosts, ...HOSTS])];
+  const routers = new Map<string, Set<string>>();
+  for (const [chain, list] of [...Object.entries(THORCHAIN_ROUTERS), ...Object.entries(config.trustedRouters ?? {})]) {
+    const set = routers.get(chain) ?? new Set<string>();
+    for (const r of list) {
+      if (!/^0x[0-9a-fA-F]{40}$/.test(r)) throw new Error(`thorchain: trusted router for ${chain} is not an EVM address`);
+      set.add(r.toLowerCase());
+    }
+    routers.set(chain, set);
+  }
+  const pinnedRouter = (chain: string, router: string | undefined) => !!router && routers.get(chain)?.has(router.toLowerCase()) === true;
+  /**
+   * A second node's view of the source chain, from a host other than `quoteHost`: the vault (and router) it reports
+   * must be the quote's, and trading open. The reason it fails, or null.
+   */
+  const confirmedElsewhere = async (quoteHost: string, chain: string, vault: string, router: string | undefined): Promise<string | null> => {
+    for (const host of confirmHosts) {
+      if (host === quoteHost) continue;
+      let entries: InboundAddress[];
+      try { entries = await inboundAddressesOn(host, clientId); } catch (error) { if (error instanceof HostUnavailable) continue; throw error; }
+      const entry = entries.find((e) => e.chain === THOR_CHAIN[chain]);
+      if (paused(entry)) return `${THOR_CHAIN[chain]} is halted / paused on the confirming node`;
+      if (!sameTarget(entry?.address, vault)) return "a second node reports another inbound vault — refused until they agree";
+      if (router !== undefined && !sameTarget(entry?.router, router)) return "a second node reports another router — refused until they agree";
+      return null;
+    }
+    return "no second node answered to confirm the inbound vault (configure confirmNodeUrl)";
+  };
   const configuredAffiliate = config.affiliate ?? "";
   const configuredAffiliateBps = config.affiliateBps ?? "";
   if (!!configuredAffiliate !== !!configuredAffiliateBps) {
@@ -481,6 +597,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       let q: ThorQuoteResponse | null = null;
       let checkedMemo: ReturnType<typeof verifiedMemo> = null;
       let inbounds: InboundAddress[] | null = null;
+      let quoteHost = "";
       for (const host of hosts) {
         try {
           if (limitMode === "liquidity_tolerance_bps") {
@@ -543,6 +660,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
           // state. Bind it against a separately fetched no-store inbound
           // snapshot from the SAME host now, then repeat the check before broadcast.
           inbounds = await inboundAddressesOn(host, clientId);
+          quoteHost = host;
           break;
         } catch (error) {
           if (error instanceof HostUnavailable) {
@@ -571,6 +689,15 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       }
       if (chainId && !sameTarget(srcInbound?.router, q.router)) {
         params.onRefusal?.("thorchain: quote router differs from the node's current router — retry");
+        return null;
+      }
+      if (chainId && !pinnedRouter(params.sourceChain, q.router)) {
+        params.onRefusal?.(`thorchain: router ${String(q.router)} is not a THORChain router this module trusts on ${params.sourceChain} (THORCHAIN_ROUTERS / trustedRouters)`);
+        return null;
+      }
+      const unconfirmed = await confirmedElsewhere(quoteHost, params.sourceChain, q.inbound_address, chainId ? q.router : undefined);
+      if (unconfirmed) {
+        params.onRefusal?.(`thorchain: ${unconfirmed}`);
         return null;
       }
       const tooSmall = belowThorMinimums(amount1e8, srcInbound, q);
@@ -694,8 +821,18 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       if (!/^\d+$/.test(data.expiry) || BigInt(data.expiry) <= BigInt(Math.floor(Date.now() / 1000))) {
         throw new Error("thorchain: quote expired before broadcast");
       }
-      const inbounds = await inboundAddresses(hosts, clientId);
+      if (evmSource && !pinnedRouter(data.sourceChain, data.router)) throw new Error("thorchain: the quote's router is not one this module trusts");
+      let inbounds: InboundAddress[] | null = null;
+      let snapshotHost = "";
+      for (const host of hosts) {
+        try { inbounds = await inboundAddressesOn(host, clientId); snapshotHost = host; break; } catch (error) { if (!(error instanceof HostUnavailable)) throw error; }
+      }
       if (!inbounds) throw new Error("thorchain: cannot refresh inbound addresses before broadcast");
+      // The vault the funds go to is confirmed by a second node right before broadcast too (after this node's own checks).
+      const confirm = async () => {
+        const unconfirmed = await confirmedElsewhere(snapshotHost, data.sourceChain!, data.inboundAddress!, evmSource ? data.router : undefined);
+        if (unconfirmed) throw new Error(`thorchain: ${unconfirmed}`);
+      };
       const src = inbounds.find((entry) => entry.chain === THOR_CHAIN[data.sourceChain!]);
       const dst = inbounds.find((entry) => entry.chain === THOR_CHAIN[data.destChain!]);
       if (paused(src) || paused(dst)) throw new Error("thorchain: source or destination chain trading is paused");
@@ -714,6 +851,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
         const amount1e8 = (BigInt(quote.sourceAmount) * 100_000_000n) / 10n ** BigInt(srcAsset.decimals);
         const tooSmall = belowThorMinimums(amount1e8, src, null);
         if (tooSmall) throw new Error(`thorchain: ${tooSmall}`);
+        await confirm();
         return;
       }
       if (!sameTarget(src?.router, data.router) || !sameTarget(tx.to, data.router)) {
@@ -744,6 +882,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       ) {
         throw new Error("thorchain: value/approval does not match the validated source asset");
       }
+      await confirm();
     },
 
     async trackIntent(ref: IntentRef): Promise<IntentStatus> {

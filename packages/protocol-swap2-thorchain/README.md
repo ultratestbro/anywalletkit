@@ -17,6 +17,20 @@ npm install @anywalletkit/protocol-swap2-thorchain @anywalletkit/core
 
 On npm: [@anywalletkit/protocol-swap2-thorchain](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-thorchain), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
+## Where the funds go
+
+The router an EVM-source swap calls and approves must be one of `THORCHAIN_ROUTERS` (Ethereum, BSC, Avalanche,
+Base; `trustedRouters` adds one, e.g. during a router migration), and the inbound vault the router pays must be
+reported by a second THORNode — another operator — both when the quote is taken and right before broadcast. A
+disagreeing or silent second node refuses the swap. The defaults are two public nodes of different operators
+(Liquify's gateway and the IBS team's node, both checked on 2026-10-28); with one `nodeUrl` of your own, name a
+second source in `confirmNodeUrl`. Node URLs must be `https:` (`allowInsecureNodeUrl` for local development).
+
+Behind `remoteProvider`, the app checks the backend's build itself: `remoteProvider({name: "thorchain", baseUrl,
+...thorchainPins()})` pins the routers and runs `verifyBuild` on the client — the vault in the router call confirmed
+by two nodes, the source asset and exact input, and the memo's destination, refund and limit against the app's own
+request (pass the backend's `affiliate` / `affiliateBps`).
+
 ## Activity
 
 Routers and Asgard vaults rotate, so `describeActivity(tx, ctx)` matches no

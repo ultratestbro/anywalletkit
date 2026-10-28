@@ -66,15 +66,15 @@ afterEach(() => vi.unstubAllGlobals());
 const provider = () => thorchainProvider({nodeUrl: [PRIMARY, SECONDARY]});
 
 describe("THORNode host failover", () => {
-  it("serves quote + inbound from the primary when it is healthy", async () => {
+  it("serves quote + inbound from the primary when it is healthy; the secondary confirms the vault", async () => {
     await expect(provider().getQuote(params())).resolves.not.toBeNull();
-    expect(calls).toEqual([`${PRIMARY} quote`, `${PRIMARY} inbound`]);
+    expect(calls).toEqual([`${PRIMARY} quote`, `${PRIMARY} inbound`, `${SECONDARY} inbound`]);
   });
 
   it("moves both calls to the secondary when the primary is unreachable", async () => {
     hosts[PRIMARY]!.quote = "down";
     await expect(provider().getQuote(params())).resolves.not.toBeNull();
-    expect(calls).toEqual([`${PRIMARY} quote`, `${SECONDARY} quote`, `${SECONDARY} inbound`]);
+    expect(calls).toEqual([`${PRIMARY} quote`, `${SECONDARY} quote`, `${SECONDARY} inbound`, `${PRIMARY} inbound`]);
   });
 
   it("treats gateway errors and rate limits as host failures", async () => {
@@ -82,15 +82,17 @@ describe("THORNode host failover", () => {
       calls = [];
       hosts[PRIMARY]!.quote = {status, body: {error: "gateway"}};
       await expect(provider().getQuote(params())).resolves.not.toBeNull();
-      expect(calls).toEqual([`${PRIMARY} quote`, `${SECONDARY} quote`, `${SECONDARY} inbound`]);
+      expect(calls).toEqual([`${PRIMARY} quote`, `${SECONDARY} quote`, `${SECONDARY} inbound`, `${PRIMARY} inbound`]);
     }
   });
 
-  it("never pairs a primary quote with a secondary inbound snapshot", async () => {
+  it("never pairs a primary quote with a secondary inbound snapshot — and without a second node nothing confirms the vault", async () => {
     hosts[PRIMARY]!.inbound = "down";
-    await expect(provider().getQuote(params())).resolves.not.toBeNull();
-    // The inbound failure on the primary re-runs the QUOTE on the secondary.
-    expect(calls).toEqual([`${PRIMARY} quote`, `${PRIMARY} inbound`, `${SECONDARY} quote`, `${SECONDARY} inbound`]);
+    const reasons: string[] = [];
+    await expect(provider().getQuote({...params(), onRefusal: (r) => reasons.push(r)})).resolves.toBeNull();
+    // The inbound failure on the primary re-runs the QUOTE on the secondary; the primary cannot then confirm it.
+    expect(calls.slice(0, 5)).toEqual([`${PRIMARY} quote`, `${PRIMARY} inbound`, `${SECONDARY} quote`, `${SECONDARY} inbound`, `${PRIMARY} inbound`]);
+    expect(reasons).toEqual(["thorchain: no second node answered to confirm the inbound vault (configure confirmNodeUrl)"]);
   });
 
   it("names a memo limit under the caller's floor instead of a silent null", async () => {
@@ -119,15 +121,15 @@ describe("THORNode host failover", () => {
         }
         return new Response(JSON.stringify((original as {body: unknown}).body), {status: 200});
       }
-      if (url.startsWith(PRIMARY) && url.includes("/inbound_addresses")) {
-        calls.push(`${PRIMARY} inbound`);
+      if (url.includes("/inbound_addresses") && (url.startsWith(PRIMARY) || url.startsWith(SECONDARY))) {
+        calls.push(`${url.startsWith(PRIMARY) ? PRIMARY : SECONDARY} inbound`);
         return new Response(JSON.stringify(inboundBody()), {status: 200});
       }
       calls.push(`other ${url}`);
       return new Response("nope", {status: 404});
     });
     await expect(provider().getQuote(params())).resolves.not.toBeNull();
-    expect(calls).toEqual([`${PRIMARY} quote`, `${PRIMARY} quote`, `${PRIMARY} inbound`]);
+    expect(calls).toEqual([`${PRIMARY} quote`, `${PRIMARY} quote`, `${PRIMARY} inbound`, `${SECONDARY} inbound`]);
   });
 
   it("fails closed when every host is down", async () => {
@@ -141,9 +143,11 @@ describe("THORNode host failover", () => {
     const quote = (await p.getQuote(params()))!;
     const tx = await p.buildDeposit(quote);
     calls = [];
-    hosts[PRIMARY]!.inbound = "down";
     await expect(p.preflightDeposit!(quote, tx)).resolves.toBeUndefined();
     expect(calls).toEqual([`${PRIMARY} inbound`, `${SECONDARY} inbound`]);
+    // One live node is one source: the vault is not confirmed (scan 2026-10-27 modules, F15).
+    hosts[PRIMARY]!.inbound = "down";
+    await expect(p.preflightDeposit!(quote, tx)).rejects.toThrow(/no second node answered/);
     hosts[SECONDARY]!.inbound = "down";
     await expect(p.preflightDeposit!(quote, tx)).rejects.toThrow(/cannot refresh/);
   });
@@ -151,8 +155,8 @@ describe("THORNode host failover", () => {
   it("accepts a comma-separated host list and rejects malformed entries", async () => {
     hosts[PRIMARY]!.quote = "down";
     await expect(thorchainProvider({nodeUrl: ` ${PRIMARY}, ${SECONDARY} `}).getQuote(params())).resolves.not.toBeNull();
-    expect(calls.at(-1)).toBe(`${SECONDARY} inbound`);
+    expect(calls.slice(-2)).toEqual([`${SECONDARY} inbound`, `${PRIMARY} inbound`]);
     expect(() => thorchainProvider({nodeUrl: "not a url"})).toThrow(/absolute http/);
-    expect(() => thorchainProvider({nodeUrl: [PRIMARY, "ftp://x"]})).toThrow(/http or https/);
+    expect(() => thorchainProvider({nodeUrl: [PRIMARY, "ftp://x"]})).toThrow(/must use https/);
   });
 });
