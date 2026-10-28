@@ -50,7 +50,7 @@ Discovery asks `eth_getLogs` for every approval event with the owner in `topic1`
 
 ### With policies
 
-Revokes are sent through `account.approve({amount: 0})`, `account.sendTransaction` and `account.revokeDelegation()`. On an account from the kit's `Wallet.getAccount(...)` they pass the wallet's policies like any other write. The kit treats them as `kind: 'revoke'`: the allowlist and the spender's blocklist entry do not apply (a blocklisted drainer's allowance can always be taken back), `confirm` and the fee cap do. `isRevokeCalldata(data)` and `isUnlimitedAmount(amount)` are exported for hosts that check calldata themselves.
+Revokes are sent through `account.approve({amount: 0})`, `account.sendTransaction` and `account.revokeDelegation()`. On an account from the kit's `Wallet.getAccount(...)` they pass the wallet's policies like any other write. The kit treats them as `kind: 'revoke'`: the allowlist and the spender's blocklist entry do not apply (a blocklisted drainer's allowance can always be taken back), `confirm` and the fee cap do. `isRevokeCalldata(data)` and `isUnlimitedAmount(amount)` are exported for hosts that check calldata themselves; to let a whole transaction through a policy as a revoke, use `isRevokeTransaction(tx, { targets })` with the approvals your scan returned (or a map from address to standard): `approve(spender, 0)` counts only on an ERC-20 target, because on an ERC-721 it approves `spender` for token #0; `approve(0x0, id)` and `setApprovalForAll(operator, false)` count on NFT targets; without `targets` only Permit2 `lockdown` does. An `'erc20'` revoke asks the token's ERC-165 first and is refused (`invalid-approval`) when the token is an ERC-721.
 
 ## How discovery works
 

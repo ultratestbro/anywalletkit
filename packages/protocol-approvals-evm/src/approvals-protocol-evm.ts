@@ -11,7 +11,7 @@ import ApprovalsProtocol, {
 } from './approvals-protocol.js'
 import { describeApprovalActivity, type ActivityTokens } from './activity.js'
 import RpcLogsSource, { mergeCandidates, type ApprovalSource, type Candidate } from './sources/rpc-logs.js'
-import { EIP7702_PREFIX, ERC20_ABI, ERC721_ABI, PERMIT2_ABI, PERMIT2_ADDRESS } from './standards.js'
+import { EIP7702_PREFIX, ERC20_ABI, ERC721_ABI, ERC721_INTERFACE_ID, PERMIT2_ABI, PERMIT2_ADDRESS } from './standards.js'
 import StateVerifier, { approvalId } from './state-verifier.js'
 import { bigintToNumber } from '@anywalletkit/core'
 
@@ -253,6 +253,7 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
       if (typeof account.revokeDelegation !== 'function') throw new ApprovalsError('This account cannot revoke an EIP-7702 delegation (no revokeDelegation()).', 'unsupported-standard', { standard: 'eip7702' })
       return normalize(await account.revokeDelegation())
     }
+    if (approval.standard === 'erc20') await this._assertNotErc721(approval)
     // ERC-20 goes through the account's own `approve` when it has one: that is
     // the operation the policy engine governs and the path wallet modules
     // already use (USDT's reset-to-zero rule never applies to amount 0).
@@ -260,6 +261,28 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
       return normalize(await account.approve({ token: approval.token, spender: approval.spender, amount: 0n }))
     }
     return normalize(await account.sendTransaction(this.buildRevokeTransaction(approval)))
+  }
+
+  /**
+   * An `'erc20'` approval's token must not be an ERC-721: there `approve(spender, 0)` APPROVES `spender`
+   * for token #0 instead of revoking anything, and the standard on an `Approval` is whatever its source
+   * said (scan 2026-10-27 modules, F31). ERC-165 decides: `supportsInterface(0x80ac58cd)` answering
+   * true refuses the revoke (`invalid-approval`); a token that reverts or answers anything else is the
+   * ERC-20 it was reported as. A failed read sends nothing (`source-failed`).
+   */
+  private async _assertNotErc721 (approval: Approval): Promise<void> {
+    const data = encodeFunctionData({ abi: ERC721_ABI, functionName: 'supportsInterface', args: [ERC721_INTERFACE_ID] })
+    let answer: Hex | undefined
+    try {
+      answer = (await this._requireProvider().call({ to: approval.token as Address, data })).data
+    } catch (error) {
+      if (error instanceof ApprovalsError) throw error
+      if (!reverted(error)) throw new ApprovalsError(`Could not check whether ${approval.token} is an ERC-721; nothing was sent.`, 'source-failed', { token: approval.token })
+      return // no ERC-165: not an ERC-721 as far as the standard can tell
+    }
+    if (typeof answer === 'string' && /^0x0{63}1$/.test(answer)) {
+      throw new ApprovalsError(`${approval.token} is an ERC-721: approve(${approval.spender}, 0) there would approve the spender for token #0. Revoke it as an 'erc721' or 'erc721-token' approval.`, 'invalid-approval', { token: approval.token, standard: 'erc20' })
+    }
   }
 
   override async revokeAll (approvals: Approval[]): Promise<RevokeResult[]> {
@@ -274,13 +297,17 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
     // calldata is an approval of the spender to the policy engine (it is an ERC-721 grant of
     // token #0 too), so only the explicit `approve({amount: 0})` revokes a blocklisted spender.
     const explicitErc20 = typeof account.approve === 'function'
+    const results: RevokeResult[] = []
     for (const a of approvals) {
       if (a.standard === 'permit2') continue
-      if (a.standard === 'eip7702' || (a.standard === 'erc20' && explicitErc20)) items.push({ ids: [a.id], approval: a })
-      else items.push({ ids: [a.id], tx: this.buildRevokeTransaction(a), approval: a })
+      if (a.standard === 'eip7702' || (a.standard === 'erc20' && explicitErc20)) { items.push({ ids: [a.id], approval: a }); continue }
+      // Raw ERC-20 calldata may ride in a batch past `revoke()`: the ERC-721 check runs here for it.
+      if (a.standard === 'erc20') {
+        try { await this._assertNotErc721(a) } catch (error) { results.push({ ids: [a.id], error: error as Error }); continue }
+      }
+      items.push({ ids: [a.id], tx: this.buildRevokeTransaction(a), approval: a })
     }
 
-    const results: RevokeResult[] = []
     if (this._config.batch) {
       const batched = items.filter((i) => i.tx)
       if (batched.length) {
@@ -300,7 +327,7 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
 
   private async _revokeItem (item: RevokeItem): Promise<RevokeResult> {
     try {
-      if (item.approval && item.approval.standard !== 'permit2') {
+      if (!item.tx && item.approval) {
         const r = await this.revoke(item.approval)
         return { ids: item.ids, ...r }
       }
@@ -335,6 +362,16 @@ function validate (a: Approval | null | undefined): asserts a is Approval {
   if (!SUPPORTED.includes(a.standard)) throw new ApprovalsError(`Standard '${a.standard}' is not supported on evm.`, 'unsupported-standard', { standard: a.standard })
   if (a.standard !== 'eip7702' && (!isAddress(a.token) || !isAddress(a.spender))) throw new ApprovalsError('token and spender must be addresses.', 'invalid-approval', { approval: a })
   if (a.standard === 'erc721-token' && a.tokenId === undefined) throw new ApprovalsError('erc721-token approvals need a tokenId.', 'invalid-approval', { approval: a })
+}
+
+/** An `eth_call` that the contract refused (a revert), as opposed to a node or transport that did not answer. */
+function reverted (error: unknown): boolean {
+  for (let e: unknown = error, depth = 0; e && typeof e === 'object' && depth < 8; e = (e as { cause?: unknown }).cause, depth++) {
+    const { code, message, name } = e as { code?: unknown; message?: unknown; name?: unknown }
+    if (code === 3 || code === 'CALL_EXCEPTION' || name === 'ExecutionRevertedError' || name === 'ContractFunctionRevertedError') return true
+    if (typeof message === 'string' && /execution reverted|\brevert(ed)?\b|invalid opcode/i.test(message.slice(0, 500))) return true
+  }
+  return false
 }
 
 function normalize (result: SendResult | undefined): { hash: string; fee: bigint } {

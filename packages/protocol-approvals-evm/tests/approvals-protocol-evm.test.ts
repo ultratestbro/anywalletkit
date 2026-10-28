@@ -435,15 +435,18 @@ test('isRevokeCalldata recognises the revoke calldata buildRevokeTransaction emi
   assert.equal(isRevokeCalldata(setOff.data.slice(0, -2) + '02'), false)
   assert.equal(isRevokeCalldata(zero.data.slice(0, -1) + 'z'), false)
   assert.equal(isRevokeCalldata(lock.data + 'ab'.repeat(32)), false)
-  // The whole transaction: no value, no 7702 authorization, lockdown only to Permit2, optional token targets.
-  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data }), true)
-  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data, value: 1n }), false)
-  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data, authorizationList: [{}] }), false)
-  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data, type: 'eip7702' }), false)
+  // The whole transaction: no value, no 7702 authorization, lockdown only to Permit2, a target of a known
+  // standard for approve (scan 2026-10-27 modules F31: without targets approve(x, 0) is not a revoke).
+  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data }), false)
+  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data }, { targets: [{ token: USDT, standard: 'erc20' }] }), true)
+  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data, value: 1n }, { targets: [{ token: USDT, standard: 'erc20' }] }), false)
+  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data, authorizationList: [{}] }, { targets: [{ token: USDT, standard: 'erc20' }] }), false)
+  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data, type: 'eip7702' }, { targets: [{ token: USDT, standard: 'erc20' }] }), false)
   assert.equal(isRevokeTransaction({ to: PERMIT2_ADDRESS, data: lock.data }), true)
   assert.equal(isRevokeTransaction({ to: USDT, data: lock.data }), false)
   assert.equal(isRevokeTransaction({ to: USDT, data: zero.data }, { targets: [USDC] }), false)
-  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data }, { targets: [USDT.toLowerCase()] }), true)
+  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data }, { targets: new Map([[USDT.toLowerCase(), 'erc20']]) }), true)
+  assert.equal(isRevokeTransaction({ to: USDT, data: zero.data }, { targets: [USDT.toLowerCase()] }), false) // standard unknown
   assert.equal(isUnlimitedAmount(MAX_UINT256), true)
   assert.equal(isUnlimitedAmount(1n << 255n), true)
   assert.equal(isUnlimitedAmount((1n << 255n) - 1n), false)
