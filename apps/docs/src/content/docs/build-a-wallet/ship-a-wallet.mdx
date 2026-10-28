@@ -115,7 +115,9 @@ Balances, token lists and history work unchanged on top
 The app builds the same router it would build locally, but every provider is a `remoteProvider`
 pointing at your server. The engine still validates every quote and every transaction **on the
 device** before anything is signed: the server can refuse, it cannot make the app sign something
-else.
+else. That needs each provider's pins (`lifiPins`, `thorchainPins()`, `chainflipPins`…): the
+contracts its calldata may call and approve come from the app, never from the server, and a remote
+provider without pins gets no calldata route at all. The server's address must be https.
 
 <Snippet file="server/src/client.ts" region="client-swaps" />
 

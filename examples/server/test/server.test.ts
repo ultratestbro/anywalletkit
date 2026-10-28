@@ -68,7 +68,7 @@ describe('reference server (docs: Ship a wallet)', () => {
   })
 
   it('swap2 over HTTP through the real remoteProvider: sealed quote → build → track; a tampered quote is refused', async () => {
-    const client = remoteProvider({ name: 'mock', baseUrl: `${base}/swap2`, headers: { authorization: `Bearer ${TOKEN}` } })
+    const client = remoteProvider({ name: 'mock', baseUrl: `${base}/swap2`, headers: { authorization: `Bearer ${TOKEN}` }, allowInsecureBaseUrl: true }) // the local test server
     const quote = await client.getQuote(PARAMS)
     expect(quote?.providerData?.__remoteSeal).toMatch(/^[0-9a-f]{64}$/)
     expect((await client.buildDeposit(quote!)).to).toBe(QUOTE.depositAddress)

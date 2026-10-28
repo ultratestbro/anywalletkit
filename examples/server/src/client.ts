@@ -4,7 +4,11 @@ import type { IWalletAccount } from '@anywalletkit/core'
 import { Wallet } from '@anywalletkit/kit'
 import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
 import { remoteProvider } from '@anywalletkit/protocol-swap2-core/remote'
+import type { RemotePins } from '@anywalletkit/protocol-swap2-core/types'
 import { RouterSwap2Protocol } from '@anywalletkit/protocol-swap2-router'
+import { lifiPins } from '@anywalletkit/protocol-swap2-lifi/provider'
+import { thorchainPins } from '@anywalletkit/protocol-swap2-thorchain/provider'
+import { chainflipPins } from '@anywalletkit/protocol-swap2-chainflip/config'
 
 // #region client-rpc
 /** An EIP-1193 provider over the server's RPC proxy (it adds the upstream key). */
@@ -33,10 +37,20 @@ export function walletOverServer(phrase: string, api: string, token: string, fet
 // #endregion client-rpc
 
 // #region client-swaps
+/**
+ * What the app trusts for each provider on the server: the contracts its calldata may call and approve,
+ * and THORChain's check of each build against two THORNodes. A remote provider without pins gets no
+ * calldata route at all; NEAR Intents pays a deposit address and needs none.
+ */
+const PINS: Readonly<Record<string, RemotePins>> = { lifi: lifiPins, thorchain: thorchainPins(), chainflip: chainflipPins }
+
 /** The same router the app would build locally, but every provider runs on the server. */
 export function swapsOverServer(account: IWalletAccount, api: string, token: string, names = ['lifi', 'near_intents', 'thorchain', 'chainflip'], fetchImpl?: typeof fetch) {
   const remote = (name: string) => remoteProvider({
-    name, baseUrl: `${api}/swap2`, headers: { authorization: `Bearer ${token}` }, ...(fetchImpl ? { fetchImpl } : {}),
+    name, baseUrl: `${api}/swap2`, headers: { authorization: `Bearer ${token}` }, ...PINS[name],
+    // https in production; plain http only for a server on this machine (the tests).
+    ...(/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(api) ? { allowInsecureBaseUrl: true } : {}),
+    ...(fetchImpl ? { fetchImpl } : {}),
   })
   return new RouterSwap2Protocol(account, {
     fromChain: account.chain,
