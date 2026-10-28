@@ -353,6 +353,19 @@ describe('withdraw', () => {
     expect((decode(redAbi, account.sent[2]!.data)[1] as readonly number[]).map(Number)).toEqual([NOW - 9000])
     await expect(protocolFor().claimWithdrawals()).rejects.toThrow(/Nothing is claimable/)
   })
+
+  it('claimWithdrawals claims only on pinned redeem queues, as every other queue call (scan 2026-10-27 modules, F25/F26)', async () => {
+    const redeemRequests: RedeemRequestSpec[] = [{ queue: Q.usdcRedeem, timestamp: NOW - 9000, shares: E18, claimable: true, assets: 1_020_000n }]
+    // The RPC lists Q.usdcRedeem; the app pinned another redeem queue for this vault.
+    const pinnedElsewhere = stubAccount(stubProvider({ redeemRequests }))
+    const p = new MellowProtocolEvm(pinnedElsewhere, { vault: VAULT, registry: null, queues: { deposit: [Q.usdcAsync], redeem: [Q.usdtRedeem] } })
+    await expect(p.claimWithdrawals()).rejects.toThrow(/is not a redeem queue pinned for vault/)
+    expect(pinnedElsewhere.sent).toHaveLength(0)
+    // A vault without pinned queues claims nothing either.
+    const unpinned = stubAccount(stubProvider({ redeemRequests }))
+    await expect(new MellowProtocolEvm(unpinned, { vault: VAULT, registry: null }).claimWithdrawals()).rejects.toThrow(/no pinned redeem queues: pass config.queues/)
+    expect(unpinned.sent).toHaveLength(0)
+  })
 })
 
 describe('not lending', () => {

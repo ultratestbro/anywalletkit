@@ -357,7 +357,7 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
       // Discovery fires many reads at once; send them one per request — some gateways answer a batch member with empty data.
       const toTransport = (p: EvmProvider) => (typeof p === 'string' ? http(p, { batch: false }) : custom(p))
       // A list (wallet-evm's failover config) fails over in order, as the account's own client does.
-      this._client = createPublicClient({ transport: list.length === 1 ? toTransport(list[0]!) : fallback(list.map(toTransport)) })
+      this._client = createPublicClient({ transport: list.length === 1 ? toTransport(list[0]!) : fallback(list.map(toTransport)), ccipRead: false })
     }
   }
 
@@ -854,6 +854,8 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
       .map((c) => ({ ...c, timestamps: timestamps ? c.timestamps.filter((t) => timestamps.includes(t)) : c.timestamps }))
       .filter((c) => c.timestamps.length > 0)
     if (targets.length === 0) throw new Error('Nothing is claimable yet.')
+    // The redeem queues come from the RPC (queueAt): claim only on the pinned ones, as for every other queue call.
+    for (const t of targets) this._assertPinnedQueue(t.queue, false)
     const account = (await this._acct.getAddress()) as Address
     const hashes: string[] = []
     let fee = 0n
