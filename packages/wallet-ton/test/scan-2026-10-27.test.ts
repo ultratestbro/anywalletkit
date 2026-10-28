@@ -1,6 +1,10 @@
 import '../src/buffer-global.js'
 import { describe, expect, it } from 'vitest'
-import { WalletManagerTon } from '../src/index.js'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { Buffer } from 'buffer'
+import { WalletManagerTon, canonicalBocCell } from '../src/index.js'
 import { fakeRpc } from './fake-rpc.js'
 
 // 2026-10-27 key/signing scan: the exploit inputs from the report, refused before anything is signed.
@@ -49,7 +53,7 @@ const WITH_HASHES = 'te6ccgEBAQEAeQAQqgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 const JETTON_WALLET = `0:${'ee'.repeat(32)}`
 
 describe('scan 2026-10-27 G3 (F2, F4): wallet-ton signs only a body the policies could read', () => {
-  it('a bodyBoc that does not re-encode byte-for-byte (with_hashes) is refused; the canonical one is signed', async () => {
+  it('a bodyBoc whose cells store their hashes (with_hashes) is refused; the plain one is signed', async () => {
     const f = fakeRpc()
     const m = new WalletManagerTon(SEED, { tonClient: ENDPOINT, fetch: f.fetch })
     const a = await m.getAccount(0)
@@ -89,5 +93,18 @@ describe('scan 2026-10-27 G4 (F18): only strict raw or CRC-checked friendly TON 
     await a.transfer({ recipient: `0:${hex}`, amount: 1n })
     expect(f.sent).toHaveLength(1)
     m.dispose()
+  })
+
+  it('a real STON.fi jetton-swap body whose serializer orders cells differently from @ton/core is accepted', () => {
+    // Recorded live from the Omniston API on 2026-10-10: 39 cells, does not round-trip through @ton/core byte for byte.
+    const fixture = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../protocol-swap2-omniston/tests/fixtures/live-2026-10-10.json'), 'utf8')
+    const bocs = [...new Set(fixture.match(/b5ee9c72[0-9a-fA-F]{20,}/g) ?? [])]
+    expect(bocs.length).toBeGreaterThan(0)
+    for (const hex of bocs) {
+      const b64 = Buffer.from(hex, 'hex').toString('base64')
+      const cell = canonicalBocCell(b64)
+      expect(Buffer.from(cell.toBoc({ idx: false, crc32: true })).equals(Buffer.from(hex, 'hex'))).toBe(false)
+      expect(cell.beginParse().loadUint(32)).toBe(0x0f8a7ea5)
+    }
   })
 })

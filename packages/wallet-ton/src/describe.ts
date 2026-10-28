@@ -137,25 +137,64 @@ function parseTo(to: string): { to: string; bounceable: boolean; testOnly?: bool
   return { to: a.toRawString(), bounceable: true, workchain: a.workChain }
 }
 
-/** The forms @ton/core writes a BoC in (index or not, CRC or not). */
-const BOC_FORMS = [{ idx: false, crc32: true }, { idx: false, crc32: false }, { idx: true, crc32: true }, { idx: true, crc32: false }] as const
-
 /**
- * A base64 BoC as its single root Cell, only when @ton/core writes that Cell back byte-for-byte in
- * one of its forms. Anything it parses but would not write (a with_hashes cell whose hash area other
- * readers take for data, a level mask on an ordinary cell, extra roots) is refused, so every reader
- * of the string sees the cell that gets signed (scan 2026-10-27 F2, F4).
+ * A base64 BoC as its single root Cell, refused when its layout is one other readers may parse
+ * differently from @ton/core: a magic other than the generic one, more than one root, absent cells,
+ * or any cell that stores its hashes (with_hashes: @ton/core skips a hash area another reader takes
+ * for data), has a level mask, or is exotic. What remains is read the same by every reader, the
+ * kit's policy reader included, whatever order the serializer put the cells in (scan 2026-10-27
+ * F2, F4). Real provider BoCs order cells differently from @ton/core, so the bytes are not required
+ * to round-trip.
  */
 export function canonicalBocCell(b64: string, what = 'bodyBoc'): Cell {
   if (!/^[A-Za-z0-9+/_-]+={0,2}$/.test(b64)) throw new UnsafeTransactionError('non-canonical-boc', `${what} is not a base64 string.`)
   const bytes = Buffer.from(b64, 'base64')
+  const layout = plainBocLayout(bytes)
+  if (layout !== null) throw new UnsafeTransactionError('non-canonical-boc', `${what} is not a plain single-root BoC (${layout}), so what was reviewed may not be what is signed.`)
   let roots: Cell[]
   try { roots = Cell.fromBoc(bytes) } catch { throw new UnsafeTransactionError('non-canonical-boc', `${what} is not a valid BoC.`) }
-  const cell = roots.length === 1 ? roots[0]! : undefined
-  if (!cell || !BOC_FORMS.some((form) => Buffer.from(cell.toBoc(form)).equals(bytes))) {
-    throw new UnsafeTransactionError('non-canonical-boc', `${what} is not a canonical single-root BoC: its bytes do not round-trip, so what was reviewed may not be what is signed.`)
+  if (roots.length !== 1) throw new UnsafeTransactionError('non-canonical-boc', `${what} has ${roots.length} roots.`)
+  return roots[0]!
+}
+
+/** Why a BoC's layout is outside the plain subset every reader parses alike, or null when it is inside. */
+function plainBocLayout(b: Uint8Array): string | null {
+  if (b.length < 6 || b[0] !== 0xb5 || b[1] !== 0xee || b[2] !== 0x9c || b[3] !== 0x72) return 'not the generic BoC magic'
+  const flags = b[4]!
+  const size = flags & 0x07
+  const offBytes = b[5]!
+  if (size < 1 || size > 4 || offBytes < 1 || offBytes > 8) return 'bad size fields'
+  let i = 6
+  const int = (n: number): number => {
+    if (i + n > b.length) throw new RangeError('truncated')
+    let v = 0
+    for (let k = 0; k < n; k++) v = v * 256 + b[i++]!
+    return v
   }
-  return cell
+  try {
+    const cells = int(size)
+    const roots = int(size)
+    const absent = int(size)
+    int(offBytes) // total cells size
+    if (roots !== 1) return `${roots} roots`
+    if (absent !== 0) return 'absent cells'
+    i += roots * size
+    if (flags & 0x80) i += cells * offBytes // index
+    for (let c = 0; c < cells; c++) {
+      if (i + 2 > b.length) return 'truncated'
+      const d1 = b[i++]!
+      const d2 = b[i++]!
+      if (d1 & 0x10) return 'a cell stores its hashes'
+      if (d1 >> 5 !== 0) return 'a cell has a level mask'
+      if (d1 & 0x08) return 'an exotic cell'
+      if ((d1 & 0x07) > 4) return 'a cell with more than 4 refs'
+      i += Math.ceil(d2 / 2) + (d1 & 0x07) * size
+    }
+    if (i + (flags & 0x40 ? 4 : 0) !== b.length) return 'trailing or missing bytes'
+  } catch {
+    return 'truncated'
+  }
+  return null
 }
 
 /**
