@@ -1,3 +1,5 @@
+import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
+
 /**
  * Uniswap v3 deployments this module trusts. Every entry was checked on-chain
  * (2026-10-12): SwapRouter02.factory() and QuoterV2.factory() both return
@@ -48,3 +50,17 @@ export const FEE_TIERS = [100, 500, 3000, 10000] as const;
 export const HOP_SYMBOLS = ["WETH", "USDC", "USDT"] as const;
 /** SwapRouter02 recipient sentinel: "keep the output in the router" (then unwrapWETH9). */
 export const ADDRESS_THIS = "0x0000000000000000000000000000000000000002";
+
+/**
+ * The SwapRouter a Uniswap swap calls and approves on a chain (the shipped {@link UNISWAP_V3} table) —
+ * the app's pins for `remoteProvider({name: "uniswap", baseUrl, ...uniswapPins})` (scan 2026-10-27 modules, F9).
+ */
+export const uniswapPins: RemotePins = Object.freeze({
+  callTargets: (chain: string): readonly string[] => uniswapRouterFor(chain),
+  spenders: (chain: string): readonly string[] => uniswapRouterFor(chain),
+});
+function uniswapRouterFor(chain: string): readonly string[] {
+  const id = /^eip155:[0-9]+$/.test(chain) ? Number(chain.slice(7)) : NaN;
+  const d = Object.prototype.hasOwnProperty.call(UNISWAP_V3, id) ? UNISWAP_V3[id] : undefined;
+  return d ? [d.router] : [];
+}

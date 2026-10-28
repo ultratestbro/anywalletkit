@@ -55,6 +55,31 @@ describe("auction engine", () => {
   });
 });
 
+describe("remote stubs without the app's pins (scan 2026-10-27 modules, F8/F9/F16)", () => {
+  it("a remote route calling or approving an address the app did not pin is dropped with its reason; pinned and local routes stay", async () => {
+    const DIAMOND = "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE";
+    const answer = (name: string, destAmount: string) => (async (url: string, init: {body: string}) => {
+      const {params} = JSON.parse(init.body) as {params: {amountIn: string}};
+      const q = {provider: name, intentId: `${name}-1`, depositAddress: "", depositMemo: null, txRequest: {to: DIAMOND, data: "0xdeadbeef", value: "0", chainId: 1, approvalAddress: DIAMOND},
+        sourceAmount: params.amountIn, destAmount, minDestAmount: destAmount, feeUsd: 0, etaSeconds: 1, reliability: 1, validUntilMs: Date.now() + 60_000};
+      return new Response(JSON.stringify(String(url).endsWith("/quote") ? q : {}), {status: 200});
+    }) as unknown as typeof fetch;
+    const unpinned = remoteProvider({name: "unpinned", baseUrl: "https://backend.example/swap2", fetchImpl: answer("unpinned", "120")});
+    const pinned = remoteProvider({name: "pinned", baseUrl: "https://backend.example/swap2", fetchImpl: answer("pinned", "100"), callTargets: () => [DIAMOND], spenders: () => [DIAMOND]});
+    const router = new CrossChainRouter([unpinned, pinned]);
+    const best = await router.getBestQuote({sourceChain: "eip155:1", sourceToken: "USDC", destChain: "eip155:10", destToken: "USDC", amountIn: "100", destAddress: "0x1"});
+    expect(best?.provider).toBe("pinned"); // the better-priced unpinned route never wins: execution would refuse it
+    expect(router.lastRejections).toEqual([expect.stringMatching(/^unpinned: the route approves 0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE, which the app did not pin as a spender/)]);
+    // What execution sees (router.getProvider): the remote marker and the app's pins survive the router's snapshot.
+    // Dropped there, the engine took the stub for a local provider and checked its calldata against the backend's addresses.
+    expect(router.getProvider("pinned")).toMatchObject({remote: true});
+    expect(router.getProvider("pinned")!.callTargets!("eip155:1")).toEqual([DIAMOND]);
+    expect(router.getProvider("pinned")!.spenders!("eip155:1")).toEqual([DIAMOND]);
+    expect(router.getProvider("unpinned")).toMatchObject({remote: true});
+    expect(router.getProvider("unpinned")!.spenders).toBeUndefined();
+  });
+});
+
 describe("aggregator over caller-supplied providers", () => {
   it("needs exactly one of providers / router", () => {
     expect(() => new RouterSwap2Protocol(undefined, {fromChain: "eip155:1"})).toThrow(/exactly one/);

@@ -48,8 +48,11 @@ account's tokens or grants an allowance. A remote stub takes the list from the a
 never from the server:
 
 ```ts
-remoteProvider({name: "cctp", baseUrl, claimTargets: cctpClaimTargets})   // cctpClaimTargets from this package
+remoteProvider({name: "cctp", baseUrl, ...cctpPins})   // cctpPins from this package: TokenMessenger + MessageTransmitter
 ```
+
+`cctpPins` also pins the burn: the TokenMessenger is the only contract the source leg may call
+and approve. Without the pins the engine refuses the stub's EVM routes.
 
 ## What the provider does
 

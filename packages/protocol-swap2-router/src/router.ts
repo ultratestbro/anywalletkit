@@ -12,7 +12,7 @@ import type {
   RoutedQuote,
   ScoreWeights,
 } from "@anywalletkit/protocol-swap2-core/types";
-import {validQuote} from "@anywalletkit/protocol-swap2-core/validate";
+import {remotePinRefusal, validQuote} from "@anywalletkit/protocol-swap2-core/validate";
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 import {bigintToNumber} from "@anywalletkit/core";
 
@@ -137,6 +137,11 @@ export class CrossChainRouter {
       // and the server both reported "provider 'cctp' has no claim step" (2026-10-13).
       ...(provider.buildClaim ? {buildClaim: provider.buildClaim.bind(provider)} : {}),
       ...(provider.claimTargets ? {claimTargets: provider.claimTargets.bind(provider)} : {}),
+      // A remote stub's marker and the app's pins (scan 2026-10-27 modules, F8/F9/F16): dropped here, the engine took a
+      // remote provider for a local one and checked its calldata against the backend's own addresses.
+      ...(provider.remote === true ? {remote: true} : {}),
+      ...(provider.callTargets ? {callTargets: provider.callTargets.bind(provider)} : {}),
+      ...(provider.spenders ? {spenders: provider.spenders.bind(provider)} : {}),
       ...(provider.close ? {close: provider.close.bind(provider)} : {}),
       ...(provider.supportsChain ? {supportsChain: provider.supportsChain.bind(provider)} : {}),
       ...(provider.supportsChainPair ? {supportsChainPair: provider.supportsChainPair.bind(provider)} : {}),
@@ -292,10 +297,18 @@ export class CrossChainRouter {
           rejections.push(reason);
           console.warn(`swap2-router: ${reason}`);
           q = null;
-        } else if (options?.requireImmediateExecution && !(q.depositAddress.length > 0 || q.txRequest !== undefined)) {
-          // Legacy deposit-address screens cannot execute order-based quotes that
-          // require a separate build/sign/register lifecycle.
-          q = null;
+        } else {
+          // A remote stub's route that calls or approves an address the app did not pin: execution would refuse it.
+          const unpinned = remotePinRefusal(p, q, snapshot.sourceChain);
+          if (unpinned) {
+            rejections.push(unpinned);
+            console.warn(`swap2-router: ${unpinned}`);
+            q = null;
+          } else if (options?.requireImmediateExecution && !(q.depositAddress.length > 0 || q.txRequest !== undefined)) {
+            // Legacy deposit-address screens cannot execute order-based quotes that
+            // require a separate build/sign/register lifecycle.
+            q = null;
+          }
         }
       } catch (err) {
         // A failed venue sitting out silently is indistinguishable from "no

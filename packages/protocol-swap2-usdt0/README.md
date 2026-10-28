@@ -98,6 +98,13 @@ fixture (the engine executes exactly the reviewed plan, no approval).
 quote + preflight verified. No funded transfer yet (plan: 10 USDT Arbitrum →
 HyperEVM from the phone, then the status through LayerZero Scan).
 
+## Behind `remoteProvider`
+
+When the provider runs on your server, spread its pins into the app's stub:
+`remoteProvider({name: "usdt0", baseUrl, ...usdt0Pins})`. The engine then lets the EVM route call and
+approve only the USDT0 OFT (and, on Ethereum, the adapter as spender), never an address the backend names; without the pins the stub gets no
+EVM calldata route (fail closed).
+
 ## Activity
 
 `describeActivity`: `send` on the OFT → "Bridged USDT0" ("Bridged USDT" on

@@ -1,3 +1,4 @@
+import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {LIFI_SOLANA_CAIP2, lifi as lifiCfg} from "./config.js";
 import {describeLifiActivity} from "./activity.js";
 import {diamondCallMismatch} from "./calldata.js";
@@ -648,3 +649,14 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
     },
   };
 }
+
+/**
+ * The LI.FI Diamond an EVM route calls and approves on a chain (the canonical one, or the chain's own
+ * where it differs) — the app's pins for `remoteProvider({name: "lifi", baseUrl, ...lifiPins})` (scan
+ * 2026-10-27 modules, F8/F16). Extra audited targets an app configures on the provider
+ * (`trustedTransactionTargets` / `trustedApprovalAddresses`) are added on the app side too.
+ */
+export const lifiPins: RemotePins = Object.freeze({
+  callTargets: (chain: string): readonly string[] => (/^eip155:[0-9]+$/.test(chain) ? [diamondFor(chain)] : []),
+  spenders: (chain: string): readonly string[] => (/^eip155:[0-9]+$/.test(chain) ? [diamondFor(chain)] : []),
+});

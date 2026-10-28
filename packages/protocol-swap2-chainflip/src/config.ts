@@ -8,6 +8,8 @@
  * 3.4 USDT ingress fee. Sources: EVM (Ethereum, Arbitrum) and Tron in this release; Solana / Bitcoin vault swaps need an
  * instruction / OP_RETURN builder and come next. Destinations: every live chain.
  */
+import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
+
 export type CfChain = "Ethereum" | "Bitcoin" | "Arbitrum" | "Solana" | "Tron";
 
 export interface CfAsset {
@@ -79,3 +81,16 @@ export const chainflip = {
   supportsChain: (chain: string) => !!CF_CHAINS[chain],
   supports: (from: string, to: string) => CF_SOURCE_CHAINS.has(from) && !!CF_CHAINS[to] && from !== to,
 };
+
+/**
+ * The Chainflip Vault a vault swap calls and approves on an EVM chain ({@link CF_VAULTS}) — the app's
+ * pins for `remoteProvider({name: "chainflip", baseUrl, ...chainflipPins})` (scan 2026-10-27 modules, F8/F16).
+ */
+export const chainflipPins: RemotePins = Object.freeze({
+  callTargets: (chain: string): readonly string[] => chainflipVaultFor(chain),
+  spenders: (chain: string): readonly string[] => chainflipVaultFor(chain),
+});
+function chainflipVaultFor(chain: string): readonly string[] {
+  const vault = chain.startsWith("eip155:") && Object.prototype.hasOwnProperty.call(CF_VAULTS, chain) ? CF_VAULTS[chain] : undefined;
+  return vault ? [vault] : [];
+}

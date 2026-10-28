@@ -82,6 +82,13 @@ TRX: 30.
 
 The endpoint rate-limits (429); the provider retries once.
 
+## Behind `remoteProvider`
+
+When the provider runs on your server, spread its pins into the app's stub:
+`remoteProvider({name: "chainflip", baseUrl, ...chainflipPins})`. The engine then lets the EVM route call and
+approve only the Chainflip Vault in `CF_VAULTS`, never an address the backend names; without the pins the stub gets no
+EVM calldata route (fail closed).
+
 ## Config
 
 ```ts

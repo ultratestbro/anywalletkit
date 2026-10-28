@@ -1,3 +1,4 @@
+import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {createPublicClient, encodeFunctionData, getAddress, http, isAddress, pad, parseAbi, zeroHash, type Hex} from "viem";
 import {describeCctpActivity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
@@ -363,4 +364,19 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
       };
     },
   };
+}
+
+/**
+ * The TokenMessenger a CCTP burn calls and approves, and the MessageTransmitter its claim calls, per
+ * chain — the app's pins for `remoteProvider({name: "cctp", baseUrl, ...cctpPins})` (scan 2026-10-27
+ * modules, F8/F16; claims since round 3, M24).
+ */
+export const cctpPins: RemotePins & {claimTargets(chain: string): readonly string[]} = Object.freeze({
+  callTargets: (chain: string): readonly string[] => cctpMessengerFor(chain),
+  spenders: (chain: string): readonly string[] => cctpMessengerFor(chain),
+  claimTargets: cctpClaimTargets,
+});
+function cctpMessengerFor(chain: string): readonly string[] {
+  const d = Object.prototype.hasOwnProperty.call(CCTP_DOMAINS, chain) ? CCTP_DOMAINS[chain] : undefined;
+  return d ? [d.tokenMessenger] : [];
 }

@@ -46,6 +46,13 @@ const fynd = fyndProvider({
 })
 ```
 
+Behind `remoteProvider` (the API key on your server), the app wires the router pins and the
+transaction check: `remoteProvider({name: "fynd", baseUrl, ...fyndPins})`. The engine then
+accepts only the Tycho router in `FYND_CHAINS` as call target and spender, and re-runs
+`checkFyndTransaction` on the client against the app's own request (input, tokens, recipient,
+minimum, no client fee) — a backend cannot point the swap anywhere else. Without the pins the
+stub gets no route.
+
 | Option | Default | Meaning |
 |---|---|---|
 | `apiKey` | none | Hosted API key from Propeller Heads, sent as the raw `Authorization` header. |

@@ -11,6 +11,7 @@
 // Hedera (295, 30316), Mantle (5000, 30181), Morph (2818, 30322), Rootstock
 // (30, 30333), Stable (988, 30396), Tempo (4217, 30410), plus HyperCore, IOTA
 // and Stellar (non-EVM) — not wallet chains here, so not routable here.
+import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
 
 export interface Usdt0Chain {
@@ -82,3 +83,15 @@ export const usdt0 = {
     return from !== to && this.supportsChain(from) && this.supportsChain(to);
   },
 };
+
+/**
+ * The USDT0 OFT a send calls on a chain, and the adapter it approves where one locks USDT (Ethereum) —
+ * the app's pins for `remoteProvider({name: "usdt0", baseUrl, ...usdt0Pins})` (scan 2026-10-27 modules, F8/F16).
+ */
+export const usdt0Pins: RemotePins = Object.freeze({
+  callTargets: (chain: string): readonly string[] => { const c = usdt0ChainFor(chain); return c ? [c.oft] : []; },
+  spenders: (chain: string): readonly string[] => { const c = usdt0ChainFor(chain); return c?.adapter ? [c.oft] : []; },
+});
+function usdt0ChainFor(chain: string): Usdt0Chain | undefined {
+  return Object.prototype.hasOwnProperty.call(USDT0_CHAINS, chain) ? USDT0_CHAINS[chain] : undefined;
+}

@@ -1023,10 +1023,13 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // into an ERC-20 transfer(depositAddress, amount); supported non-EVM
     // sources use the account's transfer() token surface below.
     let tokenId: string | undefined;
+    // The deposit-address transfer the engine writes itself (source token, quoted amount, quoted deposit address).
+    let engineTransfer = false;
     if (!unsigned.data && !unsigned.bodyBoc && !unsigned.typedData && !serialized) {
       const src = this.sourceAsset(executionOptions);
       if (src?.contract) {
         if (this.fromChain.startsWith("eip155:")) {
+          engineTransfer = true;
           unsigned = {
             ...unsigned,
             to: src.contract,
@@ -1089,20 +1092,49 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       throw new Error("swap2: provider execution amount does not match the validated quote");
     }
 
-    // The engine binds the build to the quote; also bind what the quote's own
-    // calldata hands out. A plain ERC-20 transfer / approval / Permit2 /
-    // operator approval may only name this account, the quoted deposit
-    // address or the declared spender/target. Aggregator calldata (a LI.FI
-    // diamond, a THORChain router) is not decoded here — the provider's
-    // target allowlist and the review screen cover it.
+    // The engine binds the build to the quote; also bind what the quote's own calldata hands out
+    // (scan 2026-10-27 modules, F8/F9/F16). A token call may only move the SOURCE token, at most the
+    // swap amount, to this account, the deposit address of a deposit-address route, or a declared
+    // spender; operator and Permit2 approvals are never a swap's main call. For a remote provider the
+    // addresses come only from the app's pins (`callTargets` / `spenders`): the backend that wrote
+    // `to`, `approvalAddress` and `depositAddress` is not the authority over them. Aggregator calldata
+    // (a LI.FI diamond, a THORChain router) is not decoded here — its target is pinned, and the
+    // provider's own checks and the review screen cover what it does.
+    const remote = provider.remote === true;
+    const pins = (list: readonly string[] | undefined) => (list ?? []).filter((a) => typeof a === "string" && /^0x[0-9a-fA-F]{40}$/.test(a)).map((a) => a.toLowerCase());
+    const pinnedTargets = remote ? pins(provider.callTargets?.(this.fromChain)) : [];
+    const pinnedSpenders = remote ? pins(provider.spenders?.(this.fromChain)) : [];
+    if (remote && unsigned.approvalAddress && !pinnedSpenders.includes(unsigned.approvalAddress.toLowerCase())) {
+      throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' asks to approve ${unsigned.approvalAddress} on ${this.fromChain}, which the app did not pin as a spender (remoteProvider spenders) — refused`);
+    }
     if (unsigned.data !== undefined && this.fromChain.startsWith("eip155:")) {
       const call = decodeCall({to: unsigned.to, data: unsigned.data, value: executionValue});
       // Calldata that is not hex bytes cannot be judged: refused, not passed as a plain call (scan 2026-10-27 modules F3).
       if (call.undecodable) throw new Swap2ValidationError("swap2: quote calldata is not hex bytes — refused");
-      const named = call.transfer?.to ?? call.approval?.spender;
-      const allowed = [selfAddress, q.depositAddress, unsigned.approvalAddress, unsigned.to].filter((a): a is string => !!a).map((a) => a.toLowerCase());
-      if (named && !allowed.includes(named.toLowerCase())) {
-        throw new Swap2ValidationError(`swap2: quote calldata (${call.method}) names ${getAddress(named)}, which is not this account, the deposit address or the declared spender — refused`);
+      if (call.approval && call.approval.kind !== "erc20") {
+        throw new Swap2ValidationError(`swap2: quote calldata is ${call.approval.kind === "operator" ? "an operator approval (setApprovalForAll)" : "a Permit2 approval"} — never a swap's main call; refused`);
+      }
+      if (call.transfer || call.approval) {
+        // A token call: the token is the call's target.
+        if (!source.contract || unsigned.to.toLowerCase() !== source.contract.toLowerCase()) {
+          throw new Swap2ValidationError(`swap2: quote calldata (${call.method}) moves ${getAddress(unsigned.to)}, not the source token — refused`);
+        }
+        if (call.method === "transferFrom") throw new Swap2ValidationError("swap2: quote calldata pulls the source token with transferFrom — refused");
+        const amount = call.transfer?.amount ?? call.approval?.amount ?? null;
+        if (amount === null || amount > BigInt(q.sourceAmount)) {
+          throw new Swap2ValidationError(`swap2: quote calldata (${call.method}) covers ${amount === null ? "an unlimited amount" : amount} of the source token, more than the swap's ${q.sourceAmount} — refused`);
+        }
+        const named = (call.transfer?.to ?? call.approval!.spender).toLowerCase();
+        const allowed = engineTransfer
+          ? [q.depositAddress]
+          : remote
+            ? [selfAddress, ...pinnedTargets, ...pinnedSpenders]
+            : [selfAddress, q.depositAddress, unsigned.approvalAddress];
+        if (!allowed.filter((a): a is string => !!a).map((a) => a.toLowerCase()).includes(named)) {
+          throw new Swap2ValidationError(`swap2: quote calldata (${call.method}) names ${getAddress(named)}, which is not this account, the deposit address or ${remote ? "a spender the app pinned" : "the declared spender"} — refused`);
+        }
+      } else if (remote && !pinnedTargets.includes(unsigned.to.toLowerCase())) {
+        throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' calls ${getAddress(unsigned.to)} on ${this.fromChain}, which the app did not pin as a call target (remoteProvider callTargets) — refused`);
       }
     }
 

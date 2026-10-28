@@ -1,3 +1,4 @@
+import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {decodeFunctionData, decodeFunctionResult, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
 import {describeBalancerActivity} from "./activity.js";
 import {evmRef, isEvm, timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
@@ -287,4 +288,17 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
       }
     },
   };
+}
+
+/**
+ * The Balancer V2 Vault a swap calls and approves on the chains this provider serves — the app's pins
+ * for `remoteProvider({name: "balancer", baseUrl, ...balancerPins})` (scan 2026-10-27 modules, F8/F16).
+ */
+export const balancerPins: RemotePins = Object.freeze({
+  callTargets: (chain: string): readonly string[] => balancerVaultFor(chain),
+  spenders: (chain: string): readonly string[] => balancerVaultFor(chain),
+});
+function balancerVaultFor(chain: string): readonly string[] {
+  const id = /^eip155:[0-9]+$/.test(chain) ? Number(chain.slice(7)) : NaN;
+  return Object.prototype.hasOwnProperty.call(BALANCER_V2_CHAINS, id) ? [BALANCER_V2_VAULT] : [];
 }

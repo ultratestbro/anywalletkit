@@ -1,3 +1,4 @@
+import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {decodeFunctionResult, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
 import {describeWrapActivity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
@@ -200,3 +201,16 @@ export function wrapProvider(config: WrapProviderConfig): CrossChainProvider {
     },
   };
 }
+
+/**
+ * The wrapped-native contract a wrap / unwrap calls on a chain (no spender: neither approves) — the
+ * app's pins for `remoteProvider({name: "wrap", baseUrl, ...wrapPins})` (scan 2026-10-27 modules, F8/F16).
+ */
+export const wrapPins: RemotePins = Object.freeze({
+  callTargets: (chain: string): readonly string[] => {
+    const id = /^eip155:[0-9]+$/.test(chain) ? Number(chain.slice(7)) : NaN;
+    const w = Object.prototype.hasOwnProperty.call(WRAPPED_NATIVE, id) ? WRAPPED_NATIVE[id] : undefined;
+    return w ? [w.address] : [];
+  },
+  spenders: (): readonly string[] => [],
+});

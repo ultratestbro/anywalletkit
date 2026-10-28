@@ -1,4 +1,4 @@
-import type {Quote, QuoteParams} from "./types.js";
+import type {CrossChainProvider, Quote, QuoteParams} from "./types.js";
 
 /** Shared quote validator used by both the aggregate and single-provider paths. */
 export function validQuote(q: Quote, params: QuoteParams, provider: string): boolean {
@@ -45,4 +45,26 @@ export function validQuote(q: Quote, params: QuoteParams, provider: string): boo
   } catch {
     return false;
   }
+}
+
+/**
+ * Why a remote provider's quote cannot execute in this app, or null: its EVM transaction calls or
+ * approves an address the app did not pin (`remoteProvider` `callTargets` / `spenders`). The router
+ * and the single-provider path drop such a quote with this reason, so the auction never picks a
+ * route execution would refuse (scan 2026-10-27 modules, F8/F9/F16); execution checks the build
+ * again, in full. Local providers and deposit-address routes are not judged here.
+ */
+export function remotePinRefusal(provider: Pick<CrossChainProvider, "name" | "remote" | "callTargets" | "spenders">, q: Quote, chain: string): string | null {
+  if (provider.remote !== true || !chain.startsWith("eip155:")) return null;
+  const tx = q.txRequest;
+  if (!tx || tx.serializedTx !== undefined) return null;
+  const pinned = (list: readonly string[] | undefined, address: string) =>
+    (list ?? []).some((a) => typeof a === "string" && a.toLowerCase() === address.toLowerCase());
+  if (tx.approvalAddress && !pinned(provider.spenders?.(chain), tx.approvalAddress)) {
+    return `${provider.name}: the route approves ${tx.approvalAddress}, which the app did not pin as a spender on ${chain} (remoteProvider spenders)`;
+  }
+  if (tx.data !== undefined && tx.to && !pinned(provider.callTargets?.(chain), tx.to)) {
+    return `${provider.name}: the route calls ${tx.to}, which the app did not pin as a call target on ${chain} (remoteProvider callTargets)`;
+  }
+  return null;
 }

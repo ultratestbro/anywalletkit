@@ -43,6 +43,21 @@ export interface RemoteProviderOptions {
    * refuses claims from this stub (round 3, M24).
    */
   claimTargets?: (chain: string) => readonly string[];
+  /**
+   * The contracts this provider's EVM swaps may call, and the spenders they may be approved for,
+   * per chain — the provider package's pins (`lifiPins`, `fyndPins`, `uniswapPins`…, spread into
+   * these options). The app's lists, not the server's: without them the engine refuses this stub's
+   * EVM calldata routes and approvals, so a compromised backend cannot name its own contract or
+   * spender (scan 2026-10-27 modules, F8/F9/F16). Deposit-address routes need no pins.
+   */
+  callTargets?: (chain: string) => readonly string[];
+  spenders?: (chain: string) => readonly string[];
+  /**
+   * The provider's own check of a quote's transaction, run here on the client against the request
+   * the app sent (shipped with the pins, e.g. `fyndPins`): a quote it refuses never reaches the
+   * auction. The backend runs the same check, but the backend is what this guards against.
+   */
+  verifyQuote?: (params: QuoteParams, quote: Quote) => string | null;
   /** Defaults to globalThis.fetch — injectable for tests. */
   fetchImpl?: typeof fetch;
   /** Extra headers (e.g. auth) attached to every call. */
@@ -93,6 +108,7 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
 
   return {
     name,
+    remote: true,
     // The browser side has no dark-flag env; the backend enforces its own
     // flags — a disabled provider simply quotes null / rejects build.
     enabled: () => enabled ? enabled() : true,
@@ -105,6 +121,11 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
         // The backend forwarded the venue's own refusal — throw it so the
         // router records a REASON instead of an anonymous null.
         throw new Error(String((out as {noQuote: unknown}).noQuote).slice(0, 300));
+      }
+      if (out && opts.verifyQuote) {
+        let refusal: string | null;
+        try { refusal = opts.verifyQuote(params, out); } catch (e) { refusal = e instanceof Error ? e.message : String(e); }
+        if (refusal) throw new Error(`${name}: the quote fails this app's own check — ${refusal.slice(0, 240)}`);
       }
       return out;
     },
@@ -133,5 +154,7 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
     ...(opts.supportsChainPair ? {supportsChainPair: opts.supportsChainPair.bind(opts)} : {}),
     ...(opts.supportsSameChain !== undefined ? {supportsSameChain: opts.supportsSameChain} : {}),
     ...(opts.claimTargets ? {claimTargets: opts.claimTargets} : {}),
+    ...(opts.callTargets ? {callTargets: opts.callTargets} : {}),
+    ...(opts.spenders ? {spenders: opts.spenders} : {}),
   };
 }

@@ -32,6 +32,13 @@ Not checked: a bridge's output. The destination minimum — and for some bridges
 what finally reaches the recipient — sits in bridge-specific data, so on cross-chain routes the
 reviewed minimum relies on LI.FI's API (or your `apiUrl` proxy) answering honestly.
 
+## Behind `remoteProvider`
+
+When the provider runs on your server, spread its pins into the app's stub:
+`remoteProvider({name: "lifi", baseUrl, ...lifiPins})`. The engine then lets the EVM route call and
+approve only the LI.FI Diamond of that chain, never an address the backend names; without the pins the stub gets no
+EVM calldata route (fail closed).
+
 ## Activity
 
 `describeActivity(tx, ctx)` recognizes any call into the LI.FI Diamond on an

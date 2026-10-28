@@ -183,6 +183,23 @@ export interface UnsignedTx {
 }
 
 /**
+ * The contracts a provider's EVM swaps call and approve on a chain, shipped by the provider package
+ * (`lifiPins`, `fyndPins`, `uniswapPins`…) and handed to `remoteProvider({...pins})`: a backend's
+ * build is checked against the app's addresses, never against its own (scan 2026-10-27 modules,
+ * F8/F9/F16). An empty list means the provider has no EVM calldata route on that chain.
+ */
+export interface RemotePins {
+  callTargets(chain: string): readonly string[];
+  spenders(chain: string): readonly string[];
+  /**
+   * A client-side check of a remote quote's transaction against the user's own request — the
+   * provider's local validator run again on this side (Fynd: `checkFyndTransaction`): the reason it
+   * fails, or null.
+   */
+  verifyQuote?(params: QuoteParams, quote: Quote): string | null;
+}
+
+/**
  * Pluggable cross-chain provider. Adding a provider is "add a module"; the rest
  * of the app references only this interface (never a specific provider).
  */
@@ -227,6 +244,17 @@ export interface CrossChainProvider {
    * app's list, never the server's.
    */
   claimTargets?(chain: string): readonly string[];
+  /**
+   * Set by `remoteProvider`: the quotes and builds come from a backend, not from code the app
+   * ships. The engine then takes the addresses an EVM transaction may call or approve only from
+   * {@link callTargets} / {@link spenders} — the app's pins — and refuses a calldata route or an
+   * approval it has no pin for (scan 2026-10-27 modules, F8/F9/F16).
+   */
+  readonly remote?: boolean;
+  /** Remote stubs: the contracts this provider's EVM swaps may call on `chain` (the app's list, e.g. `lifiPins`). */
+  callTargets?(chain: string): readonly string[];
+  /** Remote stubs: the spenders this provider's EVM swaps may be approved for on `chain` (the app's list). */
+  spenders?(chain: string): readonly string[];
   close?(): void;
   /** Optional discovery hook for custom providers. */
   supportsChain?(caip2: string): boolean;

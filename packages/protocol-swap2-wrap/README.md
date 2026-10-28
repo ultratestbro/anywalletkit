@@ -16,6 +16,13 @@ npm install @anywalletkit/protocol-swap2-wrap @anywalletkit/core
 
 On npm: [@anywalletkit/protocol-swap2-wrap](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-wrap), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
+## Behind `remoteProvider`
+
+When the provider runs on your server, spread its pins into the app's stub:
+`remoteProvider({name: "wrap", baseUrl, ...wrapPins})`. The engine then lets the EVM route call and
+approve only the wrapped-native contract (no spender), never an address the backend names; without the pins the stub gets no
+EVM calldata route (fail closed).
+
 ## Activity
 
 `describeActivity(tx, ctx)` recognizes calls to the chain's wrapper (the

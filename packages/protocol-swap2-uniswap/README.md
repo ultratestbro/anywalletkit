@@ -16,6 +16,13 @@ npm install @anywalletkit/protocol-swap2-uniswap @anywalletkit/core
 
 On npm: [@anywalletkit/protocol-swap2-uniswap](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-uniswap), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
+## Behind `remoteProvider`
+
+When the provider runs on your server, spread its pins into the app's stub:
+`remoteProvider({name: "uniswap", baseUrl, ...uniswapPins})`. The engine then lets the EVM route call and
+approve only the SwapRouter in `UNISWAP_V3`, never an address the backend names; without the pins the stub gets no
+EVM calldata route (fail closed).
+
 ## Activity
 
 `describeActivity(tx, ctx)` recognizes a call into the chain's SwapRouter02

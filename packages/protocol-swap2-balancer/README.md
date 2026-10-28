@@ -17,6 +17,13 @@ npm install @anywalletkit/protocol-swap2-balancer @anywalletkit/core
 
 On npm: [@anywalletkit/protocol-swap2-balancer](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-balancer), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
+## Behind `remoteProvider`
+
+When the provider runs on your server, spread its pins into the app's stub:
+`remoteProvider({name: "balancer", baseUrl, ...balancerPins})`. The engine then lets the EVM route call and
+approve only the Balancer V2 Vault, never an address the backend names; without the pins the stub gets no
+EVM calldata route (fail closed).
+
 ## Activity
 
 `describeActivity(tx, ctx)` recognizes `batchSwap` `0x945bcec9` and `swap`

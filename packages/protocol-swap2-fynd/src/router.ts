@@ -8,6 +8,8 @@
  * fee. The route inside `swaps` is opaque and is not inspected here — the
  * router itself reverts below `minAmountOut`.
  */
+import type {Quote, QuoteParams, RemotePins} from "@anywalletkit/protocol-swap2-core/types";
+import {sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import {decodeFunctionData, getAddress, parseAbi, toFunctionSelector, type Hex} from "viem";
 
 /** Router registry: github.com/propeller-heads/tycho crates/tycho-execution/config/deployment_registry.json (TychoRouterV3, effective 2026-09-01). */
@@ -124,4 +126,48 @@ export function checkFyndTransaction(tx: EncodedTx, expected: ExpectedSwap): {me
   }
   if (swaps === "0x" || (isSplit && (a[5] as bigint) < 2n)) throw new FyndTransactionError("empty or invalid route");
   return {method: call.functionName};
+}
+
+/**
+ * {@link checkFyndTransaction} on a remote quote, against the request this app sent: the pinned
+ * router, the exact input, the requested tokens, the app's recipient, the quoted minimum and no
+ * client fee. The reason it fails, or null.
+ */
+export function fyndVerifyQuote(params: QuoteParams, quote: Quote): string | null {
+  try {
+    const chainId = /^eip155:[0-9]+$/.test(params.sourceChain) ? Number(params.sourceChain.slice(7)) : NaN;
+    const src = sourceAssetOf(params);
+    if (!src) return `unknown source token ${params.sourceToken}`;
+    const tx = quote.txRequest;
+    if (!tx?.to || !tx.data) return "the quote carries no router transaction";
+    checkFyndTransaction({to: tx.to, data: tx.data, value: BigInt(tx.value ?? "0")}, {
+      chainId,
+      tokenIn: src.contract ? getAddress(src.contract) : ZERO,
+      tokenOut: /^0x0+$/.test(params.destToken) ? ZERO : getAddress(params.destToken),
+      amountIn: BigInt(params.amountIn),
+      receiver: getAddress(params.destAddress),
+      expectedAmountOut: BigInt(quote.providerData?.gross ?? "0"),
+      minAmountOut: BigInt(quote.minDestAmount),
+    });
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message.replace(/^fynd: /, "") : String(e);
+  }
+}
+
+/**
+ * The Tycho router a Fynd swap calls and approves on a chain, and {@link fyndVerifyQuote} — the
+ * app's side of `remoteProvider({name: "fynd", baseUrl, ...fyndPins})`, so a backend's quote is
+ * checked against these routers and the app's own request, never against itself (scan 2026-10-27
+ * modules, F9).
+ */
+export const fyndPins: RemotePins = Object.freeze({
+  callTargets: (chain: string): readonly string[] => fyndRouterFor(chain),
+  spenders: (chain: string): readonly string[] => fyndRouterFor(chain),
+  verifyQuote: fyndVerifyQuote,
+});
+function fyndRouterFor(chain: string): readonly string[] {
+  const id = /^eip155:[0-9]+$/.test(chain) ? Number(chain.slice(7)) : NaN;
+  const c = Object.prototype.hasOwnProperty.call(FYND_CHAINS, id) ? FYND_CHAINS[id] : undefined;
+  return c ? [c.router] : [];
 }
