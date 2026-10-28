@@ -219,6 +219,12 @@ export interface MellowProtocolConfig {
   referral?: string
   /** How many redeem requests to read per queue (default 50). */
   maxRedeemRequests?: number
+  /**
+   * The deposit / redeem queues money may go to (scan 2026-10-27 modules, F25/F26). Required for a custom `vault`;
+   * a preset ships its own list (`MELLOW_ADDRESS_MAP[...].queues`) and these addresses are added to it — a queue
+   * Mellow adds after a release, say. A queue the RPC names that is not pinned is refused before any approval.
+   */
+  queues?: { deposit?: readonly string[]; redeem?: readonly string[] }
 }
 
 // ---- helpers ----
@@ -297,6 +303,7 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
   private readonly _instant: boolean
   private readonly _referral: Address
   private readonly _maxRedeemRequests: number
+  private readonly _queues: { deposit: ReadonlySet<string> | null; redeem: ReadonlySet<string> | null }
   private readonly _client: PublicClient | undefined
   private _vaultData: VaultData | null = null
 
@@ -322,6 +329,18 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
     this.vault = getAddress(vault)
     this._chainId = chainId
     this._preset = preset ?? null
+    const pinned = (shipped: readonly string[] | undefined, extra: readonly string[] | undefined): ReadonlySet<string> | null => {
+      if (!shipped && !extra) return null
+      const set = new Set<string>()
+      for (const q of [...(shipped ?? []), ...(extra ?? [])]) {
+        if (!isAddress(q)) throw new Error(`Mellow queue '${q}' is not an address.`)
+        set.add(q.toLowerCase())
+      }
+      return set
+    }
+    // A custom vault's queues come from the caller; a preset's from the package (verified on chain 2026-10-28).
+    const ownPreset = preset && (!config.vault || config.vault.toLowerCase() === preset.vault.toLowerCase()) ? preset : undefined
+    this._queues = { deposit: pinned(ownPreset?.queues?.deposit, config.queues?.deposit), redeem: pinned(ownPreset?.queues?.redeem, config.queues?.redeem) }
     this._registry = config.registry === undefined ? DEFAULT_REGISTRY : config.registry
     this._instant = config.instant ?? true
     const referral = config.referral ?? zeroAddress
@@ -486,10 +505,24 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
   }
 
   /**
+   * The queue must be one the package or the caller pinned, never only one the RPC names (scan 2026-10-27 modules,
+   * F25/F26): `queueAt` and `hasQueue` both come from the same RPC, which a user-added or tampered endpoint controls.
+   */
+  private _assertPinnedQueue(queue: string, wantDeposit: boolean): void {
+    const kind = wantDeposit ? 'deposit' : 'redeem'
+    const pinned = wantDeposit ? this._queues.deposit : this._queues.redeem
+    if (!pinned) throw new Error(`Vault ${this.vault} has no pinned ${kind} queues: pass config.queues with the ${kind} queue addresses you expect.`)
+    if (!pinned.has(queue.toLowerCase())) {
+      throw new Error(`Queue ${queue} is not a ${kind} queue pinned for vault ${this.vault} (the preset's shipped list or config.queues) — refused. A queue Mellow added since needs a package update or config.queues.`)
+    }
+  }
+
+  /**
    * Re-checks a queue against the vault right before money touches it:
    * it must be the vault's own, of the wanted direction, and not paused.
    */
   private async _verifyQueue(queue: string, wantDeposit: boolean): Promise<void> {
+    this._assertPinnedQueue(queue, wantDeposit)
     const client = this._requireProvider()
     const vault = this.vault as Address
     const q = queue as Address
@@ -713,6 +746,7 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
     const asset = await this._asset(token)
     const q = asset.depositQueues.find((x) => x.kind === 'async')
     if (!q) throw new Error('No asynchronous deposit queue for this asset.')
+    this._assertPinnedQueue(q.address, true)
     const account = (await this._acct.getAddress()) as Address
     const [, openAssets] = await this._requireProvider().readContract({ address: q.address as Address, abi: DEPOSIT_QUEUE_ABI, functionName: 'requestOf', args: [account] })
     if (BigInt(openAssets) === 0n) throw new Error('No open deposit request to cancel.')
@@ -728,6 +762,7 @@ export default class MellowProtocolEvm extends LendingProtocol<MellowProtocolCon
     const asset = await this._asset(token)
     const q = asset.depositQueues.find((x) => x.kind === 'async')
     if (!q) throw new Error('No asynchronous deposit queue for this asset.')
+    this._assertPinnedQueue(q.address, true)
     const account = (await this._acct.getAddress()) as Address
     return await this._send({ to: q.address, data: encodeFunctionData({ abi: DEPOSIT_QUEUE_ABI, functionName: 'claim', args: [account] }), value: 0n })
   }

@@ -10,7 +10,11 @@ export interface MellowVaultPreset {
   shareSymbol: string
   /** The TokenizedShareManager, i.e. the ERC-20 share token (read from `vault.shareManager()`). */
   shareManager?: string
-  /** Deposit / redeem queues the vault listed when the preset was last verified. Used only to recognize past transactions offline (`describeActivity`); writes always discover queues on-chain. */
+  /**
+   * Deposit / redeem queues the vault listed when the preset was last verified (2026-10-28: identical to the chain).
+   * Writes go only to these (scan 2026-10-27 modules, F25/F26) — the RPC's `queueAt` picks among them, never beyond —
+   * and `describeActivity` recognizes past transactions by them.
+   */
   queues?: { deposit: string[]; redeem: string[] }
   /** Caveats known at the time the preset was added. */
   note?: string
@@ -20,7 +24,8 @@ export interface MellowVaultPreset {
  * Known Core Vaults by chain id and key. Presets are a convenience: any vault
  * on the same contracts works by passing its address as `vault`.
  * Addresses verified against the on-chain vault getters on 2026-09-07;
- * `shareManager` and `queues` read from the same getters on 2026-10-14.
+ * `shareManager` and `queues` read from the same getters on 2026-10-14, queues
+ * re-checked on 2026-10-28 (every preset: no queue added or gone).
  */
 export const MELLOW_ADDRESS_MAP: Record<number, Record<string, MellowVaultPreset>> = {
   1: {

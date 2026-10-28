@@ -57,10 +57,16 @@ Fees (in shares, read from the vault's FeeManager): deposit, redeem,
 performance and a yearly protocol fee. Lido EarnETH today: 15 % performance,
 0.2 %/yr protocol, no deposit / redeem fee.
 
-Nothing is configured by hand: the vault reports its share manager, oracle,
-fee manager, assets and queues on-chain, and the module classifies each queue
-by the methods it answers (an async deposit queue has `requestOf`, a redeem
-queue has `requestsOf`; signature-based queues are skipped).
+Nothing is configured by hand for a preset: the vault reports its share manager,
+oracle, fee manager, assets and queues on-chain, and the module classifies each
+queue by the methods it answers (an async deposit queue has `requestOf`, a
+redeem queue has `requestsOf`; signature-based queues are skipped). Money only
+goes to a queue the package pins, though: the preset's shipped `queues`
+(re-checked against the chain on 2026-10-28). The RPC's `queueAt` picks among
+them and is never the authority — a user-added or tampered RPC naming its own
+queue is refused before any approval. A custom `vault` takes the expected
+queue addresses in `queues: {deposit, redeem}`, and the same option admits a
+queue Mellow adds before the package catches up.
 
 ## Usage
 
