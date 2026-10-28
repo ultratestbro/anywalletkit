@@ -34,6 +34,12 @@ Every route is fail-closed until its allowlists and validators are configured:
   wallets, pTON wallet ownership and DeDust pool pairs on chain.
   `tonSwapPayloadCheck: "report"` traces `ton-swap-payload <reason>` instead
   of refusing (default `"enforce"`).
+  Behind `remoteProvider`, the app checks the built swap itself:
+  `remoteProvider({name: "omniston", baseUrl, verifyBuild: omnistonVerifyBuild({validateTonSwapTarget,
+  validateTonSwapLeg})})` opens the body with `checkTonSwapPayload` against the app's own request
+  (receiver, refund, on-chain minimum, input; the quote carries `routeSteps`) and asks the app's
+  validators about the DEX it pays. Without `verifyBuild` the engine refuses remote cell bodies; a
+  TON → EVM escrow body cannot be checked on the client and is refused by this helper.
 - **TON → EVM** (HTLC order, the wallet pays a jetton escrow): factory
   allowlisted on both chains, `validateTonJettonWallet`,
   `validateTonEscrowPayload`, `validateEvmOutputPosition`.

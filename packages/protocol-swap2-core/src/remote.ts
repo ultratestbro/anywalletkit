@@ -62,7 +62,7 @@ export interface RemoteProviderOptions {
    * The provider's own check of a build on the client — a typed order, a cell body — against the quote it was built
    * for: the reason it fails, or null. A build it refuses is never approved or signed.
    */
-  verifyBuild?: (quote: Quote, tx: UnsignedTx) => string | null;
+  verifyBuild?: (quote: Quote, tx: UnsignedTx, params?: QuoteParams) => string | null | Promise<string | null>;
   /**
    * Allow a non-https absolute `baseUrl` (local development only). Quotes, builds and typed orders travel this
    * channel; over plain http anyone on the path can rewrite them (scan 2026-10-27 modules, F4).
@@ -99,6 +99,14 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
     throw new Error("swap2-remote: timeoutMs must be an integer between 1 and 60000");
   }
 
+  // The request each quote answered, for verifyBuild (the build only carries the quote). Bounded: a stub quotes often.
+  const requests = new Map<string, QuoteParams>();
+  const remember = (intentId: string, params: QuoteParams) => {
+    requests.delete(intentId);
+    requests.set(intentId, params);
+    if (requests.size > 64) requests.delete(requests.keys().next().value!);
+  };
+
   async function call<T>(action: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
     const timeout = timeoutSignal(timeoutMs);
     const requestSignal = signal ? anySignal([signal, timeout]) : timeout;
@@ -123,6 +131,7 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
   return {
     name,
     remote: true,
+    ...(opts.verifyBuild ? {verifiesBuilds: true} : {}),
     // The browser side has no dark-flag env; the backend enforces its own
     // flags — a disabled provider simply quotes null / rejects build.
     enabled: () => enabled ? enabled() : true,
@@ -136,6 +145,7 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
         // router records a REASON instead of an anonymous null.
         throw new Error(String((out as {noQuote: unknown}).noQuote).slice(0, 300));
       }
+      if (out && typeof out === "object" && typeof out.intentId === "string") remember(out.intentId, params);
       if (out && opts.verifyQuote) {
         let refusal: string | null;
         try { refusal = opts.verifyQuote(params, out); } catch (e) { refusal = e instanceof Error ? e.message : String(e); }
@@ -147,7 +157,7 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
       const tx = await call<UnsignedTx>("build", {quote});
       if (opts.verifyBuild) {
         let refusal: string | null;
-        try { refusal = opts.verifyBuild(quote, tx); } catch (e) { refusal = e instanceof Error ? e.message : String(e); }
+        try { refusal = await opts.verifyBuild(quote, tx, requests.get(quote.intentId)); } catch (e) { refusal = e instanceof Error ? e.message : String(e); }
         if (refusal) throw new Error(`${name}: the build fails this app's own check — ${refusal.slice(0, 240)}`);
       }
       return tx;

@@ -44,6 +44,7 @@ import {
   decodeVault, decodeReserve, decodeObligation, vaultTokensPerShareWad, debtNow, farmUserState, plumbing, associatedTokenAddress,
 } from '@anywalletkit/protocol-lending-kamino-solana'
 import { unexpectedInstruction } from '@anywalletkit/wallet-solana'
+import { tonRawAddress } from '@anywalletkit/protocol-swap2-core'
 import ApprovalsProtocolEvm, { isRevokeCalldata, isUnlimitedAmount } from '@anywalletkit/protocol-approvals-evm'
 
 type Check = (what: string, ok: boolean, detail?: string) => void
@@ -224,6 +225,8 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const wsolAta = associatedTokenAddress('HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk', 'So11111111111111111111111111111111111111112', TOKEN)
   const rules = plumbing('HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk', wsolAta)
   const sync = (account: string, data: Uint8Array) => unexpectedInstruction({ instructions: [{ programAddressIndex: 0, accountIndices: [1], data }] }, [{ address: TOKEN }, { address: account }], rules)
+  // swap2 TON cell-body gate (scan 2026-10-27 modules, G5): friendly/raw TON addresses compared without Buffer or @ton/core (base64 + CRC16 by hand).
+  check('swap2: tonRawAddress (friendly, raw, bad checksum)', tonRawAddress('UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq') === tonRawAddress('EQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fVtv') && tonRawAddress('UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq') === '0:9b5c9d7e1ddfc2cb202ddd33608ab71db8d227e501f9763d7f2c1373fffcb87d' && tonRawAddress('UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQab') === null)
   check('wallet-solana: instruction rules (SyncNative on our wSOL only)', sync(wsolAta, Uint8Array.of(0x11)) === undefined && sync('Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS', Uint8Array.of(0x11))?.index === 0 && sync(wsolAta, Uint8Array.of(0x03))?.index === 0)
 
   // approvals

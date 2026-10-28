@@ -39,6 +39,7 @@ import {
   type CcChain,
 } from "@anywalletkit/swap2-assets";
 import type {CrossChainProvider, IntentStatus, QuoteParams, Quote, UnsignedTx} from "../types.js";
+import {tonRawAddress} from "../util.js";
 import {
   Swap2ConfigurationError,
   Swap2ExecutionError,
@@ -258,6 +259,12 @@ export interface Swap2EngineConfig extends Swap2ProtocolConfig {
    */
   serializedNativeAllowance?: bigint | number | string;
   /**
+   * The most nanoTON a TON cell-body deposit may attach as gas: on top of the input for a native source, the whole
+   * attached value for a jetton source (default 1 TON; live Omniston swaps attach 0.1–0.4). A build attaching more is
+   * refused (scan 2026-10-27 modules, F7).
+   */
+  tonGasCeiling?: bigint | number | string;
+  /**
    * Review gate: called once the live quote is built and every payload/value
    * check has passed, BEFORE any approval or signature. It receives a copy of
    * exactly what will be signed; throwing (the user cancelled) aborts with
@@ -277,6 +284,13 @@ export interface Swap2EngineConfig extends Swap2ProtocolConfig {
    * judge their price, so show the user the amounts.
    */
   allowUnlistedTokens?: boolean;
+}
+
+/** What a TON cell body does, as the engine read it before signing (scan 2026-10-27 modules, F13): its op, and the jetton transfer it is. */
+export interface TonBodySummary {
+  op: number | null;
+  /** TEP-74 transfer from the account's own jetton wallet: amount, where it goes, where the excess returns, the TON forwarded. */
+  jettonTransfer?: {amount: bigint; destination: string | null; responseDestination: string | null; forwardTon: bigint};
 }
 
 /** What `swap2()` is about to sign, handed to {@link Swap2EngineConfig.reviewExecution}. */
@@ -303,7 +317,7 @@ export interface Swap2ExecutionPlan {
   requoted?: true;
   /** The source leg exactly as the account will receive it. */
   source:
-    | {kind: "call"; to: string; data?: string; value: bigint; chainId?: number; gasLimit?: bigint; memo?: string; memoEncoding?: "utf8" | "hex"; cellBody?: boolean}
+    | {kind: "call"; to: string; data?: string; value: bigint; chainId?: number; gasLimit?: bigint; memo?: string; memoEncoding?: "utf8" | "hex"; cellBody?: boolean; cellBodyDecoded?: TonBodySummary}
     | {kind: "token-transfer"; token: string; recipient: string; amount: bigint; memo?: string; memoEncoding?: "utf8" | "hex"}
     | {kind: "serialized"; serializedTx: string}
     | {kind: "typed-order"; typedData: string};
@@ -325,6 +339,29 @@ export interface SerializedExecutionExpectation {
 }
 
 const DEFAULT_SERIALIZED_NATIVE_ALLOWANCE = 20_000_000n;
+const DEFAULT_TON_GAS_CEILING = 1_000_000_000n;
+const JETTON_TRANSFER_OP = 0x0f8a7ea5;
+
+/** A TON cell body read as a TEP-74 jetton transfer, duck-typed over the Cell `decodeTonBody` returned (@ton/core); null when it is not one. */
+function readTonBody(cell: unknown): TonBodySummary {
+  type Slice = {loadUint(n: number): number; loadUintBig(n: number): bigint; loadCoins(): bigint; loadAddress(): unknown; loadMaybeAddress(): unknown; loadMaybeRef(): unknown};
+  let s: Slice;
+  try { s = (cell as {beginParse(): Slice}).beginParse(); } catch { return {op: null}; }
+  let op: number;
+  try { op = s.loadUint(32); } catch { return {op: null}; }
+  if (op !== JETTON_TRANSFER_OP) return {op};
+  try {
+    s.loadUintBig(64); // query_id
+    const amount = s.loadCoins();
+    const destination = tonRawAddress(s.loadAddress());
+    const response = s.loadMaybeAddress();
+    s.loadMaybeRef(); // custom_payload
+    const forwardTon = s.loadCoins();
+    return {op, jettonTransfer: {amount, destination, responseDestination: response == null ? null : tonRawAddress(response), forwardTon}};
+  } catch {
+    return {op};
+  }
+}
 
 /**
  * A bound wallet account, accepted opaquely: the write surface we need is
@@ -360,6 +397,8 @@ interface Swap2Signer {
     memoEncoding?: "utf8" | "hex";
   }) => Promise<{hash?: string}>;
   signTypedData?: (args: {domain: unknown; types: unknown; primaryType?: string; message: unknown}) => Promise<string>;
+  /** TON: this account's jetton wallet for a jetton master — a jetton-source cell body must be sent to it. */
+  getJettonWalletAddress?: (token: string) => Promise<unknown>;
   /**
    * Execute a provider-built transaction the account cannot rebuild (a swap
    * aggregator's serialized Solana tx). The account owns the proof: it must
@@ -1125,6 +1164,38 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       throw new Error("swap2: provider execution amount does not match the validated quote");
     }
 
+    // A TON cell body is bound like every other build (scan 2026-10-27 modules, F7/F13/F18/F19): the TON it attaches is
+    // the input (native source) plus gas up to `tonGasCeiling`; a jetton source's body is a TEP-74 transfer of exactly
+    // the input from this account's own jetton wallet, its excess returning here. A remote stub's cell body also needs
+    // the app's own validator (`remoteProvider` `verifyBuild`, e.g. Omniston's `omnistonVerifyBuild`).
+    let tonBody: TonBodySummary | undefined;
+    if (cellBody !== undefined) {
+      const refuse = (why: string): never => { throw new Swap2ValidationError(`swap2: TON cell-body build refused — ${why}`); };
+      const raw = (this._config as Swap2EngineConfig).tonGasCeiling;
+      const ceiling = raw === undefined ? DEFAULT_TON_GAS_CEILING : BigInt(raw);
+      if (ceiling < 0n) throw new Swap2ConfigurationError("swap2: tonGasCeiling must be non-negative");
+      if (provider.remote === true && provider.verifiesBuilds !== true) refuse("a remote provider's cell body needs the app's own validator (remoteProvider verifyBuild)");
+      tonBody = readTonBody(cellBody);
+      const input = BigInt(q.sourceAmount);
+      if (source.contract) {
+        if (executionValue > ceiling) refuse(`it attaches ${executionValue} nanoTON to a jetton transfer, more than the ${ceiling} gas ceiling`);
+        const t = tonBody.jettonTransfer;
+        if (!t) refuse("a jetton-source body must be a jetton transfer");
+        if (t!.amount !== input) refuse(`the jetton transfer moves ${t!.amount}, not the swap's ${input}`);
+        if (!t!.responseDestination || t!.responseDestination !== tonRawAddress(selfAddress)) refuse("the jetton transfer returns its excess to another wallet");
+        if (t!.forwardTon >= executionValue) refuse("the jetton transfer forwards more TON than the message carries");
+        const own = typeof signer.getJettonWalletAddress === "function" ? tonRawAddress(await signer.getJettonWalletAddress(source.contract)) : null;
+        if (!own) refuse("the account cannot name its own jetton wallet (getJettonWalletAddress), so the target cannot be checked");
+        if (tonRawAddress(unsigned.to) !== own) refuse(`it is sent to ${unsigned.to}, not this account's ${source.symbol ?? "source"} jetton wallet`);
+      } else {
+        if (executionValue < input || executionValue - input > ceiling) refuse(`it attaches ${executionValue} nanoTON for a ${input} input, more than the ${ceiling} gas ceiling on top`);
+        // A remote native-source body goes to a contract the app pinned, when it pins any (DEX pools are too many to
+        // pin: then the app's verifyBuild, required above, checks the target).
+        const pinned = provider.remote === true ? [...(provider.callTargets?.(this.fromChain) ?? []), ...(q.depositAddress ? [q.depositAddress] : [])].map(tonRawAddress).filter((a): a is string => !!a) : [];
+        if (pinned.length && !pinned.includes(tonRawAddress(unsigned.to) ?? "")) refuse(`remote provider '${q.provider}' sends it to ${unsigned.to}, which the app did not pin (remoteProvider callTargets)`);
+      }
+    }
+
     // The engine binds the build to the quote; also bind what the quote's own calldata hands out
     // (scan 2026-10-27 modules, F8/F9/F16). A token call may only move the SOURCE token, at most the
     // swap amount, to this account, the deposit address of a deposit-address route, or a declared
@@ -1257,7 +1328,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
                   ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
                   ...(unsigned.gasLimit ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
                   ...(unsigned.memo ? {memo: unsigned.memo, ...(unsigned.memoEncoding ? {memoEncoding: unsigned.memoEncoding} : {})} : {}),
-                  ...(cellBody !== undefined ? {cellBody: true} : {}),
+                  ...(cellBody !== undefined ? {cellBody: true, ...(tonBody ? {cellBodyDecoded: tonBody} : {})} : {}),
                 },
       };
       const previous = carried?.reviewed;

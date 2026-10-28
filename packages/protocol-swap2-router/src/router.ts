@@ -140,6 +140,7 @@ export class CrossChainRouter {
       // A remote stub's marker and the app's pins (scan 2026-10-27 modules, F8/F9/F16): dropped here, the engine took a
       // remote provider for a local one and checked its calldata against the backend's own addresses.
       ...(provider.remote === true ? {remote: true} : {}),
+      ...(provider.verifiesBuilds === true ? {verifiesBuilds: true} : {}),
       ...(provider.callTargets ? {callTargets: provider.callTargets.bind(provider)} : {}),
       ...(provider.spenders ? {spenders: provider.spenders.bind(provider)} : {}),
       ...(provider.close ? {close: provider.close.bind(provider)} : {}),

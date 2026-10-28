@@ -198,7 +198,7 @@ export interface RemotePins {
    */
   verifyQuote?(params: QuoteParams, quote: Quote): string | null;
   /** A client-side check of a remote build (typed order, cell body) against its quote: the reason it fails, or null. */
-  verifyBuild?(quote: Quote, tx: UnsignedTx): string | null;
+  verifyBuild?(quote: Quote, tx: UnsignedTx, params?: QuoteParams): string | null | Promise<string | null>;
 }
 
 /**
@@ -253,6 +253,8 @@ export interface CrossChainProvider {
    * approval it has no pin for (scan 2026-10-27 modules, F8/F9/F16).
    */
   readonly remote?: boolean;
+  /** Set by `remoteProvider` when the app gave it `verifyBuild`: its builds are checked on the client. */
+  readonly verifiesBuilds?: boolean;
   /** Remote stubs: the contracts this provider's EVM swaps may call on `chain` (the app's list, e.g. `lifiPins`). */
   callTargets?(chain: string): readonly string[];
   /** Remote stubs: the spenders this provider's EVM swaps may be approved for on `chain` (the app's list). */

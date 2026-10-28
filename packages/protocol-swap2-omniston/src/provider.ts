@@ -1312,6 +1312,15 @@ function validSwapSettlement(q: OmnistonQuote): boolean {
 }
 
 /** Every DEX protocol name the quote's routes touch, deduplicated. */
+/** The route as `checkTonSwapPayload` takes it: one step per hop of a single route; splits and multi-route answers named, not resolved. */
+function swapSteps(v: SwapSettlement): Array<{protocol: string; inputJetton: string | null | undefined; outputJetton: string | null | undefined}> {
+  if (v.routes.length !== 1) return [{protocol: `${v.routes.length}-routes`, inputJetton: undefined, outputJetton: undefined}];
+  return v.routes[0]!.steps.map((step) => {
+    if (step.chunks.length !== 1) return {protocol: `split(${step.chunks.map((c) => c.protocol).join("|")})`, inputJetton: undefined, outputJetton: undefined};
+    return {protocol: step.chunks[0]!.protocol, inputJetton: stepJetton(step.inputAsset), outputJetton: stepJetton(step.outputAsset)};
+  });
+}
+
 function swapProtocols(v: SwapSettlement): string[] {
   const names = new Set<string>();
   for (const route of v.routes) for (const step of route.steps) for (const chunk of step.chunks) names.add(chunk.protocol);
@@ -1551,6 +1560,66 @@ function mapOrderStatus(order: OrderSnapshot): IntentStatus {
 export function omnistonPins(trustedEvmOrderProtocols: Readonly<Record<string, readonly string[]>>): RemotePins {
   const byChain = new Map(Object.entries(trustedEvmOrderProtocols).map(([chain, list]): [string, readonly string[]] => [chain, list.map((a) => getAddress(a))]));
   return Object.freeze({callTargets: (): readonly string[] => [], spenders: (chain: string): readonly string[] => byChain.get(chain) ?? []});
+}
+
+/**
+ * The app's check of a remote Omniston TON swap build, for `remoteProvider({name: "omniston", baseUrl, verifyBuild:
+ * omnistonVerifyBuild({validateTonSwapTarget, validateTonSwapLeg})})` (scan 2026-10-27 modules, F7/F13/F18/F19): the
+ * body is opened with `checkTonSwapPayload` against the app's own request — receiver, refund / excess to the trader,
+ * the on-chain minimum, the input — and the DEX it pays is confirmed with the app's validators (the same hooks the
+ * provider takes; `createOmnistonTonValidators` builds them). Any other cell body (a TON → EVM escrow) cannot be
+ * checked without the quote's settlement data and is refused; EVM typed orders pass through to the engine's own
+ * order checks. The reason it fails, or null.
+ */
+export function omnistonVerifyBuild(hooks: {
+  validateTonSwapTarget: (input: {address: string; protocols: readonly string[]}) => Promise<boolean> | boolean;
+  validateTonSwapLeg?: (leg: TonSwapLeg) => Promise<boolean> | boolean;
+  /** The integrator your backend's Omniston provider uses: the only referral a body may name. */
+  integratorAddress?: string | null;
+}): (quote: Quote, tx: UnsignedTx, params?: QuoteParams) => Promise<string | null> {
+  return async (quote, tx, params) => {
+    if (tx.bodyBoc === undefined) return null;
+    if (!params) return "the request this quote answered is unknown";
+    if (quote.providerData?.settlement !== "swap") return "only TON swap bodies can be checked on the client";
+    let steps: Array<{protocol: string; inputJetton?: string | null; outputJetton?: string | null}>;
+    try { steps = JSON.parse(quote.providerData.routeSteps ?? "") as typeof steps; } catch { return "the quote carries no route steps"; }
+    if (!Array.isArray(steps) || steps.length === 0) return "the quote carries no route steps";
+    const source = ccAsset(params.sourceChain, params.sourceToken);
+    const dest = ccAssetByToken(params.destChain, params.destToken);
+    if (!source || !dest) return "unknown source or destination token";
+    const protocols = (quote.providerData.protocols ?? "").split(",").filter(Boolean);
+    let checked: TonSwapCheckResult;
+    try {
+      checked = checkTonSwapPayload({
+        payloadHex: Buffer.from(tx.bodyBoc, "base64").toString("hex"),
+        targetAddress: tx.to,
+        sendAmount: BigInt(tx.value),
+        trader: params.refundAddress ?? "",
+        dest: params.destAddress,
+        inputUnits: quote.sourceAmount,
+        minOutputAmount: quote.minDestAmount,
+        inputJetton: source.contract ?? null,
+        outputJetton: dest.contract ?? null,
+        steps: steps.map((st) => ({protocol: String(st.protocol), inputJetton: st.inputJetton, outputJetton: st.outputJetton})),
+        integratorAddress: hooks.integratorAddress ?? null,
+      });
+    } catch (e) {
+      return e instanceof Error ? e.message.replace(/^omniston: /, "") : String(e);
+    }
+    // The DEX the message pays: the message target for a native input, the jetton transfer's destination otherwise.
+    const payload = parseSwapPayload(Buffer.from(tx.bodyBoc, "base64").toString("hex"));
+    const target = source.contract ? payload.jettonTransfer?.destination : tx.to;
+    if (!target) return "the body names no swap destination";
+    try { if (!(await hooks.validateTonSwapTarget({address: target, protocols}))) return `${target} is not a recognized DEX contract for ${protocols.join("+")}`; } catch { return "the swap target could not be checked"; }
+    if (hooks.validateTonSwapLeg) {
+      for (const leg of checked.legs) {
+        let ok = false;
+        try { ok = await hooks.validateTonSwapLeg(leg); } catch { ok = false; }
+        if (!ok) return `${leg.kind} v${leg.version} leg not verified`;
+      }
+    }
+    return null;
+  };
 }
 
 export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChainProvider {
@@ -1959,6 +2028,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       providerData: {
         settlement: "swap",
         protocols: swapProtocols(swap).join(","),
+        // For the app's own check of a remote build (omnistonVerifyBuild): the route the body must follow.
+        routeSteps: JSON.stringify(swapSteps(swap)),
         ...(q.gasBudget ? {gasBudget: q.gasBudget} : {}),
         ...(q.estimatedGasConsumption ? {gasEstimate: q.estimatedGasConsumption} : {}),
       },
@@ -2080,12 +2151,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         minOutputAmount: swap.minOutputAmount,
         inputJetton,
         outputJetton: assetContract(q.outputAsset),
-        steps: swap.routes.length === 1
-          ? routeSteps.map((step) => {
-            if (step.chunks.length !== 1) return {protocol: `split(${step.chunks.map((c) => c.protocol).join("|")})`, inputJetton: undefined, outputJetton: undefined};
-            return {protocol: step.chunks[0]!.protocol, inputJetton: stepJetton(step.inputAsset), outputJetton: stepJetton(step.outputAsset)};
-          })
-          : [{protocol: `${swap.routes.length}-routes`, inputJetton: undefined, outputJetton: undefined}],
+        steps: swapSteps(swap),
         integratorAddress: q.integratorAddress?.chain.$case === "ton" ? q.integratorAddress.chain.value : null,
       });
     } catch (error) {
