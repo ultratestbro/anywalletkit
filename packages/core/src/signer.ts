@@ -167,6 +167,16 @@ export function tweakSecp256k1PrivateKey(privateKey: Uint8Array, tweak: Uint8Arr
 const LOCAL_SECRETS = new WeakMap<LocalSigner, { privateKey: Uint8Array | undefined; seed: Uint8Array | undefined }>()
 
 /**
+ * The signer's key, read from {@link LOCAL_SECRETS}. A function of this module, not a method:
+ * no code outside it can call it, TypeScript-private or not (audit 2026-10-29 A1).
+ */
+function keyOf(signer: LocalSigner): Uint8Array {
+  const key = LOCAL_SECRETS.get(signer)?.privateKey
+  if (!key) throw new SignerError('This signer has been disposed.')
+  return key
+}
+
+/**
  * Local key signer: the key lives in one `Uint8Array`, zeroized by `dispose()`.
  * Built from a seed (derivable), from a seed as a leaf (`leafFromSeed`: no seed
  * kept), or from a raw derived key (leaf only).
@@ -211,12 +221,6 @@ export class LocalSigner implements SeedSigner {
     return new LocalSigner(curve, privateKey, publicKey, path)
   }
 
-  private key(): Uint8Array {
-    const key = LOCAL_SECRETS.get(this)?.privateKey
-    if (!key) throw new SignerError('This signer has been disposed.')
-    return key
-  }
-
   /** Public view only, for logs and serializers. */
   toJSON(): { kind: 'seed'; curve: SignerCurve; path: string; publicKey: string } {
     return { kind: this.kind, curve: this.curve, path: this.path, publicKey: bytesToHex(this.publicKey) }
@@ -224,7 +228,7 @@ export class LocalSigner implements SeedSigner {
 
   /** The public key; same as {@link LocalSigner.publicKey}. */
   async getPublicKey(): Promise<Uint8Array> {
-    this.key()
+    keyOf(this)
     return this.publicKey
   }
 
@@ -235,7 +239,7 @@ export class LocalSigner implements SeedSigner {
    * payload of the wrong length, or a `tweak` outside `schnorr`.
    */
   async sign(payload: Uint8Array, options: SignOptions = {}): Promise<Uint8Array> {
-    const key = this.key()
+    const key = keyOf(this)
     const scheme = resolveScheme(this, options.scheme)
     switch (scheme) {
       case 'ecdsa-recoverable': {
@@ -275,7 +279,7 @@ export class LocalSigner implements SeedSigner {
    * `leafFromSeed`) or was disposed.
    */
   async derive(relativePath: string): Promise<LocalSigner> {
-    this.key()
+    keyOf(this)
     const seed = LOCAL_SECRETS.get(this)?.seed
     if (!seed) throw new SignerError('This signer was built from a bare key and cannot derive children.')
     const rel = relativePath.replace(/^\/+/, '')
@@ -283,7 +287,7 @@ export class LocalSigner implements SeedSigner {
   }
 
   async deriveLeaf(relativePath: string): Promise<LocalSigner> {
-    this.key()
+    keyOf(this)
     const seed = LOCAL_SECRETS.get(this)?.seed
     if (!seed) throw new SignerError('This signer was built from a bare key and cannot derive children.')
     const rel = relativePath.replace(/^\/+/, '')

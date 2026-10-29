@@ -38,7 +38,8 @@ describe('WalletManagerEvm with an external signer', () => {
     const a = await m.getAccount(0)
     expect(await a.getAddress()).toBe(HARDHAT0)
     expect(a.path).toBe('external')
-    expect(a.signer).toBe(signer)
+    expect(a.signerKind).toBe('external')
+    expect(Reflect.get(a, 'signer')).toBeUndefined() // the signer is a private field (audit 2026-10-29 A1)
     expect(await m.getAccount()).toBe(a)
 
     const raw = (await a.signTransaction(TX)) as TransactionSerialized

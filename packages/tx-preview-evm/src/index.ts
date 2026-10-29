@@ -2,8 +2,8 @@
  * Transaction preview for EVM: what a call (or an approve → call sequence)
  * will do before the key signs it.
  *
- *  - decode: approvals (ERC-20 approve / increaseAllowance, Permit2 approve,
- *    setApprovalForAll), token transfers, and the target's label when the
+ *  - decode: approvals (ERC-20 approve / increaseAllowance / increaseApproval,
+ *    EIP-2612 and Permit2 permit calls, Permit2 approve, setApprovalForAll), token transfers, and the target's label when the
  *    caller lists it as known (a provider's trusted contracts).
  *  - simulate: eth_simulateV1 with transfer tracing → the sender's balance
  *    changes per token; where a node lacks it, eth_call says pass / revert
@@ -87,6 +87,14 @@ export interface DecodedCall {
   method: string;
   value: bigint;
   approval?: Approval;
+  /** Every allowance the call grants when it grants more than one (a Permit2 batch permit); `approval` is the first. */
+  approvals?: Approval[];
+  /**
+   * A selector that grants an allowance (EIP-2612 or Permit2 `permit`) whose arguments could not be
+   * read: shorter than the ABI needs, or offsets and lengths out of range. What it grants is
+   * unknown, so it is a warning ({@link checksFor}), never a plain call.
+   */
+  unparsedApproval?: true;
   transfer?: {token: string; to: string; amount: bigint};
   /** The calldata is not hex bytes: nothing can be said about what it does (a warning, never a plain call). */
   undecodable?: true;
@@ -124,6 +132,8 @@ export type CheckCode =
   | "approval-exact" | "approval-excess" | "approval-unlimited" | "approval-unknown-spender"
   /** A bounded approval with no `expectedApproval` to compare it with: neither "exact" nor "excess" can be said. */
   | "approval-unchecked"
+  /** A call to a selector that grants an allowance, with arguments that cannot be read: a potential permission nobody can size. */
+  | "approval-unparsed"
   | "native-value"
   /** Calldata that is not hex bytes: what it grants or moves cannot be read. */
   | "calldata-undecodable";
@@ -173,14 +183,25 @@ const SELECTOR = {
   transferFrom: "0x23b872dd", // transferFrom(address from, address to, uint256 amount)
   setApprovalForAll: "0xa22cb465", // setApprovalForAll(address operator, bool approved)
   permit2Approve: "0x87517c45", // Permit2 approve(address token, address spender, uint160 amount, uint48 expiration)
+  increaseApproval: "0xd73dd623", // increaseApproval(address spender, uint256 addedValue) — the OpenZeppelin < 2 / Zeppelin StandardToken name
+  permit: "0xd505accf", // EIP-2612 permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+  // Permit2 permit(address owner, PermitSingle permitSingle, bytes signature),
+  // PermitSingle = ((address token, uint160 amount, uint48 expiration, uint48 nonce) details, address spender, uint256 sigDeadline)
+  permit2Permit: "0x2b67b570",
+  // Permit2 permit(address owner, PermitBatch permitBatch, bytes signature),
+  // PermitBatch = ((address token, uint160 amount, uint48 expiration, uint48 nonce)[] details, address spender, uint256 sigDeadline)
+  permit2PermitBatch: "0x2a2d80d1",
 } as const;
+
+/** The most entries of a Permit2 batch permit read; a longer one is reviewed as unparsed. */
+const MAX_PERMIT_BATCH = 64;
 
 const lc = (a: string) => a.toLowerCase();
 
 /**
  * Decode one call offline: ERC-20 transfer, approve, Permit2, operator approvals and known
- * selectors. Calldata that is not hex bytes is `undecodable` (a warning in {@link checksFor}),
- * never a plain call.
+ * selectors. Calldata that is not hex bytes is `undecodable`, and a permit whose arguments cannot
+ * be read is `unparsedApproval` (both warnings in {@link checksFor}), never a plain call.
  */
 export function decodeCall(call: PreviewCall, known: Record<string, string> = {}): DecodedCall {
   const to = lc(call.to);
@@ -199,7 +220,39 @@ export function decodeCall(call: PreviewCall, known: Record<string, string> = {}
   const uint = (i: number) => BigInt(`0x${word(i)}`);
   const address = (i: number) => `0x${word(i).slice(24)}`;
   const cap = (amount: bigint) => (amount >= UNLIMITED ? null : amount);
+  // The permits are decoded strictly, the way their contracts (Solidity 0.8 ABI coder) read them:
+  // calldata too short for the head, or an offset or length out of range, is not guessed at.
+  const argBytes = BigInt((data.length - 10) / 2);
+  // Number(byte.toString()): bounded by the calldata length once the range check passed.
+  const wordAt = (byte: bigint) => {
+    if (byte + 32n > argBytes) return null;
+    const at = 10 + 2 * Number(byte.toString());
+    return data.slice(at, at + 64);
+  };
+  const unparsed = (method: string): DecodedCall => ({...base, method: `${method} (unparsed)`, unparsedApproval: true});
   switch (selector) {
+    case SELECTOR.permit: {
+      if (argBytes < 7n * 32n) return unparsed("permit (EIP-2612)");
+      const spender = address(1);
+      return {...base, method: "permit (EIP-2612)", approval: {token: to, spender, spenderLabel: knownLabel(known, spender), amount: cap(uint(2)), kind: "erc20"}};
+    }
+    case SELECTOR.permit2Permit: {
+      // owner, the inline PermitSingle (token, amount, expiration, nonce, spender, sigDeadline), the signature's offset.
+      const method = to === PERMIT2 ? "permit (Permit2)" : "permit (Permit2 signature)";
+      if (argBytes < 8n * 32n || !bytesInRange(wordAt, uint(7), argBytes)) return unparsed(method);
+      const spender = address(5);
+      return {...base, method, approval: {token: address(1), spender, spenderLabel: knownLabel(known, spender), amount: cap(uint(2)), kind: "permit2"}};
+    }
+    case SELECTOR.permit2PermitBatch: {
+      const method = to === PERMIT2 ? "permit batch (Permit2)" : "permit batch (Permit2 signature)";
+      const approvals = argBytes < 3n * 32n || !bytesInRange(wordAt, uint(2), argBytes) ? null : permitBatch(wordAt, uint(1), known);
+      if (approvals === null) return unparsed(method);
+      return {...base, method, ...(approvals.length > 0 ? {approval: approvals[0]!, approvals} : {})};
+    }
+    case SELECTOR.increaseApproval: {
+      const spender = address(0);
+      return {...base, method: "increaseApproval", approval: {token: to, spender, spenderLabel: knownLabel(known, spender), amount: cap(uint(1)), kind: "erc20"}};
+    }
     case SELECTOR.permit2Approve: {
       // Permit2's own approve(token, spender, amount, expiration), at whatever address the chain's
       // Permit2 lives (zkSync Era's is not the CREATE2 one) — every such call is read as one (F29).
@@ -227,6 +280,39 @@ export function decodeCall(call: PreviewCall, known: Record<string, string> = {}
     default:
       return base;
   }
+}
+
+type WordAt = (byte: bigint) => string | null;
+
+/** A `bytes` argument whose head word sits at `offset`: its length word and its data are inside the calldata. */
+function bytesInRange(wordAt: WordAt, offset: bigint, argBytes: bigint): boolean {
+  const length = wordAt(offset);
+  return length !== null && offset + 32n + BigInt(`0x${length}`) <= argBytes;
+}
+
+/**
+ * The allowances of a Permit2 PermitBatch whose tuple starts at byte `tuple` of the arguments, or
+ * null when an offset, the length or an entry is out of range (or the batch is over {@link MAX_PERMIT_BATCH}).
+ */
+function permitBatch(wordAt: WordAt, tuple: bigint, known: Record<string, string>): Approval[] | null {
+  const uintAt = (byte: bigint) => { const w = wordAt(byte); return w === null ? null : BigInt(`0x${w}`); };
+  const head = uintAt(tuple);
+  const spenderWord = wordAt(tuple + 32n);
+  if (head === null || spenderWord === null || wordAt(tuple + 64n) === null) return null;
+  const array = tuple + head;
+  const length = uintAt(array);
+  if (length === null || length > BigInt(MAX_PERMIT_BATCH)) return null;
+  // Each entry is four static words, inline: token, amount, expiration, nonce.
+  if (length > 0n && wordAt(array + length * 128n) === null) return null;
+  const spender = `0x${spenderWord.slice(24)}`;
+  const out: Approval[] = [];
+  for (let i = 0n; i < length; i++) {
+    const entry = array + 32n + i * 128n;
+    const token = `0x${wordAt(entry)!.slice(24)}`;
+    const amount = BigInt(`0x${wordAt(entry + 32n)!}`);
+    out.push({token, spender, spenderLabel: knownLabel(known, spender), amount: amount >= UNLIMITED ? null : amount, kind: "permit2"});
+  }
+  return out;
 }
 
 function knownLabel(known: Record<string, string>, address: string): string | null {
@@ -452,9 +538,7 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
     checks.push(own.has(r) ? {code: "recipient-own", status: "ok", detail: {address: r}} : {code: "recipient-foreign", status: "warn", detail: {address: r}});
   }
 
-  for (const c of calls) {
-    const a = c.approval;
-    if (!a) continue;
+  for (const a of calls.flatMap((c) => c.approvals ?? (c.approval ? [c.approval] : []))) {
     const detail: Record<string, string> = {token: a.token, spender: a.spender, ...(a.spenderLabel ? {label: a.spenderLabel} : {}), ...(a.amount !== null ? {amount: a.amount.toString()} : {})};
     if (!a.spenderLabel) checks.push({code: "approval-unknown-spender", status: "warn", detail});
     if (a.amount === null) checks.push({code: "approval-unlimited", status: "warn", detail});
@@ -463,6 +547,7 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
     else checks.push({code: "approval-exact", status: "ok", detail});
   }
 
+  for (const c of calls) if (c.unparsedApproval) checks.push({code: "approval-unparsed", status: "warn", detail: {address: c.to, ...(c.selector ? {selector: c.selector} : {})}});
   for (const c of calls) if (c.undecodable) checks.push({code: "calldata-undecodable", status: "warn", detail: {address: c.to}});
 
   // Native value per call into a contract: into one nobody vouched for it is a warning, not a tick.

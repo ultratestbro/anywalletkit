@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ed25519 } from '@noble/curves/ed25519.js'
-import { externalSigner } from '@anywalletkit/core'
+import { LocalSigner, externalSigner } from '@anywalletkit/core'
 import {
   appendTransactionMessageInstructions, compileTransaction, compressTransactionMessageUsingAddressLookupTables, createNoopSigner, createTransactionMessage,
   getTransactionEncoder, pipe, setTransactionMessageFeePayer, setTransactionMessageLifetimeUsingBlockhash,
@@ -119,16 +119,15 @@ describe('classifySolanaMessage', () => {
 describe('WalletAccountSolana.sign', () => {
   it('refuses a legacy / v0 / wire transaction with MessageIsTransactionError and never calls the signer', async () => {
     const a = await account()
-    let calls = 0
-    const orig = a.signer.sign.bind(a.signer)
-    ;(a.signer as { sign: typeof orig }).sign = async (...args) => { calls++; return orig(...args) }
+    // The signer is a private field of the account: watch every local key instead.
+    const spy = vi.spyOn(LocalSigner.prototype, 'sign')
     for (const bytes of [messageBytes(compiled('legacy')), messageBytes(compiled(0)), messageBytes(compiled(0, { lookup: true, to: LOOKED_UP })), wireBytes(compiled(0))]) {
       const err = await a.sign(bytes).catch((e: unknown) => e)
       expect(err).toBeInstanceOf(MessageIsTransactionError)
       expect((err as Error).message).toMatch(/use signTransaction/)
     }
-    expect(calls).toBe(0)
-    ;(a.signer as { sign: typeof orig }).sign = orig
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
   })
 
   it('still signs text, nonces, off-chain-header messages, foreign transactions and trailing-byte payloads raw (no envelope)', async () => {

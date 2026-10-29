@@ -45,14 +45,21 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
   readonly path: string
   /** Compressed secp256k1 key (33 bytes); needed synchronously for the address. */
   readonly publicKey: Uint8Array
-  /** The signer that holds the key. */
-  readonly signer: Signer
+  /**
+   * The signer that holds the key, in a private field: not a property of the account, so no code
+   * the account is handed to (a protocol module, a logger) can reach it and sign around the
+   * account's checks (audit 2026-10-29 A1).
+   */
+  readonly #signer: Signer
+  /** What holds the key: `seed`, `key` (one imported key) or `external`. */
+  readonly signerKind: Signer['kind']
   private _disposed = false
   private _readOnly: WalletAccountReadOnlyTron | undefined
 
   constructor(signer: Signer, publicKey: Uint8Array, path: string, config: TronConfig = {}) {
     super(addressFromPublicKey(publicKey), config)
-    this.signer = requireCurve(signer, 'secp256k1')
+    this.#signer = requireCurve(signer, 'secp256k1')
+    this.signerKind = this.#signer.kind
     this.publicKey = publicKey
     this.path = path
   }
@@ -75,7 +82,7 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
   /** Recoverable secp256k1 signature over a 32-byte digest from the signer: r‖s‖recovery (recovery 0/1). */
   async #signDigest(digest: Uint8Array, context: 'tron-tx' | 'tron-message'): Promise<Uint8Array> {
     this.key()
-    return this.signer.sign(digest, { scheme: 'ecdsa-recoverable', context })
+    return this.#signer.sign(digest, { scheme: 'ecdsa-recoverable', context })
   }
 
   /** TIP-191 message signature: 0x + r||s||(27 + recovery) hex (tronweb `signMessageV2` encoding). */
@@ -283,6 +290,6 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
   /** Dispose the signer (zeroizes a local key). Idempotent. */
   dispose(): void {
     this._disposed = true
-    this.signer.dispose()
+    this.#signer.dispose()
   }
 }

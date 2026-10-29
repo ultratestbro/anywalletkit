@@ -70,24 +70,33 @@ export interface DeviceSecretStorage {
    * Store or replace. The new version is written to a fresh slot first and the
    * old one removed only afterwards, so a failed write never loses the secret.
    * Never prompts on iOS; prompts once on Android (Keystore keys need the user for every use).
+   * Rejects with `stale-copy` when the new version is stored but an older copy could not be
+   * removed; the store retries that removal on its next operation.
    */
   set(id: string, secret: string, options?: SetSecretOptions): Promise<void>
   delete(id: string): Promise<void>
   /** Is something stored under `id` — no prompt. */
   has(id: string): Promise<boolean>
-  /** Public facts about one secret — no prompt. */
+  /**
+   * Public facts about one secret — no prompt. `protection` is the weakest among the copies
+   * stored: an older copy left behind by a failed removal counts until it is gone.
+   */
   info(id: string): Promise<StoredSecretInfo | null>
-  /** Every secret in this namespace — no prompt. */
+  /** Every secret in this namespace — no prompt; `protection` as in {@link info}. */
   list(): Promise<StoredSecretInfo[]>
   /**
    * Switch one secret between `biometricsOrPasscode` and `biometricsOnly`.
    * Reads it (one sheet) and writes it again under the new access control.
+   * Resolves only once no copy under the old protection is left: rejects with `stale-copy`
+   * when the new copy is stored but the old one could not be removed. Calling it again
+   * retries the removal (no sheet when the newest copy already has `protection`).
    */
   setProtection(id: string, protection: Protection, options?: { prompt?: PromptText | undefined }): Promise<void>
   /**
    * Delete every secret whose id is not in `keep` and return those ids. Run it
    * on start-up against the app's own account list: the iOS Keychain outlives
-   * an uninstall, the app's metadata does not.
+   * an uninstall, the app's metadata does not. Older copies of the kept secrets
+   * left by a failed removal are removed too (rejects with `stale-copy` when one stays).
    */
   prune(keep: Iterable<string>): Promise<string[]>
   /** Copy secrets from an older store, verify, then delete the old copies. */
@@ -155,6 +164,66 @@ export function createSecureStorage(options: SecureStorageOptions = {}): DeviceS
     return (await slotsOf(id))[0]
   }
 
+  /** What `info` / `list` report for one id: the newest copy, with the weakest protection of any copy (audit 2026-10-29 A2). */
+  function describe(copies: Slot[]): StoredSecretInfo {
+    const newest = copies.reduce((a, b) => (b.n > a.n ? b : a))
+    const weakest = copies.reduce((a, b) => (PROTECTIONS.indexOf(b.protection) < PROTECTIONS.indexOf(a.protection) ? b : a))
+    return { id: newest.id, protection: weakest.protection, createdAt: newest.createdAt }
+  }
+
+  /**
+   * Older copies may be left behind (a delete that failed after a write): true until a sweep
+   * found none. True at start: a copy left by an earlier run of the app is swept on first use.
+   */
+  let stale = true
+
+  /**
+   * Remove `older` (the copies below the newest), oldest first, so a failure never leaves an
+   * older copy as the newest one. Rejects with `stale-copy` naming what is left.
+   */
+  async function dropOlder(id: string, older: Slot[]): Promise<void> {
+    const left: Slot[] = []
+    let cause: unknown
+    for (const old of [...older].sort((a, b) => a.n - b.n)) {
+      try {
+        await call((nat) => nat.deleteItem(namespace, old.key))
+      } catch (e) {
+        left.push(old)
+        cause ??= e
+      }
+    }
+    if (left.length === 0) return
+    stale = true
+    const weakest = describe(left).protection
+    throw new SecureStorageError('stale-copy', `The newest copy of "${id}" is stored, but an older one (${weakest}) could not be removed; it is retried on the next store operation.`, { cause })
+  }
+
+  /** Remove every older copy in the namespace. `strict`: reject when one stays; otherwise only remember to try again. */
+  async function sweep(strict: boolean): Promise<void> {
+    if (!stale && !strict) return
+    stale = false
+    const byId = new Map<string, Slot[]>()
+    let all: Slot[]
+    try {
+      all = await slots()
+    } catch (e) {
+      stale = true
+      if (strict) throw e
+      return
+    }
+    for (const s of all) byId.set(s.id, [...(byId.get(s.id) ?? []), s])
+    let first: unknown
+    for (const [id, copies] of byId) {
+      if (copies.length < 2) continue
+      const newest = copies.reduce((a, b) => (b.n > a.n ? b : a))
+      await dropOlder(id, copies.filter((c) => c !== newest)).catch((e: unknown) => { first ??= e })
+    }
+    if (first !== undefined && strict) throw first
+  }
+
+  /** Before a read: sweep only when something may be left, behind any running write. */
+  const tidy = (): Promise<void> => (stale ? serial(() => sweep(false)) : Promise.resolve())
+
   async function write(id: string, secret: string, opts: SetSecretOptions = {}): Promise<void> {
     checkId(id)
     if (typeof secret !== 'string' || secret.length === 0) throw new SecureStorageError('invalid', 'The secret must be a non-empty string.')
@@ -162,7 +231,9 @@ export function createSecureStorage(options: SecureStorageOptions = {}): DeviceS
     const protection = checkProtection(opts.protection ?? existing[0]?.protection ?? defaultProtection)
     const n = (existing[0]?.n ?? 0) + 1
     await call((nat) => nat.setItem(namespace, `${id}#${n}`, secret, protection, prompt(saveText, opts.prompt)))
-    for (const old of existing) await call((nat) => nat.deleteItem(namespace, old.key)).catch(() => undefined)
+    // The new copy is stored; an older one that stays (maybe under weaker protection) is not
+    // swallowed: the caller learns it, info/list report it, and the next operation retries (audit 2026-10-29 A2).
+    await dropOlder(id, existing)
   }
 
   async function read(id: string, opts: { prompt?: PromptText | undefined } = {}): Promise<string | null> {
@@ -174,41 +245,47 @@ export function createSecureStorage(options: SecureStorageOptions = {}): DeviceS
 
   async function remove(id: string): Promise<void> {
     checkId(id)
-    for (const s of await slotsOf(id)) await call((n) => n.deleteItem(namespace, s.key))
+    // Oldest first: a delete that fails part-way leaves the newest copy, never an older (weaker) one as the one `get` reads.
+    for (const s of (await slotsOf(id)).reverse()) await call((n) => n.deleteItem(namespace, s.key))
   }
 
   const store: DeviceSecretStorage = {
-    get: (id, opts) => read(id, opts),
-    set: (id, secret, opts) => serial(() => write(id, secret, opts)),
-    delete: (id) => serial(() => remove(id)),
+    get: async (id, opts) => {
+      await tidy()
+      return read(id, opts)
+    },
+    set: (id, secret, opts) => serial(async () => { await sweep(false); await write(id, secret, opts) }),
+    delete: (id) => serial(async () => { await sweep(false); await remove(id) }),
 
     async has(id) {
       checkId(id)
+      await tidy()
       return (await latest(id)) !== undefined
     },
 
     async info(id) {
       checkId(id)
-      const s = await latest(id)
-      return s ? { id: s.id, protection: s.protection, createdAt: s.createdAt } : null
+      await tidy()
+      const copies = await slotsOf(id)
+      return copies.length > 0 ? describe(copies) : null
     },
 
     async list() {
-      const byId = new Map<string, Slot>()
-      for (const s of await slots()) {
-        const cur = byId.get(s.id)
-        if (!cur || s.n > cur.n) byId.set(s.id, s)
-      }
-      return [...byId.values()].map((s) => ({ id: s.id, protection: s.protection, createdAt: s.createdAt })).sort((a, b) => a.createdAt - b.createdAt)
+      await tidy()
+      const byId = new Map<string, Slot[]>()
+      for (const s of await slots()) byId.set(s.id, [...(byId.get(s.id) ?? []), s])
+      return [...byId.values()].map(describe).sort((a, b) => a.createdAt - b.createdAt)
     },
 
     setProtection: (id, protection, opts = {}) =>
       serial(async () => {
         checkId(id)
         checkProtection(protection)
-        const cur = await latest(id)
+        await sweep(false)
+        const [cur, ...older] = await slotsOf(id)
         if (!cur) throw new SecureStorageError('invalid', `Nothing is stored under "${id}".`)
-        if (cur.protection === protection) return
+        // Already there: done once no older copy is left under another protection (a retry after `stale-copy`).
+        if (cur.protection === protection) return dropOlder(id, older)
         if (protection === 'biometricsOnly') {
           const caps = await call((n) => n.capabilities())
           if (!caps.biometry) throw new SecureStorageError('not-available', 'Strict mode needs Face ID, Touch ID or a fingerprint enrolled on this device.')
@@ -220,6 +297,7 @@ export function createSecureStorage(options: SecureStorageOptions = {}): DeviceS
 
     prune: (keep) =>
       serial(async () => {
+        await sweep(false)
         const keepSet = new Set(keep)
         const removed: string[] = []
         for (const s of await slots()) {
@@ -227,11 +305,14 @@ export function createSecureStorage(options: SecureStorageOptions = {}): DeviceS
           await call((n) => n.deleteItem(namespace, s.key))
           if (!removed.includes(s.id)) removed.push(s.id)
         }
+        // The start-up pass: an older copy of a kept secret must not stay silently.
+        await sweep(true)
         return removed
       }),
 
     migrateFrom: (source, ids, opts = {}) =>
       serial(async () => {
+        await sweep(false)
         const result: MigrationResult = { migrated: [], empty: [], alreadyPresent: [] }
         for (const id of ids) {
           checkId(id)

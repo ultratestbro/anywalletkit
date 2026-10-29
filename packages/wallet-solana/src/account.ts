@@ -38,13 +38,20 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
   readonly path: string
   /** The signer's 32-byte ed25519 public key (needed synchronously for the address). */
   readonly publicKey: Uint8Array
-  /** The signer that holds the key. */
-  readonly signer: Signer
+  /**
+   * The signer that holds the key, in a private field: not a property of the account, so no code
+   * the account is handed to (a protocol module, a logger) can reach it and sign around the
+   * account's checks (audit 2026-10-29 A1).
+   */
+  readonly #signer: Signer
+  /** What holds the key: `seed`, `key` (one imported key) or `external`. */
+  readonly signerKind: Signer['kind']
   private _readOnly: WalletAccountReadOnlySolana | undefined
 
   constructor(signer: Signer, publicKey: Uint8Array, path: string, config: SolanaConfig = {}) {
     super(addressFromPublicKey(publicKey), config)
-    this.signer = requireCurve(signer, 'ed25519')
+    this.#signer = requireCurve(signer, 'ed25519')
+    this.signerKind = this.#signer.kind
     this.publicKey = publicKey
     this.path = path
   }
@@ -71,7 +78,7 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
     const bytes = typeof message === 'string' ? new TextEncoder().encode(message) : message
     if (isSolanaTransactionPayload(bytes, this.publicKey)) throw new MessageIsTransactionError()
     if (this.path === 'external' && bytes.length === 32) throw new MessageIsTransactionError('An external ed25519 key may also sign TON or NEAR transactions, whose signatures cover a 32-byte digest; a 32-byte message is not signed.')
-    return toHex(await this.signer.sign(bytes, { scheme: 'ed25519', context: 'solana-offchain' }))
+    return toHex(await this.#signer.sign(bytes, { scheme: 'ed25519', context: 'solana-offchain' }))
   }
 
   /**
@@ -92,7 +99,7 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
 
   /** The signature itself, for a transaction a plan has already checked. */
   async #signChecked(tx: Transaction): Promise<Transaction> {
-    const sig = (await this.signer.sign(tx.messageBytes as unknown as Uint8Array, { scheme: 'ed25519', context: 'solana-message' })) as unknown as SignatureBytes
+    const sig = (await this.#signer.sign(tx.messageBytes as unknown as Uint8Array, { scheme: 'ed25519', context: 'solana-message' })) as unknown as SignatureBytes
     return { ...tx, signatures: Object.freeze({ ...tx.signatures, [this.address]: sig }) } as Transaction
   }
 
@@ -178,6 +185,6 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
 
   /** Dispose the signer (zeroizes a local key). Idempotent. */
   dispose(): void {
-    this.signer.dispose()
+    this.#signer.dispose()
   }
 }

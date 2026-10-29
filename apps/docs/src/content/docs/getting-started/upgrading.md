@@ -1,6 +1,6 @@
 ---
 title: Upgrading
-description: What to change in your app when you move to a new Any Wallet Kit release — the 2026-10-28 security release first.
+description: What to change in your app when you move to a new Any Wallet Kit release — the 2026-10-29 audit fixes first.
 sidebar:
   order: 5
 ---
@@ -27,6 +27,53 @@ through your own server:
   stub's `verifyBuild` ran. `omnistonVerifyBuild` now opens Omniston's EVM orders too, with the order
   extension the server's build carries: deploy the new server before the new app, or remote EVM → TON
   and EVM → EVM orders are refused.
+
+## Next release: the audit fixes
+
+This release fixes three findings of the 2026-10-29 external audit.
+
+### The signer is no longer a property of an account
+
+Every chain account (`wallet-evm`, `-solana`, `-ton`, `-tron`, `-btc`, `-near`, `-zcash`) keeps its
+signer in a private field. `account.signer` is `undefined` now, on the accounts your app gets too,
+and `LocalSigner` has no `key()` method at runtime. A protocol module always gets the policy wrapper,
+even on a `Wallet` without `policies`; without them the wrapper applies no limits.
+
+What to change:
+- `account.signer.kind` → `account.signerKind` (`'seed' | 'key' | 'external'`);
+- `account.signer.publicKey` → `account.publicKey`;
+- an injected `Signer` you need later: keep your own reference to it;
+- tests that patched `account.signer.sign` to count signatures: spy on your own external signer, or
+  on `LocalSigner.prototype.sign`;
+- do not compare a module's account with `wallet.getAccount(chain)` by identity: it is a wrapper.
+
+### `setProtection` reports an old copy it could not remove
+
+`@anywalletkit/secure-storage-react-native` used to ignore a failed delete of the old copy after it
+rewrote a secret. `setProtection(id, 'biometricsOnly')` resolved, `info` and `list` said strict mode,
+and the old `biometricsOrPasscode` copy stayed in the Keychain.
+
+Now:
+- `setProtection` and `set` reject with `SecureStorageError` code `stale-copy` when the new copy is
+  stored but the old one could not be removed;
+- `info` and `list` report the weakest protection among the copies still stored;
+- the store retries the removal on its next operation, on first use after a restart and in `prune`
+  (which rejects with `stale-copy` if a copy still stays).
+
+What to change: catch `stale-copy` where you call `setProtection` and do not show strict mode as on.
+Offer a retry: calling `setProtection` again removes the old copy without another sheet. After `set`,
+`stale-copy` means the new secret is stored, so do not roll back the account.
+
+### Permit calls in the transaction preview
+
+`@anywalletkit/tx-preview-evm` decodes the calls that grant an allowance without `approve`: an EIP-2612
+`permit()` call (the token is the target), Permit2 `permit()` single and batch (the token is inside the
+struct) and `increaseApproval`. They now carry `approval`, with the usual `approval-unlimited` and
+`approval-unknown-spender` warnings. A Permit2 batch lists every allowance in the new `approvals`
+field. A permit body whose arguments can't be read gives the new `approval-unparsed` warning.
+
+What to change: if your review screen maps check codes to text, add `approval-unparsed`. If it shows
+`approval`, show every entry of `approvals` when it is set.
 
 ## 2026-10-28: the modules security release
 
