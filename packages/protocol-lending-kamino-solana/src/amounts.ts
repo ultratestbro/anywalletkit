@@ -12,8 +12,19 @@ export function toAmount(amount: bigint | number | string | undefined): bigint {
   return value
 }
 
+/** SPL mints keep decimals in a u8. */
+export const MAX_DECIMALS = 255
+/** |exponent| of a figure in scientific notation, and digits of a figure, the API may report (scan 2026-10-28 F10). */
+export const MAX_EXPONENT = 400
+export const MAX_DIGITS = 1_000
+
+function checkDecimals(decimals: number): void {
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > MAX_DECIMALS) throw new KaminoError(`Decimals must be an integer from 0 to ${MAX_DECIMALS}, not ${decimals}.`)
+}
+
 /** Base units → the decimal string Kamino's API takes ("1.5" for 1_500_000n at 6 decimals). */
 export function toDecimalString(amount: bigint, decimals: number): string {
+  checkDecimals(decimals)
   const s = amount.toString().padStart(decimals + 1, '0')
   const whole = s.slice(0, s.length - decimals), frac = s.slice(s.length - decimals).replace(/0+$/, '')
   return frac ? `${whole}.${frac}` : whole
@@ -26,7 +37,11 @@ export function toDecimalString(amount: bigint, decimals: number): string {
  * 2026-10-27 modules, F10/F11).
  */
 export function fromDecimalString(value: string | number, decimals: number): bigint {
+  checkDecimals(decimals)
   const s = String(value).trim()
+  // A few bytes of exponent expanded into a string and BigInt of hundreds of millions of digits,
+  // synchronously (scan 2026-10-28 F10): the input, its exponent and the result are bounded first.
+  if (s.length > MAX_DIGITS) throw new KaminoError(`Kamino reported a figure of ${s.length} characters; no amount or rate is that long.`)
   if (/^[-+]/.test(s)) throw new KaminoError(`Kamino reported a signed figure (${s.slice(0, 40)}); every amount and rate it reports is positive.`)
   const m = /^(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(s)
   if (!m) throw new KaminoError(`Not a decimal number: ${s.slice(0, 40)}`)
@@ -34,14 +49,16 @@ export function fromDecimalString(value: string | number, decimals: number): big
   if (exp) {
     // Normalize scientific notation ("4.6e-16") into plain digits.
     const e = Number(exp)
+    if (!(Math.abs(e) <= MAX_EXPONENT)) throw new KaminoError(`Kamino reported a figure with exponent ${exp.slice(0, 40)}; more than ${MAX_EXPONENT} either way is no amount or rate.`)
     const digits = whole + frac
     let point = whole.length + e
     if (point <= 0) { whole = '0'; frac = '0'.repeat(-point) + digits }
     else if (point >= digits.length) { whole = digits + '0'.repeat(point - digits.length); frac = '' }
     else { whole = digits.slice(0, point); frac = digits.slice(point) }
   }
-  const scaled = (whole || '0') + (frac + '0'.repeat(decimals)).slice(0, decimals)
-  return BigInt(scaled.replace(/^0+(?=\d)/, ''))
+  const scaled = ((whole || '0') + (frac + '0'.repeat(decimals)).slice(0, decimals)).replace(/^0+(?=\d)/, '')
+  if (scaled.length > MAX_DIGITS) throw new KaminoError(`Kamino reported a figure of ${scaled.length} digits in base units; no amount or rate is that large.`)
+  return BigInt(scaled)
 }
 
 /** Fixed-point helper: `value` (decimal string) scaled by 1e18. */
