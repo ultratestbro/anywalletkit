@@ -367,7 +367,9 @@ An `allowlist` policy sees `to` = `0x0000000000000000000000000000000000001000`: 
   `createSolanaHistory` / `createTonHistory` / `createTronHistory` from the chain packages, then
   `await wallet.history({ limit: 20, cursor })` → items with modules' descriptions ("Supplied 100 USDC · Aave v3").
 - Names: `nameResolvers([ensResolver({ rpcUrl: ETHEREUM_RPC })])` (`core` + `names-ens`); `resolver.supports(text)`,
-  `await resolver.resolve('vitalik.eth', chain)` → `ResolvedName`; errors are `NameError` with a `code`.
+  `await resolver.resolve('vitalik.eth', chain)` → `ResolvedName`; errors are `NameError` with a `code`. On React
+  Native, offchain names (cb.id, Basenames) need `ensResolver({ rpcUrl, ccip: { fetch: ensCcipViaProxy('https://api.example.com/ccip') } })`
+  and a server route with `createEnsCcipHandler()` from `names-ens/server`; without it they fail (`reason: 'ccip-proxy-required'`).
 - Networks: `new NetworksTable(storage)` + `await table.load()`; `table.rpcUrlsForSync(caip2)` feeds `provider`;
   `checkRpcUrl` / `verifyNetwork` before saving a user RPC.
 

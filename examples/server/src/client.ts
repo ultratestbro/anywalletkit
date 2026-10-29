@@ -1,6 +1,6 @@
 // The "Ship a wallet" docs page renders the #region blocks of this file.
 // The app side: everything goes through YOUR server, so no key is in the app bundle.
-import type { IWalletAccount } from '@anywalletkit/core'
+import type { IWalletAccount, NameResolver } from '@anywalletkit/core'
 import { Wallet } from '@anywalletkit/kit'
 import { WalletManagerEvm } from '@anywalletkit/wallet-evm'
 import { remoteProvider } from '@anywalletkit/protocol-swap2-core/remote'
@@ -9,6 +9,7 @@ import { RouterSwap2Protocol } from '@anywalletkit/protocol-swap2-router'
 import { lifiPins } from '@anywalletkit/protocol-swap2-lifi/provider'
 import { thorchainPins } from '@anywalletkit/protocol-swap2-thorchain/provider'
 import { chainflipPins } from '@anywalletkit/protocol-swap2-chainflip/config'
+import { ensCcipViaProxy, ensResolver } from '@anywalletkit/names-ens'
 
 // #region client-rpc
 /** An EIP-1193 provider over the server's RPC proxy (it adds the upstream key). */
@@ -59,3 +60,22 @@ export function swapsOverServer(account: IWalletAccount, api: string, token: str
   })
 }
 // #endregion client-swaps
+
+// #region client-names
+/**
+ * ENS names on React Native: offchain names (cb.id, Basenames, uni.eth) ask their CCIP-Read gateways through
+ * the server's `/ccip` route, because the device's fetch cannot refuse a gateway's redirect.
+ */
+export function namesOverServer(api: string, token: string, ethereumRpc: string): NameResolver {
+  return ensResolver({
+    rpcUrl: ethereumRpc,
+    ccip: {
+      fetch: ensCcipViaProxy(`${api}/ccip`, {
+        headers: { authorization: `Bearer ${token}` },
+        // https in production; plain http only for a server on this machine (the tests).
+        allowInsecureProxyUrl: /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(api),
+      }),
+    },
+  })
+}
+// #endregion client-names

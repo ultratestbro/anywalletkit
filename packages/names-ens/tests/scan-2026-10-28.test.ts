@@ -34,7 +34,7 @@ describe('F13: on React Native, resolver-chosen gateways are not fetched with a 
     const asked = globalFetch()
     const err = await ensCcipRequest({ data: CALLDATA, sender: SENDER, urls: ['https://gw.example/{sender}/{data}.json'] }).catch((e: unknown) => e)
     expect(err).toBeInstanceOf(EnsNameError)
-    expect(String((err as Error).message)).toMatch(/off on this runtime: its fetch follows redirects/)
+    expect(String((err as Error).message)).toMatch(/off on React Native: its fetch follows redirects/)
     await expect(ensCcipRead.request({ data: CALLDATA, sender: SENDER, urls: ['https://gw.example/{data}'] })).rejects.toThrow(EnsNameError)
     expect(asked).toEqual([])
   })

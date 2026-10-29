@@ -3,6 +3,7 @@ import { createServer as createHttpServer, type IncomingMessage, type Server, ty
 import { timingSafeEqual } from 'node:crypto'
 import { createSwap2Handler, Swap2HandlerError, type Swap2Call } from '@anywalletkit/protocol-swap2-core/server'
 import type { CrossChainProvider } from '@anywalletkit/protocol-swap2-core'
+import { createEnsCcipHandler, type EnsCcipHandlerOptions } from '@anywalletkit/names-ens/server'
 import { EXPENSIVE_METHODS, createRpcProxy } from './rpc.ts'
 
 export interface ServerOptions {
@@ -15,8 +16,13 @@ export interface ServerOptions {
   apiToken: string
   /** The one browser origin allowed to call this server (a native app sends no Origin). */
   allowedOrigin?: string
-  /** Requests per minute per caller and bucket; `rpcHeavy` counts each expensive RPC call (eth_getLogs, eth_call…). */
-  limits?: { live: number; display: number; status: number; rpc: number; rpcHeavy?: number }
+  /**
+   * Requests per minute per caller and bucket; `rpcHeavy` counts each expensive RPC call (eth_getLogs, eth_call…),
+   * `ccip` each CCIP-Read gateway call an app makes through `/ccip` (an offchain ENS name takes one or two).
+   */
+  limits?: { live: number; display: number; status: number; rpc: number; rpcHeavy?: number; ccip?: number }
+  /** Options for the `/ccip` route's `createEnsCcipHandler` (host lists, timeouts; DNS and fetch doubles in tests). */
+  ccip?: EnsCcipHandlerOptions
   /**
    * Who a request counts against for rate limits. Default: the socket's address — behind a proxy
    * that is the proxy's, the same for everyone. Pass a key you trust: the signed-in user's id, or
@@ -61,7 +67,7 @@ function makeGuard(opts: ServerOptions) {
   // An empty token would equal an empty Authorization header: every request would pass.
   if (typeof opts.apiToken !== 'string' || opts.apiToken.trim() === '') throw new Error('apiToken must be a non-empty string (an empty one lets every request through).')
   const token = Buffer.from(opts.apiToken)
-  const limits = { rpcHeavy: 60, ...(opts.limits ?? { live: 30, display: 240, status: 120, rpc: 600 }) }
+  const limits = { rpcHeavy: 60, ccip: 60, ...(opts.limits ?? { live: 30, display: 240, status: 120, rpc: 600 }) }
   const limiter = createRateLimiter()
   const take = (key: string, perMinute: number) => limiter.take(key, perMinute)
   const authenticate = (req: IncomingMessage): string => {
@@ -79,6 +85,8 @@ function makeGuard(opts: ServerOptions) {
       const bucket = call.action === 'track' || call.action === 'claim' ? 'status' : call.dry ? 'display' : 'live'
       take(`${caller}:swap2:${bucket}`, limits[bucket])
     },
+    /** One count per CCIP-Read gateway call: each makes this server fetch a URL a name's resolver chose. */
+    ccip: (req: IncomingMessage) => take(`${authenticate(req)}:ccip`, limits.ccip),
     /** One count per request, then one per expensive call in it (a batch of 20 eth_getLogs is 20). */
     rpc: (req: IncomingMessage) => {
       const caller = authenticate(req)
@@ -98,6 +106,9 @@ export function createServer(opts: ServerOptions): Server {
   // quotes and swap ids are then bound to that user, and another user's are refused (403).
   const swap2 = createSwap2Handler<IncomingMessage>({ providers: opts.providers, sealSecret: opts.sealSecret, guard: guard.swap2 })
   const rpc = createRpcProxy({ upstreams: opts.upstreams, ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}) })
+  // CCIP-Read for apps on React Native (offchain ENS names: cb.id, Basenames): https, public addresses only,
+  // the connection pinned to the checked address, no redirects. The app side is ensCcipViaProxy(`${api}/ccip`).
+  const ccip = createEnsCcipHandler(opts.ccip)
 
   return createHttpServer(async (req, res) => {
     if (!cors(req, res, opts.allowedOrigin)) return
@@ -115,6 +126,16 @@ export function createServer(opts: ServerOptions): Server {
         const out = await swap2(swap[1]!, body, req)
         return send(res, out.status, out.body)
       }
+      // #region ccip-route
+      if (url.pathname === '/ccip') {
+        guard.ccip(req) // the token and a per-caller limit, before the body is read
+        const raw = await readBody(req, 160 * 1024) // the gateway URL or calldata: up to 64 KiB of hex each
+        let body: unknown
+        try { body = JSON.parse(raw) } catch { return send(res, 400, { error: 'invalid JSON' }) }
+        const out = await ccip(body) // { url, method, body? } → { data } or { error }
+        return send(res, out.status, out.body)
+      }
+      // #endregion ccip-route
       const rpcPath = /^\/rpc\/([a-z0-9]+:[-_a-zA-Z0-9]+)$/.exec(url.pathname)
       if (rpcPath) {
         const charge = guard.rpc(req)

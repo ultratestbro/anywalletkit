@@ -513,6 +513,9 @@ importers:
       '@anywalletkit/kit':
         specifier: workspace:*
         version: link:../../packages/kit
+      '@anywalletkit/names-ens':
+        specifier: workspace:*
+        version: link:../../packages/names-ens
       '@anywalletkit/protocol-swap2-chainflip':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-chainflip

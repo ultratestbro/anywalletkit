@@ -1,7 +1,7 @@
 import { createPublicClient, http, isAddress, getAddress, type CcipRequestParameters, type Hex, type PublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
 import { normalize } from 'viem/ens'
-import { NameError, type NameResolver, type NameWarning, type ResolvedName } from '@anywalletkit/core'
+import { NameError, type NameErrorCode, type NameResolver, type NameWarning, type ResolvedName } from '@anywalletkit/core'
 import { isPublicHttpsUrl } from '@anywalletkit/networks/url'
 import { coinTypeFor, decodeAddressRecord } from './coins.js'
 import { warningsFor } from './warnings.js'
@@ -36,7 +36,30 @@ export interface EnsResolverOptions {
 
 interface Entry<T> { value: T; expires: number }
 
-export class EnsNameError extends NameError {}
+/**
+ * A finer reason than the {@link NameErrorCode}, for the developer rather than the user.
+ * `ccip-proxy-required`: an offchain (CCIP-Read) name on React Native with no `ccip` option set (code `lookup-failed`).
+ */
+export type EnsNameErrorReason = 'ccip-proxy-required'
+
+export class EnsNameError extends NameError {
+  /** Set when the cause is the app's setup, not the name or the network: see {@link EnsNameErrorReason}. */
+  readonly reason: EnsNameErrorReason | undefined
+  constructor(code: NameErrorCode, message: string, detail: { name?: string; chain?: string; cause?: unknown } = {}, reason?: EnsNameErrorReason) {
+    super(code, message, detail)
+    this.reason = reason
+  }
+}
+
+/** What an app on React Native must set before offchain names resolve (scan 2026-10-28 F13). */
+const CCIP_PROXY_REQUIRED =
+  'Offchain (CCIP-Read) names are off on React Native: its fetch follows redirects, so a gateway could send the device to a host on the user\'s network. ' +
+  "Ask gateways through your server: ensResolver({ rpcUrl, ccip: { fetch: ensCcipViaProxy('https://your.server/ccip') } }), with createEnsCcipHandler() " +
+  "from '@anywalletkit/names-ens/server' behind that route. Or set ccip: { allowRedirectFollowingFetch: true } to ask gateways directly and accept the risk. " +
+  'See https://docs.anywallet.tech/guides/names/#react-native'
+
+const ccipProxyRequired = (detail: { name?: string; chain?: string } = {}) =>
+  new EnsNameError('lookup-failed', CCIP_PROXY_REQUIRED, detail, 'ccip-proxy-required')
 
 /** How `ensCcipRequest` / `createEnsCcipRead` reach CCIP-Read gateways. */
 export interface EnsCcipOptions {
@@ -74,7 +97,7 @@ export async function ensCcipRequest({ data, sender, urls, requestOptions }: Cci
   const signal = requestOptions?.signal ?? undefined
   const doFetch = opts.fetch ?? ((url: string, init: RequestInit) => fetch(url, init))
   if (!opts.fetch && !opts.allowRedirectFollowingFetch && fetchFollowsRedirects()) {
-    throw new EnsNameError('lookup-failed', 'Offchain (CCIP-Read) names are off on this runtime: its fetch follows redirects. Pass a ccip fetch that refuses them (e.g. through your server).')
+    throw ccipProxyRequired()
   }
   let error: Error = new EnsNameError('lookup-failed', 'The offchain resolver names no gateway this wallet asks.')
   for (const template of urls) {
@@ -110,6 +133,14 @@ export async function ensCcipRequest({ data, sender, urls, requestOptions }: Cci
   throw error
 }
 
+const isProxyRequired = (e: unknown): boolean => e instanceof EnsNameError && e.reason === 'ccip-proxy-required'
+
+/** The refusal anywhere in an error's cause chain (viem wraps it in OffchainLookupError and a contract error). */
+function causedByProxyRequired(e: unknown): boolean {
+  for (let cur: unknown = e, depth = 0; cur && depth < 8; cur = (cur as { cause?: unknown }).cause, depth++) if (isProxyRequired(cur)) return true
+  return false
+}
+
 /** viem's `ccipRead` option with {@link ensCcipRequest} and `opts`: `createPublicClient({ chain: mainnet, transport, ccipRead: createEnsCcipRead({ fetch: viaMyServer }) })`. */
 export function createEnsCcipRead(opts: EnsCcipOptions = {}): { readonly request: (p: CcipRequestParameters) => Promise<Hex> } {
   return Object.freeze({ request: (p: CcipRequestParameters) => ensCcipRequest(p, opts) })
@@ -140,7 +171,16 @@ function ipfsPrefix(gateway: string): string {
 
 /** Names ENS can serve: `.eth` and any DNS name (cb.id, uni.eth subnames, imported DNS). */
 export function ensResolver(opts: EnsResolverOptions): NameResolver {
-  const client = opts.client ?? (opts.rpcUrl ? createPublicClient({ chain: mainnet, transport: http(opts.rpcUrl), ccipRead: opts.ccip ? createEnsCcipRead(opts.ccip) : ensCcipRead }) : null)
+  // Refusals of the React Native default, counted so that a lookup they broke says what to set (viem's batch
+  // gateway turns a thrown error into a revert string, so the error itself does not always come back).
+  let ccipRefusals = 0
+  const ccipRead = {
+    request: (p: CcipRequestParameters) => ensCcipRequest(p, opts.ccip).catch((e: unknown) => {
+      if (isProxyRequired(e)) ccipRefusals++
+      throw e
+    }),
+  }
+  const client = opts.client ?? (opts.rpcUrl ? createPublicClient({ chain: mainnet, transport: http(opts.rpcUrl), ccipRead }) : null)
   if (!client) throw new Error('names-ens: pass a mainnet client or rpcUrl')
   const ttl = opts.cacheTtlMs ?? 5 * 60_000
   const ipfs = opts.ipfsGateway ?? 'https://ipfs.io/ipfs/'
@@ -191,11 +231,14 @@ export function ensResolver(opts: EnsResolverOptions): NameResolver {
     const hit = options?.fresh ? undefined : recall<ResolvedName>(key) // `fresh`: the signing-time check, never cached
     if (hit) return hit
     let raw: string | null
+    const refusalsBefore = ccipRefusals
     try {
       raw = await client.getEnsAddress({ name, coinType })
     } catch (e) {
+      if (ccipRefusals !== refusalsBefore || causedByProxyRequired(e)) throw ccipProxyRequired({ name, chain })
       throw new NameError('lookup-failed', `Could not look up ${name}: ${e instanceof Error ? e.message : String(e)}`, { name, chain, cause: e })
     }
+    if (ccipRefusals !== refusalsBefore && (!raw || /^0x0*$/.test(raw))) throw ccipProxyRequired({ name, chain })
     if (!raw || /^0x0*$/.test(raw)) {
       // Distinguish "no such name" from "no record for this chain": the mainnet
       // record is the one almost every name has.

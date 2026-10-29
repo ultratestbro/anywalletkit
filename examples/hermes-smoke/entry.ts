@@ -42,7 +42,7 @@ import { WalletManagerNear, describeTransaction as describeNear, encodeTransacti
 import { smokeProtocols } from './protocols.js'
 import fastPbkdf2 from '@anywalletkit/runtime-hermes/fast-pbkdf2'
 import { sealBackup, openBackup, encodeBackup, decodeBackup, isBackupError } from '@anywalletkit/seed-vault'
-import { avatarUrl, ensResolver, warningsFor, coinTypeFor, decodeBtcScript } from '@anywalletkit/names-ens'
+import { avatarUrl, ensCcipRequest, ensCcipViaProxy, ensResolver, warningsFor, coinTypeFor, decodeBtcScript } from '@anywalletkit/names-ens'
 import { isNameLike, nameResolvers } from '@anywalletkit/core'
 import { TOKEN_SYMBOL_MAX, TokensTable, assessToken, foldSymbol, inspectToken, memoryJsonStorage as tokensStorage, tokenText, type TokensState } from '@anywalletkit/tokens'
 import { isTokenAddress, resolveAsset } from '@anywalletkit/swap2-assets'
@@ -277,6 +277,19 @@ async function main() {
     eq('url backslash refused', !isPublicHttpsUrl('https://127.0.0.1\\x') && !isPublicHttpsUrl('https://192.168.1.1\\.example.com') && !checkRpcUrl('https://localhost\\x').ok && !isPublicHttpsUrl('https://rpc.example\t.org/') && isPublicHttpsUrl('https://rpc.example.org/'), true)
     eq('ens avatar ipfs gateway origin', avatarUrl('ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG', 'https://gw.example'), 'https://gw.example/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')
     eq('ens avatar filtered', [avatarUrl('https://192.168.1.1/a.png'), avatarUrl('https://example.org/a.png')].join(','), ',https://example.org/a.png')
+    // scan 2026-10-28 F13: the safe CCIP-Read path runs here (no Node API, no AbortSignal.timeout); the default refuses with what to set
+    const proxied: string[] = []
+    const viaProxy = ensCcipViaProxy('https://api.example/ccip', { timeoutMs: 1000, fetch: async (url, init) => { proxied.push(`${url} ${String(init.body)}`); return { status: 200, text: async () => '{"data":"0xabcdef"}' } } })
+    const ccipParams = { data: '0x9061b923' as const, sender: '0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63' as const, urls: ['https://gw.example/{data}'] }
+    eq('ens ccip via proxy', await ensCcipRequest(ccipParams, { fetch: viaProxy }), '0xabcdef')
+    eq('ens ccip proxy request', proxied[0], 'https://api.example/ccip {"url":"https://gw.example/0x9061b923","method":"GET"}')
+    const g = globalThis as { navigator?: unknown }
+    const nav = g.navigator
+    g.navigator = { product: 'ReactNative' }
+    let reason: unknown = null
+    try { await ensCcipRequest(ccipParams) } catch (e) { reason = (e as { reason?: unknown }).reason }
+    g.navigator = nav
+    eq('ens ccip RN default says proxy', reason, 'ccip-proxy-required')
     const added = parseAddChainParams([{ chainId: '0x2105', chainName: 'Base', rpcUrls: ['https://mainnet.base.org'] }], { origin: 'https://app.example.org', now: () => 1 })
     eq('eip3085 parse', !isAddChainError(added) && added.caip2 === 'eip155:8453' && typeof added.source === 'object' && added.source.origin === 'https://app.example.org', true)
     eq('eip3085 unknown chain', isAddChainError(parseAddChainParams([{ chainId: '0x7a69', rpcUrls: ['https://x'] }])) , true)

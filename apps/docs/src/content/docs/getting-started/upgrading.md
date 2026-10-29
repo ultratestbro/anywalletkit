@@ -1,6 +1,6 @@
 ---
 title: Upgrading
-description: What to change in your app when you move to a new Any Wallet Kit release — the 2026-10-28 security release first.
+description: What to change in your app when you move to a new Any Wallet Kit release — the latest security releases first.
 sidebar:
   order: 5
 ---
@@ -9,6 +9,90 @@ Versions are `0.x`, so a minor release may change the API. A `^0.y` range never 
 release by itself: you take these changes when you bump. Each package's CHANGELOG lists its changes;
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
+
+## Next release: the 2026-10-28 security scan
+
+This release fixes the 2026-10-28 scan. Four changes can need something from you: offchain ENS names
+on React Native, typed-data signatures under policies, Solana transactions that create token accounts,
+and URLs with a backslash.
+
+### ENS on React Native (`names-ens`)
+
+React Native's fetch follows a redirect whatever `redirect: 'error'` says, so an offchain name's
+gateway could redirect the device to a host on the user's network. There, the resolver no longer asks
+gateways with the global fetch. **Offchain names (`cb.id`, Basenames, `uni.eth` subnames) fail with
+`lookup-failed`** until you set `ccip`. The error's `reason` is `ccip-proxy-required` and its message
+says what to set. Browsers, extensions and Node are unchanged.
+
+The safe fix is one route on your server with the new `createEnsCcipHandler`, and the new
+`ensCcipViaProxy` in the app:
+
+```ts
+// server (Node), behind your auth and rate limits
+import { createEnsCcipHandler } from '@anywalletkit/names-ens/server'
+const ccip = createEnsCcipHandler()
+// POST /ccip: const out = await ccip(JSON.parse(rawBody)); reply out.status with JSON out.body
+
+// app
+import { ensCcipViaProxy, ensResolver } from '@anywalletkit/names-ens'
+const ens = ensResolver({
+  rpcUrl: ETHEREUM_RPC,
+  ccip: { fetch: ensCcipViaProxy('https://api.example.com/ccip', { headers: { authorization: `Bearer ${token}` } }) },
+})
+```
+
+- **The server route** asks only https gateways on public hosts, checks every address the host
+  resolves to, connects to the checked one, and never follows a redirect. See
+  [Names](/guides/names/#react-native) and the reference server's `POST /ccip`.
+- **Without a server**, `ccip: { allowRedirectFollowingFetch: true }` brings direct lookups back and
+  accepts that a redirecting gateway can make the device send one blind request.
+- **Your own viem `client`:** pass the same options as `ccipRead: createEnsCcipRead({ … })`.
+- **A 3xx answer is never used**, on every runtime.
+
+### Policies and typed data (`kit`)
+
+The policies now read typed data that moves value by itself:
+- EIP-3009 `TransferWithAuthorization` / `ReceiveWithAuthorization` is a `send` to `to`, with the
+  verifying contract as the token and `value` as the amount;
+- an ERC-2771 `ForwardRequest` and a `MetaTransaction` are judged by the call they make;
+- a 1inch LOP `Order` (the Omniston EVM order) by its settlement contract, and by a `receiver` other
+  than the maker.
+
+What this changes:
+- **Under an allowlist,** these signatures need their destinations on the list. Typed data the
+  policies cannot read is refused: it is `kind: 'typedData'` with `destinationUnknown: true`.
+- **Under a blocklist,** unreadable typed data is refused unless you have a `confirm` hook, which then
+  sees `destinationUnknown: true`.
+- **A blocklisted verifying contract** is refused for all typed data, Permit and Permit2 included. The
+  new `WriteIntent.verifyingContract` carries it.
+- **`WriteIntent.message`** is now `false` for every `signTypedData`.
+
+See [Policies](/concepts/policies/).
+
+### Solana token accounts the transaction creates (`wallet-solana`)
+
+The guard that simulates what a program does by CPI now also watches token accounts the transaction
+creates, such as an associated token account made with `CreateAssociatedTokenIdempotent`.
+- A transaction that leaves a close authority or another owner on a token account of this wallet that
+  it creates, or a delegate allowance no top-level `Approve` shows, is refused with
+  `UnsafeTransactionError` (`sets-authority` / `approves-delegate`).
+- Creating this wallet's associated token account for another owner is refused.
+- `allowAuthorityChanges` still overrides the guard, for example for a token launch.
+- `checkSerialized` asks the simulation only for accounts of the transaction. An address outside it
+  keeps its pre-state.
+
+### URLs with a backslash (`networks`)
+
+A WHATWG parser (browsers, Node, the extension) and OkHttp end a host at `\` and drop tabs and line
+breaks, so `https://192.168.1.1\admin` was checked as one host and fetched from another. Now a URL with
+`\`, a tab, CR, LF or another control character anywhere is refused:
+- `checkRpcUrl` answers `not-a-url`;
+- `isPublicHttpsUrl` answers `false`;
+- a site's `rpcUrls` entry in `wallet_addEthereumChain` is dropped;
+- ENS gateway and avatar URLs with one are not used.
+
+If you store user-entered RPC URLs, a saved one with a backslash no longer passes: ask the user to
+enter it again.
 
 ## 2026-10-28: the modules security release
 
