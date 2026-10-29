@@ -1054,6 +1054,12 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     if (unsigned.approvalAddress && !unsigned.data && !unsigned.typedData) {
       throw new Error("swap2: approval is only valid for calldata or typed-order execution");
     }
+    // A remote stub's build that pays an address its backend named — a deposit address, a plain value send — skips
+    // every pin below; it runs only on a stub the app opened to such routes (scan 2026-10-28, F9).
+    if (provider.remote === true && provider.depositAddressRoutes !== true &&
+      unsigned.data === undefined && unsigned.bodyBoc === undefined && unsigned.typedData === undefined && !serialized) {
+      throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' sends the input to ${unsigned.to}, an address its backend named, and the app did not allow deposit-address routes for it (remoteProvider depositAddressRoutes) — refused`);
+    }
     // Memo'd deposits: TON carries it as the message body, Tron in
     // raw_data.data (both TRX and TRC-20 — bifrost reads that field for
     // either contract type). Every other chain would silently drop it.

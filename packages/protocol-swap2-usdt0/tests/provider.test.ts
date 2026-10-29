@@ -4,6 +4,12 @@ import {CrossChainRouter} from "@anywalletkit/protocol-swap2-router";
 import {usdt0Provider, USDT0_STATUS_MAP} from "../src/provider.js";
 import {USDT0_CHAINS, USDT0_BY_EID} from "../src/config.js";
 import {LZ_RECEIVE, USDT0_SEND} from "../src/activity.js";
+import {usdt0Pins} from "../src/config.js";
+import {remoteProvider} from "@anywalletkit/protocol-swap2-core/remote";
+import {createSwap2Handler} from "@anywalletkit/protocol-swap2-core/server";
+import {SingleProviderSwap2} from "@anywalletkit/protocol-swap2-core/swap2/single";
+import type {CrossChainProvider, Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+
 
 const ARB = USDT0_CHAINS["eip155:42161"]!;
 const ETH = USDT0_CHAINS["eip155:1"]!;
@@ -363,3 +369,59 @@ describe("USDT0 placeholders are for dry quotes only", () => {
     expect(reasons).toEqual(["a live quote needs a recipient", "a live quote needs a refund address"])
   })
 })
+
+// Scan 2026-10-28, F9: a remote stub's deposit-address routes now need the app's opt-in (`depositAddressRoutes`),
+// which usdt0Pins do not give. The repro's deposit route is refused; the real OFT send still executes through the
+// real provider behind the swap2 server handler, remoteProvider + usdt0Pins, and the engine.
+describe("scan 2026-10-28 F9: USDT0 remote corridor with usdt0Pins", () => {
+  const ATTACKER = "0x9999999999999999999999999999999999999999";
+
+  /** The real provider behind the real swap2 handler, as the app's backend runs it. */
+  function realBackend(provider: CrossChainProvider): typeof fetch {
+    const handle = createSwap2Handler<string>({providers: [provider], sealSecret: "test-seal-secret-that-is-at-least-32-bytes-long", guard: () => {}, subject: () => "alice"});
+    return (async (url: string, init: RequestInit) => {
+      const res = await handle(String(url).split("/").pop()!, JSON.parse(String(init.body)), "alice");
+      return new Response(JSON.stringify(res.body), {status: res.status, headers: {"content-type": "application/json"}});
+    }) as unknown as typeof fetch;
+  }
+
+  /** The repro's backend: no txRequest, depositAddress = attacker; the build a plain send of the input to it. */
+  function depositBackend(name: string, chain: string): typeof fetch {
+    return (async (url: string, init: {body: string}) => {
+      const action = String(url).split("/").at(-1)!;
+      const body = JSON.parse(init.body) as {params?: QuoteParams; quote?: Quote};
+      const reply = (v: unknown) => new Response(JSON.stringify(v), {status: 200, headers: {"content-type": "application/json"}});
+      if (action === "quote") {
+        const p = body.params!;
+        return reply({provider: name, intentId: `i-${Math.random()}`, depositAddress: ATTACKER, depositMemo: null, sourceAmount: p.amountIn,
+          destAmount: "999999999999999999999", minDestAmount: p.minAmountOut ?? "1", feeUsd: 0, etaSeconds: 1, reliability: 1, validUntilMs: Date.now() + 60_000} satisfies Quote);
+      }
+      if (action === "build") return reply({chain, to: ATTACKER, value: body.quote!.sourceAmount} satisfies UnsignedTx);
+      return reply({});
+    }) as unknown as typeof fetch;
+  }
+
+  /** The app: remoteProvider({name, baseUrl, ...pins}) under the engine, with a recording EVM account. */
+  function app(name: string, pins: RemotePins, fetchImpl: typeof fetch, self: string, fromChain: string, extra: Record<string, unknown> = {}) {
+    const sent: Array<{to: string; data?: string; value?: bigint}> = [];
+    const account = {
+      getAddress: async () => self, getChainId: async () => Number(fromChain.slice(7)), getAllowance: async () => 0n, waitForTransaction: async () => {},
+      sendTransaction: async (tx: {to: string; data?: string; value?: bigint}) => { sent.push(tx); return {hash: `0x${String(sent.length).padStart(64, "0")}`}; },
+    };
+    const provider: CrossChainProvider = remoteProvider({name, baseUrl: "https://backend.example/api/v2/swap2", fetchImpl, ...extra, ...pins});
+    class P extends SingleProviderSwap2 { protected readonly provider = provider; protected chainSupported(): boolean { return true; } }
+    return {sent, swap2: new P(account as never, {fromChain})};
+  }
+
+  it("the repro's deposit-address route (USDT0 to the attacker) is refused before anything is sent", async () => {
+    const a = app("usdt0", usdt0Pins, depositBackend("usdt0", "eip155:42161"), SENDER, "eip155:42161");
+    await expect(a.swap2.swap2({fromToken: "USDT0", toToken: HYPE.token, toChain: 999, recipient: RECIPIENT, fromTokenAmount: 10_000_000n, minAmountOut: 1n} as never)).rejects.toThrow(/did not allow deposit-address routes/);
+    expect(a.sent).toEqual([]);
+  });
+
+  it("corridor USDT0 Arbitrum → HyperEVM: the OFT send with the quoted messaging fee as value", async () => {
+    const a = app("usdt0", usdt0Pins, realBackend(make().p), SENDER, "eip155:42161");
+    await a.swap2.swap2({fromToken: "USDT0", toToken: HYPE.token, toChain: 999, recipient: RECIPIENT, fromTokenAmount: 10_000_000n, minAmountOut: 10_000_000n} as never);
+    expect(a.sent.map((t) => [t.to.toLowerCase(), t.value])).toEqual([[ARB.oft.toLowerCase(), SEALED]]);
+  });
+});

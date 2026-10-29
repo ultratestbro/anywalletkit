@@ -78,6 +78,25 @@ describe("remote stubs without the app's pins (scan 2026-10-27 modules, F8/F9/F1
     expect(router.getProvider("unpinned")).toMatchObject({remote: true});
     expect(router.getProvider("unpinned")!.spenders).toBeUndefined();
   });
+
+  it("scan 2026-10-28 F9: a remote deposit-address route is dropped unless the app opted the stub in; the opt-in survives the snapshot", async () => {
+    const answer = (name: string, destAmount: string) => (async (url: string, init: {body: string}) => {
+      const {params} = JSON.parse(init.body) as {params: {amountIn: string}};
+      const q = {provider: name, intentId: `${name}-1`, depositAddress: "0x5555555555555555555555555555555555555555", depositMemo: null,
+        sourceAmount: params.amountIn, destAmount, minDestAmount: destAmount, feeUsd: 0, etaSeconds: 1, reliability: 1, validUntilMs: Date.now() + 60_000};
+      return new Response(JSON.stringify(String(url).endsWith("/quote") ? q : {}), {status: 200});
+    }) as unknown as typeof fetch;
+    // A pinned calldata stub whose backend answers with a deposit address it chose, priced to win…
+    const pinned = remoteProvider({name: "pinned", baseUrl: "https://backend.example/swap2", fetchImpl: answer("pinned", "120"), callTargets: () => [], spenders: () => []});
+    // …and a deposit-address provider the app opened (NEAR Intents' per-quote addresses).
+    const opened = remoteProvider({name: "opened", baseUrl: "https://backend.example/swap2", fetchImpl: answer("opened", "100"), depositAddressRoutes: true});
+    const router = new CrossChainRouter([pinned, opened]);
+    const best = await router.getBestQuote({sourceChain: "tron:728126428", sourceToken: "USDT", destChain: "eip155:1", destToken: "USDC", amountIn: "100", destAddress: "0x1"});
+    expect(best?.provider).toBe("opened");
+    expect(router.lastRejections).toEqual([expect.stringMatching(/^pinned: the route pays 0x5{40}, an address the backend named, and the app did not allow deposit-address routes/)]);
+    expect(router.getProvider("opened")).toMatchObject({remote: true, depositAddressRoutes: true});
+    expect(router.getProvider("pinned")!.depositAddressRoutes).toBeUndefined();
+  });
 });
 
 describe("aggregator over caller-supplied providers", () => {

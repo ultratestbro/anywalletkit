@@ -364,6 +364,7 @@ export interface ThorchainProviderConfig {
  * the build on the client: the vault in the router call (or the Tron deposit's recipient) confirmed by two THORNodes
  * of different operators, the source asset and exact input, and the memo's asset, destination, refund and limit
  * against the app's own request. Pass the affiliate your backend's provider uses (the memo must carry exactly it).
+ * The Tron deposit route is open (`depositAddressRoutes`): its vault is the one `verifyBuild` confirms.
  */
 export function thorchainPins(opts: {
   nodeUrl?: string | string[];
@@ -379,6 +380,8 @@ export function thorchainPins(opts: {
   return Object.freeze({
     callTargets: routersFor,
     spenders: routersFor,
+    // A Tron source is a send to the inbound vault; verifyBuild confirms that vault with two THORNodes (scan 2026-10-28 F9).
+    depositAddressRoutes: true,
     async verifyBuild(quote: Quote, tx: UnsignedTx, params?: QuoteParams): Promise<string | null> {
       if (!params) return "the request this quote answered is unknown";
       const src = ccAsset(params.sourceChain, params.sourceToken);

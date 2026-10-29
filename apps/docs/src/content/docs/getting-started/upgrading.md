@@ -17,8 +17,12 @@ through your own server:
 
 - **Pins now open the call.** `uniswapPins` and `balancerPins` carry `verifyQuote`
   (`uniswapVerifyQuote`, `balancerVerifyQuote`): the router or Vault call is decoded on the device and
-  must be exactly the swap the user asked for — tokens, input, minimum, recipient. Spread the pins as
-  before; nothing else to wire.
+  must be exactly the swap the user asked for — tokens, input, minimum, recipient. `chainflipPins`
+  carry `chainflipVerifyQuote`. Spread the pins as before; nothing else to wire.
+- **Deposit-address routes need an opt-in.** A remote stub's route that pays an address the server
+  names — a deposit address or a plain value send — is refused unless the stub has
+  `depositAddressRoutes: true`. `nearIntentsPins`, `thorchainPins()` (Tron) and `chainflipPins` (Tron)
+  set it; add `...nearIntentsPins` to your NEAR Intents stub.
 - **Remote typed orders need `verifyBuild`.** The engine signs a remote EIP-712 order only after the
   stub's `verifyBuild` ran. `omnistonVerifyBuild` now opens Omniston's EVM orders too, with the order
   extension the server's build carries: deploy the new server before the new app, or remote EVM → TON
@@ -35,8 +39,9 @@ the packages you use.
 #### Pins
 
 A remote provider now takes the contracts its calldata may call and approve from your app, never
-from your server. Without pins it gets **no EVM calldata route at all**. Deposit-address routes, such
-as NEAR Intents, and Jupiter's Solana transactions need no pins. Every other provider package exports
+from your server. Without pins it gets **no EVM calldata route at all**. Jupiter's Solana transactions
+need no pins; deposit-address routes such as NEAR Intents need `depositAddressRoutes` since the next
+release (above). Every other provider package exports
 its pins:
 
 ```ts

@@ -239,7 +239,10 @@ const { status, body } = await handle(action, json, req)
 
 // app: the same router, providers proxied — the engine still validates everything on the device
 import { remoteProvider } from '@anywalletkit/protocol-swap2-core/remote'
-const providers = ['lifi', 'near_intents', 'thorchain', 'chainflip'].map((name) => remoteProvider({ name, baseUrl: `${API}/swap2`, headers: { authorization: `Bearer ${token}` } }))
+// each provider package exports its pins (lifiPins, thorchainPins(), chainflipPins, nearIntentsPins, uniswapPins…):
+// the contracts its calldata may call, the client-side checks, and the deposit-address opt-in
+const PINS = { lifi: lifiPins, near_intents: nearIntentsPins, thorchain: thorchainPins(), chainflip: chainflipPins }
+const providers = Object.entries(PINS).map(([name, pins]) => remoteProvider({ name, baseUrl: `${API}/swap2`, headers: { authorization: `Bearer ${token}` }, ...pins }))
 ```
 
 Quotes are HMAC-sealed: `build`/`preflight` refuse an unsealed, altered or expired quote. Never

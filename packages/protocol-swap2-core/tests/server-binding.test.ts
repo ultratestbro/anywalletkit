@@ -143,7 +143,8 @@ describe("swap2 engine over the server: the swap id it hands the app keeps the t
     };
     const handle = createSwap2Handler<string>({providers: [real], sealSecret: SECRET, guard: () => {}, subject: (u) => u});
     const over = (user: string) => remoteProvider({
-      name: "edge", baseUrl: "https://api.example.test/swap2",
+      // A deposit-address provider: the app opts this stub in (scan 2026-10-28 F9).
+      name: "edge", baseUrl: "https://api.example.test/swap2", depositAddressRoutes: true,
       fetchImpl: (async (url: string, init: RequestInit) => {
         const res = await handle(String(url).split("/").pop()!, JSON.parse(String(init.body)), user);
         return new Response(JSON.stringify(res.body), {status: res.status, headers: {"content-type": "application/json"}});

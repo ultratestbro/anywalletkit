@@ -48,7 +48,7 @@ export interface RemoteProviderOptions {
    * per chain — the provider package's pins (`lifiPins`, `fyndPins`, `uniswapPins`…, spread into
    * these options). The app's lists, not the server's: without them the engine refuses this stub's
    * EVM calldata routes and approvals, so a compromised backend cannot name its own contract or
-   * spender (scan 2026-10-27 modules, F8/F9/F16). Deposit-address routes need no pins.
+   * spender (scan 2026-10-27 modules, F8/F9/F16). Deposit-address routes need `depositAddressRoutes`.
    */
   callTargets?: (chain: string) => readonly string[];
   spenders?: (chain: string) => readonly string[];
@@ -63,6 +63,13 @@ export interface RemoteProviderOptions {
    * for: the reason it fails, or null. A build it refuses is never approved or signed.
    */
   verifyBuild?: (quote: Quote, tx: UnsignedTx, params?: QuoteParams) => string | null | Promise<string | null>;
+  /**
+   * Let this stub's routes send the input to an address the backend names: a deposit address (NEAR Intents, a
+   * THORChain or Chainflip Tron vault) or a plain value send. Off by default: such a route bypasses `callTargets`, so
+   * a compromised backend could name its own address (scan 2026-10-28, F9). Opt in only for a provider whose deposit
+   * addresses cannot be pinned, or whose `verifyQuote` / `verifyBuild` checks them (`thorchainPins`, `chainflipPins`).
+   */
+  depositAddressRoutes?: boolean;
   /**
    * Allow a non-https absolute `baseUrl` (local development only). Quotes, builds and typed orders travel this
    * channel; over plain http anyone on the path can rewrite them (scan 2026-10-27 modules, F4).
@@ -135,6 +142,7 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
     name,
     remote: true,
     ...(opts.verifyBuild ? {verifiesBuilds: true} : {}),
+    ...(opts.depositAddressRoutes === true ? {depositAddressRoutes: true} : {}),
     // The browser side has no dark-flag env; the backend enforces its own
     // flags — a disabled provider simply quotes null / rejects build.
     enabled: () => enabled ? enabled() : true,

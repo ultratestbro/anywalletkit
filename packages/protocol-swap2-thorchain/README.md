@@ -31,7 +31,8 @@ development).
 Behind `remoteProvider`, the app checks the backend's build itself: `remoteProvider({name: "thorchain", baseUrl,
 ...thorchainPins()})` pins the routers and runs `verifyBuild` on the client — the vault in the router call confirmed
 by two nodes, the source asset and exact input, and the memo's destination, refund and limit against the app's own
-request (pass the backend's `affiliate` / `affiliateBps`).
+request (pass the backend's `affiliate` / `affiliateBps`). The pins open the stub to the Tron deposit route
+(`depositAddressRoutes`): its vault is the one `verifyBuild` confirms.
 
 ## Activity
 
