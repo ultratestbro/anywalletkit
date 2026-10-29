@@ -305,12 +305,81 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
 }
 
 /**
- * The Balancer V2 Vault a swap calls and approves on the chains this provider serves — the app's pins
- * for `remoteProvider({name: "balancer", baseUrl, ...balancerPins})` (scan 2026-10-27 modules, F8/F16).
+ * The batch a Balancer quote's Vault call makes, opened on the client against the app's own request (scan 2026-10-28,
+ * F2): only `batchSwap` of kind GIVEN_IN on the Vault, with no internal balances and no pool `userData`, at most
+ * {@link BALANCER_MAX_SWAPS} hops; funds taken from the sender the provider names (the refund address, else the
+ * recipient) and paid to the recipient; every swap that brings in an amount sells the source token (the Vault's ETH
+ * sentinel for a native input), the amounts adding up to exactly the input; one hop delivers the destination token;
+ * and the limits allow paying exactly the input and receiving at least the quote's minimum, nothing of anything else.
+ * `manageUserBalance`, `swap`, `setRelayerApproval` and every other Vault call are refused. The reason it fails, or null.
+ */
+export function balancerVerifyQuote(params: QuoteParams, quote: Quote): string | null {
+  const id = /^eip155:[0-9]+$/.test(params.sourceChain) ? Number(params.sourceChain.slice(7)) : NaN;
+  const chain = Object.prototype.hasOwnProperty.call(BALANCER_V2_CHAINS, id) ? BALANCER_V2_CHAINS[id] : undefined;
+  if (!chain || params.destChain !== params.sourceChain) return "not a same-chain swap on a Balancer v2 chain";
+  const tx = quote.txRequest;
+  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no Vault call";
+  if (getAddress(tx.to) !== BALANCER_V2_VAULT) return `the call targets ${tx.to}, not the Vault`;
+  const src = sourceAssetOf(params);
+  if (!src) return `unknown source token ${params.sourceToken}`;
+  const nativeIn = !src.contract;
+  const nativeOut = /^0x0+$/.test(params.destToken);
+  let tokenIn: Hex, tokenOut: Hex, sender: Hex, recipient: Hex, amountIn: bigint, minOut: bigint;
+  try {
+    tokenIn = getAddress(nativeIn ? ZERO : src.contract!);
+    tokenOut = getAddress(nativeOut ? ZERO : params.destToken);
+    recipient = getAddress(params.destAddress);
+    sender = getAddress(params.refundAddress && /^0x[0-9a-fA-F]{40}$/.test(params.refundAddress) ? params.refundAddress : params.destAddress);
+    amountIn = BigInt(params.amountIn);
+    minOut = BigInt(quote.minDestAmount);
+  } catch {
+    return "the request does not name EVM tokens, a recipient and amounts";
+  }
+  if (nativeIn ? BigInt(tx.value ?? "0") !== amountIn || tx.approvalAddress !== undefined
+    : BigInt(tx.value ?? "0") !== 0n || !tx.approvalAddress || getAddress(tx.approvalAddress) !== BALANCER_V2_VAULT) {
+    return nativeIn ? "a native input is paid as exactly the input in value, with no approval" : "a token input attaches no value and approves the Vault";
+  }
+  let call: ReturnType<typeof decodeFunctionData<typeof VAULT_ABI>>;
+  try { call = decodeFunctionData({abi: VAULT_ABI, data: tx.data as Hex}); } catch { return "the Vault call is not batchSwap"; }
+  if (call.functionName !== "batchSwap") return `${call.functionName} is not batchSwap`;
+  const [kind, swaps, assets, funds, limits] = call.args;
+  if (kind !== 0) return "the batch is not GIVEN_IN";
+  if (swaps.length === 0 || swaps.length > BALANCER_MAX_SWAPS) return `the batch has ${swaps.length} pool hops, not 1–${BALANCER_MAX_SWAPS}`;
+  if (funds.fromInternalBalance || funds.toInternalBalance) return "the batch uses Vault internal balances";
+  if (getAddress(funds.sender) !== sender || getAddress(funds.recipient) !== recipient) return `the batch takes from ${funds.sender} and pays ${funds.recipient}, not this account and the recipient`;
+  const list = assets.map((a) => getAddress(a));
+  if (new Set(list).size !== list.length) return "the batch names an asset twice";
+  if ((nativeIn || nativeOut) && list.includes(getAddress(chain.weth))) return "a native swap passes through the wrapped native";
+  const inIdx = list.indexOf(tokenIn);
+  const outIdx = list.indexOf(tokenOut);
+  if (inIdx < 0 || outIdx < 0 || inIdx === outIdx) return "the batch does not trade the requested tokens";
+  if (limits.length !== list.length || limits.some((l, i) => l !== (i === inIdx ? amountIn : i === outIdx ? -minOut : 0n))) {
+    return "the limits are not exactly the input in and the quote's minimum out";
+  }
+  let given = 0n;
+  for (const step of swaps) {
+    if (step.userData !== "0x") return "the batch carries pool userData this module never sends";
+    if (step.assetInIndex >= BigInt(list.length) || step.assetOutIndex >= BigInt(list.length) || step.assetInIndex === step.assetOutIndex) return "a hop names no valid asset pair";
+    if (step.amount > 0n) {
+      if (step.assetInIndex !== BigInt(inIdx)) return "a hop brings in an amount of another asset than the input";
+      given += step.amount;
+    }
+  }
+  if (given !== amountIn) return `the hops sell ${given}, not the ${amountIn} input`;
+  if (!swaps.some((step) => step.assetOutIndex === BigInt(outIdx))) return "no hop delivers the destination token";
+  if (call.args[5] <= BigInt(Math.floor(Date.now() / 1000))) return "the batch deadline has passed";
+  return null;
+}
+
+/**
+ * The Balancer V2 Vault a swap calls and approves on the chains this provider serves, and {@link balancerVerifyQuote}
+ * — the app's pins for `remoteProvider({name: "balancer", baseUrl, ...balancerPins})` (scan 2026-10-27 modules,
+ * F8/F16; scan 2026-10-28, F2).
  */
 export const balancerPins: RemotePins = Object.freeze({
   callTargets: (chain: string): readonly string[] => balancerVaultFor(chain),
   spenders: (chain: string): readonly string[] => balancerVaultFor(chain),
+  verifyQuote: balancerVerifyQuote,
 });
 function balancerVaultFor(chain: string): readonly string[] {
   const id = /^eip155:[0-9]+$/.test(chain) ? Number(chain.slice(7)) : NaN;

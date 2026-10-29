@@ -15,9 +15,10 @@ your app does.
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps
 through your own server:
 
-- **Pins now open the call.** `uniswapPins` carry `verifyQuote` (`uniswapVerifyQuote`): the router
-  call is decoded on the device and must be exactly the swap the user asked for — tokens, input,
-  minimum, recipient. Spread the pins as before; nothing else to wire.
+- **Pins now open the call.** `uniswapPins` and `balancerPins` carry `verifyQuote`
+  (`uniswapVerifyQuote`, `balancerVerifyQuote`): the router or Vault call is decoded on the device and
+  must be exactly the swap the user asked for — tokens, input, minimum, recipient. Spread the pins as
+  before; nothing else to wire.
 
 ## 2026-10-28: the modules security release
 
