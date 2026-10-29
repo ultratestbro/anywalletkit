@@ -7,7 +7,7 @@
 // exactly these shapes.
 import {
   ADDRESS_LOOKUP_TABLE_PROGRAM, ASSOCIATED_TOKEN_PROGRAM, COMPUTE_BUDGET_PROGRAM, FARMS_PROGRAM, KLEND_PROGRAM, KVAULT_PROGRAM, MEMO_PROGRAM,
-  SYSTEM_PROGRAM, TOKEN_PROGRAM,
+  SYSTEM_PROGRAM, TOKEN_2022_PROGRAM, TOKEN_PROGRAM,
 } from './programs.js'
 
 /** Mirrors wallet-solana's `SerializedInstructionRule`. */
@@ -112,7 +112,7 @@ export interface VaultRuleAccounts {
   sharesMint: string
   /** The wallet's token account for the vault's asset. */
   tokenAta: string
-  /** The wallet's shares account (either token program's derivation). */
+  /** The wallet's shares accounts: the Token program's derivation, then Token-2022's. */
   sharesAtas: readonly string[]
   /** The vault's farm and the wallet's state in it, when the vault has a farm. */
   farm: { farm: string; userState: string } | null
@@ -136,6 +136,11 @@ export function vaultRules(op: 'deposit' | 'withdraw', a: VaultRuleAccounts, opt
     rules.push(
       { program: KVAULT_PROGRAM, data: IX.vaultWithdrawFromAvailable, dataLength: 16, accounts: redeem },
       { program: KVAULT_PROGRAM, data: IX.vaultWithdraw, dataLength: 16, accounts: redeem },
+      // A full withdrawal closes the emptied shares account, rent back to the wallet (owner 2026-10-29).
+      // Each token program only on the account it derives; destination and owner are the wallet. The
+      // token program refuses to close an account that still holds shares, so a close inside a partial
+      // withdrawal can only fail the transaction, never move value.
+      ...sharesAtas.slice(0, 2).map((ata, i): InstructionRule => ({ program: i === 0 ? TOKEN_PROGRAM : TOKEN_2022_PROGRAM, data: '09', dataLength: 1, accounts: { 0: ata, 1: me, 2: me } })),
     )
     if (farm) {
       rules.push(
