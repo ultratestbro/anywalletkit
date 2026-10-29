@@ -11,8 +11,10 @@ A review screen that shows only "to: 0x1231…" and "data: 0x095ea7b3…" asks t
 blindly. `tx-preview-evm` turns one call, or an approve → call sequence, into what the user
 needs to see before signing:
 
-- **Decoded calls.** Approvals (ERC-20 `approve` and `increaseAllowance`, Permit2 `approve`,
-  `setApprovalForAll`), token transfers, and the name of every contract you list as known.
+- **Decoded calls.** Approvals (ERC-20 `approve`, `increaseAllowance` and `increaseApproval`, an
+  EIP-2612 `permit` call, Permit2 `approve` and `permit`, single or batch, `setApprovalForAll`),
+  token transfers, and the name of every contract you list as known. A Permit2 batch puts every
+  allowance in `approvals` (the first one is also `approval`).
 - **Simulated balance changes.** The whole sequence runs in one simulated block through
   `eth_simulateV1` with transfer tracing: "-100 USDC, +0.03 ETH".
 - **Checks.** Named outcomes (`approval-unlimited`, `simulation-reverted`,
@@ -90,6 +92,7 @@ decisions:
 | `approval-excess` | warn | Approves more than `expectedApproval` |
 | `approval-unlimited` | warn | Unlimited allowance (≥ 2^128 − 1) or operator approval |
 | `approval-unknown-spender` | warn | The spender is not in `known` |
+| `approval-unparsed` | warn | A `permit` selector (EIP-2612 or Permit2) whose arguments can't be read: it may grant an allowance nobody can size |
 | `native-value` | ok / warn | A call sends native coin into a contract (`detail.amount`, per call); warn when that contract is not in `known` (`detail.address`) |
 
 ## Preview every write

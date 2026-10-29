@@ -46,6 +46,17 @@ What to change: catch `stale-copy` where you call `setProtection` and do not sho
 Offer a retry: calling `setProtection` again removes the old copy without another sheet. After `set`,
 `stale-copy` means the new secret is stored, so do not roll back the account.
 
+### Permit calls in the transaction preview
+
+`@anywalletkit/tx-preview-evm` decodes the calls that grant an allowance without `approve`: an EIP-2612
+`permit()` call (the token is the target), Permit2 `permit()` single and batch (the token is inside the
+struct) and `increaseApproval`. They now carry `approval`, with the usual `approval-unlimited` and
+`approval-unknown-spender` warnings. A Permit2 batch lists every allowance in the new `approvals`
+field. A permit body whose arguments can't be read gives the new `approval-unparsed` warning.
+
+What to change: if your review screen maps check codes to text, add `approval-unparsed`. If it shows
+`approval`, show every entry of `approvals` when it is set.
+
 ## 2026-10-28: the modules security release
 
 This release fixes the second 2026-10-27 security scan: 37 findings in the protocol modules. Most of
