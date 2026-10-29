@@ -106,6 +106,10 @@ export class MorphoMarketProtocolEvm extends MorphoBase<MorphoMarketConfig> {
           const [loanToken, collateralToken, oracle, irm, lltv] = await this.read<readonly [Address, Address, Address, Address, bigint]>(this.chain.morpho, MORPHO_ABI, 'idToMarketParams', [this._id!])
           if (loanToken === zeroAddress) throw new MorphoError(`Market ${this._id} is not created on Morpho (${this.chain.name}).`)
           params = { loanToken: getAddress(loanToken), collateralToken: getAddress(collateralToken), oracle: getAddress(oracle), irm: getAddress(irm), lltv }
+          // The params go into every write's calldata and Morpho picks the market from them, so the
+          // RPC's answer must hash to the configured id (scan 2026-10-28 F4/F5).
+          const hashed = marketId(params)
+          if (hashed !== this._id) throw new MorphoError(`The RPC's MarketParams for market ${this._id} hash to ${hashed} (${this.chain.name}); refusing them.`)
         } else {
           const [, , , , lastUpdate] = await this.read<readonly [bigint, bigint, bigint, bigint, bigint, bigint]>(this.chain.morpho, MORPHO_ABI, 'market', [this._id!])
           if (lastUpdate === 0n) throw new MorphoError(`No market with these params on Morpho (${this.chain.name}): id ${this._id}.`)
