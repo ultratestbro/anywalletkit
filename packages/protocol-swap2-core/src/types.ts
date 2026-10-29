@@ -180,6 +180,12 @@ export interface UnsignedTx {
    * `approvalAddress` names the settlement contract that needs allowance.
    */
   typedData?: string;
+  /**
+   * Typed-order execution: the order extension (0x-hex) the order's salt commits to — a 1inch Limit Order Protocol
+   * order's amount getters and post-interaction, where an HTLC order's escrow terms live. Carried so an app can open
+   * a remote build on the client (`omnistonVerifyBuild`, scan 2026-10-28 F6); the signature covers it through the salt.
+   */
+  orderExtension?: string;
 }
 
 /**

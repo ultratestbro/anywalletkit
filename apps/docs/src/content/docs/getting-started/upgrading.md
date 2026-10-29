@@ -19,6 +19,10 @@ through your own server:
   (`uniswapVerifyQuote`, `balancerVerifyQuote`): the router or Vault call is decoded on the device and
   must be exactly the swap the user asked for — tokens, input, minimum, recipient. Spread the pins as
   before; nothing else to wire.
+- **Remote typed orders need `verifyBuild`.** The engine signs a remote EIP-712 order only after the
+  stub's `verifyBuild` ran. `omnistonVerifyBuild` now opens Omniston's EVM orders too, with the order
+  extension the server's build carries: deploy the new server before the new app, or remote EVM → TON
+  and EVM → EVM orders are refused.
 
 ## 2026-10-28: the modules security release
 

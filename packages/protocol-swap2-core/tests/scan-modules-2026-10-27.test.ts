@@ -243,14 +243,28 @@ function typedRemote(typedData: string, approvalAddress: string, opts: Partial<R
 
 describe("scan 2026-10-27 modules G4 (F4): typed data from a provider is signed only when it is the swap's own order", () => {
   it("a remote build whose typedData is an EIP-2612 Permit to the attacker is refused; nothing approved, signed or registered", async () => {
+    // A permissive app validator: the engine's own order check is what refuses it.
     const t = typedAccount();
-    const r = typedRemote(permit, LOP);
+    const r = typedRemote(permit, LOP, {verifyBuild: () => null});
     await expect(g3protocol(r.provider, t.account).swap2(g3options)).rejects.toThrow(/typed order refused — Permit is a token approval/);
     expect([t.sent, t.signed, r.registered]).toEqual([[], [], []]);
     // …and with the permit's own token as the "settlement contract": not a spender the app pinned.
     const u = typedAccount();
-    await expect(g3protocol(typedRemote(permit, USDC).provider, u.account).swap2(g3options)).rejects.toThrow(/did not pin as a spender/);
+    await expect(g3protocol(typedRemote(permit, USDC, {verifyBuild: () => null}).provider, u.account).swap2(g3options)).rejects.toThrow(/did not pin as a spender/);
     expect([u.sent, u.signed]).toEqual([[], []]);
+  });
+
+  it("scan 2026-10-28 F6: a remote typed order is signed only after the app's own validator ran on it", async () => {
+    // The swap's own order, well formed for the engine — but no verifyBuild: its price, receiver and traits are unchecked.
+    const t = typedAccount();
+    const r = typedRemote(order(), LOP);
+    await expect(g3protocol(r.provider, t.account).swap2(g3options)).rejects.toThrow(/asks to sign a typed order, which needs the app's own validator/);
+    expect([t.sent, t.signed, r.registered]).toEqual([[], [], []]);
+    // With a validator that passes it, the same order is approved, signed and registered.
+    const u = typedAccount();
+    const v = typedRemote(order(), LOP, {verifyBuild: () => null});
+    await g3protocol(v.provider, u.account).swap2(g3options);
+    expect([u.sent.length, u.signed.length, v.registered.length]).toEqual([1, 1, 1]);
   });
 
   it("refuses Permit2 permits, other typed messages and orders that are not this swap's", async () => {
