@@ -13,6 +13,9 @@
  * - `auth-failed` — the OS refused the authentication for another reason.
  * - `invalid` — a bad id or option, rejected before any native call.
  * - `storage` — anything else from the Keychain / Keystore / file layer.
+ * - `stale-copy` — the newest copy of a secret is stored, but an older one (maybe under a
+ *   weaker protection) could not be removed. `info` / `list` report the weakest protection
+ *   left, and the store retries the removal on its next operation.
  */
 export type SecureStorageErrorCode =
   | 'cancelled'
@@ -24,6 +27,7 @@ export type SecureStorageErrorCode =
   | 'auth-failed'
   | 'invalid'
   | 'storage'
+  | 'stale-copy'
 
 export class SecureStorageError extends Error {
   override readonly name = 'SecureStorageError'

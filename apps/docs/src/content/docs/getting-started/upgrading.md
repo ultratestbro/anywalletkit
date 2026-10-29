@@ -29,6 +29,23 @@ What to change:
   on `LocalSigner.prototype.sign`;
 - do not compare a module's account with `wallet.getAccount(chain)` by identity: it is a wrapper.
 
+### `setProtection` reports an old copy it could not remove
+
+`@anywalletkit/secure-storage-react-native` used to ignore a failed delete of the old copy after it
+rewrote a secret. `setProtection(id, 'biometricsOnly')` resolved, `info` and `list` said strict mode,
+and the old `biometricsOrPasscode` copy stayed in the Keychain.
+
+Now:
+- `setProtection` and `set` reject with `SecureStorageError` code `stale-copy` when the new copy is
+  stored but the old one could not be removed;
+- `info` and `list` report the weakest protection among the copies still stored;
+- the store retries the removal on its next operation, on first use after a restart and in `prune`
+  (which rejects with `stale-copy` if a copy still stays).
+
+What to change: catch `stale-copy` where you call `setProtection` and do not show strict mode as on.
+Offer a retry: calling `setProtection` again removes the old copy without another sheet. After `set`,
+`stale-copy` means the new secret is stored, so do not roll back the account.
+
 ## 2026-10-28: the modules security release
 
 This release fixes the second 2026-10-27 security scan: 37 findings in the protocol modules. Most of

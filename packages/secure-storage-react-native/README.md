@@ -50,10 +50,11 @@ const { biometry, passcodeSet, hardware } = await secrets.capabilities()
 - **`prune(keepIds)`**: the iOS Keychain survives an uninstall, but the app's account list does not. Call this on start-up with the ids your app still knows, and orphaned secrets from a previous install are deleted.
 - **`migrateFrom(oldStore, ids)`** moves secrets out of `expo-secure-store` or anything else. For each id it copies the secret, reads it back, compares, and only then deletes the old copy. If the user cancels or the comparison fails, the old copy stays.
 - **Replacing a secret** writes a fresh slot first and removes the old one afterwards. A cancelled or failed write never loses the secret.
+- **An old copy that cannot be removed** is never left silently. `set` and `setProtection` reject with `stale-copy` (the new copy is stored; the old one may be under the weaker protection), `info` / `list` report the weakest protection of the copies still stored, and the store retries the removal on its next operation, on first use after a restart and in `prune`. Retry `setProtection` before you tell the user strict mode is on; it resolves once the old copy is gone.
 
 ## Errors
 
-Every failure is a `SecureStorageError` with a `code`: `cancelled`, `biometry-changed`, `lockout`, `no-passcode`, `not-available`, `locked`, `auth-failed`, `invalid`, `storage`. Branch on `isSecureStorageError(err, 'biometry-changed')` and send the user to restore from backup.
+Every failure is a `SecureStorageError` with a `code`: `cancelled`, `biometry-changed`, `lockout`, `no-passcode`, `not-available`, `locked`, `auth-failed`, `invalid`, `storage`, `stale-copy`. Branch on `isSecureStorageError(err, 'biometry-changed')` and send the user to restore from backup.
 
 ## Prompts
 
