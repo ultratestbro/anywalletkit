@@ -54,9 +54,9 @@ export class EnsNameError extends NameError {
 /** What an app on React Native must set before offchain names resolve (scan 2026-10-28 F13). */
 const CCIP_PROXY_REQUIRED =
   'Offchain (CCIP-Read) names are off on React Native: its fetch follows redirects, so a gateway could send the device to a host on the user\'s network. ' +
-  "Ask gateways through your server: ensResolver({ rpcUrl, ccip: { fetch: ensCcipViaProxy('https://your.server/ccip') } }), with createEnsCcipHandler() " +
+  'Ask gateways through your server: ensResolver({ rpcUrl, ccip: { fetch: ensCcipViaProxy(<your CCIP route>) } }), with createEnsCcipHandler() ' +
   "from '@anywalletkit/names-ens/server' behind that route. Or set ccip: { allowRedirectFollowingFetch: true } to ask gateways directly and accept the risk. " +
-  'See https://docs.anywallet.tech/guides/names/#react-native'
+  'See the names guide, section "React Native".'
 
 const ccipProxyRequired = (detail: { name?: string; chain?: string } = {}) =>
   new EnsNameError('lookup-failed', CCIP_PROXY_REQUIRED, detail, 'ccip-proxy-required')
