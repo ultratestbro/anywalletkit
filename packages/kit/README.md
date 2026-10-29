@@ -70,6 +70,11 @@ to the account (`_config` reads as a frozen copy), and under a `maxFee` rule
 refuse a `sign*` / `send*` helper the policies cannot quote. The boundary is
 what the wallet hands out: the `Wallet` object itself is the app's — give
 modules and dApp bridges accounts, managers or protocols, never the `Wallet`.
+A protocol module always gets the wrapper, with policies or without: without
+any it is a wrapper with no rules (no limits, but no signer, no internal
+helpers and no writable settings). Chain accounts keep their signer in a private
+field, so not even the app's own account (`getAccount` on a wallet without
+policies) has a `signer` property; `signerKind` says what holds the key.
 
 The lists check every destination a write names (`intent.destinations`), not
 only the contract it calls: the recipient or spender inside standard token calls

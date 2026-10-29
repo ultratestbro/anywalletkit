@@ -68,6 +68,7 @@ export class Wallet {
   private readonly _historySources = new Map<string, HistorySource>()
   private readonly _guarded = new WeakMap<object, Map<string, IWalletAccount>>()
   private readonly _guardedManagers = new WeakMap<object, object>()
+  private readonly _restricted = new WeakMap<object, Map<string, IWalletAccount>>()
   private readonly _activity: ActivityOptions
   private _journal: IntentJournal | undefined
 
@@ -201,14 +202,31 @@ export class Wallet {
     return guarded as A
   }
 
-  /** The protocol instance (one per name), constructed over the account of its chain. */
+  /**
+   * What a protocol module is handed: the account behind the wallet's policies, and without
+   * policies behind an empty rule set — no limits, but no `signer`, no internal helpers and no
+   * writable settings either. A module never gets the raw account (audit 2026-10-29 A1).
+   */
+  private restrict(account: IWalletAccount, chain: string): IWalletAccount {
+    const guarded = this.guard(account, chain)
+    if (guarded !== account) return guarded
+    let byChain = this._restricted.get(account)
+    const cached = byChain?.get(chain)
+    if (cached) return cached
+    if (!byChain) this._restricted.set(account, (byChain = new Map()))
+    const restricted = applyPolicies(account, {}, chain)
+    byChain.set(chain, restricted)
+    return restricted
+  }
+
+  /** The protocol instance (one per name), constructed over the account of its chain, never the raw account (see {@link restrict}). */
   async getProtocol<P>(name: string, index = 0): Promise<P> {
     const key = `${name}#${index}`
     const cached = this._protocolInstances.get(key)
     if (cached) return cached as P
     const reg = this._protocols.get(name)
     if (!reg) throw new Error(`No protocol registered as "${name}" (registered: ${this.protocols.join(', ') || 'none'}).`)
-    const account = await this.getAccount(reg.chain, index)
+    const account = this.restrict(await this.manager(reg.chain).getAccount(index), reg.chain)
     const instance = new reg.Protocol(account, reg.config)
     this._protocolInstances.set(key, instance)
     return instance as P

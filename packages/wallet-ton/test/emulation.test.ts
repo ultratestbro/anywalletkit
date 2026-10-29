@@ -1,6 +1,6 @@
 import '../src/buffer-global.js'
-import { describe, expect, it } from 'vitest'
-import { NetworkError } from '@anywalletkit/core'
+import { describe, expect, it, vi } from 'vitest'
+import { LocalSigner, NetworkError } from '@anywalletkit/core'
 import { SimulationError, UnsafeTransactionError, WalletManagerTon, parseTonapiRisk, parseTonapiTrace, resolveEmulate } from '../src/index.js'
 import { fakeRpc, tonapiOk } from './fake-rpc.js'
 
@@ -29,14 +29,14 @@ describe('emulation via tonapi', () => {
     const f = fakeRpc({}, { tonapi: () => tonapiOk({ root: { success: false, compute_phase: { skipped: false, success: false, exit_code: 34, exit_code_description: 'action list invalid' }, action_phase: undefined } }) })
     const m = manager(f)
     const a = await m.getAccount(0)
-    let signed = 0
-    const orig = a.signer.sign.bind(a.signer)
-    a.signer.sign = async (...args: Parameters<typeof orig>) => { signed++; return orig(...args) }
+    // The signer is a private field of the account: watch every local key instead.
+    const spy = vi.spyOn(LocalSigner.prototype, 'sign')
     const err = await a.transfer({ recipient: RECIPIENT, amount: 1n }).catch((e) => e)
     expect(err).toBeInstanceOf(SimulationError)
     expect((err as SimulationError).exitCode).toBe(34)
     expect(err.message).toMatch(/exit_code 34/)
-    expect(signed).toBe(0)
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
     expect(f.sent).toHaveLength(0)
   })
 

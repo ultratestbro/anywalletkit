@@ -46,16 +46,23 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
   readonly path: string
   /** Compressed secp256k1 public key. */
   readonly publicKey: Uint8Array
-  /** The signer that holds the key. */
-  readonly signer: Signer
+  /**
+   * The signer that holds the key, in a private field: not a property of the account, so no code
+   * the account is handed to (a protocol module, a logger) can reach it and sign around the
+   * account's checks (audit 2026-10-29 A1).
+   */
+  readonly #signer: Signer
+  /** What holds the key: `seed`, `key` (one imported key) or `external`. */
+  readonly signerKind: Signer['kind']
   private _disposed = false
   private _readOnly: WalletAccountReadOnlyZcash | undefined
 
   /** `publicKey` is the signer's compressed secp256k1 key (33 bytes); it is needed synchronously for the address. */
   constructor(signer: Signer, publicKey: Uint8Array, path: string, config: ZcashConfig = {}) {
     super(addressFromPublicKey(publicKey, config.network ?? 'mainnet'), config)
-    this.signer = requireCurve(signer, 'secp256k1')
-    if (!this.signer.schemes.includes('ecdsa')) throw new SignerError(`A Zcash account needs a signer with the 'ecdsa' scheme (has: ${this.signer.schemes.join(', ')}).`)
+    this.#signer = requireCurve(signer, 'secp256k1')
+    this.signerKind = this.#signer.kind
+    if (!this.#signer.schemes.includes('ecdsa')) throw new SignerError(`A Zcash account needs a signer with the 'ecdsa' scheme (has: ${this.#signer.schemes.join(', ')}).`)
     this.publicKey = publicKey
     this.path = path
   }
@@ -78,7 +85,7 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
   /** Zcash message signature (zcashd `signmessage` encoding), base64. */
   async sign(message: string | Uint8Array): Promise<string> {
     this.live()
-    return signMessageWith(message, this.signer)
+    return signMessageWith(message, this.#signer)
   }
 
   private ctx(intended?: { to: string; value: bigint }): DescribeContext {
@@ -113,7 +120,7 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
   async #signInputs(tx: TransparentTxV5, spent: SpentOutput[]): Promise<void> {
     for (let i = 0; i < tx.inputs.length; i++) {
       const digest = sighashAll(tx, i, spent)
-      const rs = await this.signer.sign(digest, { scheme: 'ecdsa', context: 'zcash-sighash' })
+      const rs = await this.#signer.sign(digest, { scheme: 'ecdsa', context: 'zcash-sighash' })
       const der = secp256k1.Signature.fromBytes(rs, 'compact').toBytes('der')
       tx.inputs[i]!.scriptSig = p2pkhScriptSig(der, this.publicKey)
     }
@@ -236,7 +243,7 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
 
   dispose(): void {
     this._disposed = true
-    this.signer.dispose()
+    this.#signer.dispose()
   }
 }
 

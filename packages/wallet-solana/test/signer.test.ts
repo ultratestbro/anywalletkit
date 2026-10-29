@@ -57,7 +57,8 @@ describe('WalletManagerSolana with an external signer', () => {
     const a = await m.getAccount(0)
     expect(a.address).toBe(ADDR0)
     expect(a.path).toBe('external')
-    expect(a.signer).toBe(signer)
+    expect(a.signerKind).toBe('external')
+    expect(Reflect.get(a, 'signer')).toBeUndefined() // the signer is a private field (audit 2026-10-29 A1)
     expect(await m.getAccount()).toBe(a)
 
     await a.transfer({ recipient: RECIPIENT, amount: 1_000n })
@@ -104,7 +105,7 @@ describe('WalletManagerSolana with an external signer', () => {
     const key = account0Key()
     const a = WalletAccountSolana.fromPrivateKey(key, ed25519.getPublicKey(key), 'x')
     expect(a.address).toBe(ADDR0)
-    expect(a.signer.kind).toBe('seed')
+    expect(a.signerKind).toBe('seed')
     const sig = await a.sign('x')
     expect(sig).toHaveLength(128)
     a.dispose()

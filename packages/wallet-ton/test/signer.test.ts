@@ -53,7 +53,8 @@ describe('WalletManagerTon with an external signer', () => {
     const m = new WalletManagerTon(signer, { tonClient: ENDPOINT, fetch: f.fetch })
     const a = await m.getAccount(0)
     expect(a.path).toBe('external')
-    expect(a.signer).toBe(signer)
+    expect(a.signerKind).toBe('external')
+    expect(Reflect.get(a, 'signer')).toBeUndefined() // the signer is a private field (audit 2026-10-29 A1)
     expect(await m.getAccount()).toBe(a)
     // the address is what @ton/ton computes for the same public key
     const expected = WalletContractV5R1.create({ workchain: 0, publicKey: Buffer.from(HW_PUB) }).address.toString({ bounceable: false })
@@ -112,8 +113,7 @@ describe('WalletManagerTon with an external signer', () => {
     const m = await WalletManagerTon.fromTonMnemonic(await mnemonicNew(24))
     const a = await m.getAccount()
     expect(a.path).toBe(TON_MNEMONIC_PATH)
-    expect(a.signer).toBeInstanceOf(LocalSigner)
-    expect(a.signer.kind).toBe('seed')
+        expect(a.signerKind).toBe('seed')
     expect(await m.getAccountByPath(TON_MNEMONIC_PATH)).toBe(a)
     await expect(m.getAccountByPath("0'")).rejects.toThrow(/single account/)
     m.dispose()
@@ -125,7 +125,7 @@ describe('WalletManagerTon with an external signer', () => {
     const ref = LocalSigner.fromSeed(seed, 'ed25519', `${TON_BASE_PATH}/0'`)
     const a = WalletAccountTon.fromPrivateKey(ed25519.utils.randomSecretKey(), ref.publicKey, 'x')
     expect(await a.getAddress()).toBe(ADDR0) // address comes from the public key
-    expect(a.signer.kind).toBe('seed')
+    expect(a.signerKind).toBe('seed')
     a.dispose()
     await expect(a.sign('x')).rejects.toBeInstanceOf(SignerError)
     ref.dispose()

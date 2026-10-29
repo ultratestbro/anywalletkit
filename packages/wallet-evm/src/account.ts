@@ -84,8 +84,14 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   readonly path: string
   /** Compressed secp256k1 public key (33 bytes). */
   readonly publicKey: Uint8Array
-  /** The signer that holds the key. */
-  readonly signer: Signer
+  /**
+   * The signer that holds the key, in a private field: not a property of the account, so no code
+   * the account is handed to (a protocol module, a logger) can reach it and sign around the
+   * account's checks (audit 2026-10-29 A1).
+   */
+  readonly #signer: Signer
+  /** What holds the key: `seed`, `key` (one imported key) or `external`. */
+  readonly signerKind: Signer['kind']
   private _readOnly: WalletAccountReadOnlyEvm | undefined
   /**
    * Next nonce this account expects after its own last broadcast, trusted for
@@ -103,7 +109,8 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   /** `publicKey` is the signer's compressed secp256k1 key (33 bytes); it is needed synchronously for the address. */
   constructor(signer: Signer, publicKey: Uint8Array, path: string, config: EvmConfig = {}) {
     super(addressFromPublicKey(publicKey), config)
-    this.signer = requireCurve(signer, 'secp256k1')
+    this.#signer = requireCurve(signer, 'secp256k1')
+    this.signerKind = this.#signer.kind
     this.publicKey = publicKey
     this.path = path
   }
@@ -121,7 +128,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
 
   /** Recoverable secp256k1 signature over a 32-byte hash from the signer, as a viem Signature (v = 27 | 28). */
   async #signHash(hash: Hex, context: 'evm-tx' | 'evm-191' | 'evm-712'): Promise<Signature> {
-    const sig = await this.signer.sign(hexToBytes(hash), { scheme: 'ecdsa-recoverable', context })
+    const sig = await this.#signer.sign(hexToBytes(hash), { scheme: 'ecdsa-recoverable', context })
     const recovery = sig[64]!
     const r = toHex(sig.slice(0, 32))
     const s = toHex(sig.slice(32, 64))
@@ -477,7 +484,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
 
   /** Dispose the signer (zeroizes a local key). Idempotent. */
   dispose(): void {
-    this.signer.dispose()
+    this.#signer.dispose()
   }
 }
 

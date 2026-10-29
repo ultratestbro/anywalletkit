@@ -20,6 +20,11 @@ Accounts build transactions and talk to the network. The signer never touches th
 and the account never touches the key. Because of that split, the key can live somewhere
 else entirely: a hardware wallet, an MPC node, a backend.
 
+The signer is not reachable from an account: it is a private field (`#signer`), so code the
+account is handed to cannot sign around the account's checks or read a key. An account tells
+you only what holds its key, in `signerKind` (`seed`, `key` or `external`). A local signer's key
+is not reachable from JavaScript at all, not even through a TypeScript-private method.
+
 ## The account interface
 
 Every account on every chain implements the same interface (`IWalletAccount` from

@@ -50,8 +50,14 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
   /** Compressed secp256k1 public key. */
   readonly publicKey: Uint8Array
   override readonly addressType: BtcAddressType
-  /** The signer that holds the key. */
-  readonly signer: Signer
+  /**
+   * The signer that holds the key, in a private field: not a property of the account, so no code
+   * the account is handed to (a protocol module, a logger) can reach it and sign around the
+   * account's checks (audit 2026-10-29 A1).
+   */
+  readonly #signer: Signer
+  /** What holds the key: `seed`, `key` (one imported key) or `external`. */
+  readonly signerKind: Signer['kind']
   private _disposed = false
   private _readOnly: WalletAccountReadOnlyBtc | undefined
 
@@ -60,10 +66,11 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
     const type = config.addressType ?? 'p2wpkh'
     super(addressFromPublicKey(publicKey, networkParams(config.network ?? 'bitcoin'), type), config)
     this.addressType = type
-    this.signer = requireCurve(signer, 'secp256k1')
+    this.#signer = requireCurve(signer, 'secp256k1')
+    this.signerKind = this.#signer.kind
     // Fail at construction, not mid-spend: taproot key-path needs schnorr, p2wpkh needs plain ecdsa.
     const needed = type === 'p2tr' ? 'schnorr' : 'ecdsa'
-    if (!this.signer.schemes.includes(needed)) throw new SignerError(`A ${type} account needs a signer with the '${needed}' scheme (has: ${this.signer.schemes.join(', ')}).`)
+    if (!this.#signer.schemes.includes(needed)) throw new SignerError(`A ${type} account needs a signer with the '${needed}' scheme (has: ${this.#signer.schemes.join(', ')}).`)
     this.publicKey = publicKey
     this.path = path
   }
@@ -87,7 +94,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
   async sign(message: string | Uint8Array): Promise<string> {
     this.live()
     if (this.addressType === 'p2tr') throw new UnsupportedAddressTypeError('BIP-137 message signatures do not exist for taproot accounts (BIP-322 is not implemented).')
-    return signMessageWith(message, this.signer, 'p2wpkh')
+    return signMessageWith(message, this.#signer, 'p2wpkh')
   }
 
   /** The x-only internal key and its BIP-86 tweak (no script tree) for taproot key-path spends. */
@@ -107,7 +114,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
       const scripts = Array.from({ length: tx.inputsLength }, () => this.scriptPubKey)
       for (let i = 0; i < tx.inputsLength; i++) {
         const sighash = tx.preimageWitnessV1(i, scripts, SigHash.DEFAULT, values)
-        const sig = await this.signer.sign(sighash, { scheme: 'schnorr', context: 'btc-taproot-keypath', tweak })
+        const sig = await this.#signer.sign(sighash, { scheme: 'schnorr', context: 'btc-taproot-keypath', tweak })
         tx.updateInput(i, { tapKeySig: sig }, true)
       }
       return
@@ -115,7 +122,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
     const scriptCode = p2pkh(this.publicKey).script
     for (let i = 0; i < tx.inputsLength; i++) {
       const sighash = tx.preimageWitnessV0(i, scriptCode, SigHash.ALL, values[i]!)
-      const rs = await this.signer.sign(sighash, { scheme: 'ecdsa', context: 'btc-sighash' })
+      const rs = await this.#signer.sign(sighash, { scheme: 'ecdsa', context: 'btc-sighash' })
       const der = secp256k1.Signature.fromBytes(rs, 'compact').toBytes('der')
       const sig = new Uint8Array(der.length + 1)
       sig.set(der, 0)
@@ -311,6 +318,6 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
 
   dispose(): void {
     this._disposed = true
-    this.signer.dispose()
+    this.#signer.dispose()
   }
 }

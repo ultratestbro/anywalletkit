@@ -36,14 +36,21 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   readonly needsNetwork = true
   /** Derivation path, `ton-mnemonic`, or `external`. */
   readonly path: string
-  /** The signer that holds the key. */
-  readonly signer: Signer
+  /**
+   * The signer that holds the key, in a private field: not a property of the account, so no code
+   * the account is handed to (a protocol module, a logger) can reach it and sign around the
+   * account's checks (audit 2026-10-29 A1).
+   */
+  readonly #signer: Signer
+  /** What holds the key: `seed`, `key` (one imported key) or `external`. */
+  readonly signerKind: Signer['kind']
   private _readOnly: WalletAccountReadOnlyTon | undefined
 
   /** `publicKey` is the signer's 32-byte ed25519 key; the V5R1 address derives from it synchronously. */
   constructor(signer: Signer, publicKey: Uint8Array, path: string, config: TonConfig = {}) {
     super(publicKey, config)
-    this.signer = requireCurve(signer, 'ed25519')
+    this.#signer = requireCurve(signer, 'ed25519')
+    this.signerKind = this.#signer.kind
     this.path = path
   }
 
@@ -69,7 +76,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   async sign(message: string | Uint8Array): Promise<string> {
     const bytes = typeof message === 'string' ? new TextEncoder().encode(message) : message
     if (bytes.length === 32 || carriesKey(bytes, this.publicKey)) throw new MessageIsTransactionError()
-    return toHex(await this.signer.sign(bytes, { scheme: 'ed25519', context: 'ton-message' }))
+    return toHex(await this.#signer.sign(bytes, { scheme: 'ed25519', context: 'ton-message' }))
   }
 
   /**
@@ -79,7 +86,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
    */
   async signTonProof(request: TonProofRequest): Promise<TonProof> {
     const digest = tonProofDigest(this._address, request)
-    const signature = await this.signer.sign(digest, { scheme: 'ed25519', context: 'ton-proof' })
+    const signature = await this.#signer.sign(digest, { scheme: 'ed25519', context: 'ton-proof' })
     return {
       timestamp: request.timestamp,
       domain: { lengthBytes: new TextEncoder().encode(request.domain).length, value: request.domain },
@@ -91,7 +98,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   /** TON Connect `signData` (text / binary) for this wallet's address: the reply the dApp gets. */
   async signTonConnectData(request: TonSignDataRequest): Promise<TonSignedData> {
     const digest = tonSignDataDigest(this._address, request)
-    const signature = await this.signer.sign(digest, { scheme: 'ed25519', context: 'ton-sign-data' })
+    const signature = await this.#signer.sign(digest, { scheme: 'ed25519', context: 'ton-sign-data' })
     return {
       signature: Buffer.from(signature).toString('base64'),
       address: this._address.toRawString(),
@@ -139,7 +146,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     }
     const { signing } = await this.signingCell(messages)
     const fee = await this.preflight(v5r1PackUnsigned(signing), limit, op, want)
-    const signature = await this.signer.sign(new Uint8Array(signing.hash()), { scheme: 'ed25519', context: 'ton-external' })
+    const signature = await this.#signer.sign(new Uint8Array(signing.hash()), { scheme: 'ed25519', context: 'ton-external' })
     return { body: v5r1PackSigned(signing, signature), fee }
   }
 
@@ -213,6 +220,6 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
 
   /** Disposes the signer: a local key is zeroized, an external one is released. */
   dispose(): void {
-    this.signer.dispose()
+    this.#signer.dispose()
   }
 }

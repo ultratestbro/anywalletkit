@@ -1,6 +1,6 @@
 ---
 title: Upgrading
-description: What to change in your app when you move to a new Any Wallet Kit release — the 2026-10-28 security release first.
+description: What to change in your app when you move to a new Any Wallet Kit release — the 2026-10-29 audit fixes first.
 sidebar:
   order: 5
 ---
@@ -9,6 +9,25 @@ Versions are `0.x`, so a minor release may change the API. A `^0.y` range never 
 release by itself: you take these changes when you bump. Each package's CHANGELOG lists its changes;
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
+
+## 2026-10-29: the audit fixes
+
+This release fixes three findings of the 2026-10-29 external audit.
+
+### The signer is no longer a property of an account
+
+Every chain account (`wallet-evm`, `-solana`, `-ton`, `-tron`, `-btc`, `-near`, `-zcash`) keeps its
+signer in a private field. `account.signer` is `undefined` now, on the accounts your app gets too,
+and `LocalSigner` has no `key()` method at runtime. A protocol module always gets the policy wrapper,
+even on a `Wallet` without `policies`; without them the wrapper applies no limits.
+
+What to change:
+- `account.signer.kind` → `account.signerKind` (`'seed' | 'key' | 'external'`);
+- `account.signer.publicKey` → `account.publicKey`;
+- an injected `Signer` you need later: keep your own reference to it;
+- tests that patched `account.signer.sign` to count signatures: spy on your own external signer, or
+  on `LocalSigner.prototype.sign`;
+- do not compare a module's account with `wallet.getAccount(chain)` by identity: it is a wrapper.
 
 ## 2026-10-28: the modules security release
 

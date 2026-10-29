@@ -35,14 +35,21 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
   readonly needsNetwork = true
   /** Derivation path, or `external` for an external signer. */
   readonly path: string
-  /** The signer that holds the key. */
-  readonly signer: Signer
+  /**
+   * The signer that holds the key, in a private field: not a property of the account, so no code
+   * the account is handed to (a protocol module, a logger) can reach it and sign around the
+   * account's checks (audit 2026-10-29 A1).
+   */
+  readonly #signer: Signer
+  /** What holds the key: `seed`, `key` (one imported key) or `external`. */
+  readonly signerKind: Signer['kind']
   private _disposed = false
   private _readOnly: WalletAccountReadOnlyNear | undefined
 
   constructor(signer: Signer, publicKey: Uint8Array, path: string, config: NearConfig = {}, accountId?: string) {
     super(accountId ?? implicitAccountId(publicKey), config, ed25519Key(publicKey))
-    this.signer = requireCurve(signer, 'ed25519')
+    this.#signer = requireCurve(signer, 'ed25519')
+    this.signerKind = this.#signer.kind
     this.path = path
   }
 
@@ -59,7 +66,7 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
 
   /** The same key bound to a named account (`alice.near`) that lists it as a full-access key. */
   withAccountId(accountId: string): WalletAccountNear {
-    return new WalletAccountNear(this.signer, this.publicKey.data, this.path, this._config, accountId)
+    return new WalletAccountNear(this.#signer, this.publicKey.data, this.path, this._config, accountId)
   }
 
   private key(): void {
@@ -68,7 +75,7 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
 
   async #signBytes(bytes: Uint8Array, context: 'near-tx' | 'near-message' | 'near-nep413'): Promise<Uint8Array> {
     this.key()
-    return this.signer.sign(bytes, { scheme: 'ed25519', context })
+    return this.#signer.sign(bytes, { scheme: 'ed25519', context })
   }
 
   /**
@@ -166,7 +173,7 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
   /** Dispose the signer (zeroizes a local key). Idempotent. */
   dispose(): void {
     this._disposed = true
-    this.signer.dispose()
+    this.#signer.dispose()
   }
 }
 
