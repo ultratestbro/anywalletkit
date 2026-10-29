@@ -22,9 +22,9 @@ export interface AaveProtocolConfig {
   chainId?: number
   /** Preset key in AAVE_MARKETS for the chain: 'core' (default), 'lido', 'etherfi'. */
   market?: string
-  /** A PoolAddressesProvider for a market not in the presets. The Pool is read from it. */
+  /** A PoolAddressesProvider for a market not in the presets. The Pool is read from it; `pool` is then required. */
   addressesProvider?: string
-  /** Expected Pool address; checked against what the addresses provider reports. Presets fill it. */
+  /** Expected Pool address; checked against what the addresses provider reports. Presets fill it; required with a custom `addressesProvider`. */
   pool?: string
   /** WrappedTokenGatewayV3 for native-coin legs. `null` disables native support; presets fill it. */
   wethGateway?: string | null
@@ -138,7 +138,7 @@ export class AaveProtocolEvm extends LendingProtocol<AaveProtocolConfig> {
   readonly chainId: number
   readonly preset: AaveMarket | null
   readonly addressesProvider: Address
-  private readonly _expectedPool: Address | null
+  private readonly _expectedPool: Address
   private readonly _gateway: Address | null
   private readonly _client: PublicClient | undefined
   private readonly _referral: number
@@ -168,9 +168,14 @@ export class AaveProtocolEvm extends LendingProtocol<AaveProtocolConfig> {
     const provider = config.addressesProvider ?? this.preset!.addressesProvider
     if (!isAddress(provider)) throw new AaveError("'addressesProvider' must be an address.")
     this.addressesProvider = getAddress(provider)
-    const pool = config.pool ?? this.preset?.pool
-    if (pool !== undefined && !isAddress(pool)) throw new AaveError("'pool' must be an address.")
-    this._expectedPool = pool ? getAddress(pool) : null
+    // The Pool is the spender of every approval and permit, so it is never taken from the RPC alone: a
+    // custom addressesProvider needs the expected `pool` (scan 2026-10-28 F11), unless it is a preset's
+    // on this chain, whose Pool is shipped.
+    const known = config.addressesProvider ? Object.values(presets ?? {}).find((m) => m.addressesProvider.toLowerCase() === this.addressesProvider.toLowerCase()) : undefined
+    const pool = config.pool ?? this.preset?.pool ?? known?.pool
+    if (pool === undefined) throw new AaveError(`Pass 'pool' with a custom 'addressesProvider' (${this.addressesProvider}): the Pool gets the approvals, and the RPC alone cannot name it.`)
+    if (!isAddress(pool)) throw new AaveError("'pool' must be an address.")
+    this._expectedPool = getAddress(pool)
     const gateway = config.wethGateway === undefined ? this.preset?.wethGateway : config.wethGateway
     if (gateway && !isAddress(gateway)) throw new AaveError("'wethGateway' must be an address or null.")
     this._gateway = gateway ? getAddress(gateway) : null
@@ -202,7 +207,7 @@ export class AaveProtocolEvm extends LendingProtocol<AaveProtocolConfig> {
     const chainId = parseEvmChainId(tx.chain)
     if (chainId === null) return null
     const markets: ActivityMarket[] = presetMarkets(chainId)
-    if (chainId === this.chainId && !this.preset && this._expectedPool) {
+    if (chainId === this.chainId && !this.preset) {
       const custom: ActivityMarket = { pool: this._expectedPool, chainName: `eip155:${chainId}` }
       if (this._gateway) custom.wethGateway = this._gateway
       markets.push(custom)
@@ -346,7 +351,7 @@ export class AaveProtocolEvm extends LendingProtocol<AaveProtocolConfig> {
 
   // ---- market & reserves ----
 
-  /** The market as the addresses provider reports it; the preset's Pool must agree. Cached per instance. */
+  /** The market as the addresses provider reports it; the expected Pool (preset or config) must agree. Cached per instance. */
   getMarket(): Promise<MarketInfo> {
     if (!this._market) {
       this._market = (async () => {
@@ -356,7 +361,7 @@ export class AaveProtocolEvm extends LendingProtocol<AaveProtocolConfig> {
           this.read<Address>(this.addressesProvider, ADDRESSES_PROVIDER_ABI, 'getPoolDataProvider'),
         ])
         if (pool === zeroAddress) throw new AaveError(`${this.addressesProvider} reports no Pool — not an Aave v3 PoolAddressesProvider on chain ${this.chainId}?`)
-        if (this._expectedPool && getAddress(pool) !== this._expectedPool) {
+        if (getAddress(pool) !== this._expectedPool) {
           throw new AaveError(`Pool mismatch: the addresses provider reports ${pool}, configuration expects ${this._expectedPool}. Refusing to use either.`)
         }
         const [baseCurrencyUnit, wrappedNative] = await Promise.all([

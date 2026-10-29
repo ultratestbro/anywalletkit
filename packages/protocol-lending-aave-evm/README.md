@@ -26,8 +26,10 @@ address book (bgd-labs/aave-address-book); no Aave SDK, one dependency (viem).
 Every live Aave v3 market ships as a preset (`AAVE_MARKETS[chainId][key]`):
 Ethereum (`core`, `lido`, `etherfi`), Arbitrum, Optimism, Polygon, Base,
 Avalanche, BNB, Gnosis, Scroll, Linea, Sonic, Celo, Mantle, Soneium, Plasma,
-zkSync, Metis, Ink. A market not in the list takes `addressesProvider` (and
-`pool`) in the config.
+zkSync, Metis, Ink. A market not in the list takes `addressesProvider` and
+`pool` in the config: the Pool receives the approvals and permits, so it is
+never taken from the RPC alone, and a custom provider without `pool` is
+refused (a preset's provider on its own chain picks up the shipped Pool).
 
 Only the **PoolAddressesProvider** is trusted from configuration. The Pool,
 price oracle and data provider are read from it on-chain, and the preset's Pool
@@ -102,7 +104,7 @@ calls where it is absent (zkSync).
 | --- | --- | --- |
 | `chainId` | account's chain, else 1 | must match the account's `eip155:N` |
 | `market` | `'core'` | preset key for the chain |
-| `addressesProvider`, `pool`, `wethGateway` | from the preset | explicit market; `wethGateway: null` disables native legs |
+| `addressesProvider`, `pool`, `wethGateway` | from the preset | explicit market (`pool` required with a custom `addressesProvider`); `wethGateway: null` disables native legs |
 | `provider` | the account's | RPC url(s) / EIP-1193 to read through |
 | `usePermit` | `true` | one-transaction supply / repay when possible |
 | `referralCode` | `0` | inactive on every market |
