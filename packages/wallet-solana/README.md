@@ -80,11 +80,14 @@ key is used:
    caller already put in the message is kept.
 4. **Simulation** — `simulateTransaction` (`sigVerify: false`) runs before signing;
    a failure throws `SimulationError` with the program logs. It also returns the
-   post-state of the wallet and of its token accounts the transaction writes
-   (one extra read for the pre-state), and refuses what CPI would do there: the
-   wallet's account handed to a program or given data (`wallet-owner`), a token
-   account's owner or close authority changed (`sets-authority`), a delegate
-   allowance no top-level Approve shows (`approves-delegate`);
+   post-state of the wallet, of its token accounts the transaction writes and of
+   every written account the transaction may create (one that does not exist yet,
+   or a bare System account; one extra read for the pre-state), and refuses what
+   CPI would do there: the wallet's account handed to a program or given data
+   (`wallet-owner`), a token account's owner or close authority changed, or set
+   on a token account of this wallet that the transaction creates, this wallet's
+   associated token account created for another owner (`sets-authority`), a
+   delegate allowance no top-level Approve shows (`approves-delegate`);
    `allowAuthorityChanges` skips this too. `simulate: false` disables the gate
    (and the CPI proof with it).
 5. **Fee quote** — `quoteSendTransaction` / `quoteTransfer` return
