@@ -194,7 +194,7 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
     await expect(applyPolicies(acc, { confirm: async () => false }).signPermit({ token, spender, value: 1n, deadline: 1n })).rejects.toBeInstanceOf(UserRejectedError)
   })
 
-  it('signTypedData: EIP-2612 Permit and Permit2 are approvals of the spender; other typed data is confirm-only', async () => {
+  it('signTypedData: EIP-2612 Permit and Permit2 are approvals of the spender; other typed data has unknown destinations', async () => {
     const acc = evmLike()
     const permit = { domain: { name: 'USD Coin', version: '2', chainId: 1, verifyingContract: token }, types: { Permit: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'nonce', type: 'uint256' }, { name: 'deadline', type: 'uint256' }] }, primaryType: 'Permit', message: { owner: 'addr', spender, value: unlimited.toString(), nonce: 0, deadline: '1800000000' } }
     const confirm = vi.fn(async () => true)
@@ -209,8 +209,10 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
     await applyPolicies(acc, { confirm }).signTypedData(permit2Msg)
     expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'approval', to: spender, token, unlimited: true }))
     const order = { domain: { name: 'Exchange', chainId: 1, verifyingContract: permit2 }, types: { Order: [{ name: 'maker', type: 'address' }] }, primaryType: 'Order', message: { maker: 'addr' } }
-    expect(await applyPolicies(acc, { allowlist: { 'eip155:1': [spender] }, confirm }).signTypedData(order)).toBe('0xtyped')
-    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'typedData', message: true, to: permit2 }))
+    // Typed data the policies cannot read may move value: an allowlist refuses it (scan 2026-10-28 F7), confirm decides otherwise.
+    await expect(applyPolicies(acc, { allowlist: { 'eip155:1': [spender] }, confirm }).signTypedData(order)).rejects.toThrow(/allowlist/)
+    expect(await applyPolicies(acc, { confirm }).signTypedData(order)).toBe('0xtyped')
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'typedData', message: false, to: permit2, destinations: [], destinationUnknown: true }))
     await expect(applyPolicies(acc, { confirm: async () => false }).signTypedData(order)).rejects.toBeInstanceOf(UserRejectedError)
   })
 

@@ -136,8 +136,12 @@ describe('second review: the chain check reads what is signed and never fails op
     const g = applyPolicies(acc, { blocklist: { 'eip155:1': [EVIL] } })
     await expect(g.sign('hi')).resolves.toBeDefined()
     expect(getChainId).not.toHaveBeenCalled()
-    await expect(g.signTypedData({ domain: { name: 'x' }, types: { M: [{ name: 'a', type: 'uint256' }] }, primaryType: 'M', message: { a: 1 } })).resolves.toBeDefined()
+    // Typed data the policies cannot read is refused under a blocklist with no confirm hook (scan 2026-10-28 F7)…
+    await expect(g.signTypedData({ domain: { name: 'x' }, types: { M: [{ name: 'a', type: 'uint256' }] }, primaryType: 'M', message: { a: 1 } })).rejects.toThrow(/Cannot tell every destination/)
     expect(getChainId).toHaveBeenCalledOnce()
+    // …and goes to confirm when there is one.
+    const c = applyPolicies(acc, { blocklist: { 'eip155:1': [EVIL] }, confirm: async () => true })
+    await expect(c.signTypedData({ domain: { name: 'x' }, types: { M: [{ name: 'a', type: 'uint256' }] }, primaryType: 'M', message: { a: 1 } })).resolves.toBeDefined()
   })
 
   it('getAccount hands out the same object for the same account and chain', async () => {
