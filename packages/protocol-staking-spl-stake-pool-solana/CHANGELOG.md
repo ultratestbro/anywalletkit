@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-staking-spl-stake-pool-solana
 
+## 0.2.10
+
+### Patch Changes
+
+- Updated dependencies [834c24d]
+  - @anywalletkit/core@0.7.0
+
 ## 0.2.9
 
 ### Patch Changes

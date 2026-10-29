@@ -1,5 +1,22 @@
 # @anywalletkit/protocol-swap2-balancer
 
+## 0.3.0
+
+### Minor Changes
+
+- 93479f8: `balancerPins` now carry `verifyQuote: balancerVerifyQuote`, so a remote Balancer route is opened on the device (scan 2026-10-28, F2). The pins used to pin only the Vault: a compromised backend could redirect `batchSwap`'s output or call `manageUserBalance` on the user's Vault allowances. The verifier decodes the Vault call and requires `batchSwap` of kind GIVEN_IN with no internal balances and no pool `userData`, at most `BALANCER_MAX_SWAPS` hops; funds from the sender the provider names (the refund address, else the recipient) to the recipient; every hop that brings in an amount selling the source token, the amounts adding up to exactly the input, and a hop delivering the destination token; limits of exactly the input in and the quote's minimum out, zero for everything else; a deadline still ahead. Apps that spread `...balancerPins` get it without other changes.
+  
+  **Breaking:** a remote Balancer quote whose Vault call is `manageUserBalance`, `swap`, `setRelayerApproval` or any batch that pays someone else, uses internal balances or other limits is refused, as is one without a Vault call. Upgrade notes: https://docs.anywallet.tech/getting-started/upgrading/.
+
+### Patch Changes
+
+- Updated dependencies [834c24d]
+- Updated dependencies [88a4582]
+- Updated dependencies [12fc609]
+  - @anywalletkit/core@0.7.0
+  - @anywalletkit/protocol-swap2-core@0.8.0
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.2.0
 
 ### Minor Changes

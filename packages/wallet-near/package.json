@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/wallet-near",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "NEAR wallet for Any Wallet Kit: SLIP-10 m/44'/397'/i' accounts (NEAR Wallet path), implicit and named accounts, NEAR and NEP-141 transfers over JSON-RPC, hand-written borsh, NEP-413 message signing.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

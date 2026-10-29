@@ -1,5 +1,29 @@
 # @anywalletkit/wallet-solana
 
+## 0.5.0
+
+### Minor Changes
+
+- 834c24d: A protocol module can no longer reach the private key. On a `Wallet` without `policies`, `getProtocol` handed the module the raw account, and `account.signer.key()` — private in TypeScript only — returned the 32-byte key, a copy of which outlived `dispose()`. Three layers now close it:
+  
+  - `kit`: a module always gets the restricted account. Without policies it is a wrapper with no rules: no limits, but the signer, internal helpers and the account's settings stay out of reach, as they did with `policies: {}`.
+  - `core`: `LocalSigner` reads its key through a function of the module, not a method: nothing outside `@anywalletkit/core` can call it.
+  - every chain account keeps its signer in a private field (`#signer`). The new `signerKind` field (`'seed' | 'key' | 'external'`) says what holds the key.
+  
+  **Breaking:** chain accounts (`WalletAccountEvm`, `WalletAccountSolana`, `WalletAccountTon`, `WalletAccountTron`, `WalletAccountBtc`, `WalletAccountNear`, `WalletAccountZcash`) no longer have a `signer` property, the app's own accounts included. Read `account.signerKind` instead of `account.signer.kind`; keep a reference to the `Signer` you injected if you need it.
+  
+  **Breaking:** a protocol module registered on a wallet without policies gets the policy wrapper instead of the raw account: it is a different object from `wallet.getAccount(chain)`, and writes through it are refused when they sign on another network than the module's chain.
+  
+  **Breaking:** `LocalSigner` has no `key()` method at runtime any more (it was private in TypeScript).
+- ef2ef84: The CPI guard watches token accounts the transaction creates. `sendTransaction` / `signTransaction` (the simulation that proves what a program the wallet signs for does by CPI) and `checkSerialized` used to read the post-state only of this wallet's token accounts that already existed, so a `CreateAssociatedTokenIdempotent` followed by a program that set a delegate, a close authority or (legacy SPL Token) a new owner on the fresh account by CPI was signed. Now every written account that does not exist yet, or is a bare System account, is asked for too; a token account of this wallet that the transaction creates counts as having had no delegate and no close authority, and this wallet's associated token account created for another owner is refused. `checkSerialized` asks the simulation only for accounts of the transaction (the node returns at most that many); an address outside it keeps its pre-state. `allowAuthorityChanges` still overrides the guard.
+  
+  **Breaking:** a transaction that leaves a delegate allowance (with no top-level Approve), a close authority, or another owner on a token account of this wallet that it creates is refused with `UnsafeTransactionError` (`approves-delegate` / `sets-authority`) unless `allowAuthorityChanges` is set.
+
+### Patch Changes
+
+- Updated dependencies [834c24d]
+  - @anywalletkit/core@0.7.0
+
 ## 0.4.0
 
 ### Minor Changes

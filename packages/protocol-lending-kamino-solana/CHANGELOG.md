@@ -1,5 +1,14 @@
 # @anywalletkit/protocol-lending-kamino-solana
 
+## 0.3.1
+
+### Patch Changes
+
+- 51cd6d2: Figures from Kamino's API are bounded before they are parsed. `fromDecimalString` refuses an exponent beyond ±400, an input or a base-unit result over 1 000 digits, and both it and `toDecimalString` refuse decimals that are not an integer from 0 to 255. Before, a few bytes such as `"tokensPerShare": "1e300000000"` from a compromised or custom API endpoint built strings and a BigInt of hundreds of millions of digits on the JS thread, freezing or killing the app when a vault screen loaded. No real figure comes near these bounds.
+- cc02a1c: A full withdrawal from an Earn vault works again. Kamino's API ends it with `CloseAccount` on the emptied shares account, rent back to the wallet, and the withdrawal's instruction rules allowed only the wSOL account's close, so the build was refused ("Instruction 5 (Tokenkeg…, data 09…) is not one this operation takes"). A withdrawal may now close the wallet's own shares account: the Token program on its derivation, Token-2022 on its own, the rent to the wallet and the wallet as the owner. Deposits still may not carry it, and closing any other account, or to another destination, is still refused.
+- Updated dependencies [834c24d]
+  - @anywalletkit/core@0.7.0
+
 ## 0.3.0
 
 ### Minor Changes

@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-staking-native-monad
 
+## 0.2.3
+
+### Patch Changes
+
+- Updated dependencies [834c24d]
+  - @anywalletkit/core@0.7.0
+
 ## 0.2.2
 
 ### Patch Changes

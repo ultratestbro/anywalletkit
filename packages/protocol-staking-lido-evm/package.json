@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-staking-lido-evm",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "description": "A simple package that lets @anywalletkit/wallet-evm wallet accounts stake through the Lido protocol: stake, two-phase queue withdrawals (permit-first), wrap/unwrap, rewards.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
