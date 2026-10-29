@@ -3,7 +3,7 @@ import {describeUniswapActivity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
 import {evmRef, isEvm, timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
-import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
+import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, ROUTER_ABI, UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
 import {bigintToNumber} from "@anywalletkit/core";
 
 /**
@@ -31,14 +31,6 @@ const DEFAULT_DEADLINE_S = 600;
 const QUOTER_ABI = parseAbi([
   "function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)",
   "function quoteExactInput(bytes path, uint256 amountIn) returns (uint256 amountOut, uint160[] sqrtPriceX96AfterList, uint32[] initializedTicksCrossedList, uint256 gasEstimate)",
-  "function factory() view returns (address)",
-  "function WETH9() view returns (address)",
-]);
-const ROUTER_ABI = parseAbi([
-  "function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params) payable returns (uint256 amountOut)",
-  "function exactInput((bytes path, address recipient, uint256 amountIn, uint256 amountOutMinimum) params) payable returns (uint256 amountOut)",
-  "function unwrapWETH9(uint256 amountMinimum, address recipient) payable",
-  "function multicall(uint256 deadline, bytes[] data) payable returns (bytes[] results)",
   "function factory() view returns (address)",
   "function WETH9() view returns (address)",
 ]);

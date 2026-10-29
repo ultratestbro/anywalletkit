@@ -10,6 +10,15 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: remote swaps checked on the device
+
+This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps
+through your own server:
+
+- **Pins now open the call.** `uniswapPins` carry `verifyQuote` (`uniswapVerifyQuote`): the router
+  call is decoded on the device and must be exactly the swap the user asked for — tokens, input,
+  minimum, recipient. Spread the pins as before; nothing else to wire.
+
 ## 2026-10-28: the modules security release
 
 This release fixes the second 2026-10-27 security scan: 37 findings in the protocol modules. Most of

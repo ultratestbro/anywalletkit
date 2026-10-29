@@ -1,4 +1,6 @@
-import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
+import {decodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
+import {sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
+import type {Quote, QuoteParams, RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 
 /**
  * Uniswap v3 deployments this module trusts. Every entry was checked on-chain
@@ -51,13 +53,97 @@ export const HOP_SYMBOLS = ["WETH", "USDC", "USDT"] as const;
 /** SwapRouter02 recipient sentinel: "keep the output in the router" (then unwrapWETH9). */
 export const ADDRESS_THIS = "0x0000000000000000000000000000000000000002";
 
+/** The SwapRouter02 entry points this module writes (and the deployment probes). */
+export const ROUTER_ABI = parseAbi([
+  "function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params) payable returns (uint256 amountOut)",
+  "function exactInput((bytes path, address recipient, uint256 amountIn, uint256 amountOutMinimum) params) payable returns (uint256 amountOut)",
+  "function unwrapWETH9(uint256 amountMinimum, address recipient) payable",
+  "function multicall(uint256 deadline, bytes[] data) payable returns (bytes[] results)",
+  "function factory() view returns (address)",
+  "function WETH9() view returns (address)",
+]);
+/** Most pools one `exactInput` path may cross: the provider builds direct and one-hop (two-pool) routes only. */
+const MAX_PATH_POOLS = 2;
+
 /**
- * The SwapRouter a Uniswap swap calls and approves on a chain (the shipped {@link UNISWAP_V3} table) —
- * the app's pins for `remoteProvider({name: "uniswap", baseUrl, ...uniswapPins})` (scan 2026-10-27 modules, F9).
+ * The swap a Uniswap quote's router call makes, opened on the client against the app's own request (scan 2026-10-28,
+ * F1): one `multicall(deadline, legs)` on the chain's pinned SwapRouter02 whose legs are exactly one `exactInputSingle`
+ * or `exactInput` — then `unwrapWETH9` for a native output — selling exactly the input of the source token (WETH for a
+ * native input, paid as `value`) for the destination token, with `amountOutMinimum` the quote's minimum, paid to the
+ * recipient (or kept in the router and unwrapped to the recipient for that same minimum). `pull`, `sweepToken` and
+ * every other router call are refused. The reason it fails, or null.
+ */
+export function uniswapVerifyQuote(params: QuoteParams, quote: Quote): string | null {
+  const id = /^eip155:[0-9]+$/.test(params.sourceChain) ? Number(params.sourceChain.slice(7)) : NaN;
+  const d = Object.prototype.hasOwnProperty.call(UNISWAP_V3, id) ? UNISWAP_V3[id] : undefined;
+  if (!d || params.destChain !== params.sourceChain) return "not a same-chain swap on a pinned Uniswap deployment";
+  const tx = quote.txRequest;
+  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no router call";
+  if (getAddress(tx.to) !== getAddress(d.router)) return `the call targets ${tx.to}, not the SwapRouter`;
+  const src = sourceAssetOf(params);
+  if (!src) return `unknown source token ${params.sourceToken}`;
+  const nativeIn = !src.contract;
+  const nativeOut = /^0x0+$/.test(params.destToken);
+  if ((nativeIn || nativeOut) && d.nativeWrap === false) return "this chain's router has no wrapped native";
+  let tokenIn: string, tokenOut: string, recipient: string, amountIn: bigint, minOut: bigint;
+  try {
+    tokenIn = getAddress(nativeIn ? d.weth : src.contract!);
+    tokenOut = getAddress(nativeOut ? d.weth : params.destToken);
+    recipient = getAddress(params.destAddress);
+    amountIn = BigInt(params.amountIn);
+    minOut = BigInt(quote.minDestAmount);
+  } catch {
+    return "the request does not name EVM tokens, a recipient and amounts";
+  }
+  if (nativeIn ? BigInt(tx.value ?? "0") !== amountIn || tx.approvalAddress !== undefined
+    : BigInt(tx.value ?? "0") !== 0n || !tx.approvalAddress || getAddress(tx.approvalAddress) !== getAddress(d.router)) {
+    return nativeIn ? "a native input is paid as exactly the input in value, with no approval" : "a token input attaches no value and approves the SwapRouter";
+  }
+  let legs: readonly Hex[];
+  try {
+    const outer = decodeFunctionData({abi: ROUTER_ABI, data: tx.data as Hex});
+    if (outer.functionName !== "multicall") return `${outer.functionName} is not multicall(deadline, legs)`;
+    legs = outer.args[1];
+  } catch {
+    return "the router call is not multicall(deadline, legs)";
+  }
+  if (legs.length !== (nativeOut ? 2 : 1)) return `the multicall has ${legs.length} legs, not a swap${nativeOut ? " and an unwrap" : ""}`;
+  const decode = (leg: Hex) => { try { return decodeFunctionData({abi: ROUTER_ABI, data: leg}); } catch { return null; } };
+  const swap = decode(legs[0]!);
+  const swapTo = nativeOut ? ADDRESS_THIS : recipient;
+  if (swap?.functionName === "exactInputSingle") {
+    const a = swap.args[0];
+    if (getAddress(a.tokenIn) !== tokenIn || getAddress(a.tokenOut) !== tokenOut) return "the swap trades other tokens";
+    if (a.amountIn !== amountIn || a.amountOutMinimum !== minOut || a.sqrtPriceLimitX96 !== 0n) return "the swap's input, minimum or price limit is not the quote's";
+    if (getAddress(a.recipient) !== getAddress(swapTo)) return `the swap pays ${a.recipient}, not the recipient`;
+  } else if (swap?.functionName === "exactInput") {
+    const a = swap.args[0];
+    const path = a.path.slice(2);
+    const pools = (path.length / 2 - 20) / 23;
+    if (!/^[0-9a-fA-F]*$/.test(path) || !Number.isInteger(pools) || pools < 1 || pools > MAX_PATH_POOLS) return "the swap path is not 1–2 pools";
+    if (getAddress(`0x${path.slice(0, 40)}`) !== tokenIn || getAddress(`0x${path.slice(-40)}`) !== tokenOut) return "the swap path trades other tokens";
+    if (a.amountIn !== amountIn || a.amountOutMinimum !== minOut) return "the swap's input or minimum is not the quote's";
+    if (getAddress(a.recipient) !== getAddress(swapTo)) return `the swap pays ${a.recipient}, not the recipient`;
+  } else {
+    return `${swap?.functionName ?? "an unknown call"} is not exactInputSingle / exactInput`;
+  }
+  if (nativeOut) {
+    const unwrap = decode(legs[1]!);
+    if (unwrap?.functionName !== "unwrapWETH9") return `${unwrap?.functionName ?? "an unknown call"} is not unwrapWETH9`;
+    if (unwrap.args[0] !== minOut || getAddress(unwrap.args[1]) !== recipient) return "the unwrap pays someone else or less than the minimum";
+  }
+  return null;
+}
+
+/**
+ * The SwapRouter a Uniswap swap calls and approves on a chain (the shipped {@link UNISWAP_V3} table), and
+ * {@link uniswapVerifyQuote} — the app's pins for `remoteProvider({name: "uniswap", baseUrl, ...uniswapPins})` (scan
+ * 2026-10-27 modules, F9; scan 2026-10-28, F1).
  */
 export const uniswapPins: RemotePins = Object.freeze({
   callTargets: (chain: string): readonly string[] => uniswapRouterFor(chain),
   spenders: (chain: string): readonly string[] => uniswapRouterFor(chain),
+  verifyQuote: uniswapVerifyQuote,
 });
 function uniswapRouterFor(chain: string): readonly string[] {
   const id = /^eip155:[0-9]+$/.test(chain) ? Number(chain.slice(7)) : NaN;
