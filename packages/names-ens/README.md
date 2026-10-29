@@ -50,12 +50,36 @@ await ens.avatar('vitalik.eth') // 'https://euc.li/vitalik.eth'
 await assertNameUnchanged(ens, 'vitalik.eth', 'eip155:1', addressShownToUser)
 ```
 
-Options: `client` / `rpcUrl` (mainnet; required), `cacheTtlMs`, `ipfsGateway` (point it at your proxy), `foreignTlds` (TLDs left to other resolvers; default `sol`, `near`, `ton`, `me`).
+Options: `client` / `rpcUrl` (mainnet; required), `ccip` (how gateways are asked, below), `cacheTtlMs`, `ipfsGateway` (point it at your proxy), `foreignTlds` (TLDs left to other resolvers; default `sol`, `near`, `ton`, `me`).
 
 Offchain names (CCIP-Read, EIP-3668) make the device fetch gateway URLs that the name's resolver chooses. The client built from `rpcUrl` asks only https gateways on public hosts (`ensCcipRead`: no `http://`, no localhost / LAN / link-local / CGNAT address in any spelling, redirects refused). **If you pass your own `client`, create it with `ccipRead: ensCcipRead`** (or `ccipRead: false`), or viem's default fetches whatever URL a resolver names, `http://192.168.1.1/…` included.
 
 `avatar` returns the `avatar` text record when it is an https URL on a public host, or an `ipfs://` one through `ipfsGateway` (an origin, `/ipfs/<cid>` appended, or a prefix ending in `/ipfs/`; `avatarUrl(record, gateway)` is the same filter). Everything else comes back `null`: NFT avatars (`eip155:1/erc721:…`; resolving one means fetching the metadata URL its issuer chose), and `http://`, `data:`, `ipns://` and `ar://` ones. Nothing is fetched to decide.
 
+### React Native: CCIP-Read through your server
+
+React Native's fetch follows redirects whatever `redirect: 'error'` says, so a gateway's redirect would send the device's request to a LAN or loopback host before the final URL can be checked. There, offchain names are off by default: they fail with `lookup-failed`, `reason: 'ccip-proxy-required'`, and the message says what to set. The safe path is one route on your server:
+
+```ts
+// server (Node): POST /ccip, behind your auth and rate limits
+import { createEnsCcipHandler } from '@anywalletkit/names-ens/server'
+const ccip = createEnsCcipHandler() // { allowHosts, denyHosts, timeoutMs, maxResponseBytes, maxRequestBytes }
+// in the route: const out = await ccip(JSON.parse(rawBody)); reply out.status with JSON out.body
+
+// app (Hermes): the resolver asks gateways through that route
+import { ensCcipViaProxy, ensResolver } from '@anywalletkit/names-ens'
+const ens = ensResolver({
+  rpcUrl: ETHEREUM_RPC,
+  ccip: { fetch: ensCcipViaProxy('https://api.example.com/ccip', { headers: { authorization: `Bearer ${token}` } }) },
+})
+```
+
+`createEnsCcipHandler` takes `{ url, method, body? }` (what `ensCcipViaProxy` sends) and returns `{ status, body }` (`{ data }` or `{ error }`). It asks only https gateways on public hosts; resolves the host and refuses it when any address is private, loopback, link-local, CGNAT, multicast or an IPv6 address carrying one (mapped, NAT64, 6to4); connects to the checked address with `node:https` (TLS still verifies the host name), so a second DNS answer cannot move it; never follows a redirect; applies a timeout (10 s) and an answer cap (1 MiB); sends GET, or POST with exactly `{ sender, data }`; forwards none of the caller's headers or cookies. It does not authenticate or rate-limit: your route does. `lookup` and `fetch` options replace DNS and the connection in tests (with `fetch`, the connection is not pinned). The reference server in `examples/server` has it at `POST /ccip`.
+
+`ensCcipViaProxy(proxyUrl, { headers, timeoutMs, fetch, allowInsecureProxyUrl })` needs an https proxy URL (http only for localhost with `allowInsecureProxyUrl`), uses no Node API and no `AbortSignal.timeout`, and turns the server's refusal into the lookup's error.
+
+Without a server, `ccip: { allowRedirectFollowingFetch: true }` asks gateways directly: a redirecting gateway can then make the device send one blind request to a host on the user's network. With your own client: `ccipRead: createEnsCcipRead({ … })`.
+
 ## Tests
 
-`pnpm test` — 15 unit tests over a stubbed client plus the conformance `namesSuite`. `pnpm verify:live` — mainnet via a public RPC: vitalik.eth forward / reverse / avatar, `jesse.base.eth` through CCIP-Read on the Base coin type, a name without a Base record, unregistered and invalid names.
+`pnpm test` — unit tests over a stubbed client, the CCIP-Read proxy over local servers with stubbed DNS, plus the conformance `namesSuite`. `pnpm verify:live` — mainnet via a public RPC: vitalik.eth forward / reverse / avatar, `jesse.base.eth` through CCIP-Read on the Base coin type, a name without a Base record, unregistered and invalid names.

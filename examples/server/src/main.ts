@@ -46,5 +46,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     ...(process.env.ALLOWED_ORIGIN ? { allowedOrigin: process.env.ALLOWED_ORIGIN } : {}),
   })
   const port = Number(process.env.PORT ?? 8787)
-  server.listen(port, () => console.log(`wallet server on :${port} — /health, POST /swap2/:action, POST /rpc/:caip2`))
+  server.listen(port, () => console.log(`wallet server on :${port} — /health, POST /swap2/:action, POST /rpc/:caip2, POST /ccip`))
 }

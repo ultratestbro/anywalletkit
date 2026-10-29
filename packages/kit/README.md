@@ -55,7 +55,12 @@ Every write surface of an account is covered — `sendTransaction`, `transfer`,
 them), `sign`, NEAR's `signNep413` and TON's `signTonProof` /
 `signTonConnectData` (message signatures: `confirm` only, nothing moves), the approval surfaces `approve`, `signPermit` and EIP-2612 /
 Permit2 `signTypedData` (checked against the **spender**; `confirm` sees
-`kind: 'approval'` with `unlimited`), other `signTypedData` (`confirm` only),
+`kind: 'approval'` with `unlimited`), EIP-3009 `TransferWithAuthorization` /
+`ReceiveWithAuthorization`, ERC-2771 `ForwardRequest`, `MetaTransaction` and the
+1inch LOP `Order` (`kind: 'send'`, judged by whom they pay), any other
+`signTypedData` (`kind: 'typedData'` with `destinationUnknown: true`: an
+allowlist refuses it, so does a blocklist without `confirm`; a blocklisted
+`verifyingContract` is refused),
 and chain-specific ones such as Tron's `signRaw`, NEAR's `signBuilt`, Solana's
 `sendSerialized`. The rule is deny-by-default: any account method named
 `sign*` / `send*` / `approve*` / `revoke*` / `transfer*` is guarded unless it

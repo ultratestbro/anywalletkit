@@ -107,6 +107,34 @@ async function readCapped(res: Response, cap: number): Promise<string | null> {
   return Buffer.concat(chunks).toString('utf8')
 }
 
+interface RpcCall { jsonrpc: '2.0'; id?: string | number | null; method: string; params: unknown[] }
+
+const CALL_KEYS = new Set(['jsonrpc', 'id', 'method', 'params'])
+
+const idOf = (c: unknown): unknown => {
+  const id = c && typeof c === 'object' && !Array.isArray(c) ? (c as { id?: unknown }).id : null
+  return typeof id === 'string' || typeof id === 'number' ? id : null
+}
+
+/**
+ * One JSON-RPC call reduced to `{ jsonrpc, id, method, params }`, or why it is refused. Any other
+ * key is refused, and so is a case variant of the four (`Method`, `PARAMS`): Go's encoding/json,
+ * which geth-style nodes use, matches field names case-insensitively, last key wins, so an
+ * upstream could run a method this proxy never checked. `params` must be an array (absent = []).
+ */
+function toCall(c: unknown): RpcCall | string {
+  if (!c || typeof c !== 'object' || Array.isArray(c)) return 'a call must be a JSON object'
+  const o = c as Record<string, unknown>
+  for (const k of Object.keys(o)) if (!CALL_KEYS.has(k)) return `unexpected key: ${k.slice(0, 40)}`
+  if (o.jsonrpc !== '2.0') return 'jsonrpc must be "2.0"'
+  if (typeof o.method !== 'string') return 'method must be a string'
+  const id = o.id
+  if (id !== undefined && id !== null && typeof id !== 'string' && typeof id !== 'number') return 'id must be a string, number or null'
+  if (o.params !== undefined && !Array.isArray(o.params)) return 'params must be an array'
+  const params = (o.params as unknown[] | undefined) ?? []
+  return id === undefined ? { jsonrpc: '2.0', method: o.method, params } : { jsonrpc: '2.0', id, method: o.method, params }
+}
+
 export function createRpcProxy(opts: RpcProxyOptions) {
   const maxBody = opts.maxBodyBytes ?? 256 * 1024
   const maxBatch = opts.maxBatch ?? 20
@@ -125,20 +153,26 @@ export function createRpcProxy(opts: RpcProxyOptions) {
     if (calls.length === 0 || calls.length > maxBatch) return rpcError(400, null, `batch of 1..${maxBatch} calls`)
     const allowed = ALLOWED[chain.split(':')[0]!]
     const methods: string[] = []
+    const rebuilt: RpcCall[] = []
     for (const c of calls) {
-      const { method, params, id } = (c ?? {}) as { method?: unknown; params?: unknown; id?: unknown }
-      if (typeof method !== 'string' || !allowed?.has(method)) {
-        return rpcError(403, id, `method not allowed: ${String(method).slice(0, 60)}`)
+      const call = toCall(c)
+      if (typeof call === 'string') return rpcError(400, idOf(c), call)
+      const { method, params, id } = call
+      if (!allowed?.has(method)) {
+        return rpcError(403, id, `method not allowed: ${method.slice(0, 60)}`)
       }
       const why = overBudget(method, params, maxLogsRange)
       if (why) return rpcError(403, id, why)
       methods.push(method)
+      rebuilt.push(call)
     }
     await hooks.charge?.(methods)
     // Forward the request that was checked, not the bytes that came in: with a duplicated key
     // ({"method":"eth_call", …, "method":"eth_sendRawTransaction"}) a parser that keeps the other
-    // occurrence would run a method the allowlist never saw.
-    const checked = JSON.stringify(payload)
+    // occurrence would run a method the allowlist never saw. Each call is rebuilt from the four
+    // checked fields only, so nothing else (a "Method" or "PARAMS" that a case-insensitive Go
+    // decoder would pick up) reaches the upstream.
+    const checked = JSON.stringify(Array.isArray(payload) ? rebuilt : rebuilt[0])
     for (const url of urls) {
       try {
         const res = await doFetch(url, {

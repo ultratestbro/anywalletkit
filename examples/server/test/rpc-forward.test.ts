@@ -31,6 +31,6 @@ describe('rpc proxy forwards exactly what it checked', () => {
       fetchImpl: (async (_url: string, init: RequestInit) => { seen.push(String(init.body)); return new Response('[]') }) as unknown as typeof fetch,
     })
     await proxy('eip155:1', ' [ {"jsonrpc":"2.0","id":1,"method":"eth_chainId"} , {"jsonrpc":"2.0","id":2,"method":"eth_blockNumber","params":[]} ] ')
-    expect(seen[0]).toBe('[{"jsonrpc":"2.0","id":1,"method":"eth_chainId"},{"jsonrpc":"2.0","id":2,"method":"eth_blockNumber","params":[]}]')
+    expect(seen[0]).toBe('[{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]},{"jsonrpc":"2.0","id":2,"method":"eth_blockNumber","params":[]}]')
   })
 })

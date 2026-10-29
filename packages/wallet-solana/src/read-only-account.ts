@@ -47,6 +47,14 @@ function tokenAmountOf(bytes: Uint8Array, mint: Address): bigint | undefined {
 export interface PlanOptions { simulate?: boolean | undefined; allowDurableNonce?: boolean | undefined }
 
 const CORE_PROGRAMS = new Set<string>([SYSTEM_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS])
+
+/** An account as `getMultipleAccounts` / a simulation's post-state returns it. */
+type AccountState = { lamports: bigint; owner: string; data: Uint8Array }
+const isTokenProgram = (owner: string): boolean => owner === TOKEN_PROGRAM_ADDRESS || owner === TOKEN_2022_PROGRAM_ADDRESS
+/** Token account data, not a mint: a Token-2022 account longer than the base layout carries its type at byte 165 (2 = Account). */
+const isTokenAccountData = (owner: string, data: Uint8Array): boolean => data.length === 165 || (owner === TOKEN_2022_PROGRAM_ADDRESS && data.length > 165 && data[165] === 2)
+/** Account keys one transaction can hold (u8 indexes); a simulation returns post-state for at most that many. */
+const MAX_TRANSACTION_ACCOUNTS = 256
 /** System instructions that hand an account (or a nonce account's authority) of the signer to a program or someone else. */
 const WALLET_SYSTEM_INSTRUCTIONS = new Set(['Assign', 'AssignWithSeed', 'Allocate', 'AllocateWithSeed', 'AuthorizeNonceAccount', 'CreateAccountAllowPrefund'])
 /** Token / Token-2022 instructions that hand an authority away (`SetAuthority` and the metadata / group interfaces). */
@@ -423,28 +431,72 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
   }
 
   /**
+   * Accounts whose simulated post-state the CPI guard reads, beyond the wallet: this wallet's token accounts the
+   * transaction writes, and every written account that does not exist yet (or is a bare, data-less System account):
+   * the transaction may create it as a token account of this wallet, with a delegate or close authority already
+   * planted by CPI (scan 2026-10-28 F3). Nothing else can turn into a token account: only the System program can
+   * assign an account, and only while it has no data.
+   */
+  private cpiWatched(written: readonly string[], pre: ReadonlyMap<string, AccountState | null>): string[] {
+    const me = pubkeyBytes(this.address)
+    return [...new Set(written)].filter((a) => {
+      if (a === this.address) return false
+      const st = pre.get(a)
+      if (!st) return true
+      if (st.owner === SYSTEM_PROGRAM_ADDRESS && st.data.length === 0) return true
+      const t = isTokenProgram(st.owner) ? parseTokenAccount(st.data) : null
+      return t !== null && bytesEqual(t.owner, me)
+    })
+  }
+
+  /**
+   * One watched account's authorities after the transaction against before it (`hint` ends the message). A token
+   * account that did not exist, or was not one, counts as this wallet's with no delegate and no close authority:
+   * anything else it ends up with was set by the transaction. A new token account of someone else is no concern of
+   * this wallet's, except at this wallet's own associated address, which then belongs to another owner.
+   */
+  private async cpiAuthorityRefusal(addr: string, before: AccountState | null | undefined, after: AccountState | null | undefined, approved: boolean, hint: string): Promise<UnsafeTransactionError | null> {
+    const me = pubkeyBytes(this.address)
+    const prior = before && isTokenProgram(before.owner) ? parseTokenAccount(before.data) : null
+    const wasMine = prior !== null && bytesEqual(prior.owner, me)
+    const t = after && isTokenProgram(after.owner) && isTokenAccountData(after.owner, after.data) ? parseTokenAccount(after.data) : null
+    if (!t) return null // closed (lamports out are what the description and the fee guard show), or not a token account
+    if (!wasMine && prior !== null) return null // someone else's token account before: not this wallet's to judge
+    if (!bytesEqual(t.owner, me)) {
+      if (wasMine) return new UnsafeTransactionError(`Transaction changes the owner of token account ${addr}${hint}`, 'sets-authority', [addr])
+      const ownAta = String(await this.ata(getAddressDecoder().decode(t.mint), this.address, after!.owner as Address))
+      return ownAta === addr ? new UnsafeTransactionError(`Transaction creates this wallet's associated token account ${addr} owned by someone else${hint}`, 'sets-authority', [addr]) : null
+    }
+    const was = prior ?? { closeAuthority: null, delegate: null, delegatedAmount: 0n }
+    if (!optEqual(was.closeAuthority, t.closeAuthority)) return new UnsafeTransactionError(`Transaction changes who may close token account ${addr}${hint}`, 'sets-authority', [addr])
+    const live = t.delegate !== null && t.delegatedAmount > 0n
+    const same = optEqual(was.delegate, t.delegate) && t.delegatedAmount <= was.delegatedAmount
+    if (live && !same && !approved) return new UnsafeTransactionError(`Transaction leaves a delegate allowance on token account ${addr} that no top-level Approve shows${hint}`, 'approves-delegate', [addr])
+    return null
+  }
+
+  /**
    * The simulation a signing path runs, which also proves what the transaction does to this wallet
    * beyond its top-level instructions (round 3, CPI guard). Those checks cannot see what a program
-   * the wallet signs for does by CPI, so the simulation returns the post-state of this wallet and of
-   * its token accounts the transaction writes, and the guard refuses: the wallet's account handed to
-   * a program or given data, a token account's owner or close authority changed, a delegate
-   * allowance set or raised that no top-level Approve shows. `allowAuthorityChanges` skips it.
-   * One extra read (the pre-state of the written accounts); a node that does not return the
-   * post-state it was asked for is a {@link NetworkError}.
+   * the wallet signs for does by CPI, so the simulation returns the post-state of this wallet, of
+   * its token accounts the transaction writes and of every written account it may create (see
+   * {@link cpiWatched}), and the guard refuses: the wallet's account handed to a program or given
+   * data, a token account's owner or close authority changed or set on a new one, a delegate
+   * allowance set or raised that no top-level Approve shows, this wallet's associated token account
+   * created for another owner. `allowAuthorityChanges` skips it. One extra read (the pre-state of
+   * the written accounts); a node that does not return the post-state it was asked for is a
+   * {@link NetworkError}. The node returns post-state for at most as many addresses as the
+   * transaction has accounts: every address asked for is one of them, so the list always fits.
    */
   private async simulateGuarded(wire: string, written: readonly string[], description: TransactionDescription): Promise<SimulationResult> {
     if (this._config.allowAuthorityChanges) return this.simulateWire(wire)
     const rpc = this.requireRpc('simulate transactions')
     const others = [...new Set(written.filter((a) => a !== this.address))]
-    const pre = others.length ? await this.accountStates(others) : new Map<string, { lamports: bigint; owner: string; data: Uint8Array } | null>()
-    const me = pubkeyBytes(this.address)
-    const isTokenProgram = (owner: string) => owner === TOKEN_PROGRAM_ADDRESS || owner === TOKEN_2022_PROGRAM_ADDRESS
-    const mine = others.filter((a) => {
-      const st = pre.get(a)
-      const t = st && isTokenProgram(st.owner) ? parseTokenAccount(st.data) : null
-      return t !== null && bytesEqual(t.owner, me)
-    })
+    const pre = others.length ? await this.accountStates(others) : new Map<string, AccountState | null>()
+    const mine = this.cpiWatched(others, pre)
     const watched = [this.address as string, ...mine]
+    // Every watched address is a distinct account of the transaction (the fee payer or a written one), within the node's limit.
+    if (watched.length > MAX_TRANSACTION_ACCOUNTS) throw new UnsafeTransactionError(`Transaction writes ${watched.length} accounts; the simulation cannot return them all.`, 'too-many-accounts')
     const { value } = await rpc.simulateTransaction(wire as never, {
       encoding: 'base64', sigVerify: false, replaceRecentBlockhash: true, commitment: this._commitment, accounts: { addresses: watched.map(address), encoding: 'base64' },
     }).send()
@@ -457,17 +509,12 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       throw new UnsafeTransactionError(`Transaction would ${wallet.owner !== SYSTEM_PROGRAM_ADDRESS ? `hand this wallet's account to ${wallet.owner}` : "give this wallet's account data"} (a program it signs for does it by CPI). Set allowAuthorityChanges to override.`, 'wallet-owner', [this.address])
     }
     const approvedOnTop = new Set(description.items.flatMap((it) => (it.type === 'token-approve' ? [it.source] : [])))
-    mine.forEach((addr, k) => {
-      const before = parseTokenAccount(pre.get(addr)!.data)!
+    for (const [k, addr] of mine.entries()) {
       const st = postList[k + 1]
-      const after = st && isTokenProgram(st.owner) ? parseTokenAccount(base64Bytes(st.data[0])) : null
-      if (!after) return // closed: lamports out are what the description and the fee guard show
-      if (!bytesEqual(before.owner, after.owner)) throw new UnsafeTransactionError(`Transaction changes the owner of token account ${addr} (by CPI). Set allowAuthorityChanges to override.`, 'sets-authority', [addr])
-      if (!optEqual(before.closeAuthority, after.closeAuthority)) throw new UnsafeTransactionError(`Transaction changes who may close token account ${addr} (by CPI). Set allowAuthorityChanges to override.`, 'sets-authority', [addr])
-      const live = after.delegate !== null && after.delegatedAmount > 0n
-      const same = optEqual(before.delegate, after.delegate) && after.delegatedAmount <= before.delegatedAmount
-      if (live && !same && !approvedOnTop.has(addr)) throw new UnsafeTransactionError(`Transaction leaves a delegate allowance on token account ${addr} that no top-level Approve shows (set by CPI). Set allowAuthorityChanges to override.`, 'approves-delegate', [addr])
-    })
+      const after = st ? { lamports: 0n, owner: st.owner, data: base64Bytes(st.data[0]) } : null
+      const refusal = await this.cpiAuthorityRefusal(addr, pre.get(addr), after, approvedOnTop.has(addr), ' (by CPI). Set allowAuthorityChanges to override.')
+      if (refusal) throw refusal
+    }
     return { ok: true, unitsConsumed: value.unitsConsumed ?? 0n, logs }
   }
 
@@ -796,24 +843,31 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     const wsolAta = String(await this.ata(address(WSOL_MINT), this.address, TOKEN_PROGRAM_ADDRESS))
     const writable = layout.accounts.filter((a) => isWritableRole(a.role) && a.address !== null).map((a) => a.address as string)
     const pre = await this.accountStates([this.address, wsolAta, ...tokenInAtas, ...tokenOutAtas, ...writable])
-    const isTokenProgram = (owner: string) => owner === TOKEN_PROGRAM_ADDRESS || owner === TOKEN_2022_PROGRAM_ADDRESS
     const ownedTokenAccounts = writable.filter((addr) => {
       const st = pre.get(addr)
       if (!st || !isTokenProgram(st.owner)) return false
       const parsed = parseTokenAccount(st.data)
       return parsed !== null && bytesEqual(parsed.owner, me)
     })
-    const watched = [...new Set([this.address as string, wsolAta, ...tokenInAtas, ...tokenOutAtas, ...ownedTokenAccounts])]
+    // Written accounts the transaction may create as token accounts of this wallet (scan 2026-10-28 F3).
+    const fresh = this.cpiWatched(writable, pre).filter((a) => !ownedTokenAccounts.includes(a))
+    const watched = [...new Set([this.address as string, wsolAta, ...tokenInAtas, ...tokenOutAtas, ...ownedTokenAccounts, ...fresh])]
+    // The node returns post-state for at most as many addresses as the transaction has accounts. An address that is
+    // not one of them (an ATA of the other token program, say) cannot change: its post-state is its pre-state.
+    const inTransaction = new Set(layout.accounts.flatMap((a) => (a.address !== null ? [a.address as string] : [])))
+    const simulated = watched.filter((a) => inTransaction.has(a))
+    if (simulated.length > MAX_TRANSACTION_ACCOUNTS) throw new UnsafeTransactionError(`Transaction writes ${simulated.length} accounts; the simulation cannot return them all.`, 'too-many-accounts')
 
     const { value } = await rpc.simulateTransaction(getBase64EncodedWireTransaction(transaction) as never, {
-      encoding: 'base64', sigVerify: false, replaceRecentBlockhash: true, commitment: this._commitment, accounts: { addresses: watched.map(address), encoding: 'base64' },
+      encoding: 'base64', sigVerify: false, replaceRecentBlockhash: true, commitment: this._commitment, accounts: { addresses: simulated.map(address), encoding: 'base64' },
     }).send()
     const logs = value.logs ?? []
     if (value.err) throw new SimulationError(describeSimulationErr(value.err), logs)
     const postList = (value as { accounts?: Array<{ lamports: bigint | number; owner: string; data: readonly [string, string] } | null> }).accounts
-    if (!postList || postList.length !== watched.length) throw new NetworkError('simulateTransaction did not return the requested post-state accounts.')
-    const post = new Map<string, { lamports: bigint; owner: string; data: Uint8Array } | null>()
-    watched.forEach((addr, i) => { const acc = postList[i]; post.set(addr, acc ? { lamports: BigInt(acc.lamports), owner: acc.owner, data: base64Bytes(acc.data[0]) } : null) })
+    if (!postList || postList.length !== simulated.length) throw new NetworkError('simulateTransaction did not return the requested post-state accounts.')
+    const post = new Map<string, AccountState | null>()
+    for (const addr of watched) post.set(addr, pre.get(addr) ?? null)
+    simulated.forEach((addr, i) => { const acc = postList[i]; post.set(addr, acc ? { lamports: BigInt(acc.lamports), owner: acc.owner, data: base64Bytes(acc.data[0]) } : null) })
 
     const quote = await this.quoteCompiled(transaction, description)
     const lamports = (m: Map<string, { lamports: bigint } | null>, addr: string) => m.get(addr)?.lamports ?? 0n
@@ -869,20 +923,11 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       throw new UnsafeTransactionError('Transaction changes the owner program or data of this wallet account.', 'wallet-owner', [this.address])
     }
     const approvedSources = new Set(approvals.map((ap) => ap.source))
-    for (const addr of watched) {
+    for (const addr of simulated) {
       if (addr === this.address) continue
-      const a = pre.get(addr)
-      const b = post.get(addr)
-      const before = a ? parseTokenAccount(a.data) : null
-      const after = b ? parseTokenAccount(b.data) : null
-      if (!before || !after) continue
-      if (!bytesEqual(before.owner, after.owner)) throw new UnsafeTransactionError(`Transaction changes the owner of token account ${addr}.`, 'sets-authority', [addr])
-      if (!optEqual(before.closeAuthority, after.closeAuthority)) throw new UnsafeTransactionError(`Transaction changes who may close token account ${addr}.`, 'sets-authority', [addr])
-      const liveAfter = after.delegate !== null && after.delegatedAmount > 0n
-      const sameAllowance = optEqual(before.delegate, after.delegate) && after.delegatedAmount <= before.delegatedAmount
-      if (liveAfter && !sameAllowance && !approvedSources.has(addr)) {
-        throw new UnsafeTransactionError(`Transaction leaves a new delegate allowance on token account ${addr}.`, 'approves-delegate', [addr])
-      }
+      // A token account the transaction creates counts as this wallet's with no delegate or close authority before (scan 2026-10-28 F3).
+      const refusal = await this.cpiAuthorityRefusal(addr, pre.get(addr), post.get(addr), approvedSources.has(addr), '.')
+      if (refusal) throw refusal
     }
     const exempt = new Set([...tokenInAtas, ...tokenOutAtas, ...nativeAccounts])
     for (const addr of ownedTokenAccounts) {

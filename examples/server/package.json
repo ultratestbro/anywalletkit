@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "A reference backend for a wallet: swap2 providers behind createSwap2Handler and a JSON-RPC proxy, on node:http. The docs render its #region blocks; CI runs it.",
+  "description": "A reference backend for a wallet: swap2 providers behind createSwap2Handler, a JSON-RPC proxy and a CCIP-Read proxy (createEnsCcipHandler), on node:http. The docs render its #region blocks; CI runs it.",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -12,6 +12,7 @@
   "dependencies": {
     "@anywalletkit/core": "workspace:*",
     "@anywalletkit/kit": "workspace:*",
+    "@anywalletkit/names-ens": "workspace:*",
     "@anywalletkit/protocol-swap2-chainflip": "workspace:*",
     "@anywalletkit/protocol-swap2-core": "workspace:*",
     "@anywalletkit/protocol-swap2-lifi": "workspace:*",

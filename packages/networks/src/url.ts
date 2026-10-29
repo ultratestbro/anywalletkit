@@ -18,10 +18,17 @@ export interface UrlPolicyOptions {
   allowHttpLocal?: boolean
 }
 
-/** `scheme://[user@]host[:port][/path]` → parts, or null. Hosts: DNS names, IPv4, bracketed IPv6. */
+/**
+ * `scheme://[user@]host[:port][/path]` → parts, or null. Hosts: DNS names, IPv4, bracketed IPv6.
+ * A URL with a backslash, a tab, CR/LF or another control character anywhere is refused: a WHATWG parser
+ * (browsers, Node, the extension) and OkHttp end the authority at `\` and drop tab/CR/LF, so
+ * `https://192.168.1.1\x` would be checked as one host and fetched from another (scan 2026-10-28 F12).
+ * `\` also ends the authority here, should the refusal ever be relaxed.
+ */
 export function parseUrl(input: string): { scheme: string; host: string; port: number | null; hasCredentials: boolean; rest: string } | null {
   const s = input.trim()
-  const m = /^([a-z][a-z0-9+.-]*):\/\/([^/?#]*)([/?#].*)?$/i.exec(s)
+  if (/[\x00-\x1f\x7f\\]/.test(s)) return null
+  const m = /^([a-z][a-z0-9+.-]*):\/\/([^/?#\\]*)([/?#\\].*)?$/i.exec(s)
   if (!m) return null
   let authority = m[2]!
   const hasCredentials = authority.includes('@')

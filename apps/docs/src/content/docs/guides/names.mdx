@@ -27,7 +27,8 @@ npm install @anywalletkit/names-ens
 
 ENS lives on Ethereum mainnet, so the resolver always needs an Ethereum RPC, even when the user
 sends on Base or Arbitrum. Names that resolve off-chain (Coinbase `cb.id`, Basenames, `uni.eth`)
-go through CCIP-Read without extra setup. Results are cached for five minutes by default.
+go through CCIP-Read without extra setup in a browser, an extension or Node. On React Native they
+go through your server ([React Native](#react-native) below). Results are cached for five minutes by default.
 
 ## The recipient field
 
@@ -79,3 +80,54 @@ resolver built from `rpcUrl` asks only https gateways on public hosts and refuse
 you pass your own viem `client`, create it with `ccipRead: ensCcipRead` from
 `@anywalletkit/names-ens` (or `ccipRead: false`): viem's default would fetch any URL, a router's
 admin page on the user's network included.
+
+## React Native
+
+React Native's fetch follows redirects whatever `redirect: 'error'` says, so a gateway could
+redirect the device to a LAN or loopback address, and the request goes out before the SDK can see
+the final URL. There, offchain names are off by default: they fail with `lookup-failed`, and the
+error's `reason` is `ccip-proxy-required`. The safe setup sends each gateway call to your own
+server, which refuses redirects and checks the address it connects to.
+
+On the server, one route with `createEnsCcipHandler` from `@anywalletkit/names-ens/server` (Node:
+it connects with `node:https`). Authenticate and rate-limit it like your other routes: without that
+it fetches https URLs for anyone.
+
+```ts
+// app/api/ccip/route.ts (Next.js; any framework works the same way)
+import { createEnsCcipHandler } from '@anywalletkit/names-ens/server'
+
+export const runtime = 'nodejs'
+const ccip = createEnsCcipHandler() // options: allowHosts, denyHosts, timeoutMs, maxResponseBytes
+
+export async function POST(req: Request): Promise<Response> {
+  await requireUser(req) // your auth + rate limit: throw a 401 / 429 Response
+  const raw = await req.text()
+  if (raw.length > 160 * 1024) return Response.json({ error: 'request too large' }, { status: 413 })
+  let body: unknown
+  try { body = JSON.parse(raw) } catch { return Response.json({ error: 'invalid JSON' }, { status: 400 }) }
+  const out = await ccip(body) // { url, method, body? } → { data } or { error }
+  return Response.json(out.body, { status: out.status })
+}
+```
+
+The handler asks only https gateways on public hosts. It resolves the host and refuses it when any
+address is private, loopback, link-local, CGNAT or an IPv6 address carrying one of those, then
+connects to the checked address, so a second DNS answer cannot move the request (DNS rebinding).
+It never follows a redirect, applies a timeout (10 s) and an answer cap (1 MiB), sends GET or POST
+exactly as EIP-3668 defines them, and forwards none of the app's headers or cookies.
+
+In the app, `ensCcipViaProxy` is the `fetch` for the resolver. It needs no Node API and runs on Hermes:
+
+<Snippet file="server/src/client.ts" region="client-names" />
+
+The reference server has this route at `POST /ccip`, behind the same token check and rate limits as
+its other routes:
+
+<Snippet file="server/src/server.ts" region="ccip-route" />
+
+If you would rather not run the route, `ccip: { allowRedirectFollowingFetch: true }` asks gateways
+directly and accepts that a redirecting gateway can make the device send one blind request (the
+answer is never used) to a host on the user's network.
+
+With your own `client`, the same options go to `ccipRead: createEnsCcipRead({ … })`.

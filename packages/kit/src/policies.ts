@@ -1,6 +1,6 @@
 import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
-import { canonicalAddress, erc20Transfer, hexData, sendDestinations, tonRawAddress, tronCallData, tronRawIntent } from './destinations.js'
+import { canonicalAddress, erc20Transfer, hexData, sendDestinations, tonRawAddress, tronCallData, tronRawIntent, type Destinations } from './destinations.js'
 import { snapshot } from './snapshot.js'
 import { ccAssetByToken } from '@anywalletkit/swap2-assets'
 import { catalogChain } from './activity/generic.js'
@@ -129,7 +129,12 @@ export type WriteKind =
   | 'send'
   /** An allowance for `to` (the spender) over `token`: `approve`, `signPermit`, EIP-2612 / Permit2 typed data. */
   | 'approval'
-  /** Typed data that is not a known approval (an order, a vote…): `confirm` only, `to` = verifying contract. */
+  /**
+   * Typed data the policies cannot read (a vote, an unknown order…), `to` = verifying contract. Such a
+   * signature may still move value, so `destinationUnknown` is true: an allowlist refuses it, and so does a
+   * blocklist without a `confirm` hook (scan 2026-10-28 F7). Typed data that is read — EIP-3009
+   * transfer authorisations, ERC-2771 `ForwardRequest`, `MetaTransaction`, 1inch LOP `Order` — is a `send`.
+   */
   | 'typedData'
   /** A plain message signature. */
   | 'message'
@@ -196,9 +201,14 @@ export interface WriteIntent {
   forwardTonAmount?: bigint
   /** Revokes: what each one takes away (`spender` absent for a per-token NFT approval and an EIP-7702 delegation). */
   revokes?: Array<{ token: string; spender?: string }>
+  /**
+   * `signTypedData`: the domain's `verifyingContract` as given. It is not one of `destinations` (an allowlist
+   * names spenders and recipients, not tokens), but a blocklist refuses it.
+   */
+  verifyingContract?: string
   /** The raw argument (first argument of the call), for policies that need more. */
   raw: unknown
-  /** True for `kind` message / typedData: allow/block lists do not apply, only `confirm`. */
+  /** True for `kind: 'message'`: allow/block lists do not apply, only `confirm`. Typed data is judged by the lists (scan 2026-10-28 F7). */
   message: boolean
 }
 
@@ -400,8 +410,37 @@ export function resolvePrimaryType(typed: unknown): string {
   return roots[0]!
 }
 
-/** EIP-712 input → approval intent for EIP-2612 `Permit` / Permit2, otherwise a confirm-only typed-data intent. */
+/** Destinations of typed data that moves value by itself, set by {@link typedDataIntent} for {@link withDestinations}. */
+const TYPED_DESTINATIONS = new WeakMap<DraftIntent, Destinations>()
+
+/** EIP-3009 (USDC, EURC…): a signed transfer of `value` of the verifying contract's token to `to`; anyone may submit it. */
+const EIP3009_TYPES = new Set(['TransferWithAuthorization', 'ReceiveWithAuthorization'])
+/** 1inch Limit Order Protocol v4 `Order` (the Omniston EVM order is one): the fields, in order. */
+const LOP_ORDER_FIELDS: ReadonlyArray<readonly [string, string]> = [
+  ['salt', 'uint256'], ['maker', 'address'], ['receiver', 'address'], ['makerAsset', 'address'], ['takerAsset', 'address'],
+  ['makingAmount', 'uint256'], ['takingAmount', 'uint256'], ['makerTraits', 'uint256'],
+]
+const ZERO_ADDRESS = /^0x0{40}$/i
+
+/**
+ * EIP-712 input → approval intent for EIP-2612 `Permit` / Permit2; a `send` for typed data that moves value by
+ * itself and that the policies can read: EIP-3009 `TransferWithAuthorization` / `ReceiveWithAuthorization`
+ * (destination `to`), an ERC-2771 `ForwardRequest` (the call it makes: `to` and whom its `data` pays), a
+ * `MetaTransaction` (the call to the verifying contract it makes with `functionSignature`), a 1inch LOP `Order`
+ * (the settlement contract, and a `receiver` other than the maker); any other typed data is `typedData` with
+ * unknown destinations (scan 2026-10-28 F7).
+ */
 function typedDataIntent(base: IntentBase, arg: unknown, primaryType: string): DraftIntent {
+  const draft = typedDataDraft(base, arg, primaryType)
+  const verifying = str(obj(obj(arg).domain).verifyingContract)
+  if (verifying === undefined) return draft
+  const out = { ...draft, verifyingContract: verifying }
+  const typed = TYPED_DESTINATIONS.get(draft)
+  if (typed) TYPED_DESTINATIONS.set(out, typed)
+  return out
+}
+
+function typedDataDraft(base: IntentBase, arg: unknown, primaryType: string): DraftIntent {
   const a = obj(arg)
   const domain = obj(a.domain)
   const message = obj(a.message)
@@ -434,7 +473,55 @@ function typedDataIntent(base: IntentBase, arg: unknown, primaryType: string): D
     const unlimited = approvals.length === 0 || approvals.some((a) => a.unlimited)
     return { ...approvalIntent(base, str(message.spender), one?.token, one?.amount, expiry, unlimited), approvals }
   }
-  return { ...base, kind: 'typedData', message: true, ...(verifying !== undefined ? { to: verifying } : {}) }
+  const evm = base.chain.startsWith('eip155:')
+  /** A send whose destinations are `d`. */
+  const send = (d: Destinations, fields: { to?: string | undefined; token?: string | undefined; amount?: bigint | undefined }): DraftIntent => {
+    const intent: DraftIntent = {
+      ...base, kind: 'send', message: false,
+      ...(fields.to !== undefined ? { to: fields.to } : {}), ...(fields.token !== undefined ? { token: fields.token } : {}), ...(fields.amount !== undefined ? { amount: fields.amount } : {}),
+    }
+    TYPED_DESTINATIONS.set(intent, d)
+    return intent
+  }
+  /** The EVM call typed data makes (`to`, `data`, `value`) → its destinations and the token it moves. */
+  const call = (to: string | undefined, data: unknown, value: unknown) => {
+    if (!evm || to === undefined || (data !== undefined && hexData(data) === undefined)) return { d: { list: to !== undefined ? [to] : [], unknown: true }, token: undefined, amount: undefined }
+    const d = sendDestinations(base.chain, { to, ...(data !== undefined ? { data } : {}) })
+    const t = typeof data === 'string' && hexData(data) !== undefined ? erc20Transfer(hexData(data)!) : null
+    return { d, token: t ? to : undefined, amount: t ? t.amount : big(value) }
+  }
+  if (EIP3009_TYPES.has(primaryType)) {
+    const to = str(field('to', 'address'))
+    return send(to !== undefined ? { list: [to], unknown: false } : { list: [], unknown: true }, { to, token: verifying, amount: big(field('value', 'uint256')) })
+  }
+  if (primaryType === 'ForwardRequest') {
+    // ERC-2771: the forwarder (the verifying contract) calls `to` with `data` and `value`, as `from`.
+    const to = str(field('to', 'address'))
+    const c = call(to, field('data', 'bytes'), field('value', 'uint256'))
+    const value = field('value')
+    const unreadable = !declared.has('data') || declared.get('data') !== 'bytes' || (value !== undefined && big(field('value', 'uint256')) === undefined)
+    return send({ list: c.d.list, unknown: c.d.unknown || unreadable }, { to, token: c.token, amount: c.amount })
+  }
+  if (primaryType === 'MetaTransaction') {
+    // Native meta-transaction (Polygon PoS tokens, Biconomy): the verifying contract runs `functionSignature` on itself for `from`.
+    const data = field('functionSignature', 'bytes')
+    const c = call(verifying, data, undefined)
+    return send({ list: c.d.list, unknown: c.d.unknown || data === undefined }, { to: verifying, token: c.token, amount: c.amount })
+  }
+  const order = Array.isArray(types[primaryType]) ? (types[primaryType] as unknown[]).map(obj) : []
+  if (primaryType === 'Order' && order.length === LOP_ORDER_FIELDS.length && order.every((f, i) => f.name === LOP_ORDER_FIELDS[i]![0] && f.type === LOP_ORDER_FIELDS[i]![1])) {
+    // The settlement contract takes `makingAmount` of `makerAsset` from the maker (through its allowance) when
+    // the order is filled; the maker's proceeds go to `receiver` (0x0 = the maker).
+    const receiver = str(message.receiver)
+    const maker = str(message.maker)
+    const pays = receiver !== undefined && !ZERO_ADDRESS.test(receiver) && (maker === undefined || receiver.toLowerCase() !== maker.toLowerCase())
+    const list = [...(verifying !== undefined ? [verifying] : []), ...(pays ? [receiver] : [])]
+    return send({ list, unknown: verifying === undefined || receiver === undefined }, { to: verifying, token: str(message.makerAsset), amount: big(message.makingAmount) })
+  }
+  // Anything else: the policies cannot tell whether it moves value or where to, so the lists treat it as unknown.
+  const intent: DraftIntent = { ...base, kind: 'typedData', message: false, ...(verifying !== undefined ? { to: verifying } : {}) }
+  TYPED_DESTINATIONS.set(intent, { list: [], unknown: true })
+  return intent
 }
 
 /**
@@ -443,6 +530,8 @@ function typedDataIntent(base: IntentBase, arg: unknown, primaryType: string): D
  */
 function withDestinations(intent: DraftIntent): WriteIntent {
   if (intent.message) return { ...intent, destinations: [], destinationUnknown: false }
+  const typed = TYPED_DESTINATIONS.get(intent)
+  if (typed) return { ...intent, destinations: [...new Set(typed.list)], destinationUnknown: typed.unknown }
   if (intent.kind === 'approval') {
     // Raw approval calldata (sendTransaction / signTransaction, one call or a one-call batch):
     // the contract called is checked as well as the spender.
@@ -769,6 +858,11 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
       const what = (d: string | undefined) => (intent.kind === 'approval' && d !== undefined && d === intent.to ? 'Spender' : 'Destination')
       // Each matching allowlist must hold every destination (their intersection); any matching blocklist refuses (their union).
       for (const k of keys) {
+        // Typed data: the contract that verifies the signature (the token of a permit or an EIP-3009 transfer) must not be blocklisted.
+        const verifying = intent.verifyingContract
+        if (verifying !== undefined && listed(k, policies.blocklist?.[k])?.has(canonicalAddress(k, verifying))) {
+          throw new PolicyViolationError('blocklist', `Verifying contract ${verifying} is on the ${k} blocklist.`)
+        }
         const allow = listed(k, policies.allowlist?.[k])
         if (allow) {
           const outside = intent.destinations.find((d) => !allow.has(canonicalAddress(k, d)))

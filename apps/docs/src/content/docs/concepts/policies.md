@@ -37,7 +37,13 @@ Every method that produces a signature or a broadcast: `transfer`, `sendTransact
 `signTransaction`, `sign`, the approval surfaces `approve`, `signPermit` and
 `signTypedData` (an EIP-2612 `Permit` or a Permit2 message is an approval: the lists check
 the **spender**, and `confirm` receives `kind: 'approval'` with `unlimited` and `deadline`;
-any other typed data is `kind: 'typedData'`, `confirm` only), plus chain-specific write
+typed data that moves value by itself is a send judged by whom it pays: EIP-3009
+`TransferWithAuthorization` / `ReceiveWithAuthorization` (`to`, with the verifying contract as
+the token), an ERC-2771 `ForwardRequest` and a `MetaTransaction` (the call they make, read like
+a transaction), a 1inch LOP `Order` (the settlement contract, and a `receiver` other than the
+maker). Any other typed data is `kind: 'typedData'` with `destinationUnknown: true`, because the
+policies cannot tell whether it moves value: an allowlist refuses it, and so does a blocklist
+without a `confirm` hook. A blocklisted `verifyingContract` is refused for all typed data), plus chain-specific write
 methods (Tron's `signRaw`, NEAR's `signBuilt` and `signNep413`, Solana's `sendSerialized`,
 `signCompiled`, `signTransactionMessage`, swap2's `sendSerializedTransaction`). The rule is deny-by-default: any other account
 method whose name starts with `sign`, `send`, `approve`, `revoke` or `transfer` is refused

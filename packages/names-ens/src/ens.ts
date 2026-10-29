@@ -1,7 +1,7 @@
 import { createPublicClient, http, isAddress, getAddress, type CcipRequestParameters, type Hex, type PublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
 import { normalize } from 'viem/ens'
-import { NameError, type NameResolver, type NameWarning, type ResolvedName } from '@anywalletkit/core'
+import { NameError, type NameErrorCode, type NameResolver, type NameWarning, type ResolvedName } from '@anywalletkit/core'
 import { isPublicHttpsUrl } from '@anywalletkit/networks/url'
 import { coinTypeFor, decodeAddressRecord } from './coins.js'
 import { warningsFor } from './warnings.js'
@@ -17,6 +17,12 @@ export interface EnsResolverOptions {
   client?: PublicClient
   /** …or a mainnet RPC URL to build one from. One of the two is required. */
   rpcUrl?: string
+  /**
+   * How the client built from `rpcUrl` asks CCIP-Read gateways (see {@link EnsCcipOptions}). On React Native, offchain
+   * names resolve only with `ccip.fetch` (one that refuses redirects, e.g. through your server) or
+   * `ccip.allowRedirectFollowingFetch`. With your own `client`, use `ccipRead: createEnsCcipRead(…)` instead.
+   */
+  ccip?: EnsCcipOptions
   /** Cache TTL for resolutions, reverse lookups and avatars. Default 5 min. */
   cacheTtlMs?: number
   /**
@@ -30,18 +36,69 @@ export interface EnsResolverOptions {
 
 interface Entry<T> { value: T; expires: number }
 
-export class EnsNameError extends NameError {}
+/**
+ * A finer reason than the {@link NameErrorCode}, for the developer rather than the user.
+ * `ccip-proxy-required`: an offchain (CCIP-Read) name on React Native with no `ccip` option set (code `lookup-failed`).
+ */
+export type EnsNameErrorReason = 'ccip-proxy-required'
+
+export class EnsNameError extends NameError {
+  /** Set when the cause is the app's setup, not the name or the network: see {@link EnsNameErrorReason}. */
+  readonly reason: EnsNameErrorReason | undefined
+  constructor(code: NameErrorCode, message: string, detail: { name?: string; chain?: string; cause?: unknown } = {}, reason?: EnsNameErrorReason) {
+    super(code, message, detail)
+    this.reason = reason
+  }
+}
+
+/** What an app on React Native must set before offchain names resolve (scan 2026-10-28 F13). */
+const CCIP_PROXY_REQUIRED =
+  'Offchain (CCIP-Read) names are off on React Native: its fetch follows redirects, so a gateway could send the device to a host on the user\'s network. ' +
+  "Ask gateways through your server: ensResolver({ rpcUrl, ccip: { fetch: ensCcipViaProxy('https://your.server/ccip') } }), with createEnsCcipHandler() " +
+  "from '@anywalletkit/names-ens/server' behind that route. Or set ccip: { allowRedirectFollowingFetch: true } to ask gateways directly and accept the risk. " +
+  'See https://docs.anywallet.tech/guides/names/#react-native'
+
+const ccipProxyRequired = (detail: { name?: string; chain?: string } = {}) =>
+  new EnsNameError('lookup-failed', CCIP_PROXY_REQUIRED, detail, 'ccip-proxy-required')
+
+/** How `ensCcipRequest` / `createEnsCcipRead` reach CCIP-Read gateways. */
+export interface EnsCcipOptions {
+  /**
+   * The fetch used to ask gateways, in place of the global one. Supply one that does not follow redirects: a native
+   * fetch that honours `redirect: 'manual'`/`'error'`, or one that sends the request to your own server's CCIP-Read
+   * proxy (which refuses redirects and checks the address it connects to). Passing it says redirects are handled, so
+   * gateways are asked on every runtime, React Native included. The https / public-host check still runs first.
+   */
+  fetch?: (url: string, init: RequestInit) => Promise<Response>
+  /**
+   * Ask gateways with the global fetch even on a runtime whose fetch follows redirects whatever `redirect` says
+   * (React Native). Default false: there, without `fetch`, offchain (CCIP-Read) names do not resolve. true brings
+   * them back and accepts the trade-off: a gateway that answers with a redirect makes the device send one blind
+   * request (no answer is read) to the target, a LAN or loopback host included, before the redirect is noticed.
+   */
+  allowRedirectFollowingFetch?: boolean
+}
+
+/** React Native's fetch (OkHttp / NSURLSession) follows redirects and ignores `redirect: 'error'`. */
+const fetchFollowsRedirects = (): boolean =>
+  typeof navigator !== 'undefined' && (navigator as { product?: unknown }).product === 'ReactNative'
 
 /**
  * EIP-3668 (CCIP-Read) lookups as a wallet may make them (scan 2026-10-27 modules, F37): a name's
  * offchain resolver picks the gateway URLs, and the device fetches them, so only https URLs on a public
  * host are asked — no `http://`, no localhost / LAN / link-local / CGNAT address in any spelling, no
- * placeholder in the host — and a redirect is refused (`redirect: 'error'`; React Native's fetch cannot
- * refuse one, so a redirect's final URL is checked after the fact there). Same protocol as viem's own:
- * GET with `{data}` in the URL, POST `{data, sender}` otherwise, a hex `data` answer.
+ * placeholder in the host — and a redirect is refused (`redirect: 'error'`). React Native's fetch cannot
+ * refuse a redirect, and checking the final URL afterwards is too late (the redirected request has gone out:
+ * scan 2026-10-28 F13), so there no gateway is asked unless `opts.fetch` handles redirects or
+ * `opts.allowRedirectFollowingFetch` accepts the risk. Same protocol as viem's own: GET with `{data}` in
+ * the URL, POST `{data, sender}` otherwise, a hex `data` answer.
  */
-export async function ensCcipRequest({ data, sender, urls, requestOptions }: CcipRequestParameters): Promise<Hex> {
+export async function ensCcipRequest({ data, sender, urls, requestOptions }: CcipRequestParameters, opts: EnsCcipOptions = {}): Promise<Hex> {
   const signal = requestOptions?.signal ?? undefined
+  const doFetch = opts.fetch ?? ((url: string, init: RequestInit) => fetch(url, init))
+  if (!opts.fetch && !opts.allowRedirectFollowingFetch && fetchFollowsRedirects()) {
+    throw ccipProxyRequired()
+  }
   let error: Error = new EnsNameError('lookup-failed', 'The offchain resolver names no gateway this wallet asks.')
   for (const template of urls) {
     if (signal?.aborted) throw signal.reason ?? new Error('aborted')
@@ -52,13 +109,14 @@ export async function ensCcipRequest({ data, sender, urls, requestOptions }: Cci
     }
     const post = !template.includes('{data}')
     try {
-      const res = await fetch(url, {
+      const res = await doFetch(url, {
         method: post ? 'POST' : 'GET',
         redirect: 'error',
         ...(post ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data, sender }) } : {}),
         ...(signal ? { signal } : {}),
       })
-      if (res.redirected || (typeof res.url === 'string' && res.url !== '' && !isPublicHttpsUrl(res.url))) {
+      // A redirect that was followed anyway: its answer is not used (the request itself could not be stopped).
+      if (res.redirected || (res.status >= 300 && res.status < 400) || (typeof res.url === 'string' && res.url !== '' && !isPublicHttpsUrl(res.url))) {
         error = new EnsNameError('lookup-failed', 'The offchain gateway redirected; the answer was not used.')
         continue
       }
@@ -75,8 +133,21 @@ export async function ensCcipRequest({ data, sender, urls, requestOptions }: Cci
   throw error
 }
 
-/** viem's `ccipRead` option with {@link ensCcipRequest}: `createPublicClient({ chain: mainnet, transport, ccipRead: ensCcipRead })`. */
-export const ensCcipRead = Object.freeze({ request: ensCcipRequest })
+const isProxyRequired = (e: unknown): boolean => e instanceof EnsNameError && e.reason === 'ccip-proxy-required'
+
+/** The refusal anywhere in an error's cause chain (viem wraps it in OffchainLookupError and a contract error). */
+function causedByProxyRequired(e: unknown): boolean {
+  for (let cur: unknown = e, depth = 0; cur && depth < 8; cur = (cur as { cause?: unknown }).cause, depth++) if (isProxyRequired(cur)) return true
+  return false
+}
+
+/** viem's `ccipRead` option with {@link ensCcipRequest} and `opts`: `createPublicClient({ chain: mainnet, transport, ccipRead: createEnsCcipRead({ fetch: viaMyServer }) })`. */
+export function createEnsCcipRead(opts: EnsCcipOptions = {}): { readonly request: (p: CcipRequestParameters) => Promise<Hex> } {
+  return Object.freeze({ request: (p: CcipRequestParameters) => ensCcipRequest(p, opts) })
+}
+
+/** viem's `ccipRead` option with {@link ensCcipRequest}'s defaults: `createPublicClient({ chain: mainnet, transport, ccipRead: ensCcipRead })`. */
+export const ensCcipRead = createEnsCcipRead()
 
 /**
  * An `avatar` text record as a URL an app may load: an https URL on a public host as written, or an
@@ -100,7 +171,16 @@ function ipfsPrefix(gateway: string): string {
 
 /** Names ENS can serve: `.eth` and any DNS name (cb.id, uni.eth subnames, imported DNS). */
 export function ensResolver(opts: EnsResolverOptions): NameResolver {
-  const client = opts.client ?? (opts.rpcUrl ? createPublicClient({ chain: mainnet, transport: http(opts.rpcUrl), ccipRead: ensCcipRead }) : null)
+  // Refusals of the React Native default, counted so that a lookup they broke says what to set (viem's batch
+  // gateway turns a thrown error into a revert string, so the error itself does not always come back).
+  let ccipRefusals = 0
+  const ccipRead = {
+    request: (p: CcipRequestParameters) => ensCcipRequest(p, opts.ccip).catch((e: unknown) => {
+      if (isProxyRequired(e)) ccipRefusals++
+      throw e
+    }),
+  }
+  const client = opts.client ?? (opts.rpcUrl ? createPublicClient({ chain: mainnet, transport: http(opts.rpcUrl), ccipRead }) : null)
   if (!client) throw new Error('names-ens: pass a mainnet client or rpcUrl')
   const ttl = opts.cacheTtlMs ?? 5 * 60_000
   const ipfs = opts.ipfsGateway ?? 'https://ipfs.io/ipfs/'
@@ -151,11 +231,14 @@ export function ensResolver(opts: EnsResolverOptions): NameResolver {
     const hit = options?.fresh ? undefined : recall<ResolvedName>(key) // `fresh`: the signing-time check, never cached
     if (hit) return hit
     let raw: string | null
+    const refusalsBefore = ccipRefusals
     try {
       raw = await client.getEnsAddress({ name, coinType })
     } catch (e) {
+      if (ccipRefusals !== refusalsBefore || causedByProxyRequired(e)) throw ccipProxyRequired({ name, chain })
       throw new NameError('lookup-failed', `Could not look up ${name}: ${e instanceof Error ? e.message : String(e)}`, { name, chain, cause: e })
     }
+    if (ccipRefusals !== refusalsBefore && (!raw || /^0x0*$/.test(raw))) throw ccipProxyRequired({ name, chain })
     if (!raw || /^0x0*$/.test(raw)) {
       // Distinguish "no such name" from "no record for this chain": the mainnet
       // record is the one almost every name has.
