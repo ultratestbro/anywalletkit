@@ -25,6 +25,8 @@ const offlineRpc = {
       eth_maxPriorityFeePerGas: '0x3b9aca00',
       eth_getBlockByNumber: { number: '0x10', baseFeePerGas: '0x3b9aca00', timestamp: '0x1', hash: `0x${'11'.repeat(32)}`, transactions: [] },
     }
+    // ERC-165 probe of the token before a revoke: USDC has no supportsInterface, so it reverts
+    if (method === 'eth_call') throw Object.assign(new Error('execution reverted'), { code: 3 })
     if (!(method in answers)) throw new Error(`offline test: no ${method}`)
     return answers[method]
   },
@@ -48,7 +50,7 @@ describe('Approvals guide (docs) — offline', () => {
   it('a revoke reaches confirm as kind revoke, and stops there when refused', async () => {
     const seen: WriteIntent[] = []
     const wallet = walletWithApprovals(SEED, {
-      logsRpc: LOGS_RPC,
+      logsRpc: offlineRpc,
       ethereumRpc: offlineRpc,
       cache: memoryCache(),
       policies: approvalPolicies(async (intent) => { seen.push(intent); return false }),
@@ -65,7 +67,7 @@ describe('Approvals guide (docs) — offline', () => {
   it('a blocklisted spender can still be revoked (the blocklist stops new approvals only)', async () => {
     const seen: WriteIntent[] = []
     const wallet = walletWithApprovals(SEED, {
-      logsRpc: LOGS_RPC,
+      logsRpc: offlineRpc,
       ethereumRpc: offlineRpc,
       cache: memoryCache(),
       policies: { blocklist: { 'eip155:1': [SPENDER] }, confirm: async (intent) => { seen.push(intent); return false } },
@@ -84,7 +86,7 @@ describe('Approvals guide (docs) — offline', () => {
   it('an unlimited approve gets the warning', async () => {
     const warnings: (string | undefined)[] = []
     const wallet = walletWithApprovals(SEED, {
-      logsRpc: LOGS_RPC,
+      logsRpc: offlineRpc,
       ethereumRpc: offlineRpc,
       cache: memoryCache(),
       policies: approvalPolicies(async (_intent, warning) => { warnings.push(warning); return false }),

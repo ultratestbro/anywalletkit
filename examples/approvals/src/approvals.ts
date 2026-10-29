@@ -9,7 +9,7 @@ import ApprovalsProtocolEvm, {
 
 export interface ApprovalsSetup {
   /** An RPC that answers eth_getLogs WITHOUT an address filter (your node, most paid plans). */
-  logsRpc: string
+  logsRpc: NonNullable<EvmConfig['provider']>
   cache: ApprovalsCache
   policies?: Policies
   /** The account's RPC (quotes, sends). Default: a public endpoint — pass your own in production. */
