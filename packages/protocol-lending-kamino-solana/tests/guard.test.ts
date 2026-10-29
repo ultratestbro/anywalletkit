@@ -5,12 +5,14 @@ import { describe, expect, it } from 'vitest'
 import {
   AccountRole, appendTransactionMessageInstructions, compileTransaction, createTransactionMessage, getAddressEncoder,
   getBase64EncodedWireTransaction, pipe, setTransactionMessageFeePayer, setTransactionMessageLifetimeUsingBlockhash,
-  type Address, type Transaction, type TransactionMessage,
+  createNoopSigner, type Address, type Instruction, type Transaction, type TransactionMessage,
 } from '@solana/kit'
-import { TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda } from '@solana-program/token'
-import { WalletManagerSolana, type SolanaRpc } from '@anywalletkit/wallet-solana'
+import { TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, getCloseAccountInstruction } from '@solana-program/token'
+import { WalletManagerSolana, decodeWireTransaction, resolveCompiledAccounts, unexpectedInstruction, type SolanaRpc } from '@anywalletkit/wallet-solana'
 import { KaminoVaultProtocolSolana } from '../src/index.js'
-import { KLEND_PROGRAM, KVAULT_PROGRAM } from '../src/programs.js'
+import { vaultRules } from '../src/policy.js'
+import { associatedTokenAddress } from '../src/pda.js'
+import { KLEND_PROGRAM, KVAULT_PROGRAM, TOKEN_2022_PROGRAM } from '../src/programs.js'
 import { SHARES, USDC, USDC_RESERVE, VAULT, api } from './fixture.js'
 import { defaultChain } from './chain-fixture.js'
 
@@ -60,7 +62,7 @@ function fakeRpc(pre: Record<string, State>, post: Record<string, State>) {
 }
 
 /** A kvault `withdraw` laid out as /ktx/kvault/withdraw builds it (user, vault, …, the wallet's USDC and shares accounts, the mints), extra writable accounts after. */
-function withdrawTx(sharesAta: Address, usdcAta: Address, extra: Address[] = []): string {
+function withdrawTx(sharesAta: Address, usdcAta: Address, extra: Address[] = [], after: Instruction[] = []): string {
   const w = (address: string) => ({ address: address as Address, role: AccountRole.WRITABLE })
   const r = (address: string) => ({ address: address as Address, role: AccountRole.READONLY })
   const ix = {
@@ -77,12 +79,17 @@ function withdrawTx(sharesAta: Address, usdcAta: Address, extra: Address[] = [])
     createTransactionMessage({ version: 0 }),
     (x) => setTransactionMessageFeePayer(ME, x),
     (x) => setTransactionMessageLifetimeUsingBlockhash({ blockhash: '9sHcv6xwn9YkB8nxTUGKDwPwNnmqVp5oAXxU8Fdkm4J6' as never, lastValidBlockHeight: 100n }, x),
-    (x) => appendTransactionMessageInstructions([ix], x),
+    (x) => appendTransactionMessageInstructions([ix, ...after], x),
   ) as TransactionMessage
   return getBase64EncodedWireTransaction(compileTransaction(msg as never) as Transaction)
 }
 
-async function setup(post: (a: { sharesAta: Address; usdcAta: Address; otherAta: Address }) => Record<string, State>, extra = false) {
+type Atas = { sharesAta: Address; usdcAta: Address; otherAta: Address }
+/** SPL Token CloseAccount (data 09): `account`'s rent to `destination`, signed by `owner`. */
+const closeIx = (account: Address, destination: Address, owner: Address = ME, programAddress?: Address) =>
+  getCloseAccountInstruction({ account, destination, owner: createNoopSigner(owner) }, programAddress ? { programAddress } : undefined)
+
+async function setup(post: (a: Atas) => Record<string, State>, extra = false, after: (a: Atas) => Instruction[] = () => []) {
   const [sharesAta] = await findAssociatedTokenPda({ mint: SHARES as Address, owner: ME, tokenProgram: TOKEN_PROGRAM_ADDRESS })
   const [usdcAta] = await findAssociatedTokenPda({ mint: USDC as Address, owner: ME, tokenProgram: TOKEN_PROGRAM_ADDRESS })
   const [otherAta] = await findAssociatedTokenPda({ mint: OTHER_MINT, owner: ME, tokenProgram: TOKEN_PROGRAM_ADDRESS })
@@ -92,7 +99,7 @@ async function setup(post: (a: { sharesAta: Address; usdcAta: Address; otherAta:
   const rpc = fakeRpc(pre, { ...pre, ...post({ sharesAta, usdcAta, otherAta }) })
   const kamino = api()
   kamino.routes.set(`/kvaults/users/${ME}/positions/${VAULT}`, { status: 200, body: { vaultAddress: VAULT, stakedShares: '0', unstakedShares: '1', totalShares: '1' } })
-  kamino.routes.set('/ktx/kvault/withdraw', { status: 200, body: { transaction: withdrawTx(sharesAta, usdcAta, extra ? [otherAta] : []) } })
+  kamino.routes.set('/ktx/kvault/withdraw', { status: 200, body: { transaction: withdrawTx(sharesAta, usdcAta, extra ? [otherAta] : [], after({ sharesAta, usdcAta, otherAta })) } })
   const account = await new WalletManagerSolana(SEED, { provider: rpc.rpc }).getAccount(0)
   return { vault: new KaminoVaultProtocolSolana(account, { vault: VAULT, fetch: kamino.fetch }), rpc }
 }
@@ -117,5 +124,57 @@ describe('Kamino vault withdrawal through the wallet-solana guard', () => {
     const { vault, rpc } = await setup(({ sharesAta, usdcAta, otherAta }) => ({ [ME]: sys(SOL - FEE), [sharesAta]: tokenAccount(SHARES, 0n), [usdcAta]: tokenAccount(USDC, ASSETS), [otherAta]: tokenAccount(OTHER_MINT, 0n) }), true)
     await expect(vault.withdraw({ amount: 'max' })).rejects.toMatchObject({ code: 'token-drain' })
     expect(rpc.sent).toHaveLength(0)
+  })
+
+  // Owner 2026-10-29: a full withdrawal from the API ends with CloseAccount on the emptied shares
+  // account (rent back to the wallet); it was refused as "Instruction 1 (Tokenkeg…, data 09…)".
+  it('a full withdrawal that closes the emptied shares account, rent to the wallet, passes', async () => {
+    const { vault, rpc } = await setup(
+      ({ usdcAta }) => ({ [ME]: sys(SOL - FEE + ATA_RENT), [usdcAta]: tokenAccount(USDC, ASSETS) }), // the shares account is gone
+      false,
+      ({ sharesAta }) => [closeIx(sharesAta, ME)],
+    )
+    await expect(vault.quoteWithdraw({ amount: 'max' })).resolves.toMatchObject({ shares: ONE_SHARE })
+    await expect(vault.withdraw({ amount: 'max' })).resolves.toMatchObject({ hash: 'S'.repeat(87) })
+    expect(rpc.sent).toHaveLength(1)
+  })
+
+  it('closing to another destination, or closing an account that is not the shares account, is refused', async () => {
+    const post = ({ usdcAta }: Atas) => ({ [ME]: sys(SOL - FEE), [usdcAta]: tokenAccount(USDC, ASSETS) })
+    const ATTACKER = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' as Address
+    for (const after of [
+      ({ sharesAta }: Atas) => [closeIx(sharesAta, ATTACKER)],
+      ({ otherAta }: Atas) => [closeIx(otherAta, ME)],
+      ({ usdcAta }: Atas) => [closeIx(usdcAta, ME)],
+      // The Token-2022 program on the Token program's shares account.
+      ({ sharesAta }: Atas) => [closeIx(sharesAta, ME, ME, TOKEN_2022_PROGRAM as Address)],
+    ]) {
+      const { vault, rpc } = await setup(post, false, after)
+      // The wallet's own close check or the operation's rules, whichever sees it first.
+      await expect(vault.withdraw({ amount: 'max' })).rejects.toMatchObject({ code: expect.stringMatching(/^(unexpected-instruction|closes-account)$/) })
+      expect(rpc.sent).toHaveLength(0)
+    }
+  })
+
+  it('the close is a withdrawal step only: a deposit may not carry it; a partial withdrawal may (the token program refuses a non-empty close)', async () => {
+    const sharesAtas = [associatedTokenAddress(ME, SHARES, TOKEN_PROGRAM_ADDRESS), associatedTokenAddress(ME, SHARES, TOKEN_2022_PROGRAM)] as Address[]
+    const accounts = { me: ME, vault: VAULT, mint: USDC, sharesMint: SHARES, tokenAta: associatedTokenAddress(ME, USDC, TOKEN_PROGRAM_ADDRESS), sharesAtas, farm: null, wsolAta: associatedTokenAddress(ME, 'So11111111111111111111111111111111111111112', TOKEN_PROGRAM_ADDRESS) }
+    const odd = (ixs: Instruction[], op: 'deposit' | 'withdraw') => {
+      const msg = pipe(
+        createTransactionMessage({ version: 0 }),
+        (x) => setTransactionMessageFeePayer(ME, x),
+        (x) => setTransactionMessageLifetimeUsingBlockhash({ blockhash: '9sHcv6xwn9YkB8nxTUGKDwPwNnmqVp5oAXxU8Fdkm4J6' as never, lastValidBlockHeight: 100n }, x),
+        (x) => appendTransactionMessageInstructions(ixs, x),
+      ) as TransactionMessage
+      const layout = resolveCompiledAccounts(decodeWireTransaction(getBase64EncodedWireTransaction(compileTransaction(msg as never) as Transaction)))
+      return unexpectedInstruction(layout.compiled, layout.accounts, vaultRules(op, accounts, { stake: false }))
+    }
+    expect(odd([closeIx(sharesAtas[0]!, ME)], 'deposit')).toMatchObject({ index: 0, program: TOKEN_PROGRAM_ADDRESS })
+    expect(odd([closeIx(sharesAtas[1]!, ME, ME, TOKEN_2022_PROGRAM as Address)], 'deposit')).toMatchObject({ index: 0 })
+    // Withdrawals (the rules do not know full from partial): each program on its own derivation passes, the owner must be the wallet.
+    expect(odd([closeIx(sharesAtas[0]!, ME)], 'withdraw')).toBeUndefined()
+    expect(odd([closeIx(sharesAtas[1]!, ME, ME, TOKEN_2022_PROGRAM as Address)], 'withdraw')).toBeUndefined()
+    expect(odd([closeIx(sharesAtas[1]!, ME)], 'withdraw')).toMatchObject({ index: 0 })
+    expect(odd([closeIx(sharesAtas[0]!, ME, 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' as Address)], 'withdraw')).toMatchObject({ index: 0 })
   })
 })

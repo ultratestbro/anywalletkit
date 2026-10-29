@@ -77,7 +77,8 @@ await market.withdrawCollateral({ amount: 'max' })
   its transfer gates are read (`canReceiveShares` / `canSendAssets` in,
   `canSendShares` / `canReceiveAssets` out) and caps and liquidity are left to
   the `eth_call` proof that runs before every send.
-- **Market identity.** An id is resolved with `idToMarketParams`; params are
+- **Market identity.** An id is resolved with `idToMarketParams`, and the RPC's
+  answer must hash back to the id or it is refused; params given in config are
   hashed to the id and the market must exist (`lastUpdate ≠ 0`). The golden
   test derives the live Base cbBTC/USDC id from its params.
 - **Market state.** `market()` is accrued to now exactly as `accrueInterest`
