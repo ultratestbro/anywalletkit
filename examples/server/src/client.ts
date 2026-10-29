@@ -9,6 +9,7 @@ import { RouterSwap2Protocol } from '@anywalletkit/protocol-swap2-router'
 import { lifiPins } from '@anywalletkit/protocol-swap2-lifi/provider'
 import { thorchainPins } from '@anywalletkit/protocol-swap2-thorchain/provider'
 import { chainflipPins } from '@anywalletkit/protocol-swap2-chainflip/config'
+import { nearIntentsPins } from '@anywalletkit/protocol-swap2-near-intents/config'
 
 // #region client-rpc
 /** An EIP-1193 provider over the server's RPC proxy (it adds the upstream key). */
@@ -39,10 +40,11 @@ export function walletOverServer(phrase: string, api: string, token: string, fet
 // #region client-swaps
 /**
  * What the app trusts for each provider on the server: the contracts its calldata may call and approve,
- * and THORChain's check of each build against two THORNodes. A remote provider without pins gets no
- * calldata route at all; NEAR Intents pays a deposit address and needs none.
+ * THORChain's check of each build against two THORNodes and Chainflip's decode of each vault swap. A
+ * remote provider without pins gets no calldata route at all, and one without `depositAddressRoutes` no
+ * deposit-address route: nearIntentsPins opt NEAR Intents in, its deposit addresses are per quote.
  */
-const PINS: Readonly<Record<string, RemotePins>> = { lifi: lifiPins, thorchain: thorchainPins(), chainflip: chainflipPins }
+const PINS: Readonly<Record<string, RemotePins>> = { lifi: lifiPins, thorchain: thorchainPins(), chainflip: chainflipPins, near_intents: nearIntentsPins }
 
 /** The same router the app would build locally, but every provider runs on the server. */
 export function swapsOverServer(account: IWalletAccount, api: string, token: string, names = ['lifi', 'near_intents', 'thorchain', 'chainflip'], fetchImpl?: typeof fetch) {

@@ -13,13 +13,14 @@ const PARAMS: QuoteParams = {
   sourceChain: 'eip155:1', sourceToken: 'USDC', destChain: 'eip155:8453', destToken: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
   amountIn: '100000000', destAddress: '0x9858EfFD232B4033E47d90003D41EC34EcaEda94',
 }
+// A deposit-address provider standing in for NEAR Intents: the app's stub is opened with nearIntentsPins.
 const QUOTE: Quote = {
-  provider: 'mock', intentId: 'i-1', depositAddress: '0x2222222222222222222222222222222222222222', depositMemo: null,
+  provider: 'near_intents', intentId: 'i-1', depositAddress: '0x2222222222222222222222222222222222222222', depositMemo: null,
   sourceAmount: '100000000', destAmount: '99900000', minDestAmount: '99800000', feeUsd: 0.1, etaSeconds: 30,
   reliability: 0.97, validUntilMs: Date.now() + 600_000,
 }
 const mock: CrossChainProvider = {
-  name: 'mock', enabled: () => true, supportsRoute: () => true,
+  name: 'near_intents', enabled: () => true, supportsRoute: () => true,
   getQuote: async () => ({ ...QUOTE }),
   buildDeposit: async () => ({ chain: 'eip155:1', to: QUOTE.depositAddress, value: '0', data: '0x' }),
   trackIntent: async () => ({ state: 'completed' }),
@@ -59,7 +60,7 @@ afterAll(() => new Promise<void>((r) => server.close(() => r())))
 describe('reference server (docs: Ship a wallet)', () => {
   it('health, auth and CORS', async () => {
     expect(await (await fetch(`${base}/health`)).json()).toEqual({ ok: true })
-    expect((await post('/swap2/quote', { provider: 'mock', params: PARAMS }, { 'content-type': 'application/json' })).status).toBe(401)
+    expect((await post('/swap2/quote', { provider: 'near_intents', params: PARAMS }, { 'content-type': 'application/json' })).status).toBe(401)
     expect((await post('/rpc/eip155:1', { jsonrpc: '2.0', id: 1, method: 'eth_chainId' }, { 'content-type': 'application/json' })).status).toBe(401)
     expect((await fetch(`${base}/health`, { headers: { origin: 'https://evil.example' } })).status).toBe(403)
     const pre = await fetch(`${base}/swap2/quote`, { method: 'OPTIONS', headers: { origin: 'https://wallet.example' } })
@@ -68,7 +69,7 @@ describe('reference server (docs: Ship a wallet)', () => {
   })
 
   it('swap2 over HTTP through the real remoteProvider: sealed quote → build → track; a tampered quote is refused', async () => {
-    const client = remoteProvider({ name: 'mock', baseUrl: `${base}/swap2`, headers: { authorization: `Bearer ${TOKEN}` }, allowInsecureBaseUrl: true }) // the local test server
+    const client = remoteProvider({ name: 'near_intents', baseUrl: `${base}/swap2`, headers: { authorization: `Bearer ${TOKEN}` }, allowInsecureBaseUrl: true }) // the local test server
     const quote = await client.getQuote(PARAMS)
     expect(quote?.providerData?.__remoteSeal).toMatch(/^[0-9a-f]{64}$/)
     expect((await client.buildDeposit(quote!)).to).toBe(QUOTE.depositAddress)
@@ -80,7 +81,7 @@ describe('reference server (docs: Ship a wallet)', () => {
 
   it('rate-limits live quotes per caller', async () => {
     const statuses: number[] = []
-    for (let i = 0; i < 3; i++) statuses.push((await post('/swap2/quote', { provider: 'mock', params: PARAMS })).status)
+    for (let i = 0; i < 3; i++) statuses.push((await post('/swap2/quote', { provider: 'near_intents', params: PARAMS })).status)
     expect(statuses).toContain(429) // the bucket is 3 per minute and the round-trip test used one
   })
 
@@ -109,7 +110,7 @@ describe('reference server (docs: Ship a wallet)', () => {
   it('the app side: the router quotes through the server (sealed quote, local validation)', async () => {
     const wallet = walletOverServer(PHRASE, base, TOKEN)
     const account = await wallet.getAccount('eip155:1')
-    const swaps = swapsOverServer(account, base, TOKEN, ['mock'])
+    const swaps = swapsOverServer(account, base, TOKEN, ['near_intents'])
     const quote = await swaps.quoteSwap2({
       fromToken: 'USDC', toToken: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', toChain: 'eip155:8453',
       fromTokenAmount: 100_000_000n, recipient: await account.getAddress(),

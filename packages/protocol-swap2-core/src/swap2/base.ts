@@ -1047,11 +1047,18 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
     const executionModels = [unsigned.data !== undefined, unsigned.bodyBoc !== undefined, unsigned.typedData !== undefined]
       .filter(Boolean).length;
-    if (executionModels > 1 || (unsigned.memo !== undefined && (unsigned.bodyBoc !== undefined || unsigned.typedData !== undefined))) {
+    if (executionModels > 1 || (unsigned.memo !== undefined && (unsigned.bodyBoc !== undefined || unsigned.typedData !== undefined)) ||
+      (unsigned.orderExtension !== undefined && unsigned.typedData === undefined)) {
       throw new Error("swap2: provider returned ambiguous execution payloads");
     }
     if (unsigned.approvalAddress && !unsigned.data && !unsigned.typedData) {
       throw new Error("swap2: approval is only valid for calldata or typed-order execution");
+    }
+    // A remote stub's build that pays an address its backend named — a deposit address, a plain value send — skips
+    // every pin below; it runs only on a stub the app opened to such routes (scan 2026-10-28, F9).
+    if (provider.remote === true && provider.depositAddressRoutes !== true &&
+      unsigned.data === undefined && unsigned.bodyBoc === undefined && unsigned.typedData === undefined && !serialized) {
+      throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' sends the input to ${unsigned.to}, an address its backend named, and the app did not allow deposit-address routes for it (remoteProvider depositAddressRoutes) — refused`);
     }
     // Memo'd deposits: TON carries it as the message body, Tron in
     // raw_data.data (both TRX and TRC-20 — bifrost reads that field for
@@ -1212,6 +1219,12 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' asks to approve ${unsigned.approvalAddress} on ${this.fromChain}, which the app did not pin as a spender (remoteProvider spenders) — refused`);
     }
     if (unsigned.typedData !== undefined) {
+      // The engine binds the domain, the maker and the input; the price, the receiver, the traits and the extension
+      // are the provider's to check. A remote stub's order is signed only after the app's own validator ran on it
+      // (`remoteProvider` `verifyBuild`, e.g. `omnistonVerifyBuild`), as for cell bodies (scan 2026-10-28, F6).
+      if (remote && provider.verifiesBuilds !== true) {
+        throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' asks to sign a typed order, which needs the app's own validator (remoteProvider verifyBuild) — refused`);
+      }
       const chainId = this.fromChain.startsWith("eip155:") ? Number(this.fromChain.slice("eip155:".length)) : null;
       assertTypedOrder(unsigned.typedData, unsigned.approvalAddress, {self: selfAddress, token: source.contract ?? undefined, amount: q.sourceAmount, chainId});
     }

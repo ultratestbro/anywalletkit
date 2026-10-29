@@ -1,7 +1,12 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {encodeAbiParameters} from "viem";
 import {describeProtocolBehaviour, describeProtocolModule} from "@anywalletkit/conformance";
-import {wrapProvider, WRAPPED_NATIVE} from "../src/provider.js";
+import {wrapPins, wrapProvider, WRAPPED_NATIVE} from "../src/provider.js";
+import {remoteProvider} from "@anywalletkit/protocol-swap2-core/remote";
+import {createSwap2Handler} from "@anywalletkit/protocol-swap2-core/server";
+import {SingleProviderSwap2} from "@anywalletkit/protocol-swap2-core/swap2/single";
+import type {CrossChainProvider, Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+
 import {WrapSwap2Protocol} from "../src/protocol.js";
 
 import {readdirSync, readFileSync} from "node:fs";
@@ -112,5 +117,65 @@ describe("wrapped-native table (2026-10-14 batch)", () => {
   it("Arc has no wrapped native (its USDC gas token is already an ERC-20)", () => {
     expect(WRAPPED_NATIVE[5042]).toBeUndefined();
     expect(wrapProvider({rpcUrls: {5042: ["https://rpc.test"]}}).supportsChain?.("eip155:5042")).toBe(false);
+  });
+});
+
+// Scan 2026-10-28, F9: a remote stub's deposit-address routes now need the app's opt-in (`depositAddressRoutes`),
+// which wrapPins do not give. The repro's deposit route is refused; the real wrap and unwrap still execute through
+// the real provider behind the swap2 server handler, remoteProvider + wrapPins, and the engine.
+describe("scan 2026-10-28 F9: wrap remote corridor with wrapPins", () => {
+  const ATTACKER = "0x9999999999999999999999999999999999999999";
+
+  /** The real provider behind the real swap2 handler, as the app's backend runs it. */
+  function realBackend(provider: CrossChainProvider): typeof fetch {
+    const handle = createSwap2Handler<string>({providers: [provider], sealSecret: "test-seal-secret-that-is-at-least-32-bytes-long", guard: () => {}, subject: () => "alice"});
+    return (async (url: string, init: RequestInit) => {
+      const res = await handle(String(url).split("/").pop()!, JSON.parse(String(init.body)), "alice");
+      return new Response(JSON.stringify(res.body), {status: res.status, headers: {"content-type": "application/json"}});
+    }) as unknown as typeof fetch;
+  }
+
+  /** The repro's backend: no txRequest, depositAddress = attacker; the build a plain send of the input to it. */
+  function depositBackend(name: string, chain: string): typeof fetch {
+    return (async (url: string, init: {body: string}) => {
+      const action = String(url).split("/").at(-1)!;
+      const body = JSON.parse(init.body) as {params?: QuoteParams; quote?: Quote};
+      const reply = (v: unknown) => new Response(JSON.stringify(v), {status: 200, headers: {"content-type": "application/json"}});
+      if (action === "quote") {
+        const p = body.params!;
+        return reply({provider: name, intentId: `i-${Math.random()}`, depositAddress: ATTACKER, depositMemo: null, sourceAmount: p.amountIn,
+          destAmount: "999999999999999999999", minDestAmount: p.minAmountOut ?? "1", feeUsd: 0, etaSeconds: 1, reliability: 1, validUntilMs: Date.now() + 60_000} satisfies Quote);
+      }
+      if (action === "build") return reply({chain, to: ATTACKER, value: body.quote!.sourceAmount} satisfies UnsignedTx);
+      return reply({});
+    }) as unknown as typeof fetch;
+  }
+
+  /** The app: remoteProvider({name, baseUrl, ...pins}) under the engine, with a recording EVM account. */
+  function app(name: string, pins: RemotePins, fetchImpl: typeof fetch, self: string, fromChain: string, extra: Record<string, unknown> = {}) {
+    const sent: Array<{to: string; data?: string; value?: bigint}> = [];
+    const account = {
+      getAddress: async () => self, getChainId: async () => Number(fromChain.slice(7)), getAllowance: async () => 0n, waitForTransaction: async () => {},
+      sendTransaction: async (tx: {to: string; data?: string; value?: bigint}) => { sent.push(tx); return {hash: `0x${String(sent.length).padStart(64, "0")}`}; },
+    };
+    const provider: CrossChainProvider = remoteProvider({name, baseUrl: "https://backend.example/api/v2/swap2", fetchImpl, ...extra, ...pins});
+    class P extends SingleProviderSwap2 { protected readonly provider = provider; protected chainSupported(): boolean { return true; } }
+    return {sent, swap2: new P(account as never, {fromChain})};
+  }
+
+  it("the repro's deposit-address route (the ETH to the attacker) is refused before anything is sent", async () => {
+    const a = app("wrap", wrapPins, depositBackend("wrap", "eip155:1"), ME, "eip155:1", {supportsSameChain: true});
+    await expect(a.swap2.swap2({fromToken: "ETH", toToken: WETH, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 15n, minAmountOut: 1n} as never)).rejects.toThrow(/did not allow deposit-address routes/);
+    expect(a.sent).toEqual([]);
+  });
+
+  it("corridor wrap and unwrap on Ethereum: deposit() with the value, withdraw(amount) on WETH", async () => {
+    vi.stubGlobal("fetch", stub());
+    const wrap = app("wrap", wrapPins, realBackend(wrapProvider({rpcUrls: RPC})), ME, "eip155:1", {supportsSameChain: true});
+    await wrap.swap2.swap2({fromToken: "ETH", toToken: WETH, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 15n, minAmountOut: 10n ** 15n} as never);
+    expect(wrap.sent.map((t) => [t.to.toLowerCase(), t.data, t.value])).toEqual([[WETH.toLowerCase(), "0xd0e30db0", 10n ** 15n]]);
+    const unwrap = app("wrap", wrapPins, realBackend(wrapProvider({rpcUrls: RPC})), ME, "eip155:1", {supportsSameChain: true});
+    await unwrap.swap2.swap2({fromToken: "WETH", toToken: ZERO, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 15n, minAmountOut: 10n ** 15n} as never);
+    expect(unwrap.sent.map((t) => t.to.toLowerCase())).toEqual([WETH.toLowerCase()]);
   });
 });

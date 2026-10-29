@@ -16,6 +16,14 @@ npm install @anywalletkit/protocol-swap2-near-intents @anywalletkit/core
 
 On npm: [@anywalletkit/protocol-swap2-near-intents](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-near-intents), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
+## Behind `remoteProvider`
+
+When the provider runs on your server, spread its pins into the app's stub:
+`remoteProvider({name: "near_intents", baseUrl, ...nearIntentsPins})`. Every 1Click route pays a deposit address
+minted per quote, which nothing can pin ahead: `nearIntentsPins` call no contract, approve no spender, and open the
+stub to deposit-address routes (`depositAddressRoutes`). Without it the engine refuses them. The deposit address is
+your server's word, so run the server you trust.
+
 ## Activity
 
 Most 1Click legs leave no stable on-chain marker: the source leg is a plain

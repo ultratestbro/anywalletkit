@@ -62,6 +62,19 @@ Every route is fail-closed until its allowlists and validators are configured:
   engine then signs only an `Order` whose verifying contract is a pinned
   spender, whose maker is this account and that sells exactly the swap's input
   of the source token; a `Permit` or any other typed message is refused.
+  The rest of the order is the app's to check, and the engine signs a remote
+  typed order only with `verifyBuild`: `remoteProvider({name: "omniston",
+  baseUrl, ...omnistonPins(AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS), verifyBuild:
+  omnistonVerifyBuild({...createOmnistonTonValidators()})})`. The build carries
+  the `orderExtension` the order's salt commits to, and `omnistonVerifyBuild`
+  opens both: the v4 domain on a trusted order protocol, the exact Order schema,
+  `takingAmount` at least the quote's minimum, a single-fill order with no
+  allowed sender and an expiry minutes away, the pinned v1beta8 auction and fee
+  terms, one trusted escrow factory (`trustedSettlementContracts`, default the
+  audited table) as the extension target, the whitelisted resolver as the
+  order's receiver, the destination chain and token, the audited timelocks, the
+  TON token and recipient and the quote id. The hashlock is the server's: the
+  server holds the HTLC secret. The same applies to EVM → EVM.
   `validateEvmTypedOrder` is exported for apps that hold the settlement data.
 - **EVM → EVM** (gasless order, same order protocol as EVM → TON): the signed
   extension's ExtraDataArgs name the destination chain, token and deposit and

@@ -161,14 +161,19 @@ describe("scan 2026-10-27 modules G3: a remote provider's addresses come from th
     expect(sent).toHaveLength(0);
   });
 
-  it("fail closed: a remote stub without pins gets no calldata route; its deposit-address routes still work", async () => {
+  it("fail closed: a remote stub without pins gets no calldata route; its deposit-address routes need the app's opt-in", async () => {
     const diamondRoute = {txRequest: {to: DIAMOND, data: "0xdeadbeef", value: "0", chainId: 1, gasLimit: "60000", approvalAddress: DIAMOND}};
     const unpinned = g3account();
     await expect(g3protocol(remote(diamondRoute), unpinned.account).swap2(g3options)).rejects.toThrow(/did not pin/);
     expect(unpinned.sent).toHaveLength(0);
-    // A deposit address needs no pin: the engine writes transfer(depositAddress, amount) on the source token itself.
+    // Scan 2026-10-28 F9: a deposit address is the backend's word, so it is refused unless the app opened the stub to
+    // deposit-address routes (NEAR Intents, a THORChain / Chainflip Tron vault)…
+    const closed = g3account();
+    await expect(g3protocol(remote({depositAddress: DEPOSIT}), closed.account).swap2(g3options)).rejects.toThrow(/did not allow deposit-address routes/);
+    expect(closed.sent).toHaveLength(0);
+    // …and with the opt-in the engine writes transfer(depositAddress, amount) on the source token itself.
     const deposit = g3account();
-    await g3protocol(remote({depositAddress: DEPOSIT}), deposit.account).swap2(g3options);
+    await g3protocol(remote({depositAddress: DEPOSIT}, {depositAddressRoutes: true}), deposit.account).swap2(g3options);
     expect(deposit.sent.map((t) => [t.to.toLowerCase(), t.data?.toLowerCase()])).toEqual([[USDC.toLowerCase(), transferData(DEPOSIT, 1_000_000n).toLowerCase()]]);
   });
 
@@ -191,6 +196,23 @@ describe("scan 2026-10-27 modules G3: a remote provider's addresses come from th
     expect(remotePinRefusal({name: "x", remote: true}, q, "ton:-239")).toBeNull()
     expect(remotePinRefusal({name: "x", remote: true, ...diamondPins}, q, "eip155:1")).toMatch(/approves .* did not pin as a spender/);
     expect(remotePinRefusal({name: "x", remote: true, ...diamondPins}, {txRequest: {to: DIAMOND, data: "0x01", approvalAddress: DIAMOND}} as unknown as Quote, "eip155:1")).toBeNull();
+  });
+
+  it("scan 2026-10-28 F9: remotePinRefusal drops a remote deposit-address or plain-value route unless the app opted in, on every chain", () => {
+    const deposit = {depositAddress: ATTACKER} as unknown as Quote;
+    const plain = {depositAddress: "", txRequest: {to: ATTACKER, value: "1"}} as unknown as Quote;
+    for (const chain of ["eip155:1", "tron:728126428", "bitcoin:000000000019d6689c085ae165831e93"]) {
+      expect(remotePinRefusal({name: "x", remote: true, ...diamondPins}, deposit, chain)).toMatch(/did not allow deposit-address routes/);
+      expect(remotePinRefusal({name: "x", remote: true}, deposit, chain)).toMatch(/did not allow deposit-address routes/);
+      expect(remotePinRefusal({name: "x", remote: true, depositAddressRoutes: true}, deposit, chain)).toBeNull();
+      expect(remotePinRefusal({name: "x"}, deposit, chain)).toBeNull();
+    }
+    expect(remotePinRefusal({name: "x", remote: true, ...diamondPins}, plain, "eip155:1")).toMatch(/pays 0x[0-9a-fA-F]{40}, an address the backend named/);
+    expect(remotePinRefusal({name: "x", remote: true, depositAddressRoutes: true, ...diamondPins}, plain, "eip155:1")).toBeNull();
+    // An order or cell-body route names no deposit address and is judged at build time.
+    expect(remotePinRefusal({name: "x", remote: true}, {depositAddress: ""} as unknown as Quote, "ton:-239")).toBeNull();
+    // A serialized transaction is not a plain send.
+    expect(remotePinRefusal({name: "x", remote: true}, {depositAddress: "", txRequest: {serializedTx: "AQ==", value: "0"}} as unknown as Quote, "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp")).toBeNull();
   });
 });
 
@@ -243,14 +265,28 @@ function typedRemote(typedData: string, approvalAddress: string, opts: Partial<R
 
 describe("scan 2026-10-27 modules G4 (F4): typed data from a provider is signed only when it is the swap's own order", () => {
   it("a remote build whose typedData is an EIP-2612 Permit to the attacker is refused; nothing approved, signed or registered", async () => {
+    // A permissive app validator: the engine's own order check is what refuses it.
     const t = typedAccount();
-    const r = typedRemote(permit, LOP);
+    const r = typedRemote(permit, LOP, {verifyBuild: () => null});
     await expect(g3protocol(r.provider, t.account).swap2(g3options)).rejects.toThrow(/typed order refused — Permit is a token approval/);
     expect([t.sent, t.signed, r.registered]).toEqual([[], [], []]);
     // …and with the permit's own token as the "settlement contract": not a spender the app pinned.
     const u = typedAccount();
-    await expect(g3protocol(typedRemote(permit, USDC).provider, u.account).swap2(g3options)).rejects.toThrow(/did not pin as a spender/);
+    await expect(g3protocol(typedRemote(permit, USDC, {verifyBuild: () => null}).provider, u.account).swap2(g3options)).rejects.toThrow(/did not pin as a spender/);
     expect([u.sent, u.signed]).toEqual([[], []]);
+  });
+
+  it("scan 2026-10-28 F6: a remote typed order is signed only after the app's own validator ran on it", async () => {
+    // The swap's own order, well formed for the engine — but no verifyBuild: its price, receiver and traits are unchecked.
+    const t = typedAccount();
+    const r = typedRemote(order(), LOP);
+    await expect(g3protocol(r.provider, t.account).swap2(g3options)).rejects.toThrow(/asks to sign a typed order, which needs the app's own validator/);
+    expect([t.sent, t.signed, r.registered]).toEqual([[], [], []]);
+    // With a validator that passes it, the same order is approved, signed and registered.
+    const u = typedAccount();
+    const v = typedRemote(order(), LOP, {verifyBuild: () => null});
+    await g3protocol(v.provider, u.account).swap2(g3options);
+    expect([u.sent.length, u.signed.length, v.registered.length]).toEqual([1, 1, 1]);
   });
 
   it("refuses Permit2 permits, other typed messages and orders that are not this swap's", async () => {

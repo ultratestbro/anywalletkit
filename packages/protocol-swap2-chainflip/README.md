@@ -87,7 +87,10 @@ The endpoint rate-limits (429); the provider retries once.
 When the provider runs on your server, spread its pins into the app's stub:
 `remoteProvider({name: "chainflip", baseUrl, ...chainflipPins})`. The engine then lets the EVM route call and
 approve only the Chainflip Vault in `CF_VAULTS`, never an address the backend names; without the pins the stub gets no
-EVM calldata route (fail closed).
+EVM calldata route (fail closed). The pins carry `verifyQuote: chainflipVerifyQuote`, the provider's own decode run
+on the device: the EVM vault call, or the Tron note, must name the app's destination, refund address and a minimum
+price that guarantees the quoted minimum. A Tron vault swap is a send to the Tron Vault, so the pins also open the
+stub to that deposit route (`depositAddressRoutes`); the verifier pins the Vault it pays.
 
 ## Config
 

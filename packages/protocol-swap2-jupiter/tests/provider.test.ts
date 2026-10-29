@@ -2,6 +2,11 @@ import {afterEach, describe, expect, it, vi} from "vitest";
 import {readFileSync} from "node:fs";
 import {decompileTransactionMessage, getCompiledTransactionMessageDecoder, getTransactionDecoder, type Address} from "@solana/kit";
 import {jupiterProvider} from "../src/provider.js";
+import {remoteProvider} from "@anywalletkit/protocol-swap2-core/remote";
+import {createSwap2Handler} from "@anywalletkit/protocol-swap2-core/server";
+import {SingleProviderSwap2} from "@anywalletkit/protocol-swap2-core/swap2/single";
+import type {CrossChainProvider} from "@anywalletkit/protocol-swap2-core/types";
+
 import {COMPUTE_BUDGET_PROGRAM, JUPITER_PROGRAM, WSOL_MINT} from "../src/config.js";
 import {decodeComputeBudget, fromBase64, toBase64} from "../src/codec.js";
 
@@ -186,5 +191,36 @@ describe("jupiter provider — dry quotes and status", () => {
     expect(await jupiterProvider().trackIntent({intentId: "jup:1", sourceTxHash: "sig"})).toEqual({state: "pending"});
     stub({}, () => ({value: [{err: {InstructionError: [2, {Custom: 6001}]}, confirmationStatus: "confirmed"}]}));
     expect(await jupiterProvider({rpcUrls: ["https://rpc.example"]}).trackIntent({intentId: "jup:1", sourceTxHash: "sig"})).toEqual({state: "failed"});
+  });
+});
+
+// Scan 2026-10-28, F9: a remote stub's deposit-address and plain-value routes now need the app's opt-in. A Jupiter
+// route is a provider-serialized transaction the account proves before it signs, not a send to an address the
+// backend named, so the remote corridor is unchanged: it executes through the real provider behind the swap2 server
+// handler, remoteProvider, and the engine, and the account receives the serialized transaction.
+describe("scan 2026-10-28 F9: Jupiter remote corridor", () => {
+  /** The real provider behind the real swap2 handler, as the app's backend runs it. */
+  function realBackend(provider: CrossChainProvider): typeof fetch {
+    const handle = createSwap2Handler<string>({providers: [provider], sealSecret: "test-seal-secret-that-is-at-least-32-bytes-long", guard: () => {}, subject: () => "alice"});
+    return (async (url: string, init: RequestInit) => {
+      const res = await handle(String(url).split("/").pop()!, JSON.parse(String(init.body)), "alice");
+      return new Response(JSON.stringify(res.body), {status: res.status, headers: {"content-type": "application/json"}});
+    }) as unknown as typeof fetch;
+  }
+
+  it("corridor SOL → USDC on Solana: the serialized transaction reaches the account with its expectations", async () => {
+    stub(rec("sol_usdc"));
+    const provider = remoteProvider({name: "jupiter", baseUrl: "https://backend.example/api/v2/swap2", fetchImpl: realBackend(jupiterProvider()), supportsSameChain: true});
+    const serialized: Array<{tx: string; expect: unknown}> = [];
+    const account = {
+      getAddress: async () => T,
+      sendTransaction: async () => { throw new Error("a serialized route never sends a plain transaction"); },
+      sendSerializedTransaction: async (tx: string, expect: unknown) => { serialized.push({tx, expect}); return {hash: "sig1"}; },
+    };
+    class P extends SingleProviderSwap2 { protected readonly provider = provider; protected chainSupported(): boolean { return true; } }
+    const p = new P(account as never, {fromChain: "solana:mainnet", skipAccountChainCheck: true} as never);
+    await p.swap2({fromToken: "SOL", toToken: USDC, toChain: "solana:mainnet", recipient: T, fromTokenAmount: 100_000_000n, minAmountOut: 1n} as never);
+    expect(serialized).toHaveLength(1);
+    expect(serialized[0]!.tx).toMatch(/^[A-Za-z0-9+/=]+$/);
   });
 });

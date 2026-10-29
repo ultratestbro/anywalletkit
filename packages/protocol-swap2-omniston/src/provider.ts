@@ -7,6 +7,7 @@ import {encodeAbiParameters, getAddress, hexToBytes as viemHexToBytes, keccak256
 import {ccAsset, ccAssetByToken, type CcAsset} from "@anywalletkit/swap2-assets";
 import {omniston as cfg} from "./config.js";
 import {checkTonSwapPayload, TonSwapPayloadError, type TonSwapCheckResult, type TonSwapLeg} from "./ton-swap.js";
+import {AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS, AUDITED_OMNISTON_SETTLEMENT_CONTRACTS} from "./validators/settlement.js";
 export {checkTonSwapPayload, TonSwapPayloadError, TON_SWAP_PROTOCOL_LAYOUTS} from "./ton-swap.js";
 export type {TonSwapLeg, TonSwapCheckInput, TonSwapCheckResult} from "./ton-swap.js";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
@@ -759,6 +760,122 @@ function validEvmAddress(value: unknown): boolean {
  */
 const EVM_DEST_PROTOCOL_FEE_RECIPIENTS = new Set(["0x076268146b4ec6d21fc49c27586cfa91b9079a00"]);
 
+/** The pieces of a v1beta8 order extension: the program target and every term the wallet signs through the salt. */
+interface EvmOrderExtension {
+  target: string;
+  getter: {
+    gasBump: bigint; gasPrice: bigint; auctionStart: bigint; duration: bigint; initialRateBump: bigint;
+    points: [bigint, bigint][]; integratorFee: bigint; integratorShare: bigint; resolverFee: bigint; whitelistDiscount: bigint;
+    resolver: bigint;
+  };
+  post: {
+    integratorRecipient: Uint8Array; protocolRecipient: Uint8Array; integratorFee: bigint; integratorShare: bigint;
+    resolverFee: bigint; discount: bigint; allowedTime: bigint; resolver: bigint; resolverTimeDelta: bigint;
+  };
+  /** ExtraDataArgs: hashlock, destination chain id, destination token, deposits, timelocks. */
+  extra: bigint[];
+  customData: Uint8Array;
+}
+
+/** The pinned v1beta8 auction points, the escrow timelocks and their packed word. */
+const EVM_AUCTION_POINTS = [[800000n, 100n], [700000n, 100n], [600000n, 100n], [500000n, 100n], [400000n, 100n]];
+const EVM_TIMELOCKS = [1n, 120n, 240n, 300n, 1n, 120n, 180n, 0n].reduce((packed, value, index) => packed | (value << BigInt(index * 32)), 0n);
+
+/**
+ * Split a 1inch order extension into the audited v1beta8 profile's pieces: only the amount getters (2/3, one program)
+ * and a post-interaction (7), all on one target; a SimpleSettlement getter with a five-point auction and a one-entry
+ * whitelist; a BaseEscrowFactory post-interaction with five ExtraDataArgs words; 131 bytes of custom data. Throws on
+ * any other layout. The terms are checked by the callers.
+ */
+function readEvmOrderExtension(extension: Uint8Array): EvmOrderExtension {
+  if (extension.length < 32) throw new Error("omniston: malformed EVM order extension");
+  const view = new DataView(extension.buffer, extension.byteOffset, extension.byteLength);
+  const fields: Uint8Array[] = [];
+  let begin = 0;
+  const concatLength = extension.length - 32;
+  for (let index = 0; index < 8; index++) {
+    const end = view.getUint32(28 - index * 4, false);
+    if (end < begin || end > concatLength) throw new Error("omniston: malformed EVM order extension offsets");
+    fields.push(extension.slice(32 + begin, 32 + end));
+    begin = end;
+  }
+  // Omniston's audited 1inch profile uses only amount getters (2/3) and a
+  // post-interaction (7). Suffixes can alter token calls; permit/predicate/pre
+  // interaction are separate programs and are not authorized by this adapter.
+  for (const index of [0, 1, 4, 5, 6]) {
+    if (fields[index]!.length !== 0) throw new Error("omniston: unsupported EVM order extension field");
+  }
+  if (!sliceEqual(fields[2]!, fields[3]!)) {
+    throw new Error("omniston: making/taking amount getters use different programs");
+  }
+  let target: string | undefined;
+  for (const index of [2, 3, 7]) {
+    const field = fields[index]!;
+    if (field.length <= 20) throw new Error("omniston: incomplete EVM order extension program");
+    const address = getAddress(`0x${bytesToHex(field.slice(0, 20))}`);
+    if (target !== undefined && getAddress(target) !== address) {
+      throw new Error("omniston: EVM order extension target is not independently trusted");
+    }
+    target = address;
+  }
+
+  // SimpleSettlement auction + AmountGetterWithFee.
+  const field = fields[2]!;
+  let cursor = 20;
+  const gasBump = readBigEndian(field, cursor, 3); cursor += 3;
+  const gasPrice = readBigEndian(field, cursor, 4); cursor += 4;
+  const auctionStart = readBigEndian(field, cursor, 4); cursor += 4;
+  const duration = readBigEndian(field, cursor, 3); cursor += 3;
+  const initialRateBump = readBigEndian(field, cursor, 3); cursor += 3;
+  const pointCount = bigintToNumber(readBigEndian(field, cursor, 1)); cursor += 1;
+  if (pointCount !== 5) throw new Error("omniston: unsupported EVM auction profile");
+  const points: [bigint, bigint][] = [];
+  for (let index = 0; index < pointCount; index++) {
+    points.push([readBigEndian(field, cursor, 3), readBigEndian(field, cursor + 3, 2)]);
+    cursor += 5;
+  }
+  const integratorFee = readBigEndian(field, cursor, 2); cursor += 2;
+  const integratorShare = readBigEndian(field, cursor, 1); cursor += 1;
+  const resolverFee = readBigEndian(field, cursor, 2); cursor += 2;
+  const whitelistDiscount = readBigEndian(field, cursor, 1); cursor += 1;
+  const getterWhitelistCount = bigintToNumber(readBigEndian(field, cursor, 1)); cursor += 1;
+  if (getterWhitelistCount !== 1 || cursor + getterWhitelistCount * 10 !== field.length) {
+    throw new Error("omniston: malformed EVM amount-getter whitelist");
+  }
+  const getter = {gasBump, gasPrice, auctionStart, duration, initialRateBump, points, integratorFee, integratorShare, resolverFee, whitelistDiscount, resolver: readBigEndian(field, cursor, 10)};
+
+  // BaseEscrowFactory postInteraction: fee/whitelist prefix followed by five uint256 ExtraDataArgs words.
+  const post = fields[7]!;
+  cursor = 20;
+  const integratorRecipient = post.slice(cursor, cursor + 20); cursor += 20;
+  const protocolRecipient = post.slice(cursor, cursor + 20); cursor += 20;
+  const postIntegratorFee = readBigEndian(post, cursor, 2); cursor += 2;
+  const postIntegratorShare = readBigEndian(post, cursor, 1); cursor += 1;
+  const postResolverFee = readBigEndian(post, cursor, 2); cursor += 2;
+  const postDiscount = readBigEndian(post, cursor, 1); cursor += 1;
+  const allowedTime = readBigEndian(post, cursor, 4); cursor += 4;
+  const whitelistCount = bigintToNumber(readBigEndian(post, cursor, 1)); cursor += 1;
+  if (whitelistCount !== 1 || cursor + whitelistCount * 12 + 160 !== post.length) {
+    throw new Error("omniston: malformed EVM post-interaction whitelist");
+  }
+  const postResolver = readBigEndian(post, cursor, 10); cursor += 10;
+  const resolverTimeDelta = readBigEndian(post, cursor, 2); cursor += 2;
+  const extra = Array.from({length: 5}, () => {
+    const value = readBigEndian(post, cursor, 32);
+    cursor += 32;
+    return value;
+  });
+  const customData = extension.slice(32 + begin);
+  if (customData.length !== 131) throw new Error("omniston: malformed EVM order extension custom data");
+  return {
+    target: target!,
+    getter,
+    post: {integratorRecipient, protocolRecipient, integratorFee: postIntegratorFee, integratorShare: postIntegratorShare, resolverFee: postResolverFee, discount: postDiscount, allowedTime, resolver: postResolver, resolverTimeDelta},
+    extra,
+    customData,
+  };
+}
+
 /**
  * Strict decoder for the currently observed Omniston v1beta8 EVM→TON 1inch
  * extension profile. It deliberately rejects unknown auction/fee/timelock
@@ -794,73 +911,21 @@ export async function validateEvmToTonOrderExtension(
 ): Promise<void> {
   const evmDest = expected.dstChainId !== undefined;
   if (evmDest && (!Number.isSafeInteger(expected.dstChainId) || expected.dstChainId! <= 0)) throw new Error("omniston: invalid EVM destination chain id");
-  if (extension.length < 32) throw new Error("omniston: malformed EVM order extension");
-  const view = new DataView(extension.buffer, extension.byteOffset, extension.byteLength);
-  const fields: Uint8Array[] = [];
-  let begin = 0;
-  const concatLength = extension.length - 32;
-  for (let index = 0; index < 8; index++) {
-    const end = view.getUint32(28 - index * 4, false);
-    if (end < begin || end > concatLength) throw new Error("omniston: malformed EVM order extension offsets");
-    fields.push(extension.slice(32 + begin, 32 + end));
-    begin = end;
-  }
-  // Omniston's audited 1inch profile uses only amount getters (2/3) and a
-  // post-interaction (7). Suffixes can alter token calls; permit/predicate/pre
-  // interaction are separate programs and are not authorized by this adapter.
-  for (const index of [0, 1, 4, 5, 6]) {
-    if (fields[index]!.length !== 0) throw new Error("omniston: unsupported EVM order extension field");
-  }
-  if (!sliceEqual(fields[2]!, fields[3]!)) {
-    throw new Error("omniston: making/taking amount getters use different programs");
-  }
-  let target: string | undefined;
-  for (const index of [2, 3, 7]) {
-    const field = fields[index]!;
-    if (field.length <= 20) throw new Error("omniston: incomplete EVM order extension program");
-    const address = getAddress(`0x${bytesToHex(field.slice(0, 20))}`);
-    if (!expected.trustedTarget(address) || (target !== undefined && getAddress(target) !== address)) {
-      throw new Error("omniston: EVM order extension target is not independently trusted");
-    }
-    target = address;
-  }
+  const {target, getter, post, extra, customData} = readEvmOrderExtension(extension);
+  if (!expected.trustedTarget(target)) throw new Error("omniston: EVM order extension target is not independently trusted");
 
   // SimpleSettlement auction + AmountGetterWithFee. The current trader quote
   // does not describe the curve, so only the audited live v1beta8 profile is
   // accepted. A contract/profile upgrade must add a new explicit decoder.
-  const getter = fields[2]!;
-  let cursor = 20;
-  const gasBump = readBigEndian(getter, cursor, 3); cursor += 3;
-  const gasPrice = readBigEndian(getter, cursor, 4); cursor += 4;
-  const auctionStart = readBigEndian(getter, cursor, 4); cursor += 4;
-  const duration = readBigEndian(getter, cursor, 3); cursor += 3;
-  const initialRateBump = readBigEndian(getter, cursor, 3); cursor += 3;
-  const pointCount = bigintToNumber(readBigEndian(getter, cursor, 1)); cursor += 1;
-  if (pointCount !== 5) throw new Error("omniston: unsupported EVM auction profile");
-  const points: [bigint, bigint][] = [];
-  for (let index = 0; index < pointCount; index++) {
-    points.push([readBigEndian(getter, cursor, 3), readBigEndian(getter, cursor + 3, 2)]);
-    cursor += 5;
-  }
-  const integratorFee = readBigEndian(getter, cursor, 2); cursor += 2;
-  const integratorShare = readBigEndian(getter, cursor, 1); cursor += 1;
-  const resolverFee = readBigEndian(getter, cursor, 2); cursor += 2;
-  const whitelistDiscount = readBigEndian(getter, cursor, 1); cursor += 1;
-  const getterWhitelistCount = bigintToNumber(readBigEndian(getter, cursor, 1)); cursor += 1;
-  if (getterWhitelistCount !== 1 || cursor + getterWhitelistCount * 10 !== getter.length) {
-    throw new Error("omniston: malformed EVM amount-getter whitelist");
-  }
-  const getterResolver = readBigEndian(getter, cursor, 10);
-  const expectedPoints = [[800000n, 100n], [700000n, 100n], [600000n, 100n], [500000n, 100n], [400000n, 100n]];
   const quoteResolverFee = expected.protocolFeePips % 10 === 0 ? BigInt(expected.protocolFeePips / 10) : -1n;
   const resolverLow80 = BigInt(getAddress(expected.initialResolverAddress)) & ((1n << 80n) - 1n);
   if (
-    gasBump !== 0n || gasPrice !== 0n || !within(auctionStart, expected.quoteTimestamp, 5, 5) ||
-    duration !== 1800n || initialRateBump !== 900000n ||
-    points.some((point, index) => point[0] !== expectedPoints[index]![0] || point[1] !== expectedPoints[index]![1]) ||
-    expected.integratorFeePips !== 0 || integratorFee !== 0n || integratorShare !== 100n ||
-    quoteResolverFee < 0n || resolverFee !== quoteResolverFee || whitelistDiscount !== 50n ||
-    getterResolver !== resolverLow80
+    getter.gasBump !== 0n || getter.gasPrice !== 0n || !within(getter.auctionStart, expected.quoteTimestamp, 5, 5) ||
+    getter.duration !== 1800n || getter.initialRateBump !== 900000n ||
+    getter.points.some((point, index) => point[0] !== EVM_AUCTION_POINTS[index]![0] || point[1] !== EVM_AUCTION_POINTS[index]![1]) ||
+    expected.integratorFeePips !== 0 || getter.integratorFee !== 0n || getter.integratorShare !== 100n ||
+    quoteResolverFee < 0n || getter.resolverFee !== quoteResolverFee || getter.whitelistDiscount !== 50n ||
+    getter.resolver !== resolverLow80
   ) {
     throw new Error("omniston: EVM amount-getter terms do not match the pinned v1beta8 profile");
   }
@@ -871,51 +936,35 @@ export async function validateEvmToTonOrderExtension(
   // `allowedTime` is stamped by the resolver a few seconds BEFORE the quote
   // timestamp (live 2026-10-16: 14–18 s on every chain); the auction start is
   // the quote timestamp (±1 s on Polygon). Both windows are bounded.
-  const post = fields[7]!;
-  cursor = 20;
-  const integratorRecipient = post.slice(cursor, cursor + 20); cursor += 20;
-  const protocolRecipient = post.slice(cursor, cursor + 20); cursor += 20;
-  const postIntegratorFee = readBigEndian(post, cursor, 2); cursor += 2;
-  const postIntegratorShare = readBigEndian(post, cursor, 1); cursor += 1;
-  const postResolverFee = readBigEndian(post, cursor, 2); cursor += 2;
-  const postDiscount = readBigEndian(post, cursor, 1); cursor += 1;
-  const allowedTime = readBigEndian(post, cursor, 4); cursor += 4;
-  const whitelistCount = bigintToNumber(readBigEndian(post, cursor, 1)); cursor += 1;
-  if (whitelistCount !== 1 || cursor + whitelistCount * 12 + 160 !== post.length) {
-    throw new Error("omniston: malformed EVM post-interaction whitelist");
-  }
-  const postResolver = readBigEndian(post, cursor, 10); cursor += 10;
-  const resolverTimeDelta = readBigEndian(post, cursor, 2); cursor += 2;
   if (
-    !zeroBytes(integratorRecipient) || !(zeroBytes(protocolRecipient) || (evmDest && EVM_DEST_PROTOCOL_FEE_RECIPIENTS.has(`0x${bytesToHex(protocolRecipient)}`))) ||
-    postIntegratorFee !== 0n || postIntegratorShare !== 100n || postResolverFee !== quoteResolverFee ||
-    postDiscount !== 50n || !within(allowedTime, expected.quoteTimestamp, 60, 5) ||
-    postResolver !== resolverLow80 || resolverTimeDelta !== 0n
+    !zeroBytes(post.integratorRecipient) || !(zeroBytes(post.protocolRecipient) || (evmDest && EVM_DEST_PROTOCOL_FEE_RECIPIENTS.has(`0x${bytesToHex(post.protocolRecipient)}`))) ||
+    post.integratorFee !== 0n || post.integratorShare !== 100n || post.resolverFee !== quoteResolverFee ||
+    post.discount !== 50n || !within(post.allowedTime, expected.quoteTimestamp, 60, 5) ||
+    post.resolver !== resolverLow80 || post.resolverTimeDelta !== 0n
   ) {
     throw new Error("omniston: EVM post-interaction terms do not match the pinned v1beta8 profile");
   }
-  const extra = Array.from({length: 5}, () => {
-    const value = readBigEndian(post, cursor, 32);
-    cursor += 32;
-    return value;
-  });
   const hashlock = readBigEndian(expected.secretHash, 0, expected.secretHash.length);
   // ExtraDataArgs word 2 is the destination token: the real ERC-20 for an EVM
   // destination, the order's takerAsset placeholder for TON.
   const dstToken = evmDest ? BigInt(getAddress(expected.outputTokenAddress)) : BigInt(getAddress(expected.takerAsset));
   const deposits = (BigInt(expected.srcSecurityDepositUnits) << 128n) | BigInt(expected.dstSecurityDepositUnits);
-  const timelocks = [1n, 120n, 240n, 300n, 1n, 120n, 180n, 0n]
-    .reduce((packed, value, index) => packed | (value << BigInt(index * 32)), 0n);
   if (
     expected.secretHash.length !== 32 || extra[0] !== hashlock || extra[1] !== (evmDest ? BigInt(expected.dstChainId!) : 0n) ||
-    extra[2] !== dstToken || extra[3] !== deposits || extra[4] !== timelocks
+    extra[2] !== dstToken || extra[3] !== deposits || extra[4] !== EVM_TIMELOCKS
   ) {
     throw new Error("omniston: signed EVM HTLC terms do not match the validated order details");
   }
 
-  const customData = extension.slice(32 + begin);
-  if (customData.length !== 131) throw new Error("omniston: malformed EVM order extension custom data");
-  if (evmDest) {
+  await checkOrderCustomData(customData, {evmDest, outputToken: expected.outputTokenAddress, traderDst: expected.traderDstAddress, quoteId: expected.quoteId});
+  if (expected.tradeStartDeadline < expected.quoteTimestamp) {
+    throw new Error("omniston: invalid EVM order quote deadline");
+  }
+}
+
+/** The extension's custom data: the TON output token and recipient (or nothing, for an EVM destination) and the quote id. */
+async function checkOrderCustomData(customData: Uint8Array, expected: {evmDest: boolean; outputToken: string; traderDst: string; quoteId: string}): Promise<void> {
+  if (expected.evmDest) {
     // The TON jetton/recipient slots are empty for an EVM destination (live
     // 2026-10-20). The EVM recipient is NOT in anything the wallet signs: it
     // travels in the unsigned order details only, so the destination escrow's
@@ -923,7 +972,7 @@ export async function validateEvmToTonOrderExtension(
     if (!zeroBytes(customData.slice(0, 66))) throw new Error("omniston: unexpected TON addresses in an EVM-destination order");
   } else {
     const {Address} = await import("@ton/core");
-    const expectedTon = [expected.outputTokenAddress, expected.traderDstAddress].map((value) => Address.parse(value));
+    const expectedTon = [expected.outputToken, expected.traderDst].map((value) => Address.parse(value));
     for (let index = 0; index < expectedTon.length; index++) {
       const offset = index * 33;
       const workchain = customData[offset] === 255 ? -1 : customData[offset]!;
@@ -938,9 +987,6 @@ export async function validateEvmToTonOrderExtension(
   const quoteId = expected.quoteId.replace(/^0x/, "");
   if (!QUOTE_ID.test(quoteId) || !sliceEqual(customData.slice(99), hexToBytes(quoteId.padStart(64, "0")))) {
     throw new Error("omniston: EVM order extension custom data is not bound to the quote id");
-  }
-  if (expected.tradeStartDeadline < expected.quoteTimestamp) {
-    throw new Error("omniston: invalid EVM order quote deadline");
   }
 }
 
@@ -1571,6 +1617,110 @@ export function omnistonPins(trustedEvmOrderProtocols: Readonly<Record<string, r
   return Object.freeze({callTargets: (): readonly string[] => [], spenders: (chain: string): readonly string[] => byChain.get(chain) ?? []});
 }
 
+/** Longest an EVM order may stay fillable after it is built: live orders expire at the 300 s trade-start deadline. */
+const MAX_EVM_ORDER_LIFETIME_S = 900;
+
+/**
+ * The app's check of a remote Omniston EVM typed order — EVM → TON or EVM → EVM — against what the app knows (scan
+ * 2026-10-28, F6). The backend builds the order and keeps the quote's settlement data, so the client checks what the
+ * wallet signs: the 1inch Limit Order Protocol v4 domain on a trusted order protocol and the source chain; the exact
+ * Order schema; the trader as maker, selling exactly the input of the source token; `takingAmount` at least the
+ * quote's minimum and the app's floor; a single-fill, open-taker, unexpired order whose salt commits the build's
+ * `orderExtension`; and that extension — the pinned v1beta8 auction and fees, one trusted escrow factory as target,
+ * the resolver it whitelists as the order's receiver, the destination chain and token, the audited timelocks, the TON
+ * destination token and recipient, and the quote id. The HTLC hashlock and security deposits are the backend's: it
+ * holds the secret either way. The reason it fails, or null.
+ */
+async function checkRemoteEvmOrder(
+  quote: Quote,
+  tx: UnsignedTx,
+  params: QuoteParams,
+  trusted: {orderProtocols: Readonly<Record<string, readonly string[]>>; factories: Readonly<Record<string, readonly string[]>>},
+): Promise<string | null> {
+  const chainId = evmRef(params.sourceChain);
+  if (chainId === null || !params.sourceChain.startsWith("eip155:")) return "a typed order needs an EVM source";
+  // Behind the swap2 server handler the id carries its intent token (`<id>~<tag>`).
+  const intent = decodeIntent(quote.intentId.replace(/~[0-9a-f]{32}$/, ""));
+  if (!intent || intent.kind !== "order" || intent.srcChain !== params.sourceChain) return "the quote's intent is not an order from this chain";
+  if (!tx.orderExtension || !/^0x(?:[0-9a-fA-F]{2})+$/.test(tx.orderExtension)) return "the build carries no order extension to check";
+  const source = ccAsset(params.sourceChain, params.sourceToken);
+  if (!source?.contract) return "unknown source token";
+  const tonDest = isTon(params.destChain);
+  const destChainId = tonDest ? null : evmRef(params.destChain);
+  if (!tonDest && (destChainId === null || !params.destChain.startsWith("eip155:"))) return "the destination is neither TON nor an EVM chain";
+  const outputToken = ccAssetByToken(params.destChain, params.destToken)?.contract ?? params.destToken;
+  const listed = (table: Readonly<Record<string, readonly string[]>>, chain: string, address: unknown) =>
+    typeof address === "string" && validEvmAddress(address) && (table[chain] ?? []).some((a) => validEvmAddress(a) && getAddress(a) === getAddress(address));
+  let td: {domain?: Record<string, unknown>; types?: Record<string, {name?: unknown; type?: unknown}[]>; primaryType?: unknown; message?: Record<string, unknown>};
+  try { td = JSON.parse(tx.typedData ?? ""); } catch { return "the typed data is not JSON"; }
+  const domain = td.domain ?? {};
+  const contract = domain.verifyingContract;
+  if (domain.name !== "1inch Limit Order Protocol" || domain.version !== "4") return "the domain is not the 1inch Limit Order Protocol v4";
+  if (!listed(trusted.orderProtocols, params.sourceChain, contract) || !tx.approvalAddress || getAddress(tx.approvalAddress) !== getAddress(String(contract))) {
+    return `${String(contract)} is not a trusted order protocol on ${params.sourceChain}`;
+  }
+  if (Number(domain.chainId) !== chainId || (tx.chainId !== undefined && tx.chainId !== chainId)) return "the domain chainId is not the source chain";
+  const order = td.types?.Order;
+  const message = td.message;
+  if (td.primaryType !== "Order" || !Array.isArray(order) || order.length !== ORDER_FIELDS.length ||
+    !order.every((field, i) => field.name === ORDER_FIELDS[i]![0] && field.type === ORDER_FIELDS[i]![1]) ||
+    !message || Object.keys(message).length !== ORDER_FIELDS.length || !ORDER_FIELDS.every(([name]) => Object.hasOwn(message, name)) ||
+    !ORDER_FIELDS.every(([name, type]) => (type === "address" ? validEvmAddress(message[name]) : validUint256(message[name])))) {
+    return "the typed data is not exactly a v4 Order";
+  }
+  if (!validEvmAddress(intent.trader) || getAddress(String(message.maker)) !== getAddress(intent.trader)) return "the maker is not the trader";
+  if (getAddress(String(message.makerAsset)) !== getAddress(source.contract)) return "the makerAsset is not the source token";
+  if (BigInt(message.makingAmount as string) !== BigInt(quote.sourceAmount)) return "the makingAmount is not the input";
+  if (getAddress(String(message.takerAsset)) === getAddress(String(message.makerAsset))) return "the takerAsset is the makerAsset";
+  const floor = [quote.minDestAmount, params.minAmountOut ?? "0"].filter((v) => /^\d{1,80}$/.test(v)).map((v) => BigInt(v)).reduce((a, b) => (a > b ? a : b), 0n);
+  if (floor <= 0n || BigInt(message.takingAmount as string) < floor) return `takingAmount ${String(message.takingAmount)} is below the quote's minimum ${floor}`;
+  // Single fill (ALLOW_MULTIPLE_FILLS clear), POST_INTERACTION + HAS_EXTENSION set, nothing else but NO_PARTIAL_FILLS;
+  // no allowed-sender or series restriction (the extension whitelists the resolver); an expiry minutes away.
+  const traits = BigInt(message.makerTraits as string);
+  const flags = traits & (((1n << 56n) - 1n) << 200n);
+  const baseFlags = (1n << 251n) | (1n << 249n);
+  if (flags !== baseFlags && flags !== (baseFlags | (1n << 255n))) return "the makerTraits flags are not a single-fill order with its extension";
+  if ((traits & ((1n << 80n) - 1n)) !== 0n || ((traits >> 160n) & ((1n << 40n) - 1n)) !== 0n) return "the makerTraits restrict the taker or the series";
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const expiration = (traits >> 80n) & ((1n << 40n) - 1n);
+  if (expiration <= now || expiration > now + BigInt(MAX_EVM_ORDER_LIFETIME_S)) return "the order's expiry is not minutes away";
+  const extension = viemHexToBytes(tx.orderExtension as `0x${string}`);
+  const mask = (1n << 160n) - 1n;
+  if ((BigInt(message.salt as string) & mask) !== (BigInt(keccak256(extension)) & mask)) return "the salt does not commit the order extension";
+  let parsed: EvmOrderExtension;
+  try { parsed = readEvmOrderExtension(extension); } catch (e) { return e instanceof Error ? e.message.replace(/^omniston: /, "") : String(e); }
+  const {target, getter, post, extra, customData} = parsed;
+  if (!listed(trusted.factories, params.sourceChain, target)) return `the extension targets ${target}, not a trusted escrow factory on ${params.sourceChain}`;
+  const receiverLow80 = BigInt(getAddress(String(message.receiver))) & ((1n << 80n) - 1n);
+  if (getter.resolver !== receiverLow80 || post.resolver !== receiverLow80) return "the order's receiver is not the resolver its extension whitelists";
+  if (
+    getter.gasBump !== 0n || getter.gasPrice !== 0n || getter.duration !== 1800n || getter.initialRateBump !== 900000n ||
+    getter.points.some((point, index) => point[0] !== EVM_AUCTION_POINTS[index]![0] || point[1] !== EVM_AUCTION_POINTS[index]![1]) ||
+    getter.integratorFee !== 0n || getter.integratorShare !== 100n || getter.whitelistDiscount !== 50n ||
+    !within(getter.auctionStart, bigintToNumber(now), MAX_EVM_ORDER_LIFETIME_S, 60)
+  ) {
+    return "the amount-getter terms do not match the pinned v1beta8 profile";
+  }
+  if (
+    !zeroBytes(post.integratorRecipient) || !(zeroBytes(post.protocolRecipient) || (!tonDest && EVM_DEST_PROTOCOL_FEE_RECIPIENTS.has(`0x${bytesToHex(post.protocolRecipient)}`))) ||
+    post.integratorFee !== 0n || post.integratorShare !== 100n || post.resolverFee !== getter.resolverFee || post.discount !== 50n ||
+    post.resolverTimeDelta !== 0n || !within(post.allowedTime, bigintToNumber(getter.auctionStart), 60, 5)
+  ) {
+    return "the post-interaction terms do not match the pinned v1beta8 profile";
+  }
+  let dstToken: bigint;
+  try { dstToken = tonDest ? BigInt(getAddress(String(message.takerAsset))) : BigInt(getAddress(outputToken)); } catch { return "the destination token is not an EVM address"; }
+  if (extra[1] !== (tonDest ? 0n : BigInt(destChainId!)) || extra[2] !== dstToken || extra[4] !== EVM_TIMELOCKS) {
+    return "the signed HTLC terms name another destination chain or token, or other timelocks";
+  }
+  try {
+    await checkOrderCustomData(customData, {evmDest: !tonDest, outputToken, traderDst: params.destAddress, quoteId: intent.quoteId});
+  } catch (e) {
+    return e instanceof Error ? e.message.replace(/^omniston: /, "") : String(e);
+  }
+  return null;
+}
+
 /**
  * The app's check of a remote Omniston TON build, for `remoteProvider({name: "omniston", baseUrl, verifyBuild:
  * omnistonVerifyBuild({...createOmnistonTonValidators()})})` (scan 2026-10-27 modules, F7/F13/F18/F19):
@@ -1579,7 +1729,10 @@ export function omnistonPins(trustedEvmOrderProtocols: Readonly<Record<string, r
  *   validators (`validateTonSwapTarget`, `validateTonSwapLeg`);
  * - a TON → EVM escrow body (an Omniston order from TON) goes to `verifyTonEscrowBuild` with what the app knows: the
  *   input, the trader's TON address, the destination chain, address and token, and the quote's minimum delivery.
- * EVM typed orders pass through to the engine's own order checks. The reason it fails, or null.
+ * - an EVM typed order (EVM → TON, EVM → EVM) is opened with the order extension the build carries: price, receiver,
+ *   traits, salt and the escrow terms are checked against the app's request and the audited contracts
+ *   (`trustedEvmOrderProtocols`, `trustedSettlementContracts`; default the audited tables), scan 2026-10-28 F6.
+ * The reason it fails, or null.
  */
 export function omnistonVerifyBuild(hooks: {
   validateTonSwapTarget: (input: {address: string; protocols: readonly string[]}) => Promise<boolean> | boolean;
@@ -1591,8 +1744,20 @@ export function omnistonVerifyBuild(hooks: {
   verifyTonEscrowBuild?: (input: TonEscrowBuildExpectation) => string | null | Promise<string | null>;
   /** The integrator your backend's Omniston provider uses: the only referral a body may name. */
   integratorAddress?: string | null;
+  /** EVM order protocols an EVM typed order may name, per chain. Default `AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS`. */
+  trustedEvmOrderProtocols?: Readonly<Record<string, readonly string[]>>;
+  /** Escrow factories an EVM order's extension may target, per chain. Default `AUDITED_OMNISTON_SETTLEMENT_CONTRACTS`. */
+  trustedSettlementContracts?: Readonly<Record<string, readonly string[]>>;
 }): (quote: Quote, tx: UnsignedTx, params?: QuoteParams) => Promise<string | null> {
+  const trusted = {
+    orderProtocols: hooks.trustedEvmOrderProtocols ?? AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS,
+    factories: hooks.trustedSettlementContracts ?? AUDITED_OMNISTON_SETTLEMENT_CONTRACTS,
+  };
   return async (quote, tx, params) => {
+    if (tx.typedData !== undefined) {
+      if (!params) return "the request this quote answered is unknown";
+      try { return await checkRemoteEvmOrder(quote, tx, params, trusted); } catch { return "the typed order could not be checked"; }
+    }
     if (tx.bodyBoc === undefined) return null;
     if (!params) return "the request this quote answered is unknown";
     if (quote.providerData?.settlement !== "swap") {
@@ -2431,7 +2596,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       },
     });
     const orderProtocol = getAddress(protocol.chain.value);
-    return {chain: srcChain, to: orderProtocol, value: "0", chainId, approvalAddress: orderProtocol, typedData};
+    // The extension rides along so an app behind remoteProvider can open the order itself (scan 2026-10-28, F6).
+    return {chain: srcChain, to: orderProtocol, value: "0", chainId, approvalAddress: orderProtocol, typedData, orderExtension: `0x${bytesToHex(payload.orderExtension)}`};
   }
 
   return {

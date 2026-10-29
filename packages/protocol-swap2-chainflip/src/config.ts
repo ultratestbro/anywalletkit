@@ -8,7 +8,8 @@
  * 3.4 USDT ingress fee. Sources: EVM (Ethereum, Arbitrum) and Tron in this release; Solana / Bitcoin vault swaps need an
  * instruction / OP_RETURN builder and come next. Destinations: every live chain.
  */
-import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
+import type {Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {decodeEvmVaultCall, decodeTronNote, destAddressBytes, fromHex, minOutOf, sameBytes, type CfParameters} from "./codec.js";
 
 export type CfChain = "Ethereum" | "Bitcoin" | "Arbitrum" | "Solana" | "Tron";
 
@@ -83,12 +84,68 @@ export const chainflip = {
 };
 
 /**
- * The Chainflip Vault a vault swap calls and approves on an EVM chain ({@link CF_VAULTS}) — the app's
- * pins for `remoteProvider({name: "chainflip", baseUrl, ...chainflipPins})` (scan 2026-10-27 modules, F8/F16).
+ * The provider's own decode of a vault swap, run on the client against the app's request (scan 2026-10-28, F9): an
+ * EVM source is a vault call (`xSwapNative` / `xSwapToken`) on the pinned Vault, a Tron source a send to the pinned
+ * Tron Vault whose note carries the swap; either way the destination chain, asset and address, the source token and
+ * amount, the refund address and a minimum price that guarantees the quoted minimum must be the app's, with no DCA,
+ * boost, broker fee or affiliates. The reason it fails, or null.
+ */
+export function chainflipVerifyQuote(params: QuoteParams, quote: Quote): string | null {
+  try {
+    const src = cfAsset(params.sourceChain, params.sourceToken);
+    const dst = cfAsset(params.destChain, params.destToken);
+    const dstChain = CF_CHAINS[params.destChain];
+    const vault = Object.prototype.hasOwnProperty.call(CF_VAULTS, params.sourceChain) ? CF_VAULTS[params.sourceChain] : undefined;
+    if (!src || !dst || !dstChain || !vault || !CF_SOURCE_CHAINS.has(params.sourceChain)) return "not a vault swap this release signs";
+    // A dry quote lists a route and pays nobody; execution re-quotes live.
+    if (!quote.txRequest && !quote.depositAddress) return null;
+    if (!params.refundAddress) return "a live quote needs the refund address";
+    const amountIn = BigInt(params.amountIn);
+    const dest = destAddressBytes(params.destChain, params.destAddress);
+    const refund = destAddressBytes(params.sourceChain, params.refundAddress);
+    const checkParams = (p: CfParameters): string | null => {
+      if (!sameBytes(fromHex(p.refundAddress), refund)) return "the refund address is not the sender";
+      if (minOutOf(amountIn, p.minPriceX128) < BigInt(quote.minDestAmount)) return "the minimum price does not guarantee the quoted minimum";
+      if (p.dca !== null || p.boostFeeBps !== 0 || p.broker.feeBps !== 0 || p.affiliates.length) return "DCA, boost, a broker fee or affiliates";
+      return null;
+    };
+    if (params.sourceChain.startsWith("eip155:")) {
+      const tx = quote.txRequest;
+      if (quote.depositAddress || !tx?.data || tx.serializedTx !== undefined) return "an EVM vault swap is a vault call, not a deposit";
+      if (!tx.to || tx.to.toLowerCase() !== vault.toLowerCase()) return `the call targets ${tx.to}, not the Vault`;
+      const v = decodeEvmVaultCall(tx.data);
+      if (v.dstChain !== dstChain.id || v.dstToken !== dst.id || !sameBytes(v.dstAddress, dest)) return "the vault call names another destination";
+      if (src.token === null) {
+        if (!v.native || BigInt(tx.value ?? "0") !== amountIn || tx.approvalAddress) return "the native vault call moves another amount";
+      } else if (v.native || v.srcToken?.toLowerCase() !== src.token.toLowerCase() || v.amount !== amountIn || BigInt(tx.value ?? "0") !== 0n ||
+        tx.approvalAddress?.toLowerCase() !== vault.toLowerCase()) {
+        return "the token vault call moves another token or amount";
+      }
+      return checkParams(v.params);
+    }
+    // Tron: the deposit is a send of the input to the Vault, the swap riding in the note.
+    if (quote.txRequest || quote.depositAddress !== vault || !quote.depositMemo) return "a Tron vault swap is a send to the Tron Vault with its note";
+    const n = decodeTronNote(quote.depositMemo);
+    if (n.outputAsset !== dst.id || n.destTag !== dstChain.addrTag || !sameBytes(n.destAddress, dest)) return "the note names another destination";
+    return checkParams(n.params);
+  } catch (e) {
+    return `the vault swap does not decode (${(e instanceof Error ? e.message : String(e)).slice(0, 120)})`;
+  }
+}
+
+/**
+ * The Chainflip Vault a vault swap calls and approves on an EVM chain ({@link CF_VAULTS}), and
+ * {@link chainflipVerifyQuote} — the app's pins for `remoteProvider({name: "chainflip", baseUrl, ...chainflipPins})`
+ * (scan 2026-10-27 modules, F8/F16). A Tron vault swap is a send to the Tron Vault the verifier pins, so the stub is
+ * opened to that deposit route (`depositAddressRoutes`, scan 2026-10-28 F9); its note must ride as hex bytes.
  */
 export const chainflipPins: RemotePins = Object.freeze({
   callTargets: (chain: string): readonly string[] => chainflipVaultFor(chain),
   spenders: (chain: string): readonly string[] => chainflipVaultFor(chain),
+  verifyQuote: chainflipVerifyQuote,
+  verifyBuild: (quote: Quote, tx: UnsignedTx): string | null =>
+    quote.depositMemo && tx.memoEncoding !== "hex" ? "the Tron note is not sent as hex bytes" : null,
+  depositAddressRoutes: true,
 });
 function chainflipVaultFor(chain: string): readonly string[] {
   const vault = chain.startsWith("eip155:") && Object.prototype.hasOwnProperty.call(CF_VAULTS, chain) ? CF_VAULTS[chain] : undefined;

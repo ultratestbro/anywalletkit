@@ -117,7 +117,9 @@ pointing at your server. The engine still validates every quote and every transa
 device** before anything is signed: the server can refuse, it cannot make the app sign something
 else. That needs each provider's pins (`lifiPins`, `thorchainPins()`, `chainflipPins`…): the
 contracts its calldata may call and approve come from the app, never from the server, and a remote
-provider without pins gets no calldata route at all. The server's address must be https.
+provider without pins gets no calldata route at all. A route that pays an address the server names (a
+deposit address, a plain send) runs only on a stub opened with `depositAddressRoutes` — `nearIntentsPins`
+for NEAR Intents. The server's address must be https.
 
 <Snippet file="server/src/client.ts" region="client-swaps" />
 

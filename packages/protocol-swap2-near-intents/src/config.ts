@@ -1,3 +1,4 @@
+import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {namespace} from "@anywalletkit/protocol-swap2-core/util";
 import {ccChain} from "@anywalletkit/swap2-assets";
 
@@ -47,3 +48,15 @@ export const nearIntents = {
     return this.supportsChain(from) && this.supportsChain(to);
   },
 };
+
+/**
+ * The app's side of a remote NEAR Intents stub: `remoteProvider({name: "near_intents", baseUrl, ...nearIntentsPins})`.
+ * Every 1Click route is a send to a deposit address minted per quote, so nothing can be pinned ahead: the stub calls
+ * no contract and approves no spender, and is opened to deposit-address routes (scan 2026-10-28, F9). The deposit
+ * address is your backend's word — run the backend you trust.
+ */
+export const nearIntentsPins: RemotePins = Object.freeze({
+  callTargets: (): readonly string[] => [],
+  spenders: (): readonly string[] => [],
+  depositAddressRoutes: true,
+});

@@ -49,14 +49,21 @@ export function validQuote(q: Quote, params: QuoteParams, provider: string): boo
 
 /**
  * Why a remote provider's quote cannot execute in this app, or null: its EVM transaction calls or
- * approves an address the app did not pin (`remoteProvider` `callTargets` / `spenders`). The router
- * and the single-provider path drop such a quote with this reason, so the auction never picks a
- * route execution would refuse (scan 2026-10-27 modules, F8/F9/F16); execution checks the build
- * again, in full. Local providers and deposit-address routes are not judged here.
+ * approves an address the app did not pin (`remoteProvider` `callTargets` / `spenders`), or it pays
+ * an address the backend named — a deposit address or a plain value send — on a stub the app did not
+ * open to such routes (`depositAddressRoutes`, scan 2026-10-28 F9). The router and the
+ * single-provider path drop such a quote with this reason, so the auction never picks a route
+ * execution would refuse (scan 2026-10-27 modules, F8/F9/F16); execution checks the build again, in
+ * full. Local providers are not judged here.
  */
-export function remotePinRefusal(provider: Pick<CrossChainProvider, "name" | "remote" | "callTargets" | "spenders">, q: Quote, chain: string): string | null {
-  if (provider.remote !== true || !chain.startsWith("eip155:")) return null;
+export function remotePinRefusal(provider: Pick<CrossChainProvider, "name" | "remote" | "callTargets" | "spenders" | "depositAddressRoutes">, q: Quote, chain: string): string | null {
+  if (provider.remote !== true) return null;
   const tx = q.txRequest;
+  const plain = tx ? tx.data === undefined && tx.serializedTx === undefined : typeof q.depositAddress === "string" && q.depositAddress !== "";
+  if (plain && provider.depositAddressRoutes !== true) {
+    return `${provider.name}: the route pays ${tx?.to || q.depositAddress}, an address the backend named, and the app did not allow deposit-address routes for this provider (remoteProvider depositAddressRoutes)`;
+  }
+  if (!chain.startsWith("eip155:")) return null;
   if (!tx || tx.serializedTx !== undefined) return null;
   const pinned = (list: readonly string[] | undefined, address: string) =>
     (list ?? []).some((a) => typeof a === "string" && a.toLowerCase() === address.toLowerCase());

@@ -22,7 +22,11 @@ On npm: [@anywalletkit/protocol-swap2-balancer](https://www.npmjs.com/package/@a
 When the provider runs on your server, spread its pins into the app's stub:
 `remoteProvider({name: "balancer", baseUrl, ...balancerPins})`. The engine then lets the EVM route call and
 approve only the Balancer V2 Vault, never an address the backend names; without the pins the stub gets no
-EVM calldata route (fail closed).
+EVM calldata route (fail closed). The pins carry `verifyQuote: balancerVerifyQuote`, which opens the Vault call on
+the device: only `batchSwap` of kind GIVEN_IN, no internal balances or pool `userData`, at most
+`BALANCER_MAX_SWAPS` hops, funds from this account to the recipient, the hops selling exactly the input of the
+source token, and limits of exactly the input in and the quote's minimum out. `manageUserBalance`,
+`setRelayerApproval`, `swap` and every other Vault call are refused.
 
 ## Activity
 

@@ -27,6 +27,8 @@ export interface StubOptions {
   receipt?: string | null;
   /** HTTP-fail every request to these URLs. */
   down?: string[];
+  /** amountOut for a NOMINAL input on every two-pool (exactInput) path; unset = multi-hop reverts. */
+  multiHop?: bigint;
 }
 
 export function rpcStub(o: StubOptions = {}): typeof fetch & {urls: string[]} {
@@ -52,6 +54,10 @@ export function rpcStub(o: StubOptions = {}): typeof fetch & {urls: string[]} {
           let amount = (nominal * amountIn) / NOMINAL_IN;
           if (o.impactBps && amountIn >= NOMINAL_IN) amount = (amount * BigInt(10_000 - o.impactBps)) / 10_000n;
           return {id: req.id, result: encodeAbiParameters([{type: "uint256"}, {type: "uint160"}, {type: "uint32"}, {type: "uint256"}], [amount, 0n, 1, 90_000n])};
+        }
+        if (call.functionName === "quoteExactInput" && o.multiHop !== undefined) {
+          const amount = (o.multiHop * (call.args[1] as bigint)) / NOMINAL_IN;
+          return {id: req.id, result: encodeAbiParameters([{type: "uint256"}, {type: "uint160[]"}, {type: "uint32[]"}, {type: "uint256"}], [amount, [0n, 0n], [1, 1], 180_000n])};
         }
       } catch {
         /* fall through */

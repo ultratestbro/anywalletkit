@@ -133,7 +133,8 @@ describe("Omniston EVM → TON orders (live 2026-10-16 fixtures)", () => {
     // The wallet signs the domain with a NUMERIC chainId (Omniston sends "0x2105").
     const normalized = JSON.parse(BASE.payload.typedData);
     normalized.domain.chainId = 8453;
-    expect(tx).toEqual({chain: "eip155:8453", to: LOP, value: "0", chainId: 8453, approvalAddress: LOP, typedData: JSON.stringify(normalized)});
+    // The order extension rides along for an app that checks a remote build itself (scan 2026-10-28 F6).
+    expect(tx).toEqual({chain: "eip155:8453", to: LOP, value: "0", chainId: 8453, approvalAddress: LOP, typedData: JSON.stringify(normalized), orderExtension: `0x${BASE.payload.orderExtensionHex}`});
     expect(client.calls.evmBuildOrderPayload).toEqual([{
       quoteId: quote().quoteId,
       ownerSrcAddress: {chain: {$case: "base", value: OWNER}},

@@ -141,6 +141,7 @@ export class CrossChainRouter {
       // remote provider for a local one and checked its calldata against the backend's own addresses.
       ...(provider.remote === true ? {remote: true} : {}),
       ...(provider.verifiesBuilds === true ? {verifiesBuilds: true} : {}),
+      ...(provider.depositAddressRoutes === true ? {depositAddressRoutes: true} : {}),
       ...(provider.callTargets ? {callTargets: provider.callTargets.bind(provider)} : {}),
       ...(provider.spenders ? {spenders: provider.spenders.bind(provider)} : {}),
       ...(provider.close ? {close: provider.close.bind(provider)} : {}),

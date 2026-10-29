@@ -180,6 +180,12 @@ export interface UnsignedTx {
    * `approvalAddress` names the settlement contract that needs allowance.
    */
   typedData?: string;
+  /**
+   * Typed-order execution: the order extension (0x-hex) the order's salt commits to — a 1inch Limit Order Protocol
+   * order's amount getters and post-interaction, where an HTLC order's escrow terms live. Carried so an app can open
+   * a remote build on the client (`omnistonVerifyBuild`, scan 2026-10-28 F6); the signature covers it through the salt.
+   */
+  orderExtension?: string;
 }
 
 /**
@@ -199,6 +205,12 @@ export interface RemotePins {
   verifyQuote?(params: QuoteParams, quote: Quote): string | null;
   /** A client-side check of a remote build (typed order, cell body) against its quote: the reason it fails, or null. */
   verifyBuild?(quote: Quote, tx: UnsignedTx, params?: QuoteParams): string | null | Promise<string | null>;
+  /**
+   * The provider's routes pay an address the backend names — a deposit address, or a plain value send — instead of
+   * calling a pinned contract (`thorchainPins` for a Tron vault, NEAR Intents' per-quote deposit addresses). Without
+   * it a remote stub's deposit-address and plain-value routes are refused (scan 2026-10-28, F9).
+   */
+  depositAddressRoutes?: boolean;
 }
 
 /**
@@ -255,6 +267,11 @@ export interface CrossChainProvider {
   readonly remote?: boolean;
   /** Set by `remoteProvider` when the app gave it `verifyBuild`: its builds are checked on the client. */
   readonly verifiesBuilds?: boolean;
+  /**
+   * Set by `remoteProvider` when the app opted in (`depositAddressRoutes`): this stub may send the input to an address
+   * its backend names. Without it the engine refuses a remote stub's deposit-address and plain-value builds.
+   */
+  readonly depositAddressRoutes?: boolean;
   /** Remote stubs: the contracts this provider's EVM swaps may call on `chain` (the app's list, e.g. `lifiPins`). */
   callTargets?(chain: string): readonly string[];
   /** Remote stubs: the spenders this provider's EVM swaps may be approved for on `chain` (the app's list). */
