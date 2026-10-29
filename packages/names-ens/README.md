@@ -50,9 +50,11 @@ await ens.avatar('vitalik.eth') // 'https://euc.li/vitalik.eth'
 await assertNameUnchanged(ens, 'vitalik.eth', 'eip155:1', addressShownToUser)
 ```
 
-Options: `client` / `rpcUrl` (mainnet; required), `cacheTtlMs`, `ipfsGateway` (point it at your proxy), `foreignTlds` (TLDs left to other resolvers; default `sol`, `near`, `ton`, `me`).
+Options: `client` / `rpcUrl` (mainnet; required), `ccip` (how gateways are asked, below), `cacheTtlMs`, `ipfsGateway` (point it at your proxy), `foreignTlds` (TLDs left to other resolvers; default `sol`, `near`, `ton`, `me`).
 
 Offchain names (CCIP-Read, EIP-3668) make the device fetch gateway URLs that the name's resolver chooses. The client built from `rpcUrl` asks only https gateways on public hosts (`ensCcipRead`: no `http://`, no localhost / LAN / link-local / CGNAT address in any spelling, redirects refused). **If you pass your own `client`, create it with `ccipRead: ensCcipRead`** (or `ccipRead: false`), or viem's default fetches whatever URL a resolver names, `http://192.168.1.1/…` included.
+
+React Native's fetch follows redirects whatever `redirect: 'error'` says, so a gateway's redirect would send the device's request to a LAN or loopback host before the final URL can be checked. There, offchain names are off unless you pass `ccip: { fetch }` (a fetch that does not follow redirects, usually one that goes through your server; the https / public-host check still runs first) or `ccip: { allowRedirectFollowingFetch: true }` (direct lookups; a redirecting gateway can then make the device send one blind request to a host on the user's network). With your own client: `ccipRead: createEnsCcipRead({ … })`.
 
 `avatar` returns the `avatar` text record when it is an https URL on a public host, or an `ipfs://` one through `ipfsGateway` (an origin, `/ipfs/<cid>` appended, or a prefix ending in `/ipfs/`; `avatarUrl(record, gateway)` is the same filter). Everything else comes back `null`: NFT avatars (`eip155:1/erc721:…`; resolving one means fetching the metadata URL its issuer chose), and `http://`, `data:`, `ipns://` and `ar://` ones. Nothing is fetched to decide.
 

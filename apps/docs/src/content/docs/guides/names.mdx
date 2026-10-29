@@ -27,7 +27,8 @@ npm install @anywalletkit/names-ens
 
 ENS lives on Ethereum mainnet, so the resolver always needs an Ethereum RPC, even when the user
 sends on Base or Arbitrum. Names that resolve off-chain (Coinbase `cb.id`, Basenames, `uni.eth`)
-go through CCIP-Read without extra setup. Results are cached for five minutes by default.
+go through CCIP-Read without extra setup in a browser, an extension or Node. On React Native they
+need a `ccip.fetch` (see below). Results are cached for five minutes by default.
 
 ## The recipient field
 
@@ -79,3 +80,16 @@ resolver built from `rpcUrl` asks only https gateways on public hosts and refuse
 you pass your own viem `client`, create it with `ccipRead: ensCcipRead` from
 `@anywalletkit/names-ens` (or `ccipRead: false`): viem's default would fetch any URL, a router's
 admin page on the user's network included.
+
+React Native's fetch follows redirects whatever `redirect: 'error'` says, so a gateway could
+redirect the device to a LAN or loopback address, and the request goes out before the SDK can see
+the final URL. There, offchain names are off by default. Pick one:
+
+- `ensResolver({ rpcUrl, ccip: { fetch } })` with a `fetch` that does not follow redirects. The
+  usual one sends the request to your own server, which refuses redirects and checks the address it
+  connects to. The https / public-host check still runs on the device first.
+- `ccip: { allowRedirectFollowingFetch: true }` asks gateways directly and accepts that a
+  redirecting gateway can make the device send one blind request (the answer is never used) to a
+  host on the user's network.
+
+With your own `client`, the same options go to `ccipRead: createEnsCcipRead({ … })`.
