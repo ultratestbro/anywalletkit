@@ -273,6 +273,8 @@ async function main() {
     eq('private host spellings', ['127.1', '2130706433', '0x7f.0.0.1', '100.64.0.1', '169.254.169.254', '::ffff:127.0.0.1', 'fe80::1%en0'].every(isPrivateHost) && !isPrivateHost('8.8.8.8') && !isPrivateHost('2001:4860:4860::8888'), true)
     eq('public https url', isPublicHttpsUrl('https://gw.example/{sender}/{data}.json') && !isPublicHttpsUrl('http://192.168.1.1/x') && !isPublicHttpsUrl('https://{data}.example/'), true)
     eq('private host idna and 6to4', isPrivateHost('127.0.0.\uFF11') && isPrivateHost('127\u30020\u30020\u30021') && isPrivateHost('2002:7f00:1::') && !isPrivateHost('xn--bcher-kva.example'), true)
+    // scan 2026-10-28 F12: a backslash ends the host for a WHATWG parser, so a URL with one (or a control character) is refused
+    eq('url backslash refused', !isPublicHttpsUrl('https://127.0.0.1\\x') && !isPublicHttpsUrl('https://192.168.1.1\\.example.com') && !checkRpcUrl('https://localhost\\x').ok && !isPublicHttpsUrl('https://rpc.example\t.org/') && isPublicHttpsUrl('https://rpc.example.org/'), true)
     eq('ens avatar ipfs gateway origin', avatarUrl('ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG', 'https://gw.example'), 'https://gw.example/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')
     eq('ens avatar filtered', [avatarUrl('https://192.168.1.1/a.png'), avatarUrl('https://example.org/a.png')].join(','), ',https://example.org/a.png')
     const added = parseAddChainParams([{ chainId: '0x2105', chainName: 'Base', rpcUrls: ['https://mainnet.base.org'] }], { origin: 'https://app.example.org', now: () => 1 })
