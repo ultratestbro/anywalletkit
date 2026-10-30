@@ -30,6 +30,17 @@ your app does.
   the same calldata check the server's provider runs on LI.FI's answer — receiver, minimum, input,
   output token, destination chain — runs again in the app, with the input's value and approval.
   Checked against live LI.FI answers on 32 corridors (every route the provider accepts passes).
+- **Breaking: a pinned call needs a check of the call.** A remote stub's EVM calldata route — a call on
+  a contract its `callTargets` pin — now also needs the app's own check of what the call does:
+  `verifyQuote` or `verifyBuild` on `remoteProvider`. Without either, the router and the
+  single-provider path drop the route with the reason, and the engine refuses it. Every shipped EVM
+  pins export carries one (`lifiPins`, `cctpPins`, `usdt0Pins`, `wrapPins`, `uniswapPins`,
+  `balancerPins`, `fyndPins`, `chainflipPins`; `thorchainPins()` checks builds), so spreading the
+  pins is enough. If you build `callTargets` by hand, pass a `verifyQuote` or `verifyBuild` that
+  decodes the call against the request. Omniston: keep adding
+  `verifyBuild: omnistonVerifyBuild(...)` next to `...omnistonPins(...)` — `omnistonPins` alone has no
+  check, and the app-supplied `verifyBuild` satisfies this rule. NEAR Intents (`nearIntentsPins`)
+  and Jupiter are not affected: they pin no EVM call targets.
 
 ## Next release: remote swaps checked on the device
 

@@ -177,9 +177,9 @@ describe("scan 2026-10-27 modules G3: a remote provider's addresses come from th
     expect(deposit.sent.map((t) => [t.to.toLowerCase(), t.data?.toLowerCase()])).toEqual([[USDC.toLowerCase(), transferData(DEPOSIT, 1_000_000n).toLowerCase()]]);
   });
 
-  it("with the pins, the pinned route executes: approve the pinned spender for the exact amount, then the call", async () => {
+  it("with the pins (and the app's check of the call, scan 2026-10-30 F3), the pinned route executes: approve the pinned spender for the exact amount, then the call", async () => {
     const {sent, account} = g3account();
-    await g3protocol(remote({txRequest: {to: DIAMOND, data: "0xdeadbeef", value: "0", chainId: 1, gasLimit: "60000", approvalAddress: DIAMOND}}, diamondPins), account).swap2(g3options);
+    await g3protocol(remote({txRequest: {to: DIAMOND, data: "0xdeadbeef", value: "0", chainId: 1, gasLimit: "60000", approvalAddress: DIAMOND}}, {...diamondPins, verifyQuote: () => null}), account).swap2(g3options);
     expect(sent.map((t) => [t.to.toLowerCase(), t.data?.toLowerCase()])).toEqual([[USDC.toLowerCase(), approveData(DIAMOND, 1_000_000n).toLowerCase()], [DIAMOND.toLowerCase(), "0xdeadbeef"]]);
   });
 
@@ -195,7 +195,7 @@ describe("scan 2026-10-27 modules G3: a remote provider's addresses come from th
     expect(remotePinRefusal({name: "x"}, q, "eip155:1")).toBeNull()
     expect(remotePinRefusal({name: "x", remote: true}, q, "ton:-239")).toBeNull()
     expect(remotePinRefusal({name: "x", remote: true, ...diamondPins}, q, "eip155:1")).toMatch(/approves .* did not pin as a spender/);
-    expect(remotePinRefusal({name: "x", remote: true, ...diamondPins}, {txRequest: {to: DIAMOND, data: "0x01", approvalAddress: DIAMOND}} as unknown as Quote, "eip155:1")).toBeNull();
+    expect(remotePinRefusal({name: "x", remote: true, verifiesQuotes: true, ...diamondPins}, {txRequest: {to: DIAMOND, data: "0x01", approvalAddress: DIAMOND}} as unknown as Quote, "eip155:1")).toBeNull();
   });
 
   it("scan 2026-10-28 F9: remotePinRefusal drops a remote deposit-address or plain-value route unless the app opted in, on every chain", () => {

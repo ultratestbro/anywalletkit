@@ -268,6 +268,11 @@ export interface CrossChainProvider {
   /** Set by `remoteProvider` when the app gave it `verifyBuild`: its builds are checked on the client. */
   readonly verifiesBuilds?: boolean;
   /**
+   * Set by `remoteProvider` when the app gave it `verifyQuote`: its quotes' transactions are checked on the client.
+   * A remote stub's EVM calldata route needs this or {@link verifiesBuilds} (scan 2026-10-30, F3).
+   */
+  readonly verifiesQuotes?: boolean;
+  /**
    * Set by `remoteProvider` when the app opted in (`depositAddressRoutes`): this stub may send the input to an address
    * its backend names. Without it the engine refuses a remote stub's deposit-address and plain-value builds.
    */
