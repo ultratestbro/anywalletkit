@@ -125,14 +125,26 @@ export function tonRawAddress(address: string): string | null {
   return `${wc}:${toHex(b.subarray(2, 34))}`
 }
 
-/** The form the allow/block lists compare in, per chain namespace: EVM lowercase, Tron hex, TON raw; anything else lowercase. */
+/** Bitcoin / Zcash bech32 and bech32m HRPs (segwit, Sapling, unified, TEX). */
+const BECH32_ADDRESS = /^(bc|tb|bcrt|zs|ztestsapling|zregtestsapling|u|utest|uregtest|tex|textest)1[02-9ac-hj-np-z]+$/
+
+/**
+ * The form the allow/block lists compare in, per chain namespace: EVM, NEAR, Aptos and Starknet lowercase
+ * (their addresses are hex or lowercase ids), Tron hex, TON raw, a Bitcoin / Zcash bech32 address lowercase
+ * (bech32 is one case, either one). Anything else is compared exactly: base58 (Solana, Bitcoin and Zcash
+ * legacy) is case-sensitive, and two spellings that differ only in case are two keys (scan 2026-10-30 F7).
+ */
 export function canonicalAddress(chain: string, address: string): string {
   const ns = chain.split(':')[0]
   if (ns === 'tron') return tronHexAddress(address) ?? address.toLowerCase()
   if (ns === 'ton') return tonRawAddress(address) ?? address.toLowerCase()
-  // Zcash transparent addresses are base58: case-sensitive, compared exactly (scan 2026-10-27 F19).
-  if (ns === 'zcash') return address
-  return address.toLowerCase()
+  if (ns === 'eip155' || ns === 'near' || ns === 'aptos' || ns === 'starknet') return address.toLowerCase()
+  if (ns === 'bip122' || ns === 'bitcoin' || ns === 'zcash') {
+    // Zcash transparent and Bitcoin legacy addresses are base58: compared exactly (scan 2026-10-27 F19).
+    const lower = address.toLowerCase()
+    return (address === lower || address === address.toUpperCase()) && BECH32_ADDRESS.test(lower) ? lower : address
+  }
+  return address
 }
 
 // ── EVM / Tron calldata: who receives tokens or rights inside a standard call ──

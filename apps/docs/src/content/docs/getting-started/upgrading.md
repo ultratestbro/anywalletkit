@@ -29,6 +29,14 @@ only from fields the typed data declares, as Permit2 signs them. A payload whose
 unknown destination, so an allowlist refuses it. `describeTypedData` flags such a payload
 `approve-unlimited`. Canonical Permit2 payloads from Uniswap, 1inch and other dApps read as before.
 
+### Case-sensitive addresses are compared exactly (`kit`)
+
+Allowlist and blocklist entries for Solana (and Bitcoin / Zcash base58, and any namespace without its
+own rule) must be spelled exactly as the address: they were compared lowercased, which let a different
+Solana key that differs only in letter case pass an allowlist. EVM, NEAR, Aptos and Starknet entries
+still match in any case, bech32 Bitcoin / Zcash addresses in either case, Tron and TON in any of their
+forms. If your lists hold lowercased Solana keys, store them as the wallet shows them.
+
 ## Next release: remote swaps checked on the device
 
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps
