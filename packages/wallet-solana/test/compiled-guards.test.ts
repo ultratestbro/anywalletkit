@@ -130,6 +130,8 @@ describe('compiled and message transactions get the authority guards of sendSeri
       [[getWithdrawExcessLamportsInstruction({ source: ata, destination: ADDR0, authority: me })], {}],
       [[getUnwrapLamportsInstruction({ source: ata, destination: ADDR0, authority: me, amount: null })], {}],
       [[getWithdrawNonceAccountInstruction({ nonceAccount: NONCE_ACCOUNT, recipientAccount: ADDR0, nonceAuthority: me, withdrawAmount: 1n })], {}],
+      // A pre-funded seed slot emptied back to this wallet before it is created (spl-stake-pool, scan 2026-10-30 F16)
+      [[getTransferSolWithSeedInstruction({ source: OTHER, baseAccount: me, destination: ADDR0, amount: 1n, fromSeed: 'jito:unstake:0', fromOwner: 'Stake11111111111111111111111111111111111111' as Address })], {}],
       [[transfer], { nonce: true }],
       // Review round: the wallet only PAYS for a prefunded account it does not become
       [[getCreateAccountAllowPrefundInstruction({ newAccount: createNoopSigner(FRESH), payer: me, lamports: 1n, space: 8n, programAddress: OTHER })], {}],

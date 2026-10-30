@@ -6,7 +6,7 @@
  * `pool` is the Tonstakers liquid-staking pool contract — stakes are messages
  * to it, and every on-chain read (`get_pool_full_data`) runs on it. `jetton`
  * is the tsTON jetton minter; unstakes are burns sent to the account's own
- * tsTON jetton wallet, resolved from the minter's `get_wallet_address`.
+ * tsTON jetton wallet.
  * `partnerCode` is the referral attribution carried in the stake payload
  * (Tonstakers' partner program) — the official SDK's default ships here, a
  * partner overrides it through `config.partnerCode`.
@@ -14,8 +14,12 @@
  * Mainnet verified live (2026-09-04): tonapi labels the pool `tonstake_pool`
  * (implementation liquidTF, verified), the minter reports symbol tsTON /
  * 9 decimals, and `get_pool_full_data`'s `jetton_minter` resolves to it.
- * Testnet ships only the pool address the SDK publishes; pass the rest via
- * `config.addresses` when you need it.
+ * Testnet: the pool address the SDK publishes, and the minter its
+ * `get_pool_full_data` reports (verified live 2026-10-30).
+ *
+ * The account's jetton wallet is derived on the device from the minter's
+ * pinned wallet code (`TONSTAKERS_JETTON_WALLET_CODES`) and must match the
+ * minter's `get_wallet_address`.
  */
 export default {
   '-239': {
@@ -31,6 +35,7 @@ export default {
   },
   '-3': {
     pool: 'kQANFsYyYn-GSZ4oajUJmboDURZU-udMHf9JxzO4vYM_hFP3',
+    jetton: 'kQAiQ2XK7BXePLwemeo-u4wNyjg-wxGeySmaFGEP7R2Mhf4m',
     partnerCode: 0x000000106796caefn,
     endpoints: {
       tonapi: 'https://testnet.tonapi.io/v2',

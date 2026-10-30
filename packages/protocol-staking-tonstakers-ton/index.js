@@ -15,7 +15,7 @@ export { default as StakingProtocol, IStakingProtocol } from './src/staking-prot
 export { default as TONSTAKERS_ADDRESS_MAP } from './src/tonstakers-address-map.js'
 export {
   OP_STAKE, OP_UNSTAKE, STAKE_FEE_RESERVE, UNSTAKE_FEE_RESERVE, MIN_STAKE,
-  buildStakeBody, buildUnstakeBody
+  buildStakeBody, buildUnstakeBody, TONSTAKERS_JETTON_WALLET_CODES, deriveTonstakersJettonWallet
 } from './src/tonstakers-protocol-ton.js'
 
 export { describeTonstakersActivity, rawAddress, OP_WITHDRAWAL_PAYOUT } from './src/tonstakers-activity.js'

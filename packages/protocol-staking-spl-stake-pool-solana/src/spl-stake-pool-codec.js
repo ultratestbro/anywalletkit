@@ -9,7 +9,7 @@
 //    match what the program does to the lamport;
 //  - encoders for the instructions a wallet needs: Stake Pool DepositSol(14) /
 //    WithdrawStake(10) / WithdrawSol(16) and the ..WithSlippage variants
-//    (25 / 24 / 26), System CreateAccountWithSeed(3), Stake Deactivate(5) /
+//    (25 / 24 / 26), System CreateAccountWithSeed(3) / TransferWithSeed(11), Stake Deactivate(5) /
 //    Withdraw(4), the Associated Token idempotent create and the compute
 //    budget pair. Written out here rather than pulled from an SDK: the
 //    Solana wallet is built on @solana/* 3.x, the published stake-pool client
@@ -649,6 +649,23 @@ export function ixCreateAccountWithSeed (p) {
     programAddress: SYSTEM_PROGRAM,
     accounts,
     data: new Writer().u32(3).address(p.base).bincodeString(p.seed).u64(p.lamports).u64(p.space).address(p.owner).build()
+  }
+}
+
+/**
+ * System `TransferWithSeed` (11, bincode): moves lamports out of a System-owned, data-less account at
+ * `createWithSeed(base, seed, fromOwner)`, signed by `base`. `fromOwner` is the program the ADDRESS
+ * was derived with (Stake for an unstake slot), not the account's current owner (System) — the
+ * program re-derives the address from it. Accounts [from W, base S, to W].
+ *
+ * @param {{ from: string, base: string, seed: string, fromOwner: string, to: string, lamports: bigint }} p - Parameters.
+ * @returns {Instruction} The instruction.
+ */
+export function ixTransferWithSeed (p) {
+  return {
+    programAddress: SYSTEM_PROGRAM,
+    accounts: [acc(p.from, W), acc(p.base, RS), acc(p.to, W)],
+    data: new Writer().u32(11).u64(p.lamports).bincodeString(p.seed).address(p.fromOwner).build()
   }
 }
 

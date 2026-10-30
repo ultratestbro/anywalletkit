@@ -1,7 +1,7 @@
 'use strict'
 
 import './buffer-global.js'
-import { Address, beginCell } from '@ton/core'
+import { Address, Cell, beginCell, contractAddress } from '@ton/core'
 import { TonClient } from '@ton/ton'
 
 import StakingProtocol from './staking-protocol.js'
@@ -49,6 +49,35 @@ export const STAKE_FEE_RESERVE = 1_000_000_000n
 export const UNSTAKE_FEE_RESERVE = 1_050_000_000n
 /** The pool's minimum stake (tonapi `min_stake`). */
 export const MIN_STAKE = 1_000_000_000n
+
+/**
+ * The tsTON jetton-wallet code each known minter deploys, keyed by the minter's raw address: the
+ * library cell its `get_jetton_data` returns (resolving to the code hash in the comment). Pinned so the
+ * account's jetton wallet — where an unstake sends 1.05 GRAM — is derived on the device, not taken
+ * from a node's `get_wallet_address` (scan 2026-10-30 F12). Verified live 2026-10-30: the derived
+ * address equals the minter's getter answer for random owners, and the deployed wallets of real holders.
+ */
+export const TONSTAKERS_JETTON_WALLET_CODES = Object.freeze({
+  // mainnet minter EQC98_qAmNEptUtPc7W6xdHh_ZHrBUFpw5Ft_IzNU20QAJav → code hash 12bebb0d…dd8f9b2a8 (base64 Er67Dcji…)
+  '0:bdf3fa8098d129b54b4f73b5bac5d1e1fd91eb054169c3916dfc8ccd536d1000': 'te6cckEBAQEAIwAIQgISvrsNyOICt+Jvch4lR+FrueuuyTT2V9GfIudtYr7IeG61aNQ=',
+  // testnet minter kQAiQ2XK7BXePLwemeo-u4wNyjg-wxGeySmaFGEP7R2Mhf4m (the testnet pool's jetton_minter)
+  '0:224365caec15de3cbc1e99ea3ebb8c0dca383ec3119ec9299a14610fed1d8c85': 'te6cckEBAQEAIwAIQgJQQJUQZQAYuEnu4sHWweyGQ0OM6hxbG3vdtQwe2G+DKg9yb94='
+})
+
+/**
+ * The address of `owner`'s tsTON jetton wallet under `minter`: the StateInit hash of the wallet code and
+ * its initial data — `balance:Coins(0) owner:MsgAddress master:MsgAddress 52 zero bits ^code`, the layout
+ * the minter's `get_wallet_address` hashes (checked against mainnet and testnet, 2026-10-30).
+ *
+ * @param {Address} owner - The jetton wallet's owner.
+ * @param {Address} minter - The tsTON minter.
+ * @param {Cell} code - The minter's jetton-wallet code.
+ * @returns {Address} The jetton wallet address (workchain 0).
+ */
+export function deriveTonstakersJettonWallet (owner, minter, code) {
+  const data = beginCell().storeCoins(0).storeAddress(owner).storeAddress(minter).storeUint(0, 52).storeRef(code).endCell()
+  return contractAddress(0, { code, data })
+}
 
 /**
  * The stake payload: op, query id 1, then the 64-bit partner code the pool
@@ -148,6 +177,8 @@ function readAddressItem (reader) {
  * @property {*} [tonClient] - A @ton/ton TonClient, a `{ url, secretKey }` config, or an array of either (tried in order). Defaults to the account's own client.
  * @property {string} [network] - TON network id: '-239' mainnet (default) or '-3' testnet.
  * @property {Object} [addresses] - Override for `{ pool, jetton }`.
+ * @property {Cell | string} [jettonWalletCode] - The jetton-wallet code (a Cell or base64 BOC) of a minter not in `TONSTAKERS_JETTON_WALLET_CODES`.
+ * @property {boolean} [allowUnverifiedJettonWallet] - For a minter with no known code: take the jetton wallet from the node's `get_wallet_address` unchecked. Off by default.
  * @property {bigint | number} [partnerCode] - Referral partner code carried in stake payloads.
  * @property {Object} [endpoints] - Override for the REST endpoints `{ tonapi, withdrawalPayouts }`; set a key to null to disable that feature.
  */
@@ -245,6 +276,10 @@ export default class TonstakersProtocolTon extends StakingProtocol {
     }
     /** @private */
     this._pool = Address.parse(this._addresses.pool)
+    /** @private */
+    this._jettonWalletCode = config.jettonWalletCode === undefined ? undefined : typeof config.jettonWalletCode === 'string' ? Cell.fromBase64(config.jettonWalletCode) : config.jettonWalletCode
+    /** @private */
+    this._allowUnverifiedJettonWallet = config.allowUnverifiedJettonWallet === true
     /** @private */
     this._partnerCode = BigInt(config.partnerCode ?? partnerCode ?? 0)
     /** @private */
@@ -352,17 +387,32 @@ export default class TonstakersProtocolTon extends StakingProtocol {
   }
 
   /**
-   * The account's tsTON jetton wallet, from the minter's `get_wallet_address`.
+   * The account's tsTON jetton wallet, derived on the device from the minter's pinned wallet code (or
+   * `config.jettonWalletCode`). The minter's `get_wallet_address` must agree: a node naming another
+   * address — or a minter whose code has changed — is refused, never paid. The one resolver behind the
+   * balance, quote and unstake paths (scan 2026-10-30 F12). With no known code it throws, unless
+   * `allowUnverifiedJettonWallet` takes the getter's answer as before.
    *
    * @returns {Promise<Address>} The jetton wallet address (may not be deployed yet).
    */
   async getJettonWallet () {
     const owner = Address.parse(await this._account.getAddress())
     const minter = await this._jettonMinter()
+    const pinned = TONSTAKERS_JETTON_WALLET_CODES[minter.toRawString()]
+    const code = this._jettonWalletCode ?? (pinned ? Cell.fromBase64(pinned) : undefined)
+    if (!code && !this._allowUnverifiedJettonWallet) {
+      throw new Error(`No known tsTON jetton-wallet code for minter ${minter.toString()}: pass 'jettonWalletCode', or set 'allowUnverifiedJettonWallet: true' to trust the node's get_wallet_address.`)
+    }
     const s = await this._runGetMethod(minter, 'get_wallet_address', [
       { type: 'slice', cell: beginCell().storeAddress(owner).endCell() }
     ])
-    return s.readAddress()
+    const answer = s.readAddress()
+    if (!code) return answer
+    const derived = deriveTonstakersJettonWallet(owner, minter, code)
+    if (!answer.equals(derived)) {
+      throw new Error(`The node's get_wallet_address names ${answer.toString()}, not the account's tsTON jetton wallet ${derived.toString()}: refused.`)
+    }
+    return derived
   }
 
   /** @private */

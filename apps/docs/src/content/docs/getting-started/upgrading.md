@@ -106,6 +106,24 @@ retry instead of being fixed silently; configure two RPCs to keep the automatic 
   Orders already signed keep being tracked and disclosed. If your code splits the id, strip `#…` from
   the dest segment; the quote id, trader and source chain segments are unchanged.
 
+## Next release: the 2026-10-30 scan, chain packages
+
+- **NEAR AddKey permissions are exactly one variant.** `wallet-near` refuses an AddKey whose
+  permission is not exactly `{ fullAccess: {} }` or `{ functionCall: { receiverId, methodNames,
+  allowance? } }` (`malformed-action`); it used to encode anything else as FullAccess. Keys built
+  from the documented shapes are unchanged.
+- **Tron history fails instead of hanging on a malformed page.** `listActivity` throws
+  `HistoryUnavailableError` when a TronGrid row's `block_timestamp` is not a non-negative integer;
+  it used to loop forever. Handle it like any other history outage.
+- **Tonstakers derives the tsTON jetton wallet.** The unstake destination is computed on the device
+  from the minter's pinned wallet code and must match the node's `get_wallet_address`. The default
+  mainnet and testnet deployments need nothing. With a custom `addresses.jetton`, pass that minter's
+  `jettonWalletCode`, or `allowUnverifiedJettonWallet: true` to keep the old unchecked behaviour.
+- **SPL stake-pool delayed exits reclaim pre-funded slots.** When someone sent SOL to the wallet's
+  next delayed-exit slot address, the exit transaction now starts with a System `TransferWithSeed`
+  that returns that SOL to the wallet. A signing review shows one extra incoming transfer; nothing
+  to change in the app.
+
 ## Next release: remote swaps checked on the device
 
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps

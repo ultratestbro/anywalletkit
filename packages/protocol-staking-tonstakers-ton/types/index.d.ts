@@ -125,6 +125,10 @@ export interface TonstakersProtocolConfig {
   /** "-239" mainnet (default) or "-3" testnet. */
   network?: string
   addresses?: {pool?: string; jetton?: string}
+  /** Jetton-wallet code (Cell or base64 BOC) of a minter not in TONSTAKERS_JETTON_WALLET_CODES; the wallet is derived from it. */
+  jettonWalletCode?: Cell | string
+  /** For a minter with no known code: trust the node's get_wallet_address unchecked. Off by default. */
+  allowUnverifiedJettonWallet?: boolean
   partnerCode?: bigint | number
   /** Set a key to null to disable that feature. */
   endpoints?: {tonapi?: string | null; withdrawalPayouts?: string | null}
@@ -154,6 +158,10 @@ export declare const UNSTAKE_FEE_RESERVE: bigint
 export declare const MIN_STAKE: bigint
 export declare function buildStakeBody(partnerCode: bigint | number): Cell
 export declare function buildUnstakeBody(amount: bigint, owner: Address, mode?: UnstakeMode): Cell
+/** Pinned tsTON jetton-wallet code (base64 BOC) per minter raw address. */
+export declare const TONSTAKERS_JETTON_WALLET_CODES: Readonly<Record<string, string>>
+/** The owner's tsTON jetton-wallet address under `minter`, from the wallet code and its initial data. */
+export declare function deriveTonstakersJettonWallet(owner: Address, minter: Address, code: Cell): Address
 
 export declare const TONSTAKERS_ADDRESS_MAP: Record<string, {
   pool: string

@@ -286,6 +286,8 @@ export declare namespace codec {
   function ixWithdrawSol(p: {pool: string; state: StakePoolState; withdrawAuthority: string; owner: string; source: string; poolTokens: bigint; minimumLamportsOut?: bigint}): Instruction
   function ixWithdrawStake(p: {pool: string; state: StakePoolState; withdrawAuthority: string; owner: string; source: string; splitFrom: string; splitTo: string; poolTokens: bigint; minimumLamportsOut?: bigint}): Instruction
   function ixCreateAccountWithSeed(p: {from: string; newAccount: string; base: string; seed: string; lamports: bigint; space: bigint; owner: string}): Instruction
+  /** System TransferWithSeed (11): lamports out of a System-owned, data-less seed account; `fromOwner` is the program its address was derived with. */
+  function ixTransferWithSeed(p: {from: string; base: string; seed: string; fromOwner: string; to: string; lamports: bigint}): Instruction
   function ixStakeDeactivate(p: {stake: string; authority: string}): Instruction
   function ixStakeWithdraw(p: {stake: string; recipient: string; authority: string; lamports: bigint}): Instruction
   function selectWithdrawSource(p: {pool: string; state: StakePoolState; validators: ValidatorStakeInfo[]; lamports: bigint; rentExempt: bigint; minimumDelegation: bigint; reserveLamports: bigint}): Promise<WithdrawSource>

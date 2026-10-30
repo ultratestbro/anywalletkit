@@ -73,7 +73,7 @@ Tonstakers-specific extras beyond the interface:
 await tonstakers.getPoolData()         // halted, depositsOpen, balances, minter, payout collection, rates
 await tonstakers.getRates()            // { rate, projectedRate } — GRAM per tsTON, 1e9 fixed
 await tonstakers.getInstantLiquidity() // GRAM the pool can pay instant exits from
-await tonstakers.getJettonWallet()     // the account's tsTON jetton wallet
+await tonstakers.getJettonWallet()     // the account's tsTON jetton wallet (derived, checked against the minter)
 await tonstakers.getTokenBalance()     // tsTON held
 await tonstakers.getRewards()          // earned GRAM = (rate − weighted entry rate) × tsTON
 ```
@@ -115,8 +115,14 @@ GRAM value is the figure that means anything.
   `config.endpoints`; on-chain flows never depend on them, and `getRewards`
   degrades to null.
 - **No `AbortSignal.timeout` / `.any`**, no `process.env` — Hermes and Bare
-  friendly. Only mainnet ships with a jetton minter default; testnet carries
-  the SDK's pool address and takes the rest via `config.addresses`.
+  friendly. Mainnet and testnet both ship pool and tsTON minter defaults.
+- **The jetton wallet is derived, not trusted**: the account's tsTON jetton
+  wallet — the destination of every unstake's 1.05 GRAM — is computed on the
+  device from the minter's pinned wallet code (`TONSTAKERS_JETTON_WALLET_CODES`,
+  `deriveTonstakersJettonWallet`), and the minter's `get_wallet_address` must
+  agree or the call is refused. A minter with no pinned code (a custom
+  `addresses.jetton`) needs `jettonWalletCode`, or the explicit
+  `allowUnverifiedJettonWallet: true` to trust the node's answer.
 
 ## Configuration
 
@@ -125,6 +131,8 @@ new TonstakersProtocolTon(account, {
   tonClient,     // TonClient | { url, secretKey } | array of either; defaults to the account's
   network,       // '-239' mainnet (default) or '-3' testnet
   addresses,     // { pool, jetton }
+  jettonWalletCode,            // Cell | base64 BOC — wallet code of a minter not pinned in the package
+  allowUnverifiedJettonWallet, // true: no known code, trust get_wallet_address (off by default)
   partnerCode,   // referral attribution in stake payloads
   endpoints      // { tonapi, withdrawalPayouts } — null disables the feature
 })

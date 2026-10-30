@@ -4,7 +4,7 @@ export {
   isValidAccountId, isImplicitAccountId, implicitAccountId, publicKeyToString, parsePublicKey, ed25519Key, publicKeyOfImplicit, base58ToBytes, bytesToBase58,
 } from './address.js'
 export {
-  BorshWriter, BorshReader, ACTION_TAG, actionKey, argsBytes, isPlainObject, encodeTransaction, decodeTransaction, encodeSignedTransaction, decodeSignedTransaction, decodeAnyTransaction,
+  BorshWriter, BorshReader, ACTION_TAG, actionKey, accessKeyPermissionTag, argsBytes, isPlainObject, encodeTransaction, decodeTransaction, encodeSignedTransaction, decodeSignedTransaction, decodeAnyTransaction,
   writeAction, readAction, writePublicKey, readPublicKey, writeSignature, readSignature,
 } from './borsh.js'
 export { createClient, NearRpc, toBase64, fromBase64, failureOf, outcomeFailed } from './rpc.js'

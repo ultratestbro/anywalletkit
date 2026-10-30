@@ -2,7 +2,7 @@ import { NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { base58ToBytes, bytesToBase58, ed25519Key, isImplicitAccountId, isValidAccountId, publicKeyOfImplicit, publicKeyToString } from './address.js'
-import { ACTION_TAG, decodeAnyTransaction, encodeSignedTransaction, encodeTransaction, isPlainObject } from './borsh.js'
+import { ACTION_TAG, accessKeyPermissionTag, decodeAnyTransaction, encodeSignedTransaction, encodeTransaction, isPlainObject } from './borsh.js'
 import { describeTransaction, isDangerous, type DescribeContext } from './describe.js'
 import { SimulationError, UnsafeTransactionError } from './errors.js'
 import { NearRpc, createClient, failureOf, fromBase64, outcomeFailed, type RawFinalOutcome } from './rpc.js'
@@ -354,7 +354,8 @@ const METHOD_NAME = /^[A-Za-z0-9_]{1,256}$/
 /**
  * An object transaction has exactly the shape the encoder writes, before it is built or signed (also
  * `signBuilt`): every action one known key; a function call's `methodName` a string of the method
- * grammar, `args` bytes, a string or a plain object, `gas` / `deposit` bigints; every account id and
+ * grammar, `args` bytes, a string or a plain object, `gas` / `deposit` bigints; an AddKey permission
+ * exactly one known variant (scan 2026-10-30 F9); every account id and
  * method name well formed. What the policies read is then what gets encoded (scan 2026-10-27 F6, F28).
  */
 export function assertWellFormed(tx: Pick<NearBuiltTransaction, 'receiverId' | 'actions'>): void {
@@ -373,6 +374,11 @@ function assertShape(actions: NearAction[], depth = 0): void {
       const f = a.functionCall as { args?: unknown; gas?: unknown; deposit?: unknown }
       if (!(f.args instanceof Uint8Array) && typeof f.args !== 'string' && !isPlainObject(f.args)) throw new UnsafeTransactionError('malformed-action', 'Function-call args must be bytes, a string or a plain object.')
       if ((f.gas !== undefined && typeof f.gas !== 'bigint') || (f.deposit !== undefined && typeof f.deposit !== 'bigint')) throw new UnsafeTransactionError('malformed-action', 'Function-call gas and deposit must be bigints.')
+    }
+    if ('addKey' in a) {
+      const k = a.addKey as { accessKey?: unknown }
+      if (!isPlainObject(k) || !isPlainObject(k.accessKey)) throw new UnsafeTransactionError('malformed-action', 'addKey must carry an accessKey object.')
+      try { accessKeyPermissionTag(k.accessKey.permission) } catch (e) { throw new UnsafeTransactionError('malformed-action', `AddKey: ${(e as Error).message}.`) }
     }
     if ('signedDelegate' in a && depth === 0) assertShape(a.signedDelegate.delegateAction.actions, depth + 1)
   }
