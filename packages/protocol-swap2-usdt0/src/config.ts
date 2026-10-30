@@ -14,6 +14,7 @@
 import {decodeFunctionData, getAddress, isAddress, pad, parseAbi, type Hex} from "viem";
 import type {Quote, QuoteParams, RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
+import {ccAsset} from "@anywalletkit/swap2-assets";
 
 export interface Usdt0Chain {
   caip2: string;
@@ -92,6 +93,19 @@ const OFT_SEND_ABI = parseAbi([
 ]);
 
 /**
+ * Does `symbolOrAddress` name this deployment's token on `chain`? The contract itself, or a USDT / USDT0 symbol the
+ * catalog does not bind to another contract (OP's legacy bridged USDT is not the OFT token). The provider and
+ * {@link usdt0VerifyQuote} both check the request with it.
+ */
+export function tokenMatches(chain: Usdt0Chain, symbolOrAddress: string): boolean {
+  const same = (a: string | undefined | null, b: string) => !!a && a.toLowerCase() === b.toLowerCase();
+  if (symbolOrAddress.startsWith("0x")) return same(symbolOrAddress, chain.token);
+  if (!USDT0_SYMBOLS.includes(symbolOrAddress.toUpperCase().replace("USD₮", "USDT"))) return false;
+  const known = ccAsset(chain.caip2, symbolOrAddress);
+  return !known || same(known.contract ?? "", chain.token);
+}
+
+/**
  * A remote USDT0 quote's `send`, decoded on the device against the app's own request (scan 2026-10-30, F3): exactly
  * `send(SendParam, MessagingFee, refund)` on the source OFT; the destination chain's eid; the recipient as `to`; the
  * input as `amountLD`; a `minAmountLD` no larger than the input that guarantees the quoted minimum and the caller's
@@ -103,7 +117,9 @@ export function usdt0VerifyQuote(params: QuoteParams, quote: Quote): string | nu
   const src = usdt0ChainFor(params.sourceChain);
   const dst = usdt0ChainFor(params.destChain);
   if (!src || !dst || src === dst) return "not a USDT0 route between two deployments";
-  if (params.destToken.startsWith("0x") && params.destToken.toLowerCase() !== dst.token.toLowerCase()) return `destination token ${params.destToken} is not USDT0 on ${dst.name}`;
+  // The OFT burns or locks its own token whatever the request named, so both sides are bound here (reaudit 2026-10-30, #1).
+  if (!tokenMatches(src, params.sourceToken)) return `source token ${params.sourceToken} is not USDT0 (${src.token}) on ${src.name}`;
+  if (!tokenMatches(dst, params.destToken)) return `destination token ${params.destToken} is not USDT0 (${dst.token}) on ${dst.name}`;
   const tx = quote.txRequest;
   if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no OFT call";
   if (tx.to.toLowerCase() !== src.oft.toLowerCase()) return `the call targets ${tx.to}, not the ${src.name} OFT`;

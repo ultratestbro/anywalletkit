@@ -3,7 +3,7 @@ import {describeUsdt0Activity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
 import {redactUrls, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentState, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
-import {LZ_SCAN_API, USDT0_BY_EID, USDT0_CHAINS, USDT0_SYMBOLS, usdt0 as usdt0Cfg, type Usdt0Chain} from "./config.js";
+import {LZ_SCAN_API, USDT0_BY_EID, USDT0_CHAINS, tokenMatches, usdt0 as usdt0Cfg, type Usdt0Chain} from "./config.js";
 
 /**
  * USDT0 — Tether's USDT as a LayerZero OFT. ONE source transaction:
@@ -96,14 +96,6 @@ interface ScanMessage {
 const same = (a: string | undefined | null, b: string) => !!a && a.toLowerCase() === b.toLowerCase();
 const isHexData = (v: unknown): v is Hex => typeof v === "string" && /^0x(?:[0-9a-fA-F]{2})*$/.test(v);
 
-/** Does the catalog symbol on `chain` name this deployment's token? (USDT on Ethereum/Polygon, USDT0 elsewhere.) */
-function tokenMatches(chain: Usdt0Chain, symbolOrAddress: string): boolean {
-  if (symbolOrAddress.startsWith("0x")) return same(symbolOrAddress, chain.token);
-  if (!USDT0_SYMBOLS.includes(symbolOrAddress.toUpperCase().replace("USD₮", "USDT"))) return false;
-  const known = ccAsset(chain.caip2, symbolOrAddress);
-  // A symbol the catalog binds to another contract (OP's legacy bridged USDT) is not the OFT token.
-  return !known || same(known.contract ?? "", chain.token);
-}
 
 /**
  * A refusal / preflight error that may reach a client: an RPC transport failure
