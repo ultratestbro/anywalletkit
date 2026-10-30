@@ -52,7 +52,10 @@ remoteProvider({name: "cctp", baseUrl, ...cctpPins})   // cctpPins from this pac
 ```
 
 `cctpPins` also pins the burn: the TokenMessenger is the only contract the source leg may call
-and approve. Without the pins the engine refuses the stub's EVM routes.
+and approve, and `cctpVerifyQuote` decodes the server's `depositForBurn` on the device — the input
+amount, the destination domain, the recipient as `mintRecipient`, the source USDC, no destination
+caller, and a `maxFee` that leaves the quoted minimum. Without the pins the engine refuses the stub's
+EVM routes.
 
 ## What the provider does
 

@@ -49,6 +49,38 @@ and let the user send again once activity shows the first transaction is not com
 send already skips the refused nonce. With one RPC configured, a stale `pending` nonce now costs one
 retry instead of being fixed silently; configure two RPCs to keep the automatic recovery.
 
+## Next release: the 2026-10-30 scan (remote swap pins)
+
+- **THORChain memo.** `thorchainPins().verifyBuild` refuses a remote build whose memo is not exactly the
+  canonical memo for the request (output asset, destination/refund, limit, affiliate). Your server's
+  `thorchainProvider` already builds that memo; nothing to wire.
+- **CCTP burn decoded on the device.** `cctpPins` carry `verifyQuote` (`cctpVerifyQuote`): a remote
+  `depositForBurn` must burn exactly the input of the source USDC for the recipient on the requested
+  domain, with no destination caller and a `maxFee` that leaves the quoted minimum. Spread the pins as
+  before.
+- **USDT0 send decoded on the device.** `usdt0Pins` carry `verifyQuote` (`usdt0VerifyQuote`): the OFT
+  `send` must go to the requested chain's eid and recipient, move exactly the input with a
+  `minAmountLD` that keeps the quoted minimum, carry no options or compose message, refund the trader,
+  and attach the declared native fee. Spread the pins as before.
+- **Wrap call checked on the device.** `wrapPins` carry `verifyQuote` (`wrapVerifyQuote`): only
+  `deposit()` with the input as value, or `withdraw(input)` with no value, on the chain's wrapped
+  native, for the sender.
+- **LI.FI Diamond call decoded on the device.** `lifiPins` carry `verifyQuote` (`lifiVerifyQuote`):
+  the same calldata check the server's provider runs on LI.FI's answer — receiver, minimum, input,
+  output token, destination chain — runs again in the app, with the input's value and approval.
+  Checked against live LI.FI answers on 32 corridors (every route the provider accepts passes).
+- **Breaking: a pinned call needs a check of the call.** A remote stub's EVM calldata route — a call on
+  a contract its `callTargets` pin — now also needs the app's own check of what the call does:
+  `verifyQuote` or `verifyBuild` on `remoteProvider`. Without either, the router and the
+  single-provider path drop the route with the reason, and the engine refuses it. Every shipped EVM
+  pins export carries one (`lifiPins`, `cctpPins`, `usdt0Pins`, `wrapPins`, `uniswapPins`,
+  `balancerPins`, `fyndPins`, `chainflipPins`; `thorchainPins()` checks builds), so spreading the
+  pins is enough. If you build `callTargets` by hand, pass a `verifyQuote` or `verifyBuild` that
+  decodes the call against the request. Omniston: keep adding
+  `verifyBuild: omnistonVerifyBuild(...)` next to `...omnistonPins(...)` — `omnistonPins` alone has no
+  check, and the app-supplied `verifyBuild` satisfies this rule. NEAR Intents (`nearIntentsPins`)
+  and Jupiter are not affected: they pin no EVM call targets.
+
 ## Next release: remote swaps checked on the device
 
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps

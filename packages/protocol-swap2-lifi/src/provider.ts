@@ -656,12 +656,66 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
 }
 
 /**
+ * A remote LI.FI quote's Diamond call, decoded on the device against the app's own request (scan 2026-10-30, F3) —
+ * the same {@link diamondCallMismatch} the provider runs on LI.FI's answer, with the expectation it builds: the input
+ * token and amount, the requested output token, the recipient, the quoted minimum (at least the caller's floor), the
+ * destination chain. A native input is paid in value (any excess is the declared bridge fee); a token input attaches
+ * only that declared fee and approves the Diamond. A Solana source carries a serialized transaction instead, which the
+ * account proves before signing: not judged here. The reason it fails, or null.
+ */
+export function lifiVerifyQuote(params: QuoteParams, quote: Quote): string | null {
+  const fromChain = LIFI_CHAIN[params.sourceChain];
+  const toChain = LIFI_CHAIN[params.destChain];
+  if (!fromChain || !toChain) return "not a LI.FI chain pair";
+  const tx = quote.txRequest;
+  if (!tx) return "the quote carries no transaction";
+  if (isSolana(params.sourceChain)) return tx.serializedTx && tx.data === undefined && tx.to === undefined ? null : "a Solana source carries a serialized transaction only";
+  if (!isHexData(tx.data) || !tx.to || tx.serializedTx !== undefined) return "the quote carries no Diamond call";
+  if (!sameAddress(tx.to, diamondFor(params.sourceChain))) return `the call targets ${tx.to}, not the LI.FI Diamond`;
+  if (tx.chainId !== undefined && String(tx.chainId) !== fromChain) return `the call is for chain ${tx.chainId}, not ${fromChain}`;
+  const fromToken = lifiToken(params);
+  if (!fromToken) return `unknown source token ${params.sourceToken}`;
+  const sourceIsToken = fromToken !== EVM_ZERO;
+  // The same addresses the provider quotes for: a dry quote without them prices the placeholder (never built).
+  const dry = params.dry !== false;
+  const fromAddress = params.refundAddress || (dry ? EVM_PLACEHOLDER : "");
+  const toAddress = params.destAddress || (dry ? fromAddress : "");
+  if (!fromAddress || !toAddress) return "a live quote needs the sender and the recipient";
+  let amountIn: bigint, minOut: bigint, value: bigint, nativeFee: bigint;
+  try {
+    amountIn = BigInt(params.amountIn);
+    minOut = BigInt(quote.minDestAmount);
+    value = BigInt(tx.value ?? "0");
+    nativeFee = BigInt(tx.nativeFee ?? "0");
+  } catch {
+    return "the quote's amounts are not integers";
+  }
+  if (BigInt(quote.sourceAmount) !== amountIn) return `the quote spends ${quote.sourceAmount}, not the ${amountIn} input`;
+  if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) return `the quoted minimum ${minOut} is below the caller's floor ${params.minAmountOut}`;
+  if (sourceIsToken) {
+    if (value !== nativeFee) return "a token input attaches only its declared bridge fee";
+    if (!tx.approvalAddress || !sameAddress(tx.approvalAddress, diamondFor(params.sourceChain))) return "a token input approves the LI.FI Diamond";
+  } else {
+    if (value < amountIn || value - amountIn !== nativeFee) return "a native input is paid as the input plus its declared bridge fee";
+    if (tx.approvalAddress !== undefined) return "a native input approves nothing";
+  }
+  if (quote.intentId.replace(/~[0-9a-f]{32}$/, "") !== `lifi:${fromChain}:${toChain}`) return "the intent id does not name this route";
+  const why = diamondCallMismatch(tx.data, {
+    fromToken, toToken: nativeFor(params.destChain, params.destToken), amountIn, receiver: toAddress, minOut,
+    destChainId: BigInt(toChain), sameChain: fromChain === toChain, evmDestination: !isSolana(params.destChain),
+  });
+  return why ? `the transaction does not match the request: ${why}` : null;
+}
+
+/**
  * The LI.FI Diamond an EVM route calls and approves on a chain (the canonical one, or the chain's own
- * where it differs) — the app's pins for `remoteProvider({name: "lifi", baseUrl, ...lifiPins})` (scan
- * 2026-10-27 modules, F8/F16). Extra audited targets an app configures on the provider
- * (`trustedTransactionTargets` / `trustedApprovalAddresses`) are added on the app side too.
+ * where it differs), and {@link lifiVerifyQuote} — the app's pins for `remoteProvider({name: "lifi", baseUrl,
+ * ...lifiPins})` (scan 2026-10-27 modules, F8/F16; the Diamond call itself since scan 2026-10-30, F3). Extra audited
+ * targets an app configures on the provider (`trustedTransactionTargets` / `trustedApprovalAddresses`) are added on
+ * the app side too.
  */
 export const lifiPins: RemotePins = Object.freeze({
   callTargets: (chain: string): readonly string[] => (/^eip155:[0-9]+$/.test(chain) ? [diamondFor(chain)] : []),
   spenders: (chain: string): readonly string[] => (/^eip155:[0-9]+$/.test(chain) ? [diamondFor(chain)] : []),
+  verifyQuote: lifiVerifyQuote,
 });

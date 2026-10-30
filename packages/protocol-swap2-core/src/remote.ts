@@ -142,6 +142,7 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
     name,
     remote: true,
     ...(opts.verifyBuild ? {verifiesBuilds: true} : {}),
+    ...(opts.verifyQuote ? {verifiesQuotes: true} : {}),
     ...(opts.depositAddressRoutes === true ? {depositAddressRoutes: true} : {}),
     // The browser side has no dark-flag env; the backend enforces its own
     // flags — a disabled provider simply quotes null / rejects build.

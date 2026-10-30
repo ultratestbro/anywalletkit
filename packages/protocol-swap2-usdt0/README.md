@@ -102,8 +102,10 @@ HyperEVM from the phone, then the status through LayerZero Scan).
 
 When the provider runs on your server, spread its pins into the app's stub:
 `remoteProvider({name: "usdt0", baseUrl, ...usdt0Pins})`. The engine then lets the EVM route call and
-approve only the USDT0 OFT (and, on Ethereum, the adapter as spender), never an address the backend names; without the pins the stub gets no
-EVM calldata route (fail closed).
+approve only the USDT0 OFT (and, on Ethereum, the adapter as spender), never an address the backend names, and
+`usdt0VerifyQuote` decodes the server's `send` on the device: the destination eid, the recipient, the input, a
+`minAmountLD` that keeps the quoted minimum, no options or compose message, the trader as refund and the declared
+native fee as value. Without the pins the stub gets no EVM calldata route (fail closed).
 
 ## Activity
 

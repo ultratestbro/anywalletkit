@@ -1256,6 +1256,10 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         }
       } else if (remote && !pinnedTargets.includes(unsigned.to.toLowerCase())) {
         throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' calls ${getAddress(unsigned.to)} on ${this.fromChain}, which the app did not pin as a call target (remoteProvider callTargets) — refused`);
+      } else if (remote && provider.verifiesQuotes !== true && provider.verifiesBuilds !== true) {
+        // A pinned contract executes whatever its arguments say — recipient, domain, minimum (scan 2026-10-30, F3): the
+        // app's own decode of the call (the provider's `verifyQuote`, or `verifyBuild`) must have run on it.
+        throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' calls ${getAddress(unsigned.to)} with calldata the app does not check (remoteProvider verifyQuote / verifyBuild) — refused`);
       }
     }
 

@@ -11,7 +11,8 @@
 // Hedera (295, 30316), Mantle (5000, 30181), Morph (2818, 30322), Rootstock
 // (30, 30333), Stable (988, 30396), Tempo (4217, 30410), plus HyperCore, IOTA
 // and Stellar (non-EVM) — not wallet chains here, so not routable here.
-import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
+import {decodeFunctionData, getAddress, isAddress, pad, parseAbi, type Hex} from "viem";
+import type {Quote, QuoteParams, RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
 
 export interface Usdt0Chain {
@@ -84,13 +85,79 @@ export const usdt0 = {
   },
 };
 
+const OFT_SEND_ABI = parseAbi([
+  "struct SendParam { uint32 dstEid; bytes32 to; uint256 amountLD; uint256 minAmountLD; bytes extraOptions; bytes composeMsg; bytes oftCmd; }",
+  "struct MessagingFee { uint256 nativeFee; uint256 lzTokenFee; }",
+  "function send(SendParam s, MessagingFee fee, address refundAddress) payable",
+]);
+
 /**
- * The USDT0 OFT a send calls on a chain, and the adapter it approves where one locks USDT (Ethereum) —
- * the app's pins for `remoteProvider({name: "usdt0", baseUrl, ...usdt0Pins})` (scan 2026-10-27 modules, F8/F16).
+ * A remote USDT0 quote's `send`, decoded on the device against the app's own request (scan 2026-10-30, F3): exactly
+ * `send(SendParam, MessagingFee, refund)` on the source OFT; the destination chain's eid; the recipient as `to`; the
+ * input as `amountLD`; a `minAmountLD` no larger than the input that guarantees the quoted minimum and the caller's
+ * floor; empty `extraOptions`, `composeMsg` and `oftCmd` (what the provider sends); no LZ-token fee; the trader as
+ * refund; `msg.value` = the declared native fee = the call's `nativeFee`; the adapter as spender on Ethereum only.
+ * The reason it fails, or null. The engine's native-fee ceiling bounds the fee itself.
+ */
+export function usdt0VerifyQuote(params: QuoteParams, quote: Quote): string | null {
+  const src = usdt0ChainFor(params.sourceChain);
+  const dst = usdt0ChainFor(params.destChain);
+  if (!src || !dst || src === dst) return "not a USDT0 route between two deployments";
+  if (params.destToken.startsWith("0x") && params.destToken.toLowerCase() !== dst.token.toLowerCase()) return `destination token ${params.destToken} is not USDT0 on ${dst.name}`;
+  const tx = quote.txRequest;
+  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no OFT call";
+  if (tx.to.toLowerCase() !== src.oft.toLowerCase()) return `the call targets ${tx.to}, not the ${src.name} OFT`;
+  if (tx.chainId !== undefined && tx.chainId !== src.chainId) return `the call is for chain ${tx.chainId}, not ${src.chainId}`;
+  if (src.adapter ? !tx.approvalAddress || tx.approvalAddress.toLowerCase() !== src.oft.toLowerCase() : tx.approvalAddress !== undefined) {
+    return src.adapter ? "the Ethereum send approves another spender than the adapter" : "an OFT send needs no approval";
+  }
+  let sp: {dstEid: number; to: Hex; amountLD: bigint; minAmountLD: bigint; extraOptions: Hex; composeMsg: Hex; oftCmd: Hex};
+  let fee: {nativeFee: bigint; lzTokenFee: bigint};
+  let refund: string;
+  try {
+    const d = decodeFunctionData({abi: OFT_SEND_ABI, data: tx.data as Hex});
+    [sp, fee, refund] = d.args as unknown as [typeof sp, typeof fee, string];
+  } catch {
+    return "the call is not send(SendParam, MessagingFee, refund)";
+  }
+  let amountIn: bigint, floor: bigint, value: bigint;
+  try {
+    amountIn = BigInt(params.amountIn);
+    floor = BigInt(quote.minDestAmount);
+    if (params.minAmountOut !== undefined && BigInt(params.minAmountOut) > floor) floor = BigInt(params.minAmountOut);
+    value = BigInt(tx.value ?? "0");
+  } catch {
+    return "the request does not name amounts";
+  }
+  if (sp.dstEid !== dst.eid) return `the send goes to eid ${sp.dstEid}, not ${dst.name} (${dst.eid})`;
+  if (sp.amountLD !== amountIn || BigInt(quote.sourceAmount) !== amountIn) return `the send moves ${sp.amountLD}, not the ${amountIn} input`;
+  if (sp.minAmountLD > sp.amountLD || sp.minAmountLD <= 0n || sp.minAmountLD < floor) return `the send's minAmountLD ${sp.minAmountLD} is below the ${floor} minimum`;
+  if (sp.extraOptions !== "0x" || sp.composeMsg !== "0x" || sp.oftCmd !== "0x") return "the send carries options, a compose message or an OFT command";
+  // A dry quote without addresses prices the provider's placeholders; it is never built (the engine re-quotes live).
+  const live = params.dry === false;
+  if (params.destAddress || live) {
+    if (!isAddress(params.destAddress)) return "the recipient is not an EVM address";
+    if (sp.to.toLowerCase() !== pad(getAddress(params.destAddress), {size: 32}).toLowerCase()) return `the send delivers to ${sp.to}, not the recipient`;
+  }
+  if (params.refundAddress || live) {
+    if (!isAddress(params.refundAddress ?? "")) return "the refund address is not an EVM address";
+    if (getAddress(refund) !== getAddress(params.refundAddress!)) return `the send refunds ${refund}, not the trader`;
+  }
+  if (fee.lzTokenFee !== 0n) return "the send pays an LZ-token fee";
+  if (value !== fee.nativeFee || (tx.nativeFee ?? "0") !== fee.nativeFee.toString()) return "msg.value is not the declared native fee of the send";
+  if (quote.intentId.replace(/~[0-9a-f]{32}$/, "") !== `usdt0:${src.eid}:${dst.eid}`) return "the intent id does not name this send";
+  return null;
+}
+
+/**
+ * The USDT0 OFT a send calls on a chain, and the adapter it approves where one locks USDT (Ethereum), and
+ * {@link usdt0VerifyQuote} — the app's pins for `remoteProvider({name: "usdt0", baseUrl, ...usdt0Pins})` (scan
+ * 2026-10-27 modules, F8/F16; the send's arguments since scan 2026-10-30, F3).
  */
 export const usdt0Pins: RemotePins = Object.freeze({
   callTargets: (chain: string): readonly string[] => { const c = usdt0ChainFor(chain); return c ? [c.oft] : []; },
   spenders: (chain: string): readonly string[] => { const c = usdt0ChainFor(chain); return c?.adapter ? [c.oft] : []; },
+  verifyQuote: usdt0VerifyQuote,
 });
 function usdt0ChainFor(chain: string): Usdt0Chain | undefined {
   return Object.prototype.hasOwnProperty.call(USDT0_CHAINS, chain) ? USDT0_CHAINS[chain] : undefined;

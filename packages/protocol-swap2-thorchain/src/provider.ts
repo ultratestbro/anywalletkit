@@ -413,6 +413,9 @@ export function thorchainPins(opts: {
       }
       const checked = verifiedMemo(memo, dst.asset, params.destAddress, params.refundAddress ?? "", opts.affiliate ?? "", opts.affiliateBps ?? "");
       if (!checked) return `the memo does not pay ${params.destAddress} in ${dst.asset} with this app's refund and affiliate`;
+      // The server's provider signs only the canonical memo it rebuilds from route facts, so the build must be that
+      // memo byte for byte: a fuzzy or swapped output asset (scan 2026-10-30 F2) is refused here.
+      if (memo !== checked.canonical) return `the memo is not the canonical ${checked.canonical}`;
       if ((checked.limit * 10n ** BigInt(dst.decimals)) / 100_000_000n < BigInt(quote.minDestAmount)) return `the memo's limit ${checked.limit} is below the quoted minimum`;
       // Two nodes of different operators must report this vault (and router), trading open.
       let agreeing = 0;

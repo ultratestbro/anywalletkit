@@ -51,12 +51,13 @@ export function validQuote(q: Quote, params: QuoteParams, provider: string): boo
  * Why a remote provider's quote cannot execute in this app, or null: its EVM transaction calls or
  * approves an address the app did not pin (`remoteProvider` `callTargets` / `spenders`), or it pays
  * an address the backend named — a deposit address or a plain value send — on a stub the app did not
- * open to such routes (`depositAddressRoutes`, scan 2026-10-28 F9). The router and the
+ * open to such routes (`depositAddressRoutes`, scan 2026-10-28 F9), or it is EVM calldata on a stub without the
+ * app's own check of what that calldata does (`verifyQuote` / `verifyBuild`, scan 2026-10-30 F3). The router and the
  * single-provider path drop such a quote with this reason, so the auction never picks a route
  * execution would refuse (scan 2026-10-27 modules, F8/F9/F16); execution checks the build again, in
  * full. Local providers are not judged here.
  */
-export function remotePinRefusal(provider: Pick<CrossChainProvider, "name" | "remote" | "callTargets" | "spenders" | "depositAddressRoutes">, q: Quote, chain: string): string | null {
+export function remotePinRefusal(provider: Pick<CrossChainProvider, "name" | "remote" | "callTargets" | "spenders" | "depositAddressRoutes" | "verifiesQuotes" | "verifiesBuilds">, q: Quote, chain: string): string | null {
   if (provider.remote !== true) return null;
   const tx = q.txRequest;
   const plain = tx ? tx.data === undefined && tx.serializedTx === undefined : typeof q.depositAddress === "string" && q.depositAddress !== "";
@@ -72,6 +73,9 @@ export function remotePinRefusal(provider: Pick<CrossChainProvider, "name" | "re
   }
   if (tx.data !== undefined && tx.to && !pinned(provider.callTargets?.(chain), tx.to)) {
     return `${provider.name}: the route calls ${tx.to}, which the app did not pin as a call target on ${chain} (remoteProvider callTargets)`;
+  }
+  if (tx.data !== undefined && provider.verifiesQuotes !== true && provider.verifiesBuilds !== true) {
+    return `${provider.name}: the route's calldata is not checked by the app (remoteProvider verifyQuote / verifyBuild) — a pinned target alone does not say whom it pays`;
   }
   return null;
 }

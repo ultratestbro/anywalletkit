@@ -65,7 +65,7 @@ describe("remote stubs without the app's pins (scan 2026-10-27 modules, F8/F9/F1
       return new Response(JSON.stringify(String(url).endsWith("/quote") ? q : {}), {status: 200});
     }) as unknown as typeof fetch;
     const unpinned = remoteProvider({name: "unpinned", baseUrl: "https://backend.example/swap2", fetchImpl: answer("unpinned", "120")});
-    const pinned = remoteProvider({name: "pinned", baseUrl: "https://backend.example/swap2", fetchImpl: answer("pinned", "100"), callTargets: () => [DIAMOND], spenders: () => [DIAMOND]});
+    const pinned = remoteProvider({name: "pinned", baseUrl: "https://backend.example/swap2", fetchImpl: answer("pinned", "100"), callTargets: () => [DIAMOND], spenders: () => [DIAMOND], verifyQuote: () => null});
     const router = new CrossChainRouter([unpinned, pinned]);
     const best = await router.getBestQuote({sourceChain: "eip155:1", sourceToken: "USDC", destChain: "eip155:10", destToken: "USDC", amountIn: "100", destAddress: "0x1"});
     expect(best?.provider).toBe("pinned"); // the better-priced unpinned route never wins: execution would refuse it
@@ -77,6 +77,27 @@ describe("remote stubs without the app's pins (scan 2026-10-27 modules, F8/F9/F1
     expect(router.getProvider("pinned")!.spenders!("eip155:1")).toEqual([DIAMOND]);
     expect(router.getProvider("unpinned")).toMatchObject({remote: true});
     expect(router.getProvider("unpinned")!.spenders).toBeUndefined();
+  });
+
+  it("scan 2026-10-30 F3: a pinned calldata stub without the app's check of the call is dropped; the marker survives the snapshot", async () => {
+    const DIAMOND = "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE";
+    const answer = (name: string, destAmount: string) => (async (url: string, init: {body: string}) => {
+      const {params} = JSON.parse(init.body) as {params: {amountIn: string}};
+      const q = {provider: name, intentId: `${name}-1`, depositAddress: "", depositMemo: null, txRequest: {to: DIAMOND, data: "0xdeadbeef", value: "0", chainId: 1, approvalAddress: DIAMOND},
+        sourceAmount: params.amountIn, destAmount, minDestAmount: destAmount, feeUsd: 0, etaSeconds: 1, reliability: 1, validUntilMs: Date.now() + 60_000};
+      return new Response(JSON.stringify(String(url).endsWith("/quote") ? q : {}), {status: 200});
+    }) as unknown as typeof fetch;
+    const pins = {callTargets: () => [DIAMOND], spenders: () => [DIAMOND]};
+    const unchecked = remoteProvider({name: "unchecked", baseUrl: "https://backend.example/swap2", fetchImpl: answer("unchecked", "120"), ...pins});
+    const quoteChecked = remoteProvider({name: "quote-checked", baseUrl: "https://backend.example/swap2", fetchImpl: answer("quote-checked", "100"), ...pins, verifyQuote: () => null});
+    const buildChecked = remoteProvider({name: "build-checked", baseUrl: "https://backend.example/swap2", fetchImpl: answer("build-checked", "90"), ...pins, verifyBuild: () => null});
+    const router = new CrossChainRouter([unchecked, quoteChecked, buildChecked]);
+    const best = await router.getBestQuote({sourceChain: "eip155:1", sourceToken: "USDC", destChain: "eip155:10", destToken: "USDC", amountIn: "100", destAddress: "0x1"});
+    expect(best?.provider).toBe("quote-checked");
+    expect(router.lastRejections).toEqual([expect.stringMatching(/^unchecked: the route's calldata is not checked by the app \(remoteProvider verifyQuote \/ verifyBuild\)/)]);
+    expect(router.getProvider("quote-checked")).toMatchObject({remote: true, verifiesQuotes: true});
+    expect(router.getProvider("build-checked")).toMatchObject({remote: true, verifiesBuilds: true});
+    expect(router.getProvider("unchecked")!.verifiesQuotes).toBeUndefined();
   });
 
   it("scan 2026-10-28 F9: a remote deposit-address route is dropped unless the app opted the stub in; the opt-in survives the snapshot", async () => {
