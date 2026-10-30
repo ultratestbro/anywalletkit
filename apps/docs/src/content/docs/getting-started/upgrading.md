@@ -20,6 +20,15 @@ A raw `increaseAllowance(spender, x)` or `increaseApproval(spender, x)` call rea
 `kind: 'approval'` with the spender in `to` and the increase in `amount` (it was a `send` to the
 token, and `increaseApproval`'s spender was never checked by the lists). Show it like an approve.
 
+### Permit2 is read through its declared schema (`kit`, `wallet-evm`)
+
+The Permit2 approval `confirm` sees — `approvals`, `token`, `amount`, `unlimited`, `to`, `deadline` — comes
+only from fields the typed data declares, as Permit2 signs them. A payload whose schema is not Permit2's
+(a missing or retyped `details` / `permitted`, both declared, a list where one entry belongs) reaches
+`confirm` as the worst case: `unlimited: true`, `approvals: []`; one without a declared `spender` has an
+unknown destination, so an allowlist refuses it. `describeTypedData` flags such a payload
+`approve-unlimited`. Canonical Permit2 payloads from Uniswap, 1inch and other dApps read as before.
+
 ## Next release: remote swaps checked on the device
 
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps

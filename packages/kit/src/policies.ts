@@ -446,6 +446,48 @@ function typedDataIntent(base: IntentBase, arg: unknown, primaryType: string): D
   return out
 }
 
+/** Permit2's primary types → the field that carries the grant, its struct and whether it is a list. */
+const PERMIT2_GRANT: Readonly<Record<string, { name: 'details' | 'permitted'; struct: 'PermitDetails' | 'TokenPermissions'; list: boolean }>> = {
+  PermitSingle: { name: 'details', struct: 'PermitDetails', list: false },
+  PermitBatch: { name: 'details', struct: 'PermitDetails', list: true },
+  PermitTransferFrom: { name: 'permitted', struct: 'TokenPermissions', list: false },
+  PermitWitnessTransferFrom: { name: 'permitted', struct: 'TokenPermissions', list: false },
+  PermitBatchTransferFrom: { name: 'permitted', struct: 'TokenPermissions', list: true },
+  PermitBatchWitnessTransferFrom: { name: 'permitted', struct: 'TokenPermissions', list: true },
+}
+/** The nested struct's fields the policies read, with the types Permit2 signs them as. */
+const PERMIT2_STRUCT_FIELDS: Readonly<Record<'PermitDetails' | 'TokenPermissions', ReadonlyArray<readonly [string, string]>>> = {
+  PermitDetails: [['token', 'address'], ['amount', 'uint160'], ['expiration', 'uint48']],
+  TokenPermissions: [['token', 'address'], ['amount', 'uint256']],
+}
+
+/**
+ * The entries a Permit2 signature grants, read only through the schema that gets signed (scan 2026-10-30 F4):
+ * the primary struct must declare the grant field Permit2 uses for that primary type (`details` / `permitted`,
+ * one or a list) with its struct, and that struct must declare token / amount (/ expiration) with Permit2's
+ * types. Each entry keeps only those declared fields. Null when the schema is not Permit2's — the caller then
+ * shows the worst case.
+ */
+function permit2Entries(types: Record<string, unknown>, primaryType: string, declared: ReadonlyMap<string, string>, message: Record<string, unknown>): { list: Array<Record<string, unknown>> } | null {
+  const grant = Object.prototype.hasOwnProperty.call(PERMIT2_GRANT, primaryType) ? PERMIT2_GRANT[primaryType] : undefined
+  if (!grant) return null
+  if (declared.get(grant.name) !== (grant.list ? `${grant.struct}[]` : grant.struct)) return null
+  // The other grant field declared too is not a schema Permit2 signs.
+  if (declared.has(grant.name === 'details' ? 'permitted' : 'details')) return null
+  const struct = new Map((Array.isArray(types[grant.struct]) ? (types[grant.struct] as unknown[]) : []).map((f) => [str(obj(f).name) ?? '', str(obj(f).type) ?? ''] as const))
+  const wanted = PERMIT2_STRUCT_FIELDS[grant.struct]
+  if (!wanted.every(([n, t]) => struct.get(n) === t)) return null
+  const value = message[grant.name]
+  if (grant.list !== Array.isArray(value) || (!grant.list && (typeof value !== 'object' || value === null))) return null
+  const list = (grant.list ? (value as unknown[]) : [value]).map((e) => {
+    const entry = obj(e)
+    const out: Record<string, unknown> = {}
+    for (const [n] of wanted) if (Object.prototype.hasOwnProperty.call(entry, n)) out[n] = entry[n]
+    return out
+  })
+  return { list }
+}
+
 function typedDataDraft(base: IntentBase, arg: unknown, primaryType: string): DraftIntent {
   const a = obj(arg)
   const domain = obj(a.domain)
@@ -465,19 +507,21 @@ function typedDataDraft(base: IntentBase, arg: unknown, primaryType: string): Dr
     const unlimited = allowed === true || amount === undefined || isUnlimitedAllowance(amount)
     return approvalIntent(base, spender, verifying, amount, big(field('deadline') ?? field('expiry')), unlimited)
   }
-  if (PERMIT2_TYPES.has(primaryType) && str(message.spender) !== undefined) {
-    // Every entry: `details` (allowance permits) or `permitted` (transfer permits), one or a batch (round 3, M3).
-    const field = message.details !== undefined ? message.details : message.permitted
-    const entries = (Array.isArray(field) ? field : field !== undefined ? [field] : []).map(obj)
-    const approvals = entries.map((d) => {
+  if (PERMIT2_TYPES.has(primaryType)) {
+    // Every entry: `details` (allowance permits) or `permitted` (transfer permits), one or a batch (round 3, M3),
+    // read off the DECLARED schema only: an undeclared `details` next to a signed `permitted` is not signed (scan 2026-10-30 F4).
+    const entries = permit2Entries(types, primaryType, declared, message)
+    const approvals = (entries?.list ?? []).map((d) => {
       const amount = big(d.amount)
-      return { ...(str(d.token) !== undefined ? { token: str(d.token)! } : {}), ...(amount !== undefined ? { amount } : {}), unlimited: allowanceUnlimited(d.amount, amount) }
+      // An entry whose amount cannot be read is the worst case, like a missing schema.
+      return { ...(str(d.token) !== undefined ? { token: str(d.token)! } : {}), ...(amount !== undefined ? { amount } : {}), unlimited: amount === undefined || isUnlimitedAllowance(amount) }
     })
     const one = approvals.length === 1 ? approvals[0] : undefined
-    const expiry = big(message.sigDeadline ?? message.deadline ?? (one ? entries[0]!.expiration : undefined))
-    // No entry at all: nothing tells what is granted, so the worst case.
+    const expiry = big(field('sigDeadline', 'uint256') ?? field('deadline', 'uint256') ?? (one ? entries!.list[0]!.expiration : undefined))
+    // No entry at all, or a schema that is not Permit2's: nothing tells what is granted, so the worst case;
+    // an undeclared spender is not signed, so the spender is unknown too.
     const unlimited = approvals.length === 0 || approvals.some((a) => a.unlimited)
-    return { ...approvalIntent(base, str(message.spender), one?.token, one?.amount, expiry, unlimited), approvals }
+    return { ...approvalIntent(base, spender, one?.token, one?.amount, expiry, unlimited), approvals }
   }
   const evm = base.chain.startsWith('eip155:')
   /** A send whose destinations are `d`. */
