@@ -23,6 +23,8 @@ export default defineConfig({
       ],
       head: [
         { tag: 'meta', attrs: { name: 'theme-color', content: '#06070A' } },
+        // Vercel Web Analytics: the script Vercel serves on the deployment itself (no package).
+        { tag: 'script', attrs: { defer: true, src: '/_vercel/insights/script.js' } },
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: true } },
         {
