@@ -77,7 +77,9 @@ function findHermes() {
 
 const bin = findHermes()
 if (!bin) { console.error('No Hermes binary found. Set HERMES_BIN or install hermes-engine-cli.'); process.exit(2) }
-const res = spawnSync(bin, ['-O', '-w', outfile], { encoding: 'utf8', timeout: 300_000 })
+// -Xmicrotask-queue: promise jobs drain before timers, as in React Native's Hermes runtime. Without it the CLI
+// queues promise jobs behind every timer (whatever its delay), so a deadline raced against a few awaits always wins.
+const res = spawnSync(bin, ['-O', '-w', '-Xmicrotask-queue', outfile], { encoding: 'utf8', timeout: 300_000 })
 const text = (res.stdout ?? '') + (res.stderr ?? '')
 const lines = text.split('\n').filter((l) => l.trim() && !/warning:|\^~|^\s*\}\)/.test(l))
 console.log(`[hermes ${bin}]`)

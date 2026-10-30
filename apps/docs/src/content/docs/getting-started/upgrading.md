@@ -23,6 +23,10 @@ This release fixes findings of the 2026-10-30 scan in `@anywalletkit/networks` a
 - **Answer the site generically.** When a site's `wallet_addEthereumChain` endpoint fails the check,
   answer `{ code: -32603, message: "The network's RPC failed the check." }`; show `result.error` on the
   user's own screen only.
+- **CCIP-Read answers are capped on the device.** `ensCcipRequest` (behind `ensResolver({ rpcUrl })`)
+  reads a gateway's answer to at most 1 MiB and gives each gateway 10 s for the request and the whole
+  answer: `ccip: { maxResponseBytes, timeoutMs }`. Real answers are a few KB; nothing to change unless
+  you lowered your own limits.
 
 ## Next release: remote swaps checked on the device
 

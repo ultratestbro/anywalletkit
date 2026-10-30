@@ -5,6 +5,7 @@ import { NameError, type NameErrorCode, type NameResolver, type NameWarning, typ
 import { isPublicHttpsUrl } from '@anywalletkit/networks/url'
 import { coinTypeFor, decodeAddressRecord } from './coins.js'
 import { warningsFor } from './warnings.js'
+import { cancelBody, declaresMoreThan, readCapped } from './read-capped.js'
 
 /** Options for `ensResolver`: an Ethereum-mainnet client or RPC URL, and caching. */
 export interface EnsResolverOptions {
@@ -77,6 +78,13 @@ export interface EnsCcipOptions {
    * request (no answer is read) to the target, a LAN or loopback host included, before the redirect is noticed.
    */
   allowRedirectFollowingFetch?: boolean
+  /**
+   * For one gateway: the request and the whole answer. Default 10 s. Runs alongside the caller's signal
+   * (viem passes none by default), so a gateway that never finishes its answer cannot hold the lookup.
+   */
+  timeoutMs?: number
+  /** Largest gateway answer read, in bytes; a larger one (declared or streamed) is refused. Default 1 MiB. */
+  maxResponseBytes?: number
 }
 
 /** React Native's fetch (OkHttp / NSURLSession) follows redirects and ignores `redirect: 'error'`. */
@@ -99,6 +107,8 @@ export async function ensCcipRequest({ data, sender, urls, requestOptions }: Cci
   if (!opts.fetch && !opts.allowRedirectFollowingFetch && fetchFollowsRedirects()) {
     throw ccipProxyRequired()
   }
+  const timeoutMs = opts.timeoutMs ?? 10_000
+  const cap = opts.maxResponseBytes ?? 1024 * 1024
   let error: Error = new EnsNameError('lookup-failed', 'The offchain resolver names no gateway this wallet asks.')
   for (const template of urls) {
     if (signal?.aborted) throw signal.reason ?? new Error('aborted')
@@ -108,29 +118,64 @@ export async function ensCcipRequest({ data, sender, urls, requestOptions }: Cci
       continue
     }
     const post = !template.includes('{data}')
+    const call = bounded(signal, timeoutMs)
     try {
-      const res = await doFetch(url, {
+      const res = await call.race(doFetch(url, {
         method: post ? 'POST' : 'GET',
         redirect: 'error',
         ...(post ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data, sender }) } : {}),
-        ...(signal ? { signal } : {}),
-      })
+        ...(call.signal ? { signal: call.signal } : {}),
+      }))
       // A redirect that was followed anyway: its answer is not used (the request itself could not be stopped).
       if (res.redirected || (res.status >= 300 && res.status < 400) || (typeof res.url === 'string' && res.url !== '' && !isPublicHttpsUrl(res.url))) {
+        cancelBody(res)
         error = new EnsNameError('lookup-failed', 'The offchain gateway redirected; the answer was not used.')
         continue
       }
-      const json = (res.headers.get('content-type') ?? '').startsWith('application/json')
-      const result: unknown = json ? ((await res.json()) as { data?: unknown } | null)?.data : await res.text()
-      if (!res.ok) { error = new EnsNameError('lookup-failed', `The offchain gateway answered HTTP ${res.status}.`); continue }
+      // Status and size first: an error answer, or one larger than the cap, is not read (scan 2026-10-30 F13).
+      if (!res.ok) { cancelBody(res); error = new EnsNameError('lookup-failed', `The offchain gateway answered HTTP ${res.status}.`); continue }
+      const tooLarge = () => new EnsNameError('lookup-failed', `The offchain gateway's answer is larger than ${cap} bytes; it was not used.`)
+      if (declaresMoreThan(res, cap)) { cancelBody(res); error = tooLarge(); continue }
+      const text = await call.race(readCapped(res, cap))
+      if (text === null) { error = tooLarge(); continue }
+      let result: unknown = text
+      if ((res.headers.get('content-type') ?? '').startsWith('application/json')) {
+        try { result = (JSON.parse(text) as { data?: unknown } | null)?.data } catch { result = undefined }
+      }
       if (typeof result !== 'string' || !/^0x[0-9a-fA-F]*$/.test(result)) { error = new EnsNameError('lookup-failed', 'The offchain gateway answered something that is not hex data.'); continue }
       return result as Hex
     } catch (e) {
       if (signal?.aborted) throw e
       error = e instanceof Error ? e : new Error(String(e))
+    } finally {
+      call.done()
     }
   }
   throw error
+}
+
+/**
+ * One gateway call's deadline, merged with the caller's signal by hand: Hermes has AbortController but not
+ * AbortSignal.timeout / .any. `race` settles with the work, the deadline or the caller's abort, whichever is
+ * first; the deadline and the abort also abort `signal`, which stops the request and its body stream.
+ */
+function bounded(outer: AbortSignal | undefined, timeoutMs: number): { signal: AbortSignal | undefined; race<T>(p: Promise<T>): Promise<T>; done(): void } {
+  const controller = typeof AbortController === 'function' ? new AbortController() : undefined
+  let fail: (e: unknown) => void = () => {}
+  const stop = new Promise<never>((_, reject) => { fail = reject })
+  stop.catch(() => undefined) // a cleared timer can still fire on the Hermes CLI
+  const onAbort = () => { fail(outer?.reason ?? new Error('aborted')); controller?.abort() }
+  if (outer?.aborted) onAbort()
+  else outer?.addEventListener?.('abort', onAbort)
+  const timer = setTimeout(() => {
+    fail(new EnsNameError('lookup-failed', `The offchain gateway did not answer within ${Math.round(timeoutMs / 100) / 10} s.`)) // first, so the race reports it
+    controller?.abort()
+  }, timeoutMs)
+  return {
+    signal: controller?.signal ?? outer,
+    race: <T,>(p: Promise<T>) => Promise.race([p, stop]),
+    done: () => { clearTimeout(timer); outer?.removeEventListener?.('abort', onAbort) },
+  }
 }
 
 const isProxyRequired = (e: unknown): boolean => e instanceof EnsNameError && e.reason === 'ccip-proxy-required'
