@@ -102,6 +102,22 @@ describe('the Solana guard reads Stake-program instructions', () => {
     expect(d.items[1]).toMatchObject({ instruction: 'Withdraw', stake: { name: 'Withdraw', lamports: 5_000_000_000n } })
   })
 
+  it('an SPL Stake Pool WithdrawStake into the funded slot that names this wallet as user stake authority signs (scan 2026-10-30 follow-up)', () => {
+    const POOL_PROGRAM = 'SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy' as Address
+    const TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address
+    const withdrawStake = (to: Address, authority: Address, { program = POOL_PROGRAM, data = cat(new Uint8Array([24]), u64(1_000_000_000n), u64(1n)) } = {}) =>
+      ix(program, [[ATTACKER, W], [VOTE, W], [ATTACKER, R], [STAKE0, W], [to, W], [authority, R], [WALLET, RS], [VOTE, W], [VOTE, W], [VOTE, W], [CLOCK, R], [TOKEN, R], [STAKE, R]], data)
+    expect(refused([createWithSeed(SLOT, 2_282_880n), withdrawStake(SLOT, WALLET), deactivate])).toBe('signed')
+    expect(refused([createWithSeed(SLOT, 2_282_880n), withdrawStake(SLOT, WALLET, { data: cat(new Uint8Array([10]), u64(1n)) })])).toBe('signed')
+    expect(refused([createWithSeed(SLOT, 2_282_880n), withdrawStake(SLOT, ATTACKER)])).toBe('sets-authority')
+    expect(refused([createWithSeed(SLOT, 2_282_880n), withdrawStake(STAKE0, WALLET)])).toBe('sets-authority')
+    expect(refused([createWithSeed(SLOT, 2_282_880n), withdrawStake(SLOT, WALLET, { program: ATTACKER })])).toBe('sets-authority')
+    expect(refused([createWithSeed(SLOT, 2_282_880n), withdrawStake(SLOT, WALLET, { data: new Uint8Array([9]) })])).toBe('sets-authority')
+    expect(refused([createWithSeed(SLOT, 2_282_880n), withdrawStake(SLOT, WALLET, { data: cat(new Uint8Array([24]), u64(1n)) })])).toBe('sets-authority')
+    const d = describeTransaction({ version: 0, instructions: [withdrawStake(SLOT, WALLET)] } as never, { account: WALLET })
+    expect(d.items[0]).toMatchObject({ type: 'program-call', program: POOL_PROGRAM, instruction: 'WithdrawStakeWithSlippage' })
+  })
+
   describe('review round: the wallet\'s position in the instruction does not decide', () => {
     it('the current account layout (no sysvars) and the wallet at another index are judged too', () => {
       // Authorize [stake, authority]; Withdraw [stake, recipient, authority]; AuthorizeChecked [stake, old, new]

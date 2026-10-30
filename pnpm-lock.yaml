@@ -1077,6 +1077,9 @@ importers:
       '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
+      '@anywalletkit/wallet-solana':
+        specifier: workspace:*
+        version: link:../wallet-solana
       '@solana/transaction-messages':
         specifier: ^3.0.3
         version: 3.0.3(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)

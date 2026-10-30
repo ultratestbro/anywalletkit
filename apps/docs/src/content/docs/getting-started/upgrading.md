@@ -123,6 +123,13 @@ retry instead of being fixed silently; configure two RPCs to keep the automatic 
   next delayed-exit slot address, the exit transaction now starts with a System `TransferWithSeed`
   that returns that SOL to the wallet. A signing review shows one extra incoming transfer; nothing
   to change in the app.
+- **SPL stake-pool delayed exits sign with the default Solana guard.** `wallet-solana` refused every
+  delayed exit (`requestWithdrawal({ mode: 'delayed' })`, e.g. Jito) with `sets-authority` ("funds
+  stake account … without making this wallet its staker and withdrawer") unless
+  `allowAuthorityChanges` was set. It now takes a stake account the wallet funds as the wallet's
+  when an SPL Stake Pool `WithdrawStake` in the same transaction splits into it and names this
+  wallet as the user stake authority. Nothing to change in the app; drop any `allowAuthorityChanges`
+  you set to work around it. Any other authority or program is refused as before.
 
 ## Next release: endpoint checks and CCIP-Read gateways
 

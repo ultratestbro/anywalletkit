@@ -31,6 +31,19 @@ import type { DecodedInstruction, SeedAccountDetails, SolanaTransaction, SolanaW
 
 /** The native Stake program. */
 export const STAKE_PROGRAM_ADDRESS = 'Stake11111111111111111111111111111111111111'
+/** The SPL Stake Pool program (Jito and the other pools on it). */
+export const SPL_STAKE_POOL_PROGRAM_ADDRESS = 'SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy'
+
+/**
+ * The one SPL Stake Pool instruction the guard needs to recognise: `WithdrawStake` (tag 10, u64
+ * pool tokens) / `WithdrawStakeWithSlippage` (tag 24, u64 pool tokens + u64 minimum lamports out).
+ * The program reads them with borsh, which takes the exact length only.
+ */
+function stakePoolInstructionName(data: Uint8Array): string | undefined {
+  if (data[0] === 10 && data.length === 9) return 'WithdrawStake'
+  if (data[0] === 24 && data.length === 17) return 'WithdrawStakeWithSlippage'
+  return undefined
+}
 
 const STAKE_NAMES: readonly StakeInstructionName[] = [
   'Initialize', 'Authorize', 'DelegateStake', 'Split', 'Withdraw', 'Deactivate', 'SetLockup', 'Merge',
@@ -230,6 +243,10 @@ function decodeOne(r: Resolved): DecodedInstruction {
     const accounts = r.accounts.map((a) => a.address as string)
     const stake = decodeStakeInstruction(r.data, accounts)
     return { type: 'program-call', program, accounts, dataLength: r.data.length, ...(stake ? { instruction: stake.name, stake } : {}) }
+  }
+  if (program === SPL_STAKE_POOL_PROGRAM_ADDRESS) {
+    const instruction = stakePoolInstructionName(r.data)
+    return { type: 'program-call', program, accounts: r.accounts.map((a) => a.address as string), dataLength: r.data.length, ...(instruction ? { instruction } : {}) }
   }
   const ix = asIx(r)
   try {

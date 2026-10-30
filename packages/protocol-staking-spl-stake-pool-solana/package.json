@@ -47,6 +47,7 @@
     "@solana/transactions": "^3.0.3",
     "@anywalletkit/core": "workspace:*",
     "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/wallet-solana": "workspace:*",
     "vitest": "^5.0.3"
   },
   "keywords": [

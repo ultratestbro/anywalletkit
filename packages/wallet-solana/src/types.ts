@@ -181,7 +181,7 @@ export type DecodedInstruction =
   | { type: 'close-account'; program: string; tokenProgram: TokenProgramKind; account: string; destination: string; owner: string }
   | { type: 'ata-create'; program: string; ata: string; owner: string; mint: string; payer: string; idempotent: boolean }
   | { type: 'compute-budget'; program: string; kind: 'limit' | 'price' | 'other'; value: bigint }
-  | { type: 'program-call'; program: string; accounts: readonly string[]; dataLength: number; /** System/Token(-2022)/Stake instruction name when identified (not otherwise decoded). */ instruction?: string; stake?: StakeInstructionDetails; withSeed?: SeedAccountDetails }
+  | { type: 'program-call'; program: string; accounts: readonly string[]; dataLength: number; /** System/Token(-2022)/Stake instruction name when identified (not otherwise decoded); for the SPL Stake Pool program, only `WithdrawStake` / `WithdrawStakeWithSlippage`. */ instruction?: string; stake?: StakeInstructionDetails; withSeed?: SeedAccountDetails }
   | { type: 'unknown'; program: string | null; accounts: readonly (string | null)[]; dataLength: number; /** System/Token(-2022)/Stake instruction name, identified from the data while some accounts sit in unresolved lookup tables. */ instruction?: string; stake?: StakeInstructionDetails }
 
 /** Stake-program instruction names, by their tag. */

@@ -13,7 +13,7 @@ import { TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, getCreateAssociatedToken
 import {
   TOKEN_2022_PROGRAM_ADDRESS, getMintDecoder, getTransferCheckedInstruction as getTransferChecked2022Instruction, getTransferCheckedWithFeeInstruction,
 } from '@solana-program/token-2022'
-import { MAX_U64, STAKE_PROGRAM_ADDRESS, ZERO_ADDRESS, decodeWireTransaction, describeTransaction, resolveCompiledAccounts } from './describe.js'
+import { MAX_U64, SPL_STAKE_POOL_PROGRAM_ADDRESS, STAKE_PROGRAM_ADDRESS, ZERO_ADDRESS, decodeWireTransaction, describeTransaction, resolveCompiledAccounts } from './describe.js'
 import {
   DEFAULT_PROGRAM_ALLOWLIST, SAFE_CORE_INSTRUCTIONS, WSOL_MINT, assertExpectation, base64Bytes, bytesEqual, isNativeMint, optEqual, parseTokenAccount, pubkeyBytes, unexpectedInstruction,
   type SerializedCheck, type SerializedTxGuard, type SolanaAccountData,
@@ -594,8 +594,10 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
 
   /**
    * Stake accounts this message leaves to this wallet: initialized with this wallet as staker and
-   * withdrawer and no lockup, or the destination of a Split this wallet signs (a split copies the
-   * source's authorities).
+   * withdrawer and no lockup, the destination of a Split this wallet signs (a split copies the
+   * source's authorities), or the destination of an SPL Stake Pool `WithdrawStake` that names this
+   * wallet as the user stake authority (a pool's delayed exit: the program splits pool stake into
+   * the account and, by CPI, makes that authority its staker and withdrawer).
    */
   private ownStakeAccounts(description: TransactionDescription): Set<string> {
     const own = new Set<string>()
@@ -607,6 +609,10 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       if (it.type === 'sol-transfer' && it.from === this.address) fund(it.to, it.lamports)
     }
     for (const it of description.items) {
+      // WithdrawStake accounts: [pool, validator list, withdraw authority, split from, split to (4),
+      // user stake authority (5), user transfer authority, pool-token source, manager fee, mint, clock, token program, stake program].
+      if (it.type === 'program-call' && it.program === SPL_STAKE_POOL_PROGRAM_ADDRESS && (it.instruction === 'WithdrawStake' || it.instruction === 'WithdrawStakeWithSlippage') &&
+        it.accounts.length >= 13 && it.accounts[5] === this.address && it.accounts[12] === STAKE_PROGRAM_ADDRESS) own.add(it.accounts[4]!)
       if ((it.type !== 'program-call' && it.type !== 'unknown') || it.program !== STAKE_PROGRAM_ADDRESS || !it.stake) continue
       const target = it.accounts[it.stake.name === 'Split' ? 1 : 0]
       if (!target) continue

@@ -59,7 +59,9 @@ key is used:
    wallet signs that hands a stake account over (`Authorize*` to another key, a
    `Withdraw` to anyone else, a `SetLockup*` with a foreign custodian or a lockup), a
    stake account the wallet funds that the same transaction does not initialize
-   (or split into) with this wallet as staker and withdrawer, an undecodable
+   (or split into) with this wallet as staker and withdrawer — an SPL Stake Pool
+   `WithdrawStake` into it that names this wallet as the user stake authority
+   counts (a pool's delayed exit) — an undecodable
    System / Token / Stake instruction (`UnsafeTransactionError` with `code` `core-instruction`,
    `sets-authority`, `closes-account` or `moves-lamports`;
    `allowAuthorityChanges: true` to override, e.g. for a token launch that
