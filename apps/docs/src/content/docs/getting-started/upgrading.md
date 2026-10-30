@@ -19,6 +19,10 @@ your app does.
   `depositForBurn` must burn exactly the input of the source USDC for the recipient on the requested
   domain, with no destination caller and a `maxFee` that leaves the quoted minimum. Spread the pins as
   before.
+- **USDT0 send decoded on the device.** `usdt0Pins` carry `verifyQuote` (`usdt0VerifyQuote`): the OFT
+  `send` must go to the requested chain's eid and recipient, move exactly the input with a
+  `minAmountLD` that keeps the quoted minimum, carry no options or compose message, refund the trader,
+  and attach the declared native fee. Spread the pins as before.
 
 ## Next release: remote swaps checked on the device
 
