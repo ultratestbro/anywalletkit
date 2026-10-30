@@ -153,6 +153,7 @@ const CALL_RECIPIENTS: Readonly<Record<string, { words: readonly number[]; min: 
   '0x2eb2c2d6': { words: [1], min: 5 }, // safeBatchTransferFrom(address,address,uint256[],uint256[],bytes) — ERC-1155
   '0x095ea7b3': { words: [0], min: 2 }, // approve(address,uint256)
   '0x39509351': { words: [0], min: 2 }, // increaseAllowance(address,uint256)
+  '0xd73dd623': { words: [0], min: 2 }, // increaseApproval(address,uint256) — the older StandardToken name
   '0xa22cb465': { words: [0], min: 2 }, // setApprovalForAll(address,bool)
   '0x87517c45': { words: [1], min: 4 }, // Permit2 approve(address token,address spender,uint160,uint48)
   '0xd505accf': { words: [1], min: 7 }, // permit(owner,spender,value,deadline,v,r,s) — an EIP-2612 permit sent on chain

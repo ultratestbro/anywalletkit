@@ -287,6 +287,8 @@ function approvalIntent(base: IntentBase, spender: string | undefined, token: st
 }
 
 const SELECTOR_APPROVE = '0x095ea7b3' // approve(address,uint256) — ERC-20 allowance / ERC-721 per-token
+const SELECTOR_INCREASE_ALLOWANCE = '0x39509351' // increaseAllowance(address,uint256) — ERC-20, adds to the allowance
+const SELECTOR_INCREASE_APPROVAL = '0xd73dd623' // increaseApproval(address,uint256) — the older StandardToken name of the same
 const SELECTOR_SET_APPROVAL_FOR_ALL = '0xa22cb465' // setApprovalForAll(address,bool)
 const SELECTOR_LOCKDOWN = '0xcc53287f' // Permit2 lockdown((address token, address spender)[])
 const ZERO_WORD = '0'.repeat(64)
@@ -333,8 +335,10 @@ function revokeCall(call: unknown): Array<{ token: string; spender?: string }> |
 
 /**
  * Rights a raw EVM call grants, read off exact calldata shapes: `approve(spender, x)` with a
- * non-zero spender (ERC-20 allowance or ERC-721 per-token approval) and
- * `setApprovalForAll(operator, true)`. The lists check these spenders like any destination.
+ * non-zero spender (ERC-20 allowance or ERC-721 per-token approval), `increaseAllowance` /
+ * `increaseApproval(spender, x)` (an ERC-20 allowance raised by `x`: `amount` is the increase,
+ * not the new total) and `setApprovalForAll(operator, true)`. The lists check these spenders
+ * like any destination (scan 2026-10-30 F5).
  */
 function grantCall(call: unknown): { token: string; spender: string; amount: bigint } | null {
   const c = obj(call)
@@ -345,7 +349,9 @@ function grantCall(call: unknown): { token: string; spender: string; amount: big
   if (data.length !== 10 + 128 || !/^0x[0-9a-f]*$/.test(data)) return null
   const [w0, w1] = [data.slice(10, 74), data.slice(74)]
   if (w0 === ZERO_WORD) return null
-  if (data.startsWith(SELECTOR_APPROVE)) return { token: to, spender: wordAddress(w0), amount: BigInt(`0x${w1}`) }
+  if (data.startsWith(SELECTOR_APPROVE) || data.startsWith(SELECTOR_INCREASE_ALLOWANCE) || data.startsWith(SELECTOR_INCREASE_APPROVAL)) {
+    return { token: to, spender: wordAddress(w0), amount: BigInt(`0x${w1}`) }
+  }
   if (data.startsWith(SELECTOR_SET_APPROVAL_FOR_ALL) && w1 !== ZERO_WORD) return { token: to, spender: wordAddress(w0), amount: MAX_UINT256 }
   return null
 }
