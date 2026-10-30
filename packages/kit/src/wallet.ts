@@ -67,7 +67,8 @@ export class Wallet {
   private readonly _protocolInstances = new Map<string, unknown>()
   private readonly _historySources = new Map<string, HistorySource>()
   private readonly _guarded = new WeakMap<object, Map<string, IWalletAccount>>()
-  private readonly _guardedManagers = new WeakMap<object, object>()
+  /** Guarded managers per manager and requested chain: one namespace registration serves several chains (scan 2026-10-30 F11). */
+  private readonly _guardedManagers = new WeakMap<object, Map<string, object>>()
   private readonly _restricted = new WeakMap<object, Map<string, IWalletAccount>>()
   private readonly _activity: ActivityOptions
   private _journal: IntentJournal | undefined
@@ -149,7 +150,10 @@ export class Wallet {
    */
   getManager<M extends WalletManager<IWalletAccount, object> = WalletManager<IWalletAccount, object>>(chain: string): M {
     const manager = this.manager(chain)
-    let guarded = this._guardedManagers.get(manager)
+    // One proxy per (manager, requested chain): each guards its accounts for the chain it was asked for.
+    let byChain = this._guardedManagers.get(manager)
+    if (!byChain) { byChain = new Map(); this._guardedManagers.set(manager, byChain) }
+    let guarded = byChain.get(chain)
     if (!guarded) {
       const surface = (prop: string | symbol) => typeof prop === 'string' && MANAGER_SURFACE.has(prop)
       guarded = new Proxy(manager, {
@@ -172,7 +176,7 @@ export class Wallet {
         deleteProperty: () => false,
         setPrototypeOf: () => false,
       })
-      this._guardedManagers.set(manager, guarded)
+      byChain.set(chain, guarded)
     }
     return guarded as M
   }
