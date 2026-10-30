@@ -7,6 +7,7 @@ import {
   STAKE_ACCOUNT_SPACE,
   STAKE_POOL_PROGRAM,
   STAKE_PROGRAM,
+  SYSTEM_PROGRAM,
   decodeStakeAccount,
   decodeStakePool,
   decodeValidatorList,
@@ -21,6 +22,7 @@ import {
   ixSetComputeUnitPrice,
   ixStakeDeactivate,
   ixStakeWithdraw,
+  ixTransferWithSeed,
   ixWithdrawSol,
   ixWithdrawStake,
   minimumStakeLamports,
@@ -60,9 +62,10 @@ export const DEFAULT_SLIPPAGE_BPS = 50
 /** Seed-derived stake accounts tracked per wallet for delayed exits. */
 export const DEFAULT_UNSTAKE_SLOTS = 8
 /**
- * Slot addresses someone else pre-funded (System-owned SOL at a predictable seed address, where
- * CreateAccountWithSeed then fails) are skipped; the scan goes this many indexes past the tracked
- * slots before it gives up.
+ * Slot addresses held by neither Stake nor System (not reachable without the wallet's signature, so
+ * not expected) are skipped; the scan goes this many indexes past the tracked slots before it gives
+ * up. A pre-funded slot (System-owned SOL someone sent to the predictable seed address) is not
+ * skipped: the exit takes that SOL back to the wallet first (scan 2026-10-30 F16).
  */
 export const MAX_PREFUNDED_SLOTS = 32
 /** Per-call RPC timeout (ms). */
@@ -531,19 +534,23 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
    * The account's delayed-exit slots: seed-derived stake accounts, decoded.
    *
    * @protected
-   * @returns {Promise<{ wallet: string, epoch: bigint, slots: Array<{ index: number, address: string, lamports: bigint, status: StakeActivation, deactivationEpoch: bigint | null } | null>, freeIndex: number | null, prefunded: number[] }>} Slots (null where empty), the first free one, and the indexes skipped because someone pre-funded their address.
+   * @returns {Promise<{ wallet: string, epoch: bigint, slots: Array<{ index: number, address: string, lamports: bigint, status: StakeActivation, deactivationEpoch: bigint | null } | null>, freeIndex: number | null, freeLamports: bigint, prefunded: number[], skipped: number[] }>} Slots (null where empty), the first free one and the SOL someone pre-funded it with (0 when none), the pre-funded indexes, and the indexes skipped because they cannot hold an exit.
    */
   async _getUnstakeSlots () {
     const wallet = await this._address()
     const epochInfo = await this.getEpochInfo()
     const slots = []
     const prefunded = []
+    const skipped = []
     let freeIndex = null
+    let freeLamports = 0n
     let usable = 0
     let next = 0
     const bound = this._unstakeSlots + MAX_PREFUNDED_SLOTS
-    // `unstakeSlots` usable indexes: a pre-funded address (SOL someone sent to the predictable seed
-    // address; CreateAccountWithSeed fails there) does not count and the scan goes on past it.
+    // `unstakeSlots` usable indexes. A pre-funded address (SOL someone sent to the predictable seed
+    // address: System-owned, no data) is usable — the exit moves that SOL back to the wallet with
+    // TransferWithSeed before CreateAccountWithSeed, which fails on an address holding lamports. Only
+    // an address under another program does not count, and the scan goes on past it (bounded).
     while (usable < this._unstakeSlots && next < bound) {
       const indexes = Array.from({ length: Math.min(this._unstakeSlots - usable, bound - next) }, (_, k) => next + k)
       next += indexes.length
@@ -558,7 +565,14 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
           slots.push(null)
           continue
         }
-        if (a.owner !== STAKE_PROGRAM) { prefunded.push(i); slots.push(null); continue }
+        if (a.owner === SYSTEM_PROGRAM && fromBase64(a.data[0]).length === 0) {
+          usable++
+          prefunded.push(i)
+          if (freeIndex === null) { freeIndex = i; freeLamports = BigInt(a.lamports) }
+          slots.push(null)
+          continue
+        }
+        if (a.owner !== STAKE_PROGRAM) { skipped.push(i); slots.push(null); continue }
         usable++
         const data = decodeStakeAccount(fromBase64(a.data[0]))
         if (data.state === 'uninitialized') { slots.push(null); continue }
@@ -572,7 +586,7 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
         })
       }
     }
-    return { wallet, epoch: epochInfo.epoch, slots, freeIndex, prefunded }
+    return { wallet, epoch: epochInfo.epoch, slots, freeIndex, freeLamports, prefunded, skipped }
   }
 
   /**
@@ -612,10 +626,10 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
     if (q.lamports < pool.minimumStakeLamports) {
       throw new Error(`A delayed exit must be worth at least ${pool.minimumStakeLamports} lamports (the stake program's minimum delegation plus rent) — use the instant mode for less.`)
     }
-    const { freeIndex, prefunded } = await this._getUnstakeSlots()
+    const { freeIndex, freeLamports, skipped } = await this._getUnstakeSlots()
     if (freeIndex === null) {
-      if (prefunded.length >= MAX_PREFUNDED_SLOTS) {
-        throw new Error(`No delayed-exit slot is free: ${prefunded.length} slot addresses hold SOL someone else sent there (they cannot hold an exit) — use the instant mode, or raise unstakeSlots.`)
+      if (skipped.length >= MAX_PREFUNDED_SLOTS) {
+        throw new Error(`No delayed-exit slot is free: ${skipped.length} slot addresses are held by another program (they cannot hold an exit) — use the instant mode, or raise unstakeSlots.`)
       }
       throw new Error(`All ${this._unstakeSlots} delayed-exit slots are in use — claim a finished exit first.`)
     }
@@ -639,13 +653,19 @@ export default class SplStakePoolProtocolSolana extends StakingProtocol {
       }
     }
     const stakeAccount = await findUnstakeAccount(wallet, this.pool.name, freeIndex)
+    const seed = unstakeSeed(this.pool.name, freeIndex)
+    // A pre-funded slot: its SOL goes back to the wallet first, leaving the address empty for the create.
+    const reclaim = freeLamports > 0n
+      ? [ixTransferWithSeed({ from: stakeAccount, base: wallet, seed, fromOwner: STAKE_PROGRAM, to: wallet, lamports: freeLamports })]
+      : []
     return {
       instructions: [
+        ...reclaim,
         ixCreateAccountWithSeed({
           from: wallet,
           newAccount: stakeAccount,
           base: wallet,
-          seed: unstakeSeed(this.pool.name, freeIndex),
+          seed,
           lamports: pool.rentExempt,
           space: BigInt(STAKE_ACCOUNT_SPACE),
           owner: STAKE_PROGRAM

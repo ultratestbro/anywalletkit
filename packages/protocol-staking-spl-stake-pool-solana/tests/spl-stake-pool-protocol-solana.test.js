@@ -438,27 +438,49 @@ test('_rpc fails over on transport errors but not on node-side rejections', asyn
 
 // Audit 2026-10-25 round 3, M30: the delayed-exit slot addresses are predictable (wallet + seed).
 // Anyone could send a little SOL to all eight of them: CreateAccountWithSeed then fails on each, and
-// the module said "all slots are in use" — delayed exits blocked for ~0.007 SOL. Pre-funded
-// addresses (System-owned) are now skipped without counting against the tracked slots, the scan
-// goes on past them (bounded), and only beyond the bound does it refuse, naming the cause.
-test('delayed exit: pre-funded slot addresses are skipped, the exit lands past them and is listed', async () => {
+// the module said "all slots are in use" — delayed exits blocked for ~0.007 SOL. Skipping them only
+// moved the wall (8 + 32 slots, ~0.036 SOL). Now a pre-funded address (System-owned, no data) is
+// used: the exit first takes its SOL back to the wallet with TransferWithSeed (scan 2026-10-30 F16).
+test('delayed exit: a pre-funded slot is reclaimed — its SOL back to the wallet, then the account created there', async () => {
   const prefunded = { data: new Uint8Array(0), lamports: 890_880n, owner: codec.SYSTEM_PROGRAM }
   const poisoned = {}
-  for (let i = 0; i < 8; i++) poisoned[await codec.findUnstakeAccount(HOLDER, 'Jito', i)] = prefunded
+  for (let i = 0; i < 8 + 32; i++) poisoned[await codec.findUnstakeAccount(HOLDER, 'Jito', i)] = prefunded
   const account = stubAccount()
   const r = await protocolFor(withPosition({ accounts: poisoned }), account).requestWithdrawal({ amount: SOL })
+  assert.equal(r.stakeAccount, HOLDER_SLOT0)
+  const [, , reclaim, create, withdraw, deactivate] = account.sent[0].instructions
+  assert.equal(reclaim.programAddress, codec.SYSTEM_PROGRAM)
+  assert.deepEqual(reclaim.accounts, [{ address: HOLDER_SLOT0, role: 1 }, { address: HOLDER, role: 2 }, { address: HOLDER, role: 1 }])
+  const seed = codec.unstakeSeed('Jito', 0)
+  const dv = new DataView(reclaim.data.buffer, reclaim.data.byteOffset)
+  assert.equal(dv.getUint32(0, true), 11) // TransferWithSeed
+  assert.equal(dv.getBigUint64(4, true), 890_880n) // exactly what sits there
+  assert.equal(new TextDecoder().decode(reclaim.data.subarray(20, 20 + seed.length)), seed)
+  assert.equal(codec.bytesToAddress(reclaim.data.subarray(20 + seed.length)), codec.STAKE_PROGRAM) // the address's derivation owner
+  assert.equal(create.accounts[1].address, HOLDER_SLOT0)
+  assert.equal(withdraw.accounts[4].address, HOLDER_SLOT0)
+  assert.equal(deactivate.accounts[0].address, HOLDER_SLOT0)
+
+  // An empty slot needs no reclaim: the message is the plain create.
+  const plain = stubAccount()
+  await protocolFor(withPosition(), plain).requestWithdrawal({ amount: SOL })
+  assert.equal(plain.sent[0].instructions[2].data[0], 3) // CreateAccountWithSeed
+})
+
+test('delayed exit: slot addresses held by another program are skipped; refused, cause named, past the bound', async () => {
+  const foreign = { data: new Uint8Array(8), lamports: 890_880n, owner: VOTE_A }
+  const some = {}
+  for (let i = 0; i < 8; i++) some[await codec.findUnstakeAccount(HOLDER, 'Jito', i)] = foreign
+  const account = stubAccount()
+  const r = await protocolFor(withPosition({ accounts: some }), account).requestWithdrawal({ amount: SOL })
   const slot8 = await codec.findUnstakeAccount(HOLDER, 'Jito', 8)
   assert.equal(r.stakeAccount, slot8)
   assert.equal(account.sent[0].instructions[2].accounts[1].address, slot8)
-
-  const withExit = { ...poisoned, [slot8]: { data: stakeAccount({ authority: HOLDER, stake: SOL, deactivationEpoch: EPOCH - 1n }), lamports: SOL + RENT } }
+  const withExit = { ...some, [slot8]: { data: stakeAccount({ authority: HOLDER, stake: SOL, deactivationEpoch: EPOCH - 1n }), lamports: SOL + RENT } }
   const { requests } = await protocolFor(withPosition({ accounts: withExit })).getWithdrawalRequests()
   assert.deepEqual(requests.map((q) => q.id), [8n])
-})
 
-test('delayed exit: refused with the cause named only when pre-funded addresses exhaust the bound', async () => {
-  const prefunded = { data: new Uint8Array(0), lamports: 890_880n, owner: codec.SYSTEM_PROGRAM }
   const many = {}
-  for (let i = 0; i < 8 + 32; i++) many[await codec.findUnstakeAccount(HOLDER, 'Jito', i)] = prefunded
-  await assert.rejects(() => protocolFor(withPosition({ accounts: many })).requestWithdrawal({ amount: SOL }), /40 slot addresses hold SOL someone else sent there.*instant/)
+  for (let i = 0; i < 8 + 32; i++) many[await codec.findUnstakeAccount(HOLDER, 'Jito', i)] = foreign
+  await assert.rejects(() => protocolFor(withPosition({ accounts: many })).requestWithdrawal({ amount: SOL }), /40 slot addresses are held by another program.*instant/)
 })

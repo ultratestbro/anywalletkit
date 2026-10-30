@@ -23,6 +23,10 @@ your app does.
   from the minter's pinned wallet code and must match the node's `get_wallet_address`. The default
   mainnet and testnet deployments need nothing. With a custom `addresses.jetton`, pass that minter's
   `jettonWalletCode`, or `allowUnverifiedJettonWallet: true` to keep the old unchecked behaviour.
+- **SPL stake-pool delayed exits reclaim pre-funded slots.** When someone sent SOL to the wallet's
+  next delayed-exit slot address, the exit transaction now starts with a System `TransferWithSeed`
+  that returns that SOL to the wallet. A signing review shows one extra incoming transfer; nothing
+  to change in the app.
 
 ## Next release: remote swaps checked on the device
 

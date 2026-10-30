@@ -57,7 +57,10 @@ inflation rewards.
 The wallet's stake accounts are derived with seeds
 (`createWithSeed(wallet, "<pool>-unstake:<i>", StakeProgram)`, 8 slots), so
 the queue is recoverable from the wallet alone and no ephemeral keypair ever
-signs.
+signs. A slot address someone pre-funded (SOL sent to the predictable seed
+address, where `CreateAccountWithSeed` would fail) is still used: the exit
+first moves that SOL back to the wallet with System `TransferWithSeed`, then
+creates the stake account there.
 
 ## Usage
 
