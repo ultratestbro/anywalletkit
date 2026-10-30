@@ -25,6 +25,12 @@ export default defineConfig({
         { tag: 'meta', attrs: { name: 'theme-color', content: '#06070A' } },
         // Vercel Web Analytics: the script Vercel serves on the deployment itself (no package).
         { tag: 'script', attrs: { defer: true, src: '/_vercel/insights/script.js' } },
+        // Link previews (Telegram, X, Slack): the landing's card; Starlight already sets og:title / og:description per page.
+        { tag: 'meta', attrs: { property: 'og:image', content: 'https://docs.anywallet.tech/og.jpg' } },
+        { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+        { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
+        { tag: 'meta', attrs: { property: 'og:image:alt', content: 'Any Wallet Kit: the awk capsule surrounded by the chain and module logos' } },
+        { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://docs.anywallet.tech/og.jpg' } },
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: true } },
         {
