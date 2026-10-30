@@ -10,7 +10,26 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
-## Next release: the 2026-10-30 scan fixes
+## Next release: the 2026-10-30 re-audit fixes
+
+A re-audit of the 2026-10-30 release found five more issues; all are fixed. Only the TON one can change what your
+app sees.
+
+- **TON: a gateway error on a send is "maybe sent".** `wallet-ton` used to read any JSON error from an endpoint
+  as the node's refusal. A gateway's JSON 502 / 504 / 408 or an empty `{}` after the node had taken the message
+  surfaced as a plain `NetworkError`, so a retry could pay twice. Now only toncenter's refusal envelope
+  (`{ok: false, error}` outside 408/502/503/504, not a timeout) is a refusal; anything else throws
+  `BroadcastUnknownError` (`maybeSent: true`, `hash`). Handle it as for EVM: tell the user to check Activity before
+  sending again, track the hash, never resend by itself.
+- **USDT0 remote quotes are bound to the requested tokens.** `usdt0VerifyQuote` now requires both the source and
+  the destination token to be the deployment's USDT / USDT0. Honest routes are unchanged.
+- **Fynd remote quotes are same-chain only.** `fyndVerifyQuote` refuses a request whose destination chain differs
+  from the source chain.
+- **Policies: a class prototype is read as it was.** The snapshot of a write keeps a class prototype (so
+  `instanceof` and methods work) but no longer sees fields or methods added to it after the snapshot.
+- **`verifyNetwork` caps an answer at 1 MiB** (`MAX_RESPONSE_BYTES`); a larger one fails with `too-large: …`.
+
+## 2026-10-30: the scan fixes
 
 This release fixes all 19 findings of the external scan of 2026-10-30 and makes Jito-style SPL stake-pool
 delayed exits work under the default Solana guard again. The sections below are grouped by area.
