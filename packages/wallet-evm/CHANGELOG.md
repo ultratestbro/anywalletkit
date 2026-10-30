@@ -1,5 +1,17 @@
 # @anywalletkit/wallet-evm
 
+## 0.6.0
+
+### Minor Changes
+
+- 1b85326: "nonce too low" is re-signed only when the nonce is proven taken by another transaction (scan 2026-10-30, F1). After the node refused a send with "nonce too low" and said it never saw the hash, the account signed the same payload again with the next nonce — but that RPC already held the first signed bytes, so a malicious RPC could broadcast both. Now the account asks every distinct configured endpoint directly: it signs again only when at least two of them count the account's mined transactions past the nonce and none knows the first hash (any endpoint that knows it ends the send as accepted). Otherwise the send throws the new `NonceConflictError` (extends `BroadcastUnknownError`: `maybeSent`, `hash`, plus `nonce` and `nextNonce`) and the account's next send skips the refused nonce.
+  
+  **Breaking:** with one RPC configured, a stale `pending` nonce is no longer recovered silently — the send throws `NonceConflictError` and the caller's retry goes through. Show "the network didn't confirm — check activity, then retry". Upgrade notes: https://docs.anywallet.tech/getting-started/upgrading/.
+
+### Patch Changes
+
+- 6c035e4: A Permit2 grant is read only through the schema that gets signed (scan 2026-10-30, F4). The policies took `details` whenever the message had one, so a `PermitTransferFrom` that signs `permitted` (a large amount) could show an undeclared `details` decoy (a tiny amount of another token) to `confirm`. Now the grant field is the one Permit2 uses for the primary type (`details: PermitDetails` / `PermitDetails[]` for allowance permits, `permitted: TokenPermissions` / `TokenPermissions[]` for transfer permits), its struct must declare `token` and `amount` with Permit2's types, and `spender`, `sigDeadline` / `deadline` and `expiration` count only when declared. Any other schema is the worst case: `unlimited`, no token or amount, and an undeclared spender is an unknown destination. `describeTypedData` in wallet-evm reads Permit2 the same way and flags an unreadable schema `approve-unlimited`. Canonical Permit2 payloads (Uniswap, 1inch, witness and batch forms) read exactly as before.
+
 ## 0.5.0
 
 ### Minor Changes

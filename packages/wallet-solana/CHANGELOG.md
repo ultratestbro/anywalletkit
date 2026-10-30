@@ -1,5 +1,11 @@
 # @anywalletkit/wallet-solana
 
+## 0.5.1
+
+### Patch Changes
+
+- 0ccd063: The default guard signs an SPL stake-pool delayed exit. A stake account the wallet funds counted as the wallet's only when the same transaction initialized it, or split into it, through the Stake program with this wallet as staker and withdrawer, so `protocol-staking-spl-stake-pool-solana`'s delayed exit (`CreateAccountWithSeed` of the slot, then the pool's `WithdrawStake`, which splits pool stake into it and authorizes the user by CPI) was refused with `sets-authority` unless `allowAuthorityChanges` was set. Now the destination of a `WithdrawStake` / `WithdrawStakeWithSlippage` (tag 10 / 24, exact data length) on the SPL Stake Pool program `SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy` that names this wallet as the user stake authority (account 5) counts too. Another authority, another program or another instruction is refused as before; `allowAuthorityChanges` is unchanged. `describeTransaction` names those two instructions (`instruction`) on that program. Checked by a mainnet simulation: the split leaves the account with this wallet as staker and withdrawer and no lockup.
+
 ## 0.5.0
 
 ### Minor Changes

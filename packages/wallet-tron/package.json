@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/wallet-tron",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Tron wallet for Any Wallet Kit: BIP-32 m/44'/195'/0'/0/i accounts, TRX and TRC-20 transfers against a full-node HTTP API, no tronweb.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

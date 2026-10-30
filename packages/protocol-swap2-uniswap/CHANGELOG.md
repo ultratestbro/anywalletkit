@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-swap2-uniswap
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [9e27fc6]
+  - @anywalletkit/protocol-swap2-core@0.9.0
+
 ## 0.3.0
 
 ### Minor Changes

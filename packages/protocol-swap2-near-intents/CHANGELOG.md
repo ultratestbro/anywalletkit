@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-swap2-near-intents
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [9e27fc6]
+  - @anywalletkit/protocol-swap2-core@0.9.0
+
 ## 0.2.0
 
 ### Minor Changes

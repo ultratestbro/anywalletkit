@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-near-intents",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "NEAR Intents (1Click) cross-chain swaps for Any Wallet Kit: the wallet sends to a one-time deposit address, solvers settle on NEAR and deliver on the destination chain; standalone or as a provider of the swap2 router.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

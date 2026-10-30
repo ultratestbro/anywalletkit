@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-wrap",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Wrap and unwrap the native coin (ETH\u2194WETH, BNB\u2194WBNB, POL\u2194WPOL\u2026) on 13 EVM chains as a swap2 venue: 1:1, no pool, wrapped tokens verified on-chain.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
