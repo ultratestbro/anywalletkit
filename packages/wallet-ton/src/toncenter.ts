@@ -41,15 +41,31 @@ export function tonCenterEndpoint(endpoint: TonEndpoint, opts: { fetch?: typeof 
       }
       if (!res.ok || json.ok !== true) {
         const detail = typeof json.error === 'string' ? json.error : JSON.stringify(json.error ?? json)
-        // The node answered and said no: a definitive refusal, not a lost request.
-        throw Object.assign(new NetworkError(`${method}: ${detail} (HTTP ${res.status})`, { provider: url }), { answered: true })
+        const err = new NetworkError(`${method}: ${detail} (HTTP ${res.status})`, { provider: url })
+        // Only toncenter's own refusal envelope means the node said no; a gateway's JSON 502 / 504, a timeout or a
+        // bare `{}` may come after the node took the message (reaudit 2026-10-30, #2).
+        throw isNodeRefusal(res.status, json) ? Object.assign(err, { answered: true }) : err
       }
       return json.result as T
     },
   }
 }
 
-/** An endpoint answered with a refusal (`ok: false`): nothing was taken. A thrown fetch, a timeout or a non-JSON body may have been. */
+/** HTTP statuses a gateway or proxy answers with when it lost track of the upstream request. */
+const UNKNOWN_STATUS = new Set([408, 502, 503, 504])
+
+/**
+ * toncenter's refusal envelope, `{ok: false, error: "<reason>", code}` (a refused `sendBoc` is HTTP 500 with
+ * `INVALID_BAG_OF_CELLS: …` or `LITE_SERVER_UNKNOWN: cannot apply external message …`, read live 2026-10-30), and not
+ * a timeout: the node had the message and turned it down.
+ */
+function isNodeRefusal(status: number, json: { ok?: unknown; error?: unknown }): boolean {
+  if (UNKNOWN_STATUS.has(status)) return false
+  if (json.ok !== false || typeof json.error !== 'string' || json.error.trim() === '') return false
+  return !/time[ds]? ?out|timed out|deadline/i.test(json.error)
+}
+
+/** An endpoint answered with a node refusal (toncenter's `ok: false` envelope): nothing was taken. A thrown fetch, a timeout, a non-JSON body or a gateway error may have been. */
 export function isAnsweredRefusal(e: unknown): boolean {
   return (e as { answered?: unknown } | null)?.answered === true
 }
