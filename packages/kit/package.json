@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/kit",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "The Any Wallet Kit orchestrator: one seed or signer, registered chain wallets and protocol modules, accounts by CAIP-2 chain, policies that run before anything is broadcast.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

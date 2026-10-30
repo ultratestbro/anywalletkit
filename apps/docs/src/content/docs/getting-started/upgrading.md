@@ -10,7 +10,7 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
-## Next release: the 2026-10-30 re-audit fixes
+## 2026-10-30: the re-audit fixes
 
 A re-audit of the 2026-10-30 release found five more issues; all are fixed. Only the TON one can change what your
 app sees.
