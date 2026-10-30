@@ -22,6 +22,11 @@ your app does.
   `omnistonVerifyBuild` refuses a TON swap body without `validateTonSwapLeg`; spreading
   `createOmnistonTonValidators()` into it, as the guide shows, already passes it.
   `tonSwapPayloadCheck: "report"` keeps building without it as an explicit, temporary opt-in.
+- **FULLY_FILLED needs proof.** `trackIntent` reports an Omniston order `completed` only once every
+  execution's secret was disclosed or a delivery locator (`locateEvmDelivery`, `locateTonDelivery`)
+  found the payout; a feed that says FULLY_FILLED without that stays `pending` and keeps its secrets.
+  Keep polling pending orders and keep your refund backstop as before; an order that never shows a
+  disclosure or a delivery is closed by TTL or by the backstop, not by the feed.
 
 ## Next release: remote swaps checked on the device
 

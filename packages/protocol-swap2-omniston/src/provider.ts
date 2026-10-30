@@ -34,7 +34,10 @@ import {bigintToNumber} from "@anywalletkit/core";
  *  - trackIntent: treats `orderTrack` only as a discovery hint and discloses a
  *    pending secret only after independent finalized validation of the
  *    counter-position (EVM escrow for TON→EVM; EVM source fill AND TON output
- *    position for EVM→TON).
+ *    position for EVM→TON). A feed `TRADE_STATUS_FULLY_FILLED` is reported
+ *    as completed (and the secrets deleted) only once every execution's
+ *    secret was disclosed or a delivery locator found the payout; until then
+ *    the intent stays pending with its secrets.
  *
  * CONSUMER CONTRACT — closing an intent is the caller's job. `trackIntent`
  * never returns a terminal refunded/failed state, not even on a reported
@@ -2073,6 +2076,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
    */
   const bindKey = (quoteId: string) => `${quoteId}#bind`;
   const disclosedKey = (quoteId: string) => `${quoteId}#disclosed`;
+  /** The execution indices whose secret Omniston accepted (scan 2026-10-30 F10: completion needs every one). */
+  const disclosedIndicesKey = (quoteId: string) => `${quoteId}#disclosed-indices`;
   function orderBinding(ref: Decoded, q: OmnistonQuote): string {
     return sha256(new TextEncoder().encode(JSON.stringify([
       ref.quoteId, ref.trader ?? null, ref.dest ?? null, ref.srcChain ?? null,
@@ -2083,6 +2088,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     await store.clear(quoteId);
     await store.clear(bindKey(quoteId));
     await store.clear(disclosedKey(quoteId));
+    await store.clear(disclosedIndicesKey(quoteId));
   }
   async function secretsFor(ref: Decoded, q: OmnistonQuote, count: number): Promise<{secrets: Uint8Array[]; created: boolean}> {
     const quoteId = ref.quoteId;
@@ -2934,6 +2940,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       if (!order) return {state: "pending"};
 
       let secretsHex = await store.load(decoded.quoteId);
+      /** Secrets on file: a feed-only completion must not delete them (scan 2026-10-30 F10). */
+      const storedSecrets = secretsHex?.length ?? 0;
       if (!secretsHex || cached?.quote.settlementData.$case !== "order") trace("disclosure-skipped", {gate: "context", secrets: !!secretsHex, cached: !!cached, feedStatus: order.status});
       // The secrets were locked to one order (trader, dest, chain, assets, units): the context they are disclosed
       // against must be that order — never a context rebound under a reused quote id after they were made (scan
@@ -2945,6 +2953,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
           secretsHex = undefined;
         }
       }
+      /** Executions whose secret Omniston accepted in this poll. */
+      const disclosedNow = new Set<number>();
       if (secretsHex && cached?.quote.settlementData.$case === "order") {
         const q = cached.quote;
         const settlement = q.settlementData.value as OrderSettlement;
@@ -3054,12 +3064,17 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
               .orderDiscloseHtlcSecret({quoteId: decoded.quoteId, executionIndex: i, secret: secretBytes})
               .then(async () => {
                 trace("secret-disclosed", {index: i});
+                disclosedNow.add(i);
                 // Disclosed = known to the counterparty: never lock a new order to it (scan F6).
                 await store.save(disclosedKey(decoded.quoteId), ["1"]);
               }, (error) => trace("disclose-failed", {index: i, error: error instanceof Error ? error.message : String(error)})); // retried on the next poll
           }),
         );
       }
+      // One write per poll (the disclosures above run in parallel): every index disclosed so far.
+      const disclosedBefore = ((await store.load(disclosedIndicesKey(decoded.quoteId))) ?? []).map(Number).filter(Number.isSafeInteger);
+      const disclosedAll = new Set([...disclosedBefore, ...disclosedNow]);
+      if (disclosedNow.size > 0) await store.save(disclosedIndicesKey(decoded.quoteId), [...disclosedAll].sort((a, b) => a - b).map(String));
 
       const status = mapOrderStatus(order);
       const delivered = order.executions[0]?.outputPositionAddress;
@@ -3086,9 +3101,29 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         }).catch(() => null);
         if (hash) status.destTxHash = hash;
       }
-      // A feed-only CANCELLED/FAILED signal is not on-chain invalidation of a
-      // signed order. Retain secrets/context until proven completion or TTL so
-      // a late valid output lock can still be completed safely.
+      // A feed-only status is not proof (scan 2026-10-30 F10): FULLY_FILLED is
+      // completion only when every execution's secret went out (this poll or
+      // an earlier one — a terminal snapshot may list no executions, then a
+      // recorded disclosure counts), or a delivery locator found the payout.
+      // Otherwise the order stays pending with its secrets and context, so a
+      // late real execution is still disclosed; TTL / the caller's refund
+      // backstop closes it. A feed-only CANCELLED/FAILED is no on-chain
+      // invalidation of a signed order either (mapOrderStatus keeps it pending).
+      // Without secrets on file (completed or expired before, another
+      // instance's order) this stays a plain status read of the feed.
+      if (status.state === "completed" && storedSecrets > 0 && !status.destTxHash) {
+        // An order disclosed by the previous version recorded only that a
+        // secret went out, not which: with a single secret that is all of them.
+        const legacyDisclosed = disclosedBefore.length === 0 && storedSecrets === 1 &&
+          ((await store.load(disclosedKey(decoded.quoteId))) ?? []).length > 0;
+        const allDisclosed = legacyDisclosed || (order.executions.length > 0
+          ? order.executions.every((execution) => disclosedAll.has(execution.index))
+          : disclosedAll.size > 0);
+        if (!allDisclosed) {
+          trace("completion-unproven", {feedStatus: order.status, executions: order.executions.length, disclosed: disclosedAll.size});
+          return {state: "pending", depositReceived: order.executions.length > 0 || disclosedAll.size > 0};
+        }
+      }
       if (status.state === "completed") {
         await clearSecrets(decoded.quoteId);
         await quotes.clear(decoded.quoteId);
