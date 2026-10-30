@@ -10,17 +10,22 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
-## Next release: policies, snapshots and EVM nonces
+## Next release: the 2026-10-30 scan fixes
+
+This release fixes all 19 findings of the external scan of 2026-10-30 and makes Jito-style SPL stake-pool
+delayed exits work under the default Solana guard again. The sections below are grouped by area.
+
+### Policies, snapshots and EVM nonces
 
 This release fixes six findings of the 2026-10-30 scan in `kit` and `wallet-evm`.
 
-### Allowance increases are approvals (`kit`)
+#### Allowance increases are approvals (`kit`)
 
 A raw `increaseAllowance(spender, x)` or `increaseApproval(spender, x)` call reaches `confirm` as
 `kind: 'approval'` with the spender in `to` and the increase in `amount` (it was a `send` to the
 token, and `increaseApproval`'s spender was never checked by the lists). Show it like an approve.
 
-### Permit2 is read through its declared schema (`kit`, `wallet-evm`)
+#### Permit2 is read through its declared schema (`kit`, `wallet-evm`)
 
 The Permit2 approval `confirm` sees — `approvals`, `token`, `amount`, `unlimited`, `to`, `deadline` — comes
 only from fields the typed data declares, as Permit2 signs them. A payload whose schema is not Permit2's
@@ -29,7 +34,7 @@ only from fields the typed data declares, as Permit2 signs them. A payload whose
 unknown destination, so an allowlist refuses it. `describeTypedData` flags such a payload
 `approve-unlimited`. Canonical Permit2 payloads from Uniswap, 1inch and other dApps read as before.
 
-### Case-sensitive addresses are compared exactly (`kit`)
+#### Case-sensitive addresses are compared exactly (`kit`)
 
 Allowlist and blocklist entries for Solana (and Bitcoin / Zcash base58, and any namespace without its
 own rule) must be spelled exactly as the address: they were compared lowercased, which let a different
@@ -37,7 +42,7 @@ Solana key that differs only in letter case pass an allowlist. EVM, NEAR, Aptos 
 still match in any case, bech32 Bitcoin / Zcash addresses in either case, Tron and TON in any of their
 forms. If your lists hold lowercased Solana keys, store them as the wallet shows them.
 
-### `nonce too low` from one RPC is not re-signed (`wallet-evm`)
+#### `nonce too low` from one RPC is not re-signed (`wallet-evm`)
 
 A send whose transaction the node refuses with "nonce too low", and whose hash it says it never saw, was
 signed again with the next nonce. The RPC that refused already holds the first signed bytes, so a lying
@@ -49,7 +54,7 @@ and let the user send again once activity shows the first transaction is not com
 send already skips the refused nonce. With one RPC configured, a stale `pending` nonce now costs one
 retry instead of being fixed silently; configure two RPCs to keep the automatic recovery.
 
-## Next release: the 2026-10-30 scan (remote swap pins)
+### Remote swap pins
 
 - **THORChain memo.** `thorchainPins().verifyBuild` refuses a remote build whose memo is not exactly the
   canonical memo for the request (output asset, destination/refund, limit, affiliate). Your server's
@@ -81,8 +86,6 @@ retry instead of being fixed silently; configure two RPCs to keep the automatic 
   check, and the app-supplied `verifyBuild` satisfies this rule. NEAR Intents (`nearIntentsPins`)
   and Jupiter are not affected: they pin no EVM call targets.
 
-## Next release: the 2026-10-30 scan fixes
-
 ### Omniston
 
 - **TON → TON swaps need `validateTonSwapLeg`.** Same-chain TON swaps are advertised and built only with
@@ -106,7 +109,7 @@ retry instead of being fixed silently; configure two RPCs to keep the automatic 
   Orders already signed keep being tracked and disclosed. If your code splits the id, strip `#…` from
   the dest segment; the quote id, trader and source chain segments are unchanged.
 
-## Next release: the 2026-10-30 scan, chain packages
+### Chain packages
 
 - **NEAR AddKey permissions are exactly one variant.** `wallet-near` refuses an AddKey whose
   permission is not exactly `{ fullAccess: {} }` or `{ functionCall: { receiverId, methodNames,
@@ -131,7 +134,7 @@ retry instead of being fixed silently; configure two RPCs to keep the automatic 
   wallet as the user stake authority. Nothing to change in the app; drop any `allowAuthorityChanges`
   you set to work around it. Any other authority or program is refused as before.
 
-## Next release: endpoint checks and CCIP-Read gateways
+### Endpoint checks and CCIP-Read gateways
 
 This release fixes findings of the 2026-10-30 scan in `@anywalletkit/networks` and
 `@anywalletkit/names-ens`.
@@ -155,7 +158,7 @@ This release fixes findings of the 2026-10-30 scan in `@anywalletkit/networks` a
   `ccip: { fetch }`. Browsers are unchanged (no DNS-level check there; use `ensCcipViaProxy` where it
   matters); React Native is unchanged.
 
-## Next release: remote swaps checked on the device
+## 2026-10-29: remote swaps checked on the device
 
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps
 through your own server:
@@ -173,7 +176,7 @@ through your own server:
   extension the server's build carries: deploy the new server before the new app, or remote EVM → TON
   and EVM → EVM orders are refused.
 
-## Next release: the audit fixes
+## 2026-10-29: the audit fixes
 
 This release fixes three findings of the 2026-10-29 external audit.
 
@@ -220,7 +223,7 @@ field. A permit body whose arguments can't be read gives the new `approval-unpar
 What to change: if your review screen maps check codes to text, add `approval-unparsed`. If it shows
 `approval`, show every entry of `approvals` when it is set.
 
-## Next release: names, typed data, Solana and URLs
+## 2026-10-29: names, typed data, Solana and URLs
 
 This release fixes the 2026-10-28 scan. Four changes can need something from you: offchain ENS names
 on React Native, typed-data signatures under policies, Solana transactions that create token accounts,
