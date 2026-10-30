@@ -260,10 +260,14 @@ describe("Omniston TON↔TON swap settlement", () => {
     };
   }
 
-  it("advertises TON↔TON only with the jetton-wallet and swap-target validators", () => {
+  it("advertises TON↔TON only with the jetton-wallet, swap-target and swap-leg validators (scan 2026-10-30 F8)", () => {
     const base = {enabled: true, trustedSettlementContracts: trusted, validateTonJettonWallet: () => true};
-    expect(omnistonProvider(base).supportsRoute({chain: "ton:-239", token: "GRAM"}, {chain: "ton:-239", token: "USDT"})).toBe(false);
-    const full = omnistonProvider({...base, validateTonSwapTarget: () => true});
+    const ton = [{chain: "ton:-239", token: "GRAM"}, {chain: "ton:-239", token: "USDT"}] as const;
+    expect(omnistonProvider(base).supportsRoute(...ton)).toBe(false);
+    expect(omnistonProvider({...base, validateTonSwapTarget: () => true}).supportsRoute(...ton)).toBe(false);
+    // The rollout escape hatch is an explicit opt-in.
+    expect(omnistonProvider({...base, validateTonSwapTarget: () => true, tonSwapPayloadCheck: "report"}).supportsRoute(...ton)).toBe(true);
+    const full = omnistonProvider({...base, validateTonSwapTarget: () => true, validateTonSwapLeg: () => true});
     expect(full.supportsRoute({chain: "ton:-239", token: "GRAM"}, {chain: "ton:-239", token: "USDT"})).toBe(true);
     expect(full.supportsSameChain).toBe(true);
     expect(full.supportsRoute({chain: "eip155:1", token: "ETH"}, {chain: "eip155:8453", token: "ETH"})).toBe(false);
@@ -278,6 +282,7 @@ describe("Omniston TON↔TON swap settlement", () => {
       client: client as never, enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0,
       validateTonJettonWallet: () => true,
       validateTonSwapTarget: ({address, protocols}) => { targets.push(`${address}:${protocols.join(",")}`); return true; },
+      validateTonSwapLeg: () => true,
     });
     const q = await provider.getQuote({sourceChain: "ton:-239", sourceToken: "GRAM", destChain: "ton:-239", destToken: USDT, amountIn: "1000000000", destAddress: TRADER, refundAddress: TRADER, dry: false, slippageBps: 50});
     expect(q).not.toBeNull();
@@ -303,7 +308,7 @@ describe("Omniston TON↔TON swap settlement", () => {
       const reasons: string[] = [];
       const provider = omnistonProvider({
         client: clientFor(swapQuote(native, jetton(USDT), "1000000000", "1419292", {quoteId}), [{targetAddress: POOL, sendAmount: "1100000000", payload}]) as never,
-        enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true,
+        enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true, validateTonSwapLeg: () => true,
       });
       const q = await provider.getQuote({sourceChain: "ton:-239", sourceToken: "GRAM", destChain: "ton:-239", destToken: USDT, amountIn: "1000000000", destAddress: TRADER, refundAddress: TRADER, dry: false, onRefusal: (r) => reasons.push(r)});
       return {q, reasons, provider};
@@ -321,14 +326,14 @@ describe("Omniston TON↔TON swap settlement", () => {
     const payload = await payNative(1000000000n, 1418292n);
     const greedy = omnistonProvider({
       client: clientFor(quote, [{targetAddress: POOL, sendAmount: "1300000000", payload}]) as never,
-      enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true,
+      enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true, validateTonSwapLeg: () => true,
     });
     const q = await greedy.getQuote({sourceChain: "ton:-239", sourceToken: "GRAM", destChain: "ton:-239", destToken: USDT, amountIn: "1000000000", destAddress: TRADER, refundAddress: TRADER, dry: false});
     await expect(greedy.buildDeposit(q!)).rejects.toThrow(/gas budget/);
 
     const unknownTarget = omnistonProvider({
       client: clientFor(quote, [{targetAddress: POOL, sendAmount: "1100000000", payload}]) as never,
-      enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => false,
+      enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => false, validateTonSwapLeg: () => true,
     });
     const q2 = await unknownTarget.getQuote({sourceChain: "ton:-239", sourceToken: "GRAM", destChain: "ton:-239", destToken: USDT, amountIn: "1000000000", destAddress: TRADER, refundAddress: TRADER, dry: false});
     await expect(unknownTarget.buildDeposit(q2!)).rejects.toThrow(/recognized DEX contract/);
@@ -351,6 +356,7 @@ describe("Omniston TON↔TON swap settlement", () => {
       enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0,
       validateTonJettonWallet: ({walletAddress, jettonMasterAddress}) => { wallets.push(`${walletAddress}:${jettonMasterAddress}`); return true; },
       validateTonSwapTarget: ({address}) => address === POOL,
+      validateTonSwapLeg: () => true,
     });
     const params = {sourceChain: "ton:-239", sourceToken: "USDT", destChain: "ton:-239", destToken: "", amountIn: "1000000", destAddress: TRADER, refundAddress: TRADER, dry: false};
     const q = await provider.getQuote(params);
@@ -367,7 +373,7 @@ describe("Omniston TON↔TON swap settlement", () => {
     ] as const) {
       const bad = omnistonProvider({
         client: clientFor(quote, [{targetAddress: JETTON_WALLET, sendAmount, payload}]) as never,
-        enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true,
+        enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true, validateTonSwapLeg: () => true,
       });
       const qb = await bad.getQuote(params);
       await expect(bad.buildDeposit(qb!), label).rejects.toThrow();
@@ -379,7 +385,7 @@ describe("Omniston TON↔TON swap settlement", () => {
     const payload = await swapCell((b) => b.storeUint(0xa5a7cbf8, 32).storeUint(1, 64));
     const provider = omnistonProvider({
       client: clientFor(quote, [{targetAddress: POOL, sendAmount: "1100000000", payload}]) as never,
-      enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true,
+      enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true, validateTonSwapLeg: () => true,
     });
     const q = await provider.getQuote({sourceChain: "ton:-239", sourceToken: "GRAM", destChain: "ton:-239", destToken: USDT, amountIn: "1000000000", destAddress: TRADER, refundAddress: TRADER, dry: false});
     await expect(provider.buildDeposit(q!)).rejects.toThrow(/ton-swap-payload/);
@@ -399,7 +405,7 @@ describe("Omniston TON↔TON swap settlement", () => {
       requestForQuote(request: never) { requests.push(request); return observable([{$case: "ack", value: {rfqId: "rfq1"}}, {$case: "quoteUpdated", rfqId: "rfq1", value: quotes[requests.length - 1]}]); },
       async tonBuildSwap() { return {messages: []}; }, swapTrack() { return observable([]); }, orderTrack() { throw new Error("no"); }, tonBuildEscrowTransfer() { throw new Error("no"); },
     };
-    const provider = omnistonProvider({client: client as never, enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true});
+    const provider = omnistonProvider({client: client as never, enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true, validateTonSwapLeg: () => true});
     const q = await provider.getQuote({sourceChain: "ton:-239", sourceToken: "GRAM", destChain: "ton:-239", destToken: USDT, amountIn: "1000000000", destAddress: TRADER, refundAddress: TRADER, dry: false, minAmountOut: "1418500"});
     expect(requests.length).toBe(2);
     expect(requests[0]!.settlementParams[0]!.params.value.maxPriceSlippagePips).toBe(5000);
@@ -427,7 +433,7 @@ describe("Omniston TON↔TON swap settlement", () => {
       requestForQuote(request: {settlementParams: {params: {value: {maxPriceSlippagePips: number}}}[]}) { pips.push(request.settlementParams[0]!.params.value.maxPriceSlippagePips); return observable([{$case: "ack", value: {rfqId: "rfq1"}}, {$case: "quoteUpdated", rfqId: "rfq1", value: quotes[pips.length - 1]}]); },
       async tonBuildSwap() { return {messages: []}; }, swapTrack() { return observable([]); }, orderTrack() { throw new Error("no"); }, tonBuildEscrowTransfer() { throw new Error("no"); },
     };
-    const provider = omnistonProvider({client: client as never, enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true});
+    const provider = omnistonProvider({client: client as never, enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true, validateTonSwapLeg: () => true});
     const q = await provider.getQuote({sourceChain: "ton:-239", sourceToken: "GRAM", destChain: "ton:-239", destToken: USDT, amountIn: "1000000000", destAddress: TRADER, refundAddress: TRADER, dry: false, slippageBps: 50});
     expect(pips).toEqual([5000, 4999]);
     expect(q!.minDestAmount).toBe("1421670");
@@ -436,7 +442,7 @@ describe("Omniston TON↔TON swap settlement", () => {
   it("tracks a swap through swapTrack by the outgoing tx and maps trade statuses", async () => {
     const quote = swapQuote(native, jetton(USDT), "1000000000", "1419292");
     const make = (progress: {status: string; outgoingTxHash?: string} | null) => omnistonProvider({
-      client: clientFor(quote, [], progress) as never, enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true,
+      client: clientFor(quote, [], progress) as never, enabled: true, trustedSettlementContracts: trusted, quoteSettleMs: 0, validateTonJettonWallet: () => true, validateTonSwapTarget: () => true, validateTonSwapLeg: () => true,
     });
     const intentId = (await make(null).getQuote({sourceChain: "ton:-239", sourceToken: "GRAM", destChain: "ton:-239", destToken: USDT, amountIn: "1000000000", destAddress: TRADER, refundAddress: TRADER, dry: false}))!.intentId;
     expect(intentId.endsWith("|swap")).toBe(true);

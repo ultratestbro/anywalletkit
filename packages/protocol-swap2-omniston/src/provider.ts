@@ -386,10 +386,12 @@ export interface OmnistonProviderOptions {
    * swap body depends on — that a STON.fi hop's ask wallet is its router's
    * wallet of the quoted output (and, for native input, that the pTON wallet
    * the message pays belongs to that router), or that a DeDust pool trades the
-   * quoted pair. `createOmnistonTonValidators` supplies it. When absent the
-   * decoded-body rules still apply and each skipped leg is traced as
-   * `ton-swap-payload legs-unverified`; STON.fi v1 native input (pTON v1) is
-   * refused without it.
+   * quoted pair. `createOmnistonTonValidators` supplies it. Required, with
+   * `validateTonSwapTarget`, to advertise same-chain TON swaps (scan
+   * 2026-10-30 F8: without it a genuine DEX body can pay out a token other
+   * than the quoted one). Only `tonSwapPayloadCheck: "report"` lets a host run
+   * without it — each unverified leg is then traced as `ton-swap-payload
+   * legs-unverified`; STON.fi v1 native input (pTON v1) is refused regardless.
    */
   validateTonSwapLeg?: (leg: TonSwapLeg) => Promise<boolean> | boolean;
   /**
@@ -1736,6 +1738,7 @@ async function checkRemoteEvmOrder(
  */
 export function omnistonVerifyBuild(hooks: {
   validateTonSwapTarget: (input: {address: string; protocols: readonly string[]}) => Promise<boolean> | boolean;
+  /** The DEX pays out the quoted token (`createOmnistonTonValidators().validateTonSwapLeg`). Without it a TON swap body is refused. */
   validateTonSwapLeg?: (leg: TonSwapLeg) => Promise<boolean> | boolean;
   /**
    * The app's check of a TON → EVM escrow body (`createOmnistonTonValidators().verifyTonEscrowBuild`). Without it a
@@ -1813,12 +1816,12 @@ export function omnistonVerifyBuild(hooks: {
     const target = source.contract ? payload.jettonTransfer?.destination : tx.to;
     if (!target) return "the body names no swap destination";
     try { if (!(await hooks.validateTonSwapTarget({address: target, protocols}))) return `${target} is not a recognized DEX contract for ${protocols.join("+")}`; } catch { return "the swap target could not be checked"; }
-    if (hooks.validateTonSwapLeg) {
-      for (const leg of checked.legs) {
-        let ok = false;
-        try { ok = await hooks.validateTonSwapLeg(leg); } catch { ok = false; }
-        if (!ok) return `${leg.kind} v${leg.version} leg not verified`;
-      }
+    // Scan 2026-10-30 F8: without the leg check a genuine DEX body may pay out another token than the quoted one.
+    if (!hooks.validateTonSwapLeg) return "a TON swap body needs validateTonSwapLeg (createOmnistonTonValidators)";
+    for (const leg of checked.legs) {
+      let ok = false;
+      try { ok = await hooks.validateTonSwapLeg(leg); } catch { ok = false; }
+      if (!ok) return `${leg.kind} v${leg.version} leg not verified`;
     }
     return null;
   };
@@ -2115,10 +2118,13 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
   // ── TON ↔ TON: swap settlement (immediate DEX routes, no escrow) ──────────
   const SWAP_SLIPPAGE_PIPS_DEFAULT = 5_000; // 0.5%
   /** Same-chain swaps need the jetton-wallet validator (jetton input goes
-   *  through the trader's own wallet) and a swap-target validator (the DEX
-   *  contract the funds land in is resolver-chosen per route). */
+   *  through the trader's own wallet), a swap-target validator (the DEX
+   *  contract the funds land in is resolver-chosen per route) and the leg
+   *  validator (the DEX pays out the quoted token, scan 2026-10-30 F8) —
+   *  the last waived only by the explicit `tonSwapPayloadCheck: "report"`. */
   const sameChainTonReady = (): boolean =>
-    typeof opts.validateTonJettonWallet === "function" && typeof opts.validateTonSwapTarget === "function";
+    typeof opts.validateTonJettonWallet === "function" && typeof opts.validateTonSwapTarget === "function" &&
+    (typeof opts.validateTonSwapLeg === "function" || opts.tonSwapPayloadCheck === "report");
   /** TON→EVM: the TON factory and the EVM factory are allowlisted, and the
    *  jetton-wallet, escrow-payload and EVM output-position validators exist. */
   const tonSourceReady = (from: string, to: string): boolean =>
@@ -2276,7 +2282,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     if (!isTon(ref.srcChain) || q.inputAsset.chain.$case !== "ton" || q.outputAsset.chain.$case !== "ton") {
       throw new Error("omniston: swap quote is not a TON same-chain swap");
     }
-    if (!sameChainTonReady()) throw new Error("omniston: TON same-chain swaps need independent jetton-wallet and swap-target validators");
+    if (!sameChainTonReady()) throw new Error("omniston: TON same-chain swaps need independent jetton-wallet, swap-target and swap-leg validators");
     const owner: ChainAddress = {chain: {$case: "ton", value: ref.trader}};
     const receiver: ChainAddress = {chain: {$case: "ton", value: ref.dest}};
     const omni = await getClient();
@@ -2391,7 +2397,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     }
     if (checked) {
       if (typeof opts.validateTonSwapLeg !== "function") {
-        trace("ton-swap-payload", {reason: "legs-unverified", detail: "no validateTonSwapLeg hook", mode, legs: checked.legs.length});
+        // Scan 2026-10-30 F8: the decoder proves receiver, refund and minimum, not which token the DEX pays out.
+        payloadRefusal("legs-unverified", `no validateTonSwapLeg hook for ${checked.legs.length} leg(s)`);
       } else {
         for (const leg of checked.legs) {
           let ok = false;

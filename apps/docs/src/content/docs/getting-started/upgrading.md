@@ -10,6 +10,19 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: the 2026-10-30 scan fixes
+
+### Omniston
+
+- **TON → TON swaps need `validateTonSwapLeg`.** Same-chain TON swaps are advertised and built only with
+  `validateTonJettonWallet`, `validateTonSwapTarget` and `validateTonSwapLeg`: the leg check is what proves
+  the DEX pays out the quoted token. A server that builds Omniston locally and wires the TON validators one
+  by one loses TON → TON routes until it passes the leg check too — use `createOmnistonTonValidators()`
+  whole (`omnistonProvider({...createOmnistonTonValidators(), ...})`). On the device,
+  `omnistonVerifyBuild` refuses a TON swap body without `validateTonSwapLeg`; spreading
+  `createOmnistonTonValidators()` into it, as the guide shows, already passes it.
+  `tonSwapPayloadCheck: "report"` keeps building without it as an explicit, temporary opt-in.
+
 ## Next release: remote swaps checked on the device
 
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps

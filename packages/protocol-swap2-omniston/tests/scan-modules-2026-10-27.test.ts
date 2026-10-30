@@ -184,13 +184,13 @@ describe("remote TON cell bodies need the app's own check (scan 2026-10-27 modul
 
   it("omnistonVerifyBuild opens the body against the app's request and asks the app's validator about the DEX", async () => {
     const targets: string[] = [];
-    const verify = omnistonVerifyBuild({validateTonSwapTarget: ({address}) => { targets.push(address); return true; }});
+    const verify = omnistonVerifyBuild({validateTonSwapTarget: ({address}) => { targets.push(address); return true; }, validateTonSwapLeg: () => true});
     const ok = tonRun(nativeCase, live(nativeCase), {provider: stub(nativeCase, live(nativeCase), verify)});
     await ok.swap();
     expect(ok.sent).toHaveLength(1);
     expect(targets).toEqual([nativeCase.messages[0]!.targetAddress]);
     // The validator says no: refused before anything is signed.
-    const no = tonRun(nativeCase, live(nativeCase), {provider: stub(nativeCase, live(nativeCase), omnistonVerifyBuild({validateTonSwapTarget: () => false}))});
+    const no = tonRun(nativeCase, live(nativeCase), {provider: stub(nativeCase, live(nativeCase), omnistonVerifyBuild({validateTonSwapTarget: () => false, validateTonSwapLeg: () => true}))});
     await expect(no.swap()).rejects.toThrow(/is not a recognized DEX contract/);
     expect(no.sent).toHaveLength(0);
     // checkTonSwapPayload on the client: a body whose on-chain minimum is below the quote, or for another trader, is refused.
