@@ -20,8 +20,9 @@ On npm: [@anywalletkit/protocol-swap2-wrap](https://www.npmjs.com/package/@anywa
 
 When the provider runs on your server, spread its pins into the app's stub:
 `remoteProvider({name: "wrap", baseUrl, ...wrapPins})`. The engine then lets the EVM route call and
-approve only the wrapped-native contract (no spender), never an address the backend names; without the pins the stub gets no
-EVM calldata route (fail closed).
+approve only the wrapped-native contract (no spender), never an address the backend names, and `wrapVerifyQuote`
+checks the call on the device: `deposit()` with the input as value, or `withdraw(input)` with no value, for the
+sender. Without the pins the stub gets no EVM calldata route (fail closed).
 
 ## Activity
 

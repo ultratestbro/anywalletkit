@@ -1,5 +1,5 @@
 import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
-import {decodeFunctionResult, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
+import {decodeFunctionData, decodeFunctionResult, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
 import {describeWrapActivity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
 import {evmRef, isEvm, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
@@ -202,15 +202,71 @@ export function wrapProvider(config: WrapProviderConfig): CrossChainProvider {
   };
 }
 
+function wrappedFor(chain: string): {address: `0x${string}`; symbol: string} | undefined {
+  const id = /^eip155:[0-9]+$/.test(chain) ? Number(chain.slice(7)) : NaN;
+  return Object.prototype.hasOwnProperty.call(WRAPPED_NATIVE, id) ? WRAPPED_NATIVE[id] : undefined;
+}
+
 /**
- * The wrapped-native contract a wrap / unwrap calls on a chain (no spender: neither approves) — the
- * app's pins for `remoteProvider({name: "wrap", baseUrl, ...wrapPins})` (scan 2026-10-27 modules, F8/F16).
+ * A remote wrap / unwrap quote, decoded on the device against the app's own request (scan 2026-10-30, F3): native →
+ * wrapped is exactly `deposit()` with the input as value; wrapped → native is exactly `withdraw(input)` with no value;
+ * on the chain's wrapped native, no approval, and (as WETH9 pays `msg.sender`) a recipient that is the sender. The
+ * reason it fails, or null.
+ */
+export function wrapVerifyQuote(params: QuoteParams, quote: Quote): string | null {
+  const w = wrappedFor(params.sourceChain);
+  if (!w || params.destChain !== params.sourceChain) return "not a same-chain wrap on a pinned wrapped native";
+  const src = ccAsset(params.sourceChain, params.sourceToken);
+  if (!src) return `unknown source token ${params.sourceToken}`;
+  const nativeIn = !src.contract;
+  const srcIsWrapped = !!src.contract && /^0x[0-9a-fA-F]{40}$/.test(src.contract) && getAddress(src.contract) === getAddress(w.address);
+  const nativeOut = /^0x0+$/.test(params.destToken);
+  const destIsWrapped = /^0x[0-9a-fA-F]{40}$/.test(params.destToken) && !nativeOut && getAddress(params.destToken) === getAddress(w.address);
+  const wrap = nativeIn && destIsWrapped;
+  if (!wrap && !(srcIsWrapped && nativeOut)) return `only ${w.symbol.slice(1)} ↔ ${w.symbol}`;
+  if (params.refundAddress && /^0x[0-9a-fA-F]{40}$/.test(params.refundAddress) && (!/^0x[0-9a-fA-F]{40}$/.test(params.destAddress) || getAddress(params.refundAddress) !== getAddress(params.destAddress))) {
+    return "wrapping pays the sender's own address";
+  }
+  const tx = quote.txRequest;
+  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no wrapped-native call";
+  if (getAddress(tx.to) !== getAddress(w.address)) return `the call targets ${tx.to}, not ${w.symbol}`;
+  if (tx.approvalAddress !== undefined) return "a wrap approves nothing";
+  if (tx.chainId !== undefined && `eip155:${tx.chainId}` !== params.sourceChain) return `the call is for chain ${tx.chainId}`;
+  let amount: bigint, value: bigint;
+  try {
+    amount = BigInt(params.amountIn);
+    value = BigInt(tx.value ?? "0");
+  } catch {
+    return "the request does not name amounts";
+  }
+  if (BigInt(quote.sourceAmount) !== amount) return `the quote moves ${quote.sourceAmount}, not the ${amount} input`;
+  let call: {functionName: string; args?: readonly unknown[]};
+  try {
+    call = decodeFunctionData({abi: WETH_ABI, data: tx.data as Hex});
+  } catch {
+    return "the call is neither deposit() nor withdraw(amount)";
+  }
+  if (wrap) {
+    if (call.functionName !== "deposit" || tx.data.length !== 10) return `${call.functionName} is not deposit()`;
+    if (value !== amount) return `deposit() attaches ${value}, not the ${amount} input`;
+  } else {
+    if (call.functionName !== "withdraw") return `${call.functionName} is not withdraw(amount)`;
+    if (call.args?.[0] !== amount) return `withdraw(${String(call.args?.[0])}) is not the ${amount} input`;
+    if (value !== 0n) return "withdraw attaches no value";
+  }
+  return null;
+}
+
+/**
+ * The wrapped-native contract a wrap / unwrap calls on a chain (no spender: neither approves), and
+ * {@link wrapVerifyQuote} — the app's pins for `remoteProvider({name: "wrap", baseUrl, ...wrapPins})` (scan
+ * 2026-10-27 modules, F8/F16; the call itself since scan 2026-10-30, F3).
  */
 export const wrapPins: RemotePins = Object.freeze({
   callTargets: (chain: string): readonly string[] => {
-    const id = /^eip155:[0-9]+$/.test(chain) ? Number(chain.slice(7)) : NaN;
-    const w = Object.prototype.hasOwnProperty.call(WRAPPED_NATIVE, id) ? WRAPPED_NATIVE[id] : undefined;
+    const w = wrappedFor(chain);
     return w ? [w.address] : [];
   },
   spenders: (): readonly string[] => [],
+  verifyQuote: wrapVerifyQuote,
 });

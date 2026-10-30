@@ -165,7 +165,7 @@ describe("scan 2026-10-28 F9: wrap remote corridor with wrapPins", () => {
 
   it("the repro's deposit-address route (the ETH to the attacker) is refused before anything is sent", async () => {
     const a = app("wrap", wrapPins, depositBackend("wrap", "eip155:1"), ME, "eip155:1", {supportsSameChain: true});
-    await expect(a.swap2.swap2({fromToken: "ETH", toToken: WETH, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 15n, minAmountOut: 1n} as never)).rejects.toThrow(/did not allow deposit-address routes/);
+    await expect(a.swap2.swap2({fromToken: "ETH", toToken: WETH, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 15n, minAmountOut: 1n} as never)).rejects.toThrow(/did not allow deposit-address routes|the quote carries no wrapped-native call/);
     expect(a.sent).toEqual([]);
   });
 
