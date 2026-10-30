@@ -32,7 +32,8 @@ export interface FetchResponseLike {
   /** `opaqueredirect` for a redirect a browser stopped under `redirect: 'manual'`. */
   type?: string
   headers?: { get(name: string): string | null }
-  body?: { cancel?(): unknown } | null
+  /** A stream lets the verifier stop reading at {@link MAX_RESPONSE_BYTES}; without one the deadline bounds the read. */
+  body?: { cancel?(): unknown; getReader?(): { read(): Promise<{ done: boolean; value?: Uint8Array }>; cancel(): Promise<unknown> } } | null
 }
 /**
  * A `fetch`-compatible function; pass one to route checks through a proxy or a test double. The verifier
@@ -114,6 +115,46 @@ function sameUrl(a: string, b: string): boolean {
   return norm(a) === norm(b)
 }
 const hostOf = (u: string | null | undefined): string | null => (u ? (/^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)/i.exec(u)?.[1]?.replace(/^[^@]*@/, '') ?? null) : null)
+/** The most an identity answer may weigh; real ones are a few hundred bytes (reaudit 2026-10-30, #5). */
+export const MAX_RESPONSE_BYTES = 1024 * 1024
+
+const tooLarge = () => new VerifyFailure('too-large', `Answer larger than ${MAX_RESPONSE_BYTES / 1024 / 1024} MiB.`)
+
+/**
+ * The body as text, refused past {@link MAX_RESPONSE_BYTES}: a declared `content-length` over it is not read at all,
+ * a stream is dropped once it passes it. A response without a stream (React Native's fetch, test doubles) is read
+ * with `text()`, which the runtime buffers: there the deadline bounds it and the cap is checked on the text.
+ */
+async function readCapped(res: FetchResponseLike): Promise<string> {
+  const declared = Number(res.headers?.get('content-length') ?? Number.NaN)
+  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) { release(res); throw tooLarge() }
+  const reader = typeof res.body?.getReader === 'function' ? res.body.getReader() : null
+  if (!reader) {
+    const text = await res.text()
+    if (text.length > MAX_RESPONSE_BYTES) throw tooLarge()
+    return text
+  }
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (!value) continue
+    size += value.byteLength
+    if (size > MAX_RESPONSE_BYTES) { reader.cancel().catch(() => {}); throw tooLarge() }
+    chunks.push(value)
+  }
+  const all = new Uint8Array(size)
+  let at = 0
+  for (const c of chunks) { all.set(c, at); at += c.byteLength }
+  const TD = (globalThis as { TextDecoder?: new () => { decode(b: Uint8Array): string } }).TextDecoder
+  if (typeof TD === 'function') return new TD().decode(all)
+  // Hermes may have no TextDecoder: an identity answer that is used is ASCII JSON, one byte per character.
+  let out = ''
+  for (let i = 0; i < all.length; i += 0x2000) out += String.fromCharCode.apply(null, Array.from(all.subarray(i, i + 0x2000)))
+  return out
+}
+
 /** Drop an unread body so the connection is not held open; a transport without one has nothing to release. */
 function release(res: FetchResponseLike): void {
   try { Promise.resolve(res.body?.cancel?.()).catch(() => {}) } catch { /* nothing to release */ }
@@ -154,7 +195,7 @@ async function call(fetchFn: FetchLike, url: string, init: { method?: string; he
       release(res)
       throw new VerifyFailure(`http-${res.status}`, `HTTP ${res.status}`)
     }
-    return await Promise.race([res.text(), timeout])
+    return await Promise.race([readCapped(res), timeout])
   } catch (e) {
     if (e instanceof VerifyFailure) throw e
     if (isRedirectRefusal(e)) throw redirected(null)
