@@ -131,10 +131,12 @@ export function checkFyndTransaction(tx: EncodedTx, expected: ExpectedSwap): {me
 
 /**
  * {@link checkFyndTransaction} on a remote quote, against the request this app sent: the pinned
- * router, the exact input, the requested tokens, the app's recipient, the quoted minimum and no
- * client fee. The reason it fails, or null.
+ * router, one chain, the exact input, the requested tokens, the app's recipient, the quoted minimum and
+ * no client fee. The reason it fails, or null.
  */
 export function fyndVerifyQuote(params: QuoteParams, quote: Quote): string | null {
+  // Fynd swaps on one chain; a source-chain swap must not answer a cross-chain request (reaudit 2026-10-30, #3).
+  if (params.sourceChain !== params.destChain) return "same-chain swaps only";
   try {
     const chainId = /^eip155:[0-9]+$/.test(params.sourceChain) ? Number(params.sourceChain.slice(7)) : NaN;
     const src = sourceAssetOf(params);
