@@ -572,10 +572,40 @@ function toChainAddress(caip2: string, address: string): ChainAddress | null {
 
 // ── intentId: quoteId + the trader/dest context tracking and building need ───
 
-function encodeIntent(quoteId: string, trader: string, dest: string, srcChain: string, kind: "order" | "swap" = "order"): string {
+/** Quote fields that are display or bookkeeping only: everything else is a term the order or swap commits to. */
+const QUOTE_DIGEST_SKIP = new Set(["rfqId", "resolverName", "estimatedSettlementDuration", "estimatedGasConsumption"]);
+
+/** JSON with sorted object keys: one spelling per value. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonicalJson((value as Record<string, unknown>)[k])}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+/**
+ * The digest of a quote's terms (scan 2026-10-30 F6): assets, units, fees,
+ * resolver, settlement parameters and deadlines — the whole quote minus its
+ * display fields, as it is stored (JSON round trip). An intent id carries it,
+ * so the build can tell the quote the caller holds from one the platform
+ * swapped in under the same quote id.
+ */
+function quoteDigest(q: OmnistonQuote): string {
+  const terms = JSON.parse(JSON.stringify(q)) as Record<string, unknown>;
+  for (const key of QUOTE_DIGEST_SKIP) delete terms[key];
+  return sha256(new TextEncoder().encode(canonicalJson(terms))).slice(2, 34);
+}
+const QUOTE_DIGEST = /^[0-9a-f]{32}$/;
+
+function encodeIntent(quoteId: string, trader: string, dest: string, srcChain: string, kind: "order" | "swap", digest: string): string {
   // Swap-settlement intents carry a sixth segment so tracking can branch
-  // without the (TTL-bound) quote cache; order intents keep the legacy shape.
-  return [INTENT_PREFIX, quoteId, trader, dest, srcChain, ...(kind === "swap" ? ["swap"] : [])].map(encodeURIComponent).join("|");
+  // without the (TTL-bound) quote cache; order intents keep the five-part
+  // shape. The quote digest rides on the dest segment (`<dest>#<digest>`):
+  // apps already in the field split the id into exactly these segments (the
+  // remote order check reads quote id, trader and source chain), so a new
+  // segment would make them refuse every new order.
+  return [INTENT_PREFIX, quoteId, trader, `${dest}#${digest}`, srcChain, ...(kind === "swap" ? ["swap"] : [])].map(encodeURIComponent).join("|");
 }
 
 /**
@@ -587,14 +617,19 @@ const QUOTE_ID = /^[0-9a-fA-F]{48,64}$/;
 
 function decodeIntent(
   intentId: string,
-): {quoteId: string; trader: string; dest: string; srcChain: string; kind: "order" | "swap"} | null {
+): {quoteId: string; trader: string; dest: string; srcChain: string; kind: "order" | "swap"; digest?: string} | null {
   try {
     const parts = intentId.split("|");
     if ((parts.length !== 5 && parts.length !== 6) || parts[0] !== INTENT_PREFIX) return null;
-    const [, quoteId = "", trader = "", dest = "", srcChain = "", kindPart = ""] = parts.map(decodeURIComponent);
+    const [, quoteId = "", trader = "", destPart = "", srcChain = "", kindPart = ""] = parts.map(decodeURIComponent);
+    // Ids issued before scan 2026-10-30 F6 carry no digest: tracking still reads them, building refuses them.
+    const mark = destPart.lastIndexOf("#");
+    const dest = mark < 0 ? destPart : destPart.slice(0, mark);
+    const digest = mark < 0 ? undefined : destPart.slice(mark + 1);
+    if (digest !== undefined && !QUOTE_DIGEST.test(digest)) return null;
     if (!QUOTE_ID.test(quoteId) || !trader || !dest || !srcChain) return null;
     if (parts.length === 6 && kindPart !== "swap") return null;
-    return {quoteId, trader, dest, srcChain, kind: parts.length === 6 ? "swap" : "order"};
+    return {quoteId, trader, dest, srcChain, kind: parts.length === 6 ? "swap" : "order", ...(digest ? {digest} : {})};
   } catch {
     return null;
   }
@@ -1977,7 +2012,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
   /**
    * A fresh quote's context, saved only if the quote id is new or already holds THIS context (same trader, dest,
    * chain, kind): a platform reusing an id for another user's quote never rebinds a context (scan 2026-10-27 modules,
-   * F27). Atomic with the store's `claim`; check-then-save otherwise.
+   * F27). Atomic with the store's `claim`; check-then-save otherwise. A held id is refreshed only by the same terms
+   * (same quote digest): a reused id with other terms is refused and the first quote kept (scan 2026-10-30 F6).
    */
   async function claimBuilt(quoteId: string, entry: BuiltEntry): Promise<boolean> {
     const json = JSON.stringify(entry);
@@ -1995,7 +2031,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       return true;
     }
     const a = existing.bound, b = entry.bound;
-    const same = !!a && !!b && a.kind === b.kind && a.srcChain === b.srcChain && sameIntentAddress(a.trader, b.trader) && sameIntentAddress(a.dest, b.dest);
+    const same = !!a && !!b && a.kind === b.kind && a.srcChain === b.srcChain && sameIntentAddress(a.trader, b.trader) && sameIntentAddress(a.dest, b.dest) &&
+      quoteDigest(existing.quote) === quoteDigest(entry.quote);
     if (!same) return false;
     await quotes.save(quoteId, json);
     return true;
@@ -2059,6 +2096,16 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       throw new Error(`omniston: intent id does not match the quote it was issued for (${bound.field})`);
     }
     if (bound.legacy) trace("legacy-intent", {where});
+    // Scan 2026-10-30 F6: the terms the caller's quote showed must be the cached ones. An id from before the digest
+    // (in flight across a deploy) is refused too: a fresh quote is a second away.
+    if (!decoded.digest) {
+      trace("intent-mismatch", {where, field: "digest-missing"});
+      throw new Error("omniston: this quote was issued before an update — request a fresh quote");
+    }
+    if (decoded.digest !== quoteDigest(entry.quote)) {
+      trace("intent-mismatch", {where, field: "digest"});
+      throw new Error("omniston: quote was replaced — request a fresh quote");
+    }
     return bound.ref;
   }
 
@@ -2251,7 +2298,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     const feeUsd = stableOut ? feeUnits / 10 ** dest.decimals : 0;
     return {
       provider: "omniston",
-      intentId: encodeIntent(q.quoteId, trader, params.destAddress, params.sourceChain, "swap"),
+      intentId: encodeIntent(q.quoteId, trader, params.destAddress, params.sourceChain, "swap", quoteDigest(q)),
       depositAddress: "", // swap settlement — the built message pays the DEX directly
       depositMemo: null,
       sourceAmount: q.inputUnits,
@@ -2745,7 +2792,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
       if (await quoteIdInUse(q.quoteId)) return refuse("the platform reused a quote id that already belongs to an order");
       if (!(await claimBuilt(q.quoteId, {quote: q, at: Date.now(), bound: {trader, dest: params.destAddress, srcChain: params.sourceChain, kind: "order"}}))) {
-        return refuse("the platform reused a quote id that already holds another user's quote");
+        return refuse("the platform reused a quote id that already holds another quote");
       }
 
       // Fees are charged in the OUTPUT asset; the corridor is stables, so units
@@ -2755,7 +2802,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
       return {
         provider: "omniston",
-        intentId: encodeIntent(q.quoteId, trader, params.destAddress, params.sourceChain),
+        intentId: encodeIntent(q.quoteId, trader, params.destAddress, params.sourceChain, "order", quoteDigest(q)),
         depositAddress: "", // order settlement — no static deposit address
         depositMemo: null,
         sourceAmount: q.inputUnits,
