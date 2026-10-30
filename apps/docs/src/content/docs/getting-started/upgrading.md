@@ -10,6 +10,12 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: the 2026-10-30 scan (remote swap pins)
+
+- **THORChain memo.** `thorchainPins().verifyBuild` refuses a remote build whose memo is not exactly the
+  canonical memo for the request (output asset, destination/refund, limit, affiliate). Your server's
+  `thorchainProvider` already builds that memo; nothing to wire.
+
 ## Next release: remote swaps checked on the device
 
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps
