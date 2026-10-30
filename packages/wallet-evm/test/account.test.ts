@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { decodeFunctionData, keccak256, parseTransaction, type EIP1193Provider, type Hex } from 'viem'
-import { BroadcastUnknownError, ERC20_ABI, WalletManagerEvm } from '../src/index.js'
+import { BroadcastUnknownError, ERC20_ABI, NonceConflictError, WalletManagerEvm } from '../src/index.js'
 
 const SEED = 'test test test test test test test test test test test junk'
 const HARDHAT0 = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
@@ -92,7 +92,7 @@ describe('WalletAccountEvm', () => {
     expect(parseTransaction(l2.sent[0]!).maxPriorityFeePerGas ?? 0n).toBe(0n)
   })
 
-  it('keeps its own nonce floor across sends and retries once on "nonce too low"', async () => {
+  it('keeps its own nonce floor across sends; one RPC\'s "nonce too low" is not re-signed, the next send skips the nonce', async () => {
     // Live 2026-10-09 (Base): `pending` came back stale right after our
     // approval was mined; the next tx reused the nonce and every node refused it.
     let count = 7
@@ -118,6 +118,10 @@ describe('WalletAccountEvm', () => {
     })
     const m2 = new WalletManagerEvm(SEED, { provider: rejecting.provider })
     const a2 = await m2.getAccount(0)
+    // One RPC cannot prove the nonce is taken by another transaction (scan 2026-10-30 F1): no second signature.
+    await expect(a2.sendTransaction({ to: SPENDER, value: 1n })).rejects.toBeInstanceOf(NonceConflictError)
+    expect(rejecting.sent).toEqual([])
+    // the caller's retry takes the nonce the node named
     await expect(a2.sendTransaction({ to: SPENDER, value: 1n })).resolves.toMatchObject({ hash: '0x' + 'ab'.repeat(32) })
     expect(rejecting.sent.map((r) => parseTransaction(r).nonce)).toEqual([9])
     // a caller-fixed nonce is never second-guessed

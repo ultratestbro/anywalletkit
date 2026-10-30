@@ -205,6 +205,35 @@ function big(v: unknown): bigint | undefined {
 /** An amount that is there but cannot be read is shown as the worst case: unlimited. */
 const amountOrMax = (v: unknown): bigint => (v === undefined ? 0n : big(v) ?? maxUint256)
 
+/** Permit2's primary types → the field that carries the grant, its struct and whether it is a list. */
+const PERMIT2_GRANT: Readonly<Record<string, { name: 'details' | 'permitted'; struct: 'PermitDetails' | 'TokenPermissions'; list: boolean }>> = {
+  PermitSingle: { name: 'details', struct: 'PermitDetails', list: false },
+  PermitBatch: { name: 'details', struct: 'PermitDetails', list: true },
+  PermitTransferFrom: { name: 'permitted', struct: 'TokenPermissions', list: false },
+  PermitWitnessTransferFrom: { name: 'permitted', struct: 'TokenPermissions', list: false },
+  PermitBatchTransferFrom: { name: 'permitted', struct: 'TokenPermissions', list: true },
+  PermitBatchWitnessTransferFrom: { name: 'permitted', struct: 'TokenPermissions', list: true },
+}
+const PERMIT2_AMOUNT_TYPE = { PermitDetails: 'uint160', TokenPermissions: 'uint256' } as const
+
+/**
+ * The entries a Permit2 signature grants, read through the schema that gets signed (scan 2026-10-30 F4): the
+ * primary struct declares the grant field Permit2 uses for that primary type with its struct (one or a list),
+ * and that struct declares `token: address` and `amount` with Permit2's type. Null for any other schema.
+ */
+function permit2Entries(types: TypedDataInput['types'], primaryType: string, m: Record<string, unknown>): Array<Record<string, unknown>> | null {
+  const grant = Object.prototype.hasOwnProperty.call(PERMIT2_GRANT, primaryType) ? PERMIT2_GRANT[primaryType] : undefined
+  if (!grant) return null
+  const declared = new Map((types[primaryType] ?? []).map((f) => [f.name, f.type] as const))
+  if (declared.get(grant.name) !== (grant.list ? `${grant.struct}[]` : grant.struct)) return null
+  if (declared.has(grant.name === 'details' ? 'permitted' : 'details')) return null
+  const struct = new Map((types[grant.struct] ?? []).map((f) => [f.name, f.type] as const))
+  if (struct.get('token') !== 'address' || struct.get('amount') !== PERMIT2_AMOUNT_TYPE[grant.struct]) return null
+  const value = m[grant.name]
+  if (grant.list !== Array.isArray(value) || typeof value !== 'object' || value === null) return null
+  return (grant.list ? (value as unknown[]) : [value]).map((e) => (typeof e === 'object' && e !== null ? { token: (e as Record<string, unknown>).token, amount: (e as Record<string, unknown>).amount } : {}))
+}
+
 /**
  * Decode EIP-712 typed data for a confirmation screen. Pass the account's `chainId` and address to
  * get chain and owner warnings.
@@ -256,16 +285,18 @@ export function describeTypedData(typed: TypedDataInput, ctx: { chainId?: number
     return { kind: 'permit', primaryType, domain, permit: { owner, spender, value, nonce, deadline }, warnings }
   }
   if (PERMIT2_TYPES.has(primaryType)) {
-    // AllowanceTransfer carries `details`, SignatureTransfer `permitted` (one or a list).
-    const details = (m.details ?? m.permitted) as Record<string, unknown> | Array<Record<string, unknown>> | undefined
-    const list = Array.isArray(details) ? details : details ? [details] : []
+    // AllowanceTransfer carries `details`, SignatureTransfer `permitted` (one or a list) — read only through
+    // the declared schema: an undeclared `details` next to a signed `permitted` is not signed (scan 2026-10-30 F4).
+    const list = permit2Entries(typed.types, primaryType, m)
+    // A schema that is not Permit2's: nothing tells what is granted, so the worst case.
+    if (list === null) warnings.push({ code: 'approve-unlimited', message: 'Permit2 permit whose amounts cannot be read: treat it as unlimited.' })
     // AllowanceTransfer amounts are uint160: its "unlimited" is that type's max (SignatureTransfer's
     // uint256 max is above it too).
-    for (const item of list) {
-      const amount = item.amount === undefined ? undefined : amountOrMax(item.amount)
-      if (amount !== undefined && amount >= 2n ** 160n - 1n) { warnings.push({ code: 'approve-unlimited', message: 'Unlimited Permit2 allowance.' }); break }
+    for (const item of list ?? []) {
+      const amount = amountOrMax(item.amount)
+      if (amount >= 2n ** 160n - 1n) { warnings.push({ code: 'approve-unlimited', message: 'Unlimited Permit2 allowance.' }); break }
     }
-    const deadline = big(m.sigDeadline) ?? big(m.deadline)
+    const deadline = big(fields.has('sigDeadline') ? m.sigDeadline : undefined) ?? big(fields.has('deadline') ? m.deadline : undefined)
     if (deadline !== undefined && deadline < BigInt(Math.floor(Date.now() / 1000))) warnings.push({ code: 'deadline-passed', message: 'Permit2 deadline is already in the past.' })
     return { kind: 'permit2', primaryType, domain, warnings }
   }

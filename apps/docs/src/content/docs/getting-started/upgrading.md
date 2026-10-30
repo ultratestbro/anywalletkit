@@ -10,6 +10,45 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: policies, snapshots and EVM nonces
+
+This release fixes six findings of the 2026-10-30 scan in `kit` and `wallet-evm`.
+
+### Allowance increases are approvals (`kit`)
+
+A raw `increaseAllowance(spender, x)` or `increaseApproval(spender, x)` call reaches `confirm` as
+`kind: 'approval'` with the spender in `to` and the increase in `amount` (it was a `send` to the
+token, and `increaseApproval`'s spender was never checked by the lists). Show it like an approve.
+
+### Permit2 is read through its declared schema (`kit`, `wallet-evm`)
+
+The Permit2 approval `confirm` sees — `approvals`, `token`, `amount`, `unlimited`, `to`, `deadline` — comes
+only from fields the typed data declares, as Permit2 signs them. A payload whose schema is not Permit2's
+(a missing or retyped `details` / `permitted`, both declared, a list where one entry belongs) reaches
+`confirm` as the worst case: `unlimited: true`, `approvals: []`; one without a declared `spender` has an
+unknown destination, so an allowlist refuses it. `describeTypedData` flags such a payload
+`approve-unlimited`. Canonical Permit2 payloads from Uniswap, 1inch and other dApps read as before.
+
+### Case-sensitive addresses are compared exactly (`kit`)
+
+Allowlist and blocklist entries for Solana (and Bitcoin / Zcash base58, and any namespace without its
+own rule) must be spelled exactly as the address: they were compared lowercased, which let a different
+Solana key that differs only in letter case pass an allowlist. EVM, NEAR, Aptos and Starknet entries
+still match in any case, bech32 Bitcoin / Zcash addresses in either case, Tron and TON in any of their
+forms. If your lists hold lowercased Solana keys, store them as the wallet shows them.
+
+### `nonce too low` from one RPC is not re-signed (`wallet-evm`)
+
+A send whose transaction the node refuses with "nonce too low", and whose hash it says it never saw, was
+signed again with the next nonce. The RPC that refused already holds the first signed bytes, so a lying
+RPC could broadcast both. Now the account signs again only when at least two distinct configured RPCs
+show the nonce mined by another transaction. Otherwise the send throws `NonceConflictError` — a
+`BroadcastUnknownError` (`maybeSent: true`, `hash`), with `nonce` and the node's `nextNonce`. Apps should
+show "the network didn't confirm — check activity, then retry": keep the operation pending on `hash`,
+and let the user send again once activity shows the first transaction is not coming; the account's next
+send already skips the refused nonce. With one RPC configured, a stale `pending` nonce now costs one
+retry instead of being fixed silently; configure two RPCs to keep the automatic recovery.
+
 ## Next release: remote swaps checked on the device
 
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps

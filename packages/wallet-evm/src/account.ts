@@ -9,7 +9,8 @@ import { encodeApprove, ERC20_PERMIT_ABI, PERMIT_TYPES, USDT_MAINNET } from './e
 
 /** ERC-165 interface id of ERC-721. */
 const ERC721_INTERFACE = '80ac58cd'
-import { BroadcastUnknownError, ChainMismatchError, PermitUnsupportedError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { BroadcastUnknownError, ChainMismatchError, NonceConflictError, PermitUnsupportedError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { createEndpointClients } from './client.js'
 import { WalletAccountReadOnlyEvm, assertTxShape, canonicalData, chainIdNumber, transferTransaction, typedDataHash, typedDomainChainId } from './read-only-account.js'
 export { MIN_PRIORITY_FEE_WEI, typedDomainChainId } from './read-only-account.js'
 import type { ApproveOptions, EvmConfig, EvmTransaction, EvmTransferOptions, PermitInfo, PermitOptions, SignedPermit, TypedDataInput } from './types.js'
@@ -34,6 +35,11 @@ function toBigInt(v: bigint | number | string | undefined): bigint | undefined {
  */
 /** How long a self-observed next nonce outranks the network's `pending` answer. */
 export const NONCE_FLOOR_TTL_MS = 90_000
+/**
+ * Distinct endpoints that must each show a nonce taken (mined, by a transaction that is not ours) before
+ * a "nonce too low" refusal is re-signed with a new nonce: one RPC's word is never enough (scan 2026-10-30 F1).
+ */
+export const NONCE_PROOF_ENDPOINTS = 2
 /** Simulation re-runs (and the pause between them) when a revert follows the account's own broadcast. */
 export const SIMULATION_SETTLE_RETRIES = 3
 export const SIMULATION_SETTLE_DELAY_MS = 1_500
@@ -103,6 +109,8 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
    * cannot leave the account stuck on a future nonce.
    */
   private _nonceFloor: { next: number; at: number } | undefined
+  /** One client per distinct configured endpoint, for the nonce proof (scan 2026-10-30 F1). */
+  private _endpointClients: PublicClient[] | undefined
   /** Tail of this account's send queue: prepare → sign → submit runs one send at a time. */
   private _sendTail: Promise<unknown> = Promise.resolve()
 
@@ -356,13 +364,38 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
       // "nonce too low" right after a lost answer can be THIS transaction,
       // mined in between: look for its hash before signing anything new.
       if (await this.isOnNetwork(client, first.hash, error)) return accepted(first.hash, first.nonce)
-      // Not ours: the RPC's `pending` count was stale. The node that rejected
-      // us knows the real next nonce, and nothing of ours holds this one, so
-      // one re-sign of the same payload is safe.
+      // Not found is one RPC's word, and that RPC holds the signed bytes: a second signature with
+      // another nonce is safe only when the nonce is proven taken by another transaction (scan 2026-10-30 F1).
       const hinted = /next nonce (\d+)/i.exec(errorText(error))
-      this._nonceFloor = { next: Math.max(first.nonce + 1, hinted ? Number(hinted[1]) : 0), at: Date.now() }
+      const next = hinted ? Number(hinted[1]) : undefined
+      // The caller's next send skips the nonce either way: it is taken, or held by the refused transaction.
+      this._nonceFloor = { next: Math.max(first.nonce + 1, next ?? 0), at: Date.now() }
+      const proof = await this.nonceTakenByAnother(first.hash, first.nonce)
+      if (proof === 'ours') return accepted(first.hash, first.nonce)
+      if (proof !== 'taken') throw new NonceConflictError(first.hash, first.nonce, next, error)
+      // Two endpoints agree: the RPC's `pending` count was stale and nothing of ours holds this nonce.
       return submit(await this.#signPrepared({ ...prepared, nonce: await this.nextNonce() }, limit, op))
     }
+  }
+
+  /**
+   * Is `nonce` taken by a transaction other than `hash`? Asked of every distinct configured endpoint
+   * directly (not through the failover): `taken` when at least {@link NONCE_PROOF_ENDPOINTS} of them
+   * count the account's mined transactions (`latest`) past `nonce` and do not know `hash`; `ours` when
+   * any of them knows `hash`; `unproven` otherwise (one endpoint configured, endpoints disagree or fail).
+   */
+  private async nonceTakenByAnother(hash: Hex, nonce: number): Promise<'taken' | 'ours' | 'unproven'> {
+    this._endpointClients ??= createEndpointClients(this._config)
+    const answers = await Promise.all(this._endpointClients.map(async (client) => {
+      const [count, known] = await Promise.all([
+        client.getTransactionCount({ address: this.address, blockTag: 'latest' }).catch(() => undefined),
+        client.getTransaction({ hash }).then(() => true, (e: unknown) => (e instanceof TransactionNotFoundError ? false : undefined)),
+      ])
+      return { count, known }
+    }))
+    if (answers.some((a) => a.known === true)) return 'ours'
+    const agree = answers.filter((a) => a.known === false && a.count !== undefined && a.count > nonce).length
+    return agree >= NONCE_PROOF_ENDPOINTS ? 'taken' : 'unproven'
   }
 
   /** Sign and broadcast; `options.maxFee` caps the signed fee on top of `transactionMaxFee`. */

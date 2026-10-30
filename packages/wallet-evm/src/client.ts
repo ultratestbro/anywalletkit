@@ -16,3 +16,14 @@ export function createClient(config: EvmConfig): PublicClient | undefined {
   // device fetch the URLs it names, LAN addresses included (scan 2026-10-27 modules, F37 class).
   return createPublicClient({ transport, ccipRead: false })
 }
+
+/**
+ * One public client per DISTINCT configured endpoint (the same url or provider object listed twice is one),
+ * with no failover between them: for checks that must hear several endpoints, not the first that answers.
+ */
+export function createEndpointClients(config: EvmConfig): PublicClient[] {
+  if (config.provider === undefined) return []
+  const list = Array.isArray(config.provider) ? config.provider : [config.provider]
+  return [...new Set(list)].map((p) => createPublicClient({ transport: toTransport(p), ccipRead: false }))
+}
+

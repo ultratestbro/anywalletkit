@@ -125,14 +125,26 @@ export function tonRawAddress(address: string): string | null {
   return `${wc}:${toHex(b.subarray(2, 34))}`
 }
 
-/** The form the allow/block lists compare in, per chain namespace: EVM lowercase, Tron hex, TON raw; anything else lowercase. */
+/** Bitcoin / Zcash bech32 and bech32m HRPs (segwit, Sapling, unified, TEX). */
+const BECH32_ADDRESS = /^(bc|tb|bcrt|zs|ztestsapling|zregtestsapling|u|utest|uregtest|tex|textest)1[02-9ac-hj-np-z]+$/
+
+/**
+ * The form the allow/block lists compare in, per chain namespace: EVM, NEAR, Aptos and Starknet lowercase
+ * (their addresses are hex or lowercase ids), Tron hex, TON raw, a Bitcoin / Zcash bech32 address lowercase
+ * (bech32 is one case, either one). Anything else is compared exactly: base58 (Solana, Bitcoin and Zcash
+ * legacy) is case-sensitive, and two spellings that differ only in case are two keys (scan 2026-10-30 F7).
+ */
 export function canonicalAddress(chain: string, address: string): string {
   const ns = chain.split(':')[0]
   if (ns === 'tron') return tronHexAddress(address) ?? address.toLowerCase()
   if (ns === 'ton') return tonRawAddress(address) ?? address.toLowerCase()
-  // Zcash transparent addresses are base58: case-sensitive, compared exactly (scan 2026-10-27 F19).
-  if (ns === 'zcash') return address
-  return address.toLowerCase()
+  if (ns === 'eip155' || ns === 'near' || ns === 'aptos' || ns === 'starknet') return address.toLowerCase()
+  if (ns === 'bip122' || ns === 'bitcoin' || ns === 'zcash') {
+    // Zcash transparent and Bitcoin legacy addresses are base58: compared exactly (scan 2026-10-27 F19).
+    const lower = address.toLowerCase()
+    return (address === lower || address === address.toUpperCase()) && BECH32_ADDRESS.test(lower) ? lower : address
+  }
+  return address
 }
 
 // ── EVM / Tron calldata: who receives tokens or rights inside a standard call ──
@@ -153,6 +165,7 @@ const CALL_RECIPIENTS: Readonly<Record<string, { words: readonly number[]; min: 
   '0x2eb2c2d6': { words: [1], min: 5 }, // safeBatchTransferFrom(address,address,uint256[],uint256[],bytes) — ERC-1155
   '0x095ea7b3': { words: [0], min: 2 }, // approve(address,uint256)
   '0x39509351': { words: [0], min: 2 }, // increaseAllowance(address,uint256)
+  '0xd73dd623': { words: [0], min: 2 }, // increaseApproval(address,uint256) — the older StandardToken name
   '0xa22cb465': { words: [0], min: 2 }, // setApprovalForAll(address,bool)
   '0x87517c45': { words: [1], min: 4 }, // Permit2 approve(address token,address spender,uint160,uint48)
   '0xd505accf': { words: [1], min: 7 }, // permit(owner,spender,value,deadline,v,r,s) — an EIP-2612 permit sent on chain

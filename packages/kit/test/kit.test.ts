@@ -204,10 +204,15 @@ describe('policies — every signing surface is guarded (2026-10-20 audit)', () 
     const dai = { ...permit, types: { Permit: [{ name: 'holder', type: 'address' }, { name: 'spender', type: 'address' }, { name: 'nonce', type: 'uint256' }, { name: 'expiry', type: 'uint256' }, { name: 'allowed', type: 'bool' }] }, message: { holder: 'addr', spender, nonce: 0, expiry: 1800000000, allowed: true } }
     await applyPolicies(acc, { confirm }).signTypedData(dai)
     expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'approval', to: spender, unlimited: true }))
-    const permit2Msg = { domain: { name: 'Permit2', chainId: 1, verifyingContract: permit2 }, types: { PermitSingle: [], PermitDetails: [] }, primaryType: 'PermitSingle', message: { details: { token, amount: ((1n << 160n) - 1n).toString(), expiration: 1800000000, nonce: 0 }, spender, sigDeadline: 1800000000 } }
+    const permit2Msg = { domain: { name: 'Permit2', chainId: 1, verifyingContract: permit2 }, types: { PermitSingle: [{ name: 'details', type: 'PermitDetails' }, { name: 'spender', type: 'address' }, { name: 'sigDeadline', type: 'uint256' }], PermitDetails: [{ name: 'token', type: 'address' }, { name: 'amount', type: 'uint160' }, { name: 'expiration', type: 'uint48' }, { name: 'nonce', type: 'uint48' }] }, primaryType: 'PermitSingle', message: { details: { token, amount: ((1n << 160n) - 1n).toString(), expiration: 1800000000, nonce: 0 }, spender, sigDeadline: 1800000000 } }
     await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [spender] } }).signTypedData(permit2Msg)).rejects.toBeInstanceOf(PolicyViolationError)
     await applyPolicies(acc, { confirm }).signTypedData(permit2Msg)
     expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'approval', to: spender, token, unlimited: true }))
+    // A schema that declares nothing signs nothing the policies can read: the worst case, spender unknown (scan 2026-10-30 F4).
+    const undeclared = { ...permit2Msg, types: { PermitSingle: [], PermitDetails: [] } }
+    await expect(applyPolicies(acc, { blocklist: { 'eip155:1': [spender] } }).signTypedData(undeclared)).rejects.toBeInstanceOf(PolicyViolationError)
+    await applyPolicies(acc, { confirm }).signTypedData(undeclared)
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'approval', unlimited: true, destinationUnknown: true, approvals: [] }))
     const order = { domain: { name: 'Exchange', chainId: 1, verifyingContract: permit2 }, types: { Order: [{ name: 'maker', type: 'address' }] }, primaryType: 'Order', message: { maker: 'addr' } }
     // Typed data the policies cannot read may move value: an allowlist refuses it (scan 2026-10-28 F7), confirm decides otherwise.
     await expect(applyPolicies(acc, { allowlist: { 'eip155:1': [spender] }, confirm }).signTypedData(order)).rejects.toThrow(/allowlist/)
