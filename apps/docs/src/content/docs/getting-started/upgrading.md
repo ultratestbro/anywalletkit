@@ -19,6 +19,10 @@ your app does.
 - **Tron history fails instead of hanging on a malformed page.** `listActivity` throws
   `HistoryUnavailableError` when a TronGrid row's `block_timestamp` is not a non-negative integer;
   it used to loop forever. Handle it like any other history outage.
+- **Tonstakers derives the tsTON jetton wallet.** The unstake destination is computed on the device
+  from the minter's pinned wallet code and must match the node's `get_wallet_address`. The default
+  mainnet and testnet deployments need nothing. With a custom `addresses.jetton`, pass that minter's
+  `jettonWalletCode`, or `allowUnverifiedJettonWallet: true` to keep the old unchecked behaviour.
 
 ## Next release: remote swaps checked on the device
 
