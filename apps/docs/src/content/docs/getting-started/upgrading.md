@@ -16,6 +16,9 @@ your app does.
   permission is not exactly `{ fullAccess: {} }` or `{ functionCall: { receiverId, methodNames,
   allowance? } }` (`malformed-action`); it used to encode anything else as FullAccess. Keys built
   from the documented shapes are unchanged.
+- **Tron history fails instead of hanging on a malformed page.** `listActivity` throws
+  `HistoryUnavailableError` when a TronGrid row's `block_timestamp` is not a non-negative integer;
+  it used to loop forever. Handle it like any other history outage.
 
 ## Next release: remote swaps checked on the device
 

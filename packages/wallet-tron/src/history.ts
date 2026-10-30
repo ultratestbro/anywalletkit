@@ -454,6 +454,13 @@ export function createTronHistory(options: TronHistoryOptions = {}): TronHistory
           if (pos.f !== undefined) fetched.add(pos.f)
           const page = await list<T>(path, pos.f === undefined ? params : { ...params, fingerprint: pos.f })
           if (pos.f !== undefined && page.next === pos.f) { pos = null; break }
+          // Every row's timestamp is checked once, here: a missing, string or fractional one would never
+          // equal the merge's block timestamp and the merge would spin on cached rows (scan 2026-10-30 F14).
+          if (!Array.isArray(page.data)) throw new HistoryUnavailableError(chain, `${path}: data is not a list`)
+          for (const r of page.data) {
+            const t = ts(r)
+            if (!Number.isSafeInteger(t) || t < 0) throw new HistoryUnavailableError(chain, `${path}: malformed block_timestamp`)
+          }
           rows = page.data
           next = page.next
         }
@@ -507,8 +514,11 @@ export function createTronHistory(options: TronHistoryOptions = {}): TronHistory
         // One block timestamp at a time, from both lists: every row of a transaction shares it.
         const startTx = txs.position(), startTrc20 = trc20.position()
         const byId = new Map<string, { tx?: TronGridTx; trc20: TronGridTrc20[] }>()
-        for (const r of await txs.takeAt(t)) byId.set(r.txID, { ...byId.get(r.txID), tx: r, trc20: byId.get(r.txID)?.trc20 ?? [] })
-        for (const r of await trc20.takeAt(t)) { const e = byId.get(r.transaction_id) ?? { trc20: [] }; e.trc20.push(r); byId.set(r.transaction_id, e) }
+        const takenTx = await txs.takeAt(t), takenTrc20 = await trc20.takeAt(t)
+        // Each pass consumes at least one row; one that consumes none would repeat forever.
+        if (takenTx.length + takenTrc20.length === 0) throw new HistoryUnavailableError(chain, `${base}: history merge made no progress`)
+        for (const r of takenTx) byId.set(r.txID, { ...byId.get(r.txID), tx: r, trc20: byId.get(r.txID)?.trc20 ?? [] })
+        for (const r of takenTrc20) { const e = byId.get(r.transaction_id) ?? { trc20: [] }; e.trc20.push(r); byId.set(r.transaction_id, e) }
         // txID order: the same block reads the same way on every call, whatever order each list gave.
         const groups = [...byId.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
         const done = resume?.t === t ? resume.g : 0
