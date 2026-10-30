@@ -231,11 +231,12 @@ describe("Omniston EVM → TON orders (live 2026-10-16 fixtures)", () => {
     await p.buildDeposit(q!);
     await expect(p.trackIntent({intentId: q!.intentId})).resolves.toEqual({state: "completed", depositReceived: true, destTxHash: "28dd10c6234062c29ed3dfec25817a870d8cfc2fc6f6bf77352dce6845a0b8c0"});
     expect(locate).toHaveBeenCalledWith({positionAddress: TON_POSITION, recipientAddress: TRADER_TON, jettonMasterAddress: USDT_TON, minUnits: "20344594"});
-    // A locator that finds nothing (or throws) leaves the status without a hash.
+    // A locator that finds nothing (or throws), with the secret never disclosed here: the feed's FULLY_FILLED is not
+    // proof, so the order stays pending and keeps its secret (scan 2026-10-30 F10).
     const none = provider(clientFor(quote(), payload(), {...snapshot({outputPositionPhase: "EXECUTION_PHASE_COMPLETED"}), status: "TRADE_STATUS_FULLY_FILLED"}), {locateTonDelivery: async () => { throw new Error("tonapi down"); }});
     const q2 = await none.getQuote(params());
     await none.buildDeposit(q2!);
-    await expect(none.trackIntent({intentId: q2!.intentId})).resolves.toEqual({state: "completed", depositReceived: true});
+    await expect(none.trackIntent({intentId: q2!.intentId})).resolves.toEqual({state: "pending", depositReceived: true});
   });
 
   it("keeps the secret when the EVM proof fails, the output is not locked, or the fill is partial", async () => {

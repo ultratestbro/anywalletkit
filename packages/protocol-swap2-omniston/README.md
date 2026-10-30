@@ -25,20 +25,23 @@ TRON needs its own order path and is not wired yet.
 Every route is fail-closed until its allowlists and validators are configured:
 
 - **TON → TON** (DEX swap): `trustedSettlementContracts["ton:-239"]`,
-  `validateTonJettonWallet`, `validateTonSwapTarget`. The built message's DEX
+  `validateTonJettonWallet`, `validateTonSwapTarget`, `validateTonSwapLeg`. The built message's DEX
   call is decoded in the package (STON.fi v1/v2 incl. pTON and cross-swap,
   DeDust v1, DeDust CPMM v2): receiver = destination, refunds/excess = trader,
   on-chain minimum ≥ the quote's, no foreign referral; unknown layouts and
   split/multi-route quotes are refused by name. `validateTonSwapLeg`
   (supplied by `createOmnistonTonValidators`) confirms the routers' ask
   wallets, pTON wallet ownership and DeDust pool pairs on chain.
-  `tonSwapPayloadCheck: "report"` traces `ton-swap-payload <reason>` instead
-  of refusing (default `"enforce"`).
+  Without it the decoder cannot tell which token the DEX pays out, so the
+  route is not advertised. `tonSwapPayloadCheck: "report"` traces
+  `ton-swap-payload <reason>` (incl. `legs-unverified`) instead of refusing
+  (default `"enforce"`) — an explicit rollout opt-in.
   Behind `remoteProvider`, the app checks the built body itself:
   `remoteProvider({name: "omniston", baseUrl, verifyBuild: omnistonVerifyBuild({...createOmnistonTonValidators()})})`.
   A TON → TON swap body is opened with `checkTonSwapPayload` against the app's own request (receiver,
   refund, on-chain minimum, input; the quote carries `routeSteps`) and the DEX it pays is confirmed with
-  the app's validators. A TON → EVM escrow body goes to `verifyTonEscrowBuild`: the jetton amount, the
+  the app's validators — `validateTonSwapTarget` and `validateTonSwapLeg`; without the leg check a TON swap body
+  is refused. A TON → EVM escrow body goes to `verifyTonEscrowBuild`: the jetton amount, the
   trader as owner, the destination chain, address and token and the quote's minimum delivery come from
   the app, the protocol contract from `trustedProtocolAddresses`, and the escrow code, authority key and
   timelocks are the audited ones. Without `verifyBuild` the engine refuses remote cell bodies.

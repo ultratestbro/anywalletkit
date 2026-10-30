@@ -81,6 +81,31 @@ retry instead of being fixed silently; configure two RPCs to keep the automatic 
   check, and the app-supplied `verifyBuild` satisfies this rule. NEAR Intents (`nearIntentsPins`)
   and Jupiter are not affected: they pin no EVM call targets.
 
+## Next release: the 2026-10-30 scan fixes
+
+### Omniston
+
+- **TON → TON swaps need `validateTonSwapLeg`.** Same-chain TON swaps are advertised and built only with
+  `validateTonJettonWallet`, `validateTonSwapTarget` and `validateTonSwapLeg`: the leg check is what proves
+  the DEX pays out the quoted token. A server that builds Omniston locally and wires the TON validators one
+  by one loses TON → TON routes until it passes the leg check too — use `createOmnistonTonValidators()`
+  whole (`omnistonProvider({...createOmnistonTonValidators(), ...})`). On the device,
+  `omnistonVerifyBuild` refuses a TON swap body without `validateTonSwapLeg`; spreading
+  `createOmnistonTonValidators()` into it, as the guide shows, already passes it.
+  `tonSwapPayloadCheck: "report"` keeps building without it as an explicit, temporary opt-in.
+- **FULLY_FILLED needs proof.** `trackIntent` reports an Omniston order `completed` only once every
+  execution's secret was disclosed or a delivery locator (`locateEvmDelivery`, `locateTonDelivery`)
+  found the payout; a feed that says FULLY_FILLED without that stays `pending` and keeps its secrets.
+  Keep polling pending orders and keep your refund backstop as before; an order that never shows a
+  disclosure or a delivery is closed by TTL or by the backstop, not by the feed.
+- **Intent ids carry the quote's digest.** An Omniston intent id now ends its dest segment with
+  `#<digest>` of the quote's terms, and a build whose cached quote differs refuses with "quote was
+  replaced — request a fresh quote"; a reused quote id with other terms is refused at quote time. Quotes
+  issued by the previous version (no digest) are refused on build with "request a fresh quote" — a quote
+  is valid for under a minute, so only a quote taken right across the deploy is affected; re-quote.
+  Orders already signed keep being tracked and disclosed. If your code splits the id, strip `#…` from
+  the dest segment; the quote id, trader and source chain segments are unchanged.
+
 ## Next release: remote swaps checked on the device
 
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps

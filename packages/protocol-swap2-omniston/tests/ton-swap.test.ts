@@ -332,7 +332,9 @@ describe("buildSwapDeposit with the decoder (scan F11)", () => {
   it("STON.fi v1 native input: the router's pTON v1 wallet builds; without the leg hook or with a foreign pTON wallet it is refused", async () => {
     const c = live.find((x) => x.protocols === "StonFiV1" && x.pair === "GRAM>USDT")!;
     await expect((await buildCase(c)).build()).resolves.toMatchObject({to: c.messages[0]!.targetAddress});
-    await expect((await buildCase(c, {validateTonSwapLeg: undefined})).build()).rejects.toThrow(/validateTonSwapLeg/);
+    // Without the leg hook the route is not advertised at all (scan 2026-10-30 F8); even in report mode pTON v1 needs it.
+    await expect(buildCase(c, {validateTonSwapLeg: undefined})).rejects.toThrow(/no quote/);
+    await expect((await buildCase(c, {validateTonSwapLeg: undefined, tonSwapPayloadCheck: "report"})).build()).rejects.toThrow(/validateTonSwapLeg/);
     const validators = createOmnistonTonValidators({fetch: replay()});
     await expect((await buildCase(c, {validateTonSwapLeg: validators.validateTonSwapLeg})).build()).resolves.toBeDefined();
     // Same body, but the message pays a pTON wallet the transfer's router does not own.
@@ -354,11 +356,13 @@ describe("buildSwapDeposit with the decoder (scan F11)", () => {
     expect(report.events).toContainEqual(expect.objectContaining({event: "ton-swap-payload", details: expect.objectContaining({reason: "min-out-zero", mode: "report"})}));
   });
 
-  it("a failing leg check refuses in enforce mode; a host without the leg hook gets the decoder plus a legs-unverified trace", async () => {
+  it("a failing leg check refuses in enforce mode; without the leg hook only the explicit report mode builds (scan 2026-10-30 F8)", async () => {
     const c = live.find((x) => x.protocols === "DeDustCPMMV2")!;
     await expect((await buildCase(c, {validateTonSwapLeg: () => false})).build()).rejects.toThrow(/leg-unverified/);
-    const noHook = await buildCase(c, {validateTonSwapLeg: undefined});
-    await expect(noHook.build()).resolves.toBeDefined();
-    expect(noHook.events.map((e) => e.details?.reason)).toContain("legs-unverified");
+    // enforce (default) without the hook: same-chain TON is not advertised, so there is no quote to build.
+    await expect(buildCase(c, {validateTonSwapLeg: undefined})).rejects.toThrow(/no quote/);
+    const report = await buildCase(c, {validateTonSwapLeg: undefined, tonSwapPayloadCheck: "report"});
+    await expect(report.build()).resolves.toBeDefined();
+    expect(report.events).toContainEqual(expect.objectContaining({event: "ton-swap-payload", details: expect.objectContaining({reason: "legs-unverified", mode: "report"})}));
   });
 });

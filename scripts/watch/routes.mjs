@@ -65,7 +65,7 @@ if (want("omniston")) providers.omniston = (await dist("protocol-swap2-omniston"
   // The provider refuses cross-chain quotes unless the position validators are wired (fail-closed by design).
   // They only run at disclosure / build time, which this canary never reaches; the stubs below refuse everything.
   validateEvmInputPosition: async () => false, validateTonOutputPosition: async () => false, validateEvmOutputPosition: async () => false,
-  validateTonJettonWallet: async () => false, validateTonEscrowPayload: async () => false, validateTonSwapTarget: async () => false,
+  validateTonJettonWallet: async () => false, validateTonEscrowPayload: async () => false, validateTonSwapTarget: async () => false, validateTonSwapLeg: async () => false,
 });
 if (want("cctp")) providers.cctp = (await dist("protocol-swap2-cctp", "provider.js")).cctpProvider({enabled: true, rpcUrls: ownRpc});
 if (want("uniswap")) providers.uniswap = (await dist("protocol-swap2-uniswap", "provider.js")).uniswapProvider({enabled: true, rpcUrls: venueRpc});

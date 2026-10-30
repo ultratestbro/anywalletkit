@@ -34,7 +34,10 @@ import {bigintToNumber} from "@anywalletkit/core";
  *  - trackIntent: treats `orderTrack` only as a discovery hint and discloses a
  *    pending secret only after independent finalized validation of the
  *    counter-position (EVM escrow for TON→EVM; EVM source fill AND TON output
- *    position for EVM→TON).
+ *    position for EVM→TON). A feed `TRADE_STATUS_FULLY_FILLED` is reported
+ *    as completed (and the secrets deleted) only once every execution's
+ *    secret was disclosed or a delivery locator found the payout; until then
+ *    the intent stays pending with its secrets.
  *
  * CONSUMER CONTRACT — closing an intent is the caller's job. `trackIntent`
  * never returns a terminal refunded/failed state, not even on a reported
@@ -386,10 +389,12 @@ export interface OmnistonProviderOptions {
    * swap body depends on — that a STON.fi hop's ask wallet is its router's
    * wallet of the quoted output (and, for native input, that the pTON wallet
    * the message pays belongs to that router), or that a DeDust pool trades the
-   * quoted pair. `createOmnistonTonValidators` supplies it. When absent the
-   * decoded-body rules still apply and each skipped leg is traced as
-   * `ton-swap-payload legs-unverified`; STON.fi v1 native input (pTON v1) is
-   * refused without it.
+   * quoted pair. `createOmnistonTonValidators` supplies it. Required, with
+   * `validateTonSwapTarget`, to advertise same-chain TON swaps (scan
+   * 2026-10-30 F8: without it a genuine DEX body can pay out a token other
+   * than the quoted one). Only `tonSwapPayloadCheck: "report"` lets a host run
+   * without it — each unverified leg is then traced as `ton-swap-payload
+   * legs-unverified`; STON.fi v1 native input (pTON v1) is refused regardless.
    */
   validateTonSwapLeg?: (leg: TonSwapLeg) => Promise<boolean> | boolean;
   /**
@@ -567,10 +572,40 @@ function toChainAddress(caip2: string, address: string): ChainAddress | null {
 
 // ── intentId: quoteId + the trader/dest context tracking and building need ───
 
-function encodeIntent(quoteId: string, trader: string, dest: string, srcChain: string, kind: "order" | "swap" = "order"): string {
+/** Quote fields that are display or bookkeeping only: everything else is a term the order or swap commits to. */
+const QUOTE_DIGEST_SKIP = new Set(["rfqId", "resolverName", "estimatedSettlementDuration", "estimatedGasConsumption"]);
+
+/** JSON with sorted object keys: one spelling per value. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonicalJson((value as Record<string, unknown>)[k])}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+/**
+ * The digest of a quote's terms (scan 2026-10-30 F6): assets, units, fees,
+ * resolver, settlement parameters and deadlines — the whole quote minus its
+ * display fields, as it is stored (JSON round trip). An intent id carries it,
+ * so the build can tell the quote the caller holds from one the platform
+ * swapped in under the same quote id.
+ */
+function quoteDigest(q: OmnistonQuote): string {
+  const terms = JSON.parse(JSON.stringify(q)) as Record<string, unknown>;
+  for (const key of QUOTE_DIGEST_SKIP) delete terms[key];
+  return sha256(new TextEncoder().encode(canonicalJson(terms))).slice(2, 34);
+}
+const QUOTE_DIGEST = /^[0-9a-f]{32}$/;
+
+function encodeIntent(quoteId: string, trader: string, dest: string, srcChain: string, kind: "order" | "swap", digest: string): string {
   // Swap-settlement intents carry a sixth segment so tracking can branch
-  // without the (TTL-bound) quote cache; order intents keep the legacy shape.
-  return [INTENT_PREFIX, quoteId, trader, dest, srcChain, ...(kind === "swap" ? ["swap"] : [])].map(encodeURIComponent).join("|");
+  // without the (TTL-bound) quote cache; order intents keep the five-part
+  // shape. The quote digest rides on the dest segment (`<dest>#<digest>`):
+  // apps already in the field split the id into exactly these segments (the
+  // remote order check reads quote id, trader and source chain), so a new
+  // segment would make them refuse every new order.
+  return [INTENT_PREFIX, quoteId, trader, `${dest}#${digest}`, srcChain, ...(kind === "swap" ? ["swap"] : [])].map(encodeURIComponent).join("|");
 }
 
 /**
@@ -582,14 +617,19 @@ const QUOTE_ID = /^[0-9a-fA-F]{48,64}$/;
 
 function decodeIntent(
   intentId: string,
-): {quoteId: string; trader: string; dest: string; srcChain: string; kind: "order" | "swap"} | null {
+): {quoteId: string; trader: string; dest: string; srcChain: string; kind: "order" | "swap"; digest?: string} | null {
   try {
     const parts = intentId.split("|");
     if ((parts.length !== 5 && parts.length !== 6) || parts[0] !== INTENT_PREFIX) return null;
-    const [, quoteId = "", trader = "", dest = "", srcChain = "", kindPart = ""] = parts.map(decodeURIComponent);
+    const [, quoteId = "", trader = "", destPart = "", srcChain = "", kindPart = ""] = parts.map(decodeURIComponent);
+    // Ids issued before scan 2026-10-30 F6 carry no digest: tracking still reads them, building refuses them.
+    const mark = destPart.lastIndexOf("#");
+    const dest = mark < 0 ? destPart : destPart.slice(0, mark);
+    const digest = mark < 0 ? undefined : destPart.slice(mark + 1);
+    if (digest !== undefined && !QUOTE_DIGEST.test(digest)) return null;
     if (!QUOTE_ID.test(quoteId) || !trader || !dest || !srcChain) return null;
     if (parts.length === 6 && kindPart !== "swap") return null;
-    return {quoteId, trader, dest, srcChain, kind: parts.length === 6 ? "swap" : "order"};
+    return {quoteId, trader, dest, srcChain, kind: parts.length === 6 ? "swap" : "order", ...(digest ? {digest} : {})};
   } catch {
     return null;
   }
@@ -1736,6 +1776,7 @@ async function checkRemoteEvmOrder(
  */
 export function omnistonVerifyBuild(hooks: {
   validateTonSwapTarget: (input: {address: string; protocols: readonly string[]}) => Promise<boolean> | boolean;
+  /** The DEX pays out the quoted token (`createOmnistonTonValidators().validateTonSwapLeg`). Without it a TON swap body is refused. */
   validateTonSwapLeg?: (leg: TonSwapLeg) => Promise<boolean> | boolean;
   /**
    * The app's check of a TON → EVM escrow body (`createOmnistonTonValidators().verifyTonEscrowBuild`). Without it a
@@ -1813,12 +1854,12 @@ export function omnistonVerifyBuild(hooks: {
     const target = source.contract ? payload.jettonTransfer?.destination : tx.to;
     if (!target) return "the body names no swap destination";
     try { if (!(await hooks.validateTonSwapTarget({address: target, protocols}))) return `${target} is not a recognized DEX contract for ${protocols.join("+")}`; } catch { return "the swap target could not be checked"; }
-    if (hooks.validateTonSwapLeg) {
-      for (const leg of checked.legs) {
-        let ok = false;
-        try { ok = await hooks.validateTonSwapLeg(leg); } catch { ok = false; }
-        if (!ok) return `${leg.kind} v${leg.version} leg not verified`;
-      }
+    // Scan 2026-10-30 F8: without the leg check a genuine DEX body may pay out another token than the quoted one.
+    if (!hooks.validateTonSwapLeg) return "a TON swap body needs validateTonSwapLeg (createOmnistonTonValidators)";
+    for (const leg of checked.legs) {
+      let ok = false;
+      try { ok = await hooks.validateTonSwapLeg(leg); } catch { ok = false; }
+      if (!ok) return `${leg.kind} v${leg.version} leg not verified`;
     }
     return null;
   };
@@ -1971,7 +2012,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
   /**
    * A fresh quote's context, saved only if the quote id is new or already holds THIS context (same trader, dest,
    * chain, kind): a platform reusing an id for another user's quote never rebinds a context (scan 2026-10-27 modules,
-   * F27). Atomic with the store's `claim`; check-then-save otherwise.
+   * F27). Atomic with the store's `claim`; check-then-save otherwise. A held id is refreshed only by the same terms
+   * (same quote digest): a reused id with other terms is refused and the first quote kept (scan 2026-10-30 F6).
    */
   async function claimBuilt(quoteId: string, entry: BuiltEntry): Promise<boolean> {
     const json = JSON.stringify(entry);
@@ -1989,7 +2031,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       return true;
     }
     const a = existing.bound, b = entry.bound;
-    const same = !!a && !!b && a.kind === b.kind && a.srcChain === b.srcChain && sameIntentAddress(a.trader, b.trader) && sameIntentAddress(a.dest, b.dest);
+    const same = !!a && !!b && a.kind === b.kind && a.srcChain === b.srcChain && sameIntentAddress(a.trader, b.trader) && sameIntentAddress(a.dest, b.dest) &&
+      quoteDigest(existing.quote) === quoteDigest(entry.quote);
     if (!same) return false;
     await quotes.save(quoteId, json);
     return true;
@@ -2053,6 +2096,16 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       throw new Error(`omniston: intent id does not match the quote it was issued for (${bound.field})`);
     }
     if (bound.legacy) trace("legacy-intent", {where});
+    // Scan 2026-10-30 F6: the terms the caller's quote showed must be the cached ones. An id from before the digest
+    // (in flight across a deploy) is refused too: a fresh quote is a second away.
+    if (!decoded.digest) {
+      trace("intent-mismatch", {where, field: "digest-missing"});
+      throw new Error("omniston: this quote was issued before an update — request a fresh quote");
+    }
+    if (decoded.digest !== quoteDigest(entry.quote)) {
+      trace("intent-mismatch", {where, field: "digest"});
+      throw new Error("omniston: quote was replaced — request a fresh quote");
+    }
     return bound.ref;
   }
 
@@ -2070,6 +2123,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
    */
   const bindKey = (quoteId: string) => `${quoteId}#bind`;
   const disclosedKey = (quoteId: string) => `${quoteId}#disclosed`;
+  /** The execution indices whose secret Omniston accepted (scan 2026-10-30 F10: completion needs every one). */
+  const disclosedIndicesKey = (quoteId: string) => `${quoteId}#disclosed-indices`;
   function orderBinding(ref: Decoded, q: OmnistonQuote): string {
     return sha256(new TextEncoder().encode(JSON.stringify([
       ref.quoteId, ref.trader ?? null, ref.dest ?? null, ref.srcChain ?? null,
@@ -2080,6 +2135,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     await store.clear(quoteId);
     await store.clear(bindKey(quoteId));
     await store.clear(disclosedKey(quoteId));
+    await store.clear(disclosedIndicesKey(quoteId));
   }
   async function secretsFor(ref: Decoded, q: OmnistonQuote, count: number): Promise<{secrets: Uint8Array[]; created: boolean}> {
     const quoteId = ref.quoteId;
@@ -2115,10 +2171,13 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
   // ── TON ↔ TON: swap settlement (immediate DEX routes, no escrow) ──────────
   const SWAP_SLIPPAGE_PIPS_DEFAULT = 5_000; // 0.5%
   /** Same-chain swaps need the jetton-wallet validator (jetton input goes
-   *  through the trader's own wallet) and a swap-target validator (the DEX
-   *  contract the funds land in is resolver-chosen per route). */
+   *  through the trader's own wallet), a swap-target validator (the DEX
+   *  contract the funds land in is resolver-chosen per route) and the leg
+   *  validator (the DEX pays out the quoted token, scan 2026-10-30 F8) —
+   *  the last waived only by the explicit `tonSwapPayloadCheck: "report"`. */
   const sameChainTonReady = (): boolean =>
-    typeof opts.validateTonJettonWallet === "function" && typeof opts.validateTonSwapTarget === "function";
+    typeof opts.validateTonJettonWallet === "function" && typeof opts.validateTonSwapTarget === "function" &&
+    (typeof opts.validateTonSwapLeg === "function" || opts.tonSwapPayloadCheck === "report");
   /** TON→EVM: the TON factory and the EVM factory are allowlisted, and the
    *  jetton-wallet, escrow-payload and EVM output-position validators exist. */
   const tonSourceReady = (from: string, to: string): boolean =>
@@ -2239,7 +2298,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     const feeUsd = stableOut ? feeUnits / 10 ** dest.decimals : 0;
     return {
       provider: "omniston",
-      intentId: encodeIntent(q.quoteId, trader, params.destAddress, params.sourceChain, "swap"),
+      intentId: encodeIntent(q.quoteId, trader, params.destAddress, params.sourceChain, "swap", quoteDigest(q)),
       depositAddress: "", // swap settlement — the built message pays the DEX directly
       depositMemo: null,
       sourceAmount: q.inputUnits,
@@ -2276,7 +2335,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     if (!isTon(ref.srcChain) || q.inputAsset.chain.$case !== "ton" || q.outputAsset.chain.$case !== "ton") {
       throw new Error("omniston: swap quote is not a TON same-chain swap");
     }
-    if (!sameChainTonReady()) throw new Error("omniston: TON same-chain swaps need independent jetton-wallet and swap-target validators");
+    if (!sameChainTonReady()) throw new Error("omniston: TON same-chain swaps need independent jetton-wallet, swap-target and swap-leg validators");
     const owner: ChainAddress = {chain: {$case: "ton", value: ref.trader}};
     const receiver: ChainAddress = {chain: {$case: "ton", value: ref.dest}};
     const omni = await getClient();
@@ -2391,7 +2450,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     }
     if (checked) {
       if (typeof opts.validateTonSwapLeg !== "function") {
-        trace("ton-swap-payload", {reason: "legs-unverified", detail: "no validateTonSwapLeg hook", mode, legs: checked.legs.length});
+        // Scan 2026-10-30 F8: the decoder proves receiver, refund and minimum, not which token the DEX pays out.
+        payloadRefusal("legs-unverified", `no validateTonSwapLeg hook for ${checked.legs.length} leg(s)`);
       } else {
         for (const leg of checked.legs) {
           let ok = false;
@@ -2732,7 +2792,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
       if (await quoteIdInUse(q.quoteId)) return refuse("the platform reused a quote id that already belongs to an order");
       if (!(await claimBuilt(q.quoteId, {quote: q, at: Date.now(), bound: {trader, dest: params.destAddress, srcChain: params.sourceChain, kind: "order"}}))) {
-        return refuse("the platform reused a quote id that already holds another user's quote");
+        return refuse("the platform reused a quote id that already holds another quote");
       }
 
       // Fees are charged in the OUTPUT asset; the corridor is stables, so units
@@ -2742,7 +2802,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
 
       return {
         provider: "omniston",
-        intentId: encodeIntent(q.quoteId, trader, params.destAddress, params.sourceChain),
+        intentId: encodeIntent(q.quoteId, trader, params.destAddress, params.sourceChain, "order", quoteDigest(q)),
         depositAddress: "", // order settlement — no static deposit address
         depositMemo: null,
         sourceAmount: q.inputUnits,
@@ -2927,6 +2987,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       if (!order) return {state: "pending"};
 
       let secretsHex = await store.load(decoded.quoteId);
+      /** Secrets on file: a feed-only completion must not delete them (scan 2026-10-30 F10). */
+      const storedSecrets = secretsHex?.length ?? 0;
       if (!secretsHex || cached?.quote.settlementData.$case !== "order") trace("disclosure-skipped", {gate: "context", secrets: !!secretsHex, cached: !!cached, feedStatus: order.status});
       // The secrets were locked to one order (trader, dest, chain, assets, units): the context they are disclosed
       // against must be that order — never a context rebound under a reused quote id after they were made (scan
@@ -2938,6 +3000,8 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
           secretsHex = undefined;
         }
       }
+      /** Executions whose secret Omniston accepted in this poll. */
+      const disclosedNow = new Set<number>();
       if (secretsHex && cached?.quote.settlementData.$case === "order") {
         const q = cached.quote;
         const settlement = q.settlementData.value as OrderSettlement;
@@ -3047,12 +3111,17 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
               .orderDiscloseHtlcSecret({quoteId: decoded.quoteId, executionIndex: i, secret: secretBytes})
               .then(async () => {
                 trace("secret-disclosed", {index: i});
+                disclosedNow.add(i);
                 // Disclosed = known to the counterparty: never lock a new order to it (scan F6).
                 await store.save(disclosedKey(decoded.quoteId), ["1"]);
               }, (error) => trace("disclose-failed", {index: i, error: error instanceof Error ? error.message : String(error)})); // retried on the next poll
           }),
         );
       }
+      // One write per poll (the disclosures above run in parallel): every index disclosed so far.
+      const disclosedBefore = ((await store.load(disclosedIndicesKey(decoded.quoteId))) ?? []).map(Number).filter(Number.isSafeInteger);
+      const disclosedAll = new Set([...disclosedBefore, ...disclosedNow]);
+      if (disclosedNow.size > 0) await store.save(disclosedIndicesKey(decoded.quoteId), [...disclosedAll].sort((a, b) => a - b).map(String));
 
       const status = mapOrderStatus(order);
       const delivered = order.executions[0]?.outputPositionAddress;
@@ -3079,9 +3148,29 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         }).catch(() => null);
         if (hash) status.destTxHash = hash;
       }
-      // A feed-only CANCELLED/FAILED signal is not on-chain invalidation of a
-      // signed order. Retain secrets/context until proven completion or TTL so
-      // a late valid output lock can still be completed safely.
+      // A feed-only status is not proof (scan 2026-10-30 F10): FULLY_FILLED is
+      // completion only when every execution's secret went out (this poll or
+      // an earlier one — a terminal snapshot may list no executions, then a
+      // recorded disclosure counts), or a delivery locator found the payout.
+      // Otherwise the order stays pending with its secrets and context, so a
+      // late real execution is still disclosed; TTL / the caller's refund
+      // backstop closes it. A feed-only CANCELLED/FAILED is no on-chain
+      // invalidation of a signed order either (mapOrderStatus keeps it pending).
+      // Without secrets on file (completed or expired before, another
+      // instance's order) this stays a plain status read of the feed.
+      if (status.state === "completed" && storedSecrets > 0 && !status.destTxHash) {
+        // An order disclosed by the previous version recorded only that a
+        // secret went out, not which: with a single secret that is all of them.
+        const legacyDisclosed = disclosedBefore.length === 0 && storedSecrets === 1 &&
+          ((await store.load(disclosedKey(decoded.quoteId))) ?? []).length > 0;
+        const allDisclosed = legacyDisclosed || (order.executions.length > 0
+          ? order.executions.every((execution) => disclosedAll.has(execution.index))
+          : disclosedAll.size > 0);
+        if (!allDisclosed) {
+          trace("completion-unproven", {feedStatus: order.status, executions: order.executions.length, disclosed: disclosedAll.size});
+          return {state: "pending", depositReceived: order.executions.length > 0 || disclosedAll.size > 0};
+        }
+      }
       if (status.state === "completed") {
         await clearSecrets(decoded.quoteId);
         await quotes.clear(decoded.quoteId);

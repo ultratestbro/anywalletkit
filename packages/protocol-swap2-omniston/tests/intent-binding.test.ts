@@ -70,7 +70,8 @@ function evmClient(q: unknown, snapshot: unknown = null) {
       return eePayload();
     },
     async orderRegisterSignedOrder(request: unknown) { (calls.orderRegisterSignedOrder ??= []).push(request); },
-    orderTrack(request: unknown) { (calls.orderTrack ??= []).push(request); return observable(snapshot ? [{$case: "order", value: snapshot}] : []); },
+    snapshot,
+    orderTrack(request: unknown) { (calls.orderTrack ??= []).push(request); return observable(client.snapshot ? [{$case: "order", value: client.snapshot}] : []); },
     async orderDiscloseHtlcSecret(request: unknown) { (calls.orderDiscloseHtlcSecret ??= []).push(request); },
     tonBuildEscrowTransfer() { throw new Error("not used"); },
   };
@@ -208,9 +209,11 @@ describe("intent binding: EVM → EVM", () => {
     expect(bare.client.calls.orderTrack).toEqual([{quoteId: bare.quoteId, traderAddress: {chain: {$case: "base", value: EE.OWNER}}}]);
     expect(bare.client.calls.orderDiscloseHtlcSecret).toBeUndefined();
 
-    const done = eeSetup(eeSnapshot("TRADE_STATUS_FULLY_FILLED", "EXECUTION_PHASE_COMPLETED"));
+    const done = eeSetup();
     const q = await done.quote();
     await done.p.buildDeposit(q!);
+    await done.p.trackIntent({intentId: q!.intentId}); // discloses the secret
+    done.client.snapshot = eeSnapshot("TRADE_STATUS_FULLY_FILLED", "EXECUTION_PHASE_COMPLETED");
     await expect(done.p.trackIntent({intentId: q!.intentId})).resolves.toEqual({state: "completed", depositReceived: true});
     expect(await done.quoteStore.load(done.quoteId)).toBeUndefined();
     // After completion the cache is gone: any later read is a plain status read.
@@ -394,11 +397,14 @@ describe("scan 2026-10-23 F6: the platform-chosen quoteId never decides which pr
   });
 
   it("completion clears the secret together with its binding and disclosure marks", async () => {
-    const s = eeSetup(eeSnapshot("TRADE_STATUS_FULLY_FILLED", "EXECUTION_PHASE_COMPLETED"));
+    const s = eeSetup();
     const q = await s.quote();
     await s.p.buildDeposit(q!);
+    await s.p.trackIntent({intentId: q!.intentId}); // discloses
+    s.client.snapshot = eeSnapshot("TRADE_STATUS_FULLY_FILLED", "EXECUTION_PHASE_COMPLETED");
     await s.p.trackIntent({intentId: q!.intentId});
     expect(await s.secretStore.load(s.quoteId)).toBeUndefined();
+    expect(await s.secretStore.load(`${s.quoteId}#disclosed-indices`)).toBeUndefined();
     expect(await s.secretStore.load(`${s.quoteId}#bind`)).toBeUndefined();
     expect(await s.secretStore.load(`${s.quoteId}#disclosed`)).toBeUndefined();
   });

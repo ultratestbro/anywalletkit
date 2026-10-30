@@ -184,13 +184,13 @@ describe("remote TON cell bodies need the app's own check (scan 2026-10-27 modul
 
   it("omnistonVerifyBuild opens the body against the app's request and asks the app's validator about the DEX", async () => {
     const targets: string[] = [];
-    const verify = omnistonVerifyBuild({validateTonSwapTarget: ({address}) => { targets.push(address); return true; }});
+    const verify = omnistonVerifyBuild({validateTonSwapTarget: ({address}) => { targets.push(address); return true; }, validateTonSwapLeg: () => true});
     const ok = tonRun(nativeCase, live(nativeCase), {provider: stub(nativeCase, live(nativeCase), verify)});
     await ok.swap();
     expect(ok.sent).toHaveLength(1);
     expect(targets).toEqual([nativeCase.messages[0]!.targetAddress]);
     // The validator says no: refused before anything is signed.
-    const no = tonRun(nativeCase, live(nativeCase), {provider: stub(nativeCase, live(nativeCase), omnistonVerifyBuild({validateTonSwapTarget: () => false}))});
+    const no = tonRun(nativeCase, live(nativeCase), {provider: stub(nativeCase, live(nativeCase), omnistonVerifyBuild({validateTonSwapTarget: () => false, validateTonSwapLeg: () => true}))});
     await expect(no.swap()).rejects.toThrow(/is not a recognized DEX contract/);
     expect(no.sent).toHaveLength(0);
     // checkTonSwapPayload on the client: a body whose on-chain minimum is below the quote, or for another trader, is refused.
@@ -242,8 +242,9 @@ function g10Setup(quoteStore: OmnistonQuoteStore) {
   vi.useFakeTimers({toFake: ["Date"], now: (eeQuote().quoteTimestamp + 5) * 1000});
   vi.spyOn(crypto, "getRandomValues").mockImplementation(((array: Uint8Array) => { array.set(G10_SECRET.subarray(0, array.length)); return array; }) as never);
   const calls: Record<string, unknown[]> = {};
+  let nextQuote = eeQuote;
   const client = {
-    requestForQuote() { const q = eeQuote(); return observable([{$case: "ack", value: {rfqId: q.rfqId}}, {$case: "quoteUpdated", rfqId: q.rfqId, value: q}]); },
+    requestForQuote() { const q = nextQuote(); return observable([{$case: "ack", value: {rfqId: q.rfqId}}, {$case: "quoteUpdated", rfqId: q.rfqId, value: q}]); },
     async evmBuildOrderPayload() { return {typedData: ee.payload.typedData as string, orderExtension: new Uint8Array(Buffer.from(ee.payload.orderExtensionHex, "hex")), serializedOrderDetails: new Uint8Array(Buffer.from(ee.payload.serializedOrderDetailsHex, "hex"))}; },
     async orderRegisterSignedOrder() {},
     orderTrack() { return observable([{$case: "order", value: snapshot()}]); },
@@ -258,7 +259,7 @@ function g10Setup(quoteStore: OmnistonQuoteStore) {
     secretStore: inMemorySecretStore(), quoteStore, trace: (event, d) => events.push(`${event}${d?.gate ? `:${d.gate}` : ""}`),
   });
   const quote = (dest = EE.DEST, owner = EE.OWNER) => p.getQuote({sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:42161", destToken: EE.USDT0_ARB, amountIn: "20000000", destAddress: dest, refundAddress: owner, slippageBps: 100, dry: false});
-  return {p, calls, events, quote, quoteId: eeQuote().quoteId as string};
+  return {p, calls, events, quote, quoteId: eeQuote().quoteId as string, setNext: (f: typeof eeQuote) => { nextQuote = f; }};
 }
 
 describe("Omniston: a reused quote id cannot rebind an order after its secret exists (scan 2026-10-27 modules, F27)", () => {
@@ -281,7 +282,7 @@ describe("Omniston: a reused quote id cannot rebind an order after its secret ex
     expect(s.calls.disclose ?? []).toHaveLength(1);
   });
 
-  it("claiming the quote id: another user's quote under a held id is refused; the same user's re-quote refreshes it", async () => {
+  it("claiming the quote id: another user's quote under a held id is refused; the same user's re-quote refreshes it only with the same terms (scan 2026-10-30 F6)", async () => {
     for (const atomic of [true, false]) {
       const store = asyncStore(atomic);
       const s = g10Setup(store);
@@ -290,7 +291,14 @@ describe("Omniston: a reused quote id cannot rebind an order after its secret ex
       const before = await store.load(s.quoteId);
       expect(await s.quote(ATTACKER_EVM, ATTACKER_EVM), `atomic=${atomic}`).toBeNull();
       expect(await store.load(s.quoteId)).toBe(before);
-      expect(await s.quote(), `atomic=${atomic}`).not.toBeNull();
+      const first = await s.quote();
+      expect(first, `atomic=${atomic}`).not.toBeNull();
+      // The same user, the same id, other terms (10% less output): refused, the first quote kept and still buildable.
+      const held = await store.load(s.quoteId);
+      s.setNext(() => { const q = eeQuote(); q.outputUnits = String((BigInt(q.outputUnits) * 9n) / 10n); return q; });
+      expect(await s.quote(), `atomic=${atomic}`).toBeNull();
+      expect(await store.load(s.quoteId)).toBe(held);
+      await expect(s.p.buildDeposit(first!)).resolves.toBeDefined();
       vi.useRealTimers();
       vi.restoreAllMocks();
     }
