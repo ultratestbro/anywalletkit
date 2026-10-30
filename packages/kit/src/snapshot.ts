@@ -4,9 +4,11 @@
  * differently on a later read, a `confirm` hook that edits what it was shown, or a timer that
  * edits the caller's object during an await cannot change what gets signed after it was judged.
  *
- * - Accessors are read once into plain values; functions are kept as they are.
+ * - Accessors are read once into plain values; functions are kept as they are. What an object inherits
+ *   from a custom prototype (data and accessors, not methods) is read once too and becomes the copy's
+ *   own value; a prototype that has no methods is not kept at all.
  * - Typed arrays (a Node `Buffer` stays a `Buffer`), `ArrayBuffer`, `Date`, `Map` and `Set` are
- *   copied. Arrays and objects keep their prototype (a class instance such as a TON `Cell` stays
+ *   copied. Arrays and objects keep a prototype with methods (a class instance such as a TON `Cell` stays
  *   usable) and their frozen / sealed state; cycles stay cycles.
  * - A class that keeps its state in `#private` fields does not survive the copy: its methods
  *   throw, so the write fails instead of signing something unchecked. Promises, weak collections
@@ -42,7 +44,13 @@ function copy(v: unknown, seen: Map<object, unknown>): unknown {
     for (const x of v) s.add(copy(x, seen))
     return s
   }
-  const proto = Object.getPrototypeOf(v) as object | null
+  let proto = Object.getPrototypeOf(v) as object | null
+  const plain = proto === null || proto === Object.prototype || proto === Array.prototype
+  // A custom prototype: what it carries besides methods is read once, below (scan 2026-10-30 F15).
+  const inherited = plain ? { list: [], methods: false } : inheritedData(v, proto!)
+  // A prototype with no methods is only data (`Object.create({ to })`): the copy drops it, so a field
+  // added to it later is not read either. A class keeps its prototype, and with it its methods.
+  if (!plain && !inherited.methods) proto = Array.isArray(v) ? Array.prototype : Object.prototype
   out = Array.isArray(v) ? (proto === Array.prototype ? [] : Object.setPrototypeOf([], proto)) : Object.create(proto)
   seen.set(v, out)
   for (const key of Reflect.ownKeys(v)) {
@@ -53,9 +61,35 @@ function copy(v: unknown, seen: Map<object, unknown>): unknown {
     const value = 'value' in d ? d.value : d.get ? d.get.call(v) : undefined
     Object.defineProperty(out, key, { value: copy(value, seen), writable: d.writable ?? true, enumerable: d.enumerable ?? true, configurable: d.configurable ?? true })
   }
+  for (const { key, value, enumerable } of inherited.list) {
+    Object.defineProperty(out, key, { value: copy(value, seen), writable: true, enumerable, configurable: true })
+  }
   if (Array.isArray(v)) (out as unknown[]).length = v.length
   if (Object.isFrozen(v)) Object.freeze(out)
   else if (Object.isSealed(v)) Object.seal(out)
   else if (!Object.isExtensible(v)) Object.preventExtensions(out)
   return out
+}
+
+/**
+ * What `v` inherits from a custom prototype chain (up to `Object.prototype` / `Array.prototype`), read once:
+ * every data value that is not a function, and every accessor's answer (read on `v`), nearest first and
+ * not shadowed by an own key. They become own values of the copy, so a prototype edited during an await or a
+ * getter that answers differently later cannot change what gets signed. `methods`: the chain has functions.
+ */
+function inheritedData(v: object, proto: object): { list: Array<{ key: string | symbol; value: unknown; enumerable: boolean }>; methods: boolean } {
+  const list: Array<{ key: string | symbol; value: unknown; enumerable: boolean }> = []
+  const done = new Set<string | symbol>(Reflect.ownKeys(v))
+  let methods = false
+  for (let p: object | null = proto; p !== null && p !== Object.prototype && p !== Array.prototype; p = Object.getPrototypeOf(p) as object | null) {
+    for (const key of Reflect.ownKeys(p)) {
+      const d = Reflect.getOwnPropertyDescriptor(p, key)
+      if (!d) continue
+      if (done.has(key)) { if ('value' in d && typeof d.value === 'function') methods = true; continue }
+      done.add(key)
+      if ('value' in d && typeof d.value === 'function') { methods = true; continue } // methods (and `constructor`) stay on the prototype
+      list.push({ key, value: 'value' in d ? d.value : d.get ? d.get.call(v) : undefined, enumerable: d.enumerable ?? false })
+    }
+  }
+  return { list, methods }
 }
