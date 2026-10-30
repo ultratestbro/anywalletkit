@@ -66,3 +66,25 @@ export class BroadcastUnknownError extends Error {
     this.hash = hash
   }
 }
+
+/**
+ * The node refused the transaction with "nonce too low", its hash was not found, and the nonce could
+ * not be proven spent by another transaction (scan 2026-10-30 F1). The RPC that refused it already
+ * holds the signed bytes: if it lied, it can still broadcast them, so nothing new is signed. Show
+ * "the network didn't confirm — check activity, then retry"; the account's next send uses
+ * `nextNonce` (when the node named one) or the nonce after this one.
+ */
+export class NonceConflictError extends BroadcastUnknownError {
+  /** The nonce the signed transaction carries. */
+  readonly nonce: number
+  /** The next nonce the node named in its refusal, when it named one. */
+  readonly nextNonce: number | undefined
+  constructor(hash: `0x${string}`, nonce: number, nextNonce: number | undefined, cause: unknown) {
+    super(hash, cause)
+    this.name = 'NonceConflictError'
+    this.message = `The network refused ${hash} (nonce ${nonce}) as "nonce too low", but did not show the nonce taken by another transaction: it may still be broadcast. Check the account's activity before retrying.`
+    this.nonce = nonce
+    this.nextNonce = nextNonce
+  }
+}
+

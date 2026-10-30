@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { hexToBytes, keccak256, parseTransaction, type EIP1193Provider, type Hex } from 'viem'
 import { externalSigner } from '@anywalletkit/core'
-import { BroadcastUnknownError, WalletManagerEvm } from '../src/index.js'
+import { BroadcastUnknownError, NonceConflictError, WalletManagerEvm } from '../src/index.js'
 
 // Audit 2026-10-25, finding 1: a lost broadcast answer followed by "already known" /
 // "nonce too low" from the next RPC must never produce a second signed transaction.
@@ -116,13 +116,68 @@ describe('failover never signs a second transaction for one send', () => {
     expect(all(net).map(([, r]) => parseTransaction(r).nonce)).toEqual([7, 8])
   })
 
-  it('a stale `pending` count ("nonce too low", tx not ours) is still re-signed once with the next nonce', async () => {
+  it('a stale `pending` count on the only RPC ("nonce too low", tx not ours) is not re-signed: NonceConflictError, then the next send takes the right nonce', async () => {
+    // One RPC's "not found" is not proof (scan 2026-10-30 F1): it already holds the signed bytes.
     const net = network([7, 8])
-    const { a, txSignatures } = await account([rpc(net, geth(net))])
+    const count = { eth_getTransactionCount: (p: unknown[]) => (p[1] === 'latest' ? '0x9' : '0x7') }
+    const { a, txSignatures } = await account([rpc(net, geth(net), count)])
+    const err = await a.sendTransaction({ to: SPENDER, value: 1n }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(NonceConflictError)
+    expect(err).toBeInstanceOf(BroadcastUnknownError)
+    expect(err).toMatchObject({ maybeSent: true, nonce: 7, nextNonce: 9 })
+    expect(txSignatures()).toBe(1)
+    expect(all(net)).toHaveLength(0)
+    const res = await a.sendTransaction({ to: SPENDER, value: 1n }) // the caller retries: `pending` still says 7
+    expect(txSignatures()).toBe(2)
+    expect(all(net).map(([, r]) => parseTransaction(r).nonce)).toEqual([9])
+    expect(res.hash).toBe(all(net)[0]![0])
+  })
+
+  it('a stale `pending` count that two RPCs prove (nonce mined, hash unknown) is re-signed once with the next nonce', async () => {
+    const net = network([7, 8])
+    const count = { eth_getTransactionCount: (p: unknown[]) => (p[1] === 'latest' ? '0x9' : '0x7') }
+    const { a, txSignatures } = await account([rpc(net, geth(net), count), rpc(net, geth(net), count)])
     const res = await a.sendTransaction({ to: SPENDER, value: 1n })
     expect(txSignatures()).toBe(2)
     expect(all(net).map(([, r]) => parseTransaction(r).nonce)).toEqual([9])
     expect(res.hash).toBe(all(net)[0]![0])
+  })
+
+  it('one lying RPC among two (it says the nonce is mined, the other does not) → NonceConflictError, one signature', async () => {
+    const net = network()
+    const withheld: Hex[] = []
+    const liar = rpc(net, (raw) => { withheld.push(raw); throw rpcError('nonce too low: next nonce 8, tx nonce 7') }, {
+      eth_getTransactionByHash: () => null,
+      eth_getTransactionCount: (p) => (p[1] === 'latest' ? '0x8' : '0x7'),
+    })
+    // `latest` = 7: nonce 7 is free. It takes no sends (a read-only endpoint), so the liar's refusal is the answer.
+    const honest = rpc(net, () => { throw rpcError('method not available', -32601) })
+    const { a, txSignatures } = await account([honest, liar])
+    const err = await a.sendTransaction({ to: SPENDER, value: 1n }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(NonceConflictError)
+    expect(err).toMatchObject({ maybeSent: true, hash: keccak256(withheld[0]!), nonce: 7, nextNonce: 8 })
+    expect(txSignatures()).toBe(1)
+  })
+
+  it('the same endpoint listed twice is one endpoint, not two proofs', async () => {
+    const net = network([7, 8])
+    const count = { eth_getTransactionCount: (p: unknown[]) => (p[1] === 'latest' ? '0x9' : '0x7') }
+    const one = rpc(net, geth(net), count)
+    const { a, txSignatures } = await account([one, one])
+    await expect(a.sendTransaction({ to: SPENDER, value: 1n })).rejects.toBeInstanceOf(NonceConflictError)
+    expect(txSignatures()).toBe(1)
+  })
+
+  it('an endpoint that knows our hash ends the send as accepted, without a second signature', async () => {
+    const net = network([7])
+    const withheld: Hex[] = []
+    // The first RPC keeps the bytes and denies them; the second has seen them mined.
+    const liar = rpc(net, (raw) => { withheld.push(raw); net.chain.set(keccak256(raw), raw); throw rpcError('nonce too low: next nonce 8, tx nonce 7') }, { eth_getTransactionByHash: () => null })
+    const { a, txSignatures } = await account([liar, rpc(net, geth(net))])
+    // The failover's lookup goes to the liar first; the per-endpoint check hears the other one.
+    const res = await a.sendTransaction({ to: SPENDER, value: 1n })
+    expect(txSignatures()).toBe(1)
+    expect(res.hash).toBe(keccak256(withheld[0]!))
   })
 
   it('"replacement transaction underpriced" is not retried', async () => {

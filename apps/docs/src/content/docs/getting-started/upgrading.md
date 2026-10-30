@@ -37,6 +37,18 @@ Solana key that differs only in letter case pass an allowlist. EVM, NEAR, Aptos 
 still match in any case, bech32 Bitcoin / Zcash addresses in either case, Tron and TON in any of their
 forms. If your lists hold lowercased Solana keys, store them as the wallet shows them.
 
+### `nonce too low` from one RPC is not re-signed (`wallet-evm`)
+
+A send whose transaction the node refuses with "nonce too low", and whose hash it says it never saw, was
+signed again with the next nonce. The RPC that refused already holds the first signed bytes, so a lying
+RPC could broadcast both. Now the account signs again only when at least two distinct configured RPCs
+show the nonce mined by another transaction. Otherwise the send throws `NonceConflictError` — a
+`BroadcastUnknownError` (`maybeSent: true`, `hash`), with `nonce` and the node's `nextNonce`. Apps should
+show "the network didn't confirm — check activity, then retry": keep the operation pending on `hash`,
+and let the user send again once activity shows the first transaction is not coming; the account's next
+send already skips the refused nonce. With one RPC configured, a stale `pending` nonce now costs one
+retry instead of being fixed silently; configure two RPCs to keep the automatic recovery.
+
 ## Next release: remote swaps checked on the device
 
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps

@@ -60,9 +60,14 @@ Every send goes through, in order: static refusals → simulation → fee cap �
   every signature. `quoteSendTransaction` prices the same fields, so a kit `maxFee` policy sees them too.
 - **Broadcast.** A lost answer throws `BroadcastUnknownError` with the locally computed `hash`: watch
   it, do not send again. With several RPCs, `already known` from the next one is the same transaction
-  and resolves to its hash. `nonce too low` is re-signed with the next nonce only after the account
-  has checked that the rejected hash is not on the network; `replacement transaction underpriced` is
-  never retried.
+  and resolves to its hash. `nonce too low` is re-signed with the next nonce only when the nonce is
+  proven taken by another transaction: at least two distinct configured RPCs count the account's mined
+  transactions past it (`latest`) and none of them knows the rejected hash. Otherwise — one RPC
+  configured, or the RPCs disagree — the send throws `NonceConflictError` (a `BroadcastUnknownError`:
+  `maybeSent`, `hash`, plus `nonce` and the node's `nextNonce`) and nothing new is signed, since the RPC
+  that refused may still hold and broadcast the signed bytes. Show "the network didn't confirm — check
+  activity, then retry"; the account's next send skips the refused nonce. `replacement transaction
+  underpriced` is never retried.
 - **EIP-2612 permit.** `getPermitInfo(token)` reads `name/version/nonces/DOMAIN_SEPARATOR` and
   reports `supported` only when the rebuilt EIP-712 domain equals the contract's own;
   `signPermit({token, spender, value, deadline})` returns `{signature, v, r, s, nonce, deadline, typedData}`.
