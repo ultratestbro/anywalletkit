@@ -27,6 +27,12 @@ This release fixes findings of the 2026-10-30 scan in `@anywalletkit/networks` a
   reads a gateway's answer to at most 1 MiB and gives each gateway 10 s for the request and the whole
   answer: `ccip: { maxResponseBytes, timeoutMs }`. Real answers are a few KB; nothing to change unless
   you lowered your own limits.
+- **On Node, CCIP-Read gateways go through the pinned transport.** With no `ccip.fetch`,
+  `ensResolver({ rpcUrl })` on Node asks gateways the way `createEnsCcipHandler` does: DNS answers
+  checked, the connection pinned. A gateway host that resolves to a private address — or mixes public
+  and private records — is refused. Behind a corporate split-horizon DNS or an outbound proxy, pass
+  `ccip: { fetch }`. Browsers are unchanged (no DNS-level check there; use `ensCcipViaProxy` where it
+  matters); React Native is unchanged.
 
 ## Next release: remote swaps checked on the device
 

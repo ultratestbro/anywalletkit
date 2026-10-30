@@ -6,6 +6,7 @@ import { isPublicHttpsUrl } from '@anywalletkit/networks/url'
 import { coinTypeFor, decodeAddressRecord } from './coins.js'
 import { warningsFor } from './warnings.js'
 import { cancelBody, declaresMoreThan, readCapped } from './read-capped.js'
+import { loadNodeTransport, type PinnedCall } from './node-transport.js'
 
 /** Options for `ensResolver`: an Ethereum-mainnet client or RPC URL, and caching. */
 export interface EnsResolverOptions {
@@ -65,10 +66,12 @@ const ccipProxyRequired = (detail: { name?: string; chain?: string } = {}) =>
 /** How `ensCcipRequest` / `createEnsCcipRead` reach CCIP-Read gateways. */
 export interface EnsCcipOptions {
   /**
-   * The fetch used to ask gateways, in place of the global one. Supply one that does not follow redirects: a native
-   * fetch that honours `redirect: 'manual'`/`'error'`, or one that sends the request to your own server's CCIP-Read
-   * proxy (which refuses redirects and checks the address it connects to). Passing it says redirects are handled, so
-   * gateways are asked on every runtime, React Native included. The https / public-host check still runs first.
+   * The fetch used to ask gateways, in place of the default transport. Supply one that does not follow redirects: a
+   * native fetch that honours `redirect: 'manual'`/`'error'`, or one that sends the request to your own server's
+   * CCIP-Read proxy (which refuses redirects and checks the address it connects to). Passing it says redirects are
+   * handled, so gateways are asked on every runtime, React Native included. The https check on the URL text still
+   * runs first; where the host resolves is then up to this fetch (on Node it replaces the pinned transport — pass it
+   * when gateways must go through a proxy or a split-horizon DNS you trust).
    */
   fetch?: (url: string, init: RequestInit) => Promise<Response>
   /**
@@ -91,15 +94,42 @@ export interface EnsCcipOptions {
 const fetchFollowsRedirects = (): boolean =>
   typeof navigator !== 'undefined' && (navigator as { product?: unknown }).product === 'ReactNative'
 
+/** Node (Bun and Deno report it too, and have `node:https`); never React Native, whatever a polyfill sets. */
+const runsOnNode = (): boolean => {
+  const v = (globalThis as { process?: { versions?: { node?: unknown } } }).process?.versions?.node
+  return typeof v === 'string' && v !== '' && !fetchFollowsRedirects()
+}
+
+/** The pinned Node transport, loaded once; a browser / React Native bundle has none (see node-transport.ts). */
+let nodeTransport: Promise<PinnedCall> | undefined
+function nodeTransportFor(): Promise<PinnedCall> | null {
+  if (!loadNodeTransport) return null
+  nodeTransport ??= loadNodeTransport().catch((e: unknown) => {
+    nodeTransport = undefined
+    throw new EnsNameError('lookup-failed', 'The pinned CCIP-Read transport for Node could not be loaded; pass ccip.fetch to ask gateways another way.', { cause: e })
+  })
+  return nodeTransport
+}
+
 /**
  * EIP-3668 (CCIP-Read) lookups as a wallet may make them (scan 2026-10-27 modules, F37): a name's
- * offchain resolver picks the gateway URLs, and the device fetches them, so only https URLs on a public
- * host are asked — no `http://`, no localhost / LAN / link-local / CGNAT address in any spelling, no
- * placeholder in the host — and a redirect is refused (`redirect: 'error'`). React Native's fetch cannot
- * refuse a redirect, and checking the final URL afterwards is too late (the redirected request has gone out:
- * scan 2026-10-28 F13), so there no gateway is asked unless `opts.fetch` handles redirects or
- * `opts.allowRedirectFollowingFetch` accepts the risk. Same protocol as viem's own: GET with `{data}` in
- * the URL, POST `{data, sender}` otherwise, a hex `data` answer.
+ * offchain resolver picks the gateway URLs, so only https URLs whose host is not, as written, a private
+ * one are asked — no `http://`, no localhost / LAN / link-local / CGNAT address in any spelling, no
+ * placeholder in the host — and a redirect is refused (`redirect: 'error'`). Same protocol as viem's own:
+ * GET with `{data}` in the URL, POST `{data, sender}` otherwise, a hex `data` answer, at most
+ * `opts.maxResponseBytes`, within `opts.timeoutMs` per gateway.
+ *
+ * Where the host resolves depends on the transport:
+ * - `opts.fetch`: up to that fetch (e.g. `ensCcipViaProxy` to your server's `createEnsCcipHandler`).
+ * - Node, no `opts.fetch` (scan 2026-10-30 F17): the pinned transport of `createEnsCcipHandler`, in process —
+ *   every DNS answer is checked and the connection is pinned to it, so a public-looking name that resolves to a
+ *   private address is not asked. A gateway host whose records mix public and private addresses is refused;
+ *   behind a corporate split-horizon DNS or an outbound proxy, pass `opts.fetch`.
+ * - A browser and other runtimes: the global fetch. The URL text is checked, the resolved address is not: no
+ *   DNS-level isolation. Ask gateways through your server (`ensCcipViaProxy`) where that matters.
+ * - React Native: its fetch cannot refuse a redirect, and checking the final URL afterwards is too late (the
+ *   redirected request has gone out: scan 2026-10-28 F13), so no gateway is asked unless `opts.fetch` handles
+ *   redirects or `opts.allowRedirectFollowingFetch` accepts the risk.
  */
 export async function ensCcipRequest({ data, sender, urls, requestOptions }: CcipRequestParameters, opts: EnsCcipOptions = {}): Promise<Hex> {
   const signal = requestOptions?.signal ?? undefined
@@ -109,6 +139,7 @@ export async function ensCcipRequest({ data, sender, urls, requestOptions }: Cci
   }
   const timeoutMs = opts.timeoutMs ?? 10_000
   const cap = opts.maxResponseBytes ?? 1024 * 1024
+  const pinned = !opts.fetch && runsOnNode() ? await nodeTransportFor() : null
   let error: Error = new EnsNameError('lookup-failed', 'The offchain resolver names no gateway this wallet asks.')
   for (const template of urls) {
     if (signal?.aborted) throw signal.reason ?? new Error('aborted')
@@ -120,6 +151,13 @@ export async function ensCcipRequest({ data, sender, urls, requestOptions }: Cci
     const post = !template.includes('{data}')
     const call = bounded(signal, timeoutMs)
     try {
+      if (pinned) {
+        // The handler's own deadline (timeoutMs) covers DNS, connect and the answer; the race adds the caller's abort.
+        const out = await call.race(pinned({ url, method: post ? 'POST' : 'GET', ...(post ? { body: { sender, data } } : {}) }, { timeoutMs, maxResponseBytes: cap }))
+        if ('data' in out.body) return out.body.data as Hex
+        error = new EnsNameError('lookup-failed', `The offchain gateway's answer was not used: ${out.body.error}.`)
+        continue
+      }
       const res = await call.race(doFetch(url, {
         method: post ? 'POST' : 'GET',
         redirect: 'error',

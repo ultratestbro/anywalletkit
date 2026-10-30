@@ -20,6 +20,11 @@ function globalFetch() {
 }
 const asReactNative = () => vi.stubGlobal('navigator', { product: 'ReactNative' })
 
+/** A runtime without a `process.versions.node` (a browser): gateways go through the global fetch (scan 2026-10-30 F17). Empty, not removed: libraries split it. */
+const NODE_VERSION = Object.getOwnPropertyDescriptor(process.versions, 'node')!
+const asBrowser = () => Object.defineProperty(process.versions, 'node', { ...NODE_VERSION, value: '' })
+afterEach(() => { Object.defineProperty(process.versions, 'node', NODE_VERSION) })
+
 describe('F12: a backslash gateway host is not asked', () => {
   it.each(['https://localhost\\x/{sender}/{data}.json', 'https://192.168.1.1\\admin/{data}', 'https://127.0.0.1\\x/{data}'])('%s', async (t) => {
     const asked = globalFetch()
@@ -62,7 +67,8 @@ describe('F13: on React Native, resolver-chosen gateways are not fetched with a 
     expect(() => ensResolver({ rpcUrl: 'https://rpc.example', ccip: { allowRedirectFollowingFetch: true } })).not.toThrow()
   })
 
-  it('a runtime whose fetch refuses redirects (browsers, Node) asks gateways directly, redirect: error', async () => {
+  it('a runtime whose fetch refuses redirects (browsers) asks gateways directly, redirect: error', async () => {
+    asBrowser()
     const seen: Array<string | undefined> = []
     vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => { seen.push(init.redirect); return answer() }))
     expect(await ensCcipRequest({ data: CALLDATA, sender: SENDER, urls: ['https://gw.example/{data}'] })).toBe('0xabcdef')

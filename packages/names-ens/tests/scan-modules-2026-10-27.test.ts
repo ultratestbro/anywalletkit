@@ -18,6 +18,11 @@ const PRIVATE_GATEWAYS = [
   'https://{data}.example/x', 'https://user:pw@gateway.example/{data}',
 ]
 
+/** A runtime without a `process.versions.node` (a browser): gateways go through the global fetch (scan 2026-10-30 F17). Empty, not removed: libraries split it. */
+const NODE_VERSION = Object.getOwnPropertyDescriptor(process.versions, 'node')!
+const asBrowser = () => Object.defineProperty(process.versions, 'node', { ...NODE_VERSION, value: '' })
+afterEach(() => { Object.defineProperty(process.versions, 'node', NODE_VERSION) })
+
 /** Records every URL fetched; answers a gateway with `answer` (and optionally as a redirect to `redirectedTo`). */
 function network(answer: { status?: number; body?: unknown; redirectedTo?: string } = {}) {
   const fetched: Array<{ url: string; method: string; redirect?: string; body?: string }> = []
@@ -39,6 +44,7 @@ describe('ENS CCIP-Read asks only https gateways on public hosts (scan 2026-10-2
   })
 
   it('a public https gateway is asked the way EIP-3668 says (GET with {data}, POST otherwise), redirects refused', async () => {
+    asBrowser() // the global fetch path; on Node the pinned transport asks (scan-2026-10-30-f17.test.ts)
     const fetched = network()
     expect(await ensCcipRequest({ data: CALLDATA, sender: SENDER, urls: ['http://192.168.1.1/{data}', 'https://gw.example/{sender}/{data}.json'] })).toBe('0xabcdef')
     expect(await ensCcipRequest({ data: CALLDATA, sender: SENDER, urls: ['https://gw.example/lookup'] })).toBe('0xabcdef')
