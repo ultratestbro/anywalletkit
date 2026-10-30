@@ -245,14 +245,17 @@ for (const m of manifests) {
 }
 
 // ── output ─────────────────────────────────────────────────────────────────
-const byModule = (list) => { const g = {}; for (const c of list) (g[c.module] ??= []).push(c); return g; };
+// Grouping keys come from upstream answers (an RPC error message can be "constructor" or "__proto__"), so the groups
+// live in a Map: a plain object would hand back the inherited Object.prototype value and the digest would throw (scan 2026-10-30 F19).
+const groupBy = (list, key) => { const g = new Map(); for (const x of list) { const k = String(key(x)); const a = g.get(k); if (a) a.push(x); else g.set(k, [x]); } return g; };
+const byModule = (list) => groupBy(list, (c) => c.module);
 const lines = [`# Module watch · ${TODAY}`, "", `${manifests.length} modules, ${total} sources, ${changes.length} changed, ${errors.length} unreachable.`, ""];
-for (const [mod, cs] of Object.entries(byModule(changes))) {
+for (const [mod, cs] of byModule(changes)) {
   lines.push(`## ${mod}`);
   for (const c of cs) lines.push(`- **${c.label}** (${c.type}): ${c.what}${c.link ? ` — ${c.link}` : ""}`);
   lines.push("");
 }
-const errorGroups = Object.entries(errors.reduce((g, e) => { (g[e.error] ??= []).push(e); return g; }, {})).sort((a, b) => b[1].length - a[1].length);
+const errorGroups = [...groupBy(errors, (e) => e.error)].sort((a, b) => b[1].length - a[1].length);
 if (errors.length) {
   lines.push("## Unreachable");
   for (const [err, es] of errorGroups) lines.push(es.length > 3 ? `- ${err} — ${es.length} sources: ${es.slice(0, 6).map((e) => `${slug(e.module)} · ${e.label}`).join("; ")}${es.length > 6 ? "; …" : ""}` : es.map((e) => `- ${slug(e.module)} · ${e.label}: ${err}${e.stale ? " (previous value kept)" : ""}`).join("\n"));
@@ -283,7 +286,7 @@ if (SEND && !BASELINE) {
     if (flag("--quiet-ok")) await postTelegram(`🟢 <b>Module watch · ${TODAY}</b> — ${manifests.length} modules, ${total} sources, no changes.`);
   } else {
     const h = [`${changes.length ? "🟠" : "🟡"} <b>Module watch · ${TODAY}</b> — ${changes.length} changed, ${errors.length} unreachable of ${total} sources`];
-    for (const [mod, cs] of Object.entries(byModule(changes))) {
+    for (const [mod, cs] of byModule(changes)) {
       h.push("", `<b>${esc(slug(mod))}</b>`);
       for (const c of cs) h.push(`• ${c.link ? `<a href="${esc(c.link)}">${esc(c.label)}</a>` : esc(c.label)}: ${esc(c.what)}`);
     }
