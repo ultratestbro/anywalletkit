@@ -15,6 +15,10 @@ your app does.
 - **THORChain memo.** `thorchainPins().verifyBuild` refuses a remote build whose memo is not exactly the
   canonical memo for the request (output asset, destination/refund, limit, affiliate). Your server's
   `thorchainProvider` already builds that memo; nothing to wire.
+- **CCTP burn decoded on the device.** `cctpPins` carry `verifyQuote` (`cctpVerifyQuote`): a remote
+  `depositForBurn` must burn exactly the input of the source USDC for the recipient on the requested
+  domain, with no destination caller and a `maxFee` that leaves the quoted minimum. Spread the pins as
+  before.
 
 ## Next release: remote swaps checked on the device
 

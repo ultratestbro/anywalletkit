@@ -1,5 +1,5 @@
 import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
-import {createPublicClient, encodeFunctionData, getAddress, http, isAddress, pad, parseAbi, zeroHash, type Hex} from "viem";
+import {createPublicClient, decodeFunctionData, encodeFunctionData, getAddress, http, isAddress, pad, parseAbi, zeroHash, type Hex} from "viem";
 import {describeCctpActivity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
 import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
@@ -367,14 +367,67 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
 }
 
 /**
+ * A remote CCTP quote's burn, decoded on the device against the app's own request (scan 2026-10-30, F3): exactly
+ * `depositForBurn` on the source TokenMessengerV2 with no value, approving it; the input amount; the destination
+ * chain's domain; the recipient as `mintRecipient`; the source domain's native USDC; no destination caller; a Fast
+ * or Standard threshold; and a `maxFee` that leaves at least the quoted minimum and the caller's floor. The reason
+ * it fails, or null. The engine then requires the build to repeat this quote's call.
+ */
+export function cctpVerifyQuote(params: QuoteParams, quote: Quote): string | null {
+  const src = Object.prototype.hasOwnProperty.call(CCTP_DOMAINS, params.sourceChain) ? CCTP_DOMAINS[params.sourceChain] : undefined;
+  const dst = Object.prototype.hasOwnProperty.call(CCTP_DOMAINS, params.destChain) ? CCTP_DOMAINS[params.destChain] : undefined;
+  if (!src || !dst || src === dst) return "not a CCTP route between two domains";
+  if (params.sourceToken.toUpperCase() !== "USDC" || !(same(params.destToken, dst.usdc) || params.destToken.toUpperCase() === "USDC")) return "not USDC to USDC";
+  const tx = quote.txRequest;
+  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no TokenMessenger call";
+  if (!same(tx.to, src.tokenMessenger)) return `the call targets ${tx.to}, not the TokenMessengerV2`;
+  if (BigInt(tx.value ?? "0") !== 0n) return "a burn attaches no value";
+  if (!tx.approvalAddress || !same(tx.approvalAddress, src.tokenMessenger)) return "the burn approves another spender than the TokenMessengerV2";
+  if (tx.chainId !== undefined && tx.chainId !== src.chainId) return `the call is for chain ${tx.chainId}, not ${src.chainId}`;
+  let args: readonly unknown[];
+  try {
+    const d = decodeFunctionData({abi: TOKEN_MESSENGER_ABI, data: tx.data as Hex});
+    if (d.functionName !== "depositForBurn") return `${d.functionName} is not depositForBurn`;
+    args = d.args;
+  } catch {
+    return "the call is not depositForBurn";
+  }
+  const [amount, domain, mintRecipient, burnToken, caller, maxFee, threshold] = args as [bigint, number, Hex, string, Hex, bigint, number];
+  let amountIn: bigint, floor: bigint;
+  try {
+    amountIn = BigInt(params.amountIn);
+    floor = BigInt(quote.minDestAmount);
+    if (params.minAmountOut !== undefined && BigInt(params.minAmountOut) > floor) floor = BigInt(params.minAmountOut);
+  } catch {
+    return "the request does not name amounts";
+  }
+  if (amount !== amountIn || BigInt(quote.sourceAmount) !== amountIn) return `the burn moves ${amount}, not the ${amountIn} input`;
+  if (domain !== dst.domain) return `the burn mints on domain ${domain}, not ${dst.name} (${dst.domain})`;
+  // A dry quote without a recipient prices the placeholder the provider uses; it is never built (the engine re-quotes live).
+  if (params.destAddress || params.dry === false) {
+    if (!isAddress(params.destAddress)) return "the recipient is not an EVM address";
+    if (mintRecipient.toLowerCase() !== pad(getAddress(params.destAddress), {size: 32}).toLowerCase()) return `the burn mints to ${mintRecipient}, not the recipient`;
+  }
+  if (!same(burnToken, src.usdc)) return `the burn spends ${burnToken}, not the source domain's USDC`;
+  if (caller !== zeroHash) return "the burn names a destination caller";
+  if (threshold !== FINALITY_FAST && threshold !== FINALITY_STANDARD) return `finality threshold ${threshold} is neither Fast nor Standard`;
+  if (maxFee >= amount || amount - maxFee < floor) return `the burn's maxFee ${maxFee} leaves less than the ${floor} minimum`;
+  // The server appends its intent token (`<id>~<tag>`); the id before it is what the server's provider tracks and claims.
+  if ((/^([\s\S]+)~[0-9a-f]{32}$/.exec(quote.intentId)?.[1] ?? quote.intentId) !== `cctp:${src.domain}:${dst.domain}:${threshold}`) return "the intent id does not name this burn";
+  if (quote.providerData?.maxFee !== undefined && quote.providerData.maxFee !== maxFee.toString()) return "the quoted maxFee is not the burn's";
+  return null;
+}
+
+/**
  * The TokenMessenger a CCTP burn calls and approves, and the MessageTransmitter its claim calls, per
- * chain — the app's pins for `remoteProvider({name: "cctp", baseUrl, ...cctpPins})` (scan 2026-10-27
- * modules, F8/F16; claims since round 3, M24).
+ * chain, and {@link cctpVerifyQuote} — the app's pins for `remoteProvider({name: "cctp", baseUrl, ...cctpPins})`
+ * (scan 2026-10-27 modules, F8/F16; claims since round 3, M24; the burn's arguments since scan 2026-10-30, F3).
  */
 export const cctpPins: RemotePins & {claimTargets(chain: string): readonly string[]} = Object.freeze({
   callTargets: (chain: string): readonly string[] => cctpMessengerFor(chain),
   spenders: (chain: string): readonly string[] => cctpMessengerFor(chain),
   claimTargets: cctpClaimTargets,
+  verifyQuote: cctpVerifyQuote,
 });
 function cctpMessengerFor(chain: string): readonly string[] {
   const d = Object.prototype.hasOwnProperty.call(CCTP_DOMAINS, chain) ? CCTP_DOMAINS[chain] : undefined;

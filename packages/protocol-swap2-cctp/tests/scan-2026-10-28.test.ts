@@ -58,7 +58,7 @@ const RECIPIENT = "0x3333333333333333333333333333333333333333";
 describe("scan 2026-10-28 F9: CCTP remote corridor with cctpPins", () => {
   it("the repro's deposit-address route (USDC to the attacker) is refused before anything is sent", async () => {
     const a = app("cctp", cctpPins, depositBackend("cctp", "eip155:8453"), SENDER, "eip155:8453");
-    await expect(a.swap2.swap2({fromToken: "USDC", toToken: ARB_USDC, toChain: 42161, recipient: RECIPIENT, fromTokenAmount: 10_000_000n, minAmountOut: 1n} as never)).rejects.toThrow(/did not allow deposit-address routes/);
+    await expect(a.swap2.swap2({fromToken: "USDC", toToken: ARB_USDC, toChain: 42161, recipient: RECIPIENT, fromTokenAmount: 10_000_000n, minAmountOut: 1n} as never)).rejects.toThrow(/did not allow deposit-address routes|the quote carries no TokenMessenger call/);
     expect(a.sent).toEqual([]);
   });
 
