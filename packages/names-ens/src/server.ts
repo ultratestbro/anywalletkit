@@ -2,6 +2,7 @@ import { lookup as dnsLookup } from 'node:dns/promises'
 import { request as httpsRequest } from 'node:https'
 import { isIP } from 'node:net'
 import { isPrivateHost, isPublicHttpsUrl, parseUrl } from '@anywalletkit/networks/url'
+import { readCapped } from './read-capped.js'
 
 /**
  * The server side of `ensCcipViaProxy` (`@anywalletkit/names-ens`): asks one CCIP-Read (EIP-3668) gateway on behalf of an app
@@ -208,22 +209,4 @@ async function viaFetch(doFetch: NonNullable<EnsCcipHandlerOptions['fetch']>, ur
     if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) { await res.body?.cancel(); return { status: res.status || 302, contentType, text: '' } }
     return { status: res.status, contentType, text: await readCapped(res, cap) }
   }).catch((e: unknown) => { controller.abort(); throw e }) // on the deadline: stop the request too
-}
-
-/** The body, or null when larger than `cap` (read as a stream, never buffered past it). */
-async function readCapped(res: Response, cap: number): Promise<string | null> {
-  const declared = Number(res.headers.get('content-length') ?? Number.NaN)
-  if (Number.isFinite(declared) && declared > cap) { await res.body?.cancel(); return null }
-  if (!res.body) return ''
-  const reader = res.body.getReader()
-  const chunks: Uint8Array[] = []
-  let size = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    size += value.byteLength
-    if (size > cap) { await reader.cancel(); return null }
-    chunks.push(value)
-  }
-  return Buffer.concat(chunks).toString('utf8')
 }

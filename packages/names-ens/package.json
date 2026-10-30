@@ -12,6 +12,14 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "browser": {
+    "./dist/node-transport.js": "./dist/node-transport-stub.js",
+    "./dist/node-transport.cjs": "./dist/node-transport-stub.cjs"
+  },
+  "react-native": {
+    "./dist/node-transport.js": "./dist/node-transport-stub.js",
+    "./dist/node-transport.cjs": "./dist/node-transport-stub.cjs"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

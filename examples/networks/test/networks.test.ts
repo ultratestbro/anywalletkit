@@ -44,7 +44,8 @@ describe('Networks guide (docs) — offline', () => {
     expect(await onAddEthereumChain(table, 'https://dapp.example', [{ chainId: '0x2105', chainName: 'Base', rpcUrls: ['https://x'], nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 } }], ask)).toBeNull()
     expect(asked).toEqual([])
     const zora = [{ chainId: '0x76adf1', chainName: 'Zora', rpcUrls: ['https://rpc.zora.energy'], nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 } }]
-    expect(await onAddEthereumChain(table, 'https://dapp.example', zora, ask, evmNode('0x1'))).toMatchObject({ code: -32603 })
+    // The site learns that the check failed, not what the endpoint answered (scan 2026-10-30 F18).
+    expect(await onAddEthereumChain(table, 'https://dapp.example', zora, ask, evmNode('0x1'))).toEqual({ code: -32603, message: "The network's RPC failed the check." })
     expect(await table.get('eip155:7777777')).toBeNull()
     expect(await onAddEthereumChain(table, 'https://dapp.example', zora, ask, evmNode('0x76adf1'))).toBeNull()
     expect(await table.get('eip155:7777777')).toMatchObject({ kind: 'custom', source: { origin: 'https://dapp.example' } })

@@ -71,8 +71,10 @@ refused: use a keyed path or a header.
 | NEAR | `chain_id` | latest block height |
 
 It never throws. A failure comes back with a coded reason: `chain-id-mismatch`, `url-policy`,
-`http-<status>`, `timeout`, `unreachable`… An endpoint that changes its chain id later is treated
-as an attack, not an outage.
+`redirected`, `http-<status>`, `timeout`, `unreachable`… An endpoint that changes its chain id later is treated
+as an attack, not an outage. Redirects are refused: the URL policy judged the address that was
+entered, so an endpoint that answers through a redirect fails with `redirected` until the user enters
+its final URL. Show the reason to the user; a site that supplied the endpoint gets a generic error.
 
 <Snippet file="networks/src/networks.ts" region="trust" />
 

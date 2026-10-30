@@ -70,7 +70,9 @@ export async function onAddEthereumChain(
   if (await table.get(parsed.caip2)) return null // known already: nothing to add
   if (!(await ask(parsed))) return { code: 4001, message: 'User rejected the request.' }
   const result = await verifyNetwork(parsed, fetch ? { fetch } : {})
-  if (!result.ok) return { code: -32603, message: `The network's RPC failed the check: ${result.error}` }
+  // The site gets a generic answer: what the endpoint said (or where it redirected) is for the user's
+  // own screen, not for the page that supplied the endpoint.
+  if (!result.ok) return { code: -32603, message: "The network's RPC failed the check." }
   await table.add(parsed)
   return null
 }

@@ -283,6 +283,12 @@ async function main() {
     const ccipParams = { data: '0x9061b923' as const, sender: '0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63' as const, urls: ['https://gw.example/{data}'] }
     eq('ens ccip via proxy', await ensCcipRequest(ccipParams, { fetch: viaProxy }), '0xabcdef')
     eq('ens ccip proxy request', proxied[0], 'https://api.example/ccip {"url":"https://gw.example/0x9061b923","method":"GET"}')
+    // The answer cap on Hermes (scan 2026-10-30 F13): React Native's fetch has no stream, so text() is read and measured.
+    const plain = (text: string) => async () => ({ ok: true, status: 200, redirected: false, url: '', headers: { get: (k: string) => (k === 'content-type' ? 'application/json' : null) }, body: null, text: async () => text }) as unknown as Response
+    eq('ens ccip capped answer', await ensCcipRequest(ccipParams, { fetch: plain('{"data":"0xabcdef"}') }), '0xabcdef')
+    let capped = ''
+    try { await ensCcipRequest(ccipParams, { fetch: plain(`{"data":"0x${'ab'.repeat(64)}"}`), maxResponseBytes: 64 }) } catch (e) { capped = String((e as Error).message) }
+    eq('ens ccip over cap refused', /larger than 64 bytes/.test(capped), true)
     const g = globalThis as { navigator?: unknown }
     const nav = g.navigator
     g.navigator = { product: 'ReactNative' }
@@ -302,6 +308,8 @@ async function main() {
     eq('verify evm ok', v.ok && v.tip === 16, true)
     const bad = await verifyNetwork({ caip2: 'eip155:1', family: 'evm', rpcs: ['https://x'] }, { fetch: fetchFake })
     eq('verify evm mismatch', !bad.ok && (bad.error ?? '').indexOf('chain-id-mismatch') === 0, true)
+    const moved = await verifyNetwork({ caip2: 'eip155:8453', family: 'evm', rpcs: ['https://x'] }, { fetch: async () => ({ ok: true, status: 200, url: 'http://10.0.0.5/', text: async () => '' }) })
+    eq('verify evm redirect refused', moved.error, 'redirected: Endpoint redirected to 10.0.0.5; enter the final URL')
   }
   {
     // seed-vault: the real default Argon2id (19 MiB × 2) and XChaCha20-Poly1305 on Hermes, a key protector, tamper refusal.

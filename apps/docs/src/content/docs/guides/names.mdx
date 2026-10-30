@@ -76,7 +76,20 @@ would fetch the metadata URL the NFT's issuer chose. Fetch avatars through your 
 the user's IP and address list don't reach arbitrary servers.
 
 Offchain names (CCIP-Read) make the device fetch gateway URLs the name's resolver chooses. The
-resolver built from `rpcUrl` asks only https gateways on public hosts and refuses redirects. If
+resolver built from `rpcUrl` asks only https gateway URLs whose host, as written, is not a private
+one, refuses redirects, and reads at most 1 MiB within 10 s per gateway (`ccip: { maxResponseBytes,
+timeoutMs }`). Where the host really resolves depends on the runtime:
+
+- **Node**, no `ccip.fetch`: gateways go through the same pinned transport as
+  `createEnsCcipHandler` — every DNS answer is checked and the connection is pinned to it, so a
+  public-looking name that resolves to a private address is not asked. A host whose records mix
+  public and private addresses is refused; behind a corporate split-horizon DNS or an outbound
+  proxy, pass `ccip.fetch`.
+- **Browser** and other runtimes: the global fetch connects. The URL is checked, the address it
+  resolves to is not — no DNS-level isolation. Send gateway calls through your server
+  (`ensCcipViaProxy`, below) where that matters.
+
+If
 you pass your own viem `client`, create it with `ccipRead: ensCcipRead` from
 `@anywalletkit/names-ens` (or `ccipRead: false`): viem's default would fetch any URL, a router's
 admin page on the user's network included.

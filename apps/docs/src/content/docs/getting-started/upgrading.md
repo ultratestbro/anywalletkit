@@ -124,6 +124,30 @@ retry instead of being fixed silently; configure two RPCs to keep the automatic 
   that returns that SOL to the wallet. A signing review shows one extra incoming transfer; nothing
   to change in the app.
 
+## Next release: endpoint checks and CCIP-Read gateways
+
+This release fixes findings of the 2026-10-30 scan in `@anywalletkit/networks` and
+`@anywalletkit/names-ens`.
+
+- **`verifyNetwork` refuses redirects.** An endpoint that answers through a redirect fails with
+  `redirected: Endpoint redirected to <host>; enter the final URL` — the URL policy judged the address
+  that was entered, not where it points. Ask the user for the final URL. A custom `fetch` that cannot
+  refuse redirects (it gets `redirect: 'error'`) should report `url` or `redirected` on the response.
+  `http-<status>` and `bad-json` errors no longer carry body text.
+- **Answer the site generically.** When a site's `wallet_addEthereumChain` endpoint fails the check,
+  answer `{ code: -32603, message: "The network's RPC failed the check." }`; show `result.error` on the
+  user's own screen only.
+- **CCIP-Read answers are capped on the device.** `ensCcipRequest` (behind `ensResolver({ rpcUrl })`)
+  reads a gateway's answer to at most 1 MiB and gives each gateway 10 s for the request and the whole
+  answer: `ccip: { maxResponseBytes, timeoutMs }`. Real answers are a few KB; nothing to change unless
+  you lowered your own limits.
+- **On Node, CCIP-Read gateways go through the pinned transport.** With no `ccip.fetch`,
+  `ensResolver({ rpcUrl })` on Node asks gateways the way `createEnsCcipHandler` does: DNS answers
+  checked, the connection pinned. A gateway host that resolves to a private address — or mixes public
+  and private records — is refused. Behind a corporate split-horizon DNS or an outbound proxy, pass
+  `ccip: { fetch }`. Browsers are unchanged (no DNS-level check there; use `ensCcipViaProxy` where it
+  matters); React Native is unchanged.
+
 ## Next release: remote swaps checked on the device
 
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps
