@@ -26,9 +26,20 @@ export interface FetchResponseLike {
   ok: boolean
   status: number
   text(): Promise<string>
+  /** The final URL, when the transport reports it: a different one means the request was redirected. */
+  url?: string
+  redirected?: boolean
+  /** `opaqueredirect` for a redirect a browser stopped under `redirect: 'manual'`. */
+  type?: string
+  headers?: { get(name: string): string | null }
+  body?: { cancel?(): unknown } | null
 }
-/** A `fetch`-compatible function; pass one to route checks through a proxy or a test double. */
-export type FetchLike = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: unknown }) => Promise<FetchResponseLike>
+/**
+ * A `fetch`-compatible function; pass one to route checks through a proxy or a test double. The verifier
+ * asks for `redirect: 'error'`: a transport that cannot refuse redirects should at least report `url` /
+ * `redirected`, so a redirected answer is refused (the redirected request itself has then already gone out).
+ */
+export type FetchLike = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: unknown; redirect?: 'error' | 'manual' | 'follow' }) => Promise<FetchResponseLike>
 
 /** Options for `verifyNetwork`: transport, timeout, which endpoint, and the URL policy. */
 export interface VerifyOptions extends UrlPolicyOptions {
@@ -91,6 +102,36 @@ class VerifyFailure extends Error {
   }
 }
 
+/** Scheme + host lowercased, default port, trailing slashes and fragment dropped: what a fetch reports back for the same URL. */
+function sameUrl(a: string, b: string): boolean {
+  const norm = (u: string) => {
+    const m = /^([a-z][a-z0-9+.-]*):\/\/([^/?#]*)([^#]*)/i.exec(u.trim())
+    if (!m) return u.trim()
+    const scheme = m[1]!.toLowerCase()
+    const host = m[2]!.toLowerCase().replace(scheme === 'https' ? /:443$/ : scheme === 'http' ? /:80$/ : /(?!)/, '')
+    return `${scheme}://${host}${m[3]!.replace(/\/+(?=\?|$)/, '')}`
+  }
+  return norm(a) === norm(b)
+}
+const hostOf = (u: string | null | undefined): string | null => (u ? (/^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)/i.exec(u)?.[1]?.replace(/^[^@]*@/, '') ?? null) : null)
+/** Drop an unread body so the connection is not held open; a transport without one has nothing to release. */
+function release(res: FetchResponseLike): void {
+  try { Promise.resolve(res.body?.cancel?.()).catch(() => {}) } catch { /* nothing to release */ }
+}
+const redirected = (to: string | null) =>
+  new VerifyFailure('redirected', `Endpoint redirected${to ? ` to ${to}` : ''}; enter the final URL`)
+/** undici rejects a `redirect: 'error'` fetch with `fetch failed` and the reason in `cause`. */
+function isRedirectRefusal(e: unknown): boolean {
+  for (let x: unknown = e, i = 0; x instanceof Error && i < 4; x = (x as { cause?: unknown }).cause, i++) if (/redirect/i.test(x.message)) return true
+  return false
+}
+
+/**
+ * One request. Redirects are refused (scan 2026-10-30 F18): a public endpoint could send the verifier to a
+ * plain-http or private address the URL policy never saw. Error texts carry the status, never the body:
+ * the body is whatever the endpoint (or a service behind it) chose to say, and apps show the error to the
+ * user or answer a site with it.
+ */
 async function call(fetchFn: FetchLike, url: string, init: { method?: string; headers?: Record<string, string>; body?: string }, timeoutMs: number): Promise<string> {
   const AC = (globalThis as { AbortController?: new () => { signal: unknown; abort(): void } }).AbortController
   const ac = AC ? new AC() : null
@@ -102,12 +143,21 @@ async function call(fetchFn: FetchLike, url: string, init: { method?: string; he
     }, timeoutMs)
   })
   try {
-    const res = await Promise.race([fetchFn(url, { ...init, ...(ac ? { signal: ac.signal } : {}) }), timeout])
-    const text = await Promise.race([res.text(), timeout])
-    if (!res.ok) throw new VerifyFailure(`http-${res.status}`, `HTTP ${res.status}${text ? `: ${text.slice(0, 120)}` : ''}`)
-    return text
+    const res = await Promise.race([fetchFn(url, { ...init, redirect: 'error', ...(ac ? { signal: ac.signal } : {}) }), timeout])
+    // A non-ASCII host comes back punycoded: such a URL is judged by `redirected` alone.
+    const finalUrl = typeof res.url === 'string' && res.url !== '' && /^[\x20-\x7e]*$/.test(url) ? res.url : null
+    if ((res.status >= 300 && res.status < 400) || res.type === 'opaqueredirect' || res.redirected === true || (finalUrl !== null && !sameUrl(finalUrl, url))) {
+      release(res)
+      throw redirected(hostOf(finalUrl !== null && !sameUrl(finalUrl, url) ? finalUrl : res.headers?.get('location')))
+    }
+    if (!res.ok) {
+      release(res)
+      throw new VerifyFailure(`http-${res.status}`, `HTTP ${res.status}`)
+    }
+    return await Promise.race([res.text(), timeout])
   } catch (e) {
     if (e instanceof VerifyFailure) throw e
+    if (isRedirectRefusal(e)) throw redirected(null)
     throw new VerifyFailure('unreachable', e instanceof Error ? e.message : String(e))
   } finally {
     if (timer !== undefined) clearTimeout(timer)
@@ -118,7 +168,7 @@ function parseJson(text: string): unknown {
   try {
     return JSON.parse(text) as unknown
   } catch {
-    throw new VerifyFailure('bad-json', `Not JSON: ${text.slice(0, 80)}`)
+    throw new VerifyFailure('bad-json', 'Not JSON.')
   }
 }
 

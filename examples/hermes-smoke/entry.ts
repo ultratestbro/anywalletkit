@@ -302,6 +302,9 @@ async function main() {
     eq('verify evm ok', v.ok && v.tip === 16, true)
     const bad = await verifyNetwork({ caip2: 'eip155:1', family: 'evm', rpcs: ['https://x'] }, { fetch: fetchFake })
     eq('verify evm mismatch', !bad.ok && (bad.error ?? '').indexOf('chain-id-mismatch') === 0, true)
+    const moved = await verifyNetwork({ caip2: 'eip155:8453', family: 'evm', rpcs: ['https://x'] }, { fetch: async () => ({ ok: true, status: 200, url: 'http://10.0.0.5/', text: async () => '' }) })
+    // The Hermes CLI fires timers as soon as the job queue idles: keep the fake one await deep.
+    eq('verify evm redirect refused', moved.error, 'redirected: Endpoint redirected to 10.0.0.5; enter the final URL')
   }
   {
     // seed-vault: the real default Argon2id (19 MiB × 2) and XChaCha20-Poly1305 on Hermes, a key protector, tamper refusal.

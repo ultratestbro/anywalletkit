@@ -10,6 +10,20 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: endpoint checks and CCIP-Read gateways
+
+This release fixes findings of the 2026-10-30 scan in `@anywalletkit/networks` and
+`@anywalletkit/names-ens`.
+
+- **`verifyNetwork` refuses redirects.** An endpoint that answers through a redirect fails with
+  `redirected: Endpoint redirected to <host>; enter the final URL` — the URL policy judged the address
+  that was entered, not where it points. Ask the user for the final URL. A custom `fetch` that cannot
+  refuse redirects (it gets `redirect: 'error'`) should report `url` or `redirected` on the response.
+  `http-<status>` and `bad-json` errors no longer carry body text.
+- **Answer the site generically.** When a site's `wallet_addEthereumChain` endpoint fails the check,
+  answer `{ code: -32603, message: "The network's RPC failed the check." }`; show `result.error` on the
+  user's own screen only.
+
 ## Next release: remote swaps checked on the device
 
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps

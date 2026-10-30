@@ -75,7 +75,7 @@ Rules the table enforces:
 | zcash | same, plus Blockchair `dashboards/block/0` | `/stats` blocks |
 | near | `status.chain_id` | `latest_block_height` |
 
-Returns `{ ok, latencyMs, tip?, error?, reported? }` and never throws. Errors are prefixed with a code: `chain-id-mismatch`, `url-policy`, `http-<status>`, `rpc-error`, `bad-json`, `timeout`, `unreachable`, `no-rpc`, `bad-network`. `verifyRpcs(network)` checks every endpoint. `scripts/verify-live.mjs` runs the real thing against every builtin endpoint.
+Returns `{ ok, latencyMs, tip?, error?, reported? }` and never throws. Errors are prefixed with a code: `chain-id-mismatch`, `url-policy`, `redirected`, `http-<status>`, `rpc-error`, `bad-json`, `timeout`, `unreachable`, `no-rpc`, `bad-network`. Redirects are refused (`redirect: 'error'`, and an answer whose `url` / `redirected` / 3xx status shows a redirect is `redirected: Endpoint redirected to <host>; enter the final URL`): the URL policy judged the address the user or site gave, not where it points. A custom `fetch` that cannot refuse redirects should report `url` or `redirected`, or the redirected request goes out before the check sees it. `http-<status>` and `bad-json` carry no body text. Answer a site (`wallet_addEthereumChain`) with a generic error, not with `error`. `verifyRpcs(network)` checks every endpoint. `scripts/verify-live.mjs` runs the real thing against every builtin endpoint.
 
 ## Builtin table
 
