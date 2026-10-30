@@ -44,8 +44,10 @@ reviewed minimum relies on LI.FI's API (or your `apiUrl` proxy) answering honest
 
 When the provider runs on your server, spread its pins into the app's stub:
 `remoteProvider({name: "lifi", baseUrl, ...lifiPins})`. The engine then lets the EVM route call and
-approve only the LI.FI Diamond of that chain, never an address the backend names; without the pins the stub gets no
-EVM calldata route (fail closed).
+approve only the LI.FI Diamond of that chain, never an address the backend names, and `lifiVerifyQuote` decodes the
+server's Diamond call on the device with the same check the provider runs on LI.FI's answer (receiver, minimum, input
+token and amount, output token, destination chain; value and approval for the input kind). Without the pins the stub
+gets no EVM calldata route (fail closed).
 
 ## Activity
 

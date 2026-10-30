@@ -62,7 +62,7 @@ describe("scan 2026-10-28 F9: a pinned LI.FI stub gets no deposit-address or pla
       for (const [fromToken, fromTokenAmount, toToken] of [["ETH", 10n ** 16n, "ETH"], ["USDT", 1_000_000n, TO_TOKEN]] as const) {
         const {sent, swap2} = app(evilBackend(shape));
         await expect(swap2.swap2({fromToken, toToken, toChain: 42161, recipient: RECIPIENT, fromTokenAmount, minAmountOut: 1n} as never), `${shape} ${fromToken}`)
-          .rejects.toThrow(/did not allow deposit-address routes/);
+          .rejects.toThrow(/did not allow deposit-address routes|the quote carries no (transaction|Diamond call)/);
         expect(sent, `${shape} ${fromToken}`).toEqual([]);
       }
     });

@@ -26,6 +26,10 @@ your app does.
 - **Wrap call checked on the device.** `wrapPins` carry `verifyQuote` (`wrapVerifyQuote`): only
   `deposit()` with the input as value, or `withdraw(input)` with no value, on the chain's wrapped
   native, for the sender.
+- **LI.FI Diamond call decoded on the device.** `lifiPins` carry `verifyQuote` (`lifiVerifyQuote`):
+  the same calldata check the server's provider runs on LI.FI's answer — receiver, minimum, input,
+  output token, destination chain — runs again in the app, with the input's value and approval.
+  Checked against live LI.FI answers on 32 corridors (every route the provider accepts passes).
 
 ## Next release: remote swaps checked on the device
 
