@@ -10,6 +10,13 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: the 2026-10-30 scan, chain packages
+
+- **NEAR AddKey permissions are exactly one variant.** `wallet-near` refuses an AddKey whose
+  permission is not exactly `{ fullAccess: {} }` or `{ functionCall: { receiverId, methodNames,
+  allowance? } }` (`malformed-action`); it used to encode anything else as FullAccess. Keys built
+  from the documented shapes are unchanged.
+
 ## Next release: remote swaps checked on the device
 
 This release fixes four findings of the 2026-10-28 scan in `remoteProvider` setups. If you run swaps

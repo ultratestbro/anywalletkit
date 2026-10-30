@@ -143,17 +143,42 @@ export function argsBytes(args: Uint8Array | Record<string, unknown> | string): 
   return utf8.encode(JSON.stringify(args))
 }
 
+const FUNCTION_CALL_PERMISSION_KEYS = new Set(['allowance', 'receiverId', 'methodNames'])
+
+/**
+ * The borsh tag of an access-key permission (0 FunctionCall, 1 FullAccess), read from a permission of
+ * exactly one known variant: `{ fullAccess: {} }` or `{ functionCall: { receiverId, methodNames, allowance? } }`.
+ * Anything else throws, so an empty, misspelled, unknown or doubled variant is never encoded as
+ * FullAccess. The encoder, `assertWellFormed` and the description all read this one tag (scan 2026-10-30 F9).
+ */
+export function accessKeyPermissionTag(permission: unknown): 0 | 1 {
+  const keys = isPlainObject(permission) ? Object.keys(permission) : []
+  if (keys.length !== 1) throw new TypeError(`an access-key permission must have exactly one variant, fullAccess or functionCall (has: ${keys.join(', ') || 'none'})`)
+  const variant = (permission as Record<string, unknown>)[keys[0]!]
+  if (keys[0] === 'fullAccess') {
+    if (!isPlainObject(variant)) throw new TypeError('fullAccess must be a plain object')
+    return 1
+  }
+  if (keys[0] === 'functionCall') {
+    if (!isPlainObject(variant) || Object.keys(variant).some((k) => !FUNCTION_CALL_PERMISSION_KEYS.has(k))) throw new TypeError('functionCall must be a plain { receiverId, methodNames, allowance? } object')
+    if (typeof variant.receiverId !== 'string') throw new TypeError('functionCall.receiverId must be a string')
+    if (!Array.isArray(variant.methodNames) || !variant.methodNames.every((m) => typeof m === 'string')) throw new TypeError('functionCall.methodNames must be an array of strings')
+    if (variant.allowance !== undefined && typeof variant.allowance !== 'bigint') throw new TypeError('functionCall.allowance must be a bigint or absent')
+    return 0
+  }
+  throw new TypeError(`unknown access-key permission ${JSON.stringify(keys[0])}`)
+}
+
 function writeAccessKey(w: BorshWriter, k: NearAccessKey): void {
   w.u64(k.nonce)
-  if ('functionCall' in k.permission) {
-    const p = k.permission.functionCall
-    w.u8(0)
+  const tag = accessKeyPermissionTag(k.permission)
+  w.u8(tag)
+  if (tag === 0) {
+    const p = (k.permission as Extract<NearAccessKey['permission'], { functionCall: unknown }>).functionCall
     w.option(p.allowance, (a) => w.u128(a))
     w.string(p.receiverId)
     w.u32(p.methodNames.length)
     for (const m of p.methodNames) w.string(m)
-  } else {
-    w.u8(1)
   }
 }
 function readAccessKey(r: BorshReader): NearAccessKey {

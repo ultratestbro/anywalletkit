@@ -1,4 +1,4 @@
-import { argsBytes, actionKey } from './borsh.js'
+import { accessKeyPermissionTag, argsBytes, actionKey } from './borsh.js'
 import { isImplicitAccountId, isValidAccountId } from './address.js'
 import { IMPLICIT_ACCOUNT_MIN_DEPOSIT, MAX_GAS, TGAS, type NearAction, type NearFunctionCallAction, type NearTransaction, type NearTxDescription, type NearTxKind, type NearTxWarning } from './types.js'
 
@@ -52,8 +52,12 @@ export function describeTransaction(tx: NearTransaction, ctx: DescribeContext = 
     if (DANGEROUS_ACTIONS.has(key)) {
       dangerous ??= KIND_OF_DANGEROUS[key]
       warnings.push({ code: 'dangerous-action', message: `${key} changes the account, its keys or its code.` })
-      if (key === 'addKey' && 'fullAccess' in (a as { addKey: { accessKey: { permission: object } } }).addKey.accessKey.permission) {
-        warnings.push({ code: 'full-access-key', message: 'Adds a FULL ACCESS key: whoever holds it owns the account.' })
+      if (key === 'addKey') {
+        // The tag the encoder writes, so the warning matches the signed bytes (scan 2026-10-30 F9).
+        let tag: 0 | 1 | undefined
+        try { tag = accessKeyPermissionTag((a as { addKey?: { accessKey?: { permission?: unknown } } }).addKey?.accessKey?.permission) } catch { tag = undefined }
+        if (tag === 1) warnings.push({ code: 'full-access-key', message: 'Adds a FULL ACCESS key: whoever holds it owns the account.' })
+        else if (tag === undefined) warnings.push({ code: 'dangerous-action', message: 'Malformed access-key permission: neither fullAccess nor functionCall. The wallet refuses to sign it.' })
       }
       continue
     }
