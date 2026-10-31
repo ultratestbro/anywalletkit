@@ -9,7 +9,7 @@ import { encodeApprove, ERC20_PERMIT_ABI, PERMIT_TYPES, USDT_MAINNET } from './e
 
 /** ERC-165 interface id of ERC-721. */
 const ERC721_INTERFACE = '80ac58cd'
-import { BroadcastUnknownError, ChainMismatchError, NonceConflictError, PermitUnsupportedError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { BroadcastUnknownError, ChainMismatchError, NonceConflictError, PermitUnsupportedError, SimulationError, TransactionRevertedError, UnsafeTransactionError } from './errors.js'
 import { createEndpointClients } from './client.js'
 import { WalletAccountReadOnlyEvm, assertTxShape, canonicalData, chainIdNumber, transferTransaction, typedDataHash, typedDomainChainId } from './read-only-account.js'
 export { MIN_PRIORITY_FEE_WEI, typedDomainChainId } from './read-only-account.js'
@@ -43,6 +43,8 @@ export const NONCE_PROOF_ENDPOINTS = 2
 /** Simulation re-runs (and the pause between them) when a revert follows the account's own broadcast. */
 export const SIMULATION_SETTLE_RETRIES = 3
 export const SIMULATION_SETTLE_DELAY_MS = 1_500
+/** How long {@link WalletAccountEvm.waitForTransaction} waits for a receipt by default. */
+export const WAIT_FOR_TRANSACTION_TIMEOUT_MS = 180_000
 /**
  * The nonce was taken: by a transaction the RPC's stale `pending` count did not show, or by this
  * very transaction after a lost answer. `replacement transaction underpriced` is NOT here: another
@@ -411,6 +413,18 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
 
   async transfer(options: EvmTransferOptions, writeOptions: WriteOptions = {}): Promise<TransferResult> {
     return this.#signAndBroadcast(transferTransaction(options), feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
+  }
+
+  /**
+   * Wait until `hash` is mined (one confirmation), up to `timeoutMs` (default
+   * {@link WAIT_FOR_TRANSACTION_TIMEOUT_MS}). A revert throws {@link TransactionRevertedError}
+   * (`code: 'reverted'`, the hash); no receipt in time or an RPC failure throws viem's error, without
+   * that code (the transaction may still land). Used between an approval and the step that spends it.
+   */
+  async waitForTransaction(hash: string, timeoutMs: number = WAIT_FOR_TRANSACTION_TIMEOUT_MS): Promise<void> {
+    if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) throw new Error(`Not a transaction hash: ${JSON.stringify(String(hash).slice(0, 80))}.`)
+    const receipt = await this.requireClient('wait for transactions').waitForTransactionReceipt({ hash: hash as Hex, timeout: timeoutMs })
+    if (receipt.status !== 'success') throw new TransactionRevertedError(hash as Hex, receipt.blockNumber)
   }
 
   // ── EIP-2612 permit ────────────────────────────────────────────────────────

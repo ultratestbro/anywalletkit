@@ -41,6 +41,19 @@ export class SimulationError extends Error {
   }
 }
 
+/** A transaction this account waited for was mined and reverted. `code` is always `'reverted'`. */
+export class TransactionRevertedError extends Error {
+  readonly code = 'reverted' as const
+  readonly hash: `0x${string}`
+  readonly blockNumber: bigint | undefined
+  constructor(hash: `0x${string}`, blockNumber?: bigint) {
+    super(`Transaction ${hash} reverted on chain${blockNumber !== undefined ? ` (block ${blockNumber})` : ''}.`)
+    this.name = 'TransactionRevertedError'
+    this.hash = hash
+    this.blockNumber = blockNumber
+  }
+}
+
 /** The token does not implement EIP-2612 `permit` (or its domain could not be reproduced). */
 export class PermitUnsupportedError extends Error {
   constructor(token: string, reason: string) {
