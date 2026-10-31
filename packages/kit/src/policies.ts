@@ -100,6 +100,20 @@ function signedChain(ns: string, method: string, arg: unknown): string | undefin
 }
 
 /**
+ * The EVM network EIP-712 typed data is valid on, read off its `domain.chainId`, when it carries one.
+ * With `allowCrossChainTypedData` wallet-evm signs a domain of another chain than the account's: that
+ * chain's rules apply too. A chainId that is there but not a chain id these rules read is refused.
+ */
+function domainChain(ns: string, method: string, arg: unknown): string | undefined {
+  if (ns !== 'eip155' || method !== 'signTypedData') return undefined
+  const raw = obj(obj(arg).domain).chainId
+  if (raw === undefined || raw === null) return undefined
+  const ref = chainIdRef(raw)
+  if (ref === undefined) throw new PolicyViolationError('chain', `domain.chainId ${JSON.stringify(String(raw)).slice(0, 40)} is not a chain id; nothing was signed.`)
+  return `eip155:${ref}`
+}
+
+/**
  * An off-chain signature: a message valid on every network, or typed data, whose domain chainId
  * the chain package judges (wallet-evm refuses a foreign one unless `allowCrossChainTypedData`).
  */
@@ -206,6 +220,11 @@ export interface WriteIntent {
    * names spenders and recipients, not tokens), but a blocklist refuses it.
    */
   verifyingContract?: string
+  /**
+   * `signTypedData`: the CAIP-2 chain of the EIP-712 domain (`domain.chainId`), when it carries one. It can
+   * differ from `chain` on an account that allows cross-chain typed data; its rules are checked as well.
+   */
+  domainChain?: string
   /** The raw argument (first argument of the call), for policies that need more. */
   raw: unknown
   /** True for `kind: 'message'`: allow/block lists do not apply, only `confirm`. Typed data is judged by the lists (scan 2026-10-28 F7). */
@@ -826,6 +845,7 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     // an off-chain signature (a message, valid on every network; typed data, whose domain chainId
     // the chain package judges, e.g. wallet-evm's `allowCrossChainTypedData`) and no rule needs it.
     const signed = signedChain(ns, method, arg)
+    const domain = domainChain(ns, method, arg)
     const known = isConcreteChain(account.chain) ? account.chain : undefined
     const offChain = chainFree(method)
     const exactRules = hasRuleFor((k) => k.includes(':') && canonicalNamespace(k.split(':')[0]!) === canonicalNamespace(ns))
@@ -861,15 +881,18 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     if (own === undefined && !isConcreteChain(chain) && exactRules && !message) {
       throw new PolicyViolationError('chain', `The account's chain is unknown (${account.chain}), so its policies cannot be applied.`)
     }
-    // The rules of every network in play apply: the one asked for, the account's own, the one signed for.
-    const chains = [...new Set([chain, own, signed].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
+    // The rules of every network in play apply: the one asked for, the account's own, the one signed
+    // for, and the domain chain of typed data (it may be another network than the account's).
+    const chains = [...new Set([chain, own, signed, domain].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
     // Every rule key that covers the asked-for chain or the account's own: its namespace and its
     // exact id, in whichever spelling the app wrote them (`solana:mainnet`, `tron:728126428`,
     // `bitcoin` for `bip122` — round 3, H4).
     const written = [...new Set(rules.flatMap((m) => (m ? Object.keys(m) : [])))]
     const keys = written.filter((k) => (chains.length > 0 ? chains.some((c) => ruleCovers(k, c)) : ruleCovers(k, ns)))
-    const judged = chains[0] ?? account.chain
+    // The intent's chain: the asked-for, own or signed network (typed data's domain chain is `domainChain`).
+    const judged = chains.find((c) => c !== domain || c === chain || c === own || c === signed) ?? account.chain
     const intent = intentOf(judged, await account.getAddress(), method, arg, { erc20: await approveRevokesErc20(judged, method, arg, account) })
+    if (domain !== undefined) intent.domainChain = domain
     // An SPL transfer pays a token account: its owner is the recipient, and only the network knows
     // it. Read through the account when a list or confirm will look; unread → unknown (round 3, M1).
     const pending = PENDING_TOKEN_ACCOUNTS.get(intent)
