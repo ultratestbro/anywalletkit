@@ -61,12 +61,18 @@ const errorText = (e: unknown): string => {
 }
 /** A node's own refusal (nothing entered the mempool), as opposed to a lost answer. */
 const NODE_REJECTION = /\bnonce\b|underpriced|insufficient funds|intrinsic gas|exceeds block gas limit|fee cap|\btip\b|invalid (?:sender|signature|transaction)|already known|transaction (?:type )?not supported/i
+/**
+ * JSON-RPC codes that mean the request itself was refused before the bytes could enter a pool:
+ * parse error, invalid request, method not found, invalid params, transaction rejected. Any other
+ * code (-32603 internal error, -32005 limit exceeded, -32000 "upstream request timeout", …) can
+ * come from a gateway after the node took the transaction, so it is not a refusal.
+ */
+const DEFINITIVE_RPC_CODES = new Set([-32700, -32600, -32601, -32602, -32003])
 const nodeAnswered = (e: unknown): boolean => {
   if (NODE_REJECTION.test(errorText(e))) return true
-  // A JSON-RPC error object came back (viem maps an unexplained throw to code -1).
   for (let cur: unknown = e, i = 0; cur && i < 6; cur = (cur as { cause?: unknown }).cause, i++) {
     const code = (cur as { code?: unknown }).code
-    if (typeof code === 'number' && code !== -1) return true
+    if (typeof code === 'number' && DEFINITIVE_RPC_CODES.has(code)) return true
   }
   return false
 }
