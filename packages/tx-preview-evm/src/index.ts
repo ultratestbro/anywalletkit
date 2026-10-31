@@ -516,7 +516,6 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
   // Every call is a contract the user is trusting — transfer-shaped ones included (a contract can
   // wear the selector): one check per target. Approvals are the exception: what they risk is the
   // spender and the amount, which the approval checks below cover.
-  const main = calls[calls.length - 1]!;
   const seenTargets = new Set<string>();
   for (const c of calls) {
     if (!c.selector || c.approval || seenTargets.has(lc(c.to))) continue;
@@ -532,7 +531,8 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
 
   const recipients = new Set<string>();
   for (const c of calls) if (c.transfer) recipients.add(c.transfer.to);
-  if (!main.selector && main.value > 0n) recipients.add(main.to);
+  // Plain native transfers, wherever they sit in a batch: each one pays its `to`.
+  for (const c of calls) if (!c.selector && c.value > 0n) recipients.add(lc(c.to));
   if (input.expectedRecipient) recipients.add(lc(input.expectedRecipient));
   for (const r of recipients) {
     checks.push(own.has(r) ? {code: "recipient-own", status: "ok", detail: {address: r}} : {code: "recipient-foreign", status: "warn", detail: {address: r}});
