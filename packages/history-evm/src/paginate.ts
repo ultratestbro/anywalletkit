@@ -79,6 +79,9 @@ export async function windowPage(specs: ListSpec<{ block: number }>[], cursor: W
     emitted = fetched.map((f) => f.rows.filter((r) => r.block >= bound))
     wNew = bound
   }
+  // A list still catching up (all its fetched rows above `w`) puts `L` above the window: keep the old
+  // bound, emit nothing from it this page and let that list keep skipping. The window never moves up.
+  if (w !== undefined && wNew > w) wNew = w
 
   const lists: Record<string, unknown> = { ...(cursor?.lists ?? {}) }
   let anyActive = false
