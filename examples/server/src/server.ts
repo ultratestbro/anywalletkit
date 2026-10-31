@@ -111,9 +111,13 @@ export function createServer(opts: ServerOptions): Server {
   const ccip = createEnsCcipHandler(opts.ccip)
 
   return createHttpServer(async (req, res) => {
-    if (!cors(req, res, opts.allowedOrigin)) return
-    const url = new URL(req.url ?? '/', 'http://local')
+    let path = '?' // for the error log only
     try {
+      if (!cors(req, res, opts.allowedOrigin)) return
+      // node:http passes targets URL refuses (`//[`): answer them, never let the parse throw past the listener
+      let url: URL
+      try { url = new URL(req.url ?? '/', 'http://local') } catch { return send(res, 400, { error: 'bad request target' }) }
+      path = url.pathname
       if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true })
       if (req.method !== 'POST') return send(res, 405, { error: 'method not allowed' })
 
@@ -145,8 +149,9 @@ export function createServer(opts: ServerOptions): Server {
       }
       return send(res, 404, { error: 'not found' })
     } catch (err) {
+      if (res.headersSent) return void res.destroy() // too late for a status: drop the connection, keep the process
       if (err instanceof Swap2HandlerError) return send(res, err.status, { error: err.message })
-      console.error('request failed', req.method, url.pathname) // never log bodies: they carry addresses and signed transactions
+      console.error('request failed', req.method, path) // never log bodies: they carry addresses and signed transactions
       return send(res, 500, { error: 'internal error' })
     }
   })
