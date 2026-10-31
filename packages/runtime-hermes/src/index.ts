@@ -166,8 +166,17 @@ function cloneStructured(v: unknown, seen: Map<object, unknown>): unknown {
   }
   const out: Record<string, unknown> | unknown[] = Array.isArray(v) ? new Array(v.length) : {}
   seen.set(v, out)
-  for (const k of Object.keys(v)) (out as Record<string, unknown>)[k] = cloneStructured((v as Record<string, unknown>)[k], seen)
+  for (const k of Object.keys(v)) setOwn(out, k, cloneStructured((v as Record<string, unknown>)[k], seen))
   return out
+}
+
+/**
+ * `out[k] = value` as an own data property. An own "__proto__" key (JSON.parse makes one) assigned
+ * would set the copy's prototype instead; the native clone keeps it as a plain key.
+ */
+function setOwn(out: object, k: string, value: unknown): void {
+  if (k === '__proto__') Object.defineProperty(out, k, { value, writable: true, enumerable: true, configurable: true })
+  else (out as Record<string, unknown>)[k] = value
 }
 
 /**

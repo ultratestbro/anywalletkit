@@ -85,6 +85,8 @@ export interface VaultEnvelopeV1 {
   dek: SealedBox
   /** One box per key source (keyring source id), sealed under the DEK. AAD `forgewallet-vault/secret/<id>`. */
   secrets: Record<string, SealedBox>
+  /** A fixed value sealed under the DEK (AAD `forgewallet-vault/dek-check`): proves a key is this vault's while it holds no secret. Absent in envelopes written before it existed. */
+  dekCheck?: SealedBox
   createdAt: number
 }
 
@@ -106,6 +108,8 @@ export interface VaultEnvelopeV2 {
   kdf: { name: 'scrypt'; N: number; r: number; p: number; salt: string }
   dek: SealedBox
   secrets: Record<string, SealedBox>
+  /** See {@link VaultEnvelopeV1.dekCheck}. */
+  dekCheck?: SealedBox
   passkeys: VaultPasskey[]
   createdAt: number
   /** When a v1 envelope was re-sealed as v2. */
@@ -149,6 +153,9 @@ const aadDekV1 = (kdf: VaultEnvelopeV1['kdf']) => `forgewallet-vault/1/dek/${kdf
 const aadDekV2 = (kdf: VaultEnvelopeV2['kdf']) => `forgewallet-vault/2/dek/scrypt/${kdf.N}/${kdf.r}/${kdf.p}/${kdf.salt}`
 const aadPasskey = (id: string) => `forgewallet-vault/2/passkey/${id}`
 const aadSecret = (id: string) => `forgewallet-vault/secret/${id}`
+const AAD_DEK_CHECK = 'forgewallet-vault/dek-check'
+/** What the DEK check box holds: a fixed value, so opening it proves the key and nothing else. */
+const DEK_CHECK = 'forgewallet-vault/dek-check/1'
 const HKDF_INFO = 'forgewallet-vault/2/passkey'
 
 /**
@@ -384,7 +391,8 @@ export class Vault {
     const key = await this._importDek(dek)
     return this._exclusive(async () => {
       const envelope = await this._load()
-      if (Object.keys(envelope.secrets).length > 0) await this._requireDek(dek, envelope)
+      // Only an envelope from before the DEK check, still empty, has nothing to prove the key with.
+      if (envelope.dekCheck !== undefined || Object.keys(envelope.secrets).length > 0) await this._requireDek(dek, envelope)
       if (!(sourceId in envelope.secrets) && Object.keys(envelope.secrets).length >= VAULT_LIMITS.secrets) {
         throw new VaultError(`A vault holds at most ${VAULT_LIMITS.secrets} secrets.`, 'invalid-input')
       }
@@ -446,20 +454,33 @@ export class Vault {
     if (this._kdf === 'pbkdf2') {
       const kdf: VaultEnvelopeV1['kdf'] = { name: 'PBKDF2-SHA256', iterations: this._iterations, salt: toBase64(salt) }
       const kek = await this._derivePbkdf2(password, salt, this._iterations)
-      return { v: 1, kdf, dek: await this._seal(kek, dek, aadDekV1(kdf)), secrets, createdAt }
+      return { v: 1, kdf, dek: await this._seal(kek, dek, aadDekV1(kdf)), secrets, dekCheck: await this._sealDekCheck(dek), createdAt }
     }
     const kdf: VaultEnvelopeV2['kdf'] = { name: 'scrypt', ...this._scrypt, salt: toBase64(salt) }
     const kek = await this._deriveScrypt(password, salt, kdf)
-    return { v: 2, kdf, dek: await this._seal(kek, dek, aadDekV2(kdf)), secrets, passkeys, createdAt }
+    return { v: 2, kdf, dek: await this._seal(kek, dek, aadDekV2(kdf)), secrets, dekCheck: await this._sealDekCheck(dek), passkeys, createdAt }
+  }
+
+  /** The DEK check box: {@link DEK_CHECK} sealed under `dek`. */
+  private async _sealDekCheck(dek: Uint8Array): Promise<SealedBox> {
+    return this._seal(await this._importDek(dek), new TextEncoder().encode(DEK_CHECK), AAD_DEK_CHECK)
   }
 
   /**
-   * The caller's DEK must open this envelope's secrets — it is the key the password protects, not
-   * any 32 bytes. An empty vault has nothing to prove it with, so it is refused rather than trusted.
+   * The caller's DEK must open this envelope's DEK check (or, in an envelope written before it, its
+   * first secret) — it is the key the password protects, not any 32 bytes. An old empty envelope has
+   * nothing to prove it with, so it is refused rather than trusted.
    */
   private async _requireDek(dek: Uint8Array, envelope: VaultEnvelope): Promise<void> {
     const ids = Object.keys(envelope.secrets)
     const key = await this._importDek(dek)
+    if (envelope.dekCheck !== undefined) {
+      const check = await this._open(key, envelope.dekCheck, AAD_DEK_CHECK, 'locked')
+      const ok = new TextDecoder().decode(check) === DEK_CHECK
+      zeroize(check)
+      if (!ok) throw new VaultError('The vault key does not open this entry; lock and unlock again.', 'locked')
+      return
+    }
     if (ids.length === 0) throw new VaultError('Add a secret to the vault before a passkey: an empty vault cannot prove the key is its own.', 'invalid-input')
     const probe = await this._open(key, envelope.secrets[ids[0]!]!, aadSecret(ids[0]!), 'locked')
     zeroize(probe)
@@ -541,7 +562,8 @@ export function isEnvelopeV1(x: unknown): x is VaultEnvelopeV1 {
     e.v === 1 &&
     typeof kdf === 'object' && kdf !== null && kdf.name === 'PBKDF2-SHA256' && Number.isInteger(kdf.iterations) && typeof kdf.salt === 'string' &&
     isBox(e.dek) &&
-    typeof e.secrets === 'object' && e.secrets !== null && Object.values(e.secrets as object).every(isBox)
+    typeof e.secrets === 'object' && e.secrets !== null && Object.values(e.secrets as object).every(isBox) &&
+    (e.dekCheck === undefined || isBox(e.dekCheck))
   )
 }
 
@@ -554,6 +576,7 @@ export function isEnvelopeV2(x: unknown): x is VaultEnvelopeV2 {
     typeof kdf === 'object' && kdf !== null && kdf.name === 'scrypt' && Number.isInteger(kdf.N) && Number.isInteger(kdf.r) && Number.isInteger(kdf.p) && typeof kdf.salt === 'string' &&
     isBox(e.dek) &&
     typeof e.secrets === 'object' && e.secrets !== null && Object.values(e.secrets as object).every(isBox) &&
+    (e.dekCheck === undefined || isBox(e.dekCheck)) &&
     Array.isArray(e.passkeys) && e.passkeys.every((p) => typeof p === 'object' && p !== null && typeof (p as VaultPasskey).id === 'string' && typeof (p as VaultPasskey).label === 'string' && isBox((p as VaultPasskey).dek))
   )
 }
@@ -574,7 +597,7 @@ function envelopeProblem(e: VaultEnvelope): string | null {
   if (secrets.length > VAULT_LIMITS.secrets) return `${secrets.length} secrets > ${VAULT_LIMITS.secrets}`
   const passkeys = e.v === 2 ? e.passkeys : []
   if (passkeys.length > VAULT_LIMITS.passkeys) return `${passkeys.length} passkeys > ${VAULT_LIMITS.passkeys}`
-  for (const box of [e.dek, ...secrets, ...passkeys.map((p) => p.dek)]) {
+  for (const box of [e.dek, ...(e.dekCheck ? [e.dekCheck] : []), ...secrets, ...passkeys.map((p) => p.dek)]) {
     if (box.iv.length > VAULT_LIMITS.boxChars || box.data.length > VAULT_LIMITS.boxChars) return `a sealed box above ${VAULT_LIMITS.boxChars} characters`
   }
   if (JSON.stringify(e).length > VAULT_LIMITS.envelopeChars) return `envelope above ${VAULT_LIMITS.envelopeChars} characters`

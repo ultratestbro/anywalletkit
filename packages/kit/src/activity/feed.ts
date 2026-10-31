@@ -9,6 +9,7 @@ import type { ActivityAsset, ActivityItem, ChainTx, ChainTxStatus, DescribeActiv
 import { packCursor, sourceKey, unpackCursor, type FeedCursorState, type SourceState } from './cursor.js'
 import { catalogChain, describeGeneric, isSpamTx, titleFor, type GenericActivityItem, type GenericDescribeOptions } from './generic.js'
 import type { Intent, IntentJournal } from './journal.js'
+import { sameChain } from '../chain-id.js'
 
 /** A protocol module as the feed sees it: a name for error reports and the pure `describeActivity`. */
 export interface ActivityRecognizer {
@@ -308,7 +309,14 @@ export async function buildFeed(input: FeedInput): Promise<HistoryFeedPage> {
       settle(intent, c.item.status)
     }
     if (firstPage) {
-      const unmatched = intents.filter((i) => i.status !== 'confirmed' && !i.hashes.some((h) => candidateByMatch.has(matchKey(h.chain, h.hash))))
+      // Only intents this query asks about: newer than `since`, and signed by one of its accounts or
+      // with a leg on another chain one of them is on (the destination of a cross-chain swap).
+      const asked = input.addresses.filter((a) => !chainFilter || chainFilter.has(a.chain))
+      const onChain = (a: string, b: string) => catalogChain(a) === catalogChain(b) || sameChain(a, b)
+      const inScope = (i: Intent) => (query.since === undefined || i.createdAt >= query.since) && (
+        asked.some((a) => onChain(a.chain, i.chain) && norm(i.chain, a.address) === norm(i.chain, i.address)) ||
+        i.hashes.some((h) => !onChain(h.chain, i.chain) && asked.some((a) => onChain(a.chain, h.chain))))
+      const unmatched = intents.filter((i) => i.status !== 'confirmed' && inScope(i) && !i.hashes.some((h) => candidateByMatch.has(matchKey(h.chain, h.hash))))
       await Promise.all(unmatched.map(async (intent) => {
         if (intent.status === 'failed') { top.push(intentItem(intent, 'failed', opts)); return }
         // The explorer may lag behind the chain: ask each leg's source for the row directly.

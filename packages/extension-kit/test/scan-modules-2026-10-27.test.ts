@@ -184,7 +184,11 @@ describe('Vault.rotateVaultKey (scan 2026-10-27 modules, F30)', () => {
     const storage = memoryVaultStorage()
     const vault = new Vault({ storage, scrypt: VAULT_MIN_SCRYPT })
     const dek = await vault.create(PW)
-    await vault.setSecret(crypto.getRandomValues(new Uint8Array(32)), 'first', enc('an empty vault cannot tell keys apart'))
+    // A new vault carries a DEK check: even empty, it refuses a foreign key.
+    expect(await code(vault.setSecret(crypto.getRandomValues(new Uint8Array(32)), 'first', enc('x')))).toBe('locked')
+    // An envelope written before the DEK check, still empty, cannot tell keys apart.
+    delete (storage.envelope as VaultEnvelopeV2).dekCheck
+    await vault.setSecret(crypto.getRandomValues(new Uint8Array(32)), 'first', enc('an old empty vault cannot tell keys apart'))
     await vault.deleteSecret('first')
     await vault.setSecret(dek, 'seed', enc('words'))
     expect(await code(vault.setSecret(crypto.getRandomValues(new Uint8Array(32)), 'other', enc('x')))).toBe('locked')

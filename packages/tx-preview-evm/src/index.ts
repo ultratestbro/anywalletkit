@@ -476,6 +476,30 @@ async function tokenMeta(rpc: Rpc, token: string): Promise<{symbol: string | nul
   return {symbol, decimals};
 }
 
+/** viem's error types for a call the EVM reverted (not a transport or node failure). */
+const REVERT_ERRORS = new Set(["ExecutionRevertedError", "ContractFunctionRevertedError", "RawContractError"]);
+
+/**
+ * Evidence that a failed eth_call reverted in the EVM, from the error or its `cause` chain: revert
+ * data (`data`, or `data.data`), JSON-RPC code 3, -32000 that says so, the "execution reverted"
+ * message, or one of viem's revert errors. `undefined` when there is none (a dropped connection,
+ * a timeout, a node error): that is no verdict on the call.
+ */
+function revertEvidence(err: unknown): {data?: string} | undefined {
+  let found: {data?: string} | undefined;
+  let e: unknown = err;
+  for (let depth = 0; depth < 8 && typeof e === "object" && e !== null; depth++) {
+    const o = e as {data?: unknown; code?: unknown; message?: unknown; name?: unknown; cause?: unknown};
+    const nested = typeof o.data === "object" && o.data !== null ? (o.data as {data?: unknown}).data : undefined;
+    const data = [o.data, nested].find((d): d is string => typeof d === "string" && isHex(d) && d.length > 2);
+    if (data !== undefined) return {data};
+    const message = typeof o.message === "string" ? o.message : "";
+    if (o.code === 3 || (o.code === -32000 && /revert|execution/i.test(message)) || /execution reverted/i.test(message) || (typeof o.name === "string" && REVERT_ERRORS.has(o.name))) found ??= {};
+    e = o.cause;
+  }
+  return found;
+}
+
 /** Single call without eth_simulateV1: does it revert? */
 async function callFallback(input: PreviewInput): Promise<Simulation> {
   if (input.calls.length !== 1) return {status: "unavailable", reason: "this network can't simulate a sequence of calls"};
@@ -485,8 +509,10 @@ async function callFallback(input: PreviewInput): Promise<Simulation> {
     await input.rpc("eth_call", [{from: input.from, to: c.to, ...(c.data ? {data: c.data} : {}), value: hex(c.value ?? 0n)}, "latest", ...(overrides ? [overrides] : [])]);
     return {status: "unavailable", reason: "the call passes, but this network can't show balance changes"};
   } catch (err) {
-    const data = (err as {data?: string}).data;
-    return {status: "reverted", callIndex: 0, reason: revertReason({...(data ? {returnData: data} : {}), error: {message: err instanceof Error ? err.message.slice(0, 200) : String(err)}})};
+    const message = err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200);
+    const evidence = revertEvidence(err);
+    if (!evidence) return {status: "unavailable", reason: `the call could not be checked: ${message}`};
+    return {status: "reverted", callIndex: 0, reason: revertReason({...(evidence.data ? {returnData: evidence.data} : {}), error: {message}})};
   }
 }
 
@@ -516,7 +542,6 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
   // Every call is a contract the user is trusting — transfer-shaped ones included (a contract can
   // wear the selector): one check per target. Approvals are the exception: what they risk is the
   // spender and the amount, which the approval checks below cover.
-  const main = calls[calls.length - 1]!;
   const seenTargets = new Set<string>();
   for (const c of calls) {
     if (!c.selector || c.approval || seenTargets.has(lc(c.to))) continue;
@@ -532,7 +557,8 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
 
   const recipients = new Set<string>();
   for (const c of calls) if (c.transfer) recipients.add(c.transfer.to);
-  if (!main.selector && main.value > 0n) recipients.add(main.to);
+  // Plain native transfers, wherever they sit in a batch: each one pays its `to`.
+  for (const c of calls) if (!c.selector && c.value > 0n) recipients.add(lc(c.to));
   if (input.expectedRecipient) recipients.add(lc(input.expectedRecipient));
   for (const r of recipients) {
     checks.push(own.has(r) ? {code: "recipient-own", status: "ok", detail: {address: r}} : {code: "recipient-foreign", status: "warn", detail: {address: r}});
