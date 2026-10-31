@@ -166,13 +166,24 @@ export function usdt0VerifyQuote(params: QuoteParams, quote: Quote): string | nu
 }
 
 /**
- * The USDT0 OFT a send calls on a chain, and the adapter it approves where one locks USDT (Ethereum), and
- * {@link usdt0VerifyQuote} — the app's pins for `remoteProvider({name: "usdt0", baseUrl, ...usdt0Pins})` (scan
- * 2026-10-27 modules, F8/F16; the send's arguments since scan 2026-10-30, F3).
+ * The contracts a USDT0 claim may call on `chain`: its LayerZero EndpointV2 (`lzReceive`, retrying a stored
+ * payload). Empty for a chain USDT0 is not listed on.
  */
-export const usdt0Pins: RemotePins = Object.freeze({
+export function usdt0ClaimTargets(chain: string): readonly string[] {
+  const c = usdt0ChainFor(chain);
+  return c ? [c.endpoint] : [];
+}
+
+/**
+ * The USDT0 OFT a send calls on a chain, the adapter it approves where one locks USDT (Ethereum), the endpoint
+ * a stored-payload claim calls, and {@link usdt0VerifyQuote} — the app's pins for
+ * `remoteProvider({name: "usdt0", baseUrl, ...usdt0Pins})` (scan 2026-10-27 modules, F8/F16; the send's
+ * arguments since scan 2026-10-30, F3).
+ */
+export const usdt0Pins: RemotePins & {claimTargets(chain: string): readonly string[]} = Object.freeze({
   callTargets: (chain: string): readonly string[] => { const c = usdt0ChainFor(chain); return c ? [c.oft] : []; },
   spenders: (chain: string): readonly string[] => { const c = usdt0ChainFor(chain); return c?.adapter ? [c.oft] : []; },
+  claimTargets: usdt0ClaimTargets,
   verifyQuote: usdt0VerifyQuote,
 });
 function usdt0ChainFor(chain: string): Usdt0Chain | undefined {
