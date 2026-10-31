@@ -170,7 +170,8 @@ export class NearRpc {
 
 /** Human-readable failure from an execution `status` (`{Failure: {...}}`), or undefined on success. */
 export function failureOf(status: Record<string, unknown> | undefined): string | undefined {
-  if (!status || !('Failure' in status)) return undefined
+  // Unit variants ("NotStarted", "Started") come back as plain strings.
+  if (!status || typeof status !== 'object' || !('Failure' in status)) return undefined
   const f = status.Failure
   try {
     const json = JSON.stringify(f)

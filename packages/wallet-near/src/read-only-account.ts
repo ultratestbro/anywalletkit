@@ -5,7 +5,7 @@ import { base58ToBytes, bytesToBase58, ed25519Key, isImplicitAccountId, isValidA
 import { ACTION_TAG, accessKeyPermissionTag, decodeAnyTransaction, encodeSignedTransaction, encodeTransaction, isPlainObject } from './borsh.js'
 import { describeTransaction, isDangerous, type DescribeContext } from './describe.js'
 import { SimulationError, UnsafeTransactionError } from './errors.js'
-import { NearRpc, createClient, failureOf, fromBase64, outcomeFailed, type RawFinalOutcome } from './rpc.js'
+import { NearRpc, createClient, fromBase64, outcomeFailed, type RawFinalOutcome } from './rpc.js'
 import {
   CAIP2, FT_TRANSFER_GAS, IMPLICIT_ACCOUNT_MIN_DEPOSIT, MAX_GAS, ONE_YOCTO, STORAGE_DEPOSIT_GAS, STORAGE_PRICE_PER_BYTE, TGAS,
   type NearAccountView, type NearAction, type NearBuiltTransaction, type NearConfig, type NearFeeEstimate, type NearFetch, type NearFunctionCallAction,
@@ -316,8 +316,7 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
   /** Status of one of this account's transactions (the `tx` RPC needs the sender). */
   async getTransactionReceipt(hash: string): Promise<NearReceipt | undefined> {
     const o = await this.requireRpc('fetch transaction receipts').txStatus(hash, this.address)
-    if (!o) return undefined
-    return receiptOf(hash, o)
+    return o ? receiptOf(hash, o) : undefined
   }
 
   /** Verify an `ed25519:<base58>` (or bare base58 / hex) signature produced by `sign`. */
@@ -333,10 +332,18 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
   static txHash(tx: NearBuiltTransaction): string { return bytesToBase58(WalletAccountReadOnlyNear.hashOf(tx)) }
 }
 
-export function receiptOf(hash: string, o: RawFinalOutcome): NearReceipt {
+/**
+ * The receipt of a `tx` / `send_tx` outcome: status 0 when the transaction or any receipt failed,
+ * 1 when it executed (`SuccessValue` / `SuccessReceiptId`), `undefined` while it is not executed
+ * yet (no execution status, `NotStarted` / `Started`, or `final_execution_status` NONE / INCLUDED /
+ * INCLUDED_FINAL).
+ */
+export function receiptOf(hash: string, o: RawFinalOutcome): NearReceipt | undefined {
   const failure = outcomeFailed(o)
-  const pending = o.final_execution_status !== undefined && /NONE|INCLUDED$/.test(o.final_execution_status) && !failureOf(o.status) && o.status === undefined
-  return { hash, status: failure ? 0 : 1, ...(failure ? { failure } : {}), raw: { ...o, ...(pending ? { pending: true } : {}) } }
+  if (failure) return { hash, status: 0, failure, raw: { ...o } }
+  if (o.final_execution_status !== undefined && /^(?:NONE|INCLUDED|INCLUDED_FINAL)$/.test(o.final_execution_status)) return undefined
+  const executed = typeof o.status === 'object' && o.status !== null && ('SuccessValue' in o.status || 'SuccessReceiptId' in o.status)
+  return executed ? { hash, status: 1, raw: { ...o } } : undefined
 }
 
 export function parseSignature(signature: string): Uint8Array {
