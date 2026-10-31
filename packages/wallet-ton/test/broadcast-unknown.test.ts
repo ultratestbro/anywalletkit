@@ -43,7 +43,8 @@ describe('TON: a lost broadcast answer is "maybe sent", a refusal is not', () =>
       const e1 = await a.transfer({ recipient: RECIPIENT, amount: 1n }).then(() => null, (e: unknown) => e)
       expect(e1).toBeInstanceOf(BroadcastUnknownError)
       expect(e1).toMatchObject({ maybeSent: true, hash: bodyHash(n.handed.at(-1)!) })
-      const e2 = await a.sendTransaction({ to: RECIPIENT, value: 1n }).then(() => null, (e: unknown) => e)
+      // a fresh account: this one now waits for the maybe-sent external's seqno before signing again
+      const e2 = await (await account(n.fetch)).sendTransaction({ to: RECIPIENT, value: 1n }).then(() => null, (e: unknown) => e)
       expect(e2).toMatchObject({ name: 'BroadcastUnknownError', hash: bodyHash(n.handed.at(-1)!) })
     })
   }

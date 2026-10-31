@@ -44,7 +44,8 @@ export function fakeRpc(overrides: Record<string, Handler> = {}, opts: { emulate
   const handlers: Record<string, Handler> = {
     getAddressInformation: () => ({ '@type': 'raw.fullAccountState', balance: '1000000000', state: 'active', code: '', data: '', last_transaction_id: { '@type': 'internal.transactionId', lt: '1', hash: 'AA==' }, sync_utime: 1 }),
     runGetMethod: (p) => {
-      if (p.method === 'seqno') return { '@type': 'smc.runResult', gas_used: 1, exit_code: 0, stack: [['num', '0x7']] }
+      // a broadcast external lands at once: the seqno moves with every sendBoc
+      if (p.method === 'seqno') return { '@type': 'smc.runResult', gas_used: 1, exit_code: 0, stack: [['num', '0x' + (7 + sent.length).toString(16)]] }
       if (p.method === 'get_wallet_address') {
         jettonMaster = String(p.address)
         const slice = (p.stack as Array<[string, string]> | undefined)?.[0]?.[1]

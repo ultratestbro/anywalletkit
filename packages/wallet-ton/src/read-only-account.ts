@@ -216,8 +216,8 @@ export class WalletAccountReadOnlyTon implements IWalletAccountReadOnly {
   }
 
   /** The cell to sign for `messages` at the CURRENT seqno (fetched fresh every time). */
-  protected async signingCell(messages: V5R1Message[]): Promise<{ signing: Cell; seqno: number; validUntil: number }> {
-    const seqno = await this.getSeqno()
+  protected async signingCell(messages: V5R1Message[], knownSeqno?: number): Promise<{ signing: Cell; seqno: number; validUntil: number }> {
+    const seqno = knownSeqno ?? (await this.getSeqno())
     const validUntil = this.validUntil()
     return { signing: v5r1SigningMessage({ walletId: this._walletId, validUntil, seqno, messages }), seqno, validUntil }
   }

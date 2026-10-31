@@ -9,6 +9,11 @@ import { parseV5R1Body, v5r1ExternalMessage, v5r1PackSigned, v5r1PackUnsigned, t
 import { drainModes, sendModeOf } from './describe.js'
 import type { TonConfig, TonSendable, TonTransferOptions } from './types.js'
 
+/** How long a send waits, by default, for the previous transfer to move the seqno. */
+export const PENDING_SEQNO_TIMEOUT_MS = 60_000
+/** Pause between seqno reads while that wait runs. */
+export const PENDING_SEQNO_POLL_MS = 1_500
+
 const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
 
 /** Does `bytes` carry `key` anywhere? A Solana transaction names each signer's 32-byte key. */
@@ -45,6 +50,14 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   /** What holds the key: `seed`, `key` (one imported key) or `external`. */
   readonly signerKind: Signer['kind']
   private _readOnly: WalletAccountReadOnlyTon | undefined
+  /**
+   * The last external this account broadcast (accepted, or maybe sent) and when it expires. Until
+   * the wallet's seqno moves past it, a new message signed at the chain seqno would carry the same
+   * seqno and silently never execute, so the next send waits for it first.
+   */
+  private _inFlight: { seqno: number; validUntil: number } | undefined
+  /** Tail of this account's send queue: seqno → sign → broadcast runs one send at a time. */
+  private _sendTail: Promise<unknown> = Promise.resolve()
 
   /** `publicKey` is the signer's 32-byte ed25519 key; the V5R1 address derives from it synchronously. */
   constructor(signer: Signer, publicKey: Uint8Array, path: string, config: TonConfig = {}) {
@@ -132,7 +145,27 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     return parseV5R1Body(body)?.messages.map((m) => m.mode) ?? []
   }
 
-  async #signMessages(messages: V5R1Message[], limit: bigint | number | undefined, op: string): Promise<{ body: Cell; fee: bigint }> {
+  /**
+   * The seqno to sign the next send at: the chain's, once it has moved past this account's last
+   * broadcast. While that external can still land (before its valid_until) the seqno is polled, up
+   * to `pendingSeqnoTimeoutMs`; an expired one that never landed is forgotten.
+   */
+  async #nextSendSeqno(): Promise<number> {
+    const timeout = this._config.pendingSeqnoTimeoutMs ?? PENDING_SEQNO_TIMEOUT_MS
+    const deadline = Date.now() + timeout
+    for (;;) {
+      const chain = await this.getSeqno()
+      const prev = this._inFlight
+      if (!prev || chain > prev.seqno || Date.now() / 1000 > prev.validUntil) {
+        this._inFlight = undefined
+        return chain
+      }
+      if (Date.now() >= deadline) throw new Error(`The previous transfer is still pending (seqno ${prev.seqno} has not moved): wait for it to land, then send again.`)
+      await new Promise((resolve) => setTimeout(resolve, Math.min(PENDING_SEQNO_POLL_MS, Math.max(0, deadline - Date.now()))))
+    }
+  }
+
+  async #signMessages(messages: V5R1Message[], limit: bigint | number | undefined, op: string, forSend = false): Promise<{ body: Cell; fee: bigint }> {
     this.assertNoDrain(messages.map((m) => sendModeOf(m.mode)))
     // The wallet sends with IGNORE_ERRORS: a message whose value exceeds the
     // balance is silently dropped by the action phase — the external still
@@ -144,7 +177,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
       const balance = await this.getBalance()
       if (balance < want) throw new UnsafeTransactionError('insufficient-balance', `Insufficient TON balance: the messages carry ${want} nanotons, the wallet holds ${balance} (fees come on top).`)
     }
-    const { signing } = await this.signingCell(messages)
+    const { signing } = await this.signingCell(messages, forSend ? await this.#nextSendSeqno() : undefined)
     const fee = await this.preflight(v5r1PackUnsigned(signing), limit, op, want)
     const signature = await this.#signer.sign(new Uint8Array(signing.hash()), { scheme: 'ed25519', context: 'ton-external' })
     return { body: v5r1PackSigned(signing, signature), fee }
@@ -184,31 +217,55 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     const rpc = this.requireRpc('send transactions')
     const init = await this.initIfNeeded()
     const hash = body.hash().toString('hex')
+    const parsed = parseV5R1Body(body)
+    const sent = (): void => {
+      if (parsed) this._inFlight = { seqno: parsed.seqno, validUntil: parsed.validUntil }
+    }
     try {
       await rpc.sendBoc(v5r1ExternalMessage(this._address, body, init))
     } catch (e) {
       // Only a node's explicit refusal means nothing went out (round 3, M12).
       if (isAnsweredRefusal(e)) throw e
+      sent()
       throw new BroadcastUnknownError(hash, e)
     }
+    sent()
     return hash
   }
 
+  /**
+   * One send at a time per account: two sends started together would read the same seqno before
+   * either is broadcast. A failed send does not block the next.
+   */
+  #serial<T>(run: () => Promise<T>): Promise<T> {
+    const next = this._sendTail.then(run)
+    this._sendTail = next.then(() => undefined, () => undefined)
+    return next
+  }
+
   /** Sign and broadcast; `hash` is the body hash (hex) — resolve it with getTransactionReceipt. */
-  async sendTransaction(tx: TonSendable, options: WriteOptions = {}): Promise<TransferResult> {
+  sendTransaction(tx: TonSendable, options: WriteOptions = {}): Promise<TransferResult> {
+    return this.#serial(() => this.#sendTransactionNow(tx, options))
+  }
+
+  async #sendTransactionNow(tx: TonSendable, options: WriteOptions): Promise<TransferResult> {
     this.requireRpc('send transactions')
     if (tx instanceof Cell) this.assertNoDrain(this.bodyModes(tx))
     const { body, fee } = tx instanceof Cell
       ? { body: tx, fee: await this.preflight(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction') }
-      : await this.#signMessages(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction')
+      : await this.#signMessages(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction', true)
     return { hash: await this.broadcast(body), fee }
   }
 
   /** TON (no `token`) or jetton transfer. */
-  async transfer(o: TonTransferOptions, writeOptions: WriteOptions = {}): Promise<TransferResult> {
+  transfer(o: TonTransferOptions, writeOptions: WriteOptions = {}): Promise<TransferResult> {
+    return this.#serial(() => this.#transferNow(o, writeOptions))
+  }
+
+  async #transferNow(o: TonTransferOptions, writeOptions: WriteOptions): Promise<TransferResult> {
     this.requireRpc('transfer tokens')
     const message = o.token ? await this.jettonTransferMessage(o) : this.transactionMessage({ to: o.recipient, value: o.amount, ...(o.memo !== undefined ? { body: o.memo } : {}) })
-    const { body, fee } = await this.#signMessages([message], feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
+    const { body, fee } = await this.#signMessages([message], feeLimit(this._config.transferMaxFee, writeOptions), 'transfer', true)
     return { hash: await this.broadcast(body), fee }
   }
 

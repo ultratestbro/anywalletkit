@@ -57,6 +57,12 @@ export interface TonConfig {
   simulate?: boolean
   /** Seconds a signed external stays valid (default 60, max 600). */
   validUntilSeconds?: number
+  /**
+   * Most milliseconds a send waits for this account's previous transfer to move the wallet's seqno
+   * before signing the next one (default 60 000). A transfer signed at the same seqno would never
+   * execute; past this wait the send throws instead.
+   */
+  pendingSeqnoTimeoutMs?: number
   /** Nanotons attached to a jetton transfer on top of `forwardTonAmount` (default 0.05 TON). */
   jettonAttachedValue?: bigint | number | string
   /**
