@@ -17,7 +17,7 @@ const API_TIMEOUT_MS = 15_000
  * @param {number} [ms]
  * @returns {Promise<Response>}
  */
-async function fetchWithTimeout (url, ms = API_TIMEOUT_MS) {
+async function fetchWithTimeout (url, ms = API_TIMEOUT_MS, init = {}) {
   let signal
   if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') signal = AbortSignal.timeout(ms)
   else if (typeof AbortController !== 'undefined') {
@@ -26,7 +26,79 @@ async function fetchWithTimeout (url, ms = API_TIMEOUT_MS) {
     timer.unref?.()
     signal = controller.signal
   }
-  return fetch(url, signal ? { signal } : {})
+  return fetch(url, signal ? { ...init, signal } : init)
+}
+
+/**
+ * The most a TON RPC answer may weigh before @ton/ton validates it: its zod schemas spend memory
+ * in proportion to the input, so a hostile node must not pick the size. The pool getters and
+ * balances this module reads are a few KiB.
+ */
+const MAX_RPC_RESPONSE_BYTES = 1024 * 1024
+
+const rpcTooLarge = () => new Error(`TON RPC answer larger than ${MAX_RPC_RESPONSE_BYTES / 1024 / 1024} MiB.`)
+
+/**
+ * The body as text, refused past `MAX_RPC_RESPONSE_BYTES` (declared, or counted while it streams).
+ * A response without a stream (React Native's fetch) is buffered by the runtime: there the
+ * timeout bounds it and the cap is checked on the text.
+ */
+async function readCapped (res) {
+  const declared = Number(res.headers?.get?.('content-length') ?? Number.NaN)
+  if (Number.isFinite(declared) && declared > MAX_RPC_RESPONSE_BYTES) {
+    Promise.resolve(res.body?.cancel?.()).catch(() => {})
+    throw rpcTooLarge()
+  }
+  if (typeof res.body?.getReader !== 'function') {
+    const text = await res.text()
+    if (text.length > MAX_RPC_RESPONSE_BYTES) throw rpcTooLarge() // UTF-16 units: never more than the bytes
+    return text
+  }
+  const reader = res.body.getReader()
+  const chunks = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (!value) continue
+    size += value.byteLength
+    if (size > MAX_RPC_RESPONSE_BYTES) {
+      reader.cancel().catch(() => {})
+      throw rpcTooLarge()
+    }
+    chunks.push(value)
+  }
+  const all = new Uint8Array(size)
+  let at = 0
+  for (const c of chunks) { all.set(c, at); at += c.byteLength }
+  if (typeof TextDecoder === 'function') return new TextDecoder().decode(all)
+  let out = '' // Hermes without TextDecoder: byte per character, exact for the ASCII JSON a node answers
+  for (let i = 0; i < all.length; i += 0x2000) out += String.fromCharCode.apply(null, Array.from(all.subarray(i, i + 0x2000)))
+  return out
+}
+
+/** The request headers axios hands an adapter, as a plain object. */
+function plainHeaders (headers) {
+  const h = typeof headers?.toJSON === 'function' ? headers.toJSON() : { ...headers }
+  const out = {}
+  for (const [k, v] of Object.entries(h)) if (v !== undefined && v !== null && v !== false) out[k] = String(v)
+  return out
+}
+
+/**
+ * An axios adapter for TonClient on `fetch` (Node and React Native alike) that reads at most
+ * `MAX_RPC_RESPONSE_BYTES` of the answer.
+ */
+async function cappedFetchAdapter (req) {
+  const res = await fetchWithTimeout(req.url, req.timeout || 30_000, {
+    method: String(req.method ?? 'post').toUpperCase(),
+    headers: plainHeaders(req.headers),
+    body: typeof req.data === 'string' ? req.data : JSON.stringify(req.data ?? {})
+  })
+  const text = await readCapped(res)
+  let data
+  try { data = JSON.parse(text) } catch { data = { ok: false, error: `non-JSON answer (HTTP ${res.status})` } }
+  return { data, status: res.status, statusText: res.statusText ?? '', headers: {}, config: req }
 }
 
 /** @typedef {import('./staking-protocol.js').StakeOptions} StakeOptions */
@@ -210,13 +282,17 @@ function networkOf (account) {
 function toTonClient (c) {
   if (c instanceof TonClient) return c
   const url = c?.url ?? c?.endpoint
-  if (typeof url === 'string') return new TonClient({ endpoint: url, apiKey: c.secretKey ?? c.apiKey })
+  if (typeof url === 'string') return new TonClient({ endpoint: url, apiKey: c.secretKey ?? c.apiKey, httpAdapter: cappedFetchAdapter })
   if (typeof c?.call === 'function') {
     return new TonClient({
       endpoint: 'https://tonrpc.invalid/jsonRPC', // never fetched: the adapter answers
       httpAdapter: async (req) => {
         const { method, params } = JSON.parse(typeof req.data === 'string' ? req.data : '{}')
         const result = await c.call(method, params)
+        // The TonRpc already parsed it; still keep an oversized answer away from @ton/ton's validation.
+        let size = 0
+        try { size = JSON.stringify(result)?.length ?? 0 } catch { /* not JSON-shaped: nothing to measure */ }
+        if (size > MAX_RPC_RESPONSE_BYTES) throw rpcTooLarge()
         return { data: { ok: true, result }, status: 200, statusText: 'OK', headers: {}, config: req }
       }
     })
