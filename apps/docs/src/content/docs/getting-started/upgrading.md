@@ -10,6 +10,40 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: the 2026-10-31 review fixes
+
+An external review of the 2026-10-30 release found 16 issues; all are fixed. The ones that can change what your
+app sees come first.
+
+- **EVM: an ambiguous RPC error on a send is "maybe sent".** `wallet-evm` used to read any numeric JSON-RPC code as
+  the node's refusal. `-32603`, `-32005` or a gateway's `-32000` "upstream request timeout" now throw
+  `BroadcastUnknownError` (`maybeSent: true`, `hash`); only refusal wording (nonce, underpriced, insufficient
+  funds, …) and request-level codes (`-32700`, `-32600`, `-32601`, `-32602`, `-32003`) stay plain errors. Handle it
+  as before: check Activity before sending again, track the hash, never resend by itself.
+- **TON: back-to-back sends wait for each other.** A second `transfer()` right after the first used to sign the
+  same seqno and silently never execute. The account now waits until the first one is in a block (up to
+  `pendingSeqnoTimeoutMs`, default 60 s) and otherwise throws "The previous transfer is still pending"; nothing is
+  signed. Show it as "try again in a moment".
+- **NEAR:** back-to-back sends sign increasing nonces, and `getTransactionReceipt` returns `undefined` until the
+  transaction executed (it used to answer `status: 1` while pending; `raw.pending` is gone).
+- **EVM `waitForTransaction(hash)`** is new on the account: it waits for the receipt and throws
+  `TransactionRevertedError` (`code: 'reverted'`) on a revert. swap2 uses it to wait for approvals and claims.
+  A claim proven reverted throws `Swap2ExecutionError`; poll with the id you had and claim again.
+- **EVM chains without EIP-1559** now send plain transfers at `gasPrice` (the quote already did).
+- **Policies:** with `allowCrossChainTypedData: true`, typed data is also judged by the policies of its
+  `domain.chainId`, and `confirm` gets the new `WriteIntent.domainChain`.
+- **Review (`tx-preview-evm`):** every native transfer in a batch is a recipient check, and a network error in the
+  `eth_call` fallback is `unavailable`, not `reverted`.
+- **History:** pending and failed journal intents respect `chains`, `addresses` and `since`; a backend switch no
+  longer repeats rows.
+- **Swaps and lending:** USDT0 stored-payload claims work through `claimSwap2` (`usdt0ClaimTargets`, also in
+  `usdt0Pins`); a CCTP claim with a configured but failing destination RPC reads `pending`, not `completed`; a Kamino
+  withdrawal that pays out more than asked is refused before signing.
+- **extension-kit:** an empty vault refuses a key that is not its own (`dekCheck` in new envelopes; old envelopes
+  open as before).
+- **Hardening:** the Hermes `structuredClone` polyfill keeps an own `"__proto__"` key as a key; Tonstakers caps a
+  TON node answer at 1 MiB; the example server answers a malformed request target with 400.
+
 ## 2026-10-30: the re-audit fixes
 
 A re-audit of the 2026-10-30 release found five more issues; all are fixed. Only the TON one can change what your
