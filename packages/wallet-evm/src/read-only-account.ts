@@ -1,7 +1,7 @@
 import { NetworkError, NotATokenError, type IWalletAccountReadOnly, type TokenFlag, type TokenInfo } from '@anywalletkit/core'
 import {
   bytesToHex,
-  BaseError, ContractFunctionRevertedError, decodeErrorResult, getAddress, hashTypedData, isHex,
+  BaseError, ContractFunctionRevertedError, decodeErrorResult, Eip1559FeesNotSupportedError, getAddress, hashTypedData, isHex,
   recoverMessageAddress, recoverAddress, stringToHex,
   type Hex, type PublicClient,
 } from 'viem'
@@ -267,7 +267,17 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
     let maxFeePerGas = toBigInt(tx.maxFeePerGas)
     let maxPriorityFeePerGas = toBigInt(tx.maxPriorityFeePerGas)
     if (maxFeePerGas === undefined || maxPriorityFeePerGas === undefined) {
-      const fees = await this.requireClient('read fee data').estimateFeesPerGas()
+      const client = this.requireClient('read fee data')
+      let fees: { maxFeePerGas: bigint; maxPriorityFeePerGas: bigint }
+      try {
+        fees = await client.estimateFeesPerGas()
+      } catch (e) {
+        // A chain without EIP-1559 and a transaction that asked for nothing EIP-1559: sign it
+        // legacy at the network's gas price. An explicit type 2 / 4 or fee field still fails here.
+        const asksEip1559 = tx.type !== undefined || maxFeePerGas !== undefined || maxPriorityFeePerGas !== undefined || !!tx.accessList?.length || !!tx.authorizationList?.length
+        if (!asksEip1559 && e instanceof BaseError && e.walk((x) => x instanceof Eip1559FeesNotSupportedError)) return { gasPrice: await client.getGasPrice() }
+        throw e
+      }
       // Public mainnet nodes answer eth_maxPriorityFeePerGas with 0 when
       // blocks are quiet. A zero-tip transaction is last in every builder's
       // queue and gets evicted from the mempool as soon as the base fee
@@ -291,18 +301,12 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
    * without EIP-1559).
    */
   async quoteSendTransaction(tx: EvmTransaction): Promise<{ fee: bigint }> {
-    const client = this.requireClient('quote send transaction operations')
+    this.requireClient('quote send transaction operations')
+    // The same fee fields the send signs (gasPrice on a chain without EIP-1559, see feeFields).
     const cap = async (): Promise<bigint> => {
       const chainId = tx.chainId !== undefined ? chainIdNumber(tx.chainId) : await this.getChainId()
-      try {
-        const f = await this.feeFields(tx, chainId)
-        return 'gasPrice' in f ? f.gasPrice : f.maxFeePerGas
-      } catch (e) {
-        // No fee fields and no EIP-1559 on this chain: the quote falls back to gasPrice, as getFeeRate does.
-        const setsFees = tx.gasPrice !== undefined || tx.maxFeePerGas !== undefined || tx.maxPriorityFeePerGas !== undefined
-        if (!setsFees) return client.getGasPrice()
-        throw e
-      }
+      const f = await this.feeFields(tx, chainId)
+      return 'gasPrice' in f ? f.gasPrice : f.maxFeePerGas
     }
     const [gas, rate] = await Promise.all([this.gasFor(tx), cap()])
     return { fee: gas * rate }
