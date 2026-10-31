@@ -1749,7 +1749,11 @@ function structuredCloneSafe<T>(value: T): T {
   if (value === null || typeof value !== "object") return value;
   if (Array.isArray(value)) return value.map((v) => structuredCloneSafe(v)) as T;
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = structuredCloneSafe(v);
+  // An own "__proto__" key assigned would set the copy's prototype: define it as a plain key.
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (k === "__proto__") Object.defineProperty(out, k, {value: structuredCloneSafe(v), writable: true, enumerable: true, configurable: true});
+    else out[k] = structuredCloneSafe(v);
+  }
   return out as T;
 }
 
