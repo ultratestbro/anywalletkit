@@ -265,7 +265,7 @@ describe('F6 / F10: \'max\' on a Lend market comes from the obligation on chain'
     const ok = lend(null, { deposits: [{ reserve: USDC_RESERVE, ctokens: 5_000_000n }] })
     await ok.p.quoteWithdraw({ token: USDC, amount: 'max' })
     expect(ktxCalls(ok.f).at(-1)!.body).toMatchObject({ amount: '5' })
-    expect(ok.acc.guards.at(-1)!.guard.expect.tokenIn).toEqual({ mint: USDC, minAmount: 4_975_000n })
+    expect(ok.acc.guards.at(-1)!.guard.expect.tokenIn).toEqual({ mint: USDC, minAmount: 4_975_000n, maxAmount: 5_025_002n })
     // Nothing on chain is nothing to withdraw, whatever the API says.
     const none = lend({ deposits: [usdcLeg('5')] }, {})
     await expect(none.p.withdraw({ token: USDC, amount: 'max' })).rejects.toThrow(/Nothing supplied/)
