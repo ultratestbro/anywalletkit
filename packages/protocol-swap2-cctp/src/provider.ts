@@ -155,14 +155,15 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
     return m ?? null;
   }
 
-  async function minted(dst: CctpDomain, nonce: Hex): Promise<boolean | null> {
+  /** The nonce's state on the destination: null without an RPC there, "unknown" when the configured RPC fails to answer. */
+  async function minted(dst: CctpDomain, nonce: Hex): Promise<boolean | null | "unknown"> {
     const c = client(dst.caip2);
     if (!c) return null;
     try {
       const used = await c.readContract({address: getAddress(dst.messageTransmitter), abi: MESSAGE_TRANSMITTER_ABI, functionName: "usedNonces", args: [nonce]});
       return used !== 0n;
     } catch {
-      return null;
+      return "unknown";
     }
   }
 
@@ -307,10 +308,13 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
         if (!m) return {state: "pending", depositReceived: false, claim};
         const nonce = m.decodedMessage?.nonce;
         if (m.status === "complete" && isHexData(m.attestation) && isHexData(m.message)) {
-          const done = isHexData(nonce) && nonce.length === 66 ? await minted(parsed.dst, nonce) : null;
-          if (done) return {state: "completed", claim: {...claim, ready: false}, ...(ref.destTxHash ? {destTxHash: ref.destTxHash} : {})};
+          // A message without a readable nonce cannot be checked on the destination even with an RPC there.
+          const done = isHexData(nonce) && nonce.length === 66 ? await minted(parsed.dst, nonce) : client(parsed.dst.caip2) ? "unknown" : null;
+          if (done === true) return {state: "completed", claim: {...claim, ready: false}, ...(ref.destTxHash ? {destTxHash: ref.destTxHash} : {})};
           // No destination RPC: a recorded claim hash is the best evidence we have.
           if (done === null && ref.destTxHash) return {state: "completed", destTxHash: ref.destTxHash, claim: {...claim, ready: false}};
+          // The destination RPC is configured but did not answer: a claim was sent, whether it minted is not known yet.
+          if (done === "unknown" && ref.destTxHash) return {state: "pending", depositReceived: true, destTxHash: ref.destTxHash, claim: {...claim, ready: false}};
           return {state: "action-required", depositReceived: true, claim: {...claim, ready: true}};
         }
         return {state: "pending", depositReceived: true, claim};
