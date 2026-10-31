@@ -45,6 +45,15 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
   readonly signerKind: Signer['kind']
   private _disposed = false
   private _readOnly: WalletAccountReadOnlyNear | undefined
+  /**
+   * Highest nonce this account has broadcast (accepted, or maybe sent). The access key is read at
+   * `final`, which lags the block that holds our last transaction, so a second send right after
+   * the first would sign the same nonce and be refused. A filled-in nonce is never below it + 1;
+   * NEAR only needs nonces to increase, so a gap left by a transaction that never landed is harmless.
+   */
+  private _nonceFloor: bigint | undefined
+  /** Tail of this account's send queue: prepare → sign → broadcast runs one send at a time. */
+  private _sendTail: Promise<unknown> = Promise.resolve()
 
   constructor(signer: Signer, publicKey: Uint8Array, path: string, config: NearConfig = {}, accountId?: string) {
     super(accountId ?? implicitAccountId(publicKey), config, ed25519Key(publicKey))
@@ -107,7 +116,11 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
 
   /** Build → hard checks → preflight → fee cap. Shared by sign / send / transfer. */
   private async prepare(tx: NearTransaction | string, maxFee: bigint | number | undefined, op: string): Promise<{ built: NearBuiltTransaction; estimate: NearFeeEstimate }> {
-    const built = await this.buildTransaction(tx)
+    let built = await this.buildTransaction(tx)
+    // A nonce the caller set (or a serialized transaction) is theirs; a filled-in one clears our last broadcast.
+    if (typeof tx !== 'string' && tx.nonce === undefined && this._nonceFloor !== undefined && built.nonce <= this._nonceFloor) {
+      built = { ...built, nonce: this._nonceFloor + 1n }
+    }
     this.assertSafe(built)
     const estimate = await this.estimate(built)
     this.assertSafe(built, estimate.fee)
@@ -130,14 +143,20 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
   private async broadcast(signed: NearSignedTransaction): Promise<string> {
     const hash = WalletAccountReadOnlyNear.txHash(signed.transaction)
     const rpc = this.requireRpc('broadcast')
+    const used = (): void => {
+      const n = signed.transaction.nonce
+      if (this._nonceFloor === undefined || n > this._nonceFloor) this._nonceFloor = n
+    }
     let outcome: Awaited<ReturnType<typeof rpc.sendTx>>
     try {
       outcome = await rpc.sendTx(toBase64(encodeSignedTransaction(signed)))
     } catch (e) {
       // A definitive refusal (invalid nonce, invalid tx…) is a clean failure; no answer or a node timeout may still land.
       if (isDefinitive(e)) throw e
+      used()
       throw new BroadcastUnknownError(hash, e)
     }
+    used()
     const failure = outcomeFailed(outcome)
     if (failure) throw new Error(`Transaction ${hash} failed on chain: ${failure}`)
     return outcome.transaction?.hash ?? hash
@@ -147,7 +166,11 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
    * Sign and broadcast. Accepts a transaction, or base64 borsh of an unsigned /
    * already-signed transaction (a signed one is checked, not re-signed).
    */
-  async sendTransaction(tx: NearTransaction | string, options: WriteOptions = {}): Promise<NearTransferResult> {
+  sendTransaction(tx: NearTransaction | string, options: WriteOptions = {}): Promise<NearTransferResult> {
+    return this.#serial(() => this.#sendTransactionNow(tx, options))
+  }
+
+  async #sendTransactionNow(tx: NearTransaction | string, options: WriteOptions): Promise<NearTransferResult> {
     this.key()
     this.requireRpc('send transactions')
     const presigned = typeof tx === 'string' ? decodeSigned(tx) : undefined
@@ -157,11 +180,25 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
   }
 
   /** Native NEAR (no `token`) or NEP-141 `ft_transfer` (with `storage_deposit` when the recipient needs it). */
-  async transfer(o: NearTransferOptions, writeOptions: WriteOptions = {}): Promise<NearTransferResult> {
+  transfer(o: NearTransferOptions, writeOptions: WriteOptions = {}): Promise<NearTransferResult> {
+    return this.#serial(() => this.#transferNow(o, writeOptions))
+  }
+
+  async #transferNow(o: NearTransferOptions, writeOptions: WriteOptions): Promise<NearTransferResult> {
     this.key()
     this.requireRpc('transfer tokens')
     const { built, estimate } = await this.prepare(await this.transferActions(o), feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
     return { hash: await this.broadcast(await this.signBuilt(built)), fee: estimate.fee, estimate }
+  }
+
+  /**
+   * One send at a time per account: two sends started together would read the same access-key
+   * nonce before either is broadcast. A failed send does not block the next.
+   */
+  #serial<T>(run: () => Promise<T>): Promise<T> {
+    const next = this._sendTail.then(run)
+    this._sendTail = next.then(() => undefined, () => undefined)
+    return next
   }
 
   /** The same account as a {@link WalletAccountReadOnlyNear}. */
