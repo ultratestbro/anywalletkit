@@ -1666,6 +1666,21 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     });
     if (!sent.hash) throw new Swap2ExecutionError("swap2: account did not return a claim transaction hash");
     this.emitPhase("broadcast", {hash: sent.hash});
+    // A provider may take the recorded claim hash as the delivery when it cannot read the destination: a claim the
+    // account saw revert on chain gets no id with its hash. Any other wait failure (a timeout, the RPC) proves
+    // nothing, so the hash is kept and the provider's status decides.
+    if (typeof signer.waitForTransaction === "function") {
+      try {
+        await signer.waitForTransaction(sent.hash);
+      } catch (e) {
+        const err = e as {name?: unknown; message?: unknown; code?: unknown} | null;
+        const timedOut = /timeout|timed out/i.test(String(err?.name ?? "")) || /timed out|timeout/i.test(String(err?.message ?? ""));
+        const reverted = err?.code === "reverted" || (!timedOut && /\breverted\b/i.test(String(err?.message ?? "")));
+        if (reverted) {
+          throw new Swap2ExecutionError(`swap2: the claim transaction ${sent.hash} on ${unsigned.chain} reverted — poll the status of '${id}' and claim again if it is still action-required`, {cause: e});
+        }
+      }
+    }
     // The id to keep polling names the claim, so the status can complete without a destination RPC (round 3, M27).
     return {hash: sent.hash, chain: unsigned.chain, id: encodeId(name, intentId, sourceTxHash, sent.hash)};
   }

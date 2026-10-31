@@ -204,7 +204,8 @@ describe('KaminoMarketProtocolSolana', () => {
     const w = await p.quoteWithdraw({ token: USDC, amount: 'max' })
     expect(lastPost(f)).toMatchObject({ url: '/ktx/klend/withdraw', body: { amount: '5.000123' } })
     expect(w.minReceived).toBe(lessBps(5_000_123n, 50))
-    expect(acc.guards.at(-1)!.guard.expect.tokenIn).toEqual({ mint: USDC, minAmount: lessBps(5_000_123n, 50) })
+    // and at most that plus the tolerance (interest until the block), one cToken's worth and a unit of rounding
+    expect(acc.guards.at(-1)!.guard.expect.tokenIn).toEqual({ mint: USDC, minAmount: lessBps(5_000_123n, 50), maxAmount: 5_000_123n + 25_001n + 1n + 1n })
 
     const b = await p.quoteBorrow({ token: USDC, amount: 1_000_000n })
     expect(lastPost(f).url).toBe('/ktx/klend/borrow')

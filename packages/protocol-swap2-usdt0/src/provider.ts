@@ -3,7 +3,7 @@ import {describeUsdt0Activity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
 import {redactUrls, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentState, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
-import {LZ_SCAN_API, USDT0_BY_EID, USDT0_CHAINS, tokenMatches, usdt0 as usdt0Cfg, type Usdt0Chain} from "./config.js";
+import {LZ_SCAN_API, USDT0_BY_EID, USDT0_CHAINS, tokenMatches, usdt0ClaimTargets, usdt0 as usdt0Cfg, type Usdt0Chain} from "./config.js";
 
 /**
  * USDT0 — Tether's USDT as a LayerZero OFT. ONE source transaction:
@@ -194,6 +194,7 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
   return {
     name: "usdt0",
     describeActivity: describeUsdt0Activity,
+    claimTargets: usdt0ClaimTargets,
     enabled: () => config.enabled ?? true,
     supportsChain: (chain: string) => usdt0Cfg.supportsChain(chain) && client(chain) !== null,
     supportsChainPair: (from: string, to: string) => usdt0Cfg.supports(from, to) && client(from) !== null,

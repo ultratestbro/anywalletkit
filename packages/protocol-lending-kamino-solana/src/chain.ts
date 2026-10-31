@@ -111,6 +111,13 @@ export function collateralToLiquiditySf(r: ReserveChain, ctokens: bigint): bigin
   return (ctokens * r.totalLiquiditySf) / r.collateralSupply
 }
 
+/** What one cToken of the reserve redeems for, in base units of its token, rounded up (at least 1). */
+export function oneCtokenLiquidityUp(r: ReserveChain): bigint {
+  const sf = r.collateralSupply === 0n || r.totalLiquiditySf === 0n ? SF : (r.totalLiquiditySf + r.collateralSupply - 1n) / r.collateralSupply
+  const units = (sf + SF - 1n) / SF
+  return units > 0n ? units : 1n
+}
+
 export interface ObligationChain {
   lendingMarket: string
   owner: string

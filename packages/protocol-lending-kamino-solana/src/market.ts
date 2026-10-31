@@ -2,7 +2,7 @@ import type { BorrowOptions, IWalletAccount, IWalletAccountReadOnly, LendingQuot
 import { MAIN_MARKET, type ApiMarket, type ApiObligation, type ApiReserve } from './api.js'
 import { fromDecimalString, lessBps, toAmount, toDecimalString, type AmountOption } from './amounts.js'
 import { DEFAULT_FIRST_DEPOSIT_ALLOWANCE, KaminoBase, WSOL_MINT, type KaminoBaseConfig } from './base.js'
-import { debtNow, decodeObligation, decodeReserve, depositedLiquidity, withinTolerance, type ObligationChain, type ReserveChain } from './chain.js'
+import { debtNow, decodeObligation, decodeReserve, depositedLiquidity, oneCtokenLiquidityUp, withinTolerance, type ObligationChain, type ReserveChain } from './chain.js'
 import { KaminoError } from './errors.js'
 import { associatedTokenAddress, vanillaObligation } from './pda.js'
 import { marketRules, type InstructionRule } from './policy.js'
@@ -207,11 +207,22 @@ export class KaminoMarketProtocolSolana extends KaminoBase<KaminoMarketConfig> {
     return this.sendBuilt(base64, this.spendExpectation(o.token, p.amount, this.firstDepositExtra(p)), p.rules, 'supply')
   }
 
+  /**
+   * A withdrawal pays out about what was asked: at least the amount less the slippage tolerance, at
+   * most the amount plus that tolerance (interest accrued before the block, on a 'max'), one cToken's
+   * worth at the reserve's on-chain rate (klend redeems whole cTokens) and a unit of rounding. A bigger
+   * payout is collateral the user did not choose to take out of the obligation.
+   */
+  private withdrawExpectation(mint: string, p: Prepared) {
+    const max = p.amount + (p.amount - lessBps(p.amount, this.slippageBps)) + oneCtokenLiquidityUp(p.chain.reserve) + 1n
+    return this.receiveExpectation(mint, p.amount, 0n, max)
+  }
+
   override async quoteWithdraw(o: KaminoMarketWithdrawOptions): Promise<MarketQuote> {
     const me = await this.me()
     const p = await this.prepare('withdraw', me, o.token, o.amount)
     const base64 = await this.build('withdraw', me, p)
-    const expect = this.receiveExpectation(o.token, p.amount)
+    const expect = this.withdrawExpectation(o.token, p)
     const { fee } = await this.quoteBuilt(base64, expect, p.rules)
     return { fee, reserve: p.reserve.reserve, minReceived: expect.tokenIn!.minAmount }
   }
@@ -221,7 +232,7 @@ export class KaminoMarketProtocolSolana extends KaminoBase<KaminoMarketConfig> {
     const me = await this.me()
     const p = await this.prepare('withdraw', me, o.token, o.amount)
     const base64 = await this.build('withdraw', me, p)
-    return this.sendBuilt(base64, this.receiveExpectation(o.token, p.amount), p.rules, 'withdraw')
+    return this.sendBuilt(base64, this.withdrawExpectation(o.token, p), p.rules, 'withdraw')
   }
 
   /** A borrow pays out at most what was asked: a bigger one is debt the user did not choose. */
