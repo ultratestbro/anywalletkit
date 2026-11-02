@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url'
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'suites')
 const run = (file: string, ...args: string[]) => {
   const r = spawnSync(process.execPath, [join(dir, '../../../node_modules/vitest/vitest.mjs'), 'run', '--config', join(dir, 'vitest.config.ts'), '--root', dir, file, ...args], { encoding: 'utf8', timeout: 60_000 })
-  return { passed: r.status === 0, output: `${r.stdout}\n${r.stderr}` }
+  // CI colours vitest's summary; the counts are matched on plain text.
+  return { passed: r.status === 0, output: `${r.stdout}\n${r.stderr}`.replace(/\u001b\[[0-9;]*m/g, '') }
 }
 
 describe('describeProtocolBehaviour: TRC-20 approvals in a Tron call', () => {
