@@ -850,7 +850,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     const wsolAta = String(await this.ata(address(WSOL_MINT), this.address, TOKEN_PROGRAM_ADDRESS))
     const writable = layout.accounts.filter((a) => isWritableRole(a.role) && a.address !== null).map((a) => a.address as string)
     const pre = await this.accountStates([this.address, wsolAta, ...tokenInAtas, ...tokenOutAtas, ...writable])
-    // 2b. A bridge: every instruction is one the guard follows, every order pays the reviewed recipient (before any simulation).
+    // 2b. A Mayan bridge: every instruction is one the guard follows, every order pays the reviewed recipient (before any simulation).
     if (expect.bridgeOut) {
       const created = new Map(description.items.flatMap((it) => (it.type === 'ata-create' ? [[it.ata, it.owner] as const] : [])))
       const decodeAddress = getAddressDecoder()
@@ -861,7 +861,7 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       }
       const run = layout.compiled.instructions.map((ix) => {
         const r = unwrapProxy({ programAddress: layout.accounts[ix.programAddressIndex]?.address ?? null, accounts: (ix.accountIndices ?? []).map((j) => ({ address: layout.accounts[j]?.address ?? null })), data: ix.data ? Uint8Array.from(ix.data) : new Uint8Array() })
-        return { program: r.programAddress ?? '<unresolved>', accounts: r.accounts.map((a) => a.address ?? '<unresolved>'), data: r.data }
+        return { program: r.programAddress ?? '<unresolved>', accounts: r.accounts.map((a) => a.address ?? '<unresolved>'), data: r.data, ...(r.via ? { via: r.via } : {}) }
       })
       const refusal = bridgeOutRefusal(run, description.items, expect.bridgeOut, {
         wallet: this.address, tokenAccountOwner, maxLamportsOut: expect.maxLamportsOut, ...(expect.maxTokenOut ? { maxTokenOut: expect.maxTokenOut.amount } : {}),

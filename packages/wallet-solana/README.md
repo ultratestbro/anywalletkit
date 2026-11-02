@@ -149,8 +149,9 @@ const pyusd = await account.getTokenInfo('2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsF
   `dataLength`, and the accounts at given positions, compared after lookup
   tables are resolved — or the wire is refused (`unexpected-instruction`).
   A bridge out of Solana passes `expect.bridgeOut: {destChain, recipient}`
-  (swap2 hands it to the account hook as `bridgeOut`): every top-level
-  instruction, with Mayan's CPI proxy unwrapped, must be one the guard follows
+  (swap2 hands it to the account hook as `bridgeOut`). In a Mayan route (it
+  runs one of Mayan's own programs, directly or through its CPI proxy) every
+  top-level instruction, with the proxy unwrapped, must be one the guard follows
   (transfers to this wallet's own accounts or to a fee wallet, at most 3 % of
   what may leave; a Jupiter swap into the wallet or the bridge that takes no
   platform fee or positive-slippage share; Mayan's Swift /
@@ -164,7 +165,10 @@ const pyusd = await account.getTokenInfo('2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsF
   bridge, the bridged amount less its fees) at least `minAmountOut` less the
   slippage and 1 bp of rounding (`bridge-recipient`, `bridge-token`,
   `bridge-min`, `bridge-payee`, `bridge-instruction`, `bridge-missing`,
-  `bridge-fee` otherwise).
+  `bridge-fee` otherwise). Other Solana bridges (Relay, LayerSwap, NEAR
+  Intents, LI.FI Intents, …) carry their recipient in an off-chain order or in
+  data the guard does not read: they are NOT recipient-checked, only held to
+  the ceilings and the program allowlist, as without `bridgeOut`.
   `serializedGuardFromExecution(expect, extra?)` builds the guard from the
   swap2 engine's `sendSerializedTransaction` expectation with every field
   carried over (`bridgeOut` and its reviewed terms included) — map the hook

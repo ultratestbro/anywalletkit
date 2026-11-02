@@ -1,7 +1,8 @@
 // A Solana-source bridge was held only to "SOL out ≤ input + allowance": nothing bound where the SOL went, so a provider
 // transaction that paid the whole input to another wallet passed, and so did an allowlisted bridge program carrying a
-// recipient of anyone's choosing. `expect.bridgeOut` now names the destination chain and recipient: every top-level
-// instruction (Mayan's CPI proxy unwrapped) must be one the guard follows, and every Mayan order must pay the recipient.
+// recipient of anyone's choosing. `expect.bridgeOut` now names the destination chain and recipient: in a Mayan route
+// every top-level instruction (Mayan's CPI proxy unwrapped) must be one the guard follows, and every Mayan order must pay
+// the recipient. Other bridges are held to the ceilings only (audit-2026-11-02-r3-solana-bridges.test.ts).
 // The recorded LI.FI transactions (fixtures/lifi-solana-2026-11-02.json) are public li.quest answers of 2026-11-02.
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -93,10 +94,11 @@ const usdcPre = () => ({ [ADDR0]: sys(SOL), [MY_USDC]: tokenAccount(USDC, ADDR0,
 const usdcGuard = (bridgeOut: object = BRIDGE) => ({ expect: { maxLamportsOut: ALLOWANCE, maxTokenOut: { mint: USDC, amount: 9_000_000n }, bridgeOut } as never })
 
 describe('audit 2026-11-02: a bridge out of Solana must deliver to the reviewed recipient', () => {
-  it('a plain SOL transfer of the whole input to another wallet is refused once the guard knows it is a bridge', async () => {
-    const theft = wire([getTransferSolInstruction({ source: createNoopSigner(ADDR0), destination: ATTACKER, amount: AMOUNT_IN })])
+  it('a plain SOL transfer of the whole input to another wallet is refused inside a Mayan route', async () => {
+    // Alone it is another bridge's deposit (NEAR Intents, LayerSwap pay an address): not recipient-checked, as without bridgeOut.
+    const deposit = wire([getTransferSolInstruction({ source: createNoopSigner(ADDR0), destination: ATTACKER, amount: AMOUNT_IN })])
     const { a, f } = await account({ [ADDR0]: sys(SOL), [ATTACKER]: sys(0n) })
-    await expect(a.sendSerialized(theft, { expect: { maxLamportsOut: AMOUNT_IN + ALLOWANCE, bridgeOut: BRIDGE } })).rejects.toMatchObject({ code: 'bridge-missing' })
+    await expect(a.checkSerialized(deposit, { expect: { maxLamportsOut: AMOUNT_IN + ALLOWANCE, bridgeOut: BRIDGE } })).resolves.toBeDefined()
     // With a genuine order in front of it, the transfer itself is named.
     const withOrder = wire([intoVault(), order(), getTransferSolInstruction({ source: createNoopSigner(ADDR0), destination: ATTACKER, amount: AMOUNT_IN })])
     const { a: b } = await account(usdcPre())
@@ -211,12 +213,12 @@ describe('audit 2026-11-02: the live LI.FI routes out of Solana', () => {
     for (const q of mayan) expect([q.name, await run(q)]).toEqual([q.name, 'pass'])
   })
 
-  it('the routes whose recipient lives in an off-chain order (NEAR Intents, LayerSwap, Relay) or in an unknown program are refused', async () => {
+  it('the routes whose recipient lives in an off-chain order (NEAR Intents, LayerSwap, Relay) are not recipient-checked; an unknown program is refused', async () => {
     const other = live.quotes.filter((q) => !q.tool.startsWith('mayan'))
     const got = Object.fromEntries(await Promise.all(other.map(async (q) => [q.name, await run(q)])))
     expect(got).toEqual({
-      'sol-base-usdc-layerswap': 'bridge-missing', 'sol-base-usdc-relaydepository': 'bridge-missing', 'usdc-base-usdc-relaydepository': 'bridge-missing',
-      'usdc-base-usdc-lifiIntents': 'unknown-program', 'sol-base-usdc': 'bridge-missing', 'usdc-arb-usdc': 'bridge-missing',
+      'sol-base-usdc-layerswap': 'pass', 'sol-base-usdc-relaydepository': 'pass', 'usdc-base-usdc-relaydepository': 'pass',
+      'usdc-base-usdc-lifiIntents': 'unknown-program', 'sol-base-usdc': 'pass', 'usdc-arb-usdc': 'pass',
     })
   })
 
