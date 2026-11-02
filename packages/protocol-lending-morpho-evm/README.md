@@ -22,8 +22,8 @@ On npm: [@anywalletkit/protocol-lending-morpho-evm](https://www.npmjs.com/packag
   collateral, `borrow` / `repay` take and return the loan token against it.
 
 Written from the protocol's own interfaces (morpho-blue, metamorpho, vault-v2)
-with the shares and interest maths ported from `SharesMathLib` / `MathLib` /
-`Morpho._accrueInterest`; one dependency (viem). The Morpho GraphQL API is used
+with the same shares and interest maths as Morpho Blue's `SharesMathLib` /
+`MathLib` / `Morpho._accrueInterest`; one dependency (viem). The Morpho GraphQL API is used
 only for discovery and decoration (listing, APY, TVL); every money path reads
 the chain.
 

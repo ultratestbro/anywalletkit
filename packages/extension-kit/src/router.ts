@@ -1,6 +1,6 @@
 /**
  * The request router: what a dApp may ask and what happens to each request.
- * Policy ported from Vaulty's in-app browser (`mobile/lib/browser.ts`):
+ * Policy:
  *
  * - the origin is the browser's (checked by the service worker before this runs);
  * - accounts are exposed only to origins the user connected (`eth_requestAccounts`

@@ -7,8 +7,8 @@ import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuotePar
 import {bigintToNumber} from "@anywalletkit/core";
 
 /**
- * THORChain — native L1 swaps via asgard vaults (no wrapping). Ported from
- * a production THORChain integration. Scope here is **EVM sources first**: the user
+ * THORChain — native L1 swaps via asgard vaults (no wrapping). Scope here is
+ * **EVM sources first**: the user
  * deposits on an EVM chain (Ethereum/Base/BSC/Avalanche) into the THORChain router with
  * `depositWithExpiry(vault, asset, amount, memo, expiry)`; THORChain settles the
  * swap and delivers ETH/stables to our mainnet vault. **Tron** (opt-in,

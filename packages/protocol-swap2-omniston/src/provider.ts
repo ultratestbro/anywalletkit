@@ -684,7 +684,7 @@ export function encodeTypedMessage(td: {
   );
 }
 
-// ── HTLC helpers (ported from app/lib/omniston/htlc.ts) ──────────────────────
+// ── HTLC helpers (secret, hash lock, asset and address matching, bytes) ──────
 
 function generateSecret(): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(32));

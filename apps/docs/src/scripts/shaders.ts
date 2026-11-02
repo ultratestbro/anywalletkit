@@ -1,5 +1,5 @@
 // Copied from awk-landing src/shaders.ts (VS, LOGO_FS, fullscreenProgram) — keep in sync with the landing.
-// GLSL ported as-is from the Claude Design file "Any Wallet Kit v6" (hero raymarch with the uLight branch + liquid-glass logo pill).
+// GLSL unchanged from the design file "Any Wallet Kit v6" (hero raymarch with the uLight branch + liquid-glass logo pill).
 
 export const VS = `#version 300 es
 in vec2 p; void main(){ gl_Position = vec4(p,0.,1.); }`;

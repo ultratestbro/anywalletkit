@@ -5,8 +5,7 @@ import {CC_DEST, ccAsset, ccAssetByToken, ccChain} from "@anywalletkit/swap2-ass
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 /**
- * NEAR Intents (1Click) provider — the core route, broadest coverage. Ported
- * from a production 1Click integration:
+ * NEAR Intents (1Click) provider — the core route, broadest coverage:
  *   dry quote → pricing preview; live quote → depositAddress the user funds
  *   from any wallet; status polled by depositAddress.
  * Runs server-side, so the partner JWT stays here (no proxy needed). Defensive:

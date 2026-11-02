@@ -1,4 +1,4 @@
-// Morpho Blue maths, ported from morpho-blue `SharesMathLib`, `MathLib`,
+// Morpho Blue maths, the same as morpho-blue's `SharesMathLib`, `MathLib`,
 // `MarketParamsLib` and `Morpho._accrueInterest`, so positions and rates read
 // off-chain match what the contract computes on the next touch.
 import { bigintToNumber } from '@anywalletkit/core'

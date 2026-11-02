@@ -98,9 +98,9 @@ GRAM value is the figure that means anything.
 ## Why it looks the way it does
 
 - **The official SDK only speaks TonConnect** (`tonstakers-sdk` builds and
-  sends through a connector; no payload export). Its message builders —
-  op codes, fee reserves, payload layout — are ported verbatim and ride the
-  account's own `sendTransaction({ to, value, body })`, which signs locally.
+  sends through a connector; no payload export). This module builds the same
+  messages — op codes, fee reserves, payload layout, byte for byte — and they
+  ride the account's own `sendTransaction({ to, value, body })`, which signs locally.
 - **Friendly addresses on the wire**: the module hands the account `EQ…`
   forms, which carry the bounce flag; a raw `0:…` jetton-wallet address
   carries none.
