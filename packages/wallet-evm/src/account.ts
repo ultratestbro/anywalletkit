@@ -111,6 +111,8 @@ const GATEWAY_RPC_CODES = new Set([-32603, -32005])
 const GATEWAY_WORDING = /upstream|gateway|timeout|timed out|unavailable/i
 const nodeRefused = (e: unknown): boolean => refusalWording(e, (code, text) =>
   isRpcCode(code) && !GATEWAY_RPC_CODES.has(code) && !GATEWAY_WORDING.test(text) ? NODE_REJECTION : EXACT_REJECTION)
+/** The node already holds these bytes. Read like a refusal: never from an HTTP error page. */
+const alreadyKnown = (e: unknown): boolean => refusalWording(e, () => ALREADY_KNOWN)
 const nodeAnswered = (e: unknown): boolean => {
   if (nodeRefused(e)) return true
   for (let cur: unknown = e, i = 0; cur && i < 6; cur = (cur as { cause?: unknown }).cause, i++) {
@@ -438,7 +440,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
         // These exact bytes are in a pool already: an earlier attempt reached a
         // node and its answer was lost (viem's fallback then hands the same
         // bytes to the next RPC). It is the same transaction — never sign another.
-        if ([error, ...earlier].some((e) => ALREADY_KNOWN.test(errorText(e)))) return accepted(signed.hash, signed.nonce)
+        if ([error, ...earlier].some(alreadyKnown)) return accepted(signed.hash, signed.nonce)
         // No answer from the node: the tx may be in the mempool under this hash.
         if (!nodeAnswered(error)) throw new BroadcastUnknownError(signed.hash, error)
         // A refusal from a later endpoint says nothing about an earlier one that got the same bytes
