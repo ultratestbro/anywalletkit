@@ -13,9 +13,9 @@ import { TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, getCreateAssociatedToken
 import {
   TOKEN_2022_PROGRAM_ADDRESS, getMintDecoder, getTransferCheckedInstruction as getTransferChecked2022Instruction, getTransferCheckedWithFeeInstruction,
 } from '@solana-program/token-2022'
-import { MAX_U64, SPL_STAKE_POOL_PROGRAM_ADDRESS, STAKE_PROGRAM_ADDRESS, ZERO_ADDRESS, decodeWireTransaction, describeTransaction, resolveCompiledAccounts } from './describe.js'
+import { MAX_U64, SPL_STAKE_POOL_PROGRAM_ADDRESS, STAKE_PROGRAM_ADDRESS, ZERO_ADDRESS, decodeWireTransaction, describeTransaction, resolveCompiledAccounts, unwrapProxy } from './describe.js'
 import {
-  DEFAULT_PROGRAM_ALLOWLIST, SAFE_CORE_INSTRUCTIONS, WSOL_MINT, assertExpectation, base64Bytes, bytesEqual, isNativeMint, optEqual, parseTokenAccount, pubkeyBytes, unexpectedInstruction,
+  DEFAULT_PROGRAM_ALLOWLIST, SAFE_CORE_INSTRUCTIONS, WSOL_MINT, assertExpectation, base64Bytes, bridgeOutRefusal, bytesEqual, isNativeMint, optEqual, parseTokenAccount, pubkeyBytes, unexpectedInstruction,
   type SerializedCheck, type SerializedTxGuard, type SolanaAccountData,
 } from './serialized.js'
 import { MissingSignersError, SimulationError, UnsafeTransactionError } from './errors.js'
@@ -802,10 +802,11 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     if (layout.unresolved) throw new UnsafeTransactionError('Some accounts come from lookup tables that could not be resolved; the transaction cannot be audited.', 'unresolved-lookup-tables')
     this.enforceCompiledSigners(description, options)
 
-    // 1. Programs.
+    // 1. Programs: the ones the message calls and, behind Mayan's CPI proxy, the ones it runs.
+    const called = layout.compiled.instructions.map((ix) => (layout.accounts[ix.programAddressIndex]?.address ?? '<unresolved>') as string)
     if (!guard.allowUnknownPrograms) {
       const allowed = new Set(guard.programAllowlist ?? DEFAULT_PROGRAM_ALLOWLIST)
-      const foreign = [...new Set(description.items.map((it) => it.program ?? '<unresolved>').filter((p) => !allowed.has(p)))]
+      const foreign = [...new Set([...called, ...description.items.map((it) => it.program ?? '<unresolved>')].filter((p) => !allowed.has(p)))]
       if (foreign.length) throw new UnsafeTransactionError(`Transaction invokes programs outside the allowlist: ${foreign.join(', ')}.`, 'unknown-program', foreign)
     }
     // 1b. Instructions, when the caller knows the exact shapes its operation takes.
@@ -849,6 +850,24 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     const wsolAta = String(await this.ata(address(WSOL_MINT), this.address, TOKEN_PROGRAM_ADDRESS))
     const writable = layout.accounts.filter((a) => isWritableRole(a.role) && a.address !== null).map((a) => a.address as string)
     const pre = await this.accountStates([this.address, wsolAta, ...tokenInAtas, ...tokenOutAtas, ...writable])
+    // 2b. A bridge: every instruction is one the guard follows, every order pays the reviewed recipient (before any simulation).
+    if (expect.bridgeOut) {
+      const created = new Map(description.items.flatMap((it) => (it.type === 'ata-create' ? [[it.ata, it.owner] as const] : [])))
+      const decodeAddress = getAddressDecoder()
+      const tokenAccountOwner = (addr: string): string | undefined => {
+        const st = pre.get(addr)
+        const parsed = st && isTokenProgram(st.owner) ? parseTokenAccount(st.data) : null
+        return parsed ? decodeAddress.decode(parsed.owner) : created.get(addr)
+      }
+      const run = layout.compiled.instructions.map((ix) => {
+        const r = unwrapProxy({ programAddress: layout.accounts[ix.programAddressIndex]?.address ?? null, accounts: (ix.accountIndices ?? []).map((j) => ({ address: layout.accounts[j]?.address ?? null })), data: ix.data ? Uint8Array.from(ix.data) : new Uint8Array() })
+        return { program: r.programAddress ?? '<unresolved>', accounts: r.accounts.map((a) => a.address ?? '<unresolved>'), data: r.data }
+      })
+      const refusal = bridgeOutRefusal(run, description.items, expect.bridgeOut, {
+        wallet: this.address, tokenAccountOwner, maxLamportsOut: expect.maxLamportsOut, ...(expect.maxTokenOut ? { maxTokenOut: expect.maxTokenOut.amount } : {}),
+      })
+      if (refusal) throw new UnsafeTransactionError(refusal.message, refusal.code, [refusal.detail])
+    }
     const ownedTokenAccounts = writable.filter((addr) => {
       const st = pre.get(addr)
       if (!st || !isTokenProgram(st.owner)) return false

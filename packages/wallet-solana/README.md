@@ -148,6 +148,14 @@ const pyusd = await account.getTokenInfo('2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsF
   must match one rule — program, data prefix (`data`, hex), optional exact
   `dataLength`, and the accounts at given positions, compared after lookup
   tables are resolved — or the wire is refused (`unexpected-instruction`).
+  A bridge out of Solana passes `expect.bridgeOut: {destChain, recipient}`
+  (swap2 hands it to the account hook as `bridgeOut`): every top-level
+  instruction, with Mayan's CPI proxy unwrapped, must be one the guard follows
+  (transfers to this wallet's own accounts or to a fee wallet, at most 3 % of
+  what may leave; a Jupiter swap into the wallet or the bridge; Mayan's Swift /
+  MCTP / Fast MCTP orders), and every Mayan order must pay `recipient` on
+  `destChain` (`bridge-recipient`, `bridge-payee`, `bridge-instruction`,
+  `bridge-missing`, `bridge-fee` otherwise).
   Net balances alone let a deposit that also withdraws collateral and
   transfers it away pass; the rules do not.
 * `getAccountInfos(addresses)` reads raw accounts (owner, lamports, data) in

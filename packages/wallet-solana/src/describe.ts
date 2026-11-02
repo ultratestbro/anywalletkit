@@ -118,7 +118,21 @@ export const MAX_U64 = 0xffffffffffffffffn
 /** The System program id doubles as the all-zero "burn" address. */
 export const ZERO_ADDRESS = SYSTEM_PROGRAM_ADDRESS as string
 
-type Resolved = { programAddress: string | null; accounts: Array<{ address: string | null; role: AccountRole }>; data: Uint8Array }
+type Resolved = { programAddress: string | null; accounts: Array<{ address: string | null; role: AccountRole }>; data: Uint8Array; via?: string }
+
+/**
+ * Mayan's CPI proxy (swap-sdk `CPI_PROXY_PROGRAM_ID`, `sandwichInstructionInCpiProxy`): it invokes its FIRST account
+ * with the remaining accounts and the same data, signer privileges included. LI.FI's Mayan routes wrap their System
+ * transfers, ATA creation, wSOL plumbing and the bridge call in it, so an instruction to the proxy is described (and
+ * guarded) as the instruction it runs.
+ */
+export const MAYAN_CPI_PROXY_PROGRAM_ADDRESS = 'D8C8iW6zmoKg5TRr8nQ7h14TMWqQX8FiBdj2ju5MF3wa'
+
+/** What an instruction runs: the proxied instruction for Mayan's CPI proxy, the instruction itself otherwise. */
+export function unwrapProxy<A extends { address: string | null }>(ix: { programAddress: string | null; accounts: A[]; data: Uint8Array }): { programAddress: string | null; accounts: A[]; data: Uint8Array; via?: string } {
+  if (ix.programAddress !== MAYAN_CPI_PROXY_PROGRAM_ADDRESS || ix.accounts.length === 0) return ix
+  return { programAddress: ix.accounts[0]!.address, accounts: ix.accounts.slice(1), data: ix.data, via: ix.programAddress }
+}
 
 interface Normalized {
   version: 'legacy' | 0 | 1
@@ -145,7 +159,7 @@ function fromMessage(msg: TransactionMessage): Normalized {
       if (isSignerRole(a.role)) signers.set(a.address, true)
       return { address: a.address as string, role: a.role }
     })
-    return { programAddress: ix.programAddress as string, accounts, data: (ix.data ?? new Uint8Array()) as Uint8Array }
+    return unwrapProxy({ programAddress: ix.programAddress as string, accounts, data: (ix.data ?? new Uint8Array()) as Uint8Array })
   })
   return { version: msg.version, feePayer, signers: [...signers.keys()].map((address) => ({ address, signed: undefined })), instructions, unresolvedLookups: false }
 }
@@ -197,7 +211,7 @@ function fromCompiled(tx: Transaction, ctx: DescribeContext): Normalized {
   const { compiled, accounts: all, unresolved } = resolveCompiledAccounts(tx, ctx)
   const { header, staticAccounts } = compiled
   const at = (i: number) => all[i] ?? { address: null, role: AccountRole.READONLY }
-  const instructions: Resolved[] = compiled.instructions.map((ix) => ({
+  const instructions: Resolved[] = compiled.instructions.map((ix) => unwrapProxy({
     programAddress: at(ix.programAddressIndex).address,
     accounts: (ix.accountIndices ?? []).map(at),
     data: (ix.data ?? new Uint8Array()) as Uint8Array,
@@ -271,6 +285,11 @@ function decodeOne(r: Resolved): DecodedInstruction {
     } else if (program === TOKEN_PROGRAM_ADDRESS || program === TOKEN_2022_PROGRAM_ADDRESS) {
       return decodeToken(r, ix, program)
     } else if (program === ASSOCIATED_TOKEN_PROGRAM_ADDRESS) {
+      // Empty data is the original Create (the program reads no tag then); Mayan's routes still send it that way.
+      if (r.data.length === 0 && r.accounts.length >= 6) {
+        const [payer, ata, owner, mint] = r.accounts.map((a) => a.address as string)
+        return { type: 'ata-create', program, ata: ata!, owner: owner!, mint: mint!, payer: payer!, idempotent: false }
+      }
       const t = identifyAssociatedTokenInstruction(r.data)
       if (t === AssociatedTokenInstruction.CreateAssociatedToken || t === AssociatedTokenInstruction.CreateAssociatedTokenIdempotent) {
         const p = t === AssociatedTokenInstruction.CreateAssociatedToken ? parseCreateAssociatedTokenInstruction(ix) : parseCreateAssociatedTokenIdempotentInstruction(ix)
@@ -376,7 +395,7 @@ export function describeTransaction(tx: SolanaTransaction, ctx: DescribeContext 
 
 /** System AdvanceNonceAccount (4, u32 LE). */
 function isAdvanceNonce(ix: Resolved | undefined): boolean {
-  if (!ix || ix.programAddress !== SYSTEM_PROGRAM_ADDRESS) return false
+  if (!ix || ix.via !== undefined || ix.programAddress !== SYSTEM_PROGRAM_ADDRESS) return false
   try { return identifySystemInstruction(ix.data) === SystemInstruction.AdvanceNonceAccount } catch { return false }
 }
 
