@@ -129,6 +129,11 @@ export const DEFAULT_MAX_FEE_RATE_MULTIPLIER = 10
  * hands over on a chain whose fees are a fraction of a gwei (L2s, BSC) is still signed.
  */
 export const MIN_FEE_RATE_CEILING_WEI = 10_000_000_000n
+/**
+ * How long the fee-rate check waits for the network's quote. Past it the check is skipped, as
+ * for an unreadable quote, so a silent RPC does not hold up signing a fully specified transaction.
+ */
+export const FEE_QUOTE_TIMEOUT_MS = 5_000
 
 /** Worst-case fee of a prepared transaction: all its gas at its cap (`gasPrice`, or `maxFeePerGas`). */
 export function maxFeeCost(tx: TransactionSerializable): bigint {
@@ -294,17 +299,23 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
    * given, so their rate is held against the network: above `maxFeeRateMultiplier` × the current
    * quote (the higher of `eth_gasPrice` and the EIP-1559 estimate), and above
    * {@link MIN_FEE_RATE_CEILING_WEI}, it is refused. Fees the account filled in itself are the
-   * quote already. Nothing is refused when there is no provider or the quote cannot be read.
+   * quote already. Nothing is refused when there is no provider or the quote cannot be read
+   * within {@link FEE_QUOTE_TIMEOUT_MS}.
    */
   private async assertFeeRate(tx: EvmTransaction, prepared: TransactionSerializable): Promise<void> {
     if (tx.gasPrice === undefined && tx.maxFeePerGas === undefined && tx.maxPriorityFeePerGas === undefined) return
     const k = this._config.maxFeeRateMultiplier === undefined ? DEFAULT_MAX_FEE_RATE_MULTIPLIER : this._config.maxFeeRateMultiplier
     if (k === null || !Number.isFinite(k) || !this._client) return
     const client = this._client
-    const [estimate, gasPrice] = await Promise.all([
-      client.estimateFeesPerGas().then((f) => f.maxFeePerGas, () => undefined),
-      client.getGasPrice().catch(() => undefined),
-    ])
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const late = new Promise<[undefined, undefined]>((resolve) => { timer = setTimeout(() => resolve([undefined, undefined]), FEE_QUOTE_TIMEOUT_MS) })
+    const [estimate, gasPrice] = await Promise.race([
+      Promise.all([
+        client.estimateFeesPerGas().then((f) => f.maxFeePerGas, () => undefined),
+        client.getGasPrice().catch(() => undefined),
+      ]),
+      late,
+    ]).finally(() => clearTimeout(timer))
     const quotes = [estimate, gasPrice].filter((q): q is bigint => typeof q === 'bigint' && q > 0n)
     if (!quotes.length) return
     const quote = quotes.reduce((a, b) => (b > a ? b : a))
