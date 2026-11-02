@@ -4,7 +4,7 @@ import { decodeAnyTransaction, encodeSignedTransaction } from './borsh.js'
 import { BroadcastUnknownError, MessageIsTransactionError, SimulationError } from './errors.js'
 import { nep413Hash, type Nep413Payload, type Nep413Signed } from './nep413.js'
 import { WalletAccountReadOnlyNear, assertWellFormed, receiptOf } from './read-only-account.js'
-import { fromBase64, isDefinitive, outcomeFailed, toBase64 } from './rpc.js'
+import { fromBase64, isDefinitiveBroadcast, outcomeFailed, toBase64 } from './rpc.js'
 import type { NearBuiltTransaction, NearConfig, NearFeeEstimate, NearSignedTransaction, NearTransaction, NearTransferOptions } from './types.js'
 
 /** Does `bytes` carry `key` anywhere? A Solana transaction names each signer's 32-byte key. */
@@ -161,8 +161,9 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
     try {
       outcome = await rpc.sendTx(toBase64(encodeSignedTransaction(signed)))
     } catch (e) {
-      // A definitive refusal (invalid nonce, invalid tx…) is a clean failure; no answer or a node timeout may still land.
-      if (isDefinitive(e)) throw e
+      // A known refusal (invalid nonce, invalid tx, unparsable request) is a clean failure; no answer,
+      // a node timeout or an unnamed gateway error may still land.
+      if (isDefinitiveBroadcast(e)) throw e
       used()
       throw new BroadcastUnknownError(hash, e)
     }
