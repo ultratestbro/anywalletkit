@@ -431,9 +431,9 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
       return { hash, fee }
     }
     const submit = async (signed: { raw: Hex; hash: Hex; nonce: number }): Promise<TransferResult> => {
-      let hash: Hex
       try {
-        hash = await client.sendRawTransaction({ serializedTransaction: signed.raw })
+        // The hash is ours (keccak256 of the signed bytes), not whatever id the node echoes back.
+        await client.sendRawTransaction({ serializedTransaction: signed.raw })
       } catch (error) {
         // With a provider list, what every endpoint answered before the last one (whose error this is).
         const earlier = takeBroadcastErrors(client, signed.raw).slice(0, -1)
@@ -451,7 +451,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
         throw error
       }
       takeBroadcastErrors(client, signed.raw)
-      return accepted(hash, signed.nonce)
+      return accepted(signed.hash, signed.nonce)
     }
     const first = await this.#signPrepared(prepared, limit, op)
     try {

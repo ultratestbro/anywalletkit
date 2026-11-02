@@ -22,7 +22,7 @@ function fakeProvider(overrides: Record<string, (params: unknown[]) => unknown> 
     eth_getBalance: () => '0xde0b6b3a7640000',
     eth_call: () => '0x' + '0'.repeat(63) + '0', // allowance / balanceOf = 0
     eth_getTransactionByHash: () => null, // asked after "nonce too low": is the rejected tx ours, already mined?
-    eth_sendRawTransaction: (p) => { sent.push(p[0] as Hex); return '0x' + 'ab'.repeat(32) },
+    eth_sendRawTransaction: (p) => { sent.push(p[0] as Hex); return keccak256(p[0] as Hex) },
     ...overrides,
   }
   return {
@@ -69,7 +69,8 @@ describe('WalletAccountEvm', () => {
     const a = await new WalletManagerEvm(SEED, { provider: fake.provider }).getAccount(0)
     await expect(a.sendTransaction({ to: SPENDER, value: 1_000_000_000_000_000_000n })).rejects.toThrow(/Insufficient native balance/)
     expect(fake.sent).toHaveLength(0)
-    await expect(a.sendTransaction({ to: SPENDER, value: 1n })).resolves.toMatchObject({ hash: '0x' + 'ab'.repeat(32) })
+    const sent = await a.sendTransaction({ to: SPENDER, value: 1n })
+    expect(sent.hash).toBe(keccak256(fake.sent[0]!))
   })
 
   it('floors a zero priority fee on mainnet and lifts the cap by the same amount', async () => {
@@ -113,7 +114,7 @@ describe('WalletAccountEvm', () => {
         const nonce = parseTransaction(p[0] as Hex).nonce
         if (nonce === 7) throw new Error('nonce too low: next nonce 9, tx nonce 7')
         rejecting.sent.push(p[0] as Hex)
-        return '0x' + 'ab'.repeat(32)
+        return keccak256(p[0] as Hex)
       },
     })
     const m2 = new WalletManagerEvm(SEED, { provider: rejecting.provider })
@@ -122,7 +123,8 @@ describe('WalletAccountEvm', () => {
     await expect(a2.sendTransaction({ to: SPENDER, value: 1n })).rejects.toBeInstanceOf(NonceConflictError)
     expect(rejecting.sent).toEqual([])
     // the caller's retry takes the nonce the node named
-    await expect(a2.sendTransaction({ to: SPENDER, value: 1n })).resolves.toMatchObject({ hash: '0x' + 'ab'.repeat(32) })
+    const retried = await a2.sendTransaction({ to: SPENDER, value: 1n })
+    expect(retried.hash).toBe(keccak256(rejecting.sent[0]!))
     expect(rejecting.sent.map((r) => parseTransaction(r).nonce)).toEqual([9])
     // a caller-fixed nonce is never second-guessed
     await expect(a2.sendTransaction({ to: SPENDER, value: 1n, nonce: 7 })).rejects.toThrow(/nonce too low/)
@@ -162,7 +164,8 @@ describe('WalletAccountEvm', () => {
     stale = true
     setTimeout(() => { stale = false }, 2_000)
     t0 = Date.now()
-    await expect(a.sendTransaction({ to: SPENDER, value: 1n })).resolves.toMatchObject({ hash: '0x' + 'ab'.repeat(32) })
+    const settled = await a.sendTransaction({ to: SPENDER, value: 1n })
+    expect(settled.hash).toBe(keccak256(fake.sent[1]!))
     expect(Date.now() - t0).toBeGreaterThanOrEqual(1_500)
     expect(fake.sent).toHaveLength(2)
     // …but a revert that never clears is still refused
@@ -177,7 +180,7 @@ describe('WalletAccountEvm', () => {
     const m = new WalletManagerEvm(SEED, { provider: fake.provider })
     const a = await m.getAccount(0)
     const res = await a.transfer({ token: USDT, recipient: SPENDER, amount: 1_000_000n })
-    expect(res.hash).toBe('0x' + 'ab'.repeat(32))
+    expect(res.hash).toBe(keccak256(fake.sent[0]!))
     expect(res.fee).toBe(25200n * 2_200_000_000n) // (21000 × 1.2 headroom) × maxFeePerGas, where viem estimates maxFee = baseFee × 1.2 + tip = 1.2e9 + 1e9
     const tx = parseTransaction(fake.sent[0]!)
     expect(tx.to?.toLowerCase()).toBe(USDT.toLowerCase())

@@ -266,7 +266,7 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     }
     // The network already holds these bytes: an earlier attempt (a lost answer, a failed-over node) delivered them.
     if (r?.code === 'DUP_TRANSACTION_ERROR') return signed.txID
-    if (r?.result === true && (r.code === undefined || r.code === 'SUCCESS')) return r.txid ?? signed.txID
+    if (r?.result === true && (r.code === undefined || r.code === 'SUCCESS')) return signed.txID
     // A code java-tron answers before pushing the transaction is a clean refusal; any other answer
     // (an empty body, a gateway error, OTHER_ERROR) does not prove the bytes stayed off the network.
     const detail = `${typeof r?.code === 'string' ? r.code : ''} ${nodeMessage(r?.message)}`.trim()
