@@ -512,19 +512,18 @@ const MAYAN_CHAINS: Readonly<Record<string, { wormhole: number; cctp?: number; u
  * Jupiter v6 swaps the guard follows inside a bridge transaction: the account position of the swap's output (the
  * optional `destinationTokenAccount`, which is the Jupiter program id when absent, else the user's destination) and
  * where its fee arguments sit — the v2 routes' fixed `in_amount, quoted_out_amount, slippage_bps, platform_fee_bps,
- * positive_slippage_bps` at `argsAt` (before the route plan), the v1 routes' u8 `platform_fee_bps` as the last byte
- * (after it).
+ * positive_slippage_bps` at `argsAt`, before the route plan. The v1 routes (`route` e517cb977ae3ad2a,
+ * `shared_accounts_route` c1209b3341d69c81) carry their fee after the variable-length route plan, where trailing bytes
+ * can hide it; they are refused inside a bridge (LI.FI's Mayan routes use the v2 routes only, 2026-11-02).
  */
-const JUPITER_ROUTES: Readonly<Record<string, { optional?: number; destination: number; argsAt?: number }>> = {
+const JUPITER_ROUTES: Readonly<Record<string, { optional?: number; destination: number; argsAt: number }>> = {
   bb64facc31c4af14: { optional: 7, destination: 2, argsAt: 8 }, // route_v2
   d19853937cfed8e9: { destination: 5, argsAt: 9 }, // shared_accounts_route_v2 (id: u8 first)
-  e517cb977ae3ad2a: { optional: 4, destination: 3 }, // route
-  c1209b3341d69c81: { destination: 6 }, // shared_accounts_route
 }
+const JUPITER_V1_ROUTES = new Set(['e517cb977ae3ad2a', 'c1209b3341d69c81'])
 
 /** A Jupiter route's platform fee and positive-slippage share in bps (both must be 0 inside a bridge); undefined when the data is too short to hold them. */
-function jupiterFees(route: { argsAt?: number }, d: Uint8Array): { platformFeeBps: number; positiveSlippageBps: number } | undefined {
-  if (route.argsAt === undefined) return d.length > 8 ? { platformFeeBps: d[d.length - 1]!, positiveSlippageBps: 0 } : undefined
+function jupiterFees(route: { argsAt: number }, d: Uint8Array): { platformFeeBps: number; positiveSlippageBps: number } | undefined {
   if (d.length < route.argsAt + 22) return undefined
   return { platformFeeBps: u16le(d, route.argsAt + 18), positiveSlippageBps: u16le(d, route.argsAt + 20) }
 }
@@ -663,6 +662,7 @@ export function bridgeOutRefusal(
         break
     }
     if (ix.program === JUPITER_V6_PROGRAM_ADDRESS) {
+      if (JUPITER_V1_ROUTES.has(hexOf(ix.data.subarray(0, 8)))) return refuse('bridge-instruction', ix.program, `Instruction ${i} is a Jupiter v1 route, whose fee the guard cannot read reliably; inside a bridge only the v2 routes are followed.`)
       const route = JUPITER_ROUTES[hexOf(ix.data.subarray(0, 8))]
       const optional = route?.optional !== undefined ? ix.accounts[route.optional] : undefined
       const out = route ? (optional !== undefined && optional !== JUPITER_V6_PROGRAM_ADDRESS ? optional : ix.accounts[route.destination]) : undefined

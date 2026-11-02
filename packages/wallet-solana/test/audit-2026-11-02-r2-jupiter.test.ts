@@ -1,7 +1,7 @@
 // Inside a bridge transaction the guard checked only where a Jupiter route's output lands, never its fee arguments: a
 // route_v2 with platform_fee_bps and positive_slippage_bps at 10 000 passed ahead of a valid Mayan order, though the
 // fee goes to an account the guard does not follow (protocol-swap2-jupiter refuses both itself). A Jupiter route in a
-// bridge must now take no platform fee and no positive-slippage share; the v1 routes' u8 fee (their last byte) too.
+// bridge must now take no platform fee and no positive-slippage share (v1 routes are refused there altogether).
 // Its slippage is not capped: the bridge order's own minimums (bridgeOut terms) bind the price, and LI.FI's live Mayan
 // routes swap at 100 bps under a 50-bps plan.
 import { readFileSync } from 'node:fs'
@@ -99,9 +99,9 @@ describe('audit 2026-11-02 r2: a Jupiter route inside a bridge takes no fee', ()
     expect(await check(jupiter(routeV2(10_000, 0, 0)))).toBe('pass')
   })
 
-  it('a v1 route is held to its u8 platform fee; a route too short to read is refused', async () => {
-    expect(await check(jupiterV1(routeV1(25)))).toBe('bridge-fee')
-    expect(await check(jupiterV1(routeV1(0)))).toBe('pass')
+  it('a v1 route is refused (audit-2026-11-02-r3-jupiter-v1.test.ts); a route too short to read is refused', async () => {
+    expect(await check(jupiterV1(routeV1(25)))).toBe('bridge-instruction')
+    expect(await check(jupiterV1(routeV1(0)))).toBe('bridge-instruction')
     expect(await check(jupiter(routeV2(0, 0, 0).subarray(0, 20)))).toBe('bridge-instruction')
   })
 

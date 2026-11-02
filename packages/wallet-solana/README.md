@@ -153,8 +153,8 @@ const pyusd = await account.getTokenInfo('2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsF
   runs one of Mayan's own programs, directly or through its CPI proxy) every
   top-level instruction, with the proxy unwrapped, must be one the guard follows
   (transfers to this wallet's own accounts or to a fee wallet, at most 3 % of
-  what may leave; a Jupiter swap into the wallet or the bridge that takes no
-  platform fee or positive-slippage share; Mayan's Swift /
+  what may leave; a Jupiter v2 route into the wallet or the bridge that takes
+  no platform fee or positive-slippage share; Mayan's Swift /
   MCTP / Fast MCTP orders), and every Mayan order must pay `recipient` on
   `destChain` with a non-zero minimum, a referrer / Mayan fee rate of at most
   `MAYAN_REFERRER_FEE_MAX_BPS` (50) and fixed relayer fees of at most
