@@ -54,8 +54,8 @@
   },
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",
-    "viem": "^2.44.4",
-    "vitest": "^5.0.3"
+    "viem": "^2.57.11",
+    "vitest": "^5.0.5"
   },
   "publishConfig": { "access": "public", "provenance": true }
 }

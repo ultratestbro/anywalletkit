@@ -32,12 +32,12 @@
     "@anywalletkit/protocol-swap2-core": "workspace:*",
     "@noble/hashes": "^2.4.0",
     "@scure/base": "^2.4.0",
-    "viem": "^2.57.2"
+    "viem": "^2.57.11"
   },
   "peerDependencies": { "@anywalletkit/core": "workspace:*" },
   "devDependencies": {
     "@types/node": "^22",
-    "vitest": "^5.0.3",
+    "vitest": "^5.0.5",
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/protocol-swap2-router": "workspace:*",
     "@anywalletkit/core": "workspace:*"

@@ -41,7 +41,7 @@
   "devDependencies": {
     "@anywalletkit/keyring": "workspace:*",
     "@types/node": "^22",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.5"
   },
   "keywords": [
     "keychain",
