@@ -41,7 +41,7 @@
     "@anywalletkit/core": "workspace:*",
     "@anywalletkit/wallet-evm": "workspace:*",
     "@anywalletkit/wallet-solana": "workspace:*",
-    "@types/node": "^22",
+    "@types/node": "^26",
     "vitest": "^5.0.3"
   },
   "keywords": [
