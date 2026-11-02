@@ -36,7 +36,7 @@
     "verify:live": "node scripts/verify-live.mjs"
   },
   "dependencies": {
-    "@solana/addresses": "^3.0.3",
+    "@solana/addresses": "^8.5.0",
     "@solana/instructions": "^3.0.3"
   },
   "peerDependencies": {
