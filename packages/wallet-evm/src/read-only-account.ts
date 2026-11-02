@@ -25,8 +25,8 @@ export type FeeFields = { gasPrice: bigint } | { maxFeePerGas: bigint; maxPriori
 /**
  * Refuses shapes that would silently lose meaning: anything but one plain transaction object (a list
  * of calls is for batching accounts — its elements are not what this account would sign), authorizations
- * on a transaction that is not type 4 (they would be dropped), and a type 4 with `gasPrice` (it would
- * become a legacy transaction without them).
+ * on a transaction that is not type 4 (they would be dropped), a type 4 with `gasPrice` (it would
+ * become a legacy transaction without them), and a `value` that is not a bigint, a whole number or a string.
  */
 export function assertTxShape(tx: EvmTransaction): void {
   const proto = typeof tx === 'object' && tx !== null && !Array.isArray(tx) ? (Object.getPrototypeOf(tx) as object | null) : undefined
@@ -35,6 +35,11 @@ export function assertTxShape(tx: EvmTransaction): void {
   }
   if (tx.authorizationList?.length && tx.type !== 4) throw new Error('authorizationList needs a type 4 (EIP-7702) transaction; it would be dropped otherwise.')
   if (tx.type === 4 && tx.gasPrice !== undefined) throw new Error('An EIP-7702 (type 4) transaction takes EIP-1559 fee fields (maxFeePerGas / maxPriorityFeePerGas), not gasPrice.')
+  // `value` in a shape the kit's policies read too: BigInt() would also turn a list or a valueOf object into an amount they never see.
+  const v: unknown = tx.value
+  if (v !== undefined && typeof v !== 'bigint' && typeof v !== 'string' && !(typeof v === 'number' && Number.isInteger(v))) {
+    throw new UnsafeTransactionError('value must be a bigint, a whole number or a numeric string (wei).')
+  }
   canonicalData(tx.data)
   if (tx.accessList !== undefined) {
     if (!Array.isArray(tx.accessList)) throw new UnsafeTransactionError('accessList must be an array.')
