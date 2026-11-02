@@ -306,6 +306,7 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
    * without EIP-1559).
    */
   async quoteSendTransaction(tx: EvmTransaction): Promise<{ fee: bigint }> {
+    assertTxShape(tx)
     this.requireClient('quote send transaction operations')
     // The same fee fields the send signs (gasPrice on a chain without EIP-1559, see feeFields).
     const cap = async (): Promise<bigint> => {
