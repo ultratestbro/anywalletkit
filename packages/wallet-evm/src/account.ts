@@ -93,6 +93,14 @@ const nodeAnswered = (e: unknown): boolean => {
   return false
 }
 
+/** Default {@link EvmConfig.maxFeeRateMultiplier}: a fee rate up to 10× the network's current quote is signed. */
+export const DEFAULT_MAX_FEE_RATE_MULTIPLIER = 10
+/**
+ * The fee-rate ceiling never sits below this (10 gwei per gas), so a fixed price a dApp or API
+ * hands over on a chain whose fees are a fraction of a gwei (L2s, BSC) is still signed.
+ */
+export const MIN_FEE_RATE_CEILING_WEI = 10_000_000_000n
+
 /** Worst-case fee of a prepared transaction: all its gas at its cap (`gasPrice`, or `maxFeePerGas`). */
 export function maxFeeCost(tx: TransactionSerializable): bigint {
   const rate = tx.type === 'legacy' || tx.type === 'eip2930' ? tx.gasPrice : tx.maxFeePerGas
@@ -253,6 +261,33 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   }
 
   /**
+   * Fee fields the caller set (`gasPrice`, `maxFeePerGas`, `maxPriorityFeePerGas`) are signed as
+   * given, so their rate is held against the network: above `maxFeeRateMultiplier` × the current
+   * quote (the higher of `eth_gasPrice` and the EIP-1559 estimate), and above
+   * {@link MIN_FEE_RATE_CEILING_WEI}, it is refused. Fees the account filled in itself are the
+   * quote already. Nothing is refused when there is no provider or the quote cannot be read.
+   */
+  private async assertFeeRate(tx: EvmTransaction, prepared: TransactionSerializable): Promise<void> {
+    if (tx.gasPrice === undefined && tx.maxFeePerGas === undefined && tx.maxPriorityFeePerGas === undefined) return
+    const k = this._config.maxFeeRateMultiplier === undefined ? DEFAULT_MAX_FEE_RATE_MULTIPLIER : this._config.maxFeeRateMultiplier
+    if (k === null || !Number.isFinite(k) || !this._client) return
+    const client = this._client
+    const [estimate, gasPrice] = await Promise.all([
+      client.estimateFeesPerGas().then((f) => f.maxFeePerGas, () => undefined),
+      client.getGasPrice().catch(() => undefined),
+    ])
+    const quotes = [estimate, gasPrice].filter((q): q is bigint => typeof q === 'bigint' && q > 0n)
+    if (!quotes.length) return
+    const quote = quotes.reduce((a, b) => (b > a ? b : a))
+    const scaled = (quote * BigInt(Math.round(k * 100)) + 99n) / 100n
+    const ceiling = scaled > MIN_FEE_RATE_CEILING_WEI ? scaled : MIN_FEE_RATE_CEILING_WEI
+    const rate = prepared.type === 'legacy' || prepared.type === 'eip2930' ? prepared.gasPrice : prepared.maxFeePerGas
+    if (rate !== undefined && rate > ceiling) {
+      throw new UnsafeTransactionError(`Fee rate ${rate} wei/gas is more than ${k}× the network's current ${quote} wei/gas (ceiling ${ceiling}); set maxFeeRateMultiplier to change it.`)
+    }
+  }
+
+  /**
    * The checks before a send prepares the transaction, in order: static refusals,
    * simulation (unless `simulate: false`), gas (taken from the simulation so
    * `estimateGas` runs once). Returns the tx with `gasLimit` filled; the fee cap
@@ -307,6 +342,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     await this.assertSafeTransaction(tx)
     const prepared = await this.prepare(tx)
     this.capFee(prepared, feeLimit(this._config.transactionMaxFee, options), 'transaction')
+    await this.assertFeeRate(tx, prepared)
     const hash = keccak256(serializeTransaction(prepared))
     return serializeTransaction(prepared, await this.#signHash(hash, 'evm-tx'))
   }
@@ -359,6 +395,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     const checked = await this.preflight(tx)
     const prepared = await this.prepare(checked)
     const fee = this.capFee(prepared, limit, op)
+    await this.assertFeeRate(checked, prepared)
     await this.assertCanPay(fee, prepared.value ?? 0n, op)
     const accepted = (hash: Hex, nonce: number): TransferResult => {
       this._nonceFloor = { next: nonce + 1, at: Date.now() }
