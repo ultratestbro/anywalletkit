@@ -154,8 +154,16 @@ const pyusd = await account.getTokenInfo('2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsF
   (transfers to this wallet's own accounts or to a fee wallet, at most 3 % of
   what may leave; a Jupiter swap into the wallet or the bridge; Mayan's Swift /
   MCTP / Fast MCTP orders), and every Mayan order must pay `recipient` on
-  `destChain` (`bridge-recipient`, `bridge-payee`, `bridge-instruction`,
-  `bridge-missing`, `bridge-fee` otherwise).
+  `destChain` with a non-zero minimum, a referrer / Mayan fee rate of at most
+  `MAYAN_REFERRER_FEE_MAX_BPS` (50) and fixed relayer fees of at most
+  `MAYAN_RELAYER_FEE_MAX_BPS` (10 %) of its input. With the reviewed terms
+  swap2 adds — `destToken`, `minAmountOut` + `destDecimals`, `slippageBps` —
+  an order's output token must be `destToken` and its own minimum (Swift's
+  `amountOutMin` at Mayan's 8 decimals; for a plain MCTP / Fast MCTP USDC
+  bridge, the bridged amount less its fees) at least `minAmountOut` less the
+  slippage and 1 bp of rounding (`bridge-recipient`, `bridge-token`,
+  `bridge-min`, `bridge-payee`, `bridge-instruction`, `bridge-missing`,
+  `bridge-fee` otherwise).
   Net balances alone let a deposit that also withdraws collateral and
   transfers it away pass; the rules do not.
 * `getAccountInfos(addresses)` reads raw accounts (owner, lamports, data) in

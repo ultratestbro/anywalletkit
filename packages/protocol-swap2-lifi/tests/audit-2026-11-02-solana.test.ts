@@ -70,7 +70,7 @@ describe("audit 2026-11-02: a LI.FI bridge out of Solana is bound to the reviewe
     await p.swap2({fromToken: "SOL", toToken: BASE_USDC, toChain: "eip155:8453", recipient: RECIPIENT, fromTokenAmount: BigInt(c.params.amountIn), minAmountOut: 1n});
     expect(seen).toHaveLength(1);
     expect(seen[0]!.wire).toBe(c.response.transactionRequest!.data);
-    expect(seen[0]!.expect).toEqual({maxValueOut: (BigInt(c.params.amountIn) + 20_000_000n).toString(), bridgeOut: {destChain: "eip155:8453", recipient: RECIPIENT}});
+    expect(seen[0]!.expect).toEqual({maxValueOut: (BigInt(c.params.amountIn) + 20_000_000n).toString(), bridgeOut: {destChain: "eip155:8453", recipient: RECIPIENT, destToken: BASE_USDC, minAmountOut: "46516587", destDecimals: 6}});
   });
 
   it("asks LI.FI for Mayan routes only from Solana, within whatever a route policy chose", async () => {

@@ -340,9 +340,12 @@ export interface SerializedExecutionExpectation {
   /**
    * Bridges: the destination chain (CAIP-2) and the reviewed recipient there. Value leaving the account may only go into
    * the bridge (plus the provider's declared fee), and a bridge instruction whose recipient the account can read must
-   * name this one; an account that cannot prove where the funds go refuses the transaction.
+   * name this one; an account that cannot prove where the funds go refuses the transaction. The engine also names the
+   * reviewed destination token (zero address = native), the quoted minimum in its base units with its decimals (when the
+   * catalog knows them), and the slippage the plan allows, so a bridge order's own token and minimum can be held to them.
+   * Set on every cross-chain serialized leg.
    */
-  bridgeOut?: {destChain: string; recipient: string};
+  bridgeOut?: {destChain: string; recipient: string; destToken: string; minAmountOut: string; destDecimals?: number; slippageBps?: number};
 }
 
 const DEFAULT_SERIALIZED_NATIVE_ALLOWANCE = 20_000_000n;
@@ -671,6 +674,16 @@ function assertQuoteConstraints(q: Quote, options: Swap2Options): void {
       throw new Error(`swap2: quote exceeds caller slippage (${options.slippage})`);
     }
   }
+}
+
+/** The bridge leg's reviewed terms for {@link SerializedExecutionExpectation.bridgeOut}. */
+function bridgeOutOf(params: QuoteParams, q: Quote): NonNullable<SerializedExecutionExpectation["bridgeOut"]> {
+  const decimals = resolveAsset(params.destChain, params.destToken)?.decimals;
+  return {
+    destChain: params.destChain, recipient: params.destAddress, destToken: params.destToken, minAmountOut: q.minDestAmount,
+    ...(decimals !== undefined ? {destDecimals: decimals} : {}),
+    ...(params.slippageBps !== undefined ? {slippageBps: params.slippageBps} : {}),
+  };
 }
 
 function requireExecutionFloor(options: Swap2Options): void {
@@ -1506,7 +1519,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           // Only a same-chain swap lands in this account; a bridge delivers elsewhere.
           ...(params.destChain === this.fromChain ? {tokenIn: {token: params.destToken, minAmount: q.minDestAmount}} : {}),
           ...(source.contract ? {source: {token: source.contract, maxAmount: q.sourceAmount}} : {}),
-          ...(params.destChain !== this.fromChain ? {bridgeOut: {destChain: params.destChain, recipient: params.destAddress}} : {}),
+          ...(params.destChain !== this.fromChain ? {bridgeOut: bridgeOutOf(params, q)} : {}),
         };
         sent = await signer.sendSerializedTransaction!(unsigned.serializedTx!, expect);
       } else if (tokenId) {

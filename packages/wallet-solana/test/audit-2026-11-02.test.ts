@@ -73,6 +73,7 @@ function swiftOrder(recipient: string, wormholeChain: number): Uint8Array {
   new DataView(d.buffer).setBigUint64(8, AMOUNT_IN, true)
   d.set(Buffer.from(recipient.slice(2).padStart(64, '0'), 'hex'), 25)
   new DataView(d.buffer).setUint16(57, wormholeChain, true)
+  new DataView(d.buffer).setBigUint64(91, 8_955_000n, true) // amountOutMin
   return d
 }
 const order = (recipient = RECIPIENT, chain = 30): Instruction => ({

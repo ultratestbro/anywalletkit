@@ -415,7 +415,7 @@ describe("core public contract", () => {
     })).resolves.toMatchObject({hash: "serial-sig"});
     expect(serialized).toEqual([{tx: WIRE, expect: {
       maxValueOut: "5000000", source: {token: SOL_USDT, maxAmount: "1000000"},
-      bridgeOut: {destChain: "eip155:1", recipient: "0x3333333333333333333333333333333333333333"},
+      bridgeOut: {destChain: "eip155:1", recipient: "0x3333333333333333333333333333333333333333", destToken: "0xdac17f958d2ee523a2206206994597c13d831ec7", minAmountOut: "980000", destDecimals: 6},
     }}]);
     expect(sent).toHaveLength(0);
     // (c) an account without the hook is refused before anything is sent.

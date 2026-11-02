@@ -125,8 +125,9 @@ export interface SerializedExpectation {
    * follow — compute budget, memos, LI.FI's tracking log, wSOL plumbing, transfers to this wallet's own accounts or to a
    * fee wallet (at most {@link BRIDGE_FEE_MAX_BPS} of what may leave), a Jupiter swap into this wallet or into the
    * bridge, and Mayan's Swift / MCTP / Fast MCTP order instructions — and every bridge order must name `recipient` on
-   * `destChain`. Anything else (a transfer to another wallet, an approval, a program whose recipient cannot be read) is
-   * refused (`bridge-*` codes).
+   * `destChain`, a non-zero minimum, and (with `destToken` / `minAmountOut`) the reviewed token and a minimum no further
+   * under the reviewed one than `slippageBps`. Anything else (a transfer to another wallet, an approval, a program whose
+   * recipient cannot be read, a referrer or relayer fee over its cap) is refused (`bridge-*` codes).
    */
   bridgeOut?: BridgeOutExpectation
 }
@@ -139,6 +140,22 @@ export interface BridgeOutExpectation {
   recipient: string
   /** Wallets a route's fee may be paid to (SOL directly, tokens to their token accounts). Default: LI.FI's {@link LIFI_FEE_WALLET_ADDRESS}. */
   feeWallets?: readonly string[]
+  /**
+   * The reviewed destination token (0x-address; the zero address is the chain's native coin). Every order that names
+   * its output token (Swift, the MCTP / Fast MCTP order modes) must name this one (`bridge-token`).
+   */
+  destToken?: string
+  /**
+   * The reviewed minimum the recipient receives, in the destination token's base units; needs `destDecimals`. Every
+   * order's own minimum — Swift's `amountOutMin` (Mayan keeps at most 8 decimals), or for a plain MCTP / Fast MCTP
+   * bridge of USDC the bridged amount less its relayer, Circle and referrer fees — must be at least this, less
+   * `slippageBps` and 1 bp of rounding (`bridge-min`).
+   */
+  minAmountOut?: bigint
+  /** Decimals of `destToken` on the destination chain. */
+  destDecimals?: number
+  /** How far under `minAmountOut` an order's own minimum may sit, in basis points (the plan's slippage). Default 0. */
+  slippageBps?: number
 }
 
 /**
@@ -200,6 +217,13 @@ export function assertExpectation(expect: SerializedExpectation): void {
     if (!b || typeof b.destChain !== 'string' || typeof b.recipient !== 'string' || (b.feeWallets !== undefined && (!Array.isArray(b.feeWallets) || b.feeWallets.some((w) => typeof w !== 'string')))) {
       throw new UnsafeTransactionError("The guard's bridgeOut needs a destChain and a recipient.", 'invalid-expectation', ['bridgeOut'])
     }
+    const refuse = (what: string, why: string) => { throw new UnsafeTransactionError(`The guard's bridgeOut.${what} ${why}.`, 'invalid-expectation', [`bridgeOut.${what}`]) }
+    if (b.destToken !== undefined && (typeof b.destToken !== 'string' || !/^0x[0-9a-fA-F]{40}$/.test(b.destToken))) refuse('destToken', 'is not a 0x-address')
+    if (b.minAmountOut !== undefined) {
+      bad('bridgeOut.minAmountOut', b.minAmountOut)
+      if (!Number.isInteger(b.destDecimals) || b.destDecimals! < 0 || b.destDecimals! > 36) refuse('destDecimals', 'must be the destination token\'s decimals (0-36) when minAmountOut is set')
+    }
+    if (b.slippageBps !== undefined && (!Number.isInteger(b.slippageBps) || b.slippageBps < 0 || b.slippageBps >= 10_000)) refuse('slippageBps', 'must be whole basis points in [0, 10000)')
   }
 }
 
@@ -336,19 +360,45 @@ const MAYAN_MCTP = 'dkpZqrxHFrhziEMQ931GLtfy11nFkCsfMftH9u6QwBU'
 const MAYAN_FAST_MCTP = 'Gx9rivpS3YR8pBFwMuP6omYqVxunpLvLkNn7ubNyuZZ5'
 const MAYAN_ORDER_PROGRAMS = new Set([...MAYAN_SWIFT, MAYAN_MCTP, MAYAN_FAST_MCTP])
 
+/** Most a Mayan order may give a referrer or Mayan itself (`feeRateRef`, `feeRateMayan`), in basis points of the order. Every live LI.FI order of 2026-11-02 carries 0. */
+export const MAYAN_REFERRER_FEE_MAX_BPS = 50
 /**
- * Mayan order instructions, by Anchor discriminator and exact data length (swap-sdk `src/solana/solanaSwift.ts`,
- * `solanaMctp.ts`, `solanaFastMctp.ts` layouts): where the 32-byte destination address sits, where the destination
- * chain sits — a Wormhole chain id (u16) or a CCTP domain (u32), little-endian — and which account holds the order's
- * funds (Swift's `stateAccount`, the MCTP ledger's token account). Account 0 is the trader, refunded on a cancel.
+ * Most a Mayan order's fixed relayer fees may take, in basis points of its input — Swift's submit / cancel / refund fees,
+ * the MCTP order modes' redeem / Solana / refund / Circle fees, paid on the refund path whatever the order's minimum.
+ * Live LI.FI orders of 2026-11-02 take at most 0.11 %.
  */
-const MAYAN_ORDERS: ReadonlyArray<{ name: string; disc: string; length: number; recipientAt: number; chainAt: number; chain: 'wormhole' | 'cctp'; vaultAt: number }> = [
-  { name: 'Swift init_order', disc: '204c290c27a284db', length: 198, recipientAt: 25, chainAt: 57, chain: 'wormhole', vaultAt: 3 },
-  { name: 'MCTP init_bridge_ledger_gasless', disc: '3635a7a4fa097b45', length: 107, recipientAt: 8, chainAt: 72, chain: 'wormhole', vaultAt: 2 },
-  { name: 'MCTP init_order_ledger_gasless', disc: 'a06cdad95ee9a9ad', length: 188, recipientAt: 8, chainAt: 72, chain: 'wormhole', vaultAt: 2 },
-  { name: 'Fast MCTP init_bridge_ledger', disc: 'a766806a7976ba4c', length: 124, recipientAt: 8, chainAt: 72, chain: 'cctp', vaultAt: 3 },
-  { name: 'Fast MCTP init_order_ledger', disc: '8febfcc2d35a864d', length: 180, recipientAt: 8, chainAt: 80, chain: 'cctp', vaultAt: 3 },
+export const MAYAN_RELAYER_FEE_MAX_BPS = 1_000
+
+/**
+ * Mayan order instructions, by Anchor discriminator and exact data length (swap-sdk 15.3.0 `InitSwiftLayout`,
+ * `MctpBridgeLedgerLayout`, `MctpSwapLedgerLayout`, `FastMctpBridgeLedgerLayout`, `FastMctpOrderLedgerLayout`): where
+ * the 32-byte destination address sits, where the destination chain sits — a Wormhole chain id (u16) or a CCTP domain
+ * (u32), little-endian — and which account holds the order's funds (Swift's `stateAccount`, the MCTP ledger's token
+ * account). Account 0 is the trader, refunded on a cancel. Amounts are u64 LE: `amountInAt` the order's input,
+ * `tokenOutAt` / `amountOutMinAt` its output token and minimum (orders that swap on the destination), `deductedAt` the
+ * USDC fees a plain bridge takes from what it delivers, `refundFeesAt` the fixed relayer fees of an order that swaps,
+ * `rateAt` its u8 fee rates in basis points.
+ */
+interface MayanOrderLayout {
+  name: string; disc: string; length: number; recipientAt: number; chainAt: number; chain: 'wormhole' | 'cctp'; vaultAt: number
+  amountInAt: number; tokenOutAt?: number; amountOutMinAt?: number; deductedAt?: readonly number[]; refundFeesAt?: readonly number[]; rateAt: readonly number[]
+}
+const MAYAN_ORDERS: readonly MayanOrderLayout[] = [
+  // amountInMin@8 nativeInput@16 feeSubmit@17 destAddress@25 chain@57 tokenOut@59 amountOutMin@91 gasDrop@99 feeCancel@107 feeRefund@115 deadline@123 refAddress@131 feeRateRef@163 feeRateMayan@164
+  { name: 'Swift init_order', disc: '204c290c27a284db', length: 198, recipientAt: 25, chainAt: 57, chain: 'wormhole', vaultAt: 3, amountInAt: 8, tokenOutAt: 59, amountOutMinAt: 91, refundFeesAt: [17, 107, 115], rateAt: [163, 164] },
+  // destAddress@8 amountInMin@40 gasDrop@48 feeRedeem@56 feeSolana@64 chain@72 keyRnd@74 mode@106
+  { name: 'MCTP init_bridge_ledger_gasless', disc: '3635a7a4fa097b45', length: 107, recipientAt: 8, chainAt: 72, chain: 'wormhole', vaultAt: 2, amountInAt: 40, deductedAt: [56, 64], rateAt: [] },
+  // … mode@106 tokenOut@107 amountOutMin@139 deadline@147 refAddress@155 feeRateRef@187
+  { name: 'MCTP init_order_ledger_gasless', disc: 'a06cdad95ee9a9ad', length: 188, recipientAt: 8, chainAt: 72, chain: 'wormhole', vaultAt: 2, amountInAt: 40, tokenOutAt: 107, amountOutMinAt: 139, refundFeesAt: [56, 64], rateAt: [187] },
+  // destAddress@8 amountInMin@40 gasDrop@48 feeRedeem@56 feeSolana@64 domain@72 refAddress@76 feeRateRef@108 keyRnd@109 maxCircleFee@111 minFinality@119 mode@123
+  { name: 'Fast MCTP init_bridge_ledger', disc: 'a766806a7976ba4c', length: 124, recipientAt: 8, chainAt: 72, chain: 'cctp', vaultAt: 3, amountInAt: 40, deductedAt: [56, 64, 111], rateAt: [108] },
+  // destAddress@8 amountInMin@40 gasDrop@48 feeRedeem@56 feeRefund@64 feeSolana@72 domain@80 keyRnd@84 mode@86 tokenOut@87 amountOutMin@119 deadline@127 refAddress@135 feeRateRef@167 maxCircleFee@168
+  { name: 'Fast MCTP init_order_ledger', disc: '8febfcc2d35a864d', length: 180, recipientAt: 8, chainAt: 80, chain: 'cctp', vaultAt: 3, amountInAt: 40, tokenOutAt: 87, amountOutMinAt: 119, refundFeesAt: [56, 64, 72, 168], rateAt: [167] },
 ]
+/** Decimals of the USDC a plain MCTP / Fast MCTP bridge delivers (Circle's USDC on every chain Mayan's CCTP routes serve). */
+const CCTP_USDC_DECIMALS = 6
+/** Mayan normalizes an order's output amount to at most this many decimals (swap-sdk `getNormalizeFactor`). */
+const MAYAN_MAX_DECIMALS = 8
 /** Argument-less Mayan instructions that run an order the same transaction opened (`bridge`, `bridge_with_fee_shim`). */
 const MAYAN_ORDER_FOLLOW_UPS = new Set(['ae29789262daa919', 'ebfc2bb26990c1a5'])
 
@@ -397,6 +447,49 @@ export interface BridgeOutContext {
 
 const u16le = (d: Uint8Array, at: number) => d[at]! | (d[at + 1]! << 8)
 const u32le = (d: Uint8Array, at: number) => (d[at]! | (d[at + 1]! << 8) | (d[at + 2]! << 16) | (d[at + 3]! << 24)) >>> 0
+const u64le = (d: Uint8Array, at: number) => new DataView(d.buffer, d.byteOffset, d.byteLength).getBigUint64(at, true)
+
+/**
+ * Why a Mayan order does not deliver what was reviewed, or undefined: its fee rates and relayer fees within their caps,
+ * a non-zero minimum, and — when the caller names them — the reviewed token and a minimum no further under the reviewed
+ * one than the plan's slippage (+1 bp of rounding).
+ */
+function mayanOrderRefusal(layout: MayanOrderLayout, d: Uint8Array, b: BridgeOutExpectation): { code: string; detail: string; message: string } | undefined {
+  const refuse = (code: string, detail: string, message: string) => ({ code, detail, message })
+  for (const at of layout.rateAt) {
+    if (d[at]! > MAYAN_REFERRER_FEE_MAX_BPS) return refuse('bridge-fee', String(d[at]), `The ${layout.name} order gives ${d[at]} bps to a referrer, more than ${MAYAN_REFERRER_FEE_MAX_BPS}.`)
+  }
+  const amountIn = u64le(d, layout.amountInAt)
+  const rateBps = layout.rateAt.reduce((sum, at) => sum + BigInt(d[at]!), 0n)
+  const keep = BigInt(10_000 - (b.slippageBps ?? 0) - 1)
+  const reviewed = (decimals: number) => (b.minAmountOut! / 10n ** BigInt(Math.max(0, b.destDecimals! - decimals)) * keep) / 10_000n
+  if (layout.tokenOutAt !== undefined && layout.amountOutMinAt !== undefined) {
+    const fees = (layout.refundFeesAt ?? []).reduce((sum, at) => sum + u64le(d, at), 0n)
+    if (fees * 10_000n > amountIn * BigInt(MAYAN_RELAYER_FEE_MAX_BPS)) return refuse('bridge-fee', String(fees), `The ${layout.name} order's relayer fees (${fees}) exceed ${MAYAN_RELAYER_FEE_MAX_BPS / 100}% of its input ${amountIn}.`)
+    if (b.destToken !== undefined) {
+      const tokenOut = hexOf(d.subarray(layout.tokenOutAt, layout.tokenOutAt + 32))
+      const want = `${'00'.repeat(12)}${b.destToken.slice(2).toLowerCase()}`
+      if (tokenOut !== want) return refuse('bridge-token', `0x${tokenOut}`, `The ${layout.name} order delivers token 0x${tokenOut}, not ${b.destToken}.`)
+    }
+    const min = u64le(d, layout.amountOutMinAt)
+    if (min === 0n) return refuse('bridge-min', '0', `The ${layout.name} order accepts any output (minimum 0).`)
+    if (b.minAmountOut !== undefined) {
+      const floor = reviewed(Math.min(b.destDecimals!, MAYAN_MAX_DECIMALS))
+      if (min < floor) return refuse('bridge-min', String(min), `The ${layout.name} order's minimum ${min} is under the reviewed ${b.minAmountOut} (${floor} at Mayan's precision, slippage included).`)
+    }
+    return undefined
+  }
+  // A plain USDC bridge: what arrives is the bridged amount less the fees taken from it.
+  const deducted = (layout.deductedAt ?? []).reduce((sum, at) => sum + u64le(d, at), 0n) + (amountIn * rateBps) / 10_000n
+  const delivered = amountIn > deducted ? amountIn - deducted : 0n
+  if (delivered === 0n) return refuse('bridge-min', String(deducted), `The ${layout.name} order's fees (${deducted}) take all of its ${amountIn}.`)
+  if (b.minAmountOut !== undefined) {
+    if (b.destDecimals !== CCTP_USDC_DECIMALS) return refuse('bridge-token', String(b.destDecimals), `The ${layout.name} order delivers USDC (${CCTP_USDC_DECIMALS} decimals), not a token of ${b.destDecimals}.`)
+    const floor = reviewed(CCTP_USDC_DECIMALS)
+    if (delivered < floor) return refuse('bridge-min', String(delivered), `The ${layout.name} order delivers at least ${delivered} after its fees, under the reviewed ${b.minAmountOut} (slippage included).`)
+  }
+  return undefined
+}
 
 /**
  * Why a bridge transaction does not provably deliver to `bridgeOut.recipient`, or undefined when every instruction is
@@ -433,6 +526,8 @@ export function bridgeOutRefusal(
     const recipient = hexOf(ix.data.subarray(layout.recipientAt, layout.recipientAt + 32))
     if (recipient !== want) return refuse('bridge-recipient', recipient, `The ${layout.name} order pays 0x${recipient}, not ${bridgeOut.recipient}.`)
     if (ix.accounts[0] !== ctx.wallet) return refuse('bridge-recipient', ix.accounts[0] ?? '', `The ${layout.name} order names ${ix.accounts[0] ?? 'no account'} as its trader, not this wallet.`)
+    const terms = mayanOrderRefusal(layout, ix.data, bridgeOut)
+    if (terms) return terms
     const vault = ix.accounts[layout.vaultAt]
     if (vault === undefined) return refuse('bridge-instruction', ix.program, `The ${layout.name} order has no account ${layout.vaultAt}.`)
     bridgeAccounts.add(vault)
