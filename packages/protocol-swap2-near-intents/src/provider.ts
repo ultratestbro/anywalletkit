@@ -124,7 +124,22 @@ export interface NearIntentsProviderConfig {
   feeBps?: number;
   /** Corridors the app has paused (caip2 → reason): refused up front, by name, until the app lifts them. */
   suspendedChains?: NearIntentsSuspendedChains;
+  /**
+   * Where 1Click credits the output. `DESTINATION_CHAIN` (default) withdraws to
+   * `destAddress` on `destChain`. `INTENTS` credits the NEAR Intents account
+   * `destAddress` inside intents.near — the account a near.com user holds — with
+   * no withdrawal: the asset stays there as the intents token. In this mode
+   * `destToken` may be the intents token id itself (`nep141:…` / `nep245:…`).
+   * `CONFIDENTIAL_INTENTS` credits the same account's Confidential Intents
+   * balance (where near.com keeps funds); 1Click settles it with a signed
+   * transfer intent and serves it to partners only, so it requires `jwt`.
+   */
+  recipientType?: "DESTINATION_CHAIN" | "INTENTS" | "CONFIDENTIAL_INTENTS";
 }
+
+/** NEAR account id rules (intents.near accounts include implicit hex and 0x ids). */
+const NEAR_ACCOUNT_ID = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
+const INTENTS_TOKEN_ID = /^nep(141|245):\S+$/;
 
 export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): CrossChainProvider {
   config = Object.freeze({...config});
@@ -133,6 +148,18 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
     throw new Error("near-intents: apiUrl must use http or https");
   }
   const apiBase = parsedApiUrl.toString().replace(/\/$/, "");
+  const recipientType = config.recipientType ?? "DESTINATION_CHAIN";
+  if (recipientType !== "DESTINATION_CHAIN" && recipientType !== "INTENTS" && recipientType !== "CONFIDENTIAL_INTENTS") {
+    throw new Error("near-intents: recipientType must be DESTINATION_CHAIN, INTENTS or CONFIDENTIAL_INTENTS");
+  }
+  if (recipientType === "CONFIDENTIAL_INTENTS" && !config.jwt) {
+    throw new Error("near-intents: CONFIDENTIAL_INTENTS delivery is partner-only and needs a 1Click jwt");
+  }
+  /** Output credited inside NEAR Intents (public or confidential), never withdrawn to a chain. */
+  const intents = recipientType !== "DESTINATION_CHAIN";
+  /** The 1Click destination asset: an intents token id passes through in INTENTS mode. */
+  const destinationAsset = (destChain: string, destToken: string): string | null =>
+    intents && INTENTS_TOKEN_ID.test(destToken) ? destToken : destAssetId(destChain, destToken);
   const hasRecipient = config.feeRecipient !== undefined;
   const hasBps = config.feeBps !== undefined;
   if (hasRecipient !== hasBps) throw new Error("near-intents: feeRecipient and feeBps must be configured together");
@@ -157,7 +184,7 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
       // Both ends: a destination 1Click doesn't list (Unichain, MegaETH, …)
       // answered "unknown asset" on every quote (589 of the 2026-10-10 matrix).
       const asset = ccAsset(from.chain, from.token);
-      return !!ccChain(from.chain) && !!asset?.assetId && !!destAssetId(to.chain, to.token);
+      return !!ccChain(from.chain) && !!asset?.assetId && !!destinationAsset(to.chain, to.token);
     },
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
@@ -175,11 +202,18 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
       // serve: a chain outside its list / suspended by hand, or a token the
       // catalog carries without a 1Click asset id ("1Click does not list …").
       const paused = config.suspendedChains ?? {};
-      const chainRefusal = nearIntentsChainRefusal(params.sourceChain, paused) ?? nearIntentsChainRefusal(params.destChain, paused);
+      // An output credited inside intents.near never touches the destination
+      // chain, so only the source corridor can be paused for it.
+      const rawIntentsDest = intents && INTENTS_TOKEN_ID.test(params.destToken);
+      const chainRefusal = nearIntentsChainRefusal(params.sourceChain, paused)
+        ?? (rawIntentsDest ? null : nearIntentsChainRefusal(params.destChain, paused));
       if (chainRefusal) return refuse(chainRefusal);
+      if (intents && !NEAR_ACCOUNT_ID.test(params.destAddress)) {
+        return refuse(`${recipientType} recipient must be a NEAR Intents account id`);
+      }
       const origin = ccAsset(params.sourceChain, params.sourceToken);
       if (!origin?.assetId) return refuse(`1Click does not list ${params.sourceChain} ${params.sourceToken}`);
-      const destination = destAssetId(params.destChain, params.destToken);
+      const destination = destinationAsset(params.destChain, params.destToken);
       if (!destination) return refuse(`1Click does not list ${params.destChain} ${params.destToken}`);
       const dry = params.dry !== false;
       // A live quote derives the deposit address from the refund config —
@@ -202,7 +236,7 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
         refundTo: dcfg.refundTo,
         refundType: dcfg.refundType,
         recipient: params.destAddress,
-        recipientType: "DESTINATION_CHAIN",
+        recipientType,
         deadline: requestedDeadline,
       };
       const fees = appFees(config.feeRecipient, config.feeBps);
