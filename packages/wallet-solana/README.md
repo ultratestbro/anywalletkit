@@ -163,7 +163,8 @@ const pyusd = await account.getTokenInfo('2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsF
   a Mayan order without `destToken` or `minAmountOut` is refused —
   an order's output token must be `destToken` and its own minimum (Swift's
   `amountOutMin` at Mayan's 8 decimals; for a plain MCTP / Fast MCTP USDC
-  bridge, the bridged amount less its fees) at least `minAmountOut` less the
+  bridge, the bridged amount less its fees, with `destToken` the destination
+  chain's native Circle USDC) at least `minAmountOut` less the
   slippage and 1 bp of rounding (`bridge-recipient`, `bridge-token`,
   `bridge-min`, `bridge-payee`, `bridge-instruction`, `bridge-missing`,
   `bridge-fee` otherwise). Other Solana bridges (Relay, LayerSwap, NEAR

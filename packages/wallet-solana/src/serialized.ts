@@ -153,7 +153,8 @@ export interface BridgeOutExpectation {
   /**
    * The reviewed minimum the recipient receives, in the destination token's base units; needs `destDecimals`. Every
    * order's own minimum — Swift's `amountOutMin` (Mayan keeps at most 8 decimals), or for a plain MCTP / Fast MCTP
-   * bridge of USDC the bridged amount less its relayer, Circle and referrer fees — must be at least this, less
+   * bridge of USDC (`destToken` must then be the destination chain's native USDC) the bridged amount less its relayer,
+   * Circle and referrer fees — must be at least this, less
    * `slippageBps` and 1 bp of rounding (`bridge-min`). Without it (or without `destDecimals`) every Mayan order is
    * refused (`bridge-min`): its minimum would be the provider's word alone.
    */
@@ -471,27 +472,31 @@ const MAYAN_ORDERS: readonly MayanOrderLayout[] = [
   // destAddress@8 amountInMin@40 gasDrop@48 feeRedeem@56 feeRefund@64 feeSolana@72 domain@80 keyRnd@84 mode@86 tokenOut@87 amountOutMin@119 deadline@127 refAddress@135 feeRateRef@167 maxCircleFee@168
   { name: 'Fast MCTP init_order_ledger', disc: '8febfcc2d35a864d', length: 180, recipientAt: 8, chainAt: 80, chain: 'cctp', vaultAt: 3, amountInAt: 40, tokenOutAt: 87, amountOutMinAt: 119, refundFeesAt: [56, 64, 72, 168], rateAt: [167] },
 ]
-/** Decimals of the USDC a plain MCTP / Fast MCTP bridge delivers (Circle's USDC on every chain Mayan's CCTP routes serve). */
+/** Decimals of the USDC a plain MCTP / Fast MCTP bridge delivers (Circle's native USDC, `MAYAN_CHAINS[…].usdc`). */
 const CCTP_USDC_DECIMALS = 6
 /** Mayan normalizes an order's output amount to at most this many decimals (swap-sdk `getNormalizeFactor`). */
 const MAYAN_MAX_DECIMALS = 8
 /** Argument-less Mayan instructions that run an order the same transaction opened (`bridge`, `bridge_with_fee_shim`). */
 const MAYAN_ORDER_FOLLOW_UPS = new Set(['ae29789262daa919', 'ebfc2bb26990c1a5'])
 
-/** Mayan's chain ids for the EVM chains it serves (swap-sdk `src/utils.ts` evmChainIdMap, `src/cctp.ts` getCCTPDomain). */
-const MAYAN_CHAINS: Readonly<Record<string, { wormhole: number; cctp?: number }>> = {
-  'eip155:1': { wormhole: 2, cctp: 0 },
+/**
+ * Mayan's chain ids for the EVM chains it serves (swap-sdk `src/utils.ts` evmChainIdMap, `src/cctp.ts` getCCTPDomain)
+ * and, where CCTP reaches, Circle's native USDC there — the only token a plain MCTP / Fast MCTP bridge delivers (the
+ * same addresses as protocol-swap2-cctp's `CCTP_DOMAINS`).
+ */
+const MAYAN_CHAINS: Readonly<Record<string, { wormhole: number; cctp?: number; usdc?: string }>> = {
+  'eip155:1': { wormhole: 2, cctp: 0, usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
   'eip155:56': { wormhole: 4 },
-  'eip155:137': { wormhole: 5, cctp: 7 },
-  'eip155:43114': { wormhole: 6, cctp: 1 },
-  'eip155:42161': { wormhole: 23, cctp: 3 },
-  'eip155:10': { wormhole: 24, cctp: 2 },
-  'eip155:8453': { wormhole: 30, cctp: 6 },
-  'eip155:130': { wormhole: 44, cctp: 10 },
-  'eip155:59144': { wormhole: 38, cctp: 11 },
-  'eip155:146': { wormhole: 52, cctp: 13 },
-  'eip155:999': { wormhole: 47, cctp: 19 },
-  'eip155:143': { wormhole: 48, cctp: 15 },
+  'eip155:137': { wormhole: 5, cctp: 7, usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' },
+  'eip155:43114': { wormhole: 6, cctp: 1, usdc: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E' },
+  'eip155:42161': { wormhole: 23, cctp: 3, usdc: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831' },
+  'eip155:10': { wormhole: 24, cctp: 2, usdc: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85' },
+  'eip155:8453': { wormhole: 30, cctp: 6, usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' },
+  'eip155:130': { wormhole: 44, cctp: 10, usdc: '0x078D782b760474a361dDA0AF3839290b0EF57AD6' },
+  'eip155:59144': { wormhole: 38, cctp: 11, usdc: '0x176211869cA2b568f2A7D4EE941E073a821EE1ff' },
+  'eip155:146': { wormhole: 52, cctp: 13, usdc: '0x29219dd400f2Bf60E5a23d13Be72B486D4038894' },
+  'eip155:999': { wormhole: 47, cctp: 19, usdc: '0xb88339CB7199b77E23DB6E890353E22632Ba630f' },
+  'eip155:143': { wormhole: 48, cctp: 15, usdc: '0x754704Bc059F8C67012fEd69BC8A327a5aafb603' },
 }
 
 /**
@@ -568,6 +573,8 @@ function mayanOrderRefusal(layout: MayanOrderLayout, d: Uint8Array, b: BridgeOut
   const delivered = amountIn > deducted ? amountIn - deducted : 0n
   if (delivered === 0n) return refuse('bridge-min', String(deducted), `The ${layout.name} order's fees (${deducted}) take all of its ${amountIn}.`)
   if (b.minAmountOut === undefined) return refuse('bridge-min', String(delivered), `The ${layout.name} order delivers ${delivered} after its fees, which cannot be held to a reviewed minimum: bridgeOut has no minAmountOut (with destDecimals).`)
+  const usdc = MAYAN_CHAINS[b.destChain]?.usdc
+  if (!usdc || b.destToken === undefined || b.destToken.toLowerCase() !== usdc.toLowerCase()) return refuse('bridge-token', b.destToken ?? '', `The ${layout.name} order delivers ${usdc ? `USDC (${usdc})` : 'USDC'} on ${b.destChain}, not the reviewed ${b.destToken ?? '(no token)'}.`)
   if (b.destDecimals !== CCTP_USDC_DECIMALS) return refuse('bridge-token', String(b.destDecimals), `The ${layout.name} order delivers USDC (${CCTP_USDC_DECIMALS} decimals), not a token of ${b.destDecimals}.`)
   const floor = reviewed(CCTP_USDC_DECIMALS)
   if (delivered < floor) return refuse('bridge-min', String(delivered), `The ${layout.name} order delivers at least ${delivered} after its fees, under the reviewed ${b.minAmountOut} (slippage included).`)

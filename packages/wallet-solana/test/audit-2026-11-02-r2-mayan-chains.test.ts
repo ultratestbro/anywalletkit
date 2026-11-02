@@ -2,6 +2,7 @@
 // other chain the guard maps would refuse that corridor at signing time, after the quote was shown. Every mapped
 // chain is pinned here to Mayan's own tables (swap-sdk 15.3.0 `evmChainIdMap` for the Wormhole ids Swift and MCTP
 // orders carry, `getCCTPDomain` for the CCTP domains of Fast MCTP), with the neighbouring ids refused.
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { bridgeOutRefusal, type RunInstruction } from '../src/serialized.js'
 
@@ -28,15 +29,20 @@ const swift = (wh: number) => order(SWIFT_V2, '204c290c27a284db', 198, 57, wh, f
 const mctp = (wh: number) => order(MCTP, '3635a7a4fa097b45', 107, 72, wh, false, (v) => v.setBigUint64(40, 1_000_000n, true))
 const fast = (domain: number) => order(FAST_MCTP, 'a766806a7976ba4c', 124, 72, domain, true, (v) => v.setBigUint64(40, 1_000_000n, true))
 const ctx = { wallet: WALLET, tokenAccountOwner: () => undefined, maxLamportsOut: 1_000_000_000n }
-// The orders name the native coin (Swift) or bridge USDC (MCTP, Fast MCTP) with a minimum of 1 base unit.
-const terms = { destToken: '0x0000000000000000000000000000000000000000', minAmountOut: 1n, destDecimals: 6 }
-const run = (destChain: string, ix: RunInstruction) => bridgeOutRefusal([ix], [{ type: 'program-call' } as never], { destChain, recipient: RECIPIENT, ...terms }, ctx)?.code
+// Circle's native USDC on each CCTP chain (protocol-swap2-cctp CCTP_DOMAINS): what a plain MCTP / Fast MCTP bridge delivers.
+const USDC: Record<number, string> = Object.fromEntries([...readFileSync(new URL('../../protocol-swap2-cctp/src/config.ts', import.meta.url), 'utf8')
+  .matchAll(/d\((\d+), \d+, "[^"]+", "(0x[0-9a-fA-F]{40})"\)/g)].map((m) => [Number(m[1]), m[2]!]))
+// Swift orders name the native coin, the plain bridges USDC; a minimum of 1 base unit.
+const run = (destChain: string, ix: RunInstruction) => bridgeOutRefusal([ix], [{ type: 'program-call' } as never], {
+  destChain, recipient: RECIPIENT, destToken: ix.program === SWIFT_V2 ? '0x0000000000000000000000000000000000000000' : USDC[Number(destChain.slice(7))] ?? `0x${'00'.repeat(20)}`, minAmountOut: 1n, destDecimals: 6,
+}, ctx)?.code
 
 describe('audit 2026-11-02 r2: every Mayan destination the guard maps matches Mayan\'s own ids', () => {
   it.each(Object.entries(WORMHOLE))('eip155:%s → Wormhole %s (Swift, MCTP)', (evm, wh) => {
     const chain = `eip155:${evm}`
     expect(run(chain, swift(wh))).toBeUndefined()
-    expect(run(chain, mctp(wh))).toBeUndefined()
+    // A plain MCTP bridge rides CCTP: BSC has no CCTP domain and no Circle USDC to deliver.
+    expect(run(chain, mctp(wh))).toBe(evm === '56' ? 'bridge-token' : undefined)
     for (const other of [wh - 1, wh + 1, 0]) expect(run(chain, swift(other))).toBe('bridge-recipient')
   })
 
