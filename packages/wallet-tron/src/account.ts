@@ -3,7 +3,7 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { addressFromPublicKey, toHexAddress } from './address.js'
 import { describeTransaction } from './describe.js'
 import { BroadcastUnknownError, SimulationError, UnsafeTransactionError } from './errors.js'
-import { BROADCAST_REFUSED, WITH_MISSES, nodeMessage, type FailoverFetch, type TronAnswer } from './client.js'
+import { WITH_MISSES, isBroadcastRefusal, nodeMessage, type FailoverFetch, type TronAnswer } from './client.js'
 import { WalletAccountReadOnlyTron, hashMessage } from './read-only-account.js'
 import { isDecodedContractType, verifyRawTransaction } from './raw.js'
 import { isPrebuilt } from './shape.js'
@@ -271,7 +271,7 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     // (an empty body, a gateway error, OTHER_ERROR) does not prove the bytes stayed off the network.
     const detail = `${typeof r?.code === 'string' ? r.code : ''} ${nodeMessage(r?.message)}`.trim()
     // A refusal from a later provider says nothing about an earlier one that may have taken the bytes.
-    if (typeof r?.code === 'string' && BROADCAST_REFUSED.has(r.code)) {
+    if (isBroadcastRefusal(r?.code, r?.message)) {
       if (missed) throw new BroadcastUnknownError(signed.txID, new Error(`broadcast answered ${detail} after an earlier provider gave no answer`, { cause: missed.missedError }))
       throw new Error(`Broadcast failed: ${detail}`)
     }

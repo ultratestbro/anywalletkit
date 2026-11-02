@@ -96,11 +96,22 @@ export function assertNoError(res: unknown, what: string): void {
  * `broadcasttransaction` codes java-tron returns when it refused the transaction before pushing it
  * to the network: nothing was sent, so signing again is safe. `DUP_TRANSACTION_ERROR` (already
  * known) is read as accepted; `OTHER_ERROR` and any other answer may come after the push.
+ * `NOT_ENOUGH_EFFECTIVE_CONNECTION` is a refusal only before the push: see {@link isBroadcastRefusal}.
  */
 export const BROADCAST_REFUSED: ReadonlySet<string> = new Set([
   'SIGERROR', 'CONTRACT_VALIDATE_ERROR', 'CONTRACT_EXE_ERROR', 'BANDWITH_ERROR', 'TAPOS_ERROR', 'TOO_BIG_TRANSACTION_ERROR',
   'TRANSACTION_EXPIRATION_ERROR', 'SERVER_BUSY', 'NO_CONNECTION', 'NOT_ENOUGH_EFFECTIVE_CONNECTION', 'BLOCK_UNSOLIDIFIED',
 ])
+
+/**
+ * Is this `broadcasttransaction` answer one of the pre-push refusals? java-tron also answers
+ * `NOT_ENOUGH_EFFECTIVE_CONNECTION` ("P2P broadcast failed.") after it has put the transaction in
+ * its own pending pool, so that message is not a refusal.
+ */
+export function isBroadcastRefusal(code: unknown, message: unknown): boolean {
+  if (typeof code !== 'string' || !BROADCAST_REFUSED.has(code)) return false
+  return !(code === 'NOT_ENOUGH_EFFECTIVE_CONNECTION' && /p2p broadcast/i.test(nodeMessage(message)))
+}
 
 /** A node message, hex-decoded when it is hex (java-tron hex-encodes `message`). */
 export function nodeMessage(m: unknown): string {
