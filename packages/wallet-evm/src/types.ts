@@ -22,6 +22,13 @@ export interface EvmConfig {
   /** Max fee (wei) for `sendTransaction` / `signTransaction`, checked the same way on the caller's own fee fields too. */
   transactionMaxFee?: bigint | number
   /**
+   * Ceiling on a fee rate the caller set (`gasPrice`, `maxFeePerGas`, `maxPriorityFeePerGas`):
+   * above this multiple of the network's current quote — and above 10 gwei — the transaction is
+   * refused (UnsafeTransactionError) before signing. Default 10. `null` or `Infinity` turns it off.
+   * Fees the account fills in itself, and signing without a provider (no quote), are not checked.
+   */
+  maxFeeRateMultiplier?: number | null
+  /**
    * Ethereum-mainnet USDT reverts a non-zero → non-zero `approve`. By default the account
    * throws and asks the caller to approve(0) first; with this flag the account sends the
    * reset itself and waits for it before the real approval.

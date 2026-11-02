@@ -58,6 +58,12 @@ Every send goes through, in order: static refusals → simulation → fee cap �
 - **Fee cap.** `transferMaxFee` / `transactionMaxFee` are checked on the transaction about to be
   signed — gas limit × its `gasPrice` / `maxFeePerGas`, fee fields you set yourself included — before
   every signature. `quoteSendTransaction` prices the same fields, so a kit `maxFee` policy sees them too.
+- **Fee-rate ceiling.** A `gasPrice` / `maxFeePerGas` / `maxPriorityFeePerGas` you set yourself is
+  refused (`UnsafeTransactionError`) when its rate is above `maxFeeRateMultiplier` (default 10) × the
+  network's current quote (the higher of `eth_gasPrice` and the EIP-1559 estimate) and above 10 gwei.
+  Fees the account fills in are not checked; without a provider, or when the quote cannot be read,
+  nothing is refused (use `transactionMaxFee` for offline signing). `maxFeeRateMultiplier: null` turns
+  it off.
 - **Broadcast.** A lost answer throws `BroadcastUnknownError` with the locally computed `hash`: watch
   it, do not send again. With several RPCs, `already known` from the next one is the same transaction
   and resolves to its hash. `nonce too low` is re-signed with the next nonce only when the nonce is

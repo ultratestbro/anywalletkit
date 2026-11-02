@@ -4,7 +4,7 @@ import { decodeAnyTransaction, encodeSignedTransaction } from './borsh.js'
 import { BroadcastUnknownError, MessageIsTransactionError, SimulationError } from './errors.js'
 import { nep413Hash, type Nep413Payload, type Nep413Signed } from './nep413.js'
 import { WalletAccountReadOnlyNear, assertWellFormed, receiptOf } from './read-only-account.js'
-import { fromBase64, isDefinitive, outcomeFailed, toBase64 } from './rpc.js'
+import { fromBase64, isDefinitiveBroadcast, outcomeFailed, toBase64 } from './rpc.js'
 import type { NearBuiltTransaction, NearConfig, NearFeeEstimate, NearSignedTransaction, NearTransaction, NearTransferOptions } from './types.js'
 
 /** Does `bytes` carry `key` anywhere? A Solana transaction names each signer's 32-byte key. */
@@ -107,8 +107,18 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
     return { signature: toBase64(sig), publicKey: publicKeyToString(this.publicKey), accountId: this.address }
   }
 
-  /** Sign a fully built transaction. No checks — see `signTransaction`. */
+  /**
+   * Sign a fully built transaction. It gets the same hard checks as `signTransaction` (this
+   * account's signer and key, no dangerous action unless `allowDangerousActions`, gas limit) but
+   * no node round-trip: no preflight and no fee check.
+   */
   async signBuilt(tx: NearBuiltTransaction): Promise<NearSignedTransaction> {
+    this.assertSafe(tx)
+    return this.#signChecked(tx)
+  }
+
+  /** Sign a transaction that has already been through `assertSafe`. */
+  async #signChecked(tx: NearBuiltTransaction): Promise<NearSignedTransaction> {
     assertWellFormed(tx)
     const sig = await this.#signBytes(WalletAccountReadOnlyNear.hashOf(tx), 'near-tx')
     return { transaction: tx, signature: { keyType: 'ed25519', data: sig } }
@@ -137,7 +147,7 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
     this.key()
     this.requireRpc('sign transactions')
     const { built } = await this.prepare(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
-    return toBase64(encodeSignedTransaction(await this.signBuilt(built)))
+    return toBase64(encodeSignedTransaction(await this.#signChecked(built)))
   }
 
   private async broadcast(signed: NearSignedTransaction): Promise<string> {
@@ -151,8 +161,9 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
     try {
       outcome = await rpc.sendTx(toBase64(encodeSignedTransaction(signed)))
     } catch (e) {
-      // A definitive refusal (invalid nonce, invalid tx…) is a clean failure; no answer or a node timeout may still land.
-      if (isDefinitive(e)) throw e
+      // A known refusal (invalid nonce, invalid tx, unparsable request) is a clean failure; no answer,
+      // a node timeout or an unnamed gateway error may still land.
+      if (isDefinitiveBroadcast(e)) throw e
       used()
       throw new BroadcastUnknownError(hash, e)
     }
@@ -175,7 +186,7 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
     this.requireRpc('send transactions')
     const presigned = typeof tx === 'string' ? decodeSigned(tx) : undefined
     const { built, estimate } = await this.prepare(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
-    const signed = presigned ?? (await this.signBuilt(built))
+    const signed = presigned ?? (await this.#signChecked(built))
     return { hash: await this.broadcast(signed), fee: estimate.fee, estimate }
   }
 
@@ -188,7 +199,7 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
     this.key()
     this.requireRpc('transfer tokens')
     const { built, estimate } = await this.prepare(await this.transferActions(o), feeLimit(this._config.transferMaxFee, writeOptions), 'transfer')
-    return { hash: await this.broadcast(await this.signBuilt(built)), fee: estimate.fee, estimate }
+    return { hash: await this.broadcast(await this.#signChecked(built)), fee: estimate.fee, estimate }
   }
 
   /**

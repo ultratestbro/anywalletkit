@@ -61,6 +61,20 @@ function httpTransport(url: string, headers: Record<string, string> | undefined,
 /** An `error` from the node is a definitive answer (unknown account, invalid tx…) — never failed over. */
 export const isDefinitive = (e: unknown) => e instanceof NearRpcError && !/TIMEOUT|INTERNAL|UNAVAILABLE|NO_SYNCED/i.test(e.errorName ?? '')
 
+/**
+ * A broadcast refusal that proves the transaction was not accepted: the node rejected it
+ * (`INVALID_TRANSACTION` — bad nonce, signature, balance…) or could not read the request
+ * (`REQUEST_VALIDATION_ERROR` / `PARSE_ERROR`). Anything else — a timeout, an internal error, a
+ * gateway error with no NEAR error name — may have reached the network.
+ */
+export const isDefinitiveBroadcast = (e: unknown): boolean => {
+  if (!(e instanceof NearRpcError)) return false
+  const err = e.cause as { name?: unknown; cause?: { name?: unknown } } | undefined
+  const name = typeof err?.name === 'string' ? err.name : undefined
+  const causeName = typeof err?.cause?.name === 'string' ? err.cause.name : undefined
+  return causeName === 'INVALID_TRANSACTION' || causeName === 'PARSE_ERROR' || name === 'REQUEST_VALIDATION_ERROR'
+}
+
 /** Methods that hand a signed transaction to the network: a lost answer is ambiguous, so they are never re-sent elsewhere. */
 const BROADCAST_METHODS: ReadonlySet<string> = new Set(['send_tx', 'broadcast_tx_commit', 'broadcast_tx_async'])
 

@@ -68,6 +68,22 @@ export function assertNoError(res: unknown, what: string): void {
   if (r?.code && r.code !== 'SUCCESS' && !('txID' in (r as object))) throw new Error(`${what}: ${r.code} ${hexMsg(r.message) ?? ''}`.trim())
 }
 
+/**
+ * `broadcasttransaction` codes java-tron returns when it refused the transaction before pushing it
+ * to the network: nothing was sent, so signing again is safe. `DUP_TRANSACTION_ERROR` (already
+ * known) is read as accepted; `OTHER_ERROR` and any other answer may come after the push.
+ */
+export const BROADCAST_REFUSED: ReadonlySet<string> = new Set([
+  'SIGERROR', 'CONTRACT_VALIDATE_ERROR', 'CONTRACT_EXE_ERROR', 'BANDWITH_ERROR', 'TAPOS_ERROR', 'TOO_BIG_TRANSACTION_ERROR',
+  'TRANSACTION_EXPIRATION_ERROR', 'SERVER_BUSY', 'NO_CONNECTION', 'NOT_ENOUGH_EFFECTIVE_CONNECTION', 'BLOCK_UNSOLIDIFIED',
+])
+
+/** A node message, hex-decoded when it is hex (java-tron hex-encodes `message`). */
+export function nodeMessage(m: unknown): string {
+  if (typeof m !== 'string') return ''
+  return /^[0-9a-f]+$/i.test(m) ? Buffer_from_hex(m) : m
+}
+
 function Buffer_from_hex(hex: string): string {
   try { return new TextDecoder().decode(Uint8Array.from(hex.match(/.{2}/g) ?? [], (b) => parseInt(b, 16))) } catch { return hex }
 }

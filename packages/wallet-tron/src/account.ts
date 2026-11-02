@@ -3,7 +3,7 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { addressFromPublicKey, toHexAddress } from './address.js'
 import { describeTransaction } from './describe.js'
 import { BroadcastUnknownError, SimulationError, UnsafeTransactionError } from './errors.js'
-import { assertNoError } from './client.js'
+import { BROADCAST_REFUSED, nodeMessage } from './client.js'
 import { WalletAccountReadOnlyTron, hashMessage } from './read-only-account.js'
 import { isDecodedContractType, verifyRawTransaction } from './raw.js'
 import { isPrebuilt } from './shape.js'
@@ -259,9 +259,13 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     }
     // The network already holds these bytes: an earlier attempt (a lost answer, a failed-over node) delivered them.
     if (r?.code === 'DUP_TRANSACTION_ERROR') return signed.txID
-    assertNoError(r, 'broadcast')
-    if (r.result !== true) throw new Error(`Broadcast failed: ${r.code ?? ''} ${r.message ?? ''}`.trim())
-    return r.txid ?? signed.txID
+    if (r?.result === true && (r.code === undefined || r.code === 'SUCCESS')) return r.txid ?? signed.txID
+    // A code java-tron answers before pushing the transaction is a clean refusal; any other answer
+    // (an empty body, a gateway error, OTHER_ERROR) does not prove the bytes stayed off the network.
+    const detail = `${typeof r?.code === 'string' ? r.code : ''} ${nodeMessage(r?.message)}`.trim()
+    if (typeof r?.code === 'string' && BROADCAST_REFUSED.has(r.code)) throw new Error(`Broadcast failed: ${detail}`)
+    const error = (r as { Error?: unknown } | undefined)?.Error
+    throw new BroadcastUnknownError(signed.txID, new Error(`broadcast answered ${detail || (typeof error === 'string' ? error : JSON.stringify(r) ?? 'nothing')}`))
   }
 
   async sendTransaction(tx: TronTransaction | string, options: WriteOptions = {}): Promise<TronTransferResult> {

@@ -52,6 +52,11 @@ Every `signTransaction` / `sendTransaction` / `transfer` goes through the same g
    transfer that creates an implicit account adds the protocol's ~0.007 NEAR creation charge —
    measured on mainnet, not derivable from gas) and the `transferMaxFee` / `transactionMaxFee` cap.
 
+`signBuilt(tx)` signs a transaction you built yourself (nonce, block hash and all). It runs the
+same step 2 hard checks — this account's signer and key, no dangerous action unless
+`allowDangerousActions: true`, well-formed actions, gas ≤ 300 Tgas — but makes no node call, so
+there is no preflight and no fee cap.
+
 Measured on mainnet (2026-10-10): `ft_transfer` 11.6 Tgas / 0.00041 NEAR; native transfer creating
 the recipient 15.9 Tgas / 0.0071 NEAR.
 
