@@ -76,26 +76,31 @@ const DEFINITIVE_RPC_CODES = new Set([-32700, -32600, -32601, -32602, -32003])
  */
 const EXACT_REJECTION = /nonce too (?:low|high)|nonce is too low|invalid nonce|transaction underpriced|insufficient funds for|intrinsic gas too low|exceeds block gas limit|less than block base fee|tip higher than fee cap|priority fee per gas higher than max fee|invalid sender|transaction type not supported|already known/i
 /**
- * viem's HTTP and timeout errors, also by name: an EIP-1193 provider backed by another copy of viem
- * (an app's own client) throws that copy's classes, which `instanceof` does not see.
- */
-const isTransportError = (e: unknown): boolean =>
-  e instanceof HttpRequestError || e instanceof TimeoutError || (e instanceof Error && (e.name === 'HttpRequestError' || e.name === 'TimeoutError'))
-/**
  * A code a JSON-RPC server answers with (the reserved -32768..-32000 range). Not viem's -1
  * (UnknownRpcError: the provider's error had no JSON-RPC code) nor an HTTP status used as a code.
  */
 const isRpcCode = (c: unknown): c is number => typeof c === 'number' && Number.isInteger(c) && c >= -32768 && c <= -32000
 /**
- * Does the error chain hold a node's refusal? Read only up to an HTTP or timeout error: a
- * gateway's status page or 5xx body is not the node's answer, whatever words it contains. An error
- * with a JSON-RPC code is read with the broad wording; any other text (a provider error viem had
- * to wrap as UnknownRpcError) only with a node's exact words. A viem error's `message` also
- * repeats the request URL and body, so only its `details` (the node's own text) is read.
+ * viem's HTTP and timeout errors, also by name and by an HttpRequestError's fields (`url` with
+ * `status` / `headers`): an EIP-1193 provider backed by another copy of viem (an app's own client)
+ * throws that copy's classes, which `instanceof` does not see, and a bundler may rename them.
+ */
+const isTransportError = (e: unknown): boolean =>
+  e instanceof HttpRequestError || e instanceof TimeoutError ||
+  (e instanceof Error && (e.name === 'HttpRequestError' || e.name === 'TimeoutError' ||
+    (typeof (e as { url?: unknown }).url === 'string' && ('status' in e || 'headers' in e) && !isRpcCode((e as { code?: unknown }).code))))
+/**
+ * Does the error chain hold a node's refusal? Not if an HTTP or timeout error sits anywhere in it:
+ * a gateway's status page or 5xx body is not the node's answer, whatever words it contains, and a
+ * wrapper above it (viem's UnknownRpcError around another copy's HttpRequestError) repeats that
+ * page in its own `details`. An error with a JSON-RPC code is read with the broad wording; any
+ * other text (a provider error viem had to wrap as UnknownRpcError) only with a node's exact
+ * words. A viem error's `message` also repeats the request URL and body, so only its `details`
+ * (the node's own text) is read.
  */
 const refusalWording = (e: unknown, pattern: (code: unknown, text: string) => RegExp): boolean => {
+  for (let cur: unknown = e, i = 0; cur && i < 6; cur = (cur as { cause?: unknown }).cause, i++) if (isTransportError(cur)) return false
   for (let cur: unknown = e, i = 0; cur && i < 6; cur = (cur as { cause?: unknown }).cause, i++) {
-    if (isTransportError(cur)) return false
     const o = cur as { code?: unknown; message?: unknown; details?: unknown; shortMessage?: unknown }
     const text = typeof o.shortMessage === 'string' ? o.details : o.message
     if (typeof text === 'string' && pattern(o.code, text).test(text)) return true
