@@ -16,6 +16,26 @@ npm install @anywalletkit/protocol-swap2-near-intents @anywalletkit/core
 
 On npm: [@anywalletkit/protocol-swap2-near-intents](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-near-intents), published from the [release workflow](https://github.com/ultratestbro/anywalletkit/blob/main/RELEASING.md) with provenance.
 
+## Credit a NEAR Intents (near.com) account
+
+By default 1Click withdraws the output to `destAddress` on `destChain`. With `recipientType: "INTENTS"` it credits the
+NEAR Intents account `destAddress` inside `intents.near` instead, the account a near.com user holds (`nearcom:0x…`
+in near.com is the `0x…` account here). Nothing is withdrawn: the asset stays in that account as the intents token,
+so `destToken` may be the token id itself.
+
+```ts
+const toNearCom = nearIntentsProvider({recipientType: "INTENTS"});
+await toNearCom.getQuote({
+  sourceChain: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp", sourceToken: "USDC",
+  destChain: "near:mainnet", destToken: "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+  destAddress: "0x63428e70a8016d10e8e2f7da440c898063afa299", amountIn: "5000000", refundAddress, dry: false,
+});
+```
+
+`destAddress` must be a NEAR account id (named, implicit hex or `0x…`); anything else is refused before a request is
+sent. Because the output never reaches the destination chain, a corridor paused for that chain does not block an
+intents token id.
+
 ## Behind `remoteProvider`
 
 When the provider runs on your server, spread its pins into the app's stub:

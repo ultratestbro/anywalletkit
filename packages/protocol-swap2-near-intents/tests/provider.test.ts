@@ -140,3 +140,66 @@ describe("dead corridors are refused up front", () => {
     expect(refusals[0]).toMatch(/^1Click does not list eip155:1 BNB \[/);
   });
 });
+
+describe("INTENTS recipient (credit a near.com / intents.near account)", () => {
+  const NEAR_USDC = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
+  const NEARCOM = "0x63428e70a8016d10e8e2f7da440c898063afa299";
+  const okQuote = (bodies: Record<string, unknown>[]) => async (_url: string, init: RequestInit) => {
+    bodies.push(JSON.parse(String(init.body)));
+    return new Response(JSON.stringify({quote: {depositAddress: "0xdeposit", amountIn: "5000000", amountOut: "4999000", minAmountOut: "4949000", deadline: new Date(Date.now() + 60_000).toISOString()}}));
+  };
+
+  it("sends recipientType INTENTS and passes an intents token id through as the destination asset", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", okQuote(bodies));
+    const quote = await nearIntentsProvider({apiUrl: "https://near.invalid", recipientType: "INTENTS"}).getQuote({
+      sourceChain: "eip155:1", sourceToken: "USDT", destChain: "near:mainnet", destToken: NEAR_USDC,
+      amountIn: "5000000", destAddress: NEARCOM, refundAddress: "0x0000000000000000000000000000000000000001", dry: false,
+    });
+    expect(quote?.depositAddress).toBe("0xdeposit");
+    expect(bodies[0]).toMatchObject({recipient: NEARCOM, recipientType: "INTENTS", destinationAsset: NEAR_USDC});
+  });
+
+  it("an intents token whose home chain is paused is still served: the output never leaves intents.near", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", okQuote(bodies));
+    const quote = await nearIntentsProvider({apiUrl: "https://near.invalid", recipientType: "INTENTS", suspendedChains: {"near:mainnet": "test"}}).getQuote({
+      sourceChain: "eip155:1", sourceToken: "USDT", destChain: "near:mainnet", destToken: "nep141:btc.omft.near",
+      amountIn: "5000000", destAddress: NEARCOM, dry: true,
+    });
+    expect(quote).not.toBeNull();
+    expect(bodies[0]).toMatchObject({destinationAsset: "nep141:btc.omft.near", recipientType: "INTENTS"});
+  });
+
+  it("refuses a recipient that is not a NEAR account id, without a wire call", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const refusals: string[] = [];
+    const quote = await nearIntentsProvider({apiUrl: "https://near.invalid", recipientType: "INTENTS"}).getQuote({
+      sourceChain: "eip155:1", sourceToken: "USDT", destChain: "near:mainnet", destToken: NEAR_USDC,
+      amountIn: "5000000", destAddress: "nearcom:0x63428E70", dry: true, onRefusal: (r: string) => refusals.push(r),
+    });
+    expect(quote).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(refusals[0]).toMatch(/NEAR Intents account id/);
+  });
+
+  it("default stays DESTINATION_CHAIN and does not pass raw intents ids through", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", okQuote(bodies));
+    const provider = nearIntentsProvider({apiUrl: "https://near.invalid"});
+    await provider.getQuote({
+      sourceChain: "eip155:1", sourceToken: "USDT", destChain: "eip155:42161", destToken: "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+      amountIn: "5000000", destAddress: "0x0000000000000000000000000000000000000002", dry: true,
+    });
+    expect(bodies[0]).toMatchObject({recipientType: "DESTINATION_CHAIN"});
+    // BTC as an intents token is not a NEAR-chain catalog asset: only INTENTS mode claims it.
+    const btcInIntents = {chain: "near:mainnet", token: "nep141:btc.omft.near"};
+    expect(provider.supportsRoute({chain: "eip155:1", token: "USDT"}, btcInIntents)).toBe(false);
+    expect(nearIntentsProvider({recipientType: "INTENTS"}).supportsRoute({chain: "eip155:1", token: "USDT"}, btcInIntents)).toBe(true);
+  });
+
+  it("rejects an unknown recipientType at construction", () => {
+    expect(() => nearIntentsProvider({recipientType: "CONFIDENTIAL_INTENTS" as never})).toThrow(/recipientType/);
+  });
+});
