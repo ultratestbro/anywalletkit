@@ -2,3 +2,13 @@ packages:
   - packages/*
   - examples/*
   - apps/*
+
+# `pnpm audit --prod --audit-level high` runs in CI. An advisory is ignored here only when no fixed
+# version exists for the dependency that pulls it in, with the reason it is not reachable.
+auditConfig:
+  ignoreGhsas:
+    # zod < 4.6.6 (memory on oversized constrained collections), via @ton/ton → zod ^3: no 3.x fix, and
+    # @ton/ton does not work with zod 4. @ton/ton validates TON node answers with it; protocol-staking-
+    # tonstakers-ton reads at most 1 MiB of any answer before @ton/ton sees it (MAX_RPC_RESPONSE_BYTES).
+    # Drop this line when @ton/ton moves to a fixed zod.
+    - GHSA-mrhx-c7xc-m3w5

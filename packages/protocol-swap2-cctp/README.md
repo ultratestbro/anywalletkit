@@ -76,7 +76,9 @@ EVM routes.
 - **Tracking**: `GET /v2/messages/{src}?transactionHash=` → `pending` while
   confirmations accrue, `action-required` once `status: complete` with the
   attestation, `completed` once the destination's `usedNonces(nonce)` is set
-  (needs the destination RPC; otherwise a recorded claim hash counts).
+  (needs the destination chain in `rpcUrls`: without it a swap whose claim
+  was sent stays `pending`, with the claim hash in `destTxHash`, because a
+  hash alone does not prove the mint).
 - **Claim**: `receiveMessage(message, attestation)` on the destination
   MessageTransmitterV2; the attested message must belong to the route's
   domains. An expired Fast message (`expirationBlock` passed) is sent to

@@ -40,7 +40,12 @@ export interface PreviewInput {
   own: string[];
   /** Known contracts: address → label (e.g. a provider's trusted targets). */
   known?: Record<string, string>;
-  /** Where the funds are meant to arrive (a swap's destination address). */
+  /**
+   * Where a same-chain swap's output is meant to arrive. It is a recipient check (`recipient-own` /
+   * `recipient-foreign`), and with a simulation it is compared with where the output actually goes
+   * (`output-missing`, `output-foreign`). Leave it out for a bridge: its output arrives on another
+   * chain, so nothing arrives here.
+   */
   expectedRecipient?: string;
   /** Amount the flow needs approved (base units); larger approvals are flagged. */
   expectedApproval?: bigint;
@@ -112,12 +117,25 @@ export interface BalanceChange {
   verified: boolean;
 }
 
+/** One token movement in the simulated sequence: an ERC-20 `Transfer` log, or a traced native transfer. */
+export interface TokenTransfer {
+  /** Token address, or "native". */
+  token: string;
+  from: string;
+  to: string;
+  amount: bigint;
+}
+
 /**
  * The simulation result: balance changes and gas, the call that reverted and why, or why simulation
  * was unavailable.
  */
 export type Simulation =
-  | {status: "ok"; changes: BalanceChange[]; gasUsed: bigint[]}
+  /**
+   * `transfers`: every token movement of the sequence in order, whoever sends or receives it (absent
+   * from a simulation the app built itself; the output checks then don't run).
+   */
+  | {status: "ok"; changes: BalanceChange[]; gasUsed: bigint[]; transfers?: TokenTransfer[]}
   | {status: "reverted"; callIndex: number; reason: string}
   | {status: "unavailable"; reason: string};
 
@@ -129,6 +147,10 @@ export type CheckCode =
   | "contract-known" | "contract-unknown"
   | "simulation-ok" | "simulation-reverted" | "simulation-unavailable"
   | "recipient-own" | "recipient-foreign"
+  /** The sequence spends, and nothing arrives at `expectedRecipient`. */
+  | "output-missing"
+  /** Tokens the swap pays out end at an address that is neither `expectedRecipient`, one of `own`, nor a contract that passes them on. */
+  | "output-foreign"
   | "approval-exact" | "approval-excess" | "approval-unlimited" | "approval-unknown-spender"
   /** A bounded approval with no `expectedApproval` to compare it with: neither "exact" nor "excess" can be said. */
   | "approval-unchecked"
@@ -395,6 +417,7 @@ async function simulateV1(input: PreviewInput): Promise<Simulation | null> {
   // Deposit/Withdrawal; the WETH9 events count only when no such Transfer did.
   const wethDeltas = new Map<string, bigint>();
   const mintBurn = new Set<string>();
+  const transfers: TokenTransfer[] = [];
   for (const c of calls) for (const log of c.logs ?? []) {
     const topic = lc(log.topics[0] ?? "");
     // WETH9 wrap/unwrap — counted only for contracts the caller lists as known (a
@@ -421,6 +444,7 @@ async function simulateV1(input: PreviewInput): Promise<Simulation | null> {
       continue;
     }
     const token = lc(log.address) === NATIVE_TRACE ? "native" : lc(log.address);
+    transfers.push({token, from, to, amount});
     if (from === me) deltas.set(token, (deltas.get(token) ?? 0n) - amount);
     if (to === me) deltas.set(token, (deltas.get(token) ?? 0n) + amount);
     if ((from === me && to === ZERO_ADDR) || (from === ZERO_ADDR && to === me)) mintBurn.add(token);
@@ -433,7 +457,7 @@ async function simulateV1(input: PreviewInput): Promise<Simulation | null> {
     const meta = token === "native" ? native : await tokenMeta(input.rpc, token);
     changes.push({token, symbol: meta.symbol, decimals: meta.decimals, delta, verified: token === "native" || knownLabel(input.known ?? {}, token) !== null});
   }
-  return {status: "ok", changes, gasUsed: calls.map((c) => BigInt(c.gasUsed ?? "0x0"))};
+  return {status: "ok", changes, gasUsed: calls.map((c) => BigInt(c.gasUsed ?? "0x0")), transfers};
 }
 
 function revertReason(c: SimCall): string {
@@ -563,6 +587,7 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
   for (const r of recipients) {
     checks.push(own.has(r) ? {code: "recipient-own", status: "ok", detail: {address: r}} : {code: "recipient-foreign", status: "warn", detail: {address: r}});
   }
+  if (input.expectedRecipient && sim.status === "ok" && sim.transfers) checks.push(...outputChecks(lc(input.from), own, lc(input.expectedRecipient), sim.changes, sim.transfers));
 
   for (const a of calls.flatMap((c) => c.approvals ?? (c.approval ? [c.approval] : []))) {
     const detail: Record<string, string> = {token: a.token, spender: a.spender, ...(a.spenderLabel ? {label: a.spenderLabel} : {}), ...(a.amount !== null ? {amount: a.amount.toString()} : {})};
@@ -579,6 +604,51 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
   // Native value per call into a contract: into one nobody vouched for it is a warning, not a tick.
   for (const c of calls) {
     if (c.value > 0n && c.selector) checks.push({code: "native-value", status: c.label ? "ok" : "warn", detail: {amount: c.value.toString(), ...(c.label ? {} : {address: c.to})}});
+  }
+  return checks;
+}
+
+/**
+ * A payout to a third party smaller than this share of what the recipient gets is a fee (1/20 =
+ * 5 %): routers that charge in the output token send a fraction of it to their fee address.
+ */
+const FEE_SHARE = 20n;
+
+/**
+ * Where the swap's output goes, from the sequence's transfers. The output is what `expected`
+ * receives (for the sender: its balance changes, wraps included). Nothing arriving while something
+ * is spent is `output-missing`. An address other than `expected` and `own` that ends up holding the
+ * output (or, when nothing arrives, any token the sender did not spend), more than a fee's share of
+ * it, and passes nothing on in the sequence, is `output-foreign`. Pools, routers and every other
+ * hop send tokens on and are never flagged; an account can't send anything inside the user's
+ * transaction, so a payout to one always is.
+ */
+function outputChecks(from: string, own: Set<string>, expected: string, changes: BalanceChange[], transfers: TokenTransfer[]): Check[] {
+  const net = new Map<string, Map<string, bigint>>();
+  const forwards = new Set<string>();
+  const add = (token: string, address: string, amount: bigint) => {
+    const m = net.get(token) ?? new Map<string, bigint>();
+    m.set(address, (m.get(address) ?? 0n) + amount);
+    net.set(token, m);
+  };
+  for (const t of transfers) {
+    if (t.from !== ZERO_ADDR) { add(t.token, t.from, -t.amount); forwards.add(t.from); }
+    if (t.to !== ZERO_ADDR) add(t.token, t.to, t.amount);
+  }
+  const spent = new Set(changes.filter((c) => c.delta < 0n).map((c) => c.token));
+  const received = new Map<string, bigint>();
+  if (expected === from) for (const c of changes) { if (c.delta > 0n) received.set(c.token, c.delta); }
+  else for (const [token, m] of net) { const n = m.get(expected) ?? 0n; if (n > 0n) received.set(token, n); }
+
+  const checks: Check[] = [];
+  if (received.size === 0 && spent.size > 0) checks.push({code: "output-missing", status: "warn", detail: {address: expected}});
+  const outputs = received.size > 0 ? [...received.keys()] : [...net.keys()].filter((t) => !spent.has(t));
+  for (const token of outputs) {
+    const got = received.get(token) ?? 0n;
+    for (const [address, n] of net.get(token) ?? []) {
+      if (n <= 0n || address === expected || own.has(address) || forwards.has(address) || n * FEE_SHARE <= got) continue;
+      checks.push({code: "output-foreign", status: "warn", detail: {address, token, amount: n.toString()}});
+    }
   }
   return checks;
 }

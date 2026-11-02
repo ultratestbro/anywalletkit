@@ -168,10 +168,10 @@ describe("track & claim (two-phase)", () => {
   it("attested + not yet minted → action-required with the claim ready; minted → completed", async () => {
     expect(await make({message: completeMessage()}).p.trackIntent(ref)).toMatchObject({state: "action-required", claim: {chain: "eip155:42161", ready: true}});
     expect(await make({message: completeMessage(), usedNonce: 1n}).p.trackIntent(ref)).toMatchObject({state: "completed"});
-    // Without a destination RPC the recorded claim hash is the evidence.
+    // Without a destination RPC a recorded claim hash keeps the swap pending (audit-2026-11-02.test.ts).
     const noRpc = world({message: completeMessage()});
     const p = cctpProvider({apiUrl: "https://iris.test", fetchImpl: noRpc.fetchImpl});
-    expect(await p.trackIntent({...ref, destTxHash: "0xdead"})).toMatchObject({state: "completed", destTxHash: "0xdead"});
+    expect(await p.trackIntent({...ref, destTxHash: "0xdead"})).toMatchObject({state: "pending", destTxHash: "0xdead"});
     expect(await p.trackIntent(ref)).toMatchObject({state: "action-required"});
   });
 

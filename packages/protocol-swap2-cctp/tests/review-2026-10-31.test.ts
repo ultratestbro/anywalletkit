@@ -53,12 +53,9 @@ describe("review 2026-10-31: a recorded claim hash is not a mint when the destin
     expect(await p.trackIntent({...ref, destTxHash: CLAIM})).toMatchObject({state: "pending", destTxHash: CLAIM});
   });
 
-  it("controls: the RPC reads the nonce used → completed; unused → action-required; no RPC at all → the recorded hash is the evidence", async () => {
+  it("controls: the RPC reads the nonce used → completed; unused → action-required", async () => {
     expect(await make({message: completeMessage(), usedNonce: 1n}).p.trackIntent({...ref, destTxHash: CLAIM})).toMatchObject({state: "completed", destTxHash: CLAIM});
     expect(await make({message: completeMessage()}).p.trackIntent({...ref, destTxHash: CLAIM})).toMatchObject({state: "action-required", claim: {ready: true}});
-    const noRpc = cctpProvider({apiUrl: "https://iris.test", fetchImpl: world({message: completeMessage()}).fetchImpl});
-    expect(await noRpc.trackIntent({...ref, destTxHash: CLAIM})).toMatchObject({state: "completed", destTxHash: CLAIM});
-    expect(await noRpc.trackIntent(ref)).toMatchObject({state: "action-required"});
   });
 });
 
@@ -108,7 +105,8 @@ describe("review 2026-10-31: claimSwap2 waits for the claim before handing out t
     const out = await new P(provider()).claimSwap2(id, dest);
     expect(order).toEqual([`wait ${out.hash}`]);
     expect(out.id).toBe(`${id}.${out.hash}`);
-    expect(await new P(provider()).getSwap2Status(out.id)).toMatchObject({status: "completed"});
+    // The destination RPC reads the nonce used: completed.
+    expect(await new P(make({message: completeMessage(), usedNonce: 1n}).p).getSwap2Status(out.id)).toMatchObject({status: "completed"});
   });
 
   it("control: an account without waitForTransaction keeps today's behaviour (id right after broadcast)", async () => {
