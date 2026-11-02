@@ -227,6 +227,61 @@ export function assertExpectation(expect: SerializedExpectation): void {
   }
 }
 
+/**
+ * What the swap2 engine hands an account's `sendSerializedTransaction(serializedTx, expect)` hook for a provider-built
+ * Solana leg (`SerializedExecutionExpectation` in `@anywalletkit/protocol-swap2-core`): JSON-safe base-unit strings.
+ */
+export interface SerializedExecutionInput {
+  /** Most lamports the wallet may lose, fee excluded. */
+  maxValueOut: string
+  /** Same-chain swaps: the token that must arrive and its quoted minimum. */
+  tokenIn?: { token: string; minAmount: string }
+  /** Token sources: the token that may leave and the exact input. */
+  source?: { token: string; maxAmount: string }
+  /** Cross-chain legs: where the funds must arrive and the reviewed terms ({@link BridgeOutExpectation}). */
+  bridgeOut?: { destChain: string; recipient: string; destToken?: string; minAmountOut?: string; destDecimals?: number; slippageBps?: number }
+}
+
+/**
+ * The guard for `sendSerialized` / `checkSerialized` from the swap2 engine's expectation, every field carried over:
+ * `maxValueOut` → `maxLamportsOut`, `tokenIn` → `tokenIn`, `source` → `maxTokenOut`, and `bridgeOut` with its reviewed
+ * terms (`minAmountOut` as a bigint, kept only when `destDecimals` is known). Map the hook with it rather than by hand —
+ * a bridge expectation that loses `bridgeOut` is checked against the SOL ceiling only:
+ *
+ * ```ts
+ * sendSerializedTransaction: (tx, expect) => account.sendSerialized(tx, serializedGuardFromExecution(expect))
+ * ```
+ *
+ * `extra` adds guard options (a program allowlist, instruction rules). A malformed amount throws `invalid-expectation`.
+ */
+export function serializedGuardFromExecution(expect: SerializedExecutionInput, extra: Omit<SerializedTxGuard, 'expect'> = {}): SerializedTxGuard {
+  const amount = (what: string, v: unknown): bigint => {
+    if (typeof v !== 'string' || !/^[0-9]+$/.test(v)) throw new UnsafeTransactionError(`The swap2 expectation's ${what} is not a base-unit amount.`, 'invalid-expectation', [what])
+    return BigInt(v)
+  }
+  if (!expect || typeof expect !== 'object') throw new UnsafeTransactionError('The guard has no expectation.', 'invalid-expectation')
+  const b = expect.bridgeOut
+  const terms = b && b.minAmountOut !== undefined && b.destDecimals !== undefined ? { minAmountOut: amount('bridgeOut.minAmountOut', b.minAmountOut), destDecimals: b.destDecimals } : {}
+  const guard: SerializedTxGuard = {
+    ...extra,
+    expect: {
+      maxLamportsOut: amount('maxValueOut', expect.maxValueOut),
+      ...(expect.tokenIn ? { tokenIn: { mint: expect.tokenIn.token, minAmount: amount('tokenIn.minAmount', expect.tokenIn.minAmount) } } : {}),
+      ...(expect.source ? { maxTokenOut: { mint: expect.source.token, amount: amount('source.maxAmount', expect.source.maxAmount) } } : {}),
+      ...(b ? {
+        bridgeOut: {
+          destChain: b.destChain, recipient: b.recipient,
+          ...(b.destToken !== undefined ? { destToken: b.destToken } : {}),
+          ...terms,
+          ...(b.slippageBps !== undefined ? { slippageBps: b.slippageBps } : {}),
+        },
+      } : {}),
+    },
+  }
+  assertExpectation(guard.expect)
+  return guard
+}
+
 const hexOf = (data: Uint8Array): string => Array.from(data, (b) => b.toString(16).padStart(2, '0')).join('')
 
 /** Check rules up front: a malformed one is the caller's mistake, never a silent "matches anything". */

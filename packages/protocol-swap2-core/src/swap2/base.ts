@@ -343,7 +343,8 @@ export interface SerializedExecutionExpectation {
    * name this one; an account that cannot prove where the funds go refuses the transaction. The engine also names the
    * reviewed destination token (zero address = native), the quoted minimum in its base units with its decimals (when the
    * catalog knows them), and the slippage the plan allows, so a bridge order's own token and minimum can be held to them.
-   * Set on every cross-chain serialized leg.
+   * Set on every cross-chain serialized leg. A Solana account maps the whole expectation with wallet-solana's
+   * `serializedGuardFromExecution`; a hand mapping that drops `bridgeOut` leaves the leg checked against the SOL ceiling only.
    */
   bridgeOut?: {destChain: string; recipient: string; destToken: string; minAmountOut: string; destDecimals?: number; slippageBps?: number};
 }

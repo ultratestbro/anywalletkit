@@ -5,7 +5,7 @@ export { isSignedTransaction, isNativeTransfer, isTransactionMessage } from './g
 export { describeTransaction, decodeWireTransaction, decodeStakeInstruction, resolveCompiledAccounts, MAX_U64, ZERO_ADDRESS, STAKE_PROGRAM_ADDRESS, MAYAN_CPI_PROXY_PROGRAM_ADDRESS, type DescribeContext, type CompiledAccounts } from './describe.js'
 export {
   DEFAULT_PROGRAM_ALLOWLIST, JUPITER_V6_PROGRAM_ADDRESS, LIFI_TRACKING_PROGRAM_ADDRESS, RELAY_DEPOSITORY_PROGRAM_ADDRESS, MEMO_V1_PROGRAM_ADDRESS, DFLOW_V4_PROGRAM_ADDRESS, OKX_DEX_ROUTER_PROGRAM_ADDRESS, TITAN_PROGRAM_ADDRESS, RELAY_FORWARDER_PROGRAM_ADDRESS, MAYAN_PROGRAM_ADDRESSES, MEMO_PROGRAM_ADDRESS, WSOL_MINT, TOKEN_ACCOUNT_MIN_SIZE, LIFI_FEE_WALLET_ADDRESS, BRIDGE_FEE_MAX_BPS, MAYAN_REFERRER_FEE_MAX_BPS, MAYAN_RELAYER_FEE_MAX_BPS, isNativeMint, parseTokenAccount, unexpectedInstruction,
-  type SerializedTxGuard, type SerializedExpectation, type BridgeOutExpectation, type SerializedCheck, type ParsedTokenAccount, type SerializedInstructionRule, type SolanaAccountData,
+  serializedGuardFromExecution, type SerializedExecutionInput, type SerializedTxGuard, type SerializedExpectation, type BridgeOutExpectation, type SerializedCheck, type ParsedTokenAccount, type SerializedInstructionRule, type SolanaAccountData,
 } from './serialized.js'
 export {
   WalletAccountReadOnlySolana, pickPriorityPrice, computeUnitLimitFromSimulation, type MintInfo, type SolanaPlan,

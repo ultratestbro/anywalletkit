@@ -165,6 +165,11 @@ const pyusd = await account.getTokenInfo('2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsF
   slippage and 1 bp of rounding (`bridge-recipient`, `bridge-token`,
   `bridge-min`, `bridge-payee`, `bridge-instruction`, `bridge-missing`,
   `bridge-fee` otherwise).
+  `serializedGuardFromExecution(expect, extra?)` builds the guard from the
+  swap2 engine's `sendSerializedTransaction` expectation with every field
+  carried over (`bridgeOut` and its reviewed terms included) — map the hook
+  with it, `(tx, expect) => account.sendSerialized(tx,
+  serializedGuardFromExecution(expect))`, rather than by hand.
   Net balances alone let a deposit that also withdraws collateral and
   transfers it away pass; the rules do not.
 * `getAccountInfos(addresses)` reads raw accounts (owner, lamports, data) in
