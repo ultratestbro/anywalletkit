@@ -10,7 +10,7 @@ import { encodeApprove, ERC20_PERMIT_ABI, PERMIT_TYPES, USDT_MAINNET } from './e
 /** ERC-165 interface id of ERC-721. */
 const ERC721_INTERFACE = '80ac58cd'
 import { BroadcastUnknownError, ChainMismatchError, NonceConflictError, PermitUnsupportedError, SimulationError, TransactionRevertedError, UnsafeTransactionError } from './errors.js'
-import { createEndpointClients } from './client.js'
+import { createEndpointClients, takeBroadcastErrors } from './client.js'
 import { WalletAccountReadOnlyEvm, assertTxShape, canonicalData, chainIdNumber, transferTransaction, typedDataHash, typedDomainChainId } from './read-only-account.js'
 export { MIN_PRIORITY_FEE_WEI, typedDomainChainId } from './read-only-account.js'
 import type { ApproveOptions, EvmConfig, EvmTransaction, EvmTransferOptions, PermitInfo, PermitOptions, SignedPermit, TypedDataInput } from './types.js'
@@ -402,17 +402,27 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
       return { hash, fee }
     }
     const submit = async (signed: { raw: Hex; hash: Hex; nonce: number }): Promise<TransferResult> => {
+      let hash: Hex
       try {
-        return accepted(await client.sendRawTransaction({ serializedTransaction: signed.raw }), signed.nonce)
+        hash = await client.sendRawTransaction({ serializedTransaction: signed.raw })
       } catch (error) {
+        // With a provider list, what every endpoint answered before the last one (whose error this is).
+        const earlier = takeBroadcastErrors(client, signed.raw).slice(0, -1)
         // These exact bytes are in a pool already: an earlier attempt reached a
         // node and its answer was lost (viem's fallback then hands the same
         // bytes to the next RPC). It is the same transaction — never sign another.
-        if (ALREADY_KNOWN.test(errorText(error))) return accepted(signed.hash, signed.nonce)
+        if ([error, ...earlier].some((e) => ALREADY_KNOWN.test(errorText(e)))) return accepted(signed.hash, signed.nonce)
         // No answer from the node: the tx may be in the mempool under this hash.
         if (!nodeAnswered(error)) throw new BroadcastUnknownError(signed.hash, error)
+        // A refusal from a later endpoint says nothing about an earlier one that got the same bytes
+        // and gave no answer: that one may have passed them on. "nonce too low" is left to the
+        // caller below, which looks this hash up before anything else.
+        const lost = earlier.find((e) => !nodeAnswered(e))
+        if (lost !== undefined && !NONCE_TOO_LOW.test(errorText(error))) throw new BroadcastUnknownError(signed.hash, lost)
         throw error
       }
+      takeBroadcastErrors(client, signed.raw)
+      return accepted(hash, signed.nonce)
     }
     const first = await this.#signPrepared(prepared, limit, op)
     try {
