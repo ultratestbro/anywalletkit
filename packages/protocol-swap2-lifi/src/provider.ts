@@ -234,7 +234,7 @@ const TOOL_KEY = /^[A-Za-z0-9_-]{1,64}$/;
  * through every bridge LI.FI offers (Relay included); the account checks a Mayan order's recipient on the device, the
  * other Solana bridges only against its SOL and token ceilings.
  */
-const UNBOUND_TOOLS: readonly string[] = Object.freeze(["relaydepository", "garden"]);
+const UNBOUND_TOOLS: readonly string[] = Object.freeze(["relaydepository", "garden", "squid", "symbiosis"]);
 function routeOptions(body: unknown, excluded: readonly string[]): LifiRouteOption[] {
   const routes = (body as {routes?: unknown})?.routes;
   if (!Array.isArray(routes)) return [];

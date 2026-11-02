@@ -27,8 +27,10 @@ calls are refused) and its `BridgeData` must name the reviewed recipient and cha
 input token (or what its source swaps make of it). Every refund, depositor or fallback address a
 bridge carries in its own data (Stargate's LayerZero fee refund, an expired Across deposit or LI.FI
 intent, a Mayan Swift order's trader, Chainflip's refund address, …) must be the sender or the
-recipient. Refused, because the recipient cannot be read from the calldata: routes with a destination call, and EVM-source routes to a non-EVM chain.
-Unknown calldata is refused.
+recipient. Refused, because the recipient cannot be read from the calldata: routes with a destination call, EVM-source routes to a non-EVM chain, and the
+bridges whose facet does not bind the delivery to `BridgeData` (Relay, Garden, deBridge DLN,
+ThorSwap, Squid, Symbiosis) — cross-chain requests ask LI.FI to route around Relay, Garden, Squid
+and Symbiosis, so their pairs get another bridge. Unknown calldata is refused.
 
 Every swap step is read, not only the ends: each must spend what the step before delivered, only
 steps that spend the input token may pull from the wallet (`requiresDeposit`), and together at most

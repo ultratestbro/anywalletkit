@@ -341,7 +341,7 @@ describe("LI.FI route policy hook", () => {
     const q = new URL(`https://x${calls[1]!.slice(4)}`).searchParams;
     expect(q.getAll("allowBridges")).toEqual(["stargateV2"]);
     // Malformed tool keys never reach the URL; the bridges that do not bind the receiver are always denied.
-    expect(q.getAll("denyBridges")).toEqual(["mayan", "relaydepository", "garden"]);
+    expect(q.getAll("denyBridges")).toEqual(["mayan", "relaydepository", "garden", "squid", "symbiosis"]);
   });
 
   it("keeps LI.FI's default pick without a hook, for same-chain swaps, and when the hook passes", async () => {
@@ -354,7 +354,7 @@ describe("LI.FI route policy hook", () => {
     calls = stub();
     await lifiProvider({chooseRoute: () => null}).getQuote(PARAMS);
     expect(calls[1]).not.toMatch(/allowBridges|order=/);
-    expect(new URL(`https://x${calls[1]!.slice(4)}`).searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden"]);
+    expect(new URL(`https://x${calls[1]!.slice(4)}`).searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden", "squid", "symbiosis"]);
   });
 
   it("falls back to the default pick when the routes call fails, the hook throws, or the chosen bridge is gone", async () => {

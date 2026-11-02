@@ -2,7 +2,7 @@
 // against an `orderId` (Relay's off-chain order names the recipient), so a checked receiver proves nothing: swapping in
 // another orderId kept every check green. Relay — and Garden, deBridge DLN and ThorSwap, which carry the destination in
 // facet data or an off-chain order the facet never compares — are now refused by name, and the provider asks LI.FI to
-// route around Relay and Garden. Squid is accepted on its CallBridge route only.
+// route around Relay and Garden (and, since round 5, Squid and Symbiosis — audit-2026-11-02-r5-squid-symbiosis.test.ts).
 // fixtures-live-2026-11-02.json: public li.quest/v1/quote answers of 2026-11-02, requested with those bridges denied.
 import {readFileSync} from "node:fs";
 import {afterEach, describe, expect, it, vi} from "vitest";
@@ -56,7 +56,7 @@ describe("audit 2026-11-02: bridges whose recipient the Diamond does not bind", 
     }
   });
 
-  it("Garden (HTLC redeemer + off-chain order), deBridge DLN and ThorSwap are refused; Squid only bridges on CallBridge", () => {
+  it("Garden (HTLC redeemer + off-chain order), deBridge DLN and ThorSwap are refused; so is Squid, on every route", () => {
     const garden = encodeFunctionData({abi: ABI, functionName: "startBridgeTokensViaGarden", args: [bridgeData, {redeemer: RECEIVER, refundAddress: RECEIVER, timelock: 1n, secretHash: `0x${"11".repeat(32)}`, nonEvmReceiver: ZERO32}]});
     expect(diamondCallMismatch(garden, expectation)).toMatch(/^Garden delivers/);
     // Selectors only: the calldata never decodes past them.
@@ -66,16 +66,15 @@ describe("audit 2026-11-02: bridges whose recipient the Diamond does not bind", 
     const squid = (routeType: number) => encodeFunctionData({abi: ABI, functionName: "startBridgeTokensViaSquid", args: [bridgeData, {
       routeType, destinationChain: "arbitrum", destinationAddress: "0x9999999999999999999999999999999999999999", bridgedTokenSymbol: "USDC", depositAssetId: USDC, sourceCalls: [], payload: "0x", fee: 0n, enableExpress: false,
     }]});
-    expect(diamondCallMismatch(squid(0), expectation)).toMatch(/Squid route hands the funds to a destination call/); // BridgeCall
-    expect(diamondCallMismatch(squid(2), expectation)).toMatch(/Squid route hands the funds to a destination call/); // CallBridgeCall
-    expect(diamondCallMismatch(squid(1), expectation)).toBeNull(); // CallBridge pays BridgeData.receiver
+    // BridgeCall, CallBridge and CallBridgeCall: CallBridge's source calls run on Squid's multicall with the funds.
+    for (const route of [0, 1, 2]) expect(diamondCallMismatch(squid(route), expectation)).toMatch(/^Squid delivers to a recipient the transaction does not bind/);
   });
 
-  it("asks LI.FI to route around Relay and Garden on every cross-chain request, not on a same-chain swap", async () => {
+  it("asks LI.FI to route around Relay, Garden, Squid and Symbiosis on every cross-chain request, not on a same-chain swap", async () => {
     const urls: URL[] = [];
     vi.stubGlobal("fetch", async (u: URL | string) => { urls.push(new URL(String(u))); return new Response(JSON.stringify(response())); });
     expect(await lifiProvider().getQuote(PARAMS)).not.toBeNull();
-    expect(urls[0]!.searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden"]);
+    expect(urls[0]!.searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden", "squid", "symbiosis"]);
     await lifiProvider().getQuote({...PARAMS, destChain: PARAMS.sourceChain});
     expect(urls[1]!.searchParams.getAll("denyBridges")).toEqual([]);
   });

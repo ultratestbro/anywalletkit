@@ -4,7 +4,8 @@
 // minimum price, Superset's fallback. The facets only require them to be non-zero, so an API (or an `apiUrl` proxy)
 // could name any address there and every other check stayed green. Each one must now be the sender or the recipient.
 // Live evidence: every recorded LI.FI quote (2026-10-28, 10-30, 11-02, and 2026-11-02 quotes with the bridge forced:
-// M0, Frax, Superset, Symbiosis, Squid) sets them to the sender — except Superset, which names a third address.
+// M0, Frax, Superset, Symbiosis, Squid) sets them to the sender — except Superset, which names a third address. (Squid
+// and Symbiosis are refused outright since: audit-2026-11-02-r5-squid-symbiosis.test.ts.)
 import {readFileSync} from "node:fs";
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {decodeFunctionData, encodeAbiParameters, encodeFunctionData, parseAbi, parseAbiParameters, type Abi, type Hex} from "viem";
@@ -54,7 +55,7 @@ const ABI: Abi = parseAbi(Object.entries(FACETS).flatMap(([k, t]) => [
 const REFUND_FIELDS: Record<string, string[]> = {
   AcrossV4: ["refundAddress"], Centrifuge: ["refundRecipient"], Eco: ["refundRecipient"], Frax: ["refundRecipient"], Glacis: ["refundAddress"],
   LayerSwap: ["refundRecipient"], LiFiIntentEscrowV2: ["depositAndRefundAddress"], M0: ["refundRecipient", "orderOwner"], Mayan: ["refundRecipient"],
-  NEARIntents: ["refundRecipient"], PolymerCCTP: ["refundRecipient"], Stargate: ["refundAddress"], Superset: ["refundAddress", "fallbackEoA"], Symbiosis: ["refundRecipient"],
+  NEARIntents: ["refundRecipient"], PolymerCCTP: ["refundRecipient"], Stargate: ["refundAddress"], Superset: ["refundAddress", "fallbackEoA"],
 };
 const BYTES32_FIELDS = new Set(["AcrossV4.refundAddress"]);
 
@@ -90,7 +91,6 @@ const SAMPLES: Record<string, Facet> = {
   PolymerCCTP: {polymerTokenFee: 0n, maxCCTPFee: 0n, nonEVMReceiver: ZERO32, solanaReceiverATA: ZERO32, minFinalityThreshold: 2000, refundRecipient: SENDER, hookData: "0x"},
   Stargate: {assetId: 1, sendParams: {dstEid: 30110, to: pad(RECEIVER), amountLD: 0n, minAmountLD: 0n, extraOptions: "0x", composeMsg: "0x", oftCmd: "0x"}, fee: {nativeFee: 0n, lzTokenFee: 0n}, refundAddress: SENDER},
   Superset: {path: "0x", amountOutMin: 1n, refundAddress: SENDER, fallbackEoA: RECEIVER, deadline: 1n, toEid: 30110, options: "0x", lzFee: 0n},
-  Symbiosis: {refundRecipient: SENDER, nonEvmReceiver: ZERO32, firstSwapCalldata: "0x", secondSwapCalldata: "0x", firstDexRouter: ZERO, secondDexRouter: ZERO, approvedTokens: [USDC], callTo: OTHER, callData: "0x", viaOnchainSwapV3: false, dex: ZERO, dexgateway: ZERO, onchainSwapData: "0x", fee: 0n, deadline: 1n, signature: "0x"},
   Chainflip: {nonEVMReceiver: "0x", dstToken: 3, dstCallReceiver: ZERO, dstCallSwapData: [], gasAmount: 0n, cfParameters: chainflipParams(SENDER)},
 };
 
@@ -205,7 +205,7 @@ describe("audit 2026-11-02 r5: a bridge facet's refund and fallback addresses ar
         expect(diamondCallMismatch(forged, l.e)).toBe(`the Mayan order's refund address pays ${OTHER}, neither the sender ${l.e.sender} nor the recipient`);
       }
     }
-    expect([...seen].sort()).toEqual(["AcrossV4", "Frax", "Glacis", "LayerSwap", "LiFiIntentEscrowV2", "M0", "Mayan", "NEARIntents", "PolymerCCTP", "Stargate", "Superset", "Symbiosis"]);
+    expect([...seen].sort()).toEqual(["AcrossV4", "Frax", "Glacis", "LayerSwap", "LiFiIntentEscrowV2", "M0", "Mayan", "NEARIntents", "PolymerCCTP", "Stargate", "Superset"]);
   });
 
   it("the provider and the remote pin refuse the recorded Stargate quote with LayerZero's refund address replaced", async () => {

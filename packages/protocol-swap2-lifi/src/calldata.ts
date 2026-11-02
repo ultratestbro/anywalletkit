@@ -21,7 +21,7 @@
  * chain (Across V4, Mayan, Stargate, Chainflip, LI.FI Intents, GasZip, Glacis, AllBridge, M0, Polymer
  * CCTP) or through LI.FI's backend signature over BridgeData plus the off-chain order (NEAR Intents,
  * LayerSwap, Eco, Unit, the Across Swap API). The facets in {@link UNBOUND_BRIDGES} do neither and
- * are refused; Squid is accepted only on its CallBridge route, which bridges to BridgeData.receiver.
+ * are refused.
  */
 
 /**
@@ -96,14 +96,10 @@ const BRIDGE_CALLS: Readonly<Record<string, {sourceSwaps: boolean; facet: string
   "0xb4f37581": {sourceSwaps: true, facet: "PolygonBridge"}, // swapAndStartBridgeTokensViaPolygonBridge (PolygonBridgeFacet)
   "0xf434d6ca": {sourceSwaps: false, facet: "PolymerCCTP"}, // startBridgeTokensViaPolymerCCTP (PolymerCCTPFacet)
   "0x17917a4e": {sourceSwaps: true, facet: "PolymerCCTP"}, // swapAndStartBridgeTokensViaPolymerCCTP (PolymerCCTPFacet)
-  "0x3f313808": {sourceSwaps: false, facet: "Squid"}, // startBridgeTokensViaSquid (SquidFacet)
-  "0xa8f66666": {sourceSwaps: true, facet: "Squid"}, // swapAndStartBridgeTokensViaSquid (SquidFacet)
   "0x14d53077": {sourceSwaps: false, facet: "Stargate"}, // startBridgeTokensViaStargate (StargateFacetV2)
   "0xa6010a66": {sourceSwaps: true, facet: "Stargate"}, // swapAndStartBridgeTokensViaStargate (StargateFacetV2)
   "0x0691ff78": {sourceSwaps: false, facet: "Superset"}, // startBridgeTokensViaSuperset (SupersetFacet)
   "0xf26e657f": {sourceSwaps: true, facet: "Superset"}, // swapAndStartBridgeTokensViaSuperset (SupersetFacet)
-  "0xe23b7a08": {sourceSwaps: false, facet: "Symbiosis"}, // startBridgeTokensViaSymbiosis (SymbiosisFacet)
-  "0xc46059b2": {sourceSwaps: true, facet: "Symbiosis"}, // swapAndStartBridgeTokensViaSymbiosis (SymbiosisFacet)
   "0x64261d58": {sourceSwaps: false, facet: "Unit"}, // startBridgeTokensViaUnit (UnitFacet)
   "0x21a3af52": {sourceSwaps: true, facet: "Unit"}, // swapAndStartBridgeTokensViaUnit (UnitFacet)
 };
@@ -114,7 +110,12 @@ const BRIDGE_CALLS: Readonly<Record<string, {sourceSwaps: boolean; facet: string
  * off-chain-data associated with the provided orderId corresponds to the _bridgeData"); Garden locks the funds for a
  * `redeemer` named in facet data, with the transfer details in an off-chain order; deBridge DLN passes its own
  * `receiver` and order authority through unchecked; ThorSwap pays a `vault` named in facet data with the destination in
- * a memo. A matching BridgeData.receiver proves nothing for these, so they are refused by name. Neither Relay nor
+ * a memo; Squid runs `sourceCalls` of any target on its multicall, which holds the funds, and bridges what is left
+ * (only CallBridge bridges to BridgeData.receiver at all; LI.FI's live Squid quotes are BridgeCall, a destination
+ * call); Symbiosis's MetaRouter path forwards `callTo` / `callData` verbatim and names the final recipient and the
+ * revert address there (the facet: the emitted receiver "is therefore descriptive, not an on-chain guarantee"; its
+ * other path bridges to Bitcoin only). A matching BridgeData.receiver proves nothing for these, so they are refused
+ * by name. Neither Relay nor
  * any other party publishes an unauthenticated lookup of an unfunded Relay order (2026-11-02: `/intents/status` says
  * "unknown", `/requests/v2` lists only indexed deposits, `/requests/v3` needs an API key), so there is nothing to check
  * the orderId against on the device.
@@ -128,11 +129,11 @@ const UNBOUND_BRIDGES: Readonly<Record<string, string>> = {
   "0x2c7d2db0": "deBridge DLN", // swapAndStartBridgeTokensViaDeBridgeDln
   "0x2541ec57": "ThorSwap", // startBridgeTokensViaThorSwap
   "0xad673d88": "ThorSwap", // swapAndStartBridgeTokensViaThorSwap
+  "0x3f313808": "Squid", // startBridgeTokensViaSquid
+  "0xa8f66666": "Squid", // swapAndStartBridgeTokensViaSquid
+  "0xe23b7a08": "Symbiosis", // startBridgeTokensViaSymbiosis
+  "0xc46059b2": "Symbiosis", // swapAndStartBridgeTokensViaSymbiosis
 };
-/** Squid entry points: SquidData starts with its RouteType (BridgeCall, CallBridge, CallBridgeCall). */
-const SQUID_CALLS = new Set(["0x3f313808", "0xa8f66666"]);
-/** RouteType.CallBridge: Squid bridges to BridgeData.receiver; the other two hand the funds to a destination call. */
-const SQUID_CALL_BRIDGE = 1n;
 
 /** What the quote promised, in the forms the calldata carries. */
 export interface DiamondExpectation {
@@ -324,15 +325,14 @@ const FACET_DATA: Readonly<Record<string, FacetData>> = {
   PolymerCCTP: {refunds: [["refundRecipient", 5]], zeroRefused: true},
   Stargate: {refunds: [["refundAddress", 4]]}, // (assetId, sendParams, fee.nativeFee, fee.lzTokenFee, refundAddress): LayerZero's fee refund
   Superset: {refunds: [["refundAddress", 2], ["fallbackEoA", 3]], zeroRefused: true},
-  Symbiosis: {refunds: [["refundRecipient", 0]], zeroRefused: true},
 };
 /**
  * Facets whose data names no one to pay back: Across (the SpokePool's depositor is the Diamond), AllBridge, Celer
- * Circle, GasZip, MegaETH, Optimism and Squid (no address but the receiver the facet checks), Arbitrum (its retryable's
+ * Circle, GasZip, MegaETH and Optimism (no address but the receiver the facet checks), Arbitrum (its retryable's
  * refunds go to BridgeData.receiver), Gnosis, Omni and Polygon (no facet data) and Unit (its own deposit address,
  * signed). Their excess native and swap leftovers go to the caller.
  */
-const NO_REFUND_FIELDS = new Set(["Across", "AllBridge", "ArbitrumBridge", "CelerCircleBridge", "GasZip", "GnosisBridge", "MegaETHBridge", "OmniBridge", "OptimismBridge", "PolygonBridge", "Squid", "Unit"]);
+const NO_REFUND_FIELDS = new Set(["Across", "AllBridge", "ArbitrumBridge", "CelerCircleBridge", "GasZip", "GnosisBridge", "MegaETHBridge", "OmniBridge", "OptimismBridge", "PolygonBridge", "Unit"]);
 
 /** A refund or fallback in the bridge's facet data that pays neither the sender nor the recipient, or null. */
 function refundMismatch(r: Reader, bridge: {sourceSwaps: boolean; facet: string}, e: DiamondExpectation): string | null {
@@ -395,11 +395,6 @@ export function diamondCallMismatch(data: string, e: DiamondExpectation): string
     if (!e.evmDestination) return "the recipient on a non-EVM destination sits in bridge-specific data and cannot be checked here";
     if (!same(receiver, e.receiver)) return `pays ${receiver}, not ${e.receiver}`;
     if (hasSourceSwaps !== bridge.sourceSwaps) return `unknown Diamond call ${selector}`;
-    if (SQUID_CALLS.has(selector)) {
-      // SquidData is the last argument: its offset word follows BridgeData's (and the SwapData[]'s).
-      const route = r.word(4 + r.small(4 + (bridge.sourceSwaps ? 64 : 32)));
-      if (route !== SQUID_CALL_BRIDGE) return "the Squid route hands the funds to a destination call, whose recipient cannot be checked here";
-    }
     const refund = refundMismatch(r, bridge, e);
     if (refund) return refund;
     // After source swaps the bridged amount is in the swapped token's units: only the swaps' input is comparable.
