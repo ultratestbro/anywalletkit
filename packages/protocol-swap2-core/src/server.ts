@@ -429,10 +429,12 @@ function intentRef(v: unknown): IntentRef {
   const nullable = (x: unknown, f: string) => (x === null || x === undefined ? undefined : str(x, f, 200));
   const sourceTxHash = nullable(r.sourceTxHash, "ref.sourceTxHash");
   const destTxHash = nullable(r.destTxHash, "ref.destTxHash");
+  // What the caller's own account saw of its claim (it only shapes the status this caller gets); nothing without the hash.
+  const destTxConfirmed = destTxHash !== undefined && r.destTxConfirmed === true;
   return {
     intentId: str(r.intentId, "ref.intentId", WIRE_INTENT_MAX),
     ...(sourceTxHash !== undefined ? {sourceTxHash} : {}),
-    ...(destTxHash !== undefined ? {destTxHash} : {}),
+    ...(destTxHash !== undefined ? {destTxHash, ...(destTxConfirmed ? {destTxConfirmed} : {})} : {}),
   };
 }
 

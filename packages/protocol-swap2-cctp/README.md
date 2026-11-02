@@ -32,7 +32,7 @@ const res = await swap2.swap2({fromToken: "USDC", toToken: "USDC", toChain: 4216
 const status = await swap2.getSwap2Status(res.id);   // "pending" → "action-required" once Circle attested
 if (status.status === "action-required") {
   const claimed = await swap2.claimSwap2(res.id, arbitrumAccount);   // receiveMessage on Arbitrum, signed there
-  await swap2.getSwap2Status(claimed.id);   // this id carries the claim hash: "completed" even without an Arbitrum RPC
+  await swap2.getSwap2Status(claimed.id);   // this id carries the claim hash and, once the account saw it succeed, "completed" even without an Arbitrum RPC
 }
 ```
 
@@ -75,10 +75,13 @@ EVM routes.
   must fit `maxFee`. Without an RPC the on-chain check is skipped.
 - **Tracking**: `GET /v2/messages/{src}?transactionHash=` → `pending` while
   confirmations accrue, `action-required` once `status: complete` with the
-  attestation, `completed` once the destination's `usedNonces(nonce)` is set
-  (needs the destination chain in `rpcUrls`: without it a swap whose claim
-  was sent stays `pending`, with the claim hash in `destTxHash`, because a
-  hash alone does not prove the mint).
+  attestation, `completed` once the destination's `usedNonces(nonce)` is set.
+  Without the destination chain in `rpcUrls`, `completed` comes from the id
+  `claimSwap2` returns when the destination account's `waitForTransaction`
+  saw the claim succeed (`destTxConfirmed`: a successful `receiveMessage` is
+  the mint, since it reverts once the nonce is used); a bare claim hash stays
+  `pending`, with the hash in `destTxHash`. A destination RPC that does not
+  show the mint of a confirmed claim yet reads `pending`, not `action-required`.
 - **Claim**: `receiveMessage(message, attestation)` on the destination
   MessageTransmitterV2; the attested message must belong to the route's
   domains. An expired Fast message (`expirationBlock` passed) is sent to

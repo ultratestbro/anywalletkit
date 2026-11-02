@@ -98,13 +98,13 @@ describe("review 2026-10-31: claimSwap2 waits for the claim before handing out t
     await expect(new P(provider()).claimSwap2(id, dest)).rejects.toBeInstanceOf(Swap2ExecutionError);
   });
 
-  it("control: a claim the account reports included is returned with the claim hash in the id, after the wait", async () => {
+  it("control: a claim the account reports included is returned with the claim hash in the id, marked confirmed, after the wait", async () => {
     const dest = createMockAccount({chain: "eip155:42161"});
     const order: string[] = [];
     (dest as unknown as {waitForTransaction: (h: string) => Promise<void>}).waitForTransaction = async (h) => { order.push(`wait ${h}`); };
     const out = await new P(provider()).claimSwap2(id, dest);
     expect(order).toEqual([`wait ${out.hash}`]);
-    expect(out.id).toBe(`${id}.${out.hash}`);
+    expect(out.id).toBe(`${id}.${out.hash}.ok`);
     // The destination RPC reads the nonce used: completed.
     expect(await new P(make({message: completeMessage(), usedNonce: 1n}).p).getSwap2Status(out.id)).toMatchObject({status: "completed"});
   });

@@ -47,6 +47,15 @@ export interface PreviewInput {
    * chain, so nothing arrives here.
    */
   expectedRecipient?: string;
+  /**
+   * The token the same-chain swap buys (its address; `"native"`, the zero address or 0xEeee… for
+   * the native coin). With `expectedRecipient` the output checks then read this token only: none
+   * of it arriving is `output-missing`, and more than 5 % of it ending anywhere else is
+   * `output-foreign`. Without it they read every token the sender doesn't spend, which a route
+   * paying the recipient some other token, or a third party that passes something on, can mislead:
+   * pass it whenever the swap's destination token is known.
+   */
+  expectedOutputToken?: string;
   /** Amount the flow needs approved (base units); larger approvals are flagged. */
   expectedApproval?: bigint;
   /** Native coin symbol and decimals for balance changes (default ETH / 18). */
@@ -147,9 +156,13 @@ export type CheckCode =
   | "contract-known" | "contract-unknown"
   | "simulation-ok" | "simulation-reverted" | "simulation-unavailable"
   | "recipient-own" | "recipient-foreign"
-  /** The sequence spends, and nothing arrives at `expectedRecipient`. */
+  /** The sequence spends, and nothing (of `expectedOutputToken`, when given) arrives at `expectedRecipient`. */
   | "output-missing"
-  /** Tokens the swap pays out end at an address that is neither `expectedRecipient`, one of `own`, nor a contract that passes them on. */
+  /**
+   * More than 5 % of the output ends at addresses other than `expectedRecipient` and `own`, together:
+   * `detail.amount` is their total of `detail.token`, `detail.address` the largest holder, and
+   * `detail.holders` how many there are when more than one.
+   */
   | "output-foreign"
   | "approval-exact" | "approval-excess" | "approval-unlimited" | "approval-unknown-spender"
   /** A bounded approval with no `expectedApproval` to compare it with: neither "exact" nor "excess" can be said. */
@@ -587,7 +600,10 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
   for (const r of recipients) {
     checks.push(own.has(r) ? {code: "recipient-own", status: "ok", detail: {address: r}} : {code: "recipient-foreign", status: "warn", detail: {address: r}});
   }
-  if (input.expectedRecipient && sim.status === "ok" && sim.transfers) checks.push(...outputChecks(lc(input.from), own, lc(input.expectedRecipient), sim.changes, sim.transfers));
+  if (input.expectedRecipient && sim.status === "ok" && sim.transfers) {
+    const outputToken = input.expectedOutputToken !== undefined ? tokenRef(input.expectedOutputToken) : undefined;
+    checks.push(...outputChecks(lc(input.from), own, lc(input.expectedRecipient), sim.changes, sim.transfers, outputToken));
+  }
 
   for (const a of calls.flatMap((c) => c.approvals ?? (c.approval ? [c.approval] : []))) {
     const detail: Record<string, string> = {token: a.token, spender: a.spender, ...(a.spenderLabel ? {label: a.spenderLabel} : {}), ...(a.amount !== null ? {amount: a.amount.toString()} : {})};
@@ -609,46 +625,81 @@ export function checksFor(input: PreviewInput, calls: DecodedCall[], sim: Simula
 }
 
 /**
- * A payout to a third party smaller than this share of what the recipient gets is a fee (1/20 =
- * 5 %): routers that charge in the output token send a fraction of it to their fee address.
+ * Third parties together may keep up to this share of the swap's total output (what the recipient
+ * gets plus what they keep) as fees: 1/20 = 5 %. Routers that charge in the output token, and tax
+ * tokens, send a fraction of it elsewhere.
  */
 const FEE_SHARE = 20n;
 
+/** `"native"`, the zero address and the 0xEeee… placeholder all name the native coin. */
+function tokenRef(token: string): string {
+  const t = lc(token);
+  return t === ZERO_ADDR || t === NATIVE_TRACE ? "native" : t;
+}
+
 /**
- * Where the swap's output goes, from the sequence's transfers. The output is what `expected`
- * receives (for the sender: its balance changes, wraps included). Nothing arriving while something
- * is spent is `output-missing`. An address other than `expected` and `own` that ends up holding the
- * output (or, when nothing arrives, any token the sender did not spend), more than a fee's share of
- * it, and passes nothing on in the sequence, is `output-foreign`. Pools, routers and every other
- * hop send tokens on and are never flagged; an account can't send anything inside the user's
- * transaction, so a payout to one always is.
+ * Where the swap's output goes, from the sequence's transfers, per token. What `expected` receives
+ * of a token is its balance change (for the sender, wraps included), and every other address's share
+ * is what it holds of that token at the end (received minus sent), so a pool, router or other hop
+ * that passes the token on holds nothing of it. The shares of every address other than `expected`
+ * and `own` are added up: more than {@link FEE_SHARE} of the total output is `output-foreign`.
+ *
+ * With `outputToken` (the token the swap buys) only that token is read: nothing of it arriving
+ * while something is spent is `output-missing`, and no holder is exempt. Without it every token the
+ * sender did not spend is read. For a token that arrives, a holder is exempt only when it pays out
+ * a different token it did not receive (a pool trading from its reserves); for one that does not
+ * arrive (an intermediate token pools keep), any holder that passes something on is exempt. Without
+ * `outputToken`, nothing arriving while something is spent is `output-missing`.
  */
-function outputChecks(from: string, own: Set<string>, expected: string, changes: BalanceChange[], transfers: TokenTransfer[]): Check[] {
+function outputChecks(from: string, own: Set<string>, expected: string, changes: BalanceChange[], transfers: TokenTransfer[], outputToken?: string): Check[] {
   const net = new Map<string, Map<string, bigint>>();
-  const forwards = new Set<string>();
+  const sentBy = new Map<string, Set<string>>();
+  const receivedBy = new Map<string, Set<string>>();
   const add = (token: string, address: string, amount: bigint) => {
     const m = net.get(token) ?? new Map<string, bigint>();
     m.set(address, (m.get(address) ?? 0n) + amount);
     net.set(token, m);
   };
+  const mark = (index: Map<string, Set<string>>, address: string, token: string) => {
+    const s = index.get(address) ?? new Set<string>();
+    s.add(token);
+    index.set(address, s);
+  };
   for (const t of transfers) {
-    if (t.from !== ZERO_ADDR) { add(t.token, t.from, -t.amount); forwards.add(t.from); }
-    if (t.to !== ZERO_ADDR) add(t.token, t.to, t.amount);
+    if (t.from !== ZERO_ADDR) { add(t.token, t.from, -t.amount); mark(sentBy, t.from, t.token); }
+    if (t.to !== ZERO_ADDR) { add(t.token, t.to, t.amount); mark(receivedBy, t.to, t.token); }
   }
   const spent = new Set(changes.filter((c) => c.delta < 0n).map((c) => c.token));
-  const received = new Map<string, bigint>();
-  if (expected === from) for (const c of changes) { if (c.delta > 0n) received.set(c.token, c.delta); }
-  else for (const [token, m] of net) { const n = m.get(expected) ?? 0n; if (n > 0n) received.set(token, n); }
+  const arrived = (token: string): bigint => {
+    const n = expected === from ? (changes.find((c) => c.token === token)?.delta ?? 0n) : (net.get(token)?.get(expected) ?? 0n);
+    return n > 0n ? n : 0n;
+  };
+  const received = new Set([...(expected === from ? changes.map((c) => c.token) : net.keys())].filter((t) => arrived(t) > 0n));
 
   const checks: Check[] = [];
-  if (received.size === 0 && spent.size > 0) checks.push({code: "output-missing", status: "warn", detail: {address: expected}});
-  const outputs = received.size > 0 ? [...received.keys()] : [...net.keys()].filter((t) => !spent.has(t));
+  const nothingArrives = outputToken ? arrived(outputToken) === 0n : received.size === 0;
+  if (nothingArrives && spent.size > 0) checks.push({code: "output-missing", status: "warn", detail: {address: expected}});
+  const outputs = outputToken ? [outputToken] : [...new Set([...received, ...[...net.keys()].filter((t) => !spent.has(t))])];
   for (const token of outputs) {
-    const got = received.get(token) ?? 0n;
+    const got = arrived(token);
+    const exempt = (address: string): boolean => {
+      if (outputToken) return false;
+      const sent = sentBy.get(address) ?? new Set<string>();
+      if (got === 0n) return sent.size > 0;
+      const took = receivedBy.get(address) ?? new Set<string>();
+      return [...sent].some((t) => t !== token && !took.has(t));
+    };
+    let foreign = 0n;
+    let largest: [string, bigint] | null = null;
+    let holders = 0;
     for (const [address, n] of net.get(token) ?? []) {
-      if (n <= 0n || address === expected || own.has(address) || forwards.has(address) || n * FEE_SHARE <= got) continue;
-      checks.push({code: "output-foreign", status: "warn", detail: {address, token, amount: n.toString()}});
+      if (n <= 0n || address === expected || own.has(address) || exempt(address)) continue;
+      foreign += n;
+      holders++;
+      if (!largest || n > largest[1]) largest = [address, n];
     }
+    if (!largest || foreign * FEE_SHARE <= got + foreign) continue;
+    checks.push({code: "output-foreign", status: "warn", detail: {address: largest[0], token, amount: foreign.toString(), ...(holders > 1 ? {holders: String(holders)} : {})}});
   }
   return checks;
 }

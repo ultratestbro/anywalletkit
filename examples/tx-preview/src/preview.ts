@@ -72,7 +72,7 @@ export function verdict(preview: TxPreview): Verdict {
       case 'output-missing':
         raise('danger'); lines.push(`Nothing arrives at ${d.address}.`); break
       case 'output-foreign':
-        raise('danger'); lines.push(`${d.amount} of ${d.token} goes to ${d.address}, not to the recipient.`); break
+        raise('danger'); lines.push(`${d.amount} of ${d.token} goes to ${d.address}${d.holders ? ` and ${Number(d.holders) - 1} other addresses` : ''}, not to the recipient.`); break
       default:
         break // the "ok" codes need no line
     }
@@ -144,7 +144,8 @@ export async function previewSwap(plan: Swap2ExecutionPlan, from: string, rpc: R
     known: Object.fromEntries([plan.source.to, ...plan.approvals.map((a) => a.spender)].map((a) => [a, plan.provider])),
     calls: [...approvals, { to: plan.source.to, ...(plan.source.data ? { data: plan.source.data } : {}), value: plan.source.value }],
     expectedApproval: plan.sourceAmount, // anything above the swap input is flagged
-    ...(plan.destChain === plan.fromChain ? { expectedRecipient: plan.recipient } : {}),
+    // Same-chain only: a bridge's output arrives on the other chain, so nothing would arrive here.
+    ...(plan.destChain === plan.fromChain ? { expectedRecipient: plan.recipient, expectedOutputToken: plan.destToken } : {}),
   })
 }
 // #endregion swap
