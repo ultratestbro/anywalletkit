@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { parseTransaction, type EIP1193Provider, type Hex } from 'viem'
+import { keccak256, parseTransaction, type EIP1193Provider, type Hex } from 'viem'
 import { applyPolicies } from '@anywalletkit/kit'
 import { UnsafeTransactionError, WalletManagerEvm } from '../src/index.js'
 
@@ -18,7 +18,7 @@ function provider() {
     eth_maxPriorityFeePerGas: () => '0x3b9aca00', eth_gasPrice: () => '0x6fc23ac00', eth_estimateGas: () => '0x5208',
     eth_getTransactionCount: () => '0x7', eth_getBalance: () => '0xde0b6b3a7640000', eth_call: () => '0x',
     eth_feeHistory: () => ({ oldestBlock: '0x10', baseFeePerGas: ['0x3b9aca00', '0x3b9aca00'], gasUsedRatio: [0.5], reward: [['0x3b9aca00']] }),
-    eth_sendRawTransaction: (p) => { sent.push(p[0] as Hex); return '0x' + 'ab'.repeat(32) },
+    eth_sendRawTransaction: (p) => { sent.push(p[0] as Hex); return keccak256(p[0] as Hex) },
   }
   const p = { request: async ({ method, params }: { method: string; params?: unknown[] }) => { calls.push(method); const f = h[method]; if (!f) throw Object.assign(new Error('no ' + method), { code: -32601 }); return f(params ?? []) } }
   return { sent, calls, p: p as unknown as EIP1193Provider }
@@ -33,8 +33,9 @@ describe('sendTransaction / quotes refuse a list with named fields before readin
     await expect(acc.sendTransaction(shaped() as never)).rejects.toBeInstanceOf(UnsafeTransactionError)
     expect(sent).toHaveLength(0)
     // control: the same named fields as a plain object are sent
-    await expect(acc.sendTransaction({ to: OTHER, value: 10n ** 15n, gasLimit: 21_000n })).resolves.toMatchObject({ hash: '0x' + 'ab'.repeat(32) })
+    const res = await acc.sendTransaction({ to: OTHER, value: 10n ** 15n, gasLimit: 21_000n })
     expect(sent).toHaveLength(1)
+    expect(res.hash).toBe(keccak256(sent[0]!))
     expect(parseTransaction(sent[0]!).to?.toLowerCase()).toBe(OTHER)
   })
 
