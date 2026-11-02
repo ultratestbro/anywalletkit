@@ -225,6 +225,20 @@ function outgrown(shown: PreparedTx, now: Fees): boolean {
   return shown.maxFeePerGas === undefined || now.base + now.tip > big(shown.maxFeePerGas)
 }
 
+/**
+ * A cap more than this many times what the network asks now is lowered to the current fees at
+ * signing. Signers hold a caller-set fee rate against the network's quote and refuse one far above
+ * it, so a cap shown during a spike that has since passed would be refused after the user said yes.
+ */
+const STALE_FEE_FACTOR = 4n
+
+/** True when `shown` sits far above `fresh` (a fee spike passed while the sheet was open). */
+function overpriced(shown: PreparedTx, fresh: PreparedTx): boolean {
+  if (shown.gasPrice !== undefined && fresh.gasPrice !== undefined) return big(shown.gasPrice) > STALE_FEE_FACTOR * big(fresh.gasPrice)
+  if (shown.maxFeePerGas !== undefined && fresh.maxFeePerGas !== undefined) return big(shown.maxFeePerGas) > STALE_FEE_FACTOR * big(fresh.maxFeePerGas)
+  return false
+}
+
 /** Nonce, gas, fees from the wallet's RPC. */
 export async function prepareTransaction(deps: Pick<SignDeps, 'rpc' | 'tipFloor'>, network: EvmNetwork, from: string, tx: { to: string; value: string; data: string | null; gas: string | null }): Promise<PreparedTx> {
   const call = { from, to: tx.to, value: hex(BigInt(tx.value)), ...(tx.data ? { data: tx.data } : {}) }
@@ -276,6 +290,9 @@ export function createSignHandler(deps: SignDeps): NonNullable<RouterDeps['sign'
             await deps.approvals.request({ origin, chain: network.caip2, kind: info.kind, payload: { ...payload, prepared: shown, repriced: true } })
             continue // the network may have moved again while the second sheet was open
           }
+          // A lower cap than the one approved needs no second sheet: the user pays at most what they saw.
+          const fresh = withFees(network.chainId, nonce, big(shown.gasLimit), fees)
+          if (overpriced(shown, fresh)) shown = fresh
           const handle = await deps.signerFor(info.account, network)
           let raw: string
           try {
