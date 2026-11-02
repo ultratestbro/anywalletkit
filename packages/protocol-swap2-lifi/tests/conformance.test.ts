@@ -30,14 +30,16 @@ const native = response({
   estimate: {...response().estimate, fromAmount: "2000000000000000"},
   transactionRequest: {...response().transactionRequest, value: "0x71afd498d0000"},
 });
-// The Diamond pays the swap's `_receiver`, or a bridge's `BridgeData.receiver` (no destination call: that would pay from calldata on the other chain).
+// The Diamond pays the swap's `_receiver`, or a bridge's `BridgeData.receiver` (no destination call: that would pay from calldata on the other chain)
+// and the facet's refund address (Stargate: LayerZero's unused native fee).
 const diamondPays = (source: {kind: string; data?: string}): string[] => {
   const c = decodeFunctionData({abi: DIAMOND_ABI, data: source.data as Hex});
   const args = c.args as readonly unknown[];
   if (c.functionName.startsWith("swapTokens")) return [String(args[3])];
   const bridge = args[0] as {receiver: string; hasDestinationCall: boolean};
   if (bridge.hasDestinationCall) throw new Error("bridge with a destination call");
-  return [bridge.receiver];
+  if (!/BridgeTokensViaStargate$/.test(c.functionName)) throw new Error(`no refund layout for ${c.functionName}`);
+  return [bridge.receiver, (args[args.length - 1] as {refundAddress: string}).refundAddress];
 };
 describeProtocolBehaviour("protocol-swap2-lifi", {
   type: "swap2",

@@ -29,7 +29,7 @@ const ABI: Abi = parseAbi([
 ] as readonly string[]);
 const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const bridgeData = {transactionId: ZERO32, bridge: "x", integrator: "awk", referrer: "0x0000000000000000000000000000000000000000" as Hex, sendingAssetId: USDC as Hex, receiver: RECEIVER as Hex, minAmount: 1_000_000n, destinationChainId: 42161n, hasSourceSwaps: false, hasDestinationCall: false};
-const expectation: DiamondExpectation = {fromToken: USDC, toToken: USDC, amountIn: 1_000_000n, receiver: RECEIVER, minOut: 1n, destChainId: 42161n, sameChain: false, evmDestination: true};
+const expectation: DiamondExpectation = {fromToken: USDC, toToken: USDC, amountIn: 1_000_000n, receiver: RECEIVER, sender: RECEIVER, minOut: 1n, destChainId: 42161n, sameChain: false, evmDestination: true};
 
 describe("audit 2026-11-02: bridges whose recipient the Diamond does not bind", () => {
   it("a live Relay quote with its orderId swapped is refused by the provider and by the remote pin, and so is the original", async () => {

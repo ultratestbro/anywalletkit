@@ -9,6 +9,10 @@
  * entry points only; a destination call (the final recipient sits in calldata for another chain)
  * and a non-EVM destination (the receiver sits in facet-specific data) are refused.
  *
+ * A facet's own data also names who gets money back — unused native fee, swap leftovers, the whole input when an
+ * order expires unfilled, a fallback when delivery fails ({@link FACET_DATA}); each such address must be the sender or
+ * the recipient.
+ *
  * Not checked here: a bridge's OUTPUT. The destination minimum (and for some bridges, e.g.
  * Across, what the receiver finally gets) lives in facet-specific data, so for bridges the
  * reviewed minimum still relies on LI.FI's API answering honestly.
@@ -45,63 +49,63 @@ const kindOf = (asset: string): Kind => (/^0x0{40}$/i.test(asset) ? "native" : "
  * facet sources in lifinance/contracts (86c3729, 2026-10-26). Packed facets and `*Min` variants read
  * raw calldata, not BridgeData, and are not listed: any other selector is refused.
  */
-const BRIDGE_CALLS: Readonly<Record<string, {sourceSwaps: boolean}>> = {
-  "0x1fd8010c": {sourceSwaps: false}, // startBridgeTokensViaAcross (AcrossFacet)
-  "0x3a3f7332": {sourceSwaps: true}, // swapAndStartBridgeTokensViaAcross (AcrossFacet)
-  "0xa1f1ce43": {sourceSwaps: false}, // startBridgeTokensViaAcrossV4 (AcrossFacetV4)
-  "0x1794958f": {sourceSwaps: true}, // swapAndStartBridgeTokensViaAcrossV4 (AcrossFacetV4)
-  "0x6a90d66e": {sourceSwaps: false}, // startBridgeTokensViaAcrossV4Swap (AcrossV4SwapFacet)
-  "0x9b054bc4": {sourceSwaps: true}, // swapAndStartBridgeTokensViaAcrossV4Swap (AcrossV4SwapFacet)
-  "0x6a51e9a9": {sourceSwaps: false}, // startBridgeTokensViaAllBridge (AllBridgeFacet)
-  "0x63267469": {sourceSwaps: true}, // swapAndStartBridgeTokensViaAllBridge (AllBridgeFacet)
-  "0xc9851d0b": {sourceSwaps: false}, // startBridgeTokensViaArbitrumBridge (ArbitrumBridgeFacet)
-  "0x3cc9517b": {sourceSwaps: true}, // swapAndStartBridgeTokensViaArbitrumBridge (ArbitrumBridgeFacet)
-  "0xe0a4201c": {sourceSwaps: false}, // startBridgeTokensViaCelerCircleBridge (CelerCircleBridgeFacet)
-  "0x4f3b0759": {sourceSwaps: true}, // swapAndStartBridgeTokensViaCelerCircleBridge (CelerCircleBridgeFacet)
-  "0x0315138f": {sourceSwaps: false}, // startBridgeTokensViaCentrifuge (CentrifugeFacet)
-  "0x8fd4d4dd": {sourceSwaps: true}, // swapAndStartBridgeTokensViaCentrifuge (CentrifugeFacet)
-  "0x0ad553b3": {sourceSwaps: false}, // startBridgeTokensViaChainflip (ChainflipFacet)
-  "0xee3314a1": {sourceSwaps: true}, // swapAndStartBridgeTokensViaChainflip (ChainflipFacet)
-  "0xbff90b61": {sourceSwaps: false}, // startBridgeTokensViaEco (EcoFacet)
-  "0x762aea18": {sourceSwaps: true}, // swapAndStartBridgeTokensViaEco (EcoFacet)
-  "0x678786ea": {sourceSwaps: false}, // startBridgeTokensViaFrax (FraxFacet)
-  "0x07b8e4c7": {sourceSwaps: true}, // swapAndStartBridgeTokensViaFrax (FraxFacet)
-  "0xfc5f1003": {sourceSwaps: false}, // startBridgeTokensViaGasZip (GasZipFacet)
-  "0x606326ff": {sourceSwaps: true}, // swapAndStartBridgeTokensViaGasZip (GasZipFacet)
-  "0x6f9206ba": {sourceSwaps: false}, // startBridgeTokensViaGlacis (GlacisFacet)
-  "0x9c4b6dd9": {sourceSwaps: true}, // swapAndStartBridgeTokensViaGlacis (GlacisFacet)
-  "0xf66fe519": {sourceSwaps: false}, // startBridgeTokensViaGnosisBridge (GnosisBridgeFacet)
-  "0x7bf96e0a": {sourceSwaps: true}, // swapAndStartBridgeTokensViaGnosisBridge (GnosisBridgeFacet)
-  "0xee9e98e0": {sourceSwaps: false}, // startBridgeTokensViaLayerSwap (LayerSwapFacet)
-  "0x4c279d6b": {sourceSwaps: true}, // swapAndStartBridgeTokensViaLayerSwap (LayerSwapFacet)
-  "0x7dbcf1d9": {sourceSwaps: false}, // startBridgeTokensViaLiFiIntentEscrowV2 (LiFiIntentEscrowFacetV2)
-  "0x6d21c5df": {sourceSwaps: true}, // swapAndStartBridgeTokensViaLiFiIntentEscrowV2 (LiFiIntentEscrowFacetV2)
-  "0x65782c4b": {sourceSwaps: false}, // startBridgeTokensViaM0 (M0Facet)
-  "0xb9eaf86d": {sourceSwaps: true}, // swapAndStartBridgeTokensViaM0 (M0Facet)
-  "0xb4875292": {sourceSwaps: false}, // startBridgeTokensViaMayan (MayanFacet)
-  "0x80c65808": {sourceSwaps: true}, // swapAndStartBridgeTokensViaMayan (MayanFacet)
-  "0x4213dfff": {sourceSwaps: false}, // startBridgeTokensViaMegaETHBridge (MegaETHBridgeFacet)
-  "0x22256e89": {sourceSwaps: true}, // swapAndStartBridgeTokensViaMegaETHBridge (MegaETHBridgeFacet)
-  "0x4698f032": {sourceSwaps: false}, // startBridgeTokensViaNEARIntents (NEARIntentsFacet)
-  "0x02631b09": {sourceSwaps: true}, // swapAndStartBridgeTokensViaNEARIntents (NEARIntentsFacet)
-  "0x782621d8": {sourceSwaps: false}, // startBridgeTokensViaOmniBridge (OmniBridgeFacet)
-  "0x95726782": {sourceSwaps: true}, // swapAndStartBridgeTokensViaOmniBridge (OmniBridgeFacet)
-  "0xce8a97a5": {sourceSwaps: false}, // startBridgeTokensViaOptimismBridge (OptimismBridgeFacet)
-  "0x5bb5d448": {sourceSwaps: true}, // swapAndStartBridgeTokensViaOptimismBridge (OptimismBridgeFacet)
-  "0xaf62c7d6": {sourceSwaps: false}, // startBridgeTokensViaPolygonBridge (PolygonBridgeFacet)
-  "0xb4f37581": {sourceSwaps: true}, // swapAndStartBridgeTokensViaPolygonBridge (PolygonBridgeFacet)
-  "0xf434d6ca": {sourceSwaps: false}, // startBridgeTokensViaPolymerCCTP (PolymerCCTPFacet)
-  "0x17917a4e": {sourceSwaps: true}, // swapAndStartBridgeTokensViaPolymerCCTP (PolymerCCTPFacet)
-  "0x3f313808": {sourceSwaps: false}, // startBridgeTokensViaSquid (SquidFacet)
-  "0xa8f66666": {sourceSwaps: true}, // swapAndStartBridgeTokensViaSquid (SquidFacet)
-  "0x14d53077": {sourceSwaps: false}, // startBridgeTokensViaStargate (StargateFacetV2)
-  "0xa6010a66": {sourceSwaps: true}, // swapAndStartBridgeTokensViaStargate (StargateFacetV2)
-  "0x0691ff78": {sourceSwaps: false}, // startBridgeTokensViaSuperset (SupersetFacet)
-  "0xf26e657f": {sourceSwaps: true}, // swapAndStartBridgeTokensViaSuperset (SupersetFacet)
-  "0xe23b7a08": {sourceSwaps: false}, // startBridgeTokensViaSymbiosis (SymbiosisFacet)
-  "0xc46059b2": {sourceSwaps: true}, // swapAndStartBridgeTokensViaSymbiosis (SymbiosisFacet)
-  "0x64261d58": {sourceSwaps: false}, // startBridgeTokensViaUnit (UnitFacet)
-  "0x21a3af52": {sourceSwaps: true}, // swapAndStartBridgeTokensViaUnit (UnitFacet)
+const BRIDGE_CALLS: Readonly<Record<string, {sourceSwaps: boolean; facet: string}>> = {
+  "0x1fd8010c": {sourceSwaps: false, facet: "Across"}, // startBridgeTokensViaAcross (AcrossFacet)
+  "0x3a3f7332": {sourceSwaps: true, facet: "Across"}, // swapAndStartBridgeTokensViaAcross (AcrossFacet)
+  "0xa1f1ce43": {sourceSwaps: false, facet: "AcrossV4"}, // startBridgeTokensViaAcrossV4 (AcrossFacetV4)
+  "0x1794958f": {sourceSwaps: true, facet: "AcrossV4"}, // swapAndStartBridgeTokensViaAcrossV4 (AcrossFacetV4)
+  "0x6a90d66e": {sourceSwaps: false, facet: "AcrossV4Swap"}, // startBridgeTokensViaAcrossV4Swap (AcrossV4SwapFacet)
+  "0x9b054bc4": {sourceSwaps: true, facet: "AcrossV4Swap"}, // swapAndStartBridgeTokensViaAcrossV4Swap (AcrossV4SwapFacet)
+  "0x6a51e9a9": {sourceSwaps: false, facet: "AllBridge"}, // startBridgeTokensViaAllBridge (AllBridgeFacet)
+  "0x63267469": {sourceSwaps: true, facet: "AllBridge"}, // swapAndStartBridgeTokensViaAllBridge (AllBridgeFacet)
+  "0xc9851d0b": {sourceSwaps: false, facet: "ArbitrumBridge"}, // startBridgeTokensViaArbitrumBridge (ArbitrumBridgeFacet)
+  "0x3cc9517b": {sourceSwaps: true, facet: "ArbitrumBridge"}, // swapAndStartBridgeTokensViaArbitrumBridge (ArbitrumBridgeFacet)
+  "0xe0a4201c": {sourceSwaps: false, facet: "CelerCircleBridge"}, // startBridgeTokensViaCelerCircleBridge (CelerCircleBridgeFacet)
+  "0x4f3b0759": {sourceSwaps: true, facet: "CelerCircleBridge"}, // swapAndStartBridgeTokensViaCelerCircleBridge (CelerCircleBridgeFacet)
+  "0x0315138f": {sourceSwaps: false, facet: "Centrifuge"}, // startBridgeTokensViaCentrifuge (CentrifugeFacet)
+  "0x8fd4d4dd": {sourceSwaps: true, facet: "Centrifuge"}, // swapAndStartBridgeTokensViaCentrifuge (CentrifugeFacet)
+  "0x0ad553b3": {sourceSwaps: false, facet: "Chainflip"}, // startBridgeTokensViaChainflip (ChainflipFacet)
+  "0xee3314a1": {sourceSwaps: true, facet: "Chainflip"}, // swapAndStartBridgeTokensViaChainflip (ChainflipFacet)
+  "0xbff90b61": {sourceSwaps: false, facet: "Eco"}, // startBridgeTokensViaEco (EcoFacet)
+  "0x762aea18": {sourceSwaps: true, facet: "Eco"}, // swapAndStartBridgeTokensViaEco (EcoFacet)
+  "0x678786ea": {sourceSwaps: false, facet: "Frax"}, // startBridgeTokensViaFrax (FraxFacet)
+  "0x07b8e4c7": {sourceSwaps: true, facet: "Frax"}, // swapAndStartBridgeTokensViaFrax (FraxFacet)
+  "0xfc5f1003": {sourceSwaps: false, facet: "GasZip"}, // startBridgeTokensViaGasZip (GasZipFacet)
+  "0x606326ff": {sourceSwaps: true, facet: "GasZip"}, // swapAndStartBridgeTokensViaGasZip (GasZipFacet)
+  "0x6f9206ba": {sourceSwaps: false, facet: "Glacis"}, // startBridgeTokensViaGlacis (GlacisFacet)
+  "0x9c4b6dd9": {sourceSwaps: true, facet: "Glacis"}, // swapAndStartBridgeTokensViaGlacis (GlacisFacet)
+  "0xf66fe519": {sourceSwaps: false, facet: "GnosisBridge"}, // startBridgeTokensViaGnosisBridge (GnosisBridgeFacet)
+  "0x7bf96e0a": {sourceSwaps: true, facet: "GnosisBridge"}, // swapAndStartBridgeTokensViaGnosisBridge (GnosisBridgeFacet)
+  "0xee9e98e0": {sourceSwaps: false, facet: "LayerSwap"}, // startBridgeTokensViaLayerSwap (LayerSwapFacet)
+  "0x4c279d6b": {sourceSwaps: true, facet: "LayerSwap"}, // swapAndStartBridgeTokensViaLayerSwap (LayerSwapFacet)
+  "0x7dbcf1d9": {sourceSwaps: false, facet: "LiFiIntentEscrowV2"}, // startBridgeTokensViaLiFiIntentEscrowV2 (LiFiIntentEscrowFacetV2)
+  "0x6d21c5df": {sourceSwaps: true, facet: "LiFiIntentEscrowV2"}, // swapAndStartBridgeTokensViaLiFiIntentEscrowV2 (LiFiIntentEscrowFacetV2)
+  "0x65782c4b": {sourceSwaps: false, facet: "M0"}, // startBridgeTokensViaM0 (M0Facet)
+  "0xb9eaf86d": {sourceSwaps: true, facet: "M0"}, // swapAndStartBridgeTokensViaM0 (M0Facet)
+  "0xb4875292": {sourceSwaps: false, facet: "Mayan"}, // startBridgeTokensViaMayan (MayanFacet)
+  "0x80c65808": {sourceSwaps: true, facet: "Mayan"}, // swapAndStartBridgeTokensViaMayan (MayanFacet)
+  "0x4213dfff": {sourceSwaps: false, facet: "MegaETHBridge"}, // startBridgeTokensViaMegaETHBridge (MegaETHBridgeFacet)
+  "0x22256e89": {sourceSwaps: true, facet: "MegaETHBridge"}, // swapAndStartBridgeTokensViaMegaETHBridge (MegaETHBridgeFacet)
+  "0x4698f032": {sourceSwaps: false, facet: "NEARIntents"}, // startBridgeTokensViaNEARIntents (NEARIntentsFacet)
+  "0x02631b09": {sourceSwaps: true, facet: "NEARIntents"}, // swapAndStartBridgeTokensViaNEARIntents (NEARIntentsFacet)
+  "0x782621d8": {sourceSwaps: false, facet: "OmniBridge"}, // startBridgeTokensViaOmniBridge (OmniBridgeFacet)
+  "0x95726782": {sourceSwaps: true, facet: "OmniBridge"}, // swapAndStartBridgeTokensViaOmniBridge (OmniBridgeFacet)
+  "0xce8a97a5": {sourceSwaps: false, facet: "OptimismBridge"}, // startBridgeTokensViaOptimismBridge (OptimismBridgeFacet)
+  "0x5bb5d448": {sourceSwaps: true, facet: "OptimismBridge"}, // swapAndStartBridgeTokensViaOptimismBridge (OptimismBridgeFacet)
+  "0xaf62c7d6": {sourceSwaps: false, facet: "PolygonBridge"}, // startBridgeTokensViaPolygonBridge (PolygonBridgeFacet)
+  "0xb4f37581": {sourceSwaps: true, facet: "PolygonBridge"}, // swapAndStartBridgeTokensViaPolygonBridge (PolygonBridgeFacet)
+  "0xf434d6ca": {sourceSwaps: false, facet: "PolymerCCTP"}, // startBridgeTokensViaPolymerCCTP (PolymerCCTPFacet)
+  "0x17917a4e": {sourceSwaps: true, facet: "PolymerCCTP"}, // swapAndStartBridgeTokensViaPolymerCCTP (PolymerCCTPFacet)
+  "0x3f313808": {sourceSwaps: false, facet: "Squid"}, // startBridgeTokensViaSquid (SquidFacet)
+  "0xa8f66666": {sourceSwaps: true, facet: "Squid"}, // swapAndStartBridgeTokensViaSquid (SquidFacet)
+  "0x14d53077": {sourceSwaps: false, facet: "Stargate"}, // startBridgeTokensViaStargate (StargateFacetV2)
+  "0xa6010a66": {sourceSwaps: true, facet: "Stargate"}, // swapAndStartBridgeTokensViaStargate (StargateFacetV2)
+  "0x0691ff78": {sourceSwaps: false, facet: "Superset"}, // startBridgeTokensViaSuperset (SupersetFacet)
+  "0xf26e657f": {sourceSwaps: true, facet: "Superset"}, // swapAndStartBridgeTokensViaSuperset (SupersetFacet)
+  "0xe23b7a08": {sourceSwaps: false, facet: "Symbiosis"}, // startBridgeTokensViaSymbiosis (SymbiosisFacet)
+  "0xc46059b2": {sourceSwaps: true, facet: "Symbiosis"}, // swapAndStartBridgeTokensViaSymbiosis (SymbiosisFacet)
+  "0x64261d58": {sourceSwaps: false, facet: "Unit"}, // startBridgeTokensViaUnit (UnitFacet)
+  "0x21a3af52": {sourceSwaps: true, facet: "Unit"}, // swapAndStartBridgeTokensViaUnit (UnitFacet)
 };
 
 /**
@@ -140,6 +144,8 @@ export interface DiamondExpectation {
   amountIn: bigint;
   /** The recipient (an EVM address, or another chain's address for a non-EVM destination). */
   receiver: string;
+  /** The sender the quote was asked for (its `fromAddress`): where a bridge's refunds may go, besides the recipient. */
+  sender: string;
   /** The floor the review shows. */
   minOut: bigint;
   /** LI.FI's id of the destination chain; equal to the source's for a swap. */
@@ -153,11 +159,24 @@ interface SwapStep {sendingAssetId: string; receivingAssetId: string; fromAmount
 
 class Reader {
   private readonly b: Uint8Array;
-  constructor(hex: string) {
-    if (!/^0x([0-9a-fA-F]{2})*$/.test(hex)) throw new Error("not hex");
-    this.b = Uint8Array.from(hex.slice(2).match(/../g) ?? [], (h) => Number.parseInt(h, 16));
+  constructor(src: string | Uint8Array) {
+    if (typeof src !== "string") { this.b = src; return; }
+    if (!/^0x([0-9a-fA-F]{2})*$/.test(src)) throw new Error("not hex");
+    this.b = Uint8Array.from(src.slice(2).match(/../g) ?? [], (h) => Number.parseInt(h, 16));
   }
   get length() { return this.b.length; }
+  /** `n` raw bytes at `at`, as 0x-hex. */
+  raw(at: number, n: number): string {
+    if (at < 0 || at + n > this.b.length) throw new Error("out of bounds");
+    return `0x${Array.from(this.b.subarray(at, at + n), (x) => x.toString(16).padStart(2, "0")).join("")}`;
+  }
+  /** The `bytes` whose offset word sits at `head` (relative to `base`), as a reader over its contents only. */
+  bytes(base: number, head: number): Reader {
+    const at = base + this.small(head);
+    const n = this.small(at);
+    if (at + 32 + n > this.b.length) throw new Error("bytes out of bounds");
+    return new Reader(this.b.subarray(at + 32, at + 32 + n));
+  }
   word(at: number): bigint {
     if (at < 0 || at + 32 > this.b.length) throw new Error("out of bounds");
     let v = 0n;
@@ -228,6 +247,109 @@ function checkSteps(steps: SwapStep[], e: DiamondExpectation, finalAsset: string
   return null;
 }
 
+/** A Mayan Swift order refunds its input to `trader` when it is not filled, a Wormhole swap to `refundAddr`: their byte
+ * offset in `protocolData` (Mayan's swap-sdk, src/evm; selectors as the facet lists them). MCTP and FastMCTP orders and
+ * the HyperCore deposits carry no refund address: what they do not deliver settles to the destination address the facet
+ * already checks against BridgeData.receiver. */
+const MAYAN_REFUND_AT: Readonly<Record<string, number>> = {
+  "0xa3a30834": 4 + 32 * 3, // Swift v2 createOrderWithToken(tokenIn, amountIn, (payloadType, trader, destAddr, …), customPayload)
+  "0x6147435b": 4 + 32 * 3, // Swift v2 createOrderWithSig: the same order tuple
+  "0xb866e173": 4, // Swift createOrderWithEth((trader, tokenOut, …))
+  "0x8e8d142b": 4 + 32 * 2, // Swift createOrderWithToken(tokenIn, amountIn, (trader, tokenOut, …))
+  "0x6111ad25": 4 + 32 * 9, // MayanSwap swap(relayerFees, (mayanAddr, mayanChainId, auctionAddr, destAddr, destChainId, referrer, refundAddr), …)
+  "0x1eb1cff0": 4 + 32 * 9, // MayanSwap wrapAndSwapETH: the same recipient tuple
+};
+function mayanRefunds(r: Reader, at: number): Refund[] {
+  const p = r.bytes(at, at + 32 * 2);
+  const pos = MAYAN_REFUND_AT[p.raw(0, 4)];
+  return pos === undefined ? [] : [["the Mayan order's refund address", p.address(pos)]];
+}
+/** Chainflip refunds the whole input to the address in `cfParameters` when the swap misses its minimum price:
+ * VersionedCfParameters V1 (SCALE) — version, retry duration (u32), then the refund address, 20 bytes from an EVM chain. */
+function chainflipRefunds(r: Reader, at: number): Refund[] {
+  const p = r.bytes(at, at + 32 * 5);
+  if (p.length < 25 || p.raw(0, 1) !== "0x01") throw new Error("unknown Chainflip parameters");
+  return [["the Chainflip refund address", p.raw(5, 20)]];
+}
+/** The Across Swap API call, by target: the SpokePool deposit's depositor (DepositParams, depositor first) and the
+ * periphery's `depositData.depositor` get an expired deposit back (and the periphery's positive slippage); the
+ * sponsored OFT and CCTP flows refund to an unsigned `refundRecipient`. */
+function acrossSwapRefunds(r: Reader, at: number): Refund[] {
+  const target = r.word(at);
+  const c = r.bytes(at, at + 32);
+  // The facet refuses a zero depositor / refundRecipient on every target.
+  if (target === 0n) return [["the Across deposit's depositor", c.address(c.small(0)), true]];
+  if (target === 1n) {
+    const swap = c.small(0); // SwapAndDepositData: (submissionFees.amount, submissionFees.recipient, depositData, …)
+    return [["the Across deposit's depositor", c.address(swap + c.small(swap + 64) + 96), true]]; // BaseDepositData word 3
+  }
+  if (target === 2n) return [["the sponsored OFT refund recipient", c.address(c.small(0) + 32), true]]; // (Quote(signed, unsigned), signature)
+  if (target === 3n) return [["the sponsored CCTP refund recipient", c.address(64), true]]; // (quote, signature, refundRecipient)
+  throw new Error("unknown Across Swap API target");
+}
+
+/**
+ * Where a bridge facet's data names who gets money back: an unused native fee, swap leftovers or positive slippage, the
+ * whole input when a deposit, intent or order expires unfilled, or a fallback when delivery fails. The facets only
+ * require these to be non-zero (NEAR Intents, LayerSwap and Eco also sign them on LI.FI's backend, which an `apiUrl`
+ * proxy cannot forge but LI.FI's API itself writes), so each must be the sender or the recipient; LI.FI's live quotes
+ * set them to the sender. `refunds` are [field, word] in the facet data (lifinance/contracts, the same structs at
+ * 86c3729 and on main 2026-11-02; Eco as at 86c3729, whose entry points are the listed ones); `inline` marks a static
+ * struct, which is encoded in place among the arguments rather than behind an offset (its word count). A zero is
+ * accepted where the facet itself refuses a zero in every field it uses (`zeroRefused`; Polymer CCTP reads its
+ * refundRecipient on the swap entry point only): it pays no one. Stargate passes a zero to LayerZero, and Mayan and
+ * Chainflip carry theirs into the protocol, so there a zero is refused like any other address.
+ */
+interface FacetData {
+  inline?: number;
+  refunds?: readonly (readonly [string, number])[];
+  zeroRefused?: true;
+  nested?: (r: Reader, at: number) => Refund[];
+}
+/** [what, address, a zero there is refused by the facet]. */
+type Refund = [string, string, boolean?];
+const FACET_DATA: Readonly<Record<string, FacetData>> = {
+  AcrossV4: {refunds: [["refundAddress", 1]], zeroRefused: true}, // the SpokePool depositor: an expired deposit refunds the input there
+  AcrossV4Swap: {nested: acrossSwapRefunds},
+  Centrifuge: {inline: 2, refunds: [["refundRecipient", 1]], zeroRefused: true},
+  Chainflip: {nested: chainflipRefunds},
+  Eco: {refunds: [["refundRecipient", 5]], zeroRefused: true}, // the intent's creator, refunded its reward (the input) on expiry
+  Frax: {inline: 5, refunds: [["refundRecipient", 3]], zeroRefused: true},
+  Glacis: {inline: 4, refunds: [["refundAddress", 1]], zeroRefused: true},
+  LayerSwap: {refunds: [["refundRecipient", 2]], zeroRefused: true},
+  LiFiIntentEscrowV2: {refunds: [["depositAndRefundAddress", 2]], zeroRefused: true}, // the escrow order's user
+  M0: {inline: 7, refunds: [["refundRecipient", 1], ["orderOwner", 2]], zeroRefused: true}, // orderOwner gets a cancelled order back
+  Mayan: {refunds: [["refundRecipient", 7]], nested: mayanRefunds, zeroRefused: true},
+  NEARIntents: {refunds: [["refundRecipient", 6]], zeroRefused: true}, // also the 1Click quote's refundTo
+  PolymerCCTP: {refunds: [["refundRecipient", 5]], zeroRefused: true},
+  Stargate: {refunds: [["refundAddress", 4]]}, // (assetId, sendParams, fee.nativeFee, fee.lzTokenFee, refundAddress): LayerZero's fee refund
+  Superset: {refunds: [["refundAddress", 2], ["fallbackEoA", 3]], zeroRefused: true},
+  Symbiosis: {refunds: [["refundRecipient", 0]], zeroRefused: true},
+};
+/**
+ * Facets whose data names no one to pay back: Across (the SpokePool's depositor is the Diamond), AllBridge, Celer
+ * Circle, GasZip, MegaETH, Optimism and Squid (no address but the receiver the facet checks), Arbitrum (its retryable's
+ * refunds go to BridgeData.receiver), Gnosis, Omni and Polygon (no facet data) and Unit (its own deposit address,
+ * signed). Their excess native and swap leftovers go to the caller.
+ */
+const NO_REFUND_FIELDS = new Set(["Across", "AllBridge", "ArbitrumBridge", "CelerCircleBridge", "GasZip", "GnosisBridge", "MegaETHBridge", "OmniBridge", "OptimismBridge", "PolygonBridge", "Squid", "Unit"]);
+
+/** A refund or fallback in the bridge's facet data that pays neither the sender nor the recipient, or null. */
+function refundMismatch(r: Reader, bridge: {sourceSwaps: boolean; facet: string}, e: DiamondExpectation): string | null {
+  const spec = FACET_DATA[bridge.facet];
+  if (!spec) return NO_REFUND_FIELDS.has(bridge.facet) ? null : `no known refund layout for ${bridge.facet}`;
+  // The facet data is the last argument, after BridgeData's offset word (and the SwapData[]'s).
+  const slot = 4 + (bridge.sourceSwaps ? 64 : 32);
+  const at = spec.inline ? slot : 4 + r.small(slot);
+  const paid: Refund[] = (spec.refunds ?? []).map(([field, word]) => [`${bridge.facet} ${field}`, r.address(at + 32 * word), spec.zeroRefused === true]);
+  paid.push(...(spec.nested?.(r, at) ?? []));
+  for (const [what, to, zeroRefused] of paid) {
+    if (zeroRefused && /^0x0{40}$/.test(to)) continue;
+    if (!same(to, e.sender) && !same(to, e.receiver)) return `${what} pays ${to}, neither the sender ${e.sender} nor the recipient`;
+  }
+  return null;
+}
+
 /** Why the Diamond calldata does not do what the quote says, or null when it does. */
 export function diamondCallMismatch(data: string, e: DiamondExpectation): string | null {
   let r: Reader;
@@ -278,6 +400,8 @@ export function diamondCallMismatch(data: string, e: DiamondExpectation): string
       const route = r.word(4 + r.small(4 + (bridge.sourceSwaps ? 64 : 32)));
       if (route !== SQUID_CALL_BRIDGE) return "the Squid route hands the funds to a destination call, whose recipient cannot be checked here";
     }
+    const refund = refundMismatch(r, bridge, e);
+    if (refund) return refund;
     // After source swaps the bridged amount is in the swapped token's units: only the swaps' input is comparable.
     if (hasSourceSwaps) {
       // The swapped amount is the facet's own (it replaces minAmount after the swaps); a zero is a route that bridges nothing.

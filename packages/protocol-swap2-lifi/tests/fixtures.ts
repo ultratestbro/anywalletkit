@@ -75,7 +75,7 @@ const DEX = "0x2222222222222222222222222222222222222222";
 
 /** Diamond calldata for a quote: a GenericSwapFacetV3 swap on one chain, a Stargate bridge across two. */
 export function diamondCall(
-  action: {fromToken: {address: string}; toToken: {address: string}; fromAmount: string; fromChainId: number; toChainId: number; toAddress: string},
+  action: {fromToken: {address: string}; toToken: {address: string}; fromAmount: string; fromChainId: number; toChainId: number; toAddress: string; fromAddress?: string},
   estimate: {fromAmount: string; toAmountMin?: string},
   over: {receiver?: string; minOut?: bigint; destChainId?: bigint; sendingAssetId?: string; hasDestinationCall?: boolean} = {},
 ): Hex {
@@ -90,13 +90,14 @@ export function diamondCall(
     transactionId: ZERO32, bridge: "stargate", integrator: "awk", referrer: "0x0000000000000000000000000000000000000000",
     sendingAssetId: lower(over.sendingAssetId ?? action.fromToken.address), receiver, minAmount: BigInt(estimate.fromAmount),
     destinationChainId: over.destChainId ?? BigInt(action.toChainId), hasSourceSwaps: false, hasDestinationCall: over.hasDestinationCall ?? false,
-  }, stargateData(receiver)]});
+  }, stargateData(receiver, lower(action.fromAddress ?? SENDER))]});
 }
 
-/** StargateFacetV2 facet data paying `to` (the facet requires it to equal BridgeData.receiver). */
-export function stargateData(to: string) {
+/** StargateFacetV2 facet data paying `to` (the facet requires it to equal BridgeData.receiver); LayerZero refunds the
+ * unused native fee to `refund`, which LI.FI sets to the sender. */
+export function stargateData(to: string, refund: string = SENDER) {
   return {
     assetId: 1, sendParams: {dstEid: 30110, to: `0x${to.slice(2).toLowerCase().padStart(64, "0")}` as Hex, amountLD: 0n, minAmountLD: 0n, extraOptions: "0x" as Hex, composeMsg: "0x" as Hex, oftCmd: "0x" as Hex},
-    fee: {nativeFee: 0n, lzTokenFee: 0n}, refundAddress: DEX as Hex,
+    fee: {nativeFee: 0n, lzTokenFee: 0n}, refundAddress: refund.toLowerCase() as Hex,
   };
 }

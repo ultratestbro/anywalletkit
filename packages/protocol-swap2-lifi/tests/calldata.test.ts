@@ -1,7 +1,7 @@
 import {describe, expect, it} from "vitest";
 import {encodeFunctionData, toFunctionSelector, type Hex} from "viem";
 import {diamondCallMismatch, type DiamondExpectation} from "../src/calldata.js";
-import {DIAMOND_ABI, stargateData} from "./fixtures.js";
+import {DIAMOND_ABI, SENDER, stargateData} from "./fixtures.js";
 
 // Review of round 3 H9: the bridge branch took any selector whose first word looked like an offset
 // (a packed Across call carried a fake BridgeData in its message), and compared the bridged amount
@@ -17,7 +17,7 @@ const bridgeData = (o: {asset: string; minAmount: bigint; sourceSwaps: boolean})
   sendingAssetId: o.asset as Hex, receiver: VICTIM as Hex, minAmount: o.minAmount, destinationChainId: 8453n, hasSourceSwaps: o.sourceSwaps, hasDestinationCall: false,
 });
 const expect_ = (over: Partial<DiamondExpectation> = {}): DiamondExpectation => ({
-  fromToken: USDC, toToken: USDC, amountIn: 1_000_000_000n, receiver: VICTIM, minOut: 1n, destChainId: 8453n, sameChain: false, evmDestination: true, ...over,
+  fromToken: USDC, toToken: USDC, amountIn: 1_000_000_000n, receiver: VICTIM, sender: SENDER, minOut: 1n, destChainId: 8453n, sameChain: false, evmDestination: true, ...over,
 });
 
 describe("LI.FI bridge calldata", () => {

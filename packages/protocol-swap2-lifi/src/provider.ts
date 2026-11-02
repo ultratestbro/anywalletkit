@@ -568,10 +568,10 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           return null;
         }
         // The calldata is what gets signed: it must pay the reviewed recipient at least the reviewed
-        // minimum, in the requested tokens (round 3, H9).
+        // minimum, in the requested tokens (round 3, H9), and refund only the sender or the recipient.
         if (!solanaSource) {
           const why = diamondCallMismatch(tr.data!, {
-            fromToken, toToken: expectedToToken, amountIn: BigInt(params.amountIn), receiver: toAddress, minOut: BigInt(minDestAmount),
+            fromToken, toToken: expectedToToken, amountIn: BigInt(params.amountIn), receiver: toAddress, sender: fromAddress, minOut: BigInt(minDestAmount),
             destChainId: BigInt(toChain), sameChain: fromChain === toChain, evmDestination: !isSolana(params.destChain),
           });
           if (why) return reject(`the transaction does not match the quote: ${why}`);
@@ -721,7 +721,7 @@ export function lifiVerifyQuote(params: QuoteParams, quote: Quote): string | nul
   }
   if (quote.intentId.replace(/~[0-9a-f]{32}$/, "") !== `lifi:${fromChain}:${toChain}`) return "the intent id does not name this route";
   const why = diamondCallMismatch(tx.data, {
-    fromToken, toToken: nativeFor(params.destChain, params.destToken), amountIn, receiver: toAddress, minOut,
+    fromToken, toToken: nativeFor(params.destChain, params.destToken), amountIn, receiver: toAddress, sender: fromAddress, minOut,
     destChainId: BigInt(toChain), sameChain: fromChain === toChain, evmDestination: !isSolana(params.destChain),
   });
   return why ? `the transaction does not match the request: ${why}` : null;

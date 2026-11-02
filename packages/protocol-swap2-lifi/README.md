@@ -24,8 +24,10 @@ do the same: a same-chain swap (GenericSwapFacet / V3) pays the reviewed recipie
 reviewed minimum, spending the input token and delivering the requested one; a bridge call must be
 one of LI.FI's listed `startBridgeTokensVia*` / `swapAndStartBridgeTokensVia*` entry points (packed
 calls are refused) and its `BridgeData` must name the reviewed recipient and chain and bridge the
-input token (or what its source swaps make of it). Refused, because the recipient cannot be read
-from the calldata: routes with a destination call, and EVM-source routes to a non-EVM chain.
+input token (or what its source swaps make of it). Every refund, depositor or fallback address a
+bridge carries in its own data (Stargate's LayerZero fee refund, an expired Across deposit or LI.FI
+intent, a Mayan Swift order's trader, Chainflip's refund address, …) must be the sender or the
+recipient. Refused, because the recipient cannot be read from the calldata: routes with a destination call, and EVM-source routes to a non-EVM chain.
 Unknown calldata is refused.
 
 Every swap step is read, not only the ends: each must spend what the step before delivered, only
@@ -46,7 +48,7 @@ When the provider runs on your server, spread its pins into the app's stub:
 `remoteProvider({name: "lifi", baseUrl, ...lifiPins})`. The engine then lets the EVM route call and
 approve only the LI.FI Diamond of that chain, never an address the backend names, and `lifiVerifyQuote` decodes the
 server's Diamond call on the device with the same check the provider runs on LI.FI's answer (receiver, minimum, input
-token and amount, output token, destination chain; value and approval for the input kind). Without the pins the stub
+token and amount, output token, destination chain, refund addresses; value and approval for the input kind). Without the pins the stub
 gets no EVM calldata route (fail closed).
 
 ## Activity

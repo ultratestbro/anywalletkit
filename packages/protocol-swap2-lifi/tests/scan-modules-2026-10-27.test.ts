@@ -6,7 +6,7 @@ import {readFileSync} from "node:fs";
 import {describe, expect, it} from "vitest";
 import {encodeFunctionData, parseAbi, toFunctionSelector, type AbiFunction, type Hex} from "viem";
 import {diamondCallMismatch, type DiamondExpectation} from "../src/calldata.js";
-import {DIAMOND_ABI, stargateData} from "./fixtures.js";
+import {DIAMOND_ABI, SENDER, stargateData} from "./fixtures.js";
 
 const VICTIM = "0x1111111111111111111111111111111111111111";
 const DEX = "0x2222222222222222222222222222222222222222";
@@ -30,7 +30,7 @@ const step = (s: Step) => ({callTo: DEX as Hex, approveTo: DEX as Hex, sendingAs
 const single = (fn: string, s: Step, minOut = 9_900_000_000_000_000n) => encodeFunctionData({abi: V3, functionName: fn as never, args: [ZERO32, "awk", "", VICTIM, minOut, step(s)] as never});
 const multiple = (fn: string, steps: Step[], minOut = 9_900_000_000_000_000n) => encodeFunctionData({abi: V3, functionName: fn as never, args: [ZERO32, "awk", "", VICTIM, minOut, steps.map(step)] as never});
 const swapExpect = (over: Partial<DiamondExpectation> = {}): DiamondExpectation => ({
-  fromToken: USDC, toToken: WETH, amountIn: 10_000_000_000n, receiver: VICTIM, minOut: 9_900_000_000_000_000n, destChainId: 8453n, sameChain: true, evmDestination: true, ...over,
+  fromToken: USDC, toToken: WETH, amountIn: 10_000_000_000n, receiver: VICTIM, sender: SENDER, minOut: 9_900_000_000_000_000n, destChainId: 8453n, sameChain: true, evmDestination: true, ...over,
 });
 
 describe("the V3 selectors are bound to the asset kinds they move (F20)", () => {
@@ -99,7 +99,7 @@ describe("the live LI.FI quotes of 2026-10-28 pass (golden)", () => {
     expect(live.quotes.length).toBeGreaterThanOrEqual(6);
     for (const q of live.quotes) {
       const why = diamondCallMismatch(q.data, {
-        fromToken: q.fromToken, toToken: q.toToken, amountIn: BigInt(q.fromAmount), receiver: q.toAddress, minOut: q.fromChainId === q.toChainId ? BigInt(q.toAmountMin) : 1n,
+        fromToken: q.fromToken, toToken: q.toToken, amountIn: BigInt(q.fromAmount), receiver: q.toAddress, sender: q.toAddress, minOut: q.fromChainId === q.toChainId ? BigInt(q.toAmountMin) : 1n,
         destChainId: BigInt(q.toChainId), sameChain: q.fromChainId === q.toChainId, evmDestination: true,
       });
       expect(why, `${q.fromChainId}→${q.toChainId} ${q.tool}`).toBeNull();
