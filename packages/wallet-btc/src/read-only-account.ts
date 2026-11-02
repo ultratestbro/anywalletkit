@@ -4,10 +4,18 @@ import { INPUT_WEIGHT, decodeAddress, dustLimit, kindOfType, outputVBytes, spend
 import { createClient } from './client.js'
 import { MAX_UTXO_INPUTS, selectAll, selectCoins, type CoinSelection } from './coinselect.js'
 import { DEFAULT_MAX_FEE_RATE } from './describe.js'
-import { UnsupportedAddressTypeError } from './errors.js'
+import { UnsafeTransactionError, UnsupportedAddressTypeError } from './errors.js'
 import { recoverMessagePublicKey } from './message.js'
 import { networkParams } from './network.js'
 import { CAIP2_GENESIS, type BtcAddressType, type BtcClient, type BtcConfig, type BtcMaxSpendableResult, type BtcNetwork, type BtcReceipt, type BtcSpend, type BtcTransferOptions } from './types.js'
+
+/** One plain spend object: a list (whose elements name other recipients than its own `to`) or a class instance is refused. */
+function assertSpendShape(spend: unknown): void {
+  const proto = typeof spend === 'object' && spend !== null && !Array.isArray(spend) ? (Object.getPrototypeOf(spend) as object | null) : undefined
+  if (proto === undefined || (proto !== null && Object.getPrototypeOf(proto) !== null)) {
+    throw new UnsafeTransactionError('malformed-spend', 'A spend must be one plain object ({ to, value, … }); a list or another kind of object is not signed.')
+  }
+}
 
 export { MAX_UTXO_INPUTS }
 
@@ -95,6 +103,7 @@ export class WalletAccountReadOnlyBtc implements IWalletAccountReadOnly {
 
   /** Coin selection for a spend (see coinselect.ts). Validates the recipient and the dust floor first. */
   protected async planSpend(spend: BtcSpend): Promise<SpendPlan> {
+    assertSpendShape(spend)
     const amount = toBig(spend.value)
     const recipient = decodeAddress(spend.to, this._network)
     const floor = dustLimit(recipient.kind)

@@ -1,6 +1,6 @@
 import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
-import { canonicalAddress, erc20Transfer, hexData, sendDestinations, tonRawAddress, tronCallData, tronRawIntent, type Destinations } from './destinations.js'
+import { canonicalAddress, erc20Transfer, hexData, namedArray, sendDestinations, tonRawAddress, tronCallData, tronRawIntent, type Destinations } from './destinations.js'
 import { snapshot } from './snapshot.js'
 import { ccAssetByToken } from '@anywalletkit/swap2-assets'
 import { catalogChain } from './activity/generic.js'
@@ -730,7 +730,8 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
     // EVM only, and only for plain EVM calls: Tron, NEAR and Solana sign other fields
     // (txID / raw_data_hex, receiverId / actions, messageBytes / instructions), so an EVM-looking
     // to/data riding along must never turn their write into a "revoke" that skips the lists (scan F1).
-    const calls = Array.isArray(arg) ? arg : [arg]
+    // A list that also carries named fields is no revoke or approval: which write gets signed is not known.
+    const calls = namedArray(arg) ? [] : Array.isArray(arg) ? arg : [arg]
     const found = calls.length > 0 && !calls.some(carriesForeignPayload) ? calls.map(revokeCall) : [null]
     if (found.every((r) => r !== null)) return revokeIntent(base, found.flat() as Array<{ token: string; spender?: string }>)
     // One raw approve / setApprovalForAll(true): an approval of the spender it names.

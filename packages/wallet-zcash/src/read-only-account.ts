@@ -1,10 +1,18 @@
 import { InsufficientFundsError, NetworkError, type IWalletAccountReadOnly } from '@anywalletkit/core'
 import { DUST_LIMIT, addressFromPublicKey, decodeAddress, outputSize, type DecodedAddress } from './address.js'
 import { createClient } from './client.js'
-import { DEFAULT_MAX_FEE } from './describe.js'
+import { DEFAULT_MAX_FEE, UnsafeTransactionError } from './describe.js'
 import { MAX_UTXO_INPUTS, selectAll, selectCoins, type CoinSelection } from './fee.js'
 import { recoverMessagePublicKey } from './message.js'
 import { CAIP2, type ZcashClient, type ZcashConfig, type ZcashMaxSpendableResult, type ZcashNetwork, type ZcashReceipt, type ZcashSpend, type ZcashTransferOptions } from './types.js'
+
+/** One plain spend object: a list (whose elements name other recipients than its own `to`) or a class instance is refused. */
+function assertSpendShape(spend: unknown): void {
+  const proto = typeof spend === 'object' && spend !== null && !Array.isArray(spend) ? (Object.getPrototypeOf(spend) as object | null) : undefined
+  if (proto === undefined || (proto !== null && Object.getPrototypeOf(proto) !== null)) {
+    throw new UnsafeTransactionError('malformed-spend', 'A spend must be one plain object ({ to, value, … }); a list or another kind of object is not signed.')
+  }
+}
 
 /** A coin selection for one spend, with the decoded recipient. */
 export interface SpendPlan extends CoinSelection {
@@ -65,6 +73,7 @@ export class WalletAccountReadOnlyZcash implements IWalletAccountReadOnly {
 
   /** Coin selection for a spend (ZIP-317 fee). Validates the recipient and the dust floor first. */
   protected async planSpend(spend: ZcashSpend): Promise<SpendPlan> {
+    assertSpendShape(spend)
     if (this.scriptKind !== 'p2pkh') throw new Error(`Cannot build spends from a ${this.scriptKind} address; only P2PKH (t1…) accounts spend.`)
     const amount = toBig(spend.value)
     const recipient = decodeAddress(spend.to, this._network)

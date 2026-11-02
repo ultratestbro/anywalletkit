@@ -909,15 +909,29 @@ function evmCallDestinations(call: unknown): Array<string | undefined> {
   return [str(c.to), ...(r ? r.list.map((w) => `0x${w}`) : []), ...(r?.bad ? [undefined] : [])]
 }
 
-/** EVM: the transaction goes to `to` — no `to` is a contract deployment (round 3, H2) — and to whoever its calldata pays (M1). */
+/**
+ * An array that also carries named own properties (`Object.assign([call], { to, value })`). The
+ * elements and the named fields describe two different writes, and which one gets signed depends on
+ * the account that reads it, so neither is a known destination.
+ */
+export function namedArray(v: unknown): boolean {
+  if (!Array.isArray(v)) return false
+  return Reflect.ownKeys(v).some((k) => k !== 'length' && !(typeof k === 'string' && /^(0|[1-9]\d*)$/.test(k) && Number(k) < v.length))
+}
+
+/**
+ * EVM: the transaction goes to `to` — no `to` is a contract deployment (round 3, H2) — and to whoever its calldata pays (M1).
+ * A list of calls is what a batching account (ERC-4337, EIP-7702) sends as one operation; wallet-evm refuses a list.
+ */
 function evmDestinations(arg: unknown): Destinations {
-  if (Array.isArray(arg)) return arg.length ? known(arg.flatMap(evmCallDestinations)) : UNKNOWN
+  if (Array.isArray(arg)) return arg.length && !namedArray(arg) ? known(arg.flatMap(evmCallDestinations)) : UNKNOWN
   if (str(obj(arg).to) === undefined) return UNKNOWN
   return known(evmCallDestinations(arg))
 }
 
+/** Bitcoin, Zcash and other one-recipient spends: the chain package pays `to` of one spend and takes no list. */
 function evmLikeDestinations(arg: unknown): Destinations {
-  if (Array.isArray(arg)) return arg.length ? known(arg.map((c) => str(obj(c).to))) : UNKNOWN
+  if (Array.isArray(arg)) return UNKNOWN
   const a = obj(arg)
   const to = str(a.to) ?? str(a.recipient)
   return to !== undefined ? known([to]) : UNKNOWN
