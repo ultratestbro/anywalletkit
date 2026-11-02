@@ -5,7 +5,8 @@ import {ROUTER_ABI, ROUTER_ITSELF, decode} from "./router-decode.js";
 // The behaviour fixture's reading of a SwapRouter02 multicall: an output left in the router is a
 // recipient unless the very next leg unwraps it to someone.
 const ME = "0x1111111111111111111111111111111111111111";
-const A = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", B = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
+// B is WETH, the token an unwrapWETH9 forwards (an unwrap after any other output: see the r3 test).
+const A = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", B = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 const swap = (recipient: string, amountIn: bigint) => encodeFunctionData({abi: ROUTER_ABI, functionName: "exactInputSingle",
   args: [{tokenIn: A, tokenOut: B, fee: 500, recipient: recipient as Hex, amountIn, amountOutMinimum: 0n, sqrtPriceLimitX96: 0n}]});
 const unwrap = (recipient: string) => encodeFunctionData({abi: ROUTER_ABI, functionName: "unwrapWETH9", args: [1n, recipient as Hex]});
