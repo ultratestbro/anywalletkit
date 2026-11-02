@@ -6,7 +6,7 @@ import {readFileSync} from "node:fs";
 import {describe, expect, it} from "vitest";
 import {encodeFunctionData, parseAbi, toFunctionSelector, type AbiFunction, type Hex} from "viem";
 import {diamondCallMismatch, type DiamondExpectation} from "../src/calldata.js";
-import {DIAMOND_ABI} from "./fixtures.js";
+import {DIAMOND_ABI, stargateData} from "./fixtures.js";
 
 const VICTIM = "0x1111111111111111111111111111111111111111";
 const DEX = "0x2222222222222222222222222222222222222222";
@@ -79,10 +79,10 @@ describe("every swap step is checked, not only the ends (F21–F23)", () => {
 });
 
 describe("a bridge without source swaps pulls the input (F22)", () => {
-  const bridge = (minAmount: bigint) => encodeFunctionData({abi: DIAMOND_ABI, functionName: "startBridgeTokensViaRelayDepository", args: [{
-    transactionId: ZERO32, bridge: "relay", integrator: "awk", referrer: ZERO as Hex, sendingAssetId: USDC as Hex, receiver: VICTIM as Hex, minAmount,
+  const bridge = (minAmount: bigint) => encodeFunctionData({abi: DIAMOND_ABI, functionName: "startBridgeTokensViaStargate", args: [{
+    transactionId: ZERO32, bridge: "stargate", integrator: "awk", referrer: ZERO as Hex, sendingAssetId: USDC as Hex, receiver: VICTIM as Hex, minAmount,
     destinationChainId: 42161n, hasSourceSwaps: false, hasDestinationCall: false,
-  }, {orderId: ZERO32, depositorAddress: DEX as Hex}]});
+  }, stargateData(VICTIM)]});
   const e = swapExpect({toToken: USDC, sameChain: false, destChainId: 42161n, minOut: 1n, amountIn: 1_000_000n});
   it("a bridge with minAmount = 1 is refused; the input, or a bridge fee of up to 1 % (Glacis 0.25 %), passes", () => {
     expect(diamondCallMismatch(bridge(1n), e)).toMatch(/bridges 1, not the 1000000 spent/);

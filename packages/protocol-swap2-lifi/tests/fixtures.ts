@@ -67,11 +67,13 @@ export const DIAMOND_ABI: Abi = parseAbi(([
   "function swapTokensSingleV3ERC20ToERC20(bytes32 _transactionId, string _integrator, string _referrer, address _receiver, uint256 _minAmountOut, (address callTo, address approveTo, address sendingAssetId, address receivingAssetId, uint256 fromAmount, bytes callData, bool requiresDeposit) _swapData)",
   "function startBridgeTokensViaRelayDepository((bytes32 transactionId, string bridge, string integrator, address referrer, address sendingAssetId, address receiver, uint256 minAmount, uint256 destinationChainId, bool hasSourceSwaps, bool hasDestinationCall) _bridgeData, (bytes32 orderId, address depositorAddress) _relayData)",
   "function swapAndStartBridgeTokensViaRelayDepository((bytes32 transactionId, string bridge, string integrator, address referrer, address sendingAssetId, address receiver, uint256 minAmount, uint256 destinationChainId, bool hasSourceSwaps, bool hasDestinationCall) _bridgeData, (address callTo, address approveTo, address sendingAssetId, address receivingAssetId, uint256 fromAmount, bytes callData, bool requiresDeposit)[] _swapData, (bytes32 orderId, address depositorAddress) _relayData)",
+  "function startBridgeTokensViaStargate((bytes32 transactionId, string bridge, string integrator, address referrer, address sendingAssetId, address receiver, uint256 minAmount, uint256 destinationChainId, bool hasSourceSwaps, bool hasDestinationCall) _bridgeData, (uint16 assetId, (uint32 dstEid, bytes32 to, uint256 amountLD, uint256 minAmountLD, bytes extraOptions, bytes composeMsg, bytes oftCmd) sendParams, (uint256 nativeFee, uint256 lzTokenFee) fee, address refundAddress) _stargateData)",
+  "function swapAndStartBridgeTokensViaStargate((bytes32 transactionId, string bridge, string integrator, address referrer, address sendingAssetId, address receiver, uint256 minAmount, uint256 destinationChainId, bool hasSourceSwaps, bool hasDestinationCall) _bridgeData, (address callTo, address approveTo, address sendingAssetId, address receivingAssetId, uint256 fromAmount, bytes callData, bool requiresDeposit)[] _swapData, (uint16 assetId, (uint32 dstEid, bytes32 to, uint256 amountLD, uint256 minAmountLD, bytes extraOptions, bytes composeMsg, bytes oftCmd) sendParams, (uint256 nativeFee, uint256 lzTokenFee) fee, address refundAddress) _stargateData)",
 ] as readonly string[]));
 const ZERO32 = `0x${"00".repeat(32)}` as Hex;
 const DEX = "0x2222222222222222222222222222222222222222";
 
-/** Diamond calldata for a quote: a GenericSwapFacetV3 swap on one chain, a Relay bridge across two. */
+/** Diamond calldata for a quote: a GenericSwapFacetV3 swap on one chain, a Stargate bridge across two. */
 export function diamondCall(
   action: {fromToken: {address: string}; toToken: {address: string}; fromAmount: string; fromChainId: number; toChainId: number; toAddress: string},
   estimate: {fromAmount: string; toAmountMin?: string},
@@ -84,9 +86,17 @@ export function diamondCall(
       callTo: DEX, approveTo: DEX, sendingAssetId: lower(action.fromToken.address), receivingAssetId: lower(action.toToken.address), fromAmount: BigInt(action.fromAmount), callData: "0x", requiresDeposit: true,
     }]});
   }
-  return encodeFunctionData({abi: DIAMOND_ABI, functionName: "startBridgeTokensViaRelayDepository", args: [{
-    transactionId: ZERO32, bridge: "relay", integrator: "awk", referrer: "0x0000000000000000000000000000000000000000",
+  return encodeFunctionData({abi: DIAMOND_ABI, functionName: "startBridgeTokensViaStargate", args: [{
+    transactionId: ZERO32, bridge: "stargate", integrator: "awk", referrer: "0x0000000000000000000000000000000000000000",
     sendingAssetId: lower(over.sendingAssetId ?? action.fromToken.address), receiver, minAmount: BigInt(estimate.fromAmount),
     destinationChainId: over.destChainId ?? BigInt(action.toChainId), hasSourceSwaps: false, hasDestinationCall: over.hasDestinationCall ?? false,
-  }, {orderId: ZERO32, depositorAddress: DEX}]});
+  }, stargateData(receiver)]});
+}
+
+/** StargateFacetV2 facet data paying `to` (the facet requires it to equal BridgeData.receiver). */
+export function stargateData(to: string) {
+  return {
+    assetId: 1, sendParams: {dstEid: 30110, to: `0x${to.slice(2).toLowerCase().padStart(64, "0")}` as Hex, amountLD: 0n, minAmountLD: 0n, extraOptions: "0x" as Hex, composeMsg: "0x" as Hex, oftCmd: "0x" as Hex},
+    fee: {nativeFee: 0n, lzTokenFee: 0n}, refundAddress: DEX as Hex,
+  };
 }

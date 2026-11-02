@@ -9,9 +9,15 @@
  * entry points only; a destination call (the final recipient sits in calldata for another chain)
  * and a non-EVM destination (the receiver sits in facet-specific data) are refused.
  *
- * Not checked here: a bridge's OUTPUT. The destination minimum (and for some bridges, e.g. Relay
- * and Across, what the receiver finally gets) lives in facet-specific data, so for bridges the
+ * Not checked here: a bridge's OUTPUT. The destination minimum (and for some bridges, e.g.
+ * Across, what the receiver finally gets) lives in facet-specific data, so for bridges the
  * reviewed minimum still relies on LI.FI's API answering honestly.
+ *
+ * The receiver is only worth checking where the facet itself holds the bridge to it. Most do on
+ * chain (Across V4, Mayan, Stargate, Chainflip, LI.FI Intents, GasZip, Glacis, AllBridge, M0, Polymer
+ * CCTP) or through LI.FI's backend signature over BridgeData plus the off-chain order (NEAR Intents,
+ * LayerSwap, Eco, Unit, the Across Swap API). The facets in {@link UNBOUND_BRIDGES} do neither and
+ * are refused; Squid is accepted only on its CallBridge route, which bridges to BridgeData.receiver.
  */
 
 /**
@@ -56,14 +62,10 @@ const BRIDGE_CALLS: Readonly<Record<string, {sourceSwaps: boolean}>> = {
   "0x8fd4d4dd": {sourceSwaps: true}, // swapAndStartBridgeTokensViaCentrifuge (CentrifugeFacet)
   "0x0ad553b3": {sourceSwaps: false}, // startBridgeTokensViaChainflip (ChainflipFacet)
   "0xee3314a1": {sourceSwaps: true}, // swapAndStartBridgeTokensViaChainflip (ChainflipFacet)
-  "0x4004633e": {sourceSwaps: false}, // startBridgeTokensViaDeBridgeDln (DeBridgeDlnFacet)
-  "0x2c7d2db0": {sourceSwaps: true}, // swapAndStartBridgeTokensViaDeBridgeDln (DeBridgeDlnFacet)
   "0xbff90b61": {sourceSwaps: false}, // startBridgeTokensViaEco (EcoFacet)
   "0x762aea18": {sourceSwaps: true}, // swapAndStartBridgeTokensViaEco (EcoFacet)
   "0x678786ea": {sourceSwaps: false}, // startBridgeTokensViaFrax (FraxFacet)
   "0x07b8e4c7": {sourceSwaps: true}, // swapAndStartBridgeTokensViaFrax (FraxFacet)
-  "0x5f9af35d": {sourceSwaps: false}, // startBridgeTokensViaGarden (GardenFacet)
-  "0x76ad76fe": {sourceSwaps: true}, // swapAndStartBridgeTokensViaGarden (GardenFacet)
   "0xfc5f1003": {sourceSwaps: false}, // startBridgeTokensViaGasZip (GasZipFacet)
   "0x606326ff": {sourceSwaps: true}, // swapAndStartBridgeTokensViaGasZip (GasZipFacet)
   "0x6f9206ba": {sourceSwaps: false}, // startBridgeTokensViaGlacis (GlacisFacet)
@@ -90,8 +92,6 @@ const BRIDGE_CALLS: Readonly<Record<string, {sourceSwaps: boolean}>> = {
   "0xb4f37581": {sourceSwaps: true}, // swapAndStartBridgeTokensViaPolygonBridge (PolygonBridgeFacet)
   "0xf434d6ca": {sourceSwaps: false}, // startBridgeTokensViaPolymerCCTP (PolymerCCTPFacet)
   "0x17917a4e": {sourceSwaps: true}, // swapAndStartBridgeTokensViaPolymerCCTP (PolymerCCTPFacet)
-  "0x092e8fa4": {sourceSwaps: false}, // startBridgeTokensViaRelayDepository (RelayDepositoryFacet)
-  "0xa3443faa": {sourceSwaps: true}, // swapAndStartBridgeTokensViaRelayDepository (RelayDepositoryFacet)
   "0x3f313808": {sourceSwaps: false}, // startBridgeTokensViaSquid (SquidFacet)
   "0xa8f66666": {sourceSwaps: true}, // swapAndStartBridgeTokensViaSquid (SquidFacet)
   "0x14d53077": {sourceSwaps: false}, // startBridgeTokensViaStargate (StargateFacetV2)
@@ -100,11 +100,35 @@ const BRIDGE_CALLS: Readonly<Record<string, {sourceSwaps: boolean}>> = {
   "0xf26e657f": {sourceSwaps: true}, // swapAndStartBridgeTokensViaSuperset (SupersetFacet)
   "0xe23b7a08": {sourceSwaps: false}, // startBridgeTokensViaSymbiosis (SymbiosisFacet)
   "0xc46059b2": {sourceSwaps: true}, // swapAndStartBridgeTokensViaSymbiosis (SymbiosisFacet)
-  "0x2541ec57": {sourceSwaps: false}, // startBridgeTokensViaThorSwap (ThorSwapFacet)
-  "0xad673d88": {sourceSwaps: true}, // swapAndStartBridgeTokensViaThorSwap (ThorSwapFacet)
   "0x64261d58": {sourceSwaps: false}, // startBridgeTokensViaUnit (UnitFacet)
   "0x21a3af52": {sourceSwaps: true}, // swapAndStartBridgeTokensViaUnit (UnitFacet)
 };
+
+/**
+ * Bridge entry points that do not tie where the funds go to BridgeData.receiver (lifinance/contracts, main 2026-11-02):
+ * Relay deposits against an `orderId` whose off-chain order names the recipient ("We cannot validate / guarantee that the
+ * off-chain-data associated with the provided orderId corresponds to the _bridgeData"); Garden locks the funds for a
+ * `redeemer` named in facet data, with the transfer details in an off-chain order; deBridge DLN passes its own
+ * `receiver` and order authority through unchecked; ThorSwap pays a `vault` named in facet data with the destination in
+ * a memo. A matching BridgeData.receiver proves nothing for these, so they are refused by name. Neither Relay nor
+ * any other party publishes an unauthenticated lookup of an unfunded Relay order (2026-11-02: `/intents/status` says
+ * "unknown", `/requests/v2` lists only indexed deposits, `/requests/v3` needs an API key), so there is nothing to check
+ * the orderId against on the device.
+ */
+const UNBOUND_BRIDGES: Readonly<Record<string, string>> = {
+  "0x092e8fa4": "Relay", // startBridgeTokensViaRelayDepository
+  "0xa3443faa": "Relay", // swapAndStartBridgeTokensViaRelayDepository
+  "0x5f9af35d": "Garden", // startBridgeTokensViaGarden
+  "0x76ad76fe": "Garden", // swapAndStartBridgeTokensViaGarden
+  "0x4004633e": "deBridge DLN", // startBridgeTokensViaDeBridgeDln
+  "0x2c7d2db0": "deBridge DLN", // swapAndStartBridgeTokensViaDeBridgeDln
+  "0x2541ec57": "ThorSwap", // startBridgeTokensViaThorSwap
+  "0xad673d88": "ThorSwap", // swapAndStartBridgeTokensViaThorSwap
+};
+/** Squid entry points: SquidData starts with its RouteType (BridgeCall, CallBridge, CallBridgeCall). */
+const SQUID_CALLS = new Set(["0x3f313808", "0xa8f66666"]);
+/** RouteType.CallBridge: Squid bridges to BridgeData.receiver; the other two hand the funds to a destination call. */
+const SQUID_CALL_BRIDGE = 1n;
 
 /** What the quote promised, in the forms the calldata carries. */
 export interface DiamondExpectation {
@@ -228,6 +252,8 @@ export function diamondCallMismatch(data: string, e: DiamondExpectation): string
     }
     // Bridge facets: (BridgeData, [SwapData[],] FacetData), only the listed ABI entry points.
     // BridgeData is dynamic (it holds strings), so its offset is the head size.
+    const unbound = UNBOUND_BRIDGES[selector];
+    if (unbound) return `${unbound} delivers to a recipient the transaction does not bind (an off-chain order or unchecked facet data)`;
     const bridge = BRIDGE_CALLS[selector];
     if (!bridge) return `unknown Diamond call ${selector}`;
     const head = r.small(4);
@@ -247,6 +273,11 @@ export function diamondCallMismatch(data: string, e: DiamondExpectation): string
     if (!e.evmDestination) return "the recipient on a non-EVM destination sits in bridge-specific data and cannot be checked here";
     if (!same(receiver, e.receiver)) return `pays ${receiver}, not ${e.receiver}`;
     if (hasSourceSwaps !== bridge.sourceSwaps) return `unknown Diamond call ${selector}`;
+    if (SQUID_CALLS.has(selector)) {
+      // SquidData is the last argument: its offset word follows BridgeData's (and the SwapData[]'s).
+      const route = r.word(4 + r.small(4 + (bridge.sourceSwaps ? 64 : 32)));
+      if (route !== SQUID_CALL_BRIDGE) return "the Squid route hands the funds to a destination call, whose recipient cannot be checked here";
+    }
     // After source swaps the bridged amount is in the swapped token's units: only the swaps' input is comparable.
     if (hasSourceSwaps) {
       // The swapped amount is the facet's own (it replaces minAmount after the swaps); a zero is a route that bridges nothing.

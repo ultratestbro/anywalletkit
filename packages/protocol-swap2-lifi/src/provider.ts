@@ -225,6 +225,12 @@ export interface LifiRouteChoice {
 }
 
 const TOOL_KEY = /^[A-Za-z0-9_-]{1,64}$/;
+/**
+ * LI.FI tools whose Diamond entry point does not tie the delivery to the checked receiver (see `UNBOUND_BRIDGES` in
+ * calldata.ts): every cross-chain request asks LI.FI to route around them, so the pairs they would have served get
+ * another bridge instead of a refusal.
+ */
+const UNBOUND_TOOLS: readonly string[] = Object.freeze(["relaydepository", "garden"]);
 
 function routeOptions(body: unknown): LifiRouteOption[] {
   const routes = (body as {routes?: unknown})?.routes;
@@ -237,7 +243,7 @@ function routeOptions(body: unknown): LifiRouteOption[] {
     const cross = Array.isArray(step.includedSteps) ? step.includedSteps.find((i) => i?.type === "cross")?.tool : undefined;
     const tool = typeof cross === "string" ? cross : step.tool;
     const eta = step.estimate?.executionDuration;
-    if (typeof tool !== "string" || !TOOL_KEY.test(tool) || typeof eta !== "number" || !Number.isFinite(eta) || eta < 0) continue;
+    if (typeof tool !== "string" || !TOOL_KEY.test(tool) || UNBOUND_TOOLS.includes(tool) || typeof eta !== "number" || !Number.isFinite(eta) || eta < 0) continue;
     if (typeof r.toAmount !== "string" || typeof r.toAmountMin !== "string" || !/^\d{1,60}$/.test(r.toAmount) || !/^\d{1,60}$/.test(r.toAmountMin)) continue;
     out.push({
       tool,
@@ -336,7 +342,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
               fromAmount: params.amountIn,
               fromAddress,
               toAddress,
-              options: {slippage: slippageBps / 10_000, ...(integrator().trim() ? {integrator: integrator().trim()} : {})},
+              options: {slippage: slippageBps / 10_000, bridges: {deny: UNBOUND_TOOLS}, ...(integrator().trim() ? {integrator: integrator().trim()} : {})},
             }),
             signal: signal ?? timeoutSignal(8_000),
           });
@@ -364,8 +370,9 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         if (sentSlippage !== undefined) {
           url.searchParams.set("slippage", String(sentSlippage));
         }
-        for (const t of choice?.allowBridges ?? []) url.searchParams.append("allowBridges", t);
-        for (const t of choice?.denyBridges ?? []) url.searchParams.append("denyBridges", t);
+        const cross = params.sourceChain !== params.destChain;
+        for (const t of (choice?.allowBridges ?? []).filter((b) => !UNBOUND_TOOLS.includes(b))) url.searchParams.append("allowBridges", t);
+        for (const t of new Set([...(choice?.denyBridges ?? []), ...(cross ? UNBOUND_TOOLS : [])])) url.searchParams.append("denyBridges", t);
         if (choice?.order) url.searchParams.set("order", choice.order);
         deadline = signal ? undefined : timeoutSignal(12_000);
         const res = await fetch(url, {headers: headers(apiKey()), signal: signal ?? deadline!});

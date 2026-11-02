@@ -49,11 +49,15 @@ describe("scan 2026-10-30 F3: lifiVerifyQuote over live LI.FI answers", () => {
       expect([c.name, lifiVerifyQuote(c.params, quote)]).toEqual([c.name, null]);
       table.push(`${c.name}: pass`);
     }
-    expect(accepted).toBe(26);
+    // The two Relay answers are refused since 2026-11-02: Relay's orderId is not bound to the checked receiver (live,
+    // LI.FI is asked to deny relaydepository and serves those pairs through another bridge).
+    expect(accepted).toBe(24);
     expect(table.filter((t) => t.includes("local refused"))).toEqual([
+      expect.stringMatching(/^base-usdc>arb-usdc relay: local refused \(lifi: the transaction does not match the quote: Relay delivers to a recipient the transaction does not bind/),
       expect.stringMatching(/^base-usdc>arb-usdc cbridge: local refused \(lifi: No available quotes/),
       expect.stringMatching(/^op-usdc>arb-usdc symbiosis: local refused/),
       expect.stringMatching(/^eth-eth>arb-eth hop: local refused/),
+      expect.stringMatching(/^gnosis-xdai>arb-usdc default: local refused .*Relay delivers/),
       expect.stringMatching(/^base-usdc>solana-usdc default: local refused .*non-EVM destination/),
       expect.stringMatching(/^base-eth>arb-eth gasZip: local refused/),
       expect.stringMatching(/^base-usdc>op-usdc eco: local refused/),
@@ -78,7 +82,7 @@ describe("scan 2026-10-30 F3: lifiVerifyQuote over live LI.FI answers", () => {
 
   it("refuses calldata paying another receiver, a lower minimum, another value, approval, target or intent", async () => {
     const pick = (name: string) => live.corridors.find((c) => c.name === name)!;
-    for (const name of ["base-usdc>arb-usdc across", "base-usdc>arb-usdc stargate", "base-usdc>arb-usdc relay", "base-eth>base-usdc same-chain", "base-usdc>base-eth same-chain"]) {
+    for (const name of ["base-usdc>arb-usdc across", "base-usdc>arb-usdc stargate", "base-usdc>arb-usdc mayan", "base-eth>base-usdc same-chain", "base-usdc>base-eth same-chain"]) {
       const c = pick(name);
       const q = (await localQuote(c)).quote!;
       const data = q.txRequest!.data!;
