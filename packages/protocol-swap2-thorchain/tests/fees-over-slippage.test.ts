@@ -114,9 +114,11 @@ describe("THORChain fees vs the caller's slippage", () => {
     expect(quoteUrls.map(limitParams)).toEqual([{tolerance: null, liquidity: "99"}]);
     expect(q!.minDestAmount).toBe("20508179" + "0".repeat(10));
     expect(validQuote(q!, params, "thorchain")).toBe(true);
-    // liquidity_tolerance_bps=100 would have floored to 20506108 — under the
-    // 18-decimal floor (205061085900000000) by 5.9e9 wei.
-    expect(validQuote({...q!, minDestAmount: "20506108" + "0".repeat(10)}, params, "thorchain")).toBe(false);
+    // liquidity_tolerance_bps=100 would have floored to 20506108 — under the exact
+    // 18-decimal floor (205061085900000000) by 5.9e9 wei, inside validQuote's 1 bp of
+    // provider rounding; a minimum past that is still refused.
+    expect(validQuote({...q!, minDestAmount: "20506108" + "0".repeat(10)}, params, "thorchain")).toBe(true);
+    expect(validQuote({...q!, minDestAmount: "20484000" + "0".repeat(10)}, params, "thorchain")).toBe(false);
   });
 
   it("THORChain fees above 5%: no route, a named reason (from the node's fees.total_bps)", async () => {

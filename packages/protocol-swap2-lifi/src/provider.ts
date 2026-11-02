@@ -4,6 +4,7 @@ import {describeLifiActivity} from "./activity.js";
 import {diamondCallMismatch} from "./calldata.js";
 import {solanaBridgeTxMismatch} from "./solana.js";
 import {timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
+import {slippageFloor} from "@anywalletkit/protocol-swap2-core/validate";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {bigintToNumber} from "@anywalletkit/core";
 
@@ -549,7 +550,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         if (sentSlippage !== undefined) {
           const dest = BigInt(est.toAmount);
           const min = BigInt(minDestAmount);
-          if (dest > 0n && min < (dest * BigInt(10_000 - slippageBps)) / 10_000n) {
+          if (dest > 0n && min < slippageFloor(dest, slippageBps)) {
             const effective = bigintToNumber(((dest - min) * 1_000_000n) / dest) / 1_000_000;
             const requested = slippageBps / 10_000;
             const scaled: number = Math.floor(((sentSlippage * requested) / effective) * 0.995 * 1_000_000) / 1_000_000;

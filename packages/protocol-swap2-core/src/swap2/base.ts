@@ -40,6 +40,7 @@ import {
 } from "@anywalletkit/swap2-assets";
 import type {CrossChainProvider, IntentStatus, QuoteParams, Quote, UnsignedTx} from "../types.js";
 import {tonRawAddress} from "../util.js";
+import {SLIPPAGE_ROUNDING_BPS} from "../validate.js";
 import {
   Swap2ConfigurationError,
   Swap2ExecutionError,
@@ -662,9 +663,10 @@ function assertQuoteConstraints(q: Quote, options: Swap2Options): void {
   }
   if (options.slippage !== undefined) {
     const scale = 1_000_000_000n;
-    const permitted = BigInt(floorScaled(options.slippage, 1_000_000_000));
-    // Floor, like the providers compute their minimum (see validQuote).
-    const required = (nominal * (scale - permitted)) / scale;
+    // The caller's slippage plus the providers' rounding (SLIPPAGE_ROUNDING_BPS), floored like
+    // the providers compute their minimum (see validQuote).
+    const permitted = BigInt(floorScaled(options.slippage, 1_000_000_000)) + BigInt(SLIPPAGE_ROUNDING_BPS) * 100_000n;
+    const required = permitted >= scale ? 0n : (nominal * (scale - permitted)) / scale;
     if (guaranteed < required) {
       throw new Error(`swap2: quote exceeds caller slippage (${options.slippage})`);
     }
