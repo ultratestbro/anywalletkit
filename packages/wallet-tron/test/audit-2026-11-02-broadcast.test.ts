@@ -80,9 +80,10 @@ describe('Tron broadcast: java-tron pre-push refusals stay a plain Error', () =>
 })
 
 describe('Tron broadcast: accepted answers', () => {
-  it('result:true returns the txid', async () => {
+  it('result:true returns the signed txID, not the id the node echoes', async () => {
     const e = await outcome(() => ({ status: 200, body: JSON.stringify({ result: true, txid: 'f'.repeat(64) }) }))
-    expect(e).toMatchObject({ hash: 'f'.repeat(64) })
+    expect(e).toMatchObject({ hash: expect.stringMatching(/^[0-9a-f]{64}$/) })
+    expect((e as { hash: string }).hash).not.toBe('f'.repeat(64))
   })
   it('DUP_TRANSACTION_ERROR reads as accepted', async () => {
     const r = await outcome(() => ({ status: 200, body: JSON.stringify({ code: 'DUP_TRANSACTION_ERROR', txid: 'ab' }) }))

@@ -1,7 +1,7 @@
 import { LocalSigner, SignerError, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { bytesToBase58, ed25519Key, implicitAccountId, publicKeyToString } from './address.js'
-import { decodeAnyTransaction, encodeSignedTransaction } from './borsh.js'
-import { BroadcastUnknownError, MessageIsTransactionError, SimulationError } from './errors.js'
+import { decodeAnyTransaction, decodeTransaction, encodeSignedTransaction, encodeTransaction } from './borsh.js'
+import { BroadcastUnknownError, MessageIsTransactionError, SimulationError, UnsafeTransactionError } from './errors.js'
 import { nep413Hash, type Nep413Payload, type Nep413Signed } from './nep413.js'
 import { WalletAccountReadOnlyNear, assertWellFormed, receiptOf } from './read-only-account.js'
 import { fromBase64, isDefinitiveBroadcast, outcomeFailed, toBase64 } from './rpc.js'
@@ -113,8 +113,25 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
    * no node round-trip: no preflight and no fee check.
    */
   async signBuilt(tx: NearBuiltTransaction): Promise<NearSignedTransaction> {
-    this.assertSafe(tx)
-    return this.#signChecked(tx)
+    const own = this.#ownCopy(tx)
+    this.assertSafe(own)
+    return this.#signChecked(own)
+  }
+
+  /**
+   * A plain copy of `tx`, decoded from its borsh bytes: the object the checks read is the one that
+   * gets hashed and signed, whatever the caller does with its own object (a getter, or an array
+   * changed while a node call is awaited).
+   */
+  #ownCopy(tx: NearBuiltTransaction): NearBuiltTransaction {
+    let copy: NearBuiltTransaction
+    try {
+      copy = decodeTransaction(encodeTransaction(tx))
+    } catch (e) {
+      this.assertSafe(tx)
+      throw new UnsafeTransactionError('non-canonical', `Not an encodable NEAR transaction: ${(e as Error).message}`)
+    }
+    return copy
   }
 
   /** Sign a transaction that has already been through `assertSafe`. */
@@ -131,6 +148,8 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
     if (typeof tx !== 'string' && tx.nonce === undefined && this._nonceFloor !== undefined && built.nonce <= this._nonceFloor) {
       built = { ...built, nonce: this._nonceFloor + 1n }
     }
+    // From here on the checks, the preflight and the signature all read our own copy, not the caller's actions.
+    built = this.#ownCopy(built)
     this.assertSafe(built)
     const estimate = await this.estimate(built)
     this.assertSafe(built, estimate.fee)

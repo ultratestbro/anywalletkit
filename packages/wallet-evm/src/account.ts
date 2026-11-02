@@ -10,7 +10,7 @@ import { encodeApprove, ERC20_PERMIT_ABI, PERMIT_TYPES, USDT_MAINNET } from './e
 /** ERC-165 interface id of ERC-721. */
 const ERC721_INTERFACE = '80ac58cd'
 import { BroadcastUnknownError, ChainMismatchError, NonceConflictError, PermitUnsupportedError, SimulationError, TransactionRevertedError, UnsafeTransactionError } from './errors.js'
-import { createEndpointClients } from './client.js'
+import { createEndpointClients, takeBroadcastErrors } from './client.js'
 import { WalletAccountReadOnlyEvm, assertTxShape, canonicalData, chainIdNumber, transferTransaction, typedDataHash, typedDomainChainId } from './read-only-account.js'
 export { MIN_PRIORITY_FEE_WEI, typedDomainChainId } from './read-only-account.js'
 import type { ApproveOptions, EvmConfig, EvmTransaction, EvmTransferOptions, PermitInfo, PermitOptions, SignedPermit, TypedDataInput } from './types.js'
@@ -71,21 +71,56 @@ const NODE_REJECTION = /\bnonce\b|underpriced|insufficient funds|intrinsic gas|e
  */
 const DEFINITIVE_RPC_CODES = new Set([-32700, -32600, -32601, -32602, -32003])
 /**
- * The text of the JSON-RPC errors in the chain (each carries a numeric `code`). Nothing when the
- * chain holds an HTTP or timeout error: a gateway's status page or 5xx body is not the node's
- * answer, whatever words it contains.
+ * A node's own refusal in its exact words (geth, erigon, besu, nethermind and the hosted RPCs):
+ * what is still read from an error whose source is not a JSON-RPC server for sure.
  */
-const rpcErrorText = (e: unknown): string => {
-  const parts: string[] = []
+const EXACT_REJECTION = /nonce too (?:low|high)|nonce is too low|invalid nonce|transaction underpriced|insufficient funds for|intrinsic gas too low|exceeds block gas limit|less than block base fee|tip higher than fee cap|priority fee per gas higher than max fee|invalid sender|transaction type not supported|already known/i
+/**
+ * A code a JSON-RPC server answers with (the reserved -32768..-32000 range). Not viem's -1
+ * (UnknownRpcError: the provider's error had no JSON-RPC code) nor an HTTP status used as a code.
+ */
+const isRpcCode = (c: unknown): c is number => typeof c === 'number' && Number.isInteger(c) && c >= -32768 && c <= -32000
+/**
+ * viem's HTTP and timeout errors, also by name and by an HttpRequestError's fields (`url` with
+ * `status` / `headers`): an EIP-1193 provider backed by another copy of viem (an app's own client)
+ * throws that copy's classes, which `instanceof` does not see, and a bundler may rename them.
+ */
+const isTransportError = (e: unknown): boolean =>
+  e instanceof HttpRequestError || e instanceof TimeoutError ||
+  (e instanceof Error && (e.name === 'HttpRequestError' || e.name === 'TimeoutError' ||
+    (typeof (e as { url?: unknown }).url === 'string' && ('status' in e || 'headers' in e) && !isRpcCode((e as { code?: unknown }).code))))
+/**
+ * Does the error chain hold a node's refusal? Not if an HTTP or timeout error sits anywhere in it:
+ * a gateway's status page or 5xx body is not the node's answer, whatever words it contains, and a
+ * wrapper above it (viem's UnknownRpcError around another copy's HttpRequestError) repeats that
+ * page in its own `details`. An error with a JSON-RPC code is read with the broad wording; any
+ * other text (a provider error viem had to wrap as UnknownRpcError) only with a node's exact
+ * words. A viem error's `message` also repeats the request URL and body, so only its `details`
+ * (the node's own text) is read.
+ */
+const refusalWording = (e: unknown, pattern: (code: unknown, text: string) => RegExp): boolean => {
+  for (let cur: unknown = e, i = 0; cur && i < 6; cur = (cur as { cause?: unknown }).cause, i++) if (isTransportError(cur)) return false
   for (let cur: unknown = e, i = 0; cur && i < 6; cur = (cur as { cause?: unknown }).cause, i++) {
-    if (cur instanceof HttpRequestError || cur instanceof TimeoutError) return ''
     const o = cur as { code?: unknown; message?: unknown; details?: unknown; shortMessage?: unknown }
-    if (typeof o.code === 'number') for (const v of [o.message, o.details, o.shortMessage]) if (typeof v === 'string') parts.push(v)
+    const text = typeof o.shortMessage === 'string' ? o.details : o.message
+    if (typeof text === 'string' && pattern(o.code, text).test(text)) return true
   }
-  return parts.join('\n')
+  return false
 }
+/**
+ * JSON-RPC errors a gateway or load balancer also answers with when the upstream node failed —
+ * -32603 internal error, -32005 limit exceeded, -32002 resource unavailable, or any code with
+ * gateway wording — even on a 5xx whose body viem reads as JSON-RPC. They count as a refusal only
+ * in a node's exact words.
+ */
+const GATEWAY_RPC_CODES = new Set([-32603, -32005, -32002])
+const GATEWAY_WORDING = /upstream|gateway|timeout|timed out|unavailable/i
+const nodeRefused = (e: unknown): boolean => refusalWording(e, (code, text) =>
+  isRpcCode(code) && !GATEWAY_RPC_CODES.has(code) && !GATEWAY_WORDING.test(text) ? NODE_REJECTION : EXACT_REJECTION)
+/** The node already holds these bytes. Read like a refusal: never from an HTTP error page. */
+const alreadyKnown = (e: unknown): boolean => refusalWording(e, () => ALREADY_KNOWN)
 const nodeAnswered = (e: unknown): boolean => {
-  if (NODE_REJECTION.test(rpcErrorText(e))) return true
+  if (nodeRefused(e)) return true
   for (let cur: unknown = e, i = 0; cur && i < 6; cur = (cur as { cause?: unknown }).cause, i++) {
     const code = (cur as { code?: unknown }).code
     if (typeof code === 'number' && DEFINITIVE_RPC_CODES.has(code)) return true
@@ -100,6 +135,21 @@ export const DEFAULT_MAX_FEE_RATE_MULTIPLIER = 10
  * hands over on a chain whose fees are a fraction of a gwei (L2s, BSC) is still signed.
  */
 export const MIN_FEE_RATE_CEILING_WEI = 10_000_000_000n
+/**
+ * How long the fee-rate check waits for the network's quote. Past it the check is skipped, as
+ * for an unreadable quote, so a silent RPC does not hold up signing a fully specified transaction.
+ */
+export const FEE_QUOTE_TIMEOUT_MS = 5_000
+/** Above this, {@link EvmConfig.maxFeeRateMultiplier} is the same as `Infinity` (the check is off). */
+export const MAX_FEE_RATE_MULTIPLIER = 1_000_000
+
+/** `maxFeeRateMultiplier` is unset, `null`, `Infinity` or a number of at least 1; anything else is a config mistake. */
+function assertFeeRateMultiplier(k: unknown): void {
+  if (k === undefined || k === null || k === Infinity) return
+  if (typeof k !== 'number' || Number.isNaN(k) || k < 1) {
+    throw new RangeError(`maxFeeRateMultiplier must be a number of at least 1, null or Infinity (got ${String(k)}).`)
+  }
+}
 
 /** Worst-case fee of a prepared transaction: all its gas at its cap (`gasPrice`, or `maxFeePerGas`). */
 export function maxFeeCost(tx: TransactionSerializable): bigint {
@@ -147,6 +197,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   /** `publicKey` is the signer's compressed secp256k1 key (33 bytes); it is needed synchronously for the address. */
   constructor(signer: Signer, publicKey: Uint8Array, path: string, config: EvmConfig = {}) {
     super(addressFromPublicKey(publicKey), config)
+    assertFeeRateMultiplier(config.maxFeeRateMultiplier)
     this.#signer = requireCurve(signer, 'secp256k1')
     this.signerKind = this.#signer.kind
     this.publicKey = publicKey
@@ -265,17 +316,23 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
    * given, so their rate is held against the network: above `maxFeeRateMultiplier` × the current
    * quote (the higher of `eth_gasPrice` and the EIP-1559 estimate), and above
    * {@link MIN_FEE_RATE_CEILING_WEI}, it is refused. Fees the account filled in itself are the
-   * quote already. Nothing is refused when there is no provider or the quote cannot be read.
+   * quote already. Nothing is refused when there is no provider or the quote cannot be read
+   * within {@link FEE_QUOTE_TIMEOUT_MS}.
    */
   private async assertFeeRate(tx: EvmTransaction, prepared: TransactionSerializable): Promise<void> {
     if (tx.gasPrice === undefined && tx.maxFeePerGas === undefined && tx.maxPriorityFeePerGas === undefined) return
     const k = this._config.maxFeeRateMultiplier === undefined ? DEFAULT_MAX_FEE_RATE_MULTIPLIER : this._config.maxFeeRateMultiplier
-    if (k === null || !Number.isFinite(k) || !this._client) return
+    if (k === null || !Number.isFinite(k) || k > MAX_FEE_RATE_MULTIPLIER || !this._client) return
     const client = this._client
-    const [estimate, gasPrice] = await Promise.all([
-      client.estimateFeesPerGas().then((f) => f.maxFeePerGas, () => undefined),
-      client.getGasPrice().catch(() => undefined),
-    ])
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const late = new Promise<[undefined, undefined]>((resolve) => { timer = setTimeout(() => resolve([undefined, undefined]), FEE_QUOTE_TIMEOUT_MS) })
+    const [estimate, gasPrice] = await Promise.race([
+      Promise.all([
+        client.estimateFeesPerGas().then((f) => f.maxFeePerGas, () => undefined),
+        client.getGasPrice().catch(() => undefined),
+      ]),
+      late,
+    ]).finally(() => clearTimeout(timer))
     const quotes = [estimate, gasPrice].filter((q): q is bigint => typeof q === 'bigint' && q > 0n)
     if (!quotes.length) return
     const quote = quotes.reduce((a, b) => (b > a ? b : a))
@@ -403,16 +460,26 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
     }
     const submit = async (signed: { raw: Hex; hash: Hex; nonce: number }): Promise<TransferResult> => {
       try {
-        return accepted(await client.sendRawTransaction({ serializedTransaction: signed.raw }), signed.nonce)
+        // The hash is ours (keccak256 of the signed bytes), not whatever id the node echoes back.
+        await client.sendRawTransaction({ serializedTransaction: signed.raw })
       } catch (error) {
+        // With a provider list, what every endpoint answered before the last one (whose error this is).
+        const earlier = takeBroadcastErrors(client, signed.raw).slice(0, -1)
         // These exact bytes are in a pool already: an earlier attempt reached a
         // node and its answer was lost (viem's fallback then hands the same
         // bytes to the next RPC). It is the same transaction — never sign another.
-        if (ALREADY_KNOWN.test(errorText(error))) return accepted(signed.hash, signed.nonce)
+        if ([error, ...earlier].some(alreadyKnown)) return accepted(signed.hash, signed.nonce)
         // No answer from the node: the tx may be in the mempool under this hash.
         if (!nodeAnswered(error)) throw new BroadcastUnknownError(signed.hash, error)
+        // A refusal from a later endpoint says nothing about an earlier one that got the same bytes
+        // and gave no answer: that one may have passed them on. "nonce too low" is left to the
+        // caller below, which looks this hash up before anything else.
+        const lost = earlier.find((e) => !nodeAnswered(e))
+        if (lost !== undefined && !NONCE_TOO_LOW.test(errorText(error))) throw new BroadcastUnknownError(signed.hash, lost)
         throw error
       }
+      takeBroadcastErrors(client, signed.raw)
+      return accepted(signed.hash, signed.nonce)
     }
     const first = await this.#signPrepared(prepared, limit, op)
     try {

@@ -24,8 +24,10 @@ export interface EvmConfig {
   /**
    * Ceiling on a fee rate the caller set (`gasPrice`, `maxFeePerGas`, `maxPriorityFeePerGas`):
    * above this multiple of the network's current quote — and above 10 gwei — the transaction is
-   * refused (UnsafeTransactionError) before signing. Default 10. `null` or `Infinity` turns it off.
-   * Fees the account fills in itself, and signing without a provider (no quote), are not checked.
+   * refused (UnsafeTransactionError) before signing. Default 10. `null` or `Infinity` turns it off
+   * (as does any value above 1,000,000); a value below 1, or NaN, throws a RangeError when the
+   * account is created. Fees the account fills in itself, and signing without a provider (no
+   * quote), are not checked.
    */
   maxFeeRateMultiplier?: number | null
   /**
