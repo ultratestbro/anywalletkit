@@ -25,6 +25,13 @@ export const planModule = (source: (amount: bigint) => Source) => class {
 
 /** A Tron router call that pays `who` (the fixture's decode reads it), with the input as native value. */
 export const tronCall = (to: string) => (amount: bigint): Source => ({ kind: 'call', to, data: `0x7ff36ab5${w(1n)}${w(`0x${'11'.repeat(20)}`)}`, value: amount })
+/** Tron USDT, and the 20-byte payloads of the router / stranger addresses as TRC-20 calldata carries them. */
+export const TRON_USDT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
+export const TRON_ROUTER_HEX = '0x6e0617948fe030a7e4970f8389d4ad295f249b7e'
+export const TRON_STRANGER_HEX = '0x74472e7d35395a6b5add427eecb7f4b62ad2b071'
+/** A Tron call to the source token that approves (or, with `increase`, adds to the allowance of) `spender`, no native value. */
+export const tronApprove = (spender: string, allowance: (amount: bigint) => bigint, increase = false) => (amount: bigint): Source =>
+  ({ kind: 'call', to: TRON_USDT, data: `0x${increase ? '39509351' : '095ea7b3'}${w(spender)}${w(allowance(amount))}`, value: 0n })
 export const typedOrder = (): Source => ({ kind: 'typed-order', typedData: JSON.stringify({ domain: { name: 'Order', chainId: 1 }, types: { Order: [{ name: 'receiver', type: 'address' }] }, primaryType: 'Order', message: { receiver: ME } }) })
 
 export const planFixture = (name: string, extra: Record<string, unknown> = {}) => ({

@@ -73,6 +73,21 @@ const UNLIMITED = 1n << 255n
 // input, a contract nobody declared, native value into it, calldata nobody can read.
 const WARNINGS = new Set(['recipient-foreign', 'approval-unlimited', 'approval-excess', 'approval-unknown-spender', 'approval-unparsed', 'contract-unknown', 'native-value', 'calldata-undecodable'])
 const lc = (a: string) => a.toLowerCase()
+// tx-preview's unlimited threshold, type(uint128).max, for approvals it does not read itself.
+const PREVIEW_UNLIMITED = (1n << 128n) - 1n
+// TRC-20 shares ERC-20's selectors: approve(address,uint256) and increaseAllowance(address,uint256).
+const ALLOWANCE_SELECTORS = new Set(['095ea7b3', '39509351'])
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+/** The 20-byte account a Tron (base58 T… / 41-hex) or EVM address names, as lowercase hex; null for anything else. */
+function account20(address: string): string | null {
+  const hex = /^(?:0x)?(?:41)?([0-9a-fA-F]{40})$/.exec(address)
+  if (hex) return hex[1]!.toLowerCase()
+  if (!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address)) return null
+  let n = 0n
+  for (const ch of address) n = n * 58n + BigInt(B58.indexOf(ch))
+  const full = n.toString(16).padStart(50, '0')
+  return full.startsWith('41') ? full.slice(2, 42) : null
+}
 const word = (hex: string) => hex.replace(/^0x/, '').toLowerCase().padStart(64, '0')
 const approveData = (spender: string, amount: bigint) => `0x095ea7b3${word(spender)}${word(amount.toString(16))}`
 
@@ -152,6 +167,17 @@ export function describeProtocolBehaviour<P extends object>(name: string, o: Pro
           // native value, must be declared as on EVM, and who it pays is still the fixture's to show.
           const targets = new Set([...declared, ...(f.callTargets ?? []), ...(f.spender ? [f.spender] : []), ...(f.sourceToken ? [f.sourceToken] : [])].map(lc))
           expect(targets.has(lc(s.to)), `the plan calls ${s.to}${s.value > 0n ? ' with native value' : ''}, which is not declared (callTargets, spender, source token, deposit address)`).toBe(true)
+          // TRC-20 approve / increaseAllowance calldata: the approval checks tx-preview runs on EVM — a declared
+          // spender (callTargets, spender, source token), no more than the input, and readable arguments.
+          const data = (s.data ?? '').replace(/^0x/, '').toLowerCase()
+          if (ALLOWANCE_SELECTORS.has(data.slice(0, 8))) {
+            expect(/^[0-9a-f]{136}$/.test(data), `the plan's call to ${s.to} carries approval calldata that cannot be read (approval-unparsed)`).toBe(true)
+            const spender = data.slice(32, 72)
+            const allowance = BigInt(`0x${data.slice(72, 136)}`)
+            const spenders = new Set([...(f.callTargets ?? []), ...(f.spender ? [f.spender] : []), ...(f.sourceToken ? [f.sourceToken] : [])].map(account20))
+            expect(/^0{24}$/.test(data.slice(8, 32)) && spenders.has(spender), `the plan's call approves 0x${spender}, which is not a declared spender (approval-unknown-spender)`).toBe(true)
+            expect(allowance < PREVIEW_UNLIMITED && allowance <= plan!.sourceAmount, `approval ${allowance} exceeds the input (approval-unlimited / approval-excess)`).toBe(true)
+          }
           await decoded(s, declared)
         }
       })
