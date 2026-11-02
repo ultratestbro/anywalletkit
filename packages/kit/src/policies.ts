@@ -192,8 +192,8 @@ export interface WriteIntent {
   /**
    * NEAR: what the transaction changes on the signing account itself, read off its actions (object
    * form and borsh, also for `signBuilt`): a key added (`full-access-key` too when it can do
-   * anything), a key deleted, code deployed, stake, account creation or deletion, a delegated action.
-   * Such a transaction may name only the own account as receiver while handing it over, so a confirm
+   * anything), a key deleted, code deployed, stake, account creation or deletion, a delegated action
+   * (and the changes its own actions make). Such a transaction may name only the own account as receiver while handing it over, so a confirm
    * screen must show these, not a transfer to self. Except for `delete-account` and `delegate`, whose
    * beneficiary and receivers are in `destinations`, `destinationUnknown` is true with them (an
    * allowlist refuses the write, a blocklist does without a `confirm` hook). Absent when there are none.
