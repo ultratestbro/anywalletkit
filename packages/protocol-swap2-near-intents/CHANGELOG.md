@@ -1,5 +1,28 @@
 # @anywalletkit/protocol-swap2-near-intents
 
+## 0.3.0
+
+### Minor Changes
+
+- ed2723d: `recipientType: "INTENTS"` in the provider config credits a NEAR Intents account inside `intents.near` (the account a near.com user holds) instead of withdrawing to an address on the destination chain. In that mode `destToken` may be the intents token id itself (`nep141:…` / `nep245:…`), `destAddress` must be a NEAR account id (named, implicit hex or `0x…`, refused before any request otherwise), and a corridor paused for the destination chain does not block an intents token id, since the output never leaves `intents.near`. `recipientType: "CONFIDENTIAL_INTENTS"` credits that account's Confidential Intents balance instead (where near.com keeps funds); 1Click serves it to partners only, so it requires `jwt` and throws at construction without one. The default stays `DESTINATION_CHAIN`; an unknown value throws at construction.
+
+### Patch Changes
+
+- 08988d4: With `recipientType: "INTENTS"` or `"CONFIDENTIAL_INTENTS"`, `destAddress` must now be an intents.near account someone can sign for: a named account (`alice.near`), an implicit id (64 lowercase hex) or an implicit `0x` id (40 lowercase hex, the `nearcom:0x…` account on near.com). A dot-less id that only passes the NEAR account syntax, such as a lowercase `bc1q…` address, a `0x…` that is not 40 hex or a top-level name, is refused before any request, since an output credited there could never be moved. Lowercase a checksummed `0x` address before passing it. `DESTINATION_CHAIN` (the default) is unchanged.
+- 1de24fd: With `recipientType: "INTENTS"` or `"CONFIDENTIAL_INTENTS"`, the provider now claims and quotes only a NEAR `destChain` (`near:mainnet`). The output of such a swap is credited inside intents.near and never reaches another chain, so a route like "USDC on Base to 0x…" in these modes made the swap review name Base while the funds stayed in NEAR Intents; it is now refused by name. Every intents token is still reachable: pass `destChain: "near:mainnet"` with the catalog's NEAR token or the intents token id itself (for example `nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near` for Base USDC held in intents). `DESTINATION_CHAIN` (the default) is unchanged.
+- Updated dependencies [3b81a37]
+- Updated dependencies [b16f9b1]
+- Updated dependencies [0919427]
+- Updated dependencies [ac56c9b]
+- Updated dependencies [21f2b25]
+- Updated dependencies [ccea432]
+- Updated dependencies [d1e517a]
+- Updated dependencies [57a68aa]
+- Updated dependencies [5b3e194]
+  - @anywalletkit/protocol-swap2-core@0.10.0
+  - @anywalletkit/core@0.8.0
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes

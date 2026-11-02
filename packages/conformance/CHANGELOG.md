@@ -1,5 +1,24 @@
 # @anywalletkit/conformance
 
+## 0.5.0
+
+### Minor Changes
+
+- d50c2da: `describeProtocolBehaviour` now checks who a swap plan's source call pays and which contracts it calls, not only the plan's own recipient fields and approvals. Two new fixture fields: `callTargets` (contracts the source call may go to; the declared `spender` and `sourceToken` count already) and `decode(source)` (the fixture's own reading of router calldata or a typed order, returning every address the output or refund goes to). `decode` is required whenever the source is a contract call that is not a plain token or native transfer, and for typed orders; each address it returns must be own or the declared deposit address. tx-preview's `contract-unknown`, `native-value`, `approval-unparsed` and `calldata-undecodable` warnings now fail the suite. Module authors: add `callTargets` and a `decode` to your behaviour fixtures (see the swap2 modules' tests in this repository for examples); a fixture without them now fails.
+
+### Patch Changes
+
+- 5ca3652: `describeProtocolBehaviour` now checks TRC-20 `approve` / `increaseAllowance` calldata inside a Tron call the same way it checks approvals on EVM. The spender must be declared (`spender`, `callTargets` or the source token), the allowance must be below the unlimited threshold and no more than the input, and the arguments must be readable. Before, a Tron call to the declared source token that approved an undeclared spender for the maximum passed the suite. Module authors whose Tron fixtures approve inside the source call must declare that spender and approve exactly the input.
+- ae0a4f3: `describeProtocolBehaviour` now also reads `increaseApproval(address,uint256)` (selector `0xd73dd623`, the older StandardToken name) as an approval inside a Tron call, the same as tx-preview and the kit already do, so it is held to the declared-spender and input-amount rules. The `0x` prefix of Tron call data is now matched case-insensitively, and call data that is not hex fails the suite instead of skipping the approval check. Module authors whose Tron fixtures approve via `increaseApproval` must declare that spender and approve exactly the input; fixtures must carry hex call data.
+- db06503: `describeProtocolBehaviour` now applies `callTargets` to calls on chains that tx-preview does not read, such as Tron or TON. A source call into a contract that is not declared (`callTargets`, the spender, the source token, the deposit address or an own address) fails the suite, with or without native value, as it already did on EVM. Before, such a call only had to satisfy the fixture's `decode`. Module authors with a Tron or TON `call` plan must list its contract in `callTargets`. The suite's own tests now also cover unreadable calldata, unparsed permits and typed orders.
+- Updated dependencies [d6632b9]
+- Updated dependencies [0919427]
+- Updated dependencies [02aa3f6]
+- Updated dependencies [89c4ad1]
+- Updated dependencies [1de4a34]
+  - @anywalletkit/tx-preview-evm@0.5.0
+  - @anywalletkit/core@0.8.0
+
 ## 0.4.6
 
 ### Patch Changes

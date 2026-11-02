@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/conformance",
-  "version": "0.4.6",
+  "version": "0.5.0",
   "description": "Conformance suites and golden vectors every Any Wallet Kit chain and protocol module must pass.",
   "keywords": [
     "anywalletkit"

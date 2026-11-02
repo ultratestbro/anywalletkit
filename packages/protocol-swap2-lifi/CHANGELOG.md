@@ -1,5 +1,48 @@
 # @anywalletkit/protocol-swap2-lifi
 
+## 0.5.0
+
+### Minor Changes
+
+- d1e517a: Bridges out of Solana are now bound to the recipient you reviewed, not only to a SOL-out ceiling.
+  
+  - `protocol-swap2-core`: for a cross-chain serialized leg the engine adds `bridgeOut: {destChain, recipient}` to the expectation it hands `account.sendSerializedTransaction`.
+  - `wallet-solana`: `sendSerialized` / `checkSerialized` accept `expect.bridgeOut` (`BridgeOutExpectation`). When the transaction is a Mayan route (it runs one of Mayan's own programs, directly or through Mayan's CPI proxy), every top-level instruction must be one the guard can follow — transfers to this wallet's own accounts or to a fee wallet (LI.FI's `LIFI_FEE_WALLET_ADDRESS` by default, at most 3 % of what may leave), a Jupiter swap into the wallet or the bridge, Mayan's Swift / MCTP / Fast MCTP orders — and every Mayan order must pay `recipient` on `destChain`; otherwise the wire is refused with `bridge-recipient`, `bridge-payee`, `bridge-instruction`, `bridge-missing` or `bridge-fee`. A transaction of another bridge is checked as without `bridgeOut` (see the Solana-bridges note). Instructions sent through Mayan's CPI proxy (`MAYAN_CPI_PROXY_PROGRAM_ADDRESS`) are now described and guarded as the instruction they run, so a program allowlist and the core-instruction checks see through it; the legacy empty-data ATA Create is described as an ATA creation.
+  - `protocol-swap2-lifi`: the provider and `lifiVerifyQuote` refuse a Solana bridge transaction that is not paid by the sender, or a Mayan route that transfers SOL directly to a wallet other than the sender or LI.FI's fee wallet.
+  
+  What to do: map the swap2 expectation onto `account.sendSerialized` with `serializedGuardFromExecution` from `wallet-solana` (see the note on it) instead of by hand. Without `bridgeOut` the account cannot prove where a Mayan bridge pays.
+- d673f68: LI.FI EVM routes no longer use bridges whose Diamond call does not bind the recipient the wallet checked. Relay (`relaydepository`) deposits against an order id whose off-chain order names the recipient, and Garden, deBridge DLN and ThorSwap carry the destination in facet data or an off-chain order the facet never compares, so a matching `BridgeData.receiver` said nothing about where the funds go. These calls are now refused with a named reason (also by `lifiVerifyQuote` / `lifiPins` for remote quotes), Squid is accepted only on its CallBridge route, and every cross-chain request asks LI.FI to deny `relaydepository` and `garden` (also in the `chooseRoute` candidates), so the affected pairs come back through another bridge (live 2026-11-02: Gnosis xDAI → Arbitrum USDC via NEAR Intents, Base USDC → Arbitrum via Polymer, ETH routes via Across). Nothing to change in apps; a `chooseRoute` policy that allowed only `relaydepository` now gets LI.FI's default pick.
+
+### Patch Changes
+
+- ac56c9b: A Mayan bridge order out of Solana is now always held to a reviewed token and minimum.
+  
+  - `protocol-swap2-core`: `Quote` gains an optional `destDecimals` (the destination token's decimals as the provider reports them). The swap2 server seals it (a whole number in 0..36; anything else is refused like any malformed quote field). The engine's `bridgeOut.destDecimals` uses the asset catalog's decimals, else the caller's verified `toTokenDecimals` (which the quote's value must agree with), never the quote's alone.
+  - `protocol-swap2-lifi`: quotes carry `destDecimals` from LI.FI's `action.toToken.decimals`.
+  - `wallet-solana`: with `expect.bridgeOut`, a Mayan order is refused when the guard names no `destToken` (`bridge-token`) or no `minAmountOut` with `destDecimals` (`bridge-min`), instead of passing with only its own non-zero minimum.
+  
+  What to do: nothing when you map the engine's expectation with `serializedGuardFromExecution`. A hand-built `bridgeOut` for a Mayan route must now carry `destToken`, `minAmountOut` and `destDecimals`. A swap to a destination token the catalog does not list through Mayan needs `toTokenDecimals`, or the leg is refused at signing.
+- ccea432: A quote whose minimum sits exactly at the requested slippage is no longer refused for a rounding difference. Providers compute their minimum with their own rounding — LI.FI's Mayan answers land a few base units under floor(output × (1 − slippage)) on 18-decimal tokens — so the LI.FI provider's per-step check, `validQuote` (router, single-provider path, server) and the engine's caller-slippage check refused about half of the Mayan routes out of Solana at the default 0.5 % as "0.50 % under the quote". All three now accept a minimum up to the requested slippage plus 1 bp (`SLIPPAGE_ROUNDING_BPS`, and `slippageFloor(dest, bps)` in `@anywalletkit/protocol-swap2-core/validate`); a minimum further under the quote is still refused. Nothing to change in apps.
+- dec67d8: The LI.FI Diamond check now also reads the refund, depositor and fallback addresses a bridge carries in its own data — Stargate's LayerZero fee refund, the depositor of an Across deposit (and the Across Swap API's sponsored flows), the user of a LI.FI intent, an Eco intent's creator, an M0 order's owner, a Mayan Swift order's trader, Chainflip's refund address, and the refund recipients of Centrifuge, Frax, Glacis, LayerSwap, NEAR Intents, Polymer CCTP, Superset and Symbiosis — and refuses the quote unless each one is the sender or the recipient. LI.FI's own quotes set them to the sender, so routes keep working; the check runs in the provider and in `lifiVerifyQuote` (the `lifiPins` of a `remoteProvider`). Nothing to change in apps. Superset quotes that name a third address as their refund and fallback are refused.
+- 1726ef8: LI.FI routes through Squid and Symbiosis are no longer accepted, and cross-chain requests now ask LI.FI to route around them (`denyBridges=squid,symbiosis`, also in the route-options request), the way Relay and Garden already were. Neither ties where the funds go to the recipient the app reviews: Squid's route that bridges to it first runs arbitrary calls with the funds (LI.FI's Squid quotes were already refused, as they hand the funds to a destination call), and Symbiosis's main path names the final recipient and its revert address in calldata the Diamond forwards unchecked. Pairs they would have served get another bridge from LI.FI, or another provider. An app's route policy (`chooseRoute` → `allowBridges`) cannot re-enable them. Nothing to change in apps.
+- 9088e60: LI.FI's Solana bridges other than Mayan — Relay, LayerSwap, NEAR Intents, LI.FI Intents and whatever else LI.FI offers from Solana — quote and execute again as before. From Solana the provider no longer restricts LI.FI to Mayan (no `allowBridges` / `denyBridges` of its own, a `chooseRoute` policy's pick passes through, Relay included), and neither the provider, `lifiVerifyQuote` nor the account's `bridgeOut` check refuses a transaction for calling no Mayan program.
+  
+  Be aware: these bridges deposit to an address, an order id or a program whose recipient lives in an off-chain order or in data the device does not read, so the account does NOT check their recipient. With or without `bridgeOut` they are held to what they were held to before: the program allowlist and the `maxLamportsOut` / `maxTokenOut` ceilings. Only Mayan routes (Swift, MCTP, Fast MCTP) are recipient-, token- and minimum-checked on the device. EVM sources are unchanged: Relay, Garden, deBridge DLN and ThorSwap Diamond calls stay refused and Relay / Garden stay denied in the request. LI.FI Intents calls a program outside `DEFAULT_PROGRAM_ALLOWLIST`, as before: it passes only for an app that allows that program.
+  
+  Nothing to change in apps.
+- Updated dependencies [3b81a37]
+- Updated dependencies [b16f9b1]
+- Updated dependencies [0919427]
+- Updated dependencies [ac56c9b]
+- Updated dependencies [21f2b25]
+- Updated dependencies [ccea432]
+- Updated dependencies [d1e517a]
+- Updated dependencies [57a68aa]
+- Updated dependencies [5b3e194]
+  - @anywalletkit/protocol-swap2-core@0.10.0
+  - @anywalletkit/core@0.8.0
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.4.0
 
 ### Minor Changes

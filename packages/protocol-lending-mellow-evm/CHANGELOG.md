@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-lending-mellow-evm
 
+## 0.4.2
+
+### Patch Changes
+
+- Updated dependencies [0919427]
+  - @anywalletkit/core@0.8.0
+
 ## 0.4.1
 
 ### Patch Changes

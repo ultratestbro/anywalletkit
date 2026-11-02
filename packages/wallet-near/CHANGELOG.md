@@ -1,5 +1,20 @@
 # @anywalletkit/wallet-near
 
+## 0.4.0
+
+### Minor Changes
+
+- 102fd4a: `signBuilt` now runs the same hard checks as `signTransaction` before it signs: the transaction must be this account's (signer and key), and a dangerous action — AddKey, DeleteKey, DeleteAccount, DeployContract, Stake, CreateAccount, global-contract actions, SignedDelegate — is refused with `UnsafeTransactionError` (`code: 'dangerous-action'`) unless the account was created with `allowDangerousActions: true`. Plain transfers and function calls sign as before, still with no node call. If your app signs prebuilt transactions that add or delete keys on purpose, set `allowDangerousActions: true` for that account.
+- e5f92cf: `getTransactionReceipt` returns `undefined` while a NEAR transaction is not executed yet. It used to answer `{status: 1}` (with `raw.pending`) for a transaction the node had only received or included (`final_execution_status` NONE / INCLUDED), so an app could show a payment as done before it ran. Now: `undefined` while pending (no execution status, `NotStarted` / `Started`, or NONE / INCLUDED / INCLUDED_FINAL), `status: 1` only once it executed successfully (`SuccessValue` / `SuccessReceiptId`, no failed receipt), `status: 0` with `failure` when the transaction or any receipt failed. This matches every other chain. The exported `receiptOf()` now returns `NearReceipt | undefined`, and `raw.pending` is gone: treat `undefined` as "keep polling".
+
+### Patch Changes
+
+- 35c026a: `signBuilt`, `signTransaction`, `sendTransaction` and `transfer` now take one plain copy of the transaction (encoded to borsh and decoded back) before the hard checks, and sign exactly that copy. A transaction object that changes between reads — a getter on `actions`, or an `actions` array the caller edits while the account waits for the node — can no longer get a different transaction signed from the one that was checked. `signBuilt` returns the copy as `transaction`; its bytes are the same as before for every ordinary transaction, so nothing changes for apps.
+- c12ae08: A `send_tx` error is now a plain `NearRpcError` only when the node clearly refused the transaction (`INVALID_TRANSACTION`, or `REQUEST_VALIDATION_ERROR` / `PARSE_ERROR`). Any other JSON-RPC error — including gateway errors that carry no NEAR error name, such as `-32000 upstream request timeout` or `-32603 Internal error` — now throws `BroadcastUnknownError` (`maybeSent: true`, with the locally computed `hash`), because the transaction may still land. Treat it like a timeout: watch the hash, do not sign again. Reads are unchanged.
+- f67c685: Back-to-back NEAR sends no longer reuse a nonce. The nonce was read from the access key at `final`, which lags the block that holds the previous transaction, so a second `transfer()` / `sendTransaction()` right after the first signed the same nonce and was refused with `InvalidNonce`. The account now remembers the last nonce it broadcast (accepted or maybe sent, not after a definitive refusal) and signs at least that + 1, and it runs its sends one at a time. A nonce you set yourself, or an already-serialized transaction, is used as given. Nothing to change in apps.
+- Updated dependencies [0919427]
+  - @anywalletkit/core@0.8.0
+
 ## 0.3.1
 
 ### Patch Changes

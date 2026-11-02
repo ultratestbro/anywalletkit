@@ -1,5 +1,16 @@
 # @anywalletkit/core
 
+## 0.8.0
+
+### Minor Changes
+
+- 0919427: A bridge leg's reviewed minimum is no longer held in decimals that only the provider reported.
+  
+  - `core`: `Swap2Options` gains an optional `toTokenDecimals`, the decimals of `toToken` on the destination chain when the swap catalog does not list it, as the app verified them.
+  - `protocol-swap2-core`: the engine's `bridgeOut.destDecimals` is the asset catalog's value, else the caller's `toTokenDecimals`. A quote's `destDecimals` (for example LI.FI's `action.toToken.decimals`) is no longer used on its own. When both are present and disagree, the swap is refused before anything is signed. A `toTokenDecimals` that is not a whole number in 0..36 is refused. Catalog-listed destination tokens work as before and ignore `toTokenDecimals`.
+  
+  What to do: for a swap to a destination token the catalog does not list (for example a token the user added by address), read its decimals on the destination chain (`getTokenInfo` on that chain's account, or `inspectToken` from `@anywalletkit/tokens`) and pass them as `toTokenDecimals`. Without them, a Mayan bridge out of Solana to that token has no reviewed minimum and wallet-solana refuses it at signing (`bridge-min`). Other bridges and all catalog-listed routes are unaffected.
+
 ## 0.7.0
 
 ### Minor Changes

@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-staking-ssv-evm
 
+## 0.3.11
+
+### Patch Changes
+
+- Updated dependencies [0919427]
+  - @anywalletkit/core@0.8.0
+
 ## 0.3.10
 
 ### Patch Changes

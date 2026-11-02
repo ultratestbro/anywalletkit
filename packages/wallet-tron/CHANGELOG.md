@@ -1,5 +1,16 @@
 # @anywalletkit/wallet-tron
 
+## 0.6.2
+
+### Patch Changes
+
+- f2d2e4f: After a successful broadcast, `sendTransaction` / `transfer` now always return the hash of the bytes the account signed (EVM: keccak256 of the signed transaction; Tron: the signed `txID`), not the id the RPC node echoes back. An honest node echoes the same value, so nothing changes in practice; a buggy or hostile node can no longer point the app's tracking and receipt at a different transaction.
+- f169d4c: With a list of providers, a broadcast refusal (`SERVER_BUSY`, `TAPOS_ERROR`, `BLOCK_UNSOLIDIFIED` and the other pre-push codes) from a later provider now throws `BroadcastUnknownError` (`maybeSent: true`, `hash` = the txID) when an earlier provider was sent the same signed bytes and gave no answer (a timeout, a dropped connection, an HTTP error). The earlier provider may already have pushed the transaction, so do not sign a new one for the same payment: watch the hash. A refusal from the first provider tried is still a plain `Error`, and an acceptance or `DUP_TRANSACTION_ERROR` from any provider is still a success.
+- 448c56c: A broadcast answered with `NOT_ENOUGH_EFFECTIVE_CONNECTION` and the message "P2P broadcast failed." now throws `BroadcastUnknownError` (`maybeSent: true`, `hash` = the txID) instead of a plain `Error`: java-tron sends that answer after it has already put the transaction in its pending pool, so it may still land. Watch the hash rather than signing again. The same code from the peer-count check before the push (any other message) is still a plain refusal.
+- 30e2d62: A Tron broadcast is now a plain `Error` ("Broadcast failed: <code> <message>") only when java-tron answered one of the codes it returns before pushing a transaction to the network: `SIGERROR`, `CONTRACT_VALIDATE_ERROR`, `CONTRACT_EXE_ERROR`, `BANDWITH_ERROR`, `TAPOS_ERROR`, `TOO_BIG_TRANSACTION_ERROR`, `TRANSACTION_EXPIRATION_ERROR`, `SERVER_BUSY`, `NO_CONNECTION`, `NOT_ENOUGH_EFFECTIVE_CONNECTION`, `BLOCK_UNSOLIDIFIED`. Every other answer — an empty body, `result: false` with no code, a gateway `{ Error }` body, `OTHER_ERROR` or an unknown code — now throws `BroadcastUnknownError` (`maybeSent: true`, `hash` = the txID), because the transaction may still land. Treat it like a timeout: watch the hash, do not sign a new transaction for the same payment. `DUP_TRANSACTION_ERROR` is still read as accepted.
+- Updated dependencies [0919427]
+  - @anywalletkit/core@0.8.0
+
 ## 0.6.1
 
 ### Patch Changes

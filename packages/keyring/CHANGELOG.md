@@ -1,5 +1,12 @@
 # @anywalletkit/keyring
 
+## 0.3.9
+
+### Patch Changes
+
+- Updated dependencies [0919427]
+  - @anywalletkit/core@0.8.0
+
 ## 0.3.8
 
 ### Patch Changes

@@ -1,5 +1,40 @@
 # @anywalletkit/protocol-swap2-cctp
 
+## 0.5.0
+
+### Minor Changes
+
+- 3b81a37: A CCTP swap claimed through `claimSwap2` reaches `completed` again without an RPC for the destination chain, when the destination account proves the claim.
+  
+  - `claimSwap2` already waits for the claim with the account's `waitForTransaction`. When that wait resolves (the claim was included and succeeded), the id it returns now ends in `.ok` after the claim hash: `awk1.<provider>.<intent>.<sourceTx>.<claimTx>.ok`. Polling that id passes the new `IntentRef.destTxConfirmed: true` to the provider (a remote backend forwards it too).
+  - The CCTP provider takes a confirmed claim as the mint, since `receiveMessage` reverts once the message's nonce is used: `completed` without a destination RPC. With a destination RPC that does not show the mint yet, it reads `pending` (claim not ready) instead of offering the claim again.
+  - A bare claim hash (an account without `waitForTransaction`, or a wait that timed out) still proves nothing and stays `pending` until the destination's `usedNonces` shows the mint.
+  - `parseSwapId` (extension kit) reads the `.ok` segment as `destTxConfirmed`.
+  
+  What to do: keep polling with the id `claimSwap2` returns (store it in place of the old one), and give the destination account `waitForTransaction` (the SDK's EVM accounts have it). If you parse swap ids yourself, accept a fifth segment `ok`. An RPC for each destination in `rpcUrls` is still the way to see a claim sent from elsewhere complete.
+
+### Patch Changes
+
+- f8ca135: A CCTP swap whose claim was sent no longer reads `completed` when the provider has no RPC for the destination chain. `trackIntent` now returns `pending` (`depositReceived: true`, the claim hash in `destTxHash`, `claim.ready: false`) until the destination's `usedNonces` shows the mint, which needs the destination chain in `rpcUrls`. Before, the recorded claim hash alone was taken as the mint, so a claim that never minted could show as done.
+  
+  What to do: pass `rpcUrls` for every destination chain you route CCTP to (`cctpProvider({rpcUrls})`), or poll with the id `claimSwap2` returns for a claim the destination account saw succeed (see the `destTxConfirmed` note); with neither, a claimed swap stays `pending`.
+- 57a68aa: A CCTP claim hash is no longer taken as proof that the USDC was minted when the destination can be checked.
+  
+  - `cctpProvider`: when a destination RPC is configured but the `usedNonces` read fails (or the attested message carries no nonce to read), a swap with a recorded claim hash now reports `pending` (the claim hash is kept in `transactions`) instead of `completed`. Poll again; it completes once the RPC answers and the nonce is used. Without any destination RPC the recorded claim hash is still the evidence, as before.
+  - `claimSwap2` (all two-phase providers): when the destination account has `waitForTransaction`, the engine now waits for the claim before returning. If the wait proves the claim reverted on chain (the account's error has `code: "reverted"` or says the transaction reverted, as `@anywalletkit/wallet-evm` does), `claimSwap2` throws `Swap2ExecutionError` (claim hash in the message, the account's error as `cause`) and returns no id that carries the claim hash; poll the swap's status with the id you already had and claim again if it is still `action-required`. A wait that times out or loses the RPC proves nothing: the id with the claim hash is returned as before, and the provider's status decides (for CCTP with a destination RPC, `pending` until the mint is seen). Accounts without `waitForTransaction` behave as before.
+- Updated dependencies [3b81a37]
+- Updated dependencies [b16f9b1]
+- Updated dependencies [0919427]
+- Updated dependencies [ac56c9b]
+- Updated dependencies [21f2b25]
+- Updated dependencies [ccea432]
+- Updated dependencies [d1e517a]
+- Updated dependencies [57a68aa]
+- Updated dependencies [5b3e194]
+  - @anywalletkit/protocol-swap2-core@0.10.0
+  - @anywalletkit/core@0.8.0
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.4.0
 
 ### Minor Changes

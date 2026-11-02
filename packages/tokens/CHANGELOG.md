@@ -1,5 +1,13 @@
 # @anywalletkit/tokens
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [0919427]
+  - @anywalletkit/core@0.8.0
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes

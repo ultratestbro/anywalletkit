@@ -1,5 +1,15 @@
 # @anywalletkit/wallet-zcash
 
+## 0.5.1
+
+### Patch Changes
+
+- 204217e: The kit and the wallets now read the same amount from a raw send. For `sendTransaction` / `signTransaction` on EVM, Bitcoin, Zcash, Solana, Tron and TON, the amount `confirm` sees comes from `value` (the field the wallet signs). An `amount` field next to `value` that says something else makes the amount unknown (`intent.amount` is undefined), and an `amount` alone is no longer shown as what the transaction pays. `transfer` still reads `amount`. On the wallet side, a value given as a string is signed only when it is at most 300 characters long and has no whitespace, because the policies read no longer string. Longer or padded strings now throw `UnsafeTransactionError` (`wallet-evm` for `value` and the `transfer` amount; `wallet-btc` / `wallet-zcash` with `code: 'malformed-spend'`). Apps that pass bigints, integers or plain decimal / `0x` strings need no change; trim strings before passing them.
+- 6820874: A transaction's `value` is now accepted only as a bigint, a whole number, or a string that `BigInt()` reads (decimal or `0x…`), which are the shapes the kit's policies read as the amount. Before, the wallets coerced other shapes that the policies could not read. `wallet-evm` read a one-element list or an object with `valueOf` through `BigInt()`. `wallet-btc` and `wallet-zcash` also rounded `'1e5'`, `1.4` or `[100000]` into sats or zatoshis. In each case `confirm` saw no amount while the full value was signed. These shapes now throw `UnsafeTransactionError` (BTC/Zcash: `code: 'malformed-spend'`). Apps that pass values in base units as bigints, integers or integer strings need no change. An app that passes a fractional number of sats, or a string like `'1e5'`, must round or convert it before sending. BTC `feeRate` is still rounded as before.
+- 91fe18a: A transaction is now one plain object everywhere it is signed. `wallet-evm` (`sendTransaction`, `signTransaction`, quotes and simulation), `wallet-btc` and `wallet-zcash` throw `UnsafeTransactionError` (BTC/Zcash: `code: 'malformed-spend'`) for a list or a class instance instead of reading its fields. In the kit's policies, a list that also carries named fields (`Object.assign([call], { to, value })`) has no known destination on any EVM chain (`destinationUnknown: true`, never a revoke or approval), and on Bitcoin, Zcash and other one-recipient chains any list does: an allowlist refuses it, a blocklist refuses it without a `confirm` hook. Plain lists of EVM calls for batching accounts and TON message lists are read as before. Nothing to change in apps that pass `{ to, value, data }` objects; an EVM list sent to a plain wallet-evm account (for example the approvals module with `batch: true`) now throws instead of being signed as a transaction other than the listed calls.
+- Updated dependencies [0919427]
+  - @anywalletkit/core@0.8.0
+
 ## 0.5.0
 
 ### Minor Changes

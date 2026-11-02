@@ -1,5 +1,52 @@
 # @anywalletkit/extension-kit
 
+## 0.3.4
+
+### Patch Changes
+
+- f7f2a08: `eth_sendTransaction`: when the network's fees fell to less than a quarter of the cap the review sheet showed (a fee spike passed while the sheet was open), the transaction is now signed at the current fees (2 × base fee + tip, or the current gas price) instead of the stale cap, without a second sheet — the user pays at most what they approved. Before, a provider-backed signer (a `WalletAccountEvm` with a `provider`, which refuses caller-set fees far above the network quote) could refuse the approved transaction after the user said yes. A rise in fees still asks again, as before.
+- 3b81a37: A CCTP swap claimed through `claimSwap2` reaches `completed` again without an RPC for the destination chain, when the destination account proves the claim.
+  
+  - `claimSwap2` already waits for the claim with the account's `waitForTransaction`. When that wait resolves (the claim was included and succeeded), the id it returns now ends in `.ok` after the claim hash: `awk1.<provider>.<intent>.<sourceTx>.<claimTx>.ok`. Polling that id passes the new `IntentRef.destTxConfirmed: true` to the provider (a remote backend forwards it too).
+  - The CCTP provider takes a confirmed claim as the mint, since `receiveMessage` reverts once the message's nonce is used: `completed` without a destination RPC. With a destination RPC that does not show the mint yet, it reads `pending` (claim not ready) instead of offering the claim again.
+  - A bare claim hash (an account without `waitForTransaction`, or a wait that timed out) still proves nothing and stays `pending` until the destination's `usedNonces` shows the mint.
+  - `parseSwapId` (extension kit) reads the `.ok` segment as `destTxConfirmed`.
+  
+  What to do: keep polling with the id `claimSwap2` returns (store it in place of the old one), and give the destination account `waitForTransaction` (the SDK's EVM accounts have it). If you parse swap ids yourself, accept a fifth segment `ok`. An RPC for each destination in `rpcUrls` is still the way to see a claim sent from elsewhere complete.
+- 9620342: An empty vault now tells its own key from any other. New envelopes carry `dekCheck`, a fixed value sealed under the vault key (written by `create`, `changePassword`, `rotateVaultKey` and the v1→v2 upgrade). Before, a vault with no secrets accepted any 32 bytes in `setSecret`: after `rotateVaultKey` and deleting the last secret, a session still holding the retired key could seal a secret that the password would never open again. Now `setSecret` refuses such a key with `locked`, and `addPasskey` works on an empty vault when given the vault's own key (a wrong one is `locked`). Vaults written by earlier versions open as before and get the check the next time the envelope is re-sealed (change the password or rotate the key to add it right away). Nothing else to change.
+- Updated dependencies [f2d2e4f]
+- Updated dependencies [2e5fcf4]
+- Updated dependencies [7c2f089]
+- Updated dependencies [eb3af5f]
+- Updated dependencies [204217e]
+- Updated dependencies [6820874]
+- Updated dependencies [3b81a37]
+- Updated dependencies [b16f9b1]
+- Updated dependencies [0919427]
+- Updated dependencies [ac56c9b]
+- Updated dependencies [21f2b25]
+- Updated dependencies [f08dce7]
+- Updated dependencies [b269e9b]
+- Updated dependencies [c533926]
+- Updated dependencies [af7a82b]
+- Updated dependencies [91fe18a]
+- Updated dependencies [e6c97b4]
+- Updated dependencies [828593e]
+- Updated dependencies [ccea432]
+- Updated dependencies [d1e517a]
+- Updated dependencies [4a552d4]
+- Updated dependencies [f90112a]
+- Updated dependencies [57a68aa]
+- Updated dependencies [89c63eb]
+- Updated dependencies [477f10e]
+- Updated dependencies [5b3e194]
+- Updated dependencies [701d651]
+  - @anywalletkit/wallet-evm@0.7.0
+  - @anywalletkit/protocol-swap2-core@0.10.0
+  - @anywalletkit/core@0.8.0
+  - @anywalletkit/keyring@0.3.9
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.3.3
 
 ### Patch Changes

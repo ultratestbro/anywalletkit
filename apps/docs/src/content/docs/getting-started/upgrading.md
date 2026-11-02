@@ -10,7 +10,7 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
-## Next release: the 2026-11-02 audit fixes
+## 2026-11-02: the audit fixes
 
 A second external audit and our own review of the fixes found more places where what is checked and what is signed
 could differ. All are fixed. The ones your app has to handle come first.
@@ -56,7 +56,7 @@ could differ. All are fixed. The ones your app has to handle come first.
 - **Conformance.** Behaviour fixtures declare `callTargets` and a `decode` that reads who router calldata pays;
   undeclared targets, native value into unknown contracts and unreadable approvals fail the suite.
 
-## Next release: the 2026-10-31 review fixes
+## 2026-11-02: the 2026-10-31 review fixes
 
 An external review of the 2026-10-30 release found 16 issues; all are fixed. The ones that can change what your
 app sees come first.

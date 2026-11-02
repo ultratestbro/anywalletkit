@@ -1,5 +1,32 @@
 # @anywalletkit/tx-preview-evm
 
+## 0.5.0
+
+### Minor Changes
+
+- d6632b9: The output checks behind `expectedRecipient` are measured per token and against the whole output:
+  
+  - New optional input `expectedOutputToken`: the token the same-chain swap buys (`plan.destToken`; the zero address, `0xEeee…` or `"native"` name the gas coin). With it, only that token is read: none of it arriving at the recipient is `output-missing`, and a token of some other kind arriving no longer counts as the output.
+  - Without it, every token the sender doesn't spend is read, not only the ones that reach the recipient, so 1 unit of an unrelated token arriving no longer hides where the real output went.
+  - An address that passes on part of the output is no longer exempt for having sent something: what each address keeps of the token (received minus sent) is what counts. A pool or router that forwards the output keeps none of it and is still never flagged.
+  - The 5 % fee allowance is for all third parties together and is measured against the total output (what the recipient gets plus what the others keep). Splitting the output across many addresses is flagged, and a 5 % token tax is now within the allowance (it was flagged at about 4.8 %).
+  - `output-foreign` is one check per token: `detail.amount` is the total held by third parties, `detail.address` the largest holder, and `detail.holders` the number of holders when there is more than one.
+  
+  What to do: pass `expectedOutputToken: plan.destToken` together with `expectedRecipient`, and only for a same-chain swap (a bridge's output arrives on another chain). If you word `output-foreign`, read `detail.amount` as the total and show `detail.holders` when present.
+- 02aa3f6: `expectedRecipient` is now compared with where the simulated output actually goes. Before, it was only checked for being one of `own`, so a swap whose output went to someone else still showed `recipient-own: ok` and no warning. With a successful simulation two new warnings can appear:
+  
+  - `output-missing`: the sequence spends something and nothing arrives at `expectedRecipient` (`detail.address`).
+  - `output-foreign`: more than 5 % of the output ends at addresses that are not `expectedRecipient` and not one of `own` (`detail.address`, `detail.token`, `detail.amount`), all of them together. A pool or router that passes the output on keeps none of it and is never flagged.
+  
+  The `ok` simulation also carries `transfers` (every token and native movement of the sequence, `{token, from, to, amount}`); the output checks need it, so a `Simulation` you build yourself for `checksFor` without it runs none.
+  
+  What to do: add the two codes to your review wording (an exhaustive `switch` over `CheckCode` needs the new cases). Pass `expectedRecipient` only for a same-chain swap: a bridge's output arrives on another chain, so nothing arrives here and `output-missing` would fire. For a bridge, check the destination address yourself.
+
+### Patch Changes
+
+- 89c4ad1: The review checks now list every plain native transfer in a batch as a recipient. Only the last call was looked at, so a batch that sent 1 ETH to a stranger and then 1 wei to yourself showed no `recipient-foreign` warning. Each call with no selector and a value above zero now adds its `to` (lowercased, once) to the recipient checks. Your review screen may show more `recipient-*` checks for multi-call batches; nothing to change.
+- 1de4a34: On networks without `eth_simulateV1`, a failed `eth_call` is reported as `reverted` only when there is evidence the EVM reverted: revert data on the error (or nested in its `cause`), JSON-RPC code 3, a -32000 error that mentions a revert or execution, an "execution reverted" message, or one of viem's revert error types. A dropped connection, a timeout, a rate limit or any other node error is now `simulation.status: 'unavailable'` with the error in `reason`, so the review screen says "could not check" instead of warning that a good transaction would fail. Real reverts still show `reverted` with their reason.
+
 ## 0.4.0
 
 ### Minor Changes

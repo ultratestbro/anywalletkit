@@ -1,5 +1,51 @@
 # @anywalletkit/wallet-solana
 
+## 0.6.0
+
+### Minor Changes
+
+- b16f9b1: A Mayan bridge order out of Solana must now deliver what was reviewed, not only name the reviewed recipient and chain.
+  
+  - `wallet-solana`: with `expect.bridgeOut`, every Mayan Swift / MCTP / Fast MCTP order must carry a non-zero minimum, a referrer or Mayan fee rate of at most `MAYAN_REFERRER_FEE_MAX_BPS` (50 bps) and fixed relayer fees (Swift submit / cancel / refund, the MCTP order modes' redeem / Solana / refund / Circle fees) of at most `MAYAN_RELAYER_FEE_MAX_BPS` (10 %) of its input. `BridgeOutExpectation` gains `destToken`, `minAmountOut` (bigint, with `destDecimals`) and `slippageBps`: an order's output token must be `destToken` (`bridge-token`) and its own minimum — Swift's `amountOutMin` at Mayan's 8 decimals, or for a plain MCTP / Fast MCTP USDC bridge the bridged amount less its fees — at least `minAmountOut` less 1 bp of rounding (`bridge-min`; `minAmountOut` already is the minimum at the plan's slippage, so `slippageBps` is not taken off it again). Every recorded LI.FI Mayan answer passes.
+  - `protocol-swap2-core`: the engine's `bridgeOut` now also carries `destToken`, `minAmountOut` (the quote's minimum, a base-unit string), `destDecimals` (the catalog's, else the caller's verified `toTokenDecimals`) and `slippageBps` (when the caller set a slippage).
+  
+  What to do: an app that maps the engine expectation onto `account.sendSerialized` itself forwards the new fields too, with `minAmountOut` as a bigint and only together with `destDecimals` (a string, or `minAmountOut` without `destDecimals`, is refused as `invalid-expectation`).
+- ac56c9b: A Mayan bridge order out of Solana is now always held to a reviewed token and minimum.
+  
+  - `protocol-swap2-core`: `Quote` gains an optional `destDecimals` (the destination token's decimals as the provider reports them). The swap2 server seals it (a whole number in 0..36; anything else is refused like any malformed quote field). The engine's `bridgeOut.destDecimals` uses the asset catalog's decimals, else the caller's verified `toTokenDecimals` (which the quote's value must agree with), never the quote's alone.
+  - `protocol-swap2-lifi`: quotes carry `destDecimals` from LI.FI's `action.toToken.decimals`.
+  - `wallet-solana`: with `expect.bridgeOut`, a Mayan order is refused when the guard names no `destToken` (`bridge-token`) or no `minAmountOut` with `destDecimals` (`bridge-min`), instead of passing with only its own non-zero minimum.
+  
+  What to do: nothing when you map the engine's expectation with `serializedGuardFromExecution`. A hand-built `bridgeOut` for a Mayan route must now carry `destToken`, `minAmountOut` and `destDecimals`. A swap to a destination token the catalog does not list through Mayan needs `toTokenDecimals`, or the leg is refused at signing.
+- 21f2b25: `wallet-solana` now exports `serializedGuardFromExecution(expect, extra?)` (and the `SerializedExecutionInput` type): it turns the expectation the swap2 engine hands an account's `sendSerializedTransaction(serializedTx, expect)` hook into the guard for `sendSerialized` / `checkSerialized`, carrying every field — `maxValueOut` → `maxLamportsOut`, `tokenIn`, `source` → `maxTokenOut`, and `bridgeOut` with its reviewed `destToken`, `minAmountOut` (as a bigint, only with `destDecimals`) and `slippageBps`. `extra` adds guard options such as a program allowlist. The engine sets `bridgeOut` on every cross-chain serialized leg; a guard without it still behaves as before (SOL ceiling and token bounds only), so an adapter that drops it leaves a bridge's recipient unchecked.
+  
+  What to do: replace a hand-written mapping with the helper, for example in an account adapter:
+  
+  ```ts
+  sendSerializedTransaction: (tx, expect) => solanaAccount.sendSerialized(tx, serializedGuardFromExecution(expect))
+  ```
+- d1e517a: Bridges out of Solana are now bound to the recipient you reviewed, not only to a SOL-out ceiling.
+  
+  - `protocol-swap2-core`: for a cross-chain serialized leg the engine adds `bridgeOut: {destChain, recipient}` to the expectation it hands `account.sendSerializedTransaction`.
+  - `wallet-solana`: `sendSerialized` / `checkSerialized` accept `expect.bridgeOut` (`BridgeOutExpectation`). When the transaction is a Mayan route (it runs one of Mayan's own programs, directly or through Mayan's CPI proxy), every top-level instruction must be one the guard can follow — transfers to this wallet's own accounts or to a fee wallet (LI.FI's `LIFI_FEE_WALLET_ADDRESS` by default, at most 3 % of what may leave), a Jupiter swap into the wallet or the bridge, Mayan's Swift / MCTP / Fast MCTP orders — and every Mayan order must pay `recipient` on `destChain`; otherwise the wire is refused with `bridge-recipient`, `bridge-payee`, `bridge-instruction`, `bridge-missing` or `bridge-fee`. A transaction of another bridge is checked as without `bridgeOut` (see the Solana-bridges note). Instructions sent through Mayan's CPI proxy (`MAYAN_CPI_PROXY_PROGRAM_ADDRESS`) are now described and guarded as the instruction they run, so a program allowlist and the core-instruction checks see through it; the legacy empty-data ATA Create is described as an ATA creation.
+  - `protocol-swap2-lifi`: the provider and `lifiVerifyQuote` refuse a Solana bridge transaction that is not paid by the sender, or a Mayan route that transfers SOL directly to a wallet other than the sender or LI.FI's fee wallet.
+  
+  What to do: map the swap2 expectation onto `account.sendSerialized` with `serializedGuardFromExecution` from `wallet-solana` (see the note on it) instead of by hand. Without `bridgeOut` the account cannot prove where a Mayan bridge pays.
+
+### Patch Changes
+
+- 5f8e79a: A plain Mayan MCTP / Fast MCTP bridge out of Solana delivers Circle's native USDC, and with `expect.bridgeOut` the reviewed `destToken` must now be exactly that token on `destChain` (the addresses `@anywalletkit/protocol-swap2-cctp` uses; any letter case). Before, any reviewed 6-decimal token passed, so a review of USDbC, USDC.e or USDT could be met by a USDC bridge. A plain bridge towards a chain without CCTP (BSC) is refused (`bridge-token`). Mayan orders that name their own output token (Swift, the MCTP order modes) are unchanged. LI.FI's recorded MCTP and Fast MCTP routes pass. Nothing to change in apps.
+- a8f983b: With `expect.bridgeOut`, a Mayan order's own minimum must now reach the reviewed `minAmountOut` less 1 bp of rounding. `minAmountOut` is the quote's minimum, already at the plan's slippage; the guard took `slippageBps` off it a second time, so an order could deliver up to that slippage (0.5 % at the default) under the minimum the user reviewed. `slippageBps` is still accepted and range-checked. Every recorded LI.FI Mayan route (Swift, MCTP, Fast MCTP) carries LI.FI's minimum itself and passes. Nothing to change in apps.
+- 43fc004: Inside a bridge out of Solana (`expect.bridgeOut`), a Jupiter route must now take no platform fee and no positive-slippage share (`platform_fee_bps` and `positive_slippage_bps` of `route_v2` / `shared_accounts_route_v2`); such a fee goes to an account the guard does not follow, so the wire is refused with `bridge-fee`, and a Jupiter route too short to read its fees with `bridge-instruction`. The route's slippage is not capped here — the bridge order's own minimum, checked against the reviewed one, bounds the price. LI.FI's live Mayan routes carry no Jupiter fee and pass unchanged. Nothing to change in apps.
+- 9bde776: Inside a bridge out of Solana (`expect.bridgeOut`, Mayan routes), a Jupiter v1 route (`route`, `shared_accounts_route`) is now refused with `bridge-instruction`. Its `platform_fee_bps` sits after the variable-length route plan and was read as the data's last byte, so a trailing byte could hide a fee. Only the v2 routes, whose fee fields sit at fixed offsets, are followed; every recorded LI.FI Mayan route uses them and passes. Jupiter swaps outside a bridge are unchanged. Nothing to change in apps.
+- 9088e60: LI.FI's Solana bridges other than Mayan — Relay, LayerSwap, NEAR Intents, LI.FI Intents and whatever else LI.FI offers from Solana — quote and execute again as before. From Solana the provider no longer restricts LI.FI to Mayan (no `allowBridges` / `denyBridges` of its own, a `chooseRoute` policy's pick passes through, Relay included), and neither the provider, `lifiVerifyQuote` nor the account's `bridgeOut` check refuses a transaction for calling no Mayan program.
+  
+  Be aware: these bridges deposit to an address, an order id or a program whose recipient lives in an off-chain order or in data the device does not read, so the account does NOT check their recipient. With or without `bridgeOut` they are held to what they were held to before: the program allowlist and the `maxLamportsOut` / `maxTokenOut` ceilings. Only Mayan routes (Swift, MCTP, Fast MCTP) are recipient-, token- and minimum-checked on the device. EVM sources are unchanged: Relay, Garden, deBridge DLN and ThorSwap Diamond calls stay refused and Relay / Garden stay denied in the request. LI.FI Intents calls a program outside `DEFAULT_PROGRAM_ALLOWLIST`, as before: it passes only for an app that allows that program.
+  
+  Nothing to change in apps.
+- Updated dependencies [0919427]
+  - @anywalletkit/core@0.8.0
+
 ## 0.5.1
 
 ### Patch Changes

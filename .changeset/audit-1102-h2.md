@@ -1,5 +1,0 @@
----
-"@anywalletkit/protocol-swap2-lifi": minor
----
-
-LI.FI EVM routes no longer use bridges whose Diamond call does not bind the recipient the wallet checked. Relay (`relaydepository`) deposits against an order id whose off-chain order names the recipient, and Garden, deBridge DLN and ThorSwap carry the destination in facet data or an off-chain order the facet never compares, so a matching `BridgeData.receiver` said nothing about where the funds go. These calls are now refused with a named reason (also by `lifiVerifyQuote` / `lifiPins` for remote quotes), Squid is accepted only on its CallBridge route, and every cross-chain request asks LI.FI to deny `relaydepository` and `garden` (also in the `chooseRoute` candidates), so the affected pairs come back through another bridge (live 2026-11-02: Gnosis xDAI → Arbitrum USDC via NEAR Intents, Base USDC → Arbitrum via Polymer, ETH routes via Across). Nothing to change in apps; a `chooseRoute` policy that allowed only `relaydepository` now gets LI.FI's default pick.

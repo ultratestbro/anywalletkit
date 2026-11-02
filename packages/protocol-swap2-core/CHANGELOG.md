@@ -1,5 +1,68 @@
 # @anywalletkit/protocol-swap2-core
 
+## 0.10.0
+
+### Minor Changes
+
+- 3b81a37: A CCTP swap claimed through `claimSwap2` reaches `completed` again without an RPC for the destination chain, when the destination account proves the claim.
+  
+  - `claimSwap2` already waits for the claim with the account's `waitForTransaction`. When that wait resolves (the claim was included and succeeded), the id it returns now ends in `.ok` after the claim hash: `awk1.<provider>.<intent>.<sourceTx>.<claimTx>.ok`. Polling that id passes the new `IntentRef.destTxConfirmed: true` to the provider (a remote backend forwards it too).
+  - The CCTP provider takes a confirmed claim as the mint, since `receiveMessage` reverts once the message's nonce is used: `completed` without a destination RPC. With a destination RPC that does not show the mint yet, it reads `pending` (claim not ready) instead of offering the claim again.
+  - A bare claim hash (an account without `waitForTransaction`, or a wait that timed out) still proves nothing and stays `pending` until the destination's `usedNonces` shows the mint.
+  - `parseSwapId` (extension kit) reads the `.ok` segment as `destTxConfirmed`.
+  
+  What to do: keep polling with the id `claimSwap2` returns (store it in place of the old one), and give the destination account `waitForTransaction` (the SDK's EVM accounts have it). If you parse swap ids yourself, accept a fifth segment `ok`. An RPC for each destination in `rpcUrls` is still the way to see a claim sent from elsewhere complete.
+- b16f9b1: A Mayan bridge order out of Solana must now deliver what was reviewed, not only name the reviewed recipient and chain.
+  
+  - `wallet-solana`: with `expect.bridgeOut`, every Mayan Swift / MCTP / Fast MCTP order must carry a non-zero minimum, a referrer or Mayan fee rate of at most `MAYAN_REFERRER_FEE_MAX_BPS` (50 bps) and fixed relayer fees (Swift submit / cancel / refund, the MCTP order modes' redeem / Solana / refund / Circle fees) of at most `MAYAN_RELAYER_FEE_MAX_BPS` (10 %) of its input. `BridgeOutExpectation` gains `destToken`, `minAmountOut` (bigint, with `destDecimals`) and `slippageBps`: an order's output token must be `destToken` (`bridge-token`) and its own minimum — Swift's `amountOutMin` at Mayan's 8 decimals, or for a plain MCTP / Fast MCTP USDC bridge the bridged amount less its fees — at least `minAmountOut` less 1 bp of rounding (`bridge-min`; `minAmountOut` already is the minimum at the plan's slippage, so `slippageBps` is not taken off it again). Every recorded LI.FI Mayan answer passes.
+  - `protocol-swap2-core`: the engine's `bridgeOut` now also carries `destToken`, `minAmountOut` (the quote's minimum, a base-unit string), `destDecimals` (the catalog's, else the caller's verified `toTokenDecimals`) and `slippageBps` (when the caller set a slippage).
+  
+  What to do: an app that maps the engine expectation onto `account.sendSerialized` itself forwards the new fields too, with `minAmountOut` as a bigint and only together with `destDecimals` (a string, or `minAmountOut` without `destDecimals`, is refused as `invalid-expectation`).
+- 0919427: A bridge leg's reviewed minimum is no longer held in decimals that only the provider reported.
+  
+  - `core`: `Swap2Options` gains an optional `toTokenDecimals`, the decimals of `toToken` on the destination chain when the swap catalog does not list it, as the app verified them.
+  - `protocol-swap2-core`: the engine's `bridgeOut.destDecimals` is the asset catalog's value, else the caller's `toTokenDecimals`. A quote's `destDecimals` (for example LI.FI's `action.toToken.decimals`) is no longer used on its own. When both are present and disagree, the swap is refused before anything is signed. A `toTokenDecimals` that is not a whole number in 0..36 is refused. Catalog-listed destination tokens work as before and ignore `toTokenDecimals`.
+  
+  What to do: for a swap to a destination token the catalog does not list (for example a token the user added by address), read its decimals on the destination chain (`getTokenInfo` on that chain's account, or `inspectToken` from `@anywalletkit/tokens`) and pass them as `toTokenDecimals`. Without them, a Mayan bridge out of Solana to that token has no reviewed minimum and wallet-solana refuses it at signing (`bridge-min`). Other bridges and all catalog-listed routes are unaffected.
+- ac56c9b: A Mayan bridge order out of Solana is now always held to a reviewed token and minimum.
+  
+  - `protocol-swap2-core`: `Quote` gains an optional `destDecimals` (the destination token's decimals as the provider reports them). The swap2 server seals it (a whole number in 0..36; anything else is refused like any malformed quote field). The engine's `bridgeOut.destDecimals` uses the asset catalog's decimals, else the caller's verified `toTokenDecimals` (which the quote's value must agree with), never the quote's alone.
+  - `protocol-swap2-lifi`: quotes carry `destDecimals` from LI.FI's `action.toToken.decimals`.
+  - `wallet-solana`: with `expect.bridgeOut`, a Mayan order is refused when the guard names no `destToken` (`bridge-token`) or no `minAmountOut` with `destDecimals` (`bridge-min`), instead of passing with only its own non-zero minimum.
+  
+  What to do: nothing when you map the engine's expectation with `serializedGuardFromExecution`. A hand-built `bridgeOut` for a Mayan route must now carry `destToken`, `minAmountOut` and `destDecimals`. A swap to a destination token the catalog does not list through Mayan needs `toTokenDecimals`, or the leg is refused at signing.
+- d1e517a: Bridges out of Solana are now bound to the recipient you reviewed, not only to a SOL-out ceiling.
+  
+  - `protocol-swap2-core`: for a cross-chain serialized leg the engine adds `bridgeOut: {destChain, recipient}` to the expectation it hands `account.sendSerializedTransaction`.
+  - `wallet-solana`: `sendSerialized` / `checkSerialized` accept `expect.bridgeOut` (`BridgeOutExpectation`). When the transaction is a Mayan route (it runs one of Mayan's own programs, directly or through Mayan's CPI proxy), every top-level instruction must be one the guard can follow — transfers to this wallet's own accounts or to a fee wallet (LI.FI's `LIFI_FEE_WALLET_ADDRESS` by default, at most 3 % of what may leave), a Jupiter swap into the wallet or the bridge, Mayan's Swift / MCTP / Fast MCTP orders — and every Mayan order must pay `recipient` on `destChain`; otherwise the wire is refused with `bridge-recipient`, `bridge-payee`, `bridge-instruction`, `bridge-missing` or `bridge-fee`. A transaction of another bridge is checked as without `bridgeOut` (see the Solana-bridges note). Instructions sent through Mayan's CPI proxy (`MAYAN_CPI_PROXY_PROGRAM_ADDRESS`) are now described and guarded as the instruction they run, so a program allowlist and the core-instruction checks see through it; the legacy empty-data ATA Create is described as an ATA creation.
+  - `protocol-swap2-lifi`: the provider and `lifiVerifyQuote` refuse a Solana bridge transaction that is not paid by the sender, or a Mayan route that transfers SOL directly to a wallet other than the sender or LI.FI's fee wallet.
+  
+  What to do: map the swap2 expectation onto `account.sendSerialized` with `serializedGuardFromExecution` from `wallet-solana` (see the note on it) instead of by hand. Without `bridgeOut` the account cannot prove where a Mayan bridge pays.
+- 57a68aa: A CCTP claim hash is no longer taken as proof that the USDC was minted when the destination can be checked.
+  
+  - `cctpProvider`: when a destination RPC is configured but the `usedNonces` read fails (or the attested message carries no nonce to read), a swap with a recorded claim hash now reports `pending` (the claim hash is kept in `transactions`) instead of `completed`. Poll again; it completes once the RPC answers and the nonce is used. Without any destination RPC the recorded claim hash is still the evidence, as before.
+  - `claimSwap2` (all two-phase providers): when the destination account has `waitForTransaction`, the engine now waits for the claim before returning. If the wait proves the claim reverted on chain (the account's error has `code: "reverted"` or says the transaction reverted, as `@anywalletkit/wallet-evm` does), `claimSwap2` throws `Swap2ExecutionError` (claim hash in the message, the account's error as `cause`) and returns no id that carries the claim hash; poll the swap's status with the id you already had and claim again if it is still `action-required`. A wait that times out or loses the RPC proves nothing: the id with the claim hash is returned as before, and the provider's status decides (for CCTP with a destination RPC, `pending` until the mint is seen). Accounts without `waitForTransaction` behave as before.
+
+### Patch Changes
+
+- 21f2b25: `wallet-solana` now exports `serializedGuardFromExecution(expect, extra?)` (and the `SerializedExecutionInput` type): it turns the expectation the swap2 engine hands an account's `sendSerializedTransaction(serializedTx, expect)` hook into the guard for `sendSerialized` / `checkSerialized`, carrying every field — `maxValueOut` → `maxLamportsOut`, `tokenIn`, `source` → `maxTokenOut`, and `bridgeOut` with its reviewed `destToken`, `minAmountOut` (as a bigint, only with `destDecimals`) and `slippageBps`. `extra` adds guard options such as a program allowlist. The engine sets `bridgeOut` on every cross-chain serialized leg; a guard without it still behaves as before (SOL ceiling and token bounds only), so an adapter that drops it leaves a bridge's recipient unchecked.
+  
+  What to do: replace a hand-written mapping with the helper, for example in an account adapter:
+  
+  ```ts
+  sendSerializedTransaction: (tx, expect) => solanaAccount.sendSerialized(tx, serializedGuardFromExecution(expect))
+  ```
+- ccea432: A quote whose minimum sits exactly at the requested slippage is no longer refused for a rounding difference. Providers compute their minimum with their own rounding — LI.FI's Mayan answers land a few base units under floor(output × (1 − slippage)) on 18-decimal tokens — so the LI.FI provider's per-step check, `validQuote` (router, single-provider path, server) and the engine's caller-slippage check refused about half of the Mayan routes out of Solana at the default 0.5 % as "0.50 % under the quote". All three now accept a minimum up to the requested slippage plus 1 bp (`SLIPPAGE_ROUNDING_BPS`, and `slippageFloor(dest, bps)` in `@anywalletkit/protocol-swap2-core/validate`); a minimum further under the quote is still refused. Nothing to change in apps.
+- 5b3e194: Copies no longer turn an own `"__proto__"` key into a prototype. The Hermes `structuredClone` polyfill (installed only when the runtime has no native one) and the swap2 review copy assigned keys one by one, so an object parsed from JSON with a `"__proto__"` key came out with that object as its prototype and inherited fields from it. The key is now kept as an own property, as the native `structuredClone` does; cycles and shared references are kept as before. Nothing to change in your app.
+- Updated dependencies [d6632b9]
+- Updated dependencies [0919427]
+- Updated dependencies [02aa3f6]
+- Updated dependencies [89c4ad1]
+- Updated dependencies [1de4a34]
+  - @anywalletkit/tx-preview-evm@0.5.0
+  - @anywalletkit/core@0.8.0
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.9.0
 
 ### Minor Changes

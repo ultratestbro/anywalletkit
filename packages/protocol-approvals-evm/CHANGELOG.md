@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-approvals-evm
 
+## 0.5.2
+
+### Patch Changes
+
+- Updated dependencies [0919427]
+  - @anywalletkit/core@0.8.0
+
 ## 0.5.1
 
 ### Patch Changes
