@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {encodeFunctionData} from "viem";
+import {decodeFunctionData, encodeFunctionData, type Hex} from "viem";
 import {describeProtocolBehaviour, describeProtocolModule} from "@anywalletkit/conformance";
 import {fyndProvider} from "../src/provider.js";
 import {FyndSwap2Protocol} from "../src/protocol.js";
@@ -179,12 +179,17 @@ describeProtocolModule("protocol-swap2-fynd", {
   samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
 
+// The Tycho router pays its `receiver` argument (after nTokens for a split swap).
+const fyndReceiver = (source: {kind: string; data?: string}): string[] => {
+  const c = decodeFunctionData({abi: TYCHO_ROUTER_ABI, data: source.data as Hex});
+  return [String(c.args[c.functionName === "splitSwap" ? 6 : 5])];
+};
 describeProtocolBehaviour("protocol-swap2-fynd", {
   type: "swap2",
   Protocol: FyndSwap2Protocol,
   config: {fromChain: "eip155:8453", apiKey: "k"},
   fixtures: [
-    {name: "USDC → WETH (exact approve to the Tycho router, then singleSwap)", options: {fromToken: "USDC", toToken: WETH, toChain: 8453, recipient: ME, fromTokenAmount: 1_000_000_000n, minAmountOut: 390_000_000_000_000_000n}, fetch: stub(), account: {address: ME, chain: "eip155:8453"}, own: [ME], spender: ROUTER, sourceToken: USDC},
-    {name: "ETH → USDC (native value, no approval)", options: {fromToken: "ETH", toToken: USDC, toChain: 8453, recipient: ME, fromTokenAmount: 10n ** 18n, minAmountOut: 2_900_000_000n}, fetch: stub({out: 3_000_000_000n}), account: {address: ME, chain: "eip155:8453"}, own: [ME]},
+    {name: "USDC → WETH (exact approve to the Tycho router, then singleSwap)", options: {fromToken: "USDC", toToken: WETH, toChain: 8453, recipient: ME, fromTokenAmount: 1_000_000_000n, minAmountOut: 390_000_000_000_000_000n}, fetch: stub(), account: {address: ME, chain: "eip155:8453"}, own: [ME], spender: ROUTER, sourceToken: USDC, decode: fyndReceiver},
+    {name: "ETH → USDC (native value, no approval)", options: {fromToken: "ETH", toToken: USDC, toChain: 8453, recipient: ME, fromTokenAmount: 10n ** 18n, minAmountOut: 2_900_000_000n}, fetch: stub({out: 3_000_000_000n}), account: {address: ME, chain: "eip155:8453"}, own: [ME], callTargets: [ROUTER], decode: fyndReceiver},
   ],
 });

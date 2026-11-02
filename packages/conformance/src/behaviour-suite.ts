@@ -7,7 +7,7 @@ import type { WriteProtocolCtor as Ctor } from './ctor.js'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 
 /** The swap2 engine's review plan (structural copy of `Swap2ExecutionPlan`; conformance does not depend on swap2-core). */
-interface Plan {
+export interface Swap2BehaviourPlan {
   recipient: string
   refundAddress: string
   sourceAmount: bigint
@@ -18,6 +18,8 @@ interface Plan {
     | { kind: 'serialized'; serializedTx: string }
     | { kind: 'typed-order'; typedData: string }
 }
+
+type Plan = Swap2BehaviourPlan
 
 export interface Swap2BehaviourFixture {
   name: string
@@ -33,6 +35,19 @@ export interface Swap2BehaviourFixture {
   depositAddress?: string
   /** Calldata providers: the approval spender the recorded quote declares (none → no approval allowed). */
   spender?: string
+  /**
+   * Contracts the plan's source call may go to (router, vault, OFT, wrapped-native token). The declared
+   * `spender` is one already. A call, or native value, into any other contract fails the suite.
+   */
+  callTargets?: string[]
+  /**
+   * Who the plan's output goes to, decoded by the fixture from what the account would sign — not by
+   * the module: every recipient (and refund address) named inside router calldata or a typed order,
+   * in the spelling of `own` / `depositAddress`. Required when the source is a contract call whose
+   * calldata is not a plain token transfer, and for a typed order; each address it returns must be
+   * own or the declared deposit address, and it must return at least one.
+   */
+  decode?: (source: Plan['source']) => string[] | Promise<string[]>
   /** Source token contract; omit for the native coin. */
   sourceToken?: string
   /**
@@ -53,7 +68,9 @@ export interface ProtocolBehaviourOptions<P> {
 
 class ReviewHalt extends Error {}
 const UNLIMITED = 1n << 255n
-const WARNINGS = new Set(['recipient-foreign', 'approval-unlimited', 'approval-excess', 'approval-unknown-spender'])
+// Every tx-preview warning about what the plan pays or calls: a foreign recipient, an approval beyond the
+// input, a contract nobody declared, native value into it, calldata nobody can read.
+const WARNINGS = new Set(['recipient-foreign', 'approval-unlimited', 'approval-excess', 'approval-unknown-spender', 'approval-unparsed', 'contract-unknown', 'native-value', 'calldata-undecodable'])
 const lc = (a: string) => a.toLowerCase()
 const word = (hex: string) => hex.replace(/^0x/, '').toLowerCase().padStart(64, '0')
 const approveData = (spender: string, amount: bigint) => `0x095ea7b3${word(spender)}${word(amount.toString(16))}`
@@ -75,6 +92,14 @@ export function describeProtocolBehaviour<P extends object>(name: string, o: Pro
         return { account, p }
       }
       const ownOf = async (account: IWalletAccount) => new Set([await account.getAddress(), ...(f.own ?? [])].map(lc))
+
+      /** The fixture's own reading of router calldata / a typed order: every address it pays must be declared. */
+      const decoded = async (source: Plan['source'], declared: ReadonlySet<string>) => {
+        expect(f.decode, `a ${source.kind} plan needs the fixture's \`decode\` (who the calldata or order pays)`).toBeTypeOf('function')
+        const paid = await f.decode!(source)
+        expect(paid.length, '`decode` names no recipient').toBeGreaterThan(0)
+        for (const r of paid) expect(declared.has(lc(r)), `the plan pays ${r}, which is neither own nor declared`).toBe(true)
+      }
 
       it(`${f.name}: the reviewed plan pays only own/declared addresses, with exact approvals, and nothing is signed`, async () => {
         let plan: Plan | undefined
@@ -104,16 +129,26 @@ export function describeProtocolBehaviour<P extends object>(name: string, o: Pro
           const d = decodeCall(s)
           if (d.transfer) expect({ token: d.transfer.token, to: declared.has(d.transfer.to), amount: d.transfer.amount }).toEqual({ token: src, to: true, amount: plan!.sourceAmount })
           else if (!d.selector) expect({ to: declared.has(d.to), enough: s.value >= plan!.sourceAmount }).toEqual({ to: true, enough: true })
+          else await decoded(s, declared)
           // tx-preview's named checks over approve → call, as the review screen sees them.
           const calls: PreviewCall[] = [...plan!.approvals.map((a) => ({ to: a.token, data: approveData(a.spender, a.amount) })), s]
-          const known = f.spender ? { [f.spender]: 'declared spender' } : {}
+          const known: Record<string, string> = {
+            ...Object.fromEntries((f.callTargets ?? []).map((t) => [t, 'declared contract'])),
+            ...(f.sourceToken ? { [f.sourceToken]: 'source token' } : {}),
+            ...(f.spender ? { [f.spender]: 'declared spender' } : {}),
+          }
           const input = { chainId: 0, from: [...own][0]!, calls, rpc: async () => null, own: [...declared], known, expectedApproval: plan!.sourceAmount }
           const warns = checksFor(input, calls.map((c) => decodeCall(c, known)), { status: 'unavailable', reason: 'conformance' })
-            .filter((c) => WARNINGS.has(c.code)).map((c) => c.code)
+            .filter((c) => c.status === 'warn' && WARNINGS.has(c.code)).map((c) => c.code)
           expect(warns, 'tx-preview warnings').toEqual([])
         } else if (s.kind === 'serialized') {
           expect(f.serialized, 'a serialized plan needs the fixture\'s `serialized` decoder').toBeTypeOf('function')
           await f.serialized!(s.serializedTx, own)
+        } else if (s.kind === 'typed-order') {
+          await decoded(s, declared)
+        } else {
+          // A call on a chain tx-preview does not read: who it pays is still the fixture's to show.
+          await decoded(s, declared)
         }
       })
 

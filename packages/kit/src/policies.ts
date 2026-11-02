@@ -1,7 +1,8 @@
 import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
-import { canonicalAddress, erc20Transfer, hexData, sendDestinations, tonRawAddress, tronCallData, tronRawIntent, type Destinations } from './destinations.js'
+import { canonicalAddress, erc20Transfer, hexData, namedArray, sendDestinations, tonRawAddress, tronCallData, tronRawIntent, type Destinations, type NearAccountChange } from './destinations.js'
 import { snapshot } from './snapshot.js'
+export type { NearAccountChange } from './destinations.js'
 import { ccAssetByToken } from '@anywalletkit/swap2-assets'
 import { catalogChain } from './activity/generic.js'
 
@@ -188,6 +189,16 @@ export interface WriteIntent {
    * refused; with `confirm`, the hook sees this flag and decides; an allowlist refuses it.
    */
   destinationUnknown: boolean
+  /**
+   * NEAR: what the transaction changes on the signing account itself, read off its actions (object
+   * form and borsh, also for `signBuilt`): a key added (`full-access-key` too when it can do
+   * anything), a key deleted, code deployed, stake, account creation or deletion, a delegated action.
+   * Such a transaction may name only the own account as receiver while handing it over, so a confirm
+   * screen must show these, not a transfer to self. Except for `delete-account` and `delegate`, whose
+   * beneficiary and receivers are in `destinations`, `destinationUnknown` is true with them (an
+   * allowlist refuses the write, a blocklist does without a `confirm` hook). Absent when there are none.
+   */
+  accountChanges?: NearAccountChange[]
   /** Token identifier for token transfers and approvals; undefined = native. */
   token?: string
   /** Amount when it can be read off the call (allowance for approvals). */
@@ -624,10 +635,16 @@ function withDestinations(intent: DraftIntent): WriteIntent {
   const d = sendDestinations(chain, intent.raw)
   // A batch may carry approvals among its calls: their spenders are destinations too.
   const granted = chain.startsWith('eip155:') && Array.isArray(intent.raw) ? intent.raw.flatMap((c) => { const g = grantCall(c); return g ? [g.spender] : [] }) : []
-  const out: WriteIntent = { ...intent, destinations: [...new Set([...d.list, ...granted])], destinationUnknown: d.unknown }
+  const out: WriteIntent = {
+    ...intent, destinations: [...new Set([...d.list, ...granted])], destinationUnknown: d.unknown || (d.accountChanges ?? []).some(nameless),
+    ...(d.accountChanges ? { accountChanges: d.accountChanges } : {}),
+  }
   if (d.tokenAccounts) PENDING_TOKEN_ACCOUNTS.set(out, d.tokenAccounts)
   return out
 }
+
+/** An account change whose effect no destination shows (a key, code, stake): only `delete-account` and `delegate` name who they pay. */
+const nameless = (c: NearAccountChange) => c !== 'delete-account' && c !== 'delegate'
 
 /**
  * What else a TON jetton `transfer()` pays besides its recipient (scan 2026-10-27 F3, F5, F9). The
@@ -730,7 +747,8 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
     // EVM only, and only for plain EVM calls: Tron, NEAR and Solana sign other fields
     // (txID / raw_data_hex, receiverId / actions, messageBytes / instructions), so an EVM-looking
     // to/data riding along must never turn their write into a "revoke" that skips the lists (scan F1).
-    const calls = Array.isArray(arg) ? arg : [arg]
+    // A list that also carries named fields is no revoke or approval: which write gets signed is not known.
+    const calls = namedArray(arg) ? [] : Array.isArray(arg) ? arg : [arg]
     const found = calls.length > 0 && !calls.some(carriesForeignPayload) ? calls.map(revokeCall) : [null]
     if (found.every((r) => r !== null)) return revokeIntent(base, found.flat() as Array<{ token: string; spender?: string }>)
     // One raw approve / setApprovalForAll(true): an approval of the spender it names.

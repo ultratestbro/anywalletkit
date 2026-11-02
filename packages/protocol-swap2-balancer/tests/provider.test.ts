@@ -103,12 +103,20 @@ describeProtocolModule("protocol-swap2-balancer", {
   samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
 
+// A Vault batchSwap pays `funds.recipient` (never into an internal balance).
+const vaultRecipient = (source: {kind: string; data?: string}): string[] => {
+  const c = decode(source.data!);
+  if (c.functionName !== "batchSwap") throw new Error(`not a batchSwap: ${c.functionName}`);
+  const funds = c.args[3] as {recipient: string; toInternalBalance: boolean};
+  if (funds.toInternalBalance) throw new Error("pays into an internal balance");
+  return [funds.recipient];
+};
 describeProtocolBehaviour("protocol-swap2-balancer", {
   type: "swap2",
   Protocol: BalancerSwap2Protocol,
   config: {fromChain: "eip155:1", rpcUrls: RPC},
   fixtures: [
-    {name: "WETH → USDC (exact approve to the Vault, then batchSwap)", options: {fromToken: "WETH", toToken: USDC, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 18n, minAmountOut: 1_980_000n}, fetch: stub(), account: {address: ME}, own: [ME], spender: BALANCER_V2_VAULT, sourceToken: WETH},
-    {name: "ETH → USDC (native value, no approval)", options: {fromToken: "ETH", toToken: USDC, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 18n, minAmountOut: 1_980_000n}, fetch: stub(), account: {address: ME}, own: [ME]},
+    {name: "WETH → USDC (exact approve to the Vault, then batchSwap)", options: {fromToken: "WETH", toToken: USDC, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 18n, minAmountOut: 1_980_000n}, fetch: stub(), account: {address: ME}, own: [ME], spender: BALANCER_V2_VAULT, sourceToken: WETH, decode: vaultRecipient},
+    {name: "ETH → USDC (native value, no approval)", options: {fromToken: "ETH", toToken: USDC, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 18n, minAmountOut: 1_980_000n}, fetch: stub(), account: {address: ME}, own: [ME], callTargets: [BALANCER_V2_VAULT], decode: vaultRecipient},
   ],
 });

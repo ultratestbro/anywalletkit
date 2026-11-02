@@ -23,11 +23,16 @@ export const MIN_PRIORITY_FEE_WEI: Readonly<Record<number, bigint>> = Object.fre
 export type FeeFields = { gasPrice: bigint } | { maxFeePerGas: bigint; maxPriorityFeePerGas: bigint }
 
 /**
- * Refuses shapes that would silently lose meaning: authorizations on a transaction that is not
- * type 4 (they would be dropped), and a type 4 with `gasPrice` (it would become a legacy
- * transaction without them).
+ * Refuses shapes that would silently lose meaning: anything but one plain transaction object (a list
+ * of calls is for batching accounts — its elements are not what this account would sign), authorizations
+ * on a transaction that is not type 4 (they would be dropped), and a type 4 with `gasPrice` (it would
+ * become a legacy transaction without them).
  */
 export function assertTxShape(tx: EvmTransaction): void {
+  const proto = typeof tx === 'object' && tx !== null && !Array.isArray(tx) ? (Object.getPrototypeOf(tx) as object | null) : undefined
+  if (proto === undefined || (proto !== null && Object.getPrototypeOf(proto) !== null)) {
+    throw new UnsafeTransactionError('A transaction must be one plain object ({ to, value, data, … }); a list or another kind of object is not signed.')
+  }
   if (tx.authorizationList?.length && tx.type !== 4) throw new Error('authorizationList needs a type 4 (EIP-7702) transaction; it would be dropped otherwise.')
   if (tx.type === 4 && tx.gasPrice !== undefined) throw new Error('An EIP-7702 (type 4) transaction takes EIP-1559 fee fields (maxFeePerGas / maxPriorityFeePerGas), not gasPrice.')
   canonicalData(tx.data)

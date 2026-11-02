@@ -21,6 +21,8 @@ export type UnsafeTransactionCode =
   | 'change-not-ours'
   /** Off mainnet without a configured `consensusBranchId`: the branch id cannot be known. */
   | 'unknown-branch-id'
+  /** The spend is not one plain `{ to, value, … }` object (a list, or another kind of object). */
+  | 'malformed-spend'
 
 /** A transaction failed a hard safety check and was not signed / broadcast. */
 export class UnsafeTransactionError extends Error {

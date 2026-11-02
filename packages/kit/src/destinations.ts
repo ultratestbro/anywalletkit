@@ -28,7 +28,39 @@ export interface Destinations {
    * creates as associated token accounts are already in `list`.
    */
   tokenAccounts?: string[]
+  /** NEAR: what the transaction changes on the account itself rather than paying anyone (see {@link NearAccountChange}). */
+  accountChanges?: NearAccountChange[]
 }
+
+/**
+ * A NEAR action that changes the signing account itself: its keys, its code, its stake, its
+ * existence, or a delegated action run in its name. `full-access-key` comes with `add-key` when the
+ * key added can do anything the account can.
+ */
+export type NearAccountChange =
+  | 'create-account' | 'deploy-contract' | 'stake' | 'add-key' | 'full-access-key' | 'delete-key'
+  | 'delete-account' | 'delegate' | 'global-contract'
+
+const NEAR_ACCOUNT_CHANGE: Readonly<Record<string, NearAccountChange>> = {
+  createAccount: 'create-account', deployContract: 'deploy-contract', stake: 'stake', addKey: 'add-key', deleteKey: 'delete-key',
+  deleteAccount: 'delete-account', signedDelegate: 'delegate', deployGlobalContract: 'global-contract', useGlobalContract: 'global-contract',
+}
+
+/** The account changes of NEAR actions in object form. A full-access key is read as wallet-near encodes it (`permission.fullAccess`). */
+function nearActionChanges(actions: unknown): NearAccountChange[] {
+  if (!Array.isArray(actions)) return []
+  const out: NearAccountChange[] = []
+  for (const action of actions) {
+    const keys = Object.keys(obj(action))
+    const change = keys.length === 1 ? own(NEAR_ACCOUNT_CHANGE, keys[0]!) : undefined
+    if (change === undefined) continue
+    out.push(change)
+    if (change === 'add-key' && obj(obj(obj(obj(action).addKey).accessKey).permission).functionCall === undefined) out.push('full-access-key')
+  }
+  return [...new Set(out)]
+}
+
+const withChanges = (d: Destinations, changes: NearAccountChange[]): Destinations => (changes.length ? { ...d, accountChanges: [...new Set(changes)] } : d)
 
 /** A table lookup by own key only (`__proto__` / `constructor` from a caller are not entries). */
 const own = <T>(table: Readonly<Record<string, T>>, key: string): T | undefined => (Object.prototype.hasOwnProperty.call(table, key) ? table[key] : undefined)
@@ -453,9 +485,13 @@ function nearBorshDestinations(b64: string): Destinations {
   const string = (max: number) => { const s = bytes(); if (s.length > max) throw new Error('bad string'); return ascii(s) }
   const account = () => { const s = string(64); if (!NEAR_ACCOUNT.test(s)) throw new Error('bad account id'); return s }
   const publicKey = () => { const t = u8(); if (t !== 0 && t !== 1) throw new Error('key type'); skip(t === 0 ? 32 : 64) }
+  const changes: NearAccountChange[] = []
   /** One action's recipients; null for an action not read here (Delegate, global contracts…): reading stops. */
   const action = (): Array<string | undefined> | null => {
-    switch (u8()) {
+    const tag = u8()
+    const change = ['create-account', 'deploy-contract', undefined, undefined, 'stake', 'add-key', 'delete-key', 'delete-account', 'delegate', 'global-contract', 'global-contract'][tag] as NearAccountChange | undefined
+    if (change !== undefined) changes.push(change)
+    switch (tag) {
       case 0: return [] // CreateAccount
       case 1: bytes(); return [] // DeployContract
       case 2: { const method = string(256); const args = bytes(); skip(8 + 16); return NEAR_METHOD.test(method) ? nearArgRecipient(method, args) : [undefined] } // FunctionCall
@@ -465,6 +501,7 @@ function nearBorshDestinations(b64: string): Destinations {
         publicKey(); skip(8)
         const permission = u8()
         if (permission === 0) { if (u8() === 1) skip(16); string(64); const n = u32(); for (let k = 0; k < n; k++) string(256) } else if (permission !== 1) throw new Error('permission')
+        else changes.push('full-access-key')
         return []
       }
       case 6: publicKey(); return [] // DeleteKey
@@ -484,9 +521,9 @@ function nearBorshDestinations(b64: string): Destinations {
       if (r === null) { out.push(undefined); break }
       out.push(...r)
     }
-    return known(out)
+    return withChanges(known(out), changes)
   } catch {
-    return UNKNOWN
+    return withChanges(UNKNOWN, changes)
   }
 }
 
@@ -765,8 +802,9 @@ function nearDestinations(arg: unknown): Destinations {
   // wallet-near builds from `receiverId` and nothing else (round 3, review); its actions can pay others (M1).
   const a = obj(arg)
   const to = str(a.receiverId)
-  if (to === undefined) return UNKNOWN
-  return known([to, ...(Array.isArray(a.actions) ? a.actions.flatMap((x: unknown) => nearActionRecipients(x)) : [undefined])])
+  const changes = nearActionChanges(a.actions)
+  if (to === undefined) return withChanges(UNKNOWN, changes)
+  return withChanges(known([to, ...(Array.isArray(a.actions) ? a.actions.flatMap((x: unknown) => nearActionRecipients(x)) : [undefined])]), changes)
 }
 
 // ── TON: message bodies that pay someone other than `to` (round 3, M1) ────────
@@ -909,15 +947,29 @@ function evmCallDestinations(call: unknown): Array<string | undefined> {
   return [str(c.to), ...(r ? r.list.map((w) => `0x${w}`) : []), ...(r?.bad ? [undefined] : [])]
 }
 
-/** EVM: the transaction goes to `to` — no `to` is a contract deployment (round 3, H2) — and to whoever its calldata pays (M1). */
+/**
+ * An array that also carries named own properties (`Object.assign([call], { to, value })`). The
+ * elements and the named fields describe two different writes, and which one gets signed depends on
+ * the account that reads it, so neither is a known destination.
+ */
+export function namedArray(v: unknown): boolean {
+  if (!Array.isArray(v)) return false
+  return Reflect.ownKeys(v).some((k) => k !== 'length' && !(typeof k === 'string' && /^(0|[1-9]\d*)$/.test(k) && Number(k) < v.length))
+}
+
+/**
+ * EVM: the transaction goes to `to` — no `to` is a contract deployment (round 3, H2) — and to whoever its calldata pays (M1).
+ * A list of calls is what a batching account (ERC-4337, EIP-7702) sends as one operation; wallet-evm refuses a list.
+ */
 function evmDestinations(arg: unknown): Destinations {
-  if (Array.isArray(arg)) return arg.length ? known(arg.flatMap(evmCallDestinations)) : UNKNOWN
+  if (Array.isArray(arg)) return arg.length && !namedArray(arg) ? known(arg.flatMap(evmCallDestinations)) : UNKNOWN
   if (str(obj(arg).to) === undefined) return UNKNOWN
   return known(evmCallDestinations(arg))
 }
 
+/** Bitcoin, Zcash and other one-recipient spends: the chain package pays `to` of one spend and takes no list. */
 function evmLikeDestinations(arg: unknown): Destinations {
-  if (Array.isArray(arg)) return arg.length ? known(arg.map((c) => str(obj(c).to))) : UNKNOWN
+  if (Array.isArray(arg)) return UNKNOWN
   const a = obj(arg)
   const to = str(a.to) ?? str(a.recipient)
   return to !== undefined ? known([to]) : UNKNOWN

@@ -57,6 +57,18 @@ describeProtocolModule("protocol-swap2-usdt0", {
   samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
 
+// The OFT's send pays SendParam.to (bytes32, an EVM address in its low 20 bytes) and refunds the fee to its third argument.
+const SEND_ABI = parseAbi([
+  "struct SendParam { uint32 dstEid; bytes32 to; uint256 amountLD; uint256 minAmountLD; bytes extraOptions; bytes composeMsg; bytes oftCmd; }",
+  "struct MessagingFee { uint256 nativeFee; uint256 lzTokenFee; }",
+  "function send(SendParam s, MessagingFee fee, address refundAddress) payable",
+]);
+const oftPays = (source: {kind: string; data?: string}): string[] => {
+  const {args} = decodeFunctionData({abi: SEND_ABI, data: source.data as Hex});
+  const [sp, , refund] = args;
+  if (sp.to.slice(2, 26) !== "0".repeat(24) || sp.composeMsg !== "0x") throw new Error("not a plain EVM recipient");
+  return [`0x${sp.to.slice(26)}`, refund];
+};
 describeProtocolBehaviour("protocol-swap2-usdt0", {
   type: "swap2",
   Protocol: Usdt0Swap2Protocol,
@@ -69,6 +81,8 @@ describeProtocolBehaviour("protocol-swap2-usdt0", {
       account: {address: ME},
       own: [ME],
       sourceToken: ARB.token,
+      callTargets: [ARB.oft],
+      decode: oftPays,
     },
   ],
 });
