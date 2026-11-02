@@ -1,7 +1,7 @@
 import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import {
-  BaseError, ContractFunctionRevertedError, getAddress, hashMessage, hashTypedData, hexToBytes, keccak256, serializeTransaction, TransactionNotFoundError, zeroAddress,
+  BaseError, ContractFunctionRevertedError, getAddress, HttpRequestError, TimeoutError, hashMessage, hashTypedData, hexToBytes, keccak256, serializeTransaction, TransactionNotFoundError, zeroAddress,
   type Hex, type PublicClient, type Signature, type TransactionSerializable,
 } from 'viem'
 import { publicKeyToAddress } from 'viem/accounts'
@@ -70,8 +70,22 @@ const NODE_REJECTION = /\bnonce\b|underpriced|insufficient funds|intrinsic gas|e
  * come from a gateway after the node took the transaction, so it is not a refusal.
  */
 const DEFINITIVE_RPC_CODES = new Set([-32700, -32600, -32601, -32602, -32003])
+/**
+ * The text of the JSON-RPC errors in the chain (each carries a numeric `code`). Nothing when the
+ * chain holds an HTTP or timeout error: a gateway's status page or 5xx body is not the node's
+ * answer, whatever words it contains.
+ */
+const rpcErrorText = (e: unknown): string => {
+  const parts: string[] = []
+  for (let cur: unknown = e, i = 0; cur && i < 6; cur = (cur as { cause?: unknown }).cause, i++) {
+    if (cur instanceof HttpRequestError || cur instanceof TimeoutError) return ''
+    const o = cur as { code?: unknown; message?: unknown; details?: unknown; shortMessage?: unknown }
+    if (typeof o.code === 'number') for (const v of [o.message, o.details, o.shortMessage]) if (typeof v === 'string') parts.push(v)
+  }
+  return parts.join('\n')
+}
 const nodeAnswered = (e: unknown): boolean => {
-  if (NODE_REJECTION.test(errorText(e))) return true
+  if (NODE_REJECTION.test(rpcErrorText(e))) return true
   for (let cur: unknown = e, i = 0; cur && i < 6; cur = (cur as { cause?: unknown }).cause, i++) {
     const code = (cur as { code?: unknown }).code
     if (typeof code === 'number' && DEFINITIVE_RPC_CODES.has(code)) return true
