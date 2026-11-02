@@ -35,13 +35,30 @@ function httpTransport(base: string, headers: Record<string, string> | undefined
   }
 }
 
+/** A provider's answer, with the failure of any earlier provider that was tried for the same call first. */
+export interface TronAnswer {
+  answer: unknown
+  /** True when an earlier provider was tried first and failed (a timeout, a dropped connection, an HTTP error). */
+  missed: boolean
+  /** That provider's failure. */
+  missedError?: unknown
+}
+
+/**
+ * Present on a failover transport: the same call, also reporting whether an earlier provider was
+ * tried and gave no answer. A broadcast needs this: that provider may hold the bytes already.
+ */
+export const WITH_MISSES = Symbol('tron.failover.withMisses')
+export type FailoverFetch = TronFetch & { [WITH_MISSES]?: (path: string, body: unknown) => Promise<TronAnswer> }
+
 /**
  * One transport, or a failover transport over the list. Any failure without a node's answer (a
  * timeout, a dropped connection, an HTTP error) moves on to the next provider. That holds for a
  * broadcast too: it re-sends the SAME signed bytes (one `txID`, accepted by the chain once), and
- * the account reads a duplicate answer as accepted.
+ * the account reads a duplicate answer as accepted, and a refusal that follows a provider that
+ * gave no answer as maybe sent.
  */
-export function createClient(config: TronConfig): TronFetch | undefined {
+export function createClient(config: TronConfig): FailoverFetch | undefined {
   if (config.provider === undefined) return undefined
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const list = (Array.isArray(config.provider) ? config.provider : [config.provider]).map((p) =>
@@ -50,13 +67,20 @@ export function createClient(config: TronConfig): TronFetch | undefined {
   if (list.length === 0) throw new Error("The 'provider' option cannot be set to an empty list.")
   if (list.length === 1) return list[0]!
   const attempts = list.length + (config.retries ?? 3)
-  return async (path, body) => {
+  const withMisses = async (path: string, body: unknown): Promise<TronAnswer> => {
     let lastError: unknown
+    let missed = false
     for (let i = 0; i < attempts; i++) {
-      try { return await list[i % list.length]!(path, body) } catch (e) { lastError = e }
+      try {
+        const answer = await list[i % list.length]!(path, body)
+        return missed ? { answer, missed, missedError: lastError } : { answer, missed }
+      } catch (e) { lastError = e; missed = true }
     }
     throw new NetworkError(`All Tron providers failed for ${path}`, { cause: lastError })
   }
+  const client: FailoverFetch = async (path, body) => (await withMisses(path, body)).answer
+  client[WITH_MISSES] = withMisses
+  return client
 }
 
 /** Full-node responses that carry an error body instead of a transaction. */

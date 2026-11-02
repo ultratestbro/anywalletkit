@@ -3,7 +3,7 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { addressFromPublicKey, toHexAddress } from './address.js'
 import { describeTransaction } from './describe.js'
 import { BroadcastUnknownError, SimulationError, UnsafeTransactionError } from './errors.js'
-import { BROADCAST_REFUSED, nodeMessage } from './client.js'
+import { BROADCAST_REFUSED, WITH_MISSES, nodeMessage, type FailoverFetch, type TronAnswer } from './client.js'
 import { WalletAccountReadOnlyTron, hashMessage } from './read-only-account.js'
 import { isDecodedContractType, verifyRawTransaction } from './raw.js'
 import { isPrebuilt } from './shape.js'
@@ -251,8 +251,15 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
   private async broadcast(signed: TronRawTransaction): Promise<string> {
     const client = this.requireClient('broadcast')
     let r: { result?: boolean; txid?: string; code?: string; message?: string }
+    // Set when an earlier provider of a failover list got these bytes and gave no answer.
+    let missed: TronAnswer | undefined
     try {
-      r = (await client('/wallet/broadcasttransaction', signed)) as typeof r
+      const withMisses = (client as FailoverFetch)[WITH_MISSES]
+      if (withMisses) {
+        const got = await withMisses('/wallet/broadcasttransaction', signed)
+        r = got.answer as typeof r
+        if (got.missed) missed = got
+      } else r = (await client('/wallet/broadcasttransaction', signed)) as typeof r
     } catch (e) {
       // No node answered (timeouts, dropped connections on every provider): the bytes may be in the network.
       throw new BroadcastUnknownError(signed.txID, e)
@@ -263,7 +270,11 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
     // A code java-tron answers before pushing the transaction is a clean refusal; any other answer
     // (an empty body, a gateway error, OTHER_ERROR) does not prove the bytes stayed off the network.
     const detail = `${typeof r?.code === 'string' ? r.code : ''} ${nodeMessage(r?.message)}`.trim()
-    if (typeof r?.code === 'string' && BROADCAST_REFUSED.has(r.code)) throw new Error(`Broadcast failed: ${detail}`)
+    // A refusal from a later provider says nothing about an earlier one that may have taken the bytes.
+    if (typeof r?.code === 'string' && BROADCAST_REFUSED.has(r.code)) {
+      if (missed) throw new BroadcastUnknownError(signed.txID, new Error(`broadcast answered ${detail} after an earlier provider gave no answer`, { cause: missed.missedError }))
+      throw new Error(`Broadcast failed: ${detail}`)
+    }
     const error = (r as { Error?: unknown } | undefined)?.Error
     throw new BroadcastUnknownError(signed.txID, new Error(`broadcast answered ${detail || (typeof error === 'string' ? error : JSON.stringify(r) ?? 'nothing')}`))
   }
