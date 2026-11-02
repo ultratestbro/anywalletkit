@@ -36,8 +36,9 @@ near.com keeps user funds in the Confidential Intents balance. `recipientType: "
 balance directly (1Click settles it with a signed transfer intent). 1Click serves it to partners only, so the provider
 requires `jwt` in this mode and throws at construction without it.
 
-`destAddress` must be a NEAR account id (named, implicit hex or `0x…`); anything else is refused before a request is
-sent. Because the output never reaches the destination chain, a corridor paused for that chain does not block an
+`destAddress` must be a NEAR Intents account id: a named account (`alice.near`), an implicit id (64 lowercase hex) or
+an implicit `0x` id (40 lowercase hex); anything else, a top-level name or a chain address such as `bc1q…` included,
+is refused before a request is sent. Because the output never reaches the destination chain, a corridor paused for that chain does not block an
 intents token id.
 
 ## Behind `remoteProvider`

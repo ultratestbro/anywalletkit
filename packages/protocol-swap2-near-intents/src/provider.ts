@@ -141,6 +141,17 @@ export interface NearIntentsProviderConfig {
 const NEAR_ACCOUNT_ID = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
 const INTENTS_TOKEN_ID = /^nep(141|245):\S+$/;
 
+/**
+ * An intents.near account someone can sign for: a named account (`alice.near`), an
+ * implicit ed25519 id (64 hex) or an implicit EVM-style id (`0x` + 40 hex). Any other
+ * dot-less id passes the NEAR syntax but is a pasted chain address (`bc1q…`, a padded
+ * `0x…`), credited to an account no key controls.
+ */
+function intentsAccountId(id: string): boolean {
+  if (!NEAR_ACCOUNT_ID.test(id)) return false;
+  return id.includes(".") || /^[0-9a-f]{64}$/.test(id) || /^0x[0-9a-f]{40}$/.test(id);
+}
+
 export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): CrossChainProvider {
   config = Object.freeze({...config});
   const parsedApiUrl = new URL(config.apiUrl ?? ONE_CLICK_DEFAULT);
@@ -208,7 +219,7 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
       const chainRefusal = nearIntentsChainRefusal(params.sourceChain, paused)
         ?? (rawIntentsDest ? null : nearIntentsChainRefusal(params.destChain, paused));
       if (chainRefusal) return refuse(chainRefusal);
-      if (intents && !NEAR_ACCOUNT_ID.test(params.destAddress)) {
+      if (intents && !intentsAccountId(params.destAddress)) {
         return refuse(`${recipientType} recipient must be a NEAR Intents account id`);
       }
       const origin = ccAsset(params.sourceChain, params.sourceToken);
