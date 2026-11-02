@@ -110,9 +110,9 @@ describe('audit 2026-11-02 r2: a Mayan order must deliver what was reviewed', ()
     expect(await check(swift({ amountOutMin: 0n }))).toBe('bridge-min')
     expect(await check(swift({ tokenOut: `0x${'66'.repeat(20)}` }))).toBe('bridge-token')
     expect(await check(swift({ tokenOut: '0x0000000000000000000000000000000000000000' }))).toBe('bridge-token')
-    // 0.5 % slippage + 1 bp of rounding under the reviewed minimum is the floor.
-    expect(await check(swift({ amountOutMin: (8_955_000n * 9_949n) / 10_000n }))).toBe('pass')
-    expect(await check(swift({ amountOutMin: (8_955_000n * 9_949n) / 10_000n - 1n }))).toBe('bridge-min')
+    // 1 bp of rounding under the reviewed minimum is the floor (the reviewed minimum already is at the plan's slippage).
+    expect(await check(swift({ amountOutMin: (8_955_000n * 9_999n) / 10_000n }))).toBe('pass')
+    expect(await check(swift({ amountOutMin: (8_955_000n * 9_999n) / 10_000n - 1n }))).toBe('bridge-min')
     expect(await check(swift({ amountOutMin: 1n }))).toBe('bridge-min')
     // Fees within the caps and the reviewed token and minimum pass.
     expect(await check(swift({ feeRateRef: MAYAN_REFERRER_FEE_MAX_BPS, feeCancel: (INPUT * BigInt(MAYAN_RELAYER_FEE_MAX_BPS)) / 10_000n, feeRefund: 0n }))).toBe('pass')
@@ -123,8 +123,8 @@ describe('audit 2026-11-02 r2: a Mayan order must deliver what was reviewed', ()
     const bare: BridgeOutExpectation = { destChain: 'eip155:8453', recipient: RECIPIENT }
     expect(await check(mctpBridge(INPUT), bare)).toBe('bridge-min')
     expect(await check(mctpBridge(INPUT))).toBe('bridge-min')
-    // The bridged USDC less its fees must cover the reviewed minimum (slippage + 1 bp); feeSolana counts too.
-    const fee = INPUT - (8_955_000n * 9_949n) / 10_000n
+    // The bridged USDC less its fees must cover the reviewed minimum (less 1 bp); feeSolana counts too.
+    const fee = INPUT - (8_955_000n * 9_999n) / 10_000n
     expect(await check(mctpBridge(fee - 200n, 200n))).toBe('pass')
     expect(await check(mctpBridge(fee - 200n, 201n))).toBe('bridge-min')
     // A plain bridge delivers USDC only: a reviewed 18-decimal token is not what it pays.

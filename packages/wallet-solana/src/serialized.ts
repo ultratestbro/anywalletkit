@@ -126,9 +126,10 @@ export interface SerializedExpectation {
    * follow — compute budget, memos, LI.FI's tracking log, wSOL plumbing, transfers to this wallet's own accounts or to a
    * fee wallet (at most {@link BRIDGE_FEE_MAX_BPS} of what may leave), a Jupiter swap into this wallet or into the
    * bridge, and Mayan's Swift / MCTP / Fast MCTP order instructions — and every bridge order must name `recipient` on
-   * `destChain`, a non-zero minimum, the reviewed token (`destToken`) and a minimum no further under the reviewed one
-   * (`minAmountOut`) than `slippageBps`; an order with no reviewed token or minimum is refused. Anything else (a transfer to another wallet, an approval, a program whose
-   * recipient cannot be read, a referrer or relayer fee over its cap) is refused (`bridge-*` codes). A transaction of
+   * `destChain`, a non-zero minimum, the reviewed token (`destToken`) and a minimum of at least the reviewed one
+   * (`minAmountOut`, 1 bp of rounding aside); an order with no reviewed token or minimum is refused. Anything else (a
+   * transfer to another wallet, an approval, a program whose recipient cannot be read, a referrer or relayer fee over
+   * its cap) is refused (`bridge-*` codes). A transaction of
    * another bridge (Relay, LayerSwap, NEAR Intents, LI.FI Intents, …) carries its recipient in an off-chain order or in
    * data the guard does not read: it is NOT recipient-checked, only held to `maxLamportsOut`, `maxTokenOut` and the
    * program allowlist, as without `bridgeOut`.
@@ -154,14 +155,17 @@ export interface BridgeOutExpectation {
    * The reviewed minimum the recipient receives, in the destination token's base units; needs `destDecimals`. Every
    * order's own minimum — Swift's `amountOutMin` (Mayan keeps at most 8 decimals), or for a plain MCTP / Fast MCTP
    * bridge of USDC (`destToken` must then be the destination chain's native USDC) the bridged amount less its relayer,
-   * Circle and referrer fees — must be at least this, less
-   * `slippageBps` and 1 bp of rounding (`bridge-min`). Without it (or without `destDecimals`) every Mayan order is
-   * refused (`bridge-min`): its minimum would be the provider's word alone.
+   * Circle and referrer fees — must be at least this, less 1 bp of rounding (`bridge-min`). It already is the minimum at
+   * the plan's slippage, so no slippage is taken off it again. Without it (or without `destDecimals`) every Mayan order
+   * is refused (`bridge-min`): its minimum would be the provider's word alone.
    */
   minAmountOut?: bigint
   /** Decimals of `destToken` on the destination chain. */
   destDecimals?: number
-  /** How far under `minAmountOut` an order's own minimum may sit, in basis points (the plan's slippage). Default 0. */
+  /**
+   * The plan's slippage in basis points (swap2 sends it). Checked for range only: `minAmountOut` is the minimum at this
+   * slippage already, and an order's own minimum is held to it without a second allowance.
+   */
   slippageBps?: number
 }
 
@@ -474,6 +478,11 @@ const MAYAN_ORDERS: readonly MayanOrderLayout[] = [
 ]
 /** Decimals of the USDC a plain MCTP / Fast MCTP bridge delivers (Circle's native USDC, `MAYAN_CHAINS[…].usdc`). */
 const CCTP_USDC_DECIMALS = 6
+/**
+ * How far under the reviewed minimum an order's own minimum may sit, in basis points: rounding only. The reviewed
+ * minimum is the quote's, already at the plan's slippage; LI.FI's Mayan orders carry it as is (2026-11-02).
+ */
+const MAYAN_MIN_ROUNDING_BPS = 1
 /** Mayan normalizes an order's output amount to at most this many decimals (swap-sdk `getNormalizeFactor`). */
 const MAYAN_MAX_DECIMALS = 8
 /** Argument-less Mayan instructions that run an order the same transaction opened (`bridge`, `bridge_with_fee_shim`). */
@@ -542,8 +551,8 @@ const u64le = (d: Uint8Array, at: number) => new DataView(d.buffer, d.byteOffset
 
 /**
  * Why a Mayan order does not deliver what was reviewed, or undefined: its fee rates and relayer fees within their caps,
- * a non-zero minimum, the reviewed token and a minimum no further under the reviewed one than the plan's slippage (+1 bp
- * of rounding). An order with no reviewed token or minimum to hold it to is refused.
+ * a non-zero minimum, the reviewed token and a minimum of at least the reviewed one (less {@link MAYAN_MIN_ROUNDING_BPS}).
+ * An order with no reviewed token or minimum to hold it to is refused.
  */
 function mayanOrderRefusal(layout: MayanOrderLayout, d: Uint8Array, b: BridgeOutExpectation): { code: string; detail: string; message: string } | undefined {
   const refuse = (code: string, detail: string, message: string) => ({ code, detail, message })
@@ -552,7 +561,7 @@ function mayanOrderRefusal(layout: MayanOrderLayout, d: Uint8Array, b: BridgeOut
   }
   const amountIn = u64le(d, layout.amountInAt)
   const rateBps = layout.rateAt.reduce((sum, at) => sum + BigInt(d[at]!), 0n)
-  const keep = BigInt(10_000 - (b.slippageBps ?? 0) - 1)
+  const keep = BigInt(10_000 - MAYAN_MIN_ROUNDING_BPS)
   const reviewed = (decimals: number) => (b.minAmountOut! / 10n ** BigInt(Math.max(0, b.destDecimals! - decimals)) * keep) / 10_000n
   if (layout.tokenOutAt !== undefined && layout.amountOutMinAt !== undefined) {
     const fees = (layout.refundFeesAt ?? []).reduce((sum, at) => sum + u64le(d, at), 0n)
@@ -565,7 +574,7 @@ function mayanOrderRefusal(layout: MayanOrderLayout, d: Uint8Array, b: BridgeOut
     if (min === 0n) return refuse('bridge-min', '0', `The ${layout.name} order accepts any output (minimum 0).`)
     if (b.minAmountOut === undefined) return refuse('bridge-min', String(min), `The ${layout.name} order's minimum ${min} cannot be held to a reviewed one: bridgeOut has no minAmountOut (with destDecimals).`)
     const floor = reviewed(Math.min(b.destDecimals!, MAYAN_MAX_DECIMALS))
-    if (min < floor) return refuse('bridge-min', String(min), `The ${layout.name} order's minimum ${min} is under the reviewed ${b.minAmountOut} (${floor} at Mayan's precision, slippage included).`)
+    if (min < floor) return refuse('bridge-min', String(min), `The ${layout.name} order's minimum ${min} is under the reviewed ${b.minAmountOut} (${floor} at Mayan's precision, less ${MAYAN_MIN_ROUNDING_BPS} bp of rounding).`)
     return undefined
   }
   // A plain USDC bridge: what arrives is the bridged amount less the fees taken from it.
@@ -577,7 +586,7 @@ function mayanOrderRefusal(layout: MayanOrderLayout, d: Uint8Array, b: BridgeOut
   if (!usdc || b.destToken === undefined || b.destToken.toLowerCase() !== usdc.toLowerCase()) return refuse('bridge-token', b.destToken ?? '', `The ${layout.name} order delivers ${usdc ? `USDC (${usdc})` : 'USDC'} on ${b.destChain}, not the reviewed ${b.destToken ?? '(no token)'}.`)
   if (b.destDecimals !== CCTP_USDC_DECIMALS) return refuse('bridge-token', String(b.destDecimals), `The ${layout.name} order delivers USDC (${CCTP_USDC_DECIMALS} decimals), not a token of ${b.destDecimals}.`)
   const floor = reviewed(CCTP_USDC_DECIMALS)
-  if (delivered < floor) return refuse('bridge-min', String(delivered), `The ${layout.name} order delivers at least ${delivered} after its fees, under the reviewed ${b.minAmountOut} (slippage included).`)
+  if (delivered < floor) return refuse('bridge-min', String(delivered), `The ${layout.name} order delivers at least ${delivered} after its fees, under the reviewed ${b.minAmountOut} (less ${MAYAN_MIN_ROUNDING_BPS} bp of rounding).`)
   return undefined
 }
 
