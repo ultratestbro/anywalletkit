@@ -65,6 +65,9 @@ describe("previewEvmTx", () => {
     expect(p.simulation).toEqual({status: "ok", gasUsed: [0xb000n, 0x4c2c0n], changes: [
       {token: USDC, symbol: "USDC", decimals: 6, delta: -100_000_000n, verified: false},
       {token: "native", symbol: "ETH", decimals: 18, delta: 1n, verified: true},
+    ], transfers: [
+      {token: USDC, from: ME, to: DIAMOND, amount: 100_000_000n},
+      {token: "native", from: DIAMOND, to: ME, amount: 1n},
     ]});
     expect(p.checks.map((c) => `${c.code}:${c.status}`)).toEqual(["contract-known:ok", "simulation-ok:ok", "recipient-own:ok", "approval-exact:ok"]);
   });

@@ -69,6 +69,10 @@ export function verdict(preview: TxPreview): Verdict {
         raise('warn'); lines.push(`Unknown contract ${d.address}.`); break
       case 'recipient-foreign':
         lines.push(`Sends to ${d.address}, which is not one of your accounts.`); break
+      case 'output-missing':
+        raise('danger'); lines.push(`Nothing arrives at ${d.address}.`); break
+      case 'output-foreign':
+        raise('danger'); lines.push(`${d.amount} of ${d.token} goes to ${d.address}, not to the recipient.`); break
       default:
         break // the "ok" codes need no line
     }
