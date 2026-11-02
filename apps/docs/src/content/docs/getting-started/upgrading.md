@@ -10,6 +10,47 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: the 2026-11-02 audit fixes
+
+A second external audit and our own review of the fixes found more places where what is checked and what is signed
+could differ. All are fixed. The ones your app has to handle come first.
+
+- **Review (`tx-preview-evm`): two new check codes.** With `expectedRecipient` set and an ok simulation,
+  `output-missing` (nothing arrives at the recipient) and `output-foreign` (a third party keeps more than 5 % of the
+  output, `detail.address`, `token`, `amount`, `holders`) are reported. An exhaustive `switch` over check codes needs
+  both cases. Pass `expectedRecipient` (and the new `expectedOutputToken`) **only for same-chain swaps and sends**: a
+  bridge's output never arrives on the source chain, so it would always read `output-missing`.
+- **Solana bridges: map the swap expectation with `serializedGuardFromExecution`.** swap2 now sends a `bridgeOut`
+  (destination chain, recipient, token, minimum) with every cross-chain serialized leg, and `wallet-solana` holds a
+  Mayan order to it. A hand-written mapping that copies only `maxLamportsOut` / `tokenIn` / `maxTokenOut` drops it:
+  call `account.sendSerialized(tx, serializedGuardFromExecution(expect))` instead. Solana bridges other than Mayan
+  (Relay, LayerSwap, NEAR Intents and LI.FI Intents through LI.FI) carry their recipient in an off-chain order and are
+  not recipient-checked on the device.
+- **More "maybe sent" errors.** `BroadcastUnknownError` (`maybeSent: true`, `hash`) now also comes from Tron and NEAR
+  (an unrecognised node answer, an unnamed JSON-RPC error, a gateway page, "P2P broadcast failed") and from an EVM
+  or Tron provider list when an earlier endpoint gave no answer. A successful send always returns the locally
+  computed hash. Every send, swap, Earn and dApp path should show "check Activity before sending again" and track
+  the hash; never resend by itself.
+- **EVM fee-rate ceiling.** Caller-set `gasPrice` / `maxFeePerGas` / `maxPriorityFeePerGas` above 10× the network's
+  quote (at least 10 gwei) are refused before signing. `maxFeeRateMultiplier` changes it; `null` turns it off. Fees
+  the account fills itself are not affected.
+- **Input shapes.** `wallet-evm` refuses a list or a class instance as a transaction; `wallet-btc` / `wallet-zcash`
+  refuse it as a spend (`malformed-spend`). A `value` string longer than 300 characters or with whitespace is
+  refused. In policies, a raw send's amount is its `value`: a differing `amount` field makes the amount unknown.
+- **NEAR.** `signBuilt` runs the same checks as `signTransaction` (dangerous actions need `allowDangerousActions`),
+  and every signing path signs the copy it checked. `WriteIntent.accountChanges` lists key, code, stake and account
+  changes; show them on the confirm screen. An allowlist refuses such transactions.
+- **LI.FI.** EVM bridges that do not bind the recipient on chain (Relay depository, Garden, deBridge DLN, ThorSwap,
+  Squid, Symbiosis) are refused and denied in requests, so LI.FI routes those pairs through another bridge. Every
+  refund, depositor and fallback address in a bridge's own data must be the sender or the recipient (Superset quotes
+  are refused while LI.FI fills them with a third address).
+- **Swaps.** A bridge to a destination token the catalog does not list needs `toTokenDecimals` for a Mayan route.
+  A minimum that sits exactly at the requested slippage is no longer refused over provider rounding (+1 bp).
+- **CCTP.** Without a destination RPC a recorded claim stays `pending` until `claimSwap2` saw it succeed; the id it
+  returns then ends in `.ok` and reads `completed`. Keep the id `claimSwap2` returns.
+- **Conformance.** Behaviour fixtures declare `callTargets` and a `decode` that reads who router calldata pays;
+  undeclared targets, native value into unknown contracts and unreadable approvals fail the suite.
+
 ## Next release: the 2026-10-31 review fixes
 
 An external review of the 2026-10-30 release found 16 issues; all are fixed. The ones that can change what your
