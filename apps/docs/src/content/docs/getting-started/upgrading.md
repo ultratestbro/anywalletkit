@@ -48,6 +48,11 @@ could differ. All are fixed. The ones your app has to handle come first.
   A minimum that sits exactly at the requested slippage is no longer refused over provider rounding (+1 bp).
 - **CCTP.** Without a destination RPC a recorded claim stays `pending` until `claimSwap2` saw it succeed; the id it
   returns then ends in `.ok` and reads `completed`. Keep the id `claimSwap2` returns.
+- **New: NEAR Intents credits.** `nearIntentsProvider({recipientType: "INTENTS"})` credits a NEAR Intents
+  (near.com) account inside `intents.near` instead of withdrawing to a chain; `"CONFIDENTIAL_INTENTS"` credits its
+  confidential balance and needs a 1Click partner `jwt`. Both take `destChain: "near:mainnet"` (an intents token id
+  such as `nep141:…` may be the `destToken`) and a recipient that is a named `.near`-style account, a 64-hex implicit
+  id or a lowercase `0x` + 40 hex id. The default `DESTINATION_CHAIN` is unchanged.
 - **Conformance.** Behaviour fixtures declare `callTargets` and a `decode` that reads who router calldata pays;
   undeclared targets, native value into unknown contracts and unreadable approvals fail the suite.
 
