@@ -14,6 +14,15 @@ export const ROUTER_ABI = parseAbi([
 ]);
 export const ROUTER_ITSELF = "0x0000000000000000000000000000000000000002";
 
+/** An exactInput path's output token, walked hop by hop: token (fee token)+, 20 + 23k bytes with k ≥ 1. */
+const pathOut = (path: Hex): string => {
+  const hex = path.slice(2);
+  if (hex.length < 86 || (hex.length - 40) % 46 !== 0) throw new Error(`exactInput path of ${hex.length / 2} bytes is not token (fee token)+`);
+  let out = hex.slice(0, 40);
+  for (let i = 40; i < hex.length; i += 46) out = hex.slice(i + 6, i + 46);
+  return `0x${out}`;
+};
+
 /** The decode for a chain whose wrapped native token is `weth`. */
 export const decodeFor = (weth: string) => (source: {kind: string; data?: string}): string[] => {
   const m = decodeFunctionData({abi: ROUTER_ABI, data: source.data as Hex});
@@ -22,8 +31,7 @@ export const decodeFor = (weth: string) => (source: {kind: string; data?: string
     const c = decodeFunctionData({abi: ROUTER_ABI, data: leg});
     if (c.functionName === "unwrapWETH9") return {unwrap: true, recipient: c.args[1], tokenOut: undefined};
     if (c.functionName === "exactInputSingle") return {unwrap: false, recipient: c.args[0].recipient, tokenOut: c.args[0].tokenOut as string};
-    // exactInput's output token is the path's last 20 bytes.
-    if (c.functionName === "exactInput") return {unwrap: false, recipient: c.args[0].recipient, tokenOut: `0x${c.args[0].path.slice(-40)}`};
+    if (c.functionName === "exactInput") return {unwrap: false, recipient: c.args[0].recipient, tokenOut: pathOut(c.args[0].path)};
     throw new Error(`unexpected leg ${c.functionName}`);
   });
   const forwarded = (i: number) => legs[i]!.tokenOut?.toLowerCase() === weth.toLowerCase() && legs[i + 1]?.unwrap === true;
