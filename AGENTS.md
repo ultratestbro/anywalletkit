@@ -163,7 +163,8 @@ GRAM since 2026); `ccChain(catalogId)?.assets` (`swap2-assets`) lists catalog to
 Tokens the user adds by address (EVM, Solana): `inspectToken(account, address)` (`tokens`) → `{ listed }` or
 `{ info, assessment, token }` (`getTokenInfo` on the account; `NotATokenError` for a non-token), `TokensTable` keeps
 them, and the swap engine takes them only with `allowUnlistedTokens: true` (`swapSource(token)` → `fromToken` +
-`fromTokenDecimals`; LI.FI / Uniswap / Balancer / Fynd / Jupiter quote them, no USD value).
+`fromTokenDecimals`; LI.FI / Uniswap / Balancer / Fynd / Jupiter quote them, no USD value). A bridge to an
+unlisted destination token needs `toTokenDecimals` read on the destination chain, or a Mayan leg out of Solana is refused.
 
 ## Policies (run before every signature, including protocol modules)
 

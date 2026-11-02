@@ -83,6 +83,13 @@ export interface Quote {
   sourceAmount: string; // what the user pays on source (base units)
   destAmount: string; // what arrives on dest (base units)
   minDestAmount: string; // worst case at the quoted slippage (base units)
+  /**
+   * Decimals of the destination token as the provider reports them (LI.FI's `action.toToken.decimals`). They are the
+   * provider's word, so the engine never uses them alone for the reviewed minimum it hands an account
+   * (`bridgeOut.destDecimals`): that is the catalog's value, else the caller's `toTokenDecimals`, and a quote whose value
+   * disagrees with the caller's is refused.
+   */
+  destDecimals?: number;
   feeUsd: number; // normalized fee for scoring
   /** Honest itemized fees when the provider exposes base-unit amounts. */
   fees?: {type: "network" | "protocol" | "affiliate" | "other"; amount: string; token: string; included: boolean; description?: string}[];

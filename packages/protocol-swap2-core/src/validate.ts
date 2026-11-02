@@ -1,5 +1,19 @@
 import type {CrossChainProvider, Quote, QuoteParams} from "./types.js";
 
+/**
+ * How far past the requested slippage a quote's minimum may sit and still count as "at" it. Providers derive the
+ * minimum with their own rounding: LI.FI's Mayan answers land a few base units under an exact floor on 18-decimal
+ * outputs (50.0000000001 bps at a requested 50, live 2026-11-02), which refused half of them. A minimum that is more
+ * than this past the request is still refused.
+ */
+export const SLIPPAGE_ROUNDING_BPS = 1;
+
+/** The lowest minimum a quote of `dest` may carry at `slippageBps`: floor(dest × (10 000 − slippageBps − {@link SLIPPAGE_ROUNDING_BPS}) / 10 000). */
+export function slippageFloor(dest: bigint, slippageBps: number): bigint {
+  const keep = 10_000 - slippageBps - SLIPPAGE_ROUNDING_BPS;
+  return keep <= 0 ? 0n : (dest * BigInt(keep)) / 10_000n;
+}
+
 /** Shared quote validator used by both the aggregate and single-provider paths. */
 export function validQuote(q: Quote, params: QuoteParams, provider: string): boolean {
   try {
@@ -15,10 +29,9 @@ export function validQuote(q: Quote, params: QuoteParams, provider: string): boo
     }
     if (params.slippageBps !== undefined) {
       if (!Number.isInteger(params.slippageBps) || params.slippageBps < 0 || params.slippageBps >= 10_000) return false;
-      // Providers round the floor DOWN (1Click, LI.FI: floor(dest × (1 − s))).
-      // A ceil here refused nearly every slippage-bounded quote by one base unit.
-      const required = (dest * BigInt(10_000 - params.slippageBps)) / 10_000n;
-      if (min < required) return false;
+      // Providers round the floor DOWN (1Click, LI.FI: floor(dest × (1 − s))), some through
+      // floats. A ceil here refused nearly every slippage-bounded quote by one base unit.
+      if (min < slippageFloor(dest, params.slippageBps)) return false;
     }
     if (!Number.isFinite(q.etaSeconds) || q.etaSeconds < 0) return false;
     if (!Number.isFinite(q.reliability) || q.reliability < 0 || q.reliability > 1) return false;

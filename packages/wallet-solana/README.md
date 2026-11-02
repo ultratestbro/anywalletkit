@@ -149,13 +149,34 @@ const pyusd = await account.getTokenInfo('2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsF
   `dataLength`, and the accounts at given positions, compared after lookup
   tables are resolved — or the wire is refused (`unexpected-instruction`).
   A bridge out of Solana passes `expect.bridgeOut: {destChain, recipient}`
-  (swap2 hands it to the account hook as `bridgeOut`): every top-level
-  instruction, with Mayan's CPI proxy unwrapped, must be one the guard follows
+  (swap2 hands it to the account hook as `bridgeOut`). In a Mayan route (it
+  runs one of Mayan's own programs, directly or through its CPI proxy) every
+  top-level instruction, with the proxy unwrapped, must be one the guard follows
   (transfers to this wallet's own accounts or to a fee wallet, at most 3 % of
-  what may leave; a Jupiter swap into the wallet or the bridge; Mayan's Swift /
+  what may leave; a Jupiter v2 route into the wallet or the bridge that takes
+  no platform fee or positive-slippage share; Mayan's Swift /
   MCTP / Fast MCTP orders), and every Mayan order must pay `recipient` on
-  `destChain` (`bridge-recipient`, `bridge-payee`, `bridge-instruction`,
-  `bridge-missing`, `bridge-fee` otherwise).
+  `destChain` with a non-zero minimum, a referrer / Mayan fee rate of at most
+  `MAYAN_REFERRER_FEE_MAX_BPS` (50) and fixed relayer fees of at most
+  `MAYAN_RELAYER_FEE_MAX_BPS` (10 %) of its input. With the reviewed terms
+  swap2 adds — `destToken`, `minAmountOut` + `destDecimals`, `slippageBps`;
+  a Mayan order without `destToken` or `minAmountOut` is refused —
+  an order's output token must be `destToken` and its own minimum (Swift's
+  `amountOutMin` at Mayan's 8 decimals; for a plain MCTP / Fast MCTP USDC
+  bridge, the bridged amount less its fees, with `destToken` the destination
+  chain's native Circle USDC) at least `minAmountOut` less 1 bp of rounding
+  — `minAmountOut` already is the minimum at the plan's slippage
+  (`bridge-recipient`, `bridge-token`,
+  `bridge-min`, `bridge-payee`, `bridge-instruction`, `bridge-missing`,
+  `bridge-fee` otherwise). Other Solana bridges (Relay, LayerSwap, NEAR
+  Intents, LI.FI Intents, …) carry their recipient in an off-chain order or in
+  data the guard does not read: they are NOT recipient-checked, only held to
+  the ceilings and the program allowlist, as without `bridgeOut`.
+  `serializedGuardFromExecution(expect, extra?)` builds the guard from the
+  swap2 engine's `sendSerializedTransaction` expectation with every field
+  carried over (`bridgeOut` and its reviewed terms included) — map the hook
+  with it, `(tx, expect) => account.sendSerialized(tx,
+  serializedGuardFromExecution(expect))`, rather than by hand.
   Net balances alone let a deposit that also withdraws collateral and
   transfers it away pass; the rules do not.
 * `getAccountInfos(addresses)` reads raw accounts (owner, lamports, data) in

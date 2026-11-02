@@ -4,6 +4,7 @@ import {describeLifiActivity} from "./activity.js";
 import {diamondCallMismatch} from "./calldata.js";
 import {solanaBridgeTxMismatch} from "./solana.js";
 import {timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
+import {slippageFloor} from "@anywalletkit/protocol-swap2-core/validate";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {bigintToNumber} from "@anywalletkit/core";
 
@@ -228,19 +229,13 @@ export interface LifiRouteChoice {
 const TOOL_KEY = /^[A-Za-z0-9_-]{1,64}$/;
 /**
  * LI.FI tools whose Diamond entry point does not tie the delivery to the checked receiver (see `UNBOUND_BRIDGES` in
- * calldata.ts): every cross-chain request asks LI.FI to route around them, so the pairs they would have served get
- * another bridge instead of a refusal.
+ * calldata.ts): every cross-chain request from an EVM chain asks LI.FI to route around them, so the pairs they would
+ * have served get another bridge instead of a refusal. A Solana source has no Diamond call to check and is quoted
+ * through every bridge LI.FI offers (Relay included); the account checks a Mayan order's recipient on the device, the
+ * other Solana bridges only against its SOL and token ceilings.
  */
 const UNBOUND_TOOLS: readonly string[] = Object.freeze(["relaydepository", "garden"]);
-/**
- * The only bridges a Solana source is quoted through: Mayan's Swift, MCTP and Fast MCTP orders carry the recipient and
- * the destination chain in their instruction data, which the account's guard reads (`bridgeOut`). LI.FI's other Solana
- * routes deposit to an address or order id whose recipient lives off chain (NEAR Intents, LayerSwap, Relay) or call
- * programs the guard does not follow (LI.FI Intents); the direct NEAR Intents provider serves those pairs itself.
- */
-const SOLANA_BRIDGES: readonly string[] = Object.freeze(["mayan", "mayanMCTP", "mayanFastMCTP"]);
-
-function routeOptions(body: unknown): LifiRouteOption[] {
+function routeOptions(body: unknown, excluded: readonly string[]): LifiRouteOption[] {
   const routes = (body as {routes?: unknown})?.routes;
   if (!Array.isArray(routes)) return [];
   const out: LifiRouteOption[] = [];
@@ -251,7 +246,7 @@ function routeOptions(body: unknown): LifiRouteOption[] {
     const cross = Array.isArray(step.includedSteps) ? step.includedSteps.find((i) => i?.type === "cross")?.tool : undefined;
     const tool = typeof cross === "string" ? cross : step.tool;
     const eta = step.estimate?.executionDuration;
-    if (typeof tool !== "string" || !TOOL_KEY.test(tool) || UNBOUND_TOOLS.includes(tool) || typeof eta !== "number" || !Number.isFinite(eta) || eta < 0) continue;
+    if (typeof tool !== "string" || !TOOL_KEY.test(tool) || excluded.includes(tool) || typeof eta !== "number" || !Number.isFinite(eta) || eta < 0) continue;
     if (typeof r.toAmount !== "string" || typeof r.toAmountMin !== "string" || !/^\d{1,60}$/.test(r.toAmount) || !/^\d{1,60}$/.test(r.toAmountMin)) continue;
     out.push({
       tool,
@@ -350,12 +345,12 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
               fromAmount: params.amountIn,
               fromAddress,
               toAddress,
-              options: {slippage: slippageBps / 10_000, bridges: solanaSource ? {allow: SOLANA_BRIDGES} : {deny: UNBOUND_TOOLS}, ...(integrator().trim() ? {integrator: integrator().trim()} : {})},
+              options: {slippage: slippageBps / 10_000, ...(solanaSource ? {} : {bridges: {deny: UNBOUND_TOOLS}}), ...(integrator().trim() ? {integrator: integrator().trim()} : {})},
             }),
             signal: signal ?? timeoutSignal(8_000),
           });
           if (res.ok) {
-            const options = routeOptions(await res.json());
+            const options = routeOptions(await res.json(), solanaSource ? [] : UNBOUND_TOOLS);
             if (options.length) choice = cleanChoice(config.chooseRoute(options, params));
           }
         } catch {
@@ -378,14 +373,9 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         if (sentSlippage !== undefined) {
           url.searchParams.set("slippage", String(sentSlippage));
         }
-        const cross = params.sourceChain !== params.destChain;
-        let allow = (choice?.allowBridges ?? []).filter((b) => !UNBOUND_TOOLS.includes(b));
-        if (cross && solanaSource) {
-          allow = allow.filter((b) => SOLANA_BRIDGES.includes(b));
-          if (!allow.length) allow = [...SOLANA_BRIDGES];
-        }
-        for (const t of allow) url.searchParams.append("allowBridges", t);
-        for (const t of new Set([...(choice?.denyBridges ?? []), ...(cross ? UNBOUND_TOOLS : [])])) url.searchParams.append("denyBridges", t);
+        const unbound = params.sourceChain !== params.destChain && !solanaSource ? UNBOUND_TOOLS : [];
+        for (const t of (choice?.allowBridges ?? []).filter((b) => solanaSource || !UNBOUND_TOOLS.includes(b))) url.searchParams.append("allowBridges", t);
+        for (const t of new Set([...(choice?.denyBridges ?? []), ...unbound])) url.searchParams.append("denyBridges", t);
         if (choice?.order) url.searchParams.set("order", choice.order);
         deadline = signal ? undefined : timeoutSignal(12_000);
         const res = await fetch(url, {headers: headers(apiKey()), signal: signal ?? deadline!});
@@ -411,7 +401,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           id?: string;
           action?: {
             fromToken?: {address?: string; chainId?: number};
-            toToken?: {address?: string; chainId?: number};
+            toToken?: {address?: string; chainId?: number; decimals?: number};
             fromAmount?: string;
             fromChainId?: number;
             toChainId?: number;
@@ -549,7 +539,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         if (sentSlippage !== undefined) {
           const dest = BigInt(est.toAmount);
           const min = BigInt(minDestAmount);
-          if (dest > 0n && min < (dest * BigInt(10_000 - slippageBps)) / 10_000n) {
+          if (dest > 0n && min < slippageFloor(dest, slippageBps)) {
             const effective = bigintToNumber(((dest - min) * 1_000_000n) / dest) / 1_000_000;
             const requested = slippageBps / 10_000;
             const scaled: number = Math.floor(((sentSlippage * requested) / effective) * 0.995 * 1_000_000) / 1_000_000;
@@ -597,6 +587,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           sourceAmount: params.amountIn,
           destAmount: est.toAmount,
           minDestAmount,
+          ...(Number.isInteger(action.toToken?.decimals) && action.toToken!.decimals! >= 0 && action.toToken!.decimals! <= 36 ? {destDecimals: action.toToken!.decimals!} : {}),
           feeUsd,
           etaSeconds: est.executionDuration ?? 120,
           reliability: 0.97,
@@ -685,8 +676,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
  * token and amount, the requested output token, the recipient, the quoted minimum (at least the caller's floor), the
  * destination chain. A native input is paid in value (any excess is the declared bridge fee); a token input attaches
  * only that declared fee and approves the Diamond. A Solana source carries a serialized transaction instead, which the
- * account proves before signing (for a bridge, against the engine's `bridgeOut`); here only its static part is read
- * (a Mayan program is called, no SOL goes to another wallet). The reason it fails, or null.
+ * account proves before signing (for a Mayan bridge, against the engine's `bridgeOut`); here only its static part is
+ * read (paid by the sender; a Mayan route pays SOL to no other wallet). The reason it fails, or null.
  */
 export function lifiVerifyQuote(params: QuoteParams, quote: Quote): string | null {
   const fromChain = LIFI_CHAIN[params.sourceChain];
@@ -696,7 +687,7 @@ export function lifiVerifyQuote(params: QuoteParams, quote: Quote): string | nul
   if (!tx) return "the quote carries no transaction";
   if (isSolana(params.sourceChain)) {
     if (!tx.serializedTx || tx.data !== undefined || tx.to !== undefined) return "a Solana source carries a serialized transaction only";
-    // A bridge's static part must call Mayan and pay SOL to no other wallet; the account proves the recipient (bridgeOut).
+    // The static part of a bridge (see solanaBridgeTxMismatch); the account proves a Mayan order's recipient (bridgeOut).
     return fromChain === toChain ? null : solanaBridgeTxMismatch(tx.serializedTx, params.refundAddress || (params.dry !== false ? SOLANA_PLACEHOLDER : ""));
   }
   if (!isHexData(tx.data) || !tx.to || tx.serializedTx !== undefined) return "the quote carries no Diamond call";

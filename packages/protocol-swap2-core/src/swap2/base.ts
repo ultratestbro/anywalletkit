@@ -40,6 +40,7 @@ import {
 } from "@anywalletkit/swap2-assets";
 import type {CrossChainProvider, IntentStatus, QuoteParams, Quote, UnsignedTx} from "../types.js";
 import {tonRawAddress} from "../util.js";
+import {SLIPPAGE_ROUNDING_BPS} from "../validate.js";
 import {
   Swap2ConfigurationError,
   Swap2ExecutionError,
@@ -339,9 +340,14 @@ export interface SerializedExecutionExpectation {
   /**
    * Bridges: the destination chain (CAIP-2) and the reviewed recipient there. Value leaving the account may only go into
    * the bridge (plus the provider's declared fee), and a bridge instruction whose recipient the account can read must
-   * name this one; an account that cannot prove where the funds go refuses the transaction.
+   * name this one; an account that cannot prove where the funds go refuses the transaction. The engine also names the
+   * reviewed destination token (zero address = native), the quoted minimum in its base units with its decimals (the
+   * catalog's, else the caller's verified `toTokenDecimals`; never the quote's alone), and the slippage the plan allows, so a bridge
+   * order's own token and minimum can be held to them.
+   * Set on every cross-chain serialized leg. A Solana account maps the whole expectation with wallet-solana's
+   * `serializedGuardFromExecution`; a hand mapping that drops `bridgeOut` leaves the leg checked against the SOL ceiling only.
    */
-  bridgeOut?: {destChain: string; recipient: string};
+  bridgeOut?: {destChain: string; recipient: string; destToken: string; minAmountOut: string; destDecimals?: number; slippageBps?: number};
 }
 
 const DEFAULT_SERIALIZED_NATIVE_ALLOWANCE = 20_000_000n;
@@ -665,13 +671,33 @@ function assertQuoteConstraints(q: Quote, options: Swap2Options): void {
   }
   if (options.slippage !== undefined) {
     const scale = 1_000_000_000n;
-    const permitted = BigInt(floorScaled(options.slippage, 1_000_000_000));
-    // Floor, like the providers compute their minimum (see validQuote).
-    const required = (nominal * (scale - permitted)) / scale;
+    // The caller's slippage plus the providers' rounding (SLIPPAGE_ROUNDING_BPS), floored like
+    // the providers compute their minimum (see validQuote).
+    const permitted = BigInt(floorScaled(options.slippage, 1_000_000_000)) + BigInt(SLIPPAGE_ROUNDING_BPS) * 100_000n;
+    const required = permitted >= scale ? 0n : (nominal * (scale - permitted)) / scale;
     if (guaranteed < required) {
       throw new Error(`swap2: quote exceeds caller slippage (${options.slippage})`);
     }
   }
+}
+
+/** The bridge leg's reviewed terms for {@link SerializedExecutionExpectation.bridgeOut}. */
+function bridgeOutOf(params: QuoteParams, q: Quote, toTokenDecimals: number | undefined): NonNullable<SerializedExecutionExpectation["bridgeOut"]> {
+  // The catalog's decimals, else the app's verified `toTokenDecimals` for a token the catalog does not list. The quote's
+  // own `destDecimals` is the provider's word: it never stands in alone (an account refuses a bridge order it cannot
+  // hold to a minimum), and one that disagrees with the app's is refused.
+  let decimals = resolveAsset(params.destChain, params.destToken)?.decimals;
+  if (decimals === undefined && toTokenDecimals !== undefined) {
+    if (q.destDecimals !== undefined && q.destDecimals !== toTokenDecimals) {
+      throw new Swap2ValidationError(`swap2: the quote's destDecimals ${q.destDecimals} do not match toTokenDecimals ${toTokenDecimals}`);
+    }
+    decimals = toTokenDecimals;
+  }
+  return {
+    destChain: params.destChain, recipient: params.destAddress, destToken: params.destToken, minAmountOut: q.minDestAmount,
+    ...(decimals !== undefined ? {destDecimals: decimals} : {}),
+    ...(params.slippageBps !== undefined ? {slippageBps: params.slippageBps} : {}),
+  };
 }
 
 function requireExecutionFloor(options: Swap2Options): void {
@@ -815,6 +841,10 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
     const destChain = toCaip2(options.toChain, this.fromChain);
     const constraints = callerConstraints(options);
+    const toDecimals = options.toTokenDecimals;
+    if (toDecimals !== undefined && (!Number.isInteger(toDecimals) || toDecimals < 0 || toDecimals > 36)) {
+      throw new Swap2ValidationError("swap2: toTokenDecimals must be whole decimals in 0..36");
+    }
     const amountIn = exactPositiveAmount(options.fromTokenAmount, "fromTokenAmount");
     const source = this.sourceAsset(options);
     const params: QuoteParams = {
@@ -1507,7 +1537,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           // Only a same-chain swap lands in this account; a bridge delivers elsewhere.
           ...(params.destChain === this.fromChain ? {tokenIn: {token: params.destToken, minAmount: q.minDestAmount}} : {}),
           ...(source.contract ? {source: {token: source.contract, maxAmount: q.sourceAmount}} : {}),
-          ...(params.destChain !== this.fromChain ? {bridgeOut: {destChain: params.destChain, recipient: params.destAddress}} : {}),
+          ...(params.destChain !== this.fromChain ? {bridgeOut: bridgeOutOf(params, q, executionOptions.toTokenDecimals)} : {}),
         };
         sent = await signer.sendSerializedTransaction!(unsigned.serializedTx!, expect);
       } else if (tokenId) {

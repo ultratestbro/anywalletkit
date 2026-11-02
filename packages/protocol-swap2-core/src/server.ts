@@ -365,6 +365,11 @@ function normalizeQuote(v: unknown, intentMax: number): Quote {
     validUntilMs: num(q.validUntilMs, "quote.validUntilMs"),
   };
   if (q.txRequest !== undefined) out.txRequest = txRequest(q.txRequest);
+  if (q.destDecimals !== undefined) {
+    const decimals = num(q.destDecimals, "quote.destDecimals", 0, 36);
+    if (!Number.isInteger(decimals)) bad("quote.destDecimals", "expected whole decimals");
+    out.destDecimals = decimals;
+  }
   if (q.fees !== undefined) {
     if (!Array.isArray(q.fees) || q.fees.length > 32) bad("quote.fees", "expected up to 32 entries");
     out.fees = q.fees.map((f, i) => {

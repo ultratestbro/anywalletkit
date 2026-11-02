@@ -24,12 +24,15 @@ describe("core public contract", () => {
     expect(validQuote(quote, params, "x")).toBe(true);
     expect(validQuote({...quote, validUntilMs: 0}, params, "x")).toBe(false);
     expect(validQuote({...quote, minDestAmount: "89"}, params, "x")).toBe(false);
-    // A provider floor computed as floor(dest × (1 − s)) passes (1Click: 99977003 @ 100 bps → 98977232).
+    // A provider floor computed as floor(dest × (1 − s)) passes (1Click: 99977003 @ 100 bps → 98977232), and so does
+    // one rounded up to SLIPPAGE_ROUNDING_BPS past it: floor(99977003 × 9 899 / 10 000) = 98967235.
     const {minAmountOut: _floor, ...withoutFloor} = params;
     const p100 = {...withoutFloor, slippageBps: 100};
     const q100 = {...quote, sourceAmount: "100", destAmount: "99977003", minDestAmount: "98977232"};
     expect(validQuote(q100, p100, "x")).toBe(true);
-    expect(validQuote({...q100, minDestAmount: "98977231"}, p100, "x")).toBe(false);
+    expect(validQuote({...q100, minDestAmount: "98977231"}, p100, "x")).toBe(true);
+    expect(validQuote({...q100, minDestAmount: "98967235"}, p100, "x")).toBe(true);
+    expect(validQuote({...q100, minDestAmount: "98967234"}, p100, "x")).toBe(false);
   });
 
   it("fails closed for malformed status ids and disabled discovery", async () => {
@@ -412,7 +415,7 @@ describe("core public contract", () => {
     })).resolves.toMatchObject({hash: "serial-sig"});
     expect(serialized).toEqual([{tx: WIRE, expect: {
       maxValueOut: "5000000", source: {token: SOL_USDT, maxAmount: "1000000"},
-      bridgeOut: {destChain: "eip155:1", recipient: "0x3333333333333333333333333333333333333333"},
+      bridgeOut: {destChain: "eip155:1", recipient: "0x3333333333333333333333333333333333333333", destToken: "0xdac17f958d2ee523a2206206994597c13d831ec7", minAmountOut: "980000", destDecimals: 6},
     }}]);
     expect(sent).toHaveLength(0);
     // (c) an account without the hook is refused before anything is sent.

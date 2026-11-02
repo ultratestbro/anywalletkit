@@ -1,7 +1,8 @@
 // A Solana-source bridge was held only to "SOL out ≤ input + allowance": nothing bound where the SOL went, so a provider
 // transaction that paid the whole input to another wallet passed, and so did an allowlisted bridge program carrying a
-// recipient of anyone's choosing. `expect.bridgeOut` now names the destination chain and recipient: every top-level
-// instruction (Mayan's CPI proxy unwrapped) must be one the guard follows, and every Mayan order must pay the recipient.
+// recipient of anyone's choosing. `expect.bridgeOut` now names the destination chain and recipient: in a Mayan route
+// every top-level instruction (Mayan's CPI proxy unwrapped) must be one the guard follows, and every Mayan order must pay
+// the recipient. Other bridges are held to the ceilings only (audit-2026-11-02-r3-solana-bridges.test.ts).
 // The recorded LI.FI transactions (fixtures/lifi-solana-2026-11-02.json) are public li.quest answers of 2026-11-02.
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -32,7 +33,8 @@ const SOL = 1_000_000_000n
 const FEE = 5_000n
 const AMOUNT_IN = 50_000_000n
 const ALLOWANCE = 20_000_000n
-const BRIDGE = { destChain: 'eip155:8453', recipient: RECIPIENT }
+// The synthetic Swift order names the native coin (zero tokenOut) and a minimum of 8 955 000 at Mayan's 8 decimals.
+const BRIDGE = { destChain: 'eip155:8453', recipient: RECIPIENT, destToken: '0x0000000000000000000000000000000000000000', minAmountOut: 8_955_000n * 10n ** 10n, destDecimals: 18 }
 
 type State = { lamports: bigint; owner: string; data: Uint8Array } | null
 const sys = (lamports: bigint): State => ({ lamports, owner: '11111111111111111111111111111111', data: new Uint8Array() })
@@ -73,6 +75,7 @@ function swiftOrder(recipient: string, wormholeChain: number): Uint8Array {
   new DataView(d.buffer).setBigUint64(8, AMOUNT_IN, true)
   d.set(Buffer.from(recipient.slice(2).padStart(64, '0'), 'hex'), 25)
   new DataView(d.buffer).setUint16(57, wormholeChain, true)
+  new DataView(d.buffer).setBigUint64(91, 8_955_000n, true) // amountOutMin
   return d
 }
 const order = (recipient = RECIPIENT, chain = 30): Instruction => ({
@@ -92,10 +95,11 @@ const usdcPre = () => ({ [ADDR0]: sys(SOL), [MY_USDC]: tokenAccount(USDC, ADDR0,
 const usdcGuard = (bridgeOut: object = BRIDGE) => ({ expect: { maxLamportsOut: ALLOWANCE, maxTokenOut: { mint: USDC, amount: 9_000_000n }, bridgeOut } as never })
 
 describe('audit 2026-11-02: a bridge out of Solana must deliver to the reviewed recipient', () => {
-  it('a plain SOL transfer of the whole input to another wallet is refused once the guard knows it is a bridge', async () => {
-    const theft = wire([getTransferSolInstruction({ source: createNoopSigner(ADDR0), destination: ATTACKER, amount: AMOUNT_IN })])
+  it('a plain SOL transfer of the whole input to another wallet is refused inside a Mayan route', async () => {
+    // Alone it is another bridge's deposit (NEAR Intents, LayerSwap pay an address): not recipient-checked, as without bridgeOut.
+    const deposit = wire([getTransferSolInstruction({ source: createNoopSigner(ADDR0), destination: ATTACKER, amount: AMOUNT_IN })])
     const { a, f } = await account({ [ADDR0]: sys(SOL), [ATTACKER]: sys(0n) })
-    await expect(a.sendSerialized(theft, { expect: { maxLamportsOut: AMOUNT_IN + ALLOWANCE, bridgeOut: BRIDGE } })).rejects.toMatchObject({ code: 'bridge-missing' })
+    await expect(a.checkSerialized(deposit, { expect: { maxLamportsOut: AMOUNT_IN + ALLOWANCE, bridgeOut: BRIDGE } })).resolves.toBeDefined()
     // With a genuine order in front of it, the transfer itself is named.
     const withOrder = wire([intoVault(), order(), getTransferSolInstruction({ source: createNoopSigner(ADDR0), destination: ATTACKER, amount: AMOUNT_IN })])
     const { a: b } = await account(usdcPre())
@@ -154,6 +158,14 @@ const FEE_ATA = '8jjWmLhYdqrtFMcEkiMDdqkEN85cvEFnNS4LFgNf5NRv' as Address
 type Live = { name: string; tool: string; sender: string; recipient: string; destChain: string; sourceToken: string; amountIn: string; wire: string }
 const live = JSON.parse(readFileSync(new URL('./fixtures/lifi-solana-2026-11-02.json', import.meta.url), 'utf8')) as { quotes: Live[] }
 const SYSTEM = '11111111111111111111111111111111'
+type Answer = { name: string; response: { action: { toToken: { address: string; decimals?: number } }; estimate: { toAmountMin: string } } }
+const answers = new Map((JSON.parse(readFileSync(new URL('../../protocol-swap2-lifi/tests/fixtures-live-2026-11-02.json', import.meta.url), 'utf8')) as { corridors: Answer[] }).corridors.map((c) => [c.name, c.response]))
+/** The engine's reviewed terms for a recorded answer: its toToken, toAmountMin and the token's decimals. */
+function reviewedTerms(q: Live): { destToken: string; minAmountOut: bigint; destDecimals: number } {
+  const r = answers.get(`w-${q.name}`) ?? answers.get(q.name)!
+  const token = r.action.toToken.address
+  return { destToken: token, minAmountOut: BigInt(r.estimate.toAmountMin), destDecimals: /^0x0+$/.test(token) ? 18 : 6 }
+}
 const ATA = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'
 const placeholder = (seed: string) => getAddressDecoder().decode(createHash('sha256').update(seed).digest()) as string
 
@@ -200,7 +212,7 @@ describe('audit 2026-11-02: the live LI.FI routes out of Solana', () => {
     const f = fakeRpc(pre, pre, tablesFor(q))
     const a = new WalletAccountReadOnlySolana(q.sender, { provider: f.rpc })
     const native = q.sourceToken === SYSTEM
-    const guard = { expect: { maxLamportsOut: (native ? BigInt(q.amountIn) : 0n) + ALLOWANCE, ...(native ? {} : { maxTokenOut: { mint: q.sourceToken, amount: BigInt(q.amountIn) } }), bridgeOut: { destChain: q.destChain, recipient: q.recipient } } }
+    const guard = { expect: { maxLamportsOut: (native ? BigInt(q.amountIn) : 0n) + ALLOWANCE, ...(native ? {} : { maxTokenOut: { mint: q.sourceToken, amount: BigInt(q.amountIn) } }), bridgeOut: { destChain: q.destChain, recipient: q.recipient, ...reviewedTerms(q) } } }
     return a.checkSerialized(q.wire, guard).then(() => 'pass', (e: unknown) => (e instanceof UnsafeTransactionError ? `${e.code}` : String(e)))
   }
 
@@ -210,12 +222,12 @@ describe('audit 2026-11-02: the live LI.FI routes out of Solana', () => {
     for (const q of mayan) expect([q.name, await run(q)]).toEqual([q.name, 'pass'])
   })
 
-  it('the routes whose recipient lives in an off-chain order (NEAR Intents, LayerSwap, Relay) or in an unknown program are refused', async () => {
+  it('the routes whose recipient lives in an off-chain order (NEAR Intents, LayerSwap, Relay) are not recipient-checked; an unknown program is refused', async () => {
     const other = live.quotes.filter((q) => !q.tool.startsWith('mayan'))
     const got = Object.fromEntries(await Promise.all(other.map(async (q) => [q.name, await run(q)])))
     expect(got).toEqual({
-      'sol-base-usdc-layerswap': 'bridge-missing', 'sol-base-usdc-relaydepository': 'bridge-missing', 'usdc-base-usdc-relaydepository': 'bridge-missing',
-      'usdc-base-usdc-lifiIntents': 'unknown-program', 'sol-base-usdc': 'bridge-missing', 'usdc-arb-usdc': 'bridge-missing',
+      'sol-base-usdc-layerswap': 'pass', 'sol-base-usdc-relaydepository': 'pass', 'usdc-base-usdc-relaydepository': 'pass',
+      'usdc-base-usdc-lifiIntents': 'unknown-program', 'sol-base-usdc': 'pass', 'usdc-arb-usdc': 'pass',
     })
   })
 
