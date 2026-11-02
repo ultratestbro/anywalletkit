@@ -102,7 +102,15 @@ const refusalWording = (e: unknown, pattern: (code: unknown, text: string) => Re
   }
   return false
 }
-const nodeRefused = (e: unknown): boolean => refusalWording(e, (code) => (isRpcCode(code) ? NODE_REJECTION : EXACT_REJECTION))
+/**
+ * JSON-RPC errors a gateway or load balancer also answers with when the upstream node failed —
+ * -32603 internal error, -32005 limit exceeded, or any code with gateway wording — even on a 5xx
+ * whose body viem reads as JSON-RPC. They count as a refusal only in a node's exact words.
+ */
+const GATEWAY_RPC_CODES = new Set([-32603, -32005])
+const GATEWAY_WORDING = /upstream|gateway|timeout|timed out|unavailable/i
+const nodeRefused = (e: unknown): boolean => refusalWording(e, (code, text) =>
+  isRpcCode(code) && !GATEWAY_RPC_CODES.has(code) && !GATEWAY_WORDING.test(text) ? NODE_REJECTION : EXACT_REJECTION)
 const nodeAnswered = (e: unknown): boolean => {
   if (nodeRefused(e)) return true
   for (let cur: unknown = e, i = 0; cur && i < 6; cur = (cur as { cause?: unknown }).cause, i++) {
