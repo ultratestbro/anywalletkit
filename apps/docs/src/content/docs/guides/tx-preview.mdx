@@ -53,7 +53,8 @@ revert but shows no balance changes. A sequence can't be simulated there at all
 | `calls` | Run in order in one block: approvals first, then the call |
 | `own` | Every address of this user; a transfer to one of them is not "foreign" |
 | `known` | Contracts you trust → the name to show (a provider's routers, your tokens) |
-| `expectedRecipient` | Where a same-chain swap's output should arrive. It is a recipient check, and with a simulation the output going anywhere else is flagged (`output-missing`, `output-foreign`). Leave it out for a bridge |
+| `expectedRecipient` | Where a same-chain swap's output should arrive. It is a recipient check, and with a simulation the output going anywhere else is flagged (`output-missing`, `output-foreign`). Leave it out for a bridge (and for anything else whose output does not arrive on this chain in this transaction) |
+| `expectedOutputToken` | The token the same-chain swap buys (`plan.destToken`; the zero address, `0xEeee…` or `"native"` for the gas coin). The output checks then read exactly that token. Without it they read every token the sender doesn't spend, which is weaker: pass it whenever you pass `expectedRecipient` |
 | `expectedApproval` | The allowance the flow needs; a larger approval is flagged |
 | `stateOverrides` | Simulate with a different balance, nonce or code, e.g. to preview a flow before the account is funded |
 | `native` | Symbol and decimals of the gas coin (default ETH, 18) |
@@ -88,8 +89,8 @@ decisions:
 | `simulation-reverted` | warn | It will fail; `detail.reason` says why |
 | `simulation-unavailable` | unknown | The network can't simulate it |
 | `recipient-own` / `recipient-foreign` | ok / warn | A recipient is, or isn't, one of `own` |
-| `output-missing` | warn | With `expectedRecipient`: the sequence spends, and nothing arrives at the recipient (`detail.address`) |
-| `output-foreign` | warn | With `expectedRecipient`: the output ends at `detail.address`, which is not the recipient, not one of `own`, and passes nothing on (`detail.token`, `detail.amount`). Pools and routers forward tokens and aren't flagged; a third party's share of 5 % of the output or less is read as a fee |
+| `output-missing` | warn | With `expectedRecipient`: the sequence spends, and nothing (of `expectedOutputToken`, when given) arrives at the recipient (`detail.address`) |
+| `output-foreign` | warn | With `expectedRecipient`: more than 5 % of the swap's total output ends at addresses that are not the recipient and not one of `own`, all of them together. `detail.token`, `detail.amount` (their total), `detail.address` (the largest holder) and `detail.holders` (when more than one). A pool or router that passes the output on holds none of it, so it isn't counted; fees and token taxes up to 5 % of the output are |
 | `approval-exact` | ok | Approves no more than `expectedApproval` |
 | `approval-unchecked` | unknown | A bounded approval and no `expectedApproval` to compare it with |
 | `approval-excess` | warn | Approves more than `expectedApproval` |
@@ -118,6 +119,7 @@ the approvals and the source call together, the way they will run:
 <Snippet file="tx-preview/src/preview.ts" region="swap" />
 
 `expectedApproval: plan.sourceAmount` flags a route that asks for more than it spends. For a
-same-chain swap, `expectedRecipient` flags output that doesn't arrive at the recipient or ends at a third party
-(a bridge's output arrives on another chain, so the example passes it only when both chains are the same). Wire it into
+same-chain swap, `expectedRecipient` with `expectedOutputToken: plan.destToken` flags output that doesn't arrive at the
+recipient or ends at a third party (a bridge's output arrives on another chain, so the example passes them only when both
+chains are the same). Wire it into
 the router as shown in [Swaps → Show a review screen](/guides/swaps/#show-a-review-screen).
