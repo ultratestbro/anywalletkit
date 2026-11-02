@@ -28,8 +28,9 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 
 - **Conformance is the gate.** Every chain and protocol module passes shared
   suites (`@anywalletkit/conformance`): derivation against pinned vectors, a
-  read-only account never writes, a quote never sends, a swap plan pays only
-  declared recipients. Modules are listed in a registry with tiers
+  read-only account never writes, a quote never sends, a swap plan calls only
+  declared contracts and pays only declared recipients (router calldata
+  included, as the module's test decodes it). Modules are listed in a registry with tiers
   (`core` / `verified` / `community`).
 - **Signer is separate from the account.** The private key lives in a `Signer`.
   The local seed signer is one implementation; a Safe, a hardware wallet, MPC or

@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {encodeAbiParameters} from "viem";
+import {decodeFunctionData, encodeAbiParameters, parseAbi, type Hex} from "viem";
 import {describeProtocolBehaviour, describeProtocolModule} from "@anywalletkit/conformance";
 import {wrapPins, wrapProvider, WRAPPED_NATIVE} from "../src/provider.js";
 import {remoteProvider} from "@anywalletkit/protocol-swap2-core/remote";
@@ -89,13 +89,16 @@ describeProtocolModule("protocol-swap2-wrap", {
   samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
 
+// deposit() and withdraw(wad) pay the caller, nobody else: the signing account.
+const WETH9 = parseAbi(["function deposit() payable", "function withdraw(uint256 wad)"]);
+const paysCaller = (source: {kind: string; data?: string}) => { decodeFunctionData({abi: WETH9, data: source.data as Hex}); return [ME]; };
 describeProtocolBehaviour("protocol-swap2-wrap", {
   type: "swap2",
   Protocol: WrapSwap2Protocol,
   config: {fromChain: "eip155:1", rpcUrls: RPC},
   fixtures: [
-    {name: "ETH → WETH (deposit with value)", options: {fromToken: "ETH", toToken: WETH, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 15n, minAmountOut: 10n ** 15n}, fetch: stub(), account: {address: ME}, own: [ME]},
-    {name: "WETH → ETH (withdraw)", options: {fromToken: "WETH", toToken: ZERO, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 15n, minAmountOut: 10n ** 15n}, fetch: stub(), account: {address: ME}, own: [ME], sourceToken: WETH},
+    {name: "ETH → WETH (deposit with value)", options: {fromToken: "ETH", toToken: WETH, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 15n, minAmountOut: 10n ** 15n}, fetch: stub(), account: {address: ME}, own: [ME], callTargets: [WETH], decode: paysCaller},
+    {name: "WETH → ETH (withdraw)", options: {fromToken: "WETH", toToken: ZERO, toChain: 1, recipient: ME, fromTokenAmount: 10n ** 15n, minAmountOut: 10n ** 15n}, fetch: stub(), account: {address: ME}, own: [ME], sourceToken: WETH, decode: paysCaller},
   ],
 });
 

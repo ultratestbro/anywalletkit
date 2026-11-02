@@ -1,6 +1,7 @@
 import {describeProtocolBehaviour, describeProtocolModule} from "@anywalletkit/conformance";
 import {ChainflipSwap2Protocol} from "../src/protocol.js";
 import {CF_VAULTS} from "../src/config.js";
+import {decodeEvmVaultCall, sameBytes, toHex, tronToBytes} from "../src/codec.js";
 
 import {readdirSync, readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
@@ -33,6 +34,12 @@ describeProtocolModule("protocol-swap2-chainflip", {
   samples: {getSupportedChains: []}, mustResolve: ["getSupportedChains"],
 });
 
+// The Vault swap pays its destination address (Tron: the 20 raw bytes) and refunds to the cf parameters' refund address.
+const vaultPays = (source: {kind: string; data?: string}): string[] => {
+  const call = decodeEvmVaultCall(source.data!);
+  const dest = sameBytes(call.dstAddress, tronToBytes(TRON_ME)) ? TRON_ME : toHex(call.dstAddress);
+  return [dest, call.params.refundAddress];
+};
 describeProtocolBehaviour("protocol-swap2-chainflip", {
   type: "swap2",
   Protocol: ChainflipSwap2Protocol,
@@ -46,6 +53,7 @@ describeProtocolBehaviour("protocol-swap2-chainflip", {
       own: [ME, TRON_ME],
       sourceToken: ARB_USDC,
       spender: CF_VAULTS["eip155:42161"]!,
+      decode: vaultPays,
     },
   ],
 });

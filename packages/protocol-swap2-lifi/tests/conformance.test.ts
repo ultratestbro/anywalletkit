@@ -1,6 +1,7 @@
 import {describeProtocolBehaviour, describeProtocolModule} from "@anywalletkit/conformance";
 import {LifiSwap2Protocol} from "../src/protocol.js";
-import {DIAMOND, FROM_TOKEN, RECIPIENT, SENDER, TO_TOKEN, response} from "./fixtures.js";
+import {decodeFunctionData, type Hex} from "viem";
+import {DIAMOND, DIAMOND_ABI, FROM_TOKEN, RECIPIENT, SENDER, TO_TOKEN, response} from "./fixtures.js";
 
 import {readdirSync, readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
@@ -29,6 +30,15 @@ const native = response({
   estimate: {...response().estimate, fromAmount: "2000000000000000"},
   transactionRequest: {...response().transactionRequest, value: "0x71afd498d0000"},
 });
+// The Diamond pays the swap's `_receiver`, or a bridge's `BridgeData.receiver` (no destination call: that would pay from calldata on the other chain).
+const diamondPays = (source: {kind: string; data?: string}): string[] => {
+  const c = decodeFunctionData({abi: DIAMOND_ABI, data: source.data as Hex});
+  const args = c.args as readonly unknown[];
+  if (c.functionName.startsWith("swapTokens")) return [String(args[3])];
+  const bridge = args[0] as {receiver: string; hasDestinationCall: boolean};
+  if (bridge.hasDestinationCall) throw new Error("bridge with a destination call");
+  return [bridge.receiver];
+};
 describeProtocolBehaviour("protocol-swap2-lifi", {
   type: "swap2",
   Protocol: LifiSwap2Protocol,
@@ -37,12 +47,12 @@ describeProtocolBehaviour("protocol-swap2-lifi", {
     {
       name: "USDT Ethereum → Arbitrum (approve zero-first, then calldata)",
       options: {fromToken: "USDT", toToken: TO_TOKEN, toChain: 42161, recipient: RECIPIENT, fromTokenAmount: 1_000_000n, minAmountOut: 980_000n},
-      fetch: reply(response()), account: {address: SENDER}, own: [RECIPIENT], spender: DIAMOND, sourceToken: FROM_TOKEN,
+      fetch: reply(response()), account: {address: SENDER}, own: [RECIPIENT], spender: DIAMOND, sourceToken: FROM_TOKEN, decode: diamondPays,
     },
     {
       name: "ETH Ethereum → Arbitrum (native value, no approval)",
       options: {fromToken: "ETH", toToken: TO_TOKEN, toChain: 42161, recipient: RECIPIENT, fromTokenAmount: 2_000_000_000_000_000n, minAmountOut: 980_000n},
-      fetch: reply(native), account: {address: SENDER}, own: [RECIPIENT],
+      fetch: reply(native), account: {address: SENDER}, own: [RECIPIENT], callTargets: [DIAMOND], decode: diamondPays,
     },
   ],
 });
