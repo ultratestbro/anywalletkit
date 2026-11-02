@@ -1,7 +1,7 @@
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { describe, expect, it } from 'vitest'
-import { WalletAccountReadOnlyNear, WalletManagerNear, decodeSignedTransaction, fromBase64, type NearAction, type NearBuiltTransaction } from '../src/index.js'
-import { ACCOUNT0, BLOCK, SEED, fakeNode } from './fake-node.js'
+import { WalletAccountReadOnlyNear, WalletManagerNear, decodeSignedTransaction, fromBase64, type NearAction, type NearBuiltTransaction, type NearSignedTransaction } from '../src/index.js'
+import { ACCOUNT0, BLOCK, SEED, USDT, fakeNode } from './fake-node.js'
 
 // The checks and the signature read one plain copy of the transaction, so an object that changes
 // between reads (a getter, or an array the caller edits while a node call is awaited) cannot get a
@@ -19,7 +19,7 @@ describe('NEAR signing reads its own copy of the transaction', () => {
         let reads = 0
         const tx = { signerId: ACCOUNT0, publicKey: a.publicKey, nonce: 42n, receiverId: ACCOUNT0, blockHash: new Uint8Array(32).fill(9) } as NearBuiltTransaction
         Object.defineProperty(tx, 'actions', { enumerable: true, get: () => (++reads >= flipAt ? [then] : [first]) })
-        const r = await a.signBuilt(tx).catch((e: unknown) => e)
+        const r: NearSignedTransaction | Error = await a.signBuilt(tx).catch((e: unknown) => e as Error)
         if (r instanceof Error) {
           expect(r).toMatchObject({ code: 'dangerous-action' })
           return
@@ -56,7 +56,7 @@ describe('NEAR signing reads its own copy of the transaction', () => {
   it('control: a function call with JSON args signs to the same bytes as before', async () => {
     const a = await new WalletManagerNear(SEED, { provider: fakeNode().fetch }).getAccount(0)
     const tx: NearBuiltTransaction = {
-      signerId: ACCOUNT0, publicKey: a.publicKey, nonce: 42n, receiverId: 'usdt.tether-token.near', blockHash: new Uint8Array(32).fill(9),
+      signerId: ACCOUNT0, publicKey: a.publicKey, nonce: 42n, receiverId: USDT, blockHash: new Uint8Array(32).fill(9),
       actions: [{ functionCall: { methodName: 'ft_transfer', args: { receiver_id: 'bob.near', amount: '1' }, gas: 30n * 10n ** 12n, deposit: 1n } }],
     }
     const signed = await a.signBuilt(tx)
