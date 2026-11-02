@@ -200,6 +200,23 @@ describe("INTENTS recipient (credit a near.com / intents.near account)", () => {
   });
 
   it("rejects an unknown recipientType at construction", () => {
-    expect(() => nearIntentsProvider({recipientType: "CONFIDENTIAL_INTENTS" as never})).toThrow(/recipientType/);
+    expect(() => nearIntentsProvider({recipientType: "PRIVATE" as never})).toThrow(/recipientType/);
+  });
+
+  it("CONFIDENTIAL_INTENTS credits the confidential balance and needs the partner jwt", async () => {
+    expect(() => nearIntentsProvider({recipientType: "CONFIDENTIAL_INTENTS"})).toThrow(/partner-only/);
+    const bodies: Record<string, unknown>[] = [];
+    const headers: Record<string, string>[] = [];
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+      headers.push(init.headers as Record<string, string>);
+      return okQuote(bodies)(url, init);
+    });
+    const quote = await nearIntentsProvider({apiUrl: "https://near.invalid", recipientType: "CONFIDENTIAL_INTENTS", jwt: "partner"}).getQuote({
+      sourceChain: "eip155:1", sourceToken: "USDT", destChain: "near:mainnet", destToken: NEAR_USDC,
+      amountIn: "5000000", destAddress: NEARCOM, refundAddress: "0x0000000000000000000000000000000000000001", dry: false,
+    });
+    expect(quote?.depositAddress).toBe("0xdeposit");
+    expect(bodies[0]).toMatchObject({recipient: NEARCOM, recipientType: "CONFIDENTIAL_INTENTS", destinationAsset: NEAR_USDC, refundType: "ORIGIN_CHAIN"});
+    expect(headers[0]?.authorization).toBe("Bearer partner");
   });
 });

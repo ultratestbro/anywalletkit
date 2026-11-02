@@ -32,6 +32,10 @@ await toNearCom.getQuote({
 });
 ```
 
+near.com keeps user funds in the Confidential Intents balance. `recipientType: "CONFIDENTIAL_INTENTS"` credits that
+balance directly (1Click settles it with a signed transfer intent). 1Click serves it to partners only, so the provider
+requires `jwt` in this mode and throws at construction without it.
+
 `destAddress` must be a NEAR account id (named, implicit hex or `0x…`); anything else is refused before a request is
 sent. Because the output never reaches the destination chain, a corridor paused for that chain does not block an
 intents token id.

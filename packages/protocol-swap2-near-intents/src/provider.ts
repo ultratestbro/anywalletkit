@@ -130,8 +130,11 @@ export interface NearIntentsProviderConfig {
    * `destAddress` inside intents.near — the account a near.com user holds — with
    * no withdrawal: the asset stays there as the intents token. In this mode
    * `destToken` may be the intents token id itself (`nep141:…` / `nep245:…`).
+   * `CONFIDENTIAL_INTENTS` credits the same account's Confidential Intents
+   * balance (where near.com keeps funds); 1Click settles it with a signed
+   * transfer intent and serves it to partners only, so it requires `jwt`.
    */
-  recipientType?: "DESTINATION_CHAIN" | "INTENTS";
+  recipientType?: "DESTINATION_CHAIN" | "INTENTS" | "CONFIDENTIAL_INTENTS";
 }
 
 /** NEAR account id rules (intents.near accounts include implicit hex and 0x ids). */
@@ -146,10 +149,14 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
   }
   const apiBase = parsedApiUrl.toString().replace(/\/$/, "");
   const recipientType = config.recipientType ?? "DESTINATION_CHAIN";
-  if (recipientType !== "DESTINATION_CHAIN" && recipientType !== "INTENTS") {
-    throw new Error("near-intents: recipientType must be DESTINATION_CHAIN or INTENTS");
+  if (recipientType !== "DESTINATION_CHAIN" && recipientType !== "INTENTS" && recipientType !== "CONFIDENTIAL_INTENTS") {
+    throw new Error("near-intents: recipientType must be DESTINATION_CHAIN, INTENTS or CONFIDENTIAL_INTENTS");
   }
-  const intents = recipientType === "INTENTS";
+  if (recipientType === "CONFIDENTIAL_INTENTS" && !config.jwt) {
+    throw new Error("near-intents: CONFIDENTIAL_INTENTS delivery is partner-only and needs a 1Click jwt");
+  }
+  /** Output credited inside NEAR Intents (public or confidential), never withdrawn to a chain. */
+  const intents = recipientType !== "DESTINATION_CHAIN";
   /** The 1Click destination asset: an intents token id passes through in INTENTS mode. */
   const destinationAsset = (destChain: string, destToken: string): string | null =>
     intents && INTENTS_TOKEN_ID.test(destToken) ? destToken : destAssetId(destChain, destToken);
@@ -202,7 +209,7 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
         ?? (rawIntentsDest ? null : nearIntentsChainRefusal(params.destChain, paused));
       if (chainRefusal) return refuse(chainRefusal);
       if (intents && !NEAR_ACCOUNT_ID.test(params.destAddress)) {
-        return refuse("INTENTS recipient must be a NEAR Intents account id");
+        return refuse(`${recipientType} recipient must be a NEAR Intents account id`);
       }
       const origin = ccAsset(params.sourceChain, params.sourceToken);
       if (!origin?.assetId) return refuse(`1Click does not list ${params.sourceChain} ${params.sourceToken}`);
