@@ -21,7 +21,9 @@ On npm: [@anywalletkit/protocol-swap2-near-intents](https://www.npmjs.com/packag
 By default 1Click withdraws the output to `destAddress` on `destChain`. With `recipientType: "INTENTS"` it credits the
 NEAR Intents account `destAddress` inside `intents.near` instead, the account a near.com user holds (`nearcom:0x…`
 in near.com is the `0x…` account here). Nothing is withdrawn: the asset stays in that account as the intents token,
-so `destToken` may be the token id itself.
+so `destChain` must be `near:mainnet` (another chain is refused, so a review never names a chain the output does not
+reach) and `destToken` may be the token id itself, e.g. `nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near`
+for Base USDC held in intents.
 
 ```ts
 const toNearCom = nearIntentsProvider({recipientType: "INTENTS"});

@@ -1,6 +1,6 @@
 import {nearIntents as cfg, nearIntentsChainRefusal, type NearIntentsSuspendedChains} from "./config.js";
 import {describeNearIntentsActivity} from "./activity.js";
-import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import {namespace, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import {CC_DEST, ccAsset, ccAssetByToken, ccChain} from "@anywalletkit/swap2-assets";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
@@ -129,7 +129,8 @@ export interface NearIntentsProviderConfig {
    * `destAddress` on `destChain`. `INTENTS` credits the NEAR Intents account
    * `destAddress` inside intents.near — the account a near.com user holds — with
    * no withdrawal: the asset stays there as the intents token. In this mode
-   * `destToken` may be the intents token id itself (`nep141:…` / `nep245:…`).
+   * `destChain` must be the NEAR chain (`near:mainnet`), and `destToken` may be
+   * the intents token id itself (`nep141:…` / `nep245:…`).
    * `CONFIDENTIAL_INTENTS` credits the same account's Confidential Intents
    * balance (where near.com keeps funds); 1Click settles it with a signed
    * transfer intent and serves it to partners only, so it requires `jwt`.
@@ -168,6 +169,12 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
   }
   /** Output credited inside NEAR Intents (public or confidential), never withdrawn to a chain. */
   const intents = recipientType !== "DESTINATION_CHAIN";
+  /**
+   * An intents credit lands in the intents.near contract on NEAR, whatever token it is, so
+   * only a NEAR destChain names it truthfully: a review of "USDC on Base to 0x…" must not
+   * be a credit that never reaches Base.
+   */
+  const intentsDestOk = (destChain: string): boolean => !intents || namespace(destChain) === "near";
   /** The 1Click destination asset: an intents token id passes through in INTENTS mode. */
   const destinationAsset = (destChain: string, destToken: string): string | null =>
     intents && INTENTS_TOKEN_ID.test(destToken) ? destToken : destAssetId(destChain, destToken);
@@ -185,11 +192,11 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
     // Capability discovery comes from the provider itself, so it can run alone
     // or inside the optional aggregator without a central capability table.
     supportsChain: (chain: string) => cfg.supportsChain(chain),
-    supportsChainPair: (fromChain: string, toChain: string) => cfg.supports(fromChain, toChain),
+    supportsChainPair: (fromChain: string, toChain: string) => cfg.supports(fromChain, toChain) && intentsDestOk(toChain),
     supportsRoute(from: Asset, to: Asset): boolean {
       // Chain-level gate first (namespace, catalog listing, hand-suspended
       // corridors such as TON while the HOT bridge is dark) …
-      if (!cfg.supports(from.chain, to.chain)) return false;
+      if (!cfg.supports(from.chain, to.chain) || !intentsDestOk(to.chain)) return false;
       // … then only pairs present in the curated catalog are offered — and only
       // those with a 1Click asset id (LI.FI-only tokens carry an empty assetId).
       // Both ends: a destination 1Click doesn't list (Unichain, MegaETH, …)
@@ -219,6 +226,7 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
       const chainRefusal = nearIntentsChainRefusal(params.sourceChain, paused)
         ?? (rawIntentsDest ? null : nearIntentsChainRefusal(params.destChain, paused));
       if (chainRefusal) return refuse(chainRefusal);
+      if (!intentsDestOk(params.destChain)) return refuse(`${recipientType} credits intents.near: destChain must be a NEAR chain, not ${params.destChain}`);
       if (intents && !intentsAccountId(params.destAddress)) {
         return refuse(`${recipientType} recipient must be a NEAR Intents account id`);
       }
