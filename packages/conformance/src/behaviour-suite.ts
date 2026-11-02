@@ -36,8 +36,9 @@ export interface Swap2BehaviourFixture {
   /** Calldata providers: the approval spender the recorded quote declares (none → no approval allowed). */
   spender?: string
   /**
-   * Contracts the plan's source call may go to (router, vault, OFT, wrapped-native token). The declared
-   * `spender` is one already. A call, or native value, into any other contract fails the suite.
+   * Contracts the plan's source call may go to (router, vault, OFT, wrapped-native token), on every
+   * chain. The declared `spender` and `sourceToken` are ones already. A call, or native value, into
+   * any other contract fails the suite.
    */
   callTargets?: string[]
   /**
@@ -147,7 +148,10 @@ export function describeProtocolBehaviour<P extends object>(name: string, o: Pro
         } else if (s.kind === 'typed-order') {
           await decoded(s, declared)
         } else {
-          // A call on a chain tx-preview does not read: who it pays is still the fixture's to show.
+          // A call on a chain tx-preview does not read (Tron, TON…): the contract it calls, with or without
+          // native value, must be declared as on EVM, and who it pays is still the fixture's to show.
+          const targets = new Set([...declared, ...(f.callTargets ?? []), ...(f.spender ? [f.spender] : []), ...(f.sourceToken ? [f.sourceToken] : [])].map(lc))
+          expect(targets.has(lc(s.to)), `the plan calls ${s.to}${s.value > 0n ? ' with native value' : ''}, which is not declared (callTargets, spender, source token, deposit address)`).toBe(true)
           await decoded(s, declared)
         }
       })
