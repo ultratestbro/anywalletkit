@@ -23,10 +23,18 @@ export const MIN_PRIORITY_FEE_WEI: Readonly<Record<number, bigint>> = Object.fre
 export type FeeFields = { gasPrice: bigint } | { maxFeePerGas: bigint; maxPriorityFeePerGas: bigint }
 
 /**
+ * A number given as a string is signed only when the kit's policies read the same number from it: they read
+ * at most 300 characters. Whitespace (which BigInt() skips) is refused too; it only pads a number out.
+ */
+function assertUintString(v: string, what: string): void {
+  if (v.length > 300 || /\s/.test(v)) throw new UnsafeTransactionError(`${what} as a string must be at most 300 characters with no whitespace.`)
+}
+
+/**
  * Refuses shapes that would silently lose meaning: anything but one plain transaction object (a list
  * of calls is for batching accounts — its elements are not what this account would sign), authorizations
- * on a transaction that is not type 4 (they would be dropped), and a type 4 with `gasPrice` (it would
- * become a legacy transaction without them).
+ * on a transaction that is not type 4 (they would be dropped), a type 4 with `gasPrice` (it would
+ * become a legacy transaction without them), and a `value` that is not a bigint, a whole number or a string.
  */
 export function assertTxShape(tx: EvmTransaction): void {
   const proto = typeof tx === 'object' && tx !== null && !Array.isArray(tx) ? (Object.getPrototypeOf(tx) as object | null) : undefined
@@ -35,6 +43,12 @@ export function assertTxShape(tx: EvmTransaction): void {
   }
   if (tx.authorizationList?.length && tx.type !== 4) throw new Error('authorizationList needs a type 4 (EIP-7702) transaction; it would be dropped otherwise.')
   if (tx.type === 4 && tx.gasPrice !== undefined) throw new Error('An EIP-7702 (type 4) transaction takes EIP-1559 fee fields (maxFeePerGas / maxPriorityFeePerGas), not gasPrice.')
+  // `value` in a shape the kit's policies read too: BigInt() would also turn a list or a valueOf object into an amount they never see.
+  const v: unknown = tx.value
+  if (v !== undefined && typeof v !== 'bigint' && typeof v !== 'string' && !(typeof v === 'number' && Number.isInteger(v))) {
+    throw new UnsafeTransactionError('value must be a bigint, a whole number or a numeric string (wei).')
+  }
+  if (typeof v === 'string') assertUintString(v, 'value')
   canonicalData(tx.data)
   if (tx.accessList !== undefined) {
     if (!Array.isArray(tx.accessList)) throw new UnsafeTransactionError('accessList must be an array.')
@@ -118,6 +132,7 @@ export function cleanTypes(types: TypedDataInput['types']): TypedDataInput['type
 
 /** Build the transfer tx: native value, or ERC-20 `transfer` calldata. */
 export function transferTransaction(o: EvmTransferOptions): EvmTransaction {
+  if (typeof o.amount === 'string') assertUintString(o.amount, 'amount')
   const amount = BigInt(o.amount)
   if (!o.token) return { to: getAddress(o.recipient), value: amount }
   return { to: getAddress(o.token), value: 0n, data: encodeTransfer(getAddress(o.recipient), amount) }
@@ -306,6 +321,7 @@ export class WalletAccountReadOnlyEvm implements IWalletAccountReadOnly {
    * without EIP-1559).
    */
   async quoteSendTransaction(tx: EvmTransaction): Promise<{ fee: bigint }> {
+    assertTxShape(tx)
     this.requireClient('quote send transaction operations')
     // The same fee fields the send signs (gasPrice on a chain without EIP-1559, see feeFields).
     const cap = async (): Promise<bigint> => {

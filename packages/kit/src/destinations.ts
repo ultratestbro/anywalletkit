@@ -46,8 +46,11 @@ const NEAR_ACCOUNT_CHANGE: Readonly<Record<string, NearAccountChange>> = {
   deleteAccount: 'delete-account', signedDelegate: 'delegate', deployGlobalContract: 'global-contract', useGlobalContract: 'global-contract',
 }
 
-/** The account changes of NEAR actions in object form. A full-access key is read as wallet-near encodes it (`permission.fullAccess`). */
-function nearActionChanges(actions: unknown): NearAccountChange[] {
+/**
+ * The account changes of NEAR actions in object form, a delegated action's own actions included (one
+ * level, as wallet-near signs them). A full-access key is read as wallet-near encodes it (`permission.fullAccess`).
+ */
+function nearActionChanges(actions: unknown, depth = 0): NearAccountChange[] {
   if (!Array.isArray(actions)) return []
   const out: NearAccountChange[] = []
   for (const action of actions) {
@@ -56,6 +59,7 @@ function nearActionChanges(actions: unknown): NearAccountChange[] {
     if (change === undefined) continue
     out.push(change)
     if (change === 'add-key' && obj(obj(obj(obj(action).addKey).accessKey).permission).functionCall === undefined) out.push('full-access-key')
+    if (change === 'delegate' && depth === 0) out.push(...nearActionChanges(obj(obj(obj(action).signedDelegate).delegateAction).actions, depth + 1))
   }
   return [...new Set(out)]
 }
@@ -485,9 +489,13 @@ function nearBorshDestinations(b64: string): Destinations {
   const string = (max: number) => { const s = bytes(); if (s.length > max) throw new Error('bad string'); return ascii(s) }
   const account = () => { const s = string(64); if (!NEAR_ACCOUNT.test(s)) throw new Error('bad account id'); return s }
   const publicKey = () => { const t = u8(); if (t !== 0 && t !== 1) throw new Error('key type'); skip(t === 0 ? 32 : 64) }
+  const signature = () => { const t = u8(); if (t !== 0 && t !== 1) throw new Error('signature type'); skip(t === 0 ? 64 : 65) }
   const changes: NearAccountChange[] = []
-  /** One action's recipients; null for an action not read here (Delegate, global contracts…): reading stops. */
-  const action = (): Array<string | undefined> | null => {
+  /**
+   * One action's recipients; null for an action not read here (an unknown tag, a delegate inside a
+   * delegate): reading stops. A delegate's own actions are read like the transaction's.
+   */
+  const action = (depth = 0): Array<string | undefined> | null => {
     const tag = u8()
     const change = ['create-account', 'deploy-contract', undefined, undefined, 'stake', 'add-key', 'delete-key', 'delete-account', 'delegate', 'global-contract', 'global-contract'][tag] as NearAccountChange | undefined
     if (change !== undefined) changes.push(change)
@@ -506,6 +514,24 @@ function nearBorshDestinations(b64: string): Destinations {
       }
       case 6: publicKey(); return [] // DeleteKey
       case 7: return [account()] // DeleteAccount: the beneficiary
+      case 8: { // SignedDelegate: sender, receiver, actions, nonce, max block height, public key; then the signature
+        if (depth > 0) return null
+        account()
+        const receiver = account()
+        const inner: Array<string | undefined> = [receiver]
+        const m = u32()
+        for (let k = 0; k < m; k++) {
+          const r = action(depth + 1)
+          if (r === null) return null
+          inner.push(...r)
+        }
+        skip(16)
+        publicKey()
+        signature()
+        return inner
+      }
+      case 9: { bytes(); const mode = u8(); if (mode !== 0 && mode !== 1) throw new Error('global-contract mode'); return [] } // DeployGlobalContract
+      case 10: { const mode = u8(); if (mode === 0) skip(32); else if (mode === 1) account(); else throw new Error('global-contract id'); return [] } // UseGlobalContract
       default: return null
     }
   }

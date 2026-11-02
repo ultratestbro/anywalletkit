@@ -22,6 +22,17 @@ export interface SpendPlan extends CoinSelection {
 }
 
 const toBig = (v: bigint | number | string): bigint => (typeof v === 'bigint' ? v : BigInt(typeof v === 'string' ? v.trim() : Math.round(v)))
+/**
+ * A spend's value as the kit's policies read it: a bigint, a whole number, or a string BigInt reads of at
+ * most 300 characters with no whitespace (the policies read no longer string; whitespace only pads one out).
+ * Anything else (a list, an object, '1e5', a fraction) is refused instead of being rounded into zatoshis.
+ */
+function spendValue(v: unknown): bigint {
+  if (typeof v === 'bigint') return v
+  if (typeof v === 'number' && Number.isInteger(v)) return BigInt(v)
+  if (typeof v === 'string' && v.length <= 300 && !/\s/.test(v)) { try { return BigInt(v) } catch { /* refused below */ } }
+  throw new UnsafeTransactionError('malformed-spend', 'A spend value must be a bigint, a whole number or an integer string of at most 300 characters (zatoshis).')
+}
 
 /** Watch-only Zcash account: balances, quotes, receipts, message verification. No key. */
 export class WalletAccountReadOnlyZcash implements IWalletAccountReadOnly {
@@ -75,7 +86,7 @@ export class WalletAccountReadOnlyZcash implements IWalletAccountReadOnly {
   protected async planSpend(spend: ZcashSpend): Promise<SpendPlan> {
     assertSpendShape(spend)
     if (this.scriptKind !== 'p2pkh') throw new Error(`Cannot build spends from a ${this.scriptKind} address; only P2PKH (t1…) accounts spend.`)
-    const amount = toBig(spend.value)
+    const amount = spendValue(spend.value)
     const recipient = decodeAddress(spend.to, this._network)
     if (amount < DUST_LIMIT) throw new Error(`The amount must be at least the dust limit (${DUST_LIMIT} zatoshis).`)
     const utxos = await this.requireClient('plan a spend').listUnspent(this.address)

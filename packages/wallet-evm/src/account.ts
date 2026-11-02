@@ -396,6 +396,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
    * NOT run here (nothing is sent) — `sendTransaction` runs it.
    */
   async signTransaction(tx: EvmTransaction, options: WriteOptions = {}): Promise<string> {
+    assertTxShape(tx)
     await this.assertSafeTransaction(tx)
     const prepared = await this.prepare(tx)
     this.capFee(prepared, feeLimit(this._config.transactionMaxFee, options), 'transaction')
@@ -526,6 +527,8 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
 
   /** Sign and broadcast; `options.maxFee` caps the signed fee on top of `transactionMaxFee`. */
   async sendTransaction(tx: EvmTransaction, options: WriteOptions = {}): Promise<TransferResult> {
+    // The raw input, before preflight copies it into a plain object (a list's named fields would survive the copy).
+    assertTxShape(tx)
     return this.#signAndBroadcast(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction')
   }
 
