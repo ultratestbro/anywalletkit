@@ -80,6 +80,11 @@ Balances are read with the same `getTokenBalance(address)` as catalog tokens.
   the route. Show the amounts in and out.
 - **Destination tokens.** An EVM destination was always an address. A Solana destination mint
   outside the catalog needs the same flag.
+- **Bridges to a user token.** A bridge leg is held to its reviewed minimum in the destination
+  token's decimals. For a token outside the catalog, pass `toTokenDecimals`, read on the
+  destination chain (`getTokenInfo` on that chain's account). The engine does not take a
+  provider's word for them, and a quote that reports other decimals is refused. Without them,
+  a Mayan bridge out of Solana to that token is refused at signing.
 
 **Server.** With a remote swap engine, set `allowUnlistedTokens: true` on
 `createSwap2Handler` too. Otherwise the server drops the token's decimals, and providers refuse

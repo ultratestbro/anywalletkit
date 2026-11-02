@@ -40,6 +40,13 @@ export interface Swap2CommonOptions {
   fromTokenDecimals?: number
   /** Token on the destination chain, in the same forms. */
   toToken: string
+  /**
+   * Decimals of `toToken` on the destination chain when the swap catalog does not list it, as the
+   * app verified them (read from that chain, e.g. with the destination account's `getTokenInfo`).
+   * A bridge leg is held to its reviewed minimum in these decimals, so a Mayan order out of Solana
+   * to an unlisted token is refused without them. Listed tokens ignore it.
+   */
+  toTokenDecimals?: number
   /** Destination chain. Omitted = same-chain swap. */
   toChain?: string | number
   /**

@@ -84,9 +84,10 @@ export interface Quote {
   destAmount: string; // what arrives on dest (base units)
   minDestAmount: string; // worst case at the quoted slippage (base units)
   /**
-   * Decimals of the destination token as the provider reports them (LI.FI's `action.toToken.decimals`). The engine uses
-   * them for the reviewed minimum it hands an account (`bridgeOut.destDecimals`) when the asset catalog does not know
-   * the token; the catalog's value wins when it does.
+   * Decimals of the destination token as the provider reports them (LI.FI's `action.toToken.decimals`). They are the
+   * provider's word, so the engine never uses them alone for the reviewed minimum it hands an account
+   * (`bridgeOut.destDecimals`): that is the catalog's value, else the caller's `toTokenDecimals`, and a quote whose value
+   * disagrees with the caller's is refused.
    */
   destDecimals?: number;
   feeUsd: number; // normalized fee for scoring
