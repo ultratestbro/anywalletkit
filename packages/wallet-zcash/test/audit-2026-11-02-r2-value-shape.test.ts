@@ -19,7 +19,7 @@ describe('wallet-zcash: spend value shape', () => {
   it('control: bigint, whole number and integer strings sign', async () => {
     const f = fakeBlockchair()
     const a = await mk(f.fetchFn).getAccount(0)
-    for (const value of [60_000_000n, 60_000_000, '60000000', ' 60000000 ']) {
+    for (const value of [60_000_000n, 60_000_000, '60000000']) {
       await expect(a.signTransaction({ to: RECIPIENT, value })).resolves.toMatch(/^[0-9a-f]+$/)
     }
   })

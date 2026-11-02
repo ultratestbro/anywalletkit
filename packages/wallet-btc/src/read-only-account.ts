@@ -29,14 +29,15 @@ export interface SpendPlan extends CoinSelection {
 
 const toBig = (v: bigint | number | string): bigint => (typeof v === 'bigint' ? v : BigInt(Math.round(Number(v))))
 /**
- * A spend's value as the kit's policies read it: a bigint, a whole number, or a string BigInt reads.
+ * A spend's value as the kit's policies read it: a bigint, a whole number, or a string BigInt reads of at
+ * most 300 characters with no whitespace (the policies read no longer string; whitespace only pads one out).
  * Anything else (a list, an object, '1e5', a fraction) is refused instead of being rounded into sats.
  */
 function spendValue(v: unknown): bigint {
   if (typeof v === 'bigint') return v
   if (typeof v === 'number' && Number.isInteger(v)) return BigInt(v)
-  if (typeof v === 'string') { try { return BigInt(v) } catch { /* refused below */ } }
-  throw new UnsafeTransactionError('malformed-spend', 'A spend value must be a bigint, a whole number or an integer string (sats).')
+  if (typeof v === 'string' && v.length <= 300 && !/\s/.test(v)) { try { return BigInt(v) } catch { /* refused below */ } }
+  throw new UnsafeTransactionError('malformed-spend', 'A spend value must be a bigint, a whole number or an integer string of at most 300 characters (sats).')
 }
 export const toHex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
 

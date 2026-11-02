@@ -19,7 +19,7 @@ describe('wallet-btc: spend value shape', () => {
   it('control: bigint, whole number and integer strings are spent; a fractional fee rate is still rounded', async () => {
     const f = fakeBlockbook()
     const a = await mk(f.fetchFn).getAccount(0)
-    for (const value of [10_000n, 10_000, '10000', ' 10000 ', '0x2710']) {
+    for (const value of [10_000n, 10_000, '10000', '0x2710']) {
       await expect(a.quoteSendTransaction({ to: ADDR1, value })).resolves.toMatchObject({ fee: expect.any(BigInt) })
     }
     await expect(a.quoteSendTransaction({ to: ADDR1, value: 10_000n, feeRate: 1.6 })).resolves.toMatchObject({ fee: expect.any(BigInt) })

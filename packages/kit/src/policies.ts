@@ -763,8 +763,21 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
   // A token transfer in calldata moves that token, not the native value next to it (round 3, M1).
   const move = tokenMove(ns ?? '', arg)
   const token = move?.token ?? (typeof a.token === 'string' ? a.token : undefined)
-  const amount = move ? move.amount : big(a.amount ?? a.value)
+  const amount = move ? move.amount : rawSendsValue(ns ?? '', method) ? valueAmount(a) : big(a.amount ?? a.value)
   return { ...base, kind: 'send', message: false, ...(to !== undefined ? { to } : {}), ...(token !== undefined ? { token } : {}), ...(amount !== undefined ? { amount } : {}) }
+}
+
+/** A raw send on a chain whose wallet signs the object's `value` (an `amount` field next to it is not read there). */
+function rawSendsValue(ns: string, method: WriteMethod): boolean {
+  if (method !== 'sendTransaction' && method !== 'signTransaction') return false
+  const n = canonicalNamespace(ns)
+  return n === 'eip155' || n === 'bip122' || n === 'zcash' || n === 'solana' || n === 'tron' || n === 'ton'
+}
+
+/** The signed `value` as the amount; unknown when an `amount` next to it says something else. */
+function valueAmount(a: Record<string, unknown>): bigint | undefined {
+  const value = big(a.value)
+  return a.amount !== undefined && big(a.amount) !== value ? undefined : value
 }
 
 /** One token transfer a write makes through a contract — an ERC-20 / TRC-20 `transfer`, a NEP-141 `ft_transfer(_call)` — as token and amount. */
