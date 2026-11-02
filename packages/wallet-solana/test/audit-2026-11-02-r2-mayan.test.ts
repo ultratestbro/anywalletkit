@@ -107,7 +107,7 @@ describe('audit 2026-11-02 r2: a Mayan order must deliver what was reviewed', ()
     expect(await check(swift({ feeRateMayan: 255 }), bare)).toBe('bridge-fee')
     expect(await check(swift({ feeRefund: INPUT }), bare)).toBe('bridge-fee')
     expect(await check(swift({ feeCancel: (INPUT * BigInt(MAYAN_RELAYER_FEE_MAX_BPS)) / 10_000n + 1n, feeRefund: 0n }), bare)).toBe('bridge-fee')
-    expect(await check(swift({ amountOutMin: 0n }), bare)).toBe('bridge-min')
+    expect(await check(swift({ amountOutMin: 0n }))).toBe('bridge-min')
     expect(await check(swift({ tokenOut: `0x${'66'.repeat(20)}` }))).toBe('bridge-token')
     expect(await check(swift({ tokenOut: '0x0000000000000000000000000000000000000000' }))).toBe('bridge-token')
     // 0.5 % slippage + 1 bp of rounding under the reviewed minimum is the floor.

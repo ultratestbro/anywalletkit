@@ -52,6 +52,14 @@ const code = (p: Promise<unknown>) => p.then(() => 'pass', (e: unknown) => (e in
 
 type Live = { name: string; tool: string; sender: string; recipient: string; destChain: string; sourceToken: string; amountIn: string; wire: string }
 const live = (JSON.parse(readFileSync(new URL('./fixtures/lifi-solana-2026-11-02.json', import.meta.url), 'utf8')) as { quotes: Live[] }).quotes
+type Answer = { name: string; response: { action: { toToken: { address: string; decimals?: number } }; estimate: { toAmountMin: string } } }
+const answers = new Map((JSON.parse(readFileSync(new URL('../../protocol-swap2-lifi/tests/fixtures-live-2026-11-02.json', import.meta.url), 'utf8')) as { corridors: Answer[] }).corridors.map((c) => [c.name, c.response]))
+/** The engine's reviewed terms for a recorded answer: its toToken, toAmountMin and the token's decimals. */
+function reviewedTerms(q: Live): { destToken: string; minAmountOut: bigint; destDecimals: number } {
+  const r = answers.get(`w-${q.name}`) ?? answers.get(q.name)!
+  const token = r.action.toToken.address
+  return { destToken: token, minAmountOut: BigInt(r.estimate.toAmountMin), destDecimals: /^0x0+$/.test(token) ? 18 : 6 }
+}
 const placeholder = (seed: string) => getAddressDecoder().decode(createHash('sha256').update(seed).digest()) as string
 
 /** The lookup tables were not recorded: fill the slots the guard needs from what each proxied instruction's data says it is. */
@@ -135,13 +143,13 @@ describe('audit 2026-11-02 r3: Solana bridges other than Mayan are checked as th
   it('every recorded Mayan route still passes, and one re-pointed at another recipient or chain is still refused', async () => {
     const mayan = live.filter((q) => q.tool.startsWith('mayan'))
     expect(mayan).toHaveLength(10)
-    for (const q of mayan) expect([q.name, await run(q, { destChain: q.destChain, recipient: q.recipient })]).toEqual([q.name, 'pass'])
+    for (const q of mayan) expect([q.name, await run(q, { destChain: q.destChain, recipient: q.recipient, ...reviewedTerms(q) })]).toEqual([q.name, 'pass'])
     const q = mayan.find((k) => k.name === 'sol-base-usdc-mayan')!
     const bytes = Buffer.from(q.wire, 'base64')
     const at = bytes.indexOf(Buffer.from(q.recipient.slice(2), 'hex'))
     bytes.fill(0x66, at, at + 20)
-    expect(await run(q, { destChain: q.destChain, recipient: q.recipient }, {}, bytes.toString('base64'))).toBe('bridge-recipient')
-    expect(await run(q, { destChain: 'eip155:42161', recipient: q.recipient })).toBe('bridge-recipient')
+    expect(await run(q, { destChain: q.destChain, recipient: q.recipient, ...reviewedTerms(q) }, {}, bytes.toString('base64'))).toBe('bridge-recipient')
+    expect(await run(q, { destChain: 'eip155:42161', recipient: q.recipient, ...reviewedTerms(q) })).toBe('bridge-recipient')
   })
 
   it('a wire that runs a Mayan program or the CPI proxy is a Mayan route: without a readable order it is refused', async () => {

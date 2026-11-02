@@ -122,11 +122,12 @@ export interface SerializedExpectation {
   maxTokenOut?: { mint: string; amount: bigint }
   /**
    * A bridge out of Solana: where the funds must arrive. When the transaction is a Mayan route (it runs one of Mayan's
-   * own programs, directly or through Mayan's CPI proxy), every top-level instruction must be one the guard can follow — compute budget, memos, LI.FI's tracking log, wSOL plumbing, transfers to this wallet's own accounts or to a
+   * own programs, directly or through Mayan's CPI proxy), every top-level instruction must be one the guard can
+   * follow — compute budget, memos, LI.FI's tracking log, wSOL plumbing, transfers to this wallet's own accounts or to a
    * fee wallet (at most {@link BRIDGE_FEE_MAX_BPS} of what may leave), a Jupiter swap into this wallet or into the
    * bridge, and Mayan's Swift / MCTP / Fast MCTP order instructions — and every bridge order must name `recipient` on
-   * `destChain`, a non-zero minimum, and (with `destToken` / `minAmountOut`) the reviewed token and a minimum no further
-   * under the reviewed one than `slippageBps`. Anything else (a transfer to another wallet, an approval, a program whose
+   * `destChain`, a non-zero minimum, the reviewed token (`destToken`) and a minimum no further under the reviewed one
+   * (`minAmountOut`) than `slippageBps`; an order with no reviewed token or minimum is refused. Anything else (a transfer to another wallet, an approval, a program whose
    * recipient cannot be read, a referrer or relayer fee over its cap) is refused (`bridge-*` codes). A transaction of
    * another bridge (Relay, LayerSwap, NEAR Intents, LI.FI Intents, …) carries its recipient in an off-chain order or in
    * data the guard does not read: it is NOT recipient-checked, only held to `maxLamportsOut`, `maxTokenOut` and the
@@ -145,14 +146,16 @@ export interface BridgeOutExpectation {
   feeWallets?: readonly string[]
   /**
    * The reviewed destination token (0x-address; the zero address is the chain's native coin). Every order that names
-   * its output token (Swift, the MCTP / Fast MCTP order modes) must name this one (`bridge-token`).
+   * its output token (Swift, the MCTP / Fast MCTP order modes) must name this one; without it such an order is refused
+   * (`bridge-token`).
    */
   destToken?: string
   /**
    * The reviewed minimum the recipient receives, in the destination token's base units; needs `destDecimals`. Every
    * order's own minimum — Swift's `amountOutMin` (Mayan keeps at most 8 decimals), or for a plain MCTP / Fast MCTP
    * bridge of USDC the bridged amount less its relayer, Circle and referrer fees — must be at least this, less
-   * `slippageBps` and 1 bp of rounding (`bridge-min`).
+   * `slippageBps` and 1 bp of rounding (`bridge-min`). Without it (or without `destDecimals`) every Mayan order is
+   * refused (`bridge-min`): its minimum would be the provider's word alone.
    */
   minAmountOut?: bigint
   /** Decimals of `destToken` on the destination chain. */
@@ -248,8 +251,9 @@ export interface SerializedExecutionInput {
 /**
  * The guard for `sendSerialized` / `checkSerialized` from the swap2 engine's expectation, every field carried over:
  * `maxValueOut` → `maxLamportsOut`, `tokenIn` → `tokenIn`, `source` → `maxTokenOut`, and `bridgeOut` with its reviewed
- * terms (`minAmountOut` as a bigint, kept only when `destDecimals` is known). Map the hook with it rather than by hand —
- * a bridge expectation that loses `bridgeOut` is checked against the SOL ceiling only:
+ * terms (`minAmountOut` as a bigint, kept only when `destDecimals` is known; a Mayan order without them is refused).
+ * Map the hook with it rather than by hand — a bridge expectation that loses `bridgeOut` is checked against the SOL
+ * ceiling only:
  *
  * ```ts
  * sendSerializedTransaction: (tx, expect) => account.sendSerialized(tx, serializedGuardFromExecution(expect))
@@ -533,8 +537,8 @@ const u64le = (d: Uint8Array, at: number) => new DataView(d.buffer, d.byteOffset
 
 /**
  * Why a Mayan order does not deliver what was reviewed, or undefined: its fee rates and relayer fees within their caps,
- * a non-zero minimum, and — when the caller names them — the reviewed token and a minimum no further under the reviewed
- * one than the plan's slippage (+1 bp of rounding).
+ * a non-zero minimum, the reviewed token and a minimum no further under the reviewed one than the plan's slippage (+1 bp
+ * of rounding). An order with no reviewed token or minimum to hold it to is refused.
  */
 function mayanOrderRefusal(layout: MayanOrderLayout, d: Uint8Array, b: BridgeOutExpectation): { code: string; detail: string; message: string } | undefined {
   const refuse = (code: string, detail: string, message: string) => ({ code, detail, message })
@@ -548,28 +552,25 @@ function mayanOrderRefusal(layout: MayanOrderLayout, d: Uint8Array, b: BridgeOut
   if (layout.tokenOutAt !== undefined && layout.amountOutMinAt !== undefined) {
     const fees = (layout.refundFeesAt ?? []).reduce((sum, at) => sum + u64le(d, at), 0n)
     if (fees * 10_000n > amountIn * BigInt(MAYAN_RELAYER_FEE_MAX_BPS)) return refuse('bridge-fee', String(fees), `The ${layout.name} order's relayer fees (${fees}) exceed ${MAYAN_RELAYER_FEE_MAX_BPS / 100}% of its input ${amountIn}.`)
-    if (b.destToken !== undefined) {
-      const tokenOut = hexOf(d.subarray(layout.tokenOutAt, layout.tokenOutAt + 32))
-      const want = `${'00'.repeat(12)}${b.destToken.slice(2).toLowerCase()}`
-      if (tokenOut !== want) return refuse('bridge-token', `0x${tokenOut}`, `The ${layout.name} order delivers token 0x${tokenOut}, not ${b.destToken}.`)
-    }
+    const tokenOut = hexOf(d.subarray(layout.tokenOutAt, layout.tokenOutAt + 32))
+    if (b.destToken === undefined) return refuse('bridge-token', `0x${tokenOut}`, `The ${layout.name} order delivers token 0x${tokenOut}, and no reviewed destination token (bridgeOut.destToken) was given to hold it to.`)
+    const want = `${'00'.repeat(12)}${b.destToken.slice(2).toLowerCase()}`
+    if (tokenOut !== want) return refuse('bridge-token', `0x${tokenOut}`, `The ${layout.name} order delivers token 0x${tokenOut}, not ${b.destToken}.`)
     const min = u64le(d, layout.amountOutMinAt)
     if (min === 0n) return refuse('bridge-min', '0', `The ${layout.name} order accepts any output (minimum 0).`)
-    if (b.minAmountOut !== undefined) {
-      const floor = reviewed(Math.min(b.destDecimals!, MAYAN_MAX_DECIMALS))
-      if (min < floor) return refuse('bridge-min', String(min), `The ${layout.name} order's minimum ${min} is under the reviewed ${b.minAmountOut} (${floor} at Mayan's precision, slippage included).`)
-    }
+    if (b.minAmountOut === undefined) return refuse('bridge-min', String(min), `The ${layout.name} order's minimum ${min} cannot be held to a reviewed one: bridgeOut has no minAmountOut (with destDecimals).`)
+    const floor = reviewed(Math.min(b.destDecimals!, MAYAN_MAX_DECIMALS))
+    if (min < floor) return refuse('bridge-min', String(min), `The ${layout.name} order's minimum ${min} is under the reviewed ${b.minAmountOut} (${floor} at Mayan's precision, slippage included).`)
     return undefined
   }
   // A plain USDC bridge: what arrives is the bridged amount less the fees taken from it.
   const deducted = (layout.deductedAt ?? []).reduce((sum, at) => sum + u64le(d, at), 0n) + (amountIn * rateBps) / 10_000n
   const delivered = amountIn > deducted ? amountIn - deducted : 0n
   if (delivered === 0n) return refuse('bridge-min', String(deducted), `The ${layout.name} order's fees (${deducted}) take all of its ${amountIn}.`)
-  if (b.minAmountOut !== undefined) {
-    if (b.destDecimals !== CCTP_USDC_DECIMALS) return refuse('bridge-token', String(b.destDecimals), `The ${layout.name} order delivers USDC (${CCTP_USDC_DECIMALS} decimals), not a token of ${b.destDecimals}.`)
-    const floor = reviewed(CCTP_USDC_DECIMALS)
-    if (delivered < floor) return refuse('bridge-min', String(delivered), `The ${layout.name} order delivers at least ${delivered} after its fees, under the reviewed ${b.minAmountOut} (slippage included).`)
-  }
+  if (b.minAmountOut === undefined) return refuse('bridge-min', String(delivered), `The ${layout.name} order delivers ${delivered} after its fees, which cannot be held to a reviewed minimum: bridgeOut has no minAmountOut (with destDecimals).`)
+  if (b.destDecimals !== CCTP_USDC_DECIMALS) return refuse('bridge-token', String(b.destDecimals), `The ${layout.name} order delivers USDC (${CCTP_USDC_DECIMALS} decimals), not a token of ${b.destDecimals}.`)
+  const floor = reviewed(CCTP_USDC_DECIMALS)
+  if (delivered < floor) return refuse('bridge-min', String(delivered), `The ${layout.name} order delivers at least ${delivered} after its fees, under the reviewed ${b.minAmountOut} (slippage included).`)
   return undefined
 }
 

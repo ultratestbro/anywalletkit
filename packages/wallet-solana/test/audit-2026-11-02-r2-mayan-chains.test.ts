@@ -28,7 +28,9 @@ const swift = (wh: number) => order(SWIFT_V2, '204c290c27a284db', 198, 57, wh, f
 const mctp = (wh: number) => order(MCTP, '3635a7a4fa097b45', 107, 72, wh, false, (v) => v.setBigUint64(40, 1_000_000n, true))
 const fast = (domain: number) => order(FAST_MCTP, 'a766806a7976ba4c', 124, 72, domain, true, (v) => v.setBigUint64(40, 1_000_000n, true))
 const ctx = { wallet: WALLET, tokenAccountOwner: () => undefined, maxLamportsOut: 1_000_000_000n }
-const run = (destChain: string, ix: RunInstruction) => bridgeOutRefusal([ix], [{ type: 'program-call' } as never], { destChain, recipient: RECIPIENT }, ctx)?.code
+// The orders name the native coin (Swift) or bridge USDC (MCTP, Fast MCTP) with a minimum of 1 base unit.
+const terms = { destToken: '0x0000000000000000000000000000000000000000', minAmountOut: 1n, destDecimals: 6 }
+const run = (destChain: string, ix: RunInstruction) => bridgeOutRefusal([ix], [{ type: 'program-call' } as never], { destChain, recipient: RECIPIENT, ...terms }, ctx)?.code
 
 describe('audit 2026-11-02 r2: every Mayan destination the guard maps matches Mayan\'s own ids', () => {
   it.each(Object.entries(WORMHOLE))('eip155:%s → Wormhole %s (Swift, MCTP)', (evm, wh) => {

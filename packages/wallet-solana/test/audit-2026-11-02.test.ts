@@ -33,7 +33,8 @@ const SOL = 1_000_000_000n
 const FEE = 5_000n
 const AMOUNT_IN = 50_000_000n
 const ALLOWANCE = 20_000_000n
-const BRIDGE = { destChain: 'eip155:8453', recipient: RECIPIENT }
+// The synthetic Swift order names the native coin (zero tokenOut) and a minimum of 8 955 000 at Mayan's 8 decimals.
+const BRIDGE = { destChain: 'eip155:8453', recipient: RECIPIENT, destToken: '0x0000000000000000000000000000000000000000', minAmountOut: 8_955_000n * 10n ** 10n, destDecimals: 18 }
 
 type State = { lamports: bigint; owner: string; data: Uint8Array } | null
 const sys = (lamports: bigint): State => ({ lamports, owner: '11111111111111111111111111111111', data: new Uint8Array() })
@@ -157,6 +158,14 @@ const FEE_ATA = '8jjWmLhYdqrtFMcEkiMDdqkEN85cvEFnNS4LFgNf5NRv' as Address
 type Live = { name: string; tool: string; sender: string; recipient: string; destChain: string; sourceToken: string; amountIn: string; wire: string }
 const live = JSON.parse(readFileSync(new URL('./fixtures/lifi-solana-2026-11-02.json', import.meta.url), 'utf8')) as { quotes: Live[] }
 const SYSTEM = '11111111111111111111111111111111'
+type Answer = { name: string; response: { action: { toToken: { address: string; decimals?: number } }; estimate: { toAmountMin: string } } }
+const answers = new Map((JSON.parse(readFileSync(new URL('../../protocol-swap2-lifi/tests/fixtures-live-2026-11-02.json', import.meta.url), 'utf8')) as { corridors: Answer[] }).corridors.map((c) => [c.name, c.response]))
+/** The engine's reviewed terms for a recorded answer: its toToken, toAmountMin and the token's decimals. */
+function reviewedTerms(q: Live): { destToken: string; minAmountOut: bigint; destDecimals: number } {
+  const r = answers.get(`w-${q.name}`) ?? answers.get(q.name)!
+  const token = r.action.toToken.address
+  return { destToken: token, minAmountOut: BigInt(r.estimate.toAmountMin), destDecimals: /^0x0+$/.test(token) ? 18 : 6 }
+}
 const ATA = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'
 const placeholder = (seed: string) => getAddressDecoder().decode(createHash('sha256').update(seed).digest()) as string
 
@@ -203,7 +212,7 @@ describe('audit 2026-11-02: the live LI.FI routes out of Solana', () => {
     const f = fakeRpc(pre, pre, tablesFor(q))
     const a = new WalletAccountReadOnlySolana(q.sender, { provider: f.rpc })
     const native = q.sourceToken === SYSTEM
-    const guard = { expect: { maxLamportsOut: (native ? BigInt(q.amountIn) : 0n) + ALLOWANCE, ...(native ? {} : { maxTokenOut: { mint: q.sourceToken, amount: BigInt(q.amountIn) } }), bridgeOut: { destChain: q.destChain, recipient: q.recipient } } }
+    const guard = { expect: { maxLamportsOut: (native ? BigInt(q.amountIn) : 0n) + ALLOWANCE, ...(native ? {} : { maxTokenOut: { mint: q.sourceToken, amount: BigInt(q.amountIn) } }), bridgeOut: { destChain: q.destChain, recipient: q.recipient, ...reviewedTerms(q) } } }
     return a.checkSerialized(q.wire, guard).then(() => 'pass', (e: unknown) => (e instanceof UnsafeTransactionError ? `${e.code}` : String(e)))
   }
 

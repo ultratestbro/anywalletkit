@@ -159,7 +159,8 @@ const pyusd = await account.getTokenInfo('2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsF
   `destChain` with a non-zero minimum, a referrer / Mayan fee rate of at most
   `MAYAN_REFERRER_FEE_MAX_BPS` (50) and fixed relayer fees of at most
   `MAYAN_RELAYER_FEE_MAX_BPS` (10 %) of its input. With the reviewed terms
-  swap2 adds — `destToken`, `minAmountOut` + `destDecimals`, `slippageBps` —
+  swap2 adds — `destToken`, `minAmountOut` + `destDecimals`, `slippageBps`;
+  a Mayan order without `destToken` or `minAmountOut` is refused —
   an order's output token must be `destToken` and its own minimum (Swift's
   `amountOutMin` at Mayan's 8 decimals; for a plain MCTP / Fast MCTP USDC
   bridge, the bridged amount less its fees) at least `minAmountOut` less the

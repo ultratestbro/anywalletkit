@@ -341,8 +341,8 @@ export interface SerializedExecutionExpectation {
    * Bridges: the destination chain (CAIP-2) and the reviewed recipient there. Value leaving the account may only go into
    * the bridge (plus the provider's declared fee), and a bridge instruction whose recipient the account can read must
    * name this one; an account that cannot prove where the funds go refuses the transaction. The engine also names the
-   * reviewed destination token (zero address = native), the quoted minimum in its base units with its decimals (when the
-   * catalog knows them), and the slippage the plan allows, so a bridge order's own token and minimum can be held to them.
+   * reviewed destination token (zero address = native), the quoted minimum in its base units with its decimals (the
+   * catalog's, else the quote's `destDecimals`), and the slippage the plan allows, so a bridge order's own token and minimum can be held to them.
    * Set on every cross-chain serialized leg. A Solana account maps the whole expectation with wallet-solana's
    * `serializedGuardFromExecution`; a hand mapping that drops `bridgeOut` leaves the leg checked against the SOL ceiling only.
    */
@@ -679,7 +679,10 @@ function assertQuoteConstraints(q: Quote, options: Swap2Options): void {
 
 /** The bridge leg's reviewed terms for {@link SerializedExecutionExpectation.bridgeOut}. */
 function bridgeOutOf(params: QuoteParams, q: Quote): NonNullable<SerializedExecutionExpectation["bridgeOut"]> {
-  const decimals = resolveAsset(params.destChain, params.destToken)?.decimals;
+  // The catalog's decimals, else the provider's for a token the catalog does not list (an account refuses a bridge
+  // order it cannot hold to a minimum).
+  const quoted = Number.isInteger(q.destDecimals) && q.destDecimals! >= 0 && q.destDecimals! <= 36 ? q.destDecimals : undefined;
+  const decimals = resolveAsset(params.destChain, params.destToken)?.decimals ?? quoted;
   return {
     destChain: params.destChain, recipient: params.destAddress, destToken: params.destToken, minAmountOut: q.minDestAmount,
     ...(decimals !== undefined ? {destDecimals: decimals} : {}),

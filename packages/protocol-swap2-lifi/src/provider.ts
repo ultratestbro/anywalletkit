@@ -401,7 +401,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           id?: string;
           action?: {
             fromToken?: {address?: string; chainId?: number};
-            toToken?: {address?: string; chainId?: number};
+            toToken?: {address?: string; chainId?: number; decimals?: number};
             fromAmount?: string;
             fromChainId?: number;
             toChainId?: number;
@@ -587,6 +587,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           sourceAmount: params.amountIn,
           destAmount: est.toAmount,
           minDestAmount,
+          ...(Number.isInteger(action.toToken?.decimals) && action.toToken!.decimals! >= 0 && action.toToken!.decimals! <= 36 ? {destDecimals: action.toToken!.decimals!} : {}),
           feeUsd,
           etaSeconds: est.executionDuration ?? 120,
           reliability: 0.97,

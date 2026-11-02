@@ -85,7 +85,7 @@ async function check(jup: Instruction) {
   const intoVault = getTransferCheckedInstruction({ source: MY_MID, mint: USDC, destination: VAULT, authority: createNoopSigner(ADDR0), amount: 1n, decimals: 6 })
   const pre = { [ADDR0]: sys(10n ** 9n), [MY_USDC]: tokenAccount(USDC, ADDR0, 100_000_000n), [MY_MID]: tokenAccount(USDC, ADDR0, 0n), [VAULT]: tokenAccount(USDC, STATE, 0n) }
   const a = await new WalletManagerSolana(SEED, { provider: fakeRpc(pre) }).getAccount(0)
-  const guard = { expect: { maxLamportsOut: 20_000_000n, maxTokenOut: { mint: USDC, amount: 9_000_000n }, bridgeOut: { destChain: 'eip155:8453', recipient: RECIPIENT } } }
+  const guard = { expect: { maxLamportsOut: 20_000_000n, maxTokenOut: { mint: USDC, amount: 9_000_000n }, bridgeOut: { destChain: 'eip155:8453', recipient: RECIPIENT, destToken: '0x0000000000000000000000000000000000000000', minAmountOut: 1n, destDecimals: 6 } } }
   return a.checkSerialized(wire([jup, intoVault, swift()]), guard).then(() => 'pass', (e: unknown) => (e instanceof UnsafeTransactionError ? `${e.code}` : String(e)))
 }
 
@@ -121,7 +121,7 @@ describe('audit 2026-11-02 r2: a Jupiter route inside a bridge takes no fee', ()
     const run = (data: Uint8Array) => {
       const shared = data[1] === 0x98 // d19853937cfed8e9: output at account 5
       const accounts = shared ? [ADDR0, ADDR0, ADDR0, MY_USDC, MY_USDC, MY_MID, USDC, USDC] : [ADDR0, MY_USDC, MY_MID, USDC, USDC, TOKEN_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS, JUP]
-      return bridgeOutRefusal([{ program: JUP, accounts, data }, order], [{ type: 'program-call' } as never, { type: 'program-call' } as never], { destChain: 'eip155:8453', recipient: RECIPIENT }, ctx)?.code
+      return bridgeOutRefusal([{ program: JUP, accounts, data }, order], [{ type: 'program-call' } as never, { type: 'program-call' } as never], { destChain: 'eip155:8453', recipient: RECIPIENT, destToken: '0x0000000000000000000000000000000000000000', minAmountOut: 1n, destDecimals: 6 }, ctx)?.code
     }
     for (const leg of legs) {
       expect(run(leg)).toBeUndefined()
