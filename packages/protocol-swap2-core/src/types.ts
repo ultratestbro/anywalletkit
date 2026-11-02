@@ -102,6 +102,12 @@ export interface IntentRef {
   sourceTxHash?: string | null;
   /** Two-phase routes: the destination-chain claim transaction, once sent. */
   destTxHash?: string | null;
+  /**
+   * `true` when the account that sent `destTxHash` saw it included and succeed (`claimSwap2` after
+   * the account's `waitForTransaction` resolved). A provider that cannot read the destination may
+   * take it as the delivery; a bare `destTxHash` proves only that a claim was sent.
+   */
+  destTxConfirmed?: boolean;
 }
 
 /** The router's chosen quote, tagged with how it scored. */

@@ -43,17 +43,21 @@ export interface SwapRecord {
 
 export const ACTIVE_STATUSES: ReadonlySet<SwapRecordStatus> = new Set<SwapRecordStatus>(['pending', 'action-required', 'refund-pending', 'partial', 'claiming'])
 
-/** `awk1.<provider>.<intentId>[.<sourceTxHash>[.<claimTxHash>]]` — the 4th segment is on the id `claimSwap2` returns. */
-export function parseSwapId(id: string): { provider: string; intentId: string; sourceTxHash?: string; destTxHash?: string } | null {
+/**
+ * `awk1.<provider>.<intentId>[.<sourceTxHash>[.<claimTxHash>[.ok]]]` — the 4th segment is on the id `claimSwap2`
+ * returns, and `.ok` after it when the destination account saw the claim succeed (`destTxConfirmed`).
+ */
+export function parseSwapId(id: string): { provider: string; intentId: string; sourceTxHash?: string; destTxHash?: string; destTxConfirmed?: true } | null {
   if (!id.startsWith(`${SWAP2_ID_PREFIX}.`)) return null
   const parts = id.slice(SWAP2_ID_PREFIX.length + 1).split('.')
-  if (parts.length < 2 || parts.length > 4 || !parts[0] || !parts[1]) return null
+  if (parts.length < 2 || parts.length > 5 || !parts[0] || !parts[1]) return null
+  if (parts[4] !== undefined && (parts[4] !== 'ok' || !parts[3])) return null
   const provider = decodeURIComponent(parts[0])
   const intentId = decodeURIComponent(parts[1])
   const sourceTxHash = parts[2] ? decodeURIComponent(parts[2]) : undefined
   const destTxHash = parts[3] ? decodeURIComponent(parts[3]) : undefined
   if (destTxHash && !sourceTxHash) return null
-  return { provider, intentId, ...(sourceTxHash ? { sourceTxHash } : {}), ...(destTxHash ? { destTxHash } : {}) }
+  return { provider, intentId, ...(sourceTxHash ? { sourceTxHash } : {}), ...(destTxHash ? { destTxHash } : {}), ...(parts[4] !== undefined ? { destTxConfirmed: true as const } : {}) }
 }
 
 export class SwapsStore {

@@ -466,22 +466,24 @@ export const SWAP2_ID_PREFIX = "awk1";
 
 /** Versioned provider/intent/source-hash id for durable status tracking. */
 /**
- * `awk1.<provider>.<intentId>[.<sourceTxHash>[.<destTxHash>]]`. The destination claim's hash rides
- * in the id `claimSwap2` returns, so a provider without a destination RPC can still tell the
- * delivery completed (round 3, M27).
+ * `awk1.<provider>.<intentId>[.<sourceTxHash>[.<destTxHash>[.ok]]]`. The destination claim's hash
+ * rides in the id `claimSwap2` returns, and `.ok` after it when the account saw the claim included
+ * and succeed: a provider without a destination RPC can take that as the delivery (round 3, M27).
  */
-function encodeId(provider: string, intentId: string, sourceTxHash?: string, destTxHash?: string): string {
+const CONFIRMED_SEGMENT = "ok";
+function encodeId(provider: string, intentId: string, sourceTxHash?: string, destTxHash?: string, destTxConfirmed = false): string {
   // encodeURIComponent leaves "." unescaped, which would shift decodeId's
   // split — escape it explicitly so segments are dot-safe.
   const enc = (v: string) => encodeURIComponent(v).replace(/\./g, "%2E");
-  const parts = [provider, intentId, ...(sourceTxHash != null ? [sourceTxHash, ...(destTxHash != null ? [destTxHash] : [])] : [])];
+  const dest = destTxHash != null ? [destTxHash, ...(destTxConfirmed ? [CONFIRMED_SEGMENT] : [])] : [];
+  const parts = [provider, intentId, ...(sourceTxHash != null ? [sourceTxHash, ...dest] : [])];
   return `${SWAP2_ID_PREFIX}.${parts.map(enc).join(".")}`;
 }
-function decodeId(id: string): {provider: string; intentId: string; sourceTxHash?: string; destTxHash?: string} {
+function decodeId(id: string): {provider: string; intentId: string; sourceTxHash?: string; destTxHash?: string; destTxConfirmed?: true} {
   try {
     if (!id.startsWith(`${SWAP2_ID_PREFIX}.`)) throw new Error("unsupported id version");
     const parts = id.slice(SWAP2_ID_PREFIX.length + 1).split(".");
-    if (parts.length < 2 || parts.length > 4 || !parts[0] || !parts[1]) throw new Error("invalid id shape");
+    if (parts.length < 2 || parts.length > 5 || !parts[0] || !parts[1]) throw new Error("invalid id shape");
     const provider = decodeURIComponent(parts[0]);
     const intentId = decodeURIComponent(parts[1]);
     const sourceTxHash = parts[2] ? decodeURIComponent(parts[2]) : undefined;
@@ -489,7 +491,8 @@ function decodeId(id: string): {provider: string; intentId: string; sourceTxHash
     if (!/^[A-Za-z0-9_-]+$/.test(provider) || !intentId || (parts[2] !== undefined && !sourceTxHash) || (parts[3] !== undefined && !destTxHash)) {
       throw new Error("invalid id contents");
     }
-    return {provider, intentId, ...(sourceTxHash ? {sourceTxHash} : {}), ...(destTxHash ? {destTxHash} : {})};
+    if (parts[4] !== undefined && parts[4] !== CONFIRMED_SEGMENT) throw new Error("invalid id contents");
+    return {provider, intentId, ...(sourceTxHash ? {sourceTxHash} : {}), ...(destTxHash ? {destTxHash} : {}), ...(parts[4] !== undefined ? {destTxConfirmed: true as const} : {})};
   } catch {
     throw new Swap2ValidationError("swap2: malformed swap2 status id");
   }
@@ -1590,10 +1593,10 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
 
   /** Status of a swap by the id `swap2()` returned, asked from the provider that executed it. */
   override async getSwap2Status(id: string, _options?: Swap2StatusOptions): Promise<Swap2StatusResult> {
-    const {provider: name, intentId, sourceTxHash, destTxHash} = decodeId(id);
+    const {provider: name, intentId, sourceTxHash, destTxHash, destTxConfirmed} = decodeId(id);
     const provider = this.providerFor(name);
     if (!provider) throw new Error(`swap2: no swap2 found for id '${id}'`);
-    return mapStatus(await provider.trackIntent({intentId, ...(sourceTxHash != null ? {sourceTxHash} : {}), ...(destTxHash != null ? {destTxHash} : {})}));
+    return mapStatus(await provider.trackIntent({intentId, ...(sourceTxHash != null ? {sourceTxHash} : {}), ...(destTxHash != null ? {destTxHash, ...(destTxConfirmed ? {destTxConfirmed} : {})} : {})}));
   }
 
   /**
@@ -1666,12 +1669,15 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     });
     if (!sent.hash) throw new Swap2ExecutionError("swap2: account did not return a claim transaction hash");
     this.emitPhase("broadcast", {hash: sent.hash});
-    // A provider may take the recorded claim hash as the delivery when it cannot read the destination: a claim the
-    // account saw revert on chain gets no id with its hash. Any other wait failure (a timeout, the RPC) proves
-    // nothing, so the hash is kept and the provider's status decides.
+    // A claim the account saw included and succeed is marked confirmed in the id: a provider that cannot read the
+    // destination may take that as the delivery. A claim the account saw revert gets no id with its hash. Any other
+    // wait failure (a timeout, the RPC), or an account without the wait, proves nothing: the hash is kept unmarked
+    // and the provider's status decides.
+    let confirmed = false;
     if (typeof signer.waitForTransaction === "function") {
       try {
         await signer.waitForTransaction(sent.hash);
+        confirmed = true;
       } catch (e) {
         const err = e as {name?: unknown; message?: unknown; code?: unknown} | null;
         const timedOut = /timeout|timed out/i.test(String(err?.name ?? "")) || /timed out|timeout/i.test(String(err?.message ?? ""));
@@ -1681,8 +1687,9 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         }
       }
     }
-    // The id to keep polling names the claim, so the status can complete without a destination RPC (round 3, M27).
-    return {hash: sent.hash, chain: unsigned.chain, id: encodeId(name, intentId, sourceTxHash, sent.hash)};
+    // The id to keep polling names the claim (and that it succeeded), so the status can complete without a
+    // destination RPC (round 3, M27).
+    return {hash: sent.hash, chain: unsigned.chain, id: encodeId(name, intentId, sourceTxHash, sent.hash, confirmed)};
   }
 
   /** The inherited bridge() has no floor field: quote first, then bind execution

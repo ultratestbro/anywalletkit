@@ -60,8 +60,9 @@ export interface CctpProviderConfig {
   /**
    * JSON-RPC URLs per CAIP-2 chain. Optional, but with them the provider
    * verifies the contracts before the burn and detects the mint on the
-   * destination (`usedNonces`). The destination chain's URL is what makes the
-   * status "completed": without it a claimed swap stays "pending" (claim hash kept).
+   * destination (`usedNonces`). Without the destination chain's URL the status
+   * reaches "completed" only through the id `claimSwap2` returns for a claim the
+   * account saw succeed; a bare claim hash stays "pending" (hash kept).
    */
   rpcUrls?: Readonly<Record<string, string>>;
   /** Local lifetime of a quote (fees are stable; default 60 s). */
@@ -312,9 +313,19 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
           // A message without a readable nonce cannot be checked on the destination even with an RPC there.
           const done = isHexData(nonce) && nonce.length === 66 ? await minted(parsed.dst, nonce) : client(parsed.dst.caip2) ? "unknown" : null;
           if (done === true) return {state: "completed", claim: {...claim, ready: false}, ...(ref.destTxHash ? {destTxHash: ref.destTxHash} : {})};
-          // A claim was sent, but nothing here can read whether it minted (no destination RPC, or one that did
-          // not answer): the hash is kept and the swap stays pending — a hash alone is not a mint.
-          if (done !== false && ref.destTxHash) return {state: "pending", depositReceived: true, destTxHash: ref.destTxHash, claim: {...claim, ready: false}};
+          if (ref.destTxHash) {
+            // A claim the sending account saw included and succeed is the mint: receiveMessage reverts once the
+            // nonce is used, so a successful one minted this message. Without a destination read that is completed;
+            // a destination read that does not show it yet is a node behind the claim, not a claim to send again.
+            if (ref.destTxConfirmed === true) {
+              return done === false
+                ? {state: "pending", depositReceived: true, destTxHash: ref.destTxHash, claim: {...claim, ready: false}}
+                : {state: "completed", destTxHash: ref.destTxHash, claim: {...claim, ready: false}};
+            }
+            // A claim was sent, but nothing here can read whether it minted (no destination RPC, or one that did
+            // not answer): the hash is kept and the swap stays pending — a hash alone is not a mint.
+            if (done !== false) return {state: "pending", depositReceived: true, destTxHash: ref.destTxHash, claim: {...claim, ready: false}};
+          }
           return {state: "action-required", depositReceived: true, claim: {...claim, ready: true}};
         }
         return {state: "pending", depositReceived: true, claim};
