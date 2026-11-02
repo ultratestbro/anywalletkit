@@ -62,8 +62,9 @@ Every send goes through, in order: static refusals → simulation → fee cap �
   refused (`UnsafeTransactionError`) when its rate is above `maxFeeRateMultiplier` (default 10) × the
   network's current quote (the higher of `eth_gasPrice` and the EIP-1559 estimate) and above 10 gwei.
   Fees the account fills in are not checked; without a provider, or when the quote cannot be read,
-  nothing is refused (use `transactionMaxFee` for offline signing). `maxFeeRateMultiplier: null` turns
-  it off.
+  nothing is refused (use `transactionMaxFee` for offline signing); the quote is waited for at most
+  5 s. `maxFeeRateMultiplier: null` (or `Infinity`) turns it off; a value below 1 throws a `RangeError`
+  when the account is created.
 - **Broadcast.** A lost answer throws `BroadcastUnknownError` with the locally computed `hash`: watch
   it, do not send again. With several RPCs, `already known` from the next one is the same transaction
   and resolves to its hash. `nonce too low` is re-signed with the next nonce only when the nonce is

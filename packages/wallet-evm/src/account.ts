@@ -134,6 +134,16 @@ export const MIN_FEE_RATE_CEILING_WEI = 10_000_000_000n
  * for an unreadable quote, so a silent RPC does not hold up signing a fully specified transaction.
  */
 export const FEE_QUOTE_TIMEOUT_MS = 5_000
+/** Above this, {@link EvmConfig.maxFeeRateMultiplier} is the same as `Infinity` (the check is off). */
+export const MAX_FEE_RATE_MULTIPLIER = 1_000_000
+
+/** `maxFeeRateMultiplier` is unset, `null`, `Infinity` or a number of at least 1; anything else is a config mistake. */
+function assertFeeRateMultiplier(k: unknown): void {
+  if (k === undefined || k === null || k === Infinity) return
+  if (typeof k !== 'number' || Number.isNaN(k) || k < 1) {
+    throw new RangeError(`maxFeeRateMultiplier must be a number of at least 1, null or Infinity (got ${String(k)}).`)
+  }
+}
 
 /** Worst-case fee of a prepared transaction: all its gas at its cap (`gasPrice`, or `maxFeePerGas`). */
 export function maxFeeCost(tx: TransactionSerializable): bigint {
@@ -181,6 +191,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   /** `publicKey` is the signer's compressed secp256k1 key (33 bytes); it is needed synchronously for the address. */
   constructor(signer: Signer, publicKey: Uint8Array, path: string, config: EvmConfig = {}) {
     super(addressFromPublicKey(publicKey), config)
+    assertFeeRateMultiplier(config.maxFeeRateMultiplier)
     this.#signer = requireCurve(signer, 'secp256k1')
     this.signerKind = this.#signer.kind
     this.publicKey = publicKey
@@ -305,7 +316,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
   private async assertFeeRate(tx: EvmTransaction, prepared: TransactionSerializable): Promise<void> {
     if (tx.gasPrice === undefined && tx.maxFeePerGas === undefined && tx.maxPriorityFeePerGas === undefined) return
     const k = this._config.maxFeeRateMultiplier === undefined ? DEFAULT_MAX_FEE_RATE_MULTIPLIER : this._config.maxFeeRateMultiplier
-    if (k === null || !Number.isFinite(k) || !this._client) return
+    if (k === null || !Number.isFinite(k) || k > MAX_FEE_RATE_MULTIPLIER || !this._client) return
     const client = this._client
     let timer: ReturnType<typeof setTimeout> | undefined
     const late = new Promise<[undefined, undefined]>((resolve) => { timer = setTimeout(() => resolve([undefined, undefined]), FEE_QUOTE_TIMEOUT_MS) })
