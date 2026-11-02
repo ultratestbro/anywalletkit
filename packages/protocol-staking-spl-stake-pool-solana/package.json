@@ -37,7 +37,7 @@
   },
   "dependencies": {
     "@solana/addresses": "^3.0.3",
-    "@solana/instructions": "^3.0.3"
+    "@solana/instructions": "^8.5.0"
   },
   "peerDependencies": {
     "@anywalletkit/core": "workspace:*"
