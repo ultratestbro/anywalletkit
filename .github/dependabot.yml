@@ -1,0 +1,19 @@
+# Dependency update PRs. Minor and patch bumps come grouped in one PR per ecosystem a week; majors
+# come one by one. Actions stay pinned to commit SHAs (Dependabot bumps the SHA and its version comment).
+version: 2
+updates:
+  - package-ecosystem: npm          # the pnpm workspace (pnpm-lock.yaml at the root)
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }   # a release is a week old before a PR proposes it
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 2
+    groups:
+      actions:
+        update-types: [minor, patch]

@@ -17,6 +17,8 @@ jobs:
         with: { node-version: "${{ matrix.node }}", cache: pnpm }
       - run: node scripts/check-node.mjs   # stop here on a Node that misses a security release
       - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod --audit-level high   # known advisories with no fix: auditConfig in pnpm-workspace.yaml
+        if: startsWith(matrix.node, '22.')
       - run: pnpm build          # workspace types resolve through each package's dist
       - run: pnpm typecheck
       - run: pnpm lint && pnpm lint:rules   # promises nobody awaits, Number() on bigints
