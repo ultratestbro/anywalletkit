@@ -75,8 +75,9 @@ const WARNINGS = new Set(['recipient-foreign', 'approval-unlimited', 'approval-e
 const lc = (a: string) => a.toLowerCase()
 // tx-preview's unlimited threshold, type(uint128).max, for approvals it does not read itself.
 const PREVIEW_UNLIMITED = (1n << 128n) - 1n
-// TRC-20 shares ERC-20's selectors: approve(address,uint256) and increaseAllowance(address,uint256).
-const ALLOWANCE_SELECTORS = new Set(['095ea7b3', '39509351'])
+// TRC-20 shares ERC-20's selectors: approve(address,uint256), increaseAllowance(address,uint256) and the older
+// StandardToken name increaseApproval(address,uint256), the three tx-preview and the kit read as approvals.
+const ALLOWANCE_SELECTORS = new Set(['095ea7b3', '39509351', 'd73dd623'])
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 /** The 20-byte account a Tron (base58 T… / 41-hex) or EVM address names, as lowercase hex; null for anything else. */
 function account20(address: string): string | null {
@@ -169,7 +170,8 @@ export function describeProtocolBehaviour<P extends object>(name: string, o: Pro
           expect(targets.has(lc(s.to)), `the plan calls ${s.to}${s.value > 0n ? ' with native value' : ''}, which is not declared (callTargets, spender, source token, deposit address)`).toBe(true)
           // TRC-20 approve / increaseAllowance calldata: the approval checks tx-preview runs on EVM — a declared
           // spender (callTargets, spender, source token), no more than the input, and readable arguments.
-          const data = (s.data ?? '').replace(/^0x/, '').toLowerCase()
+          const data = (s.data ?? '').replace(/^0x/i, '').toLowerCase()
+          expect(/^[0-9a-f]*$/.test(data), `the plan's call to ${s.to} carries calldata that is not hex (calldata-undecodable)`).toBe(true)
           if (ALLOWANCE_SELECTORS.has(data.slice(0, 8))) {
             expect(/^[0-9a-f]{136}$/.test(data), `the plan's call to ${s.to} carries approval calldata that cannot be read (approval-unparsed)`).toBe(true)
             const spender = data.slice(32, 72)

@@ -32,6 +32,9 @@ export const TRON_STRANGER_HEX = '0x74472e7d35395a6b5add427eecb7f4b62ad2b071'
 /** A Tron call to the source token that approves (or, with `increase`, adds to the allowance of) `spender`, no native value. */
 export const tronApprove = (spender: string, allowance: (amount: bigint) => bigint, increase = false) => (amount: bigint): Source =>
   ({ kind: 'call', to: TRON_USDT, data: `0x${increase ? '39509351' : '095ea7b3'}${w(spender)}${w(allowance(amount))}`, value: 0n })
+/** A Tron call to the source token whose calldata `data` builds from the input, no native value. */
+export const tronTokenCall = (data: (amount: bigint) => string) => (amount: bigint): Source => ({ kind: 'call', to: TRON_USDT, data: data(amount), value: 0n })
+export const tronWord = w
 export const typedOrder = (): Source => ({ kind: 'typed-order', typedData: JSON.stringify({ domain: { name: 'Order', chainId: 1 }, types: { Order: [{ name: 'receiver', type: 'address' }] }, primaryType: 'Order', message: { receiver: ME } }) })
 
 export const planFixture = (name: string, extra: Record<string, unknown> = {}) => ({
