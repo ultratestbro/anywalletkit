@@ -20,7 +20,7 @@ import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from '@solana
 import { TOKEN_2022_PROGRAM_ADDRESS } from '@solana-program/token-2022'
 import { ZERO_ADDRESS } from './describe.js'
 import { UnsafeTransactionError } from './errors.js'
-import type { SimulationResult, SolanaFeeQuote, TransactionDescription } from './types.js'
+import type { DecodedInstruction, SimulationResult, SolanaFeeQuote, TransactionDescription } from './types.js'
 
 /** Memo program (v2) — swap aggregators tag routes with it. */
 export const MEMO_PROGRAM_ADDRESS = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'
@@ -120,6 +120,25 @@ export interface SerializedExpectation {
   tokenIn?: { mint: string; minAmount: bigint; maxAmount?: bigint }
   /** Token the wallet may SEND and the most it may lose of it (the swap input for a token source). */
   maxTokenOut?: { mint: string; amount: bigint }
+  /**
+   * A bridge out of Solana: where the funds must arrive. Every top-level instruction must then be one the guard can
+   * follow — compute budget, memos, LI.FI's tracking log, wSOL plumbing, transfers to this wallet's own accounts or to a
+   * fee wallet (at most {@link BRIDGE_FEE_MAX_BPS} of what may leave), a Jupiter swap into this wallet or into the
+   * bridge, and Mayan's Swift / MCTP / Fast MCTP order instructions — and every bridge order must name `recipient` on
+   * `destChain`. Anything else (a transfer to another wallet, an approval, a program whose recipient cannot be read) is
+   * refused (`bridge-*` codes).
+   */
+  bridgeOut?: BridgeOutExpectation
+}
+
+/** {@link SerializedExpectation.bridgeOut}. */
+export interface BridgeOutExpectation {
+  /** CAIP-2 id of the destination chain (an EVM chain Mayan serves: `eip155:1`, `eip155:8453`, …). */
+  destChain: string
+  /** The reviewed recipient there (0x-address). */
+  recipient: string
+  /** Wallets a route's fee may be paid to (SOL directly, tokens to their token accounts). Default: LI.FI's {@link LIFI_FEE_WALLET_ADDRESS}. */
+  feeWallets?: readonly string[]
 }
 
 /**
@@ -176,6 +195,12 @@ export function assertExpectation(expect: SerializedExpectation): void {
     }
   }
   if (expect.maxTokenOut !== undefined) bad('maxTokenOut.amount', expect.maxTokenOut.amount)
+  if (expect.bridgeOut !== undefined) {
+    const b = expect.bridgeOut
+    if (!b || typeof b.destChain !== 'string' || typeof b.recipient !== 'string' || (b.feeWallets !== undefined && (!Array.isArray(b.feeWallets) || b.feeWallets.some((w) => typeof w !== 'string')))) {
+      throw new UnsafeTransactionError("The guard's bridgeOut needs a destChain and a recipient.", 'invalid-expectation', ['bridgeOut'])
+    }
+  }
 }
 
 const hexOf = (data: Uint8Array): string => Array.from(data, (b) => b.toString(16).padStart(2, '0')).join('')
@@ -296,3 +321,159 @@ export const bytesEqual = (a: Uint8Array, b: Uint8Array): boolean => a.length ==
 export const optEqual = (a: Uint8Array | null, b: Uint8Array | null): boolean => (a === null || b === null ? a === b : bytesEqual(a, b))
 export const pubkeyBytes = (address: string): Uint8Array => getAddressEncoder().encode(address as never) as Uint8Array
 export const base64Bytes = (data: string): Uint8Array => getBase64Encoder().encode(data) as Uint8Array
+
+/**
+ * LI.FI's fee wallet on Solana: the `feeCollection` step of its Solana quotes pays SOL here and tokens to this wallet's
+ * associated token accounts (every live cross-chain quote from Solana, 2026-10-09 … 2026-11-02).
+ */
+export const LIFI_FEE_WALLET_ADDRESS = '34FKjAdVcTax2DHqV2XnbXa9J3zmyKcFuFKWbcmgxjgm'
+/** The most a bridge transaction may pay to fee wallets, in basis points of what may leave the wallet (LI.FI takes 25). */
+export const BRIDGE_FEE_MAX_BPS = 300n
+
+/** Mayan order programs (swap-sdk `src/addresses.ts`) whose order instructions the guard reads. */
+const MAYAN_SWIFT = ['BLZRi6frs4X4DNLw56V4EXai1b6QVESN1BhHBTYM9VcY', 'mayan34VedncxdK2XobtvWFDXQASUTBXhUVzt2kKgny']
+const MAYAN_MCTP = 'dkpZqrxHFrhziEMQ931GLtfy11nFkCsfMftH9u6QwBU'
+const MAYAN_FAST_MCTP = 'Gx9rivpS3YR8pBFwMuP6omYqVxunpLvLkNn7ubNyuZZ5'
+const MAYAN_ORDER_PROGRAMS = new Set([...MAYAN_SWIFT, MAYAN_MCTP, MAYAN_FAST_MCTP])
+
+/**
+ * Mayan order instructions, by Anchor discriminator and exact data length (swap-sdk `src/solana/solanaSwift.ts`,
+ * `solanaMctp.ts`, `solanaFastMctp.ts` layouts): where the 32-byte destination address sits, where the destination
+ * chain sits — a Wormhole chain id (u16) or a CCTP domain (u32), little-endian — and which account holds the order's
+ * funds (Swift's `stateAccount`, the MCTP ledger's token account). Account 0 is the trader, refunded on a cancel.
+ */
+const MAYAN_ORDERS: ReadonlyArray<{ name: string; disc: string; length: number; recipientAt: number; chainAt: number; chain: 'wormhole' | 'cctp'; vaultAt: number }> = [
+  { name: 'Swift init_order', disc: '204c290c27a284db', length: 198, recipientAt: 25, chainAt: 57, chain: 'wormhole', vaultAt: 3 },
+  { name: 'MCTP init_bridge_ledger_gasless', disc: '3635a7a4fa097b45', length: 107, recipientAt: 8, chainAt: 72, chain: 'wormhole', vaultAt: 2 },
+  { name: 'MCTP init_order_ledger_gasless', disc: 'a06cdad95ee9a9ad', length: 188, recipientAt: 8, chainAt: 72, chain: 'wormhole', vaultAt: 2 },
+  { name: 'Fast MCTP init_bridge_ledger', disc: 'a766806a7976ba4c', length: 124, recipientAt: 8, chainAt: 72, chain: 'cctp', vaultAt: 3 },
+  { name: 'Fast MCTP init_order_ledger', disc: '8febfcc2d35a864d', length: 180, recipientAt: 8, chainAt: 80, chain: 'cctp', vaultAt: 3 },
+]
+/** Argument-less Mayan instructions that run an order the same transaction opened (`bridge`, `bridge_with_fee_shim`). */
+const MAYAN_ORDER_FOLLOW_UPS = new Set(['ae29789262daa919', 'ebfc2bb26990c1a5'])
+
+/** Mayan's chain ids for the EVM chains it serves (swap-sdk `src/utils.ts` evmChainIdMap, `src/cctp.ts` getCCTPDomain). */
+const MAYAN_CHAINS: Readonly<Record<string, { wormhole: number; cctp?: number }>> = {
+  'eip155:1': { wormhole: 2, cctp: 0 },
+  'eip155:56': { wormhole: 4 },
+  'eip155:137': { wormhole: 5, cctp: 7 },
+  'eip155:43114': { wormhole: 6, cctp: 1 },
+  'eip155:42161': { wormhole: 23, cctp: 3 },
+  'eip155:10': { wormhole: 24, cctp: 2 },
+  'eip155:8453': { wormhole: 30, cctp: 6 },
+  'eip155:130': { wormhole: 44, cctp: 10 },
+  'eip155:59144': { wormhole: 38, cctp: 11 },
+  'eip155:146': { wormhole: 52, cctp: 13 },
+  'eip155:999': { wormhole: 47, cctp: 19 },
+  'eip155:143': { wormhole: 48, cctp: 15 },
+}
+
+/**
+ * Jupiter v6 swaps the guard follows inside a bridge transaction: the account position of the swap's output (the
+ * optional `destinationTokenAccount`, which is the Jupiter program id when absent, else the user's destination).
+ */
+const JUPITER_ROUTES: Readonly<Record<string, { optional?: number; destination: number }>> = {
+  bb64facc31c4af14: { optional: 7, destination: 2 }, // route_v2
+  d19853937cfed8e9: { destination: 5 }, // shared_accounts_route_v2
+  e517cb977ae3ad2a: { optional: 4, destination: 3 }, // route
+  c1209b3341d69c81: { destination: 6 }, // shared_accounts_route
+}
+
+const BRIDGE_PLUMBING = new Set<string>([COMPUTE_BUDGET_PROGRAM_ADDRESS, MEMO_PROGRAM_ADDRESS, MEMO_V1_PROGRAM_ADDRESS, LIFI_TRACKING_PROGRAM_ADDRESS])
+const WSOL_PLUMBING = new Set(['SyncNative', 'InitializeImmutableOwner', 'GetAccountDataSize', 'AmountToUiAmount', 'UiAmountToAmount'])
+
+/** A top-level instruction as it runs (Mayan's CPI proxy unwrapped), with every account resolved. */
+export interface RunInstruction { program: string; accounts: readonly string[]; data: Uint8Array }
+
+/** What a bridge check needs to know about the wallet's own accounts. */
+export interface BridgeOutContext {
+  wallet: string
+  /** The token-account owner of `address` from its pre-state, or from an ATA creation in the same transaction. */
+  tokenAccountOwner: (address: string) => string | undefined
+  /** Most lamports / input tokens that may leave the wallet (the fee bound is a share of it). */
+  maxLamportsOut: bigint
+  maxTokenOut?: bigint
+}
+
+const u16le = (d: Uint8Array, at: number) => d[at]! | (d[at + 1]! << 8)
+const u32le = (d: Uint8Array, at: number) => (d[at]! | (d[at + 1]! << 8) | (d[at + 2]! << 16) | (d[at + 3]! << 24)) >>> 0
+
+/**
+ * Why a bridge transaction does not provably deliver to `bridgeOut.recipient`, or undefined when every instruction is
+ * one the guard follows and every bridge order names the recipient (see {@link SerializedExpectation.bridgeOut}).
+ * `items` is the description of `instructions`, index by index.
+ */
+export function bridgeOutRefusal(
+  instructions: readonly RunInstruction[],
+  items: readonly DecodedInstruction[],
+  bridgeOut: BridgeOutExpectation,
+  ctx: BridgeOutContext,
+): { message: string; code: string; detail: string } | undefined {
+  const refuse = (code: string, detail: string, message: string) => ({ code, detail, message })
+  const chain = MAYAN_CHAINS[bridgeOut.destChain]
+  if (!/^0x[0-9a-fA-F]{40}$/.test(bridgeOut.recipient)) return refuse('bridge-recipient', bridgeOut.recipient, `The bridge recipient ${bridgeOut.recipient || '(none)'} is not an EVM address; its bridge instruction cannot be checked.`)
+  const want = `${'00'.repeat(12)}${bridgeOut.recipient.slice(2).toLowerCase()}`
+  const fees = new Set(bridgeOut.feeWallets ?? [LIFI_FEE_WALLET_ADDRESS])
+  const own = (address: string) => address === ctx.wallet || ctx.tokenAccountOwner(address) === ctx.wallet
+  const feeAccount = (address: string) => fees.has(address) || fees.has(ctx.tokenAccountOwner(address) ?? '')
+
+  // 1. Bridge orders: each must name the recipient on the destination chain; their vaults may receive the input.
+  const bridgeAccounts = new Set<string>()
+  let orders = 0
+  for (let i = 0; i < instructions.length; i++) {
+    const ix = instructions[i]!
+    if (!MAYAN_ORDER_PROGRAMS.has(ix.program)) continue
+    const hex = hexOf(ix.data.subarray(0, 8))
+    if (ix.data.length === 8 && MAYAN_ORDER_FOLLOW_UPS.has(hex)) continue
+    const layout = MAYAN_ORDERS.find((o) => o.disc === hex && o.length === ix.data.length)
+    if (!layout) return refuse('bridge-instruction', ix.program, `Instruction ${i} (${ix.program}, data ${hex}…) is no Mayan order the guard can read.`)
+    const dest = layout.chain === 'wormhole' ? u16le(ix.data, layout.chainAt) : u32le(ix.data, layout.chainAt)
+    const expected = layout.chain === 'wormhole' ? chain?.wormhole : chain?.cctp
+    if (expected === undefined || dest !== expected) return refuse('bridge-recipient', String(dest), `The ${layout.name} order bridges to ${layout.chain} chain ${dest}, not ${bridgeOut.destChain}.`)
+    const recipient = hexOf(ix.data.subarray(layout.recipientAt, layout.recipientAt + 32))
+    if (recipient !== want) return refuse('bridge-recipient', recipient, `The ${layout.name} order pays 0x${recipient}, not ${bridgeOut.recipient}.`)
+    if (ix.accounts[0] !== ctx.wallet) return refuse('bridge-recipient', ix.accounts[0] ?? '', `The ${layout.name} order names ${ix.accounts[0] ?? 'no account'} as its trader, not this wallet.`)
+    const vault = ix.accounts[layout.vaultAt]
+    if (vault === undefined) return refuse('bridge-instruction', ix.program, `The ${layout.name} order has no account ${layout.vaultAt}.`)
+    bridgeAccounts.add(vault)
+    orders++
+  }
+  if (orders === 0) return refuse('bridge-missing', bridgeOut.recipient, `The transaction carries no bridge order paying ${bridgeOut.recipient} on ${bridgeOut.destChain}.`)
+
+  // 2. Everything else stays with the wallet, goes into the bridge, or pays a bounded fee.
+  let feeLamports = 0n
+  let feeTokens = 0n
+  for (let i = 0; i < instructions.length; i++) {
+    const ix = instructions[i]!
+    const it = items[i]
+    if (MAYAN_ORDER_PROGRAMS.has(ix.program) || BRIDGE_PLUMBING.has(ix.program)) continue
+    switch (it?.type) {
+      case 'sol-transfer':
+        if (own(it.to) || bridgeAccounts.has(it.to)) continue
+        if (fees.has(it.to)) { feeLamports += it.lamports; continue }
+        return refuse('bridge-payee', it.to, `Instruction ${i} sends ${it.lamports} lamports to ${it.to}, which is neither this wallet, the bridge nor a fee wallet.`)
+      case 'token-transfer':
+        if (own(it.destination) || bridgeAccounts.has(it.destination)) continue
+        if (feeAccount(it.destination)) { feeTokens += it.amount; continue }
+        return refuse('bridge-payee', it.destination, `Instruction ${i} sends ${it.amount} tokens to ${it.destination}, which is neither this wallet, the bridge nor a fee wallet.`)
+      case 'ata-create':
+      case 'close-account': // the rent comes back to this wallet (checked with the authorities)
+      case 'compute-budget':
+        continue
+      case 'program-call':
+        if ((ix.program === TOKEN_PROGRAM_ADDRESS || ix.program === TOKEN_2022_PROGRAM_ADDRESS) && it.instruction && WSOL_PLUMBING.has(it.instruction)) continue
+        break
+    }
+    if (ix.program === JUPITER_V6_PROGRAM_ADDRESS) {
+      const route = JUPITER_ROUTES[hexOf(ix.data.subarray(0, 8))]
+      const optional = route?.optional !== undefined ? ix.accounts[route.optional] : undefined
+      const out = route ? (optional !== undefined && optional !== JUPITER_V6_PROGRAM_ADDRESS ? optional : ix.accounts[route.destination]) : undefined
+      if (out !== undefined && (own(out) || bridgeAccounts.has(out))) continue
+      return refuse('bridge-payee', out ?? ix.program, out ? `Instruction ${i} swaps into ${out}, which is neither this wallet nor the bridge.` : `Instruction ${i} is a Jupiter call whose output the guard cannot read.`)
+    }
+    return refuse('bridge-instruction', ix.program, `Instruction ${i} (${it?.type === 'program-call' && it.instruction ? it.instruction : 'program'} on ${ix.program}) has no place in a bridge the guard can follow.`)
+  }
+  if (feeLamports * 10_000n > ctx.maxLamportsOut * BRIDGE_FEE_MAX_BPS) return refuse('bridge-fee', String(feeLamports), `The transaction pays ${feeLamports} lamports in fees, more than ${BRIDGE_FEE_MAX_BPS / 100n}% of the ${ctx.maxLamportsOut} that may leave.`)
+  if (feeTokens > 0n && (ctx.maxTokenOut === undefined || feeTokens * 10_000n > ctx.maxTokenOut * BRIDGE_FEE_MAX_BPS)) return refuse('bridge-fee', String(feeTokens), `The transaction pays ${feeTokens} input tokens in fees, more than ${BRIDGE_FEE_MAX_BPS / 100n}% of the input.`)
+  return undefined
+}

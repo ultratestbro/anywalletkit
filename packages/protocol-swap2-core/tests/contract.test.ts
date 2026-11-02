@@ -402,14 +402,18 @@ describe("core public contract", () => {
       tokenIn: {token: SOL_USDC, minAmount: "980000"},
     }}]);
     // (b) USDT → Ethereum (bridge): nothing arrives here, so no tokenIn; only
-    // the configured allowance of SOL and exactly the input of USDT may leave.
+    // the configured allowance of SOL and exactly the input of USDT may leave,
+    // and the account must prove it all goes to the recipient on that chain.
     serialized.length = 0;
     const bridge = new SerialProtocol(account, {fromChain: "solana:mainnet", serializedNativeAllowance: 5_000_000n});
     await expect(bridge.swap2({
       fromToken: "USDT", toToken: "0xdac17f958d2ee523a2206206994597c13d831ec7", toChain: 1,
       recipient: "0x3333333333333333333333333333333333333333", fromTokenAmount: 1_000_000n, minAmountOut: 980_000n,
     })).resolves.toMatchObject({hash: "serial-sig"});
-    expect(serialized).toEqual([{tx: WIRE, expect: {maxValueOut: "5000000", source: {token: SOL_USDT, maxAmount: "1000000"}}}]);
+    expect(serialized).toEqual([{tx: WIRE, expect: {
+      maxValueOut: "5000000", source: {token: SOL_USDT, maxAmount: "1000000"},
+      bridgeOut: {destChain: "eip155:1", recipient: "0x3333333333333333333333333333333333333333"},
+    }}]);
     expect(sent).toHaveLength(0);
     // (c) an account without the hook is refused before anything is sent.
     const plain = {getAddress: account.getAddress, getChainId: account.getChainId, sendTransaction: account.sendTransaction, transfer: account.transfer};

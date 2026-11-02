@@ -336,6 +336,12 @@ export interface SerializedExecutionExpectation {
   tokenIn?: {token: string; minAmount: string};
   /** Token sources: the token the account may send and the exact swap input. */
   source?: {token: string; maxAmount: string};
+  /**
+   * Bridges: the destination chain (CAIP-2) and the reviewed recipient there. Value leaving the account may only go into
+   * the bridge (plus the provider's declared fee), and a bridge instruction whose recipient the account can read must
+   * name this one; an account that cannot prove where the funds go refuses the transaction.
+   */
+  bridgeOut?: {destChain: string; recipient: string};
 }
 
 const DEFAULT_SERIALIZED_NATIVE_ALLOWANCE = 20_000_000n;
@@ -1498,6 +1504,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           // Only a same-chain swap lands in this account; a bridge delivers elsewhere.
           ...(params.destChain === this.fromChain ? {tokenIn: {token: params.destToken, minAmount: q.minDestAmount}} : {}),
           ...(source.contract ? {source: {token: source.contract, maxAmount: q.sourceAmount}} : {}),
+          ...(params.destChain !== this.fromChain ? {bridgeOut: {destChain: params.destChain, recipient: params.destAddress}} : {}),
         };
         sent = await signer.sendSerializedTransaction!(unsigned.serializedTx!, expect);
       } else if (tokenId) {

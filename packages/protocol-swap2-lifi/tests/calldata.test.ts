@@ -1,7 +1,7 @@
 import {describe, expect, it} from "vitest";
 import {encodeFunctionData, toFunctionSelector, type Hex} from "viem";
 import {diamondCallMismatch, type DiamondExpectation} from "../src/calldata.js";
-import {DIAMOND_ABI} from "./fixtures.js";
+import {DIAMOND_ABI, stargateData} from "./fixtures.js";
 
 // Review of round 3 H9: the bridge branch took any selector whose first word looked like an offset
 // (a packed Across call carried a fake BridgeData in its message), and compared the bridged amount
@@ -30,17 +30,19 @@ describe("LI.FI bridge calldata", () => {
     expect(diamondCallMismatch(`0x${d}`, expect_({fromToken: "0x0000000000000000000000000000000000000000", amountIn: 10n ** 18n}))).toMatch(/unknown Diamond call 0x/);
   });
 
-  it("a listed facet with static facet data (RelayDepository) decodes and is checked", () => {
-    const data = encodeFunctionData({abi: DIAMOND_ABI, functionName: "startBridgeTokensViaRelayDepository", args: [bridgeData({asset: USDC, minAmount: 1_000_000_000n, sourceSwaps: false}), {orderId: ZERO32, depositorAddress: VICTIM}]});
+  it("a listed facet (Stargate) decodes and is checked; Relay, whose orderId the Diamond does not bind, is refused", () => {
+    const data = encodeFunctionData({abi: DIAMOND_ABI, functionName: "startBridgeTokensViaStargate", args: [bridgeData({asset: USDC, minAmount: 1_000_000_000n, sourceSwaps: false}), stargateData(VICTIM)]});
     expect(diamondCallMismatch(data, expect_())).toBeNull();
     expect(diamondCallMismatch(data, expect_({receiver: ATTACKER}))).toMatch(/pays/);
+    const relay = encodeFunctionData({abi: DIAMOND_ABI, functionName: "startBridgeTokensViaRelayDepository", args: [bridgeData({asset: USDC, minAmount: 1_000_000_000n, sourceSwaps: false}), {orderId: ZERO32, depositorAddress: VICTIM}]});
+    expect(diamondCallMismatch(relay, expect_())).toMatch(/^Relay delivers to a recipient the transaction does not bind/);
   });
 
   it("after source swaps the bridged amount is the swapped token's: a USDC → WETH → bridge route is accepted", () => {
-    const data = encodeFunctionData({abi: DIAMOND_ABI, functionName: "swapAndStartBridgeTokensViaRelayDepository", args: [
+    const data = encodeFunctionData({abi: DIAMOND_ABI, functionName: "swapAndStartBridgeTokensViaStargate", args: [
       bridgeData({asset: WETH, minAmount: 300_000_000_000_000_000n, sourceSwaps: true}),
       [{callTo: VICTIM, approveTo: VICTIM, sendingAssetId: USDC, receivingAssetId: WETH, fromAmount: 1_000_000_000n, callData: "0x", requiresDeposit: true}],
-      {orderId: ZERO32, depositorAddress: VICTIM},
+      stargateData(VICTIM),
     ]});
     expect(diamondCallMismatch(data, expect_())).toBeNull();
     // the swaps must still spend the input token, at most the input
