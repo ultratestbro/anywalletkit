@@ -118,9 +118,11 @@ reserves) resolves to the deepest one by supplied value; pin another with
 ## Verify
 
 `pnpm test` (fixtures copied from live API responses). `pnpm verify:live
-[address]` reads markets, reserves and vaults from the API, then builds a vault
-deposit and a Lend deposit for the address and runs both through the guard as
-a read-only account (no keys, no writes).
+[address] [rpcUrl] [lendAddress]` reads markets, reserves and vaults from the
+API, then builds a vault deposit and a Lend deposit for the address, and a Lend
+withdraw for a wallet with USDC supplied on the main market, and runs each
+through the guard as a read-only account (no keys, no writes). A holder whose
+USDC account is frozen is named and refused before anything is built.
 
 Program ids: Kamino Lend `KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD`, kVault
 `KvauGMspG5k6rtzrqqn7WNn3oZdyKqLKwK2XWQ8FLjd`, Farms
