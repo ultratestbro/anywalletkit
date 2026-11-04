@@ -114,6 +114,31 @@ function txHashOf(entry: unknown): string | null {
   return typeof h === "string" ? h : null;
 }
 
+/** `units / 10^decimals` as an exact decimal string (no float on the way, so no Hermes bigint trap). */
+function unitsText(units: string, decimals: number): string {
+  const digits = units.replace(/^0+(?=\d)/, "").padStart(decimals + 1, "0");
+  const whole = digits.slice(0, digits.length - decimals);
+  const frac = digits.slice(digits.length - decimals).replace(/0+$/, "");
+  return frac ? `${whole}.${frac}` : whole;
+}
+
+/**
+ * 1Click's amount floors, as a stable text an app can show the user. Two wordings, both HTTP 400:
+ * - "Temporary swap limits: minimum swap amount is $1,000" — the USD floors 1Click announces in its
+ *   changelog (2026-09-09: $1,000 on BNB Chain and other chains; 2026-09-14: $100 from Tron), seen
+ *   live 2026-11-04 on Base USDC → BSC USDT and Tron USDT → Base USDC;
+ * - "Amount is too low for bridge, try at least 150000" — a floor in the ORIGIN asset's base units
+ *   (live 2026-11-04: Base USDC → Arbitrum answers it below 150000 and quotes at exactly 150000).
+ * Only digits are taken from 1Click's text; anything else is not a known floor and returns null.
+ */
+function minimumRefusal(message: string, origin: {symbol: string; decimals: number}): string | null {
+  const usd = /minimum swap amount is \$([\d,.]+)/i.exec(message)?.[1]?.replace(/[.,]+$/, "");
+  if (usd && /\d/.test(usd)) return `near_intents: below the 1Click minimum ($${usd})`;
+  const units = /amount is too low for bridge, try at least (\d{1,78})\b/i.exec(message)?.[1];
+  if (units) return `near_intents: below the 1Click minimum (at least ${unitsText(units, origin.decimals)} ${origin.symbol})`;
+  return null;
+}
+
 /** Explicit constructor configuration; no deployment environment is read. */
 export interface NearIntentsProviderConfig {
   enabled?: boolean;
@@ -208,11 +233,13 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
       // Every refusal below names itself: on the server these lines are the
       // only visibility into WHY a live quote returned null (the wire answer
       // is just `null`), and "no route" bugs hide in exactly that silence.
-      const refuse = (reason: string): null => {
+      // `shown`, when given, is the user-presentable text the caller hands on (a router rejection,
+      // the server's {noQuote}); the log line keeps the debug suffix either way.
+      const refuse = (reason: string, shown?: string): null => {
         const detail = `${reason} [dry=${params.dry !== false} ${params.sourceChain}->${params.destChain} amount=${params.amountIn}]`;
         // Caller fields and 1Click text are untrusted: no control characters in server logs.
         console.warn(`near-intents: no quote — ${detail.replace(/[\u0000-\u001f\u007f]/g, " ")}`);
-        params.onRefusal?.(detail);
+        params.onRefusal?.(shown ?? detail);
         return null;
       };
       // Up-front, named refusals — no wire call for a corridor 1Click cannot
@@ -291,7 +318,12 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
           if (!flaky || attempt >= 2 || signal?.aborted) break;
           await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
         }
-        if (!res?.ok) return refuse(`1Click ${res?.status ?? "network error"}: ${String(data.message ?? "").slice(0, 200)}`);
+        if (!res?.ok) {
+          const message = String(data.message ?? "").slice(0, 200);
+          // A known amount floor goes out as a stable, presentable reason; any other answer keeps the raw text.
+          const below = res?.status === 400 ? minimumRefusal(message, origin) : null;
+          return refuse(`1Click ${res?.status ?? "network error"}: ${message}`, below ?? undefined);
+        }
         const q = (data.quote ?? {}) as Record<string, unknown>;
 
         const depositAddress = typeof q.depositAddress === "string" ? q.depositAddress : "";
