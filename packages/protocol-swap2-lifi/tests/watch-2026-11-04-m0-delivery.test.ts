@@ -65,6 +65,13 @@ describe("watch 2026-11-04: an M0 order's tokenOut and amountOut are held to the
     expect(diamondCallMismatch(start, e)).toBe(`the M0 order asks for ${e.minOut - 1n}, below the ${e.minOut} shown`);
   });
 
+  it("an order for the native token is refused, even when tokenOut is zero to match it (M0Facet refuses that too)", () => {
+    const ZERO = "0x0000000000000000000000000000000000000000";
+    const native = {...e, toToken: ZERO};
+    expect(diamondCallMismatch(forge({tokenOut: pad(ZERO)}), native)).toBe("an M0 order cannot deliver the native token");
+    expect(diamondCallMismatch(live.transactionRequest.data, native)).toBe("an M0 order cannot deliver the native token");
+  });
+
   it("the provider and the remote pin refuse the live quote with amountOut lowered", async () => {
     const replay = (data: Hex) => vi.stubGlobal("fetch", async (u: URL) => new Response(JSON.stringify({
       ...live, action: {...live.action, slippage: Number(new URL(String(u)).searchParams.get("slippage"))}, transactionRequest: {...live.transactionRequest, data},

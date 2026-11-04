@@ -99,11 +99,16 @@ describe("watch 2026-11-04: routeWideSlippage sends slippageScope=route on EVM â
     expect(bodies[0]!.options).not.toHaveProperty("slippageScope");
   });
 
-  it("on: when LI.FI can protect no route (404 ROUTE_SLIPPAGE_UNSUPPORTED) it is asked once more in its default scope", async () => {
+  it("on: when LI.FI can protect no route (404 ROUTE_SLIPPAGE_UNSUPPORTED) or has the feature off (422 ROUTE_SLIPPAGE_UNAVAILABLE) it is asked once more in its default scope", async () => {
     const unsupported = {message: "No available quotes for the requested transfer", code: 1002, errors: {filteredOut: [{tool: "across", reason: "ROUTE_SLIPPAGE_UNSUPPORTED: the route has a destination swap"}]}};
     const {urls} = record((url) => url.searchParams.get("slippageScope") === "route" ? new Response(JSON.stringify(unsupported), {status: 404}) : new Response(JSON.stringify(response())));
     expect(await lifiProvider({routeWideSlippage: true}).getQuote(PARAMS)).not.toBeNull();
     expect(urls.map((u) => u.searchParams.get("slippageScope"))).toEqual(["route", null]);
+    // LI.FI's other documented reason for the same case: route-wide slippage switched off (422, code 1004, in `message`).
+    const off = {message: "ROUTE_SLIPPAGE_UNAVAILABLE: route-wide slippage is switched off", code: 1004};
+    const third = record((url) => url.searchParams.get("slippageScope") === "route" ? new Response(JSON.stringify(off), {status: 422}) : new Response(JSON.stringify(response())));
+    expect(await lifiProvider({routeWideSlippage: true}).getQuote(PARAMS)).not.toBeNull();
+    expect(third.urls.map((u) => u.searchParams.get("slippageScope"))).toEqual(["route", null]);
     // Any other refusal is the answer, not a reason to drop the scope.
     const other = {message: "ROUTE_SLIPPAGE_FLOOR_UNREACHABLE: no quote reaches the floor", code: 1007};
     const second = record(() => new Response(JSON.stringify(other), {status: 404}));

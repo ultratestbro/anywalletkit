@@ -293,6 +293,8 @@ function acrossSwapRefunds(r: Reader, at: number): Refund[] {
   throw new Error("unknown Across Swap API target");
 }
 
+/** The EVM native-token placeholder (the zero address) in the quote's destination token. */
+const isZeroAddress = (a: string) => /^0x0{40}$/i.test(a);
 /** ERC-20 `transfer(address,uint256)`. */
 const ERC20_TRANSFER = "0xa9059cbb";
 /**
@@ -308,13 +310,17 @@ const ERC20_TRANSFER = "0xa9059cbb";
  * happen, and the reward (the input) then goes back to refundRecipient, checked above.
  */
 function ecoDelivery(r: Reader, at: number, e: DiamondExpectation): string | null {
+  // A native delivery has no token `transfer` to read (it would be a value call to the recipient), so it is refused
+  // outright — not left to the token comparison below, where a `transfer` "of" the zero address would match.
+  if (isZeroAddress(e.toToken)) return "an Eco route to the native token cannot be checked here";
   const destination = r.word(at + 32 * 3);
   if (destination !== e.destChainId) return `the Eco intent executes on chain ${destination}, not the destination ${e.destChainId} — a route whose delivery cannot be checked here`;
   const route = r.bytes(at, at + 32 * 4);
   const tuple = route.small(0);
   const calls = tuple + route.small(tuple + 32 * 5);
   const n = route.small(calls);
-  if (n === 0 || n > 16) return "the Eco route makes no calls on the destination chain";
+  if (n === 0) return "the Eco route makes no calls on the destination chain";
+  if (n > 16) return `the Eco route makes ${n} calls on the destination chain, more than the 16 read here`;
   const last = calls + 32 + route.small(calls + 32 + 32 * (n - 1));
   const target = route.address(last);
   const data = route.bytes(last, last + 32);
@@ -333,6 +339,8 @@ function ecoDelivery(r: Reader, at: number, e: DiamondExpectation): string | nul
  * output over the quoted input (never below 1×), so the calldata's value is a lower bound there too.
  */
 function m0Delivery(r: Reader, at: number, e: DiamondExpectation): string | null {
+  // M0Facet refuses a zero tokenOut (the OrderBook would escrow the input with nothing to fill): no native delivery.
+  if (isZeroAddress(e.toToken)) return "an M0 order cannot deliver the native token";
   const tokenOut = r.address(at + 32 * 3);
   const amountOut = r.word(at + 32 * 5);
   if (!same(tokenOut, e.toToken)) return `the M0 order asks for ${tokenOut}, not ${e.toToken}`;

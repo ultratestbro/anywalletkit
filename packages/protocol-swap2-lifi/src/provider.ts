@@ -417,7 +417,11 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           const reasons = [...new Set((body?.errors?.filteredOut ?? []).map((f) => f.reason).filter((r): r is string => typeof r === "string"))];
           if (routeScope && [typeof body?.message === "string" ? body.message : "", ...reasons].some((r) => /^ROUTE_SLIPPAGE_(UNSUPPORTED|UNAVAILABLE)/.test(r))) {
             // No route LI.FI can protect route-wide (or the feature is off): its default per-step scope instead,
-            // whose minimum the floor check below still holds to the requested slippage.
+            // whose minimum the floor check below still holds to the requested slippage. Both reasons are LI.FI's
+            // documented stable prefixes (docs.li.fi/api-reference/error-codes, "Route-wide slippage errors";
+            // docs.li.fi/guides/route-wide-slippage#errors): ROUTE_SLIPPAGE_UNSUPPORTED in errors.filteredOut when no
+            // route can be protected, ROUTE_SLIPPAGE_UNAVAILABLE (422, code 1004) in `message` when route-wide
+            // slippage is switched off. This happens before any quote is shown: the user reviews the step-scope one.
             routeScope = false;
             attempt--;
             continue;

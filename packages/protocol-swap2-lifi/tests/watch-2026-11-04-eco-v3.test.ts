@@ -105,4 +105,21 @@ describe("watch 2026-11-04: EcoFacet v3 (intentDestination)", () => {
     expect(r([{target: RECEIVER as Hex, data: "0x", value: 990_000n}])).toBe("the Eco route does not end in a token transfer");
     expect(diamondCallMismatch(call({encodedRoute: "0x1234"}), e)).toMatch(/^the Diamond calldata does not decode/);
   });
+
+  it("a route to the native token is refused outright: no transfer to read, and a transfer \"of\" the zero address does not match it", () => {
+    const native = {...e, toToken: ZERO};
+    const r = (calls: Call[]) => diamondCallMismatch(call({encodedRoute: route(calls)}), native);
+    const why = "an Eco route to the native token cannot be checked here";
+    expect(r([{target: RECEIVER as Hex, data: "0x", value: 990_000n}])).toBe(why);
+    expect(r([transfer(RECEIVER, 990_000n, ZERO)])).toBe(why);
+    expect(diamondCallMismatch(call({encodedRoute: route([transfer(RECEIVER, 990_000n, ZERO)])}, true), native)).toBe(why);
+  });
+
+  it("a route of more than 16 calls is refused with its own reason; 16 ending in the transfer still pass", () => {
+    const approve: Call = {target: USDC_OP as Hex, data: encodeFunctionData({abi: ERC20, functionName: "approve", args: [OTHER as Hex, 1n]}), value: 0n};
+    const r = (calls: Call[]) => diamondCallMismatch(call({encodedRoute: route(calls)}), e);
+    expect(r([...Array<Call>(15).fill(approve), transfer(RECEIVER, 990_000n)])).toBeNull();
+    expect(r([...Array<Call>(16).fill(approve), transfer(RECEIVER, 990_000n)])).toBe("the Eco route makes 17 calls on the destination chain, more than the 16 read here");
+    expect(r([...Array<Call>(40).fill(approve), transfer(RECEIVER, 990_000n)])).toBe("the Eco route makes 41 calls on the destination chain, more than the 16 read here");
+  });
 });
