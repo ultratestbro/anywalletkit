@@ -46,8 +46,9 @@ Amounts are wei (bigint). Without `provider` in the config, reads go to the acco
 | `provider` | the account's RPC | URL, list (failover) or EIP-1193 provider, for reads and simulation. |
 | `reserveBalance` | 10 MON | Left on the wallet by `stake`; at least 10 MON, Monad's reserve balance (value transfers that dip below it revert). |
 | `maxWithdrawId` | `255` | Highest withdrawal slot used and scanned. |
-| `withdrawScan` | `'gap'` | `'gap'` reads withdrawal slots from 0 and stops 32 empty slots past the last used one; `'full'` reads all 256 per validator. |
-| `concurrency` | `6` | Reads in flight (public Monad RPCs cap requests per second; batching counts each call). |
+| `withdrawScan` | `'multicall'` | `'multicall'` reads every withdrawal slot of a validator in one `eth_call` through Multicall3 (falls back to `'full'`); `'gap'` reads slots from 0 and stops 32 empty slots past the last used one; `'full'` reads all 256 per validator, one call each. |
+| `multicallAddress` | `0xcA11…CA11` | Multicall3 for the withdrawal scan and the validator-set reads (the canonical one is deployed on Monad). |
+| `concurrency` | `4` | Reads in flight (public Monad RPCs cap requests per second; JSON-RPC batching counts each call). URL reads retry 4 times on 429, backing off 0.4–3.2 s (or the RPC's `Retry-After`). |
 | `enrich` | — | `(ids) => ({ [id]: { apr, name, … } })`: an explorer's APR, names, logos. Decoration only. |
 | `stakingAddress` / `timeoutMs` | `0x…1000` / 15 s | |
 
@@ -80,8 +81,9 @@ activatesAtEpoch }`, `listValidators`, `getValidator`, `listPositions`, `nextWit
 ## APR
 
 `apr` is 18 MON per block × blocks per year ÷ the consensus set's stake × (1 − commission). The block
-time is measured over the last 50 000 blocks; the stake is summed over the consensus set (one read
-per validator, cached). It assumes the validator proposes its share of blocks; pass `enrich` for a
+time is measured over the last 50 000 blocks; the stake is summed over the consensus set (every
+`getValidator` through Multicall3, 100 per `eth_call`, cached a minute; one read per validator when
+the RPC has no Multicall3). It assumes the validator proposes its share of blocks; pass `enrich` for a
 measured figure.
 
 ## Safety
@@ -92,7 +94,8 @@ measured figure.
   on Monad (or on the pinned chain).
 - Every write is simulated with `eth_call` as the wallet first, and the precompile's revert comes back
   in plain words (`withdrawal not ready`, `insufficient stake`, `reserve balance violation`, …).
-- The module never uses multicall, STATICCALL or EIP-7702 against the precompile (all revert there).
+- Writes never go through multicall, STATICCALL or EIP-7702 (the precompile rejects them). Reads may:
+  Multicall3's `aggregate3` reaches the precompile with a plain CALL, which it answers.
 - Policies: the transactions go to `0x0000000000000000000000000000000000001000`; an `allowlist` must
   include it.
 - **Full exits.** Once the wallet's stake with a validator reaches zero, the precompile drops that
@@ -100,8 +103,9 @@ measured figure.
   listed validators and those this instance undelegated from; in `'any'` mode keep the `id` that
   `requestWithdrawal` returns (`claimWithdrawals({ ids })` always works) or pass the validator in
   `validators` (the activity feed has it).
-- Reading withdrawals costs one `eth_call` per slot: the gap scan reads about 36 slots for a validator
-  without withdrawals; `withdrawScan: 'full'` reads all 256. Pass `validator` to read one position.
+- Reading withdrawals costs one `eth_call` per validator with the default `'multicall'` scan; without
+  Multicall3 it is one per slot (the gap scan reads about 36 slots for a validator without
+  withdrawals, `'full'` all 256). Pass `validator` to read one position.
 - Validator data for display is cached for a minute; every write decision reads the validator again.
 
 ## Testing

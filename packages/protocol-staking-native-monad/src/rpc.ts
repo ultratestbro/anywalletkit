@@ -10,14 +10,34 @@ export type MonadProvider = string | Eip1193Provider
 
 /** Default per-request timeout for URL providers. */
 export const DEFAULT_TIMEOUT_MS = 15_000
-/** Reads in flight at once: public Monad RPCs cap requests per second, and batching does not help (each call counts). */
-export const DEFAULT_CONCURRENCY = 6
+/**
+ * Reads in flight at once: public Monad RPCs cap requests per second, and JSON-RPC batching does not
+ * help (each call counts). 4 measured ~43 rps with no 429 on rpc.monad.xyz; 6 drew 15 % 429s.
+ */
+export const DEFAULT_CONCURRENCY = 4
+/** Retries of a URL read, backing off 400, 800, 1600, 3200 ms (or the RPC's Retry-After): a 429 waits past a 1 s rate window. */
+export const RETRY_COUNT = 4
+export const RETRY_DELAY_MS = 400
 
 /** A viem client over one provider or a list (fails over in order, like the account's own client). */
 export function createReadClient(providers: MonadProvider[], timeoutMs = DEFAULT_TIMEOUT_MS): PublicClient | undefined {
   if (providers.length === 0) return undefined
-  const one = (p: MonadProvider): Transport => (typeof p === 'string' ? http(p, { timeout: timeoutMs, retryCount: 2 }) : custom(p))
+  const one = (p: MonadProvider): Transport => (typeof p === 'string' ? http(p, { timeout: timeoutMs, retryCount: RETRY_COUNT, retryDelay: RETRY_DELAY_MS }) : custom(p))
   return createPublicClient({ transport: providers.length === 1 ? one(providers[0]!) : fallback(providers.map(one)), ccipRead: false })
+}
+
+/** Whether an RPC error is a rate limit: HTTP 429, JSON-RPC 429 or -32007 (a request-limit code), or the words. */
+export function isRateLimited(error: unknown): boolean {
+  let node: unknown = error
+  for (let i = 0; i < 8 && node && typeof node === 'object'; i++) {
+    const e = node as Record<string, unknown>
+    if (e.status === 429 || e.code === 429 || e.code === -32007) return true
+    for (const k of ['message', 'shortMessage', 'details']) {
+      if (typeof e[k] === 'string' && /\b429\b|too many requests|rate limit/i.test(e[k] as string)) return true
+    }
+    node = e.cause
+  }
+  return false
 }
 
 /** Maps `items` with at most `limit` calls in flight, keeping the order. */
