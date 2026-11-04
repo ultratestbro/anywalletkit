@@ -3,7 +3,7 @@ export type { KaminoVaultConfig, KaminoVaultSupplyOptions, KaminoVaultWithdrawOp
 export { KaminoMarketProtocolSolana } from './market.js'
 export type { KaminoMarketConfig, KaminoMarketWithdrawOptions, KaminoMarketRepayOptions, ReserveInfo, MarketInfo, MarketPosition, MarketQuote } from './market.js'
 export { KaminoApi, KAMINO_API, MAIN_MARKET, WITHDRAW_ALL } from './api.js'
-export type { ApiMarket, ApiReserve, ApiVault, ApiVaultAllocation, ApiVaultMetrics, ApiVaultPosition, ApiObligation, ApiLoanLeg, KtxVaultDeposit, KtxVaultWithdraw, KtxLend } from './api.js'
+export type { ApiMarket, ApiReserve, ApiVault, ApiVaultAllocation, ApiVaultMetrics, ApiVaultPosition, ApiObligation, ApiObligationState, ApiLoanLeg, KtxVaultDeposit, KtxVaultWithdraw, KtxLend } from './api.js'
 export { KaminoBase, SOLANA_MAINNET, WSOL_MINT, DEFAULT_RENT_ALLOWANCE, DEFAULT_FIRST_DEPOSIT_ALLOWANCE, KNOWN_DECIMALS } from './base.js'
 export type { KaminoBaseConfig, Expectation, SerializedGuard } from './base.js'
 export { KaminoError } from './errors.js'
@@ -14,9 +14,9 @@ export { toAmount, toDecimalString, fromDecimalString, toWad, mulWad, divWadUp, 
 export type { AmountOption } from './amounts.js'
 export { vanillaObligation, vaultSharesMint, findProgramAddress, associatedTokenAddress, farmUserState } from './pda.js'
 export {
-  decodeVault, decodeReserve, decodeObligation, decodeFarmUser, vaultTokensPerShareWad, depositedLiquidity, debtNow, CHAIN_TOLERANCE_BPS,
+  decodeVault, decodeReserve, decodeObligation, decodeFarmUser, vaultTokensPerShareWad, depositedLiquidity, debtNow, depositLegLiquidity, debtLegNow, CHAIN_TOLERANCE_BPS,
 } from './chain.js'
-export type { ChainAccount, VaultChain, ReserveChain, ObligationChain } from './chain.js'
+export type { ChainAccount, VaultChain, ReserveChain, ObligationChain, ObligationLegs } from './chain.js'
 export { marketRules, vaultRules, plumbing, IX } from './policy.js'
 export type { InstructionRule, MarketRuleAccounts, VaultRuleAccounts } from './policy.js'
 export type { SolanaAccountSurface } from './base.js'

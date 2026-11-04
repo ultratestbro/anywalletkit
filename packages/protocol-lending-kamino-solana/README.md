@@ -63,9 +63,15 @@ from its shares account and farm stake, a Lend 'max' from the obligation
 (debt with the reserve's accrued interest), and the reserve the API names
 must be this market's and lend that token. An API figure that disagrees —
 a `tokensPerShare` more than 1 % off, a reported deposit or debt that is not
-the obligation's, any negative figure — is refused, never used. Reads
-(`getVault`, `getPosition`, APY, TVL) stay the API's; mint decimals are read
-when the account has an RPC, else taken from a table of Kamino's listed mints.
+the obligation's (the API's per-token legs, or the cTokens and scaled debt in
+its raw obligation `state`, valued at the reserves' on-chain rates), any
+negative figure — is refused, never used. A Lend market's `getPosition` reads
+the wallet's obligations from the chain too: the API only names them (each
+must be the wallet's on this market; the vanilla one is read even when the
+API leaves it out), and every leg is what it redeems for, or owes, at its
+reserve's on-chain rate. Other reads (`getVault`, a vault's `getPosition`,
+APY, TVL, LTVs, USD values) stay the API's; mint decimals are read when the
+account has an RPC, else taken from a table of Kamino's listed mints.
 
 ## Usage
 
@@ -95,7 +101,7 @@ const market = new KaminoMarketProtocolSolana(account)          // Main Market
 await market.getReserves()                   // symbol, mint, supply / borrow APY (%), max LTV, TVL, utilization
 await market.supply({ token: USDC, amount: 5_000_000n })        // collateral on the wallet's obligation
 await market.borrow({ token: USDC, amount: 1_000_000n })
-await market.getPosition()                   // { obligations, supplied: {mint: units}, borrowed }
+await market.getPosition()                   // { obligations, supplied: {mint: units}, borrowed } — from the chain
 await market.repay({ token: USDC, amount: 'max' })
 await market.withdraw({ token: USDC, amount: 'max' })
 ```
@@ -118,9 +124,13 @@ reserves) resolves to the deepest one by supplied value; pin another with
 ## Verify
 
 `pnpm test` (fixtures copied from live API responses). `pnpm verify:live
-[address]` reads markets, reserves and vaults from the API, then builds a vault
-deposit and a Lend deposit for the address and runs both through the guard as
-a read-only account (no keys, no writes).
+[address] [rpcUrl] [lendAddress]` reads markets, reserves and vaults from the
+API, then builds a vault deposit and a Lend deposit for the address, and a Lend
+withdraw for a wallet with USDC supplied on the main market, and runs each
+through the guard as a read-only account (no keys, no writes); that wallet's
+`getPosition` must match its obligation on chain. A holder whose USDC account
+is frozen is named and refused before anything is built; one without USDC
+skips the deposits and still runs the withdraw.
 
 Program ids: Kamino Lend `KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD`, kVault
 `KvauGMspG5k6rtzrqqn7WNn3oZdyKqLKwK2XWQ8FLjd`, Farms

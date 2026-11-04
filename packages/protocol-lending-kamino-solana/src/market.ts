@@ -1,8 +1,11 @@
 import type { BorrowOptions, IWalletAccount, IWalletAccountReadOnly, LendingQuote, LendingResult, RepayOptions, SupplyOptions, WithdrawOptions } from '@anywalletkit/core'
-import { MAIN_MARKET, type ApiMarket, type ApiObligation, type ApiReserve } from './api.js'
+import { MAIN_MARKET, type ApiLoanLeg, type ApiMarket, type ApiObligation, type ApiReserve } from './api.js'
 import { fromDecimalString, lessBps, toAmount, toDecimalString, type AmountOption } from './amounts.js'
 import { DEFAULT_FIRST_DEPOSIT_ALLOWANCE, KaminoBase, WSOL_MINT, type KaminoBaseConfig } from './base.js'
-import { debtNow, decodeObligation, decodeReserve, depositedLiquidity, oneCtokenLiquidityUp, withinTolerance, type ObligationChain, type ReserveChain } from './chain.js'
+import {
+  debtLegNow, debtNow, decodeObligation, decodeReserve, depositLegLiquidity, depositedLiquidity, oneCtokenLiquidityUp, withinTolerance,
+  type ObligationChain, type ObligationLegs, type ReserveChain,
+} from './chain.js'
 import { KaminoError } from './errors.js'
 import { associatedTokenAddress, vanillaObligation } from './pda.js'
 import { marketRules, type InstructionRule } from './policy.js'
@@ -32,12 +35,18 @@ export interface ReserveInfo extends ApiReserve {
 export interface MarketInfo extends ApiMarket { reserves: ReserveInfo[] }
 
 export interface MarketPosition {
-  /** The obligations (loans) the wallet has in this market; an empty list means no position. */
+  /**
+   * The obligations (loans) the wallet has in this market, as they stand on chain; an empty list means
+   * no position. Their `deposits` / `borrows` legs are the chain's, each naming its reserve; LTVs and
+   * USD values stay the API's.
+   */
   obligations: ApiObligation[]
-  /** Base units per mint, summed over obligations. */
+  /** Base units per mint, summed over obligations, from the chain (debt with the interest the reserve has accrued). */
   supplied: Record<string, bigint>
   borrowed: Record<string, bigint>
 }
+
+const ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 
 export interface MarketQuote extends LendingQuote { reserve: string; minReceived?: bigint }
 
@@ -72,7 +81,7 @@ export class KaminoMarketProtocolSolana extends KaminoBase<KaminoMarketConfig> {
   constructor(account: IWalletAccountReadOnly | IWalletAccount, config: KaminoMarketConfig = {}) {
     super(account, config)
     this.market = config?.market ?? MAIN_MARKET
-    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(this.market)) throw new KaminoError("'market' must be the lending market's address.")
+    if (!ADDRESS.test(this.market)) throw new KaminoError("'market' must be the lending market's address.")
     this.firstDepositAllowance = config?.firstDepositAllowanceLamports === undefined ? DEFAULT_FIRST_DEPOSIT_ALLOWANCE : BigInt(config.firstDepositAllowanceLamports)
   }
 
@@ -111,16 +120,64 @@ export class KaminoMarketProtocolSolana extends KaminoBase<KaminoMarketConfig> {
     return candidates[0]!
   }
 
-  /** Obligations and per-mint totals. */
+  /**
+   * Obligations and per-mint totals, read from the chain (watch 2026-11-04: the live API now answers
+   * `deposits: {}` / `borrows: {}` and keeps the legs in its raw `state`, so its figures said "no
+   * position" for wallets with millions supplied). The API only names the wallet's obligations; each
+   * is read from the chain and must be the wallet's on this market, and the wallet's vanilla obligation
+   * is read even when the API leaves it out. A listed obligation that no longer exists is closed.
+   * Amounts are what each leg redeems for, or owes, at its reserve's on-chain rate.
+   */
   async getPosition(): Promise<MarketPosition> {
     const me = await this.me()
-    const obligations = await this.api.getUserObligations(this.market, me)
+    const rows = await this.api.getUserObligations(this.market, me)
+    const vanilla = vanillaObligation(me, this.market, KLEND_PROGRAM)
+    const addresses = [...new Set([...rows.map((r) => r.obligation).filter((a) => ADDRESS.test(a)), vanilla])]
+    const accounts = await this.readChain(addresses)
+    const onChain: Array<[string, ObligationChain]> = []
+    addresses.forEach((address, i) => {
+      const acc = accounts[i]
+      if (!acc) return
+      const o = decodeObligation(address, acc)
+      if (o.owner !== me || o.lendingMarket !== this.market) throw new KaminoError(`Obligation ${address} is not ${me}'s on market ${this.market}.`)
+      onChain.push([address, o])
+    })
+    const reserves = await this.chainReserves(onChain.flatMap(([, o]) => [...o.deposits, ...o.borrows].map((l) => l.reserve)))
+    const symbols = onChain.length ? new Map((await this.getReserves()).map((r) => [r.reserve, r.symbol])) : new Map<string, string>()
     const supplied: Record<string, bigint> = {}, borrowed: Record<string, bigint> = {}
-    for (const o of obligations) {
-      for (const d of o.deposits) if (d.mint) supplied[d.mint] = (supplied[d.mint] ?? 0n) + fromDecimalString(d.amount, await this.decimals(d.mint))
-      for (const b of o.borrows) if (b.mint) borrowed[b.mint] = (borrowed[b.mint] ?? 0n) + fromDecimalString(b.amount, await this.decimals(b.mint))
-    }
+    const obligations = onChain.map(([address, o]): ApiObligation => {
+      const row = rows.find((r) => r.obligation === address)
+      const leg = (reserve: string, amount: bigint, side: 'deposits' | 'borrows', totals: Record<string, bigint>): ApiLoanLeg => {
+        const r = reserves.get(reserve)!
+        totals[r.mint] = (totals[r.mint] ?? 0n) + amount
+        // The API prices per mint: its USD figure fits the leg only when the leg is that mint's one.
+        const priced = row?.[side].filter((l) => l.mint === r.mint) ?? []
+        const alone = o[side].filter((l) => reserves.get(l.reserve)!.mint === r.mint).length === 1
+        return { mint: r.mint, symbol: symbols.get(reserve) ?? priced[0]?.symbol ?? '', amount: toDecimalString(amount, r.decimals), valueUsd: alone && priced.length === 1 ? priced[0]!.valueUsd : '', reserve }
+      }
+      const deposits = o.deposits.map((d) => leg(d.reserve, depositLegLiquidity(reserves.get(d.reserve)!, d.ctokens), 'deposits', supplied))
+      const borrows = o.borrows.map((b) => leg(b.reserve, debtLegNow(reserves.get(b.reserve)!, b), 'borrows', borrowed))
+      const base: ApiObligation = row ?? { obligation: address, market: this.market, user: me, elevationGroup: 0, deposits: [], borrows: [], state: null, currentLtv: 0, maxLtv: null, liquidationLtv: 0, raw: null }
+      return { ...base, deposits, borrows }
+    })
     return { obligations, supplied, borrowed }
+  }
+
+  /**
+   * Reserves of this market from the chain, keyed by address: each must be a klend Reserve on this
+   * market. `known` (already read) is reused and filled in.
+   */
+  private async chainReserves(addresses: readonly string[], known: Map<string, ReserveChain> = new Map()): Promise<Map<string, ReserveChain>> {
+    const missing = [...new Set(addresses)].filter((a) => !known.has(a))
+    if (missing.length) {
+      const accs = await this.readChain(missing)
+      missing.forEach((a, i) => {
+        const r = decodeReserve(a, accs[i] ?? null)
+        if (r.lendingMarket !== this.market) throw new KaminoError(`Reserve ${a} belongs to market ${r.lendingMarket} on chain, not ${this.market}.`)
+        known.set(a, r)
+      })
+    }
+    return known
   }
 
   /**
@@ -165,30 +222,42 @@ export class KaminoMarketProtocolSolana extends KaminoBase<KaminoMarketConfig> {
     const o = c.obligation
     const amount = !o ? 0n : side === 'supplied' ? depositedLiquidity(o, c.reserve, reserve) : debtNow(o, c.reserve, reserve)
     if (amount <= 0n) throw new KaminoError(`Nothing ${side} in ${mint} on market ${this.market}.`)
-    const reported = await this.reported(side, me, mint, c.obligationAddress, c.reserve.decimals)
+    const known = new Map([[reserve, c.reserve]])
+    const reported = await this.reported(side, me, mint, c.obligationAddress, c.reserve.decimals, known)
     if (reported !== undefined) {
       // The API counts per mint; the obligation may hold the mint in more than one reserve.
-      const legs = side === 'supplied' ? o!.deposits : o!.borrows
-      const others = [...new Set(legs.map((l) => l.reserve).filter((r) => r !== reserve))]
-      let perMint = amount
-      if (others.length) {
-        const accs = await this.readChain(others)
-        others.forEach((r, i) => {
-          const rc = decodeReserve(r, accs[i] ?? null)
-          if (rc.mint === mint) perMint += side === 'supplied' ? depositedLiquidity(o!, rc, r) : debtNow(o!, rc, r)
-        })
-      }
+      const perMint = await this.perMint(side, o!, mint, known)
       if (!withinTolerance(reported, perMint)) throw new KaminoError(`Kamino reports ${reported} base units ${side} in ${mint}; obligation ${c.obligationAddress} has ${perMint} on chain.`)
     }
     return amount
   }
 
-  /** The API's figure for one leg of the wallet's vanilla obligation; undefined when it reports none. */
-  private async reported(side: 'supplied' | 'borrowed', me: string, mint: string, obligation: string, decimals: number): Promise<bigint | undefined> {
+  /** What the legs hold in, or owe of, `mint` across every reserve they name, at the reserves' on-chain rates. */
+  private async perMint(side: 'supplied' | 'borrowed', o: ObligationLegs, mint: string, known: Map<string, ReserveChain>): Promise<bigint> {
+    const legs = side === 'supplied' ? o.deposits : o.borrows
+    const reserves = await this.chainReserves(legs.map((l) => l.reserve), known)
+    return [...new Set(legs.map((l) => l.reserve))].reduce((sum, r) => {
+      const rc = reserves.get(r)!
+      return rc.mint !== mint ? sum : sum + (side === 'supplied' ? depositedLiquidity(o, rc, r) : debtNow(o, rc, r))
+    }, 0n)
+  }
+
+  /**
+   * The API's figure for one leg of the wallet's vanilla obligation; undefined when it reports none. Its
+   * decorated per-token legs count when it gives them; the live API (2026-10-28 on) leaves them empty and
+   * keeps the account's legs in the row's raw `state` (cTokens, scaled debt), which are valued at the
+   * reserves' on-chain rates, so a `state` that is not the chain's obligation is refused all the same.
+   */
+  private async reported(side: 'supplied' | 'borrowed', me: string, mint: string, obligation: string, decimals: number, known: Map<string, ReserveChain>): Promise<bigint | undefined> {
     const row = (await this.api.getUserObligations(this.market, me)).find((x) => x.obligation === obligation)
-    const legs = (side === 'supplied' ? row?.deposits : row?.borrows)?.filter((l) => l.mint === mint) ?? []
-    if (!legs.length) return undefined
-    return legs.reduce((sum, l) => sum + fromDecimalString(l.amount, decimals), 0n)
+    if (!row) return undefined
+    const legs = (side === 'supplied' ? row.deposits : row.borrows).filter((l) => l.mint === mint)
+    if (legs.length) return legs.reduce((sum, l) => sum + fromDecimalString(l.amount, decimals), 0n)
+    if (!row.state) return undefined
+    const stateLegs = side === 'supplied' ? row.state.deposits : row.state.borrows
+    const reserves = await this.chainReserves(stateLegs.map((l) => l.reserve), known)
+    if (!stateLegs.some((l) => reserves.get(l.reserve)!.mint === mint)) return undefined
+    return this.perMint(side, row.state, mint, known)
   }
 
   override async quoteSupply(o: SupplyOptions): Promise<MarketQuote> {
