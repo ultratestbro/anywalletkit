@@ -48,7 +48,7 @@ Amounts are wei (bigint). Without `provider` in the config, reads go to the acco
 | `maxWithdrawId` | `255` | Highest withdrawal slot used and scanned. |
 | `withdrawScan` | `'multicall'` | `'multicall'` reads every withdrawal slot of a validator in one `eth_call` through Multicall3 (falls back to `'full'`); `'gap'` reads slots from 0 and stops 32 empty slots past the last used one; `'full'` reads all 256 per validator, one call each. |
 | `multicallAddress` | `0xcA11…CA11` | Multicall3 for the withdrawal scan and the validator-set reads (the canonical one is deployed on Monad). |
-| `concurrency` | `4` | Reads in flight (public Monad RPCs cap requests per second; JSON-RPC batching counts each call). URL reads retry 4 times on 429, backing off 0.4–3.2 s (or the RPC's `Retry-After`). |
+| `concurrency` | `4` | Reads in flight (public Monad RPCs cap requests per second; JSON-RPC batching counts each call). URL reads retry 4 times on a rate limit (HTTP 429, JSON-RPC 429 / -32007), backing off 0.4–3.2 s (or the RPC's `Retry-After`, at most 5 s), and twice on other retryable failures (a timeout, a 5xx), 150 / 300 ms apart. |
 | `enrich` | — | `(ids) => ({ [id]: { apr, name, … } })`: an explorer's APR, names, logos. Decoration only. |
 | `stakingAddress` / `timeoutMs` | `0x…1000` / 15 s | |
 
@@ -82,9 +82,10 @@ activatesAtEpoch }`, `listValidators`, `getValidator`, `listPositions`, `nextWit
 
 `apr` is 18 MON per block × blocks per year ÷ the consensus set's stake × (1 − commission). The block
 time is measured over the last 50 000 blocks; the stake is summed over the consensus set (every
-`getValidator` through Multicall3, 100 per `eth_call`, cached a minute; one read per validator when
-the RPC has no Multicall3). It assumes the validator proposes its share of blocks; pass `enrich` for a
-measured figure.
+`getValidator` through Multicall3, 67 per `eth_call` (~6.9M gas each, under a 10M `eth_call` gas
+cap), cached a minute; one read per validator when the RPC has no Multicall3 or refuses it, and then
+Multicall3 is skipped for 10 minutes). It assumes the validator proposes its share of blocks; pass
+`enrich` for a measured figure.
 
 ## Safety
 

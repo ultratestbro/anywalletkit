@@ -10,7 +10,7 @@ import {
   BLOCK_REWARD, DUST_THRESHOLD, MAX_WITHDRAW_ID, MONAD_CHAIN_IDS, STAKING_PRECOMPILE, USER_RESERVE_BALANCE, type MonadChainId,
 } from './constants.js'
 import { activatesAtEpoch, commissionToPercent, packWithdrawalId, percentToCommission, toValidatorId, toWithdrawId, unpackWithdrawalId, withdrawableAtEpoch } from './encode.js'
-import { DEFAULT_CONCURRENCY, createReadClient, isRateLimited, paginate, pool, type MonadProvider } from './rpc.js'
+import { DEFAULT_CONCURRENCY, createReadClient, isRateLimited, isTransportFailure, paginate, pool, type MonadProvider } from './rpc.js'
 import {
   normalizeValidators, type NormalizedValidators, type ValidatorEnricher, type ValidatorExtra, type ValidatorInfo, type ValidatorRefusal, type ValidatorsOption,
 } from './validators.js'
@@ -29,8 +29,13 @@ export const WITHDRAW_SCAN_GAP = 32
 const MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11' as const
 /** Validator reads kept before expired ones are swept. */
 const VALIDATOR_CACHE_MAX = 512
-/** `getValidator` reads per Multicall3 eth_call (the consensus set is up to 200). */
-const VALIDATOR_BATCH = 100
+/**
+ * `getValidator` reads per Multicall3 eth_call: ~102k gas each (measured on mainnet, 2026-11-04), so
+ * 67 cost ~6.85M gas, under a 10M eth_call gas cap, and the consensus set (up to 200) is 3 eth_calls.
+ */
+export const VALIDATOR_BATCH = 67
+/** How long Multicall3 is skipped after it failed where the plain reads behind it worked, ms. */
+export const MULTICALL_RETRY_MS = 10 * 60_000
 
 /** Configuration of {@link NativeStakingProtocolMonad}. Only `validators` is required. */
 export interface NativeStakingMonadConfig {
@@ -226,6 +231,11 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
   private chainChecked: Promise<MonadChainId> | undefined
   readonly withdrawScan: 'multicall' | 'gap' | 'full'
   private readonly multicallAddress: `0x${string}`
+  /**
+   * Until when Multicall3 is skipped: it failed for a reason other than a rate limit or the transport
+   * (no Multicall3 here, a provider that refuses it, an eth_call gas cap) while the plain reads worked.
+   */
+  private multicallSkipUntil = 0
   private readonly validatorCache = new Map<bigint, { at: number; value: Promise<ValidatorTuple> }>()
   private consensusCache: { at: number; value: Promise<bigint[]> } | undefined
   private networkCache: { at: number; value: Promise<MonadNetworkStats> } | undefined
@@ -372,8 +382,8 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
 
   /**
    * Tuples of many validators, in order, through the same display cache. The ones it lacks are read
-   * through Multicall3, 100 per eth_call and one chunk after the other (a failed chunk stops the
-   * rest), instead of one eth_call per validator (~200 for the consensus set).
+   * through Multicall3, {@link VALIDATOR_BATCH} per eth_call and one chunk after the other (a failed
+   * chunk stops the rest), instead of one eth_call per validator (~200 for the consensus set).
    */
   private validatorTuples(ids: readonly bigint[]): Promise<ValidatorTuple[]> {
     // Synchronous up to the reads: a caller right behind (getNetworkStats next to listValidators) finds them cached.
@@ -397,18 +407,38 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
   /**
    * One chunk of validator tuples in one Multicall3 eth_call. When that call fails (no Multicall3, an
    * EIP-1193 provider or RPC that refuses it) the chunk is read one call each, as before; a rate-limited
-   * multicall fails as it is (100 single reads would only spend more of the limit).
+   * multicall fails as it is (a chunk of single reads would only spend more of the limit).
    */
   private async validatorChunk(ids: readonly bigint[]): Promise<ValidatorTuple[]> {
     const client = this.rpc()
     const contracts = ids.map((id) => ({ address: this.stakingAddress, abi: STAKING_ABI, functionName: 'getValidator' as const, args: [id] as const }))
-    try {
-      const rows = await client.multicall({ contracts: contracts as never, multicallAddress: this.multicallAddress, allowFailure: false, batchSize: 0 })
-      return rows as unknown as ValidatorTuple[]
-    } catch (e) {
-      if (isRateLimited(e)) throw e
-      return await pool(ids, this.concurrency, (id) => this.read<ValidatorTuple>('getValidator', [id]))
+    let failure: unknown
+    if (this.multicallUsable()) {
+      try {
+        const rows = await client.multicall({ contracts: contracts as never, multicallAddress: this.multicallAddress, allowFailure: false, batchSize: 0 })
+        return rows as unknown as ValidatorTuple[]
+      } catch (e) {
+        if (isRateLimited(e)) throw e
+        failure = e
+      }
     }
+    const rows = await pool(ids, this.concurrency, (id) => this.read<ValidatorTuple>('getValidator', [id]))
+    if (failure !== undefined) this.multicallFailed(failure)
+    return rows
+  }
+
+  /** Whether to try Multicall3 now (see {@link multicallSkipUntil}). */
+  private multicallUsable(): boolean {
+    return Date.now() >= this.multicallSkipUntil
+  }
+
+  /**
+   * Called when a multicall failed and the same reads one by one then worked: unless the failure was the
+   * transport's (a timeout, a 5xx), the multicall itself is what fails here, so skip it for a while
+   * instead of spending a failing eth_call on every refresh.
+   */
+  private multicallFailed(error: unknown): void {
+    if (!isTransportFailure(error)) this.multicallSkipUntil = Date.now() + MULTICALL_RETRY_MS
   }
 
   private consensusIds(): Promise<bigint[]> {
@@ -641,6 +671,7 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
    * call fails (no Multicall3 on this chain, an RPC that refuses it): the caller then reads them one by one.
    */
   private async allSlots(id: bigint, me: Address): Promise<Array<{ amount: bigint; withdrawEpoch: bigint }> | null> {
+    if (!this.multicallUsable()) return null
     const contracts = Array.from({ length: this.maxWithdrawId + 1 }, (_, w) => ({ address: this.stakingAddress, abi: STAKING_ABI, functionName: 'getWithdrawalRequest' as const, args: [id, me, w] as const }))
     try {
       const rows = await this.rpc().multicall({ contracts: contracts as never, multicallAddress: this.multicallAddress, allowFailure: false, batchSize: 0 })
