@@ -143,7 +143,7 @@ export class KaminoMarketProtocolSolana extends KaminoBase<KaminoMarketConfig> {
       onChain.push([address, o])
     })
     const reserves = await this.chainReserves(onChain.flatMap(([, o]) => [...o.deposits, ...o.borrows].map((l) => l.reserve)))
-    const symbols = onChain.length ? new Map((await this.getReserves()).map((r) => [r.reserve, r.symbol])) : new Map<string, string>()
+    const symbols = onChain.length ? new Map((await this.getReserves().catch(() => [] as ReserveInfo[])).map((r) => [r.reserve, r.symbol])) : new Map<string, string>()
     const supplied: Record<string, bigint> = {}, borrowed: Record<string, bigint> = {}
     const obligations = onChain.map(([address, o]): ApiObligation => {
       const row = rows.find((r) => r.obligation === address)

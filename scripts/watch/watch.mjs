@@ -399,10 +399,10 @@ async function postTelegram(lines) {
   return true;
 }
 if (SEND && !BASELINE) {
-  if (!changes.length && !errors.length) {
+  if (!changes.length && !errors.length && !repointed.length) {
     if (flag("--quiet-ok")) await postTelegram(`🟢 <b>Module watch · ${TODAY}</b> — ${manifests.length} modules, ${total} sources, no changes.`);
   } else {
-    const h = [`${changes.length ? "🟠" : "🟡"} <b>Module watch · ${TODAY}</b> — ${changes.length} changed, ${errors.length} unreachable of ${total} sources`];
+    const h = [`${changes.length ? "🟠" : "🟡"} <b>Module watch · ${TODAY}</b> — ${changes.length} changed, ${errors.length} unreachable of ${total} sources${repointed.length ? `, ${repointed.length} re-pointed` : ""}`];
     for (const [mod, cs] of byModule(changes)) {
       h.push("", `<b>${esc(slug(mod))}</b>`);
       for (const c of cs) h.push(`• ${c.link ? `<a href="${esc(c.link)}">${esc(c.label)}</a>` : esc(c.label)}: ${esc(c.what)}`);

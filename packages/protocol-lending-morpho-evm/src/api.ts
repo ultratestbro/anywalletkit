@@ -81,7 +81,7 @@ export class MorphoApi {
    * A listing is API data, not a promise that a deposit goes through: caps, Vault V2 gates and the
    * dead-deposit rule are decided on-chain by `MorphoVaultProtocolEvm` (`getDeadDeposit`,
    * `quoteSupply`), which refuses with a typed error before anything is approved. A failed V1 or
-   * V2 query throws; it never shortens the list silently.
+   * V2 query throws; it never shortens the list silently. `first` (default 50) caps the merged list.
    */
   async listVaults(o: { chainId: number; asset?: Address; first?: number; version?: 'v1' | 'v2' }): Promise<ApiVault[]> {
     const where = { chainId_in: [o.chainId], listed: true, ...(o.asset ? { assetAddress_in: [o.asset] } : {}) }
@@ -99,7 +99,7 @@ export class MorphoApi {
         `query($where: VaultV2sFilters, $first: Int) { vaultV2s(first: $first, where: $where, orderBy: TotalAssetsUsd, orderDirection: Desc) { items { ${VAULT_V2_FIELDS} } } }`, { where, first })
       out.push(...d.vaultV2s.items.map((i) => this.v2(i)))
     }
-    return out.sort((a, b) => (b.totalAssetsUsd ?? 0) - (a.totalAssetsUsd ?? 0))
+    return out.sort((a, b) => (b.totalAssetsUsd ?? 0) - (a.totalAssetsUsd ?? 0)).slice(0, first)
   }
 
   /** One vault by address, whichever generation it is; null when the API does not know it. */

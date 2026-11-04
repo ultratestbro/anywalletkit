@@ -318,7 +318,7 @@ if (q.claimableIds.length) await lido.claimWithdrawals({ ids: q.claimableIds })
 const aave = await wallet.getProtocol<AaveProtocolEvm>('aave')
 await aave.getSupplyApy(USDC); await aave.quoteSupply({ token: USDC, amount }); await aave.supply({ token: USDC, amount })
 await aave.withdraw({ token: USDC, amount: 'max' }); await aave.getPosition()  // { supplies, borrows, account: { healthFactor } }
-const [best] = await new MorphoApi().listVaults({ chainId: 8453, asset: USDC_BASE })
+const [best] = await new MorphoApi().listVaults({ chainId: 8453, asset: USDC_BASE })  // V1 or V2; quoteSupply / getDeadDeposit before offering it
 const vault = new MorphoVaultProtocolEvm(baseAccount, { vault: best.address })
 await vault.getApy(); await vault.supply({ amount }); await vault.getPosition(); await vault.withdraw({ amount: 'max' })
 ```
