@@ -388,23 +388,29 @@ function validate (a: Approval | null | undefined): asserts a is Approval {
   if (a.standard === 'permit2') permit2Of(a)
 }
 
+/** A Permit2 approval id as {@link approvalId} builds it, with or without the `@<contract>` suffix. */
+const PERMIT2_ID = /:permit2:0x[0-9a-fA-F]{40}:0x[0-9a-fA-F]{40}(?:@0x[0-9a-fA-F]{40})?$/
+
 /**
  * The Permit2 contract a Permit2 approval lives on, checksummed: its `permit2`, which must be one of the
  * approval's chain's Permit2s (zkSync Era has two). Without `permit2` the `@<contract>` suffix of its `id`
- * names it (an approval kept with the core `Approval` fields only), else the canonical Permit2. Anything
- * else, or a `permit2` the id's suffix contradicts, is refused (`invalid-approval`) — a lockdown is never
- * sent to a contract that is not that chain's Permit2, nor to the wrong one of the two.
+ * names it (an approval kept with the core `Approval` fields only), else the canonical Permit2. An id in
+ * the module's own form (`…:permit2:<token>:<spender>`) without a suffix names the canonical Permit2. Anything
+ * else, or a `permit2` the id contradicts, is refused (`invalid-approval`) — a lockdown is never sent to a
+ * contract that is not that chain's Permit2, nor to the wrong one of the two.
  */
 function permit2Of (a: Approval): string {
   const own = (a as EvmApproval).permit2
-  const suffix = typeof a.id === 'string' ? /@(0x[0-9a-fA-F]{40})$/.exec(a.id)?.[1] : undefined
-  const permit2 = own ?? suffix
+  const id = typeof a.id === 'string' ? a.id : ''
+  const suffix = /@(0x[0-9a-fA-F]{40})$/.exec(id)?.[1]
+  const named = suffix ?? (PERMIT2_ID.test(id) ? PERMIT2_ADDRESS : undefined)
+  const permit2 = own ?? named
   if (permit2 === undefined) return PERMIT2_ADDRESS
   if (typeof permit2 !== 'string' || !isAddress(permit2) || !isPermit2Address(permit2, a.chainId)) {
     throw new ApprovalsError(`${String(permit2)} is not a Permit2 contract on chain ${String(a.chainId)}.`, 'invalid-approval', { approval: a })
   }
-  if (suffix !== undefined && suffix.toLowerCase() !== permit2.toLowerCase()) {
-    throw new ApprovalsError(`The approval's permit2 ${permit2} contradicts its id, which names ${suffix}.`, 'invalid-approval', { approval: a })
+  if (named !== undefined && named.toLowerCase() !== permit2.toLowerCase()) {
+    throw new ApprovalsError(`The approval's permit2 ${permit2} contradicts its id, which names ${named}.`, 'invalid-approval', { approval: a })
   }
   return getAddress(permit2)
 }

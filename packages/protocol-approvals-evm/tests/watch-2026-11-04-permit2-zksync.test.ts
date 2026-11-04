@@ -272,6 +272,27 @@ describe('watch 2026-11-04 permit2-zksync: review follow-ups', () => {
     assert.throws(() => protocol.buildRevokeTransaction([p2({ id: zkId }), p2({})]), refused)
   })
 
+  test('an id in the module\'s form without a suffix names the CREATE2 Permit2: a `permit2` naming the other one is refused', () => {
+    const canonicalId = `324:permit2:${USDC.toLowerCase()}:${ROUTER.toLowerCase()}`
+    assert.equal(protocol.buildRevokeTransaction(p2({ id: canonicalId, permit2: PERMIT2_ADDRESS })).to, PERMIT2_ADDRESS)
+    assert.throws(() => protocol.buildRevokeTransaction(p2({ id: canonicalId, permit2: ZK })), refused)
+    assert.throws(() => protocol.buildRevokeTransaction([p2({ id: zkId, permit2: ZK }), p2({ id: canonicalId, permit2: ZK })]), refused)
+    // an id in another form names nothing: the approval's `permit2` decides
+    assert.equal(protocol.buildRevokeTransaction(p2({ id: 'host-row-7', permit2: ZK })).to, ZK)
+  })
+
+  test('a Permit2 candidate with a malformed `permit2` is dropped alone; the rest of the scan is verified', async () => {
+    const provider = chain(324, [], { [`${ZK}:${USDC}:${ROUTER}`]: 9n })
+    const source = { name: 'stub', collect: async () => ({ complete: true, gaps: [], candidates: [
+      { kind: 'permit2' as const, token: USDC, spender: ROUTER, permit2: 'not an address', block: 1, txHash: HASH, logIndex: 0 },
+      { kind: 'permit2' as const, token: USDC, spender: OTHER, permit2: 42 as unknown as string, block: 1, txHash: HASH, logIndex: 1 },
+      { kind: 'permit2' as const, token: USDC, spender: ROUTER, permit2: ZK, block: 2, txHash: HASH, logIndex: 2 },
+    ] }) }
+    const { approvals } = await new ApprovalsProtocolEvm(account(provider), { multicall: false, source }).getApprovals()
+    assert.deepEqual(approvals.map((a) => [a.id, (a as EvmApproval).permit2]), [[zkId, ZK]])
+    assert.deepEqual(provider.reads, [ZK])
+  })
+
   test('a stray `permit2` on a candidate of another kind is ignored, not read and not fatal', async () => {
     const provider = chain(324, [], {})
     const source = { name: 'stub', collect: async () => ({ complete: true, gaps: [], candidates: [

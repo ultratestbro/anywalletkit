@@ -95,7 +95,7 @@ Etherscan's own "Token Approvals" page lists the **original** allowance from the
 | `revokeAll(approvals)` | full | `RevokeResult[]` — Permit2 pairs fold into one `lockdown` per Permit2 contract; with `config.batch` every calldata revoke goes out as one `sendTransaction(tx[])` (ERC-4337 / 7702 accounts); a failed item carries `error` and the run continues |
 | `buildRevokeTransaction(approval \| approvals[])` | none | `{ to, data, value }` for hosts that batch themselves |
 
-`Approval`: `{ id, standard, chainId, token, spender, amount, unlimited, tokenId?, expiration?, grantedAt?, permit2?, risks }` (`permit2` on Permit2 approvals: the contract holding the allowance). `id` is `chainId:standard:token:spender[:tokenId][@permit2]` and is stable across scans; `@permit2` is there only for an allowance on a Permit2 other than the CREATE2 one (zkSync Era's own). A Permit2 approval without `permit2` is revoked on the contract its `id` names, else the CREATE2 one; a `permit2` the `id` contradicts is refused (`invalid-approval`). Approval objects are plain (structured-clone safe).
+`Approval`: `{ id, standard, chainId, token, spender, amount, unlimited, tokenId?, expiration?, grantedAt?, permit2?, risks }` (`permit2` on Permit2 approvals: the contract holding the allowance). `id` is `chainId:standard:token:spender[:tokenId][@permit2]` and is stable across scans; `@permit2` is there only for an allowance on a Permit2 other than the CREATE2 one (zkSync Era's own). A Permit2 approval without `permit2` is revoked on the contract its `id` names, else the CREATE2 one; a `permit2` the `id` contradicts is refused (`invalid-approval`), and an `id` of this form without `@permit2` names the CREATE2 one. Approval objects are plain (structured-clone safe).
 
 ### Config
 
