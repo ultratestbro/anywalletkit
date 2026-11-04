@@ -11,6 +11,7 @@ import {readFileSync, writeFileSync, mkdirSync, existsSync} from "node:fs";
 import {resolve, dirname} from "node:path";
 import {fileURLToPath} from "node:url";
 import {fitLines} from "./html-text.mjs";
+import {retryWaitMs} from "./retry-wait.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, "../..");
@@ -97,10 +98,11 @@ const results = [];
 const queue = [...selected];
 // One retry after 20 s for a fail / timeout: a single rate-limited or lagging RPC answer is not a module break (aave:1:lido and
 // mellow:lido-earn-* alternated ok/fail across 2026-10-20..23 and passed 8/8 locally). The first failure stays in the note.
+// A 429 / Too Many Requests note waits 60 s instead: 20 s after it the same burst was still on (native-monad, 2026-11-04).
 async function runWithRetry(job) {
   const first = await run(job);
   if (first.status !== "fail" && first.status !== "timeout") return first;
-  await new Promise((r) => setTimeout(r, 20_000));
+  await new Promise((r) => setTimeout(r, retryWaitMs(first.note)));
   const second = await run(job);
   if (second.status === "fail" || second.status === "timeout") return second;
   console.error(`retry   ${job.id} passed on the second try — first: ${first.note.slice(0, 160)}`);

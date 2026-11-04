@@ -10,7 +10,7 @@ import {
   BLOCK_REWARD, DUST_THRESHOLD, MAX_WITHDRAW_ID, MONAD_CHAIN_IDS, STAKING_PRECOMPILE, USER_RESERVE_BALANCE, type MonadChainId,
 } from './constants.js'
 import { activatesAtEpoch, commissionToPercent, packWithdrawalId, percentToCommission, toValidatorId, toWithdrawId, unpackWithdrawalId, withdrawableAtEpoch } from './encode.js'
-import { DEFAULT_CONCURRENCY, createReadClient, paginate, pool, type MonadProvider } from './rpc.js'
+import { DEFAULT_CONCURRENCY, createReadClient, isRateLimited, isTransportFailure, paginate, pool, type MonadProvider } from './rpc.js'
 import {
   normalizeValidators, type NormalizedValidators, type ValidatorEnricher, type ValidatorExtra, type ValidatorInfo, type ValidatorRefusal, type ValidatorsOption,
 } from './validators.js'
@@ -29,6 +29,13 @@ export const WITHDRAW_SCAN_GAP = 32
 const MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11' as const
 /** Validator reads kept before expired ones are swept. */
 const VALIDATOR_CACHE_MAX = 512
+/**
+ * `getValidator` reads per Multicall3 eth_call: ~102k gas each (measured on mainnet, 2026-11-04), so
+ * 67 cost ~6.85M gas, under a 10M eth_call gas cap, and the consensus set (up to 200) is 3 eth_calls.
+ */
+export const VALIDATOR_BATCH = 67
+/** How long Multicall3 is skipped after it failed where the plain reads behind it worked, ms. */
+export const MULTICALL_RETRY_MS = 10 * 60_000
 
 /** Configuration of {@link NativeStakingProtocolMonad}. Only `validators` is required. */
 export interface NativeStakingMonadConfig {
@@ -50,7 +57,7 @@ export interface NativeStakingMonadConfig {
   stakingAddress?: `0x${string}`
   /** MON `stake` leaves on the wallet: at least Monad's 10 MON reserve balance (below it transfers revert), more if you like. */
   reserveBalance?: bigint | number
-  /** Reads in flight at once (default 6). */
+  /** Reads in flight at once (default 4). */
   concurrency?: number
   /** Highest withdrawal id used and scanned (default 255). */
   maxWithdrawId?: number
@@ -62,7 +69,7 @@ export interface NativeStakingMonadConfig {
    * of claimed ones (withdrawals 0–39 with 0–35 claimed: 36–39 are not found).
    */
   withdrawScan?: 'multicall' | 'gap' | 'full'
-  /** Multicall3 for the `'multicall'` scan (default the canonical 0xcA11…CA11, deployed on Monad). */
+  /** Multicall3 for the `'multicall'` scan and the validator-set reads (default the canonical 0xcA11…CA11, deployed on Monad). */
   multicallAddress?: `0x${string}`
   /** Adds data to validators (APR, names) from an explorer or the app's backend. */
   enrich?: ValidatorEnricher
@@ -224,10 +231,15 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
   private chainChecked: Promise<MonadChainId> | undefined
   readonly withdrawScan: 'multicall' | 'gap' | 'full'
   private readonly multicallAddress: `0x${string}`
+  /**
+   * Until when Multicall3 is skipped: it failed for a reason other than a rate limit or the transport
+   * (no Multicall3 here, a provider that refuses it, an eth_call gas cap) while the plain reads worked.
+   */
+  private multicallSkipUntil = 0
   private readonly validatorCache = new Map<bigint, { at: number; value: Promise<ValidatorTuple> }>()
   private consensusCache: { at: number; value: Promise<bigint[]> } | undefined
   private networkCache: { at: number; value: Promise<MonadNetworkStats> } | undefined
-  /** The last network stats that finished, for decoration that must not trigger the ~200 reads behind them. */
+  /** The last network stats that finished, for decoration that must not trigger the validator-set reads behind them. */
   private networkSettled: MonadNetworkStats | undefined
   /** Validators this instance undelegated from: a full exit removes them from `getDelegations`. */
   private readonly unstakedFrom = new Set<bigint>()
@@ -356,13 +368,77 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
   private validatorTuple(id: bigint, fresh = false): Promise<ValidatorTuple> {
     const hit = this.validatorCache.get(id)
     if (!fresh && hit && Date.now() - hit.at < VALIDATOR_TTL_MS) return hit.value
+    return this.cacheValidator(id, this.read<ValidatorTuple>('getValidator', [id]))
+  }
+
+  private cacheValidator(id: bigint, value: Promise<ValidatorTuple>): Promise<ValidatorTuple> {
     if (this.validatorCache.size >= VALIDATOR_CACHE_MAX) {
       for (const [k, v] of this.validatorCache) if (Date.now() - v.at >= VALIDATOR_TTL_MS) this.validatorCache.delete(k)
     }
-    const value = this.read<ValidatorTuple>('getValidator', [id])
     this.validatorCache.set(id, { at: Date.now(), value })
     value.catch(() => { if (this.validatorCache.get(id)?.value === value) this.validatorCache.delete(id) })
     return value
+  }
+
+  /**
+   * Tuples of many validators, in order, through the same display cache. The ones it lacks are read
+   * through Multicall3, {@link VALIDATOR_BATCH} per eth_call and one chunk after the other (a failed
+   * chunk stops the rest), instead of one eth_call per validator (~200 for the consensus set).
+   */
+  private validatorTuples(ids: readonly bigint[]): Promise<ValidatorTuple[]> {
+    // Synchronous up to the reads: a caller right behind (getNetworkStats next to listValidators) finds them cached.
+    const out = new Map<bigint, Promise<ValidatorTuple>>()
+    const missing: bigint[] = []
+    for (const id of new Set(ids)) {
+      const hit = this.validatorCache.get(id)
+      if (hit && Date.now() - hit.at < VALIDATOR_TTL_MS) out.set(id, hit.value)
+      else missing.push(id)
+    }
+    let previous: Promise<unknown> = Promise.resolve()
+    for (let i = 0; i < missing.length; i += VALIDATOR_BATCH) {
+      const chunk = missing.slice(i, i + VALIDATOR_BATCH)
+      const rows = previous.then(() => this.validatorChunk(chunk))
+      previous = rows
+      chunk.forEach((id, j) => out.set(id, this.cacheValidator(id, rows.then((r) => r[j]!))))
+    }
+    return Promise.all(ids.map((id) => out.get(id)!))
+  }
+
+  /**
+   * One chunk of validator tuples in one Multicall3 eth_call. When that call fails (no Multicall3, an
+   * EIP-1193 provider or RPC that refuses it) the chunk is read one call each, as before; a rate-limited
+   * multicall fails as it is (a chunk of single reads would only spend more of the limit).
+   */
+  private async validatorChunk(ids: readonly bigint[]): Promise<ValidatorTuple[]> {
+    const client = this.rpc()
+    const contracts = ids.map((id) => ({ address: this.stakingAddress, abi: STAKING_ABI, functionName: 'getValidator' as const, args: [id] as const }))
+    let failure: unknown
+    if (this.multicallUsable()) {
+      try {
+        const rows = await client.multicall({ contracts: contracts as never, multicallAddress: this.multicallAddress, allowFailure: false, batchSize: 0 })
+        return rows as unknown as ValidatorTuple[]
+      } catch (e) {
+        if (isRateLimited(e)) throw e
+        failure = e
+      }
+    }
+    const rows = await pool(ids, this.concurrency, (id) => this.read<ValidatorTuple>('getValidator', [id]))
+    if (failure !== undefined) this.multicallFailed(failure)
+    return rows
+  }
+
+  /** Whether to try Multicall3 now (see {@link multicallSkipUntil}). */
+  private multicallUsable(): boolean {
+    return Date.now() >= this.multicallSkipUntil
+  }
+
+  /**
+   * Called when a multicall failed and the same reads one by one then worked: unless the failure was the
+   * transport's (a timeout, a 5xx), the multicall itself is what fails here, so skip it for a while
+   * instead of spending a failing eth_call on every refresh.
+   */
+  private multicallFailed(error: unknown): void {
+    if (!isTransportFailure(error)) this.multicallSkipUntil = Date.now() + MULTICALL_RETRY_MS
   }
 
   private consensusIds(): Promise<bigint[]> {
@@ -417,14 +493,15 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
   }
 
   /**
-   * Network figures for the APR estimate: the consensus set's total stake (one `getValidator` per
-   * validator, cached) and the block time measured over the last 50 000 blocks. Cached 10 minutes.
+   * Network figures for the APR estimate: the consensus set's total stake (every `getValidator`
+   * through Multicall3, cached a minute) and the block time measured over the last 50 000 blocks.
+   * Cached 10 minutes.
    */
   async getNetworkStats(): Promise<MonadNetworkStats> {
     if (this.networkCache && Date.now() - this.networkCache.at < NETWORK_TTL_MS) return await this.networkCache.value
     const value = (async () => {
       const ids = await this.consensusIds()
-      const tuples = await pool(ids, this.concurrency, (id) => this.validatorTuple(id))
+      const tuples = await this.validatorTuples(ids)
       const total = tuples.reduce((s, t) => s + t[6], 0n)
       const client = this.rpc()
       const head = await client.getBlock()
@@ -449,7 +526,7 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
     return this.toInfo(vid, t, stats?.apr ?? null, extra[String(vid)])
   }
 
-  /** The validator for a write decision: read fresh, no APR work (it would cost ~200 reads), no enrich. */
+  /** The validator for a write decision: read fresh, no APR work (it reads the whole validator set), no enrich. */
   private async validatorForWrite(id: bigint): Promise<ValidatorInfo> {
     return this.toInfo(id, await this.validatorTuple(id, true), this.networkSettled?.apr ?? null, undefined)
   }
@@ -463,13 +540,13 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
     let ids: bigint[]
     if (this.validators === 'any') {
       const all = await this.consensusIds()
-      const tuples = await pool(all, this.concurrency, (id) => this.validatorTuple(id))
+      const tuples = await this.validatorTuples(all)
       ids = all.map((id, i) => ({ id, stake: tuples[i]![6] })).sort((a, b) => (b.stake > a.stake ? 1 : b.stake < a.stake ? -1 : 0)).map((x) => x.id)
     } else {
       ids = this.validators.map((v) => v.id)
     }
     if (options.limit !== undefined) ids = ids.slice(0, options.limit)
-    const [tuples, extra, s] = await Promise.all([pool(ids, this.concurrency, (id) => this.validatorTuple(id)), this.enrich(ids), stats])
+    const [tuples, extra, s] = await Promise.all([this.validatorTuples(ids), this.enrich(ids), stats])
     return ids.map((id, i) => this.toInfo(id, tuples[i]!, s?.apr ?? null, extra[String(id)]))
   }
 
@@ -537,7 +614,7 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
    * The wallet's positions — every validator it has stake with, plus the configured ones, the ones it
    * unstaked from and `options.validators` — with pending stake and unclaimed rewards; a validator with
    * nothing there is left out. `validator.apr` is filled only once `getNetworkStats()` has run (it
-   * costs ~200 reads).
+   * reads the whole validator set).
    */
   async listPositions(options: { validators?: readonly (bigint | number)[] } = {}): Promise<DelegatorPosition[]> {
     const me = await this.me()
@@ -594,6 +671,7 @@ export class NativeStakingProtocolMonad extends StakingProtocol<NativeStakingMon
    * call fails (no Multicall3 on this chain, an RPC that refuses it): the caller then reads them one by one.
    */
   private async allSlots(id: bigint, me: Address): Promise<Array<{ amount: bigint; withdrawEpoch: bigint }> | null> {
+    if (!this.multicallUsable()) return null
     const contracts = Array.from({ length: this.maxWithdrawId + 1 }, (_, w) => ({ address: this.stakingAddress, abi: STAKING_ABI, functionName: 'getWithdrawalRequest' as const, args: [id, me, w] as const }))
     try {
       const rows = await this.rpc().multicall({ contracts: contracts as never, multicallAddress: this.multicallAddress, allowFailure: false, batchSize: 0 })
