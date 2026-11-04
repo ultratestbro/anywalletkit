@@ -13,15 +13,18 @@
  * order expires unfilled, a fallback when delivery fails ({@link FACET_DATA}); each such address must be the sender or
  * the recipient.
  *
- * Not checked here: a bridge's OUTPUT. The destination minimum (and for some bridges, e.g.
- * Across, what the receiver finally gets) lives in facet-specific data, so for bridges the
- * reviewed minimum still relies on LI.FI's API answering honestly.
+ * Mostly not checked here: a bridge's OUTPUT. The destination minimum (and for some bridges, e.g.
+ * Across, what the receiver finally gets) lives in facet-specific data, so for most bridges the
+ * reviewed minimum still relies on LI.FI's API answering honestly. Eco and M0 are the exceptions
+ * ({@link FacetData.delivery}): their facet data names the destination token, amount and (Eco) recipient
+ * outright, and those are held to the quote.
  *
  * The receiver is only worth checking where the facet itself holds the bridge to it. Most do on
  * chain (Across V4, Mayan, Stargate, Chainflip, LI.FI Intents, GasZip, Glacis, AllBridge, M0, Polymer
  * CCTP) or through LI.FI's backend signature over BridgeData plus the off-chain order (NEAR Intents,
- * LayerSwap, Eco, Unit, the Across Swap API). The facets in {@link UNBOUND_BRIDGES} do neither and
- * are refused.
+ * LayerSwap, Unit, the Across Swap API). Eco v3 binds its route to BridgeData.receiver by that signature
+ * only, so the route itself is read here ({@link ecoDelivery}). The facets in {@link UNBOUND_BRIDGES} do
+ * neither and are refused.
  */
 
 /**
@@ -46,8 +49,9 @@ const kindOf = (asset: string): Kind => (/^0x0{40}$/i.test(asset) ? "native" : "
 /**
  * The ABI-encoded bridge entry points of the LI.FI Diamond — `startBridgeTokensVia*` and
  * `swapAndStartBridgeTokensVia*`, whose first argument is `ILiFi.BridgeData` — computed from the
- * facet sources in lifinance/contracts (86c3729, 2026-10-26). Packed facets and `*Min` variants read
- * raw calldata, not BridgeData, and are not listed: any other selector is refused.
+ * facet sources in lifinance/contracts (86c3729, 2026-10-26; EcoFacet v3.0.0 from 9001792, 2026-11-01, whose
+ * EcoData gained `intentDestination` — the v2 selectors 0xbff90b61 / 0x762aea18 are gone from the Diamonds). Packed
+ * facets and `*Min` variants read raw calldata, not BridgeData, and are not listed: any other selector is refused.
  */
 const BRIDGE_CALLS: Readonly<Record<string, {sourceSwaps: boolean; facet: string}>> = {
   "0x1fd8010c": {sourceSwaps: false, facet: "Across"}, // startBridgeTokensViaAcross (AcrossFacet)
@@ -66,8 +70,8 @@ const BRIDGE_CALLS: Readonly<Record<string, {sourceSwaps: boolean; facet: string
   "0x8fd4d4dd": {sourceSwaps: true, facet: "Centrifuge"}, // swapAndStartBridgeTokensViaCentrifuge (CentrifugeFacet)
   "0x0ad553b3": {sourceSwaps: false, facet: "Chainflip"}, // startBridgeTokensViaChainflip (ChainflipFacet)
   "0xee3314a1": {sourceSwaps: true, facet: "Chainflip"}, // swapAndStartBridgeTokensViaChainflip (ChainflipFacet)
-  "0xbff90b61": {sourceSwaps: false, facet: "Eco"}, // startBridgeTokensViaEco (EcoFacet)
-  "0x762aea18": {sourceSwaps: true, facet: "Eco"}, // swapAndStartBridgeTokensViaEco (EcoFacet)
+  "0x05c54990": {sourceSwaps: false, facet: "Eco"}, // startBridgeTokensViaEco (EcoFacet v3.0.0, 9001792)
+  "0x8352664c": {sourceSwaps: true, facet: "Eco"}, // swapAndStartBridgeTokensViaEco (EcoFacet v3.0.0, 9001792)
   "0x678786ea": {sourceSwaps: false, facet: "Frax"}, // startBridgeTokensViaFrax (FraxFacet)
   "0x07b8e4c7": {sourceSwaps: true, facet: "Frax"}, // swapAndStartBridgeTokensViaFrax (FraxFacet)
   "0xfc5f1003": {sourceSwaps: false, facet: "GasZip"}, // startBridgeTokensViaGasZip (GasZipFacet)
@@ -289,13 +293,68 @@ function acrossSwapRefunds(r: Reader, at: number): Refund[] {
   throw new Error("unknown Across Swap API target");
 }
 
+/** The EVM native-token placeholder (the zero address) in the quote's destination token. */
+const isZeroAddress = (a: string) => /^0x0{40}$/i.test(a);
+/** ERC-20 `transfer(address,uint256)`. */
+const ERC20_TRANSFER = "0xa9059cbb";
+/**
+ * Eco v3 (EcoFacet 3.0.0, lifinance/contracts 9001792): EcoData is (nonEVMReceiver, prover, rewardDeadline,
+ * intentDestination, encodedRoute, solanaATA, refundRecipient, deadline, signature), a dynamic struct. v2 decoded the
+ * route on chain and required its final `transfer` to pay BridgeData.receiver; v3 dropped that check ("for EVM
+ * destinations the receiver is therefore enforced only by the backend signature, not on-chain") and lets the route
+ * run on another chain than the destination (`intentDestination`: the source chain for a CCTP burn, HyperEVM for a
+ * HyperCore deposit, a second intent), with calls the facet does not interpret. So the device checks what v2 did, and
+ * more: the intent runs on the destination chain itself, and the route — abi.encode(Route(salt, deadline, portal,
+ * nativeAmount, tokens, calls)), Call = (target, data, value) — ends in the destination token's `transfer` of at least
+ * the reviewed minimum to the recipient. Whatever runs before it, the solver's fill either pays that or does not
+ * happen, and the reward (the input) then goes back to refundRecipient, checked above.
+ */
+function ecoDelivery(r: Reader, at: number, e: DiamondExpectation): string | null {
+  // A native delivery has no token `transfer` to read (it would be a value call to the recipient), so it is refused
+  // outright — not left to the token comparison below, where a `transfer` "of" the zero address would match.
+  if (isZeroAddress(e.toToken)) return "an Eco route to the native token cannot be checked here";
+  const destination = r.word(at + 32 * 3);
+  if (destination !== e.destChainId) return `the Eco intent executes on chain ${destination}, not the destination ${e.destChainId} — a route whose delivery cannot be checked here`;
+  const route = r.bytes(at, at + 32 * 4);
+  const tuple = route.small(0);
+  const calls = tuple + route.small(tuple + 32 * 5);
+  const n = route.small(calls);
+  if (n === 0) return "the Eco route makes no calls on the destination chain";
+  if (n > 16) return `the Eco route makes ${n} calls on the destination chain, more than the 16 read here`;
+  const last = calls + 32 + route.small(calls + 32 + 32 * (n - 1));
+  const target = route.address(last);
+  const data = route.bytes(last, last + 32);
+  if (route.word(last + 64) !== 0n || data.length !== 68 || data.raw(0, 4) !== ERC20_TRANSFER) return "the Eco route does not end in a token transfer";
+  const to = data.address(4);
+  const amount = data.word(36);
+  if (!same(target, e.toToken)) return `the Eco route delivers ${target}, not ${e.toToken}`;
+  if (!same(to, e.receiver)) return `the Eco route pays ${to}, not ${e.receiver}`;
+  if (amount < e.minOut) return `the Eco route delivers ${amount}, below the ${e.minOut} shown`;
+  return null;
+}
+/**
+ * M0 (M0Facet 1.0.0): an order on the M0 OrderBook asks a solver for `amountOut` of `tokenOut` on the destination
+ * (M0Data words 3 and 5); the facet ties only the receiver to BridgeData. Both must be the quote's: the destination
+ * token, and at least the reviewed minimum. On the swap entry point the facet scales amountOut by the swap's realised
+ * output over the quoted input (never below 1×), so the calldata's value is a lower bound there too.
+ */
+function m0Delivery(r: Reader, at: number, e: DiamondExpectation): string | null {
+  // M0Facet refuses a zero tokenOut (the OrderBook would escrow the input with nothing to fill): no native delivery.
+  if (isZeroAddress(e.toToken)) return "an M0 order cannot deliver the native token";
+  const tokenOut = r.address(at + 32 * 3);
+  const amountOut = r.word(at + 32 * 5);
+  if (!same(tokenOut, e.toToken)) return `the M0 order asks for ${tokenOut}, not ${e.toToken}`;
+  if (amountOut < e.minOut) return `the M0 order asks for ${amountOut}, below the ${e.minOut} shown`;
+  return null;
+}
+
 /**
  * Where a bridge facet's data names who gets money back: an unused native fee, swap leftovers or positive slippage, the
  * whole input when a deposit, intent or order expires unfilled, or a fallback when delivery fails. The facets only
  * require these to be non-zero (NEAR Intents, LayerSwap and Eco also sign them on LI.FI's backend, which an `apiUrl`
  * proxy cannot forge but LI.FI's API itself writes), so each must be the sender or the recipient; LI.FI's live quotes
  * set them to the sender. `refunds` are [field, word] in the facet data (lifinance/contracts, the same structs at
- * 86c3729 and on main 2026-11-02; Eco as at 86c3729, whose entry points are the listed ones); `inline` marks a static
+ * 86c3729 and on main 2026-11-02; Eco as at v3.0.0, 9001792, whose entry points are the listed ones); `inline` marks a static
  * struct, which is encoded in place among the arguments rather than behind an offset (its word count). A zero is
  * accepted where the facet itself refuses a zero in every field it uses (`zeroRefused`; Polymer CCTP reads its
  * refundRecipient on the swap entry point only): it pays no one. Stargate passes a zero to LayerZero, and Mayan and
@@ -306,6 +365,8 @@ interface FacetData {
   refunds?: readonly (readonly [string, number])[];
   zeroRefused?: true;
   nested?: (r: Reader, at: number) => Refund[];
+  /** What the facet data says the destination receives, held to the quote: a reason it does not match, or null. */
+  delivery?: (r: Reader, at: number, e: DiamondExpectation) => string | null;
 }
 /** [what, address, a zero there is refused by the facet]. */
 type Refund = [string, string, boolean?];
@@ -314,12 +375,12 @@ const FACET_DATA: Readonly<Record<string, FacetData>> = {
   AcrossV4Swap: {nested: acrossSwapRefunds},
   Centrifuge: {inline: 2, refunds: [["refundRecipient", 1]], zeroRefused: true},
   Chainflip: {nested: chainflipRefunds},
-  Eco: {refunds: [["refundRecipient", 5]], zeroRefused: true}, // the intent's creator, refunded its reward (the input) on expiry
+  Eco: {refunds: [["refundRecipient", 6]], zeroRefused: true, delivery: ecoDelivery}, // the intent's creator, refunded its reward (the input) on expiry
   Frax: {inline: 5, refunds: [["refundRecipient", 3]], zeroRefused: true},
   Glacis: {inline: 4, refunds: [["refundAddress", 1]], zeroRefused: true},
   LayerSwap: {refunds: [["refundRecipient", 2]], zeroRefused: true},
   LiFiIntentEscrowV2: {refunds: [["depositAndRefundAddress", 2]], zeroRefused: true}, // the escrow order's user
-  M0: {inline: 7, refunds: [["refundRecipient", 1], ["orderOwner", 2]], zeroRefused: true}, // orderOwner gets a cancelled order back
+  M0: {inline: 7, refunds: [["refundRecipient", 1], ["orderOwner", 2]], zeroRefused: true, delivery: m0Delivery}, // orderOwner gets a cancelled order back
   Mayan: {refunds: [["refundRecipient", 7]], nested: mayanRefunds, zeroRefused: true},
   NEARIntents: {refunds: [["refundRecipient", 6]], zeroRefused: true}, // also the 1Click quote's refundTo
   PolymerCCTP: {refunds: [["refundRecipient", 5]], zeroRefused: true},
@@ -334,13 +395,17 @@ const FACET_DATA: Readonly<Record<string, FacetData>> = {
  */
 const NO_REFUND_FIELDS = new Set(["Across", "AllBridge", "ArbitrumBridge", "CelerCircleBridge", "GasZip", "GnosisBridge", "MegaETHBridge", "OmniBridge", "OptimismBridge", "PolygonBridge", "Unit"]);
 
+/** Where the facet data starts: the last argument, after BridgeData's offset word (and the SwapData[]'s). */
+function facetDataAt(r: Reader, bridge: {sourceSwaps: boolean}, spec: FacetData): number {
+  const slot = 4 + (bridge.sourceSwaps ? 64 : 32);
+  return spec.inline ? slot : 4 + r.small(slot);
+}
+
 /** A refund or fallback in the bridge's facet data that pays neither the sender nor the recipient, or null. */
 function refundMismatch(r: Reader, bridge: {sourceSwaps: boolean; facet: string}, e: DiamondExpectation): string | null {
   const spec = FACET_DATA[bridge.facet];
   if (!spec) return NO_REFUND_FIELDS.has(bridge.facet) ? null : `no known refund layout for ${bridge.facet}`;
-  // The facet data is the last argument, after BridgeData's offset word (and the SwapData[]'s).
-  const slot = 4 + (bridge.sourceSwaps ? 64 : 32);
-  const at = spec.inline ? slot : 4 + r.small(slot);
+  const at = facetDataAt(r, bridge, spec);
   const paid: Refund[] = (spec.refunds ?? []).map(([field, word]) => [`${bridge.facet} ${field}`, r.address(at + 32 * word), spec.zeroRefused === true]);
   paid.push(...(spec.nested?.(r, at) ?? []));
   for (const [what, to, zeroRefused] of paid) {
@@ -397,6 +462,9 @@ export function diamondCallMismatch(data: string, e: DiamondExpectation): string
     if (hasSourceSwaps !== bridge.sourceSwaps) return `unknown Diamond call ${selector}`;
     const refund = refundMismatch(r, bridge, e);
     if (refund) return refund;
+    const spec = FACET_DATA[bridge.facet];
+    const delivery = spec?.delivery?.(r, facetDataAt(r, bridge, spec), e);
+    if (delivery) return delivery;
     // After source swaps the bridged amount is in the swapped token's units: only the swaps' input is comparable.
     if (hasSourceSwaps) {
       // The swapped amount is the facet's own (it replaces minAmount after the swaps); a zero is a route that bridges nothing.

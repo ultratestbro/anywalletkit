@@ -26,14 +26,14 @@ const word = (v: bigint | string) => (typeof v === "bigint" ? v.toString(16) : v
 
 const B = "(bytes32 transactionId, string bridge, string integrator, address referrer, address sendingAssetId, address receiver, uint256 minAmount, uint256 destinationChainId, bool hasSourceSwaps, bool hasDestinationCall)";
 const S = "(address callTo, address approveTo, address sendingAssetId, address receivingAssetId, uint256 fromAmount, bytes callData, bool requiresDeposit)[]";
-// Facet data as lifinance/contracts declares it (Eco as at 86c3729, whose entry points the Diamond check lists).
+// Facet data as lifinance/contracts declares it (Eco as at v3.0.0, 9001792, whose entry points the Diamond check lists).
 const FACETS: Record<string, string> = {
   AcrossV4: "(bytes32 receiverAddress, bytes32 refundAddress, bytes32 sendingAssetId, bytes32 receivingAssetId, uint256 outputAmount, uint128 outputAmountMultiplier, bytes32 exclusiveRelayer, uint32 quoteTimestamp, uint32 fillDeadline, uint32 exclusivityParameter, bytes message)",
   AcrossV4Swap: "(uint8 swapApiTarget, bytes callData, bytes signature)",
   ArbitrumBridge: "(uint256 maxSubmissionCost, uint256 maxGas, uint256 maxGasPrice)",
   Centrifuge: "(uint256 nativeFee, address refundRecipient)",
   Chainflip: `(bytes nonEVMReceiver, uint32 dstToken, address dstCallReceiver, ${S} dstCallSwapData, uint256 gasAmount, bytes cfParameters)`,
-  Eco: "(bytes nonEVMReceiver, address prover, uint64 rewardDeadline, bytes encodedRoute, bytes32 solanaATA, address refundRecipient, uint256 deadline, bytes signature)",
+  Eco: "(bytes nonEVMReceiver, address prover, uint64 rewardDeadline, uint64 intentDestination, bytes encodedRoute, bytes32 solanaATA, address refundRecipient, uint256 deadline, bytes signature)",
   Frax: "(address oft, uint32 dstEid, uint256 nativeFee, address refundRecipient, bytes32 nonEVMReceiver)",
   Glacis: "(bytes32 receiverAddress, address refundAddress, uint256 nativeFee, bytes32 outputToken)",
   LayerSwap: "(bytes32 requestId, address depositoryReceiver, address refundRecipient, bytes32 nonEVMReceiver, bytes signature, uint256 deadline)",
@@ -74,18 +74,21 @@ const expectation: DiamondExpectation = {fromToken: USDC, toToken: USDC, amountI
 /** Mayan protocolData: the selector, then words with `refund` at `refundWord` (the facet reads the receiver at its own offset). */
 const mayanProtocol = (selector: string, refundWord: number, refund: string, receiverWord: number) =>
   `0x${selector.slice(2)}${Array.from({length: 16}, (_, i) => word(i === refundWord ? pad(refund) : i === receiverWord ? pad(RECEIVER) : 0n)).join("")}` as Hex;
+/** An Eco route (abi.encode(Route)) whose one call transfers the destination USDC to the recipient. */
+const ecoRoute = () => encodeAbiParameters(parseAbiParameters("(bytes32 salt, uint64 deadline, address portal, uint256 nativeAmount, (address token, uint256 amount)[] tokens, (address target, bytes data, uint256 value)[] calls)"),
+  [{salt: ZERO32, deadline: 1n, portal: OTHER, nativeAmount: 0n, tokens: [{token: USDC, amount: 1n}], calls: [{target: USDC, data: encodeFunctionData({abi: parseAbi(["function transfer(address, uint256)"]), args: [RECEIVER, 1n]}), value: 0n}]}]);
 const chainflipParams = (refund: string, version = "01") => `0x${version}64000000${refund.slice(2)}${"00".repeat(40)}` as Hex;
 
 // Honest facet data for each facet: every refund-like field the sender (Superset's fallback the recipient).
 const SAMPLES: Record<string, Facet> = {
   AcrossV4: {receiverAddress: pad(RECEIVER), refundAddress: pad(SENDER), sendingAssetId: pad(USDC), receivingAssetId: pad(USDC), outputAmount: 990_000n, outputAmountMultiplier: 0n, exclusiveRelayer: ZERO32, quoteTimestamp: 1, fillDeadline: 2, exclusivityParameter: 0, message: "0x"},
   Centrifuge: {nativeFee: 0n, refundRecipient: SENDER},
-  Eco: {nonEVMReceiver: "0x", prover: OTHER, rewardDeadline: 1n, encodedRoute: "0x", solanaATA: ZERO32, refundRecipient: SENDER, deadline: 1n, signature: "0x"},
+  Eco: {nonEVMReceiver: "0x", prover: OTHER, rewardDeadline: 1n, intentDestination: 42161n, encodedRoute: ecoRoute(), solanaATA: ZERO32, refundRecipient: SENDER, deadline: 1n, signature: "0x"},
   Frax: {oft: OTHER, dstEid: 30110, nativeFee: 0n, refundRecipient: SENDER, nonEVMReceiver: ZERO32},
   Glacis: {receiverAddress: pad(RECEIVER), refundAddress: SENDER, nativeFee: 0n, outputToken: ZERO32},
   LayerSwap: {requestId: ZERO32, depositoryReceiver: OTHER, refundRecipient: SENDER, nonEVMReceiver: ZERO32, signature: "0x", deadline: 1n},
   LiFiIntentEscrowV2: {dstCallReceiver: ZERO32, recipient: pad(RECEIVER), depositAndRefundAddress: SENDER, nonce: 1n, expires: 1, fillDeadline: 1, inputOracle: OTHER, outputOracle: ZERO32, outputSettler: ZERO32, outputToken: ZERO32, outputAmountMultiplier: 0n, dstCallSwapData: [], outputContext: "0x"},
-  M0: {receiverAddress: pad(RECEIVER), refundRecipient: SENDER, orderOwner: SENDER, tokenOut: ZERO32, solver: ZERO32, amountOut: 1n, fillDeadline: 1},
+  M0: {receiverAddress: pad(RECEIVER), refundRecipient: SENDER, orderOwner: SENDER, tokenOut: pad(USDC), solver: ZERO32, amountOut: 1n, fillDeadline: 1},
   Mayan: {nonEVMReceiver: pad(RECEIVER), mayanProtocol: OTHER, protocolData: mayanProtocol("0xa3a30834", 3, SENDER, 4), swapProtocol: ZERO, swapData: "0x", middleToken: ZERO, minMiddleAmount: 0n, refundRecipient: SENDER, mayanAmountIn: 1_000_000n},
   NEARIntents: {nonEVMReceiver: ZERO32, destinationAsset: ZERO32, depositAddress: OTHER, quoteId: ZERO32, deadline: 1n, minAmountOut: 1n, refundRecipient: SENDER, signature: "0x"},
   PolymerCCTP: {polymerTokenFee: 0n, maxCCTPFee: 0n, nonEVMReceiver: ZERO32, solanaReceiverATA: ZERO32, minFinalityThreshold: 2000, refundRecipient: SENDER, hookData: "0x"},

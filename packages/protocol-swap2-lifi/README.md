@@ -30,7 +30,8 @@ intent, a Mayan Swift order's trader, Chainflip's refund address, …) must be t
 recipient. Refused, because the recipient cannot be read from the calldata: routes with a destination call, EVM-source routes to a non-EVM chain, and the
 bridges whose facet does not bind the delivery to `BridgeData` (Relay, Garden, deBridge DLN,
 ThorSwap, Squid, Symbiosis) — cross-chain requests ask LI.FI to route around Relay, Garden, Squid
-and Symbiosis, so their pairs get another bridge. Unknown calldata is refused.
+and Symbiosis, and not to offer destination calls (`allowDestinationCall=false`), so their pairs get
+another bridge. Unknown calldata is refused.
 
 Every swap step is read, not only the ends: each must spend what the step before delivered, only
 steps that spend the input token may pull from the wallet (`requiresDeposit`), and together at most
@@ -40,9 +41,21 @@ bound to the asset kinds they move (`*ToNative` only for a native output, `*ToER
 bridge without source swaps must bridge the input, less at most a 1 % bridge fee. `apiUrl` must be
 `https:` (`allowInsecureApiUrl` for local development).
 
-Not checked: a bridge's output. The destination minimum — and for some bridges (Relay, Across)
-what finally reaches the recipient — sits in bridge-specific data, so on cross-chain routes the
-reviewed minimum relies on LI.FI's API (or your `apiUrl` proxy) answering honestly.
+Mostly not checked: a bridge's output. The destination minimum — and for some bridges (Relay, Across)
+what finally reaches the recipient — sits in bridge-specific data, so on most cross-chain routes the
+reviewed minimum relies on LI.FI's API (or your `apiUrl` proxy) answering honestly. Two bridges name
+it outright and are held to the quote: an Eco intent must run on the destination chain and its route
+must end in the destination token's `transfer` of at least the reviewed minimum to the recipient
+(read only when the route has at most 16 calls); an M0 order must ask for the destination token and
+at least the reviewed minimum. Neither can deliver the native token through this module: an Eco or
+M0 route whose destination token is native (ETH, POL, …) is always refused, so LI.FI picks another
+bridge for such a pair or the pair shows no route.
+
+`routeWideSlippage: true` (default off) asks LI.FI for one slippage budget for the whole route
+(`slippageScope=route`) on EVM → EVM requests instead of one per step; when LI.FI can protect no
+route for a request (`ROUTE_SLIPPAGE_UNSUPPORTED`) or has route-wide slippage switched off
+(`ROUTE_SLIPPAGE_UNAVAILABLE`), it is asked again in its default scope, held to the same floor. That
+happens while quoting, so the quote the user reviews is the per-step one, with its own minimum.
 
 ## Behind `remoteProvider`
 

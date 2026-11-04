@@ -204,6 +204,15 @@ export interface LifiProviderConfig {
    * list) belongs to the app; the module only carries the choice.
    */
   chooseRoute?: (routes: readonly LifiRouteOption[], params: QuoteParams) => LifiRouteChoice | null | undefined;
+  /**
+   * Ask LI.FI for one slippage budget for the whole route (`slippageScope=route`) on EVM → EVM requests, instead of
+   * its default of applying the slippage to every step. The minimum is then one floor, `ceil(expected × (1 −
+   * slippage))`, that the transaction (and on Across, Mayan and Stargate V2 the bridge) enforces. Only EVM routes
+   * with at most one swap and no destination call can be protected so; when LI.FI has none for a request it is asked
+   * again in its default (per-step) scope, held to the same floor by the module's checks. Default off: Solana legs and
+   * a disabled flag keep the per-step behaviour exactly as before.
+   */
+  routeWideSlippage?: boolean;
 }
 
 /** One single-transaction candidate from `/advanced/routes`, as a route policy sees it. */
@@ -315,6 +324,12 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
       if (!fromToken) return null;
 
       const solanaSource = isSolana(params.sourceChain);
+      const crossChain = params.sourceChain !== params.destChain;
+      // The Diamond check refuses a destination call (its recipient sits in calldata for the other chain), so LI.FI is
+      // asked not to offer one; the check stays as the backstop. A Solana source has no Diamond call to check.
+      const noDestinationCall = crossChain && !solanaSource;
+      // Route-wide slippage covers EVM routes only (LI.FI: not a route that starts or ends on a non-EVM chain).
+      let routeScope = config.routeWideSlippage === true && !solanaSource && !isSolana(params.destChain);
       // The placeholders price a dry quote; a live one is built for real addresses only (round 3, H8).
       const dry = params.dry !== false;
       const fromAddress = params.refundAddress || (dry ? (solanaSource ? SOLANA_PLACEHOLDER : EVM_PLACEHOLDER) : "");
@@ -332,7 +347,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
       let sentSlippage: number | undefined = slippageBps / 10_000;
       let deadline: AbortSignal | undefined;
       let choice: LifiRouteChoice | null = null;
-      if (config.chooseRoute && params.sourceChain !== params.destChain) {
+      if (config.chooseRoute && crossChain) {
         try {
           const res = await fetch(`${apiBase}/advanced/routes`, {
             method: "POST",
@@ -345,7 +360,13 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
               fromAmount: params.amountIn,
               fromAddress,
               toAddress,
-              options: {slippage: slippageBps / 10_000, ...(solanaSource ? {} : {bridges: {deny: UNBOUND_TOOLS}}), ...(integrator().trim() ? {integrator: integrator().trim()} : {})},
+              options: {
+                slippage: slippageBps / 10_000,
+                ...(routeScope ? {slippageScope: "route"} : {}),
+                ...(solanaSource ? {} : {bridges: {deny: UNBOUND_TOOLS}}),
+                ...(noDestinationCall ? {allowDestinationCall: false} : {}),
+                ...(integrator().trim() ? {integrator: integrator().trim()} : {}),
+              },
             }),
             signal: signal ?? timeoutSignal(8_000),
           });
@@ -373,7 +394,9 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         if (sentSlippage !== undefined) {
           url.searchParams.set("slippage", String(sentSlippage));
         }
-        const unbound = params.sourceChain !== params.destChain && !solanaSource ? UNBOUND_TOOLS : [];
+        if (routeScope) url.searchParams.set("slippageScope", "route");
+        if (noDestinationCall) url.searchParams.set("allowDestinationCall", "false");
+        const unbound = crossChain && !solanaSource ? UNBOUND_TOOLS : [];
         for (const t of (choice?.allowBridges ?? []).filter((b) => solanaSource || !UNBOUND_TOOLS.includes(b))) url.searchParams.append("allowBridges", t);
         for (const t of new Set([...(choice?.denyBridges ?? []), ...unbound])) url.searchParams.append("denyBridges", t);
         if (choice?.order) url.searchParams.set("order", choice.order);
@@ -392,6 +415,17 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           // When every candidate route was dropped for the same reason (Sei: "wallet is not linked to
           // the original SEI address"), that reason is the real answer — the message alone is generic.
           const reasons = [...new Set((body?.errors?.filteredOut ?? []).map((f) => f.reason).filter((r): r is string => typeof r === "string"))];
+          if (routeScope && [typeof body?.message === "string" ? body.message : "", ...reasons].some((r) => /^ROUTE_SLIPPAGE_(UNSUPPORTED|UNAVAILABLE)/.test(r))) {
+            // No route LI.FI can protect route-wide (or the feature is off): its default per-step scope instead,
+            // whose minimum the floor check below still holds to the requested slippage. Both reasons are LI.FI's
+            // documented stable prefixes (docs.li.fi/api-reference/error-codes, "Route-wide slippage errors";
+            // docs.li.fi/guides/route-wide-slippage#errors): ROUTE_SLIPPAGE_UNSUPPORTED in errors.filteredOut when no
+            // route can be protected, ROUTE_SLIPPAGE_UNAVAILABLE (422, code 1004) in `message` when route-wide
+            // slippage is switched off. This happens before any quote is shown: the user reviews the step-scope one.
+            routeScope = false;
+            attempt--;
+            continue;
+          }
           const why = reasons.length === 1 ? ` (${reasons[0]!.slice(0, 200)})` : "";
           params.onRefusal?.(`lifi: ${typeof body?.message === "string" ? body.message.slice(0, 200) : `HTTP ${res.status}`}${why}`);
           return null;
