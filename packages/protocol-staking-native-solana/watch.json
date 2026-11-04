@@ -15,10 +15,11 @@
     },
     {
       "id": "docs-stake-accounts",
-      "type": "http-text",
-      "url": "https://solana.com/docs/references/staking/stake-accounts",
-      "between": ["<main", "</main>"],
-      "label": "Solana docs · stake accounts"
+      "type": "github-file",
+      "repo": "solana-foundation/solana-com",
+      "path": "apps/docs/content/docs/en/references/staking/stake-accounts.mdx",
+      "ref": "main",
+      "label": "Solana docs · stake accounts (source)"
     }
   ]
 }

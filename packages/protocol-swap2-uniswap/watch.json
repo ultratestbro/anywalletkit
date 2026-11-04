@@ -75,7 +75,7 @@
       "id": "quoter-v2-unichain",
       "type": "evm-code",
       "chainId": 130,
-      "address": "0x565AC8C7863D9bb16d07E809ff49Fe5cD467634C",
+      "address": "0x385A5cf5F83e99f7BB2852b6A19C3538b9FA7658",
       "label": "Uniswap QuoterV2 · Unichain"
     },
     {
@@ -117,7 +117,7 @@
       "id": "quoter-v2-monad",
       "type": "evm-code",
       "chainId": 143,
-      "address": "0x2d01411773c8C24805306e89a41f7855c3C4fE65",
+      "address": "0x661E93cca42AfacB172121EF892830cA3b70F08d",
       "label": "Uniswap QuoterV2 · Monad"
     },
     {
@@ -138,7 +138,7 @@
       "id": "quoter-v2-x-layer",
       "type": "evm-code",
       "chainId": 196,
-      "address": "0x976183AC3d09840D243A88c0268BADb3B3e3259f",
+      "address": "0xD1b797D92d87B688193A2B976eFc8D577D204343",
       "label": "Uniswap QuoterV2 · X Layer"
     },
     {
@@ -327,7 +327,7 @@
       "id": "quoter-v2-linea",
       "type": "evm-code",
       "chainId": 59144,
-      "address": "0x58EaD433eA99708604c4dD7C9b7E80c70976E202",
+      "address": "0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1",
       "label": "Uniswap QuoterV2 · Linea"
     },
     {
@@ -364,6 +364,24 @@
         "</main>"
       ],
       "label": "Uniswap docs · v3 deployment addresses"
+    },
+    {
+      "id": "deployments-status",
+      "type": "json-pins",
+      "url": "https://developers.uniswap.org/deployments.json",
+      "format": "uniswap-deployments",
+      "pins": {
+        "from": "dist/index.js",
+        "export": "UNISWAP_V3",
+        "group": "$key",
+        "roles": {
+          "factory": "UniswapV3Factory",
+          "quoter": "QuoterV2",
+          "router": "SwapRouter02"
+        }
+      },
+      "status": "active",
+      "label": "Uniswap deployments.json · every pinned factory / QuoterV2 / SwapRouter02 listed and active"
     }
   ]
 }
