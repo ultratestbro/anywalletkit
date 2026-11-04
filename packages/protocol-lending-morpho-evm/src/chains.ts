@@ -32,8 +32,11 @@ export const MORPHO_CHAINS: Readonly<Record<number, MorphoChain>> = Object.freez
     ['0x3Bb6A6A0Bc85b367EFE0A5bAc81c5E52C892839a'], ['0x6128b680b277Bf4Df80DFE9D8c55A498660870ef']),
   137: chain(137, 'Polygon', '0x1bF0c2541F820E775182832f06c0B7Fc27A25f67',
     ['0xa9c87daB340631C34BB738625C70499e29ddDC98'], ['0xC11a53eE9B1eCc7a068D8e40F8F17926584F97Cf']),
+  // VaultV2Factory 2026-11-04: docs.morpho.org/get-started/resources/addresses (Unichain, Vault V2 tab, uniscan link);
+  // eth_getCode 23 124 bytes, the same code hash as the Base and Katana VaultV2Factory; isVaultV2 acknowledges the
+  // API's Unichain V2 vaults (Gauntlet USDC Prime 0xE8036ef8…3BF33b6).
   130: chain(130, 'Unichain', '0x8f5ae9CddB9f68de460C77730b018Ae7E04a140A',
-    ['0xe9EdE3929F43a7062a007C3e8652e4ACa610Bdc0'], []),
+    ['0xe9EdE3929F43a7062a007C3e8652e4ACa610Bdc0'], ['0xC9b34c108014B44e5a189A830e7e04c56704a0c9']),
   999: chain(999, 'HyperEVM', '0x68e37dE8d93d3496ae143F2E900490f6280C57cD',
     ['0xec051b19d654C48c357dC974376DeB6272f24e53'], ['0xD7217E5687FF1071356C780b5fe4803D9D967da7']),
   747474: chain(747474, 'Katana', '0xD50F2DffFd62f94Ee4AEd9ca05C61d0753268aBc',

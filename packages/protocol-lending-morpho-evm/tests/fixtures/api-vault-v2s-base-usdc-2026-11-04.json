@@ -1,0 +1,74 @@
+{
+ "data": {
+  "vaultV2s": {
+   "items": [
+    {
+     "address": "0xbeef0786756810478b88982DE00F3CD7fdB8e7c7",
+     "name": "Grove x Steakhouse USDC",
+     "symbol": "grove-steakUSDC",
+     "listed": true,
+     "factory": {
+      "address": "0x4501125508079A99ebBebCE205DeC9593C2b5857"
+     },
+     "chain": {
+      "id": 8453
+     },
+     "asset": {
+      "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "symbol": "USDC",
+      "decimals": 6
+     },
+     "apy": 0.05234783299093881,
+     "netApy": 0.05234783299093881,
+     "totalAssets": 541838755188739,
+     "totalAssetsUsd": 541794575.823996,
+     "performanceFee": 0
+    },
+    {
+     "address": "0xbeeff2490FEffa212faC2f6553682C219E6a8845",
+     "name": "Steakhouse High Yield USDC Edition",
+     "symbol": "sirloinUSDC",
+     "listed": true,
+     "factory": {
+      "address": "0x4501125508079A99ebBebCE205DeC9593C2b5857"
+     },
+     "chain": {
+      "id": 8453
+     },
+     "asset": {
+      "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "symbol": "USDC",
+      "decimals": 6
+     },
+     "apy": 0.04456066583434675,
+     "netApy": 0.03323771653995442,
+     "totalAssets": 457973629087446,
+     "totalAssetsUsd": 457936287.7496248,
+     "performanceFee": 0.25
+    },
+    {
+     "address": "0xbeef0e0834849aCC03f0089F01f4F1Eeb06873C9",
+     "name": "Steakhouse Prime USDC",
+     "symbol": "steakUSDC",
+     "listed": true,
+     "factory": {
+      "address": "0x4501125508079A99ebBebCE205DeC9593C2b5857"
+     },
+     "chain": {
+      "id": 8453
+     },
+     "asset": {
+      "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "symbol": "USDC",
+      "decimals": 6
+     },
+     "apy": 0.05238468315172982,
+     "netApy": 0.05238468315172982,
+     "totalAssets": 149990708756737,
+     "totalAssetsUsd": 149978479.11430782,
+     "performanceFee": 0
+    }
+   ]
+  }
+ }
+}

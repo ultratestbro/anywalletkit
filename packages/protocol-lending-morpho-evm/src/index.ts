@@ -9,7 +9,9 @@ export { MORPHO_CHAINS, MORPHO_CHAIN_IDS, MORPHO_API } from './chains.js'
 export type { MorphoChain } from './chains.js'
 export { MorphoApi } from './api.js'
 export type { ApiVault, ApiMarket } from './api.js'
-export { MorphoError, BLUE_ERRORS, decodeMorphoRevert } from './errors.js'
+export { MorphoError, MorphoDeadDepositError, BLUE_ERRORS, decodeMorphoRevert } from './errors.js'
+export { DEAD_ADDRESS, MIN_DEAD_SHARES, MIN_VAULT_V2_DEAD_ASSETS, evaluateDeadDeposit } from './dead-deposit.js'
+export type { DeadDeposit, VaultV2DeadState } from './dead-deposit.js'
 export {
   marketId, accrue, wTaylorCompounded, rateToApyPct, supplyApyPct, toAssetsDown, toAssetsUp, toSharesDown, toSharesUp, collateralValue, maxBorrow,
   WAD, VIRTUAL_SHARES, VIRTUAL_ASSETS, ORACLE_PRICE_SCALE, SECONDS_PER_YEAR,

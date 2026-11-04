@@ -1,13 +1,20 @@
 // An in-memory Morpho on Base: the Blue singleton with one cbBTC/USDC market
 // (the real Base market, so the id derivation has a golden value), an IRM and
 // oracle, a MetaMorpho USDC vault acknowledged by the v1.0 factory, tokens.
+// The market and every vault start with a dead deposit at 0x…dEaD above the
+// dead-deposit rule's thresholds; tests that need a bare target remove it.
 import { getAddress, maxUint256, type Abi, type Address, type Hex } from 'viem'
 import { createMockAccount } from '@anywalletkit/conformance'
 import { ERC20_ABI, ERC4626_ABI, FACTORY_V1_ABI, FACTORY_V2_ABI, IRM_ABI, MORPHO_ABI, ORACLE_ABI, VAULT_V1_ABI, VAULT_V2_ABI } from '../src/abi.js'
 import { marketId, toAssetsDown, toSharesDown, toSharesUp, type MarketParams, type MarketState } from '../src/math.js'
 import { FakeChain, revertString } from './fake-chain.js'
 
-export const USER = getAddress('0x000000000000000000000000000000000000dEaD')
+export const USER = getAddress('0x00000000000000000000000000000000000000B0')
+/** Where dead deposits live (the dead-deposit rule reads it); not the test account. */
+export const DEAD = getAddress('0x000000000000000000000000000000000000dEaD')
+/** Seeded dead deposits: Blue supply shares, and vault shares (1e18 = 1 USDC, above V2's 1e6 dead assets). */
+export const DEAD_SUPPLY_SHARES = 10n ** 12n
+export const DEAD_VAULT_SHARES = 10n ** 18n
 export const OTHER = getAddress('0x00000000000000000000000000000000000000A1')
 export const MORPHO = getAddress('0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb')
 export const FACTORY_V1 = getAddress('0xA9c3D3a366466Fa809d1Ae982Fb2c46E5fC41101')
@@ -62,6 +69,8 @@ export function makeMorpho(overrides: Partial<State> = {}): { chain: FakeChain; 
     revertOn: new Map(),
     ...overrides,
   }
+  if (!overrides.positions) state.positions.set(DEAD.toLowerCase(), { supplyShares: DEAD_SUPPLY_SHARES, borrowShares: 0n, collateral: 0n })
+  if (!overrides.balances) for (const v of [VAULT, VAULT_V2]) state.balances.set(key(v, DEAD), DEAD_VAULT_SHARES)
   const chain = new FakeChain()
   chain.chainId = 8453
   const fail = (fn: string) => { const r = state.revertOn.get(fn); if (r) revertString(r) }
@@ -132,7 +141,8 @@ export function makeMorpho(overrides: Partial<State> = {}): { chain: FakeChain; 
   const extra = (abi: readonly unknown[]) => abi.filter((x) => (x as { type: string }).type === 'function' && !ERC4626_ABI.some((y) => y.type === 'function' && y.name === nameOf(x)))
   const vaultAbi = [...ERC4626_ABI, ...extra(VAULT_V1_ABI), ...extra(ERC20_ABI)] as Abi
   chain.on(VAULT, vaultAbi, vaultHandler)
-  chain.on(FAKE_VAULT, vaultAbi, vaultHandler)
+  // The look-alike keys its own balances, so a read aimed at it cannot be answered with VAULT's state.
+  chain.on(FAKE_VAULT, vaultAbi, vaultHandlerFor(FAKE_VAULT))
 
   // Vault V2 as its source has it: max* views answer 0, the gates and the caps are enforced by
   // reverting inside deposit / withdraw / redeem, liquidity too.
@@ -146,6 +156,8 @@ export function makeMorpho(overrides: Partial<State> = {}): { chain: FakeChain; 
       case 'maxDeposit': case 'maxMint': case 'maxWithdraw': case 'maxRedeem': return 0n
       case 'performanceFee': return 5n * 10n ** 16n
       case 'managementFee': return 0n
+      case '_totalAssets': return v.totalAssets
+      case 'virtualShares': return 10n ** 12n
       case 'curator': return OTHER
       case 'canReceiveShares': return g().receiveShares
       case 'canSendShares': return g().sendShares

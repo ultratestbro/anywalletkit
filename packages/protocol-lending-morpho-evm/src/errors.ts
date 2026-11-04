@@ -12,6 +12,29 @@ export class MorphoError extends Error {
   }
 }
 
+/**
+ * A supply / deposit refused by the dead-deposit rule (`dead-deposit.ts`): the market or vault
+ * holds too few shares at 0x…dEaD, or (Vault V2) they are worth too little or its share price is
+ * deflated. `code` is `'InsufficientDeadDeposit'`; `observed` / `required` are the numbers that
+ * failed. `allowWithoutDeadDeposit` in the config skips the rule.
+ */
+export class MorphoDeadDepositError extends MorphoError {
+  readonly target: string
+  readonly reason: 'deadShares' | 'deadAssets' | 'sharePrice'
+  readonly observed: bigint
+  readonly required: bigint
+  constructor(p: { label: string; kind: 'market' | 'vault'; target: string; reason: 'deadShares' | 'deadAssets' | 'sharePrice'; observed: bigint; required: bigint }) {
+    super(p.reason === 'sharePrice'
+      ? `${p.label}: the vault's share price is at or below 1 / (10 × virtualShares) (${p.observed} < ${p.required}), so it may have been deflated before its dead deposit — refusing the deposit. Choose another vault, or pass allowWithoutDeadDeposit to proceed.`
+      : `${p.label}: ${p.target} holds ${p.observed} dead ${p.reason === 'deadShares' ? 'shares' : 'assets'} at 0x000000000000000000000000000000000000dEaD, below the required ${p.required} — its share price can be inflated against depositors, refusing the ${p.kind === 'market' ? 'supply' : 'deposit'}. Choose another ${p.kind}, or pass allowWithoutDeadDeposit to proceed.`,
+    'InsufficientDeadDeposit')
+    this.target = p.target
+    this.reason = p.reason
+    this.observed = p.observed
+    this.required = p.required
+  }
+}
+
 /** Morpho Blue ErrorsLib strings → what they mean for a wallet. */
 export const BLUE_ERRORS: Readonly<Record<string, string>> = Object.freeze({
   'market not created': 'This market does not exist on Morpho (wrong params or chain)',

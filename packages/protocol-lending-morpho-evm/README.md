@@ -77,6 +77,38 @@ await market.withdrawCollateral({ amount: 'max' })
   its transfer gates are read (`canReceiveShares` / `canSendAssets` in,
   `canSendShares` / `canReceiveAssets` out) and caps and liquidity are left to
   the `eth_call` proof that runs before every send.
+- **Dead deposit.** Before a vault deposit or a market supply, the target
+  must hold a dead deposit at `0x…dEaD`, the rule Morpho's own SDK applies
+  (morpho-sdk 9.2.0): at least `MIN_DEAD_SHARES` (1e9) shares (Blue supply
+  shares for a market, vault shares for a vault); a Vault V2's must also be
+  worth `MIN_VAULT_V2_DEAD_ASSETS` (1e6 base units), with its share price above
+  1 / (10 × virtualShares). Without one, a nearly empty target's share price can
+  be inflated against the next depositor. A target that fails is refused with
+  `MorphoDeadDepositError` (`code: 'InsufficientDeadDeposit'`, `observed`,
+  `required`) unless the config passes `allowWithoutDeadDeposit: true`.
+  `getDeadDeposit()` reads it without supplying. Withdrawals, collateral,
+  borrows and repayments are never gated by it.
+
+  Only the target itself is checked. Morpho's SDK also walks the markets a
+  vault can allocate to (every withdraw-queue market of a Vault V1, every
+  capped allocation and the liquidity market of a Vault V2). This module does
+  not, for two reasons. First, the target check guards the deposit itself:
+  the depositor's assets rounding down in the target's own share math. A
+  market the vault allocates to affects the vault's assets, which the curator
+  chooses, caps bound and every holder shares; that is curation risk, which
+  this module does not try to judge. Second, the walk refuses most listed
+  vaults: on 2026-11-04 it would have refused 45 of 69 listed Vault V1s,
+  mostly because of the idle markets (no collateral) curators keep in their
+  queues.
+- **Listing vs depositing.** `MorphoApi.listVaults` returns what the API lists,
+  Vault V1 and V2 alike. The API has no dead-deposit field, so a listed vault
+  that fails the rule stays in the list, just like a vault whose caps are full
+  or whose V2 gates refuse the account. Depositability is decided on-chain by
+  the vault protocol: `getDeadDeposit()` shows the rule, and `quoteSupply` /
+  `supply` refuse a failing dead deposit (`MorphoDeadDepositError`), full V1
+  caps (`ExceededMaxDeposit`) and V2 gates (`CannotReceiveShares`,
+  `CannotSendAssets`) with a typed error before anything is approved. Call
+  `quoteSupply` (or `getDeadDeposit`) before offering a deposit.
 - **Market identity.** An id is resolved with `idToMarketParams`, and the RPC's
   answer must hash back to the id or it is refused; params given in config are
   hashed to the id and the market must exist (`lastUpdate ≠ 0`). The golden
@@ -101,9 +133,10 @@ await market.withdrawCollateral({ amount: 'max' })
 | `vault.getVault()` | version, factory, name, asset, totalAssets, share price, fees, timelock, curator |
 | `vault.getPosition()` | shares, assets, withdrawable now |
 | `vault.getApy()`, `vault.getStats()` | net APY %, API record |
+| `vault.getDeadDeposit()`, `market.getDeadDeposit()` | shares (and V2 assets) at `0x…dEaD`, whether the dead-deposit rule passes and what failed |
 | `market.getMarket()` | params, tokens, LLTV, oracle price (1e36), accrued state, liquidity, utilization, borrow/supply APY |
 | `market.getPosition(user?)` | supply/borrow shares and assets, collateral, collateral value, max borrow, health factor, LTV, liquidation price |
-| `MorphoApi.listVaults / listMarkets / vault / marketById` | discovery, biggest first, `listed: true` |
+| `MorphoApi.listVaults / listMarkets / vault / marketById` | discovery, biggest first, `listed: true` (V1 and V2; listed is not depositable, see above) |
 
 ## Tests
 

@@ -76,6 +76,8 @@ export const VAULT_V2_ABI = parseAbi([
   'function canSendShares(address account) view returns (bool)',
   'function canReceiveAssets(address account) view returns (bool)',
   'function canSendAssets(address account) view returns (bool)',
+  'function _totalAssets() view returns (uint128)',
+  'function virtualShares() view returns (uint256)',
 ])
 
 export const FACTORY_V1_ABI = parseAbi(['function isMetaMorpho(address target) view returns (bool)', 'function MORPHO() view returns (address)'])

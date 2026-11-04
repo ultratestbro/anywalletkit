@@ -10,7 +10,8 @@ import { ERC20_ABI } from './abi.js'
 import { describeMorphoActivity, parseEvmChainId, presetContext, type MorphoActivityContext } from './activity.js'
 import { MORPHO_CHAINS, type MorphoChain } from './chains.js'
 import { MorphoApi } from './api.js'
-import { MorphoError, toMorphoError } from './errors.js'
+import type { DeadDeposit } from './dead-deposit.js'
+import { MorphoDeadDepositError, MorphoError, toMorphoError } from './errors.js'
 
 export type EvmProvider = string | EIP1193Provider
 
@@ -25,6 +26,12 @@ export interface MorphoBaseConfig {
   api?: string | null
   /** How long an approval may take to mine before the main transaction (default 180 000 ms). */
   waitTimeoutMs?: number
+  /**
+   * Supply / deposit into a market or vault that fails the dead-deposit rule (too few shares at
+   * 0x…dEaD; see `getDeadDeposit`). Default false: refused with `MorphoDeadDepositError`.
+   * Withdrawals are never gated by the rule.
+   */
+  allowWithoutDeadDeposit?: boolean
 }
 
 export interface Tx { to: Address; data: Hex; value: bigint; gasLimit?: bigint }
@@ -188,5 +195,19 @@ export abstract class MorphoBase<TConfig extends MorphoBaseConfig> extends Lendi
       this.read<number>(token, ERC20_ABI, 'decimals').catch(() => 18),
     ])
     return { symbol, decimals: Number(decimals) }
+  }
+
+  /** The dead-deposit rule for this instance's market or vault, read now. */
+  abstract getDeadDeposit(): Promise<DeadDeposit>
+
+  /**
+   * Refuses a supply / deposit into a target that fails the dead-deposit rule, unless the config
+   * opts out. `read` evaluates the rule for state the caller already holds (no second
+   * `getVault` / `resolve`). A failed read propagates: an unanswered check never counts as a pass.
+   */
+  protected async assertDeadDeposit(label: string, kind: 'market' | 'vault', target: string, read: () => Promise<DeadDeposit>): Promise<void> {
+    if (this._config.allowWithoutDeadDeposit === true) return
+    const { failure } = await read()
+    if (failure) throw new MorphoDeadDepositError({ label, kind, target, ...failure })
   }
 }

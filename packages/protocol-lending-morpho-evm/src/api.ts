@@ -1,7 +1,8 @@
 // Morpho's public GraphQL API — discovery (which vaults / markets exist and
 // are listed) and decoration (APY, TVL). Never on a money path: everything the
 // contracts need is read on-chain. Schema as of 2026-10-10 (`listed`, not the
-// older `whitelisted`; markets carry `marketId`).
+// older `whitelisted`; markets carry `marketId`); Vault V2 filters checked by
+// introspection on 2026-11-04 (`vaultV2s(where: VaultV2sFilters)`).
 import type { Address, Hex } from 'viem'
 import { MORPHO_API } from './chains.js'
 
@@ -75,7 +76,13 @@ export class MorphoApi {
     }
   }
 
-  /** Listed vaults on a chain (both generations), optionally for one deposit asset, biggest first. */
+  /**
+   * Listed vaults on a chain (both generations), optionally for one deposit asset, biggest first.
+   * A listing is API data, not a promise that a deposit goes through: caps, Vault V2 gates and the
+   * dead-deposit rule are decided on-chain by `MorphoVaultProtocolEvm` (`getDeadDeposit`,
+   * `quoteSupply`), which refuses with a typed error before anything is approved. A failed V1 or
+   * V2 query throws; it never shortens the list silently.
+   */
   async listVaults(o: { chainId: number; asset?: Address; first?: number; version?: 'v1' | 'v2' }): Promise<ApiVault[]> {
     const where = { chainId_in: [o.chainId], listed: true, ...(o.asset ? { assetAddress_in: [o.asset] } : {}) }
     const first = o.first ?? 50
@@ -86,11 +93,11 @@ export class MorphoApi {
       out.push(...d.vaults.items.map((i) => this.v1(i)))
     }
     if (o.version !== 'v1') {
-      try {
-        const d = await this.query<{ vaultV2s: { items: Record<string, never>[] } }>(
-          `query($where: VaultV2Filters, $first: Int) { vaultV2s(first: $first, where: $where, orderBy: TotalAssetsUsd, orderDirection: Desc) { items { ${VAULT_V2_FIELDS} } } }`, { where, first })
-        out.push(...d.vaultV2s.items.map((i) => this.v2(i)))
-      } catch { /* V2 listing is best effort: the schema is younger */ }
+      // The filter type is `VaultV2sFilters`. Until 2026-11-04 this asked for `VaultV2Filters`, the
+      // API rejected the query and a catch-all here returned V1 vaults only.
+      const d = await this.query<{ vaultV2s: { items: Record<string, never>[] } }>(
+        `query($where: VaultV2sFilters, $first: Int) { vaultV2s(first: $first, where: $where, orderBy: TotalAssetsUsd, orderDirection: Desc) { items { ${VAULT_V2_FIELDS} } } }`, { where, first })
+      out.push(...d.vaultV2s.items.map((i) => this.v2(i)))
     }
     return out.sort((a, b) => (b.totalAssetsUsd ?? 0) - (a.totalAssetsUsd ?? 0))
   }
