@@ -27,6 +27,9 @@ const DEFAULT_SLIPPAGE_BPS = 50;
  *  approval being mined (an Ethereum approve + head wait took >30 s live). */
 const DEFAULT_TTL_MS = 300_000;
 const DEFAULT_DEADLINE_S = 600;
+/** Least gas one v3 pool swap can use (cold pool storage + two token transfers cost far more); a quoter figure
+ *  under this per pool does not measure the swap. */
+const MIN_POOL_GAS = 20_000n;
 
 const QUOTER_ABI = parseAbi([
   "function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)",
@@ -124,10 +127,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const [rf, rw, qf, qw] = await rpc(chainId, [call(d.router, f), call(d.router, w), call(d.quoter, f), call(d.quoter, w)]);
         const addr = (r: unknown) => (typeof r === "string" && r.length >= 42 ? getAddress(`0x${r.slice(-40)}`) : null);
         const wrapped = d.nativeWrap === false ? getAddress(ZERO) : getAddress(d.weth);
-        const ok =
-          [rf, qf].every((r) => addr(r) === getAddress(d.factory)) &&
-          addr(rw) === wrapped &&
-          (d.quoterWeth === false || addr(qw) === wrapped);
+        const ok = [rf, qf].every((r) => addr(r) === getAddress(d.factory)) && addr(rw) === wrapped && addr(qw) === wrapped;
         if (!ok) throw new Error(`uniswap: the router/quoter on chain ${chainId} do not match the pinned deployment — refusing`);
       })();
       p.catch(() => verified.delete(chainId));
@@ -265,8 +265,12 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         if (nativeOut) legs.push(encodeFunctionData({abi: ROUTER_ABI, functionName: "unwrapWETH9", args: [minOut, recipient]}));
         const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineS);
         const data = encodeFunctionData({abi: ROUTER_ABI, functionName: "multicall", args: [deadline, legs]});
-        // Quoter gas covers the pool hops; the router's own overhead and an unwrap ride on top.
-        const gasLimit = (gas * 3n) / 2n + 120_000n + (nativeOut ? 40_000n : 0n);
+        // Quoter gas covers the pool hops; the router's own overhead and an unwrap ride on top. A figure no real pool
+        // swap can cost (0 from a quoter that does not measure gas) is no figure: the limit is then left to the
+        // wallet, which estimates the exact call with headroom right before broadcast, as for THORChain and Chainflip.
+        // A limit derived from it would be the bare overhead, and the swap would run out of gas on chain.
+        const pools = route.single ? 1n : BigInt((route.path!.length - 42) / 46);
+        const gasLimit = gas >= MIN_POOL_GAS * pools ? (gas * 3n) / 2n + 120_000n + (nativeOut ? 40_000n : 0n) : undefined;
 
         return {
           provider: "uniswap",
@@ -278,7 +282,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
             data,
             value: nativeIn ? amountIn.toString() : "0",
             chainId,
-            gasLimit: gasLimit.toString(),
+            ...(gasLimit !== undefined ? {gasLimit: gasLimit.toString()} : {}),
             ...(nativeIn ? {} : {approvalAddress: d.router}),
           },
           sourceAmount: amountIn.toString(),
