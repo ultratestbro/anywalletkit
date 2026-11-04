@@ -14,6 +14,426 @@
    "label": "LI.FI Diamond contracts releases"
   },
   {
+   "id": "diamond-selectors-ethereum",
+   "type": "evm-selectors",
+   "chainId": 1,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Ethereum"
+  },
+  {
+   "id": "diamond-selectors-base",
+   "type": "evm-selectors",
+   "chainId": 8453,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Base"
+  },
+  {
+   "id": "diamond-selectors-bnb-chain",
+   "type": "evm-selectors",
+   "chainId": 56,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 BNB Chain"
+  },
+  {
+   "id": "diamond-selectors-polygon",
+   "type": "evm-selectors",
+   "chainId": 137,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Polygon"
+  },
+  {
+   "id": "diamond-selectors-arbitrum",
+   "type": "evm-selectors",
+   "chainId": 42161,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Arbitrum"
+  },
+  {
+   "id": "diamond-selectors-optimism",
+   "type": "evm-selectors",
+   "chainId": 10,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Optimism"
+  },
+  {
+   "id": "diamond-selectors-gnosis",
+   "type": "evm-selectors",
+   "chainId": 100,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Gnosis"
+  },
+  {
+   "id": "diamond-selectors-monad",
+   "type": "evm-selectors",
+   "chainId": 143,
+   "address": "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Monad"
+  },
+  {
+   "id": "diamond-selectors-unichain",
+   "type": "evm-selectors",
+   "chainId": 130,
+   "address": "0x864b314D4C5a0399368609581d3E8933a63b9232",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Unichain"
+  },
+  {
+   "id": "diamond-selectors-hyperevm",
+   "type": "evm-selectors",
+   "chainId": 999,
+   "address": "0x0a0758d937d1059c356D4714e57F5df0239bce1A",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 HyperEVM"
+  },
+  {
+   "id": "diamond-selectors-robinhood-chain",
+   "type": "evm-selectors",
+   "chainId": 4663,
+   "address": "0xB477751B76CF82d00a686A1232f5fCD772414Af3",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Robinhood Chain"
+  },
+  {
+   "id": "diamond-selectors-avalanche",
+   "type": "evm-selectors",
+   "chainId": 43114,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Avalanche"
+  },
+  {
+   "id": "diamond-selectors-scroll",
+   "type": "evm-selectors",
+   "chainId": 534352,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Scroll"
+  },
+  {
+   "id": "diamond-selectors-berachain",
+   "type": "evm-selectors",
+   "chainId": 80094,
+   "address": "0xf909c4Ae16622898b885B89d7F839E0244851c66",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Berachain"
+  },
+  {
+   "id": "diamond-selectors-zksync-era",
+   "type": "evm-selectors",
+   "chainId": 324,
+   "address": "0x341e94069f53234fE6DabeF707aD424830525715",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 zkSync Era"
+  },
+  {
+   "id": "diamond-selectors-celo",
+   "type": "evm-selectors",
+   "chainId": 42220,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Celo"
+  },
+  {
+   "id": "diamond-selectors-megaeth",
+   "type": "evm-selectors",
+   "chainId": 4326,
+   "address": "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 MegaETH"
+  },
+  {
+   "id": "diamond-selectors-plasma",
+   "type": "evm-selectors",
+   "chainId": 9745,
+   "address": "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Plasma"
+  },
+  {
+   "id": "diamond-selectors-linea",
+   "type": "evm-selectors",
+   "chainId": 59144,
+   "address": "0xDE1E598b81620773454588B85D6b5D4eEC32573e",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Linea"
+  },
+  {
+   "id": "diamond-selectors-sonic",
+   "type": "evm-selectors",
+   "chainId": 146,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Sonic"
+  },
+  {
+   "id": "diamond-selectors-world-chain",
+   "type": "evm-selectors",
+   "chainId": 480,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 World Chain"
+  },
+  {
+   "id": "diamond-selectors-sei",
+   "type": "evm-selectors",
+   "chainId": 1329,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Sei"
+  },
+  {
+   "id": "diamond-selectors-ink",
+   "type": "evm-selectors",
+   "chainId": 57073,
+   "address": "0x864b314D4C5a0399368609581d3E8933a63b9232",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Ink"
+  },
+  {
+   "id": "diamond-selectors-plume",
+   "type": "evm-selectors",
+   "chainId": 98866,
+   "address": "0x6f5C8Bb0C5Fe4ECeAC40EE1C238EaB6bbb29761c",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Plume"
+  },
+  {
+   "id": "diamond-selectors-x-layer",
+   "type": "evm-selectors",
+   "chainId": 196,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 X Layer"
+  },
+  {
+   "id": "diamond-selectors-arc",
+   "type": "evm-selectors",
+   "chainId": 5042,
+   "address": "0xA4072583658Fae592A3506A42431cb6316a8d40b",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Arc"
+  },
+  {
+   "id": "diamond-selectors-mantle",
+   "type": "evm-selectors",
+   "chainId": 5000,
+   "address": "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Mantle"
+  },
+  {
+   "id": "diamond-selectors-katana",
+   "type": "evm-selectors",
+   "chainId": 747474,
+   "address": "0xC59fe32C9549e3E8B5dCcdAbC45BD287Bd5bA2bc",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Katana"
+  },
+  {
+   "id": "diamond-selectors-morph",
+   "type": "evm-selectors",
+   "chainId": 2818,
+   "address": "0xF7aB42D00D2399f8A4Fba2F15466Be40709fe307",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Morph"
+  },
+  {
+   "id": "diamond-selectors-flare",
+   "type": "evm-selectors",
+   "chainId": 14,
+   "address": "0x198FC70Dfe05E755C81e54bd67Bff3F729344B9b",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Flare"
+  },
+  {
    "id": "chains",
    "type": "http-json",
    "url": "https://li.quest/v1/chains",

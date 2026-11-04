@@ -39,6 +39,12 @@
         "</main>"
       ],
       "label": "NEAR Intents docs · chain & address support"
+    },
+    {
+      "id": "docs-changelog",
+      "type": "http-text",
+      "url": "https://docs.near-intents.org/changelog/overview.md",
+      "label": "NEAR Intents docs · changelog"
     }
   ]
 }

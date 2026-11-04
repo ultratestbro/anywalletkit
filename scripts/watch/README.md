@@ -29,14 +29,18 @@ node scripts/watch/watch.mjs [--only aave,morpho] [--send] [--dry]              
     {"id": "deployments", "type": "github-file", "repo": "owner/repo", "path": "deployments/mainnet.json", "ref": "main"},
     {"id": "chains", "type": "http-json", "url": "https://li.quest/v1/chains", "path": "chains", "itemKey": "id", "label": "LI.FI chains"},
     {"id": "docs-fees", "type": "http-text", "url": "https://developers.circle.com/cctp/…", "between": ["<main", "</main>"], "label": "CCTP fee docs"},
-    {"id": "blog", "type": "rss", "url": "https://blog.example.com/rss.xml"}
+    {"id": "blog", "type": "rss", "url": "https://blog.example.com/rss.xml"},
+    {"id": "deployments-status", "type": "json-pins", "url": "https://developers.uniswap.org/deployments.json", "format": "uniswap-deployments",
+     "pins": {"from": "dist/index.js", "export": "UNISWAP_V3", "group": "$key", "roles": {"quoter": "QuoterV2"}}, "status": "active"},
+    {"id": "diamond-selectors-base", "type": "evm-selectors", "chainId": 8453, "address": "0x1231…4EaE",
+     "selectors": {"file": "src/calldata.ts", "consts": ["BRIDGE_CALLS", "GENERIC_SWAPS"]}}
   ]
 }
 ```
 
 | type | what is compared | needs |
 |---|---|---|
-| `evm-proxy` | EIP-1967 implementation / admin / beacon slots + code hash of the address | `chainId`, `address` |
+| `evm-proxy` | EIP-1967 implementation / admin / beacon slots + code hash of the address; with no EIP-1967 slot, the address's own `implementation()` (AragonProxy stETH, FiatTokenProxy USDC) — only a revert reads as "none", any other RPC failure keeps the previous value | `chainId`, `address` |
 | `evm-code` | keccak256 of `eth_getCode` | `chainId`, `address` |
 | `solana-program` | programdata `slot` (last deploy) + upgrade `authority` | `programId` |
 | `ton-code` | sha256 of the account code cell | `address` |
@@ -45,6 +49,12 @@ node scripts/watch/watch.mjs [--only aave,morpho] [--send] [--dry]              
 | `http-json` | sha256 of canonical JSON; with `path` + `itemKey` the diff names added / removed items | `url`, optional `path` (dot path to an array), `itemKey`, `headers` |
 | `http-text` | sha256 of the visible text (scripts / styles / tags stripped), optionally only `between` two markers | `url`, optional `between` |
 | `rss` | the newest item titles + links | `url` |
+| `json-pins` | every address the module pins, loaded from its **built** entry (`pins.from`, inside the package: the watch job runs `pnpm build` first), looked up in the official list `format` reads from `url` (`uniswap-deployments`: deployments.json; `aave-docs-markets`: the market tables embedded in aave.com/docs/reference/addresses): listed in its group, under the contract name `roles` gives it, with `status` when set. A listing / name / status change is a diff; a failing pin is reported **on every run** until fixed | `url`, `format`, `pins` (`from`, `export`, optional `call`, `group` = a field or `$key`, `roles` = field → contract name), optional `status` |
+| `evm-selectors` | what each selector the module accepts resolves to on a Diamond (DiamondLoupe `facets()`, one call); the selectors are read from the module's source on every run (`selectors.file`, keys of `selectors.consts`), so they never drift. A selector whose facet is removed or replaced, or that the source starts / stops listing, is a diff | `chainId`, `address`, `selectors` |
+
+A source whose `type` changed in the manifest, and an `evm-proxy` whose first-ever `implementation()` reading is its only change, take a new baseline without a diff (the old value came from another fetcher; nothing changed upstream). That second exemption is one-time: every reading that asked `implementation()` is stored with `implProbe: true`, and on a probed proxy an `implementation()` that starts answering is reported like any upgrade.
+
+Each stored value also records its `target` (`chainId`, `address`, `programId`, `url`, `repo`, `path`, `ref` from the manifest; EVM addresses lowercased). When the manifest points an existing id somewhere else, the old value belongs to the old target: the source takes a new baseline and the digest lists it under **Re-pointed (new baseline, not a change)** instead of reporting a code change. Entries stored before targets existed are compared as before and get their target on the next run.
 
 Rules for manifests: addresses and program ids must be the ones the module's source actually calls (copy them from `src/`), one entry per chain the module supports where the address differs; repos must be the protocol's official org; API URLs the ones the provider code requests. `label` is what people read in the digest — name the contract and the chain.
 

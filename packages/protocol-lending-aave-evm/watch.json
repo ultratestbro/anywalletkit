@@ -421,13 +421,22 @@
     },
     {
       "id": "docs-addresses",
-      "type": "http-text",
-      "url": "https://aave.com/docs/resources/addresses",
-      "between": [
-        "<main",
-        "</main>"
-      ],
-      "label": "Aave docs · deployed addresses"
+      "type": "json-pins",
+      "url": "https://aave.com/docs/reference/addresses",
+      "format": "aave-docs-markets",
+      "pins": {
+        "from": "dist/index.js",
+        "export": "listMarkets",
+        "call": true,
+        "group": "name",
+        "roles": {
+          "addressesProvider": "PoolAddressesProvider",
+          "pool": "Pool",
+          "dataProvider": "AaveProtocolDataProvider",
+          "wethGateway": "WrappedTokenGatewayV3"
+        }
+      },
+      "label": "Aave docs · deployed addresses (every pinned V3 market contract)"
     }
   ]
 }
