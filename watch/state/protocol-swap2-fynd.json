@@ -3,46 +3,61 @@
  "sources": {
   "router-registry": {
    "type": "github-file",
+   "target": {
+    "repo": "propeller-heads/tycho",
+    "path": "crates/tycho-execution/config/deployment_registry.json"
+   },
    "value": "c50ba4a5610bb86c0b3a9664667cc2c33580e30b",
    "meta": {
     "sha": "c50ba4a561",
     "url": "https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/config/deployment_registry.json"
    },
-   "seenAt": "2026-11-04T09:36:08.272Z",
+   "seenAt": "2026-11-04T17:01:42.808Z",
    "changedAt": "2026-11-04T09:36:08.272Z"
   },
   "fynd-license": {
    "type": "github-file",
+   "target": {
+    "repo": "propeller-heads/fynd",
+    "path": "LICENSE.md"
+   },
    "value": "1caf1ec20a2698f6ca09755577a90d68e6a87d86",
    "meta": {
     "sha": "1caf1ec20a",
     "url": "https://github.com/propeller-heads/fynd/blob/main/LICENSE.md"
    },
-   "seenAt": "2026-11-04T09:36:08.308Z",
+   "seenAt": "2026-11-04T17:01:42.872Z",
    "changedAt": "2026-11-04T09:36:08.308Z"
   },
   "hosted-api-docs": {
    "type": "github-file",
-   "value": "e7197e07b11f368eee6c1617dc31967261e0cc63",
+   "target": {
+    "repo": "propeller-heads/fynd",
+    "path": "docs/get-started/hosted-api.md"
+   },
+   "value": "0af5fb17dbf11ba71d349f6c8121e5e2b00bae1e",
    "meta": {
-    "sha": "e7197e07b1",
+    "sha": "0af5fb17db",
     "url": "https://github.com/propeller-heads/fynd/blob/main/docs/get-started/hosted-api.md"
    },
-   "seenAt": "2026-11-04T09:36:08.355Z",
-   "changedAt": "2026-11-04T09:36:08.355Z"
+   "seenAt": "2026-11-04T17:01:42.878Z",
+   "changedAt": "2026-11-04T17:01:42.878Z"
   },
   "fynd-releases": {
    "type": "github-releases",
-   "value": "0.119.0",
+   "target": {
+    "repo": "propeller-heads/fynd"
+   },
+   "value": "0.120.0",
    "meta": {
-    "tag": "0.119.0",
-    "name": "0.119.0",
-    "at": "2026-11-03",
-    "url": "https://github.com/propeller-heads/fynd/releases/tag/0.119.0",
+    "tag": "0.120.0",
+    "name": "0.120.0",
+    "at": "2026-11-04",
+    "url": "https://github.com/propeller-heads/fynd/releases/tag/0.120.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-04T09:36:08.518Z",
-   "changedAt": "2026-11-04T09:36:08.518Z"
+   "seenAt": "2026-11-04T17:01:42.993Z",
+   "changedAt": "2026-11-04T17:01:42.993Z"
   }
  }
 }

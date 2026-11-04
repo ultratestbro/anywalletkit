@@ -3,48 +3,69 @@
  "sources": {
   "weth-gateway-ethereum-lido": {
    "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x3167c452fa3fa1e5c16bb83bc0fde4519c464299"
+   },
    "value": "b5b576bcd8c9f517",
    "meta": {
     "codeHash": "b5b576bcd8c9f517",
     "bytes": 5428
    },
-   "seenAt": "2026-11-04T09:35:46.486Z",
+   "seenAt": "2026-11-04T17:01:28.087Z",
    "changedAt": "2026-10-14T15:10:24.405Z"
   },
   "weth-gateway-ethereum-core": {
    "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0xd01607c3c5ecaba394d8be377a08590149325722"
+   },
    "value": "d0bdfd6d94577da3",
    "meta": {
     "codeHash": "d0bdfd6d94577da3",
     "bytes": 5428
    },
-   "seenAt": "2026-11-04T09:35:46.453Z",
+   "seenAt": "2026-11-04T17:01:28.086Z",
    "changedAt": "2026-10-14T15:10:24.405Z"
   },
   "addresses-provider-ethereum-lido": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 1,
+    "address": "0xcfbf336fe147d643b9cb705648500e101504b16d"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"a5fcdc4c880b7696\",\"impl\":null}",
    "meta": {
     "codeHash": "a5fcdc4c880b7696",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:46.469Z",
+   "seenAt": "2026-11-04T17:01:28.102Z",
    "changedAt": "2026-10-14T15:10:24.418Z"
   },
   "weth-gateway-ethereum-etherfi": {
    "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0xf956b38f035dc9067fb827a512d3cf35202ab0bc"
+   },
    "value": "a1f6df67f836ce9b",
    "meta": {
     "codeHash": "a1f6df67f836ce9b",
     "bytes": 5428
    },
-   "seenAt": "2026-11-04T09:35:46.491Z",
+   "seenAt": "2026-11-04T17:01:28.099Z",
    "changedAt": "2026-10-14T15:10:24.519Z"
   },
   "pool-ethereum-lido": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 1,
+    "address": "0x4e033931ad43597d96d6bcc25c280717730b58b1"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"8521df04061ab877\",\"impl\":\"0x78680a9ac74b093571e7a5b76636248f031d9bc2\",\"implCodeHash\":\"34d94162536e5adb\"}",
    "meta": {
     "codeHash": "8521df04061ab877",
@@ -53,23 +74,32 @@
     "beacon": null,
     "implCodeHash": "34d94162536e5adb"
    },
-   "seenAt": "2026-11-04T09:35:46.519Z",
+   "seenAt": "2026-11-04T17:01:28.111Z",
    "changedAt": "2026-10-14T15:10:24.523Z"
   },
   "addresses-provider-ethereum-core": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 1,
+    "address": "0x2f39d218133afab8f2b819b1066c7e434ad94e9e"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"9a005806d96339f2\",\"impl\":null}",
    "meta": {
     "codeHash": "9a005806d96339f2",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:46.442Z",
+   "seenAt": "2026-11-04T17:01:28.079Z",
    "changedAt": "2026-10-14T15:10:24.558Z"
   },
   "pool-ethereum-core": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 1,
+    "address": "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"a2842eb755ed0bd8\",\"impl\":\"0x728a138a4823392c2efa55e028d434f526fe03cf\",\"implCodeHash\":\"9998171167267357\"}",
    "meta": {
     "codeHash": "a2842eb755ed0bd8",
@@ -78,11 +108,15 @@
     "beacon": null,
     "implCodeHash": "9998171167267357"
    },
-   "seenAt": "2026-11-04T09:35:46.470Z",
+   "seenAt": "2026-11-04T17:01:28.093Z",
    "changedAt": "2026-10-14T15:10:24.588Z"
   },
   "pool-ethereum-etherfi": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 1,
+    "address": "0x0aa97c284e98396202b6a04024f5e2c65026f3c0"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"0520760524d97942\",\"impl\":\"0x0f3bceb6b3b2dfb7f0ac58fcbf6dadd23cf34244\",\"implCodeHash\":\"6afc6dcfc95c363c\"}",
    "meta": {
     "codeHash": "0520760524d97942",
@@ -91,57 +125,80 @@
     "beacon": null,
     "implCodeHash": "6afc6dcfc95c363c"
    },
-   "seenAt": "2026-11-04T09:35:46.512Z",
+   "seenAt": "2026-11-04T17:01:28.115Z",
    "changedAt": "2026-10-14T15:10:24.593Z"
   },
   "addresses-provider-op-mainnet": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 10,
+    "address": "0xa97684ead0e402dc232d5a977953df7ecbab3cdb"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"b4425bc332855de6\",\"impl\":null}",
    "meta": {
     "codeHash": "b4425bc332855de6",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:46.520Z",
+   "seenAt": "2026-11-04T17:01:28.183Z",
    "changedAt": "2026-10-14T15:10:24.862Z"
   },
   "addresses-provider-ethereum-etherfi": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 1,
+    "address": "0xeba440b438ad808101d1c451c1c5322c90befcda"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"a5fcdc4c880b7696\",\"impl\":null}",
    "meta": {
     "codeHash": "a5fcdc4c880b7696",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:46.502Z",
+   "seenAt": "2026-11-04T17:01:28.103Z",
    "changedAt": "2026-10-14T15:10:24.917Z"
   },
   "addresses-provider-bnb-chain": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 56,
+    "address": "0xff75b6da14ffbbfd355daf7a2731456b3562ba6d"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"edd6f98876569b4a\",\"impl\":null}",
    "meta": {
     "codeHash": "edd6f98876569b4a",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:46.738Z",
+   "seenAt": "2026-11-04T17:01:28.216Z",
    "changedAt": "2026-10-14T15:10:24.922Z"
   },
   "weth-gateway-op-mainnet": {
    "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0x5f2508cae9923b02316254026cd43d7902866725"
+   },
    "value": "806c7bef0fb08523",
    "meta": {
     "codeHash": "806c7bef0fb08523",
     "bytes": 5428
    },
-   "seenAt": "2026-11-04T09:35:46.545Z",
+   "seenAt": "2026-11-04T17:01:28.166Z",
    "changedAt": "2026-10-14T15:10:24.927Z"
   },
   "pool-op-mainnet": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 10,
+    "address": "0x794a61358d6845594f94dc1db02a252b5b4814ad"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"9190cf493c3977b5\",\"impl\":\"0x66185e53343336d4faea5317d1fcca103dd4088d\",\"implCodeHash\":\"21822df78a48d8ab\"}",
    "meta": {
     "codeHash": "9190cf493c3977b5",
@@ -150,11 +207,15 @@
     "beacon": null,
     "implCodeHash": "21822df78a48d8ab"
    },
-   "seenAt": "2026-11-04T09:35:46.566Z",
+   "seenAt": "2026-11-04T17:01:28.230Z",
    "changedAt": "2026-10-14T15:10:24.948Z"
   },
   "pool-bnb-chain": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 56,
+    "address": "0x6807dc923806fe8fd134338eabca509979a7e0cb"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"527bff036822502a\",\"impl\":\"0x5e2b0fcc5b9734c7ec0a03401ee9e6805f783b6d\",\"implCodeHash\":\"a65eccc67282758d\"}",
    "meta": {
     "codeHash": "527bff036822502a",
@@ -163,33 +224,46 @@
     "beacon": null,
     "implCodeHash": "a65eccc67282758d"
    },
-   "seenAt": "2026-11-04T09:35:46.748Z",
+   "seenAt": "2026-11-04T17:01:28.235Z",
    "changedAt": "2026-10-14T15:10:25.056Z"
   },
   "weth-gateway-bnb-chain": {
    "type": "evm-code",
+   "target": {
+    "chainId": 56,
+    "address": "0x0c2c95b24529664fe55d4437d7a31175cfe6c4f7"
+   },
    "value": "d186b12e423a9d6e",
    "meta": {
     "codeHash": "d186b12e423a9d6e",
     "bytes": 5428
    },
-   "seenAt": "2026-11-04T09:35:46.731Z",
+   "seenAt": "2026-11-04T17:01:28.227Z",
    "changedAt": "2026-10-14T15:10:25.132Z"
   },
   "addresses-provider-gnosis": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 100,
+    "address": "0x36616cf17557639614c1cddb356b1b83fc0b2132"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"edd6f98876569b4a\",\"impl\":null}",
    "meta": {
     "codeHash": "edd6f98876569b4a",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:46.653Z",
+   "seenAt": "2026-11-04T17:01:28.338Z",
    "changedAt": "2026-10-14T15:10:25.270Z"
   },
   "pool-gnosis": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 100,
+    "address": "0xb50201558b00496a145fe76f7424749556e326d8"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"413c7b8a660078de\",\"impl\":\"0x567048e77778a1a9067c6c97527623ceafed7961\",\"implCodeHash\":\"16fd7bb9249507e3\"}",
    "meta": {
     "codeHash": "413c7b8a660078de",
@@ -198,55 +272,77 @@
     "beacon": null,
     "implCodeHash": "16fd7bb9249507e3"
    },
-   "seenAt": "2026-11-04T09:35:46.835Z",
+   "seenAt": "2026-11-04T17:01:28.335Z",
    "changedAt": "2026-10-14T15:10:25.403Z"
   },
   "weth-gateway-polygon": {
    "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0xbc302053db3aa514a3c86b9221082f162b91ad63"
+   },
    "value": "e22743fe5432c25c",
    "meta": {
     "codeHash": "e22743fe5432c25c",
     "bytes": 5428
    },
-   "seenAt": "2026-11-04T09:35:46.770Z",
+   "seenAt": "2026-11-04T17:01:28.298Z",
    "changedAt": "2026-10-14T15:10:25.473Z"
   },
   "addresses-provider-polygon": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 137,
+    "address": "0xa97684ead0e402dc232d5a977953df7ecbab3cdb"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"b4425bc332855de6\",\"impl\":null}",
    "meta": {
     "codeHash": "b4425bc332855de6",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:46.736Z",
+   "seenAt": "2026-11-04T17:01:28.301Z",
    "changedAt": "2026-10-14T15:10:25.534Z"
   },
   "weth-gateway-gnosis": {
    "type": "evm-code",
+   "target": {
+    "chainId": 100,
+    "address": "0x721b9abab6511b46b9ee83a1aba23bdacb004149"
+   },
    "value": "d885340a86377935",
    "meta": {
     "codeHash": "d885340a86377935",
     "bytes": 5387
    },
-   "seenAt": "2026-11-04T09:35:46.732Z",
+   "seenAt": "2026-11-04T17:01:28.251Z",
    "changedAt": "2026-10-14T15:10:25.817Z"
   },
   "addresses-provider-zksync-era": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 324,
+    "address": "0x2a3948bb219d6b2fa83d64100006391a96be6cb7"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"dde9cdac198c509c\",\"impl\":null}",
    "meta": {
     "codeHash": "dde9cdac198c509c",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:47.863Z",
+   "seenAt": "2026-11-04T17:01:29.229Z",
    "changedAt": "2026-10-14T15:10:26.149Z"
   },
   "pool-polygon": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 137,
+    "address": "0x794a61358d6845594f94dc1db02a252b5b4814ad"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"9190cf493c3977b5\",\"impl\":\"0x6030db989d47cd74fc17bb6f4fcd3a8b29fee57e\",\"implCodeHash\":\"85a4de7b2316043c\"}",
    "meta": {
     "codeHash": "9190cf493c3977b5",
@@ -255,21 +351,29 @@
     "beacon": null,
     "implCodeHash": "85a4de7b2316043c"
    },
-   "seenAt": "2026-11-04T09:35:46.783Z",
+   "seenAt": "2026-11-04T17:01:28.313Z",
    "changedAt": "2026-10-14T15:10:26.177Z"
   },
   "weth-gateway-zksync-era": {
    "type": "evm-code",
+   "target": {
+    "chainId": 324,
+    "address": "0xae2b00d676130bdf22582781bbba8f4f21e8b0ff"
+   },
    "value": "b531d83d466aa961",
    "meta": {
     "codeHash": "b531d83d466aa961",
     "bytes": 22176
    },
-   "seenAt": "2026-11-04T09:35:48.034Z",
+   "seenAt": "2026-11-04T17:01:29.356Z",
    "changedAt": "2026-10-14T15:10:26.344Z"
   },
   "pool-zksync-era": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 324,
+    "address": "0x78e30497a3c7527d953c6b1e3541b021a98ac43c"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"6daec9d0eda73e7c\",\"impl\":\"0xa42190585dd42bbe504f57f1c580354da5862f40\",\"implCodeHash\":\"46acf4c367b68966\"}",
    "meta": {
     "codeHash": "6daec9d0eda73e7c",
@@ -278,45 +382,63 @@
     "beacon": null,
     "implCodeHash": "46acf4c367b68966"
    },
-   "seenAt": "2026-11-04T09:35:47.979Z",
+   "seenAt": "2026-11-04T17:01:29.391Z",
    "changedAt": "2026-10-14T15:10:26.690Z"
   },
   "addresses-provider-sonic": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 146,
+    "address": "0x5c2e738f6e27bce0f7558051bf90605dd6176900"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"c34af1d969a34cf4\",\"impl\":null}",
    "meta": {
     "codeHash": "c34af1d969a34cf4",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:47.761Z",
+   "seenAt": "2026-11-04T17:01:29.100Z",
    "changedAt": "2026-10-14T15:10:26.847Z"
   },
   "addresses-provider-metis": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 1088,
+    "address": "0xb9fabd7500b2c6781c35dd48d54f81fc2299d7af"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"6a3f62a9a38e2c7b\",\"impl\":null}",
    "meta": {
     "codeHash": "6a3f62a9a38e2c7b",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:48.238Z",
+   "seenAt": "2026-11-04T17:01:30.667Z",
    "changedAt": "2026-10-14T15:10:27.028Z"
   },
   "weth-gateway-sonic": {
    "type": "evm-code",
+   "target": {
+    "chainId": 146,
+    "address": "0x061d8e131f26512348ee5fa42e2df1ba9d6505e9"
+   },
    "value": "b8a5b27dca5208fd",
    "meta": {
     "codeHash": "b8a5b27dca5208fd",
     "bytes": 5387
    },
-   "seenAt": "2026-11-04T09:35:48.258Z",
+   "seenAt": "2026-11-04T17:01:29.365Z",
    "changedAt": "2026-10-14T15:10:27.091Z"
   },
   "pool-sonic": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 146,
+    "address": "0x5362dbb1e601abf3a4c14c22ffeda64042e5eaa3"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"45f3f166e1705207\",\"impl\":\"0x3ece05ac893ac406b83aea6796539464bd9d2db5\",\"implCodeHash\":\"272697a34d982faf\"}",
    "meta": {
     "codeHash": "45f3f166e1705207",
@@ -325,23 +447,32 @@
     "beacon": null,
     "implCodeHash": "272697a34d982faf"
    },
-   "seenAt": "2026-11-04T09:35:48.323Z",
+   "seenAt": "2026-11-04T17:01:29.471Z",
    "changedAt": "2026-10-14T15:10:27.178Z"
   },
   "addresses-provider-soneium": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 1868,
+    "address": "0x82405d1a189bd6ce4667809c35b37fbe136a4c5b"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"c34af1d969a34cf4\",\"impl\":null}",
    "meta": {
     "codeHash": "c34af1d969a34cf4",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:48.592Z",
+   "seenAt": "2026-11-04T17:01:29.810Z",
    "changedAt": "2026-10-14T15:10:27.191Z"
   },
   "pool-metis": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 1088,
+    "address": "0x90df02551bb792286e8d4f13e0e357b4bf1d6a57"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"2828b97143ae8880\",\"impl\":\"0x56b814e2ea4ae621b48fdc740850c3bba81d8251\",\"implCodeHash\":\"8bc8ad1179134889\"}",
    "meta": {
     "codeHash": "2828b97143ae8880",
@@ -350,65 +481,91 @@
     "beacon": null,
     "implCodeHash": "8bc8ad1179134889"
    },
-   "seenAt": "2026-11-04T09:35:48.159Z",
+   "seenAt": "2026-11-04T17:01:29.984Z",
    "changedAt": "2026-10-14T15:10:27.370Z"
   },
   "weth-gateway-soneium": {
    "type": "evm-code",
+   "target": {
+    "chainId": 1868,
+    "address": "0x6376d4df995f32f308f2d5049a7a320943023232"
+   },
    "value": "9f493510d4a97465",
    "meta": {
     "codeHash": "9f493510d4a97465",
     "bytes": 5387
    },
-   "seenAt": "2026-11-04T09:35:48.939Z",
+   "seenAt": "2026-11-04T17:01:30.102Z",
    "changedAt": "2026-10-14T15:10:27.571Z"
   },
   "addresses-provider-mantle": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 5000,
+    "address": "0xba50cd2a20f6da35d788639e581bca8d0b5d4d5f"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"b61c932fcffff73a\",\"impl\":null}",
    "meta": {
     "codeHash": "b61c932fcffff73a",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:48.937Z",
+   "seenAt": "2026-11-04T17:01:30.601Z",
    "changedAt": "2026-10-14T15:10:27.647Z"
   },
   "addresses-provider-base": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 8453,
+    "address": "0xe20fcbdbffc4dd138ce8b2e6fbb6cb49777ad64d"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"98587ef020f05720\",\"impl\":null}",
    "meta": {
     "codeHash": "98587ef020f05720",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:48.846Z",
+   "seenAt": "2026-11-04T17:01:30.343Z",
    "changedAt": "2026-10-14T15:10:27.713Z"
   },
   "weth-gateway-mantle": {
    "type": "evm-code",
+   "target": {
+    "chainId": 5000,
+    "address": "0x9c6ccac66b1c9aba4855e2dd284b9e16e41e06ea"
+   },
    "value": "83af0019dce61ca5",
    "meta": {
     "codeHash": "83af0019dce61ca5",
     "bytes": 5365
    },
-   "seenAt": "2026-11-04T09:35:49.271Z",
+   "seenAt": "2026-11-04T17:01:30.533Z",
    "changedAt": "2026-10-14T15:10:27.755Z"
   },
   "weth-gateway-base": {
    "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0xa0d9c1e9e48ca30c8d8c3b5d69ff5dc1f6dffc24"
+   },
    "value": "b0e9997e21798f66",
    "meta": {
     "codeHash": "b0e9997e21798f66",
     "bytes": 5428
    },
-   "seenAt": "2026-11-04T09:35:48.901Z",
+   "seenAt": "2026-11-04T17:01:30.354Z",
    "changedAt": "2026-10-14T15:10:28.009Z"
   },
   "pool-base": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 8453,
+    "address": "0xa238dd80c259a72e81d7e4664a9801593f98d1c5"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"9c5b83ded9e7a8cb\",\"impl\":\"0xa4abc5fcba6d0d7e3d144d6dbf6cb6128599dfdb\",\"implCodeHash\":\"44b987979cf2e4da\"}",
    "meta": {
     "codeHash": "9c5b83ded9e7a8cb",
@@ -417,11 +574,15 @@
     "beacon": null,
     "implCodeHash": "44b987979cf2e4da"
    },
-   "seenAt": "2026-11-04T09:35:48.891Z",
+   "seenAt": "2026-11-04T17:01:30.351Z",
    "changedAt": "2026-10-14T15:10:28.010Z"
   },
   "pool-soneium": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 1868,
+    "address": "0xdd3d7a7d03d9fd9ef45f3e587287922ef65ca38b"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"b60e32371ffd1564\",\"impl\":\"0xf2225a9099ac572b65214cb63cd9482370b1f9f6\",\"implCodeHash\":\"8fc264db400f31fe\"}",
    "meta": {
     "codeHash": "b60e32371ffd1564",
@@ -430,21 +591,29 @@
     "beacon": null,
     "implCodeHash": "8fc264db400f31fe"
    },
-   "seenAt": "2026-11-04T09:35:49.064Z",
+   "seenAt": "2026-11-04T17:01:30.011Z",
    "changedAt": "2026-10-14T15:10:28.116Z"
   },
   "weth-gateway-plasma": {
    "type": "evm-code",
+   "target": {
+    "chainId": 9745,
+    "address": "0x54bdcc37c4143f944a3ee51c892a6cbdf305e7a0"
+   },
    "value": "5436029a6b6bfd44",
    "meta": {
     "codeHash": "5436029a6b6bfd44",
     "bytes": 5365
    },
-   "seenAt": "2026-11-04T09:35:49.170Z",
+   "seenAt": "2026-11-04T17:01:30.431Z",
    "changedAt": "2026-10-14T15:10:28.306Z"
   },
   "pool-plasma": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 9745,
+    "address": "0x925a2a7214ed92428b5b1b090f80b25700095e12"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"192019a50051f8f0\",\"impl\":\"0xcd23ff25e658395e0fe1ce4803059144707a6223\",\"implCodeHash\":\"d2aec1b150df4afd\"}",
    "meta": {
     "codeHash": "192019a50051f8f0",
@@ -453,11 +622,15 @@
     "beacon": null,
     "implCodeHash": "d2aec1b150df4afd"
    },
-   "seenAt": "2026-11-04T09:35:49.274Z",
+   "seenAt": "2026-11-04T17:01:30.426Z",
    "changedAt": "2026-10-14T15:10:28.306Z"
   },
   "pool-mantle": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 5000,
+    "address": "0x458f293454fe0d67ec0655f3672301301dd51422"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"7ee63ab61cf922cc\",\"impl\":\"0x13e24a78936468bf35cb8647b08db5ad758b55a5\",\"implCodeHash\":\"5caae3b89295c188\"}",
    "meta": {
     "codeHash": "7ee63ab61cf922cc",
@@ -466,67 +639,94 @@
     "beacon": null,
     "implCodeHash": "5caae3b89295c188"
    },
-   "seenAt": "2026-11-04T09:35:49.612Z",
+   "seenAt": "2026-11-04T17:01:30.761Z",
    "changedAt": "2026-10-14T15:10:28.311Z"
   },
   "addresses-provider-plasma": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 9745,
+    "address": "0x061d8e131f26512348ee5fa42e2df1ba9d6505e9"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"b61c932fcffff73a\",\"impl\":null}",
    "meta": {
     "codeHash": "b61c932fcffff73a",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:49.159Z",
+   "seenAt": "2026-11-04T17:01:30.417Z",
    "changedAt": "2026-10-14T15:10:28.314Z"
   },
   "addresses-provider-avalanche": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 43114,
+    "address": "0xa97684ead0e402dc232d5a977953df7ecbab3cdb"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"b4425bc332855de6\",\"impl\":null}",
    "meta": {
     "codeHash": "b4425bc332855de6",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:49.388Z",
+   "seenAt": "2026-11-04T17:01:30.932Z",
    "changedAt": "2026-10-14T15:10:28.533Z"
   },
   "addresses-provider-arbitrum": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 42161,
+    "address": "0xa97684ead0e402dc232d5a977953df7ecbab3cdb"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"b4425bc332855de6\",\"impl\":null}",
    "meta": {
     "codeHash": "b4425bc332855de6",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:49.095Z",
+   "seenAt": "2026-11-04T17:01:30.485Z",
    "changedAt": "2026-10-14T15:10:28.561Z"
   },
   "weth-gateway-avalanche": {
    "type": "evm-code",
+   "target": {
+    "chainId": 43114,
+    "address": "0x2825ce5921538d17cc15ae00a8b24ff759c6cdae"
+   },
    "value": "6ff0e736895e5bb8",
    "meta": {
     "codeHash": "6ff0e736895e5bb8",
     "bytes": 5428
    },
-   "seenAt": "2026-11-04T09:35:49.469Z",
+   "seenAt": "2026-11-04T17:01:30.841Z",
    "changedAt": "2026-10-14T15:10:28.693Z"
   },
   "weth-gateway-arbitrum": {
    "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x5283beced7adf6d003225c13896e536f2d4264ff"
+   },
    "value": "8687cad7f6dc3b35",
    "meta": {
     "codeHash": "8687cad7f6dc3b35",
     "bytes": 5428
    },
-   "seenAt": "2026-11-04T09:35:49.150Z",
+   "seenAt": "2026-11-04T17:01:30.495Z",
    "changedAt": "2026-10-14T15:10:28.716Z"
   },
   "pool-avalanche": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 43114,
+    "address": "0x794a61358d6845594f94dc1db02a252b5b4814ad"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"9190cf493c3977b5\",\"impl\":\"0x6cddff90124ba51afac5715314db7c9546b32204\",\"implCodeHash\":\"aa478fdede145faf\"}",
    "meta": {
     "codeHash": "9190cf493c3977b5",
@@ -535,23 +735,32 @@
     "beacon": null,
     "implCodeHash": "aa478fdede145faf"
    },
-   "seenAt": "2026-11-04T09:35:49.635Z",
+   "seenAt": "2026-11-04T17:01:30.892Z",
    "changedAt": "2026-10-14T15:10:28.957Z"
   },
   "addresses-provider-ink": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 57073,
+    "address": "0x4172e6aaec070acb31aace343a58c93e4c70f44d"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"7f3261f61f6d67bf\",\"impl\":null}",
    "meta": {
     "codeHash": "7f3261f61f6d67bf",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:49.801Z",
+   "seenAt": "2026-11-04T17:01:31.189Z",
    "changedAt": "2026-10-14T15:10:29.052Z"
   },
   "pool-arbitrum": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 42161,
+    "address": "0x794a61358d6845594f94dc1db02a252b5b4814ad"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"9190cf493c3977b5\",\"impl\":\"0xf05fd3cc911b4c5e36e53c00354f645e22922c9a\",\"implCodeHash\":\"f3b3d13e1ed0f226\"}",
    "meta": {
     "codeHash": "9190cf493c3977b5",
@@ -560,45 +769,63 @@
     "beacon": null,
     "implCodeHash": "f3b3d13e1ed0f226"
    },
-   "seenAt": "2026-11-04T09:35:49.134Z",
+   "seenAt": "2026-11-04T17:01:30.499Z",
    "changedAt": "2026-10-14T15:10:29.073Z"
   },
   "weth-gateway-ink": {
    "type": "evm-code",
+   "target": {
+    "chainId": 57073,
+    "address": "0xde090efcd6ef4b86792e2d84e55a5fa8d49d25d2"
+   },
    "value": "927fb30e28d86818",
    "meta": {
     "codeHash": "927fb30e28d86818",
     "bytes": 5387
    },
-   "seenAt": "2026-11-04T09:35:49.888Z",
+   "seenAt": "2026-11-04T17:01:31.188Z",
    "changedAt": "2026-10-14T15:10:29.230Z"
   },
   "addresses-provider-celo": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 42220,
+    "address": "0x9f7cf9417d5251c59fe94fb9147feee1aad9cea5"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"1403ab25a01fc9df\",\"impl\":null}",
    "meta": {
     "codeHash": "1403ab25a01fc9df",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:49.377Z",
+   "seenAt": "2026-11-04T17:01:30.955Z",
    "changedAt": "2026-10-14T15:10:29.645Z"
   },
   "addresses-provider-linea": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 59144,
+    "address": "0x89502c3731f69ddc95b65753708a07f8cd0373f4"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"fc0c53be1653b6a0\",\"impl\":null}",
    "meta": {
     "codeHash": "fc0c53be1653b6a0",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:49.721Z",
+   "seenAt": "2026-11-04T17:01:31.072Z",
    "changedAt": "2026-10-14T15:10:29.681Z"
   },
   "pool-ink": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 57073,
+    "address": "0x2816cf15f6d2a220e789aa011d5ee4eb6c47feba"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"0dab9843a40712f1\",\"impl\":\"0x6a056da055c616cd89dbcd0dc4b3f4e0f6162eb6\",\"implCodeHash\":\"1bafe6bc87f18a10\"}",
    "meta": {
     "codeHash": "0dab9843a40712f1",
@@ -607,21 +834,29 @@
     "beacon": null,
     "implCodeHash": "1bafe6bc87f18a10"
    },
-   "seenAt": "2026-11-04T09:35:50.227Z",
+   "seenAt": "2026-11-04T17:01:31.459Z",
    "changedAt": "2026-10-14T15:10:29.706Z"
   },
   "weth-gateway-linea": {
    "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0x31a239f3e39c5d8ba6b201ba81ed584492ae960f"
+   },
    "value": "47e962e62d5e19f1",
    "meta": {
     "codeHash": "47e962e62d5e19f1",
     "bytes": 5565
    },
-   "seenAt": "2026-11-04T09:35:49.740Z",
+   "seenAt": "2026-11-04T17:01:31.035Z",
    "changedAt": "2026-10-14T15:10:29.801Z"
   },
   "pool-celo": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 42220,
+    "address": "0x3e59a31363e2ad014dcbc521c4a0d5757d9f3402"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"138013755530b317\",\"impl\":\"0x736a299843ec1bb6aa94e032489177ae0459c744\",\"implCodeHash\":\"f23214faf0e485f3\"}",
    "meta": {
     "codeHash": "138013755530b317",
@@ -630,11 +865,15 @@
     "beacon": null,
     "implCodeHash": "f23214faf0e485f3"
    },
-   "seenAt": "2026-11-04T09:35:49.295Z",
+   "seenAt": "2026-11-04T17:01:30.965Z",
    "changedAt": "2026-10-14T15:10:29.841Z"
   },
   "pool-linea": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 59144,
+    "address": "0xc47b8c00b0f69a36fa203ffeac0334874574a8ac"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"f9bf4beb7b80524e\",\"impl\":\"0xf2a9096bf98e1dd8fb31c4cacb2df5c982ec66ca\",\"implCodeHash\":\"c2d8fb948feeaf82\"}",
    "meta": {
     "codeHash": "f9bf4beb7b80524e",
@@ -643,33 +882,46 @@
     "beacon": null,
     "implCodeHash": "c2d8fb948feeaf82"
    },
-   "seenAt": "2026-11-04T09:35:49.914Z",
+   "seenAt": "2026-11-04T17:01:31.110Z",
    "changedAt": "2026-10-14T15:10:29.880Z"
   },
   "weth-gateway-scroll": {
    "type": "evm-code",
+   "target": {
+    "chainId": 534352,
+    "address": "0xe79ca44408dae5a57ea2a9594532f1e84d2edaa4"
+   },
    "value": "da4e43167395d864",
    "meta": {
     "codeHash": "da4e43167395d864",
     "bytes": 5428
    },
-   "seenAt": "2026-11-04T09:35:49.966Z",
+   "seenAt": "2026-11-04T17:01:31.227Z",
    "changedAt": "2026-10-14T15:10:30.077Z"
   },
   "addresses-provider-scroll": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 534352,
+    "address": "0x69850d0b276776781c063771b161bd8894bcdd04"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"5c7b08166896da28\",\"impl\":null}",
    "meta": {
     "codeHash": "5c7b08166896da28",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:35:49.898Z",
+   "seenAt": "2026-11-04T17:01:31.461Z",
    "changedAt": "2026-10-14T15:10:30.096Z"
   },
   "pool-scroll": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 534352,
+    "address": "0x11fcfe756c05ad438e312a7fd934381537d3cffe"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"732b4ce12fd5b0da\",\"impl\":\"0x7c9d9b3bdc3ba2e43fe2fb26b713abdc946db01c\",\"implCodeHash\":\"8e448c7c4e302ed6\"}",
    "meta": {
     "codeHash": "732b4ce12fd5b0da",
@@ -678,34 +930,593 @@
     "beacon": null,
     "implCodeHash": "8e448c7c4e302ed6"
    },
-   "seenAt": "2026-11-04T09:35:50.133Z",
+   "seenAt": "2026-11-04T17:01:31.464Z",
    "changedAt": "2026-10-14T15:10:30.201Z"
   },
   "docs-addresses": {
-   "type": "http-text",
-   "value": "85d144e02991ec31af4ee94ec0f431d5c4e25cdacc703d9ace1caecb56953171",
-   "meta": {
-    "hash": "85d144e02991ec31",
-    "chars": 2730
+   "type": "json-pins",
+   "target": {
+    "url": "https://aave.com/docs/reference/addresses"
    },
-   "seenAt": "2026-11-04T09:35:50.181Z",
-   "changedAt": "2026-11-04T09:35:50.181Z"
+   "value": "fdecf4a42f3952ef91516033316bb9d9029c2d2ecce9fcfd31f0c0c97abe479c",
+   "meta": {
+    "pins": 78,
+    "ok": 78,
+    "markets": 35,
+    "rows": [
+     {
+      "group": "Aave V3 Arbitrum",
+      "role": "addressesProvider",
+      "address": "0xa97684ead0e402dc232d5a977953df7ecbab3cdb",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Arbitrum.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Arbitrum",
+      "role": "dataProvider",
+      "address": "0x243aa95cac2a25651eda86e80bee66114413c43b",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Arbitrum.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Arbitrum",
+      "role": "pool",
+      "address": "0x794a61358d6845594f94dc1db02a252b5b4814ad",
+      "contract": "Pool",
+      "id": "AaveV3Arbitrum.Pool"
+     },
+     {
+      "group": "Aave V3 Arbitrum",
+      "role": "wethGateway",
+      "address": "0x5283beced7adf6d003225c13896e536f2d4264ff",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3Arbitrum.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Avalanche",
+      "role": "addressesProvider",
+      "address": "0xa97684ead0e402dc232d5a977953df7ecbab3cdb",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Avalanche.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Avalanche",
+      "role": "dataProvider",
+      "address": "0x243aa95cac2a25651eda86e80bee66114413c43b",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Avalanche.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Avalanche",
+      "role": "pool",
+      "address": "0x794a61358d6845594f94dc1db02a252b5b4814ad",
+      "contract": "Pool",
+      "id": "AaveV3Avalanche.Pool"
+     },
+     {
+      "group": "Aave V3 Avalanche",
+      "role": "wethGateway",
+      "address": "0x2825ce5921538d17cc15ae00a8b24ff759c6cdae",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3Avalanche.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Base",
+      "role": "addressesProvider",
+      "address": "0xe20fcbdbffc4dd138ce8b2e6fbb6cb49777ad64d",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Base.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Base",
+      "role": "dataProvider",
+      "address": "0x0f43731eb8d45a581f4a36dd74f5f358bc90c73a",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Base.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Base",
+      "role": "pool",
+      "address": "0xa238dd80c259a72e81d7e4664a9801593f98d1c5",
+      "contract": "Pool",
+      "id": "AaveV3Base.Pool"
+     },
+     {
+      "group": "Aave V3 Base",
+      "role": "wethGateway",
+      "address": "0xa0d9c1e9e48ca30c8d8c3b5d69ff5dc1f6dffc24",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3Base.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 BNB",
+      "role": "addressesProvider",
+      "address": "0xff75b6da14ffbbfd355daf7a2731456b3562ba6d",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3BNB.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 BNB",
+      "role": "dataProvider",
+      "address": "0xc90df74a7c16245c5f5c5870327ceb38fe5d5328",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3BNB.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 BNB",
+      "role": "pool",
+      "address": "0x6807dc923806fe8fd134338eabca509979a7e0cb",
+      "contract": "Pool",
+      "id": "AaveV3BNB.Pool"
+     },
+     {
+      "group": "Aave V3 BNB",
+      "role": "wethGateway",
+      "address": "0x0c2c95b24529664fe55d4437d7a31175cfe6c4f7",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3BNB.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Celo",
+      "role": "addressesProvider",
+      "address": "0x9f7cf9417d5251c59fe94fb9147feee1aad9cea5",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Celo.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Celo",
+      "role": "dataProvider",
+      "address": "0x2e0f8d3b1631296cc7c56538d6eb6032601e15ed",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Celo.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Celo",
+      "role": "pool",
+      "address": "0x3e59a31363e2ad014dcbc521c4a0d5757d9f3402",
+      "contract": "Pool",
+      "id": "AaveV3Celo.Pool"
+     },
+     {
+      "group": "Aave V3 Ethereum",
+      "role": "addressesProvider",
+      "address": "0x2f39d218133afab8f2b819b1066c7e434ad94e9e",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Ethereum.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Ethereum",
+      "role": "dataProvider",
+      "address": "0x0a16f2fcc0d44fae41cc54e079281d84a363becd",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Ethereum.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Ethereum",
+      "role": "pool",
+      "address": "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2",
+      "contract": "Pool",
+      "id": "AaveV3Ethereum.Pool"
+     },
+     {
+      "group": "Aave V3 Ethereum",
+      "role": "wethGateway",
+      "address": "0xd01607c3c5ecaba394d8be377a08590149325722",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3Ethereum.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Ethereum EtherFi",
+      "role": "addressesProvider",
+      "address": "0xeba440b438ad808101d1c451c1c5322c90befcda",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3EthereumEtherFi.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Ethereum EtherFi",
+      "role": "dataProvider",
+      "address": "0x7c8509591f9693d21280d96e149a08a3bf69cd0c",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3EthereumEtherFi.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Ethereum EtherFi",
+      "role": "pool",
+      "address": "0x0aa97c284e98396202b6a04024f5e2c65026f3c0",
+      "contract": "Pool",
+      "id": "AaveV3EthereumEtherFi.Pool"
+     },
+     {
+      "group": "Aave V3 Ethereum EtherFi",
+      "role": "wethGateway",
+      "address": "0xf956b38f035dc9067fb827a512d3cf35202ab0bc",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3EthereumEtherFi.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Ethereum Lido",
+      "role": "addressesProvider",
+      "address": "0xcfbf336fe147d643b9cb705648500e101504b16d",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3EthereumLido.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Ethereum Lido",
+      "role": "dataProvider",
+      "address": "0xb85b2bfebec4f5f401dbf92ac147a3076391fcd5",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3EthereumLido.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Ethereum Lido",
+      "role": "pool",
+      "address": "0x4e033931ad43597d96d6bcc25c280717730b58b1",
+      "contract": "Pool",
+      "id": "AaveV3EthereumLido.Pool"
+     },
+     {
+      "group": "Aave V3 Ethereum Lido",
+      "role": "wethGateway",
+      "address": "0x3167c452fa3fa1e5c16bb83bc0fde4519c464299",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3EthereumLido.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Gnosis",
+      "role": "addressesProvider",
+      "address": "0x36616cf17557639614c1cddb356b1b83fc0b2132",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Gnosis.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Gnosis",
+      "role": "dataProvider",
+      "address": "0xf1f5acb596568895393cb5e4d0452d6592a2fa70",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Gnosis.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Gnosis",
+      "role": "pool",
+      "address": "0xb50201558b00496a145fe76f7424749556e326d8",
+      "contract": "Pool",
+      "id": "AaveV3Gnosis.Pool"
+     },
+     {
+      "group": "Aave V3 Gnosis",
+      "role": "wethGateway",
+      "address": "0x721b9abab6511b46b9ee83a1aba23bdacb004149",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3Gnosis.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Ink (whitelabel)",
+      "role": "addressesProvider",
+      "address": "0x4172e6aaec070acb31aace343a58c93e4c70f44d",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3InkWhitelabel.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Ink (whitelabel)",
+      "role": "dataProvider",
+      "address": "0x96086c25d13943c80ff9a19791a40df6afc08328",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3InkWhitelabel.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Ink (whitelabel)",
+      "role": "pool",
+      "address": "0x2816cf15f6d2a220e789aa011d5ee4eb6c47feba",
+      "contract": "Pool",
+      "id": "AaveV3InkWhitelabel.Pool"
+     },
+     {
+      "group": "Aave V3 Ink (whitelabel)",
+      "role": "wethGateway",
+      "address": "0xde090efcd6ef4b86792e2d84e55a5fa8d49d25d2",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3InkWhitelabel.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Linea",
+      "role": "addressesProvider",
+      "address": "0x89502c3731f69ddc95b65753708a07f8cd0373f4",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Linea.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Linea",
+      "role": "dataProvider",
+      "address": "0x47cd4b507b81cb831669c71c7077f4daf6762ff4",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Linea.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Linea",
+      "role": "pool",
+      "address": "0xc47b8c00b0f69a36fa203ffeac0334874574a8ac",
+      "contract": "Pool",
+      "id": "AaveV3Linea.Pool"
+     },
+     {
+      "group": "Aave V3 Linea",
+      "role": "wethGateway",
+      "address": "0x31a239f3e39c5d8ba6b201ba81ed584492ae960f",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3Linea.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Mantle",
+      "role": "addressesProvider",
+      "address": "0xba50cd2a20f6da35d788639e581bca8d0b5d4d5f",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Mantle.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Mantle",
+      "role": "dataProvider",
+      "address": "0x487c5c669d9eee6057c44973207101276cf73b68",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Mantle.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Mantle",
+      "role": "pool",
+      "address": "0x458f293454fe0d67ec0655f3672301301dd51422",
+      "contract": "Pool",
+      "id": "AaveV3Mantle.Pool"
+     },
+     {
+      "group": "Aave V3 Mantle",
+      "role": "wethGateway",
+      "address": "0x9c6ccac66b1c9aba4855e2dd284b9e16e41e06ea",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3Mantle.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Metis",
+      "role": "addressesProvider",
+      "address": "0xb9fabd7500b2c6781c35dd48d54f81fc2299d7af",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Metis.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Metis",
+      "role": "dataProvider",
+      "address": "0x602bef1d4c381e5a29f0c562a310416a73d8be19",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Metis.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Metis",
+      "role": "pool",
+      "address": "0x90df02551bb792286e8d4f13e0e357b4bf1d6a57",
+      "contract": "Pool",
+      "id": "AaveV3Metis.Pool"
+     },
+     {
+      "group": "Aave V3 Optimism",
+      "role": "addressesProvider",
+      "address": "0xa97684ead0e402dc232d5a977953df7ecbab3cdb",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Optimism.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Optimism",
+      "role": "dataProvider",
+      "address": "0x243aa95cac2a25651eda86e80bee66114413c43b",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Optimism.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Optimism",
+      "role": "pool",
+      "address": "0x794a61358d6845594f94dc1db02a252b5b4814ad",
+      "contract": "Pool",
+      "id": "AaveV3Optimism.Pool"
+     },
+     {
+      "group": "Aave V3 Optimism",
+      "role": "wethGateway",
+      "address": "0x5f2508cae9923b02316254026cd43d7902866725",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3Optimism.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Plasma",
+      "role": "addressesProvider",
+      "address": "0x061d8e131f26512348ee5fa42e2df1ba9d6505e9",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Plasma.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Plasma",
+      "role": "dataProvider",
+      "address": "0xf2d6e38b407e31e7e7e4a16e6769728b76c7419f",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Plasma.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Plasma",
+      "role": "pool",
+      "address": "0x925a2a7214ed92428b5b1b090f80b25700095e12",
+      "contract": "Pool",
+      "id": "AaveV3Plasma.Pool"
+     },
+     {
+      "group": "Aave V3 Plasma",
+      "role": "wethGateway",
+      "address": "0x54bdcc37c4143f944a3ee51c892a6cbdf305e7a0",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3Plasma.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Polygon",
+      "role": "addressesProvider",
+      "address": "0xa97684ead0e402dc232d5a977953df7ecbab3cdb",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Polygon.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Polygon",
+      "role": "dataProvider",
+      "address": "0x243aa95cac2a25651eda86e80bee66114413c43b",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Polygon.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Polygon",
+      "role": "pool",
+      "address": "0x794a61358d6845594f94dc1db02a252b5b4814ad",
+      "contract": "Pool",
+      "id": "AaveV3Polygon.Pool"
+     },
+     {
+      "group": "Aave V3 Polygon",
+      "role": "wethGateway",
+      "address": "0xbc302053db3aa514a3c86b9221082f162b91ad63",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3Polygon.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Scroll",
+      "role": "addressesProvider",
+      "address": "0x69850d0b276776781c063771b161bd8894bcdd04",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Scroll.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Scroll",
+      "role": "dataProvider",
+      "address": "0xbea2b648f05887ecbf1d115da8b7e4a317975a51",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Scroll.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Scroll",
+      "role": "pool",
+      "address": "0x11fcfe756c05ad438e312a7fd934381537d3cffe",
+      "contract": "Pool",
+      "id": "AaveV3Scroll.Pool"
+     },
+     {
+      "group": "Aave V3 Scroll",
+      "role": "wethGateway",
+      "address": "0xe79ca44408dae5a57ea2a9594532f1e84d2edaa4",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3Scroll.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Soneium",
+      "role": "addressesProvider",
+      "address": "0x82405d1a189bd6ce4667809c35b37fbe136a4c5b",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Soneium.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Soneium",
+      "role": "dataProvider",
+      "address": "0x4a24b44b252db149b5b9bcec4dc3c2752807d626",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Soneium.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Soneium",
+      "role": "pool",
+      "address": "0xdd3d7a7d03d9fd9ef45f3e587287922ef65ca38b",
+      "contract": "Pool",
+      "id": "AaveV3Soneium.Pool"
+     },
+     {
+      "group": "Aave V3 Soneium",
+      "role": "wethGateway",
+      "address": "0x6376d4df995f32f308f2d5049a7a320943023232",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3Soneium.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 Sonic",
+      "role": "addressesProvider",
+      "address": "0x5c2e738f6e27bce0f7558051bf90605dd6176900",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3Sonic.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 Sonic",
+      "role": "dataProvider",
+      "address": "0xc0a344397cfa89df1e1d3e4fb330834d789cf2cd",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3Sonic.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 Sonic",
+      "role": "pool",
+      "address": "0x5362dbb1e601abf3a4c14c22ffeda64042e5eaa3",
+      "contract": "Pool",
+      "id": "AaveV3Sonic.Pool"
+     },
+     {
+      "group": "Aave V3 Sonic",
+      "role": "wethGateway",
+      "address": "0x061d8e131f26512348ee5fa42e2df1ba9d6505e9",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3Sonic.WrappedTokenGatewayV3"
+     },
+     {
+      "group": "Aave V3 ZkSync",
+      "role": "addressesProvider",
+      "address": "0x2a3948bb219d6b2fa83d64100006391a96be6cb7",
+      "contract": "PoolAddressesProvider",
+      "id": "AaveV3ZkSync.PoolAddressesProvider"
+     },
+     {
+      "group": "Aave V3 ZkSync",
+      "role": "dataProvider",
+      "address": "0x9057ac7b2d35606f8ad5ae2fcbafcd94e58d9927",
+      "contract": "AaveProtocolDataProvider",
+      "id": "AaveV3ZkSync.AaveProtocolDataProvider"
+     },
+     {
+      "group": "Aave V3 ZkSync",
+      "role": "pool",
+      "address": "0x78e30497a3c7527d953c6b1e3541b021a98ac43c",
+      "contract": "Pool",
+      "id": "AaveV3ZkSync.Pool"
+     },
+     {
+      "group": "Aave V3 ZkSync",
+      "role": "wethGateway",
+      "address": "0xae2b00d676130bdf22582781bbba8f4f21e8b0ff",
+      "contract": "WrappedTokenGatewayV3",
+      "id": "AaveV3ZkSync.WrappedTokenGatewayV3"
+     }
+    ],
+    "problems": []
+   },
+   "seenAt": "2026-11-04T17:01:31.767Z",
+   "changedAt": "2026-11-04T17:01:31.767Z"
   },
   "address-book": {
    "type": "github-releases",
-   "value": "v4.75.8",
+   "target": {
+    "repo": "aave-dao/aave-address-book"
+   },
+   "value": "v4.76.0",
    "meta": {
-    "tag": "v4.75.8",
-    "name": "v4.75.8",
-    "at": "2026-11-03",
-    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.75.8",
+    "tag": "v4.76.0",
+    "name": "v4.76.0",
+    "at": "2026-11-04",
+    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.76.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-04T09:35:50.579Z",
-   "changedAt": "2026-11-04T09:35:50.579Z"
+   "seenAt": "2026-11-04T17:01:31.462Z",
+   "changedAt": "2026-11-04T17:01:31.462Z"
   },
   "aave-v3-origin": {
    "type": "github-releases",
+   "target": {
+    "repo": "aave-dao/aave-v3-origin"
+   },
    "value": "v3.7.0",
    "meta": {
     "tag": "v3.7.0",
@@ -714,7 +1525,7 @@
     "url": "https://github.com/aave-dao/aave-v3-origin/releases/tag/v3.7.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-04T09:35:50.375Z",
+   "seenAt": "2026-11-04T17:01:31.563Z",
    "changedAt": "2026-10-14T15:10:30.412Z"
   }
  }

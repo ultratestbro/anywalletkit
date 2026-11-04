@@ -3,36 +3,48 @@
  "sources": {
   "pool-mainnet": {
    "type": "ton-code",
+   "target": {
+    "address": "EQCkWxfyhAkim3g2DjKQQg8T5P4g-Q1-K_jErGcDJZ4i-vqR"
+   },
    "value": "be44417503efa22e",
    "meta": {
     "codeHash": "be44417503efa22e",
     "state": "active"
    },
-   "seenAt": "2026-11-04T09:36:04.174Z",
+   "seenAt": "2026-11-04T17:01:38.803Z",
    "changedAt": "2026-10-14T15:10:40.300Z"
   },
   "tston-minter-mainnet": {
    "type": "ton-code",
+   "target": {
+    "address": "EQC98_qAmNEptUtPc7W6xdHh_ZHrBUFpw5Ft_IzNU20QAJav"
+   },
    "value": "1a39d0e85aaf8d65",
    "meta": {
     "codeHash": "1a39d0e85aaf8d65",
     "state": "active"
    },
-   "seenAt": "2026-11-04T09:36:04.068Z",
+   "seenAt": "2026-11-04T17:01:38.765Z",
    "changedAt": "2026-10-14T15:10:40.347Z"
   },
   "site": {
    "type": "http-text",
+   "target": {
+    "url": "https://tonstakers.com/"
+   },
    "value": "a6b495a492739437ef5d7fdc9b947a0f4b6152ee5724f82b9ef47bd1c8b5764e",
    "meta": {
     "hash": "a6b495a492739437",
     "chars": 3481
    },
-   "seenAt": "2026-11-04T09:36:04.045Z",
+   "seenAt": "2026-11-04T17:01:38.764Z",
    "changedAt": "2026-11-04T09:36:04.045Z"
   },
   "tonstakers-sdk": {
    "type": "github-releases",
+   "target": {
+    "repo": "tonstakers/tonstakers-sdk"
+   },
    "value": "8d4870e5794abc66254d46d619bd38bd5c223064",
    "meta": {
     "tag": "commit 8d4870e",
@@ -40,11 +52,14 @@
     "url": "https://github.com/tonstakers/tonstakers-sdk/commit/8d4870e5794abc66254d46d619bd38bd5c223064",
     "note": "default branch: Multisig support (#30)"
    },
-   "seenAt": "2026-11-04T09:36:04.731Z",
+   "seenAt": "2026-11-04T17:01:39.363Z",
    "changedAt": "2026-10-14T15:12:14.634Z"
   },
   "liquid-staking-contract": {
    "type": "github-releases",
+   "target": {
+    "repo": "ton-blockchain/liquid-staking-contract"
+   },
    "value": "1f4e9badbed52a4cf80cc58e4bb36ed375c6c8e7",
    "meta": {
     "tag": "commit 1f4e9ba",
@@ -52,7 +67,7 @@
     "url": "https://github.com/ton-blockchain/liquid-staking-contract/commit/1f4e9badbed52a4cf80cc58e4bb36ed375c6c8e7",
     "note": "default branch: added audits info (#65)"
    },
-   "seenAt": "2026-11-04T09:36:04.867Z",
+   "seenAt": "2026-11-04T17:01:39.314Z",
    "changedAt": "2026-10-14T15:12:14.686Z"
   }
  }

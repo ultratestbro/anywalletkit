@@ -3,16 +3,22 @@
  "sources": {
   "docs-reserve-balance": {
    "type": "http-text",
+   "target": {
+    "url": "https://docs.monad.xyz/developer-essentials/reserve-balance.md"
+   },
    "value": "15015a02fd3f1c1198d5c74a9580cd531551e971396d1c565c36e5d5492b33e8",
    "meta": {
     "hash": "15015a02fd3f1c11",
     "chars": 22089
    },
-   "seenAt": "2026-11-04T09:36:01.736Z",
+   "seenAt": "2026-11-04T17:01:37.417Z",
    "changedAt": "2026-10-25T21:25:04.383Z"
   },
   "monad-bft-releases": {
    "type": "github-releases",
+   "target": {
+    "repo": "category-labs/monad-bft"
+   },
    "value": "v0.16.6",
    "meta": {
     "tag": "v0.16.6",
@@ -21,17 +27,20 @@
     "url": "https://github.com/category-labs/monad-bft/releases/tag/v0.16.6",
     "prerelease": false
    },
-   "seenAt": "2026-11-04T09:36:02.562Z",
+   "seenAt": "2026-11-04T17:01:37.619Z",
    "changedAt": "2026-11-04T09:36:02.562Z"
   },
   "docs-staking-api": {
    "type": "http-text",
+   "target": {
+    "url": "https://docs.monad.xyz/reference/staking/api.md"
+   },
    "value": "97cd15f8d4a5fcf82e35ca400f610c6265818f40b62414456fc526e80af3e541",
    "meta": {
     "hash": "97cd15f8d4a5fcf8",
     "chars": 55205
    },
-   "seenAt": "2026-11-04T09:36:01.724Z",
+   "seenAt": "2026-11-04T17:01:37.482Z",
    "changedAt": "2026-11-04T09:36:01.724Z"
   }
  }

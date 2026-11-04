@@ -3,16 +3,23 @@
  "sources": {
   "ssv-token-ethereum": {
    "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x9d65ff81a3c488d585bbfb0bfe3c7707c7917f54"
+   },
    "value": "5616319396d34d32",
    "meta": {
     "codeHash": "5616319396d34d32",
     "bytes": 3603
    },
-   "seenAt": "2026-11-04T09:36:03.558Z",
+   "seenAt": "2026-11-04T17:01:38.348Z",
    "changedAt": "2026-10-14T15:10:38.260Z"
   },
   "ssv-network": {
    "type": "github-releases",
+   "target": {
+    "repo": "ssvlabs/ssv-network"
+   },
    "value": "v2.0.0",
    "meta": {
     "tag": "v2.0.0",
@@ -21,11 +28,15 @@
     "url": "https://github.com/ssvlabs/ssv-network/releases/tag/v2.0.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-04T09:36:03.827Z",
+   "seenAt": "2026-11-04T17:01:38.637Z",
    "changedAt": "2026-10-14T15:10:38.507Z"
   },
   "ssv-network-views-ethereum": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 1,
+    "address": "0xafe830b6ee262ba11cce5f32fdcd760ffe6a66e4"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"f30e969f2540174e\",\"impl\":\"0xadeb99eb2307f874d72b1f814fca106f6bfaa8e9\",\"implCodeHash\":\"b1052b925c557a29\"}",
    "meta": {
     "codeHash": "f30e969f2540174e",
@@ -34,21 +45,28 @@
     "beacon": null,
     "implCodeHash": "b1052b925c557a29"
    },
-   "seenAt": "2026-11-04T09:36:03.581Z",
+   "seenAt": "2026-11-04T17:01:38.362Z",
    "changedAt": "2026-10-14T15:10:38.741Z"
   },
   "docs-smart-contracts": {
    "type": "http-text",
+   "target": {
+    "url": "https://docs.ssv.network/developers/smart-contracts/"
+   },
    "value": "36a4f53de97d9b633c465410ad36487bd4f7ab550c3b7bdbb04cf7165e44cad6",
    "meta": {
     "hash": "36a4f53de97d9b63",
     "chars": 1573
    },
-   "seenAt": "2026-11-04T09:36:03.789Z",
+   "seenAt": "2026-11-04T17:01:38.456Z",
    "changedAt": "2026-10-14T15:10:38.784Z"
   },
   "ssv-network-ethereum": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 1,
+    "address": "0xdd9bc35ae942ef0cfa76930954a156b3ff30a4e1"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"f30e969f2540174e\",\"impl\":\"0xa72a8f31163d74d708664493d09167dfa13008e9\",\"implCodeHash\":\"76abd70c3df865ef\"}",
    "meta": {
     "codeHash": "f30e969f2540174e",
@@ -57,19 +75,24 @@
     "beacon": null,
     "implCodeHash": "76abd70c3df865ef"
    },
-   "seenAt": "2026-11-04T09:36:03.581Z",
+   "seenAt": "2026-11-04T17:01:38.361Z",
    "changedAt": "2026-10-14T15:10:38.975Z"
   },
   "cssv-token-ethereum": {
    "type": "evm-proxy",
+   "target": {
+    "chainId": 1,
+    "address": "0xe018d31f120a637828f46afd6c64ec099d960546"
+   },
    "value": "{\"admin\":null,\"beacon\":null,\"codeHash\":\"445fa29565bc2ab7\",\"impl\":null}",
    "meta": {
     "codeHash": "445fa29565bc2ab7",
     "impl": null,
     "admin": null,
-    "beacon": null
+    "beacon": null,
+    "implProbe": true
    },
-   "seenAt": "2026-11-04T09:36:03.600Z",
+   "seenAt": "2026-11-04T17:01:38.376Z",
    "changedAt": "2026-10-14T15:10:39.238Z"
   }
  }

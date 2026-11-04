@@ -3,6 +3,9 @@
  "sources": {
   "stake-program-releases": {
    "type": "github-releases",
+   "target": {
+    "repo": "solana-program/stake"
+   },
    "value": "js@v0.11.0",
    "meta": {
     "tag": "js@v0.11.0",
@@ -11,31 +14,37 @@
     "url": "https://github.com/solana-program/stake/releases/tag/js%40v0.11.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-04T09:36:02.951Z",
+   "seenAt": "2026-11-04T17:01:37.882Z",
    "changedAt": "2026-10-25T20:21:40.591Z"
   },
   "stake-program": {
    "type": "solana-program",
+   "target": {
+    "programId": "Stake11111111111111111111111111111111111111"
+   },
    "value": "{\"authority\":null,\"programData\":\"6WU8Nxarf9fudRK5atWwjLY4vFaw5UrrWhL88qz7iCMJ\",\"slot\":443232000}",
    "meta": {
     "programData": "6WU8Nxarf9fudRK5atWwjLY4vFaw5UrrWhL88qz7iCMJ",
     "slot": 443232000,
     "authority": null
    },
-   "seenAt": "2026-11-04T09:36:02.655Z",
+   "seenAt": "2026-11-04T17:01:37.710Z",
    "changedAt": "2026-10-25T20:21:40.819Z"
   },
   "docs-stake-accounts": {
-   "type": "http-text",
-   "value": "855de8e4ce9749905a3c820d96e67312df5f0554f2d9b824b0a3529a7e1d18e4",
-   "meta": {
-    "hash": "855de8e4ce974990",
-    "chars": 6599
+   "type": "github-file",
+   "target": {
+    "repo": "solana-foundation/solana-com",
+    "path": "apps/docs/content/docs/en/references/staking/stake-accounts.mdx",
+    "ref": "main"
    },
-   "seenAt": "2026-10-25T20:21:41.285Z",
-   "changedAt": "2026-10-25T20:21:41.285Z",
-   "error": "HTTP 429",
-   "errorAt": "2026-11-04T09:36:02.635Z"
+   "value": "38bb13b720425e1193f48b3f59e28523173349e8",
+   "meta": {
+    "sha": "38bb13b720",
+    "url": "https://github.com/solana-foundation/solana-com/blob/main/apps/docs/content/docs/en/references/staking/stake-accounts.mdx"
+   },
+   "seenAt": "2026-11-04T17:01:37.744Z",
+   "changedAt": "2026-11-04T17:01:37.744Z"
   }
  }
 }

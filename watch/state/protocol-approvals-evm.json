@@ -3,156 +3,219 @@
  "sources": {
   "permit2-op-mainnet": {
    "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+   },
    "value": "977d1ac2e903b062",
    "meta": {
     "codeHash": "977d1ac2e903b062",
     "bytes": 9152
    },
-   "seenAt": "2026-11-04T09:35:45.166Z",
+   "seenAt": "2026-11-04T17:01:27.235Z",
    "changedAt": "2026-10-14T15:10:22.440Z"
   },
   "permit2-polygon": {
    "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+   },
    "value": "9d00ae84c1e424cd",
    "meta": {
     "codeHash": "9d00ae84c1e424cd",
     "bytes": 9152
    },
-   "seenAt": "2026-11-04T09:35:45.278Z",
+   "seenAt": "2026-11-04T17:01:27.240Z",
    "changedAt": "2026-10-14T15:10:22.456Z"
   },
   "permit2-base": {
    "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+   },
    "value": "597df4c55f25c8ef",
    "meta": {
     "codeHash": "597df4c55f25c8ef",
     "bytes": 9152
    },
-   "seenAt": "2026-11-04T09:35:45.446Z",
+   "seenAt": "2026-11-04T17:01:27.241Z",
    "changedAt": "2026-10-14T15:10:22.457Z"
   },
   "permit2-arbitrum": {
    "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+   },
    "value": "6f7371c60f58dcfa",
    "meta": {
     "codeHash": "6f7371c60f58dcfa",
     "bytes": 9152
    },
-   "seenAt": "2026-11-04T09:35:45.458Z",
+   "seenAt": "2026-11-04T17:01:27.243Z",
    "changedAt": "2026-10-14T15:10:22.457Z"
   },
   "permit2-gnosis": {
    "type": "evm-code",
+   "target": {
+    "chainId": 100,
+    "address": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+   },
    "value": "39cdf44a53c20f98",
    "meta": {
     "codeHash": "39cdf44a53c20f98",
     "bytes": 9152
    },
-   "seenAt": "2026-11-04T09:35:45.369Z",
+   "seenAt": "2026-11-04T17:01:27.237Z",
    "changedAt": "2026-10-14T15:10:22.458Z"
   },
   "permit2-ethereum": {
    "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+   },
    "value": "6edcbff6f4da0cef",
    "meta": {
     "codeHash": "6edcbff6f4da0cef",
     "bytes": 9152
    },
-   "seenAt": "2026-11-04T09:35:45.403Z",
+   "seenAt": "2026-11-04T17:01:27.232Z",
    "changedAt": "2026-10-14T15:10:22.541Z"
   },
   "multicall3-op-mainnet": {
    "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0xca11bde05977b3631167028862be2a173976ca11"
+   },
    "value": "0fb6a9dbcc4e1709",
    "meta": {
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-11-04T09:35:45.418Z",
+   "seenAt": "2026-11-04T17:01:27.254Z",
    "changedAt": "2026-10-14T15:10:22.543Z"
   },
   "multicall3-gnosis": {
    "type": "evm-code",
+   "target": {
+    "chainId": 100,
+    "address": "0xca11bde05977b3631167028862be2a173976ca11"
+   },
    "value": "0fb6a9dbcc4e1709",
    "meta": {
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-11-04T09:35:45.516Z",
+   "seenAt": "2026-11-04T17:01:27.271Z",
    "changedAt": "2026-10-14T15:10:22.645Z"
   },
   "multicall3-base": {
    "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0xca11bde05977b3631167028862be2a173976ca11"
+   },
    "value": "0fb6a9dbcc4e1709",
    "meta": {
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-11-04T09:35:45.472Z",
+   "seenAt": "2026-11-04T17:01:27.264Z",
    "changedAt": "2026-10-14T15:10:22.655Z"
   },
   "multicall3-arbitrum": {
    "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0xca11bde05977b3631167028862be2a173976ca11"
+   },
    "value": "0fb6a9dbcc4e1709",
    "meta": {
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-11-04T09:35:45.465Z",
+   "seenAt": "2026-11-04T17:01:27.273Z",
    "changedAt": "2026-10-14T15:10:22.713Z"
   },
   "multicall3-ethereum": {
    "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0xca11bde05977b3631167028862be2a173976ca11"
+   },
    "value": "0fb6a9dbcc4e1709",
    "meta": {
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-11-04T09:35:45.439Z",
+   "seenAt": "2026-11-04T17:01:27.251Z",
    "changedAt": "2026-10-14T15:10:22.715Z"
   },
   "multicall3-polygon": {
    "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0xca11bde05977b3631167028862be2a173976ca11"
+   },
    "value": "0fb6a9dbcc4e1709",
    "meta": {
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-11-04T09:35:45.435Z",
+   "seenAt": "2026-11-04T17:01:27.262Z",
    "changedAt": "2026-10-14T15:10:22.789Z"
   },
   "multicall3-scroll": {
    "type": "evm-code",
+   "target": {
+    "chainId": 534352,
+    "address": "0xca11bde05977b3631167028862be2a173976ca11"
+   },
    "value": "0fb6a9dbcc4e1709",
    "meta": {
     "codeHash": "0fb6a9dbcc4e1709",
     "bytes": 3808
    },
-   "seenAt": "2026-11-04T09:35:45.608Z",
+   "seenAt": "2026-11-04T17:01:27.384Z",
    "changedAt": "2026-10-14T15:10:22.939Z"
   },
   "permit2-scroll": {
    "type": "evm-code",
+   "target": {
+    "chainId": 534352,
+    "address": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+   },
    "value": "61257c37379f1399",
    "meta": {
     "codeHash": "61257c37379f1399",
     "bytes": 9152
    },
-   "seenAt": "2026-11-04T09:35:45.436Z",
+   "seenAt": "2026-11-04T17:01:27.370Z",
    "changedAt": "2026-10-14T15:10:23.020Z"
   },
   "multicall3-linea": {
    "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0xca11bde05977b3631167028862be2a173976ca11"
+   },
    "value": "d57a1dc2389322df",
    "meta": {
     "codeHash": "d57a1dc2389322df",
     "bytes": 3808
    },
-   "seenAt": "2026-11-04T09:35:45.564Z",
+   "seenAt": "2026-11-04T17:01:27.338Z",
    "changedAt": "2026-10-14T15:10:23.205Z"
   },
   "multicall3": {
    "type": "github-releases",
+   "target": {
+    "repo": "mds1/multicall3"
+   },
    "value": "v3.1.0",
    "meta": {
     "tag": "v3.1.0",
@@ -161,49 +224,76 @@
     "url": "https://github.com/mds1/multicall3/releases/tag/v3.1.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-04T09:35:45.830Z",
+   "seenAt": "2026-11-04T17:01:27.727Z",
    "changedAt": "2026-10-14T15:10:23.264Z"
   },
   "docs-permit2": {
    "type": "http-text",
+   "target": {
+    "url": "https://docs.uniswap.org/contracts/permit2/overview"
+   },
    "value": "9371b2aa91762e7c1fff5b1bc04fc1d5053d37b7a5bf21d832e2c34768865a2c",
    "meta": {
     "hash": "9371b2aa91762e7c",
     "chars": 4586
    },
-   "seenAt": "2026-11-04T09:35:46.371Z",
+   "seenAt": "2026-11-04T17:01:27.960Z",
    "changedAt": "2026-11-04T09:35:46.371Z"
   },
   "permit2": {
    "type": "github-releases",
+   "target": {
+    "repo": "Uniswap/permit2"
+   },
    "value": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
    "meta": {
     "tag": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
     "url": "https://github.com/Uniswap/permit2/releases/tag/0x000000000022D473030F116dDEE9F6B43aC78BA3",
     "note": "tags only"
    },
-   "seenAt": "2026-11-04T09:35:46.030Z",
+   "seenAt": "2026-11-04T17:01:27.838Z",
    "changedAt": "2026-10-14T15:10:23.909Z"
   },
   "docs-etherscan-v2": {
    "type": "http-text",
-   "value": "afea8c4a43912960943608113c6f77eefd60951eb9f75dee2f822a027cb8c71b",
-   "meta": {
-    "hash": "afea8c4a43912960",
-    "chars": 1522
+   "target": {
+    "url": "https://docs.etherscan.io/etherscan-v2"
    },
-   "seenAt": "2026-11-04T09:35:45.828Z",
-   "changedAt": "2026-10-14T15:10:24.002Z"
+   "value": "d54a3e7c2e4573ce29d47df98d72aa0e08bd335eb0c0db28c6c4d4347838a2bb",
+   "meta": {
+    "hash": "d54a3e7c2e4573ce",
+    "chars": 1518
+   },
+   "seenAt": "2026-11-04T17:01:27.708Z",
+   "changedAt": "2026-11-04T17:01:27.708Z"
   },
   "permit2-linea": {
    "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+   },
    "value": "636bc147c6726ec9",
    "meta": {
     "codeHash": "636bc147c6726ec9",
     "bytes": 9152
    },
-   "seenAt": "2026-11-04T09:35:45.423Z",
+   "seenAt": "2026-11-04T17:01:27.335Z",
    "changedAt": "2026-10-14T15:10:24.070Z"
+  },
+  "permit2-zksync-era": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 324,
+    "address": "0x0000000000225e31d15943971f47ad3022f714fa"
+   },
+   "value": "f442bbbcd776b63b",
+   "meta": {
+    "codeHash": "f442bbbcd776b63b",
+    "bytes": 50720
+   },
+   "seenAt": "2026-11-04T17:01:27.429Z",
+   "changedAt": "2026-11-04T17:01:27.429Z"
   }
  }
 }

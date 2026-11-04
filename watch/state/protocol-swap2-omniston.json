@@ -3,16 +3,22 @@
  "sources": {
   "docs-omniston": {
    "type": "http-text",
+   "target": {
+    "url": "https://docs.ston.fi/docs/developer-section/omniston"
+   },
    "value": "7eaa0a569a6cd8a3a8e395be7335c2166f76ca0ffd2fe01da2c2a5092d37deee",
    "meta": {
     "hash": "7eaa0a569a6cd8a3",
     "chars": 3421
    },
-   "seenAt": "2026-11-04T09:36:10.749Z",
+   "seenAt": "2026-11-04T17:01:46.417Z",
    "changedAt": "2026-11-04T09:36:10.749Z"
   },
   "omniston-sdk": {
    "type": "github-releases",
+   "target": {
+    "repo": "ston-fi/omniston-sdk"
+   },
    "value": "0f94cf7c52d13ec5daa75719002af1a355ed6a75",
    "meta": {
     "tag": "commit 0f94cf7",
@@ -20,7 +26,7 @@
     "url": "https://github.com/ston-fi/omniston-sdk/commit/0f94cf7c52d13ec5daa75719002af1a355ed6a75",
     "note": "default branch: fix(demo-app): remove unnecessary `traderDstDiscloseAddress` field passing to th"
    },
-   "seenAt": "2026-11-04T09:36:11.373Z",
+   "seenAt": "2026-11-04T17:01:46.457Z",
    "changedAt": "2026-11-04T09:36:11.373Z"
   }
  }

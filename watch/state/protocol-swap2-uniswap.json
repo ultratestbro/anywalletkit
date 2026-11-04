@@ -3,512 +3,694 @@
  "sources": {
   "quoter-v2-ethereum": {
    "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x61ffe014ba17989e743c5f6cb21bf9697530b21e"
+   },
    "value": "6b7cd5cf7e8bb496",
    "meta": {
     "codeHash": "6b7cd5cf7e8bb496",
     "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:11.973Z",
+   "seenAt": "2026-11-04T17:01:47.722Z",
    "changedAt": "2026-10-14T15:10:56.533Z"
   },
   "swap-router-02-ethereum": {
    "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45"
+   },
    "value": "5e0979f7c36eac03",
    "meta": {
     "codeHash": "5e0979f7c36eac03",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:11.984Z",
+   "seenAt": "2026-11-04T17:01:47.724Z",
    "changedAt": "2026-10-14T15:10:56.555Z"
   },
   "factory-ethereum": {
    "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x1f98431c8ad98523631ae4a59f267346ea31f984"
+   },
    "value": "56e749dfb2334045",
    "meta": {
     "codeHash": "56e749dfb2334045",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:11.982Z",
+   "seenAt": "2026-11-04T17:01:47.725Z",
    "changedAt": "2026-10-14T15:10:56.568Z"
   },
   "quoter-v2-op-mainnet": {
    "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0x61ffe014ba17989e743c5f6cb21bf9697530b21e"
+   },
    "value": "9c8284312173931b",
    "meta": {
     "codeHash": "9c8284312173931b",
     "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:11.961Z",
+   "seenAt": "2026-11-04T17:01:47.731Z",
    "changedAt": "2026-10-14T15:10:56.580Z"
   },
   "swap-router-02-op-mainnet": {
    "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45"
+   },
    "value": "d4e88a8bcdde9239",
    "meta": {
     "codeHash": "d4e88a8bcdde9239",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:11.963Z",
+   "seenAt": "2026-11-04T17:01:47.728Z",
    "changedAt": "2026-10-14T15:10:56.590Z"
   },
   "factory-op-mainnet": {
    "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0x1f98431c8ad98523631ae4a59f267346ea31f984"
+   },
    "value": "56e749dfb2334045",
    "meta": {
     "codeHash": "56e749dfb2334045",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:11.964Z",
+   "seenAt": "2026-11-04T17:01:47.726Z",
    "changedAt": "2026-10-14T15:10:56.610Z"
   },
   "quoter-v2-unichain": {
    "type": "evm-code",
    "target": {
     "chainId": 130,
-    "address": "0x565ac8c7863d9bb16d07e809ff49fe5cd467634c"
+    "address": "0x385a5cf5f83e99f7bb2852b6a19c3538b9fa7658"
    },
-   "value": "819513779538d9dc",
+   "value": "c2b3e60a64112fc0",
    "meta": {
-    "codeHash": "819513779538d9dc",
-    "bytes": 10541
+    "codeHash": "c2b3e60a64112fc0",
+    "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:12.157Z",
-   "changedAt": "2026-10-14T15:10:57.086Z"
+   "seenAt": "2026-11-04T17:01:47.777Z",
+   "changedAt": "2026-11-04T17:01:47.777Z"
   },
   "factory-unichain": {
    "type": "evm-code",
+   "target": {
+    "chainId": 130,
+    "address": "0x1f98400000000000000000000000000000000003"
+   },
    "value": "8a7e594ffd4bc5b1",
    "meta": {
     "codeHash": "8a7e594ffd4bc5b1",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:12.216Z",
+   "seenAt": "2026-11-04T17:01:47.778Z",
    "changedAt": "2026-10-14T15:10:57.100Z"
   },
   "swap-router-02-unichain": {
    "type": "evm-code",
+   "target": {
+    "chainId": 130,
+    "address": "0x73855d06de49d0fe4a9c42636ba96c62da12ff9c"
+   },
    "value": "515ef786aeaeba09",
    "meta": {
     "codeHash": "515ef786aeaeba09",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:12.215Z",
+   "seenAt": "2026-11-04T17:01:47.775Z",
    "changedAt": "2026-10-14T15:10:57.112Z"
   },
   "quoter-v2-polygon": {
    "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0x61ffe014ba17989e743c5f6cb21bf9697530b21e"
+   },
    "value": "323eb74cc0476d7c",
    "meta": {
     "codeHash": "323eb74cc0476d7c",
     "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:12.045Z",
+   "seenAt": "2026-11-04T17:01:47.804Z",
    "changedAt": "2026-10-14T15:10:57.401Z"
   },
   "swap-router-02-polygon": {
    "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45"
+   },
    "value": "dc780caef812649b",
    "meta": {
     "codeHash": "dc780caef812649b",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:12.057Z",
+   "seenAt": "2026-11-04T17:01:47.810Z",
    "changedAt": "2026-10-14T15:10:57.413Z"
   },
   "factory-polygon": {
    "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0x1f98431c8ad98523631ae4a59f267346ea31f984"
+   },
    "value": "56e749dfb2334045",
    "meta": {
     "codeHash": "56e749dfb2334045",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:12.047Z",
+   "seenAt": "2026-11-04T17:01:47.799Z",
    "changedAt": "2026-10-14T15:10:57.437Z"
   },
   "swap-router-02-bnb-chain": {
    "type": "evm-code",
+   "target": {
+    "chainId": 56,
+    "address": "0xb971ef87ede563556b2ed4b1c0b0019111dd85d2"
+   },
    "value": "7e94384a5e5ab8b4",
    "meta": {
     "codeHash": "7e94384a5e5ab8b4",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:12.014Z",
+   "seenAt": "2026-11-04T17:01:47.760Z",
    "changedAt": "2026-10-14T15:10:57.953Z"
   },
   "swap-router-02-monad": {
    "type": "evm-code",
+   "target": {
+    "chainId": 143,
+    "address": "0xfe31f71c1b106eac32f1a19239c9a9a72ddfb900"
+   },
    "value": "f641f8882bf31119",
    "meta": {
     "codeHash": "f641f8882bf31119",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:12.349Z",
+   "seenAt": "2026-11-04T17:01:47.867Z",
    "changedAt": "2026-10-14T15:10:58.018Z"
   },
   "quoter-v2-monad": {
    "type": "evm-code",
    "target": {
     "chainId": 143,
-    "address": "0x2d01411773c8c24805306e89a41f7855c3c4fe65"
+    "address": "0x661e93cca42afacb172121ef892830ca3b70f08d"
    },
-   "value": "6ebd18d519daec1d",
+   "value": "9b1ac7f4971ed40b",
    "meta": {
-    "codeHash": "6ebd18d519daec1d",
-    "bytes": 10541
+    "codeHash": "9b1ac7f4971ed40b",
+    "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:12.094Z",
-   "changedAt": "2026-10-14T15:10:58.299Z"
+   "seenAt": "2026-11-04T17:01:47.841Z",
+   "changedAt": "2026-11-04T17:01:47.841Z"
   },
   "quoter-v2-x-layer": {
    "type": "evm-code",
    "target": {
     "chainId": 196,
-    "address": "0x976183ac3d09840d243a88c0268badb3b3e3259f"
+    "address": "0xd1b797d92d87b688193a2b976efc8d577d204343"
    },
-   "value": "a5972a0430a89e22",
+   "value": "31b8393e7d9aac81",
    "meta": {
-    "codeHash": "a5972a0430a89e22",
-    "bytes": 10541
+    "codeHash": "31b8393e7d9aac81",
+    "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:12.260Z",
-   "changedAt": "2026-10-14T15:10:58.418Z"
+   "seenAt": "2026-11-04T17:01:48.016Z",
+   "changedAt": "2026-11-04T17:01:48.016Z"
   },
   "factory-monad": {
    "type": "evm-code",
+   "target": {
+    "chainId": 143,
+    "address": "0x204faca1764b154221e35c0d20abb3c525710498"
+   },
    "value": "5f62806b8c43dbee",
    "meta": {
     "codeHash": "5f62806b8c43dbee",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:12.085Z",
+   "seenAt": "2026-11-04T17:01:47.839Z",
    "changedAt": "2026-10-14T15:10:58.546Z"
   },
   "swap-router-02-x-layer": {
    "type": "evm-code",
+   "target": {
+    "chainId": 196,
+    "address": "0x4f0c28f5926afda16bf2506d5d9e57ea190f9bca"
+   },
    "value": "ba46c4c09bd548bd",
    "meta": {
     "codeHash": "ba46c4c09bd548bd",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:12.328Z",
+   "seenAt": "2026-11-04T17:01:48.050Z",
    "changedAt": "2026-10-14T15:10:58.581Z"
   },
   "factory-bnb-chain": {
    "type": "evm-code",
+   "target": {
+    "chainId": 56,
+    "address": "0xdb1d10011ad0ff90774d0c6bb92e5c5c8b4461f7"
+   },
    "value": "7dffb1f3dc9bdbc5",
    "meta": {
     "codeHash": "7dffb1f3dc9bdbc5",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:12.007Z",
+   "seenAt": "2026-11-04T17:01:47.764Z",
    "changedAt": "2026-10-14T15:10:58.617Z"
   },
   "quoter-v2-bnb-chain": {
    "type": "evm-code",
+   "target": {
+    "chainId": 56,
+    "address": "0x78d78e420da98ad378d7799be8f4af69033eb077"
+   },
    "value": "52869eec25f3b15f",
    "meta": {
     "codeHash": "52869eec25f3b15f",
     "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:12.002Z",
+   "seenAt": "2026-11-04T17:01:47.758Z",
    "changedAt": "2026-10-14T15:10:58.694Z"
   },
   "factory-x-layer": {
    "type": "evm-code",
+   "target": {
+    "chainId": 196,
+    "address": "0x4b2ab38dbf28d31d467aa8993f6c2585981d6804"
+   },
    "value": "3bfad8fd1adc4b4d",
    "meta": {
     "codeHash": "3bfad8fd1adc4b4d",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:12.425Z",
+   "seenAt": "2026-11-04T17:01:48.033Z",
    "changedAt": "2026-10-14T15:10:58.820Z"
   },
   "factory-zksync-era": {
    "type": "evm-code",
+   "target": {
+    "chainId": 324,
+    "address": "0x8fda5a7a8dca67bbcdd10f02fa0649a937215422"
+   },
    "value": "8cbadddc29db76fe",
    "meta": {
     "codeHash": "8cbadddc29db76fe",
     "bytes": 8288
    },
-   "seenAt": "2026-11-04T09:36:12.324Z",
+   "seenAt": "2026-11-04T17:01:47.895Z",
    "changedAt": "2026-10-14T15:10:59.025Z"
   },
   "quoter-v2-zksync-era": {
    "type": "evm-code",
+   "target": {
+    "chainId": 324,
+    "address": "0x8cb537fc92e26d8ebbb760e632c95484b6ea3e28"
+   },
    "value": "789f48e07548ce0a",
    "meta": {
     "codeHash": "789f48e07548ce0a",
     "bytes": 74144
    },
-   "seenAt": "2026-11-04T09:36:12.341Z",
+   "seenAt": "2026-11-04T17:01:47.910Z",
    "changedAt": "2026-10-14T15:10:59.241Z"
   },
   "quoter-v2-world-chain": {
    "type": "evm-code",
+   "target": {
+    "chainId": 480,
+    "address": "0x10158d43e6cc414dee1bd1eb0efc6a5cbcff244c"
+   },
    "value": "e119531c5c766617",
    "meta": {
     "codeHash": "e119531c5c766617",
     "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:12.393Z",
+   "seenAt": "2026-11-04T17:01:47.945Z",
    "changedAt": "2026-10-14T15:10:59.242Z"
   },
   "factory-robinhood-chain": {
    "type": "evm-code",
+   "target": {
+    "chainId": 4663,
+    "address": "0x1f7d7550b1b028f7571e69a784071f0205fd2efa"
+   },
    "value": "6b14bc82001eba5c",
    "meta": {
     "codeHash": "6b14bc82001eba5c",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:12.437Z",
+   "seenAt": "2026-11-04T17:01:47.988Z",
    "changedAt": "2026-10-14T15:10:59.540Z"
   },
   "swap-router-02-zksync-era": {
    "type": "evm-code",
+   "target": {
+    "chainId": 324,
+    "address": "0x99c56385dabce3e81d8499d0b8d0257abc07e8a3"
+   },
    "value": "df2e72bc2c729990",
    "meta": {
     "codeHash": "df2e72bc2c729990",
     "bytes": 167392
    },
-   "seenAt": "2026-11-04T09:36:12.388Z",
+   "seenAt": "2026-11-04T17:01:47.959Z",
    "changedAt": "2026-10-14T15:10:59.587Z"
   },
   "swap-router-02-world-chain": {
    "type": "evm-code",
+   "target": {
+    "chainId": 480,
+    "address": "0x091ad9e2e6e5ed44c1c66db50e49a601f9f36cf6"
+   },
    "value": "2538879ddfd4856e",
    "meta": {
     "codeHash": "2538879ddfd4856e",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:12.402Z",
+   "seenAt": "2026-11-04T17:01:47.947Z",
    "changedAt": "2026-10-14T15:10:59.731Z"
   },
   "factory-base": {
    "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0x33128a8fc17869897dce68ed026d694621f6fdfd"
+   },
    "value": "4cfbd1570a7581d0",
    "meta": {
     "codeHash": "4cfbd1570a7581d0",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:12.436Z",
+   "seenAt": "2026-11-04T17:01:48.022Z",
    "changedAt": "2026-10-14T15:10:59.870Z"
   },
   "swap-router-02-base": {
    "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0x2626664c2603336e57b271c5c0b26f421741e481"
+   },
    "value": "17471a75bc2700a2",
    "meta": {
     "codeHash": "17471a75bc2700a2",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:12.460Z",
+   "seenAt": "2026-11-04T17:01:48.032Z",
    "changedAt": "2026-10-14T15:11:00.063Z"
   },
   "factory-arbitrum": {
    "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x1f98431c8ad98523631ae4a59f267346ea31f984"
+   },
    "value": "56e749dfb2334045",
    "meta": {
     "codeHash": "56e749dfb2334045",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:12.474Z",
+   "seenAt": "2026-11-04T17:01:48.074Z",
    "changedAt": "2026-10-14T15:11:00.145Z"
   },
   "quoter-v2-base": {
    "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0x3d4e44eb1374240ce5f1b871ab261cd16335b76a"
+   },
    "value": "a4f4b49709f793f9",
    "meta": {
     "codeHash": "a4f4b49709f793f9",
     "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:12.441Z",
+   "seenAt": "2026-11-04T17:01:48.042Z",
    "changedAt": "2026-10-14T15:11:00.199Z"
   },
   "swap-router-02-arbitrum": {
    "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45"
+   },
    "value": "dec742e36ee95cbf",
    "meta": {
     "codeHash": "dec742e36ee95cbf",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:12.476Z",
+   "seenAt": "2026-11-04T17:01:48.081Z",
    "changedAt": "2026-10-14T15:11:00.272Z"
   },
   "factory-world-chain": {
    "type": "evm-code",
+   "target": {
+    "chainId": 480,
+    "address": "0x7a5028bda40e7b173c278c5342087826455ea25a"
+   },
    "value": "c7040dd3f877e6dc",
    "meta": {
     "codeHash": "c7040dd3f877e6dc",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:12.409Z",
+   "seenAt": "2026-11-04T17:01:47.929Z",
    "changedAt": "2026-10-14T15:11:00.394Z"
   },
   "quoter-v2-arbitrum": {
    "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x61ffe014ba17989e743c5f6cb21bf9697530b21e"
+   },
    "value": "2932bfcaa454826d",
    "meta": {
     "codeHash": "2932bfcaa454826d",
     "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:12.461Z",
+   "seenAt": "2026-11-04T17:01:48.070Z",
    "changedAt": "2026-10-14T15:11:00.395Z"
   },
   "quoter-v2-celo": {
    "type": "evm-code",
+   "target": {
+    "chainId": 42220,
+    "address": "0x82825d0554fa07f7fc52ab63c961f330fdefa8e8"
+   },
    "value": "78b86ee95d6f60a4",
    "meta": {
     "codeHash": "78b86ee95d6f60a4",
     "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:12.520Z",
+   "seenAt": "2026-11-04T17:01:48.182Z",
    "changedAt": "2026-10-14T15:11:00.592Z"
   },
   "quoter-v2-robinhood-chain": {
    "type": "evm-code",
+   "target": {
+    "chainId": 4663,
+    "address": "0x33e885ed0ec9bf04ecfb19341582aadcb4c8a9e7"
+   },
    "value": "9f8e9b16d6c88486",
    "meta": {
     "codeHash": "9f8e9b16d6c88486",
     "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:12.472Z",
+   "seenAt": "2026-11-04T17:01:48.069Z",
    "changedAt": "2026-10-14T15:11:00.597Z"
   },
   "swap-router-02-robinhood-chain": {
    "type": "evm-code",
+   "target": {
+    "chainId": 4663,
+    "address": "0xcaf681a66d020601342297493863e78c959e5cb2"
+   },
    "value": "4eb27623b2dada04",
    "meta": {
     "codeHash": "4eb27623b2dada04",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:12.492Z",
+   "seenAt": "2026-11-04T17:01:48.057Z",
    "changedAt": "2026-10-14T15:11:00.605Z"
   },
   "factory-avalanche": {
    "type": "evm-code",
+   "target": {
+    "chainId": 43114,
+    "address": "0x740b1c1de25031c31ff4fc9a62f554a55cdc1bad"
+   },
    "value": "12bfa5a3bdc1bd74",
    "meta": {
     "codeHash": "12bfa5a3bdc1bd74",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:12.729Z",
+   "seenAt": "2026-11-04T17:01:48.163Z",
    "changedAt": "2026-10-14T15:11:00.606Z"
   },
   "swap-router-02-celo": {
    "type": "evm-code",
+   "target": {
+    "chainId": 42220,
+    "address": "0x5615cdab10dc425a742d643d949a7f474c01abc4"
+   },
    "value": "e148de9571976629",
    "meta": {
     "codeHash": "e148de9571976629",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:12.540Z",
+   "seenAt": "2026-11-04T17:01:48.159Z",
    "changedAt": "2026-10-14T15:11:00.667Z"
   },
   "quoter-v2-avalanche": {
    "type": "evm-code",
+   "target": {
+    "chainId": 43114,
+    "address": "0xbe0f5544ec67e9b3b2d979aaa43f18fd87e6257f"
+   },
    "value": "8028a74293efe5fe",
    "meta": {
     "codeHash": "8028a74293efe5fe",
     "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:12.658Z",
+   "seenAt": "2026-11-04T17:01:48.129Z",
    "changedAt": "2026-10-14T15:11:00.746Z"
   },
   "swap-router-02-avalanche": {
    "type": "evm-code",
+   "target": {
+    "chainId": 43114,
+    "address": "0xbb00ff08d01d300023c629e8ffffcb65a5a578ce"
+   },
    "value": "a734dd55568713b0",
    "meta": {
     "codeHash": "a734dd55568713b0",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:12.744Z",
+   "seenAt": "2026-11-04T17:01:48.125Z",
    "changedAt": "2026-10-14T15:11:00.781Z"
   },
   "quoter-v2-ink": {
    "type": "evm-code",
+   "target": {
+    "chainId": 57073,
+    "address": "0x96b572d2d880cf2fa2563651bd23ade6f5516652"
+   },
    "value": "2e3afabf05e8e3a4",
    "meta": {
     "codeHash": "2e3afabf05e8e3a4",
     "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:13.006Z",
+   "seenAt": "2026-11-04T17:01:48.435Z",
    "changedAt": "2026-10-14T15:11:00.919Z"
   },
   "swap-router-02-ink": {
    "type": "evm-code",
+   "target": {
+    "chainId": 57073,
+    "address": "0x177778f19e89dd1012bdbe603f144088a95c4b53"
+   },
    "value": "913533058b853c78",
    "meta": {
     "codeHash": "913533058b853c78",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:13.290Z",
+   "seenAt": "2026-11-04T17:01:48.603Z",
    "changedAt": "2026-10-14T15:11:01.036Z"
   },
   "factory-celo": {
    "type": "evm-code",
+   "target": {
+    "chainId": 42220,
+    "address": "0xafe208a311b21f13ef87e33a90049fc17a7acdec"
+   },
    "value": "d50934a0ddea9370",
    "meta": {
     "codeHash": "d50934a0ddea9370",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:12.530Z",
+   "seenAt": "2026-11-04T17:01:48.157Z",
    "changedAt": "2026-10-14T15:11:01.229Z"
   },
   "quoter-v2-linea": {
    "type": "evm-code",
    "target": {
     "chainId": 59144,
-    "address": "0x58ead433ea99708604c4dd7c9b7e80c70976e202"
+    "address": "0x42be4d6527829fefa1493e1fb9f3676d2425c3c1"
    },
-   "value": "bfed6471d7dd3202",
+   "value": "b5c8e360231a4ebd",
    "meta": {
-    "codeHash": "bfed6471d7dd3202",
-    "bytes": 10541
+    "codeHash": "b5c8e360231a4ebd",
+    "bytes": 8273
    },
-   "seenAt": "2026-11-04T09:36:12.843Z",
-   "changedAt": "2026-10-14T15:11:01.336Z"
+   "seenAt": "2026-11-04T17:01:48.230Z",
+   "changedAt": "2026-11-04T17:01:48.230Z"
   },
   "factory-ink": {
    "type": "evm-code",
+   "target": {
+    "chainId": 57073,
+    "address": "0x640887a9ba3a9c53ed27d0f7e8246a4f933f3424"
+   },
    "value": "2b2284d9031ccee1",
    "meta": {
     "codeHash": "2b2284d9031ccee1",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:13.295Z",
+   "seenAt": "2026-11-04T17:01:48.578Z",
    "changedAt": "2026-10-14T15:11:01.444Z"
   },
   "swap-router-02-linea": {
    "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0x3d4e44eb1374240ce5f1b871ab261cd16335b76a"
+   },
    "value": "bd2fea8e214c2b28",
    "meta": {
     "codeHash": "bd2fea8e214c2b28",
     "bytes": 24497
    },
-   "seenAt": "2026-11-04T09:36:12.888Z",
+   "seenAt": "2026-11-04T17:01:48.250Z",
    "changedAt": "2026-10-14T15:11:01.459Z"
   },
   "docs-deployments": {
    "type": "http-text",
+   "target": {
+    "url": "https://docs.uniswap.org/contracts/v3/reference/deployments/"
+   },
    "value": "ba9160a668ec202a98534d7036d35181ca1f6bcf3140265f2442c1bcc269a020",
    "meta": {
     "hash": "ba9160a668ec202a",
     "chars": 2770
    },
-   "seenAt": "2026-11-04T09:36:13.780Z",
+   "seenAt": "2026-11-04T17:01:48.712Z",
    "changedAt": "2026-11-04T09:36:13.780Z"
   },
   "factory-linea": {
    "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0x31fafd4889fa1269f7a13a66ee0fb458f27d72a9"
+   },
    "value": "d0817223c191ae52",
    "meta": {
     "codeHash": "d0817223c191ae52",
     "bytes": 24535
    },
-   "seenAt": "2026-11-04T09:36:12.812Z",
+   "seenAt": "2026-11-04T17:01:48.249Z",
    "changedAt": "2026-10-14T15:11:02.695Z"
   },
   "sdks": {
    "type": "github-releases",
+   "target": {
+    "repo": "Uniswap/sdks"
+   },
    "value": "@uniswap/liquidity-launcher-sdk@2.1.0",
    "meta": {
     "tag": "@uniswap/liquidity-launcher-sdk@2.1.0",
@@ -517,30 +699,438 @@
     "url": "https://github.com/Uniswap/sdks/releases/tag/%40uniswap/liquidity-launcher-sdk%402.1.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-04T09:36:13.222Z",
+   "seenAt": "2026-11-04T17:01:48.651Z",
    "changedAt": "2026-11-04T09:36:13.222Z"
   },
   "v3-core": {
    "type": "github-releases",
+   "target": {
+    "repo": "Uniswap/v3-core"
+   },
    "value": "v1.0.0",
    "meta": {
     "tag": "v1.0.0",
     "url": "https://github.com/Uniswap/v3-core/releases/tag/v1.0.0",
     "note": "tags only"
    },
-   "seenAt": "2026-11-04T09:36:13.551Z",
+   "seenAt": "2026-11-04T17:01:48.797Z",
    "changedAt": "2026-10-14T15:12:28.389Z"
   },
   "v3-periphery": {
    "type": "github-releases",
+   "target": {
+    "repo": "Uniswap/v3-periphery"
+   },
    "value": "v1.3.0",
    "meta": {
     "tag": "v1.3.0",
     "url": "https://github.com/Uniswap/v3-periphery/releases/tag/v1.3.0",
     "note": "tags only"
    },
-   "seenAt": "2026-11-04T09:36:13.447Z",
+   "seenAt": "2026-11-04T17:01:48.820Z",
    "changedAt": "2026-10-14T15:12:28.415Z"
+  },
+  "deployments-status": {
+   "type": "json-pins",
+   "target": {
+    "url": "https://developers.uniswap.org/deployments.json"
+   },
+   "value": "041f079628c555ad27a396cb8985e6493133e283e10328e5d0465502bbb251f4",
+   "meta": {
+    "pins": 48,
+    "ok": 48,
+    "generatedAt": "2026-10-16T21:00:00.000Z",
+    "commit": "cd2e8a869498",
+    "rows": [
+     {
+      "group": "1",
+      "role": "factory",
+      "address": "0x1f98431c8ad98523631ae4a59f267346ea31f984",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-ethereum"
+     },
+     {
+      "group": "1",
+      "role": "quoter",
+      "address": "0x61ffe014ba17989e743c5f6cb21bf9697530b21e",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-ethereum"
+     },
+     {
+      "group": "1",
+      "role": "router",
+      "address": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-ethereum"
+     },
+     {
+      "group": "10",
+      "role": "factory",
+      "address": "0x1f98431c8ad98523631ae4a59f267346ea31f984",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-optimism"
+     },
+     {
+      "group": "10",
+      "role": "quoter",
+      "address": "0x61ffe014ba17989e743c5f6cb21bf9697530b21e",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-optimism"
+     },
+     {
+      "group": "10",
+      "role": "router",
+      "address": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-optimism"
+     },
+     {
+      "group": "56",
+      "role": "factory",
+      "address": "0xdb1d10011ad0ff90774d0c6bb92e5c5c8b4461f7",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-bnb-chain"
+     },
+     {
+      "group": "56",
+      "role": "quoter",
+      "address": "0x78d78e420da98ad378d7799be8f4af69033eb077",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-bnb-chain"
+     },
+     {
+      "group": "56",
+      "role": "router",
+      "address": "0xb971ef87ede563556b2ed4b1c0b0019111dd85d2",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-bnb-chain"
+     },
+     {
+      "group": "130",
+      "role": "factory",
+      "address": "0x1f98400000000000000000000000000000000003",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-unichain"
+     },
+     {
+      "group": "130",
+      "role": "quoter",
+      "address": "0x385a5cf5f83e99f7bb2852b6a19c3538b9fa7658",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-unichain"
+     },
+     {
+      "group": "130",
+      "role": "router",
+      "address": "0x73855d06de49d0fe4a9c42636ba96c62da12ff9c",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-unichain"
+     },
+     {
+      "group": "137",
+      "role": "factory",
+      "address": "0x1f98431c8ad98523631ae4a59f267346ea31f984",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-polygon"
+     },
+     {
+      "group": "137",
+      "role": "quoter",
+      "address": "0x61ffe014ba17989e743c5f6cb21bf9697530b21e",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-polygon"
+     },
+     {
+      "group": "137",
+      "role": "router",
+      "address": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-polygon"
+     },
+     {
+      "group": "143",
+      "role": "factory",
+      "address": "0x204faca1764b154221e35c0d20abb3c525710498",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-monad"
+     },
+     {
+      "group": "143",
+      "role": "quoter",
+      "address": "0x661e93cca42afacb172121ef892830ca3b70f08d",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-monad"
+     },
+     {
+      "group": "143",
+      "role": "router",
+      "address": "0xfe31f71c1b106eac32f1a19239c9a9a72ddfb900",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-monad"
+     },
+     {
+      "group": "196",
+      "role": "factory",
+      "address": "0x4b2ab38dbf28d31d467aa8993f6c2585981d6804",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-x-layer"
+     },
+     {
+      "group": "196",
+      "role": "quoter",
+      "address": "0xd1b797d92d87b688193a2b976efc8d577d204343",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-x-layer"
+     },
+     {
+      "group": "196",
+      "role": "router",
+      "address": "0x4f0c28f5926afda16bf2506d5d9e57ea190f9bca",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-x-layer"
+     },
+     {
+      "group": "324",
+      "role": "factory",
+      "address": "0x8fda5a7a8dca67bbcdd10f02fa0649a937215422",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-zksync"
+     },
+     {
+      "group": "324",
+      "role": "quoter",
+      "address": "0x8cb537fc92e26d8ebbb760e632c95484b6ea3e28",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-zksync"
+     },
+     {
+      "group": "324",
+      "role": "router",
+      "address": "0x99c56385dabce3e81d8499d0b8d0257abc07e8a3",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-zksync"
+     },
+     {
+      "group": "480",
+      "role": "factory",
+      "address": "0x7a5028bda40e7b173c278c5342087826455ea25a",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-world-chain"
+     },
+     {
+      "group": "480",
+      "role": "quoter",
+      "address": "0x10158d43e6cc414dee1bd1eb0efc6a5cbcff244c",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-world-chain"
+     },
+     {
+      "group": "480",
+      "role": "router",
+      "address": "0x091ad9e2e6e5ed44c1c66db50e49a601f9f36cf6",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-world-chain"
+     },
+     {
+      "group": "4663",
+      "role": "factory",
+      "address": "0x1f7d7550b1b028f7571e69a784071f0205fd2efa",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-robinhood-chain"
+     },
+     {
+      "group": "4663",
+      "role": "quoter",
+      "address": "0x33e885ed0ec9bf04ecfb19341582aadcb4c8a9e7",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-robinhood-chain"
+     },
+     {
+      "group": "4663",
+      "role": "router",
+      "address": "0xcaf681a66d020601342297493863e78c959e5cb2",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-robinhood-chain"
+     },
+     {
+      "group": "8453",
+      "role": "factory",
+      "address": "0x33128a8fc17869897dce68ed026d694621f6fdfd",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-base"
+     },
+     {
+      "group": "8453",
+      "role": "quoter",
+      "address": "0x3d4e44eb1374240ce5f1b871ab261cd16335b76a",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-base"
+     },
+     {
+      "group": "8453",
+      "role": "router",
+      "address": "0x2626664c2603336e57b271c5c0b26f421741e481",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-base"
+     },
+     {
+      "group": "42161",
+      "role": "factory",
+      "address": "0x1f98431c8ad98523631ae4a59f267346ea31f984",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-arbitrum"
+     },
+     {
+      "group": "42161",
+      "role": "quoter",
+      "address": "0x61ffe014ba17989e743c5f6cb21bf9697530b21e",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-arbitrum"
+     },
+     {
+      "group": "42161",
+      "role": "router",
+      "address": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-arbitrum"
+     },
+     {
+      "group": "42220",
+      "role": "factory",
+      "address": "0xafe208a311b21f13ef87e33a90049fc17a7acdec",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-celo"
+     },
+     {
+      "group": "42220",
+      "role": "quoter",
+      "address": "0x82825d0554fa07f7fc52ab63c961f330fdefa8e8",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-celo"
+     },
+     {
+      "group": "42220",
+      "role": "router",
+      "address": "0x5615cdab10dc425a742d643d949a7f474c01abc4",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-celo"
+     },
+     {
+      "group": "43114",
+      "role": "factory",
+      "address": "0x740b1c1de25031c31ff4fc9a62f554a55cdc1bad",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-avalanche"
+     },
+     {
+      "group": "43114",
+      "role": "quoter",
+      "address": "0xbe0f5544ec67e9b3b2d979aaa43f18fd87e6257f",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-avalanche"
+     },
+     {
+      "group": "43114",
+      "role": "router",
+      "address": "0xbb00ff08d01d300023c629e8ffffcb65a5a578ce",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-avalanche"
+     },
+     {
+      "group": "57073",
+      "role": "factory",
+      "address": "0x640887a9ba3a9c53ed27d0f7e8246a4f933f3424",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-ink"
+     },
+     {
+      "group": "57073",
+      "role": "quoter",
+      "address": "0x96b572d2d880cf2fa2563651bd23ade6f5516652",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-ink"
+     },
+     {
+      "group": "57073",
+      "role": "router",
+      "address": "0x177778f19e89dd1012bdbe603f144088a95c4b53",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-ink"
+     },
+     {
+      "group": "59144",
+      "role": "factory",
+      "address": "0x31fafd4889fa1269f7a13a66ee0fb458f27d72a9",
+      "contract": "UniswapV3Factory",
+      "status": "active",
+      "id": "v3-uniswapv3factory-linea"
+     },
+     {
+      "group": "59144",
+      "role": "quoter",
+      "address": "0x42be4d6527829fefa1493e1fb9f3676d2425c3c1",
+      "contract": "QuoterV2",
+      "status": "active",
+      "id": "v3-quoterv2-linea"
+     },
+     {
+      "group": "59144",
+      "role": "router",
+      "address": "0x3d4e44eb1374240ce5f1b871ab261cd16335b76a",
+      "contract": "SwapRouter02",
+      "status": "active",
+      "id": "v3-swaprouter02-linea"
+     }
+    ],
+    "problems": []
+   },
+   "seenAt": "2026-11-04T17:01:48.725Z",
+   "changedAt": "2026-11-04T17:01:48.725Z"
   }
  }
 }
