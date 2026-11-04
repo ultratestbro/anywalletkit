@@ -1,5 +1,13 @@
 # @anywalletkit/extension-kit
 
+## 0.3.5
+
+### Patch Changes
+
+- @anywalletkit/protocol-swap2-core@0.10.1
+  - @anywalletkit/swap2-assets@0.2.2
+  - @anywalletkit/wallet-evm@0.7.0
+
 ## 0.3.4
 
 ### Patch Changes

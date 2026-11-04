@@ -1,5 +1,20 @@
 # @anywalletkit/protocol-swap2-lifi
 
+## 0.6.0
+
+### Minor Changes
+
+- a7cb98f: Cross-chain requests from an EVM chain now ask LI.FI not to offer routes with a destination call (`allowDestinationCall=false` on `/quote` and in the route-options request). The module already refused those routes, so a pair where LI.FI picked one showed no route; it now gets a route the module accepts. The refusal stays in place as the backstop. Requests from Solana are unchanged.
+  
+  New opt-in option `routeWideSlippage` (default off): sends `slippageScope=route` on EVM → EVM requests, so LI.FI applies one slippage budget to the whole route and returns a single minimum the transaction enforces, instead of applying the slippage to every step. When LI.FI can protect no route for a request (`ROUTE_SLIPPAGE_UNSUPPORTED`) or has route-wide slippage switched off (`ROUTE_SLIPPAGE_UNAVAILABLE`), it is asked again in its default scope while quoting, and that quote, the one the user reviews, is held to the same floor as before. Leaving it off keeps today's behaviour exactly.
+
+### Patch Changes
+
+- a7cb98f: LI.FI routes through Eco work again. Eco's facet was upgraded to v3 on 2026-11-01, which changed both entry-point selectors and moved the refund address in its data, so every Eco route was refused as an unknown Diamond call. The new entry points are listed, the refund address is read where v3 keeps it, and because v3 no longer checks on chain that the intent pays the recipient, the device reads the intent itself: it must run on the destination chain and end in a transfer of the destination token, of at least the reviewed minimum, to the recipient. Eco routes that run elsewhere (CCTP, HyperCore, chained intents), routes of more than 16 calls, and Eco routes to a native destination token (ETH, POL, …), which have no token transfer to read, are refused; for those pairs LI.FI picks another bridge or the pair shows no route. Nothing to change in apps.
+- a7cb98f: An M0 order's destination token and amount are now checked against the quote: the order must ask the solver for the destination token and at least the minimum the user reviewed. An M0 order to a native destination token (ETH, POL, …) is always refused, as M0's facet itself refuses one. Before, only its recipient and refund addresses were checked. LI.FI's live M0 quotes already match. Nothing to change in apps.
+- @anywalletkit/protocol-swap2-core@0.10.1
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.5.0
 
 ### Minor Changes

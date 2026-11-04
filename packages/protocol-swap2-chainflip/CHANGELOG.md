@@ -1,5 +1,11 @@
 # @anywalletkit/protocol-swap2-chainflip
 
+## 0.4.3
+
+### Patch Changes
+
+- @anywalletkit/protocol-swap2-core@0.10.1
+
 ## 0.4.2
 
 ### Patch Changes

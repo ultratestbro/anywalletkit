@@ -1,5 +1,11 @@
 # @anywalletkit/protocol-staking-native-monad
 
+## 0.2.5
+
+### Patch Changes
+
+- 549123d: Validator-set reads (`getNetworkStats`, `getApr`, `listValidators` in `'any'` mode) now read every `getValidator` through Multicall3, 67 per `eth_call` (~6.85M gas each, under a 10M `eth_call` gas cap), instead of one `eth_call` per consensus validator (~194 on mainnet): an APR or validator-list read is about 5 `eth_call`s instead of ~200. Results are unchanged. When the multicall fails (no Multicall3, an EIP-1193 provider or RPC that refuses it, a gas cap) the validators are read one call each as before, and if those plain reads work, Multicall3 is skipped for 10 minutes (validator set and withdrawal scan) instead of spending a failing `eth_call` on every refresh; a timeout or 5xx is not remembered. A rate-limited multicall fails as it is instead of fanning out. Rate limits are recognised by HTTP status, JSON-RPC code (429, -32007) or the words in the error's short message or details, no longer by a `429` anywhere in the message (which carries the request body and its id). URL reads retry 4 times on a rate limit with backoff (0.4, 0.8, 1.6, 3.2 s, or the RPC's `Retry-After`, at most 5 s), and twice on other retryable failures as before (150 / 300 ms), so a hung RPC still fails after 3 timeouts. The default `concurrency` is 4 (was 6), so a burst no longer draws HTTP 429 from public Monad RPCs.
+
 ## 0.2.4
 
 ### Patch Changes

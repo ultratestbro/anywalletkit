@@ -1,5 +1,13 @@
 # @anywalletkit/protocol-swap2-core
 
+## 0.10.1
+
+### Patch Changes
+
+- Updated dependencies [543598d]
+  - @anywalletkit/tx-preview-evm@0.5.1
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.10.0
 
 ### Minor Changes

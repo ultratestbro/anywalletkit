@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-swap2-thorchain
 
+## 0.3.3
+
+### Patch Changes
+
+- @anywalletkit/protocol-swap2-core@0.10.1
+  - @anywalletkit/swap2-assets@0.2.2
+
 ## 0.3.2
 
 ### Patch Changes

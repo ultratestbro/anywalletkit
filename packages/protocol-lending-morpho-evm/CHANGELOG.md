@@ -1,5 +1,23 @@
 # @anywalletkit/protocol-lending-morpho-evm
 
+## 0.4.0
+
+### Minor Changes
+
+- 1d3160d: Supplies and deposits check the dead-deposit rule that Morpho's own SDK applies (morpho-sdk 9.2.0), on the target only. A Blue market must hold at least 1e9 supply shares at `0x…dEaD` (`Morpho.position(id, 0x…dEaD)`). A Vault V1 or V2 must hold at least 1e9 shares there (`balanceOf`). A Vault V2's dead shares must also be worth at least 1e6 base units (`convertToAssets`), and its share price must be above 1 / (10 × virtualShares). Without a dead deposit, a nearly empty market or vault can have its share price inflated, so the next depositor's assets round down to nothing. New: `getDeadDeposit()` on both classes, `MorphoDeadDepositError`, `DEAD_ADDRESS`, `MIN_DEAD_SHARES`, `MIN_VAULT_V2_DEAD_ASSETS`, `evaluateDeadDeposit`, and the config option `allowWithoutDeadDeposit`. Withdrawals, collateral, borrows and repayments are not gated by the rule.
+  
+  Target only: the market or vault being supplied is checked. Morpho's SDK also walks the markets a vault can allocate to (a Vault V1's withdraw queue, a Vault V2's capped allocations and liquidity market). This module does not, and the README explains why. Do not assume full parity with the SDK's vault checks.
+  
+  `verify:live` treats a target that fails the rule as third-party state. It prints a `WARN deadDeposit FAILED (third-party state …)` line, which the canary reports as a warning, and exits 0, as long as the supply quote is refused with `MorphoDeadDepositError`. If the quote goes through or the read fails, the run still fails.
+  
+  **Breaking:** `supply` / `quoteSupply` into a market or vault that fails the rule now throws `MorphoDeadDepositError` (`code: 'InsufficientDeadDeposit'`, with `reason`, `observed`, `required`) before anything is approved or sent. Pass `allowWithoutDeadDeposit: true` to proceed anyway. On 2026-11-04, the listed targets this refuses were: idle markets (no collateral token) on every chain; HyperEVM wstHYPE/USDC 0xf5d30dcd…; three Ethereum V1 vaults (SwissBorg Morpho USDC, Steakhouse Ethena USDtb, Flagship USDT); and two cbBTC Vault V2s whose dead shares are worth a few hundred sats (Base Moonwell Frontier cbBTC, Monad Hyperithm cbBTC Apex).
+
+### Patch Changes
+
+- 1d3160d: Unichain: Vault V2 vaults are recognised. The preset now pins Unichain's VaultV2Factory `0xC9b34c108014B44e5a189A830e7e04c56704a0c9`. It is listed on docs.morpho.org, and on-chain its bytecode is the same as the Base and Katana factories. Before this, every Unichain Vault V2 failed the factory check and was refused unless `allowUnverifiedVault` was passed.
+  
+  `MorphoApi.listVaults` now lists Vault V2 vaults. It used to query `vaultV2s(where: VaultV2Filters)`, but the API's filter type is `VaultV2sFilters`. The API rejected the query ('Unknown type "VaultV2Filters"'), and a catch-all dropped the error, so only Vault V1s were ever returned. A failed V2 query now throws instead of silently shortening the list. On 2026-11-04 the fixed query finds 121 listed V2 vaults on Ethereum and 33 on Base. A listed vault is not necessarily depositable: one that fails the dead-deposit rule stays listed (the API has no such field), and `quoteSupply` / `supply` refuse it with `MorphoDeadDepositError` before any approval.
+
 ## 0.3.1
 
 ### Patch Changes

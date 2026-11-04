@@ -1,5 +1,12 @@
 # @anywalletkit/conformance
 
+## 0.5.1
+
+### Patch Changes
+
+- Updated dependencies [543598d]
+  - @anywalletkit/tx-preview-evm@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes
