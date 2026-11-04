@@ -15,7 +15,7 @@
 import { activityBase, sameAddress, type ActivityItem, type ChainTx, type DescribeActivityContext } from '@anywalletkit/core'
 import { decodeAbiParameters, getAbiItem, toFunctionSelector, type Hex } from 'viem'
 
-import { PERMIT2_ABI, PERMIT2_ADDRESS, PERMIT2_ZKSYNC_ADDRESS, SELECTORS, isPermit2Address } from './standards.js'
+import { PERMIT2_ABI, PERMIT2_ADDRESS, SELECTORS, isPermit2Address } from './standards.js'
 
 /** Registry name, as `module.json` carries it. */
 export const MODULE_NAME = '@anywalletkit/protocol-approvals-evm'
@@ -37,10 +37,12 @@ export const CHAIN_NAMES: Readonly<Record<number, string>> = Object.freeze({
   42161: 'Arbitrum', 42220: 'Celo', 43114: 'Avalanche', 57073: 'Ink', 59144: 'Linea', 80094: 'Berachain', 98866: 'Plume', 534352: 'Scroll'
 })
 
-/** Well-known spenders, so the title can say "for Permit2" instead of an address (zkSync Era's Permit2 has code on no other chain). */
+/**
+ * Well-known spenders, so the title can say "for Permit2" instead of an address. A chain's own Permit2s
+ * (zkSync Era's, on 324 only) are labelled through {@link isPermit2Address} on top of these.
+ */
 export const SPENDER_LABELS: Readonly<Record<string, string>> = Object.freeze({
-  [PERMIT2_ADDRESS.toLowerCase()]: 'Permit2',
-  [PERMIT2_ZKSYNC_ADDRESS.toLowerCase()]: 'Permit2'
+  [PERMIT2_ADDRESS.toLowerCase()]: 'Permit2'
 })
 
 const short = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`
@@ -112,7 +114,7 @@ export function describeApprovalActivity (tx: ChainTx, ctx: DescribeActivityCont
   }
 
   const label = options.tokens?.[r.token.toLowerCase()]?.symbol ?? (isPermit2 && sameAddress(r.token, call.to) ? 'Permit2 allowances' : short(r.token))
-  const spender = r.spender ? (SPENDER_LABELS[r.spender.toLowerCase()] ?? short(r.spender)) : null
+  const spender = r.spender ? (isPermit2Address(r.spender, chainId) ? 'Permit2' : (SPENDER_LABELS[r.spender.toLowerCase()] ?? short(r.spender))) : null
   const kind = r.revoke ? 'revoke' : 'approve'
   const title = r.revoke ? `Revoked ${label}${spender ? ` for ${spender}` : ''}` : `Approved ${label}${spender ? ` for ${spender}` : ''}`
   const extra: Partial<ActivityItem> = { protocol: MODULE_NAME, subtitle: `${isPermit2 ? 'Permit2' : 'Token approval'} · ${CHAIN_NAMES[chainId] ?? `eip155:${chainId}`}` }

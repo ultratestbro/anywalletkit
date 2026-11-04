@@ -73,7 +73,8 @@ export default class StateVerifier {
       const token = getAddress(c.token)
       const spender = getAddress(c.spender)
       const at = calls.length
-      const permit2 = getAddress(c.permit2 ?? PERMIT2_ADDRESS)
+      // Only a Permit2 candidate's `permit2` is read: on any other kind a stray field is ignored.
+      const permit2 = c.kind === 'permit2' ? getAddress(c.permit2 ?? PERMIT2_ADDRESS) : undefined
       switch (c.kind) {
         case 'erc20':
           calls.push({ target: token, callData: encodeFunctionData({ abi: ERC20_ABI, functionName: 'allowance', args: [owner as Address, spender] }) })
@@ -91,7 +92,7 @@ export default class StateVerifier {
           )
           break
         case 'permit2':
-          calls.push({ target: permit2, callData: encodeFunctionData({ abi: PERMIT2_ABI, functionName: 'allowance', args: [owner as Address, token, spender] }) })
+          calls.push({ target: permit2!, callData: encodeFunctionData({ abi: PERMIT2_ABI, functionName: 'allowance', args: [owner as Address, token, spender] }) })
           break
         default:
           throw new ApprovalsError(`Unknown candidate kind '${(c as Candidate).kind}'.`, 'invalid-approval', { candidate: c })

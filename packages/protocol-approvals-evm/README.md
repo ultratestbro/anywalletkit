@@ -64,7 +64,7 @@ Revokes are sent through `account.approve({amount: 0})`, `account.sendTransactio
 A cold scan from block 0 through a 10 000-block RPC window is thousands of requests. Three knobs:
 
 - `fromBlock` — the wallet's creation block. Wallets created by your app know it.
-- `cache` — `{ get(key), set(key, entry) }`; the module stores `{ fromBlock, toBlock, candidates }` (plain JSON) per `chainId:owner` and rescans only new blocks next time.
+- `cache` — `{ get(key), set(key, entry) }`; the module stores `{ fromBlock, toBlock, candidates, permit2 }` (plain JSON) per `chainId:owner` and rescans only new blocks next time. `permit2` lists the Permit2 contracts the stored scan covered: an entry that misses one of the chain's Permit2s (on zkSync Era, every entry written before its own Permit2 was known) is scanned again from its `fromBlock` once, keeping its candidates.
 - `source: new EtherscanSource({ chainId, apiKey })` — Etherscan V2, one key for every chain it indexes, **one request for the whole history** (every log with the owner in `topic1`; the parser drops the owner's transfers). The free tier covers Ethereum, Arbitrum, Polygon and others at 5 requests/s; Base, Optimism, BNB and Avalanche need a paid plan. Keep the key off the client: set `baseUrl` to your own proxy that appends it and `headers` for the proxy's auth.
 - `source: new BlockscoutSource({ chainId })` — the same query against a public Blockscout instance, no key: **one request for the whole history** (every log with the owner in `topic1`; the parser drops the owner's transfers), no key. Keyless instances allow ~10 requests per window per instance and answer 429 with `x-ratelimit-reset`; the source waits for short resets and fails fast with the wait time for long ones. Pass `apiKey` (free at dev.blockscout.com) to lift the limit, `perTopic: true` to ask per event signature instead. Use it for the first scan of an imported wallet and let `RpcLogsSource` take over.
 
@@ -95,7 +95,7 @@ Etherscan's own "Token Approvals" page lists the **original** allowance from the
 | `revokeAll(approvals)` | full | `RevokeResult[]` — Permit2 pairs fold into one `lockdown` per Permit2 contract; with `config.batch` every calldata revoke goes out as one `sendTransaction(tx[])` (ERC-4337 / 7702 accounts); a failed item carries `error` and the run continues |
 | `buildRevokeTransaction(approval \| approvals[])` | none | `{ to, data, value }` for hosts that batch themselves |
 
-`Approval`: `{ id, standard, chainId, token, spender, amount, unlimited, tokenId?, expiration?, grantedAt?, risks }`. `id` is `chainId:standard:token:spender[:tokenId]` and is stable across scans. Approval objects are plain (structured-clone safe).
+`Approval`: `{ id, standard, chainId, token, spender, amount, unlimited, tokenId?, expiration?, grantedAt?, permit2?, risks }` (`permit2` on Permit2 approvals: the contract holding the allowance). `id` is `chainId:standard:token:spender[:tokenId][@permit2]` and is stable across scans; `@permit2` is there only for an allowance on a Permit2 other than the CREATE2 one (zkSync Era's own). A Permit2 approval without `permit2` is revoked on the contract its `id` names, else the CREATE2 one; a `permit2` the `id` contradicts is refused (`invalid-approval`). Approval objects are plain (structured-clone safe).
 
 ### Config
 
