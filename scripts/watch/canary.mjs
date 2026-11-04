@@ -10,6 +10,7 @@ import {spawn} from "node:child_process";
 import {readFileSync, writeFileSync, mkdirSync, existsSync} from "node:fs";
 import {resolve, dirname} from "node:path";
 import {fileURLToPath} from "node:url";
+import {fitLines} from "./html-text.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, "../..");
@@ -139,7 +140,7 @@ if (SEND && (transitions.length || failing.length || flag("--quiet-ok"))) {
     const h = [`${failing.length ? "🔴" : transitions.length ? "🟡" : "🟢"} <b>Canary · ${TODAY}</b> — ${results.length} checks: ${esc(summary)}`];
     if (transitions.length) { h.push("", "<i>changed since last run:</i>"); for (const t of transitions.slice(0, 20)) h.push(`• ${ICON[t.from] ?? ""}→${ICON[t.to]} <b>${esc(t.id)}</b>${t.note ? `: ${esc(t.note.slice(0, 160))}` : ""}`); if (transitions.length > 20) h.push(`• …and ${transitions.length - 20} more`); }
     if (failing.length) { h.push("", "<i>still failing:</i>"); for (const f of failing.slice(0, 12)) h.push(`• ${esc(f.id)}: ${esc((f.note || f.status).slice(0, 160))}`); }
-    const body = {chat_id: chat, text: h.join("\n").slice(0, 3900), parse_mode: "HTML", disable_web_page_preview: true};
+    const body = {chat_id: chat, text: fitLines(h), parse_mode: "HTML", disable_web_page_preview: true};
     if (env.TELEGRAM_WATCH_TOPIC) body.message_thread_id = Number(env.TELEGRAM_WATCH_TOPIC);
     const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000)});
     const j = await r.json().catch(() => ({})); if (!j.ok) console.error(`telegram: send failed (${j.description ?? r.status})`);

@@ -12,6 +12,7 @@
 import {readFileSync, writeFileSync, mkdirSync, existsSync} from "node:fs";
 import {resolve, dirname} from "node:path";
 import {fileURLToPath, pathToFileURL} from "node:url";
+import {fitLines} from "./html-text.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, "../..");
@@ -150,7 +151,7 @@ if (SEND && transitions.length) {
     if (stopped.length) { h.push("", "<i>stopped quoting:</i>"); for (const t of stopped.slice(0, 15)) h.push(`• <b>${esc(t.id)}</b> ${esc(t.from)}→${esc(t.to)}${t.note ? `: ${esc(t.note.slice(0, 140))}` : ""}`); }
     if (back.length) { h.push("", "<i>quoting again:</i>"); for (const t of back.slice(0, 15)) h.push(`• <b>${esc(t.id)}</b> ${esc(t.from)}→quoting${t.suspended ? ` — <b>paused in the app (NEAR_INTENTS_SUSPENDED_CHAINS), lift it</b>${CORRIDORS.find((c) => c.id === t.id)?.note ? ` (${esc(CORRIDORS.find((c) => c.id === t.id).note)})` : ""}` : ""}`); }
     if (down.length) h.push("", `<i>still down: ${down.length}</i> — ${esc(down.map((d) => d.id).slice(0, 12).join(", "))}${down.length > 12 ? ", …" : ""}`);
-    const body = {chat_id: chat, text: h.join("\n"), parse_mode: "HTML", disable_web_page_preview: true, ...(env.TELEGRAM_WATCH_TOPIC ? {message_thread_id: Number(env.TELEGRAM_WATCH_TOPIC)} : {})};
+    const body = {chat_id: chat, text: fitLines(h), parse_mode: "HTML", disable_web_page_preview: true, ...(env.TELEGRAM_WATCH_TOPIC ? {message_thread_id: Number(env.TELEGRAM_WATCH_TOPIC)} : {})};
     const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000)});
     const j = await r.json().catch(() => ({})); if (!j.ok) log(`telegram: send failed (${j.description ?? r.status})`);
   }

@@ -131,3 +131,22 @@ export function safeLink(url, source) {
     return null;
   }
 }
+
+/**
+ * A Telegram message (4096 chars max) cut at whole lines: every line carries its own balanced tags, so a
+ * cut never leaves an open <a> or <b> (Telegram refuses the whole message, and a refused watch digest fails the job).
+ */
+export function fitLines(lines, tail = (n) => `…and ${n} more lines`, max = 3900) {
+  const out = [];
+  let used = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const room = max - used - (i < lines.length - 1 ? tail(lines.length - i).length + 1 : 0);
+    if (lines[i].length + 1 > room) {
+      if (out.length) return [...out, tail(lines.length - i)].join("\n");
+      return lines[i].replace(/<[^>]*>/g, "").slice(0, max);   // a single oversized line: plain text, no tags left to break
+    }
+    out.push(lines[i]);
+    used += lines[i].length + 1;
+  }
+  return out.join("\n");
+}

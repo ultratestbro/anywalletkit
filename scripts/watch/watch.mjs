@@ -6,7 +6,7 @@ import {readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync} from "n
 import {resolve, dirname, basename} from "node:path";
 import {fileURLToPath} from "node:url";
 import {createHash} from "node:crypto";
-import {esc, firstBlocks, readCapped, safeLink, visibleText} from "./html-text.mjs";
+import {esc, firstBlocks, fitLines, readCapped, safeLink, visibleText} from "./html-text.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, "../..");
@@ -271,10 +271,10 @@ if (!DRY && !BASELINE) {
 if (BASELINE) console.error(`baseline written for ${manifests.length} modules (${total} sources, ${errors.length} unreachable)`);
 
 // ── telegram ───────────────────────────────────────────────────────────────
-async function postTelegram(html) {
+async function postTelegram(lines) {
   const token = env.TELEGRAM_BOT_TOKEN, chat = env.TELEGRAM_WATCH_CHAT || env.TELEGRAM_ALERTS_CHAT;
   if (!token || !chat) { console.error("telegram: TELEGRAM_BOT_TOKEN / TELEGRAM_WATCH_CHAT not set, skipping"); return false; }
-  const body = {chat_id: chat, text: html.length > 3900 ? html.slice(0, 3880) + "\n…" : html, parse_mode: "HTML", disable_web_page_preview: true};
+  const body = {chat_id: chat, text: Array.isArray(lines) ? fitLines(lines, (n) => `…and ${n} more lines — full digest: watch/digest/${TODAY}.md`) : lines, parse_mode: "HTML", disable_web_page_preview: true};
   if (env.TELEGRAM_WATCH_TOPIC) body.message_thread_id = Number(env.TELEGRAM_WATCH_TOPIC);
   const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000)});
   const j = await r.json().catch(() => ({}));
@@ -296,7 +296,7 @@ if (SEND && !BASELINE) {
       if (errorGroups.length > 8) h.push(`• …and ${errorGroups.length - 8} more kinds`);
     }
     // A digest Telegram refused must fail the job: the state commit is skipped, so the changes alert again tomorrow (scan F13).
-    if (!(await postTelegram(h.join("\n")))) process.exitCode = 1;
+    if (!(await postTelegram(h.flatMap((l) => l.split("\n"))))) process.exitCode = 1;
   }
 }
 process.exit(process.exitCode ?? 0);

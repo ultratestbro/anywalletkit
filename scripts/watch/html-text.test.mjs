@@ -1,7 +1,7 @@
 // node --test scripts/watch/html-text.test.mjs — security scan 2026-10-23 F12/F13.
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {esc, firstBlocks, safeLink, visibleText} from "./html-text.mjs";
+import {esc, firstBlocks, fitLines, safeLink, visibleText} from "./html-text.mjs";
 
 const legacy = (h) => h.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<(nav|header|footer)[\s\S]*?<\/\1>/gi, " ")
   .replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
@@ -39,4 +39,20 @@ test("F13: a tag name cannot break out of href, and only trusted hosts are linke
   assert.equal(safeLink("https://evil.example/x", {url: "https://docs.lido.fi/a"}), null);
   assert.equal(safeLink("https://docs.lido.fi/b", {url: "https://docs.lido.fi/a"}), "https://docs.lido.fi/b");
   assert.equal(safeLink("http://github.com/x", {}), null);
+});
+
+test("fitLines: a long digest is cut at whole lines, so no <a> is left open (watch run 2026-11-04)", () => {
+  const lines = ["🟠 <b>Module watch</b>", ...Array.from({length: 200}, (_, i) => `• <a href="https://github.com/x/y/releases/tag/v${i}">release ${i}</a>: v${i} → v${i + 1}`)];
+  const text = fitLines(lines, (n) => `…and ${n} more lines`);
+  assert.ok(text.length <= 3900, `${text.length}`);
+  assert.equal((text.match(/<a /g) ?? []).length, (text.match(/<\/a>/g) ?? []).length);
+  assert.match(text, /…and \d+ more lines$/);
+  const kept = text.split("\n").length - 1;
+  assert.equal(text.split("\n").at(-1), `…and ${lines.length - kept} more lines`);
+});
+
+test("fitLines: a short message is unchanged; one oversized line loses its tags instead of breaking", () => {
+  assert.equal(fitLines(["a", "<b>b</b>"]), "a\n<b>b</b>");
+  const one = fitLines([`<a href="https://x">${"z".repeat(5000)}</a>`]);
+  assert.ok(one.length <= 3900 && !one.includes("<"));
 });
