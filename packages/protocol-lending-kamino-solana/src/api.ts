@@ -5,6 +5,7 @@
 // signing (see base.ts). Shapes as of 2026-10-13.
 import { KaminoError } from './errors.js'
 import { fromDecimalString } from './amounts.js'
+import type { ObligationLegs } from './chain.js'
 
 export const KAMINO_API = 'https://api.kamino.finance'
 /** Kamino's Main Market. */
@@ -85,14 +86,37 @@ export interface ApiVaultMetrics {
 
 export interface ApiVaultPosition { vaultAddress: string; stakedShares: string; unstakedShares: string; totalShares: string }
 
-export interface ApiLoanLeg { mint: string; symbol: string; amount: string; valueUsd: string }
+export interface ApiLoanLeg {
+  mint: string
+  symbol: string
+  /** Decimal string in token units. */
+  amount: string
+  /** Decimal string; '' when nothing reports one. */
+  valueUsd: string
+  /** The reserve the leg sits in, when known (always on legs read from the chain). */
+  reserve?: string
+}
+
+/** An obligation's legs as the account stores them: cTokens per deposit reserve, debt × 2^60 with the borrow rate it was last charged at. */
+export interface ApiObligationState extends ObligationLegs {
+  owner: string
+  lendingMarket: string
+}
+
 export interface ApiObligation {
   obligation: string
   market: string
   user: string
   elevationGroup: number
+  /**
+   * Per-token legs. From `getUserObligations` they are the API's decorated legs, which the live API
+   * leaves empty (`{}`) since 2026-10-28; from `KaminoMarketProtocolSolana.getPosition` they are the
+   * obligation's legs read from the chain.
+   */
   deposits: ApiLoanLeg[]
   borrows: ApiLoanLeg[]
+  /** The row's raw `state` decoded (where the live API keeps the legs now); null when it has none. */
+  state: ApiObligationState | null
   /** Fractions. */
   currentLtv: number
   maxLtv: number | null
@@ -108,6 +132,38 @@ const pct = (x: unknown): number => (x === null || x === undefined ? 0 : Number(
 const num = (x: unknown, d = 0): number => (x === null || x === undefined || x === '' ? d : Number(x))
 const big = (x: unknown): bigint => (x === null || x === undefined ? 0n : BigInt(String(x).split('.')[0]!))
 const str = (x: unknown): string => (x === null || x === undefined ? '0' : String(x))
+const DEFAULT_KEY = '11111111111111111111111111111111'
+
+/** An unsigned integer of `bits` the API serializes (a decimal string, or a safe JSON number); anything else is refused. */
+function uint(x: unknown, what: string, bits: 64 | 128): bigint {
+  let v: bigint | undefined
+  if (typeof x === 'number' && Number.isSafeInteger(x) && x >= 0) v = BigInt(x)
+  else if (typeof x === 'string' && x.length <= 40 && /^\d+$/.test(x)) v = BigInt(x)
+  if (v === undefined || v >= 1n << BigInt(bits)) throw new KaminoError(`Kamino reported ${what} as ${String(x).slice(0, 40)}; it is a u${bits}.`)
+  return v
+}
+
+/** klend's `BigFractionBytes` ({ value: four little-endian u64 limbs }) as one u256. */
+function u256Limbs(x: unknown, what: string): bigint {
+  const limbs = (x as { value?: unknown } | null)?.value
+  if (!Array.isArray(limbs) || limbs.length !== 4) throw new KaminoError(`Kamino reported ${what} without its four limbs.`)
+  return limbs.reduce<bigint>((sum, l, i) => sum + (uint(l, `a limb of ${what}`, 64) << BigInt(64 * i)), 0n)
+}
+
+/** The obligation account's legs as the API serializes its raw `state` (klend's `Obligation`, empty slots on the default key). */
+function obligationState(x: unknown): ApiObligationState | null {
+  if (!x || typeof x !== 'object') return null
+  const s = x as Record<string, unknown>
+  if (!Array.isArray(s.deposits) && !Array.isArray(s.borrows)) return null
+  const slots = (v: unknown, key: string) => (Array.isArray(v) ? v : []).filter((l): l is Record<string, unknown> => !!l && typeof l === 'object' && String((l as Record<string, unknown>)[key] ?? DEFAULT_KEY) !== DEFAULT_KEY)
+  return {
+    owner: String(s.owner ?? ''), lendingMarket: String(s.lendingMarket ?? ''),
+    deposits: slots(s.deposits, 'depositReserve').map((l) => ({ reserve: String(l.depositReserve), ctokens: uint(l.depositedAmount, 'a deposit\'s depositedAmount', 64) })),
+    borrows: slots(s.borrows, 'borrowReserve').map((l) => ({
+      reserve: String(l.borrowReserve), borrowedSf: uint(l.borrowedAmountSf, 'a borrow\'s borrowedAmountSf', 128), cumulativeBorrowRate: u256Limbs(l.cumulativeBorrowRateBsf, 'a borrow\'s cumulativeBorrowRateBsf'),
+    })),
+  }
+}
 
 export class KaminoApi {
   /** `timeoutMs` bounds each call (default 15 s): a silent API must not hang a read or a write's build. */
@@ -221,7 +277,7 @@ export class KaminoApi {
     const coll = (info.collateral ?? {}) as Record<string, unknown>, debt = (info.debt ?? {}) as Record<string, unknown>
     return {
       obligation: String(row.obligationAddress ?? row.loanId ?? row.obligation ?? row.address ?? ''), market: String(row.marketId ?? market), user: String(row.user ?? ''),
-      elevationGroup: num(row.elevationGroup), deposits: legs(coll.deposits ?? row.deposits), borrows: legs(debt.borrows ?? row.borrows),
+      elevationGroup: num(row.elevationGroup), deposits: legs(coll.deposits ?? row.deposits), borrows: legs(debt.borrows ?? row.borrows), state: obligationState(row.state),
       currentLtv: num(info.currentLtv), maxLtv: info.maxLtv === null || info.maxLtv === undefined ? null : num(info.maxLtv), liquidationLtv: num(info.liquidationLtv),
       raw: row,
     }

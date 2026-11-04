@@ -19,12 +19,13 @@ import { TOKEN_PROGRAM, holderProblem, readTokenAccount } from './holder.mjs'
 
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
 const STEAKHOUSE_USDC = 'HDsayqAsDWy3QvANGqh2yNraqcD8Fnjgh73Mhb3WRS5E'
-// Default: a busy exchange hot wallet with a large, unfrozen USDC account (~1.05M USDC, 22.8K SOL,
-// ~3 transactions a minute on 2026-11-04), so the simulated deposits have funds to move. The previous
-// default, 5tzFkiKs…uAi9, had its main USDC account frozen.
+// Default: a wallet with a large, unfrozen USDC account (~1.05M USDC and ~22.8K SOL, about three
+// transactions a minute on 2026-11-04; whose it is was not confirmed), so the simulated deposits have
+// funds to move. The previous default, 5tzFkiKs…uAi9, had its main USDC account frozen.
 const address = process.argv[2] ?? process.env.LIVE_ADDRESS ?? 'H8sMJSCQxfKiFTCfDR3DUMLPwcRbM61LGFJ8N4dK3WjS'
 const rpc = process.argv[3] ?? process.env.LIVE_RPC ?? process.env.SOLANA_RPC_URL ?? 'https://api.mainnet-beta.solana.com'
-// Default: a long-held vanilla obligation on the main market with ~2.5M USDC supplied (2026-11-04).
+// Default: a long-held vanilla obligation on the main market (D2QNBw…) with ~3.05M USDC supplied on
+// chain (3,049,982 USDC on 2026-11-04).
 const lendAddress = process.argv[4] ?? process.env.LIVE_LEND_ADDRESS ?? 'k9nmkzGVVtNKDKXzGRi8u3Y2pbaBLSVbaRjfmbh8zGV'
 
 /** The wallet's USDC account must be usable before it backs a simulation; a frozen one ends the run. */
@@ -55,14 +56,17 @@ console.log(`position: ${position.shares} shares ≈ ${Number(position.assets) /
 const usdc = await account.getTokenBalance(USDC).catch(() => 0n)
 console.log(`${address}: ${Number(usdc) / 1e6} USDC, ${Number(await account.getBalance()) / 1e9} SOL`)
 const amount = usdc >= 5_000_000n ? 5_000_000n : usdc
-if (amount === 0n) { console.log('no USDC to simulate with — pass a USDC holder'); process.exit(0) }
-
-const q = await vault.quoteSupply({ amount })
-console.log(`[vault deposit ${Number(amount) / 1e6} USDC] guard OK: fee ${q.fee} lamports, expected ${q.expectedShares} shares`)
-
 const market = new KaminoMarketProtocolSolana(account)
-const mq = await market.quoteSupply({ token: USDC, amount })
-console.log(`[lend deposit ${Number(amount) / 1e6} USDC → reserve ${mq.reserve.slice(0, 6)}…] guard OK: fee ${mq.fee} lamports`)
+// A holder without USDC (no account, or an empty one) has nothing to deposit: the deposit steps are
+// skipped, and the Lend withdraw below still runs for the supplier.
+if (amount === 0n) {
+  console.log('no USDC to simulate the deposits with — pass a USDC holder; skipping the vault and Lend deposits')
+} else {
+  const q = await vault.quoteSupply({ amount })
+  console.log(`[vault deposit ${Number(amount) / 1e6} USDC] guard OK: fee ${q.fee} lamports, expected ${q.expectedShares} shares`)
+  const mq = await market.quoteSupply({ token: USDC, amount })
+  console.log(`[lend deposit ${Number(amount) / 1e6} USDC → reserve ${mq.reserve.slice(0, 6)}…] guard OK: fee ${mq.fee} lamports`)
+}
 const pos = await market.getPosition()
 console.log(`lend position: ${pos.obligations.length} obligation(s); supplied ${JSON.stringify(Object.fromEntries(Object.entries(pos.supplied).map(([k, v]) => [k.slice(0, 6), String(v)])))}`)
 if (position.shares > 0n) {
@@ -71,7 +75,8 @@ if (position.shares > 0n) {
 }
 
 // Lend withdraw, from a wallet that has USDC supplied on the main market's vanilla obligation. What it
-// holds is read from the chain, as the guard reads it; the API's figure is printed beside it.
+// holds is read from the chain here, as the guard reads it, and printed beside getPosition(), which must
+// agree (it reads the obligations from the chain too).
 const lendAccount = lendAddress === address ? account : new WalletAccountReadOnlySolana(lendAddress, { provider: rpc })
 const lender = lendAddress === address ? market : new KaminoMarketProtocolSolana(lendAccount)
 const usdcReserve = (await lender.resolveReserve(USDC)).reserve
@@ -79,7 +84,12 @@ const obligation = vanillaObligation(lendAddress, MAIN_MARKET, KLEND_PROGRAM)
 const [r, o] = await lendAccount.getAccountInfos([usdcReserve, obligation])
 const supplied = o ? depositedLiquidity(decodeObligation(obligation, o), decodeReserve(usdcReserve, r ?? null), usdcReserve) : 0n
 const reported = (await lender.getPosition()).supplied[USDC]
-console.log(`${lendAddress}: ${Number(supplied) / 1e6} USDC supplied on chain (obligation ${obligation.slice(0, 6)}…), API position ${reported === undefined ? 'none' : `${Number(reported) / 1e6} USDC`}`)
+console.log(`${lendAddress}: ${Number(supplied) / 1e6} USDC supplied on chain (obligation ${obligation.slice(0, 6)}…), getPosition ${reported === undefined ? 'none' : `${Number(reported) / 1e6} USDC`}`)
+// Both reads are of the chain, a moment apart: interest may move the figure, nothing more.
+if (supplied > 0n && (reported === undefined || (reported > supplied ? reported - supplied : supplied - reported) * 10_000n > supplied)) {
+  console.error(`getPosition reports ${reported ?? 'no'} USDC base units supplied; the obligation holds ${supplied} on chain`)
+  process.exit(1)
+}
 if (supplied === 0n) {
   console.log('no USDC supplied — pass a USDC supplier on the main market as the third argument or LIVE_LEND_ADDRESS to simulate a Lend withdraw')
 } else {

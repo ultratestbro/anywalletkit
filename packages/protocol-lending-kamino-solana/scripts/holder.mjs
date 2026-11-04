@@ -37,7 +37,11 @@ export async function readTokenAccount(rpcUrl, account, mint, owner, fetchImpl =
   return decodeTokenAccount(value.owner, Uint8Array.from(Buffer.from(value.data[0], 'base64')), mint, owner)
 }
 
-/** Why the holder cannot back a simulation, or null when it can. */
+/**
+ * Why the holder cannot back a simulation, or null when it can. A missing account is not a problem:
+ * the holder then has no USDC, so the deposit steps skip themselves, and a withdraw's transaction
+ * creates the account it pays into.
+ */
 export function holderProblem(account, { address, tokenAccount, symbol }) {
   if (account.state === 'frozen') return `holder's ${symbol} account is frozen, pass another address (${address}, token account ${tokenAccount})`
   if (account.state === 'uninitialized') return `holder's ${symbol} account is not initialized, pass another address (${address}, token account ${tokenAccount})`

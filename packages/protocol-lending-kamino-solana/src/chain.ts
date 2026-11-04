@@ -142,16 +142,27 @@ export function decodeObligation(address: string, acc: ChainAccount | null): Obl
   return { lendingMarket: key(d, 32), owner: key(d, 64), deposits, borrows }
 }
 
-/** What an obligation leg is worth in base units of the reserve's token: deposits rounded down, debt (with the interest the reserve has accrued since) up. */
-export function depositedLiquidity(o: ObligationChain, r: ReserveChain, reserve: string): bigint {
-  return o.deposits.filter((x) => x.reserve === reserve).reduce((sum, x) => sum + collateralToLiquiditySf(r, x.ctokens) / SF, 0n)
+/** The legs of an obligation, wherever they were read from (the chain, or the API's raw `state`). */
+export type ObligationLegs = Pick<ObligationChain, 'deposits' | 'borrows'>
+
+/** One deposit leg in base units of the reserve's token, rounded down. */
+export function depositLegLiquidity(r: ReserveChain, ctokens: bigint): bigint {
+  return collateralToLiquiditySf(r, ctokens) / SF
 }
 
-export function debtNow(o: ObligationChain, r: ReserveChain, reserve: string): bigint {
-  return o.borrows.filter((x) => x.reserve === reserve).reduce((sum, x) => {
-    const sf = x.cumulativeBorrowRate > 0n && r.cumulativeBorrowRate > x.cumulativeBorrowRate ? (x.borrowedSf * r.cumulativeBorrowRate) / x.cumulativeBorrowRate : x.borrowedSf
-    return sum + (sf + SF - 1n) / SF
-  }, 0n)
+/** One debt leg in base units of the reserve's token, with the interest the reserve has accrued since, rounded up. */
+export function debtLegNow(r: ReserveChain, leg: ObligationChain['borrows'][number]): bigint {
+  const sf = leg.cumulativeBorrowRate > 0n && r.cumulativeBorrowRate > leg.cumulativeBorrowRate ? (leg.borrowedSf * r.cumulativeBorrowRate) / leg.cumulativeBorrowRate : leg.borrowedSf
+  return (sf + SF - 1n) / SF
+}
+
+/** What an obligation leg is worth in base units of the reserve's token: deposits rounded down, debt (with the interest the reserve has accrued since) up. */
+export function depositedLiquidity(o: ObligationLegs, r: ReserveChain, reserve: string): bigint {
+  return o.deposits.filter((x) => x.reserve === reserve).reduce((sum, x) => sum + depositLegLiquidity(r, x.ctokens), 0n)
+}
+
+export function debtNow(o: ObligationLegs, r: ReserveChain, reserve: string): bigint {
+  return o.borrows.filter((x) => x.reserve === reserve).reduce((sum, x) => sum + debtLegNow(r, x), 0n)
 }
 
 /** A farm `UserState`: whose it is, which farm, and the shares staked (base units). */
