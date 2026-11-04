@@ -221,6 +221,17 @@ function loadManifests() {
   }
   const pend = resolve(ROOT, "watch/pending");
   if (existsSync(pend)) for (const f of readdirSync(pend)) if (f.endsWith(".watch.json")) out.push({file: resolve(pend, f), ...JSON.parse(readFileSync(resolve(pend, f), "utf8"))});
+  // State is keyed by module + source id: two sources sharing an id would overwrite each other's
+  // target every run, be re-pointed forever and never compared.
+  const ids = new Map();
+  for (const m of out) {
+    const seen = ids.get(m.module) ?? new Map(); ids.set(m.module, seen);
+    for (const s of m.sources ?? []) {
+      if (!s.id) throw new Error(`${m.file}: a source has no id`);
+      if (seen.has(s.id)) throw new Error(`${m.module}: source id "${s.id}" appears twice (${seen.get(s.id)}, ${m.file})`);
+      seen.set(s.id, m.file);
+    }
+  }
   return out.filter((m) => !ONLY || ONLY.some((o) => m.module.includes(o)));
 }
 const slug = (m) => m.replace(/^@anywalletkit\//, "");

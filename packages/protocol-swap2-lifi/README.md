@@ -46,10 +46,12 @@ what finally reaches the recipient — sits in bridge-specific data, so on most 
 reviewed minimum relies on LI.FI's API (or your `apiUrl` proxy) answering honestly. Two bridges name
 it outright and are held to the quote: an Eco intent must run on the destination chain and its route
 must end in the destination token's `transfer` of at least the reviewed minimum to the recipient
-(a route of more than 16 calls is refused); an M0 order must ask for the destination token and
-at least the reviewed minimum. Neither can deliver the native token through this module: an Eco or
-M0 route whose destination token is native (ETH, POL, …) is always refused, so such a pair quotes
-through another bridge when LI.FI offers one, or shows no route.
+(a route of more than 16 calls is refused); an M0 order must ask for the destination token at a
+rate of at least the reviewed minimum. An M0 order can be filled in part: the recipient then gets
+that share at the order's rate and the rest of the input returns to the sender after the order's
+fill deadline. Neither can deliver the native token through this module: an Eco or M0 route whose
+destination token is native (ETH, POL, …) is always refused. The module does not ask LI.FI again
+without that bridge, so when LI.FI picks one of them for such a pair, the pair shows no LI.FI route.
 
 `routeWideSlippage: true` (default off) asks LI.FI for one slippage budget for the whole route
 (`slippageScope=route`) on EVM → EVM requests instead of one per step; when LI.FI can protect no

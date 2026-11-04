@@ -335,7 +335,8 @@ function ecoDelivery(r: Reader, at: number, e: DiamondExpectation): string | nul
  * M0 (M0Facet 1.0.0): an order on the M0 OrderBook asks a solver for `amountOut` of `tokenOut` on the destination
  * (M0Data words 3 and 5); the facet ties only the receiver to BridgeData. Both must be the quote's: the destination
  * token, and at least the reviewed minimum. On the swap entry point the facet scales amountOut by the swap's realised
- * output over the quoted input (never below 1×), so the calldata's value is a lower bound there too.
+ * output over the quoted input (never below 1×), so the calldata's value is a lower bound there too. amountOut is a
+ * limit rate, not a fill guarantee: a partial fill delivers its share and refunds the rest to orderOwner (the sender).
  */
 function m0Delivery(r: Reader, at: number, e: DiamondExpectation): string | null {
   // M0Facet refuses a zero tokenOut (the OrderBook would escrow the input with nothing to fill): no native delivery.

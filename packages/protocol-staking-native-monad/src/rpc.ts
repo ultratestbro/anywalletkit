@@ -30,9 +30,10 @@ export const RATE_LIMIT_MAX_DELAY_MS = 5_000
 /** A viem client over one provider or a list (fails over in order, like the account's own client). */
 export function createReadClient(providers: MonadProvider[], timeoutMs = DEFAULT_TIMEOUT_MS): PublicClient | undefined {
   if (providers.length === 0) return undefined
-  // viem's own retries are off (retryCount 0): withReadRetries owns the policy, so a 429 is not retried twice over.
+  // viem's own retries are off (retryCount 0), on each URL and on the fallback around them: withReadRetries
+  // owns the policy, so a 429 is not retried twice over.
   const one = (p: MonadProvider): Transport => (typeof p === 'string' ? withReadRetries(http(p, { timeout: timeoutMs, retryCount: 0 })) : custom(p))
-  return createPublicClient({ transport: providers.length === 1 ? one(providers[0]!) : fallback(providers.map(one)), ccipRead: false })
+  return createPublicClient({ transport: providers.length === 1 ? one(providers[0]!) : fallback(providers.map(one), { retryCount: 0 }), ccipRead: false })
 }
 
 /**

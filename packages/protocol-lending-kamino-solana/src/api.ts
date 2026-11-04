@@ -275,10 +275,14 @@ export class KaminoApi {
       mint: String(l.tokenMint ?? l.mint ?? ''), symbol: String(l.tokenName ?? l.symbol ?? ''), amount: str(l.tokenAmount ?? l.amount), valueUsd: str(l.tokenValue ?? l.valueUsd),
     }))
     const coll = (info.collateral ?? {}) as Record<string, unknown>, debt = (info.debt ?? {}) as Record<string, unknown>
+    // Since 2026-11 the API keeps LTVs in `refreshedStats` (USD figures) and the elevation group in `state`.
+    const stats = (row.refreshedStats ?? {}) as Record<string, unknown>, st = (row.state ?? {}) as Record<string, unknown>
+    const deposited = num(stats.userTotalDeposit)
+    const maxLtv = stats.borrowLimit !== undefined && deposited > 0 ? num(stats.borrowLimit) / deposited : info.maxLtv === null || info.maxLtv === undefined ? null : num(info.maxLtv)
     return {
       obligation: String(row.obligationAddress ?? row.loanId ?? row.obligation ?? row.address ?? ''), market: String(row.marketId ?? market), user: String(row.user ?? ''),
-      elevationGroup: num(row.elevationGroup), deposits: legs(coll.deposits ?? row.deposits), borrows: legs(debt.borrows ?? row.borrows), state: obligationState(row.state),
-      currentLtv: num(info.currentLtv), maxLtv: info.maxLtv === null || info.maxLtv === undefined ? null : num(info.maxLtv), liquidationLtv: num(info.liquidationLtv),
+      elevationGroup: num(st.elevationGroup ?? row.elevationGroup), deposits: legs(coll.deposits ?? row.deposits), borrows: legs(debt.borrows ?? row.borrows), state: obligationState(row.state),
+      currentLtv: num(stats.loanToValue ?? info.currentLtv), maxLtv, liquidationLtv: num(stats.liquidationLtv ?? info.liquidationLtv),
       raw: row,
     }
   }

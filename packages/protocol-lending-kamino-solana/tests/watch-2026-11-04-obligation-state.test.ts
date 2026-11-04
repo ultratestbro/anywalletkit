@@ -66,6 +66,15 @@ describe('the recorded live answer', () => {
     expect(o!.borrows).toEqual([])
     expect(o!.state).toEqual({ owner: LIVE.wallet, lendingMarket: MARKET, deposits: [{ reserve: USDC_RESERVE, ctokens: 2_522_117_428_027n }], borrows: [] })
   })
+
+  it('KaminoApi reads LTVs from refreshedStats (final review 2026-11-04: they came back 0 / null)', async () => {
+    const f = api()
+    f.routes.set(`/kamino-market/${MARKET}/users/${LIVE.wallet}/obligations`, { status: 200, body: LIVE.obligations })
+    const [o] = await new KaminoApi(undefined, f.fetch).getUserObligations(MARKET, LIVE.wallet)
+    expect(o!.liquidationLtv).toBeCloseTo(0.9)
+    expect(o!.currentLtv).toBe(0)
+    expect(o!.maxLtv).toBeCloseTo(2439682.7169767 / 3049603.3962208752, 6)
+  })
 })
 
 describe('getPosition reads the obligations from the chain', () => {
