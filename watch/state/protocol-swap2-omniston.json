@@ -3,25 +3,25 @@
  "sources": {
   "docs-omniston": {
    "type": "http-text",
-   "value": "81fa5377031d474d51d6cbbc1a38ec06343da49c5384720bf312d0e2557806e8",
+   "value": "7eaa0a569a6cd8a3a8e395be7335c2166f76ca0ffd2fe01da2c2a5092d37deee",
    "meta": {
-    "hash": "81fa5377031d474d",
-    "chars": 3438
+    "hash": "7eaa0a569a6cd8a3",
+    "chars": 3421
    },
-   "seenAt": "2026-10-23T11:34:53.453Z",
-   "changedAt": "2026-10-23T11:34:53.453Z"
+   "seenAt": "2026-11-04T09:36:10.749Z",
+   "changedAt": "2026-11-04T09:36:10.749Z"
   },
   "omniston-sdk": {
    "type": "github-releases",
-   "value": "fdd0bfbbe3754c8025ad5438f4a9e2e6a6fd0326",
+   "value": "0f94cf7c52d13ec5daa75719002af1a355ed6a75",
    "meta": {
-    "tag": "commit fdd0bfb",
-    "at": "2026-10-19",
-    "url": "https://github.com/ston-fi/omniston-sdk/commit/fdd0bfbbe3754c8025ad5438f4a9e2e6a6fd0326",
-    "note": "default branch: docs: update README"
+    "tag": "commit 0f94cf7",
+    "at": "2026-11-02",
+    "url": "https://github.com/ston-fi/omniston-sdk/commit/0f94cf7c52d13ec5daa75719002af1a355ed6a75",
+    "note": "default branch: fix(demo-app): remove unnecessary `traderDstDiscloseAddress` field passing to th"
    },
-   "seenAt": "2026-10-23T11:34:53.562Z",
-   "changedAt": "2026-10-20T10:23:56.523Z"
+   "seenAt": "2026-11-04T09:36:11.373Z",
+   "changedAt": "2026-11-04T09:36:11.373Z"
   }
  }
 }

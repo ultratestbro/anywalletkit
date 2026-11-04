@@ -10,7 +10,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.344Z",
+   "seenAt": "2026-11-04T09:35:57.201Z",
    "changedAt": "2026-10-14T15:10:31.919Z"
   },
   "morpho-blue-base": {
@@ -22,7 +22,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.330Z",
+   "seenAt": "2026-11-04T09:35:57.205Z",
    "changedAt": "2026-10-14T15:10:31.929Z"
   },
   "vault-v2-factory-ethereum": {
@@ -34,7 +34,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.347Z",
+   "seenAt": "2026-11-04T09:35:57.204Z",
    "changedAt": "2026-10-14T15:10:31.931Z"
   },
   "vault-v1-factory-ethereum-2": {
@@ -46,7 +46,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.354Z",
+   "seenAt": "2026-11-04T09:35:57.211Z",
    "changedAt": "2026-10-14T15:10:31.932Z"
   },
   "vault-v1-factory-ethereum-1": {
@@ -58,7 +58,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.352Z",
+   "seenAt": "2026-11-04T09:35:57.209Z",
    "changedAt": "2026-10-14T15:10:31.937Z"
   },
   "vault-v1-factory-base-1": {
@@ -70,7 +70,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.443Z",
+   "seenAt": "2026-11-04T09:35:57.217Z",
    "changedAt": "2026-10-14T15:10:31.944Z"
   },
   "morpho-blue-arbitrum": {
@@ -82,7 +82,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.393Z",
+   "seenAt": "2026-11-04T09:35:57.277Z",
    "changedAt": "2026-10-14T15:10:32.094Z"
   },
   "vault-v1-factory-base-2": {
@@ -94,7 +94,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.382Z",
+   "seenAt": "2026-11-04T09:35:57.274Z",
    "changedAt": "2026-10-14T15:10:32.097Z"
   },
   "vault-v2-factory-base": {
@@ -106,7 +106,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.496Z",
+   "seenAt": "2026-11-04T09:35:57.282Z",
    "changedAt": "2026-10-14T15:10:32.099Z"
   },
   "vault-v2-factory-arbitrum": {
@@ -118,7 +118,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.524Z",
+   "seenAt": "2026-11-04T09:35:57.306Z",
    "changedAt": "2026-10-14T15:10:32.313Z"
   },
   "morpho-blue-op-mainnet": {
@@ -130,7 +130,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.594Z",
+   "seenAt": "2026-11-04T09:35:57.316Z",
    "changedAt": "2026-10-14T15:10:32.329Z"
   },
   "morpho-blue-polygon": {
@@ -142,7 +142,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.781Z",
+   "seenAt": "2026-11-04T09:35:57.381Z",
    "changedAt": "2026-10-14T15:10:32.378Z"
   },
   "vault-v1-factory-op-mainnet": {
@@ -154,7 +154,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.626Z",
+   "seenAt": "2026-11-04T09:35:57.379Z",
    "changedAt": "2026-10-14T15:10:32.411Z"
   },
   "vault-v2-factory-op-mainnet": {
@@ -166,7 +166,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.646Z",
+   "seenAt": "2026-11-04T09:35:57.364Z",
    "changedAt": "2026-10-14T15:10:32.416Z"
   },
   "vault-v1-factory-arbitrum": {
@@ -178,7 +178,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.412Z",
+   "seenAt": "2026-11-04T09:35:57.309Z",
    "changedAt": "2026-10-14T15:10:32.507Z"
   },
   "vault-v1-factory-polygon": {
@@ -190,7 +190,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.802Z",
+   "seenAt": "2026-11-04T09:35:57.435Z",
    "changedAt": "2026-10-14T15:10:32.920Z"
   },
   "vault-v2-factory-polygon": {
@@ -202,7 +202,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.838Z",
+   "seenAt": "2026-11-04T09:35:57.432Z",
    "changedAt": "2026-10-14T15:10:33.366Z"
   },
   "vault-v2-factory-hyperevm": {
@@ -214,7 +214,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:44.284Z",
+   "seenAt": "2026-11-04T09:35:57.857Z",
    "changedAt": "2026-10-14T15:10:33.448Z"
   },
   "morpho-blue-hyperevm": {
@@ -226,7 +226,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.911Z",
+   "seenAt": "2026-11-04T09:35:57.637Z",
    "changedAt": "2026-10-14T15:10:33.452Z"
   },
   "morpho-blue-unichain": {
@@ -238,7 +238,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.778Z",
+   "seenAt": "2026-11-04T09:35:57.532Z",
    "changedAt": "2026-10-14T15:10:33.463Z"
   },
   "vault-v1-factory-unichain": {
@@ -250,7 +250,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:43.818Z",
+   "seenAt": "2026-11-04T09:35:57.634Z",
    "changedAt": "2026-10-14T15:10:33.474Z"
   },
   "vault-v1-factory-hyperevm": {
@@ -262,7 +262,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:44.013Z",
+   "seenAt": "2026-11-04T09:35:57.670Z",
    "changedAt": "2026-10-14T15:10:33.825Z"
   },
   "vault-v1-factory-monad": {
@@ -274,7 +274,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:44.605Z",
+   "seenAt": "2026-11-04T09:35:57.739Z",
    "changedAt": "2026-10-14T15:10:33.881Z"
   },
   "morpho-blue-katana": {
@@ -286,7 +286,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:44.605Z",
+   "seenAt": "2026-11-04T09:35:57.719Z",
    "changedAt": "2026-10-14T15:10:33.904Z"
   },
   "morpho-blue-monad": {
@@ -298,7 +298,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:44.543Z",
+   "seenAt": "2026-11-04T09:35:57.773Z",
    "changedAt": "2026-10-14T15:10:34.194Z"
   },
   "vault-v2-factory-monad": {
@@ -310,7 +310,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:44.636Z",
+   "seenAt": "2026-11-04T09:35:57.760Z",
    "changedAt": "2026-10-14T15:10:34.469Z"
   },
   "morpho-blue": {
@@ -323,21 +323,21 @@
     "url": "https://github.com/morpho-org/morpho-blue/releases/tag/v1.0.0",
     "prerelease": false
    },
-   "seenAt": "2026-10-23T11:34:44.912Z",
+   "seenAt": "2026-11-04T09:35:58.289Z",
    "changedAt": "2026-10-14T15:10:34.602Z"
   },
   "sdks": {
    "type": "github-releases",
-   "value": "@morpho-org/morpho-ts-v4.1.0",
+   "value": "@morpho-org/morpho-sdk-v9.2.0",
    "meta": {
-    "tag": "@morpho-org/morpho-ts-v4.1.0",
-    "name": "@morpho-org/morpho-ts-v4.1.0",
-    "at": "2026-10-22",
-    "url": "https://github.com/morpho-org/sdks/releases/tag/%40morpho-org/morpho-ts-v4.1.0",
+    "tag": "@morpho-org/morpho-sdk-v9.2.0",
+    "name": "@morpho-org/morpho-sdk-v9.2.0",
+    "at": "2026-11-02",
+    "url": "https://github.com/morpho-org/sdks/releases/tag/%40morpho-org/morpho-sdk-v9.2.0",
     "prerelease": false
    },
-   "seenAt": "2026-10-23T11:34:44.944Z",
-   "changedAt": "2026-10-23T11:34:44.944Z"
+   "seenAt": "2026-11-04T09:35:58.844Z",
+   "changedAt": "2026-11-04T09:35:58.844Z"
   },
   "morpho-blue-robinhood-chain": {
    "type": "evm-proxy",
@@ -348,7 +348,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:44.714Z",
+   "seenAt": "2026-11-04T09:35:57.875Z",
    "changedAt": "2026-10-14T15:10:34.923Z"
   },
   "vault-v2": {
@@ -361,7 +361,7 @@
     "url": "https://github.com/morpho-org/vault-v2/releases/tag/2026-10-12",
     "prerelease": false
    },
-   "seenAt": "2026-10-23T11:34:44.925Z",
+   "seenAt": "2026-11-04T09:36:00.349Z",
    "changedAt": "2026-10-14T15:10:34.989Z"
   },
   "vault-v2-factory-katana": {
@@ -373,7 +373,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:44.580Z",
+   "seenAt": "2026-11-04T09:35:57.771Z",
    "changedAt": "2026-10-14T15:10:35.065Z"
   },
   "vault-v2-factory-robinhood-chain": {
@@ -385,7 +385,7 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:44.713Z",
+   "seenAt": "2026-11-04T09:35:57.880Z",
    "changedAt": "2026-10-14T15:10:35.231Z"
   },
   "vault-v1-factory-katana": {
@@ -397,18 +397,18 @@
     "admin": null,
     "beacon": null
    },
-   "seenAt": "2026-10-23T11:34:44.572Z",
+   "seenAt": "2026-11-04T09:35:57.742Z",
    "changedAt": "2026-10-14T15:10:35.239Z"
   },
   "docs-addresses": {
    "type": "http-text",
-   "value": "8c9488b6cb79bc132fab4be54bbb04abfb483494c562518d6ff21173adec46a6",
+   "value": "8496c14229f9f76786aa9bfdc7b90cadd61088d9b2bc47fc411cd88c6eb6d32d",
    "meta": {
-    "hash": "8c9488b6cb79bc13",
-    "chars": 75531
+    "hash": "8496c14229f9f767",
+    "chars": 75954
    },
-   "seenAt": "2026-10-23T11:34:45.540Z",
-   "changedAt": "2026-10-20T10:23:37.014Z"
+   "seenAt": "2026-11-04T09:35:59.037Z",
+   "changedAt": "2026-11-04T09:35:59.037Z"
   }
  }
 }

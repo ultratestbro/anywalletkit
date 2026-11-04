@@ -11,7 +11,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-23T11:34:42.518Z",
+   "seenAt": "2026-11-04T09:35:53.221Z",
    "changedAt": "2026-10-14T15:10:30.832Z"
   },
   "vault-lido-earn-eth": {
@@ -24,7 +24,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-23T11:34:42.400Z",
+   "seenAt": "2026-11-04T09:35:53.208Z",
    "changedAt": "2026-10-14T15:10:30.850Z"
   },
   "vault-lido-conservative-earn-usd": {
@@ -37,7 +37,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-23T11:34:42.481Z",
+   "seenAt": "2026-11-04T09:35:53.214Z",
    "changedAt": "2026-10-14T15:10:30.853Z"
   },
   "vault-lido-earn-usd": {
@@ -50,7 +50,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-23T11:34:42.430Z",
+   "seenAt": "2026-11-04T09:35:53.207Z",
    "changedAt": "2026-10-14T15:10:30.853Z"
   },
   "vault-lido-strategy": {
@@ -63,7 +63,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-10-23T11:34:42.465Z",
+   "seenAt": "2026-11-04T09:35:53.209Z",
    "changedAt": "2026-10-14T15:10:30.854Z"
   },
   "registry-vaults": {
@@ -161,7 +161,7 @@
      "0xf785a3637Fb8DC057a2a23c925e83859Ef212c8d"
     ]
    },
-   "seenAt": "2026-10-23T11:34:42.913Z",
+   "seenAt": "2026-11-04T09:35:53.676Z",
    "changedAt": "2026-10-14T15:10:30.933Z"
   },
   "docs": {
@@ -171,20 +171,20 @@
     "hash": "bbb595e50a6c75a7",
     "chars": 1080
    },
-   "seenAt": "2026-10-23T11:34:43.277Z",
+   "seenAt": "2026-11-04T09:35:53.388Z",
    "changedAt": "2026-10-14T15:10:31.059Z"
   },
   "flexible-vaults": {
    "type": "github-releases",
-   "value": "9bcad572df418ac4618287bd303114b22bd13347",
+   "value": "cac8d5d283ed6d98d249d1e99f98d805d9fb8473",
    "meta": {
-    "tag": "commit 9bcad57",
-    "at": "2026-10-21",
-    "url": "https://github.com/mellow-finance/flexible-vaults/commit/9bcad572df418ac4618287bd303114b22bd13347",
-    "note": "default branch: upd configs mbhBTC/mbhcbBTC"
+    "tag": "commit cac8d5d",
+    "at": "2026-11-03",
+    "url": "https://github.com/mellow-finance/flexible-vaults/commit/cac8d5d283ed6d98d249d1e99f98d805d9fb8473",
+    "note": "default branch: deploy scripts & configs for proUSDneutr"
    },
-   "seenAt": "2026-10-23T11:34:42.855Z",
-   "changedAt": "2026-10-21T11:45:12.576Z"
+   "seenAt": "2026-11-04T09:35:57.137Z",
+   "changedAt": "2026-11-04T09:35:57.137Z"
   }
  }
 }

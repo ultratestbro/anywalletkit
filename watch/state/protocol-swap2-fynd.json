@@ -1,0 +1,48 @@
+{
+ "module": "@anywalletkit/protocol-swap2-fynd",
+ "sources": {
+  "router-registry": {
+   "type": "github-file",
+   "value": "c50ba4a5610bb86c0b3a9664667cc2c33580e30b",
+   "meta": {
+    "sha": "c50ba4a561",
+    "url": "https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/config/deployment_registry.json"
+   },
+   "seenAt": "2026-11-04T09:36:08.272Z",
+   "changedAt": "2026-11-04T09:36:08.272Z"
+  },
+  "fynd-license": {
+   "type": "github-file",
+   "value": "1caf1ec20a2698f6ca09755577a90d68e6a87d86",
+   "meta": {
+    "sha": "1caf1ec20a",
+    "url": "https://github.com/propeller-heads/fynd/blob/main/LICENSE.md"
+   },
+   "seenAt": "2026-11-04T09:36:08.308Z",
+   "changedAt": "2026-11-04T09:36:08.308Z"
+  },
+  "hosted-api-docs": {
+   "type": "github-file",
+   "value": "e7197e07b11f368eee6c1617dc31967261e0cc63",
+   "meta": {
+    "sha": "e7197e07b1",
+    "url": "https://github.com/propeller-heads/fynd/blob/main/docs/get-started/hosted-api.md"
+   },
+   "seenAt": "2026-11-04T09:36:08.355Z",
+   "changedAt": "2026-11-04T09:36:08.355Z"
+  },
+  "fynd-releases": {
+   "type": "github-releases",
+   "value": "0.119.0",
+   "meta": {
+    "tag": "0.119.0",
+    "name": "0.119.0",
+    "at": "2026-11-03",
+    "url": "https://github.com/propeller-heads/fynd/releases/tag/0.119.0",
+    "prerelease": false
+   },
+   "seenAt": "2026-11-04T09:36:08.518Z",
+   "changedAt": "2026-11-04T09:36:08.518Z"
+  }
+ }
+}
