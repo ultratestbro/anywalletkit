@@ -241,12 +241,12 @@ describe('market', () => {
 })
 
 describe('api client', () => {
-  it('maps vaults and markets from the current schema, V2 best effort', async () => {
+  it('maps vaults and markets from the current schema', async () => {
     const calls: string[] = []
     const fetchImpl = (async (_url: string, init: { body: string }) => {
       const q = JSON.parse(init.body).query as string
       calls.push(q)
-      if (q.includes('vaultV2s')) return new Response(JSON.stringify({ errors: [{ message: 'nope' }] }))
+      if (q.includes('vaultV2s')) return new Response(JSON.stringify({ data: { vaultV2s: { items: [] } } }))
       if (q.includes('vaults(')) return new Response(JSON.stringify({ data: { vaults: { items: [{ address: VAULT, name: 'Gauntlet USDC Prime', symbol: 'gtUSDCp', listed: true, factory: { address: '0xA9c3D3a366466Fa809d1Ae982Fb2c46E5fC41101' }, chain: { id: 8453 }, asset: { address: USDC, symbol: 'USDC', decimals: 6 }, state: { apy: 0.046, netApy: 0.0411, totalAssets: '414411117177972', totalAssetsUsd: 414293523.7, fee: 0.1 } }] } } }))
       if (q.includes('markets(')) return new Response(JSON.stringify({ data: { markets: { items: [{ marketId: MARKET_ID, listed: true, lltv: '860000000000000000', irmAddress: PARAMS.irm, chain: { id: 8453 }, oracle: { address: PARAMS.oracle }, loanAsset: { address: USDC, symbol: 'USDC', decimals: 6 }, collateralAsset: { address: CBBTC, symbol: 'cbBTC', decimals: 8 }, state: { supplyApy: 0.046, borrowApy: 0.0511, utilization: 0.9, supplyAssetsUsd: 1.7e9, liquidityAssets: '169282449553539' } }] } } }))
       return new Response(JSON.stringify({ data: {} }))

@@ -202,11 +202,12 @@ export abstract class MorphoBase<TConfig extends MorphoBaseConfig> extends Lendi
 
   /**
    * Refuses a supply / deposit into a target that fails the dead-deposit rule, unless the config
-   * opts out. A failed read propagates: an unanswered check never counts as a pass.
+   * opts out. `read` evaluates the rule for state the caller already holds (no second
+   * `getVault` / `resolve`). A failed read propagates: an unanswered check never counts as a pass.
    */
-  protected async assertDeadDeposit(label: string, kind: 'market' | 'vault', target: string): Promise<void> {
+  protected async assertDeadDeposit(label: string, kind: 'market' | 'vault', target: string, read: () => Promise<DeadDeposit>): Promise<void> {
     if (this._config.allowWithoutDeadDeposit === true) return
-    const { failure } = await this.getDeadDeposit()
+    const { failure } = await read()
     if (failure) throw new MorphoDeadDepositError({ label, kind, target, ...failure })
   }
 }

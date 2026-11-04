@@ -174,7 +174,10 @@ export class MorphoMarketProtocolEvm extends MorphoBase<MorphoMarketConfig> {
    * repayments and withdrawals are not gated by it.
    */
   override async getDeadDeposit(): Promise<DeadDeposit> {
-    const { id } = await this.resolve()
+    return this.deadDepositOf((await this.resolve()).id)
+  }
+
+  private async deadDepositOf(id: Hex): Promise<DeadDeposit> {
     const [deadShares] = await this.read<readonly [bigint, bigint, bigint]>(this.chain.morpho, MORPHO_ABI, 'position', [id, DEAD_ADDRESS])
     return evaluateDeadDeposit(deadShares)
   }
@@ -192,7 +195,7 @@ export class MorphoMarketProtocolEvm extends MorphoBase<MorphoMarketConfig> {
     const amount = toAmount(o.amount)
     const info = await this.getMarket()
     await this.assertLoanToken(o.token, info)
-    await this.assertDeadDeposit(`Market ${info.collateral?.symbol ?? 'idle'}/${info.loan.symbol}`, 'market', info.id)
+    await this.assertDeadDeposit(`Market ${info.collateral?.symbol ?? 'idle'}/${info.loan.symbol}`, 'market', info.id, () => this.deadDepositOf(info.id))
     const onBehalf = o.onBehalfOf ? getAddress(o.onBehalfOf) : await this.me()
     const approvals = await this.approvals(info.loan.address, this.chain.morpho, amount)
     const tx: Tx = { to: this.chain.morpho, data: this.encode(MORPHO_ABI, 'supply', [info.params, amount, 0n, onBehalf, '0x']), value: 0n }

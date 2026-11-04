@@ -141,7 +141,8 @@ export function makeMorpho(overrides: Partial<State> = {}): { chain: FakeChain; 
   const extra = (abi: readonly unknown[]) => abi.filter((x) => (x as { type: string }).type === 'function' && !ERC4626_ABI.some((y) => y.type === 'function' && y.name === nameOf(x)))
   const vaultAbi = [...ERC4626_ABI, ...extra(VAULT_V1_ABI), ...extra(ERC20_ABI)] as Abi
   chain.on(VAULT, vaultAbi, vaultHandler)
-  chain.on(FAKE_VAULT, vaultAbi, vaultHandler)
+  // The look-alike keys its own balances, so a read aimed at it cannot be answered with VAULT's state.
+  chain.on(FAKE_VAULT, vaultAbi, vaultHandlerFor(FAKE_VAULT))
 
   // Vault V2 as its source has it: max* views answer 0, the gates and the caps are enforced by
   // reverting inside deposit / withdraw / redeem, liquidity too.

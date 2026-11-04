@@ -166,7 +166,10 @@ export class MorphoVaultProtocolEvm extends MorphoBase<MorphoVaultConfig> {
    * 1 / (10 × virtualShares). `supply` refuses a vault that fails unless `allowWithoutDeadDeposit`.
    */
   override async getDeadDeposit(): Promise<DeadDeposit> {
-    const info = await this.getVault()
+    return this.deadDepositOf(await this.getVault())
+  }
+
+  private async deadDepositOf(info: VaultInfo): Promise<DeadDeposit> {
     const deadShares = await this.read<bigint>(this.vault, ERC4626_ABI, 'balanceOf', [DEAD_ADDRESS])
     if (info.version !== 'v2') return evaluateDeadDeposit(deadShares)
     const [deadAssets, totalAssets, totalSupply, virtualShares] = await Promise.all([
@@ -191,7 +194,7 @@ export class MorphoVaultProtocolEvm extends MorphoBase<MorphoVaultConfig> {
   async planSupply(o: MorphoVaultSupplyOptions): Promise<{ info: VaultInfo; approvals: Tx[]; tx: Tx; sharesOut: bigint }> {
     const amount = toAmount(o.amount)
     const info = await this.assertAsset(o.token)
-    await this.assertDeadDeposit(info.name, 'vault', this.vault)
+    await this.assertDeadDeposit(info.name, 'vault', this.vault, () => this.deadDepositOf(info))
     const receiver = o.onBehalfOf ? getAddress(o.onBehalfOf) : await this.me()
     if (info.version === 'v2') {
       // V2 answers 0 from maxDeposit for everyone; its gates are readable, its caps revert inside

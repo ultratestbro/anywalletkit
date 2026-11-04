@@ -169,11 +169,30 @@ describe('dead-deposit rule: vault deposit', () => {
     expect(ERC4626_ABI.some((x) => x.name === 'balanceOf')).toBe(true)
   })
 
-  it('an unverified vault the caller opted into gets the shares rule', async () => {
-    const { chain } = makeMorpho()
+  it('an unverified vault the caller opted into gets the shares rule, read from that vault', async () => {
+    const { chain, state } = makeMorpho()
     const acc = createMockAccount({ chain: 'eip155:8453', address: USER })
     const p = new MorphoVaultProtocolEvm(acc, { chainId: 8453, vault: FAKE_VAULT, provider: chain.provider, api: null, allowUnverifiedVault: true })
-    // FAKE_VAULT shares the V1 handler, which keys balances by VAULT: the seeded dead deposit counts.
-    expect(await p.getDeadDeposit()).toMatchObject({ deadShares: DEAD_VAULT_SHARES, deadAssets: null, ok: true })
+    // VAULT is seeded with a passing dead deposit; the look-alike has its own, distinct balances.
+    expect(state.balances.get(key(VAULT, DEAD))).toBe(DEAD_VAULT_SHARES)
+    expect(await p.getDeadDeposit()).toMatchObject({ deadShares: 0n, deadAssets: null, ok: false, failure: { reason: 'deadShares', observed: 0n } })
+    await expect(p.supply({ amount: E6 })).rejects.toMatchObject({ code: 'InsufficientDeadDeposit', target: FAKE_VAULT })
+    expect(acc.sent).toHaveLength(0)
+    setBalance(state, FAKE_VAULT, DEAD, MIN_DEAD_SHARES + 7n)
+    expect(await p.getDeadDeposit()).toMatchObject({ deadShares: MIN_DEAD_SHARES + 7n, ok: true })
+    const reads = deadReads(chain)
+    expect(reads.length).toBeGreaterThan(0)
+    expect(reads.every((c) => c.to === FAKE_VAULT)).toBe(true)
+  })
+
+  it('planSupply evaluates the rule on the state it already read: one dead read, no second vault description', async () => {
+    const { v1, v2, market, chain } = setup()
+    await v1.getVault(); await v2.getVault(); await market.getMarket()
+    const before = chain.calls.length
+    await v1.quoteSupply({ amount: E6 }); await v2.quoteSupply({ amount: E6 }); await market.quoteSupply({ amount: E6 })
+    const during = chain.calls.slice(before)
+    expect(deadReads({ calls: during } as unknown as ReturnType<typeof makeMorpho>['chain'])).toHaveLength(3)
+    // getVault / resolve would re-read asset(), the factories and idToMarketParams.
+    expect(during.filter((c) => c.fn === 'asset' || c.fn === 'isMetaMorpho' || c.fn === 'isVaultV2' || c.fn === 'idToMarketParams')).toHaveLength(0)
   })
 })
