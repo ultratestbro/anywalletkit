@@ -63,6 +63,10 @@
   },
   "quoter-v2-unichain": {
    "type": "evm-code",
+   "target": {
+    "chainId": 130,
+    "address": "0x565ac8c7863d9bb16d07e809ff49fe5cd467634c"
+   },
    "value": "819513779538d9dc",
    "meta": {
     "codeHash": "819513779538d9dc",
@@ -143,6 +147,10 @@
   },
   "quoter-v2-monad": {
    "type": "evm-code",
+   "target": {
+    "chainId": 143,
+    "address": "0x2d01411773c8c24805306e89a41f7855c3c4fe65"
+   },
    "value": "6ebd18d519daec1d",
    "meta": {
     "codeHash": "6ebd18d519daec1d",
@@ -153,6 +161,10 @@
   },
   "quoter-v2-x-layer": {
    "type": "evm-code",
+   "target": {
+    "chainId": 196,
+    "address": "0x976183ac3d09840d243a88c0268badb3b3e3259f"
+   },
    "value": "a5972a0430a89e22",
    "meta": {
     "codeHash": "a5972a0430a89e22",
@@ -443,6 +455,10 @@
   },
   "quoter-v2-linea": {
    "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0x58ead433ea99708604c4dd7c9b7e80c70976e202"
+   },
    "value": "bfed6471d7dd3202",
    "meta": {
     "codeHash": "bfed6471d7dd3202",

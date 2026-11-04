@@ -94,10 +94,13 @@ test("aave-docs-markets reads the market tables out of the escaped page payload,
   assert.throws(() => RECORD_FORMATS["aave-docs-markets"]("<main>nothing here</main>"), /no market tables/);
 });
 
-// The real pins the two json-pins sources read (needs `pnpm build`, as the watch job runs it first).
+// The real pins the two json-pins sources read (needs `pnpm build`, as the watch job runs it first). Skipped on a
+// local checkout that was never built; in CI (ci.yml runs this after `pnpm build`) a missing dist fails the test.
 const uniDist = join(ROOT, "packages/protocol-swap2-uniswap/dist/index.js");
 const aaveDist = join(ROOT, "packages/protocol-lending-aave-evm/dist/index.js");
-test("the Uniswap and Aave manifests yield every pinned address from the built packages", {skip: !existsSync(uniDist) || !existsSync(aaveDist)}, async () => {
+const missingDist = [uniDist, aaveDist].filter((f) => !existsSync(f));
+test("the Uniswap and Aave manifests yield every pinned address from the built packages", {skip: missingDist.length && !process.env.CI ? "run pnpm build first" : false}, async () => {
+  assert.deepEqual(missingDist, [], "pnpm build must run before the watch tests");
   const {createRequire} = await import("node:module");
   const req = createRequire(import.meta.url);
   const uni = req(join(ROOT, "packages/protocol-swap2-uniswap/watch.json")).sources.find((s) => s.type === "json-pins");

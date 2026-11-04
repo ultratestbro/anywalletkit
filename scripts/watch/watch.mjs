@@ -96,14 +96,19 @@ const F = {
     // No EIP-1967 slot: an AragonProxy (stETH) or a FiatTokenProxy (USDC) names its implementation through
     // implementation() instead, and its own code never changes on an upgrade (triage 2026-11-04). Only a revert means
     // "none": any other failure fails the source (previous value kept), so a flaky RPC never reads as a lost implementation.
+    // `implProbe` marks a stored reading that already asked implementation(): only a reading without it may take the
+    // first answer as a quiet baseline (rebaseline below); on a probed proxy a first answer is an upgrade and is reported.
+    // It is bookkeeping, not part of the compared value.
     if (!meta.impl && !meta.beacon) {
       let r = null;
       try { r = addrOfSlot(await rpc(url, "eth_call", [{to: s.address, data: "0x5c60da1b"}, "latest"])); }
       catch (e) { if (!(e.rpcError && /revert/i.test(e.message))) throw new Error(`implementation(): ${e.message}`); }
+      meta.implProbe = true;
       if (r) { meta.impl = r; meta.implVia = "implementation()"; }
     }
     if (meta.impl) { try { const ic = await rpc(url, "eth_getCode", [meta.impl, "latest"]); meta.implCodeHash = sha(ic).slice(0, 16); } catch {} }
-    return {value: canonical(meta), meta};
+    const {implProbe: _probe, ...compared} = meta;
+    return {value: canonical(compared), meta};
   },
   async "evm-code"(s) {
     const url = rpcFor(s.chainId); if (!url) throw new Error(`no RPC for chain ${s.chainId}`);
@@ -279,22 +284,36 @@ function describe(s, before, after) {
 const linkOf = (s, after) => safeLink(after.meta?.url || (s.type === "http-json" || s.type === "http-text" || s.type === "rss" || s.type === "json-pins" ? s.url : s.type.startsWith("github") ? `https://github.com/${s.repo}` : null), s);
 /**
  * A stored value that is not an upstream change: the manifest gave the source another type (the old value is from
- * another fetcher), or `evm-proxy` now reads implementation() where the old reading had no implementation at all.
- * Both are a new baseline, written without a diff.
+ * another fetcher), or `evm-proxy` reads implementation() for the first time ever (the stored reading carries no
+ * `implProbe` marker) where the old reading had no implementation at all. Both are a new baseline, written without a
+ * diff. Once a reading is probed, an implementation() that starts answering is a diff like any upgrade.
  */
 function rebaseline(s, prev, r) {
   if (prev.type !== s.type) return "the source type changed";
-  if (s.type === "evm-proxy" && r.meta?.implVia && !prev.meta?.impl && !prev.meta?.implVia) {
-    const {impl, implVia: _via, implCodeHash: _code, ...rest} = r.meta, {impl: _was, implCodeHash: _wasCode, ...was} = prev.meta ?? {};
+  if (s.type === "evm-proxy" && r.meta?.implVia && !prev.meta?.implProbe && !prev.meta?.impl && !prev.meta?.implVia) {
+    const {impl, implVia: _via, implCodeHash: _code, implProbe: _probe, ...rest} = r.meta, {impl: _was, implCodeHash: _wasCode, implProbe: _wasProbe, ...was} = prev.meta ?? {};
     if (canonical(rest) === canonical(was)) return `first implementation() reading ${impl}`;
   }
   return null;
 }
+/**
+ * Where a source reads from (chain, contract, program, page, file). Stored with each value: when the manifest points
+ * an existing id somewhere else (Uniswap QuoterV2 moved to the active deployments, triage 2026-11-04), the old value
+ * belongs to the old target, so the source is re-baselined and listed as re-pointed instead of reported as changed.
+ * EVM addresses compare case-insensitively (checksummed vs lowercase is the same contract).
+ */
+const TARGET_KEYS = ["chainId", "address", "programId", "url", "repo", "path", "ref"];
+function targetOf(s) {
+  const t = {};
+  for (const k of TARGET_KEYS) if (s[k] != null) t[k] = typeof s[k] === "string" && /^0x[0-9a-f]{40}$/i.test(s[k]) ? s[k].toLowerCase() : s[k];
+  return t;
+}
+const showTarget = (t) => [t.chainId != null ? `chain ${t.chainId}` : "", t.address ?? t.programId ?? t.url ?? "", t.repo ? `${t.repo}${t.path ? `/${t.path}` : ""}${t.ref ? `@${t.ref}` : ""}` : ""].filter(Boolean).join(" ") || "—";
 
 // ── run ────────────────────────────────────────────────────────────────────
 const manifests = loadManifests();
 if (!manifests.length) { console.error("no watch.json manifests found"); process.exit(1); }
-const changes = [], errors = [];
+const changes = [], errors = [], repointed = [];
 let total = 0;
 const limit = 6; let active = 0; const queue = [];
 const gate = () => new Promise((ok) => { const t = () => { if (active < limit) { active++; ok(); } else queue.push(t); }; t(); });
@@ -309,6 +328,13 @@ for (const m of manifests) {
       if (!F[s.type]) throw new Error(`unknown source type ${s.type}`);
       const r = await F[s.type](s, m);
       let prev = state.sources[s.id];
+      const target = targetOf(s);
+      // A stored entry written before targets were recorded has none: it is compared as before and gets one now.
+      if (prev?.target && canonical(prev.target) !== canonical(target)) {
+        repointed.push({module: m.module, id: s.id, label: s.label ?? s.id, from: prev.target, to: target});
+        console.error(`baseline ${slug(m.module)} · ${s.id}: source re-pointed ${showTarget(prev.target)} → ${showTarget(target)}`);
+        prev = undefined;
+      }
       const why = prev && prev.value !== r.value ? rebaseline(s, prev, r) : null;
       if (why) { console.error(`baseline ${slug(m.module)} · ${s.id}: ${why}`); prev = undefined; }
       const now = new Date().toISOString();
@@ -316,7 +342,7 @@ for (const m of manifests) {
       // A failed pin check is reported on every run until it is fixed, not only on the day it appears.
       const failed = r.problems?.length ? `${r.problems.length} pin check${r.problems.length > 1 ? "s" : ""} failing: ${r.problems.slice(0, 4).join("; ")}${r.problems.length > 4 ? `; …and ${r.problems.length - 4} more` : ""}` : null;
       if (changed || failed) changes.push({module: m.module, id: s.id, label: s.label ?? s.id, type: s.type, what: [changed ? describe(s, prev, r) : null, failed].filter(Boolean).join("; "), link: linkOf(s, r), before: prev?.meta, after: r.meta});
-      state.sources[s.id] = {type: s.type, value: r.value, meta: r.meta, seenAt: now, changedAt: changed ? now : prev?.changedAt ?? now, ...(prev?.error ? {} : {})};
+      state.sources[s.id] = {type: s.type, target, value: r.value, meta: r.meta, seenAt: now, changedAt: changed ? now : prev?.changedAt ?? now, ...(prev?.error ? {} : {})};
       if (r.text && s.keepText) state.sources[s.id].text = r.text;
     } catch (e) {
       const prev = state.sources[s.id];
@@ -333,10 +359,17 @@ for (const m of manifests) {
 // live in a Map: a plain object would hand back the inherited Object.prototype value and the digest would throw (scan 2026-10-30 F19).
 const groupBy = (list, key) => { const g = new Map(); for (const x of list) { const k = String(key(x)); const a = g.get(k); if (a) a.push(x); else g.set(k, [x]); } return g; };
 const byModule = (list) => groupBy(list, (c) => c.module);
-const lines = [`# Module watch · ${TODAY}`, "", `${manifests.length} modules, ${total} sources, ${changes.length} changed, ${errors.length} unreachable.`, ""];
+const lines = [`# Module watch · ${TODAY}`, "", `${manifests.length} modules, ${total} sources, ${changes.length} changed, ${errors.length} unreachable${repointed.length ? `, ${repointed.length} re-pointed` : ""}.`, ""];
 for (const [mod, cs] of byModule(changes)) {
   lines.push(`## ${mod}`);
   for (const c of cs) lines.push(`- **${c.label}** (${c.type}): ${c.what}${c.link ? ` — ${c.link}` : ""}`);
+  lines.push("");
+}
+// Our own manifest edits, not upstream changes: shown so a re-pointed source never looks silently reset.
+const repointLine = (p) => `${slug(p.module)} · ${p.label}: ${showTarget(p.from)} → ${showTarget(p.to)}`;
+if (repointed.length) {
+  lines.push("## Re-pointed (new baseline, not a change)");
+  for (const p of repointed) lines.push(`- ${repointLine(p)}`);
   lines.push("");
 }
 const errorGroups = [...groupBy(errors, (e) => e.error)].sort((a, b) => b[1].length - a[1].length);
@@ -349,7 +382,7 @@ const digest = lines.join("\n");
 console.log(digest);
 if (!DRY && !BASELINE) {
   mkdirSync(resolve(ROOT, "watch/diff"), {recursive: true}); mkdirSync(resolve(ROOT, "watch/digest"), {recursive: true});
-  writeFileSync(resolve(ROOT, "watch/diff", `${TODAY}.json`), JSON.stringify({date: TODAY, modules: manifests.length, sources: total, changes, errors}, null, 1) + "\n");
+  writeFileSync(resolve(ROOT, "watch/diff", `${TODAY}.json`), JSON.stringify({date: TODAY, modules: manifests.length, sources: total, changes, errors, repointed}, null, 1) + "\n");
   writeFileSync(resolve(ROOT, "watch/digest", `${TODAY}.md`), digest);
 }
 if (BASELINE) console.error(`baseline written for ${manifests.length} modules (${total} sources, ${errors.length} unreachable)`);
@@ -378,6 +411,11 @@ if (SEND && !BASELINE) {
       h.push("", "<i>unreachable:</i>");
       for (const [err, es] of errorGroups.slice(0, 8)) h.push(es.length > 3 ? `• ${esc(err)} — ${es.length} sources (${esc(es.slice(0, 3).map((e) => e.label).join(", "))}…)` : es.map((e) => `• ${esc(slug(e.module))} · ${esc(e.label)}: ${esc(err)}`).join("\n"));
       if (errorGroups.length > 8) h.push(`• …and ${errorGroups.length - 8} more kinds`);
+    }
+    if (repointed.length) {
+      h.push("", "<i>re-pointed (new baseline, not a change):</i>");
+      for (const p of repointed.slice(0, 8)) h.push(`• ${esc(repointLine(p))}`);
+      if (repointed.length > 8) h.push(`• …and ${repointed.length - 8} more`);
     }
     // A digest Telegram refused must fail the job: the state commit is skipped, so the changes alert again tomorrow (scan F13).
     if (!(await postTelegram(h.flatMap((l) => l.split("\n"))))) process.exitCode = 1;

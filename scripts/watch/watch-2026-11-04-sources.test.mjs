@@ -1,10 +1,12 @@
 // node --test scripts/watch/watch-2026-11-04-sources.test.mjs — watch triage 2026-11-04, end to end through watch.mjs:
 //   - evm-proxy reads implementation() when the EIP-1967 slot is empty (stETH is an AragonProxy: impl was null, an upgrade
-//     never moved the hash); the first such reading is a silent new baseline, a revert means "none", any other RPC
-//     failure keeps the previous value; a resolving EIP-1967 proxy is not asked at all;
+//     never moved the hash); the first such reading is a silent new baseline only once (a probed reading is marked, and
+//     a later first answer is reported), a revert means "none", any other RPC failure keeps the previous value; a
+//     resolving EIP-1967 proxy is not asked at all;
 //   - evm-selectors: what each selector of the module's own source resolves to on the Diamond; a removed facet is a diff;
 //   - json-pins: pins from the package's dist checked against a feed; a failing pin is reported on every run;
-//   - a source whose manifest type changed is re-baselined instead of reported.
+//   - a source whose manifest type changed is re-baselined instead of reported;
+//   - a source the manifest points at another address / chain is re-baselined and listed as re-pointed, not changed.
 // Same sandbox as scan-2026-10-30-f19.test.mjs: watch.mjs copied into a temp root with synthetic manifests, local servers.
 import {test} from "node:test";
 import assert from "node:assert/strict";
@@ -60,9 +62,9 @@ async function serve(rpc, pages = {}) {
   return {url: `http://127.0.0.1:${server.address().port}`, calls, close: () => server.close()};
 }
 
-async function run(root, rpcUrl) {
+async function run(root, rpcUrl, extraEnv = {}) {
   const child = spawn(process.execPath, [join(root, "scripts/watch/watch.mjs")], {
-    env: {PATH: process.env.PATH, GITHUB_TOKEN: "x", EVM_RPC_URL: rpcUrl},
+    env: {PATH: process.env.PATH, GITHUB_TOKEN: "x", EVM_RPC_URL: rpcUrl, ...extraEnv},
     stdio: ["ignore", "pipe", "pipe"],
   });
   let out = "", err = "";
@@ -77,12 +79,13 @@ const IMPL_A = "0x028271e30a695c0527a0c50ca30603fed004cdb0", IMPL_B = "0x0000000
 const CODE = {[ARAGON]: "0x6080aa", [PLAIN]: "0x6080bb", [P1967]: "0x6080cc", [IMPL_A]: "0x60aa", [IMPL_B]: "0x60bb", [IMPL_1967]: "0x60cc"};
 
 test("evm-proxy: implementation() is read when the EIP-1967 slot is empty, a first reading is a new baseline, an upgrade is a diff", async () => {
-  let impl = IMPL_A, implementationError = null;
+  let impl = IMPL_A, implementationError = null, plainImpl = null;
   const srv = await serve((method, [a, b]) => {
     if (method === "eth_getCode") return {result: CODE[a.toLowerCase()] ?? "0x"};
     if (method === "eth_getStorageAt") return {result: a === P1967 && b.startsWith("0x3608") ? pad(IMPL_1967) : ZERO};
     if (method === "eth_call" && a.data === "0x5c60da1b") {
       if (a.to === ARAGON) return implementationError ? {error: {code: -32000, message: implementationError}} : {result: pad(impl)};
+      if (a.to === PLAIN && plainImpl) return {result: pad(plainImpl)};
       return {error: {code: 3, message: "execution reverted"}};
     }
     return {error: {code: -32601, message: "method not found"}};
@@ -111,6 +114,9 @@ test("evm-proxy: implementation() is read when the EIP-1967 slot is empty, a fir
     assert.equal(st.steth.meta.implVia, "implementation()");
     assert.equal(st.steth.meta.implCodeHash, sha16(CODE[IMPL_A]));
     assert.equal(st.wsteth.value, canonical(old(PLAIN)), "a reverting implementation() leaves a plain contract's value as it was");
+    assert.equal(st.wsteth.meta.implProbe, true, "the reverting implementation() is recorded as probed");
+    assert.equal(st.steth.meta.implProbe, true);
+    assert.equal(st.wq.meta.implProbe, undefined, "a resolving EIP-1967 proxy is not probed");
     assert.equal(st.wq.value, canonical(wq), "a resolving EIP-1967 proxy keeps its value");
     assert.ok(!srv.calls.some((c) => c.method === "eth_call" && c.params[0].to === P1967), "implementation() is not asked when the slot resolves");
 
@@ -125,6 +131,14 @@ test("evm-proxy: implementation() is read when the EIP-1967 slot is empty, a fir
     assert.match(r.out, /Lido stETH: implementation\(\): header not found \(previous value kept\)/);
     st = readState(root, "lido");
     assert.equal(st.steth.meta.impl, IMPL_B);
+
+    // The quiet first reading is one-time: wstETH was probed (implementation() reverted), so an implementation()
+    // that starts answering behind unchanged own code is an upgrade, and it is reported.
+    implementationError = null; plainImpl = IMPL_A;
+    r = await run(root, srv.url);
+    assert.doesNotMatch(r.err, /baseline lido · wsteth/);
+    assert.match(r.out, new RegExp(`\\*\\*Lido wstETH\\*\\* \\(evm-proxy\\): implementation \\(implementation\\(\\)\\) — → ${IMPL_A}`));
+    assert.match(r.out, /1 changed, 0 unreachable/);
   } finally { srv.close(); }
 });
 
@@ -205,5 +219,55 @@ test("json-pins: pins come from the package's dist; a deprecated pin is a diff a
     r = await run(root, srv.url);
     assert.match(r.out, /130 quoter: 0x385a5cf5… QuoterV2 deprecated → 0x385a5cf5… QuoterV2 active/);
     assert.doesNotMatch(r.out, /pin check failing/);
+  } finally { srv.close(); }
+});
+
+test("a source pointed at another address or chain is re-baselined and listed as re-pointed, not reported as changed", async () => {
+  const OLD = "0x565AC8C7863D9bb16d07E809ff49Fe5cD467634C", NEW = "0x385A5cf5F83e99f7BB2852b6A19C3538b9FA7658", OTHER = "0x00000000000000000000000000000000000000c3";
+  const code = {[OLD.toLowerCase()]: "0x6080aa", [NEW.toLowerCase()]: "0x6080bbbb", [OTHER]: "0x60cc"};
+  const srv = await serve((method, [a]) => (method === "eth_getCode" ? {result: code[a.toLowerCase()] ?? "0x"} : {error: {code: -32601, message: "method not found"}}));
+  const quoter = {id: "quoter", type: "evm-code", chainId: 1, address: NEW, label: "QuoterV2"};
+  const legacy = {id: "legacy", type: "evm-code", chainId: 1, address: OTHER, label: "Legacy entry"};
+  const same = {id: "same", type: "evm-code", chainId: 1, address: OLD, label: "Same contract"};
+  const root = sandbox({uni: {module: "@anywalletkit/uni", sources: [quoter, legacy, same]}});
+  const meta = (c) => ({codeHash: sha16(c), bytes: (c.length - 2) / 2});
+  writeState(root, "uni", {
+    // Read from the old quoter: the stored target says so.
+    quoter: {type: "evm-code", target: {chainId: 1, address: OLD.toLowerCase()}, value: sha16(code[OLD.toLowerCase()]), meta: meta(code[OLD.toLowerCase()])},
+    // Written before targets were stored: compared as before, so a code change is still a change.
+    legacy: {type: "evm-code", value: sha16("0x60ff"), meta: meta("0x60ff")},
+    // Checksummed in the manifest, lowercase in the state: the same contract, not a re-point.
+    same: {type: "evm-code", target: {chainId: 1, address: OLD.toLowerCase()}, value: sha16(code[OLD.toLowerCase()]), meta: meta(code[OLD.toLowerCase()])},
+  });
+  try {
+    let r = await run(root, srv.url);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /1 changed, 0 unreachable, 1 re-pointed\./);
+    assert.match(r.out, /## Re-pointed \(new baseline, not a change\)\n- uni · QuoterV2: chain 1 0x565ac8c7863d9bb16d07e809ff49fe5cd467634c → chain 1 0x385a5cf5f83e99f7bb2852b6a19c3538b9fa7658/);
+    assert.doesNotMatch(r.out, /\*\*QuoterV2\*\*/, "the new contract's code is not reported as a code change");
+    assert.match(r.out, /\*\*Legacy entry\*\* \(evm-code\)/);
+    assert.doesNotMatch(r.out, /Same contract/);
+    assert.match(r.err, /baseline uni · quoter: source re-pointed chain 1 0x565ac8c7/);
+    const st = readState(root, "uni");
+    assert.deepEqual(st.quoter.target, {chainId: 1, address: NEW.toLowerCase()});
+    assert.equal(st.quoter.value, sha16(code[NEW.toLowerCase()]));
+    assert.deepEqual(st.legacy.target, {chainId: 1, address: OTHER}, "a legacy entry gets its target stored");
+    const diff = JSON.parse(readFileSync(join(root, "watch/diff", `${new Date().toISOString().slice(0, 10)}.json`), "utf8"));
+    assert.deepEqual(diff.repointed.map((p) => p.id), ["quoter"]);
+    assert.deepEqual(diff.changes.map((c) => c.id), ["legacy"]);
+
+    // From the new baseline on, a code change at the new address is reported as usual.
+    code[NEW.toLowerCase()] = "0x6080dd";
+    r = await run(root, srv.url);
+    assert.match(r.out, /\*\*QuoterV2\*\* \(evm-code\): code /);
+    assert.match(r.out, /1 changed, 0 unreachable\./);
+
+    // Another chain for the same address is a re-point too.
+    writeFileSync(join(root, "packages/uni/watch.json"), JSON.stringify({module: "@anywalletkit/uni", sources: [{...quoter, chainId: 130}, legacy, same]}));
+    code[NEW.toLowerCase()] = "0x6080ee";
+    r = await run(root, srv.url, {UNICHAIN_RPC_URL: srv.url});
+    assert.match(r.out, /0 changed, 0 unreachable, 1 re-pointed\./);
+    assert.match(r.out, /- uni · QuoterV2: chain 1 0x385a5cf5f83e99f7bb2852b6a19c3538b9fa7658 → chain 130 0x385a5cf5f83e99f7bb2852b6a19c3538b9fa7658/);
+    assert.deepEqual(readState(root, "uni").quoter.target, {chainId: 130, address: NEW.toLowerCase()});
   } finally { srv.close(); }
 });
