@@ -6,12 +6,12 @@ import {
 
 import ApprovalsProtocol, {
   ApprovalsError,
-  type AccountLike, type Approval, type ApprovalStandard, type ApprovalsResult, type EvmProvider, type GetApprovalsOptions,
+  type AccountLike, type Approval, type ApprovalStandard, type ApprovalsResult, type EvmApproval, type EvmProvider, type GetApprovalsOptions,
   type ReadOnlyAccountLike, type RevokeResult, type RevokeTransaction, type SendResult, type SpenderLabelResolver,
 } from './approvals-protocol.js'
 import { describeApprovalActivity, type ActivityTokens } from './activity.js'
 import RpcLogsSource, { mergeCandidates, type ApprovalSource, type Candidate } from './sources/rpc-logs.js'
-import { EIP7702_PREFIX, ERC20_ABI, ERC721_ABI, ERC721_INTERFACE_ID, PERMIT2_ABI, PERMIT2_ADDRESS } from './standards.js'
+import { EIP7702_PREFIX, ERC20_ABI, ERC721_ABI, ERC721_INTERFACE_ID, PERMIT2_ABI, PERMIT2_ADDRESS, isPermit2Address, permit2AddressesFor } from './standards.js'
 import StateVerifier, { approvalId } from './state-verifier.js'
 import { bigintToNumber } from '@anywalletkit/core'
 
@@ -22,6 +22,12 @@ export interface CacheEntry {
   toBlock: number
   /** Plain JSON, safe to persist. */
   candidates: Candidate[]
+  /**
+   * The Permit2 contracts whose events the cached scan picked up, lowercase. An entry without it was written
+   * by a release that knew only {@link PERMIT2_ADDRESS}; on a chain with more Permit2s (zkSync Era) such an
+   * entry, or one missing any of the chain's Permit2s, is rescanned from its `fromBlock`.
+   */
+  permit2?: string[]
 }
 
 export interface ApprovalsCache {
@@ -154,15 +160,25 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
     const chainId = await this._getChainId()
     const cacheKey = `${chainId}:${owner.toLowerCase()}`
     const cached = options.fromBlock === undefined && this._config.cache ? await this._config.cache.get(cacheKey) : null
+    const permit2 = permit2AddressesFor(chainId).map((p) => p.toLowerCase())
 
     const toBlock = options.toBlock ?? bigintToNumber(await provider.getBlockNumber())
-    const fromBlock = options.fromBlock ?? (cached ? cached.toBlock + 1 : (this._config.fromBlock ?? 0))
+    // A cached scan that did not cover one of the chain's Permit2s (zkSync Era's own, before it was known)
+    // missed its events in the whole cached range: that range is scanned again, the cached candidates kept.
+    const covered = !cached || coversPermit2(cached, permit2)
+    const resume = cached ? (covered ? cached.toBlock + 1 : (cached.fromBlock ?? this._config.fromBlock ?? 0)) : null
+    const fromBlock = options.fromBlock ?? resume ?? (this._config.fromBlock ?? 0)
     const source = this._getSource()
     const scan = toBlock >= fromBlock ? await source.collect(owner, { fromBlock, toBlock }) : { candidates: [], complete: true, gaps: [] }
     const candidates = mergeCandidates(cached?.candidates ?? [], scan.candidates)
     const coveredFrom = cached ? Math.min(cached.fromBlock ?? cached.toBlock, fromBlock) : fromBlock
     if (this._config.cache && scan.complete) {
-      await this._config.cache.set(cacheKey, { fromBlock: coveredFrom, toBlock: Math.max(toBlock, cached?.toBlock ?? 0), candidates })
+      // The marker moves up only once the whole cached range was scanned again with every Permit2.
+      const upgraded = covered || toBlock >= cached!.toBlock
+      await this._config.cache.set(cacheKey, {
+        fromBlock: coveredFrom, toBlock: Math.max(toBlock, cached?.toBlock ?? 0), candidates,
+        ...(upgraded ? { permit2 } : cached!.permit2 !== undefined ? { permit2: cached!.permit2 } : {})
+      })
     }
 
     const wanted = filterOf(options)
@@ -200,7 +216,8 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
    * The raw transaction that revokes an approval (no account needed). Useful
    * for hosts that build their own batches or policy conditions.
    *
-   * @param approval - Several Permit2 approvals fold into one `lockdown`.
+   * @param approval - Several Permit2 approvals on the same Permit2 contract fold into one `lockdown`
+   *   (zkSync Era has two Permit2s: {@link EvmApproval.permit2} says which one holds the allowance).
    */
   buildRevokeTransaction (approval: Approval | Approval[]): RevokeTransaction {
     const list = Array.isArray(approval) ? approval : [approval]
@@ -208,7 +225,9 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
     for (const a of list) validate(a)
     if (list.length > 1) {
       if (!list.every((a) => a.standard === 'permit2')) throw new ApprovalsError('Only Permit2 approvals fold into one transaction.', 'invalid-approval')
-      return { to: PERMIT2_ADDRESS, data: encodeFunctionData({ abi: PERMIT2_ABI, functionName: 'lockdown', args: [list.map((a) => ({ token: a.token as Address, spender: a.spender as Address }))] }), value: 0n }
+      const to = permit2Of(list[0]!)
+      if (!list.every((a) => permit2Of(a) === to)) throw new ApprovalsError('Only Permit2 approvals on the same Permit2 contract fold into one transaction.', 'invalid-approval')
+      return { to, data: encodeFunctionData({ abi: PERMIT2_ABI, functionName: 'lockdown', args: [list.map((a) => ({ token: a.token as Address, spender: a.spender as Address }))] }), value: 0n }
     }
     const a = list[0]!
     switch (a.standard) {
@@ -220,7 +239,7 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
       case 'erc1155':
         return { to: a.token, data: encodeFunctionData({ abi: ERC721_ABI, functionName: 'setApprovalForAll', args: [a.spender as Address, false] }), value: 0n }
       case 'permit2':
-        return { to: PERMIT2_ADDRESS, data: encodeFunctionData({ abi: PERMIT2_ABI, functionName: 'lockdown', args: [[{ token: a.token as Address, spender: a.spender as Address }]] }), value: 0n }
+        return { to: permit2Of(a), data: encodeFunctionData({ abi: PERMIT2_ABI, functionName: 'lockdown', args: [[{ token: a.token as Address, spender: a.spender as Address }]] }), value: 0n }
       case 'eip7702':
         throw new ApprovalsError('An EIP-7702 delegation is revoked with a type-4 transaction (account.revokeDelegation()), not calldata.', 'unsupported-standard', { standard: a.standard })
       default:
@@ -293,8 +312,10 @@ export default class ApprovalsProtocolEvm extends ApprovalsProtocol<ApprovalsPro
     for (const a of approvals) validate(a)
 
     const items: RevokeItem[] = []
-    const permit2 = approvals.filter((a) => a.standard === 'permit2')
-    if (permit2.length) items.push({ ids: permit2.map((a) => a.id), tx: this.buildRevokeTransaction(permit2) })
+    // One `lockdown` per Permit2 contract (zkSync Era has two).
+    const permit2 = new Map<string, Approval[]>()
+    for (const a of approvals) if (a.standard === 'permit2') permit2.set(permit2Of(a), [...(permit2.get(permit2Of(a)) ?? []), a])
+    for (const list of permit2.values()) items.push({ ids: list.map((a) => a.id), tx: this.buildRevokeTransaction(list) })
     // ERC-20 revokes leave the batch when the account has `approve`: raw approve(spender, 0)
     // calldata is an approval of the spender to the policy engine (it is an ERC-721 grant of
     // token #0 too), so only the explicit `approve({amount: 0})` revokes a blocklisted spender.
@@ -364,6 +385,45 @@ function validate (a: Approval | null | undefined): asserts a is Approval {
   if (!SUPPORTED.includes(a.standard)) throw new ApprovalsError(`Standard '${a.standard}' is not supported on evm.`, 'unsupported-standard', { standard: a.standard })
   if (a.standard !== 'eip7702' && (!isAddress(a.token) || !isAddress(a.spender))) throw new ApprovalsError('token and spender must be addresses.', 'invalid-approval', { approval: a })
   if (a.standard === 'erc721-token' && a.tokenId === undefined) throw new ApprovalsError('erc721-token approvals need a tokenId.', 'invalid-approval', { approval: a })
+  if (a.standard === 'permit2') permit2Of(a)
+}
+
+/** A Permit2 approval id as {@link approvalId} builds it, with or without the `@<contract>` suffix. */
+const PERMIT2_ID = /:permit2:0x[0-9a-fA-F]{40}:0x[0-9a-fA-F]{40}(?:@0x[0-9a-fA-F]{40})?$/
+
+/**
+ * The Permit2 contract a Permit2 approval lives on, checksummed: its `permit2`, which must be one of the
+ * approval's chain's Permit2s (zkSync Era has two). Without `permit2` the `@<contract>` suffix of its `id`
+ * names it (an approval kept with the core `Approval` fields only), else the canonical Permit2. An id in
+ * the module's own form (`…:permit2:<token>:<spender>`) without a suffix names the canonical Permit2. Anything
+ * else, or a `permit2` the id contradicts, is refused (`invalid-approval`) — a lockdown is never sent to a
+ * contract that is not that chain's Permit2, nor to the wrong one of the two.
+ */
+function permit2Of (a: Approval): string {
+  const own = (a as EvmApproval).permit2
+  const id = typeof a.id === 'string' ? a.id : ''
+  const suffix = /@(0x[0-9a-fA-F]{40})$/.exec(id)?.[1]
+  const named = suffix ?? (PERMIT2_ID.test(id) ? PERMIT2_ADDRESS : undefined)
+  const permit2 = own ?? named
+  if (permit2 === undefined) return PERMIT2_ADDRESS
+  if (typeof permit2 !== 'string' || !isAddress(permit2) || !isPermit2Address(permit2, a.chainId)) {
+    throw new ApprovalsError(`${String(permit2)} is not a Permit2 contract on chain ${String(a.chainId)}.`, 'invalid-approval', { approval: a })
+  }
+  if (named !== undefined && named.toLowerCase() !== permit2.toLowerCase()) {
+    throw new ApprovalsError(`The approval's permit2 ${permit2} contradicts its id, which names ${named}.`, 'invalid-approval', { approval: a })
+  }
+  return getAddress(permit2)
+}
+
+/**
+ * Whether a cache entry's scan picked up events from every one of `permit2` (the chain's Permit2s,
+ * lowercase). An entry without the marker predates it and covered {@link PERMIT2_ADDRESS} only; a
+ * malformed marker covers nothing.
+ */
+function coversPermit2 (entry: CacheEntry, permit2: readonly string[]): boolean {
+  const scanned = entry.permit2 === undefined ? [PERMIT2_ADDRESS.toLowerCase()] : entry.permit2
+  if (!Array.isArray(scanned)) return false
+  return permit2.every((p) => scanned.some((s) => typeof s === 'string' && s.toLowerCase() === p))
 }
 
 /** An `eth_call` that the contract refused (a revert), as opposed to a node or transport that did not answer. */

@@ -9,6 +9,15 @@ export type {
 } from '@anywalletkit/core'
 export { ApprovalsError }
 
+/**
+ * An approval as the EVM module reports it. A Permit2 allowance carries `permit2`, the Permit2
+ * contract it lives on: zkSync Era has two (see `STANDARDS.permit2AddressesFor`), and a revoke must
+ * go to the one holding the allowance. Absent means `STANDARDS.PERMIT2_ADDRESS`.
+ */
+export interface EvmApproval extends Approval {
+  permit2?: string
+}
+
 /** Verified contract name of a spender, when a `labels` resolver is configured. */
 export interface SpenderLabel {
   name: string

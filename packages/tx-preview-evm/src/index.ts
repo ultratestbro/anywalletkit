@@ -201,7 +201,9 @@ const WETH_DEPOSIT_TOPIC = "0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2
 const WETH_WITHDRAWAL_TOPIC = "0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65";
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
-const PERMIT2 = "0x000000000022d473030f116ddee9f6b43ac78ba3";
+/** Uniswap Permit2: the CREATE2 address (every chain, zkSync Era included) and zkSync Era's own EraVM build, which
+ *  has code on no other chain. Only the method label reads them: a Permit2 call is classified by selector anywhere. */
+const PERMIT2 = new Set(["0x000000000022d473030f116ddee9f6b43ac78ba3", "0x0000000000225e31d15943971f47ad3022f714fa"]);
 
 /**
  * The calls whose arguments name who receives tokens or an allowance, by selector. They are read
@@ -273,13 +275,13 @@ export function decodeCall(call: PreviewCall, known: Record<string, string> = {}
     }
     case SELECTOR.permit2Permit: {
       // owner, the inline PermitSingle (token, amount, expiration, nonce, spender, sigDeadline), the signature's offset.
-      const method = to === PERMIT2 ? "permit (Permit2)" : "permit (Permit2 signature)";
+      const method = PERMIT2.has(to) ? "permit (Permit2)" : "permit (Permit2 signature)";
       if (argBytes < 8n * 32n || !bytesInRange(wordAt, uint(7), argBytes)) return unparsed(method);
       const spender = address(5);
       return {...base, method, approval: {token: address(1), spender, spenderLabel: knownLabel(known, spender), amount: cap(uint(2)), kind: "permit2"}};
     }
     case SELECTOR.permit2PermitBatch: {
-      const method = to === PERMIT2 ? "permit batch (Permit2)" : "permit batch (Permit2 signature)";
+      const method = PERMIT2.has(to) ? "permit batch (Permit2)" : "permit batch (Permit2 signature)";
       const approvals = argBytes < 3n * 32n || !bytesInRange(wordAt, uint(2), argBytes) ? null : permitBatch(wordAt, uint(1), known);
       if (approvals === null) return unparsed(method);
       return {...base, method, ...(approvals.length > 0 ? {approval: approvals[0]!, approvals} : {})};
@@ -290,9 +292,9 @@ export function decodeCall(call: PreviewCall, known: Record<string, string> = {}
     }
     case SELECTOR.permit2Approve: {
       // Permit2's own approve(token, spender, amount, expiration), at whatever address the chain's
-      // Permit2 lives (zkSync Era's is not the CREATE2 one) — every such call is read as one (F29).
+      // Permit2 lives (zkSync Era has its own besides the CREATE2 one) — every such call is read as one (F29).
       const spender = address(1);
-      return {...base, method: to === PERMIT2 ? "approve (Permit2)" : "approve (Permit2 signature)", approval: {token: address(0), spender, spenderLabel: knownLabel(known, spender), amount: cap(uint(2)), kind: "permit2"}};
+      return {...base, method: PERMIT2.has(to) ? "approve (Permit2)" : "approve (Permit2 signature)", approval: {token: address(0), spender, spenderLabel: knownLabel(known, spender), amount: cap(uint(2)), kind: "permit2"}};
     }
     case SELECTOR.approve:
     case SELECTOR.increaseAllowance: {

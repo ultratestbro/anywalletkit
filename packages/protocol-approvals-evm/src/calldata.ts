@@ -2,7 +2,7 @@ import { decodeAbiParameters, decodeFunctionData, encodeFunctionData, type Hex }
 
 import type { ApprovalStandard } from './approvals-protocol.js'
 
-import { PERMIT2_ABI, PERMIT2_ADDRESS, SELECTORS, UNLIMITED_THRESHOLD } from './standards.js'
+import { PERMIT2_ABI, PERMIT2_ADDRESS, SELECTORS, UNLIMITED_THRESHOLD, isPermit2Address } from './standards.js'
 
 /** True when an `approve` amount should count as unlimited (>= 2^255 by default). */
 export function isUnlimitedAmount (amount: unknown, threshold: bigint = UNLIMITED_THRESHOLD): boolean {
@@ -49,7 +49,8 @@ const NFT_STANDARDS: ReadonlySet<string> = new Set(['erc721', 'erc721-token', 'e
  * authorization, strict revoke calldata, and a target whose standard makes that calldata a revoke
  * (scan 2026-10-27 modules, F31):
  *
- * - Permit2 `lockdown` only to Permit2 (no `targets` needed);
+ * - Permit2 `lockdown` only to Permit2 (no `targets` needed): the canonical {@link PERMIT2_ADDRESS}, and with
+ *   `chainId` every Permit2 of that chain (zkSync Era's own Permit2 as well on eip155:324);
  * - `approve(spender, 0)` only to a target the host knows as an ERC-20 — on an ERC-721 the same
  *   calldata APPROVES `spender` for token #0;
  * - `approve(0x0, id)` and `setApprovalForAll(operator, false)` to an NFT target (ERC-721 / ERC-1155),
@@ -60,7 +61,7 @@ const NFT_STANDARDS: ReadonlySet<string> = new Set(['erc721', 'erc721-token', 'e
  */
 export function isRevokeTransaction (
   tx: { to?: string; value?: unknown; data?: string; type?: unknown; authorizationList?: unknown[] } | undefined,
-  { targets }: { targets?: RevokeTargets } = {}
+  { targets, chainId }: { targets?: RevokeTargets; chainId?: number | string } = {}
 ): boolean {
   if (!tx || typeof tx !== 'object' || typeof tx.to !== 'string') return false
   try { if (tx.value !== undefined && tx.value !== null && BigInt(tx.value as bigint) !== 0n) return false } catch { return false }
@@ -72,7 +73,7 @@ export function isRevokeTransaction (
   const clearsToken = selector === SELECTORS.approve && /^0x[0-9a-fA-F]{136}$/.test(data) && /^0{64}$/.test(data.slice(10, 74))
   if (!clearsToken && !isRevokeCalldata(data)) return false
   const to = tx.to.toLowerCase()
-  if (selector === SELECTORS.lockdown) return to === PERMIT2_ADDRESS.toLowerCase()
+  if (selector === SELECTORS.lockdown) return chainId === undefined ? to === PERMIT2_ADDRESS.toLowerCase() : isPermit2Address(to, chainId)
   if (targets === undefined) return false
   const standards = standardsOf(targets, to)
   if (standards === null) return false // not a contract the host's scan reported
