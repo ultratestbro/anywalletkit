@@ -23,6 +23,18 @@ jobs:
       - run: node scripts/check-node.mjs   # stop here on a Node that misses a security release
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r --filter './packages/*' build
+      - name: other EVM RPCs from the QuickNode multichain endpoint
+        env:
+          QUICKNODE_MULTICHAIN_BASE: ${{ secrets.QUICKNODE_MULTICHAIN_BASE }}
+        run: |
+          # Same map as watch.yml: "<name>.%NET%.quiknode.pro/<token>/" → one <CHAIN>_RPC_URL per chain.
+          [ -z "$QUICKNODE_MULTICHAIN_BASE" ] && exit 0
+          for p in UNICHAIN:unichain-mainnet LINEA:linea-mainnet SONIC:sonic-mainnet ZKSYNC:zksync-mainnet HYPEREVM:hype-mainnet CELO:celo-mainnet GNOSIS:xdai PLASMA:plasma-mainnet MEGAETH:megaeth-mainnet ROBINHOOD:robinhood-mainnet MONAD:monad-mainnet SCROLL:scroll-mainnet BERACHAIN:bera-mainnet WORLDCHAIN:worldchain-mainnet SEI:sei-pacific INK:ink-mainnet XLAYER:xlayer-mainnet KATANA:katana-mainnet MANTLE:mantle-mainnet SONEIUM:soneium-mainnet; do
+            url="${QUICKNODE_MULTICHAIN_BASE/\%NET\%/${p##*:}}"
+            [ "${p%%:*}" = HYPEREVM ] && url="${url%/}/evm"   # QuickNode serves HyperEVM JSON-RPC under /evm
+            echo "::add-mask::$url"   # built from a secret, so Actions does not mask it on its own
+            echo "${p%%:*}_RPC_URL=$url" >> "$GITHUB_ENV"
+          done
       - name: routes canary
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
