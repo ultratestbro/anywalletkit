@@ -1,7 +1,52 @@
 import { getAbiItem, getAddress, keccak256, pad, parseAbi, stringToHex, toFunctionSelector, type Hex } from 'viem'
 
-/** Uniswap Permit2 — the same address on every EVM chain it is deployed to. */
+/**
+ * Uniswap Permit2 at its CREATE2 address — the same on every EVM chain it is deployed to, zkSync Era
+ * included (deployed there through the EVM emulator). Uniswap's own zkSync Era Permit2 is
+ * {@link PERMIT2_ZKSYNC_ADDRESS}; see {@link permit2AddressesFor}.
+ */
 export const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3'
+/**
+ * The Permit2 Uniswap documents for zkSync Era (eip155:324), compiled for EraVM: the CREATE2 address
+ * does not carry over to zkSync's address derivation. No code at this address on any other chain.
+ */
+export const PERMIT2_ZKSYNC_ADDRESS = '0x0000000000225e31D15943971F47aD3022F714Fa'
+/** zkSync Era mainnet. */
+const ZKSYNC_ERA = 324
+/** Every Permit2 contract the module knows, on any chain. */
+export const PERMIT2_ADDRESSES: readonly string[] = Object.freeze([PERMIT2_ADDRESS, PERMIT2_ZKSYNC_ADDRESS])
+const CANONICAL_ONLY: readonly string[] = Object.freeze([PERMIT2_ADDRESS])
+
+/** `324`, `'324'`, `'0x144'` or `'eip155:324'` → 324; anything else → NaN. */
+function chainNumber (chainId: number | string | undefined): number {
+  if (typeof chainId === 'number') return chainId
+  if (typeof chainId !== 'string' || chainId === '') return NaN
+  return Number(chainId.replace(/^eip155:/, ''))
+}
+
+/**
+ * The Permit2 Uniswap documents for a chain: {@link PERMIT2_ZKSYNC_ADDRESS} on zkSync Era,
+ * {@link PERMIT2_ADDRESS} everywhere else.
+ */
+export function permit2AddressFor (chainId: number | string): string {
+  return chainNumber(chainId) === ZKSYNC_ERA ? PERMIT2_ZKSYNC_ADDRESS : PERMIT2_ADDRESS
+}
+
+/**
+ * Every live Permit2 on a chain. zkSync Era has two — the CREATE2 one and Uniswap's EraVM build, both
+ * with their own allowances — so a scan, a revoke and an activity label must accept either there;
+ * every other chain has only {@link PERMIT2_ADDRESS}.
+ */
+export function permit2AddressesFor (chainId: number | string | undefined): readonly string[] {
+  return chainNumber(chainId) === ZKSYNC_ERA ? PERMIT2_ADDRESSES : CANONICAL_ONLY
+}
+
+/** True when `address` is one of the chain's Permit2 contracts ({@link permit2AddressesFor}). */
+export function isPermit2Address (address: string | undefined, chainId: number | string | undefined): boolean {
+  if (typeof address !== 'string') return false
+  const a = address.toLowerCase()
+  return permit2AddressesFor(chainId).some((p) => p.toLowerCase() === a)
+}
 /** Multicall3 — the same address on every major EVM chain. */
 export const MULTICALL3_ADDRESS = '0xcA11bde05977b3631167028862bE2a173976CA11'
 /** An ERC-20 allowance at or above this is treated as unlimited (2^255). */

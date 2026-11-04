@@ -1,7 +1,7 @@
 export { default as ApprovalsProtocol, IApprovalsProtocol, ApprovalsError } from './approvals-protocol.js'
 export type {
   Approval, ApprovalRisk, ApprovalStandard, ApprovalsCoverage, ApprovalsErrorReason, ApprovalsResult, GetApprovalsOptions, RevokeResult,
-  SpenderLabel, SpenderLabelResolver, Eip1193Provider, EvmProvider, RevokeTransaction, SendResult, ReadOnlyAccountLike, AccountLike,
+  EvmApproval, SpenderLabel, SpenderLabelResolver, Eip1193Provider, EvmProvider, RevokeTransaction, SendResult, ReadOnlyAccountLike, AccountLike,
   ApprovalsProtocolBase, ApprovalsProtocolConstructor,
 } from './approvals-protocol.js'
 export { default as RpcLogsSource, parseApprovalLog } from './sources/rpc-logs.js'

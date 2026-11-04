@@ -6,15 +6,16 @@
 //    else `approve`. (ERC-721 shares the selector; a tokenId of 0 would read as a
 //    revoke — the only case the selector cannot tell apart offline.)
 //  - `setApprovalForAll(address,bool)` 0xa22cb465 — false → `revoke`, true → `approve`.
-//  - Permit2 (0x000000000022D4…8BA3) `approve(address,address,uint160,uint48)` — amount
-//    0 → `revoke`, else `approve`; `lockdown(...)` → `revoke`.
+//  - Permit2 (0x000000000022D4…8BA3; on zkSync Era also Uniswap's 0x0000000000225e31…14Fa)
+//    `approve(address,address,uint160,uint48)` — amount 0 → `revoke`, else `approve`;
+//    `lockdown(...)` → `revoke`.
 // Calldata is needed to read the spender and the amount; with only the selector the
 // item is still returned as `approve`, titled without the amount verdict.
 
 import { activityBase, sameAddress, type ActivityItem, type ChainTx, type DescribeActivityContext } from '@anywalletkit/core'
 import { decodeAbiParameters, getAbiItem, toFunctionSelector, type Hex } from 'viem'
 
-import { PERMIT2_ABI, PERMIT2_ADDRESS, SELECTORS } from './standards.js'
+import { PERMIT2_ABI, PERMIT2_ADDRESS, PERMIT2_ZKSYNC_ADDRESS, SELECTORS, isPermit2Address } from './standards.js'
 
 /** Registry name, as `module.json` carries it. */
 export const MODULE_NAME = '@anywalletkit/protocol-approvals-evm'
@@ -36,9 +37,10 @@ export const CHAIN_NAMES: Readonly<Record<number, string>> = Object.freeze({
   42161: 'Arbitrum', 42220: 'Celo', 43114: 'Avalanche', 57073: 'Ink', 59144: 'Linea', 80094: 'Berachain', 98866: 'Plume', 534352: 'Scroll'
 })
 
-/** Well-known spenders, so the title can say "for Permit2" instead of an address. */
+/** Well-known spenders, so the title can say "for Permit2" instead of an address (zkSync Era's Permit2 has code on no other chain). */
 export const SPENDER_LABELS: Readonly<Record<string, string>> = Object.freeze({
-  [PERMIT2_ADDRESS.toLowerCase()]: 'Permit2'
+  [PERMIT2_ADDRESS.toLowerCase()]: 'Permit2',
+  [PERMIT2_ZKSYNC_ADDRESS.toLowerCase()]: 'Permit2'
 })
 
 const short = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`
@@ -75,7 +77,7 @@ export function describeApprovalActivity (tx: ChainTx, ctx: DescribeActivityCont
   const chainId = Number(m[1])
   const selector = call.selector.toLowerCase()
   const data = typeof call.data === 'string' && call.data.length >= 10 ? call.data : null
-  const isPermit2 = sameAddress(call.to, PERMIT2_ADDRESS)
+  const isPermit2 = isPermit2Address(call.to, chainId)
 
   let r: Recognized
   if (isPermit2 && selector === PERMIT2_APPROVE) {
@@ -90,7 +92,7 @@ export function describeApprovalActivity (tx: ChainTx, ctx: DescribeActivityCont
       const [pairs] = decodeAbiParameters(LOCKDOWN_PARAMS, ('0x' + (data ?? '').slice(10)) as Hex)
       if (pairs.length === 1) { token = pairs[0]!.token; spender = pairs[0]!.spender }
     } catch {}
-    r = { revoke: true, spender, token: token ?? PERMIT2_ADDRESS, amount: 0n }
+    r = { revoke: true, spender, token: token ?? call.to, amount: 0n }
   } else if (selector === SELECTORS.approve && !isPermit2) {
     const amountWord = word(data, 1)
     const amount = amountWord !== null ? BigInt(amountWord) : null
@@ -109,7 +111,7 @@ export function describeApprovalActivity (tx: ChainTx, ctx: DescribeActivityCont
     return null
   }
 
-  const label = options.tokens?.[r.token.toLowerCase()]?.symbol ?? (sameAddress(r.token, PERMIT2_ADDRESS) ? 'Permit2 allowances' : short(r.token))
+  const label = options.tokens?.[r.token.toLowerCase()]?.symbol ?? (isPermit2 && sameAddress(r.token, call.to) ? 'Permit2 allowances' : short(r.token))
   const spender = r.spender ? (SPENDER_LABELS[r.spender.toLowerCase()] ?? short(r.spender)) : null
   const kind = r.revoke ? 'revoke' : 'approve'
   const title = r.revoke ? `Revoked ${label}${spender ? ` for ${spender}` : ''}` : `Approved ${label}${spender ? ` for ${spender}` : ''}`

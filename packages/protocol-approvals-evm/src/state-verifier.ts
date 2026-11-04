@@ -1,10 +1,10 @@
 import { decodeFunctionResult, encodeFunctionData, getAddress, zeroAddress, type Address, type Hex, type PublicClient } from 'viem'
 
-import { ApprovalsError, type Approval, type ApprovalStandard } from './approvals-protocol.js'
-import type { Candidate } from './sources/rpc-logs.js'
+import { ApprovalsError, type Approval, type ApprovalStandard, type EvmApproval } from './approvals-protocol.js'
+import { permit2Suffix, type Candidate } from './sources/rpc-logs.js'
 import {
   ERC1155_INTERFACE_ID, ERC20_ABI, ERC721_ABI, MAX_UINT160, MULTICALL3_ABI, MULTICALL3_ADDRESS,
-  PERMIT2_ABI, PERMIT2_ADDRESS, UNLIMITED_THRESHOLD
+  PERMIT2_ABI, PERMIT2_ADDRESS, UNLIMITED_THRESHOLD, isPermit2Address
 } from './standards.js'
 
 export interface StateVerifierOptions {
@@ -31,9 +31,13 @@ interface ReadResult { success: boolean; returnData: Hex }
 
 const eqAddr = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
 
-/** Builds the deterministic approval id. */
-export function approvalId ({ chainId, standard, token, spender, tokenId }: { chainId: number | string; standard: ApprovalStandard; token: string; spender: string; tokenId?: string | undefined }): string {
-  return `${chainId}:${standard}:${token.toLowerCase()}:${spender.toLowerCase()}${tokenId !== undefined ? ':' + tokenId : ''}`
+/**
+ * Builds the deterministic approval id: `chainId:standard:token:spender[:tokenId]`, and for a Permit2
+ * allowance on a Permit2 other than {@link PERMIT2_ADDRESS} (zkSync Era's own) `@<that contract>` after it,
+ * so the same pair on zkSync Era's two Permit2s gets two ids.
+ */
+export function approvalId ({ chainId, standard, token, spender, tokenId, permit2 }: { chainId: number | string; standard: ApprovalStandard; token: string; spender: string; tokenId?: string | undefined; permit2?: string | undefined }): string {
+  return `${chainId}:${standard}:${token.toLowerCase()}:${spender.toLowerCase()}${tokenId !== undefined ? ':' + tokenId : ''}${standard === 'permit2' ? permit2Suffix(permit2) : ''}`
 }
 
 /**
@@ -63,10 +67,13 @@ export default class StateVerifier {
   async verify (owner: string, candidates: Candidate[], { chainId, includeZero = false, now = Math.floor(Date.now() / 1000) }: VerifyOptions): Promise<Approval[]> {
     owner = getAddress(owner)
     const calls: Call[] = []
-    const plan = candidates.map((c) => {
+    // A Permit2 candidate counts only on one of this chain's Permit2s: a cached or indexer-supplied
+    // candidate naming another contract is dropped, not read.
+    const plan = candidates.filter((c) => c.kind !== 'permit2' || isPermit2Address(c.permit2 ?? PERMIT2_ADDRESS, chainId)).map((c) => {
       const token = getAddress(c.token)
       const spender = getAddress(c.spender)
       const at = calls.length
+      const permit2 = getAddress(c.permit2 ?? PERMIT2_ADDRESS)
       switch (c.kind) {
         case 'erc20':
           calls.push({ target: token, callData: encodeFunctionData({ abi: ERC20_ABI, functionName: 'allowance', args: [owner as Address, spender] }) })
@@ -84,12 +91,12 @@ export default class StateVerifier {
           )
           break
         case 'permit2':
-          calls.push({ target: PERMIT2_ADDRESS, callData: encodeFunctionData({ abi: PERMIT2_ABI, functionName: 'allowance', args: [owner as Address, token, spender] }) })
+          calls.push({ target: permit2, callData: encodeFunctionData({ abi: PERMIT2_ABI, functionName: 'allowance', args: [owner as Address, token, spender] }) })
           break
         default:
           throw new ApprovalsError(`Unknown candidate kind '${(c as Candidate).kind}'.`, 'invalid-approval', { candidate: c })
       }
-      return { c, token, spender, at }
+      return { c, token, spender, permit2, at }
     })
 
     const results = await this._read(calls)
@@ -105,7 +112,7 @@ export default class StateVerifier {
     }
 
     const approvals: Approval[] = []
-    for (const { c, token, spender, at } of plan) {
+    for (const { c, token, spender, permit2, at } of plan) {
       const grantedAt = { block: c.block, txHash: c.txHash }
       if (c.kind === 'erc20') {
         const d = decode(at, (data) => decodeFunctionResult({ abi: ERC20_ABI, functionName: 'allowance', data }))
@@ -133,7 +140,7 @@ export default class StateVerifier {
         const expiration = Number(d[1])
         const expired = expiration !== 0 && expiration <= now
         if ((amount === 0n || expired) && !includeZero) continue
-        const a = mk({ chainId, standard: 'permit2', token, spender, amount, unlimited: amount >= MAX_UINT160, expiration, grantedAt })
+        const a = mk({ chainId, standard: 'permit2', token, spender, amount, unlimited: amount >= MAX_UINT160, expiration, grantedAt, permit2 })
         if (expired) a.risks.push('expired')
         approvals.push(a)
       }
@@ -213,7 +220,7 @@ export default class StateVerifier {
   }
 }
 
-function mk ({ chainId, standard, token, spender, amount, unlimited, tokenId, expiration, grantedAt }: {
+function mk ({ chainId, standard, token, spender, amount, unlimited, tokenId, expiration, grantedAt, permit2 }: {
   chainId: number | string
   standard: ApprovalStandard
   token: string
@@ -223,8 +230,10 @@ function mk ({ chainId, standard, token, spender, amount, unlimited, tokenId, ex
   tokenId?: string | undefined
   expiration?: number | undefined
   grantedAt?: { block?: number; txHash?: string } | undefined
-}): Approval {
-  const a: Approval = { id: approvalId({ chainId, standard, token, spender, tokenId }), standard, chainId, token, spender, amount, unlimited, risks: [] }
+  permit2?: string | undefined
+}): EvmApproval {
+  const a: EvmApproval = { id: approvalId({ chainId, standard, token, spender, tokenId, permit2 }), standard, chainId, token, spender, amount, unlimited, risks: [] }
+  if (permit2 !== undefined) a.permit2 = permit2
   if (tokenId !== undefined) a.tokenId = tokenId
   if (expiration !== undefined) a.expiration = expiration
   if (grantedAt) a.grantedAt = grantedAt

@@ -1,7 +1,7 @@
 import { decodeAbiParameters, getAddress, numberToHex, type Hex, type PublicClient } from 'viem'
 
 import { ApprovalsError } from '../approvals-protocol.js'
-import { DISCOVERY_TOPICS, PERMIT2_ADDRESS, TOPICS, ownerTopic, topicAddress } from '../standards.js'
+import { DISCOVERY_TOPICS, PERMIT2_ADDRESS, PERMIT2_ADDRESSES, TOPICS, ownerTopic, topicAddress } from '../standards.js'
 
 /**
  * A `(token, spender)` pair seen in the account's approval events. Only a
@@ -14,6 +14,11 @@ export interface Candidate {
   spender: string
   /** Decimal string, `erc721-token` only. */
   tokenId?: string
+  /**
+   * `permit2` only: the Permit2 contract that emitted the event, when it is not
+   * {@link PERMIT2_ADDRESS} (zkSync Era's own Permit2). Absent means the canonical one.
+   */
+  permit2?: string
   block: number
   txHash: string
   logIndex: number
@@ -60,13 +65,20 @@ const eqAddr = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerC
 
 /** Deterministic key of a candidate (used for de-duplication and cache merges). */
 export function candidateKey (c: Candidate): string {
-  return `${c.kind}:${c.token.toLowerCase()}:${c.spender.toLowerCase()}${c.tokenId !== undefined ? ':' + c.tokenId : ''}`
+  return `${c.kind}:${c.token.toLowerCase()}:${c.spender.toLowerCase()}${c.tokenId !== undefined ? ':' + c.tokenId : ''}${permit2Suffix(c.permit2)}`
+}
+
+/** `@<address>` for a Permit2 other than the canonical one, else empty: the same pair on two Permit2s is two allowances. */
+export function permit2Suffix (permit2: string | undefined): string {
+  return typeof permit2 === 'string' && !eqAddr(permit2, PERMIT2_ADDRESS) ? '@' + permit2.toLowerCase() : ''
 }
 
 /**
  * Classifies one raw `eth_getLogs` entry. Returns null for logs that are not
  * an approval granted BY the owner (e.g. a Permit2 event on a look-alike
  * contract, or an ERC-721 `Approval` where the owner sits in another slot).
+ * Permit2 events count from any known Permit2 ({@link PERMIT2_ADDRESSES});
+ * the verifier reads state only on the scanned chain's own Permit2s.
  */
 export function parseApprovalLog (log: RawLog, owner: string): Candidate | null {
   const [topic0, topic1, topic2, topic3] = log.topics
@@ -82,13 +94,15 @@ export function parseApprovalLog (log: RawLog, owner: string): Candidate | null 
   if (topic0 === TOPICS.approvalForAll && log.topics.length === 3) {
     return { kind: 'nft-operator', token: address, spender: topicAddress(topic2!), ...base }
   }
-  if (!eqAddr(address, PERMIT2_ADDRESS)) return null
+  const permit2 = PERMIT2_ADDRESSES.find((p) => eqAddr(address, p))
+  if (permit2 === undefined) return null
+  const at = permit2 === PERMIT2_ADDRESS ? {} : { permit2 }
   if ((topic0 === TOPICS.permit2Approval || topic0 === TOPICS.permit2Permit) && log.topics.length === 4) {
-    return { kind: 'permit2', token: topicAddress(topic2!), spender: topicAddress(topic3!), ...base }
+    return { kind: 'permit2', token: topicAddress(topic2!), spender: topicAddress(topic3!), ...at, ...base }
   }
   if (topic0 === TOPICS.permit2Lockdown && log.topics.length === 2) {
     const [token, spender] = decodeAbiParameters([{ type: 'address' }, { type: 'address' }], log.data as Hex)
-    return { kind: 'permit2', token, spender, ...base }
+    return { kind: 'permit2', token, spender, ...at, ...base }
   }
   return null
 }
