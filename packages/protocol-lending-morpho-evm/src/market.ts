@@ -2,6 +2,7 @@ import { bigintToNumber, type BorrowOptions, type IWalletAccount, type IWalletAc
 import { getAddress, isAddress, isHex, zeroAddress, type Address, type Hex } from 'viem'
 import { ERC20_ABI, IRM_ABI, MORPHO_ABI, ORACLE_ABI } from './abi.js'
 import { FALLBACK_GAS, MorphoBase, toAmount, type AmountOption, type MorphoBaseConfig, type Tx } from './base.js'
+import { DEAD_ADDRESS, evaluateDeadDeposit, type DeadDeposit } from './dead-deposit.js'
 import { MorphoError } from './errors.js'
 import {
   accrue, collateralValue, marketId, maxBorrow, rateToApyPct, supplyApyPct, toAssetsDown, toAssetsUp, toSharesUp, WAD,
@@ -167,6 +168,17 @@ export class MorphoMarketProtocolEvm extends MorphoBase<MorphoMarketConfig> {
     try { return await this.api.marketById(this.id, this.chainId) } catch { return null }
   }
 
+  /**
+   * The market's dead deposit: Blue supply shares at 0x…dEaD must be at least `MIN_DEAD_SHARES`.
+   * `supply` refuses a market that fails unless `allowWithoutDeadDeposit`; collateral, borrows,
+   * repayments and withdrawals are not gated by it.
+   */
+  override async getDeadDeposit(): Promise<DeadDeposit> {
+    const { id } = await this.resolve()
+    const [deadShares] = await this.read<readonly [bigint, bigint, bigint]>(this.chain.morpho, MORPHO_ABI, 'position', [id, DEAD_ADDRESS])
+    return evaluateDeadDeposit(deadShares)
+  }
+
   private async assertLoanToken(token: string | undefined, info: MarketInfo): Promise<void> {
     if (token === undefined) return
     if (token === 'native') throw new MorphoError('Morpho markets take ERC-20 only (wrap the native coin first).')
@@ -180,6 +192,7 @@ export class MorphoMarketProtocolEvm extends MorphoBase<MorphoMarketConfig> {
     const amount = toAmount(o.amount)
     const info = await this.getMarket()
     await this.assertLoanToken(o.token, info)
+    await this.assertDeadDeposit(`Market ${info.collateral?.symbol ?? 'idle'}/${info.loan.symbol}`, 'market', info.id)
     const onBehalf = o.onBehalfOf ? getAddress(o.onBehalfOf) : await this.me()
     const approvals = await this.approvals(info.loan.address, this.chain.morpho, amount)
     const tx: Tx = { to: this.chain.morpho, data: this.encode(MORPHO_ABI, 'supply', [info.params, amount, 0n, onBehalf, '0x']), value: 0n }

@@ -77,6 +77,18 @@ await market.withdrawCollateral({ amount: 'max' })
   its transfer gates are read (`canReceiveShares` / `canSendAssets` in,
   `canSendShares` / `canReceiveAssets` out) and caps and liquidity are left to
   the `eth_call` proof that runs before every send.
+- **Dead deposit.** Before a vault deposit or a market supply, the target
+  must hold a dead deposit at `0x…dEaD`, the rule Morpho's own SDK applies
+  (morpho-sdk 9.2.0): at least `MIN_DEAD_SHARES` (1e9) shares (Blue supply
+  shares for a market, vault shares for a vault); a Vault V2's must also be
+  worth `MIN_VAULT_V2_DEAD_ASSETS` (1e6 base units), with its share price above
+  1 / (10 × virtualShares). Without one, a nearly empty target's share price can
+  be inflated against the next depositor. A target that fails is refused with
+  `MorphoDeadDepositError` (`code: 'InsufficientDeadDeposit'`, `observed`,
+  `required`) unless the config passes `allowWithoutDeadDeposit: true`.
+  `getDeadDeposit()` reads it without supplying. Only the target is checked,
+  not the markets a vault allocates to. Withdrawals, collateral, borrows and
+  repayments are never gated by it.
 - **Market identity.** An id is resolved with `idToMarketParams`, and the RPC's
   answer must hash back to the id or it is refused; params given in config are
   hashed to the id and the market must exist (`lastUpdate ≠ 0`). The golden
@@ -101,6 +113,7 @@ await market.withdrawCollateral({ amount: 'max' })
 | `vault.getVault()` | version, factory, name, asset, totalAssets, share price, fees, timelock, curator |
 | `vault.getPosition()` | shares, assets, withdrawable now |
 | `vault.getApy()`, `vault.getStats()` | net APY %, API record |
+| `vault.getDeadDeposit()`, `market.getDeadDeposit()` | shares (and V2 assets) at `0x…dEaD`, whether the dead-deposit rule passes and what failed |
 | `market.getMarket()` | params, tokens, LLTV, oracle price (1e36), accrued state, liquidity, utilization, borrow/supply APY |
 | `market.getPosition(user?)` | supply/borrow shares and assets, collateral, collateral value, max borrow, health factor, LTV, liquidation price |
 | `MorphoApi.listVaults / listMarkets / vault / marketById` | discovery, biggest first, `listed: true` |

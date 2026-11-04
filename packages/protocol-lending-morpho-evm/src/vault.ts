@@ -2,6 +2,7 @@ import { NotImplementedError, bigintToNumber, type IWalletAccount, type IWalletA
 import { getAddress, isAddress, type Address } from 'viem'
 import { ERC20_ABI, ERC4626_ABI, FACTORY_V1_ABI, FACTORY_V2_ABI, VAULT_V1_ABI, VAULT_V2_ABI } from './abi.js'
 import { FALLBACK_GAS, MorphoBase, toAmount, type AmountOption, type MorphoBaseConfig, type Tx } from './base.js'
+import { DEAD_ADDRESS, evaluateDeadDeposit, type DeadDeposit } from './dead-deposit.js'
 import { MorphoError } from './errors.js'
 import type { ApiVault } from './api.js'
 
@@ -159,6 +160,24 @@ export class MorphoVaultProtocolEvm extends MorphoBase<MorphoVaultConfig> {
     return apy
   }
 
+  /**
+   * The vault's dead deposit: its shares at 0x…dEaD must be at least `MIN_DEAD_SHARES`; a V2
+   * vault's must also be worth `MIN_VAULT_V2_DEAD_ASSETS`, with its share price above
+   * 1 / (10 × virtualShares). `supply` refuses a vault that fails unless `allowWithoutDeadDeposit`.
+   */
+  override async getDeadDeposit(): Promise<DeadDeposit> {
+    const info = await this.getVault()
+    const deadShares = await this.read<bigint>(this.vault, ERC4626_ABI, 'balanceOf', [DEAD_ADDRESS])
+    if (info.version !== 'v2') return evaluateDeadDeposit(deadShares)
+    const [deadAssets, totalAssets, totalSupply, virtualShares] = await Promise.all([
+      this.read<bigint>(this.vault, ERC4626_ABI, 'convertToAssets', [deadShares]),
+      this.read<bigint>(this.vault, VAULT_V2_ABI, '_totalAssets'),
+      this.read<bigint>(this.vault, ERC4626_ABI, 'totalSupply'),
+      this.read<bigint>(this.vault, VAULT_V2_ABI, 'virtualShares'),
+    ])
+    return evaluateDeadDeposit(deadShares, { deadAssets, totalAssets, totalSupply, virtualShares })
+  }
+
   private async assertAsset(token: string | undefined): Promise<VaultInfo> {
     const info = await this.getVault()
     if (token !== undefined && token !== 'native' && (!isAddress(token) || getAddress(token) !== info.asset.address)) {
@@ -172,6 +191,7 @@ export class MorphoVaultProtocolEvm extends MorphoBase<MorphoVaultConfig> {
   async planSupply(o: MorphoVaultSupplyOptions): Promise<{ info: VaultInfo; approvals: Tx[]; tx: Tx; sharesOut: bigint }> {
     const amount = toAmount(o.amount)
     const info = await this.assertAsset(o.token)
+    await this.assertDeadDeposit(info.name, 'vault', this.vault)
     const receiver = o.onBehalfOf ? getAddress(o.onBehalfOf) : await this.me()
     if (info.version === 'v2') {
       // V2 answers 0 from maxDeposit for everyone; its gates are readable, its caps revert inside

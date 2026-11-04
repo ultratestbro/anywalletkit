@@ -2,7 +2,8 @@
 // Read-only check against Base: the biggest listed USDC vault (from the Morpho
 // API) is verified against the factories and described on-chain; the live
 // cbBTC/USDC market is resolved from its id, its state accrued, position read,
-// and a supply quote proven with eth_call. Nothing is sent. RPC: MORPHO_RPC.
+// and a supply quote proven with eth_call. Both must pass the dead-deposit rule
+// (shares at 0x…dEaD) the supply path enforces. Nothing is sent. RPC: MORPHO_RPC.
 import { createMockAccount } from '@anywalletkit/conformance'
 import { MorphoApi, MorphoMarketProtocolEvm, MorphoVaultProtocolEvm } from '../dist/index.js'
 
@@ -28,6 +29,9 @@ const vault = new MorphoVaultProtocolEvm(account, { chainId, vault: top.address,
 const info = await vault.getVault()
 console.log('  ', { version: info.version, factory: info.factory, name: info.name, asset: info.asset.symbol, totalAssets: String(info.totalAssets), fees: info.fees, timelock: info.timelockSeconds, sharePriceWad: String(info.sharePriceWad) })
 console.log('   apy', (await vault.getApy()).toFixed(3), '% · position', await vault.getPosition())
+const vaultDead = await vault.getDeadDeposit()
+console.log('   deadDeposit', vaultDead)
+if (!vaultDead.ok) throw new Error(`${info.name} fails the dead-deposit rule: supply would be refused`)
 try { console.log('   quoteSupply', await vault.quoteSupply({ amount: 10n ** 6n })) } catch (e) { console.log('   quoteSupply →', e.name, e.message) }
 
 const MARKET = MARKET_ENV ?? (await api.listMarkets({ chainId, first: 1 }))[0]?.id
@@ -39,5 +43,8 @@ console.log('  ', { loan: m.loan.symbol, collateral: m.collateral?.symbol, lltv:
 const stats = await market.getStats()
 console.log('   api', stats && { supplyApy: stats.supplyApy?.toFixed(3), borrowApy: stats.borrowApy?.toFixed(3), utilization: stats.utilization?.toFixed(4), listed: stats.listed })
 console.log('   position', await market.getPosition())
+const marketDead = await market.getDeadDeposit()
+console.log('   deadDeposit', marketDead)
+if (!marketDead.ok) throw new Error(`market ${MARKET} fails the dead-deposit rule: supply would be refused`)
 try { console.log('   quoteSupply', await market.quoteSupply({ amount: 10n ** 6n })) } catch (e) { console.log('   quoteSupply →', e.name, e.message) }
 console.log('ok')

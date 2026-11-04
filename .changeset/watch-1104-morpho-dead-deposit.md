@@ -1,0 +1,7 @@
+---
+"@anywalletkit/protocol-lending-morpho-evm": minor
+---
+
+Supplies and deposits check the dead-deposit rule that Morpho's own SDK applies (morpho-sdk 9.2.0). A Blue market must hold at least 1e9 supply shares at `0x…dEaD` (`Morpho.position(id, 0x…dEaD)`). A Vault V1 or V2 must hold at least 1e9 shares there (`balanceOf`). A Vault V2's dead shares must also be worth at least 1e6 base units (`convertToAssets`), and its share price must be above 1 / (10 × virtualShares). Without a dead deposit, a nearly empty market or vault can have its share price inflated, so the next depositor's assets round down to nothing. New: `getDeadDeposit()` on both classes, `MorphoDeadDepositError`, `DEAD_ADDRESS`, `MIN_DEAD_SHARES`, `MIN_VAULT_V2_DEAD_ASSETS`, `evaluateDeadDeposit`, and the config option `allowWithoutDeadDeposit`. Withdrawals, collateral, borrows and repayments are not gated by the rule.
+
+**Breaking:** `supply` / `quoteSupply` into a market or vault that fails the rule now throws `MorphoDeadDepositError` (`code: 'InsufficientDeadDeposit'`, with `reason`, `observed`, `required`) before anything is approved or sent. Pass `allowWithoutDeadDeposit: true` to proceed anyway. On 2026-11-04, the listed targets this refuses were: idle markets (no collateral token) on every chain; HyperEVM wstHYPE/USDC 0xf5d30dcd…; three Ethereum V1 vaults (SwissBorg Morpho USDC, Steakhouse Ethena USDtb, Flagship USDT); and two cbBTC Vault V2s whose dead shares are worth a few hundred sats (Base Moonwell Frontier cbBTC, Monad Hyperithm cbBTC Apex).
