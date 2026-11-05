@@ -1,0 +1,37 @@
+{
+  "note": "Plain scrvUSD transfer(\u2026) on Ethereum (etherscan.io/tx/0x42029d62\u2026): moves existing shares, no deposit or withdrawal",
+  "own": [
+    "0xecabc1bcce3ea7072fdeb51d758842103d61de3e"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x42029d62f7d1c58eeeae8eefead2602b852c8e51665e3e70b3425f67e4ac3868",
+    "time": 1793896739,
+    "status": "confirmed",
+    "address": "0xecabc1bcce3ea7072fdeb51d758842103d61de3e",
+    "from": "0xecabc1bcce3ea7072fdeb51d758842103d61de3e",
+    "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+        "from": "0xecabc1bcce3ea7072fdeb51d758842103d61de3e",
+        "to": "0x834fdb7ac614b1b20ba389a8065dcf30ebb47c6a",
+        "amount": "8663118017666784806411",
+        "standard": "erc20",
+        "symbol": "scrvUSD",
+        "decimals": 18
+      }
+    ],
+    "block": "26349881",
+    "fee": "133785690606620",
+    "call": {
+      "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+      "selector": "0xa9059cbb",
+      "data": "0xa9059cbb000000000000000000000000834fdb7ac614b1b20ba389a8065dcf30ebb47c6a0000000000000000000000000000000000000000000001d5a0e9e1e6cae9c60b"
+    }
+  },
+  "expect": {
+    "kind": "send"
+  }
+}

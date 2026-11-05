@@ -1,0 +1,60 @@
+{
+  "note": "scrvUSD deposit(753 000 crvUSD, self) by 0x2a69\u2026378d \u2014 Ethereum block 26333366, etherscan.io/tx/0xf0d735b1\u2026",
+  "own": [
+    "0x2a691723fa94b2e38c1cda37dc64c7298f73378d"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0xf0d735b14b6f2212fe9850689d8ec341675a62c16a1fd725c6e12b197b6d8a5d",
+    "time": 1793697983,
+    "status": "confirmed",
+    "address": "0x2a691723fa94b2e38c1cda37dc64c7298f73378d",
+    "from": "0x2a691723fa94b2e38c1cda37dc64c7298f73378d",
+    "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xf939e0a03fb07f59a73314e73794be0e57ac1b4e",
+        "from": "0x2a691723fa94b2e38c1cda37dc64c7298f73378d",
+        "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+        "amount": "753000000000000000000000",
+        "standard": "erc20",
+        "symbol": "crvUSD",
+        "decimals": 18
+      },
+      {
+        "token": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x2a691723fa94b2e38c1cda37dc64c7298f73378d",
+        "amount": "677457969866222208833493",
+        "standard": "erc20",
+        "symbol": "scrvUSD",
+        "decimals": 18
+      }
+    ],
+    "block": "26333366",
+    "fee": "4398849623100",
+    "call": {
+      "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+      "selector": "0x6e553f65",
+      "data": "0x6e553f65000000000000000000000000000000000000000000009f7436382303d4a000000000000000000000000000002a691723fa94b2e38c1cda37dc64c7298f73378d"
+    }
+  },
+  "expect": {
+    "kind": "supply",
+    "title": "Deposited crvUSD",
+    "assetsIn": [
+      {
+        "token": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+        "amount": "677457969866222208833493"
+      }
+    ],
+    "assetsOut": [
+      {
+        "token": "0xf939e0a03fb07f59a73314e73794be0e57ac1b4e",
+        "amount": "753000000000000000000000"
+      }
+    ],
+    "counterparty": "0x0655977feb2f289a4ab78af67bab0d17aab84367"
+  }
+}

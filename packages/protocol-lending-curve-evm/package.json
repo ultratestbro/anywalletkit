@@ -1,0 +1,38 @@
+{
+  "name": "@anywalletkit/protocol-lending-curve-evm",
+  "version": "0.0.0",
+  "description": "Curve for @anywalletkit/wallet-evm accounts: Savings crvUSD (scrvUSD) on Ethereum as a LendingProtocol. Deposit crvUSD for scrvUSD shares, redeem them with zero allowed loss. The vault is pinned on-chain (EIP-1167 clone of the pinned Yearn VaultV3 3.0.4 implementation, its code hash, apiVersion, asset) and checked for shutdown before every deposit; the Curve API only decorates the APY, bounded by the on-chain profit-unlocking rate.",
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-lending-curve-evm" },
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "module.json", "LICENSE"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": { "viem": "^2.57.2" },
+  "peerDependencies": { "@anywalletkit/core": "workspace:*" },
+  "devDependencies": {
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/history-evm": "workspace:*",
+    "@types/node": "^22",
+    "vitest": "^5.0.3"
+  },
+  "keywords": ["protocol", "lending", "curve", "crvusd", "scrvusd", "savings", "yearn", "vault", "erc-4626", "evm", "lending-protocol", "anywalletkit"],
+  "publishConfig": { "access": "public", "provenance": true }
+}

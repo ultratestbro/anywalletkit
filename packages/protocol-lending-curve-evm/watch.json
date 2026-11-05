@@ -1,0 +1,36 @@
+{
+  "module": "@anywalletkit/protocol-lending-curve-evm",
+  "sources": [
+    {
+      "id": "scrvusd-vault-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367",
+      "label": "scrvUSD vault (EIP-1167 clone) · Ethereum"
+    },
+    {
+      "id": "scrvusd-implementation-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0xd8063123BBA3B480569244AE66BFE72B6c84b00d",
+      "label": "scrvUSD implementation (Yearn VaultV3 3.0.4) · Ethereum"
+    },
+    {
+      "id": "api-savings-statistics-schema",
+      "type": "http-json",
+      "url": "https://prices.curve.finance/feeds-docs/openapi.json",
+      "path": "components.schemas.SavingsStatsResponse",
+      "label": "Curve prices API · /v1/crvusd/savings/statistics response schema"
+    },
+    {
+      "id": "docs-scrvusd-overview",
+      "type": "http-text",
+      "url": "https://docs.curve.finance/developer/scrvusd/overview",
+      "between": [
+        "<article",
+        "</article>"
+      ],
+      "label": "Curve docs · Savings crvUSD (scrvUSD) overview"
+    }
+  ]
+}
