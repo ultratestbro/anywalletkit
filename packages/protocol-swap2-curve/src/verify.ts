@@ -34,6 +34,8 @@ export function curveQuoteCheck(tables: CurveTables = {}): (params: QuoteParams,
     if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no router call";
     if (!isAddress(tx.to) || lc(tx.to) !== lc(d.router)) return `the call targets ${tx.to}, not the Curve router`;
     if (tx.chainId !== undefined && tx.chainId !== chainId) return `the call is for chain ${tx.chainId}`;
+    // The chain the build's on-chain checks and the receipt tracking run on (`curve:<chainId>`): this request's.
+    if (quote.intentId !== `curve:${chainId}`) return `the quote names ${String(quote.intentId).slice(0, 40)}, not curve:${chainId}`;
     const src = sourceAssetOf(params);
     if (!src) return `unknown source token ${params.sourceToken}`;
     const nativeIn = !src.contract;
@@ -158,6 +160,7 @@ export function curveOnChain(opts: CurveOnChainOptions) {
     if (tx.data.length !== quoted.data.length || lc(tx.data) !== lc(quoted.data)) return "the transaction is not the quoted router call";
     if (!isAddress(tx.to) || lc(tx.to) !== lc(d.router) || lc(quoted.to) !== lc(d.router)) return `the transaction calls ${tx.to}, not the Curve router`;
     if ((tx.value ?? "0") !== (quoted.value ?? "0")) return "the transaction's value is not the quote's";
+    if ((tx.chainId !== undefined && tx.chainId !== chainId) || (quoted.chainId !== undefined && quoted.chainId !== chainId)) return `the transaction is not for chain ${chainId}`;
     if ((tx.approvalAddress ?? "").toLowerCase() !== (quoted.approvalAddress ?? "").toLowerCase()) return "the transaction's approval is not the quote's";
     const call = decodeExchange(d.family, quoted.data);
     if (!call || call.selector !== EXCHANGE_SELECTOR[d.family]) return "the quoted call is not the explicit-receiver exchange";

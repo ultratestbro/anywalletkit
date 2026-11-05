@@ -94,6 +94,11 @@ describe("curveVerifyQuote: §5.3 H — what must be refused", () => {
     expect(verify(p1(), quoteFor(D1, USDC_USDT, {approval: null}))).toMatch(/approves exactly the Curve router/);
     expect(verify(p1(), quoteFor(D1, USDC_USDT, {value: "1"}))).toMatch(/attaches no value/);
   });
+  it("a quote naming another chain than the request's (its on-chain checks and tracking would run there)", () => {
+    // The same router address serves OP Mainnet, Polygon, Gnosis and Avalanche.
+    const a = args("ng5", [[USDC, TRIPOOL, USDT, [1n, 2n, 1n, 1n, 3n]]]);
+    expect(verify(p1(), {...quoteFor(D1, a), intentId: "curve:137"})).toMatch(/names curve:137, not curve:1/);
+  });
   it("a call to anything but the pinned router (an older router included), selling another amount", () => {
     expect(verify(p1(), quoteFor(D1, USDC_USDT, {to: "0x16C6521Dff6baB339122a0FE25a9116693265353"}))).toMatch(/not the Curve router/);
     expect(verify(p1(), quoteFor(D1, USDC_USDT, {amount: AMOUNT - 1n}))).toMatch(/sells 999999999, not the 1000000000 input/);

@@ -22,6 +22,9 @@ describe("Curve provider: quotes", () => {
     // 3pool direct: 1000 USDC × 0.999 − 1 wei.
     expect(q).toMatchObject({provider: "curve", intentId: "curve:1", destAmount: "998999999", minDestAmount: "998000999", depositAddress: ""});
     expect(q!.txRequest).toMatchObject({to: D1.router, value: "0", chainId: 1, approvalAddress: D1.router});
+    // No gas limit: a per-step formula ran swaps out of gas (scrvUSD deposit, Monad); the wallet estimates the call.
+    expect(q!.txRequest!.gasLimit).toBeUndefined();
+    expect((await make().buildDeposit(q!)).gasLimit).toBeUndefined();
     expect(q!.txRequest!.data!.slice(0, 10)).toBe("0xc872a3c5");
     const c = steps(q!.txRequest!.data!);
     expect(c.receiver).toBe(ME);
@@ -196,6 +199,7 @@ describe("Curve provider: preflight and tracking", () => {
     const tx = await p.buildDeposit(q!);
     await expect(p.preflightDeposit!(q!, {...tx, data: `${tx.data!.slice(0, -2)}00`})).rejects.toThrow(/not the quoted router call/);
     await expect(p.preflightDeposit!(q!, {...tx, value: "1"})).rejects.toThrow(/value is not the quote's/);
+    await expect(p.preflightDeposit!(q!, {...tx, chainId: 10})).rejects.toThrow(/not for chain 1/);
     vi.stubGlobal("fetch", rpcStub({badPoolCode: [TRIPOOL]}));
     await expect(p.preflightDeposit!(q!, tx)).rejects.toThrow(/pool 3pool .* is not the pinned code/);
     vi.stubGlobal("fetch", rpcStub({coins: {[lc(TRIPOOL)]: {2: "0x810ecC2aa8b798F28633e1586a718cd48083Bae9"}}}));

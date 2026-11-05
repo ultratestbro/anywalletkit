@@ -30,11 +30,6 @@ import {curveOnChain, curveQuoteCheck} from "./verify.js";
 
 /** Long enough for an approval to be mined on Ethereum; the router has no deadline of its own. */
 const DEFAULT_TTL_MS = 180_000;
-/** Router overhead (transfer in, transfer out) and per-step gas, from estimateGas on Ethereum v1.2 (2026-11-05:
- *  native → USDT one pool 224 180, ETH → WETH → crvUSD 283 245) with headroom. */
-const GAS_BASE = 120_000n;
-const GAS_POOL = 180_000n;
-const GAS_PSEUDO = 60_000n;
 
 export interface CurveProviderConfig {
   enabled?: boolean;
@@ -164,10 +159,12 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
         const args = routeArgs(d.family, route);
         const recipient = getAddress(params.destAddress);
         const data = encodeExchange(d.family, args, amountIn, minOut, recipient);
-        const poolSteps = BigInt(routePools(args).length);
-        const pseudoSteps = BigInt(route.steps.length) - poolSteps;
-        const gasLimit = GAS_BASE + GAS_POOL * poolSteps + GAS_PSEUDO * pseudoSteps;
-
+        // No gas limit: get_dy measures no gas, and a per-step formula was wrong both ways. Run at its limit
+        // (eth_call, 2026-11-05) the swap ran out of gas — crvUSD → scrvUSD on Ethereum needs 180 778 (formula
+        // 180 000: the vault's deposit), every Monad route 345–352k for one stable-ng pool (formula 300 000) — while a
+        // limit with room for the dearest pool overcharges where the limit is what is paid (Monad). The wallet
+        // estimates the exact call with headroom right before broadcast, after any approval (as for Uniswap without
+        // a quoter figure, THORChain and Chainflip).
         const quote: Quote = {
           provider: "curve",
           intentId: `curve:${chainId}`,
@@ -178,7 +175,6 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
             data,
             value: nativeIn ? amountIn.toString() : "0",
             chainId,
-            gasLimit: gasLimit.toString(),
             ...(nativeIn ? {} : {approvalAddress: d.router}),
           },
           sourceAmount: amountIn.toString(),
