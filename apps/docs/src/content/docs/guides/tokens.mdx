@@ -71,7 +71,8 @@ Balances are read with the same `getTokenBalance(address)` as catalog tokens.
   the catalog. It is off by default.
 - **Decimals come from the chain.** The engine reads them once with `getTokenInfo`. A
   `fromTokenDecimals` that disagrees is refused.
-- **Which providers answer.** LI.FI, Uniswap, Balancer, Fynd and Jupiter trade any token.
+- **Which providers answer.** LI.FI, Uniswap, Balancer, Fynd and Jupiter trade any token; Curve
+  trades one only when a pool of its pinned allowlist holds it.
   NEAR Intents, THORChain, Chainflip, Omniston, CCTP and USDT0 only trade their own lists, so
   they stay out of these routes.
 - **Approvals.** The approval goes to the token the user named, for exactly the amount, to the

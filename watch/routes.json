@@ -294,6 +294,54 @@
    "src": "eip155:1:USDC",
    "dst": "eip155:1:ETH",
    "amount": "100"
+  },
+  {
+   "id": "curve:eth-usdc>eth-usdt",
+   "provider": "curve",
+   "src": "eip155:1:USDC",
+   "dst": "eip155:1:USDT",
+   "amount": "100",
+   "note": "3pool"
+  },
+  {
+   "id": "curve:eth-usdc>eth-crvusd",
+   "provider": "curve",
+   "src": "eip155:1:USDC",
+   "dst": "eip155:1:crvUSD",
+   "amount": "100",
+   "note": "crvUSD/USDC"
+  },
+  {
+   "id": "curve:eth-eth>eth-steth",
+   "provider": "curve",
+   "src": "eip155:1:ETH",
+   "dst": "eip155:1:stETH",
+   "amount": "0.05",
+   "note": "ETH/stETH (native in)"
+  },
+  {
+   "id": "curve:eth-crvusd>eth-scrvusd",
+   "provider": "curve",
+   "src": "eip155:1:crvUSD",
+   "dst": "eip155:1:scrvUSD",
+   "amount": "100",
+   "note": "router v1.2 ERC-4626 hop (swap_type 9)"
+  },
+  {
+   "id": "curve:arb-usdc>arb-usdt0",
+   "provider": "curve",
+   "src": "eip155:42161:USDC",
+   "dst": "eip155:42161:USDT0",
+   "amount": "100",
+   "note": "Strategic USD Reserves"
+  },
+  {
+   "id": "curve:base-usdc>base-crvusd",
+   "provider": "curve",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:8453:crvUSD",
+   "amount": "100",
+   "note": "4pool"
   }
  ],
  "omniston": {

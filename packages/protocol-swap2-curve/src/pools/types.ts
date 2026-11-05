@@ -1,5 +1,6 @@
-/** A 0x-prefixed hex string (address, code hash). */
-export type Hex = `0x${string}`
+/** A 0x-prefixed hex string (address, code hash): viem's `Hex`, so the two never clash. */
+import type {Hex} from "viem";
+export type {Hex};
 /** One curated Curve pool. Addresses are EIP-55 checksummed; native ETH-like coin = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE. */
 export interface CurvePool {
   address: Hex

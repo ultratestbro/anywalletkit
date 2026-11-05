@@ -219,6 +219,9 @@ importers:
       '@anywalletkit/protocol-lending-aave-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-lending-aave-evm
+      '@anywalletkit/protocol-lending-curve-evm':
+        specifier: workspace:*
+        version: link:../../packages/protocol-lending-curve-evm
       '@anywalletkit/protocol-lending-kamino-solana':
         specifier: workspace:*
         version: link:../../packages/protocol-lending-kamino-solana
@@ -255,6 +258,9 @@ importers:
       '@anywalletkit/protocol-swap2-core':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-core
+      '@anywalletkit/protocol-swap2-curve':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-curve
       '@anywalletkit/protocol-swap2-fynd':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-fynd

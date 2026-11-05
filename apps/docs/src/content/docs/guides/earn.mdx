@@ -12,7 +12,7 @@ Earn modules come in two shapes, and every module of a shape has the same method
 | Interface | Modules | Flow |
 |---|---|---|
 | `StakingProtocol` | Lido (ETH), SSV Network, Tonstakers (TON), SPL stake pools (Jito on Solana), native SOL staking, native MON staking (Monad) | Stake → request a withdrawal → wait for the queue → claim |
-| `LendingProtocol` | Aave v3, Morpho, Mellow, Kamino | Supply / withdraw, and on markets that allow it, borrow / repay |
+| `LendingProtocol` | Aave v3, Morpho, Mellow, Kamino, Curve (Savings crvUSD) | Supply / withdraw, and on markets that allow it, borrow / repay |
 
 This page uses Lido and Aave on Ethereum. The other modules work the same way, with
 different packages and chains (see [Packages](/getting-started/packages/#earn)). Snippets
@@ -174,6 +174,40 @@ or pass the validator in `validators`, so the withdrawal is found again.
 :::note[Policies]
 Staking writes go to the precompile `0x0000000000000000000000000000000000001000`; a Monad
 `allowlist` must include it.
+:::
+
+## Savings crvUSD (scrvUSD)
+
+`@anywalletkit/protocol-lending-curve-evm` deposits crvUSD into Savings crvUSD (scrvUSD) on Ethereum,
+an unmodified Yearn V3 vault that holds its crvUSD idle and earns a share of crvUSD borrowing fees.
+
+```sh
+npm install @anywalletkit/protocol-lending-curve-evm @anywalletkit/wallet-evm
+```
+
+```ts
+import { ScrvUsdProtocolEvm } from '@anywalletkit/protocol-lending-curve-evm'
+
+const scrvusd = new ScrvUsdProtocolEvm(ethereumAccount)
+await scrvusd.quoteSupply({ amount }); await scrvusd.supply({ amount })   // crvUSD in, scrvUSD shares out
+const { source, apy } = await scrvusd.getApyDetails()                      // 'chain' | 'api' | 'api-clamped'
+await scrvusd.getPosition(); await scrvusd.withdraw({ amount: 'max' })
+```
+
+Before anything moves, the module checks the vault on chain: the chain is Ethereum, the vault is an
+EIP-1167 clone of the pinned VaultV3 3.0.4 implementation (code hash), `apiVersion` is 3.0.4 and the
+asset is crvUSD. It refuses deposits into a shut-down vault or one that has started lending to
+strategies (`allowStrategies` opts in); withdrawals stay open and always pass `max_loss = 0`. An
+amount above what the vault can pay now is refused with the available amount, while `'max'` redeems
+what it can and says whether that was everything (`complete`). Profit from each weekly report
+unlocks linearly over 7 days, so the APY is a variable projection: the Curve API's figure is shown
+only when it lies within max(0.5 points, 10 %) of the on-chain one, and is clamped to that band
+otherwise. Between the full unlock and the next report the on-chain figure is 0, so the API figure
+then shows as at most 0.5 %.
+
+:::note[Policies]
+An Ethereum `allowlist` must include the vault `0x0655977FEb2f289A4aB78af67BAB0d17aAb84367` and
+crvUSD `0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E` (the approval).
 :::
 
 ## Module-specific extras

@@ -9,7 +9,9 @@ provider of the router.
 
 Chains (18): Ethereum (router v1.2), Arbitrum, Base, OP Mainnet, Polygon, Gnosis, Avalanche, BNB Chain — the `[5][5]`
 routers; Sonic, Unichain, HyperEVM, Mantle, Monad, Plasma, Robinhood Chain (v1.1.1), Ink, X Layer, Plume — the `[4][5]`
-routers, which drive NG pools only. A chain is offered when it has a pinned router, allowlisted pools and an RPC.
+routers, which drive NG pools only. A chain is offered when it has a pinned router, allowlisted pools and an RPC: today
+Ethereum, Arbitrum, Base, OP Mainnet, Gnosis, Monad, Plasma and X Layer (the generated allowlist has no pool that
+passes the rules on the others; `module.json` lists only the chains offered).
 
 ## Install
 

@@ -4,6 +4,7 @@ import {describe, expect, it} from "vitest";
 import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {CURVE_DEPLOYMENTS, CURVE_LEGACY_ROUTERS} from "../src/deployments.js";
+import {CURVE_POOLS} from "../src/pools/index.js";
 
 interface Source {id: string; type: string; chainId?: number; address?: string; to?: string; signature?: string; args?: unknown[]; decode?: string; format?: string; pins?: {from: string; export: string; group: string; roles: Record<string, string>}}
 const manifest = JSON.parse(readFileSync(fileURLToPath(new URL("../watch.json", import.meta.url)), "utf8")) as {module: string; sources: Source[]};
@@ -42,6 +43,11 @@ describe("watch.json coverage", () => {
     expect(j).toHaveLength(1);
     expect(j[0]!.pins).toEqual({from: "dist/index.js", export: "CURVE_DEPLOYMENTS", group: "$key", roles: {router: "router", addressProvider: "address-provider"}});
     for (const field of Object.keys(j[0]!.pins!.roles)) for (const d of Object.values(CURVE_DEPLOYMENTS)) expect(d).toHaveProperty(field);
+  });
+  it("module.json (the registry entry) names exactly the chains the provider offers: a pinned router and allowlisted pools", () => {
+    const listed = (JSON.parse(readFileSync(fileURLToPath(new URL("../module.json", import.meta.url)), "utf8")) as {chains: string[]}).chains;
+    const offered = Object.entries(CURVE_POOLS).filter(([id, t]) => t.pools.length && CURVE_DEPLOYMENTS[Number(id)]).map(([id]) => `eip155:${id}`);
+    expect([...listed].sort()).toEqual(offered.sort());
   });
   it("ids are unique", () => {
     const ids = manifest.sources.map((s) => s.id);

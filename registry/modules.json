@@ -1,7 +1,7 @@
 {
   "$schema": "./modules.schema.json",
-  "generatedAt": "2026-10-26",
-  "count": 25,
+  "generatedAt": "2026-11-05",
+  "count": 27,
   "modules": [
     {
       "name": "@anywalletkit/protocol-approvals-evm",
@@ -49,6 +49,21 @@
       "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-lending-aave-evm",
       "addedAt": "2026-10-10"
+    },
+    {
+      "name": "@anywalletkit/protocol-lending-curve-evm",
+      "type": "lending",
+      "chains": [
+        "eip155:1"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
+      "path": "packages/protocol-lending-curve-evm",
+      "addedAt": "2026-11-05"
     },
     {
       "name": "@anywalletkit/protocol-lending-kamino-solana",
@@ -274,6 +289,29 @@
       "path": "packages/protocol-swap2-chainflip",
       "description": "Chainflip vault swaps: native BTC / ETH / SOL / TRX and USDC / USDT across Ethereum, Arbitrum, Solana, Tron and Bitcoin via Chainflip's public backend (0 bps, no account). Sources: Ethereum, Arbitrum, Tron (USDT → the Vault with the swap in the note); the encoder's output is decoded and checked before signing; fill-or-kill refunds.",
       "addedAt": "2026-10-20"
+    },
+    {
+      "name": "@anywalletkit/protocol-swap2-curve",
+      "type": "swap2",
+      "chains": [
+        "eip155:1",
+        "eip155:10",
+        "eip155:100",
+        "eip155:143",
+        "eip155:196",
+        "eip155:42161",
+        "eip155:8453",
+        "eip155:9745"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
+      "path": "packages/protocol-swap2-curve",
+      "description": "Curve same-chain swaps from the contracts only (Router NG get_dy + exchange) over a curated, pinned pool allowlist: no API, no key, no fee; router code hash, pools and coins checked on-chain.",
+      "addedAt": "2026-11-05"
     },
     {
       "name": "@anywalletkit/protocol-swap2-fynd",
