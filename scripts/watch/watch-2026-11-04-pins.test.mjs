@@ -143,6 +143,10 @@ test("curve-deployments: routers, registries, factories, crvUSD / scrvUSD / CRV 
     "9745 router 0xFF5Cb29241F002fFeD2eAa224e3e996D24A6E8d1: not listed", // Plasma is not in this trimmed feed
   ]);
 
+  // Chain keys are feed data: one named like an Object.prototype member keeps its own key as the group.
+  const odd = RECORD_FORMATS["curve-deployments"](JSON.stringify({constructor: {amm: {"router & zap": {router: "0xFF5Cb29241F002fFeD2eAa224e3e996D24A6E8d1"}}}, toString: {integrations: {"address-provider": "0x4574921eb950d3Fd5B01562162EC566Cb8bc3648"}}}));
+  assert.deepEqual(odd.records.map((r) => `${r.group} ${r.id}`), ["constructor constructor.router", "toString toString.address-provider"]);
+
   assert.throws(() => RECORD_FORMATS["curve-deployments"]("[]"), /not a deployments object/);
   assert.throws(() => RECORD_FORMATS["curve-deployments"](JSON.stringify({_instructions: "x", ethereum: {tokens: {}}})), /no routers/);
   assert.throws(() => RECORD_FORMATS["curve-deployments"]("<html>"), SyntaxError);

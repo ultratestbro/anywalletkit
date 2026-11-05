@@ -142,8 +142,10 @@ export const RECORD_FORMATS = {
     if (!j || typeof j !== "object" || Array.isArray(j)) throw new Error("not a deployments object");
     const chains = Object.keys(j).filter((k) => !k.startsWith("_") && j[k] && typeof j[k] === "object" && !Array.isArray(j[k]));
     const records = [];
+    // Chain keys come from the feed: an own-key lookup, so "constructor" or "toString" stays its key, not Object.prototype's.
+    const groupOf = (chain) => String(Object.prototype.hasOwnProperty.call(CURVE_CHAIN_IDS, chain) ? CURVE_CHAIN_IDS[chain] : chain);
     const add = (chain, contract, what, address) => {
-      if (isAddress(address)) records.push({group: String(CURVE_CHAIN_IDS[chain] ?? chain), contract, address, id: `${chain}.${what}`});
+      if (isAddress(address)) records.push({group: groupOf(chain), contract, address, id: `${chain}.${what}`});
     };
     for (const chain of chains) {
       const c = j[chain];
