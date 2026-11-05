@@ -8,6 +8,7 @@ import {fileURLToPath, pathToFileURL} from "node:url";
 import {createHash} from "node:crypto";
 import {esc, firstBlocks, fitLines, readCapped, safeLink, visibleText} from "./html-text.mjs";
 import {RECORD_FORMATS, checkPins, decodeFacets, pinsFromModule, selectorsFromSource} from "./pins.mjs";
+import {callData, decodeResult} from "./evm-call.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, "../..");
@@ -116,6 +117,25 @@ const F = {
     if (!code || code === "0x") throw new Error("no code at address");
     const meta = {codeHash: sha(code).slice(0, 16), bytes: (code.length - 2) / 2};
     return {value: meta.codeHash, meta};
+  },
+  async "evm-call"(s) {
+    // One read-only eth_call: a view the module relies on (a registry entry, version(), a pause flag), decoded so the
+    // digest names the old and new answer. A revert is a reading too (the view is gone, or now guarded) and is compared
+    // like any answer; any other failure fails the source and keeps the previous value, so a flaky RPC is never a change.
+    const url = rpcFor(s.chainId); if (!url) throw new Error(`no RPC for chain ${s.chainId}`);
+    if (typeof s.to !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(s.to)) throw new Error("evm-call: `to` is not an address");
+    const data = callData(s);
+    const call = s.signature ? `${s.signature}${s.args?.length ? ` [${s.args.join(", ")}]` : ""}` : data.slice(0, 10);
+    let hex;
+    try { hex = await rpc(url, "eth_call", [{to: s.to, data}, "latest"]); }
+    catch (e) {
+      if (!(e.rpcError && /revert/i.test(e.message))) throw e;
+      return {value: "reverted", meta: {call, reverted: e.message.slice(0, 120)}};
+    }
+    const result = decodeResult(hex, s.decode ?? "raw");
+    // A long raw answer is compared by its hash and shown cut; decoded values are compared and shown as they are.
+    const long = (s.decode ?? "raw") === "raw" && hex.length > 514;
+    return {value: long ? `sha256:${sha(result)}` : canonical(result), meta: {call, result: long ? `${result.slice(0, 66)}… (${(hex.length - 2) / 2} bytes, ${sha(result).slice(0, 16)})` : result}};
   },
   async "solana-program"(s) {
     const acc = await rpc(SOL_RPC, "getAccountInfo", [s.programId, {encoding: "jsonParsed"}]);
@@ -252,6 +272,11 @@ function describe(s, before, after) {
       return parts.join("; ") || "storage changed";
     }
     case "evm-code": return `code ${short(b.codeHash)} → ${short(a.codeHash)} (${b.bytes ?? "?"} → ${a.bytes} bytes)`;
+    case "evm-call": {
+      const fmt = (v) => (Array.isArray(v) ? `(${v.map(fmt).join(", ")})` : String(v));
+      const show = (m) => (m.reverted ? "reverted" : m.result === undefined ? "—" : fmt(m.result)).slice(0, 120);
+      return `${a.call ?? b.call ?? "eth_call"}: ${show(b)} → ${show(a)}`;
+    }
     case "solana-program": return `last deploy slot ${b.slot ?? "—"} → ${a.slot}${b.authority !== a.authority ? `; authority ${b.authority ?? "—"} → ${a.authority ?? "—"}` : ""}`;
     case "ton-code": return `code ${short(b.codeHash)} → ${short(a.codeHash)}`;
     case "github-releases": return `${b.tag ?? "—"} → ${a.tag}${a.at ? ` (${a.at})` : ""}${a.prerelease ? " pre-release" : ""}${a.note?.startsWith("default branch") ? ` — ${a.note.slice(16)}` : ""}`;
@@ -311,15 +336,17 @@ function rebaseline(s, prev, r) {
  * Where a source reads from (chain, contract, program, page, file). Stored with each value: when the manifest points
  * an existing id somewhere else (Uniswap QuoterV2 moved to the active deployments, triage 2026-11-04), the old value
  * belongs to the old target, so the source is re-baselined and listed as re-pointed instead of reported as changed.
- * EVM addresses compare case-insensitively (checksummed vs lowercase is the same contract).
+ * An `evm-call` reading belongs to its call as well (`to`, `data` / `signature` + `args`, `decode`): another call under the
+ * same id is a new baseline too. EVM addresses compare case-insensitively (checksummed vs lowercase is the same contract).
  */
-const TARGET_KEYS = ["chainId", "address", "programId", "url", "repo", "path", "ref"];
+const TARGET_KEYS = ["chainId", "address", "to", "data", "signature", "args", "decode", "programId", "url", "repo", "path", "ref"];
 function targetOf(s) {
   const t = {};
   for (const k of TARGET_KEYS) if (s[k] != null) t[k] = typeof s[k] === "string" && /^0x[0-9a-f]{40}$/i.test(s[k]) ? s[k].toLowerCase() : s[k];
   return t;
 }
-const showTarget = (t) => [t.chainId != null ? `chain ${t.chainId}` : "", t.address ?? t.programId ?? t.url ?? "", t.repo ? `${t.repo}${t.path ? `/${t.path}` : ""}${t.ref ? `@${t.ref}` : ""}` : ""].filter(Boolean).join(" ") || "—";
+const showCall = (t) => (t.signature ? `${t.signature}${t.args?.length ? ` [${t.args.join(", ")}]` : ""}` : t.data ? t.data.slice(0, 10) : "") + (t.decode ? ` as ${[].concat(t.decode).join(",")}` : "");
+const showTarget = (t) => [t.chainId != null ? `chain ${t.chainId}` : "", t.address ?? t.to ?? t.programId ?? t.url ?? "", showCall(t), t.repo ? `${t.repo}${t.path ? `/${t.path}` : ""}${t.ref ? `@${t.ref}` : ""}` : ""].filter(Boolean).join(" ") || "—";
 
 // ── run ────────────────────────────────────────────────────────────────────
 const manifests = loadManifests();
