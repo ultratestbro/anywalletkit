@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   ETH, ageDecision, anchoredTvl, anchorsFor, assetTypeDecision, checksum, coinsMatch, dedupe, fromV1, fromV2, keccakHex, ngMetaTypes, ngPlainOracles, probeAmount, rankAndCap,
-  renderChainFile, renderIndex, routerPoolType, staticFilters, usdOf, vyperEthRisk, assertCurveHost,
+  renderChainFile, renderIndex, routerPoolType, staticFilters, usdOf, vyperEthRisk, assertCurveHost, assetTypeSource,
 } from './build-allowlist.mjs'
 
 const USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
@@ -149,7 +149,7 @@ test('USD value and probe amounts stay in bigint', () => {
 
 test('API rows normalise; duplicates collapse; only curve.finance hosts', () => {
   const v1 = fromV1({ id: '0', address: '0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7', name: 'Curve.fi DAI/USDC/USDT‮', registryId: 'main', factory: true, coins: [{ address: USDC, decimals: '6', usdPrice: 1 }, { address: USDT, decimals: '6', usdPrice: 1 }], usdTotal: 10, creationTs: 0 })
-  assert.equal(v1.factory, null)
+  assert.ok(!('factory' in v1))
   assert.equal(v1.createdAt, null)
   assert.equal(v1.name, 'Curve.fi DAI/USDC/USDT')
   const v2 = fromV2({ id: 'factory_stable_ng-6', address: USDC, registry_id: 'factory_stable_ng', coins: [], tvl: 3 })
@@ -183,4 +183,15 @@ test('TVL counts only anchor coins: a pool of two mispriced tokens is worth noth
   const anchors = anchorsFor(1, { ccChain: () => ({ assets: [{ contract: USDC }, { contract: null }] }) })
   assert.ok(anchors.has(USDC) && anchors.has(ETH.toLowerCase()) && anchors.has('0xf939e0a03fb07f59a73314e73794be0e57ac1b4e'))
   assert.ok(!anchors.has(USDT))
+})
+
+test('stable-ng asset types come from a pinned factory, never from an API-supplied address', () => {
+  const cfg = { factories: ['0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf', '0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F'] }
+  const evil = '0x9999999999999999999999999999999999999999'
+  // A compromised API names its own "factory", which would answer [0, 0] for a pool of ERC-4626 coins.
+  const p = fromV1({ id: 'factory-stable-ng-1', address: USDC, registryId: 'factory-stable-ng', factory: evil, coins: [] })
+  assert.ok(!('factory' in p))
+  assert.equal(assetTypeSource({ ...p, factory: evil }, cfg), cfg.factories[0])
+  // A pool registered through a pinned factory is asked there.
+  assert.equal(assetTypeSource({ ...p, ngFactory: cfg.factories[1] }, cfg), cfg.factories[1])
 })

@@ -30,13 +30,15 @@ export const CAP_OTHER = 40
 // ---------------------------------------------------------------------------------------------
 // Chains: wallet chains where Router NG is deployed (CURVE-INTEGRATION.md §2.2). `v1` = slug on
 // api.curve.finance/v1, `v2` = chain served only by api2.curve.finance. MetaRegistry and the NG
-// factories are from Curve's deployments.json (2026-11-05); the script checks each has code.
+// factories ([stable-ng, twocrypto-ng, tricrypto-ng], in that order) are from Curve's deployments.json
+// (2026-11-05); the script checks each has code.
 // Left out: Arc 5042 (no pools, WETH 0), zkSync 324 (EraVM router ABI unverified), Fraxtal 252
 // (not a wallet chain).
 // ---------------------------------------------------------------------------------------------
 export const CHAINS = [
   { chainId: 1, name: 'Ethereum', family: 'ng5', v1: 'ethereum', rpc: 'https://ethereum-rpc.publicnode.com', metaRegistry: '0xF98B45FA17DE75FB1aD0e7aFD971b0ca00e379fC', factories: ['0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf', '0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F', '0x0c0e5f2fF0ff18a3be9b835635039256dC4B4963'] },
-  { chainId: 42161, name: 'Arbitrum', family: 'ng5', v1: 'arbitrum', rpc: 'https://arbitrum-one-rpc.publicnode.com', metaRegistry: '0x13526206545e2DC7CcfBaF28dC88F440ce7AD3e0', factories: ['0x9AF14D26075f142eb3F292D5065EB3faa646167b', '0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F', '0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8'] },
+  // Arbitrum: publicnode keeps ~128 blocks of state (~30 s at 0.25 s blocks), shorter than the run; arb1 keeps more.
+  { chainId: 42161, name: 'Arbitrum', family: 'ng5', v1: 'arbitrum', rpc: 'https://arb1.arbitrum.io/rpc', metaRegistry: '0x13526206545e2DC7CcfBaF28dC88F440ce7AD3e0', factories: ['0x9AF14D26075f142eb3F292D5065EB3faa646167b', '0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F', '0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8'] },
   { chainId: 8453, name: 'Base', family: 'ng5', v1: 'base', rpc: 'https://base-rpc.publicnode.com', metaRegistry: '0x87DD13Dd25a1DBde0E1EdcF5B8Fa6cfff7eABCaD', factories: ['0xd2002373543Ce3527023C75e7518C274A51ce712', '0xc9Fe0C63Af9A39402e8a5514f9c43Af0322b665F', '0xA5961898870943c68037F6848d2D866Ed2016bcB'] },
   { chainId: 10, name: 'Optimism', family: 'ng5', v1: 'optimism', rpc: 'https://optimism-rpc.publicnode.com', metaRegistry: '0xc65CB3156225380BEda366610BaB18D5835A1647', factories: ['0x5eeE3091f747E60a045a2E715a4c71e600e31F6E', '0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F', '0xc6C09471Ee39C7E30a067952FcC89c8922f9Ab53'] },
   { chainId: 137, name: 'Polygon', family: 'ng5', v1: 'polygon', rpc: 'https://polygon-bor-rpc.publicnode.com', metaRegistry: '0x296d2B5C23833A70D07c8fCBB97d846c1ff90DDD', factories: ['0x1764ee18e8B3ccA4787249Ceb249356192594585', '0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F', '0xC1b393EfEF38140662b91441C6710Aa704973228'] },
@@ -210,7 +212,7 @@ export function fromV1(p) {
   const und = Array.isArray(p.underlyingCoins) ? p.underlyingCoins.map((c) => ({ address: lc(c.address), decimals: num(c.decimals), usdPrice: num(c.usdPrice), symbol: c.symbol ?? '' })) : null
   return {
     id: p.id, address: lc(p.address), name: cleanName(p.name), registry: p.registryId, implementation: p.implementation ?? '',
-    factory: typeof p.factory === 'string' ? lc(p.factory) : null, coins, underlying: und, isMeta: !!p.isMetaPool, basePool: p.basePoolAddress ? lc(p.basePoolAddress) : null,
+    coins, underlying: und, isMeta: !!p.isMetaPool, basePool: p.basePoolAddress ? lc(p.basePoolAddress) : null,
     isBroken: !!p.isBroken, tvlApi: num(p.usdTotal) ?? 0, createdAt: num(p.creationTs) > 0 ? num(p.creationTs) : null, createdBlock: num(p.creationBlockNumber) > 0 ? num(p.creationBlockNumber) : null,
   }
 }
@@ -220,7 +222,7 @@ export function fromV2(p) {
   const coins = (p.coins ?? []).map((c) => ({ address: lc(c.address), decimals: num(c.decimals), usdPrice: num(c.usd_price), symbol: c.symbol ?? '' }))
   return {
     id: String(p.id ?? '').replace(/_/g, '-'), address: lc(p.address), name: cleanName(p.name), registry: String(p.registry_id ?? '').replace(/_/g, '-'),
-    implementation: p.implementation_address ? lc(p.implementation_address) : '', factory: null, coins, underlying: null,
+    implementation: p.implementation_address ? lc(p.implementation_address) : '', coins, underlying: null,
     isMeta: !!p.is_meta_pool, basePool: p.base_pool ? lc(p.base_pool) : null, isBroken: !!p.is_broken, tvlApi: num(p.tvl) ?? 0, createdAt: null, createdBlock: null,
   }
 }
@@ -257,6 +259,13 @@ export function routerPoolType(registry, nCoins) {
 }
 /** Stable pools take int128 indices; crypto pools uint256. */
 export const isStableType = (poolType) => poolType === 1 || poolType === 10
+
+/**
+ * The contract asked for a stable-ng pool's asset types: the pinned factory that listed it, else the chain's
+ * pinned stable-ng factory (`factories[0]`). Never an address from the API: a factory we do not pin can
+ * answer "all plain" for a pool of ERC-4626 or rebasing coins.
+ */
+export const assetTypeSource = (p, cfg) => p.ngFactory ?? cfg.factories[0]
 
 /**
  * Pre-NG pools that send native ETH and may be compiled with Vyper 0.2.15–0.3.0 (broken reentrancy lock,
@@ -546,18 +555,17 @@ async function verifyOnChain(chain, pools, drop) {
 
   // 7. Stable-ng asset types (factory) and rate oracles (pool immutables).
   const ng = live.filter((p) => p.poolType === 10)
-  const typeRes = await chain.calls(ng.flatMap((p) => [[p.ngFactory ?? p.factory ?? cfg.factories[0], enc('get_pool_asset_types(address)', p.address)], [p.address, enc('stored_rates()')]]))
+  const typeRes = await chain.calls(ng.flatMap((p) => [[assetTypeSource(p, cfg), enc('get_pool_asset_types(address)', p.address)], [p.address, enc('stored_rates()')]]))
   await chain.mustNotNoState(typeRes)
   const ngBad = new Map()
-  const ngFactories = new Set([...factories, ...ng.map((p) => p.factory).filter(Boolean)])
   ng.forEach((p, i) => {
     const coins = p.coins.map((c) => c.address)
     const tr = typeRes[2 * i]
     const rates = typeRes[2 * i + 1].ok ? decUintArray(typeRes[2 * i + 1].value) : null
     let types = tr.ok ? decUintArray(tr.value)?.map((x) => Number(x)) ?? null : null // eslint-disable-line anywalletkit/no-number-bigint -- uint8
     let oracles = null
-    if (types && types.length === coins.length) oracles = types.includes(1) ? ngPlainOracles(p.code, coins, types, ngFactories) : []
-    else { const m = ngMetaTypes(p.code, coins, ngFactories); if (m) { types = m.types; oracles = m.oracles } }
+    if (types && types.length === coins.length) oracles = types.includes(1) ? ngPlainOracles(p.code, coins, types, factories) : []
+    else { const m = ngMetaTypes(p.code, coins, factories); if (m) { types = m.types; oracles = m.oracles } }
     // "No oracle" must agree with the pool: a type-1 coin without one reports its fixed multiplier, 10^(36 - decimals).
     if (oracles && types) {
       oracles = oracles.map((o, k) => (types[k] === 1 && o === ZERO && rates?.[k] !== 10n ** BigInt(36 - p.chainDecimals[k]) ? null : o))
