@@ -2,7 +2,7 @@ export { ScrvUsdProtocolEvm, ScrvUsdProtocolEvm as default } from './scrvusd.js'
 export type { ScrvUsdConfig, ScrvUsdSupplyOptions, ScrvUsdWithdrawOptions, ScrvUsdInfo, ScrvUsdPosition, ScrvUsdApy } from './scrvusd.js'
 // LlamaLend lend vaults (`CurveLendVaultProtocolEvm`, curated markets per chain in chains.ts) are a later phase; they will share CurveLendingBase.
 export type { CurveLendingBaseConfig, Tx, AmountOption, EvmProvider } from './base.js'
-export { CURVE_LENDING_CHAINS, CURVE_LENDING_CHAIN_IDS, CURVE_PRICES_API, SCRVUSD, eip1167Code } from './chains.js'
+export { CURVE_LENDING_CHAINS, CURVE_LENDING_CHAIN_IDS, CURVE_PRICES_API, SCRVUSD, SCRVUSD_DEPLOYMENTS, eip1167Code } from './chains.js'
 export type { CurveLendingChain, ScrvUsdDeployment } from './chains.js'
 export { CurveApi, assertCurveHost, API_TIMEOUT_MS } from './api.js'
 export type { ScrvUsdApiStats } from './api.js'

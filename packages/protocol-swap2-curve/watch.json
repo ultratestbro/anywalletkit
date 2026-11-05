@@ -268,6 +268,409 @@
       "label": "Curve AddressProvider · Plume (signal only: id 2 is compared, never used)"
     },
     {
+      "id": "router-version-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x45312ea0eFf7E09C83CBE249fa1d7598c4C8cd4e",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Ethereum (pinned 1.2.0, [5][5])"
+    },
+    {
+      "id": "router-version-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x2191718CD32d02B8E60BAdFFeA33E4B5DD9A0A0D",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Arbitrum (pinned 1.1.0, [5][5])"
+    },
+    {
+      "id": "router-version-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0x4f37A9d177470499A2dD084621020b023fcffc1F",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Base (pinned 1.1.0, [5][5])"
+    },
+    {
+      "id": "router-version-op-mainnet",
+      "type": "evm-call",
+      "chainId": 10,
+      "to": "0x0DCDED3545D565bA3B19E683431381007245d983",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · OP Mainnet (pinned 1.1.0, [5][5])"
+    },
+    {
+      "id": "router-version-polygon",
+      "type": "evm-call",
+      "chainId": 137,
+      "to": "0x0DCDED3545D565bA3B19E683431381007245d983",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Polygon (pinned 1.1.0, [5][5])"
+    },
+    {
+      "id": "router-version-gnosis",
+      "type": "evm-call",
+      "chainId": 100,
+      "to": "0x0DCDED3545D565bA3B19E683431381007245d983",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Gnosis (pinned 1.1.0, [5][5])"
+    },
+    {
+      "id": "router-version-avalanche",
+      "type": "evm-call",
+      "chainId": 43114,
+      "to": "0x0DCDED3545D565bA3B19E683431381007245d983",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Avalanche (pinned 1.1.0, [5][5])"
+    },
+    {
+      "id": "router-version-bnb-chain",
+      "type": "evm-call",
+      "chainId": 56,
+      "to": "0xA72C85C258A81761433B4e8da60505Fe3Dd551CC",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · BNB Chain (pinned 1.1.0, [5][5])"
+    },
+    {
+      "id": "router-version-sonic",
+      "type": "evm-call",
+      "chainId": 146,
+      "to": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Sonic (pinned 1.1.0, [4][5])"
+    },
+    {
+      "id": "router-version-unichain",
+      "type": "evm-call",
+      "chainId": 130,
+      "to": "0xd2002373543Ce3527023C75e7518C274A51ce712",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Unichain (pinned 1.1.0, [4][5])"
+    },
+    {
+      "id": "router-version-hyperevm",
+      "type": "evm-call",
+      "chainId": 999,
+      "to": "0xd2002373543Ce3527023C75e7518C274A51ce712",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · HyperEVM (pinned 1.1.0, [4][5])"
+    },
+    {
+      "id": "router-version-mantle",
+      "type": "evm-call",
+      "chainId": 5000,
+      "to": "0x4f37A9d177470499A2dD084621020b023fcffc1F",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Mantle (pinned 1.1.0, [4][5])"
+    },
+    {
+      "id": "router-version-monad",
+      "type": "evm-call",
+      "chainId": 143,
+      "to": "0xFF5Cb29241F002fFeD2eAa224e3e996D24A6E8d1",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Monad (pinned 1.1.0, [4][5])"
+    },
+    {
+      "id": "router-version-plasma",
+      "type": "evm-call",
+      "chainId": 9745,
+      "to": "0xFF5Cb29241F002fFeD2eAa224e3e996D24A6E8d1",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Plasma (pinned 1.1.0, [4][5])"
+    },
+    {
+      "id": "router-version-robinhood-chain",
+      "type": "evm-call",
+      "chainId": 4663,
+      "to": "0xFF5Cb29241F002fFeD2eAa224e3e996D24A6E8d1",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Robinhood Chain (pinned 1.1.1, [4][5])"
+    },
+    {
+      "id": "router-version-ink",
+      "type": "evm-call",
+      "chainId": 57073,
+      "to": "0xd7E72f3615aa65b92A4DBdC211E296a35512988B",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Ink (pinned 1.1.0, [4][5])"
+    },
+    {
+      "id": "router-version-x-layer",
+      "type": "evm-call",
+      "chainId": 196,
+      "to": "0xBFab8ebc836E1c4D81837798FC076D219C9a1855",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · X Layer (pinned 1.1.0, [4][5])"
+    },
+    {
+      "id": "router-version-plume",
+      "type": "evm-call",
+      "chainId": 98866,
+      "to": "0x3F5A41B922a76759b9C77D36b3d337E88cD1dc5e",
+      "signature": "version()",
+      "decode": "string",
+      "label": "Curve Router NG version() · Plume (pinned 1.1.0, [4][5])"
+    },
+    {
+      "id": "address-provider-id2-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x5ffe7FB82894076ECB99A30D6A32e969e6e35E98",
+      "signature": "get_id_info(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "(address,string,uint256,uint256)",
+      "label": "Curve AddressProvider get_id_info(2) · Ethereum — names the older Router NG v1.1 0x16C6…5353 (history only), not the pinned v1.2 0x4531…cd4e"
+    },
+    {
+      "id": "address-provider-id2-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x5ffe7FB82894076ECB99A30D6A32e969e6e35E98",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · Arbitrum (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0x5ffe7FB82894076ECB99A30D6A32e969e6e35E98",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · Base (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-op-mainnet",
+      "type": "evm-call",
+      "chainId": 10,
+      "to": "0x5ffe7FB82894076ECB99A30D6A32e969e6e35E98",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · OP Mainnet (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-polygon",
+      "type": "evm-call",
+      "chainId": 137,
+      "to": "0x5ffe7FB82894076ECB99A30D6A32e969e6e35E98",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · Polygon (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-gnosis",
+      "type": "evm-call",
+      "chainId": 100,
+      "to": "0x5ffe7FB82894076ECB99A30D6A32e969e6e35E98",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · Gnosis (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-avalanche",
+      "type": "evm-call",
+      "chainId": 43114,
+      "to": "0x5ffe7FB82894076ECB99A30D6A32e969e6e35E98",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · Avalanche (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-bnb-chain",
+      "type": "evm-call",
+      "chainId": 56,
+      "to": "0x5ffe7FB82894076ECB99A30D6A32e969e6e35E98",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · BNB Chain (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-sonic",
+      "type": "evm-call",
+      "chainId": 146,
+      "to": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · Sonic (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-unichain",
+      "type": "evm-call",
+      "chainId": 130,
+      "to": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · Unichain (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-hyperevm",
+      "type": "evm-call",
+      "chainId": 999,
+      "to": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · HyperEVM (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-mantle",
+      "type": "evm-call",
+      "chainId": 5000,
+      "to": "0x5ffe7FB82894076ECB99A30D6A32e969e6e35E98",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · Mantle (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-monad",
+      "type": "evm-call",
+      "chainId": 143,
+      "to": "0x4574921eb950d3Fd5B01562162EC566Cb8bc3648",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · Monad (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-plasma",
+      "type": "evm-call",
+      "chainId": 9745,
+      "to": "0x4574921eb950d3Fd5B01562162EC566Cb8bc3648",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · Plasma (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-robinhood-chain",
+      "type": "evm-call",
+      "chainId": 4663,
+      "to": "0x4574921eb950d3Fd5B01562162EC566Cb8bc3648",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · Robinhood Chain (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-ink",
+      "type": "evm-call",
+      "chainId": 57073,
+      "to": "0x604388Bb1159AFd21eB5191cE22b4DeCdEE2Ae22",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · Ink (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-x-layer",
+      "type": "evm-call",
+      "chainId": 196,
+      "to": "0x5ffe7FB82894076ECB99A30D6A32e969e6e35E98",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · X Layer (lists the pinned router)"
+    },
+    {
+      "id": "address-provider-id2-plume",
+      "type": "evm-call",
+      "chainId": 98866,
+      "to": "0x907CE289E9Ee0BBcb0F69132B1C28A9Affc29FCA",
+      "signature": "get_address(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "Curve AddressProvider get_address(2) · Plume (lists the pinned router)"
+    },
+    {
+      "id": "scrvusd-asset-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367",
+      "signature": "asset()",
+      "decode": "address",
+      "label": "scrvUSD asset() · Ethereum (the swap_type 9 hop's crvUSD)"
+    },
+    {
+      "id": "deployments-json",
+      "type": "json-pins",
+      "url": "https://docs.curve.finance/deployments.json",
+      "format": "curve-deployments",
+      "pins": {
+        "from": "dist/index.js",
+        "export": "CURVE_DEPLOYMENTS",
+        "group": "$key",
+        "roles": {
+          "router": "router",
+          "addressProvider": "address-provider"
+        }
+      },
+      "label": "Curve deployments.json · every pinned Router NG and AddressProvider (Ethereum lists v1.2 as router-v2 and the older v1.1 as router-v1)"
+    },
+    {
       "id": "router-ng-source",
       "type": "github-file",
       "repo": "curvefi/curve-router-ng",

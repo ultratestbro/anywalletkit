@@ -50,6 +50,9 @@ export const SCRVUSD: ScrvUsdDeployment = Object.freeze({
   apiVersion: '3.0.4',
 })
 
+/** The scrvUSD deployment by chain id (Ethereum only): the shape the module watch checks against docs.curve.finance/deployments.json. */
+export const SCRVUSD_DEPLOYMENTS: Readonly<Record<number, ScrvUsdDeployment>> = Object.freeze({ 1: SCRVUSD })
+
 export const CURVE_LENDING_CHAINS: Readonly<Record<number, CurveLendingChain>> = Object.freeze({
   1: { chainId: 1, name: 'Ethereum', crvUsd: CRVUSD, scrvUsd: SCRVUSD },
 })
