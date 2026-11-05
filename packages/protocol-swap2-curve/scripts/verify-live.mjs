@@ -3,7 +3,8 @@
 // and ABI family (selector scan of the code) against the pins, then up to three real quotes from the package's pool
 // allowlist through the provider, each simulated with eth_call: a dummy address is given the input (native balance, or
 // the token's balance and the router's allowance through a stateOverride of the slots found by probing) and calls the
-// quote's exact router transaction; the router's return must be at least the quote's minimum. One line per chain.
+// quote's exact router transaction; the router's return must be at least the quote's minimum. A chain without
+// allowlisted pools must not be offered and a quote there must refuse by name. One line per chain.
 //
 //   node scripts/verify-live.mjs [chainId[,chainId…]] [--rpc url]        (build first: pnpm build)
 //
@@ -95,18 +96,22 @@ function quoteRequests(chainId) {
   const pools = [...table.pools].sort((a, b) => b.tvlUsd - a.tvlUsd)
   const reqs = []
   const seen = new Set()
+  const weth = CURVE_DEPLOYMENTS[chainId].weth.toLowerCase()
   const add = (from, fromDec, to, label, units) => {
     const k = `${from}>${to}`.toLowerCase()
     if (seen.has(k) || reqs.length >= 3) return
     seen.add(k)
-    reqs.push({from, fromDec, to, label, amount: units * 10n ** BigInt(fromDec)})
+    // One wrapped native, not a thousand: a stable-sized amount would drain an ETH/LST pool.
+    reqs.push({from, fromDec, to, label, amount: (from.toLowerCase() === weth ? 1n : units) * 10n ** BigInt(fromDec)})
   }
   const stableAmount = (dec) => (dec === 8 ? 0n : 1000n)
   for (const p of pools) {
     if (reqs.length >= 2) break
+    // A lending pool trades only its underlying coins (swap_type 2).
+    const [coins, decimals] = p.swapTypes.includes(1) ? [p.coins, p.decimals] : [p.underlying, p.underlyingDecimals]
     const [a, b] = [0, 1]
-    if (p.coins[a].toLowerCase() === ETH.toLowerCase()) add(ETH, 18, p.coins[b], `native → ${p.name}`, 1n)
-    else if (stableAmount(p.decimals[a])) add(p.coins[a], p.decimals[a], p.coins[b], p.name, p.poolType === 30 ? 100n : 1000n)
+    if (coins[a].toLowerCase() === ETH.toLowerCase()) add(ETH, 18, coins[b], `native → ${p.name}`, 1n)
+    else if (stableAmount(decimals[a])) add(coins[a], decimals[a], coins[b], p.name, p.poolType === 30 ? 100n : 1000n)
   }
   // A two-pool route: coin of the top pool to a coin only another pool has.
   const top = pools[0]
@@ -154,8 +159,16 @@ for (const chainId of chains) {
 
     // 2) Quotes from the allowlist, each simulated as a funded dummy wallet.
     const reqs = quoteRequests(chainId)
-    if (!reqs.length) notes.push('no allowlisted pools (deployment only)')
     const provider = curveProvider({rpcUrls: {[chainId]: [url]}, onWarning: () => {}})
+    notes.push(`pools ${CURVE_POOLS[chainId]?.pools.length ?? 0}`)
+    if (!reqs.length) {
+      // No allowlisted pool on this chain: the provider must not offer it, and a quote must refuse by name.
+      let why = ''
+      const caip = `eip155:${chainId}`
+      const q = await provider.getQuote({sourceChain: caip, destChain: caip, sourceToken: '', destToken: d.weth, amountIn: '1000000', destAddress: DUMMY, refundAddress: DUMMY, onRefusal: (m) => (why = m)})
+      if (q || provider.supportsChain(caip)) throw new Error('a chain without allowlisted pools is offered')
+      notes.push(`no allowlisted pools: not offered, a quote refuses (${why})`)
+    }
     for (const r of reqs) {
       let why = ''
       const native = r.from.toLowerCase() === ETH.toLowerCase()

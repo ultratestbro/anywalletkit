@@ -61,7 +61,7 @@ describe("curveVerifyQuote: what passes", () => {
 describe("curveVerifyQuote: §5.3 H — what must be refused", () => {
   it("the registered fake-USDT pool (0xA6d9…1f53), even when an allowlist lists it", () => {
     const a = args("ng5", [[USDC, TRIPOOL, USDT, [1n, 2n, 1n, 1n, 3n]], [USDT, FAKE_USDT_POOL, FAKE_USDT, [1n, 0n, 1n, 10n, 2n]]]);
-    expect(verify(p1({destToken: FAKE_USDT}), quoteFor(D1, a))).toMatch(/refuses \(fake coin or drained in 2023\)/);
+    expect(verify(p1({destToken: FAKE_USDT}), quoteFor(D1, a))).toMatch(/refuses \(fake coin, drained in 2023, or over a dead venue\)/);
   });
   it("the pools drained in 2023 (alETH, pETH, msETH), even when an allowlist lists one", () => {
     const a = args("ng5", [[CURVE_ETH, BROKEN_ALETH, "0x0100546F2cD4C9D97f798fFC9755E47865FF7Ee6", [0n, 1n, 1n, 1n, 2n]]]);

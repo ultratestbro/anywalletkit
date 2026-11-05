@@ -3,7 +3,6 @@ import type { CurveChainPools } from './types.js'
 import { POOLS_1 } from './1.js'
 import { POOLS_10 } from './10.js'
 import { POOLS_100 } from './100.js'
-import { POOLS_137 } from './137.js'
 import { POOLS_143 } from './143.js'
 import { POOLS_196 } from './196.js'
 import { POOLS_8453 } from './8453.js'
@@ -17,7 +16,6 @@ export const CURVE_POOLS: Readonly<Record<number, CurveChainPools>> = Object.fre
   1: POOLS_1,
   10: POOLS_10,
   100: POOLS_100,
-  137: POOLS_137,
   143: POOLS_143,
   196: POOLS_196,
   8453: POOLS_8453,

@@ -26,7 +26,9 @@ A chain whose RPC fails keeps its previous file, and the exit code is 1.
    on Unichain, Monad, Plasma, Ink, Robinhood and Plume. Only `*.curve.finance` hosts are accepted. API data
    is used only to find pools and to read USD prices.
 2. **Static rules**, applied in this order:
-   - the hard excludes: the fake USDT pool `0xA6d9…1f53` and the pools drained on 2023-07-30 (alETH, pETH, msETH, CRV/ETH);
+   - the hard excludes: the fake USDT pool `0xA6d9…1f53`, the pools drained on 2023-07-30 (alETH, pETH, msETH, CRV/ETH),
+     the Iron Bank lending pool `0x2dde…feAF` and Polygon amWBTC/renBTC `0xC2d9…7C67` (the provider denies the same
+     addresses at runtime, `CURVE_DENIED_POOLS`; a test keeps the two lists in step);
    - pools listed by `getHiddenPools` or flagged `isBroken`;
    - LLAMMA and families the router does not swap;
    - pools with fewer than 2 coins;
@@ -46,8 +48,10 @@ A chain whose RPC fails keeps its previous file, and the exit code is 1.
    the pool is refused. The log prints each refused oracle address so it can be reviewed.
 5. **Underlying coins** (swap_type 2). A metapool's underlying is its coin plus the coins of its base pool. A
    lending pool's underlying comes from `underlying_coins(i)`. Both are checked with
-   `get_dy_underlying(0, last, ~$100)`. A lending pool is listed for swap_type 2 only, because its wrapped
-   coins rebase.
+   `get_dy_underlying(0, last, ~$100)`. Lending pools are dropped (`lending-pool`): their wrapped coins rebase,
+   and their underlying route deposits into the lending venue, which the view never touches (Aave v2 on Polygon
+   has every reserve frozen, so am3pool quotes and then reverts). A metapool's entry records its on-chain base
+   pool (`basePool`); the provider opens `exchange_underlying` on it only while that base pool is allowlisted too.
 6. **TVL** counts only anchor coins: tokens in the SDK catalog (`@anywalletkit/swap2-assets`) on that chain,
    the native coin, and Curve's crvUSD and CRV. The pool's value is the anchored value × n / (number of anchor
    coins), capped by the full on-chain value and by the API's figure. A pool of tokens that the API misprices

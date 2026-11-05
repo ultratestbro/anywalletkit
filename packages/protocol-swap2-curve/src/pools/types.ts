@@ -11,6 +11,8 @@ export interface CurvePool {
   /** For metapools / lending pools: underlying coins in exchange_underlying index order (swap_type 2). */
   underlying?: readonly Hex[]
   underlyingDecimals?: readonly number[]
+  /** For metapools: the base pool (base_pool() read on-chain) whose coins follow the meta coins in `underlying`. */
+  basePool?: Hex
   /** Router pool_type: 1 stable, 2 twocrypto, 3 tricrypto, 10 stable-ng, 20 twocrypto-ng, 30 tricrypto-ng. */
   poolType: 1 | 2 | 3 | 10 | 20 | 30
   /** Router swap_type values this pool allows: 1 exchange; 2 exchange_underlying (only if underlying is set). */

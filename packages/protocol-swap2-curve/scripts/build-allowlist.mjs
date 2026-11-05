@@ -68,6 +68,9 @@ export const HARD_EXCLUDE = new Map([
   ['0x9848482da3ee3076165ce6497eda906e66bb85c5', 'pETH/ETH, drained 2023-07-30'],
   ['0xc897b98272aa23714464ea2a0bd5180f1b8c0025', 'msETH/ETH, drained 2023-07-30'],
   ['0x8301ae4fc9c624d1d396cbdaa1ed877821d7c511', 'CRV/ETH, drained 2023-07-30'],
+  // Lending pools whose underlying route depends on a dead or wound-down venue (the provider denies them too).
+  ['0x2dded6da1bf5dbdf597c45fcfaa3194e53ecfeaf', 'Iron Bank cyDAI/cyUSDC/cyUSDT (underlying through Iron Bank cTokens)'],
+  ['0xc2d95eef97ec6c17551d45e77b590dc1f9117c67', 'Polygon amWBTC/renBTC (renBTC is dead)'],
 ])
 
 // Tokens whose transfers move a different amount than asked (fee-on-transfer) or whose balances
@@ -630,9 +633,12 @@ async function verifyUnderlying(chain, pools, drop) {
   await chain.mustNotNoState(res)
   ok.forEach((p, i) => { if (res[i].ok && decUint(res[i].value) > 0n) p.underlyingOk = true; else p.underlyingNote = 'get-dy-underlying-failed' })
   for (const p of pools) {
-    if (p.underlyingOk || !p.lending && !p.underlyingNote) continue
-    // A lending pool's own coins are wrapped (aTokens rebase): without a working underlying route it is refused.
-    if (p.lending || p.underlyingNote === 'underlying-mismatch' && !p.isMeta) { p.dropped = true; drop(p, p.underlyingNote ?? 'underlying-unusable') }
+    // A lending pool's own coins are wrapped (aTokens rebase), and its underlying route deposits into the lending
+    // venue — which get_dy_underlying (a view) never touches: Aave v2 on Polygon has every reserve frozen, so am3pool
+    // quotes and then reverts. The provider opens swap_type 2 only on a metapool over an allowlisted base pool.
+    if (p.lending) { p.dropped = true; drop(p, 'lending-pool'); continue }
+    if (p.underlyingOk || !p.underlyingNote) continue
+    if (p.underlyingNote === 'underlying-mismatch' && !p.isMeta) { p.dropped = true; drop(p, p.underlyingNote) }
   }
 }
 
@@ -708,7 +714,8 @@ export function toEntry(p) {
   if (p.underlyingOk) {
     e.underlying = p.chainUnderlying.map((a) => (a === lc(ETH) ? ETH : checksum(a)))
     e.underlyingDecimals = p.chainUnderlyingDecimals
-    e.swapTypes = p.lending ? [2] : [1, 2]
+    e.swapTypes = [1, 2]
+    if (p.isMeta && p.chainBase) e.basePool = checksum(p.chainBase)
   }
   if (p.createdAt) e.createdAt = p.createdAt
   return e
@@ -717,6 +724,7 @@ export function toEntry(p) {
 function renderEntry(e) {
   const parts = [`address: ${q(e.address)}`, `name: ${q(e.name)}`, `coins: [${e.coins.map(q).join(', ')}]`, `decimals: [${e.decimals.join(', ')}]`]
   if (e.underlying) parts.push(`underlying: [${e.underlying.map(q).join(', ')}]`, `underlyingDecimals: [${e.underlyingDecimals.join(', ')}]`)
+  if (e.basePool) parts.push(`basePool: ${q(e.basePool)}`)
   parts.push(`poolType: ${e.poolType}`, `swapTypes: [${e.swapTypes.join(', ')}]`, `codeHash: ${q(e.codeHash)}`, `tvlUsd: ${e.tvlUsd}`)
   if (e.createdAt) parts.push(`createdAt: ${e.createdAt}`)
   return `    { ${parts.join(', ')} },`
@@ -826,7 +834,12 @@ async function main() {
     const byAddr = new Map(r.pools.map((p) => [p.address, p]))
     for (const [a, why] of interesting) { const p = byAddr.get(a); console.error(`    - ${why.padEnd(30)} ${checksum(a)} ${p?.name ?? ''} ($${Math.round(p?.tvlApi ?? 0).toLocaleString('en-US')})${r.details.has(a) ? ' ' + r.details.get(a) : ''}`) }
     for (const p of r.final) console.error(`    + ${checksum(p.address)} ${p.name} [${p.coins.map((c) => c.symbol).join('/')}] t${p.poolType} s${toEntry(p).swapTypes.join('')} $${p.tvlUsd.toLocaleString('en-US')}${p.int128 ? ' int128-coins' : ''}${p.createdAt ? '' : ' age-unknown'}`)
-    if (!r.final.length) { console.error(`  ${cfg.name}: nothing passed, no file`); continue }
+    if (!r.final.length) {
+      // A chain that ran and passed nothing loses its file (a chain whose run failed keeps it, above).
+      console.error(`  ${cfg.name}: nothing passed, no file`)
+      if (!dry) rmSync(join(OUT_DIR, `${cfg.chainId}.ts`), { force: true })
+      continue
+    }
     if (!dry) {
       writeFileSync(join(OUT_DIR, `${cfg.chainId}.ts`), renderChainFile(cfg, builtAt, r.block, r.final.map(toEntry), r.source))
     }

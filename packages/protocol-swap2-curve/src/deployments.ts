@@ -97,9 +97,11 @@ export const CURVE_LEGACY_ROUTERS: Readonly<Record<number, readonly {router: Hex
 });
 
 /**
- * Pools a route never crosses, whatever an allowlist says (defense in depth, Ethereum): a registered stable-ng pool
- * pairing real USDT with a token that calls itself "USDT" (`0x810e…ae9`), and the three factory pools drained by the
- * 2023 Vyper reentrancy-lock bug (alETH, pETH, msETH — still registered on-chain).
+ * Pools a route never crosses, whatever an allowlist says (defense in depth; the allowlist generator excludes the same
+ * addresses). Ethereum: a registered stable-ng pool pairing real USDT with a token that calls itself "USDT"
+ * (`0x810e…ae9`); the four pools drained by the 2023 Vyper reentrancy-lock bug (alETH, pETH, msETH, CRV/ETH — still
+ * registered on-chain); the Iron Bank lending pool cyDAI/cyUSDC/cyUSDT, whose underlying route redeems Iron Bank
+ * cTokens. Polygon: amWBTC/renBTC (renBTC is dead).
  */
 export const CURVE_DENIED_POOLS: Readonly<Record<number, ReadonlySet<string>>> = Object.freeze({
   1: new Set([
@@ -107,6 +109,11 @@ export const CURVE_DENIED_POOLS: Readonly<Record<number, ReadonlySet<string>>> =
     "0xc4c319e2d4d66cca4464c0c2b32c9bd23ebe784e",
     "0x9848482da3ee3076165ce6497eda906e66bb85c5",
     "0xc897b98272aa23714464ea2a0bd5180f1b8c0025",
+    "0x8301ae4fc9c624d1d396cbdaa1ed877821d7c511",
+    "0x2dded6da1bf5dbdf597c45fcfaa3194e53ecfeaf",
+  ]),
+  137: new Set([
+    "0xc2d95eef97ec6c17551d45e77b590dc1f9117c67",
   ]),
 });
 

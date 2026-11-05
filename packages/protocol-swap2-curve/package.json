@@ -39,7 +39,7 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run && node --test scripts/build-allowlist.test.mjs",
     "lint": "eslint src",
     "verify:live": "node scripts/verify-live.mjs"
   },

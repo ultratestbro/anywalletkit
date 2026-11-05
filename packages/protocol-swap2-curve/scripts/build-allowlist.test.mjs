@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   ETH, ageDecision, anchoredTvl, anchorsFor, assetTypeDecision, checksum, coinsMatch, dedupe, fromV1, fromV2, keccakHex, ngMetaTypes, ngPlainOracles, probeAmount, rankAndCap,
-  renderChainFile, renderIndex, routerPoolType, staticFilters, usdOf, vyperEthRisk, assertCurveHost, assetTypeSource,
+  renderChainFile, renderIndex, routerPoolType, staticFilters, usdOf, vyperEthRisk, assertCurveHost, assetTypeSource, toEntry, HARD_EXCLUDE,
 } from './build-allowlist.mjs'
 
 const USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
@@ -45,6 +45,11 @@ test('hidden, broken and hard-excluded pools are dropped', () => {
   assert.equal(dropped.get(fake.address), 'hard-exclude')
   assert.equal(dropped.get(aleth.address), 'hard-exclude')
   assert.equal(dropped.get(crveth.address), 'hard-exclude')
+  // Iron Bank cy-pool (Ethereum) and amWBTC/renBTC (Polygon): lending pools over a wound-down venue / a dead token.
+  for (const [address, chainId] of [['0x2dded6da1bf5dbdf597c45fcfaa3194e53ecfeaf', 1], ['0xc2d95eef97ec6c17551d45e77b590dc1f9117c67', 137]]) {
+    assert.ok(HARD_EXCLUDE.has(address))
+    assert.equal(run([pool({ address, registry: 'main', tvlApi: 50_000_000 })], chainId).dropped.get(address), 'hard-exclude')
+  }
 })
 
 test('LLAMMA / unknown families, single-coin pools and bad tokens are dropped', () => {
@@ -173,6 +178,16 @@ test('rendered files are TypeScript literals with checksummed addresses and no R
   assert.match(renderIndex([8453, 1]), /import \{ POOLS_1 \} from '\.\/1\.js'\nimport \{ POOLS_8453 \}/)
 })
 
+test('a metapool names its on-chain base pool', () => {
+  const base = '0xbebc44782c7db0a1a60cb6fe97d0b483032ff1c7'
+  const common = { address: '0x4f062658eaaf2c1ccf8c8e36d6824cdf41167956', name: 'GUSD/3Crv', coins: [coin(USDT), coin(USDC)], chainDecimals: [6, 6], poolType: 1, codeHash: '0x' + 'ab'.repeat(32), tvlUsd: 1, underlyingOk: true, chainUnderlying: [USDT, USDC, WETH], chainUnderlyingDecimals: [6, 6, 18] }
+  const meta = toEntry({ ...common, isMeta: true, chainBase: base })
+  assert.deepEqual(meta.swapTypes, [1, 2])
+  assert.equal(meta.basePool, checksum(base))
+  const cfg = { chainId: 1, name: 'Ethereum', family: 'ng5' }
+  assert.match(renderChainFile(cfg, '2026-11-05', 1, [meta], 'x'), /basePool: '0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7'/)
+})
+
 test('TVL counts only anchor coins: a pool of two mispriced tokens is worth nothing', () => {
   const bal = [10n ** 24n, 10n ** 24n]
   // ethPUSSY/bscPUSSY-style: the API prices both at $5k, neither is an anchor.
@@ -194,4 +209,10 @@ test('stable-ng asset types come from a pinned factory, never from an API-suppli
   assert.equal(assetTypeSource({ ...p, factory: evil }, cfg), cfg.factories[0])
   // A pool registered through a pinned factory is asked there.
   assert.equal(assetTypeSource({ ...p, ngFactory: cfg.factories[1] }, cfg), cfg.factories[1])
+})
+
+test('every hard exclude is denied by the provider at runtime too (src/deployments.ts)', async () => {
+  const { CURVE_DENIED_POOLS } = await import('../src/deployments.ts')
+  const denied = new Set(Object.values(CURVE_DENIED_POOLS).flatMap((set) => [...set]))
+  for (const address of HARD_EXCLUDE.keys()) assert.ok(denied.has(address), `${address} (${HARD_EXCLUDE.get(address)}) is not in CURVE_DENIED_POOLS`)
 })

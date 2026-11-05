@@ -57,7 +57,7 @@ export const POOLS: Readonly<Record<number, CurveChainPools>> = {
     pool({address: CRVUSD_USDC, name: "crvUSD/USDC", coins: [USDC, CRVUSD], decimals: [6, 18], poolType: 1, tvlUsd: 13_000_000}),
     pool({address: STETH_NG, name: "stETH-ng", coins: [CURVE_ETH, STETH], decimals: [18, 18], poolType: 1, tvlUsd: 23_000_000}),
     pool({address: TRICRYPTO_USDT, name: "TricryptoUSDT", coins: [USDT, WBTC, WETH], decimals: [6, 8, 18], poolType: 30, tvlUsd: 13_000_000}),
-    pool({address: MIM_META, name: "MIM/3CRV", coins: [MIM, "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490"], decimals: [18, 18], underlying: [MIM, DAI, USDC, USDT], underlyingDecimals: [18, 18, 6, 6], poolType: 1, swapTypes: [1, 2], tvlUsd: 500_000}),
+    pool({address: MIM_META, name: "MIM/3CRV", coins: [MIM, "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490"], decimals: [18, 18], underlying: [MIM, DAI, USDC, USDT], underlyingDecimals: [18, 18, 6, 6], basePool: TRIPOOL, poolType: 1, swapTypes: [1, 2], tvlUsd: 500_000}),
     // Adversarial: listed here, refused anyway (deny list).
     pool({address: FAKE_USDT_POOL, name: "fake USDT", coins: [FAKE_USDT, USDT], decimals: [18, 6], poolType: 10, tvlUsd: 9_000_000_000}),
     pool({address: BROKEN_ALETH, name: "alETH (drained 2023)", coins: [CURVE_ETH, "0x0100546F2cD4C9D97f798fFC9755E47865FF7Ee6"], decimals: [18, 18], poolType: 1, tvlUsd: 9_000_000_000}),

@@ -2,12 +2,16 @@
  * Routes over the curated pool allowlist: a token graph built from the pools the package pins (coins, and the
  * underlying coins of metapools that allow `exchange_underlying`), plus the router's own pseudo-hops — swap_type 8
  * between the native coin and the pinned wrapped native, and on router v1.2 swap_type 9 between crvUSD and scrvUSD.
- * Routes cross at most {@link MAX_ROUTE_POOLS} pools; intermediate tokens are only coins of allowlisted pools.
+ * Routes cross at most {@link MAX_ROUTE_POOLS} pools. A token a route hands its funds through between two hops must be
+ * one the swap2-assets catalog lists on the chain by address, or the native coin / the pinned wrapped native
+ * ({@link intermediateAllowed}); a pool's other coins, which the route does not touch, may be anything the allowlist
+ * admitted. `exchange_underlying` (swap_type 2) runs on a metapool only while its base pool is allowlisted too.
  *
  * `checkRoute` is the same rule set read back from router arguments: what the provider builds, `curveVerifyQuote`
  * (on the client, for a remote quote) and `preflightDeposit` all pass through it.
  */
 import {getAddress} from "viem";
+import {ccAssetByToken} from "@anywalletkit/swap2-assets";
 import type {RouterArgs} from "./abi.js";
 import {CURVE_DENIED_POOLS, MAX_ROUTE_POOLS, MAX_ROUTE_STEPS, ZERO_ADDRESS, type CurveDeployment} from "./deployments.js";
 import type {CurveChainPools, CurvePool, Hex} from "./pools/types.js";
@@ -31,6 +35,37 @@ const MAX_EXPLORED = 20_000;
 
 const lc = (a: string) => a.toLowerCase();
 const STABLE_POOL_TYPES = new Set([1, 10]);
+
+/**
+ * Whether a route may hand the swap through `token` between two hops on `chainId`: the router's native sentinel, the
+ * pinned wrapped native, or a token the swap2-assets catalog lists on that chain, matched by address. The source and
+ * the destination follow the engine's listed / unlisted token policy instead (as for every provider).
+ */
+export function intermediateAllowed(chainId: number, deployment: CurveDeployment, token: string): boolean {
+  const t = lc(token);
+  if (t === lc(deployment.eth)) return true;
+  if (t === lc(deployment.weth)) return t !== lc(ZERO_ADDRESS);
+  if (!/^0x[0-9a-f]{40}$/.test(t) || t === lc(ZERO_ADDRESS)) return false;
+  const listed = ccAssetByToken(`eip155:${chainId}`, t);
+  return !!listed?.contract && lc(listed.contract) === t;
+}
+
+/**
+ * Whether `exchange_underlying` (swap_type 2) may run on `pool`, given the chain's allowlisted pools `index`: only on a
+ * metapool that names its base pool, with that base pool itself allowlisted (and not denied), and `underlying` the
+ * meta coins followed by the base pool's coins. Never on a lending pool (no base pool): its underlying route deposits
+ * into the lending venue, which a `get_dy` view never touches (Aave v2 on Polygon has every reserve frozen).
+ */
+export function underlyingAllowed(pool: CurvePool, index: ReadonlyMap<string, CurvePool>): boolean {
+  const under = pool.underlying;
+  if (!under || under.length < 2 || !pool.swapTypes.includes(2)) return false;
+  if (!pool.basePool) return false;
+  const base = index.get(lc(pool.basePool));
+  if (!base || base === pool) return false;
+  const meta = pool.coins.length - 1;
+  if (under.length !== meta + base.coins.length) return false;
+  return under.every((c, k) => lc(c) === lc(k < meta ? pool.coins[k]! : base.coins[k - meta]!));
+}
 
 /** Pool types the router family can execute: `[4][5]` routers speak only to NG pools (stable-ng, twocrypto-ng, tricrypto-ng). */
 export function poolTypeAllowed(family: CurveDeployment["family"], poolType: number): boolean {
@@ -71,6 +106,9 @@ function graphFor(chainId: number, deployment: CurveDeployment, table: CurveChai
     // A `[4][5]` router never forwards the native coin to a pool: a pool listing it would take nothing.
     if (deployment.family === "lite4" && [...pool.coins, ...(pool.underlying ?? [])].some((c) => lc(c) === eth)) continue;
     g.byAddress.set(key, pool);
+  }
+  // Edges once every pool is indexed: a metapool's underlying edges need its base pool's entry.
+  for (const pool of g.byAddress.values()) {
     const pairs = new Set<string>();
     if (pool.swapTypes.includes(1)) {
       pool.coins.forEach((a, i) => pool.coins.forEach((b, j) => {
@@ -80,7 +118,7 @@ function graphFor(chainId: number, deployment: CurveDeployment, table: CurveChai
       }));
     }
     const under = pool.underlying;
-    if (pool.swapTypes.includes(2) && under && under.length >= 2 && (deployment.family === "ng5" || pool.poolType === 10)) {
+    if (under && underlyingAllowed(pool, g.byAddress) && (deployment.family === "ng5" || pool.poolType === 10)) {
       under.forEach((a, i) => under.forEach((b, j) => {
         if (i === j || lc(a) === lc(b) || pairs.has(`${lc(a)}>${lc(b)}`)) return;
         add({kind: "pool", pool, swapType: 2, i, j, tokenIn: getAddress(a), tokenOut: getAddress(b)});
@@ -125,6 +163,7 @@ export function findRoutes(chainId: number, deployment: CurveDeployment, table: 
       if (++explored > MAX_EXPLORED) { exhausted = true; return; }
       const next = lc(s.tokenOut);
       if (seenTokens.has(next)) continue;
+      if (next !== want && !intermediateAllowed(chainId, deployment, next)) continue;
       if (s.kind === "pool" && (seenPools.has(lc(s.pool.address)) || poolCount(path) >= MAX_ROUTE_POOLS)) continue;
       if (s.kind !== "pool" && path.some((p) => p.kind === s.kind)) continue;
       const steps = [...path, s];
@@ -183,7 +222,8 @@ export function routePools(args: RouterArgs): Hex[] {
 /**
  * Whether router arguments are a route this module would build on `chainId`: from `tokenIn` to `tokenOut`, every pool
  * hop through an allowlisted (and not denied) pool whose pinned coins at `i`/`j` are the hop's tokens, with the pool's
- * own pool type, an allowed swap type (1, or 2 for a metapool listing it) and its coin count; swap_type 8 only through
+ * own pool type, an allowed swap type (1, or 2 for a metapool listing it whose base pool is allowlisted too) and its
+ * coin count; every token between two hops a catalog token, the native coin or the pinned wrapped native; swap_type 8 only through
  * the pinned wrapped native between it and the native sentinel; swap_type 9 only on a v1.2 router through its pinned
  * ERC-4626 vault; no other swap type; at most {@link MAX_ROUTE_POOLS} pools, {@link MAX_ROUTE_STEPS} steps, no pool
  * twice, and nothing after the route's end. The reason it is not, or null.
@@ -204,6 +244,9 @@ export function checkRoute(chainId: number, deployment: CurveDeployment, table: 
   for (let k = steps; k < 5; k++) if (args.params[k]!.some((x) => x !== 0n)) return "the swap params carry rows after the route's end";
   if (lc(args.route[0]!) !== lc(tokenIn)) return `the route starts at ${args.route[0]}, not the source token`;
   if (lc(args.route[2 * steps]!) !== lc(tokenOut)) return `the route ends at ${args.route[2 * steps]}, not the destination token`;
+  for (let k = 1; k < steps; k++) {
+    if (!intermediateAllowed(chainId, deployment, args.route[2 * k]!)) return `step ${k} hands the swap through ${args.route[2 * k]}, a token the catalog does not list on this chain`;
+  }
   const pools = new Set<string>();
   let wraps = 0;
   let vaults = 0;
@@ -215,7 +258,7 @@ export function checkRoute(chainId: number, deployment: CurveDeployment, table: 
     const type = row[2]!;
     if (a === b) return `step ${k + 1} trades a token for itself`;
     if (type === 1n || type === 2n) {
-      if (CURVE_DENIED_POOLS[chainId]?.has(swap)) return `step ${k + 1} crosses ${args.route[2 * k + 1]}, a pool this module refuses (fake coin or drained in 2023)`;
+      if (CURVE_DENIED_POOLS[chainId]?.has(swap)) return `step ${k + 1} crosses ${args.route[2 * k + 1]}, a pool this module refuses (fake coin, drained in 2023, or over a dead venue)`;
       const pool = index.get(swap);
       if (!pool) return `step ${k + 1} crosses ${args.route[2 * k + 1]}, which is not in the pool allowlist`;
       if (pools.has(swap)) return `the route crosses ${args.route[2 * k + 1]} twice`;
@@ -223,6 +266,7 @@ export function checkRoute(chainId: number, deployment: CurveDeployment, table: 
       if (!pool.swapTypes.includes(type === 1n ? 1 : 2)) return `step ${k + 1} uses swap_type ${type}, which pool ${pool.name} does not allow`;
       if (row[3] !== BigInt(pool.poolType)) return `step ${k + 1} names pool_type ${row[3]}, not pool ${pool.name}'s ${pool.poolType}`;
       if (type === 2n && deployment.family === "lite4" && pool.poolType !== 10) return `step ${k + 1}: exchange_underlying is for stable-ng metapools on this router`;
+      if (type === 2n && !underlyingAllowed(pool, index)) return `step ${k + 1}: exchange_underlying on pool ${pool.name} needs its base pool in the allowlist`;
       const list = type === 1n ? pool.coins : pool.underlying;
       if (!list) return `step ${k + 1}: pool ${pool.name} lists no underlying coins`;
       const i = row[0]!, j = row[1]!;
