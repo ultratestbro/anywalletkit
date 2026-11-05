@@ -36,7 +36,7 @@ function encodeFacets(facets) {
 function sandbox(manifests, files = {}) {
   const root = mkdtempSync(join(tmpdir(), "watch-1104-"));
   mkdirSync(join(root, "scripts/watch"), {recursive: true});
-  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
+  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs", "evm-call.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
   for (const [dir, m] of Object.entries(manifests)) { mkdirSync(join(root, "packages", dir), {recursive: true}); writeFileSync(join(root, "packages", dir, "watch.json"), JSON.stringify(m)); }
   for (const [rel, text] of Object.entries(files)) { mkdirSync(dirname(join(root, rel)), {recursive: true}); writeFileSync(join(root, rel), text); }
   return root;

@@ -130,7 +130,49 @@ export const RECORD_FORMATS = {
     if (!markets.size) throw new Error("no market tables in the page payload");
     return {records, info: {markets: markets.size}};
   },
+  /**
+   * docs.curve.finance/deployments.json: {_instructions, _explorers, <chain>: {tokens, integrations, amm: {"router & zap",
+   * stableswap, twocrypto, tricrypto, fxswap}, scrvusd?, …}}. Records, id `<chain>.<what>`: every Router NG (`router`, and on
+   * Ethereum `router-v1` / `router-v2`, all named "router"), the AddressProvider and MetaRegistry, the pool factories
+   * ("stableswap-factory", …), the tokens crvUSD / scrvUSD / CRV (`<chain>.tokens.<symbol>`) and the scrvUSD vault. The feed
+   * has known slips (the crvUSD LayerZero bridges on Ethereum), so a module pins on-chain facts too: this is a signal.
+   */
+  "curve-deployments"(body) {
+    const j = JSON.parse(body);
+    if (!j || typeof j !== "object" || Array.isArray(j)) throw new Error("not a deployments object");
+    const chains = Object.keys(j).filter((k) => !k.startsWith("_") && j[k] && typeof j[k] === "object" && !Array.isArray(j[k]));
+    const records = [];
+    const add = (chain, contract, what, address) => {
+      if (isAddress(address)) records.push({group: String(CURVE_CHAIN_IDS[chain] ?? chain), contract, address, id: `${chain}.${what}`});
+    };
+    for (const chain of chains) {
+      const c = j[chain];
+      for (const [k, a] of Object.entries(c.amm?.["router & zap"] ?? {})) if (/^router(-v\d+)?$/.test(k)) add(chain, "router", k, a);
+      add(chain, "address-provider", "address-provider", c.integrations?.["address-provider"]);
+      add(chain, "meta-registry", "meta-registry", c.integrations?.["meta-registry"]);
+      for (const kind of CURVE_FACTORIES) add(chain, `${kind}-factory`, `${kind}.factory`, c.amm?.[kind]?.factory);
+      for (const [k, a] of Object.entries(c.tokens ?? {})) {
+        const symbol = Object.prototype.hasOwnProperty.call(CURVE_TOKENS, k.toLowerCase()) ? CURVE_TOKENS[k.toLowerCase()] : null;
+        if (symbol) add(chain, symbol, `tokens.${symbol}`, a);
+      }
+      add(chain, "scrvUSD vault", "scrvusd.vault", c.scrvusd?.vault);
+    }
+    if (!records.some((r) => r.contract === "router")) throw new Error("no routers in the feed");
+    return {records, info: {chains: chains.length}};
+  },
 };
+
+/**
+ * docs.curve.finance/deployments.json names chains by key; a record is grouped by the chain id where the chain is one the
+ * SDK carries (so a module's pins keyed by chain id match), by the key otherwise.
+ */
+const CURVE_CHAIN_IDS = {
+  ethereum: 1, optimism: 10, bsc: 56, gnosis: 100, unichain: 130, polygon: 137, monad: 143, sonic: 146, "x-layer": 196, hyperliquid: 999,
+  robinhood: 4663, mantle: 5000, arc: 5042, base: 8453, plasma: 9745, celo: 42220, arbitrum: 42161, avalanche: 43114, ink: 57073, plume: 98866,
+};
+const CURVE_TOKENS = {crv: "CRV", crvusd: "crvUSD", scrvusd: "scrvUSD"};
+const CURVE_FACTORIES = ["stableswap", "twocrypto", "tricrypto", "fxswap"];
+const isAddress = (a) => typeof a === "string" && /^0x[0-9a-fA-F]{40}$/.test(a);
 
 /** Groups compare without case or punctuation: "Aave V3 Ink (whitelabel)" is the docs' "AaveV3InkWhitelabel". */
 export const normGroup = (g) => String(g).toLowerCase().replace(/[^a-z0-9]/g, "");
