@@ -55,17 +55,20 @@ const word = (n) => pad(toHex(n))
 const slotOf = (slot, k) => keccak256(encodeAbiParameters([{ type: 'uint256' }, { type: 'address' }], [slot, k]))
 const nested = (slot, k1, k2) => keccak256(encodeAbiParameters([{ type: 'bytes32' }, { type: 'address' }], [slotOf(slot, k1), k2]))
 const FUND = 1_000n * E18
-const preview = decodeFunctionResult({ abi: VAULT_V3_ABI, functionName: 'previewDeposit', data: (await base.call({ to: SCRVUSD.vault, data: encodeFunctionData({ abi: VAULT_V3_ABI, functionName: 'previewDeposit', args: [FUND] }) })).data })
+// Every eth_call below runs at one block: profit unlocks every second, so a preview read in one
+// block and the proof in the next differ by a few wei and the equality checks would flake.
+const pinned = toHex(await base.getBlockNumber())
+const preview = decodeFunctionResult({ abi: VAULT_V3_ABI, functionName: 'previewDeposit', data: (await base.request({ method: 'eth_call', params: [{ to: SCRVUSD.vault, data: encodeFunctionData({ abi: VAULT_V3_ABI, functionName: 'previewDeposit', args: [FUND] }) }, pinned] })) })
 const override = {
   [SCRVUSD.asset]: { stateDiff: { [slotOf(1n, DUMMY)]: word(FUND), [nested(0n, DUMMY, SCRVUSD.vault)]: word(FUND) } },
   [SCRVUSD.vault]: { stateDiff: { [slotOf(18n, DUMMY)]: word(preview) } },
 }
-/** The read RPC with every eth_call run against the override. */
+/** The read RPC with every eth_call run against the override, at the pinned block. */
 const overridden = {
   request: async ({ method, params }) => {
     if (method === 'eth_call') {
-      const [tx, block = 'latest'] = params
-      return base.request({ method, params: [tx, block, override] })
+      const [tx] = params
+      return base.request({ method, params: [tx, pinned, override] })
     }
     return base.request({ method, params })
   },

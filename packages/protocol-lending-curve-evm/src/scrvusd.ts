@@ -109,17 +109,21 @@ export class ScrvUsdProtocolEvm extends CurveLendingBase<ScrvUsdConfig> {
         const fail = (check: ScrvUsdVerificationError['check'], expected: string, observed: string): never => {
           throw new ScrvUsdVerificationError({ vault: this.vault, check, expected, observed })
         }
-        const [chainId, clone, impl, apiVersion, asset] = await Promise.all([
+        // Chain and code first: on another chain, or with no vault at the address, the views below
+        // return no data, and that must surface as the typed check, not as a decode error.
+        const [chainId, clone, impl] = await Promise.all([
           this.client.getChainId(),
           this.client.getCode({ address: this.vault }),
           this.client.getCode({ address: d.implementation }),
-          this.read<string>(this.vault, VAULT_V3_ABI, 'apiVersion'),
-          this.read<Address>(this.vault, VAULT_V3_ABI, 'asset'),
         ])
         if (chainId !== d.chainId) fail('chain', `eip155:${d.chainId}`, `eip155:${chainId}`)
         if ((clone ?? '0x').toLowerCase() !== d.cloneCode.toLowerCase()) fail('clone', `EIP-1167 clone of ${d.implementation}`, clone && clone !== '0x' ? `${(clone.length - 2) / 2} bytes of other code` : 'no code')
         const implHash = impl && impl !== '0x' ? keccak256(impl) : '0x'
         if (implHash.toLowerCase() !== d.implementationCodeHash.toLowerCase()) fail('implementation', d.implementationCodeHash, implHash)
+        const [apiVersion, asset] = await Promise.all([
+          this.read<string>(this.vault, VAULT_V3_ABI, 'apiVersion'),
+          this.read<Address>(this.vault, VAULT_V3_ABI, 'asset'),
+        ])
         if (apiVersion !== d.apiVersion) fail('apiVersion', d.apiVersion, apiVersion)
         if (getAddress(asset) !== getAddress(d.asset)) fail('asset', d.asset, asset)
       })().catch((e) => { this._verified = null; throw e })

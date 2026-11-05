@@ -40,6 +40,27 @@ describe('identity checks', () => {
     await expect(p.getVault()).rejects.toMatchObject({ check: 'clone', observed: 'no code' })
   })
 
+  // A real node answers an eth_call to an address without code with no data, so the vault's views
+  // cannot be decoded there: the chain / code checks must win over that decode error.
+  it('a read RPC on another chain, where nothing lives at the address, fails the chain check (typed)', async () => {
+    const { chain, p, acct } = make()
+    chain.chainId = 8453
+    chain.codes.delete(VAULT.toLowerCase())
+    chain.codes.delete(IMPL.toLowerCase())
+    chain.contracts.delete(VAULT.toLowerCase())
+    const e = await p.supply({ amount: E18 }).catch((x) => x)
+    expect(e).toBeInstanceOf(ScrvUsdVerificationError)
+    expect(e).toMatchObject({ check: 'chain', observed: 'eip155:8453' })
+    expect(acct.sent).toHaveLength(0)
+  })
+
+  it('an address with no code on Ethereum fails the clone check (typed), not a view-call decode error', async () => {
+    const { chain, p } = make()
+    chain.codes.delete(VAULT.toLowerCase())
+    chain.contracts.delete(VAULT.toLowerCase())
+    await expect(p.withdraw({ amount: 'max' })).rejects.toMatchObject({ name: 'ScrvUsdVerificationError', check: 'clone', observed: 'no code' })
+  })
+
   it('refuses when the implementation code differs from the pinned VaultV3 3.0.4', async () => {
     const { chain, p, acct } = make()
     chain.codes.set(IMPL.toLowerCase(), `${IMPL_CODE.slice(0, -2)}00` as Hex)
