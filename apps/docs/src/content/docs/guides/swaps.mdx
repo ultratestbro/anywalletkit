@@ -77,7 +77,9 @@ pass an RPC (Ethereum, Arbitrum, Base, OP Mainnet, Gnosis, Monad, Plasma and X L
   (with headroom) right before broadcast, after any approval. A per-step formula ran some routes out
   of gas and overcharged where the limit is what you pay (Monad).
 - **Behind a backend:** `remoteProvider({ name: 'curve', baseUrl, ...curvePins })` checks the call
-  on the device; `...curveRemotePins({ rpcUrls })` also checks the build on chain.
+  on the device; `...curveRemotePins({ rpcUrls })` also checks the build on chain and holds the
+  backend's output and minimum to a fresh `get_dy` within the slippage, so the minimum is the
+  device's own. If the backend provider sets `defaultSlippageBps`, pass the same value here.
 
 ## 2. Create the router
 

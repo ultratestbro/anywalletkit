@@ -285,7 +285,9 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
   Balancer, Curve, Wrap, CCTP, USDT0 need no key; on-chain venues need `rpcUrls`.
 - Curve (`curveProvider({ rpcUrls: { 1: [url] } })`, chain ids as keys): same-chain Router NG over a pool allowlist
   pinned in the package (1–2 pools; between them only catalog tokens); no gas limit in the quote (the wallet
-  estimates at broadcast); Ethereum swaps belong on an MEV-protected RPC.
+  estimates at broadcast); Ethereum swaps belong on an MEV-protected RPC. Behind a backend use
+  `...curveRemotePins({ rpcUrls, defaultSlippageBps? })` (the backend's fixed default, if it sets one): a build's
+  output and `min_dy` are held to a fresh on-device `get_dy`.
 - Also via the kit: `wallet.registerProtocol('swap', RouterSwap2Protocol, { chain, config: { fromChain: chain, providers } })`
   then `await wallet.getProtocol<RouterSwap2Protocol>('swap')` — policies then wrap the router's account.
 

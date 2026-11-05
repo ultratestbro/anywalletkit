@@ -1,9 +1,12 @@
 // The checks a Curve quote's router call must pass (research doc §5.3): one adversarial case per rule, each built as the
 // calldata a hostile backend could send, against the fixture allowlist.
 import {afterEach, describe, expect, it, vi} from "vitest";
+import {remoteProvider} from "@anywalletkit/protocol-swap2-core/remote";
+import {createSwap2Handler} from "@anywalletkit/protocol-swap2-core/server";
+import {validQuote} from "@anywalletkit/protocol-swap2-core/validate";
 import type {Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 import {encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
-import {encodeExchange, type RouterArgs} from "../src/abi.js";
+import {decodeExchange, encodeExchange, type RouterArgs} from "../src/abi.js";
 import {CURVE_DEPLOYMENTS, CURVE_ETH, ZERO_ADDRESS, type CurveDeployment} from "../src/deployments.js";
 import {curveProvider} from "../src/provider.js";
 import {curvePins, curveQuoteCheck, curveRemotePins} from "../src/verify.js";
@@ -12,6 +15,7 @@ import {BROKEN_ALETH, CRVUSD, CRVUSD_USDC, D1, D143, D42161, DEPLOYMENTS, FAKE_U
 afterEach(() => vi.unstubAllGlobals());
 
 const verify = curveQuoteCheck(TABLES);
+const lc = (a: string) => a.toLowerCase();
 const Z = ZERO_ADDRESS;
 const AMOUNT = 1_000_000_000n;
 const MIN = 990_000_000n;
@@ -28,7 +32,7 @@ function args(family: "ng5" | "lite4", steps: readonly [string, string, string, 
 function quoteFor(d: CurveDeployment, a: RouterArgs, o: {amount?: bigint; min?: bigint; receiver?: string; value?: string; approval?: string | null; to?: string; data?: Hex} = {}): Quote {
   const min = o.min ?? MIN;
   return {
-    provider: "curve", intentId: `curve:${Object.entries(DEPLOYMENTS).find(([, x]) => x === d)![0]}`, depositAddress: "", depositMemo: null,
+    provider: "curve", intentId: `curve:${Object.entries(DEPLOYMENTS).find(([, x]) => x === d)![0]}:00000000000000aa`, depositAddress: "", depositMemo: null,
     txRequest: {
       to: o.to ?? d.router,
       data: o.data ?? encodeExchange(d.family, a, o.amount ?? AMOUNT, min, getAddress(o.receiver ?? ME) as Hex),
@@ -97,7 +101,11 @@ describe("curveVerifyQuote: §5.3 H — what must be refused", () => {
   it("a quote naming another chain than the request's (its on-chain checks and tracking would run there)", () => {
     // The same router address serves OP Mainnet, Polygon, Gnosis and Avalanche.
     const a = args("ng5", [[USDC, TRIPOOL, USDT, [1n, 2n, 1n, 1n, 3n]]]);
-    expect(verify(p1(), {...quoteFor(D1, a), intentId: "curve:137"})).toMatch(/names curve:137, not curve:1/);
+    expect(verify(p1(), {...quoteFor(D1, a), intentId: "curve:137:00000000000000aa"})).toMatch(/names curve:137:0+aa, not a curve:1 swap/);
+    // The bare chain form (one id for every quote on the chain) and anything around the id are refused too.
+    for (const id of ["curve:1", "curve:1:", "curve:01:00000000000000aa", "curve:1:00000000000000aa:x", "xcurve:1:00000000000000aa", "curve:1:00000000000000aa~short"]) {
+      expect(verify(p1(), {...quoteFor(D1, a), intentId: id})).toMatch(/not a curve:1 swap/);
+    }
   });
   it("a call to anything but the pinned router (an older router included), selling another amount", () => {
     expect(verify(p1(), quoteFor(D1, USDC_USDT, {to: "0x16C6521Dff6baB339122a0FE25a9116693265353"}))).toMatch(/not the Curve router/);
@@ -110,7 +118,7 @@ describe("curveVerifyQuote: §5.3 H — what must be refused", () => {
     const tables = {deployments: {...DEPLOYMENTS, 42161: v11, 143: lite}, pools: POOLS};
     const check = curveQuoteCheck(tables);
     const a5 = args("ng5", [[CRVUSD, SCRVUSD, SCRVUSD, [0n, 0n, 9n, 0n, 0n]]]);
-    const q5 = {...quoteFor(D42161, a5), intentId: "curve:42161", txRequest: {...quoteFor(D42161, a5).txRequest!, to: v11.router, approvalAddress: v11.router}};
+    const q5 = {...quoteFor(D42161, a5), intentId: "curve:42161:00000000000000aa", txRequest: {...quoteFor(D42161, a5).txRequest!, to: v11.router, approvalAddress: v11.router}};
     expect(check({...p1({sourceToken: CRVUSD, sourceDecimals: 18, destToken: SCRVUSD}), sourceChain: "eip155:42161", destChain: "eip155:42161"}, q5)).toMatch(/swap_type 9 \(ERC-4626\) is not available on Arbitrum's router 1.1.0/);
     const a4 = args("lite4", [[CRVUSD, SCRVUSD, SCRVUSD, [0n, 0n, 9n, 0n]]]);
     const q4 = {...quoteFor(D143, a4), txRequest: {...quoteFor(D143, a4).txRequest!, to: lite.router, approvalAddress: lite.router}};
@@ -186,6 +194,90 @@ describe("curvePins / curveRemotePins", () => {
     expect(pins.callTargets("eip155:1")).toEqual([D1.router]);
     const q = quoteFor(D1, USDC_USDT, {to: OTHER, approval: OTHER});
     expect(pins.verifyQuote!(p1(), q)).toMatch(/not the Curve router/);
+  });
+});
+
+describe("curveRemotePins: a remote build's minimum is the device's own (§5.3 C9)", () => {
+  const pinsOf = (o: {defaultSlippageBps?: number} = {}) => curveRemotePins({rpcUrls: RPC, ...TABLES, onWarning: () => {}, ...o});
+  const local = () => curveProvider({rpcUrls: RPC, ...TABLES, onWarning: () => {}});
+  const txOf = (q: Quote) => ({chain: "eip155:1", to: q.txRequest!.to!, data: q.txRequest!.data!, value: q.txRequest!.value ?? "0", approvalAddress: q.txRequest!.approvalAddress!});
+  /** The honest quote re-sealed by a hostile backend with another minimum and output. */
+  function forged(q: Quote, min: bigint, dest: bigint): Quote {
+    const call = decodeExchange(D1.family, q.txRequest!.data!)!;
+    const data = encodeExchange(D1.family, {route: call.route, params: call.params}, call.amount, min, getAddress(ME) as Hex);
+    return {...q, destAmount: dest.toString(), minDestAmount: min.toString(), providerData: {...q.providerData, minOut: min.toString()}, txRequest: {...q.txRequest!, data}};
+  }
+
+  it("H: no slippage named — min_dy = 1 with a 10× output passes every quote check, and the build is refused on chain", async () => {
+    vi.stubGlobal("fetch", rpcStub());
+    const q = (await local().getQuote(p1()))!;
+    const evil = forged(q, 1n, BigInt(q.destAmount) * 10n);
+    // What the quote-time checks cannot see (they read nothing on chain):
+    expect(validQuote(evil, p1(), "curve")).toBe(true);
+    expect(verify(p1(), evil)).toBeNull();
+    expect(await pinsOf().verifyBuild(evil, txOf(evil), p1())).toMatch(/promises 9989999990, more than 15 bps above the 998999999 the pools pay now/);
+    // The output honest, the minimum 1: refused against the fresh get_dy.
+    const low = forged(q, 1n, BigInt(q.destAmount));
+    expect(await pinsOf().verifyBuild(low, txOf(low), p1())).toMatch(/minimum 1 is more than 15 bps under the 998999999 the pools pay now/);
+    // Just under the device's own auto slippage (10 bps stable ↔ stable + the drift allowance): refused; at it: accepted.
+    const out = 998_999_999n;
+    const edge = (out * BigInt(10_000 - 15 - 1)) / 10_000n;
+    expect(await pinsOf().verifyBuild(forged(q, edge - 1n, out), txOf(forged(q, edge - 1n, out)), p1())).toMatch(/is more than 15 bps under/);
+    expect(await pinsOf().verifyBuild(forged(q, edge, out), txOf(forged(q, edge, out)), p1())).toBeNull();
+  });
+
+  it("an honest remote build passes with auto slippage, a named slippage or the backend's fixed default — also after the price moved within it", async () => {
+    vi.stubGlobal("fetch", rpcStub());
+    const auto = (await local().getQuote(p1()))!;
+    expect(await pinsOf().verifyBuild(auto, txOf(auto), p1())).toBeNull();
+    const named = (await local().getQuote(p1({slippageBps: 40})))!;
+    expect(await pinsOf().verifyBuild(named, txOf(named), p1({slippageBps: 40}))).toBeNull();
+    const fixed = (await curveProvider({rpcUrls: RPC, ...TABLES, onWarning: () => {}, defaultSlippageBps: 60}).getQuote(p1()))!;
+    expect(await pinsOf({defaultSlippageBps: 60}).verifyBuild(fixed, txOf(fixed), p1())).toBeNull();
+    // The same build against a device that does not know the backend's 60 bps: its minimum is too low for auto slippage.
+    expect(await pinsOf().verifyBuild(fixed, txOf(fixed), p1())).toMatch(/is more than 15 bps under/);
+    expect(() => pinsOf({defaultSlippageBps: 0})).toThrow(/1..4999/);
+    // The pools pay 0.05% more, then 0.05% less, than at quote time: the build stands both ways.
+    vi.stubGlobal("fetch", rpcStub({rateBps: {[lc(TRIPOOL)]: 9_995}}));
+    expect(await pinsOf().verifyBuild(auto, txOf(auto), p1())).toBeNull();
+    vi.stubGlobal("fetch", rpcStub({rateBps: {[lc(TRIPOOL)]: 9_985}}));
+    expect(await pinsOf().verifyBuild(auto, txOf(auto), p1())).toBeNull();
+    // A trade with real price impact: the device re-derives it from its own probe (10 + 120 / 2 bps here).
+    vi.stubGlobal("fetch", rpcStub({impactBps: 120, impactFrom: 1_000_000_000n}));
+    const big = (await local().getQuote(p1()))!;
+    expect(big.providerData!.slippageBps).toBe("70");
+    expect(await pinsOf().verifyBuild(big, txOf(big), p1())).toBeNull();
+    expect(await pinsOf().verifyBuild(forged(big, 1n, BigInt(big.destAmount)), txOf(forged(big, 1n, BigInt(big.destAmount))), p1())).toMatch(/is more than 75 bps under/);
+  });
+
+  it("one intent id per quote: a remote build is checked against the request it answered, not the chain's last one", async () => {
+    vi.stubGlobal("fetch", rpcStub());
+    const backend = local();
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body)) as {params?: QuoteParams; quote?: Quote};
+      const answer = url.endsWith("/quote") ? await backend.getQuote(body.params!) : await backend.buildDeposit(body.quote!);
+      return new Response(JSON.stringify(answer));
+    }) as unknown as typeof fetch;
+    const remote = remoteProvider({name: "curve", baseUrl: "https://swap.test", fetchImpl, ...pinsOf()});
+    const qa = (await remote.getQuote(p1()))!;
+    const qb = (await remote.getQuote(p1({amountIn: "2000000000", destAddress: OTHER})))!;
+    expect(qa.intentId).toMatch(/^curve:1:[0-9a-f]{16}$/);
+    expect(qa.intentId).not.toBe(qb.intentId);
+    await expect(remote.buildDeposit(qa)).resolves.toMatchObject({data: qa.txRequest!.data});
+    await expect(remote.buildDeposit(qb)).resolves.toMatchObject({data: qb.txRequest!.data});
+  });
+
+  it("through the swap2 server handler (its intent token on the id): quoted, built and checked on the client", async () => {
+    vi.stubGlobal("fetch", rpcStub());
+    const handle = createSwap2Handler({providers: [local()], sealSecret: "s".repeat(32), guard: async () => {}});
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      const r = await handle(url.split("/").pop()!, JSON.parse(String(init.body)), {});
+      return new Response(JSON.stringify(r.body), {status: r.status});
+    }) as unknown as typeof fetch;
+    const remote = remoteProvider({name: "curve", baseUrl: "https://swap.test", fetchImpl, ...pinsOf()});
+    const q = (await remote.getQuote(p1()))!;
+    expect(q.intentId).toMatch(/^curve:1:[0-9a-f]{16}~[0-9a-f]{32}$/);
+    await expect(remote.buildDeposit(q)).resolves.toMatchObject({to: D1.router, data: q.txRequest!.data});
   });
 });
 

@@ -1,7 +1,4 @@
 import {getAddress} from "viem";
-import {bigintToNumber} from "@anywalletkit/core";
-import {ccAssetByToken} from "@anywalletkit/swap2-assets";
-import {suggestSlippage} from "@anywalletkit/protocol-swap2-core/slippage";
 import {evmRef, isEvm, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {encodeExchange, encodeGetDy} from "./abi.js";
@@ -11,6 +8,8 @@ import {CURVE_POOLS} from "./pools/index.js";
 import type {CurveChainPools} from "./pools/types.js";
 import {findRoutes, routeArgs, routePools, type CurveRoute} from "./routes.js";
 import {ethCall, wordUint} from "./rpc.js";
+import {curveAutoSlippageBps, curveImpactBps} from "./slippage.js";
+import {curveIntentChain, mintCurveIntentId} from "./intent.js";
 import {curveOnChain, curveQuoteCheck} from "./verify.js";
 
 /**
@@ -23,8 +22,9 @@ import {curveOnChain, curveQuoteCheck} from "./verify.js";
  * recipient and reverts under `min_dy`, which is never 0. No API, no key, no fee.
  *
  * Router NG has no deadline: the quote's lifetime (`quoteTtlMs`) is enforced by the engine, and right before
- * broadcast `preflightDeposit` re-checks the sealed call byte for byte, the router and pool code, the pools' coins
- * and a fresh `get_dy` of the exact route against the minimum. ERC-20 sources approve exactly the input to the
+ * broadcast `preflightDeposit` re-checks the sealed call byte for byte, each hop pool's code and coins and a fresh
+ * `get_dy` of the exact route against the minimum (the router's code hash and version are checked once per chain per
+ * process: the router is immutable). ERC-20 sources approve exactly the input to the
  * pinned router (`approvalAddress`); the engine handles that leg (and a USDT-style reset to 0 first).
  */
 
@@ -135,22 +135,13 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
         if (probeIn > 0n) {
           try {
             const [probeOut] = await price(chainId, d, [route], probeIn, signal);
-            if (probeOut !== null && probeOut !== undefined && probeOut > 0n) {
-              const ratioBps = (out * probeIn * 10_000n) / (probeOut * amountIn);
-              priceImpactBps = Math.max(0, bigintToNumber(10_000n - ratioBps));
-            }
+            priceImpactBps = curveImpactBps(amountIn, out, probeOut);
           } catch {
             /* the quote stands; impact is information, not a gate */
           }
         }
 
-        const bps = params.slippageBps ?? fixedSlippage ?? suggestSlippage({
-          fromChain: params.sourceChain,
-          toChain: params.destChain,
-          fromSymbol: src.symbol,
-          toSymbol: ccAssetByToken(params.destChain, nativeOut ? "" : params.destToken)?.symbol ?? "",
-          ...(priceImpactBps !== undefined ? {priceImpactBps} : {}),
-        }).bps;
+        const bps = params.slippageBps ?? fixedSlippage ?? curveAutoSlippageBps(params, priceImpactBps);
         const minOut = (out * BigInt(10_000 - bps)) / 10_000n;
         if (minOut <= 0n) return refuse("the minimum rounds to zero for this amount");
         if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) {
@@ -167,7 +158,8 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
         // a quoter figure, THORChain and Chainflip).
         const quote: Quote = {
           provider: "curve",
-          intentId: `curve:${chainId}`,
+          // One id per quote: a remote stub keys the request a build is checked against by it.
+          intentId: mintCurveIntentId(chainId),
           depositAddress: "",
           depositMemo: null,
           txRequest: {
@@ -210,9 +202,9 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
     },
 
     /**
-     * Right before broadcast (after any approval): the transaction is byte for byte the sealed quote, the router and
-     * each hop pool are still the pinned code with the pinned coins, and the exact route still pays at least the
-     * signed minimum. Refuse with the reason instead of sending a swap that would revert or was altered.
+     * Right before broadcast (after any approval): the transaction is byte for byte the sealed quote, each hop pool is
+     * still the pinned code with the pinned coins (the immutable router's code and version were checked once for the
+     * chain), and the exact route still pays at least the signed minimum. Refuse with the reason instead of sending a swap that would revert or was altered.
      */
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
       const reason = await chain.checkSealed(quote, tx);
@@ -236,8 +228,8 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
     /** Same-chain: the swap is done when its transaction is mined successfully. */
     async trackIntent(ref: IntentRef): Promise<IntentStatus> {
       if (!ref.sourceTxHash) return {state: "pending"};
-      const chainId = Number(ref.intentId.split(":")[1]);
-      if (!deploymentOf(deployments, chainId) || !config.rpcUrls[chainId]?.length) return {state: "pending"};
+      const chainId = curveIntentChain(ref.intentId);
+      if (chainId === null || !deploymentOf(deployments, chainId) || !config.rpcUrls[chainId]?.length) return {state: "pending"};
       try {
         const [receipt] = (await rpc(chainId, [{method: "eth_getTransactionReceipt", params: [ref.sourceTxHash]}])) as [{status?: string} | null];
         if (!receipt) return {state: "pending"};

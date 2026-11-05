@@ -29,7 +29,7 @@ import { FYND_CHAINS, TYCHO_ROUTER_ABI, checkFyndTransaction } from '@anywalletk
 import { curveProvider } from '@anywalletkit/protocol-swap2-curve/provider'
 import { CurveSwap2Protocol } from '@anywalletkit/protocol-swap2-curve/protocol'
 import { CURVE_DEPLOYMENTS, CURVE_POOLS, EXCHANGE_SELECTOR, curveVerifyQuote, decodeExchange, encodeExchange, findRoutes, routeArgs } from '@anywalletkit/protocol-swap2-curve'
-import curveQuotesLive from '../../packages/protocol-swap2-curve/fixtures/quotes/quotes-2026-11-05.json'
+import curveQuotesLive from '../../packages/protocol-swap2-curve/fixtures/quotes/quotes-2026-11-06.json'
 import { encodeFunctionData, encodeFunctionResult } from 'viem'
 import { nearIntentsProvider } from '@anywalletkit/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@anywalletkit/protocol-swap2-thorchain/protocol'
@@ -158,6 +158,9 @@ export async function smokeProtocols(check: Check): Promise<void> {
     const call = decodeExchange(fam, r0.quote.txRequest!.data!)!
     const elsewhere = { ...r0.quote, txRequest: { ...r0.quote.txRequest!, data: encodeExchange(fam, call, call.amount, call.minDy, '0x1111111111111111111111111111111111111111') } }
     check('curve: refuses the recorded quote paying someone else', /not the recipient/.test(curveVerifyQuote(r0.params, elsewhere) ?? ''))
+    check('curve: a swap2 server token on the intent id passes; one id for the whole chain does not',
+      curveVerifyQuote(r0.params, { ...r0.quote, intentId: `${r0.quote.intentId}~${'ab'.repeat(16)}` }) === null
+      && /not a curve:1 swap/.test(curveVerifyQuote(r0.params, { ...r0.quote, intentId: 'curve:1' }) ?? ''))
     const cp = new CurveSwap2Protocol(evm, { ...swap2Cfg, rpcUrls: { 1: ['https://rpc.invalid'] } })
     check('curve: CurveSwap2Protocol constructs', typeof cp.quoteSwap2 === 'function')
     await tolerates(check, 'curve: getSupportedChains', () => cp.getSupportedChains())

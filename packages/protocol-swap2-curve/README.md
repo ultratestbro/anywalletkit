@@ -65,8 +65,10 @@ const curve = curveProvider({
   chain's AddressProvider is only compared (its id 2 may change at its admin's will) — a difference is a warning, the
   pinned router is still used.
 - **Right before broadcast** (`preflightDeposit`): the transaction is byte for byte the quoted call; the route passes
-  the same rules again; the router is still the pinned code; every hop pool still has its pinned code and coins; and a
-  fresh `get_dy` of the exact route still pays at least the minimum. Anything else refuses with the reason.
+  the same rules again; every hop pool's code and coins are re-read and must still be the pinned ones; and a fresh
+  `get_dy` of the exact route still pays at least the minimum. The router's code hash and version are not re-read
+  here: they are checked once per chain per process (above), and the router is immutable. Anything else refuses with
+  the reason.
 
 Router NG approves each pool it meets for the maximum from its own balance; that touches only what is in transit
 through the router, never the user's allowance, which is exact and spent in the same transaction. The router also
@@ -86,8 +88,15 @@ When the provider runs on your server, spread its pins into the app's stub:
 pinned Router NG, and `curveVerifyQuote` opens the router call on the device against the app's own request: the
 explicit-receiver `exchange`, exactly the input, the destination token, the quote's minimum (never 0), paid to the
 recipient, no zap pools, and a route through allowlisted pools only — synchronous, from the shipped tables. For the
-build checked on chain as well (router and pool code, pool coins, a fresh `get_dy` ≥ the minimum over the app's RPCs),
-use `remoteProvider({name: "curve", baseUrl, ...curveRemotePins({rpcUrls})})`.
+build checked on chain as well, use `remoteProvider({name: "curve", baseUrl, ...curveRemotePins({rpcUrls})})`: over
+the app's RPCs it checks the router (code hash and version, once per chain), each hop pool's code and coins, and a
+fresh `get_dy` of the exact route ≥ the minimum. It then holds the backend's figures to that fresh `get_dy`, so the
+minimum is the device's own: the quote's output may sit at most the slippage above it, and `min_dy` at most the
+slippage below it (or below the quoted output, if lower). The slippage is the request's `slippageBps`; without one,
+the `defaultSlippageBps` you pass (set it to the backend provider's, if it sets one); without that, the provider's auto
+slippage re-derived on the device from a fresh 1/1000 probe, plus `CURVE_AUTO_SLIPPAGE_DRIFT_BPS` (5) for the impact
+moving between quote and build. A backend that names `min_dy = 1` or an inflated output is refused at build time. Each
+quote carries its own intent id (`curve:<chainId>:<nonce>`), so a build is checked against the request it answered.
 
 ## Activity
 

@@ -1,5 +1,6 @@
 import {decodeFunctionResult, encodeFunctionData, keccak256, type Hex as ViemHex} from "viem";
 import {sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
+import {slippageFloor} from "@anywalletkit/protocol-swap2-core/validate";
 import type {Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {ADDRESS_PROVIDER_ABI, COINS_INT, COINS_UINT, EXCHANGE_SELECTOR, VERSION_ABI, decodeExchange, encodeGetDy, type DecodedExchange} from "./abi.js";
 import {CURVE_DEPLOYMENTS, ZERO_ADDRESS, chainIdOf, deploymentOf, type CurveDeployment} from "./deployments.js";
@@ -7,6 +8,8 @@ import {CURVE_POOLS} from "./pools/index.js";
 import type {CurveChainPools, Hex} from "./pools/types.js";
 import {checkRoute, poolIndex, routePools} from "./routes.js";
 import {ethCall, rpcClient, wordAddress, wordUint, type RpcCall} from "./rpc.js";
+import {curveIntentChain} from "./intent.js";
+import {curveAutoSlippageBps, curveImpactBps} from "./slippage.js";
 
 export interface CurveTables {
   /** Override the deployments (tests). */
@@ -34,8 +37,8 @@ export function curveQuoteCheck(tables: CurveTables = {}): (params: QuoteParams,
     if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no router call";
     if (!isAddress(tx.to) || lc(tx.to) !== lc(d.router)) return `the call targets ${tx.to}, not the Curve router`;
     if (tx.chainId !== undefined && tx.chainId !== chainId) return `the call is for chain ${tx.chainId}`;
-    // The chain the build's on-chain checks and the receipt tracking run on (`curve:<chainId>`): this request's.
-    if (quote.intentId !== `curve:${chainId}`) return `the quote names ${String(quote.intentId).slice(0, 40)}, not curve:${chainId}`;
+    // The chain the build's on-chain checks and the receipt tracking run on (`curve:<chainId>:…`): this request's.
+    if (curveIntentChain(quote.intentId) !== chainId) return `the quote names ${String(quote.intentId).slice(0, 40)}, not a curve:${chainId} swap`;
     const src = sourceAssetOf(params);
     if (!src) return `unknown source token ${params.sourceToken}`;
     const nativeIn = !src.contract;
@@ -147,14 +150,23 @@ export function curveOnChain(opts: CurveOnChainOptions) {
 
   /**
    * A sealed quote right before broadcast (or a remote build on the client): the transaction is byte for byte the
-   * quote's router call, the route passes `checkRoute`, the router is still the pinned code, every hop pool still has
-   * its pinned code and coins, and a fresh `get_dy` of that exact route still pays at least the minimum. The reason it
-   * fails, or null.
+   * quote's router call, the route passes `checkRoute`, the router was verified as the pinned code and version (once
+   * per chain per process — it is immutable), every hop pool still has its pinned code and coins (re-read each time),
+   * and a fresh `get_dy` of that exact route still pays at least the minimum. The reason it fails, or null.
    */
   async function checkSealed(quote: Quote, tx: UnsignedTx): Promise<string | null> {
-    const chainId = Number(quote.intentId.split(":")[1]);
-    const d = deploymentOf(deployments, chainId);
-    if (!d || quote.intentId !== `curve:${chainId}`) return "the quote is not a Curve swap on a pinned chain";
+    const r = await inspectSealed(quote, tx, false);
+    return typeof r === "string" ? r : null;
+  }
+
+  /**
+   * {@link checkSealed}, and what it read when it passes: the fresh `get_dy` of the exact route at the sealed amount,
+   * the call's minimum and, with `probe`, the same route at 1/1000 of the amount (null when it reverts).
+   */
+  async function inspectSealed(quote: Quote, tx: UnsignedTx, probe: boolean): Promise<string | {out: bigint; probeOut: bigint | null; amount: bigint; minDy: bigint}> {
+    const chainId = curveIntentChain(quote.intentId);
+    const d = chainId === null ? undefined : deploymentOf(deployments, chainId);
+    if (chainId === null || !d) return "the quote is not a Curve swap on a pinned chain";
     const quoted = quote.txRequest;
     if (!quoted?.data || !quoted.to || !tx.data) return "the quote or the transaction carries no router call";
     if (tx.data.length !== quoted.data.length || lc(tx.data) !== lc(quoted.data)) return "the transaction is not the quoted router call";
@@ -176,6 +188,9 @@ export function curveOnChain(opts: CurveOnChainOptions) {
       calls.push({method: "eth_getCode", params: [pool.address, "latest"]});
       pool.coins.forEach((_, k) => calls.push(ethCall(pool.address, `${COINS_UINT}${k.toString(16).padStart(64, "0")}`)));
     }
+    const probeIn = call.amount / 1000n;
+    const probeAt = calls.length;
+    if (probe && probeIn > 0n) calls.push(ethCall(d.router, encodeGetDy(d.family, call, probeIn)));
     const res = await rpc(chainId, calls);
     let at = 1;
     const retry: {pool: typeof hops[number]; k: number}[] = [];
@@ -199,10 +214,10 @@ export function curveOnChain(opts: CurveOnChainOptions) {
     const out = wordUint(res[0]);
     if (out === null) return "the router no longer quotes this route";
     if (out < call.minDy) return `price moved — the pools now pay ${out}, under your minimum ${call.minDy}`;
-    return null;
+    return {out, probeOut: probe && probeIn > 0n ? wordUint(res[probeAt]) : null, amount: call.amount, minDy: call.minDy};
   }
 
-  return {rpc, verifyDeployment, checkSealed};
+  return {rpc, verifyDeployment, checkSealed, inspectSealed};
 }
 
 function lastToken(call: DecodedExchange): Hex {
@@ -212,13 +227,30 @@ function lastToken(call: DecodedExchange): Hex {
 }
 
 /**
+ * How far the device's own auto slippage may sit under the backend's before a remote build's minimum counts as too low:
+ * the backend sized it from its probe at quote time, the device from a fresh one, and half the impact moves it.
+ */
+export const CURVE_AUTO_SLIPPAGE_DRIFT_BPS = 5;
+
+export interface CurveRemotePinsOptions extends CurveOnChainOptions {
+  /** The backend provider's `defaultSlippageBps`, when it sets one (a build's minimum is bounded by it). Default: auto slippage. */
+  defaultSlippageBps?: number;
+}
+
+/**
  * {@link curvePins} plus `verifyBuild`: a remote Curve build checked on the client — {@link curveVerifyQuote} on the
- * request it answered, then on chain (over the app's own RPCs) the pinned router code, each hop pool's pinned code and
- * coins, and a fresh `get_dy` of the exact route at or above the minimum.
+ * request it answered, then on chain (over the app's own RPCs) the pinned router (code and version, once per chain),
+ * each hop pool's pinned code and coins, and a fresh `get_dy` of the exact route at or above the minimum. The quote's
+ * figures are then held to that fresh `get_dy` (§5.3 C9: the minimum is the device's own): `destAmount` no more than the
+ * slippage above it, and `min_dy` no more than the slippage below it (or below `destAmount`, if lower) — the request's
+ * `slippageBps`, else `defaultSlippageBps`, else the provider's auto slippage re-derived here from a fresh 1/1000 probe
+ * (plus {@link CURVE_AUTO_SLIPPAGE_DRIFT_BPS}). A backend naming `min_dy = 1` or an inflated output is refused.
  * `remoteProvider({name: "curve", baseUrl, ...curveRemotePins({rpcUrls})})`.
  */
-export function curveRemotePins(opts: CurveOnChainOptions): RemotePins & {verifyBuild(quote: Quote, tx: UnsignedTx, params?: QuoteParams): Promise<string | null>} {
+export function curveRemotePins(opts: CurveRemotePinsOptions): RemotePins & {verifyBuild(quote: Quote, tx: UnsignedTx, params?: QuoteParams): Promise<string | null>} {
   const deployments = opts.deployments ?? CURVE_DEPLOYMENTS;
+  const fixedSlippage = opts.defaultSlippageBps;
+  if (fixedSlippage !== undefined && (!Number.isInteger(fixedSlippage) || fixedSlippage <= 0 || fixedSlippage >= 5_000)) throw new Error("curve: defaultSlippageBps must be 1..4999");
   const verifyQuote = curveQuoteCheck(opts);
   const chain = curveOnChain(opts);
   return Object.freeze({
@@ -230,7 +262,17 @@ export function curveRemotePins(opts: CurveOnChainOptions): RemotePins & {verify
       const reason = verifyQuote(params, quote);
       if (reason) return reason;
       try {
-        return await chain.checkSealed(quote, tx);
+        const auto = params.slippageBps === undefined && fixedSlippage === undefined;
+        const seen = await chain.inspectSealed(quote, tx, auto);
+        if (typeof seen === "string") return seen;
+        const {out, probeOut, amount, minDy} = seen;
+        let dest: bigint;
+        try { dest = BigInt(quote.destAmount); } catch { return "the quote names no output"; }
+        const bps = params.slippageBps ?? fixedSlippage ?? Math.min(9_999, curveAutoSlippageBps(params, curveImpactBps(amount, out, probeOut)) + CURVE_AUTO_SLIPPAGE_DRIFT_BPS);
+        if (slippageFloor(dest, bps) > out) return `the quote promises ${dest}, more than ${bps} bps above the ${out} the pools pay now`;
+        const fresh = dest < out ? dest : out;
+        if (minDy < slippageFloor(fresh, bps)) return `the swap's minimum ${minDy} is more than ${bps} bps under the ${fresh} the pools pay now`;
+        return null;
       } catch (e) {
         return e instanceof Error ? e.message.replace(/^curve: /, "") : String(e);
       }

@@ -1,4 +1,4 @@
-// Quotes the live provider built on 2026-11-05 (fixtures/quotes, recorded read-only): curveVerifyQuote — what a client
+// Quotes the live provider built on 2026-11-06 (fixtures/quotes, recorded read-only): curveVerifyQuote — what a client
 // runs on a remote quote, with the shipped deployments and allowlist — accepts each as recorded and refuses it altered.
 import {describe, expect, it} from "vitest";
 import {readFileSync} from "node:fs";
@@ -8,7 +8,7 @@ import {decodeExchange, encodeExchange} from "../src/abi.js";
 import {CURVE_DEPLOYMENTS} from "../src/deployments.js";
 import {curveVerifyQuote} from "../src/verify.js";
 
-const recorded = JSON.parse(readFileSync(fileURLToPath(new URL("../fixtures/quotes/quotes-2026-11-05.json", import.meta.url)), "utf8")) as {label: string; params: QuoteParams; quote: Quote}[];
+const recorded = JSON.parse(readFileSync(fileURLToPath(new URL("../fixtures/quotes/quotes-2026-11-06.json", import.meta.url)), "utf8")) as {label: string; params: QuoteParams; quote: Quote}[];
 const ODD = "0x00000000000000000000000000000000000bad01";
 
 describe("recorded live quotes", () => {

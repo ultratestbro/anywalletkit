@@ -20,7 +20,8 @@ describe("Curve provider: quotes", () => {
     vi.stubGlobal("fetch", rpcStub());
     const q = await make().getQuote({...base, sourceToken: "USDC", destToken: USDT, amountIn: "1000000000", slippageBps: 10});
     // 3pool direct: 1000 USDC × 0.999 − 1 wei.
-    expect(q).toMatchObject({provider: "curve", intentId: "curve:1", destAmount: "998999999", minDestAmount: "998000999", depositAddress: ""});
+    expect(q).toMatchObject({provider: "curve", destAmount: "998999999", minDestAmount: "998000999", depositAddress: ""});
+    expect(q!.intentId).toMatch(/^curve:1:[0-9a-f]{16}$/);
     expect(q!.txRequest).toMatchObject({to: D1.router, value: "0", chainId: 1, approvalAddress: D1.router});
     // No gas limit: a per-step formula ran swaps out of gas (scrvUSD deposit, Monad); the wallet estimates the call.
     expect(q!.txRequest!.gasLimit).toBeUndefined();
@@ -209,12 +210,12 @@ describe("Curve provider: preflight and tracking", () => {
   it("tracks the swap by its mined receipt", async () => {
     const p = make();
     vi.stubGlobal("fetch", rpcStub({receipt: null}));
-    expect(await p.trackIntent({intentId: "curve:1", sourceTxHash: "0xabc"})).toEqual({state: "pending"});
+    expect(await p.trackIntent({intentId: "curve:1:00000000000000aa", sourceTxHash: "0xabc"})).toEqual({state: "pending"});
     vi.stubGlobal("fetch", rpcStub({receipt: "0x1"}));
-    expect(await p.trackIntent({intentId: "curve:1", sourceTxHash: "0xabc"})).toEqual({state: "completed", destTxHash: "0xabc"});
+    expect(await p.trackIntent({intentId: "curve:1:00000000000000aa", sourceTxHash: "0xabc"})).toEqual({state: "completed", destTxHash: "0xabc"});
     vi.stubGlobal("fetch", rpcStub({receipt: "0x0"}));
-    expect(await p.trackIntent({intentId: "curve:1", sourceTxHash: "0xabc"})).toEqual({state: "failed"});
-    expect(await p.trackIntent({intentId: "curve:1"})).toEqual({state: "pending"});
+    expect(await p.trackIntent({intentId: "curve:1:00000000000000aa", sourceTxHash: "0xabc"})).toEqual({state: "failed"});
+    expect(await p.trackIntent({intentId: "curve:1:00000000000000aa"})).toEqual({state: "pending"});
   });
 });
 
