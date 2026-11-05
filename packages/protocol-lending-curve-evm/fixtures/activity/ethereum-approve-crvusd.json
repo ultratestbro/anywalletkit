@@ -1,0 +1,29 @@
+{
+  "note": "crvUSD approve(scrvUSD, 753 000 crvUSD) by 0x2a69\u2026378d before its deposit \u2014 Ethereum block 26333351, etherscan.io/tx/0x3e69b4f8\u2026 (the test wallet has no scrvUSD tx yet)",
+  "own": [
+    "0x2a691723fa94b2e38c1cda37dc64c7298f73378d"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x3e69b4f8bbaa6c918d8bd5a3df6d305f26c64bb052f37688a1e69b4622ef83f0",
+    "time": 1793697803,
+    "status": "confirmed",
+    "address": "0x2a691723fa94b2e38c1cda37dc64c7298f73378d",
+    "from": "0x2a691723fa94b2e38c1cda37dc64c7298f73378d",
+    "to": "0xf939e0a03fb07f59a73314e73794be0e57ac1b4e",
+    "nativeValue": "0",
+    "transfers": [],
+    "block": "26333351",
+    "fee": "2512645907607",
+    "call": {
+      "to": "0xf939e0a03fb07f59a73314e73794be0e57ac1b4e",
+      "selector": "0x095ea7b3",
+      "data": "0x095ea7b30000000000000000000000000655977feb2f289a4ab78af67bab0d17aab84367000000000000000000000000000000000000000000009f7436382303d4a00000"
+    }
+  },
+  "expect": {
+    "kind": "approve",
+    "title": "Approved crvUSD for Savings crvUSD",
+    "counterparty": "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367"
+  }
+}
