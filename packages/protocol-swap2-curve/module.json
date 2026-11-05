@@ -1,0 +1,33 @@
+{
+  "name": "@anywalletkit/protocol-swap2-curve",
+  "type": "swap2",
+  "chains": [
+    "eip155:1",
+    "eip155:10",
+    "eip155:100",
+    "eip155:130",
+    "eip155:137",
+    "eip155:143",
+    "eip155:146",
+    "eip155:196",
+    "eip155:42161",
+    "eip155:43114",
+    "eip155:4663",
+    "eip155:5000",
+    "eip155:56",
+    "eip155:57073",
+    "eip155:8453",
+    "eip155:9745",
+    "eip155:98866",
+    "eip155:999"
+  ],
+  "tier": "core",
+  "maintainers": [
+    "@ultratestbro"
+  ],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
+  "path": "packages/protocol-swap2-curve",
+  "description": "Curve same-chain swaps from the contracts only (Router NG get_dy + exchange) over a curated, pinned pool allowlist: no API, no key, no fee; router code hash, pools and coins checked on-chain.",
+  "addedAt": "2026-11-05"
+}
