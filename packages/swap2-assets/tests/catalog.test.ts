@@ -79,6 +79,36 @@ describe("2026-10-26: LDO, SKY, COW", () => {
   });
 });
 
+// Read on chain 2026-11-05 (code, symbol, decimals, name, totalSupply); addresses from docs.curve.finance/deployments.json.
+describe("2026-11-05: crvUSD, scrvUSD, CRV", () => {
+  it.each([
+    ["eip155:1", "crvUSD", "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E"],
+    ["eip155:1", "scrvUSD", "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367"],
+    ["eip155:1", "CRV", "0xD533a949740bb3306d119CC777fa900bA034cd52"],
+    ["eip155:42161", "crvUSD", "0x498Bf2B1e120FeD3ad3D42EA2165E9b73f99C1e5"],
+    ["eip155:42161", "CRV", "0x11cDb42B0EB46D95f990BeDD4695A6e3fA034978"],
+    ["eip155:10", "crvUSD", "0xC52D7F23a2e460248Db6eE192Cb23dD12bDDCbf6"],
+    ["eip155:10", "scrvUSD", "0x289f635106d5b822A505b39AC237A0AE9189335B"],
+    ["eip155:10", "CRV", "0x0994206dfE8De6Ec6920FF4D779B0d950605Fb53"],
+    ["eip155:8453", "crvUSD", "0x417Ac0e078398C154EdFadD9Ef675d30Be60Af93"],
+    ["eip155:8453", "scrvUSD", "0x646A737B9B6024e49f5908762B3fF73e65B5160c"],
+    ["eip155:8453", "CRV", "0x8Ee73c484A26e0A5df2Ee2a4960B789967dd0415"],
+    ["eip155:137", "crvUSD", "0xc4Ce1D6F5D98D65eE25Cf85e9F2E9DcFEe6Cb5d6"],
+    ["eip155:137", "CRV", "0x172370d5Cd63279eFa6d502DAB29171933a610AF"],
+    ["eip155:146", "crvUSD", "0x7FFf4C4a827C84E32c5E175052834111B2ccd270"],
+    ["eip155:100", "crvUSD", "0xabef652195f98a91e490f047a5006b71c85f058d"],
+  ])("%s %s is pinned to %s (18 decimals) and found by its contract in any case", (caip2, symbol, contract) => {
+    expect(ccAsset(caip2, symbol)).toMatchObject({contract, decimals: 18, assetId: ""});
+    expect(ccAssetByToken(caip2, contract.toLowerCase())!.symbol).toBe(symbol);
+  });
+
+  it("left out where the supply is dust: crvUSD on BSC and Avalanche, scrvUSD on Arbitrum and Sonic", () => {
+    for (const [caip2, symbol] of [["eip155:56", "crvUSD"], ["eip155:43114", "crvUSD"], ["eip155:42161", "scrvUSD"], ["eip155:146", "scrvUSD"]] as const) {
+      expect(ccAsset(caip2, symbol), `${caip2} ${symbol}`).toBeUndefined();
+    }
+  });
+});
+
 describe("unlisted tokens", () => {
   const PEPE = "0x6982508145454ce325ddbe47a25d4ec3d2311933";
   const BONK = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
