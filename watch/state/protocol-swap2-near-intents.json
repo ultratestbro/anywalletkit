@@ -227,7 +227,7 @@
      "nep245:v2_1.omni.hot.tg:9745_3aL9skCy1yhPoDB8oKMmRHRN7SJW"
     ]
    },
-   "seenAt": "2026-11-04T17:01:45.341Z",
+   "seenAt": "2026-11-05T14:38:18.757Z",
    "changedAt": "2026-11-04T09:36:09.954Z"
   },
   "docs-1click-api": {
@@ -240,7 +240,7 @@
     "hash": "f797dc84e44a65da",
     "chars": 1512
    },
-   "seenAt": "2026-11-04T17:01:45.751Z",
+   "seenAt": "2026-11-05T14:38:19.317Z",
    "changedAt": "2026-10-14T15:10:53.784Z"
   },
   "docs-chain-support": {
@@ -253,7 +253,7 @@
     "hash": "061760a0257c7b31",
     "chars": 7084
    },
-   "seenAt": "2026-11-04T17:01:45.505Z",
+   "seenAt": "2026-11-05T14:38:19.311Z",
    "changedAt": "2026-10-14T15:10:54.196Z"
   },
   "intents": {
@@ -269,7 +269,7 @@
     "url": "https://github.com/near/intents/releases/tag/wallet/v0.2.0",
     "prerelease": true
    },
-   "seenAt": "2026-11-04T17:01:45.406Z",
+   "seenAt": "2026-11-05T14:38:18.651Z",
    "changedAt": "2026-10-14T15:12:21.191Z"
   },
   "one-click-sdk-typescript": {
@@ -284,7 +284,7 @@
     "url": "https://github.com/defuse-protocol/one-click-sdk-typescript/commit/ae8b24e064785c8cba8081263e03e52fed4de089",
     "note": "default branch: fix virtual (#21)"
    },
-   "seenAt": "2026-11-04T17:01:45.843Z",
+   "seenAt": "2026-11-05T14:38:19.069Z",
    "changedAt": "2026-10-14T15:12:22.239Z"
   },
   "docs-changelog": {
@@ -297,7 +297,7 @@
     "hash": "1ed4822994b59014",
     "chars": 5431
    },
-   "seenAt": "2026-11-04T17:01:45.319Z",
+   "seenAt": "2026-11-05T14:38:19.213Z",
    "changedAt": "2026-11-04T17:01:45.319Z"
   }
  }

@@ -62,7 +62,7 @@
      "eNLm5e5KVDX2vEcCkt75PpZ2GMfXcZES3QrFshgpVzp"
     ]
    },
-   "seenAt": "2026-11-04T17:01:31.894Z",
+   "seenAt": "2026-11-05T14:38:04.927Z",
    "changedAt": "2026-11-04T09:35:50.766Z"
   },
   "vaults": {
@@ -271,7 +271,7 @@
      "qoCFKVrNfFCJKxEaLBbXrWNpeMT2xyfUEjFqMyddheA"
     ]
    },
-   "seenAt": "2026-11-04T17:01:31.935Z",
+   "seenAt": "2026-11-05T14:38:05.147Z",
    "changedAt": "2026-11-04T09:35:51.095Z"
   },
   "farms-program": {
@@ -285,7 +285,7 @@
     "slot": 444035168,
     "authority": "CivjSDKgTpmkRNL4zYcmv9D9QqPJg6yTxBVxMGcXvMuY"
    },
-   "seenAt": "2026-11-04T17:01:32.088Z",
+   "seenAt": "2026-11-05T14:38:04.978Z",
    "changedAt": "2026-10-14T15:11:05.541Z"
   },
   "klend-program": {
@@ -299,7 +299,7 @@
     "slot": 461744249,
     "authority": "GzFgdRJXmawPhGeBsyRCDLx4jAKPsvbUqoqitzppkzkW"
    },
-   "seenAt": "2026-11-04T17:01:32.182Z",
+   "seenAt": "2026-11-05T14:38:05.066Z",
    "changedAt": "2026-11-04T09:35:50.957Z"
   },
   "docs-api": {
@@ -312,7 +312,7 @@
     "hash": "7bfab9d955c21073",
     "chars": 3826
    },
-   "seenAt": "2026-11-04T17:01:32.326Z",
+   "seenAt": "2026-11-05T14:38:05.282Z",
    "changedAt": "2026-10-14T15:11:05.961Z"
   },
   "kvault-program": {
@@ -326,7 +326,7 @@
     "slot": 461660004,
     "authority": "GzFgdRJXmawPhGeBsyRCDLx4jAKPsvbUqoqitzppkzkW"
    },
-   "seenAt": "2026-11-04T17:01:32.137Z",
+   "seenAt": "2026-11-05T14:38:05.017Z",
    "changedAt": "2026-11-04T09:35:50.921Z"
   },
   "klend": {
@@ -342,7 +342,7 @@
     "url": "https://github.com/Kamino-Finance/klend/releases/tag/release/v1.27.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-04T17:01:32.192Z",
+   "seenAt": "2026-11-05T14:38:05.019Z",
    "changedAt": "2026-10-20T10:24:15.645Z"
   },
   "klend-sdk": {
@@ -357,7 +357,7 @@
     "url": "https://github.com/Kamino-Finance/klend-sdk/commit/6a26d6f1b5afb29953ffd139ee8c0c4ca5f26ce6",
     "note": "default branch: Update klend-sdk"
    },
-   "seenAt": "2026-11-04T17:01:32.715Z",
+   "seenAt": "2026-11-05T14:38:05.657Z",
    "changedAt": "2026-10-20T10:24:16.203Z"
   }
  }

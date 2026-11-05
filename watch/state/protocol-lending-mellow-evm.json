@@ -15,7 +15,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-04T17:01:32.860Z",
+   "seenAt": "2026-11-05T14:38:05.825Z",
    "changedAt": "2026-10-14T15:10:30.832Z"
   },
   "vault-lido-earn-eth": {
@@ -32,7 +32,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-04T17:01:32.846Z",
+   "seenAt": "2026-11-05T14:38:05.792Z",
    "changedAt": "2026-10-14T15:10:30.850Z"
   },
   "vault-lido-conservative-earn-usd": {
@@ -49,7 +49,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-04T17:01:32.855Z",
+   "seenAt": "2026-11-05T14:38:05.817Z",
    "changedAt": "2026-10-14T15:10:30.853Z"
   },
   "vault-lido-earn-usd": {
@@ -66,7 +66,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-04T17:01:32.847Z",
+   "seenAt": "2026-11-05T14:38:05.810Z",
    "changedAt": "2026-10-14T15:10:30.853Z"
   },
   "vault-lido-strategy": {
@@ -83,7 +83,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-04T17:01:32.855Z",
+   "seenAt": "2026-11-05T14:38:05.811Z",
    "changedAt": "2026-10-14T15:10:30.854Z"
   },
   "registry-vaults": {
@@ -184,7 +184,7 @@
      "0xf785a3637Fb8DC057a2a23c925e83859Ef212c8d"
     ]
    },
-   "seenAt": "2026-11-04T17:01:33.525Z",
+   "seenAt": "2026-11-05T14:38:06.056Z",
    "changedAt": "2026-10-14T15:10:30.933Z"
   },
   "docs": {
@@ -197,7 +197,7 @@
     "hash": "bbb595e50a6c75a7",
     "chars": 1080
    },
-   "seenAt": "2026-11-04T17:01:33.397Z",
+   "seenAt": "2026-11-05T14:38:06.113Z",
    "changedAt": "2026-10-14T15:10:31.059Z"
   },
   "flexible-vaults": {
@@ -212,7 +212,7 @@
     "url": "https://github.com/mellow-finance/flexible-vaults/commit/cac8d5d283ed6d98d249d1e99f98d805d9fb8473",
     "note": "default branch: deploy scripts & configs for proUSDneutr"
    },
-   "seenAt": "2026-11-04T17:01:33.387Z",
+   "seenAt": "2026-11-05T14:38:06.427Z",
    "changedAt": "2026-11-04T09:35:57.137Z"
   }
  }

@@ -6,28 +6,28 @@
    "target": {
     "url": "https://docs.ston.fi/docs/developer-section/omniston"
    },
-   "value": "7eaa0a569a6cd8a3a8e395be7335c2166f76ca0ffd2fe01da2c2a5092d37deee",
+   "value": "1c4b12f67b22dbfff1e0b1276819020b0a71f3bb207ff2393ed1e022d240d96a",
    "meta": {
-    "hash": "7eaa0a569a6cd8a3",
+    "hash": "1c4b12f67b22dbff",
     "chars": 3421
    },
-   "seenAt": "2026-11-04T17:01:46.417Z",
-   "changedAt": "2026-11-04T09:36:10.749Z"
+   "seenAt": "2026-11-05T14:38:19.741Z",
+   "changedAt": "2026-11-05T14:38:19.741Z"
   },
   "omniston-sdk": {
    "type": "github-releases",
    "target": {
     "repo": "ston-fi/omniston-sdk"
    },
-   "value": "0f94cf7c52d13ec5daa75719002af1a355ed6a75",
+   "value": "8b97fdc0ab2cb9c72337e3c0d4ca06664e6bf845",
    "meta": {
-    "tag": "commit 0f94cf7",
-    "at": "2026-11-02",
-    "url": "https://github.com/ston-fi/omniston-sdk/commit/0f94cf7c52d13ec5daa75719002af1a355ed6a75",
-    "note": "default branch: fix(demo-app): remove unnecessary `traderDstDiscloseAddress` field passing to th"
+    "tag": "commit 8b97fdc",
+    "at": "2026-11-05",
+    "url": "https://github.com/ston-fi/omniston-sdk/commit/8b97fdc0ab2cb9c72337e3c0d4ca06664e6bf845",
+    "note": "default branch: chore(demo-app): upgrade react & nextjs"
    },
-   "seenAt": "2026-11-04T17:01:46.457Z",
-   "changedAt": "2026-11-04T09:36:11.373Z"
+   "seenAt": "2026-11-05T14:38:20.233Z",
+   "changedAt": "2026-11-05T14:38:20.233Z"
   }
  }
 }
