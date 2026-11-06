@@ -1,3 +1,4 @@
+import type { TransferResult } from '@anywalletkit/core'
 import type { Cell, StateInit } from '@ton/core'
 
 /** A toncenter v2 JSON-RPC endpoint (api keys there are meant for client-side wallets). */
@@ -107,6 +108,12 @@ export interface TonTransaction {
  * V5R1 external-message body Cell.
  */
 export type TonSendable = TonTransaction | TonTransaction[] | Cell
+
+/** What a TON `sendTransaction` / `transfer` returns: the body hash, the fee, and the external message as broadcast. */
+export interface TonTransferResult extends TransferResult {
+  /** The signed external message exactly as it was broadcast, base64 BoC (a TON Connect `sendTransaction` reply). */
+  boc: string
+}
 
 /** A native TON or jetton transfer. Amount in nanotons or the jetton's base units. */
 export interface TonTransferOptions {

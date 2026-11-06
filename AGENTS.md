@@ -37,6 +37,7 @@ into the app; never install from GitHub.
 | Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,uniswap,balancer,wrap,jupiter,omniston,fynd}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
 | Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana,native-monad}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana}` |
 | Safety and data | `tx-preview-evm`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks`, `tokens` |
+| dApp connection | `walletconnect-ton` (WalletConnect for TON dApps); `extension-kit` (browser extension) |
 | Testing your own module | `conformance` (Vitest suites) |
 
 ## Chain ids (CAIP-2)
@@ -418,7 +419,7 @@ venue contracts), quote before every write, log hashes and addresses only, call 
 - A swap's `toToken` is the **destination** chain's token id (or symbol); `fromToken` the source's.
 - `Swap2MaybeSentError` means "maybe broadcast": never auto-retry a swap or a transfer.
 - TON and NEAR `sign()` refuse a 32-byte message (`MessageIsTransactionError`: it could be a transaction
-  hash). TON Connect: `signTonProof` / `signTonConnectData`; NEAR dApps and Intents: `signNep413`.
+  hash). TON Connect: `signTonProof` / `signTonConnectData` (WalletConnect for TON: `walletconnect-ton`); NEAR dApps and Intents: `signNep413`.
 - Public RPCs rate-limit; production apps pass their own endpoints (each `provider` accepts a list).
 
 ## Security rules (non-negotiable)

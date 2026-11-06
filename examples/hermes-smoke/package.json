@@ -43,6 +43,7 @@
     "@anywalletkit/wallet-ton": "workspace:*",
     "@anywalletkit/wallet-tron": "workspace:*",
     "@anywalletkit/wallet-zcash": "workspace:*",
+    "@anywalletkit/walletconnect-ton": "workspace:*",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@ton/core": "^0.63.1",
