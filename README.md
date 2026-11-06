@@ -125,7 +125,7 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 
 ## Tests
 
-`pnpm test` runs 4,100+ tests across 49 packages (Node); `pnpm test:hermes` runs 374
+`pnpm test` runs 4,100+ tests across 50 packages (Node); `pnpm test:hermes` runs 383
 checks in the Hermes VM React Native ships. Beyond unit tests the swap layer is
 checked against live providers (running totals, October 2026): 127,168 quote checks
 (11 providers, up to 36 chains, 378 assets), 60,013 builds simulated to the
