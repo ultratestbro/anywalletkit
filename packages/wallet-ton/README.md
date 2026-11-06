@@ -106,6 +106,19 @@ const reply = await account.signTonConnectData({ domain: 'app.example', timestam
 
 `domain` is the host the wallet saw the request come from, never the dApp's own claim.
 
+TON Connect requests are parsed in one place, shared by every transport (the extension's JS bridge in
+`@anywalletkit/extension-kit`, WalletConnect in `@anywalletkit/walletconnect-ton`), from the main entry
+or the light subpath `@anywalletkit/wallet-ton/tonconnect` (no `@ton/core`):
+
+```ts
+import { parseSendTransaction, parseSignData, TonConnectError, tonConnectRawAddress } from '@anywalletkit/wallet-ton/tonconnect'
+
+const req = parseSendTransaction(params[0], { network: '-239', address: account.address }) // valid_until, network, from, ≤ 4 messages
+const payload = parseSignData(params[0], { address: account.address })                    // text | binary; cell → TonConnectError 400
+const { hash, boc } = await account.sendTransaction(req.messages.map((m) => ({ to: m.address, value: BigInt(m.amount), bodyBoc: m.payload, stateInit: m.stateInit })))
+// boc: the external message exactly as broadcast — the sendTransaction reply
+```
+
 ## Describe
 
 `describeTransaction(tx)` / `account.describe(tx)` decode TON transfers (text

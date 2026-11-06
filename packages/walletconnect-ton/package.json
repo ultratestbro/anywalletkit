@@ -1,0 +1,60 @@
+{
+  "name": "@anywalletkit/walletconnect-ton",
+  "version": "0.0.0",
+  "description": "WalletConnect for TON on Any Wallet Kit: the `ton` session namespace, the required session properties (public key, V5R1 StateInit), ton_proof at connect, and ton_sendMessage / ton_signData answered through a wallet-ton account with review, policies and one signature. No WalletConnect runtime dependency: plain WalletKit objects in, JSON-RPC responses out.",
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/walletconnect-ton" },
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@ton/core": "^0.63.1"
+  },
+  "peerDependencies": {
+    "@anywalletkit/wallet-ton": "workspace:*"
+  },
+  "devDependencies": {
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/kit": "workspace:*",
+    "@anywalletkit/wallet-ton": "workspace:*",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "buffer": "^6.0.3",
+    "vitest": "^5.0.3"
+  },
+  "keywords": [
+    "walletconnect",
+    "reown",
+    "ton",
+    "ton-connect",
+    "ton_proof",
+    "dapp",
+    "wallet",
+    "anywalletkit"
+  ],
+  "publishConfig": { "access": "public", "provenance": true }
+}

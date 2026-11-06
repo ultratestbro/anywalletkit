@@ -42,9 +42,14 @@ SDK yet.
 
 **You bring:** [Reown WalletKit](https://docs.reown.com) and a project id from
 [reown.com](https://reown.com). Route its session requests (`eth_sendTransaction`,
-`personal_sign`, `eth_signTypedData_v4`, `solana_signTransaction`…) to `kit` accounts, so
-policies and [review](/build-a-wallet/review-and-safety/) apply to them like to any other
-write.
+`personal_sign`, `eth_signTypedData_v4`, `solana_signTransaction`, `ton_sendMessage`…) to
+`kit` accounts, so policies and [review](/build-a-wallet/review-and-safety/) apply to them
+like to any other write.
+
+:::note[TON]
+TON dApps connect through TON Connect, which offers only wallets listed in the TON wallets
+registry. Until yours is listed, WalletConnect is the way in. See [TON dApps](/build-a-wallet/ton-dapps/).
+:::
 
 ## Mobile: in-app browser
 

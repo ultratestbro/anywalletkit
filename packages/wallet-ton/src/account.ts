@@ -1,4 +1,4 @@
-import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
+import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type WriteOptions } from '@anywalletkit/core'
 import { Buffer } from 'buffer'
 import { Cell } from '@ton/core'
 import { BroadcastUnknownError, MessageIsTransactionError, SimulationError, UnsafeTransactionError } from './errors.js'
@@ -7,7 +7,7 @@ import { tonProofDigest, tonSignDataDigest, type TonProof, type TonProofRequest,
 import { WalletAccountReadOnlyTon } from './read-only-account.js'
 import { parseV5R1Body, v5r1ExternalMessage, v5r1PackSigned, v5r1PackUnsigned, type V5R1Message } from './wallet-v5r1.js'
 import { drainModes, sendModeOf } from './describe.js'
-import type { TonConfig, TonSendable, TonTransferOptions } from './types.js'
+import type { TonConfig, TonSendable, TonTransferOptions, TonTransferResult } from './types.js'
 
 /** How long a send waits, by default, for the previous transfer to move the seqno. */
 export const PENDING_SEQNO_TIMEOUT_MS = 60_000
@@ -213,7 +213,8 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     return body.toBoc().toString('base64')
   }
 
-  private async broadcast(body: Cell): Promise<string> {
+  /** Broadcast a signed body; `boc` is the external message exactly as it went out (base64 BoC). */
+  private async broadcast(body: Cell): Promise<{ hash: string; boc: string }> {
     const rpc = this.requireRpc('send transactions')
     const init = await this.initIfNeeded()
     const hash = body.hash().toString('hex')
@@ -221,8 +222,9 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     const sent = (): void => {
       if (parsed) this._inFlight = { seqno: parsed.seqno, validUntil: parsed.validUntil }
     }
+    const external = v5r1ExternalMessage(this._address, body, init)
     try {
-      await rpc.sendBoc(v5r1ExternalMessage(this._address, body, init))
+      await rpc.sendBoc(external)
     } catch (e) {
       // Only a node's explicit refusal means nothing went out (round 3, M12).
       if (isAnsweredRefusal(e)) throw e
@@ -230,7 +232,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
       throw new BroadcastUnknownError(hash, e)
     }
     sent()
-    return hash
+    return { hash, boc: external.toBoc().toString('base64') }
   }
 
   /**
@@ -243,30 +245,34 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
     return next
   }
 
-  /** Sign and broadcast; `hash` is the body hash (hex) — resolve it with getTransactionReceipt. */
-  sendTransaction(tx: TonSendable, options: WriteOptions = {}): Promise<TransferResult> {
+  /**
+   * Sign and broadcast; `hash` is the body hash (hex) — resolve it with getTransactionReceipt.
+   * `boc` is the signed external message as broadcast (base64 BoC): what a TON Connect
+   * `sendTransaction` reply carries.
+   */
+  sendTransaction(tx: TonSendable, options: WriteOptions = {}): Promise<TonTransferResult> {
     return this.#serial(() => this.#sendTransactionNow(tx, options))
   }
 
-  async #sendTransactionNow(tx: TonSendable, options: WriteOptions): Promise<TransferResult> {
+  async #sendTransactionNow(tx: TonSendable, options: WriteOptions): Promise<TonTransferResult> {
     this.requireRpc('send transactions')
     if (tx instanceof Cell) this.assertNoDrain(this.bodyModes(tx))
     const { body, fee } = tx instanceof Cell
       ? { body: tx, fee: await this.preflight(tx, feeLimit(this._config.transactionMaxFee, options), 'transaction') }
       : await this.#signMessages(this.toMessages(tx), feeLimit(this._config.transactionMaxFee, options), 'transaction', true)
-    return { hash: await this.broadcast(body), fee }
+    return { ...(await this.broadcast(body)), fee }
   }
 
   /** TON (no `token`) or jetton transfer. */
-  transfer(o: TonTransferOptions, writeOptions: WriteOptions = {}): Promise<TransferResult> {
+  transfer(o: TonTransferOptions, writeOptions: WriteOptions = {}): Promise<TonTransferResult> {
     return this.#serial(() => this.#transferNow(o, writeOptions))
   }
 
-  async #transferNow(o: TonTransferOptions, writeOptions: WriteOptions): Promise<TransferResult> {
+  async #transferNow(o: TonTransferOptions, writeOptions: WriteOptions): Promise<TonTransferResult> {
     this.requireRpc('transfer tokens')
     const message = o.token ? await this.jettonTransferMessage(o) : this.transactionMessage({ to: o.recipient, value: o.amount, ...(o.memo !== undefined ? { body: o.memo } : {}) })
     const { body, fee } = await this.#signMessages([message], feeLimit(this._config.transferMaxFee, writeOptions), 'transfer', true)
-    return { hash: await this.broadcast(body), fee }
+    return { ...(await this.broadcast(body)), fee }
   }
 
   /** The same wallet as a {@link WalletAccountReadOnlyTon}. */

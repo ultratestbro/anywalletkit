@@ -34,7 +34,7 @@ import { WalletManagerSolana, WalletAccountReadOnlySolana, describeTransaction a
 import { getApproveInstruction } from '@solana-program/token'
 import { appendTransactionMessageInstructions, createNoopSigner, createTransactionMessage, pipe, setTransactionMessageFeePayer, type Address } from '@solana/kit'
 import { WalletManagerTon, describeTransaction as describeTon, parseV5R1Body, v5r1SigningMessage, v5r1PackUnsigned, v5r1WalletId } from '@anywalletkit/wallet-ton'
-import { beginCell, internal } from '@ton/core'
+import { beginCell, internal, Address as TonAddress, Cell as TonCell, contractAddress, loadStateInit } from '@ton/core'
 import { WalletManagerTron, describeTransaction as describeTron, ZERO_ADDRESS as TRON_ZERO } from '@anywalletkit/wallet-tron'
 import { WalletManagerBtc, selectCoins, INPUT_WEIGHT } from '@anywalletkit/wallet-btc'
 import { WalletManagerZcash, parseTx as parseZcashTx, txid as zcashTxid, sighashAll as zcashSighash, parseP2pkhScriptSig, conventionalFee as zcashFee, outputSize as zcashOutputSize } from '@anywalletkit/wallet-zcash'
@@ -44,6 +44,8 @@ import fastPbkdf2 from '@anywalletkit/runtime-hermes/fast-pbkdf2'
 import { sealBackup, openBackup, encodeBackup, decodeBackup, isBackupError } from '@anywalletkit/seed-vault'
 import { avatarUrl, ensCcipRequest, ensCcipViaProxy, ensResolver, warningsFor, coinTypeFor, decodeBtcScript } from '@anywalletkit/names-ens'
 import { isNameLike, nameResolvers } from '@anywalletkit/core'
+import { handleTonRequest, tonProofAuthentication, tonSessionNamespace, tonSessionProperties } from '@anywalletkit/walletconnect-ton'
+import { parseSendTransaction as parseTonConnectSend, tonConnectFriendlyAddress, tonConnectRawAddress } from '@anywalletkit/wallet-ton/tonconnect'
 import { TOKEN_SYMBOL_MAX, TokensTable, assessToken, foldSymbol, inspectToken, memoryJsonStorage as tokensStorage, tokenText, type TokensState } from '@anywalletkit/tokens'
 import { isTokenAddress, resolveAsset } from '@anywalletkit/swap2-assets'
 import { NetworksTable, memoryJsonStorage, parseAddChainParams, checkRpcUrl, isPrivateHost, isPublicHttpsUrl, verifyNetwork, tonGlobalIdFromBoc, BUILTIN_NETWORKS, DEFAULT_TESTNETS, isAddChainError, type NetworksState } from '@anywalletkit/networks'
@@ -342,6 +344,44 @@ async function main() {
     eq('structuredClone bytes', c.b instanceof Uint8Array && c.b !== src.b && c.b[1] === 2, true)
     eq('structuredClone map', c.m instanceof Map && c.m.get('k') === 3n, true)
     eq('structuredClone date', c.d instanceof Date && c.d.getTime() === 5, true)
+  }
+  // walletconnect-ton: session properties, ton_proof, signData and a full ton_sendMessage over an in-memory toncenter (no network)
+  {
+    const sent: string[] = []
+    const rpc = {
+      call: async (method: string, p: Record<string, unknown>): Promise<never> => {
+        const r: Record<string, unknown> = {
+          getAddressInformation: { '@type': 'raw.fullAccountState', balance: '5000000000', state: 'active', code: '', data: '', last_transaction_id: { '@type': 'internal.transactionId', lt: '1', hash: 'AA==' }, sync_utime: 1 },
+          runGetMethod: { '@type': 'smc.runResult', gas_used: 1, exit_code: 0, stack: [['num', '0x' + (7 + sent.length).toString(16)]] },
+          estimateFee: { '@type': 'query.fees', source_fees: { '@type': 'fees', in_fwd_fee: 1000, storage_fee: 10, gas_fee: 2000, fwd_fee: 100 }, destination_fees: [] },
+          sendBoc: {},
+        }
+        if (method === 'sendBoc') sent.push(String(p.boc))
+        return r[method] as never
+      },
+    }
+    const tm = new WalletManagerTon('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about', { tonClient: rpc, emulate: false })
+    const a = await tm.getAccount(0)
+    const raw = TonAddress.parse(a.address).toRawString()
+    eq('tonconnect friendly ⇄ raw', tonConnectRawAddress(tonConnectFriendlyAddress(raw)!) === raw && tonConnectFriendlyAddress(raw) === a.address, true)
+    eq('tonconnect refuses expired', (() => { try { parseTonConnectSend({ valid_until: 1, messages: [{ address: raw, amount: '1' }] }); return 'ok' } catch (e) { return (e as { code?: number }).code } })(), 1)
+    const ns = tonSessionNamespace(a, { chains: ['ton:-239', 'ton:-3'] })!
+    eq('wc ton account friendly', ns.accounts[0], `ton:-239:${a.address}`)
+    const props = tonSessionProperties(a)
+    eq('wc ton stateInit derives the address', contractAddress(0, loadStateInit(TonCell.fromBase64(props.ton_getStateInit).beginParse())).toRawString(), raw)
+    const proposal = { params: { proposer: { metadata: { url: 'https://app.ston.fi' } }, requests: { authentication: [{ aud: 'ton_proof', statement: 'nonce', domain: 'evil.example' }] } } }
+    const cacao = (await tonProofAuthentication(a, proposal, { now: () => 1_760_000_000 }))![0]!
+    eq('wc ton_proof peer domain', cacao.p.domain + ' ' + cacao.p.iat, 'app.ston.fi 2025-10-09T08:53:20.000Z')
+    const session = { peer: { metadata: { url: 'https://app.ston.fi' } }, namespaces: { ton: { chains: ['ton:-239'], accounts: ns.accounts } } }
+    const sd = await handleTonRequest(a, { id: 1, params: { chainId: 'ton:-239', request: { method: 'ton_signData', params: { type: 'text', text: 'hi', domain: 'evil.example' } } } }, { session, review: () => true })
+    eq('wc signData bound to peer', 'result' in sd && (sd.result as { domain: string }).domain, 'app.ston.fi')
+    const dest = TonAddress.parseRaw(`0:${'ab'.repeat(32)}`).toString()
+    const req = { id: 2, params: { chainId: 'ton:-239', request: { method: 'ton_sendMessage', params: { valid_until: Math.floor(Date.now() / 1000) + 300, from: raw, messages: [{ address: dest, amount: '10000000' }] } } } }
+    const no = await handleTonRequest(a, req, { session, review: () => false })
+    eq('wc sendMessage declined', 'error' in no && no.error.code === 300 && sent.length === 0, true)
+    const ok = await handleTonRequest(a, req, { session, review: () => true })
+    eq('wc sendMessage boc = broadcast', 'result' in ok && sent.length === 1 && ok.result === sent[0], true)
+    tm.dispose()
   }
   await smokeProtocols((what, ok, detail) => {
     if (!ok) throw new Error(`protocol check failed: ${what}${detail ? ` :: ${detail}` : ''}`)
