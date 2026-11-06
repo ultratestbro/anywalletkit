@@ -100,7 +100,7 @@ test("decodeResult refuses malformed answers and unknown decode types instead of
 function sandbox(manifests) {
   const root = mkdtempSync(join(tmpdir(), "watch-1105-"));
   mkdirSync(join(root, "scripts/watch"), {recursive: true});
-  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs", "evm-call.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
+  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs", "evm-call.mjs", "zcash-branch.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
   for (const [dir, m] of Object.entries(manifests)) { mkdirSync(join(root, "packages", dir), {recursive: true}); writeFileSync(join(root, "packages", dir, "watch.json"), JSON.stringify(m)); }
   return root;
 }
