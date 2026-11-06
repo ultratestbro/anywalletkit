@@ -1,5 +1,11 @@
 # @anywalletkit/names-ens
 
+## 0.5.3
+
+### Patch Changes
+
+- @anywalletkit/networks@0.5.2
+
 ## 0.5.2
 
 ### Patch Changes

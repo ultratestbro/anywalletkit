@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-lending-curve-evm",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Curve for @anywalletkit/wallet-evm accounts: Savings crvUSD (scrvUSD) on Ethereum as a LendingProtocol. Deposit crvUSD for scrvUSD shares, redeem them with zero allowed loss. The vault is pinned on-chain (EIP-1167 clone of the pinned Yearn VaultV3 3.0.4 implementation, its code hash, apiVersion, asset) and checked for shutdown before every deposit; the Curve API only decorates the APY, bounded by the on-chain profit-unlocking rate.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

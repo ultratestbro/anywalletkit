@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/walletconnect-ton",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "WalletConnect for TON on Any Wallet Kit: the `ton` session namespace, the required session properties (public key, V5R1 StateInit), ton_proof at connect, and ton_sendMessage / ton_signData answered through a wallet-ton account with review, policies and one signature. No WalletConnect runtime dependency: plain WalletKit objects in, JSON-RPC responses out.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
