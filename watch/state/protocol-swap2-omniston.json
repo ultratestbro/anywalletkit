@@ -6,13 +6,13 @@
    "target": {
     "url": "https://docs.ston.fi/docs/developer-section/omniston"
    },
-   "value": "1c4b12f67b22dbfff1e0b1276819020b0a71f3bb207ff2393ed1e022d240d96a",
+   "value": "00f448a7bb8fee0af0776d3b583ac59df2674fd8ed136150a3b6bcc2e3d6c239",
    "meta": {
-    "hash": "1c4b12f67b22dbff",
+    "hash": "00f448a7bb8fee0a",
     "chars": 3421
    },
-   "seenAt": "2026-11-05T14:38:19.741Z",
-   "changedAt": "2026-11-05T14:38:19.741Z"
+   "seenAt": "2026-11-06T14:15:34.565Z",
+   "changedAt": "2026-11-06T14:15:34.565Z"
   },
   "omniston-sdk": {
    "type": "github-releases",
@@ -26,7 +26,7 @@
     "url": "https://github.com/ston-fi/omniston-sdk/commit/8b97fdc0ab2cb9c72337e3c0d4ca06664e6bf845",
     "note": "default branch: chore(demo-app): upgrade react & nextjs"
    },
-   "seenAt": "2026-11-05T14:38:20.233Z",
+   "seenAt": "2026-11-06T14:15:34.494Z",
    "changedAt": "2026-11-05T14:38:20.233Z"
   }
  }
