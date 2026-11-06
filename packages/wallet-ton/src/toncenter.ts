@@ -167,11 +167,13 @@ export class TonCenter {
   /** Balance, status, code and data of an account. */
   async getAddressInformation(address: Address): Promise<TonAccountState> {
     const r = await this.rpc.call<Record<string, unknown>>('getAddressInformation', { address: address.toString() })
-    need(r && typeof r === 'object' && typeof r.balance === 'string', 'getAddressInformation', r)
+    // QuickNode and some orbs nodes send an empty account's balance as the number 0, toncenter as "0".
+    const balance = r && typeof r === 'object' ? r.balance : undefined
+    need(typeof balance === 'string' || (typeof balance === 'number' && Number.isSafeInteger(balance) && balance >= 0), 'getAddressInformation', r)
     const state = r.state as string
     const last = r.last_transaction_id as { lt?: string; hash?: string } | undefined
     return {
-      balance: BigInt(r.balance as string),
+      balance: BigInt(balance as string | number),
       state: (['active', 'uninitialized', 'frozen', 'nonexist'] as const).includes(state as TonAccountStatus) ? (state as TonAccountStatus) : 'nonexist',
       code: typeof r.code === 'string' && r.code !== '' ? cellFromBase64(r.code) : null,
       data: typeof r.data === 'string' && r.data !== '' ? cellFromBase64(r.data) : null,

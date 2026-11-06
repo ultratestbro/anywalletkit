@@ -288,6 +288,13 @@ describe('WalletAccountTon', () => {
     await expect((await manager(broken).getAccount(0)).getBalance()).rejects.toThrow(/Malformed/)
   })
 
+  it('an empty account whose balance comes back as the number 0 (QuickNode, orbs) reads as 0n', async () => {
+    const empty = (balance: unknown) => fakeRpc({ getAddressInformation: () => ({ '@type': 'raw.fullAccountState', balance, state: 'uninitialized', code: '', data: '', last_transaction_id: { lt: '0', hash: '' } }) })
+    expect(await (await manager(empty(0)).getAccount(0)).getBalance()).toBe(0n)
+    expect(await (await manager(empty('0')).getAccount(0)).getBalance()).toBe(0n)
+    for (const bad of [-1, 1.5, 2 ** 60, null]) await expect((await manager(empty(bad)).getAccount(0)).getBalance()).rejects.toThrow(/Malformed/)
+  })
+
   it('custom TonRpc objects are accepted as providers', async () => {
     const calls: string[] = []
     const rpc = { async call<T>(method: string) { calls.push(method); return { balance: '5', state: 'active', code: '', data: '', last_transaction_id: { lt: '1', hash: '' } } as T } }
