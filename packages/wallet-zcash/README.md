@@ -44,8 +44,8 @@ A **v5 transaction** (ZIP-225) with transparent inputs and outputs and empty
 Sapling / Orchard bundles. Ids and signature hashes follow **ZIP-244**: BLAKE2b-256
 digests personalized with the consensus branch id, so a signature is only valid under
 the upgrade it was made for. The branch id is the one in force at tip + 1, the block
-the transaction lands in (`branchIdForHeight`: NU5 → NU6 → NU6.1 → NU6.3 "Ironwood",
-active since block 3 428 143), or `consensusBranchId` from the config when a new
+the transaction lands in (`branchIdForHeight`: NU5 → NU6 → NU6.1 → NU6.2 → NU6.3 "Ironwood" → NU7,
+active since block 3 543 405), or `consensusBranchId` from the config when a new
 upgrade activates before the package learns its id. On testnet and regtest, whose
 upgrades activate at other heights, `consensusBranchId` is required. The expiry is
 tip + 1 + `expiryDelta`; without a tip nothing is signed (a transaction with expiry 0

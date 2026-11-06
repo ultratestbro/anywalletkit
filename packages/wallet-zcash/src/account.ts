@@ -17,8 +17,8 @@ export function addressFor(publicKey: Uint8Array, network: ZcashNetwork = 'mainn
   return addressFromPublicKey(publicKey, network)
 }
 
-/** ZIP-203 default: a transaction expires 40 blocks (~50 min) after it was built. */
-export const DEFAULT_EXPIRY_DELTA = 40
+/** A transaction expires 120 blocks after the block it lands in: ~50 min at NU7's 25-second blocks (40 blocks were ~50 min at 75 s). */
+export const DEFAULT_EXPIRY_DELTA = 120
 
 export interface Built {
   tx: TransparentTxV5
