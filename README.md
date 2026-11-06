@@ -77,6 +77,7 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 | `@anywalletkit/protocol-swap2-uniswap` | Uniswap v3 straight from the contracts on 7 chains: QuoterV2 quotes (every fee tier + two-hop via WETH/USDC/USDT in one RPC batch), SwapRouter02 `multicall` execution with deadline, native in/out (wrap via value, `unwrapWETH9`), exact approvals, deployment re-verified on-chain; no API key, no frontend — the permissionless same-chain venue |
 | `@anywalletkit/protocol-swap2-wrap` | native ↔ wrapped native (ETH↔WETH, BNB↔WBNB, POL↔WPOL, AVAX↔WAVAX, HYPE↔WHYPE… 16 EVM chains) as a same-chain swap2 venue: WETH9 `deposit()` / `withdraw()`, 1:1, no approval, sender-only, tokens verified on-chain; wrapped natives added to the asset catalog |
 | `@anywalletkit/protocol-swap2-balancer` | Balancer v2 same-chain swaps on 9 chains (the cp0x permissionless Balancer venue): the SOR API only suggests the path; the Vault prices it on-chain (`queryBatchSwap`) and `batchSwap` enforces `limits` + deadline; split and multi-hop paths, native via the Vault's ETH sentinel, preflight re-price |
+| `@anywalletkit/protocol-swap2-curve` | Curve same-chain swaps straight from the contracts on Router NG (18 EVM chains pinned; pools today on Ethereum, Arbitrum, Base, OP Mainnet, Gnosis, Monad, Plasma and X Layer): the router's `get_dy` quotes and explicit-receiver `exchange`, 1–2 pools per route from a curated allowlist generated and checked on-chain (code hash, coins, TVL, age) and pinned in the package, hops between pools only through catalog tokens, fake / drained pools denied; router code hash and version checked once per chain, preflight re-reads pools and a fresh `get_dy`, a remote build's minimum held to the device's own `get_dy`; no API, no key, no fee |
 | `@anywalletkit/protocol-swap2-fynd` | Fynd (Propeller Heads) same-chain swaps on Ethereum, Base, Arbitrum, BNB Chain, Polygon, Unichain and Robinhood Chain: routes over the pools Tycho indexes, settled through TychoRouterV3; router, method, tokens, amount, receiver and minimum are decoded and checked before signing. Fynd outputs are under the Fynd License (see the package README) |
 | `@anywalletkit/protocol-swap2-jupiter` | Jupiter same-chain Solana swaps through Swap API V2's Router path (`/build`, Metis routing, no Jupiter fee, keyless or `x-api-key`): every instruction vetted and the swap arguments decoded (amount, quoted out, slippage, zero platform fee) before the v0 transaction is assembled locally; compute budget re-set (simulated limit, capped price); the wallet's serialized guard proves programs and balances before signing |
 | `@anywalletkit/kit` | orchestrator: register chain wallets + protocol modules, accounts by CAIP-2 chain, policies (fee cap, allow/block lists, confirm) on every write — sends, transfers, `signTransaction`, message signatures; the activity feed (`history()`) |
@@ -89,11 +90,12 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 | `@anywalletkit/protocol-lending-aave-evm` | Aave v3 on 18 chains (20 markets) as a `LendingProtocol`: supply / withdraw / borrow / repay, gateway for native, EIP-2612 permits, health factor, reserves with rates and caps; Pool cross-checked against the PoolAddressesProvider |
 | `@anywalletkit/protocol-lending-morpho-evm` | Morpho on 10 chains: Vaults (MetaMorpho V1 / Vault V2, ERC-4626) and Blue markets (supply / withdraw / borrow / repay / collateral) as `LendingProtocol`s; vaults verified against the factories, state accrued like the contract, API for listing / APY only |
 | `@anywalletkit/protocol-lending-kamino-solana` | Kamino on Solana: Earn vaults (kVaults: deposit / withdraw, shares, APY) and Lend markets (supply / withdraw / borrow / repay on the wallet's obligation) as `LendingProtocol`s; Kamino's official API builds the transaction, the wallet's serialized guard proves programs and balance effects before signing; positions / rates from the API |
+| `@anywalletkit/protocol-lending-curve-evm` | Curve Savings crvUSD (scrvUSD, a Yearn V3 vault) on Ethereum as a `LendingProtocol`: the vault's clone code, implementation code hash, apiVersion and asset verified before any call, deposits refused into a shut-down vault or one lending to strategies, withdrawals with max_loss 0, APY projected on-chain with the Curve API figure bounded to within max(0.5 pp, 10 %) of it (clamped to that band when it disagrees; the on-chain figure without the API) |
 | `@anywalletkit/protocol-approvals-evm` | token-approval discovery (ERC-20 / 721 / 1155 / Permit2 / EIP-7702), risk flags, revoke; viem |
 | `@anywalletkit/extension-kit` | Chromium (MV3) wallet-extension core: scrypt vault with passkey (PRF) unlock, auto-locking session, dApp request router + per-origin permissions + approval queue, signing checks (SIWE, EIP-7702, address poisoning, phishing list), swap / Earn plan review, TON Connect data, chrome adapters; no UI — the extension itself is the wallet's own product |
 
 Every protocol module ships a `module.json`; `pnpm registry` builds
-[registry/modules.json](registry/modules.json) from them (25 modules today). See
+[registry/modules.json](registry/modules.json) from them (27 modules today). See
 [registry/README.md](registry/README.md) for tiers and how to list an external module.
 
 User documentation: [docs.anywallet.tech](https://docs.anywallet.tech) (sources in `apps/docs`).
@@ -122,7 +124,7 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 
 ## Tests
 
-`pnpm test` runs 2,700+ tests across 47 packages (Node); `pnpm test:hermes` runs 333
+`pnpm test` runs 4,100+ tests across 49 packages (Node); `pnpm test:hermes` runs 374
 checks in the Hermes VM React Native ships. Beyond unit tests the swap layer is
 checked against live providers (running totals, October 2026): 127,168 quote checks
 (11 providers, up to 36 chains, 378 assets), 60,013 builds simulated to the

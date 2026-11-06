@@ -94,6 +94,64 @@ test("aave-docs-markets reads the market tables out of the escaped page payload,
   assert.throws(() => RECORD_FORMATS["aave-docs-markets"]("<main>nothing here</main>"), /no market tables/);
 });
 
+// Curve prep 2026-11-05: docs.curve.finance/deployments.json, trimmed to the shape it had that day (Ethereum carries two
+// routers and the scrvUSD vault, the lite chains carry one router, chains outside the SDK keep their key as the group).
+const CURVE_FEED = {
+  _instructions: "This is the source of truth for deployment data in this checkout.",
+  _explorers: {ethereum: "https://etherscan.io/address/"},
+  ethereum: {
+    tokens: {crv: "0xD533a949740bb3306d119CC777fa900bA034cd52", vecrv: "0x5f3b5dfeb7b28cdbd7faba78963ee202a494e2a2", crvUSD: "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E", scrvUSD: "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367"},
+    integrations: {"address-provider": "0x5ffe7FB82894076ECB99A30D6A32e969e6e35E98", "meta-registry": "0xF98B45FA17DE75FB1aD0e7aFD971b0ca00e379fC", "rate-provider": "0xA834f3d23749233c9B61ba723588570A1cCA0Ed7"},
+    amm: {
+      stableswap: {factory: "0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf", "plain-amm-implementation": "0xDCc91f930b42619377C200BA05b7513f2958b202"},
+      twocrypto: {factory: "0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F"},
+      tricrypto: {factory: "0x0c0e5f2ff0ff18a3be9b835635039256dc4b4963"},
+      "router & zap": {"router-v1": "0x16C6521Dff6baB339122a0FE25a9116693265353", "router-v2": "0x45312ea0eFf7E09C83CBE249fa1d7598c4C8cd4e", "stable-calc-zap": "0xCA8d0747B5573D69653C3aC22242e6341C36e4b4"},
+    },
+    scrvusd: {vault: "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367", "rewards-handler": "0xe8d1e2531761406af1615a6764b0d5ff52736f56"},
+  },
+  monad: {tokens: {}, integrations: {"address-provider": "0x4574921eb950d3Fd5B01562162EC566Cb8bc3648"}, amm: {"router & zap": {router: "0xFF5Cb29241F002fFeD2eAa224e3e996D24A6E8d1", "meta-zap-ng": "0x2AF43209B366A4491CCe0A97C5a7B6059fd21295"}}},
+  arc: {tokens: {}, amm: {"router & zap": {router: "0xFF5Cb29241F002fFeD2eAa224e3e996D24A6E8d1", "stable-calc-zap": ""}}},
+  fraxtal: {tokens: {crvUSD: "0xB102f7Efa0d5dE071A8D37B3548e1C7CB148Caf3"}, amm: {"router & zap": {router: "0x56C526b0159a258887e0d79ec3a80dfb940d0cD7"}}},
+  _addressOrigins: {"x-gov.l1-broadcaster": "ethereum"},
+};
+
+test("curve-deployments: routers, registries, factories, crvUSD / scrvUSD / CRV and the scrvUSD vault, grouped by chain id", () => {
+  const {records, info} = RECORD_FORMATS["curve-deployments"](JSON.stringify(CURVE_FEED));
+  assert.deepEqual(info, {chains: 4});
+  assert.deepEqual(records.filter((r) => r.group === "1").map((r) => `${r.id} ${r.contract}`), [
+    "ethereum.router-v1 router", "ethereum.router-v2 router", "ethereum.address-provider address-provider", "ethereum.meta-registry meta-registry",
+    "ethereum.stableswap.factory stableswap-factory", "ethereum.twocrypto.factory twocrypto-factory", "ethereum.tricrypto.factory tricrypto-factory",
+    "ethereum.tokens.CRV CRV", "ethereum.tokens.crvUSD crvUSD", "ethereum.tokens.scrvUSD scrvUSD", "ethereum.scrvusd.vault scrvUSD vault",
+  ]);
+  assert.ok(!records.some((r) => /vecrv|rate-provider|calc-zap|meta-zap|rewards|implementation/.test(r.id)), "only what a Curve module pins");
+  assert.deepEqual(records.filter((r) => r.contract === "router").map((r) => `${r.group} ${r.id}`), ["1 ethereum.router-v1", "1 ethereum.router-v2", "143 monad.router", "5042 arc.router", "fraxtal fraxtal.router"]);
+
+  // A module's pins keyed by chain id: Router NG v1.2 on Ethereum is listed (as router-v2), the scrvUSD vault and token too;
+  // the same router address pinned on a chain the feed does not list it for, or under another role, is a problem.
+  const pins = pinsFromModule({CURVE_DEPLOYMENTS: {
+    1: {router: "0x45312ea0eFf7E09C83CBE249fa1d7598c4C8cd4e", addressProvider: "0x5ffe7FB82894076ECB99A30D6A32e969e6e35E98", scrvUsd: "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367", crvUsd: "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E"},
+    143: {router: "0xFF5Cb29241F002fFeD2eAa224e3e996D24A6E8d1", addressProvider: "0x4574921eb950d3Fd5B01562162EC566Cb8bc3648"},
+    9745: {router: "0xFF5Cb29241F002fFeD2eAa224e3e996D24A6E8d1"},
+    5042: {router: "0xFF5Cb29241F002fFeD2eAa224e3e996D24A6E8d1", addressProvider: "0x2AF43209B366A4491CCe0A97C5a7B6059fd21295"},
+  }}, {export: "CURVE_DEPLOYMENTS", group: "$key", roles: {router: "router", addressProvider: "address-provider", scrvUsd: "scrvUSD vault", crvUsd: "crvUSD"}});
+  const {rows, problems} = checkPins(records, pins);
+  assert.deepEqual(rows.find((r) => r.group === "1" && r.role === "router"), {group: "1", role: "router", address: "0x45312ea0eff7e09c83cbe249fa1d7598c4c8cd4e", contract: "router", id: "ethereum.router-v2"});
+  assert.equal(rows.find((r) => r.group === "1" && r.role === "scrvUsd").id, "ethereum.scrvusd.vault");
+  assert.deepEqual(problems, [
+    "5042 addressProvider 0x2AF43209B366A4491CCe0A97C5a7B6059fd21295: not listed",
+    "9745 router 0xFF5Cb29241F002fFeD2eAa224e3e996D24A6E8d1: not listed", // Plasma is not in this trimmed feed
+  ]);
+
+  // Chain keys are feed data: one named like an Object.prototype member keeps its own key as the group.
+  const odd = RECORD_FORMATS["curve-deployments"](JSON.stringify({constructor: {amm: {"router & zap": {router: "0xFF5Cb29241F002fFeD2eAa224e3e996D24A6E8d1"}}}, toString: {integrations: {"address-provider": "0x4574921eb950d3Fd5B01562162EC566Cb8bc3648"}}}));
+  assert.deepEqual(odd.records.map((r) => `${r.group} ${r.id}`), ["constructor constructor.router", "toString toString.address-provider"]);
+
+  assert.throws(() => RECORD_FORMATS["curve-deployments"]("[]"), /not a deployments object/);
+  assert.throws(() => RECORD_FORMATS["curve-deployments"](JSON.stringify({_instructions: "x", ethereum: {tokens: {}}})), /no routers/);
+  assert.throws(() => RECORD_FORMATS["curve-deployments"]("<html>"), SyntaxError);
+});
+
 // The real pins the two json-pins sources read (needs `pnpm build`, as the watch job runs it first). Skipped on a
 // local checkout that was never built; in CI (ci.yml runs this after `pnpm build`) a missing dist fails the test.
 const uniDist = join(ROOT, "packages/protocol-swap2-uniswap/dist/index.js");

@@ -1,0 +1,70 @@
+{
+  "name": "@anywalletkit/protocol-swap2-curve",
+  "version": "0.0.0",
+  "description": "Curve same-chain swaps straight from the contracts: Router NG get_dy quotes and exchange execution over a curated, pinned pool allowlist — no API, no frontend, no fee.",
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-swap2-curve" },
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./provider": {
+      "types": "./dist/provider.d.ts",
+      "import": "./dist/provider.js",
+      "require": "./dist/provider.cjs"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.ts",
+      "import": "./dist/protocol.js",
+      "require": "./dist/protocol.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "module.json",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run && node --test scripts/build-allowlist.test.mjs",
+    "lint": "eslint src",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": {
+    "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/swap2-assets": "workspace:*",
+    "viem": "^2.57.2"
+  },
+  "peerDependencies": {
+    "@anywalletkit/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "vitest": "^5.0.3",
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/history-evm": "workspace:*"
+  },
+  "keywords": [
+    "curve",
+    "swap",
+    "stableswap",
+    "crvusd",
+    "permissionless",
+    "anywalletkit"
+  ],
+  "publishConfig": { "access": "public", "provenance": true }
+}

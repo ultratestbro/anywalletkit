@@ -55,6 +55,7 @@ inside the router.
 | `@anywalletkit/protocol-swap2-usdt0` | USDT0 — Tether's LayerZero OFT: USDT between 16 EVM chains in one transaction |
 | `@anywalletkit/protocol-swap2-uniswap` | Uniswap v3 straight from the contracts |
 | `@anywalletkit/protocol-swap2-balancer` | Balancer v2, priced and enforced on-chain by the Vault |
+| `@anywalletkit/protocol-swap2-curve` | Curve Router NG — same-chain swaps from the contracts over a pinned pool allowlist; no API, no key |
 | `@anywalletkit/protocol-swap2-fynd` | Fynd (Propeller Heads) same-chain swaps on 7 EVM chains, settled through TychoRouterV3 — Fynd outputs are under the Fynd License |
 | `@anywalletkit/protocol-swap2-wrap` | Native ↔ wrapped native (ETH ↔ WETH and others) |
 | `@anywalletkit/protocol-swap2-jupiter` | Jupiter — same-chain Solana swaps; the transaction is assembled and checked locally, no Jupiter fee |
@@ -73,6 +74,7 @@ inside the router.
 | `@anywalletkit/protocol-lending-morpho-evm` | Morpho Vaults and Blue markets | `LendingProtocol` |
 | `@anywalletkit/protocol-lending-mellow-evm` | Mellow Core Vaults (EarnETH / EarnUSD) | `LendingProtocol` |
 | `@anywalletkit/protocol-lending-kamino-solana` | Kamino Earn vaults and Lend markets | `LendingProtocol` |
+| `@anywalletkit/protocol-lending-curve-evm` | Curve Savings crvUSD (crvUSD → scrvUSD on Ethereum) | `LendingProtocol` |
 
 ## Data and safety
 

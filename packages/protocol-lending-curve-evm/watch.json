@@ -1,0 +1,106 @@
+{
+  "module": "@anywalletkit/protocol-lending-curve-evm",
+  "sources": [
+    {
+      "id": "scrvusd-vault-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367",
+      "label": "scrvUSD vault (EIP-1167 clone) · Ethereum"
+    },
+    {
+      "id": "scrvusd-implementation-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0xd8063123BBA3B480569244AE66BFE72B6c84b00d",
+      "label": "scrvUSD implementation (Yearn VaultV3 3.0.4) · Ethereum"
+    },
+    {
+      "id": "scrvusd-is-shutdown",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367",
+      "signature": "isShutdown()",
+      "decode": "bool",
+      "label": "scrvUSD isShutdown() · Ethereum (false; true blocks deposits)"
+    },
+    {
+      "id": "scrvusd-api-version",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367",
+      "signature": "apiVersion()",
+      "decode": "string",
+      "label": "scrvUSD apiVersion() · Ethereum (pinned 3.0.4)"
+    },
+    {
+      "id": "scrvusd-role-manager",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367",
+      "signature": "role_manager()",
+      "decode": "address",
+      "label": "scrvUSD role_manager() · Ethereum (0x4090…9968)"
+    },
+    {
+      "id": "scrvusd-profit-max-unlock-time",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367",
+      "signature": "profitMaxUnlockTime()",
+      "decode": "uint256",
+      "label": "scrvUSD profitMaxUnlockTime() · Ethereum (604800 s, the APY projection's unlock window)"
+    },
+    {
+      "id": "scrvusd-total-debt",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367",
+      "signature": "totalDebt()",
+      "decode": "uint256",
+      "label": "scrvUSD totalDebt() · Ethereum (0; above 0 the vault lends to strategies and deposits are refused by default)"
+    },
+    {
+      "id": "scrvusd-asset",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367",
+      "signature": "asset()",
+      "decode": "address",
+      "label": "scrvUSD asset() · Ethereum (crvUSD)"
+    },
+    {
+      "id": "deployments-json",
+      "type": "json-pins",
+      "url": "https://docs.curve.finance/deployments.json",
+      "format": "curve-deployments",
+      "pins": {
+        "from": "dist/index.js",
+        "export": "SCRVUSD_DEPLOYMENTS",
+        "group": "$key",
+        "roles": {
+          "vault": "scrvUSD vault",
+          "asset": "crvUSD"
+        }
+      },
+      "label": "Curve deployments.json · the pinned scrvUSD vault and crvUSD"
+    },
+    {
+      "id": "api-savings-statistics-schema",
+      "type": "http-json",
+      "url": "https://prices.curve.finance/feeds-docs/openapi.json",
+      "path": "components.schemas.SavingsStatsResponse",
+      "label": "Curve prices API · /v1/crvusd/savings/statistics response schema"
+    },
+    {
+      "id": "docs-scrvusd-overview",
+      "type": "http-text",
+      "url": "https://docs.curve.finance/developer/scrvusd/overview",
+      "between": [
+        "<article",
+        "</article>"
+      ],
+      "label": "Curve docs · Savings crvUSD (scrvUSD) overview"
+    }
+  ]
+}

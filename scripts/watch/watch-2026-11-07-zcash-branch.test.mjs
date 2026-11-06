@@ -44,7 +44,7 @@ test("zcash-branch: a table without NU7 is reported on every run until fixed; a 
   const srv = await blockchair();
   const root = mkdtempSync(join(tmpdir(), "watch-1107-"));
   mkdirSync(join(root, "scripts/watch"), {recursive: true});
-  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs", "zcash-branch.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
+  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs", "evm-call.mjs", "zcash-branch.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
   mkdirSync(join(root, "packages/zec/dist"), {recursive: true});
   writeFileSync(join(root, "packages/zec/watch.json"), JSON.stringify({module: "@anywalletkit/zec", sources: [{id: "branch-id", type: "zcash-branch", from: "dist/index.js", url: srv.url, label: "Zcash branch id"}]}));
   const dist = join(root, "packages/zec/dist/index.js");

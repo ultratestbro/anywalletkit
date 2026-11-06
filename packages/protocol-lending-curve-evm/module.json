@@ -1,0 +1,11 @@
+{
+  "name": "@anywalletkit/protocol-lending-curve-evm",
+  "type": "lending",
+  "chains": ["eip155:1"],
+  "tier": "core",
+  "maintainers": ["@ultratestbro"],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
+  "path": "packages/protocol-lending-curve-evm",
+  "addedAt": "2026-11-05"
+}

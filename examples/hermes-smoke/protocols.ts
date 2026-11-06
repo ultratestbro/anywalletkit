@@ -5,7 +5,7 @@
  * fail — with an ordinary Error, never a ReferenceError/TypeError, which is
  * what a missing polyfill looks like. Pure helpers are checked for real values.
  */
-import { createMockAccount } from '@anywalletkit/conformance'
+import { createMockAccount, parseActivityFixture, type ActivityFixtureJson } from '@anywalletkit/conformance'
 import { bigintToNumber, bigintToUnits } from '@anywalletkit/core'
 import { Address } from '@ton/core'
 import { RouterSwap2Protocol } from '@anywalletkit/protocol-swap2-router/swap2/router'
@@ -26,6 +26,10 @@ import { assembleTransaction as jupAssemble } from '@anywalletkit/protocol-swap2
 import { fyndProvider } from '@anywalletkit/protocol-swap2-fynd/provider'
 import { FyndSwap2Protocol } from '@anywalletkit/protocol-swap2-fynd/protocol'
 import { FYND_CHAINS, TYCHO_ROUTER_ABI, checkFyndTransaction } from '@anywalletkit/protocol-swap2-fynd/router'
+import { curveProvider } from '@anywalletkit/protocol-swap2-curve/provider'
+import { CurveSwap2Protocol } from '@anywalletkit/protocol-swap2-curve/protocol'
+import { CURVE_DEPLOYMENTS, CURVE_POOLS, EXCHANGE_SELECTOR, curveVerifyQuote, decodeExchange, encodeExchange, findRoutes, routeArgs } from '@anywalletkit/protocol-swap2-curve'
+import curveQuotesLive from '../../packages/protocol-swap2-curve/fixtures/quotes/quotes-2026-11-06.json'
 import { encodeFunctionData, encodeFunctionResult } from 'viem'
 import { nearIntentsProvider } from '@anywalletkit/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@anywalletkit/protocol-swap2-thorchain/protocol'
@@ -39,6 +43,8 @@ import SplStakePoolProtocolSolana, { base58Decode } from '@anywalletkit/protocol
 import MellowProtocolEvm, { toAsset } from '@anywalletkit/protocol-lending-mellow-evm'
 import { AaveProtocolEvm, parseReserveConfiguration, rayToApyPct, AAVE_MARKETS } from '@anywalletkit/protocol-lending-aave-evm'
 import { MorphoVaultProtocolEvm, MorphoMarketProtocolEvm, marketId, accrue, MORPHO_CHAINS } from '@anywalletkit/protocol-lending-morpho-evm'
+import { ScrvUsdProtocolEvm, SCRVUSD, VAULT_V3_ABI, scrvUsdAprWad, aprWadToApyPct, clampApy, assertCurveHost, describeCurveLendingActivity } from '@anywalletkit/protocol-lending-curve-evm'
+import scrvUsdDepositLive from '../../packages/protocol-lending-curve-evm/fixtures/activity/ethereum-deposit-crvusd.json'
 import { NativeStakingProtocolSolana, createWithSeed as nativeCreateWithSeed, activationStatus as nativeActivation, decodeStakeAccount as nativeDecodeStake, STAKE_PROGRAM as NATIVE_STAKE_PROGRAM } from '@anywalletkit/protocol-staking-native-solana'
 import { NativeStakingProtocolMonad, packWithdrawalId as monadPack, unpackWithdrawalId as monadUnpack, commissionToPercent as monadCommission, describeRevert as monadRevert, STAKING_ABI as MONAD_STAKING_ABI } from '@anywalletkit/protocol-staking-native-monad'
 import {
@@ -128,6 +134,37 @@ export async function smokeProtocols(check: Check): Promise<void> {
   let fyndRefused = false
   try { checkFyndTransaction({ to: FYND_CHAINS[8453]!.router, value: 0n, data: fyndData }, { ...fyndExpected, receiver: '0x1111111111111111111111111111111111111111' }) } catch { fyndRefused = true }
   check('fynd: refuses calldata paying someone else', fyndRefused)
+  {
+    // Curve Router NG: both ABI families encode and decode the explicit-receiver exchange; recorded live quotes pass the
+    // client check (shipped deployments + allowlist, catalog-only hops between pools) and fail once they pay someone else.
+    const dead = '0x000000000000000000000000000000000000dEaD'
+    const curve = curveProvider({ rpcUrls: { 1: ['https://rpc.invalid'] }, onWarning: () => {} })
+    check('curve: offers a chain with pools and an RPC, not one without pools', curve.supportsChain('eip155:1') && !curve.supportsChain('eip155:56'))
+    for (const chainId of [1, 143] as const) {
+      const d = CURVE_DEPLOYMENTS[chainId]!
+      const pool = CURVE_POOLS[chainId]!.pools.find((p) => p.swapTypes.includes(1))!
+      const route = findRoutes(chainId, d, CURVE_POOLS[chainId], pool.coins[0]!, pool.coins[1]!).routes[0]!
+      const args = routeArgs(d.family, route)
+      const data = encodeExchange(d.family, args, 10n ** 21n, 999n * 10n ** 18n, dead)
+      const back = decodeExchange(d.family, data)
+      check(`curve: ${d.family} exchange encodes and decodes (${pool.name})`, data.slice(0, 10) === EXCHANGE_SELECTOR[d.family] && !!back && back.amount === 10n ** 21n && back.minDy === 999n * 10n ** 18n
+        && back.receiver?.toLowerCase() === dead.toLowerCase() && back.route.every((a, i) => a.toLowerCase() === args.route[i]!.toLowerCase())
+        && back.params.every((row, k) => row.length === args.params[k]!.length && row.every((x, c) => x === args.params[k]![c])))
+    }
+    const recorded = curveQuotesLive as unknown as { label: string; params: Parameters<typeof curveVerifyQuote>[0]; quote: Parameters<typeof curveVerifyQuote>[1] }[]
+    for (const r of recorded) check(`curve: recorded quote passes curveVerifyQuote (${r.label})`, curveVerifyQuote(r.params, r.quote) === null)
+    const r0 = recorded[0]!
+    const fam = CURVE_DEPLOYMENTS[1]!.family
+    const call = decodeExchange(fam, r0.quote.txRequest!.data!)!
+    const elsewhere = { ...r0.quote, txRequest: { ...r0.quote.txRequest!, data: encodeExchange(fam, call, call.amount, call.minDy, '0x1111111111111111111111111111111111111111') } }
+    check('curve: refuses the recorded quote paying someone else', /not the recipient/.test(curveVerifyQuote(r0.params, elsewhere) ?? ''))
+    check('curve: a swap2 server token on the intent id passes; one id for the whole chain does not',
+      curveVerifyQuote(r0.params, { ...r0.quote, intentId: `${r0.quote.intentId}~${'ab'.repeat(16)}` }) === null
+      && /not a curve:1 swap/.test(curveVerifyQuote(r0.params, { ...r0.quote, intentId: 'curve:1' }) ?? ''))
+    const cp = new CurveSwap2Protocol(evm, { ...swap2Cfg, rpcUrls: { 1: ['https://rpc.invalid'] } })
+    check('curve: CurveSwap2Protocol constructs', typeof cp.quoteSwap2 === 'function')
+    await tolerates(check, 'curve: getSupportedChains', () => cp.getSupportedChains())
+  }
   check('cctp: claimSwap2 on the router', typeof (router as unknown as { claimSwap2?: unknown }).claimSwap2 === 'function')
 
   // lending
@@ -157,6 +194,26 @@ export async function smokeProtocols(check: Check): Promise<void> {
   check(`aave: expm1(0.04) (${e})`, Math.abs(e - 0.0408107742) < 1e-8)
   const apy = rayToApyPct(4n * 10n ** 25n)
   check(`aave: rayToApyPct (${apy.toFixed(4)} ≈ 4.081)`, Math.abs(apy - 4.081) < 0.01)
+  {
+    // Curve Savings crvUSD: constructs over the pinned vault, builds deposit / max_loss-0 redeem calldata, APR maths on
+    // live-sized bigints (profitUnlockingRate ~2.6e28, totalSupply ~1.3e25), the API band, the host allowlist, activity.
+    const dead = '0x000000000000000000000000000000000000dEaD'
+    const scrv = new ScrvUsdProtocolEvm(evm)
+    check('scrvUSD: constructs on Ethereum', typeof scrv.supply === 'function' && SCRVUSD.vault === '0x0655977FEb2f289A4aB78af67BAB0d17aAb84367')
+    await tolerates(check, 'scrvUSD: quoteSupply (no provider → refused before any write)', () => scrv.quoteSupply({ amount: 10n ** 21n }))
+    const dep = encodeFunctionData({ abi: VAULT_V3_ABI, functionName: 'deposit', args: [10n ** 21n, dead] })
+    const red = encodeFunctionData({ abi: VAULT_V3_ABI, functionName: 'redeem', args: [10n ** 21n, dead, dead, 0n] })
+    check('scrvUSD: deposit and redeem(max_loss 0) calldata', dep.slice(0, 10) === '0x6e553f65' && red.slice(0, 10) === '0x9f40a7b3' && red.endsWith('0'.repeat(64)) && red.length === 10 + 4 * 64)
+    const aprWad = scrvUsdAprWad({ profitUnlockingRate: 26n * 10n ** 27n, totalSupply: 13n * 10n ** 24n, fullProfitUnlockDate: 2_000_000_000n, now: 1_800_000_000n })
+    const sApy = aprWadToApyPct(aprWad)
+    check(`scrvUSD: APR / APY from live-sized bigints (${aprWad} → ${sApy.toFixed(4)} %)`, aprWad === 63072000000000000n && Math.abs(sApy - 6.5103) < 0.001)
+    check('scrvUSD: the API figure within the band stands; after the unlock it is clamped to 0.5 %', clampApy(6.2769, 6.273).source === 'api' && clampApy(6.3, 0).apy === 0.5 && clampApy(6.3, 0).source === 'api-clamped' && clampApy(null, 6.27).source === 'chain')
+    let fiRefused = false
+    try { assertCurveHost('https://prices.curve.fi/v1/crvusd/savings/statistics') } catch { fiRefused = true }
+    check('scrvUSD: API host allowlist (curve.finance yes, curve.fi no)', fiRefused && typeof assertCurveHost('https://prices.curve.finance') === 'string')
+    const { tx: sTx, own: sOwn } = parseActivityFixture(scrvUsdDepositLive as unknown as ActivityFixtureJson)
+    check('scrvUSD: describeActivity on a recorded deposit', describeCurveLendingActivity(sTx, { own: sOwn })?.kind === 'supply')
+  }
   const mv = new MorphoVaultProtocolEvm(evm, { chainId: 1, vault: '0xBEEF01735c132Ada46AA9aA4c54623cAA92A64CB', api: null })
   await tolerates(check, 'morpho vault: getVault (no provider → NetworkError)', () => mv.getVault())
   const mm = new MorphoMarketProtocolEvm(evm, { chainId: 1, market: { loanToken: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', collateralToken: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf', oracle: '0x663BECd10daE6C4A3Dcd89F1d76c1174199639B9', irm: '0x46415998764C29aB2a25CbeA6254146D50D22687', lltv: 860000000000000000n }, api: null })

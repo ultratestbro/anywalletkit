@@ -11,7 +11,7 @@ per-package `README.md` (shipped inside each npm package). Do not invent APIs.
 
 An open multichain wallet SDK in TypeScript. One seed (or an external signer) gives accounts on
 EVM (30+ networks), Solana, TON, Tron, Bitcoin, NEAR and Zcash. Protocol modules add swaps and
-bridges (one router over 14 venues), staking, lending, approvals, history and names. React Native
+bridges (one router over 15 venues), staking, lending, approvals, history and names. React Native
 (Hermes) is the primary target; Node ≥ 20 works without polyfills. ESM + CJS, types included.
 
 All packages are `@anywalletkit/*` **on npm** (https://www.npmjs.com/org/anywalletkit), published from
@@ -34,8 +34,8 @@ into the app; never install from GitHub.
 | Seed on the phone (Face ID / passcode) | `secure-storage-react-native` (Expo module: dev build, not Expo Go) |
 | Encrypted backup file / iCloud backup | `seed-vault`, `backup-cloud` |
 | Hermes polyfills | `runtime-hermes` |
-| Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,uniswap,balancer,wrap,jupiter,omniston,fynd}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
-| Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana,native-monad}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana}` |
+| Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,uniswap,balancer,curve,wrap,jupiter,omniston,fynd}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
+| Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana,native-monad}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana,curve-evm}` |
 | Safety and data | `tx-preview-evm`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks`, `tokens` |
 | Testing your own module | `conformance` (Vitest suites) |
 
@@ -163,7 +163,8 @@ GRAM since 2026); `ccChain(catalogId)?.assets` (`swap2-assets`) lists catalog to
 Tokens the user adds by address (EVM, Solana): `inspectToken(account, address)` (`tokens`) → `{ listed }` or
 `{ info, assessment, token }` (`getTokenInfo` on the account; `NotATokenError` for a non-token), `TokensTable` keeps
 them, and the swap engine takes them only with `allowUnlistedTokens: true` (`swapSource(token)` → `fromToken` +
-`fromTokenDecimals`; LI.FI / Uniswap / Balancer / Fynd / Jupiter quote them, no USD value). A bridge to an
+`fromTokenDecimals`; LI.FI / Uniswap / Balancer / Fynd / Jupiter quote them, Curve only within its pinned pool
+allowlist; no USD value). A bridge to an
 unlisted destination token needs `toTokenDecimals` read on the destination chain, or a Mayan leg out of Solana is refused.
 
 ## Policies (run before every signature, including protocol modules)
@@ -281,7 +282,12 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
 - Errors: `Swap2MaybeSentError` (may be on chain — never retry, track `e.id`/`e.hash`), `Swap2InFlightError`
   (double tap), `Swap2InsufficientGasError`, `Swap2FeeLimitError`, `Swap2QuoteError` (no route; message says why).
 - Keys: LI.FI `apiKey` (rate limit), 1Click `jwt` (no fee). Fynd needs an `apiKey`. Chainflip, Uniswap,
-  Balancer, Wrap, CCTP, USDT0 need no key; on-chain venues need `rpcUrls`.
+  Balancer, Curve, Wrap, CCTP, USDT0 need no key; on-chain venues need `rpcUrls`.
+- Curve (`curveProvider({ rpcUrls: { 1: [url] } })`, chain ids as keys): same-chain Router NG over a pool allowlist
+  pinned in the package (1–2 pools; between them only catalog tokens); no gas limit in the quote (the wallet
+  estimates at broadcast); Ethereum swaps belong on an MEV-protected RPC. Behind a backend use
+  `...curveRemotePins({ rpcUrls, defaultSlippageBps? })` (the backend's fixed default, if it sets one): a build's
+  output and `min_dy` are held to a fresh on-device `get_dy`.
 - Also via the kit: `wallet.registerProtocol('swap', RouterSwap2Protocol, { chain, config: { fromChain: chain, providers } })`
   then `await wallet.getProtocol<RouterSwap2Protocol>('swap')` — policies then wrap the router's account.
 
@@ -331,7 +337,8 @@ reads and quotes over a read-only account (no prompt), writes inside
 Staking = `stake` → `requestWithdrawal` → wait → `claimWithdrawals` (two-phase). Lending = `supply` /
 `withdraw` (+ `borrow` / `repay` where the market allows). Every write has a `quote*` twin that signs nothing.
 Other modules: SSV (`protocol-staking-ssv-evm`, default export), Tonstakers (TON), SPL stake pool / Jito
-(Solana), Mellow (EarnETH/EarnUSD), Kamino (`KaminoVaultProtocolSolana`, `KaminoMarketProtocolSolana`).
+(Solana), Mellow (EarnETH/EarnUSD), Kamino (`KaminoVaultProtocolSolana`, `KaminoMarketProtocolSolana`), Curve
+Savings crvUSD (`ScrvUsdProtocolEvm`, Ethereum: crvUSD → scrvUSD; `withdraw({ amount: 'max' })`, max_loss 0).
 
 Native SOL staking (`protocol-staking-native-solana`): the app lists the validators, there is no default.
 

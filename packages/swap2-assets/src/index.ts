@@ -188,6 +188,11 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "LDO", assetId: "", contract: "0x5a98fcbea516cf06857215779fd812ca3bef1b32", decimals: 18, icon: cmcIcon(8000)},
       {symbol: "SKY", assetId: "", contract: "0x56072c95faa701256059aa122697b133aded9279", decimals: 18, icon: cmcIcon(33038)},
       {symbol: "COW", assetId: "", contract: "0xdef1ca1fb7fbcdc777520aa7f396b4e015f497ab", decimals: 18, icon: cmcIcon(19269)},
+      // 2026-11-05: Curve tokens for the Curve swap provider and scrvUSD earn. Verified on-chain (code, symbol,
+      // decimals, name, supply); not in the 1Click registry. scrvUSD is the Savings crvUSD vault itself (ERC-4626).
+      {symbol: "crvUSD", assetId: "", contract: "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/30118/large/crvusd.jpg?1746670973"},
+      {symbol: "scrvUSD", assetId: "", contract: "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/51712/large/scrvusd.jpg?1746671018"},
+      {symbol: "CRV", assetId: "", contract: "0xD533a949740bb3306d119CC777fa900bA034cd52", decimals: 18, icon: cmcIcon(6538)},
     ],
   },
   {
@@ -401,6 +406,11 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       // 2026-10-26: Lido, Sky and CoW governance tokens (owner request). Verified on-chain (symbol, decimals, name);
       // not in the 1Click registry, routed by the EVM venues: LI.FI bought $100 at under 1 % and sold it back at ~1.6 % (thinner than on Ethereum).
       {symbol: "COW", assetId: "", contract: "0xc694a91e6b071bf030a18bd3053a7fe09b6dae69", decimals: 18, icon: cmcIcon(19269)},
+      // 2026-11-05: Curve tokens for the Curve swap provider and scrvUSD earn. Verified on-chain (code, symbol,
+      // decimals, name, supply: 301k crvUSD, 79k scrvUSD, 2.2M CRV); bridged ERC-20s, not in the 1Click registry.
+      {symbol: "crvUSD", assetId: "", contract: "0x417Ac0e078398C154EdFadD9Ef675d30Be60Af93", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/30118/large/crvusd.jpg?1746670973"},
+      {symbol: "scrvUSD", assetId: "", contract: "0x646A737B9B6024e49f5908762B3fF73e65B5160c", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/51712/large/scrvusd.jpg?1746671018"},
+      {symbol: "CRV", assetId: "", contract: "0x8Ee73c484A26e0A5df2Ee2a4960B789967dd0415", decimals: 18, icon: cmcIcon(6538)},
     ],
   },
   {
@@ -506,6 +516,10 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       // not in the 1Click registry, routed by the EVM venues: LI.FI bought and sold $100 both ways at under 1 %.
       {symbol: "LDO", assetId: "", contract: "0x13ad51ed4f1b7e9dc168d8a00cb3f4ddd85efa60", decimals: 18, icon: cmcIcon(8000)},
       {symbol: "COW", assetId: "", contract: "0xcb8b5cd20bdcaea9a010ac1f8d835824f5c87a04", decimals: 18, icon: cmcIcon(19269)},
+      // 2026-11-05: Curve tokens for the Curve swap provider and scrvUSD earn. Verified on-chain (code, symbol,
+      // decimals, name, supply: 1.05M crvUSD, 20M CRV); bridged ERC-20s, not in the 1Click registry. scrvUSD left out (141 supply).
+      {symbol: "crvUSD", assetId: "", contract: "0x498Bf2B1e120FeD3ad3D42EA2165E9b73f99C1e5", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/30118/large/crvusd.jpg?1746670973"},
+      {symbol: "CRV", assetId: "", contract: "0x11cDb42B0EB46D95f990BeDD4695A6e3fA034978", decimals: 18, icon: cmcIcon(6538)},
     ],
   },
   {
@@ -577,6 +591,11 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "ENA", assetId: "", contract: "0x58538e6a46e07434d7e7375bc268d3cb839c0133", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/36530/large/ethena.png?1711701436"},
       {symbol: "WLD", assetId: "", contract: "0xdc6ff44d5d932cbd77b52e5612ba0529dc6226f1", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/31069/large/worldcoin.jpeg?1696529903"},
       {symbol: "sUSDe", assetId: "", contract: "0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33669/large/sUSDe-Symbol-Color.png?1716307680"},
+      // 2026-11-05: Curve tokens for the Curve swap provider and scrvUSD earn. Verified on-chain (code, symbol,
+      // decimals, name, supply: 608k crvUSD, 5.8k scrvUSD, 6.5M CRV); bridged ERC-20s, not in the 1Click registry.
+      {symbol: "crvUSD", assetId: "", contract: "0xC52D7F23a2e460248Db6eE192Cb23dD12bDDCbf6", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/30118/large/crvusd.jpg?1746670973"},
+      {symbol: "scrvUSD", assetId: "", contract: "0x289f635106d5b822A505b39AC237A0AE9189335B", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/51712/large/scrvusd.jpg?1746671018"},
+      {symbol: "CRV", assetId: "", contract: "0x0994206dfE8De6Ec6920FF4D779B0d950605Fb53", decimals: 18, icon: cmcIcon(6538)},
     ],
   },
   {
@@ -698,6 +717,10 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "PYUSD", assetId: "", contract: "0x99af3eea856556646c98c8b9b2548fe815240750", decimals: 6, icon: "https://coin-images.coingecko.com/coins/images/31212/large/PYUSD_Token_Logo_2x.png?1765987788"},
       {symbol: "rETH", assetId: "", contract: "0x0266f4f08d82372cf0fcbccc0ff74309089c74d1", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/20764/large/reth.png?1696520159"},
       {symbol: "ZRO", assetId: "", contract: "0x6985884c4392d348587b19cb9eaaf157f13271cd", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/28206/large/ftxG9_TJ_400x400.jpeg?1696527208"},
+      // 2026-11-05: Curve tokens for the Curve swap provider and scrvUSD earn. Verified on-chain (code, symbol,
+      // decimals, name, supply: 8k crvUSD, 4.5M CRV); bridged ERC-20s, not in the 1Click registry.
+      {symbol: "crvUSD", assetId: "", contract: "0xc4Ce1D6F5D98D65eE25Cf85e9F2E9DcFEe6Cb5d6", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/30118/large/crvusd.jpg?1746670973"},
+      {symbol: "CRV", assetId: "", contract: "0x172370d5Cd63279eFa6d502DAB29171933a610AF", decimals: 18, icon: cmcIcon(6538)},
     ],
   },
   {
@@ -1300,6 +1323,9 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "PENDLE", assetId: "", contract: "0xf1ef7d2d4c0c881cd634481e0586ed5d2871a74b", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/15069/large/Pendle_Logo_Normal-03.png?1696514728"},
       {symbol: "uniBTC", assetId: "", contract: "0xc3827a4bc8224ee2d116637023b124ced6db6e90", decimals: 8, icon: "https://coin-images.coingecko.com/coins/images/39599/large/uniBTC_200px.png?1723064455"},
       {symbol: "frxUSD", assetId: "", contract: "0x80eede496655fb9047dd39d9f418d5483ed600df", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/53963/large/frxUSD.png?1737792154"},
+      // 2026-11-05: Curve tokens for the Curve swap provider and scrvUSD earn. Verified on-chain (code, symbol,
+      // decimals, name, supply: 16k crvUSD); bridged ERC-20, not in the 1Click registry. scrvUSD left out (7 supply).
+      {symbol: "crvUSD", assetId: "", contract: "0x7FFf4C4a827C84E32c5E175052834111B2ccd270", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/30118/large/crvusd.jpg?1746670973"},
     ],
   },
   {

@@ -1,0 +1,60 @@
+{
+  "note": "scrvUSD redeem(shares, self, self) \u2014 the 3-argument Vyper overload (max_loss defaults to MAX_BPS) \u2014 by the same account, Ethereum block 26343291, etherscan.io/tx/0xb3630120\u2026",
+  "own": [
+    "0x2a691723fa94b2e38c1cda37dc64c7298f73378d"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0xb363012078bebd2e08d37be4f342db5c1274173d91f5aad1991fe81a24a233fe",
+    "time": 1793817467,
+    "status": "confirmed",
+    "address": "0x2a691723fa94b2e38c1cda37dc64c7298f73378d",
+    "from": "0x2a691723fa94b2e38c1cda37dc64c7298f73378d",
+    "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+        "from": "0x2a691723fa94b2e38c1cda37dc64c7298f73378d",
+        "to": "0x0000000000000000000000000000000000000000",
+        "amount": "677457969866222208833493",
+        "standard": "erc20",
+        "symbol": "scrvUSD",
+        "decimals": 18
+      },
+      {
+        "token": "0xf939e0a03fb07f59a73314e73794be0e57ac1b4e",
+        "from": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+        "to": "0x2a691723fa94b2e38c1cda37dc64c7298f73378d",
+        "amount": "753142215156650529064503",
+        "standard": "erc20",
+        "symbol": "crvUSD",
+        "decimals": 18
+      }
+    ],
+    "block": "26343291",
+    "fee": "19980208390728",
+    "call": {
+      "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+      "selector": "0xba087652",
+      "data": "0xba087652000000000000000000000000000000000000000000008f7511f45b2c550c57d50000000000000000000000002a691723fa94b2e38c1cda37dc64c7298f73378d0000000000000000000000002a691723fa94b2e38c1cda37dc64c7298f73378d"
+    }
+  },
+  "expect": {
+    "kind": "withdraw",
+    "title": "Withdrew crvUSD",
+    "assetsIn": [
+      {
+        "token": "0xf939e0a03fb07f59a73314e73794be0e57ac1b4e",
+        "amount": "753142215156650529064503"
+      }
+    ],
+    "assetsOut": [
+      {
+        "token": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+        "amount": "677457969866222208833493"
+      }
+    ],
+    "counterparty": "0x0655977feb2f289a4ab78af67bab0d17aab84367"
+  }
+}

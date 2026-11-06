@@ -1,0 +1,27 @@
+{
+  "note": "approve on the scrvUSD share token itself for another spender (etherscan.io/tx/0x30f4e87e\u2026): not the deposit allowance",
+  "own": [
+    "0x4f82e73edb06d29ff62c91ec8f5ff06571bdeb29"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x30f4e87e7e4192bc9338d990ce7ca6a6d45f1a77c4afcddbef1bda36d7f1875f",
+    "time": 1793877263,
+    "status": "confirmed",
+    "address": "0x4f82e73edb06d29ff62c91ec8f5ff06571bdeb29",
+    "from": "0x4f82e73edb06d29ff62c91ec8f5ff06571bdeb29",
+    "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+    "nativeValue": "0",
+    "transfers": [],
+    "block": "26348264",
+    "fee": "4001560548453",
+    "call": {
+      "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+      "selector": "0x095ea7b3",
+      "data": "0x095ea7b30000000000000000000000006131b5fae19ea4f9d964eac0408e4408b66337b5ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  },
+  "expect": {
+    "kind": "approve"
+  }
+}

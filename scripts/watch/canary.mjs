@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Canary: run every Earn / safety module's own read-only `verify:live` across all its
+// Canary: run every Earn / safety module's (and Curve swaps') own read-only `verify:live` across all its
 // markets with the public test addresses (watch/addresses.json) and our RPCs, then
 // report only what changed since the last run (ok → fail, warn → ok, …) plus
 // anything still failing. Nothing is signed or sent on-chain.
@@ -7,7 +7,7 @@
 //   node scripts/watch/canary.mjs [--only aave,morpho] [--timeout 240] [--send] [--dry] [--env FILE]
 // State: watch/canary/state.json; today's rows: watch/canary/<date>.json.
 import {spawn} from "node:child_process";
-import {readFileSync, writeFileSync, mkdirSync, existsSync} from "node:fs";
+import {readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync} from "node:fs";
 import {resolve, dirname} from "node:path";
 import {fileURLToPath} from "node:url";
 import {fitLines} from "./html-text.mjs";
@@ -69,6 +69,13 @@ for (const chainId of [1, 8453, 42161]) {
   jobs.push({id: `approvals:${chainId}`, module: "approvals", script: pkg("protocol-approvals-evm"), args: [ADDR.eip155, rpcFor(chainId), "--chain", String(chainId), "--range", "10000", ...(head ? ["--from", String(Math.max(0, head - 100_000))] : [])]});
 }
 if (existsSync(pkg("protocol-lending-kamino-solana"))) jobs.push({id: "kamino", module: "kamino", script: pkg("protocol-lending-kamino-solana"), args: [ADDR.solana, solRpc]});
+// Curve swaps: per chain with allowlisted pools (one generated src/pools/<chainId>.ts each), the router's code hash, version
+// and ABI family against the pins and quotes simulated with eth_call. Savings crvUSD: the vault's identity and a
+// large holder's redeem proven (the script's default holder; the empty test address would skip that proof).
+const curvePools = resolve(ROOT, "packages/protocol-swap2-curve/src/pools");
+const CURVE = existsSync(curvePools) ? readdirSync(curvePools).map((f) => /^(\d+)\.ts$/.exec(f)?.[1]).filter(Boolean).map(Number).sort((a, b) => a - b) : [];
+for (const chainId of CURVE) jobs.push({id: `curve:${chainId}`, module: "curve", script: pkg("protocol-swap2-curve"), args: [String(chainId), "--rpc", rpcFor(chainId)]});
+jobs.push({id: "scrvusd", module: "scrvusd", script: pkg("protocol-lending-curve-evm"), args: [], env: {CURVE_RPC: rpcFor(1)}});
 
 const selected = jobs.filter((j) => !ONLY || ONLY.has(j.module) || ONLY.has(j.id));
 const SOFT_FAIL = /(^|\s)(→|->)\s*\w*Error\b|\bFAILED\b|\bError:|not found|revert/i;
