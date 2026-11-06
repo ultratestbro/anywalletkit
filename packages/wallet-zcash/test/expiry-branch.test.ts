@@ -18,12 +18,12 @@ describe('Zcash expiry and branch id', () => {
   })
 
   it('expiry = tip + 1 + delta; the branch id is the one at tip + 1', async () => {
-    const nu63 = MAINNET_UPGRADES.at(-1)!
-    const f = fakeBlockchair({ tip: nu63.height - 1 })
+    const latest = MAINNET_UPGRADES.at(-1)!
+    const f = fakeBlockchair({ tip: latest.height - 1 })
     await (await mk(f.fetchFn).getAccount(0)).transfer({ recipient: RECIPIENT, amount: 60_000_000n })
     const tx = parseTx(f.sent[0]!)
-    expect(tx.expiryHeight).toBe(nu63.height - 1 + 1 + 40)
-    expect(tx.consensusBranchId).toBe(nu63.branchId)
+    expect(tx.expiryHeight).toBe(latest.height - 1 + 1 + 120)
+    expect(tx.consensusBranchId).toBe(latest.branchId)
   })
 
   it('off mainnet the branch id must be configured', async () => {

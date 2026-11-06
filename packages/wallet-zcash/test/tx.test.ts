@@ -10,7 +10,7 @@ describe('v5 transparent transactions (ZIP-225 / ZIP-244) against mined mainnet 
     it(`${hash.slice(0, 8)}: parse → serialize round-trips the raw bytes`, () => {
       const tx = parseTx(f.hex)
       expect(hex(serializeTx(tx))).toBe(f.hex)
-      expect(tx.consensusBranchId).toBe(0x37a5165b) // NU6.3 — mined after block 3 428 143
+      expect(tx.consensusBranchId).toBe(branchIdForHeight(f.block_id)) // NU6.3 or NU7, by the block it was mined in
       expect(tx.inputs.length).toBe(f.inputs.length)
       expect(tx.outputs.map((o) => [o.value, hex(o.script)])).toEqual(f.outputs.map((o) => [BigInt(o.value), o.script_hex]))
     })
@@ -40,6 +40,18 @@ describe('v5 transparent transactions (ZIP-225 / ZIP-244) against mined mainnet 
     })
   }
 
+  it('NU7 transactions verify only under the NU7 branch id, not the NU6.3 one sends were refused for', () => {
+    const nu7 = FIXTURES.map(fixture).filter((f) => f.block_id >= 3_543_405)
+    expect(nu7).toHaveLength(3)
+    for (const f of nu7) {
+      const tx = parseTx(f.hex)
+      expect(tx.consensusBranchId).toBe(0x77190ad9)
+      const spent = f.inputs.map((i) => ({ value: BigInt(i.value), script: hexToBytes(i.script_hex) }))
+      const sig = parseP2pkhScriptSig(tx.inputs[0]!.scriptSig)!
+      expect(secp256k1.verify(sig.signature, sighashAll({ ...tx, consensusBranchId: 0x37a5165b }, 0, spent), sig.publicKey, { prehash: false, format: 'der' })).toBe(false)
+    }
+  })
+
   it('refuses non-v5 and shielded transactions', () => {
     // v4 Sapling header (0x80000004, vgid 0x892f2085)
     expect(() => parseTx('0400008085202f8900000000000000000000000000000000000000000000000000')).toThrow(/Only v5/)
@@ -49,10 +61,14 @@ describe('v5 transparent transactions (ZIP-225 / ZIP-244) against mined mainnet 
 
   it('picks the consensus branch id from the height', () => {
     expect(branchIdForHeight(undefined)).toBe(CURRENT_BRANCH_ID)
+    expect(branchIdForHeight(3_543_405)).toBe(0x77190ad9)
+    expect(branchIdForHeight(3_543_404)).toBe(0x37a5165b)
     expect(branchIdForHeight(3_428_143)).toBe(0x37a5165b)
-    expect(branchIdForHeight(3_428_142)).toBe(0x4dec4df0)
+    expect(branchIdForHeight(3_428_142)).toBe(0x5437f330)
+    expect(branchIdForHeight(3_364_600)).toBe(0x5437f330)
+    expect(branchIdForHeight(3_364_599)).toBe(0x4dec4df0)
     expect(branchIdForHeight(3_000_000)).toBe(0xc8e71055)
     expect(branchIdForHeight(1_700_000)).toBe(0xc2d6d0b4)
-    expect(MAINNET_UPGRADES.map((u) => u.name)).toEqual(['NU5', 'NU6', 'NU6.1', 'NU6.3'])
+    expect(MAINNET_UPGRADES.map((u) => u.name)).toEqual(['NU5', 'NU6', 'NU6.1', 'NU6.2', 'NU6.3', 'NU7'])
   })
 })

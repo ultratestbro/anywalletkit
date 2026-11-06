@@ -18,10 +18,12 @@ export const MAINNET_UPGRADES: ReadonlyArray<{ name: string; height: number; bra
   { name: 'NU5', height: 1_687_104, branchId: 0xc2d6d0b4 },
   { name: 'NU6', height: 2_726_400, branchId: 0xc8e71055 },
   { name: 'NU6.1', height: 3_146_400, branchId: 0x4dec4df0 },
+  { name: 'NU6.2', height: 3_364_600, branchId: 0x5437f330 },
   { name: 'NU6.3', height: 3_428_143, branchId: 0x37a5165b },
+  { name: 'NU7', height: 3_543_405, branchId: 0x77190ad9 },
 ])
 
-/** The branch id the current mainnet tip signs under (NU6.3 "Ironwood", active since block 3 428 143, 2026-07-28). */
+/** The branch id the current mainnet tip signs under (NU7, active since block 3 543 405, 2026-11-06). */
 export const CURRENT_BRANCH_ID = MAINNET_UPGRADES[MAINNET_UPGRADES.length - 1]!.branchId
 
 /** Branch id in force at `height` on mainnet (the newest upgrade when the height is unknown or ahead of the table). */

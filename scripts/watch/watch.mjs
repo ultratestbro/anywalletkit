@@ -8,6 +8,7 @@ import {fileURLToPath, pathToFileURL} from "node:url";
 import {createHash} from "node:crypto";
 import {esc, firstBlocks, fitLines, readCapped, safeLink, visibleText} from "./html-text.mjs";
 import {RECORD_FORMATS, checkPins, decodeFacets, pinsFromModule, selectorsFromSource} from "./pins.mjs";
+import {checkBranch} from "./zcash-branch.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, "../..");
@@ -198,6 +199,28 @@ const F = {
     const served = Object.values(map).filter(Boolean);
     return {value: sha(canonical(map)), meta: {selectors: served.length, of: Object.keys(map).length, facets: new Set(served).size, map, names}};
   },
+  async "zcash-branch"(s, m) {
+    // The branch id a freshly mined v5 / v6 transaction carries vs the module's table at that height (`from`: the built
+    // entry). NU7 changed it on 2026-11-06 and every send was refused until the table learned it; a new upgrade's id
+    // is a diff, a mismatch is reported on every run. Blockchair (optional BLOCKCHAIR_KEY); two to five blocks below the tip.
+    const mod = await import(pathToFileURL(ownFile(m, s.from)).href);
+    if (typeof mod.branchIdForHeight !== "function" || !Array.isArray(mod.MAINNET_UPGRADES)) throw new Error(`${s.from} exports no branchIdForHeight / MAINNET_UPGRADES`);
+    const base = String(s.url ?? "https://api.blockchair.com/zcash").replace(/\/$/, "");
+    const key = env.BLOCKCHAIR_KEY ? `?key=${encodeURIComponent(env.BLOCKCHAIR_KEY)}` : "";
+    const tip = (await fetchJson(`${base}/stats${key}`))?.data?.best_block_height;
+    if (!Number.isSafeInteger(tip)) throw new Error("no chain tip");
+    // One block or transaction Blockchair has not indexed yet (404 / 429) moves on to the next one instead of failing the source.
+    let last = null;
+    for (let height = tip - 2; height > tip - 6; height--) {
+      const block = await fetchJson(`${base}/dashboards/block/${height}${key}`).then((j) => j?.data?.[height], (e) => { last = e; return null; });
+      for (const txid of (block?.transactions ?? []).slice(0, 4)) {
+        const raw = await fetchJson(`${base}/raw/transaction/${txid}${key}`).then((j) => j?.data?.[txid]?.raw_transaction, (e) => { last = e; return null; });
+        const r = raw ? checkBranch({height, txid, raw}, mod) : null;
+        if (r) return {value: `${r.meta.branchId} ${r.meta.expected}`, meta: {...r.meta, url: `https://blockchair.com/zcash/transaction/${txid}`}, problems: r.problems, problemNoun: "branch check"};
+      }
+    }
+    throw new Error(`no v5 / v6 transaction in blocks ${tip - 5}..${tip - 2}${last ? ` (${last.message})` : ""}`);
+  },
   async "rss"(s) {
     const r = await fetch(s.url, {headers: {"user-agent": "anywalletkit-watch"}, signal: AbortSignal.timeout(20_000)});
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -288,6 +311,7 @@ function describe(s, before, after) {
       if (dropped.length) parts.push(`no longer watched: ${dropped.slice(0, 4).map(name).join(", ")}${dropped.length > 4 ? ` +${dropped.length - 4}` : ""}`);
       return parts.join("; ") || "selectors changed";
     }
+    case "zcash-branch": return `branch id ${b.branchId ?? "—"} (${b.upgrade ?? "—"}) → ${a.branchId} (${a.upgrade}) at block ${a.height}; the module signs under ${a.expected} (${a.expectedUpgrade})`;
     case "rss": { const B = new Set(b.titles ?? []); const n = (a.titles ?? []).filter((t) => !B.has(t)); return n.length ? `new: ${n.map((t) => `“${t}”`).join(", ")}` : "items changed"; }
     default: return "changed";
   }
@@ -350,8 +374,9 @@ for (const m of manifests) {
       if (why) { console.error(`baseline ${slug(m.module)} · ${s.id}: ${why}`); prev = undefined; }
       const now = new Date().toISOString();
       const changed = !!prev && prev.value !== r.value;
-      // A failed pin check is reported on every run until it is fixed, not only on the day it appears.
-      const failed = r.problems?.length ? `${r.problems.length} pin check${r.problems.length > 1 ? "s" : ""} failing: ${r.problems.slice(0, 4).join("; ")}${r.problems.length > 4 ? `; …and ${r.problems.length - 4} more` : ""}` : null;
+      // A failed pin / branch check is reported on every run until it is fixed, not only on the day it appears.
+      const noun = r.problemNoun ?? "pin check";
+      const failed = r.problems?.length ? `${r.problems.length} ${noun}${r.problems.length > 1 ? "s" : ""} failing: ${r.problems.slice(0, 4).join("; ")}${r.problems.length > 4 ? `; …and ${r.problems.length - 4} more` : ""}` : null;
       if (changed || failed) changes.push({module: m.module, id: s.id, label: s.label ?? s.id, type: s.type, what: [changed ? describe(s, prev, r) : null, failed].filter(Boolean).join("; "), link: linkOf(s, r), before: prev?.meta, after: r.meta});
       state.sources[s.id] = {type: s.type, target, value: r.value, meta: r.meta, seenAt: now, changedAt: changed ? now : prev?.changedAt ?? now, ...(prev?.error ? {} : {})};
       if (r.text && s.keepText) state.sources[s.id].text = r.text;

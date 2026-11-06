@@ -10,7 +10,7 @@ export const hex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padS
 
 const here = dirname(fileURLToPath(import.meta.url))
 
-/** A mined mainnet v5 transparent transaction (Blockchair raw + dashboard), captured 2026-10-18. */
+/** A mined mainnet v5 transparent transaction (Blockchair raw + dashboard): two NU6.3 ones captured 2026-10-18, three NU7 ones 2026-11-07. */
 export interface Fixture {
   hash: string
   hex: string
@@ -27,7 +27,14 @@ export function fixture(hash: string): Fixture {
   return { hash, hex: raw.data[hash]!.raw_transaction, inputs: d.inputs, outputs: d.outputs, fee: d.transaction.fee, block_id: d.transaction.block_id }
 }
 
-export const FIXTURES = ['7376c5f1aac539eb420587007c83d864d3668a3cef7f180f21960aaaa48c37cb', 'e14270e291acd8301ff627f655e751508cacf19c95892d1a2410809cd0b33900']
+export const FIXTURES = [
+  '7376c5f1aac539eb420587007c83d864d3668a3cef7f180f21960aaaa48c37cb',
+  'e14270e291acd8301ff627f655e751508cacf19c95892d1a2410809cd0b33900',
+  // NU7 (block 3 545 600)
+  'c8a04d6c76b0f4a29e2887ea8eb0988f8209571376fe9371f59a791e00227a17',
+  '1f69edfd316e441c524b4714bb72f0f9fd51fd9b499d7f7c7f1d6b89722892a4',
+  '6a0c7a4ccba2b77363b192408e5ff553de93cf9fde163884612957f461d169b1',
+]
 
 export interface FakeBlockchairOptions {
   utxos?: Array<{ block_id: number; transaction_hash: string; index: number; value: number }>

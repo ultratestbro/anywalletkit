@@ -18,7 +18,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 function sandbox() {
   const root = mkdtempSync(join(tmpdir(), "watch-f19-"));
   mkdirSync(join(root, "scripts/watch"), {recursive: true});
-  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
+  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs", "zcash-branch.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
   mkdirSync(join(root, "packages/fake-mod"), {recursive: true});
   writeFileSync(join(root, "packages/fake-mod/watch.json"), JSON.stringify({
     module: "@anywalletkit/fake-mod",

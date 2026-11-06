@@ -1,0 +1,17 @@
+{
+  "module": "@anywalletkit/wallet-zcash",
+  "sources": [
+    {
+      "id": "branch-id",
+      "type": "zcash-branch",
+      "from": "dist/index.js",
+      "label": "Zcash consensus branch id at the tip vs MAINNET_UPGRADES"
+    },
+    {
+      "id": "zebra-releases",
+      "type": "github-releases",
+      "repo": "ZcashFoundation/zebra",
+      "label": "Zebra node releases (network upgrade activation heights)"
+    }
+  ]
+}
