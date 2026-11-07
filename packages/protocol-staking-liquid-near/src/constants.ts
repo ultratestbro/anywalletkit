@@ -19,6 +19,16 @@ export const PRICE_SCALE = 10n ** 24n
 
 /** Epochs an unstake waits at least (the contract may add more: big amounts, after the epoch's settlement). */
 export const MIN_EPOCHS_TO_UNLOCK = 4n
+/** Block heights per epoch, mainnet and testnet. */
+export const EPOCH_LENGTH = 43_200n
+/** Fallback epoch duration when the chain cannot be read: ~6.9 h, as measured on mainnet in November 2026. */
+export const TYPICAL_EPOCH_MS = 24_840_000
+/**
+ * Unstaked balances at or below this many yoctoNEAR are treated as empty. `deposit_and_stake` charges
+ * the share price rounded down and leaves the remainder (a yocto or two) unstaked; offering to
+ * withdraw it would cost more gas than it is worth.
+ */
+export const UNSTAKED_DUST = 1_000_000n
 /** Liquid NEAR the contract keeps for itself; a withdrawal needs contract balance − 1 NEAR ≥ amount. */
 export const CONTRACT_MIN_RESERVE_BALANCE = YOCTO_PER_NEAR
 /** NEP-145 registration, the same on every family contract (storage_balance_bounds.min). */
@@ -29,7 +39,11 @@ export const DEFAULT_RESERVE = 2n * 10n ** 22n
 /** Smallest stake the module sends: 0.001 NEAR. */
 export const MIN_STAKE = 10n ** 21n
 
-/** Prepaid gas per call (rNEAR deposit_and_stake: 100 Tgas prepaid, 44–57 Tgas burnt on mainnet). */
+/**
+ * Prepaid gas per call; unused gas is refunded. Burnt on mainnet (whole transaction): deposit_and_stake
+ * ~3.5 Tgas on both contracts (it stakes nothing itself: the operator bot does), unstake_all 3.5,
+ * withdraw_all 3.4 (rNEAR) to ~11 (LiNEAR).
+ */
 export const DEFAULT_GAS = {
   stake: 100n * TGAS,
   unstake: 50n * TGAS,

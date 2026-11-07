@@ -42,3 +42,29 @@ export function sameTransactions(a: readonly NearTransaction[], b: readonly Near
   }
   return true
 }
+
+/** A function-call action as the module builds them: plain JSON args, gas and deposit always set. */
+export function fc(methodName: string, args: Record<string, unknown>, gas: bigint, deposit: bigint): NearAction {
+  return { functionCall: { methodName, args, gas, deposit } }
+}
+
+/** The only methods the module ever calls on a family contract. */
+export const LIQUID_WRITE_METHODS: readonly string[] = ['deposit_and_stake', 'unstake', 'unstake_all', 'withdraw_all']
+
+/**
+ * Throws unless every transaction goes to `contract` and holds only function calls to
+ * {@link LIQUID_WRITE_METHODS}. Runs on every plan before it is returned or sent. In particular it
+ * refuses `ft_transfer` / `ft_transfer_call` to the contract: it has no `ft_on_transfer`, so tokens
+ * (or "staking by transfer") sent that way are lost.
+ */
+export function assertLiquidPlan(transactions: readonly NearTransaction[], contract: string): void {
+  for (const tx of transactions) {
+    if (tx.receiverId !== contract) throw new Error(`Refusing a transaction to ${tx.receiverId}: liquid staking only calls ${contract}.`)
+    if (tx.signerId !== undefined) throw new Error('Refusing a transaction with a signerId: the account signs as itself.')
+    for (const a of tx.actions) {
+      const method = 'functionCall' in a ? a.functionCall.methodName : null
+      if (method === null) throw new Error(`Refusing a ${Object.keys(a)[0]} action: liquid staking sends function calls only.`)
+      if (!LIQUID_WRITE_METHODS.includes(method)) throw new Error(`Refusing ${method} on ${contract}: liquid staking calls only ${LIQUID_WRITE_METHODS.join(', ')}${/^ft_transfer/.test(method) ? ' (the contract has no ft_on_transfer: tokens sent with ft_transfer_call are lost)' : ''}.`)
+    }
+  }
+}
