@@ -4,7 +4,7 @@ import { createMockAccount } from '@anywalletkit/conformance'
 import { NativeStakingProtocolNear, NearStakingError, factoryOf, poolRequestId, sameTransactions } from '../src/index.js'
 
 // Contract helpers that the module and the app share (NEAR-STAKING-API.md). The protocol methods are
-// covered by protocol.test.ts / conformance.test.ts once implemented.
+// covered by protocol.test.ts and conformance.test.ts.
 
 const near = () => createMockAccount({ chain: 'near:mainnet', address: 'alice.near' })
 

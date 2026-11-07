@@ -1,0 +1,437 @@
+{
+  "capturedAt": "2026-11-07T22:00:57.700Z",
+  "rpc": "https://free.rpc.fastnear.com",
+  "validators": {
+    "epoch_height": 4946,
+    "epoch_start_height": 223487537,
+    "current_validators": [
+      {
+        "account_id": "astro-stakers.poolv1.near",
+        "is_slashed": false,
+        "num_expected_blocks": 2206,
+        "num_expected_chunks": 11043,
+        "num_expected_endorsements": 373432,
+        "num_produced_blocks": 2206,
+        "num_produced_chunks": 10932,
+        "num_produced_endorsements": 363716,
+        "public_key": "ed25519:2nPSBCzjqikgwrqUMcuEVReJhmkC91eqJGPGqH9sZc28",
+        "shards": [
+          13
+        ],
+        "stake": "33148187825894720921243517292554"
+      },
+      {
+        "account_id": "figment.poolv1.near",
+        "is_slashed": false,
+        "num_expected_blocks": 1896,
+        "num_expected_chunks": 13235,
+        "num_expected_endorsements": 372837,
+        "num_produced_blocks": 1896,
+        "num_produced_chunks": 13131,
+        "num_produced_endorsements": 352675,
+        "public_key": "ed25519:7RjyY1bRKDqkshbKZtgpQdwsdxou8j9my8g1hPKZ9ngM",
+        "shards": [
+          9
+        ],
+        "stake": "28164595931641711566405419193377"
+      },
+      {
+        "account_id": "ledgerbyfigment.poolv1.near",
+        "is_slashed": false,
+        "num_expected_blocks": 1573,
+        "num_expected_chunks": 14287,
+        "num_expected_endorsements": 371068,
+        "num_produced_blocks": 1573,
+        "num_produced_chunks": 14245,
+        "num_produced_endorsements": 366780,
+        "public_key": "ed25519:Gc2QWoxLN8ryX1Dyje8va4ojt5GpnUQwHyvXZnrAY84A",
+        "shards": [
+          6
+        ],
+        "stake": "23082262390413709707338118784689"
+      },
+      {
+        "account_id": "staked.poolv1.near",
+        "is_slashed": false,
+        "num_expected_blocks": 1443,
+        "num_expected_chunks": 16201,
+        "num_expected_endorsements": 370082,
+        "num_produced_blocks": 1443,
+        "num_produced_chunks": 16160,
+        "num_produced_endorsements": 367529,
+        "public_key": "ed25519:9noQuLD3hC84YJFuTxZrpAuKTzmMbQrxKYG6KL9hKymo",
+        "shards": [
+          8
+        ],
+        "stake": "21286564163210372697799852511889"
+      },
+      {
+        "account_id": "binancenode1.poolv1.near",
+        "is_slashed": false,
+        "num_expected_blocks": 1392,
+        "num_expected_chunks": 9537,
+        "num_expected_endorsements": 369168,
+        "num_produced_blocks": 1392,
+        "num_produced_chunks": 9504,
+        "num_produced_endorsements": 364093,
+        "public_key": "ed25519:Bb7uPEocbsiQwRfPmsiiiM88DodtuYnBDi6dKZ4JZo2N",
+        "shards": [
+          9
+        ],
+        "stake": "20141165911092621454829364571613"
+      },
+      {
+        "account_id": "sumerian.poolv1.near",
+        "is_slashed": false,
+        "num_expected_blocks": 1323,
+        "num_expected_chunks": 11803,
+        "num_expected_endorsements": 367275,
+        "num_produced_blocks": 1323,
+        "num_produced_chunks": 11745,
+        "num_produced_endorsements": 354984,
+        "public_key": "ed25519:BLvNwUb1nQWympnmsHTtH7HCMeH6gSaYkjNsdee9AvzR",
+        "shards": [
+          10
+        ],
+        "stake": "18783398372941804993245835608093"
+      },
+      {
+        "account_id": "zavodil.poolv1.near",
+        "is_slashed": false,
+        "num_expected_blocks": 1231,
+        "num_expected_chunks": 13998,
+        "num_expected_endorsements": 365794,
+        "num_produced_blocks": 1231,
+        "num_produced_chunks": 13955,
+        "num_produced_endorsements": 364052,
+        "public_key": "ed25519:HHARoU1hANWF9hu7YRstDDvgyigBhUeUuqecRVr8dpUz",
+        "shards": [
+          11
+        ],
+        "stake": "17943509771585500988971033765403"
+      },
+      {
+        "account_id": "liver.pool.near",
+        "is_slashed": false,
+        "num_expected_blocks": 1090,
+        "num_expected_chunks": 5379,
+        "num_expected_endorsements": 362719,
+        "num_produced_blocks": 1089,
+        "num_produced_chunks": 5358,
+        "num_produced_endorsements": 360683,
+        "public_key": "ed25519:aiKNxj28QB3P6jSu3FghugQC2edj9zBuwU1Uts1jey2",
+        "shards": [
+          13
+        ],
+        "stake": "16281947230599207578725983146430"
+      },
+      {
+        "account_id": "epic.poolv1.near",
+        "is_slashed": false,
+        "num_expected_blocks": 831,
+        "num_expected_chunks": 8927,
+        "num_expected_endorsements": 344785,
+        "num_produced_blocks": 831,
+        "num_produced_chunks": 8898,
+        "num_produced_endorsements": 342470,
+        "public_key": "ed25519:68HExKDtw1CjGzopZ8fMAMhMSZRVKRhwLzLQmGKtFNzT",
+        "shards": [
+          8
+        ],
+        "stake": "11809730591729487065231970341209"
+      },
+      {
+        "account_id": "lst-pool.near",
+        "is_slashed": false,
+        "num_expected_blocks": 332,
+        "num_expected_chunks": 4604,
+        "num_expected_endorsements": 243698,
+        "num_produced_blocks": 332,
+        "num_produced_chunks": 4584,
+        "num_produced_endorsements": 242525,
+        "public_key": "ed25519:2rKRwBMPeRcKTsxSFWE4JN7g8dBUYsLqy5fBpMYb988F",
+        "shards": [
+          7
+        ],
+        "stake": "4713892198238796047905981426122"
+      },
+      {
+        "account_id": "aurora.pool.near",
+        "is_slashed": false,
+        "num_expected_blocks": 0,
+        "num_expected_chunks": 0,
+        "num_expected_endorsements": 70973,
+        "num_produced_blocks": 0,
+        "num_produced_chunks": 0,
+        "num_produced_endorsements": 70657,
+        "public_key": "ed25519:APQSUNSAzr3yaadPogzcYeGTyMKKC45BMVpaNJdtvJZd",
+        "shards": [],
+        "stake": "513014271267449064866716191735"
+      }
+    ],
+    "next_validators": [
+      {
+        "account_id": "astro-stakers.poolv1.near",
+        "public_key": "ed25519:2nPSBCzjqikgwrqUMcuEVReJhmkC91eqJGPGqH9sZc28",
+        "shards": [
+          13
+        ],
+        "stake": "33144765207594348742795458021253"
+      },
+      {
+        "account_id": "figment.poolv1.near",
+        "public_key": "ed25519:7RjyY1bRKDqkshbKZtgpQdwsdxou8j9my8g1hPKZ9ngM",
+        "shards": [
+          9
+        ],
+        "stake": "28166040719831409666160592436801"
+      },
+      {
+        "account_id": "ledgerbyfigment.poolv1.near",
+        "public_key": "ed25519:Gc2QWoxLN8ryX1Dyje8va4ojt5GpnUQwHyvXZnrAY84A",
+        "shards": [
+          6
+        ],
+        "stake": "23083649113324642159243097378166"
+      },
+      {
+        "account_id": "staked.poolv1.near",
+        "public_key": "ed25519:9noQuLD3hC84YJFuTxZrpAuKTzmMbQrxKYG6KL9hKymo",
+        "shards": [
+          8
+        ],
+        "stake": "21301083601167849306347572078769"
+      },
+      {
+        "account_id": "binancenode1.poolv1.near",
+        "public_key": "ed25519:Bb7uPEocbsiQwRfPmsiiiM88DodtuYnBDi6dKZ4JZo2N",
+        "shards": [
+          9
+        ],
+        "stake": "20141970256984796641681688751138"
+      },
+      {
+        "account_id": "sumerian.poolv1.near",
+        "public_key": "ed25519:BLvNwUb1nQWympnmsHTtH7HCMeH6gSaYkjNsdee9AvzR",
+        "shards": [
+          10
+        ],
+        "stake": "18784148495818954076264782022322"
+      },
+      {
+        "account_id": "zavodil.poolv1.near",
+        "public_key": "ed25519:HHARoU1hANWF9hu7YRstDDvgyigBhUeUuqecRVr8dpUz",
+        "shards": [
+          11
+        ],
+        "stake": "17911279128491465502550016822130"
+      },
+      {
+        "account_id": "liver.pool.near",
+        "public_key": "ed25519:aiKNxj28QB3P6jSu3FghugQC2edj9zBuwU1Uts1jey2",
+        "shards": [
+          13
+        ],
+        "stake": "16282597053607102120486598875374"
+      },
+      {
+        "account_id": "epic.poolv1.near",
+        "public_key": "ed25519:68HExKDtw1CjGzopZ8fMAMhMSZRVKRhwLzLQmGKtFNzT",
+        "shards": [
+          8
+        ],
+        "stake": "11811341787243457861899802151394"
+      },
+      {
+        "account_id": "lst-pool.near",
+        "public_key": "ed25519:2rKRwBMPeRcKTsxSFWE4JN7g8dBUYsLqy5fBpMYb988F",
+        "shards": [
+          7
+        ],
+        "stake": "4710678044068430602568751707324"
+      },
+      {
+        "account_id": "aurora.pool.near",
+        "public_key": "ed25519:APQSUNSAzr3yaadPogzcYeGTyMKKC45BMVpaNJdtvJZd",
+        "shards": [],
+        "stake": "513049354714180439143571704152"
+      }
+    ],
+    "validator_reward_paid_prev_epoch": {
+      "astro-stakers.poolv1.near": "1320884832130864793677615180",
+      "aurora.pool.near": "20300925533713481577786426",
+      "binancenode1.poolv1.near": "797760353017547964665311182",
+      "epic.poolv1.near": "467613670815027604751281947",
+      "figment.poolv1.near": "1115477617028177135021782255",
+      "ledgerbyfigment.poolv1.near": "914154904162504750878632769",
+      "liver.pool.near": "644494910546996797282616735",
+      "lst-pool.near": "186376441393300855494670466",
+      "staked.poolv1.near": "843141311735739211541561984",
+      "sumerian.poolv1.near": "743981286039384020647058145",
+      "treasury.near": "2561883790565543155978841380",
+      "zavodil.poolv1.near": "708215741722911068307680110"
+    },
+    "_network": {
+      "validators": 352,
+      "next": 352,
+      "rewardEntries": 326,
+      "rewards": "23004444443331849274453729372",
+      "stake": "581429647555038220610125988770755"
+    }
+  },
+  "blocks": {
+    "final": {
+      "height": 223524907,
+      "timestamp": 1794088845940411600,
+      "timestamp_nanosec": "1794088845940411714",
+      "epoch_id": "Fw8ktoVQDpL12q5kX5qiAiv8qrCC1aVoS6pBqVrH5azE",
+      "hash": "BbVPM6KLxY7QgrVzCDEetygAz1jo26Me5z9GjDyjHyan"
+    },
+    "start": {
+      "height": 223487537,
+      "timestamp": 1794066710973629400,
+      "timestamp_nanosec": "1794066710973629471",
+      "epoch_id": "Fw8ktoVQDpL12q5kX5qiAiv8qrCC1aVoS6pBqVrH5azE",
+      "hash": "26kA9wCq3ogvy5iLXDR1WB5EkeidZguo5TXzGbJG386F"
+    },
+    "prev": {
+      "height": 223444337,
+      "timestamp": 1794041867417664000,
+      "timestamp_nanosec": "1794041867417664009",
+      "epoch_id": "5TxaPVVS3XGZyA5fMJhnMeP3jtqyGS4umrHXJGi7xTiR",
+      "hash": "AR9VmnpFev4QN6xfQVA7kfLFoQf4YE311S94BsgWkDAY"
+    }
+  },
+  "gasPrice": "100000000",
+  "accounts": {
+    "astro-stakers.poolv1.near": {
+      "jsonrpc": "2.0",
+      "result": {
+        "amount": "800692751121535547189764693640",
+        "block_hash": "Gzr66cLkQiTnsdTKrHrwS6DCzkHVSHM6wgfJXhdSYT3n",
+        "block_height": 223524909,
+        "code_hash": "J1arLz48fgXcGyCPVckFwLnewNH6j1uw79thsvwqGYTY",
+        "locked": "33344458614907283767926739424400",
+        "storage_paid_at": 0,
+        "storage_usage": 10155807
+      },
+      "id": "fx"
+    },
+    "figment.poolv1.near": {
+      "jsonrpc": "2.0",
+      "result": {
+        "amount": "2673881598674949109395107846755",
+        "block_hash": "DYgNBywcsQUDjHQva585dLph6q2sLkmELDifm9dy3LsT",
+        "block_height": 223524910,
+        "code_hash": "J1arLz48fgXcGyCPVckFwLnewNH6j1uw79thsvwqGYTY",
+        "locked": "28166040719831409666160592436801",
+        "storage_paid_at": 0,
+        "storage_usage": 778600
+      },
+      "id": "fx"
+    },
+    "aurora.pool.near": {
+      "jsonrpc": "2.0",
+      "result": {
+        "amount": "71029771953182621297492310412",
+        "block_hash": "DYgNBywcsQUDjHQva585dLph6q2sLkmELDifm9dy3LsT",
+        "block_height": 223524910,
+        "code_hash": "5vf2Jkqpk11H7szLnY4XdPA6maJi1ND8xe346xtbtX8e",
+        "locked": "513049354714180439143571704152",
+        "storage_paid_at": 0,
+        "storage_usage": 2526373
+      },
+      "id": "fx"
+    },
+    "zavodil.poolv1.near": {
+      "jsonrpc": "2.0",
+      "result": {
+        "amount": "352325357645243691359622829756",
+        "block_hash": "DNHHUYccviyRQ6eRL5ehmxKUgZTHV1oJdZSnSFy9BHpQ",
+        "block_height": 223524911,
+        "code_hash": "J1arLz48fgXcGyCPVckFwLnewNH6j1uw79thsvwqGYTY",
+        "locked": "17943509771585500988971033765403",
+        "storage_paid_at": 0,
+        "storage_usage": 2588504
+      },
+      "id": "fx"
+    },
+    "lst-pool.near": {
+      "jsonrpc": "2.0",
+      "result": {
+        "amount": "757914603558477377093909845251",
+        "block_hash": "DNHHUYccviyRQ6eRL5ehmxKUgZTHV1oJdZSnSFy9BHpQ",
+        "block_height": 223524911,
+        "code_hash": "DqKkcbjBiPJju2tqis8G7ayfBePvq9Gn8mjvykNupYxx",
+        "locked": "4714464664656479313138133127175",
+        "storage_paid_at": 0,
+        "storage_usage": 970701
+      },
+      "id": "fx"
+    },
+    "meta-pool.near": {
+      "jsonrpc": "2.0",
+      "result": {
+        "amount": "285203256864078635740082204201",
+        "block_hash": "815X7mwm4FqkQCjmjh3T1noMU8FqcbTFYrqQMQzRTN1z",
+        "block_height": 223524912,
+        "code_hash": "J6pS9R23vzbwxGB8eMq4qrn8UhciEYHsVbR9UJPyLNxh",
+        "locked": "0",
+        "storage_paid_at": 0,
+        "storage_usage": 8751764
+      },
+      "id": "fx"
+    },
+    "nima.near": {
+      "jsonrpc": "2.0",
+      "result": {
+        "amount": "11070437510076093599999998",
+        "block_hash": "6PQaTVQ48iMgxvVqiEpVonjxUCePxUPrGktjKXNMYEv5",
+        "block_height": 223524913,
+        "code_hash": "11111111111111111111111111111111",
+        "locked": "0",
+        "storage_paid_at": 0,
+        "storage_usage": 2451
+      },
+      "id": "fx"
+    }
+  },
+  "calls": {
+    "astro-stakers.poolv1.near is_staking_paused": false,
+    "astro-stakers.poolv1.near get_reward_fee_fraction": {
+      "numerator": 1,
+      "denominator": 100
+    },
+    "figment.poolv1.near is_staking_paused": false,
+    "figment.poolv1.near get_reward_fee_fraction": {
+      "numerator": 10,
+      "denominator": 100
+    },
+    "aurora.pool.near is_staking_paused": false,
+    "aurora.pool.near get_reward_fee_fraction": {
+      "numerator": 99,
+      "denominator": 100
+    },
+    "zavodil.poolv1.near is_staking_paused": false,
+    "zavodil.poolv1.near get_reward_fee_fraction": {
+      "numerator": 1,
+      "denominator": 100
+    },
+    "lst-pool.near is_staking_paused": "wasm execution failed with error: MethodResolveError(MethodNotFound)",
+    "lst-pool.near get_reward_fee_fraction": {
+      "numerator": 500,
+      "denominator": 10000
+    },
+    "meta-pool.near is_staking_paused": false,
+    "meta-pool.near get_reward_fee_fraction": {
+      "numerator": 1000,
+      "denominator": 10000
+    },
+    "astro-stakers.poolv1.near get_account nima.near": {
+      "account_id": "nima.near",
+      "unstaked_balance": "168908154000000000000000003",
+      "staked_balance": "701474062899674618",
+      "can_withdraw": false
+    }
+  }
+}

@@ -28,6 +28,12 @@ export const TYPICAL_EPOCH_MS = 24_840_000
 export const DEFAULT_RESERVE = 2n * 10n ** 22n
 /** Smallest stake the module sends: 0.001 NEAR (smaller deposits can round to zero pool shares). */
 export const MIN_STAKE = 10n ** 21n
+/**
+ * Unstaked balances below this are share-rounding dust, not a withdrawal: pools leave 1–10 yoctoNEAR
+ * behind (779 of the first 1 200 astro-stakers delegators on 2026-11-08). Dust is never offered as a
+ * request or a claim and never triggers the withdraw-first batch: withdrawing it costs more gas than it is worth.
+ */
+export const UNSTAKED_DUST = 10n ** 21n
 /** Default cap on a pool's reward fee, percent (pools can charge up to 100 %). */
 export const DEFAULT_MAX_FEE = 10
 
