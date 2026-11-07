@@ -1,8 +1,8 @@
-import {getAddress} from "viem";
+import {decodeErrorResult, decodeFunctionData, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
 import {evmRef, isEvm, timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {describeFyndActivity} from "./activity.js";
-import {FYND_CHAINS, checkFyndTransaction} from "./router.js";
+import {FYND_CHAINS, ROUTER_NATIVE, TYCHO_ROUTER_ABI, checkFyndTransaction} from "./router.js";
 
 /**
  * Fynd — Propeller Heads' DEX aggregator (docs.fynd.xyz) as a same-chain
@@ -68,6 +68,48 @@ interface FyndOrderQuote {
   transaction?: {to?: string; value?: string; data?: string};
 }
 
+/**
+ * The router's custom errors a preflight revert is read against (TychoRouterV3.sol, TransferManager.sol in
+ * github.com/propeller-heads/tycho crates/tycho-execution). Only `TychoRouter__NegativeSlippage` — the final
+ * output under `minAmountOut` — means the price moved; the others are named as they are.
+ */
+const ROUTER_ERRORS = parseAbi([
+  "error TychoRouter__NegativeSlippage(uint256 amount, uint256 minAmount)",
+  "error TychoRouter__FeesExceedOutput(uint256 totalFees, uint256 actualAmountOut)",
+  "error TychoRouter__NegativeOutputDelta(int256 amount)",
+  "error TychoRouter__MsgValueDoesNotMatchAmountIn(uint256 msgValue, uint256 amountIn)",
+  "error TychoRouter__AmountOutZero()",
+  "error TychoRouter__ZeroInput()",
+  "error TychoRouter__EmptySwaps()",
+  "error TransferManager__ExceededTransferFromAllowance(uint256 allowedAmount, uint256 amountAttempted)",
+]);
+const ERC20_READS = parseAbi(["function balanceOf(address) view returns (uint256)", "function allowance(address, address) view returns (uint256)"]);
+
+/** The revert data an RPC error carries (`error.data`, a nested `data.data`, or hex in the message), at most 4 KB of it. */
+function revertData(e: unknown): Hex | null {
+  const err = e as {data?: unknown; message?: unknown};
+  const nested = err.data && typeof err.data === "object" ? (err.data as {data?: unknown}).data : undefined;
+  for (const v of [err.data, nested]) if (typeof v === "string" && /^0x(?:[0-9a-fA-F]{2}){4,4096}$/.test(v)) return v as Hex;
+  const inMessage = typeof err.message === "string" ? /0x(?:[0-9a-fA-F]{2}){4,4096}/.exec(err.message.slice(0, 9000)) : null;
+  return inMessage ? (inMessage[0] as Hex) : null;
+}
+
+/** The decoded router error (or `Error(string)` / `Panic`) behind a revert, or null when it is none of them. */
+function routerRevert(e: unknown): {name: string; args: readonly unknown[]} | null {
+  const data = revertData(e);
+  if (data) {
+    try {
+      const r = decodeErrorResult({abi: ROUTER_ERRORS, data});
+      return {name: r.errorName, args: r.args ?? []};
+    } catch {
+      // not one of the router's errors
+    }
+  }
+  // Some RPCs name the error in the message instead of returning its data.
+  const message = e instanceof Error ? e.message.slice(0, 2000) : "";
+  return /\bTychoRouter__NegativeSlippage\b/.test(message) ? {name: "TychoRouter__NegativeSlippage", args: []} : null;
+}
+
 const uint = (v: unknown): bigint | null => (typeof v === "string" && /^\d+$/.test(v) ? BigInt(v) : null);
 /** A protocol name from the API as it may appear in a refusal or the quote: at most 40 characters (scan 2026-10-27 modules, F34). */
 const protocolName = (p: string): string => (p.length > 40 ? `${p.slice(0, 40)}…` : p);
@@ -103,8 +145,8 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
       try {
         const res = await fetch(url, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({jsonrpc: "2.0", id: 1, method, params}), signal: timeoutSignal(12_000)});
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const body = (await res.json()) as {result?: unknown; error?: {message?: string}};
-        if (body.error) throw Object.assign(new Error(body.error.message ?? "rpc error"), {rpc: true});
+        const body = (await res.json()) as {result?: unknown; error?: {message?: string; data?: unknown}};
+        if (body.error) throw Object.assign(new Error(body.error.message ?? "rpc error"), {rpc: true, data: body.error.data});
         return body.result ?? null;
       } catch (e) {
         if ((e as {rpc?: boolean}).rpc) throw e;
@@ -112,6 +154,49 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
       }
     }
     throw new Error(`fynd: no RPC answered on chain ${chainId} (${lastErr instanceof Error ? lastErr.message : String(lastErr)})`);
+  }
+
+  /**
+   * Why the quoted swap reverts for `sender` now, as the refusal the wallet shows. The price moved only when the
+   * router says so (`TychoRouter__NegativeSlippage`); otherwise the input side is read first — a balance under the
+   * amount, or an approval the RPC does not see yet, reverts before any pool is touched — and anything else is
+   * named neutrally with the revert's reason.
+   */
+  async function revertReason(chainId: number, sender: string, quoted: NonNullable<Quote["txRequest"]>, e: unknown): Promise<string> {
+    const revert = routerRevert(e);
+    if (revert?.name === "TychoRouter__NegativeSlippage") {
+      const [out, min] = revert.args as readonly bigint[];
+      const pays = typeof out === "bigint" && typeof min === "bigint" ? ` — the route now pays ${out}, under your minimum ${min}` : "";
+      return `fynd: the price moved past your minimum${pays}. Nothing was sent; refresh the quote.`;
+    }
+    const short = await inputShortfall(chainId, sender, quoted).catch(() => null);
+    if (short) return short;
+    const why = revert
+      ? revert.name === "Error" && typeof revert.args[0] === "string" ? revert.args[0].slice(0, 120) : `${revert.name}${revert.args.length ? `(${revert.args.map(String).join(", ").slice(0, 100)})` : ""}`
+      : e instanceof Error ? e.message.slice(0, 120) : "revert";
+    return `fynd: the swap would revert now (${why}). Nothing was sent; refresh the quote.`;
+  }
+
+  /** The wallet's side of a revert: the input balance under the amount, or (ERC-20) the router's allowance under it. Null when both cover it. */
+  async function inputShortfall(chainId: number, sender: string, quoted: NonNullable<Quote["txRequest"]>): Promise<string | null> {
+    const call = decodeFunctionData({abi: TYCHO_ROUTER_ABI, data: quoted.data as Hex});
+    const [amountIn, tokenIn] = call.args;
+    const word = (v: unknown): bigint | null => (typeof v === "string" && /^0x[0-9a-fA-F]{1,64}$/.test(v) ? BigInt(v) : null);
+    if (getAddress(tokenIn) === getAddress(ROUTER_NATIVE)) {
+      const value = BigInt(quoted.value ?? "0");
+      const balance = word(await rpc(chainId, "eth_getBalance", [sender, "latest"]));
+      if (balance !== null && balance < value) return `fynd: the wallet's balance is below the amount (${balance} < ${value}). Nothing was sent.`;
+      return null;
+    }
+    const spender = getAddress(quoted.approvalAddress ?? quoted.to ?? "");
+    const read = (data: Hex) => rpc(chainId, "eth_call", [{to: tokenIn, data}, "latest"]);
+    const [balance, allowance] = (await Promise.all([
+      read(encodeFunctionData({abi: ERC20_READS, functionName: "balanceOf", args: [sender as Hex]})),
+      read(encodeFunctionData({abi: ERC20_READS, functionName: "allowance", args: [sender as Hex, spender]})),
+    ])).map(word);
+    if (balance != null && balance < amountIn) return `fynd: the wallet's balance is below the amount (${balance} < ${amountIn}). Nothing was sent.`;
+    if (allowance != null && allowance < amountIn) return "fynd: the token approval is not visible on-chain yet. Nothing was sent; try again in a moment.";
+    return null;
   }
 
   return {
@@ -252,7 +337,8 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
     },
 
     /**
-     * Simulate the exact transaction at the latest block (allowance already in place); refuse when it would revert.
+     * Simulate the exact transaction at the latest block (allowance already in place); refuse when it would revert,
+     * with the reason ({@link revertReason}: price, balance, approval, or the revert as it is).
      * Only the quote's own transaction is simulated: behind a backend `tx` is the client's and only the quote is
      * sealed, so a client's call (any target, a megabyte of calldata) never reaches this RPC (scan 2026-10-27 modules, F24).
      */
@@ -267,9 +353,7 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
       try {
         await rpc(chainId, "eth_call", [{from: sender, to: quoted.to, data: quoted.data, value: `0x${BigInt(quoted.value ?? "0").toString(16)}`}, "latest"]);
       } catch (e) {
-        if ((e as {rpc?: boolean}).rpc) {
-          throw new Error(`fynd: the swap would revert now (${e instanceof Error ? e.message.slice(0, 120) : "revert"}) — the price moved past your minimum. Nothing was sent; refresh the quote.`);
-        }
+        if ((e as {rpc?: boolean}).rpc) throw new Error(await revertReason(chainId, sender, quoted, e));
         // no RPC answered: leave it to the router's own minimum
       }
     },

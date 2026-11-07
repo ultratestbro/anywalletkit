@@ -34,7 +34,7 @@ const curve = curveProvider({
 
 | Option | Default | Meaning |
 |---|---|---|
-| `rpcUrls` | — | `{ chainId: [url…] }`, tried in order. Quotes, preflight and receipts. A chain without one is not offered. |
+| `rpcUrls` | — | `{ chainId: [url…] }`, tried in order. Quotes, preflight and receipts. A chain without one is not offered. A batch an endpoint answers only in part (a rate-limit element such as QuickNode's -32007, a node fault) goes to the next one, once more after a 1 s pause when the last refusal was for the request rate, and then refuses as `no RPC answered on chain N`; only a revert counts as an answer. |
 | `defaultSlippageBps` | auto | Used when the caller passes none. Default: swap2-core's `suggestSlippage` for the pair and the route's price impact (stable ↔ stable 10 bps, majors 50, others 100, plus half the impact). |
 | `quoteTtlMs` | `180000` | The only expiry: Router NG has no deadline. Long enough for an approval to be mined on Ethereum. |
 | `onWarning` | `console.warn` | Told when a chain's AddressProvider lists another router than the pinned one (never acted on). |
@@ -114,6 +114,7 @@ WETH9 deposit.
 ## Live check
 
 `node scripts/verify-live.mjs [chainId,…]` (after `pnpm build`): per chain the router's code hash, version, wrapped
-native and ABI family against the pins, then up to three quotes from the allowlist, each simulated with `eth_call` as a
-dummy wallet funded by a state override (balance and router allowance); the router's return must reach the minimum.
+native and ABI family against the pins, every allowlisted pool through the preflight's own code and coins check
+(`curveOnChain(…).checkPools`), then up to three quotes from the allowlist, each simulated with `eth_call` as a dummy
+wallet funded by a state override (balance and router allowance); the router's return must reach the minimum.
 Read-only, nothing signed.

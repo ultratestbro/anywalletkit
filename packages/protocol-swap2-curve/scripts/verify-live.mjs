@@ -4,7 +4,9 @@
 // allowlist through the provider, each simulated with eth_call: a dummy address is given the input (native balance, or
 // the token's balance and the router's allowance through a stateOverride of the slots found by probing) and calls the
 // quote's exact router transaction; the router's return must be at least the quote's minimum. A chain without
-// allowlisted pools must not be offered and a quote there must refuse by name. One line per chain.
+// allowlisted pools must not be offered and a quote there must refuse by name. Every allowlisted pool is also read the
+// way a sealed quote's preflight reads it (the module's own code / coins check and decoders), so a pool the generator
+// admitted but the runtime would refuse fails here. One line per chain.
 //
 //   node scripts/verify-live.mjs [chainId[,chainId…]] [--rpc url]        (build first: pnpm build)
 //
@@ -157,7 +159,19 @@ for (const chainId of chains) {
     notes.push(`router ${d.version} ${d.family} code ${keccak256(code).slice(0, 10)}… weth ok${warning ? ` (AddressProvider id 2 differs: ${warning.split('lists router ')[1]?.split(' ')[0]})` : ''}`)
     void decodeFunctionResult({abi: VERSION, functionName: 'version', data: ver})
 
-    // 2) Quotes from the allowlist, each simulated as a funded dummy wallet.
+    // 2) The whole allowlist through the preflight's own pool check (code hash, coins(uint256) then coins(int128)).
+    const listed = CURVE_POOLS[chainId]?.pools ?? []
+    const onChain = curveOnChain({rpcUrls: {[chainId]: [url]}, onWarning: () => {}})
+    const off = []
+    for (const p of listed) {
+      const why = await onChain.checkPools(chainId, [p]).catch((e) => e?.message ?? String(e))
+      if (why) off.push(why)
+      await sleep(100)
+    }
+    if (off.length) { failures++; notes.push(`FAIL preflight pool check ${listed.length - off.length}/${listed.length}: ${off.join('; ')}`) }
+    else notes.push(`preflight pool check ${listed.length}/${listed.length}`)
+
+    // 3) Quotes from the allowlist, each simulated as a funded dummy wallet.
     const reqs = quoteRequests(chainId)
     const provider = curveProvider({rpcUrls: {[chainId]: [url]}, onWarning: () => {}})
     notes.push(`pools ${CURVE_POOLS[chainId]?.pools.length ?? 0}`)
