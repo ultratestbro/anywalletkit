@@ -7,9 +7,8 @@
 // chains. `oftVersion()` = (0x02e49c2c, 1) on all of them.
 //
 // Only chains the SDK ships (swap2-assets / wallet-evm) are listed. USDT0 is
-// also deployed on Conflux eSpace (1030, eid 30212), Flare (14, 30295),
-// Hedera (295, 30316), Mantle (5000, 30181), Morph (2818, 30322), Rootstock
-// (30, 30333), Stable (988, 30396), Tempo (4217, 30410), plus HyperCore, IOTA
+// also deployed on Conflux eSpace (1030, eid 30212), Hedera (295, 30316),
+// Rootstock (30, 30333), Stable (988, 30396), Tempo (4217, 30410), plus HyperCore, IOTA
 // and Stellar (non-EVM) — not wallet chains here, so not routable here.
 import {decodeFunctionData, getAddress, isAddress, pad, parseAbi, type Hex} from "viem";
 import type {Quote, QuoteParams, RemotePins} from "@anywalletkit/protocol-swap2-core/types";
