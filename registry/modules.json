@@ -1,7 +1,7 @@
 {
   "$schema": "./modules.schema.json",
   "generatedAt": "2026-11-07",
-  "count": 27,
+  "count": 29,
   "modules": [
     {
       "name": "@anywalletkit/protocol-approvals-evm",
@@ -155,6 +155,22 @@
       "addedAt": "2026-10-04"
     },
     {
+      "name": "@anywalletkit/protocol-staking-liquid-near",
+      "type": "staking",
+      "chains": [
+        "near:mainnet",
+        "near:testnet"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
+      "path": "packages/protocol-staking-liquid-near",
+      "addedAt": "2026-11-08"
+    },
+    {
       "name": "@anywalletkit/protocol-staking-native-monad",
       "type": "staking",
       "chains": [
@@ -169,6 +185,22 @@
       "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-staking-native-monad",
       "addedAt": "2026-10-26"
+    },
+    {
+      "name": "@anywalletkit/protocol-staking-native-near",
+      "type": "staking",
+      "chains": [
+        "near:mainnet",
+        "near:testnet"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
+      "path": "packages/protocol-staking-native-near",
+      "addedAt": "2026-11-08"
     },
     {
       "name": "@anywalletkit/protocol-staking-native-solana",

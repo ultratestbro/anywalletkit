@@ -1,0 +1,11 @@
+{
+  "name": "@anywalletkit/protocol-staking-liquid-near",
+  "type": "staking",
+  "chains": ["near:mainnet", "near:testnet"],
+  "tier": "core",
+  "maintainers": ["@ultratestbro"],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
+  "path": "packages/protocol-staking-liquid-near",
+  "addedAt": "2026-11-08"
+}

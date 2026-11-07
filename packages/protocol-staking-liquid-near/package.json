@@ -1,0 +1,40 @@
+{
+  "name": "@anywalletkit/protocol-staking-liquid-near",
+  "version": "0.0.0",
+  "description": "Liquid NEAR staking for any NEAR account through the LiNEAR contract family: LiNEAR (linear-protocol.near) and Rhea rNEAR (lst.rhealab.near), pinned by account id and code hash. Stake NEAR for the token, delayed unstake with the exact unlock epoch, withdraw with a contract-liquidity check, price, APR from the price over time. Quotes return the exact NEAR transactions, so an external signer (wallet-selector) signs what was shown.",
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-staking-liquid-near" },
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "module.json", "LICENSE"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": {
+    "@anywalletkit/wallet-near": "workspace:*",
+    "@noble/hashes": "^2.4.0"
+  },
+  "peerDependencies": { "@anywalletkit/core": "workspace:*" },
+  "devDependencies": {
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*",
+    "@types/node": "^22",
+    "vitest": "^5.0.3"
+  },
+  "keywords": ["protocol", "staking", "near", "liquid-staking", "linear", "rnear", "rhea", "lst", "staking-protocol", "anywalletkit"],
+  "publishConfig": { "access": "public", "provenance": true }
+}
