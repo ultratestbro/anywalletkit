@@ -157,11 +157,12 @@ describe("fyndProvider quote-time simulation (native input)", () => {
 
 describe("fyndProvider.preflightDeposit", () => {
   it("simulates the exact transaction from the sender and refuses when it would revert", async () => {
-    vi.stubGlobal("fetch", stub({ethCallRevert: true}));
+    vi.stubGlobal("fetch", stub());
     const p = fyndProvider({apiKey: "k", rpcUrls: RPC});
     const q = (await p.getQuote(params() as never))!;
     const tx = await p.buildDeposit(q);
-    await expect(p.preflightDeposit!(q, tx)).rejects.toThrow(/would revert now/);
+    vi.stubGlobal("fetch", stub({ethCallRevert: true}));
+    await expect(p.preflightDeposit!(q, tx)).rejects.toThrow(/price moved past your minimum. Nothing was sent/);
     vi.stubGlobal("fetch", stub());
     await expect(p.preflightDeposit!(q, tx)).resolves.toBeUndefined();
   });
