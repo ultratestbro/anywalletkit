@@ -14,6 +14,11 @@ const QUOTER = parseAbi([
   "function quoteExactInput(bytes path, uint256 amountIn) returns (uint256, uint160[], uint32[], uint256)",
 ]);
 const NOMINAL_IN = 1_000_000n;
+/** A pool price well inside TickMath's bounds (price 1): what a quote that fills the whole input leaves behind. */
+export const MID_SQRT_PRICE = 2n ** 96n;
+/** TickMath MIN_SQRT_RATIO + 1 and MAX_SQRT_RATIO - 1: where a swap without a price limit stops when the pool runs dry. */
+export const SQRT_FLOOR = 4295128740n;
+export const SQRT_CEIL = 1461446703485210103287273052203988822378723970341n;
 const word = (a: string) => `0x${a.slice(2).toLowerCase().padStart(64, "0")}`;
 
 export interface StubOptions {
@@ -33,6 +38,10 @@ export interface StubOptions {
   quoterGas?: bigint;
   /** The quoter has no WETH9() (it reverts), as Uniswap's deprecated `Quoter` contracts. */
   quoterNoWeth?: boolean;
+  /** sqrtPriceX96After per fee tier on direct quotes (default MID_SQRT_PRICE): a bound = the pool ran dry. */
+  sqrtAfter?: Record<number, bigint>;
+  /** sqrtPriceX96AfterList on two-pool quotes (default both MID_SQRT_PRICE). */
+  multiHopSqrtAfter?: readonly bigint[];
 }
 
 export function rpcStub(o: StubOptions = {}): typeof fetch & {urls: string[]} {
@@ -57,11 +66,11 @@ export function rpcStub(o: StubOptions = {}): typeof fetch & {urls: string[]} {
           if (nominal === undefined) return {id: req.id, error: {code: 3, message: "execution reverted"}};
           let amount = (nominal * amountIn) / NOMINAL_IN;
           if (o.impactBps && amountIn >= NOMINAL_IN) amount = (amount * BigInt(10_000 - o.impactBps)) / 10_000n;
-          return {id: req.id, result: encodeAbiParameters([{type: "uint256"}, {type: "uint160"}, {type: "uint32"}, {type: "uint256"}], [amount, 0n, 1, o.quoterGas ?? 90_000n])};
+          return {id: req.id, result: encodeAbiParameters([{type: "uint256"}, {type: "uint160"}, {type: "uint32"}, {type: "uint256"}], [amount, o.sqrtAfter?.[fee] ?? MID_SQRT_PRICE, 1, o.quoterGas ?? 90_000n])};
         }
         if (call.functionName === "quoteExactInput" && o.multiHop !== undefined) {
           const amount = (o.multiHop * (call.args[1] as bigint)) / NOMINAL_IN;
-          return {id: req.id, result: encodeAbiParameters([{type: "uint256"}, {type: "uint160[]"}, {type: "uint32[]"}, {type: "uint256"}], [amount, [0n, 0n], [1, 1], o.quoterGas ?? 180_000n])};
+          return {id: req.id, result: encodeAbiParameters([{type: "uint256"}, {type: "uint160[]"}, {type: "uint32[]"}, {type: "uint256"}], [amount, o.multiHopSqrtAfter ?? [MID_SQRT_PRICE, MID_SQRT_PRICE], [1, 1], o.quoterGas ?? 180_000n])};
         }
       } catch {
         /* fall through */

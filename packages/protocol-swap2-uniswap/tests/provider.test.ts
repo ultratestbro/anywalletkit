@@ -11,6 +11,7 @@ const ROUTER = parseAbi([
   "function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params) payable returns (uint256)",
   "function exactInput((bytes path, address recipient, uint256 amountIn, uint256 amountOutMinimum) params) payable returns (uint256)",
   "function unwrapWETH9(uint256 amountMinimum, address recipient) payable",
+  "function refundETH() payable",
 ]);
 const legs = (data: string) => {
   const m = decodeFunctionData({abi: ROUTER, data: data as Hex});
@@ -57,12 +58,15 @@ describe("Uniswap v3 provider", () => {
     expect(largest).toBeLessThanOrEqual(10);
   });
 
-  it("native in: the router wraps msg.value — no approval, tokenIn = WETH", async () => {
+  it("native in: the router wraps msg.value — no approval, tokenIn = WETH, unspent value refunded", async () => {
     vi.stubGlobal("fetch", rpcStub());
     const q = await uniswapProvider({rpcUrls: RPC}).getQuote({...base, sourceToken: "ETH", destToken: USDC, amountIn: "1000000000000000"});
     expect(q!.txRequest).toMatchObject({value: "1000000000000000"});
     expect(q!.txRequest!.approvalAddress).toBeUndefined();
-    expect(legs(q!.txRequest!.data!).inner[0]!.args[0]).toMatchObject({tokenIn: D.weth, tokenOut: USDC, recipient: ME});
+    const {inner} = legs(q!.txRequest!.data!);
+    expect(inner).toHaveLength(2);
+    expect(inner[0]!.args![0]).toMatchObject({tokenIn: D.weth, tokenOut: USDC, recipient: ME});
+    expect(inner[1]!.functionName).toBe("refundETH");
   });
 
   it("native out: output stays in the router, then unwrapWETH9(min, recipient)", async () => {

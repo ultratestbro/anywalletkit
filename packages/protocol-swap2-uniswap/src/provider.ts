@@ -10,11 +10,11 @@ import {bigintToNumber} from "@anywalletkit/core";
  * Uniswap v3, straight from the contracts — the permissionless swap venue.
  *
  * Quote: QuoterV2 via `eth_call` (one JSON-RPC batch: every fee tier direct,
- * plus two-hop routes through WETH / USDC / USDT). Execution: SwapRouter02
+ * plus two-hop routes through WETH / USDC / USDT / USDT0). Execution: SwapRouter02
  * `multicall(deadline, …)` — `exactInputSingle` or `exactInput`, native input
- * wrapped by the router (`value`), native output kept in the router and paid
- * out with `unwrapWETH9(min, recipient)`. No API key, no Uniswap frontend, no
- * aggregator: if the pools are live, the swap works.
+ * wrapped by the router (`value`, then `refundETH()`), native output kept in the
+ * router and paid out with `unwrapWETH9(min, recipient)`. No API key, no Uniswap
+ * frontend, no aggregator: if the pools are live, the swap works.
  *
  * Same-chain only. ERC-20 sources approve exactly the input to the router
  * (`approvalAddress`); the engine handles that leg.
@@ -30,6 +30,12 @@ const DEFAULT_DEADLINE_S = 600;
 /** Least gas one v3 pool swap can use (cold pool storage + two token transfers cost far more); a quoter figure
  *  under this per pool does not measure the swap. */
 const MIN_POOL_GAS = 20_000n;
+/** The pool's price bounds the router swaps to when no limit is set (TickMath MIN_SQRT_RATIO + 1, MAX_SQRT_RATIO - 1).
+ *  A quote that leaves a pool at one of them ran the pool dry: it is a partial fill of a smaller input, not a quote for
+ *  this one (matrix v8, Ink: 0.01 ETH "quoted" 1 raw USDC out of a pool holding 168). */
+const SQRT_PRICE_FLOOR = 4295128740n;
+const SQRT_PRICE_CEIL = 1461446703485210103287273052203988822378723970341n;
+const PARTIAL_FILL = "pool liquidity runs out before the full amount (partial fill)";
 
 const QUOTER_ABI = parseAbi([
   "function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)",
@@ -37,6 +43,13 @@ const QUOTER_ABI = parseAbi([
   "function factory() view returns (address)",
   "function WETH9() view returns (address)",
 ]);
+
+/** A quoter result's output, the pool price(s) it leaves behind and its gas figure, for either quote shape. */
+function decodeQuote(single: boolean, raw: Hex): {out: bigint; drained: boolean; gas: bigint} {
+  const [out, after, , gas] = decodeFunctionResult({abi: QUOTER_ABI, functionName: single ? "quoteExactInputSingle" : "quoteExactInput", data: raw}) as readonly [bigint, bigint | readonly bigint[], unknown, bigint];
+  const prices = typeof after === "bigint" ? [after] : after;
+  return {out, gas, drained: prices.length === 0 || prices.some((p) => p <= SQRT_PRICE_FLOOR || p >= SQRT_PRICE_CEIL)};
+}
 
 export interface UniswapProviderConfig {
   enabled?: boolean;
@@ -211,17 +224,23 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           signal,
         );
         let best: {route: Route; out: bigint; gas: bigint} | null = null;
+        let partial = false;
         results.forEach((raw, i) => {
           if (typeof raw !== "string" || raw === "0x") return;
           const r = candidates[i]!;
           try {
-            const [out, , , gas] = decodeFunctionResult({abi: QUOTER_ABI, functionName: r.single ? "quoteExactInputSingle" : "quoteExactInput", data: raw as Hex}) as readonly [bigint, unknown, unknown, bigint];
-            if (out > 0n && (!best || out > best.out)) best = {route: r, out, gas};
+            const {out, drained, gas} = decodeQuote(!!r.single, raw as Hex);
+            if (out <= 0n) return;
+            if (drained) {
+              partial = true;
+              return;
+            }
+            if (!best || out > best.out) best = {route: r, out, gas};
           } catch {
             /* a malformed slot is just not a candidate */
           }
         });
-        if (!best) return refuse("no Uniswap v3 pool route for this pair and amount");
+        if (!best) return refuse(partial ? PARTIAL_FILL : "no Uniswap v3 pool route for this pair and amount");
         const {route, out, gas} = best as {route: Route; out: bigint; gas: bigint};
 
         // Price impact (SDK-127): a probe 1/1000 the size on the same route gives the pool's
@@ -253,6 +272,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
 
         const bps = params.slippageBps ?? slippageDefault;
         const minOut = (out * BigInt(10_000 - bps)) / 10_000n;
+        if (minOut <= 0n) return refuse(`the minimum output rounds to 0 (quoted ${out} at ${bps} bps slippage) — the amount is too small for this pool`);
         if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) {
           return refuse(`floor breach (min=${minOut} < floor=${params.minAmountOut})`);
         }
@@ -263,6 +283,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           : encodeFunctionData({abi: ROUTER_ABI, functionName: "exactInput", args: [{path: route.path!, recipient: swapTo as Hex, amountIn, amountOutMinimum: minOut}]});
         const legs: Hex[] = [swap];
         if (nativeOut) legs.push(encodeFunctionData({abi: ROUTER_ABI, functionName: "unwrapWETH9", args: [minOut, recipient]}));
+        // The router wraps only what the pool takes: `value` it did not spend would stay in the router for anyone to
+        // sweep. refundETH() pays it back to the sender in the same transaction (nothing to send on a full fill).
+        if (nativeIn) legs.push(encodeFunctionData({abi: ROUTER_ABI, functionName: "refundETH"}));
         const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineS);
         const data = encodeFunctionData({abi: ROUTER_ABI, functionName: "multicall", args: [deadline, legs]});
         // Quoter gas covers the pool hops; the router's own overhead and an unwrap ride on top. A figure no real pool
@@ -270,7 +293,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         // wallet, which estimates the exact call with headroom right before broadcast, as for THORChain and Chainflip.
         // A limit derived from it would be the bare overhead, and the swap would run out of gas on chain.
         const pools = route.single ? 1n : BigInt((route.path!.length - 42) / 46);
-        const gasLimit = gas >= MIN_POOL_GAS * pools ? (gas * 3n) / 2n + 120_000n + (nativeOut ? 40_000n : 0n) : undefined;
+        const gasLimit = gas >= MIN_POOL_GAS * pools ? (gas * 3n) / 2n + 120_000n + (nativeOut ? 40_000n : 0n) + (nativeIn ? 10_000n : 0n) : undefined;
 
         return {
           provider: "uniswap",
@@ -312,7 +335,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     /**
      * Right before broadcast (after any approval): re-quote the SAME route on
      * chain. If the pool now pays less than the signed minimum, the swap would
-     * only revert and burn gas — refuse it here with the reason instead.
+     * only revert and burn gas — refuse it here with the reason instead. A pool
+     * that no longer holds enough for the whole input (it would fill part of it)
+     * is refused the same way.
      */
     async preflightDeposit(quote: Quote): Promise<void> {
       const chainId = Number(quote.intentId.split(":")[1]);
@@ -324,7 +349,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         : encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInput", args: [pd.path as Hex, BigInt(pd.amountIn)]});
       const [raw] = await rpc(chainId, [call(d.quoter, data)]);
       if (typeof raw !== "string" || raw === "0x") throw new Error("uniswap: the pool no longer quotes this route — refresh and try again");
-      const [out] = decodeFunctionResult({abi: QUOTER_ABI, functionName: pd.fee ? "quoteExactInputSingle" : "quoteExactInput", data: raw as Hex}) as readonly [bigint];
+      const {out, drained} = decodeQuote(!!pd.fee, raw as Hex);
+      if (drained) throw new Error(`uniswap: ${PARTIAL_FILL} — the pool can no longer take this swap. Nothing was sent; refresh the quote.`);
       if (out < BigInt(pd.minOut)) {
         throw new Error(`uniswap: price moved — the pool now pays ${out}, under your minimum ${pd.minOut}. Nothing was sent; refresh the quote.`);
       }

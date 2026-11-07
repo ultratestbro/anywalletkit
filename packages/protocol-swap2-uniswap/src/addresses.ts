@@ -51,8 +51,10 @@ export const UNISWAP_V3: Readonly<Record<number, UniswapDeployment>> = Object.fr
 
 /** Pool fee tiers probed for every hop (0.01%, 0.05%, 0.3%, 1%). */
 export const FEE_TIERS = [100, 500, 3000, 10000] as const;
-/** Two-hop routes go through these (when the catalog knows them on the chain). */
-export const HOP_SYMBOLS = ["WETH", "USDC", "USDT"] as const;
+/** Two-hop routes go through these (when the catalog knows them on the chain). USDT0 is the dollar pair on chains
+ *  without a native USDT (Ink, Unichain, Monad, X Layer, Arbitrum…): on Ink the WETH/USDC pools are dust, and
+ *  WETH → USDT0 → USDC is the only route with liquidity (matrix v8, 2026-11-07). */
+export const HOP_SYMBOLS = ["WETH", "USDC", "USDT", "USDT0"] as const;
 /** SwapRouter02 recipient sentinel: "keep the output in the router" (then unwrapWETH9). */
 export const ADDRESS_THIS = "0x0000000000000000000000000000000000000002";
 
@@ -61,6 +63,7 @@ export const ROUTER_ABI = parseAbi([
   "function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params) payable returns (uint256 amountOut)",
   "function exactInput((bytes path, address recipient, uint256 amountIn, uint256 amountOutMinimum) params) payable returns (uint256 amountOut)",
   "function unwrapWETH9(uint256 amountMinimum, address recipient) payable",
+  "function refundETH() payable",
   "function multicall(uint256 deadline, bytes[] data) payable returns (bytes[] results)",
   "function factory() view returns (address)",
   "function WETH9() view returns (address)",
@@ -73,8 +76,9 @@ const MAX_PATH_POOLS = 2;
  * F1): one `multicall(deadline, legs)` on the chain's pinned SwapRouter02 whose legs are exactly one `exactInputSingle`
  * or `exactInput` — then `unwrapWETH9` for a native output — selling exactly the input of the source token (WETH for a
  * native input, paid as `value`) for the destination token, with `amountOutMinimum` the quote's minimum, paid to the
- * recipient (or kept in the router and unwrapped to the recipient for that same minimum). `pull`, `sweepToken` and
- * every other router call are refused. The reason it fails, or null.
+ * recipient (or kept in the router and unwrapped to the recipient for that same minimum). A native input may end with
+ * `refundETH()`, which returns any unspent `value` to the sender (builds before 0.4.2 have none, so it is not
+ * required). `pull`, `sweepToken` and every other router call are refused. The reason it fails, or null.
  */
 export function uniswapVerifyQuote(params: QuoteParams, quote: Quote): string | null {
   const id = /^eip155:[0-9]+$/.test(params.sourceChain) ? Number(params.sourceChain.slice(7)) : NaN;
@@ -110,8 +114,9 @@ export function uniswapVerifyQuote(params: QuoteParams, quote: Quote): string | 
   } catch {
     return "the router call is not multicall(deadline, legs)";
   }
-  if (legs.length !== (nativeOut ? 2 : 1)) return `the multicall has ${legs.length} legs, not a swap${nativeOut ? " and an unwrap" : ""}`;
   const decode = (leg: Hex) => { try { return decodeFunctionData({abi: ROUTER_ABI, data: leg}); } catch { return null; } };
+  if (nativeIn && legs.length === 2 && decode(legs[1]!)?.functionName === "refundETH") legs = legs.slice(0, 1);
+  if (legs.length !== (nativeOut ? 2 : 1)) return `the multicall has ${legs.length} legs, not a swap${nativeOut ? " and an unwrap" : nativeIn ? " (and a refund)" : ""}`;
   const swap = decode(legs[0]!);
   const swapTo = nativeOut ? ADDRESS_THIS : recipient;
   if (swap?.functionName === "exactInputSingle") {
