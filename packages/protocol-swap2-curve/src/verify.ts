@@ -5,7 +5,7 @@ import type {Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/pro
 import {ADDRESS_PROVIDER_ABI, COINS_INT, COINS_UINT, EXCHANGE_SELECTOR, VERSION_ABI, decodeExchange, encodeGetDy, type DecodedExchange} from "./abi.js";
 import {CURVE_DEPLOYMENTS, ZERO_ADDRESS, chainIdOf, deploymentOf, type CurveDeployment} from "./deployments.js";
 import {CURVE_POOLS} from "./pools/index.js";
-import type {CurveChainPools, Hex} from "./pools/types.js";
+import type {CurveChainPools, CurvePool, Hex} from "./pools/types.js";
 import {checkRoute, poolIndex, routePools} from "./routes.js";
 import {ethCall, rpcClient, wordAddress, wordUint, type RpcCall} from "./rpc.js";
 import {curveIntentChain} from "./intent.js";
@@ -183,20 +183,37 @@ export function curveOnChain(opts: CurveOnChainOptions) {
     await verifyDeployment(chainId);
     const index = poolIndex(chainId, d, own(pools, chainId));
     const hops = routePools(call).map((a) => index.get(lc(a))!);
-    const calls: RpcCall[] = [ethCall(d.router, encodeGetDy(d.family, call, call.amount))];
-    for (const pool of hops) {
-      calls.push({method: "eth_getCode", params: [pool.address, "latest"]});
-      pool.coins.forEach((_, k) => calls.push(ethCall(pool.address, `${COINS_UINT}${k.toString(16).padStart(64, "0")}`)));
-    }
+    const reads = poolCalls(hops);
+    const calls: RpcCall[] = [ethCall(d.router, encodeGetDy(d.family, call, call.amount)), ...reads];
     const probeIn = call.amount / 1000n;
     const probeAt = calls.length;
     if (probe && probeIn > 0n) calls.push(ethCall(d.router, encodeGetDy(d.family, call, probeIn)));
     const res = await rpc(chainId, calls);
-    let at = 1;
-    const retry: {pool: typeof hops[number]; k: number}[] = [];
-    for (const pool of hops) {
+    const poolReason = await poolsReason(chainId, hops, res.slice(1, 1 + reads.length));
+    if (poolReason) return poolReason;
+    const out = wordUint(res[0]);
+    if (out === null) return "the router no longer quotes this route";
+    if (out < call.minDy) return `price moved — the pools now pay ${out}, under your minimum ${call.minDy}`;
+    return {out, probeOut: probe && probeIn > 0n ? wordUint(res[probeAt]) : null, amount: call.amount, minDy: call.minDy};
+  }
+
+  /** Per pool: its code, then `coins(uint256)` for each pinned coin. */
+  function poolCalls(list: readonly CurvePool[]): RpcCall[] {
+    return list.flatMap((pool) => [
+      {method: "eth_getCode", params: [pool.address, "latest"]},
+      ...pool.coins.map((_, k) => ethCall(pool.address, `${COINS_UINT}${k.toString(16).padStart(64, "0")}`)),
+    ]);
+  }
+
+  /** The answers to {@link poolCalls} held to the pins (`coins(int128)` asked where `coins(uint256)` reverts). */
+  async function poolsReason(chainId: number, list: readonly CurvePool[], res: readonly unknown[]): Promise<string | null> {
+    let at = 0;
+    const retry: {pool: CurvePool; k: number}[] = [];
+    for (const pool of list) {
       const code = res[at++];
-      if (typeof code !== "string" || code.length <= 2 || lc(keccak256(code as ViemHex)) !== lc(pool.codeHash)) return `pool ${pool.name} (${pool.address}) is not the pinned code`;
+      // eth_getCode does not revert: no string means the read itself failed, which says nothing about the pool.
+      if (typeof code !== "string") return `could not read pool ${pool.name} (${pool.address}) over RPC`;
+      if (code.length <= 2 || lc(keccak256(code as ViemHex)) !== lc(pool.codeHash)) return `pool ${pool.name} (${pool.address}) is not the pinned code`;
       for (let k = 0; k < pool.coins.length; k++) {
         const coin = wordAddress(res[at++]);
         if (coin === null) retry.push({pool, k});
@@ -211,13 +228,18 @@ export function curveOnChain(opts: CurveOnChainOptions) {
         if (coin !== lc(pool.coins[k]!)) return `pool ${pool.name} does not report its pinned coin ${k}`;
       }
     }
-    const out = wordUint(res[0]);
-    if (out === null) return "the router no longer quotes this route";
-    if (out < call.minDy) return `price moved — the pools now pay ${out}, under your minimum ${call.minDy}`;
-    return {out, probeOut: probe && probeIn > 0n ? wordUint(res[probeAt]) : null, amount: call.amount, minDy: call.minDy};
+    return null;
   }
 
-  return {rpc, verifyDeployment, checkSealed, inspectSealed};
+  /**
+   * Allowlisted pools as a sealed quote's preflight reads them, without a route: each still has its pinned code and
+   * coins. The reason the first one fails, or null (a failed read throws). For live checks over a whole allowlist.
+   */
+  async function checkPools(chainId: number, list: readonly CurvePool[]): Promise<string | null> {
+    return list.length ? poolsReason(chainId, list, await rpc(chainId, poolCalls(list))) : null;
+  }
+
+  return {rpc, verifyDeployment, checkSealed, inspectSealed, checkPools};
 }
 
 function lastToken(call: DecodedExchange): Hex {

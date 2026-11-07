@@ -2,6 +2,8 @@
 // stub's code; the pools are a fixture allowlist (real Ethereum / Monad addresses, plus adversarial entries) — tests never
 // read the package's generated allowlist. The stub answers the router's get_dy from a per-pool rate, the pools' coins()
 // and code, the router's code / version, the AddressProvider's id 2 and receipts.
+import {readFileSync} from "node:fs";
+import {fileURLToPath} from "node:url";
 import {decodeFunctionData, encodeAbiParameters, keccak256, parseAbi, type Hex} from "viem";
 import {CURVE_DEPLOYMENTS, CURVE_ETH, type CurveDeployment} from "../src/deployments.js";
 import type {CurveChainPools, CurvePool} from "../src/pools/types.js";
@@ -48,8 +50,15 @@ export const M_USDC = "0x754704Bc059F8C67012fEd69BC8A327a5aafb603";
 export const M_USDT0 = "0xe7cd86e13AC4309349F30B3435a9d337750fC82D";
 export const M_3POOL = "0x942644106B073E30D72c2C5D7529D5C296ea91ab";
 export const M_OLD_STABLE = "0x1111111111111111111111111111111111111111";
+// The Liquity factory metapool: coins(i) answers 4096 bytes, the coin in the first word (fixtures/rpc, recorded live).
+export const LUSD = "0x5f98805A4E8be255a32880FDeC7F6728C6568bA0";
+export const LUSD_META = "0xEd279fDD11cA84bEef15AF5D39BB4d4bEE23F0cA";
+export const LUSD_COINS = JSON.parse(readFileSync(fileURLToPath(new URL("../fixtures/rpc/liquity-metapool-coins.json", import.meta.url)), "utf8")) as {pool: string; block: number; calls: {data: string; result: Hex}[]};
 
 const pool = (p: Partial<CurvePool> & Pick<CurvePool, "address" | "name" | "coins" | "decimals" | "poolType">): CurvePool => ({swapTypes: [1], codeHash: POOL_HASH, tvlUsd: 1_000_000, ...p});
+
+/** Not in {@link POOLS} (its routes would tie with the 3pool's); the stub answers for it, {@link WITH_LUSD} lists it. */
+export const LUSD_POOL = pool({address: LUSD_META, name: "Curve.fi Factory USD Metapool: Liquity", coins: [LUSD, "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490"], decimals: [18, 18], underlying: [LUSD, DAI, USDC, USDT], underlyingDecimals: [18, 18, 6, 6], basePool: TRIPOOL, poolType: 1, swapTypes: [1, 2], tvlUsd: 12_000_000});
 
 export const POOLS: Readonly<Record<number, CurveChainPools>> = {
   1: {chainId: 1, builtAt: "2026-11-05T00:00:00Z", block: 1, pools: [
@@ -100,6 +109,12 @@ export interface StubOptions {
   receipt?: string | null;
   /** HTTP-fail these URLs. */
   down?: string[];
+  /** These URLs answer HTTP 200 with every element a -32007 rate-limit error (QuickNode under a burst). */
+  limited?: string[];
+  /** Raw coins(uint256) answers: pool → index → the return bytes (default: the Liquity metapool's recorded ones). */
+  coinsRaw?: Record<string, Record<number, Hex>>;
+  /** eth_getCode of these pools answers result null. */
+  noCode?: string[];
 }
 
 /** Decimal-adjusted hop: amount × 10^dOut / 10^dIn × rate. */
@@ -113,6 +128,8 @@ export function rpcStub(o: StubOptions = {}): typeof fetch & {urls: string[]; ba
   const seen: {method: string; to?: string; data?: string}[] = [];
   const byAddress = new Map<string, CurvePool>();
   for (const t of Object.values(POOLS)) for (const p of t.pools) byAddress.set(lc(p.address), p);
+  byAddress.set(lc(LUSD_META), LUSD_POOL);
+  const coinsRaw: Record<string, Record<number, Hex>> = {[lc(LUSD_META)]: Object.fromEntries(LUSD_COINS.calls.map((c) => [Number(BigInt(`0x${c.data.slice(10)}`)), c.result])), ...o.coinsRaw};
   const routers = new Map(Object.values(DEPLOYMENTS).map((d) => [lc(d.router), d]));
   const aps = new Map(Object.values(DEPLOYMENTS).map((d) => [lc(d.addressProvider), d]));
   const f = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -121,6 +138,7 @@ export function rpcStub(o: StubOptions = {}): typeof fetch & {urls: string[]; ba
     if (o.down?.includes(url)) return new Response("down", {status: 502});
     const batch = JSON.parse(String(init?.body)) as {id: number; method: string; params: unknown[]}[];
     batches.push(batch.length);
+    if (o.limited?.includes(url)) return new Response(JSON.stringify(batch.map((req) => ({id: req.id, error: {code: -32007, message: "50/second request limit reached - reduce calls per second or upgrade your account at quicknode.com"}}))));
     const out = batch.map((req) => {
       const fail = {id: req.id, error: {code: 3, message: "execution reverted"}};
       if (req.method === "eth_getTransactionReceipt") return {id: req.id, result: o.receipt === null || o.receipt === undefined ? null : {status: o.receipt}};
@@ -128,6 +146,7 @@ export function rpcStub(o: StubOptions = {}): typeof fetch & {urls: string[]; ba
         const at = lc(String(req.params[0]));
         seen.push({method: "eth_getCode", to: at});
         if (routers.has(at)) return {id: req.id, result: o.badRouterCode ? "0x6000" : ROUTER_CODE};
+        if (o.noCode?.some((p) => lc(p) === at)) return {id: req.id, result: null};
         if (byAddress.has(at)) return {id: req.id, result: o.badPoolCode?.some((p) => lc(p) === at) ? "0x6000" : POOL_CODE};
         return {id: req.id, result: "0x"};
       }
@@ -144,6 +163,8 @@ export function rpcStub(o: StubOptions = {}): typeof fetch & {urls: string[]; ba
       if ((sel === "0xc6610657" || sel === "0x23746eb8") && byAddress.has(at)) {
         const k = Number(BigInt(`0x${data.slice(10)}`));
         const p = byAddress.get(at)!;
+        if (sel === "0xc6610657" && coinsRaw[at]) return coinsRaw[at][k] ? {id: req.id, result: coinsRaw[at][k]} : fail;
+        if (sel === "0x23746eb8" && lc(p.address) === lc(LUSD_META)) return fail; // the real pool has no coins(int128)
         const coin = o.coins?.[at]?.[k] ?? p.coins[k];
         return coin ? {id: req.id, result: word(coin)} : fail;
       }
@@ -181,3 +202,5 @@ export function rpcStub(o: StubOptions = {}): typeof fetch & {urls: string[]; ba
 }
 
 export const TABLES = {deployments: DEPLOYMENTS, pools: POOLS};
+/** {@link TABLES} with the Liquity metapool listed on Ethereum. */
+export const WITH_LUSD = {deployments: DEPLOYMENTS, pools: {...POOLS, 1: {...POOLS[1]!, pools: [...POOLS[1]!.pools, LUSD_POOL]}}};
