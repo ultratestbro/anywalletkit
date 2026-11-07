@@ -1,0 +1,38 @@
+{
+ "module": "@anywalletkit/wallet-zcash",
+ "sources": {
+  "zebra-releases": {
+   "type": "github-releases",
+   "target": {
+    "repo": "ZcashFoundation/zebra"
+   },
+   "value": "v7.1.0-alpha.0",
+   "meta": {
+    "tag": "v7.1.0-alpha.0",
+    "name": "Zebra 7.1.0-alpha.0",
+    "at": "2026-10-30",
+    "url": "https://github.com/ZcashFoundation/zebra/releases/tag/v7.1.0-alpha.0",
+    "prerelease": true
+   },
+   "seenAt": "2026-11-07T12:58:19.823Z",
+   "changedAt": "2026-11-07T12:58:19.823Z"
+  },
+  "branch-id": {
+   "type": "zcash-branch",
+   "target": {},
+   "value": "0x77190ad9 0x77190ad9",
+   "meta": {
+    "height": 3548180,
+    "txid": "7692bd2df70cd8cd83e884dc6e6793275ee13712deea4f5acf66a3ef48130c4f",
+    "version": 5,
+    "branchId": "0x77190ad9",
+    "upgrade": "NU7",
+    "expected": "0x77190ad9",
+    "expectedUpgrade": "NU7",
+    "url": "https://blockchair.com/zcash/transaction/7692bd2df70cd8cd83e884dc6e6793275ee13712deea4f5acf66a3ef48130c4f"
+   },
+   "seenAt": "2026-11-07T12:58:21.398Z",
+   "changedAt": "2026-11-07T12:58:21.398Z"
+  }
+ }
+}

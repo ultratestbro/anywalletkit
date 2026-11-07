@@ -1,0 +1,31 @@
+{
+ "date": "2026-11-07",
+ "modules": 23,
+ "sources": 456,
+ "changes": [
+  {
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
+   "id": "klend",
+   "label": "Kamino Lend program releases",
+   "type": "github-releases",
+   "what": "release/v1.27.0 → release/v1.28.0 (2026-11-06) pre-release",
+   "link": "https://github.com/Kamino-Finance/klend/releases/tag/release/v1.28.0",
+   "before": {
+    "tag": "release/v1.27.0",
+    "name": "Release v1.27.0",
+    "at": "2026-10-19",
+    "url": "https://github.com/Kamino-Finance/klend/releases/tag/release/v1.27.0",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "release/v1.28.0",
+    "name": "Release v1.28.0",
+    "at": "2026-11-06",
+    "url": "https://github.com/Kamino-Finance/klend/releases/tag/release/v1.28.0",
+    "prerelease": true
+   }
+  }
+ ],
+ "errors": [],
+ "repointed": []
+}

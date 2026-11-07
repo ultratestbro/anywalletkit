@@ -1,0 +1,186 @@
+{
+ "module": "@anywalletkit/protocol-lending-curve-evm",
+ "sources": {
+  "scrvusd-vault-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x0655977feb2f289a4ab78af67bab0d17aab84367"
+   },
+   "value": "cdafbbe45c78393e",
+   "meta": {
+    "codeHash": "cdafbbe45c78393e",
+    "bytes": 45
+   },
+   "seenAt": "2026-11-07T12:58:00.546Z",
+   "changedAt": "2026-11-07T12:58:00.546Z"
+  },
+  "scrvusd-implementation-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0xd8063123bba3b480569244ae66bfe72b6c84b00d"
+   },
+   "value": "ccaff188f029d5de",
+   "meta": {
+    "codeHash": "ccaff188f029d5de",
+    "bytes": 23754
+   },
+   "seenAt": "2026-11-07T12:58:00.556Z",
+   "changedAt": "2026-11-07T12:58:00.556Z"
+  },
+  "scrvusd-api-version": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+    "signature": "apiVersion()",
+    "decode": "string"
+   },
+   "value": "\"3.0.4\"",
+   "meta": {
+    "call": "apiVersion()",
+    "result": "3.0.4"
+   },
+   "seenAt": "2026-11-07T12:58:00.566Z",
+   "changedAt": "2026-11-07T12:58:00.566Z"
+  },
+  "scrvusd-is-shutdown": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+    "signature": "isShutdown()",
+    "decode": "bool"
+   },
+   "value": "false",
+   "meta": {
+    "call": "isShutdown()",
+    "result": false
+   },
+   "seenAt": "2026-11-07T12:58:00.569Z",
+   "changedAt": "2026-11-07T12:58:00.569Z"
+  },
+  "scrvusd-profit-max-unlock-time": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+    "signature": "profitMaxUnlockTime()",
+    "decode": "uint256"
+   },
+   "value": "\"604800\"",
+   "meta": {
+    "call": "profitMaxUnlockTime()",
+    "result": "604800"
+   },
+   "seenAt": "2026-11-07T12:58:00.572Z",
+   "changedAt": "2026-11-07T12:58:00.572Z"
+  },
+  "scrvusd-role-manager": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+    "signature": "role_manager()",
+    "decode": "address"
+   },
+   "value": "\"0x40907540d8a6c65c637785e8f8b742ae6b0b9968\"",
+   "meta": {
+    "call": "role_manager()",
+    "result": "0x40907540d8a6c65c637785e8f8b742ae6b0b9968"
+   },
+   "seenAt": "2026-11-07T12:58:00.574Z",
+   "changedAt": "2026-11-07T12:58:00.574Z"
+  },
+  "scrvusd-asset": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+    "signature": "asset()",
+    "decode": "address"
+   },
+   "value": "\"0xf939e0a03fb07f59a73314e73794be0e57ac1b4e\"",
+   "meta": {
+    "call": "asset()",
+    "result": "0xf939e0a03fb07f59a73314e73794be0e57ac1b4e"
+   },
+   "seenAt": "2026-11-07T12:58:00.607Z",
+   "changedAt": "2026-11-07T12:58:00.607Z"
+  },
+  "scrvusd-total-debt": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+    "signature": "totalDebt()",
+    "decode": "uint256"
+   },
+   "value": "\"0\"",
+   "meta": {
+    "call": "totalDebt()",
+    "result": "0"
+   },
+   "seenAt": "2026-11-07T12:58:00.724Z",
+   "changedAt": "2026-11-07T12:58:00.724Z"
+  },
+  "api-savings-statistics-schema": {
+   "type": "http-json",
+   "target": {
+    "url": "https://prices.curve.finance/feeds-docs/openapi.json",
+    "path": "components.schemas.SavingsStatsResponse"
+   },
+   "value": "b226813b3334cbe301f6b81bd1456078fe7c9b815a72ba0d51018a3d0da9e816",
+   "meta": {
+    "hash": "b226813b3334cbe3"
+   },
+   "seenAt": "2026-11-07T12:58:00.876Z",
+   "changedAt": "2026-11-07T12:58:00.876Z"
+  },
+  "deployments-json": {
+   "type": "json-pins",
+   "target": {
+    "url": "https://docs.curve.finance/deployments.json"
+   },
+   "value": "82e303058f30027a22721a6eb872f14e949a4bb9de6e14563c203aa99b8a6308",
+   "meta": {
+    "pins": 2,
+    "ok": 2,
+    "chains": 30,
+    "rows": [
+     {
+      "group": "1",
+      "role": "asset",
+      "address": "0xf939e0a03fb07f59a73314e73794be0e57ac1b4e",
+      "contract": "crvUSD",
+      "id": "ethereum.tokens.crvUSD"
+     },
+     {
+      "group": "1",
+      "role": "vault",
+      "address": "0x0655977feb2f289a4ab78af67bab0d17aab84367",
+      "contract": "scrvUSD vault",
+      "id": "ethereum.scrvusd.vault"
+     }
+    ],
+    "problems": []
+   },
+   "seenAt": "2026-11-07T12:58:00.996Z",
+   "changedAt": "2026-11-07T12:58:00.996Z"
+  },
+  "docs-scrvusd-overview": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.curve.finance/developer/scrvusd/overview"
+   },
+   "value": "9ff8ae6b79ae58c7bcd9ea9c4e2750ffe1ee190ee41a12eaf06d55f75b45ad75",
+   "meta": {
+    "hash": "9ff8ae6b79ae58c7",
+    "chars": 4728
+   },
+   "seenAt": "2026-11-07T12:58:01.085Z",
+   "changedAt": "2026-11-07T12:58:01.085Z"
+  }
+ }
+}
