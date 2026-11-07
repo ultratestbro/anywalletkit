@@ -1,5 +1,11 @@
 # @anywalletkit/protocol-swap2-uniswap
 
+## 0.4.2
+
+### Patch Changes
+
+- 33974f3: A pool too shallow for the input no longer counts as a quote. QuoterV2 answers such an input with the partial fill the pool would make, stopping at the price bound, and that was taken as the best route: on Ink, where the WETH/USDC pools are dust, 0.01 ETH → USDC quoted 1 raw unit with a minimum of 0, and 10 USDC → ETH drained the pool's WETH for a fraction of the input. A route that leaves any of its pools at the price bound is now dropped. When every route does, the quote is refused with `pool liquidity runs out before the full amount (partial fill)`. Preflight re-checks this before broadcast. A quote whose minimum rounds to 0 at the chosen slippage is refused by name. USDT0 is now a two-hop token where the catalog lists it, so Ink quotes WETH → USDT0 → USDC at the market price. `uniswapVerifyQuote` now accepts a native-input swap that ends with `refundETH()`, which pays any ETH the pool did not take back to the sender in the same transaction, and still accepts quotes without it. The provider builds that leg only with the new `refundNativeInput: true` option (off by default), because apps verifying with an earlier `uniswapVerifyQuote` refuse it and would lose every native-input Uniswap route. Roll out in this order: ship the apps with pins from this release first, then turn `refundNativeInput` on in the server's provider.
+
 ## 0.4.1
 
 ### Patch Changes

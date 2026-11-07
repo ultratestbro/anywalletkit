@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-curve",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Curve same-chain swaps straight from the contracts: Router NG get_dy quotes and exchange execution over a curated, pinned pool allowlist — no API, no frontend, no fee.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
