@@ -23,7 +23,7 @@ When the provider runs on your server, spread its pins into the app's stub:
 approve only the SwapRouter in `UNISWAP_V3`, never an address the backend names; without the pins the stub gets no
 EVM calldata route (fail closed). The pins carry `verifyQuote: uniswapVerifyQuote`, which opens the router call on the
 device: one `multicall(deadline, legs)` whose legs are exactly one `exactInputSingle` / `exactInput` (at most two
-pools), then `unwrapWETH9` for a native output (or `refundETH` for a native input), selling exactly the input of the
+pools), then `unwrapWETH9` for a native output (or `refundETH` for a native input, built only with `refundNativeInput`), selling exactly the input of the
 source token for the destination token with the quote's minimum, paid to the recipient. `pull`, `sweepToken` and every
 other router call are refused.
 

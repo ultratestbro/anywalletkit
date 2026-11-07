@@ -77,8 +77,8 @@ const MAX_PATH_POOLS = 2;
  * or `exactInput` — then `unwrapWETH9` for a native output — selling exactly the input of the source token (WETH for a
  * native input, paid as `value`) for the destination token, with `amountOutMinimum` the quote's minimum, paid to the
  * recipient (or kept in the router and unwrapped to the recipient for that same minimum). A native input may end with
- * `refundETH()`, which returns any unspent `value` to the sender (builds before 0.4.2 have none, so it is not
- * required). `pull`, `sweepToken` and every other router call are refused. The reason it fails, or null.
+ * `refundETH()`, which returns any unspent `value` to the sender (a provider builds it only with `refundNativeInput`,
+ * so it is not required). `pull`, `sweepToken` and every other router call are refused. The reason it fails, or null.
  */
 export function uniswapVerifyQuote(params: QuoteParams, quote: Quote): string | null {
   const id = /^eip155:[0-9]+$/.test(params.sourceChain) ? Number(params.sourceChain.slice(7)) : NaN;

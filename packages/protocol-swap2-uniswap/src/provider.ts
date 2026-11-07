@@ -12,7 +12,7 @@ import {bigintToNumber} from "@anywalletkit/core";
  * Quote: QuoterV2 via `eth_call` (one JSON-RPC batch: every fee tier direct,
  * plus two-hop routes through WETH / USDC / USDT / USDT0). Execution: SwapRouter02
  * `multicall(deadline, …)` — `exactInputSingle` or `exactInput`, native input
- * wrapped by the router (`value`, then `refundETH()`), native output kept in the
+ * wrapped by the router (`value`, then `refundETH()` when `refundNativeInput`), native output kept in the
  * router and paid out with `unwrapWETH9(min, recipient)`. No API key, no Uniswap
  * frontend, no aggregator: if the pools are live, the swap works.
  *
@@ -63,6 +63,12 @@ export interface UniswapProviderConfig {
   deadlineSeconds?: number;
   /** Override the deployments (tests, new chains). Still verified on-chain before use. */
   deployments?: Readonly<Record<number, UniswapDeployment>>;
+  /**
+   * End a native-input swap with `refundETH()`, so `value` the pool did not take goes back to the sender in the same
+   * transaction. Default false: clients pinned to `uniswapVerifyQuote` before 0.4.2 refuse the extra leg, so a server
+   * turns this on only once the apps it serves verify with ≥ 0.4.2.
+   */
+  refundNativeInput?: boolean;
 }
 
 interface Route {
@@ -84,6 +90,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   const slippageDefault = config.defaultSlippageBps ?? DEFAULT_SLIPPAGE_BPS;
   const ttl = config.quoteTtlMs ?? DEFAULT_TTL_MS;
   const deadlineS = config.deadlineSeconds ?? DEFAULT_DEADLINE_S;
+  const refundNative = config.refundNativeInput === true;
   if (!Number.isInteger(slippageDefault) || slippageDefault <= 0 || slippageDefault >= 5_000) throw new Error("uniswap: defaultSlippageBps must be 1..4999");
   const verified = new Map<number, Promise<void>>();
 
@@ -284,8 +291,11 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const legs: Hex[] = [swap];
         if (nativeOut) legs.push(encodeFunctionData({abi: ROUTER_ABI, functionName: "unwrapWETH9", args: [minOut, recipient]}));
         // The router wraps only what the pool takes: `value` it did not spend would stay in the router for anyone to
-        // sweep. refundETH() pays it back to the sender in the same transaction (nothing to send on a full fill).
-        if (nativeIn) legs.push(encodeFunctionData({abi: ROUTER_ABI, functionName: "refundETH"}));
+        // sweep. refundETH() pays it back to the sender in the same transaction (nothing to send on a full fill). Opt-in
+        // (`refundNativeInput`) until every pinned client accepts the leg; the preflight partial-fill check and the
+        // minimum already make an unspent remainder revert rather than stay behind.
+        const refund = nativeIn && refundNative;
+        if (refund) legs.push(encodeFunctionData({abi: ROUTER_ABI, functionName: "refundETH"}));
         const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineS);
         const data = encodeFunctionData({abi: ROUTER_ABI, functionName: "multicall", args: [deadline, legs]});
         // Quoter gas covers the pool hops; the router's own overhead and an unwrap ride on top. A figure no real pool
@@ -293,7 +303,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         // wallet, which estimates the exact call with headroom right before broadcast, as for THORChain and Chainflip.
         // A limit derived from it would be the bare overhead, and the swap would run out of gas on chain.
         const pools = route.single ? 1n : BigInt((route.path!.length - 42) / 46);
-        const gasLimit = gas >= MIN_POOL_GAS * pools ? (gas * 3n) / 2n + 120_000n + (nativeOut ? 40_000n : 0n) + (nativeIn ? 10_000n : 0n) : undefined;
+        const gasLimit = gas >= MIN_POOL_GAS * pools ? (gas * 3n) / 2n + 120_000n + (nativeOut ? 40_000n : 0n) + (refund ? 10_000n : 0n) : undefined;
 
         return {
           provider: "uniswap",

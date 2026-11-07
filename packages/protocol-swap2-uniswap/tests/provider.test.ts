@@ -58,15 +58,14 @@ describe("Uniswap v3 provider", () => {
     expect(largest).toBeLessThanOrEqual(10);
   });
 
-  it("native in: the router wraps msg.value — no approval, tokenIn = WETH, unspent value refunded", async () => {
+  it("native in: the router wraps msg.value — no approval, tokenIn = WETH, one swap leg by default", async () => {
     vi.stubGlobal("fetch", rpcStub());
     const q = await uniswapProvider({rpcUrls: RPC}).getQuote({...base, sourceToken: "ETH", destToken: USDC, amountIn: "1000000000000000"});
     expect(q!.txRequest).toMatchObject({value: "1000000000000000"});
     expect(q!.txRequest!.approvalAddress).toBeUndefined();
     const {inner} = legs(q!.txRequest!.data!);
-    expect(inner).toHaveLength(2);
+    expect(inner).toHaveLength(1);
     expect(inner[0]!.args![0]).toMatchObject({tokenIn: D.weth, tokenOut: USDC, recipient: ME});
-    expect(inner[1]!.functionName).toBe("refundETH");
   });
 
   it("native out: output stays in the router, then unwrapWETH9(min, recipient)", async () => {
