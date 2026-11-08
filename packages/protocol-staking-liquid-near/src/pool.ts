@@ -1,6 +1,6 @@
 import { sha256 } from '@noble/hashes/sha2.js'
 import { isValidAccountId } from '@anywalletkit/wallet-near'
-import { LIQUID_PRESETS, type LiquidPresetName } from './constants.js'
+import { LIQUID_PRESETS, type LiquidPreset, type LiquidPresetName } from './constants.js'
 import { LiquidStakingError } from './errors.js'
 import type { LiquidPoolConfig, NearNetwork } from './types.js'
 
@@ -10,6 +10,10 @@ export interface ResolvedLiquidPool {
   symbol: string
   name: string
   codeHashes: readonly string[]
+  /** See {@link LiquidPoolConfig.firstStakePaysStorage}. */
+  firstStakePaysStorage: boolean
+  /** `pa_all_paused` is read (rNEAR, and any custom contract: one without the method has no per-feature pause). */
+  featurePauses: boolean
   preset: LiquidPresetName | null
 }
 
@@ -24,15 +28,21 @@ export function validatePoolConfig(pool: LiquidPresetName | LiquidPoolConfig): v
   if (!Array.isArray(pool.codeHashes) || pool.codeHashes.length === 0 || !pool.codeHashes.every((h) => typeof h === 'string' && h.length > 0)) {
     throw new LiquidStakingError('invalid-config', 'pool.codeHashes must pin at least one code hash.')
   }
+  if (pool.firstStakePaysStorage !== undefined && typeof pool.firstStakePaysStorage !== 'boolean') throw new LiquidStakingError('invalid-config', 'pool.firstStakePaysStorage must be a boolean.')
 }
 
 /** The contract, symbol and pinned code hashes of a pool on `network`. */
 export function resolvePool(pool: LiquidPresetName | LiquidPoolConfig, network: NearNetwork): ResolvedLiquidPool {
-  if (typeof pool !== 'string') return { contract: pool.contract, symbol: pool.symbol, name: pool.name ?? pool.symbol, codeHashes: pool.codeHashes, preset: null }
+  if (typeof pool !== 'string') {
+    // A config for a preset's own contract (re-pinned after an upgrade) keeps that preset's storage behaviour unless it says otherwise.
+    const known = (Object.values(LIQUID_PRESETS) as LiquidPreset[]).find((p) => Object.values(p.contracts).some((c) => c?.contract === pool.contract))
+    const firstStakePaysStorage = pool.firstStakePaysStorage ?? known?.firstStakePaysStorage ?? true
+    return { contract: pool.contract, symbol: pool.symbol, name: pool.name ?? pool.symbol, codeHashes: pool.codeHashes, firstStakePaysStorage, featurePauses: true, preset: null }
+  }
   const preset = LIQUID_PRESETS[pool]
   const on = (preset.contracts as Partial<Record<NearNetwork, { contract: string; codeHashes: readonly string[] }>>)[network]
   if (!on) throw new LiquidStakingError('unsupported-network', `${preset.name} has no contract on NEAR ${network}.`)
-  return { contract: on.contract, symbol: preset.symbol, name: preset.name, codeHashes: on.codeHashes, preset: pool }
+  return { contract: on.contract, symbol: preset.symbol, name: preset.name, codeHashes: on.codeHashes, firstStakePaysStorage: preset.firstStakePaysStorage, featurePauses: preset.featurePauses, preset: pool }
 }
 
 /** Stable request id of the account's unstaked balance in a contract: first 8 bytes of sha256(contract) as a u64. */

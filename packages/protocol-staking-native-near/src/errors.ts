@@ -5,11 +5,12 @@ export type NearStakingErrorCode =
   | 'wrong-chain'          // the account is not on the configured NEAR network
   | 'no-provider'          // no RPC: pass `provider`, or use a wallet-near account that has one
   | 'invalid-amount'       // not a positive bigint / safe integer
-  | 'below-minimum'        // under MIN_STAKE
+  | 'below-minimum'        // a stake under MIN_STAKE; a partial unstake leaving less than MIN_STAKE staked or less than UNSTAKED_DUST unstaked
   | 'pool-required'        // several pools allowed, no default, and the call named none
   | 'pool-not-allowed'     // see `refusals`
   | 'exceeds-staked'       // unstake larger than the staked balance
   | 'timer-reset-refused'  // the unstake would restart the wait of a balance still unbonding; see NearUnstakeOptions.allowTimerReset
+  | 'claim-first'          // the unstake must withdraw an unlocked balance first and the account cannot pay both calls at once: claim, then unstake
   | 'max-fee-exceeded'     // the fresh plan's fee is above the write's `maxFee`
   | 'nothing-staked'
   | 'not-withdrawable'     // unstaked balance still locked; see `unlock`

@@ -6,7 +6,7 @@ export type LiquidStakingErrorCode =
   | 'invalid-amount'
   | 'below-minimum'
   | 'unknown-contract-code' // the contract's live code_hash is not pinned
-  | 'contract-paused'       // is_paused true or missing
+  | 'contract-paused'       // is_paused true or missing, or a feature the plan calls paused (pa_all_paused)
   | 'exceeds-balance'       // unstake larger than the token balance
   | 'nothing-staked'
   | 'relock-refused'        // see LiquidUnstakeOptions.allowRelock

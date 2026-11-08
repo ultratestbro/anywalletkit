@@ -8,7 +8,7 @@ import {
 import { describeLiquidNearStakingActivity } from './activity.js'
 import {
   CONTRACT_MIN_RESERVE_BALANCE, DEFAULT_APR_WINDOW_EPOCHS, DEFAULT_ARCHIVAL_RPC, DEFAULT_GAS, DEFAULT_RESERVE, EPOCH_LENGTH, MIN_EPOCHS_TO_UNLOCK,
-  MIN_STAKE, NEAR_MAINNET, NEAR_TESTNET, TGAS, UNSTAKED_DUST, YOCTO_PER_NEAR,
+  MIN_STAKE, NEAR_MAINNET, NEAR_TESTNET, PAUSE_KEYS, TGAS, UNSTAKED_DUST, YOCTO_PER_NEAR,
 } from './constants.js'
 import { blockAt, epochStartsAt, readEpoch, readEpochNumbers, type EpochNumbers } from './epoch.js'
 import { LiquidStakingError } from './errors.js'
@@ -40,6 +40,11 @@ interface AccountState extends LiquidAccountDetails {
   stakedNear: bigint
 }
 
+/** What a paused feature stops, for messages. */
+const FEATURE_WORDS: Readonly<Record<string, string>> = {
+  internal_deposit: 'deposits', internal_stake: 'staking', internal_unstake: 'unstaking', internal_withdraw: 'withdrawals',
+}
+
 const near = (yocto: bigint): string => {
   const frac = (yocto % YOCTO_PER_NEAR).toString().padStart(24, '0').slice(0, 5).replace(/0+$/, '')
   return `${yocto / YOCTO_PER_NEAR}${frac ? `.${frac}` : ''} NEAR`
@@ -50,6 +55,16 @@ function amountOf(v: unknown, what: string): bigint {
   if (typeof v === 'string' && /^\d+$/.test(v)) return BigInt(v)
   if (typeof v === 'number' && Number.isSafeInteger(v) && v >= 0) return BigInt(v)
   throw new NetworkError(`${what}: expected a non-negative integer, got ${String(JSON.stringify(v)).slice(0, 60)}`)
+}
+
+/** The contract has no such method: the node says MethodNotFound, in the call result's error text or in a structured JSON-RPC error. */
+function methodMissing(e: NearRpcError): boolean {
+  if (/MethodNotFound/.test(e.message)) return true
+  try {
+    return /MethodNotFound/.test(JSON.stringify(e.cause) ?? '')
+  } catch {
+    return false
+  }
 }
 
 /** A bigint or a safe integer above zero, else 'invalid-amount'. */
@@ -78,8 +93,9 @@ const copyTx = (tx: NearTransaction): NearTransaction => ({
  *
  * Never builds `ft_transfer_call` or `ft_transfer` into the contract (it has no `ft_on_transfer`:
  * tokens sent that way are lost), and nothing but function calls to the pinned contract. Writes
- * refuse a paused contract or one whose code hash is not pinned. Every quote returns the exact
- * transactions; a write given `expected` refuses when its fresh plan differs.
+ * refuse a paused contract (or a paused feature their calls need) or one whose code hash is not
+ * pinned. Every quote returns the exact transactions; a write given `expected` refuses when its
+ * fresh plan differs.
  */
 export class LiquidStakingProtocolNear extends StakingProtocol<LiquidStakingNearConfig> {
   readonly reserve: bigint
@@ -166,11 +182,14 @@ export class LiquidStakingProtocolNear extends StakingProtocol<LiquidStakingNear
     return value
   }
 
-  /** Spendable NEAR of the account: amount − locked − storage, never below 0 (0 for an account that does not exist yet). */
+  /** Spendable NEAR of the account: amount − max(0, storage − locked), never below 0 (0 for an account that does not exist yet). */
   private async available(me: string): Promise<bigint> {
     const v = await this.client().viewAccount(me)
     if (!v) return 0n
-    const free = amountOf(v.amount, 'view_account.amount') - amountOf(v.locked, 'view_account.locked') - amountOf(v.storage_usage, 'view_account.storage_usage') * STORAGE_PRICE_PER_BYTE
+    // `amount` is the liquid balance (`locked` is not part of it), and the locked balance pays for storage first.
+    const storage = amountOf(v.storage_usage, 'view_account.storage_usage') * STORAGE_PRICE_PER_BYTE
+    const locked = amountOf(v.locked, 'view_account.locked')
+    const free = amountOf(v.amount, 'view_account.amount') - (storage > locked ? storage - locked : 0n)
     return free > 0n ? free : 0n
   }
 
@@ -198,6 +217,40 @@ export class LiquidStakingProtocolNear extends StakingProtocol<LiquidStakingNear
       throw new LiquidStakingError('unknown-contract-code', `${info.contract} runs code ${info.codeHash || '(none)'}, which is not pinned. A contract upgrade needs a new pin before the module writes to it again.`, { details: { codeHash: info.codeHash, pinned: [...this.pool.codeHashes] } })
     }
     if (info.paused) throw new LiquidStakingError('contract-paused', `${info.name} (${info.contract}) is paused: it rejects every call until it resumes.`)
+  }
+
+  /** The paused features a plan's calls check (see PAUSE_KEYS); empty when every call goes through. */
+  private static pausedFor(info: LiquidPoolInfo, methods: string[]): string[] {
+    const keys = new Set(methods.flatMap((m) => PAUSE_KEYS[m] ?? []))
+    return info.pausedFeatures.filter((k) => keys.has(k))
+  }
+
+  /** Withdrawals are stopped: the whole contract or its withdraw feature is paused. */
+  private static withdrawPaused(info: LiquidPoolInfo): boolean {
+    return info.paused || LiquidStakingProtocolNear.pausedFor(info, ['withdraw_all']).length > 0
+  }
+
+  /** Refuses transactions that call a feature the contract has paused on its own (rNEAR's per-feature pause): they would fail and burn the gas. */
+  private static assertNotPaused(info: LiquidPoolInfo, transactions: NearTransaction[]): void {
+    const methods = transactions.flatMap((t) => t.actions.flatMap((a) => ('functionCall' in a ? [a.functionCall.methodName] : [])))
+    const paused = LiquidStakingProtocolNear.pausedFor(info, methods)
+    if (paused.length === 0) return
+    const what = [...new Set(paused.map((k) => FEATURE_WORDS[k] ?? k))].join(' and ')
+    throw new LiquidStakingError('contract-paused', `${info.name} (${info.contract}) has ${what} paused (${paused.join(', ')}): this transaction would fail until it resumes.`, { details: { pausedFeatures: paused } })
+  }
+
+  /**
+   * NEAR the contract keeps from a stake for the account's NEP-145 registration: storage_balance_bounds.min
+   * when the contract charges it (rNEAR) and the account is not registered yet, else 0. Read live.
+   */
+  private async storageFee(me: string): Promise<bigint> {
+    if (!this.pool.firstStakePaysStorage) return 0n
+    const [balance, bounds] = await Promise.all([
+      this.view<unknown>('storage_balance_of', { account_id: me }),
+      this.view<{ min?: unknown } | null>('storage_balance_bounds'),
+    ])
+    if (balance !== null && balance !== undefined) return 0n
+    return amountOf(bounds?.min, 'storage_balance_bounds.min')
   }
 
   private async readAccount(me: string, price: bigint): Promise<AccountState> {
@@ -245,12 +298,22 @@ export class LiquidStakingProtocolNear extends StakingProtocol<LiquidStakingNear
   async getPoolInfo(): Promise<LiquidPoolInfo> {
     const pool = this.pool
     const rpc = this.client()
-    const [meta, summary, paused, account, beneficiaries] = await Promise.all([
+    const [meta, summary, pausedFlag, pausedKeys, account, beneficiaries] = await Promise.all([
       this.view<{ symbol?: unknown; decimals?: unknown } | null>('ft_metadata'),
       this.view<Record<string, unknown> | null>('get_summary'),
       // A contract answer other than `false` (a missing method, a panic, a non-boolean) counts as paused; a transport failure is thrown.
       this.view<unknown>('is_paused').then((v) => v !== false, (e: unknown) => {
         if (e instanceof NearRpcError) return true
+        throw e
+      }),
+      // Per-feature pauses (near-plugins Pausable, rNEAR): null when none. LiNEAR has only `is_paused`
+      // and is not asked; a custom contract without the method has none. Any other contract answer (a
+      // panic, a non-list) counts as paused.
+      !pool.featurePauses ? Promise.resolve<string[]>([]) : this.view<unknown>('pa_all_paused').then<string[] | 'unreadable', string[] | 'unreadable'>((v) => {
+        if (v === null) return []
+        return Array.isArray(v) && v.every((k) => typeof k === 'string') ? [...v].sort() : 'unreadable'
+      }, (e: unknown) => {
+        if (e instanceof NearRpcError) return methodMissing(e) ? [] : 'unreadable'
         throw e
       }),
       rpc.viewAccount(pool.contract),
@@ -265,6 +328,7 @@ export class LiquidStakingProtocolNear extends StakingProtocol<LiquidStakingNear
     for (const bps of Object.values(beneficiaries ?? {})) if (typeof bps === 'number' && Number.isInteger(bps) && bps >= 0) feeBps += bps
     const codeHash = typeof account?.code_hash === 'string' ? account.code_hash : ''
     const storageCost = account ? amountOf(account.storage_usage, 'view_account.storage_usage') * STORAGE_PRICE_PER_BYTE : 0n
+    const paused = pausedFlag || pausedKeys === 'unreadable' || pausedKeys.includes('ALL')
     return {
       contract: pool.contract,
       symbol: typeof meta.symbol === 'string' ? meta.symbol : pool.symbol,
@@ -275,6 +339,7 @@ export class LiquidStakingProtocolNear extends StakingProtocol<LiquidStakingNear
       totalShares: amountOf(summary.total_share_amount, 'get_summary.total_share_amount'),
       validators: typeof summary.validators_num === 'number' ? summary.validators_num : 0,
       paused,
+      pausedFeatures: pausedKeys === 'unreadable' ? [] : pausedKeys,
       codeHash,
       codeHashKnown: codeHash !== '' && pool.codeHashes.includes(codeHash),
       liquidity: account ? amountOf(account.amount, 'view_account.amount') : 0n,
@@ -374,15 +439,15 @@ export class LiquidStakingProtocolNear extends StakingProtocol<LiquidStakingNear
     const info = await this.getPoolInfo()
     const a = await this.readAccount(me, info.price)
     const unstaked = a.unstaked > UNSTAKED_DUST ? a.unstaked : 0n
-    const withdrawable = unstaked > 0n && a.canWithdraw && LiquidStakingProtocolNear.payable(info, unstaked) ? unstaked : 0n
+    const withdrawable = unstaked > 0n && a.canWithdraw && LiquidStakingProtocolNear.payable(info, unstaked) && !LiquidStakingProtocolNear.withdrawPaused(info) ? unstaked : 0n
     return { balance: a.shares, wrappedBalance: 0n, rate: info.price, total: a.value, unstaked, withdrawable, price: info.price }
   }
 
   /**
    * The account's unstaked NEAR as one request (a contract keeps one unstaked balance per account):
    * id `poolRequestId(contract)`, `unlockEpoch` exact from the contract. `claimable` needs the epoch
-   * reached and the contract's liquid balance to cover it (`awaitingLiquidity` otherwise).
-   * `timestamp` is 0: the contract does not keep the unstake time.
+   * reached, the contract's liquid balance to cover it (`awaitingLiquidity` otherwise) and withdrawals
+   * not paused (`paused`). `timestamp` is 0: the contract does not keep the unstake time.
    */
   override async getWithdrawalRequests(): Promise<LiquidWithdrawalRequestsView> {
     const me = await this.me()
@@ -390,10 +455,11 @@ export class LiquidStakingProtocolNear extends StakingProtocol<LiquidStakingNear
     const a = await this.readAccount(me, info.price)
     if (a.unstaked <= UNSTAKED_DUST) return { requests: [], pendingAmount: 0n, claimableAmount: 0n, claimableIds: [] }
     const awaitingLiquidity = a.canWithdraw && !LiquidStakingProtocolNear.payable(info, a.unstaked)
-    const claimable = a.canWithdraw && !awaitingLiquidity
+    const paused = LiquidStakingProtocolNear.withdrawPaused(info)
+    const claimable = a.canWithdraw && !awaitingLiquidity && !paused
     const id = poolRequestId(info.contract)
     const request: LiquidWithdrawalRequest = {
-      id, amount: a.unstaked, timestamp: 0, claimable, contract: info.contract, unlockEpoch: a.unlockEpoch, awaitingLiquidity,
+      id, amount: a.unstaked, timestamp: 0, claimable, contract: info.contract, unlockEpoch: a.unlockEpoch, awaitingLiquidity, paused,
       unlock: claimable ? null : this.contractUnlock(await this.getEpoch(), a.unlockEpoch),
     }
     return {
@@ -443,15 +509,26 @@ export class LiquidStakingProtocolNear extends StakingProtocol<LiquidStakingNear
     const info = await this.getPoolInfo()
     this.assertWritable(info)
     // deposit_and_stake creates the account's entry in the contract (real deposits on both contracts
-    // carry no storage_deposit); NEP-145 registration only matters for receiving the token by transfer.
+    // carry no storage_deposit). rNEAR keeps storage_balance_bounds.min of an unregistered account's
+    // deposit for that registration and stakes the rest; LiNEAR stakes all of it.
     const transactions = [this.tx([fc('deposit_and_stake', {}, this.gas.stake, amount)])]
+    LiquidStakingProtocolNear.assertNotPaused(info, transactions)
+    const storageFee = await this.storageFee(me)
+    // At or below the fee the contract's `amount − fee` underflows or stakes nothing: the transaction fails and burns its gas.
+    // Above it the contract stakes `amount − fee`, which is held to MIN_STAKE like any stake.
+    if (storageFee > 0n && amount - storageFee < MIN_STAKE) {
+      throw new LiquidStakingError('below-minimum', `A first stake into ${info.name} must be at least ${near(storageFee + MIN_STAKE)}: the contract keeps ${near(storageFee)} of it for the account's registration.`, { details: { minimum: storageFee + MIN_STAKE, storageFee } })
+    }
+    const warnings: LiquidStakingWarning[] = storageFee > 0n
+      ? [{ code: 'pays-storage', message: `First stake into ${info.name}: the contract keeps ${near(storageFee)} of the amount for the account's registration and stakes the rest.` }]
+      : []
     const [available, { fee, upfront, prices }, apr] = await Promise.all([this.available(me), this.costs(transactions), this.getApr().catch(() => null)])
     const reserve = this.reserveAt(prices)
     const required = amount + upfront + reserve
     if (required > available) throw new InsufficientFundsError(required, available, 'NEAR')
     return {
-      fee, upfront, reserve, amount, shares: sharesForNear(amount, info), price: info.price, apr,
-      maxStakeable: LiquidStakingProtocolNear.maxStakeable(available, reserve, upfront), transactions, warnings: [],
+      fee, upfront, reserve, amount, storageFee, shares: sharesForNear(amount - storageFee, info), price: info.price, apr,
+      maxStakeable: LiquidStakingProtocolNear.maxStakeable(available, reserve, upfront), transactions, warnings,
     }
   }
 
@@ -484,21 +561,25 @@ export class LiquidStakingProtocolNear extends StakingProtocol<LiquidStakingNear
     const amount = all ? a.stakedNear : nearForShares(shares, info)
     if (amount === 0n) throw new LiquidStakingError('below-minimum', `${shares} ${info.symbol} base units are worth less than 1 yoctoNEAR.`)
     const unstake = all ? fc('unstake_all', {}, this.gas.unstake, 0n) : fc('unstake', { amount: String(amount) }, this.gas.unstake, 0n)
+    // Unstaking paused: refused before the relock check below, whose allowRelock would not help.
+    LiquidStakingProtocolNear.assertNotPaused(info, [this.tx([unstake])])
 
     const warnings: LiquidStakingWarning[] = []
     const actions: NearAction[] = []
     let withdrawsFirst = 0n, relocks = 0n, resetsTimer = false
     if (a.unstaked > UNSTAKED_DUST && a.canWithdraw) {
-      if (LiquidStakingProtocolNear.payable(info, a.unstaked)) {
+      const withdrawPaused = LiquidStakingProtocolNear.withdrawPaused(info)
+      if (LiquidStakingProtocolNear.payable(info, a.unstaked) && !withdrawPaused) {
         // A new unstake sets the unlock epoch of the whole unstaked balance: withdraw the unlocked part first.
         actions.push(fc('withdraw_all', {}, this.gas.withdraw, 0n))
         withdrawsFirst = a.unstaked
         warnings.push({ code: 'withdraws-unlocked-first', message: `${near(a.unstaked)} already unlocked is withdrawn to the account in the same transaction, so the new unstake does not lock it again.` })
       } else if (!o.allowRelock || amount < MIN_STAKE) {
-        throw new LiquidStakingError('relock-refused', `${near(a.unstaked)} is unlocked, but ${info.name} cannot pay it out yet (it is waiting for its payout). A new unstake now would lock it again for 4+ epochs: claim it first${amount < MIN_STAKE ? '' : ', or pass allowRelock'}.`, { details: { unstaked: a.unstaked, liquidity: info.liquidity, kept: info.kept } })
+        const why = withdrawPaused ? 'has withdrawals paused' : 'cannot pay it out yet (it is waiting for its payout)'
+        throw new LiquidStakingError('relock-refused', `${near(a.unstaked)} is unlocked, but ${info.name} ${why}. A new unstake now would lock it again for 4+ epochs: ${withdrawPaused ? 'wait until withdrawals resume' : 'claim it first'}${amount < MIN_STAKE ? '' : ', or pass allowRelock'}.`, { details: { unstaked: a.unstaked, liquidity: info.liquidity, kept: info.kept, withdrawPaused } })
       } else {
         relocks = a.unstaked
-        warnings.push({ code: 'relocks-unlocked', message: `${near(a.unstaked)} already unlocked locks again with this unstake (the contract cannot pay it out yet): the whole unstaked balance waits 4+ more epochs.` })
+        warnings.push({ code: 'relocks-unlocked', message: `${near(a.unstaked)} already unlocked locks again with this unstake (the contract ${withdrawPaused ? 'has withdrawals paused' : 'cannot pay it out yet'}): the whole unstaked balance waits 4+ more epochs.` })
       }
     } else if (a.unstaked > UNSTAKED_DUST) {
       // The contract keeps one unlock epoch per account: this unstake moves it for everything already unbonding.
@@ -512,6 +593,7 @@ export class LiquidStakingProtocolNear extends StakingProtocol<LiquidStakingNear
     warnings.push({ code: 'unlock-may-be-later', message: 'Unstaking takes 4 or more epochs (~6.9 h each, about 21–35 h or more): the contract may add epochs for large amounts or after its epoch settlement. The exact epoch is known after the unstake.' })
 
     const transactions = [this.tx(actions)]
+    LiquidStakingProtocolNear.assertNotPaused(info, transactions)
     const [{ fee, upfront }, available] = await Promise.all([this.costs(transactions), this.available(me)])
     if (upfront > available) throw new InsufficientFundsError(upfront, available, 'NEAR')
     const earliestEpoch = epoch.height + MIN_EPOCHS_TO_UNLOCK
@@ -559,6 +641,7 @@ export class LiquidStakingProtocolNear extends StakingProtocol<LiquidStakingNear
       throw new LiquidStakingError('awaiting-liquidity', `${near(a.unstaked)} is unlocked; ${info.name} is waiting for its payout from the validators before it can pay it (it holds ${near(info.liquidity)} and keeps ${near(info.kept)} for its own storage).`, { details: { amount: a.unstaked, liquidity: info.liquidity, kept: info.kept } })
     }
     const transactions = [this.tx([fc('withdraw_all', {}, this.gas.withdraw, 0n)])]
+    LiquidStakingProtocolNear.assertNotPaused(info, transactions)
     const [{ fee, upfront }, available] = await Promise.all([this.costs(transactions), this.available(me)])
     if (upfront > available) throw new InsufficientFundsError(upfront, available, 'NEAR')
     return { fee, upfront, amount: a.unstaked, transactions }

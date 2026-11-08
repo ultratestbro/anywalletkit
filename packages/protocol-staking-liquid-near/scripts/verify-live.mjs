@@ -90,6 +90,7 @@ for (const pool of ['linear', 'rnear']) {
   console.log(`  price ${near(info.price)} per token, staked ${near(info.totalStaked)}, validators ${info.validators}, liquidity ${near(info.liquidity)}, fee ${info.feeBps / 100} %`)
   check(info.codeHashKnown && info.codeHash === preset.codeHashes[0], `live code hash ${info.codeHash} is the pin`)
   check(info.paused === false, 'is_paused is false')
+  check(info.pausedFeatures.length === 0, `no feature paused (pa_all_paused${pool === 'linear' ? ': no such method' : ''})`)
   check(info.decimals === 24 && info.price > 10n ** 24n, 'price above 1 NEAR per token, 24 decimals')
   check(info.price === (info.totalStaked * 10n ** 24n) / info.totalShares, 'ft_price = total staked / total shares (rounded down)')
   const epoch = await p.getEpoch()
@@ -121,7 +122,7 @@ for (const pool of ['linear', 'rnear']) {
     if (d.unstaked > 1_000_000n && !d.canWithdraw) check(claim instanceof LiquidStakingError && claim.code === 'not-withdrawable', "unbonding: claim refused with 'not-withdrawable' and its epoch")
     await outcome('stake 0.1 NEAR', async () => {
       const q = await h.quoteStake({ amount: 10n ** 23n })
-      return `${methods(q.transactions)}; ${q.shares} token units; fee ≤ ${near(q.fee)}`
+      return `${methods(q.transactions)}; ${q.shares} token units; storage fee ${near(q.storageFee)}; fee ≤ ${near(q.fee)}`
     })
   }
 }

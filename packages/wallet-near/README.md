@@ -44,7 +44,7 @@ Every `signTransaction` / `sendTransaction` / `transfer` goes through the same g
    `transactionMaxFee` when set.
 3. **Preflight** (`SimulationError`, off with `simulate: false`) — NEAR has no dry-run RPC, so
    this is what makes a transaction fail *before* a fee is paid: the signer account and its
-   access key exist and allow the call, the spendable balance (total − locked − storage) covers
+   access key exist and allow the call, the spendable balance (liquid − the storage the locked balance does not cover) covers
    deposits + fee, a named recipient exists (an implicit one may be created, for ≥ 0.002 NEAR),
    the NEP-141 balance covers an `ft_transfer`, the recipient is registered on the token or a
    `storage_deposit` rides along.

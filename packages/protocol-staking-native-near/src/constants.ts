@@ -26,8 +26,9 @@ export const TYPICAL_EPOCH_MS = 24_840_000
 
 /**
  * NEAR left on the account by `stake`: 0.02 NEAR. `stake` never leaves less than the upfront gas of
- * one unstake (about 0.055 NEAR at today's prices, see fees.ts), so the stake can always be left
- * without a top-up; this is the floor below that.
+ * the largest exit, an unstake that withdraws an unlocked balance first in the same transaction
+ * (about 0.11 NEAR at today's prices, see fees.ts), so the stake can always be left without a
+ * top-up; this is the floor below that.
  */
 export const DEFAULT_RESERVE = 2n * 10n ** 22n
 /** Smallest stake the module sends: 0.001 NEAR (smaller deposits can round to zero pool shares). */

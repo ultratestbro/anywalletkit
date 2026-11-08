@@ -94,6 +94,21 @@ describe('WalletAccountNear', () => {
     expect(q.fee).toBeGreaterThan((await a.quoteTransfer({ recipient: 'alice.near', amount: NEAR })).fee)
   })
 
+  it('a locked balance is not part of `amount` and pays for storage first: available = amount − max(0, storage − locked)', async () => {
+    const STORAGE = 182n * 10n ** 19n
+    // 50 NEAR liquid next to 40 NEAR locked (a direct stake): all 50 are spendable, the locked 40 cover the storage.
+    const staked = await manager(fakeNode({ balance: 50n * NEAR, locked: 40n * NEAR })).getAccount(0)
+    expect(await staked.getAccountView()).toMatchObject({ amount: 50n * NEAR, locked: 40n * NEAR, available: 50n * NEAR })
+    expect(await staked.getAvailableBalance()).toBe(50n * NEAR)
+    expect(await staked.getBalance()).toBe(50n * NEAR)
+    await expect(staked.transfer({ recipient: 'alice.near', amount: 45n * NEAR })).resolves.toBeTruthy() // the preflight agrees
+    // locked ≥ amount no longer reads as nothing to spend
+    expect(await (await manager(fakeNode({ balance: NEAR, locked: 5n * NEAR })).getAccount(0)).getAvailableBalance()).toBe(NEAR)
+    // a locked balance smaller than the storage covers part of it; without one the storage comes out of `amount`
+    expect(await (await manager(fakeNode({ balance: NEAR, locked: STORAGE / 2n })).getAccount(0)).getAvailableBalance()).toBe(NEAR - STORAGE / 2n)
+    expect(await (await manager(fakeNode({ balance: NEAR })).getAccount(0)).getAvailableBalance()).toBe(NEAR - STORAGE)
+  })
+
   it('hard checks refuse dangerous actions, foreign signers, >300 Tgas and fee caps before anything is signed', async () => {
     const f = fakeNode()
     const a = await manager(f).getAccount(0)

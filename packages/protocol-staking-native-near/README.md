@@ -27,7 +27,7 @@ await staking.stake({ amount: 10n ** 24n, expected: quote.transactions })  // re
 
 const unstake = await staking.quoteRequestWithdrawal({ amount: 'all' })     // unstake_all ([withdraw_all, unstake_all] if unlocked NEAR waits)
 await staking.requestWithdrawal({ amount: 'all', expected: unstake.transactions })
-// … 4 epochs later (unstake.unlock.earliestAt … latestAt) …
+// … 4 epochs later (unstake.unlock.earliestAt … latestAt; unlock is null when the epoch could not be read) …
 await staking.claimWithdrawals()                                            // withdraw_all per pool
 ```
 
@@ -55,10 +55,10 @@ APR). Writes on it throw `ReadOnlyAccountError`.
 | `maxFee` | `10` | Percent. Pools above it are refused for new stake. Read fresh at every stake; compared in integers. |
 | `allowInactive` | `false` | Stake into pools outside the current or next validator set (that stake earns nothing). |
 | `minUptime` | `0` (off) | Refuse pools whose production this epoch is below it, percent. |
-| `codeHashes` | — | Extra staking-pool code hashes to accept on top of the pinned builds. |
+| `codeHashes` | — | Extra staking-pool code hashes to accept on top of the pinned builds. A `*.pool.near` pool on such a build still gets the scheduled-fee check (Safety, 5). |
 | `provider` / `timeoutMs` | the account's RPC / 15 s | URL, transport, or a failover list. |
 | `network` | the account's | `'mainnet'` / `'testnet'`. The account must be on `near:<network>`. |
-| `reserve` | 0.02 NEAR | Left on the account by `stake`; never less than one unstake's upfront gas (~0.055 NEAR today, see Fees). |
+| `reserve` | 0.02 NEAR | Left on the account by `stake`; never less than the upfront gas of the largest exit, `[withdraw_all, unstake]` in one transaction (~0.11 NEAR today, see Fees). |
 | `gas` | 50 Tgas per call | Prepaid gas. It is all bought upfront at `min_gas_purchase_price`; the unburnt part is refunded. |
 | `discover` | `'fastnear'` | How positions outside `pools` are found: fastnear's indexer (`/v1/account/{id}/staking`), your own `(accountId) => poolIds`, or `false`. A failed lookup makes `listPositions` throw (never "no stake"); balances, requests and claims go on with the listed, passed and touched pools and say `partial: true`. |
 | `history` | — | A `HistorySource` (e.g. wallet-near's `createNearHistory`): dates the last unstake for an exact unlock epoch. |
@@ -87,8 +87,10 @@ reads and refuses with `quote-changed` (and the new `details.transactions`) when
 example when an unstaked balance unlocked between the quote and the click.
 
 Refusals are `NearStakingError` with a `code`: `wrong-chain`, `no-provider`, `invalid-amount`,
-`below-minimum` (0.001 NEAR), `pool-required`, `pool-not-allowed` (+ `refusals`), `exceeds-staked`,
-`timer-reset-refused`, `max-fee-exceeded`, `nothing-staked`, `not-withdrawable` (+ `details.unlock`),
+`below-minimum` (a stake under 0.001 NEAR, or a partial unstake that would leave less than that
+staked or unstaked),
+`pool-required`, `pool-not-allowed` (+ `refusals`), `exceeds-staked`, `timer-reset-refused`,
+`claim-first` (claim the unlocked balance, then unstake: see Fees), `max-fee-exceeded`, `nothing-staked`, `not-withdrawable` (+ `details.unlock`),
 `nothing-to-claim` (+ `details.soonest`), `unknown-request`, `quote-changed`, `invalid-config`. A
 write that does not fit the balance throws core's `InsufficientFundsError`.
 
@@ -100,15 +102,22 @@ times the 10^8 gas price. The unburnt part comes back a few blocks later. So a 5
 about 0.055 NEAR on the account even though it finally costs about 0.0005 NEAR. Quotes carry both:
 
 - `upfront`: what the node holds back besides the deposit (Σ gas × the purchase price). Every
-  balance check uses it: `stake` needs `amount + upfront + reserve ≤ balance − locked − storage`,
-  unstakes and claims need `upfront`.
+  balance check uses it: `stake` needs `amount + upfront + reserve ≤` the spendable balance (the
+  liquid balance minus the storage cost its `locked` balance does not cover), unstakes and claims
+  need `upfront`.
 - `fee`: the upper bound of what is finally paid (Σ gas × gas price + 10 %, the margin wallet-near's
   estimate uses), so `maxFee: quote.fee` passes on a wallet-near account. The module checks
   `maxFee` itself too (`max-fee-exceeded`), because wallet-selector adapters ignore it.
 
 `min_gas_purchase_price` is read from `EXPERIMENTAL_protocol_config` (cached 10 min); a node that
-cannot answer gets the mainnet value. `stake` leaves at least the upfront gas of one unstake on the
-account (`quote.reserve`), so a stake can always be left without a top-up.
+cannot answer gets the mainnet value. `stake` leaves at least the upfront gas of the largest exit on
+the account (`quote.reserve`): an unstake that withdraws an unlocked balance first, two 50 Tgas
+calls in one transaction (~0.11 NEAR today), so a stake can always be left without a top-up. When
+the balance no longer covers both calls (it was spent, or gas got dearer) but covers the
+`withdraw_all` alone, such an unstake is refused with `claim-first` (`details.id` is the request to
+claim): `claimWithdrawals` takes the unlocked NEAR out (and back to the balance), then the unstake
+needs one call's gas only. The module
+never falls back to the unstake alone, which would lock the unlocked balance for 4 more epochs.
 
 ## Timing
 
@@ -132,7 +141,10 @@ account (`quote.reserve`), so a stake can always be left without a top-up.
   chain and falls back to the estimate.
 - Pools leave 1–10 yoctoNEAR of share-rounding dust in `unstaked` (most delegators have some).
   Balances below 0.001 NEAR (`UNSTAKED_DUST`) are not requests, not claims and never trigger the
-  withdraw-first batch.
+  withdraw-first batch. So a partial unstake that would leave less than that unstaked in the pool,
+  or less than that staked, is refused (`below-minimum`; unstake `'all'` instead). Unstaking a whole
+  stake below 0.001 NEAR (made outside the module) still goes out, with warning `leaves-dust`: what it
+  leaves unstaked is below the claim minimum, and it is the only way to leave that stake.
 
 ## APR
 
@@ -157,17 +169,22 @@ astro-stakers (1 % fee) 5.01 %, figment (10 %) 4.53 %. `enrich` overrides it.
   4. `is_staking_paused` answers `false` (a missing method, an error or a non-boolean is
      `pause-unknown`, never "not paused");
   5. the fee is well-formed and at most `maxFee`: `get_reward_fee_fraction` for core-contracts pools
-     (`*.poolv1.near`); for the staking-farm builds of `*.pool.near`, `get_pool_summary`, and the
-     higher of the current fee and the one already scheduled for the next epoch (`nextFee`);
+     (`*.poolv1.near`); for the staking-farm builds of `*.pool.near` (every `*.pool.near` pool,
+     builds added through `codeHashes` included), `get_pool_summary`, and the higher of the current
+     fee and the one already scheduled for the next epoch (`nextFee`);
   6. it is in the current and next validator sets (unless `allowInactive`), with `minUptime` if set.
 - **Exits are always possible from a known pool.** Unstake and claim check only 2 and 3, so users can
   leave a pool that was paused, raised its fee (an owner can raise it to 100 % at any time; positions
   warn with `pool-fee-above-max`) or left the set. A `*.pool.near` pool that upgraded itself to code
-  the `pool.near` factory allows (`is_contract_allowed`) can still be left. `withdraw` pays the
+  the `pool.near` factory allows (`is_contract_allowed`) can still be left. The validator set and the
+  epoch only decorate exits: when those reads fail, unstakes and claims still go out (the unstake's
+  `unlock` is null, positions carry `poolInfo: null` and no unlock estimate). `withdraw` pays the
   caller only.
 - The module builds function calls on the checked pool only: `deposit_and_stake`, `unstake`,
   `unstake_all`, `withdraw_all`. Never transfers, keys, `Stake` actions or token calls.
-- `stake` sends exactly `amount` and requires `amount + upfront + reserve ≤ balance − locked − storage`.
+- `stake` sends exactly `amount` and requires `amount + upfront + reserve ≤` the spendable balance
+  (`amount − max(0, storage − locked)` of `view_account`: `locked` is not part of `amount` and pays
+  for storage first).
 - Policies: the transactions go to the pool account; an `allowlist` must include it.
 
 ## Activity

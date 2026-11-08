@@ -12,8 +12,9 @@ const PURCHASE_PRICE = 1_000_000_000n
 const gasOf = (txs: NearTransaction[]) => txs.reduce((s, tx) => s + WalletAccountReadOnlyNear.gasOf(tx.actions, false), 0n)
 const feeOf = (txs: NearTransaction[]) => gasOf(txs) * GAS_PRICE
 const upfrontOf = (txs: NearTransaction[]) => gasOf(txs) * PURCHASE_PRICE
-/** What `stake` leaves: the upfront gas of the longest unstake (50 Tgas), above the 0.02 NEAR default. */
-const EXIT_RESERVE = upfrontOf([{ receiverId: ASTRO, actions: [{ functionCall: { methodName: 'unstake', args: { amount: '9'.repeat(39) }, gas: 50n * TGAS, deposit: 0n } }] }])
+const fc = (methodName: string, args: Record<string, unknown>, gas: bigint, deposit = 0n) => ({ functionCall: { methodName, args, gas, deposit } })
+/** What `stake` leaves: the upfront gas of the largest exit ([withdraw_all, unstake] of the longest amount, 50 Tgas each), above the 0.02 NEAR default. */
+const EXIT_RESERVE = upfrontOf([{ receiverId: ASTRO, actions: [fc('withdraw_all', {}, 50n * TGAS), fc('unstake', { amount: '9'.repeat(39) }, 50n * TGAS)] }])
 const STORAGE = 182n * 10n ** 19n
 
 /** Config overrides; `defaultPool: undefined` removes the default. */
@@ -31,8 +32,6 @@ async function refusal(promise: Promise<unknown>, code: string): Promise<NearSta
   expect((e as NearStakingError).code).toBe(code)
   return e as NearStakingError
 }
-
-const fc = (methodName: string, args: Record<string, unknown>, gas: bigint, deposit = 0n) => ({ functionCall: { methodName, args, gas, deposit } })
 
 afterEach(() => { vi.unstubAllGlobals() })
 
@@ -146,6 +145,26 @@ describe('pool allow-list (getPool)', () => {
     Object.assign(node.delegation(FARM), { staked: NEAR })
     const { p } = setup({ pools: [FARM], defaultPool: undefined }, { node })
     expect((await p.listPositions())[0]!.warnings).toContain('pool-fee-above-max')
+  })
+
+  it('a *.pool.near build accepted through codeHashes still gets the scheduled-fee check', async () => {
+    const node = new FakeNear()
+    const FARM = 'farm.pool.near'
+    const NEW_BUILD = 'NewFarmBui1d1111111111111111111111111111111'
+    node.addValidator(FARM, { reward: 10n ** 24n })
+    node.addPool(FARM, { codeHash: NEW_BUILD, fee: { numerator: 1, denominator: 100 } })
+    const pool = node.pools.get(FARM)!
+    pool.summary = { reward_fee_fraction: { numerator: 1, denominator: 100 }, next_reward_fee_fraction: { numerator: 100, denominator: 100 } }
+    const { p } = setup({ pools: 'any', codeHashes: [NEW_BUILD] }, { node })
+    const info = await p.getPool(FARM)
+    expect(info).toMatchObject({ codeHashKnown: true, eligible: false, refusals: ['fee-above-max'], nextFee: { numerator: 100, denominator: 100 } })
+    await refusal(p.quoteStake({ amount: NEAR, pool: FARM }), 'pool-not-allowed')
+    // without a summary the read code is a farm build that cannot show its schedule: fee-unknown, not the plain fee
+    pool.summary = { missing: true }
+    expect((await p.getPool(FARM)).refusals).toEqual(['fee-unknown'])
+    // an extra build on a *.poolv1.near pool keeps the plain fee (core-contracts pools schedule nothing)
+    node.accounts.get(ZAVODIL)!.codeHash = NEW_BUILD
+    expect(await p.getPool(ZAVODIL)).toMatchObject({ nextFee: null, refusals: [] })
   })
 
   describe('a lying RPC: each lie alone refuses', () => {
@@ -284,7 +303,7 @@ describe('stake', () => {
     expect(node.accounts.get(ME)!.amount).toBe(1000n * NEAR + 73n * 10n ** 22n) // nothing else touched
   })
 
-  it('amount + upfront gas + reserve must fit the available balance (balance − locked − storage)', async () => {
+  it('amount + upfront gas + reserve must fit the available balance (balance − the storage the locked balance does not cover)', async () => {
     const node = new FakeNear()
     const { p } = setup({}, { node })
     const upfront = upfrontOf([{ receiverId: ASTRO, actions: [fc('deposit_and_stake', {}, 50n * TGAS, 1n)] }])
@@ -295,10 +314,24 @@ describe('stake', () => {
     const e = await p.quoteStake({ amount: max + 1n }).catch((x: unknown) => x)
     expect(e).toBeInstanceOf(InsufficientFundsError)
     expect(e).toMatchObject({ required: max + 1n + upfront + EXIT_RESERVE, available })
-    node.accounts.get(ME)!.locked = 5n * NEAR
-    expect(await p.getMaxStakeable()).toBe(max - 5n * NEAR)
     node.accounts.delete(ME) // a fresh implicit account that was never funded
     expect(await p.getMaxStakeable()).toBe(0n)
+  })
+
+  it('a locked balance is not part of `amount` and pays for storage first: available = amount − max(0, storage − locked)', async () => {
+    const node = new FakeNear()
+    const { p } = setup({}, { node })
+    const upfront = upfrontOf([{ receiverId: ASTRO, actions: [fc('deposit_and_stake', {}, 50n * TGAS, 1n)] }])
+    // 50 NEAR liquid next to 40 NEAR locked (a direct stake): all 50 are spendable, the locked 40 cover the storage.
+    Object.assign(node.accounts.get(ME)!, { amount: 50n * NEAR, locked: 40n * NEAR })
+    expect(await p.getMaxStakeable()).toBe(50n * NEAR - EXIT_RESERVE - upfront)
+    expect((await p.quoteStake({ amount: 45n * NEAR })).amount).toBe(45n * NEAR)
+    // locked ≥ amount no longer reads as nothing available
+    Object.assign(node.accounts.get(ME)!, { amount: NEAR, locked: 5n * NEAR })
+    expect(await p.getMaxStakeable()).toBe(NEAR - EXIT_RESERVE - upfront)
+    // a locked balance smaller than the storage covers part of it
+    Object.assign(node.accounts.get(ME)!, { amount: 10n * NEAR, locked: STORAGE / 2n })
+    expect(await p.getMaxStakeable()).toBe(10n * NEAR - STORAGE / 2n - EXIT_RESERVE - upfront)
   })
 
   it('prepaid gas is bought upfront at min_gas_purchase_price: the fresh-account delivery from the audit fits', async () => {
@@ -425,7 +458,7 @@ describe('unstake', () => {
     const [q, epoch] = await Promise.all([p.quoteRequestWithdrawal({ amount: NEAR }), p.getEpoch()])
     expect(q.unlock).toEqual({ epoch: null, earliestEpoch: epoch.height + 4n, latestEpoch: epoch.height + 5n, at: null, earliestAt: epochStartsAt(epoch, epoch.height + 4n), latestAt: epochStartsAt(epoch, epoch.height + 5n), source: 'estimate' })
     // ~21–28 h from now at a 6.9 h epoch.
-    const hours = (q.unlock.earliestAt - node.final.timestamp / 1e6) / 3.6e6
+    const hours = (q.unlock!.earliestAt - node.final.timestamp / 1e6) / 3.6e6
     expect(hours).toBeGreaterThan(20.5)
     expect(hours).toBeLessThan(28)
   })
@@ -437,6 +470,89 @@ describe('unstake', () => {
     await refusal(p.quoteRequestWithdrawal({ amount: NEAR + 1n }), 'exceeds-staked')
     await refusal(p.quoteRequestWithdrawal({ amount: 0n }), 'invalid-amount')
     expect((await p.quoteRequestWithdrawal({ amount: NEAR })).amount).toBe(NEAR)
+  })
+
+  it('refuses an unstake that would leave less than 0.001 NEAR unstaked: the module never offers such a balance as a claim', async () => {
+    const { p, node, account } = setup()
+    const d = Object.assign(node.delegation(ASTRO), { staked: 5n * NEAR, unstaked: 0n, canWithdraw: true })
+    const e = await refusal(p.quoteRequestWithdrawal({ amount: 9n * 10n ** 20n }), 'below-minimum')
+    expect(e.details).toMatchObject({ minimum: 10n ** 21n, pool: ASTRO, amount: 9n * 10n ** 20n })
+    await refusal(p.requestWithdrawal({ amount: 9n * 10n ** 20n }), 'below-minimum')
+    expect(account.sent).toHaveLength(0)
+    // rounding dust already in the pool counts: together they reach the minimum
+    d.unstaked = 2n
+    expect((await p.quoteRequestWithdrawal({ amount: 10n ** 21n - 2n })).amount).toBe(10n ** 21n - 2n)
+    // next to an unlocked balance the withdraw_all takes that out first, so only the amount stays
+    Object.assign(d, { unstaked: 2n * NEAR, canWithdraw: true })
+    await refusal(p.quoteRequestWithdrawal({ amount: 9n * 10n ** 20n }), 'below-minimum')
+    // part of a dust stake too
+    Object.assign(d, { staked: 9n * 10n ** 20n, unstaked: 0n })
+    await refusal(p.quoteRequestWithdrawal({ amount: 4n * 10n ** 20n }), 'below-minimum')
+    d.staked = 10n ** 21n
+    expect((await p.quoteRequestWithdrawal({ amount: 'all' })).amount).toBe(10n ** 21n)
+  })
+
+  it('refuses a partial unstake that would leave less than 0.001 NEAR staked; the whole of such a stake still goes out', async () => {
+    const { p, node, account } = setup()
+    const d = Object.assign(node.delegation(ASTRO), { staked: 15n * 10n ** 20n, unstaked: 0n, canWithdraw: true })
+    const e = await refusal(p.requestWithdrawal({ amount: 10n ** 21n }), 'below-minimum')
+    expect(e.message).toMatch(/'all'/)
+    expect(e.details).toMatchObject({ minimum: 10n ** 21n, pool: ASTRO, amount: 10n ** 21n, staked: 15n * 10n ** 20n })
+    expect(account.sent).toHaveLength(0)
+    // of 0.0015 NEAR only the whole goes (a smaller part would leave too little unstaked)
+    await refusal(p.quoteRequestWithdrawal({ amount: 5n * 10n ** 20n }), 'below-minimum')
+    expect((await p.quoteRequestWithdrawal({ amount: 15n * 10n ** 20n })).warnings).toEqual([])
+    // exactly 0.001 NEAR left staked is fine
+    d.staked = 2n * 10n ** 21n
+    expect((await p.quoteRequestWithdrawal({ amount: 10n ** 21n })).amount).toBe(10n ** 21n)
+    // a stake below the minimum (made outside the module) next to an unlocked balance: 'all' takes both out
+    Object.assign(d, { staked: 5n * 10n ** 20n, unstaked: 10n ** 21n, canWithdraw: true })
+    const all = await p.requestWithdrawal({ amount: 'all' })
+    expect(all.transactions).toEqual([{ receiverId: ASTRO, actions: [fc('withdraw_all', {}, 50n * TGAS), fc('unstake_all', {}, 50n * TGAS)] }])
+    expect(all.warnings.map((w) => w.code)).toEqual(['withdraws-unlocked-first', 'leaves-dust'])
+    // after a claim, alone: 'all' and the exact amount both go out, a part of it does not
+    Object.assign(d, { staked: 5n * 10n ** 20n, unstaked: 0n })
+    const q = await p.quoteRequestWithdrawal({ amount: 'all' })
+    expect(q.transactions).toEqual([{ receiverId: ASTRO, actions: [fc('unstake_all', {}, 50n * TGAS)] }])
+    expect(q.warnings.map((w) => w.code)).toEqual(['leaves-dust'])
+    expect((await p.quoteRequestWithdrawal({ amount: 5n * 10n ** 20n })).warnings.map((w) => w.code)).toEqual(['leaves-dust'])
+    await refusal(p.quoteRequestWithdrawal({ amount: 10n ** 20n }), 'below-minimum')
+    // in a paused pool too: exits skip the pause check
+    node.pools.get(ASTRO)!.paused = true
+    expect((await p.quoteRequestWithdrawal({ amount: 'all' })).amount).toBe(5n * 10n ** 20n)
+  })
+
+  it('the reserve a stake leaves pays for the largest exit: [withdraw_all, unstake] after the most a stake can send', async () => {
+    const node = new FakeNear()
+    const { p } = setup({}, { node })
+    const max = await p.getMaxStakeable()
+    const stake = await p.quoteStake({ amount: max })
+    // after the stake: the reserve plus the unburnt part of the stake's prepaid gas (27.7 Tgas burnt on mainnet)
+    const burnt = 28n * TGAS * 100_000_000n
+    node.accounts.get(ME)!.amount = 10n * NEAR - max - burnt
+    expect(10n * NEAR - max - burnt - STORAGE).toBeGreaterThan(stake.reserve)
+    // part unstaked earlier, unlocked by now; the rest goes in one transaction
+    Object.assign(node.delegation(ASTRO), { staked: max - NEAR, unstaked: NEAR, canWithdraw: true })
+    const q = await p.quoteRequestWithdrawal({ amount: 'all' })
+    expect(q.transactions[0]!.actions.map((a) => ('functionCall' in a ? a.functionCall.methodName : '?'))).toEqual(['withdraw_all', 'unstake_all'])
+    expect(q.upfront).toBeLessThanOrEqual(stake.reserve)
+  })
+
+  it("'claim-first' when the account cannot pay [withdraw_all, unstake] at once but can pay the claim", async () => {
+    const node = new FakeNear()
+    const { p, account } = setup({}, { node })
+    Object.assign(node.delegation(ASTRO), { staked: 5n * NEAR, unstaked: NEAR, canWithdraw: true })
+    const claimUpfront = upfrontOf([{ receiverId: ASTRO, actions: [fc('withdraw_all', {}, 50n * TGAS)] }])
+    node.accounts.get(ME)!.amount = STORAGE + claimUpfront + 10n ** 21n
+    const e = await refusal(p.requestWithdrawal({ amount: NEAR }), 'claim-first')
+    expect(e.message).toMatch(/claimWithdrawals/)
+    expect(e.details).toMatchObject({ pool: ASTRO, id: poolRequestId(ASTRO), withdrawable: NEAR, available: claimUpfront + 10n ** 21n })
+    expect(account.sent).toHaveLength(0)
+    // the claim alone goes out
+    expect((await p.quoteClaimWithdrawals()).claims).toEqual([{ id: poolRequestId(ASTRO), pool: ASTRO, amount: NEAR }])
+    // below even the claim's gas it is a plain shortfall
+    node.accounts.get(ME)!.amount = STORAGE + claimUpfront - 1n
+    await expect(p.quoteRequestWithdrawal({ amount: NEAR })).rejects.toBeInstanceOf(InsufficientFundsError)
   })
 
   it('an unlocked balance is withdrawn first in the same transaction: [withdraw_all, unstake], 100 Tgas', async () => {
@@ -675,6 +791,60 @@ describe('positions, requests, balances', () => {
     expect((await any.quoteRequestWithdrawal({ amount: 'all', pool: ZAVODIL })).amount).toBe(NEAR)
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ pools: [{ pool_id: ZAVODIL }] }), url: '' })))
     expect((await p.getStakedBalance()).partial).toBe(false)
+  })
+
+  it('exits do not depend on the validator set or the epoch: unstake and claim go out while those reads fail', async () => {
+    const node = new FakeNear()
+    let down = true
+    const provider: typeof node.fetch = async (method, params) => {
+      const q = params as Record<string, unknown> | unknown[]
+      if (down && ((method === 'validators' && Array.isArray(q) && q[0] === null) || (method === 'block' && !Array.isArray(q) && q.finality === 'final'))) {
+        throw new Error(`${method}: 503 Service Unavailable`)
+      }
+      return node.fetch(method, params)
+    }
+    const { p, account } = setup({ provider, defaultPool: undefined }, { node })
+    Object.assign(node.delegation(ASTRO), { staked: 3n * NEAR })
+    Object.assign(node.delegation(ZAVODIL), { unstaked: 2n * NEAR, canWithdraw: true })
+    Object.assign(node.delegation(FIGMENT), { unstaked: NEAR, canWithdraw: false })
+    await expect(p.getEpoch()).rejects.toThrow(/503/)
+    // unstake: the only staked pool is found, the transaction is built, the unlock is left undated
+    const u = await p.requestWithdrawal({ amount: NEAR })
+    expect(u).toMatchObject({ pool: ASTRO, unlock: null })
+    expect(u.transactions).toEqual([{ receiverId: ASTRO, actions: [fc('unstake', { amount: String(NEAR) }, 50n * TGAS)] }])
+    // requests and claims: amounts from get_account, no pool info or unlock estimate
+    const w = await p.getWithdrawalRequests()
+    expect(w).toMatchObject({ claimableIds: [poolRequestId(ZAVODIL)], claimableAmount: 2n * NEAR, pendingAmount: NEAR })
+    expect(w.requests.find((r) => r.pool === FIGMENT)!.unlock).toBeNull()
+    const c = await p.claimWithdrawals({ ids: w.claimableIds })
+    expect(c.claims).toEqual([{ id: poolRequestId(ZAVODIL), pool: ZAVODIL, amount: 2n * NEAR }])
+    expect(account.sent.at(-1)).toEqual({ receiverId: ZAVODIL, actions: [fc('withdraw_all', {}, 50n * TGAS)] })
+    await refusal(p.quoteClaimWithdrawals({ ids: [poolRequestId(FIGMENT)] }), 'not-withdrawable')
+    const b = await p.getStakedBalance()
+    expect(b).toMatchObject({ balance: 3n * NEAR, unstaked: 3n * NEAR, withdrawable: 2n * NEAR })
+    expect(b.positions.map((x) => [x.pool, x.poolInfo, x.warnings])).toEqual([[ASTRO, null, []], [FIGMENT, null, []], [ZAVODIL, null, []]])
+    // the validator set back, the epoch still down: pool info returns, unlocks stay undated
+    down = false
+    const fresh = setup({ provider: async (method, params) => {
+      if (method === 'block' && (params as Record<string, unknown>).finality === 'final') throw new Error('block: timeout')
+      return node.fetch(method, params)
+    }, defaultPool: undefined }, { node }).p
+    const ps = await fresh.listPositions()
+    expect(ps.find((x) => x.pool === ASTRO)!.poolInfo).toMatchObject({ id: ASTRO, inCurrentSet: true, inNextSet: true })
+    expect(ps.find((x) => x.pool === FIGMENT)!.unlock).toBeNull()
+    expect((await fresh.quoteRequestWithdrawal({ amount: NEAR, pool: ASTRO })).unlock).toBeNull()
+  })
+
+  it('without the epoch, nothing-to-claim still says the NEAR is unbonding (no unlock estimate to show)', async () => {
+    const node = new FakeNear()
+    const { p } = setup({ provider: async (method, params) => {
+      if (method === 'block' && (params as Record<string, unknown>).finality === 'final') throw new Error('block: timeout')
+      return node.fetch(method, params)
+    } }, { node })
+    Object.assign(node.delegation(FIGMENT), { unstaked: 2n * NEAR, canWithdraw: false })
+    const e = await refusal(p.quoteClaimWithdrawals(), 'nothing-to-claim')
+    expect(e.message).toMatch(/still unbonding/)
+    expect(e.details).toMatchObject({ soonest: null, epoch: null })
   })
 
   it('getWithdrawalRequests and getStakedBalance', async () => {

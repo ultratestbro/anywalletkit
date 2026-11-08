@@ -54,7 +54,7 @@ export async function unstakeNear(wallet: Wallet, yocto: bigint | 'all') {
   // unstake / unstake_all; [withdraw_all, unstake] when NEAR already unlocked waits in the pool, so it is not locked again.
   const quote = await staking.quoteRequestWithdrawal({ amount: yocto })
   const { hash, unlock } = await staking.requestWithdrawal({ amount: yocto, expected: quote.transactions })
-  return { hash, unlock } // 4 epochs: unlock.earliestAt … unlock.latestAt, about 21–28 h
+  return { hash, unlock } // 4 epochs: unlock.earliestAt … unlock.latestAt, about 21–28 h (null when the epoch could not be read)
 }
 
 export async function claimNear(wallet: Wallet) {

@@ -4,7 +4,7 @@ import { InsufficientFundsError, ReadOnlyAccountError } from '@anywalletkit/core
 import { createMockAccount } from '@anywalletkit/conformance'
 import { WalletAccountReadOnlyNear, type NearTransaction } from '@anywalletkit/wallet-near'
 import {
-  DEFAULT_RESERVE, LiquidStakingError, assertLiquidPlan, LiquidStakingProtocolNear, MIN_STAKE, TGAS, epochStartsAt, poolRequestId, resolvePool, sameTransactions,
+  DEFAULT_RESERVE, LiquidStakingError, assertLiquidPlan, LiquidStakingProtocolNear, MIN_STAKE, STORAGE_DEPOSIT, TGAS, epochStartsAt, poolRequestId, resolvePool, sameTransactions,
   type LiquidStakingErrorCode, type LiquidStakingNearConfig,
 } from '../src/index.js'
 import { ALICE, EPOCH, FakeNear, LINEAR, NEAR, RNEAR, RNEAR_HASH } from './fake-near.js'
@@ -18,6 +18,9 @@ function setup(o: { config?: Partial<LiquidStakingNearConfig>; node?: FakeNear; 
   const sent = () => account.sent as NearTransaction[]
   return { p, node, account, sent }
 }
+
+/** rNEAR as on mainnet: a near-plugins contract (`pa_all_paused` answers null while nothing is paused). */
+const rnearNode = () => new FakeNear({ contract: RNEAR, codeHash: RNEAR_HASH, symbol: 'rNEAR', pauseKeys: null })
 
 const refusal = (code: LiquidStakingErrorCode) => (e: unknown) => e instanceof LiquidStakingError && e.code === code
 
@@ -196,11 +199,107 @@ describe('contract checks: pinned code, pause flag', () => {
     await expect(p.quoteStake({ amount: NEAR })).rejects.toThrow(/fetch failed/)
   })
 
+  it("rNEAR per-feature pause (pa_all_paused): each write is refused by the features its calls need, the others go through", async () => {
+    const position = () => {
+      const node = rnearNode()
+      node.stakeFor(ALICE, 10n * NEAR)
+      return setup({ node, config: { pool: 'rnear' } })
+    }
+    // Withdrawals paused: is_paused is still false, but withdraw_all would fail with 'Pausable: Method is paused'.
+    {
+      const { p, node, sent } = position()
+      node.pauseKeys = ['internal_withdraw']
+      node.unstakedFor(ALICE, NEAR, EPOCH - 1n)
+      const info = await p.getPoolInfo()
+      expect(info).toMatchObject({ paused: false, pausedFeatures: ['internal_withdraw'] })
+      const e = await p.quoteClaimWithdrawals().catch((x: unknown) => x)
+      expect(e).toSatisfy(refusal('contract-paused'))
+      expect((e as LiquidStakingError).message).toMatch(/withdrawals paused/)
+      expect((e as LiquidStakingError).details).toEqual({ pausedFeatures: ['internal_withdraw'] })
+      await expect(p.claimWithdrawals()).rejects.toSatisfy(refusal('contract-paused'))
+      const view = await p.getWithdrawalRequests()
+      expect(view).toMatchObject({ claimableAmount: 0n, claimableIds: [], pendingAmount: NEAR })
+      expect(view.requests[0]).toMatchObject({ claimable: false, paused: true, awaitingLiquidity: false })
+      expect((await p.getStakedBalance()).withdrawable).toBe(0n)
+      // The unstake would put withdraw_all first: refused as a relock, or a plain unstake that relocks with allowRelock.
+      const refused = await p.quoteRequestWithdrawal({ amount: NEAR }).catch((x: unknown) => x)
+      expect(refused).toSatisfy(refusal('relock-refused'))
+      // A claim is refused too: the hint is to wait for withdrawals, not to claim.
+      expect((refused as LiquidStakingError).message).toMatch(/wait until withdrawals resume, or pass allowRelock/)
+      expect((refused as LiquidStakingError).message).not.toMatch(/claim it first/)
+      const relock = await p.quoteRequestWithdrawal({ amount: NEAR, allowRelock: true })
+      expect(relock.transactions[0]!.actions.map((a) => (a as { functionCall: { methodName: string } }).functionCall.methodName)).toEqual(['unstake'])
+      expect(relock).toMatchObject({ withdrawsFirst: 0n, relocks: NEAR })
+      await expect(p.quoteStake({ amount: NEAR })).resolves.toMatchObject({ amount: NEAR })
+      expect(sent()).toEqual([])
+    }
+    // Unstaking paused: unstakes refused, a claim and a stake go through.
+    {
+      const { p, node } = position()
+      node.pauseKeys = ['internal_unstake']
+      await expect(p.quoteRequestWithdrawal({ amount: 'all' })).rejects.toSatisfy(refusal('contract-paused'))
+      await expect(p.requestWithdrawal({ amount: NEAR })).rejects.toSatisfy(refusal('contract-paused'))
+      await expect(p.quoteStake({ amount: NEAR })).resolves.toMatchObject({ amount: NEAR })
+      node.unstakedFor(ALICE, NEAR, EPOCH - 1n)
+      await expect(p.quoteClaimWithdrawals()).resolves.toMatchObject({ amount: NEAR })
+      expect((await p.getWithdrawalRequests()).requests[0]).toMatchObject({ claimable: true, paused: false })
+    }
+    // Withdrawals and unstaking paused, with an unlocked balance: 'contract-paused' straight away, not a relock that allowRelock cannot fix.
+    {
+      const { p, node, sent } = position()
+      node.pauseKeys = ['internal_withdraw', 'internal_unstake']
+      node.unstakedFor(ALICE, NEAR, EPOCH - 1n)
+      for (const o of [{ amount: NEAR }, { amount: NEAR, allowRelock: true }, { amount: 'all' as const }]) {
+        const e = await p.quoteRequestWithdrawal(o).catch((x: unknown) => x)
+        expect(e, JSON.stringify(o, (_, v) => (typeof v === 'bigint' ? String(v) : v))).toSatisfy(refusal('contract-paused'))
+        expect((e as LiquidStakingError).details).toEqual({ pausedFeatures: ['internal_unstake'] })
+      }
+      await expect(p.requestWithdrawal({ amount: NEAR })).rejects.toSatisfy(refusal('contract-paused'))
+      expect(sent()).toEqual([])
+    }
+    // Deposits or staking paused: a stake is refused; exits go through.
+    for (const key of ['internal_deposit', 'internal_stake']) {
+      const { p, node } = position()
+      node.pauseKeys = [key]
+      await expect(p.quoteStake({ amount: NEAR }), key).rejects.toSatisfy(refusal('contract-paused'))
+      await expect(p.quoteRequestWithdrawal({ amount: NEAR })).resolves.toMatchObject({ shares: NEAR })
+    }
+    // 'ALL', a panic or a non-list answer: the whole contract counts as paused.
+    for (const keys of [['ALL'], 'panics', 'garbage'] as const) {
+      const { p, node } = position()
+      node.pauseKeys = keys as never
+      node.unstakedFor(ALICE, NEAR, EPOCH - 1n)
+      expect((await p.getPoolInfo()).paused, String(keys)).toBe(true)
+      await expect(p.quoteStake({ amount: NEAR })).rejects.toSatisfy(refusal('contract-paused'))
+      await expect(p.quoteRequestWithdrawal({ amount: 'all' })).rejects.toSatisfy(refusal('contract-paused'))
+      await expect(p.quoteClaimWithdrawals()).rejects.toSatisfy(refusal('contract-paused'))
+      expect((await p.getWithdrawalRequests()).requests[0]).toMatchObject({ claimable: false, paused: true })
+    }
+  })
+
+  it('LiNEAR has one pause flag and is not asked for pa_all_paused; a custom contract without the method has no per-feature pause', async () => {
+    const linear = setup()
+    linear.node.pauseKeys = 'panics'
+    expect(await linear.p.getPoolInfo()).toMatchObject({ paused: false, pausedFeatures: [] })
+    expect(linear.node.calls.some((c) => (c.params as { method_name?: string }).method_name === 'pa_all_paused')).toBe(false)
+    const pool = { contract: 'lst.example.near', symbol: 'xNEAR', codeHashes: ['CustomHash111'] }
+    for (const pauseKeys of ['missing', 'missing-structured'] as const) {
+      const node = new FakeNear({ contract: pool.contract, codeHash: 'CustomHash111', symbol: 'xNEAR', pauseKeys })
+      const { p } = setup({ node, config: { pool } })
+      expect(await p.getPoolInfo(), pauseKeys).toMatchObject({ paused: false, pausedFeatures: [] })
+      await expect(p.quoteStake({ amount: NEAR })).resolves.toMatchObject({ amount: NEAR })
+    }
+    // A transport failure is thrown, never read as "not paused".
+    const node = rnearNode()
+    node.failing.add('pa_all_paused')
+    await expect(setup({ node, config: { pool: 'rnear' } }).p.getPoolInfo()).rejects.toThrow(/fetch failed/)
+  })
+
   it('pool info: price, totals, liquidity, fee from the beneficiaries', async () => {
     const { p, node } = setup()
     node.beneficiaries = { 'a.near': 600, 'b.near': 100 }
     const info = await p.getPoolInfo()
-    expect(info).toMatchObject({ contract: LINEAR, symbol: 'LINEAR', name: 'LiNEAR', decimals: 24, price: node.price, totalStaked: node.totalStaked, totalShares: node.totalShares, validators: 448, paused: false, codeHashKnown: true, liquidity: node.liquidity, feeBps: 700 })
+    expect(info).toMatchObject({ contract: LINEAR, symbol: 'LINEAR', name: 'LiNEAR', decimals: 24, price: node.price, totalStaked: node.totalStaked, totalShares: node.totalShares, validators: 448, paused: false, pausedFeatures: [], codeHashKnown: true, liquidity: node.liquidity, feeBps: 700 })
     expect(info.price).toBe(1_430_129_795_786_449_767_244_775n)
   })
 })
@@ -232,13 +331,64 @@ describe('stake', () => {
     expect(r.transactions).toEqual([{ receiverId: LINEAR, actions: [{ functionCall: { methodName: 'deposit_and_stake', args: {}, gas: 30n * TGAS, deposit: NEAR } }] }])
   })
 
-  it('registered or not, the transaction is the same (deposit creates the account entry)', async () => {
+  it('LiNEAR: registered or not, the same transaction and the same tokens (deposit_and_stake stakes the whole amount)', async () => {
     const a = setup(), b = setup()
     b.node.account(ALICE).registered = true
     const [qa, qb] = await Promise.all([a.p.quoteStake({ amount: NEAR }), b.p.quoteStake({ amount: NEAR })])
     expect(sameTransactions(qa.transactions, qb.transactions)).toBe(true)
+    expect(qa).toMatchObject({ storageFee: 0n, shares: qb.shares, warnings: [] })
+    expect(qa.shares).toBe((NEAR * a.node.totalShares) / a.node.totalStaked)
+    expect(a.node.calls.some((c) => JSON.stringify(c.params).includes('storage_balance'))).toBe(false)
     expect((await a.p.getAccountDetails()).registered).toBe(false)
     expect((await b.p.getAccountDetails()).registered).toBe(true)
+    await expect(a.p.quoteStake({ amount: MIN_STAKE })).resolves.toMatchObject({ storageFee: 0n })
+  })
+
+  it('rNEAR first stake: the contract keeps storage_balance_bounds.min, so the tokens are for the rest and below fee + 0.001 NEAR is refused', async () => {
+    const node = rnearNode()
+    const { p, sent } = setup({ node, config: { pool: 'rnear' } })
+    const amount = 10n ** 22n // 0.01 NEAR
+    const q = await p.quoteStake({ amount })
+    expect(q.transactions).toEqual([{ receiverId: RNEAR, actions: [{ functionCall: { methodName: 'deposit_and_stake', args: {}, gas: 30n * TGAS, deposit: amount } }] }])
+    expect(q.storageFee).toBe(STORAGE_DEPOSIT)
+    expect(q.shares).toBe(((amount - STORAGE_DEPOSIT) * node.totalShares) / node.totalStaked)
+    expect(q.warnings.map((w) => w.code)).toEqual(['pays-storage'])
+    expect(q.warnings[0]!.message).toMatch(/0\.00125 NEAR/)
+    // 0.001 underflows `amount − fee` on-chain, 0.00125 stakes nothing: both would fail and burn the gas.
+    for (const small of [MIN_STAKE, STORAGE_DEPOSIT, STORAGE_DEPOSIT + MIN_STAKE - 1n]) {
+      const e = await p.quoteStake({ amount: small }).catch((x: unknown) => x)
+      expect(e, String(small)).toSatisfy(refusal('below-minimum'))
+      expect((e as LiquidStakingError).details).toEqual({ minimum: STORAGE_DEPOSIT + MIN_STAKE, storageFee: STORAGE_DEPOSIT })
+    }
+    await expect(p.stake({ amount: MIN_STAKE })).rejects.toSatisfy(refusal('below-minimum'))
+    expect(sent()).toEqual([])
+    await expect(p.quoteStake({ amount: STORAGE_DEPOSIT + MIN_STAKE })).resolves.toMatchObject({ storageFee: STORAGE_DEPOSIT })
+    // The bound is read live.
+    node.storageMin = 2n * STORAGE_DEPOSIT
+    expect((await p.quoteStake({ amount })).storageFee).toBe(2n * STORAGE_DEPOSIT)
+    // Once registered (a previous stake, or a storage_deposit), the whole amount is staked.
+    node.account(ALICE).registered = true
+    const again = await p.quoteStake({ amount: MIN_STAKE })
+    expect(again).toMatchObject({ storageFee: 0n, warnings: [], shares: (MIN_STAKE * node.totalShares) / node.totalStaked })
+  })
+
+  it('a custom family contract is assumed to keep the storage fee from a first stake unless the app says it does not', async () => {
+    const custom = { contract: 'lst.example.near', symbol: 'xNEAR', codeHashes: ['CustomHash111'] }
+    const node = new FakeNear({ contract: 'lst.example.near', codeHash: 'CustomHash111', symbol: 'xNEAR' })
+    expect((await setup({ node, config: { pool: custom } }).p.quoteStake({ amount: NEAR })).storageFee).toBe(STORAGE_DEPOSIT)
+    expect((await setup({ node, config: { pool: { ...custom, firstStakePaysStorage: false } } }).p.quoteStake({ amount: NEAR })).storageFee).toBe(0n)
+    expect(() => setup({ node, config: { pool: { ...custom, firstStakePaysStorage: 'no' as never } } })).toThrow(/firstStakePaysStorage/)
+    expect(resolvePool('rnear', 'mainnet').firstStakePaysStorage).toBe(true)
+    // A preset's own contract re-pinned after an upgrade keeps the preset's behaviour: no fee LiNEAR never charges.
+    const repinned = { contract: LINEAR, symbol: 'LINEAR', codeHashes: ['NewLinearBuild111'] }
+    expect(resolvePool(repinned, 'mainnet').firstStakePaysStorage).toBe(false)
+    expect(resolvePool({ ...repinned, contract: 'linear-protocol.testnet' }, 'testnet').firstStakePaysStorage).toBe(false)
+    expect(resolvePool({ ...repinned, contract: RNEAR }, 'mainnet').firstStakePaysStorage).toBe(true)
+    expect(resolvePool({ ...repinned, firstStakePaysStorage: true }, 'mainnet').firstStakePaysStorage).toBe(true)
+    const linearNode = new FakeNear({ codeHash: 'NewLinearBuild111' })
+    const q = await setup({ node: linearNode, config: { pool: repinned } }).p.quoteStake({ amount: MIN_STAKE + MIN_STAKE / 2n })
+    expect(q).toMatchObject({ storageFee: 0n, warnings: [] })
+    expect(resolvePool('linear', 'mainnet').firstStakePaysStorage).toBe(false)
   })
 
   it('an account that already held 1000 NEAR stakes exactly the amount asked, never the balance', async () => {
@@ -251,7 +401,7 @@ describe('stake', () => {
     expect(r.amount).toBe(amount)
   })
 
-  it('funds: amount + upfront gas + reserve must fit the spendable balance (amount − locked − storage)', async () => {
+  it('funds: amount + upfront gas + reserve must fit the spendable balance (amount − max(0, storage − locked))', async () => {
     const { p, node } = setup()
     const quote = await p.quoteStake({ amount: NEAR })
     const storage = 182n * 10n ** 19n
@@ -267,9 +417,13 @@ describe('stake', () => {
     // The default 0.02 NEAR reserve could not buy the 30 Tgas an unstake needs at 10^9: the floor is that unstake.
     expect(DEFAULT_RESERVE).toBeLessThan(EXIT_RESERVE)
     expect(EXIT_RESERVE).toBeGreaterThanOrEqual(30n * TGAS * PURCHASE_PRICE)
-    // Locked (staked) NEAR is not spendable.
+    // A locked balance is not part of `amount` and pays for storage first: all 5 liquid NEAR are spendable.
     node.balances.set(ALICE, { amount: 5n * NEAR, locked: 5n * NEAR, storage: 182n })
-    await expect(p.quoteStake({ amount: 4n * NEAR })).rejects.toBeInstanceOf(InsufficientFundsError)
+    expect(await p.getMaxStakeable()).toBe(5n * NEAR - quote.upfront - EXIT_RESERVE)
+    expect((await p.quoteStake({ amount: 4n * NEAR })).amount).toBe(4n * NEAR)
+    // A locked balance smaller than the storage covers part of it.
+    node.balances.set(ALICE, { amount: 5n * NEAR, locked: storage / 2n, storage: 182n })
+    expect(await p.getMaxStakeable()).toBe(5n * NEAR - storage / 2n - quote.upfront - EXIT_RESERVE)
   })
 
   it('a missing account has nothing to stake', async () => {
@@ -573,7 +727,7 @@ describe('reads', () => {
     node.unstakedFor(ALICE, 2n * NEAR, EPOCH)
     const id = poolRequestId(LINEAR)
     expect(await p.getWithdrawalRequests()).toEqual({
-      requests: [{ id, amount: 2n * NEAR, timestamp: 0, claimable: true, contract: LINEAR, unlockEpoch: EPOCH, awaitingLiquidity: false, unlock: null }],
+      requests: [{ id, amount: 2n * NEAR, timestamp: 0, claimable: true, contract: LINEAR, unlockEpoch: EPOCH, awaitingLiquidity: false, paused: false, unlock: null }],
       pendingAmount: 0n, claimableAmount: 2n * NEAR, claimableIds: [id],
     })
 
@@ -587,6 +741,13 @@ describe('reads', () => {
     const waiting = await p.getWithdrawalRequests()
     expect(waiting.requests[0]).toMatchObject({ claimable: false, awaitingLiquidity: true })
     expect(waiting.claimableIds).toEqual([])
+
+    // A paused contract cannot pay: the unlocked request is not claimable while it is paused.
+    node.liquidity = 1_000_000n * NEAR
+    node.paused = true
+    const paused = await p.getWithdrawalRequests()
+    expect(paused.requests[0]).toMatchObject({ claimable: false, awaitingLiquidity: false, paused: true })
+    expect(paused).toMatchObject({ claimableAmount: 0n, claimableIds: [], pendingAmount: 2n * NEAR })
   })
 })
 

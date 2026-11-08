@@ -24,8 +24,9 @@ const rnear = new LiquidStakingProtocolNear(account, { pool: 'rnear', provider: 
 
 const quote = await rnear.quoteStake({ amount: 730_000_000_000_000_000_000_000n })   // 0.73 NEAR
 // quote.transactions: [{ receiverId: 'lst.rhealab.near', actions: [deposit_and_stake, 30 Tgas, 0.73 NEAR] }]
-// quote.shares (tokens minted at the current totals), quote.fee (upper bound), quote.upfront (gas the node
-// holds back on acceptance), quote.reserve, quote.apr, quote.maxStakeable
+// quote.shares (tokens minted at the current totals), quote.storageFee (0.00125 NEAR kept from a first rNEAR
+// stake, else 0), quote.fee (upper bound), quote.upfront (gas the node holds back on acceptance), quote.reserve,
+// quote.apr, quote.maxStakeable
 await rnear.stake({ amount: 730_000_000_000_000_000_000_000n, expected: quote.transactions })
 
 const exit = await rnear.quoteRequestWithdrawal({ amount: 'all' })    // or token base units
@@ -46,7 +47,7 @@ to NEAR for the contract, whose `unstake` takes NEAR.
 
 | Option | Default | |
 |---|---|---|
-| `pool` | — (required) | `'linear'`, `'rnear'`, or `{ contract, symbol, name?, codeHashes }` for another contract with the same interface. `codeHashes` is required: a contract upgrade is refused until the app pins the new build. |
+| `pool` | — (required) | `'linear'`, `'rnear'`, or `{ contract, symbol, name?, codeHashes, firstStakePaysStorage? }` for another contract with the same interface. `codeHashes` is required: a contract upgrade is refused until the app pins the new build. `firstStakePaysStorage`: the contract keeps its storage fee from an unregistered account's first stake, as rNEAR does; false for a contract that stakes the whole amount, as LiNEAR does. Default: the preset's value when `contract` is a preset's own account (LiNEAR or rNEAR re-pinned after an upgrade), else true. |
 | `network` | the account's | `near:testnet` gives testnet, anything else mainnet. rNEAR has no testnet contract (`'unsupported-network'`). |
 | `provider` | the wallet-near account's RPC | URL, transport, or a list (failover). An external-signer account has no RPC: pass it. |
 | `archivalProvider` | fastnear archival | For the past price behind the APR. |
@@ -63,10 +64,10 @@ to NEAR for the contract, whose `unstake` takes NEAR.
 | `quoteStake` / `stake({ amount, expected? })` | `deposit_and_stake` with exactly `amount`. No "stake everything": pass the amount (`getMaxStakeable()` is the most it can be). |
 | `quoteRequestWithdrawal` / `requestWithdrawal({ amount, allowRelock?, allowTimerReset?, expected? })` | `unstake(nearValue)`, or `unstake_all` for `'all'` / the whole balance. An unlocked balance is withdrawn first in the same transaction. |
 | `quoteClaimWithdrawals` / `claimWithdrawals({ ids?, expected? })` | `withdraw_all`. `ids` may only be `[poolRequestId(contract)]`. |
-| `getWithdrawalRequests()` | One request when the account has NEAR unstaked: `claimable`, `unlockEpoch`, `awaitingLiquidity`, `unlock` (epoch and date). |
+| `getWithdrawalRequests()` | One request when the account has NEAR unstaked: `claimable`, `unlockEpoch`, `awaitingLiquidity`, `paused` (withdrawals paused in the contract), `unlock` (epoch and date). |
 | `getStakedBalance()` | `balance` = tokens, `rate` = price, `total` = their NEAR value, `unstaked`, `withdrawable`. |
 | `getAccountDetails()` | Tokens, value, unstaked, exact `unlockEpoch`, `canWithdraw`, `registered`. |
-| `getPoolInfo()` | Price, totals, `paused`, live `codeHash` and `codeHashKnown`, `liquidity`, `kept` (what it cannot pay out), `feeBps`. |
+| `getPoolInfo()` | Price, totals, `paused`, `pausedFeatures` (rNEAR's per-feature pauses), live `codeHash` and `codeHashKnown`, `liquidity`, `kept` (what it cannot pay out), `feeBps`. |
 | `getApr()` | The `apr` hook, else the price change over `aprWindowEpochs`, annualized (percent). |
 | `getEpoch()` | Height, start, measured duration, estimated end. |
 | `getMaxStakeable()` | Spendable − reserve − the stake's upfront gas. |
@@ -117,18 +118,32 @@ has `ft_on_transfer`: tokens sent that way are lost), never `Transfer`, keys or 
   (`'unknown-contract-code'`) or a contract that is paused (`'contract-paused'`; a missing,
   panicking or non-boolean `is_paused` counts as paused; a transport failure is thrown, never read as
   "not paused"). Both apply to exits too: a paused contract rejects every call anyway.
+- rNEAR can also pause single features (`pa_all_paused`: `internal_deposit`, `internal_stake`,
+  `internal_unstake`, `internal_withdraw`) while `is_paused` stays false. `getPoolInfo().pausedFeatures`
+  lists them, and each write is refused with `'contract-paused'` when a call it would send needs one:
+  a stake needs deposits and staking, an unstake unstaking, a claim withdrawals. While withdrawals
+  are paused, an unlocked request is not `claimable` (`paused`), and an unstake that would withdraw it
+  first is refused with `'relock-refused'` unless `allowRelock: true` (then it is a plain unstake that
+  locks it again). 'ALL', a panic or a non-list answer counts as fully paused; a contract without the
+  method (LiNEAR) has no per-feature pause.
 - Every method that uses the account checks it is on the module's network (`'wrong-chain'`). Writes
   on a read-only account throw `ReadOnlyAccountError` before any read.
-- Funds: `amount + upfront + reserve` must fit the spendable balance (amount − locked − storage),
+- Funds: `amount + upfront + reserve` must fit the spendable balance (amount − max(0, storage − locked)),
   else core's `InsufficientFundsError`. Exits check their `upfront`. `upfront` is Σ gas ×
   max(gas price + 10 %, `min_gas_purchase_price` from `EXPERIMENTAL_protocol_config`, mainnet's 10^9
   when the node cannot say): the node holds it back when it accepts the transaction. `fee` is
   Σ gas × (gas price + 10 %), the margin wallet-near's estimate uses, so `maxFee: quote.fee` passes;
   the module checks `maxFee` itself too (`'max-fee-exceeded'`). Each send gets a copy of the
   quoted transactions.
-- No NEP-145 step: `deposit_and_stake` creates the account's entry in the contract (on mainnet, an
+- No NEP-145 step: `deposit_and_stake` registers the account in the contract itself (on mainnet, an
   implicit account a 1Click delivery had just created staked into LiNEAR this way, unregistered).
-  Registration only matters for receiving the token by transfer.
+  LiNEAR stakes the whole amount. rNEAR keeps `storage_balance_bounds.min` (0.00125 NEAR) of an
+  unregistered account's first deposit for that registration and stakes the rest: the module reads
+  `storage_balance_of` and the bound live, quotes `shares` for `amount − storageFee`, adds the
+  warning `'pays-storage'`, and refuses a first stake below fee + 0.001 NEAR (0.00225 NEAR today)
+  with `'below-minimum'`. At or below the fee the contract fails the stake (`amount − fee`
+  underflows or stakes nothing) and burns the gas; above it the contract stakes `amount − fee`,
+  and the module keeps its 0.001 NEAR minimum for that part, as for any stake.
 - `deposit_and_stake` leaves the rounding remainder (a yocto or two) unstaked. Balances at or below
   `UNSTAKED_DUST` (10^6 yocto) are treated as empty, so they never produce a request or a withdraw.
 
@@ -141,8 +156,10 @@ has `ft_on_transfer`: tokens sent that way are lost), never `Transfer`, keys or 
 | Rhea rNEAR | `lst.rhealab.near` (v1.0.2) | `EPLT4C61pkVYf5Km6dC4X9x5PMo6rfBwuEwo7vgKpmuv` | rNEAR, 24 decimals, fee 5 % (`ref-finance.sputnik-dao.near`) |
 
 Both run the same interface: `ft_price`, `get_summary`, `get_account_details`, `is_paused`,
-`get_beneficiaries`, `storage_balance_of`; `deposit_and_stake`, `unstake(NEAR)`, `unstake_all`,
-`withdraw_all`. Neither has `get_num_epoch_to_unstake`, `instant_unstake` or `ft_on_transfer`.
+`get_beneficiaries`, `storage_balance_of`, `storage_balance_bounds`; `deposit_and_stake`,
+`unstake(NEAR)`, `unstake_all`, `withdraw_all`. rNEAR adds `pa_all_paused` (per-feature pauses) and
+keeps the storage fee from a first stake. Neither has `get_num_epoch_to_unstake`, `instant_unstake`
+or `ft_on_transfer`.
 
 Meta Pool stNEAR is a different contract family and is not in this package.
 

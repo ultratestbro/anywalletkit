@@ -85,7 +85,9 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
     const amount = BigInt(v.amount)
     const locked = BigInt(v.locked)
     const storageUsage = BigInt(v.storage_usage)
-    const available = amount - locked - storageUsage * STORAGE_PRICE_PER_BYTE
+    // `amount` is the liquid balance (`locked` is not part of it), and the locked balance pays for storage first.
+    const storage = storageUsage * STORAGE_PRICE_PER_BYTE
+    const available = amount - (storage > locked ? storage - locked : 0n)
     return { amount, locked, storageUsage, available: available > 0n ? available : 0n }
   }
 
@@ -94,7 +96,7 @@ export class WalletAccountReadOnlyNear implements IWalletAccountReadOnly {
     return (await this.getAccountView())?.amount ?? 0n
   }
 
-  /** What can actually be spent: total − locked (staked) − storage reservation. */
+  /** What can actually be spent: the liquid balance − the storage the locked (staked) balance does not cover. */
   async getAvailableBalance(): Promise<bigint> {
     return (await this.getAccountView())?.available ?? 0n
   }

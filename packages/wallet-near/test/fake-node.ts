@@ -8,7 +8,7 @@ export const BLOCK = base58.encode(new Uint8Array(32).fill(9))
 export const NEAR = 10n ** 24n
 
 /** Minimal fake node: accounts, access keys, a NEP-141 contract, gas price, send_tx capture. */
-export function fakeNode(opts: { balance?: bigint; usdt?: bigint; registered?: string[]; accounts?: string[]; failOnChain?: string; storageMin?: unknown } = {}) {
+export function fakeNode(opts: { balance?: bigint; locked?: bigint; usdt?: bigint; registered?: string[]; accounts?: string[]; failOnChain?: string; storageMin?: unknown } = {}) {
   const sent: string[] = []
   const accounts = new Set(opts.accounts ?? [ACCOUNT0, 'alice.near', USDT])
   const registered = new Set(opts.registered ?? [ACCOUNT0])
@@ -20,7 +20,7 @@ export function fakeNode(opts: { balance?: bigint; usdt?: bigint; registered?: s
     if (method === 'query') {
       if (p.request_type === 'view_account') {
         if (!accounts.has(p.account_id as string)) throw new NearRpcError('query', rpcError('UNKNOWN_ACCOUNT'))
-        return { amount: String(opts.balance ?? 5n * NEAR), locked: '0', storage_usage: 182 }
+        return { amount: String(opts.balance ?? 5n * NEAR), locked: String(opts.locked ?? 0n), storage_usage: 182 }
       }
       if (p.request_type === 'view_access_key') return { nonce: 41, permission: 'FullAccess' }
       if (p.request_type === 'call_function') {

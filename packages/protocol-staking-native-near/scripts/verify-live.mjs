@@ -150,7 +150,7 @@ if (rich) {
   })
   await step('quoteRequestWithdrawal all (unstake_all, + withdraw_all first when unlocked)', async () => {
     const q = await p.quoteRequestWithdrawal({ amount: 'all' })
-    return `${fmt(q.amount)}, methods ${q.transactions[0].actions.map((a) => a.functionCall.methodName).join('+')}, withdrawsFirst ${q.withdrawsFirst} yocto (pool unstaked ${rich.unstaked_balance}), resetsTimer ${q.resetsTimer}, unlock epochs ${q.unlock.earliestEpoch}–${q.unlock.latestEpoch} (${new Date(q.unlock.earliestAt).toISOString()} – ${new Date(q.unlock.latestAt).toISOString()}), warnings ${q.warnings.map((w) => w.code).join(',') || 'none'}`
+    return `${fmt(q.amount)}, methods ${q.transactions[0].actions.map((a) => a.functionCall.methodName).join('+')}, withdrawsFirst ${q.withdrawsFirst} yocto (pool unstaked ${rich.unstaked_balance}), resetsTimer ${q.resetsTimer}, unlock ${q.unlock ? `epochs ${q.unlock.earliestEpoch}–${q.unlock.latestEpoch} (${new Date(q.unlock.earliestAt).toISOString()} – ${new Date(q.unlock.latestAt).toISOString()})` : 'undated (epoch unreadable)'}, warnings ${q.warnings.map((w) => w.code).join(',') || 'none'}`
   })
   await step('quoteRequestWithdrawal 1 NEAR (unstake with a decimal-string amount)', async () => {
     const q = await p.quoteRequestWithdrawal({ amount: NEAR })

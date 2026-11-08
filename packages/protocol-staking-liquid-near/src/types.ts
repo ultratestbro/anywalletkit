@@ -17,6 +17,14 @@ export interface LiquidPoolConfig {
   name?: string
   /** code_hash values accepted for writes. Required: a contract upgrade is refused until the app pins the new build. */
   codeHashes: readonly string[]
+  /**
+   * `deposit_and_stake` keeps storage_balance_bounds.min (0.00125 NEAR) of an unregistered account's
+   * first deposit, as rNEAR does (LiNEAR does not). Default: the built-in preset's value when
+   * `contract` is a preset's account (a re-pin after an upgrade), else true: quotes then never show
+   * more tokens than the contract mints, and a first stake that leaves less than MIN_STAKE after the
+   * fee is refused (at or below the fee the contract itself would fail it).
+   */
+  firstStakePaysStorage?: boolean
 }
 
 /** Configuration of {@link LiquidStakingProtocolNear}. Only `pool` is required. */
@@ -56,8 +64,15 @@ export interface LiquidPoolInfo {
   /** Token supply (`get_summary.total_share_amount`). */
   totalShares: bigint
   validators: number
-  /** `is_paused`; a missing method counts as paused. */
+  /** `is_paused`, or 'ALL' in `pa_all_paused`; a missing `is_paused` counts as paused. */
   paused: boolean
+  /**
+   * Features the contract has paused on their own (`pa_all_paused` of a near-plugins contract such as
+   * rNEAR: 'internal_deposit', 'internal_stake', 'internal_unstake', 'internal_withdraw'). A write
+   * that calls one is refused with 'contract-paused'. Empty when nothing is paused or the contract has
+   * no per-feature pause (LiNEAR).
+   */
+  pausedFeatures: string[]
   codeHash: string
   /** The live code hash is one the module (or the app's config) pins. */
   codeHashKnown: boolean
@@ -123,6 +138,7 @@ export type LiquidStakingWarningCode =
   | 'withdraws-unlocked-first'  // the unlocked balance is withdrawn in the same transaction
   | 'relocks-unlocked'          // the unlocked balance cannot be paid now (liquidity) and would lock again: refused unless allowRelock
   | 'unlock-may-be-later'       // the contract may add epochs (large amounts, after settlement): the exact epoch is known after the unstake
+  | 'pays-storage'              // a first stake into rNEAR: the contract keeps `storageFee` of the amount for the account's registration
 
 export interface LiquidStakingWarning {
   code: LiquidStakingWarningCode
@@ -148,7 +164,12 @@ export interface LiquidStakeQuote {
   /** NEAR the stake leaves on the account: the configured reserve, but at least one unstake's `upfront`. */
   reserve: bigint
   amount: bigint
-  /** Tokens expected for `amount` at the current price (rounded down). */
+  /**
+   * NEAR the contract keeps from `amount` for the account's NEP-145 registration: storage_balance_bounds.min
+   * (0.00125 NEAR) on a first stake into rNEAR, else 0. Warning 'pays-storage' when above 0.
+   */
+  storageFee: bigint
+  /** Tokens expected for `amount − storageFee` at the current price (rounded down). */
   shares: bigint
   price: bigint
   apr: number | null
@@ -206,6 +227,8 @@ export interface LiquidWithdrawalRequest extends WithdrawalRequest {
   unlockEpoch: bigint
   /** Unlocked, but the contract's liquidity is below amount + `kept`: waiting for the epoch_withdraw bot. */
   awaitingLiquidity: boolean
+  /** The contract has withdrawals paused (`is_paused`, or 'internal_withdraw' in `pa_all_paused`): not claimable until it resumes. */
+  paused: boolean
   unlock: UnlockEstimate | null
 }
 export type LiquidWithdrawalRequestsView = Omit<WithdrawalRequestsView, 'requests'> & { requests: LiquidWithdrawalRequest[] }

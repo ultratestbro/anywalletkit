@@ -81,11 +81,11 @@ const feeValid = (v: unknown): v is Fee => {
  * staking-pool factory suffix, run known staking-pool code, answer `is_staking_paused` with false,
  * charge at most `maxFee` (now and as scheduled for the next epoch), and sit in the current and
  * next validator sets (unless `allowInactive`). Balance checks count the prepaid gas the node buys
- * upfront (fees.ts), and the stake leaves at least one exit's worth of it on the account. An unstake
+ * upfront (fees.ts), and the stake leaves the largest exit's worth of it on the account. An unstake
  * withdraws an unlocked balance first in the same transaction so it is never locked again, and
  * refuses to restart the wait of a balance still unbonding unless `allowTimerReset`. Exits (unstake,
  * claim) need only the factory suffix and known (or factory-allowed) code, so a user can always
- * leave a pool that was paused or raised its fee.
+ * leave a pool that was paused or raised its fee; the validator set and the epoch only decorate them.
  */
 export class NativeStakingProtocolNear extends StakingProtocol<NativeStakingNearConfig> {
   readonly pools: NormalizedPools
@@ -213,7 +213,10 @@ export class NativeStakingProtocolNear extends StakingProtocol<NativeStakingNear
   private async available(me: string): Promise<bigint> {
     const view = await this.requireRpc().viewAccount(me)
     if (!view) return 0n
-    const free = u128(view.amount, 'view_account amount') - u128(view.locked, 'view_account locked') - BigInt(view.storage_usage) * STORAGE_PRICE_PER_BYTE
+    // `amount` is the liquid balance (`locked` is not part of it), and the locked balance pays for storage first.
+    const storage = BigInt(view.storage_usage) * STORAGE_PRICE_PER_BYTE
+    const locked = u128(view.locked, 'view_account locked')
+    const free = u128(view.amount, 'view_account amount') - (storage > locked ? storage - locked : 0n)
     return free > 0n ? free : 0n
   }
 
@@ -223,10 +226,13 @@ export class NativeStakingProtocolNear extends StakingProtocol<NativeStakingNear
     return { ...costOf(txs, prices), prices }
   }
 
-  /** What `stake` leaves on the account: `reserve`, but never less than the upfront gas of the exit it will need. */
+  /**
+   * What `stake` leaves on the account: `reserve`, but never less than the upfront gas of the largest
+   * exit, an unstake that withdraws an unlocked balance first (`[withdraw_all, unstake]` in one transaction).
+   */
   private reserveAt(prices: GasPrices): bigint {
-    const gas = this.gas.unstake > this.gas.withdraw ? this.gas.unstake : this.gas.withdraw
-    const exit = costOf([{ receiverId: this.defaultPool ?? '', actions: [fc('unstake', { amount: MAX_U128_DIGITS }, gas, 0n)] }], prices).upfront
+    const actions = [fc('withdraw_all', {}, this.gas.withdraw, 0n), fc('unstake', { amount: MAX_U128_DIGITS }, this.gas.unstake, 0n)]
+    const exit = costOf([{ receiverId: this.defaultPool ?? '', actions }], prices).upfront
     return exit > this.reserve ? exit : this.reserve
   }
 
@@ -253,13 +259,14 @@ export class NativeStakingProtocolNear extends StakingProtocol<NativeStakingNear
   }
 
   /**
-   * The pool's fee, or null when missing or malformed. staking-farm builds (by code hash, or by the
-   * pool.near suffix when the code was not read) answer `get_pool_summary` with the fee scheduled
-   * for the next epoch beside the current one; a farm build that does not is 'fee-unknown'.
+   * The pool's fee, or null when missing or malformed. staking-farm builds (a pinned farm code hash,
+   * or any `*.pool.near` pool, whatever code the app accepted for it) answer `get_pool_summary` with
+   * the fee scheduled for the next epoch beside the current one; when the code was read, a farm
+   * build that does not is 'fee-unknown'.
    */
   private async readFee(pool: string, codeHash?: string | null): Promise<Fees | null> {
     const rpc = this.requireRpc()
-    const farm = codeHash ? STAKING_FARM_CODE_HASHES[this.network].includes(codeHash) : factoryOf(pool, this.network) === 'pool'
+    const farm = (!!codeHash && STAKING_FARM_CODE_HASHES[this.network].includes(codeHash)) || factoryOf(pool, this.network) === 'pool'
     if (farm) {
       try {
         const v = await rpc.callFunction<Record<string, unknown> | null>(pool, 'get_pool_summary')
@@ -559,15 +566,17 @@ export class NativeStakingProtocolNear extends StakingProtocol<NativeStakingNear
     const dated = new Map<string, number>()
     if (held.length === 0) return { positions: [], dated, epoch: null, partial, discoveryError }
 
+    // The validator set and the epoch only decorate positions (set warnings, APR, unlock estimates):
+    // a failing read leaves them out, so requests and claims never depend on it.
     const [set, epoch, extras, reads] = await Promise.all([
-      this.validators(),
-      this.getEpoch(),
+      this.validators().catch(() => null),
+      this.getEpoch().catch(() => null),
       this.enrich(held.map((h) => h.id)),
       mapLimit(held, this.concurrency, async ({ id }) => Promise.all([this.readFee(id), this.readPaused(id)])),
     ])
 
     let history: ChainTx[] | null = null
-    if (this._config.history && held.some(({ a }) => a.unstaked >= UNSTAKED_DUST && !a.canWithdraw)) {
+    if (epoch && this._config.history && held.some(({ a }) => a.unstaked >= UNSTAKED_DUST && !a.canWithdraw)) {
       try {
         history = (await this._config.history.listActivity(me, { limit: 100 })).items
       } catch {
@@ -583,11 +592,12 @@ export class NativeStakingProtocolNear extends StakingProtocol<NativeStakingNear
       else if (paused) refusals.push('paused')
       if (fees === null) refusals.push('fee-unknown')
       else if (this.feeAboveMax(fees)) refusals.push('fee-above-max')
-      refusals.push(...this.setRefusals(id, set))
-      const poolInfo = this.poolInfo(id, set, epoch.epochMs, extras[id], { details: false, fees, paused, refusals })
+      // Light pool info comes from the validator set: without it there is none.
+      const poolExtra = extras[id]
+      const poolInfo = set ? this.poolInfo(id, set, epoch?.epochMs ?? this.lastEpochMs, poolExtra, { details: false, fees, paused, refusals: [...refusals, ...this.setRefusals(id, set)] }) : null
 
       let unlock: UnlockEstimate | null = null
-      if (a.unstaked >= UNSTAKED_DUST && !a.canWithdraw) {
+      if (epoch && a.unstaked >= UNSTAKED_DUST && !a.canWithdraw) {
         unlock = this.estimate(epoch, epoch.height + 1n, epoch.height + NUM_EPOCHS_TO_UNLOCK)
         const last = history?.find((tx) => tx.status === 'confirmed' && tx.from === me && tx.call?.to === id &&
           (tx.call.programs ?? (tx.call.method ? [tx.call.method] : [])).some((m) => m === 'unstake' || m === 'unstake_all'))
@@ -613,12 +623,12 @@ export class NativeStakingProtocolNear extends StakingProtocol<NativeStakingNear
       const warnings: PositionWarning[] = []
       if (fees !== null && this.feeAboveMax(fees)) warnings.push('pool-fee-above-max')
       if (paused === true) warnings.push('pool-paused')
-      if (poolInfo.inCurrentSet && !poolInfo.inNextSet) warnings.push('pool-leaving-set')
-      if (!poolInfo.inCurrentSet && !poolInfo.inNextSet) warnings.push('pool-not-in-set')
+      if (poolInfo?.inCurrentSet && !poolInfo.inNextSet) warnings.push('pool-leaving-set')
+      if (poolInfo && !poolInfo.inCurrentSet && !poolInfo.inNextSet) warnings.push('pool-not-in-set')
 
       positions.push({
         pool: id,
-        name: poolInfo.name,
+        name: poolInfo ? poolInfo.name : (this.configuredName(id) ?? (typeof poolExtra?.name === 'string' ? poolExtra.name : null)),
         staked: a.staked,
         unstaked: a.unstaked,
         canWithdraw: a.canWithdraw,
@@ -754,10 +764,15 @@ export class NativeStakingProtocolNear extends StakingProtocol<NativeStakingNear
     const me = await this.me()
     const pool = o?.pool ?? this.defaultPool ?? (await this.onlyStakedPool())
     await this.exitCheck(pool)
-    const [acc, epoch, available] = await Promise.all([this.readAccount(pool, me), this.getEpoch(), this.available(me)])
+    // The epoch only dates the unlock: an unstake goes out without it (`unlock: null`).
+    const [acc, epoch, available] = await Promise.all([this.readAccount(pool, me), this.getEpoch().catch(() => null), this.available(me)])
     if (acc.staked === 0n) throw new NearStakingError('nothing-staked', `Nothing is staked in ${pool}.`, { details: { pool } })
     if (requested !== null && requested > acc.staked) {
       throw new NearStakingError('exceeds-staked', `Only ${near(acc.staked)} is staked in ${pool}; asked to unstake ${near(requested)}.`, { details: { pool, staked: acc.staked } })
+    }
+    // A remainder below MIN_STAKE is a stake no partial unstake can take out later: refuse to create one.
+    if (requested !== null && requested < acc.staked && acc.staked - requested < MIN_STAKE) {
+      throw new NearStakingError('below-minimum', `Unstaking ${near(requested)} would leave ${near(acc.staked - requested)} staked in ${pool}, below the ${near(MIN_STAKE)} minimum: unstake 'all', or leave at least ${near(MIN_STAKE)} staked.`, { details: { minimum: MIN_STAKE, pool, amount: requested, staked: acc.staked } })
     }
     const amount = requested ?? acc.staked
     const unstake = all ? fc('unstake_all', {}, this.gas.unstake, 0n) : fc('unstake', { amount: amount.toString() }, this.gas.unstake, 0n)
@@ -782,11 +797,27 @@ export class NativeStakingProtocolNear extends StakingProtocol<NativeStakingNear
       resetsTimer = true
       warnings.push({ code: 'resets-unbonding-timer', message: `${near(acc.unstaked)} already unstaking in ${pool} restarts its 4-epoch wait (about 21–28 h) together with this amount: a pool keeps one unlock time per account.` })
     }
+    // What the pool holds unstaked afterwards: below UNSTAKED_DUST it would never be offered as a request or a claim.
+    const left = (withdrawsFirst > 0n ? 0n : acc.unstaked) + amount
+    if (left < UNSTAKED_DUST) {
+      // The whole stake still goes out: it is the only exit of a stake below the minimum (made outside the module).
+      if (amount < acc.staked) {
+        throw new NearStakingError('below-minimum', `An unstake must leave at least ${near(UNSTAKED_DUST)} unstaked in ${pool} to withdraw; this one leaves ${near(left)}.`, { details: { minimum: UNSTAKED_DUST, pool, amount } })
+      }
+      warnings.push({ code: 'leaves-dust', message: `The ${near(left)} this leaves unstaked in ${pool} is below ${near(UNSTAKED_DUST)}, so the module never offers it as a request or a claim.` })
+    }
     const transactions: NearTransaction[] = [{ receiverId: pool, actions }]
-    const { fee, upfront } = await this.costs(transactions)
-    if (upfront > available) throw new InsufficientFundsError(upfront, available, 'NEAR')
+    const { fee, upfront, prices } = await this.costs(transactions)
+    if (upfront > available) {
+      // withdraw_all alone may still fit: claiming first brings the unlocked balance back, and the unstake after it is one call.
+      const claim = costOf([{ receiverId: pool, actions: [fc('withdraw_all', {}, this.gas.withdraw, 0n)] }], prices).upfront
+      if (withdrawsFirst > 0n && claim <= available) {
+        throw new NearStakingError('claim-first', `${near(acc.unstaked)} already unlocked in ${pool} must be withdrawn before this unstake, and the account cannot pay both calls in one transaction (${near(upfront)} of gas upfront, ${near(available)} available): claim it first with claimWithdrawals, then unstake.`, { details: { pool, id: poolRequestId(pool), withdrawable: acc.unstaked, required: upfront, available } })
+      }
+      throw new InsufficientFundsError(upfront, available, 'NEAR')
+    }
     // Unlocks at current + 4; + 5 if the transaction lands after this epoch ends.
-    const unlock = this.estimate(epoch, epoch.height + NUM_EPOCHS_TO_UNLOCK, epoch.height + NUM_EPOCHS_TO_UNLOCK + 1n)
+    const unlock = epoch ? this.estimate(epoch, epoch.height + NUM_EPOCHS_TO_UNLOCK, epoch.height + NUM_EPOCHS_TO_UNLOCK + 1n) : null
     return { fee, upfront, amount, pool, id: poolRequestId(pool), withdrawsFirst, resetsTimer, unlock, transactions, warnings }
   }
 
@@ -826,7 +857,9 @@ export class NativeStakingProtocolNear extends StakingProtocol<NativeStakingNear
       if (chosen.length === 0) {
         const locked = candidates.map((p) => p.unlock).filter((u): u is UnlockEstimate => u !== null)
         const soonest = locked.sort((a, b) => (a.at ?? a.earliestAt) - (b.at ?? b.earliestAt))[0] ?? null
-        throw new NearStakingError('nothing-to-claim', soonest ? 'Nothing is withdrawable yet: the unstaked NEAR is still unbonding.' : 'There is no unstaked NEAR to withdraw.', { details: { soonest, epoch } })
+        // From the balances, not from `soonest`: without the epoch a locked balance has no unlock estimate.
+        const unbonding = candidates.some((p) => !p.canWithdraw)
+        throw new NearStakingError('nothing-to-claim', unbonding ? 'Nothing is withdrawable yet: the unstaked NEAR is still unbonding.' : 'There is no unstaked NEAR to withdraw.', { details: { soonest, epoch } })
       }
     }
     chosen.sort((a, b) => {

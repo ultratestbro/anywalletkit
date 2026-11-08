@@ -28,6 +28,14 @@ export class FakeNear {
   symbol = 'LINEAR'
   /** `is_paused` answer: a boolean, or the method missing / panicking / answering garbage. */
   paused: boolean | 'missing' | 'panics' | 'garbage' = false
+  /**
+   * `pa_all_paused` answer (near-plugins per-feature pauses, rNEAR): the paused keys, null for none, or
+   * the method missing as LiNEAR answers it ('missing': in the call result; 'missing-structured': as a
+   * JSON-RPC error), panicking or answering garbage.
+   */
+  pauseKeys: string[] | null | 'missing' | 'missing-structured' | 'panics' | 'garbage' = 'missing'
+  /** `storage_balance_bounds.min` (0.00125 NEAR on both mainnet contracts). */
+  storageMin = 1_250_000_000_000_000_000_000n
   totalStaked = 12_766_424_855_885_013_372_832_084_904_913n
   totalShares = 8_926_759_580_492_877_835_961_310_684_912n
   /** The contract's liquid balance (view_account.amount). */
@@ -54,7 +62,7 @@ export class FakeNear {
   /** Throw a transport error for these call_function methods (anything but a node answer). */
   failing = new Set<string>()
 
-  constructor(init: Partial<Pick<FakeNear, 'contract' | 'codeHash' | 'symbol'>> = {}) {
+  constructor(init: Partial<Pick<FakeNear, 'contract' | 'codeHash' | 'symbol' | 'pauseKeys'>> = {}) {
     Object.assign(this, init)
     this.balances.set(ALICE, { amount: 100n * NEAR, locked: 0n, storage: 182n })
   }
@@ -114,7 +122,11 @@ export class FakeNear {
       case 'get_summary': return { total_share_amount: String(this.totalShares), total_staked_near_amount: String(this.totalStaked), ft_price: String(this.price), validators_num: 448 }
       case 'get_beneficiaries': return this.beneficiaries
       case 'ft_balance_of': return String(a?.shares ?? 0n)
-      case 'storage_balance_of': return a?.registered ? { total: '1250000000000000000000', available: '0' } : null
+      case 'storage_balance_of': return a?.registered ? { total: String(this.storageMin), available: '0' } : null
+      case 'storage_balance_bounds': return { min: String(this.storageMin), max: String(this.storageMin) }
+      case 'pa_all_paused':
+        if (this.pauseKeys === 'garbage') return { internal_withdraw: true }
+        return this.pauseKeys
       case 'get_account_details': return {
         account_id: id, unstaked_balance: String(a?.unstaked ?? 0n), staked_balance: String(((a?.shares ?? 0n) * this.totalStaked) / this.totalShares),
         unstaked_available_epoch_height: Number((a?.unlockEpoch ?? 0n).toString()), can_withdraw: (a?.unlockEpoch ?? 0n) <= this.epochHeight,
@@ -153,6 +165,11 @@ export class FakeNear {
       const args = JSON.parse(Buffer.from(p.args_base64 as string, 'base64').toString() || '{}') as Record<string, unknown>
       if (name === 'is_paused' && this.paused === 'missing') return { result: [], logs: [], error: 'wasm execution failed with error: MethodResolveError(MethodNotFound)' }
       if (name === 'is_paused' && this.paused === 'panics') return { result: [], logs: [], error: 'wasm execution failed with error: HostError(GuestPanic { panic_msg: "x" })' }
+      if (name === 'pa_all_paused' && this.pauseKeys === 'missing') return { result: [], logs: [], error: 'wasm execution failed with error: MethodResolveError(MethodNotFound)' }
+      if (name === 'pa_all_paused' && this.pauseKeys === 'missing-structured') {
+        throw new NearRpcError('query', { name: 'HANDLER_ERROR', message: 'Server error', cause: { name: 'CONTRACT_EXECUTION_ERROR', info: { vm_error: 'MethodResolveError(MethodNotFound)' } } })
+      }
+      if (name === 'pa_all_paused' && this.pauseKeys === 'panics') return { result: [], logs: [], error: 'wasm execution failed with error: HostError(GuestPanic { panic_msg: "x" })' }
       const v = this.view(name, args, height)
       if (v === undefined) return { result: [], logs: [], error: 'wasm execution failed with error: MethodResolveError(MethodNotFound)' }
       return { result: Array.from(Buffer.from(JSON.stringify(v))), logs: [], block_height: Number(height.toString()), block_hash: 'H' }

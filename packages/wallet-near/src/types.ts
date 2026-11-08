@@ -163,7 +163,7 @@ export interface NearAccountView {
   amount: bigint
   locked: bigint
   storageUsage: bigint
-  /** `amount - locked - storageUsage * STORAGE_PRICE_PER_BYTE` (never below 0). */
+  /** `amount - max(0, storageUsage * STORAGE_PRICE_PER_BYTE - locked)` (never below 0): `amount` excludes `locked`, which pays for storage first. */
   available: bigint
 }
 

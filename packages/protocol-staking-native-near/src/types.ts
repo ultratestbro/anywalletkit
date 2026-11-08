@@ -62,7 +62,8 @@ export interface NativeStakingNearConfig {
   timeoutMs?: number
   /**
    * yoctoNEAR `stake` leaves on the account (default 0.02 NEAR). Never less than the upfront gas of
-   * one unstake at the current prices (see `NearStakeQuote.reserve`), so a stake can always be left.
+   * the largest exit, `[withdraw_all, unstake]`, at the current prices (see `NearStakeQuote.reserve`),
+   * so a stake can always be left.
    */
   reserve?: bigint | number
   /** Prepaid gas overrides (defaults: 50 Tgas each). All of it is bought upfront at min_gas_purchase_price: keep it small. */
@@ -205,7 +206,7 @@ export interface NearPoolPosition {
   withdrawable: bigint
   /** For a locked unstaked balance; null when there is none or it is withdrawable. */
   unlock: UnlockEstimate | null
-  /** Light pool info (from the validator set) plus the fee read for the position check. */
+  /** Light pool info (from the validator set) plus the fee read for the position check; null when the validator set could not be read. */
   poolInfo: NearPoolInfo | null
   warnings: PositionWarning[]
 }
@@ -225,6 +226,7 @@ export interface NearStakedBalance extends StakedBalance {
 export type NearStakingWarningCode =
   | 'resets-unbonding-timer'    // a locked unstaked balance in the pool restarts its 4-epoch timer
   | 'withdraws-unlocked-first'  // the unlocked balance is withdrawn in the same transaction ([withdraw_all, unstake])
+  | 'leaves-dust'               // unstaking a whole stake below the minimum leaves less than UNSTAKED_DUST unstaked: never offered as a claim
   | 'apr-network-fallback'      // the pool has no reward data yet: APR is the network average
   | 'pool-fee-above-max'        // (positions) the pool raised its fee after the stake
 
@@ -255,7 +257,7 @@ export interface NearStakeQuote {
    * bought at min_gas_purchase_price. The unburnt part comes back a few blocks later.
    */
   upfront: bigint
-  /** NEAR the stake leaves on the account: the configured reserve, but at least one unstake's `upfront`. */
+  /** NEAR the stake leaves on the account: the configured reserve, but at least the `upfront` of the largest exit ([withdraw_all, unstake]). */
   reserve: bigint
   amount: bigint
   /** The pool, read live (`details: true`). */
@@ -298,8 +300,8 @@ export interface NearUnstakeQuote {
   withdrawsFirst: bigint
   /** A locked unstaked balance exists and its timer restarts. */
   resetsTimer: boolean
-  /** Unlock of the whole unstaked balance after this unstake (epoch = current + 4). */
-  unlock: UnlockEstimate
+  /** Unlock of the whole unstaked balance after this unstake (epoch = current + 4); null when the epoch could not be read. */
+  unlock: UnlockEstimate | null
   transactions: NearTransaction[]
   warnings: NearStakingWarning[]
 }

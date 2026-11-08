@@ -63,6 +63,7 @@ function view(contract: string, method: string, args: Record<string, unknown>): 
       case 'ft_metadata': return { spec: 'ft-1.0.0', name: lst.symbol, symbol: lst.symbol, decimals: 24 }
       case 'get_summary': return { total_share_amount: String(totalShares), total_staked_near_amount: String(lst.totalStaked), ft_price: String(lst.price), validators_num: 120 }
       case 'is_paused': return false
+      case 'pa_all_paused': return null // rNEAR's per-feature pauses: none (LiNEAR is not asked)
       case 'get_beneficiaries': return lst.beneficiaries
       case 'ft_price': return String(lst.price)
       case 'ft_balance_of': return String(shares)
