@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-staking-liquid-near",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Liquid NEAR staking for any NEAR account through the LiNEAR contract family: LiNEAR (linear-protocol.near) and Rhea rNEAR (lst.rhealab.near), pinned by account id and code hash. Stake NEAR for the token, delayed unstake with the exact unlock epoch, withdraw with a contract-liquidity check, price, APR from the price over time. Quotes return the exact NEAR transactions, so an external signer (wallet-selector) signs what was shown.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
