@@ -11,7 +11,7 @@ Earn modules come in two shapes, and every module of a shape has the same method
 
 | Interface | Modules | Flow |
 |---|---|---|
-| `StakingProtocol` | Lido (ETH), SSV Network, Tonstakers (TON), SPL stake pools (Jito on Solana), native SOL staking, native MON staking (Monad) | Stake → request a withdrawal → wait for the queue → claim |
+| `StakingProtocol` | Lido (ETH), SSV Network, Tonstakers (TON), SPL stake pools (Jito on Solana), native SOL staking, native MON staking (Monad), native NEAR staking, liquid NEAR staking (LiNEAR, rNEAR) | Stake → request a withdrawal → wait for the queue → claim |
 | `LendingProtocol` | Aave v3, Morpho, Mellow, Kamino, Curve (Savings crvUSD) | Supply / withdraw, and on markets that allow it, borrow / repay |
 
 This page uses Lido and Aave on Ethereum. The other modules work the same way, with
@@ -174,6 +174,139 @@ or pass the validator in `validators`, so the withdrawal is found again.
 :::note[Policies]
 Staking writes go to the precompile `0x0000000000000000000000000000000000001000`; a Monad
 `allowlist` must include it.
+:::
+
+## Native NEAR staking
+
+`@anywalletkit/protocol-staking-native-near` stakes NEAR into NEAR's staking pools with
+`deposit_and_stake`: no extra contract, no token, the position is the account's balance in each
+pool. Your app decides which pools it offers; the module has no default list and refuses to start
+without one.
+
+```sh
+npm install @anywalletkit/protocol-staking-native-near @anywalletkit/wallet-near
+```
+
+### Choose the pools
+
+<Snippet file="earn/src/native-near.ts" region="near-setup" />
+
+`pools: 'any'` lets users pick from the validator set (`listPools()`). Either way a pool must be a
+factory pool (`*.poolv1.near` or `*.pool.near`). That check is local, so no RPC answer can pass a
+foreign contract off as a pool, and other ids get no RPC call at all. Before every stake the module
+reads the pool live and refuses it unless it runs one of the pinned staking-pool builds
+(`KNOWN_POOL_CODE_HASHES`, plus your `codeHashes`), answers `is_staking_paused` with `false`,
+charges at most `maxFee` (10 % unless you set it; for a `*.pool.near` pool, also the fee it already
+scheduled for the next epoch) and sits in the current and next validator sets. `enrich` can attach
+an explorer's APR, a name or a logo; the checks do not depend on it.
+
+### Stake
+
+<Snippet file="earn/src/native-near.ts" region="near-stake" />
+
+Show the quote's transactions and fee, then pass the transactions the user confirmed as
+`expected`: the write plans again with fresh reads and refuses with `quote-changed` (the new plan
+in `details.transactions`) when anything differs. NEAR buys a transaction's whole prepaid gas when
+it accepts it, at `min_gas_purchase_price` (ten times the gas price on mainnet), and refunds the
+unburnt part a few blocks later. So `upfront` is what the account must hold besides the deposit,
+and `fee` is the most it finally pays. A stake leaves `reserve` on the account (0.02 NEAR, never
+less than one unstake's upfront gas), so the stake can always be left; `getMaxStakeable()` is the
+most a stake can send, and the minimum is 0.001 NEAR.
+
+### Position
+
+<Snippet file="earn/src/native-near.ts" region="near-position" />
+
+Stake in pools outside your list (made earlier, or from another app) is found through fastnear's
+indexer (`discover`). When that lookup fails, `listPositions` throws rather than report "no stake",
+while balances and requests carry on with the known pools and say `partial: true`. The APR comes
+from the protocol's own data: the pool's reward for the last epoch ÷ its stake, annualized by the
+measured epoch length, after the pool's fee.
+
+### Unstake and claim
+
+<Snippet file="earn/src/native-near.ts" region="near-unstake" />
+
+Unstaked NEAR can be withdrawn 4 epochs later (an epoch is about 6.9 hours, so about 21–28 hours).
+A pool keeps one unstaked balance per account with one unlock time: a new unstake restarts the wait
+for everything still unbonding there, so the module refuses it (`timer-reset-refused`) unless you
+pass `allowTimerReset: true`. When that balance has already unlocked, the unstake withdraws it
+first in the same transaction (`[withdraw_all, unstake]`). The pool only reports `can_withdraw`:
+pass `history` (wallet-near's `createNearHistory`) to date the unlock from the account's last
+unstake instead of estimating a range. Exits need only the factory suffix and a known code hash, so
+users can always leave a pool that was paused, raised its fee or left the validator set.
+
+:::note[External signers and policies]
+The module reads through its RPC (`provider`) and signs only through `account.sendTransaction(tx)`,
+with a `NearTransaction` of function calls (`{ receiverId, actions }`, no signer, nonce or block
+hash), and through `account.sendTransactions(txs)` when the account has it (one approval for a
+claim from several pools). An adapter over a browser wallet (wallet-selector and the like) is
+small: pass `provider`, since such an account has no RPC of its own. A watch-only account (`chain`
+and `getAddress()`) is enough for every read. The transactions go to the pool account: a NEAR
+`allowlist` must include each pool you list.
+:::
+
+## Liquid NEAR staking (LiNEAR, rNEAR)
+
+`@anywalletkit/protocol-staking-liquid-near` stakes through the LiNEAR contract family: **LiNEAR**
+(`linear-protocol.near`, testnet `linear-protocol.testnet`) and **Rhea rNEAR** (`lst.rhealab.near`,
+mainnet only). The account receives a token (LINEAR or rNEAR, 24 decimals) whose price in NEAR grows
+with the staking rewards.
+
+```sh
+npm install @anywalletkit/protocol-staking-liquid-near @anywalletkit/wallet-near
+```
+
+### Set up
+
+<Snippet file="earn/src/liquid-near.ts" region="liquid-setup" />
+
+Each contract is pinned by account id and code hash. Every write reads the contract fresh and
+refuses it when its live code hash is not pinned (`unknown-contract-code`: an upgrade needs a new
+pin, from a new package version or your own `{ contract, symbol, codeHashes }`) or when it is
+paused (`contract-paused`; a missing or failing `is_paused` counts as paused). Both checks apply to
+exits too: a paused contract rejects every call anyway. `getPoolInfo()` shows the price, the
+totals, the live code hash with `codeHashKnown`, the liquidity and the protocol fee.
+
+### Stake
+
+<Snippet file="earn/src/liquid-near.ts" region="liquid-stake" />
+
+A stake is one `deposit_and_stake` of exactly the amount; it registers the account in the contract
+itself, so there is no `storage_deposit`. The module only ever builds `deposit_and_stake`,
+`unstake`, `unstake_all` and `withdraw_all` to the pinned contract, never `ft_transfer_call` (these
+contracts have no `ft_on_transfer`: tokens sent that way are lost). `expected`, `upfront`, `fee` and
+`reserve` work as in native staking.
+
+### Position
+
+<Snippet file="earn/src/liquid-near.ts" region="liquid-position" />
+
+`balance` is the token, `total` its NEAR value at the current price. The APR is the price's growth
+over `aprWindowEpochs` (24 epochs, about 7 days), read from an archival RPC (`archivalProvider`);
+pass `apr` to show your own figure instead.
+
+### Unstake and claim
+
+<Snippet file="earn/src/liquid-near.ts" region="liquid-unstake" />
+
+`requestWithdrawal` takes token units, as the staking interface defines it, and sends their NEAR
+value (`unstake_all` for the whole balance). The wait is 4 epochs or more: the contract may add
+epochs for large amounts or after its epoch settlement, so a quote knows only the earliest epoch
+(`unlock.latestEpoch` is `null`): show `unlock.earliestAt`. The contract's exact epoch
+(`getWithdrawalRequests()` or `getAccountDetails().unlockEpoch`) can be read once the unstake is
+final. Reads use final blocks, a couple of blocks behind the send's answer, so a read right after
+the send still shows the previous unlock epoch (0 on a first unstake): read again until it is at
+least `unlock.earliestEpoch`. As in a pool, a new unstake restarts the wait of a balance still
+unbonding (`timer-reset-refused` unless `allowTimerReset`), and an unlocked balance is withdrawn
+first in the same transaction. A claim also needs the contract to hold the NEAR, which its operator
+brings back from the validators each epoch. Until then the request is `awaitingLiquidity` and a claim refuses
+with `awaiting-liquidity`: show it as "waiting for the protocol's payout". An unstake that would lock
+such an unlocked, still unpaid balance again is refused (`relock-refused`) unless `allowRelock`.
+
+:::note[External signers and policies]
+External signers work as with native staking: pass `provider`. The transactions go to the contract
+(`linear-protocol.near` or `lst.rhealab.near`); a NEAR `allowlist` must include it.
 :::
 
 ## Savings crvUSD (scrvUSD)

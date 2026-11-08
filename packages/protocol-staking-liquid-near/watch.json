@@ -1,0 +1,35 @@
+{
+  "module": "@anywalletkit/protocol-staking-liquid-near",
+  "sources": [
+    {
+      "id": "linear-releases",
+      "type": "github-releases",
+      "repo": "linear-protocol/LiNEAR",
+      "label": "LiNEAR contract releases (linear-protocol.near)"
+    },
+    {
+      "id": "rnear-contract",
+      "type": "github-releases",
+      "repo": "ref-finance/rnear-contract",
+      "label": "Rhea rNEAR contract (lst.rhealab.near), default branch"
+    },
+    {
+      "id": "docs-liquid-staking",
+      "type": "http-text",
+      "url": "https://docs.near.org/primitives/liquid-staking/liquid-staking.md",
+      "label": "NEAR docs · liquid staking (LiNEAR and Rhea contract ids)"
+    },
+    {
+      "id": "nearcore-releases",
+      "type": "github-releases",
+      "repo": "near/nearcore",
+      "label": "NEAR node releases (nearcore): protocol upgrades, gas price and epoch parameters"
+    },
+    {
+      "id": "docs-gas",
+      "type": "http-text",
+      "url": "https://docs.near.org/protocol/transactions/gas.md",
+      "label": "NEAR docs · gas (prepaid gas, gas price)"
+    }
+  ]
+}

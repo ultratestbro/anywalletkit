@@ -148,15 +148,24 @@ importers:
       '@anywalletkit/protocol-staking-lido-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-lido-evm
+      '@anywalletkit/protocol-staking-liquid-near':
+        specifier: workspace:*
+        version: link:../../packages/protocol-staking-liquid-near
       '@anywalletkit/protocol-staking-native-monad':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-native-monad
+      '@anywalletkit/protocol-staking-native-near':
+        specifier: workspace:*
+        version: link:../../packages/protocol-staking-native-near
       '@anywalletkit/protocol-staking-native-solana':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-native-solana
       '@anywalletkit/wallet-evm':
         specifier: workspace:*
         version: link:../../packages/wallet-evm
+      '@anywalletkit/wallet-near':
+        specifier: workspace:*
+        version: link:../../packages/wallet-near
       '@anywalletkit/wallet-solana':
         specifier: workspace:*
         version: link:../../packages/wallet-solana
@@ -234,9 +243,15 @@ importers:
       '@anywalletkit/protocol-staking-lido-evm':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-lido-evm
+      '@anywalletkit/protocol-staking-liquid-near':
+        specifier: workspace:*
+        version: link:../../packages/protocol-staking-liquid-near
       '@anywalletkit/protocol-staking-native-monad':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-native-monad
+      '@anywalletkit/protocol-staking-native-near':
+        specifier: workspace:*
+        version: link:../../packages/protocol-staking-native-near
       '@anywalletkit/protocol-staking-native-solana':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-native-solana

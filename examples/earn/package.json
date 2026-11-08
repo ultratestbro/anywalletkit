@@ -16,7 +16,10 @@
     "@anywalletkit/protocol-lending-aave-evm": "workspace:*",
     "@anywalletkit/wallet-solana": "workspace:*",
     "@anywalletkit/protocol-staking-native-solana": "workspace:*",
-    "@anywalletkit/protocol-staking-native-monad": "workspace:*"
+    "@anywalletkit/protocol-staking-native-monad": "workspace:*",
+    "@anywalletkit/wallet-near": "workspace:*",
+    "@anywalletkit/protocol-staking-native-near": "workspace:*",
+    "@anywalletkit/protocol-staking-liquid-near": "workspace:*"
   },
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",

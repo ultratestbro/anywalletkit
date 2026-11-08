@@ -1,0 +1,49 @@
+{
+  "module": "@anywalletkit/protocol-staking-native-near",
+  "sources": [
+    {
+      "id": "nearcore-releases",
+      "type": "github-releases",
+      "repo": "near/nearcore",
+      "label": "NEAR node releases (nearcore): protocol upgrades, gas price and epoch parameters"
+    },
+    {
+      "id": "staking-pool-source",
+      "type": "github-file",
+      "repo": "near/core-contracts",
+      "path": "staking-pool/src/lib.rs",
+      "ref": "master",
+      "label": "Reference staking pool source (core-contracts, the *.poolv1.near build)"
+    },
+    {
+      "id": "staking-farm",
+      "type": "github-releases",
+      "repo": "referencedev/staking-farm",
+      "label": "staking-farm pool contract (the *.pool.near builds), default branch"
+    },
+    {
+      "id": "docs-staking-integration",
+      "type": "http-text",
+      "url": "https://docs.near.org/integrations/staking.md",
+      "label": "NEAR docs · staking & delegation (pool methods, withdrawal availability)"
+    },
+    {
+      "id": "docs-staking-tokens",
+      "type": "http-text",
+      "url": "https://docs.near.org/protocol/tutorials/staking-tokens.md",
+      "label": "NEAR docs · staking NEAR tokens (4-epoch unbonding)"
+    },
+    {
+      "id": "docs-epoch",
+      "type": "http-text",
+      "url": "https://docs.near.org/protocol/network/epoch.md",
+      "label": "NEAR docs · epoch"
+    },
+    {
+      "id": "docs-gas",
+      "type": "http-text",
+      "url": "https://docs.near.org/protocol/transactions/gas.md",
+      "label": "NEAR docs · gas (prepaid gas, gas price)"
+    }
+  ]
+}

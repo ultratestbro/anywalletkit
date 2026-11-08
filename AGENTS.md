@@ -35,7 +35,7 @@ into the app; never install from GitHub.
 | Encrypted backup file / iCloud backup | `seed-vault`, `backup-cloud` |
 | Hermes polyfills | `runtime-hermes` |
 | Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,uniswap,balancer,curve,wrap,jupiter,omniston,fynd}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
-| Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana,native-monad}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana,curve-evm}` |
+| Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana,native-monad,native-near,liquid-near}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana,curve-evm}` |
 | Safety and data | `tx-preview-evm`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks`, `tokens` |
 | dApp connection | `walletconnect-ton` (WalletConnect for TON dApps); `extension-kit` (browser extension) |
 | Testing your own module | `conformance` (Vitest suites) |
@@ -372,6 +372,41 @@ const w = await m.getWithdrawalRequests({ validator: 97n }); if (w.claimableIds.
 await m.claimRewards({ validator: 97n })          // or compound({ validator })
 ```
 An `allowlist` policy sees `to` = `0x0000000000000000000000000000000000001000`: allow it, or staking is refused.
+
+Native NEAR staking (`protocol-staking-native-near`, account on `near:mainnet`): the app lists the staking pools, there is no default list.
+
+```ts
+import { NativeStakingProtocolNear } from '@anywalletkit/protocol-staking-native-near'
+wallet.registerProtocol('near-staking', NativeStakingProtocolNear, { chain: 'near:mainnet',
+  config: { pools: [{ id: 'astro-stakers.poolv1.near', name: 'A' }, 'figment.poolv1.near'], defaultPool: 'astro-stakers.poolv1.near', maxFee: 10 } })   // or pools: 'any'
+const n = await wallet.getProtocol<NativeStakingProtocolNear>('near-staking')
+await n.getPools(['astro-stakers.poolv1.near'])   // live: code hash, fee, paused, validator sets, apr; eligible, refusals
+const q = await n.quoteStake({ amount: 10n ** 24n })   // exact q.transactions, fee, upfront (prepaid gas held back), reserve
+await n.stake({ amount: 10n ** 24n, expected: q.transactions })   // re-plans with fresh reads; 'quote-changed' when it moved
+await n.requestWithdrawal({ amount: 'all' })      // unstake_all; [withdraw_all, unstake_all] when unlocked NEAR waits; 4 epochs (~21–28 h)
+const r = await n.getWithdrawalRequests(); if (r.claimableIds.length) await n.claimWithdrawals({ ids: r.claimableIds })   // withdraw_all per pool
+```
+A new unstake restarts the 4-epoch wait of NEAR still unbonding in that pool: refused (`timer-reset-refused`) unless
+`allowTimerReset`. Exits need only a factory pool id and a known code hash. External signers: the module calls only
+`sendTransaction({ receiverId, actions })`, and `sendTransactions(txs)` when the account has it (one approval for
+multi-pool claims); pass `provider`. An `allowlist` policy sees the pool account: allow each listed pool.
+
+Liquid NEAR staking (`protocol-staking-liquid-near`): LiNEAR (`pool: 'linear'`, `linear-protocol.near`) or Rhea rNEAR
+(`pool: 'rnear'`, `lst.rhealab.near`, mainnet only), each pinned by account id and code hash.
+
+```ts
+import { LiquidStakingProtocolNear } from '@anywalletkit/protocol-staking-liquid-near'
+wallet.registerProtocol('linear', LiquidStakingProtocolNear, { chain: 'near:mainnet', config: { pool: 'linear' } })
+const l = await wallet.getProtocol<LiquidStakingProtocolNear>('linear')
+const lq = await l.quoteStake({ amount }); await l.stake({ amount, expected: lq.transactions })   // one deposit_and_stake; lq.shares minted
+await l.getStakedBalance()                        // balance = token, total = NEAR value, price; getPoolInfo(): codeHashKnown, paused, liquidity
+const u = await l.requestWithdrawal({ amount: 'all' })   // TOKEN units ('all' = unstake_all); 4+ epochs from u.unlock.earliestEpoch
+const w = await l.getWithdrawalRequests(); if (w.claimableIds.length) await l.claimWithdrawals({ ids: w.claimableIds })   // awaitingLiquidity until paid out
+```
+Reads use final blocks: right after the send they still show the previous unlock epoch; `w.requests[0].unlockEpoch`
+(or `getAccountDetails().unlockEpoch`) is exact once it is at least `u.unlock.earliestEpoch`.
+Writes refuse an unpinned code hash (`unknown-contract-code`) or a paused contract (`contract-paused`), exits included. Never
+`ft_transfer_call` into these contracts (no `ft_on_transfer`: the tokens are lost). The `allowlist` must include the contract.
 
 ## History, names, networks
 

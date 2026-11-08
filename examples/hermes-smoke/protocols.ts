@@ -47,6 +47,10 @@ import { ScrvUsdProtocolEvm, SCRVUSD, VAULT_V3_ABI, scrvUsdAprWad, aprWadToApyPc
 import scrvUsdDepositLive from '../../packages/protocol-lending-curve-evm/fixtures/activity/ethereum-deposit-crvusd.json'
 import { NativeStakingProtocolSolana, createWithSeed as nativeCreateWithSeed, activationStatus as nativeActivation, decodeStakeAccount as nativeDecodeStake, STAKE_PROGRAM as NATIVE_STAKE_PROGRAM } from '@anywalletkit/protocol-staking-native-solana'
 import { NativeStakingProtocolMonad, packWithdrawalId as monadPack, unpackWithdrawalId as monadUnpack, commissionToPercent as monadCommission, describeRevert as monadRevert, STAKING_ABI as MONAD_STAKING_ABI } from '@anywalletkit/protocol-staking-native-monad'
+import { NativeStakingProtocolNear, factoryOf as nearFactoryOf, poolRequestId as nearPoolRequestId, annualize as nearAnnualize, describeNativeNearStakingActivity } from '@anywalletkit/protocol-staking-native-near'
+import { LiquidStakingProtocolNear, resolvePool as liquidResolvePool, sharesForNear, nearForShares, aprFromPrices, assertLiquidPlan, fc as liquidFc, describeLiquidNearStakingActivity } from '@anywalletkit/protocol-staking-liquid-near'
+import nearStakeLive from '../../packages/protocol-staking-native-near/fixtures/activity/deposit_and_stake.json'
+import rnearStakeLive from '../../packages/protocol-staking-liquid-near/fixtures/activity/rnear-deposit_and_stake.json'
 import {
   KaminoVaultProtocolSolana, KaminoMarketProtocolSolana, MAIN_MARKET, KLEND_PROGRAM, KVAULT_PROGRAM, instructionName, toDecimalString, fromDecimalString,
   decodeVault, decodeReserve, decodeObligation, vaultTokensPerShareWad, debtNow, farmUserState, plumbing, associatedTokenAddress,
@@ -250,6 +254,57 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const monadEpoch = await monad.getEpoch()
   check('native monad: getEpoch over viem + EIP-1193', monadEpoch.epoch === 2332n && monadEpoch.activatesAtEpoch === 2333n)
   await tolerates(check, 'native monad: quoteStake (offline → Error)', () => monad.quoteStake({ amount: 10n ** 18n }))
+  {
+    // NEAR staking: the local pool-id verdict, sha256 request ids as u64 and the APR / share maths on 10^24-scale bigints, the
+    // epoch clock over an offline NEAR transport (validators + block), a foreign contract refused with no RPC call, the liquid
+    // plan guard, and recorded mainnet stakes (native and rNEAR) described.
+    const NEAR = 10n ** 24n
+    check('native near: pool factory by suffix, local', nearFactoryOf('astro-stakers.poolv1.near', 'mainnet') === 'poolv1' && nearFactoryOf('aurora.pool.near', 'mainnet') === 'pool'
+      && nearFactoryOf('lst-pool.near', 'mainnet') === null && nearFactoryOf('a.b.poolv1.near', 'mainnet') === null)
+    check('native near: poolRequestId (sha256 → u64, live vector)', nearPoolRequestId('astro-stakers.poolv1.near') === 13507970402022783992n)
+    const nearApr = nearAnnualize(1350n * NEAR, 33_000_000n * NEAR, 24_840_000)
+    check(`native near: reward ÷ stake annualized in bigint fixed point (${nearApr})`, Math.abs(nearApr - 5.197233201580913) < 1e-9)
+    const START = 223_574_400
+    let nearCalls = 0
+    const nearOffline = async (method: string, params: unknown) => {
+      nearCalls++
+      if (method === 'validators') return { epoch_height: 4948, epoch_start_height: START, current_validators: [], next_validators: [], validator_reward_paid_prev_epoch: {} }
+      if (method === 'block') {
+        const height = (params as { block_id?: number }).block_id ?? START + 40_000
+        return { header: { height, epoch_id: 'e', timestamp_nanosec: String(BigInt(1_794_000_000_000 + (height - START) * 575) * 1_000_000n) } }
+      }
+      throw new Error(`offline: ${method}`)
+    }
+    const nearAcc = createMockAccount({ chain: 'near:mainnet', address: 'alice.near' })
+    const nativeNear = new NativeStakingProtocolNear(nearAcc, { pools: ['astro-stakers.poolv1.near'], provider: nearOffline })
+    const nearEpoch = await nativeNear.getEpoch()
+    check('native near: epoch clock over a NEAR transport', nearEpoch.height === 4948n && nearEpoch.epochMs === 24_840_000 && nearEpoch.blocksLeft === 3_200n, `${nearEpoch.height}/${nearEpoch.epochMs}/${nearEpoch.blocksLeft}`)
+    const before = nearCalls
+    const foreign = await nativeNear.getPool('lst-pool.near')
+    check('native near: a foreign contract is refused with no RPC call', !foreign.eligible && foreign.refusals.includes('not-factory-pool') && nearCalls === before)
+    await tolerates(check, 'native near: quoteStake (offline → Error)', () => nativeNear.quoteStake({ amount: NEAR }))
+    const { tx: nsTx, own: nsOwn } = parseActivityFixture(nearStakeLive as unknown as ActivityFixtureJson)
+    const nsItem = describeNativeNearStakingActivity(nsTx, { own: nsOwn })
+    check('native near: describeActivity on a recorded deposit_and_stake', nsItem?.kind === 'stake' && nsItem.assetsOut[0]?.amount === 1_280_210n * 10n ** 21n)
+
+    check('liquid near: presets pinned per network (rNEAR mainnet only)', liquidResolvePool('rnear', 'mainnet').contract === 'lst.rhealab.near' && liquidResolvePool('linear', 'testnet').contract === 'linear-protocol.testnet'
+      && (() => { try { liquidResolvePool('rnear', 'testnet'); return false } catch (e) { return (e as { code?: string }).code === 'unsupported-network' } })())
+    const totals = { totalStaked: 18_798_398_837_425_000_000_000_000_000_000n, totalShares: 17_593_656_000_000_000_000_000_000_000_000n }
+    const minted = sharesForNear(NEAR, totals)
+    check(`liquid near: share maths rounds down like the contract (${minted})`, minted === 935_912_475_959_041_553_434_480n && nearForShares(minted, totals) === NEAR - 1n)
+    const lstApr = aprFromPrices(NEAR, NEAR + 9n * 10n ** 20n, 0, 7 * 86_400_000)
+    check(`liquid near: APR from the price in 10^12 fixed point (${lstApr})`, Math.abs(lstApr - 4.696071428571) < 1e-9)
+    let ftRefused = false
+    try { assertLiquidPlan([{ receiverId: 'lst.rhealab.near', actions: [liquidFc('ft_transfer_call', { receiver_id: 'lst.rhealab.near', amount: '1', msg: '' }, 30n * 10n ** 12n, 1n)] }], 'lst.rhealab.near') } catch { ftRefused = true }
+    check('liquid near: the plan guard refuses ft_transfer_call into the contract', ftRefused)
+    const rnear = new LiquidStakingProtocolNear(nearAcc, { pool: 'rnear', provider: nearOffline })
+    const lstEpoch = await rnear.getEpoch()
+    check('liquid near: epoch clock over a NEAR transport', lstEpoch.height === 4948n && lstEpoch.epochMs === 24_840_000)
+    await tolerates(check, 'liquid near: quoteStake (offline → Error)', () => rnear.quoteStake({ amount: NEAR }))
+    const { tx: lsTx, own: lsOwn } = parseActivityFixture(rnearStakeLive as unknown as ActivityFixtureJson)
+    const lsItem = describeLiquidNearStakingActivity(lsTx, { own: lsOwn })
+    check('liquid near: describeActivity on a recorded rNEAR stake', lsItem?.kind === 'stake' && lsItem.assetsIn[0]?.amount === 1_534_909_765_973_083_758_154_606n && lsItem.assetsIn[0]?.symbol === 'rNEAR')
+  }
   check('kamino: instructionName', instructionName(KLEND_PROGRAM, Uint8Array.from([0xd8, 0xe0, 0xbf, 0x1b, 0xcc, 0x97, 0x66, 0xaf, 0])) === 'depositReserveLiquidityAndObligationCollateralV2')
   // Kamino chain reads (scan 2026-10-27 modules, G2): u64 / u128 / u256 fields out of account bytes, the vault's share price
   // and a debt with interest — all bigint, the u128 and u256 values above 2^64 — plus the farm PDA (live vector) and the rule check.

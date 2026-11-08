@@ -79,6 +79,7 @@ jobs:
           BSC_RPC_URL: ${{ secrets.BSC_RPC_URL }}
           SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
           TON_RPC_URL: ${{ secrets.TON_RPC_URL }}
+          NEAR_RPC_URL: ${{ secrets.NEAR_RPC_URL }}   # optional: unset, the NEAR jobs use the rate-limited free.rpc.fastnear.com
         run: node scripts/watch/canary.mjs --send --timeout 300
       - name: run routes canary
         if: ${{ !cancelled() && !inputs.only }}

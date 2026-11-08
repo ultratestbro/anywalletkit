@@ -37,7 +37,7 @@ checks every quote: amounts, recipient, refund address, fee caps. The full flow 
 
 **The job:** staking and lending with a clear yield and a clear way out.
 
-**In the kit:** eleven modules behind two interfaces: `StakingProtocol` (stake → request
+**In the kit:** thirteen modules behind two interfaces: `StakingProtocol` (stake → request
 withdrawal → claim) and `LendingProtocol` (supply and withdraw; borrow and repay where the
 market allows). See [Earn](/guides/earn/).
 
@@ -49,8 +49,11 @@ market allows). See [Earn](/guides/earn/).
 - **How long the exit takes.** Lido's withdrawal queue takes days; a Jito exit can be
   instant at a fee, or wait for the epoch; native SOL stake cools down until the next epoch
   boundary (~2 days), and native MON stake can be withdrawn one epoch after it deactivates
-  (Monad epochs are about 4 hours).
-- **Whom they delegate to.** With native staking your app picks the validators; show each
-  one's commission and whether it is voting (Solana) or in the active set (Monad).
+  (Monad epochs are about 4 hours). Unstaked NEAR waits 4 epochs (about 21–28 hours) in a
+  staking pool, and 4 or more in LiNEAR / rNEAR, whose payout also waits until the contract
+  holds the NEAR.
+- **Whom they delegate to.** With native staking your app picks the validators (on NEAR, the
+  staking pools); show each one's commission or fee and whether it is voting (Solana), in the
+  active set (Monad) or in the current and next validator sets (NEAR).
 - **What the yield is made of**, and that it changes.
 - **The health factor** before a borrow, and what happens when it drops below 1.

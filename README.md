@@ -89,6 +89,8 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 | `@anywalletkit/protocol-staking-lido-evm`, `-ssv-evm`, `-tonstakers-ton`, `-spl-stake-pool-solana` | `StakingProtocol` modules (two-phase withdrawals): Lido, SSV Network, Tonstakers, Jito / SPL stake pools; the EVM two on viem |
 | `@anywalletkit/protocol-staking-native-solana` | native SOL staking through the Stake program to the validators the app lists (fail-closed: no list, no module; commission cap and delinquency checked at every delegation); seed-derived stake accounts only the wallet signs, statuses computed from StakeHistory like the program, partial unstake by split, claim, re-delegate, merge |
 | `@anywalletkit/protocol-staking-native-monad` | native MON staking through Monad's staking precompile to the validator ids the app lists (fail-closed: no list, no module; live commission cap and active-set check at every delegation); withdrawal slots, claim / compound rewards, Monad's 10 MON reserve respected, every write simulated first |
+| `@anywalletkit/protocol-staking-native-near` | native NEAR staking: `deposit_and_stake` into the staking pools the app lists (fail-closed: no list, no module; factory-suffix check before any RPC call, pinned staking-pool code hashes, live pause, fee cap and validator-set checks at every stake, while exits need only a known pool); 4-epoch unbonding (exact unlock epoch when the app passes the account's `history`, else a range), `withdraw_all` per pool, APR from the protocol's reward data; quotes return the exact NEAR transactions for external signers, and a write refuses when its fresh plan differs from the confirmed one |
+| `@anywalletkit/protocol-staking-liquid-near` | liquid NEAR staking through the LiNEAR contract family: LiNEAR and Rhea rNEAR, pinned by account id and code hash (an unpinned upgrade or a paused contract refuses every write); stake for the token, delayed unstake with the contract's exact unlock epoch, withdraw after a contract-liquidity check, APR from the price over time; function calls to the pinned contract only (never `ft_transfer_call`), exact transactions for external signers |
 | `@anywalletkit/protocol-lending-mellow-evm` | Mellow Core Vaults (Lido EarnETH / EarnUSD) as a `LendingProtocol`; viem |
 | `@anywalletkit/protocol-lending-aave-evm` | Aave v3 on 18 chains (20 markets) as a `LendingProtocol`: supply / withdraw / borrow / repay, gateway for native, EIP-2612 permits, health factor, reserves with rates and caps; Pool cross-checked against the PoolAddressesProvider |
 | `@anywalletkit/protocol-lending-morpho-evm` | Morpho on 13 chains: Vaults (MetaMorpho V1 / Vault V2, ERC-4626) and Blue markets (supply / withdraw / borrow / repay / collateral) as `LendingProtocol`s; vaults verified against the factories, state accrued like the contract, API for listing / APY only |
@@ -102,7 +104,7 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 | `@anywalletkit/extension-kit` | Chromium (MV3) wallet-extension core: scrypt vault with passkey (PRF) unlock, auto-locking session, dApp request router + per-origin permissions + approval queue, signing checks (SIWE, EIP-7702, address poisoning, phishing list), swap / Earn plan review, TON Connect data, chrome adapters; no UI — the extension itself is the wallet's own product |
 
 Every protocol module ships a `module.json`; `pnpm registry` builds
-[registry/modules.json](registry/modules.json) from them (27 modules today). See
+[registry/modules.json](registry/modules.json) from them (29 modules today). See
 [registry/README.md](registry/README.md) for tiers and how to list an external module.
 
 User documentation: [docs.anywallet.tech](https://docs.anywallet.tech) (sources in `apps/docs`).
@@ -123,7 +125,7 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 | Area | Next | Later |
 |---|---|---|
 | Swap & bridge | 0x Swap API v2, Symbiosis, Jupiter `/order` + `/execute` (USDT0 + Chainflip shipped 2026-10-20, Jupiter `/build` 2026-10-23, Curve 2026-11-07) | rhino.fi, swapdk, BOB Gateway, Velora, Orchestra; Uniswap v4 / v2 + LP positions; Balancer v3 |
-| Earn | Sky (sUSDS / SKY), Ethena (USDe → sUSDe), Euler v2, Morpho fixed-rate markets (native SOL + MON staking shipped 2026-10-26, Curve scrvUSD 2026-11-07) | Hyperliquid exit, fiat on/off-ramp (MoonPay, Transak) |
+| Earn | Sky (sUSDS / SKY), Ethena (USDe → sUSDe), Euler v2, Morpho fixed-rate markets (native SOL + MON staking shipped 2026-10-26, Curve scrvUSD 2026-11-07, native NEAR + LiNEAR / rNEAR staking 2026-11-08) | Hyperliquid exit, fiat on/off-ramp (MoonPay, Transak) |
 | Safety | `@anywalletkit/receive` (quarantine receive addresses on a separate seed branch) + `@anywalletkit/screening` (risk signals from shipped lists + on-device 2-hop tracing, two privacy modes); outbound recipient check + address-poisoning detector | tx-preview for Solana / TON / Tron; wallet-btc PSBT partial signing + BIP-322 |
 | Accounts | multisig: Safe (EVM), Squads (Solana), multisig-v2 (TON), account permissions (Tron), multisig2 / Sputnik (NEAR) | gasless sends (EIP-7702 + paymaster, GasFree on Tron, TON paymaster, Solana fee payer) |
 | Names | SNS `.sol`, TON DNS `.ton`, NEAR named accounts on the same `NameResolver` (ENS shipped) | `.gwei` |
@@ -131,7 +133,7 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 
 ## Tests
 
-`pnpm test` runs 4,100+ tests across 50 packages (Node); `pnpm test:hermes` runs 383
+`pnpm test` runs 4,300+ tests across 52 packages (Node); `pnpm test:hermes` runs 397
 checks in the Hermes VM React Native ships. Beyond unit tests the swap layer is
 checked against live providers (running totals, November 2026): 149,728 quote checks
 (13 providers, up to 36 chains, 398 assets), 65,481 builds simulated to the

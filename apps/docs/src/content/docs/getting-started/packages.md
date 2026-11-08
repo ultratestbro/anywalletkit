@@ -70,6 +70,8 @@ inside the router.
 | `@anywalletkit/protocol-staking-spl-stake-pool-solana` | SPL stake pools (Jito by default) | `StakingProtocol` |
 | `@anywalletkit/protocol-staking-native-solana` | Native SOL staking to the validators your app lists (Stake program) | `StakingProtocol` |
 | `@anywalletkit/protocol-staking-native-monad` | Native MON staking to the validators your app lists (staking precompile) | `StakingProtocol` |
+| `@anywalletkit/protocol-staking-native-near` | Native NEAR staking to the staking pools your app lists (`deposit_and_stake`) | `StakingProtocol` |
+| `@anywalletkit/protocol-staking-liquid-near` | Liquid NEAR staking: LiNEAR and Rhea rNEAR (NEAR → LINEAR / rNEAR) | `StakingProtocol` |
 | `@anywalletkit/protocol-lending-aave-evm` | Aave v3 | `LendingProtocol` |
 | `@anywalletkit/protocol-lending-morpho-evm` | Morpho Vaults and Blue markets | `LendingProtocol` |
 | `@anywalletkit/protocol-lending-mellow-evm` | Mellow Core Vaults (EarnETH / EarnUSD) | `LendingProtocol` |

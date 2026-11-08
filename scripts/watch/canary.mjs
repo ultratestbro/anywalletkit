@@ -5,6 +5,7 @@
 // anything still failing. Nothing is signed or sent on-chain.
 //
 //   node scripts/watch/canary.mjs [--only aave,morpho] [--timeout 240] [--send] [--dry] [--env FILE]
+// --timeout is per job (seconds); a job with its own `timeoutS` gets the longer of the two.
 // State: watch/canary/state.json; today's rows: watch/canary/<date>.json.
 import {spawn} from "node:child_process";
 import {readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync} from "node:fs";
@@ -45,6 +46,7 @@ const PUBLIC_RPC = {
 const rpcFor = (chainId) => env[RPC_ENV[chainId]] || PUBLIC_RPC[chainId];
 const solRpc = env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
 const tonRpc = env.TON_RPC_URL ? `${env.TON_RPC_URL.replace(/\/$/, "")}/jsonRPC` : "https://toncenter.com/api/v2/jsonRPC";
+const nearRpc = env.NEAR_RPC_URL || "https://free.rpc.fastnear.com";
 const pkg = (name) => resolve(ROOT, "packages", name, "scripts/verify-live.mjs");
 
 // Same job list as Vaulty's app/scripts/earn-check (kept in sync by hand).
@@ -58,6 +60,11 @@ jobs.push({id: "jito", module: "spl-stake-pool", script: pkg("protocol-staking-s
 // Native staking checks a wallet that holds stake accounts (the script's default), not the empty test address.
 jobs.push({id: "native-stake", module: "native-stake", script: pkg("protocol-staking-native-solana"), args: [], env: {SOLANA_RPC: solRpc}});
 jobs.push({id: "native-monad", module: "native-monad", script: pkg("protocol-staking-native-monad"), args: [rpcFor(143), "143"]});
+// NEAR staking checks real delegators (a pool's get_accounts) and known LiNEAR / rNEAR holders, not the empty test address.
+// Without NEAR_RPC_URL both run side by side on the free endpoint (a burst of ~20 requests, then ~1 a second), which sets
+// their pace, not the modules: 480 s each (liquid-near took 212–290 s next to native-near on 2026-11-08, native-near up to 300).
+jobs.push({id: "native-near", module: "native-near", script: pkg("protocol-staking-native-near"), args: [nearRpc], timeoutS: 480});
+jobs.push({id: "liquid-near", module: "liquid-near", script: pkg("protocol-staking-liquid-near"), args: [nearRpc], timeoutS: 480});
 for (const preset of ["lido-earn-eth", "lido-earn-usd"]) jobs.push({id: `mellow:${preset}`, module: "mellow", script: pkg("protocol-lending-mellow-evm"), args: [ADDR.eip155, rpcFor(1), preset]});
 for (const [chainId, markets] of Object.entries(AAVE)) for (const m of markets) jobs.push({id: `aave:${chainId}:${m}`, module: "aave", script: pkg("protocol-lending-aave-evm"), args: [], env: {AAVE_RPC: rpcFor(Number(chainId)), AAVE_CHAIN: chainId, AAVE_MARKET: m, AAVE_USER: ADDR.eip155}});
 for (const chainId of MORPHO) jobs.push({id: `morpho:${chainId}`, module: "morpho", script: pkg("protocol-lending-morpho-evm"), args: [], env: {MORPHO_RPC: rpcFor(chainId), MORPHO_CHAIN: String(chainId), MORPHO_USER: ADDR.eip155}});
@@ -85,7 +92,7 @@ function run(job) {
     const t0 = Date.now(); let out = "";
     const child = spawn("node", [job.script, ...job.args], {cwd: dirname(job.script), env: {...process.env, ...(job.env ?? {})}, stdio: ["ignore", "pipe", "pipe"]});
     child.stdout.on("data", (d) => (out += d)); child.stderr.on("data", (d) => (out += d));
-    const timer = setTimeout(() => child.kill("SIGKILL"), TIMEOUT_MS);
+    const timer = setTimeout(() => child.kill("SIGKILL"), Math.max(TIMEOUT_MS, (job.timeoutS ?? 0) * 1000)); // a job's own timeoutS can only extend --timeout
     child.on("close", (code, signal) => {
       clearTimeout(timer);
       const lines = out.split("\n").filter(Boolean);
