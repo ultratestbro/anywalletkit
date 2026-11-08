@@ -37,7 +37,15 @@ function assertSafe(txs: NearTransaction[], contract: string = LINEAR) {
   }
 }
 
-const feeOf = (txs: NearTransaction[], gasPrice: bigint) => txs.reduce((s, t) => s + WalletAccountReadOnlyNear.gasOf(t.actions, false), 0n) * gasPrice
+const gasOf = (txs: NearTransaction[]) => txs.reduce((s, t) => s + WalletAccountReadOnlyNear.gasOf(t.actions, false), 0n)
+/** The fee model: gas × (gas price + 10 %), the margin wallet-near's own estimate uses. */
+const feeOf = (txs: NearTransaction[], gasPrice: bigint) => gasOf(txs) * ((gasPrice * 11n) / 10n)
+/** What the node holds back on acceptance: all gas bought at min_gas_purchase_price (10^9 on mainnet). */
+const PURCHASE_PRICE = 1_000_000_000n
+const upfrontOf = (txs: NearTransaction[]) => gasOf(txs) * PURCHASE_PRICE
+const EXIT_RESERVE = upfrontOf([{ receiverId: LINEAR, actions: [{ functionCall: { methodName: 'unstake', args: { amount: '9'.repeat(39) }, gas: 30n * TGAS, deposit: 0n } }] }])
+/** LiNEAR's storage on mainnet (13.35 MB): what the contract must keep beside its payouts. */
+const LINEAR_KEPT = 13_347_387n * 10n ** 19n
 
 describe('config', () => {
   const near = (chain = 'near:mainnet') => createMockAccount({ chain, address: ALICE })
@@ -61,11 +69,12 @@ describe('config', () => {
     expect(() => new LiquidStakingProtocolNear(near(), { pool: 'linear', apr: 4.5 as never })).toThrow(/apr must be a function/)
   })
 
-  it('defaults: 0.02 NEAR reserve, 100/50/50/30 Tgas, 24-epoch APR window', () => {
+  it('defaults: 0.02 NEAR reserve, 30 Tgas per call, 24-epoch APR window', () => {
     const p = new LiquidStakingProtocolNear(near(), { pool: 'linear' })
     expect(p.reserve).toBe(DEFAULT_RESERVE)
     expect(DEFAULT_RESERVE).toBe(2n * 10n ** 22n)
-    expect(p.gas).toEqual({ stake: 100n * TGAS, unstake: 50n * TGAS, withdraw: 50n * TGAS, storage: 30n * TGAS })
+    expect(p.gas).toEqual({ stake: 30n * TGAS, unstake: 30n * TGAS, withdraw: 30n * TGAS })
+    expect(() => new LiquidStakingProtocolNear(near(), { pool: 'linear', gas: { unstake: 200n * TGAS, withdraw: 101n * TGAS } })).toThrow(/one transaction/)
     expect(p.aprWindowEpochs).toBe(24)
   })
 
@@ -197,15 +206,30 @@ describe('contract checks: pinned code, pause flag', () => {
 })
 
 describe('stake', () => {
-  it('one transaction: deposit_and_stake with the exact amount, 100 Tgas, no storage step', async () => {
+  it('one transaction: deposit_and_stake with the exact amount, 30 Tgas, no storage step', async () => {
     const { p, node } = setup()
     const q = await p.quoteStake({ amount: 7n * NEAR })
-    expect(q.transactions).toEqual([{ receiverId: LINEAR, actions: [{ functionCall: { methodName: 'deposit_and_stake', args: {}, gas: 100n * TGAS, deposit: 7n * NEAR } }] }])
+    expect(q.transactions).toEqual([{ receiverId: LINEAR, actions: [{ functionCall: { methodName: 'deposit_and_stake', args: {}, gas: 30n * TGAS, deposit: 7n * NEAR } }] }])
     assertSafe(q.transactions)
-    expect(q).toMatchObject({ amount: 7n * NEAR, price: node.price, storageDeposit: 0n, warnings: [] })
+    expect(q).toMatchObject({ amount: 7n * NEAR, price: node.price, warnings: [], reserve: EXIT_RESERVE })
+    expect(q).not.toHaveProperty('storageDeposit')
     expect(q.shares).toBe((7n * NEAR * node.totalShares) / node.totalStaked)
     expect(q.fee).toBe(feeOf(q.transactions, node.gasPrice))
+    expect(q.upfront).toBe(upfrontOf(q.transactions))
     expect(typeof q.apr).toBe('number')
+  })
+
+  it('the account gets a copy: one that rewrites what it is handed cannot change the result the app holds', async () => {
+    const { p, account } = setup()
+    const send = account.sendTransaction.bind(account)
+    account.sendTransaction = async (tx, o) => {
+      const t = tx as NearTransaction
+      ;(t.actions[0] as { functionCall: { deposit: bigint } }).functionCall.deposit = 1n
+      t.receiverId = 'evil.near'
+      return send(tx, o)
+    }
+    const r = await p.stake({ amount: NEAR })
+    expect(r.transactions).toEqual([{ receiverId: LINEAR, actions: [{ functionCall: { methodName: 'deposit_and_stake', args: {}, gas: 30n * TGAS, deposit: NEAR } }] }])
   })
 
   it('registered or not, the transaction is the same (deposit creates the account entry)', async () => {
@@ -227,19 +251,22 @@ describe('stake', () => {
     expect(r.amount).toBe(amount)
   })
 
-  it('funds: amount + fee + reserve must fit the spendable balance (amount − locked − storage)', async () => {
+  it('funds: amount + upfront gas + reserve must fit the spendable balance (amount − locked − storage)', async () => {
     const { p, node } = setup()
     const quote = await p.quoteStake({ amount: NEAR })
     const storage = 182n * 10n ** 19n
     // Exactly enough: passes.
-    node.balances.set(ALICE, { amount: NEAR + quote.fee + DEFAULT_RESERVE + storage, locked: 0n, storage: 182n })
+    node.balances.set(ALICE, { amount: NEAR + quote.upfront + EXIT_RESERVE + storage, locked: 0n, storage: 182n })
     expect((await p.quoteStake({ amount: NEAR })).maxStakeable).toBe(NEAR)
     expect(await p.getMaxStakeable()).toBe(NEAR)
     // One yocto short: refused with the numbers.
-    node.balances.set(ALICE, { amount: NEAR + quote.fee + DEFAULT_RESERVE + storage - 1n, locked: 0n, storage: 182n })
+    node.balances.set(ALICE, { amount: NEAR + quote.upfront + EXIT_RESERVE + storage - 1n, locked: 0n, storage: 182n })
     const e = await p.quoteStake({ amount: NEAR }).catch((x: unknown) => x)
     expect(e).toBeInstanceOf(InsufficientFundsError)
-    expect(e).toMatchObject({ required: NEAR + quote.fee + DEFAULT_RESERVE, available: NEAR + quote.fee + DEFAULT_RESERVE - 1n })
+    expect(e).toMatchObject({ required: NEAR + quote.upfront + EXIT_RESERVE, available: NEAR + quote.upfront + EXIT_RESERVE - 1n })
+    // The default 0.02 NEAR reserve could not buy the 30 Tgas an unstake needs at 10^9: the floor is that unstake.
+    expect(DEFAULT_RESERVE).toBeLessThan(EXIT_RESERVE)
+    expect(EXIT_RESERVE).toBeGreaterThanOrEqual(30n * TGAS * PURCHASE_PRICE)
     // Locked (staked) NEAR is not spendable.
     node.balances.set(ALICE, { amount: 5n * NEAR, locked: 5n * NEAR, storage: 182n })
     await expect(p.quoteStake({ amount: 4n * NEAR })).rejects.toBeInstanceOf(InsufficientFundsError)
@@ -300,7 +327,7 @@ describe('unstake', () => {
     const tokens = 10n * NEAR
     const q = await p.quoteRequestWithdrawal({ amount: tokens })
     const nearValue = (tokens * node.totalStaked) / node.totalShares
-    expect(q.transactions).toEqual([{ receiverId: LINEAR, actions: [{ functionCall: { methodName: 'unstake', args: { amount: String(nearValue) }, gas: 50n * TGAS, deposit: 0n } }] }])
+    expect(q.transactions).toEqual([{ receiverId: LINEAR, actions: [{ functionCall: { methodName: 'unstake', args: { amount: String(nearValue) }, gas: 30n * TGAS, deposit: 0n } }] }])
     assertSafe(q.transactions)
     expect(q).toMatchObject({ shares: tokens, amount: nearValue, id: poolRequestId(LINEAR), withdrawsFirst: 0n, resetsTimer: false, relocks: 0n })
     // internal.rs: shares burnt = ceil(amount × totalShares / totalStaked) ≤ the tokens asked.
@@ -315,7 +342,7 @@ describe('unstake', () => {
     const shares = node.account(ALICE).shares
     for (const amount of ['all', shares] as const) {
       const q = await p.quoteRequestWithdrawal({ amount })
-      expect(q.transactions[0]!.actions).toEqual([{ functionCall: { methodName: 'unstake_all', args: {}, gas: 50n * TGAS, deposit: 0n } }])
+      expect(q.transactions[0]!.actions).toEqual([{ functionCall: { methodName: 'unstake_all', args: {}, gas: 30n * TGAS, deposit: 0n } }])
       expect(q.shares).toBe(shares)
       expect(q.amount).toBe((shares * node.totalStaked) / node.totalShares)
     }
@@ -342,13 +369,14 @@ describe('unstake', () => {
     expect(q.warnings.map((w) => w.code)).toEqual(['withdraws-unlocked-first', 'unlock-may-be-later'])
     assertSafe(q.transactions)
     expect(q.fee).toBe(feeOf(q.transactions, node.gasPrice))
+    expect(q.upfront).toBe(upfrontOf(q.transactions))
   })
 
   it("an unlocked balance the contract cannot pay yet: 'relock-refused', or relocks with allowRelock", async () => {
     const { p, node, sent } = setup()
     node.stakeFor(ALICE, 20n * NEAR)
     node.unstakedFor(ALICE, 3n * NEAR, EPOCH)
-    node.liquidity = 3n * NEAR // − 1 NEAR reserve < 3 NEAR
+    node.liquidity = 3n * NEAR // − what the contract keeps < 3 NEAR
     await expect(p.quoteRequestWithdrawal({ amount: 'all' })).rejects.toSatisfy(refusal('relock-refused'))
     await expect(p.requestWithdrawal({ amount: 'all' })).rejects.toSatisfy(refusal('relock-refused'))
     expect(sent()).toEqual([])
@@ -356,16 +384,48 @@ describe('unstake', () => {
     expect(q.transactions[0]!.actions).toHaveLength(1)
     expect(q).toMatchObject({ relocks: 3n * NEAR, withdrawsFirst: 0n })
     expect(q.warnings.map((w) => w.code)).toContain('relocks-unlocked')
-    // Exactly the reserve plus the balance: payable.
-    node.liquidity = 4n * NEAR
+    // Exactly what it keeps plus the balance: payable.
+    node.liquidity = LINEAR_KEPT + 3n * NEAR
     expect((await p.quoteRequestWithdrawal({ amount: 'all' })).withdrawsFirst).toBe(3n * NEAR)
   })
 
-  it('a locked unstaked balance restarts its timer: resetsTimer and the warning', async () => {
-    const { p, node } = setup()
+  it("the contract's storage cost is kept too, not just 1 NEAR: a payout that would leave it below is not offered (audit M3)", async () => {
+    const node = new FakeNear({ contract: RNEAR, codeHash: RNEAR_HASH, symbol: 'rNEAR' })
+    node.contractStorage = 5_197_575n // lst.rhealab.near on 2026-11-08: 51.98 NEAR of storage
+    const kept = 5_197_575n * 10n ** 19n
+    const { p, sent } = setup({ node, config: { pool: 'rnear' } })
+    node.stakeFor(ALICE, 20n * NEAR)
+    node.unstakedFor(ALICE, 3n * NEAR, EPOCH)
+    // 1 NEAR + 3 NEAR + 40 NEAR: enough under the old "− 1 NEAR" rule, short of the storage the runtime keeps.
+    node.liquidity = 44n * NEAR
+    expect((await p.getPoolInfo()).kept).toBe(kept)
+    expect((await p.getStakedBalance()).withdrawable).toBe(0n)
+    expect((await p.getWithdrawalRequests()).requests[0]).toMatchObject({ claimable: false, awaitingLiquidity: true })
+    await expect(p.quoteClaimWithdrawals()).rejects.toSatisfy(refusal('awaiting-liquidity'))
+    // the unstake is not built as [withdraw_all, unstake] (that whole transaction would revert): relock-refused, as for any unpayable balance
+    await expect(p.requestWithdrawal({ amount: 'all' })).rejects.toSatisfy(refusal('relock-refused'))
+    expect(sent()).toEqual([])
+    node.liquidity = kept + 3n * NEAR
+    expect((await p.quoteClaimWithdrawals()).amount).toBe(3n * NEAR)
+    // a small contract still keeps its own 1 NEAR
+    node.contractStorage = 100n
+    node.liquidity = NEAR + 3n * NEAR - 1n
+    await expect(p.quoteClaimWithdrawals()).rejects.toSatisfy(refusal('awaiting-liquidity'))
+  })
+
+  it('a locked unstaked balance would restart its timer: refused unless allowTimerReset', async () => {
+    const { p, node, sent } = setup()
     node.stakeFor(ALICE, 20n * NEAR)
     node.unstakedFor(ALICE, 2n * NEAR, EPOCH + 2n)
-    const q = await p.quoteRequestWithdrawal({ amount: NEAR })
+    const e = await p.quoteRequestWithdrawal({ amount: NEAR }).catch((x: unknown) => x)
+    expect(e).toSatisfy(refusal('timer-reset-refused'))
+    expect((e as LiquidStakingError).details).toMatchObject({ unstaked: 2n * NEAR, unlockEpoch: EPOCH + 2n })
+    await expect(p.requestWithdrawal({ amount: NEAR })).rejects.toSatisfy(refusal('timer-reset-refused'))
+    expect(sent()).toEqual([])
+    // below MIN_STAKE it is refused even when allowed: dust never restarts a real balance's wait
+    const tiny = (MIN_STAKE * node.totalShares) / node.totalStaked - 1n
+    await expect(p.quoteRequestWithdrawal({ amount: tiny, allowTimerReset: true })).rejects.toSatisfy(refusal('timer-reset-refused'))
+    const q = await p.quoteRequestWithdrawal({ amount: NEAR, allowTimerReset: true })
     expect(q.resetsTimer).toBe(true)
     expect(q.transactions[0]!.actions).toHaveLength(1)
     expect(q.warnings.find((w) => w.code === 'resets-unbonding-timer')?.message).toMatch(/restarts the wait for the whole unstaked balance/)
@@ -390,11 +450,33 @@ describe('unstake', () => {
     expect(q.unlock.earliestAt - epoch.startedAt).toBe(4 * epoch.epochMs)
   })
 
-  it('the fee must be covered by the spendable balance', async () => {
+  it('the upfront gas must be covered by the spendable balance (0.02 NEAR cannot buy 30 Tgas at 10^9)', async () => {
     const { p, node } = setup()
     node.stakeFor(ALICE, 5n * NEAR)
-    node.balances.set(ALICE, { amount: 182n * 10n ** 19n, locked: 0n, storage: 182n })
+    node.balances.set(ALICE, { amount: 182n * 10n ** 19n + DEFAULT_RESERVE, locked: 0n, storage: 182n })
     await expect(p.quoteRequestWithdrawal({ amount: 'all' })).rejects.toBeInstanceOf(InsufficientFundsError)
+    // what a stake leaves is enough for the unstake, and then for the claim
+    node.balances.set(ALICE, { amount: 182n * 10n ** 19n + EXIT_RESERVE, locked: 0n, storage: 182n })
+    expect((await p.quoteRequestWithdrawal({ amount: 'all' })).shares).toBe(node.account(ALICE).shares)
+    node.unstakedFor(ALICE, NEAR, EPOCH)
+    node.account(ALICE).shares = 0n
+    expect((await p.quoteClaimWithdrawals()).amount).toBe(NEAR)
+  })
+
+  it('min_gas_purchase_price from the protocol config, or the mainnet value when the node cannot say; maxFee checked by the module', async () => {
+    const node = new FakeNear()
+    node.minGasPurchasePrice = '3000000000'
+    const { p, sent } = setup({ node })
+    const q = await p.quoteStake({ amount: NEAR })
+    expect(q.upfront).toBe(gasOf(q.transactions) * 3_000_000_000n)
+    const failing = new FakeNear()
+    failing.minGasPurchasePrice = 'fails'
+    const f = await setup({ node: failing }).p.quoteStake({ amount: NEAR })
+    expect(f.upfront).toBe(upfrontOf(f.transactions))
+    await expect(p.stake({ amount: NEAR, maxFee: q.fee - 1n })).rejects.toSatisfy(refusal('max-fee-exceeded'))
+    expect(sent()).toEqual([])
+    await p.stake({ amount: NEAR, maxFee: q.fee, expected: q.transactions })
+    expect(sent()).toHaveLength(1)
   })
 
   it("requestWithdrawal sends the quote; 'quote-changed' when an unlocked balance appeared since", async () => {
@@ -426,9 +508,9 @@ describe('claim', () => {
   it("unlocked but the contract holds too little: 'awaiting-liquidity'", async () => {
     const { p, node } = setup()
     node.unstakedFor(ALICE, 5n * NEAR, EPOCH)
-    node.liquidity = 6n * NEAR - 1n
+    node.liquidity = LINEAR_KEPT + 5n * NEAR - 1n
     await expect(p.quoteClaimWithdrawals()).rejects.toSatisfy(refusal('awaiting-liquidity'))
-    node.liquidity = 6n * NEAR
+    node.liquidity = LINEAR_KEPT + 5n * NEAR
     await expect(p.quoteClaimWithdrawals()).resolves.toMatchObject({ amount: 5n * NEAR })
   })
 
@@ -436,8 +518,8 @@ describe('claim', () => {
     const { p, node, sent } = setup()
     node.unstakedFor(ALICE, 5n * NEAR, EPOCH - 2n)
     const q = await p.quoteClaimWithdrawals()
-    expect(q.transactions).toEqual([{ receiverId: LINEAR, actions: [{ functionCall: { methodName: 'withdraw_all', args: {}, gas: 50n * TGAS, deposit: 0n } }] }])
-    expect(q).toMatchObject({ amount: 5n * NEAR, fee: feeOf(q.transactions, node.gasPrice) })
+    expect(q.transactions).toEqual([{ receiverId: LINEAR, actions: [{ functionCall: { methodName: 'withdraw_all', args: {}, gas: 30n * TGAS, deposit: 0n } }] }])
+    expect(q).toMatchObject({ amount: 5n * NEAR, fee: feeOf(q.transactions, node.gasPrice), upfront: upfrontOf(q.transactions) })
     const r = await p.claimWithdrawals({ ids: [poolRequestId(LINEAR)], expected: q.transactions })
     expect(sameTransactions(q.transactions, sent())).toBe(true)
     expect(r.hashes).toHaveLength(1)

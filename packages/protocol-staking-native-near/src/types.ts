@@ -60,9 +60,12 @@ export interface NativeStakingNearConfig {
   provider?: NearProvider | NearProvider[]
   /** Per-request timeout for url providers, ms (default 15 000). */
   timeoutMs?: number
-  /** yoctoNEAR `stake` leaves on the account for gas and storage (default 0.02 NEAR). */
+  /**
+   * yoctoNEAR `stake` leaves on the account (default 0.02 NEAR). Never less than the upfront gas of
+   * one unstake at the current prices (see `NearStakeQuote.reserve`), so a stake can always be left.
+   */
   reserve?: bigint | number
-  /** Prepaid gas overrides (defaults: stake 50 Tgas, unstake 50 Tgas, withdraw 125 Tgas). */
+  /** Prepaid gas overrides (defaults: 50 Tgas each). All of it is bought upfront at min_gas_purchase_price: keep it small. */
   gas?: { stake?: bigint; unstake?: bigint; withdraw?: bigint }
   /** More staking-pool code hashes to accept, on top of KNOWN_POOL_CODE_HASHES (the app vouches for them). */
   codeHashes?: readonly string[]
@@ -108,9 +111,14 @@ export interface NearPoolInfo {
   details: boolean
   codeHash: string | null
   codeHashKnown: boolean | null
-  /** Reward fee as the pool reports it (`get_reward_fee_fraction`). */
+  /** Reward fee as the pool reports it (`get_reward_fee_fraction`, or the current one of staking-farm's `get_pool_summary`). */
   fee: { numerator: number; denominator: number } | null
   feePercent: number | null
+  /**
+   * The fee a staking-farm pool already scheduled for the next epoch (`next_reward_fee_fraction`);
+   * null for pools without a schedule or when not read. `maxFee` and the APR use the higher of the two.
+   */
+  nextFee: { numerator: number; denominator: number } | null
   /** `is_staking_paused`; null when not read or missing (a missing method is the 'pause-unknown' refusal). */
   paused: boolean | null
   /** Stake in the current validator set (0n when not in it). */
@@ -207,6 +215,8 @@ export interface NearStakedBalance extends StakedBalance {
   unstaked: bigint
   withdrawable: bigint
   positions: NearPoolPosition[]
+  /** Pool discovery failed: the figures cover only the listed, passed and touched pools. */
+  partial: boolean
 }
 
 // ── Writes ───────────────────────────────────────────────────────────────────
@@ -238,13 +248,20 @@ export interface NearStakeOptions extends StakeOptions, NearWriteOptions {
 }
 
 export interface NearStakeQuote {
-  /** Upper bound of the network fee, yoctoNEAR (prepaid gas × gas price; unused gas is refunded). */
+  /** Upper bound of the network fee, yoctoNEAR (all gas burnt, at the gas price + 10 %). Passes as `maxFee`. */
   fee: bigint
+  /**
+   * NEAR the node holds back when it accepts the transaction, beside the deposit: the prepaid gas,
+   * bought at min_gas_purchase_price. The unburnt part comes back a few blocks later.
+   */
+  upfront: bigint
+  /** NEAR the stake leaves on the account: the configured reserve, but at least one unstake's `upfront`. */
+  reserve: bigint
   amount: bigint
   /** The pool, read live (`details: true`). */
   pool: NearPoolInfo
   apr: number | null
-  /** What `stake` can send now: available − reserve − fee (never below 0). */
+  /** What `stake` can send now: available − reserve − upfront (never below 0). */
   maxStakeable: bigint
   /** Exactly what `stake` sends: receiverId + actions, no signer / nonce / block hash. */
   transactions: NearTransaction[]
@@ -260,10 +277,18 @@ export interface NearUnstakeOptions extends Omit<WithdrawalRequestOptions, 'amou
   amount: bigint | number | 'all'
   /** Pool id; default `defaultPool`, or the only pool with a staked balance. */
   pool?: string
+  /**
+   * Accept that an unstaked balance still unbonding in the pool restarts its 4-epoch wait together
+   * with this amount (default false: refused with 'timer-reset-refused'). Never accepted for an
+   * amount below MIN_STAKE.
+   */
+  allowTimerReset?: boolean
 }
 
 export interface NearUnstakeQuote {
   fee: bigint
+  /** See {@link NearStakeQuote.upfront}: the account must hold this much NEAR to send the unstake. */
+  upfront: bigint
   /** yoctoNEAR moving from staked to unstaked (for 'all': the current staked balance). */
   amount: bigint
   pool: string
@@ -290,7 +315,11 @@ export interface NearWithdrawalRequest extends WithdrawalRequest {
   /** Null when claimable. */
   unlock: UnlockEstimate | null
 }
-export type NearWithdrawalRequestsView = Omit<WithdrawalRequestsView, 'requests'> & { requests: NearWithdrawalRequest[] }
+export type NearWithdrawalRequestsView = Omit<WithdrawalRequestsView, 'requests'> & {
+  requests: NearWithdrawalRequest[]
+  /** Pool discovery failed: only the listed, passed and touched pools were read. */
+  partial: boolean
+}
 
 export interface NearClaimOptions extends ClaimWithdrawalsOptions, NearWriteOptions {
   /** Also look at these pools (besides the listed and discovered ones). */
@@ -298,6 +327,8 @@ export interface NearClaimOptions extends ClaimWithdrawalsOptions, NearWriteOpti
 }
 export interface NearClaimQuote {
   fee: bigint
+  /** See {@link NearStakeQuote.upfront}. */
+  upfront: bigint
   amount: bigint
   claims: Array<{ id: bigint; pool: string; amount: bigint }>
   /** One `withdraw_all` transaction per pool. */

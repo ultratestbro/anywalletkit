@@ -73,11 +73,16 @@ describe('readEpoch (recorded mainnet answers, 2026-11-08)', () => {
 })
 
 describe('epochStartsAt and epochOfHeight', () => {
-  const e = { height: 4946n, startBlock: 223_487_537n, length: EPOCH_LENGTH, block: 223_520_000n, blocksLeft: 0n, startedAt: 1_000_000, epochMs: 24_840_000, endsAt: 0 }
-  it('epoch starts are startedAt + Δ × epochMs', () => {
+  const e = { height: 4946n, startBlock: 223_487_537n, length: EPOCH_LENGTH, block: 223_520_000n, blocksLeft: 0n, startedAt: 1_000_000, epochMs: 24_840_000, endsAt: 1_000_000 + 24_840_000 }
+  it('past epochs count back from startedAt, later ones on from endsAt', () => {
     expect(epochStartsAt(e, 4946n)).toBe(1_000_000)
+    expect(epochStartsAt(e, 4947n)).toBe(e.endsAt)
     expect(epochStartsAt(e, 4950n)).toBe(1_000_000 + 4 * 24_840_000)
     expect(epochStartsAt(e, 4945n)).toBe(1_000_000 - 24_840_000)
+    // A slow epoch moves every later start, exactly as the liquid module dates them.
+    const slow = { ...e, endsAt: e.endsAt + 600_000 }
+    expect(epochStartsAt(slow, 4950n)).toBe(1_000_000 + 4 * 24_840_000 + 600_000)
+    expect(epochStartsAt(slow, 4945n)).toBe(1_000_000 - 24_840_000)
   })
   it('heights map to epochs around the boundaries', () => {
     expect(epochOfHeight(e, 223_487_537n)).toBe(4946n)

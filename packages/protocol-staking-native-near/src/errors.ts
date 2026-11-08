@@ -9,6 +9,8 @@ export type NearStakingErrorCode =
   | 'pool-required'        // several pools allowed, no default, and the call named none
   | 'pool-not-allowed'     // see `refusals`
   | 'exceeds-staked'       // unstake larger than the staked balance
+  | 'timer-reset-refused'  // the unstake would restart the wait of a balance still unbonding; see NearUnstakeOptions.allowTimerReset
+  | 'max-fee-exceeded'     // the fresh plan's fee is above the write's `maxFee`
   | 'nothing-staked'
   | 'not-withdrawable'     // unstaked balance still locked; see `unlock`
   | 'nothing-to-claim'

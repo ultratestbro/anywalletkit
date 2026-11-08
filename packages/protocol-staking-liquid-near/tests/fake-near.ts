@@ -32,6 +32,10 @@ export class FakeNear {
   totalShares = 8_926_759_580_492_877_835_961_310_684_912n
   /** The contract's liquid balance (view_account.amount). */
   liquidity = 1_000_000n * NEAR
+  /** The contract's storage_usage in bytes (LiNEAR on mainnet: 13.35 MB = 133.5 NEAR of storage). */
+  contractStorage = 13_347_387n
+  /** `runtime_config.min_gas_purchase_price`; 'fails' makes EXPERIMENTAL_protocol_config throw. */
+  minGasPurchasePrice: string | 'fails' = '1000000000'
   beneficiaries: Record<string, number> = { 'linear.sputnik-dao.near': 600 }
   epochHeight = EPOCH
   epochStart = EPOCH_START
@@ -126,11 +130,15 @@ export class FakeNear {
     this.calls.push({ method, params })
     const p = params as Record<string, unknown>
     if (method === 'gas_price') return { gas_price: String(this.gasPrice) }
+    if (method === 'EXPERIMENTAL_protocol_config') {
+      if (this.minGasPurchasePrice === 'fails') throw FakeNear.rpcError(method, 'INTERNAL_ERROR')
+      return { protocol_version: 88, runtime_config: { min_gas_purchase_price: this.minGasPurchasePrice } }
+    }
     if (method === 'validators') return { epoch_height: Number(this.epochHeight.toString()), epoch_start_height: Number(this.epochStart.toString()), current_validators: [], next_validators: [] }
     if (method === 'block') return this.block(p.finality === 'final' ? this.head : BigInt(p.block_id as number))
     if (method === 'query' && p.request_type === 'view_account') {
       const id = p.account_id as string
-      if (id === this.contract) return { amount: String(this.liquidity), locked: '0', storage_usage: 13_347_387, code_hash: this.codeHash }
+      if (id === this.contract) return { amount: String(this.liquidity), locked: '0', storage_usage: Number(this.contractStorage.toString()), code_hash: this.codeHash }
       const b = this.balances.get(id)
       if (!b) throw FakeNear.rpcError('query', 'UNKNOWN_ACCOUNT')
       return { amount: String(b.amount), locked: String(b.locked), storage_usage: Number(b.storage.toString()), code_hash: '11111111111111111111111111111111' }

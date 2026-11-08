@@ -38,7 +38,7 @@ export const recording = (): Recording =>
 /** A pool view's behaviour: a value, a missing method, or a failing call. */
 export type View<T> = T | { missing: true } | { throws: string }
 export interface Delegation { staked: bigint; unstaked: bigint; canWithdraw: boolean }
-export interface FakePool { paused: View<unknown>; fee: View<unknown>; delegators: Map<string, Delegation> }
+export interface FakePool { paused: View<unknown>; fee: View<unknown>; delegators: Map<string, Delegation>; summary?: View<unknown> }
 export interface FakeAccount { amount: bigint; locked: bigint; storage: number; codeHash: string }
 
 const rpcError = (name: string, message = name) => new NearRpcError('query', { name: 'HANDLER_ERROR', message, cause: { name } })
@@ -48,6 +48,10 @@ export class FakeNear {
   validators = structuredClone(this.rec.validators)
   final: Header = { ...this.rec.blocks.final }
   gasPrice = this.rec.gasPrice
+  /** `runtime_config.min_gas_purchase_price` of EXPERIMENTAL_protocol_config (mainnet, protocol 88); a { throws } fails the call. */
+  minGasPurchasePrice: View<string> = '1000000000'
+  /** Code hashes the pool.near factory allows (`is_contract_allowed`). */
+  factoryAllowed = new Set<string>(['AjD4YJaXgpiRdiArqnzyDi7Bkr1gJms9Z2w7Ev5esTKB', 'GGfKUF9TuAFN4AzbecPonNGuRTuVqx8UPXmViogN8pRm', '5vf2Jkqpk11H7szLnY4XdPA6maJi1ND8xe346xtbtX8e'])
   accounts = new Map<string, FakeAccount>()
   pools = new Map<string, FakePool>()
   /** Heights the chain skipped (UNKNOWN_BLOCK) and blocks a node pruned (any other error). */
@@ -69,6 +73,8 @@ export class FakeNear {
       }
       this.pools.set(id, { paused: view('is_staking_paused'), fee: view('get_reward_fee_fraction'), delegators: new Map() })
     }
+    // staking-farm pools answer get_pool_summary; unless a test sets one, it repeats the current fee as the next one.
+    this.accounts.set('pool.near', { amount: 100n * NEAR, locked: 0n, storage: 2_000_000, codeHash: 'factory' })
     const nima = this.rec.calls[`${ASTRO} get_account nima.near`] as { staked_balance: string; unstaked_balance: string; can_withdraw: boolean }
     this.pools.get(ASTRO)!.delegators.set('nima.near', { staked: BigInt(nima.staked_balance), unstaked: BigInt(nima.unstaked_balance), canWithdraw: nima.can_withdraw })
     // The wallet under test: 10 NEAR, a plain named account (182 bytes of storage).
@@ -125,6 +131,10 @@ export class FakeNear {
   private view(pool: string, method: string, args: Record<string, unknown>): unknown {
     const account = this.accounts.get(pool)
     if (!account) throw rpcError('UNKNOWN_ACCOUNT', `account ${pool} does not exist while viewing`)
+    if (pool === 'pool.near') {
+      if (method === 'is_contract_allowed') return this.factoryAllowed.has(String(args.code_hash))
+      return { __error: 'wasm execution failed with error: MethodResolveError(MethodNotFound)' }
+    }
     const p = this.pools.get(pool)
     const answer = (v: View<unknown> | undefined): unknown => {
       if (v === undefined || (typeof v === 'object' && v !== null && 'missing' in v)) return { __error: 'wasm execution failed with error: MethodResolveError(MethodNotFound)' }
@@ -134,6 +144,12 @@ export class FakeNear {
     if (!p) return answer(undefined)
     if (method === 'is_staking_paused') return answer(p.paused)
     if (method === 'get_reward_fee_fraction') return answer(p.fee)
+    if (method === 'get_pool_summary') {
+      if (p.summary !== undefined) return answer(p.summary)
+      const fee = answer(p.fee)
+      if (fee && typeof fee === 'object' && '__error' in fee) return fee
+      return { owner: 'owner.near', total_staked_balance: '1', reward_fee_fraction: fee, next_reward_fee_fraction: fee, burn_fee_fraction: { numerator: 0, denominator: 1 }, farms: [] }
+    }
     if (method === 'get_account') {
       const d = p.delegators.get(String(args.account_id))
       return { account_id: args.account_id, unstaked_balance: String(d?.unstaked ?? 0n), staked_balance: String(d?.staked ?? 0n), can_withdraw: d?.canWithdraw ?? true }
@@ -145,6 +161,12 @@ export class FakeNear {
     this.requests.push({ method, params })
     const p = params as Record<string, unknown>
     if (method === 'gas_price') return { gas_price: this.gasPrice }
+    if (method === 'EXPERIMENTAL_protocol_config') {
+      const v = this.minGasPurchasePrice
+      if (typeof v === 'object' && 'throws' in v) throw new NearRpcError(method, { name: 'HANDLER_ERROR', message: v.throws, cause: { name: 'INTERNAL_ERROR' } })
+      if (typeof v === 'object') return { protocol_version: 88, runtime_config: {} }
+      return { protocol_version: 88, runtime_config: { min_gas_purchase_price: v } }
+    }
     if (method === 'validators') {
       if (Array.isArray(params) && params[0] === null) return structuredClone(this.validators)
       if (typeof p?.epoch_id === 'string') {

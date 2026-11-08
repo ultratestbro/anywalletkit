@@ -21,7 +21,7 @@ export const PRICE_SCALE = 10n ** 24n
 export const MIN_EPOCHS_TO_UNLOCK = 4n
 /** Block heights per epoch, mainnet and testnet. */
 export const EPOCH_LENGTH = 43_200n
-/** Fallback epoch duration when the chain cannot be read: ~6.9 h, as measured on mainnet in November 2026. */
+/** Fallback epoch duration when the chain cannot be read: ~6.9 h (measured 6.9–7.1 h on mainnet in November 2026). */
 export const TYPICAL_EPOCH_MS = 24_840_000
 /**
  * Unstaked balances at or below this many yoctoNEAR are treated as empty. `deposit_and_stake` charges
@@ -29,27 +29,44 @@ export const TYPICAL_EPOCH_MS = 24_840_000
  * withdraw it would cost more gas than it is worth.
  */
 export const UNSTAKED_DUST = 1_000_000n
-/** Liquid NEAR the contract keeps for itself; a withdrawal needs contract balance − 1 NEAR ≥ amount. */
+/**
+ * Liquid NEAR the contract keeps for itself: a withdrawal needs contract balance − 1 NEAR ≥ amount
+ * (assert_can_withdraw). The runtime also keeps the contract's storage cost (storage_usage × 10^19:
+ * ~52 NEAR for rNEAR, ~133 NEAR for LiNEAR), so what it can pay is balance − max(1 NEAR, storage).
+ */
 export const CONTRACT_MIN_RESERVE_BALANCE = YOCTO_PER_NEAR
-/** NEP-145 registration, the same on every family contract (storage_balance_bounds.min). */
+/** NEP-145 registration, the same on every family contract (storage_balance_bounds.min). Only for receiving the token by transfer: `deposit_and_stake` registers the staker itself. */
 export const STORAGE_DEPOSIT = 1_250_000_000_000_000_000_000n
 
-/** NEAR left on the account by `stake`, for gas and storage: 0.02 NEAR. */
+/**
+ * NEAR left on the account by `stake`: 0.02 NEAR. `stake` never leaves less than the upfront gas of
+ * one unstake (about 0.035 NEAR at today's prices, see fees.ts), so the stake can always be left.
+ */
 export const DEFAULT_RESERVE = 2n * 10n ** 22n
 /** Smallest stake the module sends: 0.001 NEAR. */
 export const MIN_STAKE = 10n ** 21n
 
 /**
- * Prepaid gas per call; unused gas is refunded. Burnt on mainnet (whole transaction): deposit_and_stake
- * ~3.5 Tgas on both contracts (it stakes nothing itself: the operator bot does), unstake_all 3.5,
- * withdraw_all 3.4 (rNEAR) to ~11 (LiNEAR).
+ * Prepaid gas per call. All of it is bought upfront at min_gas_purchase_price (the unburnt part is
+ * refunded), so it is kept near what the calls use. Burnt on mainnet (whole transaction):
+ * deposit_and_stake ~3.1–3.5 Tgas on both contracts (it stakes nothing itself: the operator bot does;
+ * an rNEAR stake with 30 Tgas prepaid succeeded), unstake_all 3.5, withdraw_all 3.4 (rNEAR) to ~11
+ * (LiNEAR). None of them makes a cross-contract call but the payout transfer.
  */
 export const DEFAULT_GAS = {
-  stake: 100n * TGAS,
-  unstake: 50n * TGAS,
-  withdraw: 50n * TGAS,
-  storage: 30n * TGAS,
+  stake: 30n * TGAS,
+  unstake: 30n * TGAS,
+  withdraw: 30n * TGAS,
 } as const
+
+/** Gas price margin of fee estimates (+10 %, as wallet-near's own estimate), so a quoted fee also passes as `maxFee`. */
+export const GAS_PRICE_MARGIN_NUM = 11n
+export const GAS_PRICE_MARGIN_DEN = 10n
+/**
+ * Price per prepaid gas unit when the node cannot report `runtime_config.min_gas_purchase_price`:
+ * the mainnet value (protocol 88, Nov 2026), so balance checks fail toward needing more.
+ */
+export const MIN_GAS_PURCHASE_PRICE_FALLBACK = 10n ** 9n
 
 /** Epochs the APR looks back over by default (~7 days at ~6.9 h per epoch). */
 export const DEFAULT_APR_WINDOW_EPOCHS = 24

@@ -85,12 +85,14 @@ export async function readEpoch(rpc: NearRpc, options: ReadEpochOptions = {}): P
   }
 }
 
-/** Unix ms estimate of the start of epoch `height`, from the clock (`startedAt + (height − current) × epochMs`). */
+/**
+ * Unix ms estimate of the start of epoch `height`. Past and current epochs count from `startedAt`;
+ * later ones from `endsAt` (which follows the current epoch's real progress), one `epochMs` each.
+ * The liquid module dates epochs the same way.
+ */
 export function epochStartsAt(epoch: NearEpoch, height: bigint): number {
-  const delta = height - epoch.height
-  // Epoch counts are tiny (thousands), so the conversion below is exact.
-  // eslint-disable-next-line anywalletkit/no-number-bigint
-  return epoch.startedAt + Number(delta) * epoch.epochMs
+  if (height <= epoch.height) return epoch.startedAt - bigintToNumber(epoch.height - height) * epoch.epochMs
+  return epoch.endsAt + bigintToNumber(height - epoch.height - 1n) * epoch.epochMs
 }
 
 /**

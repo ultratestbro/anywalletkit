@@ -10,6 +10,8 @@ export type LiquidStakingErrorCode =
   | 'exceeds-balance'       // unstake larger than the token balance
   | 'nothing-staked'
   | 'relock-refused'        // see LiquidUnstakeOptions.allowRelock
+  | 'timer-reset-refused'   // see LiquidUnstakeOptions.allowTimerReset
+  | 'max-fee-exceeded'      // the fresh plan's fee is above the write's `maxFee`
   | 'not-withdrawable'      // unlock epoch not reached; see `details.unlock`
   | 'awaiting-liquidity'    // unlocked, but the contract cannot pay yet
   | 'nothing-to-claim'

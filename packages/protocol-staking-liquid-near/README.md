@@ -23,8 +23,9 @@ import { LiquidStakingProtocolNear } from '@anywalletkit/protocol-staking-liquid
 const rnear = new LiquidStakingProtocolNear(account, { pool: 'rnear', provider: ['https://free.rpc.fastnear.com'] })
 
 const quote = await rnear.quoteStake({ amount: 730_000_000_000_000_000_000_000n })   // 0.73 NEAR
-// quote.transactions: [{ receiverId: 'lst.rhealab.near', actions: [deposit_and_stake, 100 Tgas, 0.73 NEAR] }]
-// quote.shares (tokens minted at the current totals), quote.fee (upper bound), quote.apr, quote.maxStakeable
+// quote.transactions: [{ receiverId: 'lst.rhealab.near', actions: [deposit_and_stake, 30 Tgas, 0.73 NEAR] }]
+// quote.shares (tokens minted at the current totals), quote.fee (upper bound), quote.upfront (gas the node
+// holds back on acceptance), quote.reserve, quote.apr, quote.maxStakeable
 await rnear.stake({ amount: 730_000_000_000_000_000_000_000n, expected: quote.transactions })
 
 const exit = await rnear.quoteRequestWithdrawal({ amount: 'all' })    // or token base units
@@ -48,8 +49,8 @@ to NEAR for the contract, whose `unstake` takes NEAR.
 | `network` | the account's | `near:testnet` gives testnet, anything else mainnet. rNEAR has no testnet contract (`'unsupported-network'`). |
 | `provider` | the wallet-near account's RPC | URL, transport, or a list (failover). An external-signer account has no RPC: pass it. |
 | `archivalProvider` | fastnear archival | For the past price behind the APR. |
-| `reserve` | 0.02 NEAR | Left on the account by `stake`, for gas. |
-| `gas` | stake 100, unstake 50, withdraw 50 Tgas | Prepaid; unused gas is refunded, but the quoted fee is the prepaid upper bound and `getMaxStakeable()` keeps it back. Burnt on mainnet: `deposit_and_stake` ~3.5 Tgas (a plain deposit was sent with 30 Tgas), `unstake_all` 3.5, `withdraw_all` 3.4 (rNEAR) to ~11 (LiNEAR). |
+| `reserve` | 0.02 NEAR | Left on the account by `stake`; never less than one unstake's upfront gas (~0.035 NEAR today). |
+| `gas` | 30 Tgas per call | Prepaid gas, all bought upfront at `min_gas_purchase_price` (10^9 on mainnet, 10× the gas price); the unburnt part is refunded a few blocks later. Burnt on mainnet: the contract's receipt of each call 2.4–3.4 Tgas (a plain rNEAR deposit was sent with 30 Tgas), whole transactions 3.4 (rNEAR) to ~11 (LiNEAR). |
 | `apr` | — | `() => percent`: an app's or an indexer's figure instead of the estimate. |
 | `aprWindowEpochs` | 24 (~7 days) | Window of the price-based APR. |
 | `timeoutMs` | 15 000 | Per request, URL providers. |
@@ -59,15 +60,15 @@ to NEAR for the contract, whose `unstake` takes NEAR.
 | | What it does |
 |---|---|
 | `quoteStake` / `stake({ amount, expected? })` | `deposit_and_stake` with exactly `amount`. No "stake everything": pass the amount (`getMaxStakeable()` is the most it can be). |
-| `quoteRequestWithdrawal` / `requestWithdrawal({ amount, allowRelock?, expected? })` | `unstake(nearValue)`, or `unstake_all` for `'all'` / the whole balance. An unlocked balance is withdrawn first in the same transaction. |
+| `quoteRequestWithdrawal` / `requestWithdrawal({ amount, allowRelock?, allowTimerReset?, expected? })` | `unstake(nearValue)`, or `unstake_all` for `'all'` / the whole balance. An unlocked balance is withdrawn first in the same transaction. |
 | `quoteClaimWithdrawals` / `claimWithdrawals({ ids?, expected? })` | `withdraw_all`. `ids` may only be `[poolRequestId(contract)]`. |
 | `getWithdrawalRequests()` | One request when the account has NEAR unstaked: `claimable`, `unlockEpoch`, `awaitingLiquidity`, `unlock` (epoch and date). |
 | `getStakedBalance()` | `balance` = tokens, `rate` = price, `total` = their NEAR value, `unstaked`, `withdrawable`. |
 | `getAccountDetails()` | Tokens, value, unstaked, exact `unlockEpoch`, `canWithdraw`, `registered`. |
-| `getPoolInfo()` | Price, totals, `paused`, live `codeHash` and `codeHashKnown`, `liquidity`, `feeBps`. |
+| `getPoolInfo()` | Price, totals, `paused`, live `codeHash` and `codeHashKnown`, `liquidity`, `kept` (what it cannot pay out), `feeBps`. |
 | `getApr()` | The `apr` hook, else the price change over `aprWindowEpochs`, annualized (percent). |
 | `getEpoch()` | Height, start, measured duration, estimated end. |
-| `getMaxStakeable()` | Spendable − reserve − fee. |
+| `getMaxStakeable()` | Spendable − reserve − the stake's upfront gas. |
 | `describeActivity(tx, ctx)` | Feed labels: "Staked NEAR for rNEAR · Rhea rNEAR liquid staking", "Requested unstake", "Withdrew unstaked NEAR". |
 
 Helpers: `resolvePool`, `poolRequestId`, `sameTransactions`, `canSendBatch`, `fc`, `readEpoch`,
@@ -96,10 +97,13 @@ has `ft_on_transfer`: tokens sent that way are lost), never `Transfer`, keys or 
   After it, `getAccountDetails().unlockEpoch` is exact; `getWithdrawalRequests()` dates it.
 - **A new unstake restarts the timer for the whole unstaked balance in that contract.** When part
   of it is already unlocked, the module withdraws it first in the same transaction
-  (`withdrawsFirst`, `'withdraws-unlocked-first'`). When it is still locked, the quote says so
-  (`resetsTimer`, `'resets-unbonding-timer'`).
-- A withdrawal also needs the contract to hold the NEAR: its liquid balance minus its 1 NEAR reserve
-  must cover the amount (`ERR_NO_ENOUGH_CONTRACT_BALANCE` otherwise). The contract's bot brings the
+  (`withdrawsFirst`, `'withdraws-unlocked-first'`). When it is still locked, the unstake is refused
+  (`'timer-reset-refused'`) unless `allowTimerReset: true`; the quote then says so (`resetsTimer`,
+  `'resets-unbonding-timer'`). Below 0.001 NEAR it is refused even then.
+- A withdrawal also needs the contract to hold the NEAR: its liquid balance minus what it keeps must
+  cover the amount. It keeps 1 NEAR itself (`ERR_NO_ENOUGH_CONTRACT_BALANCE`), and the runtime keeps
+  its storage cost (storage_usage × 10^19: ~52 NEAR for rNEAR, ~133 NEAR for LiNEAR; a receipt that
+  goes below it fails, reverting the whole transaction), so `kept` = max(1 NEAR, storage cost). The contract's bot brings the
   NEAR back from the validators each epoch. Until then the request is `awaitingLiquidity` and a claim
   refuses with `'awaiting-liquidity'` ("waiting for the protocol's payout"). An unstake that would
   lock such an unlocked balance again refuses with `'relock-refused'` unless `allowRelock: true`.
@@ -112,8 +116,13 @@ has `ft_on_transfer`: tokens sent that way are lost), never `Transfer`, keys or 
   "not paused"). Both apply to exits too: a paused contract rejects every call anyway.
 - Every method that uses the account checks it is on the module's network (`'wrong-chain'`). Writes
   on a read-only account throw `ReadOnlyAccountError` before any read.
-- Funds: `amount + fee + reserve` must fit the spendable balance (amount − locked − storage), else
-  core's `InsufficientFundsError`. Exits check the fee.
+- Funds: `amount + upfront + reserve` must fit the spendable balance (amount − locked − storage),
+  else core's `InsufficientFundsError`. Exits check their `upfront`. `upfront` is Σ gas ×
+  max(gas price + 10 %, `min_gas_purchase_price` from `EXPERIMENTAL_protocol_config`, mainnet's 10^9
+  when the node cannot say): the node holds it back when it accepts the transaction. `fee` is
+  Σ gas × (gas price + 10 %), the margin wallet-near's estimate uses, so `maxFee: quote.fee` passes;
+  the module checks `maxFee` itself too (`'max-fee-exceeded'`). Each send gets a copy of the
+  quoted transactions.
 - No NEP-145 step: `deposit_and_stake` creates the account's entry in the contract (on mainnet, an
   implicit account a 1Click delivery had just created staked into LiNEAR this way, unregistered).
   Registration only matters for receiving the token by transfer.

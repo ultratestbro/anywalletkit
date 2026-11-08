@@ -57,6 +57,17 @@ async function value(name, run, show) {
   await step(name, async () => { out = await run(); return show?.(out) })
   return out
 }
+/**
+ * A real delegator may hold too little spare NEAR to buy the prepaid gas upfront: then the module
+ * refuses exactly where the node would (InsufficientFundsError), and that is the expected answer.
+ */
+async function orUpfrontShort(run) {
+  try { return await run() } catch (e) {
+    if (e?.name === 'InsufficientFundsError') return `refused: InsufficientFundsError (needs ${fmt(BigInt(e.required))} upfront, has ${fmt(BigInt(e.available))}: the node would refuse it too)`
+    throw e
+  }
+}
+
 async function refused(name, code, run) {
   await step(name, async () => {
     try { await run() } catch (e) { if (e?.code === code || e?.name === code) return `refused: ${e.code ?? e.name}${e.refusals ? ` [${e.refusals.join(', ')}]` : ''}`; throw e }
@@ -80,12 +91,12 @@ const pools = await value('listPools (one validators call)', () => fresh.listPoo
 await step('listPools made exactly one RPC call', async () => { if (requests - before !== 1) throw new Error(`${requests - before} calls`); return `${requests - before}` })
 await step('listPools keeps only factory pools', async () => { const bad = pools?.filter((p) => factoryOf(p.id, 'mainnet') === null) ?? []; if (bad.length) throw new Error(bad.map((p) => p.id).join(', ')); return 'yes (lst-pool.near and other foreign validators dropped)' })
 
-for (const [id, expect] of [[POOL, 'eligible'], ['figment.poolv1.near', 'eligible'], ['aurora.pool.near', 'fee-above-max'], ['nope-xyz-404.poolv1.near', 'not-found']]) {
+for (const [id, expect] of [[POOL, 'eligible'], ['figment.poolv1.near', 'eligible'], ['aurora.pool.near', 'fee-above-max'], ['intear.pool.near', 'eligible'], ['nope-xyz-404.poolv1.near', 'not-found']]) {
   await step(`getPool ${id} → ${expect}`, async () => {
     const p = await any.getPool(id)
     const verdict = p.eligible ? 'eligible' : p.refusals.join('/')
     if (!verdict.includes(expect)) throw new Error(`got ${verdict}`)
-    return `${verdict}; code ${p.codeHash?.slice(0, 8) ?? '-'} known ${p.codeHashKnown}, fee ${p.feePercent ?? '-'} %, paused ${p.paused}, stake ${fmt(p.stake)}, uptime ${p.uptime?.toFixed(1) ?? '-'} %, APR ${p.apr?.toFixed(2) ?? '-'} % (${p.aprSource})`
+    return `${verdict}; code ${p.codeHash?.slice(0, 8) ?? '-'} known ${p.codeHashKnown}, fee ${p.feePercent ?? '-'} %${p.nextFee ? ` (next ${p.nextFee.numerator}/${p.nextFee.denominator})` : ''}, paused ${p.paused}, stake ${fmt(p.stake)}, uptime ${p.uptime?.toFixed(1) ?? '-'} %, APR ${p.apr?.toFixed(2) ?? '-'} % (${p.aprSource})`
   })
 }
 for (const id of ['lst-pool.near', 'meta-pool.near']) {
@@ -132,7 +143,10 @@ if (rich) {
   await step('getMaxStakeable', async () => fmt(await p.getMaxStakeable()))
   await step('quoteStake 1 NEAR (deposit_and_stake)', async () => {
     const q = await p.quoteStake({ amount: NEAR })
-    return `fee ≤ ${fmt(q.fee)}, ${q.pool.id} APR ${q.apr?.toFixed(2)} %, max ${fmt(q.maxStakeable)}, tx ${JSON.stringify(q.transactions, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))}`
+    // The node buys all prepaid gas upfront at min_gas_purchase_price (10^9 since protocol 88).
+    if (q.upfront < 50n * 10n ** 12n * 10n ** 9n) throw new Error(`upfront ${q.upfront} is below 50 Tgas × 10^9`)
+    if (q.reserve < q.upfront - 10n ** 22n) throw new Error(`reserve ${q.reserve} cannot pay a later unstake`)
+    return `fee ≤ ${fmt(q.fee)}, upfront ${fmt(q.upfront)}, reserve ${fmt(q.reserve)}, ${q.pool.id} APR ${q.apr?.toFixed(2)} %, max ${fmt(q.maxStakeable)}, tx ${JSON.stringify(q.transactions, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))}`
   })
   await step('quoteRequestWithdrawal all (unstake_all, + withdraw_all first when unlocked)', async () => {
     const q = await p.quoteRequestWithdrawal({ amount: 'all' })
@@ -152,27 +166,28 @@ if (rich) {
 const ready = delegators.find((d) => BigInt(d.unstaked_balance) > 10n ** 21n && d.can_withdraw)
 if (ready) {
   const p = new NativeStakingProtocolNear(watch(ready.account_id), { pools: [POOL], provider: transport, discover: false })
-  await step(`quoteClaimWithdrawals for ${ready.account_id} (withdraw_all)`, async () => { const q = await p.quoteClaimWithdrawals(); return `${fmt(q.amount)} from ${q.claims.map((c) => c.pool).join(',')}, fee ≤ ${fmt(q.fee)}` })
+  await step(`quoteClaimWithdrawals for ${ready.account_id} (withdraw_all)`, () => orUpfrontShort(async () => { const q = await p.quoteClaimWithdrawals(); return `${fmt(q.amount)} from ${q.claims.map((c) => c.pool).join(',')}, fee ≤ ${fmt(q.fee)}, upfront ${fmt(q.upfront)}` }))
 } else console.log('skip claim quote: no delegator with a withdrawable balance in the first accounts')
 // An unlocked balance waiting next to stake: the unstake must take it out first, in the same transaction.
 const both = delegators.find((d) => BigInt(d.unstaked_balance) > 10n ** 21n && d.can_withdraw && BigInt(d.staked_balance) > NEAR)
 if (both) {
   const p = new NativeStakingProtocolNear(watch(both.account_id), { pools: [POOL], provider: transport, discover: false })
-  await step(`quoteRequestWithdrawal 1 NEAR for ${both.account_id} → [withdraw_all, unstake]`, async () => {
+  await step(`quoteRequestWithdrawal 1 NEAR for ${both.account_id} → [withdraw_all, unstake]`, () => orUpfrontShort(async () => {
     const q = await p.quoteRequestWithdrawal({ amount: NEAR })
     const methods = q.transactions[0].actions.map((a) => a.functionCall.methodName).join('+')
     if (methods !== 'withdraw_all+unstake') throw new Error(`methods ${methods}`)
-    return `${methods}, withdrawsFirst ${fmt(q.withdrawsFirst)}, fee ≤ ${fmt(q.fee)}`
-  })
+    return `${methods}, withdrawsFirst ${fmt(q.withdrawsFirst)}, fee ≤ ${fmt(q.fee)}, upfront ${fmt(q.upfront)}`
+  }))
 } else console.log('skip withdraw-first check: no delegator with both stake and an unlocked balance in the first accounts')
 const unbonding = delegators.find((d) => BigInt(d.unstaked_balance) > 10n ** 21n && !d.can_withdraw && BigInt(d.staked_balance) > NEAR)
 if (unbonding) {
   const p = new NativeStakingProtocolNear(watch(unbonding.account_id), { pools: [POOL], provider: transport, discover: false })
-  await step(`quoteRequestWithdrawal 1 NEAR for ${unbonding.account_id} → resets the unbonding timer`, async () => {
-    const q = await p.quoteRequestWithdrawal({ amount: NEAR })
+  await refused(`quoteRequestWithdrawal 1 NEAR for ${unbonding.account_id} → refused: it would restart the unbonding timer`, 'timer-reset-refused', () => p.quoteRequestWithdrawal({ amount: NEAR }))
+  await step(`… and with allowTimerReset → resetsTimer`, () => orUpfrontShort(async () => {
+    const q = await p.quoteRequestWithdrawal({ amount: NEAR, allowTimerReset: true })
     if (!q.resetsTimer || q.transactions[0].actions.length !== 1) throw new Error(JSON.stringify(q.warnings))
     return q.warnings.map((w) => w.message).join(' ')
-  })
+  }))
 }
 
 console.log(`\n${requests} RPC requests`)

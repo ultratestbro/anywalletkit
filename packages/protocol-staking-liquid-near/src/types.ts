@@ -31,10 +31,10 @@ export interface LiquidStakingNearConfig {
   archivalProvider?: NearProvider | NearProvider[]
   /** Per-request timeout for url providers, ms (default 15 000). */
   timeoutMs?: number
-  /** yoctoNEAR `stake` leaves on the account for gas and storage (default 0.02 NEAR). */
+  /** yoctoNEAR `stake` leaves on the account (default 0.02 NEAR); never less than one unstake's upfront gas. */
   reserve?: bigint | number
-  /** Prepaid gas overrides (defaults: stake 100 Tgas, unstake 50, withdraw 50, storage_deposit 30). */
-  gas?: { stake?: bigint; unstake?: bigint; withdraw?: bigint; storage?: bigint }
+  /** Prepaid gas overrides (defaults: 30 Tgas each). All of it is bought upfront at min_gas_purchase_price: keep it small. */
+  gas?: { stake?: bigint; unstake?: bigint; withdraw?: bigint }
   /** Replaces the price-based APR estimate (an app's or an indexer's figure), percent. */
   apr?: () => Promise<number> | number
   /** Epochs the APR estimate looks back over (default 24, ~7 days). */
@@ -63,6 +63,8 @@ export interface LiquidPoolInfo {
   codeHashKnown: boolean
   /** The contract's liquid balance (view_account.amount): what withdrawals are paid from. */
   liquidity: bigint
+  /** What the contract cannot pay out: max(1 NEAR, its storage cost). A withdrawal needs liquidity − kept ≥ amount. */
+  kept: bigint
   /** Protocol fee on rewards, basis points (sum of `get_beneficiaries`). */
   feeBps: number
 }
@@ -117,8 +119,7 @@ export interface LiquidStakedBalance extends StakedBalance {
 // ── Writes ───────────────────────────────────────────────────────────────────
 
 export type LiquidStakingWarningCode =
-  | 'registers-storage'         // the first stake pays the 0.00125 NEAR NEP-145 registration
-  | 'resets-unbonding-timer'    // a locked unstaked balance restarts its timer
+  | 'resets-unbonding-timer'    // a locked unstaked balance restarts its timer (only with allowTimerReset)
   | 'withdraws-unlocked-first'  // the unlocked balance is withdrawn in the same transaction
   | 'relocks-unlocked'          // the unlocked balance cannot be paid now (liquidity) and would lock again: refused unless allowRelock
   | 'unlock-may-be-later'       // the contract may add epochs (large amounts, after settlement): the exact epoch is known after the unstake
@@ -137,17 +138,23 @@ export interface LiquidWriteOptions extends WriteOptions {
 export interface LiquidStakeOptions extends StakeOptions, LiquidWriteOptions {}
 
 export interface LiquidStakeQuote {
-  /** Upper bound of the network fee, yoctoNEAR. */
+  /** Upper bound of the network fee, yoctoNEAR (all gas burnt, at the gas price + 10 %). Passes as `maxFee`. */
   fee: bigint
+  /**
+   * NEAR the node holds back when it accepts the transaction, beside the deposit: the prepaid gas,
+   * bought at min_gas_purchase_price. The unburnt part comes back a few blocks later.
+   */
+  upfront: bigint
+  /** NEAR the stake leaves on the account: the configured reserve, but at least one unstake's `upfront`. */
+  reserve: bigint
   amount: bigint
   /** Tokens expected for `amount` at the current price (rounded down). */
   shares: bigint
   price: bigint
-  /** 0n, or STORAGE_DEPOSIT when the account is not registered yet. */
-  storageDeposit: bigint
   apr: number | null
+  /** available − reserve − upfront (never below 0). */
   maxStakeable: bigint
-  /** [storage_deposit?, deposit_and_stake] to the contract, as one transaction. */
+  /** One transaction: a single `deposit_and_stake` (it registers the account itself; no storage_deposit). */
   transactions: NearTransaction[]
   warnings: LiquidStakingWarning[]
 }
@@ -161,10 +168,17 @@ export interface LiquidUnstakeOptions extends Omit<WithdrawalRequestOptions, 'am
   amount: bigint | number | 'all'
   /** Accept that an unlocked balance the contract cannot pay now locks again (default false: refused). */
   allowRelock?: boolean
+  /**
+   * Accept that an unstaked balance still unbonding restarts its wait (4+ epochs) together with this
+   * amount (default false: refused with 'timer-reset-refused'). Never accepted below MIN_STAKE.
+   */
+  allowTimerReset?: boolean
 }
 
 export interface LiquidUnstakeQuote {
   fee: bigint
+  /** See {@link LiquidStakeQuote.upfront}: the account must hold this much NEAR to send the unstake. */
+  upfront: bigint
   /** Tokens burnt (for 'all': the whole balance). */
   shares: bigint
   /** NEAR moving to unstaked: what `unstake(amount)` is called with (shares × price, rounded down). */
@@ -190,7 +204,7 @@ export interface LiquidUnstakeResult extends LiquidUnstakeQuote {
 export interface LiquidWithdrawalRequest extends WithdrawalRequest {
   contract: string
   unlockEpoch: bigint
-  /** Unlocked, but the contract's liquidity is below amount + 1 NEAR: waiting for the epoch_withdraw bot. */
+  /** Unlocked, but the contract's liquidity is below amount + `kept`: waiting for the epoch_withdraw bot. */
   awaitingLiquidity: boolean
   unlock: UnlockEstimate | null
 }
@@ -199,6 +213,8 @@ export type LiquidWithdrawalRequestsView = Omit<WithdrawalRequestsView, 'request
 export interface LiquidClaimOptions extends ClaimWithdrawalsOptions, LiquidWriteOptions {}
 export interface LiquidClaimQuote {
   fee: bigint
+  /** See {@link LiquidStakeQuote.upfront}. */
+  upfront: bigint
   amount: bigint
   /** One `withdraw_all` transaction. */
   transactions: NearTransaction[]
