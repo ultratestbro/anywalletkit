@@ -319,6 +319,8 @@ describe('scan 2026-10-27 G14 (F24): EIP-712 primary-type inference is bounded',
     for (let i = 0; i < 20_000; i++) types[`T${i}`] = [{ name: 'f', type: `T${i + 1}` }]
     const t0 = performance.now()
     await expect(applyPolicies(Object.assign(createMockAccount(), { signTypedData: async (_typed: unknown) => '0x' }), { confirm: async () => true }, 'eip155:1').signTypedData!({ domain: {}, types, message: {} } as never)).rejects.toThrow(/types/)
-    expect(performance.now() - t0).toBeLessThan(200)
+    // The count bound refuses before any inference (~10 ms locally); unbounded inference over 20 000 chained types
+    // runs for seconds. 2 s keeps that gap without failing on a loaded CI runner.
+    expect(performance.now() - t0).toBeLessThan(2_000)
   })
 })
