@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-staking-native-near",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Native NEAR staking for any NEAR account: deposit_and_stake into the staking pools your app allows (standard *.poolv1.near / *.pool.near pools with a known code hash, live fee and pause checks). Unstake with the 4-epoch (about 21–28 h) unbonding countdown, withdraw, pool info with APR from the protocol's own reward data, positions across pools. Quotes return the exact NEAR transactions, so an external signer (wallet-selector) signs what was shown.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
