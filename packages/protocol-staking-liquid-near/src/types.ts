@@ -189,7 +189,7 @@ export interface LiquidUnstakeQuote {
   resetsTimer: boolean
   /** Unlocked NEAR that locks again because the contract cannot pay it now (only with allowRelock). */
   relocks: bigint
-  /** earliest = current + 4; latestEpoch null (the contract decides); exact after the unstake via getAccountDetails. */
+  /** earliest = current + 4; latestEpoch null (the contract decides); exact via getAccountDetails once the unstake is final. */
   unlock: UnlockEstimate
   transactions: NearTransaction[]
   warnings: LiquidStakingWarning[]

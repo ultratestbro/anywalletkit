@@ -11,18 +11,36 @@ const RPC = process.argv[2] ?? 'https://free.rpc.fastnear.com'
 const ARCHIVAL = process.argv[3] ?? 'https://archival-rpc.mainnet.fastnear.com'
 const sleep = (ms) => new Promise((s) => setTimeout(s, ms))
 
-/** A JSON-RPC transport that backs off on HTTP 429 / 5xx (the free endpoints rate-limit bursts). */
+const REUSE_MS = 30_000
+
+/**
+ * A JSON-RPC transport for the free endpoints, which take a burst of about 20 requests and then about
+ * one a second. It backs off on HTTP 429 / 5xx (at most 10 s a try), and answers a request it made in
+ * the last 30 s from that answer instead of resending it: every holder's quotes re-read the same
+ * contract state, epoch and gas price, and without this a run sent ~280 requests and spent most of its
+ * 5–6 minutes rate limited (the canary allows 300 s). 30 s old reads change nothing these checks test.
+ */
 const transport = (url) => {
   let id = 0
-  return async (method, params) => {
-    for (let i = 0; i < 8; i++) {
+  const send = async (method, params) => {
+    for (let i = 0; i < 12; i++) {
       const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: String(++id), method, params }) })
-      if (r.status === 429 || r.status >= 500) { await sleep(800 * 2 ** i); continue }
+      if (r.status === 429 || r.status >= 500) { await sleep(Math.min(800 * 2 ** i, 10_000)); continue }
       const j = await r.json()
       if (j.error) throw new NearRpcError(method, j.error)
       return j.result
     }
     throw new Error(`${method}: still rate limited`)
+  }
+  const recent = new Map()
+  return (method, params) => {
+    const key = `${method} ${JSON.stringify(params)}`
+    const hit = recent.get(key)
+    if (hit && Date.now() - hit.at < REUSE_MS) return hit.value.then((v) => structuredClone(v))
+    const value = send(method, params)
+    recent.set(key, { at: Date.now(), value })
+    value.catch(() => { if (recent.get(key)?.value === value) recent.delete(key) }) // errors are asked again
+    return value.then((v) => structuredClone(v))
   }
 }
 const provider = transport(RPC)

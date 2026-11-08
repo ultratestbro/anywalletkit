@@ -31,9 +31,10 @@ await rnear.stake({ amount: 730_000_000_000_000_000_000_000n, expected: quote.tr
 const exit = await rnear.quoteRequestWithdrawal({ amount: 'all' })    // or token base units
 // exit.unlock.earliestEpoch = now + 4; exit.warnings explain timer resets and withdraw-first
 await rnear.requestWithdrawal({ amount: 'all', expected: exit.transactions })
-const { unlockEpoch } = await rnear.getAccountDetails()                // exact, from the contract
+// Show exit.unlock.earliestAt. Reads use final blocks, so right after the send they still show the previous
+// unlock epoch (0 on a first unstake): read the exact one once it is at least exit.unlock.earliestEpoch.
 
-const { requests } = await rnear.getWithdrawalRequests()              // one request per contract
+const { requests } = await rnear.getWithdrawalRequests()              // one per contract: exact unlockEpoch, unlock date
 await rnear.claimWithdrawals()                                         // withdraw_all, once unlocked and payable
 ```
 
@@ -94,9 +95,11 @@ has `ft_on_transfer`: tokens sent that way are lost), never `Transfer`, keys or 
 - An unstake waits **4 or more epochs** (about 21–35 hours or more). The contract may add epochs for
   large amounts and adds one when the unstake lands after its epoch settlement, so before the unstake
   only the earliest epoch is known (`unlock.latestEpoch = null`, warning `'unlock-may-be-later'`).
-  After it, `getAccountDetails().unlockEpoch` is exact; `getWithdrawalRequests()` dates it.
-- **A new unstake restarts the timer for the whole unstaked balance in that contract.** When part
-  of it is already unlocked, the module withdraws it first in the same transaction
+  Once the unstake is final, `getAccountDetails().unlockEpoch` is exact and `getWithdrawalRequests()`
+  dates it. Reads use final blocks, a couple of blocks behind the send's answer: read right after the
+  send, they still show the previous unlock epoch (0 on a first unstake).
+- **A new unstake restarts the timer for the whole unstaked balance in that contract.** When it is
+  already unlocked, the module withdraws it first in the same transaction
   (`withdrawsFirst`, `'withdraws-unlocked-first'`). When it is still locked, the unstake is refused
   (`'timer-reset-refused'`) unless `allowTimerReset: true`; the quote then says so (`resetsTimer`,
   `'resets-unbonding-timer'`). Below 0.001 NEAR it is refused even then.

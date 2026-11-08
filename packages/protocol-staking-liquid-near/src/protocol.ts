@@ -74,7 +74,7 @@ const copyTx = (tx: NearTransaction): NearTransaction => ({
 /**
  * Liquid NEAR staking through the LiNEAR contract family (LiNEAR, Rhea rNEAR): `deposit_and_stake`
  * mints the token, `unstake` starts the delayed exit (4+ epochs, exact epoch from the contract),
- * `withdraw_all` pays out once unlocked and the contract holds the NEAR. See NEAR-STAKING-API.md.
+ * `withdraw_all` pays out once unlocked and the contract holds the NEAR. See the package README.
  *
  * Never builds `ft_transfer_call` or `ft_transfer` into the contract (it has no `ft_on_transfer`:
  * tokens sent that way are lost), and nothing but function calls to the pinned contract. Writes
@@ -529,8 +529,9 @@ export class LiquidStakingProtocolNear extends StakingProtocol<LiquidStakingNear
 
   /**
    * Unstakes `amount` token base units (`unstake` with their NEAR value), or `'all'` (`unstake_all`).
-   * An unlocked balance is withdrawn in the same transaction first. Once it lands,
-   * `getAccountDetails().unlockEpoch` is the exact epoch the NEAR unlocks at.
+   * An unlocked balance is withdrawn in the same transaction first. Once it is final,
+   * `getAccountDetails().unlockEpoch` is the exact epoch the NEAR unlocks at; reads use final blocks,
+   * so right after the send they still show the previous one (show the result's `unlock` meanwhile).
    */
   override async requestWithdrawal(options: LiquidUnstakeOptions): Promise<LiquidUnstakeResult> {
     return { ...(await this.send('requestWithdrawal', () => this.planUnstake(options), options)), approveHash: null }

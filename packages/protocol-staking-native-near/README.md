@@ -4,10 +4,8 @@ Native NEAR staking for any NEAR account: `deposit_and_stake` into the staking p
 allows**, unstake with the 4-epoch unbonding (about 21–28 h at ~6.9 h per epoch), `withdraw_all`
 once unlocked. No extra contract, no token: the position is the account's balance in each pool.
 
-> Status: in development (0.0.0), not on npm yet.
-
 ```sh
-npm install @anywalletkit/protocol-staking-native-near @anywalletkit/core
+npm install @anywalletkit/protocol-staking-native-near @anywalletkit/wallet-near @anywalletkit/kit
 ```
 
 ## Usage

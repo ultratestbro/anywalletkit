@@ -75,7 +75,7 @@ const feeValid = (v: unknown): v is Fee => {
 
 /**
  * Native NEAR staking: `deposit_and_stake` into standard staking pools, unstake with the 4-epoch
- * unbonding, `withdraw_all` once unlocked. See NEAR-STAKING-API.md for the full contract.
+ * unbonding, `withdraw_all` once unlocked. See the package README for the full behaviour.
  *
  * Fail-closed before anything is signed: the pool must be allowed (`pools` list or `'any'`), carry a
  * staking-pool factory suffix, run known staking-pool code, answer `is_staking_paused` with false,
