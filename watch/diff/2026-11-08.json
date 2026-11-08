@@ -1,0 +1,47 @@
+{
+ "date": "2026-11-08",
+ "modules": 23,
+ "sources": 456,
+ "changes": [
+  {
+   "module": "@anywalletkit/protocol-lending-aave-evm",
+   "id": "address-book",
+   "label": "Aave address book releases",
+   "type": "github-releases",
+   "what": "v4.76.1 → v4.76.2 (2026-11-08)",
+   "link": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.76.2",
+   "before": {
+    "tag": "v4.76.1",
+    "name": "v4.76.1",
+    "at": "2026-11-05",
+    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.76.1",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "v4.76.2",
+    "name": "v4.76.2",
+    "at": "2026-11-08",
+    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.76.2",
+    "prerelease": false
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-omniston",
+   "id": "docs-omniston",
+   "label": "STON.fi docs · Omniston",
+   "type": "http-text",
+   "what": "page text changed (3421 → 3422 chars)",
+   "link": "https://docs.ston.fi/docs/developer-section/omniston",
+   "before": {
+    "hash": "00f448a7bb8fee0a",
+    "chars": 3421
+   },
+   "after": {
+    "hash": "de3a68ec9a0e35b5",
+    "chars": 3422
+   }
+  }
+ ],
+ "errors": [],
+ "repointed": []
+}
