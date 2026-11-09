@@ -5,7 +5,7 @@ import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js'
 import { hex } from '@scure/base'
 import { addressFromPublicKey, spendInfo } from './address.js'
 import { FINAL_SEQUENCE, RBF_SEQUENCE, assertSafe, describeTransaction, parseRawTransaction, type DescribeContext } from './describe.js'
-import { BroadcastUnknownError, UnsafeTransactionError, UnsupportedAddressTypeError } from './errors.js'
+import { BroadcastUnknownError, FeeLimitExceededError, UnsafeTransactionError, UnsupportedAddressTypeError } from './errors.js'
 import { isAlreadyKnown, isAnsweredRefusal } from './http.js'
 import { signMessageWith } from './message.js'
 import { networkParams } from './network.js'
@@ -182,7 +182,7 @@ export class WalletAccountBtc extends WalletAccountReadOnlyBtc implements IWalle
   }
 
   private checkMax(fee: bigint, limit: bigint | number | undefined, op: string) {
-    if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation.`)
+    if (limit !== undefined && fee > BigInt(limit)) throw new FeeLimitExceededError(fee, BigInt(limit), `Exceeded maximum fee cost for ${op} operation.`)
   }
 
   /**

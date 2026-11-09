@@ -14,3 +14,22 @@ export class BroadcastUnknownError extends Error {
     this.hash = hash
   }
 }
+
+/**
+ * The fee of the transaction about to go out is above the cap in force: the account's configured
+ * maximum or the call's `maxFee`, whichever is lower. Thrown before anything is broadcast or
+ * returned, so a wallet can show `fee` and ask the user again.
+ */
+export class FeeLimitExceededError extends Error {
+  readonly code = 'fee-limit-exceeded'
+  /** The fee the transaction would pay, base units. */
+  readonly fee: bigint
+  /** The cap it is above, base units. */
+  readonly limit: bigint
+  constructor(fee: bigint, limit: bigint, message: string) {
+    super(message)
+    this.name = 'FeeLimitExceededError'
+    this.fee = fee
+    this.limit = limit
+  }
+}

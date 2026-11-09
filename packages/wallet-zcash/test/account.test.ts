@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { InsufficientFundsError, NetworkError } from '@anywalletkit/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { mnemonicToAccount } from 'viem/accounts'
-import { UnsafeTransactionError, WalletManagerZcash, decodeAddress, parseP2pkhScriptSig, parseTx, recoverMessagePublicKey, sighashAll, txid } from '../src/index.js'
+import { FeeLimitExceededError, UnsafeTransactionError, WalletManagerZcash, decodeAddress, parseP2pkhScriptSig, parseTx, recoverMessagePublicKey, sighashAll, txid } from '../src/index.js'
 import { SEED, TXID_A, TXID_B, fakeBlockchair, hex, mk } from './helpers.js'
 
 const RECIPIENT = 't1KfwsnwJeNRVjQGBDZhwKskpQbih2qx5Ua'
@@ -135,6 +135,10 @@ describe('WalletAccountZcash', () => {
     await expect(a.transfer({ recipient: RECIPIENT, amount: 60_000_000n })).rejects.toThrow(/maximum fee/)
     const b = await mk(f.fetchFn, { transactionMaxFee: 5_000 }).getAccount(0)
     await expect(b.sendTransaction({ to: RECIPIENT, value: 60_000_000n })).rejects.toThrow(/maximum fee/)
+    // The cap in force and the fee that broke it are on the error: a wallet can show the new fee and ask again.
+    const over = await b.sendTransaction({ to: RECIPIENT, value: 60_000_000n }).catch((e: unknown) => e)
+    expect(over).toBeInstanceOf(FeeLimitExceededError)
+    expect(over).toMatchObject({ name: 'FeeLimitExceededError', code: 'fee-limit-exceeded', limit: 5_000n, fee: 10_000n })
     const c = await mk(f.fetchFn, { maxFee: 50_000n }).getAccount(0)
     await expect(c.sendTransaction({ to: RECIPIENT, value: 60_000_000n, fee: 60_000n })).rejects.toThrow(UnsafeTransactionError)
     expect(f.sent).toHaveLength(0)

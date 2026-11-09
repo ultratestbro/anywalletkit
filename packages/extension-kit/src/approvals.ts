@@ -21,6 +21,12 @@
  * own pages) skip every limit. `declineOrigin` / `declineSite` drop one origin's
  * or one site's backlog (the page closed; "decline all from this site").
  *
+ * A follow-up (`request(…, { followUp: true })`) is another sheet for a request
+ * the user has just approved — the fee changed before signing. Each approval pays
+ * for one follow-up of the same origin, kind and chain: that one skips the limits
+ * above and is shown ahead of the requests already waiting. A refused origin
+ * stays refused.
+ *
  * An origin can carry a transport note (`via`, set by the WalletConnect bridge):
  * the sheet then says the request came over WalletConnect, what the dApp claims
  * to be and what WalletConnect Verify says about that claim — the claim itself is
@@ -124,6 +130,22 @@ export interface ApprovalQueueOptions {
   now?: () => number
 }
 
+/** Options of one {@link ApprovalQueue.request}. */
+export interface ApprovalRequestOptions {
+  /**
+   * Another sheet for a request the user has just approved (the fee changed before signing). It skips
+   * the queue and rate limits and is shown ahead of the requests already waiting — once per approval
+   * of the same origin, kind and chain; with no such approval behind it, it is an ordinary request.
+   * `refuse` still applies.
+   */
+  followUp?: boolean
+}
+
+/** Follow-ups one origin + kind + chain may have paid for and not used. */
+const FOLLOW_UP_CREDITS_MAX = 8
+/** Origin + kind + chain entries remembered for follow-ups. */
+const FOLLOW_UP_KEYS_MAX = 256
+
 /** The window side: open for one request, close when it is answered. `memoryApprovalWindow()` for tests. */
 export interface ApprovalWindow {
   open(request: ApprovalRequest): Promise<void>
@@ -146,6 +168,8 @@ export class ApprovalQueue {
   private readonly _rate: TokenBucket | null
   /** Per site: cooldown end and strikes (how many times the bucket ran dry recently). */
   private readonly _cooldown = new Map<string, { until: number; strikes: number; last: number }>()
+  /** Per origin + kind + chain: approvals that have not been followed up (see {@link ApprovalRequestOptions.followUp}). */
+  private readonly _approved = new Map<string, number>()
 
   constructor(private readonly window: ApprovalWindow, private readonly newId: () => string = () => crypto.randomUUID(), private readonly options: ApprovalQueueOptions = {}) {
     window.onClosed((id) => { if (this._current?.request.id === id) this.decline(id) })
@@ -177,14 +201,38 @@ export class ApprovalQueue {
     return `This site opened too many requests; try again in ${Math.ceil(wait / 1000)} s.`
   }
 
+  private static followUpKey(r: Pick<ApprovalRequest, 'origin' | 'kind' | 'chain'>): string {
+    return `${r.origin}\n${r.kind}\n${r.chain}`
+  }
+
+  /** The user approved `r`: it may be followed up once. */
+  private approved(r: ApprovalRequest): void {
+    const key = ApprovalQueue.followUpKey(r)
+    const n = Math.min((this._approved.get(key) ?? 0) + 1, FOLLOW_UP_CREDITS_MAX)
+    this._approved.delete(key)
+    this._approved.set(key, n)
+    if (this._approved.size > FOLLOW_UP_KEYS_MAX) this._approved.delete(this._approved.keys().next().value!)
+  }
+
+  /** Spends one approval of the same origin, kind and chain; false when there is none. */
+  private spendApproval(r: Pick<ApprovalRequest, 'origin' | 'kind' | 'chain'>): boolean {
+    const key = ApprovalQueue.followUpKey(r)
+    const n = this._approved.get(key) ?? 0
+    if (n <= 0) return false
+    if (n === 1) this._approved.delete(key)
+    else this._approved.set(key, n - 1)
+    return true
+  }
+
   /** Enqueue and wait for the user's answer. Refuses (never queues) past the per-origin limits. */
-  request<T = unknown>(input: Omit<ApprovalRequest, 'id' | 'createdAt' | 'originWarnings' | 'via'>): Promise<T> {
+  request<T = unknown>(input: Omit<ApprovalRequest, 'id' | 'createdAt' | 'originWarnings' | 'via'>, opts: ApprovalRequestOptions = {}): Promise<T> {
     let refused: string | null | undefined
     try { refused = this.options.refuse?.(input.origin) } catch (e) { refused = `The wallet could not check this site (${e instanceof Error ? e.message : String(e)}).` }
     if (refused) return Promise.reject(new OriginRefused(refused))
     let exempt = false
     try { exempt = this.options.exempt?.(input.origin) === true } catch { exempt = false }
-    if (!exempt) {
+    const followUp = opts.followUp === true && this.spendApproval(input)
+    if (!exempt && !followUp) {
       const all = this.all
       const sameOrigin = all.filter((p) => p.request.origin === input.origin)
       if (input.kind === 'connect' && sameOrigin.some((p) => p.request.kind === 'connect')) {
@@ -210,7 +258,8 @@ export class ApprovalQueue {
       const warnings = this.options.annotate?.(input.origin) ?? []
       const via = this._via.get(input.origin)
       const pending: Pending = { request: { ...input, id: this.newId(), createdAt: Date.now(), ...(warnings.length ? { originWarnings: warnings } : {}), ...(via ? { via } : {}) }, resolve: resolve as (v: unknown) => void, reject }
-      this._waiting.push(pending)
+      if (followUp) this._waiting.unshift(pending)
+      else this._waiting.push(pending)
       void this.next()
     })
   }
@@ -272,7 +321,7 @@ export class ApprovalQueue {
   }
 
   resolve(requestId: string, value: unknown): boolean {
-    return this.settle(requestId, (p) => p.resolve(value))
+    return this.settle(requestId, (p) => { this.approved(p.request); p.resolve(value) })
   }
 
   decline(requestId: string, error: Error = new ReviewDeclined()): boolean {
@@ -282,6 +331,7 @@ export class ApprovalQueue {
   /** Lock, disconnect, shutdown: everything pending is declined. */
   declineAll(error: Error = new ReviewDeclined('The wallet was locked.')): void {
     const all = [...(this._current ? [this._current] : []), ...this._waiting.splice(0)]
+    this._approved.clear()
     for (const p of all) p.reject(error)
     if (this._current) void this.window.close(this._current.request.id)
     this._current = null

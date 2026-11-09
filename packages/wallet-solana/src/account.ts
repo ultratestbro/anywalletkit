@@ -1,7 +1,7 @@
 import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { compileTransaction, getAddressDecoder, getBase64EncodedWireTransaction, getBase58Decoder, type SignatureBytes, type Transaction, type TransactionMessage } from '@solana/kit'
 import { decodeWireTransaction, describeTransaction } from './describe.js'
-import { BroadcastUnknownError } from './errors.js'
+import { BroadcastUnknownError, FeeLimitExceededError } from './errors.js'
 import { MessageIsTransactionError, isSolanaTransactionPayload } from './offchain.js'
 import { WalletAccountReadOnlySolana, type SolanaPlan } from './read-only-account.js'
 import { isDefinitive } from './rpc.js'
@@ -104,7 +104,7 @@ export class WalletAccountSolana extends WalletAccountReadOnlySolana implements 
   }
 
   private maxFeeCheck(fee: bigint, limit: bigint | number | undefined, op: string) {
-    if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation.`)
+    if (limit !== undefined && fee > BigInt(limit)) throw new FeeLimitExceededError(fee, BigInt(limit), `Exceeded maximum fee cost for ${op} operation.`)
   }
 
   async #signPlan(plan: SolanaPlan): Promise<Transaction> {

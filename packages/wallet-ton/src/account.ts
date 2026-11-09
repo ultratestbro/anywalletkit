@@ -1,7 +1,7 @@
 import { LocalSigner, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type WriteOptions } from '@anywalletkit/core'
 import { Buffer } from 'buffer'
 import { Cell } from '@ton/core'
-import { BroadcastUnknownError, MessageIsTransactionError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { BroadcastUnknownError, FeeLimitExceededError, MessageIsTransactionError, SimulationError, UnsafeTransactionError } from './errors.js'
 import { isAnsweredRefusal } from './toncenter.js'
 import { tonProofDigest, tonSignDataDigest, type TonProof, type TonProofRequest, type TonSignDataRequest, type TonSignedData } from './tonconnect.js'
 import { WalletAccountReadOnlyTon } from './read-only-account.js'
@@ -122,7 +122,7 @@ export class WalletAccountTon extends WalletAccountReadOnlyTon implements IWalle
   }
 
   private checkMaxFee(fee: bigint, limit: bigint | number | undefined, op: string) {
-    if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation.`)
+    if (limit !== undefined && fee > BigInt(limit)) throw new FeeLimitExceededError(fee, BigInt(limit), `Exceeded maximum fee cost for ${op} operation.`)
   }
 
   /**

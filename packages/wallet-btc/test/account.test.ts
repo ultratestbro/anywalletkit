@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { InsufficientFundsError } from '@anywalletkit/core'
 import { p2pkh, p2tr, SigHash } from '@scure/btc-signer'
 import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js'
-import { FINAL_SEQUENCE, RBF_SEQUENCE, UnsupportedAddressTypeError, WalletManagerBtc, parseRawTransaction, recoverMessagePublicKey } from '../src/index.js'
+import { FeeLimitExceededError, FINAL_SEQUENCE, RBF_SEQUENCE, UnsupportedAddressTypeError, WalletManagerBtc, parseRawTransaction, recoverMessagePublicKey } from '../src/index.js'
 import { ADDR0, ADDR1, SEED, TXID_A, fakeBlockbook, hex, mk, prevTx } from './helpers.js'
 
 const RECIPIENT = ADDR1
@@ -140,6 +140,11 @@ describe('WalletAccountBtc (p2wpkh)', () => {
     const a = await m.getAccount(0)
     await expect(a.transfer({ recipient: RECIPIENT, amount: 60_000n })).rejects.toThrow(/maximum fee/)
     await expect(a.sendTransaction({ to: RECIPIENT, value: 60_000n })).rejects.toThrow(/maximum fee/)
+    // The cap in force and the fee that broke it are on the error: a wallet can show the new fee and ask again.
+    const over = await a.sendTransaction({ to: RECIPIENT, value: 60_000n }).catch((e: unknown) => e)
+    expect(over).toBeInstanceOf(FeeLimitExceededError)
+    expect(over).toMatchObject({ name: 'FeeLimitExceededError', code: 'fee-limit-exceeded', limit: 1n })
+    expect((over as FeeLimitExceededError).fee).toBeGreaterThan(1n)
     expect(f.sent).toHaveLength(0)
     m.dispose()
   })

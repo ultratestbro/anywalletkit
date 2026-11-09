@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { base58 } from '@scure/base'
 import {
+  FeeLimitExceededError,
   NearRpcError, SimulationError, UnsafeTransactionError, WalletManagerNear, decodeSignedTransaction, describeTransaction, fromBase64, type NearFetch,
 } from '../src/index.js'
 import { ACCOUNT0, BLOCK, NEAR, SEED, USDT, fakeNode } from './fake-node.js'
@@ -121,6 +122,11 @@ describe('WalletAccountNear', () => {
     expect(f.sent).toHaveLength(0)
     const capped = await manager(f, { transferMaxFee: 1n }).getAccount(0)
     await expect(capped.transfer({ recipient: 'alice.near', amount: 1n })).rejects.toThrow(/maximum fee/)
+    // The cap in force and the fee that broke it are on the error: a wallet can show the new fee and ask again.
+    const over = await capped.transfer({ recipient: 'alice.near', amount: 1n }).catch((e: unknown) => e)
+    expect(over).toBeInstanceOf(FeeLimitExceededError)
+    expect(over).toMatchObject({ name: 'FeeLimitExceededError', code: 'fee-limit-exceeded', limit: 1n })
+    expect((over as FeeLimitExceededError).fee).toBeGreaterThan(1n)
     // allowed when the owner opts in
     const loose = await manager(f, { allowDangerousActions: true }).getAccount(0)
     await expect(loose.sendTransaction({ receiverId: ACCOUNT0, actions: [{ deleteKey: { publicKey: pk } }] })).resolves.toBeTruthy()

@@ -3,7 +3,7 @@ import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { DUST_LIMIT, addressFromPublicKey } from './address.js'
 import { UnsafeTransactionError, assertSafe, describeTransaction, type DescribeContext } from './describe.js'
 import { bytesToHex } from './encoding.js'
-import { BroadcastUnknownError } from './errors.js'
+import { BroadcastUnknownError, FeeLimitExceededError } from './errors.js'
 import { isAlreadyKnown, isAnsweredRefusal } from './http.js'
 import { signMessageWith } from './message.js'
 import { WalletAccountReadOnlyZcash, type SpendPlan } from './read-only-account.js'
@@ -147,7 +147,7 @@ export class WalletAccountZcash extends WalletAccountReadOnlyZcash implements IW
   }
 
   private checkMax(fee: bigint, limit: bigint | number | undefined, op: string) {
-    if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation.`)
+    if (limit !== undefined && fee > BigInt(limit)) throw new FeeLimitExceededError(fee, BigInt(limit), `Exceeded maximum fee cost for ${op} operation.`)
   }
 
   /** The outputs a raw transaction spends, fetched through the client (the wire format carries no values). */
