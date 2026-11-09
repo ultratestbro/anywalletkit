@@ -240,6 +240,13 @@ export interface WriteIntent {
   raw: unknown
   /** True for `kind: 'message'`: allow/block lists do not apply, only `confirm`. Typed data is judged by the lists (scan 2026-10-28 F7). */
   message: boolean
+  /**
+   * EVM `sign` of exactly 32 bytes (a raw 32-byte buffer, or a `0x` + 64-hex string): a blind hash signature.
+   * Verifiers that accept an eth_sign-wrapped digest (CoW Protocol's `ethsign` order scheme, Safe owner
+   * signatures with v > 30…) turn it into an order or a transfer, so it is `kind: 'typedData'` with unknown
+   * destinations — an allowlist refuses it, so does a blocklist without `confirm` (extension audit E55).
+   */
+  blindHash?: true
 }
 
 /**
@@ -668,6 +675,12 @@ function tonJettonTransfer(chain: string, from: string, a: Record<string, unknow
   return { list, unknown }
 }
 
+/** A message that is exactly 32 bytes: a raw buffer of 32, or `0x` + 64 hex digits (what a dApp sends for a digest). */
+function isBlindHash(arg: unknown): boolean {
+  if (arg instanceof Uint8Array) return arg.length === 32
+  return typeof arg === 'string' && /^0x[0-9a-fA-F]{64}$/.test(arg.trim())
+}
+
 /** What {@link intentOf} needs to know beyond the arguments: whether an `approve` of 0 is on a known ERC-20. */
 interface IntentContext { erc20?: boolean }
 
@@ -739,6 +752,11 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
       const r = tronRawIntent(a.raw_data_hex)
       return { ...base, kind: 'send', message: false, ...(r.to !== undefined ? { to: r.to } : {}), ...(r.token !== undefined ? { token: r.token } : {}), ...(r.amount !== undefined ? { amount: r.amount } : {}) }
     }
+  }
+  if (method === 'sign' && chain.startsWith('eip155:') && isBlindHash(arg)) {
+    const intent: DraftIntent = { ...base, kind: 'typedData', message: false, blindHash: true }
+    TYPED_DESTINATIONS.set(intent, { list: [], unknown: true })
+    return intent
   }
   if (MESSAGE_METHODS.includes(method)) return { ...base, kind: 'message', message: true }
   if (method === 'revokeDelegation') return revokeIntent(base, [{ token: from }])
