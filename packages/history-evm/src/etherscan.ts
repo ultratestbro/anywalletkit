@@ -34,7 +34,12 @@ interface EtherscanEnvelope {
 /** Etherscan status "0" messages that mean "do not retry, this backend cannot serve the chain". */
 const UNAVAILABLE_PATTERNS = [/invalid api key/i, /missing.*api key/i, /free api access/i, /unsupported chain/i, /community free api limit/i, /chain not supported/i, /upgrade.*plan/i, /unauthorized/i, /proceed with api key/i, /x402/i]
 const RATE_LIMIT_PATTERNS = [/rate limit/i, /max calls per sec/i, /too many requests/i]
-const EMPTY_PATTERNS = [/no transactions found/i, /no records found/i]
+/**
+ * Status "0" answers that mean "nothing here". Blockscout's Etherscan-format API (Blockscout PRO, Elysium's `/api`)
+ * names the list: `No internal transactions found` (txlistinternal) and `No token transfers found` (tokentx), read
+ * live on 2026-11-10 — without them an address with no internal transfers failed the whole page.
+ */
+const EMPTY_PATTERNS = [/no transactions found/i, /no records found/i, /no internal transactions found/i, /no token transfers found/i]
 
 /** Etherscan-format explorer client (Etherscan v2, or a keyless mirror such as Routescan). */
 export class EtherscanClient {

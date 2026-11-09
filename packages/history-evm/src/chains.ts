@@ -67,11 +67,18 @@ export const BLOCKSCOUT_URLS: Readonly<Record<number, string>> = {
  * Etherscan v1/v2, no `chainid`/`apikey` parameters. Verified 2026-10-14:
  * `status: "1"` for 1 and 43114, `No transactions found` (served) for 9745;
  * `chain not supported` for every other id of ours.
+ *
+ * Elysium 99901 (2026-11-10): Kinetiq's explorer is a Blockscout whose
+ * `/api/v2` sits behind a Vercel bot checkpoint (HTTP 429 HTML for non-browser
+ * clients), while its Etherscan-format RPC API at `/api` answers keyless JSON
+ * (`txlist`, `tokentx` → `status: "1"`); it is served here, through the same
+ * keyless Etherscan-format client.
  */
 export const ETHERSCAN_COMPAT_URLS: Readonly<Record<number, string>> = {
   1: 'https://api.routescan.io/v2/network/mainnet/evm/1/etherscan/api',
   43114: 'https://api.routescan.io/v2/network/mainnet/evm/43114/etherscan/api',
   9745: 'https://api.routescan.io/v2/network/mainnet/evm/9745/etherscan/api',
+  99901: 'https://elysium.kinetiq.xyz/api',
 }
 
 /**
@@ -167,6 +174,7 @@ export const EXPLORER_TX_BASE: Readonly<Record<number, string>> = {
   57073: 'https://explorer.inkonchain.com',
   98866: 'https://explorer.plume.org',
   196: 'https://www.okx.com/web3/explorer/xlayer',
+  99901: 'https://elysium.kinetiq.xyz', // the explorer's own transaction links are <root>/tx/<hash>
 }
 
 /**

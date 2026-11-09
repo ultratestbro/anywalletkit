@@ -99,6 +99,7 @@ and `/api/v2/transactions`, kept only when both answer `200` JSON.
 | Ink | 57073 | **no** | Blockscout `explorer.inkonchain.com` | |
 | Plume | 98866 | **no** | Blockscout `explorer.plume.org` | |
 | X Layer | 196 | **no** | **none** | only OKLink (own API, key); empty page + `note` |
+| Elysium (Kinetiq) | 99901 | **no** | Blockscout's Etherscan-format API `elysium.kinetiq.xyz/api` (keyless, `ETHERSCAN_COMPAT_URLS`; reported as `routescan`) | checked 2026-11-10; its `/api/v2` is behind a Vercel bot checkpoint (429), so the Blockscout v2 client is not used; Blockscout's `No internal transactions found` / `No token transfers found` read as empty lists |
 
 "free plan ok" = a free-tier key returned rows (or `No transactions found`)
 that day; "paid plan only" = `Free API access is not supported for this

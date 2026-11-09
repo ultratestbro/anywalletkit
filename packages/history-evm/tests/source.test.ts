@@ -154,3 +154,45 @@ describe('Blockscout PRO backend', () => {
     expect(page.backend).toBe('routescan')
   })
 })
+
+// Elysium 99901 (2026-11-10): the explorer's Blockscout `/api/v2` is behind a Vercel bot checkpoint; its Etherscan-format
+// `/api` answers keyless. Blockscout names the empty lists ("No internal transactions found", "No token transfers found").
+describe('Elysium: keyless Etherscan-format Blockscout API', () => {
+  const ADDRESS = '0x64c1442f63a85cd6eb443f086413422aa27ba1a4'
+  const TX = {
+    blockNumber: '3521004', timeStamp: '1794259910', hash: '0x7c7c4b3ce1' + '0'.repeat(54), nonce: '3', blockHash: '0x' + '1'.repeat(64), transactionIndex: '1',
+    from: ADDRESS, to: '0xba876237b0f021a6c6d852d6c26e107997cc5e81', value: '303930000000000000', gas: '60000', gasPrice: '500000000', isError: '0',
+    txreceipt_status: '1', input: '0xd0e30db0', contractAddress: '', cumulativeGasUsed: '58718', gasUsed: '45000', confirmations: '10', methodId: '0xd0e30db0', functionName: 'deposit()',
+  }
+  it('lists through https://elysium.kinetiq.xyz/api with no key, chain id or apikey, and links to the explorer root', async () => {
+    const seen: string[] = []
+    const fetch = async (url: string) => {
+      seen.push(url)
+      const action = new URL(url).searchParams.get('action')
+      const body = action === 'txlist' ? { status: '1', message: 'OK', result: [TX] }
+        : action === 'tokentx' ? { status: '0', message: 'No token transfers found', result: [] }
+        : { status: '0', message: 'No internal transactions found', result: [] }
+      return { ok: true, status: 200, json: async () => body, text: async () => '' }
+    }
+    const src = createEvmHistory({ chainId: 99901, fetch: fetch as never })
+    const page = await src.listActivity(ADDRESS, { limit: 10 })
+    expect(page.backend).toBe('routescan') // the keyless Etherscan-format client
+    expect(page.items.map((i) => i.hash)).toEqual([TX.hash])
+    expect(seen.length).toBe(3)
+    for (const u of seen) {
+      expect(u.startsWith('https://elysium.kinetiq.xyz/api?')).toBe(true)
+      expect(u).not.toMatch(/chainid=|chain_id=|apikey=/)
+    }
+    expect(src.explorerTxUrl('0x1')).toBe('https://elysium.kinetiq.xyz/tx/0x1')
+  })
+  it('an address with no history is an empty page, not an unavailable backend', async () => {
+    const fetch = async (url: string) => {
+      const action = new URL(url).searchParams.get('action')
+      const message = action === 'txlist' ? 'No transactions found' : action === 'tokentx' ? 'No token transfers found' : 'No internal transactions found'
+      return { ok: true, status: 200, json: async () => ({ status: '0', message, result: [] }), text: async () => '' }
+    }
+    const page = await createEvmHistory({ chainId: 99901, fetch: fetch as never }).listActivity(ADDRESS)
+    expect(page.items).toEqual([])
+    expect(page.cursor).toBeUndefined()
+  })
+})
