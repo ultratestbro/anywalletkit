@@ -1,6 +1,6 @@
 # Any Wallet Kit
 
-Open-source multichain wallet SDK. One seed phrase → accounts on EVM (30 networks),
+Open-source multichain wallet SDK. One seed phrase → accounts on EVM (31 networks),
 Bitcoin, TON, Tron, Solana, NEAR and Zcash (transparent), with a single account interface that protocol
 modules (swap, cross-chain swap, lending, staking, approvals, names) are written against.
 
