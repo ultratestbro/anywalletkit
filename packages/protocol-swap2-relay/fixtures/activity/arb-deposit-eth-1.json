@@ -1,0 +1,41 @@
+{
+  "note": "Relay depositNative of 0.00005 ETH into the Arbitrum RelayDepository for an ETH → ETH order to Base (public tx 2026-11-10, request 0x17942673…697dc9; the depositor is `own`)",
+  "own": [
+    "0xe22c433E2F8e414F323922BE7ef1091cd90a12F7"
+  ],
+  "tx": {
+    "chain": "eip155:42161",
+    "hash": "0xcd7742661f2a500c0f610aa18912682744a2ce81b105a82918ac2b161fc385e1",
+    "time": 1794267319,
+    "status": "confirmed",
+    "address": "0xe22c433E2F8e414F323922BE7ef1091cd90a12F7",
+    "from": "0xe22c433E2F8e414F323922BE7ef1091cd90a12F7",
+    "to": "0x4cD00E387622C35bDDB9b4c962C136462338BC31",
+    "nativeValue": "50000000000000",
+    "transfers": [
+      {
+        "token": null,
+        "from": "0xe22c433E2F8e414F323922BE7ef1091cd90a12F7",
+        "to": "0x4cD00E387622C35bDDB9b4c962C136462338BC31",
+        "amount": "50000000000000"
+      }
+    ],
+    "fee": "499819064000",
+    "call": {
+      "to": "0x4cD00E387622C35bDDB9b4c962C136462338BC31",
+      "selector": "0x49290c1c"
+    },
+    "block": "522819210"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged ETH",
+    "assetsOut": [
+      {
+        "token": null,
+        "amount": "50000000000000"
+      }
+    ],
+    "counterparty": "0x4cD00E387622C35bDDB9b4c962C136462338BC31"
+  }
+}

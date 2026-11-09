@@ -1,0 +1,36 @@
+{
+  "note": "The fill of the order above on Base: a plain USDC transferFrom sent by one of Relay's relayer keys. Nothing in it names Relay on chain, so the module does not claim it (it reads as an ordinary incoming transfer)",
+  "own": [
+    "0x3692dea4346c95eb3957d8022c40373ab2A21369"
+  ],
+  "tx": {
+    "chain": "eip155:8453",
+    "hash": "0xd654e5f179839ef36734eaa8b36b667ebd2d19e31625bee6ad0d49a5cf71d63d",
+    "time": 1794267410,
+    "status": "confirmed",
+    "address": "0x3692dea4346c95eb3957d8022c40373ab2A21369",
+    "from": "0xf42b73d2e4D3912EAdE2A5f7AB39b54064c2acEc",
+    "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "from": "0xf70da97812CB96acDF810712Aa562db8dfA3dbEF",
+        "to": "0x3692dea4346c95eb3957d8022c40373ab2A21369",
+        "amount": "40505",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "323432420573",
+    "call": {
+      "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "selector": "0x23b872dd"
+    },
+    "block": "55385175"
+  },
+  "expect": {
+    "kind": "receive"
+  }
+}

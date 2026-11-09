@@ -1,0 +1,733 @@
+{
+  "module": "@anywalletkit/protocol-swap2-relay",
+  "sources": [
+    {
+      "id": "chains",
+      "type": "http-json",
+      "url": "https://api.relay.link/chains",
+      "path": "chains",
+      "itemKey": "id",
+      "label": "Relay chains (api.relay.link/chains): ids, order chain names, depositories, solver addresses"
+    },
+    {
+      "id": "depository-source",
+      "type": "github-file",
+      "repo": "relayprotocol/relay-depository",
+      "path": "packages/ethereum-vm/src/RelayDepository.sol",
+      "label": "RelayDepository.sol (the deposit functions and their arguments)"
+    },
+    {
+      "id": "order-source",
+      "type": "github-file",
+      "repo": "relayprotocol/relay-protocol-sdk",
+      "path": "src/order/index.ts",
+      "label": "Relay order types and hashing (relay-protocol-sdk src/order)"
+    },
+    {
+      "id": "docs-input-validation",
+      "type": "http-text",
+      "url": "https://docs.relay.link/references/api/api_core_concepts/input-validation.md",
+      "label": "Relay docs · input validation (order id, solver signature, depository from /chains)"
+    },
+    {
+      "id": "depository-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Ethereum"
+    },
+    {
+      "id": "allocator-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Ethereum"
+    },
+    {
+      "id": "owner-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Ethereum"
+    },
+    {
+      "id": "depository-optimism",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · OP Mainnet"
+    },
+    {
+      "id": "allocator-optimism",
+      "type": "evm-call",
+      "chainId": 10,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · OP Mainnet"
+    },
+    {
+      "id": "owner-optimism",
+      "type": "evm-call",
+      "chainId": 10,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · OP Mainnet"
+    },
+    {
+      "id": "depository-bnb",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · BNB Chain"
+    },
+    {
+      "id": "allocator-bnb",
+      "type": "evm-call",
+      "chainId": 56,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · BNB Chain"
+    },
+    {
+      "id": "owner-bnb",
+      "type": "evm-call",
+      "chainId": 56,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · BNB Chain"
+    },
+    {
+      "id": "depository-gnosis",
+      "type": "evm-code",
+      "chainId": 100,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Gnosis"
+    },
+    {
+      "id": "allocator-gnosis",
+      "type": "evm-call",
+      "chainId": 100,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Gnosis"
+    },
+    {
+      "id": "owner-gnosis",
+      "type": "evm-call",
+      "chainId": 100,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Gnosis"
+    },
+    {
+      "id": "depository-unichain",
+      "type": "evm-code",
+      "chainId": 130,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Unichain"
+    },
+    {
+      "id": "allocator-unichain",
+      "type": "evm-call",
+      "chainId": 130,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Unichain"
+    },
+    {
+      "id": "owner-unichain",
+      "type": "evm-call",
+      "chainId": 130,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Unichain"
+    },
+    {
+      "id": "depository-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Polygon"
+    },
+    {
+      "id": "allocator-polygon",
+      "type": "evm-call",
+      "chainId": 137,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Polygon"
+    },
+    {
+      "id": "owner-polygon",
+      "type": "evm-call",
+      "chainId": 137,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Polygon"
+    },
+    {
+      "id": "depository-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Monad"
+    },
+    {
+      "id": "allocator-monad",
+      "type": "evm-call",
+      "chainId": 143,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Monad"
+    },
+    {
+      "id": "owner-monad",
+      "type": "evm-call",
+      "chainId": 143,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Monad"
+    },
+    {
+      "id": "depository-sonic",
+      "type": "evm-code",
+      "chainId": 146,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Sonic"
+    },
+    {
+      "id": "allocator-sonic",
+      "type": "evm-call",
+      "chainId": 146,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Sonic"
+    },
+    {
+      "id": "owner-sonic",
+      "type": "evm-call",
+      "chainId": 146,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Sonic"
+    },
+    {
+      "id": "depository-xlayer",
+      "type": "evm-code",
+      "chainId": 196,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · X Layer"
+    },
+    {
+      "id": "allocator-xlayer",
+      "type": "evm-call",
+      "chainId": 196,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · X Layer"
+    },
+    {
+      "id": "owner-xlayer",
+      "type": "evm-call",
+      "chainId": 196,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · X Layer"
+    },
+    {
+      "id": "depository-zksync",
+      "type": "evm-code",
+      "chainId": 324,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · zkSync Era"
+    },
+    {
+      "id": "allocator-zksync",
+      "type": "evm-call",
+      "chainId": 324,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · zkSync Era"
+    },
+    {
+      "id": "owner-zksync",
+      "type": "evm-call",
+      "chainId": 324,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · zkSync Era"
+    },
+    {
+      "id": "depository-worldchain",
+      "type": "evm-code",
+      "chainId": 480,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · World Chain"
+    },
+    {
+      "id": "allocator-worldchain",
+      "type": "evm-call",
+      "chainId": 480,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · World Chain"
+    },
+    {
+      "id": "owner-worldchain",
+      "type": "evm-call",
+      "chainId": 480,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · World Chain"
+    },
+    {
+      "id": "depository-hyperevm",
+      "type": "evm-code",
+      "chainId": 999,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · HyperEVM"
+    },
+    {
+      "id": "allocator-hyperevm",
+      "type": "evm-call",
+      "chainId": 999,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · HyperEVM"
+    },
+    {
+      "id": "owner-hyperevm",
+      "type": "evm-call",
+      "chainId": 999,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · HyperEVM"
+    },
+    {
+      "id": "depository-morph",
+      "type": "evm-code",
+      "chainId": 2818,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Morph"
+    },
+    {
+      "id": "allocator-morph",
+      "type": "evm-call",
+      "chainId": 2818,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Morph"
+    },
+    {
+      "id": "owner-morph",
+      "type": "evm-call",
+      "chainId": 2818,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Morph"
+    },
+    {
+      "id": "depository-megaeth",
+      "type": "evm-code",
+      "chainId": 4326,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · MegaETH"
+    },
+    {
+      "id": "allocator-megaeth",
+      "type": "evm-call",
+      "chainId": 4326,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · MegaETH"
+    },
+    {
+      "id": "owner-megaeth",
+      "type": "evm-call",
+      "chainId": 4326,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · MegaETH"
+    },
+    {
+      "id": "depository-robinhood",
+      "type": "evm-code",
+      "chainId": 4663,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Robinhood Chain"
+    },
+    {
+      "id": "allocator-robinhood",
+      "type": "evm-call",
+      "chainId": 4663,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Robinhood Chain"
+    },
+    {
+      "id": "owner-robinhood",
+      "type": "evm-call",
+      "chainId": 4663,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Robinhood Chain"
+    },
+    {
+      "id": "depository-mantle",
+      "type": "evm-code",
+      "chainId": 5000,
+      "address": "0x59916da825d2d2ec1bf878d71c88826f6633ecca",
+      "label": "RelayDepository · Mantle"
+    },
+    {
+      "id": "allocator-mantle",
+      "type": "evm-call",
+      "chainId": 5000,
+      "to": "0x59916da825d2d2ec1bf878d71c88826f6633ecca",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Mantle"
+    },
+    {
+      "id": "owner-mantle",
+      "type": "evm-call",
+      "chainId": 5000,
+      "to": "0x59916da825d2d2ec1bf878d71c88826f6633ecca",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Mantle"
+    },
+    {
+      "id": "depository-arc",
+      "type": "evm-code",
+      "chainId": 5042,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Arc"
+    },
+    {
+      "id": "allocator-arc",
+      "type": "evm-call",
+      "chainId": 5042,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Arc"
+    },
+    {
+      "id": "owner-arc",
+      "type": "evm-call",
+      "chainId": 5042,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Arc"
+    },
+    {
+      "id": "depository-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Base"
+    },
+    {
+      "id": "allocator-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Base"
+    },
+    {
+      "id": "owner-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Base"
+    },
+    {
+      "id": "depository-plasma",
+      "type": "evm-code",
+      "chainId": 9745,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Plasma"
+    },
+    {
+      "id": "allocator-plasma",
+      "type": "evm-call",
+      "chainId": 9745,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Plasma"
+    },
+    {
+      "id": "owner-plasma",
+      "type": "evm-call",
+      "chainId": 9745,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Plasma"
+    },
+    {
+      "id": "depository-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Arbitrum"
+    },
+    {
+      "id": "allocator-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Arbitrum"
+    },
+    {
+      "id": "owner-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Arbitrum"
+    },
+    {
+      "id": "depository-celo",
+      "type": "evm-code",
+      "chainId": 42220,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Celo"
+    },
+    {
+      "id": "allocator-celo",
+      "type": "evm-call",
+      "chainId": 42220,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Celo"
+    },
+    {
+      "id": "owner-celo",
+      "type": "evm-call",
+      "chainId": 42220,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Celo"
+    },
+    {
+      "id": "depository-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Avalanche"
+    },
+    {
+      "id": "allocator-avalanche",
+      "type": "evm-call",
+      "chainId": 43114,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Avalanche"
+    },
+    {
+      "id": "owner-avalanche",
+      "type": "evm-call",
+      "chainId": 43114,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Avalanche"
+    },
+    {
+      "id": "depository-ink",
+      "type": "evm-code",
+      "chainId": 57073,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Ink"
+    },
+    {
+      "id": "allocator-ink",
+      "type": "evm-call",
+      "chainId": 57073,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Ink"
+    },
+    {
+      "id": "owner-ink",
+      "type": "evm-call",
+      "chainId": 57073,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Ink"
+    },
+    {
+      "id": "depository-linea",
+      "type": "evm-code",
+      "chainId": 59144,
+      "address": "0x59916da825d2d2ec1bf878d71c88826f6633ecca",
+      "label": "RelayDepository · Linea"
+    },
+    {
+      "id": "allocator-linea",
+      "type": "evm-call",
+      "chainId": 59144,
+      "to": "0x59916da825d2d2ec1bf878d71c88826f6633ecca",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Linea"
+    },
+    {
+      "id": "owner-linea",
+      "type": "evm-call",
+      "chainId": 59144,
+      "to": "0x59916da825d2d2ec1bf878d71c88826f6633ecca",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Linea"
+    },
+    {
+      "id": "depository-berachain",
+      "type": "evm-code",
+      "chainId": 80094,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Berachain"
+    },
+    {
+      "id": "allocator-berachain",
+      "type": "evm-call",
+      "chainId": 80094,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Berachain"
+    },
+    {
+      "id": "owner-berachain",
+      "type": "evm-call",
+      "chainId": 80094,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Berachain"
+    },
+    {
+      "id": "depository-plume",
+      "type": "evm-code",
+      "chainId": 98866,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Plume"
+    },
+    {
+      "id": "allocator-plume",
+      "type": "evm-call",
+      "chainId": 98866,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Plume"
+    },
+    {
+      "id": "owner-plume",
+      "type": "evm-call",
+      "chainId": 98866,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Plume"
+    },
+    {
+      "id": "depository-scroll",
+      "type": "evm-code",
+      "chainId": 534352,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Scroll"
+    },
+    {
+      "id": "allocator-scroll",
+      "type": "evm-call",
+      "chainId": 534352,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Scroll"
+    },
+    {
+      "id": "owner-scroll",
+      "type": "evm-call",
+      "chainId": 534352,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Scroll"
+    },
+    {
+      "id": "depository-katana",
+      "type": "evm-code",
+      "chainId": 747474,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Katana"
+    },
+    {
+      "id": "allocator-katana",
+      "type": "evm-call",
+      "chainId": 747474,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Katana"
+    },
+    {
+      "id": "owner-katana",
+      "type": "evm-call",
+      "chainId": 747474,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Katana"
+    }
+  ]
+}

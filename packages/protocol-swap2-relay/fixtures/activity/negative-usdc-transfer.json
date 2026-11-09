@@ -1,0 +1,36 @@
+{
+  "note": "A plain USDC transfer on Arbitrum to a Relay deposit address (Relay's other deposit flow, which this module never uses): a token transfer, not a depository call",
+  "own": [
+    "0xC4974ECf75c3E1E142861f84977B2064A926E616"
+  ],
+  "tx": {
+    "chain": "eip155:42161",
+    "hash": "0xdbc06527b523b1e5d0dbd24199f06263d321db26cba03b3b3e69ce631f5f9719",
+    "time": 1794267566,
+    "status": "confirmed",
+    "address": "0xC4974ECf75c3E1E142861f84977B2064A926E616",
+    "from": "0xC4974ECf75c3E1E142861f84977B2064A926E616",
+    "to": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+        "from": "0xC4974ECf75c3E1E142861f84977B2064A926E616",
+        "to": "0x4cD00E387622C35bDDB9b4c962C136462338BC31",
+        "amount": "5000000",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "915068712000",
+    "call": {
+      "to": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+      "selector": "0xa9059cbb"
+    },
+    "block": "522819951"
+  },
+  "expect": {
+    "kind": "send"
+  }
+}
