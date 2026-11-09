@@ -39,8 +39,9 @@ export interface RouteView {
  * What the wallet cannot vouch for on a route — data for the app's list and sheet, never a refusal:
  * - `min-below-slippage`: the provider's minimum sits `minGapBps` under its own quote, further than the `slippageBps`
  *   the app asked for (a backend that inflates the output and drops the minimum would otherwise win BEST);
- * - `deposit-address`: the route pays an address the provider's server assigns (a 1Click deposit address), so where the
- *   funds end up is that server's word, not calldata the wallet can check.
+ * - `deposit-address`: the route pays an address the provider's server assigns (a 1Click deposit address, a THORChain
+ *   inbound vault on a non-EVM source chain, a Bitcoin deposit address), so where the funds end up is that server's
+ *   word, not calldata the wallet can check.
  */
 export type RouteWarning =
   | { kind: 'min-below-slippage'; slippageBps: number; minGapBps: number }
@@ -55,6 +56,13 @@ export interface RankOptions {
    * route from any other provider exists. Which providers these are is the app's call.
    */
   depositAddressProviders?: readonly string[]
+  /**
+   * The same flag per route, for a provider that pays a server-assigned address only on some routes (a THORChain
+   * inbound vault on a non-EVM source chain, a Bitcoin deposit address) and verifiable calldata on the rest. A route is
+   * flagged when its provider is listed above OR this returns true; a throw counts as flagged. BEST goes to a flagged
+   * route only when every route is flagged. Which routes these are is the app's call.
+   */
+  depositAddressRoute?: (quote: Quote) => boolean
 }
 
 export interface RouteListView {
@@ -71,6 +79,8 @@ export interface QuoteRoutesOptions {
   onUpdate?: (view: RouteListView) => void
   /** See {@link RankOptions.depositAddressProviders}; the slippage comes from `params.slippageBps`. */
   depositAddressProviders?: readonly string[]
+  /** {@link RankOptions.depositAddressRoute} with the request next to the quote (a quote does not name its source chain). */
+  depositAddressRoute?: (quote: Quote, params: QuoteParams) => boolean
   /** Per-provider wall clock (default 20 s). */
   timeoutMs?: number
   signal?: AbortSignal
@@ -96,7 +106,12 @@ export async function quoteRoutes(providers: readonly CrossChainProvider[], para
     candidates.push(p)
   }
   const pending = new Set(candidates.map((p) => p.name))
-  const rankOptions: RankOptions = { ...(params.slippageBps !== undefined ? { slippageBps: params.slippageBps } : {}), ...(options.depositAddressProviders ? { depositAddressProviders: options.depositAddressProviders } : {}) }
+  const depositAddressRoute = options.depositAddressRoute
+  const rankOptions: RankOptions = {
+    ...(params.slippageBps !== undefined ? { slippageBps: params.slippageBps } : {}),
+    ...(options.depositAddressProviders ? { depositAddressProviders: options.depositAddressProviders } : {}),
+    ...(depositAddressRoute ? { depositAddressRoute: (q: Quote) => depositAddressRoute(q, params) } : {}),
+  }
   // The requested slippage is the providers' input; a quote whose minimum still lands under it is shown with a
   // warning (rank), not refused: quote-value issues are warnings, never blocks.
   const { slippageBps: _slippage, ...shapeParams } = params
@@ -139,13 +154,21 @@ function gapBps(dest: bigint, min: bigint): number {
  * Highest output first (same destination token for every quote); FASTEST = lowest ETA among them.
  *
  * BEST goes to the highest output among the routes without a {@link RouteWarning} that bars it: never a route whose
- * minimum is below the requested slippage, and a deposit-address route only when no other provider's route exists.
+ * minimum is below the requested slippage, and a deposit-address route only when every route is one (no route with
+ * verifiable calldata exists).
  * The BEST route is listed first; the rest keep the output order. With no route eligible there is no BEST.
  */
 export function rank(quotes: Quote[], options: RankOptions = {}): RouteView[] {
   const sorted = [...quotes].sort((a, b) => (BigInt(b.destAmount) > BigInt(a.destAmount) ? 1 : BigInt(b.destAmount) < BigInt(a.destAmount) ? -1 : a.feeUsd - b.feeUsd || a.etaSeconds - b.etaSeconds))
   const fastest = sorted.length ? sorted.reduce((f, q) => (q.etaSeconds < f.etaSeconds ? q : f)) : null
   const depositProviders = new Set(options.depositAddressProviders ?? [])
+  const paysAssignedAddress = (q: Quote): boolean => {
+    if (depositProviders.has(q.provider)) return true
+    if (!options.depositAddressRoute) return false
+    // A policy hook that fails says nothing about the route: the warning is the safe side.
+    try { return options.depositAddressRoute(q) === true } catch { return true }
+  }
+  const assigned = new Map(sorted.map((q) => [q, paysAssignedAddress(q)] as const))
   const s = options.slippageBps
   const warningsOf = (q: Quote): RouteWarning[] => {
     const w: RouteWarning[] = []
@@ -154,11 +177,11 @@ export function rank(quotes: Quote[], options: RankOptions = {}): RouteView[] {
       const min = BigInt(q.minDestAmount)
       if (min < slippageFloor(dest, s)) w.push({ kind: 'min-below-slippage', slippageBps: s, minGapBps: gapBps(dest, min) })
     }
-    if (depositProviders.has(q.provider)) w.push({ kind: 'deposit-address' })
+    if (assigned.get(q)) w.push({ kind: 'deposit-address' })
     return w
   }
   const warned = new Map(sorted.map((q) => [q, warningsOf(q)] as const))
-  const verifiableExists = sorted.some((q) => !depositProviders.has(q.provider))
+  const verifiableExists = sorted.some((q) => !assigned.get(q))
   const best = sorted.find((q) => {
     const w = warned.get(q)!
     return !w.some((x) => x.kind === 'min-below-slippage') && !(w.some((x) => x.kind === 'deposit-address') && verifiableExists)
@@ -201,7 +224,8 @@ export interface SwapReviewMeta {
   /** The slippage the swap was quoted at (bps): a plan minimum further under its output is warned on the sheet (never refused). */
   slippageBps?: number
   /**
-   * The route pays an address the provider's server assigned (NEAR Intents 1Click deposit address): the sheet warns,
+   * The route pays an address the provider's server assigned (a NEAR Intents 1Click deposit address, a THORChain
+   * inbound vault on a non-EVM source chain, a Bitcoin deposit address — the app's call per route): the sheet warns,
    * and the recipient check does not pass on `plan.recipient` alone — the transaction does not carry it.
    */
   depositAddressAssignedByProvider?: boolean

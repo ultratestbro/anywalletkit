@@ -6,6 +6,7 @@
  */
 import { decodeFunctionData, getAddress, maxUint256, zeroAddress, type Hex } from 'viem'
 import { ERC20_ABI } from './erc20.js'
+import { PERMIT2_ADDRESS, permit2KnownSpender } from './permit2-spenders.js'
 import { canonicalData, inferPrimaryType } from './read-only-account.js'
 import type { EvmTransaction, TypedDataInput } from './types.js'
 
@@ -30,7 +31,10 @@ export type TxWarningCode = 'approve-unlimited' | 'to-zero-address' | 'chain-mis
  */
 export type TypedDataWarningCode =
   | 'chain-mismatch' | 'deadline-passed' | 'approve-unlimited' | 'owner-mismatch'
-  /** A permit or Permit2 grant to a spender the caller did not list in `knownSpenders`. */
+  /**
+   * A permit or Permit2 grant to a spender the caller did not list in `knownSpenders`. A Permit2 grant to
+   * a Uniswap Universal Router of the signed chain (`UNISWAP_UNIVERSAL_ROUTERS`) does not get it either.
+   */
   | 'spender-unknown'
   /** A Seaport order pays part (or all) of its consideration to an address other than the signer. */
   | 'consideration-foreign'
@@ -106,7 +110,7 @@ export interface Permit2Entry {
 export interface Permit2Grant {
   /** Who may pull the tokens, as written in the message ('' when it cannot be read). */
   spender: string
-  /** The caller's label for a spender listed in `knownSpenders`. */
+  /** The caller's label for a spender listed in `knownSpenders`, or "Uniswap Universal Router" for a pinned router of the signed chain. */
   spenderLabel?: string
   /** Every token granted (empty when the schema is not Permit2's — then it is treated as unlimited). */
   entries: Permit2Entry[]
@@ -375,7 +379,9 @@ function seaportOrders(types: TypedDataInput['types'], primaryType: string, m: R
 /**
  * Decode EIP-712 typed data for a confirmation screen. Pass the account's `chainId` and address to
  * get chain and owner warnings, and `knownSpenders` (address → label) for the contracts a permit or
- * Permit2 grant may go to without a `spender-unknown` warning.
+ * Permit2 grant may go to without a `spender-unknown` warning. One set is built in, for Permit2 grants
+ * only: the Uniswap Universal Router deployments of the chain in the signed domain
+ * (`UNISWAP_UNIVERSAL_ROUTERS`); the same address on another chain, or in a token permit, is unknown.
  *
  * Asset-granting forms come back as grants: EIP-2612 / DAI permits (`permit`), every Permit2 primary
  * type (`permit2`: spender, tokens, amounts, expirations, deadline), Seaport orders (`seaport`: offer
@@ -396,8 +402,8 @@ export function describeTypedData(typed: TypedDataInput, ctx: { chainId?: number
     warnings.push({ code: 'chain-mismatch', message: `Typed data is for chain ${domain.chainId}, account is on chain ${ctx.chainId}.` })
   }
   const now = BigInt(Math.floor(Date.now() / 1000))
-  const spenderCheck = (spender: string, what: string): string | undefined => {
-    const label = labelOf(ctx.knownSpenders, spender)
+  const spenderCheck = (spender: string, what: string, builtIn?: string): string | undefined => {
+    const label = labelOf(ctx.knownSpenders, spender) ?? builtIn
     if (label === undefined) {
       warnings.push({ code: 'spender-unknown', message: spender ? `${what} to ${spender}, which is not a known contract: whoever controls it can take the tokens. Only sign if you trust it.` : `${what} whose spender cannot be read: treat it as a grant to anyone.` })
     }
@@ -458,7 +464,10 @@ export function describeTypedData(typed: TypedDataInput, ctx: { chainId?: number
     if (deadline !== undefined && deadline < now) warnings.push({ code: 'deadline-passed', message: 'Permit2 deadline is already in the past.' })
     const transfer = PERMIT2_GRANT[primaryType]!.name === 'permitted'
     const spender = declaredType(typed.types, primaryType, 'spender') === 'address' ? str(m.spender) ?? '' : ''
-    const spenderLabel = spenderCheck(spender, transfer ? 'Permit2 transfer' : 'Permit2 allowance')
+    // The built-in list answers only for a grant Permit2 would honour: its own address as the verifying
+    // contract and a router of the chain the signature is for (the signed domain, not the account's chain).
+    const router = domain.verifyingContract?.toLowerCase() === PERMIT2_ADDRESS.toLowerCase() ? permit2KnownSpender(domain.chainId, spender) : undefined
+    const spenderLabel = spenderCheck(spender, transfer ? 'Permit2 transfer' : 'Permit2 allowance', router)
     const grant: Permit2Grant = { spender, entries, transfer }
     if (spenderLabel !== undefined) grant.spenderLabel = spenderLabel
     if (deadline !== undefined) grant.deadline = deadline
