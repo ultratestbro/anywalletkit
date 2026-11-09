@@ -33,7 +33,7 @@ import { ApprovalQueue, type OriginVia } from './approvals.js'
 import type { EvmNetwork } from './networks.js'
 import { RELAY_ERRORS, type RelayError } from './relay.js'
 import { RouterError, type RouterDeps } from './router.js'
-import { describeSiwe, type SiweInfo } from './siwe.js'
+import { SIWE_FORBIDDEN_CHARS, describeSiwe, type SiweInfo } from './siwe.js'
 
 /** The account nonce an RPC reported, refused when it is not a safe integer (a broken or hostile RPC). */
 const safeNonce = (n: bigint): number => {
@@ -42,8 +42,8 @@ const safeNonce = (n: bigint): number => {
 }
 
 export type SignRequestInfo =
-  | { kind: 'sign-message'; method: 'personal_sign'; account: string; /** Decoded text when printable, else the hex. */ text: string; /** What is actually signed (hex or utf-8 string). */ raw: string; /** Parsed Sign-In with Ethereum (EIP-4361) with the checks against the asking origin, when the text is one. */ siwe?: SiweInfo }
-  | { kind: 'sign-typed-data'; method: string; account: string; /** Pretty-printed JSON. */ text: string; typedData: TypedData }
+  | { kind: 'sign-message'; method: 'personal_sign'; account: string; /** Decoded text when printable, else the hex; invisible / direction-changing characters shown as `⟨U+XXXX⟩` ({@link revealHidden}). */ text: string; /** What is actually signed (hex or utf-8 string). */ raw: string; /** Parsed Sign-In with Ethereum (EIP-4361) with the checks against the asking origin, when the text is one. */ siwe?: SiweInfo; /** `text` had invisible or direction-changing characters (now escaped): the sheet should warn. */ hiddenChars?: true }
+  | { kind: 'sign-typed-data'; method: string; account: string; /** Pretty-printed JSON, invisible / direction-changing characters escaped. */ text: string; typedData: TypedData; /** `text` had invisible or direction-changing characters (now escaped): the sheet should warn. */ hiddenChars?: true }
   | { kind: 'send-transaction'; method: 'eth_sendTransaction'; account: string; tx: { to: string; value: string; data: string | null; gas: string | null } }
 
 export interface TypedData {
@@ -63,6 +63,12 @@ export interface PreparedTx {
   gasPrice?: string
   /** gasLimit × max fee, base units. */
   maxFee: string
+  /**
+   * Set when the page chose the gas limit and the wallet's own `eth_estimateGas` answered: the estimate
+   * (0x hex) and whether the page's limit is above max(estimate × 1.5, estimate + 50 000) — then the sheet
+   * should warn with the max fee. The page's limit is still the one signed.
+   */
+  gasCheck?: { estimate: string; excessive: boolean }
 }
 
 /** The approval window's payload for the three signing kinds. */
@@ -98,16 +104,46 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/
 const HEX = /^0x([0-9a-fA-F]{2})*$/
 const lc = (s: string) => s.toLowerCase()
 
-/** Vaulty's `messageText`: hex that decodes to printable text is shown decoded; binary payloads stay hex. */
+/**
+ * Characters that change how text displays without showing themselves: every format character
+ * (Unicode Cf — bidi embeddings / overrides / isolates, LRM / RLM / ALM, zero-width space / joiners,
+ * word joiner, BOM, soft hyphen, tag characters…), line / paragraph separators, the invisible Hangul
+ * fillers, and C0 / C1 controls other than tab, newline and carriage return.
+ */
+const INVISIBLE = /[\p{Cf}\u2028\u2029\u115f\u1160\u3164\uffa0\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/gu
+
+/**
+ * Text for a review sheet: every invisible or direction-changing character replaced by a visible
+ * `⟨U+XXXX⟩`, so the order on screen is the order of the bytes (a right-to-left override can make
+ * "exe.gnp" read as "png.exe"). `hidden` says whether anything was replaced — the sheet should warn.
+ */
+export function revealHidden(text: string): { text: string; hidden: boolean } {
+  let hidden = false
+  const out = text.replace(INVISIBLE, (c) => {
+    hidden = true
+    return `⟨U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}⟩`
+  })
+  return { text: out, hidden }
+}
+
+/**
+ * Vaulty's `messageText`: hex that decodes to printable text is shown decoded; binary payloads stay hex.
+ * Invisible and direction-changing characters come back escaped ({@link revealHidden}).
+ */
 export function messageText(value: unknown): string {
-  if (typeof value !== 'string') return ''
-  if (!HEX.test(value)) return value
+  return shownMessage(value).text
+}
+
+/** {@link messageText} plus whether it escaped anything. */
+function shownMessage(value: unknown): { text: string; hidden: boolean } {
+  if (typeof value !== 'string') return { text: '', hidden: false }
+  if (!HEX.test(value)) return revealHidden(value)
   try {
     const bytes = Uint8Array.from(value.slice(2).match(/../g) ?? [], (b) => Number.parseInt(b, 16))
     const s = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
-    return /^[\x09\x0a\x0d\x20-\x7e -￿]*$/.test(s) ? s : value
+    return /^[\x09\x0a\x0d\x20-\x7e\u00a0-\uffff]*$/.test(s) ? revealHidden(s) : { text: value, hidden: false }
   } catch {
-    return value
+    return { text: value, hidden: false }
   }
 }
 
@@ -144,13 +180,16 @@ export function classifySignRequest(input: { network: EvmNetwork; method: string
     if (ours(msg) && !ours(addr)) [msg, addr] = [addr, msg]
     if (!ours(addr)) return err(RELAY_ERRORS.unauthorized, 'personal_sign for an address this wallet does not hold.')
     if (typeof msg !== 'string') return err(RELAY_ERRORS.invalidParams, 'personal_sign expects a message string.')
-    const text = messageText(msg)
+    const shown = shownMessage(msg)
+    const text = shown.text
     const signed = decodedMessage(msg) ?? text
     const siwe = input.origin ? describeSiwe(signed, { origin: input.origin, account: checksum(addr), chainId: input.network.chainId, ...(input.via ? { via: input.via } : {}), ...(input.now !== undefined ? { now: input.now } : {}) }) : null
     // A sign-in message with hidden control characters would show as an opaque hex blob while
     // a lenient verifier still accepts it: refuse it outright.
     if (siwe && HIDDEN_CONTROL.test(signed)) return err(RELAY_ERRORS.invalidParams, 'This sign-in message contains hidden control characters — refused.')
-    return { kind: 'sign-message', method, account: checksum(addr), text, raw: msg, ...(siwe ? { siwe } : {}) }
+    // Bidi controls and zero-width characters can make the domain or statement read differently from what is signed.
+    if (siwe && SIWE_FORBIDDEN_CHARS.test(signed)) return err(RELAY_ERRORS.invalidParams, 'This sign-in message contains invisible or text-direction characters — refused.')
+    return { kind: 'sign-message', method, account: checksum(addr), text, raw: msg, ...(siwe ? { siwe } : {}), ...(shown.hidden ? { hiddenChars: true as const } : {}) }
   }
 
   if (method === 'eth_signTypedData_v4' || method === 'eth_signTypedData_v3' || method === 'eth_signTypedData') {
@@ -170,7 +209,8 @@ export function classifySignRequest(input: { network: EvmNetwork; method: string
       // A domain bound to another chain than the one the site is on is the classic cross-chain replay / phishing shape.
       return err(RELAY_ERRORS.chainDisconnected, `Typed data is for chain ${String(cid)}; this site is on ${input.network.name} (${input.network.chainId}).`)
     }
-    return { kind: 'sign-typed-data', method, account: checksum(addr), text: JSON.stringify(parsed, bigintSafe, 2), typedData: parsed }
+    const shown = revealHidden(JSON.stringify(parsed, bigintSafe, 2))
+    return { kind: 'sign-typed-data', method, account: checksum(addr), text: shown.text, typedData: parsed, ...(shown.hidden ? { hiddenChars: true as const } : {}) }
   }
 
   if (method === 'eth_sendTransaction') {
@@ -239,17 +279,36 @@ function overpriced(shown: PreparedTx, fresh: PreparedTx): boolean {
   return false
 }
 
-/** Nonce, gas, fees from the wallet's RPC. */
+/** A page's gas limit above max(estimate × 1.5, estimate + 50 000) is flagged on the sheet (never replaced). */
+export function gasLimitExcessive(limit: bigint, estimate: bigint): boolean {
+  const a = (estimate * 3n) / 2n
+  const b = estimate + 50_000n
+  return limit > (a > b ? a : b)
+}
+
+/**
+ * Nonce, gas, fees from the wallet's RPC. A gas limit the page set is used as given, but it is checked
+ * against the wallet's own estimate ({@link PreparedTx.gasCheck}); a failed estimate (a call that
+ * reverts now) leaves the check out instead of failing the request.
+ */
 export async function prepareTransaction(deps: Pick<SignDeps, 'rpc' | 'tipFloor'>, network: EvmNetwork, from: string, tx: { to: string; value: string; data: string | null; gas: string | null }): Promise<PreparedTx> {
   const call = { from, to: tx.to, value: hex(BigInt(tx.value)), ...(tx.data ? { data: tx.data } : {}) }
+  const estimate = () => deps.rpc(network, 'eth_estimateGas', [call])
   const [nonceHex, block, gasHex] = await Promise.all([
     deps.rpc(network, 'eth_getTransactionCount', [from, 'pending']),
     deps.rpc(network, 'eth_getBlockByNumber', ['latest', false]) as Promise<{ baseFeePerGas?: string | null } | null>,
-    tx.gas ? Promise.resolve(tx.gas) : deps.rpc(network, 'eth_estimateGas', [call]),
+    tx.gas ? estimate().then((v) => v, () => null) : estimate(),
   ])
-  const estimated = big(gasHex)
-  const gasLimit = tx.gas ? estimated : (estimated * 120n + 99n) / 100n
-  return withFees(network.chainId, safeNonce(big(nonceHex)), gasLimit, await readFees(deps, network, block))
+  const nonce = safeNonce(big(nonceHex))
+  if (!tx.gas) {
+    const estimated = big(gasHex)
+    return withFees(network.chainId, nonce, (estimated * 120n + 99n) / 100n, await readFees(deps, network, block))
+  }
+  const limit = big(tx.gas)
+  const prepared = withFees(network.chainId, nonce, limit, await readFees(deps, network, block))
+  let est: bigint | null = null
+  try { est = typeof gasHex === 'string' ? big(gasHex) : null } catch { est = null }
+  return est !== null && est > 0n ? { ...prepared, gasCheck: { estimate: hex(est), excessive: gasLimitExcessive(limit, est) } } : prepared
 }
 
 /** The router's `sign` hook: classify → prepare → review → sign (→ broadcast). */

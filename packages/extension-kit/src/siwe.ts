@@ -35,7 +35,20 @@ export interface SiweInfo {
   problems: string[]
   /** The header said "sign-in" but the rest did not parse as EIP-4361 (`message` then holds what could be read). */
   malformed?: boolean
+  /**
+   * Set when the sign-in names another site than the one asking (its host differs from the page's
+   * host, or from a WalletConnect Verify-attested URL): `domain` as written in the message, `origin`
+   * the asking site as `scheme://host`. A sheet should make this its headline, not one warning among many.
+   */
+  crossSite?: { domain: string; origin: string }
 }
+
+/**
+ * Characters a sign-in message is refused for: bidi controls (ALM, LRM / RLM, embeddings, overrides,
+ * isolates), zero-width space / joiners, word joiner and invisible operators, BOM — they can make the
+ * domain or the statement read differently from the bytes that are signed.
+ */
+export const SIWE_FORBIDDEN_CHARS = /[\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/
 
 export interface SiweContext {
   /** The page that asked, as the browser recorded it (`https://…`), or a transport pseudo-origin (`wc:<topic>`). */
@@ -168,11 +181,25 @@ export function siweProblems(m: SiweMessage, ctx: SiweContext): string[] {
   return out
 }
 
+/**
+ * The asking site when the sign-in names a different host: the browser-recorded origin, or for a
+ * WalletConnect pseudo-origin the URL Verify attested (VALID, not scam). `null` when the hosts agree
+ * or when no site can be vouched for at all (that case is a separate "cannot verify" problem).
+ */
+export function siweCrossSite(m: SiweMessage, ctx: SiweContext): { domain: string; origin: string } | null {
+  const site = originWhere(ctx.origin) ?? (ctx.via?.verify === 'VALID' && !ctx.via.scam ? whereOf(ctx.via.url) : null)
+  if (!site) return null
+  const domain = whereOf(m.domain)
+  return !domain || domain.host !== site.host ? { domain: m.domain, origin: `${site.scheme}://${site.host}` } : null
+}
+
 /** `null` only when the text does not start with an EIP-4361 header; a header with unreadable fields comes back with a "malformed sign-in message" problem. */
 export function describeSiwe(text: string, ctx: SiweContext): SiweInfo | null {
   const p = parseLoose(text)
   if (!p) return null
   const problems = siweProblems(p.message, ctx)
-  if (p.missing.length === 0) return { message: p.message, problems }
-  return { message: p.message, problems: [`This is a malformed sign-in message (EIP-4361): ${p.missing.join(', ')} missing or unreadable — check the site before signing.`, ...problems], malformed: true }
+  const cross = siweCrossSite(p.message, ctx)
+  const crossSite = cross ? { crossSite: cross } : {}
+  if (p.missing.length === 0) return { message: p.message, problems, ...crossSite }
+  return { message: p.message, problems: [`This is a malformed sign-in message (EIP-4361): ${p.missing.join(', ')} missing or unreadable — check the site before signing.`, ...problems], malformed: true, ...crossSite }
 }
