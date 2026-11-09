@@ -4,11 +4,15 @@
  *
  * - the origin is the browser's (checked by the service worker before this runs);
  * - accounts are exposed only to origins the user connected (`eth_requestAccounts`
- *   → approval window); `eth_accounts` is `[]` otherwise;
+ *   → approval window); `eth_accounts` is `[]` otherwise. Grants are per site: an
+ *   origin sees the accounts IT was granted that the wallet exposes right now (the
+ *   active one), connecting another account adds it to that origin only, and a
+ *   signature must name a granted and exposed account;
  * - chain switching and adding go through the approval window; a chain can be
  *   added only if the asset catalog knows it, with https RPCs;
  * - read-only JSON-RPC is answered from the wallet's own clients (the networks
- *   table's failover list), never from a URL the page names;
+ *   table's failover list), never from a URL the page names; `eth_getLogs` from an
+ *   origin without an EVM grant spans at most {@link GETLOGS_MAX_SPAN_UNCONNECTED} blocks;
  * - `eth_sign` (blind hash signing) is never offered; the other signing methods
  *   go to the `sign` hook (the review flow) when the wallet provides one;
  * - everything else is refused with 4200.
@@ -105,6 +109,15 @@ export const READ_METHODS: ReadonlySet<string> = new Set([
   'eth_getTransactionByHash', 'eth_getTransactionCount', 'eth_getTransactionReceipt', 'eth_maxPriorityFeePerGas',
 ])
 
+/**
+ * Blocks an `eth_getLogs` from an origin without an EVM grant may span. A page that is not connected
+ * reads recent events (a token's latest transfers, a pool's last swaps), not history: 1000 blocks is
+ * ~3.3 h on Ethereum and ~30 min on 2 s chains, and stays inside every public RPC's own range cap,
+ * so one call cannot make the wallet's RPC scan millions of blocks for a page nobody connected.
+ * Connected origins are not bounded here (the node's own limits apply).
+ */
+export const GETLOGS_MAX_SPAN_UNCONNECTED = 1000
+
 /** Methods that produce a signature — the review flow's business (step 4), never answered here. */
 export const SIGNING_METHODS: ReadonlySet<string> = new Set(['personal_sign', 'eth_signTypedData_v4', 'eth_signTypedData_v3', 'eth_signTypedData', 'eth_sendTransaction'])
 
@@ -169,9 +182,12 @@ export class RequestRouter {
         return this.visibleAccounts(permission)
       case 'eth_requestAccounts':
         return this.connect(origin, network)
-      case 'wallet_getPermissions':
-        // An origin connected only on another chain holds no EVM permission (scan F6/F8).
-        return permission && permission.accounts.length > 0 ? [permissionDescriptor(origin, permission.accounts)] : []
+      case 'wallet_getPermissions': {
+        // An origin connected only on another chain holds no EVM permission (scan F6/F8); a granted account
+        // that is not exposed right now is not listed either (per-site grants).
+        const visible = await this.visibleAccounts(permission)
+        return visible.length > 0 ? [permissionDescriptor(origin, visible)] : []
+      }
       case 'wallet_requestPermissions': {
         const accounts = await this.connect(origin, network)
         return [permissionDescriptor(origin, accounts)]
@@ -207,12 +223,21 @@ export class RequestRouter {
         throw new RouterError(RELAY_ERRORS.unsupportedMethod, `${method} (blind signing) is never offered by this wallet.`)
     }
 
-    if (READ_METHODS.has(method)) return this.deps.rpc(network, method, params)
+    if (READ_METHODS.has(method)) {
+      if (method === 'eth_getLogs' && !(permission && permission.accounts.length > 0)) await this.boundLogs(network, params)
+      return this.deps.rpc(network, method, params)
+    }
 
     if (SIGNING_METHODS.has(method)) {
       if (!this.deps.sign) throw new RouterError(RELAY_ERRORS.unsupportedMethod, `${method} is not available yet.`)
-      if (!permission) throw new RouterError(RELAY_ERRORS.unauthorized, 'Connect the wallet first (eth_requestAccounts).')
-      return this.deps.sign({ origin, network, method, params, accounts: permission.accounts })
+      if (!permission || permission.accounts.length === 0) throw new RouterError(RELAY_ERRORS.unauthorized, 'Connect the wallet first (eth_requestAccounts).')
+      const visible = await this.visibleAccounts(permission)
+      const named = namedAccount(method, params)
+      const inactive = named !== undefined && permission.accounts.some((a) => a.toLowerCase() === named.toLowerCase()) && !visible.some((a) => a.toLowerCase() === named.toLowerCase())
+      if (visible.length === 0 || inactive) {
+        throw new RouterError(RELAY_ERRORS.unauthorized, 'The account this site asks for is not the wallet\'s active account (or the wallet is locked). Switch to it in the wallet, or connect the active account (eth_requestAccounts).')
+      }
+      return this.deps.sign({ origin, network, method, params, accounts: visible })
     }
 
     throw new RouterError(RELAY_ERRORS.unsupportedMethod, `This wallet does not support ${method}.`)
@@ -225,9 +250,32 @@ export class RequestRouter {
     return permission.accounts.filter((a) => available.includes(a))
   }
 
+  /** An unconnected origin's `eth_getLogs`: a block hash, or a range of at most {@link GETLOGS_MAX_SPAN_UNCONNECTED} blocks. */
+  private async boundLogs(network: EvmNetwork, params: unknown[]): Promise<void> {
+    const filter = (params[0] ?? {}) as { fromBlock?: unknown; toBlock?: unknown; blockHash?: unknown }
+    if (typeof filter !== 'object' || filter === null) throw new RouterError(RELAY_ERRORS.invalidParams, 'eth_getLogs expects a filter object.')
+    if (filter.blockHash !== undefined && filter.blockHash !== null) return
+    let head: bigint | undefined
+    const block = async (tag: unknown): Promise<bigint> => {
+      if (tag === undefined || tag === null || tag === 'latest' || tag === 'pending' || tag === 'safe' || tag === 'finalized') {
+        head ??= BigInt(String(await this.deps.rpc(network, 'eth_blockNumber', [])))
+        return head
+      }
+      if (tag === 'earliest') return 0n
+      if (typeof tag === 'string' && /^0x[0-9a-fA-F]{1,16}$/.test(tag)) return BigInt(tag)
+      throw new RouterError(RELAY_ERRORS.invalidParams, 'eth_getLogs: fromBlock / toBlock must be a block tag or a hex block number.')
+    }
+    const from = await block(filter.fromBlock)
+    const to = await block(filter.toBlock)
+    if (to - from > BigInt(GETLOGS_MAX_SPAN_UNCONNECTED)) {
+      throw new RouterError(RELAY_ERRORS.limitExceeded, `eth_getLogs over more than ${GETLOGS_MAX_SPAN_UNCONNECTED} blocks is answered for connected sites only; narrow the range or connect the wallet.`)
+    }
+  }
+
   /**
    * Connected and unlocked → the accounts; otherwise the approval window (which
-   * unlocks first when needed) picks them. Emits `connect` + `accountsChanged`.
+   * unlocks first when needed) picks them, and they are ADDED to this origin's
+   * grant (other origins are untouched). Emits `connect` + `accountsChanged`.
    */
   private async connect(origin: string, network: EvmNetwork): Promise<string[]> {
     const existing = await this.visibleAccounts(await this.deps.permissions.get(origin))
@@ -236,7 +284,7 @@ export class RequestRouter {
     const available = await this.deps.accounts()
     const accounts = Array.isArray(chosen) ? chosen.filter((a): a is string => typeof a === 'string' && available.includes(a)) : []
     if (accounts.length === 0) throw new ReviewDeclined('No account was selected.')
-    await this.deps.permissions.connect(origin, accounts, network.caip2)
+    await this.deps.permissions.grant(origin, accounts, network.caip2)
     this.deps.emit(origin, 'connect', { chainId: chainHex(network.caip2) })
     this.deps.emit(origin, 'accountsChanged', accounts)
     return accounts
@@ -257,6 +305,14 @@ export class RequestRouter {
     await this.deps.permissions.setChain(origin, to.caip2)
     this.deps.emit(origin, 'chainChanged', chainHex(to.caip2))
   }
+}
+
+/** The address a signing request names (`from` / the signer), when it names one. */
+function namedAccount(method: string, params: unknown[]): string | undefined {
+  const addr = (x: unknown) => (typeof x === 'string' && /^0x[0-9a-fA-F]{40}$/.test(x) ? x : undefined)
+  if (method === 'personal_sign') return addr(params[1]) ?? addr(params[0])
+  if (method === 'eth_sendTransaction') return addr((params[0] as { from?: unknown } | undefined)?.from)
+  return addr(params[0])
 }
 
 const permissionDescriptor = (origin: string, accounts: string[]) => ({
