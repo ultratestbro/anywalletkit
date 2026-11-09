@@ -228,7 +228,7 @@ export class Vault {
     if (isEnvelopeV1(envelope)) {
       if (envelope.kdf.iterations < VAULT_MIN_ITERATIONS) throw new VaultError(`The vault's KDF (${envelope.kdf.iterations} iterations) is below the floor this build accepts.`, 'weak-kdf')
       const kek = await this._derivePbkdf2(password, fromBase64(envelope.kdf.salt), envelope.kdf.iterations)
-      const dek = await this._open(kek, envelope.dek, aadDekV1(envelope.kdf), 'wrong-password')
+      const dek = await this._proveOwn(await this._open(kek, envelope.dek, aadDekV1(envelope.kdf), 'wrong-password'), envelope)
       if (this._kdf === 'scrypt') {
         // Upgrade in place: same secrets, same createdAt, scrypt-wrapped DEK.
         const next = await this._sealEnvelope(password, dek, envelope.secrets, [], envelope.createdAt)
@@ -238,7 +238,25 @@ export class Vault {
     }
     if (!isStrongScrypt(envelope.kdf)) throw new VaultError(`The vault's scrypt cost (N=${envelope.kdf.N} r=${envelope.kdf.r} p=${envelope.kdf.p}) is below the floor this build accepts.`, 'weak-kdf')
     const kek = await this._deriveScrypt(password, fromBase64(envelope.kdf.salt), envelope.kdf)
-    return this._open(kek, envelope.dek, aadDekV2(envelope.kdf), 'wrong-password')
+    return this._proveOwn(await this._open(kek, envelope.dek, aadDekV2(envelope.kdf), 'wrong-password'), envelope)
+  }
+
+  /**
+   * A DEK unwrapped from a dek / passkey box must be the key this vault's secrets are sealed under
+   * (audit 2026-11-09 E21): a box spliced in from another vault, under another password or passkey,
+   * opens with that password but holds a foreign key. Proven with the DEK check, or — in an envelope
+   * written before it — the first secret; an old empty envelope has nothing to prove it with. Returns
+   * `dek`; on a mismatch zeroizes it and fails as `wrong-password` (the same failure as tampering).
+   */
+  private async _proveOwn(dek: Uint8Array, envelope: VaultEnvelope): Promise<Uint8Array> {
+    if (envelope.dekCheck === undefined && Object.keys(envelope.secrets).length === 0) return dek
+    try {
+      await this._requireDek(dek, envelope)
+      return dek
+    } catch {
+      zeroize(dek)
+      throw new VaultError('Wrong password.', 'wrong-password')
+    }
   }
 
   /**
@@ -272,9 +290,13 @@ export class Vault {
    *
    * Passkeys are dropped — their boxes hold the old DEK and cannot be re-wrapped without their PRF
    * output — and must be registered again ({@link Vault.addPasskey} with the new DEK).
+   *
+   * With `newPassword` this is also the password change: the new DEK is wrapped under `newPassword`
+   * (at least {@link VAULT_MIN_PASSWORD_LENGTH} characters), and `password` must be the current one.
    */
-  async rotateVaultKey(password: string): Promise<Uint8Array> {
+  async rotateVaultKey(password: string, newPassword?: string): Promise<Uint8Array> {
     requirePassword(password)
+    if (newPassword !== undefined) requirePassword(newPassword, VAULT_MIN_PASSWORD_LENGTH)
     return this._exclusive(async () => {
       const oldDek = await this._unlock(password)
       const dek = this._random(DEK_BYTES)
@@ -290,7 +312,7 @@ export class Vault {
             zeroize(plaintext)
           }
         }
-        const next = await this._sealEnvelope(password, dek, secrets, [], envelope.createdAt)
+        const next = await this._sealEnvelope(newPassword ?? password, dek, secrets, [], envelope.createdAt)
         const upgradedAt = isEnvelopeV2(envelope) ? envelope.upgradedAt : undefined
         await this._write(isEnvelopeV2(next) ? { ...next, ...(upgradedAt !== undefined ? { upgradedAt } : {}), rotatedAt: Date.now() } : next)
         return dek
@@ -358,7 +380,7 @@ export class Vault {
       const entry = envelope.passkeys.find((p) => p.id === id)
       if (!entry) throw new VaultError('No such passkey on this vault.', 'missing')
       const key = await this._derivePasskeyKek(prf, id)
-      return await this._open(key, entry.dek, aadPasskey(id), 'wrong-password')
+      return await this._proveOwn(await this._open(key, entry.dek, aadPasskey(id), 'wrong-password'), envelope)
     } finally {
       zeroize(prf)
     }

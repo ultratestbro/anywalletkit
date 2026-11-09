@@ -475,6 +475,53 @@ export class Keyring {
   }
 
   /**
+   * Re-derive every stored address from its key and report the ones that differ — the stored
+   * addresses are public metadata in the app's storage, which may not be authenticated (an address
+   * shown on a Receive screen must come from the key, not from that file). With `repair`, the
+   * metadata is overwritten with the derived addresses; an address with nothing behind it (no secret
+   * for the source, or a chain a single key does not sign on) is removed. Reads each source's secret
+   * once. A secret store that fails (locked, say) aborts the whole check and changes nothing; only a
+   * secret that is missing counts as "nothing behind it". Chains not registered here are skipped.
+   */
+  async verifyAddresses(options: { repair?: boolean } = {}): Promise<AddressMismatch[]> {
+    const mismatches: AddressMismatch[] = []
+    for (const source of clone(this._state.sources)) {
+      const accounts = this._state.accounts.filter((a) => a.sourceId === source.id)
+      if (accounts.length === 0) continue
+      let secret: Secret | null
+      try {
+        secret = await this.secret(source.id)
+      } catch (e) {
+        if (!(e instanceof KeyringError && e.code === 'secret-missing')) throw e
+        secret = null
+      }
+      for (const meta of accounts) {
+        const stored = Object.entries(meta.addresses).filter(([chain]) => chain in this._chains) as [ChainKey, string][]
+        if (stored.length === 0) continue
+        let derived: Partial<Record<ChainKey, string>> = {}
+        if (secret?.type === 'mnemonic') derived = await this.deriveAddresses(secret, meta.index ?? 0, stored.map(([chain]) => chain))
+        else if (secret?.type === 'privateKey') derived = secret.chain in this._chains ? await this.singleAddress(secret, secret.chain) : {}
+        else if (secret?.type === 'tonMnemonic') derived = 'ton' in this._chains ? await this.singleAddress(secret, 'ton') : {}
+        for (const [chain, address] of stored) {
+          const want = derived[chain] ?? null
+          if (address !== want) mismatches.push({ accountId: meta.id, chain, stored: address, derived: want })
+        }
+      }
+    }
+    if (options.repair && mismatches.length > 0) {
+      await this.mutate(async (state) => {
+        for (const m of mismatches) {
+          const a = state.accounts.find((x) => x.id === m.accountId)
+          if (!a || a.addresses[m.chain] !== m.stored) continue // changed meanwhile: leave it to the next check
+          if (m.derived === null) delete a.addresses[m.chain]
+          else a.addresses[m.chain] = m.derived
+        }
+      })
+    }
+    return mismatches
+  }
+
+  /**
    * Restore-time discovery: walk indexes above the source's highest one, add
    * every account `isUsed` says has activity, stop after `gapLimit` (default 1,
    * as MetaMask / Phantom do) unused accounts in a row or at `maxIndex`.
@@ -764,6 +811,16 @@ export class Keyring {
     this._queue = run.catch(() => undefined)
     return run
   }
+}
+
+/** One stored address that does not match its key ({@link Keyring.verifyAddresses}). */
+export interface AddressMismatch {
+  accountId: string
+  chain: ChainKey
+  /** What the metadata says. */
+  stored: string
+  /** What the key derives; `null` when nothing stands behind the address (no secret, or a chain the key does not sign on). */
+  derived: string | null
 }
 
 /**

@@ -108,7 +108,11 @@ export class Session {
     })
   }
 
-  /** User activity: push the auto-lock out again. No-op when locked. */
+  /**
+   * User activity: push the auto-lock out again. No-op when locked. Call it for explicit user
+   * gestures only (unlock, send, approve / decline, an action in the wallet's own UI) — not for
+   * passive polls, page requests or worker restarts, or the timer never runs out.
+   */
   async touch(): Promise<void> {
     return this._serial(async () => {
       const epoch = this._epoch
@@ -124,11 +128,25 @@ export class Session {
     return this._autoLockMs
   }
 
-  /** Change the timer (options page); re-arms from now when unlocked. 0 disables. */
+  /**
+   * Set the timer period (0 disables). Never pushes the deadline out — call this at every worker
+   * start with the stored setting: it re-arms the alarm at the stored deadline (a restart must not
+   * count as activity, audit 2026-11-09 E11), and only brings the deadline forward when the new
+   * period ends sooner. A longer period (or 0) applies from the next {@link Session.touch} /
+   * {@link Session.unlock}; call `touch()` right after when the user changed it explicitly.
+   */
   async setAutoLockMs(ms: number): Promise<void> {
     if (!Number.isFinite(ms) || ms < 0) throw new VaultError('Auto-lock must be a non-negative number of milliseconds.', 'invalid-input')
     this._autoLockMs = ms
-    await this.touch()
+    return this._serial(async () => {
+      const epoch = this._epoch
+      const record = await this._read()
+      if (!record || epoch !== this._epoch) return
+      const cap = this._expiry()
+      const expiresAt = cap !== null && (record.expiresAt === null || cap < record.expiresAt) ? cap : record.expiresAt
+      if (expiresAt !== record.expiresAt) await this._storage.set(this._key, { ...record, expiresAt } satisfies SessionRecord)
+      await this._arm(expiresAt)
+    })
   }
 
   onLock(callback: () => void): () => void {

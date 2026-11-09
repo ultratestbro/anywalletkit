@@ -73,12 +73,22 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
   compromise, `rotateVaultKey(password)` makes a fresh DEK, re-seals every
   secret, drops the passkeys (register them again) and writes one envelope;
   hand the returned DEK to `session.unlock`, which replaces the old one.
-  `setSecret` refuses a DEK that does not open the vault's secrets.
+  `rotateVaultKey(oldPassword, newPassword)` is the password change with a
+  fresh DEK. `setSecret` refuses a DEK that does not open the vault's secrets,
+  and `unlock` / `unlockWithPasskey` refuse (`wrong-password`) a box that opens
+  but holds another vault's key (a spliced dek or passkey box).
 - **Unlocked state.** Only the DEK is kept, in `chrome.storage.session`
   (memory-only, trusted contexts), with an expiry enforced on every read and an
   alarm that locks; key buffers this package owns are zeroized after use.
   `unlock` / `lock` / `touch` / `getKey` run one at a time, so activity racing a
-  lock never brings the key back.
+  lock never brings the key back. `setAutoLockMs` never pushes the deadline out
+  (safe to call at every worker start); `touch` only for explicit user gestures.
+- **Stored settings and grants.** `chrome.storage.local` is not authenticated.
+  `macJsonStorage(store, { label, key })` adds an HMAC-SHA256 under a key derived
+  from the DEK (`deriveStorageMacKey`); a plain, edited or foreign value reads as
+  `null` (`read()` says why: `unsigned` / `invalid`). Without a key (locked) it
+  reads the stored value unverified and writes it unsigned (or refuses, by
+  option), so verify at unlock; after `rotateVaultKey`, `rekey` the stores.
 - **Errors to pages.** `toRelayError(e, { log })` passes the wallet's own refusals
   (EIP-1193 codes) and a node's JSON-RPC error (code, revert data) with URLs
   removed; anything else is `-32603 Internal error` on the page and goes to `log`.
