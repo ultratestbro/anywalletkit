@@ -235,6 +235,11 @@ export class ApprovalQueue {
     return this.all.filter((p) => p.request.origin === origin).length
   }
 
+  /** Requests waiting for any origin of `site` (current + queued). */
+  pendingForSite(site: string): number {
+    return this.all.filter((p) => this.site(p.request.origin) === site).length
+  }
+
   /** The site (registrable domain) the queue's limits put `origin` under. */
   siteFor(origin: string): string {
     return this.site(origin)

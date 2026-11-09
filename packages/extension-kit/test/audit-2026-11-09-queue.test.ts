@@ -73,6 +73,8 @@ describe('ApprovalQueue: global, per-site and rate limits (audit E17)', () => {
     const a2 = ask(q, 'https://a.evil.tld')
     await flush()
     expect(w.opened[0]!.origin).toBe('https://a.evil.tld')
+    expect(q.siteFor('https://a.evil.tld')).toBe('evil.tld')
+    expect(q.pendingForSite('evil.tld')).toBe(3)
     expect(q.declineOrigin('https://a.evil.tld')).toBe(2)
     expect(await settled(a)).toBe('declined')
     expect(await settled(a2)).toBe('declined')
