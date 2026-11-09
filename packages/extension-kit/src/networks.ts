@@ -150,6 +150,18 @@ export class NetworksTable {
     )
     return this._loading
   }
+
+  /**
+   * Forget the cached table: the next read asks storage again. For a storage whose answer changes under
+   * the table — e.g. one that only hands out the user's networks once the wallet is unlocked.
+   */
+  reload(): Promise<void> {
+    return this.serialize(async () => {
+      await this._loading?.catch(() => undefined)
+      this._custom = null
+      this._loading = null
+    })
+  }
 }
 
 /**

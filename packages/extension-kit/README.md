@@ -90,6 +90,16 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
   `null` (`read()` says why: `unsigned` / `invalid`). Without a key (locked) it
   reads the stored value unverified and writes it unsigned (or refuses, by
   option), so verify at unlock; after `rotateVaultKey`, `rekey` the stores.
+  Rollback: share one `storageVersionLedger({ manifest, mark })` between the
+  stores (`versions`) and every signed value carries a version inside its MAC; a
+  signed manifest in the same area lists the latest of each, and `mark` (session
+  storage) remembers the highest manifest epoch. An older signed value put back,
+  or a deleted one, reads as `stale`; so does everything when the manifest is
+  missing, edited, or — while the browser session lives — older than the mark.
+  Not detectable: the whole area put back (or wiped) consistently when there is
+  no mark, i.e. across a browser restart or an extension reload — a restored
+  profile backup looks the same. `condemn(key)` after a refused manifest, then
+  rewrite the stores; on key rotation `ledger.rekey` first, then each store.
 - **Errors to pages.** `toRelayError(e, { log })` passes the wallet's own refusals
   (EIP-1193 codes) and a node's JSON-RPC error (code, revert data) with URLs
   removed; anything else is `-32603 Internal error` on the page and goes to `log`.
