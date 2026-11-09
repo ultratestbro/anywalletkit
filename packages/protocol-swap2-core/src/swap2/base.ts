@@ -165,6 +165,9 @@ const NATIVE_FEE_CAP: Readonly<Record<string, bigint>> = Object.freeze({
   "eip155:14": nativeUnits("eip155:14", 1500), // 1500 FLR (≈ $0.0067 each)
   "eip155:5042": nativeUnits("eip155:5042", 10), // 10 USDC — Arc's gas token, in its 18-decimal native units
   // Katana and Morph are ETH-denominated: the 0.005 ETH default applies.
+  // 2026-11-10: Elysium pays gas in HYPE (18 decimals, ≈ $74.5 on li.quest that day) — HyperEVM's 0.1 HYPE ceiling, not
+  // the ETH default (0.005 HYPE ≈ $0.37 would refuse ordinary bridge fees).
+  "eip155:99901": nativeUnits("eip155:99901", "0.1"), // 0.1 HYPE
 });
 const DEFAULT_NATIVE_FEE_CAP = 5_000_000_000_000_000n; // 0.005 of an ETH-denominated L2
 
