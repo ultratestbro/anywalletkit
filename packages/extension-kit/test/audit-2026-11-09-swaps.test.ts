@@ -97,6 +97,53 @@ describe('E6 — deposit addresses assigned by the provider server', () => {
   })
 })
 
+// Round two (owner decision 3): the same flag per ROUTE, not only per provider — a THORChain inbound vault on a non-EVM
+// source chain or a Chainflip Bitcoin deposit address is the provider server's word exactly like a 1Click deposit
+// address, while the same provider's EVM routes carry verifiable calldata. Which routes these are is the app's policy.
+describe('E6 — the deposit-address flag per route (app predicate)', () => {
+  const TRON = 'tron:728126428'
+  const fromTron: QuoteParams = { ...params, sourceChain: TRON, sourceToken: 'TRX' }
+  // The app's policy in these tests: 1Click always, THORChain only from a non-EVM source.
+  const policy = (q: Quote, p: QuoteParams) => q.provider === 'near_intents' || (q.provider === 'thorchain' && !p.sourceChain.startsWith('eip155:'))
+
+  it('rank: a route the predicate marks is flagged and never BEST while an unmarked route exists', () => {
+    const routes = rank([quote('thorchain', 3_100_000_000n, 50n, 30), quote('lifi', 3_000_000_000n, 50n)], { slippageBps: 50, depositAddressRoute: (q) => q.provider === 'thorchain' })
+    expect(routes.map((r) => [r.provider, r.tags, (r.warnings ?? []).map((w) => w.kind)])).toEqual([['lifi', ['best'], []], ['thorchain', ['fastest'], ['deposit-address']]])
+  })
+
+  it('rank: when every route is marked, the best of them is BEST (and all stay listed with the warning)', () => {
+    const routes = rank([quote('chainflip', 2_900_000_000n, 50n), quote('thorchain', 3_100_000_000n, 50n), quote('near_intents', 3_000_000_000n, 50n)], { depositAddressProviders: ['near_intents'], depositAddressRoute: (q) => q.provider !== 'near_intents' })
+    expect(routes.map((r) => [r.provider, r.tags.includes('best')])).toEqual([['thorchain', true], ['near_intents', false], ['chainflip', false]])
+    expect(routes.every((r) => (r.warnings ?? []).some((w) => w.kind === 'deposit-address'))).toBe(true)
+  })
+
+  it('rank: the provider list and the predicate add up; a route marked by both is flagged once', () => {
+    const routes = rank([quote('near_intents', 3_100_000_000n, 50n), quote('lifi', 3_000_000_000n, 50n)], { depositAddressProviders: ['near_intents'], depositAddressRoute: (q) => q.provider === 'near_intents' })
+    expect(routes[1]!.warnings).toEqual([{ kind: 'deposit-address' }])
+    expect(routes[0]!.provider).toBe('lifi')
+  })
+
+  it('rank: a predicate that throws counts as marked — the warning is the safe side', () => {
+    const routes = rank([quote('thorchain', 3_100_000_000n, 50n), quote('lifi', 3_000_000_000n, 50n)], { depositAddressRoute: (q) => { if (q.provider === 'thorchain') throw new Error('boom'); return false } })
+    expect(routes.map((r) => [r.provider, r.tags.includes('best'), (r.warnings ?? []).map((w) => w.kind)])).toEqual([['lifi', true, []], ['thorchain', false, ['deposit-address']]])
+  })
+
+  it('quoteRoutes hands the predicate the request too: THORChain from Tron is marked, THORChain from Ethereum is not', async () => {
+    const providers = [provider('thorchain', quote('thorchain', 3_100_000_000n, 50n)), provider('lifi', quote('lifi', 3_000_000_000n, 50n))]
+    const tron = await quoteRoutes(providers, fromTron, { depositAddressRoute: policy })
+    expect(tron.routes.map((r) => [r.provider, r.tags.includes('best'), (r.warnings ?? []).map((w) => w.kind)])).toEqual([['lifi', true, []], ['thorchain', false, ['deposit-address']]])
+    const evm = await quoteRoutes(providers, params, { depositAddressRoute: policy })
+    expect(evm.routes.map((r) => [r.provider, r.tags.includes('best'), r.warnings ?? []])).toEqual([['thorchain', true, []], ['lifi', false, []]])
+  })
+
+  it('quoteRoutes: every update the app sees while quotes stream is ranked with the predicate', async () => {
+    const seen: string[][] = []
+    await quoteRoutes([provider('thorchain', quote('thorchain', 3_100_000_000n, 50n))], fromTron, { depositAddressRoute: policy, onUpdate: (v) => seen.push(v.routes.flatMap((r) => (r.warnings ?? []).map((w) => `${r.provider}:${w.kind}:${r.tags.includes('best')}`))) })
+    // Alone on the pair it is BEST, and still carries the warning.
+    expect(seen.at(-1)).toEqual(['thorchain:deposit-address:true'])
+  })
+})
+
 const plan: Swap2ExecutionPlan = {
   provider: 'lifi', fromChain: 'eip155:1', destChain: 'eip155:8453', destToken: USDC, recipient: A, refundAddress: A,
   sourceAmount: 1_000_000n, destAmount: 990_000n, minDestAmount: 980_000n, feeUsd: 0.4, etaSeconds: 120, validUntilMs: Date.now() + 60_000,
