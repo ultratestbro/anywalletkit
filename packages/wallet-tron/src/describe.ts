@@ -36,6 +36,21 @@ function warn(list: TronTxWarning[], code: TronTxWarning['code'], message: strin
   list.push({ code, message })
 }
 
+/** sun as a TRX string (6 decimals, trailing zeros dropped). */
+function sunToTrx(sun: bigint): string {
+  const neg = sun < 0n
+  const v = neg ? -sun : sun
+  const frac = (v % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '')
+  return `${neg ? '-' : ''}${v / 1_000_000n}${frac ? `.${frac}` : ''}`
+}
+
+/** What a contract call moves besides its calldata, and an undecoded selector (E33). */
+function warnCallExtras(d: TronTxDescription, warnings: TronTxWarning[]) {
+  if (d.kind === 'contract-call' && d.selector !== undefined && !SELECTORS[d.selector]) warn(warnings, 'unknown-selector', `Calls ${d.contract ?? 'a contract'} with selector 0x${d.selector || '(none)'}, which the wallet does not decode.`)
+  if (d.callValue !== undefined && d.callValue > 0n) warn(warnings, 'call-value', `Also sends ${sunToTrx(d.callValue)} TRX to the contract ${d.contract ?? ''}.`.replace(' .', '.'))
+  if (d.callTokenValue !== undefined && d.callTokenValue > 0n) warn(warnings, 'call-token-value', `Also sends ${d.callTokenValue} base units of the TRC-10 token ${d.tokenId ?? '?'} to the contract ${d.contract ?? ''}.`.replace(' .', '.'))
+}
+
 /** Decode a selector + ABI words into the TRC-20 part of a description. */
 function describeCalldata(d: TronTxDescription, contract: string, data: string, warnings: TronTxWarning[]) {
   const { selector, words } = splitCalldata(data)
@@ -73,6 +88,7 @@ function describeContractCall(tx: TronContractCall, warnings: TronTxWarning[]): 
   describeCalldata(d, tx.contractAddress, data, warnings)
   if (tx.options?.callValue) d.callValue = BigInt(tx.options.callValue)
   if (tx.options?.feeLimit !== undefined) d.feeLimit = tx.options.feeLimit
+  warnCallExtras(d, warnings)
   return d
 }
 
@@ -124,6 +140,9 @@ function describeRaw(tx: TronRawTransaction, warnings: TronTxWarning[], ctx: Des
     case 'TriggerSmartContract': {
       describeCalldata(d, String(v.contract_address), String(v.data ?? ''), warnings)
       if (v.call_value) d.callValue = BigInt(v.call_value as number | string)
+      if (v.call_token_value) d.callTokenValue = BigInt(v.call_token_value as number | string)
+      if (v.token_id) d.tokenId = String(v.token_id)
+      warnCallExtras(d, warnings)
       break
     }
     case 'FreezeBalanceV2Contract':

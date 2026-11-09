@@ -12,8 +12,8 @@ export {
   type V5R1Message, type V5R1SigningParams, type V5R1WalletIdParts, type ParsedV5R1Body,
 } from './wallet-v5r1.js'
 export {
-  describeTransaction, describeMessageRelaxed, decodeBody, commentCell, canonicalBocCell, messageBody, JETTON_TRANSFER_OP,
-  type TonDescription, type TonDescribedMessage, type TonDescribedKind, type TonJettonDetails, type TonWarning, type TonWarningCode, type DecodedBody,
+  describeTransaction, describeMessageRelaxed, decodeBody, commentCell, canonicalBocCell, messageBody, JETTON_TRANSFER_OP, NFT_TRANSFER_OP,
+  type TonDescription, type TonDescribedMessage, type TonDescribedKind, type TonJettonDetails, type TonNftDetails, type TonWarning, type TonWarningCode, type DecodedBody,
 } from './describe.js'
 export { WalletAccountReadOnlyTon, SEND_MODE } from './read-only-account.js'
 export { WalletAccountTon } from './account.js'

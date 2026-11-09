@@ -166,6 +166,12 @@ export type TronTxKind = 'trx-transfer' | 'trc10-transfer' | 'trc20-transfer' | 
 /** Problems a Tron description is flagged with. */
 export type TronTxWarningCode =
   | 'unlimited-approve' | 'zero-address' | 'unactivated-recipient' | 'memo-fee' | 'expired'
+  /** A contract call whose 4-byte selector the wallet does not decode. */
+  | 'unknown-selector'
+  /** A contract call that also sends TRX to the contract (`call_value`). */
+  | 'call-value'
+  /** A contract call that also sends a TRC-10 token to the contract (`call_token_value`). */
+  | 'call-token-value'
   /** Prebuilt transaction without `raw_data_hex`: described from the unsigned JSON copy, cannot be signed. */
   | 'no-raw-hex'
   /** `raw_data_hex` is not a well-formed Transaction.raw: nothing can be said about it. */
@@ -200,6 +206,10 @@ export interface TronTxDescription {
   selector?: string
   /** sun attached to the call. */
   callValue?: bigint
+  /** TRC-10 base units attached to the call (`call_token_value`). */
+  callTokenValue?: bigint
+  /** TRC-10 token id of `callTokenValue` (`token_id`). */
+  tokenId?: string
   feeLimit?: number
   /** Decoded memo (`raw_data.data`). */
   memo?: string
