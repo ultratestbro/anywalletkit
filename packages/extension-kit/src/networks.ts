@@ -45,7 +45,8 @@ export const DEFAULT_NETWORKS: readonly EvmNetwork[] = Object.freeze([
   net(4326, 'MegaETH', 'ETH', ['https://mainnet.megaeth.com/rpc']),
   net(130, 'Unichain', 'ETH', ['https://mainnet.unichain.org', 'https://unichain-rpc.publicnode.com'], 'https://uniscan.xyz'),
   net(143, 'Monad', 'MON', ['https://rpc.monad.xyz']),
-  net(9745, 'Plasma', 'XPL', ['https://rpc.plasma.to']),
+  // Second operator (Tenderly's public gateway, keyless): rpc.plasma.to alone cannot satisfy a two-operator check.
+  net(9745, 'Plasma', 'XPL', ['https://rpc.plasma.to', 'https://plasma.gateway.tenderly.co']),
   net(59144, 'Linea', 'ETH', ['https://rpc.linea.build', 'https://linea-rpc.publicnode.com'], 'https://lineascan.build'),
   net(100, 'Gnosis', 'xDAI', ['https://rpc.gnosischain.com', 'https://gnosis-rpc.publicnode.com'], 'https://gnosisscan.io'),
   net(146, 'Sonic', 'S', ['https://rpc.soniclabs.com', 'https://sonic-rpc.publicnode.com'], 'https://sonicscan.org'),
