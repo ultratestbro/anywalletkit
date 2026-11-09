@@ -87,8 +87,11 @@ The relay drops a request whose `method` is not a method name (letters, digits a
 128 characters, `isRelayMethod`). Reject such a request in your injected provider with `-32600`,
 so the page gets an answer.
 
-Auto-lock defaults to 15 minutes (`SESSION_DEFAULT_AUTOLOCK_MS`). Change it with
-`session.setAutoLockMs(ms)`, and call `session.touch()` when the user is active in your UI.
+Auto-lock defaults to 15 minutes (`SESSION_DEFAULT_AUTOLOCK_MS`). Apply the stored setting with
+`session.setAutoLockMs(ms)` at every worker start: it never pushes the deadline out, it only re-arms
+the alarm (and brings the deadline forward when the new period is shorter). Call `session.touch()`
+for explicit user gestures only (unlock, send, approve or decline, an action in your own UI), never
+for passive polls or page requests, and right after the user changed the period to a longer one.
 
 ## The request router
 

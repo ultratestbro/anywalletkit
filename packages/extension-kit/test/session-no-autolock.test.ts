@@ -43,6 +43,7 @@ describe('Session without auto-lock, on storage that goes through JSON', () => {
     const session = new Session({ storage: chromeSessionStorage(area), alarms, name: 's', now: () => t })
     await session.unlock(DEK())
     await session.setAutoLockMs(0)
+    await session.touch() // a longer period (0 = never) applies from the next explicit touch (E11)
     t += 60 * 60_000
     expect(await session.isUnlocked()).toBe(true)
     expect(alarms.pending.size).toBe(0)
