@@ -29,7 +29,7 @@
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/core": "workspace:*",
-    "@types/node": "^22",
+    "@types/node": "^26",
     "vitest": "^5.0.3"
   },
   "keywords": ["protocol", "lending", "morpho", "morpho-blue", "metamorpho", "vault", "erc-4626", "borrow", "evm", "lending-protocol", "anywalletkit"],

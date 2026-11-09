@@ -15,8 +15,8 @@ importers:
         specifier: ^3.0.3
         version: 3.0.3
       '@types/node':
-        specifier: ^22.20.5
-        version: 22.20.5
+        specifier: ^26.6.6
+        version: 26.6.6
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
@@ -40,31 +40,31 @@ importers:
         version: 8.71.1(eslint@10.12.0)(typescript@5.9.3)
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   apps/docs:
     dependencies:
       '@astrojs/starlight':
         specifier: 0.42.6
-        version: 0.42.6(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3)
+        version: 0.42.6(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3)
       astro:
         specifier: 7.4.1
-        version: 7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
+        version: 7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
       cookie:
         specifier: 2.0.1
         version: 2.0.1
       sharp:
         specifier: ^0.35.5
-        version: 0.35.5(@types/node@24.19.2)
+        version: 0.35.5(@types/node@26.6.6)
       starlight-links-validator:
         specifier: 0.27.0
-        version: 0.27.0(@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3))(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 0.27.0(@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3))(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
       starlight-llms-txt:
         specifier: 0.12.0
-        version: 0.12.0(@astrojs/markdown-satteri@0.4.4)(@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3))(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 0.12.0(@astrojs/markdown-satteri@0.4.4)(@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3))(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
       starlight-typedoc:
         specifier: 0.23.1
-        version: 0.23.1(@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3))(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typedoc-plugin-markdown@4.13.1(typedoc@0.28.20(typescript@5.9.3)))(typedoc@0.28.20(typescript@5.9.3))
+        version: 0.23.1(@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3))(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typedoc-plugin-markdown@4.13.1(typedoc@0.28.20(typescript@5.9.3)))(typedoc@0.28.20(typescript@5.9.3))
       typedoc:
         specifier: 0.28.20
         version: 0.28.20(typescript@5.9.3)
@@ -95,7 +95,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   examples/balances:
     dependencies:
@@ -132,7 +132,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   examples/earn:
     dependencies:
@@ -178,7 +178,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   examples/extension-kit:
     dependencies:
@@ -206,7 +206,7 @@ importers:
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   examples/hermes-smoke:
     dependencies:
@@ -412,7 +412,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   examples/keyring:
     dependencies:
@@ -446,7 +446,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   examples/names:
     dependencies:
@@ -465,7 +465,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   examples/networks:
     dependencies:
@@ -493,7 +493,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   examples/quickstart:
     dependencies:
@@ -530,7 +530,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   examples/server:
     dependencies:
@@ -570,7 +570,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   examples/signer:
     dependencies:
@@ -598,7 +598,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   examples/swap:
     dependencies:
@@ -653,7 +653,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   examples/tx-preview:
     dependencies:
@@ -684,7 +684,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/backup-cloud:
     dependencies:
@@ -696,11 +696,11 @@ importers:
         version: 58.0.24(react-native@0.88.0(@babel/core@7.29.7)(react@19.3.1))(react@19.3.1)
     devDependencies:
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/conformance:
     dependencies:
@@ -713,7 +713,7 @@ importers:
     devDependencies:
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/core:
     dependencies:
@@ -762,7 +762,7 @@ importers:
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/history-evm:
     dependencies:
@@ -774,11 +774,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/keyring:
     dependencies:
@@ -827,7 +827,7 @@ importers:
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/kit:
     dependencies:
@@ -861,7 +861,7 @@ importers:
         version: link:../wallet-zcash
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/names-ens:
     dependencies:
@@ -885,11 +885,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/networks:
     dependencies:
@@ -898,11 +898,11 @@ importers:
         version: link:../swap2-assets
     devDependencies:
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-approvals-evm:
     dependencies:
@@ -920,11 +920,11 @@ importers:
         specifier: workspace:*
         version: link:../wallet-evm
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-lending-aave-evm:
     dependencies:
@@ -939,11 +939,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-lending-curve-evm:
     dependencies:
@@ -961,11 +961,11 @@ importers:
         specifier: workspace:*
         version: link:../history-evm
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-lending-kamino-solana:
     dependencies:
@@ -995,11 +995,11 @@ importers:
         specifier: ^8.4.0
         version: 8.4.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-lending-mellow-evm:
     dependencies:
@@ -1017,11 +1017,11 @@ importers:
         specifier: workspace:*
         version: link:../wallet-evm
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-lending-morpho-evm:
     dependencies:
@@ -1036,11 +1036,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-staking-lido-evm:
     dependencies:
@@ -1058,11 +1058,11 @@ importers:
         specifier: workspace:*
         version: link:../wallet-evm
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-staking-liquid-near:
     dependencies:
@@ -1080,11 +1080,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-staking-native-monad:
     dependencies:
@@ -1105,11 +1105,11 @@ importers:
         specifier: workspace:*
         version: link:../wallet-evm
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-staking-native-near:
     dependencies:
@@ -1127,11 +1127,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-staking-native-solana:
     dependencies:
@@ -1149,11 +1149,11 @@ importers:
         specifier: workspace:*
         version: link:../wallet-solana
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-staking-spl-stake-pool-solana:
     dependencies:
@@ -1181,7 +1181,7 @@ importers:
         version: 3.0.3(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-staking-ssv-evm:
     dependencies:
@@ -1199,11 +1199,11 @@ importers:
         specifier: workspace:*
         version: link:../wallet-evm
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-staking-tonstakers-ton:
     dependencies:
@@ -1225,7 +1225,7 @@ importers:
         version: link:../core
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-balancer:
     dependencies:
@@ -1246,11 +1246,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-cctp:
     dependencies:
@@ -1271,11 +1271,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-chainflip:
     dependencies:
@@ -1302,11 +1302,11 @@ importers:
         specifier: workspace:*
         version: link:../protocol-swap2-router
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-core:
     dependencies:
@@ -1327,11 +1327,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-curve:
     dependencies:
@@ -1355,11 +1355,11 @@ importers:
         specifier: workspace:*
         version: link:../history-evm
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-fynd:
     dependencies:
@@ -1380,11 +1380,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-jupiter:
     dependencies:
@@ -1414,11 +1414,11 @@ importers:
         specifier: workspace:*
         version: link:../wallet-solana
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-lifi:
     dependencies:
@@ -1436,14 +1436,14 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       viem:
         specifier: ^2.57.2
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-near-intents:
     dependencies:
@@ -1461,11 +1461,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-omniston:
     dependencies:
@@ -1498,11 +1498,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-router:
     dependencies:
@@ -1520,11 +1520,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-thorchain:
     dependencies:
@@ -1545,11 +1545,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-uniswap:
     dependencies:
@@ -1570,11 +1570,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-usdt0:
     dependencies:
@@ -1598,11 +1598,11 @@ importers:
         specifier: workspace:*
         version: link:../protocol-swap2-router
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-wrap:
     dependencies:
@@ -1623,11 +1623,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/runtime-hermes:
     dependencies:
@@ -1637,7 +1637,7 @@ importers:
     devDependencies:
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/secure-storage-react-native:
     dependencies:
@@ -1649,11 +1649,11 @@ importers:
         specifier: workspace:*
         version: link:../keyring
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/seed-vault:
     dependencies:
@@ -1665,11 +1665,11 @@ importers:
         version: 2.4.0
     devDependencies:
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/swap2-assets:
     devDependencies:
@@ -1678,7 +1678,7 @@ importers:
         version: link:../conformance
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/tokens:
     dependencies:
@@ -1696,11 +1696,11 @@ importers:
         specifier: workspace:*
         version: link:../wallet-solana
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/tx-preview-evm:
     dependencies:
@@ -1709,11 +1709,11 @@ importers:
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
       '@types/node':
-        specifier: ^22
-        version: 22.20.5
+        specifier: ^26
+        version: 26.6.6
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/wallet-btc:
     dependencies:
@@ -1738,7 +1738,7 @@ importers:
         version: link:../conformance
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/wallet-evm:
     dependencies:
@@ -1760,7 +1760,7 @@ importers:
         version: link:../kit
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/wallet-near:
     dependencies:
@@ -1785,7 +1785,7 @@ importers:
         version: link:../protocol-swap2-near-intents
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/wallet-solana:
     dependencies:
@@ -1819,7 +1819,7 @@ importers:
         version: link:../protocol-staking-spl-stake-pool-solana
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/wallet-ton:
     dependencies:
@@ -1856,7 +1856,7 @@ importers:
         version: 16.3.0(@ton/core@0.63.1(@ton/crypto@3.3.0))(@ton/crypto@3.3.0)
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/wallet-tron:
     dependencies:
@@ -1878,7 +1878,7 @@ importers:
         version: link:../conformance
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/wallet-zcash:
     dependencies:
@@ -1903,7 +1903,7 @@ importers:
         version: 2.57.2(typescript@5.9.3)(zod@4.6.7)
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/walletconnect-ton:
     dependencies:
@@ -1931,7 +1931,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
 packages:
 
@@ -4171,11 +4171,11 @@ packages:
   '@types/nlcst@2.0.3':
     resolution: {integrity: sha512-vSYNSDe6Ix3q+6Z7ri9lyWqgGhJTmzRjZRqyq15N0Z/1/UnVsno9G/N40NBijoYx2seFDIl0+B2mgAb9mezUCA==}
 
-  '@types/node@22.20.5':
-    resolution: {integrity: sha512-U2+DNr+wSjpsTS/wZGYHq7GcwfuSmKiKvoPvK22zwTlRhU91yOniN4qRR5KhIjvif7ysw/dz/hKmfDH0Ris4aA==}
-
   '@types/node@24.19.2':
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
+
+  '@types/node@26.6.6':
+    resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
 
   '@types/sax@1.2.7':
     resolution: {integrity: sha512-rO73L89PJxeYM3s3pPPjiPgVVcymqU490g0YO5n5By0k2Erzj6tay/4lr1CHAAU4JyOWd1rpQ8bCf6cZfHU96A==}
@@ -4312,6 +4312,11 @@ packages:
 
   acorn@8.18.0:
     resolution: {integrity: sha512-lGq+9yr1/GuAWaVYIHRjvvySG5/4VfKIvC8EWxStPdcDh/Ka7FG3twP6v4d5BkravUilhIAsG4Qj83t02LWUPQ==}
+    engines: {node: '>=0.4.0'}
+    hasBin: true
+
+  acorn@8.19.0:
+    resolution: {integrity: sha512-oJlA3XiRm7Cyk6qFD2Jn8ak9B7jSy0qy00ADO3+8dpT0LSjFihQYv4C02LFCSYJV3Q37xYwwRy5m+IpIiUzqWw==}
     engines: {node: '>=0.4.0'}
     hasBin: true
 
@@ -5492,6 +5497,9 @@ packages:
   magic-string@1.4.3:
     resolution: {integrity: sha512-z12OxmaPGE0F4xlpGdjuAUckipLpQlTAuAmyGhNoD7ODpYUzvDfvtxUbjM/jwznyP178oju/KDdyi220wNJ0RQ==}
 
+  magic-string@1.4.5:
+    resolution: {integrity: sha512-oLLC2+YvQUfAa+vxoufE/yc1icb87M9iXIRqAoR/2EhE/8cb3SF/+Gi0c2By1B+5Vz2e2vQtUvHiu1+63Znh+w==}
+
   magicast@0.5.5:
     resolution: {integrity: sha512-UicdXN8zQ3JHlxVq+28afMXPr1z7WNY6+7EJnzTdQWkTAlMLF5fNCCKxJHBQwGaNGR11581EiQmQzx73+MvszA==}
 
@@ -6474,14 +6482,14 @@ packages:
   uncrypto@0.1.3:
     resolution: {integrity: sha512-Ql87qFHB3s/De2ClA9e0gsnS6zXG27SkTiSJwjCc9MebbfapQfuPzumMIUMi38ezPZVNFcHI9sUIepeQfw8J8Q==}
 
-  undici-types@6.21.0:
-    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
-
   undici-types@7.24.6:
     resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
 
-  undici-types@8.11.2:
-    resolution: {integrity: sha512-iMVNmWZ0leK/goS6eXMizSzmm9CDWtyphwbaCms3DNLqRxDL+mMoNVcZMTyyVgXP0N+Z8neAMzDoUOUJL8veKg==}
+  undici-types@8.12.3:
+    resolution: {integrity: sha512-EXE4ydL3S76dFb27UFjNVZHTyv/TLdATj/KUe29ptdcg6qXL48J2tZ3126E5kICj5jn781OR+XlVH1N6Mz8jbA==}
+
+  undici-types@8.9.0:
+    resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
   undici@8.12.3:
     resolution: {integrity: sha512-+fdndUTwBP86cVjihTp21hZHo7d6oj1c/47XPA3lL8mM0XHs+C4EkcjmgRsFnFk2f/UONGDy9ItBItmXsLOQHw==}
@@ -6800,6 +6808,18 @@ packages:
       utf-8-validate:
         optional: true
 
+  ws@8.22.1:
+    resolution: {integrity: sha512-oyL6OPYme/CmiFvNuGzeoxCJ4nOrZE2O1FwM9MWM1AsGri6nLXB2pg+lNA8aLeXMSav0J6eIVS1j6vUPzUtK9g==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   xxhash-wasm@1.1.0:
     resolution: {integrity: sha512-147y/6YNh+tlp6nd/2pWq38i9h6mz/EuQ6njIrmW8D1BS5nCqs0P6DG+m6zTGnNz5I+uhZ0SHxBs9BsPrwcKDA==}
 
@@ -6917,11 +6937,11 @@ snapshots:
       github-slugger: 2.0.0
       satteri: 0.10.5
 
-  '@astrojs/mdx@8.1.0(@astrojs/markdown-satteri@0.4.4)(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))':
+  '@astrojs/mdx@8.1.0(@astrojs/markdown-satteri@0.4.4)(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))':
     dependencies:
       '@astrojs/internal-helpers': 0.13.0
       '@astrojs/markdown-satteri': 0.4.4
-      astro: 7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
+      astro: 7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
       es-module-lexer: 3.0.4
 
   '@astrojs/prism@4.1.0':
@@ -6933,17 +6953,17 @@ snapshots:
       sitemap: 9.0.1
       zod: 4.6.7
 
-  '@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3)':
+  '@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3)':
     dependencies:
       '@astrojs/markdown-satteri': 0.4.4
-      '@astrojs/mdx': 8.1.0(@astrojs/markdown-satteri@0.4.4)(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+      '@astrojs/mdx': 8.1.0(@astrojs/markdown-satteri@0.4.4)(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
       '@astrojs/sitemap': 3.7.4
       '@pagefind/default-ui': 1.5.2
       '@types/hast': 3.0.5
       '@types/js-yaml': 4.0.9
       '@types/mdast': 4.0.4
-      astro: 7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
-      astro-expressive-code: 0.44.2(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+      astro: 7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
+      astro-expressive-code: 0.44.2(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
       bcp-47: 2.1.1
       hast-util-format: 1.1.0
       hast-util-select: 6.0.4
@@ -7936,7 +7956,7 @@ snapshots:
       '@jest/schemas': 29.6.3
       '@types/istanbul-lib-coverage': 2.0.6
       '@types/istanbul-reports': 3.0.4
-      '@types/node': 22.20.5
+      '@types/node': 26.6.6
       '@types/yargs': 17.0.35
       chalk: 4.1.2
 
@@ -8849,7 +8869,7 @@ snapshots:
       '@solana/errors': 8.4.0(typescript@5.9.3)
       '@solana/rpc-spec': 8.4.0(typescript@5.9.3)
       '@solana/rpc-spec-types': 8.4.0(typescript@5.9.3)
-      undici-types: 8.11.2
+      undici-types: 8.12.3
     optionalDependencies:
       typescript: 5.9.3
 
@@ -9126,17 +9146,17 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
 
-  '@types/node@22.20.5':
-    dependencies:
-      undici-types: 6.21.0
-
   '@types/node@24.19.2':
     dependencies:
       undici-types: 7.24.6
 
+  '@types/node@26.6.6':
+    dependencies:
+      undici-types: 8.9.0
+
   '@types/sax@1.2.7':
     dependencies:
-      '@types/node': 22.20.5
+      '@types/node': 26.6.6
 
   '@types/unist@2.0.11': {}
 
@@ -9241,13 +9261,13 @@ snapshots:
 
   '@ungap/structured-clone@1.4.0': {}
 
-  '@vitest/browser-playwright@5.0.3(playwright@1.63.0)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(vitest@5.0.3)':
+  '@vitest/browser-playwright@5.0.3(playwright@1.63.0)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(vitest@5.0.3)':
     dependencies:
-      '@vitest/browser': 5.0.3(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(vitest@5.0.3)
-      '@vitest/mocker': 5.0.3(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+      '@vitest/browser': 5.0.3(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(vitest@5.0.3)
+      '@vitest/mocker': 5.0.3(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
       playwright: 1.63.0
       tinyrainbow: 3.2.0
-      vitest: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+      vitest: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -9255,32 +9275,18 @@ snapshots:
       - vite
     optional: true
 
-  '@vitest/browser-playwright@5.0.3(playwright@1.63.0)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(vitest@5.0.3)':
-    dependencies:
-      '@vitest/browser': 5.0.3(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(vitest@5.0.3)
-      '@vitest/mocker': 5.0.3(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
-      playwright: 1.63.0
-      tinyrainbow: 3.2.0
-      vitest: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
-    transitivePeerDependencies:
-      - bufferutil
-      - msw
-      - utf-8-validate
-      - vite
-    optional: true
-
-  '@vitest/browser@5.0.3(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(vitest@5.0.3)':
+  '@vitest/browser@5.0.3(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(vitest@5.0.3)':
     dependencies:
       '@blazediff/core': 1.10.0
-      '@vitest/mocker': 5.0.3(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+      '@vitest/mocker': 5.0.3(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
       '@vitest/ui': 5.0.3(vitest@5.0.3)
       '@vitest/utils': 5.0.3
-      magic-string: 1.4.3
+      magic-string: 1.4.5
       pngjs: 7.0.0
       sirv: 3.0.2
       tinyrainbow: 3.2.0
-      vitest: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
-      ws: 8.22.0
+      vitest: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+      ws: 8.22.1
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -9288,42 +9294,14 @@ snapshots:
       - vite
     optional: true
 
-  '@vitest/browser@5.0.3(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(vitest@5.0.3)':
-    dependencies:
-      '@blazediff/core': 1.10.0
-      '@vitest/mocker': 5.0.3(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
-      '@vitest/ui': 5.0.3(vitest@5.0.3)
-      '@vitest/utils': 5.0.3
-      magic-string: 1.4.3
-      pngjs: 7.0.0
-      sirv: 3.0.2
-      tinyrainbow: 3.2.0
-      vitest: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
-      ws: 8.22.0
-    transitivePeerDependencies:
-      - bufferutil
-      - msw
-      - utf-8-validate
-      - vite
-    optional: true
-
-  '@vitest/mocker@5.0.3(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))':
+  '@vitest/mocker@5.0.3(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.0.3
       estree-walker: 3.0.3
       magic-string: 1.4.3
     optionalDependencies:
-      vite: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
-
-  '@vitest/mocker@5.0.3(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))':
-    dependencies:
-      '@jridgewell/trace-mapping': 0.3.31
-      '@vitest/spy': 5.0.3
-      estree-walker: 3.0.3
-      magic-string: 1.4.3
-    optionalDependencies:
-      vite: 8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
+      vite: 8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
 
   '@vitest/pretty-format@5.0.3':
     dependencies:
@@ -9340,7 +9318,7 @@ snapshots:
       pathe: 2.0.3
       sirv: 3.0.2
       tinyrainbow: 3.2.0
-      vitest: 5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+      vitest: 5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
     optional: true
 
   '@vitest/utils@5.0.3':
@@ -9365,6 +9343,8 @@ snapshots:
       acorn: 8.18.0
 
   acorn@8.18.0: {}
+
+  acorn@8.19.0: {}
 
   agent-base@6.0.2:
     dependencies:
@@ -9416,13 +9396,13 @@ snapshots:
 
   assertion-error@2.0.1: {}
 
-  astro-expressive-code@0.44.2(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)):
+  astro-expressive-code@0.44.2(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)):
     dependencies:
-      astro: 7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
+      astro: 7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
       rehype-expressive-code: 0.44.2
       url-extras: 0.1.0
 
-  astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1):
+  astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1):
     dependencies:
       '@astrojs/compiler-rs': 0.5.2
       '@astrojs/internal-helpers': 0.13.0
@@ -9471,13 +9451,13 @@ snapshots:
       unifont: 1.0.3
       unstorage: 1.17.6
       verkit: 0.5.0
-      vite: 8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
-      vitefu: 1.1.3(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+      vite: 8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
+      vitefu: 1.1.3(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
       xxhash-wasm: 1.1.0
       yargs-parser: 22.0.0
       zod: 4.6.7
     optionalDependencies:
-      sharp: 0.35.5(@types/node@24.19.2)
+      sharp: 0.35.5(@types/node@26.6.6)
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -10480,7 +10460,7 @@ snapshots:
   jest-util@29.7.0:
     dependencies:
       '@jest/types': 29.6.3
-      '@types/node': 22.20.5
+      '@types/node': 26.6.6
       chalk: 4.1.2
       ci-info: 3.9.0
       graceful-fs: 4.2.11
@@ -10497,7 +10477,7 @@ snapshots:
 
   jest-worker@29.7.0:
     dependencies:
-      '@types/node': 22.20.5
+      '@types/node': 26.6.6
       jest-util: 29.7.0
       merge-stream: 2.0.0
       supports-color: 8.1.1
@@ -10638,6 +10618,11 @@ snapshots:
   magic-string@1.4.3:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
+
+  magic-string@1.4.5:
+    dependencies:
+      '@jridgewell/sourcemap-codec': 1.6.0
+    optional: true
 
   magicast@0.5.5:
     dependencies:
@@ -11759,7 +11744,7 @@ snapshots:
 
   setprototypeof@1.2.0: {}
 
-  sharp@0.35.5(@types/node@24.19.2):
+  sharp@0.35.5(@types/node@26.6.6):
     dependencies:
       '@img/colour': 1.1.0
       detect-libc: 2.1.2
@@ -11790,7 +11775,7 @@ snapshots:
       '@img/sharp-win32-arm64': 0.35.5
       '@img/sharp-win32-ia32': 0.35.5
       '@img/sharp-win32-x64': 0.35.5
-      '@types/node': 24.19.2
+      '@types/node': 26.6.6
 
   shebang-command@2.0.0:
     dependencies:
@@ -11850,11 +11835,11 @@ snapshots:
     dependencies:
       type-fest: 0.7.1
 
-  starlight-links-validator@0.27.0(@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3))(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)):
+  starlight-links-validator@0.27.0(@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3))(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)):
     dependencies:
       '@astrojs/markdown-satteri': 0.4.4
-      '@astrojs/starlight': 0.42.6(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3)
-      astro: 7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
+      '@astrojs/starlight': 0.42.6(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3)
+      astro: 7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
       github-slugger: 2.0.0
       hast-util-from-html: 2.0.3
       is-absolute-url: 5.0.0
@@ -11868,13 +11853,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  starlight-llms-txt@0.12.0(@astrojs/markdown-satteri@0.4.4)(@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3))(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)):
+  starlight-llms-txt@0.12.0(@astrojs/markdown-satteri@0.4.4)(@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3))(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)):
     dependencies:
-      '@astrojs/mdx': 8.1.0(@astrojs/markdown-satteri@0.4.4)(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
-      '@astrojs/starlight': 0.42.6(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3)
+      '@astrojs/mdx': 8.1.0(@astrojs/markdown-satteri@0.4.4)(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+      '@astrojs/starlight': 0.42.6(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3)
       '@types/hast': 3.0.5
       '@types/micromatch': 4.0.10
-      astro: 7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
+      astro: 7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
       github-slugger: 2.0.0
       hast-util-select: 6.0.4
       micromatch: 4.0.8
@@ -11889,10 +11874,10 @@ snapshots:
       - '@astrojs/markdown-satteri'
       - supports-color
 
-  starlight-typedoc@0.23.1(@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3))(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typedoc-plugin-markdown@4.13.1(typedoc@0.28.20(typescript@5.9.3)))(typedoc@0.28.20(typescript@5.9.3)):
+  starlight-typedoc@0.23.1(@astrojs/starlight@0.42.6(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3))(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typedoc-plugin-markdown@4.13.1(typedoc@0.28.20(typescript@5.9.3)))(typedoc@0.28.20(typescript@5.9.3)):
     dependencies:
-      '@astrojs/starlight': 0.42.6(astro@7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3)
-      astro: 7.4.1(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
+      '@astrojs/starlight': 0.42.6(astro@7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(typescript@5.9.3)
+      astro: 7.4.1(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
       github-slugger: 2.0.0
       typedoc: 0.28.20(typescript@5.9.3)
       typedoc-plugin-markdown: 4.13.1(typedoc@0.28.20(typescript@5.9.3))
@@ -11963,7 +11948,7 @@ snapshots:
   terser@5.51.2:
     dependencies:
       '@jridgewell/source-map': 0.3.11
-      acorn: 8.18.0
+      acorn: 8.19.0
       commander: 2.20.3
       source-map-support: 0.5.21
 
@@ -12092,11 +12077,11 @@ snapshots:
 
   uncrypto@0.1.3: {}
 
-  undici-types@6.21.0: {}
-
   undici-types@7.24.6: {}
 
-  undici-types@8.11.2: {}
+  undici-types@8.12.3: {}
+
+  undici-types@8.9.0: {}
 
   undici@8.12.3: {}
 
@@ -12225,7 +12210,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1):
+  vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
@@ -12233,34 +12218,20 @@ snapshots:
       rolldown: 1.2.14
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 22.20.5
+      '@types/node': 26.6.6
       esbuild: 0.28.2
       fsevents: 2.3.3
       terser: 5.51.2
       yaml: 2.9.1
 
-  vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1):
-    dependencies:
-      lightningcss: 1.33.0
-      picomatch: 4.0.7
-      postcss: 8.5.31
-      rolldown: 1.2.14
-      tinyglobby: 0.2.17
+  vitefu@1.1.3(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)):
     optionalDependencies:
-      '@types/node': 24.19.2
-      esbuild: 0.28.2
-      fsevents: 2.3.3
-      terser: 5.51.2
-      yaml: 2.9.1
+      vite: 8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
 
-  vitefu@1.1.3(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)):
-    optionalDependencies:
-      vite: 8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
-
-  vitest@5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)):
+  vitest@5.0.3(@types/node@26.6.6)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.0.3(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+      '@vitest/mocker': 5.0.3(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
       chai: 6.3.0
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
@@ -12271,34 +12242,11 @@ snapshots:
       tinybench: 6.2.0
       tinyexec: 1.3.1
       tinyglobby: 0.2.17
-      vite: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
+      vite: 8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
       why-is-node-running: 3.2.1
     optionalDependencies:
-      '@types/node': 22.20.5
-      '@vitest/browser-playwright': 5.0.3(playwright@1.63.0)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(vitest@5.0.3)
-      '@vitest/ui': 5.0.3(vitest@5.0.3)
-    transitivePeerDependencies:
-      - msw
-
-  vitest@5.0.3(@types/node@24.19.2)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)):
-    dependencies:
-      '@types/chai': 5.2.3
-      '@vitest/mocker': 5.0.3(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
-      chai: 6.3.0
-      es-module-lexer: 2.3.2
-      expect-type: 1.4.0
-      magic-string: 1.4.3
-      obug: 2.2.1
-      picomatch: 4.0.7
-      std-env: 4.3.0
-      tinybench: 6.2.0
-      tinyexec: 1.3.1
-      tinyglobby: 0.2.17
-      vite: 8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
-      why-is-node-running: 3.2.1
-    optionalDependencies:
-      '@types/node': 24.19.2
-      '@vitest/browser-playwright': 5.0.3(playwright@1.63.0)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(vitest@5.0.3)
+      '@types/node': 26.6.6
+      '@vitest/browser-playwright': 5.0.3(playwright@1.63.0)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(vitest@5.0.3)
       '@vitest/ui': 5.0.3(vitest@5.0.3)
     transitivePeerDependencies:
       - msw
@@ -12336,6 +12284,9 @@ snapshots:
   ws@8.21.0: {}
 
   ws@8.22.0: {}
+
+  ws@8.22.1:
+    optional: true
 
   xxhash-wasm@1.1.0: {}
 

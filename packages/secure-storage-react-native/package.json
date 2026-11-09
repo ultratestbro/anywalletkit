@@ -40,7 +40,7 @@
   },
   "devDependencies": {
     "@anywalletkit/keyring": "workspace:*",
-    "@types/node": "^22",
+    "@types/node": "^26",
     "vitest": "^5.0.3"
   },
   "keywords": [

@@ -31,7 +31,7 @@
     "@anywalletkit/core": "workspace:*",
     "@anywalletkit/history-evm": "workspace:*",
     "@anywalletkit/wallet-evm": "workspace:*",
-    "@types/node": "^22",
+    "@types/node": "^26",
     "vitest": "^5.0.3"
   },
   "keywords": ["protocol", "staking", "monad", "mon", "native-staking", "delegation", "validator", "staking-protocol", "anywalletkit"],
