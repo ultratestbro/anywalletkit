@@ -58,7 +58,7 @@ describe('describeTypedData', () => {
     const types = { Permit: [{ name: 'holder', type: 'address' }, { name: 'spender', type: 'address' }, { name: 'nonce', type: 'uint256' }, { name: 'expiry', type: 'uint256' }, { name: 'allowed', type: 'bool' }] }
     const d = describeTypedData({ domain: { name: 'Dai Stablecoin', version: '1', chainId: 1, verifyingContract: DAI }, types, primaryType: 'Permit', message: { holder: ME, spender: EVIL, nonce: '0', expiry: '0', allowed: true } }, { account: ME })
     expect(d).toMatchObject({ kind: 'permit', permit: { owner: ME, spender: EVIL, value: maxUint256, deadline: 0n } })
-    expect(d.warnings.map((w) => w.code)).toEqual(['approve-unlimited']) // expiry 0 = no deadline in DAI, not a passed one
+    expect(d.warnings.map((w) => w.code)).toEqual(['approve-unlimited', 'spender-unknown']) // expiry 0 = no deadline in DAI, not a passed one
     const revoke = describeTypedData({ domain: { name: 'Dai Stablecoin', version: '1', chainId: 1, verifyingContract: DAI }, types, primaryType: 'Permit', message: { holder: ME, spender: EVIL, nonce: '0', expiry: future.toString(), allowed: false } }, { account: ME })
     expect(revoke).toMatchObject({ kind: 'permit', permit: { value: 0n } })
     expect(revoke.warnings).toEqual([])

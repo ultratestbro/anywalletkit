@@ -21,7 +21,8 @@ const typed = (extra: Record<string, unknown>, amount = 10n ** 30n) => ({
   },
   message: { permitted: { token: USDC, amount }, spender: '0x00000000000000000000000000000000000000aa', nonce: 0n, deadline: FUTURE, ...extra },
 })
-const codes = (t: unknown) => describeTypedData(t as never).warnings.map((w) => w.code)
+// The spender (0x…aa) is not listed as known: `spender-unknown` is on every one of these (audit 2026-11-09 E3), not what this file checks.
+const codes = (t: unknown) => describeTypedData(t as never).warnings.map((w) => w.code).filter((c) => c !== 'spender-unknown')
 
 describe('scan 2026-10-30 F4: the Permit2 description is what gets signed', () => {
   it('undeclared fields are not signed (control: the signature with the decoy equals the one without)', async () => {
