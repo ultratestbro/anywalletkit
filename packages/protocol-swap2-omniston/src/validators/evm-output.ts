@@ -211,6 +211,11 @@ function decodeFeeParameters(parameters: Hex): {protocolFee: bigint; integratorF
 export async function omnistonEvmRpcRequest(chain: string, method: string, params: unknown[], rpcUrls?: OmnistonRpcUrls): Promise<unknown> {
   const urls = [...(rpcUrls?.[chain] ?? []), ...(DEFAULT_RPC_URLS[chain] ?? [])].filter((url): url is string => !!url);
   if (!urls.length) throw new Error(`omniston: no RPC configured for ${chain}`);
+  return await rpcOver(urls, chain, method, params);
+}
+
+/** The first of `urls` that answers (failover in order). */
+async function rpcOver(urls: readonly string[], chain: string, method: string, params: unknown[]): Promise<unknown> {
   let lastError: unknown;
   for (const url of urls) {
     try {
@@ -229,6 +234,96 @@ export async function omnistonEvmRpcRequest(chain: string, method: string, param
     }
   }
   throw lastError instanceof Error ? lastError : new Error(`omniston: RPC failed for ${chain}`);
+}
+
+// ── Independent RPC operators (extension audit 2026-11-09, E37) ──────────────
+
+/**
+ * The operator behind an RPC endpoint, for counting a quorum: the registrable domain, approximated by the host's last
+ * two labels (`base-rpc.publicnode.com` → `publicnode.com`, `mainnet.base.org` → `base.org`); an IP literal is its own
+ * operator. Two endpoints of one company under different domains still count twice — pass `operatorOf` to merge them.
+ */
+export function omnistonRpcOperator(url: string): string {
+  const host = new URL(url).hostname.toLowerCase().replace(/\.$/, "");
+  if (/^[\d.]+$/.test(host) || host.includes(":") || host.startsWith("[")) return host;
+  return host.split(".").slice(-2).join(".");
+}
+
+/** The endpoints for `chain` — the caller's first, the public fallbacks after, each URL once — grouped by operator in first-seen order. */
+export function omnistonRpcOperatorGroups(chain: string, rpcUrls?: OmnistonRpcUrls, operatorOf: (url: string) => string = omnistonRpcOperator): {operator: string; urls: string[]}[] {
+  const groups: {operator: string; urls: string[]}[] = [];
+  const seen = new Set<string>();
+  for (const url of [...(rpcUrls?.[chain] ?? []), ...(DEFAULT_RPC_URLS[chain] ?? [])]) {
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    let operator: string;
+    try { operator = operatorOf(url); } catch { continue; }
+    const group = groups.find((g) => g.operator === operator);
+    if (group) group.urls.push(url); else groups.push({operator, urls: [url]});
+  }
+  return groups;
+}
+
+/** Quorum options shared by the EVM output and input validators. */
+export interface OmnistonRpcQuorumOptions {
+  /**
+   * Independent RPC operators that must each prove the position on their own before the secret is disclosed. The
+   * chain's endpoints (`rpcUrls`, then the public fallbacks) are grouped by operator ({@link omnistonRpcOperatorGroups});
+   * every group runs the whole validation — its state reads pinned to its own finalized block (head minus the chain's
+   * confirmations) instead of `latest` — and at least `quorum` groups must pass. With fewer operators configured than
+   * the quorum, nothing is disclosed. Default 1: one validation over the first answering endpoint, as before.
+   * Needs `rpcUrls` (or the public fallbacks); a single injected `request` cannot be split into operators.
+   */
+  quorum?: number;
+  /** The operator of an endpoint URL (default {@link omnistonRpcOperator}). */
+  operatorOf?: (url: string) => string;
+}
+
+/** State reads (`eth_call`, `eth_getCode`, `eth_getBalance`) at the finalized block the run's first `eth_blockNumber` implies. */
+function pinnedStateRequest(request: RpcRequest): RpcRequest {
+  let pinned: Hex | null = null;
+  return async (chain, method, params) => {
+    if (method === "eth_blockNumber") {
+      const head = await request(chain, method, params);
+      const latest = BigInt(head as string);
+      const confirmations = OMNISTON_EVM_MIN_CONFIRMATIONS[chain] ?? 20n;
+      pinned = quantity(latest >= confirmations ? latest - confirmations : 0n);
+      return head;
+    }
+    if (pinned && (method === "eth_call" || method === "eth_getCode" || method === "eth_getBalance") && params.at(-1) === "latest") {
+      return await request(chain, method, [...params.slice(0, -1), pinned]);
+    }
+    return await request(chain, method, params);
+  };
+}
+
+/**
+ * Runs `once` against one request (quorum 1: the caller's `request`, or the endpoints with failover), or against every
+ * independent operator with pinned state reads (quorum ≥ 2) — true only when at least `quorum` of them prove it.
+ * Refusals from an operator's run carry its `operator`.
+ */
+export function omnistonQuorumValidator<I extends {chain: string}>(
+  options: {request?: RpcRequest; rpcUrls?: OmnistonRpcUrls} & OmnistonRpcQuorumOptions,
+  refuse: (reason: string, details?: Record<string, unknown>) => false,
+  once: (request: RpcRequest, input: I, refuse: (reason: string, details?: Record<string, unknown>) => false) => Promise<boolean>,
+): (input: I) => Promise<boolean> {
+  const quorum = options.quorum ?? 1;
+  if (!Number.isSafeInteger(quorum) || quorum < 1) throw new Error("omniston: quorum must be a positive integer");
+  if (quorum === 1) {
+    const request: RpcRequest = options.request ?? ((chain, method, params) => omnistonEvmRpcRequest(chain, method, params, options.rpcUrls));
+    return (input) => once(request, input, refuse);
+  }
+  if (options.request) throw new Error("omniston: an RPC quorum needs rpcUrls (one request per operator), not a single request");
+  return async (input) => {
+    const groups = omnistonRpcOperatorGroups(input.chain, options.rpcUrls, options.operatorOf);
+    const operators = groups.map((g) => g.operator);
+    if (groups.length < quorum) return refuse("rpc-quorum-unavailable", {chain: input.chain, operators, quorum});
+    const results = await Promise.all(groups.map((g) =>
+      once(pinnedStateRequest((chain, method, params) => rpcOver(g.urls, chain, method, params)), input, (reason, details) => refuse(reason, {...details, operator: g.operator}))
+        .catch(() => false)));
+    const agreed = operators.filter((_, i) => results[i]);
+    return agreed.length >= quorum || refuse("rpc-quorum-not-met", {chain: input.chain, agreed, operators, quorum});
+  };
 }
 
 async function ethCall(request: RpcRequest, chain: string, to: string, data: Hex): Promise<Hex> {
@@ -287,14 +382,13 @@ function locateImmutables(input: Hex, secretHash: Hex): {
   }
 }
 
-export function createOmnistonEvmOutputValidator(options: {request?: RpcRequest; rpcUrls?: OmnistonRpcUrls; now?: () => number; onRefusal?: OmnistonEvmOutputRefusal} = {}) {
-  const refuse = (reason: string, details?: Record<string, unknown>): false => {
+export function createOmnistonEvmOutputValidator(options: {request?: RpcRequest; rpcUrls?: OmnistonRpcUrls; now?: () => number; onRefusal?: OmnistonEvmOutputRefusal} & OmnistonRpcQuorumOptions = {}) {
+  const report = (reason: string, details?: Record<string, unknown>): false => {
     try { options.onRefusal?.(reason, details); } catch { /* diagnostics never break validation */ }
     return false;
   };
-  const request: RpcRequest = options.request ?? ((chain, method, params) => omnistonEvmRpcRequest(chain, method, params, options.rpcUrls));
   const now = options.now ?? Date.now;
-  return async (input: EvmOutputValidationInput): Promise<boolean> => {
+  return omnistonQuorumValidator<EvmOutputValidationInput>(options, report, async (request, input, refuse): Promise<boolean> => {
     try {
       if (
         !OMNISTON_EVM_LOOKBACK_BLOCKS[input.chain] || input.executionIndex !== 0 ||
@@ -456,7 +550,7 @@ export function createOmnistonEvmOutputValidator(options: {request?: RpcRequest;
     } catch (error) {
       return refuse("error", {message: error instanceof Error ? error.message : String(error)});
     }
-  };
+  });
 }
 
 const TRANSFER_TOPIC = keccak256(stringToHex("Transfer(address,address,uint256)"));
