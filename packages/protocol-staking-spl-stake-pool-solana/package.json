@@ -43,7 +43,7 @@
     "@anywalletkit/core": "workspace:*"
   },
   "devDependencies": {
-    "@solana/transaction-messages": "^3.0.3",
+    "@solana/transaction-messages": "^8.6.0",
     "@solana/transactions": "^3.0.3",
     "@anywalletkit/core": "workspace:*",
     "@anywalletkit/conformance": "workspace:*",
