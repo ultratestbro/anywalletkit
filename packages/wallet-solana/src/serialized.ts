@@ -20,7 +20,7 @@ import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from '@solana
 import { TOKEN_2022_PROGRAM_ADDRESS } from '@solana-program/token-2022'
 import { MAYAN_CPI_PROXY_PROGRAM_ADDRESS, ZERO_ADDRESS } from './describe.js'
 import { UnsafeTransactionError } from './errors.js'
-import type { DecodedInstruction, SimulationResult, SolanaFeeQuote, TransactionDescription } from './types.js'
+import type { DecodedInstruction, SimulatedAccountChange, SimulationResult, SolanaFeeQuote, TransactionDescription } from './types.js'
 
 /** Memo program (v2) — swap aggregators tag routes with it. */
 export const MEMO_PROGRAM_ADDRESS = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'
@@ -353,6 +353,8 @@ export interface SerializedCheck {
   tokenOutDelta: bigint | undefined
   /** Accounts whose pre/post state was compared. */
   watched: readonly string[]
+  /** Every simulated change to an account of this wallet (see {@link SimulatedAccountChange}), for a sheet to list. */
+  changes?: readonly SimulatedAccountChange[]
 }
 
 /** True for every spelling of native SOL: the System program id, `0x0…`, or the wSOL mint. */
