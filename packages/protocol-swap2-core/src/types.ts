@@ -70,6 +70,11 @@ export interface TxRequest {
   nativeFee?: string;
   /** Solana: base64-serialized transaction to sign & broadcast as-is. */
   serializedTx?: string;
+  /**
+   * Permit2 signature-transfer execution (a 0x Settler swap): the JSON EIP-712 `PermitTransferFrom`
+   * the account signs right before `data` is sent — see {@link UnsignedTx.permit2Transfer}.
+   */
+  permit2Transfer?: string;
 }
 
 /** A normalized quote from one provider. */
@@ -195,6 +200,16 @@ export interface UnsignedTx {
    * `approvalAddress` names the settlement contract that needs allowance.
    */
   typedData?: string;
+  /**
+   * Permit2 signature-transfer execution (a 0x Settler swap): the JSON EIP-712 `PermitTransferFrom`
+   * the account signs right before the calldata is sent. NOT a typed order: there is a source
+   * transaction, and the signature is only usable inside it (Permit2 takes the token from
+   * `msg.sender` of the spender's call). The engine binds the payload to the swap before any
+   * approval — Permit2 itself as the verifying contract and as `approvalAddress`, the source token,
+   * exactly the input amount, `to` as the Permit2 spender, a near deadline — signs it as typed
+   * data (never as a raw hash) and sends `data ++ uint256(signature length) ++ signature`.
+   */
+  permit2Transfer?: string;
   /**
    * Typed-order execution: the order extension (0x-hex) the order's salt commits to — a 1inch Limit Order Protocol
    * order's amount getters and post-interaction, where an HTLC order's escrow terms live. Carried so an app can open

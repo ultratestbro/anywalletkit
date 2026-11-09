@@ -68,7 +68,7 @@ export function quoteRejection(q: Quote, params: QuoteParams, provider: string):
       if (tx.value !== undefined && !/^[0-9]+$/.test(tx.value)) return MALFORMED;
       if (tx.gasLimit !== undefined && !/^[0-9]+$/.test(tx.gasLimit)) return MALFORMED;
       if (tx.chainId !== undefined && (!Number.isSafeInteger(tx.chainId) || tx.chainId <= 0)) return MALFORMED;
-      if ([tx.to, tx.data, tx.approvalAddress, tx.serializedTx].some((value) => value !== undefined && typeof value !== "string")) return MALFORMED;
+      if ([tx.to, tx.data, tx.approvalAddress, tx.serializedTx, tx.permit2Transfer].some((value) => value !== undefined && typeof value !== "string")) return MALFORMED;
     }
     // Execution is always re-quoted. An unknown/zero expiry cannot prove that
     // the transaction is still safe to sign, so contribution packages reject it.
