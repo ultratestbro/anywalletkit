@@ -9,7 +9,7 @@ import { encodeApprove, ERC20_PERMIT_ABI, PERMIT_TYPES, USDT_MAINNET } from './e
 
 /** ERC-165 interface id of ERC-721. */
 const ERC721_INTERFACE = '80ac58cd'
-import { BroadcastUnknownError, ChainMismatchError, NonceConflictError, PermitUnsupportedError, SimulationError, TransactionRevertedError, UnsafeTransactionError } from './errors.js'
+import { BroadcastUnknownError, FeeLimitExceededError, ChainMismatchError, NonceConflictError, PermitUnsupportedError, SimulationError, TransactionRevertedError, UnsafeTransactionError } from './errors.js'
 import { createEndpointClients, takeBroadcastErrors } from './client.js'
 import { WalletAccountReadOnlyEvm, assertTxShape, canonicalData, chainIdNumber, transferTransaction, typedDataHash, typedDomainChainId } from './read-only-account.js'
 export { MIN_PRIORITY_FEE_WEI, typedDomainChainId } from './read-only-account.js'
@@ -307,7 +307,7 @@ export class WalletAccountEvm extends WalletAccountReadOnlyEvm implements IWalle
    */
   private capFee(prepared: TransactionSerializable, limit: bigint | number | undefined, op: string): bigint {
     const fee = maxFeeCost(prepared)
-    if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation.`)
+    if (limit !== undefined && fee > BigInt(limit)) throw new FeeLimitExceededError(fee, BigInt(limit), `Exceeded maximum fee cost for ${op} operation.`)
     return fee
   }
 

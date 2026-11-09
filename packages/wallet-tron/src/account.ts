@@ -2,7 +2,7 @@ import { LocalSigner, SignerError, feeLimit, requireCurve, type IWalletAccount, 
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { addressFromPublicKey, toHexAddress } from './address.js'
 import { describeTransaction } from './describe.js'
-import { BroadcastUnknownError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { BroadcastUnknownError, FeeLimitExceededError, SimulationError, UnsafeTransactionError } from './errors.js'
 import { WITH_MISSES, isBroadcastRefusal, nodeMessage, type FailoverFetch, type TronAnswer } from './client.js'
 import { WalletAccountReadOnlyTron, hashMessage } from './read-only-account.js'
 import { isDecodedContractType, verifyRawTransaction } from './raw.js'
@@ -208,7 +208,7 @@ export class WalletAccountTron extends WalletAccountReadOnlyTron implements IWal
   }
 
   private maxFeeCheck(fee: bigint, limit: bigint | number | undefined, op: string) {
-    if (limit !== undefined && fee > BigInt(limit)) throw new Error(`Exceeded maximum fee cost for ${op} operation${op === 'transfer' ? 's' : ''}.`)
+    if (limit !== undefined && fee > BigInt(limit)) throw new FeeLimitExceededError(fee, BigInt(limit), `Exceeded maximum fee cost for ${op} operation${op === 'transfer' ? 's' : ''}.`)
   }
 
   /** Build → hard checks → simulate → estimate → fee cap. Shared by sign / send / transfer. */

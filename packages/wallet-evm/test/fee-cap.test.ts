@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseTransaction, type EIP1193Provider, type Hex } from 'viem'
-import { WalletManagerEvm } from '../src/index.js'
+import { FeeLimitExceededError, WalletManagerEvm } from '../src/index.js'
 
 // Audit 2026-10-25, finding 2: the fee cap was checked on a network quote while the
 // caller's own gasPrice / maxFeePerGas was signed. The cap now holds for what is signed.
@@ -63,6 +63,11 @@ describe('the fee cap holds for what is signed', () => {
     const { a, sent } = await account({ transactionMaxFee: LIMIT })
     await expect(a.sendTransaction({ to: SPENDER, value: 1n, gasPrice: 100n * GWEI })).rejects.toThrow(/Exceeded maximum fee cost for transaction/)
     await expect(a.sendTransaction({ to: SPENDER, value: 1n, type: 1, gasPrice: 100n * GWEI })).rejects.toThrow(/Exceeded maximum fee cost/)
+    // The cap in force and the fee that broke it are on the error: a wallet can show the new fee and ask again.
+    const over = await a.sendTransaction({ to: SPENDER, value: 1n, gasPrice: 100n * GWEI }).catch((e: unknown) => e)
+    expect(over).toBeInstanceOf(FeeLimitExceededError)
+    expect(over).toMatchObject({ name: 'FeeLimitExceededError', code: 'fee-limit-exceeded', limit: LIMIT, fee: GAS * 100n * GWEI })
+    await expect(a.sendTransaction({ to: SPENDER, value: 1n }, { maxFee: NETWORK_COST - 1n })).rejects.toMatchObject({ code: 'fee-limit-exceeded', limit: NETWORK_COST - 1n, fee: NETWORK_COST })
     expect(sent).toHaveLength(0)
   })
 
