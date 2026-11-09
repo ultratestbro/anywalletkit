@@ -117,6 +117,23 @@ describe("wrapped-native table (2026-10-14 batch)", () => {
     expect(wrapProvider({rpcUrls: {}}).supportsChain?.(caip2)).toBe(false);
   });
 
+  it("Elysium (99901): HYPE ↔ WHYPE (aeWETH, verified 2026-11-10) — deposit() and withdraw(amount) on 0xbA87…5E81", async () => {
+    const WHYPE = "0xbA876237B0F021A6c6D852d6c26E107997cC5E81";
+    expect(WRAPPED_NATIVE[99901]).toEqual({address: WHYPE, symbol: "WHYPE"});
+    const p = wrapProvider({rpcUrls: {99901: ["https://rpc.test"]}});
+    expect(p.supportsChainPair?.("eip155:99901", "eip155:99901")).toBe(true);
+    expect(p.supportsChainPair?.("eip155:99901", "eip155:999")).toBe(false);
+    const ely = {...base, sourceChain: "eip155:99901", destChain: "eip155:99901"};
+    vi.stubGlobal("fetch", stub({symbol: "WHYPE"}));
+    await expect(p.getQuote({...ely, sourceToken: "HYPE", destToken: WHYPE})).resolves.toMatchObject({intentId: "wrap:99901", txRequest: {to: WHYPE, data: "0xd0e30db0", value: base.amountIn, chainId: 99901}});
+    await expect(p.getQuote({...ely, sourceToken: "WHYPE", destToken: ZERO})).resolves.toMatchObject({txRequest: {to: WHYPE, value: "0", data: "0x2e1a7d4d" + BigInt(base.amountIn).toString(16).padStart(64, "0")}});
+    // The on-chain symbol check still guards the pin: an RPC answering another symbol is refused.
+    const reasons: string[] = [];
+    vi.stubGlobal("fetch", stub({symbol: "WETH"}));
+    await expect(wrapProvider({rpcUrls: {99901: ["https://rpc.test"]}}).getQuote({...ely, sourceToken: "HYPE", destToken: WHYPE, onRefusal: (r) => { reasons.push(r); }})).resolves.toBeNull();
+    expect(reasons.join()).toMatch(/is not WHYPE/);
+  });
+
   it("Arc has no wrapped native (its USDC gas token is already an ERC-20)", () => {
     expect(WRAPPED_NATIVE[5042]).toBeUndefined();
     expect(wrapProvider({rpcUrls: {5042: ["https://rpc.test"]}}).supportsChain?.("eip155:5042")).toBe(false);

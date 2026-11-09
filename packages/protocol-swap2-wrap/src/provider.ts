@@ -44,6 +44,12 @@ export const WRAPPED_NATIVE: Readonly<Record<number, {address: `0x${string}`; sy
   747474: {address: "0xEE7D8BCFb72bC1880D0Cf19822eB0A2e6577aB62", symbol: "vbETH"},
   2818: {address: "0x5300000000000000000000000000000000000011", symbol: "WETH"},
   14: {address: "0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d", symbol: "WFLR"},
+  // 2026-11-10: Elysium (Kinetiq, Arbitrum Orbit on HyperEVM). WHYPE is the chain's aeWETH behind a transparent proxy
+  // (implementation 0xf098…0542): symbol "WHYPE", 18 decimals, supply ~31.3k, deposit() / withdraw(uint256) in the
+  // implementation's bytecode, eth_estimateGas of deposit() with value from a funded sender and of withdraw(1e15) from
+  // a holder both pass, withdraw from an empty account reverts "burn amount exceeds balance". It emits Transfer
+  // mint / burn, not WETH9's Deposit / Withdrawal — activity reads the call, not those events.
+  99901: {address: "0xbA876237B0F021A6c6D852d6c26E107997cC5E81", symbol: "WHYPE"},
 });
 
 const WETH_ABI = parseAbi([
