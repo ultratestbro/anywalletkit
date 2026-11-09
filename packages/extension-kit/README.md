@@ -73,7 +73,10 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
   compromise, `rotateVaultKey(password)` makes a fresh DEK, re-seals every
   secret, drops the passkeys (register them again) and writes one envelope;
   hand the returned DEK to `session.unlock`, which replaces the old one.
-  `setSecret` refuses a DEK that does not open the vault's secrets.
+  `rotateVaultKey(oldPassword, newPassword)` is the password change with a
+  fresh DEK. `setSecret` refuses a DEK that does not open the vault's secrets,
+  and `unlock` / `unlockWithPasskey` refuse (`wrong-password`) a box that opens
+  but holds another vault's key (a spliced dek or passkey box).
 - **Unlocked state.** Only the DEK is kept, in `chrome.storage.session`
   (memory-only, trusted contexts), with an expiry enforced on every read and an
   alarm that locks; key buffers this package owns are zeroized after use.
