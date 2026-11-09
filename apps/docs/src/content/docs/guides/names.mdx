@@ -30,6 +30,12 @@ sends on Base or Arbitrum. Names that resolve off-chain (Coinbase `cb.id`, Basen
 go through CCIP-Read without extra setup in a browser, an extension or Node. On React Native they
 go through your server ([React Native](#react-native) below). Results are cached for five minutes by default.
 
+**Where the resolved address is what the user signs for, cross-check it.** With a single
+`rpcUrl`, whoever runs that RPC decides which address a name points to. Pass two endpoints run by
+different operators instead, `ensResolver({ rpcUrls: ['https://ethereum-rpc.publicnode.com', 'https://eth.drpc.org'] })`
+(or `clients: [a, b]`): every forward lookup, the signing-time check included, asks both and is
+refused unless they return the same address (`lookup-failed`, `EnsNameError.reason === 'rpc-disagreement'`).
+
 ## The recipient field
 
 <Snippet file="names/src/names.ts" region="recipient" />
