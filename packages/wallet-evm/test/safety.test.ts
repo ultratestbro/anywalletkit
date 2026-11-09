@@ -79,16 +79,16 @@ describe('describeTypedData', () => {
   })
 
   it('recognises EIP-2612 permit and its fields', () => {
-    const d = describeTypedData(permit(), { chainId: 1, account: HARDHAT0 })
+    const d = describeTypedData(permit(), { chainId: 1, account: HARDHAT0, knownSpenders: { [SPENDER]: 'Router' } })
     expect(d.kind).toBe('permit')
     expect(d.primaryType).toBe('Permit')
     expect(d.domain).toEqual({ name: 'USD Coin', version: '2', chainId: 1, verifyingContract: USDT })
-    expect(d.permit).toEqual({ owner: HARDHAT0, spender: SPENDER, value: 100n, nonce: 0n, deadline: now + 600n })
+    expect(d.permit).toEqual({ owner: HARDHAT0, spender: SPENDER, value: 100n, nonce: 0n, deadline: now + 600n, spenderLabel: 'Router' })
     expect(d.warnings).toEqual([])
   })
 
   it('warns on chain mismatch, passed deadline, unlimited value, foreign owner', () => {
-    const codes = (t: ReturnType<typeof permit>, ctx?: { chainId?: number; account?: string }) => describeTypedData(t, ctx).warnings.map((w) => w.code)
+    const codes = (t: ReturnType<typeof permit>, ctx?: { chainId?: number; account?: string }) => describeTypedData(t, { ...ctx, knownSpenders: { [SPENDER]: 'Router' } }).warnings.map((w) => w.code)
     expect(codes(permit({}, { chainId: 137 }), { chainId: 1 })).toEqual(['chain-mismatch'])
     expect(codes(permit({ deadline: now - 1n }))).toEqual(['deadline-passed'])
     expect(codes(permit({ value: maxUint256 }))).toEqual(['approve-unlimited'])
@@ -103,7 +103,7 @@ describe('describeTypedData', () => {
       message: { details: { token: USDT, amount: 2n ** 160n - 1n, expiration: 0, nonce: 0 }, spender: OTHER, sigDeadline: 1n },
     })
     expect(p2.kind).toBe('permit2')
-    expect(p2.warnings.map((w) => w.code)).toEqual(['approve-unlimited', 'deadline-passed'])
+    expect(p2.warnings.map((w) => w.code)).toEqual(['approve-unlimited', 'deadline-passed', 'spender-unknown'])
     expect(describeTypedData({ domain: { chainId: 1, verifyingContract: SPENDER }, types: { SafeTx: [{ name: 'to', type: 'address' }] }, message: { to: OTHER } }).kind).toBe('safe-tx')
     expect(describeTypedData({ domain: { name: 'Forge' }, types: { Mail: [{ name: 'to', type: 'address' }] }, message: { to: OTHER } }).kind).toBe('generic')
   })

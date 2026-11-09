@@ -42,11 +42,15 @@ token" flow on it.
 
 Every send goes through, in order: static refusals → simulation → fee cap → sign → broadcast.
 
-- **What you sign.** `describeTransaction(tx, {chainId})` and `describeTypedData(typed, {chainId, account})`
+- **What you sign.** `describeTransaction(tx, {chainId})` and `describeTypedData(typed, {chainId, account, knownSpenders})`
   are pure, offline decoders for a confirmation screen: kind (`native-transfer`, `erc20-transfer`,
-  `erc20-approve`, `contract-call`, `eip7702-delegation`, …; `permit`, `permit2`, `safe-tx`, `generic`),
-  decoded fields, and warnings (`approve-unlimited`, `to-zero-address`, `chain-mismatch`,
-  `deadline-passed`, `owner-mismatch`, `legacy-fee-fields`).
+  `erc20-approve`, `contract-call`, `eip7702-delegation`, …; `permit`, `permit2`, `seaport`, `safe-tx`, `generic`),
+  decoded fields (a Permit2 grant's spender, tokens, amounts and deadline; a Seaport order's offer and
+  consideration with recipients; a Safe transaction's to / value / data / operation), and warnings
+  (`approve-unlimited`, `to-zero-address`, `chain-mismatch`, `deadline-passed`, `owner-mismatch`,
+  `legacy-fee-fields`, `spender-unknown`, `consideration-foreign`, `safe-delegatecall`). A `generic`
+  payload is one the decoder cannot read: show it as "may authorise actions by the verifying contract",
+  never as harmless.
 - **Hard refusals** before any signature: a tx or typed-data domain for another chain throws
   `ChainMismatchError` (override typed data with `allowCrossChainTypedData`); value to the zero
   address throws `UnsafeTransactionError` (override with `allowBurn`).
