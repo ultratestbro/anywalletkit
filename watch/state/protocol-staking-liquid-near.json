@@ -1,0 +1,78 @@
+{
+ "module": "@anywalletkit/protocol-staking-liquid-near",
+ "sources": {
+  "docs-gas": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.near.org/protocol/transactions/gas.md"
+   },
+   "value": "6773bfe17b481dc865e883e7ddf53be34d6eb6bf5678aad570744475acdf1f99",
+   "meta": {
+    "hash": "6773bfe17b481dc8",
+    "chars": 12977
+   },
+   "seenAt": "2026-11-09T16:13:30.563Z",
+   "changedAt": "2026-11-09T16:13:30.563Z"
+  },
+  "docs-liquid-staking": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.near.org/primitives/liquid-staking/liquid-staking.md"
+   },
+   "value": "9e577f142689e61cacb8a11a7d42fabb8386a4d71226fd3a4e8bb42791ce4906",
+   "meta": {
+    "hash": "9e577f142689e61c",
+    "chars": 4270
+   },
+   "seenAt": "2026-11-09T16:13:30.582Z",
+   "changedAt": "2026-11-09T16:13:30.582Z"
+  },
+  "nearcore-releases": {
+   "type": "github-releases",
+   "target": {
+    "repo": "near/nearcore"
+   },
+   "value": "2.14.0",
+   "meta": {
+    "tag": "2.14.0",
+    "name": "2.14.0",
+    "at": "2026-10-26",
+    "url": "https://github.com/near/nearcore/releases/tag/2.14.0",
+    "prerelease": false
+   },
+   "seenAt": "2026-11-09T16:13:30.582Z",
+   "changedAt": "2026-11-09T16:13:30.582Z"
+  },
+  "linear-releases": {
+   "type": "github-releases",
+   "target": {
+    "repo": "linear-protocol/LiNEAR"
+   },
+   "value": "v1.6.3",
+   "meta": {
+    "tag": "v1.6.3",
+    "name": "LiNEAR v1.6.3",
+    "at": "2026-06-08",
+    "url": "https://github.com/linear-protocol/LiNEAR/releases/tag/v1.6.3",
+    "prerelease": false
+   },
+   "seenAt": "2026-11-09T16:13:30.657Z",
+   "changedAt": "2026-11-09T16:13:30.657Z"
+  },
+  "rnear-contract": {
+   "type": "github-releases",
+   "target": {
+    "repo": "ref-finance/rnear-contract"
+   },
+   "value": "341cd8c970895e1b6bcb433699b20253922d621d",
+   "meta": {
+    "tag": "commit 341cd8c",
+    "at": "2025-08-05",
+    "url": "https://github.com/ref-finance/rnear-contract/commit/341cd8c970895e1b6bcb433699b20253922d621d",
+    "note": "default branch: Merge pull request #3 from ref-finance/audit_fix"
+   },
+   "seenAt": "2026-11-09T16:13:31.191Z",
+   "changedAt": "2026-11-09T16:13:31.191Z"
+  }
+ }
+}

@@ -6,28 +6,28 @@
    "target": {
     "url": "https://docs.ston.fi/docs/developer-section/omniston"
    },
-   "value": "de3a68ec9a0e35b533e4a496a6a34fea8926afe53d643f9d04fc0340b2294303",
+   "value": "83d251a63dc18a93762630e16b74b318e6114aeb676bd11a94d9341aa40fbe99",
    "meta": {
-    "hash": "de3a68ec9a0e35b5",
+    "hash": "83d251a63dc18a93",
     "chars": 3422
    },
-   "seenAt": "2026-11-08T13:21:36.255Z",
-   "changedAt": "2026-11-08T13:21:36.255Z"
+   "seenAt": "2026-11-09T16:13:41.672Z",
+   "changedAt": "2026-11-09T16:13:41.672Z"
   },
   "omniston-sdk": {
    "type": "github-releases",
    "target": {
     "repo": "ston-fi/omniston-sdk"
    },
-   "value": "8b97fdc0ab2cb9c72337e3c0d4ca06664e6bf845",
+   "value": "ae756abd35e2aafe4f6aa4a80e669d7ce84dcea5",
    "meta": {
-    "tag": "commit 8b97fdc",
-    "at": "2026-11-05",
-    "url": "https://github.com/ston-fi/omniston-sdk/commit/8b97fdc0ab2cb9c72337e3c0d4ca06664e6bf845",
-    "note": "default branch: chore(demo-app): upgrade react & nextjs"
+    "tag": "commit ae756ab",
+    "at": "2026-11-09",
+    "url": "https://github.com/ston-fi/omniston-sdk/commit/ae756abd35e2aafe4f6aa4a80e669d7ce84dcea5",
+    "note": "default branch: release(sdk-react): v.0.8.13"
    },
-   "seenAt": "2026-11-08T13:21:36.391Z",
-   "changedAt": "2026-11-05T14:38:20.233Z"
+   "seenAt": "2026-11-09T16:13:41.795Z",
+   "changedAt": "2026-11-09T16:13:41.795Z"
   }
  }
 }

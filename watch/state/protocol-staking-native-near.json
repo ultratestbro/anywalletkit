@@ -1,0 +1,103 @@
+{
+ "module": "@anywalletkit/protocol-staking-native-near",
+ "sources": {
+  "docs-staking-integration": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.near.org/integrations/staking.md"
+   },
+   "value": "a9533293a3d55b02a13e76601153862fcb798257da68ceb517bd20cfd7a6b124",
+   "meta": {
+    "hash": "a9533293a3d55b02",
+    "chars": 3269
+   },
+   "seenAt": "2026-11-09T16:13:31.555Z",
+   "changedAt": "2026-11-09T16:13:31.555Z"
+  },
+  "docs-staking-tokens": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.near.org/protocol/tutorials/staking-tokens.md"
+   },
+   "value": "8e7c00174471c2117a94938bafdc1a72e6d4887bd41f5e8591b34d6fdf19ef35",
+   "meta": {
+    "hash": "8e7c00174471c211",
+    "chars": 7619
+   },
+   "seenAt": "2026-11-09T16:13:31.598Z",
+   "changedAt": "2026-11-09T16:13:31.598Z"
+  },
+  "docs-gas": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.near.org/protocol/transactions/gas.md"
+   },
+   "value": "6773bfe17b481dc865e883e7ddf53be34d6eb6bf5678aad570744475acdf1f99",
+   "meta": {
+    "hash": "6773bfe17b481dc8",
+    "chars": 12977
+   },
+   "seenAt": "2026-11-09T16:13:31.621Z",
+   "changedAt": "2026-11-09T16:13:31.621Z"
+  },
+  "docs-epoch": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.near.org/protocol/network/epoch.md"
+   },
+   "value": "57069f82a0e7d0b54b4e09aa3aad863d8830e6fb94d60ec2439fca86f93ee837",
+   "meta": {
+    "hash": "57069f82a0e7d0b5",
+    "chars": 2682
+   },
+   "seenAt": "2026-11-09T16:13:31.632Z",
+   "changedAt": "2026-11-09T16:13:31.632Z"
+  },
+  "staking-pool-source": {
+   "type": "github-file",
+   "target": {
+    "repo": "near/core-contracts",
+    "path": "staking-pool/src/lib.rs",
+    "ref": "master"
+   },
+   "value": "4c6ab0b68b0a2b9deb6e71a6e1bc785d58e49a42",
+   "meta": {
+    "sha": "4c6ab0b68b",
+    "url": "https://github.com/near/core-contracts/blob/master/staking-pool/src/lib.rs"
+   },
+   "seenAt": "2026-11-09T16:13:31.654Z",
+   "changedAt": "2026-11-09T16:13:31.654Z"
+  },
+  "nearcore-releases": {
+   "type": "github-releases",
+   "target": {
+    "repo": "near/nearcore"
+   },
+   "value": "2.14.0",
+   "meta": {
+    "tag": "2.14.0",
+    "name": "2.14.0",
+    "at": "2026-10-26",
+    "url": "https://github.com/near/nearcore/releases/tag/2.14.0",
+    "prerelease": false
+   },
+   "seenAt": "2026-11-09T16:13:31.750Z",
+   "changedAt": "2026-11-09T16:13:31.750Z"
+  },
+  "staking-farm": {
+   "type": "github-releases",
+   "target": {
+    "repo": "referencedev/staking-farm"
+   },
+   "value": "f0b0e69134aa88c59343607b844b0c4fb2f8cd44",
+   "meta": {
+    "tag": "commit f0b0e69",
+    "at": "2025-12-22",
+    "url": "https://github.com/referencedev/staking-farm/commit/f0b0e69134aa88c59343607b844b0c4fb2f8cd44",
+    "note": "default branch: chore: Added explicit MIT or Apache-2.0 licensing - this has been always the int"
+   },
+   "seenAt": "2026-11-09T16:13:32.324Z",
+   "changedAt": "2026-11-09T16:13:32.324Z"
+  }
+ }
+}
