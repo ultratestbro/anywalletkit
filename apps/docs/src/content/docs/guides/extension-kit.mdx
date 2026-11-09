@@ -81,7 +81,20 @@ nothing in the new vault, and `setSecret` refuses it.
 
 ```ts
 await session.unlock(await vault.rotateVaultKey(password))
+// a password change that also retires the old key:
+await session.unlock(await vault.rotateVaultKey(oldPassword, newPassword))
 ```
+
+`unlock` and `unlockWithPasskey` check that the key they unwrap is the vault's own, so a box
+copied in from another vault fails as `wrong-password`. Still, do not treat `unlock(password)` as
+a yes/no check and then use the session's key: compare the two keys, or use the one the password
+opened.
+
+`chrome.storage.local` is not authenticated, so settings and site grants kept there can be edited by
+anything that writes the area. Wrap those stores with `macJsonStorage(store, { label, key })`: values
+carry an HMAC under `deriveStorageMacKey(dek)`, and a plain, edited or foreign value reads as `null`
+(`read()` tells you why). Without a key (locked) it reads the stored value unverified, so verify at
+unlock, and `rekey` the stores after `rotateVaultKey`.
 
 The relay drops a request whose `method` is not a method name (letters, digits and `_`, at most
 128 characters, `isRelayMethod`). Reject such a request in your injected provider with `-32600`,
