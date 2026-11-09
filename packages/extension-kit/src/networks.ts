@@ -65,6 +65,8 @@ export const DEFAULT_NETWORKS: readonly EvmNetwork[] = Object.freeze([
   net(2818, 'Morph', 'ETH', ['https://rpc.morphl2.io', 'https://rpc-quicknode.morphl2.io'], 'https://explorer.morphl2.io'),
   net(14, 'Flare', 'FLR', ['https://flare-api.flare.network/ext/C/rpc', 'https://flare.rpc.thirdweb.com'], 'https://flare-explorer.flare.network'),
   // Elysium by Kinetiq (chain 99901, HYPE gas; Arbitrum Orbit on HyperEVM) — public RPC and explorer checked 2026-11-10.
+  // The explorer value is the link base (<root>/tx/<hash>, <root>/address/<a>), not LI.FI's blockExplorerUrls
+  // https://elysium.kinetiq.xyz/explorer/ (the overview page; the bare root is the Elysium site home).
   net(99901, 'Elysium', 'HYPE', ['https://rpc.elysium.kinetiq.xyz'], 'https://elysium.kinetiq.xyz'),
 ])
 
