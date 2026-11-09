@@ -1231,6 +1231,29 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
     ],
   },
   {
+    // Elysium by Kinetiq (chain 99901, native HYPE) — an Arbitrum Nitro (Orbit) chain whose parent chain is HyperEVM
+    // (ArbSys 0x64 arbChainID() = 99901; tokens arrive through its canonical token bridge). Not Vulcan Forged's Elysium
+    // (chain 1339). LI.FI + wrap; no 1Click / THORChain / Chainflip / CCTP / USDT0 / Omniston. Every token below is a
+    // bridged ERC-20 (StandardArbERC20 behind one beacon) whose l1Address() is the HyperEVM token of the same name:
+    // USDC.e ↔ HyperEVM's Circle USDC 0xb883…630f (on-chain symbol "USDC", 6 dec — bridged, not Circle-native, no CCTP,
+    // so the catalog calls it USDC.e), kHYPE ↔ 0xfD73…296D, UBTC ↔ 0x9FDB…3463, UETH ↔ 0xBe67…7907, KNTQ ↔ 0x0000…c2d6.
+    // WHYPE is the chain's aeWETH (deposit() / withdraw(uint256), estimateGas-checked), l1Address() = HyperEVM's WHYPE.
+    // Verified on-chain 2026-11-10 (code, symbol, name, decimals, totalSupply, l1Address). USOL is left out: 0.0005 in supply.
+    key: "elysium",
+    caip2: "eip155:99901",
+    icon: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/elysium.svg",
+    label: "Elysium",
+    assets: [
+      {symbol: "HYPE", assetId: "", decimals: 18, icon: cmcIcon(32196)},
+      {symbol: "WHYPE", assetId: "", contract: "0xbA876237B0F021A6c6D852d6c26E107997cC5E81", decimals: 18, icon: cmcIcon(32196)},
+      {symbol: "USDC.e", assetId: "", contract: "0xb47c4C8F73F009CC0C0d3f92B388d13E293F0B65", decimals: 6, icon: cmcIcon(3408)},
+      {symbol: "kHYPE", assetId: "", contract: "0x248888D396A546A69A188f3Deb476964e581E9d0", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/67388/large/khype.png?1752632397"},
+      {symbol: "UBTC", assetId: "", contract: "0xE9C29585EAe4B9a55b02a9605AEa892B40d972E8", decimals: 8, icon: "https://coin-images.coingecko.com/coins/images/55066/large/ubtc.jpg?1743580113"},
+      {symbol: "UETH", assetId: "", contract: "0x7A66A75fe41Bc26867C17fe1bc7D1C076EBd4eCd", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/55069/large/eth.jpg?1743582414"},
+      {symbol: "KNTQ", assetId: "", contract: "0xe45a355d9e9cAd2aD85F2d03E3eE3102A036acF0", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/70252/large/kntq.png?1761279547"},
+    ],
+  },
+  {
     // MegaETH (real-time Ethereum L2, native ETH). LI.FI + wrap; no 1Click ids.
     key: "megaeth",
     caip2: "eip155:4326",
