@@ -20,7 +20,10 @@
  * The fee caps signed are the ones shown, unless the network outgrew them
  * while the sheet was open (EIP-1559: base fee + tip above the shown cap;
  * legacy: a higher gas price) — then the user is asked again with the new
- * numbers (`repriced: true`).
+ * numbers (`repriced: true`, `repricedFrom` = the max fee shown before) on a
+ * follow-up sheet the queue limits do not refuse, at most {@link MAX_FEE_REASKS}
+ * times in a row; declining it signs nothing. A new max fee above the wallet's
+ * own ceiling ({@link SignDeps.feeCeiling}) is refused without a sheet.
  *
  * The review payload ({@link SignApproval}) carries what the window shows: the
  * classified request, the prepared fields, the fee, and the preview the wallet
@@ -78,6 +81,8 @@ export interface SignApproval {
   prepared?: PreparedTx
   /** A second sheet for the same transaction: the network's fee outgrew the cap the first one showed. */
   repriced?: true
+  /** With `repriced`: the max fee (`prepared.maxFee`, base units) the sheet before this one showed. */
+  repricedFrom?: string
   /** What the wallet attached (tx-preview-evm `TxPreview`, typed-data description…). */
   preview: unknown
 }
@@ -103,7 +108,16 @@ export interface SignDeps {
    * blind hash signature can be a CoW order or a Safe transaction paying someone else (extension audit E55).
    */
   allowBlindHash?: () => boolean | Promise<boolean>
+  /**
+   * The most one transaction may cost in fee on `network` (base units), when the wallet has such a limit
+   * (the one its signer enforces). A fee that rose above it after the sheet is refused right away, with
+   * no second sheet. The first sheet is not checked here: the signer is the guard for it.
+   */
+  feeCeiling?: (network: EvmNetwork) => bigint | undefined
 }
+
+/** How many times in a row one transaction's fee may be asked again ({@link SignApproval.repriced}); the next rise stops the request, nothing signed. */
+export const MAX_FEE_REASKS = 3
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/
 const HEX = /^0x([0-9a-fA-F]{2})*$/
@@ -351,14 +365,21 @@ export function createSignHandler(deps: SignDeps): NonNullable<RouterDeps['sign'
       const key = `${network.caip2}|${lc(info.account)}`
       return serial(key, async () => {
         let shown = prepared!
+        let reasks = 0
         for (;;) {
           const [nonceHex, fees] = await Promise.all([deps.rpc(network, 'eth_getTransactionCount', [info.account, 'pending']), readFees(deps, network)])
           const local = nextNonce.get(key) ?? 0
           const nodeNonce = safeNonce(big(nonceHex))
           const nonce = nodeNonce > local ? nodeNonce : local
           if (outgrown(shown, fees)) {
-            shown = withFees(network.chainId, nonce, big(shown.gasLimit), fees)
-            await deps.approvals.request({ origin, chain: network.caip2, kind: info.kind, payload: { ...payload, prepared: shown, repriced: true } })
+            const next = withFees(network.chainId, nonce, big(shown.gasLimit), fees)
+            const ceiling = deps.feeCeiling?.(network)
+            if (ceiling !== undefined && BigInt(next.maxFee) > ceiling) throw new RouterError(RELAY_ERRORS.internal, `The network fee rose above the wallet's limit for ${network.name}; nothing was signed.`)
+            if (reasks >= MAX_FEE_REASKS) throw new RouterError(RELAY_ERRORS.internal, 'The network fee kept rising while you were reviewing; nothing was signed. Try again later.')
+            reasks++
+            // The same transaction, approved once already: a follow-up sheet, not a new request of the site.
+            await deps.approvals.request({ origin, chain: network.caip2, kind: info.kind, payload: { ...payload, prepared: next, repriced: true, repricedFrom: shown.maxFee } }, { followUp: true })
+            shown = next
             continue // the network may have moved again while the second sheet was open
           }
           // A lower cap than the one approved needs no second sheet: the user pays at most what they saw.
