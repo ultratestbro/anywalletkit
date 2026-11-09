@@ -198,8 +198,35 @@ export type NearTxKind =
   | 'global-contract'
 /** Problems a NEAR description is flagged with. */
 export type NearTxWarningCode = 'dangerous-action' | 'full-access-key' | 'zero-amount' | 'implicit-new-account' | 'self-transfer' | 'high-gas' | 'unknown-method' | 'invalid-account'
+  /** Several actions in one transaction: each one has to be read, not just the first or last. */
+  | 'batch'
+  /** A function call attaches more than 1 yoctoNEAR to a method other than `storage_deposit`. */
+  | 'deposit'
 /** One flagged problem, with a sentence a wallet can show. */
 export interface NearTxWarning { code: NearTxWarningCode; message: string }
+
+/** One action of a NEAR transaction, decoded. Token amounts are base units (the description knows no decimals). */
+export interface NearActionDescription {
+  index: number
+  type: 'transfer' | 'function-call' | 'dangerous' | 'unknown'
+  /** Function call: the method name. Dangerous action: its key (`addKey`, `deleteAccount`…). */
+  method?: string
+  /** yoctoNEAR the action moves out of the signer: the Transfer amount or the call's attached deposit. */
+  deposit: bigint
+  /** Prepaid gas of a function call. */
+  gas?: bigint
+  /** Transfer: the transaction receiver. `ft_transfer` / `ft_transfer_call`: the NEP-141 `receiver_id`. */
+  receiverId?: string
+  /** `ft_transfer` / `ft_transfer_call`: token base units. */
+  amount?: bigint
+  /** `ft_transfer` / `ft_transfer_call`: the NEP-141 contract (the transaction receiver). */
+  token?: string
+  /** `ft_transfer` / `ft_transfer_call`: the memo. */
+  memo?: string
+}
+
+/** Tokens a transaction sends to one recipient, summed over its `ft_transfer` / `ft_transfer_call` actions. */
+export interface NearTokenOutflow { token: string; to: string; amount: bigint }
 
 /** A NEAR transaction decoded for a confirmation screen. */
 export interface NearTxDescription {
@@ -207,13 +234,17 @@ export interface NearTxDescription {
   warnings: NearTxWarning[]
   /** Signer account id when known. */
   from?: string
-  /** Receiver account id (native transfer) or NEP-141 `receiver_id` (ft-transfer). */
+  /**
+   * Receiver account id (native transfer) or NEP-141 `receiver_id` (ft-transfer). Set only when the
+   * transaction has one destination of value; a batch that pays several leaves it undefined — read
+   * `tokenOutflows` and `nativeOutflow`.
+   */
   to?: string
-  /** yoctoNEAR (native) or token base units (ft-transfer). */
+  /** yoctoNEAR (native transfer) or token base units (ft-transfer); same rule as `to`. */
   amount?: bigint
-  /** NEP-141 contract account id. */
+  /** NEP-141 contract account id (one token outflow only). */
   token?: string
-  /** NEP-141 memo. */
+  /** NEP-141 memo (one token outflow only). */
   memo?: string
   /** Called contract (function-call / batch). */
   contract?: string
@@ -224,6 +255,12 @@ export interface NearTxDescription {
   /** Total prepaid gas across function calls. */
   gas: bigint
   actionCount: number
+  /** Every action, in order. */
+  actions: NearActionDescription[]
+  /** yoctoNEAR leaving the signer: every Transfer plus every function-call deposit (equals `deposit`). */
+  nativeOutflow: bigint
+  /** Token outflows per (token, recipient), in first-seen order. */
+  tokenOutflows: NearTokenOutflow[]
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────

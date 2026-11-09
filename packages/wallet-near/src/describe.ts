@@ -1,6 +1,6 @@
 import { accessKeyPermissionTag, argsBytes, actionKey } from './borsh.js'
 import { isImplicitAccountId, isValidAccountId } from './address.js'
-import { IMPLICIT_ACCOUNT_MIN_DEPOSIT, MAX_GAS, TGAS, type NearAction, type NearFunctionCallAction, type NearTransaction, type NearTxDescription, type NearTxKind, type NearTxWarning } from './types.js'
+import { IMPLICIT_ACCOUNT_MIN_DEPOSIT, MAX_GAS, TGAS, type NearAction, type NearActionDescription, type NearFunctionCallAction, type NearTokenOutflow, type NearTransaction, type NearTxDescription, type NearTxKind, type NearTxWarning } from './types.js'
 
 /** What an offline description can be told to sharpen its warnings. */
 export interface DescribeContext {
@@ -43,13 +43,18 @@ export function describeTransaction(tx: NearTransaction, ctx: DescribeContext = 
   let memo: string | undefined
   let contract: string | undefined
   let dangerous: NearTxKind | undefined
+  const described: NearActionDescription[] = []
+  const outflows: NearTokenOutflow[] = []
+  let transfers = 0n
+  let transferCount = 0
 
   if (!isValidAccountId(tx.receiverId)) warnings.push({ code: 'invalid-account', message: `"${tx.receiverId}" is not a valid NEAR account id.` })
 
-  for (const a of actions) {
+  actions.forEach((a, index) => {
     let key: string
-    try { key = actionKey(a) } catch { warnings.push({ code: 'dangerous-action', message: 'Unknown action.' }); continue }
+    try { key = actionKey(a) } catch { warnings.push({ code: 'dangerous-action', message: 'Unknown action.' }); described.push({ index, type: 'unknown', deposit: 0n }); return }
     if (DANGEROUS_ACTIONS.has(key)) {
+      described.push({ index, type: 'dangerous', method: key, deposit: 0n })
       dangerous ??= KIND_OF_DANGEROUS[key]
       warnings.push({ code: 'dangerous-action', message: `${key} changes the account, its keys or its code.` })
       if (key === 'addKey') {
@@ -59,30 +64,55 @@ export function describeTransaction(tx: NearTransaction, ctx: DescribeContext = 
         if (tag === 1) warnings.push({ code: 'full-access-key', message: 'Adds a FULL ACCESS key: whoever holds it owns the account.' })
         else if (tag === undefined) warnings.push({ code: 'dangerous-action', message: 'Malformed access-key permission: neither fullAccess nor functionCall. The wallet refuses to sign it.' })
       }
-      continue
+      return
     }
     if (key === 'transfer') {
       const d = (a as { transfer: { deposit: bigint } }).transfer.deposit
       deposit += d
-      amount = (amount ?? 0n) + d
-      continue
+      transfers += d
+      transferCount++
+      described.push({ index, type: 'transfer', deposit: d, receiverId: tx.receiverId })
+      return
     }
     if (key === 'functionCall') {
       const f = (a as NearFunctionCallAction).functionCall
       const g = f.gas ?? 30n * TGAS
+      const attached = f.deposit ?? 0n
       gas += g
-      deposit += f.deposit ?? 0n
+      deposit += attached
       methods.push(f.methodName)
       contract = tx.receiverId
+      const item: NearActionDescription = { index, type: 'function-call', method: f.methodName, deposit: attached, gas: g }
+      // ft_transfer takes exactly 1 yocto and storage_deposit pays for storage; anything else attaching NEAR is a payment.
+      if (attached > 1n && f.methodName !== 'storage_deposit') warnings.push({ code: 'deposit', message: `Attaches ${attached} yoctoNEAR to ${tx.receiverId}.${f.methodName}: that NEAR leaves the account.` })
       if (f.methodName === 'ft_transfer' || f.methodName === 'ft_transfer_call') {
         const args = parseArgs(f)
-        token = tx.receiverId
-        to = typeof args?.receiver_id === 'string' ? args.receiver_id : undefined
-        if (typeof args?.amount === 'string' && /^\d+$/.test(args.amount)) amount = BigInt(args.amount)
-        if (typeof args?.memo === 'string') memo = args.memo
-        if (to !== undefined && !isValidAccountId(to)) warnings.push({ code: 'invalid-account', message: `"${to}" is not a valid NEAR account id.` })
+        const receiver = typeof args?.receiver_id === 'string' ? args.receiver_id : undefined
+        const units = typeof args?.amount === 'string' && /^\d+$/.test(args.amount) ? BigInt(args.amount) : undefined
+        item.token = tx.receiverId
+        if (receiver !== undefined) item.receiverId = receiver
+        if (units !== undefined) item.amount = units
+        if (typeof args?.memo === 'string') item.memo = args.memo
+        if (receiver !== undefined && !isValidAccountId(receiver)) warnings.push({ code: 'invalid-account', message: `"${receiver}" is not a valid NEAR account id.` })
+        // An ft_transfer whose receiver or amount does not parse still moves something: it is its own outflow.
+        const same = receiver !== undefined && units !== undefined ? outflows.find((o) => o.token === tx.receiverId && o.to === receiver) : undefined
+        if (same) same.amount += units!
+        else outflows.push({ token: tx.receiverId, to: receiver ?? '?', amount: units ?? 0n })
       }
+      described.push(item)
     }
+  })
+
+  // One destination of value → the classic to/amount/token; several → none of them (read tokenOutflows / nativeOutflow).
+  const ftTransfers = described.filter((x) => x.method === 'ft_transfer' || x.method === 'ft_transfer_call')
+  if (ftTransfers.length === 0) {
+    if (transferCount > 0) amount = transfers
+  } else if (transferCount === 0 && outflows.length === 1) {
+    const only = outflows[0]!
+    token = only.token
+    to = only.to === '?' ? undefined : only.to
+    if (ftTransfers.every((x) => x.amount !== undefined)) amount = only.amount
+    memo = ftTransfers.find((x) => x.memo !== undefined)?.memo
   }
 
   const callMethods = methods.filter((m) => m !== 'storage_deposit')
@@ -94,6 +124,12 @@ export function describeTransaction(tx: NearTransaction, ctx: DescribeContext = 
   else kind = 'batch'
 
   if (kind === 'function-call' && !FT_METHODS.has(methods[0]!)) warnings.push({ code: 'unknown-method', message: `Calls ${tx.receiverId}.${methods[0]} — not a token method we recognise.` })
+  if (kind === 'batch' && actions.length > 0) {
+    const parts = described.map((x) => x.type === 'transfer' ? `send ${x.deposit} yoctoNEAR to ${x.receiverId}`
+      : x.amount !== undefined || x.receiverId !== undefined ? `${x.method} ${x.amount ?? '?'} of ${x.token} to ${x.receiverId ?? '?'}`
+      : x.type === 'function-call' ? `call ${x.method}${x.deposit > 0n ? ` with ${x.deposit} yoctoNEAR` : ''}` : `${x.method ?? 'unknown action'}`)
+    warnings.push({ code: 'batch', message: `${actions.length} actions in one transaction on ${tx.receiverId}: ${parts.join('; ')}.` })
+  }
   if ((kind === 'near-transfer' || kind === 'ft-transfer') && amount === 0n) warnings.push({ code: 'zero-amount', message: 'Transfers nothing.' })
   if (gas > MAX_GAS) warnings.push({ code: 'high-gas', message: `Prepaid gas ${gas} exceeds the 300 Tgas transaction limit.` })
   if (from !== undefined && to !== undefined && from === to && (kind === 'near-transfer' || kind === 'ft-transfer')) warnings.push({ code: 'self-transfer', message: 'Sends to the signing account itself.' })
@@ -106,7 +142,7 @@ export function describeTransaction(tx: NearTransaction, ctx: DescribeContext = 
   }
 
   return {
-    kind, warnings, deposit, gas, actionCount: actions.length,
+    kind, warnings, deposit, gas, actionCount: actions.length, actions: described, nativeOutflow: deposit, tokenOutflows: outflows,
     ...(from !== undefined ? { from } : {}),
     ...(to !== undefined ? { to } : {}),
     ...(amount !== undefined ? { amount } : {}),
