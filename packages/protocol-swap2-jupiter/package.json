@@ -65,14 +65,14 @@
     "@anywalletkit/protocol-swap2-core": "workspace:*",
     "@anywalletkit/swap2-assets": "workspace:*",
     "@scure/base": "^2.4.0",
-    "@solana/kit": "^8.4.0"
+    "@solana/kit": "^8.6.0"
   },
   "peerDependencies": {
     "@anywalletkit/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22",
-    "vitest": "^5.0.3",
+    "vitest": "^5.1.0",
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/protocol-swap2-router": "workspace:*",
     "@anywalletkit/core": "workspace:*",

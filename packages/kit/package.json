@@ -50,7 +50,7 @@
     "@anywalletkit/wallet-tron": "workspace:*",
     "@anywalletkit/wallet-ton": "workspace:*",
     "@anywalletkit/wallet-zcash": "workspace:*",
-    "vitest": "^5.0.3"
+    "vitest": "^5.1.0"
   },
   "publishConfig": { "access": "public", "provenance": true }
 }

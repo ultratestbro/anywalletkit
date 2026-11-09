@@ -53,9 +53,9 @@
     "@anywalletkit/wallet-ton": "workspace:*",
     "@anywalletkit/wallet-tron": "workspace:*",
     "@anywalletkit/wallet-zcash": "workspace:*",
-    "viem": "^2.57.2",
+    "viem": "^2.57.14",
     "@ton/crypto": "^3.3.0",
-    "vitest": "^5.0.3"
+    "vitest": "^5.1.0"
   },
   "publishConfig": { "access": "public", "provenance": true }
 }

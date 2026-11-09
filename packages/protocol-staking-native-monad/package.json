@@ -24,7 +24,7 @@
     "lint": "eslint src",
     "verify:live": "node scripts/verify-live.mjs"
   },
-  "dependencies": { "viem": "^2.57.2" },
+  "dependencies": { "viem": "^2.57.14" },
   "peerDependencies": { "@anywalletkit/core": "workspace:*" },
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",
@@ -32,7 +32,7 @@
     "@anywalletkit/history-evm": "workspace:*",
     "@anywalletkit/wallet-evm": "workspace:*",
     "@types/node": "^22",
-    "vitest": "^5.0.3"
+    "vitest": "^5.1.0"
   },
   "keywords": ["protocol", "staking", "monad", "mon", "native-staking", "delegation", "validator", "staking-protocol", "anywalletkit"],
   "publishConfig": { "access": "public", "provenance": true }

@@ -65,7 +65,7 @@
     "@anywalletkit/protocol-staking-tonstakers-ton": "workspace:*",
     "@anywalletkit/protocol-swap2-omniston": "workspace:*",
     "@ton/ton": "^16.3.0",
-    "vitest": "^5.0.3"
+    "vitest": "^5.1.0"
   },
   "publishConfig": { "access": "public", "provenance": true }
 }
