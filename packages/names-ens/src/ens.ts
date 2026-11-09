@@ -17,8 +17,20 @@ export interface EnsResolverOptions {
    * `rpcUrl` has it already.
    */
   client?: PublicClient
-  /** …or a mainnet RPC URL to build one from. One of the two is required. */
+  /** …or a mainnet RPC URL to build one from. One of `client`, `rpcUrl`, `clients`, `rpcUrls` is required. */
   rpcUrl?: string
+  /**
+   * Cross-checked resolution: two or more mainnet RPC URLs run by DIFFERENT operators (different hosts are
+   * required; different companies are up to you). Every forward resolution — the signing-time `fresh` one
+   * included — asks each endpoint and is refused unless all of them return the same address: one that answers
+   * otherwise, says the name does not exist, or does not answer makes the lookup fail (`lookup-failed`, reason
+   * `rpc-disagreement` when they answered differently). A single compromised or malicious RPC can then no longer
+   * choose the recipient. Use it wherever a name becomes the address a user signs for. Clients are built as from
+   * `rpcUrl` (same CCIP-Read rules). Not combinable with `client` / `rpcUrl` / `clients`.
+   */
+  rpcUrls?: readonly string[]
+  /** …or two or more mainnet clients on different endpoints, same rule as `rpcUrls` (build each with `ccipRead: ensCcipRead`). */
+  clients?: readonly PublicClient[]
   /**
    * How the client built from `rpcUrl` asks CCIP-Read gateways (see {@link EnsCcipOptions}). On React Native, offchain
    * names resolve only with `ccip.fetch` (one that refuses redirects, e.g. through your server) or
@@ -41,8 +53,9 @@ interface Entry<T> { value: T; expires: number }
 /**
  * A finer reason than the {@link NameErrorCode}, for the developer rather than the user.
  * `ccip-proxy-required`: an offchain (CCIP-Read) name on React Native with no `ccip` option set (code `lookup-failed`).
+ * `rpc-disagreement`: with `rpcUrls` / `clients`, the endpoints answered differently for the name (code `lookup-failed`).
  */
-export type EnsNameErrorReason = 'ccip-proxy-required'
+export type EnsNameErrorReason = 'ccip-proxy-required' | 'rpc-disagreement'
 
 export class EnsNameError extends NameError {
   /** Set when the cause is the app's setup, not the name or the network: see {@link EnsNameErrorReason}. */
@@ -252,6 +265,32 @@ function ipfsPrefix(gateway: string): string {
   return /\/ipfs$/i.test(g) ? `${g}/` : `${g}/ipfs/`
 }
 
+/** The client(s) a resolver asks: one (`client` / `rpcUrl`) or a cross-check of two or more on different endpoints. */
+function clientsFor(opts: EnsResolverOptions, build: (url: string) => PublicClient): PublicClient[] {
+  const multi = opts.rpcUrls !== undefined || opts.clients !== undefined
+  if (multi) {
+    if ([opts.rpcUrls, opts.clients, opts.rpcUrl, opts.client].filter((x) => x !== undefined).length !== 1) {
+      throw new Error('names-ens: pass one of client, rpcUrl, clients, rpcUrls')
+    }
+    if (opts.rpcUrls) {
+      const urls = [...opts.rpcUrls]
+      if (urls.length < 2) throw new Error('names-ens: rpcUrls needs at least two endpoints (use rpcUrl for one)')
+      const hosts = urls.map((u) => {
+        try { return new URL(u).hostname.toLowerCase() } catch { throw new Error(`names-ens: rpcUrls has an invalid URL: ${u}`) }
+      })
+      if (new Set(hosts).size !== hosts.length) throw new Error('names-ens: rpcUrls must name different hosts — the same endpoint twice is not a cross-check')
+      return urls.map(build)
+    }
+    const list = [...(opts.clients ?? [])]
+    if (list.length < 2) throw new Error('names-ens: clients needs at least two clients (use client for one)')
+    if (new Set(list).size !== list.length) throw new Error('names-ens: clients must be different clients — the same one twice is not a cross-check')
+    return list
+  }
+  const one = opts.client ?? (opts.rpcUrl ? build(opts.rpcUrl) : null)
+  if (!one) throw new Error('names-ens: pass a mainnet client or rpcUrl')
+  return [one]
+}
+
 /** Names ENS can serve: `.eth` and any DNS name (cb.id, uni.eth subnames, imported DNS). */
 export function ensResolver(opts: EnsResolverOptions): NameResolver {
   // Refusals of the React Native default, counted so that a lookup they broke says what to set (viem's batch
@@ -263,8 +302,8 @@ export function ensResolver(opts: EnsResolverOptions): NameResolver {
       throw e
     }),
   }
-  const client = opts.client ?? (opts.rpcUrl ? createPublicClient({ chain: mainnet, transport: http(opts.rpcUrl), ccipRead }) : null)
-  if (!client) throw new Error('names-ens: pass a mainnet client or rpcUrl')
+  const clients = clientsFor(opts, (url) => createPublicClient({ chain: mainnet, transport: http(url), ccipRead }))
+  const client = clients[0]!
   const ttl = opts.cacheTtlMs ?? 5 * 60_000
   const ipfs = opts.ipfsGateway ?? 'https://ipfs.io/ipfs/'
   const foreign = new Set((opts.foreignTlds ?? ['sol', 'near', 'ton', 'me']).map((t) => t.toLowerCase()))
@@ -306,17 +345,12 @@ export function ensResolver(opts: EnsResolverOptions): NameResolver {
     return true
   }
 
-  const resolve = async (input: string, chain: string, options?: { fresh?: boolean }): Promise<ResolvedName> => {
-    const { name, warnings } = normalized(input)
-    const coinType = coinTypeFor(chain)
-    if (coinType === null) throw new NameError('unsupported', `ENS has no address record type for ${chain}`, { name, chain })
-    const key = `r:${name}:${chain}`
-    const hit = options?.fresh ? undefined : recall<ResolvedName>(key) // `fresh`: the signing-time check, never cached
-    if (hit) return hit
+  /** One endpoint's answer: the decoded address, or a NameError (`not-found`, `no-address-for-chain`, `lookup-failed`). */
+  const addressFrom = async (c: PublicClient, name: string, chain: string, coinType: bigint): Promise<string> => {
     let raw: string | null
     const refusalsBefore = ccipRefusals
     try {
-      raw = await client.getEnsAddress({ name, coinType })
+      raw = await c.getEnsAddress({ name, coinType })
     } catch (e) {
       if (ccipRefusals !== refusalsBefore || causedByProxyRequired(e)) throw ccipProxyRequired({ name, chain })
       throw new NameError('lookup-failed', `Could not look up ${name}: ${e instanceof Error ? e.message : String(e)}`, { name, chain, cause: e })
@@ -325,13 +359,39 @@ export function ensResolver(opts: EnsResolverOptions): NameResolver {
     if (!raw || /^0x0*$/.test(raw)) {
       // Distinguish "no such name" from "no record for this chain": the mainnet
       // record is the one almost every name has.
-      const eth = coinType === 60n ? null : await client.getEnsAddress({ name }).catch(() => null)
+      const eth = coinType === 60n ? null : await c.getEnsAddress({ name }).catch(() => null)
       if (coinType !== 60n && eth) {
         throw new NameError('no-address-for-chain', `${name} has no address for ${chain} (it only has an Ethereum address — not used here on purpose)`, { name, chain })
       }
       throw new NameError('not-found', `${name} is not registered or has no address`, { name, chain })
     }
-    const address = decodeAddressRecord(chain, raw, name)
+    return decodeAddressRecord(chain, raw, name)
+  }
+
+  /** Every endpoint, in parallel; the address only when all of them return it (extension audit 2026-11-09, E48). */
+  const crossChecked = async (name: string, chain: string, coinType: bigint): Promise<string> => {
+    const answers = await Promise.allSettled(clients.map((c) => addressFrom(c, name, chain, coinType)))
+    const errors = answers.flatMap((a) => (a.status === 'rejected' ? [a.reason as unknown] : []))
+    const proxy = errors.find(isProxyRequired)
+    if (proxy) throw proxy
+    const failed = errors.find((e) => !(e instanceof NameError) || e.code === 'lookup-failed' || e.code === 'invalid-name' || e.code === 'unsupported')
+    if (failed) {
+      throw new NameError('lookup-failed', `Could not look up ${name} on every RPC endpoint: ${failed instanceof Error ? failed.message : String(failed)}`, { name, chain, cause: failed })
+    }
+    const addresses = answers.flatMap((a) => (a.status === 'fulfilled' ? [a.value] : []))
+    if (errors.length === 0 && addresses.every((x) => x === addresses[0])) return addresses[0]!
+    if (addresses.length === 0 && errors.every((e) => (e as NameError).code === (errors[0] as NameError).code)) throw errors[0]
+    throw new EnsNameError('lookup-failed', `The RPC endpoints disagree about ${name} on ${chain}, so it was not used. Try again later, or paste the address.`, { name, chain }, 'rpc-disagreement')
+  }
+
+  const resolve = async (input: string, chain: string, options?: { fresh?: boolean }): Promise<ResolvedName> => {
+    const { name, warnings } = normalized(input)
+    const coinType = coinTypeFor(chain)
+    if (coinType === null) throw new NameError('unsupported', `ENS has no address record type for ${chain}`, { name, chain })
+    const key = `r:${name}:${chain}`
+    const hit = options?.fresh ? undefined : recall<ResolvedName>(key) // `fresh`: the signing-time check, never cached
+    if (hit) return hit
+    const address = clients.length === 1 ? await addressFrom(client, name, chain, coinType) : await crossChecked(name, chain, coinType)
     return remember(key, { name, chain, address, resolver: 'ens', warnings })
   }
 
