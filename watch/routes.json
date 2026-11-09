@@ -210,6 +210,14 @@
    "note": "SDK-133 first-try failures"
   },
   {
+   "id": "lifi:base-usdc>elysium-usdce",
+   "provider": "lifi",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:99901:USDC.e",
+   "amount": "100",
+   "note": "only way in: LI.FI Intents (Relay refused, UNBOUND_TOOLS)"
+  },
+  {
    "id": "om:ton-usdt>base-usdc",
    "provider": "omniston",
    "src": "ton:-239:USDT",
@@ -287,6 +295,13 @@
    "src": "eip155:8453:ETH",
    "dst": "eip155:8453:WETH",
    "amount": "0.05"
+  },
+  {
+   "id": "wrap:elysium-hype>whype",
+   "provider": "wrap",
+   "src": "eip155:99901:HYPE",
+   "dst": "eip155:99901:WHYPE",
+   "amount": "1"
   },
   {
    "id": "bal:eth-usdc>eth-eth",
