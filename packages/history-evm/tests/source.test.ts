@@ -195,6 +195,21 @@ describe('Elysium: keyless Etherscan-format Blockscout API', () => {
     expect(page.items).toEqual([])
     expect(page.cursor).toBeUndefined()
   })
+  it('"Too many calls at once" (overlapping calls refused) is retried, not a failed page', async () => {
+    const refused = new Set<string>()
+    const fetch = async (url: string) => {
+      const action = new URL(url).searchParams.get('action')!
+      if (!refused.has(action)) {
+        refused.add(action)
+        return { ok: true, status: 200, json: async () => ({ status: '0', message: 'NOTOK', result: 'Too many calls at once: wait for an answer before the next call, and try again in a second.' }), text: async () => '' }
+      }
+      const body = action === 'txlist' ? { status: '1', message: 'OK', result: [TX] } : { status: '0', message: 'No token transfers found', result: [] }
+      return { ok: true, status: 200, json: async () => body, text: async () => '' }
+    }
+    const page = await createEvmHistory({ chainId: 99901, fetch: fetch as never }).listActivity(ADDRESS, { limit: 10 })
+    expect(page.items.map((i) => i.hash)).toEqual([TX.hash])
+    expect(refused.size).toBe(3)
+  })
   it('the built-in entry is labelled blockscout-etherscan; an override keeps the routescan label; prefer: "blockscout" moves it first', async () => {
     expect(ETHERSCAN_COMPAT_BACKENDS[99901]).toBe('blockscout-etherscan')
     expect(ETHERSCAN_COMPAT_BACKENDS[43114]).toBeUndefined()
