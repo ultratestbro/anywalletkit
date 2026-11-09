@@ -11,9 +11,15 @@
  * promises die with it — the page gets no answer and retries, which is the
  * failure mode MetaMask has too.
  *
- * Two limits keep a page from burying one real request under decoys (SDK-142 M3):
- * at most `maxPendingPerOrigin` requests wait per origin (-32005), and a second
- * `connect` while one is pending is refused outright (-32002).
+ * Limits keep a page from burying one real request under decoys (SDK-142 M3,
+ * audit E17): at most `maxPendingPerOrigin` requests wait per origin, at most
+ * `maxPendingPerSite` per registrable domain (subdomains share them), at most
+ * `maxPendingTotal` in the whole queue (-32005 for each), a second `connect`
+ * while one is pending is refused outright (-32002), and each site may open only
+ * so many sheets per minute (`openRate`: a token bucket; running dry starts a
+ * cooldown that doubles on every repeat). Origins the wallet names `exempt` (its
+ * own pages) skip every limit. `declineOrigin` / `declineSite` drop one origin's
+ * or one site's backlog (the page closed; "decline all from this site").
  *
  * An origin can carry a transport note (`via`, set by the WalletConnect bridge):
  * the sheet then says the request came over WalletConnect, what the dApp claims
@@ -21,6 +27,7 @@
  * never used as the permission key.
  */
 import { RELAY_ERRORS } from './relay.js'
+import { TokenBucket, siteOf as defaultSiteOf } from './site.js'
 
 export class ReviewDeclined extends Error {
   readonly code = RELAY_ERRORS.userRejected
@@ -61,6 +68,22 @@ export class OriginRefused extends Error {
 }
 
 export const APPROVALS_MAX_PENDING_PER_ORIGIN = 3
+/** Requests one site (registrable domain: every subdomain counts) may have waiting. */
+export const APPROVALS_MAX_PENDING_PER_SITE = 5
+/** Requests the whole queue holds (exempt origins not counted). */
+export const APPROVALS_MAX_PENDING_TOTAL = 20
+
+/** How fast one site may open sheets: a token bucket per site; running dry refuses for a cooldown that doubles on every repeat. */
+export interface ApprovalRateOptions {
+  /** Sheets a site may open at once. Default 10. */
+  burst?: number
+  /** Sheets per second a site earns back. Default 1/6 (10 a minute). */
+  refillPerSecond?: number
+  /** First cooldown after the bucket ran dry. Default 30 s. */
+  backoffMs?: number
+  /** Longest cooldown; also how long a site must stay quiet for its strikes to reset. Default 10 min. */
+  maxBackoffMs?: number
+}
 
 export interface ApprovalRequest<P = unknown> {
   id: string
@@ -87,6 +110,18 @@ export interface ApprovalQueueOptions {
   refuse?: (origin: string) => string | null | undefined
   /** Requests one origin may have waiting (current + queued). Default {@link APPROVALS_MAX_PENDING_PER_ORIGIN}. */
   maxPendingPerOrigin?: number
+  /** Requests one site may have waiting. Default {@link APPROVALS_MAX_PENDING_PER_SITE}. */
+  maxPendingPerSite?: number
+  /** Requests the queue holds in all. Default {@link APPROVALS_MAX_PENDING_TOTAL}. */
+  maxPendingTotal?: number
+  /** Origin → site for the per-site limits. Default {@link defaultSiteOf siteOf} (conservative eTLD+1; pass a Public Suffix List based one if you ship it). */
+  siteOf?: (origin: string) => string
+  /** Origins that skip every limit (the wallet's own pages: Send, swaps). They still queue behind other requests. */
+  exempt?: (origin: string) => boolean
+  /** Sheet-opening rate per site; `false` turns it off. */
+  openRate?: ApprovalRateOptions | false
+  /** Clock (ms), injectable for tests. */
+  now?: () => number
 }
 
 /** The window side: open for one request, close when it is answered. `memoryApprovalWindow()` for tests. */
@@ -108,9 +143,38 @@ export class ApprovalQueue {
   private readonly _waiting: Pending[] = []
   private readonly _listeners = new Set<() => void>()
   private readonly _via = new Map<string, OriginVia>()
+  private readonly _rate: TokenBucket | null
+  /** Per site: cooldown end and strikes (how many times the bucket ran dry recently). */
+  private readonly _cooldown = new Map<string, { until: number; strikes: number; last: number }>()
 
   constructor(private readonly window: ApprovalWindow, private readonly newId: () => string = () => crypto.randomUUID(), private readonly options: ApprovalQueueOptions = {}) {
     window.onClosed((id) => { if (this._current?.request.id === id) this.decline(id) })
+    const rate = options.openRate === false ? null : options.openRate ?? {}
+    this._rate = rate ? new TokenBucket({ capacity: rate.burst ?? 10, refillPerSecond: rate.refillPerSecond ?? 1 / 6, ...(options.now ? { now: options.now } : {}) }) : null
+  }
+
+  private site(origin: string): string {
+    try { return (this.options.siteOf ?? defaultSiteOf)(origin) } catch { return origin }
+  }
+
+  private get all(): Pending[] {
+    return [...(this._current ? [this._current] : []), ...this._waiting]
+  }
+
+  /** The per-site rate: a reason to refuse, or null (and one token spent). */
+  private rateRefusal(site: string): string | null {
+    if (!this._rate) return null
+    const rate = this.options.openRate || {}
+    const now = (this.options.now ?? Date.now)()
+    const max = rate.maxBackoffMs ?? 600_000
+    const c = this._cooldown.get(site)
+    if (c && now < c.until) return `This site opened too many requests; try again in ${Math.ceil((c.until - now) / 1000)} s.`
+    if (this._rate.take(site)) return null
+    const strikes = c && now - c.last < max ? c.strikes + 1 : 1
+    const wait = Math.min(max, (rate.backoffMs ?? 30_000) * 2 ** (strikes - 1))
+    this._cooldown.set(site, { until: now + wait, strikes, last: now })
+    if (this._cooldown.size > 1000) for (const [k, v] of this._cooldown) if (now - v.last >= max) this._cooldown.delete(k)
+    return `This site opened too many requests; try again in ${Math.ceil(wait / 1000)} s.`
   }
 
   /** Enqueue and wait for the user's answer. Refuses (never queues) past the per-origin limits. */
@@ -118,13 +182,29 @@ export class ApprovalQueue {
     let refused: string | null | undefined
     try { refused = this.options.refuse?.(input.origin) } catch (e) { refused = `The wallet could not check this site (${e instanceof Error ? e.message : String(e)}).` }
     if (refused) return Promise.reject(new OriginRefused(refused))
-    const sameOrigin = [...(this._current ? [this._current] : []), ...this._waiting].filter((p) => p.request.origin === input.origin)
-    if (input.kind === 'connect' && sameOrigin.some((p) => p.request.kind === 'connect')) {
-      return Promise.reject(new QueueLimitError(RELAY_ERRORS.resourceUnavailable, 'A connect request from this site is already waiting for your answer.'))
-    }
-    const max = this.options.maxPendingPerOrigin ?? APPROVALS_MAX_PENDING_PER_ORIGIN
-    if (sameOrigin.length >= max) {
-      return Promise.reject(new QueueLimitError(RELAY_ERRORS.limitExceeded, `This site already has ${max} requests waiting for you; answer or close them first.`))
+    let exempt = false
+    try { exempt = this.options.exempt?.(input.origin) === true } catch { exempt = false }
+    if (!exempt) {
+      const all = this.all
+      const sameOrigin = all.filter((p) => p.request.origin === input.origin)
+      if (input.kind === 'connect' && sameOrigin.some((p) => p.request.kind === 'connect')) {
+        return Promise.reject(new QueueLimitError(RELAY_ERRORS.resourceUnavailable, 'A connect request from this site is already waiting for your answer.'))
+      }
+      const max = this.options.maxPendingPerOrigin ?? APPROVALS_MAX_PENDING_PER_ORIGIN
+      if (sameOrigin.length >= max) {
+        return Promise.reject(new QueueLimitError(RELAY_ERRORS.limitExceeded, `This site already has ${max} requests waiting for you; answer or close them first.`))
+      }
+      const site = this.site(input.origin)
+      const maxSite = this.options.maxPendingPerSite ?? APPROVALS_MAX_PENDING_PER_SITE
+      if (all.filter((p) => this.site(p.request.origin) === site).length >= maxSite) {
+        return Promise.reject(new QueueLimitError(RELAY_ERRORS.limitExceeded, `This site already has ${maxSite} requests waiting for you across its subdomains; answer or close them first.`))
+      }
+      const maxTotal = this.options.maxPendingTotal ?? APPROVALS_MAX_PENDING_TOTAL
+      if (all.filter((p) => !this.isExempt(p.request.origin)).length >= maxTotal) {
+        return Promise.reject(new QueueLimitError(RELAY_ERRORS.limitExceeded, `The wallet already has ${maxTotal} requests waiting for you; answer or close them first.`))
+      }
+      const slow = this.rateRefusal(site)
+      if (slow) return Promise.reject(new QueueLimitError(RELAY_ERRORS.limitExceeded, slow))
     }
     return new Promise<T>((resolve, reject) => {
       const warnings = this.options.annotate?.(input.origin) ?? []
@@ -146,9 +226,40 @@ export class ApprovalQueue {
     return this._via.get(origin)
   }
 
+  private isExempt(origin: string): boolean {
+    try { return this.options.exempt?.(origin) === true } catch { return false }
+  }
+
   /** Requests waiting for `origin` (current + queued). */
   pendingFor(origin: string): number {
-    return [...(this._current ? [this._current] : []), ...this._waiting].filter((p) => p.request.origin === origin).length
+    return this.all.filter((p) => p.request.origin === origin).length
+  }
+
+  /** Requests waiting for any origin of `site` (current + queued). */
+  pendingForSite(site: string): number {
+    return this.all.filter((p) => this.site(p.request.origin) === site).length
+  }
+
+  /** The site (registrable domain) the queue's limits put `origin` under. */
+  siteFor(origin: string): string {
+    return this.site(origin)
+  }
+
+  /** Decline everything waiting for `origin` (its last page closed). Returns how many requests were declined. */
+  declineOrigin(origin: string, error: Error = new ReviewDeclined('The page was closed — nothing was signed.')): number {
+    return this.declineWhere((p) => p.request.origin === origin, error)
+  }
+
+  /** "Decline all from this site": everything waiting for any origin of `site` (see {@link siteFor}). */
+  declineSite(site: string, error: Error = new ReviewDeclined()): number {
+    return this.declineWhere((p) => this.site(p.request.origin) === site, error)
+  }
+
+  private declineWhere(match: (p: Pending) => boolean, error: Error): number {
+    // Queued ones first: declining the current one opens the next window, which must not be one of these.
+    const ids = [...this._waiting.filter(match), ...(this._current && match(this._current) ? [this._current] : [])].map((p) => p.request.id)
+    for (const id of ids) this.decline(id, error)
+    return ids.length
   }
 
   /** The request currently shown (the window asks for it by id on load). */
