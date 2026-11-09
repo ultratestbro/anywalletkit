@@ -3,10 +3,10 @@ import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
 // ── LI.FI — EVM calldata routes implemented by this contribution adapter ─────
 // 2026-08 sweep (li.quest/v1/chains): + Avalanche 43114, Scroll 534352,
 // Berachain 80094 (HyperEVM 999 / Robinhood 4663 were already routed by the
-// provider's own chain map).
+// provider's own chain map). 2026-11-10: + Elysium 99901 (li.quest/v1/chains key "ely").
 /** The catalog's Solana id; LI.FI numbers it 1151111081099710. */
 export const LIFI_SOLANA_CAIP2 = "solana:mainnet";
-const LIFI_EVM = new Set([1, 8453, 56, 137, 42161, 10, 100, 143, 130, 999, 4663, 43114, 534352, 80094, 324, 42220, 4326, 9745, 59144, 146, 480, 1329, 57073, 98866, 196, 5042, 5000, 747474, 2818, 14]);
+const LIFI_EVM = new Set([1, 8453, 56, 137, 42161, 10, 100, 143, 130, 999, 4663, 43114, 534352, 80094, 324, 42220, 4326, 9745, 59144, 146, 480, 1329, 57073, 98866, 196, 5042, 5000, 747474, 2818, 14, 99901]);
 export const lifi = {
   enabled: () => true,
   apiKey: () => undefined,
