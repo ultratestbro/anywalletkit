@@ -39,6 +39,10 @@ await keyring.withAccount(next.id, 'evm', (account) => account.sendTransaction(t
 // A chain registered after an account was created: derive what it lacks (one secret read per source).
 keyring.missingChains(next.id)                                   // ['zcash'] — no secret read
 await keyring.completeAddresses(next.sourceId)
+
+// Metadata storage that is not authenticated: re-derive every stored address from its key (after
+// unlock) and overwrite what does not match, before showing a Receive address or exposing it to a dApp.
+const mismatches = await keyring.verifyAddresses({ repair: true })
 ```
 
 ## Derivation (what changes per account)
