@@ -63,7 +63,10 @@ export const BLOCKSCOUT_URLS: Readonly<Record<number, string>> = {
 }
 
 /**
- * Keyless Etherscan-format mirrors (Routescan). Same response shape as
+ * Keyless Etherscan-format endpoints: Routescan mirrors, plus a chain's own
+ * Blockscout `/api` where its `/api/v2` is unusable (see
+ * {@link ETHERSCAN_COMPAT_BACKENDS} for which backend label each entry reports;
+ * unlisted entries are Routescan). Same response shape as
  * Etherscan v1/v2, no `chainid`/`apikey` parameters. Verified 2026-10-14:
  * `status: "1"` for 1 and 43114, `No transactions found` (served) for 9745;
  * `chain not supported` for every other id of ours.
@@ -79,6 +82,15 @@ export const ETHERSCAN_COMPAT_URLS: Readonly<Record<number, string>> = {
   43114: 'https://api.routescan.io/v2/network/mainnet/evm/43114/etherscan/api',
   9745: 'https://api.routescan.io/v2/network/mainnet/evm/9745/etherscan/api',
   99901: 'https://elysium.kinetiq.xyz/api',
+}
+
+/**
+ * Backend label of the {@link ETHERSCAN_COMPAT_URLS} entries that are not Routescan, so `page.backend`
+ * names the service that answered. Applies to the built-in URL only; an `etherscanCompatUrl` override
+ * is reported as `routescan`.
+ */
+export const ETHERSCAN_COMPAT_BACKENDS: Readonly<Record<number, 'blockscout-etherscan'>> = {
+  99901: 'blockscout-etherscan', // Kinetiq's own Blockscout
 }
 
 /**

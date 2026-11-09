@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { HistoryUnavailableError, createEvmHistory, resetEtherscanChainlistCache, resetSharedBuckets } from '../src/index.js'
+import { ETHERSCAN_COMPAT_BACKENDS, HistoryUnavailableError, createEvmHistory, resetEtherscanChainlistCache, resetSharedBuckets } from '../src/index.js'
 import { ADDRESS, fakeFetch } from './helpers.js'
 
 beforeEach(() => {
@@ -176,7 +176,7 @@ describe('Elysium: keyless Etherscan-format Blockscout API', () => {
     }
     const src = createEvmHistory({ chainId: 99901, fetch: fetch as never })
     const page = await src.listActivity(ADDRESS, { limit: 10 })
-    expect(page.backend).toBe('routescan') // the keyless Etherscan-format client
+    expect(page.backend).toBe('blockscout-etherscan') // Kinetiq's own Blockscout, not Routescan
     expect(page.items.map((i) => i.hash)).toEqual([TX.hash])
     expect(seen.length).toBe(3)
     for (const u of seen) {
@@ -194,5 +194,21 @@ describe('Elysium: keyless Etherscan-format Blockscout API', () => {
     const page = await createEvmHistory({ chainId: 99901, fetch: fetch as never }).listActivity(ADDRESS)
     expect(page.items).toEqual([])
     expect(page.cursor).toBeUndefined()
+  })
+  it('the built-in entry is labelled blockscout-etherscan; an override keeps the routescan label; prefer: "blockscout" moves it first', async () => {
+    expect(ETHERSCAN_COMPAT_BACKENDS[99901]).toBe('blockscout-etherscan')
+    expect(ETHERSCAN_COMPAT_BACKENDS[43114]).toBeUndefined()
+    const empty = async () => ({ ok: true, status: 200, json: async () => ({ status: '0', message: 'No transactions found', result: [] }), text: async () => '' })
+    const override = await createEvmHistory({ chainId: 99901, fetch: empty as never, etherscanCompatUrl: 'https://proxy.example/api' }).listActivity(ADDRESS)
+    expect(override.backend).toBe('routescan')
+    const seen: string[] = []
+    const fetch = async (url: string) => {
+      seen.push(new URL(url).host)
+      return empty()
+    }
+    const src = createEvmHistory({ chainId: 99901, fetch: fetch as never, blockscoutProApiKey: 'proapi_x', blockscoutProRateLimit: 1000, prefer: 'blockscout' })
+    const page = await src.listActivity(ADDRESS)
+    expect(page.backend).toBe('blockscout-etherscan')
+    expect(seen.every((h) => h === 'elysium.kinetiq.xyz')).toBe(true)
   })
 })

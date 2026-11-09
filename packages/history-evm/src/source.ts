@@ -9,6 +9,7 @@ import {
   BLOCKSCOUT_PRO_API,
   BLOCKSCOUT_URLS,
   ETHERSCAN_COMPAT_URLS,
+  ETHERSCAN_COMPAT_BACKENDS,
   ETHERSCAN_V2_API,
   ETHERSCAN_V2_CHAINLIST,
   ETHERSCAN_V2_CHAIN_IDS_FALLBACK,
@@ -98,6 +99,7 @@ export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
   const apiKey = options.etherscanApiKey
 
   const compatUrl = options.etherscanCompatUrl === null ? undefined : (options.etherscanCompatUrl ?? ETHERSCAN_COMPAT_URLS[chainId])
+  const compatBackend: HistoryBackend = (compatUrl === ETHERSCAN_COMPAT_URLS[chainId] && ETHERSCAN_COMPAT_BACKENDS[chainId]) || 'routescan'
   const blockscoutUrl = options.blockscoutUrl === null ? undefined : (options.blockscoutUrl ?? BLOCKSCOUT_URLS[chainId])
   const alchemyNetwork = options.alchemyNetwork ?? (ALCHEMY_TRANSFERS_CHAIN_IDS.includes(chainId) ? ALCHEMY_NETWORKS[chainId] : undefined)
   const alchemyOn = Boolean(options.alchemyApiKey && alchemyNetwork)
@@ -154,13 +156,16 @@ export function createEvmHistory(options: EvmHistoryOptions): EvmHistorySource {
         )
       }
       if (compatUrl) {
-        list.push(new EtherscanClient({ backend: 'routescan', baseUrl: compatUrl, fetch: fetchFn, bucket: sharedBucket(`compat:${compatUrl}`, 2), timeoutMs }))
+        list.push(new EtherscanClient({ backend: compatBackend, baseUrl: compatUrl, fetch: fetchFn, bucket: sharedBucket(`compat:${compatUrl}`, 2), timeoutMs }))
       }
       if (blockscoutUrl) {
         list.push(new BlockscoutClient({ baseUrl: blockscoutUrl, fetch: fetchFn, bucket: sharedBucket(`blockscout:${blockscoutUrl}`, 5), timeoutMs }))
       }
       const first = options.prefer
-      if (first === 'blockscout' || first === 'alchemy') list.sort((a, b) => (a.backend === first ? -1 : b.backend === first ? 1 : 0))
+      if (first === 'blockscout' || first === 'alchemy') {
+        const moved = (b: Backend): boolean => b.backend === first || (first === 'blockscout' && b.backend === 'blockscout-etherscan')
+        list.sort((a, b) => (moved(a) === moved(b) ? 0 : moved(a) ? -1 : 1))
+      }
       return list
     })()
     return resolved

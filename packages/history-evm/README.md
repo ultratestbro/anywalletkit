@@ -44,15 +44,15 @@ history.explorerTxUrl(one.hash) // https://basescan.org/tx/0x…
 | `alchemyUrl` | `https://{network}.g.alchemy.com/v2/{key}` | Host template for a proxy; `{network}` / `{key}` substituted. |
 | `alchemyComputeUnitsPerSecond` | 300 | Alchemy compute units per second, shared per key across chains. Each call is charged its published cost (Transfers 120, receipt 20, tx 17, block 16, else 26) and a JSON-RPC batch the sum of its members, so concurrent chains on one key stay under the free tier's 500 CU/s. A rate-limit answer is retried up to three times with backoff. |
 | `blockscoutUrl` | built-in table | Any Blockscout `/api/v2` root; adds or overrides the chain's entry. |
-| `etherscanCompatUrl` | built-in table (Routescan) | Keyless Etherscan-format endpoint. |
+| `etherscanCompatUrl` | built-in table (Routescan; Elysium's own Blockscout `/api`) | Keyless Etherscan-format endpoint. `page.backend` is `routescan`, or `blockscout-etherscan` for a built-in Blockscout entry (`ETHERSCAN_COMPAT_BACKENDS`); an override is reported as `routescan`. |
 | `fetch` | `globalThis.fetch` | Inject for tests / custom transports. |
 | `rateLimit` | 3 rps with a key | Etherscan requests per second (free tier 3, Lite 5, Standard 10). One token bucket per key is shared by every source in the process (25 chains do not multiply the quota). Blockscout: 5 rps per host, Routescan: 2 rps. |
-| `prefer` | `'etherscan'` | `'blockscout'` tries Blockscout first to save Etherscan quota; `'alchemy'` tries Alchemy first (Base, where it is the only free one, or to spend Alchemy CU instead of Etherscan calls). |
+| `prefer` | `'etherscan'` | `'blockscout'` tries Blockscout first to save Etherscan quota (its `/api/v2`, and a built-in Blockscout Etherscan-format `/api` such as Elysium's); `'alchemy'` tries Alchemy first (Base, where it is the only free one, or to spend Alchemy CU instead of Etherscan calls). |
 | `timeoutMs` | 15 000 | Per request (`AbortSignal.timeout` when the runtime has it). |
 
 Backend order: Etherscan v2 (key + chain in the v2 chainlist) → Blockscout PRO
 (key) → Alchemy (key + documented Transfers API, or `alchemyNetwork`) →
-Routescan → Blockscout. `prefer` moves Blockscout or Alchemy first.
+Routescan (or a chain's own Blockscout `/api`, `blockscout-etherscan`) → Blockscout. `prefer` moves Blockscout or Alchemy first.
 A failing backend is retried once on rate limiting (HTTP 429/5xx, `Max rate
 limit reached`), then the next backend is tried. Plan / key refusals (`Free
 API access is not supported for this chain`, `Missing/Invalid API Key`,
@@ -99,7 +99,7 @@ and `/api/v2/transactions`, kept only when both answer `200` JSON.
 | Ink | 57073 | **no** | Blockscout `explorer.inkonchain.com` | |
 | Plume | 98866 | **no** | Blockscout `explorer.plume.org` | |
 | X Layer | 196 | **no** | **none** | only OKLink (own API, key); empty page + `note` |
-| Elysium (Kinetiq) | 99901 | **no** | Blockscout's Etherscan-format API `elysium.kinetiq.xyz/api` (keyless, `ETHERSCAN_COMPAT_URLS`; reported as `routescan`) | checked 2026-11-10; its `/api/v2` is behind a Vercel bot checkpoint (429), so the Blockscout v2 client is not used; Blockscout's `No internal transactions found` / `No token transfers found` read as empty lists |
+| Elysium (Kinetiq) | 99901 | **no** | Blockscout's Etherscan-format API `elysium.kinetiq.xyz/api` (keyless, `ETHERSCAN_COMPAT_URLS`; reported as `blockscout-etherscan`) | checked 2026-11-10; its `/api/v2` is behind a Vercel bot checkpoint (429), so the Blockscout v2 client is not used; Blockscout's `No internal transactions found` / `No token transfers found` read as empty lists |
 
 "free plan ok" = a free-tier key returned rows (or `No transactions found`)
 that day; "paid plan only" = `Free API access is not supported for this
