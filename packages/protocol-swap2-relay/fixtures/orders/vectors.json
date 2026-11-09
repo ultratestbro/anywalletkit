@@ -1,0 +1,217 @@
+[
+ {
+  "label": "Arbitrum USDC > Elysium HYPE, quote read 2026-11-10",
+  "orderId": "0x7e13ad12f74edf1ab7f655f336a62c966516c92c84fc8734427a349f33d8efb3",
+  "orderSignature": "0x31a5d9509568fb1e0fde6aede887f532080e622749b178d4def6a95d3d19b1c615bac1f44bb3af71c8be7155722837d5dcc6af5c4e712ce38e7c8c7d4624a74e1b",
+  "orderData": {
+   "version": "v1",
+   "solverChainId": "base",
+   "solver": "0xf70da97812cb96acdf810712aa562db8dfa3dbef",
+   "salt": "0x558f331f320c117f8d1740384f8dc42ae553b2fb1f02db0448e1fea41f8bce01",
+   "inputs": [
+    {
+     "payment": {
+      "chainId": "arbitrum",
+      "currency": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+      "amount": "20000000",
+      "weight": "1"
+     },
+     "refunds": [
+      {
+       "chainId": "arbitrum",
+       "recipient": "0x000000000000000000000000000000000000dEaD",
+       "currency": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+       "minimumAmount": "0",
+       "deadline": 1794869847,
+       "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+      },
+      {
+       "chainId": "elysium",
+       "recipient": "0x000000000000000000000000000000000000dEaD",
+       "currency": "0xb47c4c8f73f009cc0c0d3f92b388d13e293f0b65",
+       "minimumAmount": "0",
+       "deadline": 1794869847,
+       "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+      }
+     ]
+    }
+   ],
+   "output": {
+    "chainId": "elysium",
+    "payments": [
+     {
+      "recipient": "0x000000000000000000000000000000000000dEaD",
+      "currency": "0x0000000000000000000000000000000000000000",
+      "minimumAmount": "256608045056938625",
+      "expectedAmount": "261844943935651658"
+     }
+    ],
+    "calls": [],
+    "deadline": 1794869847,
+    "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+   },
+   "fees": []
+  }
+ },
+ {
+  "label": "Base ETH > Arbitrum ETH, quote read 2026-11-10",
+  "orderId": "0xcbcb29a534e9352536bb7ebf1a64f1ab31ced2cac0a3b1718ceb9f37386e0996",
+  "orderSignature": "0x802b77591f0c8554b74cc288fecfea84c50f6fe5306870cc8dbb6fe7011c80ec17aaa85a093eb6abef92289c03de953457b7e48209c57b15d3d03bed7fc620801c",
+  "orderData": {
+   "version": "v1",
+   "solverChainId": "base",
+   "solver": "0xf70da97812cb96acdf810712aa562db8dfa3dbef",
+   "salt": "0x885fd1aac69aa71b816164d617de8847852dec29257d6d08445d9da0e88214d5",
+   "inputs": [
+    {
+     "payment": {
+      "chainId": "base",
+      "currency": "0x0000000000000000000000000000000000000000",
+      "amount": "10000000000000000",
+      "weight": "1"
+     },
+     "refunds": [
+      {
+       "chainId": "base",
+       "recipient": "0x000000000000000000000000000000000000dEaD",
+       "currency": "0x0000000000000000000000000000000000000000",
+       "minimumAmount": "0",
+       "deadline": 1794869695,
+       "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+      },
+      {
+       "chainId": "arbitrum",
+       "recipient": "0x000000000000000000000000000000000000dEaD",
+       "currency": "0x0000000000000000000000000000000000000000",
+       "minimumAmount": "0",
+       "deadline": 1794869695,
+       "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+      }
+     ]
+    }
+   ],
+   "output": {
+    "chainId": "arbitrum",
+    "payments": [
+     {
+      "recipient": "0x000000000000000000000000000000000000dEaD",
+      "currency": "0x0000000000000000000000000000000000000000",
+      "minimumAmount": "9789323565840044",
+      "expectedAmount": "9989105679428616"
+     }
+    ],
+    "calls": [],
+    "deadline": 1794869695,
+    "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+   },
+   "fees": []
+  }
+ },
+ {
+  "label": "Base ETH > Arbitrum ETH (second request), quote read 2026-11-10",
+  "orderId": "0x88bc03040848e96b6155ef0cbf4a9c9bd30f935498a078837b6ebcefbdb1132f",
+  "orderSignature": "0xaa552f76f740c43313a8f5a433f26b039597d895ef00fbaaf20c08ea2451cb426b6fd661a5a60990bf59628b0979291f81286a6fa7d2a7f0e0ed03cbd0d5e4d71b",
+  "orderData": {
+   "version": "v1",
+   "solverChainId": "base",
+   "solver": "0xf70da97812cb96acdf810712aa562db8dfa3dbef",
+   "salt": "0x13a9b940b83bcf457c688b163c46a1b4025ce0ecd64cf993a1b43ca4b7eb49de",
+   "inputs": [
+    {
+     "payment": {
+      "chainId": "base",
+      "currency": "0x0000000000000000000000000000000000000000",
+      "amount": "10000000000000000",
+      "weight": "1"
+     },
+     "refunds": [
+      {
+       "chainId": "base",
+       "recipient": "0x000000000000000000000000000000000000dEaD",
+       "currency": "0x0000000000000000000000000000000000000000",
+       "minimumAmount": "0",
+       "deadline": 1794870141,
+       "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+      },
+      {
+       "chainId": "arbitrum",
+       "recipient": "0x000000000000000000000000000000000000dEaD",
+       "currency": "0x0000000000000000000000000000000000000000",
+       "minimumAmount": "0",
+       "deadline": 1794870141,
+       "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+      }
+     ]
+    }
+   ],
+   "output": {
+    "chainId": "arbitrum",
+    "payments": [
+     {
+      "recipient": "0x000000000000000000000000000000000000dEaD",
+      "currency": "0x0000000000000000000000000000000000000000",
+      "minimumAmount": "9789317911990255",
+      "expectedAmount": "9989099910194137"
+     }
+    ],
+    "calls": [],
+    "deadline": 1794870141,
+    "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+   },
+   "fees": []
+  }
+ },
+ {
+  "label": "Arbitrum USDT input, an order of another wallet read from Relay request data 2026-11-10 (no signature kept)",
+  "orderId": "0x5c0a4732ad7072afcebabd11bc87f2a72275c1dab556ddfd3e31a4e86943fca5",
+  "orderData": {
+   "fees": [],
+   "salt": "0x74316267082320151a717111b6a14c2ea87c173ac80a3f0ecafcc095b316914e",
+   "inputs": [
+    {
+     "payment": {
+      "amount": "118260000",
+      "weight": "1",
+      "chainId": "arbitrum",
+      "currency": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9"
+     },
+     "refunds": [
+      {
+       "chainId": "arbitrum",
+       "currency": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+       "deadline": 1794869195,
+       "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7",
+       "recipient": "0x413D97B7aAaD91C4D477D1799Ee3B7CCaa253e37",
+       "minimumAmount": "0"
+      },
+      {
+       "chainId": "hyperevm",
+       "currency": "0x0000000000000000000000000000000000000000",
+       "deadline": 1794869195,
+       "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7",
+       "recipient": "0x413D97B7aAaD91C4D477D1799Ee3B7CCaa253e37",
+       "minimumAmount": "0"
+      }
+     ]
+    }
+   ],
+   "output": {
+    "calls": [],
+    "chainId": "hyperevm",
+    "deadline": 1794869195,
+    "payments": [
+     {
+      "currency": "0x0000000000000000000000000000000000000000",
+      "recipient": "0x413D97B7aAaD91C4D477D1799Ee3B7CCaa253e37",
+      "minimumAmount": "1500063399428994532",
+      "expectedAmount": "1554469843967869981"
+     }
+    ],
+    "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+   },
+   "solver": "0xf70da97812cb96acdf810712aa562db8dfa3dbef",
+   "version": "v1",
+   "solverChainId": "base"
+  }
+ }
+]

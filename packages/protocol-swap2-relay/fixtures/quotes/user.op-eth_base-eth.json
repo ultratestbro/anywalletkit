@@ -1,0 +1,109 @@
+{
+ "note": "Relay POST /quote/v2 (includeProtocolData), keyless, read 2026-11-10; trimmed to the fields the module reads.",
+ "request": {
+  "sourceChain": "eip155:10",
+  "destChain": "eip155:8453",
+  "sourceToken": "0x0000000000000000000000000000000000000000",
+  "destToken": "0x0000000000000000000000000000000000000000",
+  "amount": "4000000000000000",
+  "depositor": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+  "recipient": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+  "nowMs": 1794267894397
+ },
+ "response": {
+  "steps": [
+   {
+    "id": "deposit",
+    "requestId": "0x1794267894901173754f6d526da39d748e9a289eec8a498f78fe429286a1161f",
+    "items": [
+     {
+      "data": {
+       "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+       "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+       "data": "0x49290c1c00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c876f5e5c61459215b07536a7cb46fc0b2812dae56245dfeeb2388e3b4d3c1ed29",
+       "value": "4000000000000000",
+       "chainId": 10,
+       "gas": "32713",
+       "maxFeePerGas": "622",
+       "maxPriorityFeePerGas": "100"
+      }
+     }
+    ]
+   }
+  ],
+  "fees": {
+   "relayer": {
+    "currency": {
+     "address": "0x0000000000000000000000000000000000000000"
+    },
+    "amount": "11356474389945",
+    "amountUsd": "0.024170"
+   }
+  },
+  "details": {
+   "timeEstimate": 1
+  },
+  "protocol": {
+   "v2": {
+    "orderId": "0x76f5e5c61459215b07536a7cb46fc0b2812dae56245dfeeb2388e3b4d3c1ed29",
+    "hubType": "onchain",
+    "orderData": {
+     "version": "v1",
+     "solverChainId": "base",
+     "solver": "0xf70da97812cb96acdf810712aa562db8dfa3dbef",
+     "salt": "0xb92515f051ede8d45531e55c2180d3fb49ca53784466968a0955d6c6e2f43497",
+     "inputs": [
+      {
+       "payment": {
+        "chainId": "optimism",
+        "currency": "0x0000000000000000000000000000000000000000",
+        "amount": "4000000000000000",
+        "weight": "1"
+       },
+       "refunds": [
+        {
+         "chainId": "optimism",
+         "recipient": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+         "currency": "0x0000000000000000000000000000000000000000",
+         "minimumAmount": "0",
+         "deadline": 1794872694,
+         "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+        },
+        {
+         "chainId": "base",
+         "recipient": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+         "currency": "0x0000000000000000000000000000000000000000",
+         "minimumAmount": "0",
+         "deadline": 1794872694,
+         "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+        }
+       ]
+      }
+     ],
+     "output": {
+      "chainId": "base",
+      "payments": [
+       {
+        "recipient": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "currency": "0x0000000000000000000000000000000000000000",
+        "minimumAmount": "3908870655097854",
+        "expectedAmount": "3988643525610055"
+       }
+      ],
+      "calls": [],
+      "deadline": 1794872694,
+      "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+     },
+     "fees": []
+    },
+    "orderSignature": "0x09f3dac029d0d5839025e0ed59b29506b8c004f9cb93610798a23408eda4d22567bfb89a3d9a20f537e6442f25320d119d8df99a401aa93b477cf460f9ad048a1c",
+    "paymentDetails": {
+     "chainId": "optimism",
+     "depository": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+     "currency": "0x0000000000000000000000000000000000000000",
+     "amount": "4000000000000000"
+    }
+   }
+  }
+ }
+}
