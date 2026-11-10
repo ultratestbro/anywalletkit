@@ -680,6 +680,31 @@
       "label": "RelayDepository owner() · Plume"
     },
     {
+      "id": "depository-elysium",
+      "type": "evm-code",
+      "chainId": 99901,
+      "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "label": "RelayDepository · Elysium"
+    },
+    {
+      "id": "allocator-elysium",
+      "type": "evm-call",
+      "chainId": 99901,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "allocator()",
+      "decode": "address",
+      "label": "RelayDepository allocator() · Elysium"
+    },
+    {
+      "id": "owner-elysium",
+      "type": "evm-call",
+      "chainId": 99901,
+      "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "RelayDepository owner() · Elysium"
+    },
+    {
       "id": "depository-scroll",
       "type": "evm-code",
       "chainId": 534352,

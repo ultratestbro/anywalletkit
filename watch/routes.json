@@ -367,6 +367,14 @@
    "note": "ERC-20 deposit, order verified on the device"
   },
   {
+   "id": "relay:arb-usdc>ely-hype",
+   "provider": "relay",
+   "src": "eip155:42161:USDC",
+   "dst": "eip155:99901:HYPE",
+   "amount": "100",
+   "note": "native HYPE into Elysium, order verified on the device"
+  },
+  {
    "id": "relay:base-eth>arb-eth",
    "provider": "relay",
    "src": "eip155:8453:ETH",

@@ -9,8 +9,8 @@ const json = <T>(rel: string): T => JSON.parse(readFileSync(fileURLToPath(new UR
 interface Source {id: string; type: string; chainId?: number; address?: string; to?: string; signature?: string; decode?: string; url?: string}
 const manifest = json<{module: string; sources: Source[]}>("../watch.json");
 const chains = Object.values(RELAY_CHAINS);
-// Pinned by chain id before the chain has an RPC in the watch job.
-const UNWATCHED = [99901];
+// Pinned by chain id before the chain has an RPC in the watch job (none today).
+const UNWATCHED: number[] = [];
 
 describe("relay pins", () => {
   it("29 chains, each a lowercase depository, a slug and a CAIP-2 key of its own id", () => {
@@ -80,7 +80,7 @@ describe("watch.json coverage", () => {
 
   it("every pinned depository has its code, allocator() and owner() read on its chain", () => {
     const watched = chains.filter((c) => !UNWATCHED.includes(c.chainId));
-    expect(watched).toHaveLength(28);
+    expect(watched).toHaveLength(29);
     for (const c of watched) {
       expect(manifest.sources.filter((s) => s.type === "evm-code" && s.chainId === c.chainId && s.address === c.depository), c.name).toHaveLength(1);
       for (const signature of ["allocator()", "owner()"]) {
