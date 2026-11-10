@@ -1,0 +1,674 @@
+[
+ {
+  "chainId": 1,
+  "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 1,
+  "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 1,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 1,
+  "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 1,
+  "address": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+  "min": "500",
+  "max": "100000000",
+  "decimals": 8
+ },
+ {
+  "chainId": 1,
+  "address": "0xD9A442856C234a39a81a089C06451EBAa4306a72",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 56,
+  "address": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+  "min": "300000000000000000",
+  "max": "200000000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 56,
+  "address": "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56",
+  "min": "300000000000000000",
+  "max": "200000000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 56,
+  "address": "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 56,
+  "address": "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
+  "min": "5000000000000",
+  "max": "1000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 56,
+  "address": "0xA67c48F86Fc6d0176Dca38883CA8153C76a532c7",
+  "min": "500",
+  "max": "100000000",
+  "decimals": 8
+ },
+ {
+  "chainId": 43114,
+  "address": "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 43114,
+  "address": "0xA7D7079b0FEaD91F3e65f86E8915Cb59c1a4C664",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 137,
+  "address": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 137,
+  "address": "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 40,
+  "address": "0xe6E5f3d264117E030C21920356641DbD5B3d660c",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 288,
+  "address": "0x66a2A913e447d6b4BF33EFbec43aAeF87890FBbc",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 324,
+  "address": "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 324,
+  "address": "0x1d17CBcF0D6D143135aE902365D2E5e2A16538D4",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 324,
+  "address": "0x5AEa5775959fBC2557Cc8789bC1bf90A239D9a91",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 324,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 324,
+  "address": "0xBBeB516fb02a01611cBBE0453Fe3c580D7281011",
+  "min": "500",
+  "max": "100000000",
+  "decimals": 8
+ },
+ {
+  "chainId": 324,
+  "address": "0xED0c95EBe5a3E687cB2224687024FeC6518E683e",
+  "min": "500",
+  "max": "100000000",
+  "decimals": 8
+ },
+ {
+  "chainId": 42161,
+  "address": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 42161,
+  "address": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 42161,
+  "address": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 42161,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 10,
+  "address": "0x7F5c764cBc14f9669B88837ca1490cCa17c31607",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 10,
+  "address": "0x4200000000000000000000000000000000000006",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 10,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 59144,
+  "address": "0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 59144,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 59144,
+  "address": "0x176211869cA2b568f2A7D4EE941E073a821EE1ff",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 5000,
+  "address": "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 5000,
+  "address": "0xdEAddEaDdeadDEadDEADDEAddEADDEAddead1111",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 8453,
+  "address": "0x4200000000000000000000000000000000000006",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 8453,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 8453,
+  "address": "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 728126428,
+  "address": "0xa614f803b6fd780986a42c78ec9c7f77e6ded13c",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 534352,
+  "address": "0x5300000000000000000000000000000000000004",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 534352,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 534352,
+  "address": "0x06eFdBFf2a14a7c8E15944D1F4A48F9F95F663A4",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 169,
+  "address": "0x0Dc808adcE2099A9F62AA87D9670745AbA741746",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 169,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 169,
+  "address": "0xb73603C5d87fA094B7314C74ACE2e64D165016fb",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 1088,
+  "address": "0x420000000000000000000000000000000000000A",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 34443,
+  "address": "0x4200000000000000000000000000000000000006",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 34443,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 30,
+  "address": "0x779Ded0c9e1022225f8E0630b35a9b54bE713736",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 30,
+  "address": "0xef213441A85dF4d7ACbDaE0Cf78004e1E486bB96",
+  "min": "300000000000000000",
+  "max": "200000000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 30,
+  "address": "0x74c9f2b00581F1B11AA7ff05aa9F608B7389De67",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 30,
+  "address": "0x542fDA317318eBF1d3DEAf76E0b632741A7e677d",
+  "min": "5000000000000",
+  "max": "1000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 30,
+  "address": "",
+  "min": "5000000000000",
+  "max": "1000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 30,
+  "address": "0xB52E582263c1d0189b3cc1402c1B7205b7F2E9Ba",
+  "min": "500",
+  "max": "100000000",
+  "decimals": 8
+ },
+ {
+  "chainId": 4200,
+  "address": "0xF6D226f9Dc15d9bB51182815b320D3fBE324e1bA",
+  "min": "5000000000000",
+  "max": "1000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 4200,
+  "address": "",
+  "min": "5000000000000",
+  "max": "1000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 167000,
+  "address": "0xA51894664A773981C6C112C43ce576f315d5b1B6",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 167000,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 1329,
+  "address": "0x3894085Ef7Ff0f0aeDf52E2A2704928d1Ec074F1",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 1329,
+  "address": "0xB75D0B03c06A926e488e2659DF1A861F860bD3d1",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 25,
+  "address": "0xc21223249CA28397B4B6541dfFaEcC539BfF0c59",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 252,
+  "address": "0xA8a59D73388D0c4344a7b0Ba287ddb654227c38a",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 252,
+  "address": "0xFc00000000000000000000000000000000000001",
+  "min": "300000000000000000",
+  "max": "200000000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 223,
+  "address": "0x4200000000000000000000000000000000000006",
+  "min": "5000000000000",
+  "max": "1000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 223,
+  "address": "",
+  "min": "5000000000000",
+  "max": "1000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 85918,
+  "address": "0x9328Eb759596C38a25f59028B146Fecdc3621Dfe",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 388,
+  "address": "0xaa5b845F8C9c047779bEDf64829601d8B264076c",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 2345,
+  "address": "0xbC10000000000000000000000000000000000000",
+  "min": "5000000000000",
+  "max": "1000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 2345,
+  "address": "",
+  "min": "5000000000000",
+  "max": "1000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 146,
+  "address": "0x50c42dEAcD8Fc9773493ED674b675bE577f2634b",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 2741,
+  "address": "0x3439153EB7AF838Ad19d56E1571FBD09333C2809",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 2741,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 100,
+  "address": "0x2a22f9c3b484c3629090FeED35F17Ff8F88f76F0",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 100,
+  "address": "0x6A023CCd1ff6F2045C3309768eAd9E68F978f6e1",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 80094,
+  "address": "0x2F6F07CDcf3588944Bf4C42aC74ff24bF56e7590",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 130,
+  "address": "0x4200000000000000000000000000000000000006",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 130,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 1868,
+  "address": "0x4200000000000000000000000000000000000006",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 1868,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 204,
+  "address": "0xE7798f023fC62146e8Aa1b36Da45fb70855a77Ea",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 999,
+  "address": "0xBe6727B535545C67d5cAa73dEa54865B92CF7907",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 999,
+  "address": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 747474,
+  "address": "0x4200000000000000000000000000000000000006",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 747474,
+  "address": "0xEE7D8BCFb72bC1880D0Cf19822eB0A2e6577aB62",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 747474,
+  "address": "",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 747474,
+  "address": "0x203A662b0BD271A6ed5a60EdFbd04bFce608FD36",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 9745,
+  "address": "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 143,
+  "address": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 3652501241,
+  "address": "0x1DfC1e32d75b3f4Cb2F2B1BCEcAD984E99eeba05",
+  "min": "500",
+  "max": "100000000",
+  "decimals": 8
+ },
+ {
+  "chainId": 3652501241,
+  "address": "0x334524A0ADB21425afCF77aC40580D68e30E51d8",
+  "min": "500",
+  "max": "100000000",
+  "decimals": 8
+ },
+ {
+  "chainId": 56,
+  "address": "0xA67c48F86Fc6d0176Dca38883CA8153C76a532c7",
+  "min": "500",
+  "max": "100000000",
+  "decimals": 8
+ },
+ {
+  "chainId": 40,
+  "address": "0xe6E5f3d264117E030C21920356641DbD5B3d660c",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 40,
+  "address": "0x63d71E79AdF0886c989A23b04a0E86F1489b6BC3",
+  "min": "100000000000000",
+  "max": "50000000000000000000",
+  "decimals": 18
+ },
+ {
+  "chainId": 40,
+  "address": "0x7bD3ffe9f0C9CF08FD60e102FEa455A6EA580276",
+  "min": "300000",
+  "max": "200000000000",
+  "decimals": 6
+ },
+ {
+  "chainId": 324,
+  "address": "0xED0c95EBe5a3E687cB2224687024FeC6518E683e",
+  "min": "500",
+  "max": "100000000",
+  "decimals": 8
+ },
+ {
+  "chainId": 30,
+  "address": "0xB52E582263c1d0189b3cc1402c1B7205b7F2E9Ba",
+  "min": "500",
+  "max": "100000000",
+  "decimals": 8
+ }
+]

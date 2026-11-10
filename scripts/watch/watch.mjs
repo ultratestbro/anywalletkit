@@ -36,6 +36,7 @@ const RPC_ENV = {
   480: "WORLDCHAIN_RPC_URL", 1329: "SEI_RPC_URL", 57073: "INK_RPC_URL", 98866: "PLUME_RPC_URL", 196: "XLAYER_RPC_URL",
   747474: "KATANA_RPC_URL", 5000: "MANTLE_RPC_URL", 1868: "SONEIUM_RPC_URL", 1088: "METIS_RPC_URL",
   14: "FLARE_RPC_URL", 5042: "ARC_RPC_URL", 2818: "MORPH_RPC_URL",
+  13863860: "SYMBIOSIS_HOST_RPC_URL",
 };
 const PUBLIC_RPC = {
   1: "https://ethereum-rpc.publicnode.com", 8453: "https://base-rpc.publicnode.com", 42161: "https://arbitrum-one-rpc.publicnode.com", 10: "https://optimism-rpc.publicnode.com",
@@ -47,6 +48,8 @@ const PUBLIC_RPC = {
   1088: "https://andromeda.metis.io/?owner=1088", 1868: "https://rpc.soneium.org", 5000: "https://rpc.mantle.xyz", 747474: "https://rpc.katana.network",
   // The public RPCs packages/networks lists for these chains.
   14: "https://flare-api.flare.network/ext/C/rpc", 5042: "https://rpc.mainnet.arc.io", 2818: "https://rpc.morphl2.io",
+  // Symbiosis' host chain (protocol-swap2-symbiosis: the pools and the MulticallRouter its verifier pins).
+  13863860: "https://symbiosis.calderachain.xyz/http",
 };
 const rpcFor = (chainId) => env[RPC_ENV[chainId]] || PUBLIC_RPC[chainId];
 const SOL_RPC = env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";

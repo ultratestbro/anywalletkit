@@ -1,0 +1,98 @@
+{
+  "note": "Symbiosis metaRoute on the Base MetaRouterGateway: 0.002 ETH → USDT on Tron (public tx 2026-11-09, status Success, paid by Tron tx 0f424b75…a748; sender is `own`)",
+  "own": [
+    "0x6A2D78dEa38e383b4b0B8fBdffb8eBc3d320Cba3"
+  ],
+  "tx": {
+    "chain": "eip155:8453",
+    "hash": "0x673b9c1ded2cebe1971eda3239d6362a4168d25b7d57296554a29cd1c5ef0b9a",
+    "time": 1794268775,
+    "status": "confirmed",
+    "address": "0x6A2D78dEa38e383b4b0B8fBdffb8eBc3d320Cba3",
+    "from": "0x6A2D78dEa38e383b4b0B8fBdffb8eBc3d320Cba3",
+    "to": "0xa18348e793E77239EC68CAa51b74c5Cdc82c8a9d",
+    "nativeValue": "2000000000000000",
+    "transfers": [
+      {
+        "token": null,
+        "from": "0x6A2D78dEa38e383b4b0B8fBdffb8eBc3d320Cba3",
+        "to": "0xa18348e793E77239EC68CAa51b74c5Cdc82c8a9d",
+        "amount": "2000000000000000"
+      },
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "from": "0x72AB388E2E2F6FaceF59E3C3FA2C4E29011c2D38",
+        "to": "0x351bd5171C4DeC6707A49F2d084C8f92Eb9267a0",
+        "amount": "4263696",
+        "standard": "erc20"
+      },
+      {
+        "token": "0x4200000000000000000000000000000000000006",
+        "from": "0xBc1D9760bd6ca468CA9fB5Ff2CFbEAC35d86c973",
+        "to": "0x72AB388E2E2F6FaceF59E3C3FA2C4E29011c2D38",
+        "amount": "1999400000000000",
+        "standard": "erc20",
+        "symbol": "WETH",
+        "decimals": 18
+      },
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "from": "0x351bd5171C4DeC6707A49F2d084C8f92Eb9267a0",
+        "to": "0x5D0bC342178C8Fe2c2f9A9fcC9D52555C99936db",
+        "amount": "4263696",
+        "standard": "erc20"
+      },
+      {
+        "token": "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA",
+        "from": "0x5D0bC342178C8Fe2c2f9A9fcC9D52555C99936db",
+        "to": "0xCbFD5DcaD860f49D0BD2fDaD78d9d943CAeBedef",
+        "amount": "4264279",
+        "standard": "erc20",
+        "symbol": "USDbC",
+        "decimals": 6
+      },
+      {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "from": "0x5D0bC342178C8Fe2c2f9A9fcC9D52555C99936db",
+        "to": "0x0cA6d588D9E3a14f62eF88afcd6B3d0AD13af1f0",
+        "amount": "20626",
+        "standard": "erc20"
+      },
+      {
+        "token": "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA",
+        "from": "0x5D0bC342178C8Fe2c2f9A9fcC9D52555C99936db",
+        "to": "0x0cA6d588D9E3a14f62eF88afcd6B3d0AD13af1f0",
+        "amount": "27448",
+        "standard": "erc20",
+        "symbol": "USDbC",
+        "decimals": 6
+      },
+      {
+        "token": "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA",
+        "from": "0xCbFD5DcaD860f49D0BD2fDaD78d9d943CAeBedef",
+        "to": "0xEE981B2459331AD268cc63CE6167b446AF4161f8",
+        "amount": "4264279",
+        "standard": "erc20",
+        "symbol": "USDbC",
+        "decimals": 6
+      }
+    ],
+    "fee": "6664483916607",
+    "call": {
+      "to": "0xa18348e793E77239EC68CAa51b74c5Cdc82c8a9d",
+      "selector": "0xa11b1198"
+    },
+    "block": "55392001"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged ETH",
+    "assetsOut": [
+      {
+        "token": null,
+        "amount": "2000000000000000"
+      }
+    ],
+    "counterparty": "0xa18348e793E77239EC68CAa51b74c5Cdc82c8a9d"
+  }
+}

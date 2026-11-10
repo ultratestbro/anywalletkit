@@ -1,0 +1,219 @@
+{
+ "recordedAt": "2026-11-10",
+ "params": {
+  "sourceChain": "ton:-239",
+  "sourceToken": "USDT",
+  "destChain": "tron:728126428",
+  "destToken": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+  "amountIn": "50000000",
+  "destAddress": "TNPdqto8HiuMzoG7Vv9wyyYhWzCojLeHAF",
+  "refundAddress": "UQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqEBI",
+  "slippageBps": 100,
+  "dry": false
+ },
+ "config": {
+  "tronSource": true,
+  "btcSource": true,
+  "fallbackReceiver": "0x28C6c06298d514Db089934071355E5743bf21d60"
+ },
+ "force": [],
+ "exchanges": [
+  {
+   "method": "GET",
+   "path": "/v1/swap-limits",
+   "status": 200,
+   "response": "@limits"
+  },
+  {
+   "method": "POST",
+   "path": "/v2/quote",
+   "body": {
+    "tokenAmountIn": {
+     "address": "0x9328Eb759596C38a25f59028B146Fecdc3621Dfe",
+     "chainId": 85918,
+     "decimals": 6,
+     "amount": "50000000",
+     "attributes": {
+      "ton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+     }
+    },
+    "tokenOut": {
+     "address": "0xa614f803b6fd780986a42c78ec9c7f77e6ded13c",
+     "chainId": 728126428,
+     "decimals": 6
+    },
+    "from": "UQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqEBI",
+    "to": "TNPdqto8HiuMzoG7Vv9wyyYhWzCojLeHAF",
+    "slippage": 100,
+    "fallbackReceiver": "0x28C6c06298d514Db089934071355E5743bf21d60",
+    "disabledProviders": "changelly,thorchain-bridge,chainflip-bridge"
+   },
+   "status": 200,
+   "response": {
+    "fee": {
+     "symbol": "USDT",
+     "icon": "https://s3.openocean.finance/token_logos/logos/1642600369413_5107823985163122.jpg",
+     "address": "0xa614f803b6fd780986a42c78ec9c7f77e6ded13c",
+     "amount": "2750000",
+     "chainId": 728126428,
+     "decimals": 6,
+     "priceUsd": 1
+    },
+    "route": [],
+    "inTradeType": "symbiosis",
+    "outTradeType": "symbiosis",
+    "fees": [
+     {
+      "provider": "symbiosis",
+      "value": {
+       "symbol": "sUSDT",
+       "icon": "https://s3.openocean.finance/token_logos/logos/1642600369413_5107823985163122.jpg",
+       "address": "0x8D8Ce7Bf0C7f7a368Bb92087Fc9D474d2DffC072",
+       "amount": "250000",
+       "chainId": 13863860,
+       "decimals": 6,
+       "attributes": {
+        "ton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       },
+       "priceUsd": 1
+      },
+      "save": {
+       "symbol": "sUSDT",
+       "icon": "https://s3.openocean.finance/token_logos/logos/1642600369413_5107823985163122.jpg",
+       "address": "0x8D8Ce7Bf0C7f7a368Bb92087Fc9D474d2DffC072",
+       "amount": "0",
+       "chainId": 13863860,
+       "decimals": 6,
+       "attributes": {
+        "ton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+       },
+       "priceUsd": 1
+      },
+      "description": "Cross-chain fee"
+     },
+     {
+      "provider": "symbiosis",
+      "value": {
+       "symbol": "USDT",
+       "icon": "https://s3.openocean.finance/token_logos/logos/1642600369413_5107823985163122.jpg",
+       "address": "0xa614f803b6fd780986a42c78ec9c7f77e6ded13c",
+       "amount": "2750000",
+       "chainId": 728126428,
+       "decimals": 6,
+       "priceUsd": 1
+      },
+      "save": {
+       "symbol": "USDT",
+       "icon": "https://s3.openocean.finance/token_logos/logos/1642600369413_5107823985163122.jpg",
+       "address": "0xa614f803b6fd780986a42c78ec9c7f77e6ded13c",
+       "amount": "0",
+       "chainId": 728126428,
+       "decimals": 6,
+       "priceUsd": 1
+      },
+      "description": "Cross-chain fee"
+     }
+    ],
+    "routes": [
+     {
+      "provider": "symbiosis",
+      "tokens": [
+       {
+        "symbol": "USDT",
+        "name": "USDt",
+        "icon": "https://s3.openocean.finance/token_logos/logos/1642600369413_5107823985163122.jpg",
+        "address": "0x9328Eb759596C38a25f59028B146Fecdc3621Dfe",
+        "chainId": 85918,
+        "decimals": 6,
+        "priceUsd": 0,
+        "attributes": {
+         "ton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+        }
+       },
+       {
+        "symbol": "USDT",
+        "name": "Tether USDt",
+        "icon": "https://s3.openocean.finance/token_logos/logos/1642600369413_5107823985163122.jpg",
+        "address": "0xa614f803b6fd780986a42c78ec9c7f77e6ded13c",
+        "chainId": 728126428,
+        "decimals": 6,
+        "priceUsd": 1
+       }
+      ]
+     }
+    ],
+    "labels": [
+     "octopool-swap"
+    ],
+    "kind": "crosschain-swap",
+    "priceImpact": "0.07",
+    "tokenAmountOut": {
+     "symbol": "USDT",
+     "icon": "https://s3.openocean.finance/token_logos/logos/1642600369413_5107823985163122.jpg",
+     "address": "0xa614f803b6fd780986a42c78ec9c7f77e6ded13c",
+     "amount": "47037066",
+     "chainId": 728126428,
+     "decimals": 6,
+     "priceUsd": 1
+    },
+    "tokenAmountOutMin": {
+     "symbol": "USDT",
+     "icon": "https://s3.openocean.finance/token_logos/logos/1642600369413_5107823985163122.jpg",
+     "address": "0xa614f803b6fd780986a42c78ec9c7f77e6ded13c",
+     "amount": "46937492",
+     "chainId": 728126428,
+     "decimals": 6,
+     "priceUsd": 1
+    },
+    "amountInUsd": {
+     "symbol": "tokenIn",
+     "address": "0x9328Eb759596C38a25f59028B146Fecdc3621Dfe",
+     "amount": "50000000",
+     "chainId": 85918,
+     "decimals": 6,
+     "attributes": {
+      "ton": "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+     },
+     "priceUsd": 0
+    },
+    "approveTo": "0x0000000000000000000000000000000000000000",
+    "type": "ton",
+    "rewards": [],
+    "estimatedTime": 61,
+    "tx": {
+     "validUntil": 1794873612,
+     "messages": [
+      {
+       "address": "EQAvLzOubdnAtv7gjO9ZfrAKnVklFS_4xG7iQXzrfyllmImd",
+       "amount": "200000000",
+       "payload": "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"
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "result": {
+  "destAmount": "47037066",
+  "minDestAmount": "46937492",
+  "providerData": {
+   "sourceChain": "ton:-239",
+   "sourceToken": "USDT",
+   "destChain": "tron:728126428",
+   "destToken": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+   "recipient": "TNPdqto8HiuMzoG7Vv9wyyYhWzCojLeHAF",
+   "sender": "UQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqEBI",
+   "amountIn": "50000000",
+   "slippageBps": "100",
+   "fallbackReceiver": "0x28C6c06298d514Db089934071355E5743bf21d60",
+   "priceImpact": "0.07",
+   "labels": "octopool-swap",
+   "tonTo": "EQAvLzOubdnAtv7gjO9ZfrAKnVklFS_4xG7iQXzrfyllmImd",
+   "tonValue": "200000000",
+   "tonBody": "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",
+   "sourceSwap": "0",
+   "destSwap": "0",
+   "serviceReverts": "1"
+  }
+ }
+}

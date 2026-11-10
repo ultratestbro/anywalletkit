@@ -1,0 +1,69 @@
+{
+  "note": "Symbiosis metaRoute on the Ethereum MetaRouterGateway selling USDC (public tx 2026-11-08; the operation is in Symbiosis' stuck list and its status reads Pending; sender is `own`)",
+  "own": [
+    "0xfff63776d6BA8E7c708B3caAC15D76bd5B1a2Cf6"
+  ],
+  "tx": {
+    "chain": "eip155:1",
+    "hash": "0x58ef3577664d528065d0eb83dc2534d086bfb53b9b70446cefc23c7777edfde1",
+    "time": 1794153803,
+    "status": "confirmed",
+    "address": "0xfff63776d6BA8E7c708B3caAC15D76bd5B1a2Cf6",
+    "from": "0xfff63776d6BA8E7c708B3caAC15D76bd5B1a2Cf6",
+    "to": "0xB4769e9c5bE31199a25ecD1B0C6609183fa72521",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0xfff63776d6BA8E7c708B3caAC15D76bd5B1a2Cf6",
+        "to": "0xc227b3a439EE6ae3A22500757125f4dE91d8008E",
+        "amount": "3000411",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      },
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0xc227b3a439EE6ae3A22500757125f4dE91d8008E",
+        "to": "0xf08754FB36e418Da2FbD76ED45bD03a3E7733B51",
+        "amount": "3000411",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      },
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "from": "0xf08754FB36e418Da2FbD76ED45bD03a3E7733B51",
+        "to": "0xc227b3a439EE6ae3A22500757125f4dE91d8008E",
+        "amount": "3000411",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      },
+      {
+        "token": "0xd38BB40815d2B0c2d2c866e0c72c5728ffC76dd9",
+        "from": "0xc227b3a439EE6ae3A22500757125f4dE91d8008E",
+        "to": "0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8",
+        "amount": "0",
+        "standard": "erc20"
+      }
+    ],
+    "fee": "18865198798389",
+    "call": {
+      "to": "0xB4769e9c5bE31199a25ecD1B0C6609183fa72521",
+      "selector": "0xa11b1198"
+    },
+    "block": "26371228"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged USDC",
+    "assetsOut": [
+      {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "amount": "3000411"
+      }
+    ],
+    "counterparty": "0xB4769e9c5bE31199a25ecD1B0C6609183fa72521"
+  }
+}

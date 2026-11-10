@@ -1,0 +1,668 @@
+{
+  "module": "@anywalletkit/protocol-swap2-symbiosis",
+  "sources": [
+    {
+      "id": "gateway-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0xB4769e9c5bE31199a25ecD1B0C6609183fa72521",
+      "label": "Symbiosis MetaRouterGateway (the approval spender) · Ethereum"
+    },
+    {
+      "id": "gateway-executor-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0xB4769e9c5bE31199a25ecD1B0C6609183fa72521",
+      "signature": "metaRouterExecutorDontApprove()",
+      "decode": "address",
+      "label": "MetaRouterGateway → MetaRouter · Ethereum (pinned 0xc227b3a439EE6ae3A22500757125f4dE91d8008E)"
+    },
+    {
+      "id": "executor-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0xc227b3a439EE6ae3A22500757125f4dE91d8008E",
+      "label": "Symbiosis MetaRouter · Ethereum"
+    },
+    {
+      "id": "portal-ethereum",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8",
+      "label": "Symbiosis Portal · Ethereum"
+    },
+    {
+      "id": "portal-bridge-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8",
+      "signature": "bridge()",
+      "decode": "address",
+      "label": "Portal → Bridge · Ethereum (pinned 0x5523985926Aa12BA58DC5Ad00DDca99678D7227E)"
+    },
+    {
+      "id": "bridge-ethereum",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0x5523985926Aa12BA58DC5Ad00DDca99678D7227E",
+      "label": "Symbiosis Bridge · Ethereum"
+    },
+    {
+      "id": "aggregator-1inch-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x111111125421cA6dc452d289314280a0f8842A65",
+      "label": "1inch AggregationRouterV6 (allow-listed swap target) · Ethereum"
+    },
+    {
+      "id": "aggregator-kyber-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 (allow-listed swap target) · Ethereum"
+    },
+    {
+      "id": "gateway-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x851B43189de721dD94AbA767AAd9E6F6d6a95CCA",
+      "label": "Symbiosis MetaRouterGateway (the approval spender) · BNB Chain"
+    },
+    {
+      "id": "gateway-executor-bnb-chain",
+      "type": "evm-call",
+      "chainId": 56,
+      "to": "0x851B43189de721dD94AbA767AAd9E6F6d6a95CCA",
+      "signature": "metaRouterExecutorDontApprove()",
+      "decode": "address",
+      "label": "MetaRouterGateway → MetaRouter · BNB Chain (pinned 0x980447DdcEf79A7499Da4538Da8FC59BAcAD6997)"
+    },
+    {
+      "id": "executor-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x980447DdcEf79A7499Da4538Da8FC59BAcAD6997",
+      "label": "Symbiosis MetaRouter · BNB Chain"
+    },
+    {
+      "id": "portal-bnb-chain",
+      "type": "evm-proxy",
+      "chainId": 56,
+      "address": "0x5Aa5f7f84eD0E5db0a4a85C3947eA16B53352FD4",
+      "label": "Symbiosis Portal · BNB Chain"
+    },
+    {
+      "id": "portal-bridge-bnb-chain",
+      "type": "evm-call",
+      "chainId": 56,
+      "to": "0x5Aa5f7f84eD0E5db0a4a85C3947eA16B53352FD4",
+      "signature": "bridge()",
+      "decode": "address",
+      "label": "Portal → Bridge · BNB Chain (pinned 0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8)"
+    },
+    {
+      "id": "bridge-bnb-chain",
+      "type": "evm-proxy",
+      "chainId": 56,
+      "address": "0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8",
+      "label": "Symbiosis Bridge · BNB Chain"
+    },
+    {
+      "id": "aggregator-1inch-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x111111125421cA6dc452d289314280a0f8842A65",
+      "label": "1inch AggregationRouterV6 (allow-listed swap target) · BNB Chain"
+    },
+    {
+      "id": "aggregator-kyber-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 (allow-listed swap target) · BNB Chain"
+    },
+    {
+      "id": "gateway-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0xfeC09BE39F82b13471D2e0E7d72e6ee589c631c6",
+      "label": "Symbiosis MetaRouterGateway (the approval spender) · Avalanche"
+    },
+    {
+      "id": "gateway-executor-avalanche",
+      "type": "evm-call",
+      "chainId": 43114,
+      "to": "0xfeC09BE39F82b13471D2e0E7d72e6ee589c631c6",
+      "signature": "metaRouterExecutorDontApprove()",
+      "decode": "address",
+      "label": "MetaRouterGateway → MetaRouter · Avalanche (pinned 0x4494b8cBC69c794d82Bd2d820A6ff6f62D7D841A)"
+    },
+    {
+      "id": "executor-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0x4494b8cBC69c794d82Bd2d820A6ff6f62D7D841A",
+      "label": "Symbiosis MetaRouter · Avalanche"
+    },
+    {
+      "id": "portal-avalanche",
+      "type": "evm-proxy",
+      "chainId": 43114,
+      "address": "0xE75C7E85FE6ADd07077467064aD15847E6ba9877",
+      "label": "Symbiosis Portal · Avalanche"
+    },
+    {
+      "id": "portal-bridge-avalanche",
+      "type": "evm-call",
+      "chainId": 43114,
+      "to": "0xE75C7E85FE6ADd07077467064aD15847E6ba9877",
+      "signature": "bridge()",
+      "decode": "address",
+      "label": "Portal → Bridge · Avalanche (pinned 0x292fC50e4eB66C3f6514b9E402dBc25961824D62)"
+    },
+    {
+      "id": "bridge-avalanche",
+      "type": "evm-proxy",
+      "chainId": 43114,
+      "address": "0x292fC50e4eB66C3f6514b9E402dBc25961824D62",
+      "label": "Symbiosis Bridge · Avalanche"
+    },
+    {
+      "id": "aggregator-1inch-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0x111111125421cA6dc452d289314280a0f8842A65",
+      "label": "1inch AggregationRouterV6 (allow-listed swap target) · Avalanche"
+    },
+    {
+      "id": "aggregator-kyber-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 (allow-listed swap target) · Avalanche"
+    },
+    {
+      "id": "gateway-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x2eE9559387b806E88fd46b9DA160D64A29CE7Da0",
+      "label": "Symbiosis MetaRouterGateway (the approval spender) · Polygon"
+    },
+    {
+      "id": "gateway-executor-polygon",
+      "type": "evm-call",
+      "chainId": 137,
+      "to": "0x2eE9559387b806E88fd46b9DA160D64A29CE7Da0",
+      "signature": "metaRouterExecutorDontApprove()",
+      "decode": "address",
+      "label": "MetaRouterGateway → MetaRouter · Polygon (pinned 0x7a73a0bA4919778C5442f026bd01795b4f2A4cB8)"
+    },
+    {
+      "id": "executor-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x7a73a0bA4919778C5442f026bd01795b4f2A4cB8",
+      "label": "Symbiosis MetaRouter · Polygon"
+    },
+    {
+      "id": "portal-polygon",
+      "type": "evm-proxy",
+      "chainId": 137,
+      "address": "0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8",
+      "label": "Symbiosis Portal · Polygon"
+    },
+    {
+      "id": "portal-bridge-polygon",
+      "type": "evm-call",
+      "chainId": 137,
+      "to": "0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8",
+      "signature": "bridge()",
+      "decode": "address",
+      "label": "Portal → Bridge · Polygon (pinned 0x5523985926Aa12BA58DC5Ad00DDca99678D7227E)"
+    },
+    {
+      "id": "bridge-polygon",
+      "type": "evm-proxy",
+      "chainId": 137,
+      "address": "0x5523985926Aa12BA58DC5Ad00DDca99678D7227E",
+      "label": "Symbiosis Bridge · Polygon"
+    },
+    {
+      "id": "aggregator-1inch-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x111111125421cA6dc452d289314280a0f8842A65",
+      "label": "1inch AggregationRouterV6 (allow-listed swap target) · Polygon"
+    },
+    {
+      "id": "aggregator-kyber-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 (allow-listed swap target) · Polygon"
+    },
+    {
+      "id": "gateway-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x3743c756b64ECd0770f1d4f47696A73d2A46dcbe",
+      "label": "Symbiosis MetaRouterGateway (the approval spender) · Arbitrum"
+    },
+    {
+      "id": "gateway-executor-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x3743c756b64ECd0770f1d4f47696A73d2A46dcbe",
+      "signature": "metaRouterExecutorDontApprove()",
+      "decode": "address",
+      "label": "MetaRouterGateway → MetaRouter · Arbitrum (pinned 0xf37E321e1c275d249B7A9c825aE802A9f464Eb94)"
+    },
+    {
+      "id": "executor-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0xf37E321e1c275d249B7A9c825aE802A9f464Eb94",
+      "label": "Symbiosis MetaRouter · Arbitrum"
+    },
+    {
+      "id": "portal-arbitrum",
+      "type": "evm-proxy",
+      "chainId": 42161,
+      "address": "0x01A3c8E513B758EBB011F7AFaf6C37616c9C24d9",
+      "label": "Symbiosis Portal · Arbitrum"
+    },
+    {
+      "id": "portal-bridge-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x01A3c8E513B758EBB011F7AFaf6C37616c9C24d9",
+      "signature": "bridge()",
+      "decode": "address",
+      "label": "Portal → Bridge · Arbitrum (pinned 0x5523985926Aa12BA58DC5Ad00DDca99678D7227E)"
+    },
+    {
+      "id": "bridge-arbitrum",
+      "type": "evm-proxy",
+      "chainId": 42161,
+      "address": "0x5523985926Aa12BA58DC5Ad00DDca99678D7227E",
+      "label": "Symbiosis Bridge · Arbitrum"
+    },
+    {
+      "id": "aggregator-1inch-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x111111125421cA6dc452d289314280a0f8842A65",
+      "label": "1inch AggregationRouterV6 (allow-listed swap target) · Arbitrum"
+    },
+    {
+      "id": "aggregator-kyber-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 (allow-listed swap target) · Arbitrum"
+    },
+    {
+      "id": "gateway-optimism",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0xA9A96Ee51dD54B9f51d46b1fbD2A19c1295Ec75b",
+      "label": "Symbiosis MetaRouterGateway (the approval spender) · Optimism"
+    },
+    {
+      "id": "gateway-executor-optimism",
+      "type": "evm-call",
+      "chainId": 10,
+      "to": "0xA9A96Ee51dD54B9f51d46b1fbD2A19c1295Ec75b",
+      "signature": "metaRouterExecutorDontApprove()",
+      "decode": "address",
+      "label": "MetaRouterGateway → MetaRouter · Optimism (pinned 0x356d322BF762d4022D8c241428770565f236c2EA)"
+    },
+    {
+      "id": "executor-optimism",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x356d322BF762d4022D8c241428770565f236c2EA",
+      "label": "Symbiosis MetaRouter · Optimism"
+    },
+    {
+      "id": "portal-optimism",
+      "type": "evm-proxy",
+      "chainId": 10,
+      "address": "0x292fC50e4eB66C3f6514b9E402dBc25961824D62",
+      "label": "Symbiosis Portal · Optimism"
+    },
+    {
+      "id": "portal-bridge-optimism",
+      "type": "evm-call",
+      "chainId": 10,
+      "to": "0x292fC50e4eB66C3f6514b9E402dBc25961824D62",
+      "signature": "bridge()",
+      "decode": "address",
+      "label": "Portal → Bridge · Optimism (pinned 0x5523985926Aa12BA58DC5Ad00DDca99678D7227E)"
+    },
+    {
+      "id": "bridge-optimism",
+      "type": "evm-proxy",
+      "chainId": 10,
+      "address": "0x5523985926Aa12BA58DC5Ad00DDca99678D7227E",
+      "label": "Symbiosis Bridge · Optimism"
+    },
+    {
+      "id": "aggregator-1inch-optimism",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x111111125421cA6dc452d289314280a0f8842A65",
+      "label": "1inch AggregationRouterV6 (allow-listed swap target) · Optimism"
+    },
+    {
+      "id": "aggregator-kyber-optimism",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 (allow-listed swap target) · Optimism"
+    },
+    {
+      "id": "gateway-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0xa18348e793E77239EC68CAa51b74c5Cdc82c8a9d",
+      "label": "Symbiosis MetaRouterGateway (the approval spender) · Base"
+    },
+    {
+      "id": "gateway-executor-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0xa18348e793E77239EC68CAa51b74c5Cdc82c8a9d",
+      "signature": "metaRouterExecutorDontApprove()",
+      "decode": "address",
+      "label": "MetaRouterGateway → MetaRouter · Base (pinned 0xCbFD5DcaD860f49D0BD2fDaD78d9d943CAeBedef)"
+    },
+    {
+      "id": "executor-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0xCbFD5DcaD860f49D0BD2fDaD78d9d943CAeBedef",
+      "label": "Symbiosis MetaRouter · Base"
+    },
+    {
+      "id": "portal-base",
+      "type": "evm-proxy",
+      "chainId": 8453,
+      "address": "0xEE981B2459331AD268cc63CE6167b446AF4161f8",
+      "label": "Symbiosis Portal · Base"
+    },
+    {
+      "id": "portal-bridge-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0xEE981B2459331AD268cc63CE6167b446AF4161f8",
+      "signature": "bridge()",
+      "decode": "address",
+      "label": "Portal → Bridge · Base (pinned 0x8097f0B9f06C27AF9579F75762F971D745bb222F)"
+    },
+    {
+      "id": "bridge-base",
+      "type": "evm-proxy",
+      "chainId": 8453,
+      "address": "0x8097f0B9f06C27AF9579F75762F971D745bb222F",
+      "label": "Symbiosis Bridge · Base"
+    },
+    {
+      "id": "aggregator-1inch-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x111111125421cA6dc452d289314280a0f8842A65",
+      "label": "1inch AggregationRouterV6 (allow-listed swap target) · Base"
+    },
+    {
+      "id": "aggregator-kyber-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 (allow-listed swap target) · Base"
+    },
+    {
+      "id": "v2-router-bsc",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+      "label": "Uniswap-V2-style router a route may swap on · BNB Chain"
+    },
+    {
+      "id": "v2-router-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff",
+      "label": "Uniswap-V2-style router a route may swap on · Polygon"
+    },
+    {
+      "id": "v2-router-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x327Df1E6de05895d2ab08513aaDD9313Fe505d86",
+      "label": "Uniswap-V2-style router a route may swap on · Base"
+    },
+    {
+      "id": "unwrapper-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x5ad095DE83693ba063941f2f2C5A0dF02383B651",
+      "label": "Symbiosis Unwrapper · Ethereum"
+    },
+    {
+      "id": "unwrapper-wrapper-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x5ad095DE83693ba063941f2f2C5A0dF02383B651",
+      "signature": "wrapper()",
+      "decode": "address",
+      "label": "Unwrapper → wrapped native token · Ethereum (pinned 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)"
+    },
+    {
+      "id": "unwrapper-optimism",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x88139ad1199e8c78a0804d4bEBF4FbAD89EF9D89",
+      "label": "Symbiosis Unwrapper · Optimism"
+    },
+    {
+      "id": "unwrapper-wrapper-optimism",
+      "type": "evm-call",
+      "chainId": 10,
+      "to": "0x88139ad1199e8c78a0804d4bEBF4FbAD89EF9D89",
+      "signature": "wrapper()",
+      "decode": "address",
+      "label": "Unwrapper → wrapped native token · Optimism (pinned 0x4200000000000000000000000000000000000006)"
+    },
+    {
+      "id": "unwrapper-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x5Eb4ED9F745531221FAE41906e11d37642B15da6",
+      "label": "Symbiosis Unwrapper · Arbitrum"
+    },
+    {
+      "id": "unwrapper-wrapper-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x5Eb4ED9F745531221FAE41906e11d37642B15da6",
+      "signature": "wrapper()",
+      "decode": "address",
+      "label": "Unwrapper → wrapped native token · Arbitrum (pinned 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1)"
+    },
+    {
+      "id": "unwrapper-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x8e1d36F9da8CFe842bCf8670A12ACd51c26d195D",
+      "label": "Symbiosis Unwrapper · Base"
+    },
+    {
+      "id": "unwrapper-wrapper-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0x8e1d36F9da8CFe842bCf8670A12ACd51c26d195D",
+      "signature": "wrapper()",
+      "decode": "address",
+      "label": "Unwrapper → wrapped native token · Base (pinned 0x4200000000000000000000000000000000000006)"
+    },
+    {
+      "id": "host-synthesis",
+      "type": "evm-proxy",
+      "chainId": 13863860,
+      "address": "0x45CFd6FB7999328F189aaD2739Fba4Be6C45E5bf",
+      "label": "Symbiosis Synthesis · host chain (mints and burns the synthetics)"
+    },
+    {
+      "id": "host-synthesis-fabric",
+      "type": "evm-call",
+      "chainId": 13863860,
+      "to": "0x45CFd6FB7999328F189aaD2739Fba4Be6C45E5bf",
+      "signature": "fabric()",
+      "decode": "address",
+      "label": "Synthesis → Fabric · host chain (pinned 0xf85FC807D05d3Ab2309364226970aAc57b4e1ea4; the source of the synthetic-token map)"
+    },
+    {
+      "id": "host-synthesis-metarouter",
+      "type": "evm-call",
+      "chainId": 13863860,
+      "to": "0x45CFd6FB7999328F189aaD2739Fba4Be6C45E5bf",
+      "signature": "metaRouter()",
+      "decode": "address",
+      "label": "Synthesis → MetaRouter · host chain (pinned 0x2b7Aa8bDc40B6d3d19d0dE7480c4db8d5B6495e2)"
+    },
+    {
+      "id": "host-fabric",
+      "type": "evm-proxy",
+      "chainId": 13863860,
+      "address": "0xf85FC807D05d3Ab2309364226970aAc57b4e1ea4",
+      "label": "Symbiosis SyntFabric · host chain"
+    },
+    {
+      "id": "host-metarouter",
+      "type": "evm-code",
+      "chainId": 13863860,
+      "address": "0x2b7Aa8bDc40B6d3d19d0dE7480c4db8d5B6495e2",
+      "label": "Symbiosis MetaRouter · host chain (the only receiver of a pool step's output)"
+    },
+    {
+      "id": "host-multicall-router",
+      "type": "evm-code",
+      "chainId": 13863860,
+      "address": "0xBbAD2fe9558e55EbfA04b3B5Bff0b6c4E2ffDD2C",
+      "label": "Symbiosis MulticallRouter · host chain (runs the pool steps)"
+    },
+    {
+      "id": "host-bridge",
+      "type": "evm-proxy",
+      "chainId": 13863860,
+      "address": "0x1a039cE63AE35a67Bf0E9F6DbFaE969639D59eC8",
+      "label": "Symbiosis BridgeV2 · host chain"
+    },
+    {
+      "id": "host-pool-usd",
+      "type": "evm-proxy",
+      "chainId": 13863860,
+      "address": "0xC3255E317481B95A3e61844c274dE8BAF8eDF397",
+      "label": "Symbiosis USD omni pool · host chain (an allow-listed pool-step target)"
+    },
+    {
+      "id": "host-pool-usd-last-index",
+      "type": "evm-call",
+      "chainId": 13863860,
+      "to": "0xC3255E317481B95A3e61844c274dE8BAF8eDF397",
+      "signature": "lastIndex()",
+      "decode": "uint256",
+      "label": "USD omni pool · number of assets (a change means src/pools.ts must be regenerated: scripts/build-pins.mjs)"
+    },
+    {
+      "id": "host-pool-eth",
+      "type": "evm-proxy",
+      "chainId": 13863860,
+      "address": "0x2d877Fe148dBCB056Bf71ED5232E8d580195c0f1",
+      "label": "Symbiosis ETH omni pool · host chain (an allow-listed pool-step target)"
+    },
+    {
+      "id": "host-pool-eth-last-index",
+      "type": "evm-call",
+      "chainId": 13863860,
+      "to": "0x2d877Fe148dBCB056Bf71ED5232E8d580195c0f1",
+      "signature": "lastIndex()",
+      "decode": "uint256",
+      "label": "ETH omni pool · number of assets (a change means src/pools.ts must be regenerated: scripts/build-pins.mjs)"
+    },
+    {
+      "id": "host-pool-btc",
+      "type": "evm-proxy",
+      "chainId": 13863860,
+      "address": "0xBf084Ee3E5C73129167167Bd5DB9FE8513d8F7e0",
+      "label": "Symbiosis BTC omni pool · host chain (an allow-listed pool-step target)"
+    },
+    {
+      "id": "host-pool-btc-last-index",
+      "type": "evm-call",
+      "chainId": 13863860,
+      "to": "0xBf084Ee3E5C73129167167Bd5DB9FE8513d8F7e0",
+      "signature": "lastIndex()",
+      "decode": "uint256",
+      "label": "BTC omni pool · number of assets (a change means src/pools.ts must be regenerated: scripts/build-pins.mjs)"
+    },
+    {
+      "id": "host-pool-wbnb",
+      "type": "evm-proxy",
+      "chainId": 13863860,
+      "address": "0x095B362957B3E3638AE1eb7A957f392cD3Dc3c7C",
+      "label": "Symbiosis WBNB omni pool · host chain (an allow-listed pool-step target)"
+    },
+    {
+      "id": "host-pool-wbnb-last-index",
+      "type": "evm-call",
+      "chainId": 13863860,
+      "to": "0x095B362957B3E3638AE1eb7A957f392cD3Dc3c7C",
+      "signature": "lastIndex()",
+      "decode": "uint256",
+      "label": "WBNB omni pool · number of assets (a change means src/pools.ts must be regenerated: scripts/build-pins.mjs)"
+    },
+    {
+      "id": "ton-portal",
+      "type": "ton-code",
+      "address": "EQBZh9CpLZyNlwI7am0PHpVy8T8zdJxAhlG3m3xMi0BoVaUh",
+      "label": "Symbiosis Portal · TON mainnet"
+    },
+    {
+      "id": "js-sdk-mainnet-config",
+      "type": "github-file",
+      "repo": "symbiosis-finance/js-sdk",
+      "path": "src/crosschain/config/mainnet.ts",
+      "ref": "main",
+      "label": "Symbiosis js-sdk mainnet config (a second source for the pins; stale for gateway and reverter on 2026-11-10 — the chain is the reference)"
+    },
+    {
+      "id": "core-contracts-metarouter",
+      "type": "github-file",
+      "repo": "symbiosis-finance/core-contracts",
+      "path": "contracts/synth-core/metarouter/MetaRouter.sol",
+      "label": "MetaRouter source (offsets and call order the verifier mirrors)"
+    },
+    {
+      "id": "core-contracts-multicall",
+      "type": "github-file",
+      "repo": "symbiosis-finance/core-contracts",
+      "path": "contracts/periphery/MulticallRouter.sol",
+      "label": "MulticallRouter source (how the running amount is written into each pool step)"
+    },
+    {
+      "id": "api-openapi",
+      "type": "http-text",
+      "url": "https://api.symbiosis.finance/crosschain/docs/swagger-ui-init.js",
+      "label": "Symbiosis API description (swagger)"
+    },
+    {
+      "id": "api-swap-limits",
+      "type": "http-json",
+      "url": "https://api.symbiosis.finance/crosschain/v1/swap-limits",
+      "itemKey": "address",
+      "label": "Symbiosis API · /v1/swap-limits (bridged tokens per chain)"
+    }
+  ]
+}
