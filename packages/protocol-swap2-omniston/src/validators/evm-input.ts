@@ -11,7 +11,8 @@ import {
 import {
   OMNISTON_EVM_LOOKBACK_BLOCKS,
   OMNISTON_EVM_MIN_CONFIRMATIONS,
-  omnistonEvmRpcRequest,
+  omnistonQuorumValidator,
+  type OmnistonRpcQuorumOptions,
   type OmnistonRpcRequest,
   type OmnistonRpcUrls,
 } from "./evm-output.js";
@@ -132,14 +133,14 @@ async function ethCall(request: OmnistonRpcRequest, chain: string, to: string, d
 /** Diagnostics hook: every refusal names its check and the numbers it compared (never a secret). */
 export type OmnistonValidatorRefusal = (reason: string, details?: Record<string, unknown>) => void;
 
-export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcRequest; rpcUrls?: OmnistonRpcUrls; now?: () => number; onRefusal?: OmnistonValidatorRefusal} = {}) {
-  const refuse = (reason: string, details?: Record<string, unknown>): false => {
+/** `quorum` / `operatorOf`: see {@link OmnistonRpcQuorumOptions} — the same independent-operator check as the output validator. */
+export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcRequest; rpcUrls?: OmnistonRpcUrls; now?: () => number; onRefusal?: OmnistonValidatorRefusal} & OmnistonRpcQuorumOptions = {}) {
+  const report = (reason: string, details?: Record<string, unknown>): false => {
     try { options.onRefusal?.(reason, details); } catch { /* diagnostics never break validation */ }
     return false;
   };
-  const request: OmnistonRpcRequest = options.request ?? ((chain, method, params) => omnistonEvmRpcRequest(chain, method, params, options.rpcUrls));
   const now = options.now ?? Date.now;
-  return async (input: EvmInputValidationInput): Promise<boolean> => {
+  return omnistonQuorumValidator<EvmInputValidationInput>(options, report, async (request, input, refuse): Promise<boolean> => {
     try {
       if (
         !OMNISTON_EVM_LOOKBACK_BLOCKS[input.chain] ||
@@ -255,5 +256,5 @@ export function createOmnistonEvmInputValidator(options: {request?: OmnistonRpcR
     } catch (error) {
       return refuse("error", {message: error instanceof Error ? error.message : String(error)});
     }
-  };
+  });
 }

@@ -11,16 +11,30 @@ import type { TonSendable, TonTransaction } from './types.js'
 
 /** TEP-74 `transfer` op code of a jetton wallet. */
 export const JETTON_TRANSFER_OP = 0x0f8a7ea5
+/** TEP-62 `transfer` op code of an NFT item. */
+export const NFT_TRANSFER_OP = 0x5fcc3d14
 const LARGE_FORWARD_NANOTON = 500_000_000n // 0.5 TON
 
 /** What one outgoing message does. */
-export type TonDescribedKind = 'ton-transfer' | 'jetton-transfer' | 'contract-call'
+export type TonDescribedKind = 'ton-transfer' | 'jetton-transfer' | 'nft-transfer' | 'contract-call'
 
 /** Fields of a TEP-74 jetton `transfer` body. */
 export interface TonJettonDetails {
   queryId: bigint
   amount: bigint
   destination: string
+  responseDestination: string | null
+  forwardTonAmount: bigint
+  forwardPayload: 'none' | 'comment' | 'cell'
+  forwardComment?: string
+  hasCustomPayload: boolean
+}
+
+/** Fields of a TEP-62 NFT `transfer` body. */
+export interface TonNftDetails {
+  queryId: bigint
+  /** Who receives the NFT. */
+  newOwner: string
   responseDestination: string | null
   forwardTonAmount: bigint
   forwardPayload: 'none' | 'comment' | 'cell'
@@ -42,6 +56,8 @@ export interface TonDescribedMessage {
   /** Body op code for contract calls (hex). */
   op?: string
   jetton?: TonJettonDetails
+  /** TEP-62 NFT transfer: the message goes to the NFT item, `nft.newOwner` receives it. */
+  nft?: TonNftDetails
   hasStateInit: boolean
   bodyBits: number
   /**
@@ -63,6 +79,12 @@ export type TonWarningCode =
   | 'extended-actions'
   | 'carries-all-balance'
   | 'destroys-account'
+  /** The message deploys code and data at its destination (state init). */
+  | 'state-init'
+  /** The message hands an NFT to `nft.newOwner`. */
+  | 'nft-transfer'
+  /** The body starts with an op code the wallet does not decode. */
+  | 'unknown-op'
 
 /** One flagged problem; `index` is the message it is about. */
 export interface TonWarning { code: TonWarningCode; message: string; index?: number }
@@ -84,6 +106,7 @@ export type DecodedBody =
   | { type: 'empty' }
   | { type: 'comment'; text: string }
   | { type: 'jetton-transfer'; jetton: TonJettonDetails }
+  | { type: 'nft-transfer'; nft: TonNftDetails }
   | { type: 'op'; op: number }
   | { type: 'unknown' }
 
@@ -96,6 +119,7 @@ export function decodeBody(body: Cell): DecodedBody {
   try {
     if (op === 0) return { type: 'comment', text: s.loadStringTail() }
     if (op === JETTON_TRANSFER_OP) return { type: 'jetton-transfer', jetton: loadJettonTransfer(s) }
+    if (op === NFT_TRANSFER_OP) return { type: 'nft-transfer', nft: loadNftTransfer(s) }
   } catch {
     return { type: 'unknown' }
   }
@@ -109,9 +133,18 @@ function loadJettonTransfer(s: Slice): TonJettonDetails {
   const responseDestination = s.loadMaybeAddress()
   const customPayload = s.loadMaybeRef()
   const forwardTonAmount = s.loadCoins()
+  const { forwardPayload, forwardComment } = loadForwardPayload(s)
+  return {
+    queryId, amount, destination: destination.toString(), responseDestination: responseDestination ? responseDestination.toString() : null,
+    forwardTonAmount, forwardPayload, ...(forwardComment !== undefined ? { forwardComment } : {}), hasCustomPayload: customPayload !== null,
+  }
+}
+
+/** TEP-74 / TEP-62 `forward_payload:(Either Cell ^Cell)`: none, a text comment, or another cell. */
+function loadForwardPayload(s: Slice): { forwardPayload: 'none' | 'comment' | 'cell'; forwardComment?: string } {
   const inRef = s.loadBit()
   const payload: Slice = inRef ? s.loadRef().beginParse() : s
-  let forwardPayload: TonJettonDetails['forwardPayload'] = 'none'
+  let forwardPayload: 'none' | 'comment' | 'cell' = 'none'
   let forwardComment: string | undefined
   if (payload.remainingBits > 0 || payload.remainingRefs > 0) {
     forwardPayload = 'cell'
@@ -122,8 +155,19 @@ function loadJettonTransfer(s: Slice): TonJettonDetails {
       }
     }
   }
+  return { forwardPayload, ...(forwardComment !== undefined ? { forwardComment } : {}) }
+}
+
+/** TEP-62 `transfer#5fcc3d14 query_id new_owner response_destination custom_payload forward_amount forward_payload`. */
+function loadNftTransfer(s: Slice): TonNftDetails {
+  const queryId = s.loadUintBig(64)
+  const newOwner = s.loadAddress()
+  const responseDestination = s.loadMaybeAddress()
+  const customPayload = s.loadMaybeRef()
+  const forwardTonAmount = s.loadCoins()
+  const { forwardPayload, forwardComment } = loadForwardPayload(s)
   return {
-    queryId, amount, destination: destination.toString(), responseDestination: responseDestination ? responseDestination.toString() : null,
+    queryId, newOwner: newOwner.toString(), responseDestination: responseDestination ? responseDestination.toString() : null,
     forwardTonAmount, forwardPayload, ...(forwardComment !== undefined ? { forwardComment } : {}), hasCustomPayload: customPayload !== null,
   }
 }
@@ -226,6 +270,7 @@ function describeOne(
   const decoded = body ? decodeBody(body) : ({ type: 'empty' } as DecodedBody)
   const base = { to: to.to, value, bounceable, ...(to.testOnly !== undefined ? { testOnly: to.testOnly } : {}), hasStateInit, bodyBits: body ? body.bits.length : 0 }
   if (value <= 0n) warnings.push({ code: 'zero-value', message: 'message carries no TON; it cannot pay for gas at the destination', index: i })
+  if (hasStateInit) warnings.push({ code: 'state-init', message: 'message carries a state init: it deploys code and data at its destination', index: i })
   if (to.workchain !== 0 && to.workchain !== -1) warnings.push({ code: 'exotic-workchain', message: `workchain ${to.workchain}`, index: i })
   if (ctx.network && to.testOnly !== undefined) {
     if (to.testOnly && ctx.network !== 'testnet') warnings.push({ code: 'testnet-address', message: 'test-only address on a mainnet wallet', index: i })
@@ -239,7 +284,14 @@ function describeOne(
       item = { kind: 'jetton-transfer', ...base, jetton: decoded.jetton, op: hex(JETTON_TRANSFER_OP) }
       if (decoded.jetton.forwardTonAmount > LARGE_FORWARD_NANOTON) warnings.push({ code: 'large-forward-amount', message: `forward_ton_amount ${decoded.jetton.forwardTonAmount} > 0.5 TON`, index: i })
       break
-    case 'op': item = { kind: 'contract-call', ...base, op: hex(decoded.op) }; break
+    case 'nft-transfer':
+      item = { kind: 'nft-transfer', ...base, nft: decoded.nft, op: hex(NFT_TRANSFER_OP) }
+      warnings.push({ code: 'nft-transfer', message: `transfers the NFT ${to.to} to ${decoded.nft.newOwner}`, index: i })
+      break
+    case 'op':
+      item = { kind: 'contract-call', ...base, op: hex(decoded.op) }
+      warnings.push({ code: 'unknown-op', message: `contract call with op ${hex(decoded.op)}, which the wallet does not decode`, index: i })
+      break
     default:
       item = { kind: 'contract-call', ...base }
       warnings.push({ code: 'unknown-body', message: 'message body could not be decoded', index: i })

@@ -47,7 +47,7 @@ describe('describeTransaction (offline)', () => {
     const d = describeTransaction([{ to: UQ, value: 1n, body: call }, { to: EQ, value: 1n }, { to: EQ, value: 1n, body: beginCell().storeUint(1, 3).endCell() }])
     expect(d.kind).toBe('mixed')
     expect(d.items[0]).toMatchObject({ kind: 'contract-call', op: '0xabcdef01' })
-    expect(d.warnings.map((w) => w.code)).toEqual(['non-bounceable-contract-call', 'unknown-body'])
+    expect(d.warnings.map((w) => w.code)).toEqual(['unknown-op', 'non-bounceable-contract-call', 'unknown-body'])
   })
 
   it('network flag, zero value, exotic workchain, invalid address and bad bodyBoc become warnings, never throws', () => {

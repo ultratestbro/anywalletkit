@@ -94,7 +94,8 @@ async function main() {
         message: { owner: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', spender: '0x000000000000000000000000000000000000bEEF', value: 1n, nonce: 0n, deadline: 2n ** 40n },
       }, { chainId: 1, account: '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266' })
       eq('evm describeTypedData kind', permit.kind, 'permit')
-      eq('evm describeTypedData warnings', permit.warnings.length, 0)
+      // The spender 0x…bEEF is not in `knownSpenders`: an unknown-spender grant (extension audit E3).
+      eq('evm describeTypedData warnings', permit.warnings.map((w) => w.code).join(','), 'spender-unknown')
     }
     const sol = new WalletManagerSolana(mnemonic)
     for (const v of derivationVectors.vectors.solana[seedName]!.accounts) {

@@ -20,7 +20,10 @@
  * The fee caps signed are the ones shown, unless the network outgrew them
  * while the sheet was open (EIP-1559: base fee + tip above the shown cap;
  * legacy: a higher gas price) — then the user is asked again with the new
- * numbers (`repriced: true`).
+ * numbers (`repriced: true`, `repricedFrom` = the max fee shown before) on a
+ * follow-up sheet the queue limits do not refuse, at most {@link MAX_FEE_REASKS}
+ * times in a row; declining it signs nothing. A new max fee above the wallet's
+ * own ceiling ({@link SignDeps.feeCeiling}) is refused without a sheet.
  *
  * The review payload ({@link SignApproval}) carries what the window shows: the
  * classified request, the prepared fields, the fee, and the preview the wallet
@@ -33,7 +36,7 @@ import { ApprovalQueue, type OriginVia } from './approvals.js'
 import type { EvmNetwork } from './networks.js'
 import { RELAY_ERRORS, type RelayError } from './relay.js'
 import { RouterError, type RouterDeps } from './router.js'
-import { describeSiwe, type SiweInfo } from './siwe.js'
+import { SIWE_FORBIDDEN_CHARS, describeSiwe, type SiweInfo } from './siwe.js'
 
 /** The account nonce an RPC reported, refused when it is not a safe integer (a broken or hostile RPC). */
 const safeNonce = (n: bigint): number => {
@@ -42,8 +45,8 @@ const safeNonce = (n: bigint): number => {
 }
 
 export type SignRequestInfo =
-  | { kind: 'sign-message'; method: 'personal_sign'; account: string; /** Decoded text when printable, else the hex. */ text: string; /** What is actually signed (hex or utf-8 string). */ raw: string; /** Parsed Sign-In with Ethereum (EIP-4361) with the checks against the asking origin, when the text is one. */ siwe?: SiweInfo }
-  | { kind: 'sign-typed-data'; method: string; account: string; /** Pretty-printed JSON. */ text: string; typedData: TypedData }
+  | { kind: 'sign-message'; method: 'personal_sign'; account: string; /** Decoded text when printable, else the hex; invisible / direction-changing characters shown as `⟨U+XXXX⟩` ({@link revealHidden}). */ text: string; /** What is actually signed (hex or utf-8 string). */ raw: string; /** Parsed Sign-In with Ethereum (EIP-4361) with the checks against the asking origin, when the text is one. */ siwe?: SiweInfo; /** `text` had invisible or direction-changing characters (now escaped): the sheet should warn. */ hiddenChars?: true; /** The message is exactly 32 bytes (`0x` + 64 hex): a blind hash signature that CoW Protocol (`ethsign`), Safe (v > 30) and others accept as an order or a transfer. Only with the wallet's opt-in ({@link SignDeps.allowBlindHash}); the sheet must make it a danger screen. */ blindHash?: true }
+  | { kind: 'sign-typed-data'; method: string; account: string; /** Pretty-printed JSON, invisible / direction-changing characters escaped. */ text: string; typedData: TypedData; /** `text` had invisible or direction-changing characters (now escaped): the sheet should warn. */ hiddenChars?: true }
   | { kind: 'send-transaction'; method: 'eth_sendTransaction'; account: string; tx: { to: string; value: string; data: string | null; gas: string | null } }
 
 export interface TypedData {
@@ -63,6 +66,12 @@ export interface PreparedTx {
   gasPrice?: string
   /** gasLimit × max fee, base units. */
   maxFee: string
+  /**
+   * Set when the page chose the gas limit and the wallet's own `eth_estimateGas` answered: the estimate
+   * (0x hex) and whether the page's limit is above max(estimate × 1.5, estimate + 50 000) — then the sheet
+   * should warn with the max fee. The page's limit is still the one signed.
+   */
+  gasCheck?: { estimate: string; excessive: boolean }
 }
 
 /** The approval window's payload for the three signing kinds. */
@@ -72,6 +81,8 @@ export interface SignApproval {
   prepared?: PreparedTx
   /** A second sheet for the same transaction: the network's fee outgrew the cap the first one showed. */
   repriced?: true
+  /** With `repriced`: the max fee (`prepared.maxFee`, base units) the sheet before this one showed. */
+  repricedFrom?: string
   /** What the wallet attached (tx-preview-evm `TxPreview`, typed-data description…). */
   preview: unknown
 }
@@ -92,22 +103,66 @@ export interface SignDeps {
   preview?(input: { network: EvmNetwork; request: SignRequestInfo; accounts: string[] }): Promise<unknown>
   /** Tip floor per chain id in wei (default 0.1 gwei everywhere). */
   tipFloor?: (chainId: number) => bigint
+  /**
+   * Whether a personal_sign of a raw 32-byte hash may reach the sheet (read per request). Default: refused — a
+   * blind hash signature can be a CoW order or a Safe transaction paying someone else (extension audit E55).
+   */
+  allowBlindHash?: () => boolean | Promise<boolean>
+  /**
+   * The most one transaction may cost in fee on `network` (base units), when the wallet has such a limit
+   * (the one its signer enforces). A fee that rose above it after the sheet is refused right away, with
+   * no second sheet. The first sheet is not checked here: the signer is the guard for it.
+   */
+  feeCeiling?: (network: EvmNetwork) => bigint | undefined
 }
+
+/** How many times in a row one transaction's fee may be asked again ({@link SignApproval.repriced}); the next rise stops the request, nothing signed. */
+export const MAX_FEE_REASKS = 3
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/
 const HEX = /^0x([0-9a-fA-F]{2})*$/
 const lc = (s: string) => s.toLowerCase()
 
-/** Vaulty's `messageText`: hex that decodes to printable text is shown decoded; binary payloads stay hex. */
+/**
+ * Characters that change how text displays without showing themselves: every format character
+ * (Unicode Cf — bidi embeddings / overrides / isolates, LRM / RLM / ALM, zero-width space / joiners,
+ * word joiner, BOM, soft hyphen, tag characters…), line / paragraph separators, the invisible Hangul
+ * fillers, and C0 / C1 controls other than tab, newline and carriage return.
+ */
+const INVISIBLE = /[\p{Cf}\u2028\u2029\u115f\u1160\u3164\uffa0\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/gu
+
+/**
+ * Text for a review sheet: every invisible or direction-changing character replaced by a visible
+ * `⟨U+XXXX⟩`, so the order on screen is the order of the bytes (a right-to-left override can make
+ * "exe.gnp" read as "png.exe"). `hidden` says whether anything was replaced — the sheet should warn.
+ */
+export function revealHidden(text: string): { text: string; hidden: boolean } {
+  let hidden = false
+  const out = text.replace(INVISIBLE, (c) => {
+    hidden = true
+    return `⟨U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}⟩`
+  })
+  return { text: out, hidden }
+}
+
+/**
+ * Vaulty's `messageText`: hex that decodes to printable text is shown decoded; binary payloads stay hex.
+ * Invisible and direction-changing characters come back escaped ({@link revealHidden}).
+ */
 export function messageText(value: unknown): string {
-  if (typeof value !== 'string') return ''
-  if (!HEX.test(value)) return value
+  return shownMessage(value).text
+}
+
+/** {@link messageText} plus whether it escaped anything. */
+function shownMessage(value: unknown): { text: string; hidden: boolean } {
+  if (typeof value !== 'string') return { text: '', hidden: false }
+  if (!HEX.test(value)) return revealHidden(value)
   try {
     const bytes = Uint8Array.from(value.slice(2).match(/../g) ?? [], (b) => Number.parseInt(b, 16))
     const s = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
-    return /^[\x09\x0a\x0d\x20-\x7e -￿]*$/.test(s) ? s : value
+    return /^[\x09\x0a\x0d\x20-\x7e\u00a0-\uffff]*$/.test(s) ? revealHidden(s) : { text: value, hidden: false }
   } catch {
-    return value
+    return { text: value, hidden: false }
   }
 }
 
@@ -132,7 +187,10 @@ const HIDDEN_CONTROL = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/
 const err = (code: number, message: string): RelayError => ({ code, message })
 
 /** Signing method + params → what the window reviews, or the error to answer with. */
-export function classifySignRequest(input: { network: EvmNetwork; method: string; params: unknown[]; accounts: string[]; /** The asking page (browser-recorded) — needed for the SIWE domain check. */ origin?: string; /** Transport note for pseudo-origins (WalletConnect Verify), for the SIWE check. */ via?: OriginVia; now?: number }): SignRequestInfo | RelayError {
+/** A personal_sign message that is a raw 32-byte hash: what an `ethsign`-style verifier turns into an order or a transfer. */
+const BLIND_HASH = /^0x[0-9a-fA-F]{64}$/
+
+export function classifySignRequest(input: { network: EvmNetwork; method: string; params: unknown[]; accounts: string[]; /** The asking page (browser-recorded) — needed for the SIWE domain check. */ origin?: string; /** Transport note for pseudo-origins (WalletConnect Verify), for the SIWE check. */ via?: OriginVia; now?: number; /** Let a 32-byte hash personal_sign reach the sheet (marked `blindHash`) instead of refusing it. Default false. */ allowBlindHash?: boolean }): SignRequestInfo | RelayError {
   const { method, params } = input
   const owned = new Set(input.accounts.map(lc))
   const ours = (a: unknown): a is string => typeof a === 'string' && ADDRESS.test(a) && owned.has(lc(a))
@@ -144,13 +202,19 @@ export function classifySignRequest(input: { network: EvmNetwork; method: string
     if (ours(msg) && !ours(addr)) [msg, addr] = [addr, msg]
     if (!ours(addr)) return err(RELAY_ERRORS.unauthorized, 'personal_sign for an address this wallet does not hold.')
     if (typeof msg !== 'string') return err(RELAY_ERRORS.invalidParams, 'personal_sign expects a message string.')
-    const text = messageText(msg)
+    // 32 raw bytes are signed as an EIP-191 "\n32" message: CoW Protocol's ethsign orders, Safe owner signatures (v > 30)…
+    const blindHash = BLIND_HASH.test(msg)
+    if (blindHash && !input.allowBlindHash) return err(RELAY_ERRORS.unsupportedMethod, 'This site asks you to sign a raw 32-byte hash (blind signing). It can be a swap order or a transfer (e.g. CoW Protocol) paying someone else, so this wallet refuses it. "Allow blind hash signatures" in Options turns on a review for such requests.')
+    const shown = shownMessage(msg)
+    const text = shown.text
     const signed = decodedMessage(msg) ?? text
     const siwe = input.origin ? describeSiwe(signed, { origin: input.origin, account: checksum(addr), chainId: input.network.chainId, ...(input.via ? { via: input.via } : {}), ...(input.now !== undefined ? { now: input.now } : {}) }) : null
     // A sign-in message with hidden control characters would show as an opaque hex blob while
     // a lenient verifier still accepts it: refuse it outright.
     if (siwe && HIDDEN_CONTROL.test(signed)) return err(RELAY_ERRORS.invalidParams, 'This sign-in message contains hidden control characters — refused.')
-    return { kind: 'sign-message', method, account: checksum(addr), text, raw: msg, ...(siwe ? { siwe } : {}) }
+    // Bidi controls and zero-width characters can make the domain or statement read differently from what is signed.
+    if (siwe && SIWE_FORBIDDEN_CHARS.test(signed)) return err(RELAY_ERRORS.invalidParams, 'This sign-in message contains invisible or text-direction characters — refused.')
+    return { kind: 'sign-message', method, account: checksum(addr), text, raw: msg, ...(siwe ? { siwe } : {}), ...(shown.hidden ? { hiddenChars: true as const } : {}), ...(blindHash ? { blindHash: true as const } : {}) }
   }
 
   if (method === 'eth_signTypedData_v4' || method === 'eth_signTypedData_v3' || method === 'eth_signTypedData') {
@@ -170,7 +234,8 @@ export function classifySignRequest(input: { network: EvmNetwork; method: string
       // A domain bound to another chain than the one the site is on is the classic cross-chain replay / phishing shape.
       return err(RELAY_ERRORS.chainDisconnected, `Typed data is for chain ${String(cid)}; this site is on ${input.network.name} (${input.network.chainId}).`)
     }
-    return { kind: 'sign-typed-data', method, account: checksum(addr), text: JSON.stringify(parsed, bigintSafe, 2), typedData: parsed }
+    const shown = revealHidden(JSON.stringify(parsed, bigintSafe, 2))
+    return { kind: 'sign-typed-data', method, account: checksum(addr), text: shown.text, typedData: parsed, ...(shown.hidden ? { hiddenChars: true as const } : {}) }
   }
 
   if (method === 'eth_sendTransaction') {
@@ -239,17 +304,36 @@ function overpriced(shown: PreparedTx, fresh: PreparedTx): boolean {
   return false
 }
 
-/** Nonce, gas, fees from the wallet's RPC. */
+/** A page's gas limit above max(estimate × 1.5, estimate + 50 000) is flagged on the sheet (never replaced). */
+export function gasLimitExcessive(limit: bigint, estimate: bigint): boolean {
+  const a = (estimate * 3n) / 2n
+  const b = estimate + 50_000n
+  return limit > (a > b ? a : b)
+}
+
+/**
+ * Nonce, gas, fees from the wallet's RPC. A gas limit the page set is used as given, but it is checked
+ * against the wallet's own estimate ({@link PreparedTx.gasCheck}); a failed estimate (a call that
+ * reverts now) leaves the check out instead of failing the request.
+ */
 export async function prepareTransaction(deps: Pick<SignDeps, 'rpc' | 'tipFloor'>, network: EvmNetwork, from: string, tx: { to: string; value: string; data: string | null; gas: string | null }): Promise<PreparedTx> {
   const call = { from, to: tx.to, value: hex(BigInt(tx.value)), ...(tx.data ? { data: tx.data } : {}) }
+  const estimate = () => deps.rpc(network, 'eth_estimateGas', [call])
   const [nonceHex, block, gasHex] = await Promise.all([
     deps.rpc(network, 'eth_getTransactionCount', [from, 'pending']),
     deps.rpc(network, 'eth_getBlockByNumber', ['latest', false]) as Promise<{ baseFeePerGas?: string | null } | null>,
-    tx.gas ? Promise.resolve(tx.gas) : deps.rpc(network, 'eth_estimateGas', [call]),
+    tx.gas ? estimate().then((v) => v, () => null) : estimate(),
   ])
-  const estimated = big(gasHex)
-  const gasLimit = tx.gas ? estimated : (estimated * 120n + 99n) / 100n
-  return withFees(network.chainId, safeNonce(big(nonceHex)), gasLimit, await readFees(deps, network, block))
+  const nonce = safeNonce(big(nonceHex))
+  if (!tx.gas) {
+    const estimated = big(gasHex)
+    return withFees(network.chainId, nonce, (estimated * 120n + 99n) / 100n, await readFees(deps, network, block))
+  }
+  const limit = big(tx.gas)
+  const prepared = withFees(network.chainId, nonce, limit, await readFees(deps, network, block))
+  let est: bigint | null = null
+  try { est = typeof gasHex === 'string' ? big(gasHex) : null } catch { est = null }
+  return est !== null && est > 0n ? { ...prepared, gasCheck: { estimate: hex(est), excessive: gasLimitExcessive(limit, est) } } : prepared
 }
 
 /** The router's `sign` hook: classify → prepare → review → sign (→ broadcast). */
@@ -268,7 +352,8 @@ export function createSignHandler(deps: SignDeps): NonNullable<RouterDeps['sign'
 
   return async ({ origin, network, method, params, accounts }) => {
     const via = deps.approvals.viaFor(origin)
-    const info = classifySignRequest({ network, method, params, accounts, origin, ...(via ? { via } : {}) })
+    const allowBlindHash = method === 'personal_sign' && deps.allowBlindHash ? await deps.allowBlindHash() : false
+    const info = classifySignRequest({ network, method, params, accounts, origin, ...(via ? { via } : {}), ...(allowBlindHash ? { allowBlindHash: true } : {}) })
     if ('code' in info) throw RouterError.from(info)
 
     const prepared = info.kind === 'send-transaction' ? await prepareTransaction(deps, network, info.account, info.tx) : undefined
@@ -280,14 +365,21 @@ export function createSignHandler(deps: SignDeps): NonNullable<RouterDeps['sign'
       const key = `${network.caip2}|${lc(info.account)}`
       return serial(key, async () => {
         let shown = prepared!
+        let reasks = 0
         for (;;) {
           const [nonceHex, fees] = await Promise.all([deps.rpc(network, 'eth_getTransactionCount', [info.account, 'pending']), readFees(deps, network)])
           const local = nextNonce.get(key) ?? 0
           const nodeNonce = safeNonce(big(nonceHex))
           const nonce = nodeNonce > local ? nodeNonce : local
           if (outgrown(shown, fees)) {
-            shown = withFees(network.chainId, nonce, big(shown.gasLimit), fees)
-            await deps.approvals.request({ origin, chain: network.caip2, kind: info.kind, payload: { ...payload, prepared: shown, repriced: true } })
+            const next = withFees(network.chainId, nonce, big(shown.gasLimit), fees)
+            const ceiling = deps.feeCeiling?.(network)
+            if (ceiling !== undefined && BigInt(next.maxFee) > ceiling) throw new RouterError(RELAY_ERRORS.internal, `The network fee rose above the wallet's limit for ${network.name}; nothing was signed.`)
+            if (reasks >= MAX_FEE_REASKS) throw new RouterError(RELAY_ERRORS.internal, 'The network fee kept rising while you were reviewing; nothing was signed. Try again later.')
+            reasks++
+            // The same transaction, approved once already: a follow-up sheet, not a new request of the site.
+            await deps.approvals.request({ origin, chain: network.caip2, kind: info.kind, payload: { ...payload, prepared: next, repriced: true, repricedFrom: shown.maxFee } }, { followUp: true })
+            shown = next
             continue // the network may have moved again while the second sheet was open
           }
           // A lower cap than the one approved needs no second sheet: the user pays at most what they saw.

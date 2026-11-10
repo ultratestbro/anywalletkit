@@ -3,7 +3,7 @@ import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { decodeRawData, encodeRawData,
+import { FeeLimitExceededError, decodeRawData, encodeRawData,
   SimulationError, UnsafeTransactionError, WalletManagerTron, ZERO_ADDRESS, bandwidthPoints, describeTransaction, encodeParameters,
   hashMessage, recoverMessageAddress, selector, toHexAddress, type TronFetch, type TronRawTransaction,
 } from '../src/index.js'
@@ -311,6 +311,11 @@ describe('WalletAccountTron', () => {
     await expect(withNow(() => a.transfer({ token: USDT, recipient: RECIPIENT, amount: 1n }))).rejects.toThrow(/maximum fee/)
     await expect(withNow(() => a.sendTransaction({ to: RECIPIENT, value: 1n }))).rejects.toThrow(/maximum fee/)
     await expect(withNow(() => a.signTransaction({ to: RECIPIENT, value: 1n }))).rejects.toThrow(/maximum fee/)
+    // The cap in force and the fee that broke it are on the error: a wallet can show the new fee and ask again.
+    const over = await withNow(() => a.transfer({ recipient: RECIPIENT, amount: 1n })).catch((e: unknown) => e)
+    expect(over).toBeInstanceOf(FeeLimitExceededError)
+    expect(over).toMatchObject({ name: 'FeeLimitExceededError', code: 'fee-limit-exceeded' })
+    expect((over as FeeLimitExceededError).fee).toBeGreaterThan((over as FeeLimitExceededError).limit)
     expect(f.broadcast).toHaveLength(0)
     m.dispose()
   })

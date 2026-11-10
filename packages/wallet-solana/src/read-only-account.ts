@@ -19,6 +19,7 @@ import {
   type SerializedCheck, type SerializedTxGuard, type SolanaAccountData,
 } from './serialized.js'
 import { MissingSignersError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { accountChanges, custodyRefusal, custodyWatched } from './custody.js'
 import { isNativeTransfer, isSignedTransaction, isTransactionMessage } from './guards.js'
 import { createRpc } from './rpc.js'
 import { METAPLEX_METADATA_PROGRAM, parseMetaplexMetadata, parseMint } from './token-info.js'
@@ -494,7 +495,9 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     const others = [...new Set(written.filter((a) => a !== this.address))]
     const pre = others.length ? await this.accountStates(others) : new Map<string, AccountState | null>()
     const mine = this.cpiWatched(others, pre)
-    const watched = [this.address as string, ...mine]
+    // Stake / nonce accounts of this wallet the transaction writes (extension audit 2026-11-09, E9).
+    const custody = custodyWatched(this.address, others, pre).filter((a) => !mine.includes(a))
+    const watched = [this.address as string, ...mine, ...custody]
     // Every watched address is a distinct account of the transaction (the fee payer or a written one), within the node's limit.
     if (watched.length > MAX_TRANSACTION_ACCOUNTS) throw new UnsafeTransactionError(`Transaction writes ${watched.length} accounts; the simulation cannot return them all.`, 'too-many-accounts')
     const { value } = await rpc.simulateTransaction(wire as never, {
@@ -502,19 +505,21 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     }).send()
     const logs = value.logs ?? []
     if (value.err) return { ok: false, error: describeSimulationErr(value.err), logs }
-    const postList = (value as { accounts?: Array<{ owner: string; data: readonly [string, string] } | null> }).accounts
+    const postList = (value as { accounts?: Array<{ lamports?: bigint | number; owner: string; data: readonly [string, string] } | null> }).accounts
     if (!postList || postList.length !== watched.length) throw new NetworkError('simulateTransaction did not return the requested post-state accounts.')
+    const post = new Map<string, AccountState | null>()
+    watched.forEach((a, i) => { const st = postList[i]; post.set(a, st ? { lamports: BigInt(st.lamports ?? 0), owner: st.owner, data: base64Bytes(st.data[0]) } : null) })
     const wallet = postList[0]
     if (wallet && (wallet.owner !== SYSTEM_PROGRAM_ADDRESS || base64Bytes(wallet.data[0]).length > 0)) {
       throw new UnsafeTransactionError(`Transaction would ${wallet.owner !== SYSTEM_PROGRAM_ADDRESS ? `hand this wallet's account to ${wallet.owner}` : "give this wallet's account data"} (a program it signs for does it by CPI). Set allowAuthorityChanges to override.`, 'wallet-owner', [this.address])
     }
     const approvedOnTop = new Set(description.items.flatMap((it) => (it.type === 'token-approve' ? [it.source] : [])))
-    for (const [k, addr] of mine.entries()) {
-      const st = postList[k + 1]
-      const after = st ? { lamports: 0n, owner: st.owner, data: base64Bytes(st.data[0]) } : null
-      const refusal = await this.cpiAuthorityRefusal(addr, pre.get(addr), after, approvedOnTop.has(addr), ' (by CPI). Set allowAuthorityChanges to override.')
+    for (const addr of mine) {
+      const refusal = await this.cpiAuthorityRefusal(addr, pre.get(addr), post.get(addr), approvedOnTop.has(addr), ' (by CPI). Set allowAuthorityChanges to override.')
       if (refusal) throw refusal
     }
+    const custodyFailure = custodyRefusal(this.address, [...mine, ...custody], pre, post, description, ' (by CPI). Set allowAuthorityChanges to override.')
+    if (custodyFailure) throw custodyFailure
     return { ok: true, unitsConsumed: value.unitsConsumed ?? 0n, logs }
   }
 
@@ -547,7 +552,8 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
    * this wallet; a token `Batch` (it can carry any of these); an undecodable System / Token
    * instruction. Instructions whose accounts sit in unresolved lookup tables are judged by their
    * identified name (this wallet, a signer, is always a static key). A program this wallet signs
-   * for can still do any of this by CPI; `sendSerialized` proves the outcome by simulation instead.
+   * for can still do any of this by CPI; the simulation guards prove the outcome instead (the wallet,
+   * its token accounts, and its stake and nonce accounts: see `custody.ts`).
    */
   protected enforceAuthorities(description: TransactionDescription): void {
     const hint = ' Set allowAuthorityChanges to override.'
@@ -876,7 +882,9 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     })
     // Written accounts the transaction may create as token accounts of this wallet (scan 2026-10-28 F3).
     const fresh = this.cpiWatched(writable, pre).filter((a) => !ownedTokenAccounts.includes(a))
-    const watched = [...new Set([this.address as string, wsolAta, ...tokenInAtas, ...tokenOutAtas, ...ownedTokenAccounts, ...fresh])]
+    // Stake / nonce accounts of this wallet the transaction writes (extension audit 2026-11-09, E9).
+    const custody = custodyWatched(this.address, writable, pre)
+    const watched = [...new Set([this.address as string, wsolAta, ...tokenInAtas, ...tokenOutAtas, ...ownedTokenAccounts, ...fresh, ...custody])]
     // The node returns post-state for at most as many addresses as the transaction has accounts. An address that is
     // not one of them (an ATA of the other token program, say) cannot change: its post-state is its pre-state.
     const inTransaction = new Set(layout.accounts.flatMap((a) => (a.address !== null ? [a.address as string] : [])))
@@ -910,7 +918,10 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
     }
     const nativeAccounts = watched.filter((addr) => addr !== this.address && (ownWsol(pre.get(addr)) || ownWsol(post.get(addr))))
     const native = (m: Map<string, { lamports: bigint } | null>) => nativeAccounts.reduce((sum, a) => sum + lamports(m, a), lamports(m, this.address))
-    const lamportsDelta = native(post) - native(pre)
+    // The rent of a token account of this wallet that the transaction closes is the wallet's SOL wherever it goes: closed into
+    // the wallet it is neutral, closed to anyone else it is spent (extension audit 2026-11-09, E9).
+    const closedRent = ownedTokenAccounts.reduce((sum, a) => (nativeAccounts.includes(a) || lamports(post, a) > 0n ? sum : sum + lamports(pre, a)), 0n)
+    const lamportsDelta = native(post) - native(pre) - closedRent
     const ceiling = expect.maxLamportsOut + quote.fee
     if (lamportsDelta < -ceiling) throw new UnsafeTransactionError(`Transaction spends ${-lamportsDelta} lamports; at most ${ceiling} (${expect.maxLamportsOut} + fee ${quote.fee}) allowed.`, 'lamports-out', [String(-lamportsDelta)])
 
@@ -954,6 +965,8 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       const refusal = await this.cpiAuthorityRefusal(addr, pre.get(addr), post.get(addr), approvedSources.has(addr), '.')
       if (refusal) throw refusal
     }
+    const custodyFailure = custodyRefusal(this.address, [...fresh, ...custody], pre, post, description, '.')
+    if (custodyFailure) throw custodyFailure
     const exempt = new Set([...tokenInAtas, ...tokenOutAtas, ...nativeAccounts])
     for (const addr of ownedTokenAccounts) {
       if (exempt.has(addr)) continue
@@ -961,7 +974,8 @@ export class WalletAccountReadOnlySolana implements IWalletAccountReadOnly {
       const after = tokenAmount(post, addr)
       if (after < before) throw new UnsafeTransactionError(`Transaction drains ${before - after} from token account ${addr}, which is not part of the swap.`, 'token-drain', [addr])
     }
-    return { description, simulation: { ok: true, unitsConsumed: value.unitsConsumed ?? 0n, logs }, quote, lamportsDelta, tokenInDelta, tokenOutDelta, watched }
+    const changes = accountChanges(this.address, watched, pre, post, new Set(nativeAccounts), isTokenProgram)
+    return { description, simulation: { ok: true, unitsConsumed: value.unitsConsumed ?? 0n, logs }, quote, lamportsDelta, tokenInDelta, tokenOutDelta, watched, changes }
   }
 
   /** {@link checkSerialized} without throwing for a refusal: the check or the reason. */

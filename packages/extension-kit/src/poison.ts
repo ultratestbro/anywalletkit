@@ -52,6 +52,11 @@ export class RecipientBook {
     this._state = s
   }
 
+  /** Forget the cached book: the next read asks storage again (e.g. a storage that only answers once the wallet is unlocked). */
+  reload(): void {
+    this._state = null
+  }
+
   /** `known` → the address is one the user paid before; `lookalike` → it imitates one. */
   async check(namespace: string, address: string): Promise<{ known: boolean; lookalike: string | null }> {
     const list = await this.list(namespace)

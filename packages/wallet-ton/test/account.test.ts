@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { Buffer } from 'buffer'
 import { Address, Cell, beginCell, loadMessage, loadOutList } from '@ton/core'
-import { SimulationError, UnsafeTransactionError, WalletManagerTon, parseV5R1Body, v5r1WalletId, TESTNET_GLOBAL_ID } from '../src/index.js'
+import { FeeLimitExceededError, SimulationError, UnsafeTransactionError, WalletManagerTon, parseV5R1Body, v5r1WalletId, TESTNET_GLOBAL_ID } from '../src/index.js'
 import { WalletContractV5R1 } from '@ton/ton'
 import { JETTON_WALLET, fakeRpc, tonapiOk } from './fake-rpc.js'
 
@@ -243,6 +243,12 @@ describe('WalletAccountTon', () => {
     const a = await manager(f, { transferMaxFee: 1n, transactionMaxFee: 1n }).getAccount(0)
     await expect(a.transfer({ recipient: RECIPIENT, amount: 1n })).rejects.toThrow(/maximum fee/)
     await expect(a.sendTransaction({ to: RECIPIENT, value: 1n })).rejects.toThrow(/maximum fee/)
+    // The cap in force and the fee that broke it are on the error: a wallet can show the new fee and ask again.
+    const over = await a.transfer({ recipient: RECIPIENT, amount: 1n }).catch((e: unknown) => e)
+    expect(over).toBeInstanceOf(FeeLimitExceededError)
+    expect(over).toMatchObject({ name: 'FeeLimitExceededError', code: 'fee-limit-exceeded', limit: 1n })
+    expect((over as FeeLimitExceededError).fee).toBeGreaterThan(1n)
+    await expect(a.transfer({ recipient: RECIPIENT, amount: 1n }, { maxFee: 0n })).rejects.toMatchObject({ code: 'fee-limit-exceeded', limit: 0n })
     expect(f.sent).toHaveLength(0)
   })
 

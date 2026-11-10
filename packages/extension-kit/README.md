@@ -37,17 +37,18 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
 | Session | `Session`, `chromeSessionStorage`, `chromeAlarms`, `SESSION_DEFAULT_AUTOLOCK_MS` | the DEK in `chrome.storage.session` with an expiry and an alarm; `getKey()` re-checks the expiry itself |
 | Keyring adapters | `chromeKeyringStorage`, `vaultSecretStorage` | `@anywalletkit/keyring` metadata as plain JSON, secrets through the vault, one DEK use per call |
 | Relay | `PageRequest` / `RelayRequest` shapes and guards, `isRelayMethod`, `pageRequestFrom`, `stampOrigin`, `checkSenderOrigin`, `RELAY_ERRORS` | page ⇄ content script ⇄ service worker messages; the content script takes only messages the page window itself posted (`pageRequestFrom(event, window)`: an iframe's `parent.postMessage` is not the site), and the origin is the browser's (`port.sender`), never the page's |
-| Router | `RequestRouter`, `READ_METHODS`, `SIGNING_METHODS`, `toRelayError` | what a dApp may call: accounts only for connected origins, chain add / switch through the approval window, reads from the wallet's own RPCs, `eth_sign` never offered, everything else 4200 |
-| Permissions | `PermissionStore`, `CHAIN_ACCOUNT_KEYS` | per-origin accounts (EVM, Solana, TON, Tron, Bitcoin, NEAR) and chain |
-| Approvals | `ApprovalQueue`, `ReviewDeclined`, `QueueLimitError`, `APPROVALS_MAX_PENDING_PER_ORIGIN` | one approval window at a time, at most 3 pending requests per origin and one pending `connect`; transport notes (`setVia`) for WalletConnect peers |
-| Signing | `classifySignRequest`, `prepareTransaction`, `createSignHandler`, `messageText` | connected-address and chain checks, EIP-7702 delegations from sites refused, nonce / gas / fees from the wallet's RPC |
+| Router | `RequestRouter`, `READ_METHODS`, `SIGNING_METHODS`, `GETLOGS_MAX_SPAN_UNCONNECTED`, `toRelayError` | what a dApp may call: per-site grants (an origin sees the accounts it was granted that are active right now; connecting another account adds it to that origin only; signatures only for a granted and active account), chain add / switch through the approval window, reads from the wallet's own RPCs (`eth_getLogs` bounded to 1000 blocks for unconnected origins), `eth_sign` never offered, everything else 4200 |
+| Permissions | `PermissionStore`, `CHAIN_ACCOUNT_KEYS` | per-origin accounts (EVM, Solana, TON, Tron, Bitcoin, NEAR) and chain; `grant` adds accounts to one origin |
+| Approvals | `ApprovalQueue`, `ReviewDeclined`, `QueueLimitError`, `APPROVALS_MAX_PENDING_PER_ORIGIN`, `APPROVALS_MAX_PENDING_PER_SITE`, `APPROVALS_MAX_PENDING_TOTAL` | one approval window at a time; at most 3 pending requests per origin, 5 per site (registrable domain), 20 in all, one pending `connect`; a per-site sheet rate with a doubling cooldown; `declineOrigin` / `declineSite`; `exempt` for the wallet's own pages; transport notes (`setVia`) for WalletConnect peers |
+| Limits | `siteOf`, `MULTI_LABEL_SUFFIXES`, `TokenBucket` | a conservative registrable domain (eTLD+1, no full Public Suffix List: the last two labels, three under known multi-label and hosting suffixes) and a keyed token bucket, for per-site limits |
+| Signing | `classifySignRequest`, `prepareTransaction`, `createSignHandler`, `messageText`, `revealHidden`, `gasLimitExcessive` | connected-address and chain checks, EIP-7702 delegations from sites refused, nonce / gas / fees from the wallet's RPC, a site's gas limit checked against the estimate (`gasCheck`), invisible / bidi characters escaped as `⟨U+XXXX⟩` (`hiddenChars`), a personal_sign of a raw 32-byte hash refused unless `allowBlindHash` (then `blindHash`) |
 | Networks | `NetworksTable`, `DEFAULT_NETWORKS`, `parseAddChainParams`, Solana / TON / Tron endpoints | EVM networks with public RPC failover lists; `wallet_addEthereumChain` only for catalog chains, https only, `eth_chainId` verified, site-supplied RPCs stamped `custom` |
 | Review gate | `ReviewGate`, `evmCallMatcher`, `chainTxMatcher` | after one sheet reviewed a whole plan, exactly those operations pass once within a TTL |
 | Swaps | `quoteRoutes`, `reviewSwapPlan`, `executionFloor`, `SwapsStore`, `SwapTracker`, `parseSwapId` | progressive quotes over swap2 providers, one review sheet per plan (a gasless order is shown and matched by its EIP-712 hash), pre-approvals bound to the reviewing account (`meta.account`), pending swaps resumed across worker restarts |
 | Earn | `reviewEarnPlan`, `earnPlanMatchers` | one sheet for an Earn module's plan (approvals + call), bound to `meta.account` |
 | TON Connect | `parseConnectRequest`, `parseSendTransaction`, `parseSignData`, `tonProofMessage`, `tonSignDataMessage` | the pure-data half of TON Connect v2 (the digests `ton_proof` and `signData` sign, to verify them); the account signs with `signTonProof` / `signTonConnectData` (wallet-ton) — `sign()` refuses 32-byte digests |
 | Phishing | `PhishingDetector` | MetaMask `eth-phishing-detect` list format, shipped with the build (never fetched at runtime); a listed site is refused (`refusal` → `refuse` on `ApprovalQueue` and `RequestRouter`, 4100, no window); fuzzy lookalikes, brand-in-label, punycode warn |
-| SIWE | `parseSiwe`, `siweProblems`, `describeSiwe` | EIP-4361 sign-in messages: domain vs. the asking site, address, chain, expiry, nonce (warnings) |
+| SIWE | `parseSiwe`, `siweProblems`, `describeSiwe`, `siweCrossSite` | EIP-4361 sign-in messages: domain vs. the asking site (`crossSite`), address, chain, expiry, nonce (warnings); bidi / zero-width characters refused |
 | Address poisoning | `lookalikeOf`, `RecipientBook` | warns when a new recipient imitates one the user confirmed |
 | WebAuthn | `verifyAssertion`, `approvalChallenge`, `derToRaw`, `rawToDer` | ES256 assertion check for "passkey on every signature"; the worker never trusts the page's word |
 
@@ -73,12 +74,32 @@ pnpm add @anywalletkit/extension-kit @anywalletkit/core @anywalletkit/keyring
   compromise, `rotateVaultKey(password)` makes a fresh DEK, re-seals every
   secret, drops the passkeys (register them again) and writes one envelope;
   hand the returned DEK to `session.unlock`, which replaces the old one.
-  `setSecret` refuses a DEK that does not open the vault's secrets.
+  `rotateVaultKey(oldPassword, newPassword)` is the password change with a
+  fresh DEK. `setSecret` refuses a DEK that does not open the vault's secrets,
+  and `unlock` / `unlockWithPasskey` refuse (`wrong-password`) a box that opens
+  but holds another vault's key (a spliced dek or passkey box).
 - **Unlocked state.** Only the DEK is kept, in `chrome.storage.session`
   (memory-only, trusted contexts), with an expiry enforced on every read and an
   alarm that locks; key buffers this package owns are zeroized after use.
   `unlock` / `lock` / `touch` / `getKey` run one at a time, so activity racing a
-  lock never brings the key back.
+  lock never brings the key back. `setAutoLockMs` never pushes the deadline out
+  (safe to call at every worker start); `touch` only for explicit user gestures.
+- **Stored settings and grants.** `chrome.storage.local` is not authenticated.
+  `macJsonStorage(store, { label, key })` adds an HMAC-SHA256 under a key derived
+  from the DEK (`deriveStorageMacKey`); a plain, edited or foreign value reads as
+  `null` (`read()` says why: `unsigned` / `invalid`). Without a key (locked) it
+  reads the stored value unverified and writes it unsigned (or refuses, by
+  option), so verify at unlock; after `rotateVaultKey`, `rekey` the stores.
+  Rollback: share one `storageVersionLedger({ manifest, mark })` between the
+  stores (`versions`) and every signed value carries a version inside its MAC; a
+  signed manifest in the same area lists the latest of each, and `mark` (session
+  storage) remembers the highest manifest epoch. An older signed value put back,
+  or a deleted one, reads as `stale`; so does everything when the manifest is
+  missing, edited, or — while the browser session lives — older than the mark.
+  Not detectable: the whole area put back (or wiped) consistently when there is
+  no mark, i.e. across a browser restart or an extension reload — a restored
+  profile backup looks the same. `condemn(key)` after a refused manifest, then
+  rewrite the stores; on key rotation `ledger.rekey` first, then each store.
 - **Errors to pages.** `toRelayError(e, { log })` passes the wallet's own refusals
   (EIP-1193 codes) and a node's JSON-RPC error (code, revert data) with URLs
   removed; anything else is `-32603 Internal error` on the page and goes to `log`.

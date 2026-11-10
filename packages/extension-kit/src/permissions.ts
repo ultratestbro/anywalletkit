@@ -76,6 +76,22 @@ export class PermissionStore {
     })
   }
 
+  /**
+   * Add EVM accounts to an origin's grant (per-site grants): the new ones first, the ones it already
+   * holds stay. The chain stays the origin's own when it has one. Used by the router's connect; `connect`
+   * replaces the list instead.
+   */
+  grant(origin: string, accounts: string[], chain: string): Promise<OriginPermission> {
+    return this.serialize(async () => {
+      if (accounts.length === 0) throw new Error('Connect at least one account.')
+      const current = await this.get(origin)
+      const merged = [...accounts, ...(current?.accounts ?? []).filter((a) => !accounts.some((x) => x.toLowerCase() === a.toLowerCase()))]
+      const permission: OriginPermission = { ...(current ?? {}), origin, accounts: merged, chain: current?.chain ?? chain, connectedAt: current?.connectedAt ?? Date.now() }
+      await this.write(origin, permission)
+      return permission
+    })
+  }
+
   /** Connect another chain's accounts to the same origin (one "connected sites" list). */
   connectChain(origin: string, key: ChainAccountsKey, accounts: string[], defaultChain: string): Promise<OriginPermission> {
     return this.serialize(async () => {
@@ -111,6 +127,11 @@ export class PermissionStore {
   }
 
   /**
+   * @deprecated Rewrites every origin's grant to the active account, which shows that account to sites
+   * the user never connected it to (and links accounts across sites). Grants are per site now: the
+   * router shows an origin its granted accounts that are also active, and connecting another account
+   * adds it to that one origin ({@link grant}). Kept for compatibility; nothing in this package calls it.
+   *
    * The active EVM account changed: every origin holding an EVM grant now sees `accounts` (MetaMask behaviour).
    * An origin connected only on another chain (`accounts: []` — Solana/TON/Tron/BTC/NEAR providers, a WalletConnect
    * session without eip155) is skipped: it never passed an EVM connect and must not learn the EVM address (scan F6/F8).

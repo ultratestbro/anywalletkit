@@ -15,7 +15,7 @@
  *   nothing sent (`ReviewDeclined`, 4001).
  */
 import type { CrossChainProvider, Quote, QuoteParams, Swap2ExecutionPlan } from '@anywalletkit/protocol-swap2-core'
-import { validQuote } from '@anywalletkit/protocol-swap2-core'
+import { slippageFloor, validQuote } from '@anywalletkit/protocol-swap2-core'
 import { typedDataHash } from '@anywalletkit/wallet-evm'
 import { ApprovalQueue } from './approvals.js'
 import { ReviewGate, chainTxMatcher, evmCallMatcher, typedDataMatcher, type GateMatcher } from './gate.js'
@@ -31,6 +31,38 @@ export interface RouteView {
   etaSeconds: number
   validUntilMs: number
   tags: ('best' | 'fastest')[]
+  /** Why this route is not a plain pick: a flagged route is never BEST (see {@link rank}). Absent when there is nothing to say. */
+  warnings?: RouteWarning[]
+}
+
+/**
+ * What the wallet cannot vouch for on a route — data for the app's list and sheet, never a refusal:
+ * - `min-below-slippage`: the provider's minimum sits `minGapBps` under its own quote, further than the `slippageBps`
+ *   the app asked for (a backend that inflates the output and drops the minimum would otherwise win BEST);
+ * - `deposit-address`: the route pays an address the provider's server assigns (a 1Click deposit address, a THORChain
+ *   inbound vault on a non-EVM source chain, a Bitcoin deposit address), so where the funds end up is that server's
+ *   word, not calldata the wallet can check.
+ */
+export type RouteWarning =
+  | { kind: 'min-below-slippage'; slippageBps: number; minGapBps: number }
+  | { kind: 'deposit-address' }
+
+/** The app's route policy inputs for {@link rank}. */
+export interface RankOptions {
+  /** The slippage the quotes were requested at (bps): a route whose minimum sits further under its output is flagged and never BEST. */
+  slippageBps?: number
+  /**
+   * Providers whose routes pay an address their server assigns (NEAR Intents 1Click): flagged, and BEST only when no
+   * route from any other provider exists. Which providers these are is the app's call.
+   */
+  depositAddressProviders?: readonly string[]
+  /**
+   * The same flag per route, for a provider that pays a server-assigned address only on some routes (a THORChain
+   * inbound vault on a non-EVM source chain, a Bitcoin deposit address) and verifiable calldata on the rest. A route is
+   * flagged when its provider is listed above OR this returns true; a throw counts as flagged. BEST goes to a flagged
+   * route only when every route is flagged. Which routes these are is the app's call.
+   */
+  depositAddressRoute?: (quote: Quote) => boolean
 }
 
 export interface RouteListView {
@@ -45,6 +77,10 @@ export interface RouteListView {
 
 export interface QuoteRoutesOptions {
   onUpdate?: (view: RouteListView) => void
+  /** See {@link RankOptions.depositAddressProviders}; the slippage comes from `params.slippageBps`. */
+  depositAddressProviders?: readonly string[]
+  /** {@link RankOptions.depositAddressRoute} with the request next to the quote (a quote does not name its source chain). */
+  depositAddressRoute?: (quote: Quote, params: QuoteParams) => boolean
   /** Per-provider wall clock (default 20 s). */
   timeoutMs?: number
   signal?: AbortSignal
@@ -70,7 +106,16 @@ export async function quoteRoutes(providers: readonly CrossChainProvider[], para
     candidates.push(p)
   }
   const pending = new Set(candidates.map((p) => p.name))
-  const view = (): RouteListView => ({ routes: rank(Object.values(quotes)), pending: [...pending], refusals: { ...refusals }, quotes: { ...quotes } })
+  const depositAddressRoute = options.depositAddressRoute
+  const rankOptions: RankOptions = {
+    ...(params.slippageBps !== undefined ? { slippageBps: params.slippageBps } : {}),
+    ...(options.depositAddressProviders ? { depositAddressProviders: options.depositAddressProviders } : {}),
+    ...(depositAddressRoute ? { depositAddressRoute: (q: Quote) => depositAddressRoute(q, params) } : {}),
+  }
+  // The requested slippage is the providers' input; a quote whose minimum still lands under it is shown with a
+  // warning (rank), not refused: quote-value issues are warnings, never blocks.
+  const { slippageBps: _slippage, ...shapeParams } = params
+  const view = (): RouteListView => ({ routes: rank(Object.values(quotes), rankOptions), pending: [...pending], refusals: { ...refusals }, quotes: { ...quotes } })
   const emit = () => options.onUpdate?.(view())
   emit()
   await Promise.all(
@@ -84,7 +129,7 @@ export async function quoteRoutes(providers: readonly CrossChainProvider[], para
         // Race the signal too: a provider that ignores it must not hold the list open forever.
         const aborted = new Promise<never>((_, reject) => ctrl.signal.addEventListener('abort', () => reject(ctrl.signal.reason instanceof Error ? ctrl.signal.reason : new Error(String(ctrl.signal.reason ?? 'cancelled'))), { once: true }))
         const q = await Promise.race([p.getQuote({ ...params, dry: true, onRefusal: (r) => { refusal = r } }, ctrl.signal), aborted])
-        if (q && validQuote(q, { ...params, dry: true }, p.name)) quotes[p.name] = q
+        if (q && validQuote(q, { ...shapeParams, dry: true }, p.name)) quotes[p.name] = q
         else refusals[p.name] = refusal ?? (q ? 'returned an invalid quote' : 'no route for this pair right now')
       } catch (e) {
         refusals[p.name] = ctrl.signal.aborted ? String(ctrl.signal.reason instanceof Error ? ctrl.signal.reason.message : ctrl.signal.reason ?? 'cancelled') : e instanceof Error ? e.message : String(e)
@@ -99,17 +144,57 @@ export async function quoteRoutes(providers: readonly CrossChainProvider[], para
   return view()
 }
 
-/** Highest output first (same destination token for every quote); FASTEST = lowest ETA among them. */
-export function rank(quotes: Quote[]): RouteView[] {
+/** How far `min` sits under `dest`, in whole bps (rounded up, so a gap is never understated). */
+function gapBps(dest: bigint, min: bigint): number {
+  if (dest <= 0n || min >= dest) return 0
+  return Number((((dest - min) * 10_000n + dest - 1n) / dest).toString()) // ≤ 10 000: min ≥ 0
+}
+
+/**
+ * Highest output first (same destination token for every quote); FASTEST = lowest ETA among them.
+ *
+ * BEST goes to the highest output among the routes without a {@link RouteWarning} that bars it: never a route whose
+ * minimum is below the requested slippage, and a deposit-address route only when every route is one (no route with
+ * verifiable calldata exists).
+ * The BEST route is listed first; the rest keep the output order. With no route eligible there is no BEST.
+ */
+export function rank(quotes: Quote[], options: RankOptions = {}): RouteView[] {
   const sorted = [...quotes].sort((a, b) => (BigInt(b.destAmount) > BigInt(a.destAmount) ? 1 : BigInt(b.destAmount) < BigInt(a.destAmount) ? -1 : a.feeUsd - b.feeUsd || a.etaSeconds - b.etaSeconds))
   const fastest = sorted.length ? sorted.reduce((f, q) => (q.etaSeconds < f.etaSeconds ? q : f)) : null
-  return sorted.map((q, i) => {
+  const depositProviders = new Set(options.depositAddressProviders ?? [])
+  const paysAssignedAddress = (q: Quote): boolean => {
+    if (depositProviders.has(q.provider)) return true
+    if (!options.depositAddressRoute) return false
+    // A policy hook that fails says nothing about the route: the warning is the safe side.
+    try { return options.depositAddressRoute(q) === true } catch { return true }
+  }
+  const assigned = new Map(sorted.map((q) => [q, paysAssignedAddress(q)] as const))
+  const s = options.slippageBps
+  const warningsOf = (q: Quote): RouteWarning[] => {
+    const w: RouteWarning[] = []
+    if (s !== undefined && Number.isInteger(s) && s >= 0 && s < 10_000) {
+      const dest = BigInt(q.destAmount)
+      const min = BigInt(q.minDestAmount)
+      if (min < slippageFloor(dest, s)) w.push({ kind: 'min-below-slippage', slippageBps: s, minGapBps: gapBps(dest, min) })
+    }
+    if (assigned.get(q)) w.push({ kind: 'deposit-address' })
+    return w
+  }
+  const warned = new Map(sorted.map((q) => [q, warningsOf(q)] as const))
+  const verifiableExists = sorted.some((q) => !assigned.get(q))
+  const best = sorted.find((q) => {
+    const w = warned.get(q)!
+    return !w.some((x) => x.kind === 'min-below-slippage') && !(w.some((x) => x.kind === 'deposit-address') && verifiableExists)
+  })
+  const ordered = best ? [best, ...sorted.filter((q) => q !== best)] : sorted
+  return ordered.map((q) => {
     const poolFee = q.providerData?.poolFee
     const feeNote = typeof poolFee === 'string' && poolFee && q.feeUsd === 0 ? (poolFee === 'pools' ? 'pool fees in price' : `pool ${poolFee} in price`) : undefined
     const tags: RouteView['tags'] = []
-    if (i === 0) tags.push('best')
+    if (q === best) tags.push('best')
     if (fastest && q.provider === fastest.provider) tags.push('fastest')
-    return { provider: q.provider, destAmount: q.destAmount, minDestAmount: q.minDestAmount, feeUsd: q.feeUsd, etaSeconds: q.etaSeconds, validUntilMs: q.validUntilMs, tags, ...(feeNote ? { feeNote } : {}) }
+    const warnings = warned.get(q)!
+    return { provider: q.provider, destAmount: q.destAmount, minDestAmount: q.minDestAmount, feeUsd: q.feeUsd, etaSeconds: q.etaSeconds, validUntilMs: q.validUntilMs, tags, ...(feeNote ? { feeNote } : {}), ...(warnings.length ? { warnings } : {}) }
   })
 }
 
@@ -136,6 +221,14 @@ export interface SwapReviewMeta {
   toChainName: string
   /** All of the user's addresses — recipient own/foreign. */
   own: string[]
+  /** The slippage the swap was quoted at (bps): a plan minimum further under its output is warned on the sheet (never refused). */
+  slippageBps?: number
+  /**
+   * The route pays an address the provider's server assigned (a NEAR Intents 1Click deposit address, a THORChain
+   * inbound vault on a non-EVM source chain, a Bitcoin deposit address — the app's call per route): the sheet warns,
+   * and the recipient check does not pass on `plan.recipient` alone — the transaction does not carry it.
+   */
+  depositAddressAssignedByProvider?: boolean
 }
 
 /** What the swap sheet renders. Amounts are base-unit strings. */
@@ -161,6 +254,10 @@ export interface SwapApproval {
     /** The EIP-712 order the account signs (gasless routes): `typedData` to render, `text` pretty JSON. */
     | { kind: 'typed-order'; typedData: TypedData; text: string }
   checks: { status: 'ok' | 'warn' | 'unknown'; label: string }[]
+  /** With `meta.slippageBps`: how far the minimum sits under the output, and whether that is more than the slippage. */
+  slippage?: { bps: number; minGapBps: number; below: boolean }
+  /** With `meta.depositAddressAssignedByProvider`: the funds go to an address the provider's server named. */
+  depositAssignedByProvider?: true
 }
 
 const APPROVE_SELECTOR = '0x095ea7b3'
@@ -177,18 +274,25 @@ function depositOf(s: { to: string; data?: string }, approvals: number): string 
   return `0x${s.data.slice(10 + 24, 10 + 64)}`
 }
 
+/** bps as a short percentage: 50 → "0.5%", 1000 → "10%", 125 → "1.25%". */
+const pct = (bps: number): string => `${Number((bps / 100).toFixed(2))}%`
+
 export function swapApprovalPayload(plan: Swap2ExecutionPlan, meta: SwapReviewMeta): SwapApproval {
   const isOwn = meta.own.some((a) => lc(a) === lc(plan.recipient))
+  const assigned = meta.depositAddressAssignedByProvider === true
   const checks: SwapApproval['checks'] = [{ status: 'ok', label: `Built by the ${meta.providerLabel} module` }]
+  const depositCheck: SwapApproval['checks'][number] = assigned
+    ? { status: 'warn', label: `Deposit address assigned by the ${meta.providerLabel} server — funds go to an address the wallet cannot verify` }
+    : { status: 'ok', label: `Deposit address from the ${meta.providerLabel} quote` }
   const s = plan.source
   let source: SwapApproval['source']
   if (s.kind === 'call') {
     const deposit = depositOf(s, plan.approvals.length)
     source = { kind: 'call', to: s.to, ...(s.data ? { data: s.data } : {}), value: s.value.toString(), ...(deposit ? { deposit } : {}) }
-    checks.push(deposit ? { status: 'ok', label: `Deposit address from the ${meta.providerLabel} quote` } : { status: 'ok', label: `Calls the ${meta.providerLabel} contract` })
+    checks.push(deposit || assigned ? depositCheck : { status: 'ok', label: `Calls the ${meta.providerLabel} contract` })
   } else if (s.kind === 'token-transfer') {
     source = { kind: 'token-transfer', token: s.token, recipient: s.recipient, amount: s.amount.toString(), ...(s.memo ? { memo: s.memo } : {}) }
-    checks.push({ status: 'ok', label: `Deposit address from the ${meta.providerLabel} quote` })
+    checks.push(depositCheck)
   } else if (s.kind === 'serialized') {
     source = { kind: 'serialized' }
     checks.push({ status: 'ok', label: 'Balance changes are proven before signing (SDK guard)' })
@@ -199,7 +303,21 @@ export function swapApprovalPayload(plan: Swap2ExecutionPlan, meta: SwapReviewMe
   }
   for (const a of plan.approvals) checks.push(a.amount > plan.sourceAmount ? { status: 'warn', label: 'Approval is larger than this swap needs' } : { status: 'ok', label: 'Approval is exactly the amount needed' })
   if (plan.approvals.length > 1) checks.push({ status: 'ok', label: `${plan.approvals.length} approvals (reset to 0 first)` })
-  checks.push(isOwn ? { status: 'ok', label: 'Funds arrive at your address' } : { status: 'warn', label: `Funds arrive at ${plan.recipient.slice(0, 6)}…${plan.recipient.slice(-4)}, not your address` })
+  // A deposit-address leg does not carry the recipient: "your address" is only the provider server's promise.
+  checks.push(!isOwn
+    ? { status: 'warn', label: `Funds arrive at ${plan.recipient.slice(0, 6)}…${plan.recipient.slice(-4)}, not your address` }
+    : assigned
+      ? { status: 'unknown', label: `Delivery to your address is the ${meta.providerLabel} server’s promise — this transaction does not enforce it` }
+      : { status: 'ok', label: 'Funds arrive at your address' })
+  let slippage: SwapApproval['slippage']
+  const sb = meta.slippageBps
+  if (sb !== undefined && Number.isInteger(sb) && sb >= 0 && sb < 10_000) {
+    const below = plan.minDestAmount < slippageFloor(plan.destAmount, sb)
+    slippage = { bps: sb, minGapBps: gapBps(plan.destAmount, plan.minDestAmount), below }
+    checks.push(below
+      ? { status: 'warn', label: `Minimum is ${pct(slippage.minGapBps)} under the quote — more than your ${pct(sb)} slippage` }
+      : { status: 'ok', label: `Minimum within your ${pct(sb)} slippage` })
+  }
   return {
     provider: plan.provider, providerLabel: meta.providerLabel, fromChain: plan.fromChain, toChain: plan.destChain, fromChainName: meta.fromChainName, toChainName: meta.toChainName,
     send: { symbol: meta.fromSymbol, decimals: meta.fromDecimals, amount: plan.sourceAmount.toString() },
@@ -207,6 +325,8 @@ export function swapApprovalPayload(plan: Swap2ExecutionPlan, meta: SwapReviewMe
     recipient: { address: plan.recipient, isOwn }, refundAddress: plan.refundAddress, feeUsd: plan.feeUsd, etaSeconds: plan.etaSeconds, validUntilMs: plan.validUntilMs,
     approvals: plan.approvals.map((a) => ({ token: a.token, spender: a.spender, amount: a.amount.toString() })),
     source, checks,
+    ...(slippage ? { slippage } : {}),
+    ...(assigned ? { depositAssignedByProvider: true as const } : {}),
   }
 }
 

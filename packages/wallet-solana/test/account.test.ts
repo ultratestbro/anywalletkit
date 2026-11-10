@@ -9,6 +9,7 @@ import { getTransferSolInstruction } from '@solana-program/system'
 import { TOKEN_PROGRAM_ADDRESS, getApproveInstruction, getCloseAccountInstruction, getMintEncoder, getSetAuthorityInstruction, AuthorityType } from '@solana-program/token'
 import { TOKEN_2022_PROGRAM_ADDRESS, getMintEncoder as getMint2022Encoder, getTransferCheckedWithFeeInstructionDataDecoder } from '@solana-program/token-2022'
 import {
+  FeeLimitExceededError,
   MissingSignersError, SimulationError, UnsafeTransactionError, WalletManagerSolana, ZERO_ADDRESS, computeUnitLimitFromSimulation, describeTransaction,
   pickPriorityPrice, type SolanaConfig, type SolanaRpc,
 } from '../src/index.js'
@@ -287,6 +288,10 @@ describe('WalletAccountSolana', () => {
     const { a, m, f } = await wallet(fakeRpc(), { transferMaxFee: 5100n, transactionMaxFee: 5100n })
     await expect(a.transfer({ recipient: RECIPIENT, amount: 1n })).rejects.toThrow(/maximum fee/)
     await expect(a.sendTransaction({ to: RECIPIENT, value: 1n })).rejects.toThrow(/maximum fee/)
+    // The cap in force and the fee that broke it are on the error: a wallet can show the new fee and ask again.
+    const over = await a.transfer({ recipient: RECIPIENT, amount: 1n }).catch((e: unknown) => e)
+    expect(over).toBeInstanceOf(FeeLimitExceededError)
+    expect(over).toMatchObject({ name: 'FeeLimitExceededError', code: 'fee-limit-exceeded', limit: 5100n, fee: 5154n })
     expect(f.sent).toHaveLength(0)
     const roomy = await wallet(fakeRpc(), { transferMaxFee: 5154n })
     await roomy.a.transfer({ recipient: RECIPIENT, amount: 1n })

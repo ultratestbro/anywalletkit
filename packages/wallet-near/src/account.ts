@@ -1,7 +1,7 @@
 import { LocalSigner, SignerError, feeLimit, requireCurve, type IWalletAccount, type IWalletAccountReadOnly, type Signer, type TransferResult, type WriteOptions } from '@anywalletkit/core'
 import { bytesToBase58, ed25519Key, implicitAccountId, publicKeyToString } from './address.js'
 import { decodeAnyTransaction, decodeTransaction, encodeSignedTransaction, encodeTransaction } from './borsh.js'
-import { BroadcastUnknownError, MessageIsTransactionError, SimulationError, UnsafeTransactionError } from './errors.js'
+import { BroadcastUnknownError, FeeLimitExceededError, MessageIsTransactionError, SimulationError, UnsafeTransactionError } from './errors.js'
 import { nep413Hash, type Nep413Payload, type Nep413Signed } from './nep413.js'
 import { WalletAccountReadOnlyNear, assertWellFormed, receiptOf } from './read-only-account.js'
 import { fromBase64, isDefinitiveBroadcast, outcomeFailed, toBase64 } from './rpc.js'
@@ -153,7 +153,7 @@ export class WalletAccountNear extends WalletAccountReadOnlyNear implements IWal
     this.assertSafe(built)
     const estimate = await this.estimate(built)
     this.assertSafe(built, estimate.fee)
-    if (maxFee !== undefined && estimate.fee > BigInt(maxFee)) throw new Error(`Exceeded maximum fee cost for ${op} operation${op === 'transfer' ? 's' : ''}.`)
+    if (maxFee !== undefined && estimate.fee > BigInt(maxFee)) throw new FeeLimitExceededError(estimate.fee, BigInt(maxFee), `Exceeded maximum fee cost for ${op} operation${op === 'transfer' ? 's' : ''}.`)
     if (this._config.simulate !== false) {
       const sim = await this.simulateTransaction(built, estimate)
       if (!sim.ok) throw new SimulationError(sim.reason ?? 'unknown')
