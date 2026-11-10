@@ -291,6 +291,9 @@ importers:
       '@anywalletkit/protocol-swap2-omniston':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-omniston
+      '@anywalletkit/protocol-swap2-relay':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-relay
       '@anywalletkit/protocol-swap2-router':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-router

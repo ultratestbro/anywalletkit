@@ -35,6 +35,7 @@
     "@anywalletkit/protocol-swap2-lifi": "workspace:*",
     "@anywalletkit/protocol-swap2-near-intents": "workspace:*",
     "@anywalletkit/protocol-swap2-omniston": "workspace:*",
+    "@anywalletkit/protocol-swap2-relay": "workspace:*",
     "@anywalletkit/protocol-swap2-router": "workspace:*",
     "@anywalletkit/protocol-swap2-thorchain": "workspace:*",
     "@anywalletkit/protocol-swap2-usdt0": "workspace:*",

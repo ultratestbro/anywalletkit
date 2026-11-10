@@ -30,6 +30,11 @@ import { curveProvider } from '@anywalletkit/protocol-swap2-curve/provider'
 import { CurveSwap2Protocol } from '@anywalletkit/protocol-swap2-curve/protocol'
 import { CURVE_DEPLOYMENTS, CURVE_POOLS, EXCHANGE_SELECTOR, curveVerifyQuote, decodeExchange, encodeExchange, findRoutes, routeArgs } from '@anywalletkit/protocol-swap2-curve'
 import curveQuotesLive from '../../packages/protocol-swap2-curve/fixtures/quotes/quotes-2026-11-06.json'
+import { RelaySwap2Protocol } from '@anywalletkit/protocol-swap2-relay/protocol'
+import { RELAY_SOLVERS, RelayRefusal, parseRelayOrder, relayOrderId, relayOrderSigner, relayProvider, verifyRelayOrder } from '@anywalletkit/protocol-swap2-relay'
+import relayVectors from '../../packages/protocol-swap2-relay/fixtures/orders/vectors.json'
+import relayUsdcLive from '../../packages/protocol-swap2-relay/fixtures/quotes/user.arb-usdc_base-usdc.json'
+import relayNativeLive from '../../packages/protocol-swap2-relay/fixtures/quotes/base-eth_arb-eth.json'
 import { encodeFunctionData, encodeFunctionResult } from 'viem'
 import { nearIntentsProvider } from '@anywalletkit/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@anywalletkit/protocol-swap2-thorchain/protocol'
@@ -168,6 +173,31 @@ export async function smokeProtocols(check: Check): Promise<void> {
     const cp = new CurveSwap2Protocol(evm, { ...swap2Cfg, rpcUrls: { 1: ['https://rpc.invalid'] } })
     check('curve: CurveSwap2Protocol constructs', typeof cp.quoteSwap2 === 'function')
     await tolerates(check, 'curve: getSupportedChains', () => cp.getSupportedChains())
+  }
+  {
+    // Relay: the order id is our own EIP-712 hashStruct and the solver signature is recovered here (keccak + secp256k1
+    // recovery on Hermes); recorded live quotes pass the whole on-device check and fail once the order pays someone else.
+    const solver = RELAY_SOLVERS[0]!.address
+    const vectors = relayVectors as unknown as { label: string; orderId: string; orderSignature?: string; orderData: unknown }[]
+    check(`relay: order hash vectors (${vectors.length})`, vectors.length >= 4 && vectors.every((v) => relayOrderId(parseRelayOrder(v.orderData)) === v.orderId))
+    check('relay: solver signature recovers to the pinned signer', vectors.filter((v) => v.orderSignature).length > 0
+      && vectors.filter((v) => v.orderSignature).every((v) => relayOrderSigner(v.orderId as `0x${string}`, v.orderSignature) === solver))
+    type Recorded = { request: { sourceChain: string; destChain: string; sourceToken: string; destToken: string; amount: string; depositor: string; recipient: string; nowMs: number }
+      response: { steps: { id: string; items: { data: { to: string; data: string; value: string; chainId: number } }[] }[]; protocol: { v2: Parameters<typeof verifyRelayOrder>[1] } } }
+    for (const [label, raw] of [['Arbitrum USDC → Base USDC', relayUsdcLive], ['Base ETH → Arbitrum ETH', relayNativeLive]] as const) {
+      const f = raw as unknown as Recorded
+      const request = { ...f.request, amount: BigInt(f.request.amount) }
+      const offered = f.response.steps.find((x) => x.id === 'deposit')!.items[0]!.data
+      const ok = verifyRelayOrder(request, f.response.protocol.v2, offered)
+      check(`relay: recorded quote passes the on-device check and the deposit is rebuilt byte for byte (${label})`, ok.deposit.data.toLowerCase() === offered.data.toLowerCase() && ok.deposit.to.toLowerCase() === offered.to.toLowerCase())
+      let code = ''
+      try { verifyRelayOrder({ ...request, recipient: '0x000000000000000000000000000000000000dEaD' }, f.response.protocol.v2, offered) } catch (e) { code = e instanceof RelayRefusal ? e.code : 'other' }
+      check(`relay: refuses the recorded order for another recipient (${label})`, code === 'output-recipient')
+    }
+    const relay = relayProvider()
+    check('relay: pinned EVM chains only', relay.supportsChain('eip155:42161') && relay.supportsChain('eip155:99901') && !relay.supportsChain('eip155:14') && !relay.supportsChain('solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'))
+    const rp = new RelaySwap2Protocol(evm, { ...swap2Cfg })
+    check('relay: RelaySwap2Protocol constructs', typeof rp.quoteSwap2 === 'function')
   }
   check('cctp: claimSwap2 on the router', typeof (router as unknown as { claimSwap2?: unknown }).claimSwap2 === 'function')
 
