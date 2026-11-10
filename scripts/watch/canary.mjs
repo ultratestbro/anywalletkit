@@ -95,6 +95,9 @@ if (existsSync(pkg("protocol-swap2-0x"))) jobs.push({id: "zeroex", module: "zero
 // decimals, the HubPool's registry) and /suggested-fees on nine corridors on the pinned SpokePools — keyless, always.
 // Live quotes (local and through createSwap2Handler) only with ACROSS_API_KEY; without it a neutral line, exit 0.
 if (existsSync(pkg("protocol-swap2-across"))) jobs.push({id: "across", module: "across", script: pkg("protocol-swap2-across"), args: [], timeoutS: 300});
+// CoW Protocol: per chain, the pinned settlement / vault relayer / eth-flow read on chain and read-only quotes through
+// the provider (an order and a permit signed by a throwaway key and verified locally; nothing is placed).
+for (const chainId of [1, 8453, 42161]) jobs.push({id: `cow:${chainId}`, module: "cow", script: pkg("protocol-swap2-cow"), args: [String(chainId)], env: {[`COW_RPC_${chainId}`]: rpcFor(chainId)}});
 
 const selected = jobs.filter((j) => !ONLY || ONLY.has(j.module) || ONLY.has(j.id));
 function run(job) {

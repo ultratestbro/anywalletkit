@@ -1,0 +1,91 @@
+{
+  "name": "@anywalletkit/protocol-swap2-cow",
+  "version": "0.0.0",
+  "description": "CoW Protocol same-chain swaps for Any Wallet Kit: gasless EIP-712 sell orders (EIP-2612 permit where the token has it), native-coin sells through eth-flow, cancellation and status on Ethereum, Base and Arbitrum \u2014 every order rebuilt and checked against the request before it is signed.",
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": {
+    "url": "https://github.com/ultratestbro/anywalletkit/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ultratestbro/anywalletkit.git",
+    "directory": "packages/protocol-swap2-cow"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./provider": {
+      "types": "./dist/provider.d.ts",
+      "import": "./dist/provider.js",
+      "require": "./dist/provider.cjs"
+    },
+    "./order": {
+      "types": "./dist/order.d.ts",
+      "import": "./dist/order.js",
+      "require": "./dist/order.cjs"
+    },
+    "./activity": {
+      "types": "./dist/activity.d.ts",
+      "import": "./dist/activity.js",
+      "require": "./dist/activity.cjs"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.ts",
+      "import": "./dist/protocol.js",
+      "require": "./dist/protocol.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "module.json",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": {
+    "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "viem": "^2.57.2"
+  },
+  "peerDependencies": {
+    "@anywalletkit/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "vitest": "^5.0.3",
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*"
+  },
+  "keywords": [
+    "swap2",
+    "swap",
+    "cow-protocol",
+    "cow-swap",
+    "intents",
+    "gasless",
+    "evm",
+    "anywalletkit"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

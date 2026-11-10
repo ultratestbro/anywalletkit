@@ -62,6 +62,7 @@ inside the router.
 | `@anywalletkit/protocol-swap2-relay` | Relay — EVM → EVM through the RelayDepository on 29 chains; the order is hashed and checked on the device, the deposit built locally; no key |
 | `@anywalletkit/protocol-swap2-0x` | 0x Swap API v2 same-chain swaps on 7 EVM chains through Permit2; the Settler comes from 0x's on-chain registry and every signed payload is checked on the device |
 | `@anywalletkit/protocol-swap2-across` | Across — EVM → EVM bridging of the same asset between 17 chains through a plain SpokePool deposit built and verified on the device; priced from Across API V5 against Across's relayer fee; API key on your server (`acrossRemoteProvider` in the app) |
+| `@anywalletkit/protocol-swap2-cow` | CoW Protocol — same-chain swaps as signed orders on Ethereum, Base and Arbitrum: gasless for tokens (EIP-712 order, EIP-2612 permit), native coin through eth-flow; no key, off by default |
 | `@anywalletkit/protocol-swap2-wrap` | Native ↔ wrapped native (ETH ↔ WETH and others) |
 | `@anywalletkit/protocol-swap2-jupiter` | Jupiter — same-chain Solana swaps; the transaction is assembled and checked locally, no Jupiter fee |
 

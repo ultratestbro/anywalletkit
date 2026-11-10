@@ -65,6 +65,13 @@ import { checkAcrossQuote, verifyAcrossDeposit } from '@anywalletkit/protocol-sw
 import acrossEthLive from '../../packages/protocol-swap2-across/fixtures/api/quotes/eth-arb-base-2000.json'
 import acrossUsdcLive from '../../packages/protocol-swap2-across/fixtures/api/quotes/usdc-base-arb-25.json'
 import { decodeFunctionData, encodeFunctionData, encodeFunctionResult, parseAbi } from 'viem'
+import { cowProvider } from '@anywalletkit/protocol-swap2-cow/provider'
+import { CowSwap2Protocol } from '@anywalletkit/protocol-swap2-cow/protocol'
+import {
+  COW_DEPLOYMENTS, COW_VAULT_RELAYER, ETH_FLOW_CREATE_SELECTOR, buildAppData, cowDomainSeparator, decodeEthFlowCall, encodeCreateOrder, ethFlowOrderId,
+  orderDigest, orderTypedData, orderUid, packEthFlowData, permitTypedData, signedBy, unpackEthFlowData,
+} from '@anywalletkit/protocol-swap2-cow'
+import { encodeFunctionData, encodeFunctionResult } from 'viem'
 import { nearIntentsProvider } from '@anywalletkit/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@anywalletkit/protocol-swap2-thorchain/protocol'
 import { THORNODE_CONFIRM_PATHS, thorchainPins, thorchainProvider } from '@anywalletkit/protocol-swap2-thorchain/provider'
@@ -96,7 +103,7 @@ import {
   decodeVault, decodeReserve, decodeObligation, vaultTokensPerShareWad, debtNow, farmUserState, plumbing, associatedTokenAddress,
 } from '@anywalletkit/protocol-lending-kamino-solana'
 import { unexpectedInstruction } from '@anywalletkit/wallet-solana'
-import { redactUrls, tonRawAddress, refusal, refusalOf, withReason, httpRefusal, parseRetryAfter, combinedRefusal, refusalNotes, Swap2QuoteError, SWAP2_REFUSAL_REASONS, appendPermit2Signature, permit2TransferJson, readPermit2Transfer } from '@anywalletkit/protocol-swap2-core'
+import { assertGpv2Order, redactUrls, tonRawAddress, refusal, refusalOf, withReason, httpRefusal, parseRetryAfter, combinedRefusal, refusalNotes, Swap2QuoteError, SWAP2_REFUSAL_REASONS, appendPermit2Signature, permit2TransferJson, readPermit2Transfer } from '@anywalletkit/protocol-swap2-core'
 import ApprovalsProtocolEvm, { isRevokeCalldata, isUnlimitedAmount } from '@anywalletkit/protocol-approvals-evm'
 
 type Check = (what: string, ok: boolean, detail?: string) => void
@@ -624,6 +631,50 @@ export async function smokeProtocols(check: Check): Promise<void> {
     check('across: V5 fee-cap refusal with amountLimits.side min reads as amount_too_small', parseAcrossV5Error(400, { error: { code: 'policy.amount_out_of_range', message: 'raise the amount above 1 base units', details: { amountLimits: { side: 'min', amount: '1' } } } }).info?.reason === 'amount_too_small')
     const ap = new AcrossSwap2Protocol(evm, { ...swap2Cfg })
     check('across: AcrossSwap2Protocol constructs (no key: disabled)', typeof ap.quoteSwap2 === 'function')
+    // CoW Protocol: the EIP-712 order digest and UID of a real mainnet order and its owner's signature (keccak, ABI
+    // encoding and secp256k1 recovery under Hermes), the appData hash the orderbook confirmed, the eth-flow order
+    // round trip (uint256 / uint32 / int64 words), and core's own gate on the typed data the provider hands out.
+    const off = cowProvider({})
+    const cow = cowProvider({ enabled: true })
+    const usdcBase = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', wethBase = '0x4200000000000000000000000000000000000006'
+    check('cow: off by default; on, same-chain on Base and never across chains', !off.enabled() && cow.enabled()
+      && cow.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:8453', token: wethBase })
+      && !cow.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:42161', token: 'USDC' })
+      && !cow.supportsRoute({ chain: 'eip155:10', token: 'USDC' }, { chain: 'eip155:10', token: 'USDT' }))
+    const owner = '0x479c9148a3a409694c309436eb9b1992c88b67cc'
+    const real = {
+      sellToken: '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', buyToken: '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', receiver: owner,
+      sellAmount: '199691156692397702', buyAmount: '567021', validTo: 1794266282, appData: '0xc7615b42274337b3360c10e8870527dac5e61844d70ac1d88022a0f8c2bb219b',
+      feeAmount: '0', kind: 'sell', partiallyFillable: false, sellTokenBalance: 'erc20', buyTokenBalance: 'erc20',
+    } as const
+    const digest = orderDigest(1, real)
+    check('cow: domain separators of Ethereum, Base and Arbitrum', cowDomainSeparator(1) === '0xc078f884a2676e1345748b1feace7b0abee5d00ecadb6e574dcdd109a63e8943'
+      && cowDomainSeparator(8453) === '0xd72ffa789b6fae41254d0b5a13e6e1e92ed947ec6a251edf1cf0b6c02c257b4b' && cowDomainSeparator(42161) === '0x69d78e7a7cafcaf924483f99f65e8f4e303a99a446db7ab319f9d40e940bced2')
+    check('cow: digest and UID of a real mainnet order', orderUid(digest, owner, real.validTo) === '0x8c53cd3ba6afe1aa26753328f94c5e4aab9022a7272639d6d87dfe8e28e9c812479c9148a3a409694c309436eb9b1992c88b67cc6af254aa', digest)
+    const realSig = '0xb193e19c4528f2e5286f4cb09aa1521faa53c8d366738f6ffdb6e602fbab013200c2a3a751683c97f17c7d11ce1e970a080ab9e4ff172574f404c14969baba1f1b'
+    check('cow: the owner\'s EIP-712 signature recovers the owner, and no one else', await signedBy(digest, realSig, owner) && !(await signedBy(digest, realSig, '0x000000000000000000000000000000000000dEaD')))
+    check('cow: default appData document hash', buildAppData({ slippageBps: 50 }).hash === '0x1fc7dfb9bfb16e9ba1136920e86cb315962f298f72e605a4f4949828b53715da')
+    const now = Math.floor(Date.now() / 1000)
+    const mine = { ...real, sellToken: usdcBase, buyToken: wethBase, receiver: '0x000000000000000000000000000000000000dEaD', sellAmount: '5000000', buyAmount: '1400000000000000', validTo: now + 1200 }
+    const expectation = { self: mine.receiver, token: usdcBase, amount: '5000000', chainId: 8453, recipient: mine.receiver, destToken: wethBase, minDest: '1400000000000000', now }
+    const typed = JSON.stringify(orderTypedData(8453, mine))
+    let gate = false, bent = false
+    try { gate = assertGpv2Order(typed, COW_VAULT_RELAYER, expectation).validTo === mine.validTo } catch { /* reported below */ }
+    try { assertGpv2Order(JSON.stringify(orderTypedData(8453, { ...mine, receiver: owner })), COW_VAULT_RELAYER, expectation) } catch { bent = true }
+    check('cow: core\'s order gate accepts the order and refuses another receiver', gate && bent)
+    const permit = permitTypedData({ chainId: 8453, token: usdcBase, domain: { name: 'USD Coin', version: '2' }, owner: mine.receiver, value: '5000000', nonce: '0', deadline: mine.validTo })
+    check('cow: permit names the vault relayer and the exact amount', permit.message.spender.toLowerCase() === COW_VAULT_RELAYER.toLowerCase() && permit.message.value === '5000000', JSON.stringify(permit.message))
+    const flow = { buyToken: usdcBase, receiver: mine.receiver, sellAmount: (5n * 10n ** 16n).toString(), buyAmount: '150000000', appData: buildAppData({ slippageBps: 50 }).hash, validTo: now + 1200, quoteId: 987654321 }
+    const call = encodeCreateOrder(flow)
+    const back = decodeEthFlowCall(call)
+    const packed = unpackEthFlowData(packEthFlowData(flow))
+    check('cow: eth-flow createOrder encodes, decodes and packs back', call.slice(0, 10) === ETH_FLOW_CREATE_SELECTOR && back?.method === 'createOrder' && back.order.sellAmount === flow.sellAmount
+      && back.order.validTo === flow.validTo && back.order.quoteId === flow.quoteId && packed?.buyAmount === flow.buyAmount && packed.quoteId === flow.quoteId && packed.validTo === flow.validTo)
+    const flowId = ethFlowOrderId(COW_DEPLOYMENTS[8453]!, flow)
+    check('cow: eth-flow order UID is owned by the eth-flow contract and never expires', flowId.uid.length === 114 && flowId.uid.slice(66, 106) === COW_DEPLOYMENTS[8453]!.ethFlow.slice(2).toLowerCase() && flowId.uid.endsWith('ffffffff'))
+    const cowP = new CowSwap2Protocol(evm, { ...swap2Cfg, enabled: true })
+    check('cow: CowSwap2Protocol constructs', typeof cowP.quoteSwap2 === 'function' && typeof cowP.cancelSwap2 === 'function')
+    await tolerates(check, 'cow: getSupportedChains', () => cowP.getSupportedChains())
   }
   check('cctp: claimSwap2 on the router', typeof (router as unknown as { claimSwap2?: unknown }).claimSwap2 === 'function')
 

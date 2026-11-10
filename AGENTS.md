@@ -11,7 +11,7 @@ per-package `README.md` (shipped inside each npm package). Do not invent APIs.
 
 An open multichain wallet SDK in TypeScript. One seed (or an external signer) gives accounts on
 EVM (30+ networks), Solana, TON, Tron, Bitcoin, NEAR and Zcash. Protocol modules add swaps and
-bridges (one router over 17 venues), staking, lending, approvals, history and names. React Native
+bridges (one router over 18 venues), staking, lending, approvals, history and names. React Native
 (Hermes) is the primary target; Node ≥ 20 works without polyfills. ESM + CJS, types included.
 
 All packages are `@anywalletkit/*` **on npm** (https://www.npmjs.com/org/anywalletkit), published from
@@ -34,7 +34,7 @@ into the app; never install from GitHub.
 | Seed on the phone (Face ID / passcode) | `secure-storage-react-native` (Expo module: dev build, not Expo Go) |
 | Encrypted backup file / iCloud backup | `seed-vault`, `backup-cloud` |
 | Hermes polyfills | `runtime-hermes` |
-| Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,stargate,uniswap,balancer,curve,wrap,jupiter,omniston,fynd,relay,symbiosis,0x,across}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
+| Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,stargate,uniswap,balancer,curve,cow,wrap,jupiter,omniston,fynd,relay,symbiosis,0x,across}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
 | Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana,native-monad,native-near,liquid-near}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana,curve-evm}` |
 | Safety and data | `tx-preview-evm`, `tx-preview-solana`, `shutter`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks`, `tokens` |
 | dApp connection | `walletconnect-ton` (WalletConnect for TON dApps); `extension-kit` (browser extension) |
@@ -291,7 +291,7 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
   or a string) on a server only — under React Native a provider with a key throws; the app runs
   `zeroExRemoteProvider` (with its own `rpcUrls`). Across needs its API V5 key
   (`apiKey`, a getter or a string): keep it on a server, the app runs `acrossRemoteProvider`. Chainflip, Uniswap,
-  Balancer, Curve, Wrap, CCTP, USDT0, Stargate need no key; on-chain venues need `rpcUrls`.
+  Balancer, Curve, CoW, Wrap, CCTP, USDT0, Stargate need no key; on-chain venues need `rpcUrls`.
 - Curve (`curveProvider({ rpcUrls: { 1: [url] } })`, chain ids as keys): same-chain Router NG over a pool allowlist
   pinned in the package (1–2 pools; between them only catalog tokens); no gas limit in the quote (the wallet
   estimates at broadcast); Ethereum swaps belong on an MEV-protected RPC. Behind a backend use
@@ -339,6 +339,11 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
   paid). Bus retired (refused); Scroll refused from 2026-12-08. Opt-in `compose: { enabled: true }` on provider AND pins:
   USDC / USDT → another ERC-20 on Ethereum (`routeId: 'compose'`, LI.FI receiver + one Uniswap V3 swap; `partial` = the
   bridged stablecoin paid on Ethereum).
+- CoW (`cowProvider({ enabled: true, enabledChains: [8453], rpcUrls? })`, **off by default**): same-chain signed orders on
+  Ethereum, Base, Arbitrum. The account needs `signTypedData` (EIP-712 only). Token sell = permit + order signatures
+  (no gas) or one exact approval + signature; native sell = one eth-flow transaction. The swap is `pending` until a
+  solver fills it or `validTo` (20 min) passes. `protocol.cancelSwap2(id, account, { onchain? })` cancels;
+  `claimSwap2(id, account)` refunds an expired native-coin order. Runs on the device, not behind `remoteProvider`.
 - Also via the kit: `wallet.registerProtocol('swap', RouterSwap2Protocol, { chain, config: { fromChain: chain, providers } })`
   then `await wallet.getProtocol<RouterSwap2Protocol>('swap')` — policies then wrap the router's account.
 

@@ -1,0 +1,288 @@
+{
+  "module": "@anywalletkit/protocol-swap2-cow",
+  "sources": [
+    {
+      "id": "settlement-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x9008D19f58AAbD9eD0D60971565AA8510560ab41",
+      "label": "GPv2Settlement · Ethereum"
+    },
+    {
+      "id": "vault-relayer-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0xC92E8bdf79f0507f65a392b0ab4667716BFE0110",
+      "label": "GPv2VaultRelayer · Ethereum"
+    },
+    {
+      "id": "eth-flow-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0xbA3cB449bD2B4ADddBc894D8697F5170800EAdeC",
+      "label": "CoWSwapEthFlow (production) · Ethereum"
+    },
+    {
+      "id": "settlement-domain-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x9008D19f58AAbD9eD0D60971565AA8510560ab41",
+      "signature": "domainSeparator()",
+      "decode": "bytes32",
+      "label": "GPv2Settlement domainSeparator() · Ethereum (the EIP-712 domain every order is signed under)"
+    },
+    {
+      "id": "settlement-relayer-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x9008D19f58AAbD9eD0D60971565AA8510560ab41",
+      "signature": "vaultRelayer()",
+      "decode": "address",
+      "label": "GPv2Settlement vaultRelayer() · Ethereum (the pinned allowance spender)"
+    },
+    {
+      "id": "eth-flow-settlement-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0xbA3cB449bD2B4ADddBc894D8697F5170800EAdeC",
+      "signature": "cowSwapSettlement()",
+      "decode": "address",
+      "label": "CoWSwapEthFlow cowSwapSettlement() · Ethereum"
+    },
+    {
+      "id": "eth-flow-wrapped-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0xbA3cB449bD2B4ADddBc894D8697F5170800EAdeC",
+      "signature": "wrappedNativeToken()",
+      "decode": "address",
+      "label": "CoWSwapEthFlow wrappedNativeToken() · Ethereum (pinned wrapped native)"
+    },
+    {
+      "id": "eth-flow-deployment-ethereum",
+      "type": "github-file",
+      "repo": "cowprotocol/ethflowcontract",
+      "path": "broadcast/Deploy.sol/1/deployment.prod.json",
+      "label": "ethflowcontract production deployment · Ethereum"
+    },
+    {
+      "id": "settlement-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x9008D19f58AAbD9eD0D60971565AA8510560ab41",
+      "label": "GPv2Settlement · Base"
+    },
+    {
+      "id": "vault-relayer-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0xC92E8bdf79f0507f65a392b0ab4667716BFE0110",
+      "label": "GPv2VaultRelayer · Base"
+    },
+    {
+      "id": "eth-flow-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0xbA3cB449bD2B4ADddBc894D8697F5170800EAdeC",
+      "label": "CoWSwapEthFlow (production) · Base"
+    },
+    {
+      "id": "settlement-domain-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0x9008D19f58AAbD9eD0D60971565AA8510560ab41",
+      "signature": "domainSeparator()",
+      "decode": "bytes32",
+      "label": "GPv2Settlement domainSeparator() · Base (the EIP-712 domain every order is signed under)"
+    },
+    {
+      "id": "settlement-relayer-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0x9008D19f58AAbD9eD0D60971565AA8510560ab41",
+      "signature": "vaultRelayer()",
+      "decode": "address",
+      "label": "GPv2Settlement vaultRelayer() · Base (the pinned allowance spender)"
+    },
+    {
+      "id": "eth-flow-settlement-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0xbA3cB449bD2B4ADddBc894D8697F5170800EAdeC",
+      "signature": "cowSwapSettlement()",
+      "decode": "address",
+      "label": "CoWSwapEthFlow cowSwapSettlement() · Base"
+    },
+    {
+      "id": "eth-flow-wrapped-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0xbA3cB449bD2B4ADddBc894D8697F5170800EAdeC",
+      "signature": "wrappedNativeToken()",
+      "decode": "address",
+      "label": "CoWSwapEthFlow wrappedNativeToken() · Base (pinned wrapped native)"
+    },
+    {
+      "id": "eth-flow-deployment-base",
+      "type": "github-file",
+      "repo": "cowprotocol/ethflowcontract",
+      "path": "broadcast/Deploy.sol/8453/deployment.prod.json",
+      "label": "ethflowcontract production deployment · Base"
+    },
+    {
+      "id": "settlement-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x9008D19f58AAbD9eD0D60971565AA8510560ab41",
+      "label": "GPv2Settlement · Arbitrum"
+    },
+    {
+      "id": "vault-relayer-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0xC92E8bdf79f0507f65a392b0ab4667716BFE0110",
+      "label": "GPv2VaultRelayer · Arbitrum"
+    },
+    {
+      "id": "eth-flow-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0xbA3cB449bD2B4ADddBc894D8697F5170800EAdeC",
+      "label": "CoWSwapEthFlow (production) · Arbitrum"
+    },
+    {
+      "id": "settlement-domain-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x9008D19f58AAbD9eD0D60971565AA8510560ab41",
+      "signature": "domainSeparator()",
+      "decode": "bytes32",
+      "label": "GPv2Settlement domainSeparator() · Arbitrum (the EIP-712 domain every order is signed under)"
+    },
+    {
+      "id": "settlement-relayer-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x9008D19f58AAbD9eD0D60971565AA8510560ab41",
+      "signature": "vaultRelayer()",
+      "decode": "address",
+      "label": "GPv2Settlement vaultRelayer() · Arbitrum (the pinned allowance spender)"
+    },
+    {
+      "id": "eth-flow-settlement-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0xbA3cB449bD2B4ADddBc894D8697F5170800EAdeC",
+      "signature": "cowSwapSettlement()",
+      "decode": "address",
+      "label": "CoWSwapEthFlow cowSwapSettlement() · Arbitrum"
+    },
+    {
+      "id": "eth-flow-wrapped-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0xbA3cB449bD2B4ADddBc894D8697F5170800EAdeC",
+      "signature": "wrappedNativeToken()",
+      "decode": "address",
+      "label": "CoWSwapEthFlow wrappedNativeToken() · Arbitrum (pinned wrapped native)"
+    },
+    {
+      "id": "eth-flow-deployment-arbitrum",
+      "type": "github-file",
+      "repo": "cowprotocol/ethflowcontract",
+      "path": "broadcast/Deploy.sol/42161/deployment.prod.json",
+      "label": "ethflowcontract production deployment · Arbitrum"
+    },
+    {
+      "id": "contracts-networks",
+      "type": "github-file",
+      "repo": "cowprotocol/contracts",
+      "path": "networks.json",
+      "label": "cowprotocol/contracts networks.json (GPv2Settlement / GPv2VaultRelayer per chain)"
+    },
+    {
+      "id": "contracts-order",
+      "type": "github-file",
+      "repo": "cowprotocol/contracts",
+      "path": "src/contracts/libraries/GPv2Order.sol",
+      "label": "GPv2Order.sol (order struct, type hash, UID packing)"
+    },
+    {
+      "id": "contracts-signing",
+      "type": "github-file",
+      "repo": "cowprotocol/contracts",
+      "path": "src/contracts/mixins/GPv2Signing.sol",
+      "label": "GPv2Signing.sol (EIP-712 domain, signing schemes)"
+    },
+    {
+      "id": "eth-flow-source",
+      "type": "github-file",
+      "repo": "cowprotocol/ethflowcontract",
+      "path": "src/CoWSwapEthFlow.sol",
+      "label": "CoWSwapEthFlow.sol (createOrder / invalidateOrder)"
+    },
+    {
+      "id": "eth-flow-order",
+      "type": "github-file",
+      "repo": "cowprotocol/ethflowcontract",
+      "path": "src/libraries/EthFlowOrder.sol",
+      "label": "EthFlowOrder.sol (order data, the GPv2 order it becomes)"
+    },
+    {
+      "id": "eth-flow-releases",
+      "type": "github-releases",
+      "repo": "cowprotocol/ethflowcontract",
+      "label": "ethflowcontract releases"
+    },
+    {
+      "id": "orderbook-openapi",
+      "type": "github-file",
+      "repo": "cowprotocol/services",
+      "path": "crates/orderbook/openapi.yml",
+      "label": "Order Book API openapi.yml (quote, orders, cancellation, app_data, error types)"
+    },
+    {
+      "id": "services-releases",
+      "type": "github-releases",
+      "repo": "cowprotocol/services",
+      "label": "cowprotocol/services releases (orderbook)"
+    },
+    {
+      "id": "app-data-schema",
+      "type": "github-file",
+      "repo": "cowprotocol/cow-sdk",
+      "path": "packages/app-data/src/schemas/v1.16.0.json",
+      "label": "appData schema v1.16.0 (the document version this module writes)"
+    },
+    {
+      "id": "docs-order-book-api",
+      "type": "http-text",
+      "url": "https://docs.cow.fi/cow-protocol/reference/apis/orderbook",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "CoW docs · Order Book API"
+    },
+    {
+      "id": "docs-eth-flow",
+      "type": "http-text",
+      "url": "https://docs.cow.fi/cow-protocol/reference/contracts/periphery/eth-flow",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "CoW docs · Eth-flow"
+    },
+    {
+      "id": "docs-signing-schemes",
+      "type": "http-text",
+      "url": "https://docs.cow.fi/cow-protocol/reference/core/signing-schemes",
+      "between": [
+        "<main",
+        "</main>"
+      ],
+      "label": "CoW docs · Signing schemes"
+    }
+  ]
+}

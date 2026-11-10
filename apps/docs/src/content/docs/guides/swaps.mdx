@@ -47,6 +47,7 @@ app, and each provider also works on its own without the router.
 | `stargate` | Stargate V2 Taxi (LayerZero) | USDC, USDT and ETH between 15 EVM chains from the pools, no API key; delivery and paid recovery checked against the chain. Opt-in `compose` route swaps into another ERC-20 on Ethereum. Off until `enabled: true` ([below](#stargate)) |
 | `uniswap`, `balancer` | On-chain DEX | Same-chain, priced from the contracts, no API key |
 | `curve` | On-chain DEX (Curve Router NG) | Same-chain stablecoin, ETH ↔ LST and crvUSD swaps from the contracts over a pinned pool allowlist; no API, no key, no fee ([below](#curve)) |
+| `cow` | Intents (CoW Protocol orders) | Same-chain swaps on Ethereum, Base and Arbitrum that solvers fill: no gas coin needed for a token swap (EIP-712 order, EIP-2612 permit where the token has one), native coin through eth-flow; orders can be cancelled; no key, off by default ([below](#cow-protocol)) |
 | `wrap` | WETH9 | Native ↔ wrapped native, 1:1 |
 | `jupiter` | Solana aggregator (Metis) | Same-chain Solana swaps; instructions from Jupiter's `/build`, checked and assembled locally, no Jupiter fee; key optional |
 | `fynd` | EVM aggregator (Propeller Heads) | Same-chain swaps on Ethereum, Base, Arbitrum, BNB Chain, Polygon, Unichain, Robinhood Chain, Arc and Elysium through the Tycho router; key or your own Fynd server. Its outputs are under the [Fynd License](https://github.com/propeller-heads/fynd/blob/main/LICENSE.md): read it before you ship |
@@ -260,6 +261,38 @@ const providers = [remoteProvider({ name: 'stargate', baseUrl, headers, ...starg
   USDT source can deliver another ERC-20 on Ethereum (`routeId: 'compose'`): Taxi into the pinned
   LI.FI receiver plus one Uniswap V3 swap the SDK encodes itself. If the swap does not run, the
   bridged stablecoin is paid to the recipient on Ethereum and the route reports `partial`.
+
+### CoW Protocol
+
+`@anywalletkit/protocol-swap2-cow` places the swap as an order: the account signs it, CoW's solvers
+compete to fill it, and the network cost is taken from the sold token. It ships off — pass
+`enabled: true` (and `enabledChains` to roll out chain by chain).
+
+```ts
+import { cowProvider } from '@anywalletkit/protocol-swap2-cow'
+
+const cow = cowProvider({ enabled: true, enabledChains: [8453], rpcUrls: { 8453: ['https://base.example/rpc'] } })
+```
+
+- **Selling a token** costs no gas when the token has EIP-2612 `permit` (the account signs the
+  permit, then the order) or is already approved; otherwise one exact approval to the vault relayer
+  comes first. The permit needs `rpcUrls`.
+- **Selling the native coin** is one transaction to eth-flow (`createOrder`); the coin is held by the
+  contract until the order fills, and returns if it expires. `claimSwap2(id, account)` builds that
+  refund when CoW's refund service has not sent it.
+- **Signing is EIP-712 typed data only**, so the account must implement `signTypedData`; the module
+  never asks for a signature over a bare order digest.
+- **An order is not a transaction.** `swap2()` returns once the order is placed; the status stays
+  `pending` until a solver fills it or it expires (20 minutes by default). An unfilled token order
+  costs nothing — the tokens never left the account.
+- **Cancel** with `cancelSwap2(id, account)` (a signed request to the orderbook, free) or
+  `cancelSwap2(id, account, { onchain: true })` (a transaction, binding).
+- **Checked before signing:** the order is written on the device from the request; the quote only
+  fills in amounts, which are held to the slippage and the caller's minimum. The settlement
+  contract, vault relayer and eth-flow are pinned per chain; the signed fee is always 0; appData is
+  the hash of the document the module wrote (no partner fee, no hooks but its own permit).
+- **Runs on the device** against the public orderbook (`api.cow.fi`), no key. It is not meant to sit
+  behind `remoteProvider`.
 
 ## 2. Create the router
 
