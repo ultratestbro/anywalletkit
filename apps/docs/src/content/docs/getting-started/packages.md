@@ -50,6 +50,7 @@ inside the router.
 | `@anywalletkit/protocol-swap2-lifi` | LI.FI — same-chain and cross-chain |
 | `@anywalletkit/protocol-swap2-thorchain` | THORChain — native cross-chain swaps |
 | `@anywalletkit/protocol-swap2-chainflip` | Chainflip — native BTC, ETH, SOL, TRX and stablecoins between Ethereum, Arbitrum, Solana, Tron and Bitcoin; no key, 0 bps |
+| `@anywalletkit/protocol-swap2-symbiosis` | Symbiosis — cross-chain swaps between seven EVM chains, Tron and TON (EVM and TON sources, Tron opt-in); calldata decoded and bound before signing; no key, 0 bps |
 | `@anywalletkit/protocol-swap2-omniston` | STON.fi Omniston — TON swaps, TON ↔ EVM and EVM ↔ EVM stablecoin orders |
 | `@anywalletkit/protocol-swap2-cctp` | Circle CCTP V2 — native USDC between EVM chains |
 | `@anywalletkit/protocol-swap2-usdt0` | USDT0 — Tether's LayerZero OFT: USDT between 16 EVM chains in one transaction |

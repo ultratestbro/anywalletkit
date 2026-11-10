@@ -75,6 +75,7 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 | `@anywalletkit/protocol-swap2-cctp` | Circle CCTP V2: native USDC burn-and-mint between 17 EVM chains, Fast / Standard by Circle's fee API, two-phase delivery (`claimSwap2` with the user's `receiveMessage`), preflight against the real contracts |
 | `@anywalletkit/protocol-swap2-usdt0` | USDT0 (the LayerZero OFT for USDT): USDT / USDT0 between 16 EVM chains in one source transaction — `quoteOFT` + `quoteSend` on the OFT itself, `send` with the LayerZero fee as `msg.value`, approval only for the Ethereum adapter, status from LayerZero Scan, `lzReceive` retry of a stored payload as the claim; the only direct USDT path into HyperEVM; every deployment re-verified on-chain |
 | `@anywalletkit/protocol-swap2-chainflip` | Chainflip vault swaps: native BTC / ETH / SOL / TRX and USDC / USDT across Ethereum, Arbitrum, Solana, Tron and Bitcoin through Chainflip's public backend (its own broker, 0 bps, no account); sources Ethereum, Arbitrum and Tron (Tron: a plain USDT transfer to the Vault with the swap in the note — no approval); every byte the encoder returns decoded and checked before signing; fill-or-kill refunds to the sender |
+| `@anywalletkit/protocol-swap2-symbiosis` | Symbiosis cross-chain swaps through its public REST API (no key, no partner id, 0 bps of ours): Ethereum, BNB Chain, Avalanche, Polygon, Arbitrum, Optimism and Base plus TON as sources, Tron as an opt-in source, all nine as destinations; one transaction to the pinned MetaRouterGateway (or one jetton transfer to the pinned TON portal) with the calldata decoded and bound to the request — pools, path, destination call, recipient, minimum — before a quote is shown; routes whose calldata cannot be read are refused; limits enforced locally; stuck / reverted states reported as they are |
 | `@anywalletkit/protocol-swap2-uniswap` | Uniswap v3 straight from the contracts on 16 chains: QuoterV2 quotes (every fee tier + two-hop via WETH/USDC/USDT/USDT0 in one RPC batch; a pool too shallow for the input — a partial fill at the price bound — or a minimum that rounds to 0 is refused by name), SwapRouter02 `multicall` execution with deadline, native in/out (wrap via value, `unwrapWETH9`), exact approvals, deployment re-verified on-chain; no API key, no frontend — the permissionless same-chain venue |
 | `@anywalletkit/protocol-swap2-wrap` | native ↔ wrapped native (ETH↔WETH, BNB↔WBNB, POL↔WPOL, AVAX↔WAVAX, HYPE↔WHYPE… 27 EVM chains) as a same-chain swap2 venue: WETH9 `deposit()` / `withdraw()`, 1:1, no approval, sender-only, tokens verified on-chain; wrapped natives added to the asset catalog |
 | `@anywalletkit/protocol-swap2-balancer` | Balancer v2 same-chain swaps on 9 chains (the cp0x permissionless Balancer venue): the SOR API only suggests the path; the Vault prices it on-chain (`queryBatchSwap`) and `batchSwap` enforces `limits` + deadline; split and multi-hop paths, native via the Vault's ETH sentinel, preflight re-price |
@@ -104,7 +105,7 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 | `@anywalletkit/extension-kit` | Chromium (MV3) wallet-extension core: scrypt vault with passkey (PRF) unlock, auto-locking session, dApp request router + per-origin permissions + approval queue, signing checks (SIWE, EIP-7702, address poisoning, phishing list), swap / Earn plan review, TON Connect data, chrome adapters; no UI — the extension itself is the wallet's own product |
 
 Every protocol module ships a `module.json`; `pnpm registry` builds
-[registry/modules.json](registry/modules.json) from them (29 modules today). See
+[registry/modules.json](registry/modules.json) from them (30 modules today). See
 [registry/README.md](registry/README.md) for tiers and how to list an external module.
 
 User documentation: [docs.anywallet.tech](https://docs.anywallet.tech) (sources in `apps/docs`).
@@ -133,7 +134,7 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 
 ## Tests
 
-`pnpm test` runs 4,300+ tests across 52 packages (Node); `pnpm test:hermes` runs 397
+`pnpm test` runs 4,300+ tests across 53 packages (Node); `pnpm test:hermes` runs 401
 checks in the Hermes VM React Native ships. Beyond unit tests the swap layer is
 checked against live providers (running totals, November 2026): 149,728 quote checks
 (13 providers, up to 36 chains, 398 assets), 65,481 builds simulated to the

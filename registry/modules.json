@@ -1,7 +1,7 @@
 {
   "$schema": "./modules.schema.json",
-  "generatedAt": "2026-11-08",
-  "count": 29,
+  "generatedAt": "2026-11-10",
+  "count": 30,
   "modules": [
     {
       "name": "@anywalletkit/protocol-approvals-evm",
@@ -456,6 +456,30 @@
       "path": "packages/protocol-swap2-router",
       "description": "Optional aggregator: auctions the swap2 providers you install and pass in, executes the winner. Chains = union of our provider modules.",
       "addedAt": "2026-10-04"
+    },
+    {
+      "name": "@anywalletkit/protocol-swap2-symbiosis",
+      "type": "swap2",
+      "chains": [
+        "eip155:1",
+        "eip155:10",
+        "eip155:137",
+        "eip155:42161",
+        "eip155:43114",
+        "eip155:56",
+        "eip155:8453",
+        "ton:-239",
+        "tron:728126428"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
+      "path": "packages/protocol-swap2-symbiosis",
+      "description": "Symbiosis — any-to-any cross-chain swaps between seven EVM chains, Tron and TON through Symbiosis' public API: one call to the pinned MetaRouterGateway (or one jetton transfer to the pinned TON portal), decoded and bound to the request on the device; every reported fee in the quote, limits enforced locally.",
+      "addedAt": "2026-11-10"
     },
     {
       "name": "@anywalletkit/protocol-swap2-thorchain",
