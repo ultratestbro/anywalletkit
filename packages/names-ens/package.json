@@ -50,7 +50,7 @@
     "@anywalletkit/networks": "workspace:*",
     "@noble/hashes": "^1.8.0",
     "@scure/base": "^1.2.6",
-    "viem": "^2.57.2"
+    "viem": "^2.57.16"
   },
   "peerDependencies": {
     "@anywalletkit/core": "workspace:*"
@@ -59,7 +59,7 @@
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/core": "workspace:*",
     "@types/node": "^22",
-    "vitest": "^5.0.3"
+    "vitest": "^5.1.0"
   },
   "keywords": [
     "ens",

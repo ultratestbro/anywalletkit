@@ -55,16 +55,16 @@
     "@ton/core": "^0.63.1",
     "buffer": "^6.0.3",
     "fastestsmallesttextencoderdecoder": "^1.0.22",
-    "viem": "^2.57.2",
+    "viem": "^2.57.16",
     "whatwg-url-without-unicode": "8.0.0-3",
     "@anywalletkit/tokens": "workspace:*",
     "@anywalletkit/swap2-assets": "workspace:*"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
-    "@react-native/babel-preset": "^0.87.1",
-    "@solana-program/token": "^0.17.0",
-    "@solana/kit": "^8.4.0",
+    "@react-native/babel-preset": "^0.88.1",
+    "@solana-program/token": "^0.18.0",
+    "@solana/kit": "^8.6.0",
     "esbuild": "^0.28.2",
     "hermes-engine-cli": "^0.12.0"
   }

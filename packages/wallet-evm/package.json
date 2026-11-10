@@ -44,12 +44,12 @@
   "dependencies": {
     "@anywalletkit/core": "workspace:*",
     "@noble/curves": "^2.4.0",
-    "viem": "^2.57.2"
+    "viem": "^2.57.16"
   },
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/kit": "workspace:*",
-    "vitest": "^5.0.3"
+    "vitest": "^5.1.0"
   },
   "publishConfig": { "access": "public", "provenance": true }
 }

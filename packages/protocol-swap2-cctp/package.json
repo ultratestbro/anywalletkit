@@ -30,12 +30,12 @@
   "dependencies": {
     "@anywalletkit/protocol-swap2-core": "workspace:*",
     "@anywalletkit/swap2-assets": "workspace:*",
-    "viem": "^2.57.2"
+    "viem": "^2.57.16"
   },
   "peerDependencies": { "@anywalletkit/core": "workspace:*" },
   "devDependencies": {
     "@types/node": "^22",
-    "vitest": "^5.0.3",
+    "vitest": "^5.1.0",
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/core": "workspace:*"
   },

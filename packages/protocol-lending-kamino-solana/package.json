@@ -34,10 +34,10 @@
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/core": "workspace:*",
     "@anywalletkit/wallet-solana": "workspace:*",
-    "@solana-program/token": "^0.17.0",
-    "@solana/kit": "^8.4.0",
+    "@solana-program/token": "^0.18.0",
+    "@solana/kit": "^8.6.0",
     "@types/node": "^22",
-    "vitest": "^5.0.3"
+    "vitest": "^5.1.0"
   },
   "keywords": ["protocol", "lending", "kamino", "klend", "kvault", "earn", "vault", "borrow", "solana", "lending-protocol", "anywalletkit"],
   "publishConfig": { "access": "public", "provenance": true }

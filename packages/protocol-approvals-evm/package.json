@@ -34,7 +34,7 @@
     "verify:live": "node scripts/verify-live.mjs"
   },
   "dependencies": {
-    "viem": "^2.57.2"
+    "viem": "^2.57.16"
   },
   "peerDependencies": {
     "@anywalletkit/core": "workspace:*"
@@ -44,7 +44,7 @@
     "@anywalletkit/core": "workspace:*",
     "@anywalletkit/wallet-evm": "workspace:*",
     "@types/node": "^22",
-    "vitest": "^5.0.3"
+    "vitest": "^5.1.0"
   },
   "keywords": [
     "protocol",
