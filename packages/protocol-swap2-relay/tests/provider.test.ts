@@ -1,4 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
+import {forgetClearedOrders} from "../src/cleared.js";
 import type {Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {RELAY_DEPOSIT_ERC20, relayChain} from "../src/config.js";
 import {RELAY_STATUS_MAP, relayProvider} from "../src/provider.js";
@@ -38,7 +39,7 @@ async function quoted(name: string, over: Partial<QuoteParams> = {}, edit: (f: Q
   return {f, provider, params, quote, seen};
 }
 
-beforeEach(() => { vi.useFakeTimers({toFake: ["Date"]}); });
+beforeEach(() => { vi.useFakeTimers({toFake: ["Date"]}); forgetClearedOrders(); });
 afterEach(() => { vi.useRealTimers(); });
 
 describe("getQuote", () => {
@@ -52,7 +53,7 @@ describe("getQuote", () => {
       user: f.request.depositor, recipient: f.request.recipient, refundTo: f.request.depositor,
       originChainId: 42161, destinationChainId: 8453,
       originCurrency: f.request.sourceToken.toLowerCase(), destinationCurrency: f.request.destToken.toLowerCase(),
-      amount: f.request.amount, tradeType: "EXACT_INPUT", includeProtocolData: true,
+      amount: f.request.amount, tradeType: "EXACT_INPUT", includeProtocolData: true, slippageTolerance: "200",
     });
     expect((seen[0]!.init!.headers as Record<string, string>)["x-api-key"]).toBeUndefined();
     const order = protoOf(f).orderData;

@@ -33,8 +33,24 @@ const DEPOSITORY_ABI = parseAbi([
   "function depositErc20(address depositor, address token, uint256 amount, bytes32 id)",
 ]);
 
-/** Widest slippage a request may ask for, and the floor applied when it asks for none: half the expected amount. */
+/** Widest slippage a request may ask for. */
 export const RELAY_MAX_SLIPPAGE_BPS = 5_000;
+/**
+ * The slippage this module asks Relay for, and holds the order to, when the caller names none (Relay's own default
+ * on 2026-11-10). Without it the answering side would choose how far the minimum may sit under the expected amount.
+ */
+export const RELAY_DEFAULT_SLIPPAGE_BPS = 200;
+
+/** A direct deposit used ~33k (native) and ~76k (ERC-20) gas in Relay's own estimates (2026-11-10). */
+export const RELAY_GAS_FLOOR_NATIVE = 90_000n;
+export const RELAY_GAS_FLOOR_ERC20 = 180_000n;
+/** Chains that meter gas differently (Mantle, zkSync) estimate far higher; an estimate is taken up to this. */
+export const RELAY_GAS_CAP = 60_000_000n;
+/** The longest a quote may claim to live: the provider's own upper bound plus the tolerated clock difference. */
+export const RELAY_MAX_QUOTE_LIFE_MS = 300_000 + RELAY_CLOCK_SKEW_S * 1000;
+
+export {relayClearOrder} from "./cleared.js";
+import {relayClearOrder} from "./cleared.js";
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const U256_MAX = (1n << 256n) - 1n;
@@ -275,7 +291,7 @@ export function verifyRelayOrder(request: RelayRequest, protocol: RelayProtocolD
     throw new RelayRefusal("output-minimum", `the order's minimum output ${pay.minimumAmount} is under the caller's floor ${request.minAmountOut}`);
   }
   if (pay.expectedAmount < pay.minimumAmount) throw new RelayRefusal("output-expected", `the order expects ${pay.expectedAmount}, less than its own minimum ${pay.minimumAmount}`);
-  const slippage = BigInt(request.slippageBps ?? RELAY_MAX_SLIPPAGE_BPS);
+  const slippage = BigInt(request.slippageBps ?? RELAY_DEFAULT_SLIPPAGE_BPS);
   const floor = (pay.expectedAmount * (10_000n - slippage)) / 10_000n;
   if (pay.minimumAmount < floor) {
     throw new RelayRefusal("output-minimum", `the order's minimum output ${pay.minimumAmount} is more than ${slippage} bps under its expected ${pay.expectedAmount}`);
@@ -420,6 +436,22 @@ export function checkRelayQuote(request: RelayRequest, quote: Quote, tx?: RelayD
   if (quote.sourceAmount !== request.amount.toString(10) || quote.minDestAmount !== v.minimumAmount.toString(10) || quote.destAmount !== v.expectedAmount.toString(10)) {
     throw new RelayRefusal("quote-amounts", "the amounts the quote shows are not the order's");
   }
+  // Gas is the one number of the call that no order binds: held to the band this module itself would set, so a
+  // backend can neither starve the deposit (a paid revert) nor name an absurd limit. Absent = the wallet estimates.
+  const gas = (t as {gasLimit?: unknown}).gasLimit;
+  if (gas !== undefined) {
+    const floor = v.deposit.approvalAddress === undefined ? RELAY_GAS_FLOOR_NATIVE : RELAY_GAS_FLOOR_ERC20;
+    if (typeof gas !== "string" || !/^[1-9]\d{0,10}$/.test(gas) || BigInt(gas) < floor || BigInt(gas) > RELAY_GAS_CAP) {
+      throw new RelayRefusal("quote-gas", `the gas limit ${String(gas).slice(0, 40)} is outside ${floor}–${RELAY_GAS_CAP}`);
+    }
+  }
+  const now = request.nowMs ?? Date.now();
+  if (typeof quote.validUntilMs !== "number" || !Number.isFinite(quote.validUntilMs) || quote.validUntilMs > now + RELAY_MAX_QUOTE_LIFE_MS) {
+    throw new RelayRefusal("quote-expiry", "the quote claims to live longer than a Relay quote may");
+  }
+  if (typeof quote.intentId !== "string" || quote.intentId !== `relay:${String(quote.providerData?.requestId)}` || !/^relay:0x[0-9a-f]{64}$/.test(quote.intentId)) {
+    throw new RelayRefusal("quote-shape", "the quote's id is not its Relay request id");
+  }
   return v;
 }
 
@@ -441,7 +473,9 @@ export function relayVerifyBuild(quote: Quote, tx: UnsignedTx, params?: QuotePar
     if (tx.serializedTx !== undefined || tx.memo !== undefined || tx.typedData !== undefined || tx.bodyBoc !== undefined) {
       throw new RelayRefusal("quote-shape", "a Relay deposit is one EVM call");
     }
-    checkRelayQuote(relayRequestOf(params), quote, tx);
+    const v = checkRelayQuote(relayRequestOf(params), quote, tx);
+    // The remote path has no client-side step after this one: an order is built for once.
+    relayClearOrder(v.id, "build");
     return null;
   } catch (err) {
     return relayRefusalReason(err);

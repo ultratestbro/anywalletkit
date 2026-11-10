@@ -3,7 +3,7 @@ import type {Asset, CrossChainProvider, IntentRef, IntentState, IntentStatus, Qu
 import {describeRelayActivity} from "./activity.js";
 import {RELAY_API, relay as relayCfg, relayChain} from "./config.js";
 import {RelayRefusal} from "./order.js";
-import {checkRelayQuote, relayRequestOf, verifyRelayOrder, type RelayRequest} from "./verify.js";
+import {RELAY_DEFAULT_SLIPPAGE_BPS, RELAY_GAS_CAP as GAS_CAP, RELAY_GAS_FLOOR_ERC20 as GAS_FLOOR_ERC20, RELAY_GAS_FLOOR_NATIVE as GAS_FLOOR_NATIVE, checkRelayQuote, relayClearOrder, relayRequestOf, verifyRelayOrder, type RelayRequest} from "./verify.js";
 
 /**
  * Relay (relay.link) — a solver network. ONE source transaction: a deposit into the chain's RelayDepository that names
@@ -16,8 +16,12 @@ import {checkRelayQuote, relayRequestOf, verifyRelayOrder, type RelayRequest} fr
  *    as the estimate, `minimumAmount` as the enforced minimum).
  *  - The API's `approve` step is never used: an ERC-20 input sets `approvalAddress` to the pinned depository and the
  *    engine approves exactly the input amount.
- *  - `baseUrl` may be the app's own proxy that adds the API key. It needs no trust: a proxy that lies can only
- *    produce an order the device refuses.
+ *  - `baseUrl` may be the app's own proxy that adds the API key. It cannot get a deposit signed for another
+ *    recipient, chain, token, minimum or refund address than the request's. It CAN make the quote worse: the solver
+ *    signs whatever request reaches Relay, so a proxy that adds an app fee or a gas top-up gets a genuine order with
+ *    a lower expected amount. The response's own account of such extras is refused (`app-fee`, `gas-topup`), but a
+ *    proxy can strip that too — the amounts shown are always the order's, and what bounds the price is the caller's
+ *    `minAmountOut` or the other quotes of the router, not this module.
  *  - Routes Relay serves by first swapping on the source chain call a router, not the depository, and are refused
  *    by name (`tx-target`); so are non-EVM chains and any chain without a pin.
  *  - Status: `GET /intents/status/v3?requestId=` — display only, nothing is signed on its word.
@@ -29,11 +33,6 @@ const QUOTE_TIMEOUT_MS = 20_000;
 const STATUS_TIMEOUT_MS = 12_000;
 const INTENT_PREFIX = "relay:";
 const REQUEST_ID = /^0x[0-9a-f]{64}$/;
-/** A direct deposit used ~33k (native) and ~76k (ERC-20) gas in Relay's own estimates (2026-11-10). */
-const GAS_FLOOR_NATIVE = 90_000n;
-const GAS_FLOOR_ERC20 = 180_000n;
-/** Chains that meter gas differently (Mantle, zkSync) estimate far higher; the API's estimate is taken up to this. */
-const GAS_CAP = 60_000_000n;
 const MAX_BODY = 512 * 1024;
 const MAX_REMEMBERED = 256;
 
@@ -50,13 +49,24 @@ export interface RelayProviderConfig {
   quoteTtlMs?: number;
   /** Injectable for tests and for runtimes that bring their own. */
   fetchImpl?: typeof fetch;
+  /**
+   * Where cleared order ids are also kept, so that "one deposit per order" survives an app restart (the built-in
+   * record lives in memory). `has` is asked and `add` awaited right before a signature; either throwing refuses.
+   */
+  clearedStore?: RelayClearedStore;
+}
+
+/** A durable record of order ids a deposit was cleared for. `expiresAtMs` is when an entry may be dropped. */
+export interface RelayClearedStore {
+  has(orderId: string): boolean | Promise<boolean>;
+  add(orderId: string, expiresAtMs: number): void | Promise<void>;
 }
 
 interface RelayStep {id?: unknown; requestId?: unknown; items?: unknown}
 interface RelayQuoteBody {
   steps?: unknown;
-  fees?: {relayer?: {currency?: {address?: unknown}; amount?: unknown; amountUsd?: unknown}};
-  details?: {timeEstimate?: unknown};
+  fees?: {relayer?: {currency?: {address?: unknown}; amount?: unknown; amountUsd?: unknown}; app?: {amount?: unknown}};
+  details?: {timeEstimate?: unknown; currencyGasTopup?: {amount?: unknown}};
   protocol?: {v2?: unknown};
   message?: unknown;
   errorCode?: unknown;
@@ -112,8 +122,6 @@ export function relayProvider(config: RelayProviderConfig = {}): CrossChainProvi
   // The request each live quote answered, kept on this side: a deposit is checked against what was asked here, not
   // against what the quote object says was asked.
   const issued = new Map<string, RelayRequest>();
-  // Order ids a deposit was already cleared for: the same order is never funded twice by this instance.
-  const cleared = new Set<string>();
   const remember = <K, V>(m: Map<K, V>, k: K, v: V): void => {
     m.delete(k);
     m.set(k, v);
@@ -188,7 +196,8 @@ export function relayProvider(config: RelayProviderConfig = {}): CrossChainProvi
             amount: request.amount.toString(10),
             tradeType: "EXACT_INPUT",
             includeProtocolData: true,
-            ...(request.slippageBps !== undefined ? {slippageTolerance: String(request.slippageBps)} : {}),
+            // Always named: Relay's "auto" would leave the distance between expected and minimum to the answering side.
+            slippageTolerance: String(request.slippageBps ?? RELAY_DEFAULT_SLIPPAGE_BPS),
           }),
           signal: signal ? anySignal([signal, timeoutSignal(QUOTE_TIMEOUT_MS)]) : timeoutSignal(QUOTE_TIMEOUT_MS),
         });
@@ -209,6 +218,11 @@ export function relayProvider(config: RelayProviderConfig = {}): CrossChainProvi
         const step = depositStep(body);
         const proto = (body.protocol?.v2 ?? null) as Record<string, unknown> | null;
         const v = verifyRelayOrder(request, proto, step.tx);
+        // Extras this module never asks for. Each lowers the output inside a genuine order; the response's own account
+        // of them is only a hint (an answering side that adds one can also hide it), so this refuses the honest case.
+        const extra = (x: unknown): boolean => x !== undefined && x !== null && x !== "0" && x !== 0;
+        if (extra(body.fees?.app?.amount)) throw new RelayRefusal("app-fee", "the quote charges an app fee this module did not ask for");
+        if (extra(body.details?.currencyGasTopup?.amount)) throw new RelayRefusal("gas-topup", "the quote converts part of the output into a gas top-up this module did not ask for");
         const native = v.deposit.approvalAddress === undefined;
         const floor = native ? GAS_FLOOR_NATIVE : GAS_FLOOR_ERC20;
         const apiGas = typeof step.tx.gas === "string" && /^[1-9]\d{0,9}$/.test(step.tx.gas) ? BigInt(step.tx.gas) * 2n : 0n;
@@ -303,9 +317,11 @@ export function relayProvider(config: RelayProviderConfig = {}): CrossChainProvi
         throw new RelayRefusal("quote-shape", "a Relay deposit is one EVM call");
       }
       const v = checkRelayQuote(request, quote, tx);
-      if (cleared.has(v.id)) throw new RelayRefusal("order-reused", `order ${v.id} was already cleared for a deposit — quote again`);
-      cleared.add(v.id);
-      if (cleared.size > MAX_REMEMBERED * 4) cleared.delete(cleared.values().next().value as string);
+      const store = config.clearedStore;
+      if (store && await store.has(v.id)) throw new RelayRefusal("order-reused", `order ${v.id} was already cleared for a deposit — quote again`);
+      relayClearOrder(v.id, "sign");
+      // Kept until the order's own deadline: a deposit for it is never signed twice, restart or not.
+      if (store) await store.add(v.id, v.order.output.deadline * 1000);
     },
 
     async trackIntent(ref: IntentRef): Promise<IntentStatus> {
