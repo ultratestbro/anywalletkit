@@ -1,7 +1,13 @@
 import type { ChainTx, HistoryPage, HistoryQuery, HistorySource } from '@anywalletkit/core'
 
-/** Which explorer family answered. `routescan` = keyless Etherscan-format mirror; `alchemy` = Alchemy Transfers API + JSON-RPC. */
-export type HistoryBackend = 'etherscan' | 'blockscout-pro' | 'alchemy' | 'routescan' | 'blockscout'
+/**
+ * Which explorer family answered. `etherscan` = Etherscan v2 (keyed); `blockscout-pro` = Blockscout PRO
+ * multichain API (keyed); `alchemy` = Alchemy Transfers API + JSON-RPC; `routescan` = Routescan's keyless
+ * Etherscan-format mirror (also the label of any `etherscanCompatUrl` override); `blockscout-etherscan` = a
+ * chain's own Blockscout, through its keyless Etherscan-format `/api` (built-in entries such as Elysium 99901);
+ * `blockscout` = a Blockscout instance's `/api/v2`.
+ */
+export type HistoryBackend = 'etherscan' | 'blockscout-pro' | 'alchemy' | 'routescan' | 'blockscout-etherscan' | 'blockscout'
 
 /** The subset of WHATWG `fetch` this package uses; lets tests and hosts inject their own. */
 export type FetchLike = (
@@ -49,13 +55,13 @@ export interface EvmHistoryOptions {
   alchemyComputeUnitsPerSecond?: number
   /** Blockscout instance root (`https://eth.blockscout.com`). Overrides / adds to the built-in table; `null` disables the built-in entry. */
   blockscoutUrl?: string | null
-  /** Keyless Etherscan-format endpoint (Routescan style). Overrides / adds to the built-in table; `null` disables the built-in entry. */
+  /** Keyless Etherscan-format endpoint (Routescan style). Overrides / adds to the built-in table; `null` disables the built-in entry. An override is reported as backend `routescan`. */
   etherscanCompatUrl?: string | null
   /** Fetch implementation; defaults to `globalThis.fetch`. */
   fetch?: FetchLike
   /** Etherscan requests per second for this key. Default 3 (the free tier's limit; Lite 5, Standard 10). Shared by every source using the same key — 25 chains do not multiply it. */
   rateLimit?: number
-  /** Try Blockscout (or Alchemy) before Etherscan when both exist (saves Etherscan quota / the only free source on Base). Default: Etherscan first. */
+  /** Try Blockscout (or Alchemy) before Etherscan when both exist (saves Etherscan quota / the only free source on Base). `'blockscout'` moves both `blockscout` and `blockscout-etherscan` first. Default: Etherscan first. */
   prefer?: 'etherscan' | 'blockscout' | 'alchemy'
   /** Per-request timeout, ms. Default 15 000. */
   timeoutMs?: number

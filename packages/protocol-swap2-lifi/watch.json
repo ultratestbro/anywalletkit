@@ -434,6 +434,20 @@
    "label": "LI.FI Diamond selectors \u00b7 Flare"
   },
   {
+   "id": "diamond-selectors-elysium",
+   "type": "evm-selectors",
+   "chainId": 99901,
+   "address": "0x24E6dA91AA4A8FEe2447F542c92E006243bd6Dc5",
+   "selectors": {
+    "file": "src/calldata.ts",
+    "consts": [
+     "BRIDGE_CALLS",
+     "GENERIC_SWAPS"
+    ]
+   },
+   "label": "LI.FI Diamond selectors \u00b7 Elysium"
+  },
+  {
    "id": "chains",
    "type": "http-json",
    "url": "https://li.quest/v1/chains",

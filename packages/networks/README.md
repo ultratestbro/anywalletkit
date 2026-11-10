@@ -79,7 +79,7 @@ Returns `{ ok, latencyMs, tip?, error?, reported? }` and never throws. Errors ar
 
 ## Builtin table
 
-`CATALOG_NETWORKS` — the 30 EVM mainnets of the asset catalog (Ethereum, Base, BNB, Arbitrum, Optimism, Polygon, Avalanche, HyperEVM, Robinhood, zkSync, Celo, MegaETH, Unichain, Monad, Plasma, Linea, Gnosis, Sonic, World Chain, Sei, Ink, Plume, X Layer, Scroll, Berachain, Arc, Mantle, Katana, Morph, Flare) with the public failover lists, plus Solana, TON, Tron, Bitcoin, NEAR and Zcash with public endpoints (the mobile app prepends its keyed proxies through the table).
+`CATALOG_NETWORKS` — the 31 EVM mainnets of the asset catalog (Ethereum, Base, BNB, Arbitrum, Optimism, Polygon, Avalanche, HyperEVM, Robinhood, zkSync, Celo, MegaETH, Unichain, Monad, Plasma, Linea, Gnosis, Sonic, World Chain, Sei, Ink, Plume, X Layer, Scroll, Berachain, Arc, Mantle, Katana, Morph, Flare, Elysium) with the public failover lists, plus Solana, TON, Tron, Bitcoin, NEAR and Zcash with public endpoints (the mobile app prepends its keyed proxies through the table).
 
 `DEFAULT_TESTNETS` (shipped `enabled: false`; endpoints and identities called on 2026-10-21):
 

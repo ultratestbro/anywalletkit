@@ -70,6 +70,7 @@ describe("LI.FI provider security contract", () => {
     [80094, "BERA", "0xf909c4Ae16622898b885B89d7F839E0244851c66"], // Berachain
     [747474, "ETH", "0xC59fe32C9549e3E8B5dCcdAbC45BD287Bd5bA2bc"], // Katana (li.quest/v1/chains, 2026-10-14)
     [2818, "ETH", "0xF7aB42D00D2399f8A4Fba2F15466Be40709fe307"], // Morph (li.quest/v1/chains, 2026-10-14)
+    [99901, "HYPE", "0x24E6dA91AA4A8FEe2447F542c92E006243bd6Dc5"], // Elysium (li.quest/v1/chains + deployments/elysium.json, 2026-11-10)
   ])("trusts chain %i's own Diamond (lifinance/contracts deployments, 2026-10-11)", async (chainId, native, own) => {
     const ZERO = "0x0000000000000000000000000000000000000000";
     const body = (to: string) => response({
@@ -407,6 +408,61 @@ describe("LI.FI chain table (2026-10-14 batch)", () => {
     });
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify(body)));
     await expect(lifiProvider().getQuote({...PARAMS, sourceChain: "eip155:5042", sourceToken: "0x3600000000000000000000000000000000000000", destChain: "eip155:8453", destToken: ZERO, amountIn: "5000000"})).resolves.toBeNull();
+  });
+});
+
+// li.quest/v1/chains id 99901 (key "ely") and deployments/elysium.json, read 2026-11-10. Live that day, with the
+// module's deny list: Arbitrum / Base USDC ↔ Elysium USDC.e and Elysium HYPE → Arbitrum USDC quote through LI.FI
+// Intents (LiFiIntentEscrowV2); HYPE in from HyperEVM / Ethereum is offered only through Relay, which is refused.
+describe("LI.FI chain table (2026-11-10: Elysium)", () => {
+  const ZERO = "0x0000000000000000000000000000000000000000";
+  const ELY_DIAMOND = "0x24E6dA91AA4A8FEe2447F542c92E006243bd6Dc5";
+  const ELY_USDCE = "0xb47c4C8F73F009CC0C0d3f92B388d13E293F0B65";
+  const BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+  const quoteFor = (from: {chainId: number; token: string}, to: {chainId: number; token: string}, amount: string, diamond: string, value = "0x0") => response({
+    action: {...response().action, fromToken: {address: from.token, chainId: from.chainId}, toToken: {address: to.token, chainId: to.chainId}, fromChainId: from.chainId, toChainId: to.chainId, fromAmount: amount},
+    estimate: {...response().estimate, fromAmount: amount, approvalAddress: diamond},
+    transactionRequest: {...response().transactionRequest, to: diamond, value, chainId: from.chainId},
+  });
+
+  it("is supported both ways and same-chain", () => {
+    expect(lifi.supportsChain("eip155:99901")).toBe(true);
+    expect(lifi.supports("eip155:99901", "eip155:8453")).toBe(true);
+    expect(lifi.supports("eip155:42161", "eip155:99901")).toBe(true);
+    expect(lifi.supports("eip155:99901", "eip155:99901")).toBe(true);
+    expect(lifi.supportsChain("eip155:1339")).toBe(false); // Vulcan Forged's Elysium is not this chain
+  });
+
+  it("USDC.e out of Elysium: own Diamond as target and spender, numbered 99901; the canonical Diamond is refused", async () => {
+    let sent = "";
+    const reasons: string[] = [];
+    const params = {...PARAMS, sourceChain: "eip155:99901", sourceToken: "USDC.e", destChain: "eip155:8453", destToken: BASE_USDC, amountIn: "5000000", onRefusal: (r: string) => { reasons.push(r); }};
+    vi.stubGlobal("fetch", async (url: string | URL) => { sent = String(url); return new Response(JSON.stringify(quoteFor({chainId: 99901, token: ELY_USDCE}, {chainId: 8453, token: BASE_USDC}, "5000000", ELY_DIAMOND))); });
+    await expect(lifiProvider().getQuote(params)).resolves.toMatchObject({txRequest: {to: ELY_DIAMOND, approvalAddress: ELY_DIAMOND, chainId: 99901}});
+    expect(reasons).toEqual([]);
+    const q = new URL(sent).searchParams;
+    expect([q.get("fromChain"), q.get("fromToken"), q.get("toChain")]).toEqual(["99901", ELY_USDCE, "8453"]);
+    expect(q.getAll("denyBridges")).toContain("relaydepository");
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(quoteFor({chainId: 99901, token: ELY_USDCE}, {chainId: 8453, token: BASE_USDC}, "5000000", DIAMOND))));
+    await expect(lifiProvider().getQuote(params)).resolves.toBeNull();
+  });
+
+  it("native HYPE out of Elysium carries the input as value and approves nothing", async () => {
+    const params = {...PARAMS, sourceChain: "eip155:99901", sourceToken: "HYPE", destChain: "eip155:8453", destToken: ZERO, amountIn: "1000000000000000"};
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(quoteFor({chainId: 99901, token: ZERO}, {chainId: 8453, token: ZERO}, "1000000000000000", ELY_DIAMOND, "0x38d7ea4c68000"))));
+    const quote = await lifiProvider().getQuote(params);
+    expect(quote).toMatchObject({txRequest: {to: ELY_DIAMOND, chainId: 99901, value: "1000000000000000"}});
+    expect(quote!.txRequest!.approvalAddress).toBeUndefined();
+  });
+
+  it("into Elysium: Base USDC → USDC.e asks for toChain 99901 and the bridged token, through Base's Diamond", async () => {
+    let sent = "";
+    vi.stubGlobal("fetch", async (url: string | URL) => { sent = String(url); return new Response(JSON.stringify(quoteFor({chainId: 8453, token: BASE_USDC}, {chainId: 99901, token: ELY_USDCE}, "5000000", DIAMOND))); });
+    const params = {...PARAMS, sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:99901", destToken: ELY_USDCE, amountIn: "5000000"};
+    await expect(lifiProvider().getQuote(params)).resolves.toMatchObject({txRequest: {to: DIAMOND, chainId: 8453}, destAmount: "990000"});
+    const q = new URL(sent).searchParams;
+    expect([q.get("fromChain"), q.get("toChain"), q.get("toToken")]).toEqual(["8453", "99901", ELY_USDCE]);
+    expect(q.getAll("denyBridges")).toContain("relaydepository");
   });
 });
 

@@ -64,6 +64,42 @@ describe("2026-10-14 batch: Arc, Mantle, Katana, Morph, Flare", () => {
   });
 });
 
+// Read on chain 2026-11-10 (code, symbol, name, decimals, totalSupply, l1Address() on the Orbit token bridge).
+describe("2026-11-10: Elysium (Kinetiq, chain 99901)", () => {
+  it("resolves as Elysium with HYPE (18 decimals) leading, visible in the pickers", () => {
+    const c = ccChain("eip155:99901")!;
+    expect(c).toMatchObject({key: "elysium", label: "Elysium"});
+    expect(c.assets[0]).toMatchObject({symbol: "HYPE", decimals: 18});
+    expect(c.hidden ?? false).toBe(false);
+    expect(c.offrampOnly ?? false).toBe(false);
+    expect(ccChain("eip155:1339")).toBeUndefined(); // Vulcan Forged's Elysium is another chain
+  });
+
+  it("the native asset is contract-less and the wrapped native WHYPE is pinned", () => {
+    expect(ccAssetByToken("eip155:99901", "")).toMatchObject({symbol: "HYPE", decimals: 18});
+    expect(ccAssetByToken("eip155:99901", "")!.contract).toBeUndefined();
+    expect(ccAsset("eip155:99901", "WHYPE")).toMatchObject({contract: "0xbA876237B0F021A6c6D852d6c26E107997cC5E81", decimals: 18});
+    expect(ccAssetByToken("eip155:99901", "0xba876237b0f021a6c6d852d6c26e107997cc5e81")!.symbol).toBe("WHYPE");
+  });
+
+  it.each([
+    ["USDC.e", "0xb47c4C8F73F009CC0C0d3f92B388d13E293F0B65", 6],
+    ["kHYPE", "0x248888D396A546A69A188f3Deb476964e581E9d0", 18],
+    ["UBTC", "0xE9C29585EAe4B9a55b02a9605AEa892B40d972E8", 8],
+    ["UETH", "0x7A66A75fe41Bc26867C17fe1bc7D1C076EBd4eCd", 18],
+    ["KNTQ", "0xe45a355d9e9cAd2aD85F2d03E3eE3102A036acF0", 18],
+  ])("%s is pinned to %s (%i decimals) and found by its contract", (symbol, contract, decimals) => {
+    expect(ccAsset("eip155:99901", symbol)).toMatchObject({contract, decimals});
+    expect(ccAssetByToken("eip155:99901", contract.toLowerCase())!.symbol).toBe(symbol);
+  });
+
+  it("its USDC is the HyperEVM USDC bridged over the Orbit gateway: USDC.e, never the canonical USDC symbol", () => {
+    expect(ccAsset("eip155:99901", "USDC")).toBeUndefined();
+    expect(ccAsset("eip155:99901", "USDC.e")!.contract).not.toBe(ccAsset("eip155:999", "USDC")!.contract);
+    expect(ccAsset("eip155:99901", "USOL")).toBeUndefined(); // 0.0005 USOL in supply on 2026-11-10
+  });
+});
+
 describe("2026-10-26: LDO, SKY, COW", () => {
   it.each([
     ["eip155:1", "LDO", "0x5a98fcbea516cf06857215779fd812ca3bef1b32"],

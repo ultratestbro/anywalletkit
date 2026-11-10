@@ -1,6 +1,6 @@
 {
   "$schema": "./modules.schema.json",
-  "generatedAt": "2026-11-08",
+  "generatedAt": "2026-11-09",
   "count": 29,
   "modules": [
     {
@@ -569,7 +569,8 @@
         "eip155:8453",
         "eip155:9745",
         "eip155:98866",
-        "eip155:999"
+        "eip155:999",
+        "eip155:99901"
       ],
       "tier": "core",
       "maintainers": [

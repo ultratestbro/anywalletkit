@@ -568,6 +568,21 @@ describe("edge: native-fee ceilings", () => {
     await expect(on(14, "1500000000000000000001")).rejects.toThrow(/exceeds the cap 1500000000000000000000 for eip155:14/);
   });
 
+  it("Elysium pays gas in HYPE: HyperEVM's 0.1 HYPE ceiling, not the 0.005 ETH-chain default", async () => {
+    expect(nativeDecimals("eip155:99901")).toBe(18);
+    const onElysium = (fee: string) => {
+      let plan: Swap2ExecutionPlan | undefined;
+      const p = provider({getQuote: async (params) => quote(params, {txRequest: {...txRequest, chainId: 99901, value: fee, nativeFee: fee}}), buildDeposit: async (q) => ({...built(q), chain: "eip155:99901"})});
+      // Elysium's catalog stable is the bridged USDC.e (HyperEVM's USDC over the Orbit gateway).
+      const run = protocol(p, account([], {getChainId: async () => 99901}), {fromChain: "eip155:99901", reviewExecution: (pl) => { plan = pl; throw new Error("stop at review"); }}).swap2({...options, fromToken: "USDC.e"});
+      return run.then(() => plan, (e: Error) => (plan ? plan : Promise.reject(e)));
+    };
+    // 0.05 HYPE is above the ETH default (0.005) and passes; 0.1 HYPE + 1 wei is refused.
+    await expect(onElysium("50000000000000000")).resolves.toMatchObject({source: {value: 50_000_000_000_000_000n}});
+    await expect(onElysium("100000000000000000")).resolves.toMatchObject({source: {value: 100_000_000_000_000_000n}});
+    await expect(onElysium("100000000000000001")).rejects.toThrow(/exceeds the cap 100000000000000000 for eip155:99901/);
+  });
+
   it("a value that differs from the declared fee is refused; an in-cap declared fee is shown in the plan", async () => {
     const log: string[] = [];
     await expect(protocol(withFee("1000", "2000"), account(log)).swap2(options)).rejects.toThrow(/does not match the quoted native fee/);

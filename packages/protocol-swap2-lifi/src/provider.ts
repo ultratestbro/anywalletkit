@@ -60,6 +60,9 @@ const LIFI_CHAIN: Record<string, string> = {
   "eip155:747474": "747474",
   "eip155:2818": "2818",
   "eip155:14": "14",
+  // 2026-11-10: Elysium (Kinetiq; li.quest/v1/chains id 99901, key "ely"). LI.FI's bridges there are Relay (refused
+  // below: UNBOUND_TOOLS) and LI.FI Intents; same-chain swaps go through GenericSwapFacetV3 (KyberSwap, Nordstern).
+  "eip155:99901": "99901",
   [LIFI_SOLANA_CAIP2]: "1151111081099710",
 };
 const CAIP2_BY_LIFI_CHAIN: Record<string, string> = Object.fromEntries(Object.entries(LIFI_CHAIN).map(([caip2, id]) => [id, caip2]));
@@ -113,6 +116,9 @@ const LIFI_DIAMONDS: Readonly<Record<string, string>> = {
   "eip155:747474": "0xC59fe32C9549e3E8B5dCcdAbC45BD287Bd5bA2bc", // Katana
   "eip155:2818": "0xF7aB42D00D2399f8A4Fba2F15466Be40709fe307", // Morph
   "eip155:14": "0x198FC70Dfe05E755C81e54bd67Bff3F729344B9b", // Flare (li.quest diamondAddress 2026-10-14; the canonical 0x1231… has no code there)
+  // Elysium: li.quest diamondAddress = deployments/elysium.json LiFiDiamond; code on 99901, DiamondLoupe facets() serves
+  // GenericSwapFacetV3 + LiFiIntentEscrowFacetV2; the canonical 0x1231… has no code there (all read 2026-11-10).
+  "eip155:99901": "0x24E6dA91AA4A8FEe2447F542c92E006243bd6Dc5", // Elysium
   "eip155:4326": "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37", // MegaETH (deployments/megaeth.json, matches a live quote 2026-10-12)
 };
 const diamondFor = (chain: string): string => LIFI_DIAMONDS[chain] ?? LIFI_DIAMOND;

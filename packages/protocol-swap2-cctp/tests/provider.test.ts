@@ -73,6 +73,13 @@ describe("domain table", () => {
       expect(p.supportsRoute({chain: c, token: "USDC"}, {chain: "eip155:8453", token: BASE.usdc})).toBe(false);
     }
   });
+
+  it("Elysium (99901) is not a CCTP domain: its USDC.e is HyperEVM's USDC over the Orbit gateway, not Circle-minted", () => {
+    const {p} = make();
+    expect(p.supportsChain?.("eip155:99901")).toBe(false);
+    expect(p.supportsRoute({chain: "eip155:99901", token: "USDC.e"}, {chain: "eip155:8453", token: BASE.usdc})).toBe(false);
+    expect(p.supportsRoute({chain: "eip155:8453", token: "USDC"}, {chain: "eip155:99901", token: "0xb47c4C8F73F009CC0C0d3f92B388d13E293F0B65"})).toBe(false);
+  });
 });
 
 describe("quote", () => {

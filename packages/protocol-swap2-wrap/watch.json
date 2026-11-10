@@ -161,6 +161,13 @@
       "chainId": 534352,
       "address": "0x5300000000000000000000000000000000000004",
       "label": "WETH wrapper · Scroll"
+    },
+    {
+      "id": "wrapper-elysium",
+      "type": "evm-proxy",
+      "chainId": 99901,
+      "address": "0xbA876237B0F021A6c6D852d6c26E107997cC5E81",
+      "label": "WHYPE wrapper (upgradeable aeWETH proxy) · Elysium"
     }
   ]
 }

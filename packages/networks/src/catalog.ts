@@ -58,6 +58,12 @@ export const EVM_MAINNETS: readonly Network[] = Object.freeze([
   evm(747474, 'Katana', 'ETH', ['https://rpc.katana.network'], 'https://explorer.katanarpc.com'),
   evm(2818, 'Morph', 'ETH', ['https://rpc.morphl2.io', 'https://rpc-quicknode.morphl2.io'], 'https://explorer.morphl2.io'),
   evm(14, 'Flare', 'FLR', ['https://flare-api.flare.network/ext/C/rpc', 'https://flare.rpc.thirdweb.com'], 'https://flare-explorer.flare.network'),
+  // Elysium by Kinetiq (Arbitrum Orbit on HyperEVM, gas in HYPE). The one public RPC (CORS *, eth_chainId 0x1863d) and
+  // the Blockscout explorer (pages at the root: /tx/<hash>, /address/<a>) were checked on 2026-11-10. Not chain 1339.
+  // `explorer` is the base for /tx/ and /address/ links, so it is the root, not LI.FI's blockExplorerUrls value
+  // https://elysium.kinetiq.xyz/explorer/: that path is the explorer's overview page, while the root itself is the
+  // Elysium site home (the explorer's own nav links "Overview" to /explorer and the logo to /, beside /bridge, /docs).
+  evm(99901, 'Elysium', 'HYPE', ['https://rpc.elysium.kinetiq.xyz'], 'https://elysium.kinetiq.xyz'),
 ])
 
 // ---- non-EVM mainnets: the CAIP-2 ids the asset catalog / swap2 engine use, public endpoints only ----

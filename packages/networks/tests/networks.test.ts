@@ -20,8 +20,16 @@ describe('catalog', () => {
     }
     expect(CATALOG_NETWORKS.every((n) => n.kind === 'catalog' && n.enabled)).toBe(true)
     expect(DEFAULT_TESTNETS.every((n) => n.kind === 'testnet' && !n.enabled)).toBe(true)
-    expect(EVM_MAINNETS.length).toBe(30)
+    expect(EVM_MAINNETS.length).toBe(31)
     expect(DEFAULT_TESTNETS.length).toBe(13)
+  })
+  it('Elysium (Kinetiq, 99901): HYPE gas, its public RPC and explorer, enabled; chain 1339 is not it', () => {
+    const ely = EVM_MAINNETS.find((n) => n.caip2 === 'eip155:99901')
+    expect(ely).toMatchObject({ family: 'evm', name: 'Elysium', symbol: 'HYPE', decimals: 18, kind: 'catalog', enabled: true, rpcs: ['https://rpc.elysium.kinetiq.xyz'], explorer: 'https://elysium.kinetiq.xyz' })
+    expect(expectedIdentity('eip155:99901')).toEqual({ family: 'evm', value: '99901' })
+    expect(chainHex('eip155:99901')).toBe('0x1863d')
+    expect(caip2FromChainId('0x1863d')).toBe('eip155:99901')
+    expect(EVM_MAINNETS.some((n) => n.caip2 === 'eip155:1339')).toBe(false)
   })
   it('every catalog mainnet is in the asset catalog', () => {
     for (const n of CATALOG_NETWORKS) expect(isCatalogChain(n.caip2), n.caip2).toBe(true)
