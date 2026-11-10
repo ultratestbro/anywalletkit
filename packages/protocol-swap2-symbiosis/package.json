@@ -1,0 +1,52 @@
+{
+  "name": "@anywalletkit/protocol-swap2-symbiosis",
+  "version": "0.0.0",
+  "description": "Symbiosis for the swap2 engine: any-to-any cross-chain swaps between seven EVM chains, Tron and TON through Symbiosis' public REST API — one source transaction to the pinned MetaRouterGateway (or one jetton transfer to the pinned TON portal), the calldata decoded and bound to the request on the device before anything is signed, every reported fee in the quote, limits enforced locally, status with the stuck / reverted path spelled out.",
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-swap2-symbiosis" },
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./config": { "types": "./dist/config.d.ts", "import": "./dist/config.js", "require": "./dist/config.cjs" },
+    "./pools": { "types": "./dist/pools.d.ts", "import": "./dist/pools.js", "require": "./dist/pools.cjs" },
+    "./verify": { "types": "./dist/verify.d.ts", "import": "./dist/verify.js", "require": "./dist/verify.cjs" },
+    "./provider": { "types": "./dist/provider.d.ts", "import": "./dist/provider.js", "require": "./dist/provider.cjs" },
+    "./protocol": { "types": "./dist/protocol.d.ts", "import": "./dist/protocol.js", "require": "./dist/protocol.cjs" },
+    "./activity": { "types": "./dist/activity.d.ts", "import": "./dist/activity.js", "require": "./dist/activity.cjs" },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "module.json"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": {
+    "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/swap2-assets": "workspace:*",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
+    "viem": "^2.57.2"
+  },
+  "peerDependencies": { "@anywalletkit/core": "workspace:*" },
+  "devDependencies": {
+    "@ton/core": "^0.63.1",
+    "@types/node": "^22",
+    "vitest": "^5.0.3",
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/protocol-swap2-router": "workspace:*",
+    "@anywalletkit/wallet-tron": "workspace:*",
+    "@anywalletkit/core": "workspace:*"
+  },
+  "keywords": ["swap2", "bridge", "symbiosis", "cross-chain", "tron", "ton", "anywalletkit"],
+  "publishConfig": { "access": "public", "provenance": true }
+}

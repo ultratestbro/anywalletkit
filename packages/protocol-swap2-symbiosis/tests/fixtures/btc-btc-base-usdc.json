@@ -1,0 +1,64 @@
+{
+ "recordedAt": "2026-11-09",
+ "params": {
+  "sourceChain": "bitcoin:mainnet",
+  "sourceToken": "BTC",
+  "destChain": "eip155:8453",
+  "destToken": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+  "amountIn": "200000",
+  "destAddress": "0x28C6c06298d514Db089934071355E5743bf21d60",
+  "refundAddress": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+  "slippageBps": 100,
+  "dry": true
+ },
+ "config": {
+  "tronSource": true,
+  "btcSource": true,
+  "fallbackReceiver": "0x28C6c06298d514Db089934071355E5743bf21d60"
+ },
+ "force": [],
+ "exchanges": [
+  {
+   "method": "GET",
+   "path": "/v1/swap-limits",
+   "status": 200,
+   "response": "@limits"
+  },
+  {
+   "method": "POST",
+   "path": "/v2/quote",
+   "body": {
+    "tokenAmountIn": {
+     "address": "",
+     "chainId": 3652501241,
+     "decimals": 8,
+     "amount": "200000"
+    },
+    "tokenOut": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "chainId": 8453,
+     "decimals": 6
+    },
+    "from": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+    "to": "0x28C6c06298d514Db089934071355E5743bf21d60",
+    "slippage": 100,
+    "fallbackReceiver": "0x28C6c06298d514Db089934071355E5743bf21d60",
+    "refundAddress": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+    "disabledProviders": "changelly,thorchain-bridge,chainflip-bridge"
+   },
+   "status": 400,
+   "response": {
+    "code": 0,
+    "message": "This swap is not available",
+    "errors": [
+     {
+      "message": "This swap is not available"
+     }
+    ]
+   }
+  }
+ ],
+ "result": {
+  "refusal": "Symbiosis: This swap is not available"
+ }
+}

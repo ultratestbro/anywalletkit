@@ -19,6 +19,8 @@ import { Usdt0Swap2Protocol } from '@anywalletkit/protocol-swap2-usdt0/protocol'
 import { chainflipProvider } from '@anywalletkit/protocol-swap2-chainflip/provider'
 import { ChainflipSwap2Protocol } from '@anywalletkit/protocol-swap2-chainflip/protocol'
 import { decodeTronNote } from '@anywalletkit/protocol-swap2-chainflip/codec'
+import { symbiosisProvider } from '@anywalletkit/protocol-swap2-symbiosis/provider'
+import { SymbiosisSwap2Protocol } from '@anywalletkit/protocol-swap2-symbiosis/protocol'
 import { jupiterProvider } from '@anywalletkit/protocol-swap2-jupiter/provider'
 import { JupiterSwap2Protocol } from '@anywalletkit/protocol-swap2-jupiter/protocol'
 import { decodeSwapArgs, fromBase64 as jupFromBase64 } from '@anywalletkit/protocol-swap2-jupiter/codec'
@@ -90,7 +92,7 @@ export async function smokeProtocols(check: Check): Promise<void> {
   // TON is a hand-suspended 1Click corridor (HOT bridge dark since 2026-10-16) and LI.FI has no Bitcoin, so
   // Bitcoin can only have come from the near-intents provider.
   check('router: capabilities come from the passed providers', chains.includes('eip155:1') && chains.includes('bitcoin:mainnet'), chains.join(','))
-  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol], ['usdt0', Usdt0Swap2Protocol], ['chainflip', ChainflipSwap2Protocol], ['jupiter', JupiterSwap2Protocol], ['fynd', FyndSwap2Protocol]] as const) {
+  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol], ['usdt0', Usdt0Swap2Protocol], ['chainflip', ChainflipSwap2Protocol], ['symbiosis', SymbiosisSwap2Protocol], ['jupiter', JupiterSwap2Protocol], ['fynd', FyndSwap2Protocol]] as const) {
     const p = new (P as never as new (a: unknown, c: unknown) => { getSupportedChains(): Promise<unknown>; quoteSwap2(o: unknown): Promise<unknown> })(evm, swap2Cfg)
     check(`${name}: constructs`, typeof p.quoteSwap2 === 'function')
     await tolerates(check, `${name}: getSupportedChains`, () => p.getSupportedChains())
@@ -126,6 +128,9 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const cfNote = decodeTronNote('0x0703111111111111111111111111111111111111111100890101320000008840e6c55b9ada326d211d818c34a994aeced808f5285c8fc2f5285c8fc2f5285c8fc2f50000000000000000000000000000000000016400000070d0cd75a367987344a3896a18e1510e5429ca5e88357b6c2a2e306b3877380d000000')
   check('chainflip: decodes a Tron vault-swap note', cfNote.outputAsset === 7 && cfNote.destTag === 3 && cfNote.destAddress.length === 20 && cfNote.params.minPriceX128 > 0n && !cfNote.ccm, JSON.stringify({ a: cfNote.outputAsset, t: cfNote.destTag }))
   await tolerates(check, 'chainflip: getQuote dry (network)', () => cf.getQuote({ sourceChain: 'tron:728126428', sourceToken: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', destChain: 'eip155:42161', destToken: 'USDC', amountIn: '20000000', destAddress: '0x000000000000000000000000000000000000dEaD', dry: true }))
+  const sym = symbiosisProvider()
+  check('symbiosis: route BSC USDC → TON USDT, Tron source off by default', sym.supportsRoute({ chain: 'eip155:56', token: 'USDC' }, { chain: 'ton:-239', token: 'USDT' }) && !sym.supportsRoute({ chain: 'tron:728126428', token: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t' }, { chain: 'eip155:8453', token: 'USDC' }))
+  await tolerates(check, 'symbiosis: getQuote dry (network)', () => sym.getQuote({ sourceChain: 'eip155:56', sourceToken: 'USDC', destChain: 'ton:-239', destToken: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs', amountIn: '1500000000000000000000', destAddress: 'UQBHyu-oZVDHRYQ1-rKlGqpHy5yAqanPBirEQNMNOmfHLtaT', dry: true }))
   const jup = jupiterProvider()
   check('jupiter: route SOL → USDC on Solana only', jup.supportsRoute({ chain: 'solana:mainnet', token: 'SOL' }, { chain: 'solana:mainnet', token: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' }) && !jup.supportsRoute({ chain: 'solana:mainnet', token: 'SOL' }, { chain: 'eip155:1', token: 'USDC' }))
   // live /build 2026-10-23: shared_accounts_route_v2, 25 USDC → SOL at 75 bps — u64 / u16 LE reads under Hermes

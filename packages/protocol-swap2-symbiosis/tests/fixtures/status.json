@@ -1,0 +1,103 @@
+{
+ "recordedAt": "2026-11-10",
+ "note": "GET /v2/tx/{chainId}/{hash} and GET /v1/stucked/{address} as the public API answered; `reverted` is the documented shape (no reverted operation was found to record)",
+ "success": {
+  "status": {
+   "code": 0,
+   "text": "Success"
+  },
+  "txIn": {
+   "chainId": 8453,
+   "hash": "0x673b9c1ded2cebe1971eda3239d6362a4168d25b7d57296554a29cd1c5ef0b9a",
+   "time": "2026-11-09T23:59:35Z",
+   "address": "0x6a2d78dea38e383b4b0b8fbdffb8ebc3d320cba3",
+   "tokenAmount": {
+    "symbol": "ETH",
+    "address": "",
+    "amount": "2000000000000000",
+    "chainId": 8453,
+    "decimals": 18,
+    "priceUsd": 2129.44
+   }
+  },
+  "tx": {
+   "chainId": 728126428,
+   "hash": "0f424b7577faa1725fb7476ebe4a6d7bfa74b6b8e2083f30d340d1953fb7a748",
+   "time": "2026-11-09T23:59:51Z",
+   "address": "TAcqENzyK6mzDpMruj3A7CDFgrC2mxuyfP",
+   "tokenAmount": {
+    "symbol": "USDT",
+    "address": "0xa614f803B6FD780986A42c78Ec9c7f77e6DeD13C",
+    "amount": "1262647",
+    "chainId": 728126428,
+    "decimals": 6,
+    "priceUsd": 1
+   }
+  }
+ },
+ "pendingStuck": {
+  "status": {
+   "code": 1,
+   "text": "Pending"
+  },
+  "txIn": {
+   "chainId": 1,
+   "hash": "0x58ef3577664d528065d0eb83dc2534d086bfb53b9b70446cefc23c7777edfde1",
+   "time": "2026-11-08T16:03:23Z",
+   "address": "0xfff63776d6ba8e7c708b3caac15d76bd5b1a2cf6",
+   "tokenAmount": {
+    "symbol": "USDC",
+    "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "amount": "3000411",
+    "chainId": 1,
+    "decimals": 6,
+    "priceUsd": 1
+   }
+  }
+ },
+ "notFound": {
+  "status": 404,
+  "body": "{\"status\":{\"code\":-1,\"text\":\"Not found\"}}"
+ },
+ "stuckList": [
+  {
+   "hash": "0x58ef3577664d528065d0eb83dc2534d086bfb53b9b70446cefc23c7777edfde1",
+   "chainId": 1,
+   "createdAt": "2026-11-08T16:03:23Z",
+   "tokenAmount": {
+    "symbol": "USDC",
+    "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "amount": "3000411",
+    "chainId": 1,
+    "decimals": 6,
+    "priceUsd": 1
+   }
+  },
+  {
+   "hash": "0x9134dce03df1006660ad0aa695df977cee799722141ef5b2aa43564caf7b6531",
+   "chainId": 1,
+   "createdAt": "2026-11-06T05:39:47Z",
+   "tokenAmount": {
+    "symbol": "USDC",
+    "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "amount": "1000000",
+    "chainId": 1,
+    "decimals": 6,
+    "priceUsd": 1
+   }
+  },
+  {
+   "hash": "0x67f3db52f5ba27adb9b186e49da2a4d8ae698bff3e58ed1bd5abf4bf9b22d89b",
+   "chainId": 1,
+   "createdAt": "2026-11-06T05:39:23Z",
+   "tokenAmount": {
+    "symbol": "USDC",
+    "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "amount": "1000000",
+    "chainId": 1,
+    "decimals": 6,
+    "priceUsd": 1
+   }
+  }
+ ]
+}
