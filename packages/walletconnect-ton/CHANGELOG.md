@@ -1,5 +1,13 @@
 # @anywalletkit/walletconnect-ton
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [9677422]
+- Updated dependencies [ca72d9b]
+  - @anywalletkit/wallet-ton@0.8.1
+
 ## 0.1.0
 
 ### Minor Changes

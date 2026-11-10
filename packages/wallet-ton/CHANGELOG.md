@@ -1,5 +1,12 @@
 # @anywalletkit/wallet-ton
 
+## 0.8.1
+
+### Patch Changes
+
+- 9677422: The fee-cap refusal (the account's configured maximum or the call's `maxFee`) is now a typed `FeeLimitExceededError` with `code: 'fee-limit-exceeded'`, the `fee` the transaction would pay and the `limit` it is above. The message is unchanged and the error is still thrown before anything is broadcast or returned, so a wallet can show the new fee and ask the user again instead of matching the message text.
+- ca72d9b: `describeTransaction` decodes TEP-62 NFT transfers (op `0x5fcc3d14`): new kind `nft-transfer` and an `nft` field on the message (`newOwner`, `responseDestination`, `forwardTonAmount`, forward payload), so a screen can name who receives the NFT instead of the NFT item address. New warnings: `nft-transfer` (names the new owner), `state-init` (the message deploys code and data) and `unknown-op` (a body op the wallet does not decode). New exports `NFT_TRANSFER_OP` and `TonNftDetails`; `DecodedBody` gains `{ type: 'nft-transfer' }`. Code that switches over `TonDescribedKind` or `TonWarningCode` should handle the new values; warnings stay informational and nothing new is refused.
+
 ## 0.8.0
 
 ### Minor Changes

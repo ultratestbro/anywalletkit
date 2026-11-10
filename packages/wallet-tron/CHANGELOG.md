@@ -1,5 +1,12 @@
 # @anywalletkit/wallet-tron
 
+## 0.6.3
+
+### Patch Changes
+
+- 9677422: The fee-cap refusal (the account's configured maximum or the call's `maxFee`) is now a typed `FeeLimitExceededError` with `code: 'fee-limit-exceeded'`, the `fee` the transaction would pay and the `limit` it is above. The message is unchanged and the error is still thrown before anything is broadcast or returned, so a wallet can show the new fee and ask the user again instead of matching the message text.
+- 1892949: `describeTransaction` now flags what a contract call moves besides its calldata: new warnings `call-value` (the call also sends TRX to the contract, amount in TRX), `call-token-value` (it also sends a TRC-10 token) and `unknown-selector` (a selector the wallet does not decode). New description fields `callTokenValue` and `tokenId` carry the TRC-10 `call_token_value` / `token_id` decoded from `raw_data_hex`. Warnings stay informational and nothing new is refused.
+
 ## 0.6.2
 
 ### Patch Changes

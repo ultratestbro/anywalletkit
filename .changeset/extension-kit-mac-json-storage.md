@@ -1,5 +1,0 @@
----
-"@anywalletkit/extension-kit": patch
----
-
-New: `macJsonStorage(store, { label, key })` and `deriveStorageMacKey(dek)` — integrity for the small JSON stores a wallet keeps in `chrome.storage.local` (settings, per-site permissions), which that area does not authenticate. Each value is stored with an HMAC-SHA256 under a key derived from the vault key (HKDF-SHA256, one-way, so a wallet may keep it in `chrome.storage.session` while locked). `get()` answers `null` for a value that is plain (written before, or planted), edited, signed for another store or under another key; `read()` tells which (`ok` / `empty` / `unsigned` / `invalid` / `no-key`) and `rekey(oldKey, newKey)` re-signs after `rotateVaultKey`. Without a key, reads return the stored value unverified (or `null`, `readWithoutKey: 'null'`) and writes store it unsigned so it fails verification later (or throw `locked`, `writeWithoutKey: 'refuse'`). It plugs into anything that takes a `JsonStorage`, e.g. `new PermissionStore(macJsonStorage(chromeJsonStorage(area, key), { label, key }))`. Nothing changes for code that does not use it.

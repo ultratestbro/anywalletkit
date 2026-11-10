@@ -1,5 +1,76 @@
 # @anywalletkit/extension-kit
 
+## 0.4.0
+
+### Minor Changes
+
+- d9791fe: A `personal_sign` whose message is a raw 32-byte hash (`0x` + 64 hex) is refused (4200) before any sheet: the
+  bytes are signed as an EIP-191 "\n32" message, which CoW Protocol's `ethsign` order scheme, Safe owner signatures
+  (v > 30) and similar verifiers accept as an order or a transfer to someone else. A wallet can opt in per request with
+  the new `SignDeps.allowBlindHash` (or `allowBlindHash` on `classifySignRequest`); the request then reaches the sheet
+  with `blindHash: true`, which the sheet should show as a danger screen.
+- 16078d4: Signing sheet signals from the 2026-11-09 extension audit:
+  
+  - `messageText` and the typed-data `text` now show every invisible or direction-changing character
+    (Unicode Cf — bidi overrides / isolates, zero-width characters, BOM… — plus line separators and stray
+    controls) as a visible `⟨U+XXXX⟩`; the request carries `hiddenChars: true` when anything was escaped. The
+    bytes that get signed are unchanged. New export `revealHidden`.
+  - A Sign-In with Ethereum message containing bidi controls or zero-width characters is refused (-32602),
+    like one with hidden control characters. New export `SIWE_FORBIDDEN_CHARS`.
+  - `describeSiwe` sets `crossSite: { domain, origin }` when the sign-in names another site than the one
+    asking (new export `siweCrossSite`), so a sheet can make it the headline.
+  - `prepareTransaction` still signs a page's gas limit as given, but now also asks the wallet's RPC for an
+    estimate and returns `gasCheck: { estimate, excessive }` — `excessive` when the page's limit is above
+    max(estimate × 1.5, estimate + 50 000) (new export `gasLimitExcessive`). A failing estimate leaves
+    `gasCheck` out and does not fail the request.
+- a7c092d: Elysium by Kinetiq (`eip155:99901`, gas in HYPE) is a builtin network: `EVM_MAINNETS` / `CATALOG_NETWORKS` and the extension's `DEFAULT_NETWORKS` carry its public RPC `https://rpc.elysium.kinetiq.xyz` (CORS-open, `eth_chainId` 0x1863d, checked with `verifyRpcs` on 2026-11-10) and its explorer `https://elysium.kinetiq.xyz`. 31 EVM mainnets.
+
+### Patch Changes
+
+- c88afea: The `deposit-address` route flag can now be set per route, not only per provider:
+  
+  - `RankOptions.depositAddressRoute(quote)` and `QuoteRoutesOptions.depositAddressRoute(quote, params)` — the app's predicate for a provider that pays a server-assigned address only on some routes (a THORChain inbound vault on a non-EVM source chain, a Bitcoin deposit address) and verifiable calldata on the rest. A route is flagged when its provider is in `depositAddressProviders` or the predicate returns true; a predicate that throws counts as flagged.
+  - BEST still never goes to a flagged route while an unflagged route exists; when every route is flagged, the best of them is BEST. Flagged routes stay listed and selectable.
+  
+  `depositAddressProviders` keeps working as before; without the new option nothing changes.
+- 31aa916: A fee that rose after the review is asked again on a follow-up sheet that the queue limits do not refuse. `ApprovalQueue.request(input, { followUp: true })` is another sheet for a request the user has just approved: each approval pays for one follow-up of the same origin, kind and chain, which skips the per-origin / per-site / total limits and the rate limit and is shown ahead of the requests already waiting (a refused origin stays refused). The `eth_sendTransaction` re-ask uses it, carries the max fee shown before (`SignApproval.repricedFrom`), stops after `MAX_FEE_REASKS` (3) re-asks in a row with nothing signed, and refuses a new fee above `SignDeps.feeCeiling(network)` without a second sheet.
+- b5810c3: `DEFAULT_NETWORKS`: Plasma gains a second RPC endpoint run by a different operator — `https://plasma.gateway.tenderly.co` (Tenderly's public gateway, no key) after `https://rpc.plasma.to`. A wallet that requires two independent operators before it acts (the Omniston HTLC-secret quorum) could not reach that on Plasma with one endpoint; ordinary reads gain a failover. Checked live on 2026-11-10: chain id 0x2611, no redirect, CORS open, the same block hashes and escrow-factory logs as `rpc.plasma.to`, state reads at past blocks. An extension that allowlists hosts must list the new one.
+- 394c908: New: `storageVersionLedger({ manifest, mark })` and the `versions` option of `macJsonStorage` — rollback protection for signed stores. A MAC alone proves who wrote a value, not that it is the latest: an older signed value copied back verified. With a ledger every signed value carries a version inside its MAC (`STORAGE_VERSION_FIELD`), a signed manifest kept next to the stores lists the latest version of each, and `mark` (session storage) remembers the highest manifest epoch seen. `read()` answers the new state `stale` (and `get()` `null`) for an older signed value put back, for a store deleted after it was written, and for every store when the manifest is missing, unsigned, edited, or older than the mark. A value exactly one version ahead of the manifest is accepted and recorded (a worker killed between the two writes). `ledger.condemn(key)` starts a sealed manifest above everything before it; `ledger.rekey(oldKey, newKey)` goes before the stores' `rekey`, which keep their versions; `acceptUnversioned` lets values signed before the ledger existed through until they are rewritten (off by default). Not detectable, by design of the platform: the whole storage area put back or wiped consistently when there is no mark (across a browser restart or an extension reload). Also new: `NetworksTable.reload()` and `RecipientBook.reload()` drop the in-memory copy, for a storage that only answers once the wallet is unlocked. Nothing changes for code that passes no `versions`; `MacState` gains the member `'stale'`, which only a store with a ledger returns.
+- f9e0bdf: `Session.setAutoLockMs` no longer pushes the auto-lock deadline out. Before, it ended with `touch()`, so a wallet that applied its stored setting at every service-worker start (alarms, page loads and port reconnects all restart the worker) extended the deadline by a full period each time and never locked. Now it stores the period, re-arms the alarm at the stored deadline (a missed alarm comes back, an expired record locks), and only brings the deadline forward when the new period ends sooner. A longer period, or 0 (never), applies from the next `touch()` / `unlock()`: call `session.touch()` right after the user changed the setting. Call `touch()` for explicit user gestures only, not for passive polls or page requests.
+- 97197e2: New: `macJsonStorage(store, { label, key })` and `deriveStorageMacKey(dek)` — integrity for the small JSON stores a wallet keeps in `chrome.storage.local` (settings, per-site permissions), which that area does not authenticate. Each value is stored with an HMAC-SHA256 under a key derived from the vault key (HKDF-SHA256, one-way, so a wallet may keep it in `chrome.storage.session` while locked). `get()` answers `null` for a value that is plain (written before, or planted), edited, signed for another store or under another key; `read()` tells which (`ok` / `empty` / `unsigned` / `invalid` / `no-key`) and `rekey(oldKey, newKey)` re-signs after `rotateVaultKey`. Without a key, reads return the stored value unverified (or `null`, `readWithoutKey: 'null'`) and writes store it unsigned so it fails verification later (or throw `locked`, `writeWithoutKey: 'refuse'`). It plugs into anything that takes a `JsonStorage`, e.g. `new PermissionStore(macJsonStorage(chromeJsonStorage(area, key), { label, key }))`. Nothing changes for code that does not use it.
+- a96508b: Per-site EVM grants in `RequestRouter`. An origin sees the accounts it was granted that the wallet exposes right now (`accounts()`, the active account), as before; what changes is that connecting another account (`eth_requestAccounts` / `wallet_requestPermissions` after a switch) now ADDS it to that origin's grant through the new `PermissionStore.grant` instead of replacing the list, so switching back to an account the site already had needs no new sheet. `wallet_getPermissions` lists only the visible accounts. A signing request is refused with 4100 and a message that says to switch accounts when it names a granted account that is not the active one (or when the wallet is locked), and the `sign` hook now receives the visible accounts instead of the whole grant. `PermissionStore.setAccountsEverywhere` is deprecated: it rewrote every origin's grant to the active account and showed that account to sites it was never connected to; nothing in the package calls it, call sites should stop calling it.
+  
+  `eth_getLogs` from an origin without an EVM grant may span at most `GETLOGS_MAX_SPAN_UNCONNECTED` (1000) blocks; a wider range (block tags resolved against `eth_blockNumber`) is refused with -32005 before it reaches the RPC. Connected origins and `blockHash` filters are unchanged.
+- c8c4f4b: `ApprovalQueue` limits beyond one origin, so a page that hops over subdomains cannot bury a real request under windows. New defaults: at most `APPROVALS_MAX_PENDING_PER_SITE` (5) requests waiting per site (registrable domain; subdomains share them) and `APPROVALS_MAX_PENDING_TOTAL` (20) in the whole queue, both -32005; and a per-site sheet rate (`openRate`: a token bucket, 10 at once and 10 a minute by default; running dry refuses with -32005 for a cooldown that starts at 30 s and doubles on each repeat, up to 10 min). Options `maxPendingPerSite`, `maxPendingTotal`, `openRate` (`false` turns the rate off), `siteOf` and `exempt` (origins that skip every limit — pass the wallet's own pages). New methods `declineOrigin(origin)` (the origin's last page closed) and `declineSite(site)` ("decline all from this site"), `siteFor(origin)` and `pendingForSite(site)`.
+  
+  New helpers `siteOf(origin)` (a conservative registrable domain without a full Public Suffix List: the last two labels, three under `MULTI_LABEL_SUFFIXES` such as `co.uk`, `github.io`, `vercel.app`; a pseudo-origin such as `wc:<topic>` is its own site) and `TokenBucket` (a token bucket per key, memory only).
+- 84a9097: Swap routes carry what the wallet cannot vouch for, and BEST respects it (warnings, never refusals):
+  
+  - `rank(quotes, options)` takes `RankOptions` (`slippageBps`, `depositAddressProviders`); `RouteView.warnings` lists `min-below-slippage` (the provider's minimum sits further under its own quote than the requested slippage, with `minGapBps`) and `deposit-address` (the route pays an address the provider's server assigns, e.g. a NEAR Intents 1Click deposit address). A route below the slippage is never BEST; a deposit-address route is BEST only when no other provider's route exists. The BEST route is listed first, the rest keep the output order; with no eligible route there is no BEST.
+  - `quoteRoutes` passes `params.slippageBps` to the providers and ranks with it, but a quote whose minimum still lands under it is kept and flagged instead of refused as "invalid"; `QuoteRoutesOptions.depositAddressProviders` names the deposit-address providers (the app's choice).
+  - `SwapReviewMeta.slippageBps` adds a sheet check (`Minimum within your X% slippage`, or a warning when the plan's minimum is further under the output) and `SwapApproval.slippage`; `SwapReviewMeta.depositAddressAssignedByProvider` turns the deposit check into a warning ("Deposit address assigned by the … server — funds go to an address the wallet cannot verify"), sets `SwapApproval.depositAssignedByProvider`, and the recipient check is no longer "Funds arrive at your address" on `plan.recipient` alone (status `unknown`).
+  
+  Without the new options nothing changes.
+- 68f3fe1: `Vault.unlock` and `Vault.unlockWithPasskey` now prove that the unwrapped key is the vault's own (its DEK check, or the first secret in an envelope written before the check existed) and fail with `wrong-password` otherwise. Before, a dek box or passkey box spliced in from another vault "unlocked" with the attacker's password or passkey and returned a foreign key; a wallet that used `unlock(password)` as a yes/no password check (for example before showing the seed phrase) accepted it. `changePassword` and `rotateVaultKey` refuse such a box too.
+  
+  `rotateVaultKey(password, newPassword?)`: with `newPassword`, the fresh DEK is wrapped under the new password, so changing the password and retiring the old DEK is one step (one envelope write). Passkeys are dropped as before, since their boxes hold the old DEK.
+- Updated dependencies [56e3c33]
+- Updated dependencies [9677422]
+- Updated dependencies [9677422]
+- Updated dependencies [867041b]
+- Updated dependencies [b5810c3]
+- Updated dependencies [6d6e801]
+- Updated dependencies [ff6582a]
+- Updated dependencies [a7c092d]
+- Updated dependencies [89feb83]
+- Updated dependencies [ca72d9b]
+  - @anywalletkit/wallet-evm@0.8.0
+  - @anywalletkit/wallet-ton@0.8.1
+  - @anywalletkit/networks@0.6.0
+  - @anywalletkit/swap2-assets@0.3.0
+  - @anywalletkit/protocol-swap2-core@0.10.3
+  - @anywalletkit/keyring@0.3.10
+
 ## 0.3.6
 
 ### Patch Changes

@@ -1,5 +1,29 @@
 # @anywalletkit/wallet-evm
 
+## 0.8.0
+
+### Minor Changes
+
+- 56e3c33: `describeTypedData` describes every asset-granting typed-data form as a grant. Permit2 (all primary types)
+  now returns `permit2` with the spender, every token / amount (with expiration and nonce for
+  AllowanceTransfer), the deadline and the witness type; Seaport `OrderComponents` / `BulkOrder` is a new
+  `seaport` kind with the offer and the consideration (each item's recipient); `SafeTx` returns `safeTx` with
+  to / value / data / operation and the decoded inner call. New warnings: `spender-unknown` on any permit or
+  Permit2 grant whose spender is not in the new `knownSpenders` option (address → label),
+  `consideration-foreign` when a Seaport order pays anyone but the signer (worded as "receive nothing back"
+  when nothing returns to the signer), and `safe-delegatecall` for operation 1 or an unreadable operation.
+  Callers that compared the warning list of a permit with `[]` now also see `spender-unknown` unless they
+  pass the spender in `knownSpenders`; code that switches on `kind` should handle `seaport`.
+
+### Patch Changes
+
+- 9677422: The fee-cap refusal (the account's configured maximum or the call's `maxFee`) is now a typed `FeeLimitExceededError` with `code: 'fee-limit-exceeded'`, the `fee` the transaction would pay and the `limit` it is above. The message is unchanged and the error is still thrown before anything is broadcast or returned, so a wallet can show the new fee and ask the user again instead of matching the message text.
+- 867041b: `describeTypedData` no longer puts `spender-unknown` on a Permit2 grant to Uniswap's Universal Router:
+  
+  - New pinned table `UNISWAP_UNIVERSAL_ROUTERS` (chain id → deployments with `address`, `version`, `source`): 65 Universal Router addresses on 19 chains, taken from Uniswap's deployment files, SDK table and documentation and each checked on-chain. `permit2KnownSpender(chainId, spender)` is the lookup, `PERMIT2_ADDRESS` and `UNISWAP_UNIVERSAL_ROUTER_LABEL` the constants.
+  - A Permit2 grant (any primary type) whose verifying contract is Permit2 and whose spender is a router listed for the chain in the signed domain comes back with `spenderLabel: "Uniswap Universal Router"` and without the warning. The same address on a chain where it is not listed, any other spender, a domain without a chain id, another verifying contract and EIP-2612 / DAI token permits keep the warning. Other warnings (`approve-unlimited`, `deadline-passed`, `chain-mismatch`) are unchanged.
+  - `knownSpenders` keeps working and its label takes precedence. Only the Universal Router is built in; no other protocol.
+
 ## 0.7.0
 
 ### Minor Changes

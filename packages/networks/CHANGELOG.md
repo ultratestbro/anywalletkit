@@ -1,5 +1,17 @@
 # @anywalletkit/networks
 
+## 0.6.0
+
+### Minor Changes
+
+- a7c092d: Elysium by Kinetiq (`eip155:99901`, gas in HYPE) is a builtin network: `EVM_MAINNETS` / `CATALOG_NETWORKS` and the extension's `DEFAULT_NETWORKS` carry its public RPC `https://rpc.elysium.kinetiq.xyz` (CORS-open, `eth_chainId` 0x1863d, checked with `verifyRpcs` on 2026-11-10) and its explorer `https://elysium.kinetiq.xyz`. 31 EVM mainnets.
+
+### Patch Changes
+
+- b5810c3: Builtin Plasma network: a second RPC endpoint run by a different operator, `https://plasma.gateway.tenderly.co` (Tenderly's public gateway, no key), after `https://rpc.plasma.to` — the same list the extension's `DEFAULT_NETWORKS` now ships. Checked live on 2026-11-10 (chain id 0x2611, no redirect, CORS open, block hashes and logs equal to `rpc.plasma.to`).
+- Updated dependencies [6d6e801]
+  - @anywalletkit/swap2-assets@0.3.0
+
 ## 0.5.2
 
 ### Patch Changes

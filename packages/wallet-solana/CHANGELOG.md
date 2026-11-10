@@ -1,5 +1,14 @@
 # @anywalletkit/wallet-solana
 
+## 0.6.1
+
+### Patch Changes
+
+- 9677422: The fee-cap refusal (the account's configured maximum or the call's `maxFee`) is now a typed `FeeLimitExceededError` with `code: 'fee-limit-exceeded'`, the `fee` the transaction would pay and the `limit` it is above. The message is unchanged and the error is still thrown before anything is broadcast or returned, so a wallet can show the new fee and ask the user again instead of matching the message text.
+- b906c60: The simulation guards now watch the wallet's stake and nonce accounts. `checkSerialized` / `sendSerialized` and the simulation every `sendTransaction` / `signTransaction` / `signCompiled` runs read the post-state of every written Stake-program account and every nonce account whose authority is the wallet, and refuse (`UnsafeTransactionError`) what no top-level instruction explains: a staker, withdrawer, lockup or nonce authority changed without a top-level `Authorize*` / `SetLockup*` on that account (`sets-authority`); stake lamports leaving the wallet's control beyond what top-level `Stake::Withdraw` instructions pay to the wallet, or nonce lamports leaving without a top-level `WithdrawNonceAccount` to the wallet (`moves-lamports`). A program the wallet signs for could otherwise drain or re-authorize them by CPI. Splits, merges and moves between the wallet's own stake accounts, and the wallet's own withdrawals, still pass. `allowAuthorityChanges` keeps skipping the send-path check.
+  
+  `SerializedCheck` gains `changes`: every simulated change to an account of the wallet (the wallet, wrapped SOL, token, stake and nonce accounts — lamports, token amounts, closed / created, authority changed), for a review sheet to list. `lamportsDelta` now counts the rent of a token account of the wallet that the transaction closes: closed to someone else it is spent; closed into the wallet it is neutral (it used to show as SOL received).
+
 ## 0.6.0
 
 ### Minor Changes

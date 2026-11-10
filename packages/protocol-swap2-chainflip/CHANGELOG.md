@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-swap2-chainflip
 
+## 0.4.5
+
+### Patch Changes
+
+- Updated dependencies [ff6582a]
+  - @anywalletkit/protocol-swap2-core@0.10.3
+
 ## 0.4.4
 
 ### Patch Changes
