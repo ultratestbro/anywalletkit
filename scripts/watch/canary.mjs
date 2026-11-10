@@ -83,6 +83,9 @@ const curvePools = resolve(ROOT, "packages/protocol-swap2-curve/src/pools");
 const CURVE = existsSync(curvePools) ? readdirSync(curvePools).map((f) => /^(\d+)\.ts$/.exec(f)?.[1]).filter(Boolean).map(Number).sort((a, b) => a - b) : [];
 for (const chainId of CURVE) jobs.push({id: `curve:${chainId}`, module: "curve", script: pkg("protocol-swap2-curve"), args: [String(chainId), "--rpc", rpcFor(chainId)]});
 jobs.push({id: "scrvusd", module: "scrvusd", script: pkg("protocol-lending-curve-evm"), args: [], env: {CURVE_RPC: rpcFor(1)}});
+// Relay: every pin against /chains and on chain (depository code, allocator, owner, selectors), then live quotes verified,
+// built and preflighted through the provider and the router. Keyless; RELAY_API_KEY is passed through when set.
+if (existsSync(pkg("protocol-swap2-relay"))) jobs.push({id: "relay", module: "relay", script: pkg("protocol-swap2-relay"), args: [], timeoutS: 300});
 
 const selected = jobs.filter((j) => !ONLY || ONLY.has(j.module) || ONLY.has(j.id));
 const SOFT_FAIL = /(^|\s)(→|->)\s*\w*Error\b|\bFAILED\b|\bError:|not found|revert/i;

@@ -1,0 +1,44 @@
+{
+  "note": "Relay depositErc20 of USDC into the Arbitrum RelayDepository for a USDC → USDC order to Base (public tx 2026-11-10, request 0x17942673…50ecba; the depositor is `own`)",
+  "own": [
+    "0x3692dea4346c95eb3957d8022c40373ab2A21369"
+  ],
+  "tx": {
+    "chain": "eip155:42161",
+    "hash": "0x935747a9b95715d13ba38217b2b3ba523168f1a4591947ddc6640190f7768893",
+    "time": 1794267409,
+    "status": "confirmed",
+    "address": "0x3692dea4346c95eb3957d8022c40373ab2A21369",
+    "from": "0x3692dea4346c95eb3957d8022c40373ab2A21369",
+    "to": "0x4cD00E387622C35bDDB9b4c962C136462338BC31",
+    "nativeValue": "0",
+    "transfers": [
+      {
+        "token": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+        "from": "0x3692dea4346c95eb3957d8022c40373ab2A21369",
+        "to": "0x4cD00E387622C35bDDB9b4c962C136462338BC31",
+        "amount": "61771",
+        "standard": "erc20",
+        "symbol": "USDC",
+        "decimals": 6
+      }
+    ],
+    "fee": "1186281398400",
+    "call": {
+      "to": "0x4cD00E387622C35bDDB9b4c962C136462338BC31",
+      "selector": "0xe8017952"
+    },
+    "block": "522819496"
+  },
+  "expect": {
+    "kind": "bridge",
+    "title": "Bridged USDC",
+    "assetsOut": [
+      {
+        "token": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+        "amount": "61771"
+      }
+    ],
+    "counterparty": "0x4cD00E387622C35bDDB9b4c962C136462338BC31"
+  }
+}

@@ -1,0 +1,128 @@
+{
+ "note": "Relay POST /quote/v2 (includeProtocolData), keyless, read 2026-11-10; trimmed to the fields the module reads.",
+ "request": {
+  "sourceChain": "eip155:1",
+  "destChain": "eip155:8453",
+  "sourceToken": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+  "destToken": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+  "amount": "20000000",
+  "depositor": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+  "recipient": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+  "nowMs": 1794266623000
+ },
+ "response": {
+  "steps": [
+   {
+    "id": "approve",
+    "requestId": "0x1794266618b45eb99c1122cf1a04f576987e4a377ece47027080e57c7c33e3ba",
+    "items": [
+     {
+      "data": {
+       "from": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+       "to": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+       "data": "0x095ea7b30000000000000000000000004cd00e387622c35bddb9b4c962c136462338bc310000000000000000000000000000000000000000000000000000000001312d00",
+       "value": "0",
+       "chainId": 1,
+       "gas": "63616",
+       "maxFeePerGas": "116842028",
+       "maxPriorityFeePerGas": "62957336"
+      }
+     }
+    ]
+   },
+   {
+    "id": "deposit",
+    "requestId": "0x1794266618b45eb99c1122cf1a04f576987e4a377ece47027080e57c7c33e3ba",
+    "items": [
+     {
+      "data": {
+       "from": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+       "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+       "data": "0xe8017952000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045000000000000000000000000dac17f958d2ee523a2206206994597c13d831ec70000000000000000000000000000000000000000000000000000000001312d007e7f051c3e94f365694214060d5c68a9cb71217ca38ba94103ba8ee8982746ac",
+       "value": "0",
+       "chainId": 1,
+       "gas": "76908",
+       "maxFeePerGas": "116842028",
+       "maxPriorityFeePerGas": "62957336"
+      }
+     }
+    ]
+   }
+  ],
+  "fees": {
+   "relayer": {
+    "currency": {
+     "address": "0xdac17f958d2ee523a2206206994597c13d831ec7"
+    },
+    "amount": "24841",
+    "amountUsd": "0.024811"
+   }
+  },
+  "details": {
+   "timeEstimate": 1,
+   "slippageTolerance": "100"
+  },
+  "protocol": {
+   "v2": {
+    "orderId": "0x7e7f051c3e94f365694214060d5c68a9cb71217ca38ba94103ba8ee8982746ac",
+    "hubType": "onchain",
+    "orderData": {
+     "version": "v1",
+     "solverChainId": "base",
+     "solver": "0xf70da97812cb96acdf810712aa562db8dfa3dbef",
+     "salt": "0x78dde0fefdaa013361334d2fa63d209e6a8baaa771ba72416e5d174fe499ee60",
+     "inputs": [
+      {
+       "payment": {
+        "chainId": "ethereum",
+        "currency": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+        "amount": "20000000",
+        "weight": "1"
+       },
+       "refunds": [
+        {
+         "chainId": "ethereum",
+         "recipient": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+         "currency": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+         "minimumAmount": "0",
+         "deadline": 1794871418,
+         "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+        },
+        {
+         "chainId": "base",
+         "recipient": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+         "currency": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "minimumAmount": "0",
+         "deadline": 1794871418,
+         "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+        }
+       ]
+      }
+     ],
+     "output": {
+      "chainId": "base",
+      "payments": [
+       {
+        "recipient": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+        "currency": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        "minimumAmount": "19754499",
+        "expectedAmount": "19954039"
+       }
+      ],
+      "calls": [],
+      "deadline": 1794871418,
+      "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+     },
+     "fees": []
+    },
+    "orderSignature": "0x085ac550c5471f2e1c76b255eb023f1df7b7485f7b76065684ff3f1af96e55e62449b093d579a280bdb6e0e98e964ee7c93860335a7027d38f291cd0cf8123c31b",
+    "paymentDetails": {
+     "chainId": "ethereum",
+     "depository": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+     "currency": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+     "amount": "20000000"
+    }
+   }
+  }
+ }
+}

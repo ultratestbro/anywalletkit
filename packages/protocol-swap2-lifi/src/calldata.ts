@@ -119,10 +119,14 @@ const BRIDGE_CALLS: Readonly<Record<string, {sourceSwaps: boolean; facet: string
  * call); Symbiosis's MetaRouter path forwards `callTo` / `callData` verbatim and names the final recipient and the
  * revert address there (the facet: the emitted receiver "is therefore descriptive, not an on-chain guarantee"; its
  * other path bridges to Bitcoin only). A matching BridgeData.receiver proves nothing for these, so they are refused
- * by name. Neither Relay nor
- * any other party publishes an unauthenticated lookup of an unfunded Relay order (2026-11-02: `/intents/status` says
- * "unknown", `/requests/v2` lists only indexed deposits, `/requests/v3` needs an API key), so there is nothing to check
- * the orderId against on the device.
+ * by name.
+ *
+ * Relay's `orderId` is not opaque: it is a hash commitment, the EIP-712 `hashStruct` of the order (recipient, output
+ * token, minimum, deadlines, refunds), signed by Relay's solver. What this path lacks is the preimage: a LI.FI quote
+ * carries the id without the order behind it, and neither Relay nor any other party publishes an unauthenticated
+ * lookup of an unfunded order by id (2026-11-02: `/intents/status` says "unknown", `/requests/v2` lists only indexed
+ * deposits, `/requests/v3` needs an API key). With nothing to hash, the id cannot be held to the request here. Relay's
+ * own quote does return the order, and `@anywalletkit/protocol-swap2-relay` verifies it on the device.
  */
 const UNBOUND_BRIDGES: Readonly<Record<string, string>> = {
   "0x092e8fa4": "Relay", // startBridgeTokensViaRelayDepository

@@ -47,6 +47,7 @@ app, and each provider also works on its own without the router.
 | `wrap` | WETH9 | Native ↔ wrapped native, 1:1 |
 | `jupiter` | Solana aggregator (Metis) | Same-chain Solana swaps; instructions from Jupiter's `/build`, checked and assembled locally, no Jupiter fee; key optional |
 | `fynd` | EVM aggregator (Propeller Heads) | Same-chain swaps on Ethereum, Base, Arbitrum, BNB Chain, Polygon, Unichain and Robinhood Chain through the Tycho router; key or your own Fynd server. Its outputs are under the [Fynd License](https://github.com/propeller-heads/fynd/blob/main/LICENSE.md): read it before you ship |
+| `relay` | Intents (Relay depository) | EVM → EVM bridging and cross-chain swaps on 29 chains, native coin and ERC-20; the order is verified on the device and the deposit built locally; no key ([below](#relay)) |
 
 ### Curve
 
@@ -80,6 +81,40 @@ pass an RPC (Ethereum, Arbitrum, Base, OP Mainnet, Gnosis, Monad, Plasma and X L
   on the device; `...curveRemotePins({ rpcUrls })` also checks the build on chain and holds the
   backend's output and minimum to a fresh `get_dy` within the slippage, so the minimum is the
   device's own. If the backend provider sets `defaultSlippageBps`, pass the same value here.
+
+### Relay
+
+`@anywalletkit/protocol-swap2-relay` talks to Relay's own API and verifies the whole order on the
+device before anything is signed. A Relay deposit names an order only by its hash; the module asks
+for the order behind it, recomputes the hash (EIP-712 `hashStruct`, Relay's types) and requires it
+to be the id in the deposit calldata, requires the solver's signature to recover to the pinned
+signer, and holds the order to the request: recipient, both chains, both tokens, the exact input
+amount, the minimum, the deadlines and every refund recipient. The deposit and the exact ERC-20
+approval are then built locally for the depository pinned in the package, never taken from the API.
+
+```ts
+import { relayProvider } from '@anywalletkit/protocol-swap2-relay'
+
+const relay = relayProvider() // or { baseUrl: 'https://your-backend.example/relay' }: see the proxy note below
+```
+
+- **Named refusals.** A refused quote reads `relay: <what was found> [<code>]` and reaches
+  `onRefusal`; through the router it shows in `lastRejections`.
+- **What it does not take.** Routes where Relay swaps on the source chain first (the transaction
+  would not call the depository), orders with destination calls or their own fees, the
+  whole-allowance deposit, and non-EVM chains.
+- **Unfilled orders.** Relay refunds on the source chain to the sender; status reports
+  `refund-pending` / `refunded`. Status is read from Relay unauthenticated and is for display only.
+- **Behind a backend:** `remoteProvider({ name: 'relay', baseUrl, ...relayPins })` runs the same
+  checks on the device against the quote and the built transaction.
+- **What a proxy or backend can still do.** It cannot change the recipient, chains, tokens, refund
+  addresses or the minimum shown. It can make the quote worse: the solver signs whatever request
+  reaches Relay, so one forwarded with an app fee or a gas top-up returns a genuine order with a
+  lower amount. The module refuses a quote that accounts for either and always names the slippage
+  (yours, else 2 %), but the price itself is bounded only by your `minAmountOut` or the router's
+  other quotes.
+- **One deposit per order.** Cleared order ids are remembered for the JS realm; pass `clearedStore`
+  to keep them across app restarts.
 
 ## 2. Create the router
 

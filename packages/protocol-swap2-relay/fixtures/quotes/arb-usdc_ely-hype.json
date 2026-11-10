@@ -1,0 +1,128 @@
+{
+ "note": "Relay POST /quote/v2 (includeProtocolData), keyless, read 2026-11-10; trimmed to the fields the module reads.",
+ "request": {
+  "sourceChain": "eip155:42161",
+  "destChain": "eip155:99901",
+  "sourceToken": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+  "destToken": "0x0000000000000000000000000000000000000000",
+  "amount": "20000000",
+  "depositor": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+  "recipient": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+  "nowMs": 1794266612000
+ },
+ "response": {
+  "steps": [
+   {
+    "id": "approve",
+    "requestId": "0x1794266607787890e78a7774afa4b25d1d84ceaa4e45c96976fff42750d81e57",
+    "items": [
+     {
+      "data": {
+       "from": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+       "to": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+       "data": "0x095ea7b30000000000000000000000004cd00e387622c35bddb9b4c962c136462338bc310000000000000000000000000000000000000000000000000000000001312d00",
+       "value": "0",
+       "chainId": 42161,
+       "gas": "73314",
+       "maxFeePerGas": "22000000",
+       "maxPriorityFeePerGas": "0"
+      }
+     }
+    ]
+   },
+   {
+    "id": "deposit",
+    "requestId": "0x1794266607787890e78a7774afa4b25d1d84ceaa4e45c96976fff42750d81e57",
+    "items": [
+     {
+      "data": {
+       "from": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+       "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+       "data": "0xe8017952000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e58310000000000000000000000000000000000000000000000000000000001312d004f989e0b97d74252139f9b88d44cf0843897be0977bba494be026c4e33da7574",
+       "value": "0",
+       "chainId": 42161,
+       "gas": "76460",
+       "maxFeePerGas": "22000000",
+       "maxPriorityFeePerGas": "0"
+      }
+     }
+    ]
+   }
+  ],
+  "fees": {
+   "relayer": {
+    "currency": {
+     "address": "0xaf88d065e77c8cc2239327c5edb3a432268e5831"
+    },
+    "amount": "76345",
+    "amountUsd": "0.076325"
+   }
+  },
+  "details": {
+   "timeEstimate": 1,
+   "slippageTolerance": "100"
+  },
+  "protocol": {
+   "v2": {
+    "orderId": "0x4f989e0b97d74252139f9b88d44cf0843897be0977bba494be026c4e33da7574",
+    "hubType": "onchain",
+    "orderData": {
+     "version": "v1",
+     "solverChainId": "base",
+     "solver": "0xf70da97812cb96acdf810712aa562db8dfa3dbef",
+     "salt": "0x8d81aeb175ddcfbd6f93ebf3b51af337ce99660fb22b1b004942030065695f32",
+     "inputs": [
+      {
+       "payment": {
+        "chainId": "arbitrum",
+        "currency": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+        "amount": "20000000",
+        "weight": "1"
+       },
+       "refunds": [
+        {
+         "chainId": "arbitrum",
+         "recipient": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+         "currency": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+         "minimumAmount": "0",
+         "deadline": 1794871407,
+         "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+        },
+        {
+         "chainId": "elysium",
+         "recipient": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+         "currency": "0xb47c4c8f73f009cc0c0d3f92b388d13e293f0b65",
+         "minimumAmount": "0",
+         "deadline": 1794871407,
+         "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+        }
+       ]
+      }
+     ],
+     "output": {
+      "chainId": "elysium",
+      "payments": [
+       {
+        "recipient": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+        "currency": "0x0000000000000000000000000000000000000000",
+        "minimumAmount": "260691961166102274",
+        "expectedAmount": "263325213299093207"
+       }
+      ],
+      "calls": [],
+      "deadline": 1794871407,
+      "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+     },
+     "fees": []
+    },
+    "orderSignature": "0x0b6eef8d9831c67ddfa04f88bf666b37a883480b43bef6ae07c598fb609d2d2d6a9ed2306564288a4d7bda0260d4feef83f369bfb3d3a561c4f3ad5ce2e590491b",
+    "paymentDetails": {
+     "chainId": "arbitrum",
+     "depository": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+     "currency": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+     "amount": "20000000"
+    }
+   }
+  }
+ }
+}

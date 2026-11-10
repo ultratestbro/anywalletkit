@@ -73,6 +73,7 @@ if (want("uniswap")) providers.uniswap = (await dist("protocol-swap2-uniswap", "
 if (want("wrap")) providers.wrap = (await dist("protocol-swap2-wrap", "provider.js")).wrapProvider({enabled: true, rpcUrls: venueRpc});
 if (want("balancer")) providers.balancer = (await dist("protocol-swap2-balancer", "provider.js")).balancerProvider({enabled: true, rpcUrls: venueRpc});
 if (want("curve")) providers.curve = (await dist("protocol-swap2-curve", "provider.js")).curveProvider({enabled: true, rpcUrls: venueRpc, onWarning: () => {}});
+if (want("relay")) providers.relay = (await dist("protocol-swap2-relay", "provider.js")).relayProvider({enabled: true, ...(env.RELAY_API_KEY ? {apiKey: env.RELAY_API_KEY} : {})});
 if (want("fynd") && env.FYND_API_KEY) providers.fynd = (await dist("protocol-swap2-fynd", "provider.js")).fyndProvider({enabled: true, apiKey: env.FYND_API_KEY});
 
 // ── one dry quote per corridor ───────────────────────────────────────────────

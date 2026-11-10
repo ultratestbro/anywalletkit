@@ -357,6 +357,38 @@
    "dst": "eip155:8453:crvUSD",
    "amount": "100",
    "note": "4pool"
+  },
+  {
+   "id": "relay:arb-usdc>base-usdc",
+   "provider": "relay",
+   "src": "eip155:42161:USDC",
+   "dst": "eip155:8453:USDC",
+   "amount": "100",
+   "note": "ERC-20 deposit, order verified on the device"
+  },
+  {
+   "id": "relay:base-eth>arb-eth",
+   "provider": "relay",
+   "src": "eip155:8453:ETH",
+   "dst": "eip155:42161:ETH",
+   "amount": "0.05",
+   "note": "native deposit"
+  },
+  {
+   "id": "relay:eth-usdt>base-usdc",
+   "provider": "relay",
+   "src": "eip155:1:USDT",
+   "dst": "eip155:8453:USDC",
+   "amount": "100",
+   "note": "token changes across chains"
+  },
+  {
+   "id": "relay:linea-eth>base-eth",
+   "provider": "relay",
+   "src": "eip155:59144:ETH",
+   "dst": "eip155:8453:ETH",
+   "amount": "0.05",
+   "note": "second depository deployment (Mantle / Linea)"
   }
  ],
  "omniston": {

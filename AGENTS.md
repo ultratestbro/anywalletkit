@@ -11,7 +11,7 @@ per-package `README.md` (shipped inside each npm package). Do not invent APIs.
 
 An open multichain wallet SDK in TypeScript. One seed (or an external signer) gives accounts on
 EVM (30+ networks), Solana, TON, Tron, Bitcoin, NEAR and Zcash. Protocol modules add swaps and
-bridges (one router over 15 venues), staking, lending, approvals, history and names. React Native
+bridges (one router over 16 venues), staking, lending, approvals, history and names. React Native
 (Hermes) is the primary target; Node ≥ 20 works without polyfills. ESM + CJS, types included.
 
 All packages are `@anywalletkit/*` **on npm** (https://www.npmjs.com/org/anywalletkit), published from
@@ -34,7 +34,7 @@ into the app; never install from GitHub.
 | Seed on the phone (Face ID / passcode) | `secure-storage-react-native` (Expo module: dev build, not Expo Go) |
 | Encrypted backup file / iCloud backup | `seed-vault`, `backup-cloud` |
 | Hermes polyfills | `runtime-hermes` |
-| Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,uniswap,balancer,curve,wrap,jupiter,omniston,fynd}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
+| Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,uniswap,balancer,curve,wrap,jupiter,omniston,fynd,relay}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
 | Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana,native-monad,native-near,liquid-near}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana,curve-evm}` |
 | Safety and data | `tx-preview-evm`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks`, `tokens` |
 | dApp connection | `walletconnect-ton` (WalletConnect for TON dApps); `extension-kit` (browser extension) |
@@ -289,6 +289,14 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
   estimates at broadcast); Ethereum swaps belong on an MEV-protected RPC. Behind a backend use
   `...curveRemotePins({ rpcUrls, defaultSlippageBps? })` (the backend's fixed default, if it sets one): a build's
   output and `min_dy` are held to a fresh on-device `get_dy`.
+- Relay (`relayProvider({ baseUrl?, apiKey? })`, no key needed; a `baseUrl` proxy cannot redirect
+  funds but can worsen the price — hold it with `minAmountOut` or the router's other quotes): EVM → EVM through
+  the RelayDepository on 29 pinned chains. The order behind the deposit id is verified on the device (hash recomputed,
+  pinned solver signature, recipient / tokens / amounts / minimum / deadlines / refunds held to the request) and the
+  deposit and exact approval are built locally; refusals are named (`relay: … [code]`, `onRefusal`). Slippage is
+  always named to Relay (the caller's, else 2 %); one deposit per order (`clearedStore` to survive restarts). Routes that
+  swap on the source chain first, order fees, app fees, gas top-ups, destination calls and non-EVM chains are refused. Behind a backend:
+  `remoteProvider({ name: 'relay', baseUrl, ...relayPins })`.
 - Also via the kit: `wallet.registerProtocol('swap', RouterSwap2Protocol, { chain, config: { fromChain: chain, providers } })`
   then `await wallet.getProtocol<RouterSwap2Protocol>('swap')` — policies then wrap the router's account.
 

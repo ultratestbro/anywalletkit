@@ -80,6 +80,7 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 | `@anywalletkit/protocol-swap2-balancer` | Balancer v2 same-chain swaps on 9 chains (the cp0x permissionless Balancer venue): the SOR API only suggests the path; the Vault prices it on-chain (`queryBatchSwap`) and `batchSwap` enforces `limits` + deadline; split and multi-hop paths, native via the Vault's ETH sentinel, preflight re-price |
 | `@anywalletkit/protocol-swap2-curve` | Curve same-chain swaps straight from the contracts on Router NG (18 EVM chains pinned; pools today on Ethereum, Arbitrum, Base, OP Mainnet, Gnosis, Monad, Plasma and X Layer): the router's `get_dy` quotes and explicit-receiver `exchange`, 1–2 pools per route from a curated allowlist generated and checked on-chain (code hash, coins, TVL, age) and pinned in the package, hops between pools only through catalog tokens, fake / drained pools denied; router code hash and version checked once per chain, preflight re-reads pools and a fresh `get_dy`, a remote build's minimum held to the device's own `get_dy`; no API, no key, no fee |
 | `@anywalletkit/protocol-swap2-fynd` | Fynd (Propeller Heads) same-chain swaps on Ethereum, Base, Arbitrum, BNB Chain, Polygon, Unichain and Robinhood Chain: routes over the pools Tycho indexes, settled through TychoRouterV3; router, method, tokens, amount, receiver and minimum are decoded and checked before signing. Fynd outputs are under the Fynd License (see the package README) |
+| `@anywalletkit/protocol-swap2-relay` | Relay (relay.link) EVM → EVM bridging and cross-chain swaps through the RelayDepository on 29 pinned chains, quoted from Relay's own API and verified on the device: the order behind the deposit id is hashed here (EIP-712 `hashStruct`) and held to the calldata, the solver's signature must recover to the pinned signer, recipient, chains, tokens, amounts, minimum, deadlines and every refund recipient are held to the request, and the deposit and the exact approval are built locally for the pinned depository; named refusals, no provider SDK, no key |
 | `@anywalletkit/protocol-swap2-jupiter` | Jupiter same-chain Solana swaps through Swap API V2's Router path (`/build`, Metis routing, no Jupiter fee, keyless or `x-api-key`): every instruction vetted and the swap arguments decoded (amount, quoted out, slippage, zero platform fee) before the v0 transaction is assembled locally; compute budget re-set (simulated limit, capped price); the wallet's serialized guard proves programs and balances before signing |
 | `@anywalletkit/kit` | orchestrator: register chain wallets + protocol modules, accounts by CAIP-2 chain, policies (fee cap, allow/block lists, confirm) on every write — sends, transfers, `signTransaction`, message signatures; the activity feed (`history()`) |
 | `@anywalletkit/keyring` | many accounts from one seed plus imported seeds / private keys / Tonkeeper words, one `AccountMeta` list across chains, per-execution accounts that dispose the key after use |
@@ -104,7 +105,7 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 | `@anywalletkit/extension-kit` | Chromium (MV3) wallet-extension core: scrypt vault with passkey (PRF) unlock, auto-locking session, dApp request router + per-origin permissions + approval queue, signing checks (SIWE, EIP-7702, address poisoning, phishing list), swap / Earn plan review, TON Connect data, chrome adapters; no UI — the extension itself is the wallet's own product |
 
 Every protocol module ships a `module.json`; `pnpm registry` builds
-[registry/modules.json](registry/modules.json) from them (29 modules today). See
+[registry/modules.json](registry/modules.json) from them (30 modules today). See
 [registry/README.md](registry/README.md) for tiers and how to list an external module.
 
 User documentation: [docs.anywallet.tech](https://docs.anywallet.tech) (sources in `apps/docs`).
@@ -133,7 +134,7 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 
 ## Tests
 
-`pnpm test` runs 4,300+ tests across 52 packages (Node); `pnpm test:hermes` runs 397
+`pnpm test` runs 4,600+ tests across 53 packages (Node); `pnpm test:hermes` runs 405
 checks in the Hermes VM React Native ships. Beyond unit tests the swap layer is
 checked against live providers (running totals, November 2026): 149,728 quote checks
 (13 providers, up to 36 chains, 398 assets), 65,481 builds simulated to the

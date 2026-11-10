@@ -1,0 +1,110 @@
+{
+ "note": "Relay POST /quote/v2 (includeProtocolData), keyless, read 2026-11-10; trimmed to the fields the module reads.",
+ "request": {
+  "sourceChain": "eip155:56",
+  "destChain": "eip155:42161",
+  "sourceToken": "0x0000000000000000000000000000000000000000",
+  "destToken": "0x0000000000000000000000000000000000000000",
+  "amount": "20000000000000000",
+  "depositor": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+  "recipient": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+  "nowMs": 1794266619000
+ },
+ "response": {
+  "steps": [
+   {
+    "id": "deposit",
+    "requestId": "0x1794266614841eee264bf26e443efdce754eab1ab39db1595ad4a13560a3ac76",
+    "items": [
+     {
+      "data": {
+       "from": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+       "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+       "data": "0x49290c1c000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa9604563d11c4a8f8b67ca8539ef96f74af8aaac631c6e4cdcfe310b010de4ea7779d6",
+       "value": "20000000000000000",
+       "chainId": 56,
+       "gas": "32713",
+       "maxFeePerGas": "67927273",
+       "maxPriorityFeePerGas": "67927273"
+      }
+     }
+    ]
+   }
+  ],
+  "fees": {
+   "relayer": {
+    "currency": {
+     "address": "0x0000000000000000000000000000000000000000"
+    },
+    "amount": "64695922032432",
+    "amountUsd": "0.044565"
+   }
+  },
+  "details": {
+   "timeEstimate": 1,
+   "slippageTolerance": "100"
+  },
+  "protocol": {
+   "v2": {
+    "orderId": "0x63d11c4a8f8b67ca8539ef96f74af8aaac631c6e4cdcfe310b010de4ea7779d6",
+    "hubType": "onchain",
+    "orderData": {
+     "version": "v1",
+     "solverChainId": "base",
+     "solver": "0xf70da97812cb96acdf810712aa562db8dfa3dbef",
+     "salt": "0x046b104ba17abea2577aae127b1598a3810b07f42dd655bc3599298d50c4314a",
+     "inputs": [
+      {
+       "payment": {
+        "chainId": "bnb",
+        "currency": "0x0000000000000000000000000000000000000000",
+        "amount": "20000000000000000",
+        "weight": "1"
+       },
+       "refunds": [
+        {
+         "chainId": "bnb",
+         "recipient": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+         "currency": "0x0000000000000000000000000000000000000000",
+         "minimumAmount": "0",
+         "deadline": 1794871414,
+         "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+        },
+        {
+         "chainId": "arbitrum",
+         "recipient": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+         "currency": "0x0000000000000000000000000000000000000000",
+         "minimumAmount": "0",
+         "deadline": 1794871414,
+         "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+        }
+       ]
+      }
+     ],
+     "output": {
+      "chainId": "arbitrum",
+      "payments": [
+       {
+        "recipient": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+        "currency": "0x0000000000000000000000000000000000000000",
+        "minimumAmount": "6363884260844744",
+        "expectedAmount": "6428165920045196"
+       }
+      ],
+      "calls": [],
+      "deadline": 1794871414,
+      "extraData": "0x0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7"
+     },
+     "fees": []
+    },
+    "orderSignature": "0x89dd426217c70eb98f1097be4e823f81f65b15a1eca66c864a0e9250e50c768b64bc532cbf993c88ba1a2281504c062b1e73c503f0e6dd394ce92ce84d4a46d11b",
+    "paymentDetails": {
+     "chainId": "bnb",
+     "depository": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+     "currency": "0x0000000000000000000000000000000000000000",
+     "amount": "20000000000000000"
+    }
+   }
+  }
+ }
+}
