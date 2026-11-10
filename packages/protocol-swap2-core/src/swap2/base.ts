@@ -42,6 +42,7 @@ import type {CrossChainProvider, IntentStatus, QuoteParams, Quote, UnsignedTx, R
 import {validRouteId} from "../validate.js";
 import {tonRawAddress} from "../util.js";
 import {PERMIT2_ADDRESS, appendPermit2Signature, readPermit2Transfer, type Permit2Transfer} from "../permit2.js";
+import {GPV2_ORDER_FIELDS, assertGpv2Cancellation, assertGpv2Order, assertGpv2Permit, isGpv2Order, type Gpv2OrderExpectation} from "./gpv2.js";
 import {SLIPPAGE_ROUNDING_BPS} from "../validate.js";
 import {Swap2OperationJournal, loadSwap2Operation, type Swap2OperationStore, type Swap2Operation} from "../operation.js";
 import {
@@ -512,6 +513,12 @@ export interface Swap2ExecutionPlan {
   validUntilMs: number;
   /** ERC-20 approvals sent first, in order (USDT on Ethereum resets to 0 first). */
   approvals: {token: string; spender: string; amount: bigint; chainId?: number}[];
+  /**
+   * CoW Protocol: EIP-2612 permits signed instead of an approval transaction (no gas). The allowance is
+   * granted when the order settles, through the order's pre-hook; the order then signed is the reviewed
+   * one with another `appData` (the hash that commits to the hook).
+   */
+  permits?: {token: string; spender: string; amount: bigint; deadline: number; chainId?: number}[];
   /**
    * `true` on a second review: the first quote expired while its approval was being mined, and
    * the fresh one differs from what was reviewed (another payload, a worse output). The allowance
@@ -1533,6 +1540,8 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     if (remote && unsigned.approvalAddress && !pinnedSpenders.includes(unsigned.approvalAddress.toLowerCase())) {
       throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' asks to approve ${unsigned.approvalAddress} on ${this.fromChain}, which the app did not pin as a spender (remoteProvider spenders) — refused`, {reason: "policy_refused"});
     }
+    let gpv2: ReturnType<typeof assertGpv2Order> | undefined;
+    let gpv2Expect: Gpv2OrderExpectation | undefined;
     if (unsigned.typedData !== undefined) {
       // The engine binds the domain, the maker and the input; the price, the receiver, the traits and the extension
       // are the provider's to check. A remote stub's order is signed only after the app's own validator ran on it
@@ -1541,7 +1550,19 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' asks to sign a typed order, which needs the app's own validator (remoteProvider verifyBuild) — refused`, {reason: "policy_refused"});
       }
       const chainId = this.fromChain.startsWith("eip155:") ? Number(this.fromChain.slice("eip155:".length)) : null;
-      assertTypedOrder(unsigned.typedData, unsigned.approvalAddress, {self: selfAddress, token: source.contract ?? undefined, amount: q.sourceAmount, chainId});
+      if (isGpv2Order(unsigned.typedData)) {
+        // A CoW Protocol order names its receiver, its price and its expiry in the signed struct itself: the
+        // engine binds every field, not only the maker side.
+        gpv2Expect = {self: selfAddress, token: source.contract ?? undefined, amount: q.sourceAmount, chainId, recipient, destToken: params.destToken, minDest: q.minDestAmount, now: Math.floor(Date.now() / 1000)};
+        gpv2 = assertGpv2Order(unsigned.typedData, unsigned.approvalAddress, gpv2Expect);
+        // Known before any approval is sent: an order nobody can sign must not cost an allowance transaction.
+        if (typeof signer.signTypedData !== "function") throw new Swap2ExecutionError("swap2: a CoW order needs an account with signTypedData");
+      } else {
+        assertTypedOrder(unsigned.typedData, unsigned.approvalAddress, {self: selfAddress, token: source.contract ?? undefined, amount: q.sourceAmount, chainId});
+      }
+    }
+    if (!gpv2 && (unsigned.permit !== undefined || unsigned.approvalAmount !== undefined)) {
+      throw new Swap2ValidationError("swap2: a permit or an allowance target is only accepted with a CoW order — refused");
     }
     // Permit2 signature transfer (0x Settler): the engine binds what the account will sign — Permit2's own domain on
     // the source chain, the source token, exactly the input, the called contract as the only spender, a near deadline
@@ -1612,6 +1633,18 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // cannot leave an allowance behind before failing validation.
     const needsApproval = !!unsigned.approvalAddress && !!source.contract;
     const approvalAmount = needsApproval ? BigInt(executionOptions.fromTokenAmount!) : 0n;
+    // CoW orders share one allowance per token: the target covers the account's other open orders too, an
+    // allowance that already covers it is left alone, and cleanup puts back what was there instead of zero.
+    let allowanceTarget = approvalAmount;
+    if (unsigned.approvalAmount !== undefined) {
+      const declared = /^(?:0|[1-9][0-9]{0,77})$/.test(unsigned.approvalAmount) ? BigInt(unsigned.approvalAmount) : null;
+      if (!needsApproval || declared === null || declared < approvalAmount || declared >= 1n << 255n) {
+        throw new Swap2ValidationError(`swap2: the allowance target ${unsigned.approvalAmount} is not a finite amount covering the swap's ${approvalAmount} — refused`);
+      }
+      allowanceTarget = declared;
+    }
+    let restoreAllowance = 0n;
+    let resetBeforeRestore = false;
     const sameHex = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
     let approvalAmounts: bigint[] = [];
     let revokeApproval: (() => Promise<void>) | undefined;
@@ -1634,7 +1667,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     if (needsApproval && carried) {
       // Re-quote pass: the allowance must fit the fresh quote exactly;
       // otherwise it is revoked and the swap aborts (the caller may retry).
-      if (!sameHex(carried.token, source.contract!) || !sameHex(carried.spender, unsigned.approvalAddress!) || carried.amount !== approvalAmount) {
+      if (!sameHex(carried.token, source.contract!) || !sameHex(carried.spender, unsigned.approvalAddress!) || carried.amount !== allowanceTarget) {
         carried.adopted = true;
         if (!carried.signatureTransferOnly) await carried.revoke().catch(() => {});
         throw new Swap2QuoteError(`swap2: the fresh quote moved the spender to ${unsigned.approvalAddress} — aborted, ${revokedNote(carried.signatureTransferOnly, `the allowance for ${carried.spender}`)}`, {reason: "vault_mismatch"});
@@ -1656,13 +1689,27 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           current = undefined;
         }
       }
-      // Permit2 is a standing spender many apps share: an allowance already covering the input is the user's own and
-      // is left as it is (lowering it to the exact amount would cost a transaction and break those apps). A smaller
-      // one, or one that cannot be read, is set to exactly the input like any other approval. When the swap does not go
-      // out it stays (signature transfer only, see above); otherwise it is taken back to 0 (the earlier, smaller value
-      // is not restored).
-      approvalAmounts = current === approvalAmount || (permit2 && current !== undefined && current >= approvalAmount)
-        ? [] : [...(usdtMainnet && current !== 0n ? [0n] : []), approvalAmount];
+      if (gpv2) {
+        approvalAmounts = current !== undefined && current >= allowanceTarget ? [] : [...(usdtMainnet && current !== 0n ? [0n] : []), allowanceTarget];
+        restoreAllowance = current ?? 0n;
+        resetBeforeRestore = usdtMainnet && restoreAllowance !== 0n;
+      } else {
+        // Permit2 is a standing spender many apps share: an allowance already covering the input is the user's own and
+        // is left as it is (lowering it to the exact amount would cost a transaction and break those apps). A smaller
+        // one, or one that cannot be read, is set to exactly the input like any other approval. When the swap does not go
+        // out it stays (signature transfer only, see above); otherwise it is taken back to 0 (the earlier, smaller value
+        // is not restored).
+        approvalAmounts = current === approvalAmount || (permit2 && current !== undefined && current >= approvalAmount)
+          ? [] : [...(usdtMainnet && current !== 0n ? [0n] : []), approvalAmount];
+      }
+    }
+    // A token with EIP-2612: the allowance comes from a signed permit carried in the order (no transaction, no gas).
+    let permit: {typedData: string; amount: bigint; deadline: number} | undefined;
+    if (unsigned.permit !== undefined && gpv2 && needsApproval && !carried && approvalAmounts.length
+      && typeof provider.applyPermit === "function" && typeof signer.signTypedData === "function") {
+      const checked = assertGpv2Permit(unsigned.permit, {self: selfAddress, token: source.contract!, value: allowanceTarget, chainId: gpv2Expect!.chainId, deadline: gpv2.validTo});
+      permit = {typedData: unsigned.permit, ...checked};
+      approvalAmounts = [];
     }
 
     // The re-quote pass is reviewed again only when it differs from what the
@@ -1690,6 +1737,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         etaSeconds: q.etaSeconds,
         validUntilMs: q.validUntilMs,
         approvals,
+        ...(permit ? {permits: [{token: source.contract!, spender: unsigned.approvalAddress!, amount: permit.amount, deadline: permit.deadline, ...chainId}]} : {}),
         source: serialized
           ? {kind: "serialized", serializedTx: unsigned.serializedTx!}
           : unsigned.typedData
@@ -1784,7 +1832,11 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // Install cleanup BEFORE broadcasting approval. An RPC can lose the
       // response after the transaction was accepted; treating that exception
       // as "nothing happened" would leave a live allowance with no callback.
-      revokeAllowance = async () => { await approve(0n, "revoke"); };
+      revokeAllowance = async () => {
+        // A GPv2 approval restores what was there before (other open orders spend it); any other returns to 0.
+        if (resetBeforeRestore) await approve(0n, "revoke");
+        await approve(restoreAllowance, "revoke");
+      };
       revokeApproval = signatureTransferOnly ? keep : revokeAllowance;
       try {
         for (const [i, amount] of approvalAmounts.entries()) {
@@ -1805,7 +1857,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     const mayRequote = !carried && approvalAmounts.length > 0 && !!revokeAllowance;
     const requote = async (): Promise<Swap2Result> => {
       this.emitPhase("requoting");
-      const handoff: CarriedAllowance = {provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), ...(journal ? {journal} : {}), token: source.contract!, spender: unsigned.approvalAddress!, amount: approvalAmount, revoke: revokeAllowance!, signatureTransferOnly, adopted: false, ...(reviewed ? {reviewed} : {})};
+      const handoff: CarriedAllowance = {provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), ...(journal ? {journal} : {}), token: source.contract!, spender: unsigned.approvalAddress!, amount: allowanceTarget, revoke: revokeAllowance!, signatureTransferOnly, adopted: false, ...(reviewed ? {reviewed} : {})};
       try {
         return await this.executeSwap2(signer, snapshot, config, handoff);
       } catch (error) {
@@ -1848,7 +1900,26 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         if (!provider.registerSignedOrder) {
           throw new Error(`swap2: provider '${q.provider}' cannot register signed orders`);
         }
-        const td = JSON.parse(unsigned.typedData) as {
+        let orderTypedData = unsigned.typedData;
+        if (permit) {
+          const p = JSON.parse(permit.typedData) as {domain: unknown; types: Record<string, unknown>; message: unknown};
+          const {EIP712Domain: _permitDomain, ...permitTypes} = p.types;
+          const permitSignature = await signer.signTypedData({domain: normalizeTypedDomain(p.domain), types: permitTypes, primaryType: "Permit", message: p.message});
+          const funded = await provider.applyPermit!(q.intentId, permitSignature);
+          if (!funded || funded.typedData === undefined || funded.data !== undefined || funded.serializedTx !== undefined || funded.value !== "0"
+            || funded.chain !== unsigned.chain || funded.to !== unsigned.to || funded.chainId !== unsigned.chainId || funded.approvalAddress !== unsigned.approvalAddress) {
+            throw new Swap2ValidationError("swap2: the order returned for the signed permit is not the reviewed order's build — refused");
+          }
+          // The same order, field by field; only appData (the hash that now commits to the permit hook) may differ.
+          const again = assertGpv2Order(funded.typedData, funded.approvalAddress, {...gpv2Expect!, now: Math.floor(Date.now() / 1000)});
+          for (const f of GPV2_ORDER_FIELDS) {
+            if (f.name !== "appData" && String(again.message[f.name]).toLowerCase() !== String(gpv2!.message[f.name]).toLowerCase()) {
+              throw new Swap2ValidationError(`swap2: the order returned for the signed permit changed ${f.name} — refused`);
+            }
+          }
+          orderTypedData = funded.typedData;
+        }
+        const td = JSON.parse(orderTypedData) as {
           domain: unknown;
           types: Record<string, unknown>;
           primaryType?: string;
@@ -1872,10 +1943,11 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         });
         const signature = journal ? await journal.effect("order-sign", this.fromChain, sign, {ambiguous: maybeSent}) : await sign();
         const register = () => provider.registerSignedOrder!(q.intentId, signature);
-        if (journal) await journal.effect("order-register", this.fromChain, register, {ambiguous: (error) => maybeSent(error) ?? {}});
-        else await register();
+        // A provider whose order id only exists once the order is placed (a CoW order UID) returns it here.
+        const registered = journal ? await journal.effect("order-register", this.fromChain, register, {ambiguous: (error) => maybeSent(error) ?? {}}) : await register();
+        const placedId = registered && typeof registered === "object" && typeof registered.intentId === "string" && registered.intentId ? registered.intentId : q.intentId;
         return {
-          id: encodeId(q.provider, q.intentId),
+          id: encodeId(q.provider, placedId),
           fees: this.toQuote(q, executionOptions).fees,
           fromTokenAmount: BigInt(q.sourceAmount),
           toTokenAmount: BigInt(q.destAmount),
@@ -2271,6 +2343,98 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // The id to keep polling names the claim (and that it succeeded), so the status can complete without a
     // destination RPC (round 3, M27).
     return {hash: sent.hash, chain: unsigned.chain, id: encodeId(name, intentId, sourceTxHash, sent.hash, confirmed)};
+  }
+
+  /**
+   * Cancel an order that rests before it settles (CoW Protocol), by the id `swap2()` returned.
+   *
+   * Default: the free off-chain cancellation — the account signs an EIP-712 `OrderCancellations` message
+   * for its own order and the provider hands it to the orderbook. It is best effort: an order a solver
+   * already picked up may still settle, so keep polling the status. `{onchain: true}` sends the
+   * transaction that invalidates the order in the contract instead (costs gas, final once mined); an
+   * order placed by an on-chain transaction (a native-coin sell) can only be cancelled this way, and the
+   * same transaction refunds it after it expired.
+   *
+   * The engine signs nothing but a cancellation of orders this account owns, for GPv2Settlement on the
+   * account's chain, and sends nothing but plain calldata to a contract the provider declares
+   * (`cancelTargets`). Cancelling stays available when the provider is switched off.
+   */
+  async cancelSwap2(id: string, account: Swap2Account, options?: {onchain?: boolean}): Promise<{mode: "offchain"; id: string} | {mode: "onchain"; hash: string; chain: string; id: string}> {
+    const {provider: name, intentId, sourceTxHash} = decodeId(id);
+    const provider = this.providerFor(name);
+    if (!provider) throw new Error(`swap2: no swap2 found for id '${id}'`);
+    if (typeof provider.buildCancel !== "function") {
+      throw new Swap2UnsupportedOperationError(`swap2: provider '${name}' has no cancel step`);
+    }
+    const signerCandidate = account as Partial<Swap2Signer> | undefined;
+    if (!signerCandidate || typeof signerCandidate.sendTransaction !== "function" || typeof signerCandidate.getAddress !== "function") {
+      throw new Swap2ExecutionError("swap2: cancelSwap2() requires the signing account that placed the order");
+    }
+    const signer = signerCandidate as Swap2Signer;
+    const self = await signer.getAddress();
+    if (typeof self !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(self)) throw new Swap2ExecutionError("swap2: cancelSwap2() requires an EVM account");
+    const onchain = options?.onchain === true;
+    const unsigned = await provider.buildCancel(sourceTxHash == null ? {intentId} : {intentId, sourceTxHash}, {owner: self, onchain});
+    if (!unsigned) throw new Swap2StatusError("swap2: nothing to cancel — the order has settled, expired or was cancelled already");
+    if (!unsigned.chain || !unsigned.chain.startsWith("eip155:")) {
+      throw new Swap2UnsupportedOperationError(`swap2: cancellation is only implemented for EVM orders (got '${unsigned.chain || "?"}')`);
+    }
+    const expectedId = unsigned.chain.slice("eip155:".length);
+    if (unsigned.chainId !== undefined && String(unsigned.chainId) !== expectedId) {
+      throw new Error(`swap2: cancel chainId ${unsigned.chainId} does not match ${unsigned.chain}`);
+    }
+    if (unsigned.serializedTx !== undefined || unsigned.bodyBoc !== undefined || unsigned.memo !== undefined || unsigned.approvalAddress !== undefined || unsigned.permit !== undefined) {
+      throw new Error("swap2: a cancellation must be a typed message or plain calldata");
+    }
+    if (unsigned.value !== undefined && unsigned.value !== "0") throw new Error("swap2: a cancellation must not carry native value");
+    const actual = await readAccountChain(signer);
+    if (actual == null) throw new Error(`swap2: account chain identity is unavailable for ${unsigned.chain}`);
+    const actualText = typeof actual === "string" ? actual : String(actual);
+    const actualId = actualText.startsWith("eip155:") ? actualText.slice("eip155:".length) : actualText;
+    if (actualId !== expectedId) throw new Error(`swap2: the order is on ${unsigned.chain}, but the account is bound to ${actualText}`);
+
+    if (unsigned.typedData !== undefined) {
+      if (onchain || unsigned.data !== undefined) throw new Error("swap2: provider returned a typed cancellation for an on-chain cancel");
+      assertGpv2Cancellation(unsigned.typedData, {self, chainId: Number(expectedId)});
+      if (typeof signer.signTypedData !== "function") throw new Swap2ExecutionError("swap2: off-chain cancellation needs an account with signTypedData — pass {onchain: true} to cancel by transaction");
+      if (typeof provider.registerCancel !== "function") throw new Swap2UnsupportedOperationError(`swap2: provider '${name}' cannot register a cancellation`);
+      const td = JSON.parse(unsigned.typedData) as {domain: unknown; types: Record<string, unknown>; message: unknown};
+      const {EIP712Domain: _domain, ...types} = td.types;
+      this.emitPhase("signing");
+      const signature = await signer.signTypedData({domain: normalizeTypedDomain(td.domain), types, primaryType: "OrderCancellations", message: td.message});
+      await provider.registerCancel(intentId, signature);
+      return {mode: "offchain", id};
+    }
+
+    if (!onchain) {
+      throw new Swap2UnsupportedOperationError("swap2: this order can only be cancelled by an on-chain transaction (it costs gas) — call cancelSwap2(id, account, {onchain: true})");
+    }
+    if (!unsigned.to || !unsigned.data || !/^0x(?:[0-9a-fA-F]{2})+$/.test(unsigned.data)) {
+      throw new Error("swap2: provider returned a malformed cancel transaction");
+    }
+    if (typeof provider.cancelTargets !== "function") {
+      throw new Swap2UnsupportedOperationError(`swap2: provider '${name}' declares no cancelTargets — a cancellation may only call contracts the provider names for its chain`);
+    }
+    const targets = provider.cancelTargets(unsigned.chain).map((a) => a.toLowerCase());
+    if (!targets.includes(unsigned.to.toLowerCase())) {
+      throw new Swap2ValidationError(`swap2: cancel target ${unsigned.to} is not a contract '${name}' declares for ${unsigned.chain} — refused`);
+    }
+    const call = decodeCall({to: unsigned.to, data: unsigned.data, value: 0n});
+    if (call.undecodable) throw new Swap2ValidationError("swap2: cancel calldata is not hex bytes — refused");
+    if (call.transfer || call.approval) {
+      throw new Swap2ValidationError(`swap2: cancel calldata (${call.method}) moves tokens or grants an allowance — refused`);
+    }
+    this.emitPhase("signing");
+    const sent = await signer.sendTransaction({
+      to: unsigned.to,
+      data: unsigned.data,
+      value: 0n,
+      chainId: Number(expectedId),
+      ...(unsigned.gasLimit ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
+    });
+    if (!sent.hash) throw new Swap2ExecutionError("swap2: account did not return a cancel transaction hash");
+    this.emitPhase("broadcast", {hash: sent.hash});
+    return {mode: "onchain", hash: sent.hash, chain: unsigned.chain, id};
   }
 
   /** The inherited bridge() has no floor field: quote first, then bind execution

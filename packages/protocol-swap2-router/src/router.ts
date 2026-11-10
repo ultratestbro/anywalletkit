@@ -155,6 +155,12 @@ export class CrossChainRouter {
       ...(provider.preflightDeposit ? {preflightDeposit: provider.preflightDeposit.bind(provider)} : {}),
       ...(provider.notifyDeposit ? {notifyDeposit: provider.notifyDeposit.bind(provider)} : {}),
       ...(provider.registerSignedOrder ? {registerSignedOrder: provider.registerSignedOrder.bind(provider)} : {}),
+      // Resting orders (CoW Protocol): the permit that funds an order and its cancellation. Missing here, the
+      // engine would fall back to an approval transaction and report "no cancel step" for a routed order.
+      ...(provider.applyPermit ? {applyPermit: provider.applyPermit.bind(provider)} : {}),
+      ...(provider.buildCancel ? {buildCancel: provider.buildCancel.bind(provider)} : {}),
+      ...(provider.registerCancel ? {registerCancel: provider.registerCancel.bind(provider)} : {}),
+      ...(provider.cancelTargets ? {cancelTargets: provider.cancelTargets.bind(provider)} : {}),
       // Two-phase routes (CCTP): the destination claim. Missing here, the engine
       // and the server both reported "provider 'cctp' has no claim step" (2026-10-13).
       ...(provider.buildClaim ? {buildClaim: provider.buildClaim.bind(provider)} : {}),

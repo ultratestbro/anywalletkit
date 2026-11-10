@@ -240,6 +240,18 @@ export interface UnsignedTx {
    * a remote build on the client (`omnistonVerifyBuild`, scan 2026-10-28 F6); the signature covers it through the salt.
    */
   orderExtension?: string;
+  /**
+   * CoW Protocol typed orders only: the allowance the vault relayer needs once this order is added to the
+   * account's other open orders of the same token — never less than the swap's input. The engine raises a lower
+   * allowance to it and leaves a sufficient one alone (lowering it would starve the open orders).
+   */
+  approvalAmount?: string;
+  /**
+   * CoW Protocol typed orders only: the JSON EIP-712 `Permit` (EIP-2612) for `approvalAmount`, offered when the
+   * token supports it. The engine signs it instead of sending an approval transaction and hands the signature to
+   * `CrossChainProvider.applyPermit`, which returns the order with the permit as its pre-hook.
+   */
+  permit?: string;
 }
 
 /**
@@ -312,7 +324,23 @@ export interface CrossChainProvider {
    */
   notifyDeposit?(intentId: string, txHash: string): Promise<void>;
   /** Gasless typed-order providers: register the wallet's EIP-712 signature. */
-  registerSignedOrder?(intentId: string, signature: string): Promise<void>;
+  registerSignedOrder?(intentId: string, signature: string): Promise<void | {intentId: string}>;
+  /**
+   * CoW Protocol: fold the account's EIP-2612 permit signature into the order (its appData pre-hook) and return
+   * the build to sign — the same order with another `appData`. The engine re-checks it field by field.
+   */
+  applyPermit?(intentId: string, signature: string): Promise<UnsignedTx>;
+  /**
+   * Orders that rest before they settle (CoW Protocol): what cancels one, or `null` when nothing is left to
+   * cancel. Off-chain (`onchain: false`): typed data for the orderbook, completed via `registerCancel` — free,
+   * best effort. On-chain: plain calldata to a contract `cancelTargets` names (an order placed by an on-chain
+   * transaction can only be cancelled this way). The engine executes it through `cancelSwap2`.
+   */
+  buildCancel?(ref: IntentRef, options: {owner: string; onchain: boolean}): Promise<UnsignedTx | null>;
+  /** Off-chain cancellation: hand the signed cancellation to the provider's API. */
+  registerCancel?(intentId: string, signature: string): Promise<void>;
+  /** The contracts an on-chain cancellation may call on `chain` (CAIP-2). */
+  cancelTargets?(chain: string): readonly string[];
   /**
    * Two-phase routes: the destination-chain transaction that completes the
    * delivery (CCTP `receiveMessage(message, attestation)`), or `null` while
