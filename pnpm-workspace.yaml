@@ -3,6 +3,10 @@ packages:
   - examples/*
   - apps/*
 
+# A version reaches the lockfile only once it is a week old (minutes), the same window Dependabot
+# waits. Workspace packages are linked, not resolved from the registry, so they are not affected.
+minimumReleaseAge: 10080
+
 # `pnpm audit --prod --audit-level high` runs in CI. An advisory is ignored here only when no fixed
 # version exists for the dependency that pulls it in, with the reason it is not reachable.
 auditConfig:

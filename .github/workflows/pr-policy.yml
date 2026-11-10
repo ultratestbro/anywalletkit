@@ -2,6 +2,9 @@ name: pr-policy
 # Outside pull requests are not accepted yet (CONTRIBUTING.md): close them with
 # a pointer to issues. Runs on pull_request_target but never checks out or runs
 # the PR's code — it only comments and closes.
+# Dependabot's PRs stay open (its author_association is NONE): they go through
+# the normal `ci` checks and the owner's review like any other change. The PR
+# author's login is set by GitHub, so no outside PR can pass as dependabot[bot].
 on:
   pull_request_target:
     types: [opened, reopened]
@@ -12,7 +15,7 @@ permissions:
 
 jobs:
   close:
-    if: ${{ !contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) }}
+    if: ${{ github.event.pull_request.user.login != 'dependabot[bot]' && !contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
