@@ -289,11 +289,13 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
   estimates at broadcast); Ethereum swaps belong on an MEV-protected RPC. Behind a backend use
   `...curveRemotePins({ rpcUrls, defaultSlippageBps? })` (the backend's fixed default, if it sets one): a build's
   output and `min_dy` are held to a fresh on-device `get_dy`.
-- Relay (`relayProvider({ baseUrl?, apiKey? })`, no key needed, `baseUrl` may be an untrusted proxy): EVM → EVM through
+- Relay (`relayProvider({ baseUrl?, apiKey? })`, no key needed; a `baseUrl` proxy cannot redirect
+  funds but can worsen the price — hold it with `minAmountOut` or the router's other quotes): EVM → EVM through
   the RelayDepository on 29 pinned chains. The order behind the deposit id is verified on the device (hash recomputed,
   pinned solver signature, recipient / tokens / amounts / minimum / deadlines / refunds held to the request) and the
-  deposit and exact approval are built locally; refusals are named (`relay: … [code]`, `onRefusal`). Routes that swap
-  on the source chain first, order fees, destination calls and non-EVM chains are refused. Behind a backend:
+  deposit and exact approval are built locally; refusals are named (`relay: … [code]`, `onRefusal`). Slippage is
+  always named to Relay (the caller's, else 2 %); one deposit per order (`clearedStore` to survive restarts). Routes that
+  swap on the source chain first, order fees, app fees, gas top-ups, destination calls and non-EVM chains are refused. Behind a backend:
   `remoteProvider({ name: 'relay', baseUrl, ...relayPins })`.
 - Also via the kit: `wallet.registerProtocol('swap', RouterSwap2Protocol, { chain, config: { fromChain: chain, providers } })`
   then `await wallet.getProtocol<RouterSwap2Protocol>('swap')` — policies then wrap the router's account.

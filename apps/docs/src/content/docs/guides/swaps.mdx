@@ -95,7 +95,7 @@ approval are then built locally for the depository pinned in the package, never 
 ```ts
 import { relayProvider } from '@anywalletkit/protocol-swap2-relay'
 
-const relay = relayProvider() // or { baseUrl: 'https://your-backend.example/relay' }: the proxy needs no trust
+const relay = relayProvider() // or { baseUrl: 'https://your-backend.example/relay' }: see the proxy note below
 ```
 
 - **Named refusals.** A refused quote reads `relay: <what was found> [<code>]` and reaches
@@ -107,6 +107,14 @@ const relay = relayProvider() // or { baseUrl: 'https://your-backend.example/rel
   `refund-pending` / `refunded`. Status is read from Relay unauthenticated and is for display only.
 - **Behind a backend:** `remoteProvider({ name: 'relay', baseUrl, ...relayPins })` runs the same
   checks on the device against the quote and the built transaction.
+- **What a proxy or backend can still do.** It cannot change the recipient, chains, tokens, refund
+  addresses or the minimum shown. It can make the quote worse: the solver signs whatever request
+  reaches Relay, so one forwarded with an app fee or a gas top-up returns a genuine order with a
+  lower amount. The module refuses a quote that accounts for either and always names the slippage
+  (yours, else 2 %), but the price itself is bounded only by your `minAmountOut` or the router's
+  other quotes.
+- **One deposit per order.** Cleared order ids are remembered for the JS realm; pass `clearedStore`
+  to keep them across app restarts.
 
 ## 2. Create the router
 

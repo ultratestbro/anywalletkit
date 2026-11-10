@@ -46,7 +46,7 @@ Every check has a code; a refusal reads `relay: <what was found> [<code>]` and r
 
 - input: the source chain by Relay's name for it, the token, and exactly the amount being sent (`input-chain`, `input-currency`, `input-amount`);
 - output: the destination chain, the user's recipient, the requested token (`output-chain`, `output-recipient`, `output-currency`);
-- `minimumAmount` is what the quote shows as the minimum and is never below the caller's own floor, nor below the requested slippage off the expected amount; `expectedAmount` is only an estimate and is never enforced or shown as a guarantee (`output-minimum`, `output-expected`);
+- `minimumAmount` is what the quote shows as the minimum and is never below the caller's own floor, nor further below the expected amount than the slippage asked for — the caller's `slippageBps`, or 2 % when none is named, which is also what the request to Relay always says (`slippageTolerance`); `expectedAmount` is only an estimate and is never enforced or shown as a guarantee (`output-minimum`, `output-expected`);
 - deadlines are Relay's seven days from a quote issued within the last ten minutes — an old order is stale even when everything else fits (`output-deadline`, `refund-deadline`);
 - there is a refund on the source chain to the sender in the token sent, and any refund on the destination chain goes to the recipient (or the sender); nobody else is named, on no other chain (`refund-missing`, `refund-chain`, `refund-recipient`, `refund-currency`);
 - the API's own summary of the payment is there and describes the order's input on the pinned depository (`payment-details`).
@@ -61,9 +61,14 @@ Every check has a code; a refusal reads `relay: <what was found> [<code>]` and r
 **Around it**
 
 - `preflightDeposit` runs all of it again on the exact bytes about to be signed, against the request this instance issued the quote for; a refused preflight spends nothing.
-- One deposit per order per provider instance (`order-reused`).
+- One deposit per order (`order-reused`): the ids cleared for signing are kept for the whole JS realm, across provider instances, for longer than an order can pass the age check. Pass `clearedStore` (`has` / `add`) to keep them on disk as well, so that an app restart inside those minutes does not forget; a store that fails refuses the signature.
+- A quote that accounts for an app fee or a gas top-up is refused (`app-fee`, `gas-topup`): this module asks for neither.
 - A quote priced without the user's addresses (a dry quote) is never built or signed.
-- `relayPins` gives `remoteProvider` the same checks on the client of a swap2 server: `callTargets` / `spenders` are the depository, `verifyQuote` and `verifyBuild` run the verifier against the user's own request.
+- `relayPins` gives `remoteProvider` the same checks on the client of a swap2 server: `callTargets` / `spenders` are the depository, `verifyQuote` and `verifyBuild` run the verifier against the user's own request. On that path the client also holds the gas limit to the band this module itself sets (`quote-gas`), the quote's life to five minutes plus clock skew (`quote-expiry`) and the tracking id to the quote's own request id, and refuses a second build for the same order (`order-reused`).
+
+**What the answering side can still do**
+
+`baseUrl` (an app's proxy that adds the API key) or a swap2 server cannot get a deposit signed for another recipient, chain, token, refund address, or a minimum other than the one shown. It can make the quote *worse*: the solver signs whatever request reaches Relay, so a request forwarded with an app fee or a gas top-up comes back as a genuine order with a lower expected amount, and the fee line that gives it away can be stripped. The amounts shown are always the order's own. What bounds the price is the caller's `minAmountOut` or the other quotes in the router — that policy is the app's, not this module's. The fee, the ETA and the status of a request are the answering side's word and are display only.
 
 ## What is refused by design
 
@@ -99,8 +104,9 @@ Read on 2026-11-10 from `GET https://api.relay.link/chains` and on chain; `pnpm 
 - The seven-day deadline rule is Relay's current constant; if Relay changes it, quotes are refused (`output-deadline`) until the pin is updated.
 - An order that charges fees inside the order (`fees`) is refused; today's orders carry none.
 - The contract a refund or fill is routed through (`extraData`) is Relay's choice and is not pinned; the recipients are.
-- The memory of issued quotes and funded orders is per provider instance.
-- Without a `slippageBps` or a floor from the caller, the order's own minimum is accepted when it is at least half the expected amount; pass a slippage or `minAmountOut` to hold it tighter.
+- The memory of issued quotes is per provider instance; the record of cleared orders is per JS realm and in memory unless `clearedStore` is given. What Relay does with a second deposit for one order id was not tested.
+- A caller may ask for up to 50 % slippage (`slippageBps` 5000); more is refused.
+- `trackIntent` is not checked against the chains: a `completed` is Relay's statement, not a verified fill.
 
 ## Checks
 
