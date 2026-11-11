@@ -1,5 +1,30 @@
 # @anywalletkit/extension-kit
 
+## 0.5.0
+
+### Minor Changes
+
+- 87fbc2d: A `personal_sign` whose message comes as text but whose UTF-8 encoding — the bytes the signer signs — is exactly
+  32 bytes is no longer a normal message: it reaches the sheet with `blindHash: true` and the new
+  `blindHashForm: 'text'`. Those are the same 32 bytes behind the EIP-191 "\n32" prefix that CoW Protocol's
+  `ethsign` order scheme and similar verifiers accept as an order or a transfer, and a site can grind an order until
+  its digest is valid UTF-8 and send it decoded. It is not refused, and `allowBlindHash` does not change it: show it as
+  a danger screen ("This looks like a hidden hash. Signing it may authorize a transfer or an order.", Reject / Sign
+  anyway). **Breaking:** until now `blindHash` came only with the `allowBlindHash` opt-in, so a wallet that never
+  turned it on may have no danger screen for it; it now gets `blindHash: true` without the opt-in, and a sheet with no
+  `blindHash` branch shows it as an ordinary message. Add that branch (red screen, Reject / Sign anyway) before you
+  bump. A sheet that already turns `blindHash` into a danger screen covers it without changes. The hex form (`0x` + 64
+  hex) is unchanged — refused unless `allowBlindHash`, then `blindHash: true` — and now also carries
+  `blindHashForm: 'hex'`. The 32-byte check reads the bytes the signer is handed (hex decoded, any other string as
+  UTF-8), not the string's length: multi-byte characters, a BOM and hex-looking text count as the bytes they encode
+  to; only a message of at most 66 characters is encoded for it. New type `PersonalSignBlindHashForm`
+  (`'hex' | 'text'`).
+
+### Patch Changes
+
+- @anywalletkit/wallet-evm@0.8.0
+  - @anywalletkit/keyring@0.3.10
+
 ## 0.4.0
 
 ### Minor Changes
