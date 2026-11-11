@@ -8,7 +8,7 @@ import {
   chromeSessionStorage, createSignHandler, isRelayRequest, isRelayToContent, pageRequestFrom, stampOrigin,
   toRelayError, vaultSecretStorage,
   type AlarmsLike, type ApprovalRequest, type PageMessageEvent, type PageWindow, type ApprovalWindow, type EvmNetwork, type EvmSigner, type PermissionsState,
-  type PortSender, type RelayResponse, type RelayToContent, type StorageAreaLike,
+  type PortSender, type RelayResponse, type RelayToContent, type SignRequestInfo, type StorageAreaLike,
 } from '@anywalletkit/extension-kit'
 import { Keyring } from '@anywalletkit/keyring'
 import { WalletManagerEvm, type WalletAccountEvm } from '@anywalletkit/wallet-evm'
@@ -161,6 +161,21 @@ export function createRouter(wallet: WalletParts, options: WorkerOptions) {
 }
 export type WorkerParts = ReturnType<typeof createRouter>
 // #endregion router
+
+// #region sign-sheet
+/** What a message sheet says first. Exactly 32 signed bytes (`blindHash`) may be an order or a transfer, whatever the text reads like. */
+export function messageSheet(request: SignRequestInfo): { danger: boolean; title: string; warning?: string; reject: string; approve: string } {
+  if (request.kind !== 'sign-message') throw new Error('Not a personal_sign request.')
+  if (request.blindHash) {
+    // 'text': ordinary-looking text of 32 bytes (always shown); 'hex': 0x + 64 hex (only with allowBlindHash on).
+    const warning = request.blindHashForm === 'text'
+      ? 'This looks like a hidden hash. Signing it may authorize a transfer or an order.'
+      : 'This site asks you to sign a raw 32-byte hash. Signing it may authorize a transfer or an order.'
+    return { danger: true, title: 'Hidden hash', warning, reject: 'Reject', approve: 'Sign anyway' }
+  }
+  return { danger: false, title: request.siwe ? 'Sign in' : 'Sign a message', reject: 'Reject', approve: 'Sign' }
+}
+// #endregion sign-sheet
 
 /** The parts of a `chrome.runtime.Port` the worker uses. */
 export interface PortLike {

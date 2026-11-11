@@ -10,6 +10,72 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: hidden hashes in text messages
+
+A message whose signed bytes are exactly 32 is a blind hash signature (an order or a transfer to a CoW
+Protocol `ethsign` or Safe verifier), whatever form it comes in. Until now only the hex form and raw bytes were
+caught; text whose UTF-8 encoding is 32 bytes passed as a normal message.
+
+- **kit, Breaking:** an EVM `sign` of such text is `kind: 'typedData'`, `blindHash: true`, `blindHashForm: 'text'`,
+  `destinationUnknown: true`, no longer `kind: 'message'`. A `confirm` that turns `blindHash` into a danger screen
+  covers it; word it with `blindHashForm` ("This looks like a hidden hash. Signing it may authorize a transfer or an
+  order."). Without `confirm`, an allowlist or a blocklist now refuses it. With `confirm`, `confirm` gets it, under
+  an allowlist too (the hex and bytes forms stay refused there before `confirm`). The form's type is
+  `EvmSignBlindHashForm`. Only a function is a `confirm` hook: `confirm: uiReady ? showSheet : null` (or `false`,
+  `0`, `''`) is no hook, and the lists refuse; any other value that is not a function refuses every write with a
+  `TypeError`.
+- **kit, Breaking:** the blind hash rule follows the account's namespace, not the spelling of the chain it was asked
+  for: an EVM account asked for as `eip155`, registered under another key, or wrapped with
+  `applyPolicies(account, policies, 'eip155')` now gets all three forms flagged, as an account asked for as
+  `eip155:1` already did. For the hex and bytes forms, which passed there as plain messages, that means: `confirm`
+  gets `kind: 'typedData'` with `blindHash: true` instead of `kind: 'message'`, an allowlist refuses them with or
+  without `confirm`, and a blocklist refuses them when there is no `confirm`.
+- **kit, Breaking:** the rules of the account's own namespace apply however you asked for it. An EVM account whose
+  chain was not known yet (wallet-evm without `chainId`), asked for under a key that is no chain id of its family —
+  your own registration key (`registerWallet('evm', …)`, then `getAccount('evm')` or `getManager('evm')`),
+  `applyPolicies(account, policies, 'ethereum')`, another family's id — matched no rule: a blind hash `sign` and
+  typed data without `domain.chainId` were signed under an `eip155` allowlist or blocklist. They are judged by it
+  now. Under such a key an exact-id rule (`'eip155:1'`) needs the account's chain as under `eip155`. Registering
+  EVM wallets under `eip155` or an exact id avoids the question.
+- **kit, Breaking:** an account of any chain asked for under a key that is neither a chain id of its family nor its
+  namespace (`'evm'`, `'sol'`, `'tonkey'`, `'zec'`) has its writes read on its own chain, not on the key, whether
+  its chain was known or not. `confirm` sees the account's chain id (`eip155:1`, `ton:-239`, …) instead of the key,
+  and the write is read by its chain's rules. EVM: an ERC-20 recipient in a transaction's calldata is a
+  destination (an `eip155` allowlist of the token alone now refuses a transfer to a recipient not on it; a
+  blocklist on the recipient refuses it), and `approve({ token, amount: 0 })` on an ERC-20 is a revoke (a revoke skips the allowlist). TON: a
+  jetton transfer carries `attachedValue` / `forwardTonAmount` and the jetton is a destination (a blocklist on it
+  refuses). Zcash: a recipient padded with a space or U+FEFF is `destinationUnknown` (a blocklist without `confirm`
+  refuses it). Tron and NEAR token transfers through a contract, which had no destination there (an allowlist
+  refused them, so did a blocklist without `confirm`), now have the token contract and its recipient as
+  destinations. An account asked for by its namespace (`getAccount('ton')`) is read as before.
+- **kit, Breaking:** a blind hash needs the account's chain like typed data when an exact-id rule of the family
+  (`'eip155:1'`) could be the account's own. An account that reports `eip155:unknown` (wallet-evm without `chainId`)
+  now asks its RPC for the chain id first (an RPC error comes back as the error); an offline one is refused with
+  `PolicyViolationError('chain')`. Until now it was signed without any rule. Pass `chainId`, or ask for the account
+  by its exact chain id.
+- **kit, Breaking:** an EVM `sign` takes a string or a `Uint8Array` (from any realm, a subclass, a Node `Buffer`
+  too). Anything else — an array of numbers, another typed array, an `ArrayBuffer`, `{ raw }` — is refused with
+  `PolicyViolationError('method')`; convert it to a `Uint8Array` first.
+- **kit, Breaking:** an EVM `sign` of a string with a lone surrogate (a UTF-16 unit U+D800–U+DFFF that is not half
+  of a pair) is refused with `PolicyViolationError('method')` before any rule. UTF-8 encoders disagree on such a
+  string: the Hermes `TextEncoder` polyfill signs other bytes than the kit counts (32 for 33). Text decoded from
+  UTF-8 never has one; a string cut in the middle of an emoji, or built from a `\uD83E` escape, does — cut text at
+  a code point. The account is handed the string as it came, as before.
+- **kit, Breaking:** both `method` refusals hold for every EVM account behind the policies, even with no rule set:
+  every account of a `Wallet` created with `policies` (`{}` included), every account a protocol module is given, and
+  an account of a `Wallet` without policies asked for by an exact chain id other than the one it reports. They
+  do not touch an account of a `Wallet` without policies asked for by namespace, by a registration key or by the
+  chain id it reports: that one is the chain package's own.
+- **kit, Breaking:** an EVM `sign` of a `Uint8Array` hands the account a plain `Uint8Array` of the kit's realm,
+  copied from the argument's elements: a Node `Buffer` arrives as a `Uint8Array`, a `Uint8Array` from another realm or a
+  subclass as one of this realm. Until now the copy kept its class. If your own EVM account calls `Buffer` methods
+  on the message, wrap it (`Buffer.from(message)`); wallet-evm does not.
+- **extension-kit, Breaking if your sheet has no `blindHash` branch:** such a `personal_sign` reaches the sheet with
+  `blindHash: true`, `blindHashForm: 'text'`, also when `allowBlindHash` is off. Until now `blindHash` came only
+  with that opt-in, so a wallet that never turned it on may show `blindHash` on the normal message sheet. Add a red
+  danger screen for `blindHash` (Reject / Sign anyway) before you bump; a sheet that already has one covers it. The
+  hex form is unchanged and now carries `blindHashForm: 'hex'`. The form's type is `PersonalSignBlindHashForm`.
+
 ## 2026-11-02: the audit fixes
 
 A second external audit and our own review of the fixes found more places where what is checked and what is signed

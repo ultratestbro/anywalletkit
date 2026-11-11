@@ -1,6 +1,7 @@
 import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
 import { canonicalAddress, erc20Transfer, hexData, namedArray, sendDestinations, tonRawAddress, tronCallData, tronRawIntent, type Destinations, type NearAccountChange } from './destinations.js'
+import { evmSignMessage } from './message-bytes.js'
 import { snapshot } from './snapshot.js'
 export type { NearAccountChange } from './destinations.js'
 import { ccAssetByToken } from '@anywalletkit/swap2-assets'
@@ -241,13 +242,31 @@ export interface WriteIntent {
   /** True for `kind: 'message'`: allow/block lists do not apply, only `confirm`. Typed data is judged by the lists (scan 2026-10-28 F7). */
   message: boolean
   /**
-   * EVM `sign` of exactly 32 bytes (a raw 32-byte buffer, or a `0x` + 64-hex string): a blind hash signature.
-   * Verifiers that accept an eth_sign-wrapped digest (CoW Protocol's `ethsign` order scheme, Safe owner
-   * signatures with v > 30…) turn it into an order or a transfer, so it is `kind: 'typedData'` with unknown
-   * destinations — an allowlist refuses it, so does a blocklist without `confirm` (extension audit E55).
+   * An EVM `sign` that may be a blind hash signature: a 32-byte `Uint8Array`, a `0x` + 64-hex string
+   * (flagged by its shape — what a dApp sends for a digest; the account is handed the string, and
+   * wallet-evm signs its UTF-8, 66 bytes, while another signer may decode it to the 32 bytes), or any
+   * other string whose UTF-8 encoding — what an EIP-191 signer signs for it — is 32 bytes (the account
+   * is handed the string as it is). Verifiers that accept an eth_sign-wrapped digest (CoW Protocol's
+   * `ethsign` order scheme, Safe owner signatures with v > 30…) turn 32 such bytes into an order or a
+   * transfer, so it is `kind: 'typedData'` with unknown destinations (extension audit E55). Without a
+   * `confirm` hook an allowlist or a blocklist refuses it. With one, `confirm` gets it — show a danger
+   * screen with Reject / Sign anyway — except the hex and bytes forms under an allowlist, which are
+   * refused before `confirm`. The account's namespace decides that a `sign` is an EVM one and that its
+   * namespace rules apply, whatever key the account was asked for under. Like typed data it needs the
+   * account's chain when an exact rule of the family could be the account's (the chain is learned, or the
+   * write is refused with `chain`). {@link WriteIntent.blindHashForm} says how it came.
    */
   blindHash?: true
+  /**
+   * With `blindHash`: how it came — `'bytes'` a 32-byte `Uint8Array`, `'hex'` a `0x` + 64-hex string,
+   * `'text'` any other string whose UTF-8 encoding is 32 bytes (a digest ground until it is valid UTF-8 and
+   * sent as text: "This looks like a hidden hash. Signing it may authorize a transfer or an order.").
+   */
+  blindHashForm?: EvmSignBlindHashForm
 }
+
+/** How the 32 bytes of an EVM blind hash `sign` came ({@link WriteIntent.blindHashForm}). extension-kit's `personal_sign` counterpart is `PersonalSignBlindHashForm` (no `'bytes'`: a site sends a string). */
+export type EvmSignBlindHashForm = 'bytes' | 'hex' | 'text'
 
 /**
  * Rules the kit checks before every signature and broadcast of an account it hands out. Keys of the
@@ -256,7 +275,15 @@ export interface WriteIntent {
  * checked, a destination must be on every matching allowlist, and any matching blocklist refuses.
  * An id matches its network in any spelling: `solana:mainnet` = `solana:5eykt…`,
  * `tron:728126428` = `tron:mainnet` = `tron:0x2b6653dc`, `bitcoin:mainnet` = `bip122:0000…`,
- * `eip155:0x1` = `eip155:1`; the `bitcoin` namespace is `bip122`.
+ * `eip155:0x1` = `eip155:1`; the `bitcoin` namespace is `bip122`. The rules of the account's own
+ * namespace apply however it was asked for (an exact id, its namespace, a registration key such as
+ * `evm`). An exact id's rules apply when that id is one of the chains in play: the chain asked for
+ * (when it is an exact id, of any family), the chain the account reports or learns from its RPC, the
+ * chain an EVM transaction is signed for, and the domain chain of typed data. An off-chain signature
+ * (typed data, a blind hash) asked for under an exact id of the account's family does not make the
+ * account learn its chain: the rules of another exact id of the family (`eip155:1` for an account
+ * asked for as `eip155:137`) reach it only when the account already reports that chain, although a
+ * blind hash signature is valid on every chain.
  */
 export interface Policies {
   /**
@@ -269,7 +296,12 @@ export interface Policies {
   allowlist?: Record<string, string[]>
   /** Per-chain blocklist of destinations — recipients, called contracts and approval spenders. */
   blocklist?: Record<string, string[]>
-  /** Last word before broadcast: return false (or throw) to reject. Hook a confirmation UI here. */
+  /**
+   * Last word before broadcast: return false (or throw) to reject. Hook a confirmation UI here. Only a
+   * function is a hook: `null`, `false`, `0` or `''` mean none (an allowlist then refuses 32-byte text
+   * and a blocklist an unknown destination, as without the key); any other value refuses every write
+   * (`TypeError`), nothing is signed unconfirmed.
+   */
   confirm?: (intent: WriteIntent) => boolean | Promise<boolean>
 }
 
@@ -281,7 +313,8 @@ export class PolicyViolationError extends Error {
   /**
    * The rule that refused the write. `chain` means the account's chain id is unknown, so no rule
    * could be matched. `method` means the method is not part of the write surface the policies
-   * can read (see {@link GUARDED_WRITES}).
+   * can read (see {@link GUARDED_WRITES}), or its argument is not one they can read (an EVM `sign`
+   * of anything but a string or a `Uint8Array`, or of a string with a lone surrogate).
    */
   readonly policy: 'maxFee' | 'allowlist' | 'blocklist' | 'chain' | 'method'
   constructor(policy: 'maxFee' | 'allowlist' | 'blocklist' | 'chain' | 'method', message: string) {
@@ -675,14 +708,24 @@ function tonJettonTransfer(chain: string, from: string, a: Record<string, unknow
   return { list, unknown }
 }
 
-/** A message that is exactly 32 bytes: a raw buffer of 32, or `0x` + 64 hex digits (what a dApp sends for a digest). */
-function isBlindHash(arg: unknown): boolean {
-  if (arg instanceof Uint8Array) return arg.length === 32
-  return typeof arg === 'string' && /^0x[0-9a-fA-F]{64}$/.test(arg.trim())
+/**
+ * An EVM `sign` that may be a blind hash, and how it came. `signed` is how many bytes an EIP-191 signer signs
+ * for `arg` ({@link evmSignMessage}): 32 of them from a `Uint8Array` or from any string, or `0x` + 64 hex digits
+ * (what a dApp sends for a digest; flagged by its shape whatever the account makes of it — wallet-evm signs
+ * the string's UTF-8, 66 bytes, another signer may decode it to the 32).
+ */
+function blindHashForm(arg: unknown, signed: number): EvmSignBlindHashForm | undefined {
+  if (typeof arg !== 'string') return signed === 32 ? 'bytes' : undefined
+  if (/^0x[0-9a-fA-F]{64}$/.test(arg.trim())) return 'hex'
+  return signed === 32 ? 'text' : undefined
 }
 
-/** What {@link intentOf} needs to know beyond the arguments: whether an `approve` of 0 is on a known ERC-20. */
-interface IntentContext { erc20?: boolean }
+/**
+ * What {@link intentOf} needs to know beyond the arguments: whether an `approve` of 0 is on a known ERC-20;
+ * whether a `sign` on an EVM account is a blind hash, and in which form ({@link blindHashForm}, decided by
+ * the guard before the chain: its namespace decides, not the spelling of the chain it was asked for).
+ */
+interface IntentContext { erc20?: boolean; blindHashForm?: EvmSignBlindHashForm }
 
 /**
  * Is `approve({ token, amount: 0 })` on an ERC-20? On an ERC-721, approve(spender, 0) APPROVES token
@@ -753,8 +796,8 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
       return { ...base, kind: 'send', message: false, ...(r.to !== undefined ? { to: r.to } : {}), ...(r.token !== undefined ? { token: r.token } : {}), ...(r.amount !== undefined ? { amount: r.amount } : {}) }
     }
   }
-  if (method === 'sign' && chain.startsWith('eip155:') && isBlindHash(arg)) {
-    const intent: DraftIntent = { ...base, kind: 'typedData', message: false, blindHash: true }
+  if (method === 'sign' && ctx.blindHashForm !== undefined) {
+    const intent: DraftIntent = { ...base, kind: 'typedData', message: false, blindHash: true, blindHashForm: ctx.blindHashForm }
     TYPED_DESTINATIONS.set(intent, { list: [], unknown: true })
     return intent
   }
@@ -886,8 +929,19 @@ export function guardReturned(value: unknown, wrap: (account: IWalletAccount) =>
 export function applyPolicies<A extends IWalletAccount>(account: A, policies: Policies, chain?: string): A {
   const rules = [policies.maxFee, policies.allowlist, policies.blocklist]
   const hasRuleFor = (key: (k: string) => boolean) => rules.some((m) => m !== undefined && Object.keys(m).some(key))
-  const guard = async (method: WriteMethod, arg: unknown) => {
+  /** `evmSigned`: for a `sign` on an EVM account, how many bytes an EIP-191 signer signs for it (the blind hash check measures them). */
+  const guard = async (method: WriteMethod, arg: unknown, evmSigned?: number) => {
+    // The confirm hook, read once for the whole check: a function, or none. `null`, `false`, `0` or `''` (a JS app's
+    // `confirm: uiReady ? fn : null`) are none everywhere below: the allowlist read `!== undefined` while the call
+    // read truthiness, so 32-byte text skipped the allowlist and then no hook ran (SDK-303 round 3 review). Any other
+    // value that is not a function cannot be asked: the write is refused rather than signed unconfirmed.
+    const hook: unknown = policies.confirm
+    if (hook && typeof hook !== 'function') throw new TypeError('Policies.confirm must be a function; nothing was signed.')
+    const confirm = typeof hook === 'function' ? (hook as NonNullable<Policies['confirm']>) : undefined
     const ns = account.chain.split(':')[0]!
+    // A blind hash is decided before the chain: it is judged like typed data, so like typed data it needs
+    // the account's chain when an exact rule of the family could be its own (SDK-303 round 2).
+    const blind = method === 'sign' && evmSigned !== undefined ? blindHashForm(arg, evmSigned) : undefined
     // The network the write really goes to, before any rule, confirm or signature (audit #7): the
     // account's own and, for an EVM transaction that carries one, its chainId. An EVM account that
     // has not asked its RPC yet reports "eip155:unknown": learn its chain id — unless the write is
@@ -897,12 +951,19 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     const domain = domainChain(ns, method, arg)
     const known = isConcreteChain(account.chain) ? account.chain : undefined
     const offChain = chainFree(method)
-    const exactRules = hasRuleFor((k) => k.includes(':') && canonicalNamespace(k.split(':')[0]!) === canonicalNamespace(ns))
+    /** A key or chain id of the account's own family (`bitcoin` for `bip122`); a registration key such as `evm` is not one. */
+    const family = (c: string) => canonicalNamespace(c.split(':')[0]!) === canonicalNamespace(ns)
+    // The chain asked for says which exact rules are the account's only when it is a concrete id of the account's
+    // family: a registration key (`evm`) or another family's id (`solana:mainnet`) says nothing (SDK-303 round 3).
+    const askedHere = isConcreteChain(chain) && family(chain)
+    const exactRules = hasRuleFor((k) => k.includes(':') && family(k))
     let learned: string | undefined
     const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
-    // A message needs no chain id at all: no list or cap applies to it.
-    const message = MESSAGE_METHODS.includes(method)
-    const needed = !offChain || (!message && !isConcreteChain(chain) && exactRules)
+    // A message needs no chain id at all: no list or cap applies to it. A blind hash is no message:
+    // an exact allowlist of the family may be the account's, so its chain is learned, or the write
+    // is refused below when it cannot be.
+    const message = MESSAGE_METHODS.includes(method) && blind === undefined
+    const needed = !offChain || (!message && !askedHere && exactRules)
     if (known === undefined && needed && typeof getChainId === 'function') {
       try {
         learned = `${ns}:${await getChainId.call(account)}`
@@ -924,10 +985,10 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         }
       }
     }
-    // The account's network is unknown and none was asked for: the namespace's own rules need no
-    // chain id, but an exact rule of this family could be the account's — refuse rather than guess
+    // The account's network is unknown and none of its family was asked for: the namespace's own rules
+    // need no chain id, but an exact rule of this family could be the account's — refuse rather than guess
     // (a chainId the write carries says what is signed, not which rules the account answers to).
-    if (own === undefined && !isConcreteChain(chain) && exactRules && !message) {
+    if (own === undefined && !askedHere && exactRules && !message) {
       throw new PolicyViolationError('chain', `The account's chain is unknown (${account.chain}), so its policies cannot be applied.`)
     }
     // The rules of every network in play apply: the one asked for, the account's own, the one signed
@@ -935,18 +996,22 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     const chains = [...new Set([chain, own, signed, domain].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
     // Every rule key that covers the asked-for chain or the account's own: its namespace and its
     // exact id, in whichever spelling the app wrote them (`solana:mainnet`, `tron:728126428`,
-    // `bitcoin` for `bip122` — round 3, H4).
+    // `bitcoin` for `bip122` — round 3, H4). The rules of the account's own namespace apply always,
+    // however it was asked for: an account asked for under a registration key (`evm`) or another
+    // family's id, whose chain is not known, matched no rule at all (SDK-303 round 3).
     const written = [...new Set(rules.flatMap((m) => (m ? Object.keys(m) : [])))]
-    const keys = written.filter((k) => (chains.length > 0 ? chains.some((c) => ruleCovers(k, c)) : ruleCovers(k, ns)))
-    // The intent's chain: the asked-for, own or signed network (typed data's domain chain is `domainChain`).
-    const judged = chains.find((c) => c !== domain || c === chain || c === own || c === signed) ?? account.chain
-    const intent = intentOf(judged, await account.getAddress(), method, arg, { erc20: await approveRevokesErc20(judged, method, arg, account) })
+    const keys = written.filter((k) => ruleCovers(k, ns) || chains.some((c) => ruleCovers(k, c)))
+    // The intent's chain: the asked-for, own or signed network of the account's family (typed data's domain
+    // chain is `domainChain`). A key of another family (`evm`) would have the write read as another chain's:
+    // an EVM transaction's calldata recipients were not seen under it (SDK-303 round 3).
+    const judged = chains.find((c) => family(c) && (c !== domain || c === chain || c === own || c === signed)) ?? account.chain
+    const intent = intentOf(judged, await account.getAddress(), method, arg, { erc20: await approveRevokesErc20(judged, method, arg, account), ...(blind !== undefined ? { blindHashForm: blind } : {}) })
     if (domain !== undefined) intent.domainChain = domain
     // An SPL transfer pays a token account: its owner is the recipient, and only the network knows
     // it. Read through the account when a list or confirm will look; unread → unknown (round 3, M1).
     const pending = PENDING_TOKEN_ACCOUNTS.get(intent)
     if (pending) {
-      const judged = policies.confirm !== undefined || keys.some((k) => policies.allowlist?.[k] !== undefined || policies.blocklist?.[k] !== undefined)
+      const judged = confirm !== undefined || keys.some((k) => policies.allowlist?.[k] !== undefined || policies.blocklist?.[k] !== undefined)
       const read = (account as { getTokenAccountOwner?: (address: string) => Promise<string | undefined> }).getTokenAccountOwner
       for (const t of pending) {
         let owner: string | undefined
@@ -986,7 +1051,11 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
           throw new PolicyViolationError('blocklist', `Verifying contract ${verifying} is on the ${k} blocklist.`)
         }
         const allow = listed(k, policies.allowlist?.[k])
-        if (allow) {
+        // Text whose UTF-8 is 32 bytes reads like a message and may be one: with a confirm hook it goes there,
+        // to be shown as a danger screen, instead of being refused (SDK-303 round 2). Without one, and for the
+        // hex and bytes forms always, an allowlist refuses it (its destinations are unknown).
+        const toConfirm = intent.blindHashForm === 'text' && confirm !== undefined
+        if (allow && !toConfirm) {
           const outside = intent.destinations.find((d) => !allow.has(canonicalAddress(k, d)))
           if (outside !== undefined || intent.destinations.length === 0 || intent.destinationUnknown) {
             throw new PolicyViolationError('allowlist', `${what(outside)} ${outside ?? '(unknown)'} is not on the ${k} allowlist.`)
@@ -997,12 +1066,12 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
           const hit = intent.destinations.find((d) => block.has(canonicalAddress(k, d)))
           if (hit !== undefined) throw new PolicyViolationError('blocklist', `${what(hit)} ${hit} is on the ${k} blocklist.`)
           // Fail closed only when nobody else can look (scan F16); with a confirm hook it sees destinationUnknown.
-          if (intent.destinationUnknown && !policies.confirm) throw new PolicyViolationError('blocklist', `Cannot tell every destination of this ${intent.method} on ${k}, and the ${k} blocklist is on with no confirm hook to ask.`)
+          if (intent.destinationUnknown && confirm === undefined) throw new PolicyViolationError('blocklist', `Cannot tell every destination of this ${intent.method} on ${k}, and the ${k} blocklist is on with no confirm hook to ask.`)
         }
       }
     }
     // confirm gets its own copy of the argument: whatever it edits is not what gets signed (round 3, M2).
-    if (policies.confirm && !(await policies.confirm({ ...intent, raw: snapshot(intent.raw) }))) throw new UserRejectedError('The write was not confirmed.')
+    if (confirm !== undefined && !(await confirm.call(policies, { ...intent, raw: snapshot(intent.raw) }))) throw new UserRejectedError('The write was not confirmed.')
     // The quote is an estimate: the account signs its own gas limit (with headroom) and fee fields.
     // Hand it the tightest cap so it checks the transaction it is about to sign (audit #4).
     return caps.length > 0 && CAPPED[method] !== undefined ? caps.reduce((a, b) => (b.cap < a.cap ? b : a)).cap : undefined
@@ -1029,9 +1098,17 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         if (!fn) {
           const original = v as (...args: unknown[]) => Promise<unknown>
           fn = async (...given: unknown[]) => {
-            // One copy, taken before anything is judged, is what the rules see and what gets signed (round 3, M2).
-            const args = snapshot(given)
-            const maxFee = await guard(prop, args[0])
+            // An EVM `sign`: the account's namespace says it is one, however the chain was asked for (SDK-303). Only
+            // a string or a Uint8Array, and no string with a lone surrogate (UTF-8 encoders disagree on those, so the
+            // bytes signed could differ from the bytes measured): anything else is refused before any rule. Read off
+            // the caller's argument itself, not a snapshot: a typed array's snapshot is made through its species
+            // constructor, which can turn another typed array into a Uint8Array or pad it (SDK-303 round 3).
+            const evm = prop === 'sign' && canonicalNamespace(account.chain.split(':')[0]!) === 'eip155' ? evmSignMessage(given[0]) : undefined
+            if (evm !== undefined && 'refused' in evm) throw new PolicyViolationError('method', evm.refused)
+            // One copy, taken before anything is judged, is what the rules see and what gets signed (round 3, M2). An
+            // EVM `sign`'s message is already one: the caller's string, or a plain copy of the bytes measured.
+            const args = evm !== undefined ? [evm.handed, ...snapshot(given.slice(1))] : snapshot(given)
+            const maxFee = await guard(prop, args[0], evm?.signedLength)
             if (maxFee !== undefined) {
               // WriteOptions sit at CAPPED[prop] (second, or third after sendSerialized's guard); a tighter caller cap stays.
               const at = CAPPED[prop]!

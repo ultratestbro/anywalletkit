@@ -29,7 +29,10 @@ const wallet = new Wallet(seedPhrase, {
 | `blocklist` | chain id or namespace → destinations that are refused | `PolicyViolationError` (`policy: 'blocklist'`) |
 | `confirm` | one function for every write | `UserRejectedError` when it returns `false` |
 
-Address comparison ignores letter case.
+Address comparison ignores letter case. Only a function is a `confirm` hook: `null`, `false`, `0`
+or `''` (`confirm: uiReady ? showSheet : null`) mean there is none, and the lists then refuse what
+they would have left to the hook. Any other value that is not a function refuses every write with
+a `TypeError`.
 
 ## What is guarded
 
@@ -84,6 +87,47 @@ receives `attachedValue` and `forwardTonAmount`. wallet-ton itself refuses a for
 The checks and the signature work from one copy of the arguments, taken before the first check,
 and `confirm` gets a copy of its own: nothing can change what is signed after it was judged.
 
+### Blind hash signatures
+
+32 bytes signed behind the EIP-191 prefix may be an order or a transfer: CoW Protocol's `ethsign`
+orders and Safe owner signatures (v > 30) accept a digest signed that way. So an EVM `sign` that
+may be one is not a plain message but `kind: 'typedData'` with `blindHash: true` and
+`destinationUnknown: true`. `confirm` should make it a danger screen with **Reject** and
+**Sign anyway**. `blindHashForm` (type `EvmSignBlindHashForm`) says how it came:
+
+| `blindHashForm` | Argument |
+|---|---|
+| `'bytes'` | a 32-byte `Uint8Array` |
+| `'hex'` | a `0x` + 64-hex string, flagged by its shape: it is how a dApp sends a digest. The account is handed the string; wallet-evm signs its UTF-8, the 66 bytes of those characters, not the 32 bytes they spell. Another signer may decode it to the 32 bytes |
+| `'text'` | any other string whose UTF-8 encoding is 32 bytes: 16 accented letters, 8 emoji, 32 ASCII characters. A site can grind an order until its digest is valid UTF-8 and send it as text: "This looks like a hidden hash. Signing it may authorize a transfer or an order." |
+
+What the lists do with it:
+
+| | no `confirm` | with `confirm` |
+|---|---|---|
+| no lists | signed | `confirm` decides |
+| allowlist | refused (`allowlist`) | `'text'`: `confirm` decides; `'hex'`, `'bytes'`: refused (`allowlist`), `confirm` never sees it |
+| blocklist | refused (`blocklist`) | `confirm` decides |
+
+Like typed data it needs the account's chain when an exact-id rule of the family could be the
+account's own: an account that reports `eip155:unknown` learns its chain id from its RPC first,
+and an offline one is refused (`chain`) — see [Which chain's rules apply](#which-chains-rules-apply).
+The account's namespace decides that a `sign` is an EVM one, and that the `eip155` rules judge it,
+not the spelling of the chain it was asked for (`eip155`, `eip155:1`, a registration key).
+
+The length is counted in UTF-8 bytes, not characters: 32 characters with one `é` are 33 bytes
+and stay a message. The account is handed the string as it came, so an external signer shows it
+as text, and a `Uint8Array` as a plain `Uint8Array` copy of the bytes that were counted (a Node
+`Buffer` arrives as a `Uint8Array`). The kit counts a string's UTF-8 with its own reading of it,
+the signer encodes it with the runtime's `TextEncoder`. The two agree on every well-formed string,
+so a string with a lone surrogate (a UTF-16 unit U+D800–U+DFFF that is not half of a pair) is
+refused with `PolicyViolationError('method')` before any rule: the `TextEncoder` polyfill of the
+Hermes setup reads some of them as other bytes than the spec, and can turn 33 counted bytes into
+32 signed ones. An EVM `sign` takes a string or a `Uint8Array` (from any realm, a subclass, a Node
+`Buffer` too); anything else is refused with `PolicyViolationError('method')`. Both refusals hold
+for every EVM account behind the policies, with no rule set too: every account of a `Wallet`
+created with `policies`, and every account a protocol module is given.
+
 ### Revokes
 
 Taking an approval back moves nothing, so a revoke is its own kind: `kind: 'revoke'`. This
@@ -127,6 +171,8 @@ What `confirm` receives:
 | `unlimited` | Approvals: type(uint128).max or above, a DAI-style `allowed`, or an amount that cannot be read |
 | `approvals` | Approvals: every token a signature grants (a Permit2 batch has several) |
 | `message` | `true` for message signatures |
+| `blindHash` | EVM `sign` that may be a blind hash (32 bytes, or the `0x` + 64-hex form): show a danger screen (see above) |
+| `blindHashForm` | With `blindHash`: `'bytes'`, `'hex'` or `'text'` |
 | `raw` | The original argument, for anything else you need |
 
 ## Which chain's rules apply
@@ -151,6 +197,22 @@ policies: {
 
 When the account cannot learn its chain id, its namespace rules still apply; an exact-id rule
 of that family refuses the write (`policy: 'chain'`) instead of guessing.
+
+The account's own namespace rules apply however you asked for it. A registration key of your own
+(`registerWallet('evm', …)` then `getAccount('evm')`) or another family's id is no chain: under it,
+an EVM account is judged by the `eip155` rules and by the exact-id rules of the chain it reports,
+which it learns from its RPC first when an exact-id rule of the family is set. An exact id you
+asked for applies whatever its family: an EVM account asked for as `solana:mainnet` is judged by
+the `solana:mainnet` rules too.
+
+An off-chain signature (typed data, a blind hash `sign`) asked for under an exact id of the
+account's family is judged by the rules of that id and of the chain the account already reports;
+the account does not ask its RPC for its chain id for it. So an `eip155:1` allowlist does not
+reach a blind hash signed through an account asked for as `eip155:137`, even when its RPC is on
+mainnet, although a signature over 32 raw bytes is valid on every chain (a CoW Protocol order for
+mainnet included). A transaction in that setup is refused (`chain`): it learns that it signs for
+mainnet, not for `eip155:137`. To hold every EVM signature to one list, key it by the namespace
+(`eip155`), or ask for EVM accounts by the chain id their RPC is on.
 
 ## Policies and chain-level limits
 

@@ -60,7 +60,19 @@ Permit2 `signTypedData` (checked against the **spender**; `confirm` sees
 1inch LOP `Order` (`kind: 'send'`, judged by whom they pay), any other
 `signTypedData` (`kind: 'typedData'` with `destinationUnknown: true`: an
 allowlist refuses it, so does a blocklist without `confirm`; a blocklisted
-`verifyingContract` is refused),
+`verifyingContract` is refused), an EVM `sign` that may be a blind hash — a
+32-byte `Uint8Array`, a `0x` + 64-hex string (by its shape: a dApp's digest;
+wallet-evm signs the 66 bytes of its text, another signer may decode it), or
+other text whose UTF-8 encoding is 32 bytes (`blindHash: true`,
+`blindHashForm: 'bytes' | 'hex' | 'text'`; `confirm` should make it a danger
+screen; without `confirm` (only a function is one: `null` or `false` is none)
+an allowlist or a blocklist refuses it, and under an
+allowlist the hex and bytes forms are refused even with `confirm`; like typed
+data it needs the account's chain when an exact-id rule could be its own; the
+`eip155` rules judge it under whatever key the account was asked for; the
+account is handed the caller's string as it is, a `Uint8Array` as a plain
+copy, and an EVM `sign` of anything but a string or a `Uint8Array`, or of a
+string with a lone surrogate, is refused, with no rule set too),
 and chain-specific ones such as Tron's `signRaw`, NEAR's `signBuilt`, Solana's
 `sendSerialized`. The rule is deny-by-default: any account method named
 `sign*` / `send*` / `approve*` / `revoke*` / `transfer*` is guarded unless it

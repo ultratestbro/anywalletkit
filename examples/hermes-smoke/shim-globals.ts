@@ -13,8 +13,12 @@ if (typeof g.console === 'undefined' && typeof print === 'function') {
   g.console = { log: p, error: p, warn: p, info: p, debug: p }
 }
 // The TextEncoder polyfill installs TextEncoder+TextDecoder only when TextEncoder is absent;
-// RN 0.81's Hermes has TextEncoder but no TextDecoder.
-if (typeof g.TextDecoder === 'undefined' && typeof g.TextEncoder !== 'undefined') delete g.TextEncoder
+// RN 0.81's Hermes has TextEncoder but no TextDecoder. Its own TextEncoder is kept for the UTF-8 check (utf8.ts).
+export let hermesTextEncoder: (new () => { encode(s: string): Uint8Array }) | undefined
+if (typeof g.TextDecoder === 'undefined' && typeof g.TextEncoder !== 'undefined') {
+  hermesTextEncoder = g.TextEncoder as typeof hermesTextEncoder
+  delete g.TextEncoder
+}
 // react-native-get-random-values stand-in (NOT secure; nothing in the smoke derives keys from it).
 const c = (g.crypto ??= {}) as { getRandomValues?: (a: ArrayBufferView) => ArrayBufferView }
 c.getRandomValues ??= (a) => { const u = new Uint8Array(a.buffer, a.byteOffset, a.byteLength); for (let i = 0; i < u.length; i++) u[i] = Math.floor(Math.random() * 256); return a }

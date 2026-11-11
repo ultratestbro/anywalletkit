@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { recoverMessageAddress } from 'viem'
 import { derivationVectors } from '@anywalletkit/conformance'
-import { KEYRING_STORAGE_KEY, PAGE_TARGET, VAULT_STORAGE_KEY, VaultError, isPageEvent, isPageResponse, newRequestId, type AlarmsLike, type StorageAreaLike } from '@anywalletkit/extension-kit'
+import { KEYRING_STORAGE_KEY, PAGE_TARGET, VAULT_STORAGE_KEY, VaultError, isPageEvent, isPageResponse, newRequestId, type AlarmsLike, type SignApproval, type StorageAreaLike } from '@anywalletkit/extension-kit'
 import {
-  addPasskey, createRouter, createWallet, onPort, openWallet, popupApprovalWindow, startContentScript, unlockWithPasskey, unlockWithPassword,
+  addPasskey, createRouter, createWallet, messageSheet, onPort, openWallet, popupApprovalWindow, startContentScript, unlockWithPasskey, unlockWithPassword,
   type ChromeLike, type PortLike, type WindowsLike,
 } from '../src/extension.ts'
 
@@ -149,6 +149,30 @@ describe('extension-kit guide', () => {
     await flush()
     const signature = page.answer(id)?.result as `0x${string}`
     expect(await recoverMessageAddress({ message: 'hello', signature })).toBe(ADDRESS)
+  })
+
+  it('personal_sign of 32 bytes: text is a danger sheet, the hex form is refused (this wallet has no allowBlindHash)', async () => {
+    const { page, worker, lastRequest } = await connected()
+    const normal = page.send('personal_sign', ['0x68656c6c6f', ADDRESS])
+    await flush()
+    expect(messageSheet((lastRequest().payload as SignApproval).request)).toEqual({ danger: false, title: 'Sign a message', reject: 'Reject', approve: 'Sign' })
+    worker.approvals.decline(lastRequest().id)
+    await flush()
+    expect(page.answer(normal)?.error?.code).toBe(4001)
+
+    const hidden = 'é'.repeat(16) // 32 UTF-8 bytes: the same signature as the digest 0xc3a9…c3a9
+    const id = page.send('personal_sign', [hidden, ADDRESS])
+    await flush()
+    const request = (lastRequest().payload as SignApproval).request
+    expect(request).toMatchObject({ kind: 'sign-message', blindHash: true, blindHashForm: 'text' })
+    expect(messageSheet(request)).toEqual({ danger: true, title: 'Hidden hash', warning: 'This looks like a hidden hash. Signing it may authorize a transfer or an order.', reject: 'Reject', approve: 'Sign anyway' })
+    worker.approvals.resolve(lastRequest().id, null)
+    await flush()
+    expect(await recoverMessageAddress({ message: { raw: `0x${'c3a9'.repeat(16)}` }, signature: page.answer(id)?.result as `0x${string}` })).toBe(ADDRESS)
+
+    const hex = page.send('personal_sign', [`0x${'c3a9'.repeat(16)}`, ADDRESS])
+    await flush()
+    expect(page.answer(hex)?.error?.code).toBe(4200)
   })
 
   it('closing the popup declines; locking declines every waiting request', async () => {

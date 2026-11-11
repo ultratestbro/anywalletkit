@@ -156,6 +156,24 @@ Show on every approval:
   your preview. The nonce on the sheet is a guess; the one signed is read after the approval.
   When the network's fee outgrew the shown cap while the sheet was open, the same transaction
   comes back with `payload.repriced: true` and the new numbers: say the fee went up.
+- **A hidden hash**: a `personal_sign` whose signed bytes are exactly 32 comes with
+  `request.blindHash: true`. Those 32 bytes, signed behind the EIP-191 prefix, are what CoW
+  Protocol's `ethsign` orders and Safe owner signatures (v > 30) accept as an order or a
+  transfer, so make it a red danger screen with **Reject** and **Sign anyway**, never the
+  normal message sheet. `request.blindHashForm` says how it came:
+  - `'text'`: ordinary-looking text whose UTF-8 encoding is 32 bytes (16 accented letters,
+    8 emoji, 32 ASCII characters). A site can grind an order until its digest is valid UTF-8
+    and send it as text. It always reaches the sheet, also without `allowBlindHash`, so the
+    sheet needs this branch even if the wallet never offers the option: "This looks like a
+    hidden hash. Signing it may authorize a transfer or an order."
+  - `'hex'`: `0x` + 64 hex digits. Refused (4200) before any sheet unless you pass
+    `allowBlindHash` to `createSignHandler` (an "Allow blind hash signatures" option the user
+    turns on, behind the password), and then shown the same way.
+
+  The check counts the bytes that get signed (hex decoded, any other string as UTF-8), not
+  the characters on screen.
+
+<Snippet file="extension-kit/src/extension.ts" region="sign-sheet" />
 
 ## The relay
 
