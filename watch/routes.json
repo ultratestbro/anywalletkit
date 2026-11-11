@@ -403,7 +403,8 @@
   "_doc": "Mirror of Vaulty app/src/lib/omnistonSettlement.ts (audited settlement contracts + EVM order protocols); keep in sync by hand.",
   "trustedSettlementContracts": {
    "ton:-239": [
-    "EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ"
+    "EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ",
+    "EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA"
    ],
    "eip155:1": [
     "0xafCF681272AF10959736f45616eeCBC22D7095E2"
