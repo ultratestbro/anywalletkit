@@ -473,7 +473,8 @@ venue contracts), quote before every write, log hashes and addresses only, call 
 - An EVM `sign()` that may be a blind hash (a 32-byte `Uint8Array`, `0x` + 64 hex, or text whose UTF-8 is 32 bytes) is
   `blindHash: true` (`blindHashForm`): `confirm` gets it — show a danger screen, never the normal message sheet.
   Without `confirm` an allowlist or a blocklist refuses it; under an allowlist the hex and bytes forms are refused even
-  with `confirm`. An EVM `sign()` takes only a string (no lone surrogates) or a `Uint8Array`.
+  with `confirm`. An EVM `sign()` takes only a string (no lone surrogates) or a `Uint8Array` (else `method`, rules or
+  not). The account's namespace rules (`eip155`) apply under any key it was asked for, a registration key too.
 - Public RPCs rate-limit; production apps pass their own endpoints (each `provider` accepts a list).
 
 ## Security rules (non-negotiable)

@@ -109,18 +109,21 @@ What the lists do with it:
 Like typed data it needs the account's chain when an exact-id rule of the family could be the
 account's own: an account that reports `eip155:unknown` learns its chain id from its RPC first,
 and an offline one is refused (`chain`) — see [Which chain's rules apply](#which-chains-rules-apply).
-The account's namespace decides that a `sign` is an EVM one, not the spelling of the chain it was
-asked for (`eip155`, `eip155:1`, a registration key).
+The account's namespace decides that a `sign` is an EVM one, and that the `eip155` rules judge it,
+not the spelling of the chain it was asked for (`eip155`, `eip155:1`, a registration key).
 
 The length is counted in UTF-8 bytes, not characters: 32 characters with one `é` are 33 bytes
 and stay a message. The account is handed the string as it came, so an external signer shows it
-as text, and a `Uint8Array` as a copy of the bytes that were counted. The kit counts a string's
-UTF-8 with its own encoder, the signer with the runtime's `TextEncoder`. The two agree on every
-well-formed string, so a string with a lone surrogate (a UTF-16 unit U+D800–U+DFFF that is not
-half of a pair) is refused with `PolicyViolationError('method')` before any rule: the
-`TextEncoder` polyfill of the Hermes setup reads one as other bytes than the spec, and can turn
-33 counted bytes into 32 signed ones. An EVM `sign` takes a string or a `Uint8Array` (from any
-realm, a Node `Buffer` too); anything else is refused with `PolicyViolationError('method')`.
+as text, and a `Uint8Array` as a plain `Uint8Array` copy of the bytes that were counted (a Node
+`Buffer` arrives as a `Uint8Array`). The kit counts a string's UTF-8 with its own reading of it,
+the signer encodes it with the runtime's `TextEncoder`. The two agree on every well-formed string,
+so a string with a lone surrogate (a UTF-16 unit U+D800–U+DFFF that is not half of a pair) is
+refused with `PolicyViolationError('method')` before any rule: the `TextEncoder` polyfill of the
+Hermes setup reads some of them as other bytes than the spec, and can turn 33 counted bytes into
+32 signed ones. An EVM `sign` takes a string or a `Uint8Array` (from any realm, a subclass, a Node
+`Buffer` too); anything else is refused with `PolicyViolationError('method')`. Both refusals hold
+for every EVM account behind the policies, with no rule set too: every account of a `Wallet`
+created with `policies`, and every account a protocol module is given.
 
 ### Revokes
 
@@ -191,6 +194,11 @@ policies: {
 
 When the account cannot learn its chain id, its namespace rules still apply; an exact-id rule
 of that family refuses the write (`policy: 'chain'`) instead of guessing.
+
+The account's own namespace rules apply however you asked for it. A registration key of your own
+(`registerWallet('evm', …)` then `getAccount('evm')`) or another family's id is no chain: under it,
+an EVM account is judged by the `eip155` rules and by the exact-id rules of the chain it reports,
+which it learns from its RPC first when an exact-id rule of the family is set.
 
 ## Policies and chain-level limits
 

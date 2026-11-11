@@ -68,9 +68,10 @@ other text whose UTF-8 encoding is 32 bytes (`blindHash: true`,
 screen; without `confirm` an allowlist or a blocklist refuses it, and under an
 allowlist the hex and bytes forms are refused even with `confirm`; like typed
 data it needs the account's chain when an exact-id rule could be its own; the
-account is handed the caller's string as it is, and an EVM `sign` of anything
-but a string or a `Uint8Array`, or of a string with a lone surrogate, is
-refused),
+`eip155` rules judge it under whatever key the account was asked for; the
+account is handed the caller's string as it is, a `Uint8Array` as a plain
+copy, and an EVM `sign` of anything but a string or a `Uint8Array`, or of a
+string with a lone surrogate, is refused, with no rule set too),
 and chain-specific ones such as Tron's `signRaw`, NEAR's `signBuilt`, Solana's
 `sendSerialized`. The rule is deny-by-default: any account method named
 `sign*` / `send*` / `approve*` / `revoke*` / `transfer*` is guarded unless it

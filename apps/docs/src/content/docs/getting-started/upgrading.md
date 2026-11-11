@@ -24,21 +24,40 @@ caught; text whose UTF-8 encoding is 32 bytes passed as a normal message.
   `EvmSignBlindHashForm`.
 - **kit, Breaking:** the blind hash rule follows the account's namespace, not the spelling of the chain it was asked
   for: an EVM account asked for as `eip155`, registered under another key, or wrapped with
-  `applyPolicies(account, policies, 'eip155')` now gets all three forms flagged, and under an allowlist the hex and
-  bytes forms refused, as an account asked for as `eip155:1` already did.
+  `applyPolicies(account, policies, 'eip155')` now gets all three forms flagged, as an account asked for as
+  `eip155:1` already did. For the hex and bytes forms, which passed there as plain messages, that means: `confirm`
+  gets `kind: 'typedData'` with `blindHash: true` instead of `kind: 'message'`, an allowlist refuses them with or
+  without `confirm`, and a blocklist refuses them when there is no `confirm`.
+- **kit, Breaking:** the rules of the account's own namespace apply however you asked for it. An EVM account whose
+  chain was not known yet (wallet-evm without `chainId`), asked for under a key that is no chain id of its family —
+  your own registration key (`registerWallet('evm', …)`, then `getAccount('evm')` or `getManager('evm')`),
+  `applyPolicies(account, policies, 'ethereum')`, another family's id — matched no rule: a blind hash `sign` and
+  typed data without `domain.chainId` were signed under an `eip155` allowlist or blocklist. They are judged by it
+  now. Under such a key an exact-id rule (`'eip155:1'`) needs the account's chain as under `eip155`, `confirm` sees
+  the account's chain (`eip155:…`) instead of the key, and a transaction is read as an EVM one (an ERC-20 recipient
+  in its calldata is a destination). Registering EVM wallets under `eip155` or an exact id avoids the question.
 - **kit, Breaking:** a blind hash needs the account's chain like typed data when an exact-id rule of the family
   (`'eip155:1'`) could be the account's own. An account that reports `eip155:unknown` (wallet-evm without `chainId`)
   now asks its RPC for the chain id first (an RPC error comes back as the error); an offline one is refused with
   `PolicyViolationError('chain')`. Until now it was signed without any rule. Pass `chainId`, or ask for the account
   by its exact chain id.
-- **kit, Breaking:** an EVM `sign` takes a string or a `Uint8Array` (from any realm, a Node `Buffer` too). Anything
-  else — an array of numbers, another typed array, an `ArrayBuffer`, `{ raw }` — is refused with
+- **kit, Breaking:** an EVM `sign` takes a string or a `Uint8Array` (from any realm, a subclass, a Node `Buffer`
+  too). Anything else — an array of numbers, another typed array, an `ArrayBuffer`, `{ raw }` — is refused with
   `PolicyViolationError('method')`; convert it to a `Uint8Array` first.
 - **kit, Breaking:** an EVM `sign` of a string with a lone surrogate (a UTF-16 unit U+D800–U+DFFF that is not half
   of a pair) is refused with `PolicyViolationError('method')` before any rule. UTF-8 encoders disagree on such a
   string: the Hermes `TextEncoder` polyfill signs other bytes than the kit counts (32 for 33). Text decoded from
   UTF-8 never has one; a string cut in the middle of an emoji, or built from a `\uD83E` escape, does — cut text at
-  a code point. The account is handed the string as it came (a `Uint8Array` as a copy), as before.
+  a code point. The account is handed the string as it came, as before.
+- **kit, Breaking:** both `method` refusals hold for every EVM account behind the policies, even with no rule set:
+  every account of a `Wallet` created with `policies` (`{}` included), every account a protocol module is given, and
+  an account of a `Wallet` without policies asked for by an exact chain id other than the one it reports. They
+  do not touch an account of a `Wallet` without policies asked for by namespace, by a registration key or by the
+  chain id it reports: that one is the chain package's own.
+- **kit, Breaking:** an EVM `sign` of a `Uint8Array` hands the account a plain `Uint8Array` of the kit's realm,
+  copied from the argument's elements: a Node `Buffer` arrives as a `Uint8Array`, an array from another realm or a
+  subclass as one of this realm. Until now the copy kept its class. If your own EVM account calls `Buffer` methods
+  on the message, wrap it (`Buffer.from(message)`); wallet-evm does not.
 - **extension-kit, Breaking if your sheet has no `blindHash` branch:** such a `personal_sign` reaches the sheet with
   `blindHash: true`, `blindHashForm: 'text'`, also when `allowBlindHash` is off. Until now `blindHash` came only
   with that opt-in, so a wallet that never turned it on may show `blindHash` on the normal message sheet. Add a red
