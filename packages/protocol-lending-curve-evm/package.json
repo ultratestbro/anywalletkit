@@ -31,7 +31,7 @@
     "@anywalletkit/core": "workspace:*",
     "@anywalletkit/history-evm": "workspace:*",
     "@types/node": "^22",
-    "vitest": "^5.0.3"
+    "vitest": "^5.1.0"
   },
   "keywords": ["protocol", "lending", "curve", "crvusd", "scrvusd", "savings", "yearn", "vault", "erc-4626", "evm", "lending-protocol", "anywalletkit"],
   "publishConfig": { "access": "public", "provenance": true }

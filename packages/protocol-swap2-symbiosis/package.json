@@ -41,7 +41,7 @@
   "devDependencies": {
     "@ton/core": "^0.63.1",
     "@types/node": "^22",
-    "vitest": "^5.0.3",
+    "vitest": "^5.1.0",
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/protocol-swap2-router": "workspace:*",
     "@anywalletkit/wallet-tron": "workspace:*",

@@ -32,17 +32,19 @@
     "@changesets/cli": "^3.0.3",
     "@types/node": "^22.20.5",
     "esbuild": "^0.28.2",
-    "eslint": "10.12.0",
+    "eslint": "10.14.0",
     "fastestsmallesttextencoderdecoder": "^1.0.22",
     "hermes-engine-cli": "^0.12.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "8.71.1",
-    "vitest": "^5.0.3"
+    "typescript-eslint": "8.72.1",
+    "vitest": "^5.1.0"
   },
   "pnpm": {
     "overrides": {
-      "follow-redirects": "1.16.2"
+      "follow-redirects": "1.16.2",
+      "launch-editor@<2.14.2": "2.14.2",
+      "esbuild@<0.28.1": "0.28.2"
     }
   }
 }
