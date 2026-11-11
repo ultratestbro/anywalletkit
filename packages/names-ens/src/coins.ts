@@ -3,8 +3,8 @@
  * the raw `addr(node, coinType)` bytes into each chain's address form.
  */
 import { getAddress } from 'viem'
-import { base58check, bech32, bech32m } from '@scure/base'
-import { sha256 } from '@noble/hashes/sha256'
+import { bech32, bech32m, createBase58check } from '@scure/base'
+import { sha256 } from '@noble/hashes/sha2.js'
 import { NameError } from '@anywalletkit/core'
 
 /** CAIP-2 id of Bitcoin mainnet, for reading a name's BTC record. */
@@ -26,7 +26,7 @@ export function coinTypeFor(chain: string): bigint | null {
   return null
 }
 
-const b58check = base58check(sha256)
+const b58check = createBase58check(sha256)
 const hex = (h: string) => {
   const s = h.startsWith('0x') ? h.slice(2) : h
   if (s.length % 2) throw new Error('odd hex')
