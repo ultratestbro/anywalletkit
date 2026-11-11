@@ -251,9 +251,10 @@ export interface WriteIntent {
    * transfer, so it is `kind: 'typedData'` with unknown destinations (extension audit E55). Without a
    * `confirm` hook an allowlist or a blocklist refuses it. With one, `confirm` gets it — show a danger
    * screen with Reject / Sign anyway — except the hex and bytes forms under an allowlist, which are
-   * refused before `confirm`. Like typed data it needs the account's chain when an exact rule of the
-   * family could be the account's (the chain is learned, or the write is refused with `chain`).
-   * {@link WriteIntent.blindHashForm} says how it came.
+   * refused before `confirm`. The account's namespace decides that a `sign` is an EVM one and that its
+   * namespace rules apply, whatever key the account was asked for under. Like typed data it needs the
+   * account's chain when an exact rule of the family could be the account's (the chain is learned, or the
+   * write is refused with `chain`). {@link WriteIntent.blindHashForm} says how it came.
    */
   blindHash?: true
   /**
@@ -274,7 +275,10 @@ export type EvmSignBlindHashForm = 'bytes' | 'hex' | 'text'
  * checked, a destination must be on every matching allowlist, and any matching blocklist refuses.
  * An id matches its network in any spelling: `solana:mainnet` = `solana:5eykt…`,
  * `tron:728126428` = `tron:mainnet` = `tron:0x2b6653dc`, `bitcoin:mainnet` = `bip122:0000…`,
- * `eip155:0x1` = `eip155:1`; the `bitcoin` namespace is `bip122`.
+ * `eip155:0x1` = `eip155:1`; the `bitcoin` namespace is `bip122`. The rules of the account's own
+ * namespace apply however it was asked for (an exact id, its namespace, a registration key such as
+ * `evm`); an exact id's rules apply to the chain asked for when that is an id of the account's family,
+ * and to the chain the account reports.
  */
 export interface Policies {
   /**
@@ -930,14 +934,19 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     const domain = domainChain(ns, method, arg)
     const known = isConcreteChain(account.chain) ? account.chain : undefined
     const offChain = chainFree(method)
-    const exactRules = hasRuleFor((k) => k.includes(':') && canonicalNamespace(k.split(':')[0]!) === canonicalNamespace(ns))
+    /** A key or chain id of the account's own family (`bitcoin` for `bip122`); a registration key such as `evm` is not one. */
+    const family = (c: string) => canonicalNamespace(c.split(':')[0]!) === canonicalNamespace(ns)
+    // The chain asked for says which exact rules are the account's only when it is a concrete id of the account's
+    // family: a registration key (`evm`) or another family's id (`solana:mainnet`) says nothing (SDK-303 round 3).
+    const askedHere = isConcreteChain(chain) && family(chain)
+    const exactRules = hasRuleFor((k) => k.includes(':') && family(k))
     let learned: string | undefined
     const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
     // A message needs no chain id at all: no list or cap applies to it. A blind hash is no message:
     // an exact allowlist of the family may be the account's, so its chain is learned, or the write
     // is refused below when it cannot be.
     const message = MESSAGE_METHODS.includes(method) && blind === undefined
-    const needed = !offChain || (!message && !isConcreteChain(chain) && exactRules)
+    const needed = !offChain || (!message && !askedHere && exactRules)
     if (known === undefined && needed && typeof getChainId === 'function') {
       try {
         learned = `${ns}:${await getChainId.call(account)}`
@@ -959,10 +968,10 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         }
       }
     }
-    // The account's network is unknown and none was asked for: the namespace's own rules need no
-    // chain id, but an exact rule of this family could be the account's — refuse rather than guess
+    // The account's network is unknown and none of its family was asked for: the namespace's own rules
+    // need no chain id, but an exact rule of this family could be the account's — refuse rather than guess
     // (a chainId the write carries says what is signed, not which rules the account answers to).
-    if (own === undefined && !isConcreteChain(chain) && exactRules && !message) {
+    if (own === undefined && !askedHere && exactRules && !message) {
       throw new PolicyViolationError('chain', `The account's chain is unknown (${account.chain}), so its policies cannot be applied.`)
     }
     // The rules of every network in play apply: the one asked for, the account's own, the one signed
@@ -970,11 +979,15 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     const chains = [...new Set([chain, own, signed, domain].filter((c): c is string => c !== undefined && !c.endsWith(':unknown')))]
     // Every rule key that covers the asked-for chain or the account's own: its namespace and its
     // exact id, in whichever spelling the app wrote them (`solana:mainnet`, `tron:728126428`,
-    // `bitcoin` for `bip122` — round 3, H4).
+    // `bitcoin` for `bip122` — round 3, H4). The rules of the account's own namespace apply always,
+    // however it was asked for: an account asked for under a registration key (`evm`) or another
+    // family's id, whose chain is not known, matched no rule at all (SDK-303 round 3).
     const written = [...new Set(rules.flatMap((m) => (m ? Object.keys(m) : [])))]
-    const keys = written.filter((k) => (chains.length > 0 ? chains.some((c) => ruleCovers(k, c)) : ruleCovers(k, ns)))
-    // The intent's chain: the asked-for, own or signed network (typed data's domain chain is `domainChain`).
-    const judged = chains.find((c) => c !== domain || c === chain || c === own || c === signed) ?? account.chain
+    const keys = written.filter((k) => ruleCovers(k, ns) || chains.some((c) => ruleCovers(k, c)))
+    // The intent's chain: the asked-for, own or signed network of the account's family (typed data's domain
+    // chain is `domainChain`). A key of another family (`evm`) would have the write read as another chain's:
+    // an EVM transaction's calldata recipients were not seen under it (SDK-303 round 3).
+    const judged = chains.find((c) => family(c) && (c !== domain || c === chain || c === own || c === signed)) ?? account.chain
     const intent = intentOf(judged, await account.getAddress(), method, arg, { erc20: await approveRevokesErc20(judged, method, arg, account), ...(blind !== undefined ? { blindHashForm: blind } : {}) })
     if (domain !== undefined) intent.domainChain = domain
     // An SPL transfer pays a token account: its owner is the recipient, and only the network knows
