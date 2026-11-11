@@ -132,15 +132,16 @@ Checked before any transaction is built:
 
 ## Why the instructions are hand-encoded
 
-`@anywalletkit/wallet-solana` is built on `@solana/*` 3.x. The published
-stake-pool client wants web3.js v1 and `@solana-program/stake` wants kit ≥ 5;
-either would put a second Solana stack into the consumer's bundle. The six
-instructions this module needs have stable, documented layouts (Stake Pool
-`DepositSol` 14 / `WithdrawStake` 10 / `WithdrawSol` 16 and their
-`..WithSlippage` variants 25 / 24 / 26, System `CreateAccountWithSeed` 3,
-Stake `Deactivate` 5 / `Withdraw` 4), verified against the program sources
-and by simulation — `src/spl-stake-pool-codec.js` encodes them with
-`@solana/addresses` and `@solana/instructions` only.
+The published stake-pool client wants web3.js v1, which would put a second
+Solana stack into the consumer's bundle. The six instructions this module
+needs have stable, documented layouts (Stake Pool `DepositSol` 14 /
+`WithdrawStake` 10 / `WithdrawSol` 16 and their `..WithSlippage` variants
+25 / 24 / 26, System `CreateAccountWithSeed` 3, Stake `Deactivate` 5 /
+`Withdraw` 4), verified against the program sources and by simulation —
+`src/spl-stake-pool-codec.js` encodes them with `@solana/addresses` and
+`@solana/instructions` only, the same 8.x packages `@solana/kit` (and so
+`@anywalletkit/wallet-solana`) is built on. `tests/instruction-bytes.json`
+pins every derived address, instruction and compiled message byte for byte.
 
 ## Tests
 
