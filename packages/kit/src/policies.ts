@@ -1,6 +1,7 @@
 import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
 import { canonicalAddress, erc20Transfer, hexData, namedArray, sendDestinations, tonRawAddress, tronCallData, tronRawIntent, type Destinations, type NearAccountChange } from './destinations.js'
+import { evmMessageBytes } from './message-bytes.js'
 import { snapshot } from './snapshot.js'
 export type { NearAccountChange } from './destinations.js'
 import { ccAssetByToken } from '@anywalletkit/swap2-assets'
@@ -241,13 +242,24 @@ export interface WriteIntent {
   /** True for `kind: 'message'`: allow/block lists do not apply, only `confirm`. Typed data is judged by the lists (scan 2026-10-28 F7). */
   message: boolean
   /**
-   * EVM `sign` of exactly 32 bytes (a raw 32-byte buffer, or a `0x` + 64-hex string): a blind hash signature.
-   * Verifiers that accept an eth_sign-wrapped digest (CoW Protocol's `ethsign` order scheme, Safe owner
-   * signatures with v > 30…) turn it into an order or a transfer, so it is `kind: 'typedData'` with unknown
-   * destinations — an allowlist refuses it, so does a blocklist without `confirm` (extension audit E55).
+   * EVM `sign` of exactly 32 bytes — a raw 32-byte buffer, a `0x` + 64-hex string, or text whose UTF-8
+   * encoding (what the account signs for a string) is 32 bytes: a blind hash signature. Verifiers that
+   * accept an eth_sign-wrapped digest (CoW Protocol's `ethsign` order scheme, Safe owner signatures with
+   * v > 30…) turn it into an order or a transfer, so it is `kind: 'typedData'` with unknown destinations —
+   * an allowlist refuses it, so does a blocklist without `confirm` (extension audit E55). `confirm` should
+   * show it as a danger screen with Reject / Sign anyway; {@link WriteIntent.blindHashForm} says how it came.
    */
   blindHash?: true
+  /**
+   * With `blindHash`: how the 32 bytes came — `'bytes'` a `Uint8Array`, `'hex'` a `0x` + 64-hex string,
+   * `'text'` any other string whose UTF-8 encoding is 32 bytes (a digest ground until it is valid UTF-8 and
+   * sent as text: "This looks like a hidden hash. Signing it may authorize a transfer or an order.").
+   */
+  blindHashForm?: BlindHashForm
 }
+
+/** How the 32 bytes of a blind hash `sign` came ({@link WriteIntent.blindHashForm}). */
+export type BlindHashForm = 'bytes' | 'hex' | 'text'
 
 /**
  * Rules the kit checks before every signature and broadcast of an account it hands out. Keys of the
@@ -675,10 +687,17 @@ function tonJettonTransfer(chain: string, from: string, a: Record<string, unknow
   return { list, unknown }
 }
 
-/** A message that is exactly 32 bytes: a raw buffer of 32, or `0x` + 64 hex digits (what a dApp sends for a digest). */
-function isBlindHash(arg: unknown): boolean {
-  if (arg instanceof Uint8Array) return arg.length === 32
-  return typeof arg === 'string' && /^0x[0-9a-fA-F]{64}$/.test(arg.trim())
+/**
+ * An EVM `sign` argument of exactly 32 bytes, and how it came: a raw buffer of 32, `0x` + 64 hex digits
+ * (what a dApp sends for a digest; flagged whatever the account makes of it), or any other string whose
+ * UTF-8 encoding — the bytes the account signs for it ({@link evmMessageBytes}) — is 32 bytes long.
+ */
+function blindHashForm(arg: unknown): BlindHashForm | undefined {
+  if (arg instanceof Uint8Array) return arg.length === 32 ? 'bytes' : undefined
+  if (typeof arg !== 'string') return undefined
+  if (/^0x[0-9a-fA-F]{64}$/.test(arg.trim())) return 'hex'
+  // A UTF-16 code unit is at least one UTF-8 byte: a longer string never encodes to 32 bytes.
+  return arg.length <= 32 && evmMessageBytes(arg)!.length === 32 ? 'text' : undefined
 }
 
 /** What {@link intentOf} needs to know beyond the arguments: whether an `approve` of 0 is on a known ERC-20. */
@@ -753,8 +772,9 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
       return { ...base, kind: 'send', message: false, ...(r.to !== undefined ? { to: r.to } : {}), ...(r.token !== undefined ? { token: r.token } : {}), ...(r.amount !== undefined ? { amount: r.amount } : {}) }
     }
   }
-  if (method === 'sign' && chain.startsWith('eip155:') && isBlindHash(arg)) {
-    const intent: DraftIntent = { ...base, kind: 'typedData', message: false, blindHash: true }
+  const blind = method === 'sign' && chain.startsWith('eip155:') ? blindHashForm(arg) : undefined
+  if (blind !== undefined) {
+    const intent: DraftIntent = { ...base, kind: 'typedData', message: false, blindHash: true, blindHashForm: blind }
     TYPED_DESTINATIONS.set(intent, { list: [], unknown: true })
     return intent
   }
