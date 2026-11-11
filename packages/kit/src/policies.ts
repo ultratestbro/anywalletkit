@@ -242,16 +242,18 @@ export interface WriteIntent {
   /** True for `kind: 'message'`: allow/block lists do not apply, only `confirm`. Typed data is judged by the lists (scan 2026-10-28 F7). */
   message: boolean
   /**
-   * EVM `sign` of exactly 32 bytes — a raw 32-byte buffer, a `0x` + 64-hex string, or text whose UTF-8
-   * encoding (what the account signs for a string) is 32 bytes: a blind hash signature. Verifiers that
-   * accept an eth_sign-wrapped digest (CoW Protocol's `ethsign` order scheme, Safe owner signatures with
-   * v > 30…) turn it into an order or a transfer, so it is `kind: 'typedData'` with unknown destinations —
-   * an allowlist refuses it, so does a blocklist without `confirm` (extension audit E55). `confirm` should
+   * An EVM `sign` that may be a blind hash signature: a 32-byte `Uint8Array`, a `0x` + 64-hex string
+   * (flagged by its shape — what a dApp sends for a digest; wallet-evm signs its 66 characters, another
+   * signer may decode it to the 32 bytes), or any other string whose UTF-8 encoding — the bytes the
+   * account is handed — is 32 bytes. Verifiers that accept an eth_sign-wrapped digest (CoW Protocol's
+   * `ethsign` order scheme, Safe owner signatures with v > 30…) turn 32 such bytes into an order or a
+   * transfer, so it is `kind: 'typedData'` with unknown destinations — an allowlist refuses it before
+   * `confirm`, so does a blocklist without `confirm` (extension audit E55). Otherwise `confirm` should
    * show it as a danger screen with Reject / Sign anyway; {@link WriteIntent.blindHashForm} says how it came.
    */
   blindHash?: true
   /**
-   * With `blindHash`: how the 32 bytes came — `'bytes'` a `Uint8Array`, `'hex'` a `0x` + 64-hex string,
+   * With `blindHash`: how it came — `'bytes'` a 32-byte `Uint8Array`, `'hex'` a `0x` + 64-hex string,
    * `'text'` any other string whose UTF-8 encoding is 32 bytes (a digest ground until it is valid UTF-8 and
    * sent as text: "This looks like a hidden hash. Signing it may authorize a transfer or an order.").
    */
@@ -293,7 +295,8 @@ export class PolicyViolationError extends Error {
   /**
    * The rule that refused the write. `chain` means the account's chain id is unknown, so no rule
    * could be matched. `method` means the method is not part of the write surface the policies
-   * can read (see {@link GUARDED_WRITES}).
+   * can read (see {@link GUARDED_WRITES}), or its argument is not one they can read (an EVM `sign`
+   * of anything but a string or a `Uint8Array`).
    */
   readonly policy: 'maxFee' | 'allowlist' | 'blocklist' | 'chain' | 'method'
   constructor(policy: 'maxFee' | 'allowlist' | 'blocklist' | 'chain' | 'method', message: string) {
@@ -688,20 +691,22 @@ function tonJettonTransfer(chain: string, from: string, a: Record<string, unknow
 }
 
 /**
- * An EVM `sign` argument of exactly 32 bytes, and how it came: a raw buffer of 32, `0x` + 64 hex digits
- * (what a dApp sends for a digest; flagged whatever the account makes of it), or any other string whose
- * UTF-8 encoding — the bytes the account signs for it ({@link evmMessageBytes}) — is 32 bytes long.
+ * An EVM `sign` that may be a blind hash, and how it came. `signed` is what the account is handed
+ * ({@link evmMessageBytes}): 32 of them from a `Uint8Array` or from any string, or `0x` + 64 hex digits
+ * (what a dApp sends for a digest; flagged by its shape whatever the account makes of it).
  */
-function blindHashForm(arg: unknown): BlindHashForm | undefined {
-  if (arg instanceof Uint8Array) return arg.length === 32 ? 'bytes' : undefined
-  if (typeof arg !== 'string') return undefined
+function blindHashForm(arg: unknown, signed: Uint8Array): BlindHashForm | undefined {
+  if (typeof arg !== 'string') return signed.length === 32 ? 'bytes' : undefined
   if (/^0x[0-9a-fA-F]{64}$/.test(arg.trim())) return 'hex'
-  // A UTF-16 code unit is at least one UTF-8 byte: a longer string never encodes to 32 bytes.
-  return arg.length <= 32 && evmMessageBytes(arg)!.length === 32 ? 'text' : undefined
+  return signed.length === 32 ? 'text' : undefined
 }
 
-/** What {@link intentOf} needs to know beyond the arguments: whether an `approve` of 0 is on a known ERC-20. */
-interface IntentContext { erc20?: boolean }
+/**
+ * What {@link intentOf} needs to know beyond the arguments: whether an `approve` of 0 is on a known ERC-20;
+ * for a `sign` on an EVM account, the bytes the account will be handed (its namespace decides, not the
+ * spelling of the chain it was asked for: `eip155`, an `evm` registration key).
+ */
+interface IntentContext { erc20?: boolean; evmSigned?: Uint8Array }
 
 /**
  * Is `approve({ token, amount: 0 })` on an ERC-20? On an ERC-721, approve(spender, 0) APPROVES token
@@ -772,7 +777,7 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
       return { ...base, kind: 'send', message: false, ...(r.to !== undefined ? { to: r.to } : {}), ...(r.token !== undefined ? { token: r.token } : {}), ...(r.amount !== undefined ? { amount: r.amount } : {}) }
     }
   }
-  const blind = method === 'sign' && chain.startsWith('eip155:') ? blindHashForm(arg) : undefined
+  const blind = method === 'sign' && ctx.evmSigned !== undefined ? blindHashForm(arg, ctx.evmSigned) : undefined
   if (blind !== undefined) {
     const intent: DraftIntent = { ...base, kind: 'typedData', message: false, blindHash: true, blindHashForm: blind }
     TYPED_DESTINATIONS.set(intent, { list: [], unknown: true })
@@ -906,7 +911,8 @@ export function guardReturned(value: unknown, wrap: (account: IWalletAccount) =>
 export function applyPolicies<A extends IWalletAccount>(account: A, policies: Policies, chain?: string): A {
   const rules = [policies.maxFee, policies.allowlist, policies.blocklist]
   const hasRuleFor = (key: (k: string) => boolean) => rules.some((m) => m !== undefined && Object.keys(m).some(key))
-  const guard = async (method: WriteMethod, arg: unknown) => {
+  /** `evmSigned`: for a `sign` on an EVM account, the bytes it will be handed (the blind hash check measures them). */
+  const guard = async (method: WriteMethod, arg: unknown, evmSigned?: Uint8Array) => {
     const ns = account.chain.split(':')[0]!
     // The network the write really goes to, before any rule, confirm or signature (audit #7): the
     // account's own and, for an EVM transaction that carries one, its chainId. An EVM account that
@@ -960,7 +966,7 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     const keys = written.filter((k) => (chains.length > 0 ? chains.some((c) => ruleCovers(k, c)) : ruleCovers(k, ns)))
     // The intent's chain: the asked-for, own or signed network (typed data's domain chain is `domainChain`).
     const judged = chains.find((c) => c !== domain || c === chain || c === own || c === signed) ?? account.chain
-    const intent = intentOf(judged, await account.getAddress(), method, arg, { erc20: await approveRevokesErc20(judged, method, arg, account) })
+    const intent = intentOf(judged, await account.getAddress(), method, arg, { erc20: await approveRevokesErc20(judged, method, arg, account), ...(evmSigned !== undefined ? { evmSigned } : {}) })
     if (domain !== undefined) intent.domainChain = domain
     // An SPL transfer pays a token account: its owner is the recipient, and only the network knows
     // it. Read through the account when a list or confirm will look; unread → unknown (round 3, M1).
@@ -1051,7 +1057,12 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
           fn = async (...given: unknown[]) => {
             // One copy, taken before anything is judged, is what the rules see and what gets signed (round 3, M2).
             const args = snapshot(given)
-            const maxFee = await guard(prop, args[0])
+            // An EVM `sign`: the account's namespace says it is one, however the chain was asked for. The account
+            // is handed the very bytes the blind hash check measured (SDK-303), and an argument with no known bytes
+            // (an array of numbers, another typed array, an array-like a signer would read by index) is refused.
+            const evmSigned = prop === 'sign' && canonicalNamespace(account.chain.split(':')[0]!) === 'eip155' ? evmMessageBytes(args[0]) ?? null : undefined
+            if (evmSigned === null) throw new PolicyViolationError('method', 'An EVM sign() takes a string or a Uint8Array; the policies cannot tell what this argument would sign, so nothing was signed.')
+            const maxFee = await guard(prop, args[0], evmSigned)
             if (maxFee !== undefined) {
               // WriteOptions sit at CAPPED[prop] (second, or third after sendSerialized's guard); a tighter caller cap stays.
               const at = CAPPED[prop]!
@@ -1062,6 +1073,8 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
               next[at] = { ...given, maxFee: tighter }
               return original.apply(target, next)
             }
+            // Same message, same signature: a string's UTF-8 is what an EIP-191 signer signs for it (an off-chain sign has no fee cap).
+            if (evmSigned !== undefined) return original.apply(target, [evmSigned, ...args.slice(1)])
             // EIP-712 without primaryType: hand the signer the type the policy judged, so the two cannot diverge (scan F13).
             // Same struct, same hash — only the inference is made explicit.
             if (prop === 'signTypedData' && typeof args[0] === 'object' && args[0] !== null && str(obj(args[0]).primaryType) === undefined) {
