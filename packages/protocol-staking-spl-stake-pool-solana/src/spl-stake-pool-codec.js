@@ -12,9 +12,10 @@
 //    (25 / 24 / 26), System CreateAccountWithSeed(3) / TransferWithSeed(11), Stake Deactivate(5) /
 //    Withdraw(4), the Associated Token idempotent create and the compute
 //    budget pair. Written out here rather than pulled from an SDK: the
-//    Solana wallet is built on @solana/* 3.x, the published stake-pool client
-//    wants web3.js v1 and @solana-program/stake wants kit ≥5 — a second kit
-//    copy is exactly what a mobile bundle must not carry;
+//    published stake-pool client wants web3.js v1 — a second Solana stack is
+//    exactly what a mobile bundle must not carry. Only @solana/addresses and
+//    @solana/instructions are used, the 8.x that @solana/kit (and so the
+//    Solana wallet) carries; tests/instruction-bytes.json pins the bytes;
 //  - the withdraw-source selection the program enforces (preferred validator
 //    first, then any validator stake account that keeps its minimum, the
 //    reserve only when no validator holds stake).

@@ -36,15 +36,15 @@
     "verify:live": "node scripts/verify-live.mjs"
   },
   "dependencies": {
-    "@solana/addresses": "^3.0.3",
-    "@solana/instructions": "^3.0.3"
+    "@solana/addresses": "^8.6.0",
+    "@solana/instructions": "^8.6.0"
   },
   "peerDependencies": {
     "@anywalletkit/core": "workspace:*"
   },
   "devDependencies": {
-    "@solana/transaction-messages": "^3.0.3",
-    "@solana/transactions": "^3.0.3",
+    "@solana/transaction-messages": "^8.6.0",
+    "@solana/transactions": "^8.6.0",
     "@anywalletkit/core": "workspace:*",
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/wallet-solana": "workspace:*",
