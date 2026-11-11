@@ -80,6 +80,19 @@ describe('SDK-303 round 2: a blind hash sign() on an EVM account whose chain is 
         }
       })
 
+      it('with a provider, no chainId, with confirm: the text form goes to confirm on the learned chain (danger screen)', async () => {
+        const intents: WriteIntent[] = []
+        const account = await open({ provider: provider('0x1') }, { allowlist, confirm: async (i) => { intents.push(i); return true } })
+        const signature = await account.sign(TEXT)
+        expect(account.chain).toBe('eip155:1')
+        expect(intents).toHaveLength(1)
+        expect(intents[0]).toMatchObject({ kind: 'typedData', message: false, blindHash: true, blindHashForm: 'text', destinations: [], destinationUnknown: true, raw: TEXT })
+        expect(signature).toBe(await (await new WalletManagerEvm(SEED, { chainId: 1 }).getAccount(0)).sign(TEXT))
+        // Declined there: nothing is signed.
+        const declined = await open({ provider: provider('0x1') }, { allowlist, confirm: async () => false })
+        await expect(declined.sign(TEXT)).rejects.toMatchObject({ name: 'UserRejectedError' })
+      })
+
       it('with a provider on another chain: the eip155:1 allowlist is not its rule, confirm sees the blind hash', async () => {
         const intents: WriteIntent[] = []
         const account = await open({ provider: provider('0x89') }, { allowlist, confirm: async (i) => { intents.push(i); return true } })

@@ -80,16 +80,42 @@ describe('SDK-303: an EVM sign() of a string whose UTF-8 is 32 bytes', () => {
     expect(await applyPolicies(mock(), { maxFee: { [CHAIN]: 1n } }).sign(m)).toMatch(/^0x/)
   })
 
-  it('the lists judge it like the hex and bytes forms: an allowlist refuses it, a blocklist without confirm refuses it', async () => {
+  it('without confirm the lists refuse it: an allowlist (allowlist), a blocklist (blocklist)', async () => {
     for (const m of [TEXT32[0]![1], TEXT32[1]![1]]) {
-      await expect(applyPolicies(mock(), { allowlist: { [CHAIN]: [TREASURY] } }).sign(m)).rejects.toThrow(PolicyViolationError)
-      await expect(applyPolicies(mock(), { blocklist: { [CHAIN]: [TREASURY] } }).sign(m)).rejects.toThrow(/blocklist/)
-      const { intents, confirm } = seen()
-      expect(await applyPolicies(mock(), { blocklist: { [CHAIN]: [TREASURY] }, confirm }).sign(m)).toMatch(/^0x/)
-      expect(intents[0]).toMatchObject({ blindHash: true, blindHashForm: 'text' })
+      const account = mock()
+      await expect(applyPolicies(account, { allowlist: { [CHAIN]: [TREASURY] } }).sign(m)).rejects.toMatchObject({ name: 'PolicyViolationError', policy: 'allowlist' })
+      await expect(applyPolicies(account, { blocklist: { [CHAIN]: [TREASURY] } }).sign(m)).rejects.toMatchObject({ name: 'PolicyViolationError', policy: 'blocklist' })
+      expect(account.calls.filter((c) => c.method === 'sign')).toEqual([])
     }
     // A 31- or 33-byte text is a message: the lists skip it.
     expect(await applyPolicies(mock(), { allowlist: { [CHAIN]: [TREASURY] } }).sign('a'.repeat(33))).toMatch(/^0x/)
+  })
+
+  it('with confirm, under an allowlist or a blocklist, confirm decides: it sees the blind hash (text form) as a danger screen would', async () => {
+    for (const lists of [{ allowlist: { [CHAIN]: [TREASURY] } }, { blocklist: { [CHAIN]: [TREASURY] } }, { allowlist: { eip155: [TREASURY] }, blocklist: { [CHAIN]: [TREASURY] } }]) {
+      for (const m of [TEXT32[0]![1], TEXT32[1]![1]]) {
+        const { intents, confirm } = seen()
+        const account = mock()
+        expect(await applyPolicies(account, { ...lists, confirm }).sign(m)).toMatch(/^0x/)
+        expect(intents).toHaveLength(1)
+        expect(intents[0]).toMatchObject({ kind: 'typedData', message: false, blindHash: true, blindHashForm: 'text', destinations: [], destinationUnknown: true, raw: m })
+        expect(account.calls.filter((c) => c.method === 'sign')).toHaveLength(1)
+        // Rejected on the danger screen: nothing is signed.
+        const declined = mock()
+        await expect(applyPolicies(declined, { ...lists, confirm: async () => false }).sign(m)).rejects.toBeInstanceOf(UserRejectedError)
+        expect(declined.calls.filter((c) => c.method === 'sign')).toEqual([])
+      }
+    }
+  })
+
+  it('under an allowlist the hex and bytes forms are refused even with confirm, which never sees them', async () => {
+    for (const m of [DIGEST, ` ${DIGEST}\n`, bytes(DIGEST)]) {
+      const confirm = vi.fn(async () => true)
+      const account = mock()
+      await expect(applyPolicies(account, { allowlist: { [CHAIN]: [TREASURY] }, confirm }).sign(m)).rejects.toMatchObject({ name: 'PolicyViolationError', policy: 'allowlist' })
+      expect(confirm).not.toHaveBeenCalled()
+      expect(account.calls.filter((c) => c.method === 'sign')).toEqual([])
+    }
   })
 
   it('the hex and bytes forms are unchanged, now with their form named', async () => {

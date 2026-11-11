@@ -247,9 +247,12 @@ export interface WriteIntent {
    * signer may decode it to the 32 bytes), or any other string whose UTF-8 encoding — the bytes the
    * account is handed — is 32 bytes. Verifiers that accept an eth_sign-wrapped digest (CoW Protocol's
    * `ethsign` order scheme, Safe owner signatures with v > 30…) turn 32 such bytes into an order or a
-   * transfer, so it is `kind: 'typedData'` with unknown destinations — an allowlist refuses it before
-   * `confirm`, so does a blocklist without `confirm` (extension audit E55). Otherwise `confirm` should
-   * show it as a danger screen with Reject / Sign anyway; {@link WriteIntent.blindHashForm} says how it came.
+   * transfer, so it is `kind: 'typedData'` with unknown destinations (extension audit E55). Without a
+   * `confirm` hook an allowlist or a blocklist refuses it. With one, `confirm` gets it — show a danger
+   * screen with Reject / Sign anyway — except the hex and bytes forms under an allowlist, which are
+   * refused before `confirm`. Like typed data it needs the account's chain when an exact rule of the
+   * family could be the account's (the chain is learned, or the write is refused with `chain`).
+   * {@link WriteIntent.blindHashForm} says how it came.
    */
   blindHash?: true
   /**
@@ -1016,7 +1019,11 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
           throw new PolicyViolationError('blocklist', `Verifying contract ${verifying} is on the ${k} blocklist.`)
         }
         const allow = listed(k, policies.allowlist?.[k])
-        if (allow) {
+        // Text whose UTF-8 is 32 bytes reads like a message and may be one: with a confirm hook it goes there,
+        // to be shown as a danger screen, instead of being refused (SDK-303 round 2). Without one, and for the
+        // hex and bytes forms always, an allowlist refuses it (its destinations are unknown).
+        const toConfirm = intent.blindHashForm === 'text' && policies.confirm !== undefined
+        if (allow && !toConfirm) {
           const outside = intent.destinations.find((d) => !allow.has(canonicalAddress(k, d)))
           if (outside !== undefined || intent.destinations.length === 0 || intent.destinationUnknown) {
             throw new PolicyViolationError('allowlist', `${what(outside)} ${outside ?? '(unknown)'} is not on the ${k} allowlist.`)
