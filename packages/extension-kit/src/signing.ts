@@ -52,8 +52,8 @@ export type SignRequestInfo =
 
 /**
  * How a 32-byte personal_sign message came ({@link SignRequestInfo} `blindHashForm`): `0x` + 64 hex, or text whose
- * UTF-8 encoding is 32 bytes. (kit's `BlindHashForm` for `WriteIntent` also has `'bytes'`, a raw `Uint8Array`, which a
- * personal_sign from a site cannot be.)
+ * UTF-8 encoding is 32 bytes. (kit's `EvmSignBlindHashForm` for `WriteIntent` also has `'bytes'`, a raw `Uint8Array`,
+ * which a personal_sign from a site cannot be.)
  */
 export type PersonalSignBlindHashForm = 'hex' | 'text'
 

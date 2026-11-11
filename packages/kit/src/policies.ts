@@ -261,11 +261,11 @@ export interface WriteIntent {
    * `'text'` any other string whose UTF-8 encoding is 32 bytes (a digest ground until it is valid UTF-8 and
    * sent as text: "This looks like a hidden hash. Signing it may authorize a transfer or an order.").
    */
-  blindHashForm?: BlindHashForm
+  blindHashForm?: EvmSignBlindHashForm
 }
 
-/** How the 32 bytes of a blind hash `sign` came ({@link WriteIntent.blindHashForm}). */
-export type BlindHashForm = 'bytes' | 'hex' | 'text'
+/** How the 32 bytes of an EVM blind hash `sign` came ({@link WriteIntent.blindHashForm}). extension-kit's `personal_sign` counterpart is `PersonalSignBlindHashForm` (no `'bytes'`: a site sends a string). */
+export type EvmSignBlindHashForm = 'bytes' | 'hex' | 'text'
 
 /**
  * Rules the kit checks before every signature and broadcast of an account it hands out. Keys of the
@@ -700,7 +700,7 @@ function tonJettonTransfer(chain: string, from: string, a: Record<string, unknow
  * (what a dApp sends for a digest; flagged by its shape whatever the account makes of it — wallet-evm signs
  * the string's UTF-8, 66 bytes, another signer may decode it to the 32).
  */
-function blindHashForm(arg: unknown, signed: Uint8Array): BlindHashForm | undefined {
+function blindHashForm(arg: unknown, signed: Uint8Array): EvmSignBlindHashForm | undefined {
   if (typeof arg !== 'string') return signed.length === 32 ? 'bytes' : undefined
   if (/^0x[0-9a-fA-F]{64}$/.test(arg.trim())) return 'hex'
   return signed.length === 32 ? 'text' : undefined
@@ -711,7 +711,7 @@ function blindHashForm(arg: unknown, signed: Uint8Array): BlindHashForm | undefi
  * whether a `sign` on an EVM account is a blind hash, and in which form ({@link blindHashForm}, decided by
  * the guard before the chain: its namespace decides, not the spelling of the chain it was asked for).
  */
-interface IntentContext { erc20?: boolean; blindHashForm?: BlindHashForm }
+interface IntentContext { erc20?: boolean; blindHashForm?: EvmSignBlindHashForm }
 
 /**
  * Is `approve({ token, amount: 0 })` on an ERC-20? On an ERC-721, approve(spender, 0) APPROVES token
