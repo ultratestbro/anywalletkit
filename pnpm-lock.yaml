@@ -1166,8 +1166,8 @@ importers:
   packages/protocol-staking-spl-stake-pool-solana:
     dependencies:
       '@solana/addresses':
-        specifier: ^3.0.3
-        version: 3.0.3(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+        specifier: ^8.6.0
+        version: 8.6.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
       '@solana/instructions':
         specifier: ^3.0.3
         version: 3.0.3(typescript@5.9.3)
