@@ -1,22 +1,27 @@
 import { describe, expect, it, vi } from 'vitest'
 
 // SDK-303 round 2 (D3). An EVM sign() behind the policies hands the account the caller's string, and an EIP-191
-// signer signs it as UTF-8 with the runtime's TextEncoder (viem, in wallet-evm), while the policies measure it with
-// their own encoder. On Hermes without a native TextEncoder the documented setup installs
-// fastestsmallesttextencoderdecoder (EncoderDecoderTogether.min.js, 1.0.22). Read from its source, its encode():
-//  - preallocates 2 × length + 8 bytes and grows (to 3 × length) only on a 3-byte character, testing the index
-//    after a high surrogate has already advanced it;
+// signer signs it as UTF-8 with the runtime's TextEncoder (viem, in wallet-evm), while the policies count it with
+// their own reading (utf8Length; utf8Bytes writes the same bytes). On Hermes without a native TextEncoder the
+// documented setup installs fastestsmallesttextencoderdecoder (EncoderDecoderTogether.min.js, 1.0.22). Read from
+// its source, its encode(s), with l = s.length and c = the bytes written so far:
+//  - preallocates 2 × l + 8 bytes; before each 3-byte write (U+0800–U+FFFF, or the U+FFFD of a lone surrogate) at
+//    unit index i — for a high surrogate the index after it, already advanced — it grows the buffer to 3 × l, once,
+//    when c > 2 × i + 7; writes past the end of a typed array are lost;
 //  - on a high surrogate it consumes the next code unit unconditionally: when that unit is not a low surrogate it
-//    writes one U+FFFD for both (the WHATWG encoder writes U+FFFD and then encodes the unit);
-//  - a lone high surrogate at the end is a U+FFFD for both, but when the bytes before it are exactly
-//    2 × length + 6 the U+FFFD's last byte lands past the buffer and is dropped ('中' × 8 + U+D83E: 26, not 27);
-//  - a lone low surrogate is U+FFFD in both.
-// For a well-formed string every write stays inside the buffer (at most 2 bytes per code unit until a 3-byte
-// character grows it) and each code point is encoded as the spec does: no difference. So the kit refuses a string
-// with any lone surrogate (both kinds, to depend on no encoder's reading of them), and this file proves that for
-// every string it does not refuse, polyfill bytes == spec bytes == the bytes the kit measured — and that each
-// string the polyfill reads differently is one the kit refuses. The polyfill is installed as this runtime's
-// TextEncoder before viem loads (viem builds its encoder at import), as on a Hermes app.
+//    writes one U+FFFD for both (the WHATWG encoder writes U+FFFD and then encodes the unit) — always a difference;
+//  - a lone high surrogate at the end is a U+FFFD in both, except when c is exactly 2 × l + 6 before it and the
+//    buffer has not grown: then the U+FFFD's last byte lands past the buffer ('中' × 8 + U+D83E: 26 bytes, not 27).
+//    Both conditions are needed: '中' × 9 + 'a' + U+D800 has 28 = 2 × 11 + 6 bytes before it, but the ninth '中'
+//    grew the buffer, and it is encoded as the spec does. Two bytes are never lost (c never reaches 2 × l + 7
+//    there without growing);
+//  - a lone low surrogate is U+FFFD in both, and for a well-formed string every write stays inside the buffer and
+//    each code point is encoded as the spec does: no difference.
+// `polyfillDiffers` below is that rule, and a test checks it against the polyfill on random strings. The kit
+// refuses a string with any lone surrogate (both kinds, a superset, to depend on no encoder's reading of them),
+// and this file proves that for every string it does not refuse, polyfill bytes == spec bytes == the bytes the
+// kit counts — and that each string the polyfill reads differently is one the kit refuses. The polyfill is
+// installed as this runtime's TextEncoder before viem loads (viem builds its encoder at import), as on a Hermes app.
 
 const { Native, Polyfill } = await vi.hoisted(async () => {
   const { readFileSync } = await import('node:fs')
@@ -75,6 +80,38 @@ function holds(s: string): { refused: boolean; disagree: boolean } {
   return { refused: false, disagree }
 }
 
+/**
+ * Where the polyfill writes other bytes than the spec, from its source (see the top of this file): a lone high
+ * surrogate with a unit after it ('swallow'), or a trailing one with exactly 2 × length + 6 bytes before it while
+ * the buffer has not grown ('truncate'). Anything else: the same bytes.
+ */
+function polyfillDiffers(s: string): 'swallow' | 'truncate' | undefined {
+  const l = s.length
+  let c = 0
+  let grown = false
+  for (let i = 0; i < l; i++) {
+    const u = s.charCodeAt(i)
+    if (u < 0x80) c += 1
+    else if (u < 0x800) c += 2
+    else if (u >= 0xd800 && u <= 0xdbff) {
+      const next = i + 1 < l ? s.charCodeAt(i + 1) : -1
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        c += 4
+        i++
+      } else if (i + 1 < l) return 'swallow'
+      else {
+        // The trailing one: its index is already advanced to l when the buffer is checked.
+        if (!grown && c > 2 * l + 7) grown = true
+        return !grown && c >= 2 * l + 6 ? 'truncate' : undefined
+      }
+    } else {
+      if (!grown && c > 2 * i + 7) grown = true
+      c += 3
+    }
+  }
+  return undefined
+}
+
 /** xorshift32: a fixed sequence, so a failure names the same string every run. */
 function rng(seed: number) {
   let x = seed >>> 0
@@ -110,6 +147,35 @@ describe('SDK-303 round 2: the Hermes TextEncoder polyfill, the spec and the kit
     expect(Array.from(new TextEncoder().encode(TRUNCATE).slice(-2))).toEqual([0xef, 0xbf])
     expect(spec.encode(TRUNCATE)).toHaveLength(33)
   })
+
+  it('the polyfill differs from the spec exactly where its source says (polyfillDiffers), and only on lone high surrogates', () => {
+    // The reviewer's counterexample to "2 × length + 6 bytes" alone: the buffer had grown, the bytes agree.
+    const grownFirst = `${'中'.repeat(9)}a\uD800`
+    expect(utf8Length(grownFirst.slice(0, -1))).toBe(2 * grownFirst.length + 6)
+    expect(polyfillDiffers(grownFirst)).toBeUndefined()
+    expect(poly.encode(grownFirst)).toEqual(spec.encode(grownFirst))
+    expect(polyfillDiffers(TRUNCATE)).toBe('truncate')
+    expect(polyfillDiffers(SWALLOW)).toBe('swallow')
+    const KINDS = ['a', '\u007f', 'é', '\u07ff', '\u0800', '中', '\ufeff', '\ufffd', '\uffff', '🦊', '\uD800', '\uDBFF', '\uDC00', '\uDFFF']
+    const next = rng(0x9e3779b9)
+    const counts = { swallow: 0, truncate: 0, same: 0 }
+    for (let n = 0; n < 300_000; n++) {
+      // Half of them mostly 3-byte characters (the buffer's edge), a third ending in a lone high surrogate.
+      const len = next() % 40
+      let s = ''
+      for (let i = 0; i < len; i++) s += n % 2 === 0 && next() % 3 !== 0 ? '中' : KINDS[next() % KINDS.length]!
+      if (n % 3 === 0) s += '\uD800'
+      const differs = polyfillDiffers(s)
+      const p = poly.encode(s)
+      const n2 = spec.encode(s)
+      if (same(p, n2) !== (differs === undefined)) throw new Error(`the rule is wrong for ${JSON.stringify(s)}: ${differs}`)
+      if (differs === 'truncate' && p.length !== n2.length - 1) throw new Error(`more than one byte lost: ${JSON.stringify(s)}`)
+      if (differs !== undefined && loneSurrogateAt(s) < 0) throw new Error(`differs without a lone surrogate: ${JSON.stringify(s)}`)
+      counts[differs ?? 'same']++
+    }
+    expect(counts.truncate).toBeGreaterThan(100)
+    expect(counts.swallow).toBeGreaterThan(1000)
+  }, 120_000)
 
   it('every Unicode scalar value, alone and at the buffer-growth edge: accepted, the same bytes in all three', () => {
     const grow = '中'.repeat(8)
