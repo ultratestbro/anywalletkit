@@ -471,8 +471,9 @@ venue contracts), quote before every write, log hashes and addresses only, call 
 - TON and NEAR `sign()` refuse a 32-byte message (`MessageIsTransactionError`: it could be a transaction
   hash). TON Connect: `signTonProof` / `signTonConnectData` (WalletConnect for TON: `walletconnect-ton`); NEAR dApps and Intents: `signNep413`.
 - An EVM `sign()` that may be a blind hash (a 32-byte `Uint8Array`, `0x` + 64 hex, or text whose UTF-8 is 32 bytes) is
-  `blindHash: true` (`blindHashForm`): an allowlist refuses it, otherwise `confirm` gets it — show a danger screen,
-  never the normal message sheet. An EVM `sign()` takes only a string or a `Uint8Array`.
+  `blindHash: true` (`blindHashForm`): `confirm` gets it — show a danger screen, never the normal message sheet.
+  Without `confirm` an allowlist or a blocklist refuses it; under an allowlist the hex and bytes forms are refused even
+  with `confirm`. An EVM `sign()` takes only a string (no lone surrogates) or a `Uint8Array`.
 - Public RPCs rate-limit; production apps pass their own endpoints (each `provider` accepts a list).
 
 ## Security rules (non-negotiable)

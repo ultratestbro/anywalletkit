@@ -16,16 +16,29 @@ A message whose signed bytes are exactly 32 is a blind hash signature (an order 
 Protocol `ethsign` or Safe verifier), whatever form it comes in. Until now only the hex form and raw bytes were
 caught; text whose UTF-8 encoding is 32 bytes passed as a normal message.
 
-- **kit:** an EVM `sign` of such text is `kind: 'typedData'`, `blindHash: true`, `blindHashForm: 'text'`, no longer
-  `kind: 'message'`. A `confirm` that turns `blindHash` into a danger screen covers it; word it with
-  `blindHashForm` ("This looks like a hidden hash. Signing it may authorize a transfer or an order."). Under an
-  allowlist, or a blocklist without `confirm`, it is now refused, as the hex and bytes forms already were. The rule
-  follows the account's namespace now, so an account asked for as `eip155` (or registered under another key) is
-  covered too.
+- **kit, Breaking:** an EVM `sign` of such text is `kind: 'typedData'`, `blindHash: true`, `blindHashForm: 'text'`,
+  `destinationUnknown: true`, no longer `kind: 'message'`. A `confirm` that turns `blindHash` into a danger screen
+  covers it; word it with `blindHashForm` ("This looks like a hidden hash. Signing it may authorize a transfer or an
+  order."). Without `confirm`, an allowlist or a blocklist now refuses it. With `confirm`, `confirm` gets it, under
+  an allowlist too (the hex and bytes forms stay refused there before `confirm`). The form's type is
+  `EvmSignBlindHashForm`.
+- **kit, Breaking:** the blind hash rule follows the account's namespace, not the spelling of the chain it was asked
+  for: an EVM account asked for as `eip155`, registered under another key, or wrapped with
+  `applyPolicies(account, policies, 'eip155')` now gets all three forms flagged, and under an allowlist the hex and
+  bytes forms refused, as an account asked for as `eip155:1` already did.
+- **kit, Breaking:** a blind hash needs the account's chain like typed data when an exact-id rule of the family
+  (`'eip155:1'`) could be the account's own. An account that reports `eip155:unknown` (wallet-evm without `chainId`)
+  now asks its RPC for the chain id first (an RPC error comes back as the error); an offline one is refused with
+  `PolicyViolationError('chain')`. Until now it was signed without any rule. Pass `chainId`, or ask for the account
+  by its exact chain id.
 - **kit, Breaking:** an EVM `sign` takes a string or a `Uint8Array` (from any realm, a Node `Buffer` too). Anything
   else — an array of numbers, another typed array, an `ArrayBuffer`, `{ raw }` — is refused with
-  `PolicyViolationError('method')`; convert it to a `Uint8Array` first. The account is handed the bytes the policies
-  measured: a string's UTF-8 as a `Uint8Array` (the same signature).
+  `PolicyViolationError('method')`; convert it to a `Uint8Array` first.
+- **kit, Breaking:** an EVM `sign` of a string with a lone surrogate (a UTF-16 unit U+D800–U+DFFF that is not half
+  of a pair) is refused with `PolicyViolationError('method')` before any rule. UTF-8 encoders disagree on such a
+  string: the Hermes `TextEncoder` polyfill signs other bytes than the kit counts (32 for 33). Text decoded from
+  UTF-8 never has one; a string cut in the middle of an emoji, or built from a `\uD83E` escape, does — cut text at
+  a code point. The account is handed the string as it came (a `Uint8Array` as a copy), as before.
 - **extension-kit, Breaking if your sheet has no `blindHash` branch:** such a `personal_sign` reaches the sheet with
   `blindHash: true`, `blindHashForm: 'text'`, also when `allowBlindHash` is off. Until now `blindHash` came only
   with that opt-in, so a wallet that never turned it on may show `blindHash` on the normal message sheet. Add a red
