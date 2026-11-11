@@ -12,8 +12,9 @@ import { PolicyViolationError, Wallet, applyPolicies, type Policies, type WriteI
 //    non-string to viem as `{ raw }`, which reads an array-like by index: exactly those 32 bytes were signed.
 // 2. The rule looked at the spelling of the chain the account was asked for (`eip155:`): an account asked for by
 //    namespace (`getAccount('eip155')`), or registered under another key, skipped it in every form.
-// 3. The length was measured with the kit's UTF-8 encoder, the signature made with the runtime's: the account is now
-//    handed the measured bytes (see blind-hash-polyfill.test.ts for a TextEncoder that miscounts).
+// 3. The length was measured with the kit's UTF-8 encoder, the signature made with the runtime's. The account gets the
+//    caller's string as it is; a string on which UTF-8 encoders can disagree (one with a lone surrogate) is refused
+//    (see blind-hash-polyfill.test.ts for the Hermes TextEncoder polyfill, which disagrees on exactly those).
 
 const SEED = 'test test test test test test test test test test test junk'
 const CHAIN = 'eip155:1'
@@ -83,14 +84,20 @@ describe('SDK-303 review: an EVM sign() takes a string or a Uint8Array, nothing 
     }
   })
 
-  it('the account is handed the measured bytes: a string as its UTF-8, a Uint8Array as a copy', async () => {
+  it('the account is handed the caller\'s string as it is, a Uint8Array as a plain copy of its bytes', async () => {
     const account = mock()
     const g = applyPolicies(account, {})
-    const cases: Array<string | Uint8Array> = ['hello', 'é'.repeat(16), `\uD83Ea${'b'.repeat(29)}`, HEX, '', D, new Uint8Array(0)]
-    for (const m of cases) await g.sign(m)
+    const strings = ['hello', 'é'.repeat(16), '🦊'.repeat(8), HEX, '']
+    const arrays = [D, new Uint8Array(0)]
+    for (const m of [...strings, ...arrays]) await g.sign(m)
     const handed = account.calls.filter((c) => c.method === 'sign').map((c) => c.args[0])
-    expect(handed.map((h) => Array.from(h as Uint8Array))).toEqual(cases.map((m) => Array.from(typeof m === 'string' ? utf8Bytes(m) : m)))
-    for (const h of handed) expect(h).toBeInstanceOf(Uint8Array)
+    expect(handed.slice(0, strings.length)).toEqual(strings)
+    for (const [i, a] of arrays.entries()) {
+      const h = handed[strings.length + i] as Uint8Array
+      expect(Object.getPrototypeOf(h)).toBe(Uint8Array.prototype)
+      expect(h).not.toBe(a)
+      expect(Array.from(h)).toEqual(Array.from(a))
+    }
     // confirm still sees what the caller sent, not the bytes.
     const { intents, confirm } = seen()
     await applyPolicies(mock(), { confirm }).sign('é'.repeat(16))

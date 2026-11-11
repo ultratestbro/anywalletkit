@@ -3,14 +3,15 @@ import { UserRejectedError } from '@anywalletkit/core'
 import { createMockAccount } from '@anywalletkit/conformance'
 // wallet-evm is not a kit devDependency; its built dist is imported by path (offline: no provider, chainId fixed).
 import { WalletManagerEvm } from '../../wallet-evm/dist/index.js'
-import { evmMessageBytes, utf8Bytes } from '../src/message-bytes.js'
+import { utf8Bytes } from '../src/message-bytes.js'
 import { PolicyViolationError, Wallet, applyPolicies, type WriteIntent } from '../src/index.js'
 
 // SDK-303 (extension audit E55, second half): `sign()` flagged 32 bytes only as a Uint8Array or a `0x` + 64-hex
 // string. A string whose UTF-8 encoding is exactly 32 bytes was `kind: 'message'` — and wallet-evm signs exactly
 // those 32 bytes behind the EIP-191 "\n32" prefix, which is what CoW Protocol's `ethsign` verifies. A site grinds free
 // order fields until the digest is valid UTF-8 and sends it decoded. It is now a blind hash like the other forms
-// (`blindHashForm: 'text'`): confirm sees it as a danger screen, an allowlist refuses it.
+// (`blindHashForm: 'text'`): confirm sees it as a danger screen; without confirm an allowlist or a blocklist refuses it.
+// The account is handed the caller's string as it is.
 
 const SEED = 'test test test test test test test test test test test junk'
 const CHAIN = 'eip155:1'
@@ -21,14 +22,13 @@ const enc = (s: string) => new TextEncoder().encode(s)
 const bytes = (hex: string) => Uint8Array.from(hex.slice(2).match(/../g)!, (b) => Number.parseInt(b, 16))
 const siwe = `swap.example wants you to sign in with your Ethereum account:\n0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266\n\nSign in to Swap\n\nURI: https://swap.example/login\nVersion: 1\nChain ID: 1\nNonce: k9Qz1bX2pL7m\nIssued At: 2026-11-11T10:00:00Z`
 
-/** Strings whose UTF-8 encoding — what the account signs — is exactly 32 bytes. */
+/** Strings whose UTF-8 encoding — what an EIP-191 signer signs for them — is exactly 32 bytes. */
 const TEXT32: Array<[string, string]> = [
   ['ASCII', 'Login nonce: 0123456789abcdefghi'],
   ['two-byte letters (16 characters)', 'é'.repeat(16)],
   ['four-byte emoji (16 UTF-16 units)', '🦊'.repeat(8)],
   ['mixed widths', `${'ж'.repeat(10)}€€${'a'.repeat(6)}`],
   ['a leading BOM (3 bytes + 29)', `﻿${'a'.repeat(29)}`],
-  ['a lone surrogate (U+FFFD, 3 bytes + 29)', `\uD83E${'a'.repeat(29)}`],
   ['0x + 30 hex (signed as 32 characters of text)', DIGEST.slice(0, 32)],
   ['hex-looking but not hex: 0x + 29 hex + z', `0x${HEX29}z`],
   ['hex-looking with a leading space: " 0x" + 29 hex', ` 0x${HEX29}`],
@@ -99,7 +99,7 @@ describe('SDK-303: an EVM sign() of a string whose UTF-8 is 32 bytes', () => {
         expect(await applyPolicies(account, { ...lists, confirm }).sign(m)).toMatch(/^0x/)
         expect(intents).toHaveLength(1)
         expect(intents[0]).toMatchObject({ kind: 'typedData', message: false, blindHash: true, blindHashForm: 'text', destinations: [], destinationUnknown: true, raw: m })
-        expect(account.calls.filter((c) => c.method === 'sign')).toHaveLength(1)
+        expect(account.calls.filter((c) => c.method === 'sign').map((c) => c.args[0])).toEqual([m])
         // Rejected on the danger screen: nothing is signed.
         const declined = mock()
         await expect(applyPolicies(declined, { ...lists, confirm: async () => false }).sign(m)).rejects.toBeInstanceOf(UserRejectedError)
@@ -133,6 +133,16 @@ describe('SDK-303: an EVM sign() of a string whose UTF-8 is 32 bytes', () => {
     await expect(applyPolicies(mock(), { allowlist: { [CHAIN]: [TREASURY] } }).sign(bytes(DIGEST))).rejects.toThrow(/allowlist/)
   })
 
+  it('a 32-byte string with a lone surrogate is refused (method) before any rule or confirm: encoders disagree on it', async () => {
+    for (const m of [`\uD83E${'a'.repeat(29)}`, `${'a'.repeat(29)}\uDD8A`, `\uD83Ea${'b'.repeat(29)}`]) {
+      const confirm = vi.fn(async () => true)
+      const account = mock()
+      await expect(applyPolicies(account, { confirm }).sign(m)).rejects.toMatchObject({ name: 'PolicyViolationError', policy: 'method', message: expect.stringMatching(/lone surrogate/) })
+      expect(confirm).not.toHaveBeenCalled()
+      expect(account.calls.filter((c) => c.method === 'sign')).toEqual([])
+    }
+  })
+
   it('only EVM: other chains keep their own rules for sign()', async () => {
     const { intents, confirm } = seen()
     await applyPolicies(createMockAccount({ chain: 'tron:0x2b6653dc', address: 'TXYZ' }), { confirm }).sign('é'.repeat(16))
@@ -155,22 +165,27 @@ describe('SDK-303: real wallet-evm (offline)', () => {
     return { intents, guarded, plain }
   }
 
-  it('invariant: the bytes the policies measured are the bytes wallet-evm signs, for every case', async () => {
+  it('invariant: wallet-evm gets what the caller gave and signs exactly the bytes the policies measured, for every case', async () => {
     const { intents, guarded, plain } = await setup()
     const cases: Array<[string, string | Uint8Array]> = [...TEXT32, ...NORMAL, ['32 raw bytes', bytes(DIGEST)], ['31 raw bytes', new Uint8Array(31)], ['33 raw bytes', new Uint8Array(33).fill(7)]]
     for (const [name, m] of cases) {
-      const measured = evmMessageBytes(m)!
+      const measured = typeof m === 'string' ? utf8Bytes(m) : m
       const signature = await guarded.sign(m)
       // ECDSA here is deterministic (RFC 6979): the same signature means the same signed bytes.
+      expect(signature, name).toBe(await plain.sign(m))
       expect(signature, name).toBe(await plain.sign(measured))
       expect(intents.at(-1)!.blindHash === true, name).toBe(measured.length === 32)
     }
   })
 
-  it('the hex form is flagged by its shape: wallet-evm signs its 66 characters, another signer may decode them', async () => {
+  it('the hex form is flagged by its shape: wallet-evm gets the string and signs its UTF-8 (66 bytes), not the 32 bytes it spells', async () => {
     const { intents, guarded, plain } = await setup()
-    expect(await guarded.sign(DIGEST)).toBe(await plain.sign(utf8Bytes(DIGEST)))
+    const signature = await guarded.sign(DIGEST)
     expect(intents[0]).toMatchObject({ blindHash: true, blindHashForm: 'hex' })
+    expect(signature).toBe(await plain.sign(DIGEST))
+    expect(utf8Bytes(DIGEST)).toHaveLength(66)
+    expect(signature).toBe(await plain.sign(utf8Bytes(DIGEST)))
+    expect(signature).not.toBe(await plain.sign(bytes(DIGEST)))
   })
 
   it('a digest ground to valid UTF-8, sent as text, is the same signature as its 32 raw bytes — and flagged', async () => {
