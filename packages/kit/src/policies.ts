@@ -277,8 +277,13 @@ export type EvmSignBlindHashForm = 'bytes' | 'hex' | 'text'
  * `tron:728126428` = `tron:mainnet` = `tron:0x2b6653dc`, `bitcoin:mainnet` = `bip122:0000…`,
  * `eip155:0x1` = `eip155:1`; the `bitcoin` namespace is `bip122`. The rules of the account's own
  * namespace apply however it was asked for (an exact id, its namespace, a registration key such as
- * `evm`); an exact id's rules apply to the chain asked for when that is an id of the account's family,
- * and to the chain the account reports.
+ * `evm`). An exact id's rules apply when that id is one of the chains in play: the chain asked for
+ * (when it is an exact id, of any family), the chain the account reports or learns from its RPC, the
+ * chain an EVM transaction is signed for, and the domain chain of typed data. An off-chain signature
+ * (typed data, a blind hash) asked for under an exact id of the account's family does not make the
+ * account learn its chain: the rules of another exact id of the family (`eip155:1` for an account
+ * asked for as `eip155:137`) reach it only when the account already reports that chain, although a
+ * blind hash signature is valid on every chain.
  */
 export interface Policies {
   /**
@@ -291,7 +296,12 @@ export interface Policies {
   allowlist?: Record<string, string[]>
   /** Per-chain blocklist of destinations — recipients, called contracts and approval spenders. */
   blocklist?: Record<string, string[]>
-  /** Last word before broadcast: return false (or throw) to reject. Hook a confirmation UI here. */
+  /**
+   * Last word before broadcast: return false (or throw) to reject. Hook a confirmation UI here. Only a
+   * function is a hook: `null`, `false`, `0` or `''` mean none (an allowlist then refuses 32-byte text
+   * and a blocklist an unknown destination, as without the key); any other value refuses every write
+   * (`TypeError`), nothing is signed unconfirmed.
+   */
   confirm?: (intent: WriteIntent) => boolean | Promise<boolean>
 }
 
@@ -921,6 +931,13 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
   const hasRuleFor = (key: (k: string) => boolean) => rules.some((m) => m !== undefined && Object.keys(m).some(key))
   /** `evmSigned`: for a `sign` on an EVM account, how many bytes an EIP-191 signer signs for it (the blind hash check measures them). */
   const guard = async (method: WriteMethod, arg: unknown, evmSigned?: number) => {
+    // The confirm hook, read once for the whole check: a function, or none. `null`, `false`, `0` or `''` (a JS app's
+    // `confirm: uiReady ? fn : null`) are none everywhere below: the allowlist read `!== undefined` while the call
+    // read truthiness, so 32-byte text skipped the allowlist and then no hook ran (SDK-303 round 3 review). Any other
+    // value that is not a function cannot be asked: the write is refused rather than signed unconfirmed.
+    const hook: unknown = policies.confirm
+    if (hook && typeof hook !== 'function') throw new TypeError('Policies.confirm must be a function; nothing was signed.')
+    const confirm = typeof hook === 'function' ? (hook as NonNullable<Policies['confirm']>) : undefined
     const ns = account.chain.split(':')[0]!
     // A blind hash is decided before the chain: it is judged like typed data, so like typed data it needs
     // the account's chain when an exact rule of the family could be its own (SDK-303 round 2).
@@ -994,7 +1011,7 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     // it. Read through the account when a list or confirm will look; unread → unknown (round 3, M1).
     const pending = PENDING_TOKEN_ACCOUNTS.get(intent)
     if (pending) {
-      const judged = policies.confirm !== undefined || keys.some((k) => policies.allowlist?.[k] !== undefined || policies.blocklist?.[k] !== undefined)
+      const judged = confirm !== undefined || keys.some((k) => policies.allowlist?.[k] !== undefined || policies.blocklist?.[k] !== undefined)
       const read = (account as { getTokenAccountOwner?: (address: string) => Promise<string | undefined> }).getTokenAccountOwner
       for (const t of pending) {
         let owner: string | undefined
@@ -1037,7 +1054,7 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         // Text whose UTF-8 is 32 bytes reads like a message and may be one: with a confirm hook it goes there,
         // to be shown as a danger screen, instead of being refused (SDK-303 round 2). Without one, and for the
         // hex and bytes forms always, an allowlist refuses it (its destinations are unknown).
-        const toConfirm = intent.blindHashForm === 'text' && policies.confirm !== undefined
+        const toConfirm = intent.blindHashForm === 'text' && confirm !== undefined
         if (allow && !toConfirm) {
           const outside = intent.destinations.find((d) => !allow.has(canonicalAddress(k, d)))
           if (outside !== undefined || intent.destinations.length === 0 || intent.destinationUnknown) {
@@ -1049,12 +1066,12 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
           const hit = intent.destinations.find((d) => block.has(canonicalAddress(k, d)))
           if (hit !== undefined) throw new PolicyViolationError('blocklist', `${what(hit)} ${hit} is on the ${k} blocklist.`)
           // Fail closed only when nobody else can look (scan F16); with a confirm hook it sees destinationUnknown.
-          if (intent.destinationUnknown && !policies.confirm) throw new PolicyViolationError('blocklist', `Cannot tell every destination of this ${intent.method} on ${k}, and the ${k} blocklist is on with no confirm hook to ask.`)
+          if (intent.destinationUnknown && confirm === undefined) throw new PolicyViolationError('blocklist', `Cannot tell every destination of this ${intent.method} on ${k}, and the ${k} blocklist is on with no confirm hook to ask.`)
         }
       }
     }
     // confirm gets its own copy of the argument: whatever it edits is not what gets signed (round 3, M2).
-    if (policies.confirm && !(await policies.confirm({ ...intent, raw: snapshot(intent.raw) }))) throw new UserRejectedError('The write was not confirmed.')
+    if (confirm !== undefined && !(await confirm.call(policies, { ...intent, raw: snapshot(intent.raw) }))) throw new UserRejectedError('The write was not confirmed.')
     // The quote is an estimate: the account signs its own gas limit (with headroom) and fee fields.
     // Hand it the tightest cap so it checks the transaction it is about to sign (audit #4).
     return caps.length > 0 && CAPPED[method] !== undefined ? caps.reduce((a, b) => (b.cap < a.cap ? b : a)).cap : undefined
