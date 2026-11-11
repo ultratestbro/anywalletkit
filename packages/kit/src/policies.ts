@@ -703,10 +703,10 @@ function blindHashForm(arg: unknown, signed: Uint8Array): BlindHashForm | undefi
 
 /**
  * What {@link intentOf} needs to know beyond the arguments: whether an `approve` of 0 is on a known ERC-20;
- * for a `sign` on an EVM account, the bytes the account will be handed (its namespace decides, not the
- * spelling of the chain it was asked for: `eip155`, an `evm` registration key).
+ * whether a `sign` on an EVM account is a blind hash, and in which form ({@link blindHashForm}, decided by
+ * the guard before the chain: its namespace decides, not the spelling of the chain it was asked for).
  */
-interface IntentContext { erc20?: boolean; evmSigned?: Uint8Array }
+interface IntentContext { erc20?: boolean; blindHashForm?: BlindHashForm }
 
 /**
  * Is `approve({ token, amount: 0 })` on an ERC-20? On an ERC-721, approve(spender, 0) APPROVES token
@@ -777,9 +777,8 @@ function draftIntentOf(chain: string, from: string, method: WriteMethod, arg: un
       return { ...base, kind: 'send', message: false, ...(r.to !== undefined ? { to: r.to } : {}), ...(r.token !== undefined ? { token: r.token } : {}), ...(r.amount !== undefined ? { amount: r.amount } : {}) }
     }
   }
-  const blind = method === 'sign' && ctx.evmSigned !== undefined ? blindHashForm(arg, ctx.evmSigned) : undefined
-  if (blind !== undefined) {
-    const intent: DraftIntent = { ...base, kind: 'typedData', message: false, blindHash: true, blindHashForm: blind }
+  if (method === 'sign' && ctx.blindHashForm !== undefined) {
+    const intent: DraftIntent = { ...base, kind: 'typedData', message: false, blindHash: true, blindHashForm: ctx.blindHashForm }
     TYPED_DESTINATIONS.set(intent, { list: [], unknown: true })
     return intent
   }
@@ -914,6 +913,9 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
   /** `evmSigned`: for a `sign` on an EVM account, the bytes it will be handed (the blind hash check measures them). */
   const guard = async (method: WriteMethod, arg: unknown, evmSigned?: Uint8Array) => {
     const ns = account.chain.split(':')[0]!
+    // A blind hash is decided before the chain: it is judged like typed data, so like typed data it needs
+    // the account's chain when an exact rule of the family could be its own (SDK-303 round 2).
+    const blind = method === 'sign' && evmSigned !== undefined ? blindHashForm(arg, evmSigned) : undefined
     // The network the write really goes to, before any rule, confirm or signature (audit #7): the
     // account's own and, for an EVM transaction that carries one, its chainId. An EVM account that
     // has not asked its RPC yet reports "eip155:unknown": learn its chain id — unless the write is
@@ -926,8 +928,10 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     const exactRules = hasRuleFor((k) => k.includes(':') && canonicalNamespace(k.split(':')[0]!) === canonicalNamespace(ns))
     let learned: string | undefined
     const getChainId = (account as { getChainId?: () => Promise<number | bigint> }).getChainId
-    // A message needs no chain id at all: no list or cap applies to it.
-    const message = MESSAGE_METHODS.includes(method)
+    // A message needs no chain id at all: no list or cap applies to it. A blind hash is no message:
+    // an exact allowlist of the family may be the account's, so its chain is learned, or the write
+    // is refused below when it cannot be.
+    const message = MESSAGE_METHODS.includes(method) && blind === undefined
     const needed = !offChain || (!message && !isConcreteChain(chain) && exactRules)
     if (known === undefined && needed && typeof getChainId === 'function') {
       try {
@@ -966,7 +970,7 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
     const keys = written.filter((k) => (chains.length > 0 ? chains.some((c) => ruleCovers(k, c)) : ruleCovers(k, ns)))
     // The intent's chain: the asked-for, own or signed network (typed data's domain chain is `domainChain`).
     const judged = chains.find((c) => c !== domain || c === chain || c === own || c === signed) ?? account.chain
-    const intent = intentOf(judged, await account.getAddress(), method, arg, { erc20: await approveRevokesErc20(judged, method, arg, account), ...(evmSigned !== undefined ? { evmSigned } : {}) })
+    const intent = intentOf(judged, await account.getAddress(), method, arg, { erc20: await approveRevokesErc20(judged, method, arg, account), ...(blind !== undefined ? { blindHashForm: blind } : {}) })
     if (domain !== undefined) intent.domainChain = domain
     // An SPL transfer pays a token account: its owner is the recipient, and only the network knows
     // it. Read through the account when a list or confirm will look; unread → unknown (round 3, M1).
