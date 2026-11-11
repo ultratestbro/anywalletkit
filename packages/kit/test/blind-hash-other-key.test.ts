@@ -137,7 +137,9 @@ describe('SDK-303 round 3: an EVM account asked for under a key of no chain of i
     })
   }
 
-  it("for comparison, asked for as 'eip155' the same setups were already refused", async () => {
+  // Not as in the last release: there, asked for as 'eip155', the hex and bytes forms were not flagged and the text
+  // form was a plain message, so all three were signed (the namespace rule of SDK-303 flags them under any key).
+  it("for comparison, asked for as 'eip155' the same setups are refused the same way", async () => {
     for (const [, config] of CONFIGS) {
       const w = new Wallet(SEED, { policies: { allowlist: { eip155: [T] } } })
       w.registerWallet('eip155', WalletManagerEvm as never, config())
