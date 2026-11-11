@@ -40,6 +40,7 @@ import { WalletManagerBtc, selectCoins, INPUT_WEIGHT } from '@anywalletkit/walle
 import { WalletManagerZcash, parseTx as parseZcashTx, txid as zcashTxid, sighashAll as zcashSighash, parseP2pkhScriptSig, conventionalFee as zcashFee, outputSize as zcashOutputSize } from '@anywalletkit/wallet-zcash'
 import { WalletManagerNear, describeTransaction as describeNear, encodeTransaction as encodeNearTx, decodeTransaction as decodeNearTx, toBase64 as nearToBase64 } from '@anywalletkit/wallet-near'
 import { smokeProtocols } from './protocols.js'
+import { smokeUtf8 } from './utf8.js'
 import fastPbkdf2 from '@anywalletkit/runtime-hermes/fast-pbkdf2'
 import { sealBackup, openBackup, encodeBackup, decodeBackup, isBackupError } from '@anywalletkit/seed-vault'
 import { avatarUrl, ensCcipRequest, ensCcipViaProxy, ensResolver, warningsFor, coinTypeFor, decodeBtcScript } from '@anywalletkit/names-ens'
@@ -386,6 +387,10 @@ async function main() {
   }
   await smokeProtocols((what, ok, detail) => {
     if (!ok) throw new Error(`protocol check failed: ${what}${detail ? ` :: ${detail}` : ''}`)
+    checks++
+  })
+  await smokeUtf8((what, ok, detail) => {
+    if (!ok) throw new Error(`UTF-8 check failed: ${what}${detail ? ` :: ${detail}` : ''}`)
     checks++
   })
   out(`HERMES_SMOKE_OK ${checks}`)
