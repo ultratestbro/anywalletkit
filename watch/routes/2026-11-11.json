@@ -1,0 +1,440 @@
+{
+ "date": "2026-11-11",
+ "counts": {
+  "quoting": 46,
+  "no-route": 6
+ },
+ "transitions": [
+  {
+   "id": "th:eth-usdt>avax",
+   "provider": "thorchain",
+   "from": "quoting",
+   "to": "no-route",
+   "note": "thorchain: a second node reports another inbound vault — refused until they agree",
+   "suspended": false,
+   "hint": "thorchain: a second node reports another inbound vault — refused until they agree"
+  },
+  {
+   "id": "th:tron-usdt>eth",
+   "provider": "thorchain",
+   "from": "quoting",
+   "to": "no-route",
+   "note": "thorchain: a second node reports another inbound vault — refused until they agree",
+   "suspended": false,
+   "hint": "thorchain: a second node reports another inbound vault — refused until they agree"
+  },
+  {
+   "id": "th:eth>btc",
+   "provider": "thorchain",
+   "from": "quoting",
+   "to": "no-route",
+   "note": "thorchain: a second node reports another inbound vault — refused until they agree",
+   "suspended": false,
+   "hint": "thorchain: a second node reports another inbound vault — refused until they agree"
+  }
+ ],
+ "down": [
+  {
+   "id": "th:eth-usdt>avax",
+   "status": "no-route",
+   "note": "thorchain: a second node reports another inbound vault — refused until they agree",
+   "suspended": false
+  },
+  {
+   "id": "om:ton-usdt>base-usdc",
+   "status": "no-route",
+   "note": "omniston: untrusted TON settlement contract EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA",
+   "suspended": false
+  },
+  {
+   "id": "om:base-usdc>ton-usdt",
+   "status": "no-route",
+   "note": "omniston: untrusted ton:-239 settlement contract EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA",
+   "suspended": false
+  },
+  {
+   "id": "th:tron-usdt>eth",
+   "status": "no-route",
+   "note": "thorchain: a second node reports another inbound vault — refused until they agree",
+   "suspended": false
+  },
+  {
+   "id": "th:eth>btc",
+   "status": "no-route",
+   "note": "thorchain: a second node reports another inbound vault — refused until they agree",
+   "suspended": false
+  },
+  {
+   "id": "om:eth-usdt>ton-usdt",
+   "status": "no-route",
+   "note": "omniston: untrusted ton:-239 settlement contract EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA",
+   "suspended": false
+  }
+ ],
+ "results": [
+  {
+   "id": "cctp:eth-usdc>base-usdc",
+   "provider": "cctp",
+   "status": "quoting",
+   "ms": 200,
+   "note": "out 99.9890 USDC"
+  },
+  {
+   "id": "cctp:base-usdc>arb-usdc",
+   "provider": "cctp",
+   "status": "quoting",
+   "ms": 88,
+   "note": "out 99.9857 USDC"
+  },
+  {
+   "id": "wrap:base-eth>base-weth",
+   "provider": "wrap",
+   "status": "quoting",
+   "ms": 337,
+   "note": "out 0.0500000 WETH"
+  },
+  {
+   "id": "relay:arb-usdc>base-usdc",
+   "provider": "relay",
+   "status": "quoting",
+   "ms": 580,
+   "note": "out 99.9690 USDC"
+  },
+  {
+   "id": "uni:base-usdc>base-eth",
+   "provider": "uniswap",
+   "status": "quoting",
+   "ms": 596,
+   "note": "out 0.0486571 ETH"
+  },
+  {
+   "id": "ni:eth-usdc>base-usdc",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 692,
+   "note": "out 99.9785 USDC"
+  },
+  {
+   "id": "relay:arb-usdc>ely-hype",
+   "provider": "relay",
+   "status": "quoting",
+   "ms": 178,
+   "note": "out 1.40560 HYPE"
+  },
+  {
+   "id": "relay:base-eth>arb-eth",
+   "provider": "relay",
+   "status": "quoting",
+   "ms": 108,
+   "note": "out 0.0499849 ETH"
+  },
+  {
+   "id": "curve:eth-usdc>eth-usdt",
+   "provider": "curve",
+   "status": "quoting",
+   "ms": 949,
+   "note": "out 100.099 USDT"
+  },
+  {
+   "id": "relay:eth-usdt>base-usdc",
+   "provider": "relay",
+   "status": "quoting",
+   "ms": 116,
+   "note": "out 99.8462 USDC"
+  },
+  {
+   "id": "curve:eth-usdc>eth-crvusd",
+   "provider": "curve",
+   "status": "quoting",
+   "ms": 77,
+   "note": "out 100.239 crvUSD"
+  },
+  {
+   "id": "curve:eth-eth>eth-steth",
+   "provider": "curve",
+   "status": "quoting",
+   "ms": 53,
+   "note": "out 0.0500000 stETH"
+  },
+  {
+   "id": "relay:linea-eth>base-eth",
+   "provider": "relay",
+   "status": "quoting",
+   "ms": 109,
+   "note": "out 0.0499551 ETH"
+  },
+  {
+   "id": "curve:eth-crvusd>eth-scrvusd",
+   "provider": "curve",
+   "status": "quoting",
+   "ms": 55,
+   "note": "out 89.8600 scrvUSD"
+  },
+  {
+   "id": "wrap:elysium-hype>whype",
+   "provider": "wrap",
+   "status": "quoting",
+   "ms": 827,
+   "note": "out 1.00000 WHYPE"
+  },
+  {
+   "id": "curve:arb-usdc>arb-usdt0",
+   "provider": "curve",
+   "status": "quoting",
+   "ms": 209,
+   "note": "out 100.094 USDT0"
+  },
+  {
+   "id": "curve:base-usdc>base-crvusd",
+   "provider": "curve",
+   "status": "quoting",
+   "ms": 73,
+   "note": "out 100.285 crvUSD"
+  },
+  {
+   "id": "bal:eth-usdc>eth-eth",
+   "provider": "balancer",
+   "status": "quoting",
+   "ms": 1419,
+   "note": "out 0.0485978 ETH"
+  },
+  {
+   "id": "ni:base-usdc>arb-usdc",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 794,
+   "note": "out 99.9822 USDC"
+  },
+  {
+   "id": "lifi:eth-usdc>base-usdc",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 1495,
+   "note": "out 99.7500 USDC"
+  },
+  {
+   "id": "th:eth-usdt>avax",
+   "provider": "thorchain",
+   "status": "no-route",
+   "ms": 1673,
+   "note": "thorchain: a second node reports another inbound vault — refused until they agree"
+  },
+  {
+   "id": "ni:btc>base-usdc",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 457,
+   "note": "out 146.859 USDC"
+  },
+  {
+   "id": "ni:sol>base-usdc",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 444,
+   "note": "out 41.1659 USDC"
+  },
+  {
+   "id": "ni:tron-usdt>base-usdc",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 624,
+   "note": "out 149.832 USDC"
+  },
+  {
+   "id": "lifi:base-eth>arb-eth",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 1598,
+   "note": "out 0.0498721 ETH"
+  },
+  {
+   "id": "om:ton-usdt>base-usdc",
+   "provider": "omniston",
+   "status": "no-route",
+   "ms": 3094,
+   "note": "omniston: untrusted TON settlement contract EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA"
+  },
+  {
+   "id": "ni:base-usdc>plasma-usdt0",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 434,
+   "note": "out 99.8674 USDT0"
+  },
+  {
+   "id": "ni:base-usdc>ton-usdt",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 748,
+   "note": "out 100.010 USDT"
+  },
+  {
+   "id": "lifi:polygon-usdc>base-usdc",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 1274,
+   "note": "out 99.7500 USDC"
+  },
+  {
+   "id": "lifi:base-usdc>base-eth",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 501,
+   "note": "out 0.0485481 ETH"
+  },
+  {
+   "id": "ni:gram>ton-usdt",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 751,
+   "note": "out 22.8670 USDT"
+  },
+  {
+   "id": "ni:ton-usdt>base-usdc",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 733,
+   "note": "out 99.8699 USDC"
+  },
+  {
+   "id": "om:base-usdc>ton-usdt",
+   "provider": "omniston",
+   "status": "no-route",
+   "ms": 3002,
+   "note": "omniston: untrusted ton:-239 settlement contract EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA"
+  },
+  {
+   "id": "lifi:base-usdc>plasma-usdt0",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 1549,
+   "note": "out 99.8259 USDT0"
+  },
+  {
+   "id": "ni:base-usdc>op-usdc",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 807,
+   "note": "out 99.9793 USDC"
+  },
+  {
+   "id": "ni:base-usdc>polygon-usdc",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 516,
+   "note": "out 99.9698 USDC"
+  },
+  {
+   "id": "th:tron-usdt>eth",
+   "provider": "thorchain",
+   "status": "no-route",
+   "ms": 5305,
+   "note": "thorchain: a second node reports another inbound vault — refused until they agree"
+  },
+  {
+   "id": "ni:base-usdc>avax-usdc",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 599,
+   "note": "out 99.9629 USDC"
+  },
+  {
+   "id": "lifi:base-usdc>op-usdc",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 1887,
+   "note": "out 99.7500 USDC"
+  },
+  {
+   "id": "ni:base-usdc>scroll-usdt",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 903,
+   "note": "out 99.8674 USDT"
+  },
+  {
+   "id": "th:eth>btc",
+   "provider": "thorchain",
+   "status": "no-route",
+   "ms": 1568,
+   "note": "thorchain: a second node reports another inbound vault — refused until they agree"
+  },
+  {
+   "id": "om:gram>ton-usdt",
+   "provider": "omniston",
+   "status": "quoting",
+   "ms": 3003,
+   "note": "out 23.0213 USDT"
+  },
+  {
+   "id": "ni:base-usdc>monad-usdc",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 805,
+   "note": "out 99.7793 USDC"
+  },
+  {
+   "id": "lifi:base-usdc>worldchain-usdc",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 1226,
+   "note": "out 99.7500 USDC"
+  },
+  {
+   "id": "ni:base-usdc>bsc-usdt",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 434,
+   "note": "out 1501.15 USDT"
+  },
+  {
+   "id": "lifi:base-usdc>sei-usdc",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 1439,
+   "note": "out 99.7500 USDC"
+  },
+  {
+   "id": "om:eth-usdt>ton-usdt",
+   "provider": "omniston",
+   "status": "no-route",
+   "ms": 3000,
+   "note": "omniston: untrusted ton:-239 settlement contract EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA"
+  },
+  {
+   "id": "lifi:base-usdc>ink-usdc",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 1411,
+   "note": "out 99.7500 USDC"
+  },
+  {
+   "id": "lifi:base-usdc>xlayer-usdt0",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 3368,
+   "note": "out 99.7969 USDT0"
+  },
+  {
+   "id": "lifi:base-usdc>celo-usdc",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 1752,
+   "note": "out 99.6146 USDC"
+  },
+  {
+   "id": "lifi:base-usdc>gnosis-usdc",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 1944,
+   "note": "out 99.7198 USDC"
+  },
+  {
+   "id": "lifi:base-usdc>elysium-usdce",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 424,
+   "note": "out 99.7269 USDC.e"
+  }
+ ]
+}
