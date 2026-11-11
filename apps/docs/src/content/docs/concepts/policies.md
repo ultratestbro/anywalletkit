@@ -84,6 +84,24 @@ receives `attachedValue` and `forwardTonAmount`. wallet-ton itself refuses a for
 The checks and the signature work from one copy of the arguments, taken before the first check,
 and `confirm` gets a copy of its own: nothing can change what is signed after it was judged.
 
+### Blind hash signatures
+
+An EVM `sign` of exactly 32 signed bytes may be an order or a transfer: CoW Protocol's `ethsign`
+orders and Safe owner signatures (v > 30) accept a digest signed behind the EIP-191 prefix. So it
+is not a plain message but `kind: 'typedData'` with `blindHash: true` and
+`destinationUnknown: true`: an allowlist refuses it, and so does a blocklist without a `confirm`
+hook. Without lists it is signed after `confirm`, which should make it a danger screen with
+**Reject** and **Sign anyway**. `blindHashForm` says how it came:
+
+| `blindHashForm` | Argument |
+|---|---|
+| `'bytes'` | a 32-byte `Uint8Array` |
+| `'hex'` | a `0x` + 64-hex string |
+| `'text'` | any other string whose UTF-8 encoding (what the account signs) is 32 bytes: 16 accented letters, 8 emoji, 32 ASCII characters. A site can grind an order until its digest is valid UTF-8 and send it as text: "This looks like a hidden hash. Signing it may authorize a transfer or an order." |
+
+The length is counted in UTF-8 bytes, not characters: 32 characters with one `é` are 33 bytes
+and stay a message.
+
 ### Revokes
 
 Taking an approval back moves nothing, so a revoke is its own kind: `kind: 'revoke'`. This
@@ -127,6 +145,8 @@ What `confirm` receives:
 | `unlimited` | Approvals: type(uint128).max or above, a DAI-style `allowed`, or an amount that cannot be read |
 | `approvals` | Approvals: every token a signature grants (a Permit2 batch has several) |
 | `message` | `true` for message signatures |
+| `blindHash` | EVM `sign` of exactly 32 signed bytes: show a danger screen (see above) |
+| `blindHashForm` | With `blindHash`: `'bytes'`, `'hex'` or `'text'` |
 | `raw` | The original argument, for anything else you need |
 
 ## Which chain's rules apply

@@ -10,6 +10,20 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: hidden hashes in text messages
+
+A message whose signed bytes are exactly 32 is a blind hash signature (an order or a transfer to a CoW
+Protocol `ethsign` or Safe verifier), whatever form it comes in. Until now only the hex form and raw bytes were
+caught; text whose UTF-8 encoding is 32 bytes passed as a normal message.
+
+- **kit:** an EVM `sign` of such text is `kind: 'typedData'`, `blindHash: true`, `blindHashForm: 'text'`, no longer
+  `kind: 'message'`. A `confirm` that turns `blindHash` into a danger screen covers it; word it with
+  `blindHashForm` ("This looks like a hidden hash. Signing it may authorize a transfer or an order."). Under an
+  allowlist, or a blocklist without `confirm`, it is now refused, as the hex and bytes forms already were.
+- **extension-kit:** such a `personal_sign` reaches the sheet with `blindHash: true`, `blindHashForm: 'text'`, also
+  when `allowBlindHash` is off. A sheet that shows `blindHash` as a danger screen covers it. The hex form is
+  unchanged and now carries `blindHashForm: 'hex'`.
+
 ## 2026-11-02: the audit fixes
 
 A second external audit and our own review of the fixes found more places where what is checked and what is signed
