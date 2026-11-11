@@ -42,7 +42,7 @@ caller's string as it is, so for the `0x` + 64-hex form wallet-evm signs the 66 
   `transfer` in a transaction's calldata makes its recipient a destination next to the token, so an
   `eip155: [TOKEN]` allowlist now refuses a transfer to a recipient not on it and a blocklist on the recipient
   refuses it; `approve({ token, amount: 0 })` on an ERC-20 is `kind: 'revoke'` (asked through `getTokenInfo` when
-  the token is not in the catalog). TON under such a key: a jetton transfer carries `attachedValue` and
+  the token is not in the catalog), and a revoke skips the allowlist. TON under such a key: a jetton transfer carries `attachedValue` and
   `forwardTonAmount` and the jetton is a destination (a blocklist on it refuses). Zcash under such a key: a
   recipient that is not plain base58 (padded with a space or U+FEFF) is `destinationUnknown`, so a blocklist without
   `confirm` refuses it. Tron and NEAR token transfers through a contract (a TRC-20 `transfer`, a NEP-141

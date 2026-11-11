@@ -42,7 +42,7 @@ caught; text whose UTF-8 encoding is 32 bytes passed as a normal message.
   its chain was known or not. `confirm` sees the account's chain id (`eip155:1`, `ton:-239`, …) instead of the key,
   and the write is read by its chain's rules. EVM: an ERC-20 recipient in a transaction's calldata is a
   destination (an `eip155` allowlist of the token alone now refuses a transfer to a recipient not on it; a
-  blocklist on the recipient refuses it), and `approve({ token, amount: 0 })` on an ERC-20 is a revoke. TON: a
+  blocklist on the recipient refuses it), and `approve({ token, amount: 0 })` on an ERC-20 is a revoke (a revoke skips the allowlist). TON: a
   jetton transfer carries `attachedValue` / `forwardTonAmount` and the jetton is a destination (a blocklist on it
   refuses). Zcash: a recipient padded with a space or U+FEFF is `destinationUnknown` (a blocklist without `confirm`
   refuses it). Tron and NEAR token transfers through a contract, which had no destination there (an allowlist
@@ -67,7 +67,7 @@ caught; text whose UTF-8 encoding is 32 bytes passed as a normal message.
   do not touch an account of a `Wallet` without policies asked for by namespace, by a registration key or by the
   chain id it reports: that one is the chain package's own.
 - **kit, Breaking:** an EVM `sign` of a `Uint8Array` hands the account a plain `Uint8Array` of the kit's realm,
-  copied from the argument's elements: a Node `Buffer` arrives as a `Uint8Array`, an array from another realm or a
+  copied from the argument's elements: a Node `Buffer` arrives as a `Uint8Array`, a `Uint8Array` from another realm or a
   subclass as one of this realm. Until now the copy kept its class. If your own EVM account calls `Buffer` methods
   on the message, wrap it (`Buffer.from(message)`); wallet-evm does not.
 - **extension-kit, Breaking if your sheet has no `blindHash` branch:** such a `personal_sign` reaches the sheet with
