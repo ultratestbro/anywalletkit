@@ -10,6 +10,22 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: Omniston's new TON Escrow Minter
+
+Since 2026-11-10 Omniston settles every TON ↔ EVM order through a new TON Escrow Minter,
+`EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA`. `protocol-swap2-omniston` 0.5.4 and older refuse those quotes
+("untrusted TON settlement contract" for TON → EVM, "untrusted ton:-239 settlement contract" for EVM → TON), so TON ↔
+EVM routes are gone until you bump. TON → TON swaps are not affected.
+
+- **protocol-swap2-omniston:** the audited table trusts the new minter next to the old one, and
+  `DEFAULT_OMNISTON_TON_CODE_HASHES.position` pins the code of the positions it deploys. Bump; no code change.
+- **Your own settlement table:** a `trustedSettlementContracts` table, a `trustedProtocolAddresses` list or an env
+  such as `OMNISTON_TRUSTED_SETTLEMENT_CONTRACTS` replaces the built-in table. Add the new address under `ton:-239`,
+  spelled exactly as above (TON addresses are compared as strings), and keep the old one. A custom
+  `positionCodeHashes` needs `eb503578b4d9cd791c9c0ecd0da6da4064aae2bcb19d3c924d4001c493386bc5` too: without it EVM →
+  TON orders on the new minter fill and then fail the check before the secret is disclosed, and roll back on their
+  timelocks.
+
 ## Next release: hidden hashes in text messages
 
 A message whose signed bytes are exactly 32 is a blind hash signature (an order or a transfer to a CoW

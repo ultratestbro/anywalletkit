@@ -117,6 +117,26 @@ resolver's calldata AND to derive, through the trusted factory's
 escrow address the factory announced; a decoy tuple or hidden immutables fail
 closed.
 
+### Trusted TON contracts
+
+TON ↔ EVM orders settle through Omniston's TON Escrow Minter. The audited
+table trusts two of them (`AUDITED_OMNISTON_SETTLEMENT_CONTRACTS["ton:-239"]`):
+
+| Minter | Code | Positions it deploys (EVM → TON) | Quoted |
+|---|---|---|---|
+| `EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ` (rev1) | `f91c43d3…` | `e4d5115a…` | until 2026-11-10 |
+| `EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA` (rev2) | `9737943f…` | `eb503578…` | since 2026-11-10 |
+
+rev1 stays trusted while orders on it settle and refund. The provider compares
+TON addresses as strings, so a table of your own must spell them exactly as
+above; it replaces the built-in table, so it must list every network. A new
+minter is a new trust decision: its address goes into the settlement table and
+the code of its positions into `DEFAULT_OMNISTON_TON_CODE_HASHES.position`
+(`positionCodeHashes`), in the same release. With the address alone, EVM → TON
+orders fill and then fail the check before the secret is disclosed. Both
+minters are admin-upgradable after a 7-day delay; the module watch reads their
+code and data daily.
+
 ## Activity
 
 `describeActivity(tx, ctx)` recognizes TON-side transactions by their
@@ -126,10 +146,11 @@ at the destination contract and both sides of every transfer:
 - STON.fi DEX router (`STONFI_ROUTERS` in `src/activity.ts`; v2.2
   `EQCS4UEa…cN3` is what the wallet's swaps hit, v1 kept for older history) →
   `swap`, "Swapped GRAM → USD₮" / "Swapped USD₮ → GRAM", subtitle "STON.fi · TON".
-- Omniston HTLC escrow (`OMNISTON_ESCROWS`, the Escrow Minter
-  `EQAbWJ3Y…mrZ` that every live quote names as `srcProtocolContractAddress`) →
-  `bridge`, "Bridged USD₮", subtitle "Omniston · STON.fi". The EVM leg is paid by
-  the resolver and is not recognizable offline.
+- Omniston HTLC escrow (`OMNISTON_ESCROWS`, the Escrow Minters a quote names as
+  `srcProtocolContractAddress`: `EQAbWJ3Y…mrZ` until 2026-11-10, `EQDybO88…9IA`
+  since; both stay listed for history) → `bridge`, "Bridged USD₮", subtitle
+  "Omniston · STON.fi". The EVM leg is paid by the resolver and is not
+  recognizable offline.
 
 EVM → TON: the EVM leg is an off-chain signature (no transaction to
 recognize); the delivery is a jetton transfer from the same escrow contract and
