@@ -35,7 +35,7 @@ const { Native, Polyfill } = await vi.hoisted(async () => {
 
 // wallet-evm is not a kit devDependency; its built dist is imported by path (offline: no provider, chainId fixed).
 import { WalletManagerEvm } from '../../wallet-evm/dist/index.js'
-import { evmSignMessage, loneSurrogateAt, utf8Bytes } from '../src/message-bytes.js'
+import { evmSignMessage, loneSurrogateAt, utf8Bytes, utf8Length } from '../src/message-bytes.js'
 import { PolicyViolationError, Wallet, type WriteIntent } from '../src/index.js'
 
 const SEED = 'test test test test test test test test test test test junk'
@@ -56,7 +56,8 @@ const same = (a: Uint8Array, b: Uint8Array) => {
 
 /**
  * The property: either the kit refuses the string (it has a lone surrogate), or polyfill bytes == spec bytes ==
- * the bytes the kit measured, and the string is handed on as it came. Says whether the encoders disagree.
+ * the kit's bytes, the length the kit counted is theirs, and the string is handed on as it came. Says whether the
+ * encoders disagree.
  */
 function holds(s: string): { refused: boolean; disagree: boolean } {
   const read = evmSignMessage(s)
@@ -68,7 +69,9 @@ function holds(s: string): { refused: boolean; disagree: boolean } {
     return { refused: true, disagree }
   }
   if (read.handed !== s) throw new Error(`not handed as it came: ${JSON.stringify(s)}`)
-  if (disagree || !same(read.signed, n)) throw new Error(`accepted, but the bytes differ: ${JSON.stringify(s)} poly=${p.length} spec=${n.length} kit=${read.signed.length}`)
+  if (disagree || !same(utf8Bytes(s), n) || read.signedLength !== n.length || utf8Length(s) !== n.length) {
+    throw new Error(`accepted, but the bytes differ: ${JSON.stringify(s)} poly=${p.length} spec=${n.length} kit=${read.signedLength}`)
+  }
   return { refused: false, disagree }
 }
 

@@ -84,6 +84,33 @@ describe('SDK-303 review: an EVM sign() takes a string or a Uint8Array, nothing 
     }
   })
 
+  it('a typed array is read off the argument itself, never through its species constructor (round 3)', async () => {
+    // An Int8Array whose species is Uint8Array: a snapshot made through slice() would be a Uint8Array. Refused.
+    class Disguised extends Int8Array { static get [Symbol.species]() { return Uint8Array } }
+    const confirm = vi.fn(async () => true)
+    const refusedAccount = mock()
+    const err = await applyPolicies(refusedAccount, { confirm }).sign(new Disguised(D.buffer.slice(0)) as never).catch((e: unknown) => e)
+    expect(err).toMatchObject({ policy: 'method', message: expect.stringMatching(/string or a Uint8Array/) })
+    expect(confirm).not.toHaveBeenCalled()
+    expect(refusedAccount.calls.filter((c) => c.method === 'sign')).toEqual([])
+    // 31 bytes whose species pads a copy to 32: counted and handed as the 31 they are, a message.
+    function Padded32(this: unknown, _n: number) { return new Uint8Array(32) }
+    class Padding extends Uint8Array { static get [Symbol.species]() { return Padded32 as unknown as Uint8ArrayConstructor } }
+    // 32 bytes whose species throws: never run, still the blind hash it is.
+    class Throwing extends Uint8Array { static get [Symbol.species](): Uint8ArrayConstructor { throw new Error('species read') } }
+    const { intents, confirm: seenConfirm } = seen()
+    const account = mock()
+    const g = applyPolicies(account, { confirm: seenConfirm })
+    await g.sign(new Padding(D.subarray(0, 31)))
+    await g.sign(new Throwing(D))
+    expect(intents.map((i) => [i.kind, i.blindHashForm])).toEqual([['message', undefined], ['typedData', 'bytes']])
+    const handed = account.calls.filter((c) => c.method === 'sign').map((c) => c.args[0] as Uint8Array)
+    expect(handed.map((h) => [Object.getPrototypeOf(h) === Uint8Array.prototype, h.length])).toEqual([[true, 31], [true, 32]])
+    expect(Array.from(handed[0]!)).toEqual(Array.from(D.subarray(0, 31)))
+    // confirm's copy of the argument is the bytes measured, too.
+    expect((intents[0]!.raw as Uint8Array).length).toBe(31)
+  })
+
   it('the account is handed the caller\'s string as it is, a Uint8Array as a plain copy of its bytes', async () => {
     const account = mock()
     const g = applyPolicies(account, {})

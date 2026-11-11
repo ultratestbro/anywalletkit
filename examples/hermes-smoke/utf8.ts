@@ -1,6 +1,6 @@
 /**
- * SDK-303: an EVM `sign()` behind the kit's policies hands the signer the caller's string and measures its UTF-8
- * with the kit's own encoder, while viem signs it through the runtime's `TextEncoder`. Under Hermes that is the
+ * SDK-303: an EVM `sign()` behind the kit's policies hands the signer the caller's string and counts its UTF-8
+ * with the kit's own reading of it, while viem signs it through the runtime's `TextEncoder`. Under Hermes that is the
  * polyfill this smoke installs (fastestsmallesttextencoderdecoder: an app without a native TextEncoder) or React
  * Native's own. For every string the kit accepts both write exactly the kit's bytes; the strings the polyfill
  * reads differently (a lone surrogate) are the ones the kit refuses. Seeded, so a failure names the same string.
@@ -66,12 +66,19 @@ export async function smokeUtf8(check: (what: string, ok: boolean, detail?: stri
     wellFormed.push(s)
   }
   let refused = ''
-  for (const s of wellFormed) if (!refused && 'refused' in evmSignMessage(s)) refused = JSON.stringify(s)
+  const counted = new Map<string, number>()
+  for (const s of wellFormed) {
+    const read = evmSignMessage(s)
+    if ('refused' in read) { if (!refused) refused = JSON.stringify(s) } else counted.set(s, read.signedLength)
+  }
   check('utf8: the kit accepts every well-formed string', refused === '', refused)
   for (const [name, e] of encoders) {
     let bad = ''
-    for (const s of wellFormed) if (!same(e.encode(s), utf8Bytes(s))) { bad = JSON.stringify(s); break }
-    check(`utf8: ${name} writes the kit's bytes for ${wellFormed.length} well-formed strings`, bad === '', bad)
+    for (const s of wellFormed) {
+      const bytes = e.encode(s)
+      if (!same(bytes, utf8Bytes(s)) || bytes.length !== counted.get(s)) { bad = JSON.stringify(s); break }
+    }
+    check(`utf8: ${name} writes the kit's bytes, as many as it counts, for ${wellFormed.length} well-formed strings`, bad === '', bad)
   }
 
   // Lone surrogates, alone, at the end, at the buffer edge and before each kind of unit: all refused by the kit;

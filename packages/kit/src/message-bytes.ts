@@ -2,13 +2,14 @@
  * What an EVM `sign()` behind the policies signs, and what they measure of it for the blind hash rule.
  *
  * The account is handed what the caller gave: a string as that string (an external signer shows it as
- * text), a `Uint8Array` as a plain copy of its bytes. An EIP-191 signer signs a string as its UTF-8
- * encoding — wallet-evm through viem and the runtime's `TextEncoder` — and the policies measure that
- * encoding with their own encoder ({@link utf8Bytes}, the WHATWG algorithm). The two agree on every
- * well-formed string. They can disagree only on a lone surrogate: the `TextEncoder` polyfill the Hermes
- * setup installs (fastestsmallesttextencoderdecoder 1.0.22) swallows the code unit after a lone high
- * surrogate into its U+FFFD, and drops the last byte of a U+FFFD for a lone high surrogate that ends the
- * string at the edge of its output buffer. So a string with a lone surrogate is refused before any rule
+ * text), a `Uint8Array` as a plain `Uint8Array` copy of its bytes. An EIP-191 signer signs a string as its
+ * UTF-8 encoding — wallet-evm through viem and the runtime's `TextEncoder` — and the policies count that
+ * encoding's length with their own reading of it ({@link utf8Length}, the WHATWG algorithm; {@link utf8Bytes}
+ * writes the same bytes, for the tests). The two agree on every well-formed string. They can disagree only
+ * on a lone high surrogate: the `TextEncoder` polyfill the Hermes setup installs
+ * (fastestsmallesttextencoderdecoder 1.0.22) swallows the code unit after one into its U+FFFD, and drops
+ * the last byte of the U+FFFD of one that ends the string when exactly 2 × length + 6 bytes come before it
+ * and its output buffer has not grown. So a string with any lone surrogate is refused before any rule
  * ({@link evmSignMessage}).
  */
 
@@ -46,7 +47,7 @@ export function utf8Length(s: string): number {
   return n
 }
 
-/** UTF-8 as the WHATWG `TextEncoder` writes it (a lone surrogate → U+FFFD), without needing one (Hermes). */
+/** UTF-8 as the WHATWG `TextEncoder` writes it (a lone surrogate → U+FFFD), without needing one (Hermes). The policies count it with {@link utf8Length}; the tests compare these bytes with the encoders'. */
 export function utf8Bytes(s: string): Uint8Array {
   const out = new Uint8Array(utf8Length(s))
   let o = 0
@@ -82,18 +83,21 @@ function isUint8Array(v: unknown): boolean {
 
 /** An EVM `sign(message)` argument the policies can read. */
 export interface EvmSignMessage {
-  /** The bytes signed after the "\x19Ethereum Signed Message:\n<length>" prefix: a string's UTF-8, a `Uint8Array`'s elements. */
-  signed: Uint8Array
-  /** What the account is handed: the caller's string itself, or a plain copy of the bytes (`signed`). */
+  /** How many bytes are signed after the "\x19Ethereum Signed Message:\n<length>" prefix: a string's UTF-8 length, a `Uint8Array`'s element count. */
+  signedLength: number
+  /** What the account is handed: the caller's string itself, or a plain `Uint8Array` copy of the bytes counted. */
   handed: string | Uint8Array
 }
 
 /**
  * An EVM `sign(message)` argument, read: a well-formed string, signed as its UTF-8 and handed as it is; a
- * `Uint8Array` (from any realm, a subclass, a `Buffer`), signed and handed as a plain copy of its own elements,
- * so a `length` getter or another realm cannot make a signer read other bytes. Anything else is refused with
- * the reason: an array of numbers, another typed array, an array-like (what a signer makes of those is not
- * known: viem reads any array-like by index), and a string with a lone surrogate (UTF-8 encoders disagree on it).
+ * `Uint8Array` (from any realm, a subclass, a `Buffer`), signed and handed as a plain `Uint8Array` of this realm
+ * copied from its own elements (`new Uint8Array(typedArray)` reads the internal length and buffer: no `length`
+ * getter, species constructor or other realm can make the signer read other bytes than those counted). Anything
+ * else is refused with the reason: an array of numbers, another typed array, an array-like (what a signer makes
+ * of those is not known: viem reads any array-like by index), and a string with a lone surrogate (UTF-8 encoders
+ * disagree on it). Read the caller's argument itself, not a snapshot of it: a snapshot of a typed array is made
+ * through its species constructor.
  */
 export function evmSignMessage(message: unknown): EvmSignMessage | { refused: string } {
   if (typeof message === 'string') {
@@ -102,9 +106,10 @@ export function evmSignMessage(message: unknown): EvmSignMessage | { refused: st
       const unit = message.charCodeAt(at).toString(16).toUpperCase()
       return { refused: `An EVM sign() of text with a lone surrogate (U+${unit} at index ${at}) is refused: UTF-8 encoders disagree on it, so the bytes signed could differ from the bytes the policies measured; nothing was signed.` }
     }
-    return { signed: utf8Bytes(message), handed: message }
+    // Only the length is needed (32 or not): a long message is counted, never copied.
+    return { signedLength: utf8Length(message), handed: message }
   }
   if (!isUint8Array(message)) return { refused: 'An EVM sign() takes a string or a Uint8Array; the policies cannot tell what this argument would sign, so nothing was signed.' }
   const bytes = new Uint8Array(message as Uint8Array)
-  return { signed: bytes, handed: bytes }
+  return { signedLength: bytes.length, handed: bytes }
 }

@@ -699,15 +699,15 @@ function tonJettonTransfer(chain: string, from: string, a: Record<string, unknow
 }
 
 /**
- * An EVM `sign` that may be a blind hash, and how it came. `signed` is what an EIP-191 signer signs for
- * `arg` ({@link evmSignMessage}): 32 of them from a `Uint8Array` or from any string, or `0x` + 64 hex digits
+ * An EVM `sign` that may be a blind hash, and how it came. `signed` is how many bytes an EIP-191 signer signs
+ * for `arg` ({@link evmSignMessage}): 32 of them from a `Uint8Array` or from any string, or `0x` + 64 hex digits
  * (what a dApp sends for a digest; flagged by its shape whatever the account makes of it — wallet-evm signs
  * the string's UTF-8, 66 bytes, another signer may decode it to the 32).
  */
-function blindHashForm(arg: unknown, signed: Uint8Array): EvmSignBlindHashForm | undefined {
-  if (typeof arg !== 'string') return signed.length === 32 ? 'bytes' : undefined
+function blindHashForm(arg: unknown, signed: number): EvmSignBlindHashForm | undefined {
+  if (typeof arg !== 'string') return signed === 32 ? 'bytes' : undefined
   if (/^0x[0-9a-fA-F]{64}$/.test(arg.trim())) return 'hex'
-  return signed.length === 32 ? 'text' : undefined
+  return signed === 32 ? 'text' : undefined
 }
 
 /**
@@ -919,8 +919,8 @@ export function guardReturned(value: unknown, wrap: (account: IWalletAccount) =>
 export function applyPolicies<A extends IWalletAccount>(account: A, policies: Policies, chain?: string): A {
   const rules = [policies.maxFee, policies.allowlist, policies.blocklist]
   const hasRuleFor = (key: (k: string) => boolean) => rules.some((m) => m !== undefined && Object.keys(m).some(key))
-  /** `evmSigned`: for a `sign` on an EVM account, the bytes an EIP-191 signer signs for it (the blind hash check measures them). */
-  const guard = async (method: WriteMethod, arg: unknown, evmSigned?: Uint8Array) => {
+  /** `evmSigned`: for a `sign` on an EVM account, how many bytes an EIP-191 signer signs for it (the blind hash check measures them). */
+  const guard = async (method: WriteMethod, arg: unknown, evmSigned?: number) => {
     const ns = account.chain.split(':')[0]!
     // A blind hash is decided before the chain: it is judged like typed data, so like typed data it needs
     // the account's chain when an exact rule of the family could be its own (SDK-303 round 2).
@@ -1081,14 +1081,17 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
         if (!fn) {
           const original = v as (...args: unknown[]) => Promise<unknown>
           fn = async (...given: unknown[]) => {
-            // One copy, taken before anything is judged, is what the rules see and what gets signed (round 3, M2).
-            const args = snapshot(given)
             // An EVM `sign`: the account's namespace says it is one, however the chain was asked for (SDK-303). Only
             // a string or a Uint8Array, and no string with a lone surrogate (UTF-8 encoders disagree on those, so the
-            // bytes signed could differ from the bytes measured): anything else is refused before any rule.
-            const evm = prop === 'sign' && canonicalNamespace(account.chain.split(':')[0]!) === 'eip155' ? evmSignMessage(args[0]) : undefined
+            // bytes signed could differ from the bytes measured): anything else is refused before any rule. Read off
+            // the caller's argument itself, not a snapshot: a typed array's snapshot is made through its species
+            // constructor, which can turn another typed array into a Uint8Array or pad it (SDK-303 round 3).
+            const evm = prop === 'sign' && canonicalNamespace(account.chain.split(':')[0]!) === 'eip155' ? evmSignMessage(given[0]) : undefined
             if (evm !== undefined && 'refused' in evm) throw new PolicyViolationError('method', evm.refused)
-            const maxFee = await guard(prop, args[0], evm?.signed)
+            // One copy, taken before anything is judged, is what the rules see and what gets signed (round 3, M2). An
+            // EVM `sign`'s message is already one: the caller's string, or a plain copy of the bytes measured.
+            const args = evm !== undefined ? [evm.handed, ...snapshot(given.slice(1))] : snapshot(given)
+            const maxFee = await guard(prop, args[0], evm?.signedLength)
             if (maxFee !== undefined) {
               // WriteOptions sit at CAPPED[prop] (second, or third after sendSerialized's guard); a tighter caller cap stays.
               const at = CAPPED[prop]!
@@ -1099,8 +1102,6 @@ export function applyPolicies<A extends IWalletAccount>(account: A, policies: Po
               next[at] = { ...given, maxFee: tighter }
               return original.apply(target, next)
             }
-            // The caller's string as it is (an external signer shows it as text), or a plain copy of the bytes measured.
-            if (evm !== undefined) return original.apply(target, [evm.handed, ...args.slice(1)])
             // EIP-712 without primaryType: hand the signer the type the policy judged, so the two cannot diverge (scan F13).
             // Same struct, same hash — only the inference is made explicit.
             if (prop === 'signTypedData' && typeof args[0] === 'object' && args[0] !== null && str(obj(args[0]).primaryType) === undefined) {
