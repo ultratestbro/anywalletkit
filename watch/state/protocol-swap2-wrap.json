@@ -12,7 +12,7 @@
     "codeHash": "4215c84e1e3cdd4e",
     "bytes": 3000
    },
-   "seenAt": "2026-11-10T14:51:35.779Z",
+   "seenAt": "2026-11-11T14:18:22.267Z",
    "changedAt": "2026-10-14T15:11:03.017Z"
   },
   "wrapper-ethereum": {
@@ -26,7 +26,7 @@
     "codeHash": "a9817472fdcc178e",
     "bytes": 3124
    },
-   "seenAt": "2026-11-10T14:51:35.772Z",
+   "seenAt": "2026-11-11T14:18:22.214Z",
    "changedAt": "2026-10-14T15:11:03.018Z"
   },
   "wrapper-bnb-chain": {
@@ -40,7 +40,7 @@
     "codeHash": "fa2cc55695081e99",
     "bytes": 3124
    },
-   "seenAt": "2026-11-10T14:51:35.780Z",
+   "seenAt": "2026-11-11T14:18:22.218Z",
    "changedAt": "2026-10-14T15:11:03.019Z"
   },
   "wrapper-gnosis": {
@@ -54,7 +54,7 @@
     "codeHash": "d13e00b1f2deb1ef",
     "bytes": 3204
    },
-   "seenAt": "2026-11-10T14:51:35.887Z",
+   "seenAt": "2026-11-11T14:18:22.335Z",
    "changedAt": "2026-10-14T15:11:03.224Z"
   },
   "wrapper-unichain": {
@@ -68,7 +68,7 @@
     "codeHash": "497c3fe8bb94acd2",
     "bytes": 2865
    },
-   "seenAt": "2026-11-10T14:51:35.883Z",
+   "seenAt": "2026-11-11T14:18:22.292Z",
    "changedAt": "2026-10-14T15:11:03.232Z"
   },
   "wrapper-op-mainnet": {
@@ -82,7 +82,7 @@
     "codeHash": "0f05518544674703",
     "bytes": 2041
    },
-   "seenAt": "2026-11-10T14:51:35.778Z",
+   "seenAt": "2026-11-11T14:18:22.217Z",
    "changedAt": "2026-10-14T15:11:03.244Z"
   },
   "wrapper-x-layer": {
@@ -96,7 +96,7 @@
     "codeHash": "92ce603c6e53d1c7",
     "bytes": 3474
    },
-   "seenAt": "2026-11-10T14:51:36.294Z",
+   "seenAt": "2026-11-11T14:18:22.911Z",
    "changedAt": "2026-10-14T15:11:03.311Z"
   },
   "wrapper-monad": {
@@ -110,7 +110,7 @@
     "codeHash": "b9c4d44e2f1bd82f",
     "bytes": 3249
    },
-   "seenAt": "2026-11-10T14:51:35.863Z",
+   "seenAt": "2026-11-11T14:18:22.309Z",
    "changedAt": "2026-10-14T15:11:03.312Z"
   },
   "wrapper-world-chain": {
@@ -124,7 +124,7 @@
     "codeHash": "ea06b8e6b54582dc",
     "bytes": 2041
    },
-   "seenAt": "2026-11-10T14:51:35.870Z",
+   "seenAt": "2026-11-11T14:18:22.331Z",
    "changedAt": "2026-10-14T15:11:03.421Z"
   },
   "wrapper-sonic": {
@@ -138,7 +138,7 @@
     "codeHash": "5cab81e5eda3869d",
     "bytes": 2636
    },
-   "seenAt": "2026-11-10T14:51:36.427Z",
+   "seenAt": "2026-11-11T14:18:22.704Z",
    "changedAt": "2026-10-14T15:11:03.547Z"
   },
   "wrapper-sei": {
@@ -152,7 +152,7 @@
     "codeHash": "eda54bbbbe729efe",
     "bytes": 2041
    },
-   "seenAt": "2026-11-10T14:51:35.997Z",
+   "seenAt": "2026-11-11T14:18:22.466Z",
    "changedAt": "2026-10-14T15:11:03.630Z"
   },
   "wrapper-hyperevm": {
@@ -166,7 +166,7 @@
     "codeHash": "50427450c281bf3d",
     "bytes": 2041
    },
-   "seenAt": "2026-11-10T14:51:36.009Z",
+   "seenAt": "2026-11-11T14:18:22.454Z",
    "changedAt": "2026-10-14T15:11:03.704Z"
   },
   "wrapper-arbitrum": {
@@ -180,7 +180,7 @@
     "codeHash": "d058f7f80f1da876",
     "bytes": 2092
    },
-   "seenAt": "2026-11-10T14:51:35.987Z",
+   "seenAt": "2026-11-11T14:18:22.456Z",
    "changedAt": "2026-10-14T15:11:03.705Z"
   },
   "wrapper-ink": {
@@ -194,7 +194,7 @@
     "codeHash": "497c3fe8bb94acd2",
     "bytes": 2865
    },
-   "seenAt": "2026-11-10T14:51:36.170Z",
+   "seenAt": "2026-11-11T14:18:22.605Z",
    "changedAt": "2026-10-14T15:11:03.782Z"
   },
   "wrapper-plasma": {
@@ -208,7 +208,7 @@
     "codeHash": "d2396182435bfc96",
     "bytes": 3204
    },
-   "seenAt": "2026-11-10T14:51:36.060Z",
+   "seenAt": "2026-11-11T14:18:22.610Z",
    "changedAt": "2026-10-14T15:11:03.783Z"
   },
   "wrapper-avalanche": {
@@ -222,7 +222,7 @@
     "codeHash": "561ff04aed88349c",
     "bytes": 3249
    },
-   "seenAt": "2026-11-10T14:51:36.088Z",
+   "seenAt": "2026-11-11T14:18:22.543Z",
    "changedAt": "2026-10-14T15:11:03.792Z"
   },
   "wrapper-zksync-era": {
@@ -236,7 +236,7 @@
     "codeHash": "1a0647714d640297",
     "bytes": 15840
    },
-   "seenAt": "2026-11-10T14:51:35.832Z",
+   "seenAt": "2026-11-11T14:18:22.434Z",
    "changedAt": "2026-10-14T15:11:03.938Z"
   },
   "wrapper-linea": {
@@ -250,7 +250,7 @@
     "codeHash": "f6e5bdcad8ba2c35",
     "bytes": 3124
    },
-   "seenAt": "2026-11-10T14:51:36.106Z",
+   "seenAt": "2026-11-11T14:18:22.568Z",
    "changedAt": "2026-10-14T15:11:03.955Z"
   },
   "wrapper-plume": {
@@ -264,7 +264,7 @@
     "codeHash": "cf5fdf81267b7ab8",
     "bytes": 2634
    },
-   "seenAt": "2026-11-10T14:51:36.165Z",
+   "seenAt": "2026-11-11T14:18:22.645Z",
    "changedAt": "2026-10-14T15:11:04.070Z"
   },
   "wrapper-base": {
@@ -278,7 +278,7 @@
     "codeHash": "955cbb26fe57de04",
     "bytes": 2041
    },
-   "seenAt": "2026-11-10T14:51:35.898Z",
+   "seenAt": "2026-11-11T14:18:22.444Z",
    "changedAt": "2026-10-14T15:11:04.141Z"
   },
   "wrapper-berachain": {
@@ -292,7 +292,7 @@
     "codeHash": "4970c6b40faef5f9",
     "bytes": 2596
    },
-   "seenAt": "2026-11-10T14:51:36.328Z",
+   "seenAt": "2026-11-11T14:18:22.807Z",
    "changedAt": "2026-10-14T15:11:04.147Z"
   },
   "wrapper-scroll": {
@@ -306,7 +306,7 @@
     "codeHash": "1bf2d307b1553695",
     "bytes": 5871
    },
-   "seenAt": "2026-11-10T14:51:36.294Z",
+   "seenAt": "2026-11-11T14:18:22.824Z",
    "changedAt": "2026-10-14T15:11:04.211Z"
   },
   "wrapper-megaeth": {
@@ -320,8 +320,25 @@
     "codeHash": "1bc8eba632763f6e",
     "bytes": 2846
    },
-   "seenAt": "2026-11-10T14:51:35.974Z",
+   "seenAt": "2026-11-11T14:18:22.443Z",
    "changedAt": "2026-10-14T15:11:04.370Z"
+  },
+  "wrapper-elysium": {
+   "type": "evm-proxy",
+   "target": {
+    "chainId": 99901,
+    "address": "0xba876237b0f021a6c6d852d6c26e107997cc5e81"
+   },
+   "value": "{\"admin\":\"0xdeae688c60778379f98f3e29c7e94d6e3934a30a\",\"beacon\":null,\"codeHash\":\"e980519ff078267d\",\"impl\":\"0xf098387f303b6bbfe9da7cb16f70639b76430542\",\"implCodeHash\":\"a66191810853d3dd\"}",
+   "meta": {
+    "codeHash": "e980519ff078267d",
+    "impl": "0xf098387f303b6bbfe9da7cb16f70639b76430542",
+    "admin": "0xdeae688c60778379f98f3e29c7e94d6e3934a30a",
+    "beacon": null,
+    "implCodeHash": "a66191810853d3dd"
+   },
+   "seenAt": "2026-11-11T14:18:23.226Z",
+   "changedAt": "2026-11-11T14:18:23.226Z"
   }
  }
 }

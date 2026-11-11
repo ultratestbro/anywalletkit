@@ -6,13 +6,13 @@
    "target": {
     "url": "https://docs.near.org/protocol/transactions/gas.md"
    },
-   "value": "6773bfe17b481dc865e883e7ddf53be34d6eb6bf5678aad570744475acdf1f99",
+   "value": "803b61063bdbda59634ce60c05026a88c94dbb140372d3fa8dd0eefc5a144ea6",
    "meta": {
-    "hash": "6773bfe17b481dc8",
+    "hash": "803b61063bdbda59",
     "chars": 12977
    },
-   "seenAt": "2026-11-10T14:51:16.530Z",
-   "changedAt": "2026-11-09T16:13:30.563Z"
+   "seenAt": "2026-11-11T14:17:56.005Z",
+   "changedAt": "2026-11-11T14:17:56.005Z"
   },
   "docs-liquid-staking": {
    "type": "http-text",
@@ -24,7 +24,7 @@
     "hash": "9e577f142689e61c",
     "chars": 4270
    },
-   "seenAt": "2026-11-10T14:51:16.641Z",
+   "seenAt": "2026-11-11T14:17:56.107Z",
    "changedAt": "2026-11-09T16:13:30.582Z"
   },
   "nearcore-releases": {
@@ -32,16 +32,16 @@
    "target": {
     "repo": "near/nearcore"
    },
-   "value": "2.14.0",
+   "value": "2.14.1",
    "meta": {
-    "tag": "2.14.0",
-    "name": "2.14.0",
-    "at": "2026-10-26",
-    "url": "https://github.com/near/nearcore/releases/tag/2.14.0",
+    "tag": "2.14.1",
+    "name": "2.14.1",
+    "at": "2026-11-11",
+    "url": "https://github.com/near/nearcore/releases/tag/2.14.1",
     "prerelease": false
    },
-   "seenAt": "2026-11-10T14:51:16.781Z",
-   "changedAt": "2026-11-09T16:13:30.582Z"
+   "seenAt": "2026-11-11T14:17:56.240Z",
+   "changedAt": "2026-11-11T14:17:56.240Z"
   },
   "linear-releases": {
    "type": "github-releases",
@@ -56,7 +56,7 @@
     "url": "https://github.com/linear-protocol/LiNEAR/releases/tag/v1.6.3",
     "prerelease": false
    },
-   "seenAt": "2026-11-10T14:51:16.738Z",
+   "seenAt": "2026-11-11T14:17:56.251Z",
    "changedAt": "2026-11-09T16:13:30.657Z"
   },
   "rnear-contract": {
@@ -71,7 +71,7 @@
     "url": "https://github.com/ref-finance/rnear-contract/commit/341cd8c970895e1b6bcb433699b20253922d621d",
     "note": "default branch: Merge pull request #3 from ref-finance/audit_fix"
    },
-   "seenAt": "2026-11-10T14:51:17.435Z",
+   "seenAt": "2026-11-11T14:17:56.903Z",
    "changedAt": "2026-11-09T16:13:31.191Z"
   }
  }

@@ -11,7 +11,7 @@
     "codeHash": "be44417503efa22e",
     "state": "active"
    },
-   "seenAt": "2026-11-10T14:51:22.042Z",
+   "seenAt": "2026-11-11T14:18:00.142Z",
    "changedAt": "2026-10-14T15:10:40.300Z"
   },
   "tston-minter-mainnet": {
@@ -24,7 +24,7 @@
     "codeHash": "1a39d0e85aaf8d65",
     "state": "active"
    },
-   "seenAt": "2026-11-10T14:51:22.044Z",
+   "seenAt": "2026-11-11T14:18:00.154Z",
    "changedAt": "2026-10-14T15:10:40.347Z"
   },
   "site": {
@@ -37,7 +37,7 @@
     "hash": "a6b495a492739437",
     "chars": 3481
    },
-   "seenAt": "2026-11-10T14:51:22.042Z",
+   "seenAt": "2026-11-11T14:18:00.204Z",
    "changedAt": "2026-11-04T09:36:04.045Z"
   },
   "tonstakers-sdk": {
@@ -52,7 +52,7 @@
     "url": "https://github.com/tonstakers/tonstakers-sdk/commit/8d4870e5794abc66254d46d619bd38bd5c223064",
     "note": "default branch: Multisig support (#30)"
    },
-   "seenAt": "2026-11-10T14:51:22.885Z",
+   "seenAt": "2026-11-11T14:18:01.639Z",
    "changedAt": "2026-10-14T15:12:14.634Z"
   },
   "liquid-staking-contract": {
@@ -67,7 +67,7 @@
     "url": "https://github.com/ton-blockchain/liquid-staking-contract/commit/1f4e9badbed52a4cf80cc58e4bb36ed375c6c8e7",
     "note": "default branch: added audits info (#65)"
    },
-   "seenAt": "2026-11-10T14:51:22.835Z",
+   "seenAt": "2026-11-11T14:18:01.045Z",
    "changedAt": "2026-10-14T15:12:14.686Z"
   }
  }

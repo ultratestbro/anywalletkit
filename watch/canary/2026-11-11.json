@@ -1,0 +1,389 @@
+{
+ "date": "2026-11-11",
+ "counts": {
+  "ok": 41,
+  "warn": 13
+ },
+ "transitions": [],
+ "failing": [],
+ "results": [
+  {
+   "id": "ssv",
+   "module": "ssv",
+   "status": "ok",
+   "ms": 724,
+   "note": ""
+  },
+  {
+   "id": "lido",
+   "module": "lido",
+   "status": "ok",
+   "ms": 2015,
+   "note": ""
+  },
+  {
+   "id": "jito",
+   "module": "spl-stake-pool",
+   "status": "ok",
+   "ms": 2088,
+   "note": ""
+  },
+  {
+   "id": "native-stake",
+   "module": "native-stake",
+   "status": "ok",
+   "ms": 3149,
+   "note": ""
+  },
+  {
+   "id": "tonstakers",
+   "module": "tonstakers",
+   "status": "ok",
+   "ms": 4079,
+   "note": ""
+  },
+  {
+   "id": "mellow:lido-earn-eth",
+   "module": "mellow",
+   "status": "ok",
+   "ms": 1756,
+   "note": ""
+  },
+  {
+   "id": "mellow:lido-earn-usd",
+   "module": "mellow",
+   "status": "ok",
+   "ms": 1984,
+   "note": ""
+  },
+  {
+   "id": "aave:1:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 975,
+   "note": ""
+  },
+  {
+   "id": "aave:1:lido",
+   "module": "aave",
+   "status": "ok",
+   "ms": 873,
+   "note": ""
+  },
+  {
+   "id": "aave:1:etherfi",
+   "module": "aave",
+   "status": "warn",
+   "ms": 362,
+   "note": "quoteSupply → AaveError weETH: supply cap reached (0 base units left)."
+  },
+  {
+   "id": "aave:10:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 462,
+   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:56:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 488,
+   "note": "quoteSupply → AaveError Cake: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:100:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 1156,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:137:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 1225,
+   "note": ""
+  },
+  {
+   "id": "aave:146:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 766,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:324:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 1630,
+   "note": "quoteSupply → AaveError USDC: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:1088:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 1257,
+   "note": "quoteSupply → AaveError m.DAI: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:1868:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 1052,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:5000:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 1259,
+   "note": ""
+  },
+  {
+   "id": "aave:8453:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 1265,
+   "note": ""
+  },
+  {
+   "id": "aave:9745:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 1311,
+   "note": ""
+  },
+  {
+   "id": "aave:42161:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 527,
+   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:42220:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 1210,
+   "note": ""
+  },
+  {
+   "id": "aave:43114:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 1734,
+   "note": "quoteSupply → AaveError DAI.e: supply cap reached (0 base units left)."
+  },
+  {
+   "id": "aave:57073:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 1291,
+   "note": ""
+  },
+  {
+   "id": "aave:59144:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 1266,
+   "note": ""
+  },
+  {
+   "id": "aave:534352:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 1379,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "morpho:1",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 2510,
+   "note": ""
+  },
+  {
+   "id": "native-monad",
+   "module": "native-monad",
+   "status": "ok",
+   "ms": 31813,
+   "note": ""
+  },
+  {
+   "id": "morpho:8453",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 2950,
+   "note": ""
+  },
+  {
+   "id": "morpho:42161",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 2336,
+   "note": ""
+  },
+  {
+   "id": "morpho:10",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 3169,
+   "note": ""
+  },
+  {
+   "id": "morpho:137",
+   "module": "morpho",
+   "status": "warn",
+   "ms": 2358,
+   "note": " quoteSupply → MorphoError Compound USDC: deposits are closed right now (caps reached or the receiver is gated)."
+  },
+  {
+   "id": "morpho:130",
+   "module": "morpho",
+   "status": "warn",
+   "ms": 3853,
+   "note": " quoteSupply → MorphoError Gauntlet WETH: deposits are closed right now (caps reached or the receiver is gated)."
+  },
+  {
+   "id": "morpho:999",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 4217,
+   "note": ""
+  },
+  {
+   "id": "morpho:143",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 2778,
+   "note": ""
+  },
+  {
+   "id": "morpho:747474",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 5164,
+   "note": ""
+  },
+  {
+   "id": "approvals:1",
+   "module": "approvals",
+   "status": "ok",
+   "ms": 1548,
+   "note": ""
+  },
+  {
+   "id": "approvals:8453",
+   "module": "approvals",
+   "status": "ok",
+   "ms": 1063,
+   "note": ""
+  },
+  {
+   "id": "morpho:4663",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 4116,
+   "note": ""
+  },
+  {
+   "id": "approvals:42161",
+   "module": "approvals",
+   "status": "ok",
+   "ms": 611,
+   "note": ""
+  },
+  {
+   "id": "kamino",
+   "module": "kamino",
+   "status": "ok",
+   "ms": 4835,
+   "note": ""
+  },
+  {
+   "id": "curve:10",
+   "module": "curve",
+   "status": "ok",
+   "ms": 1141,
+   "note": ""
+  },
+  {
+   "id": "curve:100",
+   "module": "curve",
+   "status": "ok",
+   "ms": 2716,
+   "note": ""
+  },
+  {
+   "id": "curve:1",
+   "module": "curve",
+   "status": "ok",
+   "ms": 8730,
+   "note": ""
+  },
+  {
+   "id": "curve:196",
+   "module": "curve",
+   "status": "ok",
+   "ms": 3646,
+   "note": ""
+  },
+  {
+   "id": "curve:143",
+   "module": "curve",
+   "status": "ok",
+   "ms": 6439,
+   "note": ""
+  },
+  {
+   "id": "native-near",
+   "module": "native-near",
+   "status": "ok",
+   "ms": 65059,
+   "note": ""
+  },
+  {
+   "id": "curve:9745",
+   "module": "curve",
+   "status": "ok",
+   "ms": 3387,
+   "note": ""
+  },
+  {
+   "id": "curve:8453",
+   "module": "curve",
+   "status": "ok",
+   "ms": 6027,
+   "note": ""
+  },
+  {
+   "id": "scrvusd",
+   "module": "scrvusd",
+   "status": "ok",
+   "ms": 1881,
+   "note": ""
+  },
+  {
+   "id": "relay",
+   "module": "relay",
+   "status": "ok",
+   "ms": 10356,
+   "note": ""
+  },
+  {
+   "id": "liquid-near",
+   "module": "liquid-near",
+   "status": "ok",
+   "ms": 80055,
+   "note": ""
+  },
+  {
+   "id": "curve:42161",
+   "module": "curve",
+   "status": "ok",
+   "ms": 24102,
+   "note": ""
+  }
+ ]
+}

@@ -1,0 +1,341 @@
+{
+ "date": "2026-11-11",
+ "modules": 27,
+ "sources": 649,
+ "changes": [
+  {
+   "module": "@anywalletkit/protocol-lending-aave-evm",
+   "id": "pool-ethereum-core",
+   "label": "Aave v3 Pool · Ethereum core",
+   "type": "evm-proxy",
+   "what": "implementation 0x728a138a4823392c2efa55e028d434f526fe03cf → 0x4295fe69b3e978eb511e4558b4407ad871612fcb",
+   "link": null,
+   "before": {
+    "codeHash": "a2842eb755ed0bd8",
+    "impl": "0x728a138a4823392c2efa55e028d434f526fe03cf",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "9998171167267357"
+   },
+   "after": {
+    "codeHash": "a2842eb755ed0bd8",
+    "impl": "0x4295fe69b3e978eb511e4558b4407ad871612fcb",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "47e6aad54bb9e266"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-aave-evm",
+   "id": "pool-ethereum-lido",
+   "label": "Aave v3 Pool · Ethereum Lido",
+   "type": "evm-proxy",
+   "what": "implementation 0x78680a9ac74b093571e7a5b76636248f031d9bc2 → 0x13fa6017a1d0479ad3117e7e80b785cc1372d0f3",
+   "link": null,
+   "before": {
+    "codeHash": "8521df04061ab877",
+    "impl": "0x78680a9ac74b093571e7a5b76636248f031d9bc2",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "34d94162536e5adb"
+   },
+   "after": {
+    "codeHash": "8521df04061ab877",
+    "impl": "0x13fa6017a1d0479ad3117e7e80b785cc1372d0f3",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "65d3a904990f7793"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-aave-evm",
+   "id": "pool-op-mainnet",
+   "label": "Aave v3 Pool · OP Mainnet",
+   "type": "evm-proxy",
+   "what": "implementation 0x66185e53343336d4faea5317d1fcca103dd4088d → 0x4d48678de6c79c3cbb3695cbcd89c50132815b74",
+   "link": null,
+   "before": {
+    "codeHash": "9190cf493c3977b5",
+    "impl": "0x66185e53343336d4faea5317d1fcca103dd4088d",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "21822df78a48d8ab"
+   },
+   "after": {
+    "codeHash": "9190cf493c3977b5",
+    "impl": "0x4d48678de6c79c3cbb3695cbcd89c50132815b74",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "a56ef30b823e1b5e"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-aave-evm",
+   "id": "pool-base",
+   "label": "Aave v3 Pool · Base",
+   "type": "evm-proxy",
+   "what": "implementation 0xa4abc5fcba6d0d7e3d144d6dbf6cb6128599dfdb → 0xf248dd0adb01e78043e8a423b8504c8129f11918",
+   "link": null,
+   "before": {
+    "codeHash": "9c5b83ded9e7a8cb",
+    "impl": "0xa4abc5fcba6d0d7e3d144d6dbf6cb6128599dfdb",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "44b987979cf2e4da"
+   },
+   "after": {
+    "codeHash": "9c5b83ded9e7a8cb",
+    "impl": "0xf248dd0adb01e78043e8a423b8504c8129f11918",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "09ed6bfd1143bf0d"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-aave-evm",
+   "id": "pool-arbitrum",
+   "label": "Aave v3 Pool · Arbitrum",
+   "type": "evm-proxy",
+   "what": "implementation 0xf05fd3cc911b4c5e36e53c00354f645e22922c9a → 0xa6e7d235a5b2fc7811d10669bbe20fa14b658a1e",
+   "link": null,
+   "before": {
+    "codeHash": "9190cf493c3977b5",
+    "impl": "0xf05fd3cc911b4c5e36e53c00354f645e22922c9a",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "f3b3d13e1ed0f226"
+   },
+   "after": {
+    "codeHash": "9190cf493c3977b5",
+    "impl": "0xa6e7d235a5b2fc7811d10669bbe20fa14b658a1e",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "4395f695cb788bab"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-aave-evm",
+   "id": "pool-mantle",
+   "label": "Aave v3 Pool · Mantle",
+   "type": "evm-proxy",
+   "what": "implementation 0x13e24a78936468bf35cb8647b08db5ad758b55a5 → 0x446dd4cc29206ecb662a9b60a26396039c1a192c",
+   "link": null,
+   "before": {
+    "codeHash": "7ee63ab61cf922cc",
+    "impl": "0x13e24a78936468bf35cb8647b08db5ad758b55a5",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "5caae3b89295c188"
+   },
+   "after": {
+    "codeHash": "7ee63ab61cf922cc",
+    "impl": "0x446dd4cc29206ecb662a9b60a26396039c1a192c",
+    "admin": null,
+    "beacon": null,
+    "implCodeHash": "bb5c04f8475607e2"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-aave-evm",
+   "id": "address-book",
+   "label": "Aave address book releases",
+   "type": "github-releases",
+   "what": "v4.77.3 → v4.77.6 (2026-11-11)",
+   "link": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.77.6",
+   "before": {
+    "tag": "v4.77.3",
+    "name": "v4.77.3",
+    "at": "2026-11-10",
+    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.77.3",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "v4.77.6",
+    "name": "v4.77.6",
+    "at": "2026-11-11",
+    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.77.6",
+    "prerelease": false
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
+   "id": "docs-api",
+   "label": "Kamino docs · developers API",
+   "type": "http-text",
+   "what": "page text changed (3759 → 3759 chars)",
+   "link": "https://docs.kamino.finance/developers/api",
+   "before": {
+    "hash": "89bd105be4f3f77f",
+    "chars": 3759
+   },
+   "after": {
+    "hash": "4cce91712c0544a9",
+    "chars": 3759
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-morpho-evm",
+   "id": "docs-addresses",
+   "label": "Morpho docs · deployed addresses",
+   "type": "http-text",
+   "what": "page text changed (75954 → 75938 chars)",
+   "link": "https://docs.morpho.org/get-started/resources/addresses/",
+   "before": {
+    "hash": "8496c14229f9f767",
+    "chars": 75954
+   },
+   "after": {
+    "hash": "a489c1d7f24655b0",
+    "chars": 75938
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-staking-liquid-near",
+   "id": "docs-gas",
+   "label": "NEAR docs · gas (prepaid gas, gas price)",
+   "type": "http-text",
+   "what": "page text changed (12977 → 12977 chars)",
+   "link": "https://docs.near.org/protocol/transactions/gas.md",
+   "before": {
+    "hash": "6773bfe17b481dc8",
+    "chars": 12977
+   },
+   "after": {
+    "hash": "803b61063bdbda59",
+    "chars": 12977
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-staking-liquid-near",
+   "id": "nearcore-releases",
+   "label": "NEAR node releases (nearcore): protocol upgrades, gas price and epoch parameters",
+   "type": "github-releases",
+   "what": "2.14.0 → 2.14.1 (2026-11-11)",
+   "link": "https://github.com/near/nearcore/releases/tag/2.14.1",
+   "before": {
+    "tag": "2.14.0",
+    "name": "2.14.0",
+    "at": "2026-10-26",
+    "url": "https://github.com/near/nearcore/releases/tag/2.14.0",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "2.14.1",
+    "name": "2.14.1",
+    "at": "2026-11-11",
+    "url": "https://github.com/near/nearcore/releases/tag/2.14.1",
+    "prerelease": false
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-staking-native-near",
+   "id": "docs-gas",
+   "label": "NEAR docs · gas (prepaid gas, gas price)",
+   "type": "http-text",
+   "what": "page text changed (12977 → 12977 chars)",
+   "link": "https://docs.near.org/protocol/transactions/gas.md",
+   "before": {
+    "hash": "6773bfe17b481dc8",
+    "chars": 12977
+   },
+   "after": {
+    "hash": "803b61063bdbda59",
+    "chars": 12977
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-staking-native-near",
+   "id": "nearcore-releases",
+   "label": "NEAR node releases (nearcore): protocol upgrades, gas price and epoch parameters",
+   "type": "github-releases",
+   "what": "2.14.0 → 2.14.1 (2026-11-11)",
+   "link": "https://github.com/near/nearcore/releases/tag/2.14.1",
+   "before": {
+    "tag": "2.14.0",
+    "name": "2.14.0",
+    "at": "2026-10-26",
+    "url": "https://github.com/near/nearcore/releases/tag/2.14.0",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "2.14.1",
+    "name": "2.14.1",
+    "at": "2026-11-11",
+    "url": "https://github.com/near/nearcore/releases/tag/2.14.1",
+    "prerelease": false
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-fynd",
+   "id": "router-registry",
+   "label": "Tycho router registry (the router Fynd swaps must settle through)",
+   "type": "github-file",
+   "what": "file changed 6a0b172d71 → e46ead95e8",
+   "link": "https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/config/deployment_registry.json",
+   "before": {
+    "sha": "6a0b172d71",
+    "url": "https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/config/deployment_registry.json"
+   },
+   "after": {
+    "sha": "e46ead95e8",
+    "url": "https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/config/deployment_registry.json"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-fynd",
+   "id": "fynd-releases",
+   "label": "Fynd releases",
+   "type": "github-releases",
+   "what": "0.122.0 → 0.124.0 (2026-11-11)",
+   "link": "https://github.com/propeller-heads/fynd/releases/tag/0.124.0",
+   "before": {
+    "tag": "0.122.0",
+    "name": "0.122.0",
+    "at": "2026-11-05",
+    "url": "https://github.com/propeller-heads/fynd/releases/tag/0.122.0",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "0.124.0",
+    "name": "0.124.0",
+    "at": "2026-11-11",
+    "url": "https://github.com/propeller-heads/fynd/releases/tag/0.124.0",
+    "prerelease": false
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-near-intents",
+   "id": "docs-changelog",
+   "label": "NEAR Intents docs · changelog",
+   "type": "http-text",
+   "what": "page text changed (5828 → 5973 chars)",
+   "link": "https://docs.near-intents.org/changelog/overview.md",
+   "before": {
+    "hash": "74f4d5388d422f91",
+    "chars": 5828
+   },
+   "after": {
+    "hash": "47fea590879ed65c",
+    "chars": 5973
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-omniston",
+   "id": "docs-omniston",
+   "label": "STON.fi docs · Omniston",
+   "type": "http-text",
+   "what": "page text changed (3422 → 3422 chars)",
+   "link": "https://docs.ston.fi/docs/developer-section/omniston",
+   "before": {
+    "hash": "f5319f282d666794",
+    "chars": 3422
+   },
+   "after": {
+    "hash": "ff8d0f687d0baca5",
+    "chars": 3422
+   }
+  }
+ ],
+ "errors": [],
+ "repointed": []
+}

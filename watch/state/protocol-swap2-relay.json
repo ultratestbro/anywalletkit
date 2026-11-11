@@ -1,0 +1,1453 @@
+{
+ "module": "@anywalletkit/protocol-swap2-relay",
+ "sources": {
+  "depository-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "c1897f573dc70ee2",
+   "meta": {
+    "codeHash": "c1897f573dc70ee2",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:14.027Z",
+   "changedAt": "2026-11-11T14:18:14.027Z"
+  },
+  "allocator-ethereum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:14.029Z",
+   "changedAt": "2026-11-11T14:18:14.029Z"
+  },
+  "owner-ethereum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:14.033Z",
+   "changedAt": "2026-11-11T14:18:14.033Z"
+  },
+  "allocator-optimism": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 10,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:14.077Z",
+   "changedAt": "2026-11-11T14:18:14.077Z"
+  },
+  "depository-optimism": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "6ebc132d774633ef",
+   "meta": {
+    "codeHash": "6ebc132d774633ef",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:14.080Z",
+   "changedAt": "2026-11-11T14:18:14.080Z"
+  },
+  "owner-optimism": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 10,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:14.106Z",
+   "changedAt": "2026-11-11T14:18:14.106Z"
+  },
+  "depository-bnb": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 56,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "b174e6dd543815be",
+   "meta": {
+    "codeHash": "b174e6dd543815be",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:14.113Z",
+   "changedAt": "2026-11-11T14:18:14.113Z"
+  },
+  "owner-bnb": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 56,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:14.122Z",
+   "changedAt": "2026-11-11T14:18:14.122Z"
+  },
+  "docs-input-validation": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.relay.link/references/api/api_core_concepts/input-validation.md"
+   },
+   "value": "4050635ea9b2bece5302e1d6cb6c2d188760914260311cd11be58baebb3fa976",
+   "meta": {
+    "hash": "4050635ea9b2bece",
+    "chars": 13868
+   },
+   "seenAt": "2026-11-11T14:18:14.124Z",
+   "changedAt": "2026-11-11T14:18:14.124Z"
+  },
+  "allocator-bnb": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 56,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:14.145Z",
+   "changedAt": "2026-11-11T14:18:14.145Z"
+  },
+  "depository-source": {
+   "type": "github-file",
+   "target": {
+    "repo": "relayprotocol/relay-depository",
+    "path": "packages/ethereum-vm/src/RelayDepository.sol"
+   },
+   "value": "80b2a1ddddc10f0d7578f03b78c3187b2fc77da1",
+   "meta": {
+    "sha": "80b2a1dddd",
+    "url": "https://github.com/relayprotocol/relay-depository/blob/main/packages/ethereum-vm/src/RelayDepository.sol"
+   },
+   "seenAt": "2026-11-11T14:18:14.155Z",
+   "changedAt": "2026-11-11T14:18:14.155Z"
+  },
+  "order-source": {
+   "type": "github-file",
+   "target": {
+    "repo": "relayprotocol/relay-protocol-sdk",
+    "path": "src/order/index.ts"
+   },
+   "value": "9d7dc0075eb31a55b773ebe0042624cba22a4501",
+   "meta": {
+    "sha": "9d7dc0075e",
+    "url": "https://github.com/relayprotocol/relay-protocol-sdk/blob/main/src/order/index.ts"
+   },
+   "seenAt": "2026-11-11T14:18:14.204Z",
+   "changedAt": "2026-11-11T14:18:14.204Z"
+  },
+  "allocator-gnosis": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 100,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:14.256Z",
+   "changedAt": "2026-11-11T14:18:14.256Z"
+  },
+  "owner-gnosis": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 100,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:14.267Z",
+   "changedAt": "2026-11-11T14:18:14.267Z"
+  },
+  "depository-gnosis": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 100,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "a1c36765a0ab2fc6",
+   "meta": {
+    "codeHash": "a1c36765a0ab2fc6",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:14.295Z",
+   "changedAt": "2026-11-11T14:18:14.295Z"
+  },
+  "allocator-unichain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 130,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:14.330Z",
+   "changedAt": "2026-11-11T14:18:14.330Z"
+  },
+  "depository-unichain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 130,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "deb002751326fe30",
+   "meta": {
+    "codeHash": "deb002751326fe30",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:14.340Z",
+   "changedAt": "2026-11-11T14:18:14.340Z"
+  },
+  "owner-unichain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 130,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:14.388Z",
+   "changedAt": "2026-11-11T14:18:14.388Z"
+  },
+  "depository-polygon": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "c7986b86ba3c650e",
+   "meta": {
+    "codeHash": "c7986b86ba3c650e",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:14.434Z",
+   "changedAt": "2026-11-11T14:18:14.434Z"
+  },
+  "allocator-polygon": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 137,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:14.460Z",
+   "changedAt": "2026-11-11T14:18:14.460Z"
+  },
+  "chains": {
+   "type": "http-json",
+   "target": {
+    "url": "https://api.relay.link/chains",
+    "path": "chains"
+   },
+   "value": "[\"1\",\"10\",\"100\",\"1088\",\"130\",\"1337\",\"137\",\"143\",\"146\",\"169\",\"1868\",\"196\",\"2020\",\"224235520\",\"25\",\"2741\",\"2818\",\"288\",\"324\",\"33139\",\"34443\",\"3586256\",\"360\",\"42018\",\"42161\",\"4217\",\"42220\",\"43114\",\"4326\",\"4663\",\"480\",\"48900\",\"5000\",\"5031\",\"5042\",\"534352\",\"537724\",\"548123634\",\"56\",\"57073\",\"59144\",\"60808\",\"685689\",\"728126428\",\"747\",\"747474\",\"7777777\",\"792703809\",\"80094\",\"8253038\",\"8453\",\"9286185\",\"9745\",\"97477\",\"988\",\"98866\",\"999\",\"99901\"]",
+   "meta": {
+    "count": 58,
+    "keys": [
+     "1",
+     "10",
+     "100",
+     "1088",
+     "130",
+     "1337",
+     "137",
+     "143",
+     "146",
+     "169",
+     "1868",
+     "196",
+     "2020",
+     "224235520",
+     "25",
+     "2741",
+     "2818",
+     "288",
+     "324",
+     "33139",
+     "34443",
+     "3586256",
+     "360",
+     "42018",
+     "42161",
+     "4217",
+     "42220",
+     "43114",
+     "4326",
+     "4663",
+     "480",
+     "48900",
+     "5000",
+     "5031",
+     "5042",
+     "534352",
+     "537724",
+     "548123634",
+     "56",
+     "57073",
+     "59144",
+     "60808",
+     "685689",
+     "728126428",
+     "747",
+     "747474",
+     "7777777",
+     "792703809",
+     "80094",
+     "8253038",
+     "8453",
+     "9286185",
+     "9745",
+     "97477",
+     "988",
+     "98866",
+     "999",
+     "99901"
+    ]
+   },
+   "seenAt": "2026-11-11T14:18:14.462Z",
+   "changedAt": "2026-11-11T14:18:14.462Z"
+  },
+  "depository-monad": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 143,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "eab6087ee5353879",
+   "meta": {
+    "codeHash": "eab6087ee5353879",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:14.463Z",
+   "changedAt": "2026-11-11T14:18:14.463Z"
+  },
+  "owner-polygon": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 137,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:14.494Z",
+   "changedAt": "2026-11-11T14:18:14.494Z"
+  },
+  "allocator-monad": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 143,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:14.508Z",
+   "changedAt": "2026-11-11T14:18:14.508Z"
+  },
+  "owner-monad": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 143,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:14.534Z",
+   "changedAt": "2026-11-11T14:18:14.534Z"
+  },
+  "allocator-xlayer": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 196,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:14.737Z",
+   "changedAt": "2026-11-11T14:18:14.737Z"
+  },
+  "depository-xlayer": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 196,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "7169d4b81106bdb8",
+   "meta": {
+    "codeHash": "7169d4b81106bdb8",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:14.742Z",
+   "changedAt": "2026-11-11T14:18:14.742Z"
+  },
+  "depository-zksync": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 324,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "1066a89487233cd8",
+   "meta": {
+    "codeHash": "1066a89487233cd8",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:14.800Z",
+   "changedAt": "2026-11-11T14:18:14.800Z"
+  },
+  "allocator-zksync": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 324,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:14.827Z",
+   "changedAt": "2026-11-11T14:18:14.827Z"
+  },
+  "owner-zksync": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 324,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:14.858Z",
+   "changedAt": "2026-11-11T14:18:14.858Z"
+  },
+  "depository-sonic": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 146,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "d1e05d5545b94f3a",
+   "meta": {
+    "codeHash": "d1e05d5545b94f3a",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:14.946Z",
+   "changedAt": "2026-11-11T14:18:14.946Z"
+  },
+  "allocator-sonic": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 146,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:14.948Z",
+   "changedAt": "2026-11-11T14:18:14.948Z"
+  },
+  "depository-worldchain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 480,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "c8a1a19032c5178e",
+   "meta": {
+    "codeHash": "c8a1a19032c5178e",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:14.951Z",
+   "changedAt": "2026-11-11T14:18:14.951Z"
+  },
+  "owner-xlayer": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 196,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:14.955Z",
+   "changedAt": "2026-11-11T14:18:14.955Z"
+  },
+  "owner-sonic": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 146,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:14.965Z",
+   "changedAt": "2026-11-11T14:18:14.965Z"
+  },
+  "allocator-worldchain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 480,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:14.969Z",
+   "changedAt": "2026-11-11T14:18:14.969Z"
+  },
+  "owner-worldchain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 480,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:15.047Z",
+   "changedAt": "2026-11-11T14:18:15.047Z"
+  },
+  "allocator-hyperevm": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 999,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:15.083Z",
+   "changedAt": "2026-11-11T14:18:15.083Z"
+  },
+  "depository-morph": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 2818,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "0cefe3dd6311da01",
+   "meta": {
+    "codeHash": "0cefe3dd6311da01",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:15.116Z",
+   "changedAt": "2026-11-11T14:18:15.116Z"
+  },
+  "allocator-morph": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 2818,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:15.141Z",
+   "changedAt": "2026-11-11T14:18:15.141Z"
+  },
+  "depository-megaeth": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4326,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "48f012d761a3d57a",
+   "meta": {
+    "codeHash": "48f012d761a3d57a",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:15.176Z",
+   "changedAt": "2026-11-11T14:18:15.176Z"
+  },
+  "allocator-megaeth": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 4326,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:15.195Z",
+   "changedAt": "2026-11-11T14:18:15.195Z"
+  },
+  "owner-hyperevm": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 999,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:15.198Z",
+   "changedAt": "2026-11-11T14:18:15.198Z"
+  },
+  "depository-hyperevm": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 999,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "87e2afc72addb7ce",
+   "meta": {
+    "codeHash": "87e2afc72addb7ce",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:15.199Z",
+   "changedAt": "2026-11-11T14:18:15.199Z"
+  },
+  "owner-morph": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 2818,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:15.207Z",
+   "changedAt": "2026-11-11T14:18:15.207Z"
+  },
+  "owner-megaeth": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 4326,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:15.225Z",
+   "changedAt": "2026-11-11T14:18:15.225Z"
+  },
+  "depository-robinhood": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4663,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "3bec33d24a944af6",
+   "meta": {
+    "codeHash": "3bec33d24a944af6",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:15.283Z",
+   "changedAt": "2026-11-11T14:18:15.283Z"
+  },
+  "allocator-robinhood": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 4663,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:15.299Z",
+   "changedAt": "2026-11-11T14:18:15.299Z"
+  },
+  "owner-robinhood": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 4663,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:15.323Z",
+   "changedAt": "2026-11-11T14:18:15.323Z"
+  },
+  "depository-arc": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 5042,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "ab7a8d3c866ec76f",
+   "meta": {
+    "codeHash": "ab7a8d3c866ec76f",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:15.355Z",
+   "changedAt": "2026-11-11T14:18:15.355Z"
+  },
+  "allocator-arc": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 5042,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:15.370Z",
+   "changedAt": "2026-11-11T14:18:15.370Z"
+  },
+  "depository-base": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "4107bc5d1a28f08e",
+   "meta": {
+    "codeHash": "4107bc5d1a28f08e",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:15.388Z",
+   "changedAt": "2026-11-11T14:18:15.388Z"
+  },
+  "owner-arc": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 5042,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:15.393Z",
+   "changedAt": "2026-11-11T14:18:15.393Z"
+  },
+  "owner-base": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 8453,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:15.397Z",
+   "changedAt": "2026-11-11T14:18:15.397Z"
+  },
+  "allocator-base": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 8453,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:15.400Z",
+   "changedAt": "2026-11-11T14:18:15.400Z"
+  },
+  "allocator-plasma": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 9745,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:15.559Z",
+   "changedAt": "2026-11-11T14:18:15.559Z"
+  },
+  "depository-plasma": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 9745,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "c1b952020c22707e",
+   "meta": {
+    "codeHash": "c1b952020c22707e",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:15.560Z",
+   "changedAt": "2026-11-11T14:18:15.560Z"
+  },
+  "owner-plasma": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 9745,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:15.571Z",
+   "changedAt": "2026-11-11T14:18:15.571Z"
+  },
+  "depository-arbitrum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "84d8b699bf4a3604",
+   "meta": {
+    "codeHash": "84d8b699bf4a3604",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:15.601Z",
+   "changedAt": "2026-11-11T14:18:15.601Z"
+  },
+  "allocator-arbitrum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42161,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:15.601Z",
+   "changedAt": "2026-11-11T14:18:15.601Z"
+  },
+  "owner-arbitrum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42161,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:15.612Z",
+   "changedAt": "2026-11-11T14:18:15.612Z"
+  },
+  "depository-celo": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42220,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "f289b2c0acb5ed9d",
+   "meta": {
+    "codeHash": "f289b2c0acb5ed9d",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:15.674Z",
+   "changedAt": "2026-11-11T14:18:15.674Z"
+  },
+  "allocator-celo": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42220,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:15.675Z",
+   "changedAt": "2026-11-11T14:18:15.675Z"
+  },
+  "owner-celo": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42220,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:15.682Z",
+   "changedAt": "2026-11-11T14:18:15.682Z"
+  },
+  "allocator-mantle": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 5000,
+    "to": "0x59916da825d2d2ec1bf878d71c88826f6633ecca",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:15.774Z",
+   "changedAt": "2026-11-11T14:18:15.774Z"
+  },
+  "allocator-avalanche": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 43114,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:15.788Z",
+   "changedAt": "2026-11-11T14:18:15.788Z"
+  },
+  "owner-avalanche": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 43114,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:15.810Z",
+   "changedAt": "2026-11-11T14:18:15.810Z"
+  },
+  "owner-mantle": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 5000,
+    "to": "0x59916da825d2d2ec1bf878d71c88826f6633ecca",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:15.828Z",
+   "changedAt": "2026-11-11T14:18:15.828Z"
+  },
+  "depository-avalanche": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 43114,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "f2dae426de97f142",
+   "meta": {
+    "codeHash": "f2dae426de97f142",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:15.860Z",
+   "changedAt": "2026-11-11T14:18:15.860Z"
+  },
+  "depository-linea": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0x59916da825d2d2ec1bf878d71c88826f6633ecca"
+   },
+   "value": "46dac807551adb4a",
+   "meta": {
+    "codeHash": "46dac807551adb4a",
+    "bytes": 8777
+   },
+   "seenAt": "2026-11-11T14:18:15.954Z",
+   "changedAt": "2026-11-11T14:18:15.954Z"
+  },
+  "depository-mantle": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 5000,
+    "address": "0x59916da825d2d2ec1bf878d71c88826f6633ecca"
+   },
+   "value": "627e518013c39bd6",
+   "meta": {
+    "codeHash": "627e518013c39bd6",
+    "bytes": 8777
+   },
+   "seenAt": "2026-11-11T14:18:15.956Z",
+   "changedAt": "2026-11-11T14:18:15.956Z"
+  },
+  "allocator-linea": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 59144,
+    "to": "0x59916da825d2d2ec1bf878d71c88826f6633ecca",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:15.993Z",
+   "changedAt": "2026-11-11T14:18:15.993Z"
+  },
+  "owner-linea": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 59144,
+    "to": "0x59916da825d2d2ec1bf878d71c88826f6633ecca",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:16.054Z",
+   "changedAt": "2026-11-11T14:18:16.054Z"
+  },
+  "allocator-ink": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 57073,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:16.216Z",
+   "changedAt": "2026-11-11T14:18:16.216Z"
+  },
+  "owner-ink": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 57073,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:16.241Z",
+   "changedAt": "2026-11-11T14:18:16.241Z"
+  },
+  "depository-berachain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 80094,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "e1fa2cb1da2d8625",
+   "meta": {
+    "codeHash": "e1fa2cb1da2d8625",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:16.245Z",
+   "changedAt": "2026-11-11T14:18:16.245Z"
+  },
+  "depository-ink": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 57073,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "d9761980d9d6428e",
+   "meta": {
+    "codeHash": "d9761980d9d6428e",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:16.263Z",
+   "changedAt": "2026-11-11T14:18:16.263Z"
+  },
+  "allocator-berachain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 80094,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:16.270Z",
+   "changedAt": "2026-11-11T14:18:16.270Z"
+  },
+  "depository-plume": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 98866,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "8f621e057ea0fba8",
+   "meta": {
+    "codeHash": "8f621e057ea0fba8",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:16.311Z",
+   "changedAt": "2026-11-11T14:18:16.311Z"
+  },
+  "allocator-plume": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 98866,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:16.314Z",
+   "changedAt": "2026-11-11T14:18:16.314Z"
+  },
+  "owner-plume": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 98866,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:16.315Z",
+   "changedAt": "2026-11-11T14:18:16.315Z"
+  },
+  "owner-berachain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 80094,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:16.328Z",
+   "changedAt": "2026-11-11T14:18:16.328Z"
+  },
+  "allocator-scroll": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 534352,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:16.496Z",
+   "changedAt": "2026-11-11T14:18:16.496Z"
+  },
+  "allocator-elysium": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 99901,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:16.500Z",
+   "changedAt": "2026-11-11T14:18:16.500Z"
+  },
+  "depository-scroll": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 534352,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "eba7f8bd0fe6f4f9",
+   "meta": {
+    "codeHash": "eba7f8bd0fe6f4f9",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:16.502Z",
+   "changedAt": "2026-11-11T14:18:16.502Z"
+  },
+  "owner-scroll": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 534352,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:16.504Z",
+   "changedAt": "2026-11-11T14:18:16.504Z"
+  },
+  "owner-elysium": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 99901,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:16.537Z",
+   "changedAt": "2026-11-11T14:18:16.537Z"
+  },
+  "allocator-katana": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 747474,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "allocator()",
+    "decode": "address"
+   },
+   "value": "\"0x63c1d3e9c646184529c5694630a01c00df171b56\"",
+   "meta": {
+    "call": "allocator()",
+    "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
+   },
+   "seenAt": "2026-11-11T14:18:16.574Z",
+   "changedAt": "2026-11-11T14:18:16.574Z"
+  },
+  "depository-katana": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 747474,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "d0a4148cb583d8f3",
+   "meta": {
+    "codeHash": "d0a4148cb583d8f3",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:16.595Z",
+   "changedAt": "2026-11-11T14:18:16.595Z"
+  },
+  "owner-katana": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 747474,
+    "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xf61a305199fa1135d76ffab3752d42f55cbd775a\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
+   },
+   "seenAt": "2026-11-11T14:18:16.632Z",
+   "changedAt": "2026-11-11T14:18:16.632Z"
+  },
+  "depository-elysium": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 99901,
+    "address": "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+   },
+   "value": "9bde975fa8a38ae7",
+   "meta": {
+    "codeHash": "9bde975fa8a38ae7",
+    "bytes": 8628
+   },
+   "seenAt": "2026-11-11T14:18:16.671Z",
+   "changedAt": "2026-11-11T14:18:16.671Z"
+  }
+ }
+}

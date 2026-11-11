@@ -241,7 +241,7 @@
      "nep245:v2_1.omni.hot.tg:9745_3aL9skCy1yhPoDB8oKMmRHRN7SJW"
     ]
    },
-   "seenAt": "2026-11-10T14:51:31.740Z",
+   "seenAt": "2026-11-11T14:18:11.509Z",
    "changedAt": "2026-11-10T14:51:31.740Z"
   },
   "docs-1click-api": {
@@ -254,7 +254,7 @@
     "hash": "4052bfabb53df4cd",
     "chars": 1559
    },
-   "seenAt": "2026-11-10T14:51:31.684Z",
+   "seenAt": "2026-11-11T14:18:11.506Z",
    "changedAt": "2026-11-10T14:51:31.684Z"
   },
   "docs-chain-support": {
@@ -267,7 +267,7 @@
     "hash": "061760a0257c7b31",
     "chars": 7084
    },
-   "seenAt": "2026-11-10T14:51:31.747Z",
+   "seenAt": "2026-11-11T14:18:11.478Z",
    "changedAt": "2026-10-14T15:10:54.196Z"
   },
   "intents": {
@@ -283,7 +283,7 @@
     "url": "https://github.com/near/intents/releases/tag/wallet/v0.2.0",
     "prerelease": true
    },
-   "seenAt": "2026-11-10T14:51:31.623Z",
+   "seenAt": "2026-11-11T14:18:11.962Z",
    "changedAt": "2026-10-14T15:12:21.191Z"
   },
   "one-click-sdk-typescript": {
@@ -298,7 +298,7 @@
     "url": "https://github.com/defuse-protocol/one-click-sdk-typescript/commit/ae8b24e064785c8cba8081263e03e52fed4de089",
     "note": "default branch: fix virtual (#21)"
    },
-   "seenAt": "2026-11-10T14:51:32.189Z",
+   "seenAt": "2026-11-11T14:18:12.699Z",
    "changedAt": "2026-10-14T15:12:22.239Z"
   },
   "docs-changelog": {
@@ -306,13 +306,13 @@
    "target": {
     "url": "https://docs.near-intents.org/changelog/overview.md"
    },
-   "value": "74f4d5388d422f914e03d7f3caf96c8535a7af56fd9c6229828d0434ad8773e0",
+   "value": "47fea590879ed65ceee0fac039f2cffa0fd9074dcbdded0022d4dac7e0928be4",
    "meta": {
-    "hash": "74f4d5388d422f91",
-    "chars": 5828
+    "hash": "47fea590879ed65c",
+    "chars": 5973
    },
-   "seenAt": "2026-11-10T14:51:31.423Z",
-   "changedAt": "2026-11-10T14:51:31.423Z"
+   "seenAt": "2026-11-11T14:18:11.222Z",
+   "changedAt": "2026-11-11T14:18:11.222Z"
   }
  }
 }
