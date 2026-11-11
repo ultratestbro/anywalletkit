@@ -35,6 +35,7 @@
 import { ApprovalQueue, type OriginVia } from './approvals.js'
 import type { EvmNetwork } from './networks.js'
 import { RELAY_ERRORS, type RelayError } from './relay.js'
+import { HEX, personalSignBytes, personalSignInput } from './personal-sign.js'
 import { RouterError, type RouterDeps } from './router.js'
 import { SIWE_FORBIDDEN_CHARS, describeSiwe, type SiweInfo } from './siwe.js'
 
@@ -45,9 +46,12 @@ const safeNonce = (n: bigint): number => {
 }
 
 export type SignRequestInfo =
-  | { kind: 'sign-message'; method: 'personal_sign'; account: string; /** Decoded text when printable, else the hex; invisible / direction-changing characters shown as `⟨U+XXXX⟩` ({@link revealHidden}). */ text: string; /** What is actually signed (hex or utf-8 string). */ raw: string; /** Parsed Sign-In with Ethereum (EIP-4361) with the checks against the asking origin, when the text is one. */ siwe?: SiweInfo; /** `text` had invisible or direction-changing characters (now escaped): the sheet should warn. */ hiddenChars?: true; /** The message is exactly 32 bytes (`0x` + 64 hex): a blind hash signature that CoW Protocol (`ethsign`), Safe (v > 30) and others accept as an order or a transfer. Only with the wallet's opt-in ({@link SignDeps.allowBlindHash}); the sheet must make it a danger screen. */ blindHash?: true }
+  | { kind: 'sign-message'; method: 'personal_sign'; account: string; /** Decoded text when printable, else the hex; invisible / direction-changing characters shown as `⟨U+XXXX⟩` ({@link revealHidden}). */ text: string; /** What is actually signed (hex or utf-8 string). */ raw: string; /** Parsed Sign-In with Ethereum (EIP-4361) with the checks against the asking origin, when the text is one. */ siwe?: SiweInfo; /** `text` had invisible or direction-changing characters (now escaped): the sheet should warn. */ hiddenChars?: true; /** The bytes signed are exactly 32: a blind hash signature that CoW Protocol (`ethsign`), Safe (v > 30) and others accept as an order or a transfer. The sheet must make it a danger screen with Reject / Sign anyway; `blindHashForm` says how the message came. */ blindHash?: true; /** With `blindHash`: `'hex'` — `0x` + 64 hex, only with the wallet's opt-in ({@link SignDeps.allowBlindHash}); `'text'` — text whose UTF-8 encoding is 32 bytes (a digest a site ground to valid UTF-8, sent as text), always shown, never refused. */ blindHashForm?: BlindHashForm }
   | { kind: 'sign-typed-data'; method: string; account: string; /** Pretty-printed JSON, invisible / direction-changing characters escaped. */ text: string; typedData: TypedData; /** `text` had invisible or direction-changing characters (now escaped): the sheet should warn. */ hiddenChars?: true }
   | { kind: 'send-transaction'; method: 'eth_sendTransaction'; account: string; tx: { to: string; value: string; data: string | null; gas: string | null } }
+
+/** How a 32-byte personal_sign message came ({@link SignRequestInfo} `blindHashForm`): `0x` + 64 hex, or text whose UTF-8 encoding is 32 bytes. */
+export type BlindHashForm = 'hex' | 'text'
 
 export interface TypedData {
   domain: Record<string, unknown>
@@ -88,6 +92,11 @@ export interface SignApproval {
 }
 
 export interface EvmSigner {
+  /**
+   * EIP-191 personal_sign. Bytes are signed as given, a string as its UTF-8 encoding (what viem
+   * `signMessage`, ethers and wallet-evm `sign` do): the 32-byte check of {@link classifySignRequest}
+   * measures the message that way.
+   */
   signMessage(message: string | Uint8Array): Promise<string>
   signTypedData(typed: TypedData): Promise<string>
   /** Fully specified tx (chainId, nonce, gas, fees) → signed raw transaction. */
@@ -104,8 +113,10 @@ export interface SignDeps {
   /** Tip floor per chain id in wei (default 0.1 gwei everywhere). */
   tipFloor?: (chainId: number) => bigint
   /**
-   * Whether a personal_sign of a raw 32-byte hash may reach the sheet (read per request). Default: refused — a
-   * blind hash signature can be a CoW order or a Safe transaction paying someone else (extension audit E55).
+   * Whether a personal_sign of a raw 32-byte hash (`0x` + 64 hex) may reach the sheet (read per request). Default:
+   * refused — a blind hash signature can be a CoW order or a Safe transaction paying someone else (extension
+   * audit E55). Text whose UTF-8 encoding is 32 bytes is not affected: it always reaches the sheet, marked
+   * `blindHash` with `blindHashForm: 'text'`.
    */
   allowBlindHash?: () => boolean | Promise<boolean>
   /**
@@ -120,7 +131,6 @@ export interface SignDeps {
 export const MAX_FEE_REASKS = 3
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/
-const HEX = /^0x([0-9a-fA-F]{2})*$/
 const lc = (s: string) => s.toLowerCase()
 
 /**
@@ -187,10 +197,7 @@ const HIDDEN_CONTROL = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/
 const err = (code: number, message: string): RelayError => ({ code, message })
 
 /** Signing method + params → what the window reviews, or the error to answer with. */
-/** A personal_sign message that is a raw 32-byte hash: what an `ethsign`-style verifier turns into an order or a transfer. */
-const BLIND_HASH = /^0x[0-9a-fA-F]{64}$/
-
-export function classifySignRequest(input: { network: EvmNetwork; method: string; params: unknown[]; accounts: string[]; /** The asking page (browser-recorded) — needed for the SIWE domain check. */ origin?: string; /** Transport note for pseudo-origins (WalletConnect Verify), for the SIWE check. */ via?: OriginVia; now?: number; /** Let a 32-byte hash personal_sign reach the sheet (marked `blindHash`) instead of refusing it. Default false. */ allowBlindHash?: boolean }): SignRequestInfo | RelayError {
+export function classifySignRequest(input: { network: EvmNetwork; method: string; params: unknown[]; accounts: string[]; /** The asking page (browser-recorded) — needed for the SIWE domain check. */ origin?: string; /** Transport note for pseudo-origins (WalletConnect Verify), for the SIWE check. */ via?: OriginVia; now?: number; /** Let a 32-byte hash personal_sign in its hex form (`0x` + 64 hex) reach the sheet (marked `blindHash`) instead of refusing it. Default false. Text whose UTF-8 encoding is 32 bytes always reaches it, marked. */ allowBlindHash?: boolean }): SignRequestInfo | RelayError {
   const { method, params } = input
   const owned = new Set(input.accounts.map(lc))
   const ours = (a: unknown): a is string => typeof a === 'string' && ADDRESS.test(a) && owned.has(lc(a))
@@ -202,9 +209,11 @@ export function classifySignRequest(input: { network: EvmNetwork; method: string
     if (ours(msg) && !ours(addr)) [msg, addr] = [addr, msg]
     if (!ours(addr)) return err(RELAY_ERRORS.unauthorized, 'personal_sign for an address this wallet does not hold.')
     if (typeof msg !== 'string') return err(RELAY_ERRORS.invalidParams, 'personal_sign expects a message string.')
-    // 32 raw bytes are signed as an EIP-191 "\n32" message: CoW Protocol's ethsign orders, Safe owner signatures (v > 30)…
-    const blindHash = BLIND_HASH.test(msg)
-    if (blindHash && !input.allowBlindHash) return err(RELAY_ERRORS.unsupportedMethod, 'This site asks you to sign a raw 32-byte hash (blind signing). It can be a swap order or a transfer (e.g. CoW Protocol) paying someone else, so this wallet refuses it. "Allow blind hash signatures" in Options turns on a review for such requests.')
+    // 32 signed bytes are an EIP-191 "\n32" message: CoW Protocol's ethsign orders, Safe owner signatures (v > 30)…
+    // Measured on what the signer gets (personal-sign.ts), not on the string: a digest ground until it is valid
+    // UTF-8 and sent as text signs the same 32 bytes as its hex form (16 two-byte letters are 32 bytes too).
+    const blindHashForm: BlindHashForm | undefined = personalSignBytes(msg).length !== 32 ? undefined : HEX.test(msg) ? 'hex' : 'text'
+    if (blindHashForm === 'hex' && !input.allowBlindHash) return err(RELAY_ERRORS.unsupportedMethod, 'This site asks you to sign a raw 32-byte hash (blind signing). It can be a swap order or a transfer (e.g. CoW Protocol) paying someone else, so this wallet refuses it. "Allow blind hash signatures" in Options turns on a review for such requests.')
     const shown = shownMessage(msg)
     const text = shown.text
     const signed = decodedMessage(msg) ?? text
@@ -214,7 +223,7 @@ export function classifySignRequest(input: { network: EvmNetwork; method: string
     if (siwe && HIDDEN_CONTROL.test(signed)) return err(RELAY_ERRORS.invalidParams, 'This sign-in message contains hidden control characters — refused.')
     // Bidi controls and zero-width characters can make the domain or statement read differently from what is signed.
     if (siwe && SIWE_FORBIDDEN_CHARS.test(signed)) return err(RELAY_ERRORS.invalidParams, 'This sign-in message contains invisible or text-direction characters — refused.')
-    return { kind: 'sign-message', method, account: checksum(addr), text, raw: msg, ...(siwe ? { siwe } : {}), ...(shown.hidden ? { hiddenChars: true as const } : {}), ...(blindHash ? { blindHash: true as const } : {}) }
+    return { kind: 'sign-message', method, account: checksum(addr), text, raw: msg, ...(siwe ? { siwe } : {}), ...(shown.hidden ? { hiddenChars: true as const } : {}), ...(blindHashForm ? { blindHash: true as const, blindHashForm } : {}) }
   }
 
   if (method === 'eth_signTypedData_v4' || method === 'eth_signTypedData_v3' || method === 'eth_signTypedData') {
@@ -406,7 +415,7 @@ export function createSignHandler(deps: SignDeps): NonNullable<RouterDeps['sign'
     try {
       switch (info.kind) {
         case 'sign-message':
-          return await handle.signer.signMessage(HEX.test(info.raw) ? Uint8Array.from(info.raw.slice(2).match(/../g) ?? [], (b) => Number.parseInt(b, 16)) : info.raw)
+          return await handle.signer.signMessage(personalSignInput(info.raw))
         case 'sign-typed-data':
           return await handle.signer.signTypedData(info.typedData)
       }
