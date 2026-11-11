@@ -5,7 +5,31 @@
  * See how-to-project/OMNISTON-NETWORK-ONBOARDING.md before adding a network.
  */
 export const AUDITED_OMNISTON_SETTLEMENT_CONTRACTS: Record<string, string[]> = {
-  "ton:-239": ["EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ"],
+  // TON Escrow Minters. The provider compares TON addresses as these exact
+  // strings, so each one is kept in the form Omniston's quotes use.
+  // - EQAbWJ3Y… (code f91c43d3…, "rev1", deployed 2026-06-09): every quote
+  //   named it until 2026-11-10. It stays while orders on it settle and
+  //   refund; backstops and history read this table too.
+  // - EQDybO88… (code 9737943f…, "rev2"): every TON <-> EVM quote names it
+  //   since 2026-11-10 ~19:00Z. Reviewed 2026-11-12, read-only:
+  //   - Deploy tx fkabfHcN8DcrqQyazmlB+UprljBDeEkvFlgaVOi905g=
+  //     (2026-11-10 18:47:06Z). Code and data still equal that StateInit:
+  //     no upgrade since, none pending (no pendingCode, upgradeAfter 0).
+  //   - Same admin (0:408fff62…) as rev1; it is also the admin_address of the
+  //     STON.fi DEX v2 routers api.ston.fi lists. Deployed from the same
+  //     wallet as rev1 (a weak signal on TON: anyone can send a StateInit).
+  //   - The bytecode diff to rev1 only adds restrictions: escrow / execution
+  //     code must be in an embedded whitelist (9e77…, f6ed…, d304…, pinned in
+  //     ton.ts, plus 9fe4… for TON <-> TON) and the escrow sub-VM must return
+  //     one value. Fees, timelocks, payouts, admin and the 7-day upgrade delay
+  //     are unchanged. Replayed through both codes, the real traffic of both
+  //     minters (~42k transactions) and of ~1,070 of their positions gave the
+  //     same outputs.
+  //   - It deploys positions with code eb503578…, pinned next to e4d5115a…
+  //     in DEFAULT_OMNISTON_TON_CODE_HASHES.position. Both changes ship
+  //     together: without the pin every EVM -> TON order on this minter fills
+  //     and then fails the disclosure check.
+  "ton:-239": ["EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ", "EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA"],
   "eip155:1": ["0xafCF681272AF10959736f45616eeCBC22D7095E2"],
   "eip155:56": ["0xafCF681272AF10959736f45616eeCBC22D7095E2"],
   "eip155:137": ["0x41A392062A4307a6961d48e30FF20bF6823715B8"],

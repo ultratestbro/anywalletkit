@@ -20,8 +20,15 @@ export const STONFI_ROUTERS: readonly string[] = [
   "EQCS4UEa5UaJLzOyyKieqQOQ2P9M-7kXpkO5HnP3Bv250cN3",
   "EQB3ncyBUTjZUA5EnFKR5_EnOMI9V1tTEAAPaiU71gc4TiUt",
 ];
-/** Omniston HTLC escrow on TON (Omniston Escrow Minter) — the `srcProtocolContractAddress` of TON→EVM orders. */
-export const OMNISTON_ESCROWS: readonly string[] = ["EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ"];
+/**
+ * Omniston HTLC escrow on TON (Omniston Escrow Minter) — the `srcProtocolContractAddress` of TON→EVM orders.
+ * Every minter that ever held an order stays here: this list recognizes history, it grants no trust.
+ * EQAbWJ3Y… until 2026-11-10, EQDybO88… since 2026-11-10 ~19:00Z.
+ */
+export const OMNISTON_ESCROWS: readonly string[] = [
+  "EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ",
+  "EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA",
+];
 
 function raw(address: string | null | undefined): string | null {
   if (!address) return null;
