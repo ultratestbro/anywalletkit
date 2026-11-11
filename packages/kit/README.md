@@ -60,10 +60,13 @@ Permit2 `signTypedData` (checked against the **spender**; `confirm` sees
 1inch LOP `Order` (`kind: 'send'`, judged by whom they pay), any other
 `signTypedData` (`kind: 'typedData'` with `destinationUnknown: true`: an
 allowlist refuses it, so does a blocklist without `confirm`; a blocklisted
-`verifyingContract` is refused), an EVM `sign` of exactly 32 signed bytes — a
-32-byte `Uint8Array`, a `0x` + 64-hex string, or text whose UTF-8 encoding is 32
-bytes (`blindHash: true`, `blindHashForm: 'bytes' | 'hex' | 'text'`; judged like
-unreadable typed data: `confirm` should make it a danger screen),
+`verifyingContract` is refused), an EVM `sign` that may be a blind hash — a
+32-byte `Uint8Array`, a `0x` + 64-hex string (by its shape: a dApp's digest,
+which another signer may decode), or other text whose UTF-8 encoding is 32 bytes
+(`blindHash: true`, `blindHashForm: 'bytes' | 'hex' | 'text'`; judged like
+unreadable typed data: an allowlist refuses it, otherwise `confirm` should make
+it a danger screen; the account is handed the measured bytes, and an EVM `sign`
+of anything but a string or a `Uint8Array` is refused),
 and chain-specific ones such as Tron's `signRaw`, NEAR's `signBuilt`, Solana's
 `sendSerialized`. The rule is deny-by-default: any account method named
 `sign*` / `send*` / `approve*` / `revoke*` / `transfer*` is guarded unless it

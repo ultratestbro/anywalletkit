@@ -163,8 +163,9 @@ Show on every approval:
   normal message sheet. `request.blindHashForm` says how it came:
   - `'text'`: ordinary-looking text whose UTF-8 encoding is 32 bytes (16 accented letters,
     8 emoji, 32 ASCII characters). A site can grind an order until its digest is valid UTF-8
-    and send it as text. It always reaches the sheet: "This looks like a hidden hash. Signing
-    it may authorize a transfer or an order."
+    and send it as text. It always reaches the sheet, also without `allowBlindHash`, so the
+    sheet needs this branch even if the wallet never offers the option: "This looks like a
+    hidden hash. Signing it may authorize a transfer or an order."
   - `'hex'`: `0x` + 64 hex digits. Refused (4200) before any sheet unless you pass
     `allowBlindHash` to `createSignHandler` (an "Allow blind hash signatures" option the user
     turns on, behind the password), and then shown the same way.

@@ -19,10 +19,18 @@ caught; text whose UTF-8 encoding is 32 bytes passed as a normal message.
 - **kit:** an EVM `sign` of such text is `kind: 'typedData'`, `blindHash: true`, `blindHashForm: 'text'`, no longer
   `kind: 'message'`. A `confirm` that turns `blindHash` into a danger screen covers it; word it with
   `blindHashForm` ("This looks like a hidden hash. Signing it may authorize a transfer or an order."). Under an
-  allowlist, or a blocklist without `confirm`, it is now refused, as the hex and bytes forms already were.
-- **extension-kit:** such a `personal_sign` reaches the sheet with `blindHash: true`, `blindHashForm: 'text'`, also
-  when `allowBlindHash` is off. A sheet that shows `blindHash` as a danger screen covers it. The hex form is
-  unchanged and now carries `blindHashForm: 'hex'`.
+  allowlist, or a blocklist without `confirm`, it is now refused, as the hex and bytes forms already were. The rule
+  follows the account's namespace now, so an account asked for as `eip155` (or registered under another key) is
+  covered too.
+- **kit, Breaking:** an EVM `sign` takes a string or a `Uint8Array` (from any realm, a Node `Buffer` too). Anything
+  else — an array of numbers, another typed array, an `ArrayBuffer`, `{ raw }` — is refused with
+  `PolicyViolationError('method')`; convert it to a `Uint8Array` first. The account is handed the bytes the policies
+  measured: a string's UTF-8 as a `Uint8Array` (the same signature).
+- **extension-kit, Breaking if your sheet has no `blindHash` branch:** such a `personal_sign` reaches the sheet with
+  `blindHash: true`, `blindHashForm: 'text'`, also when `allowBlindHash` is off. Until now `blindHash` came only
+  with that opt-in, so a wallet that never turned it on may show `blindHash` on the normal message sheet. Add a red
+  danger screen for `blindHash` (Reject / Sign anyway) before you bump; a sheet that already has one covers it. The
+  hex form is unchanged and now carries `blindHashForm: 'hex'`. The form's type is `PersonalSignBlindHashForm`.
 
 ## 2026-11-02: the audit fixes
 

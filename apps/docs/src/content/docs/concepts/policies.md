@@ -86,21 +86,25 @@ and `confirm` gets a copy of its own: nothing can change what is signed after it
 
 ### Blind hash signatures
 
-An EVM `sign` of exactly 32 signed bytes may be an order or a transfer: CoW Protocol's `ethsign`
-orders and Safe owner signatures (v > 30) accept a digest signed behind the EIP-191 prefix. So it
-is not a plain message but `kind: 'typedData'` with `blindHash: true` and
-`destinationUnknown: true`: an allowlist refuses it, and so does a blocklist without a `confirm`
-hook. Without lists it is signed after `confirm`, which should make it a danger screen with
-**Reject** and **Sign anyway**. `blindHashForm` says how it came:
+32 bytes signed behind the EIP-191 prefix may be an order or a transfer: CoW Protocol's `ethsign`
+orders and Safe owner signatures (v > 30) accept a digest signed that way. So an EVM `sign` that
+may be one is not a plain message but `kind: 'typedData'` with `blindHash: true` and
+`destinationUnknown: true`: an allowlist refuses it before `confirm`, and so does a blocklist
+without a `confirm` hook. Without lists it is signed after `confirm`, which should make it a
+danger screen with **Reject** and **Sign anyway**. `blindHashForm` says how it came:
 
 | `blindHashForm` | Argument |
 |---|---|
 | `'bytes'` | a 32-byte `Uint8Array` |
-| `'hex'` | a `0x` + 64-hex string |
-| `'text'` | any other string whose UTF-8 encoding (what the account signs) is 32 bytes: 16 accented letters, 8 emoji, 32 ASCII characters. A site can grind an order until its digest is valid UTF-8 and send it as text: "This looks like a hidden hash. Signing it may authorize a transfer or an order." |
+| `'hex'` | a `0x` + 64-hex string, flagged by its shape: it is how a dApp sends a digest. wallet-evm signs it as its 66 characters of text; another signer may decode it to the 32 bytes |
+| `'text'` | any other string whose UTF-8 encoding is 32 bytes: 16 accented letters, 8 emoji, 32 ASCII characters. A site can grind an order until its digest is valid UTF-8 and send it as text: "This looks like a hidden hash. Signing it may authorize a transfer or an order." |
 
 The length is counted in UTF-8 bytes, not characters: 32 characters with one `é` are 33 bytes
-and stay a message.
+and stay a message. The account is handed exactly the bytes that were counted (a string as its
+UTF-8), so what was judged is what gets signed, whatever `TextEncoder` the runtime has. An EVM
+`sign` takes a string or a `Uint8Array` (from any realm, a Node `Buffer` too); anything else is
+refused with `PolicyViolationError('method')`. The account's namespace decides that a `sign` is an
+EVM one, not the spelling of the chain it was asked for (`eip155`, `eip155:1`).
 
 ### Revokes
 
@@ -145,7 +149,7 @@ What `confirm` receives:
 | `unlimited` | Approvals: type(uint128).max or above, a DAI-style `allowed`, or an amount that cannot be read |
 | `approvals` | Approvals: every token a signature grants (a Permit2 batch has several) |
 | `message` | `true` for message signatures |
-| `blindHash` | EVM `sign` of exactly 32 signed bytes: show a danger screen (see above) |
+| `blindHash` | EVM `sign` that may be a blind hash (32 bytes, or the `0x` + 64-hex form): show a danger screen (see above) |
 | `blindHashForm` | With `blindHash`: `'bytes'`, `'hex'` or `'text'` |
 | `raw` | The original argument, for anything else you need |
 
