@@ -15,7 +15,10 @@ caller's string as it is, so for the `0x` + 64-hex form wallet-evm signs the 66 
 
 - **Breaking:** for such text `kind` is `'typedData'`, no longer `'message'`. Without a `confirm` hook an allowlist now
   refuses it (`PolicyViolationError`, `allowlist`) and so does a blocklist (`blocklist`); with one, `confirm` gets
-  it, under an allowlist too — the hex and bytes forms stay refused under an allowlist before `confirm`.
+  it, under an allowlist too — the hex and bytes forms stay refused under an allowlist before `confirm`. Only a
+  function is a `confirm` hook: `confirm: null`, `false`, `0` or `''` count as none here as everywhere else (the
+  lists refuse), and any other value that is not a function refuses every write with a `TypeError` before any rule
+  (it was called, and threw, after them).
 - **Breaking:** whether a `sign` is an EVM one follows the account's namespace, not the spelling of the chain it was
   asked for. An EVM account asked for by namespace (`getAccount('eip155')`), registered under another key
   (`registerWallet('evm', …)`), or wrapped with `applyPolicies(account, policies, 'eip155')` now gets all three
@@ -29,9 +32,24 @@ caller's string as it is, so for the `0x` + 64-hex form wallet-evm signs the 66 
   `applyPolicies(account, policies, 'ethereum')`, another family's id — matched no rule at all: a blind hash `sign`
   in every form and typed data without `domain.chainId` were signed with an `eip155` allowlist or blocklist in
   place. They are judged by the `eip155` rules now. Under such a key an exact-id rule (`'eip155:1'`) needs the
-  account's chain as under a namespace (learned from the RPC, or `PolicyViolationError('chain')` offline), and the
-  write is read on the account's chain: `confirm` gets `chain: 'eip155:…'` instead of the key, and a transaction's
-  calldata is read as an EVM one (an ERC-20 recipient is a destination; under `'evm'` it was not seen).
+  account's chain as under a namespace (learned from the RPC, or `PolicyViolationError('chain')` offline).
+- **Breaking:** a write of an account asked for under a key that is neither a chain id of its family nor its
+  namespace is read on the account's own chain, not on the key — for every chain family, whether the chain was
+  known or not. `confirm` gets `chain` as the account's id (`eip155:1`, `solana:5eykt…`, `ton:-239`,
+  `zcash:mainnet`; `eip155:unknown` for an off-chain signature of an EVM account that has not learned its chain)
+  instead of the key (`evm`, `sol`, `tonkey`, `zec`), and the write is read by its chain's rules,
+  not the generic ones. EVM (`registerWallet('evm', …, { chainId: 1 })` + `getAccount('evm')`): an ERC-20
+  `transfer` in a transaction's calldata makes its recipient a destination next to the token, so an
+  `eip155: [TOKEN]` allowlist now refuses a transfer to a recipient not on it and a blocklist on the recipient
+  refuses it; `approve({ token, amount: 0 })` on an ERC-20 is `kind: 'revoke'` (asked through `getTokenInfo` when
+  the token is not in the catalog). TON under such a key: a jetton transfer carries `attachedValue` and
+  `forwardTonAmount` and the jetton is a destination (a blocklist on it refuses). Zcash under such a key: a
+  recipient that is not plain base58 (padded with a space or U+FEFF) is `destinationUnknown`, so a blocklist without
+  `confirm` refuses it. Tron and NEAR token transfers through a contract (a TRC-20 `transfer`, a NEP-141
+  `ft_transfer`) were `destinationUnknown` with no destination under such a key (an allowlist refused them, so did a
+  blocklist without `confirm`): the token contract and its recipient are their destinations now, judged like any
+  other. Solana transactions are read by Solana's rules. An account asked for by its namespace
+  (`getAccount('ton')`) is read on that namespace as before.
 - **Breaking:** a blind hash needs the account's chain like typed data when an exact-id rule of the family
   (`'eip155:1'`) could be the account's own: an account that reports `eip155:unknown` asks its RPC for the chain id
   first, and an offline one is refused with `PolicyViolationError('chain')`; before, it was signed without any rule.

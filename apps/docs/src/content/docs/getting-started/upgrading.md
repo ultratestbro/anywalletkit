@@ -21,7 +21,9 @@ caught; text whose UTF-8 encoding is 32 bytes passed as a normal message.
   covers it; word it with `blindHashForm` ("This looks like a hidden hash. Signing it may authorize a transfer or an
   order."). Without `confirm`, an allowlist or a blocklist now refuses it. With `confirm`, `confirm` gets it, under
   an allowlist too (the hex and bytes forms stay refused there before `confirm`). The form's type is
-  `EvmSignBlindHashForm`.
+  `EvmSignBlindHashForm`. Only a function is a `confirm` hook: `confirm: uiReady ? showSheet : null` (or `false`,
+  `0`, `''`) is no hook, and the lists refuse; any other value that is not a function refuses every write with a
+  `TypeError`.
 - **kit, Breaking:** the blind hash rule follows the account's namespace, not the spelling of the chain it was asked
   for: an EVM account asked for as `eip155`, registered under another key, or wrapped with
   `applyPolicies(account, policies, 'eip155')` now gets all three forms flagged, as an account asked for as
@@ -33,9 +35,19 @@ caught; text whose UTF-8 encoding is 32 bytes passed as a normal message.
   your own registration key (`registerWallet('evm', …)`, then `getAccount('evm')` or `getManager('evm')`),
   `applyPolicies(account, policies, 'ethereum')`, another family's id — matched no rule: a blind hash `sign` and
   typed data without `domain.chainId` were signed under an `eip155` allowlist or blocklist. They are judged by it
-  now. Under such a key an exact-id rule (`'eip155:1'`) needs the account's chain as under `eip155`, `confirm` sees
-  the account's chain (`eip155:…`) instead of the key, and a transaction is read as an EVM one (an ERC-20 recipient
-  in its calldata is a destination). Registering EVM wallets under `eip155` or an exact id avoids the question.
+  now. Under such a key an exact-id rule (`'eip155:1'`) needs the account's chain as under `eip155`. Registering
+  EVM wallets under `eip155` or an exact id avoids the question.
+- **kit, Breaking:** an account of any chain asked for under a key that is neither a chain id of its family nor its
+  namespace (`'evm'`, `'sol'`, `'tonkey'`, `'zec'`) has its writes read on its own chain, not on the key, whether
+  its chain was known or not. `confirm` sees the account's chain id (`eip155:1`, `ton:-239`, …) instead of the key,
+  and the write is read by its chain's rules. EVM: an ERC-20 recipient in a transaction's calldata is a
+  destination (an `eip155` allowlist of the token alone now refuses a transfer to a recipient not on it; a
+  blocklist on the recipient refuses it), and `approve({ token, amount: 0 })` on an ERC-20 is a revoke. TON: a
+  jetton transfer carries `attachedValue` / `forwardTonAmount` and the jetton is a destination (a blocklist on it
+  refuses). Zcash: a recipient padded with a space or U+FEFF is `destinationUnknown` (a blocklist without `confirm`
+  refuses it). Tron and NEAR token transfers through a contract, which had no destination there (an allowlist
+  refused them, so did a blocklist without `confirm`), now have the token contract and its recipient as
+  destinations. An account asked for by its namespace (`getAccount('ton')`) is read as before.
 - **kit, Breaking:** a blind hash needs the account's chain like typed data when an exact-id rule of the family
   (`'eip155:1'`) could be the account's own. An account that reports `eip155:unknown` (wallet-evm without `chainId`)
   now asks its RPC for the chain id first (an RPC error comes back as the error); an offline one is refused with

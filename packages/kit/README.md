@@ -65,7 +65,8 @@ allowlist refuses it, so does a blocklist without `confirm`; a blocklisted
 wallet-evm signs the 66 bytes of its text, another signer may decode it), or
 other text whose UTF-8 encoding is 32 bytes (`blindHash: true`,
 `blindHashForm: 'bytes' | 'hex' | 'text'`; `confirm` should make it a danger
-screen; without `confirm` an allowlist or a blocklist refuses it, and under an
+screen; without `confirm` (only a function is one: `null` or `false` is none)
+an allowlist or a blocklist refuses it, and under an
 allowlist the hex and bytes forms are refused even with `confirm`; like typed
 data it needs the account's chain when an exact-id rule could be its own; the
 `eip155` rules judge it under whatever key the account was asked for; the

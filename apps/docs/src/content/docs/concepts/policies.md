@@ -29,7 +29,10 @@ const wallet = new Wallet(seedPhrase, {
 | `blocklist` | chain id or namespace → destinations that are refused | `PolicyViolationError` (`policy: 'blocklist'`) |
 | `confirm` | one function for every write | `UserRejectedError` when it returns `false` |
 
-Address comparison ignores letter case.
+Address comparison ignores letter case. Only a function is a `confirm` hook: `null`, `false`, `0`
+or `''` (`confirm: uiReady ? showSheet : null`) mean there is none, and the lists then refuse what
+they would have left to the hook. Any other value that is not a function refuses every write with
+a `TypeError`.
 
 ## What is guarded
 
@@ -198,7 +201,18 @@ of that family refuses the write (`policy: 'chain'`) instead of guessing.
 The account's own namespace rules apply however you asked for it. A registration key of your own
 (`registerWallet('evm', …)` then `getAccount('evm')`) or another family's id is no chain: under it,
 an EVM account is judged by the `eip155` rules and by the exact-id rules of the chain it reports,
-which it learns from its RPC first when an exact-id rule of the family is set.
+which it learns from its RPC first when an exact-id rule of the family is set. An exact id you
+asked for applies whatever its family: an EVM account asked for as `solana:mainnet` is judged by
+the `solana:mainnet` rules too.
+
+An off-chain signature (typed data, a blind hash `sign`) asked for under an exact id of the
+account's family is judged by the rules of that id and of the chain the account already reports;
+the account does not ask its RPC for its chain id for it. So an `eip155:1` allowlist does not
+reach a blind hash signed through an account asked for as `eip155:137`, even when its RPC is on
+mainnet, although a signature over 32 raw bytes is valid on every chain (a CoW Protocol order for
+mainnet included). A transaction in that setup is refused (`chain`): it learns that it signs for
+mainnet, not for `eip155:137`. To hold every EVM signature to one list, key it by the namespace
+(`eip155`), or ask for EVM accounts by the chain id their RPC is on.
 
 ## Policies and chain-level limits
 
