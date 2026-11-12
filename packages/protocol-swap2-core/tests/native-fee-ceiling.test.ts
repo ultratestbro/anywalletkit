@@ -248,6 +248,8 @@ describe("nativeFeeCeiling: an answer that is not a ceiling refuses the executio
     ["a symbol", () => Symbol("cap"), "a symbol"],
     ["Infinity", () => Infinity, "the number Infinity"],
     ["a boolean", () => true, "the boolean true"],
+    ["a function", () => () => 10n ** 16n, "a function"],
+    ["an object whose then getter throws", () => Object.defineProperty({}, "then", {get() { throw new Error("trap"); }}), "an object"],
   ];
   it.each(answers)("%s", async (_name, hook, shown) => {
     const error = await refused(route, {nativeFeeCeiling: hook as never});

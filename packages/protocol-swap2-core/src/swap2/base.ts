@@ -356,8 +356,9 @@ export interface Swap2EngineConfig extends Swap2ProtocolConfig {
   /**
    * The app's native-fee ceiling for a route. A route may charge native coin on top of the input (a bridge's messaging
    * fee, declared by the quote); the engine refuses a fee above its per-chain cap (0.005 ETH on Ethereum and on chains
-   * without a row, 100 CELO on Celo, …). This hook is asked once per execution whose quote declares a native fee, before
-   * the review and before any approval:
+   * without a row, 100 CELO on Celo, …). This hook is asked for every execution pass whose quote declares a native fee, before
+   * that pass's review and approvals (once, unless the quote expires during an approval and the engine re-quotes: the
+   * fresh quote is asked again; a refusal then revokes the allowance just granted):
    *
    * - a non-negative `bigint` is the cap for that execution, in place of the chain's own (higher or lower; `0n` refuses
    *   any fee). It may be at most {@link NATIVE_FEE_CEILING_MAX_MULTIPLE} × the chain's cap (`ctx.maxCeiling`);

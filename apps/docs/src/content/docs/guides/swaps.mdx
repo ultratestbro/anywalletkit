@@ -230,8 +230,9 @@ Ethereum and on chains without a cap of their own (Arbitrum, Base, …), 100 CEL
 `swap2: quoted native fee <fee> exceeds the cap <cap> for <chain>`.
 
 To allow one route above it, set `nativeFeeCeiling` on the router (or on any swap2
-protocol). The engine calls it once per `swap2()` whose quote declares a native fee, before
-the review screen and before any approval:
+protocol). The engine calls it for every execution pass whose quote declares a native fee, before
+that pass's review screen and approvals: once, unless the quote expires during an approval and the engine
+re-quotes (the fresh quote is asked again, and a refusal then revokes the allowance just granted):
 
 | The hook returns | Result |
 |---|---|

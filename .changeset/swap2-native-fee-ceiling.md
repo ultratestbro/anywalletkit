@@ -3,8 +3,9 @@
 ---
 
 `nativeFeeCeiling` on the engine config (`Swap2EngineConfig`, so on every swap2 protocol and the router): the app's
-own cap for the native fee a route charges on top of the input (a bridge's messaging fee). The engine asks it once per
-`swap2()` whose quote declares a native fee, before the review and before any approval, with
+own cap for the native fee a route charges on top of the input (a bridge's messaging fee). The engine asks it for every
+execution pass whose quote declares a native fee, before that pass's review and approvals (once, unless the quote
+expires during an approval and the engine re-quotes: the fresh quote is asked again), with
 `{provider, intentId, fromChain, destChain, nativeFee, defaultCap, maxCeiling}` (`Swap2NativeFeeCeilingContext`). A
 non-negative `bigint` is the cap for that execution in place of the chain's own (higher or lower; `0n` refuses any
 fee); `undefined` keeps the chain's cap. Anything else (a number, a string, `null`, a Promise), a throw, or a value
