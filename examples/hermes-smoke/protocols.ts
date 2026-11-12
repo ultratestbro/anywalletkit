@@ -17,6 +17,9 @@ import { CctpSwap2Protocol } from '@anywalletkit/protocol-swap2-cctp/protocol'
 import { usdt0Provider } from '@anywalletkit/protocol-swap2-usdt0/provider'
 import { Usdt0Swap2Protocol } from '@anywalletkit/protocol-swap2-usdt0/protocol'
 import { USDT0_MESH_DESTINATIONS, USDT0_MESH_SOURCES, meshRecipientBytes32, meshRecipientMatches, usdt0VerifyQuote } from '@anywalletkit/protocol-swap2-usdt0/config'
+import { describeUsdt0Activity } from '@anywalletkit/protocol-swap2-usdt0/activity'
+import usdt0MeshTonLive from '../../packages/protocol-swap2-usdt0/fixtures/activity/arb-mesh-send-ton-1.json'
+import usdt0MeshTronLive from '../../packages/protocol-swap2-usdt0/fixtures/activity/arb-mesh-send-tron-1.json'
 import { chainflipProvider } from '@anywalletkit/protocol-swap2-chainflip/provider'
 import { ChainflipSwap2Protocol } from '@anywalletkit/protocol-swap2-chainflip/protocol'
 import { decodeTronNote } from '@anywalletkit/protocol-swap2-chainflip/codec'
@@ -174,7 +177,9 @@ export async function smokeProtocols(check: Check): Promise<void> {
   // approvalRequired(), peers(), quoteOFT and quoteSend as the live one did on 2026-11-12 (quoteSend into TON
   // 56287292611713 wei). viem's http transport reads only these response fields (the VM has no Response).
   const MESH_FEE = 56_287_292_611_713n
+  let meshRpcCalls = 0
   const meshRpc = (async (_url: string, init?: { body?: string }) => {
+    meshRpcCalls++
     const req = JSON.parse(String(init?.body)) as { id: number; method: string; params: Array<{ to: string; data: `0x${string}` }> }
     const reply = (result: unknown) => {
       const text = JSON.stringify({ jsonrpc: '2.0', id: req.id, result })
@@ -212,6 +217,42 @@ export async function smokeProtocols(check: Check): Promise<void> {
     try { await meshLive.preflightDeposit!(mq, { ...mtx, data: swapped }) } catch (e) { tampered = (e as Error).message }
     check('usdt0 mesh: buildDeposit + preflightDeposit pass (sealed send decoded, fee re-quoted); a swapped recipient in the calldata is refused',
       pre === 'ok' && mtx.to === mArb.oft && mtx.value === sealedFee && tampered === 'usdt0: the deposit is not the sealed Legacy Mesh send', `${pre} | ${tampered}`)
+    // The rest of the sealed send (review 2026-11-12): the view call that carries the same SendParam, the three byte
+    // fields, the MessagingFee, the refund and the chain — each swapped alone is refused before any RPC read.
+    const resend = (sp: Record<string, unknown>, fee: { nativeFee: bigint; lzTokenFee: bigint }, refund: `0x${string}`) => encodeFunctionData({ abi: meshSend, functionName: 'send', args: [sp as never, fee, refund] })
+    const attacker = '0x9999999999999999999999999999999999999999' as const
+    const tampers: Array<[string, typeof mtx, string]> = [
+      ['quoteSend', { ...mtx, data: encodeFunctionData({ abi: meshSend, functionName: 'quoteSend', args: [sp0 as never, false] }) }, 'usdt0: the deposit calls quoteSend, not send(SendParam, MessagingFee, refund)'],
+      ['extraOptions', { ...mtx, data: resend({ ...sp0, extraOptions: '0x0003' }, fee0, refund0) }, "usdt0: the deposit's SendParam.extraOptions 0x0003 is not the sealed 0x"],
+      ['composeMsg', { ...mtx, data: resend({ ...sp0, composeMsg: '0x01' }, fee0, refund0) }, "usdt0: the deposit's SendParam.composeMsg 0x01 is not the sealed 0x"],
+      ['oftCmd', { ...mtx, data: resend({ ...sp0, oftCmd: '0x01' }, fee0, refund0) }, "usdt0: the deposit's SendParam.oftCmd 0x01 is not the sealed 0x"],
+      ['nativeFee', { ...mtx, data: resend(sp0, { ...fee0, nativeFee: 1n }, refund0) }, `usdt0: the deposit's MessagingFee.nativeFee 1 is not the sealed ${sealedFee}`],
+      ['lzTokenFee', { ...mtx, data: resend(sp0, { ...fee0, lzTokenFee: 1n }, refund0) }, "usdt0: the deposit's MessagingFee.lzTokenFee 1 is not 0"],
+      ['refund', { ...mtx, data: resend(sp0, fee0, attacker) }, `usdt0: the deposit refunds ${attacker}, not the sealed refund address 0x4444444444444444444444444444444444444444`],
+      ['chainId', { ...mtx, chainId: 1 }, 'usdt0: the deposit is for eip155:42161 (chainId 1), not Arbitrum (eip155:42161)'],
+    ]
+    const rpcBefore = meshRpcCalls
+    const missed: string[] = []
+    for (const [what, t, want] of tampers) {
+      let got = 'passed'
+      try { await meshLive.preflightDeposit!(mq, t) } catch (e) { got = (e as Error).message }
+      if (got !== want) missed.push(`${what}: ${got}`)
+    }
+    check('usdt0 mesh: preflight refuses the view-call selector, options / compose / OFT command, another MessagingFee, refund or chain — before any RPC read',
+      missed.length === 0 && meshRpcCalls === rpcBefore, `${missed.join(' | ')} | rpc ${meshRpcCalls - rpcBefore}`)
+  }
+  // describeActivity runs on device for every EVM transaction in the history: two recorded Legacy Mesh sends (Arbitrum →
+  // TON and → Tron, 2026-11-12) read their destination from the calldata's eid; the LayerZero fee is not a bridged asset.
+  for (const [fixture, dstName, amount] of [[usdt0MeshTonLive, 'TON', 7_327_122_217n], [usdt0MeshTronLive, 'Tron', 800_000_000_000n]] as const) {
+    const { tx: aTx, own: aOwn } = parseActivityFixture(fixture as unknown as ActivityFixtureJson)
+    const item = describeUsdt0Activity(aTx, { own: aOwn })
+    check(`usdt0 mesh: describeActivity on a recorded Arbitrum → ${dstName} send`,
+      !!item && item.kind === 'bridge' && item.title === 'Bridged USDT0 → USDT' && item.subtitle === `USDT0 Legacy Mesh · Arbitrum → ${dstName}`
+      && item.assetsOut.length === 1 && item.assetsOut[0]!.token === mArb.token && item.assetsOut[0]!.amount === amount
+      && item.counterparty === mArb.oft && item.fee === aTx.fee,
+      item ? `${item.title} | ${item.subtitle} | ${item.assetsOut.map((a) => `${a.token}:${a.amount}`).join(',')} | fee ${item.fee}` : 'null')
+    // The same calldata on another contract is not a mesh send.
+    check(`usdt0 mesh: the ${dstName} send's calldata to another contract is not described`, describeUsdt0Activity({ ...aTx, to: '0x9999999999999999999999999999999999999999', call: { ...aTx.call!, to: '0x9999999999999999999999999999999999999999' } }, { own: aOwn }) === null)
   }
   // Tron off by default: answered as before the mesh, without a network call.
   const offReasons: string[] = []
