@@ -426,7 +426,9 @@ export async function smokeProtocols(check: Check): Promise<void> {
  * preflightDeposit refuses a vault retired since the quote, a hanging first quote host does not use up the vault
  * check's budget, the budget running out before a node is asked and a lastblock-only failure get their own texts, the
  * quoting node's lastblock read is armed with its own 8 s (not confirmTimeoutMs), and thorchainPins().verifyBuild
- * applies the same rule. The nodes are a fake fetch serving the answers recorded on 2026-11-12 (React Native's fetch
+ * applies the same rule. Review round 3: a field of another type (an address or router as a number, a halt flag as a
+ * string) skips the confirming node and makes the quoting node unavailable instead of throwing a TypeError. The
+ * nodes are a fake fetch serving the answers recorded on 2026-11-12 (React Native's fetch
  * shape: no Response class, `url` set, no `redirected`). The Hermes CLI runs timers in the order they were set,
  * without waiting, so elapsed time is a jump of Date.now (what an app backgrounded mid-quote sees) and a read's bound
  * is checked as the delay its timer was armed with.
@@ -561,6 +563,20 @@ async function smokeThorchainVaultRotation(check: Check): Promise<void> {
     r = await quote()
     check('thorchain: an asgard answer in another shape is skipped, refused when alone', shapeAlone && r.q !== null, r.reasons.join('; '))
 
+    // Review round 3: a field of another type is another shape — an address as a number made sameTarget throw a
+    // TypeError out of getQuote, and `halted: "true"` read as open. The confirming node is skipped, the quoting node
+    // unavailable, with the existing texts.
+    reset()
+    const ethWith = (inbound: unknown, o: Record<string, unknown>) => (inbound as Record<string, unknown>[]).map((e) => (e.chain === 'ETH' ? { ...e, ...o } : e))
+    nodes[C1]!.inbound = ethWith(inboundWith(vaultA), { address: 42 })
+    const typeAlone = await quote({ confirmNodeUrl: [C1] }).then((x) => x.q === null && x.reasons[0] === NO_SECOND, (e: unknown) => `threw ${String(e)}`)
+    const typeNext = await quote().then((x) => x.q !== null && x.reasons.length === 0, (e: unknown) => `threw ${String(e)}`)
+    nodes[C1] = fresh()
+    nodes[Q]!.inbound = ethWith(inboundWith(vaultB), { halted: 'true' })
+    const quotingType = await quote().then((x) => x.q === null && x.reasons[0] === 'thorchain: inbound addresses unavailable from every node', (e: unknown) => `threw ${String(e)}`)
+    check('thorchain: a field of another type skips the confirming node and makes the quoting node unavailable (no TypeError)',
+      typeAlone === true && typeNext === true && quotingType === true, `${typeAlone}; ${typeNext}; ${quotingType}`)
+
     // The re-check right before broadcast confirms the same way, and refuses a vault retired since the quote.
     reset()
     const p = thorchainProvider({ nodeUrl: Q, confirmNodeUrl: [C1, C2] })
@@ -653,6 +669,10 @@ async function smokeThorchainVaultRotation(check: Check): Promise<void> {
       lagging === 'two THORNodes within 50 blocks of the highest THORChain height they report could not confirm the inbound vault (behind or unreachable)' &&
       redirected === 'two THORNodes could not confirm the inbound vault' && slow === 'two THORNodes could not confirm the inbound vault' && Date.now() - t2 < 2_000,
       `${lagging}; ${redirected}; ${slow}; ${Date.now() - t2} ms`)
+    // A node whose router is a number is skipped by verifyBuild too (it threw a TypeError before).
+    nodes[C2] = fresh({ inbound: ethWith(inboundWith(vaultB), { router: 42 }) })
+    const typed = await verify().then((x) => x, (e: unknown) => `threw ${String(e)}`)
+    check('thorchain: verifyBuild skips a node with a field of another type (no TypeError)', typed === 'two THORNodes could not confirm the inbound vault', String(typed))
   } finally {
     Date.now = realNow
     onRead = null
