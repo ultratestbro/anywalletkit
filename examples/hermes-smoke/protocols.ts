@@ -16,6 +16,7 @@ import { cctpProvider } from '@anywalletkit/protocol-swap2-cctp/provider'
 import { CctpSwap2Protocol } from '@anywalletkit/protocol-swap2-cctp/protocol'
 import { usdt0Provider } from '@anywalletkit/protocol-swap2-usdt0/provider'
 import { Usdt0Swap2Protocol } from '@anywalletkit/protocol-swap2-usdt0/protocol'
+import { USDT0_MESH_DESTINATIONS, USDT0_MESH_SOURCES, meshRecipientBytes32, meshRecipientMatches, usdt0VerifyQuote } from '@anywalletkit/protocol-swap2-usdt0/config'
 import { chainflipProvider } from '@anywalletkit/protocol-swap2-chainflip/provider'
 import { ChainflipSwap2Protocol } from '@anywalletkit/protocol-swap2-chainflip/protocol'
 import { decodeTronNote } from '@anywalletkit/protocol-swap2-chainflip/codec'
@@ -37,7 +38,7 @@ import { RELAY_SOLVERS, RelayRefusal, parseRelayOrder, relayOrderId, relayOrderS
 import relayVectors from '../../packages/protocol-swap2-relay/fixtures/orders/vectors.json'
 import relayUsdcLive from '../../packages/protocol-swap2-relay/fixtures/quotes/user.arb-usdc_base-usdc.json'
 import relayNativeLive from '../../packages/protocol-swap2-relay/fixtures/quotes/base-eth_arb-eth.json'
-import { encodeFunctionData, encodeFunctionResult } from 'viem'
+import { encodeFunctionData, encodeFunctionResult, parseAbi } from 'viem'
 import { nearIntentsProvider } from '@anywalletkit/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@anywalletkit/protocol-swap2-thorchain/protocol'
 import { OmnistonSwap2Protocol } from '@anywalletkit/protocol-swap2-omniston/protocol'
@@ -123,6 +124,34 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const usdt0 = usdt0Provider({ rpcUrls: { 'eip155:42161': 'https://arbitrum-one-rpc.publicnode.com' } })
   check('usdt0: route USDT0 Arbitrum → HyperEVM, none from BSC', usdt0.supportsRoute({ chain: 'eip155:42161', token: 'USDT0' }, { chain: 'eip155:999', token: 'USDT0' }) && !usdt0.supportsRoute({ chain: 'eip155:56', token: 'USDT' }, { chain: 'eip155:1', token: 'USDT' }))
   await tolerates(check, 'usdt0: getQuote (network)', () => usdt0.getQuote({ sourceChain: 'eip155:42161', sourceToken: 'USDT0', destChain: 'eip155:999', destToken: 'USDT0', amountIn: '10000000', destAddress: '0x000000000000000000000000000000000000dEaD' }))
+  // USDT0 Legacy Mesh (2026-11-12): the recipient bytes of real delivered packets (Ethereum → Tron, Arbitrum → TON) from the
+  // address the destination paid — base58check + sha256 and TON base64 + CRC16 under Hermes; the send decoded back.
+  const mTron = USDT0_MESH_DESTINATIONS['tron:728126428']!
+  const mTon = USDT0_MESH_DESTINATIONS['ton:-239']!
+  const mArb = USDT0_MESH_SOURCES['eip155:42161']!
+  const tronTo = meshRecipientBytes32(mTron, 'TRjNDwg9kSj7sv1J6qGG4ad2wB9S9XqjMn')
+  const tonTo = meshRecipientBytes32(mTon, 'UQAQskXMoOIlwQZWQaqDmfRsNQaYsyTE5ImQoZ2QMCMqzp5R')
+  check('usdt0 mesh: Tron recipient → the packet bytes32', 'to' in tronTo && tronTo.to === '0x000000000000000000000000ace3e3286b7692028204857bd539c82517372727' && meshRecipientMatches(mTron, tronTo.to, 'TRjNDwg9kSj7sv1J6qGG4ad2wB9S9XqjMn'), JSON.stringify(tronTo))
+  check('usdt0 mesh: TON recipient → the packet bytes32', 'to' in tonTo && tonTo.to === '0x10b245cca0e225c1065641aa8399f46c350698b324c4e48990a19d9030232ace' && meshRecipientMatches(mTon, tonTo.to, 'UQAQskXMoOIlwQZWQaqDmfRsNQaYsyTE5ImQoZ2QMCMqzp5R'), JSON.stringify(tonTo))
+  check('usdt0 mesh: a garbled Tron / a masterchain TON recipient is refused', 'refusal' in meshRecipientBytes32(mTron, 'TRjNDwg9kSj7sv1J6qGG4ad2wB9S9XqjMm') && 'refusal' in meshRecipientBytes32(mTon, '-1:10b245cca0e225c1065641aa8399f46c350698b324c4e48990a19d9030232ace'))
+  check('usdt0 mesh: route Arbitrum USDT0 → Tron USDT, never from Tron', usdt0.supportsRoute({ chain: 'eip155:42161', token: 'USDT0' }, { chain: 'tron:728126428', token: 'USDT' }) && !usdt0.supportsRoute({ chain: 'tron:728126428', token: 'USDT' }, { chain: 'eip155:42161', token: 'USDT0' }))
+  if ('to' in tronTo) {
+    const meshSend = parseAbi(['struct SendParam { uint32 dstEid; bytes32 to; uint256 amountLD; uint256 minAmountLD; bytes extraOptions; bytes composeMsg; bytes oftCmd; }', 'struct MessagingFee { uint256 nativeFee; uint256 lzTokenFee; }', 'function send(SendParam s, MessagingFee fee, address refundAddress) payable'])
+    const meshData = encodeFunctionData({ abi: meshSend, functionName: 'send', args: [{ dstEid: 30420, to: tronTo.to, amountLD: 10_000_000n, minAmountLD: 9_997_000n, extraOptions: '0x', composeMsg: '0x', oftCmd: '0x' }, { nativeFee: 7n, lzTokenFee: 0n }, '0x4444444444444444444444444444444444444444'] })
+    const meshQuote = { provider: 'usdt0', intentId: 'usdt0-mesh:30110:30420', depositAddress: '', depositMemo: null, txRequest: { to: mArb.oft, data: meshData, value: '7', chainId: 42161, approvalAddress: mArb.oft, nativeFee: '7' }, sourceAmount: '10000000', destAmount: '9997000', minDestAmount: '9997000', feeUsd: 0, etaSeconds: 90, reliability: 1, validUntilMs: 0 }
+    const meshParams = { sourceChain: 'eip155:42161', sourceToken: 'USDT0', destChain: 'tron:728126428', destToken: 'USDT', amountIn: '10000000', destAddress: 'TRjNDwg9kSj7sv1J6qGG4ad2wB9S9XqjMn', refundAddress: '0x4444444444444444444444444444444444444444', dry: false }
+    check('usdt0 mesh: verifyQuote passes the send, refuses another recipient', usdt0VerifyQuote(meshParams, meshQuote) === null && usdt0VerifyQuote({ ...meshParams, destAddress: 'TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj' }, meshQuote) !== null, String(usdt0VerifyQuote(meshParams, meshQuote)))
+  }
+  // A TON delivery completes on the tonapi payout of the packet's amount to 0:<to> (canned Scan + tonapi answers; the VM
+  // has no Response, so the answers are the three fields the provider reads).
+  const answer = (body: unknown) => ({ ok: true, status: 200, json: async () => body })
+  const meshTrackFetch = (async (url: string) => String(url).startsWith('https://scan.test')
+    ? answer({ data: [{ pathway: { srcEid: 30110, dstEid: 30343, sender: { address: mArb.oft.toLowerCase() } }, source: { tx: { payload: '0x000210b245cca0e225c1065641aa8399f46c350698b324c4e48990a19d9030232ace000000003a1ec3dc' } }, destination: { tx: { txHash: '0x' + 'ef'.repeat(32) } }, status: { name: 'DELIVERED' } }] })
+    : answer({ in_progress: false, actions: [{ type: 'JettonTransfer', status: 'ok', JettonTransfer: { sender: { address: '0:1ddf580052174ed1dd0d66c35bfdc1a5fcc69af4f4ae36154b13dcfc6c14a35f' }, recipient: { address: '0:10b245cca0e225c1065641aa8399f46c350698b324c4e48990a19d9030232ace' }, amount: '975094748', jetton: { address: '0:b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe' } } }] })) as unknown as typeof fetch
+  const meshTracker = usdt0Provider({ rpcUrls: { 'eip155:42161': 'https://arbitrum-one-rpc.publicnode.com' }, scanUrl: 'https://scan.test', tonApiUrl: 'https://ton.test', fetchImpl: meshTrackFetch })
+  const meshTon = await meshTracker.trackIntent({ intentId: 'usdt0-mesh:30110:30343', sourceTxHash: '0x' + 'cd'.repeat(32) })
+  check('usdt0 mesh: TON payout found in the delivery trace → completed', meshTon.state === 'completed' && meshTon.destTxHash === 'ef'.repeat(32), JSON.stringify(meshTon))
+  await tolerates(check, 'usdt0 mesh: getQuote Arbitrum → TON (network)', () => usdt0.getQuote({ sourceChain: 'eip155:42161', sourceToken: 'USDT0', destChain: 'ton:-239', destToken: 'USDT', amountIn: '10000000', destAddress: 'UQAQskXMoOIlwQZWQaqDmfRsNQaYsyTE5ImQoZ2QMCMqzp5R' }))
   const cf = chainflipProvider()
   check('chainflip: route Tron USDT → Arbitrum USDC, none from BSC', cf.supportsRoute({ chain: 'tron:728126428', token: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t' }, { chain: 'eip155:42161', token: 'USDC' }) && !cf.supportsRoute({ chain: 'eip155:56', token: 'USDT' }, { chain: 'eip155:1', token: 'USDT' }))
   // live encoder note 2026-10-20: Tron USDT → Arbitrum USDC (asset 7, tag 3 = Arb) — SCALE + U256 LE min price under Hermes BigInt
