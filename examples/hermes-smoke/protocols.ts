@@ -240,6 +240,28 @@ export async function smokeProtocols(check: Check): Promise<void> {
     }
     check('usdt0 mesh: preflight refuses the view-call selector, options / compose / OFT command, another MessagingFee, refund or chain — before any RPC read',
       missed.length === 0 && meshRpcCalls === rpcBefore, `${missed.join(' | ')} | rpc ${meshRpcCalls - rpcBefore}`)
+    // Review r3 (2026-11-13): a dry quote without a recipient is priced for the zero account and keeps only its price —
+    // no send to build or sign; build, preflight and the remote pin refuse it by name, and a named zero account is refused.
+    const dryParams = { ...tonParams, destAddress: '', dry: true }
+    const priced = await meshLive.getQuote(dryParams)
+    let built = 'built'
+    try { await meshLive.buildDeposit(priced!) } catch (e) { built = (e as Error).message }
+    let pre2 = 'passed'
+    try { await meshLive.preflightDeposit!({ ...priced!, txRequest: mq.txRequest }, mtx) } catch (e) { pre2 = (e as Error).message }
+    const standIn = encodeFunctionData({ abi: meshSend, functionName: 'send', args: [{ ...sp0, to: `0x${'00'.repeat(32)}` } as never, fee0, refund0] })
+    const carries = usdt0VerifyQuote(dryParams, { ...mq, txRequest: { ...mq.txRequest!, data: standIn } })
+    check('usdt0 mesh: a dry quote priced for the zero-account placeholder carries no send; build, preflight and verifyQuote refuse it by name',
+      !!priced && priced.txRequest === undefined && priced.providerData?.placeholder === 'recipient' && priced.destAmount === '9997000'
+      && built === 'swap2: this USDT0 quote was priced for a placeholder recipient (a dry quote without that address) and has no transaction to build — quote again with the recipient and the refund address'
+      && pre2 === 'usdt0: this quote was priced for a placeholder recipient (a dry quote without that address) and has nothing to sign — quote again with the recipient and the refund address'
+      && carries === 'a dry quote priced for a placeholder recipient carries a transaction — it would pay or refund that placeholder, not the wallet that signs it'
+      && usdt0VerifyQuote(dryParams, priced!) === null,
+      `${priced ? JSON.stringify(priced.providerData) : 'null'} | ${built} | ${pre2} | ${String(carries)}`)
+    const zeroReasons: string[] = []
+    const rpcBeforeZero = meshRpcCalls
+    const zero = await meshLive.getQuote({ ...tonParams, destAddress: 'UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ', onRefusal: (r: string) => zeroReasons.push(r) })
+    check('usdt0 mesh: a live quote to the TON zero account is refused before any RPC read',
+      zero === null && zeroReasons.join() === 'destination is the zero account — nothing sent there can be recovered' && meshRpcCalls === rpcBeforeZero, zeroReasons.join('; '))
   }
   // describeActivity runs on device for every EVM transaction in the history: two recorded Legacy Mesh sends (Arbitrum →
   // TON and → Tron, 2026-11-12) read their destination from the calldata's eid; the LayerZero fee is not a bridged asset.
