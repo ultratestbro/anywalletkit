@@ -46,13 +46,22 @@ the bridges whose delivery the transaction binds, then held to the requested own
   facet cannot check; it must be the owner's USDC associated token account, derived on the device.
 - **Chainflip**: the vault swap's 32-byte destination address must be the owner and its asset the requested one
   (SOL, USDC or USDT on Solana).
-- **LI.FI Intents**: the escrowed order's recipient and output token must be the owner and the requested mint.
 
 These requests ask LI.FI for those bridges only (`allowBridges`; a `chooseRoute` pick is kept among them). NEAR
 Intents and LayerSwap pay a deposit address whose off-chain order names the recipient, and Smart Deposits a
-deposit address outright: deposits the device cannot verify, refused for this direction. Any other bridge to
-Solana is refused as before. EVM → EVM and Solana-source requests are unchanged. A dry EVM → Solana quote with no
-recipient prices a Solana placeholder recipient.
+deposit address outright: deposits the device cannot verify, refused for this direction. **LI.FI Intents** to
+Solana is refused too: its escrowed order names its own input oracle, output oracle, output settler and output
+amount multiplier, none of which is pinned here, so a matching recipient would not bind the delivery (the escrow
+releases the input on the oracle's word). Any other bridge to Solana is refused as before. EVM → EVM and
+Solana-source requests are unchanged.
+
+**Dry quotes without an address.** A dry quote (`dry` not `false`) without `refundAddress` is priced for a
+placeholder sender (vitalik.eth on EVM, the public BIP-39 "abandon" account on Solana), and a dry EVM → Solana quote
+without `destAddress` for the "abandon" account as the recipient. Such a quote prices the route only: it carries no
+`txRequest` (its `providerData.placeholder` names the stand-in), `buildDeposit` refuses it, and `lifiVerifyQuote` /
+`lifiPins` refuse a quote for such a request that carries a transaction — LI.FI's transaction for a placeholder would
+pay or refund that public account from whichever wallet signs it. Quote again with both addresses to build. A dry
+EVM → EVM quote with a `refundAddress` but no recipient prices the sender's own address and keeps its transaction.
 
 Every swap step is read, not only the ends: each must spend what the step before delivered, only
 steps that spend the input token may pull from the wallet (`requiresDeposit`), and together at most
