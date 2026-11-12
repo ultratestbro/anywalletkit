@@ -14,6 +14,9 @@ import {decodeFunctionData, getAddress, isAddress, pad, parseAbi, type Hex} from
 import type {Quote, QuoteParams, RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
 import {ccAsset} from "@anywalletkit/swap2-assets";
+import {meshDestTokenMatches, meshDestinationFor, meshRecipientBytes32, meshRecipientMatches, meshSourceFor, type Usdt0MeshDestination, type Usdt0MeshSource} from "./mesh.js";
+
+export * from "./mesh.js";
 
 export interface Usdt0Chain {
   caip2: string;
@@ -76,12 +79,22 @@ export const LZ_SCAN_API = "https://scan.layerzero-api.com";
 /** Token symbols the catalog uses for the same asset across chains. */
 export const USDT0_SYMBOLS: readonly string[] = Object.freeze(["USDT0", "USDT", "USD₮0", "USD₮"]);
 
+const isUsdt0Chain = (chain: string): boolean => isEvm(chain) && !!usdt0ChainFor(`eip155:${evmRef(chain)}`);
+const isMeshSource = (chain: string): boolean => isEvm(chain) && !!meshSourceFor(`eip155:${evmRef(chain)}`);
+
 export const usdt0 = {
+  /** A chain this package routes in any role: a USDT0 deployment, a Legacy Mesh EVM source, or Tron / TON (destinations only). */
   supportsChain(chain: string): boolean {
-    return isEvm(chain) && !!USDT0_CHAINS[`eip155:${evmRef(chain)}`];
+    return isUsdt0Chain(chain) || isMeshSource(chain) || !!meshDestinationFor(chain);
   },
+  /** A chain this package can send FROM (it signs only on EVM): a USDT0 deployment or a Legacy Mesh EVM source. */
+  supportsSourceChain(chain: string): boolean {
+    return isUsdt0Chain(chain) || isMeshSource(chain);
+  },
+  /** USDT0 between two deployments, or the Legacy Mesh from an EVM source into Tron / TON. Never from Tron or TON. */
   supports(from: string, to: string): boolean {
-    return from !== to && this.supportsChain(from) && this.supportsChain(to);
+    if (from === to) return false;
+    return (isUsdt0Chain(from) && isUsdt0Chain(to)) || (isMeshSource(from) && !!meshDestinationFor(to));
   },
 };
 
@@ -96,7 +109,7 @@ const OFT_SEND_ABI = parseAbi([
  * catalog does not bind to another contract (OP's legacy bridged USDT is not the OFT token). The provider and
  * {@link usdt0VerifyQuote} both check the request with it.
  */
-export function tokenMatches(chain: Usdt0Chain, symbolOrAddress: string): boolean {
+export function tokenMatches(chain: Pick<Usdt0Chain, "caip2" | "token">, symbolOrAddress: string): boolean {
   const same = (a: string | undefined | null, b: string) => !!a && a.toLowerCase() === b.toLowerCase();
   if (symbolOrAddress.startsWith("0x")) return same(symbolOrAddress, chain.token);
   if (!USDT0_SYMBOLS.includes(symbolOrAddress.toUpperCase().replace("USD₮", "USDT"))) return false;
@@ -110,9 +123,15 @@ export function tokenMatches(chain: Usdt0Chain, symbolOrAddress: string): boolea
  * input as `amountLD`; a `minAmountLD` no larger than the input that guarantees the quoted minimum and the caller's
  * floor; empty `extraOptions`, `composeMsg` and `oftCmd` (what the provider sends); no LZ-token fee; the trader as
  * refund; `msg.value` = the declared native fee = the call's `nativeFee`; the adapter as spender on Ethereum only.
- * The reason it fails, or null. The engine's native-fee ceiling bounds the fee itself.
+ * The reason it fails, or null. The engine's native-fee ceiling bounds the fee itself. A route into Tron / TON is
+ * a Legacy Mesh send and is held to {@link usdt0VerifyMeshSend} instead.
  */
 export function usdt0VerifyQuote(params: QuoteParams, quote: Quote): string | null {
+  const meshDst = meshDestinationFor(params.destChain);
+  if (meshDst) {
+    const meshSrc = meshSourceFor(params.sourceChain);
+    return meshSrc ? usdt0VerifyMeshSend(params, quote, meshSrc, meshDst) : "not a USDT0 Legacy Mesh route from an EVM source";
+  }
   const src = usdt0ChainFor(params.sourceChain);
   const dst = usdt0ChainFor(params.destChain);
   if (!src || !dst || src === dst) return "not a USDT0 route between two deployments";
@@ -164,6 +183,64 @@ export function usdt0VerifyQuote(params: QuoteParams, quote: Quote): string | nu
   return null;
 }
 
+/** Intent-id tag of a Legacy Mesh send (`usdt0-mesh:<srcEid>:<dstEid>`); a USDT0 OFT send is `usdt0:<srcEid>:<dstEid>`. */
+export const USDT0_MESH_INTENT = "usdt0-mesh";
+
+/**
+ * A Legacy Mesh send (EVM source → Tron / TON), decoded against the request: `send(SendParam, MessagingFee, refund)` on
+ * the source chain's pinned mesh OFT, approved to that OFT (it pulls the token); the destination's eid; `to` read back
+ * the way the destination OFT reads it (Tron: low 20 bytes as base58check; TON: the account hash on workchain 0) and
+ * equal to the requested recipient; the input as `amountLD`; a `minAmountLD` that guarantees the quoted minimum and
+ * the caller's floor; no options, compose message or OFT command; no LZ-token fee; the trader as refund;
+ * `msg.value` = the declared native fee = the call's `nativeFee`. The provider runs it on its own build too.
+ */
+export function usdt0VerifyMeshSend(params: QuoteParams, quote: Quote, src: Usdt0MeshSource, dst: Usdt0MeshDestination): string | null {
+  if (!tokenMatches(src, params.sourceToken)) return `source token ${params.sourceToken} is not USDT0 (${src.token}) on ${src.name}`;
+  if (!meshDestTokenMatches(dst, params.destToken)) return `destination token ${params.destToken} is not USDT0 (${dst.token}) on ${dst.name}`;
+  const tx = quote.txRequest;
+  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no OFT call";
+  if (tx.to.toLowerCase() !== src.oft.toLowerCase()) return `the call targets ${tx.to}, not the ${src.name} Legacy Mesh OFT`;
+  if (tx.chainId !== undefined && tx.chainId !== src.chainId) return `the call is for chain ${tx.chainId}, not ${src.chainId}`;
+  if (!tx.approvalAddress || tx.approvalAddress.toLowerCase() !== src.oft.toLowerCase()) return "the Legacy Mesh send approves another spender than its OFT";
+  let sp: {dstEid: number; to: Hex; amountLD: bigint; minAmountLD: bigint; extraOptions: Hex; composeMsg: Hex; oftCmd: Hex};
+  let fee: {nativeFee: bigint; lzTokenFee: bigint};
+  let refund: string;
+  try {
+    const d = decodeFunctionData({abi: OFT_SEND_ABI, data: tx.data as Hex});
+    [sp, fee, refund] = d.args as unknown as [typeof sp, typeof fee, string];
+  } catch {
+    return "the call is not send(SendParam, MessagingFee, refund)";
+  }
+  let amountIn: bigint, floor: bigint, value: bigint;
+  try {
+    amountIn = BigInt(params.amountIn);
+    floor = BigInt(quote.minDestAmount);
+    if (params.minAmountOut !== undefined && BigInt(params.minAmountOut) > floor) floor = BigInt(params.minAmountOut);
+    value = BigInt(tx.value ?? "0");
+  } catch {
+    return "the request does not name amounts";
+  }
+  if (sp.dstEid !== dst.eid) return `the send goes to eid ${sp.dstEid}, not ${dst.name} (${dst.eid})`;
+  if (sp.amountLD !== amountIn || BigInt(quote.sourceAmount) !== amountIn) return `the send moves ${sp.amountLD}, not the ${amountIn} input`;
+  if (sp.minAmountLD > sp.amountLD || sp.minAmountLD <= 0n || sp.minAmountLD < floor) return `the send's minAmountLD ${sp.minAmountLD} is below the ${floor} minimum`;
+  if (sp.extraOptions !== "0x" || sp.composeMsg !== "0x" || sp.oftCmd !== "0x") return "the send carries options, a compose message or an OFT command";
+  // A dry quote without a recipient prices the zero-account placeholder; it is never built (the engine re-quotes live).
+  const live = params.dry === false;
+  if (params.destAddress || live) {
+    const want = meshRecipientBytes32(dst, params.destAddress ?? "");
+    if ("refusal" in want) return want.refusal;
+    if (sp.to.toLowerCase() !== want.to.toLowerCase() || !meshRecipientMatches(dst, sp.to, params.destAddress)) return `the send delivers to ${sp.to}, not the recipient`;
+  }
+  if (params.refundAddress || live) {
+    if (!isAddress(params.refundAddress ?? "")) return "the refund address is not an EVM address";
+    if (getAddress(refund) !== getAddress(params.refundAddress!)) return `the send refunds ${refund}, not the trader`;
+  }
+  if (fee.lzTokenFee !== 0n) return "the send pays an LZ-token fee";
+  if (value !== fee.nativeFee || (tx.nativeFee ?? "0") !== fee.nativeFee.toString()) return "msg.value is not the declared native fee of the send";
+  if (quote.intentId.replace(/~[0-9a-f]{32}$/, "") !== `${USDT0_MESH_INTENT}:${src.eid}:${dst.eid}`) return "the intent id does not name this send";
+  return null;
+}
+
 /**
  * The contracts a USDT0 claim may call on `chain`: its LayerZero EndpointV2 (`lzReceive`, retrying a stored
  * payload). Empty for a chain USDT0 is not listed on.
@@ -180,8 +257,16 @@ export function usdt0ClaimTargets(chain: string): readonly string[] {
  * arguments since scan 2026-10-30, F3).
  */
 export const usdt0Pins: RemotePins & {claimTargets(chain: string): readonly string[]} = Object.freeze({
-  callTargets: (chain: string): readonly string[] => { const c = usdt0ChainFor(chain); return c ? [c.oft] : []; },
-  spenders: (chain: string): readonly string[] => { const c = usdt0ChainFor(chain); return c?.adapter ? [c.oft] : []; },
+  // The Legacy Mesh OFT is a second target (and spender: it pulls the token) on Ethereum and Arbitrum, the only one on
+  // Celo; usdt0VerifyQuote holds each send to the contract of its own route.
+  callTargets: (chain: string): readonly string[] => {
+    const c = usdt0ChainFor(chain), m = meshSourceFor(chain);
+    return [...(c ? [c.oft] : []), ...(m ? [m.oft] : [])];
+  },
+  spenders: (chain: string): readonly string[] => {
+    const c = usdt0ChainFor(chain), m = meshSourceFor(chain);
+    return [...(c?.adapter ? [c.oft] : []), ...(m ? [m.oft] : [])];
+  },
   claimTargets: usdt0ClaimTargets,
   verifyQuote: usdt0VerifyQuote,
 });
