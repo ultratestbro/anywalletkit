@@ -52,6 +52,8 @@ interface FakeNode {
   down?: boolean;
   /** Never answers until the request is aborted. */
   hang?: boolean;
+  /** Answer one read only after this many ms (rejected if the request is aborted first). */
+  delay?: Partial<Record<Path, number>>;
   /** Replace one read's answer. */
   answer?: Partial<Record<Path, () => Response>>;
 }
@@ -106,6 +108,17 @@ beforeEach(() => {
       });
     }
     if (!path) return new Response("nope", {status: 404});
+    const wait = n.delay?.[path];
+    if (wait !== undefined) {
+      await new Promise<void>((resolve, reject) => {
+        const s = init?.signal;
+        const t = setTimeout(resolve, wait);
+        s?.addEventListener("abort", () => {
+          clearTimeout(t);
+          reject(new DOMException("aborted", "AbortError"));
+        });
+      });
+    }
     const custom = n.answer?.[path];
     if (custom) return custom();
     const body = path === "quote" ? n.quote : path === "lastblock" ? lastblockAt(n.height) : path === "inboundAddresses" ? n.inbound : path === "asgardVaults" ? n.asgard : n.mimir;
@@ -113,10 +126,21 @@ beforeEach(() => {
     return new Response(JSON.stringify(body), {status: 200});
   });
 });
+const nativeTimeout = AbortSignal.timeout;
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  (AbortSignal as unknown as {timeout: unknown}).timeout = nativeTimeout;
 });
+/**
+ * Fake setTimeout / clearTimeout / Date, and no native AbortSignal.timeout (Node's runs on its own timer), so every
+ * deadline — the 8 s read bounds included — runs on the fake clock, as it would on Hermes (which has no
+ * AbortSignal.timeout).
+ */
+function fakeClock(): void {
+  vi.useFakeTimers({toFake: ["setTimeout", "clearTimeout", "Date"]});
+  (AbortSignal as unknown as {timeout: unknown}).timeout = undefined;
+}
 
 const params = (o: Partial<QuoteParams> = {}): QuoteParams => ({
   sourceChain: "eip155:1", sourceToken: "ETH", destChain: "bitcoin:mainnet", destToken: NATIVE,
@@ -416,7 +440,7 @@ describe("node lag and failures: the next confirming node is asked", () => {
     expect(hanging[0]!.aborted).toBe(true);
   });
 
-  it("confirming nodes share the quote's 8 s budget: hanging nodes are cut off at the deadline, the timers are cleared", async () => {
+  it("confirming nodes share the vault check's 8 s budget: hanging nodes are cut off at the deadline, the timers are cleared", async () => {
     vi.useFakeTimers({toFake: ["setTimeout", "clearTimeout", "Date"]});
     for (const h of [CONFIRM, CONFIRM2, LIQUIFY, IBS, "https://confirm3.invalid"]) nodes[h] = node({hang: true});
     const reasons: string[] = [];
@@ -498,3 +522,195 @@ describe("readers on the answers recorded from three operators (2026-11-12)", ()
     expect(flags(compromised.slice("COMPROMISEDVAULT-".length).toLowerCase())).toBe("compromised");
   });
 });
+
+describe("the vault check's own budget: it starts when the quote is in hand", () => {
+  const HANG = "https://hang.invalid";
+  const BUDGET_GONE = "thorchain: the 8 s confirmation budget ran out before a second node could be asked to confirm the inbound vault — retry";
+
+  it("a hanging first nodeUrl host and a sound second one: the quote is confirmed (0.3.5 quoted here too)", async () => {
+    fakeClock();
+    nodes[HANG] = node({hang: true});
+    const reasons: string[] = [];
+    const started = Date.now();
+    const pending = provider({nodeUrl: [HANG, QUOTE]}).getQuote(params({onRefusal: (r) => reasons.push(r)}));
+    await vi.advanceTimersByTimeAsync(8_500);
+    const q = await pending;
+    expect(reasons).toEqual([]);
+    expect(q?.providerData?.inboundAddress).toBe(VAULT_B);
+    // The first host used its whole 8 s; the check still had its own 8 s and asked the confirming node.
+    expect(reads.filter((r) => r.path === "/thorchain/quote/swap").map((r) => r.host)).toEqual([HANG, QUOTE]);
+    expect(readsOn(CONFIRM)).toContain(THORNODE_CONFIRM_PATHS.asgardVaults);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(8_000);
+    // Nothing outlives the 8 s read bounds of the requests already answered.
+    await vi.advanceTimersByTimeAsync(8_000);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("before broadcast too: a hanging first host's snapshot does not use up the re-check's budget", async () => {
+    fakeClock();
+    nodes[HANG] = node({hang: true});
+    const p = provider({nodeUrl: [HANG, QUOTE]});
+    const quoting = p.getQuote(params());
+    await vi.advanceTimersByTimeAsync(8_500);
+    const q = (await quoting)!;
+    const tx = await p.buildDeposit(q);
+    reads = [];
+    const checking = p.preflightDeposit!(q, tx).then(() => "ok", (e: unknown) => String(e));
+    await vi.advanceTimersByTimeAsync(8_500);
+    await expect(checking).resolves.toBe("ok");
+    expect(readsOn(HANG)).toEqual(expect.arrayContaining([THORNODE_CONFIRM_PATHS.inboundAddresses, THORNODE_CONFIRM_PATHS.lastblock]));
+    expect(readsOn(CONFIRM)).toContain(THORNODE_CONFIRM_PATHS.asgardVaults);
+  });
+
+  it("the quoting node's own snapshot using the budget up: refused with a new text, no confirming node asked", async () => {
+    fakeClock();
+    nodes[QUOTE]!.delay = {inboundAddresses: 7_950};
+    const reasons: string[] = [];
+    const pending = provider().getQuote(params({onRefusal: (r) => reasons.push(r)}));
+    await vi.advanceTimersByTimeAsync(8_100);
+    await expect(pending).resolves.toBeNull();
+    expect(reasons).toEqual([BUDGET_GONE]);
+    for (const h of [CONFIRM, CONFIRM2, LIQUIFY, IBS]) expect(readsOn(h)).toEqual([]);
+    await vi.advanceTimersByTimeAsync(8_000);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("150 ms left is enough to ask (and here hear) a confirming node; 50 ms is not", async () => {
+    fakeClock();
+    nodes[QUOTE]!.delay = {inboundAddresses: 7_850};
+    const reasons: string[] = [];
+    const pending = provider().getQuote(params({onRefusal: (r) => reasons.push(r)}));
+    await vi.advanceTimersByTimeAsync(8_100);
+    expect((await pending)?.providerData?.inboundAddress).toBe(VAULT_B);
+    expect(reasons).toEqual([]);
+    expect(readsOn(CONFIRM).length).toBeGreaterThan(0);
+  });
+
+  it("a node asked with the last of the budget that does not answer keeps the existing text (it was asked)", async () => {
+    fakeClock();
+    nodes[QUOTE]!.delay = {inboundAddresses: 7_000};
+    for (const h of [CONFIRM, CONFIRM2, LIQUIFY, IBS]) nodes[h] = node({hang: true});
+    const reasons: string[] = [];
+    const pending = provider().getQuote(params({onRefusal: (r) => reasons.push(r)}));
+    await vi.advanceTimersByTimeAsync(8_100);
+    await expect(pending).resolves.toBeNull();
+    expect(reasons).toEqual(["thorchain: no second node answered to confirm the inbound vault (configure confirmNodeUrl)"]);
+    expect(readsOn(CONFIRM).length).toBeGreaterThan(0);
+    expect(readsOn(CONFIRM2)).toEqual([]); // the 1 s left went to the first node
+  });
+
+  it("before broadcast: the refreshing node's snapshot using the budget up → the new text", async () => {
+    const p = provider();
+    const q = (await p.getQuote(params()))!;
+    const tx = await p.buildDeposit(q);
+    fakeClock();
+    nodes[QUOTE]!.delay = {inboundAddresses: 7_950};
+    reads = [];
+    const checking = p.preflightDeposit!(q, tx).then(() => "ok", (e: unknown) => (e instanceof Error ? e.message : String(e)));
+    await vi.advanceTimersByTimeAsync(8_100);
+    await expect(checking).resolves.toBe(BUDGET_GONE);
+    expect(readsOn(CONFIRM)).toEqual([]);
+  });
+});
+
+describe("the quoting node's lastblock read has its own 8 s bound, apart from confirmTimeoutMs", () => {
+  const HEIGHT_GONE = "thorchain: THORChain height (/thorchain/lastblock) unavailable from every node that answered the inbound addresses";
+  const PREFLIGHT_HEIGHT_GONE = "thorchain: cannot read THORChain height (/thorchain/lastblock) before broadcast from any node that answered the inbound addresses";
+
+  it("confirmTimeoutMs: 100 does not cut the quoting node's lastblock: an answer after 500 ms still quotes and re-checks", async () => {
+    fakeClock();
+    nodes[QUOTE]!.delay = {lastblock: 500};
+    const p = provider({confirmTimeoutMs: 100});
+    const reasons: string[] = [];
+    const quoting = p.getQuote(params({onRefusal: (r) => reasons.push(r)}));
+    await vi.advanceTimersByTimeAsync(600);
+    const q = await quoting;
+    expect(reasons).toEqual([]);
+    expect(q).not.toBeNull();
+    const tx = await p.buildDeposit(q!);
+    const checking = p.preflightDeposit!(q!, tx).then(() => "ok", (e: unknown) => String(e));
+    await vi.advanceTimersByTimeAsync(600);
+    await expect(checking).resolves.toBe("ok");
+  });
+
+  it("…while a confirming node still gets only confirmTimeoutMs", async () => {
+    fakeClock();
+    nodes[CONFIRM]!.delay = {lastblock: 500};
+    nodes[CONFIRM2] = node();
+    const reasons: string[] = [];
+    const pending = provider({confirmTimeoutMs: 100}).getQuote(params({onRefusal: (r) => reasons.push(r)}));
+    await vi.advanceTimersByTimeAsync(600);
+    expect(await pending).not.toBeNull();
+    expect(readsOn(CONFIRM2)).toContain(THORNODE_CONFIRM_PATHS.lastblock); // CONFIRM was cut off at 100 ms
+  });
+
+  it("only the quoting node's lastblock failing names lastblock, not 'inbound addresses unavailable'", async () => {
+    fakeClock();
+    const failures: [string, Partial<FakeNode>][] = [
+      ["503", {answer: {lastblock: () => new Response("down", {status: 503})}}],
+      ["404 (a proxy that does not pass the path)", {answer: {lastblock: () => new Response("nope", {status: 404})}}],
+      ["another shape", {answer: {lastblock: () => new Response(JSON.stringify({height: 1}), {status: 200})}}],
+      ["no answer within its 8 s", {delay: {lastblock: 9_000}}],
+    ];
+    for (const [what, failure] of failures) {
+      nodes[QUOTE] = node({inbound: inboundWith(VAULT_B), quote: quoteNaming(VAULT_B), ...failure});
+      const reasons: string[] = [];
+      const pending = provider().getQuote(params({onRefusal: (r) => reasons.push(r)}));
+      await vi.advanceTimersByTimeAsync(8_100);
+      expect(await pending, what).toBeNull();
+      expect(reasons, what).toEqual([HEIGHT_GONE]);
+    }
+  });
+
+  it("the inbound snapshot failing keeps the existing text; a mix names lastblock only when a node answered the snapshot", async () => {
+    nodes[QUOTE]!.answer = {inboundAddresses: () => new Response("down", {status: 503})};
+    let r = await quote();
+    expect(r.reasons).toEqual(["thorchain: inbound addresses unavailable from every node"]);
+    // Both fail on the snapshot read, one of them only on its height → the height is what no node could give.
+    nodes["https://quote2.invalid"] = node({inbound: inboundWith(VAULT_B), quote: quoteNaming(VAULT_B), answer: {lastblock: () => new Response("down", {status: 503})}});
+    r = await quote({nodeUrl: [QUOTE, "https://quote2.invalid"]});
+    expect(r.reasons).toEqual([HEIGHT_GONE]);
+    // A host down before its snapshot does not change that; a failing lastblock does not hide a sound host after it.
+    nodes["https://quote3.invalid"] = node({down: true});
+    r = await quote({nodeUrl: ["https://quote2.invalid", "https://quote3.invalid"]});
+    expect(r.reasons).toEqual([HEIGHT_GONE]);
+    nodes["https://quote3.invalid"] = node({inbound: inboundWith(VAULT_B), quote: quoteNaming(VAULT_B)});
+    r = await quote({nodeUrl: ["https://quote2.invalid", "https://quote3.invalid"]});
+    expect(r.reasons).toEqual([]);
+    expect(r.q).not.toBeNull();
+  });
+
+  it("before broadcast: lastblock alone failing → its own text; the snapshot failing → the existing one", async () => {
+    const p = provider();
+    const q = (await p.getQuote(params()))!;
+    const tx = await p.buildDeposit(q);
+    nodes[QUOTE]!.answer = {lastblock: () => new Response("down", {status: 503})};
+    await expect(p.preflightDeposit!(q, tx)).rejects.toThrow(PREFLIGHT_HEIGHT_GONE);
+    nodes[QUOTE]!.answer = {inboundAddresses: () => new Response("down", {status: 503})};
+    await expect(p.preflightDeposit!(q, tx)).rejects.toThrow("thorchain: cannot refresh inbound addresses before broadcast");
+  });
+
+  it("a failed snapshot read drops the height read still running; the caller aborting during the snapshot rejects at once", async () => {
+    fakeClock();
+    nodes[QUOTE]!.delay = {lastblock: 5_000};
+    nodes[QUOTE]!.answer = {inboundAddresses: () => new Response("down", {status: 503})};
+    const stub = globalThis.fetch;
+    const heightReads: AbortSignal[] = [];
+    vi.stubGlobal("fetch", (input: string | URL, init?: RequestInit) => {
+      if (String(input) === `${QUOTE}${THORNODE_CONFIRM_PATHS.lastblock}`) heightReads.push(init!.signal!);
+      return stub(input, init);
+    });
+    const pending = provider().getQuote(params());
+    await vi.advanceTimersByTimeAsync(10);
+    await expect(pending).resolves.toBeNull();
+    expect(heightReads).toHaveLength(1);
+    expect(heightReads[0]!.aborted).toBe(true);
+    nodes[QUOTE] = node({inbound: inboundWith(VAULT_B), quote: quoteNaming(VAULT_B), delay: {lastblock: 5_000}});
+    const ctrl = new AbortController();
+    const settled = provider().getQuote(params(), ctrl.signal).then(() => "resolved", (e: unknown) => (e instanceof Error ? e.name : String(e)));
+    await vi.advanceTimersByTimeAsync(100);
+    ctrl.abort();
+    await expect(settled).resolves.toBe("AbortError");
+  });
+});
+
