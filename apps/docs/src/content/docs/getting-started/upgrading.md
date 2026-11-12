@@ -12,7 +12,7 @@ your app does.
 
 ## Next release: Omniston's new TON Escrow Minter
 
-Since 2026-11-10 Omniston settles every TON ↔ EVM order through a new TON Escrow Minter (rev2),
+Since 2026-11-10 Omniston quotes TON ↔ EVM orders on a new TON Escrow Minter (rev2),
 `EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA`. `protocol-swap2-omniston` 0.5.4 and older refuse those quotes
 ("untrusted TON settlement contract" for TON → EVM, "untrusted ton:-239 settlement contract" for EVM → TON), so TON ↔
 EVM routes are gone until you bump. TON → TON swaps are not affected.
@@ -22,7 +22,7 @@ EVM routes are gone until you bump. TON → TON swaps are not affected.
   not only the server: a mobile app or an extension that checks a remote TON → EVM build or an EVM → TON position on
   the device refuses rev2 until it ships a build with the new version.
 - **The old minter is no longer trusted:** `EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ` (rev1) left the default
-  table and its position code `e4d5115a…` left the pins. Omniston's resolvers moved off it, and it lacks the
+  table and its position code `e4d5115a…` left the pins. Omniston's quotes moved off it (it still took a few orders on 2026-11-12), and it lacks the
   escrow-code whitelist rev2 checks every order against. A quote or a build that names rev1 is refused with its
   address in the reason; a rev1 output position fails `position-code-hash`.
 - **Old rev1 orders need nothing:** activity history still recognizes them (rev1 stays in `OMNISTON_ESCROWS`), and

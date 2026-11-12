@@ -290,6 +290,23 @@ describe("SDK-306: EVM → TON quotes naming rev2 as the TON factory (live 2026-
     expect(pinned.q).toBeNull();
     expect(pinned.seen).toEqual([`omniston: untrusted ton:-239 settlement contract ${REV1}`]);
   });
+
+  it("a rev1 quote cached by a provider that still trusted rev1 is not built by the provider with the new default table (a shared quote store)", async () => {
+    const fx = rev1Orders.base;
+    const params = {sourceChain: "eip155:8453", sourceToken: "USDT", destChain: "ton:-239", destToken: USDT, amountIn: fx.quoteUpdated.inputUnits,
+      destAddress: fx.buildRequest.traderDstAddress, refundAddress: fx.buildRequest.ownerSrcAddress, slippageBps: 100, dry: false};
+    const quoteStore = inMemoryQuoteStore();
+    const secretStore = inMemorySecretStore();
+    const quote = (await quoteFor({params, quoteUpdated: fx.quoteUpdated as Quote}, SETTLEMENT_WITH_REV1, {quoteStore, secretStore})).q;
+    expect(quote).not.toBeNull();
+    const after = omnistonProvider({
+      client: clientFor(null) as never, quoteSettleMs: 0, maxHtlcExecutions: 1, quoteStore, secretStore,
+      trustedSettlementContracts: AUDITED_OMNISTON_SETTLEMENT_CONTRACTS, trustedEvmOrderProtocols: AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS,
+      validateEvmInputPosition: () => true, validateTonOutputPosition: () => true,
+    });
+    await expect(after.buildDeposit(quote!)).rejects.toThrow(`omniston: untrusted ton:-239 settlement contract ${REV1}`);
+    expect(await secretStore.load(fx.quoteUpdated.quoteId as string)).toBeUndefined();
+  });
 });
 
 describe("SDK-306: EVM → TON output position of the rev2 minter (EQDy9LIC…, deployed 2026-11-11 21:21:00Z)", () => {
@@ -488,6 +505,34 @@ describe("SDK-306: a TON → EVM order on rev1 in flight when the app upgrades",
     await after.trackIntent({intentId: quote!.intentId});
     expect(output).toHaveBeenCalledWith(expect.objectContaining({factoryAddress: BASE_FACTORY, recipientAddress: RECIPIENT, positionAddress: POSITION}));
     expect(calls.disclose).toEqual([{quoteId: q.quoteId, executionIndex: 0, secret: new Uint8Array(SECRET)}]);
+  });
+
+  it("is not built by the provider with the new default table when it was only quoted before the upgrade (a shared quote store)", async () => {
+    const c = rev1Escrows.baseUsdc;
+    const q = structuredClone(c.quoteUpdated.value);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    q.quoteTimestamp = nowSeconds;
+    q.settlementData.value.tradeStartDeadline = nowSeconds + 300;
+    const calls: Record<string, unknown[]> = {};
+    const client = {
+      requestForQuote() { return observable([{$case: "ack", value: {rfqId: q.rfqId}}, {$case: "quoteUpdated", rfqId: q.rfqId, value: q}]); },
+      async tonBuildEscrowTransfer(request: unknown) { (calls.build ??= []).push(request); return structuredClone(c.escrowResponse); },
+    };
+    const secretStore = inMemorySecretStore();
+    const shared: OmnistonProviderOptions = {
+      client: client as never, quoteSettleMs: 0, maxHtlcExecutions: 1, secretStore, quoteStore: inMemoryQuoteStore(),
+      validateTonJettonWallet: ({walletAddress}) => walletAddress === c.escrowResponse.messages[0].targetAddress,
+      validateTonEscrowPayload: () => true,
+      validateEvmOutputPosition: async () => true,
+    };
+    const before = omnistonProvider({...shared, trustedSettlementContracts: {...AUDITED_OMNISTON_SETTLEMENT_CONTRACTS, "ton:-239": [REV1]}});
+    const quote = await before.getQuote({sourceChain: "ton:-239", sourceToken: "USDT", destChain: "eip155:8453", destToken: BASE_USDC,
+      amountIn: "5000000", destAddress: RECIPIENT, refundAddress: TRADER, slippageBps: 100, dry: true});
+    expect(quote).not.toBeNull();
+    const after = omnistonProvider({...shared, trustedSettlementContracts: AUDITED_OMNISTON_SETTLEMENT_CONTRACTS});
+    await expect(after.buildDeposit(quote!)).rejects.toThrow(`omniston: untrusted TON settlement contract ${REV1}`);
+    expect(calls.build).toBeUndefined();
+    expect(await secretStore.load(q.quoteId)).toBeUndefined();
   });
 });
 

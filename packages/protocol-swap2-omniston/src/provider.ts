@@ -2556,6 +2556,10 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     const inputToken = assetContract(q.inputAsset);
     const outputToken = assetContract(q.outputAsset);
     const destChainId = tonDest ? null : evmRef(destChain);
+    // Named apart so a quote cached under an older table is refused with the factory it names.
+    if (factory?.chain.$case === destCase && !isTrusted(destChain, factory.chain.value)) {
+      throw new Error(`omniston: untrusted ${destChain} settlement contract ${factory.chain.value}`);
+    }
     if (
       protocol.chain.$case !== srcCase || !isTrustedOrderProtocol(srcChain, protocol.chain.value) ||
       resolver?.chain.$case !== srcCase || !validEvmAddress(resolver.chain.value) ||
@@ -2847,6 +2851,12 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       const destCase = q.outputAsset.chain.$case;
       const traderDst = destCase === "ton" ? null : {chain: {$case: destCase, value: getAddress(ref.dest)}};
       if (!traderDst) throw new Error("omniston: TON-destination orders are not supported");
+      // Same re-check as buildEvmOrder: a quote cached under an older table (a shared quote store, a minter
+      // dropped since) builds only if this provider's table trusts its minter too.
+      const minter = q.settlementData.value.srcProtocolContractAddress;
+      if (minter.chain.$case !== "ton" || !isTrusted(srcChain, minter.chain.value)) {
+        throw new Error(`omniston: untrusted TON settlement contract ${minter.chain.value}`);
+      }
 
       const settlement = q.settlementData;
       const hashingFunction = settlement.$case === "order" ? settlement.value.htlcHashingFunction : undefined;

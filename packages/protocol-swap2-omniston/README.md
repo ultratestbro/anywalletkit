@@ -126,9 +126,9 @@ pin (`DEFAULT_OMNISTON_TON_CODE_HASHES.position`) trust rev2 only:
 | Minter | Code | Positions it deploys (EVM → TON) | Quoted | Trusted by default |
 |---|---|---|---|---|
 | `EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA` (rev2) | `9737943f…` | `eb503578…` | since 2026-11-10 | yes |
-| `EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ` (rev1) | `f91c43d3…` | `e4d5115a…` | until 2026-11-10 | no (0.5.4 and older: yes) |
+| `EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ` (rev1) | `f91c43d3…` | `e4d5115a…` | until 2026-11-10 (a few orders on 2026-11-12) | no (0.5.4 and older: yes) |
 
-Omniston's resolvers moved to rev2 on 2026-11-10. rev2 checks the escrow and
+Omniston's quotes moved to rev2 on 2026-11-10. rev2 checks the escrow and
 execution code of every order against a whitelist built into the contract;
 rev1 has no such whitelist. So a quote or a build that names rev1 is refused
 with its address in the reason ("untrusted TON settlement contract

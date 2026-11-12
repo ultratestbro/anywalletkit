@@ -8,7 +8,7 @@ export const AUDITED_OMNISTON_SETTLEMENT_CONTRACTS: Record<string, string[]> = {
   // The TON Escrow Minter a new TON <-> EVM order may name. The provider
   // compares TON addresses as these exact strings, so it is kept in the form
   // Omniston's quotes use.
-  // - EQDybO88… (code 9737943f…, "rev2"): every TON <-> EVM quote names it
+  // - EQDybO88… (code 9737943f…, "rev2"): Omniston's TON <-> EVM quotes name it
   //   since 2026-11-10 ~19:00Z. Reviewed 2026-11-12, read-only:
   //   - Deploy tx fkabfHcN8DcrqQyazmlB+UprljBDeEkvFlgaVOi905g=
   //     (2026-11-10 18:47:06Z). Code and data still equal that StateInit:
@@ -30,11 +30,11 @@ export const AUDITED_OMNISTON_SETTLEMENT_CONTRACTS: Record<string, string[]> = {
   //     go together: without the pin every EVM -> TON order on this minter
   //     fills and then fails the disclosure check.
   // - EQAbWJ3Y… (code f91c43d3…, "rev1", deployed 2026-06-09) is no longer
-  //   trusted by default (2026-11-12). Omniston's resolvers moved to rev2 on
-  //   2026-11-10, and rev1 lacks the escrow-code whitelist rev2 added: on
+  //   trusted by default (2026-11-12). Omniston's quotes moved to rev2 on
+  //   2026-11-10 (rev1 still took a few orders on 2026-11-12), and rev1 lacks the escrow-code whitelist rev2 added: on
   //   rev1 only the SDK's own pins check the escrow and execution code an
-  //   order carries. A quote or build that names rev1 is refused with its
-  //   address in the reason; its positions (code e4d5115a…) fail
+  //   order carries. A quote that names rev1 is refused with its address
+  //   in the reason, and so is building one cached under an older table; its positions (code e4d5115a…) fail
   //   position-code-hash. It stays in OMNISTON_ESCROWS (activity.ts), which
   //   recognizes history and grants no trust. Old orders need nothing from
   //   this table: trackIntent reads no trust table, and every disclosure
