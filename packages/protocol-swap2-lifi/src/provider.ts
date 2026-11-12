@@ -250,7 +250,19 @@ const TOOL_KEY = /^[A-Za-z0-9_-]{1,64}$/;
  * other Solana bridges only against its SOL and token ceilings.
  */
 const UNBOUND_TOOLS: readonly string[] = Object.freeze(["relaydepository", "garden", "squid", "symbiosis"]);
-function routeOptions(body: unknown, excluded: readonly string[]): LifiRouteOption[] {
+/**
+ * EVM → Solana: the LI.FI tools whose Diamond call names the Solana recipient where the device reads it (calldata.ts,
+ * `solanaRecipientMismatch`): Mayan's Swift, MCTP and Fast MCTP routes, Polymer CCTP (fast and standard), Chainflip and
+ * LI.FI Intents. Such requests ask LI.FI for these bridges only, so a pair is not lost to a bridge whose recipient the
+ * module cannot read (NEAR Intents, LayerSwap, Smart Deposits, … are refused for this direction).
+ */
+const SOLANA_DESTINATION_TOOLS: readonly string[] = Object.freeze(["mayan", "mayanMCTP", "mayanFastMCTP", "polymer", "polymerStandard", "chainflip", "lifiIntents"]);
+/** LI.FI's Smart Deposits pay a deposit address; nothing in the transaction binds where it delivers. */
+const SMART_DEPOSITS_TOOL = /^smartdeposits?$/i;
+/** A dry EVM → Solana quote without a recipient prices the publicly known BIP-39 "abandon" account 0 on Solana. */
+const dryRecipient = (params: Pick<QuoteParams, "sourceChain" | "destChain">, fromAddress: string): string =>
+  !isSolana(params.sourceChain) && isSolana(params.destChain) ? SOLANA_PLACEHOLDER : fromAddress;
+function routeOptions(body: unknown, excluded: readonly string[], allowed?: readonly string[]): LifiRouteOption[] {
   const routes = (body as {routes?: unknown})?.routes;
   if (!Array.isArray(routes)) return [];
   const out: LifiRouteOption[] = [];
@@ -261,7 +273,7 @@ function routeOptions(body: unknown, excluded: readonly string[]): LifiRouteOpti
     const cross = Array.isArray(step.includedSteps) ? step.includedSteps.find((i) => i?.type === "cross")?.tool : undefined;
     const tool = typeof cross === "string" ? cross : step.tool;
     const eta = step.estimate?.executionDuration;
-    if (typeof tool !== "string" || !TOOL_KEY.test(tool) || excluded.includes(tool) || typeof eta !== "number" || !Number.isFinite(eta) || eta < 0) continue;
+    if (typeof tool !== "string" || !TOOL_KEY.test(tool) || excluded.includes(tool) || (allowed && !allowed.includes(tool)) || typeof eta !== "number" || !Number.isFinite(eta) || eta < 0) continue;
     if (typeof r.toAmount !== "string" || typeof r.toAmountMin !== "string" || !/^\d{1,60}$/.test(r.toAmount) || !/^\d{1,60}$/.test(r.toAmountMin)) continue;
     out.push({
       tool,
@@ -331,6 +343,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
 
       const solanaSource = isSolana(params.sourceChain);
       const crossChain = params.sourceChain !== params.destChain;
+      // EVM → Solana: only the bridges whose Solana recipient the calldata check reads (SOLANA_DESTINATION_TOOLS).
+      const evmToSolana = !solanaSource && isSolana(params.destChain);
       // The Diamond check refuses a destination call (its recipient sits in calldata for the other chain), so LI.FI is
       // asked not to offer one; the check stays as the backstop. A Solana source has no Diamond call to check.
       const noDestinationCall = crossChain && !solanaSource;
@@ -339,7 +353,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
       // The placeholders price a dry quote; a live one is built for real addresses only (round 3, H8).
       const dry = params.dry !== false;
       const fromAddress = params.refundAddress || (dry ? (solanaSource ? SOLANA_PLACEHOLDER : EVM_PLACEHOLDER) : "");
-      const toAddress = params.destAddress || (dry ? fromAddress : "");
+      const toAddress = params.destAddress || (dry ? dryRecipient(params, fromAddress) : "");
       if (!fromAddress) return reject("a live quote needs the sender's address");
       if (!toAddress) return reject("a live quote needs a recipient");
 
@@ -369,7 +383,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
               options: {
                 slippage: slippageBps / 10_000,
                 ...(routeScope ? {slippageScope: "route"} : {}),
-                ...(solanaSource ? {} : {bridges: {deny: UNBOUND_TOOLS}}),
+                ...(solanaSource ? {} : {bridges: {...(evmToSolana ? {allow: SOLANA_DESTINATION_TOOLS} : {}), deny: UNBOUND_TOOLS}}),
                 ...(noDestinationCall ? {allowDestinationCall: false} : {}),
                 ...(integrator().trim() ? {integrator: integrator().trim()} : {}),
               },
@@ -377,7 +391,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
             signal: signal ?? timeoutSignal(8_000),
           });
           if (res.ok) {
-            const options = routeOptions(await res.json(), solanaSource ? [] : UNBOUND_TOOLS);
+            const options = routeOptions(await res.json(), solanaSource ? [] : UNBOUND_TOOLS, evmToSolana ? SOLANA_DESTINATION_TOOLS : undefined);
             if (options.length) choice = cleanChoice(config.chooseRoute(options, params));
           }
         } catch {
@@ -403,7 +417,10 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         if (routeScope) url.searchParams.set("slippageScope", "route");
         if (noDestinationCall) url.searchParams.set("allowDestinationCall", "false");
         const unbound = crossChain && !solanaSource ? UNBOUND_TOOLS : [];
-        for (const t of (choice?.allowBridges ?? []).filter((b) => solanaSource || !UNBOUND_TOOLS.includes(b))) url.searchParams.append("allowBridges", t);
+        const allow = (choice?.allowBridges ?? []).filter((b) => solanaSource || !UNBOUND_TOOLS.includes(b));
+        // EVM → Solana: the policy's pick among the readable bridges, or all of them.
+        const solanaAllow = evmToSolana ? allow.filter((b) => SOLANA_DESTINATION_TOOLS.includes(b)) : [];
+        for (const t of evmToSolana ? (solanaAllow.length ? solanaAllow : SOLANA_DESTINATION_TOOLS) : allow) url.searchParams.append("allowBridges", t);
         for (const t of new Set([...(choice?.denyBridges ?? []), ...unbound])) url.searchParams.append("denyBridges", t);
         if (choice?.order) url.searchParams.set("order", choice.order);
         deadline = signal ? undefined : timeoutSignal(12_000);
@@ -468,6 +485,13 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           };
         };
         const receivedAt = Date.now();
+        if (evmToSolana) {
+          const steps = (q as {includedSteps?: unknown}).includedSteps;
+          const tools = [(q as {tool?: unknown}).tool, ...(Array.isArray(steps) ? steps.map((i: {tool?: unknown} | null) => i?.tool) : [])];
+          if (tools.some((t) => typeof t === "string" && SMART_DEPOSITS_TOOL.test(t))) {
+            return reject("LI.FI Smart Deposits pay a deposit address whose recipient the transaction does not bind — refused for a Solana destination");
+          }
+        }
         const action = q.action;
         const est = q.estimate;
         const tr = q.transactionRequest;
@@ -739,7 +763,7 @@ export function lifiVerifyQuote(params: QuoteParams, quote: Quote): string | nul
   // The same addresses the provider quotes for: a dry quote without them prices the placeholder (never built).
   const dry = params.dry !== false;
   const fromAddress = params.refundAddress || (dry ? EVM_PLACEHOLDER : "");
-  const toAddress = params.destAddress || (dry ? fromAddress : "");
+  const toAddress = params.destAddress || (dry ? dryRecipient(params, fromAddress) : "");
   if (!fromAddress || !toAddress) return "a live quote needs the sender and the recipient";
   let amountIn: bigint, minOut: bigint, value: bigint, nativeFee: bigint;
   try {
