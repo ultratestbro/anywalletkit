@@ -27,11 +27,32 @@ calls are refused) and its `BridgeData` must name the reviewed recipient and cha
 input token (or what its source swaps make of it). Every refund, depositor or fallback address a
 bridge carries in its own data (Stargate's LayerZero fee refund, an expired Across deposit or LI.FI
 intent, a Mayan Swift order's trader, Chainflip's refund address, …) must be the sender or the
-recipient. Refused, because the recipient cannot be read from the calldata: routes with a destination call, EVM-source routes to a non-EVM chain, and the
+recipient. Refused, because the recipient cannot be read from the calldata: routes with a destination call and the
 bridges whose facet does not bind the delivery to `BridgeData` (Relay, Garden, deBridge DLN,
 ThorSwap, Squid, Symbiosis) — cross-chain requests ask LI.FI to route around Relay, Garden, Squid
 and Symbiosis, and not to offer destination calls (`allowDestinationCall=false`), so their pairs get
 another bridge. Unknown calldata is refused.
+
+**EVM → Solana.** `BridgeData` names LI.FI's Solana chain id and, as its receiver, only LI.FI's non-EVM
+placeholder (`0x11f1…11F1`, required exactly); the recipient sits in the bridge's own data and is read there for
+the bridges whose delivery the transaction binds, then held to the requested owner (`destAddress`) and token:
+
+- **Mayan** (`mayan`, `mayanMCTP`, `mayanFastMCTP`): the facet's `nonEVMReceiver` and the destination address in
+  the Mayan order or transfer it forwards (Swift v2, MCTP `createOrder` / `bridgeWithFee`, Fast MCTP `createOrder`
+  / `bridge`) must both be the owner; the order must go to Solana (Wormhole chain 1 / CCTP domain 5), carry no
+  custom payload and name the requested mint (32 zero bytes for SOL); a plain CCTP transfer delivers USDC. Other
+  Mayan entry points are refused.
+- **Polymer CCTP** (`polymer`, `polymerStandard`): CCTP mints to the token account the calldata names, which the
+  facet cannot check; it must be the owner's USDC associated token account, derived on the device.
+- **Chainflip**: the vault swap's 32-byte destination address must be the owner and its asset the requested one
+  (SOL, USDC or USDT on Solana).
+- **LI.FI Intents**: the escrowed order's recipient and output token must be the owner and the requested mint.
+
+These requests ask LI.FI for those bridges only (`allowBridges`; a `chooseRoute` pick is kept among them). NEAR
+Intents and LayerSwap pay a deposit address whose off-chain order names the recipient, and Smart Deposits a
+deposit address outright: deposits the device cannot verify, refused for this direction. Any other bridge to
+Solana is refused as before. EVM → EVM and Solana-source requests are unchanged. A dry EVM → Solana quote with no
+recipient prices a Solana placeholder recipient.
 
 Every swap step is read, not only the ends: each must spend what the step before delivered, only
 steps that spend the input token may pull from the wallet (`requiresDeposit`), and together at most
