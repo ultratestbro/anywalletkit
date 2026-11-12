@@ -75,7 +75,7 @@ describe("SDK-306: the audited TON tables", () => {
     expect(live.evmToTonQuotes.ethUsdt.quoteUpdated.settlementData.value.dstProtocolContractAddress.chain.value).toBe(REV2);
   });
 
-  it("pin the position code of each minter, and leave every other TON pin as audited (the rev2 minter whitelists exactly the pinned escrow, execution and output-escrow codes)", () => {
+  it("pin the position code of each minter, and leave every other TON pin as audited (the rev2 minter's whitelist holds the pinned escrow, execution and output-escrow codes, plus a TON <-> TON code the SDK does not pin)", () => {
     expect(DEFAULT_OMNISTON_TON_CODE_HASHES.position).toEqual([POSITION_REV1, POSITION_REV2]);
     expect(live.evmToTonPosition.codeHash).toBe(POSITION_REV2);
     expect(DEFAULT_OMNISTON_TON_CODE_HASHES.escrow).toEqual(["9e77cb9e8fd7406d4e85e5f57378eb51e51b862424cf988306c783d50ade697a"]);

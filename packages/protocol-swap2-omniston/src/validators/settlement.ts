@@ -18,13 +18,15 @@ export const AUDITED_OMNISTON_SETTLEMENT_CONTRACTS: Record<string, string[]> = {
   //   - Same admin (0:408fff62…) as rev1; it is also the admin_address of the
   //     STON.fi DEX v2 routers api.ston.fi lists. Deployed from the same
   //     wallet as rev1 (a weak signal on TON: anyone can send a StateInit).
-  //   - The bytecode diff to rev1 only adds restrictions: escrow / execution
-  //     code must be in an embedded whitelist (9e77…, f6ed…, d304…, pinned in
-  //     ton.ts, plus 9fe4… for TON <-> TON) and the escrow sub-VM must return
-  //     one value. Fees, timelocks, payouts, admin and the 7-day upgrade delay
-  //     are unchanged. Replayed through both codes, the real traffic of both
-  //     minters (~42k transactions) and of ~1,070 of their positions gave the
-  //     same outputs.
+  //   - The bytecode diff to rev1: escrow / execution code must be in an
+  //     embedded whitelist (9e77…, f6ed…, d304…, pinned in ton.ts, plus 9fe4…
+  //     for TON <-> TON, which the SDK does not pin), the escrow sub-VM must
+  //     return one value, and a failed position deploy now credits the amount
+  //     back to the same account contract instead of aborting (the only new
+  //     path that moves value; no real message has used it). Fees, timelocks,
+  //     payouts, admin and the 7-day upgrade delay are unchanged. Replayed
+  //     through both codes, the real traffic of both minters (~42k
+  //     transactions) and of ~1,070 of their positions gave the same outputs.
   //   - It deploys positions with code eb503578…, pinned next to e4d5115a…
   //     in DEFAULT_OMNISTON_TON_CODE_HASHES.position. Both changes ship
   //     together: without the pin every EVM -> TON order on this minter fills

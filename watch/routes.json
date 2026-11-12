@@ -400,7 +400,7 @@
   }
  ],
  "omniston": {
-  "_doc": "Mirror of Vaulty app/src/lib/omnistonSettlement.ts (audited settlement contracts + EVM order protocols); keep in sync by hand.",
+  "_doc": "Mirror of AUDITED_OMNISTON_SETTLEMENT_CONTRACTS / AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS in packages/protocol-swap2-omniston/src/validators/settlement.ts, for the canary; scripts/watch/watch-2026-11-12-omniston-ton.test.mjs checks that the TON entries match.",
   "trustedSettlementContracts": {
    "ton:-239": [
     "EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ",

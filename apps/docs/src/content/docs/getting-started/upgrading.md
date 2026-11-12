@@ -19,6 +19,8 @@ EVM routes are gone until you bump. TON → TON swaps are not affected.
 
 - **protocol-swap2-omniston:** the audited table trusts the new minter next to the old one, and
   `DEFAULT_OMNISTON_TON_CODE_HASHES.position` pins the code of the positions it deploys. Bump; no code change.
+  Bump every place that runs the validators, not only the server: a mobile app or an extension that checks a remote
+  TON → EVM build on the device refuses the new minter until it ships a build with the new version.
 - **Your own settlement table:** a `trustedSettlementContracts` table, a `trustedProtocolAddresses` list or an env
   such as `OMNISTON_TRUSTED_SETTLEMENT_CONTRACTS` replaces the built-in table. Add the new address under `ton:-239`,
   spelled exactly as above (TON addresses are compared as strings), and keep the old one. A custom
