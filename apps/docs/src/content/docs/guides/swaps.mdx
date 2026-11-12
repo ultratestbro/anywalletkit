@@ -42,7 +42,7 @@ app, and each provider also works on its own without the router.
 | `symbiosis` | Cross-chain (pool bridge + DEX legs) | Ethereum, BNB Chain, Avalanche, Polygon, Arbitrum, Optimism, Base, TON (sources) and Tron (opt-in source); all nine as destinations; no key, 0 bps |
 | `omniston` | STON.fi | TON swaps, TON ↔ EVM and EVM ↔ EVM stablecoin orders |
 | `cctp` | Circle burn-and-mint | USDC between EVM chains, no slippage |
-| `usdt0` | Tether's LayerZero OFT | USDT / USDT0 between 16 EVM chains in one transaction; the direct USDT path into HyperEVM; USDT from Ethereum / Arbitrum / Celo into Tron and TON through the Legacy Mesh (destinations only) |
+| `usdt0` | Tether's LayerZero OFT | USDT / USDT0 between 16 EVM chains in one transaction; the direct USDT path into HyperEVM; USDT from Ethereum / Arbitrum / Celo into TON through the Legacy Mesh (destinations only); Tron opt-in (`meshDestinations`): its LayerZero fee is above the engine's native-fee ceiling today |
 | `uniswap`, `balancer` | On-chain DEX | Same-chain, priced from the contracts, no API key |
 | `curve` | On-chain DEX (Curve Router NG) | Same-chain stablecoin, ETH ↔ LST and crvUSD swaps from the contracts over a pinned pool allowlist; no API, no key, no fee ([below](#curve)) |
 | `wrap` | WETH9 | Native ↔ wrapped native, 1:1 |

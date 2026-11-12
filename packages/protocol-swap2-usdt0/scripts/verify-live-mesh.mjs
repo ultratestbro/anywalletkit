@@ -6,6 +6,9 @@
 //     the sealed send decoded back (eid, recipient bytes, amounts, refund), buildDeposit + preflightDeposit (eth_call).
 //  3. Real delivered mesh transfers from LayerZero Scan: the encoder reproduces each packet's recipient bytes from the
 //     address the destination paid, and trackIntent follows them to "completed" (TON: the payout read from tonapi).
+//  4. The default provider (meshDestinations unset = TON only): Tron is not offered and answers as before the mesh,
+//     with no RPC call; TON quotes. The sealed fee of every quote against the swap2 engine's native-fee ceiling.
+// Tron is opt-in (meshDestinations), so sections 2 and 3 run a provider with both destinations on.
 // RPC_<chainId>=url overrides a public endpoint.
 import {createPublicClient, decodeFunctionData, getAddress, http, parseAbi} from "viem";
 import {usdt0Provider, TON_API} from "../dist/provider.js";
@@ -50,7 +53,10 @@ for (const s of Object.values(USDT0_MESH_SOURCES)) {
 }
 
 console.log("2. live quotes (read-only), 10 and 1000 USDT from every mesh source into Tron and TON");
-const p = usdt0Provider({rpcUrls});
+const p = usdt0Provider({rpcUrls, meshDestinations: ["tron", "ton"]});
+// protocol-swap2-core's per-chain native-fee ceiling (swap2/base.ts NATIVE_FEE_CAP, 2026-11-12) — shown, not enforced here.
+const ENGINE_CAP = {"eip155:1": 5_000_000_000_000_000n, "eip155:42161": 5_000_000_000_000_000n, "eip155:42220": 100_000_000_000_000_000_000n};
+const ceiling = [];
 const sourceToken = {"eip155:1": "USDT", "eip155:42161": "USDT0", "eip155:42220": USDT0_MESH_SOURCES["eip155:42220"].token};
 for (const s of Object.values(USDT0_MESH_SOURCES)) {
   for (const d of [TRON, TON]) {
@@ -66,6 +72,7 @@ for (const s of Object.values(USDT0_MESH_SOURCES)) {
       const ok = sp.dstEid === d.eid && sp.to === want && meshRecipientMatches(d, sp.to, RECIPIENT[d.caip2]) && String(sp.amountLD) === amountIn && String(sp.minAmountLD) === q.minDestAmount && getAddress(refund) === REFUND && fee.nativeFee === BigInt(q.txRequest.value);
       if (!ok) bad++;
       const nativeSym = s.chainId === 42220 ? "CELO" : "ETH";
+      if (amountIn === "10000000") ceiling.push(`${s.name} → ${d.name}: sealed ${fmt(q.txRequest.nativeFee)} ${s.chainId === 42220 ? "CELO" : "ETH"} vs ceiling ${fmt(ENGINE_CAP[s.caip2])} → ${BigInt(q.txRequest.nativeFee) > ENGINE_CAP[s.caip2] ? "engine refuses" : "fits"}`);
       console.log(`  ${ok ? "ok " : "BAD"} ${s.name.padEnd(9)} → ${d.name.padEnd(4)} ${String(Number(amountIn) / 1e6).padStart(5)} USDT: receives ${Number(q.destAmount) / 1e6} (mesh fee ${q.fees.map((f) => Number(f.amount) / 1e6).join("+")}), LayerZero fee sealed ${fmt(q.txRequest.nativeFee)} ${nativeSym} (quote ${fmt((BigInt(q.txRequest.nativeFee) * 10_000n) / 12_500n)}), to ${sp.to}, eta ${q.etaSeconds}s, preflight ${preflight}`);
     }
   }
@@ -94,6 +101,21 @@ for (const t of PAST) {
   const ok = payload.startsWith("0x0002") && enc.to === packetTo && status.state === "completed";
   if (!ok) bad++;
   console.log(`  ${ok ? "ok " : "BAD"} ${s.name} → ${t.dst.name} ${t.tx.slice(0, 12)}… recipient ${recipient} → ${enc.to ?? enc.refusal} ${enc.to === packetTo ? "= packet to" : `≠ packet ${packetTo}`}; amount ${Number(BigInt(`0x${payload.slice(70, 86)}`)) / 1e6} USDT; track ${JSON.stringify(status)}`);
+}
+console.log("4. default provider (Tron opt-in) and the engine's native-fee ceiling");
+{
+  let rpcCalls = 0;
+  const counted = (input, init) => { rpcCalls++; return fetch(input, init); };
+  const def = usdt0Provider({rpcUrls, fetchImpl: counted});
+  const reasons = [];
+  const tron = await def.getQuote({sourceChain: "eip155:42161", sourceToken: "USDT0", destChain: TRON.caip2, destToken: "USDT", amountIn: "10000000", destAddress: RECIPIENT[TRON.caip2], refundAddress: REFUND, dry: false, onRefusal: (r) => reasons.push(r)});
+  const tronCalls = rpcCalls;
+  const tronOk = tron === null && reasons.join() === "USDT0 is not deployed on this chain" && tronCalls === 0 && !def.supportsChain(TRON.caip2) && !def.supportsRoute({chain: "eip155:42161", token: "USDT0"}, {chain: TRON.caip2, token: "USDT"});
+  const ton = await def.getQuote({sourceChain: "eip155:42161", sourceToken: "USDT0", destChain: TON.caip2, destToken: "USDT", amountIn: "10000000", destAddress: RECIPIENT[TON.caip2], refundAddress: REFUND, dry: false});
+  if (!tronOk || !ton) bad++;
+  console.log(`  ${tronOk ? "ok " : "BAD"} default → Tron: ${reasons.join("; ")} (rpc calls ${tronCalls}, supportsChain ${def.supportsChain(TRON.caip2)})`);
+  console.log(`  ${ton ? "ok " : "BAD"} default → TON: ${ton ? `receives ${Number(ton.destAmount) / 1e6}, sealed fee ${fmt(ton.txRequest.nativeFee)} ETH (rpc calls ${rpcCalls - tronCalls})` : "no quote"}`);
+  for (const line of ceiling) console.log(`      ${line}`);
 }
 console.log(`hosts: ${LZ_SCAN_API}, ${TON_API}, RPCs ${Object.values(rpcUrls).map((u) => new URL(u).host).join(", ")}`);
 console.log(bad ? `FAILED (${bad})` : "ok");
