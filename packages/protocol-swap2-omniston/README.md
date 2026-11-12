@@ -120,22 +120,50 @@ closed.
 ### Trusted TON contracts
 
 TON ↔ EVM orders settle through Omniston's TON Escrow Minter. The audited
-table trusts two of them (`AUDITED_OMNISTON_SETTLEMENT_CONTRACTS["ton:-239"]`):
+table (`AUDITED_OMNISTON_SETTLEMENT_CONTRACTS["ton:-239"]`) and the position
+pin (`DEFAULT_OMNISTON_TON_CODE_HASHES.position`) trust rev2 only:
 
-| Minter | Code | Positions it deploys (EVM → TON) | Quoted |
-|---|---|---|---|
-| `EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ` (rev1) | `f91c43d3…` | `e4d5115a…` | until 2026-11-10 |
-| `EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA` (rev2) | `9737943f…` | `eb503578…` | since 2026-11-10 |
+| Minter | Code | Positions it deploys (EVM → TON) | Quoted | Trusted by default |
+|---|---|---|---|---|
+| `EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA` (rev2) | `9737943f…` | `eb503578…` | since 2026-11-10 | yes |
+| `EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ` (rev1) | `f91c43d3…` | `e4d5115a…` | until 2026-11-10 | no, since 2026-11-12 |
 
-rev1 stays trusted while orders on it settle and refund. The provider compares
-TON addresses as strings, so a table of your own must spell them exactly as
-above; it replaces the built-in table, so it must list every network. A new
-minter is a new trust decision: its address goes into the settlement table and
-the code of its positions into `DEFAULT_OMNISTON_TON_CODE_HASHES.position`
-(`positionCodeHashes`), in the same release. With the address alone, EVM → TON
-orders fill and then fail the check before the secret is disclosed. Both
-minters are admin-upgradable after a 7-day delay; the module watch reads their
-code and data daily.
+Omniston's resolvers moved to rev2 on 2026-11-10. rev2 checks the escrow and
+execution code of every order against a whitelist built into the contract;
+rev1 has no such whitelist. So a quote, a build or an output position on rev1
+is refused by default ("untrusted TON settlement contract EQAbWJ3Y…",
+"the escrow transfer pays EQAbWJ3Y…, not an Omniston protocol contract this
+app trusts", `position-code-hash`). Both minters stay in `OMNISTON_ESCROWS`,
+which recognizes history and grants no trust (see Activity).
+
+An app that still has to settle an order on rev1 passes rev1 explicitly, and
+takes it out again once that order is closed:
+
+```ts
+const REV2 = "EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA";
+const REV1 = "EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ";
+const ton = createOmnistonTonValidators({
+  trustedProtocolAddresses: [REV2, REV1], // TON → EVM builds (verifyTonEscrowBuild)
+  positionCodeHashes: [
+    "eb503578b4d9cd791c9c0ecd0da6da4064aae2bcb19d3c924d4001c493386bc5", // rev2 positions
+    "e4d5115a321ade7b827e38fb522c20d2f2cd46e4c6b0b5f7dd8b6b096792d77b", // rev1 positions
+  ],
+});
+omnistonProvider({
+  ...ton,
+  trustedSettlementContracts: {...AUDITED_OMNISTON_SETTLEMENT_CONTRACTS, "ton:-239": [REV2, REV1]},
+  // …
+});
+```
+
+The provider compares TON addresses as strings, so a table of your own must
+spell them exactly as above; it replaces the built-in table, so it must list
+every network. A new minter is a new trust decision: its address goes into the
+settlement table and the code of its positions into
+`DEFAULT_OMNISTON_TON_CODE_HASHES.position` (`positionCodeHashes`), in the same
+release. With the address alone, EVM → TON orders fill and then fail the check
+before the secret is disclosed. The minters are admin-upgradable after a 7-day
+delay; the module watch reads the code and data of every trusted minter daily.
 
 ## Activity
 
@@ -148,9 +176,11 @@ at the destination contract and both sides of every transfer:
   `swap`, "Swapped GRAM → USD₮" / "Swapped USD₮ → GRAM", subtitle "STON.fi · TON".
 - Omniston HTLC escrow (`OMNISTON_ESCROWS`, the Escrow Minters a quote names as
   `srcProtocolContractAddress`: `EQAbWJ3Y…mrZ` until 2026-11-10, `EQDybO88…9IA`
-  since; both stay listed for history) → `bridge`, "Bridged USD₮", subtitle
-  "Omniston · STON.fi". The EVM leg is paid by the resolver and is not
-  recognizable offline.
+  since; both stay listed for history, though only rev2 is trusted for new
+  orders) → `bridge`, "Bridged USD₮", subtitle "Omniston · STON.fi". The EVM
+  leg is paid by the resolver and is not recognizable offline. A refund
+  backstop that looks for the input coming back from a minter should read this
+  list too, not only the trusted table.
 
 EVM → TON: the EVM leg is an off-chain signature (no transaction to
 recognize); the delivery is a jetton transfer from the same escrow contract and

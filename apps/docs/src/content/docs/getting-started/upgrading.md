@@ -12,21 +12,29 @@ your app does.
 
 ## Next release: Omniston's new TON Escrow Minter
 
-Since 2026-11-10 Omniston settles every TON ↔ EVM order through a new TON Escrow Minter,
+Since 2026-11-10 Omniston settles every TON ↔ EVM order through a new TON Escrow Minter (rev2),
 `EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA`. `protocol-swap2-omniston` 0.5.4 and older refuse those quotes
 ("untrusted TON settlement contract" for TON → EVM, "untrusted ton:-239 settlement contract" for EVM → TON), so TON ↔
 EVM routes are gone until you bump. TON → TON swaps are not affected.
 
-- **protocol-swap2-omniston:** the audited table trusts the new minter next to the old one, and
-  `DEFAULT_OMNISTON_TON_CODE_HASHES.position` pins the code of the positions it deploys. Bump; no code change.
-  Bump every place that runs the validators, not only the server: a mobile app or an extension that checks a remote
-  TON → EVM build on the device refuses the new minter until it ships a build with the new version.
+- **protocol-swap2-omniston:** the audited table trusts rev2 only, and `DEFAULT_OMNISTON_TON_CODE_HASHES.position`
+  pins only the code of the positions rev2 deploys. Bump; no code change. Bump every place that runs the validators,
+  not only the server: a mobile app or an extension that checks a remote TON → EVM build or an EVM → TON position on
+  the device refuses rev2 until it ships a build with the new version.
+- **The old minter is no longer trusted:** `EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ` (rev1) left the default
+  table and its position code `e4d5115a…` left the pins. Omniston's resolvers moved off it, and it lacks the
+  escrow-code whitelist rev2 checks every order against, so a quote, a build or a position on rev1 is now refused by
+  name. It stays in `OMNISTON_ESCROWS`, so activity history still recognizes rev1 orders. A refund backstop that looks
+  for the input coming back from a minter should read `OMNISTON_ESCROWS` (every minter that ever held an order), not
+  the trusted table. Only an app that still has to settle an order on rev1 passes rev1 explicitly
+  (`trustedSettlementContracts` / `trustedProtocolAddresses` with both minters, `positionCodeHashes` with
+  `eb503578b4d9cd791c9c0ecd0da6da4064aae2bcb19d3c924d4001c493386bc5` and
+  `e4d5115a321ade7b827e38fb522c20d2f2cd46e4c6b0b5f7dd8b6b096792d77b`), and drops it once that order is closed.
 - **Your own settlement table:** a `trustedSettlementContracts` table, a `trustedProtocolAddresses` list or an env
-  such as `OMNISTON_TRUSTED_SETTLEMENT_CONTRACTS` replaces the built-in table. Add the new address under `ton:-239`,
-  spelled exactly as above (TON addresses are compared as strings), and keep the old one. A custom
-  `positionCodeHashes` needs `eb503578b4d9cd791c9c0ecd0da6da4064aae2bcb19d3c924d4001c493386bc5` too: without it EVM →
-  TON orders on the new minter fill and then fail the check before the secret is disclosed, and roll back on their
-  timelocks.
+  such as `OMNISTON_TRUSTED_SETTLEMENT_CONTRACTS` replaces the built-in table. List rev2 under `ton:-239`, spelled
+  exactly as above (TON addresses are compared as strings), and drop rev1 unless it must settle an old order. A
+  custom `positionCodeHashes` needs `eb503578b4d9cd791c9c0ecd0da6da4064aae2bcb19d3c924d4001c493386bc5`: without it EVM
+  → TON orders on rev2 fill and then fail the check before the secret is disclosed, and roll back on their timelocks.
 
 ## Next release: hidden hashes in text messages
 
