@@ -40,7 +40,7 @@ import relayNativeLive from '../../packages/protocol-swap2-relay/fixtures/quotes
 import { encodeFunctionData, encodeFunctionResult } from 'viem'
 import { nearIntentsProvider } from '@anywalletkit/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@anywalletkit/protocol-swap2-thorchain/protocol'
-import { THORNODE_CONFIRM_PATHS, thorchainProvider } from '@anywalletkit/protocol-swap2-thorchain/provider'
+import { THORNODE_CONFIRM_PATHS, thorchainPins, thorchainProvider } from '@anywalletkit/protocol-swap2-thorchain/provider'
 import thorAsgardLive from '../../packages/protocol-swap2-thorchain/fixtures/thornode/2026-11-12/liquify/vaults_asgard.json'
 import thorInboundLive from '../../packages/protocol-swap2-thorchain/fixtures/thornode/2026-11-12/liquify/inbound_addresses.json'
 import thorLastblockLive from '../../packages/protocol-swap2-thorchain/fixtures/thornode/2026-11-12/liquify/lastblock.json'
@@ -421,25 +421,44 @@ export async function smokeProtocols(check: Check): Promise<void> {
  * CS-9 (2026-11-12): THORChain's second-node vault check on Hermes — the confirming node accepts any ActiveVault of
  * its asgard list (the inbound rotates), a node more than 50 blocks behind or slower than its per-node timeout
  * (AbortController + setTimeout, no AbortSignal.timeout/any) is skipped for the next one, a RetiringVault is refused.
- * The nodes are a fake fetch serving the answers recorded on 2026-11-12 (React Native's fetch shape: no Response
- * class, `url` set, no `redirected`).
+ * Review round 2: a redirect React Native's fetch followed is caught by `res.url` alone (no `redirected` there), the
+ * mimir's compromised / insolvent flags and an answer in another shape are handled on the device, the re-check in
+ * preflightDeposit refuses a vault retired since the quote, a hanging first quote host does not use up the vault
+ * check's budget, the budget running out before a node is asked and a lastblock-only failure get their own texts, the
+ * quoting node's lastblock read is armed with its own 8 s (not confirmTimeoutMs), and thorchainPins().verifyBuild
+ * applies the same rule. The nodes are a fake fetch serving the answers recorded on 2026-11-12 (React Native's fetch
+ * shape: no Response class, `url` set, no `redirected`). The Hermes CLI runs timers in the order they were set,
+ * without waiting, so elapsed time is a jump of Date.now (what an app backgrounded mid-quote sees) and a read's bound
+ * is checked as the delay its timer was armed with.
  */
 async function smokeThorchainVaultRotation(check: Check): Promise<void> {
   type Vault = { pub_key: string; status: string; addresses: { chain: string; address: string }[] }
   const asgard = thorAsgardLive as unknown as Vault[]
+  const mimirLive = thorMimirLive as Record<string, number>
   const height = Math.max(...(thorLastblockLive as { thorchain: number }[]).map((e) => e.thorchain))
   const addr = (tail: string, chain: string) => asgard.find((v) => v.pub_key.endsWith(tail))!.addresses.find((a) => a.chain === chain)!.address
   const vaultA = addr('udx7767', 'ETH')
   const vaultB = addr('4wxjp8az', 'ETH')
-  const inboundWith = (evm: string) => (thorInboundLive as Record<string, unknown>[]).map((e) => (['ETH', 'BASE', 'BSC', 'AVAX'].includes(String(e.chain)) ? { ...e, address: evm } : e))
+  const pubB = asgard.find((v) => v.pub_key.endsWith('4wxjp8az'))!.pub_key.toUpperCase()
+  const router = '0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146'
+  const inboundWith = (evm: string, ethRouter = router) => (thorInboundLive as Record<string, unknown>[]).map((e) => {
+    if (!['ETH', 'BASE', 'BSC', 'AVAX'].includes(String(e.chain))) return e
+    return String(e.chain) === 'ETH' ? { ...e, address: evm, router: ethRouter } : { ...e, address: evm }
+  })
+  const retiredB = asgard.map((v) => (v.addresses.some((a) => a.address === vaultB) ? { ...v, status: 'RetiringVault' } : v))
   const btc = 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq'
-  type FakeNode = { height: number; inbound: unknown; asgard: unknown; hang?: boolean }
+  type Answer = { status?: number; url?: string; body?: unknown }
+  type FakeNode = { height: number; inbound: unknown; asgard: unknown; mimir?: unknown; hang?: boolean; down?: boolean; answer?: Record<string, Answer> }
   const nodes: Record<string, FakeNode> = {}
-  const Q = 'https://quote.invalid', C1 = 'https://confirm1.invalid', C2 = 'https://confirm2.invalid'
+  const Q = 'https://quote.invalid', QH = 'https://quote-hang.invalid', C1 = 'https://confirm1.invalid', C2 = 'https://confirm2.invalid'
+  const LIQUIFY = 'https://gateway.liquify.com/chain/thorchain_api', IBS = 'https://thorchain.ibs.team/api'
   const urls: string[] = []
   let cacheOption = false
+  let onRead: ((host: string, path: string) => void) | null = null
   const g = globalThis as { fetch: unknown }
   const realFetch = g.fetch
+  const realNow = Date.now
+  const aborted = () => Object.assign(new Error('aborted'), { name: 'AbortError' })
   g.fetch = (input: string, init?: { signal?: AbortSignal; cache?: string }) => {
     const url = String(input)
     const host = Object.keys(nodes).find((h) => url.startsWith(`${h}/`))
@@ -451,34 +470,50 @@ async function smokeThorchainVaultRotation(check: Check): Promise<void> {
       urls.push(url)
       if (init && 'cache' in init) cacheOption = true
     }
+    onRead?.(host, path)
+    if (n.down) return Promise.reject(new TypeError('Network request failed'))
+    const s = init?.signal
     if (n.hang) {
       return new Promise((_, reject) => {
-        const s = init?.signal
-        const fail = () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
-        if (s?.aborted) fail()
-        else s?.addEventListener('abort', fail)
+        if (s?.aborted) reject(aborted())
+        else s?.addEventListener('abort', () => reject(aborted()))
       })
     }
-    const body = path === '/thorchain/quote/swap'
-      ? { expected_amount_out: '100000', inbound_address: vaultB, router: '0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146', memo: `=:b:${btc}:95000`, expiry: Math.floor(Date.now() / 1000) + 3600 }
+    const custom = n.answer?.[path]
+    const body = custom && 'body' in custom ? custom.body
+      : path === '/thorchain/quote/swap'
+      ? { expected_amount_out: '100000', inbound_address: vaultB, router, memo: `=:b:${btc}:95000`, expiry: Math.floor(Date.now() / 1000) + 3600 }
       : path === THORNODE_CONFIRM_PATHS.lastblock ? (thorLastblockLive as Record<string, unknown>[]).map((e) => ({ ...e, thorchain: n.height }))
       : path === THORNODE_CONFIRM_PATHS.inboundAddresses ? n.inbound
       : path === THORNODE_CONFIRM_PATHS.asgardVaults ? n.asgard
-      : path === THORNODE_CONFIRM_PATHS.mimir ? thorMimirLive
+      : path === THORNODE_CONFIRM_PATHS.mimir ? (n.mimir ?? mimirLive)
       : undefined
-    const ok = body !== undefined
-    return Promise.resolve({ ok, status: ok ? 200 : 404, url, json: async () => body ?? null })
+    const status = custom?.status ?? (body !== undefined ? 200 : 404)
+    return Promise.resolve({ ok: status >= 200 && status < 300, status, url: custom?.url ?? url, json: async () => body ?? null })
   }
-  const quote = async (o: { confirmTimeoutMs?: number } = {}) => {
+  const quoteParams = {
+    sourceChain: 'eip155:1', sourceToken: 'ETH', destChain: 'bitcoin:mainnet', destToken: '0x0000000000000000000000000000000000000000',
+    amountIn: '50000000000000000', destAddress: btc,
+  }
+  type ProviderOptions = { confirmTimeoutMs?: number; nodeUrl?: string[]; confirmNodeUrl?: string[] }
+  const quote = async (o: ProviderOptions = {}) => {
     const reasons: string[] = []
-    const q = await thorchainProvider({ nodeUrl: Q, confirmNodeUrl: [C1, C2], ...o }).getQuote({
-      sourceChain: 'eip155:1', sourceToken: 'ETH', destChain: 'bitcoin:mainnet', destToken: '0x0000000000000000000000000000000000000000',
-      amountIn: '50000000000000000', destAddress: btc, onRefusal: (r: string) => reasons.push(r),
-    })
+    const q = await thorchainProvider({ nodeUrl: Q, confirmNodeUrl: [C1, C2], ...o }).getQuote({ ...quoteParams, onRefusal: (r: string) => reasons.push(r) })
     return { q, reasons }
   }
+  const fresh = (o: Partial<FakeNode> = {}): FakeNode => ({ height, inbound: inboundWith(vaultA), asgard, ...o })
+  const reset = () => {
+    for (const h of Object.keys(nodes)) delete nodes[h]
+    // The default public nodes stay unreachable here: down, so a check with one configured node is not slowed.
+    nodes[LIQUIFY] = fresh({ down: true })
+    nodes[IBS] = fresh({ down: true })
+    nodes[Q] = fresh({ inbound: inboundWith(vaultB) })
+    nodes[C1] = fresh()
+    nodes[C2] = fresh()
+  }
+  const NO_SECOND = 'thorchain: no second node answered to confirm the inbound vault (configure confirmNodeUrl)'
   try {
-    for (const h of ['https://gateway.liquify.com/chain/thorchain_api', 'https://thorchain.ibs.team/api']) nodes[h] = { height, inbound: [], asgard: [], hang: true }
+    for (const h of [LIQUIFY, IBS]) nodes[h] = { height, inbound: [], asgard: [], hang: true }
     nodes[Q] = { height, inbound: inboundWith(vaultB), asgard }
     nodes[C1] = { height, inbound: inboundWith(vaultA), asgard }
     nodes[C2] = { height, inbound: inboundWith(vaultA), asgard }
@@ -492,14 +527,135 @@ async function smokeThorchainVaultRotation(check: Check): Promise<void> {
     const t0 = Date.now()
     r = await quote({ confirmTimeoutMs: 150 })
     check('thorchain: per-node timeout (AbortController + setTimeout) moves to the next node', r.q !== null && Date.now() - t0 < 3_000, `${Date.now() - t0} ms; ${r.reasons.join('; ')}`)
-    nodes[C1] = { height, inbound: inboundWith(vaultA), asgard: asgard.map((v) => (v.addresses.some((a) => a.address === vaultB) ? { ...v, status: 'RetiringVault' } : v)) }
+    nodes[C1] = { height, inbound: inboundWith(vaultA), asgard: retiredB }
     r = await quote()
     check('thorchain: a RetiringVault never confirms', r.q === null && r.reasons[0] === 'thorchain: a second node lists the inbound vault as RetiringVault, not ActiveVault — refused', r.reasons.join('; '))
     nodes[C1] = { height: height - 60, inbound: inboundWith(vaultA), asgard }
     nodes[C2] = { height: height - 60, inbound: inboundWith(vaultA), asgard }
     r = await quote({ confirmTimeoutMs: 150 })
     check('thorchain: every confirming node behind → refused by name', r.q === null && /^thorchain: no confirming node is within 50 blocks/.test(r.reasons[0] ?? ''), r.reasons.join('; '))
+
+    // A redirect React Native's fetch followed: only `res.url` shows it (no `redirected` field) — the node is skipped.
+    reset()
+    nodes[C1]!.answer = { [THORNODE_CONFIRM_PATHS.lastblock]: { url: `${C1}/thorchain/lastblock?height=1` } }
+    r = await quote({ confirmNodeUrl: [C1] })
+    const alone = r.q === null && r.reasons[0] === NO_SECOND
+    nodes[C1]!.answer = { [THORNODE_CONFIRM_PATHS.inboundAddresses]: { url: 'https://elsewhere.invalid/thorchain/inbound_addresses' } }
+    r = await quote()
+    check('thorchain: a followed redirect (res.url only) is not trusted: skipped, refused when alone', alone && r.q !== null && urls.some((u) => u.startsWith(`${C2}/`)), r.reasons.join('; '))
+
+    // The confirming node's mimir flags the quoted vault.
+    reset()
+    nodes[C1]!.mimir = { ...mimirLive, [`COMPROMISEDVAULT-${pubB}`]: 1 }
+    r = await quote()
+    const compromised = r.q === null && r.reasons[0] === "thorchain: a second node's mimir flags the inbound vault as compromised — refused"
+    nodes[C1]!.mimir = { ...mimirLive, [`SOLVENCYHALTVAULT-${pubB}-ETH`]: 1 }
+    r = await quote()
+    check('thorchain: mimir CompromisedVault / SolvencyHaltVault refuse', compromised && r.q === null && r.reasons[0] === "thorchain: a second node's mimir flags the inbound vault as insolvent — refused", r.reasons.join('; '))
+
+    // An answer in another shape: the node is skipped, never trusted.
+    reset()
+    nodes[C1]!.answer = { [THORNODE_CONFIRM_PATHS.asgardVaults]: { body: { vaults: [] } } }
+    r = await quote({ confirmNodeUrl: [C1] })
+    const shapeAlone = r.q === null && r.reasons[0] === NO_SECOND
+    r = await quote()
+    check('thorchain: an asgard answer in another shape is skipped, refused when alone', shapeAlone && r.q !== null, r.reasons.join('; '))
+
+    // The re-check right before broadcast confirms the same way, and refuses a vault retired since the quote.
+    reset()
+    const p = thorchainProvider({ nodeUrl: Q, confirmNodeUrl: [C1, C2] })
+    const q = (await p.getQuote(quoteParams))!
+    const tx = await p.buildDeposit(q)
+    const first = await p.preflightDeposit!(q, tx).then(() => 'ok', (e: unknown) => String(e))
+    nodes[C1]!.asgard = retiredB
+    const second = await p.preflightDeposit!(q, tx).then(() => 'ok', (e: Error) => e.message)
+    check('thorchain: preflightDeposit re-confirms (rotated vault ok, retired since the quote refused)', first === 'ok' && second === 'thorchain: a second node lists the inbound vault as RetiringVault, not ActiveVault — refused', `${first}; ${second}`)
+
+    // A hanging first quote host (8.5 s pass while it is asked) does not use up the vault check's budget.
+    reset()
+    nodes[QH] = fresh({ hang: true })
+    onRead = (host) => {
+      if (host === QH) Date.now = () => realNow() + 8_500
+    }
+    urls.length = 0
+    r = await quote({ nodeUrl: [QH, Q] })
+    Date.now = realNow
+    onRead = null
+    check('thorchain: a hanging first quote host + a sound second → confirmed (own budget from the quote in hand)', r.q?.providerData?.inboundAddress === vaultB && r.reasons.length === 0 && urls.some((u) => u.startsWith(`${C1}/thorchain/vaults/asgard`)), r.reasons.join('; '))
+
+    // The clock jumps while the quoting node reads its height (the app backgrounded): no time is left to ask a node.
+    reset()
+    let asked = 0
+    onRead = (host, path) => {
+      if (host === Q && path === THORNODE_CONFIRM_PATHS.lastblock) Date.now = () => realNow() + 9_000
+      if (host === C1 || host === C2) asked++
+    }
+    r = await quote()
+    Date.now = realNow
+    onRead = null
+    check('thorchain: budget gone before any confirming node was asked → its own text', r.q === null && asked === 0 && r.reasons[0] === 'thorchain: the 8 s confirmation budget ran out before a second node could be asked to confirm the inbound vault — retry', r.reasons.join('; '))
+
+    // Only the quoting node's lastblock failing names lastblock; a small confirmTimeoutMs does not cut it.
+    reset()
+    nodes[Q]!.answer = { [THORNODE_CONFIRM_PATHS.lastblock]: { status: 404, body: null } }
+    r = await quote()
+    const heightGone = r.q === null && r.reasons[0] === 'thorchain: THORChain height (/thorchain/lastblock) unavailable from every node that answered the inbound addresses'
+    nodes[Q]!.answer = {}
+    const gt = globalThis as unknown as { setTimeout: (fn: () => void, ms?: number) => unknown }
+    const realSetTimeout = gt.setTimeout
+    const delays: number[] = []
+    let armed: number[] = []
+    gt.setTimeout = (fn: () => void, ms?: number) => {
+      delays.push(ms ?? 0)
+      return realSetTimeout(fn, ms)
+    }
+    onRead = (host, path) => {
+      if (host === Q && path === THORNODE_CONFIRM_PATHS.lastblock) armed = delays.slice()
+    }
+    try {
+      r = await quote({ confirmTimeoutMs: 100 })
+    } finally {
+      gt.setTimeout = realSetTimeout
+      onRead = null
+    }
+    // Every timer armed up to the quoting node's lastblock read (quote, inbound_addresses, lastblock) is 8 s.
+    check('thorchain: quoting node lastblock: own 8 s bound (not confirmTimeoutMs), its failure named', heightGone && r.q !== null && armed.length >= 3 && armed.every((d) => d === 8_000), `${armed.join(',')}; ${r.reasons.join('; ')}`)
+
+    // thorchainPins().verifyBuild on the device: the same rule.
+    reset()
+    const built = (await thorchainProvider({ nodeUrl: Q, confirmNodeUrl: [C1, C2] }).getQuote(quoteParams))!
+    const builtTx = await thorchainProvider({ nodeUrl: Q }).buildDeposit(built)
+    const verify = (o: { nodeUrl?: string[]; confirmTimeoutMs?: number } = {}) => thorchainPins({ nodeUrl: [C1, C2], ...o }).verifyBuild(built, builtTx, quoteParams)
+    urls.length = 0
+    cacheOption = false
+    const rotated = await verify()
+    check('thorchain: verifyBuild confirms a rotated ActiveVault on fixed GET paths', rotated === null && urls.length > 0 && urls.every((u) => !u.includes('?')) && !cacheOption, String(rotated))
+    nodes[C2]!.asgard = retiredB
+    const retired = await verify()
+    nodes[C2]!.asgard = asgard
+    nodes[C1]!.mimir = { ...mimirLive, [`COMPROMISEDVAULT-${pubB}`]: 1 }
+    const flagged = await verify()
+    nodes[C1]!.mimir = undefined
+    nodes[C1]!.inbound = inboundWith(vaultA, '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+    const routerSwap = await verify()
+    check('thorchain: verifyBuild refuses RetiringVault, a compromised vault and another router',
+      retired === 'a THORNode lists the inbound vault as RetiringVault, not ActiveVault' && flagged === "a THORNode's mimir flags the inbound vault as compromised" && routerSwap === 'a THORNode reports another router',
+      `${retired}; ${flagged}; ${routerSwap}`)
+    reset()
+    nodes[C2]!.height = height - 51
+    const lagging = await verify()
+    nodes[C2] = fresh({ answer: { [THORNODE_CONFIRM_PATHS.lastblock]: { url: `${C2}/thorchain/lastblock?height=1` } } })
+    const redirected = await verify()
+    nodes[C2] = fresh({ hang: true })
+    const t2 = Date.now()
+    const slow = await verify({ confirmTimeoutMs: 150 })
+    check('thorchain: verifyBuild skips a lagging, redirected or slow node (two must confirm)',
+      lagging === 'two THORNodes within 50 blocks of the highest THORChain height they report could not confirm the inbound vault (behind or unreachable)' &&
+      redirected === 'two THORNodes could not confirm the inbound vault' && slow === 'two THORNodes could not confirm the inbound vault' && Date.now() - t2 < 2_000,
+      `${lagging}; ${redirected}; ${slow}; ${Date.now() - t2} ms`)
   } finally {
+    Date.now = realNow
+    onRead = null
     g.fetch = realFetch
   }
 }
