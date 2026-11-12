@@ -477,11 +477,11 @@ function mayanToSolana(r: Reader, at: number, t: SolanaTarget): string | null {
   const p = r.bytes(at, at + 32 * 2);
   const selector = p.raw(0, 4);
   const o = MAYAN_SOLANA[selector];
-  if (!o) return `the Mayan call ${selector} is not one whose Solana recipient is read here`;
+  if (!o) return `the Mayan call ${selector} is an entry point whose Solana recipient cannot be checked here`;
   const word = (i: number) => 4 + 32 * i;
   if (o.payloadType && p.word(word(o.payloadType[0])) !== o.payloadType[1]) return `the Mayan call ${selector} carries payload type ${p.word(word(o.payloadType[0]))}, not a plain delivery`;
   const dest = p.raw(word(o.destAddr), 32);
-  if (dest !== t.ownerHex) return `the Mayan order pays ${keyOf(dest)} on Solana, not ${t.e.receiver}`;
+  if (dest !== t.ownerHex) return `the Mayan order pays ${keyOf(dest)} on Solana, not the recipient ${t.e.receiver}`;
   const chain = p.word(word(o.chain));
   if (chain !== (o.cctp ? CCTP_DOMAIN_SOLANA : WORMHOLE_SOLANA)) return `the Mayan order goes to ${o.cctp ? "CCTP domain" : "Wormhole chain"} ${chain}, not Solana`;
   if (o.tokenOut === undefined) return t.e.toToken === SOLANA_USDC ? null : `a Mayan CCTP transfer delivers USDC, not ${t.e.toToken}`;
@@ -506,8 +506,8 @@ function polymerToSolana(r: Reader, at: number, t: SolanaTarget): string | null 
 /** Chainflip (ChainflipFacet 1.0.1): the vault swap's dstAddress is `nonEVMReceiver` verbatim (32 bytes, the owner, for Solana) and `dstToken` Chainflip's asset id. */
 function chainflipToSolana(r: Reader, at: number, t: SolanaTarget): string | null {
   const dst = r.bytes(at, at);
-  if (dst.length !== 32) return `Chainflip pays a ${dst.length}-byte address on Solana, not ${t.e.receiver}`;
-  if (dst.raw(0, 32) !== t.ownerHex) return `Chainflip pays ${keyOf(dst.raw(0, 32))} on Solana, not ${t.e.receiver}`;
+  if (dst.length !== 32) return `Chainflip pays a ${dst.length}-byte address on Solana, not the recipient ${t.e.receiver}`;
+  if (dst.raw(0, 32) !== t.ownerHex) return `Chainflip pays ${keyOf(dst.raw(0, 32))} on Solana, not the recipient ${t.e.receiver}`;
   const asset = r.word(at + 32);
   const want = CHAINFLIP_SOLANA_ASSETS[t.e.toToken];
   return want !== undefined && asset === want ? null : `Chainflip delivers its asset ${asset}, not ${t.e.toToken}`;
@@ -520,7 +520,7 @@ function chainflipToSolana(r: Reader, at: number, t: SolanaTarget): string | nul
  */
 function intentsToSolana(r: Reader, at: number, t: SolanaTarget): string | null {
   const recipient = r.raw(at + 32, 32);
-  if (recipient !== t.ownerHex) return `the LI.FI Intents order pays ${keyOf(recipient)} on Solana, not ${t.e.receiver}`;
+  if (recipient !== t.ownerHex) return `the LI.FI Intents order pays ${keyOf(recipient)} on Solana, not the recipient ${t.e.receiver}`;
   const token = r.raw(at + 32 * 9, 32);
   return token === t.mintHex ? null : `the LI.FI Intents order delivers ${keyOf(token)}, not ${t.e.toToken}`;
 }
@@ -542,7 +542,7 @@ const SOLANA_DELIVERY: Readonly<Record<string, (r: Reader, at: number, t: Solana
 function solanaRecipientMismatch(r: Reader, bridge: {sourceSwaps: boolean; facet: string}, receiver: string, e: DiamondExpectation): string | null {
   if (e.destChainId !== LIFI_SOLANA_CHAIN_ID) return NON_EVM_UNREAD;
   if (!same(receiver, NON_EVM_ADDRESS)) return `BridgeData pays ${receiver}, not LI.FI's non-EVM placeholder ${NON_EVM_ADDRESS}, on a Solana route`;
-  if (DEPOSIT_FACETS.has(bridge.facet)) return `${bridge.facet} pays a deposit address whose off-chain order names the Solana recipient — a deposit the device cannot verify is refused`;
+  if (DEPOSIT_FACETS.has(bridge.facet)) return `${bridge.facet} pays a deposit address whose off-chain order names the Solana recipient — the transaction does not bind it`;
   const read = SOLANA_DELIVERY[bridge.facet];
   if (!read) return NON_EVM_UNREAD;
   const owner = solanaKey(e.receiver);

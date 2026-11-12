@@ -88,7 +88,7 @@ describe("EVM → Solana: the recipient is read from the bridge's own data", () 
     for (const c of live) got[c.name] = await outcome(c);
     expect(Object.keys(got)).toHaveLength(16);
     for (const [name, result] of Object.entries(got)) {
-      if (/ (near|layerswap)$/.test(name)) expect([name, result]).toEqual([name, expect.stringMatching(/pays a deposit address whose off-chain order names the Solana recipient — a deposit the device cannot verify is refused$/)]);
+      if (/ (near|layerswap)$/.test(name)) expect([name, result]).toEqual([name, expect.stringMatching(/pays a deposit address whose off-chain order names the Solana recipient — the transaction does not bind it$/)]);
       else expect([name, result]).toEqual([name, "pass"]);
     }
     // Five Mayan entry points (Swift v2, MCTP createOrder / bridgeWithFee, Fast MCTP createOrder / bridge) are covered live.
@@ -113,14 +113,14 @@ describe("EVM → Solana: the recipient is read from the bridge's own data", () 
     const e = expectation(swift);
     expect(diamondCallMismatch(evm(swift), e)).toBeNull();
     expect(diamondCallMismatch(rewrite(evm(swift), (a) => { a[2].nonEVMReceiver = word(OTHER); }), e)).toBe(`Mayan's nonEVMReceiver is ${OTHER}, not the recipient ${swift.params.destAddress}`);
-    expect(diamondCallMismatch(rewrite(evm(swift), mayanWord(4, word(OTHER))), e)).toBe(`the Mayan order pays ${OTHER} on Solana, not ${swift.params.destAddress}`);
+    expect(diamondCallMismatch(rewrite(evm(swift), mayanWord(4, word(OTHER))), e)).toBe(`the Mayan order pays ${OTHER} on Solana, not the recipient ${swift.params.destAddress}`);
     expect(diamondCallMismatch(rewrite(evm(swift), mayanWord(5, uint(30n))), e)).toBe("the Mayan order goes to Wormhole chain 30, not Solana");
     expect(diamondCallMismatch(rewrite(evm(swift), mayanWord(2, uint(2n))), e)).toBe("the Mayan call 0xa3a30834 carries payload type 2, not a plain delivery");
     expect(diamondCallMismatch(rewrite(evm(swift), mayanWord(7, word(USDC))), e)).toBe(`the Mayan order delivers ${USDC}, not ${SOL}`);
     expect(diamondCallMismatch(evm(swift), {...e, toToken: USDC})).toBe(`the Mayan order delivers ${SOL}, not ${USDC}`);
     // An entry point whose layout is not read here (Swift v1 createOrderWithToken) is refused, not guessed.
     const v1 = rewrite(evm(swift), (a) => { a[2].protocolData = `0x8e8d142b${(a[2].protocolData as string).slice(10)}`; });
-    expect(diamondCallMismatch(v1, e)).toBe("the Mayan call 0x8e8d142b is not one whose Solana recipient is read here");
+    expect(diamondCallMismatch(v1, e)).toBe("the Mayan call 0x8e8d142b is an entry point whose Solana recipient cannot be checked here");
 
     const fastBridge = pick("ethereum-usdc>solana-usdc mayanFastMCTP"); // bridge: destAddr w5, destDomain w6, payloadType w9
     expect(diamondCallMismatch(evm(fastBridge), expectation(fastBridge))).toBeNull();
@@ -163,8 +163,8 @@ describe("EVM → Solana: the recipient is read from the bridge's own data", () 
     const e = expectation(c);
     expect(diamondCallMismatch(evm(c), e)).toBeNull();
     expect(diamondCallMismatch(rewrite(evm(c), (a) => { a[2].dstToken = 10; }), e)).toBe(`Chainflip delivers its asset 10, not ${SOL}`);
-    expect(diamondCallMismatch(rewrite(evm(c), (a) => { a[2].nonEVMReceiver = word(OTHER); }), e)).toBe(`Chainflip pays ${OTHER} on Solana, not ${c.params.destAddress}`);
-    expect(diamondCallMismatch(rewrite(evm(c), (a) => { a[2].nonEVMReceiver = (word(c.params.destAddress)).slice(0, 42); }), e)).toBe(`Chainflip pays a 20-byte address on Solana, not ${c.params.destAddress}`);
+    expect(diamondCallMismatch(rewrite(evm(c), (a) => { a[2].nonEVMReceiver = word(OTHER); }), e)).toBe(`Chainflip pays ${OTHER} on Solana, not the recipient ${c.params.destAddress}`);
+    expect(diamondCallMismatch(rewrite(evm(c), (a) => { a[2].nonEVMReceiver = (word(c.params.destAddress)).slice(0, 42); }), e)).toBe(`Chainflip pays a 20-byte address on Solana, not the recipient ${c.params.destAddress}`);
     const usdc = pick("ethereum-usdc>solana-usdc chainflip");
     expect(diamondCallMismatch(evm(usdc), expectation(usdc))).toBeNull();
     expect(diamondCallMismatch(evm(usdc), expectation(usdc, {toToken: USDT}))).toBe(`Chainflip delivers its asset 10, not ${USDT}`);
@@ -174,7 +174,7 @@ describe("EVM → Solana: the recipient is read from the bridge's own data", () 
     const c = pick("arbitrum-usdc>solana-usdc lifiIntents");
     const e = expectation(c);
     expect(diamondCallMismatch(evm(c), e)).toBeNull();
-    expect(diamondCallMismatch(rewrite(evm(c), (a) => { a[2].recipient = word(OTHER); }), e)).toBe(`the LI.FI Intents order pays ${OTHER} on Solana, not ${c.params.destAddress}`);
+    expect(diamondCallMismatch(rewrite(evm(c), (a) => { a[2].recipient = word(OTHER); }), e)).toBe(`the LI.FI Intents order pays ${OTHER} on Solana, not the recipient ${c.params.destAddress}`);
     expect(diamondCallMismatch(rewrite(evm(c), (a) => { a[2].outputToken = word(USDT); }), e)).toBe(`the LI.FI Intents order delivers ${USDT}, not ${USDC}`);
   });
 
@@ -201,9 +201,9 @@ describe("EVM → Solana: the recipient is read from the bridge's own data", () 
 
   it("NEAR Intents and LayerSwap (deposit addresses) are refused by name, and so is a Smart Deposits answer", async () => {
     const near = pick("ethereum-usdc>solana-usdc near");
-    expect(diamondCallMismatch(evm(near), expectation(near))).toBe("NEARIntents pays a deposit address whose off-chain order names the Solana recipient — a deposit the device cannot verify is refused");
+    expect(diamondCallMismatch(evm(near), expectation(near))).toBe("NEARIntents pays a deposit address whose off-chain order names the Solana recipient — the transaction does not bind it");
     const ls = pick("base-usdc>solana-usdc layerswap");
-    expect(diamondCallMismatch(evm(ls), expectation(ls))).toBe("LayerSwap pays a deposit address whose off-chain order names the Solana recipient — a deposit the device cannot verify is refused");
+    expect(diamondCallMismatch(evm(ls), expectation(ls))).toBe("LayerSwap pays a deposit address whose off-chain order names the Solana recipient — the transaction does not bind it");
     const smart = {...near.response, tool: "smartDeposits", includedSteps: [{type: "cross", tool: "smartDeposits"}]};
     expect(await outcome(near, smart)).toBe("lifi: LI.FI Smart Deposits pay a deposit address whose recipient the transaction does not bind — refused for a Solana destination");
     // Its tool named only in includedSteps is refused the same way.
