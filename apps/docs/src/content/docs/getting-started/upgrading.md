@@ -23,18 +23,26 @@ EVM routes are gone until you bump. TON → TON swaps are not affected.
   the device refuses rev2 until it ships a build with the new version.
 - **The old minter is no longer trusted:** `EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ` (rev1) left the default
   table and its position code `e4d5115a…` left the pins. Omniston's resolvers moved off it, and it lacks the
-  escrow-code whitelist rev2 checks every order against, so a quote, a build or a position on rev1 is now refused by
-  name. It stays in `OMNISTON_ESCROWS`, so activity history still recognizes rev1 orders. A refund backstop that looks
-  for the input coming back from a minter should read `OMNISTON_ESCROWS` (every minter that ever held an order), not
-  the trusted table. Only an app that still has to settle an order on rev1 passes rev1 explicitly
-  (`trustedSettlementContracts` / `trustedProtocolAddresses` with both minters, `positionCodeHashes` with
-  `eb503578b4d9cd791c9c0ecd0da6da4064aae2bcb19d3c924d4001c493386bc5` and
-  `e4d5115a321ade7b827e38fb522c20d2f2cd46e4c6b0b5f7dd8b6b096792d77b`), and drops it once that order is closed.
+  escrow-code whitelist rev2 checks every order against. A quote or a build that names rev1 is refused with its
+  address in the reason; a rev1 output position fails `position-code-hash`.
+- **Old rev1 orders need nothing:** activity history still recognizes them (rev1 stays in `OMNISTON_ESCROWS`), and
+  `trackIntent` reads no trust table. Every disclosure check refuses a quote older than 6 hours, so a rev1 order
+  quoted before the switch (2026-11-10 ~19:00Z) can no longer be closed by any version; it is cancelled after its
+  timelocks and the input goes back. The one exception is an EVM → TON order quoted on rev1 less than 6 hours before
+  you deploy: it would fail `position-code-hash`. To let it complete, pass
+  `positionCodeHashes: ["eb503578b4d9cd791c9c0ecd0da6da4064aae2bcb19d3c924d4001c493386bc5", "e4d5115a321ade7b827e38fb522c20d2f2cd46e4c6b0b5f7dd8b6b096792d77b"]`
+  to `createOmnistonTonValidators` until 6 hours after the deploy; that pin trusts no new order. TON → EVM orders in
+  flight need nothing.
+- **Refund backstops:** a backstop that looks for the input coming back from a minter should read `OMNISTON_ESCROWS`
+  too, not only the trusted table: the trusted table no longer has rev1, and your own table may hold a minter the list
+  does not. `OMNISTON_ESCROWS` is exported by the package root (`@anywalletkit/protocol-swap2-omniston`), not by
+  `/validators`.
 - **Your own settlement table:** a `trustedSettlementContracts` table, a `trustedProtocolAddresses` list or an env
   such as `OMNISTON_TRUSTED_SETTLEMENT_CONTRACTS` replaces the built-in table. List rev2 under `ton:-239`, spelled
-  exactly as above (TON addresses are compared as strings), and drop rev1 unless it must settle an old order. A
-  custom `positionCodeHashes` needs `eb503578b4d9cd791c9c0ecd0da6da4064aae2bcb19d3c924d4001c493386bc5`: without it EVM
-  → TON orders on rev2 fill and then fail the check before the secret is disclosed, and roll back on their timelocks.
+  exactly as above (TON addresses are compared as strings), and leave rev1 out: listing it trusts rev1 again for new
+  orders and does not help close an old one. A custom `positionCodeHashes` needs
+  `eb503578b4d9cd791c9c0ecd0da6da4064aae2bcb19d3c924d4001c493386bc5`: without it EVM → TON orders on rev2 fill and
+  then fail the check before the secret is disclosed, and are cancelled after their timelocks.
 
 ## Next release: hidden hashes in text messages
 
