@@ -397,6 +397,25 @@ describe("node lag and failures: the next confirming node is asked", () => {
     expect(Date.now() - started).toBeLessThan(2_000);
   });
 
+  it("when one read of a node fails, its sibling still running is aborted (nothing left in flight)", async () => {
+    nodes[CONFIRM]!.answer = {lastblock: () => new Response("down", {status: 503})};
+    nodes[CONFIRM2] = node();
+    const stub = globalThis.fetch;
+    const hanging: AbortSignal[] = [];
+    vi.stubGlobal("fetch", (input: string | URL, init?: RequestInit) => {
+      if (String(input) === `${CONFIRM}${THORNODE_CONFIRM_PATHS.inboundAddresses}`) {
+        hanging.push(init!.signal!);
+        return new Promise<Response>((_, reject) => init!.signal!.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))));
+      }
+      return stub(input, init);
+    });
+    const {q, reasons} = await quote();
+    expect(reasons).toEqual([]);
+    expect(q).not.toBeNull();
+    expect(hanging).toHaveLength(1);
+    expect(hanging[0]!.aborted).toBe(true);
+  });
+
   it("confirming nodes share the quote's 8 s budget: hanging nodes are cut off at the deadline, the timers are cleared", async () => {
     vi.useFakeTimers({toFake: ["setTimeout", "clearTimeout", "Date"]});
     for (const h of [CONFIRM, CONFIRM2, LIQUIFY, IBS, "https://confirm3.invalid"]) nodes[h] = node({hang: true});

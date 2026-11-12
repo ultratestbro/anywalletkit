@@ -18,8 +18,9 @@ export const THORNODE_CONFIRM_PATHS = Object.freeze({
 } as const);
 
 /**
- * A signal that aborts after `ms` or when `outer` aborts, and `clear()` that drops the timer and the listener.
- * Built from AbortController + setTimeout (no AbortSignal.timeout / AbortSignal.any: Hermes lacks them).
+ * A signal that aborts after `ms` or when `outer` aborts, and `clear()` that drops the timer and the listener and
+ * aborts whatever read of that node is still running (a sibling of one that failed). Built from AbortController +
+ * setTimeout (no AbortSignal.timeout / AbortSignal.any: Hermes lacks them).
  */
 export function nodeDeadline(ms: number, outer?: AbortSignal): {signal: AbortSignal; clear(): void} {
   const ctrl = new AbortController();
@@ -34,6 +35,7 @@ export function nodeDeadline(ms: number, outer?: AbortSignal): {signal: AbortSig
     clear() {
       clearTimeout(timer);
       outer?.removeEventListener("abort", onAbort);
+      if (!ctrl.signal.aborted) ctrl.abort();
     },
   };
 }
