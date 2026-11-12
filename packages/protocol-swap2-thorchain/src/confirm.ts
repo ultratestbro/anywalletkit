@@ -2,8 +2,10 @@
  * What a confirming THORNode is asked, how its answers are read, and the rule that decides whether it confirms the
  * vault a quote (or a remote build) pays (the second-node check of scan 2026-10-27 modules, F15). Shapes follow the
  * THORNode OpenAPI (`LastBlockResponse`, `InboundAddressesResponse`, `VaultsResponse`, `MimirResponse`); every reader
- * returns null on anything else, so a node that answers in another shape is skipped, never trusted. The provider's
- * confirming nodes and `thorchainPins().verifyBuild` on the device apply the same rule ({@link vaultVerdict}).
+ * checks the type of each field it reads and returns null on anything else, so a node that answers in another shape
+ * (a field of another type included) is skipped, never trusted. The provider's confirming nodes and
+ * `thorchainPins().verifyBuild` on the device apply the same rule ({@link vaultVerdict}); the quoting node's
+ * `inbound_addresses` and `lastblock` go through the same readers, and another shape makes that node unavailable.
  */
 
 /**
@@ -70,9 +72,9 @@ export function paused(entry: InboundAddress | undefined): boolean {
   return !entry || entry.halted === true || entry.global_trading_paused === true || entry.chain_trading_paused === true;
 }
 
-/** Same address: EVM (`0x…`) case-insensitively, every other chain exactly. */
-export function sameTarget(a: string | undefined, b: string | undefined): boolean {
-  if (!a || !b) return false;
+/** Same address: EVM (`0x…`) case-insensitively, every other chain exactly. Anything but two non-empty strings is not. */
+export function sameTarget(a: unknown, b: unknown): boolean {
+  if (typeof a !== "string" || typeof b !== "string" || !a || !b) return false;
   return a.startsWith("0x") || b.startsWith("0x") ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
@@ -147,7 +149,45 @@ function int64(v: unknown): number | null {
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** THORChain's own block height from `GET /thorchain/lastblock` (the `thorchain` field of every entry), or null. */
+/** The string fields read from an inbound entry (THORNode `InboundAddress`: `string`, omitted when empty). */
+const INBOUND_STRINGS = ["address", "router", "dust_threshold"] as const;
+/** The halt / pause flags read from an inbound entry (THORNode `InboundAddress`: `bool`). */
+const INBOUND_FLAGS = ["halted", "global_trading_paused", "chain_trading_paused"] as const;
+
+/**
+ * `GET /thorchain/inbound_addresses`: one entry per chain with the fields this module reads, or null for another
+ * shape — an entry that is not an object, a `chain` that is not a string, an `address`, `router` or `dust_threshold`
+ * present and not a string, a `halted`, `global_trading_paused` or `chain_trading_paused` present and not a boolean.
+ * Fields this module does not read are left out unchecked.
+ */
+export function inboundAddresses(body: unknown): InboundAddress[] | null {
+  if (!Array.isArray(body)) return null;
+  const out: InboundAddress[] = [];
+  for (const e of body) {
+    if (!isObject(e) || typeof e.chain !== "string") return null;
+    const entry: InboundAddress = {chain: e.chain};
+    for (const k of INBOUND_STRINGS) {
+      const v = e[k];
+      if (v === undefined) continue;
+      if (typeof v !== "string") return null;
+      entry[k] = v;
+    }
+    for (const k of INBOUND_FLAGS) {
+      const v = e[k];
+      if (v === undefined) continue;
+      if (typeof v !== "boolean") return null;
+      entry[k] = v;
+    }
+    out.push(entry);
+  }
+  return out;
+}
+
+/**
+ * THORChain's own block height from `GET /thorchain/lastblock` (the highest `thorchain` field of its entries), or null
+ * for another shape: not a non-empty list, an entry that is not an object, a `thorchain` that is not a non-negative
+ * int64 (a safe integer, or a decimal string of up to 15 digits). The other fields of an entry are not read.
+ */
 export function lastblockHeight(body: unknown): number | null {
   if (!Array.isArray(body) || body.length === 0) return null;
   let height = -1;
@@ -166,7 +206,12 @@ export interface AsgardVaultView {
   addresses: readonly {chain: string; address: string}[];
 }
 
-/** `GET /thorchain/vaults/asgard`: each vault's pub key, status and per-chain addresses, or null for another shape. */
+/**
+ * `GET /thorchain/vaults/asgard`: each vault's pub key, status and per-chain addresses, or null for another shape — a
+ * vault that is not an object, a `status` that is not a string, a `pub_key` that is not a `thorpub1…` string, a
+ * `type` present and not "AsgardVault", `addresses` not a list, an address entry that is not an object or whose
+ * `chain` or `address` is not a string.
+ */
 export function asgardVaults(body: unknown): AsgardVaultView[] | null {
   if (!Array.isArray(body)) return null;
   const out: AsgardVaultView[] = [];
@@ -190,11 +235,15 @@ export type VaultFlag = "compromised" | "insolvent";
 /**
  * `GET /thorchain/mimir` read for one vault: THORNode drops a vault from inbound election while
  * `CompromisedVault-<pubkey>` or any `SolvencyHaltVault-<pubkey>-<chain>` is above zero, and no-ops an inbound to a
- * compromised vault (funds are not credited). Returns a lookup, or null when the answer is not a mimir map.
+ * compromised vault (funds are not credited). Returns a lookup, or null when the answer is not a mimir map: not a
+ * non-empty object, or a value that is neither a number nor a string (THORNode's mimir is a map of int64, which JSON
+ * writes either way; values above 2^53 such as `MAXIMUMLIQUIDITYRUNE` are numbers too, so only the type is checked
+ * here). A flag's value must also be an int64 ({@link int64}); the lookup answers "malformed" when it is not.
  */
 export function mimirFlags(body: unknown): ((pubKey: string) => VaultFlag | null | "malformed") | null {
   if (!isObject(body) || Object.keys(body).length === 0) return null;
   const keys = Object.keys(body).map((k) => [k.toUpperCase(), body[k]] as const);
+  if (keys.some(([, value]) => typeof value !== "number" && typeof value !== "string")) return null;
   return (pubKey: string) => {
     const pub = pubKey.toUpperCase();
     const compromisedKey = `COMPROMISEDVAULT-${pub}`;
@@ -247,14 +296,16 @@ export async function nodeHead(host: string, read: (path: string) => Promise<unk
  * `/thorchain/vaults/asgard` that its mimir does not flag compromised or insolvent (THORNode leaves those out of
  * inbound election). A RetiringVault, or any other status, never confirms. Both chains must be open, and on EVM the
  * node's router must be the claim's. `vaults/asgard` and `mimir` are read only when the current inbound differs.
- * Throws HostUnavailable when the node answers in another shape.
+ * Throws HostUnavailable when the node answers in another shape, a field of another type included
+ * ({@link inboundAddresses}, {@link asgardVaults}, {@link mimirFlags}).
  */
 export async function vaultVerdict(host: string, read: (path: string) => Promise<unknown>, inbound: unknown, claim: VaultClaim): Promise<VaultVerdict> {
   if (!Array.isArray(inbound)) throw new HostUnavailable(host, "inbound_addresses is not a list");
-  const entries = inbound as (InboundAddress | null)[];
-  const entry = entries.find((e) => e?.chain === claim.chain) ?? undefined;
+  const entries = inboundAddresses(inbound);
+  if (!entries) throw new HostUnavailable(host, "inbound_addresses is not a THORNode inbound address list");
+  const entry = entries.find((e) => e.chain === claim.chain);
   if (paused(entry)) return {ok: false, why: "halted", chain: claim.chain};
-  if (claim.destChain !== undefined && paused(entries.find((e) => e?.chain === claim.destChain) ?? undefined)) {
+  if (claim.destChain !== undefined && paused(entries.find((e) => e.chain === claim.destChain))) {
     return {ok: false, why: "halted", chain: claim.destChain};
   }
   if (!sameTarget(entry?.address, claim.vault)) {

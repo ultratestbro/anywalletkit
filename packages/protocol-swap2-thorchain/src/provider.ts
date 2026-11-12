@@ -10,6 +10,7 @@ import {
   MIN_CONFIRM_TIMEOUT_MS,
   THORNODE_CONFIRM_PATHS,
   confirmOptions,
+  inboundAddresses,
   lastblockHeight,
   nodeDeadline,
   nodeHead,
@@ -274,11 +275,14 @@ function belowThorMinimums(amount1e8: bigint, inbound: InboundAddress | undefine
 }
 
 /** Inbound snapshot from ONE host. Throws HostUnavailable so the caller can
- *  re-run the whole quote on the next host rather than mixing nodes. */
+ *  re-run the whole quote on the next host rather than mixing nodes — also when
+ *  a field this module reads has another type (`inboundAddresses`). */
 async function inboundAddressesOn(host: string, clientId: string): Promise<InboundAddress[]> {
   const res = await hostGet(host, "/thorchain/inbound_addresses", clientId);
   if (!res.ok || !Array.isArray(res.body)) throw new HostUnavailable(host, `inbound_addresses HTTP ${res.status}`);
-  return res.body as InboundAddress[];
+  const entries = inboundAddresses(res.body);
+  if (!entries) throw new HostUnavailable(host, "inbound_addresses is not a THORNode inbound address list");
+  return entries;
 }
 
 function verifiedMemo(
@@ -331,7 +335,9 @@ export interface ThorchainProviderConfig {
   /**
    * THORNode base URL(s), tried in order; a comma-separated string is
    * accepted for env-style configuration. Defaults to the documented public
-   * hosts. Quote + inbound snapshot always come from the same host.
+   * hosts. Quote + inbound snapshot always come from the same host. A host whose
+   * `inbound_addresses` or `lastblock` answer has another shape (a field of
+   * another type included) is unavailable: the next one is asked.
    */
   nodeUrl?: string | string[];
   /**
@@ -388,8 +394,9 @@ export interface ThorchainProviderConfig {
  * address of an ActiveVault its mimir does not flag compromised or insolvent (never RetiringVault or another status),
  * both chains open, on EVM its router the call's. All `nodeUrl` nodes are asked in parallel on the fixed GET paths of
  * {@link THORNODE_CONFIRM_PATHS}, each within `confirmTimeoutMs` (so the check takes at most that long); a node that
- * fails, redirects, answers another shape, is slower, or trails the highest THORChain height the nodes report by more
- * than `confirmMaxLagBlocks` is skipped. In `nodeUrl` order, a node's refusal refuses; two confirming nodes pass.
+ * fails, redirects, answers another shape (a field of another type included), is slower, or trails the highest
+ * THORChain height the nodes report by more than `confirmMaxLagBlocks` is skipped. In `nodeUrl` order, a node's
+ * refusal refuses; two confirming nodes pass.
  */
 export function thorchainPins(opts: {
   nodeUrl?: string | string[];
