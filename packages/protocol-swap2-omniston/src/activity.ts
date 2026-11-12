@@ -24,8 +24,8 @@ export const STONFI_ROUTERS: readonly string[] = [
  * Omniston HTLC escrow on TON (Omniston Escrow Minter) — the `srcProtocolContractAddress` of TON→EVM orders.
  * Every minter that ever held an order stays here: this list recognizes history (activity, and a refund from a
  * minter back to the trader), it grants no trust. New orders follow `AUDITED_OMNISTON_SETTLEMENT_CONTRACTS`, which
- * lists only rev2 since 2026-11-12. Quotes named EQAbWJ3Y… (rev1) until 2026-11-10, EQDybO88… (rev2) since
- * 2026-11-10 ~19:00Z.
+ * lists only rev2 in the releases after 0.5.4. Quotes named EQAbWJ3Y… (rev1) until 2026-11-10, EQDybO88… (rev2)
+ * since 2026-11-10 ~19:00Z. Exported by the package root only, not by `/validators`.
  */
 export const OMNISTON_ESCROWS: readonly string[] = [
   "EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ",

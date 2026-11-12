@@ -329,7 +329,7 @@ const escrowCases = ([["baseUsdc", "eip155:8453"], ["bnbUsdc", "eip155:56"]] as 
 
 /**
  * These escrows pay the rev1 TON Escrow Minter, which left the default trust on 2026-11-12 (SDK-306): the app trusts it
- * explicitly here, as one settling an old order would. Every other check runs with the default pins.
+ * explicitly here so these real captures keep exercising the checks. Every other check runs with the default pins.
  */
 const WITH_REV1 = {trustedProtocolAddresses: ["EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ"]};
 

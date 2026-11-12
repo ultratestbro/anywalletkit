@@ -33,12 +33,15 @@ export const AUDITED_OMNISTON_SETTLEMENT_CONTRACTS: Record<string, string[]> = {
   //   trusted by default (2026-11-12). Omniston's resolvers moved to rev2 on
   //   2026-11-10, and rev1 lacks the escrow-code whitelist rev2 added: on
   //   rev1 only the SDK's own pins check the escrow and execution code an
-  //   order carries. A quote or build that names rev1 is refused, and so are
-  //   its positions (code e4d5115a…). It stays in OMNISTON_ESCROWS
-  //   (activity.ts), which recognizes history and grants no trust. An app
-  //   that still has to settle an order on rev1 passes it explicitly:
-  //   trustedSettlementContracts / trustedProtocolAddresses with both
-  //   minters, positionCodeHashes with both position codes.
+  //   order carries. A quote or build that names rev1 is refused with its
+  //   address in the reason; its positions (code e4d5115a…) fail
+  //   position-code-hash. It stays in OMNISTON_ESCROWS (activity.ts), which
+  //   recognizes history and grants no trust. Old orders need nothing from
+  //   this table: trackIntent reads no trust table, and every disclosure
+  //   check refuses a quote older than 6 h, so a rev1 order quoted before
+  //   the switch cannot be closed by any version. Listing rev1 here or in
+  //   trustedProtocolAddresses trusts it again for NEW orders; it does not
+  //   help close an old one.
   "ton:-239": ["EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA"],
   "eip155:1": ["0xafCF681272AF10959736f45616eeCBC22D7095E2"],
   "eip155:56": ["0xafCF681272AF10959736f45616eeCBC22D7095E2"],

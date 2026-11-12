@@ -5,7 +5,8 @@ import {afterEach, describe, expect, it, vi} from "vitest";
 import {Address, beginCell, Cell} from "@ton/core";
 import {parseActivityFixture, type ActivityFixtureJson} from "@anywalletkit/conformance";
 import {validQuote} from "@anywalletkit/protocol-swap2-core/validate";
-import {omnistonProvider, type OmnistonProviderOptions} from "../src/provider.js";
+import {keccak256} from "viem";
+import {inMemoryQuoteStore, inMemorySecretStore, omnistonProvider, type OmnistonProviderOptions} from "../src/provider.js";
 import {describeOmnistonActivity, OMNISTON_ESCROWS} from "../src/activity.js";
 import {AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS, AUDITED_OMNISTON_SETTLEMENT_CONTRACTS} from "../src/validators/settlement.js";
 import {createOmnistonTonValidators, DEFAULT_OMNISTON_TON_CODE_HASHES} from "../src/validators/ton.js";
@@ -13,8 +14,10 @@ import {createOmnistonTonValidators, DEFAULT_OMNISTON_TON_CODE_HASHES} from "../
 /**
  * Omniston's rev2 TON Escrow Minter EQDybO88… (SDK-306). Since 2026-11-10 every TON <-> EVM quote names it instead
  * of EQAbWJ3Y… (rev1), and the rev2 minter deploys EVM → TON positions with code eb503578…. Since 2026-11-12 the
- * audited tables trust rev2 only: a quote, build or position on rev1 is refused by default, rev1 stays in
- * OMNISTON_ESCROWS for history, and an app that still has to settle an order on rev1 passes it explicitly.
+ * audited tables trust rev2 only: a quote or build naming rev1 is refused by default (its address in the reason), a
+ * rev1 position fails position-code-hash, and rev1 stays in OMNISTON_ESCROWS for history. Old orders need no trust:
+ * trackIntent reads no trust table, and every disclosure check refuses a quote older than 6 h. Passing rev1 in
+ * trustedSettlementContracts / trustedProtocolAddresses is an explicit widening that trusts it for NEW orders again.
  * Captured 2026-11-11/12, read-only: RFQs and UNSIGNED builds (nothing signed, registered, disclosed or sent) and
  * tonapi / toncenter account reads of a real rev2 and a real rev1 position. The rev1 fixtures stay as they are: they
  * are the history of the old minter.
@@ -41,7 +44,8 @@ const LOOKALIKE = (() => {
   return new Address(rev2.workChain, hash).toString();
 })();
 const raw = (address: string) => Address.parse(address).toRawString();
-/** What an app that must settle an old rev1 order passes: both minters, both position codes. */
+/** An explicit widening back to rev1 (new orders included): both minters, both position codes. The rev1 tests use it so
+ *  the real rev1 captures keep exercising the same checks. */
 const SETTLEMENT_WITH_REV1 = {...AUDITED_OMNISTON_SETTLEMENT_CONTRACTS, "ton:-239": [REV2, REV1]};
 const PROTOCOLS_WITH_REV1 = {trustedProtocolAddresses: [REV2, REV1]};
 const POSITIONS_WITH_REV1 = {positionCodeHashes: [POSITION_REV2, POSITION_REV1]};
@@ -179,7 +183,7 @@ describe("SDK-306: TON → EVM on the rev2 minter (live 2026-11-11, TON USD₮ �
     expect((await refusals(lookalike)).seen).toEqual([`omniston: untrusted TON settlement contract ${LOOKALIKE}`]);
   });
 
-  it("refuses a quote naming rev1 by default, by name; an app that trusts rev1 explicitly (an old order to settle) still gets it", async () => {
+  it("refuses a quote naming rev1 by default, by name; an app that lists rev1 explicitly gets it again (a widening for new orders)", async () => {
     const onRev1 = () => fresh((q) => { q.settlementData.value.srcProtocolContractAddress.chain.value = REV1; });
     const byDefault = await refusals(onRev1());
     expect(byDefault.q).toBeNull();
@@ -228,7 +232,7 @@ describe("SDK-306: TON → EVM on the rev2 minter (live 2026-11-11, TON USD₮ �
     expect(createOmnistonTonValidators({escrowCodeHashes: ["00".repeat(32)]}).verifyTonEscrowBuild(expectation)).toMatch(/not the audited escrow/);
   });
 
-  it("verifyTonEscrowBuild: a live rev1 escrow (2026-10-10, TON USD₮ → Base USDC) is refused by default, by name, and passes when the app trusts rev1 explicitly", () => {
+  it("verifyTonEscrowBuild: a live rev1 escrow (2026-10-10, TON USD₮ → Base USDC) is refused by default, by name, and passes only when the app lists rev1 explicitly", () => {
     const c = rev1Escrows.baseUsdc;
     const old = {
       payloadBocHex: c.escrowResponse.messages[0].payload as string, ownerAddress: c.escrowRequest.ownerSrcAddress.chain.value as string,
@@ -244,14 +248,14 @@ describe("SDK-306: TON → EVM on the rev2 minter (live 2026-11-11, TON USD₮ �
 
 describe("SDK-306: EVM → TON quotes naming rev2 as the TON factory (live 2026-11-11)", () => {
   const cases = [["Base USDC → TON USD₮", live.evmToTonQuotes.baseUsdc], ["Ethereum USDT → TON USD₮", live.evmToTonQuotes.ethUsdt]] as const;
-  const quoteFor = async (c: {params: Record<string, unknown>; quoteUpdated: Quote}, trusted = AUDITED_OMNISTON_SETTLEMENT_CONTRACTS) => {
+  const quoteFor = async (c: {params: Record<string, unknown>; quoteUpdated: Quote}, trusted = AUDITED_OMNISTON_SETTLEMENT_CONTRACTS, extra: Partial<OmnistonProviderOptions> = {}) => {
     // The resolver signed timestamps relative to the live quote: pin the clock 5 s after it.
     vi.useFakeTimers({toFake: ["Date"], now: (c.quoteUpdated.quoteTimestamp + 5) * 1000});
     const seen: string[] = [];
     const q = await omnistonProvider({
       client: clientFor(structuredClone(c.quoteUpdated)) as never, quoteSettleMs: 0, maxHtlcExecutions: 1,
       trustedSettlementContracts: trusted, trustedEvmOrderProtocols: AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS,
-      validateEvmInputPosition: () => true, validateTonOutputPosition: () => true,
+      validateEvmInputPosition: () => true, validateTonOutputPosition: () => true, ...extra,
     }).getQuote({...c.params, onRefusal: (r: string) => seen.push(r)} as never);
     return {q, seen};
   };
@@ -267,7 +271,7 @@ describe("SDK-306: EVM → TON quotes naming rev2 as the TON factory (live 2026-
     });
   }
 
-  it("a live rev1 order (Base USDT → TON USD₮, 2026-10-16) is refused by default, by name; quoted when the app trusts rev1 explicitly", async () => {
+  it("a live rev1 order (Base USDT → TON USD₮, 2026-10-16) is refused by default, by name; quoted only when the app lists rev1 in its settlement table", async () => {
     const fx = rev1Orders.base;
     const c = {
       params: {sourceChain: "eip155:8453", sourceToken: "USDT", destChain: "ton:-239", destToken: USDT, amountIn: fx.quoteUpdated.inputUnits,
@@ -281,6 +285,10 @@ describe("SDK-306: EVM → TON quotes naming rev2 as the TON factory (live 2026-
     const explicit = await quoteFor(c, SETTLEMENT_WITH_REV1);
     expect(explicit.seen).toEqual([]);
     expect(explicit.q?.destAmount).toBe(fx.quoteUpdated.outputUnits);
+    // Pinning the rev1 position code (for an EVM → TON order already in flight) does not let a new rev1 quote through.
+    const pinned = await quoteFor(c, AUDITED_OMNISTON_SETTLEMENT_CONTRACTS, {validateTonOutputPosition: createOmnistonTonValidators(POSITIONS_WITH_REV1).validateTonOutputPosition});
+    expect(pinned.q).toBeNull();
+    expect(pinned.seen).toEqual([`omniston: untrusted ton:-239 settlement contract ${REV1}`]);
   });
 });
 
@@ -388,10 +396,10 @@ describe("SDK-306: EVM → TON output position of the rev1 minter (EQAb9CzW…, 
       return json({}, false);
     });
   };
-  const check = async (pins: {positionCodeHashes?: string[]} = {}, over: Partial<typeof input> = {}) => {
+  const check = async (pins: {positionCodeHashes?: string[]} = {}, over: Partial<typeof input> = {}, nowSeconds = WITHDRAWAL_AT + 5) => {
     const reasons: {reason: string; details?: Record<string, unknown>}[] = [];
     const ok = await createOmnistonTonValidators({
-      fetch: tonapi() as unknown as typeof fetch, now: () => (WITHDRAWAL_AT + 5) * 1000,
+      fetch: tonapi() as unknown as typeof fetch, now: () => nowSeconds * 1000,
       onRefusal: (reason, details) => reasons.push({reason, ...(details ? {details} : {})}), ...pins,
     }).validateTonOutputPosition!({...input, ...over});
     return {ok, reasons};
@@ -409,16 +417,77 @@ describe("SDK-306: EVM → TON output position of the rev1 minter (EQAb9CzW…, 
     expect(await check()).toEqual({ok: false, reasons: [{reason: "position-code-hash", details: {hash: POSITION_REV1}}]});
   });
 
-  it("passes when the app pins the rev1 position code explicitly (an old order to settle); every other check still runs", async () => {
+  it("inside its 6 h window (an EVM → TON order quoted on rev1 just before an upgrade) it passes with the rev1 position code pinned; every other check still runs", async () => {
     expect(await check(POSITIONS_WITH_REV1)).toEqual({ok: true, reasons: []});
     expect((await check(POSITIONS_WITH_REV1, {recipientAddress: REV2})).reasons.map((r) => r.reason)).toEqual(["state"]);
     expect((await check(POSITIONS_WITH_REV1, {secretHash: new Uint8Array(32).fill(8)})).reasons.map((r) => r.reason)).toEqual(["state"]);
+  });
+
+  it("more than 6 h after its quote it is refused with quote-age before its code is read, pinned or not: no version closes a rev1 order quoted before the switch", async () => {
+    const late = input.quoteTimestamp + 6 * 60 * 60 + 1;
+    expect(await check({}, {}, late)).toEqual({ok: false, reasons: [{reason: "quote-age"}]});
+    expect(await check(POSITIONS_WITH_REV1, {}, late)).toEqual({ok: false, reasons: [{reason: "quote-age"}]});
+    // The day rev1 left the default (2026-11-12 12:00Z) against Omniston's last rev1 quotes (2026-11-10 ~19:00Z): 41 h.
+    expect(await check(POSITIONS_WITH_REV1, {quoteTimestamp: Date.UTC(2026, 10, 10, 19) / 1000}, Date.UTC(2026, 10, 12, 12) / 1000))
+      .toEqual({ok: false, reasons: [{reason: "quote-age"}]});
   });
 
   it("cannot stand in for an order on rev2 even with both codes pinned: the factory in its state is rev1", async () => {
     const {ok, reasons} = await check(POSITIONS_WITH_REV1, {protocolAddress: REV2});
     expect(ok).toBe(false);
     expect(reasons).toEqual([{reason: "state", details: {check: expect.stringMatching(/^state#5:/)}}]);
+  });
+});
+
+describe("SDK-306: a TON → EVM order on rev1 in flight when the app upgrades", () => {
+  // A provider on the old default (rev1 trusted, as 0.5.4) quoted and built the order on rev1 (the live 2026-10-10
+  // capture); the provider is then rebuilt with the new default table on the same stores. trackIntent reads no trust
+  // table, and a TON → EVM disclosure checks only the EVM output position: the order still completes.
+  const SECRET = Buffer.from("11".repeat(32), "hex");
+  const SECRET_HASH = new Uint8Array(Buffer.from(keccak256(SECRET).slice(2), "hex"));
+  const BASE_FACTORY = "0xACa3E2F9b61a44892926bC6c3e104192E7D1c3cd";
+  const POSITION = "0x1111111111111111111111111111111111111111";
+  const TRADER = "UQCbXJ1-Hd_CyyAt3TNgircduNIn5QH5dj1_LBNz__y4fQaq";
+  const RECIPIENT = "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA";
+
+  it("is tracked and its secret disclosed by the provider with the new default table", async () => {
+    const c = rev1Escrows.baseUsdc;
+    const q = structuredClone(c.quoteUpdated.value);
+    expect(q.settlementData.value.srcProtocolContractAddress.chain.value).toBe(REV1);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    q.quoteTimestamp = nowSeconds;
+    q.settlementData.value.tradeStartDeadline = nowSeconds + 300;
+    vi.useFakeTimers({toFake: ["Date"], now: nowSeconds * 1000});
+    vi.spyOn(crypto, "getRandomValues").mockImplementation(((array: Uint8Array) => { array.set(SECRET.subarray(0, array.length)); return array; }) as never);
+    const s = q.settlementData.value;
+    const calls: Record<string, unknown[]> = {};
+    const client = {
+      requestForQuote() { return observable([{$case: "ack", value: {rfqId: q.rfqId}}, {$case: "quoteUpdated", rfqId: q.rfqId, value: q}]); },
+      async tonBuildEscrowTransfer(request: unknown) { (calls.build ??= []).push(request); return structuredClone(c.escrowResponse); },
+      orderTrack() {
+        return observable([{$case: "order", value: {status: "ORDER_STATUS_ACTIVE", executions: [{
+          index: 0, inputUnits: q.inputUnits, outputUnits: q.outputUnits, resolverSendsUnits: s.resolverSendsUnits, secretHash: SECRET_HASH,
+          outputPositionAddress: {chain: {$case: "base", value: POSITION}}, outputPositionPhase: "EXECUTION_PHASE_READY_FOR_PRIVATE_COMPLETION",
+        }]}}]);
+      },
+      async orderDiscloseHtlcSecret(request: unknown) { (calls.disclose ??= []).push(request); },
+    };
+    const shared: OmnistonProviderOptions = {
+      client: client as never, quoteSettleMs: 0, maxHtlcExecutions: 1, secretStore: inMemorySecretStore(), quoteStore: inMemoryQuoteStore(),
+      validateTonJettonWallet: ({walletAddress}) => walletAddress === c.escrowResponse.messages[0].targetAddress,
+      validateTonEscrowPayload: () => true,
+    };
+    const before = omnistonProvider({...shared, trustedSettlementContracts: {...AUDITED_OMNISTON_SETTLEMENT_CONTRACTS, "ton:-239": [REV1]}, validateEvmOutputPosition: async () => true});
+    const quote = await before.getQuote({sourceChain: "ton:-239", sourceToken: "USDT", destChain: "eip155:8453", destToken: BASE_USDC,
+      amountIn: "5000000", destAddress: RECIPIENT, refundAddress: TRADER, slippageBps: 100, dry: true});
+    expect(quote).not.toBeNull();
+    await before.buildDeposit(quote!);
+    expect(calls.build).toHaveLength(1);
+    const output = vi.fn(async () => true);
+    const after = omnistonProvider({...shared, trustedSettlementContracts: AUDITED_OMNISTON_SETTLEMENT_CONTRACTS, validateEvmOutputPosition: output});
+    await after.trackIntent({intentId: quote!.intentId});
+    expect(output).toHaveBeenCalledWith(expect.objectContaining({factoryAddress: BASE_FACTORY, recipientAddress: RECIPIENT, positionAddress: POSITION}));
+    expect(calls.disclose).toEqual([{quoteId: q.quoteId, executionIndex: 0, secret: new Uint8Array(SECRET)}]);
   });
 });
 

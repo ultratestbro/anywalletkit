@@ -38,8 +38,11 @@ export const DEFAULT_OMNISTON_TON_CODE_HASHES = {
    *    and settled rev2 positions pass every check of
    *    validateTonOutputPosition.
    *  - e4d5115a… (positions of the rev1 minter EQAbWJ3Y…) left the default
-   *    with rev1 on 2026-11-12; an app settling an old rev1 order passes it
-   *    in positionCodeHashes. */
+   *    with rev1 on 2026-11-12. Only an EVM -> TON order quoted on rev1 less
+   *    than 6 h before an app upgrades can still need it (positionCodeHashes
+   *    with both codes, until those 6 h are over). That pin alone trusts no
+   *    new order: a new quote must name a trusted minter, and a position
+   *    counts only when the minter its quote named deployed it. */
   position: ["eb503578b4d9cd791c9c0ecd0da6da4064aae2bcb19d3c924d4001c493386bc5"],
   outputEscrow: ["d30423575384773abaad8d3c6f763898afa3d57a5693005904b7c61e95cee630"],
 } as const;

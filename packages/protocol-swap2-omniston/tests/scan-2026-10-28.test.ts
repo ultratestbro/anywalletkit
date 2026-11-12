@@ -28,7 +28,8 @@ const USDT_TON = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs";
 const hex = (value: string) => new Uint8Array(Buffer.from(value, "hex"));
 /**
  * The EVM → TON orders were captured on the rev1 TON Escrow Minter, which left the default trust on 2026-11-12
- * (SDK-306). The backend trusts it explicitly, as an app settling an old order would; the checks are the same.
+ * (SDK-306). The backend trusts it explicitly so these real captures keep exercising the same checks; an app that did
+ * this would trust rev1 again for new orders.
  */
 const SETTLEMENT_WITH_REV1 = {...AUDITED_OMNISTON_SETTLEMENT_CONTRACTS, "ton:-239": ["EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ"]};
 

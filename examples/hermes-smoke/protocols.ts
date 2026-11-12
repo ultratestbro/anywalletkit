@@ -390,8 +390,9 @@ export async function smokeProtocols(check: Check): Promise<void> {
   }
   {
     // 2026-10-28: a remote TON → EVM Omniston order is checked on the device — the live escrow (USDT on TON → USDC on Base) passes, another destination does not.
-    // 2026-11-12 (SDK-306): the default trusts the rev2 TON Escrow Minter only — its live escrow passes; the rev1 escrow of 2026-10-10 is refused
-    // unless the app trusts rev1 explicitly (an old order to settle).
+    // 2026-11-12 (SDK-306): the default trusts the rev2 TON Escrow Minter only — its live escrow passes; the rev1 escrow of 2026-10-10 is refused.
+    // An app that lists rev1 in trustedProtocolAddresses trusts it again for new builds (an explicit widening; old orders do not need it),
+    // and the other checks still run: the same body for another recipient is refused.
     type EscrowFixture = { quoteUpdated: { inputUnits: string; outputAsset: { chain: { value: { kind: { value: string } } } }; settlementData: { value: { resolverSendsUnits: string } } }; escrowRequest: { ownerSrcAddress: { chain: { value: string } }; traderDstAddress: { chain: { value: string } } }; escrowResponse: { messages: Array<{ payload: string }> } }
     const expectationOf = (c: EscrowFixture) => ({
       payloadBocHex: c.escrowResponse.messages[0]!.payload, ownerAddress: c.escrowRequest.ownerSrcAddress.chain.value, inputUnits: c.quoteUpdated.inputUnits,
