@@ -20,18 +20,35 @@ another inbound vault — refused until they agree").
 - **protocol-swap2-thorchain:** a confirming node now also confirms the source chain's address of a vault it lists
   as `ActiveVault` and its mimir does not flag compromised or insolvent; a `RetiringVault` never confirms. A node
   more than `confirmMaxLagBlocks` (default 50) behind the quoting node, slower than `confirmTimeoutMs` (default
-  2500 ms), redirecting or answering another shape is skipped for the next one. Bump; no code change.
+  2500 ms), redirecting or answering another shape is skipped for the next one. The vault check has its own 8 s
+  budget from the moment the quote is in hand, so a slow first `nodeUrl` host no longer leaves it without time.
+  Bump; no code change.
 - **A proxy in front of a confirming node:** pass `GET /thorchain/lastblock`, `/thorchain/vaults/asgard` and
   `/thorchain/mimir` next to `/thorchain/inbound_addresses`, no query string (`THORNODE_CONFIRM_PATHS` lists them).
   A proxy that answers 404 to the new paths is skipped and the next confirming node is asked, so update the proxy
   before the app.
+- **A proxy in front of the quoting node (`nodeUrl`):** pass `GET /thorchain/lastblock` without a query string too,
+  next to `/thorchain/quote/swap` and `/thorchain/inbound_addresses`. The quoting node's height is what a confirming
+  node's lag is measured against; a `nodeUrl` that does not answer it is skipped for the next one, and with none
+  left the quote is refused with "THORChain height (/thorchain/lastblock) unavailable from every node that answered
+  the inbound addresses".
 - **Refusals matched by text:** existing texts are unchanged. New ones: "no confirming node is within 50 blocks of
   the quoting node's THORChain height (behind or unreachable) — refused until one catches up", "a second node lists
   the inbound vault as RetiringVault, not ActiveVault — refused" (the status as the node names it), "a second node's
-  mimir flags the inbound vault as compromised — refused" (or `insolvent`). "… is halted / paused on the confirming
-  node" can now name the destination chain too.
-- **`thorchainPins().verifyBuild`** is unchanged: it still compares the build's vault with two nodes' current
-  inbound.
+  mimir flags the inbound vault as compromised — refused" (or `insolvent`), "the 8 s confirmation budget ran out
+  before a second node could be asked to confirm the inbound vault — retry", "THORChain height (/thorchain/lastblock)
+  unavailable from every node that answered the inbound addresses" and, before broadcast, "cannot read THORChain
+  height (/thorchain/lastblock) before broadcast from any node that answered the inbound addresses". "… is halted /
+  paused on the confirming node" can now name the destination chain too.
+- **`thorchainPins().verifyBuild`** (the device's check of a remote build) now applies the same rule, so a rotation
+  between your backend's quote and the device's check no longer refuses. It asks every `nodeUrl` node in parallel on
+  the same four fixed GET paths, each within `confirmTimeoutMs` (new option, default 2500 ms), and skips a node more
+  than `confirmMaxLagBlocks` (new option, default 50) behind the highest THORChain height the nodes report. If the
+  device reaches THORNodes through a proxy, that proxy needs the four paths as well. Its texts are unchanged; new
+  ones: "a THORNode lists the inbound vault as RetiringVault, not ActiveVault", "a THORNode's mimir flags the inbound
+  vault as compromised" (or `insolvent`), "two THORNodes within 50 blocks of the highest THORChain height they report
+  could not confirm the inbound vault (behind or unreachable)"; "`<CHAIN>` is halted / paused" can now name the
+  destination chain.
 
 ## Next release: Omniston's new TON Escrow Minter
 

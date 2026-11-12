@@ -46,9 +46,26 @@ calldata must still pay exactly the quoted vault.
 
 A confirming node is skipped for the next one when it trails the quoting node's THORChain height
 (`/thorchain/lastblock`, the `thorchain` field) by more than `confirmMaxLagBlocks` (default 50 ≈ 5 minutes), does not
-answer within `confirmTimeoutMs` (default 2500 ms; all nodes share the quote's 8 s), redirects, or answers in
-another shape. When every node trails, the refusal says so ("no confirming node is within 50 blocks …"); when none
-answers, it is "no second node answered to confirm the inbound vault".
+answer within `confirmTimeoutMs` (default 2500 ms), redirects (also when the runtime followed the redirect itself, as
+React Native's fetch does: `res.url` must be the URL asked), or answers in another shape. When every node trails, the
+refusal says so ("no confirming node is within 50 blocks …"); when none answers, it is "no second node answered to
+confirm the inbound vault".
+
+**Time.** The vault check has its own 8 s budget. It starts when the quoting node's quote is in hand (before
+broadcast: when a node is asked to refresh the inbound snapshot) and covers that node's `inbound_addresses` and
+`lastblock` reads and every confirming node, each getting `confirmTimeoutMs` or what is left; time a failed host took
+before does not count, and no confirming node is asked with less than 100 ms left. When the budget runs out before
+any confirming node was asked, the refusal is "the 8 s confirmation budget ran out before a second node could be asked to confirm the
+inbound vault — retry". `confirmTimeoutMs` bounds confirming nodes only: each read of the quoting node (the quote,
+`inbound_addresses`, `lastblock`) gets 8 s whatever it is. When a node answers `inbound_addresses` but not
+`lastblock`, the refusal names it: "THORChain height (/thorchain/lastblock) unavailable from every node that answered
+the inbound addresses" (before broadcast: "cannot read THORChain height (/thorchain/lastblock) before broadcast from
+any node that answered the inbound addresses"). Worst case without a caller signal: each `nodeUrl` host takes at most
+8 s for the quote (16 s when a quote without a slippage is retried with a wider tolerance) plus 8 s for its snapshot,
+and the host that quotes is confirmed within the 8 s that started when its quote was in hand: hosts × 16 s, or hosts ×
+24 s with the retry (32 s / 48 s with the two default hosts); `preflightDeposit` hosts × 8 s. A caller's AbortSignal
+(the router passes one: 8 s per provider, 25 s when it is the only one) replaces the 8 s bound of the quote request
+and ends the quote when it aborts.
 
 **Requests a confirming node gets** (`THORNODE_CONFIRM_PATHS`), all `GET`, no query string, no body, headers
 `accept` and `x-client-id` only. A proxy in front of a confirming node can pass exactly these four and refuse
@@ -63,17 +80,29 @@ anything else:
 
 The quoting node (`nodeUrl`) gets `/thorchain/quote/swap?from_asset=…&to_asset=…&amount=…&destination=…` with
 `tolerance_bps` or `liquidity_tolerance_bps`, `streaming_quantity=1` and, when set, `refund_address`, `affiliate`,
-`affiliate_bps`; then `/thorchain/inbound_addresses` and `/thorchain/lastblock`; `trackIntent` reads
-`/thorchain/tx/status/<HASH>` and `/thorchain/tx/<HASH>`. The quote's `inbound_addresses` read and the quote itself
-ask for `cache: "no-store"`, which React Native's fetch sends as an extra `?_=<time>` query; confirming reads set no
-cache option.
+`affiliate_bps`; then `/thorchain/inbound_addresses` and `GET /thorchain/lastblock` (no query string, so a proxy in
+front of a `nodeUrl` must pass it too); `trackIntent` reads `/thorchain/tx/status/<HASH>` and `/thorchain/tx/<HASH>`.
+The quote's `inbound_addresses` read and the quote itself ask for `cache: "no-store"`, which React Native's fetch
+sends as an extra `?_=<time>` query; `lastblock` and the confirming reads set no cache option.
 
 Behind `remoteProvider`, the app checks the backend's build itself: `remoteProvider({name: "thorchain", baseUrl,
 ...thorchainPins()})` pins the routers and runs `verifyBuild` on the client — the vault in the router call confirmed
 by two nodes, the source asset and exact input, and the memo's destination, refund and limit against the app's own
 request (pass the backend's `affiliate` / `affiliateBps`). The pins open the stub to the Tron deposit route
-(`depositAddressRoutes`): its vault is the one `verifyBuild` confirms. `verifyBuild` still asks each of its two nodes
-for its current inbound address only (`/thorchain/inbound_addresses`), not for the active vault list above.
+(`depositAddressRoutes`): its vault is the one `verifyBuild` confirms.
+
+`verifyBuild` confirms the vault by the same rule as the provider's confirming nodes, so an inbound rotation between
+the backend's quote and the device's check does not refuse: current inbound or a non-flagged `ActiveVault` (never
+`RetiringVault` or another status), both chains open, on EVM the node's router equal to the call's. It asks every
+`nodeUrl` node (default: the two public nodes) in parallel on the four `THORNODE_CONFIRM_PATHS` (the same GETs, so the
+same proxy rules), each within `confirmTimeoutMs` (default 2500 ms, so the check takes at most that); a node that
+fails, redirects, answers another shape, is slower, or trails the highest THORChain height the nodes report by more
+than `confirmMaxLagBlocks` (default 50) is skipped. In `nodeUrl` order a node's refusal refuses and two confirming
+nodes pass. Refusals: "a THORNode reports another inbound vault than `<vault>`", "a THORNode reports another router",
+"`<CHAIN>` is halted / paused" (now also the destination chain), "a THORNode lists the inbound vault as `<Status>`, not
+ActiveVault", "a THORNode's mimir flags the inbound vault as compromised" (or `insolvent`), "two THORNodes within 50
+blocks of the highest THORChain height they report could not confirm the inbound vault (behind or unreachable)", "two
+THORNodes could not confirm the inbound vault".
 
 ## Activity
 
