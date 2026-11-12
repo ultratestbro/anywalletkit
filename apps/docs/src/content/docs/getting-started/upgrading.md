@@ -10,6 +10,36 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: LI.FI to Solana, LI.FI Intents and dry quotes
+
+`protocol-swap2-lifi` quotes EVM → Solana routes (Mayan, Polymer CCTP and Chainflip, their Solana recipient read from
+the calldata on the device), refuses LI.FI Intents everywhere, and no longer hands out a transaction LI.FI built for a
+placeholder address. `protocol-swap2-router` values the quotes that carry no transaction net of their bridge fee.
+
+- **protocol-swap2-lifi, Breaking:** LI.FI Intents (`lifiIntents`) is refused between EVM chains too, not only to
+  Solana: its escrowed order names its own oracles, output settler and output amount, none of which is pinned, so its
+  escrow could release the input without the delivery. Every cross-chain request from an EVM chain denies it, and a
+  remote quote carrying its Diamond call fails `lifiPins` with "a LI.FI Intents order to an EVM chain names its own
+  oracles, output settler and output amount, which cannot be checked here — its escrow could release the input without
+  the delivery". LI.FI serves those pairs through another bridge (13 of 14 live EVM → EVM corridors still quote); where
+  LI.FI Intents is its only bridge LI.FI answers "No available quotes" — Elysium has no cross-chain LI.FI route for now.
+  No code change; route Elysium transfers through another provider. Bump the device too: a mobile app or an extension
+  that checks remote LI.FI quotes with `lifiPins` still accepts an Intents call until it ships the new version.
+- **protocol-swap2-lifi, Breaking:** a dry quote (`dry` not `false`) without `refundAddress`, or a dry EVM → Solana
+  quote without `destAddress`, is priced for a placeholder (vitalik.eth, or the public "abandon" account on Solana) and
+  now carries no `txRequest`: `providerData.placeholder` says `"sender"` or `"recipient"`, `buildDeposit` refuses it,
+  and `lifiPins` refuse such a quote that carries a transaction. If your app built, signed or showed the transaction of
+  a dry LI.FI quote, pass both addresses (the sender as `refundAddress`, the recipient as `destAddress`) or quote again
+  with them before you build. A dry EVM → EVM quote with a `refundAddress` but no recipient keeps its transaction.
+- **Valuing quotes yourself:** a price-only LI.FI quote declares a bridge's native fee on top of the input as
+  `providerData.nativeFee` (base units of the source chain's native coin) instead of `txRequest.nativeFee`. The router's
+  `usdValue` and `quoteValues` read it when there is no `txRequest` (bump `protocol-swap2-router` with
+  `protocol-swap2-lifi`); a `valueUsd` of your own should do the same, or a dry auction without the sender ranks a LI.FI
+  route with a bridge fee on its gross output.
+- **New: EVM → Solana through LI.FI.** Apps that kept LI.FI away from EVM → Solana pairs can stop doing so. NEAR Intents,
+  LayerSwap, Smart Deposits and LI.FI Intents are refused for that direction with named reasons; other Solana bridges
+  keep the existing refusal.
+
 ## Next release: Omniston's new TON Escrow Minter
 
 Since 2026-11-10 Omniston quotes TON ↔ EVM orders on a new TON Escrow Minter (rev2),
