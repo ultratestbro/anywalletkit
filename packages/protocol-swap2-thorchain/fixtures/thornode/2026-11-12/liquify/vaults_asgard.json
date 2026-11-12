@@ -1,0 +1,2071 @@
+[
+  {
+    "block_height": 28203657,
+    "pub_key": "thorpub1addwnpepqgwpafz6l99mkevlz7spaezgzcxy5t2896hgm7e6kytqrkmulex4wxjp8az",
+    "coins": [
+      {
+        "asset": "XRP.XRP",
+        "amount": "65444282800",
+        "decimals": 6
+      },
+      {
+        "asset": "TRON.USDT-TR7NHQJEKQXGTCI8Q8ZY4PL8OTSZGJLJ6T",
+        "amount": "17486723493000",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.USDT-0X55D398326F99059FF775485246999027B3197955",
+        "amount": "9509649990253"
+      },
+      {
+        "asset": "ETH.USDC-0XA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48",
+        "amount": "189936474126100",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.NAMI",
+        "amount": "31726400892200",
+        "decimals": 6
+      },
+      {
+        "asset": "AVAX.USDT-0X9702230A8EA53601F5CD2DC00FDBC13D4DF4A8C7",
+        "amount": "1399202203900",
+        "decimals": 6
+      },
+      {
+        "asset": "BTC.BTC",
+        "amount": "5416639478"
+      },
+      {
+        "asset": "BSC.TWT-0X4B0F1812E5DF2A09796481FF14017E6005508003",
+        "amount": "89379414039"
+      },
+      {
+        "asset": "ETH.USDT-0XDAC17F958D2EE523A2206206994597C13D831EC7",
+        "amount": "34323711478000",
+        "decimals": 6
+      },
+      {
+        "asset": "BCH.BCH",
+        "amount": "52492070151"
+      },
+      {
+        "asset": "BSC.BNB",
+        "amount": "16579181918"
+      },
+      {
+        "asset": "ETH.DAI-0X6B175474E89094C44DA98B954EEDEAC495271D0F",
+        "amount": "80934425771"
+      },
+      {
+        "asset": "ETH.ETH",
+        "amount": "52335367371"
+      },
+      {
+        "asset": "GAIA.WINK",
+        "amount": "17418812224400",
+        "decimals": 6
+      },
+      {
+        "asset": "TRON.TRX",
+        "amount": "34553209611100",
+        "decimals": 6
+      },
+      {
+        "asset": "BASE.VVV-0XACFE6019ED1A7DC6F7B508C02D1B04EC88CC21BF",
+        "amount": "26447700504"
+      },
+      {
+        "asset": "GAIA.ATOM",
+        "amount": "4423060998300",
+        "decimals": 6
+      },
+      {
+        "asset": "AVAX.USDC-0XB97EF9EF8734C71904D8002F8B6BC66DD9C48A6E",
+        "amount": "237684138600",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.BUSD-0XE9E7CEA3DEDCA5984780BAFC599BD69ADD087D56",
+        "amount": "733598077385"
+      },
+      {
+        "asset": "ETH.LENDS-0X2C06BA9E7F0DACCBC1F6A33EA67E85BB68FBEE3A",
+        "amount": "23390020858"
+      },
+      {
+        "asset": "BSC.USDC-0X8AC76A51CC950D9822D68B83FE1AD97B32CD580D",
+        "amount": "462825401730"
+      },
+      {
+        "asset": "GAIA.XUSK",
+        "amount": "22403062400",
+        "decimals": 6
+      },
+      {
+        "asset": "AVAX.AVAX",
+        "amount": "371227534843"
+      },
+      {
+        "asset": "BSC.BTCB-0X7130D2A12B9BCBFAE4F2634D864A1EE1CE3EAD9C",
+        "amount": "23243332"
+      },
+      {
+        "asset": "AVAX.SOL-0XFE6B19286885A4F7F55ADAD09C3CD1F906D2478F",
+        "amount": "351216387"
+      },
+      {
+        "asset": "ETH.WSTETH-0X7F39C581F595B53C5CB19BD0B3F8DA6C935E2CA0",
+        "amount": "10"
+      },
+      {
+        "asset": "GAIA.KUJI",
+        "amount": "12037210532200",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.ETH-0X2170ED0880AC9A755FD29B2688956BD959F933F8",
+        "amount": "1531924701"
+      },
+      {
+        "asset": "ETH.VIU-0X519475B31653E46D20CD09F9FDCF3B12BDACB4F5",
+        "amount": "841619"
+      },
+      {
+        "asset": "GAIA.LVN",
+        "amount": "2481353252006000",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.LQDY",
+        "amount": "57955330891000",
+        "decimals": 6
+      },
+      {
+        "asset": "DOGE.DOGE",
+        "amount": "79750601627505"
+      },
+      {
+        "asset": "GAIA.FUZN",
+        "amount": "94102262531800",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.VTHOR-0X815C23ECA83261B6EC689B60CC4A58B54BC24D8D",
+        "amount": "210457939721"
+      },
+      {
+        "asset": "ETH.WBTC-0X2260FAC5E5542A773AA44FBCFEDF7C193BC2C599",
+        "amount": "225429615"
+      },
+      {
+        "asset": "ETH.GRT-0XC944E90C64B2C07662A292BE6244BDF05CDA44A7",
+        "amount": "1690673828"
+      },
+      {
+        "asset": "ETH.FOX-0XC770EEFAD204B5180DF6A14EE197D99D808EE52D",
+        "amount": "8924613111829"
+      },
+      {
+        "asset": "ETH.SNX-0XC011A73EE8576FB46F5E1C5751CA3B9FE0AF2A6F",
+        "amount": "37657946515"
+      },
+      {
+        "asset": "ETH.LUSD-0X5F98805A4E8BE255A32880FDEC7F6728C6568BA0",
+        "amount": "1372709459374"
+      },
+      {
+        "asset": "LTC.LTC",
+        "amount": "33993286265"
+      },
+      {
+        "asset": "ETH.LINK-0X514910771AF9CA656AF840DFF83E8264ECF986CA",
+        "amount": "1505549503"
+      },
+      {
+        "asset": "ETH.XRUNE-0X69FA0FEE221AD11012BAB0FDB45D444D3D2CE71C",
+        "amount": "1687956721765369"
+      },
+      {
+        "asset": "ETH.GUSD-0X056FD409E1D7A124BD7017459DFEA2F387B6D5CD",
+        "amount": "550073000000",
+        "decimals": 2
+      },
+      {
+        "asset": "BASE.ETH",
+        "amount": "402631768"
+      },
+      {
+        "asset": "BASE.USDC-0X833589FCD6EDB6E08F4C7C32D4F71B54BDA02913",
+        "amount": "3323752207200",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.RKUJI",
+        "amount": "646322948200",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.AAVE-0X7FC66500C84A76AD7E9C93437BFC5AC33E2DDAE9",
+        "amount": "2573377034"
+      },
+      {
+        "asset": "SOL.SOL",
+        "amount": "14852433400",
+        "decimals": 9
+      },
+      {
+        "asset": "ETH.THOR-0XA5F2211B9B8170F694421F2046281775E8468044",
+        "amount": "5017680690688"
+      },
+      {
+        "asset": "ZEC.ZEC",
+        "amount": "12744291669"
+      },
+      {
+        "asset": "ETH.TGT-0X108A850856DB3F85D0269A2693D896B394C80325",
+        "amount": "3246437353200"
+      }
+    ],
+    "type": "AsgardVault",
+    "status": "ActiveVault",
+    "status_since": 28203871,
+    "membership": [
+      "thorpub1addwnpepq04cvrhekametlquvkd6yhk9nzexu7pjg7v9luznq99puwdmtvtwx5r9247",
+      "thorpub1addwnpepq0lqcx32sxh5kjsgkexq87q0hr4vunaqljcc07zm5s88jjx6ped8uv2ysv9",
+      "thorpub1addwnpepq0mej0y53ssh7qfggz6rgs380ltlm306cl2lt4tww4dky743980m596j0xq",
+      "thorpub1addwnpepq0v4pw8077r4j0lr9rxmw5j5pazzmsdlk8ud43ux2caf3x8q26jmvh7z2kt",
+      "thorpub1addwnpepq27ccaj8n7vyeh30ngsnvytkzyyfv4zc4jzznyvl239gks9mje3dydt0avz",
+      "thorpub1addwnpepq27lpkd5pxz7fwefma2ay0a7424tcsy2f5fmn05tgydrhmyafdzdycvn0xd",
+      "thorpub1addwnpepq2x5kdzz4v5e69dr3ehzt9tzwcu8fmeaac5pc8g0hk926dlt9dxggy0k09m",
+      "thorpub1addwnpepqddz5tqsf7gawgk78j90c6qhsnnhmh9zfxexqmelqay9acpwpm53g6en746",
+      "thorpub1addwnpepqfu55qvj63qaf6jl9lvwe54yhnar04n3esusg6us6ev0q6y4zler2tygv4a",
+      "thorpub1addwnpepqg2sl8qakn8pgg0j0c4r23aq0lhdgxvglahzgpuqn03awtelxqda2fq9t25",
+      "thorpub1addwnpepqgukmd4rx7gq7ggf949pejwffe97tspmtptmm8tpne6rnkc98py778tfs0m",
+      "thorpub1addwnpepqt96qu27m8en0zwfhfxwrxvswf7n58ymjxs567rzxsdjz3y62q4266h5j3w",
+      "thorpub1addwnpepqtqhu08vyx7v7n3m9y2wpwggtkt5y832t84tzs9h2wf9kt2tzydguttktea",
+      "thorpub1addwnpepqtsdrt9a47usvc2vhf55n4pnre55wgpsxky6mxr669dlwuhzqz35cjnq737",
+      "thorpub1addwnpepqtxxj65ax3d68w2hzdu9ruxmrcfxg0httn6syrxtkq54425pgkzyz9hxzy9",
+      "thorpub1addwnpepqvrjtvnr2s9pu09nfqqhcepwa2sdxjct37wkfysy2m7yr7ajrnh7gdqvsd5",
+      "thorpub1addwnpepqw9xcsnmzegl8wactqsnfqujs0p7gkj8n6qqtc7sll4sqmh3tl3kc3j2yw7",
+      "thorpub1addwnpepqwm22urck3est0xq9ljfel6jvx0es4rs978fqwtwmuyaz054urj3k23rrye",
+      "thorpub1addwnpepqwrkymlldught008frju4mxq69kmvx2psc330ky9x3654jgjcd9u7n3997x"
+    ],
+    "chains": [
+      "AVAX",
+      "BASE",
+      "BCH",
+      "BSC",
+      "BTC",
+      "DOGE",
+      "ETH",
+      "GAIA",
+      "LTC",
+      "SOL",
+      "THOR",
+      "TRON",
+      "XRP",
+      "ZEC"
+    ],
+    "inbound_tx_count": 31427,
+    "outbound_tx_count": 31223,
+    "routers": [
+      {
+        "chain": "AVAX",
+        "router": "0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"
+      },
+      {
+        "chain": "BASE",
+        "router": "0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"
+      },
+      {
+        "chain": "BSC",
+        "router": "0xb30ec53f98ff5947ede720d32ac2da7e52a5f56b"
+      },
+      {
+        "chain": "ETH",
+        "router": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146"
+      }
+    ],
+    "addresses": [
+      {
+        "chain": "AVAX",
+        "address": "0x718f6c9df785bc4e323086de024ca822efbe8ab9"
+      },
+      {
+        "chain": "BASE",
+        "address": "0x718f6c9df785bc4e323086de024ca822efbe8ab9"
+      },
+      {
+        "chain": "BCH",
+        "address": "qrs928gzftvvlm0ukyuu3hwx90jadhz66y3f968clg"
+      },
+      {
+        "chain": "BSC",
+        "address": "0x718f6c9df785bc4e323086de024ca822efbe8ab9"
+      },
+      {
+        "chain": "BTC",
+        "address": "bc1qup236qj2mr87ml9388ydm33tuhtdckk33j68qx"
+      },
+      {
+        "chain": "DOGE",
+        "address": "DRbFs1GDf9F3MGnHy24vPP8h7wCE8nCBAU"
+      },
+      {
+        "chain": "ETH",
+        "address": "0x718f6c9df785bc4e323086de024ca822efbe8ab9"
+      },
+      {
+        "chain": "GAIA",
+        "address": "cosmos1up236qj2mr87ml9388ydm33tuhtdckk38gyvyt"
+      },
+      {
+        "chain": "LTC",
+        "address": "ltc1qup236qj2mr87ml9388ydm33tuhtdckk34wqrck"
+      },
+      {
+        "chain": "SOL",
+        "address": "4jUDa9gFRtwua6GDHhfnLRZRv7XZr1dLexxEbQ6VeR3M"
+      },
+      {
+        "chain": "THOR",
+        "address": "thor1up236qj2mr87ml9388ydm33tuhtdckk3p0ah35"
+      },
+      {
+        "chain": "TRON",
+        "address": "TLKfB2goHRY1SykEpVbiGdsesACrkCxCeW"
+      },
+      {
+        "chain": "XRP",
+        "address": "rMTwKkK2MjLkFGb6NSnMqcyaNoTvuiZhzs"
+      },
+      {
+        "chain": "ZEC",
+        "address": "tex1up236qj2mr87ml9388ydm33tuhtdckk39dgv9g"
+      }
+    ],
+    "pub_key_eddsa": "thorpub1zcjduepqxa6r49f83vc4fgu8slzs469933z48lr6gmm9w5ynnxp58sftp9gq3a7tue",
+    "deficit": null
+  },
+  {
+    "block_height": 28203657,
+    "pub_key": "thorpub1addwnpepqvlena222zluk5p3r0s9uey758rd43qedtxf2xalprynuaxp69rscr0jy4h",
+    "coins": [
+      {
+        "asset": "GAIA.ATOM",
+        "amount": "1201269286500",
+        "decimals": 6
+      },
+      {
+        "asset": "XRP.XRP",
+        "amount": "64391772300",
+        "decimals": 6
+      },
+      {
+        "asset": "AVAX.AVAX",
+        "amount": "1717349231824"
+      },
+      {
+        "asset": "TRON.TRX",
+        "amount": "19769463477900",
+        "decimals": 6
+      },
+      {
+        "asset": "BCH.BCH",
+        "amount": "115190070168"
+      },
+      {
+        "asset": "GAIA.KUJI",
+        "amount": "126944658405500",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.BUSD-0XE9E7CEA3DEDCA5984780BAFC599BD69ADD087D56",
+        "amount": "101064451535"
+      },
+      {
+        "asset": "GAIA.RKUJI",
+        "amount": "7932604303100",
+        "decimals": 6
+      },
+      {
+        "asset": "AVAX.USDC-0XB97EF9EF8734C71904D8002F8B6BC66DD9C48A6E",
+        "amount": "1915228298300",
+        "decimals": 6
+      },
+      {
+        "asset": "BTC.BTC",
+        "amount": "2431817"
+      },
+      {
+        "asset": "BSC.BNB",
+        "amount": "62645773163"
+      },
+      {
+        "asset": "BSC.TWT-0X4B0F1812E5DF2A09796481FF14017E6005508003",
+        "amount": "182429705772"
+      },
+      {
+        "asset": "ETH.USDT-0XDAC17F958D2EE523A2206206994597C13D831EC7",
+        "amount": "77996312487200",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.USDT-0X55D398326F99059FF775485246999027B3197955",
+        "amount": "985559048068"
+      },
+      {
+        "asset": "TRON.USDT-TR7NHQJEKQXGTCI8Q8ZY4PL8OTSZGJLJ6T",
+        "amount": "3719066479000",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.USDC-0XA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48",
+        "amount": "82460605714700",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.ETH-0X2170ED0880AC9A755FD29B2688956BD959F933F8",
+        "amount": "188964291"
+      },
+      {
+        "asset": "DOGE.DOGE",
+        "amount": "219314877535930"
+      },
+      {
+        "asset": "BSC.USDC-0X8AC76A51CC950D9822D68B83FE1AD97B32CD580D",
+        "amount": "2988511725160"
+      },
+      {
+        "asset": "ETH.ETH",
+        "amount": "158733788066"
+      },
+      {
+        "asset": "GAIA.WINK",
+        "amount": "101029059602500",
+        "decimals": 6
+      },
+      {
+        "asset": "BASE.ETH",
+        "amount": "17954111"
+      },
+      {
+        "asset": "GAIA.NSTK",
+        "amount": "88363880627200",
+        "decimals": 6
+      },
+      {
+        "asset": "LTC.LTC",
+        "amount": "967748666050"
+      },
+      {
+        "asset": "AVAX.SOL-0XFE6B19286885A4F7F55ADAD09C3CD1F906D2478F",
+        "amount": "331841213"
+      },
+      {
+        "asset": "ETH.DAI-0X6B175474E89094C44DA98B954EEDEAC495271D0F",
+        "amount": "148929068328"
+      },
+      {
+        "asset": "ETH.TGT-0X108A850856DB3F85D0269A2693D896B394C80325",
+        "amount": "38930636909531"
+      },
+      {
+        "asset": "ETH.VTHOR-0X815C23ECA83261B6EC689B60CC4A58B54BC24D8D",
+        "amount": "754054730257"
+      },
+      {
+        "asset": "GAIA.FUZN",
+        "amount": "248846540440400",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.NAMI",
+        "amount": "42339525712900",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.LQDY",
+        "amount": "173927198017300",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.WBTC-0X2260FAC5E5542A773AA44FBCFEDF7C193BC2C599",
+        "amount": "306483793"
+      },
+      {
+        "asset": "GAIA.LVN",
+        "amount": "1970486406004800",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.DPI-0X1494CA1F11D487C2BBE4543E90080AEBA4BA3C2B",
+        "amount": "360976779"
+      },
+      {
+        "asset": "GAIA.AUTO",
+        "amount": "6889593035100",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.LUSD-0X5F98805A4E8BE255A32880FDEC7F6728C6568BA0",
+        "amount": "783937547391"
+      },
+      {
+        "asset": "ETH.THOR-0XA5F2211B9B8170F694421F2046281775E8468044",
+        "amount": "168201922806812"
+      },
+      {
+        "asset": "ETH.USDP-0X8E870D67F660D95D5BE530380D0EC0BD388289E1",
+        "amount": "459183968647"
+      },
+      {
+        "asset": "ETH.LINK-0X514910771AF9CA656AF840DFF83E8264ECF986CA",
+        "amount": "2189193335"
+      },
+      {
+        "asset": "ETH.XRUNE-0X69FA0FEE221AD11012BAB0FDB45D444D3D2CE71C",
+        "amount": "593080805651259"
+      },
+      {
+        "asset": "ETH.GUSD-0X056FD409E1D7A124BD7017459DFEA2F387B6D5CD",
+        "amount": "580075000000",
+        "decimals": 2
+      },
+      {
+        "asset": "ETH.LENDS-0X2C06BA9E7F0DACCBC1F6A33EA67E85BB68FBEE3A",
+        "amount": "11695010430"
+      },
+      {
+        "asset": "ETH.FOX-0XC770EEFAD204B5180DF6A14EE197D99D808EE52D",
+        "amount": "22107568802889"
+      },
+      {
+        "asset": "ETH.VIU-0X519475B31653E46D20CD09F9FDCF3B12BDACB4F5",
+        "amount": "704626"
+      },
+      {
+        "asset": "ETH.SNX-0XC011A73EE8576FB46F5E1C5751CA3B9FE0AF2A6F",
+        "amount": "21149932410"
+      },
+      {
+        "asset": "ETH.YFI-0X0BC529C00C6401AEF6D220BE8C6EA1667F6AD93E",
+        "amount": "61609897"
+      },
+      {
+        "asset": "ETH.WSTETH-0X7F39C581F595B53C5CB19BD0B3F8DA6C935E2CA0",
+        "amount": "6"
+      },
+      {
+        "asset": "BASE.USDC-0X833589FCD6EDB6E08F4C7C32D4F71B54BDA02913",
+        "amount": "6463356227900",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.BTCB-0X7130D2A12B9BCBFAE4F2634D864A1EE1CE3EAD9C",
+        "amount": "30950083"
+      },
+      {
+        "asset": "BASE.VVV-0XACFE6019ED1A7DC6F7B508C02D1B04EC88CC21BF",
+        "amount": "4497799069"
+      },
+      {
+        "asset": "ETH.AAVE-0X7FC66500C84A76AD7E9C93437BFC5AC33E2DDAE9",
+        "amount": "3151266801"
+      },
+      {
+        "asset": "SOL.SOL",
+        "amount": "34707140878",
+        "decimals": 9
+      },
+      {
+        "asset": "AVAX.USDT-0X9702230A8EA53601F5CD2DC00FDBC13D4DF4A8C7",
+        "amount": "390332528300",
+        "decimals": 6
+      },
+      {
+        "asset": "ZEC.ZEC",
+        "amount": "1127919581"
+      }
+    ],
+    "type": "AsgardVault",
+    "status": "ActiveVault",
+    "status_since": 28203871,
+    "membership": [
+      "thorpub1addwnpepq04a3jtfsg89grfd0wpszhx89rve4xaqlpy7gu9mdfnyt3h75s9z790v8sa",
+      "thorpub1addwnpepq07wsllwa8sr8zh4numdzuh788r2svyqg0fn4mxvq3g0xlv9kdhv6x3e5lj",
+      "thorpub1addwnpepq25ghsn9dq68rkff23ma7a692sryayfg762qer4pp2956n0h3ux5gefeldg",
+      "thorpub1addwnpepq2ckf284thx06l73436ckuh0aq46fgn95j30559853x0hyqszg0nq9cut3g",
+      "thorpub1addwnpepq2kwsavwc2rpk7nmrhg3kxhzcw9m0hn4uwyjndza297axfgx7alvvtq9u5d",
+      "thorpub1addwnpepqd3pw3n390fwpfvenws7fuffulldx2jjv3l8feskc8prv8zs5phlqg89hum",
+      "thorpub1addwnpepqd88e9wpwmy0tkj6xxpjnzh0pashvz7g09nwus4dn7ys27twulg8qpv4swp",
+      "thorpub1addwnpepqdcyjl7uqvgyzwltesfjhslfdx3navjkyrtgd5zvuq8pgcjtjyp428g67f2",
+      "thorpub1addwnpepqdfthejxpjykxj6q8xn24cjn7lensmkdmcs3fs7jztal86kl87tfcqlkux0",
+      "thorpub1addwnpepqdr7mfl07psgf5x4s58x6hdtdndcymnqhhgxa4n3d0hwz7c03cxr55zsj2m",
+      "thorpub1addwnpepqdsy2jpjectwhc94a9nwh5zx6plf6a8f4xa5qg3zc725mnpssw9lymcpgpg",
+      "thorpub1addwnpepqdx0ms2yztt594egfxr57kadcpwg4f5uyr5phrfs2m7nc5tylajm78gcfs0",
+      "thorpub1addwnpepqfddm3ke3ve9c7h3r9u3d7jz7w5td6fw429ev0kuud695us44frggpzuq05",
+      "thorpub1addwnpepqfvu3s3lzvn4g5g8rccscycunx53ufuca7rzx8d7l3tnn7hulw74sps5f9m",
+      "thorpub1addwnpepqgpwz8f0vne7nr6yq80h0zh889hcxk7nzsz9586vqxkxhhncs4z2q4j705m",
+      "thorpub1addwnpepqgs84puzkyf0wwvgn0d2qfuklrvjp2tarxrkydyj3rayzcsxjgfnvw3ffxn",
+      "thorpub1addwnpepqtgmymvhe28c2n9r0z33x25sm09s8m8h75e88p3ftqmyw4feumtdzmnhrs2",
+      "thorpub1addwnpepqwtud6842za0ulya5fey94ppdpmf487sctlqyyfjk6ga3vws4p46uch0sak"
+    ],
+    "chains": [
+      "AVAX",
+      "BASE",
+      "BCH",
+      "BSC",
+      "BTC",
+      "DOGE",
+      "ETH",
+      "GAIA",
+      "LTC",
+      "SOL",
+      "THOR",
+      "TRON",
+      "XRP",
+      "ZEC"
+    ],
+    "inbound_tx_count": 16913,
+    "outbound_tx_count": 17336,
+    "routers": [
+      {
+        "chain": "AVAX",
+        "router": "0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"
+      },
+      {
+        "chain": "BASE",
+        "router": "0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"
+      },
+      {
+        "chain": "BSC",
+        "router": "0xb30ec53f98ff5947ede720d32ac2da7e52a5f56b"
+      },
+      {
+        "chain": "ETH",
+        "router": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146"
+      }
+    ],
+    "addresses": [
+      {
+        "chain": "AVAX",
+        "address": "0x6b4068070d95d87b321909bb21c8979fba2b8876"
+      },
+      {
+        "chain": "BASE",
+        "address": "0x6b4068070d95d87b321909bb21c8979fba2b8876"
+      },
+      {
+        "chain": "BCH",
+        "address": "qzat5qhem4xrcy6k20k2v8l837wt5rvrnykj63fjv5"
+      },
+      {
+        "chain": "BSC",
+        "address": "0x6b4068070d95d87b321909bb21c8979fba2b8876"
+      },
+      {
+        "chain": "BTC",
+        "address": "bc1qh2aq97wafs7px4jnajnpleu0njaqmque8dku3p"
+      },
+      {
+        "chain": "DOGE",
+        "address": "DNAR4Fdz3xGbSpUK7Qo1ub3j8AJdZQuHZ3"
+      },
+      {
+        "chain": "ETH",
+        "address": "0x6b4068070d95d87b321909bb21c8979fba2b8876"
+      },
+      {
+        "chain": "GAIA",
+        "address": "cosmos1h2aq97wafs7px4jnajnpleu0njaqmque3hgh4v"
+      },
+      {
+        "chain": "LTC",
+        "address": "ltc1qh2aq97wafs7px4jnajnpleu0njaqmquer3vcf3"
+      },
+      {
+        "chain": "SOL",
+        "address": "EegWc6g1HahqxvRAPmiB7PaSjprGHYHuuinviJ9mEx1N"
+      },
+      {
+        "chain": "THOR",
+        "address": "thor1h2aq97wafs7px4jnajnpleu0njaqmquehs3vqn"
+      },
+      {
+        "chain": "TRON",
+        "address": "TKkJTcjxUhSnd5tW8kUKnSyUx9oYi8RwcE"
+      },
+      {
+        "chain": "XRP",
+        "address": "rJpKWz6LkY4JuFH54FoTMFt3Ep2L3dXy4Y"
+      },
+      {
+        "chain": "ZEC",
+        "address": "tex1h2aq97wafs7px4jnajnpleu0njaqmquenjyh50"
+      }
+    ],
+    "pub_key_eddsa": "thorpub1zcjduepqet83sdvhlccvl54tj0rz6ydxh8a507m8fwe0hc3gdqeqafd67evspdjell",
+    "deficit": null
+  },
+  {
+    "block_height": 28203657,
+    "pub_key": "thorpub1addwnpepq0dvh7eefu93m7zlc8wkmwxexq3t7k5lanswqj9npl37rtp5l8msupg2wf8",
+    "coins": [
+      {
+        "asset": "ETH.ETH",
+        "amount": "3234878608"
+      },
+      {
+        "asset": "XRP.XRP",
+        "amount": "36776887419100",
+        "decimals": 6
+      },
+      {
+        "asset": "TRON.USDT-TR7NHQJEKQXGTCI8Q8ZY4PL8OTSZGJLJ6T",
+        "amount": "6974050811400",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.KUJI",
+        "amount": "76604965248700",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.BNB",
+        "amount": "50617242936"
+      },
+      {
+        "asset": "AVAX.USDT-0X9702230A8EA53601F5CD2DC00FDBC13D4DF4A8C7",
+        "amount": "5272664123300",
+        "decimals": 6
+      },
+      {
+        "asset": "BCH.BCH",
+        "amount": "138570216643"
+      },
+      {
+        "asset": "BASE.ETH",
+        "amount": "157045555"
+      },
+      {
+        "asset": "BASE.USDC-0X833589FCD6EDB6E08F4C7C32D4F71B54BDA02913",
+        "amount": "384895796500",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.TWT-0X4B0F1812E5DF2A09796481FF14017E6005508003",
+        "amount": "274081715222"
+      },
+      {
+        "asset": "BTC.BTC",
+        "amount": "5702629160"
+      },
+      {
+        "asset": "AVAX.USDC-0XB97EF9EF8734C71904D8002F8B6BC66DD9C48A6E",
+        "amount": "5381911842100",
+        "decimals": 6
+      },
+      {
+        "asset": "TRON.TRX",
+        "amount": "25804914696600",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.GRT-0XC944E90C64B2C07662A292BE6244BDF05CDA44A7",
+        "amount": "6072998047"
+      },
+      {
+        "asset": "BSC.USDT-0X55D398326F99059FF775485246999027B3197955",
+        "amount": "1145187983913"
+      },
+      {
+        "asset": "AVAX.AVAX",
+        "amount": "7387032242511"
+      },
+      {
+        "asset": "GAIA.NAMI",
+        "amount": "105452718912000",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.USDC-0X8AC76A51CC950D9822D68B83FE1AD97B32CD580D",
+        "amount": "17502397581"
+      },
+      {
+        "asset": "BSC.BUSD-0XE9E7CEA3DEDCA5984780BAFC599BD69ADD087D56",
+        "amount": "591614198070"
+      },
+      {
+        "asset": "AVAX.SOL-0XFE6B19286885A4F7F55ADAD09C3CD1F906D2478F",
+        "amount": "106717179"
+      },
+      {
+        "asset": "ETH.USDP-0X8E870D67F660D95D5BE530380D0EC0BD388289E1",
+        "amount": "3991175525818"
+      },
+      {
+        "asset": "BSC.ETH-0X2170ED0880AC9A755FD29B2688956BD959F933F8",
+        "amount": "170149253"
+      },
+      {
+        "asset": "DOGE.DOGE",
+        "amount": "231159568298952"
+      },
+      {
+        "asset": "BSC.BTCB-0X7130D2A12B9BCBFAE4F2634D864A1EE1CE3EAD9C",
+        "amount": "12798460"
+      },
+      {
+        "asset": "GAIA.LVN",
+        "amount": "1897505428004500",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.VTHOR-0X815C23ECA83261B6EC689B60CC4A58B54BC24D8D",
+        "amount": "327455110602"
+      },
+      {
+        "asset": "GAIA.XUSK",
+        "amount": "16002652100",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.LQDY",
+        "amount": "63070827459200",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.TGT-0X108A850856DB3F85D0269A2693D896B394C80325",
+        "amount": "31868225672606"
+      },
+      {
+        "asset": "GAIA.NSTK",
+        "amount": "12474235290800",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.DPI-0X1494CA1F11D487C2BBE4543E90080AEBA4BA3C2B",
+        "amount": "357255367"
+      },
+      {
+        "asset": "ETH.VIU-0X519475B31653E46D20CD09F9FDCF3B12BDACB4F5",
+        "amount": "25487"
+      },
+      {
+        "asset": "ETH.SNX-0XC011A73EE8576FB46F5E1C5751CA3B9FE0AF2A6F",
+        "amount": "69213768635"
+      },
+      {
+        "asset": "ETH.THOR-0XA5F2211B9B8170F694421F2046281775E8468044",
+        "amount": "272668374895743"
+      },
+      {
+        "asset": "ETH.AAVE-0X7FC66500C84A76AD7E9C93437BFC5AC33E2DDAE9",
+        "amount": "1477875632"
+      },
+      {
+        "asset": "ETH.WSTETH-0X7F39C581F595B53C5CB19BD0B3F8DA6C935E2CA0",
+        "amount": "10"
+      },
+      {
+        "asset": "ETH.LENDS-0X2C06BA9E7F0DACCBC1F6A33EA67E85BB68FBEE3A",
+        "amount": "22415436656"
+      },
+      {
+        "asset": "ETH.DAI-0X6B175474E89094C44DA98B954EEDEAC495271D0F",
+        "amount": "6480214923330"
+      },
+      {
+        "asset": "LTC.LTC",
+        "amount": "568774498080"
+      },
+      {
+        "asset": "ETH.USDC-0XA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48",
+        "amount": "14067090546000",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.XRUNE-0X69FA0FEE221AD11012BAB0FDB45D444D3D2CE71C",
+        "amount": "1769941407660831"
+      },
+      {
+        "asset": "ETH.YFI-0X0BC529C00C6401AEF6D220BE8C6EA1667F6AD93E",
+        "amount": "29663793"
+      },
+      {
+        "asset": "ETH.GUSD-0X056FD409E1D7A124BD7017459DFEA2F387B6D5CD",
+        "amount": "66264000000",
+        "decimals": 2
+      },
+      {
+        "asset": "ETH.USDT-0XDAC17F958D2EE523A2206206994597C13D831EC7",
+        "amount": "36924875100",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.WINK",
+        "amount": "12193219856300",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.FUZN",
+        "amount": "72497242776900",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.WBTC-0X2260FAC5E5542A773AA44FBCFEDF7C193BC2C599",
+        "amount": "722999343"
+      },
+      {
+        "asset": "GAIA.ATOM",
+        "amount": "1829812553700",
+        "decimals": 6
+      },
+      {
+        "asset": "BASE.VVV-0XACFE6019ED1A7DC6F7B508C02D1B04EC88CC21BF",
+        "amount": "1613074313"
+      },
+      {
+        "asset": "ETH.LUSD-0X5F98805A4E8BE255A32880FDEC7F6728C6568BA0",
+        "amount": "228002179320"
+      },
+      {
+        "asset": "SOL.SOL",
+        "amount": "15343934573",
+        "decimals": 9
+      },
+      {
+        "asset": "ZEC.ZEC",
+        "amount": "9991887783"
+      }
+    ],
+    "type": "AsgardVault",
+    "status": "ActiveVault",
+    "status_since": 28203871,
+    "membership": [
+      "thorpub1addwnpepq0aw9f4qf0xjr3xsnccj7gl3tcjcc6umyxhgywdr8xkzw8vsz09mjkgrrm9",
+      "thorpub1addwnpepq289d7rcz4srhfy9jh6sxxnx3mqwk3v5ns25c995u05at0y2x0qkv0alq7h",
+      "thorpub1addwnpepqd7td7g267ve6u8jq6twk0g0422kvqt2sced9swcdflu30ucj8h7cu4xg2a",
+      "thorpub1addwnpepqdha9qg8qsuk6vwm27wn6446stw322tl22e4uwf3xmqky8lndcf6z4ff9x7",
+      "thorpub1addwnpepqds7p7hc70yslzu9knv87pc9smf8y4e4tj0w3h56uafvl0gur0rmw3unk42",
+      "thorpub1addwnpepqdyqdz0sxkg4fyevxa7mfyy6xsgwljaxtdaw0ru9un32yylff8gnq38ln2q",
+      "thorpub1addwnpepqdz4gjqc4elsed0t2l4pfvxz6fwu424ef68cpc0rzqkte2086zpes50dx8p",
+      "thorpub1addwnpepqf4rn4my9mfjha2nd3c3ud8782quw9u0wnsrg30m8fykkppjwlez2qf6n6h",
+      "thorpub1addwnpepqf9zz3qfvg4u9c34mxpthpkjqaamvumdpp65nc3kqcklu4lf82thzzvrcs0",
+      "thorpub1addwnpepqfd60hxdz3e2kep76yzhlkdapw09papypf8gak7nken23wkau9w8wsvpsp0",
+      "thorpub1addwnpepqtsf5w3muw32kjmcpj8nxs9cv3rzf5se90a22758qssy2tjf4netclg47we",
+      "thorpub1addwnpepqttz93p9msadxfrumwpllcxrd0948272h8qsrqngwkyujs9hdssa77f0hpl",
+      "thorpub1addwnpepqv0utu0xn0hfhyvy95kgpqemxk7jkeqmswurt94gslazz9kslvcry37vpkq",
+      "thorpub1addwnpepqv288jmf02alutq55ml9uvv62x2vx5n57vzg85l5ehagjafl7r5mwf65jdq",
+      "thorpub1addwnpepqvzkfsunnrt70hgcd0gakl33xd68leygy9q6utphlvng9e58fr0g6gxvdv9",
+      "thorpub1addwnpepqw3dljmjmskmrfdplvjupursj2hgvrejqjyfqdn4d9k0r5chjrlsx9v6vgg",
+      "thorpub1addwnpepqw565vmdhg5q7n9nptwsal28s79ysnjqjfl5jjhdawyya2pz0w5r78yga7l",
+      "thorpub1addwnpepqwe9ec59s6vhnvhanzkw38h4n39jkxfd8xa26tw9zn5fmqeaye8lg7ltnc4",
+      "thorpub1addwnpepqwqtj2xpy702jfl80v77vcm9drfxauyn03ex9jkseqtlzmz49t2p6220jjg"
+    ],
+    "chains": [
+      "AVAX",
+      "BASE",
+      "BCH",
+      "BSC",
+      "BTC",
+      "DOGE",
+      "ETH",
+      "GAIA",
+      "LTC",
+      "SOL",
+      "THOR",
+      "TRON",
+      "XRP",
+      "ZEC"
+    ],
+    "inbound_tx_count": 25465,
+    "outbound_tx_count": 29916,
+    "routers": [
+      {
+        "chain": "AVAX",
+        "router": "0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"
+      },
+      {
+        "chain": "BASE",
+        "router": "0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"
+      },
+      {
+        "chain": "BSC",
+        "router": "0xb30ec53f98ff5947ede720d32ac2da7e52a5f56b"
+      },
+      {
+        "chain": "ETH",
+        "router": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146"
+      }
+    ],
+    "addresses": [
+      {
+        "chain": "AVAX",
+        "address": "0x4d39d5c55cfeb48f44d680fcac20493635dafdee"
+      },
+      {
+        "chain": "BASE",
+        "address": "0x4d39d5c55cfeb48f44d680fcac20493635dafdee"
+      },
+      {
+        "chain": "BCH",
+        "address": "qpzlxtlf0kr3745ez3s5g2k4q648sj8l6grc7ktk5v"
+      },
+      {
+        "chain": "BSC",
+        "address": "0x4d39d5c55cfeb48f44d680fcac20493635dafdee"
+      },
+      {
+        "chain": "BTC",
+        "address": "bc1qghejl6tasu04dxg5v9zz44gx4fuy3l7jvdpmrv"
+      },
+      {
+        "chain": "DOGE",
+        "address": "DBWxVSAEpejxB5mwnrQPZVZFcL55jt5ZbR"
+      },
+      {
+        "chain": "ETH",
+        "address": "0x4d39d5c55cfeb48f44d680fcac20493635dafdee"
+      },
+      {
+        "chain": "GAIA",
+        "address": "cosmos1ghejl6tasu04dxg5v9zz44gx4fuy3l7j6hls8p"
+      },
+      {
+        "chain": "LTC",
+        "address": "ltc1qghejl6tasu04dxg5v9zz44gx4fuy3l7jg3mlmu"
+      },
+      {
+        "chain": "SOL",
+        "address": "hACMLpEAFY2FuEovmhX4VtMnoeMG2FzAEexSjJAzKBR"
+      },
+      {
+        "chain": "THOR",
+        "address": "thor1ghejl6tasu04dxg5v9zz44gx4fuy3l7jusxtj7"
+      },
+      {
+        "chain": "TRON",
+        "address": "TH1YKH9MUuJtDmekPia4x9fZXAcpPrMv8B"
+      },
+      {
+        "chain": "XRP",
+        "address": "rf4ixBDbXNqCenbMhGQqrjPejUL8Tj3fwr"
+      },
+      {
+        "chain": "ZEC",
+        "address": "tex1ghejl6tasu04dxg5v9zz44gx4fuy3l7jcjnsxz"
+      }
+    ],
+    "pub_key_eddsa": "thorpub1zcjduepqpfy6z33zk37y524ssjnh53gchkjgn0r2q6ykgz77qd0az2at8r7qwnytnw",
+    "deficit": null
+  },
+  {
+    "block_height": 28203754,
+    "pub_key": "thorpub1addwnpepqva65k2jxjvafm6dufxh8zca2ghue4hsrwgx27tzjyj5e3uagqku7ql58h5",
+    "coins": [
+      {
+        "asset": "TRON.TRX",
+        "amount": "3060447978800",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.ATOM",
+        "amount": "509232236700",
+        "decimals": 6
+      },
+      {
+        "asset": "XRP.XRP",
+        "amount": "38271738800100",
+        "decimals": 6
+      },
+      {
+        "asset": "BCH.BCH",
+        "amount": "53928887762"
+      },
+      {
+        "asset": "BTC.BTC",
+        "amount": "8182643858"
+      },
+      {
+        "asset": "AVAX.USDT-0X9702230A8EA53601F5CD2DC00FDBC13D4DF4A8C7",
+        "amount": "27790986200",
+        "decimals": 6
+      },
+      {
+        "asset": "BASE.ETH",
+        "amount": "581864132"
+      },
+      {
+        "asset": "GAIA.WINK",
+        "amount": "6096609928100",
+        "decimals": 6
+      },
+      {
+        "asset": "AVAX.AVAX",
+        "amount": "105144566401"
+      },
+      {
+        "asset": "AVAX.SOL-0XFE6B19286885A4F7F55ADAD09C3CD1F906D2478F",
+        "amount": "170679832"
+      },
+      {
+        "asset": "ETH.GRT-0XC944E90C64B2C07662A292BE6244BDF05CDA44A7",
+        "amount": "3475952149"
+      },
+      {
+        "asset": "BSC.BNB",
+        "amount": "12407902634"
+      },
+      {
+        "asset": "ETH.ETH",
+        "amount": "3733436447"
+      },
+      {
+        "asset": "BASE.USDC-0X833589FCD6EDB6E08F4C7C32D4F71B54BDA02913",
+        "amount": "2002507682700",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.LUSD-0X5F98805A4E8BE255A32880FDEC7F6728C6568BA0",
+        "amount": "59917000000"
+      },
+      {
+        "asset": "DOGE.DOGE",
+        "amount": "1810797662309"
+      },
+      {
+        "asset": "ETH.WBTC-0X2260FAC5E5542A773AA44FBCFEDF7C193BC2C599",
+        "amount": "262063433"
+      },
+      {
+        "asset": "BSC.BTCB-0X7130D2A12B9BCBFAE4F2634D864A1EE1CE3EAD9C",
+        "amount": "19095045"
+      },
+      {
+        "asset": "LTC.LTC",
+        "amount": "186007749539"
+      },
+      {
+        "asset": "ETH.USDT-0XDAC17F958D2EE523A2206206994597C13D831EC7",
+        "amount": "612220678400",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.USDC-0XA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48",
+        "amount": "40033504983500",
+        "decimals": 6
+      },
+      {
+        "asset": "TRON.USDT-TR7NHQJEKQXGTCI8Q8ZY4PL8OTSZGJLJ6T",
+        "amount": "1325885412600",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.USDT-0X55D398326F99059FF775485246999027B3197955",
+        "amount": "816628668669"
+      },
+      {
+        "asset": "GAIA.FUZN",
+        "amount": "5576713660300",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.LVN",
+        "amount": "510866846001300",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.USDC-0X8AC76A51CC950D9822D68B83FE1AD97B32CD580D",
+        "amount": "812470576129"
+      },
+      {
+        "asset": "BSC.ETH-0X2170ED0880AC9A755FD29B2688956BD959F933F8",
+        "amount": "330026516"
+      },
+      {
+        "asset": "BSC.BUSD-0XE9E7CEA3DEDCA5984780BAFC599BD69ADD087D56",
+        "amount": "3417866706024"
+      },
+      {
+        "asset": "GAIA.XUSK",
+        "amount": "16002652100",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.LQDY",
+        "amount": "32439053393600",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.VTHOR-0X815C23ECA83261B6EC689B60CC4A58B54BC24D8D",
+        "amount": "327455110602"
+      },
+      {
+        "asset": "ETH.TGT-0X108A850856DB3F85D0269A2693D896B394C80325",
+        "amount": "20233967454022"
+      },
+      {
+        "asset": "ETH.SNX-0XC011A73EE8576FB46F5E1C5751CA3B9FE0AF2A6F",
+        "amount": "69213768635"
+      },
+      {
+        "asset": "GAIA.NAMI",
+        "amount": "30161658009600",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.AAVE-0X7FC66500C84A76AD7E9C93437BFC5AC33E2DDAE9",
+        "amount": "1683375644"
+      },
+      {
+        "asset": "ETH.GUSD-0X056FD409E1D7A124BD7017459DFEA2F387B6D5CD",
+        "amount": "862339000000",
+        "decimals": 2
+      },
+      {
+        "asset": "ETH.USDP-0X8E870D67F660D95D5BE530380D0EC0BD388289E1",
+        "amount": "1727559877286"
+      },
+      {
+        "asset": "ETH.LENDS-0X2C06BA9E7F0DACCBC1F6A33EA67E85BB68FBEE3A",
+        "amount": "4872921012"
+      },
+      {
+        "asset": "ETH.DAI-0X6B175474E89094C44DA98B954EEDEAC495271D0F",
+        "amount": "1929106129753"
+      },
+      {
+        "asset": "ETH.XRUNE-0X69FA0FEE221AD11012BAB0FDB45D444D3D2CE71C",
+        "amount": "3811460230192968"
+      },
+      {
+        "asset": "ETH.THOR-0XA5F2211B9B8170F694421F2046281775E8468044",
+        "amount": "29224066004864"
+      },
+      {
+        "asset": "BASE.VVV-0XACFE6019ED1A7DC6F7B508C02D1B04EC88CC21BF",
+        "amount": "6965021039"
+      },
+      {
+        "asset": "SOL.SOL",
+        "amount": "11299420515",
+        "decimals": 9
+      },
+      {
+        "asset": "AVAX.USDC-0XB97EF9EF8734C71904D8002F8B6BC66DD9C48A6E",
+        "amount": "176682471000",
+        "decimals": 6
+      },
+      {
+        "asset": "ZEC.ZEC",
+        "amount": "3917270820"
+      }
+    ],
+    "type": "AsgardVault",
+    "status": "ActiveVault",
+    "status_since": 28203871,
+    "membership": [
+      "thorpub1addwnpepq04rh2cjy9ufjdshzgnwurgl4r7gac4m87u4w43tkcxzepy2kt97wftv9hl",
+      "thorpub1addwnpepq07v97krt4avdsmzzf9k78yx8hrmrnt7tewt9393jksutsdkswn9jmx9gsj",
+      "thorpub1addwnpepq09l2sjrzd8yrkcz5weg89jkwu36s3sva0pc5jh8tedsduym3q04u70pwy4",
+      "thorpub1addwnpepq0x8n0g4s2mk0dflddk2ekhnw0ktg88lv97pmva73wz03kvujmmm286nfl9",
+      "thorpub1addwnpepqd2tgkqrh4j8pkz8u83rlyc3nedlrynvu34nxsqzgs6sfxzjwfz5krswlnk",
+      "thorpub1addwnpepqd9qa6m9kjev2udpehc8q2kd2m66xe57es64av7cgrszj7jq7mmh63xufqx",
+      "thorpub1addwnpepqdzxy7szcm57fakpgfxkq0qlnnxzfa880e2japqkl3leg70s9wlnqptrx2f",
+      "thorpub1addwnpepqfl5auyy002mn6smvzxq02x6q68stl9z04d6dmc4teyj54nfscj46s7m0cc",
+      "thorpub1addwnpepqfp27u54xs2letpcyz7rlrsfjnwg555ztffz2vx3z42e64fym550ssx7hcg",
+      "thorpub1addwnpepqfvm0x7en09ynhqj4rll5dngj583q7kkphdjqa98fnshfl7859t86929pk5",
+      "thorpub1addwnpepqgke3xtam5ekx3zmjdz8u9xa53f24du26kv0u0n8lf9pazpnam24ssgzl8g",
+      "thorpub1addwnpepqt5adu5f0tdtxzrygrdmqys3vyq0fmalad0mp37kv6efy5xlrzh6jprzga0",
+      "thorpub1addwnpepqt5e9ls2jg4k2jaxhv50nu509p0anv64tre83c5nd0xz5dc4fl0yklna9ey",
+      "thorpub1addwnpepqtmrqhqtqaya99pq0jjthvwdwcjsmfn9sqsgdqc64455wrtprarzktng2y2",
+      "thorpub1addwnpepqv2k2ulufmfzf8fz5dslhvxjgc2pzgqr094sxyde8gvmmve3ms5lzx93vwg",
+      "thorpub1addwnpepqvejnm07w69eghg48dcp9a5rfpz5wpmcxx4snjtmt6dcdzl85uu5uy8579h",
+      "thorpub1addwnpepqw6q84we025gcmyy6evt0rxvtaant5remh072lw0vf6rke705qzyu4dpfj7",
+      "thorpub1addwnpepqwapn29ukvplavwu5x3nxhlj080c9rtqgs4nkpnqsxgessmxn4a6ysmhp88"
+    ],
+    "chains": [
+      "AVAX",
+      "BASE",
+      "BCH",
+      "BSC",
+      "BTC",
+      "DOGE",
+      "ETH",
+      "GAIA",
+      "LTC",
+      "SOL",
+      "THOR",
+      "TRON",
+      "XRP",
+      "ZEC"
+    ],
+    "inbound_tx_count": 25251,
+    "outbound_tx_count": 28094,
+    "routers": [
+      {
+        "chain": "AVAX",
+        "router": "0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"
+      },
+      {
+        "chain": "BASE",
+        "router": "0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"
+      },
+      {
+        "chain": "BSC",
+        "router": "0xb30ec53f98ff5947ede720d32ac2da7e52a5f56b"
+      },
+      {
+        "chain": "ETH",
+        "router": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146"
+      }
+    ],
+    "addresses": [
+      {
+        "chain": "AVAX",
+        "address": "0x46f3fb8c14006268d153b18000495c8ee858e94b"
+      },
+      {
+        "chain": "BASE",
+        "address": "0x46f3fb8c14006268d153b18000495c8ee858e94b"
+      },
+      {
+        "chain": "BCH",
+        "address": "qre7hk63vp6jh6vrlt02swgn5pqvsr27j5hvr7tpj9"
+      },
+      {
+        "chain": "BSC",
+        "address": "0x46f3fb8c14006268d153b18000495c8ee858e94b"
+      },
+      {
+        "chain": "BTC",
+        "address": "bc1q704ak5tqw547nql6m65rjyaqgryq6h54d6ks2s"
+      },
+      {
+        "chain": "DOGE",
+        "address": "DTNqHV51o3KruyDyG19onew6VHD1Mzs9Ht"
+      },
+      {
+        "chain": "ETH",
+        "address": "0x46f3fb8c14006268d153b18000495c8ee858e94b"
+      },
+      {
+        "chain": "GAIA",
+        "address": "cosmos1704ak5tqw547nql6m65rjyaqgryq6h54mqgmwa"
+      },
+      {
+        "chain": "LTC",
+        "address": "ltc1q704ak5tqw547nql6m65rjyaqgryq6h54fxv5jq"
+      },
+      {
+        "chain": "SOL",
+        "address": "Crhguz59E1KrJeHXhZknXqw2kSrbR6Urs6zt3oAzyoXL"
+      },
+      {
+        "chain": "THOR",
+        "address": "thor1704ak5tqw547nql6m65rjyaqgryq6h54a83qmz"
+      },
+      {
+        "chain": "TRON",
+        "address": "TGSNahJvAdh86aR5pdcxiep1mBWSRK3HHL"
+      },
+      {
+        "chain": "XRP",
+        "address": "rPNjkN34VdR24ys4XRwENtmVc975pkShYY"
+      },
+      {
+        "chain": "ZEC",
+        "address": "tex1704ak5tqw547nql6m65rjyaqgryq6h54e9ym07"
+      }
+    ],
+    "pub_key_eddsa": "thorpub1zcjduepqkqkqtfu4yv0ft89vgsx9lkk7vv59ugc0lhfe4vx4pfqewgf89nrsm9ta9l",
+    "deficit": null
+  },
+  {
+    "block_height": 28203756,
+    "pub_key": "thorpub1addwnpepqgpx9za9xd2e22hvsj9gn40erhnrp0u8njpqm9sy6wdjmcnpw7fajaan99h",
+    "coins": [
+      {
+        "asset": "BCH.BCH",
+        "amount": "35683751719"
+      },
+      {
+        "asset": "TRON.TRX",
+        "amount": "7780967005200",
+        "decimals": 6
+      },
+      {
+        "asset": "AVAX.AVAX",
+        "amount": "272060945232"
+      },
+      {
+        "asset": "XRP.XRP",
+        "amount": "48057533455900",
+        "decimals": 6
+      },
+      {
+        "asset": "TRON.USDT-TR7NHQJEKQXGTCI8Q8ZY4PL8OTSZGJLJ6T",
+        "amount": "8781658493400",
+        "decimals": 6
+      },
+      {
+        "asset": "BTC.BTC",
+        "amount": "6871210565"
+      },
+      {
+        "asset": "BSC.BNB",
+        "amount": "119595508316"
+      },
+      {
+        "asset": "GAIA.ATOM",
+        "amount": "1082020426100",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.ETH",
+        "amount": "62011010702"
+      },
+      {
+        "asset": "BASE.ETH",
+        "amount": "74770736"
+      },
+      {
+        "asset": "BSC.USDT-0X55D398326F99059FF775485246999027B3197955",
+        "amount": "1310686492486"
+      },
+      {
+        "asset": "GAIA.FUZN",
+        "amount": "196920512997000",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.NSTK",
+        "amount": "111235197587300",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.KUJI",
+        "amount": "126944658405500",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.YFI-0X0BC529C00C6401AEF6D220BE8C6EA1667F6AD93E",
+        "amount": "18475752"
+      },
+      {
+        "asset": "DOGE.DOGE",
+        "amount": "332971457683734"
+      },
+      {
+        "asset": "ETH.WBTC-0X2260FAC5E5542A773AA44FBCFEDF7C193BC2C599",
+        "amount": "407812847"
+      },
+      {
+        "asset": "ETH.DAI-0X6B175474E89094C44DA98B954EEDEAC495271D0F",
+        "amount": "11262338070282"
+      },
+      {
+        "asset": "AVAX.USDC-0XB97EF9EF8734C71904D8002F8B6BC66DD9C48A6E",
+        "amount": "891255270700",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.DPI-0X1494CA1F11D487C2BBE4543E90080AEBA4BA3C2B",
+        "amount": "647525353"
+      },
+      {
+        "asset": "ETH.LUSD-0X5F98805A4E8BE255A32880FDEC7F6728C6568BA0",
+        "amount": "337514875344"
+      },
+      {
+        "asset": "ETH.WSTETH-0X7F39C581F595B53C5CB19BD0B3F8DA6C935E2CA0",
+        "amount": "81"
+      },
+      {
+        "asset": "ETH.AAVE-0X7FC66500C84A76AD7E9C93437BFC5AC33E2DDAE9",
+        "amount": "1385331190"
+      },
+      {
+        "asset": "ETH.USDC-0XA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48",
+        "amount": "10833057362900",
+        "decimals": 6
+      },
+      {
+        "asset": "LTC.LTC",
+        "amount": "91673386618"
+      },
+      {
+        "asset": "BSC.BTCB-0X7130D2A12B9BCBFAE4F2634D864A1EE1CE3EAD9C",
+        "amount": "5267956"
+      },
+      {
+        "asset": "BSC.BUSD-0XE9E7CEA3DEDCA5984780BAFC599BD69ADD087D56",
+        "amount": "573706350491"
+      },
+      {
+        "asset": "ETH.USDT-0XDAC17F958D2EE523A2206206994597C13D831EC7",
+        "amount": "45662109608000",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.RKUJI",
+        "amount": "9694844222300",
+        "decimals": 6
+      },
+      {
+        "asset": "AVAX.USDT-0X9702230A8EA53601F5CD2DC00FDBC13D4DF4A8C7",
+        "amount": "619059415900",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.TWT-0X4B0F1812E5DF2A09796481FF14017E6005508003",
+        "amount": "182429705773"
+      },
+      {
+        "asset": "BSC.USDC-0X8AC76A51CC950D9822D68B83FE1AD97B32CD580D",
+        "amount": "1032930461426"
+      },
+      {
+        "asset": "BASE.VVV-0XACFE6019ED1A7DC6F7B508C02D1B04EC88CC21BF",
+        "amount": "1708026383"
+      },
+      {
+        "asset": "BSC.ETH-0X2170ED0880AC9A755FD29B2688956BD959F933F8",
+        "amount": "109554240"
+      },
+      {
+        "asset": "GAIA.XUSK",
+        "amount": "22403062400",
+        "decimals": 6
+      },
+      {
+        "asset": "AVAX.SOL-0XFE6B19286885A4F7F55ADAD09C3CD1F906D2478F",
+        "amount": "292929436"
+      },
+      {
+        "asset": "ETH.SNX-0XC011A73EE8576FB46F5E1C5751CA3B9FE0AF2A6F",
+        "amount": "96127672450"
+      },
+      {
+        "asset": "GAIA.WINK",
+        "amount": "62707672708800",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.THOR-0XA5F2211B9B8170F694421F2046281775E8468044",
+        "amount": "203007322611122"
+      },
+      {
+        "asset": "GAIA.LVN",
+        "amount": "729809780001800",
+        "decimals": 6
+      },
+      {
+        "asset": "BASE.USDC-0X833589FCD6EDB6E08F4C7C32D4F71B54BDA02913",
+        "amount": "28059846500",
+        "decimals": 6
+      },
+      {
+        "asset": "SOL.SOL",
+        "amount": "10857462105",
+        "decimals": 9
+      },
+      {
+        "asset": "ZEC.ZEC",
+        "amount": "7266466445"
+      },
+      {
+        "asset": "ETH.USDP-0X8E870D67F660D95D5BE530380D0EC0BD388289E1",
+        "amount": "392719777919"
+      }
+    ],
+    "type": "AsgardVault",
+    "status": "ActiveVault",
+    "status_since": 28203871,
+    "membership": [
+      "thorpub1addwnpepq05hr74qgg4zlwmzghy7jx4d3xhpyuar3rf24l0nz4kf004kx6cw7n37kdd",
+      "thorpub1addwnpepq07zcq0hkeh6g3h80mdvty28t7xy9sal938xnedrc28tqg8ehf2fcgn4r5e",
+      "thorpub1addwnpepq0827m797p6r5ag0j8j6tqz86ft9yfa4y78qen5aqctzk0xx26druxz3pck",
+      "thorpub1addwnpepq0cwyzs303w2jkznv8smx7kn8a5c9stt03pj5ky573lhm0u8cx59wqhaar4",
+      "thorpub1addwnpepq0hhxnr4xek3sg7wgnq4wyt2x6r3c77z7sluxtwtpesnklxwjxefyjvakan",
+      "thorpub1addwnpepq0jkk20j5xhyt7pa826404k2npfc6ule6d8xsyrts7ktmv5zxdy8y6xf3g6",
+      "thorpub1addwnpepq0pcwrz0hpgmeemuhwyecyxxlw6qedc338ag0f4gd3xx27lcxpf7j9a57zc",
+      "thorpub1addwnpepq27sw82eagjfydhjc5wyd840e7v9jtn580d9sqxuju7scyvh724szz7tjm0",
+      "thorpub1addwnpepqd72kq3ctz9l0x8c7l8uufksa3nlqe334tjptde5r6k2qlksatuqsy8uuh7",
+      "thorpub1addwnpepqf5dyw64283p3gruefrqmjh0ugw9nzaddq2d95awd6hqjgg832le6hvqgwc",
+      "thorpub1addwnpepqfa9fke8z3cnv2xjrldv2swaxz4h9u37war8fj4aframea8vwny063ln6gl",
+      "thorpub1addwnpepqfxmcpqwlq9rel0t656trdwa4m08hmv3cxm8kh4e5a2pdkl4flcl2p8yz6v",
+      "thorpub1addwnpepqfypsxu38k78pfrp76862h2ua8a74f0w79u7a8yhk3yesdmf2cnkue3lsc5",
+      "thorpub1addwnpepqg04wkfqqvz9fqf5cfx7hcyrgyauukkhjg6dx87q6mvgps80t4ym22sgp85",
+      "thorpub1addwnpepqgvskeva7mat4jvx3vnmg0z6kj3lq59hqj4j628zw7lnntllgd7eg0vqh9g",
+      "thorpub1addwnpepqtm9qgr48rukxlff8s2745lnztx5g6shmfju6lu4g9mngf9mlhn0g9d2le4",
+      "thorpub1addwnpepqtn094jgnaw4ejsjhxzvzmf6535yqu7yrwknjsdgfylwys536v9m6jtrmyu",
+      "thorpub1addwnpepqvvuyaaghcwckkcl3kpu4yv0rtkyhd8ruga6nerpwzj7pmpd0f5zs3vvjlt",
+      "thorpub1addwnpepqwghgfzu3zk07xc27cpya3mwl54wa2cgkgxjjpsxkpkl6v3va2d4jgywt3j"
+    ],
+    "chains": [
+      "AVAX",
+      "BASE",
+      "BCH",
+      "BSC",
+      "BTC",
+      "DOGE",
+      "ETH",
+      "GAIA",
+      "LTC",
+      "SOL",
+      "THOR",
+      "TRON",
+      "XRP",
+      "ZEC"
+    ],
+    "inbound_tx_count": 24469,
+    "outbound_tx_count": 31762,
+    "routers": [
+      {
+        "chain": "AVAX",
+        "router": "0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"
+      },
+      {
+        "chain": "BASE",
+        "router": "0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"
+      },
+      {
+        "chain": "BSC",
+        "router": "0xb30ec53f98ff5947ede720d32ac2da7e52a5f56b"
+      },
+      {
+        "chain": "ETH",
+        "router": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146"
+      }
+    ],
+    "addresses": [
+      {
+        "chain": "AVAX",
+        "address": "0x51649cf810ea9f1f61165044b7149070c67f79c8"
+      },
+      {
+        "chain": "BASE",
+        "address": "0x51649cf810ea9f1f61165044b7149070c67f79c8"
+      },
+      {
+        "chain": "BCH",
+        "address": "qqvq099cf3dj3uwjyk70mn03xg74rdgcc53rdqreag"
+      },
+      {
+        "chain": "BSC",
+        "address": "0x51649cf810ea9f1f61165044b7149070c67f79c8"
+      },
+      {
+        "chain": "BTC",
+        "address": "bc1qrqrefwzvtv50r539hn7umufj84gm2xx9vz7ykw"
+      },
+      {
+        "chain": "DOGE",
+        "address": "D7L9qbUENRJ6dp4YUcoHLG9UmfPF6GESfy"
+      },
+      {
+        "chain": "ETH",
+        "address": "0x51649cf810ea9f1f61165044b7149070c67f79c8"
+      },
+      {
+        "chain": "GAIA",
+        "address": "cosmos1rqrefwzvtv50r539hn7umufj84gm2xx96cq0jr"
+      },
+      {
+        "chain": "LTC",
+        "address": "ltc1qrqrefwzvtv50r539hn7umufj84gm2xx9g7yqw7"
+      },
+      {
+        "chain": "SOL",
+        "address": "4ZG5opFRTvkVDBPEgLynpTD5gh3VGPrR3zBVAPQ3GQry"
+      },
+      {
+        "chain": "THOR",
+        "address": "thor1rqrefwzvtv50r539hn7umufj84gm2xx9ule58u"
+      },
+      {
+        "chain": "TRON",
+        "address": "THPaGKe6aZkUcNht24hcscZPLwtcJAbpun"
+      },
+      {
+        "chain": "XRP",
+        "address": "rsUhJLXbnrPFao1Akpo58Vy1tXeA6gkdUA"
+      },
+      {
+        "chain": "ZEC",
+        "address": "tex1rqrefwzvtv50r539hn7umufj84gm2xx9cav0nq"
+      }
+    ],
+    "pub_key_eddsa": "thorpub1zcjduepqxnttxu9jthl7zyppt8readul74x5gdy0gzq7sgglqmxycu7j49nq97y9n5",
+    "deficit": null
+  },
+  {
+    "block_height": 28203871,
+    "pub_key": "thorpub1addwnpepq2dxvtsjwz8de5k96ct7aap2d7ccgjeekr02n0eudcankqa02d89udx7767",
+    "coins": [
+      {
+        "asset": "AVAX.AVAX",
+        "amount": "590649443528"
+      },
+      {
+        "asset": "TRON.TRX",
+        "amount": "856015792100",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.RKUJI",
+        "amount": "2408562867200",
+        "decimals": 6
+      },
+      {
+        "asset": "XRP.XRP",
+        "amount": "5389557600",
+        "decimals": 6
+      },
+      {
+        "asset": "AVAX.USDC-0XB97EF9EF8734C71904D8002F8B6BC66DD9C48A6E",
+        "amount": "2100225376800",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.ETH",
+        "amount": "10883134629"
+      },
+      {
+        "asset": "BCH.BCH",
+        "amount": "171424450629"
+      },
+      {
+        "asset": "BTC.BTC",
+        "amount": "6922647887"
+      },
+      {
+        "asset": "AVAX.USDT-0X9702230A8EA53601F5CD2DC00FDBC13D4DF4A8C7",
+        "amount": "1744220212500",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.BTCB-0X7130D2A12B9BCBFAE4F2634D864A1EE1CE3EAD9C",
+        "amount": "2904439"
+      },
+      {
+        "asset": "ETH.FOX-0XC770EEFAD204B5180DF6A14EE197D99D808EE52D",
+        "amount": "32052138419625"
+      },
+      {
+        "asset": "GAIA.FUZN",
+        "amount": "224102246412300",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.USDC-0X8AC76A51CC950D9822D68B83FE1AD97B32CD580D",
+        "amount": "3234916845486"
+      },
+      {
+        "asset": "GAIA.ATOM",
+        "amount": "812631728700",
+        "decimals": 6
+      },
+      {
+        "asset": "BASE.ETH",
+        "amount": "2040278328"
+      },
+      {
+        "asset": "GAIA.LVN",
+        "amount": "1751543472004100",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.WBTC-0X2260FAC5E5542A773AA44FBCFEDF7C193BC2C599",
+        "amount": "71798595"
+      },
+      {
+        "asset": "BSC.BNB",
+        "amount": "55997913405"
+      },
+      {
+        "asset": "BSC.TWT-0X4B0F1812E5DF2A09796481FF14017E6005508003",
+        "amount": "145104795248"
+      },
+      {
+        "asset": "AVAX.SOL-0XFE6B19286885A4F7F55ADAD09C3CD1F906D2478F",
+        "amount": "454090818"
+      },
+      {
+        "asset": "BASE.USDC-0X833589FCD6EDB6E08F4C7C32D4F71B54BDA02913",
+        "amount": "124738011500",
+        "decimals": 6
+      },
+      {
+        "asset": "BSC.ETH-0X2170ED0880AC9A755FD29B2688956BD959F933F8",
+        "amount": "152927752"
+      },
+      {
+        "asset": "DOGE.DOGE",
+        "amount": "332990779867662"
+      },
+      {
+        "asset": "ETH.GUSD-0X056FD409E1D7A124BD7017459DFEA2F387B6D5CD",
+        "amount": "2057936000000",
+        "decimals": 2
+      },
+      {
+        "asset": "ETH.VTHOR-0X815C23ECA83261B6EC689B60CC4A58B54BC24D8D",
+        "amount": "575401707949"
+      },
+      {
+        "asset": "GAIA.NAMI",
+        "amount": "176389233452700",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.LINK-0X514910771AF9CA656AF840DFF83E8264ECF986CA",
+        "amount": "2218259747"
+      },
+      {
+        "asset": "BSC.BUSD-0XE9E7CEA3DEDCA5984780BAFC599BD69ADD087D56",
+        "amount": "301544745555"
+      },
+      {
+        "asset": "ETH.AAVE-0X7FC66500C84A76AD7E9C93437BFC5AC33E2DDAE9",
+        "amount": "3229867487"
+      },
+      {
+        "asset": "ETH.YFI-0X0BC529C00C6401AEF6D220BE8C6EA1667F6AD93E",
+        "amount": "34874918"
+      },
+      {
+        "asset": "BASE.VVV-0XACFE6019ED1A7DC6F7B508C02D1B04EC88CC21BF",
+        "amount": "16712431794"
+      },
+      {
+        "asset": "ETH.USDP-0X8E870D67F660D95D5BE530380D0EC0BD388289E1",
+        "amount": "1213458751296"
+      },
+      {
+        "asset": "BSC.USDT-0X55D398326F99059FF775485246999027B3197955",
+        "amount": "91019881032"
+      },
+      {
+        "asset": "ETH.THOR-0XA5F2211B9B8170F694421F2046281775E8468044",
+        "amount": "101824127436903"
+      },
+      {
+        "asset": "ETH.DAI-0X6B175474E89094C44DA98B954EEDEAC495271D0F",
+        "amount": "3591434272426"
+      },
+      {
+        "asset": "ETH.LENDS-0X2C06BA9E7F0DACCBC1F6A33EA67E85BB68FBEE3A",
+        "amount": "62373388956"
+      },
+      {
+        "asset": "ETH.XRUNE-0X69FA0FEE221AD11012BAB0FDB45D444D3D2CE71C",
+        "amount": "2281037527416627"
+      },
+      {
+        "asset": "LTC.LTC",
+        "amount": "93035022642"
+      },
+      {
+        "asset": "ETH.TGT-0X108A850856DB3F85D0269A2693D896B394C80325",
+        "amount": "17767627386014"
+      },
+      {
+        "asset": "ETH.DPI-0X1494CA1F11D487C2BBE4543E90080AEBA4BA3C2B",
+        "amount": "539604462"
+      },
+      {
+        "asset": "ETH.VIU-0X519475B31653E46D20CD09F9FDCF3B12BDACB4F5",
+        "amount": "1520757"
+      },
+      {
+        "asset": "ETH.WSTETH-0X7F39C581F595B53C5CB19BD0B3F8DA6C935E2CA0",
+        "amount": "34"
+      },
+      {
+        "asset": "ETH.SNX-0XC011A73EE8576FB46F5E1C5751CA3B9FE0AF2A6F",
+        "amount": "58807878925"
+      },
+      {
+        "asset": "ETH.USDT-0XDAC17F958D2EE523A2206206994597C13D831EC7",
+        "amount": "1813476146600",
+        "decimals": 6
+      },
+      {
+        "asset": "TRON.USDT-TR7NHQJEKQXGTCI8Q8ZY4PL8OTSZGJLJ6T",
+        "amount": "14991296397200",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.USDC-0XA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48",
+        "amount": "55515994186400",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.WINK",
+        "amount": "23515422152600",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.NSTK",
+        "amount": "70691104501900",
+        "decimals": 6
+      },
+      {
+        "asset": "GAIA.KUJI",
+        "amount": "12037210532300",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.GRT-0XC944E90C64B2C07662A292BE6244BDF05CDA44A7",
+        "amount": "5166625977"
+      },
+      {
+        "asset": "GAIA.XUSK",
+        "amount": "25602570200",
+        "decimals": 6
+      },
+      {
+        "asset": "ETH.LUSD-0X5F98805A4E8BE255A32880FDEC7F6728C6568BA0",
+        "amount": "1533316306272"
+      },
+      {
+        "asset": "GAIA.AUTO",
+        "amount": "1935212949700",
+        "decimals": 6
+      },
+      {
+        "asset": "SOL.SOL",
+        "amount": "8337566760",
+        "decimals": 9
+      },
+      {
+        "asset": "ZEC.ZEC",
+        "amount": "2889883198"
+      }
+    ],
+    "type": "AsgardVault",
+    "status": "ActiveVault",
+    "status_since": 28203871,
+    "membership": [
+      "thorpub1addwnpepq0ncge2ss7zs0mnp2x3w5zk8cq6x48fj5qcls5sc7gk67l20tmkv6rv34xw",
+      "thorpub1addwnpepq2265p98yfj7l32svwqxn366qvsdfg8n86eaft4rr9q6y67jak0q2nedrts",
+      "thorpub1addwnpepq2aeav5xgyhk846kvmqns3q2ds6ctextwdus35qztue8wheyfqrg6yueujv",
+      "thorpub1addwnpepq2cf6yahyvmzt4ajraxjcz4324xp5y28v78vpwjt37fs2zrkpfpucm5d46r",
+      "thorpub1addwnpepq2cvhhnf6ged2a3rwestuw8dvflwremh7w8z76ejxwgy690p4q8nu2fqufv",
+      "thorpub1addwnpepqd35jq6v9wqpc5gxr8lspt3kjgnmrp752gy90v0ltyqukp2awt30sz259aw",
+      "thorpub1addwnpepqdk39rnxkxplgdp8etdpgpmyt6002fnsldae0mgqzknfc0638rh7csfsxh8",
+      "thorpub1addwnpepqfgr35pzfxj4rccs0t5w20j8lr8deewh2zrrard9f2t0jfn8tn5hq9d6wmz",
+      "thorpub1addwnpepqgl74hzqpdwlvsmj3f7vv0p6q5muansyc6qwnr97q07lqw9rlgkjwstnq0u",
+      "thorpub1addwnpepqgsmrd72mumk452w74l54gjzyv7v3z3t0purwjaq5cqmpvpdxcqe5kp8qzd",
+      "thorpub1addwnpepqt9m0ppqh6gxpaq8968sgg2rk755zm7e7lrxjqzk95f53l0rdn46wz2kqmn",
+      "thorpub1addwnpepqthuughjkv5pmyfx37smngyu6wf02f3wkc3jgg9ffj86e8kjgkvzx9sxe5j",
+      "thorpub1addwnpepqtxghkykhrwzwww30lvvv5wve68lpcert5wsz3lmqvdxxhnaylelg953pg0",
+      "thorpub1addwnpepqvhdv8mgdx6xuuvc9fglkjj8686x3vxj2u0dq2g5wwfkcpf5zuhrsqwah6c",
+      "thorpub1addwnpepqvkx0j254re0hy8u2senjhmefgaazpr2hysc2g6ypq9l97qpltje79gpy7w",
+      "thorpub1addwnpepqwaa757l9nt473tsuq2vu5ev4jw8350pcvupfnjezygs82wh5htc6g787kc",
+      "thorpub1addwnpepqwjwaksmt74sfrrn0rzsmrvw6hjqydhvc4qufea99q0a524ttu0tcyt39z6",
+      "thorpub1addwnpepqwrdjre3g4z0pz6psmgvtrnsakpsjwvyle7jnwaparu23rm5jqdruyt73k7"
+    ],
+    "chains": [
+      "AVAX",
+      "BASE",
+      "BCH",
+      "BSC",
+      "BTC",
+      "DOGE",
+      "ETH",
+      "GAIA",
+      "LTC",
+      "SOL",
+      "THOR",
+      "TRON",
+      "XRP",
+      "ZEC"
+    ],
+    "inbound_tx_count": 26459,
+    "outbound_tx_count": 30121,
+    "routers": [
+      {
+        "chain": "AVAX",
+        "router": "0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"
+      },
+      {
+        "chain": "BASE",
+        "router": "0x00dc6100103BC402d490aEE3F9a5560cBd91f1d4"
+      },
+      {
+        "chain": "BSC",
+        "router": "0xb30ec53f98ff5947ede720d32ac2da7e52a5f56b"
+      },
+      {
+        "chain": "ETH",
+        "router": "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146"
+      }
+    ],
+    "addresses": [
+      {
+        "chain": "AVAX",
+        "address": "0x0d15b57a5ba0a31a4774c03ddfacf79b289db9ce"
+      },
+      {
+        "chain": "BASE",
+        "address": "0x0d15b57a5ba0a31a4774c03ddfacf79b289db9ce"
+      },
+      {
+        "chain": "BCH",
+        "address": "qpk3zrsl6nlxm9mr8au8fenn932sjw0m8y4pnsakyk"
+      },
+      {
+        "chain": "BSC",
+        "address": "0x0d15b57a5ba0a31a4774c03ddfacf79b289db9ce"
+      },
+      {
+        "chain": "BTC",
+        "address": "bc1qd5gsu875lekewcel0p6wvuev25ynn7ee79g3lf"
+      },
+      {
+        "chain": "DOGE",
+        "address": "DF5ndBX4Fd6yUcPvAs9SkbH5r4VaZE6huG"
+      },
+      {
+        "chain": "ETH",
+        "address": "0x0d15b57a5ba0a31a4774c03ddfacf79b289db9ce"
+      },
+      {
+        "chain": "GAIA",
+        "address": "cosmos1d5gsu875lekewcel0p6wvuev25ynn7eeglk6my"
+      },
+      {
+        "chain": "LTC",
+        "address": "ltc1qd5gsu875lekewcel0p6wvuev25ynn7ee6ej48e"
+      },
+      {
+        "chain": "SOL",
+        "address": "EmR9wBW3Zmk2dbGoHExDnWV5wyY1AfLiTzT2KzTzzBWK"
+      },
+      {
+        "chain": "THOR",
+        "address": "thor1d5gsu875lekewcel0p6wvuev25ynn7eewc0pwm"
+      },
+      {
+        "chain": "TRON",
+        "address": "TBAPnuwEht65McDbxDvDYs2XLRSSbYQMUM"
+      },
+      {
+        "chain": "XRP",
+        "address": "rwA6nv2QxDUgAcDKSH9tUqf7xvmHEhhQUu"
+      },
+      {
+        "chain": "ZEC",
+        "address": "tex1d5gsu875lekewcel0p6wvuev25ynn7ee266668"
+      }
+    ],
+    "pub_key_eddsa": "thorpub1zcjduepqejyvharn37xpyxc9qysxj0st85w78nzj3v49s7kg2yex59l4cgzq9xx8at",
+    "deficit": null
+  }
+]

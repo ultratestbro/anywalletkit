@@ -5,6 +5,9 @@ import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import {ccAsset, ccAssetByToken} from "@anywalletkit/swap2-assets";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {bigintToNumber} from "@anywalletkit/core";
+import {THORNODE_CONFIRM_PATHS, asgardVaults, lastblockHeight, mimirFlags, nodeDeadline, sameRequestUrl} from "./confirm.js";
+
+export {THORNODE_CONFIRM_PATHS} from "./confirm.js";
 
 /**
  * THORChain — native L1 swaps via asgard vaults (no wrapping). Scope here is
@@ -72,6 +75,17 @@ const TOLERANCE_BPS = "300"; // 3% max slippage, embedded as an on-chain LIM
 const MAX_TOLERANCE_BPS = 500n;
 /** How long a quote stays executable (bounded by the memo's own expiry). */
 const QUOTE_VALIDITY_MS = 5 * 60_000;
+/** The whole quote (or pre-broadcast re-check) gets this long; confirming nodes share what the quote leaves of it. */
+const QUOTE_DEADLINE_MS = 8_000;
+/**
+ * A confirming node may trail the quoting node by this many THORChain blocks (~6 s each) before the next one is asked.
+ * Public nodes reachable from a browser ran ~25–28 blocks behind the Liquify gateway on 2026-11-12.
+ */
+const DEFAULT_CONFIRM_MAX_LAG_BLOCKS = 50;
+/** Time one confirming node gets for all of its reads. */
+const DEFAULT_CONFIRM_TIMEOUT_MS = 2_500;
+/** A confirming node behind the quoting node by more than the allowed lag: ask the next one. */
+const LAGGING = Symbol("lagging");
 
 // CAIP-2 → THORChain chain prefix. EVM chains execute via the router; TRON
 // executes via a native send to the inbound vault + memo (no router).
@@ -226,6 +240,31 @@ async function hostGet(host: string, path: string, clientId: string, signal?: Ab
   return {ok: res.ok, status: res.status, body};
 }
 
+/**
+ * One read for the vault check (THORNODE_CONFIRM_PATHS): GET on a fixed path, no query string, no `cache` option —
+ * React Native's fetch turns `cache: "no-store"` into a `?_=<time>` query, which a pass-through proxy refuses; THORNode
+ * answers carry no cache validators, so nothing is reused. A redirect, a non-2xx status or a body that is not JSON is
+ * a host failure (the next node is asked); `outer` aborting is the caller giving up and is rethrown as is.
+ */
+async function nodeRead(host: string, path: string, clientId: string, signal: AbortSignal, outer?: AbortSignal): Promise<unknown> {
+  const url = `${host}${path}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {method: "GET", headers: {accept: "application/json", "x-client-id": clientId}, redirect: "error", signal});
+  } catch (error) {
+    if (outer?.aborted) throw error;
+    throw new HostUnavailable(host, error instanceof Error ? error.message : "fetch failed");
+  }
+  if (res.redirected === true || !sameRequestUrl(res.url, url)) throw new HostUnavailable(host, `${path} redirected`);
+  if (!res.ok) throw new HostUnavailable(host, `${path} HTTP ${res.status}`);
+  try {
+    return await res.json();
+  } catch (error) {
+    if (outer?.aborted) throw error;
+    throw new HostUnavailable(host, `${path} is not JSON`);
+  }
+}
+
 /** Per-request failover for reads whose answer is host-independent (tx status). */
 async function thornodeGet(
   path: string,
@@ -343,6 +382,16 @@ export interface ThorchainProviderConfig {
    * refuses. Default: the other `nodeUrl` hosts, else the default public nodes. Name a node of another operator.
    */
   confirmNodeUrl?: string | string[];
+  /**
+   * Blocks a confirming node may trail the quoting node's THORChain height (`/thorchain/lastblock`) before it is
+   * skipped for the next confirming node. Default 50 (~5 minutes). Integer 0–100000.
+   */
+  confirmMaxLagBlocks?: number;
+  /**
+   * Time one confirming node gets for all of its reads, in ms, inside the quote's 8 s budget; a node that has not
+   * answered by then is skipped for the next one. Default 2500. Integer 100–8000.
+   */
+  confirmTimeoutMs?: number;
   /** Routers to trust besides {@link THORCHAIN_ROUTERS}, per CAIP-2 chain (a router migration before a release). */
   trustedRouters?: Readonly<Record<string, readonly string[]>>;
   /** Allow `http:` node URLs (local development only): the vault and router a swap pays come from them. */
@@ -468,22 +517,115 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
     routers.set(chain, set);
   }
   const pinnedRouter = (chain: string, router: string | undefined) => !!router && routers.get(chain)?.has(router.toLowerCase()) === true;
+  const confirmMaxLagBlocks = config.confirmMaxLagBlocks ?? DEFAULT_CONFIRM_MAX_LAG_BLOCKS;
+  if (!Number.isInteger(confirmMaxLagBlocks) || confirmMaxLagBlocks < 0 || confirmMaxLagBlocks > 100_000) {
+    throw new Error("thorchain: confirmMaxLagBlocks must be an integer between 0 and 100000");
+  }
+  const confirmTimeoutMs = config.confirmTimeoutMs ?? DEFAULT_CONFIRM_TIMEOUT_MS;
+  if (!Number.isInteger(confirmTimeoutMs) || confirmTimeoutMs < 100 || confirmTimeoutMs > QUOTE_DEADLINE_MS) {
+    throw new Error(`thorchain: confirmTimeoutMs must be an integer between 100 and ${QUOTE_DEADLINE_MS}`);
+  }
+  /** THORChain's block height as `host` reports it (`/thorchain/lastblock`); a host failure when it cannot say. */
+  const nodeHeight = async (host: string, outer?: AbortSignal): Promise<number> => {
+    const node = nodeDeadline(confirmTimeoutMs, outer);
+    try {
+      const height = lastblockHeight(await nodeRead(host, THORNODE_CONFIRM_PATHS.lastblock, clientId, node.signal, outer));
+      if (height === null) throw new HostUnavailable(host, "lastblock is not a THORNode lastblock list");
+      return height;
+    } finally {
+      node.clear();
+    }
+  };
   /**
-   * A second node's view of the source chain, from a host other than `quoteHost`: the vault (and router) it reports
-   * must be the quote's, and trading open. The reason it fails, or null.
+   * One confirming node's verdict on the vault (and router) a quote names; null when it confirms. The vault must be
+   * the node's current inbound for the chain, or — the inbound rotates among the active vaults every few minutes, and
+   * a node a few blocks behind still names the previous one — the chain's address of a vault the node lists as
+   * ActiveVault in `/thorchain/vaults/asgard` that its mimir does not flag compromised or insolvent (THORNode leaves
+   * those out of inbound election). A RetiringVault, or any other status, never confirms.
    */
-  const confirmedElsewhere = async (quoteHost: string, chain: string, vault: string, router: string | undefined): Promise<string | null> => {
+  const confirmOn = async (
+    host: string,
+    signal: AbortSignal,
+    outer: AbortSignal | undefined,
+    quoteHeight: number,
+    chain: string,
+    destChain: string | undefined,
+    vault: string,
+    router: string | undefined,
+  ): Promise<string | null | typeof LAGGING> => {
+    const read = (path: string) => nodeRead(host, path, clientId, signal, outer);
+    const [lastblock, inbound] = await Promise.all([read(THORNODE_CONFIRM_PATHS.lastblock), read(THORNODE_CONFIRM_PATHS.inboundAddresses)]);
+    const height = lastblockHeight(lastblock);
+    if (height === null) throw new HostUnavailable(host, "lastblock is not a THORNode lastblock list");
+    if (quoteHeight - height > confirmMaxLagBlocks) return LAGGING;
+    if (!Array.isArray(inbound)) throw new HostUnavailable(host, "inbound_addresses is not a list");
+    const entries = inbound as (InboundAddress | null)[];
+    const thorChain = THOR_CHAIN[chain];
+    const entry = entries.find((e) => e?.chain === thorChain) ?? undefined;
+    if (paused(entry)) return `${thorChain} is halted / paused on the confirming node`;
+    if (destChain !== undefined) {
+      const destThorChain = THOR_CHAIN[destChain];
+      if (paused(entries.find((e) => e?.chain === destThorChain) ?? undefined)) return `${destThorChain} is halted / paused on the confirming node`;
+    }
+    if (!sameTarget(entry?.address, vault)) {
+      const [asgardBody, mimirBody] = await Promise.all([read(THORNODE_CONFIRM_PATHS.asgardVaults), read(THORNODE_CONFIRM_PATHS.mimir)]);
+      const vaults = asgardVaults(asgardBody);
+      if (!vaults) throw new HostUnavailable(host, "vaults/asgard is not a THORNode vault list");
+      const flags = mimirFlags(mimirBody);
+      if (!flags) throw new HostUnavailable(host, "mimir is not a THORNode mimir map");
+      const holders = vaults.filter((v) => v.addresses.some((a) => a.chain === thorChain && sameTarget(a.address, vault)));
+      const active = holders.find((v) => v.status === "ActiveVault");
+      if (!active) {
+        if (!holders.length) return "a second node reports another inbound vault — refused until they agree";
+        const status = /^[A-Za-z]{1,32}$/.test(holders[0]!.status) ? holders[0]!.status : "an unknown status";
+        return `a second node lists the inbound vault as ${status}, not ActiveVault — refused`;
+      }
+      const flag = flags(active.pubKey);
+      if (flag === "malformed") throw new HostUnavailable(host, "mimir holds a non-integer vault flag");
+      if (flag) return `a second node's mimir flags the inbound vault as ${flag} — refused`;
+    }
+    if (router !== undefined && !sameTarget(entry?.router, router)) return "a second node reports another router — refused until they agree";
+    return null;
+  };
+  /**
+   * A second node's view of the source chain, from a host other than `quoteHost` (the next one when a node trails the
+   * quoting node by more than `confirmMaxLagBlocks`, fails, or takes longer than `confirmTimeoutMs`): the vault (and
+   * router) the quote names must be confirmed, and trading open on both chains. The reason it fails, or null.
+   */
+  const confirmedElsewhere = async (
+    quoteHost: string,
+    quoteHeight: number,
+    chain: string,
+    destChain: string | undefined,
+    vault: string,
+    router: string | undefined,
+    deadlineAt: number,
+    outer?: AbortSignal,
+  ): Promise<string | null> => {
+    let lagging = false;
     for (const host of confirmHosts) {
       if (host === quoteHost) continue;
-      let entries: InboundAddress[];
-      try { entries = await inboundAddressesOn(host, clientId); } catch (error) { if (error instanceof HostUnavailable) continue; throw error; }
-      const entry = entries.find((e) => e.chain === THOR_CHAIN[chain]);
-      if (paused(entry)) return `${THOR_CHAIN[chain]} is halted / paused on the confirming node`;
-      if (!sameTarget(entry?.address, vault)) return "a second node reports another inbound vault — refused until they agree";
-      if (router !== undefined && !sameTarget(entry?.router, router)) return "a second node reports another router — refused until they agree";
-      return null;
+      const budget = Math.min(confirmTimeoutMs, deadlineAt - Date.now());
+      if (budget <= 0) break;
+      const node = nodeDeadline(budget, outer);
+      try {
+        const verdict = await confirmOn(host, node.signal, outer, quoteHeight, chain, destChain, vault, router);
+        if (verdict === LAGGING) {
+          lagging = true;
+          continue;
+        }
+        return verdict;
+      } catch (error) {
+        if (outer?.aborted) throw error;
+        if (error instanceof HostUnavailable) continue;
+        throw error;
+      } finally {
+        node.clear();
+      }
     }
-    return "no second node answered to confirm the inbound vault (configure confirmNodeUrl)";
+    return lagging
+      ? `no confirming node is within ${confirmMaxLagBlocks} blocks of the quoting node's THORChain height (behind or unreachable) — refused until one catches up`
+      : "no second node answered to confirm the inbound vault (configure confirmNodeUrl)";
   };
   const configuredAffiliate = config.affiliate ?? "";
   const configuredAffiliateBps = config.affiliateBps ?? "";
@@ -525,6 +667,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
     },
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
+      const deadlineAt = Date.now() + QUOTE_DEADLINE_MS;
       if (!(config.enabled ?? true)) return null;
       if (params.flex) return null; // memo/LIM embed the exact amount
       const chainId = CHAIN_ID[params.sourceChain];
@@ -604,6 +747,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       let checkedMemo: ReturnType<typeof verifiedMemo> = null;
       let inbounds: InboundAddress[] | null = null;
       let quoteHost = "";
+      let quoteHeight = 0;
       for (const host of hosts) {
         try {
           if (limitMode === "liquidity_tolerance_bps") {
@@ -665,7 +809,8 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
           // A quote gateway is not an authority for rotating vault/router
           // state. Bind it against a separately fetched no-store inbound
           // snapshot from the SAME host now, then repeat the check before broadcast.
-          inbounds = await inboundAddressesOn(host, clientId);
+          // The same host's THORChain height is what a confirming node's lag is measured against.
+          [inbounds, quoteHeight] = await Promise.all([inboundAddressesOn(host, clientId), nodeHeight(host, signal)]);
           quoteHost = host;
           break;
         } catch (error) {
@@ -701,7 +846,9 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
         params.onRefusal?.(`thorchain: router ${String(q.router)} is not a THORChain router this module trusts on ${params.sourceChain} (THORCHAIN_ROUTERS / trustedRouters)`);
         return null;
       }
-      const unconfirmed = await confirmedElsewhere(quoteHost, params.sourceChain, q.inbound_address, chainId ? q.router : undefined);
+      const unconfirmed = await confirmedElsewhere(
+        quoteHost, quoteHeight, params.sourceChain, params.destChain, q.inbound_address, chainId ? q.router : undefined, deadlineAt, signal,
+      );
       if (unconfirmed) {
         params.onRefusal?.(`thorchain: ${unconfirmed}`);
         return null;
@@ -828,15 +975,26 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
         throw new Error("thorchain: quote expired before broadcast");
       }
       if (evmSource && !pinnedRouter(data.sourceChain, data.router)) throw new Error("thorchain: the quote's router is not one this module trusts");
+      const deadlineAt = Date.now() + QUOTE_DEADLINE_MS;
       let inbounds: InboundAddress[] | null = null;
       let snapshotHost = "";
+      let snapshotHeight = 0;
       for (const host of hosts) {
-        try { inbounds = await inboundAddressesOn(host, clientId); snapshotHost = host; break; } catch (error) { if (!(error instanceof HostUnavailable)) throw error; }
+        try {
+          [inbounds, snapshotHeight] = await Promise.all([inboundAddressesOn(host, clientId), nodeHeight(host)]);
+          snapshotHost = host;
+          break;
+        } catch (error) {
+          inbounds = null;
+          if (!(error instanceof HostUnavailable)) throw error;
+        }
       }
       if (!inbounds) throw new Error("thorchain: cannot refresh inbound addresses before broadcast");
       // The vault the funds go to is confirmed by a second node right before broadcast too (after this node's own checks).
       const confirm = async () => {
-        const unconfirmed = await confirmedElsewhere(snapshotHost, data.sourceChain!, data.inboundAddress!, evmSource ? data.router : undefined);
+        const unconfirmed = await confirmedElsewhere(
+          snapshotHost, snapshotHeight, data.sourceChain!, data.destChain, data.inboundAddress!, evmSource ? data.router : undefined, deadlineAt,
+        );
         if (unconfirmed) throw new Error(`thorchain: ${unconfirmed}`);
       };
       const src = inbounds.find((entry) => entry.chain === THOR_CHAIN[data.sourceChain!]);

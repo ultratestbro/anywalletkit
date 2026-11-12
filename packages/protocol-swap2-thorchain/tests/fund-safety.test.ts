@@ -9,6 +9,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {decodeFunctionData, encodeFunctionData} from "viem";
 import {thorchainProvider} from "../src/provider.js";
+import {confirmReads} from "./thornode-stub.js";
 import type {Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 const VAULT = "0x1111111111111111111111111111111111111111";
@@ -96,6 +97,8 @@ beforeEach(() => {
   gw = {quote: quoteBody(`=:b:${BTC_DEST}:${LIMIT_SATS}`), quoteStatus: 200, inbounds: inbound(), quoteUrls: []};
   vi.stubGlobal("fetch", async (input: string | URL) => {
     const url = String(input);
+    const confirm = confirmReads(url, () => gw.inbounds ?? []);
+    if (confirm) return confirm;
     if (url.includes("/thorchain/quote/swap")) {
       gw.quoteUrls.push(url);
       return new Response(JSON.stringify(gw.quote ?? {error: "no quote"}), {status: gw.quoteStatus});
@@ -206,6 +209,8 @@ describe("memo canonicalization (a gateway-spelled memo is never executed)", () 
     const inb = gw.inbounds;
     vi.stubGlobal("fetch", async (input: string | URL) => {
       const url = String(input);
+      const confirm = confirmReads(url, () => inb ?? []);
+      if (confirm) return confirm;
       if (url.includes("/quote/swap")) {
         gw.quoteUrls.push(url);
         const next = bodies.shift()!;

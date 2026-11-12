@@ -13,6 +13,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {validQuote} from "@anywalletkit/protocol-swap2-core/validate";
 import {thorchainProvider} from "../src/provider.js";
+import {confirmReads} from "./thornode-stub.js";
 import type {QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 
 const NODE = "https://thor.invalid";
@@ -55,6 +56,8 @@ beforeEach(() => {
   quoteUrls = [];
   vi.stubGlobal("fetch", async (input: string | URL) => {
     const url = new URL(String(input));
+    const confirm = confirmReads(String(input), () => [{chain: "BASE", address: VAULT}, {chain: "ETH", address: VAULT}, {chain: "BTC", address: BTC_DEST}]);
+    if (confirm) return confirm;
     if (url.pathname.endsWith("/thorchain/quote/swap")) {
       quoteUrls.push(url);
       const next = replies.shift();

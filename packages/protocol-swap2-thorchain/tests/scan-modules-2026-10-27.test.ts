@@ -5,6 +5,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {encodeFunctionData} from "viem";
 import {THORCHAIN_ROUTERS, thorchainPins, thorchainProvider} from "../src/provider.js";
+import {confirmReads} from "./thornode-stub.js";
 import type {Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 const PRIMARY = "https://primary.invalid";
@@ -28,6 +29,8 @@ beforeEach(() => {
     if (!host) return new Response("nope", {status: 404});
     const n = nodes[host]!;
     if (!n.up) throw new TypeError("fetch failed");
+    const confirm = confirmReads(url, () => inbound(n));
+    if (confirm) return confirm;
     if (url.includes("/inbound_addresses")) return new Response(JSON.stringify(inbound(n)), {status: 200});
     if (url.includes("/quote/swap")) {
       return new Response(JSON.stringify({expected_amount_out: "100000", inbound_address: n.vault, router: quoteRouter, memo: `=:b:${BTC_DEST}:95000`, expiry: Math.floor(Date.now() / 1000) + 3600}), {status: 200});
