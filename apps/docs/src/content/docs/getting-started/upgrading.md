@@ -10,6 +10,32 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: USDT0 dry quotes without an address
+
+`protocol-swap2-usdt0` quotes are dry unless `dry: false`. A dry quote without `destAddress` used to be built for a
+stand-in recipient — vitalik.eth between EVM chains, the zero account on Tron and TON — and one without `refundAddress`
+for vitalik.eth as the refund address; `buildDeposit` and `preflightDeposit` passed that transaction, so signing it paid
+the USDT to vitalik.eth or burned it. The engine's `swap2` never signed one (it re-quotes live with the account's own
+addresses).
+
+- **protocol-swap2-usdt0, Breaking:** such a quote is now its price only: no `txRequest`, `providerData.placeholder`
+  set to `"recipient"` or `"refund"`, the LayerZero fee still in `providerData.nativeFee`. `buildDeposit` refuses it
+  ("swap2: this USDT0 quote was priced for a placeholder recipient … has no transaction to build — quote again with the
+  recipient and the refund address"), and so does `preflightDeposit` ("usdt0: this quote was priced for a placeholder
+  … has nothing to sign — …"). If your app builds, signs or shows the transaction of a dry USDT0 quote, pass both
+  addresses. `quoteSwap2` and `swap2` need nothing.
+- **Routers, Breaking:** without `txRequest`, `usdValue` cannot net the LayerZero fee of such a quote, and
+  `getBestQuote(params, {requireImmediateExecution: true})` drops it. Pass the account's own address as `recipient` and
+  `refundAddress` in dry previews that rank by `usdValue` or need an executable answer.
+- **Behind `remoteProvider`, Breaking:** `usdt0Pins` refuse a dry quote that carries a transaction for a request
+  without one of the addresses, and hold a price-only one to the input, the floor and the route. Bump the server and
+  the app together: an app on 0.4.4 refuses the new server's price-only dry quotes ("the quote carries no OFT call"),
+  and the new app refuses a 0.4.4 server's dry quotes with the stand-in's send. Until both are bumped USDT0 is missing
+  from dry previews; execution is not affected.
+- **Zero-account recipients, Breaking:** `0x000…0`, Tron `T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb` and TON `0:000…0` (any
+  spelling) are refused, dry or live: "destination is the zero account — nothing sent there can be recovered". An app
+  that used the zero address as a "no recipient yet" value in USDT0 quotes must leave `destAddress` empty instead.
+
 ## Next release: Omniston's new TON Escrow Minter
 
 Since 2026-11-10 Omniston quotes TON ↔ EVM orders on a new TON Escrow Minter (rev2),

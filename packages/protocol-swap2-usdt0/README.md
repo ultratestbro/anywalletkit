@@ -64,6 +64,27 @@ not from an API.
 - **Preflight** (right before signing): target is the source OFT, peer still
   wired, and the *current* `quoteSend` fee still fits the sealed `value` —
   the endpoint reverts an underpaid send, so a fee past the headroom means re-quote.
+- **Dry quotes without an address carry no transaction.** A quote is dry unless
+  `dry: false`. Without `destAddress` it is priced for a stand-in recipient
+  (vitalik.eth here, the zero account into Tron / TON), without `refundAddress`
+  for vitalik.eth as the refund address: the price does not depend on them, but
+  the `send` built for them would pay or refund that account from whichever
+  wallet signs it. Such a quote comes back as its price only — no `txRequest`,
+  `providerData.placeholder` = `"recipient"` (checked first) or `"refund"`, the
+  sealed LayerZero fee still in `providerData.nativeFee` — and `buildDeposit`
+  ("swap2: this USDT0 quote was priced for a placeholder recipient | refund
+  address (a dry quote without that address) and has no transaction to build —
+  quote again with the recipient and the refund address") and `preflightDeposit`
+  ("usdt0: this quote was priced for a placeholder … and has nothing to sign — …")
+  refuse it, also with a transaction attached. Name both addresses for a quote
+  you will build; the engine's `swap2` always does (it re-quotes live with the
+  account's own addresses). Without `txRequest` a router's `usdValue` cannot net
+  the LayerZero fee and `requireImmediateExecution` drops the quote.
+- **The zero account is never a recipient**: `0x000…0` here, `T9yD14…` on Tron
+  and `0:000…0` (any spelling) on TON — what reaches it is burned or, where the
+  token refuses it, stuck in a stored packet for good. Dry or live, `getQuote` and `usdt0VerifyQuote` refuse it ("destination is the zero
+  account — nothing sent there can be recovered"), and `preflightDeposit` refuses
+  a quote that seals it ("usdt0: destination is the zero account — …").
 - **Tracking**: LayerZero Scan `GET /v1/messages/tx/{sourceTxHash}`, matched
   to the route's eids and the source OFT. `INFLIGHT` / `CONFIRMING` /
   `BLOCKED` → pending; `DELIVERED` → completed with the destination hash;
@@ -126,7 +147,9 @@ const q = await usdt0Provider({rpcUrls}).getQuote({
   `address(uint160(uint256(to)))`); TON raw `0:…` or user-friendly `EQ…` / `UQ…` → the 32-byte account hash. The bytes32
   holds no workchain: the TON OFT pays on workchain 0, so `-1:…` and testnet-flagged addresses are refused. Both were
   reproduced from real delivered packets (LayerZero Scan) and the address the destination paid (TronGrid, toncenter).
-  The built `send` is decoded back and compared with the request before it is returned (`usdt0VerifyMeshSend`).
+  The built `send` is decoded back and compared with the request before it is returned (`usdt0VerifyMeshSend`). The
+  zero account (`T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb`, `0:000…0` / `EQAAAA…M9c` / `UQAAAA…JKZ`) is only the stand-in of a
+  dry quote without a recipient, which carries no `send` (above); named as the recipient it is refused.
 - **Preflight**: before any network read, the deposit is decoded and held to the sealed send as a whole — the target is
   the source chain's mesh OFT and the transaction is on that chain; the call is `send` (not `quoteSend` / `quoteOFT`,
   which carry the same `SendParam`); all seven `SendParam` fields are the ones built (`dstEid`, `to`, `amountLD`,
@@ -175,8 +198,13 @@ Mesh OFT (call target and spender), never an address the backend names, and
 `usdt0VerifyQuote` decodes the server's `send` on the device: the destination eid, the recipient, the input, a
 `minAmountLD` that keeps the quoted minimum, no options or compose message, the trader as refund and the declared
 native fee as value; a route into Tron / TON is held to `usdt0VerifyMeshSend` (the mesh OFT of that chain, the
-destination eid, the recipient read back as the Tron / TON OFT reads it). Without the pins the stub gets no EVM
-calldata route (fail closed).
+destination eid, the recipient read back as the Tron / TON OFT reads it). A dry request without the recipient or the
+refund address must get a quote with no transaction ("a dry quote priced for a placeholder recipient | refund address
+carries a transaction — it would pay or refund that placeholder, not the wallet that signs it"); its price-only quote is
+held to the input, a minimum within the input and the caller's floor, no deposit address and the route's intent id.
+Deploy the server and the app together: an app on 0.4.4 refuses the server's price-only dry OFT quotes ("the quote
+carries no OFT call"), and this version refuses a 0.4.4 server's dry OFT quotes that carry the stand-in's send.
+Without the pins the stub gets no EVM calldata route (fail closed).
 
 ## Activity
 
