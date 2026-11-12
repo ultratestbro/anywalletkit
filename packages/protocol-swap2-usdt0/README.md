@@ -3,7 +3,9 @@
 [![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-usdt0?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-usdt0)
 
 [USDT0](https://docs.usdt0.to) — Tether's USDT as a LayerZero OFT — as a swap2
-provider: USDT / USDT0 between 16 EVM chains in **one source transaction**.
+provider: USDT / USDT0 between 16 EVM chains in **one source transaction**, and
+USDT from Ethereum / Arbitrum / Celo into **Tron and TON** through the USDT0
+Legacy Mesh (see below).
 `send(SendParam, MessagingFee, refund)` on the chain's OFT with the LayerZero
 messaging fee as `msg.value`; LayerZero's DVNs verify the packet and the
 executor delivers on the destination (USDT0 minted, or USDT released from the
@@ -80,6 +82,51 @@ not from an API.
   not wallet chains here yet.
   OP's catalog `USDT` is the legacy bridged token (not the OFT); `USDT0` is.
 
+## Legacy Mesh: USDT into Tron and TON
+
+The [USDT0 Legacy Mesh](https://docs.usdt0.to/overview/the-legacy-mesh) moves Tether's USDT between pools where it was
+never replaced by an OFT. This package sends **from EVM only**: Ethereum USDT, Arbitrum USDT0 and Celo USD₮
+(`0x4806…3D5e`, by contract: the catalog's Celo `USDT` is a bridged token) into **Tron** (`tron:728126428`, eid 30420)
+and **TON** (`ton:-239`, eid 30343). Tron and TON are destinations only: `supportsChain` says yes, no pair starts there.
+
+```ts
+const q = await usdt0Provider({rpcUrls}).getQuote({
+  sourceChain: "eip155:42161", sourceToken: "USDT0", destChain: "tron:728126428", destToken: "USDT",
+  amountIn: "10000000", destAddress: "T…", refundAddress: "0x…", dry: false,
+});
+```
+
+- **Contracts** (docs.usdt0.to deployments API `usdt0.legacyMesh`, Sourcify source `UsdtOFT`, re-read on-chain
+  2026-11-12): the `UsdtOFT` on Ethereum `0x1F74…dFB0`, Arbitrum `0x7765…9B92`, Celo `0xf10E…b243` (not proxies); each
+  peers the Tron OFT `TFG4wB…zevLPt` and the TON OFT `EQAd31…jX6Gq`. Before the first quote the OFT's `token()` and
+  `approvalRequired()` (= true: it pulls the token, so the send approves that OFT), per pair `peers(eid)` = the pinned
+  destination OFT; a mismatch refuses the route.
+- **Quote**: `quoteOFT` — `maxAmountLD` is the pool's credit toward the destination (what it can pay out there now),
+  received = amount − `feeBps` (3 → 0.03 %), listed as a `protocol` fee "USDT0 Legacy Mesh fee" — then `quoteSend` for
+  the LayerZero fee (+ 25 % headroom, refunded). Nothing is hard-coded. Live 2026-11-12: into TON ≈ 0.000056 ETH
+  (1.74 CELO), into Tron ≈ 0.00534 ETH (170 CELO) — the Tron executor is expensive.
+- **Recipient**: Tron base58check `T…` → its 20 account bytes left-padded to bytes32 (the Tron OFT pays
+  `address(uint160(uint256(to)))`); TON raw `0:…` or user-friendly `EQ…` / `UQ…` → the 32-byte account hash. The bytes32
+  holds no workchain: the TON OFT pays on workchain 0, so `-1:…` and testnet-flagged addresses are refused. Both were
+  reproduced from real delivered packets (LayerZero Scan) and the address the destination paid (TronGrid, toncenter).
+  The built `send` is decoded back and compared with the request before it is returned (`usdt0VerifyMeshSend`).
+- **Preflight**: target, the sealed send in the calldata, chain + peer, and the current `quoteSend` (which reverts with
+  `InsufficientCredits` when the pool can no longer pay) within the sealed value.
+- **Status**: the LayerZero Scan message (intent `usdt0-mesh:<srcEid>:<dstEid>`). Tron pays inside `lzReceive`, so
+  `DELIVERED` is completed. TON pays with a jetton transfer later in the trace: `DELIVERED` completes only when
+  `GET {tonApiUrl}/v2/events/{destination hash}` (default `https://tonapi.io`, no query string) shows the TON OFT's USDT
+  transfer of the packet's amount to the packet's recipient; a failed one is `failed`, anything else stays `pending`.
+  A stored payload stays `pending` (its retry is on Tron / TON, which this package does not sign); no `buildClaim`.
+- **Engine fee ceiling**: the swap2 engine caps the native fee per chain (0.005 ETH on Ethereum / Arbitrum, 100 CELO).
+  Into TON fits; into Tron the LayerZero fee alone is above it today, so the engine refuses to execute that route
+  until that ceiling (in `protocol-swap2-core`) is raised. The provider still quotes it, with the real fee.
+- **Sending from Tron / TON** (not built): it needs the Tron OFT's `send` signed by `wallet-tron` (a TRC-20 approval +
+  a contract call with TRX for the fee) and the TON OFT's message built and signed by `wallet-ton`, plus an EVM / Tron /
+  TON recipient encoder on the way back.
+
+`pnpm verify:live:mesh` re-reads the mesh pins on-chain, quotes 10 and 1000 USDT from every source into Tron and TON
+(decoded back, with the preflight), and follows four real delivered transfers to `completed`.
+
 ## Tests
 
 `pnpm test` — provider tests over a fake JSON-RPC + fake LayerZero Scan
@@ -102,15 +149,20 @@ HyperEVM from the phone, then the status through LayerZero Scan).
 
 When the provider runs on your server, spread its pins into the app's stub:
 `remoteProvider({name: "usdt0", baseUrl, ...usdt0Pins})`. The engine then lets the EVM route call and
-approve only the USDT0 OFT (and, on Ethereum, the adapter as spender), never an address the backend names, and
+approve only the USDT0 OFT (and, on Ethereum, the adapter as spender) or, on Ethereum / Arbitrum / Celo, the Legacy
+Mesh OFT (call target and spender), never an address the backend names, and
 `usdt0VerifyQuote` decodes the server's `send` on the device: the destination eid, the recipient, the input, a
 `minAmountLD` that keeps the quoted minimum, no options or compose message, the trader as refund and the declared
-native fee as value. Without the pins the stub gets no EVM calldata route (fail closed).
+native fee as value; a route into Tron / TON is held to `usdt0VerifyMeshSend` (the mesh OFT of that chain, the
+destination eid, the recipient read back as the Tron / TON OFT reads it). Without the pins the stub gets no EVM
+calldata route (fail closed).
 
 ## Activity
 
 `describeActivity`: `send` on the OFT → "Bridged USDT0" ("Bridged USDT" on
 Ethereum); the executor's delivery (USDT0 minted to the owner, or USDT
 released by the adapter, in a transaction the owner did not send) → "Received
-USDT0 via LayerZero"; the owner's own `lzReceive` retry → the same. Fixtures
+USDT0 via LayerZero"; the owner's own `lzReceive` retry → the same; `send` on a
+Legacy Mesh OFT → "Bridged USDT0 → USDT" with "USDT0 Legacy Mesh · Arbitrum →
+Tron" (the destination from the calldata's eid). Fixtures
 are recorded mainnet transactions (`fixtures/activity`).
