@@ -12,11 +12,18 @@ import {createOmnistonTonValidators, DEFAULT_OMNISTON_TON_CODE_HASHES} from "../
 
 /**
  * Omniston's rev2 TON Escrow Minter EQDybO88… (SDK-306). Since 2026-11-10 every TON <-> EVM quote names it instead
- * of EQAbWJ3Y…, and the rev2 minter deploys EVM → TON positions with code eb503578…. Captured 2026-11-11/12, read-only:
- * RFQs and UNSIGNED builds (nothing signed, registered, disclosed or sent) and tonapi / toncenter account reads of a
- * real rev2 position. The rev1 fixtures stay as they are: they are the history of the old minter.
+ * of EQAbWJ3Y… (rev1), and the rev2 minter deploys EVM → TON positions with code eb503578…. Since 2026-11-12 the
+ * audited tables trust rev2 only: a quote, build or position on rev1 is refused by default, rev1 stays in
+ * OMNISTON_ESCROWS for history, and an app that still has to settle an order on rev1 passes it explicitly.
+ * Captured 2026-11-11/12, read-only: RFQs and UNSIGNED builds (nothing signed, registered, disclosed or sent) and
+ * tonapi / toncenter account reads of a real rev2 and a real rev1 position. The rev1 fixtures stay as they are: they
+ * are the history of the old minter.
  */
 const live = JSON.parse(readFileSync(new URL("./fixtures/live-ton-settlement-rev2-2026-11-11.json", import.meta.url), "utf8"));
+/** The rev1 captures: TON → EVM escrow builds of 2026-10-10, EVM → TON orders of 2026-10-16, a settled rev1 position. */
+const rev1Escrows = JSON.parse(readFileSync(new URL("./fixtures/live-2026-10-10.json", import.meta.url), "utf8"));
+const rev1Orders = JSON.parse(readFileSync(new URL("./fixtures/live-evm-ton-2026-10-16.json", import.meta.url), "utf8")).chains;
+const rev1Position = JSON.parse(readFileSync(new URL("./fixtures/live-ton-rev1-position-2026-11-11.json", import.meta.url), "utf8"));
 const REV1 = "EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ";
 const REV2 = "EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA";
 const POSITION_REV1 = "e4d5115a321ade7b827e38fb522c20d2f2cd46e4c6b0b5f7dd8b6b096792d77b";
@@ -34,6 +41,10 @@ const LOOKALIKE = (() => {
   return new Address(rev2.workChain, hash).toString();
 })();
 const raw = (address: string) => Address.parse(address).toRawString();
+/** What an app that must settle an old rev1 order passes: both minters, both position codes. */
+const SETTLEMENT_WITH_REV1 = {...AUDITED_OMNISTON_SETTLEMENT_CONTRACTS, "ton:-239": [REV2, REV1]};
+const PROTOCOLS_WITH_REV1 = {trustedProtocolAddresses: [REV2, REV1]};
+const POSITIONS_WITH_REV1 = {positionCodeHashes: [POSITION_REV2, POSITION_REV1]};
 
 type Quote = Record<string, unknown> & {quoteTimestamp: number; settlementData: {value: Record<string, unknown> & {srcProtocolContractAddress: {chain: {value: string}}; dstProtocolContractAddress: {chain: {value: string}}}}};
 
@@ -68,15 +79,15 @@ afterEach(() => {
 });
 
 describe("SDK-306: the audited TON tables", () => {
-  it("trust both Escrow Minters, in the exact string form Omniston's quotes use (the provider compares TON addresses as strings)", () => {
-    expect(AUDITED_OMNISTON_SETTLEMENT_CONTRACTS["ton:-239"]).toEqual([REV1, REV2]);
+  it("trust the rev2 Escrow Minter only, in the exact string form Omniston's quotes use (the provider compares TON addresses as strings)", () => {
+    expect(AUDITED_OMNISTON_SETTLEMENT_CONTRACTS["ton:-239"]).toEqual([REV2]);
     expect(live.tonToEvm.quoteUpdated.settlementData.value.srcProtocolContractAddress.chain.value).toBe(REV2);
     expect(live.evmToTonQuotes.baseUsdc.quoteUpdated.settlementData.value.dstProtocolContractAddress.chain.value).toBe(REV2);
     expect(live.evmToTonQuotes.ethUsdt.quoteUpdated.settlementData.value.dstProtocolContractAddress.chain.value).toBe(REV2);
   });
 
-  it("pin the position code of each minter, and leave every other TON pin as audited (the rev2 minter's whitelist holds the pinned escrow, execution and output-escrow codes, plus a TON <-> TON code the SDK does not pin)", () => {
-    expect(DEFAULT_OMNISTON_TON_CODE_HASHES.position).toEqual([POSITION_REV1, POSITION_REV2]);
+  it("pin the rev2 position code only, and leave every other TON pin as audited (the rev2 minter's whitelist holds the pinned escrow, execution and output-escrow codes, plus a TON <-> TON code the SDK does not pin)", () => {
+    expect(DEFAULT_OMNISTON_TON_CODE_HASHES.position).toEqual([POSITION_REV2]);
     expect(live.evmToTonPosition.codeHash).toBe(POSITION_REV2);
     expect(DEFAULT_OMNISTON_TON_CODE_HASHES.escrow).toEqual(["9e77cb9e8fd7406d4e85e5f57378eb51e51b862424cf988306c783d50ade697a"]);
     expect(DEFAULT_OMNISTON_TON_CODE_HASHES.execution).toEqual(["f6edbc76e6fbcd6bac573cb942401a3d9198ee9605f9403b0f5c8081259210e5"]);
@@ -84,7 +95,7 @@ describe("SDK-306: the audited TON tables", () => {
     expect(DEFAULT_OMNISTON_TON_CODE_HASHES.outputEscrow).toEqual(["d30423575384773abaad8d3c6f763898afa3d57a5693005904b7c61e95cee630"]);
   });
 
-  it("recognize history on both minters", () => {
+  it("recognize history on both minters (a list that grants no trust)", () => {
     expect(OMNISTON_ESCROWS).toEqual([REV1, REV2]);
   });
 });
@@ -168,6 +179,16 @@ describe("SDK-306: TON → EVM on the rev2 minter (live 2026-11-11, TON USD₮ �
     expect((await refusals(lookalike)).seen).toEqual([`omniston: untrusted TON settlement contract ${LOOKALIKE}`]);
   });
 
+  it("refuses a quote naming rev1 by default, by name; an app that trusts rev1 explicitly (an old order to settle) still gets it", async () => {
+    const onRev1 = () => fresh((q) => { q.settlementData.value.srcProtocolContractAddress.chain.value = REV1; });
+    const byDefault = await refusals(onRev1());
+    expect(byDefault.q).toBeNull();
+    expect(byDefault.seen).toEqual([`omniston: untrusted TON settlement contract ${REV1}`]);
+    const explicit = await refusals(onRev1(), {trustedSettlementContracts: SETTLEMENT_WITH_REV1});
+    expect(explicit.seen).toEqual([]);
+    expect(explicit.q?.destAmount).toBe(TON.quoteUpdated.outputUnits);
+  });
+
   it("builds the live escrow transfer; the default pins accept everything the provider binds, and the hashlock binds the provider's own secret", async () => {
     const seen: Parameters<NonNullable<OmnistonProviderOptions["validateTonEscrowPayload"]>>[0][] = [];
     const client = clientFor(fresh());
@@ -206,6 +227,19 @@ describe("SDK-306: TON → EVM on the rev2 minter (live 2026-11-11, TON USD₮ �
       .toMatch(/^the resolver is bound to deliver /);
     expect(createOmnistonTonValidators({escrowCodeHashes: ["00".repeat(32)]}).verifyTonEscrowBuild(expectation)).toMatch(/not the audited escrow/);
   });
+
+  it("verifyTonEscrowBuild: a live rev1 escrow (2026-10-10, TON USD₮ → Base USDC) is refused by default, by name, and passes when the app trusts rev1 explicitly", () => {
+    const c = rev1Escrows.baseUsdc;
+    const old = {
+      payloadBocHex: c.escrowResponse.messages[0].payload as string, ownerAddress: c.escrowRequest.ownerSrcAddress.chain.value as string,
+      inputUnits: c.quoteUpdated.value.inputUnits as string, destinationChain: "eip155:8453", destinationAddress: c.escrowRequest.traderDstAddress.chain.value as string,
+      outputTokenAddress: c.quoteUpdated.value.outputAsset.chain.value.kind.value as string, minResolverSendsUnits: c.quoteUpdated.value.settlementData.value.resolverSendsUnits as string,
+    };
+    expect(createOmnistonTonValidators().verifyTonEscrowBuild(old)).toBe(`the escrow transfer pays ${REV1}, not an Omniston protocol contract this app trusts`);
+    expect(createOmnistonTonValidators(PROTOCOLS_WITH_REV1).verifyTonEscrowBuild(old)).toBeNull();
+    // Trusting rev1 relaxes nothing else: the same body for another recipient is still refused.
+    expect(createOmnistonTonValidators(PROTOCOLS_WITH_REV1).verifyTonEscrowBuild({...old, destinationAddress: `0x${"dd".repeat(20)}`})).toMatch(/not this swap's/);
+  });
 });
 
 describe("SDK-306: EVM → TON quotes naming rev2 as the TON factory (live 2026-11-11)", () => {
@@ -232,6 +266,22 @@ describe("SDK-306: EVM → TON quotes naming rev2 as the TON factory (live 2026-
       expect(old.seen).toEqual([`omniston: untrusted ton:-239 settlement contract ${REV2}`]);
     });
   }
+
+  it("a live rev1 order (Base USDT → TON USD₮, 2026-10-16) is refused by default, by name; quoted when the app trusts rev1 explicitly", async () => {
+    const fx = rev1Orders.base;
+    const c = {
+      params: {sourceChain: "eip155:8453", sourceToken: "USDT", destChain: "ton:-239", destToken: USDT, amountIn: fx.quoteUpdated.inputUnits,
+        destAddress: fx.buildRequest.traderDstAddress, refundAddress: fx.buildRequest.ownerSrcAddress, slippageBps: 100, dry: false},
+      quoteUpdated: fx.quoteUpdated as Quote,
+    };
+    expect(c.quoteUpdated.settlementData.value.dstProtocolContractAddress.chain.value).toBe(REV1);
+    const byDefault = await quoteFor(c);
+    expect(byDefault.q).toBeNull();
+    expect(byDefault.seen).toEqual([`omniston: untrusted ton:-239 settlement contract ${REV1}`]);
+    const explicit = await quoteFor(c, SETTLEMENT_WITH_REV1);
+    expect(explicit.seen).toEqual([]);
+    expect(explicit.q?.destAmount).toBe(fx.quoteUpdated.outputUnits);
+  });
 });
 
 describe("SDK-306: EVM → TON output position of the rev2 minter (EQDy9LIC…, deployed 2026-11-11 21:21:00Z)", () => {
@@ -309,6 +359,66 @@ describe("SDK-306: EVM → TON output position of the rev2 minter (EQDy9LIC…, 
     expect(rev1Order.ok).toBe(false);
     expect(rev1Order.reasons).toEqual([{reason: "state", details: {check: expect.stringMatching(/^state#5:/)}}]);
     expect(await check(tonapi(), {outputJettonMasterAddress: GRAM})).toEqual({ok: false, reasons: [{reason: "jetton-wallet"}]});
+  });
+});
+
+describe("SDK-306: EVM → TON output position of the rev1 minter (EQAb9CzW…, deployed 2026-11-10 18:21:16Z, settled)", () => {
+  const POS = rev1Position;
+  // Decoded from the position's own state (every field is checked in its slot by the validator).
+  const WITHDRAWAL_AT = 1_794_334_877;
+  const input = {
+    positionAddress: POS.position as string, protocolAddress: REV1, outputJettonMasterAddress: USDT,
+    recipientAddress: "EQBUStfqDNXubCSXU8hS8GeIT9ZVbxflgjS_rzsNw4V_ErjH",
+    quoteId: "4bc2f5b757fb6c29f019ae68a18e27a101e6f2bb2ba79ca6c94def4fc3d82d61",
+    quoteTimestamp: WITHDRAWAL_AT - 20,
+    inputUnits: "4970266", outputUnits: "4970266", resolverSendsUnits: "4970266", dstSecurityDepositUnits: "500000000",
+    secretHash: new Uint8Array(Buffer.from("abd8abc3ec7085cfdc72a3a508d8888570404ea9a64f1db7af702c869885da02", "hex")),
+  };
+  const tonapi = () => {
+    const wallets: Record<string, string> = {[raw(REV1)]: POS.factoryJettonWallet.wallet_address.address, [raw(REV2)]: live.evmToTonPosition.factoryJettonWallet.wallet_address.address};
+    return vi.fn(async (url: string) => {
+      const json = (body: unknown, ok = true) => ({ok, status: ok ? 200 : 404, json: async () => body}) as unknown as Response;
+      if (url.endsWith(`/v2/blockchain/accounts/${encodeURIComponent(POS.position)}`)) return json({address: POS.account.address, status: POS.account.status, code: POS.account.code, data: POS.account.data});
+      if (url.endsWith(`/v2/blockchain/accounts/${encodeURIComponent(POS.position)}/transactions?limit=25`)) return json({transactions: structuredClone(POS.transactions)});
+      const jettons = /\/v2\/accounts\/([^/]+)\/jettons\/([^/?]+)$/.exec(url);
+      if (jettons) {
+        const wallet = wallets[raw(decodeURIComponent(jettons[1]!))];
+        return wallet && raw(decodeURIComponent(jettons[2]!)) === raw(USDT) ? json({wallet_address: {address: wallet}, jetton: POS.factoryJettonWallet.jetton}) : json({error: "not found"}, false);
+      }
+      return json({}, false);
+    });
+  };
+  const check = async (pins: {positionCodeHashes?: string[]} = {}, over: Partial<typeof input> = {}) => {
+    const reasons: {reason: string; details?: Record<string, unknown>}[] = [];
+    const ok = await createOmnistonTonValidators({
+      fetch: tonapi() as unknown as typeof fetch, now: () => (WITHDRAWAL_AT + 5) * 1000,
+      onRefusal: (reason, details) => reasons.push({reason, ...(details ? {details} : {})}), ...pins,
+    }).validateTonOutputPosition!({...input, ...over});
+    return {ok, reasons};
+  };
+
+  it("the fixture is the real position: rev1 position code, deployed by the rev1 minter, custody at its USD₮ wallet", () => {
+    expect(Cell.fromBoc(Buffer.from(POS.account.code, "hex"))[0]!.hash().toString("hex")).toBe(POSITION_REV1);
+    const deploy = POS.transactions.find((tx: {in_msg: {op_code: string}}) => tx.in_msg.op_code === "0xf240cd30");
+    expect(raw(deploy.in_msg.source.address)).toBe(raw(REV1));
+    expect(deploy.utime).toBe(WITHDRAWAL_AT - 1);
+    expect(raw(POS.factoryJettonWallet.wallet_address.address)).toBe(raw(REV1_USDT_WALLET));
+  });
+
+  it("is refused by default: the rev1 position code left the pins with rev1", async () => {
+    expect(await check()).toEqual({ok: false, reasons: [{reason: "position-code-hash", details: {hash: POSITION_REV1}}]});
+  });
+
+  it("passes when the app pins the rev1 position code explicitly (an old order to settle); every other check still runs", async () => {
+    expect(await check(POSITIONS_WITH_REV1)).toEqual({ok: true, reasons: []});
+    expect((await check(POSITIONS_WITH_REV1, {recipientAddress: REV2})).reasons.map((r) => r.reason)).toEqual(["state"]);
+    expect((await check(POSITIONS_WITH_REV1, {secretHash: new Uint8Array(32).fill(8)})).reasons.map((r) => r.reason)).toEqual(["state"]);
+  });
+
+  it("cannot stand in for an order on rev2 even with both codes pinned: the factory in its state is rev1", async () => {
+    const {ok, reasons} = await check(POSITIONS_WITH_REV1, {protocolAddress: REV2});
+    expect(ok).toBe(false);
+    expect(reasons).toEqual([{reason: "state", details: {check: expect.stringMatching(/^state#5:/)}}]);
   });
 });
 

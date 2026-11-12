@@ -327,8 +327,14 @@ const escrowCases = ([["baseUsdc", "eip155:8453"], ["bnbUsdc", "eip155:56"]] as 
   };
 });
 
+/**
+ * These escrows pay the rev1 TON Escrow Minter, which left the default trust on 2026-11-12 (SDK-306): the app trusts it
+ * explicitly here, as one settling an old order would. Every other check runs with the default pins.
+ */
+const WITH_REV1 = {trustedProtocolAddresses: ["EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ"]};
+
 describe("remote TON → EVM: the escrow body is checked on the client (2026-10-28 follow-up to F18/F19)", () => {
-  const v = createOmnistonTonValidators();
+  const v = createOmnistonTonValidators(WITH_REV1);
 
   it("the live TON → EVM escrows (Base and BNB) pass with what the app knows", () => {
     for (const c of escrowCases) expect(v.verifyTonEscrowBuild(c.expect), c.key).toBeNull();
@@ -346,7 +352,7 @@ describe("remote TON → EVM: the escrow body is checked on the client (2026-10-
     expect(no({minResolverSendsUnits: (BigInt(c.expect.minResolverSendsUnits) + 1n).toString()})).toMatch(/bound to deliver .* under the quote's minimum/);
     expect(no({payloadBocHex: "b5ee9c72"})).toMatch(/not an Omniston escrow transfer/);
     expect(createOmnistonTonValidators({trustedProtocolAddresses: [TON_ATTACKER]}).verifyTonEscrowBuild(c.expect)).toMatch(/not an Omniston protocol contract this app trusts/);
-    expect(createOmnistonTonValidators({escrowCodeHashes: ["00".repeat(32)]}).verifyTonEscrowBuild(c.expect)).toMatch(/audited escrow/);
+    expect(createOmnistonTonValidators({...WITH_REV1, escrowCodeHashes: ["00".repeat(32)]}).verifyTonEscrowBuild(c.expect)).toMatch(/audited escrow/);
   });
 
   it("end to end: a remote Omniston stub's TON → EVM order is built and sent; without the escrow check it is refused", async () => {
@@ -378,7 +384,7 @@ describe("remote TON → EVM: the escrow body is checked on the client (2026-10-
           fromTokenAmount: BigInt(c.expect.inputUnits), minAmountOut: BigInt(c.expect.minResolverSendsUnits)});
         return {sent, swap};
       };
-      const ok = runWith(stubFor(omnistonVerifyBuild({...createOmnistonTonValidators()})));
+      const ok = runWith(stubFor(omnistonVerifyBuild({...createOmnistonTonValidators(WITH_REV1)})));
       await ok.swap();
       expect(ok.sent, c.key).toHaveLength(1);
       // The validators without the escrow check (an app wiring them one by one): refused, nothing sent.

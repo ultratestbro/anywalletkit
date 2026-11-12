@@ -5,11 +5,9 @@
  * See how-to-project/OMNISTON-NETWORK-ONBOARDING.md before adding a network.
  */
 export const AUDITED_OMNISTON_SETTLEMENT_CONTRACTS: Record<string, string[]> = {
-  // TON Escrow Minters. The provider compares TON addresses as these exact
-  // strings, so each one is kept in the form Omniston's quotes use.
-  // - EQAbWJ3Y… (code f91c43d3…, "rev1", deployed 2026-06-09): every quote
-  //   named it until 2026-11-10. It stays while orders on it settle and
-  //   refund; backstops and history read this table too.
+  // The TON Escrow Minter a new TON <-> EVM order may name. The provider
+  // compares TON addresses as these exact strings, so it is kept in the form
+  // Omniston's quotes use.
   // - EQDybO88… (code 9737943f…, "rev2"): every TON <-> EVM quote names it
   //   since 2026-11-10 ~19:00Z. Reviewed 2026-11-12, read-only:
   //   - Deploy tx fkabfHcN8DcrqQyazmlB+UprljBDeEkvFlgaVOi905g=
@@ -27,11 +25,21 @@ export const AUDITED_OMNISTON_SETTLEMENT_CONTRACTS: Record<string, string[]> = {
   //     payouts, admin and the 7-day upgrade delay are unchanged. Replayed
   //     through both codes, the real traffic of both minters (~42k
   //     transactions) and of ~1,070 of their positions gave the same outputs.
-  //   - It deploys positions with code eb503578…, pinned next to e4d5115a…
-  //     in DEFAULT_OMNISTON_TON_CODE_HASHES.position. Both changes ship
-  //     together: without the pin every EVM -> TON order on this minter fills
-  //     and then fails the disclosure check.
-  "ton:-239": ["EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ", "EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA"],
+  //   - It deploys positions with code eb503578…, the only code in
+  //     DEFAULT_OMNISTON_TON_CODE_HASHES.position. The address and that pin
+  //     go together: without the pin every EVM -> TON order on this minter
+  //     fills and then fails the disclosure check.
+  // - EQAbWJ3Y… (code f91c43d3…, "rev1", deployed 2026-06-09) is no longer
+  //   trusted by default (2026-11-12). Omniston's resolvers moved to rev2 on
+  //   2026-11-10, and rev1 lacks the escrow-code whitelist rev2 added: on
+  //   rev1 only the SDK's own pins check the escrow and execution code an
+  //   order carries. A quote or build that names rev1 is refused, and so are
+  //   its positions (code e4d5115a…). It stays in OMNISTON_ESCROWS
+  //   (activity.ts), which recognizes history and grants no trust. An app
+  //   that still has to settle an order on rev1 passes it explicitly:
+  //   trustedSettlementContracts / trustedProtocolAddresses with both
+  //   minters, positionCodeHashes with both position codes.
+  "ton:-239": ["EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA"],
   "eip155:1": ["0xafCF681272AF10959736f45616eeCBC22D7095E2"],
   "eip155:56": ["0xafCF681272AF10959736f45616eeCBC22D7095E2"],
   "eip155:137": ["0x41A392062A4307a6961d48e30FF20bF6823715B8"],
