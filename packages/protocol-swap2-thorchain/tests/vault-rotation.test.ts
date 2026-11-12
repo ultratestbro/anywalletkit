@@ -12,8 +12,8 @@
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {decodeFunctionData, encodeFunctionData, getAddress} from "viem";
-import {THORNODE_CONFIRM_PATHS, thorchainProvider} from "../src/provider.js";
-import type {QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
+import {THORNODE_CONFIRM_PATHS, thorchainPins, thorchainProvider} from "../src/provider.js";
+import type {Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import inboundLive from "../fixtures/thornode/2026-11-12/liquify/inbound_addresses.json";
 import {LIVE_ASGARD, LIVE_HEIGHT, LIVE_MIMIR, lastblockAt} from "./thornode-stub.js";
 
@@ -714,3 +714,150 @@ describe("the quoting node's lastblock read has its own 8 s bound, apart from co
   });
 });
 
+describe("thorchainPins().verifyBuild: the provider's rule on the device", () => {
+  const CONFIRM3 = "https://confirm3.invalid";
+  /** A build of the provider's own quote (vault B, rotated away on the confirming nodes) and its request. */
+  async function built(o: Partial<QuoteParams> = {}): Promise<{q: Quote; tx: UnsignedTx; p: QuoteParams}> {
+    const p = params(o);
+    const prov = provider({tronSource: true});
+    const q = (await prov.getQuote(p))!;
+    expect(q).not.toBeNull();
+    return {q, tx: await prov.buildDeposit(q), p};
+  }
+  const pins = (o: Parameters<typeof thorchainPins>[0] = {}) => thorchainPins({nodeUrl: [CONFIRM, CONFIRM2], ...o});
+  beforeEach(() => {
+    nodes[CONFIRM2] = node();
+  });
+
+  it("a rotated vault that both nodes list as ActiveVault passes, on the fixed GET paths only", async () => {
+    const {q, tx, p} = await built();
+    reads = [];
+    await expect(pins().verifyBuild(q, tx, p)).resolves.toBeNull();
+    for (const h of [CONFIRM, CONFIRM2]) expect(readsOn(h).sort()).toEqual(Object.values(THORNODE_CONFIRM_PATHS).slice().sort());
+    for (const r of reads) {
+      expect(r.search).toBe("");
+      expect(r.method).toBe("GET");
+      expect(r.init && "cache" in r.init).toBe(false);
+      expect(r.init?.redirect).toBe("error");
+    }
+  });
+
+  it("an exact match needs only lastblock + inbound_addresses", async () => {
+    const {q, tx, p} = await built();
+    nodes[CONFIRM]!.inbound = nodes[CONFIRM2]!.inbound = inboundWith(VAULT_B);
+    reads = [];
+    await expect(pins().verifyBuild(q, tx, p)).resolves.toBeNull();
+    expect(readsOn(CONFIRM).sort()).toEqual([THORNODE_CONFIRM_PATHS.inboundAddresses, THORNODE_CONFIRM_PATHS.lastblock].sort());
+  });
+
+  it("RetiringVault (or any status but ActiveVault) on either node → refused", async () => {
+    const {q, tx, p} = await built();
+    for (const status of ["RetiringVault", "InactiveVault"]) {
+      for (const h of [CONFIRM, CONFIRM2]) {
+        nodes[CONFIRM]!.asgard = nodes[CONFIRM2]!.asgard = LIVE_ASGARD;
+        nodes[h]!.asgard = asgardWith(B_TAIL, {status});
+        await expect(pins().verifyBuild(q, tx, p)).resolves.toBe(`a THORNode lists the inbound vault as ${status}, not ActiveVault`);
+      }
+    }
+  });
+
+  it("a vault the mimir flags compromised or insolvent → refused", async () => {
+    const {q, tx, p} = await built();
+    const pub = liveVault(B_TAIL).pub_key.toUpperCase();
+    nodes[CONFIRM2]!.mimir = {...LIVE_MIMIR, [`COMPROMISEDVAULT-${pub}`]: 1};
+    await expect(pins().verifyBuild(q, tx, p)).resolves.toBe("a THORNode's mimir flags the inbound vault as compromised");
+    nodes[CONFIRM2]!.mimir = {...LIVE_MIMIR, [`SOLVENCYHALTVAULT-${pub}-ETH`]: 7};
+    await expect(pins().verifyBuild(q, tx, p)).resolves.toBe("a THORNode's mimir flags the inbound vault as insolvent");
+  });
+
+  it("a node reporting another router → refused (existing text), on a rotated vault and on an exact match", async () => {
+    const {q, tx, p} = await built();
+    nodes[CONFIRM2]!.inbound = inboundWith(VAULT_A, TRON_A, {ETH: {router: ATTACKER_ROUTER}});
+    await expect(pins().verifyBuild(q, tx, p)).resolves.toBe("a THORNode reports another router");
+    nodes[CONFIRM2]!.inbound = inboundWith(VAULT_B, TRON_A, {ETH: {router: ATTACKER_ROUTER}});
+    await expect(pins().verifyBuild(q, tx, p)).resolves.toBe("a THORNode reports another router");
+    // A swapped router in the build itself is refused before any node is asked.
+    reads = [];
+    await expect(pins().verifyBuild(q, {...tx, to: ATTACKER_ROUTER}, p)).resolves.toBe(`router ${ATTACKER_ROUTER} is not pinned`);
+    expect(reads).toEqual([]);
+  });
+
+  it("a vault no node lists, and halts on either chain → refused with the existing texts", async () => {
+    const {q, tx, p} = await built();
+    const swapped = encodeFunctionData({abi: ROUTER_ABI, functionName: "depositWithExpiry", args: [NOT_A_VAULT as `0x${string}`, NATIVE, 50_000_000_000_000_000n, q.providerData!.memo!, BigInt(q.providerData!.expiry!)]});
+    await expect(pins().verifyBuild(q, {...tx, data: swapped}, p)).resolves.toBe(`a THORNode reports another inbound vault than ${NOT_A_VAULT}`);
+    nodes[CONFIRM]!.inbound = inboundWith(VAULT_A, TRON_A, {ETH: {chain_trading_paused: true}});
+    await expect(pins().verifyBuild(q, tx, p)).resolves.toBe("ETH is halted / paused");
+    nodes[CONFIRM]!.inbound = inboundWith(VAULT_A, TRON_A, {BTC: {halted: true}});
+    await expect(pins().verifyBuild(q, tx, p)).resolves.toBe("BTC is halted / paused");
+  });
+
+  it("node lag: a node more than 50 blocks behind the freshest is skipped; with too few left → refused by name", async () => {
+    const {q, tx, p} = await built();
+    const LAG = "two THORNodes within 50 blocks of the highest THORChain height they report could not confirm the inbound vault (behind or unreachable)";
+    nodes[CONFIRM2]!.height = LIVE_HEIGHT - 51;
+    await expect(pins().verifyBuild(q, tx, p)).resolves.toBe(LAG);
+    // Every node but the freshest behind.
+    nodes[CONFIRM3] = node({height: LIVE_HEIGHT + 60});
+    nodes[CONFIRM2]!.height = LIVE_HEIGHT;
+    await expect(pins({nodeUrl: [CONFIRM, CONFIRM2, CONFIRM3]}).verifyBuild(q, tx, p)).resolves.toBe(LAG);
+    // A third fresh node makes two; 50 behind is still within; the limit is configurable.
+    nodes[CONFIRM3]!.height = LIVE_HEIGHT;
+    nodes[CONFIRM2]!.height = LIVE_HEIGHT - 51;
+    await expect(pins({nodeUrl: [CONFIRM, CONFIRM2, CONFIRM3]}).verifyBuild(q, tx, p)).resolves.toBeNull();
+    nodes[CONFIRM2]!.height = LIVE_HEIGHT - 50;
+    await expect(pins().verifyBuild(q, tx, p)).resolves.toBeNull();
+    nodes[CONFIRM2]!.height = LIVE_HEIGHT - 28;
+    await expect(pins({confirmMaxLagBlocks: 10}).verifyBuild(q, tx, p)).resolves.toBe(LAG.replace("50 blocks", "10 blocks"));
+    // A lagging node's stale view is not what decides: its RetiringVault is skipped with it.
+    nodes[CONFIRM2] = node({height: LIVE_HEIGHT - 80, asgard: asgardWith(B_TAIL, {status: "RetiringVault"})});
+    await expect(pins({nodeUrl: [CONFIRM, CONFIRM2, CONFIRM3]}).verifyBuild(q, tx, p)).resolves.toBeNull();
+  });
+
+  it("per-node timeout, redirects and other shapes skip the node; two must still confirm", async () => {
+    const {q, tx, p} = await built();
+    const redirected = () => {
+      const res = new Response(JSON.stringify(lastblockAt(LIVE_HEIGHT)), {status: 200});
+      Object.defineProperty(res, "url", {value: `${CONFIRM2}/thorchain/lastblock?height=1`}); // followed by the runtime
+      return res;
+    };
+    const cases: [string, Partial<FakeNode>][] = [
+      ["hangs", {hang: true}],
+      ["redirects", {answer: {lastblock: redirected}}],
+      ["answers another shape", {answer: {asgardVaults: () => new Response(JSON.stringify({vaults: []}), {status: 200})}}],
+      ["is down", {down: true}],
+    ];
+    for (const [what, broken] of cases) {
+      nodes[CONFIRM2] = node(broken);
+      const started = Date.now();
+      await expect(pins({confirmTimeoutMs: 150}).verifyBuild(q, tx, p), what).resolves.toBe("two THORNodes could not confirm the inbound vault");
+      expect(Date.now() - started, what).toBeLessThan(2_000);
+      nodes[CONFIRM3] = node();
+      await expect(pins({nodeUrl: [CONFIRM, CONFIRM2, CONFIRM3], confirmTimeoutMs: 150}).verifyBuild(q, tx, p), what).resolves.toBeNull();
+      delete nodes[CONFIRM3];
+    }
+  });
+
+  it("in nodeUrl order: a refusing node refuses before two later ones confirm; two confirming nodes pass before a refusing third", async () => {
+    const {q, tx, p} = await built();
+    nodes[CONFIRM3] = node({asgard: asgardWith(B_TAIL, {status: "RetiringVault"})});
+    await expect(pins({nodeUrl: [CONFIRM3, CONFIRM, CONFIRM2]}).verifyBuild(q, tx, p)).resolves.toBe("a THORNode lists the inbound vault as RetiringVault, not ActiveVault");
+    await expect(pins({nodeUrl: [CONFIRM, CONFIRM2, CONFIRM3]}).verifyBuild(q, tx, p)).resolves.toBeNull();
+  });
+
+  it("Tron: a rotated vault passes; a case-changed address is another address", async () => {
+    const tronQuote = {expected_amount_out: "2061155", inbound_address: TRON_B, memo: `=:e:${ETH_DEST}:2014026`, expiry: Math.floor(Date.now() / 1000) + 3600};
+    nodes[QUOTE] = node({inbound: inboundWith(VAULT_B, TRON_B), quote: tronQuote});
+    const {q, tx, p} = await built({sourceChain: "tron:728126428", sourceToken: "USDT", destChain: "eip155:1", destToken: NATIVE, amountIn: "50000000", destAddress: ETH_DEST});
+    expect(tx.to).toBe(TRON_B);
+    await expect(pins().verifyBuild(q, tx, p)).resolves.toBeNull();
+    await expect(pins().verifyBuild(q, {...tx, to: TRON_B.toLowerCase()}, p)).resolves.toBe(`a THORNode reports another inbound vault than ${TRON_B.toLowerCase()}`);
+  });
+
+  it("confirmMaxLagBlocks and confirmTimeoutMs are validated as on the provider", () => {
+    expect(() => thorchainPins({confirmMaxLagBlocks: -1})).toThrow("thorchain: confirmMaxLagBlocks must be an integer between 0 and 100000");
+    expect(() => thorchainPins({confirmTimeoutMs: 99})).toThrow("thorchain: confirmTimeoutMs must be an integer between 100 and 8000");
+    expect(() => thorchainPins({confirmTimeoutMs: 8_001})).toThrow(/confirmTimeoutMs/);
+    expect(() => thorchainPins({confirmMaxLagBlocks: 0, confirmTimeoutMs: 100})).not.toThrow();
+  });
+});

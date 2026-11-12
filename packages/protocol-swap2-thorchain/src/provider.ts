@@ -382,6 +382,13 @@ export interface ThorchainProviderConfig {
  * of different operators, the source asset and exact input, and the memo's asset, destination, refund and limit
  * against the app's own request. Pass the affiliate your backend's provider uses (the memo must carry exactly it).
  * The Tron deposit route is open (`depositAddressRoutes`): its vault is the one `verifyBuild` confirms.
+ *
+ * A node confirms by the provider's rule: the vault is its current inbound for the source chain or that chain's
+ * address of an ActiveVault its mimir does not flag compromised or insolvent (never RetiringVault or another status),
+ * both chains open, on EVM its router the call's. All `nodeUrl` nodes are asked in parallel on the fixed GET paths of
+ * {@link THORNODE_CONFIRM_PATHS}, each within `confirmTimeoutMs` (so the check takes at most that long); a node that
+ * fails, redirects, answers another shape, is slower, or trails the highest THORChain height the nodes report by more
+ * than `confirmMaxLagBlocks` is skipped. In `nodeUrl` order, a node's refusal refuses; two confirming nodes pass.
  */
 export function thorchainPins(opts: {
   nodeUrl?: string | string[];
@@ -389,10 +396,34 @@ export function thorchainPins(opts: {
   affiliateBps?: string;
   trustedRouters?: Readonly<Record<string, readonly string[]>>;
   clientId?: string;
+  /** Blocks a node may trail the highest THORChain height the nodes report before it is skipped. Default 50; 0–100000. */
+  confirmMaxLagBlocks?: number;
+  /** Time each node gets for all of its reads, in ms; the nodes are asked in parallel. Default 2500; 100–8000. */
+  confirmTimeoutMs?: number;
 } = {}): RemotePins & {verifyBuild(quote: Quote, tx: UnsignedTx, params?: QuoteParams): Promise<string | null>} {
   const nodes = [...new Set((Array.isArray(opts.nodeUrl) ? opts.nodeUrl : opts.nodeUrl ? opts.nodeUrl.split(",") : HOSTS).map((h) => h.trim().replace(/\/$/, "")).filter(Boolean))];
   for (const n of nodes) if (!/^https:\/\//i.test(n)) throw new Error("thorchain: thorchainPins nodeUrl must use https");
   const clientId = opts.clientId?.trim() || DEFAULT_CLIENT_ID;
+  const {maxLagBlocks, timeoutMs} = confirmOptions(opts);
+  /** One node's THORChain height and verdict on the claim; null when it failed, `verdict` null when only the verdict did. */
+  const askNode = async (host: string, claim: VaultClaim): Promise<{height: number; verdict: VaultVerdict | null} | null> => {
+    const node = nodeDeadline(timeoutMs);
+    const read = (path: string) => nodeRead(host, path, clientId, node.signal);
+    try {
+      const head = await nodeHead(host, read);
+      try {
+        return {height: head.height, verdict: await vaultVerdict(host, read, head.inbound, claim)};
+      } catch (error) {
+        if (error instanceof HostUnavailable) return {height: head.height, verdict: null};
+        throw error;
+      }
+    } catch (error) {
+      if (error instanceof HostUnavailable) return null;
+      throw error;
+    } finally {
+      node.clear();
+    }
+  };
   const routersFor = (chain: string): readonly string[] => [...(THORCHAIN_ROUTERS[chain] ?? []), ...(opts.trustedRouters?.[chain] ?? [])];
   return Object.freeze({
     callTargets: routersFor,
@@ -434,18 +465,36 @@ export function thorchainPins(opts: {
       // memo byte for byte: a fuzzy or swapped output asset (scan 2026-10-30 F2) is refused here.
       if (memo !== checked.canonical) return `the memo is not the canonical ${checked.canonical}`;
       if ((checked.limit * 10n ** BigInt(dst.decimals)) / 100_000_000n < BigInt(quote.minDestAmount)) return `the memo's limit ${checked.limit} is below the quoted minimum`;
-      // Two nodes of different operators must report this vault (and router), trading open.
+      // Two nodes of different operators must confirm this vault (and router), trading open on both chains.
+      const sourceChain = THOR_CHAIN[params.sourceChain] ?? params.sourceChain;
+      const claim: VaultClaim = {chain: sourceChain, destChain: THOR_CHAIN[params.destChain] ?? params.destChain, vault, ...(router !== undefined ? {router} : {})};
+      const views = await Promise.all(nodes.map((host) => askNode(host, claim)));
+      // The freshest height any node reports is the reference: a node far behind it may still list a vault that has
+      // since retired or been flagged.
+      const top = views.reduce((max, v) => (v && v.height > max ? v.height : max), -1);
       let agreeing = 0;
-      for (const host of nodes) {
-        let entries: InboundAddress[];
-        try { entries = await inboundAddressesOn(host, clientId); } catch (error) { if (error instanceof HostUnavailable) continue; throw error; }
-        const entry = entries.find((e) => e.chain === THOR_CHAIN[params.sourceChain]);
-        if (paused(entry)) return `${THOR_CHAIN[params.sourceChain]} is halted / paused`;
-        if (!sameTarget(entry?.address, vault)) return `a THORNode reports another inbound vault than ${vault}`;
-        if (router !== undefined && !sameTarget(entry?.router, router)) return "a THORNode reports another router";
+      let lagging = false;
+      for (const view of views) {
+        if (!view?.verdict) continue;
+        if (top - view.height > maxLagBlocks) {
+          lagging = true;
+          continue;
+        }
+        const v = view.verdict;
+        if (!v.ok) {
+          switch (v.why) {
+            case "halted": return `${v.chain} is halted / paused`;
+            case "another-vault": return `a THORNode reports another inbound vault than ${vault}`;
+            case "not-active": return `a THORNode lists the inbound vault as ${v.status}, not ActiveVault`;
+            case "flagged": return `a THORNode's mimir flags the inbound vault as ${v.flag}`;
+            case "another-router": return "a THORNode reports another router";
+          }
+        }
         if (++agreeing >= 2) return null;
       }
-      return "two THORNodes could not confirm the inbound vault";
+      return lagging
+        ? `two THORNodes within ${maxLagBlocks} blocks of the highest THORChain height they report could not confirm the inbound vault (behind or unreachable)`
+        : "two THORNodes could not confirm the inbound vault";
     },
   });
 }

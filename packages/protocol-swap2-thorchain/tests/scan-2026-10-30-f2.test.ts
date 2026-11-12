@@ -25,7 +25,8 @@ beforeEach(() => {
     const confirm = confirmReads(String(input), () => []);
     if (confirm) return confirm;
     if (url.pathname.endsWith("/inbound_addresses")) {
-      return new Response(JSON.stringify([{chain: "TRON", address: TRON_VAULT, halted: false, dust_threshold: "10000000"}, {chain: "ETH", address: "0x1111111111111111111111111111111111111111", router: "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146", halted: false, dust_threshold: "1000"}]));
+      // verifyBuild checks the destination chain is open too (CS-9), so the snapshot lists BTC as a live node does.
+      return new Response(JSON.stringify([{chain: "TRON", address: TRON_VAULT, halted: false, dust_threshold: "10000000"}, {chain: "ETH", address: "0x1111111111111111111111111111111111111111", router: "0xD37BbE5744D730a1d98d8DC97c42F0Ca46aD7146", halted: false, dust_threshold: "1000"}, {chain: "BTC", address: "bc1qyl7j673h6hlvvlgf3kj7s4ll5yfmxzzvk03qky", halted: false, dust_threshold: "10000"}]));
     }
     if (url.pathname.includes("/quote/swap")) {
       const target = [url.searchParams.get("destination"), url.searchParams.get("refund_address")].filter(Boolean).join("/");
