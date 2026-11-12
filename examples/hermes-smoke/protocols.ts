@@ -407,6 +407,57 @@ export async function smokeProtocols(check: Check): Promise<void> {
     check('omniston: TON → EVM escrow verified on the device', v.verifyTonEscrowBuild(now) === null && v.verifyTonEscrowBuild({ ...now, destinationAddress: '0x' + '99'.repeat(20) }) !== null &&
       v.verifyTonEscrowBuild(old) !== null && withRev1.verifyTonEscrowBuild(old) === null && withRev1.verifyTonEscrowBuild({ ...old, destinationAddress: '0x' + '99'.repeat(20) }) !== null)
   }
+  {
+    // 2026-11-13: the app's native-fee ceiling on the execution path (USDT0 Legacy Mesh Ethereum → Tron, eid 30420): the live
+    // LayerZero fee + 25 % headroom (0.006676 ETH) passes the app's 0.01 ETH ceiling and reaches the review; without the hook
+    // the 0.005 ETH default refuses it with the unchanged text; a garbage answer, a throw and a value above 20 × the default refuse.
+    const OFT = '0x1F748c76dE468e9D11bd340fA9D5CBADf315dFB0'
+    const FEE = 6_676_000_000_000_000n
+    let sent = 0
+    const mesh = (name: string) => ({
+      name, enabled: () => true, supportsRoute: () => true,
+      getQuote: async (params: { amountIn: string }) => ({
+        provider: name, intentId: 'usdt0-mesh:30101:30420', depositAddress: '', depositMemo: null,
+        txRequest: { to: OFT, data: '0xc7c7f5b3', value: FEE.toString(), chainId: 1, gasLimit: '400000', approvalAddress: OFT, nativeFee: FEE.toString() },
+        sourceAmount: params.amountIn, destAmount: '9997000', minDestAmount: '9997000', feeUsd: 0, etaSeconds: 120, reliability: 1, validUntilMs: Date.now() + 60_000,
+      }),
+      buildDeposit: async () => ({ chain: 'eip155:1', to: OFT, data: '0xc7c7f5b3', value: FEE.toString(), chainId: 1, gasLimit: '400000', approvalAddress: OFT }),
+      trackIntent: async () => ({ state: 'pending' as const }),
+    })
+    const payer = {
+      getAddress: async () => '0x4444444444444444444444444444444444444444', getChainId: async () => 1, getAllowance: async () => 0n,
+      sendTransaction: async () => { sent += 1; return { hash: '0x1' } },
+    }
+    const TRON_MESH = new Map([['eip155:1', 10n ** 16n], ['eip155:42161', 10n ** 16n], ['eip155:42220', 300n * 10n ** 18n]])
+    const tronMesh = ({ provider, intentId, fromChain, destChain }: { provider: string; intentId: string; fromChain: string; destChain: string }) =>
+      provider === 'usdt0' && destChain === 'tron:728126428' && /^usdt0-mesh:\d+:30420(?:~|$)/.test(intentId) ? TRON_MESH.get(fromChain) : undefined
+    const attempt = async (name: string, nativeFeeCeiling?: unknown): Promise<string> => {
+      const p = new RouterSwap2Protocol(payer, {
+        fromChain: 'eip155:1', providers: [mesh(name) as never],
+        reviewExecution: (plan) => { throw new Error(`review ${String((plan.source as { value?: bigint }).value)}`) },
+        ...(nativeFeeCeiling !== undefined ? { nativeFeeCeiling: nativeFeeCeiling as never } : {}),
+      })
+      try {
+        await p.swap2({ fromToken: 'USDT', toToken: 'USDT', toChain: 'tron:0x2b6653dc', recipient: 'TJRabPrwbZy45sbavfcjinPJC18kjpRTv8', fromTokenAmount: 10_000_000n, minAmountOut: 9_997_000n })
+        return 'resolved'
+      } catch (e) { return e instanceof Error ? `${e.name}: ${e.message}` : String(e) }
+    }
+    const allowed = await attempt('usdt0', tronMesh)
+    check('swap2: nativeFeeCeiling lets USDT0 mesh → Tron through at 0.006676 ETH (0.01 ETH app ceiling)', allowed === `Error: review ${FEE}`, allowed)
+    const plain = await attempt('usdt0')
+    check('swap2: no nativeFeeCeiling → the 0.005 ETH default refuses it (unchanged text)', plain === 'Error: swap2: quoted native fee 6676000000000000 exceeds the cap 5000000000000000 for eip155:1', plain)
+    const other = await attempt('copycat', tronMesh)
+    check('swap2: nativeFeeCeiling for usdt0 only — another provider keeps the default', /exceeds the cap 5000000000000000 for eip155:1$/.test(other), other)
+    const garbage = await attempt('usdt0', () => 0.01)
+    const thrown = await attempt('usdt0', () => { throw new Error('table missing') })
+    const tooHigh = await attempt('usdt0', () => 10n ** 17n + 1n)
+    check('swap2: nativeFeeCeiling garbage / throw / above 20 × the default refuse (Swap2ConfigurationError)',
+      garbage === 'Swap2ConfigurationError: swap2: nativeFeeCeiling returned the number 0.01 for usdt0 eip155:1 → tron:728126428, not a non-negative bigint or undefined — the native fee is refused'
+      && thrown === 'Swap2ConfigurationError: swap2: nativeFeeCeiling threw for usdt0 eip155:1 → tron:728126428 (table missing) — the native fee is refused'
+      && tooHigh === 'Swap2ConfigurationError: swap2: nativeFeeCeiling returned 100000000000000001 for usdt0 eip155:1 → tron:728126428, above the hard maximum 100000000000000000 (20 × the default cap 5000000000000000) — the native fee is refused',
+      `${garbage} | ${thrown} | ${tooHigh}`)
+    check('swap2: nativeFeeCeiling runs — nothing signed in any of them', sent === 0, String(sent))
+  }
   check('approvals: isRevokeCalldata', isRevokeCalldata('0x095ea7b3' + '0'.repeat(24) + 'beef'.padStart(40, '0') + '0'.repeat(64)) === true)
   check('approvals: isUnlimitedAmount', isUnlimitedAmount((1n << 256n) - 1n) === true && isUnlimitedAmount(5n) === false)
 }
