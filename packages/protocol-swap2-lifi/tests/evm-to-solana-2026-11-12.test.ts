@@ -5,7 +5,9 @@
 // device) and Chainflip — and held to the requested owner and mint; such requests ask LI.FI for those bridges only.
 // NEAR Intents, LayerSwap and Smart Deposits pay a deposit address whose order names the recipient off chain, and a
 // LI.FI Intents order names its own oracles, output settler and output amount (review r1, 2026-11-12): refused for this
-// direction. The fixture is read-only answers of the public li.quest/v1/quote (no API key).
+// direction. A dry quote priced for a placeholder (no sender, or no Solana recipient) carries no transaction, and no
+// build or verify entry point lets one through. The fixture is read-only answers of the public li.quest/v1/quote (no
+// API key).
 import {readFileSync} from "node:fs";
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {decodeFunctionData, encodeFunctionData, parseAbi, toFunctionSelector, type Hex} from "viem";
@@ -276,10 +278,12 @@ describe("EVM → Solana: LI.FI is asked only for the bridges whose recipient is
     expect(urls[2]!.searchParams.getAll("allowBridges")).toEqual(READABLE);
   });
 
-  it("a dry quote without a recipient prices a Solana placeholder recipient, not the EVM sender", async () => {
+  it("a dry quote without a recipient prices a Solana placeholder recipient, not the EVM sender, and carries no transaction", async () => {
     const {urls} = record();
-    await lifiProvider().getQuote({...c.params, destAddress: "", dry: true});
+    const q = await lifiProvider().getQuote({...c.params, destAddress: "", dry: true});
     expect(urls[0]!.searchParams.get("toAddress")).toBe("HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk");
+    expect(q).toMatchObject({destAmount: c.response.estimate.toAmount, providerData: {placeholder: "recipient"}});
+    expect(q!.txRequest).toBeUndefined();
     await lifiProvider().getQuote({...c.params, destChain: "eip155:8453", destToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", destAddress: "", dry: true});
     expect(urls[1]!.searchParams.get("toAddress")).toBe(c.params.refundAddress);
   });

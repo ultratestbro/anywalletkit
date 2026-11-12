@@ -108,12 +108,18 @@ describe("scan 2026-10-30 F3: lifiVerifyQuote over live LI.FI answers", () => {
     expect(lifiVerifyQuote({...token.params, amountIn: "1"}, t)).toMatch(/not the 1 input/);
   });
 
-  it("a dry quote prices the placeholder; a Solana source's serialized transaction is read for its static part only", () => {
+  it("a dry quote priced for the placeholder carries no transaction; a Solana source's serialized transaction is read for its static part only", () => {
     const dry = {sourceChain: "eip155:8453", sourceToken: "ETH", destChain: "eip155:8453", destToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", amountIn: "1", destAddress: ""} as QuoteParams;
-    expect(lifiVerifyQuote(dry, {intentId: "lifi:8453:8453", sourceAmount: "1", minDestAmount: "1", txRequest: {to: "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE", data: "0x12345678", value: "1"}} as Quote)).toMatch(/unknown Diamond call|too short/);
+    const call = {intentId: "lifi:8453:8453", sourceAmount: "1", minDestAmount: "1", txRequest: {to: "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE", data: "0x12345678", value: "1"}} as Quote;
+    // Since review r1 of 2026-11-12 a dry quote without the sender is priced for the placeholder and must carry no
+    // transaction (dry-placeholder-2026-11-12.test.ts); with the sender named, the calldata is decoded as before.
+    expect(lifiVerifyQuote(dry, call)).toBe("a dry quote priced for a placeholder sender carries a transaction — it would pay or refund that placeholder, not the wallet that signs it");
+    expect(lifiVerifyQuote({...dry, refundAddress: "0x4444444444444444444444444444444444444444"}, call)).toMatch(/unknown Diamond call|too short/);
     const sol = {sourceChain: "solana:mainnet", sourceToken: "SOL", destChain: "eip155:8453", destToken: "0x0000000000000000000000000000000000000000", amountIn: "1", destAddress: "0x3333333333333333333333333333333333333333"} as QuoteParams;
+    expect(lifiVerifyQuote(sol, {txRequest: {serializedTx: "AQ==", value: "1"}} as Quote)).toBe("a dry quote priced for a placeholder sender carries a transaction — it would pay or refund that placeholder, not the wallet that signs it");
     // Since 2026-11-02 a bridge's transaction must at least decode and call Mayan; the account proves the recipient.
-    expect(lifiVerifyQuote(sol, {txRequest: {serializedTx: "AQ==", value: "1"}} as Quote)).toMatch(/does not decode/);
-    expect(lifiVerifyQuote(sol, {txRequest: {serializedTx: "AQ==", to: "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE", value: "1"}} as Quote)).toMatch(/serialized transaction only/);
+    const solSender = {...sol, refundAddress: "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk"};
+    expect(lifiVerifyQuote(solSender, {txRequest: {serializedTx: "AQ==", value: "1"}} as Quote)).toMatch(/does not decode/);
+    expect(lifiVerifyQuote(solSender, {txRequest: {serializedTx: "AQ==", to: "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE", value: "1"}} as Quote)).toMatch(/serialized transaction only/);
   });
 });
