@@ -111,9 +111,13 @@ const q = await usdt0Provider({rpcUrls}).getQuote({
   account with `getTokenInfo` or `fromTokenDecimals: 6`. Catalog-driven token pickers will not offer it.
 - **Contracts** (docs.usdt0.to deployments API `usdt0.legacyMesh`, Sourcify source `UsdtOFT`, re-read on-chain
   2026-11-12): the `UsdtOFT` on Ethereum `0x1F74…dFB0`, Arbitrum `0x7765…9B92`, Celo `0xf10E…b243` (not proxies); each
-  peers the Tron OFT `TFG4wB…zevLPt` and the TON OFT `EQAd31…jX6Gq`. Before the first quote the OFT's `token()` and
-  `approvalRequired()` (= true: it pulls the token, so the send approves that OFT), per pair `peers(eid)` = the pinned
-  destination OFT; a mismatch refuses the route.
+  peers the Tron OFT `TFG4wB…zevLPt` and the TON OFT `EQAd31…jX6Gq`. At runtime, once per provider instance, the
+  provider re-reads the OFT's `token()` and `approvalRequired()` (= true: it pulls the token, so the send approves that
+  OFT) before the first mesh quote on a chain, and `peers(dstEid)` = the pinned destination OFT before the first quote of
+  each pair; a mismatch refuses the route, a failed read is not cached, preflight reuses the cached results. `endpoint()` and
+  `feeBps()` are not re-read at runtime: `endpoint` is an immutable of the non-proxy `UsdtOFT`, and the module watch
+  (`watch.json`) follows each OFT's code hash and its `feeBps()`; a fee change reaches a quote through `quoteOFT`'s
+  received amount, which the sealed `minAmountLD` holds (`SlippageExceeded`).
 - **Quote**: `quoteOFT` — `maxAmountLD` is the pool's credit toward the destination (what it can pay out there now),
   received = amount − `feeBps` (3 → 0.03 %), listed as a `protocol` fee "USDT0 Legacy Mesh fee" — then `quoteSend` for
   the LayerZero fee (+ 25 % headroom, refunded). Nothing is hard-coded. Live 2026-11-12: into TON ≈ 0.000056 ETH
@@ -123,8 +127,12 @@ const q = await usdt0Provider({rpcUrls}).getQuote({
   holds no workchain: the TON OFT pays on workchain 0, so `-1:…` and testnet-flagged addresses are refused. Both were
   reproduced from real delivered packets (LayerZero Scan) and the address the destination paid (TronGrid, toncenter).
   The built `send` is decoded back and compared with the request before it is returned (`usdt0VerifyMeshSend`).
-- **Preflight**: target, the sealed send in the calldata, chain + peer, and the current `quoteSend` (which reverts with
-  `InsufficientCredits` when the pool can no longer pay) within the sealed value.
+- **Preflight**: before any network read, the deposit is decoded and held to the sealed send as a whole — the target is
+  the source chain's mesh OFT and the transaction is on that chain; the call is `send` (not `quoteSend` / `quoteOFT`,
+  which carry the same `SendParam`); all seven `SendParam` fields are the ones built (`dstEid`, `to`, `amountLD`,
+  `minAmountLD`, and empty `extraOptions`, `composeMsg`, `oftCmd`); `MessagingFee.nativeFee` is the sealed fee and
+  `lzTokenFee` 0; the refund is the sealed refund address. Then the pins (chain + peer), the current `quoteSend` (which
+  reverts with `InsufficientCredits` when the pool can no longer pay) within the sealed fee, and `msg.value` = that fee.
 - **Status**: the LayerZero Scan message (intent `usdt0-mesh:<srcEid>:<dstEid>`). Tron pays inside `lzReceive`, so
   `DELIVERED` is completed. TON pays with a jetton transfer later in the trace: `DELIVERED` completes only when
   `GET {tonApiUrl}/v2/events/{destination hash}` (default `https://tonapi.io`, no query string) shows the TON OFT's USDT
