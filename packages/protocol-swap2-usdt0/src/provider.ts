@@ -42,7 +42,8 @@ import {
  * (approval to it: it pulls the token). Quote = `quoteOFT` (limit = the pool's
  * credit toward the destination, received = amount − 0.03 % mesh fee) +
  * `quoteSend`; the recipient is encoded as the destination OFT reads it and
- * the built send is decoded against the request before it is returned. Status:
+ * the built send is decoded against the request before it is returned, and
+ * the deposit again, whole, against the sealed send at preflight. Status:
  * the same LayerZero Scan message; on Tron the payout is inside `lzReceive`
  * (DELIVERED = paid), on TON it is a jetton transfer later in the trace, so a
  * TON delivery completes only when tonapi shows that transfer to the recipient.
@@ -384,7 +385,13 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     }
   }
 
-  /** Right before signing a mesh send: target, the sealed send in the calldata, chain + peer, the current fee (and credits) still fit. */
+  /**
+   * Right before signing a mesh send, with no network read until the calldata is the sealed send: the target is the
+   * source chain's pinned mesh OFT (and the transaction is on that chain); the calldata is `send(SendParam, MessagingFee,
+   * refund)` itself — every SendParam field exactly as built (dstEid, to, amountLD, minAmountLD, and the empty
+   * extraOptions / composeMsg / oftCmd), `MessagingFee` = the sealed native fee and no LZ-token fee, the refund the
+   * sealed trader. Then chain + peer, the current fee (and credits) must still fit, and `msg.value` = the sealed fee.
+   */
   async function meshPreflight(quote: Quote, tx: UnsignedTx, src: Usdt0MeshSource, dst: Usdt0MeshDestination): Promise<void> {
     if (!same(tx.to, src.oft)) throw new Error(`usdt0: deposit target ${tx.to} is not the ${src.name} Legacy Mesh OFT`);
     const pd = quote.providerData ?? {};
@@ -393,14 +400,31 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
       throw new Error("usdt0: quote carries no sealed send parameters");
     }
     const sp = meshSendParam(dst.eid, pd.recipientBytes32 as Hex, BigInt(pd.amountLD!), BigInt(pd.minAmountLD!));
+    const sealed = BigInt(pd.nativeFee!);
+    let call: {functionName: string; args?: readonly unknown[]};
     let sent: typeof sp;
     try {
-      [sent] = decodeFunctionData({abi: MESH_ABI, data: (tx.data ?? "0x") as Hex}).args as unknown as [typeof sp];
+      call = decodeFunctionData({abi: MESH_ABI, data: (tx.data ?? "0x") as Hex});
+      [sent] = call.args as unknown as [typeof sp];
     } catch {
       throw new Error("usdt0: the deposit is not the sealed Legacy Mesh send");
     }
     if (sent.dstEid !== sp.dstEid || !same(sent.to, sp.to) || sent.amountLD !== sp.amountLD || sent.minAmountLD !== sp.minAmountLD) {
       throw new Error("usdt0: the deposit is not the sealed Legacy Mesh send");
+    }
+    // The rest of the sealed send (review 2026-11-12): `quoteSend(sp, false)` / `quoteOFT(sp)` carry the same SendParam
+    // and used to pass; so did options, a compose message, another fee or another refund address next to it.
+    if (call.functionName !== "send") throw new Error(`usdt0: the deposit calls ${call.functionName}, not send(SendParam, MessagingFee, refund)`);
+    for (const field of ["extraOptions", "composeMsg", "oftCmd"] as const) {
+      if (String(sent[field]).toLowerCase() !== sp[field]) throw new Error(`usdt0: the deposit's SendParam.${field} ${String(sent[field])} is not the sealed ${sp[field]}`);
+    }
+    const [, sentFee, sentRefund] = call.args as unknown as [typeof sp, {nativeFee: bigint; lzTokenFee: bigint}, string];
+    if (sentFee.nativeFee !== sealed) throw new Error(`usdt0: the deposit's MessagingFee.nativeFee ${sentFee.nativeFee} is not the sealed ${sealed}`);
+    if (sentFee.lzTokenFee !== 0n) throw new Error(`usdt0: the deposit's MessagingFee.lzTokenFee ${sentFee.lzTokenFee} is not 0`);
+    if (!isAddress(pd.refundAddress ?? "")) throw new Error("usdt0: quote carries no sealed refund address");
+    if (getAddress(sentRefund) !== getAddress(pd.refundAddress!)) throw new Error(`usdt0: the deposit refunds ${sentRefund}, not the sealed refund address ${getAddress(pd.refundAddress!)}`);
+    if ((tx.chain && tx.chain !== src.caip2) || (tx.chainId !== undefined && tx.chainId !== src.chainId)) {
+      throw new Error(`usdt0: the deposit is for ${tx.chain || "?"} (chainId ${String(tx.chainId ?? "?")}), not ${src.name} (${src.caip2})`);
     }
     const c = client(src.caip2);
     if (!c) throw new Error(`usdt0: no RPC for ${src.caip2}`);
@@ -412,7 +436,6 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     } catch (err) {
       throw new Error(rpcSafeReason(err, src.name));
     }
-    const sealed = BigInt(pd.nativeFee!);
     if (fee.nativeFee > sealed) throw new Error(`usdt0: LayerZero fee rose to ${fee.nativeFee} above the sealed ${sealed} (quote + ${FEE_HEADROOM_BPS / 100n} % headroom) — re-quote`);
     if (BigInt(tx.value) !== sealed) throw new Error(`usdt0: transaction value ${tx.value} is not the quoted fee ${sealed}`);
   }

@@ -441,6 +441,55 @@ describe("build & preflight", () => {
     await expect(make({quoteSendFails: "http"}).p.preflightDeposit!(q!, tx)).rejects.toThrow("usdt0: RPC for Arbitrum unavailable — try again");
     await expect(make({}, {rpcUrls: {"eip155:1": "http://rpc.eth"}}).p.preflightDeposit!(q!, tx)).rejects.toThrow("usdt0: no RPC for eip155:42161");
   });
+
+  it("preflight holds the whole sealed send: each field swapped on its own is refused before any network read", async () => {
+    const {q, p, calls} = await quote();
+    const tx = await p.buildDeposit(q!);
+    const sealed = sealedOf(FEE_TRON);
+    const data = (f: Parameters<typeof edit>[1]) => edit(q!, f).txRequest!.data!;
+    const [sp0] = decodeFunctionData({abi: ABI, data: tx.data as Hex}).args as unknown as [Record<string, unknown>];
+    const refused = async (t: typeof tx, message: string, qq: Quote = q!) => {
+      const before = calls.length;
+      await expect(p.preflightDeposit!(qq, t)).rejects.toThrow(message);
+      expect(calls.length).toBe(before); // no RPC read for a deposit that is not the sealed send
+    };
+    // Selector: the view calls carry the same SendParam and decode with the same ABI.
+    await refused({...tx, data: encodeFunctionData({abi: ABI, functionName: "quoteSend", args: [sp0 as never, false]})}, "usdt0: the deposit calls quoteSend, not send(SendParam, MessagingFee, refund)");
+    await refused({...tx, data: encodeFunctionData({abi: ABI, functionName: "quoteOFT", args: [sp0 as never]})}, "usdt0: the deposit calls quoteOFT, not send(SendParam, MessagingFee, refund)");
+    // SendParam: the four fields checked before keep their refusal; the other three each get their own.
+    await refused({...tx, data: data((sp) => { sp.dstEid = TON.eid; })}, "usdt0: the deposit is not the sealed Legacy Mesh send");
+    await refused({...tx, data: data((sp) => { sp.to = TON_TO_B32; })}, "usdt0: the deposit is not the sealed Legacy Mesh send");
+    await refused({...tx, data: data((sp) => { sp.amountLD = 10_000_001n; })}, "usdt0: the deposit is not the sealed Legacy Mesh send");
+    await refused({...tx, data: data((sp) => { sp.minAmountLD = 1n; })}, "usdt0: the deposit is not the sealed Legacy Mesh send");
+    await refused({...tx, data: data((sp) => { sp.extraOptions = "0x0003"; })}, "usdt0: the deposit's SendParam.extraOptions 0x0003 is not the sealed 0x");
+    await refused({...tx, data: data((sp) => { sp.composeMsg = "0x01"; })}, "usdt0: the deposit's SendParam.composeMsg 0x01 is not the sealed 0x");
+    await refused({...tx, data: data((sp) => { sp.oftCmd = "0x01"; })}, "usdt0: the deposit's SendParam.oftCmd 0x01 is not the sealed 0x");
+    // MessagingFee: the sealed native fee (also when msg.value moves with it), never an LZ-token fee.
+    await refused({...tx, data: data((_sp, r) => { r.fee.nativeFee = 1n; })}, `usdt0: the deposit's MessagingFee.nativeFee 1 is not the sealed ${sealed}`);
+    await refused({...tx, value: (sealed + 1n).toString(), data: data((_sp, r) => { r.fee.nativeFee = sealed + 1n; })}, `usdt0: the deposit's MessagingFee.nativeFee ${sealed + 1n} is not the sealed ${sealed}`);
+    await refused({...tx, data: data((_sp, r) => { r.fee.lzTokenFee = 1n; })}, "usdt0: the deposit's MessagingFee.lzTokenFee 1 is not 0");
+    // Refund: the trader the quote sealed.
+    await refused({...tx, data: data((_sp, r) => { r.refund = ATTACKER; })}, `usdt0: the deposit refunds ${ATTACKER}, not the sealed refund address ${SENDER}`);
+    await refused(tx, "usdt0: quote carries no sealed refund address", {...q!, providerData: {...q!.providerData, refundAddress: ""}});
+    await refused(tx, "usdt0: quote carries no sealed refund address", {...q!, providerData: {...q!.providerData, refundAddress: "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj"}});
+    // Target and chain: the pinned mesh OFT of the source chain, on that chain.
+    await refused({...tx, to: ATTACKER}, `usdt0: deposit target ${ATTACKER} is not the Arbitrum Legacy Mesh OFT`);
+    await refused({...tx, to: ETH.oft}, `usdt0: deposit target ${ETH.oft} is not the Arbitrum Legacy Mesh OFT`);
+    await refused({...tx, chainId: 1}, "usdt0: the deposit is for eip155:42161 (chainId 1), not Arbitrum (eip155:42161)");
+    await refused({...tx, chain: "eip155:1"}, "usdt0: the deposit is for eip155:1 (chainId 42161), not Arbitrum (eip155:42161)");
+    // Value: msg.value = the sealed fee (checked after the fee re-quote, as before).
+    await expect(p.preflightDeposit!(q!, {...tx, value: (sealed - 1n).toString()})).rejects.toThrow(`usdt0: transaction value ${sealed - 1n} is not the quoted fee ${sealed}`);
+    // The untouched send still passes: a lowercased refund in the quote, no chainId on the transaction.
+    await expect(p.preflightDeposit!({...q!, providerData: {...q!.providerData, refundAddress: SENDER.toLowerCase()}}, tx)).resolves.toBeUndefined();
+    const {chainId: _omit, ...noChainId} = tx;
+    await expect(p.preflightDeposit!(q!, noChainId)).resolves.toBeUndefined();
+    // A TON send is held the same way.
+    const ton = await quote({}, {}, TO_TON);
+    const tonTx = await ton.p.buildDeposit(ton.q!);
+    await expect(ton.p.preflightDeposit!(ton.q!, tonTx)).resolves.toBeUndefined();
+    await expect(ton.p.preflightDeposit!(ton.q!, {...tonTx, data: edit(ton.q!, (sp) => { sp.composeMsg = "0x01"; }).txRequest!.data!})).rejects.toThrow("usdt0: the deposit's SendParam.composeMsg 0x01 is not the sealed 0x");
+    await expect(ton.p.preflightDeposit!(ton.q!, {...tonTx, data: edit(ton.q!, (_sp, r) => { r.refund = ATTACKER; }).txRequest!.data!})).rejects.toThrow(`usdt0: the deposit refunds ${ATTACKER}, not the sealed refund address ${SENDER}`);
+  });
 });
 
 describe("tracking", () => {
