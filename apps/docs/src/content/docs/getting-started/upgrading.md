@@ -10,6 +10,29 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: THORChain's rotating inbound vault
+
+THORChain's inbound address moves among its active asgard vaults every few minutes, and public nodes a browser can
+reach often trail the quoting node by ~25–28 blocks. `protocol-swap2-thorchain` 0.3.5 and older required the
+confirming node's current inbound to equal the quoted vault, so most quotes were refused ("a second node reports
+another inbound vault — refused until they agree").
+
+- **protocol-swap2-thorchain:** a confirming node now also confirms the source chain's address of a vault it lists
+  as `ActiveVault` and its mimir does not flag compromised or insolvent; a `RetiringVault` never confirms. A node
+  more than `confirmMaxLagBlocks` (default 50) behind the quoting node, slower than `confirmTimeoutMs` (default
+  2500 ms), redirecting or answering another shape is skipped for the next one. Bump; no code change.
+- **A proxy in front of a confirming node:** pass `GET /thorchain/lastblock`, `/thorchain/vaults/asgard` and
+  `/thorchain/mimir` next to `/thorchain/inbound_addresses`, no query string (`THORNODE_CONFIRM_PATHS` lists them).
+  A proxy that answers 404 to the new paths is skipped and the next confirming node is asked, so update the proxy
+  before the app.
+- **Refusals matched by text:** existing texts are unchanged. New ones: "no confirming node is within 50 blocks of
+  the quoting node's THORChain height (behind or unreachable) — refused until one catches up", "a second node lists
+  the inbound vault as RetiringVault, not ActiveVault — refused" (the status as the node names it), "a second node's
+  mimir flags the inbound vault as compromised — refused" (or `insolvent`). "… is halted / paused on the confirming
+  node" can now name the destination chain too.
+- **`thorchainPins().verifyBuild`** is unchanged: it still compares the build's vault with two nodes' current
+  inbound.
+
 ## Next release: Omniston's new TON Escrow Minter
 
 Since 2026-11-10 Omniston quotes TON ↔ EVM orders on a new TON Escrow Minter (rev2),
