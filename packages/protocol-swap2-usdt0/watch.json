@@ -1,0 +1,186 @@
+{
+ "module": "@anywalletkit/protocol-swap2-usdt0",
+ "sources": [
+  {
+   "id": "mesh-oft-ethereum",
+   "type": "evm-code",
+   "chainId": 1,
+   "address": "0x1F748c76dE468e9D11bd340fA9D5CBADf315dFB0",
+   "label": "USDT0 Legacy Mesh UsdtOFT · Ethereum (not a proxy: a new deployment is a new address)"
+  },
+  {
+   "id": "mesh-peer-tron-ethereum",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0x1F748c76dE468e9D11bd340fA9D5CBADf315dFB0",
+   "signature": "peers(uint32)",
+   "args": [
+    30420
+   ],
+   "decode": "bytes32",
+   "label": "USDT0 Legacy Mesh peers(30420) = Tron OFT TFG4wB…zevLPt · Ethereum"
+  },
+  {
+   "id": "mesh-peer-ton-ethereum",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0x1F748c76dE468e9D11bd340fA9D5CBADf315dFB0",
+   "signature": "peers(uint32)",
+   "args": [
+    30343
+   ],
+   "decode": "bytes32",
+   "label": "USDT0 Legacy Mesh peers(30343) = TON OFT EQAd31…jX6Gq · Ethereum"
+  },
+  {
+   "id": "mesh-fee-bps-ethereum",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0x1F748c76dE468e9D11bd340fA9D5CBADf315dFB0",
+   "signature": "feeBps()",
+   "decode": "uint256",
+   "label": "USDT0 Legacy Mesh feeBps (3 = 0.03 %) · Ethereum"
+  },
+  {
+   "id": "mesh-oft-arbitrum",
+   "type": "evm-code",
+   "chainId": 42161,
+   "address": "0x77652D5aba086137b595875263FC200182919B92",
+   "label": "USDT0 Legacy Mesh UsdtOFT · Arbitrum (not a proxy: a new deployment is a new address)"
+  },
+  {
+   "id": "mesh-peer-tron-arbitrum",
+   "type": "evm-call",
+   "chainId": 42161,
+   "to": "0x77652D5aba086137b595875263FC200182919B92",
+   "signature": "peers(uint32)",
+   "args": [
+    30420
+   ],
+   "decode": "bytes32",
+   "label": "USDT0 Legacy Mesh peers(30420) = Tron OFT TFG4wB…zevLPt · Arbitrum"
+  },
+  {
+   "id": "mesh-peer-ton-arbitrum",
+   "type": "evm-call",
+   "chainId": 42161,
+   "to": "0x77652D5aba086137b595875263FC200182919B92",
+   "signature": "peers(uint32)",
+   "args": [
+    30343
+   ],
+   "decode": "bytes32",
+   "label": "USDT0 Legacy Mesh peers(30343) = TON OFT EQAd31…jX6Gq · Arbitrum"
+  },
+  {
+   "id": "mesh-fee-bps-arbitrum",
+   "type": "evm-call",
+   "chainId": 42161,
+   "to": "0x77652D5aba086137b595875263FC200182919B92",
+   "signature": "feeBps()",
+   "decode": "uint256",
+   "label": "USDT0 Legacy Mesh feeBps (3 = 0.03 %) · Arbitrum"
+  },
+  {
+   "id": "mesh-oft-celo",
+   "type": "evm-code",
+   "chainId": 42220,
+   "address": "0xf10E161027410128E63E75D0200Fb6d34b2db243",
+   "label": "USDT0 Legacy Mesh UsdtOFT · Celo (not a proxy: a new deployment is a new address)"
+  },
+  {
+   "id": "mesh-peer-tron-celo",
+   "type": "evm-call",
+   "chainId": 42220,
+   "to": "0xf10E161027410128E63E75D0200Fb6d34b2db243",
+   "signature": "peers(uint32)",
+   "args": [
+    30420
+   ],
+   "decode": "bytes32",
+   "label": "USDT0 Legacy Mesh peers(30420) = Tron OFT TFG4wB…zevLPt · Celo"
+  },
+  {
+   "id": "mesh-peer-ton-celo",
+   "type": "evm-call",
+   "chainId": 42220,
+   "to": "0xf10E161027410128E63E75D0200Fb6d34b2db243",
+   "signature": "peers(uint32)",
+   "args": [
+    30343
+   ],
+   "decode": "bytes32",
+   "label": "USDT0 Legacy Mesh peers(30343) = TON OFT EQAd31…jX6Gq · Celo"
+  },
+  {
+   "id": "mesh-fee-bps-celo",
+   "type": "evm-call",
+   "chainId": 42220,
+   "to": "0xf10E161027410128E63E75D0200Fb6d34b2db243",
+   "signature": "feeBps()",
+   "decode": "uint256",
+   "label": "USDT0 Legacy Mesh feeBps (3 = 0.03 %) · Celo"
+  },
+  {
+   "id": "mesh-oft-ton-code",
+   "type": "ton-code",
+   "address": "EQAd31gAUhdO0d0NZsNb_cGl_Maa9PSuNhVLE9z8bBSjX6Gq",
+   "label": "USDT0 Legacy Mesh OFT · TON (code)"
+  },
+  {
+   "id": "docs-deployments-legacy-mesh",
+   "type": "http-json",
+   "url": "https://docs.usdt0.to/api/deployments",
+   "path": "usdt0.legacyMesh",
+   "label": "docs.usdt0.to deployments API · Legacy Mesh (every chain's OFT and eid)"
+  },
+  {
+   "id": "docs-deployments-native",
+   "type": "http-json",
+   "url": "https://docs.usdt0.to/api/deployments",
+   "path": "usdt0.native",
+   "label": "docs.usdt0.to deployments API · USDT0 OFT deployments"
+  },
+  {
+   "id": "docs-legacy-mesh",
+   "type": "http-text",
+   "url": "https://docs.usdt0.to/overview/the-legacy-mesh",
+   "between": [
+    "<main",
+    "</main>"
+   ],
+   "label": "USDT0 docs · The Legacy Mesh (chains, 0.03 % fee)"
+  },
+  {
+   "id": "docs-developer",
+   "type": "http-text",
+   "url": "https://docs.usdt0.to/technical-documentation/developer",
+   "between": [
+    "<main",
+    "</main>"
+   ],
+   "label": "USDT0 docs · Developer Guide (OFT interface, Legacy Mesh §4)"
+  },
+  {
+   "id": "lz-scan-messages-tx",
+   "type": "http-json",
+   "url": "https://scan.layerzero-api.com/v1/openapi",
+   "path": "paths./messages/tx/{tx}",
+   "label": "LayerZero Scan API · GET /v1/messages/tx/{tx} (status of a send)"
+  },
+  {
+   "id": "tonapi-events",
+   "type": "http-json",
+   "url": "https://tonapi.io/v2/openapi.json",
+   "path": "paths./v2/events/{event_id}",
+   "label": "tonapi · GET /v2/events/{event_id} (TON payout of a mesh delivery)"
+  },
+  {
+   "id": "tonapi-jetton-transfer-action",
+   "type": "http-json",
+   "url": "https://tonapi.io/v2/openapi.json",
+   "path": "components.schemas.JettonTransferAction",
+   "label": "tonapi · JettonTransferAction schema (what the TON payout check reads)"
+  }
+ ]
+}
