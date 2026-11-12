@@ -51,13 +51,15 @@ const ABI: Abi = parseAbi(Object.entries(FACETS).flatMap(([k, t]) => [
   `function startBridgeTokensVia${k}(${B} _bridgeData, ${t} _facetData)`,
   `function swapAndStartBridgeTokensVia${k}(${B} _bridgeData, ${S} _swapData, ${t} _facetData)`,
 ]) as readonly string[]);
-/** The refund-like fields of each facet's data, as the check reads them. */
+/** The refund-like fields of each facet's data, as the check reads them. LI.FI Intents (`depositAndRefundAddress`) is
+ * refused before its refund field is read since 2026-11-13 (its oracles and settler are not pinned): see below. */
 const REFUND_FIELDS: Record<string, string[]> = {
   AcrossV4: ["refundAddress"], Centrifuge: ["refundRecipient"], Eco: ["refundRecipient"], Frax: ["refundRecipient"], Glacis: ["refundAddress"],
-  LayerSwap: ["refundRecipient"], LiFiIntentEscrowV2: ["depositAndRefundAddress"], M0: ["refundRecipient", "orderOwner"], Mayan: ["refundRecipient"],
+  LayerSwap: ["refundRecipient"], M0: ["refundRecipient", "orderOwner"], Mayan: ["refundRecipient"],
   NEARIntents: ["refundRecipient"], PolymerCCTP: ["refundRecipient"], Stargate: ["refundAddress"], Superset: ["refundAddress", "fallbackEoA"],
 };
 const BYTES32_FIELDS = new Set(["AcrossV4.refundAddress"]);
+const INTENTS_UNPINNED = "a LI.FI Intents order to an EVM chain names its own oracles, output settler and output amount, which cannot be checked here — its escrow could release the input without the delivery";
 
 type Facet = Record<string, unknown>;
 const bridgeData = (sourceSwaps = false) => ({
@@ -112,6 +114,15 @@ describe("audit 2026-11-02 r5: a bridge facet's refund and fallback addresses ar
     // The recipient is an acceptable refund address too (Superset's fallback above); a dirty bytes32 does not decode.
     expect(diamondCallMismatch(call("Stargate", {...SAMPLES.Stargate, refundAddress: RECEIVER}), expectation)).toBeNull();
     expect(diamondCallMismatch(call("AcrossV4", {...SAMPLES.AcrossV4, refundAddress: `0x01${pad(SENDER).slice(4)}`}), expectation)).toMatch(/does not decode \(not an address\)/);
+  });
+
+  it("LI.FI Intents between EVM chains is refused before its refund address is read: honest, forged or zero, both entry points", () => {
+    for (const swaps of [false, true]) {
+      for (const refund of [SENDER, RECEIVER, OTHER, ZERO]) {
+        const data = call("LiFiIntentEscrowV2", {...SAMPLES.LiFiIntentEscrowV2, depositAndRefundAddress: refund}, swaps);
+        expect([swaps, refund, diamondCallMismatch(data, expectation)]).toEqual([swaps, refund, INTENTS_UNPINNED]);
+      }
+    }
   });
 
   it("a zero refund address passes only where the facet itself refuses a zero it would use (Polymer CCTP ignores it without swaps)", () => {
@@ -177,7 +188,14 @@ describe("audit 2026-11-02 r5: a bridge facet's refund and fallback addresses ar
 
   it("every recorded live quote passes; its refund fields (and a Mayan order's trader) set to another address are refused", () => {
     const seen = new Set<string>();
+    let intents = 0;
     for (const l of live()) {
+      if (l.facet === "LiFiIntentEscrowV2") {
+        // Recorded LI.FI Intents calls between EVM chains (BSC USDT → Arbitrum USDC, OP ETH → Base ETH): refused outright.
+        expect([l.name, diamondCallMismatch(l.data, l.e)]).toEqual([l.name, INTENTS_UNPINNED]);
+        intents++;
+        continue;
+      }
       const fields = REFUND_FIELDS[l.facet];
       if (!fields) continue;
       seen.add(l.facet);
@@ -208,7 +226,8 @@ describe("audit 2026-11-02 r5: a bridge facet's refund and fallback addresses ar
         expect(diamondCallMismatch(forged, l.e)).toBe(`the Mayan order's refund address pays ${OTHER}, neither the sender ${l.e.sender} nor the recipient`);
       }
     }
-    expect([...seen].sort()).toEqual(["AcrossV4", "Frax", "Glacis", "LayerSwap", "LiFiIntentEscrowV2", "M0", "Mayan", "NEARIntents", "PolymerCCTP", "Stargate", "Superset"]);
+    expect([...seen].sort()).toEqual(["AcrossV4", "Frax", "Glacis", "LayerSwap", "M0", "Mayan", "NEARIntents", "PolymerCCTP", "Stargate", "Superset"]);
+    expect(intents).toBe(2);
   });
 
   it("the provider and the remote pin refuse the recorded Stargate quote with LayerZero's refund address replaced", async () => {

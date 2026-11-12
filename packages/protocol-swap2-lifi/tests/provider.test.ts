@@ -342,7 +342,7 @@ describe("LI.FI route policy hook", () => {
     const q = new URL(`https://x${calls[1]!.slice(4)}`).searchParams;
     expect(q.getAll("allowBridges")).toEqual(["stargateV2"]);
     // Malformed tool keys never reach the URL; the bridges that do not bind the receiver are always denied.
-    expect(q.getAll("denyBridges")).toEqual(["mayan", "relaydepository", "garden", "squid", "symbiosis"]);
+    expect(q.getAll("denyBridges")).toEqual(["mayan", "relaydepository", "garden", "squid", "symbiosis", "lifiIntents"]);
   });
 
   it("keeps LI.FI's default pick without a hook, for same-chain swaps, and when the hook passes", async () => {
@@ -355,7 +355,7 @@ describe("LI.FI route policy hook", () => {
     calls = stub();
     await lifiProvider({chooseRoute: () => null}).getQuote(PARAMS);
     expect(calls[1]).not.toMatch(/allowBridges|order=/);
-    expect(new URL(`https://x${calls[1]!.slice(4)}`).searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden", "squid", "symbiosis"]);
+    expect(new URL(`https://x${calls[1]!.slice(4)}`).searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden", "squid", "symbiosis", "lifiIntents"]);
   });
 
   it("falls back to the default pick when the routes call fails, the hook throws, or the chosen bridge is gone", async () => {
@@ -414,6 +414,8 @@ describe("LI.FI chain table (2026-10-14 batch)", () => {
 // li.quest/v1/chains id 99901 (key "ely") and deployments/elysium.json, read 2026-11-10. Live that day, with the
 // module's deny list: Arbitrum / Base USDC ↔ Elysium USDC.e and Elysium HYPE → Arbitrum USDC quote through LI.FI
 // Intents (LiFiIntentEscrowV2); HYPE in from HyperEVM / Ethereum is offered only through Relay, which is refused.
+// Since 2026-11-13 LI.FI Intents is denied and refused too (evm-intents-2026-11-13.test.ts), so live Elysium has no
+// cross-chain LI.FI route; the chain table and its Diamond are still checked here over synthetic Stargate calls.
 describe("LI.FI chain table (2026-11-10: Elysium)", () => {
   const ZERO = "0x0000000000000000000000000000000000000000";
   const ELY_DIAMOND = "0x24E6dA91AA4A8FEe2447F542c92E006243bd6Dc5";
@@ -442,7 +444,7 @@ describe("LI.FI chain table (2026-11-10: Elysium)", () => {
     expect(reasons).toEqual([]);
     const q = new URL(sent).searchParams;
     expect([q.get("fromChain"), q.get("fromToken"), q.get("toChain")]).toEqual(["99901", ELY_USDCE, "8453"]);
-    expect(q.getAll("denyBridges")).toContain("relaydepository");
+    expect(q.getAll("denyBridges")).toEqual(expect.arrayContaining(["relaydepository", "lifiIntents"]));
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify(quoteFor({chainId: 99901, token: ELY_USDCE}, {chainId: 8453, token: BASE_USDC}, "5000000", DIAMOND))));
     await expect(lifiProvider().getQuote(params)).resolves.toBeNull();
   });
@@ -462,7 +464,7 @@ describe("LI.FI chain table (2026-11-10: Elysium)", () => {
     await expect(lifiProvider().getQuote(params)).resolves.toMatchObject({txRequest: {to: DIAMOND, chainId: 8453}, destAmount: "990000"});
     const q = new URL(sent).searchParams;
     expect([q.get("fromChain"), q.get("toChain"), q.get("toToken")]).toEqual(["8453", "99901", ELY_USDCE]);
-    expect(q.getAll("denyBridges")).toContain("relaydepository");
+    expect(q.getAll("denyBridges")).toEqual(expect.arrayContaining(["relaydepository", "lifiIntents"]));
   });
 });
 

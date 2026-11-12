@@ -61,7 +61,8 @@ const LIFI_CHAIN: Record<string, string> = {
   "eip155:2818": "2818",
   "eip155:14": "14",
   // 2026-11-10: Elysium (Kinetiq; li.quest/v1/chains id 99901, key "ely"). LI.FI's bridges there are Relay (refused
-  // below: UNBOUND_TOOLS) and LI.FI Intents; same-chain swaps go through GenericSwapFacetV3 (KyberSwap, Nordstern).
+  // below: UNBOUND_TOOLS) and LI.FI Intents (refused too: UNPINNED_TOOLS), so it has no cross-chain LI.FI route for now;
+  // same-chain swaps go through GenericSwapFacetV3 (KyberSwap, Nordstern).
   "eip155:99901": "99901",
   [LIFI_SOLANA_CAIP2]: "1151111081099710",
 };
@@ -251,6 +252,15 @@ const TOOL_KEY = /^[A-Za-z0-9_-]{1,64}$/;
  */
 const UNBOUND_TOOLS: readonly string[] = Object.freeze(["relaydepository", "garden", "squid", "symbiosis"]);
 /**
+ * LI.FI Intents (`lifiIntents`): the escrowed order names its own input oracle, output oracle, output settler and output
+ * amount multiplier, none of which is pinned here, so its Diamond call is refused on every route (calldata.ts,
+ * `INTENTS_UNPINNED` / `INTENTS_TO_SOLANA`) and every cross-chain request from an EVM chain asks LI.FI to route around it,
+ * like the unbound tools. A Solana source is unchanged (no Diamond call; see UNBOUND_TOOLS).
+ */
+const UNPINNED_TOOLS: readonly string[] = Object.freeze(["lifiIntents"]);
+/** The LI.FI tools every cross-chain request from an EVM chain is asked to avoid, and a route policy cannot pick. */
+const REFUSED_EVM_TOOLS: readonly string[] = Object.freeze([...UNBOUND_TOOLS, ...UNPINNED_TOOLS]);
+/**
  * EVM → Solana: the LI.FI tools whose Diamond call binds the delivery to the Solana recipient the device reads
  * (calldata.ts, `solanaRecipientMismatch`): Mayan's Swift, MCTP and Fast MCTP routes, Polymer CCTP (fast and standard)
  * and Chainflip. Such requests ask LI.FI for these bridges only, so a pair is not lost to a bridge the module refuses
@@ -399,7 +409,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
               options: {
                 slippage: slippageBps / 10_000,
                 ...(routeScope ? {slippageScope: "route"} : {}),
-                ...(solanaSource ? {} : {bridges: {...(evmToSolana ? {allow: SOLANA_DESTINATION_TOOLS} : {}), deny: UNBOUND_TOOLS}}),
+                ...(solanaSource ? {} : {bridges: {...(evmToSolana ? {allow: SOLANA_DESTINATION_TOOLS} : {}), deny: REFUSED_EVM_TOOLS}}),
                 ...(noDestinationCall ? {allowDestinationCall: false} : {}),
                 ...(integrator().trim() ? {integrator: integrator().trim()} : {}),
               },
@@ -407,7 +417,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
             signal: signal ?? timeoutSignal(8_000),
           });
           if (res.ok) {
-            const options = routeOptions(await res.json(), solanaSource ? [] : UNBOUND_TOOLS, evmToSolana ? SOLANA_DESTINATION_TOOLS : undefined);
+            const options = routeOptions(await res.json(), solanaSource ? [] : REFUSED_EVM_TOOLS, evmToSolana ? SOLANA_DESTINATION_TOOLS : undefined);
             if (options.length) choice = cleanChoice(config.chooseRoute(options, params));
           }
         } catch {
@@ -432,8 +442,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         }
         if (routeScope) url.searchParams.set("slippageScope", "route");
         if (noDestinationCall) url.searchParams.set("allowDestinationCall", "false");
-        const unbound = crossChain && !solanaSource ? UNBOUND_TOOLS : [];
-        const allow = (choice?.allowBridges ?? []).filter((b) => solanaSource || !UNBOUND_TOOLS.includes(b));
+        const unbound = crossChain && !solanaSource ? REFUSED_EVM_TOOLS : [];
+        const allow = (choice?.allowBridges ?? []).filter((b) => solanaSource || !REFUSED_EVM_TOOLS.includes(b));
         // EVM → Solana: the policy's pick among the readable bridges, or all of them.
         const solanaAllow = evmToSolana ? allow.filter((b) => SOLANA_DESTINATION_TOOLS.includes(b)) : [];
         for (const t of evmToSolana ? (solanaAllow.length ? solanaAllow : SOLANA_DESTINATION_TOOLS) : allow) url.searchParams.append("allowBridges", t);

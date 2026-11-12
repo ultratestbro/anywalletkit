@@ -3,7 +3,7 @@
 // lifiVerifyQuote: the provider's own diamondCallMismatch with the expectation it builds, run on the device.
 // The fixture is read-only answers of the public li.quest/v1/quote (2026-10-30, no API key) across 32 corridors — same-chain
 // swaps, bridges via Across, Stargate, Relay, Mayan, LayerSwap, Polymer, Glacis, LI.FI Intents and NEAR, native in and
-// out, and the routes the provider refuses (no quote). Every quote the provider accepts must pass the remote check,
+// out, and the routes the provider refuses (no quote; Relay since 2026-11-02, LI.FI Intents since 2026-11-13). Every quote the provider accepts must pass the remote check,
 // directly and through the real swap2 server handler and remoteProvider. Base USDC → Solana USDC (Polymer CCTP) was
 // refused until the Solana recipient was read (2026-11-12): it now passes, its USDC account derived on the device.
 import {readFileSync} from "node:fs";
@@ -51,14 +51,17 @@ describe("scan 2026-10-30 F3: lifiVerifyQuote over live LI.FI answers", () => {
       table.push(`${c.name}: pass`);
     }
     // The two Relay answers are refused since 2026-11-02: Relay's orderId is not bound to the checked receiver (live,
-    // LI.FI is asked to deny relaydepository and serves those pairs through another bridge).
-    expect(accepted).toBe(25);
+    // LI.FI is asked to deny relaydepository and serves those pairs through another bridge). The LI.FI Intents answer
+    // (BSC USDT → Arbitrum USDC) is refused since 2026-11-13: its oracles and output settler are not pinned (live, LI.FI
+    // is asked to deny lifiIntents and serves the pair through another bridge: evm-intents-2026-11-13.test.ts).
+    expect(accepted).toBe(24);
     expect(table).toContain("base-usdc>solana-usdc default: pass");
     expect(table.filter((t) => t.includes("local refused"))).toEqual([
       expect.stringMatching(/^base-usdc>arb-usdc relay: local refused \(lifi: the transaction does not match the quote: Relay delivers to a recipient the transaction does not bind/),
       expect.stringMatching(/^base-usdc>arb-usdc cbridge: local refused \(lifi: No available quotes/),
       expect.stringMatching(/^op-usdc>arb-usdc symbiosis: local refused/),
       expect.stringMatching(/^eth-eth>arb-eth hop: local refused/),
+      "bsc-usdt>arb-usdc default: local refused (lifi: the transaction does not match the quote: a LI.FI Intents order to an EVM chain names its own oracles, output settler and output amount, which cannot be checked here — its escrow could release the input without the delivery)",
       expect.stringMatching(/^gnosis-xdai>arb-usdc default: local refused .*Relay delivers/),
       expect.stringMatching(/^base-eth>arb-eth gasZip: local refused/),
       expect.stringMatching(/^base-usdc>op-usdc eco: local refused/),

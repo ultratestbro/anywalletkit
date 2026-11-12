@@ -249,15 +249,15 @@ describe("EVM → Solana: LI.FI is asked only for the bridges whose recipient is
   }
   const route = (tool: string) => ({toAmount: "990000", toAmountMin: "985050", steps: [{tool, estimate: {executionDuration: 30}, includedSteps: [{type: "cross", tool}]}]});
 
-  it("/quote carries allowBridges = the readable bridges, LI.FI Intents not among them (the unbound ones still denied); EVM → EVM and Solana sources are unchanged", async () => {
+  it("/quote carries allowBridges = the readable bridges, LI.FI Intents not among them (the unbound ones and LI.FI Intents denied, as from EVM to EVM); Solana sources are unchanged", async () => {
     const {urls} = record();
     expect(await lifiProvider().getQuote(c.params)).not.toBeNull();
     expect(urls[0]!.searchParams.getAll("allowBridges")).toEqual(READABLE);
     expect(urls[0]!.searchParams.getAll("allowBridges")).not.toContain("lifiIntents");
-    expect(urls[0]!.searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden", "squid", "symbiosis"]);
+    expect(urls[0]!.searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden", "squid", "symbiosis", "lifiIntents"]);
     await lifiProvider().getQuote({...c.params, destChain: "eip155:8453", destToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", destAddress: c.params.refundAddress!});
     expect(urls[1]!.searchParams.getAll("allowBridges")).toEqual([]);
-    expect(urls[1]!.searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden", "squid", "symbiosis"]);
+    expect(urls[1]!.searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden", "squid", "symbiosis", "lifiIntents"]);
     await lifiProvider().getQuote({sourceChain: "solana:mainnet", sourceToken: "SOL", destChain: "eip155:8453", destToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", amountIn: "100000000", destAddress: c.params.refundAddress!, refundAddress: c.params.destAddress, dry: false});
     expect(urls[2]!.searchParams.getAll("allowBridges")).toEqual([]);
     expect(urls[2]!.searchParams.getAll("denyBridges")).toEqual([]);
@@ -268,7 +268,7 @@ describe("EVM → Solana: LI.FI is asked only for the bridges whose recipient is
     const policy = (pickTool: string) => (options: readonly {tool: string}[]) => { seen = options.map((o) => o.tool); return {allowBridges: [pickTool]}; };
     const {urls, bodies} = record({routes: [route("near"), route("mayan"), route("relaydepository"), route("lifiIntents"), route("polymerStandard")]});
     expect(await lifiProvider({chooseRoute: policy("polymerStandard")}).getQuote(c.params)).not.toBeNull();
-    expect(bodies[0]!.options).toMatchObject({bridges: {allow: READABLE, deny: ["relaydepository", "garden", "squid", "symbiosis"]}});
+    expect(bodies[0]!.options).toMatchObject({bridges: {allow: READABLE, deny: ["relaydepository", "garden", "squid", "symbiosis", "lifiIntents"]}});
     expect(seen).toEqual(["mayan", "polymerStandard"]);
     expect(urls[0]!.searchParams.getAll("allowBridges")).toEqual(["polymerStandard"]);
     // A policy that picks NEAR Intents or LI.FI Intents gets every readable bridge instead.

@@ -215,7 +215,7 @@
    "src": "eip155:8453:USDC",
    "dst": "eip155:99901:USDC.e",
    "amount": "100",
-   "note": "only way in: LI.FI Intents (Relay refused, UNBOUND_TOOLS)"
+   "note": "only way in was LI.FI Intents (Relay refused, UNBOUND_TOOLS); LI.FI Intents is refused too since protocol-swap2-lifi 0.8.0 (unpinned oracles, UNPINNED_TOOLS), so no-route is expected until they are pinned"
   },
   {
    "id": "om:ton-usdt>base-usdc",

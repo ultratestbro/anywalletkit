@@ -9,9 +9,9 @@
  * entry points only; a destination call (the final recipient sits in calldata for another chain) is
  * refused. For a Solana destination BridgeData.receiver is only LI.FI's non-EVM placeholder and the
  * recipient sits in facet-specific data: it is read for Mayan, Polymer CCTP and Chainflip
- * ({@link solanaRecipientMismatch}); LI.FI Intents to Solana is refused (its escrowed order names its own
- * oracles, output settler and output amount, none of which is pinned here), and so is any other non-EVM
- * destination.
+ * ({@link solanaRecipientMismatch}); any other non-EVM destination is refused. LI.FI Intents is refused on
+ * every route, to Solana and between EVM chains alike: its escrowed order names its own oracles, output
+ * settler and output amount, none of which is pinned here ({@link INTENTS_UNPINNED}).
  *
  * A facet's own data also names who gets money back — unused native fee, swap leftovers, the whole input when an
  * order expires unfilled, a fallback when delivery fails ({@link FACET_DATA}); each such address must be the sender or
@@ -26,11 +26,12 @@
  * the minimum is not.
  *
  * The receiver is only worth checking where the facet itself holds the bridge to it. Most do on
- * chain (Across V4, Mayan, Stargate, Chainflip, LI.FI Intents, GasZip, Glacis, AllBridge, M0, Polymer
- * CCTP) or through LI.FI's backend signature over BridgeData plus the off-chain order (NEAR Intents,
- * LayerSwap, Unit, the Across Swap API). Eco v3 binds its route to BridgeData.receiver by that signature
- * only, so the route itself is read here ({@link ecoDelivery}). The facets in {@link UNBOUND_BRIDGES} do
- * neither and are refused.
+ * chain (Across V4, Mayan, Stargate, Chainflip, GasZip, Glacis, AllBridge, M0, Polymer CCTP) or through
+ * LI.FI's backend signature over BridgeData plus the off-chain order (NEAR Intents, LayerSwap, Unit, the
+ * Across Swap API). Eco v3 binds its route to BridgeData.receiver by that signature only, so the route
+ * itself is read here ({@link ecoDelivery}). The facets in {@link UNBOUND_BRIDGES} do neither and are
+ * refused. LI.FI Intents binds its recipient on chain, but releases the escrowed input on the word of an
+ * oracle its own calldata names, so it is refused too ({@link INTENTS_UNPINNED}).
  */
 
 import {associatedTokenAccount, base58, solanaKey} from "./solana-address.js";
@@ -391,7 +392,9 @@ const FACET_DATA: Readonly<Record<string, FacetData>> = {
   Frax: {inline: 5, refunds: [["refundRecipient", 3]], zeroRefused: true},
   Glacis: {inline: 4, refunds: [["refundAddress", 1]], zeroRefused: true},
   LayerSwap: {refunds: [["refundRecipient", 2]], zeroRefused: true},
-  LiFiIntentEscrowV2: {refunds: [["depositAndRefundAddress", 2]], zeroRefused: true}, // the escrow order's user
+  // The escrow order's user. Not reached while LI.FI Intents is refused on every route (INTENTS_UNPINNED); kept for when
+  // its oracles and settler are pinned.
+  LiFiIntentEscrowV2: {refunds: [["depositAndRefundAddress", 2]], zeroRefused: true},
   M0: {inline: 7, refunds: [["refundRecipient", 1], ["orderOwner", 2]], zeroRefused: true, delivery: m0Delivery}, // orderOwner gets a cancelled order back
   Mayan: {refunds: [["refundRecipient", 7]], nested: mayanRefunds, zeroRefused: true},
   NEARIntents: {refunds: [["refundRecipient", 6]], zeroRefused: true}, // also the 1Click quote's refundTo
@@ -530,6 +533,15 @@ const SOLANA_DELIVERY: Readonly<Record<string, (r: Reader, at: number, t: Solana
  * oracle — so an Intents order to Solana is refused, recipient read or not.
  */
 const INTENTS_TO_SOLANA = "a LI.FI Intents order to Solana names its own oracles, output settler and output amount, which cannot be checked here — its escrow could release the input without the delivery";
+/**
+ * The same holds between EVM chains: the escrow trusts the `inputOracle` the calldata names, the output side runs through
+ * the `outputSettler` and `outputOracle` it names, and the committed output is `input × outputAmountMultiplier / 1e18`;
+ * none of them is pinned or bounded here (lifinance/contracts LiFiIntentEscrowFacetV2 2.0.0 only requires the recipient
+ * and a non-zero refund address). An Intents call to an EVM chain (or on a same-chain route) is refused before anything
+ * else is read; to Solana with {@link INTENTS_TO_SOLANA}.
+ */
+const INTENTS_UNPINNED = "a LI.FI Intents order to an EVM chain names its own oracles, output settler and output amount, which cannot be checked here — its escrow could release the input without the delivery";
+const INTENTS_FACET = "LiFiIntentEscrowV2";
 
 /**
  * EVM → Solana: BridgeData must name LI.FI's Solana chain id (checked by the caller) and, as its receiver, exactly the
@@ -543,7 +555,7 @@ function solanaRecipientMismatch(r: Reader, bridge: {sourceSwaps: boolean; facet
   if (e.destChainId !== LIFI_SOLANA_CHAIN_ID) return NON_EVM_UNREAD;
   if (!same(receiver, NON_EVM_ADDRESS)) return `BridgeData pays ${receiver}, not LI.FI's non-EVM placeholder ${NON_EVM_ADDRESS}, on a Solana route`;
   if (DEPOSIT_FACETS.has(bridge.facet)) return `${bridge.facet} pays a deposit address whose off-chain order names the Solana recipient — the transaction does not bind it`;
-  if (bridge.facet === "LiFiIntentEscrowV2") return INTENTS_TO_SOLANA;
+  if (bridge.facet === INTENTS_FACET) return INTENTS_TO_SOLANA;
   const read = SOLANA_DELIVERY[bridge.facet];
   if (!read) return NON_EVM_UNREAD;
   const owner = solanaKey(e.receiver);
@@ -581,6 +593,7 @@ export function diamondCallMismatch(data: string, e: DiamondExpectation): string
     if (unbound) return `${unbound} delivers to a recipient the transaction does not bind (an off-chain order or unchecked facet data)`;
     const bridge = BRIDGE_CALLS[selector];
     if (!bridge) return `unknown Diamond call ${selector}`;
+    if (bridge.facet === INTENTS_FACET && e.evmDestination) return INTENTS_UNPINNED;
     const head = r.small(4);
     if (head < (bridge.sourceSwaps ? 96 : 64) || head % 32 !== 0 || head > 32 * 32) return `unknown Diamond call ${selector}`;
     const at = 4 + head;
