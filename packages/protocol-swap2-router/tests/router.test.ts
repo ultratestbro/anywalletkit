@@ -248,6 +248,46 @@ describe("ranking, route picker, progressive quotes", () => {
     expect(set.best.netValueUsd).toBeCloseTo(99, 6);
   });
 
+  it("nets the native fee a price-only quote declares (providerData.nativeFee, no transaction) out of its value", async () => {
+    const {usdValue} = await import("../src/value.js");
+    // A dry LI.FI quote priced for a placeholder sender carries no transaction: its 0.001 ETH ($3) bridge fee rides in
+    // providerData. Read from txRequest only, it was worth $100 and tagged best over a $99 route with no fee.
+    const priceOnly = {depositAddress: "", providerData: {placeholder: "sender", nativeFee: "1000000000000000"}};
+    const router = new CrossChainRouter([q("lifi", "100000000", 60, priceOnly), q("plain", "99000000", 60)], {valueUsd: usdValue({ETH: 3000, USDT: 1})});
+    const set = (await router.getQuotes(PARAMS))!;
+    expect(set.quotes.find((x) => x.provider === "lifi")!.netValueUsd).toBeCloseTo(97, 6);
+    expect(set.best.provider).toBe("plain");
+    // Without a declared fee the price-only quote is worth its whole output; a zero fee subtracts nothing.
+    const value = usdValue({ETH: 3000, USDT: 1});
+    const quote = (extra: Record<string, unknown>) => ({
+      provider: "lifi", intentId: "lifi", depositAddress: "", depositMemo: null, sourceAmount: PARAMS.amountIn, destAmount: "100000000", minDestAmount: "100000000",
+      feeUsd: 0, etaSeconds: 60, reliability: 1, validUntilMs: Date.now() + 60_000, ...extra,
+    });
+    expect(value(quote({providerData: {placeholder: "sender"}}), PARAMS)).toBeCloseTo(100, 6);
+    expect(value(quote({providerData: {placeholder: "sender", nativeFee: "0"}}), PARAMS)).toBeCloseTo(100, 6);
+    // A quote with a transaction declares its fee there: providerData.nativeFee next to it is not read (USDT0 seals both).
+    expect(value(quote({txRequest: {to: "0xd", data: "0x", value: "0"}, providerData: {nativeFee: "1000000000000000"}}), PARAMS)).toBeCloseTo(100, 6);
+    expect(value(quote({txRequest: {to: "0xd", data: "0x", value: "2000000000000000", nativeFee: "2000000000000000"}, providerData: {nativeFee: "1000000000000000"}}), PARAMS)).toBeCloseTo(94, 6);
+    expect(value(quote({providerData: {nativeFee: "1000000000000000"}}), PARAMS)).toBeCloseTo(97, 6);
+    // No price for the source's native coin: the fee cannot be valued, so neither can the quote.
+    expect(usdValue({USDT: 1})(quote({providerData: {nativeFee: "1000000000000000"}}), PARAMS)).toBeNull();
+  });
+
+  it("a price-only quote whose providerData.nativeFee is not a base-unit integer cannot be valued (the auction compares outputs)", async () => {
+    const {usdValue, quoteValues} = await import("../src/value.js");
+    const value = usdValue({ETH: 3000, USDT: 1});
+    for (const bad of ["", "-1", "0x10", " 1", "1.5", "1e18", "1".repeat(81)]) {
+      const q1 = {provider: "lifi", intentId: "lifi", depositAddress: "", depositMemo: null, sourceAmount: PARAMS.amountIn, destAmount: "100000000", minDestAmount: "100000000",
+        feeUsd: 0, etaSeconds: 60, reliability: 1, validUntilMs: Date.now() + 60_000, providerData: {nativeFee: bad}};
+      expect([bad, value(q1, PARAMS)]).toEqual([bad, null]);
+      expect([bad, quoteValues({ETH: 3000, USDT: 1}, PARAMS, [{provider: "lifi", destAmount: "100000000", providerData: {nativeFee: bad}}])[0]!.valueUsdOut]).toEqual([bad, null]);
+    }
+    const router = new CrossChainRouter([q("lifi", "100000000", 60, {depositAddress: "", providerData: {nativeFee: "0x10"}}), q("plain", "99000000", 60)], {valueUsd: value});
+    const set = (await router.getQuotes(PARAMS))!;
+    expect(set.best.netValueUsd).toBeNull();
+    expect(set.best.provider).toBe("lifi"); // unpriced: guaranteed outputs compared, as without prices
+  });
+
   it("without a price for every quote it compares guaranteed outputs", async () => {
     const router = new CrossChainRouter([q("a", "99000000", 60), q("b", "98000000", 60)], {valueUsd: () => null});
     const set = (await router.getQuotes(PARAMS))!;
@@ -314,6 +354,18 @@ describe("quoteValues (SDK-127): USD in / out / loss and the better alternative 
     ]);
     expect(bridged[0]!.valueUsdOut).toBeCloseTo(98, 3);
     expect(bridged[0]!.lossPct).toBeCloseTo(2, 3);
+  });
+
+  it("a price-only quote's providerData.nativeFee is netted out of the delivered value too, and names the better alternative", async () => {
+    const {quoteValues} = await import("../src/value.js");
+    const params = {sourceChain: "eip155:1", sourceToken: "USDT", destChain: "eip155:8453", destToken: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", amountIn: "100000000"};
+    const v = quoteValues({USDT: 1, ETH: 2000, USDC: 1}, params, [
+      {provider: "lifi", destAmount: "99500000", providerData: {placeholder: "sender", nativeFee: "2500000000000000"}},
+      {provider: "cctp", destAmount: "99000000"},
+    ]);
+    expect(v[0]!.valueUsdOut).toBeCloseTo(94.5, 3);
+    expect(v[0]!.betterAlternative).toMatchObject({provider: "cctp"});
+    expect(v[1]!.betterAlternative).toBeUndefined();
   });
 
   it("names the better alternative by raw output when the destination has no price (Oct 16 Base USDT→ENA: Uniswap 19.2 vs LI.FI 24.5)", async () => {

@@ -58,7 +58,10 @@ The same is available one level down on `CrossChainRouter#getQuotes(params, {onU
 
 1. **Value.** With `valueUsd` (e.g. `usdValue(prices, {gasUsd})`) each quote is worth its guaranteed
    output in USD minus what the route charges on top: a native bridge fee and, when you can say it,
-   the source gas. Without prices for every quote the auction compares guaranteed outputs.
+   the source gas. The fee is the transaction's `txRequest.nativeFee`; a price-only quote, which carries
+   no transaction (a dry LI.FI quote without the sender), declares it as `providerData.nativeFee`, read only
+   when there is no `txRequest` (a value that is not a base-unit integer leaves the quote unpriced).
+   Without prices for every quote the auction compares guaranteed outputs.
 2. **Price first.** Quotes within `tieBand` (default 0.2%) of the best value are the same price.
 3. **Speed and reliability inside the tie.** Among equal prices the faster, then the more reliable,
    route wins (`weights`, default `price:0.6,speed:0.3,reliability:0.1`). A sliver of extra output no
