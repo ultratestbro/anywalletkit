@@ -16,6 +16,19 @@
         "</main>"
       ],
       "label": "STON.fi docs · Omniston"
+    },
+    {
+      "id": "ton-escrow-minter-rev2-code",
+      "type": "ton-code",
+      "address": "EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA",
+      "label": "Omniston TON Escrow Minter rev2 · code (an executed upgrade)"
+    },
+    {
+      "id": "ton-escrow-minter-rev2-data",
+      "type": "http-json",
+      "url": "https://tonapi.io/v2/blockchain/accounts/EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA",
+      "path": "data",
+      "label": "Omniston TON Escrow Minter rev2 · data (admin, pending admin / code, upgrade time, position code; constant since deploy)"
     }
   ]
 }

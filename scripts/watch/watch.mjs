@@ -186,6 +186,8 @@ const F = {
   async "http-json"(s) {
     const j = await fetchJson(s.url, {headers: s.headers ?? {}});
     const arr = dig(j, s.path);
+    // A missing path must not fall back to the whole answer: that hashes balances and timestamps and diffs every run.
+    if (s.path && arr === undefined) throw new Error(`no "${s.path}" in the answer`);
     if (s.itemKey && Array.isArray(arr)) {
       const keys = arr.map((x) => String(dig(x, s.itemKey))).sort();
       return {value: canonical(keys), meta: {count: keys.length, keys}};

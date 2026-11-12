@@ -26,6 +26,12 @@ const evmEvm = JSON.parse(readFileSync(new URL("./fixtures/live-evm-evm-2026-10-
 const ATTACKER = "0xa77ac3e5a77ac3e5a77ac3e5a77ac3e5a77ac3e5";
 const USDT_TON = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs";
 const hex = (value: string) => new Uint8Array(Buffer.from(value, "hex"));
+/**
+ * The EVM → TON orders were captured on the rev1 TON Escrow Minter, which left the default trust on 2026-11-12
+ * (SDK-306). The backend trusts it explicitly so these real captures keep exercising the same checks; an app that did
+ * this would trust rev1 again for new orders.
+ */
+const SETTLEMENT_WITH_REV1 = {...AUDITED_OMNISTON_SETTLEMENT_CONTRACTS, "ton:-239": ["EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ"]};
 
 /** Every live order: source chain and token symbol, destination chain, token and recipient. */
 const corridors: Array<{name: string; fx: Fixture; from: string; token: string; toChain: string; toToken: string}> = [
@@ -76,7 +82,7 @@ function backend(fx: Fixture, tamper?: (tx: UnsignedTx) => UnsignedTx) {
   const client = clientFor(fx);
   const real = omnistonProvider({
     client: client as never, quoteSettleMs: 0, maxHtlcExecutions: 1,
-    trustedSettlementContracts: AUDITED_OMNISTON_SETTLEMENT_CONTRACTS, trustedEvmOrderProtocols: AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS,
+    trustedSettlementContracts: SETTLEMENT_WITH_REV1, trustedEvmOrderProtocols: AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS,
     validateEvmInputPosition: () => true, validateTonOutputPosition: () => true, validateEvmOutputPosition: () => true,
   });
   const handle = createSwap2Handler<string>({providers: [real], sealSecret: "test-seal-secret-that-is-at-least-32-bytes-long", guard: () => {}, subject: () => "alice"});
@@ -204,7 +210,7 @@ describe("scan 2026-10-28 F6: a remote Omniston EVM typed order is opened on the
       pin(c.fx);
       const real = omnistonProvider({
         client: clientFor(c.fx) as never, quoteSettleMs: 0, maxHtlcExecutions: 1,
-        trustedSettlementContracts: AUDITED_OMNISTON_SETTLEMENT_CONTRACTS, trustedEvmOrderProtocols: AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS,
+        trustedSettlementContracts: SETTLEMENT_WITH_REV1, trustedEvmOrderProtocols: AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS,
         validateEvmInputPosition: () => true, validateTonOutputPosition: () => true, validateEvmOutputPosition: () => true,
       });
       const params: QuoteParams = {sourceChain: c.from, sourceToken: c.token, destChain: c.toChain, destToken: c.toToken,

@@ -43,6 +43,7 @@ import { ThorchainSwap2Protocol } from '@anywalletkit/protocol-swap2-thorchain/p
 import { OmnistonSwap2Protocol } from '@anywalletkit/protocol-swap2-omniston/protocol'
 import { createOmnistonTonValidators } from '@anywalletkit/protocol-swap2-omniston/validators'
 import escrowLive from '../../packages/protocol-swap2-omniston/tests/fixtures/live-2026-10-10.json'
+import escrowRev2Live from '../../packages/protocol-swap2-omniston/tests/fixtures/live-ton-settlement-rev2-2026-11-11.json'
 import LidoProtocolEvm, { splitWithdrawalAmounts } from '@anywalletkit/protocol-staking-lido-evm'
 import SsvProtocolEvm, { MINIMAL_STAKING_AMOUNT } from '@anywalletkit/protocol-staking-ssv-evm'
 import TonstakersProtocolTon, { buildStakeBody, buildUnstakeBody } from '@anywalletkit/protocol-staking-tonstakers-ton'
@@ -388,15 +389,23 @@ export async function smokeProtocols(check: Check): Promise<void> {
     check('swap2: redactUrls linear on 64 KB', Date.now() - t0 < 1_000 && out.endsWith(' <url>') && !out.includes('KEY'))
   }
   {
-    // 2026-10-28: a remote TON → EVM Omniston order is checked on the device — the live escrow (USDT on TON → USDC on Base) passes, another destination does not
-    const c = (escrowLive as unknown as { baseUsdc: { quoteUpdated: { value: { inputUnits: string; outputAsset: { chain: { value: { kind: { value: string } } } }; settlementData: { value: { resolverSendsUnits: string } } } }; escrowRequest: { ownerSrcAddress: { chain: { value: string } }; traderDstAddress: { chain: { value: string } } }; escrowResponse: { messages: Array<{ payload: string }> } } }).baseUsdc
+    // 2026-10-28: a remote TON → EVM Omniston order is checked on the device — the live escrow (USDT on TON → USDC on Base) passes, another destination does not.
+    // 2026-11-12 (SDK-306): the default trusts the rev2 TON Escrow Minter only — its live escrow passes; the rev1 escrow of 2026-10-10 is refused.
+    // An app that lists rev1 in trustedProtocolAddresses trusts it again for new builds (an explicit widening; old orders do not need it),
+    // and the other checks still run: the same body for another recipient is refused.
+    type EscrowFixture = { quoteUpdated: { inputUnits: string; outputAsset: { chain: { value: { kind: { value: string } } } }; settlementData: { value: { resolverSendsUnits: string } } }; escrowRequest: { ownerSrcAddress: { chain: { value: string } }; traderDstAddress: { chain: { value: string } } }; escrowResponse: { messages: Array<{ payload: string }> } }
+    const expectationOf = (c: EscrowFixture) => ({
+      payloadBocHex: c.escrowResponse.messages[0]!.payload, ownerAddress: c.escrowRequest.ownerSrcAddress.chain.value, inputUnits: c.quoteUpdated.inputUnits,
+      destinationChain: 'eip155:8453', destinationAddress: c.escrowRequest.traderDstAddress.chain.value, outputTokenAddress: c.quoteUpdated.outputAsset.chain.value.kind.value,
+      minResolverSendsUnits: c.quoteUpdated.settlementData.value.resolverSendsUnits,
+    })
+    const rev1 = (escrowLive as unknown as { baseUsdc: Omit<EscrowFixture, 'quoteUpdated'> & { quoteUpdated: { value: EscrowFixture['quoteUpdated'] } } }).baseUsdc
+    const old = expectationOf({ ...rev1, quoteUpdated: rev1.quoteUpdated.value })
+    const now = expectationOf((escrowRev2Live as unknown as { tonToEvm: EscrowFixture }).tonToEvm)
     const v = createOmnistonTonValidators()
-    const expectation = {
-      payloadBocHex: c.escrowResponse.messages[0]!.payload, ownerAddress: c.escrowRequest.ownerSrcAddress.chain.value, inputUnits: c.quoteUpdated.value.inputUnits,
-      destinationChain: 'eip155:8453', destinationAddress: c.escrowRequest.traderDstAddress.chain.value, outputTokenAddress: c.quoteUpdated.value.outputAsset.chain.value.kind.value,
-      minResolverSendsUnits: c.quoteUpdated.value.settlementData.value.resolverSendsUnits,
-    }
-    check('omniston: TON → EVM escrow verified on the device', v.verifyTonEscrowBuild(expectation) === null && v.verifyTonEscrowBuild({ ...expectation, destinationAddress: '0x' + '99'.repeat(20) }) !== null)
+    const withRev1 = createOmnistonTonValidators({ trustedProtocolAddresses: ['EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA', 'EQAbWJ3Y1HgIIvcMq1prG1anlDC0T3cZlAU7luPT6LmTpmrZ'] })
+    check('omniston: TON → EVM escrow verified on the device', v.verifyTonEscrowBuild(now) === null && v.verifyTonEscrowBuild({ ...now, destinationAddress: '0x' + '99'.repeat(20) }) !== null &&
+      v.verifyTonEscrowBuild(old) !== null && withRev1.verifyTonEscrowBuild(old) === null && withRev1.verifyTonEscrowBuild({ ...old, destinationAddress: '0x' + '99'.repeat(20) }) !== null)
   }
   check('approvals: isRevokeCalldata', isRevokeCalldata('0x095ea7b3' + '0'.repeat(24) + 'beef'.padStart(40, '0') + '0'.repeat(64)) === true)
   check('approvals: isUnlimitedAmount', isUnlimitedAmount((1n << 256n) - 1n) === true && isUnlimitedAmount(5n) === false)

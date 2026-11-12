@@ -26,8 +26,24 @@ export const DEFAULT_OMNISTON_TON_CODE_HASHES = {
   authorityKeys: ["ed210da12aa96ea42de4f2f61dc172bbaa3da86051a1b2a6f342f69a777d2770"],
   /** EVM→TON output position: the contract the factory deploys for the
    *  resolver's jetton lock (observed on every resolver-created position,
-   *  2026-10-15/16), and the escrow code cell it carries in its state. */
-  position: ["e4d5115a321ade7b827e38fb522c20d2f2cd46e4c6b0b5f7dd8b6b096792d77b"],
+   *  2026-10-15/16), and the escrow code cell it carries in its state.
+   *  A position counts only when a trusted factory itself sent its deploy
+   *  message, and a minter deploys only the position code stored in its own
+   *  data, so this list follows the trusted minters in
+   *  AUDITED_OMNISTON_SETTLEMENT_CONTRACTS["ton:-239"]:
+   *  - eb503578…: positions of the rev2 Escrow Minter EQDybO88… (the position
+   *    code stored in its data; reviewed 2026-11-12). The diff to rev1's
+   *    e4d5115a… is 13 sub-VM calls in another mode (RUNVMX 20 -> 276) and 2
+   *    escrow-code whitelist checks. The state layout is the same, and live
+   *    and settled rev2 positions pass every check of
+   *    validateTonOutputPosition.
+   *  - e4d5115a… (positions of the rev1 minter EQAbWJ3Y…) left the default
+   *    with rev1 on 2026-11-12. Only an EVM -> TON order quoted on rev1 less
+   *    than 6 h before an app upgrades can still need it (positionCodeHashes
+   *    with both codes, until those 6 h are over). That pin alone trusts no
+   *    new order: a new quote must name a trusted minter, and a position
+   *    counts only when the minter its quote named deployed it. */
+  position: ["eb503578b4d9cd791c9c0ecd0da6da4064aae2bcb19d3c924d4001c493386bc5"],
   outputEscrow: ["d30423575384773abaad8d3c6f763898afa3d57a5693005904b7c61e95cee630"],
 } as const;
 
