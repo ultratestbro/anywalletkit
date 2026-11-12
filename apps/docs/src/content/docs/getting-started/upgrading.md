@@ -27,11 +27,11 @@ another inbound vault — refused until they agree").
   `/thorchain/mimir` next to `/thorchain/inbound_addresses`, no query string (`THORNODE_CONFIRM_PATHS` lists them).
   A proxy that answers 404 to the new paths is skipped and the next confirming node is asked, so update the proxy
   before the app.
-- **A proxy in front of the quoting node (`nodeUrl`):** pass `GET /thorchain/lastblock` without a query string too,
-  next to `/thorchain/quote/swap` and `/thorchain/inbound_addresses`. The quoting node's height is what a confirming
-  node's lag is measured against; a `nodeUrl` that does not answer it is skipped for the next one, and with none
-  left the quote is refused with "THORChain height (/thorchain/lastblock) unavailable from every node that answered
-  the inbound addresses".
+- **Breaking: a proxy in front of the quoting node (`nodeUrl`):** pass `GET /thorchain/lastblock` without a query
+  string too, next to `/thorchain/quote/swap` and `/thorchain/inbound_addresses`. The quoting node's height is what a
+  confirming node's lag is measured against; a `nodeUrl` that does not answer it is skipped for the next one, and with
+  none left the quote is refused with "THORChain height (/thorchain/lastblock) unavailable from every node that
+  answered the inbound addresses".
 - **A proxy that rewrites THORNode answers:** keep THORNode's field types. A field of another type (an address or
   router as a number, a halt flag as a string, a `null` entry) is another shape: a confirming node answering it is
   skipped, and a quoting node is unavailable, so the next `nodeUrl` host is asked ("inbound addresses unavailable
