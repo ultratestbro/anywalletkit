@@ -6,8 +6,10 @@
  * Same-chain swaps run through GenericSwapFacet(V3): receiver, minimum, the input token and amount,
  * and the output token are in the arguments. Bridges take `ILiFi.BridgeData` as their first
  * argument: its receiver, destination chain and bridged asset are checked, for the listed bridge
- * entry points only; a destination call (the final recipient sits in calldata for another chain)
- * and a non-EVM destination (the receiver sits in facet-specific data) are refused.
+ * entry points only; a destination call (the final recipient sits in calldata for another chain) is
+ * refused. For a Solana destination BridgeData.receiver is only LI.FI's non-EVM placeholder and the
+ * recipient sits in facet-specific data: it is read for Mayan, Polymer CCTP, Chainflip and LI.FI
+ * Intents ({@link solanaRecipientMismatch}); any other non-EVM destination is refused.
  *
  * A facet's own data also names who gets money back — unused native fee, swap leftovers, the whole input when an
  * order expires unfilled, a fallback when delivery fails ({@link FACET_DATA}); each such address must be the sender or
@@ -17,7 +19,9 @@
  * Across, what the receiver finally gets) lives in facet-specific data, so for most bridges the
  * reviewed minimum still relies on LI.FI's API answering honestly. Eco and M0 are the exceptions
  * ({@link FacetData.delivery}): their facet data names the destination token, amount and (Eco) recipient
- * outright, and those are held to the quote.
+ * outright, and those are held to the quote. To Solana the delivered token is held to the quote where the
+ * facet names it (a Mayan order, Chainflip, LI.FI Intents; Mayan's and Polymer's CCTP legs deliver USDC);
+ * the minimum is not.
  *
  * The receiver is only worth checking where the facet itself holds the bridge to it. Most do on
  * chain (Across V4, Mayan, Stargate, Chainflip, LI.FI Intents, GasZip, Glacis, AllBridge, M0, Polymer
@@ -26,6 +30,8 @@
  * only, so the route itself is read here ({@link ecoDelivery}). The facets in {@link UNBOUND_BRIDGES} do
  * neither and are refused.
  */
+
+import {associatedTokenAccount, base58, solanaKey} from "./solana-address.js";
 
 /**
  * The V3 entry points move one asset kind in and one out, and check the minimum against THAT kind's balance: a
@@ -419,6 +425,133 @@ function refundMismatch(r: Reader, bridge: {sourceSwaps: boolean; facet: string}
   return null;
 }
 
+/** The refusal for a non-EVM destination whose recipient this module does not read. */
+const NON_EVM_UNREAD = "the recipient on a non-EVM destination sits in bridge-specific data and cannot be checked here";
+/** LI.FI's Solana chain id and the BridgeData.receiver of a non-EVM destination (LiFiData.sol, lifinance/contracts). */
+const LIFI_SOLANA_CHAIN_ID = 1151111081099710n;
+const NON_EVM_ADDRESS = "0x11f111f111f111f111f111f111f111f111f111f1";
+const SOLANA_USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+/** Solana as Mayan names it: Wormhole chain 1, CCTP domain 5 (Mayan swap-sdk `utils.ts` / `cctp.ts`; Circle's domain list). */
+const WORMHOLE_SOLANA = 1n;
+const CCTP_DOMAIN_SOLANA = 5n;
+/** Chainflip's asset ids on Solana (SOL, USDC, USDT), as `@anywalletkit/protocol-swap2-chainflip` lists them. */
+const CHAINFLIP_SOLANA_ASSETS: Readonly<Record<string, bigint>> = {
+  "11111111111111111111111111111111": 9n,
+  [SOLANA_USDC]: 10n,
+  Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: 16n,
+};
+/** Facets that pay a deposit address or a depository whose off-chain order names the recipient. */
+const DEPOSIT_FACETS = new Set(["NEARIntents", "LayerSwap", "Unit"]);
+
+/** A Mayan call's Solana fields, as head words of `protocolData` after its selector (Mayan swap-sdk ABIs, selectors as MayanFacet lists them). */
+interface MayanSolanaLayout {destAddr: number; chain: number; cctp: boolean; payloadType?: readonly [number, bigint]; tokenOut?: number}
+const MAYAN_SOLANA: Readonly<Record<string, MayanSolanaLayout>> = {
+  // Swift v2 createOrderWithToken(tokenIn, amountIn, (payloadType, trader, destAddr, destChainId, referrerAddr, tokenOut, minAmountOut, …), customPayload)
+  "0xa3a30834": {destAddr: 4, chain: 5, cctp: false, payloadType: [2, 1n], tokenOut: 7},
+  // MCTP createOrder((tokenIn, amountIn, gasDrop, destAddr, destChain, tokenOut, minAmountOut, deadline, redeemFee, referrerAddr, referrerBps))
+  "0x1c59b7fc": {destAddr: 3, chain: 4, cctp: false, tokenOut: 5},
+  // MCTP bridgeWithFee(tokenIn, amountIn, redeemFee, gasDrop, destAddr, destDomain, payloadType, customPayload): delivers USDC
+  "0x2072197f": {destAddr: 4, chain: 5, cctp: true, payloadType: [6, 1n]},
+  // Fast MCTP bridge(tokenIn, amountIn, redeemFee, circleMaxFee, gasDrop, destAddr, destDomain, referrerAddress, referrerBps, payloadType, minFinalityThreshold, customPayload): delivers USDC
+  "0xf58b6de8": {destAddr: 5, chain: 6, cctp: true, payloadType: [9, 1n]},
+  // Fast MCTP createOrder(tokenIn, amountIn, circleMaxFee, destDomain, minFinalityThreshold, (payloadType 3, destAddr, tokenOut, amountOutMin, …))
+  "0x2337e236": {destAddr: 6, chain: 3, cctp: true, payloadType: [5, 3n], tokenOut: 7},
+};
+
+/** What a Solana delivery must name: the requested owner and mint, as raw keys and as 0x-hex words. */
+interface SolanaTarget {owner: Uint8Array; ownerHex: string; mint: Uint8Array; mintHex: string; e: DiamondExpectation}
+const hexOf = (b: Uint8Array): string => `0x${Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("")}`;
+/** A 0x-hex 32-byte word as a Solana address, for messages. */
+const keyOf = (word: string): string => base58(Uint8Array.from(word.slice(2).match(/../g) ?? [], (h) => Number.parseInt(h, 16)));
+
+/**
+ * Mayan (MayanFacet 2.0.0) requires MayanData.nonEVMReceiver to equal the destination address inside `protocolData`, the
+ * order or transfer it forwards to Mayan; both are read. For Solana Mayan's swap-sdk writes the owner wallet there
+ * (`nativeAddressToHexString(destinationAddress, solana)`), and Mayan's programs pay its associated token account. An
+ * order names its output token (the mint; 32 zero bytes for SOL) and Solana as Wormhole chain 1 or CCTP domain 5; a
+ * plain CCTP transfer delivers USDC. A custom payload (a handler as destAddr) is refused.
+ */
+function mayanToSolana(r: Reader, at: number, t: SolanaTarget): string | null {
+  const declared = r.raw(at, 32);
+  if (declared !== t.ownerHex) return `Mayan's nonEVMReceiver is ${keyOf(declared)}, not the recipient ${t.e.receiver}`;
+  const p = r.bytes(at, at + 32 * 2);
+  const selector = p.raw(0, 4);
+  const o = MAYAN_SOLANA[selector];
+  if (!o) return `the Mayan call ${selector} is not one whose Solana recipient is read here`;
+  const word = (i: number) => 4 + 32 * i;
+  if (o.payloadType && p.word(word(o.payloadType[0])) !== o.payloadType[1]) return `the Mayan call ${selector} carries payload type ${p.word(word(o.payloadType[0]))}, not a plain delivery`;
+  const dest = p.raw(word(o.destAddr), 32);
+  if (dest !== t.ownerHex) return `the Mayan order pays ${keyOf(dest)} on Solana, not ${t.e.receiver}`;
+  const chain = p.word(word(o.chain));
+  if (chain !== (o.cctp ? CCTP_DOMAIN_SOLANA : WORMHOLE_SOLANA)) return `the Mayan order goes to ${o.cctp ? "CCTP domain" : "Wormhole chain"} ${chain}, not Solana`;
+  if (o.tokenOut === undefined) return t.e.toToken === SOLANA_USDC ? null : `a Mayan CCTP transfer delivers USDC, not ${t.e.toToken}`;
+  const token = p.raw(word(o.tokenOut), 32);
+  return token === t.mintHex ? null : `the Mayan order delivers ${keyOf(token)}, not ${t.e.toToken}`;
+}
+
+/**
+ * Polymer CCTP (PolymerCCTPFacet 3.1.0): CCTP mints to `solanaReceiverATA`, which the facet cannot check ("must be the
+ * USDC ATA of nonEVMReceiver"; nonEVMReceiver is the owner wallet the relayer reads). It must be the associated token
+ * account of the requested owner for USDC, derived here.
+ */
+function polymerToSolana(r: Reader, at: number, t: SolanaTarget): string | null {
+  const declared = r.raw(at + 32 * 2, 32);
+  if (declared !== t.ownerHex) return `Polymer CCTP's nonEVMReceiver is ${keyOf(declared)}, not the recipient ${t.e.receiver}`;
+  if (t.e.toToken !== SOLANA_USDC) return `Polymer CCTP delivers USDC, not ${t.e.toToken}`;
+  const mintTo = r.raw(at + 32 * 3, 32);
+  const account = hexOf(associatedTokenAccount(t.owner, t.mint));
+  return mintTo === account ? null : `the Polymer CCTP transfer mints to ${keyOf(mintTo)}, not the recipient's USDC account ${keyOf(account)}`;
+}
+
+/** Chainflip (ChainflipFacet 1.0.1): the vault swap's dstAddress is `nonEVMReceiver` verbatim (32 bytes, the owner, for Solana) and `dstToken` Chainflip's asset id. */
+function chainflipToSolana(r: Reader, at: number, t: SolanaTarget): string | null {
+  const dst = r.bytes(at, at);
+  if (dst.length !== 32) return `Chainflip pays a ${dst.length}-byte address on Solana, not ${t.e.receiver}`;
+  if (dst.raw(0, 32) !== t.ownerHex) return `Chainflip pays ${keyOf(dst.raw(0, 32))} on Solana, not ${t.e.receiver}`;
+  const asset = r.word(at + 32);
+  const want = CHAINFLIP_SOLANA_ASSETS[t.e.toToken];
+  return want !== undefined && asset === want ? null : `Chainflip delivers its asset ${asset}, not ${t.e.toToken}`;
+}
+
+/**
+ * LI.FI Intents (LiFiIntentEscrowFacetV2 2.0.0): the escrowed order's output names `recipient` and `outputToken` (raw
+ * 32-byte keys on Solana); the Solana output settler pays the recipient's associated token account for that mint (its
+ * `fill` instruction), or the recipient itself for native SOL (token = 32 zero bytes).
+ */
+function intentsToSolana(r: Reader, at: number, t: SolanaTarget): string | null {
+  const recipient = r.raw(at + 32, 32);
+  if (recipient !== t.ownerHex) return `the LI.FI Intents order pays ${keyOf(recipient)} on Solana, not ${t.e.receiver}`;
+  const token = r.raw(at + 32 * 9, 32);
+  return token === t.mintHex ? null : `the LI.FI Intents order delivers ${keyOf(token)}, not ${t.e.toToken}`;
+}
+
+const SOLANA_DELIVERY: Readonly<Record<string, (r: Reader, at: number, t: SolanaTarget) => string | null>> = {
+  Mayan: mayanToSolana,
+  PolymerCCTP: polymerToSolana,
+  Chainflip: chainflipToSolana,
+  LiFiIntentEscrowV2: intentsToSolana,
+};
+
+/**
+ * EVM → Solana: BridgeData must name LI.FI's Solana chain id (checked by the caller) and, as its receiver, exactly the
+ * NON_EVM_ADDRESS placeholder; the recipient sits in the facet's own data and is held here to the requested owner (the
+ * raw 32 bytes of `destAddress`) and the requested mint, for the facets whose delivery the transaction binds. NEAR
+ * Intents, LayerSwap and Unit pay a deposit address or a depository whose off-chain order names the recipient: a
+ * deposit the device cannot verify, refused for this direction. Any other facet keeps the non-EVM refusal.
+ */
+function solanaRecipientMismatch(r: Reader, bridge: {sourceSwaps: boolean; facet: string}, receiver: string, e: DiamondExpectation): string | null {
+  if (e.destChainId !== LIFI_SOLANA_CHAIN_ID) return NON_EVM_UNREAD;
+  if (!same(receiver, NON_EVM_ADDRESS)) return `BridgeData pays ${receiver}, not LI.FI's non-EVM placeholder ${NON_EVM_ADDRESS}, on a Solana route`;
+  if (DEPOSIT_FACETS.has(bridge.facet)) return `${bridge.facet} pays a deposit address whose off-chain order names the Solana recipient — a deposit the device cannot verify is refused`;
+  const read = SOLANA_DELIVERY[bridge.facet];
+  if (!read) return NON_EVM_UNREAD;
+  const owner = solanaKey(e.receiver);
+  if (!owner) return `the recipient ${e.receiver} is not a Solana address`;
+  const mint = solanaKey(e.toToken);
+  if (!mint) return `the destination token ${e.toToken} is not a Solana mint`;
+  return read(r, facetDataAt(r, bridge, FACET_DATA[bridge.facet]!), {owner, ownerHex: hexOf(owner), mint, mintHex: hexOf(mint), e});
+}
+
 /** Why the Diamond calldata does not do what the quote says, or null when it does. */
 export function diamondCallMismatch(data: string, e: DiamondExpectation): string | null {
   let r: Reader;
@@ -461,8 +594,10 @@ export function diamondCallMismatch(data: string, e: DiamondExpectation): string
     if (e.sameChain) return "a bridge call on a same-chain route";
     if (destinationChainId !== e.destChainId) return `bridges to chain ${destinationChainId}, not ${e.destChainId}`;
     if (hasDestinationCall) return "the route runs a call on the destination chain, whose recipient cannot be checked here";
-    if (!e.evmDestination) return "the recipient on a non-EVM destination sits in bridge-specific data and cannot be checked here";
-    if (!same(receiver, e.receiver)) return `pays ${receiver}, not ${e.receiver}`;
+    if (!e.evmDestination) {
+      const why = solanaRecipientMismatch(r, bridge, receiver, e);
+      if (why) return why;
+    } else if (!same(receiver, e.receiver)) return `pays ${receiver}, not ${e.receiver}`;
     if (hasSourceSwaps !== bridge.sourceSwaps) return `unknown Diamond call ${selector}`;
     const refund = refundMismatch(r, bridge, e);
     if (refund) return refund;
