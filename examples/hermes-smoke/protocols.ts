@@ -9,10 +9,12 @@ import { createMockAccount, parseActivityFixture, type ActivityFixtureJson } fro
 import { bigintToNumber, bigintToUnits } from '@anywalletkit/core'
 import { Address } from '@ton/core'
 import { RouterSwap2Protocol } from '@anywalletkit/protocol-swap2-router/swap2/router'
+import { usdValue } from '@anywalletkit/protocol-swap2-router/value'
 import { NearIntentsSwap2Protocol } from '@anywalletkit/protocol-swap2-near-intents/protocol'
 import { LifiSwap2Protocol } from '@anywalletkit/protocol-swap2-lifi/protocol'
 import { lifiProvider, lifiVerifyQuote } from '@anywalletkit/protocol-swap2-lifi/provider'
 import lifiSolanaLive from '../../packages/protocol-swap2-lifi/tests/fixtures-live-2026-11-12-evm-solana.json'
+import lifiEvmIntentsLive from '../../packages/protocol-swap2-lifi/tests/fixtures-live-2026-11-13-evm-intents.json'
 import { cctpProvider } from '@anywalletkit/protocol-swap2-cctp/provider'
 import { CctpSwap2Protocol } from '@anywalletkit/protocol-swap2-cctp/protocol'
 import { usdt0Provider } from '@anywalletkit/protocol-swap2-usdt0/provider'
@@ -163,6 +165,54 @@ export async function smokeProtocols(check: Check): Promise<void> {
       let built = ''
       try { if (dryQuote) await lifiProvider({}).buildDeposit({ ...dryQuote, txRequest: asQuote(polymer).txRequest! }) } catch (e) { built = e instanceof Error ? e.message : String(e) }
       check('lifi: buildDeposit refuses a quote priced for a placeholder, even with a transaction attached', /^swap2: this LI\.FI quote was priced for a placeholder recipient/.test(built), built)
+    } finally {
+      g.fetch = offline
+    }
+  }
+  {
+    // LI.FI Intents between EVM chains (live answers 2026-11-13): the escrowed order names its own oracles, output
+    // settler and output amount, so the Diamond call is refused on the device too (lifiVerifyQuote, the remote pin).
+    // A dry quote without the sender (price-only) declares its native bridge fee as providerData.nativeFee, and the
+    // router's usdValue nets it out (live Stargate V2 answer: LayerZero's fee in value).
+    type A = { tool?: string; action: { fromToken: { address: string } }; estimate: { toAmountMin: string }; transactionRequest: { to: string; data: string; value: string; chainId: number } }
+    type C = { name: string; params: Parameters<typeof lifiVerifyQuote>[0]; status?: number; response: A }
+    const fx = lifiEvmIntentsLive as unknown as { corridors: C[]; intents: C[]; priceOnly: C }
+    const asQuote = (c: C): Parameters<typeof lifiVerifyQuote>[1] => {
+      const tr = c.response.transactionRequest
+      const native = /^0x0{40}$/.test(c.response.action.fromToken.address)
+      const value = BigInt(tr.value)
+      const fee = native ? value - BigInt(c.params.amountIn) : value
+      return {
+        provider: 'lifi', intentId: `lifi:${tr.chainId}:${c.params.destChain.split(':')[1]}`, depositAddress: '', depositMemo: null, sourceAmount: c.params.amountIn,
+        destAmount: c.response.estimate.toAmountMin, minDestAmount: c.response.estimate.toAmountMin, feeUsd: 0, etaSeconds: 60, reliability: 1, validUntilMs: Date.now() + 60_000,
+        txRequest: { to: tr.to, data: tr.data, value: value.toString(), chainId: tr.chainId, ...(native ? {} : { approvalAddress: tr.to }), ...(fee > 0n ? { nativeFee: fee.toString() } : {}) },
+      }
+    }
+    const unpinned = 'the transaction does not match the request: a LI.FI Intents order to an EVM chain names its own oracles, output settler and output amount, which cannot be checked here — its escrow could release the input without the delivery'
+    const intentsWhy = fx.intents.map((c) => lifiVerifyQuote(c.params, asQuote(c)) ?? 'accepted')
+    check(`lifi: EVM → EVM refuses LI.FI Intents (oracles / settler not pinned) (${fx.intents.length})`, fx.intents.length === 3 && intentsWhy.every((w) => w === unpinned), intentsWhy.join(' | ').slice(0, 300))
+    const others = fx.corridors.filter((c) => c.status === 200)
+    const passed = others.filter((c) => lifiVerifyQuote(c.params, asQuote(c)) === null).map((c) => c.name)
+    check(`lifi: EVM → EVM quotes through other bridges pass lifiVerifyQuote (${passed.length}/${others.length})`, others.length === 13 && passed.length === others.length, others.filter((c) => !passed.includes(c.name)).map((c) => c.name).join(', '))
+
+    const stargate = fx.priceOnly
+    const g = globalThis as { fetch?: unknown }
+    const offline = g.fetch
+    g.fetch = async (u: unknown) => {
+      const url = new URL(String(u))
+      const answer = stargate.response as unknown as { action: object }
+      return { ok: true, status: 200, json: async () => ({ ...answer, action: { ...answer.action, slippage: Number(url.searchParams.get('slippage')) } }) }
+    }
+    try {
+      const q = await lifiProvider({}).getQuote(stargate.params)
+      const fee = BigInt(stargate.response.transactionRequest.value).toString()
+      check('lifi: a price-only quote declares its native bridge fee (providerData.nativeFee)', !!q && q.txRequest === undefined && q.providerData?.placeholder === 'sender' && q.providerData?.nativeFee === fee, JSON.stringify(q?.providerData ?? null))
+      check('lifi: lifiVerifyQuote passes it, refuses a malformed declared fee', !!q && lifiVerifyQuote(stargate.params, q) === null
+        && lifiVerifyQuote(stargate.params, { ...q, providerData: { ...q.providerData, nativeFee: '0x10' } }) === 'the price-only quote declares a native fee of 0x10, not a base-unit integer')
+      const value = q ? usdValue({ ETH: 3000, USDC: 1 })(q, stargate.params) : null
+      const gross = Number(stargate.response.estimate.toAmountMin) / 1e6
+      const net = gross - (Number(fee) / 1e18) * 3000
+      check('router: usdValue nets a price-only quote\'s providerData.nativeFee', value !== null && Math.abs(value - net) < 1e-6 && net < gross - 1, `${value} vs ${net} (gross ${gross})`)
     } finally {
       g.fetch = offline
     }
