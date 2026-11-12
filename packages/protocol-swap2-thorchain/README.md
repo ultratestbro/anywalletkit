@@ -64,8 +64,9 @@ any node that answered the inbound addresses"). Worst case without a caller sign
 8 s for the quote (16 s when a quote without a slippage is retried with a wider tolerance) plus 8 s for its snapshot,
 and the host that quotes is confirmed within the 8 s that started when its quote was in hand: hosts × 16 s, or hosts ×
 24 s with the retry (32 s / 48 s with the two default hosts); `preflightDeposit` hosts × 8 s. A caller's AbortSignal
-(the router passes one: 8 s per provider, 25 s when it is the only one) replaces the 8 s bound of the quote request
-and ends the quote when it aborts.
+(the router passes one: 8 s per provider, 25 s when it is the only one) replaces the 8 s bound of the quote request;
+when it aborts, the quote request, the quoting node's `lastblock` read and the confirming reads stop at once, and its
+`inbound_addresses` read keeps its own 8 s.
 
 **Requests a confirming node gets** (`THORNODE_CONFIRM_PATHS`), all `GET`, no query string, no body, headers
 `accept` and `x-client-id` only. A proxy in front of a confirming node can pass exactly these four and refuse

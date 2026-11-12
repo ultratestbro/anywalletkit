@@ -357,7 +357,8 @@ export interface ThorchainProviderConfig {
    * without a slippage is retried with a wider tolerance) plus 8 s for its snapshot, and the check of the host that
    * quotes ends within the 8 s that started when its quote was in hand — hosts × 16 s, or hosts × 24 s with the
    * retry (32 s / 48 s with the two default hosts). `preflightDeposit`: hosts × 8 s. A caller's AbortSignal (the
-   * router passes one) replaces the 8 s bound of the quote request and ends the quote whenever it aborts.
+   * router passes one) replaces the 8 s bound of the quote request; when it aborts, the quote request, the quoting
+   * node's `lastblock` read and the confirming reads stop at once, and its `inbound_addresses` read keeps its own 8 s.
    */
   confirmTimeoutMs?: number;
   /** Routers to trust besides {@link THORCHAIN_ROUTERS}, per CAIP-2 chain (a router migration before a release). */
