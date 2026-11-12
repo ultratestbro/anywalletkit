@@ -32,6 +32,10 @@ another inbound vault — refused until they agree").
   node's lag is measured against; a `nodeUrl` that does not answer it is skipped for the next one, and with none
   left the quote is refused with "THORChain height (/thorchain/lastblock) unavailable from every node that answered
   the inbound addresses".
+- **A proxy that rewrites THORNode answers:** keep THORNode's field types. A field of another type (an address or
+  router as a number, a halt flag as a string, a `null` entry) is another shape: a confirming node answering it is
+  skipped, and a quoting node is unavailable, so the next `nodeUrl` host is asked ("inbound addresses unavailable
+  from every node" when none is left). Before, such an answer threw a TypeError out of `getQuote`.
 - **Refusals matched by text:** existing texts are unchanged. New ones: "no confirming node is within 50 blocks of
   the quoting node's THORChain height (behind or unreachable) — refused until one catches up", "a second node lists
   the inbound vault as RetiringVault, not ActiveVault — refused" (the status as the node names it), "a second node's

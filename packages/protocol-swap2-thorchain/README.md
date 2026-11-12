@@ -51,6 +51,18 @@ React Native's fetch does: `res.url` must be the URL asked), or answers in anoth
 refusal says so ("no confirming node is within 50 blocks …"); when none answers, it is "no second node answered to
 confirm the inbound vault".
 
+**Another shape** includes a field of another type. The type of every field read is checked (THORNode's own types):
+in `inbound_addresses` each entry is an object with a string `chain`, `address`, `router` and `dust_threshold` are
+strings and `halted`, `global_trading_paused` and `chain_trading_paused` booleans when present; in `vaults/asgard`
+`status` is a string, `pub_key` a `thorpub1…` string, `addresses` a list of objects with string `chain` and `address`;
+every `mimir` value is a number or a string (int64), and a vault flag an int64; `lastblock`'s `thorchain` is a
+non-negative int64. One such field anywhere in an answer (another chain's entry or another vault included) skips
+the confirming node, and `verifyBuild` skips it the same way. The quoting node's `inbound_addresses` and `lastblock`
+are read the same way: another shape makes that node unavailable and the next `nodeUrl` host is asked, with the
+existing refusals when none is left ("inbound addresses unavailable from every node", "THORChain height
+(/thorchain/lastblock) unavailable from every node that answered the inbound addresses"; before broadcast "cannot
+refresh inbound addresses before broadcast").
+
 **Time.** The vault check has its own 8 s budget. It starts when the quoting node's quote is in hand (before
 broadcast: when a node is asked to refresh the inbound snapshot) and covers that node's `inbound_addresses` and
 `lastblock` reads and every confirming node, each getting `confirmTimeoutMs` or what is left; time a failed host took
@@ -97,9 +109,10 @@ the backend's quote and the device's check does not refuse: current inbound or a
 `RetiringVault` or another status), both chains open, on EVM the node's router equal to the call's. It asks every
 `nodeUrl` node (default: the two public nodes) in parallel on the four `THORNODE_CONFIRM_PATHS` (the same GETs, so the
 same proxy rules), each within `confirmTimeoutMs` (default 2500 ms, so the check takes at most that); a node that
-fails, redirects, answers another shape, is slower, or trails the highest THORChain height the nodes report by more
-than `confirmMaxLagBlocks` (default 50) is skipped. In `nodeUrl` order a node's refusal refuses and two confirming
-nodes pass. Refusals: "a THORNode reports another inbound vault than `<vault>`", "a THORNode reports another router",
+fails, redirects, answers another shape (a field of another type included, as above), is slower, or trails the
+highest THORChain height the nodes report by more than `confirmMaxLagBlocks` (default 50) is skipped. In `nodeUrl`
+order a node's refusal refuses and two confirming nodes pass. Refusals: "a THORNode reports another inbound vault
+than `<vault>`", "a THORNode reports another router",
 "`<CHAIN>` is halted / paused" (now also the destination chain), "a THORNode lists the inbound vault as `<Status>`, not
 ActiveVault", "a THORNode's mimir flags the inbound vault as compromised" (or `insolvent`), "two THORNodes within 50
 blocks of the highest THORChain height they report could not confirm the inbound vault (behind or unreachable)", "two
