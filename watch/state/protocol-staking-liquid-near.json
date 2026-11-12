@@ -11,7 +11,7 @@
     "hash": "803b61063bdbda59",
     "chars": 12977
    },
-   "seenAt": "2026-11-11T14:17:56.005Z",
+   "seenAt": "2026-11-12T15:10:41.527Z",
    "changedAt": "2026-11-11T14:17:56.005Z"
   },
   "docs-liquid-staking": {
@@ -24,7 +24,7 @@
     "hash": "9e577f142689e61c",
     "chars": 4270
    },
-   "seenAt": "2026-11-11T14:17:56.107Z",
+   "seenAt": "2026-11-12T15:10:41.605Z",
    "changedAt": "2026-11-09T16:13:30.582Z"
   },
   "nearcore-releases": {
@@ -40,7 +40,7 @@
     "url": "https://github.com/near/nearcore/releases/tag/2.14.1",
     "prerelease": false
    },
-   "seenAt": "2026-11-11T14:17:56.240Z",
+   "seenAt": "2026-11-12T15:10:41.578Z",
    "changedAt": "2026-11-11T14:17:56.240Z"
   },
   "linear-releases": {
@@ -56,7 +56,7 @@
     "url": "https://github.com/linear-protocol/LiNEAR/releases/tag/v1.6.3",
     "prerelease": false
    },
-   "seenAt": "2026-11-11T14:17:56.251Z",
+   "seenAt": "2026-11-12T15:10:41.570Z",
    "changedAt": "2026-11-09T16:13:30.657Z"
   },
   "rnear-contract": {
@@ -71,7 +71,7 @@
     "url": "https://github.com/ref-finance/rnear-contract/commit/341cd8c970895e1b6bcb433699b20253922d621d",
     "note": "default branch: Merge pull request #3 from ref-finance/audit_fix"
    },
-   "seenAt": "2026-11-11T14:17:56.903Z",
+   "seenAt": "2026-11-12T15:10:42.195Z",
    "changedAt": "2026-11-09T16:13:31.191Z"
   }
  }

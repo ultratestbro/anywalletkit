@@ -11,7 +11,7 @@
     "hash": "a9533293a3d55b02",
     "chars": 3269
    },
-   "seenAt": "2026-11-11T14:17:57.487Z",
+   "seenAt": "2026-11-12T15:10:42.744Z",
    "changedAt": "2026-11-09T16:13:31.555Z"
   },
   "docs-staking-tokens": {
@@ -24,7 +24,7 @@
     "hash": "8e7c00174471c211",
     "chars": 7619
    },
-   "seenAt": "2026-11-11T14:17:57.434Z",
+   "seenAt": "2026-11-12T15:10:42.738Z",
    "changedAt": "2026-11-09T16:13:31.598Z"
   },
   "docs-gas": {
@@ -37,7 +37,7 @@
     "hash": "803b61063bdbda59",
     "chars": 12977
    },
-   "seenAt": "2026-11-11T14:17:57.485Z",
+   "seenAt": "2026-11-12T15:10:42.752Z",
    "changedAt": "2026-11-11T14:17:57.485Z"
   },
   "docs-epoch": {
@@ -50,7 +50,7 @@
     "hash": "57069f82a0e7d0b5",
     "chars": 2682
    },
-   "seenAt": "2026-11-11T14:17:57.398Z",
+   "seenAt": "2026-11-12T15:10:42.665Z",
    "changedAt": "2026-11-09T16:13:31.632Z"
   },
   "staking-pool-source": {
@@ -65,7 +65,7 @@
     "sha": "4c6ab0b68b",
     "url": "https://github.com/near/core-contracts/blob/master/staking-pool/src/lib.rs"
    },
-   "seenAt": "2026-11-11T14:17:57.563Z",
+   "seenAt": "2026-11-12T15:10:42.715Z",
    "changedAt": "2026-11-09T16:13:31.654Z"
   },
   "nearcore-releases": {
@@ -81,7 +81,7 @@
     "url": "https://github.com/near/nearcore/releases/tag/2.14.1",
     "prerelease": false
    },
-   "seenAt": "2026-11-11T14:17:57.711Z",
+   "seenAt": "2026-11-12T15:10:42.898Z",
    "changedAt": "2026-11-11T14:17:57.711Z"
   },
   "staking-farm": {
@@ -96,7 +96,7 @@
     "url": "https://github.com/referencedev/staking-farm/commit/f0b0e69134aa88c59343607b844b0c4fb2f8cd44",
     "note": "default branch: chore: Added explicit MIT or Apache-2.0 licensing - this has been always the int"
    },
-   "seenAt": "2026-11-11T14:17:58.511Z",
+   "seenAt": "2026-11-12T15:10:43.769Z",
    "changedAt": "2026-11-09T16:13:32.324Z"
   }
  }

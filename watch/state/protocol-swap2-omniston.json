@@ -6,13 +6,13 @@
    "target": {
     "url": "https://docs.ston.fi/docs/developer-section/omniston"
    },
-   "value": "ff8d0f687d0baca5cde85cf3d438cc2bbf78bc2b8d4e9618e4a781e620a200e3",
+   "value": "f4d7016bbcd0cd43767c3b5229fb9f030be4ec89abe8b7e60c09a38779536615",
    "meta": {
-    "hash": "ff8d0f687d0baca5",
+    "hash": "f4d7016bbcd0cd43",
     "chars": 3422
    },
-   "seenAt": "2026-11-11T14:18:13.228Z",
-   "changedAt": "2026-11-11T14:18:13.228Z"
+   "seenAt": "2026-11-12T15:10:55.880Z",
+   "changedAt": "2026-11-12T15:10:55.880Z"
   },
   "omniston-sdk": {
    "type": "github-releases",
@@ -26,7 +26,7 @@
     "url": "https://github.com/ston-fi/omniston-sdk/commit/ae756abd35e2aafe4f6aa4a80e669d7ce84dcea5",
     "note": "default branch: release(sdk-react): v.0.8.13"
    },
-   "seenAt": "2026-11-11T14:18:13.954Z",
+   "seenAt": "2026-11-12T15:10:58.823Z",
    "changedAt": "2026-11-09T16:13:41.795Z"
   }
  }

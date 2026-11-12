@@ -2,271 +2,271 @@
  "lido": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "ssv": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "jito": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "tonstakers": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:1:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:1:lido": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "mellow:lido-earn-eth": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:1:etherfi": {
   "status": "warn",
   "note": "quoteSupply → AaveError weETH: supply cap reached (0 base units left).",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:10:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:56:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError Cake: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:100:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:137:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "mellow:lido-earn-usd": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:146:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:1868:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:324:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError USDC: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:1088:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError m.DAI: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:5000:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:8453:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:9745:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:42161:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:42220:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:43114:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError DAI.e: supply cap reached (0 base units left).",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:57073:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:534352:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "aave:59144:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "morpho:1": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "morpho:8453": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "morpho:42161": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "morpho:10": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "morpho:137": {
   "status": "warn",
   "note": " quoteSupply → MorphoError Compound USDC: deposits are closed right now (caps reached or the receiver is gated).",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "morpho:130": {
   "status": "warn",
   "note": " quoteSupply → MorphoError Gauntlet WETH: deposits are closed right now (caps reached or the receiver is gated).",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "morpho:4663": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "morpho:999": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "morpho:143": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "morpho:747474": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "approvals:42161": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "approvals:8453": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "approvals:1": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "kamino": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "native-stake": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "native-monad": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "curve:10": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "curve:1": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "curve:100": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "curve:196": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "curve:9745": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "curve:143": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "scrvusd": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "curve:8453": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "curve:42161": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "liquid-near": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "native-near": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "at": "2026-11-12T15:13:12.818Z"
  },
  "relay": {
-  "status": "ok",
-  "note": "",
-  "at": "2026-11-11T14:19:56.520Z"
+  "status": "fail",
+  "note": "ok quote Linea ETH → Base ETH out 4986267738062072 min 4886542383300831 · 0x49290c1c → 0x59916da825d2d2ec1bf878d71c88826f6633ecca · ~1s · router ok | ok quote HyperEVM HYPE → Elysium HYPE out 501042794825013406 min 491021938928513138 · 0x49290c1c → 0x4cd00e387622c35bddb9b4c962c136462338bc31 · ~1s · ",
+  "at": "2026-11-12T15:13:12.818Z"
  }
 }
