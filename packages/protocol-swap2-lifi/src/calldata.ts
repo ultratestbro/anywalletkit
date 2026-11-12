@@ -8,8 +8,10 @@
  * argument: its receiver, destination chain and bridged asset are checked, for the listed bridge
  * entry points only; a destination call (the final recipient sits in calldata for another chain) is
  * refused. For a Solana destination BridgeData.receiver is only LI.FI's non-EVM placeholder and the
- * recipient sits in facet-specific data: it is read for Mayan, Polymer CCTP, Chainflip and LI.FI
- * Intents ({@link solanaRecipientMismatch}); any other non-EVM destination is refused.
+ * recipient sits in facet-specific data: it is read for Mayan, Polymer CCTP and Chainflip
+ * ({@link solanaRecipientMismatch}); LI.FI Intents to Solana is refused (its escrowed order names its own
+ * oracles, output settler and output amount, none of which is pinned here), and so is any other non-EVM
+ * destination.
  *
  * A facet's own data also names who gets money back — unused native fee, swap leftovers, the whole input when an
  * order expires unfilled, a fallback when delivery fails ({@link FACET_DATA}); each such address must be the sender or
@@ -20,7 +22,7 @@
  * reviewed minimum still relies on LI.FI's API answering honestly. Eco and M0 are the exceptions
  * ({@link FacetData.delivery}): their facet data names the destination token, amount and (Eco) recipient
  * outright, and those are held to the quote. To Solana the delivered token is held to the quote where the
- * facet names it (a Mayan order, Chainflip, LI.FI Intents; Mayan's and Polymer's CCTP legs deliver USDC);
+ * facet names it (a Mayan order, Chainflip; Mayan's and Polymer's CCTP legs deliver USDC);
  * the minimum is not.
  *
  * The receiver is only worth checking where the facet itself holds the bridge to it. Most do on
@@ -513,36 +515,35 @@ function chainflipToSolana(r: Reader, at: number, t: SolanaTarget): string | nul
   return want !== undefined && asset === want ? null : `Chainflip delivers its asset ${asset}, not ${t.e.toToken}`;
 }
 
-/**
- * LI.FI Intents (LiFiIntentEscrowFacetV2 2.0.0): the escrowed order's output names `recipient` and `outputToken` (raw
- * 32-byte keys on Solana); the Solana output settler pays the recipient's associated token account for that mint (its
- * `fill` instruction), or the recipient itself for native SOL (token = 32 zero bytes).
- */
-function intentsToSolana(r: Reader, at: number, t: SolanaTarget): string | null {
-  const recipient = r.raw(at + 32, 32);
-  if (recipient !== t.ownerHex) return `the LI.FI Intents order pays ${keyOf(recipient)} on Solana, not the recipient ${t.e.receiver}`;
-  const token = r.raw(at + 32 * 9, 32);
-  return token === t.mintHex ? null : `the LI.FI Intents order delivers ${keyOf(token)}, not ${t.e.toToken}`;
-}
-
 const SOLANA_DELIVERY: Readonly<Record<string, (r: Reader, at: number, t: SolanaTarget) => string | null>> = {
   Mayan: mayanToSolana,
   PolymerCCTP: polymerToSolana,
   Chainflip: chainflipToSolana,
-  LiFiIntentEscrowV2: intentsToSolana,
 };
+
+/**
+ * LI.FI Intents (LiFiIntentEscrowFacetV2 2.0.0) escrows the input on the source chain for an order whose `inputOracle`,
+ * `outputOracle`, `outputSettler` and `outputAmountMultiplier` come from the calldata: the escrow releases the input to
+ * whoever the input oracle says filled the order, and the committed output is `input × multiplier / 1e18`. Naming the
+ * recipient and the output token binds nothing while an API or proxy can name its own oracle (which then attests a fill
+ * that never happened) or a near-zero multiplier, and these addresses are not pinned here for Solana's settler and
+ * oracle — so an Intents order to Solana is refused, recipient read or not.
+ */
+const INTENTS_TO_SOLANA = "a LI.FI Intents order to Solana names its own oracles, output settler and output amount, which cannot be checked here — its escrow could release the input without the delivery";
 
 /**
  * EVM → Solana: BridgeData must name LI.FI's Solana chain id (checked by the caller) and, as its receiver, exactly the
  * NON_EVM_ADDRESS placeholder; the recipient sits in the facet's own data and is held here to the requested owner (the
- * raw 32 bytes of `destAddress`) and the requested mint, for the facets whose delivery the transaction binds. NEAR
- * Intents, LayerSwap and Unit pay a deposit address or a depository whose off-chain order names the recipient: a
- * deposit the device cannot verify, refused for this direction. Any other facet keeps the non-EVM refusal.
+ * raw 32 bytes of `destAddress`) and the requested mint, for the facets whose delivery the transaction binds (Mayan,
+ * Polymer CCTP, Chainflip). NEAR Intents, LayerSwap and Unit pay a deposit address or a depository whose off-chain order
+ * names the recipient: a deposit the device cannot verify, refused for this direction. LI.FI Intents is refused
+ * ({@link INTENTS_TO_SOLANA}). Any other facet keeps the non-EVM refusal.
  */
 function solanaRecipientMismatch(r: Reader, bridge: {sourceSwaps: boolean; facet: string}, receiver: string, e: DiamondExpectation): string | null {
   if (e.destChainId !== LIFI_SOLANA_CHAIN_ID) return NON_EVM_UNREAD;
   if (!same(receiver, NON_EVM_ADDRESS)) return `BridgeData pays ${receiver}, not LI.FI's non-EVM placeholder ${NON_EVM_ADDRESS}, on a Solana route`;
   if (DEPOSIT_FACETS.has(bridge.facet)) return `${bridge.facet} pays a deposit address whose off-chain order names the Solana recipient — the transaction does not bind it`;
+  if (bridge.facet === "LiFiIntentEscrowV2") return INTENTS_TO_SOLANA;
   const read = SOLANA_DELIVERY[bridge.facet];
   if (!read) return NON_EVM_UNREAD;
   const owner = solanaKey(e.receiver);

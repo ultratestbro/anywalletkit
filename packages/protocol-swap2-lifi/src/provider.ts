@@ -251,12 +251,13 @@ const TOOL_KEY = /^[A-Za-z0-9_-]{1,64}$/;
  */
 const UNBOUND_TOOLS: readonly string[] = Object.freeze(["relaydepository", "garden", "squid", "symbiosis"]);
 /**
- * EVM → Solana: the LI.FI tools whose Diamond call names the Solana recipient where the device reads it (calldata.ts,
- * `solanaRecipientMismatch`): Mayan's Swift, MCTP and Fast MCTP routes, Polymer CCTP (fast and standard), Chainflip and
- * LI.FI Intents. Such requests ask LI.FI for these bridges only, so a pair is not lost to a bridge whose recipient the
- * module cannot read (NEAR Intents, LayerSwap, Smart Deposits, … are refused for this direction).
+ * EVM → Solana: the LI.FI tools whose Diamond call binds the delivery to the Solana recipient the device reads
+ * (calldata.ts, `solanaRecipientMismatch`): Mayan's Swift, MCTP and Fast MCTP routes, Polymer CCTP (fast and standard)
+ * and Chainflip. Such requests ask LI.FI for these bridges only, so a pair is not lost to a bridge the module refuses
+ * for this direction (NEAR Intents, LayerSwap and Smart Deposits pay a deposit address; LI.FI Intents names its own
+ * oracles and output settler, which are not pinned here).
  */
-const SOLANA_DESTINATION_TOOLS: readonly string[] = Object.freeze(["mayan", "mayanMCTP", "mayanFastMCTP", "polymer", "polymerStandard", "chainflip", "lifiIntents"]);
+const SOLANA_DESTINATION_TOOLS: readonly string[] = Object.freeze(["mayan", "mayanMCTP", "mayanFastMCTP", "polymer", "polymerStandard", "chainflip"]);
 /** LI.FI's Smart Deposits pay a deposit address; nothing in the transaction binds where it delivers. */
 const SMART_DEPOSITS_TOOL = /^smartdeposits?$/i;
 /** A dry EVM → Solana quote without a recipient prices the publicly known BIP-39 "abandon" account 0 on Solana. */

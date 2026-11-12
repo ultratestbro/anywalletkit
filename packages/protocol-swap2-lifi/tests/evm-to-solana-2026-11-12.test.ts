@@ -2,9 +2,10 @@
 // sits in bridge-specific data and cannot be checked here"): BridgeData.receiver is LI.FI's NON_EVM_ADDRESS placeholder
 // and the recipient sits in the facet's own data. It is now read for the facets LI.FI routes EVM → Solana through whose
 // delivery the transaction binds — Mayan (Swift v2, MCTP, Fast MCTP), Polymer CCTP (the USDC account derived on the
-// device), Chainflip and LI.FI Intents — and held to the requested owner and mint; such requests ask LI.FI for those
-// bridges only. NEAR Intents, LayerSwap and Smart Deposits pay a deposit address whose order names the recipient off
-// chain: refused for this direction. The fixture is read-only answers of the public li.quest/v1/quote (no API key).
+// device) and Chainflip — and held to the requested owner and mint; such requests ask LI.FI for those bridges only.
+// NEAR Intents, LayerSwap and Smart Deposits pay a deposit address whose order names the recipient off chain, and a
+// LI.FI Intents order names its own oracles, output settler and output amount (review r1, 2026-11-12): refused for this
+// direction. The fixture is read-only answers of the public li.quest/v1/quote (no API key).
 import {readFileSync} from "node:fs";
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {decodeFunctionData, encodeFunctionData, parseAbi, toFunctionSelector, type Hex} from "viem";
@@ -15,7 +16,7 @@ import {associatedTokenAccount, base58, solanaKey} from "../src/solana-address.j
 
 afterEach(() => vi.unstubAllGlobals());
 
-type Answer = {tool: string; action: {toAddress: string; slippage: number}; transactionRequest: {data: string}; includedSteps?: {type: string; tool: string}[]};
+type Answer = {tool: string; action: {toAddress: string; slippage: number}; estimate: {toAmount: string; toAmountMin: string}; transactionRequest: {data: string}; includedSteps?: {type: string; tool: string}[]};
 type Corridor = {name: string; params: QuoteParams; response: Answer};
 const live = (JSON.parse(readFileSync(new URL("./fixtures-live-2026-11-12-evm-solana.json", import.meta.url), "utf8")) as {corridors: Corridor[]}).corridors;
 const SOLANA_ID = 1151111081099710n;
@@ -26,6 +27,10 @@ const SOL = "11111111111111111111111111111111";
 /** A public key that is no one's recipient here. */
 const OTHER = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS";
 const NOT_READ = "the recipient on a non-EVM destination sits in bridge-specific data and cannot be checked here";
+const INTENTS = "a LI.FI Intents order to Solana names its own oracles, output settler and output amount, which cannot be checked here — its escrow could release the input without the delivery";
+const DEPOSIT = /pays a deposit address whose off-chain order names the Solana recipient — the transaction does not bind it$/;
+/** The recorded corridors whose bridge is refused for this direction whatever the calldata says. */
+const REFUSED = / (near|layerswap|lifiIntents)$/;
 
 const word = (b58: string) => `0x${Array.from(solanaKey(b58)!, (x) => x.toString(16).padStart(2, "0")).join("")}` as Hex;
 const pick = (name: string) => { const c = live.find((k) => k.name === name); if (!c) throw new Error(name); return c; };
@@ -83,21 +88,23 @@ async function outcome(c: Corridor, answer?: Answer, params: QuoteParams = c.par
 const withData = (c: Corridor, data: string): Answer => ({...c.response, transactionRequest: {...c.response.transactionRequest, data}});
 
 describe("EVM → Solana: the recipient is read from the bridge's own data", () => {
-  it("every recorded Mayan, Polymer, Chainflip and LI.FI Intents answer passes the provider and the remote pin; NEAR Intents and LayerSwap are refused as deposits", async () => {
+  it("every recorded Mayan, Polymer and Chainflip answer passes the provider and the remote pin; NEAR Intents and LayerSwap are refused as deposits, LI.FI Intents for its unpinned oracles", async () => {
     const got: Record<string, string> = {};
     for (const c of live) got[c.name] = await outcome(c);
     expect(Object.keys(got)).toHaveLength(16);
     for (const [name, result] of Object.entries(got)) {
-      if (/ (near|layerswap)$/.test(name)) expect([name, result]).toEqual([name, expect.stringMatching(/pays a deposit address whose off-chain order names the Solana recipient — the transaction does not bind it$/)]);
+      if (/ (near|layerswap)$/.test(name)) expect([name, result]).toEqual([name, expect.stringMatching(DEPOSIT)]);
+      else if (/ lifiIntents$/.test(name)) expect([name, result]).toEqual([name, `lifi: the transaction does not match the quote: ${INTENTS}`]);
       else expect([name, result]).toEqual([name, "pass"]);
     }
+    expect(Object.values(got).filter((r) => r === "pass")).toHaveLength(12);
     // Five Mayan entry points (Swift v2, MCTP createOrder / bridgeWithFee, Fast MCTP createOrder / bridge) are covered live.
     const mayan = live.filter((c) => c.response.tool.startsWith("mayan")).map((c) => ((decodeFunctionData({abi: ABI, data: evm(c) as Hex}).args as unknown as Args)[2].protocolData as string).slice(0, 10));
     expect(new Set(mayan)).toEqual(new Set(["0xa3a30834", "0x1c59b7fc", "0x2072197f", "0x2337e236", "0xf58b6de8"]));
   });
 
   it("an answer that names the requested recipient but whose calldata pays another Solana key is refused, on every facet", async () => {
-    for (const c of live.filter((k) => !/ (near|layerswap)$/.test(k.name))) {
+    for (const c of live.filter((k) => !REFUSED.test(k.name))) {
       const owner = word(c.params.destAddress).slice(2);
       const data = evm(c).toLowerCase();
       expect(data).toContain(owner);
@@ -170,16 +177,29 @@ describe("EVM → Solana: the recipient is read from the bridge's own data", () 
     expect(diamondCallMismatch(evm(usdc), expectation(usdc, {toToken: USDT}))).toBe(`Chainflip delivers its asset 10, not ${USDT}`);
   });
 
-  it("LI.FI Intents: the escrowed order's recipient and output token are held to the request", () => {
-    const c = pick("arbitrum-usdc>solana-usdc lifiIntents");
-    const e = expectation(c);
-    expect(diamondCallMismatch(evm(c), e)).toBeNull();
-    expect(diamondCallMismatch(rewrite(evm(c), (a) => { a[2].recipient = word(OTHER); }), e)).toBe(`the LI.FI Intents order pays ${OTHER} on Solana, not the recipient ${c.params.destAddress}`);
-    expect(diamondCallMismatch(rewrite(evm(c), (a) => { a[2].outputToken = word(USDT); }), e)).toBe(`the LI.FI Intents order delivers ${USDT}, not ${USDC}`);
+  it("LI.FI Intents to Solana is refused: the order's oracles, output settler and output amount are not pinned, so a right recipient binds nothing", async () => {
+    const intents = live.filter((k) => / lifiIntents$/.test(k.name));
+    expect(intents).toHaveLength(2);
+    for (const c of intents) {
+      const e = expectation(c);
+      // The recorded order names the requested recipient and mint …
+      const order = (decodeFunctionData({abi: ABI, data: evm(c) as Hex}).args as unknown as Args)[2];
+      expect([order.recipient, order.outputToken]).toEqual([word(c.params.destAddress), word(USDC)]);
+      // … and is refused all the same, as is the order with an oracle, settler, multiplier or recipient an API or proxy picked.
+      expect(diamondCallMismatch(evm(c), e)).toBe(INTENTS);
+      for (const edit of [
+        (a: Args) => { a[2].inputOracle = "0x9999999999999999999999999999999999999999"; },
+        (a: Args) => { a[2].outputOracle = word(OTHER); },
+        (a: Args) => { a[2].outputSettler = word(OTHER); },
+        (a: Args) => { a[2].outputAmountMultiplier = 1n; },
+        (a: Args) => { a[2].recipient = word(OTHER); },
+      ]) expect(diamondCallMismatch(rewrite(evm(c), edit), e)).toBe(INTENTS);
+      expect(await outcome(c)).toBe(`lifi: the transaction does not match the quote: ${INTENTS}`);
+    }
   });
 
   it("BridgeData must name Solana and the non-EVM placeholder; another facet, an unknown entry point or broken calldata is refused", () => {
-    const c = pick("ethereum-usdc>solana-usdc lifiIntents");
+    const c = pick("ethereum-usdc>solana-usdc polymerStandard");
     const e = expectation(c);
     expect(diamondCallMismatch(rewrite(evm(c), (a) => { a[0].destinationChainId = 1n; }), e)).toBe(`bridges to chain 1, not ${SOLANA_ID}`);
     expect(diamondCallMismatch(rewrite(evm(c), (a) => { a[0].receiver = c.params.refundAddress; }), e)).toBe(`BridgeData pays ${c.params.refundAddress!.toLowerCase()}, not LI.FI's non-EVM placeholder 0x11f111f111f111f111f111f111f111f111f111f1, on a Solana route`);
@@ -212,8 +232,8 @@ describe("EVM → Solana: the recipient is read from the bridge's own data", () 
 });
 
 describe("EVM → Solana: LI.FI is asked only for the bridges whose recipient is read", () => {
-  const READABLE = ["mayan", "mayanMCTP", "mayanFastMCTP", "polymer", "polymerStandard", "chainflip", "lifiIntents"];
-  const c = pick("ethereum-usdc>solana-usdc lifiIntents");
+  const READABLE = ["mayan", "mayanMCTP", "mayanFastMCTP", "polymer", "polymerStandard", "chainflip"];
+  const c = pick("ethereum-usdc>solana-usdc polymerStandard");
   function record(routes: unknown = {routes: []}) {
     const urls: URL[] = [];
     const bodies: {options?: Record<string, unknown>}[] = [];
@@ -227,10 +247,11 @@ describe("EVM → Solana: LI.FI is asked only for the bridges whose recipient is
   }
   const route = (tool: string) => ({toAmount: "990000", toAmountMin: "985050", steps: [{tool, estimate: {executionDuration: 30}, includedSteps: [{type: "cross", tool}]}]});
 
-  it("/quote carries allowBridges = the readable bridges (the unbound ones still denied); EVM → EVM and Solana sources are unchanged", async () => {
+  it("/quote carries allowBridges = the readable bridges, LI.FI Intents not among them (the unbound ones still denied); EVM → EVM and Solana sources are unchanged", async () => {
     const {urls} = record();
     expect(await lifiProvider().getQuote(c.params)).not.toBeNull();
     expect(urls[0]!.searchParams.getAll("allowBridges")).toEqual(READABLE);
+    expect(urls[0]!.searchParams.getAll("allowBridges")).not.toContain("lifiIntents");
     expect(urls[0]!.searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden", "squid", "symbiosis"]);
     await lifiProvider().getQuote({...c.params, destChain: "eip155:8453", destToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", destAddress: c.params.refundAddress!});
     expect(urls[1]!.searchParams.getAll("allowBridges")).toEqual([]);
@@ -243,13 +264,16 @@ describe("EVM → Solana: LI.FI is asked only for the bridges whose recipient is
   it("a route policy sees only readable candidates; its pick is kept among them, otherwise all readable bridges are asked", async () => {
     let seen: string[] = [];
     const policy = (pickTool: string) => (options: readonly {tool: string}[]) => { seen = options.map((o) => o.tool); return {allowBridges: [pickTool]}; };
-    const {urls, bodies} = record({routes: [route("near"), route("mayan"), route("relaydepository"), route("lifiIntents")]});
-    expect(await lifiProvider({chooseRoute: policy("lifiIntents")}).getQuote(c.params)).not.toBeNull();
+    const {urls, bodies} = record({routes: [route("near"), route("mayan"), route("relaydepository"), route("lifiIntents"), route("polymerStandard")]});
+    expect(await lifiProvider({chooseRoute: policy("polymerStandard")}).getQuote(c.params)).not.toBeNull();
     expect(bodies[0]!.options).toMatchObject({bridges: {allow: READABLE, deny: ["relaydepository", "garden", "squid", "symbiosis"]}});
-    expect(seen).toEqual(["mayan", "lifiIntents"]);
-    expect(urls[0]!.searchParams.getAll("allowBridges")).toEqual(["lifiIntents"]);
+    expect(seen).toEqual(["mayan", "polymerStandard"]);
+    expect(urls[0]!.searchParams.getAll("allowBridges")).toEqual(["polymerStandard"]);
+    // A policy that picks NEAR Intents or LI.FI Intents gets every readable bridge instead.
     await lifiProvider({chooseRoute: () => ({allowBridges: ["near"]})}).getQuote(c.params);
     expect(urls[1]!.searchParams.getAll("allowBridges")).toEqual(READABLE);
+    await lifiProvider({chooseRoute: () => ({allowBridges: ["lifiIntents"]})}).getQuote(c.params);
+    expect(urls[2]!.searchParams.getAll("allowBridges")).toEqual(READABLE);
   });
 
   it("a dry quote without a recipient prices a Solana placeholder recipient, not the EVM sender", async () => {
