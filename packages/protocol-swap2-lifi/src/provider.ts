@@ -577,6 +577,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         }
 
         let txRequest: NonNullable<Quote["txRequest"]>;
+        // The bridge's native fee on top of the input (EVM source); a price-only quote declares it in providerData.
+        let nativeFee = 0n;
         if (solanaSource) {
           // `value` declares what the account may let the tx take in native
           // coin: the input for a SOL source, nothing for a token source.
@@ -593,7 +595,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           // Base, POL Polygon → Optimism). Declared here, sealed with the
           // quote, bounded by the engine — never silently attached.
           const value = BigInt(tr.value!);
-          const nativeFee = sourceIsToken ? value : value > BigInt(params.amountIn) ? value - BigInt(params.amountIn) : 0n;
+          nativeFee = sourceIsToken ? value : value > BigInt(params.amountIn) ? value - BigInt(params.amountIn) : 0n;
           if (!sourceIsToken && value < BigInt(params.amountIn)) return reject("the transaction sends less native coin than the input");
           txRequest = {
             to: tr.to!,
@@ -663,7 +665,9 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           depositAddress: "",
           depositMemo: null,
           // Every check above ran on LI.FI's transaction; one built for a placeholder is not handed out (placeholderIn).
-          ...(placeholder ? {providerData: {placeholder}} : {txRequest}),
+          // Its bridge fee on top of the input still is, as `providerData.nativeFee`, so the router's value nets it out
+          // (usdValue reads it when there is no txRequest) instead of ranking the route on its gross output.
+          ...(placeholder ? {providerData: {placeholder, ...(nativeFee > 0n ? {nativeFee: nativeFee.toString()} : {})}} : {txRequest}),
           // What the wallet spends (action.fromAmount, = the input); an input-side bridge fee is inside destAmount.
           sourceAmount: params.amountIn,
           destAmount: est.toAmount,
@@ -824,10 +828,13 @@ export function lifiVerifyQuote(params: QuoteParams, quote: Quote): string | nul
 
 /**
  * A dry quote with no transaction (priced for a placeholder): what it spends, its minimum against the caller's floor and
- * the route its intent id names are still held to the request; it pays no deposit address. The reason, or null.
+ * the route its intent id names are still held to the request; it pays no deposit address, and the bridge fee it declares
+ * (`providerData.nativeFee`, which the router nets out of its value) is a base-unit integer. The reason, or null.
  */
 function priceOnlyMismatch(params: QuoteParams, quote: Quote, route: string): string | null {
   if (quote.depositAddress !== "") return `a LI.FI quote pays no deposit address, but this one names ${String(quote.depositAddress).slice(0, 64)}`;
+  const fee = quote.providerData?.nativeFee;
+  if (fee !== undefined && !/^\d{1,80}$/.test(String(fee))) return `the price-only quote declares a native fee of ${String(fee).slice(0, 40)}, not a base-unit integer`;
   try {
     if (BigInt(quote.sourceAmount) !== BigInt(params.amountIn)) return `the quote spends ${quote.sourceAmount}, not the ${params.amountIn} input`;
     const minOut = BigInt(quote.minDestAmount);
