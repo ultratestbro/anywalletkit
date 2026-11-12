@@ -38,7 +38,7 @@ import { RELAY_SOLVERS, RelayRefusal, parseRelayOrder, relayOrderId, relayOrderS
 import relayVectors from '../../packages/protocol-swap2-relay/fixtures/orders/vectors.json'
 import relayUsdcLive from '../../packages/protocol-swap2-relay/fixtures/quotes/user.arb-usdc_base-usdc.json'
 import relayNativeLive from '../../packages/protocol-swap2-relay/fixtures/quotes/base-eth_arb-eth.json'
-import { encodeFunctionData, encodeFunctionResult, parseAbi } from 'viem'
+import { decodeFunctionData, encodeFunctionData, encodeFunctionResult, parseAbi } from 'viem'
 import { nearIntentsProvider } from '@anywalletkit/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@anywalletkit/protocol-swap2-thorchain/protocol'
 import { OmnistonSwap2Protocol } from '@anywalletkit/protocol-swap2-omniston/protocol'
@@ -134,9 +134,27 @@ export async function smokeProtocols(check: Check): Promise<void> {
   check('usdt0 mesh: Tron recipient → the packet bytes32', 'to' in tronTo && tronTo.to === '0x000000000000000000000000ace3e3286b7692028204857bd539c82517372727' && meshRecipientMatches(mTron, tronTo.to, 'TRjNDwg9kSj7sv1J6qGG4ad2wB9S9XqjMn'), JSON.stringify(tronTo))
   check('usdt0 mesh: TON recipient → the packet bytes32', 'to' in tonTo && tonTo.to === '0x10b245cca0e225c1065641aa8399f46c350698b324c4e48990a19d9030232ace' && meshRecipientMatches(mTon, tonTo.to, 'UQAQskXMoOIlwQZWQaqDmfRsNQaYsyTE5ImQoZ2QMCMqzp5R'), JSON.stringify(tonTo))
   check('usdt0 mesh: a garbled Tron / a masterchain TON recipient is refused', 'refusal' in meshRecipientBytes32(mTron, 'TRjNDwg9kSj7sv1J6qGG4ad2wB9S9XqjMm') && 'refusal' in meshRecipientBytes32(mTon, '-1:10b245cca0e225c1065641aa8399f46c350698b324c4e48990a19d9030232ace'))
-  check('usdt0 mesh: route Arbitrum USDT0 → Tron USDT, never from Tron', usdt0.supportsRoute({ chain: 'eip155:42161', token: 'USDT0' }, { chain: 'tron:728126428', token: 'USDT' }) && !usdt0.supportsRoute({ chain: 'tron:728126428', token: 'USDT' }, { chain: 'eip155:42161', token: 'USDT0' }))
+  // TON by default; Tron only through meshDestinations (its LayerZero fee is above the engine's native-fee ceiling today).
+  const usdt0Tron = usdt0Provider({ rpcUrls: { 'eip155:42161': 'https://arbitrum-one-rpc.publicnode.com' }, meshDestinations: ['tron', 'ton'] })
+  check('usdt0 mesh: route Arbitrum USDT0 → TON USDT by default, → Tron only opted in, never from Tron',
+    usdt0.supportsRoute({ chain: 'eip155:42161', token: 'USDT0' }, { chain: 'ton:-239', token: 'USDT' })
+    && !usdt0.supportsRoute({ chain: 'eip155:42161', token: 'USDT0' }, { chain: 'tron:728126428', token: 'USDT' })
+    && usdt0Tron.supportsRoute({ chain: 'eip155:42161', token: 'USDT0' }, { chain: 'tron:728126428', token: 'USDT' })
+    && !usdt0Tron.supportsRoute({ chain: 'tron:728126428', token: 'USDT' }, { chain: 'eip155:42161', token: 'USDT0' }))
+  const meshSend = parseAbi([
+    'struct SendParam { uint32 dstEid; bytes32 to; uint256 amountLD; uint256 minAmountLD; bytes extraOptions; bytes composeMsg; bytes oftCmd; }',
+    'struct MessagingFee { uint256 nativeFee; uint256 lzTokenFee; }',
+    'struct OFTLimit { uint256 minAmountLD; uint256 maxAmountLD; }',
+    'struct OFTFeeDetail { int256 feeAmountLD; string description; }',
+    'struct OFTReceipt { uint256 amountSentLD; uint256 amountReceivedLD; }',
+    'function send(SendParam s, MessagingFee fee, address refundAddress) payable',
+    'function quoteSend(SendParam s, bool payInLzToken) view returns (MessagingFee)',
+    'function quoteOFT(SendParam s) view returns (OFTLimit, OFTFeeDetail[], OFTReceipt)',
+    'function token() view returns (address)',
+    'function approvalRequired() view returns (bool)',
+    'function peers(uint32 eid) view returns (bytes32)',
+  ])
   if ('to' in tronTo) {
-    const meshSend = parseAbi(['struct SendParam { uint32 dstEid; bytes32 to; uint256 amountLD; uint256 minAmountLD; bytes extraOptions; bytes composeMsg; bytes oftCmd; }', 'struct MessagingFee { uint256 nativeFee; uint256 lzTokenFee; }', 'function send(SendParam s, MessagingFee fee, address refundAddress) payable'])
     const meshData = encodeFunctionData({ abi: meshSend, functionName: 'send', args: [{ dstEid: 30420, to: tronTo.to, amountLD: 10_000_000n, minAmountLD: 9_997_000n, extraOptions: '0x', composeMsg: '0x', oftCmd: '0x' }, { nativeFee: 7n, lzTokenFee: 0n }, '0x4444444444444444444444444444444444444444'] })
     const meshQuote = { provider: 'usdt0', intentId: 'usdt0-mesh:30110:30420', depositAddress: '', depositMemo: null, txRequest: { to: mArb.oft, data: meshData, value: '7', chainId: 42161, approvalAddress: mArb.oft, nativeFee: '7' }, sourceAmount: '10000000', destAmount: '9997000', minDestAmount: '9997000', feeUsd: 0, etaSeconds: 90, reliability: 1, validUntilMs: 0 }
     const meshParams = { sourceChain: 'eip155:42161', sourceToken: 'USDT0', destChain: 'tron:728126428', destToken: 'USDT', amountIn: '10000000', destAddress: 'TRjNDwg9kSj7sv1J6qGG4ad2wB9S9XqjMn', refundAddress: '0x4444444444444444444444444444444444444444', dry: false }
@@ -152,6 +170,53 @@ export async function smokeProtocols(check: Check): Promise<void> {
   const meshTon = await meshTracker.trackIntent({ intentId: 'usdt0-mesh:30110:30343', sourceTxHash: '0x' + 'cd'.repeat(32) })
   check('usdt0 mesh: TON payout found in the delivery trace → completed', meshTon.state === 'completed' && meshTon.destTxHash === 'ef'.repeat(32), JSON.stringify(meshTon))
   await tolerates(check, 'usdt0 mesh: getQuote Arbitrum → TON (network)', () => usdt0.getQuote({ sourceChain: 'eip155:42161', sourceToken: 'USDT0', destChain: 'ton:-239', destToken: 'USDT', amountIn: '10000000', destAddress: 'UQAQskXMoOIlwQZWQaqDmfRsNQaYsyTE5ImQoZ2QMCMqzp5R' }))
+  // The whole quote → build → preflight path on device: a canned Arbitrum mesh OFT behind fetchImpl answering token(),
+  // approvalRequired(), peers(), quoteOFT and quoteSend as the live one did on 2026-11-12 (quoteSend into TON
+  // 56287292611713 wei). viem's http transport reads only these response fields (the VM has no Response).
+  const MESH_FEE = 56_287_292_611_713n
+  const meshRpc = (async (_url: string, init?: { body?: string }) => {
+    const req = JSON.parse(String(init?.body)) as { id: number; method: string; params: Array<{ to: string; data: `0x${string}` }> }
+    const reply = (result: unknown) => {
+      const text = JSON.stringify({ jsonrpc: '2.0', id: req.id, result })
+      return { ok: true, status: 200, statusText: 'OK', body: null, headers: { get: (k: string) => (k.toLowerCase() === 'content-type' ? 'application/json' : null) }, text: async () => text, json: async () => JSON.parse(text) as unknown }
+    }
+    if (req.method === 'eth_chainId') return reply('0xa4b1')
+    if (req.method !== 'eth_call' || req.params[0]!.to.toLowerCase() !== mArb.oft.toLowerCase()) throw new Error(`canned mesh RPC: unexpected ${req.method}`)
+    const { functionName, args } = decodeFunctionData({ abi: meshSend, data: req.params[0]!.data })
+    const enc = (result: unknown) => reply(encodeFunctionResult({ abi: meshSend, functionName, result } as never))
+    if (functionName === 'token') return enc(mArb.token)
+    if (functionName === 'approvalRequired') return enc(true)
+    if (functionName === 'peers') return enc((args as unknown as [number])[0] === mTon.eid ? mTon.peer : mTron.peer)
+    const sp = (args as unknown as [{ amountLD: bigint }])[0]
+    if (functionName === 'quoteOFT') return enc([{ minAmountLD: 0n, maxAmountLD: 10n ** 13n }, [], { amountSentLD: sp.amountLD, amountReceivedLD: sp.amountLD - (sp.amountLD * 3n) / 10_000n }])
+    if (functionName === 'quoteSend') return enc({ nativeFee: MESH_FEE, lzTokenFee: 0n })
+    throw new Error(`canned mesh RPC: unexpected ${functionName}`)
+  }) as unknown as typeof fetch
+  const meshLive = usdt0Provider({ rpcUrls: { 'eip155:42161': 'https://rpc.test' }, fetchImpl: meshRpc })
+  const meshReasons: string[] = []
+  const tonParams = { sourceChain: 'eip155:42161', sourceToken: 'USDT0', destChain: 'ton:-239', destToken: 'USDT', amountIn: '10000000', destAddress: 'UQAQskXMoOIlwQZWQaqDmfRsNQaYsyTE5ImQoZ2QMCMqzp5R', refundAddress: '0x4444444444444444444444444444444444444444', dry: false }
+  const mq = await meshLive.getQuote({ ...tonParams, onRefusal: (r: string) => meshReasons.push(r) })
+  const sealedFee = (MESH_FEE + (MESH_FEE * 2_500n) / 10_000n).toString()
+  check('usdt0 mesh: getQuote Arbitrum → TON from the OFT (canned RPC): received − 3 bps, fee + 25 %, mesh fee row, recipient bytes',
+    !!mq && mq.intentId === 'usdt0-mesh:30110:30343' && mq.destAmount === '9997000' && mq.txRequest?.value === sealedFee && mq.txRequest?.approvalAddress === mArb.oft
+    && Math.abs(mq.feeUsd - 0.003) < 1e-9 && mq.fees?.[0]?.amount === '3000' && mq.providerData?.recipientBytes32 === '0x10b245cca0e225c1065641aa8399f46c350698b324c4e48990a19d9030232ace',
+    mq ? JSON.stringify({ v: mq.txRequest?.value, out: mq.destAmount, fee: mq.feeUsd }) : meshReasons.join('; '))
+  if (mq) {
+    check('usdt0 mesh: the provider\'s own quote passes usdt0VerifyQuote', usdt0VerifyQuote(tonParams, mq) === null, String(usdt0VerifyQuote(tonParams, mq)))
+    const mtx = await meshLive.buildDeposit(mq)
+    let pre = 'ok'
+    try { await meshLive.preflightDeposit!(mq, mtx) } catch (e) { pre = (e as Error).message }
+    const [sp0, fee0, refund0] = decodeFunctionData({ abi: meshSend, data: mtx.data as `0x${string}` }).args as unknown as [Record<string, unknown>, { nativeFee: bigint; lzTokenFee: bigint }, `0x${string}`]
+    const swapped = encodeFunctionData({ abi: meshSend, functionName: 'send', args: [{ ...sp0, to: `0x${'22'.repeat(32)}` } as never, fee0, refund0] })
+    let tampered = 'passed'
+    try { await meshLive.preflightDeposit!(mq, { ...mtx, data: swapped }) } catch (e) { tampered = (e as Error).message }
+    check('usdt0 mesh: buildDeposit + preflightDeposit pass (sealed send decoded, fee re-quoted); a swapped recipient in the calldata is refused',
+      pre === 'ok' && mtx.to === mArb.oft && mtx.value === sealedFee && tampered === 'usdt0: the deposit is not the sealed Legacy Mesh send', `${pre} | ${tampered}`)
+  }
+  // Tron off by default: answered as before the mesh, without a network call.
+  const offReasons: string[] = []
+  const off = await meshLive.getQuote({ ...tonParams, destChain: 'tron:728126428', destAddress: 'TRjNDwg9kSj7sv1J6qGG4ad2wB9S9XqjMn', onRefusal: (r: string) => offReasons.push(r) })
+  check('usdt0 mesh: Tron without meshDestinations → "USDT0 is not deployed on this chain"', off === null && offReasons.join() === 'USDT0 is not deployed on this chain', offReasons.join('; '))
   const cf = chainflipProvider()
   check('chainflip: route Tron USDT → Arbitrum USDC, none from BSC', cf.supportsRoute({ chain: 'tron:728126428', token: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t' }, { chain: 'eip155:42161', token: 'USDC' }) && !cf.supportsRoute({ chain: 'eip155:56', token: 'USDT' }, { chain: 'eip155:1', token: 'USDT' }))
   // live encoder note 2026-10-20: Tron USDT → Arbitrum USDC (asset 7, tag 3 = Arb) — SCALE + U256 LE min price under Hermes BigInt
