@@ -11,7 +11,8 @@ import { Address } from '@ton/core'
 import { RouterSwap2Protocol } from '@anywalletkit/protocol-swap2-router/swap2/router'
 import { NearIntentsSwap2Protocol } from '@anywalletkit/protocol-swap2-near-intents/protocol'
 import { LifiSwap2Protocol } from '@anywalletkit/protocol-swap2-lifi/protocol'
-import { lifiProvider } from '@anywalletkit/protocol-swap2-lifi/provider'
+import { lifiProvider, lifiVerifyQuote } from '@anywalletkit/protocol-swap2-lifi/provider'
+import lifiSolanaLive from '../../packages/protocol-swap2-lifi/tests/fixtures-live-2026-11-12-evm-solana.json'
 import { cctpProvider } from '@anywalletkit/protocol-swap2-cctp/provider'
 import { CctpSwap2Protocol } from '@anywalletkit/protocol-swap2-cctp/protocol'
 import { usdt0Provider } from '@anywalletkit/protocol-swap2-usdt0/provider'
@@ -97,6 +98,41 @@ export async function smokeProtocols(check: Check): Promise<void> {
     const p = new (P as never as new (a: unknown, c: unknown) => { getSupportedChains(): Promise<unknown>; quoteSwap2(o: unknown): Promise<unknown> })(evm, swap2Cfg)
     check(`${name}: constructs`, typeof p.quoteSwap2 === 'function')
     await tolerates(check, `${name}: getSupportedChains`, () => p.getSupportedChains())
+  }
+  {
+    // LI.FI EVM → Solana (live answers 2026-11-12): the Solana recipient read from Mayan, Polymer CCTP, Chainflip and
+    // LI.FI Intents calldata (bytes32 → base58), Polymer's USDC account derived on the device (sha256 + ed25519 off-curve
+    // check under Hermes BigInt); NEAR Intents / LayerSwap deposits refused.
+    type C = { name: string; params: Parameters<typeof lifiVerifyQuote>[0]; response: { action: { fromToken: { address: string } }; estimate: { toAmountMin: string }; transactionRequest: { to: string; data: string; value: string; chainId: number } } }
+    const corridors = (lifiSolanaLive as unknown as { corridors: C[] }).corridors
+    const asQuote = (c: C, data = c.response.transactionRequest.data): Parameters<typeof lifiVerifyQuote>[1] => {
+      const tr = c.response.transactionRequest
+      const native = /^0x0{40}$/.test(c.response.action.fromToken.address)
+      const value = BigInt(tr.value)
+      const fee = native ? value - BigInt(c.params.amountIn) : value
+      return {
+        provider: 'lifi', intentId: `lifi:${tr.chainId}:1151111081099710`, depositAddress: '', depositMemo: null, sourceAmount: c.params.amountIn,
+        destAmount: c.response.estimate.toAmountMin, minDestAmount: c.response.estimate.toAmountMin, feeUsd: 0, etaSeconds: 60, reliability: 1, validUntilMs: Date.now() + 60_000,
+        txRequest: { to: tr.to, data, value: value.toString(), chainId: tr.chainId, ...(native ? {} : { approvalAddress: tr.to }), ...(fee > 0n ? { nativeFee: fee.toString() } : {}) },
+      }
+    }
+    const readable = corridors.filter((c) => !/ (near|layerswap)$/.test(c.name))
+    const passed = readable.filter((c) => lifiVerifyQuote(c.params, asQuote(c)) === null).map((c) => c.name)
+    check(`lifi: EVM → Solana recorded quotes pass lifiVerifyQuote (${passed.length}/${readable.length})`, readable.length === 14 && passed.length === readable.length, readable.filter((c) => !passed.includes(c.name)).join(', '))
+    const other = 'd8a9e6d2f2a3c5ad3b7a6f1c8f5c4b3e2d1c0b9a8f7e6d5c4b3a2918f7e6d5c4'
+    const refusalFor = (c: C) => lifiVerifyQuote({ ...c.params, destAddress: 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' }, asQuote(c)) ?? ''
+    for (const name of ['ethereum-usdc>solana-usdc polymerStandard', 'base-usdc>solana-sol mayan', 'ethereum-eth>solana-sol chainflip', 'arbitrum-usdc>solana-usdc lifiIntents']) {
+      const c = corridors.find((k) => k.name === name)!
+      check(`lifi: EVM → Solana refuses another requested recipient (${name})`, /not (the recipient )?Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS/.test(refusalFor(c)), refusalFor(c))
+      const data = c.response.transactionRequest.data.toLowerCase()
+      const atAta = name.includes('polymer') ? data.indexOf('40d2f27c461f29e9feba1ab8acd39496a9c65b0ae62a713f01f941a993bf55ed') : -1
+      if (atAta > 0) {
+        const swapped = `${data.slice(0, atAta)}${other}${data.slice(atAta + 64)}`
+        check('lifi: EVM → Solana refuses a Polymer CCTP mint to an account that is not the owner\'s USDC account', /^the transaction does not match the request: the Polymer CCTP transfer mints to /.test(lifiVerifyQuote(c.params, asQuote(c, swapped)) ?? ''))
+      }
+    }
+    const near = corridors.find((k) => k.name.endsWith(' near'))!
+    check('lifi: EVM → Solana refuses a NEAR Intents deposit address', /pays a deposit address whose off-chain order names the Solana recipient/.test(lifiVerifyQuote(near.params, asQuote(near)) ?? ''))
   }
 
   // staking
