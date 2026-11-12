@@ -13,7 +13,7 @@ your app does.
 ## Next release: LI.FI to Solana, LI.FI Intents and dry quotes
 
 `protocol-swap2-lifi` quotes EVM → Solana routes (Mayan, Polymer CCTP and Chainflip, their Solana recipient read from
-the calldata on the device), refuses LI.FI Intents everywhere, and no longer hands out a transaction LI.FI built for a
+the calldata on the device), refuses LI.FI Intents on every route from an EVM chain, and no longer hands out a transaction LI.FI built for a
 placeholder address. `protocol-swap2-router` values the quotes that carry no transaction net of their bridge fee.
 
 - **protocol-swap2-lifi, Breaking:** LI.FI Intents (`lifiIntents`) is refused between EVM chains too, not only to

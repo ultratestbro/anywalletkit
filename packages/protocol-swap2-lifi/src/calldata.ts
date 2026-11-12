@@ -10,7 +10,7 @@
  * refused. For a Solana destination BridgeData.receiver is only LI.FI's non-EVM placeholder and the
  * recipient sits in facet-specific data: it is read for Mayan, Polymer CCTP and Chainflip
  * ({@link solanaRecipientMismatch}); any other non-EVM destination is refused. LI.FI Intents is refused on
- * every route, to Solana and between EVM chains alike: its escrowed order names its own oracles, output
+ * every route from an EVM chain, to Solana and between EVM chains alike: its escrowed order names its own oracles, output
  * settler and output amount, none of which is pinned here ({@link INTENTS_UNPINNED}).
  *
  * A facet's own data also names who gets money back — unused native fee, swap leftovers, the whole input when an
@@ -392,7 +392,7 @@ const FACET_DATA: Readonly<Record<string, FacetData>> = {
   Frax: {inline: 5, refunds: [["refundRecipient", 3]], zeroRefused: true},
   Glacis: {inline: 4, refunds: [["refundAddress", 1]], zeroRefused: true},
   LayerSwap: {refunds: [["refundRecipient", 2]], zeroRefused: true},
-  // The escrow order's user. Not reached while LI.FI Intents is refused on every route (INTENTS_UNPINNED); kept for when
+  // The escrow order's user. Not reached while LI.FI Intents is refused on every EVM-source route (INTENTS_UNPINNED); kept for when
   // its oracles and settler are pinned.
   LiFiIntentEscrowV2: {refunds: [["depositAndRefundAddress", 2]], zeroRefused: true},
   M0: {inline: 7, refunds: [["refundRecipient", 1], ["orderOwner", 2]], zeroRefused: true, delivery: m0Delivery}, // orderOwner gets a cancelled order back

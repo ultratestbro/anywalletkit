@@ -31,8 +31,8 @@ recipient. Refused, because the recipient cannot be read from the calldata: rout
 bridges whose facet does not bind the delivery to `BridgeData` (Relay, Garden, deBridge DLN,
 ThorSwap, Squid, Symbiosis) — cross-chain requests ask LI.FI to route around Relay, Garden, Squid
 and Symbiosis, and not to offer destination calls (`allowDestinationCall=false`), so their pairs get
-another bridge. **LI.FI Intents** (`lifiIntents`) is refused on every route and denied in every cross-chain
-request from an EVM chain as well: its escrowed order names its own input oracle, output oracle, output settler and
+another bridge. **LI.FI Intents** (`lifiIntents`) is refused on every route from an EVM chain and denied in every
+cross-chain request from an EVM chain (Solana-source requests are unchanged): its escrowed order names its own input oracle, output oracle, output settler and
 output amount multiplier, none of which is pinned here, so a matching recipient would not bind the delivery (the
 escrow releases the input on the oracle's word). LI.FI serves those pairs through another bridge; where LI.FI Intents
 is its only one (Elysium, 2026-11-13) LI.FI has no route. Unknown calldata is refused.
