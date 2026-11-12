@@ -143,20 +143,25 @@ describe("quote", () => {
     expect(wrongPeer.reasons[0]).toMatch(/no peer/);
   });
 
-  it("verifies each chain and pair once; dry quotes use placeholders; buildDeposit reproduces the sealed request", async () => {
+  it("verifies each chain and pair once; dry quotes are priced for placeholders; buildDeposit reproduces the sealed request", async () => {
     const {p, calls} = make();
-    await p.getQuote(PARAMS);
+    const live = (await p.getQuote(PARAMS))!;
     await p.getQuote(PARAMS);
     const rpc = calls.filter((u) => u.startsWith("http://rpc.arb"));
     // 1st quote: token + approvalRequired + peers + quoteOFT + quoteSend (5); 2nd: quoteOFT + quoteSend (2).
     expect(rpc).toHaveLength(7);
+    // Since review r3 (2026-11-13) a dry quote priced for vitalik.eth (no recipient, no refund address) keeps only its
+    // price: the send built for it would pay vitalik.eth from whichever wallet signed it (placeholder-2026-11-13.test.ts).
     const {refundAddress: _refund, ...noRefund} = PARAMS;
     const dry = (await p.getQuote({...noRefund, destAddress: "", dry: true}))!;
-    expect(dry.providerData!.recipient).toBe("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
-    const tx = await p.buildDeposit(dry);
-    expect(tx).toMatchObject({chain: "eip155:42161", to: ARB.oft, data: dry.txRequest!.data, value: SEALED.toString(), chainId: 42161, gasLimit: "450000"});
+    expect(dry.txRequest).toBeUndefined();
+    expect(dry.providerData).toMatchObject({placeholder: "recipient", nativeFee: SEALED.toString()});
+    expect(dry.providerData!.recipient).toBeUndefined();
+    await expect(p.buildDeposit(dry)).rejects.toThrow("swap2: this USDT0 quote was priced for a placeholder recipient");
+    const tx = await p.buildDeposit(live);
+    expect(tx).toMatchObject({chain: "eip155:42161", to: ARB.oft, data: live.txRequest!.data, value: SEALED.toString(), chainId: 42161, gasLimit: "450000"});
     expect(tx.approvalAddress).toBeUndefined();
-    await expect(p.buildDeposit({...dry, intentId: "cctp:6:3:1000"})).rejects.toThrow(/no transaction request/);
+    await expect(p.buildDeposit({...live, intentId: "cctp:6:3:1000"})).rejects.toThrow(/no transaction request/);
   });
 });
 

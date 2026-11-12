@@ -189,11 +189,13 @@ describe("quote", () => {
     expect((await quote({sourceChain: "eip155:42220", sourceToken: "USDT"})).reasons).toEqual([`source token USDT is not USDT0 (${CELO.token}) on Celo`]);
   });
 
-  it("a dry quote without a recipient prices the zero account; a live one without a recipient is refused", async () => {
+  it("a dry quote without a recipient prices the zero account and carries no send; a live one without a recipient is refused", async () => {
+    // Review r3 (2026-11-13): the send built for the zero-account stand-in burned the USDT for whoever signed it, so a
+    // dry quote priced for it keeps only its price (placeholder-2026-11-13.test.ts covers every entry point).
     const dry = await quote({destAddress: "", refundAddress: "", dry: true});
     expect(dry.reasons).toEqual([]);
-    const [sp] = decodeFunctionData({abi: ABI, data: dry.q!.txRequest!.data as Hex}).args as unknown as [{to: string}];
-    expect(sp.to).toBe("0x" + "00".repeat(32));
+    expect(dry.q!.txRequest).toBeUndefined();
+    expect(dry.q!.providerData).toMatchObject({placeholder: "recipient", amountLD: "10000000", minAmountLD: "9997000"});
     expect((await quote({destAddress: ""})).reasons).toEqual(["a live quote needs a recipient"]);
     expect((await quote({refundAddress: ""})).reasons).toEqual(["a live quote needs a refund address"]);
   });
@@ -345,11 +347,18 @@ describe("usdt0VerifyMeshSend: each refusal of a remote mesh quote", () => {
     expect(usdt0VerifyQuote(TO_TRON, {...q!, txRequest: {...tx, nativeFee: "1"}})).toBe("msg.value is not the declared native fee of the send");
   });
 
-  it("a dry quote without addresses prices the placeholder and is not held to a recipient; a live one is", async () => {
+  it("a dry quote without addresses prices the placeholder and carries no send; a live one is held to a recipient", async () => {
     const dryParams = {...TO_TON, destAddress: "", refundAddress: "", dry: true};
     const {q} = await quote({destAddress: "", refundAddress: "", dry: true}, {}, TO_TON);
     expect(usdt0VerifyQuote(dryParams, q!)).toBeNull();
-    expect(usdt0VerifyQuote({...dryParams, dry: false}, q!)).toBe("destination must be a TON address (raw 0:… or user-friendly EQ…/UQ…)");
+    // Since review r3 (2026-11-13) the provider no longer builds the zero-account send; the one it used to build (the live
+    // send re-pointed at the zero account and refunding vitalik.eth) is refused for the dry request and, for a live
+    // request without a recipient, still by the recipient check.
+    const live = (await quote({}, {}, TO_TON)).q!;
+    const stand = edit(live, (sp, r) => { sp.to = "0x" + "00".repeat(32); r.refund = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"; });
+    expect(usdt0VerifyQuote(dryParams, stand)).toBe("a dry quote priced for a placeholder recipient carries a transaction — it would pay or refund that placeholder, not the wallet that signs it");
+    expect(usdt0VerifyQuote({...dryParams, dry: false}, stand)).toBe("destination must be a TON address (raw 0:… or user-friendly EQ…/UQ…)");
+    expect(usdt0VerifyQuote({...dryParams, dry: false}, q!)).toBe("the quote carries no OFT call");
   });
 });
 

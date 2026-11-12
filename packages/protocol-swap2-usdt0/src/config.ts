@@ -18,8 +18,10 @@ import {
   USDT0_MESH_DEFAULT_DESTINATIONS, USDT0_MESH_DESTINATIONS, meshDestTokenMatches, meshDestinationFor, meshDestinationOn, meshRecipientBytes32, meshRecipientMatches, meshSourceFor,
   type Usdt0MeshDestination, type Usdt0MeshSource,
 } from "./mesh.js";
+import {ZERO_RECIPIENT_REFUSAL, isZeroEvmAddress, placeholderCarriesRefusal, placeholderIn, priceOnlyMismatch} from "./placeholder.js";
 
 export * from "./mesh.js";
+export type {Usdt0Placeholder} from "./placeholder.js";
 
 export interface Usdt0Chain {
   caip2: string;
@@ -133,7 +135,9 @@ export function tokenMatches(chain: Pick<Usdt0Chain, "caip2" | "token">, symbolO
  * floor; empty `extraOptions`, `composeMsg` and `oftCmd` (what the provider sends); no LZ-token fee; the trader as
  * refund; `msg.value` = the declared native fee = the call's `nativeFee`; the adapter as spender on Ethereum only.
  * The reason it fails, or null. The engine's native-fee ceiling bounds the fee itself. A route into Tron / TON is
- * a Legacy Mesh send and is held to {@link usdt0VerifyMeshSend} instead.
+ * a Legacy Mesh send and is held to {@link usdt0VerifyMeshSend} instead. A recipient that is the zero address is
+ * refused; a dry request without the recipient or the refund address is priced for the provider's stand-in, so its
+ * quote must carry no transaction and is held to its amount, floor and route only.
  */
 export function usdt0VerifyQuote(params: QuoteParams, quote: Quote): string | null {
   const meshDst = meshDestinationFor(params.destChain);
@@ -148,6 +152,12 @@ export function usdt0VerifyQuote(params: QuoteParams, quote: Quote): string | nu
   // The OFT burns or locks its own token whatever the request named, so both sides are bound here (reaudit 2026-10-30, #1).
   if (!tokenMatches(src, params.sourceToken)) return `source token ${params.sourceToken} is not USDT0 (${src.token}) on ${src.name}`;
   if (!tokenMatches(dst, params.destToken)) return `destination token ${params.destToken} is not USDT0 (${dst.token}) on ${dst.name}`;
+  // Nothing paid to the zero address comes back: burned, or a packet stored for good (review r3, 2026-11-13).
+  if (isZeroEvmAddress(params.destAddress)) return ZERO_RECIPIENT_REFUSAL;
+  // A dry request without the recipient or the refund address is priced for vitalik.eth in its place; a send built for
+  // it pays or refunds vitalik.eth from whichever wallet signs it, so such a quote carries no transaction (review r3).
+  const placeholder = placeholderIn(params);
+  if (placeholder) return quote.txRequest !== undefined ? placeholderCarriesRefusal(placeholder) : priceOnlyMismatch(params, quote, `usdt0:${src.eid}:${dst.eid}`);
   const tx = quote.txRequest;
   if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no OFT call";
   if (tx.to.toLowerCase() !== src.oft.toLowerCase()) return `the call targets ${tx.to}, not the ${src.name} OFT`;
@@ -177,7 +187,8 @@ export function usdt0VerifyQuote(params: QuoteParams, quote: Quote): string | nu
   if (sp.amountLD !== amountIn || BigInt(quote.sourceAmount) !== amountIn) return `the send moves ${sp.amountLD}, not the ${amountIn} input`;
   if (sp.minAmountLD > sp.amountLD || sp.minAmountLD <= 0n || sp.minAmountLD < floor) return `the send's minAmountLD ${sp.minAmountLD} is below the ${floor} minimum`;
   if (sp.extraOptions !== "0x" || sp.composeMsg !== "0x" || sp.oftCmd !== "0x") return "the send carries options, a compose message or an OFT command";
-  // A dry quote without addresses prices the provider's placeholders; it is never built (the engine re-quotes live).
+  // A dry quote without addresses is priced for the provider's placeholders and carries no transaction (above), so here
+  // the request names both addresses (or is live, where a blank one is refused).
   const live = params.dry === false;
   if (params.destAddress || live) {
     if (!isAddress(params.destAddress)) return "the recipient is not an EVM address";
@@ -202,11 +213,23 @@ export const USDT0_MESH_INTENT = "usdt0-mesh";
  * the way the destination OFT reads it (Tron: low 20 bytes as base58check; TON: the account hash on workchain 0) and
  * equal to the requested recipient; the input as `amountLD`; a `minAmountLD` that guarantees the quoted minimum and
  * the caller's floor; no options, compose message or OFT command; no LZ-token fee; the trader as refund;
- * `msg.value` = the declared native fee = the call's `nativeFee`. The provider runs it on its own build too.
+ * `msg.value` = the declared native fee = the call's `nativeFee`. The provider runs it on its own build too. A recipient
+ * that is the zero account (Tron T9yD14…, TON `0:000…0` in any spelling) is refused; a dry request without the
+ * recipient or the refund address is priced for the zero account / vitalik.eth in its place, so its quote must carry no
+ * transaction and is held to its amount, floor and route only.
  */
 export function usdt0VerifyMeshSend(params: QuoteParams, quote: Quote, src: Usdt0MeshSource, dst: Usdt0MeshDestination): string | null {
   if (!tokenMatches(src, params.sourceToken)) return `source token ${params.sourceToken} is not USDT0 (${src.token}) on ${src.name}`;
   if (!meshDestTokenMatches(dst, params.destToken)) return `destination token ${params.destToken} is not USDT0 (${dst.token}) on ${dst.name}`;
+  // Nothing paid to the zero account comes back: burned, or a packet stored for good (review r3, 2026-11-13).
+  if (params.destAddress) {
+    const named = meshRecipientBytes32(dst, params.destAddress);
+    if (!("refusal" in named) && /^0x0{64}$/.test(named.to)) return ZERO_RECIPIENT_REFUSAL;
+  }
+  // A dry request without the recipient is priced for the zero account (without the refund address, for vitalik.eth as
+  // the refund); a send built for it burns the USDT or refunds vitalik.eth, so such a quote carries no transaction.
+  const placeholder = placeholderIn(params);
+  if (placeholder) return quote.txRequest !== undefined ? placeholderCarriesRefusal(placeholder) : priceOnlyMismatch(params, quote, `${USDT0_MESH_INTENT}:${src.eid}:${dst.eid}`);
   const tx = quote.txRequest;
   if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no OFT call";
   if (tx.to.toLowerCase() !== src.oft.toLowerCase()) return `the call targets ${tx.to}, not the ${src.name} Legacy Mesh OFT`;
@@ -234,7 +257,8 @@ export function usdt0VerifyMeshSend(params: QuoteParams, quote: Quote, src: Usdt
   if (sp.amountLD !== amountIn || BigInt(quote.sourceAmount) !== amountIn) return `the send moves ${sp.amountLD}, not the ${amountIn} input`;
   if (sp.minAmountLD > sp.amountLD || sp.minAmountLD <= 0n || sp.minAmountLD < floor) return `the send's minAmountLD ${sp.minAmountLD} is below the ${floor} minimum`;
   if (sp.extraOptions !== "0x" || sp.composeMsg !== "0x" || sp.oftCmd !== "0x") return "the send carries options, a compose message or an OFT command";
-  // A dry quote without a recipient prices the zero-account placeholder; it is never built (the engine re-quotes live).
+  // A dry quote without a recipient is priced for the zero-account placeholder and carries no transaction (above), so
+  // here the request names both addresses (or is live, where a blank one is refused).
   const live = params.dry === false;
   if (params.destAddress || live) {
     const want = meshRecipientBytes32(dst, params.destAddress ?? "");

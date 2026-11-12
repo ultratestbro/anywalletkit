@@ -10,6 +10,7 @@ import {
   meshDestTxHash, meshDestinationFor, meshDestinationOn, meshRecipientBytes32, meshRecipientMatches, meshSourceFor, type Usdt0MeshDestination,
   type Usdt0MeshFamily, type Usdt0MeshSource,
 } from "./mesh.js";
+import {ZERO_RECIPIENT_REFUSAL, isZeroEvmAddress, placeholderBuildRefusal, placeholderIn, placeholderPreflightRefusal, type Usdt0Placeholder} from "./placeholder.js";
 
 /**
  * USDT0 — Tether's USDT as a LayerZero OFT. ONE source transaction:
@@ -49,6 +50,10 @@ import {
  * TON delivery completes only when tonapi shows that transfer to the recipient.
  * No claim on Tron / TON (nothing signs there in this package). TON is on by default, Tron is opt-in
  * (`meshDestinations`): its LayerZero fee is above the swap2 engine's native-fee ceiling today.
+ *
+ * A dry request without the recipient or the refund address is priced for a stand-in (vitalik.eth; the zero account on
+ * Tron / TON) and comes back as its price only: no `txRequest`, `providerData.placeholder` = "recipient" | "refund".
+ * `buildDeposit` and `preflightDeposit` refuse such a quote; a recipient that is the zero account is refused outright.
  */
 
 const OFT_ABI = parseAbi([
@@ -152,6 +157,17 @@ interface ScanMessage {
 
 const same = (a: string | undefined | null, b: string) => !!a && a.toLowerCase() === b.toLowerCase();
 const isHexData = (v: unknown): v is Hex => typeof v === "string" && /^0x(?:[0-9a-fA-F]{2})*$/.test(v);
+
+/**
+ * A quote built for a stand-in, reduced to its price (review r3, 2026-11-13): the `send` is dropped and so are the
+ * sealed addresses (the stand-in's), so neither `buildDeposit` nor `preflightDeposit` has anything to work from; the
+ * amounts, the fee rows and the sealed LayerZero fee (`providerData.nativeFee`) stay for display.
+ */
+function priceOnly(quote: Quote, placeholder: Usdt0Placeholder): Quote {
+  const {txRequest: _send, providerData, ...price} = quote;
+  const {recipient: _recipient, recipientBytes32: _bytes, refundAddress: _refund, ...kept} = providerData ?? {};
+  return {...price, providerData: {...kept, placeholder}};
+}
 
 
 /**
@@ -320,9 +336,12 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     if (!recipient) return refuse("a live quote needs a recipient");
     const encoded = meshRecipientBytes32(dst, recipient);
     if ("refusal" in encoded) return refuse(encoded.refusal);
+    // Only the dry stand-in may be the zero account (that quote carries no send); a named one is a burn address.
+    if (params.destAddress && encoded.to === ZERO_B32) return refuse(ZERO_RECIPIENT_REFUSAL);
     const refund = params.refundAddress || (dry ? EVM_PLACEHOLDER : "");
     if (!refund) return refuse("a live quote needs a refund address");
     if (!isAddress(refund)) return refuse("refund address must be an EVM address");
+    const placeholder = dry ? placeholderIn(params) : null;
     const c = client(src.caip2);
     if (!c) return refuse(`no RPC configured for ${src.caip2}`);
 
@@ -376,6 +395,13 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
           amountLD: amount.toString(), minAmountLD: received.toString(), nativeFee: nativeFee.toString(),
         },
       };
+      // A send for a stand-in is not handed out: the price, held to the dry request (amount, floor, route, no deposit).
+      if (placeholder) {
+        const priced = priceOnly(quote, placeholder);
+        const off = usdt0VerifyMeshSend(params, priced, src, dst);
+        if (off) return refuse(`usdt0: the built Legacy Mesh send does not match the request — ${off}`);
+        return priced;
+      }
       // What was built, read back against the request: target, eid, recipient bytes, amounts, refund, fee, intent.
       const mismatch = usdt0VerifyMeshSend({...params, destAddress: recipient, refundAddress: refund, dry: false}, quote, src, dst);
       if (mismatch) return refuse(`usdt0: the built Legacy Mesh send does not match the request — ${mismatch}`);
@@ -399,6 +425,7 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
       || !meshRecipientMatches(dst, pd.recipientBytes32!, pd.recipient ?? "")) {
       throw new Error("usdt0: quote carries no sealed send parameters");
     }
+    if (pd.recipientBytes32 === ZERO_B32) throw new Error(`usdt0: ${ZERO_RECIPIENT_REFUSAL}`);
     const sp = meshSendParam(dst.eid, pd.recipientBytes32 as Hex, BigInt(pd.amountLD!), BigInt(pd.minAmountLD!));
     const sealed = BigInt(pd.nativeFee!);
     let call: {functionName: string; args?: readonly unknown[]};
@@ -539,9 +566,13 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
       const recipient = params.destAddress || (dry ? EVM_PLACEHOLDER : "");
       if (!recipient) return refuse("a live quote needs a recipient");
       if (!isAddress(recipient)) return refuse("destination must be an EVM address");
+      // Nothing paid to the zero address comes back: burned, or a packet stored for good.
+      if (isZeroEvmAddress(recipient)) return refuse(ZERO_RECIPIENT_REFUSAL);
       const refund = params.refundAddress || (dry ? EVM_PLACEHOLDER : "");
       if (!refund) return refuse("a live quote needs a refund address");
       if (!isAddress(refund)) return refuse("refund address must be an EVM address");
+      // vitalik.eth stands in for a missing address: its send would pay or refund vitalik.eth, so only the price is kept.
+      const placeholder = dry ? placeholderIn(params) : null;
       const c = client(src.caip2);
       if (!c) return refuse(`no RPC configured for ${src.caip2}`);
 
@@ -568,7 +599,7 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
         const feeUsd = protocolFees.reduce((a, f) => a + Number(f.amount) / 1e6, 0);
         // Ethereum sources wait for 60 confirmations before the DVNs attest (~15 min live); L2 sources land in a few minutes.
         const eta = src.chainId === 1 ? 1000 : 240;
-        return {
+        const quote: Quote = {
           provider: "usdt0",
           intentId: `usdt0:${src.eid}:${dst.eid}`,
           depositAddress: "",
@@ -595,12 +626,16 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
             amountLD: amount.toString(), minAmountLD: received.toString(), nativeFee: nativeFee.toString(),
           },
         };
+        return placeholder ? priceOnly(quote, placeholder) : quote;
       } catch (err) {
         return refuse(rpcSafeReason(err, src.name));
       }
     },
 
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
+      // A dry quote priced for a stand-in recipient or refund address is never built, even with a transaction attached.
+      const placeholder = quote.providerData?.placeholder;
+      if (placeholder !== undefined) throw new Error(placeholderBuildRefusal(placeholder));
       const tx = quote.txRequest;
       const parsed = parseIntent(quote.intentId) ?? parseMeshIntent(quote.intentId);
       if (!tx || !parsed) throw new Error("swap2: USDT0 quote has no transaction request");
@@ -623,6 +658,8 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
      * wasted broadcast.
      */
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
+      const placeholder = quote.providerData?.placeholder;
+      if (placeholder !== undefined) throw new Error(placeholderPreflightRefusal(placeholder));
       const mesh = parseMeshIntent(quote.intentId);
       if (mesh) return meshPreflight(quote, tx, mesh.src, mesh.dst);
       const parsed = parseIntent(quote.intentId);
@@ -633,6 +670,7 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
       if (!/^\d+$/.test(pd.amountLD ?? "") || !/^\d+$/.test(pd.minAmountLD ?? "") || !/^\d+$/.test(pd.nativeFee ?? "") || !isAddress(pd.recipient ?? "")) {
         throw new Error("usdt0: quote carries no sealed send parameters");
       }
+      if (isZeroEvmAddress(pd.recipient)) throw new Error(`usdt0: ${ZERO_RECIPIENT_REFUSAL}`);
       const c = client(src.caip2);
       if (!c) throw new Error(`usdt0: no RPC for ${src.caip2}`);
       const sp = sendParam(dst.eid, pd.recipient!, BigInt(pd.amountLD!), BigInt(pd.minAmountLD!));
