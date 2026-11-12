@@ -10,6 +10,24 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: an app-set native fee ceiling for swaps
+
+Not breaking, and nothing to do unless you want it: without the new option every swap behaves as before, with the
+same caps and the same error texts.
+
+- **protocol-swap2-core, new option:** `nativeFeeCeiling` on the engine config (`RouterSwap2Protocol` and every
+  swap2 protocol) lets your app set the cap on the native fee one route charges on top of the input, in place of
+  the chain's (0.005 ETH on Ethereum and on chains without a row, 100 CELO on Celo, …). It is called with
+  `{ provider, intentId, fromChain, destChain, nativeFee, defaultCap, maxCeiling }` before the review and before any
+  approval. A non-negative `bigint` is the cap, `undefined` keeps the chain's. Anything else, a throw, or a value
+  above `maxCeiling` (20 × the chain's cap) refuses the swap with a `Swap2ConfigurationError`. See
+  [Native fee ceiling](/guides/swaps/#native-fee-ceiling) for the USDT0 → Tron example: provider `usdt0`, destination
+  `tron:728126428`, Tron eid 30420 in the intent id, 0.01 ETH on Ethereum and Arbitrum, 300 CELO on Celo.
+- **Only `swap2()` applies the cap:** `quoteSwap2` and `quoteSwap2Routes` do not check native fees, as before. A
+  route whose fee your hook does not allow is still listed, and its `swap2()` is refused.
+- **protocol-swap2-router:** `using(provider)` now runs with the config the router was created with (a frozen copy),
+  so the picked route keeps your `nativeFeeCeiling` and `reviewExecution` even if you change the config object later.
+
 ## Next release: Omniston's new TON Escrow Minter
 
 Since 2026-11-10 Omniston quotes TON ↔ EVM orders on a new TON Escrow Minter (rev2),

@@ -221,6 +221,55 @@ not itemize its fees is refused whenever a cap is set. With caps on, the USDC ex
 keeps only the CCTP route. To protect the user without losing routes, compare the
 guaranteed output (`toTokenAmountMin`) instead.
 
+### Native fee ceiling
+
+Some bridges charge native coin on top of the input (a LayerZero messaging fee, for example),
+declared in the quote. `swap2()` refuses such a fee above the chain's cap: 0.005 ETH on
+Ethereum and on chains without a cap of their own (Arbitrum, Base, …), 100 CELO on Celo,
+20 POL on Polygon, and so on. The error reads
+`swap2: quoted native fee <fee> exceeds the cap <cap> for <chain>`.
+
+To allow one route above it, set `nativeFeeCeiling` on the router (or on any swap2
+protocol). The engine calls it once per `swap2()` whose quote declares a native fee, before
+the review screen and before any approval:
+
+| The hook returns | Result |
+|---|---|
+| a non-negative `bigint` | the cap for this execution, higher or lower than the chain's (`0n` refuses any fee) |
+| `undefined` | the chain's cap, as without the hook |
+| anything else, or throws | the swap is refused (`Swap2ConfigurationError`) |
+| more than `ctx.maxCeiling` (20 × the chain's cap: 0.1 ETH on Ethereum, 2000 CELO on Celo) | the swap is refused |
+
+No answer removes the cap. Return `undefined` for every route you do not mean.
+
+USDT0 Legacy Mesh into Tron is the case this was built for. Its LayerZero fee was
+0.005341 ETH from Ethereum and Arbitrum and 170.5 CELO from Celo on 2026-11-12. With the
+provider's 25 % headroom the quote declares 0.006676 ETH and 213.1 CELO, both above the
+default caps. Tron is LayerZero endpoint 30420, and the `usdt0` provider's mesh intent ids
+read `usdt0-mesh:<source eid>:<destination eid>`:
+
+```ts
+const TRON_MESH_CEILING = new Map([
+  ['eip155:1', 10n ** 16n],             // 0.01 ETH on Ethereum
+  ['eip155:42161', 10n ** 16n],         // 0.01 ETH on Arbitrum
+  ['eip155:42220', 300n * 10n ** 18n],  // 300 CELO on Celo
+])
+
+const swaps = new RouterSwap2Protocol(account, {
+  fromChain: account.chain,
+  providers,
+  nativeFeeCeiling: ({ provider, intentId, fromChain, destChain }) =>
+    provider === 'usdt0' && destChain === 'tron:728126428' && /^usdt0-mesh:\d+:30420(?:~|$)/.test(intentId)
+      ? TRON_MESH_CEILING.get(fromChain)
+      : undefined,
+})
+```
+
+`destChain` is always the catalog id (`tron:728126428`), even when you passed
+`tron:0x2b6653dc`. Through a swap2 server the intent id ends in `~<token>`, which the
+pattern above allows. The cap applies only when the swap executes: `quoteSwap2Routes` still
+lists a route whose fee is above it.
+
 ## With the kit
 
 Register the router as a protocol and the [policies](/concepts/policies/) wrap the account
