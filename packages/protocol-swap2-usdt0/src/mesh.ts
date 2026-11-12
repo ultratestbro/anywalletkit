@@ -46,10 +46,21 @@ export interface Usdt0MeshSource {
   endpoint: string;
 }
 
+/** A Legacy Mesh destination family (the provider's `meshDestinations` option names them). */
+export type Usdt0MeshFamily = "tron" | "ton";
+
+/**
+ * The Legacy Mesh destinations a provider offers unless its `meshDestinations` option says otherwise: TON only. Tron is
+ * opt-in: the LayerZero fee into Tron (live 2026-11-12: ≈ 0.0053 ETH from Ethereum / Arbitrum, ≈ 170 CELO from Celo,
+ * before the 25 % headroom) is above the swap2 engine's native-fee ceiling (0.005 ETH, 100 CELO), so the engine refuses
+ * to execute such a send; offer it only where the send can be executed.
+ */
+export const USDT0_MESH_DEFAULT_DESTINATIONS: readonly Usdt0MeshFamily[] = Object.freeze(["ton"] as const);
+
 /** A Legacy Mesh destination this package delivers to (no signing there). */
 export interface Usdt0MeshDestination {
   caip2: string;
-  family: "tron" | "ton";
+  family: Usdt0MeshFamily;
   eid: number;
   name: string;
   /** The destination's `UsdtOFT`, in that chain's own spelling. */
@@ -92,7 +103,7 @@ export const USDT0_MESH_DESTINATION_BY_EID: Readonly<Record<number, Usdt0MeshDes
 );
 
 /** Dry-quote placeholders (never built: a live quote needs the real recipient): the zero account of each family. */
-export const USDT0_MESH_PLACEHOLDER: Readonly<Record<"tron" | "ton", string>> = Object.freeze({
+export const USDT0_MESH_PLACEHOLDER: Readonly<Record<Usdt0MeshFamily, string>> = Object.freeze({
   tron: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
   ton: `0:${"0".repeat(64)}`,
 });
@@ -108,6 +119,12 @@ export function meshSourceFor(chain: string): Usdt0MeshSource | undefined {
 /** The mesh destination on `chain` (`tron:728126428` / `tron:0x2b6653dc`, `ton:-239`), if any. */
 export function meshDestinationFor(chain: string): Usdt0MeshDestination | undefined {
   return own(USDT0_MESH_DESTINATIONS, catalogChainId(chain));
+}
+
+/** The mesh destination on `chain` when its family is one of `families` (default {@link USDT0_MESH_DEFAULT_DESTINATIONS}). */
+export function meshDestinationOn(chain: string, families: readonly string[] = USDT0_MESH_DEFAULT_DESTINATIONS): Usdt0MeshDestination | undefined {
+  const dst = meshDestinationFor(chain);
+  return dst && families.includes(dst.family) ? dst : undefined;
 }
 
 const hex = (b: Uint8Array): string => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");

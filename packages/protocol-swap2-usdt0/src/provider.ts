@@ -6,8 +6,9 @@ import {bigintToUnits} from "@anywalletkit/core";
 import type {Asset, CrossChainProvider, IntentRef, IntentState, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {LZ_SCAN_API, USDT0_BY_EID, USDT0_CHAINS, USDT0_MESH_INTENT, tokenMatches, usdt0ClaimTargets, usdt0VerifyMeshSend, usdt0 as usdt0Cfg, type Usdt0Chain} from "./config.js";
 import {
-  USDT0_MESH_DESTINATION_BY_EID, USDT0_MESH_PLACEHOLDER, USDT0_MESH_SOURCES, USDT0_MESH_SOURCE_BY_EID, meshDestTokenMatches, meshDestTxHash, meshDestinationFor,
-  meshRecipientBytes32, meshRecipientMatches, meshSourceFor, type Usdt0MeshDestination, type Usdt0MeshSource,
+  USDT0_MESH_DEFAULT_DESTINATIONS, USDT0_MESH_DESTINATION_BY_EID, USDT0_MESH_PLACEHOLDER, USDT0_MESH_SOURCES, USDT0_MESH_SOURCE_BY_EID, meshDestTokenMatches,
+  meshDestTxHash, meshDestinationFor, meshDestinationOn, meshRecipientBytes32, meshRecipientMatches, meshSourceFor, type Usdt0MeshDestination,
+  type Usdt0MeshFamily, type Usdt0MeshSource,
 } from "./mesh.js";
 
 /**
@@ -45,7 +46,8 @@ import {
  * the same LayerZero Scan message; on Tron the payout is inside `lzReceive`
  * (DELIVERED = paid), on TON it is a jetton transfer later in the trace, so a
  * TON delivery completes only when tonapi shows that transfer to the recipient.
- * No claim on Tron / TON (nothing signs there in this package).
+ * No claim on Tron / TON (nothing signs there in this package). TON is on by default, Tron is opt-in
+ * (`meshDestinations`): its LayerZero fee is above the swap2 engine's native-fee ceiling today.
  */
 
 const OFT_ABI = parseAbi([
@@ -127,6 +129,14 @@ export interface Usdt0ProviderConfig {
   tonApiUrl?: string;
   /** Local lifetime of a quote (default 60 s; the sealed fee is re-checked at preflight). */
   quoteTtlMs?: number;
+  /**
+   * USDT0 Legacy Mesh destinations to offer from the EVM mesh sources (Ethereum, Arbitrum, Celo): `"ton"`, `"tron"`.
+   * Default `["ton"]`; `[]` leaves the mesh out. Tron is opt-in: the LayerZero fee into Tron (live 2026-11-12:
+   * ≈ 0.0053 ETH from Ethereum / Arbitrum, ≈ 170 CELO from Celo, before the 25 % headroom) is above the swap2 engine's
+   * native-fee ceiling (0.005 ETH, 100 CELO), so `swap2` refuses to execute it — turn it on only where that send can
+   * run. A destination left out is not routed and answers as it did before the mesh ("USDT0 is not deployed on this chain").
+   */
+  meshDestinations?: readonly Usdt0MeshFamily[];
   /** Injectable for tests (also used by the RPC transport). */
   fetchImpl?: typeof fetch;
 }
@@ -165,6 +175,11 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
   if (!/^https?:\/\//.test(tonApi)) throw new Error("usdt0: tonApiUrl must use http or https");
   const quoteTtlMs = config.quoteTtlMs ?? DEFAULT_QUOTE_TTL_MS;
   if (!Number.isInteger(quoteTtlMs) || quoteTtlMs <= 0 || quoteTtlMs > 300_000) throw new Error("usdt0: quoteTtlMs must be an integer between 1 and 300000");
+  const families: unknown = config.meshDestinations ?? USDT0_MESH_DEFAULT_DESTINATIONS;
+  if (!Array.isArray(families) || families.some((f) => f !== "tron" && f !== "ton")) throw new Error('usdt0: meshDestinations lists only "tron" and "ton"');
+  const meshFamilies: readonly Usdt0MeshFamily[] = Object.freeze([...(families as Usdt0MeshFamily[])]);
+  /** The mesh destination on `chain` when this provider offers it. */
+  const meshOn = (chain: string): Usdt0MeshDestination | undefined => meshDestinationOn(chain, meshFamilies);
   const rpcUrls = Object.freeze({...(config.rpcUrls ?? {})});
   const doFetch: typeof fetch = (input, init) => (config.fetchImpl ?? fetch)(input, init);
 
@@ -292,9 +307,7 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     dstEid, to, amountLD, minAmountLD, extraOptions: "0x" as Hex, composeMsg: "0x" as Hex, oftCmd: "0x" as Hex,
   });
 
-  async function meshQuote(params: QuoteParams, dst: Usdt0MeshDestination, refuse: (reason: string) => null): Promise<Quote | null> {
-    const src = meshSourceFor(params.sourceChain);
-    if (!src) return refuse(`the USDT0 Legacy Mesh is not wired for ${params.sourceChain} → ${dst.name}: its EVM sources are Ethereum, Arbitrum and Celo`);
+  async function meshQuote(params: QuoteParams, src: Usdt0MeshSource, dst: Usdt0MeshDestination, refuse: (reason: string) => null): Promise<Quote | null> {
     if (!tokenMatches(src, params.sourceToken)) return refuse(`source token ${params.sourceToken} is not USDT0 (${src.token}) on ${src.name}`);
     if (!meshDestTokenMatches(dst, params.destToken)) return refuse(`destination token ${params.destToken} is not USDT0 (${dst.token}) on ${dst.name}`);
     if (!/^\d+$/.test(params.amountIn)) return refuse("amount must be a base-unit integer");
@@ -462,13 +475,14 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     describeActivity: describeUsdt0Activity,
     claimTargets: usdt0ClaimTargets,
     enabled: () => config.enabled ?? true,
-    // Tron / TON are destinations only: supported while some mesh source has an RPC, never as the source of a pair.
+    // Tron / TON are destinations only (each when meshDestinations names it): supported while some mesh source has an RPC,
+    // never as the source of a pair.
     supportsChain: (chain: string) => meshDestinationFor(chain)
-      ? Object.keys(USDT0_MESH_SOURCES).some((c) => client(c) !== null)
-      : usdt0Cfg.supportsSourceChain(chain) && client(chain) !== null,
-    supportsChainPair: (from: string, to: string) => usdt0Cfg.supports(from, to) && client(from) !== null,
+      ? !!meshOn(chain) && Object.keys(USDT0_MESH_SOURCES).some((c) => client(c) !== null)
+      : usdt0Cfg.supportsSourceChain(chain, meshFamilies) && client(chain) !== null,
+    supportsChainPair: (from: string, to: string) => usdt0Cfg.supports(from, to, meshFamilies) && client(from) !== null,
     supportsRoute(from: Asset, to: Asset): boolean {
-      const meshDst = meshDestinationFor(to.chain);
+      const meshDst = meshOn(to.chain);
       if (meshDst) {
         const meshSrc = meshSourceFor(from.chain);
         return !!meshSrc && client(from.chain) !== null && tokenMatches(meshSrc, from.token) && meshDestTokenMatches(meshDst, to.token);
@@ -482,10 +496,12 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
       const refuse = (reason: string) => { params.onRefusal?.(reason); return null; };
       if (params.flex) return refuse("the amount is sealed into the calldata (no flexible deposits)");
-      const fromMesh = meshDestinationFor(params.sourceChain);
-      if (fromMesh) return refuse(`the USDT0 Legacy Mesh is not wired for a ${fromMesh.name} source here: Tron and TON are destinations only (a send from them is signed on that chain)`);
-      const meshDst = meshDestinationFor(params.destChain);
-      if (meshDst) return meshQuote(params, meshDst, refuse);
+      // Tron / TON never send here (a send from them is signed on that chain); a source without a mesh OFT, or a mesh
+      // destination this provider does not offer, is not a mesh route: all of them keep the answer they had before the mesh.
+      if (meshDestinationFor(params.sourceChain)) return refuse("USDT0 is not deployed on this chain");
+      const meshDst = meshOn(params.destChain);
+      const meshSrc = meshSourceFor(params.sourceChain);
+      if (meshDst && meshSrc) return meshQuote(params, meshSrc, meshDst, refuse);
       const src = USDT0_CHAINS[params.sourceChain];
       const dst = USDT0_CHAINS[params.destChain];
       if (!src || !dst) return refuse("USDT0 is not deployed on this chain");

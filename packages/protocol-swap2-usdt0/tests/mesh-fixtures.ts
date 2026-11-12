@@ -49,6 +49,8 @@ export const ABI = parseAbi([
 export interface MeshWorld {
   token?: string; approvalRequired?: boolean; peer?: Hex;
   credits?: bigint; fee?: bigint; lzTokenFee?: bigint;
+  /** quoteOFT: the OFT's minimum and what it says arrives (default: amount − 3 bps). */
+  oftMin?: bigint; received?: (amount: bigint) => bigint;
   /** quoteSend: "credits" reverts with InsufficientCredits, "http" answers 500. */
   quoteSendFails?: "credits" | "http";
   message?: unknown; scanStatus?: number;
@@ -89,7 +91,7 @@ export function meshWorld(o: MeshWorld = {}) {
           return enc(o.peer ?? dst?.peer ?? "0x" + "00".repeat(32));
         }
         const sp = (args as unknown as [{dstEid: number; amountLD: bigint; minAmountLD: bigint}])[0];
-        if (functionName === "quoteOFT") return enc([{minAmountLD: 0n, maxAmountLD: o.credits ?? 10n ** 13n}, [], {amountSentLD: sp.amountLD, amountReceivedLD: recvOf(sp.amountLD)}]);
+        if (functionName === "quoteOFT") return enc([{minAmountLD: o.oftMin ?? 0n, maxAmountLD: o.credits ?? 10n ** 13n}, [], {amountSentLD: sp.amountLD, amountReceivedLD: (o.received ?? recvOf)(sp.amountLD)}]);
         if (functionName === "quoteSend") {
           if (o.quoteSendFails === "http") return new Response("upstream", {status: 500});
           if (o.quoteSendFails === "credits") {
@@ -106,17 +108,18 @@ export function meshWorld(o: MeshWorld = {}) {
   return {fetchImpl, calls};
 }
 
+/** Both mesh destinations on (Tron is opt-in); pass `cfg.meshDestinations` to test the default or another set. */
 export const make = (o: MeshWorld = {}, cfg: Record<string, unknown> = {}) => {
   const w = meshWorld(o);
-  return {...w, p: usdt0Provider({scanUrl: "https://scan.test", tonApiUrl: "https://ton.test", fetchImpl: w.fetchImpl, rpcUrls: RPC, ...cfg})};
+  return {...w, p: usdt0Provider({scanUrl: "https://scan.test", tonApiUrl: "https://ton.test", fetchImpl: w.fetchImpl, rpcUrls: RPC, meshDestinations: ["tron", "ton"], ...cfg})};
 };
 
 export const TO_TRON: QuoteParams = {sourceChain: "eip155:42161", sourceToken: "USDT0", destChain: "tron:728126428", destToken: "USDT", amountIn: "10000000", destAddress: TRON_TO, refundAddress: SENDER, dry: false};
 export const TO_TON: QuoteParams = {...TO_TRON, destChain: "ton:-239", destToken: TON.token, destAddress: TON_TO};
 
-export async function quote(params: Partial<QuoteParams> = {}, o: MeshWorld = {}, base: QuoteParams = TO_TRON) {
+export async function quote(params: Partial<QuoteParams> = {}, o: MeshWorld = {}, base: QuoteParams = TO_TRON, cfg: Record<string, unknown> = {}) {
   const reasons: string[] = [];
-  const {p, calls} = make(o);
+  const {p, calls} = make(o, cfg);
   const q = await p.getQuote({...base, ...params, onRefusal: (r) => reasons.push(r)});
   return {q, reasons, p, calls};
 }

@@ -14,7 +14,10 @@ import {decodeFunctionData, getAddress, isAddress, pad, parseAbi, type Hex} from
 import type {Quote, QuoteParams, RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
 import {ccAsset} from "@anywalletkit/swap2-assets";
-import {meshDestTokenMatches, meshDestinationFor, meshRecipientBytes32, meshRecipientMatches, meshSourceFor, type Usdt0MeshDestination, type Usdt0MeshSource} from "./mesh.js";
+import {
+  USDT0_MESH_DEFAULT_DESTINATIONS, USDT0_MESH_DESTINATIONS, meshDestTokenMatches, meshDestinationFor, meshDestinationOn, meshRecipientBytes32, meshRecipientMatches, meshSourceFor,
+  type Usdt0MeshDestination, type Usdt0MeshSource,
+} from "./mesh.js";
 
 export * from "./mesh.js";
 
@@ -81,20 +84,26 @@ export const USDT0_SYMBOLS: readonly string[] = Object.freeze(["USDT0", "USDT", 
 
 const isUsdt0Chain = (chain: string): boolean => isEvm(chain) && !!usdt0ChainFor(`eip155:${evmRef(chain)}`);
 const isMeshSource = (chain: string): boolean => isEvm(chain) && !!meshSourceFor(`eip155:${evmRef(chain)}`);
+/** Some Legacy Mesh destination is on: a mesh source is then a chain this package sends from. */
+const meshAnyOn = (families: readonly string[]): boolean => Object.values(USDT0_MESH_DESTINATIONS).some((d) => families.includes(d.family));
 
+/**
+ * What this package routes, by chain. `meshDestinations` is the provider option of the same name (default
+ * {@link USDT0_MESH_DEFAULT_DESTINATIONS}: TON; Tron is opt-in); `[]` leaves the Legacy Mesh out.
+ */
 export const usdt0 = {
   /** A chain this package routes in any role: a USDT0 deployment, a Legacy Mesh EVM source, or Tron / TON (destinations only). */
-  supportsChain(chain: string): boolean {
-    return isUsdt0Chain(chain) || isMeshSource(chain) || !!meshDestinationFor(chain);
+  supportsChain(chain: string, meshDestinations: readonly string[] = USDT0_MESH_DEFAULT_DESTINATIONS): boolean {
+    return isUsdt0Chain(chain) || (meshAnyOn(meshDestinations) && isMeshSource(chain)) || !!meshDestinationOn(chain, meshDestinations);
   },
   /** A chain this package can send FROM (it signs only on EVM): a USDT0 deployment or a Legacy Mesh EVM source. */
-  supportsSourceChain(chain: string): boolean {
-    return isUsdt0Chain(chain) || isMeshSource(chain);
+  supportsSourceChain(chain: string, meshDestinations: readonly string[] = USDT0_MESH_DEFAULT_DESTINATIONS): boolean {
+    return isUsdt0Chain(chain) || (meshAnyOn(meshDestinations) && isMeshSource(chain));
   },
   /** USDT0 between two deployments, or the Legacy Mesh from an EVM source into Tron / TON. Never from Tron or TON. */
-  supports(from: string, to: string): boolean {
+  supports(from: string, to: string, meshDestinations: readonly string[] = USDT0_MESH_DEFAULT_DESTINATIONS): boolean {
     if (from === to) return false;
-    return (isUsdt0Chain(from) && isUsdt0Chain(to)) || (isMeshSource(from) && !!meshDestinationFor(to));
+    return (isUsdt0Chain(from) && isUsdt0Chain(to)) || (isMeshSource(from) && !!meshDestinationOn(to, meshDestinations));
   },
 };
 
@@ -130,7 +139,8 @@ export function usdt0VerifyQuote(params: QuoteParams, quote: Quote): string | nu
   const meshDst = meshDestinationFor(params.destChain);
   if (meshDst) {
     const meshSrc = meshSourceFor(params.sourceChain);
-    return meshSrc ? usdt0VerifyMeshSend(params, quote, meshSrc, meshDst) : "not a USDT0 Legacy Mesh route from an EVM source";
+    // A source without a mesh OFT keeps the answer it had before the mesh existed.
+    return meshSrc ? usdt0VerifyMeshSend(params, quote, meshSrc, meshDst) : "not a USDT0 route between two deployments";
   }
   const src = usdt0ChainFor(params.sourceChain);
   const dst = usdt0ChainFor(params.destChain);

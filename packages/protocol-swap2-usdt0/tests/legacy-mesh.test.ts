@@ -141,9 +141,11 @@ describe("routes", () => {
     const bare = usdt0Provider({rpcUrls: {"eip155:999": "http://rpc.hype"}});
     expect(bare.supportsChain?.("tron:728126428")).toBe(false);
     expect(bare.supportsRoute({chain: "eip155:42161", token: "USDT0"}, {chain: "tron:728126428", token: "USDT"})).toBe(false);
-    // The config view: any role vs. where it can send from.
+    // The config view: any role vs. where it can send from; Tron only when named (the provider's default is TON).
     expect(usdt0.supportsChain("ton:-239") && !usdt0.supportsSourceChain("ton:-239")).toBe(true);
-    expect(usdt0.supports("eip155:1", "tron:728126428") && !usdt0.supports("tron:728126428", "eip155:1")).toBe(true);
+    expect(usdt0.supports("eip155:1", "ton:-239") && !usdt0.supports("ton:-239", "eip155:1")).toBe(true);
+    expect(usdt0.supports("eip155:1", "tron:728126428")).toBe(false);
+    expect(usdt0.supports("eip155:1", "tron:728126428", ["tron", "ton"]) && !usdt0.supports("tron:728126428", "eip155:1", ["tron", "ton"])).toBe(true);
   });
 
   it("the protocol lists EVM source chains only (Celo added, Tron / TON never)", async () => {
@@ -203,12 +205,18 @@ describe("quote", () => {
     expect((await quote({destAddress: `-1:${TON_TO_RAW.slice(2)}`}, {}, TO_TON)).reasons[0]).toMatch(/workchain 0 address/);
     expect((await quote({destToken: "TRX"})).reasons).toEqual([`destination token TRX is not USDT0 (${TRON.token}) on Tron`]);
     expect((await quote({sourceToken: "USDC"})).reasons).toEqual([`source token USDC is not USDT0 (${ARB.token}) on Arbitrum`]);
+    // Not a mesh route: each keeps the refusal it had before the mesh (apps match it by text), without a network call.
+    const before = ["USDT0 is not deployed on this chain"];
     const fromTron = await quote({sourceChain: "tron:728126428", sourceToken: "USDT", destChain: "eip155:42161", destToken: ARB.token, destAddress: SENDER});
-    expect(fromTron.reasons).toEqual(["the USDT0 Legacy Mesh is not wired for a Tron source here: Tron and TON are destinations only (a send from them is signed on that chain)"]);
+    expect(fromTron.reasons).toEqual(before);
     expect(fromTron.calls).toEqual([]);
     const fromTon = await quote({sourceChain: "ton:-239", sourceToken: "USDT", destChain: "eip155:1", destToken: "USDT", destAddress: SENDER});
-    expect(fromTon.reasons[0]).toMatch(/not wired for a TON source/);
-    expect((await quote({sourceChain: "eip155:999", sourceToken: "USDT0"})).reasons).toEqual(["the USDT0 Legacy Mesh is not wired for eip155:999 → Tron: its EVM sources are Ethereum, Arbitrum and Celo"]);
+    expect(fromTon.reasons).toEqual(before);
+    expect((await quote({sourceChain: "tron:728126428", sourceToken: "USDT", destChain: "ton:-239", destToken: "USDT", destAddress: TON_TO})).reasons).toEqual(before);
+    const hype = await quote({sourceChain: "eip155:999", sourceToken: "USDT0"});
+    expect(hype.reasons).toEqual(before);
+    expect(hype.calls).toEqual([]);
+    expect((await quote({sourceChain: "eip155:10", sourceToken: "USDT0"}, {}, TO_TON)).reasons).toEqual(before);
     expect((await quote({amountIn: "0"})).reasons).toEqual(["amount must be positive"]);
     expect((await quote({flex: true})).reasons).toEqual(["the amount is sealed into the calldata (no flexible deposits)"]);
   });
@@ -229,6 +237,119 @@ describe("quote", () => {
     expect((await quote({}, {lzTokenFee: 1n})).reasons).toEqual(["OFT asks for a fee in LZ token — unsupported"]);
     expect((await quote({minAmountOut: "9997001"})).reasons).toEqual(["received 9997000 is below the caller's floor 9997001"]);
     expect((await quote({}, {fee: 7n})).q!.txRequest!.value).toBe(sealedOf(7n).toString());
+  });
+});
+
+describe("meshDestinations: TON by default, Tron opt-in (its LayerZero fee is above the engine's native-fee ceiling)", () => {
+  const ARB_USDT0 = {chain: "eip155:42161", token: "USDT0"};
+  it("default: Tron is not offered and answers as before the mesh, without a network call; TON is", async () => {
+    const def = {meshDestinations: undefined};
+    const {p} = make({}, def);
+    expect(p.supportsChain?.("tron:728126428")).toBe(false);
+    expect(p.supportsChain?.("tron:0x2b6653dc")).toBe(false);
+    expect(p.supportsChainPair?.("eip155:42161", "tron:728126428")).toBe(false);
+    expect(p.supportsRoute(ARB_USDT0, {chain: "tron:728126428", token: "USDT"})).toBe(false);
+    const tron = await quote({}, {}, TO_TRON, def);
+    expect(tron.q).toBeNull();
+    expect(tron.reasons).toEqual(["USDT0 is not deployed on this chain"]);
+    expect(tron.calls).toEqual([]);
+    expect(p.supportsChain?.("ton:-239")).toBe(true);
+    expect(p.supportsChain?.("eip155:42220")).toBe(true);
+    expect(p.supportsRoute(ARB_USDT0, {chain: "ton:-239", token: "USDT"})).toBe(true);
+    const ton = await quote({}, {}, TO_TON, def);
+    expect(ton.reasons).toEqual([]);
+    expect(ton.q?.intentId).toBe("usdt0-mesh:30110:30343");
+  });
+
+  it('["tron"] only: Tron on, TON answers as before; [] leaves the mesh out (Celo is no source then), USDT0 routes stay', async () => {
+    const tronOnly = make({}, {meshDestinations: ["tron"]}).p;
+    expect(tronOnly.supportsRoute(ARB_USDT0, {chain: "tron:728126428", token: "USDT"})).toBe(true);
+    expect(tronOnly.supportsChain?.("ton:-239")).toBe(false);
+    expect((await quote({}, {}, TO_TRON, {meshDestinations: ["tron"]})).reasons).toEqual([]);
+    expect((await quote({}, {}, TO_TON, {meshDestinations: ["tron"]})).reasons).toEqual(["USDT0 is not deployed on this chain"]);
+    const off = make({}, {meshDestinations: []}).p;
+    for (const chain of ["tron:728126428", "ton:-239", "eip155:42220"]) expect(off.supportsChain?.(chain)).toBe(false);
+    expect(off.supportsChainPair?.("eip155:1", "ton:-239")).toBe(false);
+    expect(off.supportsChainPair?.("eip155:42161", "eip155:1")).toBe(true);
+    expect(off.supportsRoute(ARB_USDT0, {chain: "eip155:1", token: "USDT"})).toBe(true);
+    const tonOff = await quote({}, {}, TO_TON, {meshDestinations: []});
+    expect(tonOff.reasons).toEqual(["USDT0 is not deployed on this chain"]);
+    expect(tonOff.calls).toEqual([]);
+  });
+
+  it("only tron / ton are accepted, and the caller's array is copied", async () => {
+    for (const bad of [["sol"], ["ton", "TRON"], "ton", [1], {0: "ton"}]) {
+      expect(() => usdt0Provider({meshDestinations: bad as never})).toThrow('usdt0: meshDestinations lists only "tron" and "ton"');
+    }
+    const list: string[] = ["ton"];
+    const {p} = make({}, {meshDestinations: list});
+    list.push("tron");
+    expect(p.supportsRoute(ARB_USDT0, {chain: "tron:728126428", token: "USDT"})).toBe(false);
+  });
+
+  it("the static view and the standalone protocol follow the same option", async () => {
+    expect(usdt0.supportsChain("tron:728126428")).toBe(false);
+    expect(usdt0.supportsChain("tron:728126428", ["tron"])).toBe(true);
+    expect(usdt0.supportsSourceChain("eip155:42220")).toBe(true);
+    expect(usdt0.supportsSourceChain("eip155:42220", [])).toBe(false);
+    expect(usdt0.supportsChain("eip155:42220", [])).toBe(false);
+    expect(usdt0.supportsChain("eip155:42161", [])).toBe(true);
+    expect(usdt0.supports("eip155:42220", "ton:-239", ["tron"])).toBe(false);
+    const proto = (meshDestinations?: string[]) => new Usdt0Swap2Protocol(undefined, {fromChain: "eip155:42161", rpcUrls: RPC, skipAccountChainCheck: true, ...(meshDestinations ? {meshDestinations} : {})} as never);
+    const chains = async (m?: string[]) => (await proto(m).getSupportedChains()).map((c) => String(c.id));
+    expect(await chains()).toContain("eip155:42220");
+    expect(await chains([])).not.toContain("eip155:42220");
+    expect(await chains([])).toContain("eip155:42161");
+    const pair = async (to: string, m?: string[]) => (await proto(m).getSupportedTokens({fromChain: "eip155:42161", toChain: to})).length > 0;
+    expect(await pair("ton:-239")).toBe(true);
+    expect(await pair("tron:728126428")).toBe(false);
+    expect(await pair("tron:728126428", ["tron", "ton"])).toBe(true);
+  });
+});
+
+describe("quote: request and OFT answers that refuse a mesh route", () => {
+  it("a non-integer amount, a non-EVM refund, the OFT minimum, dust, an OFT that pays out more, no RPC", async () => {
+    expect((await quote({amountIn: "1.5"})).reasons).toEqual(["amount must be a base-unit integer"]);
+    expect((await quote({amountIn: "1e7"})).reasons).toEqual(["amount must be a base-unit integer"]);
+    expect((await quote({refundAddress: TRON_TO})).reasons).toEqual(["refund address must be an EVM address"]);
+    expect((await quote({}, {oftMin: 20_000_000n})).reasons).toEqual(["amount 10000000 is below the OFT minimum 20000000"]);
+    expect((await quote({}, {received: () => 0n})).reasons).toEqual(["amount is below the OFT dust threshold — nothing would arrive"]);
+    expect((await quote({}, {received: (a) => a + 1n})).reasons).toEqual(["OFT reports more received than sent — refusing"]);
+    const reasons: string[] = [];
+    const {p, calls} = make({}, {rpcUrls: {"eip155:42161": "http://rpc.arb"}});
+    expect(await p.getQuote({...TO_TON, sourceChain: "eip155:1", sourceToken: "USDT", onRefusal: (r) => reasons.push(r)})).toBeNull();
+    expect(reasons).toEqual(["no RPC configured for eip155:1"]);
+    expect(calls).toEqual([]);
+  });
+});
+
+describe("usdt0VerifyMeshSend: each refusal of a remote mesh quote", () => {
+  it("chain, call shape, refund, amounts, source token, and each of options / OFT command on its own", async () => {
+    const {q} = await quote();
+    const tx = q!.txRequest!;
+    const verify = (quoteOver: Partial<Quote> = {}, paramsOver: Record<string, unknown> = {}) => usdt0VerifyQuote({...TO_TRON, ...paramsOver}, {...q!, ...quoteOver});
+    expect(verify({txRequest: {...tx, chainId: 1}})).toBe("the call is for chain 1, not 42161");
+    expect(verify({txRequest: {...tx, serializedTx: "0x00"}})).toBe("the quote carries no OFT call");
+    const {data: _data, ...noData} = tx;
+    expect(verify({txRequest: noData})).toBe("the quote carries no OFT call");
+    expect(verify({txRequest: {...tx, data: encodeFunctionData({abi: ABI, functionName: "token"})}})).toBe("the call is not send(SendParam, MessagingFee, refund)");
+    expect(verify({}, {refundAddress: TRON_TO})).toBe("the refund address is not an EVM address");
+    expect(verify({}, {refundAddress: undefined})).toBe("the refund address is not an EVM address"); // a live request names the trader
+    expect(verify({}, {amountIn: "1e7"})).toBe("the request does not name amounts");
+    expect(verify({minDestAmount: "x"})).toBe("the request does not name amounts");
+    expect(verify({}, {sourceToken: "USDC"})).toBe(`source token USDC is not USDT0 (${ARB.token}) on Arbitrum`);
+    expect(verify({}, {sourceChain: "eip155:1", sourceToken: "USDT"})).toMatch(/not the Ethereum Legacy Mesh OFT/);
+    expect(usdt0VerifyQuote(TO_TRON, edit(q!, (sp) => { sp.extraOptions = "0x0003"; }))).toBe("the send carries options, a compose message or an OFT command");
+    expect(usdt0VerifyQuote(TO_TRON, edit(q!, (sp) => { sp.oftCmd = "0x01"; }))).toBe("the send carries options, a compose message or an OFT command");
+    expect(usdt0VerifyQuote(TO_TRON, edit(q!, (sp) => { sp.minAmountLD = 10_000_001n; }))).toMatch(/minAmountLD 10000001 is below/);
+    expect(usdt0VerifyQuote(TO_TRON, {...q!, txRequest: {...tx, nativeFee: "1"}})).toBe("msg.value is not the declared native fee of the send");
+  });
+
+  it("a dry quote without addresses prices the placeholder and is not held to a recipient; a live one is", async () => {
+    const dryParams = {...TO_TON, destAddress: "", refundAddress: "", dry: true};
+    const {q} = await quote({destAddress: "", refundAddress: "", dry: true}, {}, TO_TON);
+    expect(usdt0VerifyQuote(dryParams, q!)).toBeNull();
+    expect(usdt0VerifyQuote({...dryParams, dry: false}, q!)).toBe("destination must be a TON address (raw 0:… or user-friendly EQ…/UQ…)");
   });
 });
 
@@ -254,7 +375,9 @@ describe("usdt0VerifyQuote on a mesh send (remote backends)", () => {
     expect(usdt0VerifyQuote(TO_TRON, edit(q!, (_sp, r) => { r.fee.lzTokenFee = 1n; }))).toMatch(/LZ-token fee/);
     expect(usdt0VerifyQuote(TO_TRON, {...q!, txRequest: {...q!.txRequest!, value: "1"}})).toMatch(/msg.value/);
     expect(usdt0VerifyQuote(TO_TRON, {...q!, intentId: "usdt0:30110:30420"})).toBe("the intent id does not name this send");
-    expect(usdt0VerifyQuote({...TO_TRON, sourceChain: "eip155:999"}, q!)).toBe("not a USDT0 Legacy Mesh route from an EVM source");
+    // A source without a mesh OFT (HyperEVM) or a Tron / TON source keeps the pre-mesh answer.
+    expect(usdt0VerifyQuote({...TO_TRON, sourceChain: "eip155:999"}, q!)).toBe("not a USDT0 route between two deployments");
+    expect(usdt0VerifyQuote({...TO_TRON, sourceChain: "ton:-239", destChain: "eip155:42161"}, q!)).toBe("not a USDT0 route between two deployments");
     expect(usdt0VerifyQuote({...TO_TRON, destToken: "TRX"}, q!)).toMatch(/destination token TRX/);
   });
 
@@ -315,6 +438,8 @@ describe("build & preflight", () => {
     await expect(drained.p.preflightDeposit!(q!, tx)).rejects.toThrow(/InsufficientCredits/);
     const rewired = make({peer: pad(ATTACKER, {size: 32})});
     await expect(rewired.p.preflightDeposit!(q!, tx)).rejects.toThrow(/no pinned peer for Tron/);
+    await expect(make({quoteSendFails: "http"}).p.preflightDeposit!(q!, tx)).rejects.toThrow("usdt0: RPC for Arbitrum unavailable — try again");
+    await expect(make({}, {rpcUrls: {"eip155:1": "http://rpc.eth"}}).p.preflightDeposit!(q!, tx)).rejects.toThrow("usdt0: no RPC for eip155:42161");
   });
 });
 
