@@ -460,3 +460,41 @@ describe("options", () => {
     expect(Object.isFrozen(THORNODE_CONFIRM_PATHS)).toBe(true);
   });
 });
+
+describe("readers on the answers recorded from three operators (2026-11-12)", () => {
+  it("lastblock: THORChain's own height from each node; nothing else is a height", async () => {
+    const {lastblockHeight} = await import("../src/confirm.js");
+    const recorded = {
+      liquify: (await import("../fixtures/thornode/2026-11-12/liquify/lastblock.json")).default,
+      thorwallet: (await import("../fixtures/thornode/2026-11-12/thorwallet/lastblock.json")).default,
+      ibs: (await import("../fixtures/thornode/2026-11-12/ibs/lastblock.json")).default,
+    };
+    expect(lastblockHeight(recorded.liquify)).toBe(28643286);
+    expect(lastblockHeight(recorded.thorwallet)).toBe(28643287);
+    expect(lastblockHeight(recorded.ibs)).toBe(28643287);
+    expect(lastblockHeight(recorded.liquify.map((e) => ({...e, thorchain: String(e.thorchain)})))).toBe(28643286); // proto3 int64 as a string
+    for (const bad of [null, {}, [], [{chain: "BTC"}], [{thorchain: -1}], [{thorchain: 1.5}], [{thorchain: "28643286?"}], [null]]) expect(lastblockHeight(bad)).toBeNull();
+  });
+
+  it("asgard: the six recorded ActiveVaults with their per-chain addresses; the inbound nodes name one of them", async () => {
+    const {asgardVaults} = await import("../src/confirm.js");
+    const vaults = asgardVaults(LIVE_ASGARD)!;
+    expect(vaults).toHaveLength(6);
+    expect(vaults.every((v) => v.status === "ActiveVault" && v.addresses.length === 14)).toBe(true);
+    for (const n of ["liquify", "thorwallet", "ibs"]) {
+      const inbound = (await import(`../fixtures/thornode/2026-11-12/${n}/inbound_addresses.json`)).default as {chain: string; address: string}[];
+      for (const chain of ["ETH", "BASE", "BSC", "AVAX", "TRON", "BTC"]) {
+        const address = inbound.find((e) => e.chain === chain)!.address;
+        expect(vaults.filter((v) => v.addresses.some((a) => a.chain === chain && a.address === address)), `${n} ${chain}`).toHaveLength(1);
+      }
+    }
+  });
+
+  it("mimir: the recorded map flags none of the six active vaults, and flags the vault its CompromisedVault key names", async () => {
+    const {mimirFlags} = await import("../src/confirm.js");
+    const flags = mimirFlags(LIVE_MIMIR)!;
+    for (const v of LIVE_ASGARD) expect(flags(v.pub_key)).toBeNull(); // SolvencyHaltVault keys present at 0 are not flags
+    const compromised = Object.keys(LIVE_MIMIR).find((k) => k.startsWith("COMPROMISEDVAULT-") && LIVE_MIMIR[k]! > 0)!;
+    expect(flags(compromised.slice("COMPROMISEDVAULT-".length).toLowerCase())).toBe("compromised");
+  });
+});
