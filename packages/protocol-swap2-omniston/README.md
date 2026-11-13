@@ -38,6 +38,9 @@ Every route is fail-closed until its allowlists and validators are configured:
   (default `"enforce"`) — an explicit rollout opt-in.
   Behind `remoteProvider`, the app checks the built body itself:
   `remoteProvider({name: "omniston", baseUrl, verifyBuild: omnistonVerifyBuild({...createOmnistonTonValidators()})})`.
+  A body this check refuses reaches the app with its refusal reason (`vault_mismatch`, `price_check_failed`,
+  `recipient_mismatch`…) when the stub also gets `reasonOf: omnistonPins(AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS).reasonOf`
+  (the whole pins carry it too); without it the refusal is unclassified.
   A TON → TON swap body is opened with `checkTonSwapPayload` against the app's own request (receiver,
   refund, on-chain minimum, input; the quote carries `routeSteps`) and the DEX it pays is confirmed with
   the app's validators — `validateTonSwapTarget` and `validateTonSwapLeg`; without the leg check a TON swap body
