@@ -2,6 +2,7 @@ import {createPublicClient, decodeFunctionData, encodeFunctionData, fallback, ge
 import {describeUsdt0Activity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
 import {redactUrls, timeoutSignal, tonRawAddress} from "@anywalletkit/protocol-swap2-core/util";
+import {httpRefusal, refusal, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {bigintToUnits} from "@anywalletkit/core";
 import type {Asset, CrossChainProvider, IntentRef, IntentState, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {LZ_SCAN_API, USDT0_BY_EID, USDT0_CHAINS, USDT0_MESH_INTENT, tokenMatches, usdt0ClaimTargets, usdt0VerifyMeshSend, usdt0 as usdt0Cfg, type Usdt0Chain} from "./config.js";
@@ -11,6 +12,7 @@ import {
   type Usdt0MeshFamily, type Usdt0MeshSource,
 } from "./mesh.js";
 import {ZERO_RECIPIENT_REFUSAL, isZeroEvmAddress, placeholderBuildRefusal, placeholderIn, placeholderPreflightRefusal, type Usdt0Placeholder} from "./placeholder.js";
+import {usdt0Notes} from "./refusals.js";
 
 /**
  * USDT0 — Tether's USDT as a LayerZero OFT. ONE source transaction:
@@ -176,13 +178,62 @@ function priceOnly(quote: Quote, placeholder: Usdt0Placeholder): Quote {
  * endpoint's key sits in that path — scan 2026-10-23 F8); anything else loses its URLs.
  */
 function rpcSafeReason(err: unknown, chainName: string): string {
-  const e = err as {name?: string; shortMessage?: string; message?: string} | undefined;
-  const text = `${e?.shortMessage ?? ""}\n${e?.message ?? String(err)}`;
-  if (/HttpRequestError|TimeoutError|RpcRequestError|WebSocketRequestError/.test(String(e?.name)) || /\bURL: |HTTP request failed|request timed out|took too long to respond/i.test(text)) {
+  if (rpcTransportFailure(err)) {
     return `usdt0: RPC for ${chainName} unavailable — try again`;
   }
   return redactUrls(err instanceof Error ? err.message : String(err));
 }
+
+/** viem's HTTP / timeout / JSON-RPC transport failures: their text names the endpoint's URL. */
+function rpcTransportFailure(err: unknown): boolean {
+  const e = err as {name?: string; shortMessage?: string; message?: string} | undefined;
+  const text = `${e?.shortMessage ?? ""}\n${e?.message ?? String(err)}`;
+  return /HttpRequestError|TimeoutError|RpcRequestError|WebSocketRequestError/.test(String(e?.name)) || /\bURL: |HTTP request failed|request timed out|took too long to respond/i.test(text);
+}
+
+/** A UsdtOFT custom error by name (the Legacy Mesh ABI decodes them); any other revert is a failed simulation. */
+function revertReason(errorName: unknown): Swap2RefusalReason {
+  switch (errorName) {
+    case "InsufficientCredits": return "insufficient_liquidity"; // the pool cannot pay this out on the destination
+    case "SlippageExceeded": return "price_check_failed";
+    case "TONComposeNotSupported": return "unsupported_pair";
+    default: return "simulation_failed";
+  }
+}
+
+/**
+ * The reason behind {@link rpcSafeReason}'s text. A transport failure: the endpoint's HTTP status (429 rate_limited
+ * with its Retry-After, 401 / 403 key_rejected, any other upstream_unavailable with the status), a node's "limit
+ * exceeded" or a 429 code in its JSON-RPC answer (rate_limited), else (the network, viem's timeout) upstream_unavailable. Otherwise this module's own
+ * classification (an address the chain contradicts), a revert of the OFT's read (named: {@link revertReason}), or an
+ * answer of another shape (upstream_unavailable).
+ */
+function rpcRefusal(err: unknown): Swap2RefusalInfo {
+  type Link = {name?: unknown; status?: unknown; code?: unknown; headers?: {get?: (name: string) => string | null}; data?: {errorName?: unknown}; cause?: unknown};
+  const links: Link[] = [];
+  for (let e = err as Link | undefined, i = 0; e && typeof e === "object" && i < 8; e = e.cause as Link | undefined, i++) links.push(e);
+  if (rpcTransportFailure(err)) {
+    for (const e of links) {
+      // viem keeps the failing HTTP status on HttpRequestError, and on RpcRequestError when the status came with a JSON-RPC body.
+      if ((e.name === "HttpRequestError" || e.name === "RpcRequestError") && typeof e.status === "number") {
+        return httpRefusal(e.status, e.headers?.get?.("retry-after")) ?? {reason: "upstream_unavailable", httpStatus: e.status};
+      }
+      // A node's throttling answer: -32005 "limit exceeded", or a 429 code in the JSON-RPC body.
+      if (e.name === "LimitExceededRpcError" || (e.name === "RpcRequestError" && e.code === 429)) return {reason: "rate_limited"};
+    }
+    return {reason: "upstream_unavailable"};
+  }
+  const own = refusalOf(err);
+  if (own) return own;
+  for (const e of links) {
+    if (e.name === "ContractFunctionRevertedError") return {reason: revertReason(e.data?.errorName)};
+    if (e.name === "ExecutionRevertedError") return {reason: "simulation_failed"};
+  }
+  return {reason: "upstream_unavailable"};
+}
+
+/** A peer the chain reports for a pinned route: none at all (zero) is a route not wired, another one a contract that is not the pinned one. */
+const peerReason = (peer: unknown): Swap2RefusalReason => (/^0x0*$/.test(String(peer)) ? "unsupported_pair" : "vault_mismatch");
 
 export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvider {
   config = Object.freeze({...config});
@@ -215,13 +266,13 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     if (!p) {
       p = (async () => {
         const c = client(chain.caip2);
-        if (!c) throw new Error(`usdt0: no RPC for ${chain.caip2}`);
+        if (!c) throw refusal("unsupported_pair", `usdt0: no RPC for ${chain.caip2}`);
         const [token, approval] = await Promise.all([
           c.readContract({address: getAddress(chain.oft), abi: OFT_ABI, functionName: "token"}),
           c.readContract({address: getAddress(chain.oft), abi: OFT_ABI, functionName: "approvalRequired"}),
         ]);
-        if (!same(token, chain.token)) throw new Error(`usdt0: OFT ${chain.oft} on ${chain.name} reports token ${token}, expected ${chain.token}`);
-        if (approval !== chain.adapter) throw new Error(`usdt0: OFT ${chain.oft} on ${chain.name} reports approvalRequired=${String(approval)}, expected ${String(chain.adapter)}`);
+        if (!same(token, chain.token)) throw refusal("vault_mismatch", `usdt0: OFT ${chain.oft} on ${chain.name} reports token ${token}, expected ${chain.token}`);
+        if (approval !== chain.adapter) throw refusal("vault_mismatch", `usdt0: OFT ${chain.oft} on ${chain.name} reports approvalRequired=${String(approval)}, expected ${String(chain.adapter)}`);
       })();
       p.catch(() => verified.delete(chain.caip2));
       verified.set(chain.caip2, p);
@@ -237,9 +288,9 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     if (!p) {
       p = (async () => {
         const c = client(src.caip2);
-        if (!c) throw new Error(`usdt0: no RPC for ${src.caip2}`);
+        if (!c) throw refusal("unsupported_pair", `usdt0: no RPC for ${src.caip2}`);
         const peer = await c.readContract({address: getAddress(src.oft), abi: OFT_ABI, functionName: "peers", args: [dst.eid]});
-        if (!same(peer, pad(getAddress(dst.oft), {size: 32}))) throw new Error(`usdt0: ${src.name} OFT has no peer for ${dst.name} (eid ${dst.eid}) — route not wired`);
+        if (!same(peer, pad(getAddress(dst.oft), {size: 32}))) throw refusal(peerReason(peer), `usdt0: ${src.name} OFT has no peer for ${dst.name} (eid ${dst.eid}) — route not wired`);
       })();
       p.catch(() => peers.delete(key));
       peers.set(key, p);
@@ -261,14 +312,21 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
 
   /** The LayerZero message of a source transaction on this route, or null while Scan has not indexed it. */
   async function scanMessage(src: {eid: number; oft: string}, dst: {eid: number}, sourceTxHash: string): Promise<ScanMessage | null | "foreign"> {
-    const res = await doFetch(`${scan}/v1/messages/tx/${encodeURIComponent(sourceTxHash)}`, {headers: {accept: "application/json"}, signal: timeoutSignal(SCAN_TIMEOUT_MS)});
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`usdt0: LayerZero Scan → ${res.status}`);
-    const body = (await res.json()) as {data?: ScanMessage[]};
-    const list = Array.isArray(body?.data) ? body.data : [];
-    if (list.length === 0) return null;
-    const m = list.find((x) => x.pathway?.srcEid === src.eid && x.pathway?.dstEid === dst.eid && same(x.pathway?.sender?.address, src.oft));
-    return m ?? "foreign";
+    try {
+      const res = await doFetch(`${scan}/v1/messages/tx/${encodeURIComponent(sourceTxHash)}`, {headers: {accept: "application/json"}, signal: timeoutSignal(SCAN_TIMEOUT_MS)});
+      if (res.status === 404) return null;
+      // 429 rate_limited (Retry-After), 401 / 403 key_rejected, any other status upstream_unavailable with it.
+      if (!res.ok) throw withReason(new Error(`usdt0: LayerZero Scan → ${res.status}`), httpRefusal(res.status, res.headers?.get?.("retry-after")) ?? {reason: "upstream_unavailable", httpStatus: res.status});
+      const body = (await res.json()) as {data?: ScanMessage[]};
+      const list = Array.isArray(body?.data) ? body.data : [];
+      if (list.length === 0) return null;
+      const m = list.find((x) => x.pathway?.srcEid === src.eid && x.pathway?.dstEid === dst.eid && same(x.pathway?.sender?.address, src.oft));
+      return m ?? "foreign";
+    } catch (err) {
+      // The same error, classified: the network, this module's own timeout or a body that is not JSON → upstream_unavailable.
+      if (err instanceof Error) withReason(err, "upstream_unavailable");
+      throw err;
+    }
   }
 
   // ── Legacy Mesh (EVM source → Tron / TON) ────────────────────────────────────────────────────────────────────────
@@ -280,13 +338,13 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     if (!p) {
       p = (async () => {
         const c = client(src.caip2);
-        if (!c) throw new Error(`usdt0: no RPC for ${src.caip2}`);
+        if (!c) throw refusal("unsupported_pair", `usdt0: no RPC for ${src.caip2}`);
         const [token, approval] = await Promise.all([
           c.readContract({address: getAddress(src.oft), abi: MESH_ABI, functionName: "token"}),
           c.readContract({address: getAddress(src.oft), abi: MESH_ABI, functionName: "approvalRequired"}),
         ]);
-        if (!same(token, src.token)) throw new Error(`usdt0: Legacy Mesh OFT ${src.oft} on ${src.name} reports token ${token}, expected ${src.token}`);
-        if (approval !== true) throw new Error(`usdt0: Legacy Mesh OFT ${src.oft} on ${src.name} reports approvalRequired=${String(approval)}, expected true`);
+        if (!same(token, src.token)) throw refusal("vault_mismatch", `usdt0: Legacy Mesh OFT ${src.oft} on ${src.name} reports token ${token}, expected ${src.token}`);
+        if (approval !== true) throw refusal("vault_mismatch", `usdt0: Legacy Mesh OFT ${src.oft} on ${src.name} reports approvalRequired=${String(approval)}, expected true`);
       })();
       p.catch(() => meshVerified.delete(src.caip2));
       meshVerified.set(src.caip2, p);
@@ -302,9 +360,9 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     if (!p) {
       p = (async () => {
         const c = client(src.caip2);
-        if (!c) throw new Error(`usdt0: no RPC for ${src.caip2}`);
+        if (!c) throw refusal("unsupported_pair", `usdt0: no RPC for ${src.caip2}`);
         const peer = await c.readContract({address: getAddress(src.oft), abi: MESH_ABI, functionName: "peers", args: [dst.eid]});
-        if (!same(peer, dst.peer)) throw new Error(`usdt0: ${src.name} Legacy Mesh OFT has no pinned peer for ${dst.name} (eid ${dst.eid}) — route not wired`);
+        if (!same(peer, dst.peer)) throw refusal(peerReason(peer), `usdt0: ${src.name} Legacy Mesh OFT has no pinned peer for ${dst.name} (eid ${dst.eid}) — route not wired`);
       })();
       p.catch(() => meshPeers.delete(key));
       meshPeers.set(key, p);
@@ -324,41 +382,41 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     dstEid, to, amountLD, minAmountLD, extraOptions: "0x" as Hex, composeMsg: "0x" as Hex, oftCmd: "0x" as Hex,
   });
 
-  async function meshQuote(params: QuoteParams, src: Usdt0MeshSource, dst: Usdt0MeshDestination, refuse: (reason: string) => null): Promise<Quote | null> {
-    if (!tokenMatches(src, params.sourceToken)) return refuse(`source token ${params.sourceToken} is not USDT0 (${src.token}) on ${src.name}`);
-    if (!meshDestTokenMatches(dst, params.destToken)) return refuse(`destination token ${params.destToken} is not USDT0 (${dst.token}) on ${dst.name}`);
+  async function meshQuote(params: QuoteParams, src: Usdt0MeshSource, dst: Usdt0MeshDestination, refuse: (reason: string, info?: Swap2RefusalReason | Swap2RefusalInfo) => null): Promise<Quote | null> {
+    if (!tokenMatches(src, params.sourceToken)) return refuse(`source token ${params.sourceToken} is not USDT0 (${src.token}) on ${src.name}`, "unsupported_pair");
+    if (!meshDestTokenMatches(dst, params.destToken)) return refuse(`destination token ${params.destToken} is not USDT0 (${dst.token}) on ${dst.name}`, "unsupported_pair");
     if (!/^\d+$/.test(params.amountIn)) return refuse("amount must be a base-unit integer");
     const amount = BigInt(params.amountIn);
-    if (amount <= 0n) return refuse("amount must be positive");
+    if (amount <= 0n) return refuse("amount must be positive", "amount_too_small");
     // The zero-account placeholder prices a dry quote; a live one without a recipient would send there (round 3, H8).
     const dry = params.dry !== false;
     const recipient = params.destAddress || (dry ? USDT0_MESH_PLACEHOLDER[dst.family] : "");
-    if (!recipient) return refuse("a live quote needs a recipient");
+    if (!recipient) return refuse("a live quote needs a recipient", "policy_refused");
     const encoded = meshRecipientBytes32(dst, recipient);
-    if ("refusal" in encoded) return refuse(encoded.refusal);
+    if ("refusal" in encoded) return refuse(encoded.refusal, "recipient_mismatch");
     // Only the dry stand-in may be the zero account (that quote carries no send); a named one is a burn address.
-    if (params.destAddress && encoded.to === ZERO_B32) return refuse(ZERO_RECIPIENT_REFUSAL);
+    if (params.destAddress && encoded.to === ZERO_B32) return refuse(ZERO_RECIPIENT_REFUSAL, "recipient_mismatch");
     const refund = params.refundAddress || (dry ? EVM_PLACEHOLDER : "");
-    if (!refund) return refuse("a live quote needs a refund address");
-    if (!isAddress(refund)) return refuse("refund address must be an EVM address");
+    if (!refund) return refuse("a live quote needs a refund address", "policy_refused");
+    if (!isAddress(refund)) return refuse("refund address must be an EVM address", "recipient_mismatch");
     const placeholder = dry ? placeholderIn(params) : null;
     const c = client(src.caip2);
-    if (!c) return refuse(`no RPC configured for ${src.caip2}`);
+    if (!c) return refuse(`no RPC configured for ${src.caip2}`, "unsupported_pair");
 
     try {
       await Promise.all([verifyMeshSource(src), verifyMeshPeer(src, dst)]);
       const probe = meshSendParam(dst.eid, encoded.to, amount, 0n);
       const [limit, feeDetails, receipt] = await c.readContract({address: getAddress(src.oft), abi: MESH_ABI, functionName: "quoteOFT", args: [probe]});
-      // maxAmountLD is the pool's credit toward the destination: what it can pay out there right now.
-      if (amount < limit.minAmountLD) return refuse(`amount ${amount} is below the OFT minimum ${limit.minAmountLD}`);
-      if (amount > limit.maxAmountLD) return refuse(`amount ${amount} exceeds the OFT maximum ${limit.maxAmountLD}`);
+      // maxAmountLD is the pool's credit toward the destination: what it can pay out there right now (insufficient_liquidity).
+      if (amount < limit.minAmountLD) return refuse(`amount ${amount} is below the OFT minimum ${limit.minAmountLD}`, "amount_too_small");
+      if (amount > limit.maxAmountLD) return refuse(`amount ${amount} exceeds the OFT maximum ${limit.maxAmountLD}`, "insufficient_liquidity");
       const received = receipt.amountReceivedLD;
-      if (received <= 0n) return refuse("amount is below the OFT dust threshold — nothing would arrive");
-      if (received > amount) return refuse("OFT reports more received than sent — refusing");
-      if (params.minAmountOut !== undefined && received < BigInt(params.minAmountOut)) return refuse(`received ${received} is below the caller's floor ${params.minAmountOut}`);
+      if (received <= 0n) return refuse("amount is below the OFT dust threshold — nothing would arrive", "amount_too_small");
+      if (received > amount) return refuse("OFT reports more received than sent — refusing", "price_check_failed");
+      if (params.minAmountOut !== undefined && received < BigInt(params.minAmountOut)) return refuse(`received ${received} is below the caller's floor ${params.minAmountOut}`, "price_check_failed");
       const sp = meshSendParam(dst.eid, encoded.to, amount, received);
       const fee = await c.readContract({address: getAddress(src.oft), abi: MESH_ABI, functionName: "quoteSend", args: [sp, false]});
-      if (fee.lzTokenFee !== 0n) return refuse("OFT asks for a fee in LZ token — unsupported");
+      if (fee.lzTokenFee !== 0n) return refuse("OFT asks for a fee in LZ token — unsupported", "unsupported_pair");
       const nativeFee = fee.nativeFee + (fee.nativeFee * FEE_HEADROOM_BPS) / 10_000n;
       const data = encodeFunctionData({abi: MESH_ABI, functionName: "send", args: [sp, {nativeFee, lzTokenFee: 0n}, getAddress(refund)]});
       // The mesh fee (feeBps of the input, 3 bps today) is what quoteOFT keeps back; the OFT lists no fee rows for it.
@@ -399,15 +457,15 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
       if (placeholder) {
         const priced = priceOnly(quote, placeholder);
         const off = usdt0VerifyMeshSend(params, priced, src, dst);
-        if (off) return refuse(`usdt0: the built Legacy Mesh send does not match the request — ${off}`);
+        if (off) return refuse(`usdt0: the built Legacy Mesh send does not match the request — ${off}`, usdt0Notes.reasonOf(off) ?? "policy_refused");
         return priced;
       }
       // What was built, read back against the request: target, eid, recipient bytes, amounts, refund, fee, intent.
       const mismatch = usdt0VerifyMeshSend({...params, destAddress: recipient, refundAddress: refund, dry: false}, quote, src, dst);
-      if (mismatch) return refuse(`usdt0: the built Legacy Mesh send does not match the request — ${mismatch}`);
+      if (mismatch) return refuse(`usdt0: the built Legacy Mesh send does not match the request — ${mismatch}`, usdt0Notes.reasonOf(mismatch) ?? "policy_refused");
       return quote;
     } catch (err) {
-      return refuse(rpcSafeReason(err, src.name));
+      return refuse(rpcSafeReason(err, src.name), rpcRefusal(err));
     }
   }
 
@@ -419,13 +477,13 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
    * sealed trader. Then chain + peer, the current fee (and credits) must still fit, and `msg.value` = the sealed fee.
    */
   async function meshPreflight(quote: Quote, tx: UnsignedTx, src: Usdt0MeshSource, dst: Usdt0MeshDestination): Promise<void> {
-    if (!same(tx.to, src.oft)) throw new Error(`usdt0: deposit target ${tx.to} is not the ${src.name} Legacy Mesh OFT`);
+    if (!same(tx.to, src.oft)) throw refusal("vault_mismatch", `usdt0: deposit target ${tx.to} is not the ${src.name} Legacy Mesh OFT`);
     const pd = quote.providerData ?? {};
     if (!/^\d+$/.test(pd.amountLD ?? "") || !/^\d+$/.test(pd.minAmountLD ?? "") || !/^\d+$/.test(pd.nativeFee ?? "") || !/^0x[0-9a-fA-F]{64}$/.test(pd.recipientBytes32 ?? "")
       || !meshRecipientMatches(dst, pd.recipientBytes32!, pd.recipient ?? "")) {
-      throw new Error("usdt0: quote carries no sealed send parameters");
+      throw refusal("policy_refused", "usdt0: quote carries no sealed send parameters");
     }
-    if (pd.recipientBytes32 === ZERO_B32) throw new Error(`usdt0: ${ZERO_RECIPIENT_REFUSAL}`);
+    if (pd.recipientBytes32 === ZERO_B32) throw refusal("recipient_mismatch", `usdt0: ${ZERO_RECIPIENT_REFUSAL}`);
     const sp = meshSendParam(dst.eid, pd.recipientBytes32 as Hex, BigInt(pd.amountLD!), BigInt(pd.minAmountLD!));
     const sealed = BigInt(pd.nativeFee!);
     let call: {functionName: string; args?: readonly unknown[]};
@@ -434,37 +492,38 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
       call = decodeFunctionData({abi: MESH_ABI, data: (tx.data ?? "0x") as Hex});
       [sent] = call.args as unknown as [typeof sp];
     } catch {
-      throw new Error("usdt0: the deposit is not the sealed Legacy Mesh send");
+      throw refusal("policy_refused", "usdt0: the deposit is not the sealed Legacy Mesh send");
     }
     if (sent.dstEid !== sp.dstEid || !same(sent.to, sp.to) || sent.amountLD !== sp.amountLD || sent.minAmountLD !== sp.minAmountLD) {
-      throw new Error("usdt0: the deposit is not the sealed Legacy Mesh send");
+      throw refusal("policy_refused", "usdt0: the deposit is not the sealed Legacy Mesh send");
     }
     // The rest of the sealed send (review 2026-11-12): `quoteSend(sp, false)` / `quoteOFT(sp)` carry the same SendParam
     // and used to pass; so did options, a compose message, another fee or another refund address next to it.
-    if (call.functionName !== "send") throw new Error(`usdt0: the deposit calls ${call.functionName}, not send(SendParam, MessagingFee, refund)`);
+    if (call.functionName !== "send") throw refusal("policy_refused", `usdt0: the deposit calls ${call.functionName}, not send(SendParam, MessagingFee, refund)`);
     for (const field of ["extraOptions", "composeMsg", "oftCmd"] as const) {
-      if (String(sent[field]).toLowerCase() !== sp[field]) throw new Error(`usdt0: the deposit's SendParam.${field} ${String(sent[field])} is not the sealed ${sp[field]}`);
+      if (String(sent[field]).toLowerCase() !== sp[field]) throw refusal("policy_refused", `usdt0: the deposit's SendParam.${field} ${String(sent[field])} is not the sealed ${sp[field]}`);
     }
     const [, sentFee, sentRefund] = call.args as unknown as [typeof sp, {nativeFee: bigint; lzTokenFee: bigint}, string];
-    if (sentFee.nativeFee !== sealed) throw new Error(`usdt0: the deposit's MessagingFee.nativeFee ${sentFee.nativeFee} is not the sealed ${sealed}`);
-    if (sentFee.lzTokenFee !== 0n) throw new Error(`usdt0: the deposit's MessagingFee.lzTokenFee ${sentFee.lzTokenFee} is not 0`);
-    if (!isAddress(pd.refundAddress ?? "")) throw new Error("usdt0: quote carries no sealed refund address");
-    if (getAddress(sentRefund) !== getAddress(pd.refundAddress!)) throw new Error(`usdt0: the deposit refunds ${sentRefund}, not the sealed refund address ${getAddress(pd.refundAddress!)}`);
+    if (sentFee.nativeFee !== sealed) throw refusal("policy_refused", `usdt0: the deposit's MessagingFee.nativeFee ${sentFee.nativeFee} is not the sealed ${sealed}`);
+    if (sentFee.lzTokenFee !== 0n) throw refusal("policy_refused", `usdt0: the deposit's MessagingFee.lzTokenFee ${sentFee.lzTokenFee} is not 0`);
+    if (!isAddress(pd.refundAddress ?? "")) throw refusal("policy_refused", "usdt0: quote carries no sealed refund address");
+    if (getAddress(sentRefund) !== getAddress(pd.refundAddress!)) throw refusal("recipient_mismatch", `usdt0: the deposit refunds ${sentRefund}, not the sealed refund address ${getAddress(pd.refundAddress!)}`);
     if ((tx.chain && tx.chain !== src.caip2) || (tx.chainId !== undefined && tx.chainId !== src.chainId)) {
-      throw new Error(`usdt0: the deposit is for ${tx.chain || "?"} (chainId ${String(tx.chainId ?? "?")}), not ${src.name} (${src.caip2})`);
+      throw refusal("policy_refused", `usdt0: the deposit is for ${tx.chain || "?"} (chainId ${String(tx.chainId ?? "?")}), not ${src.name} (${src.caip2})`);
     }
     const c = client(src.caip2);
-    if (!c) throw new Error(`usdt0: no RPC for ${src.caip2}`);
+    if (!c) throw refusal("unsupported_pair", `usdt0: no RPC for ${src.caip2}`);
     let fee: {nativeFee: bigint};
     try {
       await Promise.all([verifyMeshSource(src), verifyMeshPeer(src, dst)]);
       // quoteSend reverts with InsufficientCredits when the pool can no longer pay this out on the destination.
       fee = await c.readContract({address: getAddress(src.oft), abi: MESH_ABI, functionName: "quoteSend", args: [sp, false]});
     } catch (err) {
-      throw new Error(rpcSafeReason(err, src.name));
+      throw withReason(new Error(rpcSafeReason(err, src.name)), rpcRefusal(err));
     }
-    if (fee.nativeFee > sealed) throw new Error(`usdt0: LayerZero fee rose to ${fee.nativeFee} above the sealed ${sealed} (quote + ${FEE_HEADROOM_BPS / 100n} % headroom) — re-quote`);
-    if (BigInt(tx.value) !== sealed) throw new Error(`usdt0: transaction value ${tx.value} is not the quoted fee ${sealed}`);
+    // The sealed fee no longer covers the send: the quote is stale (quote_expired), a new one carries the current fee.
+    if (fee.nativeFee > sealed) throw refusal("quote_expired", `usdt0: LayerZero fee rose to ${fee.nativeFee} above the sealed ${sealed} (quote + ${FEE_HEADROOM_BPS / 100n} % headroom) — re-quote`);
+    if (BigInt(tx.value) !== sealed) throw refusal("policy_refused", `usdt0: transaction value ${tx.value} is not the quoted fee ${sealed}`);
   }
 
   /**
@@ -544,51 +603,57 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
     },
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
-      const refuse = (reason: string) => { params.onRefusal?.(reason); return null; };
-      if (params.flex) return refuse("the amount is sealed into the calldata (no flexible deposits)");
+      // The classification goes to onRefusal next to the text; an unclassified refusal (a developer's bad argument) has none.
+      const refuse = (reason: string, info?: Swap2RefusalReason | Swap2RefusalInfo) => {
+        const classified = typeof info === "string" ? {reason: info} : info;
+        if (classified) params.onRefusal?.(reason, classified);
+        else params.onRefusal?.(reason);
+        return null;
+      };
+      if (params.flex) return refuse("the amount is sealed into the calldata (no flexible deposits)", "unsupported_pair");
       // Tron / TON never send here (a send from them is signed on that chain); a source without a mesh OFT, or a mesh
       // destination this provider does not offer, is not a mesh route: all of them keep the answer they had before the mesh.
-      if (meshDestinationFor(params.sourceChain)) return refuse("USDT0 is not deployed on this chain");
+      if (meshDestinationFor(params.sourceChain)) return refuse("USDT0 is not deployed on this chain", "unsupported_pair");
       const meshDst = meshOn(params.destChain);
       const meshSrc = meshSourceFor(params.sourceChain);
       if (meshDst && meshSrc) return meshQuote(params, meshSrc, meshDst, refuse);
       const src = USDT0_CHAINS[params.sourceChain];
       const dst = USDT0_CHAINS[params.destChain];
-      if (!src || !dst) return refuse("USDT0 is not deployed on this chain");
-      if (src === dst) return refuse("same-chain transfers are not a bridge");
-      if (!tokenMatches(src, params.sourceToken)) return refuse(`source token ${params.sourceToken} is not USDT0 (${src.token}) on ${src.name}`);
-      if (!tokenMatches(dst, params.destToken)) return refuse(`destination token ${params.destToken} is not USDT0 (${dst.token}) on ${dst.name}`);
+      if (!src || !dst) return refuse("USDT0 is not deployed on this chain", "unsupported_pair");
+      if (src === dst) return refuse("same-chain transfers are not a bridge", "unsupported_pair");
+      if (!tokenMatches(src, params.sourceToken)) return refuse(`source token ${params.sourceToken} is not USDT0 (${src.token}) on ${src.name}`, "unsupported_pair");
+      if (!tokenMatches(dst, params.destToken)) return refuse(`destination token ${params.destToken} is not USDT0 (${dst.token}) on ${dst.name}`, "unsupported_pair");
       if (!/^\d+$/.test(params.amountIn)) return refuse("amount must be a base-unit integer");
       const amount = BigInt(params.amountIn);
-      if (amount <= 0n) return refuse("amount must be positive");
+      if (amount <= 0n) return refuse("amount must be positive", "amount_too_small");
       // The placeholder prices a dry quote; a live one without addresses would send there (round 3, H8).
       const dry = params.dry !== false;
       const recipient = params.destAddress || (dry ? EVM_PLACEHOLDER : "");
-      if (!recipient) return refuse("a live quote needs a recipient");
-      if (!isAddress(recipient)) return refuse("destination must be an EVM address");
+      if (!recipient) return refuse("a live quote needs a recipient", "policy_refused");
+      if (!isAddress(recipient)) return refuse("destination must be an EVM address", "recipient_mismatch");
       // Nothing paid to the zero address comes back: burned, or a packet stored for good.
-      if (isZeroEvmAddress(recipient)) return refuse(ZERO_RECIPIENT_REFUSAL);
+      if (isZeroEvmAddress(recipient)) return refuse(ZERO_RECIPIENT_REFUSAL, "recipient_mismatch");
       const refund = params.refundAddress || (dry ? EVM_PLACEHOLDER : "");
-      if (!refund) return refuse("a live quote needs a refund address");
-      if (!isAddress(refund)) return refuse("refund address must be an EVM address");
+      if (!refund) return refuse("a live quote needs a refund address", "policy_refused");
+      if (!isAddress(refund)) return refuse("refund address must be an EVM address", "recipient_mismatch");
       // vitalik.eth stands in for a missing address: its send would pay or refund vitalik.eth, so only the price is kept.
       const placeholder = dry ? placeholderIn(params) : null;
       const c = client(src.caip2);
-      if (!c) return refuse(`no RPC configured for ${src.caip2}`);
+      if (!c) return refuse(`no RPC configured for ${src.caip2}`, "unsupported_pair");
 
       try {
         await Promise.all([verifyChain(src), verifyPeer(src, dst)]);
         const probe = sendParam(dst.eid, recipient, amount, 0n);
         const [limit, feeDetails, receipt] = await c.readContract({address: getAddress(src.oft), abi: OFT_ABI, functionName: "quoteOFT", args: [probe]});
-        if (amount < limit.minAmountLD) return refuse(`amount ${amount} is below the OFT minimum ${limit.minAmountLD}`);
-        if (amount > limit.maxAmountLD) return refuse(`amount ${amount} exceeds the OFT maximum ${limit.maxAmountLD}`);
+        if (amount < limit.minAmountLD) return refuse(`amount ${amount} is below the OFT minimum ${limit.minAmountLD}`, "amount_too_small");
+        if (amount > limit.maxAmountLD) return refuse(`amount ${amount} exceeds the OFT maximum ${limit.maxAmountLD}`, "amount_too_large");
         const received = receipt.amountReceivedLD;
-        if (received <= 0n) return refuse("amount is below the OFT dust threshold — nothing would arrive");
-        if (received > amount) return refuse("OFT reports more received than sent — refusing");
-        if (params.minAmountOut !== undefined && received < BigInt(params.minAmountOut)) return refuse(`received ${received} is below the caller's floor ${params.minAmountOut}`);
+        if (received <= 0n) return refuse("amount is below the OFT dust threshold — nothing would arrive", "amount_too_small");
+        if (received > amount) return refuse("OFT reports more received than sent — refusing", "price_check_failed");
+        if (params.minAmountOut !== undefined && received < BigInt(params.minAmountOut)) return refuse(`received ${received} is below the caller's floor ${params.minAmountOut}`, "price_check_failed");
         const sp = sendParam(dst.eid, recipient, amount, received);
         const fee = await c.readContract({address: getAddress(src.oft), abi: OFT_ABI, functionName: "quoteSend", args: [sp, false]});
-        if (fee.lzTokenFee !== 0n) return refuse("OFT asks for a fee in LZ token — unsupported");
+        if (fee.lzTokenFee !== 0n) return refuse("OFT asks for a fee in LZ token — unsupported", "unsupported_pair");
         // Sealed with headroom: OAppSender requires msg.value == MessagingFee.nativeFee, the
         // endpoint refunds whatever the current fee does not use to `refund`.
         const nativeFee = fee.nativeFee + (fee.nativeFee * FEE_HEADROOM_BPS) / 10_000n;
@@ -628,17 +693,17 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
         };
         return placeholder ? priceOnly(quote, placeholder) : quote;
       } catch (err) {
-        return refuse(rpcSafeReason(err, src.name));
+        return refuse(rpcSafeReason(err, src.name), rpcRefusal(err));
       }
     },
 
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
       // A dry quote priced for a stand-in recipient or refund address is never built, even with a transaction attached.
       const placeholder = quote.providerData?.placeholder;
-      if (placeholder !== undefined) throw new Error(placeholderBuildRefusal(placeholder));
+      if (placeholder !== undefined) throw refusal("policy_refused", placeholderBuildRefusal(placeholder));
       const tx = quote.txRequest;
       const parsed = parseIntent(quote.intentId) ?? parseMeshIntent(quote.intentId);
-      if (!tx || !parsed) throw new Error("swap2: USDT0 quote has no transaction request");
+      if (!tx || !parsed) throw refusal("policy_refused", "swap2: USDT0 quote has no transaction request");
       return {
         chain: parsed.src.caip2,
         to: tx.to ?? "",
@@ -659,31 +724,31 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
      */
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
       const placeholder = quote.providerData?.placeholder;
-      if (placeholder !== undefined) throw new Error(placeholderPreflightRefusal(placeholder));
+      if (placeholder !== undefined) throw refusal("policy_refused", placeholderPreflightRefusal(placeholder));
       const mesh = parseMeshIntent(quote.intentId);
       if (mesh) return meshPreflight(quote, tx, mesh.src, mesh.dst);
       const parsed = parseIntent(quote.intentId);
-      if (!parsed) throw new Error("usdt0: malformed intent id");
+      if (!parsed) throw refusal("policy_refused", "usdt0: malformed intent id");
       const {src, dst} = parsed;
-      if (!same(tx.to, src.oft)) throw new Error(`usdt0: deposit target ${tx.to} is not the ${src.name} OFT`);
+      if (!same(tx.to, src.oft)) throw refusal("vault_mismatch", `usdt0: deposit target ${tx.to} is not the ${src.name} OFT`);
       const pd = quote.providerData ?? {};
       if (!/^\d+$/.test(pd.amountLD ?? "") || !/^\d+$/.test(pd.minAmountLD ?? "") || !/^\d+$/.test(pd.nativeFee ?? "") || !isAddress(pd.recipient ?? "")) {
-        throw new Error("usdt0: quote carries no sealed send parameters");
+        throw refusal("policy_refused", "usdt0: quote carries no sealed send parameters");
       }
-      if (isZeroEvmAddress(pd.recipient)) throw new Error(`usdt0: ${ZERO_RECIPIENT_REFUSAL}`);
+      if (isZeroEvmAddress(pd.recipient)) throw refusal("recipient_mismatch", `usdt0: ${ZERO_RECIPIENT_REFUSAL}`);
       const c = client(src.caip2);
-      if (!c) throw new Error(`usdt0: no RPC for ${src.caip2}`);
+      if (!c) throw refusal("unsupported_pair", `usdt0: no RPC for ${src.caip2}`);
       const sp = sendParam(dst.eid, pd.recipient!, BigInt(pd.amountLD!), BigInt(pd.minAmountLD!));
       let fee: {nativeFee: bigint};
       try {
         await Promise.all([verifyChain(src), verifyPeer(src, dst)]);
         fee = await c.readContract({address: getAddress(src.oft), abi: OFT_ABI, functionName: "quoteSend", args: [sp, false]});
       } catch (err) {
-        throw new Error(rpcSafeReason(err, src.name));
+        throw withReason(new Error(rpcSafeReason(err, src.name)), rpcRefusal(err));
       }
       const sealed = BigInt(pd.nativeFee!);
-      if (fee.nativeFee > sealed) throw new Error(`usdt0: LayerZero fee rose to ${fee.nativeFee} above the sealed ${sealed} (quote + ${FEE_HEADROOM_BPS / 100n} % headroom) — re-quote`);
-      if (BigInt(tx.value) !== sealed) throw new Error(`usdt0: transaction value ${tx.value} is not the quoted fee ${sealed}`);
+      if (fee.nativeFee > sealed) throw refusal("quote_expired", `usdt0: LayerZero fee rose to ${fee.nativeFee} above the sealed ${sealed} (quote + ${FEE_HEADROOM_BPS / 100n} % headroom) — re-quote`);
+      if (BigInt(tx.value) !== sealed) throw refusal("policy_refused", `usdt0: transaction value ${tx.value} is not the quoted fee ${sealed}`);
     },
 
     async trackIntent(ref: IntentRef): Promise<IntentStatus> {
@@ -727,9 +792,9 @@ export function usdt0Provider(config: Usdt0ProviderConfig = {}): CrossChainProvi
       const guid = m.guid;
       const message = m.source?.tx?.payload;
       if (!Number.isInteger(nonce) || !isHexData(guid) || guid.length !== 66 || !isHexData(message) || message.length <= 2) {
-        throw new Error("usdt0: LayerZero Scan has no complete packet for the stored payload");
+        throw refusal("upstream_unavailable", "usdt0: LayerZero Scan has no complete packet for the stored payload");
       }
-      if (!same(m.pathway?.receiver?.address, dst.oft)) throw new Error("usdt0: stored payload is addressed to another receiver");
+      if (!same(m.pathway?.receiver?.address, dst.oft)) throw refusal("vault_mismatch", "usdt0: stored payload is addressed to another receiver");
       const valueRaw = m.source?.tx?.options?.lzReceive?.value ?? "0";
       const value = /^\d+$/.test(valueRaw) ? valueRaw : "0";
       return {

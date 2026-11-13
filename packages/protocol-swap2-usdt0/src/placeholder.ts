@@ -9,6 +9,7 @@
 // A recipient that IS the zero account (EVM 0x000…0, Tron T9yD14…, TON 0:000…0 in any spelling) is refused outright,
 // dry or live.
 import type {Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
+import {note} from "./refusals.js";
 
 /** Which address of a dry request the provider filled with its stand-in (`providerData.placeholder`). */
 export type Usdt0Placeholder = "recipient" | "refund";
@@ -45,21 +46,24 @@ export const isZeroEvmAddress = (address: unknown): boolean => typeof address ==
 /**
  * A quote with no transaction (priced for a stand-in), held to the request on what it still says: it pays no deposit
  * address, spends exactly the input, delivers no more than the input (a USDT0 / Legacy Mesh send keeps back a fee or
- * nothing), guarantees the caller's floor, and its intent id names `route`. The reason it fails, or null.
+ * nothing), guarantees the caller's floor, and its intent id names `route`. The reason it fails, or null. Each text is
+ * noted with its `Swap2RefusalReason`: a deposit address (`vault_mismatch`), amounts that are not integers
+ * (`upstream_unavailable`), more out than in or a minimum below the floor (`price_check_failed`), another input or
+ * intent (`policy_refused`).
  */
 export function priceOnlyMismatch(params: Pick<QuoteParams, "amountIn" | "minAmountOut">, quote: Quote, route: string): string | null {
-  if (quote.depositAddress !== "") return `a USDT0 quote pays no deposit address, but this one names ${String(quote.depositAddress).slice(0, 64)}`;
+  if (quote.depositAddress !== "") return note(`a USDT0 quote pays no deposit address, but this one names ${String(quote.depositAddress).slice(0, 64)}`, "vault_mismatch");
   let amountIn: bigint, dest: bigint, min: bigint, floor: bigint | undefined;
   try {
     amountIn = BigInt(params.amountIn);
-    if (BigInt(quote.sourceAmount) !== amountIn) return `the quote spends ${String(quote.sourceAmount).slice(0, 80)}, not the ${amountIn} input`;
+    if (BigInt(quote.sourceAmount) !== amountIn) return note(`the quote spends ${String(quote.sourceAmount).slice(0, 80)}, not the ${amountIn} input`, "policy_refused");
     dest = BigInt(quote.destAmount);
     min = BigInt(quote.minDestAmount);
     floor = params.minAmountOut !== undefined ? BigInt(params.minAmountOut) : undefined;
   } catch {
-    return "the quote's amounts are not integers";
+    return note("the quote's amounts are not integers", "upstream_unavailable");
   }
-  if (dest > amountIn || min > amountIn) return `the quote delivers more than the ${amountIn} input`;
-  if (floor !== undefined && min < floor) return `the quoted minimum ${min} is below the caller's floor ${floor}`;
-  return String(quote.intentId).replace(/~[0-9a-f]{32}$/, "") === route ? null : "the intent id does not name this send";
+  if (dest > amountIn || min > amountIn) return note(`the quote delivers more than the ${amountIn} input`, "price_check_failed");
+  if (floor !== undefined && min < floor) return note(`the quoted minimum ${min} is below the caller's floor ${floor}`, "price_check_failed");
+  return String(quote.intentId).replace(/~[0-9a-f]{32}$/, "") === route ? null : note("the intent id does not name this send", "policy_refused");
 }

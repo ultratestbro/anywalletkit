@@ -19,6 +19,7 @@ import {
   type Usdt0MeshDestination, type Usdt0MeshSource,
 } from "./mesh.js";
 import {ZERO_RECIPIENT_REFUSAL, isZeroEvmAddress, placeholderCarriesRefusal, placeholderIn, priceOnlyMismatch} from "./placeholder.js";
+import {note, usdt0Notes} from "./refusals.js";
 
 export * from "./mesh.js";
 export type {Usdt0Placeholder} from "./placeholder.js";
@@ -129,12 +130,25 @@ export function tokenMatches(chain: Pick<Usdt0Chain, "caip2" | "token">, symbolO
 }
 
 /**
+ * `BigInt(quote.sourceAmount)`. A backend's amount that is not an integer still throws the same error; its text is
+ * noted (`upstream_unavailable`: an answer of another shape), so the stub's "fails this app's own check" carries it.
+ */
+function quotedSourceAmount(quote: Quote): bigint {
+  try {
+    return BigInt(quote.sourceAmount);
+  } catch (e) {
+    if (e instanceof Error) note(e.message, "upstream_unavailable");
+    throw e;
+  }
+}
+
+/**
  * A remote USDT0 quote's `send`, decoded on the device against the app's own request (scan 2026-10-30, F3): exactly
  * `send(SendParam, MessagingFee, refund)` on the source OFT; the destination chain's eid; the recipient as `to`; the
  * input as `amountLD`; a `minAmountLD` no larger than the input that guarantees the quoted minimum and the caller's
  * floor; empty `extraOptions`, `composeMsg` and `oftCmd` (what the provider sends); no LZ-token fee; the trader as
  * refund; `msg.value` = the declared native fee = the call's `nativeFee`; the adapter as spender on Ethereum only.
- * The reason it fails, or null. The engine's native-fee ceiling bounds the fee itself. A route into Tron / TON is
+ * The reason it fails, or null (its `Swap2RefusalReason` through `usdt0Pins.reasonOf`). The engine's native-fee ceiling bounds the fee itself. A route into Tron / TON is
  * a Legacy Mesh send and is held to {@link usdt0VerifyMeshSend} instead. A recipient that is the zero address is
  * refused; a dry request without the recipient or the refund address is priced for the provider's stand-in, so its
  * quote must carry no transaction and is held to its amount, floor and route only.
@@ -144,26 +158,26 @@ export function usdt0VerifyQuote(params: QuoteParams, quote: Quote): string | nu
   if (meshDst) {
     const meshSrc = meshSourceFor(params.sourceChain);
     // A source without a mesh OFT keeps the answer it had before the mesh existed.
-    return meshSrc ? usdt0VerifyMeshSend(params, quote, meshSrc, meshDst) : "not a USDT0 route between two deployments";
+    return meshSrc ? usdt0VerifyMeshSend(params, quote, meshSrc, meshDst) : note("not a USDT0 route between two deployments", "unsupported_pair");
   }
   const src = usdt0ChainFor(params.sourceChain);
   const dst = usdt0ChainFor(params.destChain);
-  if (!src || !dst || src === dst) return "not a USDT0 route between two deployments";
+  if (!src || !dst || src === dst) return note("not a USDT0 route between two deployments", "unsupported_pair");
   // The OFT burns or locks its own token whatever the request named, so both sides are bound here (reaudit 2026-10-30, #1).
-  if (!tokenMatches(src, params.sourceToken)) return `source token ${params.sourceToken} is not USDT0 (${src.token}) on ${src.name}`;
-  if (!tokenMatches(dst, params.destToken)) return `destination token ${params.destToken} is not USDT0 (${dst.token}) on ${dst.name}`;
+  if (!tokenMatches(src, params.sourceToken)) return note(`source token ${params.sourceToken} is not USDT0 (${src.token}) on ${src.name}`, "unsupported_pair");
+  if (!tokenMatches(dst, params.destToken)) return note(`destination token ${params.destToken} is not USDT0 (${dst.token}) on ${dst.name}`, "unsupported_pair");
   // Nothing paid to the zero address comes back: burned, or a packet stored for good (review r3, 2026-11-13).
-  if (isZeroEvmAddress(params.destAddress)) return ZERO_RECIPIENT_REFUSAL;
+  if (isZeroEvmAddress(params.destAddress)) return note(ZERO_RECIPIENT_REFUSAL, "recipient_mismatch");
   // A dry request without the recipient or the refund address is priced for vitalik.eth in its place; a send built for
   // it pays or refunds vitalik.eth from whichever wallet signs it, so such a quote carries no transaction (review r3).
   const placeholder = placeholderIn(params);
-  if (placeholder) return quote.txRequest !== undefined ? placeholderCarriesRefusal(placeholder) : priceOnlyMismatch(params, quote, `usdt0:${src.eid}:${dst.eid}`);
+  if (placeholder) return quote.txRequest !== undefined ? note(placeholderCarriesRefusal(placeholder), "recipient_mismatch") : priceOnlyMismatch(params, quote, `usdt0:${src.eid}:${dst.eid}`);
   const tx = quote.txRequest;
-  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no OFT call";
-  if (tx.to.toLowerCase() !== src.oft.toLowerCase()) return `the call targets ${tx.to}, not the ${src.name} OFT`;
-  if (tx.chainId !== undefined && tx.chainId !== src.chainId) return `the call is for chain ${tx.chainId}, not ${src.chainId}`;
+  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return note("the quote carries no OFT call", "policy_refused");
+  if (tx.to.toLowerCase() !== src.oft.toLowerCase()) return note(`the call targets ${tx.to}, not the ${src.name} OFT`, "vault_mismatch");
+  if (tx.chainId !== undefined && tx.chainId !== src.chainId) return note(`the call is for chain ${tx.chainId}, not ${src.chainId}`, "policy_refused");
   if (src.adapter ? !tx.approvalAddress || tx.approvalAddress.toLowerCase() !== src.oft.toLowerCase() : tx.approvalAddress !== undefined) {
-    return src.adapter ? "the Ethereum send approves another spender than the adapter" : "an OFT send needs no approval";
+    return note(src.adapter ? "the Ethereum send approves another spender than the adapter" : "an OFT send needs no approval", "vault_mismatch");
   }
   let sp: {dstEid: number; to: Hex; amountLD: bigint; minAmountLD: bigint; extraOptions: Hex; composeMsg: Hex; oftCmd: Hex};
   let fee: {nativeFee: bigint; lzTokenFee: bigint};
@@ -172,7 +186,7 @@ export function usdt0VerifyQuote(params: QuoteParams, quote: Quote): string | nu
     const d = decodeFunctionData({abi: OFT_SEND_ABI, data: tx.data as Hex});
     [sp, fee, refund] = d.args as unknown as [typeof sp, typeof fee, string];
   } catch {
-    return "the call is not send(SendParam, MessagingFee, refund)";
+    return note("the call is not send(SendParam, MessagingFee, refund)", "policy_refused");
   }
   let amountIn: bigint, floor: bigint, value: bigint;
   try {
@@ -181,26 +195,26 @@ export function usdt0VerifyQuote(params: QuoteParams, quote: Quote): string | nu
     if (params.minAmountOut !== undefined && BigInt(params.minAmountOut) > floor) floor = BigInt(params.minAmountOut);
     value = BigInt(tx.value ?? "0");
   } catch {
-    return "the request does not name amounts";
+    return note("the request does not name amounts", "upstream_unavailable");
   }
-  if (sp.dstEid !== dst.eid) return `the send goes to eid ${sp.dstEid}, not ${dst.name} (${dst.eid})`;
-  if (sp.amountLD !== amountIn || BigInt(quote.sourceAmount) !== amountIn) return `the send moves ${sp.amountLD}, not the ${amountIn} input`;
-  if (sp.minAmountLD > sp.amountLD || sp.minAmountLD <= 0n || sp.minAmountLD < floor) return `the send's minAmountLD ${sp.minAmountLD} is below the ${floor} minimum`;
-  if (sp.extraOptions !== "0x" || sp.composeMsg !== "0x" || sp.oftCmd !== "0x") return "the send carries options, a compose message or an OFT command";
+  if (sp.dstEid !== dst.eid) return note(`the send goes to eid ${sp.dstEid}, not ${dst.name} (${dst.eid})`, "recipient_mismatch");
+  if (sp.amountLD !== amountIn || quotedSourceAmount(quote) !== amountIn) return note(`the send moves ${sp.amountLD}, not the ${amountIn} input`, "policy_refused");
+  if (sp.minAmountLD > sp.amountLD || sp.minAmountLD <= 0n || sp.minAmountLD < floor) return note(`the send's minAmountLD ${sp.minAmountLD} is below the ${floor} minimum`, "price_check_failed");
+  if (sp.extraOptions !== "0x" || sp.composeMsg !== "0x" || sp.oftCmd !== "0x") return note("the send carries options, a compose message or an OFT command", "policy_refused");
   // A dry quote without addresses is priced for the provider's placeholders and carries no transaction (above), so here
   // the request names both addresses (or is live, where a blank one is refused).
   const live = params.dry === false;
   if (params.destAddress || live) {
-    if (!isAddress(params.destAddress)) return "the recipient is not an EVM address";
-    if (sp.to.toLowerCase() !== pad(getAddress(params.destAddress), {size: 32}).toLowerCase()) return `the send delivers to ${sp.to}, not the recipient`;
+    if (!isAddress(params.destAddress)) return note("the recipient is not an EVM address", "recipient_mismatch");
+    if (sp.to.toLowerCase() !== pad(getAddress(params.destAddress), {size: 32}).toLowerCase()) return note(`the send delivers to ${sp.to}, not the recipient`, "recipient_mismatch");
   }
   if (params.refundAddress || live) {
-    if (!isAddress(params.refundAddress ?? "")) return "the refund address is not an EVM address";
-    if (getAddress(refund) !== getAddress(params.refundAddress!)) return `the send refunds ${refund}, not the trader`;
+    if (!isAddress(params.refundAddress ?? "")) return note("the refund address is not an EVM address", "recipient_mismatch");
+    if (getAddress(refund) !== getAddress(params.refundAddress!)) return note(`the send refunds ${refund}, not the trader`, "recipient_mismatch");
   }
-  if (fee.lzTokenFee !== 0n) return "the send pays an LZ-token fee";
-  if (value !== fee.nativeFee || (tx.nativeFee ?? "0") !== fee.nativeFee.toString()) return "msg.value is not the declared native fee of the send";
-  if (quote.intentId.replace(/~[0-9a-f]{32}$/, "") !== `usdt0:${src.eid}:${dst.eid}`) return "the intent id does not name this send";
+  if (fee.lzTokenFee !== 0n) return note("the send pays an LZ-token fee", "policy_refused");
+  if (value !== fee.nativeFee || (tx.nativeFee ?? "0") !== fee.nativeFee.toString()) return note("msg.value is not the declared native fee of the send", "policy_refused");
+  if (quote.intentId.replace(/~[0-9a-f]{32}$/, "") !== `usdt0:${src.eid}:${dst.eid}`) return note("the intent id does not name this send", "policy_refused");
   return null;
 }
 
@@ -219,22 +233,22 @@ export const USDT0_MESH_INTENT = "usdt0-mesh";
  * transaction and is held to its amount, floor and route only.
  */
 export function usdt0VerifyMeshSend(params: QuoteParams, quote: Quote, src: Usdt0MeshSource, dst: Usdt0MeshDestination): string | null {
-  if (!tokenMatches(src, params.sourceToken)) return `source token ${params.sourceToken} is not USDT0 (${src.token}) on ${src.name}`;
-  if (!meshDestTokenMatches(dst, params.destToken)) return `destination token ${params.destToken} is not USDT0 (${dst.token}) on ${dst.name}`;
+  if (!tokenMatches(src, params.sourceToken)) return note(`source token ${params.sourceToken} is not USDT0 (${src.token}) on ${src.name}`, "unsupported_pair");
+  if (!meshDestTokenMatches(dst, params.destToken)) return note(`destination token ${params.destToken} is not USDT0 (${dst.token}) on ${dst.name}`, "unsupported_pair");
   // Nothing paid to the zero account comes back: burned, or a packet stored for good (review r3, 2026-11-13).
   if (params.destAddress) {
     const named = meshRecipientBytes32(dst, params.destAddress);
-    if (!("refusal" in named) && /^0x0{64}$/.test(named.to)) return ZERO_RECIPIENT_REFUSAL;
+    if (!("refusal" in named) && /^0x0{64}$/.test(named.to)) return note(ZERO_RECIPIENT_REFUSAL, "recipient_mismatch");
   }
   // A dry request without the recipient is priced for the zero account (without the refund address, for vitalik.eth as
   // the refund); a send built for it burns the USDT or refunds vitalik.eth, so such a quote carries no transaction.
   const placeholder = placeholderIn(params);
-  if (placeholder) return quote.txRequest !== undefined ? placeholderCarriesRefusal(placeholder) : priceOnlyMismatch(params, quote, `${USDT0_MESH_INTENT}:${src.eid}:${dst.eid}`);
+  if (placeholder) return quote.txRequest !== undefined ? note(placeholderCarriesRefusal(placeholder), "recipient_mismatch") : priceOnlyMismatch(params, quote, `${USDT0_MESH_INTENT}:${src.eid}:${dst.eid}`);
   const tx = quote.txRequest;
-  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no OFT call";
-  if (tx.to.toLowerCase() !== src.oft.toLowerCase()) return `the call targets ${tx.to}, not the ${src.name} Legacy Mesh OFT`;
-  if (tx.chainId !== undefined && tx.chainId !== src.chainId) return `the call is for chain ${tx.chainId}, not ${src.chainId}`;
-  if (!tx.approvalAddress || tx.approvalAddress.toLowerCase() !== src.oft.toLowerCase()) return "the Legacy Mesh send approves another spender than its OFT";
+  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return note("the quote carries no OFT call", "policy_refused");
+  if (tx.to.toLowerCase() !== src.oft.toLowerCase()) return note(`the call targets ${tx.to}, not the ${src.name} Legacy Mesh OFT`, "vault_mismatch");
+  if (tx.chainId !== undefined && tx.chainId !== src.chainId) return note(`the call is for chain ${tx.chainId}, not ${src.chainId}`, "policy_refused");
+  if (!tx.approvalAddress || tx.approvalAddress.toLowerCase() !== src.oft.toLowerCase()) return note("the Legacy Mesh send approves another spender than its OFT", "vault_mismatch");
   let sp: {dstEid: number; to: Hex; amountLD: bigint; minAmountLD: bigint; extraOptions: Hex; composeMsg: Hex; oftCmd: Hex};
   let fee: {nativeFee: bigint; lzTokenFee: bigint};
   let refund: string;
@@ -242,7 +256,7 @@ export function usdt0VerifyMeshSend(params: QuoteParams, quote: Quote, src: Usdt
     const d = decodeFunctionData({abi: OFT_SEND_ABI, data: tx.data as Hex});
     [sp, fee, refund] = d.args as unknown as [typeof sp, typeof fee, string];
   } catch {
-    return "the call is not send(SendParam, MessagingFee, refund)";
+    return note("the call is not send(SendParam, MessagingFee, refund)", "policy_refused");
   }
   let amountIn: bigint, floor: bigint, value: bigint;
   try {
@@ -251,27 +265,27 @@ export function usdt0VerifyMeshSend(params: QuoteParams, quote: Quote, src: Usdt
     if (params.minAmountOut !== undefined && BigInt(params.minAmountOut) > floor) floor = BigInt(params.minAmountOut);
     value = BigInt(tx.value ?? "0");
   } catch {
-    return "the request does not name amounts";
+    return note("the request does not name amounts", "upstream_unavailable");
   }
-  if (sp.dstEid !== dst.eid) return `the send goes to eid ${sp.dstEid}, not ${dst.name} (${dst.eid})`;
-  if (sp.amountLD !== amountIn || BigInt(quote.sourceAmount) !== amountIn) return `the send moves ${sp.amountLD}, not the ${amountIn} input`;
-  if (sp.minAmountLD > sp.amountLD || sp.minAmountLD <= 0n || sp.minAmountLD < floor) return `the send's minAmountLD ${sp.minAmountLD} is below the ${floor} minimum`;
-  if (sp.extraOptions !== "0x" || sp.composeMsg !== "0x" || sp.oftCmd !== "0x") return "the send carries options, a compose message or an OFT command";
+  if (sp.dstEid !== dst.eid) return note(`the send goes to eid ${sp.dstEid}, not ${dst.name} (${dst.eid})`, "recipient_mismatch");
+  if (sp.amountLD !== amountIn || quotedSourceAmount(quote) !== amountIn) return note(`the send moves ${sp.amountLD}, not the ${amountIn} input`, "policy_refused");
+  if (sp.minAmountLD > sp.amountLD || sp.minAmountLD <= 0n || sp.minAmountLD < floor) return note(`the send's minAmountLD ${sp.minAmountLD} is below the ${floor} minimum`, "price_check_failed");
+  if (sp.extraOptions !== "0x" || sp.composeMsg !== "0x" || sp.oftCmd !== "0x") return note("the send carries options, a compose message or an OFT command", "policy_refused");
   // A dry quote without a recipient is priced for the zero-account placeholder and carries no transaction (above), so
   // here the request names both addresses (or is live, where a blank one is refused).
   const live = params.dry === false;
   if (params.destAddress || live) {
     const want = meshRecipientBytes32(dst, params.destAddress ?? "");
-    if ("refusal" in want) return want.refusal;
-    if (sp.to.toLowerCase() !== want.to.toLowerCase() || !meshRecipientMatches(dst, sp.to, params.destAddress)) return `the send delivers to ${sp.to}, not the recipient`;
+    if ("refusal" in want) return note(want.refusal, "recipient_mismatch");
+    if (sp.to.toLowerCase() !== want.to.toLowerCase() || !meshRecipientMatches(dst, sp.to, params.destAddress)) return note(`the send delivers to ${sp.to}, not the recipient`, "recipient_mismatch");
   }
   if (params.refundAddress || live) {
-    if (!isAddress(params.refundAddress ?? "")) return "the refund address is not an EVM address";
-    if (getAddress(refund) !== getAddress(params.refundAddress!)) return `the send refunds ${refund}, not the trader`;
+    if (!isAddress(params.refundAddress ?? "")) return note("the refund address is not an EVM address", "recipient_mismatch");
+    if (getAddress(refund) !== getAddress(params.refundAddress!)) return note(`the send refunds ${refund}, not the trader`, "recipient_mismatch");
   }
-  if (fee.lzTokenFee !== 0n) return "the send pays an LZ-token fee";
-  if (value !== fee.nativeFee || (tx.nativeFee ?? "0") !== fee.nativeFee.toString()) return "msg.value is not the declared native fee of the send";
-  if (quote.intentId.replace(/~[0-9a-f]{32}$/, "") !== `${USDT0_MESH_INTENT}:${src.eid}:${dst.eid}`) return "the intent id does not name this send";
+  if (fee.lzTokenFee !== 0n) return note("the send pays an LZ-token fee", "policy_refused");
+  if (value !== fee.nativeFee || (tx.nativeFee ?? "0") !== fee.nativeFee.toString()) return note("msg.value is not the declared native fee of the send", "policy_refused");
+  if (quote.intentId.replace(/~[0-9a-f]{32}$/, "") !== `${USDT0_MESH_INTENT}:${src.eid}:${dst.eid}`) return note("the intent id does not name this send", "policy_refused");
   return null;
 }
 
@@ -288,7 +302,10 @@ export function usdt0ClaimTargets(chain: string): readonly string[] {
  * The USDT0 OFT a send calls on a chain, the adapter it approves where one locks USDT (Ethereum), the endpoint
  * a stored-payload claim calls, and {@link usdt0VerifyQuote} — the app's pins for
  * `remoteProvider({name: "usdt0", baseUrl, ...usdt0Pins})` (scan 2026-10-27 modules, F8/F16; the send's
- * arguments since scan 2026-10-30, F3).
+ * arguments since scan 2026-10-30, F3). `reasonOf` classifies each text the check returns: a route or token this
+ * venue does not serve (`unsupported_pair`), another recipient, refund address or destination eid, or the zero account
+ * (`recipient_mismatch`), another OFT or spender (`vault_mismatch`), a minimum below the floor (`price_check_failed`),
+ * amounts that are not integers (`upstream_unavailable`), any other call shape, amount, fee or intent (`policy_refused`).
  */
 export const usdt0Pins: RemotePins & {claimTargets(chain: string): readonly string[]} = Object.freeze({
   // The Legacy Mesh OFT is a second target (and spender: it pulls the token) on Ethereum and Arbitrum, the only one on
@@ -303,6 +320,7 @@ export const usdt0Pins: RemotePins & {claimTargets(chain: string): readonly stri
   },
   claimTargets: usdt0ClaimTargets,
   verifyQuote: usdt0VerifyQuote,
+  reasonOf: usdt0Notes.reasonOf,
 });
 function usdt0ChainFor(chain: string): Usdt0Chain | undefined {
   return Object.prototype.hasOwnProperty.call(USDT0_CHAINS, chain) ? USDT0_CHAINS[chain] : undefined;
