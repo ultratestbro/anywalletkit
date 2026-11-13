@@ -8,12 +8,16 @@
  *    owner, inside a transaction that did NOT call the token itself (a plain
  *    transfer is not a bridge);
  *  - `lzReceive` on the LayerZero endpoint is the owner's own retry of a
- *    stored payload (`claimSwap2`).
+ *    stored payload (`claimSwap2`);
+ *  - `send(...)` on a Legacy Mesh OFT (Ethereum, Arbitrum, Celo) is a send
+ *    into Tron / TON: "Bridged USDT0 → USDT", the destination named from the
+ *    calldata's eid.
  */
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 import {calledContract, chainLabel, describeSwapLike, matchesCall} from "@anywalletkit/protocol-swap2-core/activity";
 import {decodeFunctionData, parseAbi, type Hex} from "viem";
 import {USDT0_BY_EID, USDT0_CHAINS, type Usdt0Chain} from "./config.js";
+import {USDT0_MESH_DESTINATION_BY_EID, meshSourceFor, type Usdt0MeshDestination} from "./mesh.js";
 
 const SEND_ABI = parseAbi([
   "struct SendParam { uint32 dstEid; bytes32 to; uint256 amountLD; uint256 minAmountLD; bytes extraOptions; bytes composeMsg; bytes oftCmd; }",
@@ -35,20 +39,46 @@ function symbolFor(chain: Usdt0Chain): string {
   return chain.adapter || [42161, 10, 137].includes(chain.chainId) ? "USDT" : "USDT0";
 }
 
-/** `send(SendParam, …)` → the destination deployment (dstEid is the first word of the tuple), null when the calldata is absent or foreign. */
-function sendDestination(tx: ChainTx): Usdt0Chain | null {
+/** `send(SendParam, …)` → the destination eid (the first word of the tuple), null when the calldata is absent or foreign. */
+function sendDstEid(tx: ChainTx): number | null {
   const data = tx.call?.data;
   if (!data || data.length < 10 + 64 * 2) return null;
   try {
     const [sp] = decodeFunctionData({abi: SEND_ABI, data: data as Hex}).args as unknown as [{dstEid: number}];
-    return USDT0_BY_EID[sp.dstEid] ?? null;
+    return sp.dstEid;
   } catch {
     return null;
   }
 }
+/** `send(SendParam, …)` → the destination deployment, null when the calldata is absent or foreign. */
+function sendDestination(tx: ChainTx): Usdt0Chain | null {
+  const eid = sendDstEid(tx);
+  return eid === null ? null : USDT0_BY_EID[eid] ?? null;
+}
+/** A Legacy Mesh `send` → its Tron / TON destination, null when the calldata is absent or names another eid. */
+function meshDestination(tx: ChainTx): Usdt0MeshDestination | null {
+  const eid = sendDstEid(tx);
+  return eid !== null && Object.prototype.hasOwnProperty.call(USDT0_MESH_DESTINATION_BY_EID, eid) ? USDT0_MESH_DESTINATION_BY_EID[eid]! : null;
+}
 const lc = (a: string) => a.toLowerCase();
 
 export function describeUsdt0Activity(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null {
+  const mesh = meshSourceFor(tx.chain);
+  if (mesh && matchesCall(tx, [mesh.oft], [USDT0_SEND])) {
+    // As for an OFT send: the native value is the LayerZero fee (plus the refunded headroom), not a swapped asset.
+    const item = describeSwapLike(tx, ctx, {protocol: USDT0_MODULE, subtitle: `USDT0 Legacy Mesh · ${chainLabel(tx.chain)}`, kind: "bridge", outVerb: "Bridged"});
+    if (!item) return null;
+    const native = item.assetsOut.filter((a) => a.token === null).reduce((sum, a) => sum + a.amount, 0n);
+    item.assetsOut = item.assetsOut.filter((a) => a.token !== null);
+    if (native > 0n) item.fee = (item.fee ?? 0n) + native;
+    const srcSym = item.assetsOut[0]?.symbol ?? (mesh.chainId === 42161 ? "USDT0" : "USDT");
+    const dst = meshDestination(tx);
+    if (dst) {
+      item.title = `Bridged ${srcSym} → USDT`;
+      item.subtitle = `USDT0 Legacy Mesh · ${chainLabel(tx.chain)} → ${dst.name}`;
+    } else item.title = `Bridged ${srcSym}`;
+    return item;
+  }
   const chain = USDT0_CHAINS[tx.chain];
   if (!chain) return null;
   const subtitle = `USDT0 · ${chainLabel(tx.chain)}`;
