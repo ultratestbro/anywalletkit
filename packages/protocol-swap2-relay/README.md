@@ -29,7 +29,7 @@ Standalone: `new RelaySwap2Protocol(account, {fromChain: "eip155:42161"})`.
 
 ## What is checked
 
-Every check has a code; a refusal reads `relay: <what was found> [<code>]` and reaches `onRefusal`. Nothing returns a silent null.
+Every check has a code; a refusal reads `relay: <what was found> [<code>]` and reaches `onRefusal`. Nothing returns a silent null. Next to the text, a refusal carries `reason`, a stable `Swap2RefusalReason` from `@anywalletkit/protocol-swap2-core` (on the thrown error, as `onRefusal`'s second argument, and through `relayPins.reasonOf` for the pins' texts): for example `recipient_mismatch` for an order paying or refunding someone else, `vault_mismatch` for a deposit or approval off the pinned depository, `price_check_failed` for a minimum under the floor or the slippage, `quote_expired` for an order older than ten minutes, and Relay's own answers by its `errorCode` or the HTTP status (`rate_limited` with `retryAfterMs`, `key_rejected`, `upstream_unavailable`). A malformed request from the caller carries none.
 
 **The order is the one the deposit names**
 

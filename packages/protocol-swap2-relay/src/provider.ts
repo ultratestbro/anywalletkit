@@ -1,5 +1,6 @@
 import {anySignal, redactUrls, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentState, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {httpRefusal, refusal, refusalOf, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {describeRelayActivity} from "./activity.js";
 import {RELAY_API, relay as relayCfg, relayChain} from "./config.js";
 import {RelayRefusal} from "./order.js";
@@ -78,6 +79,60 @@ export const RELAY_STATUS_MAP: Readonly<Record<string, IntentState>> = Object.fr
   success: "completed", refund: "refunded", refunded: "refunded", failure: "refund-pending",
 });
 
+/**
+ * Relay's error codes that say why there is no quote (`errorCode` of a non-2xx answer, as docs.relay.link lists them
+ * under "handling errors"). They win over the HTTP status except a 429, which keeps its Retry-After; a code not
+ * listed here is read from the status, and failing that a JSON refusal is `no_route`.
+ */
+const RELAY_ERROR_REASONS: Readonly<Record<string, Swap2RefusalReason>> = Object.freeze(Object.assign(Object.create(null) as Record<string, Swap2RefusalReason>, {
+  AMOUNT_TOO_LOW: "amount_too_small",
+  AMOUNT_TOO_HIGH: "amount_too_large",
+  INSUFFICIENT_LIQUIDITY: "insufficient_liquidity",
+  NO_QUOTES: "no_route",
+  NO_SWAP_ROUTES_FOUND: "no_route",
+  NO_INTERNAL_SWAP_ROUTES_FOUND: "no_route",
+  // Relay's own failures: a third-party pricing failure, and the transient codes it says to retry with backoff.
+  SWAP_QUOTE_FAILED: "upstream_unavailable",
+  REQUEST_TIMED_OUT: "upstream_unavailable",
+  RPC_HTTP_ERROR: "upstream_unavailable",
+  PRICE_FETCH_FAILED: "upstream_unavailable",
+  SERVICE_UNAVAILABLE: "upstream_unavailable",
+  // The recipient resolves to a token contract, which cannot receive.
+  INVALID_RECIPIENT: "recipient_mismatch",
+  UNSUPPORTED_CHAIN: "unsupported_pair",
+  UNSUPPORTED_CURRENCY: "unsupported_pair",
+  UNSUPPORTED_ROUTE: "unsupported_pair",
+  UNSUPPORTED_EXECUTION_TYPE: "unsupported_pair",
+  INVALID_INPUT_CURRENCY: "unsupported_pair",
+  INVALID_OUTPUT_CURRENCY: "unsupported_pair",
+  CHAIN_DISABLED: "chain_halted",
+  ROUTE_TEMPORARILY_RESTRICTED: "chain_halted",
+  SWAP_IMPACT_TOO_HIGH: "price_check_failed",
+  UNAUTHORIZED: "key_rejected",
+  UNAUTHORIZED_QUOTE: "key_rejected",
+  FORBIDDEN: "key_rejected",
+}));
+
+/**
+ * Why a non-2xx quote answer refused: a 429 first (its wait), then Relay's own code, then the status, then the body's
+ * shape. `aborted`: the caller's own signal fired, so a body that could not be read is not Relay's failure.
+ */
+function quoteHttpRefusal(res: Response, parsed: unknown, aborted: boolean): Swap2RefusalInfo | undefined {
+  const code = (parsed as RelayQuoteBody | null)?.errorCode;
+  const byCode = typeof code === "string" && Object.prototype.hasOwnProperty.call(RELAY_ERROR_REASONS, code) ? RELAY_ERROR_REASONS[code] : undefined;
+  const byStatus = httpRefusal(res.status, res.headers?.get?.("retry-after"));
+  if (byStatus?.reason === "rate_limited") return byStatus;
+  if (byCode) {
+    if (byStatus?.reason === byCode) return byStatus;
+    // The reasons that carry the status keep it whatever the status was.
+    return byCode === "upstream_unavailable" || byCode === "key_rejected" ? {reason: byCode, httpStatus: res.status} : {reason: byCode};
+  }
+  if (byStatus) return byStatus;
+  // A JSON refusal Relay did not name is a quote it does not have; anything else is an answer of another shape.
+  if (parsed !== null && typeof parsed === "object") return {reason: "no_route"};
+  return aborted ? undefined : {reason: "upstream_unavailable", httpStatus: res.status};
+}
+
 function clip(text: string, max = 240): string {
   const t = redactUrls(text).replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max)}…` : t;
@@ -86,22 +141,22 @@ function clip(text: string, max = 240): string {
 /** The single deposit step of a quote response; an `approve` step is ignored, anything else refuses the quote. */
 function depositStep(body: RelayQuoteBody): {requestId: string; tx: {to?: unknown; data?: unknown; value?: unknown; chainId?: unknown; gas?: unknown}} {
   const steps = body.steps;
-  if (!Array.isArray(steps) || steps.length === 0 || steps.length > 8) throw new RelayRefusal("quote-steps", "the quote has no steps");
+  if (!Array.isArray(steps) || steps.length === 0 || steps.length > 8) throw new RelayRefusal("quote-steps", "the quote has no steps", "upstream_unavailable");
   let found: RelayStep | null = null;
   for (const s of steps as RelayStep[]) {
-    if (s === null || typeof s !== "object") throw new RelayRefusal("quote-steps", "the quote has a malformed step");
+    if (s === null || typeof s !== "object") throw new RelayRefusal("quote-steps", "the quote has a malformed step", "upstream_unavailable");
     if (s.id === "approve") continue; // never used: the approval is built here, for the exact amount, to the pinned depository
-    if (s.id !== "deposit") throw new RelayRefusal("quote-steps", `the quote needs a "${clip(String(s.id), 40)}" step, only a single deposit is signed`);
-    if (found) throw new RelayRefusal("quote-steps", "the quote has more than one deposit step");
+    if (s.id !== "deposit") throw new RelayRefusal("quote-steps", `the quote needs a "${clip(String(s.id), 40)}" step, only a single deposit is signed`, "unsupported_pair");
+    if (found) throw new RelayRefusal("quote-steps", "the quote has more than one deposit step", "unsupported_pair");
     found = s;
   }
-  if (!found) throw new RelayRefusal("quote-steps", "the quote has no deposit step");
+  if (!found) throw new RelayRefusal("quote-steps", "the quote has no deposit step", "upstream_unavailable");
   const items = found.items;
-  if (!Array.isArray(items) || items.length !== 1) throw new RelayRefusal("quote-steps", "the deposit step is not a single transaction");
+  if (!Array.isArray(items) || items.length !== 1) throw new RelayRefusal("quote-steps", "the deposit step is not a single transaction", "unsupported_pair");
   const data = (items[0] as {data?: unknown} | null)?.data;
-  if (data === null || typeof data !== "object") throw new RelayRefusal("quote-steps", "the deposit step has no transaction");
+  if (data === null || typeof data !== "object") throw new RelayRefusal("quote-steps", "the deposit step has no transaction", "upstream_unavailable");
   const requestId = typeof found.requestId === "string" ? found.requestId.toLowerCase() : "";
-  if (!REQUEST_ID.test(requestId)) throw new RelayRefusal("quote-steps", "the quote has no request id to track the deposit by");
+  if (!REQUEST_ID.test(requestId)) throw new RelayRefusal("quote-steps", "the quote has no request id to track the deposit by", "upstream_unavailable");
   return {requestId, tx: data as never};
 }
 
@@ -140,14 +195,14 @@ export function relayProvider(config: RelayProviderConfig = {}): CrossChainProvi
     };
     // The pricing placeholder is never a party to a deposit, whatever flags the quote object carries.
     if (sealed.depositor.toLowerCase() === EVM_PLACEHOLDER.toLowerCase() || sealed.recipient.toLowerCase() === EVM_PLACEHOLDER.toLowerCase()) {
-      throw new RelayRefusal("request-invalid", "a quote priced without the real addresses is never built or signed — quote again with them");
+      throw new RelayRefusal("request-invalid", "a quote priced without the real addresses is never built or signed — quote again with them", "policy_refused");
     }
     const mine = issued.get(quote.intentId);
     if (!mine) return sealed;
     const same = mine.sourceChain === sealed.sourceChain && mine.destChain === sealed.destChain && mine.amount === sealed.amount
       && mine.sourceToken.toLowerCase() === sealed.sourceToken.toLowerCase() && mine.destToken.toLowerCase() === sealed.destToken.toLowerCase()
       && mine.depositor.toLowerCase() === sealed.depositor.toLowerCase() && mine.recipient.toLowerCase() === sealed.recipient.toLowerCase();
-    if (!same) throw new RelayRefusal("request-invalid", "the quote no longer says what was asked when it was issued — quote again");
+    if (!same) throw new RelayRefusal("request-invalid", "the quote no longer says what was asked when it was issued — quote again", "policy_refused");
     return mine;
   }
 
@@ -166,7 +221,7 @@ export function relayProvider(config: RelayProviderConfig = {}): CrossChainProvi
     supportsRoute: (from: Asset, to: Asset) => relayCfg.supports(from.chain, to.chain),
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
-      const refuse = (reason: string) => { params.onRefusal?.(reason); return null; };
+      const refuse = (reason: string, info?: Swap2RefusalInfo) => { params.onRefusal?.(reason, info); return null; };
       const dry = params.dry !== false;
       // Only a quote priced with the placeholder is unbuildable; one asked with real addresses is a real order.
       const placeholder = dry && (!params.destAddress || !params.refundAddress);
@@ -175,7 +230,7 @@ export function relayProvider(config: RelayProviderConfig = {}): CrossChainProvi
         // The placeholder prices a dry quote; a live one without addresses is refused.
         request = relayRequestOf(params, dry ? {placeholder: EVM_PLACEHOLDER} : {});
       } catch (err) {
-        if (err instanceof RelayRefusal) return refuse(err.message);
+        if (err instanceof RelayRefusal) return refuse(err.message, refusalOf(err));
         throw err;
       }
       const src = relayChain(request.sourceChain)!;
@@ -206,12 +261,15 @@ export function relayProvider(config: RelayProviderConfig = {}): CrossChainProvi
         if (!res.ok) {
           const e = (parsed ?? {}) as RelayQuoteBody;
           const why = typeof e.message === "string" ? clip(e.message) : `HTTP ${res.status}`;
-          return refuse(`relay: no quote — ${typeof e.errorCode === "string" ? `${clip(e.errorCode, 60)}: ` : ""}${why}`);
+          return refuse(`relay: no quote — ${typeof e.errorCode === "string" ? `${clip(e.errorCode, 60)}: ` : ""}${why}`, quoteHttpRefusal(res, parsed, signal?.aborted === true));
         }
-        if (parsed === null || typeof parsed !== "object") return refuse("relay: the quote response is not JSON");
+        // A body cut off by the caller's own abort is not Relay's failure.
+        if (parsed === null || typeof parsed !== "object") return refuse("relay: the quote response is not JSON", signal?.aborted ? undefined : {reason: "upstream_unavailable"});
         body = parsed as RelayQuoteBody;
       } catch (err) {
-        return refuse(`relay: quote request failed — ${clip(err instanceof Error ? err.message : String(err))}`);
+        // The network, or this module's own timeout; the caller's own abort is not Relay's failure.
+        const info = refusalOf(err) ?? (signal?.aborted ? undefined : {reason: "upstream_unavailable" as const});
+        return refuse(`relay: quote request failed — ${clip(err instanceof Error ? err.message : String(err))}`, info);
       }
 
       try {
@@ -221,8 +279,8 @@ export function relayProvider(config: RelayProviderConfig = {}): CrossChainProvi
         // Extras this module never asks for. Each lowers the output inside a genuine order; the response's own account
         // of them is only a hint (an answering side that adds one can also hide it), so this refuses the honest case.
         const extra = (x: unknown): boolean => x !== undefined && x !== null && x !== "0" && x !== 0;
-        if (extra(body.fees?.app?.amount)) throw new RelayRefusal("app-fee", "the quote charges an app fee this module did not ask for");
-        if (extra(body.details?.currencyGasTopup?.amount)) throw new RelayRefusal("gas-topup", "the quote converts part of the output into a gas top-up this module did not ask for");
+        if (extra(body.fees?.app?.amount)) throw new RelayRefusal("app-fee", "the quote charges an app fee this module did not ask for", "policy_refused");
+        if (extra(body.details?.currencyGasTopup?.amount)) throw new RelayRefusal("gas-topup", "the quote converts part of the output into a gas top-up this module did not ask for", "policy_refused");
         const native = v.deposit.approvalAddress === undefined;
         const floor = native ? GAS_FLOOR_NATIVE : GAS_FLOOR_ERC20;
         const apiGas = typeof step.tx.gas === "string" && /^[1-9]\d{0,9}$/.test(step.tx.gas) ? BigInt(step.tx.gas) * 2n : 0n;
@@ -282,16 +340,16 @@ export function relayProvider(config: RelayProviderConfig = {}): CrossChainProvi
           },
         };
       } catch (err) {
-        if (err instanceof RelayRefusal) return refuse(err.message);
-        return refuse(`relay: unreadable quote — ${clip(err instanceof Error ? err.message : String(err))}`);
+        if (err instanceof RelayRefusal) return refuse(err.message, refusalOf(err));
+        return refuse(`relay: unreadable quote — ${clip(err instanceof Error ? err.message : String(err))}`, refusalOf(err) ?? {reason: "upstream_unavailable"});
       }
     },
 
     /** The quote's own transaction — after the order it carries has been verified once more. */
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
       const tx = quote.txRequest;
-      if (!tx || !quote.intentId.startsWith(INTENT_PREFIX)) throw new Error("swap2: Relay quote has no transaction request");
-      if (quote.providerData?.placeholder === "1") throw new RelayRefusal("request-invalid", "a quote priced without the real addresses is never built — quote again with them");
+      if (!tx || !quote.intentId.startsWith(INTENT_PREFIX)) throw refusal("policy_refused", "swap2: Relay quote has no transaction request");
+      if (quote.providerData?.placeholder === "1") throw new RelayRefusal("request-invalid", "a quote priced without the real addresses is never built — quote again with them", "policy_refused");
       const request = requestOf(quote);
       const v = checkRelayQuote(request, quote);
       return {
@@ -310,15 +368,15 @@ export function relayProvider(config: RelayProviderConfig = {}): CrossChainProvi
      * and the exact transaction about to be signed — and each order is cleared for one deposit only.
      */
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
-      if (quote.providerData?.placeholder === "1") throw new RelayRefusal("request-invalid", "a quote priced without the real addresses is never signed");
+      if (quote.providerData?.placeholder === "1") throw new RelayRefusal("request-invalid", "a quote priced without the real addresses is never signed", "policy_refused");
       const request = requestOf(quote);
-      if (tx.chain !== request.sourceChain) throw new RelayRefusal("tx-chain", `the deposit is for ${tx.chain}, not ${request.sourceChain}`);
+      if (tx.chain !== request.sourceChain) throw new RelayRefusal("tx-chain", `the deposit is for ${tx.chain}, not ${request.sourceChain}`, "vault_mismatch");
       if (tx.serializedTx !== undefined || tx.memo !== undefined || tx.typedData !== undefined || tx.bodyBoc !== undefined) {
-        throw new RelayRefusal("quote-shape", "a Relay deposit is one EVM call");
+        throw new RelayRefusal("quote-shape", "a Relay deposit is one EVM call", "policy_refused");
       }
       const v = checkRelayQuote(request, quote, tx);
       const store = config.clearedStore;
-      if (store && await store.has(v.id)) throw new RelayRefusal("order-reused", `order ${v.id} was already cleared for a deposit — quote again`);
+      if (store && await store.has(v.id)) throw new RelayRefusal("order-reused", `order ${v.id} was already cleared for a deposit — quote again`, "policy_refused");
       relayClearOrder(v.id, "sign");
       // Kept until the order's own deadline: a deposit for it is never signed twice, restart or not.
       if (store) await store.add(v.id, v.order.output.deadline * 1000);

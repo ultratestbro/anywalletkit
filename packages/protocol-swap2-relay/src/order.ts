@@ -11,6 +11,7 @@
  * to terms the device has seen.
  */
 import {secp256k1} from "@noble/curves/secp256k1.js";
+import {withReason, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {hashMessage, hashStruct, hexToBytes, keccak256, type Hex} from "viem";
 
 /** Why an order, a quote or a deposit was refused. One code per check; the message says what was found. */
@@ -63,12 +64,20 @@ export type RelayRefusalCode =
   | "quote-approval"
   | "quote-shape";
 
+/**
+ * `code` names the check; `reason` (a `Swap2RefusalReason` from `@anywalletkit/protocol-swap2-core`) is the stable
+ * classification an app switches on. It is set where the refusal is raised, so one code can carry different reasons
+ * (an order deadline too far ahead is `policy_refused`, one already used up is `quote_expired`); a malformed request
+ * from the caller (a programming error) carries none.
+ */
 export class RelayRefusal extends Error {
   readonly code: RelayRefusalCode;
-  constructor(code: RelayRefusalCode, detail: string) {
+  declare readonly reason?: Swap2RefusalReason;
+  constructor(code: RelayRefusalCode, detail: string, reason?: Swap2RefusalReason) {
     super(`relay: ${detail} [${code}]`);
     this.name = "RelayRefusal";
     this.code = code;
+    if (reason !== undefined) withReason(this, reason);
   }
 }
 
@@ -142,7 +151,8 @@ const MAX_BYTES_HEX = 2 + 2 * 1024;
 const MAX_TEXT = 64;
 const U256_MAX = (1n << 256n) - 1n;
 
-const bad = (what: string): never => { throw new RelayRefusal("order-malformed", `the order's ${what}`); };
+// The answer is not the documented shape.
+const bad = (what: string): never => { throw new RelayRefusal("order-malformed", `the order's ${what}`, "upstream_unavailable"); };
 
 function rec(v: unknown, what: string): Record<string, unknown> {
   if (v === null || typeof v !== "object" || Array.isArray(v)) bad(`${what} is not an object`);
