@@ -1,5 +1,6 @@
 import {decodeErrorResult, decodeFunctionData, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
 import {evmRef, isEvm, timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
+import {httpRefusal, refusal, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {describeFyndActivity} from "./activity.js";
 import {FYND_CHAINS, ROUTER_NATIVE, TYCHO_ROUTER_ABI, checkFyndTransaction} from "./router.js";
@@ -39,6 +40,17 @@ const QUOTE_FAILURES: Readonly<Record<string, string>> = {
   price_check_failed: "the price guard rejected the route",
   encoding_failed: "could not encode the swap (fees + slippage leave nothing)",
 };
+/** The refusal reason of each solver failure in {@link QUOTE_FAILURES}; another status stays unclassified. */
+const QUOTE_FAILURE_REASONS: Readonly<Record<string, Swap2RefusalReason>> = {
+  no_route_found: "no_route",
+  insufficient_liquidity: "insufficient_liquidity",
+  timeout: "upstream_unavailable",
+  not_ready: "stale_node",
+  price_check_failed: "price_check_failed",
+  encoding_failed: "amount_too_small",
+};
+const quoteFailureReason = (status: unknown): Swap2RefusalReason | undefined =>
+  typeof status === "string" && Object.prototype.hasOwnProperty.call(QUOTE_FAILURE_REASONS, status) ? QUOTE_FAILURE_REASONS[status] : undefined;
 
 export interface FyndProviderConfig {
   enabled?: boolean;
@@ -144,7 +156,11 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
     for (const url of config.rpcUrls?.[chainId] ?? []) {
       try {
         const res = await fetch(url, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({jsonrpc: "2.0", id: 1, method, params}), signal: timeoutSignal(12_000)});
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const error = new Error(`HTTP ${res.status}`);
+          const info = httpRefusal(res.status, res.headers?.get?.("retry-after"));
+          throw info ? withReason(error, info) : error;
+        }
         const body = (await res.json()) as {result?: unknown; error?: {message?: string; data?: unknown}};
         if (body.error) throw Object.assign(new Error(body.error.message ?? "rpc error"), {rpc: true, data: body.error.data});
         return body.result ?? null;
@@ -153,28 +169,29 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
         lastErr = e;
       }
     }
-    throw new Error(`fynd: no RPC answered on chain ${chainId} (${lastErr instanceof Error ? lastErr.message : String(lastErr)})`);
+    // Every endpoint failed: the last one's own classification (a 429, a rejected key), else unavailable.
+    throw withReason(new Error(`fynd: no RPC answered on chain ${chainId} (${lastErr instanceof Error ? lastErr.message : String(lastErr)})`), refusalOf(lastErr) ?? "upstream_unavailable");
   }
 
   /**
    * Why the quoted swap reverts for `sender` now, as the refusal the wallet shows. The price moved only when the
    * router says so (`TychoRouter__NegativeSlippage`); otherwise the input side is read first — a balance under the
    * amount, or an approval the RPC does not see yet, reverts before any pool is touched — and anything else is
-   * named neutrally with the revert's reason.
+   * named neutrally with the revert's reason. The price is `price_check_failed`; the rest reverted in simulation.
    */
-  async function revertReason(chainId: number, sender: string, quoted: NonNullable<Quote["txRequest"]>, e: unknown): Promise<string> {
+  async function revertReason(chainId: number, sender: string, quoted: NonNullable<Quote["txRequest"]>, e: unknown): Promise<Error> {
     const revert = routerRevert(e);
     if (revert?.name === "TychoRouter__NegativeSlippage") {
       const [out, min] = revert.args as readonly bigint[];
       const pays = typeof out === "bigint" && typeof min === "bigint" ? ` — the route now pays ${out}, under your minimum ${min}` : "";
-      return `fynd: the price moved past your minimum${pays}. Nothing was sent; refresh the quote.`;
+      return refusal("price_check_failed", `fynd: the price moved past your minimum${pays}. Nothing was sent; refresh the quote.`);
     }
     const short = await inputShortfall(chainId, sender, quoted).catch(() => null);
-    if (short) return short;
+    if (short) return refusal("simulation_failed", short);
     const why = revert
       ? revert.name === "Error" && typeof revert.args[0] === "string" ? revert.args[0].slice(0, 120) : `${revert.name}${revert.args.length ? `(${revert.args.map(String).join(", ").slice(0, 100)})` : ""}`
       : e instanceof Error ? e.message.slice(0, 120) : "revert";
-    return `fynd: the swap would revert now (${why}). Nothing was sent; refresh the quote.`;
+    return refusal("simulation_failed", `fynd: the swap would revert now (${why}). Nothing was sent; refresh the quote.`);
   }
 
   /** The wallet's side of a revert: the input balance under the amount, or (ERC-20) the router's allowance under it. Null when both cover it. */
@@ -209,23 +226,23 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
     supportsRoute: (from: Asset, to: Asset) => from.chain === to.chain && chainIdOf(from.chain) !== null,
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
-      const refuse = (why: string): null => {
-        params.onRefusal?.(`fynd: ${why}`);
+      const refuse = (why: string, info?: Swap2RefusalReason | Swap2RefusalInfo): null => {
+        params.onRefusal?.(`fynd: ${why}`, typeof info === "string" ? {reason: info} : info);
         return null;
       };
-      if (params.flex) return refuse("amount-flexible deposits are not supported");
-      if (params.sourceChain !== params.destChain) return refuse("same-chain swaps only");
+      if (params.flex) return refuse("amount-flexible deposits are not supported", "unsupported_pair");
+      if (params.sourceChain !== params.destChain) return refuse("same-chain swaps only", "unsupported_pair");
       const chainId = chainIdOf(params.sourceChain);
-      if (chainId === null) return refuse(`Fynd is not configured for ${params.sourceChain}`);
+      if (chainId === null) return refuse(`Fynd is not configured for ${params.sourceChain}`, "unsupported_pair");
       const ep = endpoint(chainId)!;
       const src = sourceAssetOf(params);
-      if (!src) return refuse(`unknown source token ${params.sourceToken}`);
+      if (!src) return refuse(`unknown source token ${params.sourceToken}`, "unsupported_pair");
       const tokenIn = src.contract ? getAddress(src.contract) : ZERO;
       const nativeOut = /^0x0+$/.test(params.destToken);
-      if (!nativeOut && !/^0x[0-9a-fA-F]{40}$/.test(params.destToken)) return refuse("destination token must be an EVM address");
+      if (!nativeOut && !/^0x[0-9a-fA-F]{40}$/.test(params.destToken)) return refuse("destination token must be an EVM address", "unsupported_pair");
       const tokenOut = nativeOut ? ZERO : getAddress(params.destToken);
-      if (tokenIn === tokenOut) return refuse("same token in and out");
-      if (!/^0x[0-9a-fA-F]{40}$/.test(params.destAddress)) return refuse("recipient must be an EVM address");
+      if (tokenIn === tokenOut) return refuse("same token in and out", "unsupported_pair");
+      if (!/^0x[0-9a-fA-F]{40}$/.test(params.destAddress)) return refuse("recipient must be an EVM address", "recipient_mismatch");
       const receiver = getAddress(params.destAddress);
       const sender = getAddress(params.refundAddress && /^0x[0-9a-fA-F]{40}$/.test(params.refundAddress) ? params.refundAddress : params.destAddress);
       let amountIn: bigint;
@@ -236,7 +253,7 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
       }
       if (amountIn <= 0n) return refuse("amount must be positive");
       const bps = params.slippageBps ?? slippageDefault;
-      if (!Number.isInteger(bps) || bps <= 0 || bps >= 10_000) return refuse("invalid slippage");
+      if (!Number.isInteger(bps) || bps <= 0 || bps >= 10_000) return refuse("invalid slippage", "price_check_failed");
 
       const body = {
         orders: [{token_in: tokenIn, token_out: tokenOut, amount: amountIn.toString(), side: "sell", sender, receiver}],
@@ -250,21 +267,24 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
       try {
         res = await fetch(ep.url, {method: "POST", headers: {"content-type": "application/json", ...ep.headers}, body: JSON.stringify(body), signal: signal ?? timeoutSignal(timeoutMs)});
       } catch (e) {
-        return refuse(`API unreachable (${e instanceof Error ? e.name : "error"})`);
+        // The network or this module's own timeout; the caller's abort is not the API's failure.
+        return refuse(`API unreachable (${e instanceof Error ? e.name : "error"})`, signal?.aborted ? undefined : "upstream_unavailable");
       }
-      if (res.status === 401 || res.status === 403) return refuse(`API key rejected (HTTP ${res.status})`);
-      if (res.status === 429) return refuse("rate limited (HTTP 429)");
-      if (res.status === 422) return refuse("no route for this pair");
-      if (!res.ok) return refuse(`API answered HTTP ${res.status}`);
+      if (res.status === 401 || res.status === 403) return refuse(`API key rejected (HTTP ${res.status})`, httpRefusal(res.status));
+      if (res.status === 429) return refuse("rate limited (HTTP 429)", httpRefusal(res.status, res.headers?.get?.("retry-after")));
+      if (res.status === 422) return refuse("no route for this pair", "no_route");
+      // 408 / 425 / 5xx: unavailable; another 4xx says nothing without the body (a 404 is a misconfigured URL).
+      if (!res.ok) return refuse(`API answered HTTP ${res.status}`, httpRefusal(res.status, res.headers?.get?.("retry-after")));
       let parsed: {orders?: FyndOrderQuote[]};
       try {
         parsed = (await res.json()) as {orders?: FyndOrderQuote[]};
       } catch {
-        return refuse("malformed API response");
+        // The body failed to read or parse; the caller aborting mid-read is not the API's failure.
+        return refuse("malformed API response", signal?.aborted ? undefined : "upstream_unavailable");
       }
-      if (!Array.isArray(parsed.orders) || parsed.orders.length !== 1) return refuse("malformed API response (order count)");
+      if (!Array.isArray(parsed.orders) || parsed.orders.length !== 1) return refuse("malformed API response (order count)", "upstream_unavailable");
       const q = parsed.orders[0]!;
-      if (q.status !== "success") return refuse(QUOTE_FAILURES[q.status ?? ""] ?? `quote status ${String(q.status).slice(0, 40)}`);
+      if (q.status !== "success") return refuse(QUOTE_FAILURES[q.status ?? ""] ?? `quote status ${String(q.status).slice(0, 40)}`, quoteFailureReason(q.status));
 
       const quotedIn = uint(q.amount_in);
       const gross = uint(q.amount_out);
@@ -274,21 +294,21 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
       const minOut = uint(q.fee_breakdown?.min_amount_received);
       const value = uint(q.transaction?.value ?? "");
       if (quotedIn === null || gross === null || routerFee === null || clientFee === null || maxSlippage === null || minOut === null || value === null) {
-        return refuse("malformed quote amounts");
+        return refuse("malformed quote amounts", "upstream_unavailable");
       }
-      if (quotedIn !== amountIn) return refuse(`quoted ${quotedIn}, not the requested ${amountIn}`);
-      if (clientFee !== 0n) return refuse("the quote carries a client fee");
-      if (routerFee + clientFee + maxSlippage + minOut !== gross) return refuse("fee breakdown does not add up to the output");
-      if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) return refuse(`floor breach (min=${minOut} < floor=${params.minAmountOut})`);
+      if (quotedIn !== amountIn) return refuse(`quoted ${quotedIn}, not the requested ${amountIn}`, "price_check_failed");
+      if (clientFee !== 0n) return refuse("the quote carries a client fee", "policy_refused");
+      if (routerFee + clientFee + maxSlippage + minOut !== gross) return refuse("fee breakdown does not add up to the output", "price_check_failed");
+      if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) return refuse(`floor breach (min=${minOut} < floor=${params.minAmountOut})`, "price_check_failed");
       const tx = {to: q.transaction?.to ?? "", value, data: q.transaction?.data ?? ""};
       try {
         checkFyndTransaction(tx, {chainId, tokenIn, tokenOut, amountIn, receiver, expectedAmountOut: gross, minAmountOut: minOut});
       } catch (e) {
-        return refuse(e instanceof Error ? e.message.replace(/^fynd: /, "") : String(e));
+        return refuse(e instanceof Error ? e.message.replace(/^fynd: /, "") : String(e), refusalOf(e));
       }
       const allProtocols = [...new Set((q.route?.swaps ?? []).map((s) => s.protocol).filter((p): p is string => typeof p === "string"))];
       const banned = allProtocols.find(isExcluded);
-      if (banned) return refuse(`the route goes through ${protocolName(banned)}, which this wallet excludes`);
+      if (banned) return refuse(`the route goes through ${protocolName(banned)}, which this wallet excludes`, "policy_refused");
       // Native input needs no allowance: the exact transaction can be executed
       // against the latest block right now, so a route that would revert never
       // enters the auction. (ERC-20 input is simulated in preflightDeposit,
@@ -297,7 +317,7 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
         try {
           await rpc(chainId, "eth_call", [{from: sender, to: tx.to, data: tx.data, value: `0x${value.toString(16)}`}, "latest", {[sender]: {balance: `0x${(value + 10n ** 18n).toString(16)}`}}]);
         } catch (e) {
-          if ((e as {rpc?: boolean}).rpc) return refuse(`the route does not execute on-chain right now (simulation reverted via ${allProtocols.slice(0, 6).map(protocolName).join(", ") || "?"})`);
+          if ((e as {rpc?: boolean}).rpc) return refuse(`the route does not execute on-chain right now (simulation reverted via ${allProtocols.slice(0, 6).map(protocolName).join(", ") || "?"})`, "simulation_failed");
           // no RPC answered: the router still enforces the minimum
         }
       }
@@ -348,19 +368,19 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
       if (!FYND_CHAINS[chainId] || !config.rpcUrls?.[chainId]?.length || !tx.data || !sender) return;
       const quoted = quote.txRequest;
       if (!quoted?.to || !quoted.data || !sameText(tx.to, quoted.to) || !sameText(tx.data, quoted.data) || !sameAmount(tx.value || "0", quoted.value ?? "0")) {
-        throw new Error("fynd: the transaction is not the quoted swap. Nothing was sent; refresh the quote.");
+        throw refusal("policy_refused", "fynd: the transaction is not the quoted swap. Nothing was sent; refresh the quote.");
       }
       try {
         await rpc(chainId, "eth_call", [{from: sender, to: quoted.to, data: quoted.data, value: `0x${BigInt(quoted.value ?? "0").toString(16)}`}, "latest"]);
       } catch (e) {
-        if ((e as {rpc?: boolean}).rpc) throw new Error(await revertReason(chainId, sender, quoted, e));
+        if ((e as {rpc?: boolean}).rpc) throw await revertReason(chainId, sender, quoted, e);
         // no RPC answered: leave it to the router's own minimum
       }
     },
 
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
       const tx = quote.txRequest;
-      if (!tx?.to || !tx.data) throw new Error("swap2: Fynd quote has no transaction request");
+      if (!tx?.to || !tx.data) throw refusal("policy_refused", "swap2: Fynd quote has no transaction request");
       return {chain: "", to: tx.to, value: tx.value ?? "0", data: tx.data, ...(tx.chainId !== undefined ? {chainId: tx.chainId} : {}), ...(tx.gasLimit ? {gasLimit: tx.gasLimit} : {}), ...(tx.approvalAddress ? {approvalAddress: tx.approvalAddress} : {})};
     },
 

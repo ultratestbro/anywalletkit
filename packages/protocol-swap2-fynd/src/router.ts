@@ -10,6 +10,7 @@
  */
 import type {Quote, QuoteParams, RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
+import {refusalNotes, refusalOf, withReason, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {decodeFunctionData, getAddress, parseAbi, toFunctionSelector, type Hex} from "viem";
 
 /** Router registry: github.com/propeller-heads/tycho crates/tycho-execution/config/deployment_registry.json (TychoRouterV3, effective 2026-09-01). */
@@ -59,6 +60,10 @@ export class FyndTransactionError extends Error {
     this.name = "FyndTransactionError";
   }
 }
+/** A {@link FyndTransactionError} tagged with its refusal reason (class, name and text unchanged). */
+const fail = (message: string, reason: Swap2RefusalReason): FyndTransactionError => withReason(new FyndTransactionError(message), reason);
+/** The reasons of the texts {@link fyndVerifyQuote} returned, for `fyndPins.reasonOf`. */
+const notes = refusalNotes();
 
 export interface ExpectedSwap {
   chainId: number;
@@ -91,22 +96,22 @@ const routerToken = (t: string) => (sameAddress(t, ZERO) ? ROUTER_NATIVE : t);
 /** Refuses (throws {@link FyndTransactionError}) unless `tx` is exactly the swap the wallet asked for. */
 export function checkFyndTransaction(tx: EncodedTx, expected: ExpectedSwap): {method: "singleSwap" | "sequentialSwap" | "splitSwap"} {
   const chain = FYND_CHAINS[expected.chainId];
-  if (!chain) throw new FyndTransactionError(`chain ${expected.chainId} has no pinned Tycho router`);
+  if (!chain) throw fail(`chain ${expected.chainId} has no pinned Tycho router`, "unsupported_pair");
   // `tx.to` is the API's: named in the refusal only when it is an address (scan 2026-10-27 modules, F34).
-  if (!sameAddress(tx.to, chain.router)) throw new FyndTransactionError(`the transaction targets ${/^0x[0-9a-fA-F]{40}$/.test(tx.to) ? tx.to : "something that is not an address"}, not the Tycho router on ${chain.name}`);
-  if (sameAddress(expected.receiver, ZERO) || sameAddress(expected.receiver, chain.router)) throw new FyndTransactionError("invalid receiver");
+  if (!sameAddress(tx.to, chain.router)) throw fail(`the transaction targets ${/^0x[0-9a-fA-F]{40}$/.test(tx.to) ? tx.to : "something that is not an address"}, not the Tycho router on ${chain.name}`, "vault_mismatch");
+  if (sameAddress(expected.receiver, ZERO) || sameAddress(expected.receiver, chain.router)) throw fail("invalid receiver", "recipient_mismatch");
   if (expected.amountIn <= 0n || expected.minAmountOut <= 0n || expected.minAmountOut > expected.expectedAmountOut) {
-    throw new FyndTransactionError("invalid quote amounts");
+    throw fail("invalid quote amounts", "price_check_failed");
   }
   const nativeIn = sameAddress(expected.tokenIn, ZERO);
-  if (tx.value !== (nativeIn ? expected.amountIn : 0n)) throw new FyndTransactionError("native value does not match the input");
-  if (!/^0x(?:[0-9a-fA-F]{2}){4,}$/.test(tx.data)) throw new FyndTransactionError("malformed calldata");
+  if (tx.value !== (nativeIn ? expected.amountIn : 0n)) throw fail("native value does not match the input", "price_check_failed");
+  if (!/^0x(?:[0-9a-fA-F]{2}){4,}$/.test(tx.data)) throw fail("malformed calldata", "policy_refused");
 
   let call: ReturnType<typeof decodeFunctionData<typeof TYCHO_ROUTER_ABI>>;
   try {
     call = decodeFunctionData({abi: TYCHO_ROUTER_ABI, data: tx.data as Hex});
   } catch {
-    throw new FyndTransactionError("not a plain singleSwap / sequentialSwap / splitSwap call (Permit2 and vault variants are not used)");
+    throw fail("not a plain singleSwap / sequentialSwap / splitSwap call (Permit2 and vault variants are not used)", "policy_refused");
   }
   const a = call.args;
   const [amountIn, tokenIn, tokenOut, expectedAmountOut, minAmountOut] = a;
@@ -114,18 +119,18 @@ export function checkFyndTransaction(tx: EncodedTx, expected: ExpectedSwap): {me
   const receiver = (isSplit ? a[6] : a[5]) as string;
   const fee = (isSplit ? a[7] : a[6]) as {clientFeeBps: number; clientFeeReceiver: string; maxClientContribution: bigint; deadline: bigint; clientSignature: string};
   const swaps = (isSplit ? a[8] : a[7]) as string;
-  if (amountIn !== expected.amountIn) throw new FyndTransactionError(`calldata spends ${amountIn}, not ${expected.amountIn}`);
+  if (amountIn !== expected.amountIn) throw fail(`calldata spends ${amountIn}, not ${expected.amountIn}`, "price_check_failed");
   if (!sameAddress(tokenIn, routerToken(expected.tokenIn)) || !sameAddress(tokenOut, routerToken(expected.tokenOut))) {
-    throw new FyndTransactionError("calldata swaps other tokens than requested");
+    throw fail("calldata swaps other tokens than requested", "policy_refused");
   }
-  if (!sameAddress(receiver, expected.receiver)) throw new FyndTransactionError(`calldata pays ${receiver}, not ${expected.receiver}`);
+  if (!sameAddress(receiver, expected.receiver)) throw fail(`calldata pays ${receiver}, not ${expected.receiver}`, "recipient_mismatch");
   if (expectedAmountOut !== expected.expectedAmountOut || minAmountOut !== expected.minAmountOut) {
-    throw new FyndTransactionError("calldata amounts do not match the quote");
+    throw fail("calldata amounts do not match the quote", "price_check_failed");
   }
   if (fee.clientFeeBps !== 0 || fee.maxClientContribution !== 0n || !sameAddress(fee.clientFeeReceiver, ZERO)) {
-    throw new FyndTransactionError("calldata carries client-fee parameters — this module charges none");
+    throw fail("calldata carries client-fee parameters — this module charges none", "policy_refused");
   }
-  if (swaps === "0x" || (isSplit && (a[5] as bigint) < 2n)) throw new FyndTransactionError("empty or invalid route");
+  if (swaps === "0x" || (isSplit && (a[5] as bigint) < 2n)) throw fail("empty or invalid route", "policy_refused");
   return {method: call.functionName};
 }
 
@@ -136,13 +141,13 @@ export function checkFyndTransaction(tx: EncodedTx, expected: ExpectedSwap): {me
  */
 export function fyndVerifyQuote(params: QuoteParams, quote: Quote): string | null {
   // Fynd swaps on one chain; a source-chain swap must not answer a cross-chain request (reaudit 2026-10-30, #3).
-  if (params.sourceChain !== params.destChain) return "same-chain swaps only";
+  if (params.sourceChain !== params.destChain) return notes.note("same-chain swaps only", "unsupported_pair");
   try {
     const chainId = /^eip155:[0-9]+$/.test(params.sourceChain) ? Number(params.sourceChain.slice(7)) : NaN;
     const src = sourceAssetOf(params);
-    if (!src) return `unknown source token ${params.sourceToken}`;
+    if (!src) return notes.note(`unknown source token ${params.sourceToken}`, "unsupported_pair");
     const tx = quote.txRequest;
-    if (!tx?.to || !tx.data) return "the quote carries no router transaction";
+    if (!tx?.to || !tx.data) return notes.note("the quote carries no router transaction", "policy_refused");
     checkFyndTransaction({to: tx.to, data: tx.data, value: BigInt(tx.value ?? "0")}, {
       chainId,
       tokenIn: src.contract ? getAddress(src.contract) : ZERO,
@@ -154,7 +159,10 @@ export function fyndVerifyQuote(params: QuoteParams, quote: Quote): string | nul
     });
     return null;
   } catch (e) {
-    return e instanceof Error ? e.message.replace(/^fynd: /, "") : String(e);
+    const text = e instanceof Error ? e.message.replace(/^fynd: /, "") : String(e);
+    // checkFyndTransaction's refusals are classified; a request or quote that does not parse is not.
+    const info = refusalOf(e);
+    return info ? notes.note(text, info) : text;
   }
 }
 
@@ -162,12 +170,13 @@ export function fyndVerifyQuote(params: QuoteParams, quote: Quote): string | nul
  * The Tycho router a Fynd swap calls and approves on a chain, and {@link fyndVerifyQuote} — the
  * app's side of `remoteProvider({name: "fynd", baseUrl, ...fyndPins})`, so a backend's quote is
  * checked against these routers and the app's own request, never against itself (scan 2026-10-27
- * modules, F9).
+ * modules, F9). `reasonOf` classifies the texts `fyndVerifyQuote` returned, so the remote stub's refusal carries a reason.
  */
 export const fyndPins: RemotePins = Object.freeze({
   callTargets: (chain: string): readonly string[] => fyndRouterFor(chain),
   spenders: (chain: string): readonly string[] => fyndRouterFor(chain),
   verifyQuote: fyndVerifyQuote,
+  reasonOf: (refusal: string) => notes.reasonOf(refusal),
 });
 function fyndRouterFor(chain: string): readonly string[] {
   const id = /^eip155:[0-9]+$/.test(chain) ? Number(chain.slice(7)) : NaN;
