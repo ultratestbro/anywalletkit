@@ -3,6 +3,7 @@ import {bigintToNumber} from "@anywalletkit/core";
 import {ccAssetByToken} from "@anywalletkit/swap2-assets";
 import {sourceAssetOf, tonRawAddress} from "@anywalletkit/protocol-swap2-core/util";
 import type {Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {refusalOf, withReason, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {Slice, parseBoc, snakeHex, type TonCell} from "./boc.js";
 import {
   SYMBIOSIS_AGGREGATORS, SYMBIOSIS_CHAINS, SYMBIOSIS_HOST, SYMBIOSIS_HOST_CHAIN_ID, SYMBIOSIS_REVERTER, SYMBIOSIS_TON_CHAIN_ID, SYMBIOSIS_TON_PORTAL_RAW,
@@ -10,6 +11,7 @@ import {
   account20, gatewayAddress, symbiosisChain, symbiosisToken, tronToEvm, validAddress, type SymbiosisChain,
 } from "./config.js";
 import {SYMBIOSIS_HOST_META_ROUTER, SYMBIOSIS_POOLS, SYMBIOSIS_SYNTHS} from "./pools.js";
+import {notes, noted} from "./reasons.js";
 
 /**
  * What a Symbiosis source transaction is allowed to be — checked on the device, from the bytes the
@@ -196,7 +198,8 @@ export interface SymbiosisVerifyOptions {
 }
 
 class Refusal extends Error {}
-const refuse = (reason: string): never => { throw new Refusal(reason); };
+/** Throws the refusal, its text as it reads, classified (`Swap2RefusalReason`). */
+const refuse = (reason: string, why: Swap2RefusalReason): never => { throw withReason(new Refusal(reason), why); };
 const lower = (a: string) => a.toLowerCase();
 const same = (a: string, b: string | null | undefined) => typeof b === "string" && lower(a) === lower(b);
 
@@ -207,23 +210,23 @@ const same = (a: string, b: string | null | undefined) => typeof b === "string" 
 export function symbiosisRequest(params: QuoteParams, options: SymbiosisVerifyOptions = {}): SymbiosisRequest | string {
   const source = symbiosisChain(params.sourceChain);
   const dest = symbiosisChain(params.destChain);
-  if (!source || !dest) return "unsupported chain";
-  if (source === dest) return "same-chain swaps are not served";
-  if (dest.family === "bitcoin") return "Bitcoin is not a destination";
+  if (!source || !dest) return noted("unsupported chain", "unsupported_pair");
+  if (source === dest) return noted("same-chain swaps are not served", "unsupported_pair");
+  if (dest.family === "bitcoin") return noted("Bitcoin is not a destination", "unsupported_pair");
   if (typeof params.amountIn !== "string" || !/^\d+$/.test(params.amountIn) || BigInt(params.amountIn) <= 0n) return "amount must be a positive integer string";
   const asset = sourceAssetOf(params);
-  if (!asset) return `unknown source token ${params.sourceToken}`;
+  if (!asset) return noted(`unknown source token ${params.sourceToken}`, "unsupported_pair");
   const buy = ccAssetByToken(params.destChain, params.destToken);
-  if (!buy) return `destination token ${params.destToken} is not in the catalog`;
+  if (!buy) return noted(`destination token ${params.destToken} is not in the catalog`, "unsupported_pair");
   const out = symbiosisToken(dest, buy.contract);
-  if (!out) return "malformed destination token";
+  if (!out) return noted("malformed destination token", "unsupported_pair");
   const sender = params.refundAddress ?? "";
-  if (!validAddress(source, sender)) return `the sender is not a ${source.name} address`;
-  if (!validAddress(dest, params.destAddress)) return `the recipient is not a ${dest.name} address`;
+  if (!validAddress(source, sender)) return noted(`the sender is not a ${source.name} address`, "recipient_mismatch");
+  if (!validAddress(dest, params.destAddress)) return noted(`the recipient is not a ${dest.name} address`, "recipient_mismatch");
   let fallbackReceiver: string | null = null;
   if (source.family !== "evm") {
     const own = dest.family === "evm" ? params.destAddress : options.fallbackReceiver;
-    if (!own || !isAddress(own) || same(own, ZERO)) return "a non-EVM source to a non-EVM destination needs the user's own EVM address (fallbackReceiver)";
+    if (!own || !isAddress(own) || same(own, ZERO)) return noted("a non-EVM source to a non-EVM destination needs the user's own EVM address (fallbackReceiver)", "unsupported_pair");
     fallbackReceiver = getAddress(own);
   }
   return {
@@ -248,22 +251,22 @@ function ownSet(r: SymbiosisRequest): string[] {
  * did not look.
  */
 function decode(abi: Abi, data: string, selector: string, name: string, what: string = name): readonly unknown[] {
-  if (typeof data !== "string" || !/^0x([0-9a-fA-F]{2})*$/.test(data)) refuse(`${what}: not hex calldata`);
-  if (lower(data.slice(0, 10)) !== selector) refuse(`${what}: unexpected function ${data.slice(0, 10)}`);
+  if (typeof data !== "string" || !/^0x([0-9a-fA-F]{2})*$/.test(data)) refuse(`${what}: not hex calldata`, "policy_refused");
+  if (lower(data.slice(0, 10)) !== selector) refuse(`${what}: unexpected function ${data.slice(0, 10)}`, "policy_refused");
   let decoded: {functionName: string; args?: readonly unknown[]};
   try {
     decoded = decodeFunctionData({abi, data: data as Hex}) as {functionName: string; args?: readonly unknown[]};
   } catch {
-    return refuse(`${what}: calldata does not decode`);
+    return refuse(`${what}: calldata does not decode`, "policy_refused");
   }
-  if (decoded.functionName !== name) refuse(`${what}: unexpected function ${decoded.functionName}`);
+  if (decoded.functionName !== name) refuse(`${what}: unexpected function ${decoded.functionName}`, "policy_refused");
   let again: string;
   try {
     again = encodeFunctionData({abi, functionName: decoded.functionName, args: decoded.args});
   } catch {
-    return refuse(`${what}: calldata does not re-encode`);
+    return refuse(`${what}: calldata does not re-encode`, "policy_refused");
   }
-  if (lower(again) !== lower(data)) refuse(`${what}: calldata is not canonically encoded`);
+  if (lower(again) !== lower(data)) refuse(`${what}: calldata is not canonically encoded`, "policy_refused");
   return decoded.args ?? [];
 }
 
@@ -302,15 +305,15 @@ interface AggregatorSwap {
 
 /** The byte position where the single 32-byte word in which two encodings differ ends; refuses anything else. */
 function patchedWordEnd(a: string, b: string, what: string): bigint {
-  if (a.length !== b.length) return refuse(`${what}: the amount does not sit in one fixed word`);
+  if (a.length !== b.length) return refuse(`${what}: the amount does not sit in one fixed word`, "policy_refused");
   let at = -1;
   for (let i = 10; i < a.length; i += 64) {
     if (a.slice(i, i + 64) !== b.slice(i, i + 64)) {
-      if (at !== -1) return refuse(`${what}: the amount is written in more than one place`);
+      if (at !== -1) return refuse(`${what}: the amount is written in more than one place`, "policy_refused");
       at = i;
     }
   }
-  if (at === -1) return refuse(`${what}: the amount word was not found`);
+  if (at === -1) return refuse(`${what}: the amount word was not found`, "policy_refused");
   return BigInt((at - 2) / 2 + 32);
 }
 
@@ -321,21 +324,21 @@ function patchedWordEnd(a: string, b: string, what: string): bigint {
  * Any other target or function is refused. `chain` must be an EVM chain both routers are deployed on.
  */
 function decodeAggregatorSwap(chain: SymbiosisChain, target: string, data: string, what: string): AggregatorSwap {
-  if (chain.family !== "evm") refuse(`${what}: no aggregator router is allow-listed on ${chain.name}`);
+  if (chain.family !== "evm") refuse(`${what}: no aggregator router is allow-listed on ${chain.name}`, "vault_mismatch");
   if (same(target, SYMBIOSIS_AGGREGATORS.oneInchV6)) {
     const [, d] = decode(ONE_INCH_ABI, data, SEL_ONE_INCH_SWAP, "swap", what) as [string, OneInchDesc, string];
-    if (d.flags !== 0n) refuse(`${what}: the 1inch swap sets flags ${d.flags} (partial fill, extra value or Permit2 are not accepted)`);
-    if (d.minReturnAmount <= 0n) refuse(`${what}: the swap names no minimum`);
+    if (d.flags !== 0n) refuse(`${what}: the 1inch swap sets flags ${d.flags} (partial fill, extra value or Permit2 are not accepted)`, "policy_refused");
+    if (d.minReturnAmount <= 0n) refuse(`${what}: the swap names no minimum`, "price_check_failed");
     return {router: "1inch-v6", srcToken: d.srcToken, dstToken: d.dstToken, dstReceiver: d.dstReceiver, amount: d.amount, minReturnAmount: d.minReturnAmount, amountOffset: 196n};
   }
   if (same(target, SYMBIOSIS_AGGREGATORS.kyberV2)) {
     const [x] = decode(KYBER_ABI, data, SEL_KYBER_SWAP, "swap", what) as [KyberExecution];
     const d = x.desc;
-    if ((d.flags & ~KYBER_FLAGS_ALLOWED) !== 0n) refuse(`${what}: the KyberSwap swap sets flags ${d.flags} (partial fill, extra value, burns or a fee on the output are not accepted)`);
-    if (d.feeReceivers.length !== 0 || d.feeAmounts.length !== 0) refuse(`${what}: the KyberSwap swap pays a fee receiver`);
-    if (d.permit !== "0x") refuse(`${what}: the KyberSwap swap carries a permit`);
-    if (d.minReturnAmount <= 0n) refuse(`${what}: the swap names no minimum`);
-    if (d.srcReceivers.length !== d.srcAmounts.length) refuse(`${what}: malformed KyberSwap receivers`);
+    if ((d.flags & ~KYBER_FLAGS_ALLOWED) !== 0n) refuse(`${what}: the KyberSwap swap sets flags ${d.flags} (partial fill, extra value, burns or a fee on the output are not accepted)`, "policy_refused");
+    if (d.feeReceivers.length !== 0 || d.feeAmounts.length !== 0) refuse(`${what}: the KyberSwap swap pays a fee receiver`, "policy_refused");
+    if (d.permit !== "0x") refuse(`${what}: the KyberSwap swap carries a permit`, "policy_refused");
+    if (d.minReturnAmount <= 0n) refuse(`${what}: the swap names no minimum`, "price_check_failed");
+    if (d.srcReceivers.length !== d.srcAmounts.length) refuse(`${what}: malformed KyberSwap receivers`, "policy_refused");
     // The router writes nothing itself; whoever patches the running amount in must hit `desc.amount` exactly.
     const flipped = encodeFunctionData({abi: KYBER_ABI, functionName: "swap", args: [{...x, desc: {...d, amount: d.amount ^ ((1n << 256n) - 1n)}}] as never});
     return {router: "kyberswap-v2", srcToken: d.srcToken, dstToken: d.dstToken, dstReceiver: d.dstReceiver, amount: d.amount, minReturnAmount: d.minReturnAmount, amountOffset: patchedWordEnd(lower(data), lower(flipped), what)};
@@ -345,18 +348,18 @@ function decodeAggregatorSwap(chain: SymbiosisChain, target: string, data: strin
     const selector = lower(String(data).slice(0, 10));
     if (selector === SEL_V2_FROM_ETH) {
       const [least, route, payTo] = decode(V2_ABI, data, selector, "swapExactETHForTokens", what) as [bigint, readonly string[], string, bigint];
-      if (route.length < 2 || route.length > MAX_V2_PATH) refuse(`${what}: unexpected swap path`);
-      if (least <= 0n) refuse(`${what}: the swap names no minimum`);
+      if (route.length < 2 || route.length > MAX_V2_PATH) refuse(`${what}: unexpected swap path`, "policy_refused");
+      if (least <= 0n) refuse(`${what}: the swap names no minimum`, "price_check_failed");
       return {router: "uniswap-v2", srcToken: AGGREGATOR_NATIVE, dstToken: route[route.length - 1]!, dstReceiver: payTo, amount: null, minReturnAmount: least, amountOffset: null};
     }
-    if (selector !== SEL_V2_TOKENS && selector !== SEL_V2_ETH) refuse(`${what}: unexpected V2 router function ${selector}`);
+    if (selector !== SEL_V2_TOKENS && selector !== SEL_V2_ETH) refuse(`${what}: unexpected V2 router function ${selector}`, "policy_refused");
     const toNative = selector === SEL_V2_ETH;
     const [amount, min, path, to] = decode(V2_ABI, data, selector, toNative ? "swapExactTokensForETH" : "swapExactTokensForTokens", what) as [bigint, bigint, readonly string[], string, bigint];
-    if (path.length < 2 || path.length > MAX_V2_PATH) refuse(`${what}: unexpected swap path`);
-    if (min <= 0n) refuse(`${what}: the swap names no minimum`);
+    if (path.length < 2 || path.length > MAX_V2_PATH) refuse(`${what}: unexpected swap path`, "policy_refused");
+    if (min <= 0n) refuse(`${what}: the swap names no minimum`, "price_check_failed");
     return {router: "uniswap-v2", srcToken: path[0]!, dstToken: toNative ? AGGREGATOR_NATIVE : path[path.length - 1]!, dstReceiver: to, amount, minReturnAmount: min, amountOffset: FIRST_WORD_END};
   }
-  return refuse(`${what}: ${target} is not an allow-listed swap router`);
+  return refuse(`${what}: ${target} is not an allow-listed swap router`, "vault_mismatch");
 }
 
 const scale18 = (amount: bigint, decimals: number): bigint => amount * 10n ** BigInt(18 - decimals);
@@ -366,33 +369,33 @@ const scale18 = (amount: bigint, decimals: number): bigint => amount * 10n ** Bi
  * Symbiosis pool between the pool's pinned tokens. Returns the minimum the last pool must pay out.
  */
 function checkPools(s: Pick<MetaSynthesize, "amount" | "swapTokens" | "secondDexRouter" | "secondSwapCalldata">): bigint {
-  if (!same(s.secondDexRouter, SYMBIOSIS_HOST.multicallRouter)) refuse(`the host-chain swap calls ${s.secondDexRouter}, not the pinned MulticallRouter`);
+  if (!same(s.secondDexRouter, SYMBIOSIS_HOST.multicallRouter)) refuse(`the host-chain swap calls ${s.secondDexRouter}, not the pinned MulticallRouter`, "vault_mismatch");
   const [amountIn, calls, receiveSides, path, offsets, to] =
     decode(ABI, s.secondSwapCalldata, SEL_MULTICALL, "multicall") as [bigint, readonly string[], readonly string[], readonly string[], readonly bigint[], string];
   const n = calls.length;
-  if (n < 1 || n > MAX_POOL_STEPS || receiveSides.length !== n || offsets.length !== n || path.length !== n + 1) refuse("the host-chain swap has a malformed step list");
-  if (amountIn !== s.amount) refuse("the host-chain swap is sized for another amount than the bridge request");
-  if (!same(to, SYMBIOSIS_HOST_META_ROUTER)) refuse(`the host-chain swap pays ${to}, not the pinned host-chain MetaRouter`);
-  if (s.swapTokens.length !== 2 || !same(path[0]!, s.swapTokens[0]) || !same(path[n]!, s.swapTokens[1])) refuse("the host-chain swap path is not the bridge request's token pair");
+  if (n < 1 || n > MAX_POOL_STEPS || receiveSides.length !== n || offsets.length !== n || path.length !== n + 1) refuse("the host-chain swap has a malformed step list", "policy_refused");
+  if (amountIn !== s.amount) refuse("the host-chain swap is sized for another amount than the bridge request", "policy_refused");
+  if (!same(to, SYMBIOSIS_HOST_META_ROUTER)) refuse(`the host-chain swap pays ${to}, not the pinned host-chain MetaRouter`, "vault_mismatch");
+  if (s.swapTokens.length !== 2 || !same(path[0]!, s.swapTokens[0]) || !same(path[n]!, s.swapTokens[1])) refuse("the host-chain swap path is not the bridge request's token pair", "policy_refused");
   let minDy = 0n;
   for (let i = 0; i < n; i++) {
     const pool = SYMBIOSIS_POOLS[lower(receiveSides[i]!)];
-    if (!pool) refuse(`host-chain swap step ${i + 1} calls ${receiveSides[i]}, not a pinned Symbiosis pool`);
+    if (!pool) refuse(`host-chain swap step ${i + 1} calls ${receiveSides[i]}, not a pinned Symbiosis pool`, "vault_mismatch");
     const [from, into, , min, payTo] = decode(POOL_ABI, calls[i]!, SEL_POOL_SWAP, "swap", `host-chain swap step ${i + 1}`) as [bigint, bigint, bigint, bigint, string, bigint];
-    if (offsets[i] !== POOL_OFFSET) refuse(`host-chain swap step ${i + 1} writes the running amount at ${offsets[i]}, not into the swap amount`);
-    if (from >= BigInt(pool!.length) || into >= BigInt(pool!.length) || from === into) refuse(`host-chain swap step ${i + 1} names a token index the pool does not have`);
+    if (offsets[i] !== POOL_OFFSET) refuse(`host-chain swap step ${i + 1} writes the running amount at ${offsets[i]}, not into the swap amount`, "policy_refused");
+    if (from >= BigInt(pool!.length) || into >= BigInt(pool!.length) || from === into) refuse(`host-chain swap step ${i + 1} names a token index the pool does not have`, "policy_refused");
     const a = pool![bigintToNumber(from)];
     const b = pool![bigintToNumber(into)];
-    if (!a || !b || !same(a, path[i]) || !same(b, path[i + 1])) refuse(`host-chain swap step ${i + 1} does not trade the path's tokens`);
-    if (!same(payTo, SYMBIOSIS_HOST.multicallRouter)) refuse(`host-chain swap step ${i + 1} pays ${payTo}, not the MulticallRouter`);
-    if (min <= 0n) refuse(`host-chain swap step ${i + 1} names no minimum`);
+    if (!a || !b || !same(a, path[i]) || !same(b, path[i + 1])) refuse(`host-chain swap step ${i + 1} does not trade the path's tokens`, "policy_refused");
+    if (!same(payTo, SYMBIOSIS_HOST.multicallRouter)) refuse(`host-chain swap step ${i + 1} pays ${payTo}, not the MulticallRouter`, "vault_mismatch");
+    if (min <= 0n) refuse(`host-chain swap step ${i + 1} names no minimum`, "price_check_failed");
     minDy = min;
   }
   // Like-asset pools: the amount the request states must be in line with the minimum it promises.
   const first = SYMBIOSIS_SYNTHS[lower(path[0]!)];
   const last = SYMBIOSIS_SYNTHS[lower(path[n]!)];
-  if (!first || !last) return refuse("the host-chain swap moves a token that is not a pinned synthetic token");
-  if (scale18(s.amount, first.decimals) * 10_000n < scale18(minDy, last.decimals) * CONSISTENCY_BPS) refuse("the bridge request states an amount far below the minimum its pool swap demands");
+  if (!first || !last) return refuse("the host-chain swap moves a token that is not a pinned synthetic token", "policy_refused");
+  if (scale18(s.amount, first.decimals) * 10_000n < scale18(minDy, last.decimals) * CONSISTENCY_BPS) refuse("the bridge request states an amount far below the minimum its pool swap demands", "price_check_failed");
   return minDy;
 }
 
@@ -405,43 +408,43 @@ function checkFinalCall(r: SymbiosisRequest, data: string, own: readonly string[
   const revert = (a: string): boolean => {
     if (own.includes(lower(a))) return false;
     if (same(a, SYMBIOSIS_REVERTER)) return true;
-    return refuse(`the burn names ${a} as the address that may revert it — neither the user nor Symbiosis' revert service`);
+    return refuse(`the burn names ${a} as the address that may revert it — neither the user nor Symbiosis' revert service`, "recipient_mismatch");
   };
   const synth = SYMBIOSIS_SYNTHS[lower(burned)];
-  if (!synth || synth.chain !== r.dest.id) return refuse(`the route burns ${burned}, which is not a pinned synthetic of a ${r.dest.name} token`);
+  if (!synth || synth.chain !== r.dest.id) return refuse(`the route burns ${burned}, which is not a pinned synthetic of a ${r.dest.name} token`, "policy_refused");
   /** Nothing follows on the destination: the released token is the output, the pools' minimum less the relayers' fee is the least of it. */
   const direct = (fee: bigint): void => {
-    if (r.destToken === null || !same(synth.real, r.destToken)) refuse("the route releases another token than the one quoted");
-    if (poolMin - fee < minOut) refuse(`the route guarantees ${poolMin - fee}, below the quoted minimum ${minOut}`);
+    if (r.destToken === null || !same(synth.real, r.destToken)) refuse("the route releases another token than the one quoted", "price_check_failed");
+    if (poolMin - fee < minOut) refuse(`the route guarantees ${poolMin - fee}, below the quoted minimum ${minOut}`, "price_check_failed");
   };
   if (r.dest.family === "ton") {
-    if (selector !== SEL_BURN_TON) refuse(`a TON destination must end in burnSyntheticTokenTON, got ${selector}`);
+    if (selector !== SEL_BURN_TON) refuse(`a TON destination must end in burnSyntheticTokenTON, got ${selector}`, "policy_refused");
     const [fee, stoken, , , to, receiveSide, oppositeBridge, revertable, chainID] =
       decode(ABI, data, SEL_BURN_TON, "burnSyntheticTokenTON") as [bigint, string, bigint, string, {workchain: number; address_hash: string}, string, string, string, bigint];
-    if (!same(stoken, burned)) refuse("the burn names another token than the one the pools pay out");
-    if (chainID !== BigInt(SYMBIOSIS_TON_CHAIN_ID)) refuse(`the burn names chain ${chainID}, not TON`);
+    if (!same(stoken, burned)) refuse("the burn names another token than the one the pools pay out", "policy_refused");
+    if (chainID !== BigInt(SYMBIOSIS_TON_CHAIN_ID)) refuse(`the burn names chain ${chainID}, not TON`, "recipient_mismatch");
     const want = tonRawAddress(r.recipient);
-    if (!want || `${to.workchain}:${lower(to.address_hash).slice(2)}` !== want) refuse("the burn pays a TON address that is not the recipient");
-    if (!same(receiveSide, ZERO) || !same(oppositeBridge, ZERO)) refuse("the TON burn names an unexpected receive side or bridge");
+    if (!want || `${to.workchain}:${lower(to.address_hash).slice(2)}` !== want) refuse("the burn pays a TON address that is not the recipient", "recipient_mismatch");
+    if (!same(receiveSide, ZERO) || !same(oppositeBridge, ZERO)) refuse("the TON burn names an unexpected receive side or bridge", "vault_mismatch");
     direct(fee);
     return {destSwap: null, serviceReverts: revert(revertable)};
   }
-  if (r.dest.family !== "evm" && r.dest.family !== "tron") refuse(`${r.dest.name} is not a destination`);
+  if (r.dest.family !== "evm" && r.dest.family !== "tron") refuse(`${r.dest.name} is not a destination`, "unsupported_pair");
   const recipient = account20(r.dest, r.recipient);
-  if (!recipient || !r.dest.portal || !r.dest.bridge) return refuse(`no pinned deployment on ${r.dest.name}`);
+  if (!recipient || !r.dest.portal || !r.dest.bridge) return refuse(`no pinned deployment on ${r.dest.name}`, "unsupported_pair");
   // Plain `burnSyntheticToken` is not accepted: the MetaRouter writes the cross-chain id over a word
   // that is the receiver in that function.
-  if (selector !== SEL_META_BURN) refuse(`the route does not end in metaBurnSyntheticToken (${selector})`);
+  if (selector !== SEL_META_BURN) refuse(`the route does not end in metaBurnSyntheticToken (${selector})`, "policy_refused");
   const [b] = decode(ABI, data, SEL_META_BURN, "metaBurnSyntheticToken") as [MetaBurn];
-  if (!same(b.sToken, burned)) refuse("the burn names another token than the one the pools pay out");
-  if (b.chainID !== BigInt(r.dest.id)) refuse(`the burn names chain ${b.chainID}, not ${r.dest.name}`);
-  if (!same(b.chain2address, recipient)) refuse(`the burn pays ${b.chain2address}, not the recipient`);
-  if (!same(b.receiveSide, r.dest.portal)) refuse(`the burn releases through ${b.receiveSide}, not the pinned ${r.dest.name} Portal`);
-  if (!same(b.oppositeBridge, r.dest.bridge)) refuse(`the burn names bridge ${b.oppositeBridge}, not the pinned ${r.dest.name} Bridge`);
-  if (!own.includes(lower(b.syntCaller))) refuse(`the burn is made on behalf of ${b.syntCaller}, not the user`);
+  if (!same(b.sToken, burned)) refuse("the burn names another token than the one the pools pay out", "policy_refused");
+  if (b.chainID !== BigInt(r.dest.id)) refuse(`the burn names chain ${b.chainID}, not ${r.dest.name}`, "recipient_mismatch");
+  if (!same(b.chain2address, recipient)) refuse(`the burn pays ${b.chain2address}, not the recipient`, "recipient_mismatch");
+  if (!same(b.receiveSide, r.dest.portal)) refuse(`the burn releases through ${b.receiveSide}, not the pinned ${r.dest.name} Portal`, "vault_mismatch");
+  if (!same(b.oppositeBridge, r.dest.bridge)) refuse(`the burn names bridge ${b.oppositeBridge}, not the pinned ${r.dest.name} Bridge`, "vault_mismatch");
+  if (!own.includes(lower(b.syntCaller))) refuse(`the burn is made on behalf of ${b.syntCaller}, not the user`, "recipient_mismatch");
   const serviceReverts = revert(b.revertableAddress);
   if (b.finalCallData === "0x") {
-    if (!same(b.finalReceiveSide, ZERO) || b.finalOffset !== 0n) refuse("the burn names a destination call target without a call");
+    if (!same(b.finalReceiveSide, ZERO) || b.finalOffset !== 0n) refuse("the burn names a destination call target without a call", "policy_refused");
     direct(b.stableBridgingFee);
     return {destSwap: null, serviceReverts};
   }
@@ -450,19 +453,19 @@ function checkFinalCall(r: SymbiosisRequest, data: string, own: readonly string[
   const unwrapper = SYMBIOSIS_UNWRAPPERS[r.dest.id];
   if (unwrapper && same(b.finalReceiveSide, unwrapper.unwrapper)) {
     const [, to] = decode(UNWRAP_ABI, b.finalCallData, SEL_UNWRAP, "unwrap", "destination unwrap") as [bigint, string];
-    if (r.destToken !== null) refuse("the route unwraps to the native coin, which is not the token quoted");
-    if (!same(synth.real, unwrapper.wrapped)) refuse("the route unwraps a token that is not the chain's wrapped native token");
-    if (!same(to, recipient)) refuse(`the unwrap pays ${to}, not the recipient`);
-    if (b.finalOffset !== FIRST_WORD_END) refuse(`the unwrap gets the released amount written at ${b.finalOffset}, not into its amount`);
-    if (poolMin - b.stableBridgingFee < minOut) refuse(`the route guarantees ${poolMin - b.stableBridgingFee}, below the quoted minimum ${minOut}`);
+    if (r.destToken !== null) refuse("the route unwraps to the native coin, which is not the token quoted", "price_check_failed");
+    if (!same(synth.real, unwrapper.wrapped)) refuse("the route unwraps a token that is not the chain's wrapped native token", "policy_refused");
+    if (!same(to, recipient)) refuse(`the unwrap pays ${to}, not the recipient`, "recipient_mismatch");
+    if (b.finalOffset !== FIRST_WORD_END) refuse(`the unwrap gets the released amount written at ${b.finalOffset}, not into its amount`, "policy_refused");
+    if (poolMin - b.stableBridgingFee < minOut) refuse(`the route guarantees ${poolMin - b.stableBridgingFee}, below the quoted minimum ${minOut}`, "price_check_failed");
     return {destSwap: "unwrap", serviceReverts};
   }
   const swap = decodeAggregatorSwap(r.dest, b.finalReceiveSide, b.finalCallData, "destination swap");
-  if (!same(swap.srcToken, synth.real)) refuse("the destination swap sells another token than the one released");
-  if (!same(swap.dstToken, r.destToken ?? AGGREGATOR_NATIVE)) refuse("the destination swap buys another token than the one quoted");
-  if (!same(swap.dstReceiver, recipient)) refuse(`the destination swap pays ${swap.dstReceiver}, not the recipient`);
-  if (swap.minReturnAmount < minOut) refuse(`the destination swap guarantees ${swap.minReturnAmount}, below the quoted minimum ${minOut}`);
-  if (swap.amountOffset === null || b.finalOffset !== swap.amountOffset) refuse(`the destination swap gets the released amount written at ${b.finalOffset}, not into its amount`);
+  if (!same(swap.srcToken, synth.real)) refuse("the destination swap sells another token than the one released", "policy_refused");
+  if (!same(swap.dstToken, r.destToken ?? AGGREGATOR_NATIVE)) refuse("the destination swap buys another token than the one quoted", "price_check_failed");
+  if (!same(swap.dstReceiver, recipient)) refuse(`the destination swap pays ${swap.dstReceiver}, not the recipient`, "recipient_mismatch");
+  if (swap.minReturnAmount < minOut) refuse(`the destination swap guarantees ${swap.minReturnAmount}, below the quoted minimum ${minOut}`, "price_check_failed");
+  if (swap.amountOffset === null || b.finalOffset !== swap.amountOffset) refuse(`the destination swap gets the released amount written at ${b.finalOffset}, not into its amount`, "policy_refused");
   return {destSwap: swap.router, serviceReverts};
 }
 
@@ -471,22 +474,22 @@ function checkFinalCall(r: SymbiosisRequest, data: string, own: readonly string[
  * calldata and the TON cell. `rtoken` is the bridged token as the source chain's contracts name it.
  */
 function checkSynthesize(r: SymbiosisRequest, s: Omit<MetaSynthesize, "syntCaller" | "clientID">, own: readonly string[], minOut: bigint): {destSwap: SymbiosisDestCall | null; serviceReverts: boolean} {
-  if (s.chainID !== BigInt(SYMBIOSIS_HOST_CHAIN_ID)) refuse(`the bridge request targets chain ${s.chainID}, not Symbiosis' host chain`);
-  if (!same(s.receiveSide, SYMBIOSIS_HOST.synthesis) || !same(s.finalReceiveSide, SYMBIOSIS_HOST.synthesis)) refuse("the bridge request does not name the pinned host-chain Synthesis");
-  if (!same(s.oppositeBridge, SYMBIOSIS_HOST.bridge)) refuse("the bridge request does not name the pinned host-chain Bridge");
-  if (!own.includes(lower(s.chain2address))) refuse(`the bridge request credits ${s.chain2address} on the host chain, not one of the user's addresses`);
+  if (s.chainID !== BigInt(SYMBIOSIS_HOST_CHAIN_ID)) refuse(`the bridge request targets chain ${s.chainID}, not Symbiosis' host chain`, "vault_mismatch");
+  if (!same(s.receiveSide, SYMBIOSIS_HOST.synthesis) || !same(s.finalReceiveSide, SYMBIOSIS_HOST.synthesis)) refuse("the bridge request does not name the pinned host-chain Synthesis", "vault_mismatch");
+  if (!same(s.oppositeBridge, SYMBIOSIS_HOST.bridge)) refuse("the bridge request does not name the pinned host-chain Bridge", "vault_mismatch");
+  if (!own.includes(lower(s.chain2address))) refuse(`the bridge request credits ${s.chain2address} on the host chain, not one of the user's addresses`, "recipient_mismatch");
   let serviceReverts = false;
   if (!own.includes(lower(s.revertableAddress))) {
-    if (!same(s.revertableAddress, SYMBIOSIS_REVERTER)) refuse(`the bridge request lets ${s.revertableAddress} revert it — neither the user nor Symbiosis' revert service`);
+    if (!same(s.revertableAddress, SYMBIOSIS_REVERTER)) refuse(`the bridge request lets ${s.revertableAddress} revert it — neither the user nor Symbiosis' revert service`, "recipient_mismatch");
     serviceReverts = true;
   }
-  if (s.amount <= s.stableBridgingFee) refuse("the bridge request's fee takes the whole amount");
+  if (s.amount <= s.stableBridgingFee) refuse("the bridge request's fee takes the whole amount", "amount_too_small");
   const minted = s.swapTokens.length > 0 ? SYMBIOSIS_SYNTHS[lower(s.swapTokens[0]!)] : undefined;
-  if (!minted || minted.chain !== r.source.id || !same(minted.real, s.rtoken)) refuse("the bridge request does not start from the pinned synthetic of the bridged token");
+  if (!minted || minted.chain !== r.source.id || !same(minted.real, s.rtoken)) refuse("the bridge request does not start from the pinned synthetic of the bridged token", "policy_refused");
   // Two different chains never share a synthetic token, so a route without a pool swap cannot reach the destination.
-  if (s.secondSwapCalldata === "0x") refuse("the bridge request carries no host-chain pool swap");
+  if (s.secondSwapCalldata === "0x") refuse("the bridge request carries no host-chain pool swap", "policy_refused");
   const poolMin = checkPools(s);
-  if (s.finalOffset !== FINAL_OFFSET) refuse(`unexpected amount offset ${s.finalOffset} in the final call`);
+  if (s.finalOffset !== FINAL_OFFSET) refuse(`unexpected amount offset ${s.finalOffset} in the final call`, "policy_refused");
   const final = checkFinalCall(r, s.finalCalldata, own, s.swapTokens[1]!, poolMin, minOut);
   return {destSwap: final.destSwap, serviceReverts: serviceReverts || final.serviceReverts};
 }
@@ -497,55 +500,55 @@ function checkSynthesize(r: SymbiosisRequest, s: Omit<MetaSynthesize, "syntCalle
  * of the buy token the quote promises. Throws with the reason.
  */
 export function checkSymbiosisCall(r: SymbiosisRequest, call: {to: string; data: string; value: string}, minOut: bigint): SymbiosisBound {
-  if (r.source.family !== "evm" && r.source.family !== "tron") refuse(`${r.source.name} sources are not contract calls`);
-  if (minOut <= 0n) refuse("the quote names no minimum");
+  if (r.source.family !== "evm" && r.source.family !== "tron") refuse(`${r.source.name} sources are not contract calls`, "unsupported_pair");
+  if (minOut <= 0n) refuse("the quote names no minimum", "price_check_failed");
   const gateway = r.source.gateway;
   const sender = account20(r.source, r.sender);
-  if (!gateway || !r.source.portal || !r.source.executor || !sender) return refuse(`no pinned deployment on ${r.source.name}`);
+  if (!gateway || !r.source.portal || !r.source.executor || !sender) return refuse(`no pinned deployment on ${r.source.name}`, "unsupported_pair");
   const to = r.source.family === "tron" ? tronToEvm(call.to) : typeof call.to === "string" && isAddress(call.to, {strict: false}) ? call.to : null;
-  if (!to || !same(to, gateway)) refuse(`the transaction calls ${call.to}, not the pinned ${r.source.name} MetaRouterGateway`);
-  if (typeof call.value !== "string" || !/^\d+$/.test(call.value)) refuse("the transaction value is not a number");
+  if (!to || !same(to, gateway)) refuse(`the transaction calls ${call.to}, not the pinned ${r.source.name} MetaRouterGateway`, "vault_mismatch");
+  if (typeof call.value !== "string" || !/^\d+$/.test(call.value)) refuse("the transaction value is not a number", "policy_refused");
   const native = r.sellToken === null;
   const sell = native ? ZERO : account20(r.source, r.sellToken!);
-  if (!sell) return refuse("the sell token is not a contract address");
-  if (BigInt(call.value) !== (native ? r.amountIn : 0n)) refuse(`the transaction attaches ${call.value}, expected ${native ? r.amountIn : 0n}`);
+  if (!sell) return refuse("the sell token is not a contract address", "unsupported_pair");
+  if (BigInt(call.value) !== (native ? r.amountIn : 0n)) refuse(`the transaction attaches ${call.value}, expected ${native ? r.amountIn : 0n}`, "policy_refused");
 
   const [t] = decode(ABI, call.data, SYMBIOSIS_META_ROUTE_SELECTOR, "metaRoute") as [MetaRoute];
-  if (t.amount !== r.amountIn) refuse(`the call sells ${t.amount}, not ${r.amountIn}`);
-  if (t.nativeIn !== native) refuse("the call's native flag does not match the sell token");
-  if (t.approvedTokens.length < 1 || t.approvedTokens.length > 2) refuse("unexpected token list");
-  if (!same(t.approvedTokens[0]!, sell)) refuse(`the call sells token ${t.approvedTokens[0]}, not the requested one`);
+  if (t.amount !== r.amountIn) refuse(`the call sells ${t.amount}, not ${r.amountIn}`, "policy_refused");
+  if (t.nativeIn !== native) refuse("the call's native flag does not match the sell token", "policy_refused");
+  if (t.approvedTokens.length < 1 || t.approvedTokens.length > 2) refuse("unexpected token list", "policy_refused");
+  if (!same(t.approvedTokens[0]!, sell)) refuse(`the call sells token ${t.approvedTokens[0]}, not the requested one`, "policy_refused");
   // The MetaRouter skips the second swap when its calldata is empty; the router named beside it is then never called.
-  if (t.secondSwapCalldata !== "0x") refuse("the call carries a second source-chain swap");
-  if (!same(t.relayRecipient, r.source.portal)) refuse(`the call hands the funds to ${t.relayRecipient}, not the pinned ${r.source.name} Portal`);
+  if (t.secondSwapCalldata !== "0x") refuse("the call carries a second source-chain swap", "policy_refused");
+  if (!same(t.relayRecipient, r.source.portal)) refuse(`the call hands the funds to ${t.relayRecipient}, not the pinned ${r.source.name} Portal`, "vault_mismatch");
 
   const [s] = decode(ABI, t.otherSideCalldata, SEL_META_SYNTHESIZE, "metaSynthesize") as [MetaSynthesize];
   const bridged = t.approvedTokens[t.approvedTokens.length - 1]!;
-  if (!same(s.rtoken, bridged)) refuse("the bridged token is not the last approved token");
-  if (same(s.rtoken, ZERO)) refuse("the bridged token is the zero address");
-  if (!same(s.syntCaller, sender)) refuse(`the bridge request is made on behalf of ${s.syntCaller}, not the sender`);
+  if (!same(s.rtoken, bridged)) refuse("the bridged token is not the last approved token", "policy_refused");
+  if (same(s.rtoken, ZERO)) refuse("the bridged token is the zero address", "policy_refused");
+  if (!same(s.syntCaller, sender)) refuse(`the bridge request is made on behalf of ${s.syntCaller}, not the sender`, "recipient_mismatch");
 
   // What happens before the bridge: nothing, the wrap of the native coin by the bridged token's own
   // contract, or one decoded swap on an allow-listed aggregator router. Nothing else.
   let sourceSwap: SymbiosisAggregator | null = null;
   if (t.firstSwapCalldata === "0x") {
-    if (native) refuse("a native sale without a wrap step");
-    if (!same(t.firstDexRouter, ZERO)) refuse("a source swap target without a call");
+    if (native) refuse("a native sale without a wrap step", "policy_refused");
+    if (!same(t.firstDexRouter, ZERO)) refuse("a source swap target without a call", "policy_refused");
     // The API names the sell token twice when nothing is swapped.
-    if (!same(s.rtoken, sell)) refuse("no source swap, yet the bridged token is not the sell token");
-    if (s.amount !== r.amountIn) refuse(`the bridge request moves ${s.amount}, not ${r.amountIn}`);
+    if (!same(s.rtoken, sell)) refuse("no source swap, yet the bridged token is not the sell token", "policy_refused");
+    if (s.amount !== r.amountIn) refuse(`the bridge request moves ${s.amount}, not ${r.amountIn}`, "policy_refused");
   } else if (native && lower(t.firstSwapCalldata) === SEL_WRAP) {
-    if (!same(t.firstDexRouter, s.rtoken)) refuse("the wrap step does not call the bridged token");
-    if (s.amount !== r.amountIn) refuse(`the bridge request moves ${s.amount}, not ${r.amountIn}`);
+    if (!same(t.firstDexRouter, s.rtoken)) refuse("the wrap step does not call the bridged token", "vault_mismatch");
+    if (s.amount !== r.amountIn) refuse(`the bridge request moves ${s.amount}, not ${r.amountIn}`, "policy_refused");
   } else {
-    if (t.approvedTokens.length !== 2) refuse("a source swap without the token it buys");
+    if (t.approvedTokens.length !== 2) refuse("a source swap without the token it buys", "policy_refused");
     const swap = decodeAggregatorSwap(r.source, t.firstDexRouter, t.firstSwapCalldata, "source swap");
-    if (!same(swap.srcToken, native ? AGGREGATOR_NATIVE : sell)) refuse("the source swap sells another token than the one requested");
+    if (!same(swap.srcToken, native ? AGGREGATOR_NATIVE : sell)) refuse("the source swap sells another token than the one requested", "policy_refused");
     // A native sale on a V2 router has no amount argument: it sells the value sent, which is the sell amount (checked above).
-    if (swap.amount !== null && swap.amount !== r.amountIn) refuse(`the source swap sells ${swap.amount}, not ${r.amountIn}`);
-    if (!same(swap.dstToken, s.rtoken) || same(s.rtoken, sell)) refuse("the source swap does not buy the bridged token");
-    if (!same(swap.dstReceiver, r.source.executor)) refuse(`the source swap pays ${swap.dstReceiver}, not the pinned ${r.source.name} MetaRouter`);
-    if (swap.minReturnAmount * 10_000n < s.amount * CONSISTENCY_BPS) refuse("the source swap's minimum is far below the amount the bridge request states");
+    if (swap.amount !== null && swap.amount !== r.amountIn) refuse(`the source swap sells ${swap.amount}, not ${r.amountIn}`, "policy_refused");
+    if (!same(swap.dstToken, s.rtoken) || same(s.rtoken, sell)) refuse("the source swap does not buy the bridged token", "policy_refused");
+    if (!same(swap.dstReceiver, r.source.executor)) refuse(`the source swap pays ${swap.dstReceiver}, not the pinned ${r.source.name} MetaRouter`, "vault_mismatch");
+    if (swap.minReturnAmount * 10_000n < s.amount * CONSISTENCY_BPS) refuse("the source swap's minimum is far below the amount the bridge request states", "price_check_failed");
     sourceSwap = swap.router;
   }
   const rest = checkSynthesize(r, s, ownSet(r), minOut);
@@ -561,44 +564,44 @@ const hexAddress = (s: Slice): string => `0x${s.hex(20)}`;
  * Throws with the reason.
  */
 export function checkSymbiosisTonMessage(r: SymbiosisRequest, msg: {to: string; value: string; bodyBoc: string}, minOut: bigint): SymbiosisBound {
-  if (r.source.family !== "ton") refuse("not a TON source");
-  if (minOut <= 0n) refuse("the quote names no minimum");
-  if (r.sellToken === null) refuse("native TON sources are not served");
+  if (r.source.family !== "ton") refuse("not a TON source", "unsupported_pair");
+  if (minOut <= 0n) refuse("the quote names no minimum", "price_check_failed");
+  if (r.sellToken === null) refuse("native TON sources are not served", "unsupported_pair");
   const master = tonRawAddress(r.sellToken!);
   const sender = tonRawAddress(r.sender);
   const rtoken = symbiosisToken(r.source, r.sellToken)?.address;
-  if (!master || !sender || !rtoken) return refuse("malformed TON address in the request");
-  if (!tonRawAddress(msg.to)) refuse("the message is not addressed to a TON account");
-  if (typeof msg.value !== "string" || !/^\d+$/.test(msg.value)) refuse("the attached value is not a number");
+  if (!master || !sender || !rtoken) return refuse("malformed TON address in the request", "unsupported_pair");
+  if (!tonRawAddress(msg.to)) refuse("the message is not addressed to a TON account", "policy_refused");
+  if (typeof msg.value !== "string" || !/^\d+$/.test(msg.value)) refuse("the attached value is not a number", "policy_refused");
   const value = BigInt(msg.value);
-  if (value <= 0n || value > SYMBIOSIS_TON_VALUE_CEILING) refuse(`the message attaches ${value} nanotons, above the ${SYMBIOSIS_TON_VALUE_CEILING} ceiling`);
+  if (value <= 0n || value > SYMBIOSIS_TON_VALUE_CEILING) refuse(`the message attaches ${value} nanotons, above the ${SYMBIOSIS_TON_VALUE_CEILING} ceiling`, "policy_refused");
   const own = ownSet(r);
   let root: TonCell;
-  try { root = parseBoc(msg.bodyBoc); } catch (e) { return refuse(`the message body does not parse: ${(e as Error).message}`); }
+  try { root = parseBoc(msg.bodyBoc); } catch (e) { return refuse(`the message body does not parse: ${(e as Error).message}`, "policy_refused"); }
   try {
     const body = new Slice(root);
-    if (body.uint(32) !== OP_JETTON_TRANSFER) refuse("the message is not a jetton transfer");
+    if (body.uint(32) !== OP_JETTON_TRANSFER) refuse("the message is not a jetton transfer", "policy_refused");
     body.uint(64); // query id
     const amount = body.coins();
-    if (amount !== r.amountIn) refuse(`the transfer moves ${amount}, not ${r.amountIn}`);
-    if (body.address() !== SYMBIOSIS_TON_PORTAL_RAW) refuse("the transfer does not go to the pinned TON Portal");
-    if (body.address() !== sender) refuse("the transfer's excess does not return to the sender");
-    if (body.bool()) refuse("the transfer carries a custom payload");
+    if (amount !== r.amountIn) refuse(`the transfer moves ${amount}, not ${r.amountIn}`, "policy_refused");
+    if (body.address() !== SYMBIOSIS_TON_PORTAL_RAW) refuse("the transfer does not go to the pinned TON Portal", "vault_mismatch");
+    if (body.address() !== sender) refuse("the transfer's excess does not return to the sender", "recipient_mismatch");
+    if (body.bool()) refuse("the transfer carries a custom payload", "policy_refused");
     const forwardTon = body.coins();
-    if (forwardTon >= value) refuse("the transfer forwards more TON than the message attaches");
-    if (!body.bool()) refuse("the bridge request is not carried in a reference");
+    if (forwardTon >= value) refuse("the transfer forwards more TON than the message attaches", "policy_refused");
+    if (!body.bool()) refuse("the bridge request is not carried in a reference", "policy_refused");
     const request = new Slice(body.nextRef());
     body.end();
 
-    if (request.uint(32) !== OP_TON_META_SYNTHESIZE) refuse("the forward payload is not a Symbiosis bridge request");
+    if (request.uint(32) !== OP_TON_META_SYNTHESIZE) refuse("the forward payload is not a Symbiosis bridge request", "policy_refused");
     const head = new Slice(request.nextRef());
     const sides = new Slice(request.nextRef());
     const tail = new Slice(request.nextRef());
     request.end();
 
     const stableBridgingFee = head.coins(); // the relayers' fee — not bound beyond "less than the amount"
-    if (head.address() !== master) refuse("the bridge request names a jetton that is not the sell token");
-    if (head.coins() !== r.amountIn) refuse("the bridge request moves an amount that is not the sell amount");
+    if (head.address() !== master) refuse("the bridge request names a jetton that is not the sell token", "policy_refused");
+    if (head.coins() !== r.amountIn) refuse("the bridge request moves an amount that is not the sell amount", "policy_refused");
     const chain2address = hexAddress(head);
     head.end();
 
@@ -617,11 +620,11 @@ export function checkSymbiosisTonMessage(r: SymbiosisRequest, msg: {to: string; 
     const finalCell = tail.nextRef();
     const secondCell = tail.nextRef();
     tail.end();
-    if (swapTokens.bits % 160 !== 0 || swapTokens.bits > 320 || swapTokens.refs.length !== 0) refuse("malformed swap token list");
+    if (swapTokens.bits % 160 !== 0 || swapTokens.bits > 320 || swapTokens.refs.length !== 0) refuse("malformed swap token list", "policy_refused");
     const tokens = new Slice(swapTokens);
     const swapList: string[] = [];
     for (let i = 0; i < swapTokens.bits / 160; i++) swapList.push(hexAddress(tokens));
-    if (finalLength > 16_384n || secondLength > 65_536n) refuse("oversized calldata in the bridge request");
+    if (finalLength > 16_384n || secondLength > 65_536n) refuse("oversized calldata in the bridge request", "policy_refused");
     const finalCalldata = `0x${snakeHex(finalCell, bigintToNumber(finalLength))}`;
     const secondSwapCalldata = `0x${snakeHex(secondCell, bigintToNumber(secondLength))}`;
 
@@ -632,14 +635,14 @@ export function checkSymbiosisTonMessage(r: SymbiosisRequest, msg: {to: string; 
     return {sourceSwap: null, ...rest};
   } catch (e) {
     if (e instanceof Refusal) throw e;
-    return refuse(`the message body is not a Symbiosis bridge request: ${(e as Error).message}`);
+    return refuse(`the message body is not a Symbiosis bridge request: ${(e as Error).message}`, "policy_refused");
   }
 }
 
 /** The least of the buy token a quote promises — what the route's own minimums are held to. */
 function quotedMinimum(quote: Quote): bigint {
   const m = quote.minDestAmount;
-  if (typeof m !== "string" || !/^\d+$/.test(m) || BigInt(m) <= 0n) return refuse("the quote names no minimum");
+  if (typeof m !== "string" || !/^\d+$/.test(m) || BigInt(m) <= 0n) return refuse("the quote names no minimum", "price_check_failed");
   return BigInt(m);
 }
 
@@ -648,21 +651,21 @@ const reason = (e: unknown): string => `symbiosis: ${e instanceof Error ? e.mess
 /** The check a route's bytes get, by source family; the reason it fails, or what it could not bind. */
 function checkRoute(r: SymbiosisRequest, tx: {to?: string; data?: string; value?: string; bodyBoc?: string; approvalAddress?: string; chainId?: number}, minOut: bigint): SymbiosisBound {
   if (r.source.family === "ton") {
-    if (tx.data !== undefined || tx.approvalAddress !== undefined) refuse("a TON source carries no calldata or approval");
-    if (tx.bodyBoc === undefined) refuse("a TON source needs a message body");
+    if (tx.data !== undefined || tx.approvalAddress !== undefined) refuse("a TON source carries no calldata or approval", "policy_refused");
+    if (tx.bodyBoc === undefined) refuse("a TON source needs a message body", "policy_refused");
     return checkSymbiosisTonMessage(r, {to: tx.to ?? "", value: tx.value ?? "0", bodyBoc: tx.bodyBoc!}, minOut);
   }
-  if (r.source.family !== "evm" && r.source.family !== "tron") refuse(`${r.source.name} sources carry nothing this module can check`);
-  if (tx.bodyBoc !== undefined) refuse("unexpected message body");
-  if (tx.chainId !== r.source.id) refuse(`the transaction is for chain ${String(tx.chainId)}, not ${r.source.name}`);
+  if (r.source.family !== "evm" && r.source.family !== "tron") refuse(`${r.source.name} sources carry nothing this module can check`, "recipient_unverifiable");
+  if (tx.bodyBoc !== undefined) refuse("unexpected message body", "policy_refused");
+  if (tx.chainId !== r.source.id) refuse(`the transaction is for chain ${String(tx.chainId)}, not ${r.source.name}`, "policy_refused");
   const gateway = gatewayAddress(r.source)!;
   if (r.sellToken === null) {
-    if (tx.approvalAddress !== undefined) refuse("a native sale asks for an approval");
+    if (tx.approvalAddress !== undefined) refuse("a native sale asks for an approval", "policy_refused");
   } else if (tx.approvalAddress === undefined || lower(tx.approvalAddress) !== lower(gateway)) {
     // Tron base58 is case-sensitive; the gateway spelling is produced locally, so equality after lowercasing is exact enough for both.
-    refuse(`the approval names ${String(tx.approvalAddress)}, not the pinned ${r.source.name} MetaRouterGateway`);
+    refuse(`the approval names ${String(tx.approvalAddress)}, not the pinned ${r.source.name} MetaRouterGateway`, "vault_mismatch");
   }
-  if (r.source.family === "tron" && tx.approvalAddress !== undefined && tx.approvalAddress !== gateway) refuse("the approval does not name the pinned Tron MetaRouterGateway");
+  if (r.source.family === "tron" && tx.approvalAddress !== undefined && tx.approvalAddress !== gateway) refuse("the approval does not name the pinned Tron MetaRouterGateway", "vault_mismatch");
   return checkSymbiosisCall(r, {to: tx.to ?? "", data: tx.data ?? "", value: tx.value ?? "0"}, minOut);
 }
 
@@ -680,25 +683,25 @@ export function symbiosisTonMessage(quote: Quote): {to: string; value: string; b
 export function symbiosisInspectQuote(params: QuoteParams, quote: Quote, options: SymbiosisVerifyOptions = {}): {bound: SymbiosisBound | null} | {refusal: string} {
   try {
     const r = symbiosisRequest(params, options);
-    if (typeof r === "string") return {refusal: `symbiosis: ${r}`};
-    if (quote.sourceAmount !== params.amountIn) return {refusal: "symbiosis: the quote is for a different amount"};
+    if (typeof r === "string") return {refusal: noted(`symbiosis: ${r}`, notes.reasonOf(r))};
+    if (quote.sourceAmount !== params.amountIn) return {refusal: noted("symbiosis: the quote is for a different amount", "policy_refused")};
     if (r.source.family === "bitcoin") {
       // A deposit address the backend names: nothing on the device says whose it is.
       return quote.txRequest === undefined && quote.depositAddress !== "" && symbiosisTonMessage(quote) === null
         ? {bound: null}
-        : {refusal: "symbiosis: a Bitcoin source is a deposit-address route"};
+        : {refusal: noted("symbiosis: a Bitcoin source is a deposit-address route", "policy_refused")};
     }
     if (r.source.family === "ton") {
       const msg = symbiosisTonMessage(quote);
-      if (!msg || quote.txRequest !== undefined || quote.depositAddress !== "") return {refusal: "symbiosis: a TON source carries one jetton transfer"};
+      if (!msg || quote.txRequest !== undefined || quote.depositAddress !== "") return {refusal: noted("symbiosis: a TON source carries one jetton transfer", "policy_refused")};
       return {bound: checkRoute(r, msg, quotedMinimum(quote))};
     }
     const tx = quote.txRequest;
-    if (!tx || quote.depositAddress !== "") return {refusal: "symbiosis: the quote carries no transaction"};
-    if (tx.serializedTx !== undefined) return {refusal: "symbiosis: unexpected serialized transaction"};
+    if (!tx || quote.depositAddress !== "") return {refusal: noted("symbiosis: the quote carries no transaction", "policy_refused")};
+    if (tx.serializedTx !== undefined) return {refusal: noted("symbiosis: unexpected serialized transaction", "policy_refused")};
     return {bound: checkRoute(r, tx, quotedMinimum(quote))};
   } catch (e) {
-    return {refusal: reason(e)};
+    return {refusal: noted(reason(e), refusalOf(e))};
   }
 }
 
@@ -715,18 +718,18 @@ export function symbiosisVerifyQuote(params: QuoteParams, quote: Quote, options:
 /** A built source transaction against the user's own request — the reason it fails, or null. */
 export function symbiosisVerifyBuild(quote: Quote, tx: UnsignedTx, params?: QuoteParams, options: SymbiosisVerifyOptions = {}): string | null {
   try {
-    if (!params) return "symbiosis: the build cannot be checked without the request";
+    if (!params) return noted("symbiosis: the build cannot be checked without the request", "policy_refused");
     const r = symbiosisRequest(params, options);
-    if (typeof r === "string") return `symbiosis: ${r}`;
-    if (symbiosisChain(tx.chain) !== r.source) return "symbiosis: the build is for another chain";
-    if (tx.serializedTx !== undefined || tx.stateInitBoc !== undefined || tx.typedData !== undefined || tx.memo != null) return "symbiosis: the build carries a part this route never has";
+    if (typeof r === "string") return noted(`symbiosis: ${r}`, notes.reasonOf(r));
+    if (symbiosisChain(tx.chain) !== r.source) return noted("symbiosis: the build is for another chain", "policy_refused");
+    if (tx.serializedTx !== undefined || tx.stateInitBoc !== undefined || tx.typedData !== undefined || tx.memo != null) return noted("symbiosis: the build carries a part this route never has", "policy_refused");
     if (r.source.family === "bitcoin") {
-      return tx.data === undefined && tx.bodyBoc === undefined && tx.to === quote.depositAddress && tx.to !== "" ? null : "symbiosis: a Bitcoin source pays the quote's deposit address";
+      return tx.data === undefined && tx.bodyBoc === undefined && tx.to === quote.depositAddress && tx.to !== "" ? null : noted("symbiosis: a Bitcoin source pays the quote's deposit address", "vault_mismatch");
     }
     checkRoute(r, tx, quotedMinimum(quote));
     return null;
   } catch (e) {
-    return reason(e);
+    return noted(reason(e), refusalOf(e));
   }
 }
 
@@ -746,6 +749,8 @@ export function symbiosisPinsFor(options: SymbiosisVerifyOptions & {btcSource?: 
     spenders: targets,
     verifyQuote: (params, quote) => symbiosisVerifyQuote(params, quote, options),
     verifyBuild: (quote, tx, params) => symbiosisVerifyBuild(quote, tx, params, options),
+    // The reason of each text verifyQuote / verifyBuild returned (remoteProvider puts it on its refusal).
+    reasonOf: notes.reasonOf,
     ...(options.btcSource ? {depositAddressRoutes: true} : {}),
   };
 }

@@ -4,7 +4,9 @@ import {ccAsset, ccAssetByToken, type CcAsset} from "@anywalletkit/swap2-assets"
 import {suggestSlippage} from "@anywalletkit/protocol-swap2-core/slippage";
 import {anySignal, redactUrls, sourceAssetOf, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentState, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {httpRefusal, parseRetryAfter, refusal, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {describeSymbiosisActivity} from "./activity.js";
+import {notes} from "./reasons.js";
 import {
   SYMBIOSIS_API, SYMBIOSIS_BY_ID, SYMBIOSIS_REVERTER, account20, evmToTron, gatewayAddress, symbiosis as symbiosisCfg, symbiosisChain, symbiosisToken, tronToEvm,
   validAddress, type SymbiosisChain,
@@ -156,6 +158,28 @@ export const SYMBIOSIS_STATUS: Readonly<Record<string, {state: IntentState; mean
 const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
 const digits = (v: unknown): v is string => typeof v === "string" && /^\d+$/.test(v);
 const sameText = (a: unknown, b: string): boolean => typeof a === "string" && a.toLowerCase() === b.toLowerCase();
+/** The error with its reason when there is one (the class and text as they are). */
+const tagged = <E extends Error>(error: E, info: Swap2RefusalInfo | undefined): E => (info ? withReason(error, info) : error);
+
+/**
+ * What Symbiosis' own error message says, where it names one of the refusal reasons ("Price impact is too high",
+ * "This swap is not available", an amount below its minimum, …). Undefined for anything else.
+ *
+ * A key rejection only when the message names the credential: a bare "Forbidden" / "Unauthorized" on a 401 / 403 is
+ * already the status's, and on any other status (a forbidden token or address) it says nothing about the key. "Not
+ * available" is Symbiosis' wording for a pair it does not route; a gateway's "Service Unavailable" is no such answer.
+ */
+function apiReason(message: string): Swap2RefusalReason | undefined {
+  if (/price impact/i.test(message)) return "price_check_failed";
+  if (/too many requests|rate.?limit/i.test(message)) return "rate_limited";
+  if (/api.?key|partner.?id/i.test(message)) return "key_rejected";
+  if (/less than (the )?fee|fees? (exceeds?|is (more|greater|higher) than)|amount.{0,40}(too (low|small)|below|less than)|min(imum)? amount/i.test(message)) return "amount_too_small";
+  if (/amount.{0,40}(too (high|large|big)|above|exceeds?|more than)|max(imum)? amount/i.test(message)) return "amount_too_large";
+  if (/liquidity/i.test(message)) return "insufficient_liquidity";
+  if (/paused|halted|maintenance|suspended/i.test(message)) return "chain_halted";
+  if (/no (route|path|transit)|route not found|not available|not supported|(can ?not|could not|unable to) find|no quote/i.test(message)) return "no_route";
+  return undefined;
+}
 
 /**
  * The engine state of a status answer. `dst` and `destToken` (Symbiosis' spelling; "" for the native
@@ -230,9 +254,9 @@ export function symbiosisTronCall(quote: Quote, options: {fallbackReceiver?: str
   const tx = quote.txRequest;
   if (quote.provider !== "symbiosis" || !params || !tx || symbiosisChain(params.sourceChain)?.family !== "tron") throw new Error("symbiosis: not a Tron-source quote");
   const why = symbiosisInspectQuote(params, quote, options);
-  if ("refusal" in why) throw new Error(why.refusal);
+  if ("refusal" in why) throw tagged(new Error(why.refusal), notes.reasonOf(why.refusal));
   const cap = options.feeLimitCap ?? DEFAULT_TRON_FEE_LIMIT_CAP;
-  if (!digits(tx.gasLimit) || BigInt(tx.gasLimit) <= 0n || BigInt(tx.gasLimit) > cap) throw new Error(`symbiosis: Tron fee limit ${String(tx.gasLimit)} is missing or above the ${cap} sun ceiling`);
+  if (!digits(tx.gasLimit) || BigInt(tx.gasLimit) <= 0n || BigInt(tx.gasLimit) > cap) throw refusal("policy_refused", `symbiosis: Tron fee limit ${String(tx.gasLimit)} is missing or above the ${cap} sun ceiling`);
   const data = tx.data!;
   const asset = sourceAssetOf(params);
   const feeLimit = BigInt(tx.gasLimit);
@@ -270,17 +294,34 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
 
   async function call(path: string, init: {body?: unknown; timeoutMs: number; signal?: AbortSignal}): Promise<unknown> {
     const timeout = timeoutSignal(init.timeoutMs);
-    const res = await doFetch(`${api}${path}`, {
-      method: init.body === undefined ? "GET" : "POST",
-      headers: headers(init.body !== undefined),
-      ...(init.body !== undefined ? {body: JSON.stringify(init.body)} : {}),
-      signal: init.signal ? anySignal([init.signal, timeout]) : timeout,
-    });
+    let res: Response;
+    try {
+      res = await doFetch(`${api}${path}`, {
+        method: init.body === undefined ? "GET" : "POST",
+        headers: headers(init.body !== undefined),
+        ...(init.body !== undefined ? {body: JSON.stringify(init.body)} : {}),
+        signal: init.signal ? anySignal([init.signal, timeout]) : timeout,
+      });
+    } catch (err) {
+      // The API unreachable, or its time ran out: upstream_unavailable. The caller's own abort stays unclassified.
+      throw err instanceof Error && !init.signal?.aborted ? withReason(err, "upstream_unavailable") : err;
+    }
     let body: unknown;
     try { body = await res.json(); } catch { body = undefined; }
     if (!res.ok) {
       const message = str((body as {message?: unknown} | undefined)?.message);
-      throw new Error(message ? `Symbiosis: ${message.slice(0, 300)}` : `Symbiosis API → ${res.status}`);
+      // A throttle or a rejected key by its status; otherwise what the API's message says (a throttle with the wait the
+      // Retry-After header names; on a 5xx, "no route" is the venue failing, not an answer about the pair), else the
+      // status (5xx), else a quote request Symbiosis refused (400 / 422, its own refusals' status) is no route and any
+      // other answer (404, 405, 415, a refused limits read …) an unusable one.
+      const retryAfter = res.headers?.get?.("retry-after");
+      const http = httpRefusal(res.status, retryAfter);
+      const said = message ? apiReason(message) : undefined;
+      const wait = said === "rate_limited" ? parseRetryAfter(retryAfter) : undefined;
+      const info: Swap2RefusalInfo = http && http.reason !== "upstream_unavailable" ? http
+        : said && !(http && said === "no_route") ? {reason: said, ...(wait !== undefined ? {retryAfterMs: wait} : {})}
+        : http ?? (init.body !== undefined && (res.status === 400 || res.status === 422) ? {reason: "no_route"} : {reason: "upstream_unavailable", httpStatus: res.status});
+      throw withReason(new Error(message ? `Symbiosis: ${message.slice(0, 300)}` : `Symbiosis API → ${res.status}`), info);
     }
     return body;
   }
@@ -291,9 +332,10 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
     if (limits && Date.now() - limits.at < LIMITS_TTL_MS) return limits.list;
     const list = (async () => {
       const body = await call("/v1/swap-limits", {timeoutMs: API_TIMEOUT_MS, ...(signal ? {signal} : {})});
-      if (!Array.isArray(body) || body.length === 0) throw new Error("Symbiosis limits are unreadable");
+      // No list: the API's fault, unless the caller aborted while the body was read (call() reads such a body as none).
+      if (!Array.isArray(body) || body.length === 0) throw signal?.aborted ? new Error("Symbiosis limits are unreadable") : refusal("upstream_unavailable", "Symbiosis limits are unreadable");
       return body.map((e: {chainId?: unknown; address?: unknown; min?: unknown; max?: unknown}) => {
-        if (typeof e?.chainId !== "number" || typeof e.address !== "string" || !digits(e.min) || !digits(e.max)) throw new Error("Symbiosis limits are unreadable");
+        if (typeof e?.chainId !== "number" || typeof e.address !== "string" || !digits(e.min) || !digits(e.max)) throw refusal("upstream_unavailable", "Symbiosis limits are unreadable");
         return {chainId: e.chainId, address: e.address.toLowerCase(), min: BigInt(e.min), max: BigInt(e.max)};
       });
     })();
@@ -302,11 +344,11 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
     limits = entry;
     return list;
   }
-  const limitRefusal = (list: ApiLimit[], chain: SymbiosisChain, token: string, amount: bigint, what: string): string | null => {
+  const limitRefusal = (list: ApiLimit[], chain: SymbiosisChain, token: string, amount: bigint, what: string): {text: string; reason: Swap2RefusalReason} | null => {
     const l = list.find((e) => e.chainId === chain.id && e.address === token.toLowerCase());
     if (!l) return null;
-    if (l.min > 0n && amount < l.min) return `${what} ${amount} is below Symbiosis' minimum ${l.min} on ${chain.name}`;
-    if (l.max > 0n && amount > l.max) return `${what} ${amount} is above Symbiosis' maximum ${l.max} on ${chain.name}`;
+    if (l.min > 0n && amount < l.min) return {text: `${what} ${amount} is below Symbiosis' minimum ${l.min} on ${chain.name}`, reason: "amount_too_small"};
+    if (l.max > 0n && amount > l.max) return {text: `${what} ${amount} is above Symbiosis' maximum ${l.max} on ${chain.name}`, reason: "amount_too_large"};
     return null;
   };
 
@@ -336,39 +378,43 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
     },
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
-      const refuse = (reason: string) => { params.onRefusal?.(reason); return null; };
-      if (params.flex) return refuse("the amount is sealed into the transaction (no flexible deposits)");
+      const refuse = (reason: string, why?: Swap2RefusalReason | Swap2RefusalInfo) => {
+        if (why === undefined) params.onRefusal?.(reason);
+        else params.onRefusal?.(reason, typeof why === "string" ? {reason: why} : why);
+        return null;
+      };
+      if (params.flex) return refuse("the amount is sealed into the transaction (no flexible deposits)", "unsupported_pair");
       const src = symbiosisChain(params.sourceChain);
       const dst = symbiosisChain(params.destChain);
-      if (!src || !dst) return refuse("Symbiosis is not wired for this chain");
-      if (src === dst) return refuse("same-chain swaps are not served");
-      if (dst.family === "bitcoin") return refuse("Bitcoin is not a destination");
-      if (!sourceOpen(src)) return refuse(`${src.name} sources are switched off (${src.family === "tron" ? "tronSource" : "btcSource"})`);
+      if (!src || !dst) return refuse("Symbiosis is not wired for this chain", "unsupported_pair");
+      if (src === dst) return refuse("same-chain swaps are not served", "unsupported_pair");
+      if (dst.family === "bitcoin") return refuse("Bitcoin is not a destination", "unsupported_pair");
+      if (!sourceOpen(src)) return refuse(`${src.name} sources are switched off (${src.family === "tron" ? "tronSource" : "btcSource"})`, "policy_refused");
       if (typeof params.amountIn !== "string" || !/^\d+$/.test(params.amountIn)) return refuse("amount must be a base-unit integer");
       const amount = BigInt(params.amountIn);
-      if (amount <= 0n) return refuse("amount must be positive");
+      if (amount <= 0n) return refuse("amount must be positive", "amount_too_small");
       if (params.slippageBps !== undefined && (!Number.isInteger(params.slippageBps) || params.slippageBps < 0 || params.slippageBps >= 10_000)) return refuse("slippage must be 0..9999 bps");
       const sell = sourceAssetOf(params);
-      if (!sell) return refuse(`unknown source token ${params.sourceToken} on ${src.name}`);
-      if (src.family === "ton" && !sell.contract) return refuse("TON's native coin is not bridged by Symbiosis itself");
+      if (!sell) return refuse(`unknown source token ${params.sourceToken} on ${src.name}`, "unsupported_pair");
+      if (src.family === "ton" && !sell.contract) return refuse("TON's native coin is not bridged by Symbiosis itself", "unsupported_pair");
       const buy = ccAssetByToken(params.destChain, params.destToken);
-      if (!buy) return refuse(`destination token ${params.destToken} is not in the catalog (its decimals are unknown)`);
+      if (!buy) return refuse(`destination token ${params.destToken} is not in the catalog (its decimals are unknown)`, "unsupported_pair");
       const tokenIn = symbiosisToken(src, sell.contract);
       const tokenOut = symbiosisToken(dst, buy.contract);
-      if (!tokenIn || !tokenOut) return refuse("malformed token address");
+      if (!tokenIn || !tokenOut) return refuse("malformed token address", "unsupported_pair");
 
       // The placeholder prices a dry quote; a live one without addresses would be built for it.
       const dry = params.dry !== false;
       const recipient = params.destAddress || (dry ? placeholder(dst) : "");
       if (!recipient) return refuse("a live quote needs a recipient");
-      if (!validAddress(dst, recipient)) return refuse(`the recipient is not a ${dst.name} address`);
+      if (!validAddress(dst, recipient)) return refuse(`the recipient is not a ${dst.name} address`, "recipient_mismatch");
       const sender = params.refundAddress || (dry ? placeholder(src) : "");
       if (!sender) return refuse("a live quote needs the sender (refund address)");
-      if (!validAddress(src, sender)) return refuse(`the sender is not a ${src.name} address`);
+      if (!validAddress(src, sender)) return refuse(`the sender is not a ${src.name} address`, "recipient_mismatch");
       let fallbackReceiver: string | undefined;
       if (src.family !== "evm") {
         fallbackReceiver = dst.family === "evm" ? getAddress(recipient) : config.fallbackReceiver ?? (dry ? EVM_PLACEHOLDER : undefined);
-        if (!fallbackReceiver) return refuse(`${src.name} → ${dst.name} needs the user's own EVM address (fallbackReceiver)`);
+        if (!fallbackReceiver) return refuse(`${src.name} → ${dst.name} needs the user's own EVM address (fallbackReceiver)`, "unsupported_pair");
       }
       const request: QuoteParams = {...params, destAddress: recipient, refundAddress: sender};
       const options = fallbackReceiver !== undefined && dst.family !== "evm" ? {fallbackReceiver} : {};
@@ -376,7 +422,7 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
       try {
         const list = await swapLimits(signal);
         const below = limitRefusal(list, src, tokenIn.address, amount, "amount");
-        if (below) return refuse(below);
+        if (below) return refuse(below.text, below.reason);
 
         const bps = params.slippageBps ?? fixedSlippage ?? suggestSlippage({fromChain: params.sourceChain, toChain: params.destChain, fromSymbol: sell.symbol, toSymbol: buy.symbol}).bps;
         const btc = src.family === "bitcoin";
@@ -399,7 +445,7 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
         let r: ApiQuote;
         for (let attempt = 1; ; attempt++) {
           r = (await call(btc && !dry ? "/v2/swap" : "/v2/quote", {body: {...body, disabledProviders: disabled.join(",")}, timeoutMs: API_TIMEOUT_MS, ...(signal ? {signal} : {})})) as ApiQuote;
-          if (!r || typeof r !== "object") return refuse("Symbiosis returned no quote");
+          if (!r || typeof r !== "object") return refuse("Symbiosis returned no quote", signal?.aborted ? undefined : "upstream_unavailable");
           // A venue this module cannot read (a new one the list above does not know yet): ask again without it.
           const venues = (Array.isArray(r.routes) ? r.routes : []).map((x: {provider?: unknown}) => x?.provider)
             .filter((v): v is string => typeof v === "string" && /^[a-z0-9-]{1,32}$/.test(v) && !READABLE_PROVIDERS.includes(v) && !disabled.includes(v));
@@ -411,48 +457,48 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
 
         // ── The answer must be for the request ───────────────────────────────
         const want = btc ? "btc" : src.family;
-        if (r.type !== want) return refuse(`Symbiosis answered with a '${String(r.type)}' route, not a ${src.name} transaction`);
-        if (r.kind !== "crosschain-swap") return refuse(`Symbiosis answered with a '${String(r.kind)}' route`);
+        if (r.type !== want) return refuse(`Symbiosis answered with a '${String(r.type)}' route, not a ${src.name} transaction`, "upstream_unavailable");
+        if (r.kind !== "crosschain-swap") return refuse(`Symbiosis answered with a '${String(r.kind)}' route`, "upstream_unavailable");
         const labels = Array.isArray(r.labels) ? r.labels.filter((l): l is string => typeof l === "string") : [];
         const partner = labels.find((l) => REFUSED_LABELS.includes(l));
-        if (partner) return refuse(`Symbiosis answered with a ${partner} route (a third party holds the funds)`);
+        if (partner) return refuse(`Symbiosis answered with a ${partner} route (a third party holds the funds)`, "recipient_unverifiable");
         const out = r.tokenAmountOut;
         const min = r.tokenAmountOutMin;
         for (const t of [out, min]) {
           if (!t || t.chainId !== dst.id || !sameText(t.address, tokenOut.address) || t.decimals !== buy.decimals || !digits(t.amount)) {
-            return refuse("Symbiosis quoted another token or chain than requested");
+            return refuse("Symbiosis quoted another token or chain than requested", "price_check_failed");
           }
         }
         const destAmount = BigInt(out!.amount as string);
         const minDest = BigInt(min!.amount as string);
-        if (destAmount <= 0n || minDest <= 0n || minDest > destAmount) return refuse("Symbiosis quoted an unusable output amount");
-        if (params.minAmountOut !== undefined && minDest < BigInt(params.minAmountOut)) return refuse(`the route guarantees ${minDest}, below the caller's floor ${params.minAmountOut}`);
+        if (destAmount <= 0n || minDest <= 0n || minDest > destAmount) return refuse("Symbiosis quoted an unusable output amount", "price_check_failed");
+        if (params.minAmountOut !== undefined && minDest < BigInt(params.minAmountOut)) return refuse(`the route guarantees ${minDest}, below the caller's floor ${params.minAmountOut}`, "price_check_failed");
         const above = limitRefusal(list, dst, tokenOut.address, destAmount, "received amount");
-        if (above) return refuse(above);
+        if (above) return refuse(above.text, above.reason);
 
         // ── Fees: every one the API reports, or no quote ─────────────────────
         const inUsd = typeof r.amountInUsd?.priceUsd === "number" && r.amountInUsd.priceUsd > 0 && digits(r.amountInUsd.amount) && typeof r.amountInUsd.decimals === "number"
           ? bigintToUnits(BigInt(r.amountInUsd.amount), r.amountInUsd.decimals) * r.amountInUsd.priceUsd
           : null;
         const outPrice = typeof out!.priceUsd === "number" && out!.priceUsd > 0 ? out!.priceUsd : inUsd !== null ? inUsd / bigintToUnits(destAmount, buy.decimals) : null;
-        if (!Array.isArray(r.fees) || r.fees.length === 0) return refuse("Symbiosis reported no fees — a quote without readable fees is not shown");
+        if (!Array.isArray(r.fees) || r.fees.length === 0) return refuse("Symbiosis reported no fees — a quote without readable fees is not shown", "upstream_unavailable");
         const fees: Quote["fees"] = [];
         let feeUsd = 0;
         for (const f of r.fees as ApiFee[]) {
           const v = f?.value;
           if (!v || !digits(v.amount) || typeof v.decimals !== "number" || !Number.isInteger(v.decimals) || v.decimals < 0 || v.decimals > 36 || typeof v.symbol !== "string" || typeof v.chainId !== "number") {
-            return refuse("Symbiosis reported a fee that cannot be read");
+            return refuse("Symbiosis reported a fee that cannot be read", "upstream_unavailable");
           }
           const units = bigintToUnits(BigInt(v.amount), v.decimals);
           if (units > 0) {
             const price = typeof v.priceUsd === "number" && v.priceUsd > 0 ? v.priceUsd : v.chainId === dst.id && sameText(v.address, tokenOut.address) ? outPrice : null;
-            if (price === null || !Number.isFinite(price)) return refuse(`Symbiosis reported a fee in ${v.symbol} without a price`);
+            if (price === null || !Number.isFinite(price)) return refuse(`Symbiosis reported a fee in ${v.symbol} without a price`, "upstream_unavailable");
             feeUsd += units * price;
           }
           const where = SYMBIOSIS_BY_ID[v.chainId]?.name ?? (v.chainId === 13863860 ? "Symbiosis' host chain" : `chain ${v.chainId}`);
           fees.push({type: "protocol", amount: v.amount, token: v.symbol.slice(0, 32), included: true, description: `${str(f.description)?.slice(0, 80) || "Symbiosis fee"} (${str(f.provider)?.slice(0, 32) || "symbiosis"}, ${where})`});
         }
-        if (!Number.isFinite(feeUsd) || feeUsd < 0) return refuse("Symbiosis fees do not add up");
+        if (!Number.isFinite(feeUsd) || feeUsd < 0) return refuse("Symbiosis fees do not add up", "upstream_unavailable");
         const eta = typeof r.estimatedTime === "number" && Number.isFinite(r.estimatedTime) && r.estimatedTime > 0 ? Math.ceil(r.estimatedTime) : 600;
         const impact = typeof r.priceImpact === "string" && /^-?\d+(\.\d+)?$/.test(r.priceImpact) ? r.priceImpact : undefined;
 
@@ -488,7 +534,7 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
             return quote;
           }
           const deposit = str(tx.depositAddress);
-          if (!deposit || !validAddress(src, deposit)) return refuse("Symbiosis returned no Bitcoin deposit address");
+          if (!deposit || !validAddress(src, deposit)) return refuse("Symbiosis returned no Bitcoin deposit address", "upstream_unavailable");
           const expires = typeof tx.expiresAt === "string" ? Date.parse(tx.expiresAt) : typeof tx.expiresAt === "number" ? tx.expiresAt * (tx.expiresAt < 1e12 ? 1000 : 1) : NaN;
           quote = {
             ...base, depositAddress: deposit,
@@ -498,7 +544,7 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
         } else if (src.family === "ton") {
           const messages = Array.isArray(tx.messages) ? (tx.messages as {address?: unknown; amount?: unknown; payload?: unknown}[]) : [];
           const m = messages[0];
-          if (messages.length !== 1 || !m || typeof m.address !== "string" || !digits(m.amount) || typeof m.payload !== "string") return refuse("Symbiosis returned something other than one TON message");
+          if (messages.length !== 1 || !m || typeof m.address !== "string" || !digits(m.amount) || typeof m.payload !== "string") return refuse("Symbiosis returned something other than one TON message", "upstream_unavailable");
           const until = typeof tx.validUntil === "number" && Number.isFinite(tx.validUntil) ? tx.validUntil * 1000 : NaN;
           quote = {
             ...base, depositAddress: "",
@@ -506,27 +552,27 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
             providerData: {...sealed, tonTo: m.address, tonValue: m.amount, tonBody: m.payload},
           };
         } else {
-          if (tx.chainId !== src.id) return refuse(`Symbiosis built a transaction for chain ${String(tx.chainId)}, not ${src.name}`);
-          if (typeof tx.to !== "string" || typeof tx.data !== "string" || !/^0x([0-9a-fA-F]{2})*$/.test(tx.data)) return refuse("Symbiosis returned no transaction");
+          if (tx.chainId !== src.id) return refuse(`Symbiosis built a transaction for chain ${String(tx.chainId)}, not ${src.name}`, "policy_refused");
+          if (typeof tx.to !== "string" || typeof tx.data !== "string" || !/^0x([0-9a-fA-F]{2})*$/.test(tx.data)) return refuse("Symbiosis returned no transaction", "upstream_unavailable");
           const value = tx.value === undefined || tx.value === null ? "0" : String(tx.value);
-          if (!digits(value)) return refuse("Symbiosis returned a malformed transaction value");
+          if (!digits(value)) return refuse("Symbiosis returned a malformed transaction value", "upstream_unavailable");
           const gateway = gatewayAddress(src)!;
           const token = !!sell.contract;
-          if (token && !sameText(r.approveTo, gateway)) return refuse(`Symbiosis asks to approve ${String(r.approveTo)}, not the pinned ${src.name} MetaRouterGateway`);
+          if (token && !sameText(r.approveTo, gateway)) return refuse(`Symbiosis asks to approve ${String(r.approveTo)}, not the pinned ${src.name} MetaRouterGateway`, "vault_mismatch");
           if (src.family === "tron") {
-            if (tx.functionSelector !== SYMBIOSIS_META_ROUTE_SIGNATURE) return refuse("Symbiosis built a Tron call that is not metaRoute");
-            if (tx.from !== undefined && (typeof tx.from !== "string" || tronToEvm(tx.from) !== tronToEvm(sender))) return refuse("Symbiosis built the Tron call for another owner");
+            if (tx.functionSelector !== SYMBIOSIS_META_ROUTE_SIGNATURE) return refuse("Symbiosis built a Tron call that is not metaRoute", "policy_refused");
+            if (tx.from !== undefined && (typeof tx.from !== "string" || tronToEvm(tx.from) !== tronToEvm(sender))) return refuse("Symbiosis built the Tron call for another owner", "policy_refused");
             const limit = typeof tx.feeLimit === "number" && Number.isSafeInteger(tx.feeLimit) ? BigInt(tx.feeLimit) : digits(tx.feeLimit) ? BigInt(tx.feeLimit) : null;
-            if (limit === null || limit <= 0n) return refuse("Symbiosis named no Tron fee limit");
-            if (limit > tronFeeLimitCap) return refuse(`Symbiosis asks a Tron fee limit of ${limit} sun, above the ${tronFeeLimitCap} ceiling`);
-            if (tronToEvm(tx.to) === null) return refuse("Symbiosis returned a malformed Tron contract");
+            if (limit === null || limit <= 0n) return refuse("Symbiosis named no Tron fee limit", "upstream_unavailable");
+            if (limit > tronFeeLimitCap) return refuse(`Symbiosis asks a Tron fee limit of ${limit} sun, above the ${tronFeeLimitCap} ceiling`, "policy_refused");
+            if (tronToEvm(tx.to) === null) return refuse("Symbiosis returned a malformed Tron contract", "upstream_unavailable");
             quote = {
               ...base, depositAddress: "",
               txRequest: {to: tx.to, data: `${SYMBIOSIS_META_ROUTE_SELECTOR}${tx.data.slice(2)}`, value, chainId: src.id, gasLimit: limit.toString(), ...(token ? {approvalAddress: gateway} : {})},
               providerData: sealed,
             };
           } else {
-            if (!isAddress(tx.to)) return refuse("Symbiosis returned a malformed contract address");
+            if (!isAddress(tx.to)) return refuse("Symbiosis returned a malformed contract address", "upstream_unavailable");
             quote = {
               ...base, depositAddress: "",
               txRequest: {to: getAddress(tx.to), data: tx.data, value, chainId: src.id, ...(token ? {approvalAddress: gateway} : {})},
@@ -543,7 +589,7 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
           // that venue instead of losing the pair. The new answer goes through every check above.
           const legs = (Array.isArray(r.routes) ? r.routes : []).map((x: {provider?: unknown}) => x?.provider)
             .filter((v, i, all): v is string => typeof v === "string" && OPTIONAL_PROVIDERS.includes(v) && !avoided.includes(v) && all.indexOf(v) === i);
-          if (btc || legs.length === 0 || pass > OPTIONAL_PROVIDERS.length || !/^symbiosis: (source|destination) swap: /.test(seen.refusal)) return refuse(seen.refusal);
+          if (btc || legs.length === 0 || pass > OPTIONAL_PROVIDERS.length || !/^symbiosis: (source|destination) swap: /.test(seen.refusal)) return refuse(seen.refusal, notes.reasonOf(seen.refusal));
           avoided.push(...legs);
           await new Promise<void>((done) => setTimeout(done, RETRY_WAIT_MS));
           if (signal?.aborted) return refuse("aborted");
@@ -551,7 +597,7 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
         }
         const bound: SymbiosisBound | null = seen.bound;
         if (bound) {
-          if (config.boundSourceOnly === true && bound.sourceSwap) return refuse("the route swaps on the source chain before bridging (boundSourceOnly)");
+          if (config.boundSourceOnly === true && bound.sourceSwap) return refuse("the route swaps on the source chain before bridging (boundSourceOnly)", "policy_refused");
           quote.providerData = {
             ...quote.providerData, sourceSwap: bound.sourceSwap ? "1" : "0", destSwap: bound.destSwap ? "1" : "0", serviceReverts: bound.serviceReverts ? "1" : "0",
             ...(bound.sourceSwap ? {sourceRouter: bound.sourceSwap} : {}), ...(bound.destSwap ? {destRouter: bound.destSwap} : {}),
@@ -560,13 +606,13 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
         return quote;
         }
       } catch (err) {
-        return refuse(redactUrls(err instanceof Error ? err.message : String(err)));
+        return refuse(redactUrls(err instanceof Error ? err.message : String(err)), refusalOf(err));
       }
     },
 
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
       const parsed = parseIntent(quote.intentId);
-      if (!parsed) throw new Error("swap2: malformed Symbiosis intent id");
+      if (!parsed) throw refusal("policy_refused", "swap2: malformed Symbiosis intent id");
       const chain = parsed.src.caip2;
       const tx = quote.txRequest;
       if (tx) {
@@ -583,30 +629,30 @@ export function symbiosisProvider(config: SymbiosisProviderConfig = {}): CrossCh
       const ton = symbiosisTonMessage(quote);
       if (parsed.src.family === "ton" && ton) return {chain, to: ton.to, value: ton.value, bodyBoc: ton.bodyBoc};
       if (parsed.src.family === "bitcoin" && quote.depositAddress) return {chain, to: quote.depositAddress, value: quote.sourceAmount};
-      throw new Error("swap2: Symbiosis quote carries no transaction");
+      throw refusal("policy_refused", "swap2: Symbiosis quote carries no transaction");
     },
 
     /** Right before signing: the build is the quote's own transaction and still passes every check against the sealed request. */
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
       const parsed = parseIntent(quote.intentId);
       const params = sealedParams(quote);
-      if (!parsed || !params || symbiosisChain(params.sourceChain) !== parsed.src || symbiosisChain(params.destChain) !== parsed.dst) throw new Error("symbiosis: quote carries no sealed request");
-      if (!sourceOpen(parsed.src)) throw new Error(`symbiosis: ${parsed.src.name} sources are switched off`);
-      if (Date.now() >= quote.validUntilMs) throw new Error("symbiosis: the quote expired — re-quote");
+      if (!parsed || !params || symbiosisChain(params.sourceChain) !== parsed.src || symbiosisChain(params.destChain) !== parsed.dst) throw refusal("policy_refused", "symbiosis: quote carries no sealed request");
+      if (!sourceOpen(parsed.src)) throw refusal("policy_refused", `symbiosis: ${parsed.src.name} sources are switched off`);
+      if (Date.now() >= quote.validUntilMs) throw refusal("quote_expired", "symbiosis: the quote expired — re-quote");
       // The user's own EVM address comes from this provider's configuration, never from the quote.
       const why = symbiosisVerifyBuild(quote, tx, params, verifyOptions);
-      if (why) throw new Error(why);
+      if (why) throw tagged(new Error(why), notes.reasonOf(why));
       const q = quote.txRequest;
       if (q) {
         if (tx.to !== q.to || (tx.data ?? "") !== (q.data ?? "") || tx.value !== (q.value ?? "0") || tx.chainId !== q.chainId || tx.approvalAddress !== q.approvalAddress) {
-          throw new Error("symbiosis: the build differs from the quoted transaction");
+          throw refusal("policy_refused", "symbiosis: the build differs from the quoted transaction");
         }
-        if (parsed.src.family === "tron" && (!digits(tx.gasLimit) || BigInt(tx.gasLimit) > tronFeeLimitCap)) throw new Error("symbiosis: Tron fee limit above the ceiling");
+        if (parsed.src.family === "tron" && (!digits(tx.gasLimit) || BigInt(tx.gasLimit) > tronFeeLimitCap)) throw refusal("policy_refused", "symbiosis: Tron fee limit above the ceiling");
       } else if (parsed.src.family === "ton") {
         const m = symbiosisTonMessage(quote);
-        if (!m || tx.to !== m.to || tx.value !== m.value || tx.bodyBoc !== m.bodyBoc) throw new Error("symbiosis: the build differs from the quoted TON message");
+        if (!m || tx.to !== m.to || tx.value !== m.value || tx.bodyBoc !== m.bodyBoc) throw refusal("policy_refused", "symbiosis: the build differs from the quoted TON message");
       } else if (tx.value !== quote.sourceAmount) {
-        throw new Error("symbiosis: the Bitcoin payment is not the quoted amount");
+        throw refusal("policy_refused", "symbiosis: the Bitcoin payment is not the quoted amount");
       }
     },
 
