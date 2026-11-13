@@ -6,7 +6,9 @@ import {solanaBridgeTxMismatch} from "./solana.js";
 import {timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import {slippageFloor} from "@anywalletkit/protocol-swap2-core/validate";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {httpRefusal, parseRetryAfter, refusal, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {bigintToNumber} from "@anywalletkit/core";
+import {note, reasonOf} from "./refusals.js";
 
 /**
  * LI.FI meta-aggregator — the CALLDATA execution model: the quote returns a
@@ -311,6 +313,98 @@ function routeOptions(body: unknown, excluded: readonly string[], allowed?: read
   return out;
 }
 
+/** LI.FI's tool error codes (docs.li.fi/api-reference/error-codes, "Tool errors") that name one reason. */
+const LIFI_TOOL_REASONS: Readonly<Record<string, Swap2RefusalReason>> = {
+  NO_POSSIBLE_ROUTE: "no_route",
+  INSUFFICIENT_LIQUIDITY: "insufficient_liquidity",
+  TOOL_TIMEOUT: "upstream_unavailable",
+  RPC_ERROR: "upstream_unavailable",
+  AMOUNT_TOO_LOW: "amount_too_small",
+  AMOUNT_TOO_HIGH: "amount_too_large",
+  FEES_HIGHER_THAN_AMOUNT: "amount_too_small",
+  FEES_HGHER_THAN_AMOUNT: "amount_too_small", // an older spelling of the same code
+  DIFFERENT_RECIPIENT_NOT_SUPPORTED: "unsupported_pair",
+  CANNOT_GUARANTEE_MIN_AMOUNT: "price_check_failed",
+};
+/** LI.FI's API error codes (the same page) that name one reason. */
+const LIFI_ERROR_REASONS: Readonly<Record<number, Swap2RefusalReason>> = {
+  1001: "no_route", // FailedToBuildTransactionError: "None of the available routes could successfully generate a tx"
+  1002: "no_route", // NoQuoteError: "No available quotes for the requested transfer"
+  1003: "no_route", // NotFoundError
+  1005: "rate_limited", // RateLimitError
+  1006: "upstream_unavailable", // ServerError
+  1007: "price_check_failed", // SlippageError
+  1008: "upstream_unavailable", // ThirdPartyError
+  1009: "upstream_unavailable", // TimeoutError
+  1010: "key_rejected", // UnauthorizedError
+  1012: "upstream_unavailable", // RpcFailure
+};
+/** LI.FI's messages, read when no code says more. */
+const LIFI_MESSAGE_REASONS: readonly (readonly [RegExp, Swap2RefusalReason])[] = [
+  [/no available quotes|unable to find a quote|none of the available routes|no route/i, "no_route"],
+  [/rate limit|too many requests/i, "rate_limited"],
+  [/api[ -]?key|unauthori[sz]ed/i, "key_rejected"],
+  [/insufficient liquidity|not enough liquidity/i, "insufficient_liquidity"],
+  [/amount (?:is )?too (?:low|small)|below the minimum/i, "amount_too_small"],
+  [/amount (?:is )?too (?:high|large)|above the maximum/i, "amount_too_large"],
+  [/not supported|unsupported|unknown token|invalid token/i, "unsupported_pair"],
+  [/halted|paused|maintenance/i, "chain_halted"],
+];
+
+/** The tool error codes in a LI.FI error body (`errors`, its `failed[].subpaths` or a plain list), bounded. */
+function lifiToolCodes(errors: unknown): string[] {
+  const out = new Set<string>();
+  const stack: unknown[] = [errors];
+  for (let visited = 0; stack.length > 0 && visited < 256; visited++) {
+    const node = stack.pop();
+    if (Array.isArray(node)) {
+      stack.push(...node.slice(0, 64));
+      continue;
+    }
+    if (!node || typeof node !== "object") continue;
+    const code = (node as {code?: unknown}).code;
+    if (typeof code === "string" && Object.prototype.hasOwnProperty.call(LIFI_TOOL_REASONS, code)) out.add(code);
+    for (const [key, value] of Object.entries(node).slice(0, 64)) if (key !== "action" && value && typeof value === "object") stack.push(value);
+  }
+  return [...out];
+}
+
+/** What LI.FI's body says, in order: the tool codes when they agree, the route-floor filter, the API code, the message. */
+function lifiBodyReason(body: unknown, filteredOut: readonly string[]): Swap2RefusalReason | undefined {
+  const b = body && typeof body === "object" ? (body as {message?: unknown; code?: unknown; errors?: unknown}) : {};
+  const tools = [...new Set(lifiToolCodes(b.errors).map((code) => LIFI_TOOL_REASONS[code]!))];
+  if (tools.length === 1) return tools[0]!;
+  if (filteredOut.length > 0 && filteredOut.every((r) => /^ROUTE_SLIPPAGE_FLOOR_UNREACHABLE/.test(r))) return "price_check_failed";
+  const byCode = typeof b.code === "number" ? LIFI_ERROR_REASONS[b.code] : undefined;
+  if (byCode) return byCode;
+  const message = typeof b.message === "string" ? b.message : "";
+  return LIFI_MESSAGE_REASONS.find(([pattern]) => pattern.test(message))?.[1];
+}
+
+/** What the body may still name on a 408 / 425 / 5xx: a passing condition, never a verdict on the pair or the route. */
+const LIFI_TRANSIENT_REASONS: ReadonlySet<Swap2RefusalReason> = new Set(["rate_limited", "insufficient_liquidity", "chain_halted"]);
+
+/**
+ * Why LI.FI answered a quote with an error status: 429 (with Retry-After) and 401 / 403 by their status; 408 / 425 /
+ * 5xx as `upstream_unavailable` unless the body names a passing condition (throttling, liquidity, a halt), since a
+ * failing LI.FI says nothing about the pair or the route; any other status by what its body says (the tool codes
+ * when they agree, the API code, the message), else LI.FI declining to route the request (`no_route`).
+ */
+function lifiHttpRefusal(status: number, retryAfter: string | null | undefined, body: unknown, filteredOut: readonly string[]): Swap2RefusalInfo {
+  const http = httpRefusal(status, retryAfter);
+  if (http && http.reason !== "upstream_unavailable") return http;
+  const info = (reason: Swap2RefusalReason): Swap2RefusalInfo => {
+    if (reason === "rate_limited") {
+      const wait = parseRetryAfter(retryAfter);
+      return {reason, httpStatus: status, ...(wait !== undefined ? {retryAfterMs: wait} : {})};
+    }
+    return reason === "upstream_unavailable" || reason === "key_rejected" ? {reason, httpStatus: status} : {reason};
+  };
+  const byBody = lifiBodyReason(body, filteredOut);
+  if (http) return byBody !== undefined && LIFI_TRANSIENT_REASONS.has(byBody) ? info(byBody) : http;
+  return byBody !== undefined ? info(byBody) : {reason: "no_route"};
+}
+
 function cleanChoice(choice: LifiRouteChoice | null | undefined): LifiRouteChoice | null {
   if (!choice) return null;
   const allow = (choice.allowBridges ?? []).filter((t) => TOOL_KEY.test(t));
@@ -357,7 +451,12 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
       /** Every refusal after LI.FI answered is named — a bare null hides which check failed (matrix v7: 4 silent nulls). */
-      const reject = (why: string): null => { params.onRefusal?.(`lifi: ${why}`); return null; };
+      const reject = (why: string, reason?: Swap2RefusalReason | Swap2RefusalInfo): null => {
+        const info = typeof reason === "string" ? {reason} : reason;
+        if (info) params.onRefusal?.(`lifi: ${why}`, info);
+        else params.onRefusal?.(`lifi: ${why}`);
+        return null;
+      };
       if (params.flex) return null; // calldata model — the amount is baked in
       const fromChain = LIFI_CHAIN[params.sourceChain];
       const toChain = LIFI_CHAIN[params.destChain];
@@ -476,7 +575,10 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
             continue;
           }
           const why = reasons.length === 1 ? ` (${reasons[0]!.slice(0, 200)})` : "";
-          params.onRefusal?.(`lifi: ${typeof body?.message === "string" ? body.message.slice(0, 200) : `HTTP ${res.status}`}${why}`);
+          params.onRefusal?.(
+            `lifi: ${typeof body?.message === "string" ? body.message.slice(0, 200) : `HTTP ${res.status}`}${why}`,
+            lifiHttpRefusal(res.status, res.headers?.get?.("retry-after"), body, reasons),
+          );
           return null;
         }
         const q = (await res.json()) as {
@@ -515,7 +617,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           const steps = (q as {includedSteps?: unknown}).includedSteps;
           const tools = [(q as {tool?: unknown}).tool, ...(Array.isArray(steps) ? steps.map((i: {tool?: unknown} | null) => i?.tool) : [])];
           if (tools.some((t) => typeof t === "string" && SMART_DEPOSITS_TOOL.test(t))) {
-            return reject("LI.FI Smart Deposits pay a deposit address whose recipient the transaction does not bind — refused for a Solana destination");
+            return reject("LI.FI Smart Deposits pay a deposit address whose recipient the transaction does not bind — refused for a Solana destination", "recipient_unverifiable");
           }
         }
         const action = q.action;
@@ -524,7 +626,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         const expectedToToken = nativeFor(params.destChain, params.destToken);
         const expectedFromChain = Number(fromChain);
         const expectedToChain = Number(toChain);
-        if (q.type !== "lifi" || !q.id || !action || !est?.toAmount || !est.fromAmount || !tr) return reject("incomplete quote (no action, estimate or transaction)");
+        if (q.type !== "lifi" || !q.id || !action || !est?.toAmount || !est.fromAmount || !tr) return reject("incomplete quote (no action, estimate or transaction)", "upstream_unavailable");
         const mismatch = [
           action.fromChainId !== expectedFromChain && "source chain",
           action.toChainId !== expectedToChain && "destination chain",
@@ -534,26 +636,32 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           !sameChainAddress(params.sourceChain, action.fromAddress, fromAddress) && "sender",
           !sameChainAddress(params.destChain, action.toAddress, toAddress) && "recipient",
         ].filter(Boolean);
-        if (mismatch.length) return reject(`quote does not match the request (${mismatch.join(", ")})`);
+        if (mismatch.length) {
+          return reject(
+            `quote does not match the request (${mismatch.join(", ")})`,
+            // LI.FI refunds to the sender it was asked for (fromAddress): either address differing pays or refunds someone else.
+            mismatch.includes("recipient") || mismatch.includes("sender") ? "recipient_mismatch" : "policy_refused",
+          );
+        }
         // The transaction spends exactly the input (action.fromAmount, checked above). Some bridges
         // (glacis, 2026-10) take their fee from the input, so estimate.fromAmount — what is bridged —
         // is a little lower and toAmount already reflects it. Accept a bounded input-side fee instead
         // of a silent null; never an estimate that bridges MORE than is spent.
         const bridged = BigInt(est.fromAmount);
         const spent = BigInt(params.amountIn);
-        if (bridged > spent) return reject(`the estimate bridges ${est.fromAmount}, more than the ${params.amountIn} spent`);
+        if (bridged > spent) return reject(`the estimate bridges ${est.fromAmount}, more than the ${params.amountIn} spent`, "price_check_failed");
         if ((spent - bridged) * 10_000n > spent * BigInt(MAX_INPUT_FEE_BPS)) {
-          return reject(`the route takes ${bigintToNumber(((spent - bridged) * 10_000n) / spent) / 100}% of the input as a fee (over ${MAX_INPUT_FEE_BPS / 100}%)`);
+          return reject(`the route takes ${bigintToNumber(((spent - bridged) * 10_000n) / spent) / 100}% of the input as a fee (over ${MAX_INPUT_FEE_BPS / 100}%)`, "policy_refused");
         }
         // Source-VM execution payload. EVM: calldata to a trusted target.
         // Solana: a base64 transaction the account proves before signing —
         // there is no target to trust here, the balance proof replaces it.
         if (solanaSource) {
-          if (!tr.data || tr.data.length < 64 || tr.data.length % 4 !== 0 || !BASE64.test(tr.data)) return reject("the Solana transaction is not base64");
-          if (tr.to !== undefined || tr.value !== undefined || tr.gasLimit !== undefined) return reject("the Solana transaction carries EVM fields");
+          if (!tr.data || tr.data.length < 64 || tr.data.length % 4 !== 0 || !BASE64.test(tr.data)) return reject("the Solana transaction is not base64", "upstream_unavailable");
+          if (tr.to !== undefined || tr.value !== undefined || tr.gasLimit !== undefined) return reject("the Solana transaction carries EVM fields", "upstream_unavailable");
           if (fromChain !== toChain) {
             const why = solanaBridgeTxMismatch(tr.data, fromAddress);
-            if (why) return reject(why);
+            if (why) return reject(why, reasonOf(why));
           }
           // `estimate.approvalAddress` is ignored for a Solana source: LI.FI
           // returns its EVM diamond here on Mayan routes too (seen 2026-10-09,
@@ -565,17 +673,24 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           tr.chainId !== expectedFromChain || !tr.value || !tr.gasLimit ||
           !trustedAddress(params.sourceChain, tr.to, trustedTransactionTargets) ||
           !sameAddress(tr.from, fromAddress)
-        ) return reject("the transaction is malformed or targets an untrusted contract");
+        ) {
+          return reject(
+            "the transaction is malformed or targets an untrusted contract",
+            !isHexData(tr.data) || !normalizeAddress(tr.to) || !normalizeAddress(tr.from) || !tr.value || !tr.gasLimit
+              ? "upstream_unavailable"
+              : !trustedAddress(params.sourceChain, tr.to, trustedTransactionTargets) ? "vault_mismatch" : "policy_refused",
+          );
+        }
         if (
           sentSlippage !== undefined &&
           (typeof action.slippage !== "number" || Math.abs(action.slippage - sentSlippage) > 1e-12)
-        ) return reject("the quote ignored the requested slippage");
+        ) return reject("the quote ignored the requested slippage", "price_check_failed");
 
         const sourceIsToken = fromToken !== EVM_ZERO && fromToken !== SOLANA_NATIVE;
         if (solanaSource) {
           // No allowances on Solana; nothing to trust beyond the balance proof.
         } else if (sourceIsToken) {
-          if (!trustedAddress(params.sourceChain, est.approvalAddress, trustedApprovalAddresses)) return reject("the approval target is not a trusted LI.FI contract");
+          if (!trustedAddress(params.sourceChain, est.approvalAddress, trustedApprovalAddresses)) return reject("the approval target is not a trusted LI.FI contract", "vault_mismatch");
         } else if (est.approvalAddress !== undefined) {
           // LI.FI started returning an approvalAddress for NATIVE sources too
           // (seen 2026-09 on every ETH-source quote, e.g. ETH → Robinhood via
@@ -583,7 +698,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           // approval is meaningless for the native asset, so it is not a
           // reason to refuse the quote — but it must still be a trusted
           // target, and it is never propagated for a native source.
-          if (!trustedAddress(params.sourceChain, est.approvalAddress, trustedApprovalAddresses)) return reject("the approval target is not a trusted LI.FI contract");
+          if (!trustedAddress(params.sourceChain, est.approvalAddress, trustedApprovalAddresses)) return reject("the approval target is not a trusted LI.FI contract", "vault_mismatch");
         }
 
         let txRequest: NonNullable<Quote["txRequest"]>;
@@ -595,9 +710,9 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           txRequest = {serializedTx: tr.data!, value: sourceIsToken ? "0" : params.amountIn};
         } else {
           try {
-            if (BigInt(tr.value!) < 0n || BigInt(tr.gasLimit!) <= 0n) return reject("the transaction has a negative value or no gas limit");
+            if (BigInt(tr.value!) < 0n || BigInt(tr.gasLimit!) <= 0n) return reject("the transaction has a negative value or no gas limit", "upstream_unavailable");
           } catch {
-            return reject("the transaction value or gas limit is not a number");
+            return reject("the transaction value or gas limit is not a number", "upstream_unavailable");
           }
           // Some bridges charge a native messaging fee inside `value`: for a
           // token source the whole value is that fee; for a native source it
@@ -606,7 +721,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           // quote, bounded by the engine — never silently attached.
           const value = BigInt(tr.value!);
           nativeFee = sourceIsToken ? value : value > BigInt(params.amountIn) ? value - BigInt(params.amountIn) : 0n;
-          if (!sourceIsToken && value < BigInt(params.amountIn)) return reject("the transaction sends less native coin than the input");
+          if (!sourceIsToken && value < BigInt(params.amountIn)) return reject("the transaction sends less native coin than the input", "policy_refused");
           txRequest = {
             to: tr.to!,
             data: tr.data!,
@@ -626,7 +741,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
 
         // The optimistic output is not a safety floor. A quote without the
         // provider's minimum cannot satisfy an exact-input execution contract.
-        if (!est.toAmountMin) return reject("the quote has no minimum output");
+        if (!est.toAmountMin) return reject("the quote has no minimum output", "upstream_unavailable");
         const minDestAmount = est.toAmountMin;
         if (sentSlippage !== undefined) {
           const dest = BigInt(est.toAmount);
@@ -641,12 +756,13 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
             }
             params.onRefusal?.(
               `lifi: this route's minimum is ${(effective * 100).toFixed(2)}% under the quote (LI.FI applies slippage on every step) — more than the requested ${slippageBps / 100}%`,
+              {reason: "price_check_failed"},
             );
             return null;
           }
         }
         if (params.minAmountOut !== undefined && BigInt(minDestAmount) < BigInt(params.minAmountOut)) {
-          params.onRefusal?.(`lifi: floor breach (min=${minDestAmount} < floor=${params.minAmountOut})`);
+          params.onRefusal?.(`lifi: floor breach (min=${minDestAmount} < floor=${params.minAmountOut})`, {reason: "price_check_failed"});
           return null;
         }
         // A same-chain swap must deliver in the same transaction. LI.FI sometimes routes a
@@ -656,7 +772,10 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         // Name it here, before anything is built.
         const duration = est.executionDuration ?? 0;
         if (fromChain === toChain && duration > SAME_CHAIN_MAX_SECONDS) {
-          params.onRefusal?.(`lifi: same-chain route settles asynchronously (${duration} s via ${(q as {tool?: string}).tool ?? "unknown tool"}) — a same-chain swap must deliver in the same transaction`);
+          params.onRefusal?.(
+            `lifi: same-chain route settles asynchronously (${duration} s via ${(q as {tool?: string}).tool ?? "unknown tool"}) — a same-chain swap must deliver in the same transaction`,
+            {reason: "unsupported_pair"},
+          );
           return null;
         }
         // The calldata is what gets signed: it must pay the reviewed recipient at least the reviewed
@@ -666,7 +785,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
             fromToken, toToken: expectedToToken, amountIn: BigInt(params.amountIn), receiver: toAddress, sender: fromAddress, minOut: BigInt(minDestAmount),
             destChainId: BigInt(toChain), sameChain: fromChain === toChain, evmDestination: !isSolana(params.destChain),
           });
-          if (why) return reject(`the transaction does not match the quote: ${why}`);
+          if (why) return reject(`the transaction does not match the quote: ${why}`, reasonOf(why) ?? "policy_refused");
         }
         return {
           provider: "lifi",
@@ -692,7 +811,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         };
       } catch {
         // Our own 12 s deadline (not the caller's signal): say so instead of a silent null.
-        if (deadline?.aborted) params.onRefusal?.("lifi: no quote within 12 s");
+        if (deadline?.aborted) params.onRefusal?.("lifi: no quote within 12 s", {reason: "upstream_unavailable"});
         return null;
       }
       return null;
@@ -702,10 +821,10 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
       // A dry quote priced for a placeholder sender or recipient (placeholderIn) is never built, even with a transaction attached.
       const placeholder = quote.providerData?.placeholder;
       if (placeholder !== undefined) {
-        throw new Error(`swap2: this LI.FI quote was priced for a placeholder ${String(placeholder).slice(0, 20)} (a dry quote without that address) and has no transaction to build — quote again with the sender and the recipient`);
+        throw refusal("policy_refused", `swap2: this LI.FI quote was priced for a placeholder ${String(placeholder).slice(0, 20)} (a dry quote without that address) and has no transaction to build — quote again with the sender and the recipient`);
       }
       const tx = quote.txRequest;
-      if (!tx) throw new Error("swap2: LI.FI quote has no transaction request");
+      if (!tx) throw refusal("policy_refused", "swap2: LI.FI quote has no transaction request");
       // The intent id carries the LI.FI source chain; a serialized leg names
       // its chain so the engine can refuse a mismatched account.
       const [, fromChain] = quote.intentId.split(":");
@@ -784,26 +903,26 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
 export function lifiVerifyQuote(params: QuoteParams, quote: Quote): string | null {
   const fromChain = LIFI_CHAIN[params.sourceChain];
   const toChain = LIFI_CHAIN[params.destChain];
-  if (!fromChain || !toChain) return "not a LI.FI chain pair";
+  if (!fromChain || !toChain) return note("not a LI.FI chain pair", "unsupported_pair");
   // A dry quote priced for a placeholder sender or recipient (placeholderIn) prices the route only: with a transaction
   // it would pay or refund that public account from whichever wallet signs it.
   const placeholder = params.dry !== false ? placeholderIn(params) : null;
   if (placeholder) {
-    if (quote.txRequest !== undefined) return `a dry quote priced for a placeholder ${placeholder} carries a transaction — it would pay or refund that placeholder, not the wallet that signs it`;
+    if (quote.txRequest !== undefined) return note(`a dry quote priced for a placeholder ${placeholder} carries a transaction — it would pay or refund that placeholder, not the wallet that signs it`, "recipient_mismatch");
     return priceOnlyMismatch(params, quote, `lifi:${fromChain}:${toChain}`);
   }
   const tx = quote.txRequest;
-  if (!tx) return "the quote carries no transaction";
+  if (!tx) return note("the quote carries no transaction", "policy_refused");
   if (isSolana(params.sourceChain)) {
-    if (!tx.serializedTx || tx.data !== undefined || tx.to !== undefined) return "a Solana source carries a serialized transaction only";
+    if (!tx.serializedTx || tx.data !== undefined || tx.to !== undefined) return note("a Solana source carries a serialized transaction only", "policy_refused");
     // The static part of a bridge (see solanaBridgeTxMismatch); the account proves a Mayan order's recipient (bridgeOut).
     return fromChain === toChain ? null : solanaBridgeTxMismatch(tx.serializedTx, params.refundAddress || (params.dry !== false ? SOLANA_PLACEHOLDER : ""));
   }
-  if (!isHexData(tx.data) || !tx.to || tx.serializedTx !== undefined) return "the quote carries no Diamond call";
-  if (!sameAddress(tx.to, diamondFor(params.sourceChain))) return `the call targets ${tx.to}, not the LI.FI Diamond`;
-  if (tx.chainId !== undefined && String(tx.chainId) !== fromChain) return `the call is for chain ${tx.chainId}, not ${fromChain}`;
+  if (!isHexData(tx.data) || !tx.to || tx.serializedTx !== undefined) return note("the quote carries no Diamond call", "policy_refused");
+  if (!sameAddress(tx.to, diamondFor(params.sourceChain))) return note(`the call targets ${tx.to}, not the LI.FI Diamond`, "vault_mismatch");
+  if (tx.chainId !== undefined && String(tx.chainId) !== fromChain) return note(`the call is for chain ${tx.chainId}, not ${fromChain}`, "policy_refused");
   const fromToken = lifiToken(params);
-  if (!fromToken) return `unknown source token ${params.sourceToken}`;
+  if (!fromToken) return note(`unknown source token ${params.sourceToken}`, "unsupported_pair");
   const sourceIsToken = fromToken !== EVM_ZERO;
   // The same addresses the provider quotes for: a dry quote without them prices the placeholder (never built).
   const dry = params.dry !== false;
@@ -817,23 +936,23 @@ export function lifiVerifyQuote(params: QuoteParams, quote: Quote): string | nul
     value = BigInt(tx.value ?? "0");
     nativeFee = BigInt(tx.nativeFee ?? "0");
   } catch {
-    return "the quote's amounts are not integers";
+    return note("the quote's amounts are not integers", "upstream_unavailable");
   }
-  if (BigInt(quote.sourceAmount) !== amountIn) return `the quote spends ${quote.sourceAmount}, not the ${amountIn} input`;
-  if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) return `the quoted minimum ${minOut} is below the caller's floor ${params.minAmountOut}`;
+  if (BigInt(quote.sourceAmount) !== amountIn) return note(`the quote spends ${quote.sourceAmount}, not the ${amountIn} input`, "policy_refused");
+  if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) return note(`the quoted minimum ${minOut} is below the caller's floor ${params.minAmountOut}`, "price_check_failed");
   if (sourceIsToken) {
-    if (value !== nativeFee) return "a token input attaches only its declared bridge fee";
-    if (!tx.approvalAddress || !sameAddress(tx.approvalAddress, diamondFor(params.sourceChain))) return "a token input approves the LI.FI Diamond";
+    if (value !== nativeFee) return note("a token input attaches only its declared bridge fee", "policy_refused");
+    if (!tx.approvalAddress || !sameAddress(tx.approvalAddress, diamondFor(params.sourceChain))) return note("a token input approves the LI.FI Diamond", "vault_mismatch");
   } else {
-    if (value < amountIn || value - amountIn !== nativeFee) return "a native input is paid as the input plus its declared bridge fee";
-    if (tx.approvalAddress !== undefined) return "a native input approves nothing";
+    if (value < amountIn || value - amountIn !== nativeFee) return note("a native input is paid as the input plus its declared bridge fee", "policy_refused");
+    if (tx.approvalAddress !== undefined) return note("a native input approves nothing", "vault_mismatch");
   }
-  if (quote.intentId.replace(/~[0-9a-f]{32}$/, "") !== `lifi:${fromChain}:${toChain}`) return "the intent id does not name this route";
+  if (quote.intentId.replace(/~[0-9a-f]{32}$/, "") !== `lifi:${fromChain}:${toChain}`) return note("the intent id does not name this route", "policy_refused");
   const why = diamondCallMismatch(tx.data, {
     fromToken, toToken: nativeFor(params.destChain, params.destToken), amountIn, receiver: toAddress, sender: fromAddress, minOut,
     destChainId: BigInt(toChain), sameChain: fromChain === toChain, evmDestination: !isSolana(params.destChain),
   });
-  return why ? `the transaction does not match the request: ${why}` : null;
+  return why ? note(`the transaction does not match the request: ${why}`, reasonOf(why) ?? "policy_refused") : null;
 }
 
 /**
@@ -842,17 +961,17 @@ export function lifiVerifyQuote(params: QuoteParams, quote: Quote): string | nul
  * (`providerData.nativeFee`, which the router nets out of its value) is a base-unit integer. The reason, or null.
  */
 function priceOnlyMismatch(params: QuoteParams, quote: Quote, route: string): string | null {
-  if (quote.depositAddress !== "") return `a LI.FI quote pays no deposit address, but this one names ${String(quote.depositAddress).slice(0, 64)}`;
+  if (quote.depositAddress !== "") return note(`a LI.FI quote pays no deposit address, but this one names ${String(quote.depositAddress).slice(0, 64)}`, "vault_mismatch");
   const fee = quote.providerData?.nativeFee;
-  if (fee !== undefined && !/^\d{1,80}$/.test(String(fee))) return `the price-only quote declares a native fee of ${String(fee).slice(0, 40)}, not a base-unit integer`;
+  if (fee !== undefined && !/^\d{1,80}$/.test(String(fee))) return note(`the price-only quote declares a native fee of ${String(fee).slice(0, 40)}, not a base-unit integer`, "upstream_unavailable");
   try {
-    if (BigInt(quote.sourceAmount) !== BigInt(params.amountIn)) return `the quote spends ${quote.sourceAmount}, not the ${params.amountIn} input`;
+    if (BigInt(quote.sourceAmount) !== BigInt(params.amountIn)) return note(`the quote spends ${quote.sourceAmount}, not the ${params.amountIn} input`, "policy_refused");
     const minOut = BigInt(quote.minDestAmount);
-    if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) return `the quoted minimum ${minOut} is below the caller's floor ${params.minAmountOut}`;
+    if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) return note(`the quoted minimum ${minOut} is below the caller's floor ${params.minAmountOut}`, "price_check_failed");
   } catch {
-    return "the quote's amounts are not integers";
+    return note("the quote's amounts are not integers", "upstream_unavailable");
   }
-  return quote.intentId.replace(/~[0-9a-f]{32}$/, "") === route ? null : "the intent id does not name this route";
+  return quote.intentId.replace(/~[0-9a-f]{32}$/, "") === route ? null : note("the intent id does not name this route", "policy_refused");
 }
 
 /**
@@ -866,4 +985,6 @@ export const lifiPins: RemotePins = Object.freeze({
   callTargets: (chain: string): readonly string[] => (/^eip155:[0-9]+$/.test(chain) ? [diamondFor(chain)] : []),
   spenders: (chain: string): readonly string[] => (/^eip155:[0-9]+$/.test(chain) ? [diamondFor(chain)] : []),
   verifyQuote: lifiVerifyQuote,
+  /** The reason of a text {@link lifiVerifyQuote} returned (`remoteProvider` puts it on the stub's refusal). */
+  reasonOf: (text: string): Swap2RefusalInfo | undefined => reasonOf(text),
 });

@@ -9,6 +9,7 @@
 
 import {base64Bytes} from "@anywalletkit/protocol-swap2-core/util";
 import {base58} from "./solana-address.js";
+import {note} from "./refusals.js";
 
 /** Mayan's CPI proxy and order programs (swap-sdk `src/addresses.ts`). */
 const MAYAN_ENTRY_PROGRAMS = new Set([
@@ -50,7 +51,7 @@ class Cursor {
 /** Why the transaction is visibly wrong for `sender` (see the module note), or null when its static part is consistent with a bridge. */
 export function solanaBridgeTxMismatch(base64: string, sender: string): string | null {
   const bytes = base64Bytes(base64);
-  if (!bytes) return "the Solana transaction is not base64";
+  if (!bytes) return note("the Solana transaction is not base64", "upstream_unavailable");
   const c = new Cursor(bytes);
   try {
     c.bytes(64 * c.short()); // signatures
@@ -58,7 +59,7 @@ export function solanaBridgeTxMismatch(base64: string, sender: string): string |
     if ((first & 0x80) === 0) c.at--; // legacy message: no version prefix
     c.bytes(3); // header
     const keys = Array.from({length: c.short()}, () => base58(c.bytes(32)));
-    if (keys[0] !== sender) return `the Solana transaction is paid by ${keys[0] ?? "nobody"}, not the sender ${sender}`;
+    if (keys[0] !== sender) return note(`the Solana transaction is paid by ${keys[0] ?? "nobody"}, not the sender ${sender}`, "policy_refused");
     c.bytes(32); // recent blockhash
     let mayan = false;
     const payees: string[] = [];
@@ -75,8 +76,8 @@ export function solanaBridgeTxMismatch(base64: string, sender: string): string |
       }
     }
     // A deposit to an address is how the other bridges are paid; a Mayan route moves its funds through its order.
-    return mayan && payees.length ? `the Solana transaction transfers SOL to ${payees[0]}, which is neither the sender nor LI.FI's fee wallet` : null;
+    return mayan && payees.length ? note(`the Solana transaction transfers SOL to ${payees[0]}, which is neither the sender nor LI.FI's fee wallet`, "recipient_mismatch") : null;
   } catch (err) {
-    return `the Solana transaction does not decode (${err instanceof Error ? err.message : String(err)})`;
+    return note(`the Solana transaction does not decode (${err instanceof Error ? err.message : String(err)})`, "policy_refused");
   }
 }
