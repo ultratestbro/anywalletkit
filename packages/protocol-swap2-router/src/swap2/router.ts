@@ -129,12 +129,12 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
     return new RouterSwap2Protocol(this.account, {...rest, router: this.router.only(provider)});
   }
 
-  protected override noRouteDetail(): string {
-    return this.router.lastRejections.join("; ").slice(0, 400);
+  protected override noRouteDetail(params?: QuoteParams): string {
+    return ((params && this.router.rejectionsFor(params)) ?? this.router.lastRejections).join("; ").slice(0, 400);
   }
 
-  protected override noRouteRefusals(): readonly Swap2Refusal[] {
-    return this.router.lastRefusals;
+  protected override noRouteRefusals(params?: QuoteParams): readonly Swap2Refusal[] {
+    return (params && this.router.refusalsFor(params)) ?? this.router.lastRefusals;
   }
 
   protected providerFor(name: string): CrossChainProvider | undefined {

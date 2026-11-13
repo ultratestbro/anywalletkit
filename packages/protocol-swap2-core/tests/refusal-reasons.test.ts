@@ -11,8 +11,10 @@ import {
   isSwap2RefusalReason,
   parseRetryAfter,
   refusal,
+  refusalInfo,
   refusalNotes,
   refusalOf,
+  Swap2MaybeSentError,
   withReason,
   type Swap2Refusal,
 } from "../src/errors.js";
@@ -101,7 +103,37 @@ describe("refusalOf()", () => {
     expect(refusalOf({reason: "nope"})).toBeUndefined();
     expect(refusalOf({reason: "ERC20: transfer amount exceeds balance"})).toBeUndefined();
     for (const v of [null, undefined, "no_route", 42]) expect(refusalOf(v)).toBeUndefined();
-    expect(refusalOf({reason: "no_route", retryAfterMs: "5", httpStatus: "503"})).toEqual({reason: "no_route"});
+  });
+
+  it("reads only reasons this module stamped: a contract's revert text that spells a reason is not one", () => {
+    // wallet-evm's SimulationError and viem's ContractFunctionRevertedError carry the revert string in `reason`.
+    class SimulationError extends Error { constructor(readonly reason: string) { super(`simulation failed: ${reason}`); } }
+    const revert = new SimulationError("quote_expired");
+    withReason(revert, "simulation_failed");
+    expect(refusalOf(revert)).toBeUndefined();
+    expect(refusalOf(new Error("wrapped", {cause: revert}))).toBeUndefined();
+    expect(refusalOf(Object.assign(new Error("x"), {reason: "rate_limited", retryAfterMs: 1}))).toBeUndefined();
+    expect(refusalOf({reason: "no_route"})).toBeUndefined();
+    // a stamped link further down still counts
+    expect(refusalOf(new Error("outer", {cause: new SimulationError("rate_limited")}))).toBeUndefined();
+    expect(refusalOf(new Error("outer", {cause: refusal("chain_halted", "halted")}))).toEqual({reason: "chain_halted"});
+  });
+
+  it("is never a retry signal on a transaction that may have been broadcast", () => {
+    const network = withReason(new TypeError("Network request failed"), "upstream_unavailable");
+    expect(refusalOf(new Swap2MaybeSentError("swap2: the source transaction may have been broadcast", "0xabc", undefined, {cause: network}))).toBeUndefined();
+    expect(refusalOf(new Error("outer", {cause: new Swap2MaybeSentError("maybe", undefined, undefined, {cause: network})}))).toBeUndefined();
+    expect(refusalOf(new Error("outer", {cause: Object.assign(withReason(new Error("x"), "rate_limited"), {maybeSent: true})}))).toBeUndefined();
+  });
+});
+
+describe("refusalInfo()", () => {
+  it("reads a plain object's valid fields (a server body, an onRefusal argument), no cause walk", () => {
+    expect(refusalInfo({reason: "no_route", retryAfterMs: "5", httpStatus: "503"})).toEqual({reason: "no_route"});
+    expect(refusalInfo({reason: "rate_limited", retryAfterMs: 1000, httpStatus: 429, extra: 1})).toEqual({reason: "rate_limited", retryAfterMs: 1000, httpStatus: 429});
+    expect(refusalInfo({reason: "nope"})).toBeUndefined();
+    expect(refusalInfo({cause: {reason: "no_route"}})).toBeUndefined();
+    for (const v of [null, undefined, "no_route", 42]) expect(refusalInfo(v)).toBeUndefined();
   });
 });
 
@@ -391,5 +423,114 @@ describe("server → remote stub", () => {
     const berr = await build.buildDeposit(q!).catch((e: Error) => e);
     expect((berr as Error).message).toBe("mock: the build fails this app's own check — the vault is not the confirmed one");
     expect(refusalOf(berr)).toEqual({reason: "vault_mismatch"});
+  });
+});
+
+// ---- review round: per-call outcomes, normalized intake, the remaining server / stub paths ----------------
+
+describe("review round", () => {
+  it("overlapping quotes on one protocol each get their own reason and refusals", async () => {
+    const p = protocol(provider({
+      getQuote: async (params) => {
+        const big = params.amountIn === "5000";
+        await new Promise((r) => setTimeout(r, big ? 10 : 60));
+        params.onRefusal?.(big ? "halted" : "below its minimum", {reason: big ? "chain_halted" : "amount_too_small"});
+        return null;
+      },
+    }));
+    const [small, big] = await Promise.all([
+      p.quoteSwap2(options).catch((e: Swap2QuoteError) => e),
+      new Promise((r) => setTimeout(r, 5)).then(() => p.quoteSwap2({...options, fromTokenAmount: 5000n}).catch((e: Swap2QuoteError) => e)),
+    ]);
+    expect((small as Swap2QuoteError).message).toBe("swap2: no route available for the requested pair :: edge: below its minimum");
+    expect((small as Swap2QuoteError).reason).toBe("amount_too_small");
+    expect((big as Swap2QuoteError).message).toBe("swap2: no route available for the requested pair :: edge: halted");
+    expect((big as Swap2QuoteError).reason).toBe("chain_halted");
+  });
+
+  it("a provider's onRefusal info is normalized and cannot rename the venue or rewrite its text", async () => {
+    const spoof = await noRoute(provider({getQuote: async (p) => { p.onRefusal?.("x", {reason: "slippage", provider: "lifi", message: "lifi: spoofed", retryAfterMs: -5} as never); return null; }}));
+    expect(spoof.reason).toBe("no_route");
+    expect(spoof.refusals).toEqual([{message: "edge: x", provider: "edge"}]);
+    const named = await noRoute(provider({getQuote: async (p) => { p.onRefusal?.("y", {reason: "rate_limited", provider: "lifi", message: "z", retryAfterMs: 1000} as never); return null; }}));
+    expect(named.refusals).toEqual([{reason: "rate_limited", retryAfterMs: 1000, message: "edge: y", provider: "edge"}]);
+    const str = await noRoute(provider({getQuote: async (p) => { p.onRefusal?.("w", "no_route" as never); return null; }}));
+    expect(str.refusals).toEqual([{message: "edge: w", provider: "edge"}]);
+    const e = new Swap2QuoteError("x", {refusals: [{message: "m", reason: "bogus" as never, retryAfterMs: 1e15, provider: 7 as never, extra: 1} as never]});
+    expect(e.refusals).toEqual([{message: "m"}]);
+  });
+
+  it("a quote the engine would reject is classified on the server too (502 price_check_failed / quote_expired)", async () => {
+    const low = createSwap2Handler({providers: [mock({getQuote: async () => ({...QUOTE, minDestAmount: "1"})})], sealSecret: SECRET, guard: allow});
+    expect(await low("quote", {provider: "mock", params: {...PARAMS, minAmountOut: "99000000"}}, "u")).toEqual({status: 502, body: {error: "mock returned a quote the swap engine would reject", reason: "price_check_failed"}});
+    const stale = createSwap2Handler({providers: [mock({getQuote: async () => ({...QUOTE, validUntilMs: Date.now() - 1})})], sealSecret: SECRET, guard: allow});
+    expect(await stale("quote", {provider: "mock", params: PARAMS}, "u")).toEqual({status: 502, body: {error: "mock returned a quote the swap engine would reject", reason: "quote_expired"}});
+    const other = createSwap2Handler({providers: [mock({getQuote: async () => ({...QUOTE, provider: "spoof"})})], sealSecret: SECRET, guard: allow});
+    expect((await other("quote", {provider: "mock", params: PARAMS}, "u")).body).toEqual({error: "mock returned a quote the swap engine would reject", reason: "policy_refused"});
+  });
+
+  it("a classified refusal thrown from getQuote keeps its reason behind the opaque 500; anything else stays bare", async () => {
+    const limited = createSwap2Handler({providers: [mock({getQuote: async () => { throw refusal("rate_limited", "mock: 429 at https://api.mock.test/?key=SECRET", {retryAfterMs: 4000}); }})], sealSecret: SECRET, guard: allow});
+    expect(await limited("quote", {provider: "mock", params: PARAMS}, "u")).toEqual({status: 500, body: {error: "internal error", reason: "rate_limited", retryAfterMs: 4000}});
+    const err = await wire(limited).getQuote(PARAMS).catch((e: Error) => e);
+    expect(refusalOf(err)).toEqual({reason: "rate_limited", retryAfterMs: 4000});
+    const bare = createSwap2Handler({providers: [mock({getQuote: async () => { throw new Error("boom at https://rpc/key"); }})], sealSecret: SECRET, guard: allow});
+    expect(await bare("quote", {provider: "mock", params: PARAMS}, "u")).toEqual({status: 500, body: {error: "internal error"}});
+  });
+
+  it("the server's intent-token 403s are policy_refused, never read as a rejected key", async () => {
+    const handle = createSwap2Handler({providers: [mock()], sealSecret: SECRET, guard: allow});
+    expect(await handle("track", {provider: "mock", ref: {intentId: "abc"}}, "u")).toEqual({status: 403, body: {error: "swap id carries no intent token from this server", reason: "policy_refused"}});
+    expect(refusalOf(await wire(handle).trackIntent({intentId: "abc"}).catch((e: Error) => e))).toEqual({reason: "policy_refused"});
+    expect((await handle("track", {provider: "mock", ref: {intentId: `abc~${"0".repeat(32)}`}}, "u")).body).toEqual({error: "swap id carries an invalid intent token", reason: "policy_refused"});
+  });
+
+  it("the stub: a 2xx that is not JSON is upstream_unavailable; a classified body keeps the status's wait; a classified verify throw keeps its reason", async () => {
+    const html = await against(200, "<html>captive portal</html>").getQuote(PARAMS).catch((e: Error) => e);
+    expect(html).toBeInstanceOf(SyntaxError);
+    expect(refusalOf(html)).toEqual({reason: "upstream_unavailable"});
+    const merged = await against(429, JSON.stringify({error: "slow", reason: "rate_limited"}), {"retry-after": "30"}).getQuote(PARAMS).catch((e: Error) => e);
+    expect(refusalOf(merged)).toEqual({reason: "rate_limited", httpStatus: 429, retryAfterMs: 30_000});
+    const own = await against(429, JSON.stringify({error: "slow", reason: "rate_limited", retryAfterMs: 5000}), {"retry-after": "30"}).getQuote(PARAMS).catch((e: Error) => e);
+    expect(refusalOf(own)).toEqual({reason: "rate_limited", httpStatus: 429, retryAfterMs: 5000});
+    const differs = await against(403, JSON.stringify({error: "provider 'mock' is disabled", reason: "policy_refused"})).getQuote(PARAMS).catch((e: Error) => e);
+    expect(refusalOf(differs)).toEqual({reason: "policy_refused"});
+    const handle = createSwap2Handler({providers: [mock()], sealSecret: SECRET, guard: allow});
+    const thrown = await wire(handle, {verifyQuote: () => { throw refusal("recipient_mismatch", "the recipient differs"); }}).getQuote(PARAMS).catch((e: Error) => e);
+    expect((thrown as Error).message).toBe("mock: the quote fails this app's own check — the recipient differs");
+    expect(refusalOf(thrown)).toEqual({reason: "recipient_mismatch"});
+  });
+
+  it("quoteRejection says why validQuote refuses, check for check", async () => {
+    const {quoteRejection, validQuote} = await import("../src/validate.js");
+    const q = {...QUOTE};
+    expect(quoteRejection(q, PARAMS, "mock")).toBeNull();
+    expect(validQuote(q, PARAMS, "mock")).toBe(true);
+    const cases: [Partial<Quote>, Partial<QuoteParams>, unknown][] = [
+      [{provider: "other"}, {}, {reason: "policy_refused"}],
+      [{sourceAmount: "1"}, {}, {reason: "policy_refused"}],
+      [{destAmount: "x"}, {}, {reason: "upstream_unavailable"}],
+      [{reliability: 2}, {}, {reason: "upstream_unavailable"}],
+      [{minDestAmount: "99900001"}, {}, {reason: "upstream_unavailable"}],
+      [{}, {minAmountOut: "99800001"}, {reason: "price_check_failed"}],
+      [{minDestAmount: "1"}, {slippageBps: 50}, {reason: "price_check_failed"}],
+      [{validUntilMs: Date.now() - 1}, {}, {reason: "quote_expired"}],
+      [{validUntilMs: Number.NaN}, {}, {reason: "upstream_unavailable"}],
+      [{}, {minAmountOut: "abc"}, {}],
+      [{}, {slippageBps: 1.5}, {}],
+    ];
+    for (const [over, params, want] of cases) {
+      expect(quoteRejection({...q, ...over} as Quote, {...PARAMS, ...params}, "mock")).toEqual(want);
+      expect(validQuote({...q, ...over} as Quote, {...PARAMS, ...params}, "mock")).toBe(false);
+    }
+  });
+
+  it("the helpers take a wait or status that may be undefined (exactOptionalPropertyTypes)", () => {
+    const header: string | null = null;
+    const e = refusal("rate_limited", "x: 429", {retryAfterMs: parseRetryAfter(header), httpStatus: 429});
+    expect(refusalOf(e)).toEqual({reason: "rate_limited", httpStatus: 429});
+    const status: number | undefined = undefined;
+    expect(refusalOf(withReason(new Error("y"), {reason: "upstream_unavailable", httpStatus: status}))).toEqual({reason: "upstream_unavailable"});
+    expect(new Swap2QuoteError("z", {reason: undefined, retryAfterMs: undefined}).reason).toBeUndefined();
   });
 });

@@ -1,4 +1,5 @@
 import type {CrossChainProvider, Quote, QuoteParams} from "./types.js";
+import type {Swap2RefusalReason} from "./errors.js";
 
 /**
  * How far past the requested slippage a quote's minimum may sit and still count as "at" it. Providers derive the
@@ -16,47 +17,66 @@ export function slippageFloor(dest: bigint, slippageBps: number): bigint {
 
 /** Shared quote validator used by both the aggregate and single-provider paths. */
 export function validQuote(q: Quote, params: QuoteParams, provider: string): boolean {
+  return quoteRejection(q, params, provider) === null;
+}
+
+const OTHER_QUOTE = Object.freeze({reason: "policy_refused"} as const);
+const MALFORMED = Object.freeze({reason: "upstream_unavailable"} as const);
+const BELOW = Object.freeze({reason: "price_check_failed"} as const);
+const EXPIRED = Object.freeze({reason: "quote_expired"} as const);
+/** The caller's own request is malformed (a bad floor or slippage): refused, but not the venue's refusal. */
+const BAD_REQUEST = Object.freeze({});
+
+/**
+ * Why {@link validQuote} refuses a quote, or null when it passes (the same checks, in the same order): another
+ * provider's or another input's quote (`policy_refused`), a malformed one (`upstream_unavailable`), a minimum
+ * under the floor or the slippage (`price_check_failed`), an expired one (`quote_expired`). An empty object
+ * when the request itself is malformed.
+ */
+export function quoteRejection(q: Quote, params: QuoteParams, provider: string): {readonly reason?: Swap2RefusalReason} | null {
   try {
-    if (q.provider !== provider || q.sourceAmount !== params.amountIn) return false;
-    if (typeof q.intentId !== "string" || !q.intentId || typeof q.depositAddress !== "string" || (q.depositMemo !== null && typeof q.depositMemo !== "string")) return false;
-    if (![q.sourceAmount, q.destAmount, q.minDestAmount].every((value) => /^[0-9]+$/.test(value))) return false;
+    if (q.provider !== provider || q.sourceAmount !== params.amountIn) return OTHER_QUOTE;
+    if (typeof q.intentId !== "string" || !q.intentId || typeof q.depositAddress !== "string" || (q.depositMemo !== null && typeof q.depositMemo !== "string")) return MALFORMED;
+    if (![q.sourceAmount, q.destAmount, q.minDestAmount].every((value) => /^[0-9]+$/.test(value))) return MALFORMED;
     const source = BigInt(q.sourceAmount);
     const dest = BigInt(q.destAmount);
     const min = BigInt(q.minDestAmount);
-    if (source <= 0n || dest <= 0n || min <= 0n || min > dest) return false;
+    if (source <= 0n || dest <= 0n || min <= 0n || min > dest) return MALFORMED;
     if (params.minAmountOut !== undefined) {
-      if (!/^[0-9]+$/.test(params.minAmountOut) || BigInt(params.minAmountOut) <= 0n || min < BigInt(params.minAmountOut)) return false;
+      if (!/^[0-9]+$/.test(params.minAmountOut) || BigInt(params.minAmountOut) <= 0n) return BAD_REQUEST;
+      if (min < BigInt(params.minAmountOut)) return BELOW;
     }
     if (params.slippageBps !== undefined) {
-      if (!Number.isInteger(params.slippageBps) || params.slippageBps < 0 || params.slippageBps >= 10_000) return false;
+      if (!Number.isInteger(params.slippageBps) || params.slippageBps < 0 || params.slippageBps >= 10_000) return BAD_REQUEST;
       // Providers round the floor DOWN (1Click, LI.FI: floor(dest × (1 − s))), some through
       // floats. A ceil here refused nearly every slippage-bounded quote by one base unit.
-      if (min < slippageFloor(dest, params.slippageBps)) return false;
+      if (min < slippageFloor(dest, params.slippageBps)) return BELOW;
     }
-    if (!Number.isFinite(q.etaSeconds) || q.etaSeconds < 0) return false;
-    if (!Number.isFinite(q.reliability) || q.reliability < 0 || q.reliability > 1) return false;
-    if (!Number.isFinite(q.feeUsd) || q.feeUsd < 0) return false;
+    if (!Number.isFinite(q.etaSeconds) || q.etaSeconds < 0) return MALFORMED;
+    if (!Number.isFinite(q.reliability) || q.reliability < 0 || q.reliability > 1) return MALFORMED;
+    if (!Number.isFinite(q.feeUsd) || q.feeUsd < 0) return MALFORMED;
     if (q.fees && (!Array.isArray(q.fees) || !q.fees.every((fee) =>
       ["network", "protocol", "affiliate", "other"].includes(fee.type) &&
       /^[0-9]+$/.test(fee.amount) &&
       typeof fee.token === "string" && fee.token.length > 0 &&
       typeof fee.included === "boolean" &&
       (fee.description === undefined || typeof fee.description === "string")
-    ))) return false;
-    if (q.providerData && (Array.isArray(q.providerData) || typeof q.providerData !== "object" || !Object.values(q.providerData).every((value) => typeof value === "string"))) return false;
+    ))) return MALFORMED;
+    if (q.providerData && (Array.isArray(q.providerData) || typeof q.providerData !== "object" || !Object.values(q.providerData).every((value) => typeof value === "string"))) return MALFORMED;
     const tx = q.txRequest;
     if (tx) {
-      if (tx.value !== undefined && !/^[0-9]+$/.test(tx.value)) return false;
-      if (tx.gasLimit !== undefined && !/^[0-9]+$/.test(tx.gasLimit)) return false;
-      if (tx.chainId !== undefined && (!Number.isSafeInteger(tx.chainId) || tx.chainId <= 0)) return false;
-      if ([tx.to, tx.data, tx.approvalAddress, tx.serializedTx].some((value) => value !== undefined && typeof value !== "string")) return false;
+      if (tx.value !== undefined && !/^[0-9]+$/.test(tx.value)) return MALFORMED;
+      if (tx.gasLimit !== undefined && !/^[0-9]+$/.test(tx.gasLimit)) return MALFORMED;
+      if (tx.chainId !== undefined && (!Number.isSafeInteger(tx.chainId) || tx.chainId <= 0)) return MALFORMED;
+      if ([tx.to, tx.data, tx.approvalAddress, tx.serializedTx].some((value) => value !== undefined && typeof value !== "string")) return MALFORMED;
     }
     // Execution is always re-quoted. An unknown/zero expiry cannot prove that
     // the transaction is still safe to sign, so contribution packages reject it.
-    if (!Number.isFinite(q.validUntilMs) || q.validUntilMs <= Date.now()) return false;
-    return true;
+    if (!Number.isFinite(q.validUntilMs)) return MALFORMED;
+    if (q.validUntilMs <= Date.now()) return EXPIRED;
+    return null;
   } catch {
-    return false;
+    return MALFORMED;
   }
 }
 

@@ -27,7 +27,8 @@ Not breaking: every refusal text is unchanged. A classified refusal now also car
   `policy_refused`, so it is not read as a rejected key. Bump the server and the app together to get reasons from
   the server; either side alone works as before.
 - **protocol-swap2-router:** `lastRefusals` and `RouteSet.refusals` hold the same refusals as `lastRejections`, each
-  with its `reason`. With no enabled provider serving the route, `lastRefusals` holds one `unsupported_pair` entry.
+  with its `reason` (`refusalsFor(params)` for one auction). With nobody to ask, `lastRefusals` lists the disabled
+  venues that serve the route (`policy_refused`), or one `unsupported_pair` entry.
 - **Refusals matched by text:** switch them to `reason`. A refusal without one is not classified. A wallet's
   `SimulationError` keeps its own `reason` field (the revert text).
 

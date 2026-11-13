@@ -1,30 +1,40 @@
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 import {BaseSwap2Protocol} from "./base.js";
 import type {CrossChainProvider, Quote, QuoteParams} from "../types.js";
-import {refusalOf, type Swap2Refusal, type Swap2RefusalInfo} from "../errors.js";
-import {remotePinRefusal, validQuote} from "../validate.js";
+import {refusalInfo, refusalOf, type Swap2Refusal, type Swap2RefusalInfo, type Swap2RefusalReason} from "../errors.js";
+import {quoteRejection, remotePinRefusal} from "../validate.js";
 
 /** A single-provider swap2: quoting/tracking route through one solver. The
  *  per-provider packages subclass this — the contribution unit shape. */
 export abstract class SingleProviderSwap2 extends BaseSwap2Protocol {
   protected abstract readonly provider: CrossChainProvider;
-  /** Why the last resolveQuote came back empty — the provider's own reason, like the router's. */
-  private lastRefusal = "";
-  /** The same refusal, classified where the provider could; a venue that sat out without a text still says why here. */
-  private lastRefusals: Swap2Refusal[] = [];
+  /**
+   * Why a resolveQuote came back empty — the provider's own text, like the router's, and the same refusal classified —
+   * per call (keyed by the params it was given), so overlapping quotes on one instance never read each other's.
+   */
+  private readonly outcomes = new WeakMap<QuoteParams, {text: string; refusals: Swap2Refusal[]}>();
+  /** The latest call's outcome, for a subclass that asks without naming the call. */
+  private latest: {text: string; refusals: Swap2Refusal[]} = {text: "", refusals: []};
   protected async resolveQuote(params: QuoteParams): Promise<Quote | null> {
-    this.lastRefusal = "";
-    this.lastRefusals = [];
+    const outcome: {text: string; refusals: Swap2Refusal[]} = {text: "", refusals: []};
+    this.outcomes.set(params, outcome);
+    this.latest = outcome;
     const name = this.provider.name;
     const outer = params.onRefusal;
-    const note = (text: string, info: Swap2RefusalInfo | undefined) => {
-      if (this.lastRefusal) return;
-      this.lastRefusal = text;
-      this.lastRefusals = [{message: text.slice(0, 400), provider: name, ...info}];
+    // The provider's classification is normalized, and the venue's own text and name are written last: an adapter
+    // can neither smuggle a value outside the reasons nor put its refusal under another venue's name.
+    const note = (text: string, info: unknown) => {
+      if (outcome.text) return;
+      outcome.text = text;
+      outcome.refusals = [{...refusalInfo(info), message: text.slice(0, 400), provider: name}];
+    };
+    const silent = (message: string, reason: Swap2RefusalReason): null => {
+      outcome.refusals = [{reason, message, provider: name}];
+      return null;
     };
     const snapshot = Object.freeze({...params, onRefusal: (reason: string, info?: Swap2RefusalInfo) => {
       note(reason.startsWith(`${name}:`) ? reason : `${name}: ${reason}`, info);
-      try { outer?.(reason, info); } catch { /* diagnostics only */ }
+      try { outer?.(reason, refusalInfo(info)); } catch { /* diagnostics only */ }
     }});
     const from = Object.freeze({chain: snapshot.sourceChain, token: snapshot.sourceToken});
     const to = Object.freeze({chain: snapshot.destChain, token: snapshot.destToken});
@@ -33,18 +43,19 @@ export abstract class SingleProviderSwap2 extends BaseSwap2Protocol {
       // capability and quote-integrity boundary as the aggregator. Previously
       // they called getQuote directly, so `enabled: false` was advisory only.
       // These sit out without a text (the no-route message is unchanged); only the classified list says why.
-      if (!this.provider.enabled()) return this.silent(`${name}: disabled`, "policy_refused");
-      if (!this.provider.supportsRoute(from, to)) return this.silent(`${name}: does not serve this route`, "unsupported_pair");
+      if (!this.provider.enabled()) return silent(`${name}: disabled`, "policy_refused");
+      if (!this.provider.supportsRoute(from, to)) return silent(`${name}: does not serve this route`, "unsupported_pair");
       if (snapshot.sourceChain === snapshot.destChain && this.provider.supportsSameChain !== true) {
-        return this.silent(`${name}: does not serve same-chain swaps`, "unsupported_pair");
+        return silent(`${name}: does not serve same-chain swaps`, "unsupported_pair");
       }
       const quote = await this.provider.getQuote(snapshot);
       if (!quote) {
-        if (!this.lastRefusal) this.lastRefusals = [{message: `${name}: returned no quote`, provider: name, reason: "no_route"}];
+        if (!outcome.text) outcome.refusals = [{reason: "no_route", message: `${name}: returned no quote`, provider: name}];
         return null;
       }
-      if (!validQuote(quote, snapshot, name)) {
-        note(`${name}: rejected by validation (minDest=${quote.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"})`, {reason: "price_check_failed"});
+      const rejected = quoteRejection(quote, snapshot, name);
+      if (rejected) {
+        note(`${name}: rejected by validation (minDest=${quote.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"})`, rejected);
         return null;
       }
       const unpinned = remotePinRefusal(this.provider, quote, snapshot.sourceChain);
@@ -58,15 +69,11 @@ export abstract class SingleProviderSwap2 extends BaseSwap2Protocol {
       return null;
     }
   }
-  private silent(message: string, reason: Swap2RefusalInfo["reason"]): null {
-    this.lastRefusals = [{message, provider: this.provider.name, reason}];
-    return null;
+  protected override noRouteDetail(params?: QuoteParams): string {
+    return ((params && this.outcomes.get(params)) ?? this.latest).text.slice(0, 400);
   }
-  protected override noRouteDetail(): string {
-    return this.lastRefusal.slice(0, 400);
-  }
-  protected override noRouteRefusals(): readonly Swap2Refusal[] {
-    return this.lastRefusals;
+  protected override noRouteRefusals(params?: QuoteParams): readonly Swap2Refusal[] {
+    return ((params && this.outcomes.get(params)) ?? this.latest).refusals;
   }
   protected providerFor(name: string): CrossChainProvider | undefined {
     return name === this.provider.name ? this.provider : undefined;

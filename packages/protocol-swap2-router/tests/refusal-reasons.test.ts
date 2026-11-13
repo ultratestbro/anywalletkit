@@ -75,11 +75,18 @@ describe("lastRefusals", () => {
     expect(router.lastRefusals).toEqual([{provider: "r", message: expect.stringContaining("which the app did not pin as a call target"), reason: "policy_refused"}]);
   });
 
-  it("no enabled venue serving the route is one unsupported_pair; lastRejections stays empty", async () => {
-    const router = new CrossChainRouter([provider("a", {supportsRoute: () => false}), provider("b", {enabled: () => false})]);
+  it("no venue serving the route is one unsupported_pair; lastRejections stays empty", async () => {
+    const router = new CrossChainRouter([provider("a", {supportsRoute: () => false}), provider("b", {supportsRoute: () => false, enabled: () => false})]);
     await expect(router.getBestQuote(PARAMS)).resolves.toBeNull();
     expect(router.lastRejections).toEqual([]);
     expect(router.lastRefusals).toEqual([{message: "swap2-router: no enabled provider serves this route", reason: "unsupported_pair"}]);
+  });
+
+  it("when only disabled venues serve the route, each is policy_refused, as on the single-provider path", async () => {
+    const router = new CrossChainRouter([provider("a", {supportsRoute: () => false}), provider("dark", {enabled: () => false}), provider("broken", {enabled: () => { throw new Error("x"); }})]);
+    await expect(router.getBestQuote(PARAMS)).resolves.toBeNull();
+    expect(router.lastRejections).toEqual([]);
+    expect(router.lastRefusals).toEqual([{reason: "policy_refused", message: "dark: disabled", provider: "dark"}]);
   });
 
   it("is reset per call, and a route set carries the refusals of the venues that sat out", async () => {
@@ -131,5 +138,75 @@ describe("RouterSwap2Protocol's no route", () => {
     const e = await quoteError([provider("a", {supportsRoute: () => false})]);
     expect(e.message).toBe("swap2: no route available for the requested pair");
     expect(e.reason).toBe("unsupported_pair");
+  });
+});
+
+describe("review round", () => {
+  const options = {fromToken: "USDT", toToken: "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", toChain: "eip155:42161", fromTokenAmount: 100n, recipient: "0x3333333333333333333333333333333333333333"};
+
+  it("overlapping quotes on one router protocol each get their own reason, refusals and text", async () => {
+    const venue = provider("v", {
+      getQuote: async (params) => {
+        const big = params.amountIn === "5000";
+        await new Promise((r) => setTimeout(r, big ? 10 : 60));
+        params.onRefusal?.(big ? "halted" : "below its minimum", {reason: big ? "chain_halted" : "amount_too_small"});
+        return null;
+      },
+    });
+    const swaps = new RouterSwap2Protocol(undefined, {fromChain: "eip155:1", providers: [venue]});
+    const [small, big] = await Promise.all([
+      swaps.quoteSwap2(options).catch((e: Swap2QuoteError) => e),
+      new Promise((r) => setTimeout(r, 5)).then(() => swaps.quoteSwap2({...options, fromTokenAmount: 5000n}).catch((e: Swap2QuoteError) => e)),
+    ]);
+    expect((small as Swap2QuoteError).message).toBe("swap2: no route available for the requested pair :: v: below its minimum");
+    expect((small as Swap2QuoteError).reason).toBe("amount_too_small");
+    expect((small as Swap2QuoteError).refusals).toEqual([{reason: "amount_too_small", message: "v: below its minimum", provider: "v"}]);
+    expect((big as Swap2QuoteError).message).toBe("swap2: no route available for the requested pair :: v: halted");
+    expect((big as Swap2QuoteError).reason).toBe("chain_halted");
+  });
+
+  it("refusalsFor / rejectionsFor answer per params object", async () => {
+    const router = new CrossChainRouter([provider("a", {getQuote: async (p) => { p.onRefusal?.("no", {reason: "no_route"}); return null; }})]);
+    const one = {...PARAMS};
+    const two = {...PARAMS, amountIn: "2"};
+    await router.getBestQuote(one);
+    await router.getBestQuote(two);
+    expect(router.refusalsFor(one)).toEqual([{reason: "no_route", message: "a: no", provider: "a"}]);
+    expect(router.rejectionsFor(two)).toEqual(["a: no"]);
+    expect(router.refusalsFor({...PARAMS})).toBeUndefined();
+  });
+
+  it("an adapter cannot file its refusal under another venue or smuggle values outside the reasons", async () => {
+    const heard: unknown[] = [];
+    const router = new CrossChainRouter([
+      provider("evil", {getQuote: async (p) => { p.onRefusal?.("evil: nope", {reason: "totally_bogus", provider: "lifi", message: "lifi: spoofed", retryAfterMs: -5, httpStatus: "x"} as never); return null; }}),
+      provider("str", {getQuote: async (p) => { p.onRefusal?.("str: nope", "no_route" as never); return null; }}),
+      provider("ok", {getQuote: async (p) => { p.onRefusal?.("ok: busy", {reason: "rate_limited", provider: "evil", retryAfterMs: 2000} as never); return null; }}),
+    ]);
+    await router.getBestQuote({...PARAMS, onRefusal: (_t, info) => heard.push(info)});
+    expect(byProvider(router.lastRefusals)).toEqual([
+      {message: "evil: nope", provider: "evil"},
+      {reason: "rate_limited", retryAfterMs: 2000, message: "ok: busy", provider: "ok"},
+      {message: "str: nope", provider: "str"},
+    ]);
+    expect(heard).toContainEqual({reason: "rate_limited", retryAfterMs: 2000});
+    expect(heard.filter((h) => h !== undefined)).toHaveLength(1);
+  });
+
+  it("an expired or malformed quote is not called a price failure", async () => {
+    const router = new CrossChainRouter([
+      provider("stale", {getQuote: async (p) => ({...(await provider("stale").getQuote(p))!, validUntilMs: Date.now() - 1})}),
+      provider("odd", {getQuote: async (p) => ({...(await provider("odd").getQuote(p))!, reliability: 2})}),
+    ]);
+    await router.getBestQuote(PARAMS);
+    expect(byProvider(router.lastRefusals).map((r) => [r.provider, r.reason])).toEqual([["odd", "upstream_unavailable"], ["stale", "quote_expired"]]);
+  });
+
+  it("using() a disabled venue says policy_refused, like the single-provider path", async () => {
+    const swaps = new RouterSwap2Protocol(undefined, {fromChain: "eip155:1", providers: [provider("dark", {enabled: () => false}), provider("other")]});
+    const e = await swaps.using("dark").quoteSwap2(options).catch((x: Swap2QuoteError) => x);
+    expect(e).toBeInstanceOf(Swap2QuoteError);
+    expect((e as Swap2QuoteError).message).toBe("swap2: no route available for the requested pair");
+    expect((e as Swap2QuoteError).reason).toBe("policy_refused");
   });
 });

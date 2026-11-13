@@ -1,6 +1,6 @@
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "./types.js";
 import {anySignal, timeoutSignal} from "./util.js";
-import {httpRefusal, refusalOf, withReason, type Swap2RefusalInfo} from "./errors.js";
+import {httpRefusal, refusalInfo, refusalOf, withReason, type Swap2RefusalInfo} from "./errors.js";
 
 /**
  * HTTP-proxied `CrossChainProvider`: forwards every provider call to a backend
@@ -147,15 +147,24 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
       // ("quote expired", "route unsupported"), not just status codes.
       const text = await res.text().catch(() => "");
       const error = new Error(`swap2-remote ${name}/${action}: ${res.status} ${text.slice(0, 300)}`);
-      // The backend's own classification first (a provider's refusal, an expired quote), else what the status says.
-      const info = bodyRefusal(text) ?? httpRefusal(res.status, res.headers?.get?.("retry-after"));
+      // The backend's own classification first (a provider's refusal, an expired quote), else what the status says;
+      // the status still lends its wait and code when both name the same reason.
+      const body = bodyRefusal(text);
+      const status = httpRefusal(res.status, res.headers?.get?.("retry-after"));
+      const info = body && status && body.reason === status.reason ? {...status, ...body} : body ?? status;
       throw info ? withReason(error, info) : error;
     }
-    return (await res.json()) as T;
+    try {
+      return (await res.json()) as T;
+    } catch (error) {
+      // A 2xx that is not JSON (a CDN or captive-portal page, a cut body) or a timeout mid-body: the backend's failure.
+      if (!signal?.aborted && error instanceof Error) withReason(error, "upstream_unavailable");
+      throw error;
+    }
   }
   /** The app's `reasonOf` for a pins refusal; a throwing one leaves it unclassified. */
   const reasonOfPins = (text: string): Swap2RefusalInfo | undefined => {
-    try { return refusalOf(opts.reasonOf?.(text)); } catch { return undefined; }
+    try { return refusalInfo(opts.reasonOf?.(text)); } catch { return undefined; }
   };
 
   return {
@@ -177,16 +186,17 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
         // router records a REASON instead of an anonymous null.
         const {noQuote, reason, retryAfterMs, httpStatus} = out as {noQuote: unknown; reason?: unknown; retryAfterMs?: unknown; httpStatus?: unknown};
         const error = new Error(String(noQuote).slice(0, 300));
-        const info = refusalOf({reason, retryAfterMs, httpStatus});
+        const info = refusalInfo({reason, retryAfterMs, httpStatus});
         throw info ? withReason(error, info) : error;
       }
       if (out && typeof out === "object" && typeof out.intentId === "string") remember(out.intentId, params);
       if (out && opts.verifyQuote) {
         let refusal: string | null;
-        try { refusal = opts.verifyQuote(params, out); } catch (e) { refusal = e instanceof Error ? e.message : String(e); }
+        let thrown: Swap2RefusalInfo | undefined;
+        try { refusal = opts.verifyQuote(params, out); } catch (e) { refusal = e instanceof Error ? e.message : String(e); thrown = refusalOf(e); }
         if (refusal) {
           const error = new Error(`${name}: the quote fails this app's own check — ${refusal.slice(0, 240)}`);
-          const info = reasonOfPins(refusal);
+          const info = reasonOfPins(refusal) ?? thrown;
           throw info ? withReason(error, info) : error;
         }
       }
@@ -196,10 +206,11 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
       const tx = await call<UnsignedTx>("build", {quote});
       if (opts.verifyBuild) {
         let refusal: string | null;
-        try { refusal = await opts.verifyBuild(quote, tx, requests.get(quote.intentId)); } catch (e) { refusal = e instanceof Error ? e.message : String(e); }
+        let thrown: Swap2RefusalInfo | undefined;
+        try { refusal = await opts.verifyBuild(quote, tx, requests.get(quote.intentId)); } catch (e) { refusal = e instanceof Error ? e.message : String(e); thrown = refusalOf(e); }
         if (refusal) {
           const error = new Error(`${name}: the build fails this app's own check — ${refusal.slice(0, 240)}`);
-          const info = reasonOfPins(refusal);
+          const info = reasonOfPins(refusal) ?? thrown;
           throw info ? withReason(error, info) : error;
         }
       }
@@ -239,7 +250,7 @@ function bodyRefusal(text: string): Swap2RefusalInfo | undefined {
     const body: unknown = JSON.parse(text);
     if (!body || typeof body !== "object" || Array.isArray(body)) return undefined;
     const {reason, retryAfterMs, httpStatus} = body as {reason?: unknown; retryAfterMs?: unknown; httpStatus?: unknown};
-    return refusalOf({reason, retryAfterMs, httpStatus});
+    return refusalInfo({reason, retryAfterMs, httpStatus});
   } catch {
     return undefined;
   }

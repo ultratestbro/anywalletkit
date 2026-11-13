@@ -12,8 +12,8 @@ import type {
   RoutedQuote,
   ScoreWeights,
 } from "@anywalletkit/protocol-swap2-core/types";
-import {remotePinRefusal, validQuote} from "@anywalletkit/protocol-swap2-core/validate";
-import {refusal, refusalOf, type Swap2Refusal, type Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
+import {quoteRejection, remotePinRefusal} from "@anywalletkit/protocol-swap2-core/validate";
+import {refusal, refusalInfo, refusalOf, type Swap2Refusal, type Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 import {bigintToNumber} from "@anywalletkit/core";
 
@@ -114,6 +114,16 @@ export class CrossChainRouter {
    */
   get lastRefusals(): readonly Swap2Refusal[] {
     return this._lastRefusals;
+  }
+  /** Each call's own rejections and refusals, keyed by the params object it was given: overlapping auctions never read each other's. */
+  private readonly outcomes = new WeakMap<QuoteParams, {rejections: readonly string[]; refusals: readonly Swap2Refusal[]}>();
+  /** `lastRejections` for the auction that was given exactly this `params` object (undefined for another object). */
+  rejectionsFor(params: QuoteParams): readonly string[] | undefined {
+    return this.outcomes.get(params)?.rejections;
+  }
+  /** `lastRefusals` for the auction that was given exactly this `params` object (undefined for another object). */
+  refusalsFor(params: QuoteParams): readonly Swap2Refusal[] | undefined {
+    return this.outcomes.get(params)?.refusals;
   }
   private readonly weights: ScoreWeights;
   private readonly valueUsd: RouterOptions["valueUsd"];
@@ -268,9 +278,12 @@ export class CrossChainRouter {
     this._lastRejections = rejections;
     const classified: Swap2Refusal[] = [];
     this._lastRefusals = classified;
-    const reject = (provider: string, message: string, info: Swap2RefusalInfo | undefined) => {
+    this.outcomes.set(params, {rejections, refusals: classified});
+    // The venue's classification is normalized and its slot's name and text written last: an adapter can neither
+    // smuggle a value outside the reasons nor file its refusal under another venue.
+    const reject = (provider: string, message: string, info: unknown) => {
       rejections.push(message);
-      classified.push({message, provider, ...info});
+      classified.push({...refusalInfo(info), message, provider});
     };
     const snapshot = Object.freeze({...params});
     const from = Object.freeze({chain: snapshot.sourceChain, token: snapshot.sourceToken});
@@ -283,7 +296,14 @@ export class CrossChainRouter {
       eligible = eligible.filter((p) => p.supportsSameChain === true);
     }
     if (eligible.length === 0) {
-      classified.push({message: "swap2-router: no enabled provider serves this route", reason: "unsupported_pair"});
+      // Why nobody was asked: the venues that serve the route are disabled (one policy_refused entry each), or none serves it.
+      const dark = this.providers.filter((p) => {
+        try {
+          return !p.enabled() && p.supportsRoute(from, to) && (snapshot.sourceChain !== snapshot.destChain || p.supportsSameChain === true);
+        } catch { return false; }
+      });
+      if (dark.length > 0) for (const p of dark) classified.push({reason: "policy_refused", message: `${p.name}: disabled`, provider: p.name});
+      else classified.push({message: "swap2-router: no enabled provider serves this route", reason: "unsupported_pair"});
       return null;
     }
 
@@ -306,22 +326,24 @@ export class CrossChainRouter {
     await Promise.all(eligible.map(async (p, i) => {
       const controller = new AbortController();
       const own = Object.freeze({...snapshot, onRefusal: (reason: string, info?: Swap2RefusalInfo) => {
+        const valid = refusalInfo(info);
         if (refusals[i] === undefined) {
           refusals[i] = reason.startsWith(`${p.name}:`) ? reason : `${p.name}: ${reason}`;
-          refusalInfos[i] = info;
+          refusalInfos[i] = valid;
         }
-        try { snapshot.onRefusal?.(reason, info); } catch { /* diagnostics only */ }
+        try { snapshot.onRefusal?.(reason, valid); } catch { /* diagnostics only */ }
       }});
       let q: Quote | null = null;
+      let rejected: ReturnType<typeof quoteRejection> = null;
       try {
         q = await withTimeout(p.getQuote(own, controller.signal), timeoutMs);
         if (!q) {
           // A provider RETURNING null (vs throwing) was the one silent path
           // left — record it so the surfaced no-route error names the venue.
           reject(p.name, refusals[i] ?? `${p.name}: returned no quote`, refusals[i] !== undefined ? refusalInfos[i] : {reason: "no_route"});
-        } else if (!validQuote(q, snapshot, p.name)) {
+        } else if ((rejected = quoteRejection(q, snapshot, p.name))) {
           const reason = `${p.name}: rejected by validation (minDest=${q.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"}, validUntil=${q.validUntilMs}, now=${Date.now()})`;
-          reject(p.name, reason, {reason: "price_check_failed"});
+          reject(p.name, reason, rejected);
           console.warn(`swap2-router: ${reason}`);
           q = null;
         } else {

@@ -90,6 +90,13 @@ export interface Swap2RefusalInfo {
   readonly httpStatus?: number;
 }
 
+/** What the helpers accept: a reason, with a wait and a status that may be left undefined. */
+export interface Swap2RefusalInput {
+  readonly reason: Swap2RefusalReason;
+  readonly retryAfterMs?: number | undefined;
+  readonly httpStatus?: number | undefined;
+}
+
 /** One refusal: its text, its reason when classified, and the venue that gave it. */
 export interface Swap2Refusal {
   /** The refusal's text, as it always read. */
@@ -122,10 +129,23 @@ function normalized(info: {reason?: unknown; retryAfterMs?: unknown; httpStatus?
   };
 }
 
-/** Puts the valid fields of `info` on `target`. */
+/**
+ * Marks an error this module classified (withReason, refusal(), a Swap2Error's options). refusalOf reads only marked
+ * errors: a wallet's SimulationError or viem's revert error has a `reason` the contract chose, which may spell one
+ * of the reasons. A registry symbol, so two copies of this module (separate CJS entry points) agree.
+ */
+const CLASSIFIED: unique symbol = Symbol.for("@anywalletkit/protocol-swap2-core/refusal-reason") as never;
+
+/** Puts the valid fields of `info` on `target` and marks it classified. */
 function stamp(target: object, info: Swap2RefusalInfo | undefined): void {
   if (!info) return;
   Object.assign(target, info);
+  if (!Object.prototype.hasOwnProperty.call(target, CLASSIFIED)) Object.defineProperty(target, CLASSIFIED, {value: true});
+}
+
+/** A valid copy of a plain object's `reason` / `retryAfterMs` / `httpStatus` (a server body, an onRefusal argument), or undefined. */
+export function refusalInfo(value: unknown): Swap2RefusalInfo | undefined {
+  return value && typeof value === "object" ? normalized(value as {reason?: unknown; retryAfterMs?: unknown; httpStatus?: unknown}) : undefined;
 }
 
 /**
@@ -134,7 +154,7 @@ function stamp(target: object, info: Swap2RefusalInfo | undefined): void {
  * error that already has a `reason`: the first classification stands, and a field of another meaning
  * is kept (a wallet's `SimulationError` keeps its revert text).
  */
-export function withReason<E extends Error>(error: E, info: Swap2RefusalReason | Swap2RefusalInfo): E {
+export function withReason<E extends Error>(error: E, info: Swap2RefusalReason | Swap2RefusalInput): E {
   if ((error as {reason?: unknown}).reason !== undefined) return error;
   stamp(error, normalized(typeof info === "string" ? {reason: info} : info));
   return error;
@@ -144,7 +164,7 @@ export function withReason<E extends Error>(error: E, info: Swap2RefusalReason |
 export function refusal(
   reason: Swap2RefusalReason,
   message: string,
-  extra?: {retryAfterMs?: number; httpStatus?: number; cause?: unknown},
+  extra?: {retryAfterMs?: number | undefined; httpStatus?: number | undefined; cause?: unknown},
 ): Error {
   const error = extra?.cause !== undefined ? new Error(message, {cause: extra.cause}) : new Error(message);
   return withReason(error, {
@@ -156,12 +176,17 @@ export function refusal(
 
 /**
  * The reason an error carries, validated: its own, else the first one found down its `cause` chain
- * (six deep). Undefined when there is none.
+ * (six deep). Only reasons this module put there count (withReason, refusal(), a Swap2Error's options),
+ * never another field that happens to be named `reason`. Undefined when there is none, and always
+ * undefined for a source transaction that may have been broadcast (`Swap2MaybeSentError`, or a link
+ * with `maybeSent: true`): that is never a refusal to retry on.
  */
 export function refusalOf(error: unknown): Swap2RefusalInfo | undefined {
-  let e = error as {reason?: unknown; retryAfterMs?: unknown; httpStatus?: unknown; cause?: unknown} | undefined;
+  let e = error as ({name?: unknown; maybeSent?: unknown; cause?: unknown; [CLASSIFIED]?: unknown} & object) | undefined;
   for (let i = 0; e && typeof e === "object" && i < 6; e = e.cause as typeof e, i++) {
-    const info = normalized(e);
+    if (e instanceof Swap2MaybeSentError || e.name === "Swap2MaybeSentError" || e.maybeSent === true) return undefined;
+    if (e[CLASSIFIED] !== true) continue;
+    const info = normalized(e as {reason?: unknown});
     if (info) return info;
   }
   return undefined;
@@ -205,7 +230,7 @@ export function httpRefusal(status: number, retryAfter?: string | null, nowMs: n
  */
 export function combinedRefusal(refusals: readonly Swap2Refusal[]): Swap2RefusalInfo {
   const first = refusals[0]?.reason;
-  if (!first || refusals.some((r) => r.reason !== first)) return {reason: "no_route"};
+  if (!isSwap2RefusalReason(first) || refusals.some((r) => r.reason !== first)) return {reason: "no_route"};
   if (first === "rate_limited") {
     const waits = refusals.map((r) => r.retryAfterMs);
     const wait = waits.every((w): w is number => w !== undefined) ? Math.min(...waits) : undefined;
@@ -221,7 +246,7 @@ export function combinedRefusal(refusals: readonly Swap2Refusal[]): Swap2Refusal
  * `reasonOf` (the `RemotePins` hook) reads it back. Keeps the last `limit` texts (default 64), so it never grows.
  */
 export function refusalNotes(limit = 64): {
-  note(text: string, info: Swap2RefusalReason | Swap2RefusalInfo): string;
+  note(text: string, info: Swap2RefusalReason | Swap2RefusalInput): string;
   reasonOf(text: string): Swap2RefusalInfo | undefined;
 } {
   const seen = new Map<string, Swap2RefusalInfo>();
@@ -241,10 +266,10 @@ export function refusalNotes(limit = 64): {
 
 /** `ErrorOptions` plus a refusal's reason and, for an engine-wide "no route", every venue's refusal. */
 export interface Swap2ErrorOptions extends ErrorOptions {
-  reason?: Swap2RefusalReason;
-  retryAfterMs?: number;
-  httpStatus?: number;
-  refusals?: readonly Swap2Refusal[];
+  reason?: Swap2RefusalReason | undefined;
+  retryAfterMs?: number | undefined;
+  httpStatus?: number | undefined;
+  refusals?: readonly Swap2Refusal[] | undefined;
 }
 
 /** Public, machine-readable error base shared by every contribution package. */
@@ -259,7 +284,14 @@ export class Swap2Error extends Error {
     super(message, options);
     this.name = new.target.name;
     stamp(this, options ? normalized(options) : undefined);
-    if (options?.refusals) this.refusals = Object.freeze(options.refusals.map((r) => Object.freeze({...r})));
+    // Each entry rebuilt from its valid fields only: the list is what an app switches on.
+    if (options?.refusals) {
+      this.refusals = Object.freeze(options.refusals.map((r) => Object.freeze({
+        ...normalized(r),
+        message: String(r.message),
+        ...(typeof r.provider === "string" ? {provider: r.provider} : {}),
+      })));
+    }
   }
 }
 

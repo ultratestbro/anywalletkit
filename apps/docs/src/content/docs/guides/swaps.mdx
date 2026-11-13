@@ -258,9 +258,10 @@ Where the reason travels:
 
 - **The engine's "no route available"** (`Swap2QuoteError`) has `refusals`: each venue's refusal as
   `{ provider, message, reason?, retryAfterMs?, httpStatus? }`. Its own `reason` is the venues' shared reason, or
-  `no_route` when they differ. A venue that sat out without a text (disabled, or not serving the pair) is listed too,
-  with an unchanged message.
-- **The router** keeps the same list in `lastRefusals`, next to `lastRejections`, and in `RouteSet.refusals`.
+  `no_route` when they differ. With no venue to ask, the list says why while the message stays as it was: the
+  disabled venues that serve the pair (`policy_refused`), or `unsupported_pair`.
+- **The router** keeps the same list in `lastRefusals`, next to `lastRejections`, and in `RouteSet.refusals`;
+  `refusalsFor(params)` gives one auction's list when quotes overlap.
 - **`onRefusal`** gets the classification as a second argument: `onRefusal(text, { reason, retryAfterMs?, httpStatus? })`.
 - **A swap2 server** adds `reason` (and `retryAfterMs`, `httpStatus`) to its error bodies and to `noQuote`. The
   `remoteProvider` stub puts it back on the error. A status alone also classifies: 429 → `rate_limited` (with
@@ -268,8 +269,9 @@ Where the reason travels:
 - **Provider pins** (`lifiPins`, `thorchainPins`, …) classify their own refusal texts through `reasonOf`, so a remote
   stub's "fails this app's own check" carries a reason too.
 
-A refusal without `reason` is not classified. A wallet's `SimulationError` keeps its own `reason` field (the revert
-text): check `err.name === 'SimulationError'` for those.
+A refusal without `reason` is not classified. `refusalOf` reads only reasons the SDK set: a wallet's
+`SimulationError` keeps its own `reason` field (the revert text, which a contract chooses), so check
+`err.name === 'SimulationError'` for those. A `Swap2MaybeSentError` never has a reason: do not retry it.
 
 ## Fee caps
 

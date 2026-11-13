@@ -886,17 +886,20 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
   /** Why the last resolveQuote came back empty (venue names + reasons), or "".
    *  Rides inside the no-route error so execution failures are diagnosable
    *  from the surface that shows them. */
-  protected noRouteDetail(): string {
+  protected noRouteDetail(_params?: QuoteParams): string {
     return "";
   }
-  /** Each venue's refusal behind the last empty resolveQuote, classified where the venue could (`Swap2RefusalReason`). */
-  protected noRouteRefusals(): readonly Swap2Refusal[] {
+  /**
+   * Each venue's refusal behind the empty resolveQuote for `params` (the object it was given), classified where the
+   * venue could (`Swap2RefusalReason`). Per call: overlapping quotes on one instance must not read each other's.
+   */
+  protected noRouteRefusals(_params?: QuoteParams): readonly Swap2Refusal[] {
     return [];
   }
-  /** The engine's "no route available", carrying every venue's refusal and the reason they add up to. */
-  private noRouteError(): Swap2QuoteError {
-    const detail = this.noRouteDetail();
-    const refusals = this.noRouteRefusals();
+  /** The engine's "no route available" for that call, carrying every venue's refusal and the reason they add up to. */
+  private noRouteError(params: QuoteParams): Swap2QuoteError {
+    const detail = this.noRouteDetail(params);
+    const refusals = this.noRouteRefusals(params);
     return new Swap2QuoteError(`swap2: no route available for the requested pair${detail ? ` :: ${detail}` : ""}`, {...combinedRefusal(refusals), refusals});
   }
   /** Look up a provider by name to resume/track an in-flight swap2. */
@@ -1101,8 +1104,9 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
    */
   override async quoteSwap2(options: Swap2Options): Promise<Swap2Quote> {
     const snapshot = await this.prepareOptions(snapshotOptions(options));
-    const q = await this.resolveQuote(this.toParams(snapshot, true));
-    if (!q) throw this.noRouteError();
+    const params = this.toParams(snapshot, true);
+    const q = await this.resolveQuote(params);
+    if (!q) throw this.noRouteError(params);
     assertQuoteConstraints(q, snapshot);
     this.assertQuoteFeeCaps(q, snapshot);
     return this.toQuote(q, snapshot);
@@ -1155,7 +1159,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     const executionOptions = await this.prepareOptions(snapshotOptions({...snapshot, recipient, refundAddress}));
     const params = this.toParams(executionOptions, false);
     const resolved = await this.resolveQuote(params);
-    if (!resolved) throw this.noRouteError();
+    if (!resolved) throw this.noRouteError(params);
     const q = snapshotQuote(resolved);
     assertQuoteConstraints(q, executionOptions);
     this.assertQuoteFeeCaps(q, executionOptions, configSnapshot);
@@ -1169,16 +1173,16 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
 
     const serialized = unsigned.serializedTx !== undefined;
     if (serialized) {
-      if (!unsigned.serializedTx) throw new Error("swap2: provider returned an empty serialized transaction");
+      if (!unsigned.serializedTx) throw refusal("policy_refused", "swap2: provider returned an empty serialized transaction");
       if (unsigned.data !== undefined || unsigned.bodyBoc !== undefined || unsigned.typedData !== undefined || unsigned.memo !== undefined || unsigned.approvalAddress !== undefined) {
-        throw new Error("swap2: provider returned ambiguous execution payloads");
+        throw refusal("policy_refused", "swap2: provider returned ambiguous execution payloads");
       }
       if (typeof signer.sendSerializedTransaction !== "function") {
         throw new Swap2ExecutionError(`swap2: ${this.fromChain} serialized execution requires account.sendSerializedTransaction`);
       }
     }
     if (unsigned.chain && unsigned.chain !== this.fromChain) {
-      throw new Error(`swap2: provider transaction chain ${unsigned.chain} does not match ${this.fromChain}`);
+      throw refusal("policy_refused", `swap2: provider transaction chain ${unsigned.chain} does not match ${this.fromChain}`);
     }
     if (unsigned.stateInitBoc !== undefined) {
       throw new Error("swap2: deposit requires a stateInit the generic account cannot attach");
@@ -1213,10 +1217,10 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       .filter(Boolean).length;
     if (executionModels > 1 || (unsigned.memo !== undefined && (unsigned.bodyBoc !== undefined || unsigned.typedData !== undefined)) ||
       (unsigned.orderExtension !== undefined && unsigned.typedData === undefined)) {
-      throw new Error("swap2: provider returned ambiguous execution payloads");
+      throw refusal("policy_refused", "swap2: provider returned ambiguous execution payloads");
     }
     if (unsigned.approvalAddress && !unsigned.data && !unsigned.typedData) {
-      throw new Error("swap2: approval is only valid for calldata or typed-order execution");
+      throw refusal("policy_refused", "swap2: approval is only valid for calldata or typed-order execution");
     }
     // A remote stub's build that pays an address its backend named — a deposit address, a plain value send — skips
     // every pin below; it runs only on a stub the app opened to such routes (scan 2026-10-28, F9).
@@ -1256,7 +1260,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       }
     }
     if (unsigned.chainId !== undefined && this.fromChain.startsWith("eip155:") && String(unsigned.chainId) !== this.fromChain.slice("eip155:".length)) {
-      throw new Error(`swap2: provider transaction chain ${unsigned.chainId} does not match ${this.fromChain}`);
+      throw refusal("policy_refused", `swap2: provider transaction chain ${unsigned.chainId} does not match ${this.fromChain}`);
     }
 
     // TOKEN-asset sources on deposit-address routes need token-transfer
@@ -1330,7 +1334,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // Only a fee the sealed quote declared, and only up to the route's cap (the chain's, or the app's nativeFeeCeiling).
       const declared = declaredNativeFee(q, this.fromChain, feeRoute);
       if (executionValue !== declared) {
-        throw new Error(declared === 0n
+        throw refusal("policy_refused", declared === 0n
           ? "swap2: token execution attempted to attach native value"
           : `swap2: token execution value ${executionValue} does not match the quoted native fee ${declared}`);
       }
