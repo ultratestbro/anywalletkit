@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-symbiosis",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Symbiosis for the swap2 engine: any-to-any cross-chain swaps between seven EVM chains, Tron and TON through Symbiosis' public REST API — one source transaction to the pinned MetaRouterGateway (or one jetton transfer to the pinned TON portal), the calldata decoded and bound to the request on the device before anything is signed, every reported fee in the quote, limits enforced locally, status with the stuck / reverted path spelled out.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
