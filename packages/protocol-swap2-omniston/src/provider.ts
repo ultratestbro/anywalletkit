@@ -11,6 +11,7 @@ import {AUDITED_OMNISTON_EVM_ORDER_PROTOCOLS, AUDITED_OMNISTON_SETTLEMENT_CONTRA
 export {checkTonSwapPayload, TonSwapPayloadError, TON_SWAP_PROTOCOL_LAYOUTS} from "./ton-swap.js";
 export type {TonSwapLeg, TonSwapCheckInput, TonSwapCheckResult} from "./ton-swap.js";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {refusal, refusalNotes, refusalOf, withReason, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {bigintToNumber} from "@anywalletkit/core";
 
 /**
@@ -684,6 +685,80 @@ export function encodeTypedMessage(td: {
   );
 }
 
+// ── Refusal reasons (Swap2RefusalReason next to the unchanged texts) ─────────
+
+/**
+ * The reason behind an error the Omniston SDK raised for a call to the venue (a call or the RFQ stream). The SDK's
+ * `OmnistonError` carries the venue's JSON-RPC error data as `details`, whose `error_info` names why: a quote the venue
+ * no longer holds is expired, an unsupported route or operation and an unsupported token are `unsupported_pair`, the
+ * swap limit is `amount_too_large`, a wrong output amount or a refund on slippage in the venue's emulation is
+ * `price_check_failed` and any other emulation failure `simulation_failed`. An invalid argument or parameters is the
+ * request's fault, not a refusal: undefined. Anything else — no structured reason, another one, the connection — is the
+ * venue's failure (`upstream_unavailable`).
+ */
+function venueReason(error: unknown): Swap2RefusalReason | undefined {
+  const details = typeof error === "object" && error !== null ? (error as {details?: unknown}).details : undefined;
+  const info = typeof details === "object" && details !== null ? (details as {error_info?: unknown}).error_info : undefined;
+  if (typeof info !== "object" || info === null) return "upstream_unavailable";
+  const {reason, metadata} = info as {reason?: unknown; metadata?: unknown};
+  const meta = (typeof metadata === "object" && metadata !== null ? metadata : {}) as {object_type?: unknown; type?: unknown};
+  const type = typeof meta.type === "string" ? meta.type : "";
+  switch (reason) {
+    case "INVALID_ARGUMENT":
+    case "INVALID_PARAMETERS":
+      return undefined;
+    case "NOT_FOUND":
+      return typeof meta.object_type === "string" && meta.object_type.toLowerCase() === "quote" ? "quote_expired" : "upstream_unavailable";
+    case "UNSUPPORTED":
+      return "unsupported_pair";
+    case "SWAP_LIMIT_EXCEEDED":
+      return "amount_too_large";
+    case "QUOTE_VALIDATION_FAILED":
+      if (type === "EMULATION_UNSUPPORTED_TOKEN") return "unsupported_pair";
+      if (type === "EMULATION_WRONG_OUTPUT_AMOUNT" || type === "EMULATION_REFUND_SLIPPAGE") return "price_check_failed";
+      return type.startsWith("EMULATION_") ? "simulation_failed" : "upstream_unavailable";
+    default:
+      return "upstream_unavailable";
+  }
+}
+
+/**
+ * An error the Omniston SDK raised for a call to the venue (its WebSocket API: the answer or the connection), tagged
+ * with {@link venueReason} and rethrown as is; an error that already carries a reason keeps it, and an invalid
+ * argument stays unclassified.
+ */
+function venueFailure(error: unknown): unknown {
+  if (!(error instanceof Error)) return error;
+  const reason = venueReason(error);
+  return reason ? withReason(error, reason) : error;
+}
+
+/** An intent id bound to another trader, recipient or signed owner pays someone else; another kind or chain is refused outright. */
+function mismatchReason(field: string): Swap2RefusalReason {
+  return field === "trader" || field === "dest" || field === "owner" ? "recipient_mismatch" : "policy_refused";
+}
+
+/**
+ * The reason behind a `checkTonSwapPayload` code (`TonSwapPayloadError.reason`) and the provider's own leg codes: the
+ * output or a refund going elsewhere, a minimum under the quote, a DEX leg not confirmed on chain; every other code is
+ * a body this module never signs (malformed, unknown layout, unsupported route, other amount, foreign referral).
+ */
+function tonSwapPayloadReason(code: string): Swap2RefusalReason {
+  switch (code) {
+    case "receiver-not-destination":
+    case "refund-not-trader":
+    case "excess-not-trader":
+      return "recipient_mismatch";
+    case "min-out-zero":
+    case "min-out-below-quote":
+      return "price_check_failed";
+    case "leg-unverified":
+      return "vault_mismatch";
+    default:
+      return "policy_refused";
+  }
+}
+
 // ── HTLC helpers (secret, hash lock, asset and address matching, bytes) ──────
 
 function generateSecret(): Uint8Array {
@@ -697,7 +772,7 @@ function hashlock(secret: Uint8Array, hashingFunction: string | undefined): Uint
     case "HASHING_FUNCTION_SHA256":
       return sha256(secret, "bytes");
     default:
-      throw new Error(`omniston: unsupported HTLC hashing function ${String(hashingFunction)}`);
+      throw refusal("policy_refused", `omniston: unsupported HTLC hashing function ${String(hashingFunction)}`);
   }
 }
 
@@ -742,7 +817,7 @@ function stepJetton(asset: AssetId | undefined): string | null | undefined {
 
 function readBigEndian(bytes: Uint8Array, offset: number, length: number): bigint {
   if (!Number.isInteger(offset) || !Number.isInteger(length) || length < 1 || offset < 0 || offset + length > bytes.length) {
-    throw new Error("omniston: truncated EVM order extension");
+    throw refusal("policy_refused", "omniston: truncated EVM order extension");
   }
   let value = 0n;
   for (let index = offset; index < offset + length; index++) value = (value << 8n) | BigInt(bytes[index]!);
@@ -828,14 +903,14 @@ const EVM_TIMELOCKS = [1n, 120n, 240n, 300n, 1n, 120n, 180n, 0n].reduce((packed,
  * any other layout. The terms are checked by the callers.
  */
 function readEvmOrderExtension(extension: Uint8Array): EvmOrderExtension {
-  if (extension.length < 32) throw new Error("omniston: malformed EVM order extension");
+  if (extension.length < 32) throw refusal("policy_refused", "omniston: malformed EVM order extension");
   const view = new DataView(extension.buffer, extension.byteOffset, extension.byteLength);
   const fields: Uint8Array[] = [];
   let begin = 0;
   const concatLength = extension.length - 32;
   for (let index = 0; index < 8; index++) {
     const end = view.getUint32(28 - index * 4, false);
-    if (end < begin || end > concatLength) throw new Error("omniston: malformed EVM order extension offsets");
+    if (end < begin || end > concatLength) throw refusal("policy_refused", "omniston: malformed EVM order extension offsets");
     fields.push(extension.slice(32 + begin, 32 + end));
     begin = end;
   }
@@ -843,18 +918,18 @@ function readEvmOrderExtension(extension: Uint8Array): EvmOrderExtension {
   // post-interaction (7). Suffixes can alter token calls; permit/predicate/pre
   // interaction are separate programs and are not authorized by this adapter.
   for (const index of [0, 1, 4, 5, 6]) {
-    if (fields[index]!.length !== 0) throw new Error("omniston: unsupported EVM order extension field");
+    if (fields[index]!.length !== 0) throw refusal("policy_refused", "omniston: unsupported EVM order extension field");
   }
   if (!sliceEqual(fields[2]!, fields[3]!)) {
-    throw new Error("omniston: making/taking amount getters use different programs");
+    throw refusal("policy_refused", "omniston: making/taking amount getters use different programs");
   }
   let target: string | undefined;
   for (const index of [2, 3, 7]) {
     const field = fields[index]!;
-    if (field.length <= 20) throw new Error("omniston: incomplete EVM order extension program");
+    if (field.length <= 20) throw refusal("policy_refused", "omniston: incomplete EVM order extension program");
     const address = getAddress(`0x${bytesToHex(field.slice(0, 20))}`);
     if (target !== undefined && getAddress(target) !== address) {
-      throw new Error("omniston: EVM order extension target is not independently trusted");
+      throw refusal("vault_mismatch", "omniston: EVM order extension target is not independently trusted");
     }
     target = address;
   }
@@ -868,7 +943,7 @@ function readEvmOrderExtension(extension: Uint8Array): EvmOrderExtension {
   const duration = readBigEndian(field, cursor, 3); cursor += 3;
   const initialRateBump = readBigEndian(field, cursor, 3); cursor += 3;
   const pointCount = bigintToNumber(readBigEndian(field, cursor, 1)); cursor += 1;
-  if (pointCount !== 5) throw new Error("omniston: unsupported EVM auction profile");
+  if (pointCount !== 5) throw refusal("policy_refused", "omniston: unsupported EVM auction profile");
   const points: [bigint, bigint][] = [];
   for (let index = 0; index < pointCount; index++) {
     points.push([readBigEndian(field, cursor, 3), readBigEndian(field, cursor + 3, 2)]);
@@ -880,7 +955,7 @@ function readEvmOrderExtension(extension: Uint8Array): EvmOrderExtension {
   const whitelistDiscount = readBigEndian(field, cursor, 1); cursor += 1;
   const getterWhitelistCount = bigintToNumber(readBigEndian(field, cursor, 1)); cursor += 1;
   if (getterWhitelistCount !== 1 || cursor + getterWhitelistCount * 10 !== field.length) {
-    throw new Error("omniston: malformed EVM amount-getter whitelist");
+    throw refusal("policy_refused", "omniston: malformed EVM amount-getter whitelist");
   }
   const getter = {gasBump, gasPrice, auctionStart, duration, initialRateBump, points, integratorFee, integratorShare, resolverFee, whitelistDiscount, resolver: readBigEndian(field, cursor, 10)};
 
@@ -896,7 +971,7 @@ function readEvmOrderExtension(extension: Uint8Array): EvmOrderExtension {
   const allowedTime = readBigEndian(post, cursor, 4); cursor += 4;
   const whitelistCount = bigintToNumber(readBigEndian(post, cursor, 1)); cursor += 1;
   if (whitelistCount !== 1 || cursor + whitelistCount * 12 + 160 !== post.length) {
-    throw new Error("omniston: malformed EVM post-interaction whitelist");
+    throw refusal("policy_refused", "omniston: malformed EVM post-interaction whitelist");
   }
   const postResolver = readBigEndian(post, cursor, 10); cursor += 10;
   const resolverTimeDelta = readBigEndian(post, cursor, 2); cursor += 2;
@@ -906,7 +981,7 @@ function readEvmOrderExtension(extension: Uint8Array): EvmOrderExtension {
     return value;
   });
   const customData = extension.slice(32 + begin);
-  if (customData.length !== 131) throw new Error("omniston: malformed EVM order extension custom data");
+  if (customData.length !== 131) throw refusal("policy_refused", "omniston: malformed EVM order extension custom data");
   return {
     target: target!,
     getter,
@@ -952,7 +1027,7 @@ export async function validateEvmToTonOrderExtension(
   const evmDest = expected.dstChainId !== undefined;
   if (evmDest && (!Number.isSafeInteger(expected.dstChainId) || expected.dstChainId! <= 0)) throw new Error("omniston: invalid EVM destination chain id");
   const {target, getter, post, extra, customData} = readEvmOrderExtension(extension);
-  if (!expected.trustedTarget(target)) throw new Error("omniston: EVM order extension target is not independently trusted");
+  if (!expected.trustedTarget(target)) throw refusal("vault_mismatch", "omniston: EVM order extension target is not independently trusted");
 
   // SimpleSettlement auction + AmountGetterWithFee. The current trader quote
   // does not describe the curve, so only the audited live v1beta8 profile is
@@ -967,7 +1042,7 @@ export async function validateEvmToTonOrderExtension(
     quoteResolverFee < 0n || getter.resolverFee !== quoteResolverFee || getter.whitelistDiscount !== 50n ||
     getter.resolver !== resolverLow80
   ) {
-    throw new Error("omniston: EVM amount-getter terms do not match the pinned v1beta8 profile");
+    throw refusal("policy_refused", "omniston: EVM amount-getter terms do not match the pinned v1beta8 profile");
   }
 
   // BaseEscrowFactory postInteraction: exact fee/whitelist prefix followed by
@@ -982,7 +1057,7 @@ export async function validateEvmToTonOrderExtension(
     post.discount !== 50n || !within(post.allowedTime, expected.quoteTimestamp, 60, 5) ||
     post.resolver !== resolverLow80 || post.resolverTimeDelta !== 0n
   ) {
-    throw new Error("omniston: EVM post-interaction terms do not match the pinned v1beta8 profile");
+    throw refusal("policy_refused", "omniston: EVM post-interaction terms do not match the pinned v1beta8 profile");
   }
   const hashlock = readBigEndian(expected.secretHash, 0, expected.secretHash.length);
   // ExtraDataArgs word 2 is the destination token: the real ERC-20 for an EVM
@@ -993,12 +1068,12 @@ export async function validateEvmToTonOrderExtension(
     expected.secretHash.length !== 32 || extra[0] !== hashlock || extra[1] !== (evmDest ? BigInt(expected.dstChainId!) : 0n) ||
     extra[2] !== dstToken || extra[3] !== deposits || extra[4] !== EVM_TIMELOCKS
   ) {
-    throw new Error("omniston: signed EVM HTLC terms do not match the validated order details");
+    throw refusal("policy_refused", "omniston: signed EVM HTLC terms do not match the validated order details");
   }
 
   await checkOrderCustomData(customData, {evmDest, outputToken: expected.outputTokenAddress, traderDst: expected.traderDstAddress, quoteId: expected.quoteId});
   if (expected.tradeStartDeadline < expected.quoteTimestamp) {
-    throw new Error("omniston: invalid EVM order quote deadline");
+    throw refusal("quote_expired", "omniston: invalid EVM order quote deadline");
   }
 }
 
@@ -1009,7 +1084,7 @@ async function checkOrderCustomData(customData: Uint8Array, expected: {evmDest: 
     // 2026-10-20). The EVM recipient is NOT in anything the wallet signs: it
     // travels in the unsigned order details only, so the destination escrow's
     // maker is what the disclosure gate (validateEvmOutputPosition) must prove.
-    if (!zeroBytes(customData.slice(0, 66))) throw new Error("omniston: unexpected TON addresses in an EVM-destination order");
+    if (!zeroBytes(customData.slice(0, 66))) throw refusal("recipient_mismatch", "omniston: unexpected TON addresses in an EVM-destination order");
   } else {
     const {Address} = await import("@ton/core");
     const expectedTon = [expected.outputToken, expected.traderDst].map((value) => Address.parse(value));
@@ -1017,16 +1092,16 @@ async function checkOrderCustomData(customData: Uint8Array, expected: {evmDest: 
       const offset = index * 33;
       const workchain = customData[offset] === 255 ? -1 : customData[offset]!;
       if (workchain !== expectedTon[index]!.workChain || !sliceEqual(customData.slice(offset + 1, offset + 33), expectedTon[index]!.hash)) {
-        throw new Error("omniston: signed EVM→TON address does not match the validated request");
+        throw refusal("recipient_mismatch", "omniston: signed EVM→TON address does not match the validated request");
       }
     }
   }
   if (!zeroBytes(customData.slice(66, 99))) {
-    throw new Error("omniston: unexpected private TON disclosure address");
+    throw refusal("policy_refused", "omniston: unexpected private TON disclosure address");
   }
   const quoteId = expected.quoteId.replace(/^0x/, "");
   if (!QUOTE_ID.test(quoteId) || !sliceEqual(customData.slice(99), hexToBytes(quoteId.padStart(64, "0")))) {
-    throw new Error("omniston: EVM order extension custom data is not bound to the quote id");
+    throw refusal("policy_refused", "omniston: EVM order extension custom data is not bound to the quote id");
   }
 }
 
@@ -1102,7 +1177,7 @@ export function validateEvmTypedOrder(
     !validUint256(message.makingAmount) || BigInt(message.makingAmount as string) !== BigInt(expected.makingAmount) ||
     !validUint256(message.takingAmount) || BigInt(message.takingAmount as string) !== BigInt(expected.takingAmount)
   ) {
-    throw new Error("omniston: EVM order fields do not match the validated quote/request");
+    throw refusal("policy_refused", "omniston: EVM order fields do not match the validated quote/request");
   }
 }
 
@@ -1131,9 +1206,9 @@ async function validateTonEscrowPayload(
   try {
     roots = Cell.fromBoc(Buffer.from(boc));
   } catch {
-    throw new Error("omniston: malformed TON escrow BoC");
+    throw refusal("policy_refused", "omniston: malformed TON escrow BoC");
   }
-  if (roots.length !== 1) throw new Error("omniston: TON escrow must contain exactly one root cell");
+  if (roots.length !== 1) throw refusal("policy_refused", "omniston: TON escrow must contain exactly one root cell");
   const slice = roots[0]!.beginParse();
   const op = slice.loadUint(32);
   slice.loadUintBig(64); // query id is resolver-chosen and not security-critical
@@ -1150,7 +1225,7 @@ async function validateTonEscrowPayload(
     forwardAmount <= 0n || forwardAmount > BigInt(message.sendAmount) || !payloadByRef ||
     slice.remainingBits !== 0 || slice.remainingRefs !== 1
   ) {
-    throw new Error("omniston: TON jetton transfer does not match the validated quote/request");
+    throw refusal("policy_refused", "omniston: TON jetton transfer does not match the validated quote/request");
   }
   const forwardPayload = slice.loadRef();
   const verified = await validateForwardPayload({
@@ -1170,7 +1245,7 @@ async function validateTonEscrowPayload(
     ...(expected.hashingFunction ? {hashingFunction: expected.hashingFunction} : {}),
     exclusivityTimeout: expected.exclusivityTimeout,
   });
-  if (!verified) throw new Error("omniston: TON escrow forward payload failed independent semantic validation");
+  if (!verified) throw refusal("policy_refused", "omniston: TON escrow forward payload failed independent semantic validation");
 }
 
 /** Fee token id: the catalog's 1Click asset id, or the on-chain contract for
@@ -1204,24 +1279,24 @@ class ProtoReader {
       const byte = this.bytes[this.pos++]!;
       out += (byte & 0x7f) * 2 ** shift;
       if ((byte & 0x80) === 0) {
-        if (!Number.isSafeInteger(out)) throw new Error("omniston: unsafe protobuf varint");
+        if (!Number.isSafeInteger(out)) throw refusal("policy_refused", "omniston: unsafe protobuf varint");
         return out;
       }
       shift += 7;
     }
-    throw new Error("omniston: malformed protobuf varint");
+    throw refusal("policy_refused", "omniston: malformed protobuf varint");
   }
   field(): {number: number; wire: number} {
     const tag = this.varint();
     const number = Math.floor(tag / 8);
     const wire = tag & 7;
-    if (number < 1) throw new Error("omniston: malformed protobuf field");
+    if (number < 1) throw refusal("policy_refused", "omniston: malformed protobuf field");
     return {number, wire};
   }
   lengthDelimited(): Uint8Array {
     const length = this.varint();
     const end = this.pos + length;
-    if (length < 0 || end > this.bytes.length) throw new Error("omniston: truncated protobuf payload");
+    if (length < 0 || end > this.bytes.length) throw refusal("policy_refused", "omniston: truncated protobuf payload");
     const value = this.bytes.slice(this.pos, end);
     this.pos = end;
     return value;
@@ -1231,10 +1306,10 @@ class ProtoReader {
     if (wire === 1) { this.advance(8); return; }
     if (wire === 2) { this.lengthDelimited(); return; }
     if (wire === 5) { this.advance(4); return; }
-    throw new Error("omniston: unsupported protobuf wire type");
+    throw refusal("policy_refused", "omniston: unsupported protobuf wire type");
   }
   private advance(length: number): void {
-    if (this.pos + length > this.bytes.length) throw new Error("omniston: truncated protobuf payload");
+    if (this.pos + length > this.bytes.length) throw refusal("policy_refused", "omniston: truncated protobuf payload");
     this.pos += length;
   }
 }
@@ -1253,10 +1328,10 @@ function decodeChainAddress(bytes: Uint8Array): ChainAddress {
   while (!reader.done) {
     const {number, wire} = reader.field();
     const $case = PROTO_CASE_BY_FIELD[number];
-    if (!$case || wire !== 2 || address) throw new Error("omniston: malformed chain address in order details");
+    if (!$case || wire !== 2 || address) throw refusal("policy_refused", "omniston: malformed chain address in order details");
     address = {chain: {$case, value: utf8.decode(reader.lengthDelimited())}};
   }
-  if (!address?.chain.value) throw new Error("omniston: empty chain address in order details");
+  if (!address?.chain.value) throw refusal("policy_refused", "omniston: empty chain address in order details");
   return address;
 }
 
@@ -1266,18 +1341,18 @@ function decodeAssetId(bytes: Uint8Array): AssetId {
   while (!reader.done) {
     const {number, wire} = reader.field();
     const $case = PROTO_CASE_BY_FIELD[number];
-    if (!$case || wire !== 2 || asset) throw new Error("omniston: malformed asset id in order details");
+    if (!$case || wire !== 2 || asset) throw refusal("policy_refused", "omniston: malformed asset id in order details");
     const kindReader = new ProtoReader(reader.lengthDelimited());
     const kindField = kindReader.field();
     if (kindField.wire !== 2 || (kindField.number !== 1 && kindField.number !== 2)) {
-      throw new Error("omniston: unsupported asset kind in order details");
+      throw refusal("policy_refused", "omniston: unsupported asset kind in order details");
     }
     const kindCase = kindField.number === 1 ? "native" : ($case === "ton" ? "jetton" : $case === "tron" ? "trc20" : "erc20");
     const value = kindField.number === 1 ? {} : utf8.decode(kindReader.lengthDelimited());
-    if (!kindReader.done || (kindField.number === 2 && !value)) throw new Error("omniston: malformed asset kind in order details");
+    if (!kindReader.done || (kindField.number === 2 && !value)) throw refusal("policy_refused", "omniston: malformed asset kind in order details");
     asset = {chain: {$case, value: {kind: {$case: kindCase, value}}}};
   }
-  if (!asset) throw new Error("omniston: empty asset id in order details");
+  if (!asset) throw refusal("policy_refused", "omniston: empty asset id in order details");
   return asset;
 }
 
@@ -1285,12 +1360,12 @@ function validateSerializedOrderDetails(
   bytes: Uint8Array | undefined,
   expected: {quoteId: string; outputAsset: AssetId; traderDstAddress: ChainAddress; secretHashes: Uint8Array[]},
 ): void {
-  if (!bytes?.length) throw new Error("omniston: EVM HTLC order payload has no serialized details");
+  if (!bytes?.length) throw refusal("policy_refused", "omniston: EVM HTLC order payload has no serialized details");
   const wrapper = new ProtoReader(bytes);
   const outer = wrapper.field();
-  if (outer.number !== 1 || outer.wire !== 2) throw new Error("omniston: unsupported HTLC order-details version");
+  if (outer.number !== 1 || outer.wire !== 2) throw refusal("policy_refused", "omniston: unsupported HTLC order-details version");
   const detailsBytes = wrapper.lengthDelimited();
-  if (!wrapper.done) throw new Error("omniston: ambiguous HTLC order-details wrapper");
+  if (!wrapper.done) throw refusal("policy_refused", "omniston: ambiguous HTLC order-details wrapper");
   const reader = new ProtoReader(detailsBytes);
   let quoteId: string | undefined;
   let outputAsset: AssetId | undefined;
@@ -1298,13 +1373,13 @@ function validateSerializedOrderDetails(
   const hashes: Uint8Array[] = [];
   while (!reader.done) {
     const {number, wire} = reader.field();
-    if (wire !== 2) throw new Error("omniston: malformed HTLC order details");
+    if (wire !== 2) throw refusal("policy_refused", "omniston: malformed HTLC order details");
     const value = reader.lengthDelimited();
     if (number === 1 && quoteId === undefined) quoteId = utf8.decode(value);
     else if (number === 2 && outputAsset === undefined) outputAsset = decodeAssetId(value);
     else if (number === 3 && traderDstAddress === undefined) traderDstAddress = decodeChainAddress(value);
     else if (number === 5) hashes.push(value);
-    else throw new Error("omniston: duplicate or unexpected HTLC order-details field");
+    else throw refusal("policy_refused", "omniston: duplicate or unexpected HTLC order-details field");
   }
   if (
     quoteId !== expected.quoteId ||
@@ -1313,7 +1388,7 @@ function validateSerializedOrderDetails(
     hashes.length !== expected.secretHashes.length ||
     hashes.some((hash, i) => !bytesEqual(hash, expected.secretHashes[i]!))
   ) {
-    throw new Error("omniston: resolver order payload does not match the validated quote/request");
+    throw refusal("policy_refused", "omniston: resolver order payload does not match the validated quote/request");
   }
 }
 
@@ -1353,7 +1428,7 @@ function bytesToHex(bytes: Uint8Array): string {
 function hexToBytes(hex: string): Uint8Array {
   const clean = hex.replace(/^0x/, "");
   if (!clean || !/^(?:[0-9a-fA-F]{2})+$/.test(clean)) {
-    throw new Error("omniston: malformed hex payload");
+    throw refusal("policy_refused", "omniston: malformed hex payload");
   }
   const out = new Uint8Array(clean.length / 2);
   for (let i = 0; i < out.length; i++) out[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16);
@@ -1430,6 +1505,28 @@ interface RfqOutcome {
   rejected?: string;
   /** The stream errored (socket/SDK) before a usable quote arrived. */
   error?: string;
+  /** The reason behind `error` ({@link venueReason}): set with it, undefined for an invalid argument. */
+  errorReason?: Swap2RefusalReason | undefined;
+  /** The venue answered this RFQ at all (ack, quote or noQuote): silence until the window closed is the venue's failure, not "no route". */
+  answered?: boolean;
+}
+
+/**
+ * The reason behind a `quoteRejection` text: a quote whose timestamp is out of range is stale; any other rejected
+ * update is the venue answering something other than what was asked.
+ */
+function rejectionReason(rejection: string): Swap2RefusalReason {
+  return rejection === "quote timestamp out of range" ? "quote_expired" : "upstream_unavailable";
+}
+
+/**
+ * Why an RFQ produced no quote, as a reason: the stream failed (the venue's own reason when it gave one, undefined for
+ * an invalid argument), the latest update was rejected, or no resolver quoted.
+ */
+function rfqReason(outcome: RfqOutcome): Swap2RefusalReason | undefined {
+  if (outcome.error) return outcome.errorReason;
+  if (outcome.rejected) return rejectionReason(outcome.rejected);
+  return outcome.answered ? "no_route" : "upstream_unavailable";
 }
 
 /** The first failing check of a `quoteUpdated` event, or null when it is usable. */
@@ -1488,6 +1585,7 @@ function awaitQuote(
     const max = setTimeout(() => finish(latest), QUOTE_MAX_MS);
     sub = stream.subscribe({
       next: (event) => {
+        if (event.$case === "ack" || event.$case === "quoteUpdated" || event.$case === "noQuote") outcome.answered = true;
         if (event.$case === "ack") {
           acknowledgedRfqId = (event as {$case: "ack"; value: {rfqId: string}}).value.rfqId || null;
         } else if (event.$case === "quoteUpdated") {
@@ -1510,6 +1608,7 @@ function awaitQuote(
       },
       error: (err) => {
         outcome.error = String((err as {message?: unknown})?.message ?? err).slice(0, 200);
+        outcome.errorReason = venueReason(err);
         finish(null);
       },
       complete: () => finish(latest),
@@ -1561,9 +1660,9 @@ function parseSwapPayload(payloadHex: string): {
   op: number;
   jettonTransfer: null | {amount: bigint; destination: string; responseDestination: string | null; forwardTon: bigint};
 } {
-  if (!/^(?:[0-9a-fA-F]{2})+$/.test(payloadHex)) throw new Error("omniston: malformed swap payload hex");
+  if (!/^(?:[0-9a-fA-F]{2})+$/.test(payloadHex)) throw refusal("policy_refused", "omniston: malformed swap payload hex");
   const roots = TonCell.fromBoc(Buffer.from(payloadHex, "hex"));
-  if (roots.length !== 1) throw new Error("omniston: swap payload must have one root");
+  if (roots.length !== 1) throw refusal("policy_refused", "omniston: swap payload must have one root");
   const s = roots[0]!.beginParse();
   const op = s.loadUint(32);
   if (op !== JETTON_TRANSFER_OP) return {op, jettonTransfer: null};
@@ -1654,7 +1753,43 @@ function mapOrderStatus(order: OrderSnapshot): IntentStatus {
  */
 export function omnistonPins(trustedEvmOrderProtocols: Readonly<Record<string, readonly string[]>>): RemotePins {
   const byChain = new Map(Object.entries(trustedEvmOrderProtocols).map(([chain, list]): [string, readonly string[]] => [chain, list.map((a) => getAddress(a))]));
-  return Object.freeze({callTargets: (): readonly string[] => [], spenders: (chain: string): readonly string[] => byChain.get(chain) ?? []});
+  return Object.freeze({
+    callTargets: (): readonly string[] => [],
+    spenders: (chain: string): readonly string[] => byChain.get(chain) ?? [],
+    // The reason behind a text omnistonVerifyBuild returned, so the remote stub's refusal carries it.
+    reasonOf: verifyNotes.reasonOf,
+  });
+}
+
+/**
+ * The reasons behind the texts `omnistonVerifyBuild` returns (`said(text, reason)` where a text is produced), read back
+ * by `omnistonPins(...).reasonOf` for `remoteProvider`. Bounded: the last 64 texts. One instance per realm: the
+ * CommonJS build bundles this module into each entry (the package root and `./provider` carry a copy each), so the
+ * notes live under a registered symbol on `globalThis`, and pins taken from one entry read back the texts of an
+ * `omnistonVerifyBuild` taken from the other.
+ */
+const VERIFY_NOTES = Symbol.for("@anywalletkit/protocol-swap2-omniston/verify-notes@1");
+const verifyNotes: ReturnType<typeof refusalNotes> = (() => {
+  const shared = (globalThis as unknown as Record<symbol, unknown>)[VERIFY_NOTES] as Partial<ReturnType<typeof refusalNotes>> | undefined;
+  if (shared && typeof shared.note === "function" && typeof shared.reasonOf === "function") return shared as ReturnType<typeof refusalNotes>;
+  const notes = refusalNotes();
+  try {
+    Object.defineProperty(globalThis, VERIFY_NOTES, {value: notes});
+  } catch {
+    // A frozen global: this copy keeps its own notes.
+  }
+  return notes;
+})();
+const said = verifyNotes.note;
+
+/**
+ * The reason behind a `verifyTonEscrowBuild` text (`createOmnistonTonValidators`): an untrusted protocol contract, a
+ * delivery under the quote's minimum; any other text, the app's own check included, is a body this app does not sign.
+ */
+function tonEscrowBuildReason(text: string): Swap2RefusalReason {
+  if (text.startsWith("the escrow transfer pays ")) return "vault_mismatch";
+  if (text.startsWith("the resolver is bound to deliver ")) return "price_check_failed";
+  return "policy_refused";
 }
 
 /** Longest an EVM order may stay fillable after it is built: live orders expire at the 300 s trade-start deadline. */
@@ -1678,85 +1813,85 @@ async function checkRemoteEvmOrder(
   trusted: {orderProtocols: Readonly<Record<string, readonly string[]>>; factories: Readonly<Record<string, readonly string[]>>},
 ): Promise<string | null> {
   const chainId = evmRef(params.sourceChain);
-  if (chainId === null || !params.sourceChain.startsWith("eip155:")) return "a typed order needs an EVM source";
+  if (chainId === null || !params.sourceChain.startsWith("eip155:")) return said("a typed order needs an EVM source", "policy_refused");
   // Behind the swap2 server handler the id carries its intent token (`<id>~<tag>`).
   const intent = decodeIntent(quote.intentId.replace(/~[0-9a-f]{32}$/, ""));
-  if (!intent || intent.kind !== "order" || intent.srcChain !== params.sourceChain) return "the quote's intent is not an order from this chain";
-  if (!tx.orderExtension || !/^0x(?:[0-9a-fA-F]{2})+$/.test(tx.orderExtension)) return "the build carries no order extension to check";
+  if (!intent || intent.kind !== "order" || intent.srcChain !== params.sourceChain) return said("the quote's intent is not an order from this chain", "policy_refused");
+  if (!tx.orderExtension || !/^0x(?:[0-9a-fA-F]{2})+$/.test(tx.orderExtension)) return said("the build carries no order extension to check", "policy_refused");
   const source = ccAsset(params.sourceChain, params.sourceToken);
-  if (!source?.contract) return "unknown source token";
+  if (!source?.contract) return said("unknown source token", "unsupported_pair");
   const tonDest = isTon(params.destChain);
   const destChainId = tonDest ? null : evmRef(params.destChain);
-  if (!tonDest && (destChainId === null || !params.destChain.startsWith("eip155:"))) return "the destination is neither TON nor an EVM chain";
+  if (!tonDest && (destChainId === null || !params.destChain.startsWith("eip155:"))) return said("the destination is neither TON nor an EVM chain", "unsupported_pair");
   const outputToken = ccAssetByToken(params.destChain, params.destToken)?.contract ?? params.destToken;
   const listed = (table: Readonly<Record<string, readonly string[]>>, chain: string, address: unknown) =>
     typeof address === "string" && validEvmAddress(address) && (table[chain] ?? []).some((a) => validEvmAddress(a) && getAddress(a) === getAddress(address));
   let td: {domain?: Record<string, unknown>; types?: Record<string, {name?: unknown; type?: unknown}[]>; primaryType?: unknown; message?: Record<string, unknown>};
-  try { td = JSON.parse(tx.typedData ?? ""); } catch { return "the typed data is not JSON"; }
+  try { td = JSON.parse(tx.typedData ?? ""); } catch { return said("the typed data is not JSON", "policy_refused"); }
   const domain = td.domain ?? {};
   const contract = domain.verifyingContract;
-  if (domain.name !== "1inch Limit Order Protocol" || domain.version !== "4") return "the domain is not the 1inch Limit Order Protocol v4";
+  if (domain.name !== "1inch Limit Order Protocol" || domain.version !== "4") return said("the domain is not the 1inch Limit Order Protocol v4", "policy_refused");
   if (!listed(trusted.orderProtocols, params.sourceChain, contract) || !tx.approvalAddress || getAddress(tx.approvalAddress) !== getAddress(String(contract))) {
-    return `${String(contract)} is not a trusted order protocol on ${params.sourceChain}`;
+    return said(`${String(contract)} is not a trusted order protocol on ${params.sourceChain}`, "vault_mismatch");
   }
-  if (Number(domain.chainId) !== chainId || (tx.chainId !== undefined && tx.chainId !== chainId)) return "the domain chainId is not the source chain";
+  if (Number(domain.chainId) !== chainId || (tx.chainId !== undefined && tx.chainId !== chainId)) return said("the domain chainId is not the source chain", "policy_refused");
   const order = td.types?.Order;
   const message = td.message;
   if (td.primaryType !== "Order" || !Array.isArray(order) || order.length !== ORDER_FIELDS.length ||
     !order.every((field, i) => field.name === ORDER_FIELDS[i]![0] && field.type === ORDER_FIELDS[i]![1]) ||
     !message || Object.keys(message).length !== ORDER_FIELDS.length || !ORDER_FIELDS.every(([name]) => Object.hasOwn(message, name)) ||
     !ORDER_FIELDS.every(([name, type]) => (type === "address" ? validEvmAddress(message[name]) : validUint256(message[name])))) {
-    return "the typed data is not exactly a v4 Order";
+    return said("the typed data is not exactly a v4 Order", "policy_refused");
   }
-  if (!validEvmAddress(intent.trader) || getAddress(String(message.maker)) !== getAddress(intent.trader)) return "the maker is not the trader";
-  if (getAddress(String(message.makerAsset)) !== getAddress(source.contract)) return "the makerAsset is not the source token";
-  if (BigInt(message.makingAmount as string) !== BigInt(quote.sourceAmount)) return "the makingAmount is not the input";
-  if (getAddress(String(message.takerAsset)) === getAddress(String(message.makerAsset))) return "the takerAsset is the makerAsset";
+  if (!validEvmAddress(intent.trader) || getAddress(String(message.maker)) !== getAddress(intent.trader)) return said("the maker is not the trader", "policy_refused");
+  if (getAddress(String(message.makerAsset)) !== getAddress(source.contract)) return said("the makerAsset is not the source token", "policy_refused");
+  if (BigInt(message.makingAmount as string) !== BigInt(quote.sourceAmount)) return said("the makingAmount is not the input", "policy_refused");
+  if (getAddress(String(message.takerAsset)) === getAddress(String(message.makerAsset))) return said("the takerAsset is the makerAsset", "policy_refused");
   const floor = [quote.minDestAmount, params.minAmountOut ?? "0"].filter((v) => /^\d{1,80}$/.test(v)).map((v) => BigInt(v)).reduce((a, b) => (a > b ? a : b), 0n);
-  if (floor <= 0n || BigInt(message.takingAmount as string) < floor) return `takingAmount ${String(message.takingAmount)} is below the quote's minimum ${floor}`;
+  if (floor <= 0n || BigInt(message.takingAmount as string) < floor) return said(`takingAmount ${String(message.takingAmount)} is below the quote's minimum ${floor}`, "price_check_failed");
   // Single fill (ALLOW_MULTIPLE_FILLS clear), POST_INTERACTION + HAS_EXTENSION set, nothing else but NO_PARTIAL_FILLS;
   // no allowed-sender or series restriction (the extension whitelists the resolver); an expiry minutes away.
   const traits = BigInt(message.makerTraits as string);
   const flags = traits & (((1n << 56n) - 1n) << 200n);
   const baseFlags = (1n << 251n) | (1n << 249n);
-  if (flags !== baseFlags && flags !== (baseFlags | (1n << 255n))) return "the makerTraits flags are not a single-fill order with its extension";
-  if ((traits & ((1n << 80n) - 1n)) !== 0n || ((traits >> 160n) & ((1n << 40n) - 1n)) !== 0n) return "the makerTraits restrict the taker or the series";
+  if (flags !== baseFlags && flags !== (baseFlags | (1n << 255n))) return said("the makerTraits flags are not a single-fill order with its extension", "policy_refused");
+  if ((traits & ((1n << 80n) - 1n)) !== 0n || ((traits >> 160n) & ((1n << 40n) - 1n)) !== 0n) return said("the makerTraits restrict the taker or the series", "policy_refused");
   const now = BigInt(Math.floor(Date.now() / 1000));
   const expiration = (traits >> 80n) & ((1n << 40n) - 1n);
-  if (expiration <= now || expiration > now + BigInt(MAX_EVM_ORDER_LIFETIME_S)) return "the order's expiry is not minutes away";
+  if (expiration <= now || expiration > now + BigInt(MAX_EVM_ORDER_LIFETIME_S)) return said("the order's expiry is not minutes away", expiration <= now ? "quote_expired" : "policy_refused");
   const extension = viemHexToBytes(tx.orderExtension as `0x${string}`);
   const mask = (1n << 160n) - 1n;
-  if ((BigInt(message.salt as string) & mask) !== (BigInt(keccak256(extension)) & mask)) return "the salt does not commit the order extension";
+  if ((BigInt(message.salt as string) & mask) !== (BigInt(keccak256(extension)) & mask)) return said("the salt does not commit the order extension", "policy_refused");
   let parsed: EvmOrderExtension;
-  try { parsed = readEvmOrderExtension(extension); } catch (e) { return e instanceof Error ? e.message.replace(/^omniston: /, "") : String(e); }
+  try { parsed = readEvmOrderExtension(extension); } catch (e) { return said(e instanceof Error ? e.message.replace(/^omniston: /, "") : String(e), refusalOf(e) ?? "policy_refused"); }
   const {target, getter, post, extra, customData} = parsed;
-  if (!listed(trusted.factories, params.sourceChain, target)) return `the extension targets ${target}, not a trusted escrow factory on ${params.sourceChain}`;
+  if (!listed(trusted.factories, params.sourceChain, target)) return said(`the extension targets ${target}, not a trusted escrow factory on ${params.sourceChain}`, "vault_mismatch");
   const receiverLow80 = BigInt(getAddress(String(message.receiver))) & ((1n << 80n) - 1n);
-  if (getter.resolver !== receiverLow80 || post.resolver !== receiverLow80) return "the order's receiver is not the resolver its extension whitelists";
+  if (getter.resolver !== receiverLow80 || post.resolver !== receiverLow80) return said("the order's receiver is not the resolver its extension whitelists", "recipient_mismatch");
   if (
     getter.gasBump !== 0n || getter.gasPrice !== 0n || getter.duration !== 1800n || getter.initialRateBump !== 900000n ||
     getter.points.some((point, index) => point[0] !== EVM_AUCTION_POINTS[index]![0] || point[1] !== EVM_AUCTION_POINTS[index]![1]) ||
     getter.integratorFee !== 0n || getter.integratorShare !== 100n || getter.whitelistDiscount !== 50n ||
     !within(getter.auctionStart, bigintToNumber(now), MAX_EVM_ORDER_LIFETIME_S, 60)
   ) {
-    return "the amount-getter terms do not match the pinned v1beta8 profile";
+    return said("the amount-getter terms do not match the pinned v1beta8 profile", "policy_refused");
   }
   if (
     !zeroBytes(post.integratorRecipient) || !(zeroBytes(post.protocolRecipient) || (!tonDest && EVM_DEST_PROTOCOL_FEE_RECIPIENTS.has(`0x${bytesToHex(post.protocolRecipient)}`))) ||
     post.integratorFee !== 0n || post.integratorShare !== 100n || post.resolverFee !== getter.resolverFee || post.discount !== 50n ||
     post.resolverTimeDelta !== 0n || !within(post.allowedTime, bigintToNumber(getter.auctionStart), 60, 5)
   ) {
-    return "the post-interaction terms do not match the pinned v1beta8 profile";
+    return said("the post-interaction terms do not match the pinned v1beta8 profile", "policy_refused");
   }
   let dstToken: bigint;
-  try { dstToken = tonDest ? BigInt(getAddress(String(message.takerAsset))) : BigInt(getAddress(outputToken)); } catch { return "the destination token is not an EVM address"; }
+  try { dstToken = tonDest ? BigInt(getAddress(String(message.takerAsset))) : BigInt(getAddress(outputToken)); } catch { return said("the destination token is not an EVM address", "policy_refused"); }
   if (extra[1] !== (tonDest ? 0n : BigInt(destChainId!)) || extra[2] !== dstToken || extra[4] !== EVM_TIMELOCKS) {
-    return "the signed HTLC terms name another destination chain or token, or other timelocks";
+    return said("the signed HTLC terms name another destination chain or token, or other timelocks", "policy_refused");
   }
   try {
     await checkOrderCustomData(customData, {evmDest: !tonDest, outputToken, traderDst: params.destAddress, quoteId: intent.quoteId});
   } catch (e) {
-    return e instanceof Error ? e.message.replace(/^omniston: /, "") : String(e);
+    return said(e instanceof Error ? e.message.replace(/^omniston: /, "") : String(e), refusalOf(e) ?? "policy_refused");
   }
   return null;
 }
@@ -1796,20 +1931,20 @@ export function omnistonVerifyBuild(hooks: {
   };
   return async (quote, tx, params) => {
     if (tx.typedData !== undefined) {
-      if (!params) return "the request this quote answered is unknown";
-      try { return await checkRemoteEvmOrder(quote, tx, params, trusted); } catch { return "the typed order could not be checked"; }
+      if (!params) return said("the request this quote answered is unknown", "policy_refused");
+      try { return await checkRemoteEvmOrder(quote, tx, params, trusted); } catch { return said("the typed order could not be checked", "policy_refused"); }
     }
     if (tx.bodyBoc === undefined) return null;
-    if (!params) return "the request this quote answered is unknown";
+    if (!params) return said("the request this quote answered is unknown", "policy_refused");
     if (quote.providerData?.settlement !== "swap") {
       // A TON → EVM order: the escrow the trader funds, checked against the app's request (scan 2026-10-27 follow-up:
       // remote TON → EVM was refused outright because only swap bodies could be opened on the client).
       if (params.sourceChain.startsWith("ton:") && params.destChain.startsWith("eip155:")) {
-        if (!hooks.verifyTonEscrowBuild) return "a TON → EVM escrow body needs verifyTonEscrowBuild (createOmnistonTonValidators)";
-        if (!params.refundAddress) return "the trader's TON address (refundAddress) is unknown";
+        if (!hooks.verifyTonEscrowBuild) return said("a TON → EVM escrow body needs verifyTonEscrowBuild (createOmnistonTonValidators)", "unsupported_pair");
+        if (!params.refundAddress) return said("the trader's TON address (refundAddress) is unknown", "recipient_unverifiable");
         const floor = [quote.minDestAmount, params.minAmountOut ?? "0"].filter((v) => /^\d{1,80}$/.test(v)).map((v) => BigInt(v)).reduce((a, b) => (a > b ? a : b), 0n);
         try {
-          return await hooks.verifyTonEscrowBuild({
+          const text = await hooks.verifyTonEscrowBuild({
             payloadBocHex: Buffer.from(tx.bodyBoc, "base64").toString("hex"),
             ownerAddress: params.refundAddress,
             inputUnits: quote.sourceAmount,
@@ -1818,18 +1953,19 @@ export function omnistonVerifyBuild(hooks: {
             outputTokenAddress: params.destToken,
             minResolverSendsUnits: floor.toString(),
           });
+          return text ? said(text, tonEscrowBuildReason(text)) : text;
         } catch {
-          return "the escrow body could not be checked";
+          return said("the escrow body could not be checked", "policy_refused");
         }
       }
-      return "only TON swap and TON → EVM escrow bodies can be checked on the client";
+      return said("only TON swap and TON → EVM escrow bodies can be checked on the client", "unsupported_pair");
     }
     let steps: Array<{protocol: string; inputJetton?: string | null; outputJetton?: string | null}>;
-    try { steps = JSON.parse(quote.providerData.routeSteps ?? "") as typeof steps; } catch { return "the quote carries no route steps"; }
-    if (!Array.isArray(steps) || steps.length === 0) return "the quote carries no route steps";
+    try { steps = JSON.parse(quote.providerData.routeSteps ?? "") as typeof steps; } catch { return said("the quote carries no route steps", "policy_refused"); }
+    if (!Array.isArray(steps) || steps.length === 0) return said("the quote carries no route steps", "policy_refused");
     const source = ccAsset(params.sourceChain, params.sourceToken);
     const dest = ccAssetByToken(params.destChain, params.destToken);
-    if (!source || !dest) return "unknown source or destination token";
+    if (!source || !dest) return said("unknown source or destination token", "unsupported_pair");
     const protocols = (quote.providerData.protocols ?? "").split(",").filter(Boolean);
     let checked: TonSwapCheckResult;
     try {
@@ -1847,19 +1983,19 @@ export function omnistonVerifyBuild(hooks: {
         integratorAddress: hooks.integratorAddress ?? null,
       });
     } catch (e) {
-      return e instanceof Error ? e.message.replace(/^omniston: /, "") : String(e);
+      return said(e instanceof Error ? e.message.replace(/^omniston: /, "") : String(e), e instanceof TonSwapPayloadError ? tonSwapPayloadReason(e.reason) : "policy_refused");
     }
     // The DEX the message pays: the message target for a native input, the jetton transfer's destination otherwise.
     const payload = parseSwapPayload(Buffer.from(tx.bodyBoc, "base64").toString("hex"));
     const target = source.contract ? payload.jettonTransfer?.destination : tx.to;
-    if (!target) return "the body names no swap destination";
-    try { if (!(await hooks.validateTonSwapTarget({address: target, protocols}))) return `${target} is not a recognized DEX contract for ${protocols.join("+")}`; } catch { return "the swap target could not be checked"; }
+    if (!target) return said("the body names no swap destination", "policy_refused");
+    try { if (!(await hooks.validateTonSwapTarget({address: target, protocols}))) return said(`${target} is not a recognized DEX contract for ${protocols.join("+")}`, "vault_mismatch"); } catch { return said("the swap target could not be checked", "policy_refused"); }
     // Scan 2026-10-30 F8: without the leg check a genuine DEX body may pay out another token than the quoted one.
-    if (!hooks.validateTonSwapLeg) return "a TON swap body needs validateTonSwapLeg (createOmnistonTonValidators)";
+    if (!hooks.validateTonSwapLeg) return said("a TON swap body needs validateTonSwapLeg (createOmnistonTonValidators)", "unsupported_pair");
     for (const leg of checked.legs) {
       let ok = false;
       try { ok = await hooks.validateTonSwapLeg(leg); } catch { ok = false; }
-      if (!ok) return `${leg.kind} v${leg.version} leg not verified`;
+      if (!ok) return said(`${leg.kind} v${leg.version} leg not verified`, "vault_mismatch");
     }
     return null;
   };
@@ -2090,21 +2226,21 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     if (!bound.ok) {
       if (bound.reason === "legacy-expired") {
         trace("legacy-intent-expired", {where});
-        throw new Error("omniston: quote expired — request a fresh quote");
+        throw refusal("quote_expired", "omniston: quote expired — request a fresh quote");
       }
       trace("intent-mismatch", {where, field: bound.field});
-      throw new Error(`omniston: intent id does not match the quote it was issued for (${bound.field})`);
+      throw refusal(mismatchReason(bound.field), `omniston: intent id does not match the quote it was issued for (${bound.field})`);
     }
     if (bound.legacy) trace("legacy-intent", {where});
     // Scan 2026-10-30 F6: the terms the caller's quote showed must be the cached ones. An id from before the digest
     // (in flight across a deploy) is refused too: a fresh quote is a second away.
     if (!decoded.digest) {
       trace("intent-mismatch", {where, field: "digest-missing"});
-      throw new Error("omniston: this quote was issued before an update — request a fresh quote");
+      throw refusal("quote_expired", "omniston: this quote was issued before an update — request a fresh quote");
     }
     if (decoded.digest !== quoteDigest(entry.quote)) {
       trace("intent-mismatch", {where, field: "digest"});
-      throw new Error("omniston: quote was replaced — request a fresh quote");
+      throw refusal("policy_refused", "omniston: quote was replaced — request a fresh quote");
     }
     return bound.ref;
   }
@@ -2146,10 +2282,10 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       const disclosed = ((await store.load(disclosedKey(quoteId))) ?? []).length > 0;
       if (boundTo !== binding || disclosed) {
         traceFor(quoteId)("secret-reuse-refused", {disclosed, bound: boundTo !== undefined});
-        throw new Error("omniston: this quote id already belongs to another order — request a fresh quote");
+        throw refusal("policy_refused", "omniston: this quote id already belongs to another order — request a fresh quote");
       }
       if (existing.length !== count || !existing.every((s) => /^[0-9a-fA-F]{64}$/.test(s))) {
-        throw new Error("omniston: stored HTLC secrets for this quote do not fit the order — request a fresh quote");
+        throw refusal("policy_refused", "omniston: stored HTLC secrets for this quote do not fit the order — request a fresh quote");
       }
       traceFor(quoteId)("secret-reused", {count});
       return {secrets: existing.map(hexToBytes), created: false};
@@ -2244,7 +2380,10 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     let q = await rfq(slippagePips);
     if (!q) {
       if (!signal?.aborted) {
-        params.onRefusal?.(`omniston: ${outcome.error ? `RFQ failed: ${outcome.error}` : outcome.rejected ? `swap quote rejected: ${outcome.rejected}` : "no TON DEX route quoted this pair/amount"}`);
+        const text = `omniston: ${outcome.error ? `RFQ failed: ${outcome.error}` : outcome.rejected ? `swap quote rejected: ${outcome.rejected}` : "no TON DEX route quoted this pair/amount"}`;
+        const reason = rfqReason(outcome);
+        if (reason) params.onRefusal?.(text, {reason});
+        else params.onRefusal?.(text);
       }
       return null;
     }
@@ -2333,27 +2472,32 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
   ): Promise<UnsignedTx> {
     if (!ref.trader) throw new Error("omniston: quote was requested without a refund/source address");
     if (!isTon(ref.srcChain) || q.inputAsset.chain.$case !== "ton" || q.outputAsset.chain.$case !== "ton") {
-      throw new Error("omniston: swap quote is not a TON same-chain swap");
+      throw refusal("policy_refused", "omniston: swap quote is not a TON same-chain swap");
     }
-    if (!sameChainTonReady()) throw new Error("omniston: TON same-chain swaps need independent jetton-wallet, swap-target and swap-leg validators");
+    if (!sameChainTonReady()) throw refusal("unsupported_pair", "omniston: TON same-chain swaps need independent jetton-wallet, swap-target and swap-leg validators");
     const owner: ChainAddress = {chain: {$case: "ton", value: ref.trader}};
     const receiver: ChainAddress = {chain: {$case: "ton", value: ref.dest}};
     const omni = await getClient();
-    if (typeof omni.tonBuildSwap !== "function") throw new Error("omniston: client does not support swap settlement (tonBuildSwap)");
-    const tx = await omni.tonBuildSwap({
-      quoteId: ref.quoteId,
-      transferSrcAddress: owner,
-      refundSrcAddress: owner,
-      gasExcessAddress: owner,
-      traderDstAddress: receiver,
-      // Build at the slippage the quote was requested with: its
-      // minOutputAmount is the minimum this module reported to the router.
-      useRecommendedSlippage: false,
-    });
+    if (typeof omni.tonBuildSwap !== "function") throw refusal("unsupported_pair", "omniston: client does not support swap settlement (tonBuildSwap)");
+    let tx: {messages: EscrowMessage[]};
+    try {
+      tx = await omni.tonBuildSwap({
+        quoteId: ref.quoteId,
+        transferSrcAddress: owner,
+        refundSrcAddress: owner,
+        gasExcessAddress: owner,
+        traderDstAddress: receiver,
+        // Build at the slippage the quote was requested with: its
+        // minOutputAmount is the minimum this module reported to the router.
+        useRecommendedSlippage: false,
+      });
+    } catch (error) {
+      throw venueFailure(error);
+    }
     const [message, ...rest] = tx.messages;
-    if (!message || rest.length > 0) throw new Error(`omniston: expected exactly one swap message, got ${tx.messages.length}`);
-    if (message.jettonWalletStateInit) throw new Error("omniston: deploying a resolver-provided jetton wallet is not supported");
-    if (!isPositiveInteger(message.sendAmount)) throw new Error("omniston: malformed swap message value");
+    if (!message || rest.length > 0) throw refusal("policy_refused", `omniston: expected exactly one swap message, got ${tx.messages.length}`);
+    if (message.jettonWalletStateInit) throw refusal("policy_refused", "omniston: deploying a resolver-provided jetton wallet is not supported");
+    if (!isPositiveInteger(message.sendAmount)) throw refusal("policy_refused", "omniston: malformed swap message value");
     const sendAmount = BigInt(message.sendAmount);
     const gasCap = BigInt(maxTonExecutionNano);
     const gasBudget = q.gasBudget && isPositiveInteger(q.gasBudget) ? BigInt(q.gasBudget) : gasCap;
@@ -2373,51 +2517,51 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       // Jetton input: a transfer from the trader's OWN jetton wallet whose
       // forward lands in the DEX. The TON attached is gas only.
       const transfer = payload.jettonTransfer;
-      if (!transfer) throw new Error("omniston: jetton-input swap message is not a jetton transfer");
-      if (sendAmount > gasCap || sendAmount > gasBudget) throw new Error(`omniston: swap message attaches more TON than the quoted gas budget (${sendAmount} > ${gasBudget} nanoTON, cap ${gasCap}, ${protocols.join("+")})`);
-      if (transfer.amount !== BigInt(q.inputUnits)) throw new Error("omniston: swap message moves a different amount than quoted");
+      if (!transfer) throw refusal("policy_refused", "omniston: jetton-input swap message is not a jetton transfer");
+      if (sendAmount > gasCap || sendAmount > gasBudget) throw refusal("policy_refused", `omniston: swap message attaches more TON than the quoted gas budget (${sendAmount} > ${gasBudget} nanoTON, cap ${gasCap}, ${protocols.join("+")})`);
+      if (transfer.amount !== BigInt(q.inputUnits)) throw refusal("policy_refused", "omniston: swap message moves a different amount than quoted");
       if (!transfer.responseDestination || !sameTonAddress(transfer.responseDestination, ref.trader)) {
-        throw new Error("omniston: swap message returns excess to a wallet other than the trader");
+        throw refusal("recipient_mismatch", "omniston: swap message returns excess to a wallet other than the trader");
       }
-      if (transfer.forwardTon >= sendAmount) throw new Error("omniston: swap message forwards more TON than it carries");
+      if (transfer.forwardTon >= sendAmount) throw refusal("policy_refused", "omniston: swap message forwards more TON than it carries");
       const walletValid = await opts.validateTonJettonWallet!({
         ownerAddress: ref.trader,
         jettonMasterAddress: inputJetton,
         walletAddress: message.targetAddress,
       });
-      if (!walletValid) throw new Error("omniston: TON jetton wallet was not independently validated");
+      if (!walletValid) throw refusal("vault_mismatch", "omniston: TON jetton wallet was not independently validated");
       const targetValid = await opts.validateTonSwapTarget!({address: transfer.destination, protocols});
-      if (!targetValid) throw new Error("omniston: swap destination is not a recognized DEX contract for the quoted protocol");
+      if (!targetValid) throw refusal("vault_mismatch", "omniston: swap destination is not a recognized DEX contract for the quoted protocol");
     } else if (ptonV1Native) {
       const transfer = payload.jettonTransfer!;
       const input = BigInt(q.inputUnits);
-      if (transfer.amount !== input) throw new Error("omniston: swap message moves a different amount than quoted");
-      if (sendAmount < input) throw new Error("omniston: swap message carries less than the quoted input");
+      if (transfer.amount !== input) throw refusal("policy_refused", "omniston: swap message moves a different amount than quoted");
+      if (sendAmount < input) throw refusal("policy_refused", "omniston: swap message carries less than the quoted input");
       const gas = sendAmount - input;
-      if (gas > gasCap || gas > gasBudget) throw new Error(`omniston: swap message attaches more TON than the quoted gas budget (${gas} > ${gasBudget} nanoTON, cap ${gasCap}, ${protocols.join("+")})`);
+      if (gas > gasCap || gas > gasBudget) throw refusal("policy_refused", `omniston: swap message attaches more TON than the quoted gas budget (${gas} > ${gasBudget} nanoTON, cap ${gasCap}, ${protocols.join("+")})`);
       // pTON v1 forwards exactly the gas share of the value to the router (live: 0.1 of 0.1 GRAM).
-      if (transfer.forwardTon > gas) throw new Error("omniston: swap message forwards more TON than its gas");
+      if (transfer.forwardTon > gas) throw refusal("policy_refused", "omniston: swap message forwards more TON than its gas");
       if (!transfer.responseDestination || !sameTonAddress(transfer.responseDestination, ref.trader)) {
-        throw new Error("omniston: swap message returns excess to a wallet other than the trader");
+        throw refusal("recipient_mismatch", "omniston: swap message returns excess to a wallet other than the trader");
       }
-      if (typeof opts.validateTonSwapLeg !== "function") throw new Error("omniston: STON.fi v1 native input needs the validateTonSwapLeg validator (pTON v1 wallet ownership)");
+      if (typeof opts.validateTonSwapLeg !== "function") throw refusal("unsupported_pair", "omniston: STON.fi v1 native input needs the validateTonSwapLeg validator (pTON v1 wallet ownership)");
       // The pTON v1 wallet (a router-owned proxy-TON wallet) and the router it names.
       const targetValid = await opts.validateTonSwapTarget!({address: message.targetAddress, protocols});
-      if (!targetValid) throw new Error("omniston: swap target is not a recognized DEX contract for the quoted protocol");
+      if (!targetValid) throw refusal("vault_mismatch", "omniston: swap target is not a recognized DEX contract for the quoted protocol");
       const routerValid = await opts.validateTonSwapTarget!({address: transfer.destination, protocols});
-      if (!routerValid) throw new Error("omniston: swap destination is not a recognized DEX contract for the quoted protocol");
+      if (!routerValid) throw refusal("vault_mismatch", "omniston: swap destination is not a recognized DEX contract for the quoted protocol");
     } else {
       // Native input: the message itself pays the DEX — value = input + gas.
       if (payload.jettonTransfer) {
         // Name what came back so the refusal can be triaged: which protocol route, where the message goes and what the jetton transfer targets.
-        throw new Error(`omniston: native-input swap message must not be a jetton transfer (route ${protocols.join("+") || "?"}, target ${message.targetAddress}, transfer ${payload.jettonTransfer.amount} to ${payload.jettonTransfer.destination}, forwardTon ${payload.jettonTransfer.forwardTon}, value ${sendAmount})`);
+        throw refusal("policy_refused", `omniston: native-input swap message must not be a jetton transfer (route ${protocols.join("+") || "?"}, target ${message.targetAddress}, transfer ${payload.jettonTransfer.amount} to ${payload.jettonTransfer.destination}, forwardTon ${payload.jettonTransfer.forwardTon}, value ${sendAmount})`);
       }
       const input = BigInt(q.inputUnits);
-      if (sendAmount < input) throw new Error("omniston: swap message carries less than the quoted input");
+      if (sendAmount < input) throw refusal("policy_refused", "omniston: swap message carries less than the quoted input");
       const gas = sendAmount - input;
-      if (gas > gasCap || gas > gasBudget) throw new Error(`omniston: swap message attaches more TON than the quoted gas budget (${gas} > ${gasBudget} nanoTON, cap ${gasCap}, ${protocols.join("+")})`);
+      if (gas > gasCap || gas > gasBudget) throw refusal("policy_refused", `omniston: swap message attaches more TON than the quoted gas budget (${gas} > ${gasBudget} nanoTON, cap ${gasCap}, ${protocols.join("+")})`);
       const targetValid = await opts.validateTonSwapTarget!({address: message.targetAddress, protocols});
-      if (!targetValid) throw new Error("omniston: swap target is not a recognized DEX contract for the quoted protocol");
+      if (!targetValid) throw refusal("vault_mismatch", "omniston: swap target is not a recognized DEX contract for the quoted protocol");
     }
 
     // Scan F11: open the DEX call and bind receiver, refund/excess, minimum
@@ -2427,7 +2571,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     const trace = traceFor(ref.quoteId);
     const payloadRefusal = (reason: string, detail: string): void => {
       trace("ton-swap-payload", {reason, detail, mode, protocols: protocols.join("+")});
-      if (mode === "enforce") throw new Error(`omniston: ton-swap-payload ${reason} — ${detail}`);
+      if (mode === "enforce") throw refusal(tonSwapPayloadReason(reason), `omniston: ton-swap-payload ${reason} — ${detail}`);
     };
     let checked: TonSwapCheckResult | null = null;
     try {
@@ -2517,36 +2661,36 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     const srcChain = ref.srcChain;
     const chainId = evmRef(srcChain);
     const srcCase = q.inputAsset.chain.$case;
-    if (chainId === null || EVM_CASE[chainId] !== srcCase) throw new Error("omniston: source chain does not match the EVM quote");
+    if (chainId === null || EVM_CASE[chainId] !== srcCase) throw refusal("policy_refused", "omniston: source chain does not match the EVM quote");
     const destCase = q.outputAsset.chain.$case;
     const destChain = caipForChainCase(destCase);
     const tonDest = destCase === "ton";
-    if (!destChain || destChain === srcChain) throw new Error("omniston: EVM-source order has no supported destination chain");
+    if (!destChain || destChain === srcChain) throw refusal("unsupported_pair", "omniston: EVM-source order has no supported destination chain");
     if (
       !trustedOrderProtocols.has(srcChain) || typeof opts.validateEvmInputPosition !== "function" ||
       typeof (tonDest ? opts.validateTonOutputPosition : opts.validateEvmOutputPosition) !== "function"
     ) {
-      throw new Error(`omniston: EVM→${tonDest ? "TON" : "EVM"} needs a trusted order protocol and both position validators`);
+      throw refusal("unsupported_pair", `omniston: EVM→${tonDest ? "TON" : "EVM"} needs a trusted order protocol and both position validators`);
     }
     let owner: string;
     try {
       owner = getAddress(ref.trader);
     } catch {
-      throw new Error("omniston: trader is not an EVM address");
+      throw refusal("recipient_mismatch", "omniston: trader is not an EVM address");
     }
     let dest: string;
     if (tonDest) {
       try {
         TonAddress.parse(ref.dest);
       } catch {
-        throw new Error("omniston: destination is not a TON address");
+        throw refusal("recipient_mismatch", "omniston: destination is not a TON address");
       }
       dest = ref.dest;
     } else {
       try {
         dest = getAddress(ref.dest);
       } catch {
-        throw new Error("omniston: destination is not an EVM address");
+        throw refusal("recipient_mismatch", "omniston: destination is not an EVM address");
       }
     }
     const traderDst = {chain: {$case: destCase, value: dest}} as ChainAddress;
@@ -2558,7 +2702,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
     const destChainId = tonDest ? null : evmRef(destChain);
     // Named apart so a quote cached under an older table is refused with the factory it names.
     if (factory?.chain.$case === destCase && !isTrusted(destChain, factory.chain.value)) {
-      throw new Error(`omniston: untrusted ${destChain} settlement contract ${factory.chain.value}`);
+      throw refusal("vault_mismatch", `omniston: untrusted ${destChain} settlement contract ${factory.chain.value}`);
     }
     if (
       protocol.chain.$case !== srcCase || !isTrustedOrderProtocol(srcChain, protocol.chain.value) ||
@@ -2566,7 +2710,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       factory?.chain.$case !== destCase || !isTrusted(destChain, factory.chain.value) ||
       !inputToken || !outputToken || !Number.isSafeInteger(settlement.protocolFeePips) ||
       (!tonDest && (destChainId === null || !validEvmAddress(outputToken) || !isPositiveInteger(settlement.dstSecurityDepositUnits ?? "")))
-    ) throw new Error("omniston: incomplete EVM order settlement binding in quote");
+    ) throw refusal("policy_refused", "omniston: incomplete EVM order settlement binding in quote");
 
     // One execution: the signed order has ALLOW_MULTIPLE_FILLS clear and the
     // TON position commits a single hash. Persist BEFORE anything is signed.
@@ -2586,14 +2730,14 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       });
     } catch (error) {
       await forget();
-      throw error;
+      throw venueFailure(error);
     }
     let td: unknown;
     try {
       try {
         td = JSON.parse(payload.typedData);
       } catch {
-        throw new Error("omniston: malformed EVM order typed data");
+        throw refusal("policy_refused", "omniston: malformed EVM order typed data");
       }
       validateSerializedOrderDetails(payload.serializedOrderDetails, {
         quoteId: ref.quoteId,
@@ -2688,56 +2832,58 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       // Amount-flexible deposits need a static deposit address — orders don't have one.
       if (params.flex) return null;
       if (isTon(params.sourceChain) && isTon(params.destChain)) return await getSwapQuote(params, signal);
-      const refuse = (reason: string): null => {
-        params.onRefusal?.(`omniston: ${reason}`);
+      // `why`: the refusal's Swap2RefusalReason; absent for the caller's own invalid arguments and configuration.
+      const refuse = (reason: string, why?: Swap2RefusalReason): null => {
+        if (why) params.onRefusal?.(`omniston: ${reason}`, {reason: why});
+        else params.onRefusal?.(`omniston: ${reason}`);
         return null;
       };
       const evmSource = !isTon(params.sourceChain);
       const tonDest = isTon(params.destChain);
-      if (!cfg.supports(params.sourceChain, params.destChain)) return refuse("route is not an Omniston order corridor");
+      if (!cfg.supports(params.sourceChain, params.destChain)) return refuse("route is not an Omniston order corridor", "unsupported_pair");
       if (!trustedContracts.has(params.sourceChain) || !trustedContracts.has(params.destChain)) {
-        return refuse(`no trusted settlement contract configured for ${trustedContracts.has(params.sourceChain) ? params.destChain : params.sourceChain}`);
+        return refuse(`no trusted settlement contract configured for ${trustedContracts.has(params.sourceChain) ? params.destChain : params.sourceChain}`, "unsupported_pair");
       }
       if (evmSource) {
-        if (!trustedOrderProtocols.has(params.sourceChain)) return refuse(`no trusted EVM order protocol configured for ${params.sourceChain}`);
+        if (!trustedOrderProtocols.has(params.sourceChain)) return refuse(`no trusted EVM order protocol configured for ${params.sourceChain}`, "unsupported_pair");
         if (typeof opts.validateEvmInputPosition !== "function" || typeof (tonDest ? opts.validateTonOutputPosition : opts.validateEvmOutputPosition) !== "function") {
           return refuse(tonDest
             ? "EVM→TON needs the EVM input-position and TON output-position validators"
-            : "EVM→EVM needs the EVM input-position and EVM output-position validators");
+            : "EVM→EVM needs the EVM input-position and EVM output-position validators", "unsupported_pair");
         }
         if (params.dry === false) {
           if (tonDest) {
             try {
               TonAddress.parse(params.destAddress);
             } catch {
-              return refuse("destination is not a TON address");
+              return refuse("destination is not a TON address", "recipient_mismatch");
             }
-          } else if (!validEvmAddress(params.destAddress)) return refuse("destination is not an EVM address");
+          } else if (!validEvmAddress(params.destAddress)) return refuse("destination is not an EVM address", "recipient_mismatch");
         }
       } else if (
         typeof opts.validateTonJettonWallet !== "function" ||
         typeof opts.validateTonEscrowPayload !== "function" ||
         typeof opts.validateEvmOutputPosition !== "function"
-      ) return refuse("TON→EVM needs the jetton-wallet, escrow-payload and EVM output-position validators");
+      ) return refuse("TON→EVM needs the jetton-wallet, escrow-payload and EVM output-position validators", "unsupported_pair");
 
       const source = ccAsset(params.sourceChain, params.sourceToken);
       const dest = ccAssetByToken(params.destChain, params.destToken);
-      if (!source || !dest) return refuse("asset is not in the catalog");
+      if (!source || !dest) return refuse("asset is not in the catalog", "unsupported_pair");
       const inputAsset = toAssetId(params.sourceChain, source);
       const outputAsset = toAssetId(params.destChain, dest);
       if (!inputAsset || !outputAsset) {
-        return refuse(`cross-chain orders are token corridors only (no ${!inputAsset ? source.symbol : dest.symbol} native leg)`);
+        return refuse(`cross-chain orders are token corridors only (no ${!inputAsset ? source.symbol : dest.symbol} native leg)`, "unsupported_pair");
       }
 
       // The resolver only fills the corridor up to ~$1000 a swap (stables 1:1).
       const maxUnits = decimalToUnits(maxUsdText, source.decimals);
       if (!maxUnits || !isPositiveInteger(params.amountIn)) return refuse("invalid amount");
-      if (BigInt(params.amountIn) > maxUnits) return refuse(`amount above the ${maxUsdText} USD per-swap cap`);
+      if (BigInt(params.amountIn) > maxUnits) return refuse(`amount above the ${maxUsdText} USD per-swap cap`, "amount_too_large");
 
       // Execution and tracking both need the trader's source-chain wallet.
       const trader = params.refundAddress ?? "";
       if (!trader && !params.dry) return refuse(`execution quote needs the trader's ${evmSource ? "EVM" : "TON"} address (refundAddress)`);
-      if (evmSource && trader && !validEvmAddress(trader)) return refuse("refundAddress is not an EVM address");
+      if (evmSource && trader && !validEvmAddress(trader)) return refuse("refundAddress is not an EVM address", "recipient_mismatch");
 
       const request: QuoteRequest = {
         inputAsset,
@@ -2770,33 +2916,34 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
           rfq.error ? `RFQ failed: ${rfq.error}`
             : rfq.rejected ? `resolver quote rejected: ${rfq.rejected}`
               : "no resolver quoted this route/amount",
+          rfqReason(rfq),
         );
       }
       const orderData = q.settlementData.$case === "order" ? q.settlementData.value : null;
-      if (!orderData) return refuse("resolver answered without order settlement");
+      if (!orderData) return refuse("resolver answered without order settlement", "upstream_unavailable");
       const srcContract = orderData.srcProtocolContractAddress.chain.value;
       if (evmSource ? !isTrustedOrderProtocol(params.sourceChain, srcContract) : !isTrusted(params.sourceChain, srcContract)) {
-        return refuse(evmSource ? `untrusted ${params.sourceChain} order protocol ${srcContract}` : `untrusted TON settlement contract ${srcContract}`);
+        return refuse(evmSource ? `untrusted ${params.sourceChain} order protocol ${srcContract}` : `untrusted TON settlement contract ${srcContract}`, "vault_mismatch");
       }
       if (!orderData.dstProtocolContractAddress || !isTrusted(params.destChain, orderData.dstProtocolContractAddress.chain.value)) {
-        return refuse(`untrusted ${params.destChain} settlement contract ${orderData.dstProtocolContractAddress?.chain.value ?? "(none)"}`);
+        return refuse(`untrusted ${params.destChain} settlement contract ${orderData.dstProtocolContractAddress?.chain.value ?? "(none)"}`, "vault_mismatch");
       }
       const deadlineMs = orderData.tradeStartDeadline * 1000;
-      if (!Number.isFinite(deadlineMs) || deadlineMs <= Date.now()) return refuse("quote trade-start deadline already passed");
+      if (!Number.isFinite(deadlineMs) || deadlineMs <= Date.now()) return refuse("quote trade-start deadline already passed", "quote_expired");
       // An execution quote whose deadline cannot outlast signing + inclusion
       // would fund an escrow no resolver will fill.
-      if (params.dry === false && deadlineMs - Date.now() < MIN_START_HEADROOM_MS) return refuse("quote trade-start deadline too close to execute");
+      if (params.dry === false && deadlineMs - Date.now() < MIN_START_HEADROOM_MS) return refuse("quote trade-start deadline too close to execute", "quote_expired");
 
       // The advertised corridors are stable-to-stable. Bound a resolver's
       // optimistic amount before it can dominate the router auction with an
       // impossible quote; settlement remains all-or-refund within this range.
       const inputScaled = BigInt(q.inputUnits) * 10n ** BigInt(dest.decimals);
       const outputScaled = BigInt(q.outputUnits) * 10n ** BigInt(source.decimals);
-      if (outputScaled * 2n < inputScaled || outputScaled > inputScaled * 2n) return refuse("quoted output is outside 0.5x–2x of the input");
+      if (outputScaled * 2n < inputScaled || outputScaled > inputScaled * 2n) return refuse("quoted output is outside 0.5x–2x of the input", "price_check_failed");
 
-      if (await quoteIdInUse(q.quoteId)) return refuse("the platform reused a quote id that already belongs to an order");
+      if (await quoteIdInUse(q.quoteId)) return refuse("the platform reused a quote id that already belongs to an order", "policy_refused");
       if (!(await claimBuilt(q.quoteId, {quote: q, at: Date.now(), bound: {trader, dest: params.destAddress, srcChain: params.sourceChain, kind: "order"}}))) {
-        return refuse("the platform reused a quote id that already holds another quote");
+        return refuse("the platform reused a quote id that already holds another quote", "policy_refused");
       }
 
       // Fees are charged in the OUTPUT asset; the corridor is stables, so units
@@ -2830,32 +2977,32 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
      */
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
       if (!Number.isFinite(quote.validUntilMs) || quote.validUntilMs <= Date.now()) {
-        throw new Error("omniston: quote expired — request a fresh quote");
+        throw refusal("quote_expired", "omniston: quote expired — request a fresh quote");
       }
       const decoded = decodeIntent(quote.intentId);
       if (!decoded) throw new Error("omniston: malformed intent id");
       const cached = await loadBuilt(decoded.quoteId);
-      if (!cached) throw new Error("omniston: quote expired — request a fresh quote");
+      if (!cached) throw refusal("quote_expired", "omniston: quote expired — request a fresh quote");
       const ref = requireBinding(decoded, cached, "buildDeposit");
       const q = cached.quote;
       if (q.settlementData.$case === "swap") return await buildSwapDeposit(ref, q, q.settlementData.value);
       if (q.settlementData.$case !== "order" || q.settlementData.value.tradeStartDeadline * 1000 <= Date.now()) {
-        throw new Error("omniston: quote trade deadline expired — request a fresh quote");
+        throw refusal("quote_expired", "omniston: quote trade deadline expired — request a fresh quote");
       }
 
       if (!ref.trader) throw new Error("omniston: quote was requested without a refund/source address");
       const srcCase = q.inputAsset.chain.$case;
       if (srcCase !== "ton") return await buildEvmOrder(ref, q, q.settlementData.value, cached.bound);
       const srcChain = ref.srcChain;
-      if (!isTon(srcChain)) throw new Error("omniston: source chain does not match TON quote");
+      if (!isTon(srcChain)) throw refusal("policy_refused", "omniston: source chain does not match TON quote");
       const destCase = q.outputAsset.chain.$case;
       const traderDst = destCase === "ton" ? null : {chain: {$case: destCase, value: getAddress(ref.dest)}};
-      if (!traderDst) throw new Error("omniston: TON-destination orders are not supported");
+      if (!traderDst) throw refusal("unsupported_pair", "omniston: TON-destination orders are not supported");
       // Same re-check as buildEvmOrder: a quote cached under an older table (a shared quote store, a minter
       // dropped since) builds only if this provider's table trusts its minter too.
       const minter = q.settlementData.value.srcProtocolContractAddress;
       if (minter.chain.$case !== "ton" || !isTrusted(srcChain, minter.chain.value)) {
-        throw new Error(`omniston: untrusted TON settlement contract ${minter.chain.value}`);
+        throw refusal("vault_mismatch", `omniston: untrusted TON settlement contract ${minter.chain.value}`);
       }
 
       const settlement = q.settlementData;
@@ -2880,27 +3027,27 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         });
       } catch (error) {
         await forget();
-        throw error;
+        throw venueFailure(error);
       }
       const [message, ...rest] = tx.messages;
       if (!message || rest.length > 0) {
         await forget();
-        throw new Error(`omniston: expected exactly one escrow message, got ${tx.messages.length}`);
+        throw refusal("policy_refused", `omniston: expected exactly one escrow message, got ${tx.messages.length}`);
       }
       if (!isPositiveInteger(message.sendAmount) || BigInt(message.sendAmount) > BigInt(maxTonExecutionNano)) {
         await forget();
-        throw new Error("omniston: resolver TON execution value exceeds the configured safety cap");
+        throw refusal("policy_refused", "omniston: resolver TON execution value exceeds the configured safety cap");
       }
       const expectedProtocol = q.settlementData.value.srcProtocolContractAddress;
       const initialResolver = q.settlementData.value.srcInitialResolverAddress;
       const jettonMaster = assetContract(q.inputAsset);
       if (expectedProtocol.chain.$case !== "ton" || initialResolver?.chain.$case !== "ton" || !jettonMaster) {
         await forget();
-        throw new Error("omniston: incomplete TON settlement binding in quote");
+        throw refusal("policy_refused", "omniston: incomplete TON settlement binding in quote");
       }
       if (message.jettonWalletStateInit) {
         await forget();
-        throw new Error("omniston: deploying a resolver-provided jetton wallet is not supported");
+        throw refusal("policy_refused", "omniston: deploying a resolver-provided jetton wallet is not supported");
       }
       let walletValid = false;
       try {
@@ -2917,11 +3064,11 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       }
       if (!walletValid) {
         await forget();
-        throw new Error("omniston: TON jetton wallet was not independently validated");
+        throw refusal("vault_mismatch", "omniston: TON jetton wallet was not independently validated");
       }
       try {
         if (!opts.validateTonEscrowPayload) {
-          throw new Error("omniston: TON source requires an independent escrow-payload validator");
+          throw refusal("unsupported_pair", "omniston: TON source requires an independent escrow-payload validator");
         }
         await validateTonEscrowPayload(message, {
           quoteId: ref.quoteId,
@@ -2975,7 +3122,7 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         const result = bindIntent(decoded, stored);
         if (!result.ok && result.reason === "mismatch") {
           trace("intent-mismatch", {where: "trackIntent", field: result.field});
-          throw new Error(`omniston: intent id does not match the quote it was issued for (${result.field})`);
+          throw refusal(mismatchReason(result.field), `omniston: intent id does not match the quote it was issued for (${result.field})`);
         }
         if (result.ok) {
           if (result.legacy) trace("legacy-intent", {where: "trackIntent"});
@@ -3193,13 +3340,13 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
       if (!ref) throw new Error("omniston: malformed intent id");
       const cached = await loadBuilt(ref.quoteId);
       const order = cached?.evmOrder;
-      if (!order) throw new Error("omniston: no signed-order context for this quote — build the order again");
+      if (!order) throw refusal("quote_expired", "omniston: no signed-order context for this quote — build the order again");
       // Same binding as buildDeposit: the intentId must be the one this order was built for.
       requireBinding(ref, cached!, "registerSignedOrder");
       if (!/^0x[0-9a-fA-F]{130}$/.test(signature)) throw new Error("omniston: malformed order signature");
       const td = JSON.parse(order.typedData) as Parameters<typeof encodeTypedMessage>[0];
       const omni = await getClient();
-      await omni.orderRegisterSignedOrder({
+      const request: Parameters<OmnistonClientLike["orderRegisterSignedOrder"]>[0] = {
         quoteId: ref.quoteId,
         ownerSrcAddress: {chain: {$case: order.chainCase, value: order.owner}} as ChainAddress,
         signedOrder: {order: {$case: "evmV1", value: {
@@ -3208,7 +3355,12 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
           orderExtension: hexToBytes(order.orderExtension),
         }}},
         ...(order.serializedOrderDetails ? {serializedOrderDetails: hexToBytes(order.serializedOrderDetails)} : {}),
-      });
+      };
+      try {
+        await omni.orderRegisterSignedOrder(request);
+      } catch (error) {
+        throw venueFailure(error);
+      }
     },
 
     close(): void {
