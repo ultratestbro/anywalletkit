@@ -21,6 +21,7 @@
  */
 import {encodeFunctionData, parseAbi, type Hex} from "viem";
 import type {Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {refusalNotes, refusalOf, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import {
   RELAY_CLOCK_SKEW_S, RELAY_DEPOSIT_ERC20, RELAY_DEPOSIT_ERC20_ALLOWANCE, RELAY_DEPOSIT_NATIVE, RELAY_MAX_ORDER_AGE_S,
@@ -148,22 +149,24 @@ export function buildRelayDeposit(source: RelayChain, depositor: string, token: 
 }
 
 function checkRequest(r: RelayRequest): {source: RelayChain; dest: RelayChain; nowS: number} {
-  const invalid = (what: string): never => { throw new RelayRefusal("request-invalid", what); };
+  // A malformed request is the caller's own bug and carries no reason; the zero-address parties and the slippage cap
+  // are refusals.
+  const invalid = (what: string, reason?: Swap2RefusalReason): never => { throw new RelayRefusal("request-invalid", what, reason); };
   if (r === null || typeof r !== "object") invalid("no request to check the order against");
   const source = relayChain(r.sourceChain);
   const dest = relayChain(r.destChain);
-  if (!source) throw new RelayRefusal("chain-unsupported", `source chain ${String(r.sourceChain)} is not a pinned Relay chain`);
-  if (!dest) throw new RelayRefusal("chain-unsupported", `destination chain ${String(r.destChain)} is not a pinned Relay chain`);
-  if (source === dest) throw new RelayRefusal("chain-unsupported", "source and destination are the same chain");
+  if (!source) throw new RelayRefusal("chain-unsupported", `source chain ${String(r.sourceChain)} is not a pinned Relay chain`, "unsupported_pair");
+  if (!dest) throw new RelayRefusal("chain-unsupported", `destination chain ${String(r.destChain)} is not a pinned Relay chain`, "unsupported_pair");
+  if (source === dest) throw new RelayRefusal("chain-unsupported", "source and destination are the same chain", "unsupported_pair");
   for (const [what, v] of [["input token", r.sourceToken], ["output token", r.destToken], ["depositor", r.depositor], ["recipient", r.recipient]] as const) {
     if (typeof v !== "string" || !ADDRESS.test(v)) invalid(`the ${what} is not an address`);
   }
-  if (/^0x0{40}$/.test(r.depositor)) invalid("the depositor is the zero address");
-  if (/^0x0{40}$/.test(r.recipient)) invalid("the recipient is the zero address");
+  if (/^0x0{40}$/.test(r.depositor)) invalid("the depositor is the zero address", "recipient_mismatch");
+  if (/^0x0{40}$/.test(r.recipient)) invalid("the recipient is the zero address", "recipient_mismatch");
   if (typeof r.amount !== "bigint" || r.amount <= 0n || r.amount > U256_MAX) invalid("the amount is not a positive integer");
   if (r.minAmountOut !== undefined && (typeof r.minAmountOut !== "bigint" || r.minAmountOut < 0n)) invalid("the output floor is not an unsigned integer");
   if (r.slippageBps !== undefined && (!Number.isInteger(r.slippageBps) || r.slippageBps < 0 || r.slippageBps > RELAY_MAX_SLIPPAGE_BPS)) {
-    invalid(`slippage must be a whole number of basis points up to ${RELAY_MAX_SLIPPAGE_BPS}`);
+    invalid(`slippage must be a whole number of basis points up to ${RELAY_MAX_SLIPPAGE_BPS}`, "policy_refused");
   }
   const nowMs = r.nowMs ?? Date.now();
   if (!Number.isFinite(nowMs) || nowMs <= 0) invalid("the clock is not a time");
@@ -176,10 +179,10 @@ const isAddr = (bytes: Hex, addr: string): boolean => bytes.length === 42 && byt
 function checkDeadline(code: "output-deadline" | "refund-deadline", what: string, deadline: number, nowS: number): void {
   const left = deadline - nowS;
   if (left > RELAY_ORDER_LIFETIME_S + RELAY_CLOCK_SKEW_S) {
-    throw new RelayRefusal(code, `${what} is ${left} s away, past the ${RELAY_ORDER_LIFETIME_S} s an order lives`);
+    throw new RelayRefusal(code, `${what} is ${left} s away, past the ${RELAY_ORDER_LIFETIME_S} s an order lives`, "policy_refused");
   }
   if (left < RELAY_ORDER_LIFETIME_S - RELAY_MAX_ORDER_AGE_S) {
-    throw new RelayRefusal(code, `${what} is ${left} s away: the order is older than ${RELAY_MAX_ORDER_AGE_S} s or already past it`);
+    throw new RelayRefusal(code, `${what} is ${left} s away: the order is older than ${RELAY_MAX_ORDER_AGE_S} s or already past it`, "quote_expired");
   }
 }
 
@@ -190,56 +193,56 @@ function wordAddress(word: string): string | null {
 
 /** Where the deposit goes: the pinned depository of the source chain, and nothing else. Checked before the order is read. */
 function checkDepositTarget(tx: RelayDepositTx, source: RelayChain): void {
-  if (tx === null || typeof tx !== "object") throw new RelayRefusal("tx-calldata", "there is no deposit transaction");
+  if (tx === null || typeof tx !== "object") throw new RelayRefusal("tx-calldata", "there is no deposit transaction", "policy_refused");
   if (tx.chainId !== source.chainId) {
-    throw new RelayRefusal("tx-chain", `the deposit is for chain ${String(tx.chainId)}, not ${source.chainId}`);
+    throw new RelayRefusal("tx-chain", `the deposit is for chain ${String(tx.chainId)}, not ${source.chainId}`, "vault_mismatch");
   }
   if (typeof tx.to !== "string" || !ADDRESS.test(tx.to) || lower(tx.to) !== source.depository) {
-    throw new RelayRefusal("tx-target", `the deposit calls ${String(tx.to)}, not the ${source.name} depository ${source.depository} — routes that first swap on the source chain go through a router and are not signed by this module`);
+    throw new RelayRefusal("tx-target", `the deposit calls ${String(tx.to)}, not the ${source.name} depository ${source.depository} — routes that first swap on the source chain go through a router and are not signed by this module`, "vault_mismatch");
   }
 }
 
 function checkDepositTx(tx: RelayDepositTx, source: RelayChain, request: RelayRequest, order: RelayOrder, id: Hex): void {
   checkDepositTarget(tx, source);
   if (typeof tx.data !== "string" || !/^0x(?:[0-9a-fA-F]{2})*$/.test(tx.data) || tx.data.length < 10) {
-    throw new RelayRefusal("tx-calldata", "the deposit has no calldata");
+    throw new RelayRefusal("tx-calldata", "the deposit has no calldata", "policy_refused");
   }
   const data = lower(tx.data);
   const selector = data.slice(0, 10);
   const input = order.inputs[0]!.payment;
   const native = isNative(input.currency);
   if (selector === RELAY_DEPOSIT_ERC20_ALLOWANCE) {
-    throw new RelayRefusal("tx-selector", "the deposit uses depositErc20 without an amount, which takes the whole allowance");
+    throw new RelayRefusal("tx-selector", "the deposit uses depositErc20 without an amount, which takes the whole allowance", "policy_refused");
   }
   if (selector !== RELAY_DEPOSIT_NATIVE && selector !== RELAY_DEPOSIT_ERC20) {
-    throw new RelayRefusal("tx-selector", `the deposit calls ${selector}, not a known deposit function`);
+    throw new RelayRefusal("tx-selector", `the deposit calls ${selector}, not a known deposit function`, "policy_refused");
   }
   if ((selector === RELAY_DEPOSIT_NATIVE) !== native) {
-    throw new RelayRefusal("tx-selector", `the deposit calls ${native ? "depositErc20" : "depositNative"} for an order whose input is ${native ? "the native coin" : "a token"}`);
+    throw new RelayRefusal("tx-selector", `the deposit calls ${native ? "depositErc20" : "depositNative"} for an order whose input is ${native ? "the native coin" : "a token"}`, "policy_refused");
   }
   const words = native ? 2 : 4;
   if (data.length !== 10 + 64 * words) {
-    throw new RelayRefusal("tx-calldata", `the deposit calldata is ${(data.length - 2) / 2} bytes, not ${4 + 32 * words}`);
+    throw new RelayRefusal("tx-calldata", `the deposit calldata is ${(data.length - 2) / 2} bytes, not ${4 + 32 * words}`, "policy_refused");
   }
   const word = (i: number): string => data.slice(10 + 64 * i, 74 + 64 * i);
   const depositor = wordAddress(word(0));
-  if (depositor === null) throw new RelayRefusal("tx-calldata", "the depositor argument is not a padded address");
+  if (depositor === null) throw new RelayRefusal("tx-calldata", "the depositor argument is not a padded address", "policy_refused");
   if (depositor !== lower(request.depositor)) {
-    throw new RelayRefusal("tx-depositor", `the deposit is credited to ${depositor}, not to the sender ${lower(request.depositor)}`);
+    throw new RelayRefusal("tx-depositor", `the deposit is credited to ${depositor}, not to the sender ${lower(request.depositor)}`, "recipient_mismatch");
   }
   if (!native) {
     const token = wordAddress(word(1));
-    if (token === null) throw new RelayRefusal("tx-calldata", "the token argument is not a padded address");
-    if (token !== input.currency) throw new RelayRefusal("tx-token", `the deposit moves ${token}, the order's input is ${input.currency}`);
+    if (token === null) throw new RelayRefusal("tx-calldata", "the token argument is not a padded address", "policy_refused");
+    if (token !== input.currency) throw new RelayRefusal("tx-token", `the deposit moves ${token}, the order's input is ${input.currency}`, "policy_refused");
     const amount = BigInt(`0x${word(2)}`);
-    if (amount !== input.amount) throw new RelayRefusal("tx-amount", `the deposit moves ${amount}, the order's input is ${input.amount}`);
+    if (amount !== input.amount) throw new RelayRefusal("tx-amount", `the deposit moves ${amount}, the order's input is ${input.amount}`, "policy_refused");
   }
   const txId = `0x${word(native ? 1 : 3)}`;
-  if (txId !== id) throw new RelayRefusal("tx-id", `the deposit names order ${txId}, the order received hashes to ${id}`);
+  if (txId !== id) throw new RelayRefusal("tx-id", `the deposit names order ${txId}, the order received hashes to ${id}`, "recipient_unverifiable");
   const value = typeof tx.value === "string" && /^(?:0|[1-9]\d{0,77})$/.test(tx.value) ? BigInt(tx.value) : null;
   const wantValue = native ? input.amount : 0n;
   if (value === null || value !== wantValue) {
-    throw new RelayRefusal("tx-value", `the deposit sends ${String(tx.value)} wei, it must send ${wantValue}`);
+    throw new RelayRefusal("tx-value", `the deposit sends ${String(tx.value)} wei, it must send ${wantValue}`, "policy_refused");
   }
 }
 
@@ -257,89 +260,89 @@ export function verifyRelayOrder(request: RelayRequest, protocol: RelayProtocolD
 
   // The envelope.
   if (protocol === null || typeof protocol !== "object") {
-    throw new RelayRefusal("protocol-data-missing", "the quote carries no order (protocol.v2) — nothing to check the deposit against");
+    throw new RelayRefusal("protocol-data-missing", "the quote carries no order (protocol.v2) — nothing to check the deposit against", "upstream_unavailable");
   }
   if (protocol.orderData === undefined || protocol.orderData === null) {
-    throw new RelayRefusal("protocol-data-missing", "the quote carries no order data — nothing to check the deposit against");
+    throw new RelayRefusal("protocol-data-missing", "the quote carries no order data — nothing to check the deposit against", "upstream_unavailable");
   }
   if (protocol.hubType !== "onchain") {
-    throw new RelayRefusal("hub-type", `the order settles through a "${String(protocol.hubType)}" hub, only "onchain" is read`);
+    throw new RelayRefusal("hub-type", `the order settles through a "${String(protocol.hubType)}" hub, only "onchain" is read`, "unsupported_pair");
   }
   const order = parseRelayOrder(protocol.orderData);
 
   // The shape.
-  if (order.version !== RELAY_ORDER_VERSION) throw new RelayRefusal("order-version", `order version "${order.version}" is not ${RELAY_ORDER_VERSION}`);
-  if (order.inputs.length !== 1) throw new RelayRefusal("order-inputs", `the order has ${order.inputs.length} inputs, exactly one is signed for`);
-  if (order.output.payments.length !== 1) throw new RelayRefusal("order-payments", `the order pays ${order.output.payments.length} outputs, exactly one is accepted`);
-  if (order.output.calls.length !== 0) throw new RelayRefusal("order-calls", "the order runs calls on the destination — only plain payments are accepted");
-  if (order.fees.length !== 0) throw new RelayRefusal("order-fees", "the order carries order-level fees, which this module does not show and does not accept");
+  if (order.version !== RELAY_ORDER_VERSION) throw new RelayRefusal("order-version", `order version "${order.version}" is not ${RELAY_ORDER_VERSION}`, "upstream_unavailable");
+  if (order.inputs.length !== 1) throw new RelayRefusal("order-inputs", `the order has ${order.inputs.length} inputs, exactly one is signed for`, "policy_refused");
+  if (order.output.payments.length !== 1) throw new RelayRefusal("order-payments", `the order pays ${order.output.payments.length} outputs, exactly one is accepted`, "policy_refused");
+  if (order.output.calls.length !== 0) throw new RelayRefusal("order-calls", "the order runs calls on the destination — only plain payments are accepted", "policy_refused");
+  if (order.fees.length !== 0) throw new RelayRefusal("order-fees", "the order carries order-level fees, which this module does not show and does not accept", "policy_refused");
   const input = order.inputs[0]!;
   const pay = order.output.payments[0]!;
-  if (input.payment.weight === 0n) throw new RelayRefusal("input-weight", "the order's input has zero weight");
+  if (input.payment.weight === 0n) throw new RelayRefusal("input-weight", "the order's input has zero weight", "policy_refused");
 
   // The solver.
   if (!RELAY_SOLVERS.some((s) => s.address === order.solver && s.chainId === order.solverChainId)) {
-    throw new RelayRefusal("solver-not-pinned", `solver ${order.solver} on "${order.solverChainId}" is not a pinned Relay solver`);
+    throw new RelayRefusal("solver-not-pinned", `solver ${order.solver} on "${order.solverChainId}" is not a pinned Relay solver`, "recipient_unverifiable");
   }
 
   // The output: who is paid, where, in what, and at least how much.
-  if (order.output.chainId !== dest.slug) throw new RelayRefusal("output-chain", `the order pays on "${order.output.chainId}", the request is for ${dest.name} ("${dest.slug}")`);
-  if (!isAddr(pay.recipient, request.recipient)) throw new RelayRefusal("output-recipient", `the order pays ${pay.recipient}, not the recipient ${lower(request.recipient)}`);
-  if (!isAddr(pay.currency, request.destToken)) throw new RelayRefusal("output-currency", `the order pays in ${pay.currency}, the request is for ${lower(request.destToken)}`);
-  if (pay.minimumAmount <= 0n) throw new RelayRefusal("output-minimum", "the order's minimum output is zero");
+  if (order.output.chainId !== dest.slug) throw new RelayRefusal("output-chain", `the order pays on "${order.output.chainId}", the request is for ${dest.name} ("${dest.slug}")`, "recipient_mismatch");
+  if (!isAddr(pay.recipient, request.recipient)) throw new RelayRefusal("output-recipient", `the order pays ${pay.recipient}, not the recipient ${lower(request.recipient)}`, "recipient_mismatch");
+  if (!isAddr(pay.currency, request.destToken)) throw new RelayRefusal("output-currency", `the order pays in ${pay.currency}, the request is for ${lower(request.destToken)}`, "price_check_failed");
+  if (pay.minimumAmount <= 0n) throw new RelayRefusal("output-minimum", "the order's minimum output is zero", "price_check_failed");
   if (request.minAmountOut !== undefined && pay.minimumAmount < request.minAmountOut) {
-    throw new RelayRefusal("output-minimum", `the order's minimum output ${pay.minimumAmount} is under the caller's floor ${request.minAmountOut}`);
+    throw new RelayRefusal("output-minimum", `the order's minimum output ${pay.minimumAmount} is under the caller's floor ${request.minAmountOut}`, "price_check_failed");
   }
-  if (pay.expectedAmount < pay.minimumAmount) throw new RelayRefusal("output-expected", `the order expects ${pay.expectedAmount}, less than its own minimum ${pay.minimumAmount}`);
+  if (pay.expectedAmount < pay.minimumAmount) throw new RelayRefusal("output-expected", `the order expects ${pay.expectedAmount}, less than its own minimum ${pay.minimumAmount}`, "price_check_failed");
   const slippage = BigInt(request.slippageBps ?? RELAY_DEFAULT_SLIPPAGE_BPS);
   const floor = (pay.expectedAmount * (10_000n - slippage)) / 10_000n;
   if (pay.minimumAmount < floor) {
-    throw new RelayRefusal("output-minimum", `the order's minimum output ${pay.minimumAmount} is more than ${slippage} bps under its expected ${pay.expectedAmount}`);
+    throw new RelayRefusal("output-minimum", `the order's minimum output ${pay.minimumAmount} is more than ${slippage} bps under its expected ${pay.expectedAmount}`, "price_check_failed");
   }
   checkDeadline("output-deadline", "the output deadline", order.output.deadline, nowS);
 
   // The input: exactly what is sent.
-  if (input.payment.chainId !== source.slug) throw new RelayRefusal("input-chain", `the order is funded on "${input.payment.chainId}", the request sends on ${source.name} ("${source.slug}")`);
-  if (!isAddr(input.payment.currency, request.sourceToken)) throw new RelayRefusal("input-currency", `the order is funded in ${input.payment.currency}, the request sends ${lower(request.sourceToken)}`);
-  if (input.payment.amount !== request.amount) throw new RelayRefusal("input-amount", `the order is funded with ${input.payment.amount}, the request sends ${request.amount}`);
+  if (input.payment.chainId !== source.slug) throw new RelayRefusal("input-chain", `the order is funded on "${input.payment.chainId}", the request sends on ${source.name} ("${source.slug}")`, "policy_refused");
+  if (!isAddr(input.payment.currency, request.sourceToken)) throw new RelayRefusal("input-currency", `the order is funded in ${input.payment.currency}, the request sends ${lower(request.sourceToken)}`, "policy_refused");
+  if (input.payment.amount !== request.amount) throw new RelayRefusal("input-amount", `the order is funded with ${input.payment.amount}, the request sends ${request.amount}`, "policy_refused");
 
   // Refunds: on the source chain back to the sender in the token sent; on the destination to the recipient or the
   // sender; nowhere else. An unfilled order must have a way back on the source chain.
   let originRefund = false;
   for (const refund of input.refunds) {
     if (refund.chainId === source.slug) {
-      if (!isAddr(refund.recipient, request.depositor)) throw new RelayRefusal("refund-recipient", `a source-chain refund goes to ${refund.recipient}, not the sender ${lower(request.depositor)}`);
-      if (refund.currency !== input.payment.currency) throw new RelayRefusal("refund-currency", `a source-chain refund is in ${refund.currency}, not the token sent`);
+      if (!isAddr(refund.recipient, request.depositor)) throw new RelayRefusal("refund-recipient", `a source-chain refund goes to ${refund.recipient}, not the sender ${lower(request.depositor)}`, "recipient_mismatch");
+      if (refund.currency !== input.payment.currency) throw new RelayRefusal("refund-currency", `a source-chain refund is in ${refund.currency}, not the token sent`, "policy_refused");
       originRefund = true;
     } else if (refund.chainId === dest.slug) {
       if (!isAddr(refund.recipient, request.recipient) && !isAddr(refund.recipient, request.depositor)) {
-        throw new RelayRefusal("refund-recipient", `a destination-chain refund goes to ${refund.recipient}, neither the recipient nor the sender`);
+        throw new RelayRefusal("refund-recipient", `a destination-chain refund goes to ${refund.recipient}, neither the recipient nor the sender`, "recipient_mismatch");
       }
-      if (refund.currency.length !== 42) throw new RelayRefusal("refund-currency", "a destination-chain refund names no token");
+      if (refund.currency.length !== 42) throw new RelayRefusal("refund-currency", "a destination-chain refund names no token", "policy_refused");
     } else {
-      throw new RelayRefusal("refund-chain", `a refund is payable on "${refund.chainId}", neither the source nor the destination chain`);
+      throw new RelayRefusal("refund-chain", `a refund is payable on "${refund.chainId}", neither the source nor the destination chain`, "recipient_mismatch");
     }
     checkDeadline("refund-deadline", "a refund deadline", refund.deadline, nowS);
   }
-  if (!originRefund) throw new RelayRefusal("refund-missing", "the order has no refund to the sender on the source chain");
+  if (!originRefund) throw new RelayRefusal("refund-missing", "the order has no refund to the sender on the source chain", "policy_refused");
 
   // The id and who signed it.
   const id = relayOrderId(order);
   if (typeof protocol.orderId !== "string" || lower(protocol.orderId) !== id) {
-    throw new RelayRefusal("order-id-mismatch", `the quote names order ${String(protocol.orderId)}, the order data hashes to ${id}`);
+    throw new RelayRefusal("order-id-mismatch", `the quote names order ${String(protocol.orderId)}, the order data hashes to ${id}`, "recipient_unverifiable");
   }
   const signer = relayOrderSigner(id, protocol.orderSignature);
   if (signer === null || signer !== order.solver) {
-    throw new RelayRefusal("signature-invalid", signer === null ? "the order signature is not a valid signature" : `the order is signed by ${signer}, not by its solver ${order.solver}`);
+    throw new RelayRefusal("signature-invalid", signer === null ? "the order signature is not a valid signature" : `the order is signed by ${signer}, not by its solver ${order.solver}`, "recipient_unverifiable");
   }
 
   // What the API says the payment is: it must describe the same deposit.
   const pd = protocol.paymentDetails as {chainId?: unknown; depository?: unknown; currency?: unknown; amount?: unknown} | null | undefined;
-  if (pd === null || typeof pd !== "object") throw new RelayRefusal("payment-details", "the quote has no payment details");
+  if (pd === null || typeof pd !== "object") throw new RelayRefusal("payment-details", "the quote has no payment details", "upstream_unavailable");
   if (pd.chainId !== source.slug || typeof pd.depository !== "string" || lower(pd.depository) !== source.depository
     || typeof pd.currency !== "string" || lower(pd.currency) !== input.payment.currency
     || typeof pd.amount !== "string" || pd.amount !== input.payment.amount.toString(10)) {
-    throw new RelayRefusal("payment-details", "the quote's payment details do not describe the order's input on the pinned depository");
+    throw new RelayRefusal("payment-details", "the quote's payment details do not describe the order's input on the pinned depository", "vault_mismatch");
   }
 
   const built = buildRelayDeposit(source, request.depositor, input.payment.currency, input.payment.amount, id);
@@ -347,7 +350,7 @@ export function verifyRelayOrder(request: RelayRequest, protocol: RelayProtocolD
     checkDepositTx(deposit, source, request, order, id);
     // Whatever the field checks above let through, the bytes signed are the bytes built here.
     if (lower(deposit.data as string) !== built.data || lower(deposit.to as string) !== built.to || deposit.value !== built.value) {
-      throw new RelayRefusal("tx-calldata", "the deposit is not the call this module builds for the order");
+      throw new RelayRefusal("tx-calldata", "the deposit is not the call this module builds for the order", "policy_refused");
     }
   }
   return {order, id, deposit: built, expectedAmount: pay.expectedAmount, minimumAmount: pay.minimumAmount, source, dest};
@@ -364,20 +367,20 @@ export function relayRefusalReason(err: unknown): string {
  * only). The sender is `refundAddress` — the engine sets it to the account that signs.
  */
 export function relayRequestOf(params: QuoteParams, opts: {placeholder?: string; nowMs?: number} = {}): RelayRequest {
-  const invalid = (what: string): never => { throw new RelayRefusal("request-invalid", what); };
-  if (params.flex) invalid("the amount is sealed into the order (no flexible deposits)");
-  if (!relayChain(params.sourceChain)) throw new RelayRefusal("chain-unsupported", `source chain ${params.sourceChain} is not a pinned Relay chain`);
-  if (!relayChain(params.destChain)) throw new RelayRefusal("chain-unsupported", `destination chain ${params.destChain} is not a pinned Relay chain`);
-  if (params.sourceChain === params.destChain) throw new RelayRefusal("chain-unsupported", "same-chain swaps are not served through the depository");
+  const invalid = (what: string, reason?: Swap2RefusalReason): never => { throw new RelayRefusal("request-invalid", what, reason); };
+  if (params.flex) invalid("the amount is sealed into the order (no flexible deposits)", "unsupported_pair");
+  if (!relayChain(params.sourceChain)) throw new RelayRefusal("chain-unsupported", `source chain ${params.sourceChain} is not a pinned Relay chain`, "unsupported_pair");
+  if (!relayChain(params.destChain)) throw new RelayRefusal("chain-unsupported", `destination chain ${params.destChain} is not a pinned Relay chain`, "unsupported_pair");
+  if (params.sourceChain === params.destChain) throw new RelayRefusal("chain-unsupported", "same-chain swaps are not served through the depository", "unsupported_pair");
   let sourceToken: string;
   if (typeof params.sourceToken === "string" && ADDRESS.test(params.sourceToken)) sourceToken = params.sourceToken;
   else {
     const asset = sourceAssetOf(params);
-    if (!asset) invalid(`source token ${String(params.sourceToken)} is not known on ${params.sourceChain}`);
+    if (!asset) invalid(`source token ${String(params.sourceToken)} is not known on ${params.sourceChain}`, "unsupported_pair");
     sourceToken = asset!.contract ?? RELAY_NATIVE;
-    if (!ADDRESS.test(sourceToken)) invalid(`source token ${String(params.sourceToken)} has no EVM contract`);
+    if (!ADDRESS.test(sourceToken)) invalid(`source token ${String(params.sourceToken)} has no EVM contract`, "unsupported_pair");
   }
-  if (typeof params.destToken !== "string" || !ADDRESS.test(params.destToken)) invalid("the destination token must be an EVM address (zero for the native coin)");
+  if (typeof params.destToken !== "string" || !ADDRESS.test(params.destToken)) invalid("the destination token must be an EVM address (zero for the native coin)", "unsupported_pair");
   if (typeof params.amountIn !== "string" || !/^[1-9]\d{0,77}$/.test(params.amountIn)) invalid("amount must be a positive base-unit integer");
   if (params.minAmountOut !== undefined && !/^(?:0|[1-9]\d{0,77})$/.test(params.minAmountOut)) invalid("the output floor must be a base-unit integer");
   const recipient = params.destAddress || opts.placeholder || "";
@@ -421,20 +424,20 @@ export function relayProtocolOf(quote: Quote): RelayProtocolData | null {
  * {@link RelayRefusal}. Used on the client of a remote provider and again before signing.
  */
 export function checkRelayQuote(request: RelayRequest, quote: Quote, tx?: RelayDepositTx & {approvalAddress?: unknown}): VerifiedRelayOrder {
-  if (quote === null || typeof quote !== "object" || quote.provider !== "relay") throw new RelayRefusal("quote-shape", "not a Relay quote");
+  if (quote === null || typeof quote !== "object" || quote.provider !== "relay") throw new RelayRefusal("quote-shape", "not a Relay quote", "policy_refused");
   const t = tx ?? quote.txRequest;
-  if (!t) throw new RelayRefusal("quote-shape", "the quote has no transaction");
-  if (quote.depositAddress) throw new RelayRefusal("quote-shape", "a Relay quote pays the depository through its calldata, never a deposit address");
+  if (!t) throw new RelayRefusal("quote-shape", "the quote has no transaction", "policy_refused");
+  if (quote.depositAddress) throw new RelayRefusal("quote-shape", "a Relay quote pays the depository through its calldata, never a deposit address", "vault_mismatch");
   if ((quote.txRequest as {serializedTx?: unknown; nativeFee?: unknown} | undefined)?.serializedTx !== undefined || (quote.txRequest as {nativeFee?: unknown} | undefined)?.nativeFee !== undefined) {
-    throw new RelayRefusal("quote-shape", "a Relay deposit carries no extra native fee and no serialized transaction");
+    throw new RelayRefusal("quote-shape", "a Relay deposit carries no extra native fee and no serialized transaction", "policy_refused");
   }
   const v = verifyRelayOrder(request, relayProtocolOf(quote), t);
   const approval = (t as {approvalAddress?: unknown}).approvalAddress;
   if (v.deposit.approvalAddress === undefined ? approval !== undefined && approval !== "" : typeof approval !== "string" || lower(approval) !== v.deposit.approvalAddress) {
-    throw new RelayRefusal("quote-approval", `the quote approves ${String(approval)}, the order needs ${v.deposit.approvalAddress ?? "no approval"}`);
+    throw new RelayRefusal("quote-approval", `the quote approves ${String(approval)}, the order needs ${v.deposit.approvalAddress ?? "no approval"}`, "vault_mismatch");
   }
   if (quote.sourceAmount !== request.amount.toString(10) || quote.minDestAmount !== v.minimumAmount.toString(10) || quote.destAmount !== v.expectedAmount.toString(10)) {
-    throw new RelayRefusal("quote-amounts", "the amounts the quote shows are not the order's");
+    throw new RelayRefusal("quote-amounts", "the amounts the quote shows are not the order's", "price_check_failed");
   }
   // Gas is the one number of the call that no order binds: held to the band this module itself would set, so a
   // backend can neither starve the deposit (a paid revert) nor name an absurd limit. Absent = the wallet estimates.
@@ -442,17 +445,26 @@ export function checkRelayQuote(request: RelayRequest, quote: Quote, tx?: RelayD
   if (gas !== undefined) {
     const floor = v.deposit.approvalAddress === undefined ? RELAY_GAS_FLOOR_NATIVE : RELAY_GAS_FLOOR_ERC20;
     if (typeof gas !== "string" || !/^[1-9]\d{0,10}$/.test(gas) || BigInt(gas) < floor || BigInt(gas) > RELAY_GAS_CAP) {
-      throw new RelayRefusal("quote-gas", `the gas limit ${String(gas).slice(0, 40)} is outside ${floor}–${RELAY_GAS_CAP}`);
+      throw new RelayRefusal("quote-gas", `the gas limit ${String(gas).slice(0, 40)} is outside ${floor}–${RELAY_GAS_CAP}`, "policy_refused");
     }
   }
   const now = request.nowMs ?? Date.now();
   if (typeof quote.validUntilMs !== "number" || !Number.isFinite(quote.validUntilMs) || quote.validUntilMs > now + RELAY_MAX_QUOTE_LIFE_MS) {
-    throw new RelayRefusal("quote-expiry", "the quote claims to live longer than a Relay quote may");
+    throw new RelayRefusal("quote-expiry", "the quote claims to live longer than a Relay quote may", "policy_refused");
   }
   if (typeof quote.intentId !== "string" || quote.intentId !== `relay:${String(quote.providerData?.requestId)}` || !/^relay:0x[0-9a-f]{64}$/.test(quote.intentId)) {
-    throw new RelayRefusal("quote-shape", "the quote's id is not its Relay request id");
+    throw new RelayRefusal("quote-shape", "the quote's id is not its Relay request id", "policy_refused");
   }
   return v;
+}
+
+// The reason behind each text the pins return (`relayPins.reasonOf`), bounded.
+const pinNotes = refusalNotes();
+/** The refusal's text, its reason noted for `relayPins.reasonOf`; rethrows anything that is not a refusal. */
+function notedReason(err: unknown): string {
+  const text = relayRefusalReason(err);
+  const info = refusalOf(err);
+  return info ? pinNotes.note(text, info) : text;
 }
 
 /** `RemotePins.verifyQuote`: the reason a remote Relay quote fails against the user's own request, or null. */
@@ -461,35 +473,36 @@ export function relayVerifyQuote(params: QuoteParams, quote: Quote): string | nu
     checkRelayQuote(relayRequestOf(params), quote);
     return null;
   } catch (err) {
-    return relayRefusalReason(err);
+    return notedReason(err);
   }
 }
 
 /** `RemotePins.verifyBuild`: a remote build must be the quote's own (verified) transaction, and is verified again. */
 export function relayVerifyBuild(quote: Quote, tx: UnsignedTx, params?: QuoteParams): string | null {
   try {
-    if (!params) throw new RelayRefusal("request-invalid", "the request this quote answered is not known on this side — quote again");
-    if (tx.chain !== params.sourceChain) throw new RelayRefusal("tx-chain", `the build is for ${tx.chain}, not ${params.sourceChain}`);
+    if (!params) throw new RelayRefusal("request-invalid", "the request this quote answered is not known on this side — quote again", "policy_refused");
+    if (tx.chain !== params.sourceChain) throw new RelayRefusal("tx-chain", `the build is for ${tx.chain}, not ${params.sourceChain}`, "vault_mismatch");
     if (tx.serializedTx !== undefined || tx.memo !== undefined || tx.typedData !== undefined || tx.bodyBoc !== undefined) {
-      throw new RelayRefusal("quote-shape", "a Relay deposit is one EVM call");
+      throw new RelayRefusal("quote-shape", "a Relay deposit is one EVM call", "policy_refused");
     }
     const v = checkRelayQuote(relayRequestOf(params), quote, tx);
     // The remote path has no client-side step after this one: an order is built for once.
     relayClearOrder(v.id, "build");
     return null;
   } catch (err) {
-    return relayRefusalReason(err);
+    return notedReason(err);
   }
 }
 
 /**
  * The app's pins for a remote Relay provider (`remoteProvider({name: "relay", ...relayPins})`): the only contract a
  * build may call or approve is the chain's depository, and every quote and build is verified on the client against
- * the user's own request.
+ * the user's own request. `reasonOf` classifies a text `verifyQuote` / `verifyBuild` returned.
  */
 export const relayPins: RemotePins = Object.freeze({
   callTargets: (chain: string): readonly string[] => { const c = relayChain(chain); return c ? [c.depository] : []; },
   spenders: (chain: string): readonly string[] => { const c = relayChain(chain); return c ? [c.depository] : []; },
   verifyQuote: relayVerifyQuote,
   verifyBuild: relayVerifyBuild,
+  reasonOf: pinNotes.reasonOf,
 });

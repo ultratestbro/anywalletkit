@@ -19,10 +19,10 @@ const clearedOrders = new Map<string, number>();
 export function relayClearOrder(id: string, stage: "build" | "sign", nowMs: number = Date.now()): void {
   const key = `${stage}:${id.toLowerCase()}`;
   const until = clearedOrders.get(key);
-  if (until !== undefined && until > nowMs) throw new RelayRefusal("order-reused", `order ${id} was already cleared for a deposit — quote again`);
+  if (until !== undefined && until > nowMs) throw new RelayRefusal("order-reused", `order ${id} was already cleared for a deposit — quote again`, "policy_refused");
   if (clearedOrders.size >= CLEARED_MAX) {
     for (const [k, t] of clearedOrders) if (t <= nowMs) clearedOrders.delete(k);
-    if (clearedOrders.size >= CLEARED_MAX) throw new RelayRefusal("order-reused", "too many deposits cleared in the last minutes — try again later");
+    if (clearedOrders.size >= CLEARED_MAX) throw new RelayRefusal("order-reused", "too many deposits cleared in the last minutes — try again later", "policy_refused");
   }
   clearedOrders.set(key, nowMs + CLEARED_TTL_MS);
 }
