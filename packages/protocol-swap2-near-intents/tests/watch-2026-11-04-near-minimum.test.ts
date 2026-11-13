@@ -83,6 +83,6 @@ describe("watch 2026-11-04: 1Click amount floors are a stable, presentable refus
     oneClick(400, "Temporary swap limits: minimum swap amount is $1,000");
     const handle = createSwap2Handler<string>({providers: [nearIntentsProvider({apiUrl: "https://near.invalid"})], sealSecret: "test-seal-secret-that-is-at-least-32-bytes-long", guard: () => {}, subject: () => "alice"});
     const res = await handle("quote", {provider: "near_intents", params: {...BASE_TO_BSC, dry: false, refundAddress: EVM_DEST}}, "alice");
-    expect(res.body).toEqual({noQuote: "near_intents: below the 1Click minimum ($1,000)"});
+    expect(res.body).toEqual({noQuote: "near_intents: below the 1Click minimum ($1,000)", reason: "amount_too_small"});
   });
 });
