@@ -2,6 +2,7 @@ import {decodeFunctionResult, encodeFunctionData, keccak256, type Hex as ViemHex
 import {sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import {slippageFloor} from "@anywalletkit/protocol-swap2-core/validate";
 import type {Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {refusal, refusalOf} from "@anywalletkit/protocol-swap2-core/errors";
 import {ADDRESS_PROVIDER_ABI, COINS_INT, COINS_UINT, EXCHANGE_SELECTOR, VERSION_ABI, decodeExchange, encodeGetDy, type DecodedExchange} from "./abi.js";
 import {CURVE_DEPLOYMENTS, ZERO_ADDRESS, chainIdOf, deploymentOf, type CurveDeployment} from "./deployments.js";
 import {CURVE_POOLS} from "./pools/index.js";
@@ -10,6 +11,7 @@ import {checkRoute, poolIndex, routePools} from "./routes.js";
 import {ethCall, rpcClient, wordAddress, wordUint, type RpcCall} from "./rpc.js";
 import {curveIntentChain} from "./intent.js";
 import {curveAutoSlippageBps, curveImpactBps} from "./slippage.js";
+import {notes, noted} from "./reasons.js";
 
 export interface CurveTables {
   /** Override the deployments (tests). */
@@ -32,20 +34,20 @@ export function curveQuoteCheck(tables: CurveTables = {}): (params: QuoteParams,
   return function verify(params: QuoteParams, quote: Quote): string | null {
     const chainId = chainIdOf(params.sourceChain);
     const d = deploymentOf(deployments, chainId);
-    if (!d || params.destChain !== params.sourceChain) return "not a same-chain swap on a pinned Curve router";
+    if (!d || params.destChain !== params.sourceChain) return noted("not a same-chain swap on a pinned Curve router", "unsupported_pair");
     const tx = quote.txRequest;
-    if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no router call";
-    if (!isAddress(tx.to) || lc(tx.to) !== lc(d.router)) return `the call targets ${tx.to}, not the Curve router`;
-    if (tx.chainId !== undefined && tx.chainId !== chainId) return `the call is for chain ${tx.chainId}`;
+    if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return noted("the quote carries no router call", "policy_refused");
+    if (!isAddress(tx.to) || lc(tx.to) !== lc(d.router)) return noted(`the call targets ${tx.to}, not the Curve router`, "vault_mismatch");
+    if (tx.chainId !== undefined && tx.chainId !== chainId) return noted(`the call is for chain ${tx.chainId}`, "policy_refused");
     // The chain the build's on-chain checks and the receipt tracking run on (`curve:<chainId>:…`): this request's.
-    if (curveIntentChain(quote.intentId) !== chainId) return `the quote names ${String(quote.intentId).slice(0, 40)}, not a curve:${chainId} swap`;
+    if (curveIntentChain(quote.intentId) !== chainId) return noted(`the quote names ${String(quote.intentId).slice(0, 40)}, not a curve:${chainId} swap`, "policy_refused");
     const src = sourceAssetOf(params);
-    if (!src) return `unknown source token ${params.sourceToken}`;
+    if (!src) return noted(`unknown source token ${params.sourceToken}`, "unsupported_pair");
     const nativeIn = !src.contract;
     const nativeOut = /^0x0+$/.test(params.destToken);
-    if (!nativeOut && !isAddress(params.destToken)) return "destination token must be an EVM address";
-    if (!isAddress(params.destAddress)) return "recipient must be an EVM address";
-    if ((!nativeIn && lc(src.contract!) === lc(d.eth)) || (!nativeOut && lc(params.destToken) === lc(d.eth))) return "the router's native sentinel is not a token";
+    if (!nativeOut && !isAddress(params.destToken)) return noted("destination token must be an EVM address", "unsupported_pair");
+    if (!isAddress(params.destAddress)) return noted("recipient must be an EVM address", "recipient_mismatch");
+    if ((!nativeIn && lc(src.contract!) === lc(d.eth)) || (!nativeOut && lc(params.destToken) === lc(d.eth))) return noted("the router's native sentinel is not a token", "unsupported_pair");
     const tokenIn = nativeIn ? d.eth : src.contract!;
     const tokenOut = nativeOut ? d.eth : params.destToken;
     let amountIn: bigint, minOut: bigint, value: bigint;
@@ -54,21 +56,21 @@ export function curveQuoteCheck(tables: CurveTables = {}): (params: QuoteParams,
       minOut = BigInt(quote.minDestAmount);
       value = BigInt(tx.value ?? "0");
     } catch {
-      return "the request does not name amounts";
+      return noted("the request does not name amounts", "policy_refused");
     }
     if (nativeIn ? value !== amountIn || tx.approvalAddress !== undefined
       : value !== 0n || !tx.approvalAddress || !isAddress(tx.approvalAddress) || lc(tx.approvalAddress) !== lc(d.router)) {
-      return nativeIn ? "a native input is paid as exactly the input in value, with no approval" : "a token input attaches no value and approves exactly the Curve router";
+      return noted(nativeIn ? "a native input is paid as exactly the input in value, with no approval" : "a token input attaches no value and approves exactly the Curve router", "policy_refused");
     }
     const call = decodeExchange(d.family, tx.data);
-    if (!call) return "the router call is not exchange(route, params, amount, min, receiver)";
-    if (call.selector !== EXCHANGE_SELECTOR[d.family]) return `selector ${call.selector} is not the explicit-receiver exchange ${EXCHANGE_SELECTOR[d.family]}`;
-    if (!call.receiver || lc(call.receiver) !== lc(params.destAddress)) return `the swap pays ${call.receiver ?? "the sender"}, not the recipient`;
-    if (call.pools && call.pools.some((p) => lc(p) !== lc(ZERO_ADDRESS))) return "the call names zap pools this module never uses";
-    if (call.amount !== amountIn) return `the swap sells ${call.amount}, not the ${amountIn} input`;
-    if (call.minDy <= 0n) return "the swap has no minimum (min_dy 0)";
-    if (call.minDy !== minOut) return `the swap's minimum ${call.minDy} is not the quote's ${minOut}`;
-    if (quote.providerData?.minOut !== undefined && quote.providerData.minOut !== minOut.toString()) return "the quote's facts disagree on the minimum";
+    if (!call) return noted("the router call is not exchange(route, params, amount, min, receiver)", "policy_refused");
+    if (call.selector !== EXCHANGE_SELECTOR[d.family]) return noted(`selector ${call.selector} is not the explicit-receiver exchange ${EXCHANGE_SELECTOR[d.family]}`, "policy_refused");
+    if (!call.receiver || lc(call.receiver) !== lc(params.destAddress)) return noted(`the swap pays ${call.receiver ?? "the sender"}, not the recipient`, "recipient_mismatch");
+    if (call.pools && call.pools.some((p) => lc(p) !== lc(ZERO_ADDRESS))) return noted("the call names zap pools this module never uses", "policy_refused");
+    if (call.amount !== amountIn) return noted(`the swap sells ${call.amount}, not the ${amountIn} input`, "policy_refused");
+    if (call.minDy <= 0n) return noted("the swap has no minimum (min_dy 0)", "price_check_failed");
+    if (call.minDy !== minOut) return noted(`the swap's minimum ${call.minDy} is not the quote's ${minOut}`, "price_check_failed");
+    if (quote.providerData?.minOut !== undefined && quote.providerData.minOut !== minOut.toString()) return noted("the quote's facts disagree on the minimum", "price_check_failed");
     return checkRoute(chainId, d, own(pools, chainId), call, tokenIn, tokenOut);
   };
 }
@@ -93,6 +95,8 @@ export const curvePins: RemotePins = Object.freeze({
   callTargets: (chain: string): readonly string[] => routerFor(CURVE_DEPLOYMENTS, chain),
   spenders: (chain: string): readonly string[] => routerFor(CURVE_DEPLOYMENTS, chain),
   verifyQuote: curveVerifyQuote,
+  // The reason of each text verifyQuote returned (remoteProvider puts it on its refusal).
+  reasonOf: notes.reasonOf,
 });
 
 function routerFor(deployments: Readonly<Record<number, CurveDeployment>>, chain: string): readonly string[] {
@@ -123,18 +127,18 @@ export function curveOnChain(opts: CurveOnChainOptions) {
     if (!p) {
       const d = deploymentOf(deployments, chainId);
       p = (async () => {
-        if (!d) throw new Error(`curve: no pinned router on chain ${chainId}`);
+        if (!d) throw refusal("unsupported_pair", `curve: no pinned router on chain ${chainId}`);
         const [code, version, listed] = await rpc(chainId, [
           {method: "eth_getCode", params: [d.router, "latest"]},
           ethCall(d.router, encodeFunctionData({abi: VERSION_ABI, functionName: "version"})),
           ethCall(d.addressProvider, encodeFunctionData({abi: ADDRESS_PROVIDER_ABI, functionName: "get_address", args: [2n]})),
         ]);
         if (typeof code !== "string" || code.length <= 2 || lc(keccak256(code as ViemHex)) !== lc(d.codeHash)) {
-          throw new Error(`curve: the router on chain ${chainId} is not the pinned code (code hash mismatch) — refusing`);
+          throw refusal("vault_mismatch", `curve: the router on chain ${chainId} is not the pinned code (code hash mismatch) — refusing`);
         }
         let v = "";
         try { v = typeof version === "string" ? decodeFunctionResult({abi: VERSION_ABI, functionName: "version", data: version as ViemHex}) : ""; } catch { /* below */ }
-        if (v !== d.version) throw new Error(`curve: the router on chain ${chainId} reports version ${v || "none"}, not ${d.version} — refusing`);
+        if (v !== d.version) throw refusal("vault_mismatch", `curve: the router on chain ${chainId} reports version ${v || "none"}, not ${d.version} — refusing`);
         // The AddressProvider is informational (its admin may change any id): a different id 2 is a signal for the
         // module watch, never a router to use.
         const ap = wordAddress(listed);
@@ -166,17 +170,17 @@ export function curveOnChain(opts: CurveOnChainOptions) {
   async function inspectSealed(quote: Quote, tx: UnsignedTx, probe: boolean): Promise<string | {out: bigint; probeOut: bigint | null; amount: bigint; minDy: bigint}> {
     const chainId = curveIntentChain(quote.intentId);
     const d = chainId === null ? undefined : deploymentOf(deployments, chainId);
-    if (chainId === null || !d) return "the quote is not a Curve swap on a pinned chain";
+    if (chainId === null || !d) return noted("the quote is not a Curve swap on a pinned chain", "policy_refused");
     const quoted = quote.txRequest;
-    if (!quoted?.data || !quoted.to || !tx.data) return "the quote or the transaction carries no router call";
-    if (tx.data.length !== quoted.data.length || lc(tx.data) !== lc(quoted.data)) return "the transaction is not the quoted router call";
-    if (!isAddress(tx.to) || lc(tx.to) !== lc(d.router) || lc(quoted.to) !== lc(d.router)) return `the transaction calls ${tx.to}, not the Curve router`;
-    if ((tx.value ?? "0") !== (quoted.value ?? "0")) return "the transaction's value is not the quote's";
-    if ((tx.chainId !== undefined && tx.chainId !== chainId) || (quoted.chainId !== undefined && quoted.chainId !== chainId)) return `the transaction is not for chain ${chainId}`;
-    if ((tx.approvalAddress ?? "").toLowerCase() !== (quoted.approvalAddress ?? "").toLowerCase()) return "the transaction's approval is not the quote's";
+    if (!quoted?.data || !quoted.to || !tx.data) return noted("the quote or the transaction carries no router call", "policy_refused");
+    if (tx.data.length !== quoted.data.length || lc(tx.data) !== lc(quoted.data)) return noted("the transaction is not the quoted router call", "policy_refused");
+    if (!isAddress(tx.to) || lc(tx.to) !== lc(d.router) || lc(quoted.to) !== lc(d.router)) return noted(`the transaction calls ${tx.to}, not the Curve router`, "vault_mismatch");
+    if ((tx.value ?? "0") !== (quoted.value ?? "0")) return noted("the transaction's value is not the quote's", "policy_refused");
+    if ((tx.chainId !== undefined && tx.chainId !== chainId) || (quoted.chainId !== undefined && quoted.chainId !== chainId)) return noted(`the transaction is not for chain ${chainId}`, "policy_refused");
+    if ((tx.approvalAddress ?? "").toLowerCase() !== (quoted.approvalAddress ?? "").toLowerCase()) return noted("the transaction's approval is not the quote's", "vault_mismatch");
     const call = decodeExchange(d.family, quoted.data);
-    if (!call || call.selector !== EXCHANGE_SELECTOR[d.family]) return "the quoted call is not the explicit-receiver exchange";
-    if (call.minDy <= 0n) return "the swap has no minimum (min_dy 0)";
+    if (!call || call.selector !== EXCHANGE_SELECTOR[d.family]) return noted("the quoted call is not the explicit-receiver exchange", "policy_refused");
+    if (call.minDy <= 0n) return noted("the swap has no minimum (min_dy 0)", "price_check_failed");
     const last = lastToken(call);
     const reason = checkRoute(chainId, d, own(pools, chainId), call, call.route[0]!, last);
     if (reason) return reason;
@@ -192,8 +196,8 @@ export function curveOnChain(opts: CurveOnChainOptions) {
     const poolReason = await poolsReason(chainId, hops, res.slice(1, 1 + reads.length));
     if (poolReason) return poolReason;
     const out = wordUint(res[0]);
-    if (out === null) return "the router no longer quotes this route";
-    if (out < call.minDy) return `price moved — the pools now pay ${out}, under your minimum ${call.minDy}`;
+    if (out === null) return noted("the router no longer quotes this route", "simulation_failed");
+    if (out < call.minDy) return noted(`price moved — the pools now pay ${out}, under your minimum ${call.minDy}`, "price_check_failed");
     return {out, probeOut: probe && probeIn > 0n ? wordUint(res[probeAt]) : null, amount: call.amount, minDy: call.minDy};
   }
 
@@ -212,12 +216,12 @@ export function curveOnChain(opts: CurveOnChainOptions) {
     for (const pool of list) {
       const code = res[at++];
       // eth_getCode does not revert: no string means the read itself failed, which says nothing about the pool.
-      if (typeof code !== "string") return `could not read pool ${pool.name} (${pool.address}) over RPC`;
-      if (code.length <= 2 || lc(keccak256(code as ViemHex)) !== lc(pool.codeHash)) return `pool ${pool.name} (${pool.address}) is not the pinned code`;
+      if (typeof code !== "string") return noted(`could not read pool ${pool.name} (${pool.address}) over RPC`, "upstream_unavailable");
+      if (code.length <= 2 || lc(keccak256(code as ViemHex)) !== lc(pool.codeHash)) return noted(`pool ${pool.name} (${pool.address}) is not the pinned code`, "vault_mismatch");
       for (let k = 0; k < pool.coins.length; k++) {
         const coin = wordAddress(res[at++]);
         if (coin === null) retry.push({pool, k});
-        else if (coin !== lc(pool.coins[k]!)) return `pool ${pool.name} now reports coin ${k} = ${coin}, not the pinned ${pool.coins[k]}`;
+        else if (coin !== lc(pool.coins[k]!)) return noted(`pool ${pool.name} now reports coin ${k} = ${coin}, not the pinned ${pool.coins[k]}`, "vault_mismatch");
       }
     }
     if (retry.length) {
@@ -225,7 +229,7 @@ export function curveOnChain(opts: CurveOnChainOptions) {
       const again = await rpc(chainId, retry.map(({pool, k}) => ethCall(pool.address, `${COINS_INT}${k.toString(16).padStart(64, "0")}`)));
       for (const [n, {pool, k}] of retry.entries()) {
         const coin = wordAddress(again[n]);
-        if (coin !== lc(pool.coins[k]!)) return `pool ${pool.name} does not report its pinned coin ${k}`;
+        if (coin !== lc(pool.coins[k]!)) return noted(`pool ${pool.name} does not report its pinned coin ${k}`, "vault_mismatch");
       }
     }
     return null;
@@ -279,8 +283,10 @@ export function curveRemotePins(opts: CurveRemotePinsOptions): RemotePins & {ver
     callTargets: (c: string): readonly string[] => routerFor(deployments, c),
     spenders: (c: string): readonly string[] => routerFor(deployments, c),
     verifyQuote,
+    // The reason of each text verifyQuote / verifyBuild returned (remoteProvider puts it on its refusal).
+    reasonOf: notes.reasonOf,
     async verifyBuild(quote: Quote, tx: UnsignedTx, params?: QuoteParams): Promise<string | null> {
-      if (!params) return "the request this quote answered is unknown";
+      if (!params) return noted("the request this quote answered is unknown", "policy_refused");
       const reason = verifyQuote(params, quote);
       if (reason) return reason;
       try {
@@ -289,14 +295,14 @@ export function curveRemotePins(opts: CurveRemotePinsOptions): RemotePins & {ver
         if (typeof seen === "string") return seen;
         const {out, probeOut, amount, minDy} = seen;
         let dest: bigint;
-        try { dest = BigInt(quote.destAmount); } catch { return "the quote names no output"; }
+        try { dest = BigInt(quote.destAmount); } catch { return noted("the quote names no output", "upstream_unavailable"); }
         const bps = params.slippageBps ?? fixedSlippage ?? Math.min(9_999, curveAutoSlippageBps(params, curveImpactBps(amount, out, probeOut)) + CURVE_AUTO_SLIPPAGE_DRIFT_BPS);
-        if (slippageFloor(dest, bps) > out) return `the quote promises ${dest}, more than ${bps} bps above the ${out} the pools pay now`;
+        if (slippageFloor(dest, bps) > out) return noted(`the quote promises ${dest}, more than ${bps} bps above the ${out} the pools pay now`, "price_check_failed");
         const fresh = dest < out ? dest : out;
-        if (minDy < slippageFloor(fresh, bps)) return `the swap's minimum ${minDy} is more than ${bps} bps under the ${fresh} the pools pay now`;
+        if (minDy < slippageFloor(fresh, bps)) return noted(`the swap's minimum ${minDy} is more than ${bps} bps under the ${fresh} the pools pay now`, "price_check_failed");
         return null;
       } catch (e) {
-        return e instanceof Error ? e.message.replace(/^curve: /, "") : String(e);
+        return noted(e instanceof Error ? e.message.replace(/^curve: /, "") : String(e), refusalOf(e));
       }
     },
   });

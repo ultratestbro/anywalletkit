@@ -1,6 +1,7 @@
 import {getAddress} from "viem";
 import {evmRef, isEvm, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {refusal, refusalOf, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {encodeExchange, encodeGetDy} from "./abi.js";
 import {describeCurveActivity} from "./activity.js";
 import {CURVE_DEPLOYMENTS, deploymentOf, type CurveDeployment} from "./deployments.js";
@@ -11,6 +12,7 @@ import {ethCall, wordUint} from "./rpc.js";
 import {curveAutoSlippageBps, curveImpactBps} from "./slippage.js";
 import {curveIntentChain, mintCurveIntentId} from "./intent.js";
 import {curveOnChain, curveQuoteCheck} from "./verify.js";
+import {notes, tagged} from "./reasons.js";
 
 /**
  * Curve, straight from the contracts — Router NG on every chain in `CURVE_DEPLOYMENTS`.
@@ -85,47 +87,48 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
     },
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
-      const refuse = (why: string): null => {
-        params.onRefusal?.(`curve: ${why}`);
+      const refuse = (why: string, info?: Swap2RefusalReason | Swap2RefusalInfo): null => {
+        if (info === undefined) params.onRefusal?.(`curve: ${why}`);
+        else params.onRefusal?.(`curve: ${why}`, typeof info === "string" ? {reason: info} : info);
         return null;
       };
-      if (params.flex) return refuse("amount-flexible deposits are not supported");
-      if (params.sourceChain !== params.destChain) return refuse("same-chain swaps only");
+      if (params.flex) return refuse("amount-flexible deposits are not supported", "unsupported_pair");
+      if (params.sourceChain !== params.destChain) return refuse("same-chain swaps only", "unsupported_pair");
       const chainId = chainIdOf(params.sourceChain);
-      if (chainId === null) return refuse(`no Curve router, pool allowlist or RPC for ${params.sourceChain}`);
+      if (chainId === null) return refuse(`no Curve router, pool allowlist or RPC for ${params.sourceChain}`, "unsupported_pair");
       const d = deploymentOf(deployments, chainId)!;
       const src = sourceAssetOf(params);
-      if (!src) return refuse(`unknown source token ${params.sourceToken}`);
+      if (!src) return refuse(`unknown source token ${params.sourceToken}`, "unsupported_pair");
       const nativeIn = !src.contract;
       const nativeOut = /^0x0+$/.test(params.destToken);
-      if (!nativeOut && !/^0x[0-9a-fA-F]{40}$/.test(params.destToken)) return refuse("destination token must be an EVM address");
-      if (!/^0x[0-9a-fA-F]{40}$/.test(params.destAddress)) return refuse("recipient must be an EVM address");
+      if (!nativeOut && !/^0x[0-9a-fA-F]{40}$/.test(params.destToken)) return refuse("destination token must be an EVM address", "unsupported_pair");
+      if (!/^0x[0-9a-fA-F]{40}$/.test(params.destAddress)) return refuse("recipient must be an EVM address", "recipient_mismatch");
       let amountIn: bigint;
       try {
         amountIn = BigInt(params.amountIn);
       } catch {
         return refuse("amount is not an integer");
       }
-      if (amountIn <= 0n) return refuse("amount must be positive");
+      if (amountIn <= 0n) return refuse("amount must be positive", "amount_too_small");
       if (params.slippageBps !== undefined && (!Number.isInteger(params.slippageBps) || params.slippageBps < 0 || params.slippageBps >= 10_000)) return refuse("slippage must be 0..9999 bps");
-      if (!nativeIn && src.contract!.toLowerCase() === d.eth.toLowerCase()) return refuse("the native coin is named by the catalog, not by the router's 0xEeee sentinel");
-      if (!nativeOut && params.destToken.toLowerCase() === d.eth.toLowerCase()) return refuse("name a native output with the zero address, not the router's 0xEeee sentinel");
+      if (!nativeIn && src.contract!.toLowerCase() === d.eth.toLowerCase()) return refuse("the native coin is named by the catalog, not by the router's 0xEeee sentinel", "unsupported_pair");
+      if (!nativeOut && params.destToken.toLowerCase() === d.eth.toLowerCase()) return refuse("name a native output with the zero address, not the router's 0xEeee sentinel", "unsupported_pair");
       const tokenIn = getAddress(nativeIn ? d.eth : src.contract!);
       const tokenOut = getAddress(nativeOut ? d.eth : params.destToken);
-      if (tokenIn === tokenOut) return refuse("same token in and out");
+      if (tokenIn === tokenOut) return refuse("same token in and out", "unsupported_pair");
       const wrapPair = [getAddress(d.eth), getAddress(d.weth)];
-      if (wrapPair.includes(tokenIn) && wrapPair.includes(tokenOut)) return refuse("that is a wrap/unwrap, not a swap");
+      if (wrapPair.includes(tokenIn) && wrapPair.includes(tokenOut)) return refuse("that is a wrap/unwrap, not a swap", "unsupported_pair");
 
       try {
         await chain.verifyDeployment(chainId);
         const {routes, truncated} = findRoutes(chainId, d, tableOf(chainId), tokenIn, tokenOut);
-        if (!routes.length) return refuse("no allowlisted Curve pool route for this pair");
+        if (!routes.length) return refuse("no allowlisted Curve pool route for this pair", "no_route");
         const outs = await price(chainId, d, routes, amountIn, signal);
         let best: {route: CurveRoute; out: bigint} | null = null;
         outs.forEach((out, i) => {
           if (out !== null && out > 0n && (!best || out > best.out)) best = {route: routes[i]!, out};
         });
-        if (!best) return refuse("no allowlisted Curve pool quotes this pair and amount");
+        if (!best) return refuse("no allowlisted Curve pool quotes this pair and amount", "no_route");
         const {route, out} = best as {route: CurveRoute; out: bigint};
 
         // Price impact: a probe 1/1000 the size on the same route gives the marginal rate; the full-size rate's
@@ -143,9 +146,9 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
 
         const bps = params.slippageBps ?? fixedSlippage ?? curveAutoSlippageBps(params, priceImpactBps);
         const minOut = (out * BigInt(10_000 - bps)) / 10_000n;
-        if (minOut <= 0n) return refuse("the minimum rounds to zero for this amount");
+        if (minOut <= 0n) return refuse("the minimum rounds to zero for this amount", "amount_too_small");
         if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) {
-          return refuse(`floor breach (min=${minOut} < floor=${params.minAmountOut})`);
+          return refuse(`floor breach (min=${minOut} < floor=${params.minAmountOut})`, "price_check_failed");
         }
         const args = routeArgs(d.family, route);
         const recipient = getAddress(params.destAddress);
@@ -194,10 +197,10 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
         };
         // The same check a client runs on a remote quote, on what this provider just built.
         const why = selfCheck(params, quote);
-        if (why) return refuse(`built a call its own check refuses (${why})`);
+        if (why) return refuse(`built a call its own check refuses (${why})`, notes.reasonOf(why) ?? "policy_refused");
         return quote;
       } catch (e) {
-        return refuse(e instanceof Error ? e.message.replace(/^curve: /, "") : String(e));
+        return refuse(e instanceof Error ? e.message.replace(/^curve: /, "") : String(e), refusalOf(e));
       }
     },
 
@@ -208,12 +211,12 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
      */
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
       const reason = await chain.checkSealed(quote, tx);
-      if (reason) throw new Error(`curve: ${reason}. Nothing was sent; refresh the quote.`);
+      if (reason) throw tagged(new Error(`curve: ${reason}. Nothing was sent; refresh the quote.`), notes.reasonOf(reason));
     },
 
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
       const tx = quote.txRequest;
-      if (!tx?.to || !tx.data) throw new Error("swap2: Curve quote has no transaction request");
+      if (!tx?.to || !tx.data) throw refusal("policy_refused", "swap2: Curve quote has no transaction request");
       return {
         chain: "",
         to: tx.to,
