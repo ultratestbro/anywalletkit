@@ -1,0 +1,5 @@
+---
+"@anywalletkit/protocol-swap2-router": patch
+---
+
+`usdValue` and `quoteValues` net out the native fee a price-only quote declares. A quote with a transaction declares a bridge's native fee on top of the input as `txRequest.nativeFee`, read as before; a quote without a transaction (a dry LI.FI quote priced for a placeholder sender or recipient, which keeps only its price) now declares it as `providerData.nativeFee`, read only when there is no `txRequest`. Until now such a quote was valued on its gross output, so in a dry auction without the sender a LI.FI route with a bridge fee could be tagged best over a cheaper one (live, 2026-11-13: Base USDC → Arbitrum USDC through Stargate V2 was worth $99.19 instead of $97.26 at ETH $3000). A `providerData.nativeFee` that is not a base-unit integer leaves the quote unpriced (`usdValue` returns null, so the auction compares guaranteed outputs; `quoteValues` gives `valueUsdOut: null`). Quotes with a transaction are valued exactly as before; a `providerData.nativeFee` next to a `txRequest` is not read.

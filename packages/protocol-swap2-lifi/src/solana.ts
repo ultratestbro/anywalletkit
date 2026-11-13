@@ -8,8 +8,8 @@
  */
 
 import {base64Bytes} from "@anywalletkit/protocol-swap2-core/util";
+import {base58} from "./solana-address.js";
 
-const ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 /** Mayan's CPI proxy and order programs (swap-sdk `src/addresses.ts`). */
 const MAYAN_ENTRY_PROGRAMS = new Set([
   "D8C8iW6zmoKg5TRr8nQ7h14TMWqQX8FiBdj2ju5MF3wa", // CPI_PROXY_PROGRAM_ID
@@ -21,15 +21,6 @@ const MAYAN_ENTRY_PROGRAMS = new Set([
 const SYSTEM_PROGRAM = "11111111111111111111111111111111";
 /** LI.FI's fee wallet on Solana (its `feeCollection` step pays SOL here, tokens to its token accounts). */
 export const LIFI_SOLANA_FEE_WALLET = "34FKjAdVcTax2DHqV2XnbXa9J3zmyKcFuFKWbcmgxjgm";
-
-function base58(bytes: Uint8Array): string {
-  let n = 0n;
-  for (const b of bytes) n = (n << 8n) | BigInt(b);
-  let out = "";
-  while (n > 0n) { out = ALPHABET[Number(n % 58n)]! + out; n /= 58n; }
-  for (const b of bytes) { if (b !== 0) break; out = `1${out}`; }
-  return out;
-}
 
 class Cursor {
   at = 0;

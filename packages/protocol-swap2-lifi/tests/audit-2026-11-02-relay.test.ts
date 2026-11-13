@@ -20,6 +20,7 @@ const oct30 = JSON.parse(readFileSync(new URL("./fixtures-live-2026-10-30.json",
 const nov02 = JSON.parse(readFileSync(new URL("./fixtures-live-2026-11-02.json", import.meta.url), "utf8")) as {corridors: {name: string; params: QuoteParams; response: Body}[]};
 
 const RECEIVER = "0x3333333333333333333333333333333333333333";
+const INTENTS_UNPINNED = "a LI.FI Intents order to an EVM chain names its own oracles, output settler and output amount, which cannot be checked here — its escrow could release the input without the delivery";
 const ZERO32 = `0x${"00".repeat(32)}` as Hex;
 const B = "(bytes32 transactionId, string bridge, string integrator, address referrer, address sendingAssetId, address receiver, uint256 minAmount, uint256 destinationChainId, bool hasSourceSwaps, bool hasDestinationCall) _bridgeData";
 const SQUID = "(uint8 routeType, string destinationChain, string destinationAddress, string bridgedTokenSymbol, address depositAssetId, (uint8 callType, address target, uint256 value, bytes callData, bytes payload)[] sourceCalls, bytes payload, uint256 fee, bool enableExpress) _squidData";
@@ -70,16 +71,16 @@ describe("audit 2026-11-02: bridges whose recipient the Diamond does not bind", 
     for (const route of [0, 1, 2]) expect(diamondCallMismatch(squid(route), expectation)).toMatch(/^Squid delivers to a recipient the transaction does not bind/);
   });
 
-  it("asks LI.FI to route around Relay, Garden, Squid and Symbiosis on every cross-chain request, not on a same-chain swap", async () => {
+  it("asks LI.FI to route around Relay, Garden, Squid and Symbiosis (and LI.FI Intents) on every cross-chain request, not on a same-chain swap", async () => {
     const urls: URL[] = [];
     vi.stubGlobal("fetch", async (u: URL | string) => { urls.push(new URL(String(u))); return new Response(JSON.stringify(response())); });
     expect(await lifiProvider().getQuote(PARAMS)).not.toBeNull();
-    expect(urls[0]!.searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden", "squid", "symbiosis"]);
+    expect(urls[0]!.searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden", "squid", "symbiosis", "lifiIntents"]);
     await lifiProvider().getQuote({...PARAMS, destChain: PARAMS.sourceChain});
     expect(urls[1]!.searchParams.getAll("denyBridges")).toEqual([]);
   });
 
-  it("the corridors LI.FI serves with Relay and Garden denied (live, 2026-11-02) pass the provider and the remote pin", async () => {
+  it("the corridors LI.FI serves with Relay and Garden denied (live, 2026-11-02) pass the provider and the remote pin; its LI.FI Intents answer is refused", async () => {
     const evm = nov02.corridors.filter((c) => c.name.startsWith("evm-"));
     expect(evm.length).toBeGreaterThanOrEqual(9);
     const tools = new Set<string>();
@@ -87,11 +88,17 @@ describe("audit 2026-11-02: bridges whose recipient the Diamond does not bind", 
       vi.stubGlobal("fetch", async () => new Response(JSON.stringify(c.response)));
       const reasons: string[] = [];
       const quote = await lifiProvider().getQuote({...c.params, onRefusal: (r) => reasons.push(r)});
+      if (c.response.tool === "lifiIntents") {
+        // Since 2026-11-13 LI.FI Intents is denied in requests and its Diamond call refused between EVM chains too
+        // (unpinned oracles and settler: evm-intents-2026-11-13.test.ts).
+        expect([c.name, quote, reasons]).toEqual([c.name, null, [`lifi: the transaction does not match the quote: ${INTENTS_UNPINNED}`]]);
+        continue;
+      }
       expect([c.name, reasons]).toEqual([c.name, []]);
       expect([c.name, lifiVerifyQuote(c.params, quote!)]).toEqual([c.name, null]);
       tools.add(c.response.tool!);
     }
     // gnosis xDAI → Arbitrum USDC was Relay's on 2026-10-30; LI.FI now routes it through NEAR Intents.
-    expect([...tools].sort()).toEqual(["across", "arbitrum", "lifiIntents", "near", "polymerStandard"]);
+    expect([...tools].sort()).toEqual(["across", "arbitrum", "near", "polymerStandard"]);
   });
 });

@@ -19,10 +19,25 @@ function priceOf(prices: Readonly<Record<string, number>>, symbol: string): numb
 const units = (amount: string | bigint, decimals: number) => bigintToUnits(BigInt(amount), decimals);
 
 /**
+ * The native coin a route charges on top of the input, as its quote declares it (base units): a quote with a
+ * transaction declares it there (`txRequest.nativeFee`); a price-only quote, which carries no transaction (a dry LI.FI
+ * quote priced for a placeholder sender or recipient), declares it as `providerData.nativeFee`, only read when there is
+ * no `txRequest`. Undefined when there is none; null when a `providerData.nativeFee` is not a base-unit integer (the
+ * quote then cannot be valued).
+ */
+function declaredNativeFee(quote: Pick<Quote, "txRequest" | "providerData">): string | undefined | null {
+  if (quote.txRequest) return quote.txRequest.nativeFee;
+  const declared = quote.providerData?.nativeFee;
+  if (declared === undefined) return undefined;
+  return /^\d{1,80}$/.test(declared) ? declared : null;
+}
+
+/**
  * A `valueUsd` for the router: the guaranteed output in USD, minus the native
- * fee the route charges on top of the input (bridge messaging fees), minus
- * the source gas when `gasUsd` can say it. null when a needed price is missing
- * — the auction then falls back to comparing guaranteed outputs.
+ * fee the route charges on top of the input (bridge messaging fees: the
+ * transaction's `nativeFee`, or a price-only quote's `providerData.nativeFee`),
+ * minus the source gas when `gasUsd` can say it. null when a needed price is
+ * missing — the auction then falls back to comparing guaranteed outputs.
  */
 export function usdValue(
   prices: Readonly<Record<string, number>>,
@@ -34,7 +49,8 @@ export function usdValue(
     const destPrice = priceOf(prices, dest.symbol);
     if (destPrice === null) return null;
     let value = units(quote.minDestAmount, dest.decimals) * destPrice;
-    const nativeFee = quote.txRequest?.nativeFee;
+    const nativeFee = declaredNativeFee(quote);
+    if (nativeFee === null) return null;
     if (nativeFee && BigInt(nativeFee) > 0n) {
       const native = ccAssetByToken(params.sourceChain, "");
       const nativePrice = native ? priceOf(prices, native.symbol) : null;
@@ -62,7 +78,7 @@ export interface QuoteValue {
   provider: string;
   /** USD the user pays: the source amount at the current price. null when unpriced. */
   valueUsdIn: number | null;
-  /** USD the quote delivers: the expected `destAmount` at the current price, minus a native fee paid on top. null when unpriced. */
+  /** USD the quote delivers: the expected `destAmount` at the current price, minus a native fee paid on top (`txRequest.nativeFee`, or a price-only quote's `providerData.nativeFee`). null when unpriced. */
   valueUsdOut: number | null;
   /** (in − out) / in × 100. Positive = the user receives less value than they pay. null when either side is unpriced. */
   lossPct: number | null;
@@ -116,8 +132,9 @@ export function quoteValues(prices: Readonly<Record<string, number>>, params: Va
     if (dest && destPrice !== null) {
       try {
         valueUsdOut = units(q.destAmount, dest.decimals) * destPrice;
-        const nativeFee = q.txRequest?.nativeFee;
-        if (nativeFee && BigInt(nativeFee) > 0n) {
+        const nativeFee = declaredNativeFee(q);
+        if (nativeFee === null) valueUsdOut = null;
+        else if (nativeFee && BigInt(nativeFee) > 0n) {
           const native = ccAssetByToken(params.sourceChain, "");
           const nativePrice = native ? priceOf(prices, native.symbol) : null;
           if (native && nativePrice !== null) valueUsdOut -= units(nativeFee, native.decimals) * nativePrice;

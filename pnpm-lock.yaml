@@ -1436,6 +1436,12 @@ importers:
       '@anywalletkit/swap2-assets':
         specifier: workspace:*
         version: link:../swap2-assets
+      '@noble/curves':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
     devDependencies:
       '@anywalletkit/conformance':
         specifier: workspace:*

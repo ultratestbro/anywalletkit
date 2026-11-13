@@ -45,7 +45,7 @@ describe("watch 2026-11-04: allowDestinationCall=false on EVM-source cross-chain
   it("/advanced/routes options carry allowDestinationCall: false next to the deny list", async () => {
     const {bodies, urls} = record();
     expect(await lifiProvider({chooseRoute: choose}).getQuote(PARAMS)).not.toBeNull();
-    expect(bodies[0]!.options).toMatchObject({allowDestinationCall: false, bridges: {deny: ["relaydepository", "garden", "squid", "symbiosis"]}});
+    expect(bodies[0]!.options).toMatchObject({allowDestinationCall: false, bridges: {deny: ["relaydepository", "garden", "squid", "symbiosis", "lifiIntents"]}});
     expect(urls[0]!.searchParams.getAll("allowDestinationCall")).toEqual(["false"]);
     expect(urls[0]!.searchParams.getAll("allowBridges")).toEqual(["across"]);
   });

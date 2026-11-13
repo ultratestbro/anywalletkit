@@ -3,8 +3,9 @@
 // lifiVerifyQuote: the provider's own diamondCallMismatch with the expectation it builds, run on the device.
 // The fixture is read-only answers of the public li.quest/v1/quote (2026-10-30, no API key) across 32 corridors — same-chain
 // swaps, bridges via Across, Stargate, Relay, Mayan, LayerSwap, Polymer, Glacis, LI.FI Intents and NEAR, native in and
-// out, and the routes the provider refuses (no quote, a Solana destination). Every quote the provider accepts must
-// pass the remote check, directly and through the real swap2 server handler and remoteProvider.
+// out, and the routes the provider refuses (no quote; Relay since 2026-11-02, LI.FI Intents since 2026-11-13). Every quote the provider accepts must pass the remote check,
+// directly and through the real swap2 server handler and remoteProvider. Base USDC → Solana USDC (Polymer CCTP) was
+// refused until the Solana recipient was read (2026-11-12): it now passes, its USDC account derived on the device.
 import {readFileSync} from "node:fs";
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {remoteProvider} from "@anywalletkit/protocol-swap2-core/remote";
@@ -50,15 +51,18 @@ describe("scan 2026-10-30 F3: lifiVerifyQuote over live LI.FI answers", () => {
       table.push(`${c.name}: pass`);
     }
     // The two Relay answers are refused since 2026-11-02: Relay's orderId is not bound to the checked receiver (live,
-    // LI.FI is asked to deny relaydepository and serves those pairs through another bridge).
+    // LI.FI is asked to deny relaydepository and serves those pairs through another bridge). The LI.FI Intents answer
+    // (BSC USDT → Arbitrum USDC) is refused since 2026-11-13: its oracles and output settler are not pinned (live, LI.FI
+    // is asked to deny lifiIntents and serves the pair through another bridge: evm-intents-2026-11-13.test.ts).
     expect(accepted).toBe(24);
+    expect(table).toContain("base-usdc>solana-usdc default: pass");
     expect(table.filter((t) => t.includes("local refused"))).toEqual([
       expect.stringMatching(/^base-usdc>arb-usdc relay: local refused \(lifi: the transaction does not match the quote: Relay delivers to a recipient the transaction does not bind/),
       expect.stringMatching(/^base-usdc>arb-usdc cbridge: local refused \(lifi: No available quotes/),
       expect.stringMatching(/^op-usdc>arb-usdc symbiosis: local refused/),
       expect.stringMatching(/^eth-eth>arb-eth hop: local refused/),
+      "bsc-usdt>arb-usdc default: local refused (lifi: the transaction does not match the quote: a LI.FI Intents order to an EVM chain names its own oracles, output settler and output amount, which cannot be checked here — its escrow could release the input without the delivery)",
       expect.stringMatching(/^gnosis-xdai>arb-usdc default: local refused .*Relay delivers/),
-      expect.stringMatching(/^base-usdc>solana-usdc default: local refused .*non-EVM destination/),
       expect.stringMatching(/^base-eth>arb-eth gasZip: local refused/),
       expect.stringMatching(/^base-usdc>op-usdc eco: local refused/),
     ]);
@@ -107,12 +111,18 @@ describe("scan 2026-10-30 F3: lifiVerifyQuote over live LI.FI answers", () => {
     expect(lifiVerifyQuote({...token.params, amountIn: "1"}, t)).toMatch(/not the 1 input/);
   });
 
-  it("a dry quote prices the placeholder; a Solana source's serialized transaction is read for its static part only", () => {
+  it("a dry quote priced for the placeholder carries no transaction; a Solana source's serialized transaction is read for its static part only", () => {
     const dry = {sourceChain: "eip155:8453", sourceToken: "ETH", destChain: "eip155:8453", destToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", amountIn: "1", destAddress: ""} as QuoteParams;
-    expect(lifiVerifyQuote(dry, {intentId: "lifi:8453:8453", sourceAmount: "1", minDestAmount: "1", txRequest: {to: "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE", data: "0x12345678", value: "1"}} as Quote)).toMatch(/unknown Diamond call|too short/);
+    const call = {intentId: "lifi:8453:8453", sourceAmount: "1", minDestAmount: "1", txRequest: {to: "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE", data: "0x12345678", value: "1"}} as Quote;
+    // Since review r1 of 2026-11-12 a dry quote without the sender is priced for the placeholder and must carry no
+    // transaction (dry-placeholder-2026-11-12.test.ts); with the sender named, the calldata is decoded as before.
+    expect(lifiVerifyQuote(dry, call)).toBe("a dry quote priced for a placeholder sender carries a transaction — it would pay or refund that placeholder, not the wallet that signs it");
+    expect(lifiVerifyQuote({...dry, refundAddress: "0x4444444444444444444444444444444444444444"}, call)).toMatch(/unknown Diamond call|too short/);
     const sol = {sourceChain: "solana:mainnet", sourceToken: "SOL", destChain: "eip155:8453", destToken: "0x0000000000000000000000000000000000000000", amountIn: "1", destAddress: "0x3333333333333333333333333333333333333333"} as QuoteParams;
+    expect(lifiVerifyQuote(sol, {txRequest: {serializedTx: "AQ==", value: "1"}} as Quote)).toBe("a dry quote priced for a placeholder sender carries a transaction — it would pay or refund that placeholder, not the wallet that signs it");
     // Since 2026-11-02 a bridge's transaction must at least decode and call Mayan; the account proves the recipient.
-    expect(lifiVerifyQuote(sol, {txRequest: {serializedTx: "AQ==", value: "1"}} as Quote)).toMatch(/does not decode/);
-    expect(lifiVerifyQuote(sol, {txRequest: {serializedTx: "AQ==", to: "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE", value: "1"}} as Quote)).toMatch(/serialized transaction only/);
+    const solSender = {...sol, refundAddress: "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk"};
+    expect(lifiVerifyQuote(solSender, {txRequest: {serializedTx: "AQ==", value: "1"}} as Quote)).toMatch(/does not decode/);
+    expect(lifiVerifyQuote(solSender, {txRequest: {serializedTx: "AQ==", to: "0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE", value: "1"}} as Quote)).toMatch(/serialized transaction only/);
   });
 });

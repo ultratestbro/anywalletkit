@@ -109,9 +109,9 @@ describe("audit 2026-11-02 r3: LI.FI's Solana bridges are offered as before", ()
     urls.length = 0; bodies.length = 0;
     const evm = {...params, sourceChain: "eip155:42161", sourceToken: "ETH", refundAddress: `0x${"11".repeat(20)}`};
     await lifiProvider({chooseRoute: (r) => { offered = r.map((o) => o.tool); return {allowBridges: ["relaydepository", "mayan"]}; }}).getQuote(evm);
-    expect(bodies[0]!.options!.bridges).toEqual({deny: ["relaydepository", "garden", "squid", "symbiosis"]});
+    expect(bodies[0]!.options!.bridges).toEqual({deny: ["relaydepository", "garden", "squid", "symbiosis", "lifiIntents"]});
     expect(offered).toEqual(["mayan"]);
     expect(urls.at(-1)!.searchParams.getAll("allowBridges")).toEqual(["mayan"]);
-    expect(urls.at(-1)!.searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden", "squid", "symbiosis"]);
+    expect(urls.at(-1)!.searchParams.getAll("denyBridges")).toEqual(["relaydepository", "garden", "squid", "symbiosis", "lifiIntents"]);
   });
 });

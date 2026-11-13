@@ -48,7 +48,9 @@
   },
   "dependencies": {
     "@anywalletkit/protocol-swap2-core": "workspace:*",
-    "@anywalletkit/swap2-assets": "workspace:*"
+    "@anywalletkit/swap2-assets": "workspace:*",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0"
   },
   "peerDependencies": {
     "@anywalletkit/core": "workspace:*"

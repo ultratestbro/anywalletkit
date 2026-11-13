@@ -61,7 +61,8 @@ const LIFI_CHAIN: Record<string, string> = {
   "eip155:2818": "2818",
   "eip155:14": "14",
   // 2026-11-10: Elysium (Kinetiq; li.quest/v1/chains id 99901, key "ely"). LI.FI's bridges there are Relay (refused
-  // below: UNBOUND_TOOLS) and LI.FI Intents; same-chain swaps go through GenericSwapFacetV3 (KyberSwap, Nordstern).
+  // below: UNBOUND_TOOLS) and LI.FI Intents (refused too: UNPINNED_TOOLS), so it has no cross-chain LI.FI route for now;
+  // same-chain swaps go through GenericSwapFacetV3 (KyberSwap, Nordstern).
   "eip155:99901": "99901",
   [LIFI_SOLANA_CAIP2]: "1151111081099710",
 };
@@ -250,7 +251,42 @@ const TOOL_KEY = /^[A-Za-z0-9_-]{1,64}$/;
  * other Solana bridges only against its SOL and token ceilings.
  */
 const UNBOUND_TOOLS: readonly string[] = Object.freeze(["relaydepository", "garden", "squid", "symbiosis"]);
-function routeOptions(body: unknown, excluded: readonly string[]): LifiRouteOption[] {
+/**
+ * LI.FI Intents (`lifiIntents`): the escrowed order names its own input oracle, output oracle, output settler and output
+ * amount multiplier, none of which is pinned here, so its Diamond call is refused on every route (calldata.ts,
+ * `INTENTS_UNPINNED` / `INTENTS_TO_SOLANA`) and every cross-chain request from an EVM chain asks LI.FI to route around it,
+ * like the unbound tools. A Solana source is unchanged (no Diamond call; see UNBOUND_TOOLS).
+ */
+const UNPINNED_TOOLS: readonly string[] = Object.freeze(["lifiIntents"]);
+/** The LI.FI tools every cross-chain request from an EVM chain is asked to avoid, and a route policy cannot pick. */
+const REFUSED_EVM_TOOLS: readonly string[] = Object.freeze([...UNBOUND_TOOLS, ...UNPINNED_TOOLS]);
+/**
+ * EVM → Solana: the LI.FI tools whose Diamond call binds the delivery to the Solana recipient the device reads
+ * (calldata.ts, `solanaRecipientMismatch`): Mayan's Swift, MCTP and Fast MCTP routes, Polymer CCTP (fast and standard)
+ * and Chainflip. Such requests ask LI.FI for these bridges only, so a pair is not lost to a bridge the module refuses
+ * for this direction (NEAR Intents, LayerSwap and Smart Deposits pay a deposit address; LI.FI Intents names its own
+ * oracles and output settler, which are not pinned here).
+ */
+const SOLANA_DESTINATION_TOOLS: readonly string[] = Object.freeze(["mayan", "mayanMCTP", "mayanFastMCTP", "polymer", "polymerStandard", "chainflip"]);
+/** LI.FI's Smart Deposits pay a deposit address; nothing in the transaction binds where it delivers. */
+const SMART_DEPOSITS_TOOL = /^smartdeposits?$/i;
+/** A dry EVM → Solana quote without a recipient prices the publicly known BIP-39 "abandon" account 0 on Solana (never built: {@link placeholderIn}). */
+const dryRecipient = (params: Pick<QuoteParams, "sourceChain" | "destChain">, fromAddress: string): string =>
+  !isSolana(params.sourceChain) && isSolana(params.destChain) ? SOLANA_PLACEHOLDER : fromAddress;
+/**
+ * Which address of a dry request the module fills with its placeholder: the sender when there is no `refundAddress`
+ * (vitalik.eth, or the Solana "abandon" account from Solana), the recipient of an EVM → Solana request without a
+ * `destAddress` (the "abandon" account) — or null when the quote is for the request's own addresses (a dry EVM → EVM or
+ * Solana-source quote without a recipient prices the sender's own address). The placeholders are public accounts, and
+ * the Solana one's key anyone can derive and sweep: a transaction LI.FI builds for them pays or refunds them from
+ * whichever wallet signs it. Such a quote therefore prices the route and carries no transaction; `buildDeposit`
+ * refuses it and {@link lifiVerifyQuote} refuses one that carries a transaction anyway.
+ */
+function placeholderIn(params: Pick<QuoteParams, "sourceChain" | "destChain" | "refundAddress" | "destAddress">): "sender" | "recipient" | null {
+  if (!params.refundAddress) return "sender";
+  return !params.destAddress && dryRecipient(params, params.refundAddress) !== params.refundAddress ? "recipient" : null;
+}
+function routeOptions(body: unknown, excluded: readonly string[], allowed?: readonly string[]): LifiRouteOption[] {
   const routes = (body as {routes?: unknown})?.routes;
   if (!Array.isArray(routes)) return [];
   const out: LifiRouteOption[] = [];
@@ -261,7 +297,7 @@ function routeOptions(body: unknown, excluded: readonly string[]): LifiRouteOpti
     const cross = Array.isArray(step.includedSteps) ? step.includedSteps.find((i) => i?.type === "cross")?.tool : undefined;
     const tool = typeof cross === "string" ? cross : step.tool;
     const eta = step.estimate?.executionDuration;
-    if (typeof tool !== "string" || !TOOL_KEY.test(tool) || excluded.includes(tool) || typeof eta !== "number" || !Number.isFinite(eta) || eta < 0) continue;
+    if (typeof tool !== "string" || !TOOL_KEY.test(tool) || excluded.includes(tool) || (allowed && !allowed.includes(tool)) || typeof eta !== "number" || !Number.isFinite(eta) || eta < 0) continue;
     if (typeof r.toAmount !== "string" || typeof r.toAmountMin !== "string" || !/^\d{1,60}$/.test(r.toAmount) || !/^\d{1,60}$/.test(r.toAmountMin)) continue;
     out.push({
       tool,
@@ -331,17 +367,21 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
 
       const solanaSource = isSolana(params.sourceChain);
       const crossChain = params.sourceChain !== params.destChain;
+      // EVM → Solana: only the bridges whose Solana recipient the calldata check reads (SOLANA_DESTINATION_TOOLS).
+      const evmToSolana = !solanaSource && isSolana(params.destChain);
       // The Diamond check refuses a destination call (its recipient sits in calldata for the other chain), so LI.FI is
       // asked not to offer one; the check stays as the backstop. A Solana source has no Diamond call to check.
       const noDestinationCall = crossChain && !solanaSource;
       // Route-wide slippage covers EVM routes only (LI.FI: not a route that starts or ends on a non-EVM chain).
       let routeScope = config.routeWideSlippage === true && !solanaSource && !isSolana(params.destChain);
-      // The placeholders price a dry quote; a live one is built for real addresses only (round 3, H8).
+      // The placeholders price a dry quote; a live one is built for real addresses only (round 3, H8). A quote priced for
+      // a placeholder carries no transaction (placeholderIn).
       const dry = params.dry !== false;
       const fromAddress = params.refundAddress || (dry ? (solanaSource ? SOLANA_PLACEHOLDER : EVM_PLACEHOLDER) : "");
-      const toAddress = params.destAddress || (dry ? fromAddress : "");
+      const toAddress = params.destAddress || (dry ? dryRecipient(params, fromAddress) : "");
       if (!fromAddress) return reject("a live quote needs the sender's address");
       if (!toAddress) return reject("a live quote needs a recipient");
+      const placeholder = dry ? placeholderIn(params) : null;
 
       // LI.FI applies `slippage` to EACH step of a multi-step route (bridge +
       // destination swap), so its minimum can sit ~2× the requested slippage
@@ -369,7 +409,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
               options: {
                 slippage: slippageBps / 10_000,
                 ...(routeScope ? {slippageScope: "route"} : {}),
-                ...(solanaSource ? {} : {bridges: {deny: UNBOUND_TOOLS}}),
+                ...(solanaSource ? {} : {bridges: {...(evmToSolana ? {allow: SOLANA_DESTINATION_TOOLS} : {}), deny: REFUSED_EVM_TOOLS}}),
                 ...(noDestinationCall ? {allowDestinationCall: false} : {}),
                 ...(integrator().trim() ? {integrator: integrator().trim()} : {}),
               },
@@ -377,7 +417,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
             signal: signal ?? timeoutSignal(8_000),
           });
           if (res.ok) {
-            const options = routeOptions(await res.json(), solanaSource ? [] : UNBOUND_TOOLS);
+            const options = routeOptions(await res.json(), solanaSource ? [] : REFUSED_EVM_TOOLS, evmToSolana ? SOLANA_DESTINATION_TOOLS : undefined);
             if (options.length) choice = cleanChoice(config.chooseRoute(options, params));
           }
         } catch {
@@ -402,8 +442,11 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         }
         if (routeScope) url.searchParams.set("slippageScope", "route");
         if (noDestinationCall) url.searchParams.set("allowDestinationCall", "false");
-        const unbound = crossChain && !solanaSource ? UNBOUND_TOOLS : [];
-        for (const t of (choice?.allowBridges ?? []).filter((b) => solanaSource || !UNBOUND_TOOLS.includes(b))) url.searchParams.append("allowBridges", t);
+        const unbound = crossChain && !solanaSource ? REFUSED_EVM_TOOLS : [];
+        const allow = (choice?.allowBridges ?? []).filter((b) => solanaSource || !REFUSED_EVM_TOOLS.includes(b));
+        // EVM → Solana: the policy's pick among the readable bridges, or all of them.
+        const solanaAllow = evmToSolana ? allow.filter((b) => SOLANA_DESTINATION_TOOLS.includes(b)) : [];
+        for (const t of evmToSolana ? (solanaAllow.length ? solanaAllow : SOLANA_DESTINATION_TOOLS) : allow) url.searchParams.append("allowBridges", t);
         for (const t of new Set([...(choice?.denyBridges ?? []), ...unbound])) url.searchParams.append("denyBridges", t);
         if (choice?.order) url.searchParams.set("order", choice.order);
         deadline = signal ? undefined : timeoutSignal(12_000);
@@ -468,6 +511,13 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           };
         };
         const receivedAt = Date.now();
+        if (evmToSolana) {
+          const steps = (q as {includedSteps?: unknown}).includedSteps;
+          const tools = [(q as {tool?: unknown}).tool, ...(Array.isArray(steps) ? steps.map((i: {tool?: unknown} | null) => i?.tool) : [])];
+          if (tools.some((t) => typeof t === "string" && SMART_DEPOSITS_TOOL.test(t))) {
+            return reject("LI.FI Smart Deposits pay a deposit address whose recipient the transaction does not bind — refused for a Solana destination");
+          }
+        }
         const action = q.action;
         const est = q.estimate;
         const tr = q.transactionRequest;
@@ -537,6 +587,8 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
         }
 
         let txRequest: NonNullable<Quote["txRequest"]>;
+        // The bridge's native fee on top of the input (EVM source); a price-only quote declares it in providerData.
+        let nativeFee = 0n;
         if (solanaSource) {
           // `value` declares what the account may let the tx take in native
           // coin: the input for a SOL source, nothing for a token source.
@@ -553,7 +605,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           // Base, POL Polygon → Optimism). Declared here, sealed with the
           // quote, bounded by the engine — never silently attached.
           const value = BigInt(tr.value!);
-          const nativeFee = sourceIsToken ? value : value > BigInt(params.amountIn) ? value - BigInt(params.amountIn) : 0n;
+          nativeFee = sourceIsToken ? value : value > BigInt(params.amountIn) ? value - BigInt(params.amountIn) : 0n;
           if (!sourceIsToken && value < BigInt(params.amountIn)) return reject("the transaction sends less native coin than the input");
           txRequest = {
             to: tr.to!,
@@ -622,7 +674,10 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           intentId: `lifi:${fromChain}:${toChain}`,
           depositAddress: "",
           depositMemo: null,
-          txRequest,
+          // Every check above ran on LI.FI's transaction; one built for a placeholder is not handed out (placeholderIn).
+          // Its bridge fee on top of the input still is, as `providerData.nativeFee`, so the router's value nets it out
+          // (usdValue reads it when there is no txRequest) instead of ranking the route on its gross output.
+          ...(placeholder ? {providerData: {placeholder, ...(nativeFee > 0n ? {nativeFee: nativeFee.toString()} : {})}} : {txRequest}),
           // What the wallet spends (action.fromAmount, = the input); an input-side bridge fee is inside destAmount.
           sourceAmount: params.amountIn,
           destAmount: est.toAmount,
@@ -644,6 +699,11 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
     },
 
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
+      // A dry quote priced for a placeholder sender or recipient (placeholderIn) is never built, even with a transaction attached.
+      const placeholder = quote.providerData?.placeholder;
+      if (placeholder !== undefined) {
+        throw new Error(`swap2: this LI.FI quote was priced for a placeholder ${String(placeholder).slice(0, 20)} (a dry quote without that address) and has no transaction to build — quote again with the sender and the recipient`);
+      }
       const tx = quote.txRequest;
       if (!tx) throw new Error("swap2: LI.FI quote has no transaction request");
       // The intent id carries the LI.FI source chain; a serialized leg names
@@ -717,12 +777,21 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
  * destination chain. A native input is paid in value (any excess is the declared bridge fee); a token input attaches
  * only that declared fee and approves the Diamond. A Solana source carries a serialized transaction instead, which the
  * account proves before signing (for a Mayan bridge, against the engine's `bridgeOut`); here only its static part is
- * read (paid by the sender; a Mayan route pays SOL to no other wallet). The reason it fails, or null.
+ * read (paid by the sender; a Mayan route pays SOL to no other wallet). A dry request without the sender, or an EVM →
+ * Solana one without the recipient, is priced for a placeholder: its quote must carry no transaction and is held to its
+ * terms only. The reason it fails, or null.
  */
 export function lifiVerifyQuote(params: QuoteParams, quote: Quote): string | null {
   const fromChain = LIFI_CHAIN[params.sourceChain];
   const toChain = LIFI_CHAIN[params.destChain];
   if (!fromChain || !toChain) return "not a LI.FI chain pair";
+  // A dry quote priced for a placeholder sender or recipient (placeholderIn) prices the route only: with a transaction
+  // it would pay or refund that public account from whichever wallet signs it.
+  const placeholder = params.dry !== false ? placeholderIn(params) : null;
+  if (placeholder) {
+    if (quote.txRequest !== undefined) return `a dry quote priced for a placeholder ${placeholder} carries a transaction — it would pay or refund that placeholder, not the wallet that signs it`;
+    return priceOnlyMismatch(params, quote, `lifi:${fromChain}:${toChain}`);
+  }
   const tx = quote.txRequest;
   if (!tx) return "the quote carries no transaction";
   if (isSolana(params.sourceChain)) {
@@ -739,7 +808,7 @@ export function lifiVerifyQuote(params: QuoteParams, quote: Quote): string | nul
   // The same addresses the provider quotes for: a dry quote without them prices the placeholder (never built).
   const dry = params.dry !== false;
   const fromAddress = params.refundAddress || (dry ? EVM_PLACEHOLDER : "");
-  const toAddress = params.destAddress || (dry ? fromAddress : "");
+  const toAddress = params.destAddress || (dry ? dryRecipient(params, fromAddress) : "");
   if (!fromAddress || !toAddress) return "a live quote needs the sender and the recipient";
   let amountIn: bigint, minOut: bigint, value: bigint, nativeFee: bigint;
   try {
@@ -765,6 +834,25 @@ export function lifiVerifyQuote(params: QuoteParams, quote: Quote): string | nul
     destChainId: BigInt(toChain), sameChain: fromChain === toChain, evmDestination: !isSolana(params.destChain),
   });
   return why ? `the transaction does not match the request: ${why}` : null;
+}
+
+/**
+ * A dry quote with no transaction (priced for a placeholder): what it spends, its minimum against the caller's floor and
+ * the route its intent id names are still held to the request; it pays no deposit address, and the bridge fee it declares
+ * (`providerData.nativeFee`, which the router nets out of its value) is a base-unit integer. The reason, or null.
+ */
+function priceOnlyMismatch(params: QuoteParams, quote: Quote, route: string): string | null {
+  if (quote.depositAddress !== "") return `a LI.FI quote pays no deposit address, but this one names ${String(quote.depositAddress).slice(0, 64)}`;
+  const fee = quote.providerData?.nativeFee;
+  if (fee !== undefined && !/^\d{1,80}$/.test(String(fee))) return `the price-only quote declares a native fee of ${String(fee).slice(0, 40)}, not a base-unit integer`;
+  try {
+    if (BigInt(quote.sourceAmount) !== BigInt(params.amountIn)) return `the quote spends ${quote.sourceAmount}, not the ${params.amountIn} input`;
+    const minOut = BigInt(quote.minDestAmount);
+    if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) return `the quoted minimum ${minOut} is below the caller's floor ${params.minAmountOut}`;
+  } catch {
+    return "the quote's amounts are not integers";
+  }
+  return quote.intentId.replace(/~[0-9a-f]{32}$/, "") === route ? null : "the intent id does not name this route";
 }
 
 /**

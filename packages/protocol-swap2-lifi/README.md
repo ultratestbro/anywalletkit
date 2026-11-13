@@ -27,11 +27,47 @@ calls are refused) and its `BridgeData` must name the reviewed recipient and cha
 input token (or what its source swaps make of it). Every refund, depositor or fallback address a
 bridge carries in its own data (Stargate's LayerZero fee refund, an expired Across deposit or LI.FI
 intent, a Mayan Swift order's trader, Chainflip's refund address, …) must be the sender or the
-recipient. Refused, because the recipient cannot be read from the calldata: routes with a destination call, EVM-source routes to a non-EVM chain, and the
+recipient. Refused, because the recipient cannot be read from the calldata: routes with a destination call and the
 bridges whose facet does not bind the delivery to `BridgeData` (Relay, Garden, deBridge DLN,
 ThorSwap, Squid, Symbiosis) — cross-chain requests ask LI.FI to route around Relay, Garden, Squid
 and Symbiosis, and not to offer destination calls (`allowDestinationCall=false`), so their pairs get
-another bridge. Unknown calldata is refused.
+another bridge. **LI.FI Intents** (`lifiIntents`) is refused on every route from an EVM chain and denied in every
+cross-chain request from an EVM chain (Solana-source requests are unchanged): its escrowed order names its own input oracle, output oracle, output settler and
+output amount multiplier, none of which is pinned here, so a matching recipient would not bind the delivery (the
+escrow releases the input on the oracle's word). LI.FI serves those pairs through another bridge; where LI.FI Intents
+is its only one (Elysium, 2026-11-13) LI.FI has no route. Unknown calldata is refused.
+
+**EVM → Solana.** `BridgeData` names LI.FI's Solana chain id and, as its receiver, only LI.FI's non-EVM
+placeholder (`0x11f1…11F1`, required exactly); the recipient sits in the bridge's own data and is read there for
+the bridges whose delivery the transaction binds, then held to the requested owner (`destAddress`) and token:
+
+- **Mayan** (`mayan`, `mayanMCTP`, `mayanFastMCTP`): the facet's `nonEVMReceiver` and the destination address in
+  the Mayan order or transfer it forwards (Swift v2, MCTP `createOrder` / `bridgeWithFee`, Fast MCTP `createOrder`
+  / `bridge`) must both be the owner; the order must go to Solana (Wormhole chain 1 / CCTP domain 5), carry no
+  custom payload and name the requested mint (32 zero bytes for SOL); a plain CCTP transfer delivers USDC. Other
+  Mayan entry points are refused.
+- **Polymer CCTP** (`polymer`, `polymerStandard`): CCTP mints to the token account the calldata names, which the
+  facet cannot check; it must be the owner's USDC associated token account, derived on the device.
+- **Chainflip**: the vault swap's 32-byte destination address must be the owner and its asset the requested one
+  (SOL, USDC or USDT on Solana).
+
+These requests ask LI.FI for those bridges only (`allowBridges`; a `chooseRoute` pick is kept among them). NEAR
+Intents and LayerSwap pay a deposit address whose off-chain order names the recipient, and Smart Deposits a
+deposit address outright: deposits the device cannot verify, refused for this direction. LI.FI Intents to
+Solana is refused like everywhere else (see above). Any other bridge to Solana is refused as before. Solana-source
+requests are unchanged.
+
+**Dry quotes without an address.** A dry quote (`dry` not `false`) without `refundAddress` is priced for a
+placeholder sender (vitalik.eth on EVM, the public BIP-39 "abandon" account on Solana), and a dry EVM → Solana quote
+without `destAddress` for the "abandon" account as the recipient. Such a quote prices the route only: it carries no
+`txRequest` (its `providerData.placeholder` names the stand-in), `buildDeposit` refuses it, and `lifiVerifyQuote` /
+`lifiPins` refuse a quote for such a request that carries a transaction — LI.FI's transaction for a placeholder would
+pay or refund that public account from whichever wallet signs it. Quote again with both addresses to build. A dry
+EVM → EVM quote with a `refundAddress` but no recipient prices the sender's own address and keeps its transaction.
+A bridge's native fee on top of the input (LayerZero's on Stargate, for instance) stays on the price-only quote as
+`providerData.nativeFee` (base units of the source chain's native coin), which the router's `usdValue` and
+`quoteValues` net out of its value as they do `txRequest.nativeFee`; `lifiVerifyQuote` refuses one that is not a
+base-unit integer.
 
 Every swap step is read, not only the ends: each must spend what the step before delivered, only
 steps that spend the input token may pull from the wallet (`requiresDeposit`), and together at most

@@ -9,9 +9,12 @@ import { createMockAccount, parseActivityFixture, type ActivityFixtureJson } fro
 import { bigintToNumber, bigintToUnits } from '@anywalletkit/core'
 import { Address } from '@ton/core'
 import { RouterSwap2Protocol } from '@anywalletkit/protocol-swap2-router/swap2/router'
+import { usdValue } from '@anywalletkit/protocol-swap2-router/value'
 import { NearIntentsSwap2Protocol } from '@anywalletkit/protocol-swap2-near-intents/protocol'
 import { LifiSwap2Protocol } from '@anywalletkit/protocol-swap2-lifi/protocol'
-import { lifiProvider } from '@anywalletkit/protocol-swap2-lifi/provider'
+import { lifiProvider, lifiVerifyQuote } from '@anywalletkit/protocol-swap2-lifi/provider'
+import lifiSolanaLive from '../../packages/protocol-swap2-lifi/tests/fixtures-live-2026-11-12-evm-solana.json'
+import lifiEvmIntentsLive from '../../packages/protocol-swap2-lifi/tests/fixtures-live-2026-11-13-evm-intents.json'
 import { cctpProvider } from '@anywalletkit/protocol-swap2-cctp/provider'
 import { CctpSwap2Protocol } from '@anywalletkit/protocol-swap2-cctp/protocol'
 import { usdt0Provider } from '@anywalletkit/protocol-swap2-usdt0/provider'
@@ -106,6 +109,122 @@ export async function smokeProtocols(check: Check): Promise<void> {
     const p = new (P as never as new (a: unknown, c: unknown) => { getSupportedChains(): Promise<unknown>; quoteSwap2(o: unknown): Promise<unknown> })(evm, swap2Cfg)
     check(`${name}: constructs`, typeof p.quoteSwap2 === 'function')
     await tolerates(check, `${name}: getSupportedChains`, () => p.getSupportedChains())
+  }
+  {
+    // LI.FI EVM → Solana (live answers 2026-11-12): the Solana recipient read from Mayan, Polymer CCTP and Chainflip
+    // calldata (bytes32 → base58), Polymer's USDC account derived on the device (sha256 + ed25519 off-curve check under
+    // Hermes BigInt); NEAR Intents / LayerSwap deposits and LI.FI Intents (unpinned oracles and settler) refused. A dry
+    // quote priced for a placeholder carries no transaction: the provider keeps only its price, buildDeposit and
+    // lifiVerifyQuote refuse one with a transaction.
+    type C = { name: string; params: Parameters<typeof lifiVerifyQuote>[0]; response: { action: { fromToken: { address: string } }; estimate: { toAmountMin: string }; transactionRequest: { to: string; data: string; value: string; chainId: number } } }
+    const corridors = (lifiSolanaLive as unknown as { corridors: C[] }).corridors
+    const asQuote = (c: C, data = c.response.transactionRequest.data): Parameters<typeof lifiVerifyQuote>[1] => {
+      const tr = c.response.transactionRequest
+      const native = /^0x0{40}$/.test(c.response.action.fromToken.address)
+      const value = BigInt(tr.value)
+      const fee = native ? value - BigInt(c.params.amountIn) : value
+      return {
+        provider: 'lifi', intentId: `lifi:${tr.chainId}:1151111081099710`, depositAddress: '', depositMemo: null, sourceAmount: c.params.amountIn,
+        destAmount: c.response.estimate.toAmountMin, minDestAmount: c.response.estimate.toAmountMin, feeUsd: 0, etaSeconds: 60, reliability: 1, validUntilMs: Date.now() + 60_000,
+        txRequest: { to: tr.to, data, value: value.toString(), chainId: tr.chainId, ...(native ? {} : { approvalAddress: tr.to }), ...(fee > 0n ? { nativeFee: fee.toString() } : {}) },
+      }
+    }
+    const readable = corridors.filter((c) => !/ (near|layerswap|lifiIntents)$/.test(c.name))
+    const passed = readable.filter((c) => lifiVerifyQuote(c.params, asQuote(c)) === null).map((c) => c.name)
+    check(`lifi: EVM → Solana recorded quotes pass lifiVerifyQuote (${passed.length}/${readable.length})`, readable.length === 12 && passed.length === readable.length, readable.filter((c) => !passed.includes(c.name)).join(', '))
+    const other = 'd8a9e6d2f2a3c5ad3b7a6f1c8f5c4b3e2d1c0b9a8f7e6d5c4b3a2918f7e6d5c4'
+    const refusalFor = (c: C) => lifiVerifyQuote({ ...c.params, destAddress: 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' }, asQuote(c)) ?? ''
+    for (const name of ['ethereum-usdc>solana-usdc polymerStandard', 'base-usdc>solana-sol mayan', 'ethereum-eth>solana-sol chainflip']) {
+      const c = corridors.find((k) => k.name === name)!
+      check(`lifi: EVM → Solana refuses another requested recipient (${name})`, /not (the recipient )?Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS/.test(refusalFor(c)), refusalFor(c))
+      const data = c.response.transactionRequest.data.toLowerCase()
+      const atAta = name.includes('polymer') ? data.indexOf('40d2f27c461f29e9feba1ab8acd39496a9c65b0ae62a713f01f941a993bf55ed') : -1
+      if (atAta > 0) {
+        const swapped = `${data.slice(0, atAta)}${other}${data.slice(atAta + 64)}`
+        check('lifi: EVM → Solana refuses a Polymer CCTP mint to an account that is not the owner\'s USDC account', /^the transaction does not match the request: the Polymer CCTP transfer mints to /.test(lifiVerifyQuote(c.params, asQuote(c, swapped)) ?? ''))
+      }
+    }
+    const near = corridors.find((k) => k.name.endsWith(' near'))!
+    check('lifi: EVM → Solana refuses a NEAR Intents deposit address', /pays a deposit address whose off-chain order names the Solana recipient/.test(lifiVerifyQuote(near.params, asQuote(near)) ?? ''))
+    const intents = corridors.filter((k) => k.name.endsWith(' lifiIntents'))
+    const intentsWhy = intents.map((c) => lifiVerifyQuote(c.params, asQuote(c)) ?? '')
+    check(`lifi: EVM → Solana refuses LI.FI Intents (oracles / settler not pinned) (${intents.length})`, intents.length === 2 && intentsWhy.every((w) => /^the transaction does not match the request: a LI\.FI Intents order to Solana names its own oracles, output settler and output amount/.test(w)), intentsWhy.join(' | '))
+
+    // Dry quote without a recipient: priced for the Solana placeholder, carried without a transaction (the provider's
+    // whole getQuote path under Hermes over a scripted fetch: URL params, the Diamond call decode, the strip).
+    const polymer = corridors.find((k) => k.name === 'ethereum-usdc>solana-usdc polymerStandard')!
+    const dryParams = { ...polymer.params, destAddress: '', dry: true }
+    const carries = 'a dry quote priced for a placeholder recipient carries a transaction — it would pay or refund that placeholder, not the wallet that signs it'
+    check('lifi: a dry EVM → Solana request without a recipient refuses a transaction (lifiVerifyQuote)', lifiVerifyQuote(dryParams, asQuote(polymer)) === carries, lifiVerifyQuote(dryParams, asQuote(polymer)) ?? 'accepted')
+    const g = globalThis as { fetch?: unknown }
+    const offline = g.fetch
+    let toAddress: string | null = null
+    g.fetch = async (u: unknown) => {
+      const url = new URL(String(u))
+      toAddress = url.searchParams.get('toAddress')
+      const answer = (polymer as unknown as { response: { action: object } }).response
+      const body = { ...answer, action: { ...answer.action, slippage: Number(url.searchParams.get('slippage')) } }
+      return { ok: true, status: 200, json: async () => body }
+    }
+    try {
+      const dryQuote = await lifiProvider({}).getQuote(dryParams)
+      check('lifi: a dry EVM → Solana quote prices the Solana placeholder recipient', toAddress === 'HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk', String(toAddress))
+      check('lifi: a dry quote priced for a placeholder carries no transaction', !!dryQuote && dryQuote.txRequest === undefined && dryQuote.providerData?.placeholder === 'recipient', JSON.stringify(dryQuote?.providerData ?? null))
+      check('lifi: a price-only dry quote passes lifiVerifyQuote', !!dryQuote && lifiVerifyQuote(dryParams, dryQuote) === null, dryQuote ? lifiVerifyQuote(dryParams, dryQuote) ?? '' : 'no quote')
+      let built = ''
+      try { if (dryQuote) await lifiProvider({}).buildDeposit({ ...dryQuote, txRequest: asQuote(polymer).txRequest! }) } catch (e) { built = e instanceof Error ? e.message : String(e) }
+      check('lifi: buildDeposit refuses a quote priced for a placeholder, even with a transaction attached', /^swap2: this LI\.FI quote was priced for a placeholder recipient/.test(built), built)
+    } finally {
+      g.fetch = offline
+    }
+  }
+  {
+    // LI.FI Intents between EVM chains (live answers 2026-11-13): the escrowed order names its own oracles, output
+    // settler and output amount, so the Diamond call is refused on the device too (lifiVerifyQuote, the remote pin).
+    // A dry quote without the sender (price-only) declares its native bridge fee as providerData.nativeFee, and the
+    // router's usdValue nets it out (live Stargate V2 answer: LayerZero's fee in value).
+    type A = { tool?: string; action: { fromToken: { address: string } }; estimate: { toAmountMin: string }; transactionRequest: { to: string; data: string; value: string; chainId: number } }
+    type C = { name: string; params: Parameters<typeof lifiVerifyQuote>[0]; status?: number; response: A }
+    const fx = lifiEvmIntentsLive as unknown as { corridors: C[]; intents: C[]; priceOnly: C }
+    const asQuote = (c: C): Parameters<typeof lifiVerifyQuote>[1] => {
+      const tr = c.response.transactionRequest
+      const native = /^0x0{40}$/.test(c.response.action.fromToken.address)
+      const value = BigInt(tr.value)
+      const fee = native ? value - BigInt(c.params.amountIn) : value
+      return {
+        provider: 'lifi', intentId: `lifi:${tr.chainId}:${c.params.destChain.split(':')[1]}`, depositAddress: '', depositMemo: null, sourceAmount: c.params.amountIn,
+        destAmount: c.response.estimate.toAmountMin, minDestAmount: c.response.estimate.toAmountMin, feeUsd: 0, etaSeconds: 60, reliability: 1, validUntilMs: Date.now() + 60_000,
+        txRequest: { to: tr.to, data: tr.data, value: value.toString(), chainId: tr.chainId, ...(native ? {} : { approvalAddress: tr.to }), ...(fee > 0n ? { nativeFee: fee.toString() } : {}) },
+      }
+    }
+    const unpinned = 'the transaction does not match the request: a LI.FI Intents order to an EVM chain names its own oracles, output settler and output amount, which cannot be checked here — its escrow could release the input without the delivery'
+    const intentsWhy = fx.intents.map((c) => lifiVerifyQuote(c.params, asQuote(c)) ?? 'accepted')
+    check(`lifi: EVM → EVM refuses LI.FI Intents (oracles / settler not pinned) (${fx.intents.length})`, fx.intents.length === 3 && intentsWhy.every((w) => w === unpinned), intentsWhy.join(' | ').slice(0, 300))
+    const others = fx.corridors.filter((c) => c.status === 200)
+    const passed = others.filter((c) => lifiVerifyQuote(c.params, asQuote(c)) === null).map((c) => c.name)
+    check(`lifi: EVM → EVM quotes through other bridges pass lifiVerifyQuote (${passed.length}/${others.length})`, others.length === 13 && passed.length === others.length, others.filter((c) => !passed.includes(c.name)).map((c) => c.name).join(', '))
+
+    const stargate = fx.priceOnly
+    const g = globalThis as { fetch?: unknown }
+    const offline = g.fetch
+    g.fetch = async (u: unknown) => {
+      const url = new URL(String(u))
+      const answer = stargate.response as unknown as { action: object }
+      return { ok: true, status: 200, json: async () => ({ ...answer, action: { ...answer.action, slippage: Number(url.searchParams.get('slippage')) } }) }
+    }
+    try {
+      const q = await lifiProvider({}).getQuote(stargate.params)
+      const fee = BigInt(stargate.response.transactionRequest.value).toString()
+      check('lifi: a price-only quote declares its native bridge fee (providerData.nativeFee)', !!q && q.txRequest === undefined && q.providerData?.placeholder === 'sender' && q.providerData?.nativeFee === fee, JSON.stringify(q?.providerData ?? null))
+      check('lifi: lifiVerifyQuote passes it, refuses a malformed declared fee', !!q && lifiVerifyQuote(stargate.params, q) === null
+        && lifiVerifyQuote(stargate.params, { ...q, providerData: { ...q.providerData, nativeFee: '0x10' } }) === 'the price-only quote declares a native fee of 0x10, not a base-unit integer')
+      const value = q ? usdValue({ ETH: 3000, USDC: 1 })(q, stargate.params) : null
+      const gross = Number(stargate.response.estimate.toAmountMin) / 1e6
+      const net = gross - (Number(fee) / 1e18) * 3000
+      check('router: usdValue nets a price-only quote\'s providerData.nativeFee', value !== null && Math.abs(value - net) < 1e-6 && net < gross - 1, `${value} vs ${net} (gross ${gross})`)
+    } finally {
+      g.fetch = offline
+    }
   }
 
   // staking
