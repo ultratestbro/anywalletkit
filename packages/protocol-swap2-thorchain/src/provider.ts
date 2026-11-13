@@ -2,6 +2,7 @@ import {thorchain as thorCfg} from "./config.js";
 import {describeThorchainActivity} from "./activity.js";
 import {decodeFunctionData, encodeFunctionData} from "viem";
 import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import {combinedRefusal, httpRefusal, refusal, refusalNotes, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {ccAsset, ccAssetByToken} from "@anywalletkit/swap2-assets";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {bigintToNumber} from "@anywalletkit/core";
@@ -17,6 +18,7 @@ import {
   nodeRead,
   paused,
   sameTarget,
+  statusRefusal,
   vaultVerdict,
   type InboundAddress,
   type VaultClaim,
@@ -102,6 +104,11 @@ const NODE_READ_TIMEOUT_MS = 8_000;
 const CONFIRM_BUDGET_MS = 8_000;
 /** A confirming node behind the quoting node by more than the allowed lag: ask the next one. */
 const LAGGING = Symbol("lagging");
+/** Why the second-node check refused: its text and, next to it, its reason. */
+interface Unconfirmed {
+  text: string;
+  info: Swap2RefusalInfo;
+}
 
 // CAIP-2 → THORChain chain prefix. EVM chains execute via the router; TRON
 // executes via a native send to the inbound vault + memo (no router).
@@ -238,7 +245,7 @@ async function hostGet(host: string, path: string, clientId: string, signal?: Ab
     throw new HostUnavailable(host, error instanceof Error ? error.message : "fetch failed");
   }
   if (res.status >= 500 || res.status === 429 || res.status === 403) {
-    throw new HostUnavailable(host, `HTTP ${res.status}`);
+    throw new HostUnavailable(host, `HTTP ${res.status}`, statusRefusal(res.status, res.headers?.get?.("retry-after")));
   }
   const body = (await res.json().catch(() => null)) as HostResponse["body"];
   return {ok: res.ok, status: res.status, body};
@@ -274,12 +281,43 @@ function belowThorMinimums(amount1e8: bigint, inbound: InboundAddress | undefine
   return null;
 }
 
+/**
+ * The reason every node failing adds up to (each failure's own classification, see HostUnavailable): theirs when they
+ * all agree (the shortest wait when every node throttled), else `upstream_unavailable`.
+ */
+function nodesFailed(failures: readonly (Swap2RefusalInfo | undefined)[]): Swap2RefusalInfo {
+  const known = failures.filter((f): f is Swap2RefusalInfo => f !== undefined);
+  if (!known.length || known.length !== failures.length) return {reason: "upstream_unavailable"};
+  const combined = combinedRefusal(known.map((f) => ({message: "", ...f})));
+  return combined.reason === "no_route" ? {reason: "upstream_unavailable"} : combined;
+}
+
+/**
+ * The reason a node's quote rejection gives: its text first (THORNode's simulation errors: price limit, halt, dust,
+ * missing pool), else its HTTP status, else `no_route`. `bodyless`: the node answered a non-2xx status without a JSON
+ * body (the `HTTP <status>` text), another shape than THORNode's `{code, message}`.
+ */
+function quoteRejection(text: string, status: number, bodyless: boolean): Swap2RefusalInfo {
+  // Fees ate the whole output: nothing is left to emit at this amount.
+  if (/emit asset 0 less than price limit/.test(text)) return {reason: "amount_too_small"};
+  if (/emit asset \d+ less than price limit/.test(text)) return {reason: "price_check_failed"};
+  if (/halt|paused/i.test(text)) return {reason: "chain_halted"};
+  if (/dust|too small|not enough [a-z ]*(?:to pay|for) (?:the )?fee/i.test(text)) return {reason: "amount_too_small"};
+  if (/insufficient liquidity|not enough liquidity/i.test(text)) return {reason: "insufficient_liquidity"};
+  if (/pool [^ ]* ?(?:does not exist|doesn't exist|not exist|not found|not available|is not available)|no pool/i.test(text)) return {reason: "unsupported_pair"};
+  if (/rate limit|too many requests/i.test(text)) return {reason: "rate_limited"};
+  if (/api key|unauthori[sz]ed/i.test(text)) return {reason: "key_rejected"};
+  const byStatus = status >= 400 ? httpRefusal(status) : undefined;
+  if (byStatus) return byStatus;
+  return bodyless ? {reason: "upstream_unavailable", httpStatus: status} : {reason: "no_route"};
+}
+
 /** Inbound snapshot from ONE host. Throws HostUnavailable so the caller can
  *  re-run the whole quote on the next host rather than mixing nodes — also when
  *  a field this module reads has another type (`inboundAddresses`). */
 async function inboundAddressesOn(host: string, clientId: string): Promise<InboundAddress[]> {
   const res = await hostGet(host, "/thorchain/inbound_addresses", clientId);
-  if (!res.ok || !Array.isArray(res.body)) throw new HostUnavailable(host, `inbound_addresses HTTP ${res.status}`);
+  if (!res.ok || !Array.isArray(res.body)) throw new HostUnavailable(host, `inbound_addresses HTTP ${res.status}`, res.ok ? undefined : statusRefusal(res.status));
   const entries = inboundAddresses(res.body);
   if (!entries) throw new HostUnavailable(host, "inbound_addresses is not a THORNode inbound address list");
   return entries;
@@ -292,30 +330,36 @@ function verifiedMemo(
   expectedRefund: string,
   expectedAffiliate: string,
   expectedAffiliateBps: string,
+  why?: (reason: Swap2RefusalReason) => void,
 ): {limit: bigint; canonical: string} | null {
-  if (memo.includes("|")) return null; // DEX-aggregator tail is a separate, unbound execution program.
+  /** Null, after telling `why` the reason the memo is refused. */
+  const refused = (reason: Swap2RefusalReason): null => {
+    why?.(reason);
+    return null;
+  };
+  if (memo.includes("|")) return refused("recipient_unverifiable"); // DEX-aggregator tail is a separate, unbound execution program.
   const parts = memo.split(":");
-  if (parts.length !== 4 && parts.length !== 6) return null;
+  if (parts.length !== 4 && parts.length !== 6) return refused("policy_refused");
   const [op, asset, destination, limit, affiliate, bps] = parts;
   // Quote responses legitimately use THORChain fuzzy asset notation (`b` for
   // BTC.BTC). We never execute that untrusted spelling: after checking the
   // shape, destination/refund, limit and affiliate we rebuild a canonical memo
   // from our own route facts below.
-  if (op !== "=" || !asset || !/^[A-Za-z0-9._~\-]+$/.test(asset)) return null;
+  if (op !== "=" || !asset || !/^[A-Za-z0-9._~\-]+$/.test(asset)) return refused("policy_refused");
   const expectedTarget = expectedRefund ? `${expectedDestination}/${expectedRefund}` : expectedDestination;
-  if (!sameTarget(destination, expectedTarget)) return null;
+  if (!sameTarget(destination, expectedTarget)) return refused("recipient_mismatch");
   if (parts.length === 6) {
-    if (!expectedAffiliate || affiliate !== expectedAffiliate || bps !== expectedAffiliateBps) return null;
+    if (!expectedAffiliate || affiliate !== expectedAffiliate || bps !== expectedAffiliateBps) return refused("policy_refused");
   } else if (expectedAffiliate || expectedAffiliateBps) {
-    return null;
+    return refused("policy_refused");
   }
   const stream = (limit ?? "").split("/");
   // We never request streaming swaps. A provider-supplied LIM/INTERVAL/QTY
   // memo changes the floor to a per-sub-swap condition, so reject it instead
   // of presenting LIM as an atomic total guarantee.
-  if (stream.length !== 1 || stream.some((v) => !/^\d+$/.test(v))) return null;
+  if (stream.length !== 1 || stream.some((v) => !/^\d+$/.test(v))) return refused("price_check_failed");
   const floor = BigInt(stream[0] ?? "0");
-  if (floor <= 0n) return null;
+  if (floor <= 0n) return refused("price_check_failed");
   const canonical = `=:${expectedAsset}:${expectedTarget}:${stream.join("/")}${
     expectedAffiliate ? `:${expectedAffiliate}:${expectedAffiliateBps}` : ""
   }`;
@@ -413,8 +457,11 @@ export function thorchainPins(opts: {
   for (const n of nodes) if (!/^https:\/\//i.test(n)) throw new Error("thorchain: thorchainPins nodeUrl must use https");
   const clientId = opts.clientId?.trim() || DEFAULT_CLIENT_ID;
   const {maxLagBlocks, timeoutMs} = confirmOptions(opts);
-  /** One node's THORChain height and verdict on the claim; null when it failed, `verdict` null when only the verdict did. */
-  const askNode = async (host: string, claim: VaultClaim): Promise<{height: number; verdict: VaultVerdict | null} | null> => {
+  /**
+   * One node's THORChain height and verdict on the claim; null when it failed, `verdict` null when only the verdict did.
+   * A failure's classification (HostUnavailable) goes to `failures`, for the refusal when two nodes could not confirm.
+   */
+  const askNode = async (host: string, claim: VaultClaim, failures: (Swap2RefusalInfo | undefined)[]): Promise<{height: number; verdict: VaultVerdict | null} | null> => {
     const node = nodeDeadline(timeoutMs);
     const read = (path: string) => nodeRead(host, path, clientId, node.signal);
     try {
@@ -422,61 +469,73 @@ export function thorchainPins(opts: {
       try {
         return {height: head.height, verdict: await vaultVerdict(host, read, head.inbound, claim)};
       } catch (error) {
-        if (error instanceof HostUnavailable) return {height: head.height, verdict: null};
+        if (error instanceof HostUnavailable) {
+          failures.push(refusalOf(error));
+          return {height: head.height, verdict: null};
+        }
         throw error;
       }
     } catch (error) {
-      if (error instanceof HostUnavailable) return null;
+      if (error instanceof HostUnavailable) {
+        failures.push(refusalOf(error));
+        return null;
+      }
       throw error;
     } finally {
       node.clear();
     }
   };
   const routersFor = (chain: string): readonly string[] => [...(THORCHAIN_ROUTERS[chain] ?? []), ...(opts.trustedRouters?.[chain] ?? [])];
+  // Each text verifyBuild returns, with its reason (`reasonOf`, so a remote stub's refusal carries it).
+  const {note, reasonOf} = refusalNotes();
   return Object.freeze({
     callTargets: routersFor,
     spenders: routersFor,
+    reasonOf,
     // A Tron source is a send to the inbound vault; verifyBuild confirms that vault with two THORNodes (scan 2026-10-28 F9).
     depositAddressRoutes: true,
     async verifyBuild(quote: Quote, tx: UnsignedTx, params?: QuoteParams): Promise<string | null> {
-      if (!params) return "the request this quote answered is unknown";
+      if (!params) return note("the request this quote answered is unknown", "policy_refused");
       const src = ccAsset(params.sourceChain, params.sourceToken);
       const dst = destAsset(params.destChain, params.destToken);
-      if (!src || !dst) return "unknown source or destination asset";
+      if (!src || !dst) return note("unknown source or destination asset", "unsupported_pair");
       const chainId = CHAIN_ID[params.sourceChain];
       let vault: string, memo: string, router: string | undefined;
       if (chainId) {
-        if (!tx.data) return "no router calldata";
+        if (!tx.data) return note("no router calldata", "policy_refused");
         let args: readonly unknown[] | undefined;
         try {
           const d = decodeFunctionData({abi: ROUTER_ABI, data: tx.data as `0x${string}`});
-          if (d.functionName !== "depositWithExpiry") return `${d.functionName} is not depositWithExpiry`;
+          if (d.functionName !== "depositWithExpiry") return note(`${d.functionName} is not depositWithExpiry`, "policy_refused");
           args = d.args;
-        } catch { return "the router calldata does not decode"; }
-        if (!args || args.length !== 5) return "the router calldata does not decode";
+        } catch { return note("the router calldata does not decode", "policy_refused"); }
+        if (!args || args.length !== 5) return note("the router calldata does not decode", "policy_refused");
         router = tx.to;
-        if (!routersFor(params.sourceChain).some((r) => sameTarget(r, router))) return `router ${tx.to} is not pinned`;
+        if (!routersFor(params.sourceChain).some((r) => sameTarget(r, router))) return note(`router ${tx.to} is not pinned`, "vault_mismatch");
         vault = String(args[0]);
         const asset = String(args[1]);
-        if (!sameTarget(asset, src.contract ?? NATIVE)) return `the router call moves ${asset}, not the source asset`;
-        if (BigInt(args[2] as bigint) !== BigInt(quote.sourceAmount)) return `the router call moves ${String(args[2])}, not the ${quote.sourceAmount} input`;
+        if (!sameTarget(asset, src.contract ?? NATIVE)) return note(`the router call moves ${asset}, not the source asset`, "policy_refused");
+        if (BigInt(args[2] as bigint) !== BigInt(quote.sourceAmount)) return note(`the router call moves ${String(args[2])}, not the ${quote.sourceAmount} input`, "policy_refused");
         memo = String(args[3]);
       } else {
         // A deposit source (Tron): a plain send of the input to the vault with the memo.
-        if (!tx.memo || tx.value !== quote.sourceAmount) return "the deposit is not a send of the input with a memo";
+        if (!tx.memo || tx.value !== quote.sourceAmount) return note("the deposit is not a send of the input with a memo", "policy_refused");
         vault = tx.to;
         memo = tx.memo;
       }
-      const checked = verifiedMemo(memo, dst.asset, params.destAddress, params.refundAddress ?? "", opts.affiliate ?? "", opts.affiliateBps ?? "");
-      if (!checked) return `the memo does not pay ${params.destAddress} in ${dst.asset} with this app's refund and affiliate`;
+      let memoRefusal: Swap2RefusalReason = "recipient_mismatch";
+      const checked = verifiedMemo(memo, dst.asset, params.destAddress, params.refundAddress ?? "", opts.affiliate ?? "", opts.affiliateBps ?? "", (why) => { memoRefusal = why; });
+      if (!checked) return note(`the memo does not pay ${params.destAddress} in ${dst.asset} with this app's refund and affiliate`, memoRefusal);
       // The server's provider signs only the canonical memo it rebuilds from route facts, so the build must be that
       // memo byte for byte: a fuzzy or swapped output asset (scan 2026-10-30 F2) is refused here.
-      if (memo !== checked.canonical) return `the memo is not the canonical ${checked.canonical}`;
-      if ((checked.limit * 10n ** BigInt(dst.decimals)) / 100_000_000n < BigInt(quote.minDestAmount)) return `the memo's limit ${checked.limit} is below the quoted minimum`;
+      if (memo !== checked.canonical) return note(`the memo is not the canonical ${checked.canonical}`, "policy_refused");
+      if ((checked.limit * 10n ** BigInt(dst.decimals)) / 100_000_000n < BigInt(quote.minDestAmount)) return note(`the memo's limit ${checked.limit} is below the quoted minimum`, "price_check_failed");
       // Two nodes of different operators must confirm this vault (and router), trading open on both chains.
       const sourceChain = THOR_CHAIN[params.sourceChain] ?? params.sourceChain;
       const claim: VaultClaim = {chain: sourceChain, destChain: THOR_CHAIN[params.destChain] ?? params.destChain, vault, ...(router !== undefined ? {router} : {})};
-      const views = await Promise.all(nodes.map((host) => askNode(host, claim)));
+      // Each node that failed, classified: what two nodes not confirming adds up to (all throttled → rate_limited).
+      const failures: (Swap2RefusalInfo | undefined)[] = [];
+      const views = await Promise.all(nodes.map((host) => askNode(host, claim, failures)));
       // The freshest height any node reports is the reference: a node far behind it may still list a vault that has
       // since retired or been flagged.
       const top = views.reduce((max, v) => (v && v.height > max ? v.height : max), -1);
@@ -491,18 +550,18 @@ export function thorchainPins(opts: {
         const v = view.verdict;
         if (!v.ok) {
           switch (v.why) {
-            case "halted": return `${v.chain} is halted / paused`;
-            case "another-vault": return `a THORNode reports another inbound vault than ${vault}`;
-            case "not-active": return `a THORNode lists the inbound vault as ${v.status}, not ActiveVault`;
-            case "flagged": return `a THORNode's mimir flags the inbound vault as ${v.flag}`;
-            case "another-router": return "a THORNode reports another router";
+            case "halted": return note(`${v.chain} is halted / paused`, "chain_halted");
+            case "another-vault": return note(`a THORNode reports another inbound vault than ${vault}`, "vault_mismatch");
+            case "not-active": return note(`a THORNode lists the inbound vault as ${v.status}, not ActiveVault`, "vault_mismatch");
+            case "flagged": return note(`a THORNode's mimir flags the inbound vault as ${v.flag}`, "vault_mismatch");
+            case "another-router": return note("a THORNode reports another router", "vault_mismatch");
           }
         }
         if (++agreeing >= 2) return null;
       }
       return lagging
-        ? `two THORNodes within ${maxLagBlocks} blocks of the highest THORChain height they report could not confirm the inbound vault (behind or unreachable)`
-        : "two THORNodes could not confirm the inbound vault";
+        ? note(`two THORNodes within ${maxLagBlocks} blocks of the highest THORChain height they report could not confirm the inbound vault (behind or unreachable)`, "stale_node")
+        : note("two THORNodes could not confirm the inbound vault", nodesFailed(failures));
     },
   });
 }
@@ -588,14 +647,17 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
         },
       );
     });
-  /** The provider's refusal for a confirming node's verdict (the texts of the second-node check). */
-  const confirmText = (v: Exclude<VaultVerdict, {ok: true}>): string => {
+  /**
+   * The provider's refusal for a confirming node's verdict (the texts of the second-node check), with its reason. The
+   * reason travels next to the text: the same text ("no second node answered…") can carry different reasons.
+   */
+  const confirmText = (v: Exclude<VaultVerdict, {ok: true}>): Unconfirmed => {
     switch (v.why) {
-      case "halted": return `${v.chain} is halted / paused on the confirming node`;
-      case "another-vault": return "a second node reports another inbound vault — refused until they agree";
-      case "not-active": return `a second node lists the inbound vault as ${v.status}, not ActiveVault — refused`;
-      case "flagged": return `a second node's mimir flags the inbound vault as ${v.flag} — refused`;
-      case "another-router": return "a second node reports another router — refused until they agree";
+      case "halted": return {text: `${v.chain} is halted / paused on the confirming node`, info: {reason: "chain_halted"}};
+      case "another-vault": return {text: "a second node reports another inbound vault — refused until they agree", info: {reason: "vault_mismatch"}};
+      case "not-active": return {text: `a second node lists the inbound vault as ${v.status}, not ActiveVault — refused`, info: {reason: "vault_mismatch"}};
+      case "flagged": return {text: `a second node's mimir flags the inbound vault as ${v.flag} — refused`, info: {reason: "vault_mismatch"}};
+      case "another-router": return {text: "a second node reports another router — refused until they agree", info: {reason: "vault_mismatch"}};
     }
   };
   /**
@@ -608,7 +670,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
     outer: AbortSignal | undefined,
     quoteHeight: number,
     claim: VaultClaim,
-  ): Promise<string | null | typeof LAGGING> => {
+  ): Promise<Unconfirmed | null | typeof LAGGING> => {
     const read = (path: string) => nodeRead(host, path, clientId, signal, outer);
     const head = await nodeHead(host, read);
     if (quoteHeight - head.height > confirmMaxLagBlocks) return LAGGING;
@@ -620,7 +682,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
    * quoting node by more than `confirmMaxLagBlocks`, fails, or takes longer than `confirmTimeoutMs`): the vault (and
    * router) the quote names must be confirmed, and trading open on both chains. Each node gets `confirmTimeoutMs` or
    * what is left of the budget ending at `deadlineAt`, and none is asked with less than MIN_CONFIRM_TIMEOUT_MS left.
-   * The reason it fails, or null.
+   * Why it fails (the text and its reason), or null.
    */
   const confirmedElsewhere = async (
     quoteHost: string,
@@ -631,7 +693,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
     router: string | undefined,
     deadlineAt: number,
     outer?: AbortSignal,
-  ): Promise<string | null> => {
+  ): Promise<Unconfirmed | null> => {
     const claim: VaultClaim = {
       chain: THOR_CHAIN[chain] ?? chain,
       ...(destChain !== undefined ? {destChain: THOR_CHAIN[destChain] ?? destChain} : {}),
@@ -640,10 +702,16 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
     };
     let lagging = false;
     let asked = 0;
+    // Each confirming node's failure (HostUnavailable), and a node the budget left unasked: what no second node
+    // answering adds up to (every node throttled → rate_limited with the shortest wait).
+    const failures: (Swap2RefusalInfo | undefined)[] = [];
     for (const host of confirmHosts) {
       if (host === quoteHost) continue;
       const budget = Math.min(confirmTimeoutMs, deadlineAt - Date.now());
-      if (budget < MIN_CONFIRM_TIMEOUT_MS) break;
+      if (budget < MIN_CONFIRM_TIMEOUT_MS) {
+        failures.push({reason: "upstream_unavailable"}); // out of time before this node could be asked
+        break;
+      }
       asked++;
       const node = nodeDeadline(budget, outer);
       try {
@@ -655,19 +723,22 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
         return verdict;
       } catch (error) {
         if (outer?.aborted) throw error;
-        if (error instanceof HostUnavailable) continue;
+        if (error instanceof HostUnavailable) {
+          failures.push(refusalOf(error));
+          continue;
+        }
         throw error;
       } finally {
         node.clear();
       }
     }
     if (lagging) {
-      return `no confirming node is within ${confirmMaxLagBlocks} blocks of the quoting node's THORChain height (behind or unreachable) — refused until one catches up`;
+      return {text: `no confirming node is within ${confirmMaxLagBlocks} blocks of the quoting node's THORChain height (behind or unreachable) — refused until one catches up`, info: {reason: "stale_node"}};
     }
     if (asked === 0) {
-      return `the ${CONFIRM_BUDGET_MS / 1000} s confirmation budget ran out before a second node could be asked to confirm the inbound vault — retry`;
+      return {text: `the ${CONFIRM_BUDGET_MS / 1000} s confirmation budget ran out before a second node could be asked to confirm the inbound vault — retry`, info: {reason: "upstream_unavailable"}};
     }
-    return "no second node answered to confirm the inbound vault (configure confirmNodeUrl)";
+    return {text: "no second node answered to confirm the inbound vault (configure confirmNodeUrl)", info: nodesFailed(failures)};
   };
   const configuredAffiliate = config.affiliate ?? "";
   const configuredAffiliateBps = config.affiliateBps ?? "";
@@ -721,7 +792,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       const fromAsset = thorAsset(params.sourceChain, params.sourceToken);
       const dst = destAsset(params.destChain, params.destToken);
       if (!src || !fromAsset || !dst || fromAsset === dst.asset) {
-        params.onRefusal?.(`thorchain: no pool for ${params.sourceToken} on ${params.sourceChain} → ${params.destToken} on ${params.destChain}`);
+        params.onRefusal?.(`thorchain: no pool for ${params.sourceToken} on ${params.sourceChain} → ${params.destToken} on ${params.destChain}`, {reason: "unsupported_pair"});
         return null;
       }
 
@@ -733,13 +804,13 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       // amount than the amount priced by the quote (the remainder is dust the
       // memo cannot account for and may be donated to the vault).
       if (amount1e8 * 10n ** BigInt(src.decimals) !== amountIn * 100_000_000n) {
-        params.onRefusal?.(`thorchain: amount has more precision than THORChain's 8 decimals — round it to 8 decimals`);
+        params.onRefusal?.(`thorchain: amount has more precision than THORChain's 8 decimals — round it to 8 decimals`, {reason: "policy_refused"});
         return null;
       }
 
       const requestedTolerance = params.slippageBps ?? Number(TOLERANCE_BPS);
       if (!Number.isInteger(requestedTolerance) || requestedTolerance < 0 || requestedTolerance > bigintToNumber(MAX_TOLERANCE_BPS)) {
-        params.onRefusal?.(`thorchain: slippage ${String(params.slippageBps)} bps is outside 0–${MAX_TOLERANCE_BPS} bps`);
+        params.onRefusal?.(`thorchain: slippage ${String(params.slippageBps)} bps is outside 0–${MAX_TOLERANCE_BPS} bps`, {reason: "policy_refused"});
         return null;
       }
       // An explicit slippage → `liquidity_tolerance_bps`. The node floors LIM in
@@ -750,6 +821,12 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       const explicitSlippage = params.slippageBps !== undefined;
       const liquidityBps = explicitSlippage ? (dst.decimals > 8 ? requestedTolerance - 1 : requestedTolerance) : 0;
       const limitMode = liquidityBps > 0 ? "liquidity_tolerance_bps" : "tolerance_bps";
+      // The HTTP status of the last quote answer, and whether it came without a JSON body (classifies a rejection).
+      let quoteStatus = 0;
+      let quoteBodyless = false;
+      // The last quote answer's body was lost while the caller's own signal was aborted (hostGet reads it as no body):
+      // what a missing body would say about the node is unknown, so only the status classifies it.
+      let quoteBodyAborted = false;
       // `tolerance_bps` → LIM from the feeless spot output; `liquidity_tolerance_bps`
       // → LIM from the expected output after fees (the node accepts only one).
       const quoteOn = async (
@@ -776,6 +853,9 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
         }
         if (params.refundAddress) qs.set("refund_address", params.refundAddress);
         const res = await hostGet(host, `/thorchain/quote/swap?${qs.toString()}`, clientId, signal);
+        quoteStatus = res.status;
+        quoteBodyless = res.body === null && !res.ok;
+        quoteBodyAborted = res.body === null && signal?.aborted === true;
         if (Array.isArray(res.body)) return null;
         // A 4xx carries the node's rejection body (used by the adaptive retry).
         return (res.body ?? (res.ok ? null : {error: `HTTP ${res.status}`})) as ThorQuoteResponse | null;
@@ -793,14 +873,17 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       let confirmDeadlineAt = 0;
       // A node answered its inbound addresses but not its THORChain height.
       let heightUnavailable = false;
+      // Each failed host's classification (HostUnavailable), for the refusal when every host failed.
+      const hostFailures: (Swap2RefusalInfo | undefined)[] = [];
       for (const host of hosts) {
         try {
           if (limitMode === "liquidity_tolerance_bps") {
             q = await quoteOn(host, String(liquidityBps), "liquidity_tolerance_bps");
             const feeBps = Number(q?.fees?.total_bps);
             if (Number.isFinite(feeBps) && feeBps > bigintToNumber(MAX_TOLERANCE_BPS)) {
-              // Dust amounts: a fixed outbound fee eats the swap.
-              params.onRefusal?.(`thorchain: THORChain fees ${(feeBps / 100).toFixed(2)}% — too expensive at this amount (cap ${bigintToNumber(MAX_TOLERANCE_BPS) / 100}%)`);
+              // Dust amounts: a fixed outbound fee eats the swap. `total_bps` also counts the liquidity (slip) fee, so a
+              // large swap through a thin pool lands here too: this module's own fee cap, not a size limit (policy_refused).
+              params.onRefusal?.(`thorchain: THORChain fees ${(feeBps / 100).toFixed(2)}% — too expensive at this amount (cap ${bigintToNumber(MAX_TOLERANCE_BPS) / 100}%)`, {reason: "policy_refused"});
               return null;
             }
           } else {
@@ -827,28 +910,30 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
           if (q?.error || q?.message) {
             // The node's own rejection (no pool, price limit, halted…) is the
             // caller's answer — surface it instead of an anonymous null.
-            params.onRefusal?.(`thorchain: ${String(q.error ?? q.message).slice(0, 200)}`);
+            // A body lost to the caller's abort is not another shape (upstream_unavailable): its status alone, if it says.
+            params.onRefusal?.(`thorchain: ${String(q.error ?? q.message).slice(0, 200)}`, quoteBodyAborted ? httpRefusal(quoteStatus) : quoteRejection(String(q.error ?? q.message), quoteStatus, quoteBodyless));
             return null;
           }
           if (!q || !q.expected_amount_out || !q.inbound_address || !q.memo || !q.expiry) {
-            params.onRefusal?.(`thorchain: incomplete quote from ${host} (expected_amount_out / inbound_address / memo / expiry missing)`);
+            params.onRefusal?.(`thorchain: incomplete quote from ${host} (expected_amount_out / inbound_address / memo / expiry missing)`, quoteBodyAborted ? undefined : {reason: "upstream_unavailable", ...(quoteStatus >= 300 ? {httpStatus: quoteStatus} : {})});
             return null;
           }
           // A router is required for EVM and must be ABSENT for a deposit
           // source: a router on a Tron quote means the venue changed its
           // execution model and a plain send would no longer settle.
           if (chainId ? !q.router : !!q.router) {
-            params.onRefusal?.(chainId ? "thorchain: quote has no router for an EVM source" : "thorchain: quote names a router for a deposit source — execution model changed");
+            params.onRefusal?.(chainId ? "thorchain: quote has no router for an EVM source" : "thorchain: quote names a router for a deposit source — execution model changed", {reason: chainId ? "upstream_unavailable" : "policy_refused"});
             return null;
           }
-          checkedMemo = verifiedMemo(q.memo, dst.asset, params.destAddress, params.refundAddress ?? "", configuredAffiliate, configuredAffiliateBps);
+          let memoRefusal: Swap2RefusalReason = "recipient_mismatch";
+          checkedMemo = verifiedMemo(q.memo, dst.asset, params.destAddress, params.refundAddress ?? "", configuredAffiliate, configuredAffiliateBps, (why) => { memoRefusal = why; });
           if (!checkedMemo) {
-            params.onRefusal?.(`thorchain: memo failed verification (${String(q.memo).slice(0, 80)})`);
+            params.onRefusal?.(`thorchain: memo failed verification (${String(q.memo).slice(0, 80)})`, {reason: memoRefusal});
             return null;
           }
           const floor1e8 = params.minAmountOut !== undefined ? toThorUnitsCeil(BigInt(params.minAmountOut), dst.decimals) : undefined;
           if (floor1e8 !== undefined && checkedMemo.limit < floor1e8) {
-            params.onRefusal?.(`thorchain: floor breach (limit=${checkedMemo.limit} < floor=${floor1e8}, 1e8 units)`);
+            params.onRefusal?.(`thorchain: floor breach (limit=${checkedMemo.limit} < floor=${floor1e8}, 1e8 units)`, {reason: "price_check_failed"});
             return null;
           }
           // The quote is in hand: the vault check's own budget starts now, so time a failed host took before does
@@ -870,6 +955,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
           break;
         } catch (error) {
           if (error instanceof HostUnavailable) {
+            hostFailures.push(refusalOf(error));
             q = null;
             checkedMemo = null;
             inbounds = null;
@@ -885,6 +971,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
             : heightUnavailable
               ? "thorchain: THORChain height (/thorchain/lastblock) unavailable from every node that answered the inbound addresses"
               : "thorchain: inbound addresses unavailable from every node",
+          inbounds ? {reason: "no_route"} : nodesFailed(hostFailures),
         );
         return null;
       }
@@ -892,44 +979,44 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       const srcInbound = inbounds.find((entry) => entry.chain === THOR_CHAIN[params.sourceChain]);
       const dstInbound = inbounds.find((entry) => entry.chain === THOR_CHAIN[params.destChain]);
       if (paused(srcInbound) || paused(dstInbound)) {
-        params.onRefusal?.(`thorchain: ${paused(srcInbound) ? THOR_CHAIN[params.sourceChain] : THOR_CHAIN[params.destChain]} chain is halted / paused on THORChain`);
+        params.onRefusal?.(`thorchain: ${paused(srcInbound) ? THOR_CHAIN[params.sourceChain] : THOR_CHAIN[params.destChain]} chain is halted / paused on THORChain`, {reason: "chain_halted"});
         return null;
       }
       if (!sameTarget(srcInbound?.address, q.inbound_address)) {
-        params.onRefusal?.("thorchain: quote inbound address differs from the node's current inbound (vault rotated) — retry");
+        params.onRefusal?.("thorchain: quote inbound address differs from the node's current inbound (vault rotated) — retry", {reason: "vault_mismatch"});
         return null;
       }
       if (chainId && !sameTarget(srcInbound?.router, q.router)) {
-        params.onRefusal?.("thorchain: quote router differs from the node's current router — retry");
+        params.onRefusal?.("thorchain: quote router differs from the node's current router — retry", {reason: "vault_mismatch"});
         return null;
       }
       if (chainId && !pinnedRouter(params.sourceChain, q.router)) {
-        params.onRefusal?.(`thorchain: router ${String(q.router)} is not a THORChain router this module trusts on ${params.sourceChain} (THORCHAIN_ROUTERS / trustedRouters)`);
+        params.onRefusal?.(`thorchain: router ${String(q.router)} is not a THORChain router this module trusts on ${params.sourceChain} (THORCHAIN_ROUTERS / trustedRouters)`, {reason: "vault_mismatch"});
         return null;
       }
       const unconfirmed = await confirmedElsewhere(
         quoteHost, quoteHeight, params.sourceChain, params.destChain, q.inbound_address, chainId ? q.router : undefined, confirmDeadlineAt, signal,
       );
       if (unconfirmed) {
-        params.onRefusal?.(`thorchain: ${unconfirmed}`);
+        params.onRefusal?.(`thorchain: ${unconfirmed.text}`, unconfirmed.info);
         return null;
       }
       const tooSmall = belowThorMinimums(amount1e8, srcInbound, q);
       if (tooSmall) {
-        params.onRefusal?.(`thorchain: ${tooSmall}`);
+        params.onRefusal?.(`thorchain: ${tooSmall}`, {reason: "amount_too_small"});
         return null;
       }
 
       // expected_amount_out is 1e8 of the DEST asset → base units.
       const outUnits = (BigInt(q.expected_amount_out) * 10n ** BigInt(dst.decimals)) / 100000000n;
       if (outUnits <= 0n) {
-        params.onRefusal?.("thorchain: expected output rounds to zero");
+        params.onRefusal?.("thorchain: expected output rounds to zero", {reason: "amount_too_small"});
         return null;
       }
       const memoMinUnits = (limit1e8 * 10n ** BigInt(dst.decimals)) / 100_000_000n;
       const minUnits = memoMinUnits;
       if (minUnits <= 0n || minUnits > outUnits) {
-        params.onRefusal?.(`thorchain: memo limit ${limit1e8} inconsistent with expected output ${q.expected_amount_out}`);
+        params.onRefusal?.(`thorchain: memo limit ${limit1e8} inconsistent with expected output ${q.expected_amount_out}`, {reason: "price_check_failed"});
         return null;
       }
       // The caller's slippage is measured from the quoted output, as validQuote
@@ -938,7 +1025,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       if (params.slippageBps !== undefined) {
         const slippageFloor = (outUnits * BigInt(10_000 - params.slippageBps)) / 10_000n;
         if (minUnits < slippageFloor) {
-          params.onRefusal?.(`thorchain: memo limit ${limit1e8} is below expected ${q.expected_amount_out} minus ${params.slippageBps} bps slippage (1e8 units)`);
+          params.onRefusal?.(`thorchain: memo limit ${limit1e8} is below expected ${q.expected_amount_out} minus ${params.slippageBps} bps slippage (1e8 units)`, {reason: "price_check_failed"});
           return null;
         }
       }
@@ -946,7 +1033,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       const nowSeconds = Math.floor(Date.now() / 1000);
       const executionExpiry = Math.min(q.expiry, nowSeconds + 15 * 60);
       if (!Number.isInteger(executionExpiry) || executionExpiry <= nowSeconds + 30) {
-        params.onRefusal?.(`thorchain: quote expires in ${Number.isInteger(executionExpiry) ? executionExpiry - nowSeconds : "?"} s — too soon to execute`);
+        params.onRefusal?.(`thorchain: quote expires in ${Number.isInteger(executionExpiry) ? executionExpiry - nowSeconds : "?"} s — too soon to execute`, {reason: "quote_expired"});
         return null;
       }
       const assetAddr = (src.contract ? src.contract : NATIVE) as `0x${string}`;
@@ -1007,7 +1094,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
       if (!quote.txRequest) {
         const sourceChain = quote.providerData?.sourceChain ?? "";
         if (!isDepositSource(sourceChain) || !quote.depositAddress || !quote.depositMemo) {
-          throw new Error("thorchain: deposit-address execution is only supported for an opted-in Tron source");
+          throw refusal("unsupported_pair", "thorchain: deposit-address execution is only supported for an opted-in Tron source");
         }
         // Plain send to the inbound vault (the engine turns a TRC-20 source
         // into transfer()); the memo MUST ride on-chain in raw_data.data.
@@ -1027,20 +1114,22 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
       const data = quote.providerData;
       if (!data?.sourceChain || !data.destChain || !data.inboundAddress || !data.assetAddress || !data.expiry || !data.memo) {
-        throw new Error("thorchain: quote is missing execution-bound metadata");
+        throw refusal("policy_refused", "thorchain: quote is missing execution-bound metadata");
       }
       const evmSource = CHAIN_ID[data.sourceChain] !== undefined;
-      if (evmSource && !data.router) throw new Error("thorchain: quote is missing execution-bound metadata");
-      if (!evmSource && !isDepositSource(data.sourceChain)) throw new Error("thorchain: source chain has no executor");
+      if (evmSource && !data.router) throw refusal("policy_refused", "thorchain: quote is missing execution-bound metadata");
+      if (!evmSource && !isDepositSource(data.sourceChain)) throw refusal("unsupported_pair", "thorchain: source chain has no executor");
       if (!/^\d+$/.test(data.expiry) || BigInt(data.expiry) <= BigInt(Math.floor(Date.now() / 1000))) {
-        throw new Error("thorchain: quote expired before broadcast");
+        throw refusal("quote_expired", "thorchain: quote expired before broadcast");
       }
-      if (evmSource && !pinnedRouter(data.sourceChain, data.router)) throw new Error("thorchain: the quote's router is not one this module trusts");
+      if (evmSource && !pinnedRouter(data.sourceChain, data.router)) throw refusal("vault_mismatch", "thorchain: the quote's router is not one this module trusts");
       let inbounds: InboundAddress[] | null = null;
       let snapshotHost = "";
       let snapshotHeight = 0;
       let confirmDeadlineAt = 0;
       let heightUnavailable = false;
+      // Each failed host's classification (HostUnavailable), for the refusal when every host failed.
+      const hostFailures: (Swap2RefusalInfo | undefined)[] = [];
       for (const host of hosts) {
         // The re-check's budget starts when this node is asked; a host that failed before does not use it up.
         const deadlineAt = Date.now() + CONFIRM_BUDGET_MS;
@@ -1048,6 +1137,7 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
           const snapshot = await nodeSnapshot(host);
           if ("heightError" in snapshot) {
             heightUnavailable = true;
+            hostFailures.push(refusalOf(snapshot.heightError));
             continue;
           }
           inbounds = snapshot.inbounds;
@@ -1058,52 +1148,54 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
         } catch (error) {
           inbounds = null;
           if (!(error instanceof HostUnavailable)) throw error;
+          hostFailures.push(refusalOf(error));
         }
       }
       if (!inbounds) {
-        throw new Error(
+        throw withReason(new Error(
           heightUnavailable
             ? "thorchain: cannot read THORChain height (/thorchain/lastblock) before broadcast from any node that answered the inbound addresses"
             : "thorchain: cannot refresh inbound addresses before broadcast",
-        );
+        ), nodesFailed(hostFailures));
       }
       // The vault the funds go to is confirmed by a second node right before broadcast too (after this node's own checks).
       const confirm = async () => {
         const unconfirmed = await confirmedElsewhere(
           snapshotHost, snapshotHeight, data.sourceChain!, data.destChain, data.inboundAddress!, evmSource ? data.router : undefined, confirmDeadlineAt,
         );
-        if (unconfirmed) throw new Error(`thorchain: ${unconfirmed}`);
+        if (unconfirmed) throw withReason(new Error(`thorchain: ${unconfirmed.text}`), unconfirmed.info);
       };
       const src = inbounds.find((entry) => entry.chain === THOR_CHAIN[data.sourceChain!]);
       const dst = inbounds.find((entry) => entry.chain === THOR_CHAIN[data.destChain!]);
-      if (paused(src) || paused(dst)) throw new Error("thorchain: source or destination chain trading is paused");
-      if (!sameTarget(src?.address, data.inboundAddress)) throw new Error("thorchain: inbound vault rotated after quote");
+      if (paused(src) || paused(dst)) throw refusal("chain_halted", "thorchain: source or destination chain trading is paused");
+      if (!sameTarget(src?.address, data.inboundAddress)) throw refusal("vault_mismatch", "thorchain: inbound vault rotated after quote");
       if (!evmSource) {
         // Deposit source: exactly a plain send of the validated amount to the
         // validated vault carrying the validated memo — nothing else.
         if (tx.data !== undefined || tx.approvalAddress !== undefined || tx.bodyBoc !== undefined || tx.typedData !== undefined || tx.serializedTx !== undefined || tx.stateInitBoc !== undefined) {
-          throw new Error("thorchain: deposit-address execution must be a plain send with memo");
+          throw refusal("policy_refused", "thorchain: deposit-address execution must be a plain send with memo");
         }
         if (!sameTarget(tx.to, data.inboundAddress) || tx.memo !== data.memo || tx.value !== quote.sourceAmount || (tx.chain && tx.chain !== data.sourceChain)) {
-          throw new Error("thorchain: deposit does not match the validated quote");
+          // Another recipient than the validated vault is a changed deposit target; any other difference, a changed send.
+          throw refusal(!sameTarget(tx.to, data.inboundAddress) ? "vault_mismatch" : "policy_refused", "thorchain: deposit does not match the validated quote");
         }
         const srcAsset = ccAssetByToken(data.sourceChain, sameTarget(data.assetAddress, NATIVE) ? "" : data.assetAddress);
-        if (!srcAsset) throw new Error("thorchain: unknown source asset");
+        if (!srcAsset) throw refusal("unsupported_pair", "thorchain: unknown source asset");
         const amount1e8 = (BigInt(quote.sourceAmount) * 100_000_000n) / 10n ** BigInt(srcAsset.decimals);
         const tooSmall = belowThorMinimums(amount1e8, src, null);
-        if (tooSmall) throw new Error(`thorchain: ${tooSmall}`);
+        if (tooSmall) throw refusal("amount_too_small", `thorchain: ${tooSmall}`);
         await confirm();
         return;
       }
       if (!sameTarget(src?.router, data.router) || !sameTarget(tx.to, data.router)) {
-        throw new Error("thorchain: router rotated after quote");
+        throw refusal("vault_mismatch", "thorchain: router rotated after quote");
       }
-      if (!tx.data) throw new Error("thorchain: missing depositWithExpiry calldata");
+      if (!tx.data) throw refusal("policy_refused", "thorchain: missing depositWithExpiry calldata");
       let decoded: {functionName: string; args?: readonly unknown[]};
       try {
         decoded = decodeFunctionData({abi: ROUTER_ABI, data: tx.data as `0x${string}`});
       } catch {
-        throw new Error("thorchain: malformed depositWithExpiry calldata");
+        throw refusal("policy_refused", "thorchain: malformed depositWithExpiry calldata");
       }
       const args = decoded.args;
       if (
@@ -1114,14 +1206,18 @@ export function thorchainProvider(config: ThorchainProviderConfig = {}): CrossCh
         String(args[3]) !== data.memo || BigInt(args[4] as bigint) !== BigInt(data.expiry) ||
         tx.chainId !== CHAIN_ID[data.sourceChain]
       ) {
-        throw new Error("thorchain: calldata does not match the validated quote");
+        // The call pays another vault than the validated one: a changed deposit target; any other difference, a changed call.
+        const vaultChanged = decoded.functionName === "depositWithExpiry" && !!args && args.length === 5 && !sameTarget(String(args[0]), data.inboundAddress);
+        throw refusal(vaultChanged ? "vault_mismatch" : "policy_refused", "thorchain: calldata does not match the validated quote");
       }
       const tokenSource = !sameTarget(data.assetAddress, NATIVE);
       if (
         tx.value !== (tokenSource ? "0" : quote.sourceAmount) ||
         (tokenSource ? !sameTarget(tx.approvalAddress, data.router) : tx.approvalAddress !== undefined)
       ) {
-        throw new Error("thorchain: value/approval does not match the validated source asset");
+        // An approval for another spender than the validated router is a changed deposit target; any other difference, a changed call.
+        const spenderChanged = tokenSource && tx.approvalAddress !== undefined && !sameTarget(tx.approvalAddress, data.router);
+        throw refusal(spenderChanged ? "vault_mismatch" : "policy_refused", "thorchain: value/approval does not match the validated source asset");
       }
       await confirm();
     },
