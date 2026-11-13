@@ -76,7 +76,7 @@ import {
   decodeVault, decodeReserve, decodeObligation, vaultTokensPerShareWad, debtNow, farmUserState, plumbing, associatedTokenAddress,
 } from '@anywalletkit/protocol-lending-kamino-solana'
 import { unexpectedInstruction } from '@anywalletkit/wallet-solana'
-import { redactUrls, tonRawAddress } from '@anywalletkit/protocol-swap2-core'
+import { redactUrls, tonRawAddress, refusal, refusalOf, withReason, httpRefusal, parseRetryAfter, combinedRefusal, refusalNotes, Swap2QuoteError, SWAP2_REFUSAL_REASONS } from '@anywalletkit/protocol-swap2-core'
 import ApprovalsProtocolEvm, { isRevokeCalldata, isUnlimitedAmount } from '@anywalletkit/protocol-approvals-evm'
 
 type Check = (what: string, ok: boolean, detail?: string) => void
@@ -668,6 +668,27 @@ export async function smokeProtocols(check: Check): Promise<void> {
     const t0 = Date.now()
     const out = redactUrls('a.'.repeat(32_768) + ' https://rpc.example/v2/KEY')
     check('swap2: redactUrls linear on 64 KB', Date.now() - t0 < 1_000 && out.endsWith(' <url>') && !out.includes('KEY'))
+  }
+  {
+    // CS-13: refusal reasons ride on the error without changing its class or text; Retry-After dates are read by hand (no Date.parse).
+    const e = refusal('rate_limited', 'lifi: 429', { retryAfterMs: 2000, httpStatus: 429 })
+    const sim = Object.assign(new Error('simulation failed'), { reason: 'execution reverted' })
+    withReason(sim, 'simulation_failed')
+    const wrapped = new Error('outer', { cause: e })
+    const now = Date.UTC(2026, 10, 13, 12, 0, 0)
+    const quoteError = new Swap2QuoteError('swap2: no route available for the requested pair', { ...combinedRefusal([{ message: 'a', reason: 'amount_too_small' }, { message: 'b', reason: 'amount_too_small' }]) })
+    const notes = refusalNotes(1)
+    notes.note('lifi: recipient differs', 'recipient_mismatch')
+    notes.note('lifi: vault moved', 'vault_mismatch')
+    check('swap2: refusal reasons (plain Error, cause chain, foreign reason kept, 17 frozen, bounded notes)',
+      notes.reasonOf('lifi: recipient differs') === undefined && notes.reasonOf('lifi: vault moved')?.reason === 'vault_mismatch' &&
+      e.constructor === Error && e.message === 'lifi: 429' && refusalOf(wrapped)?.retryAfterMs === 2000 && sim.reason === 'execution reverted' && refusalOf(sim) === undefined &&
+      SWAP2_REFUSAL_REASONS.length === 17 && Object.isFrozen(SWAP2_REFUSAL_REASONS) && quoteError.reason === 'amount_too_small' && quoteError.code === 'QUOTE',
+      JSON.stringify({ r: refusalOf(wrapped), sim: sim.reason, q: quoteError.reason }))
+    check('swap2: httpRefusal / parseRetryAfter (seconds, IMF-fixdate)',
+      httpRefusal(429, 'Fri, 13 Nov 2026 12:00:30 GMT', now)?.retryAfterMs === 30_000 && parseRetryAfter('120', now) === 120_000 && parseRetryAfter('2026-11-13T12:00:30Z', now) === undefined &&
+      httpRefusal(503)?.reason === 'upstream_unavailable' && httpRefusal(401)?.reason === 'key_rejected' && httpRefusal(404) === undefined,
+      JSON.stringify(httpRefusal(429, 'Fri, 13 Nov 2026 12:00:30 GMT', now)))
   }
   {
     // 2026-10-28: a remote TON → EVM Omniston order is checked on the device — the live escrow (USDT on TON → USDC on Base) passes, another destination does not.

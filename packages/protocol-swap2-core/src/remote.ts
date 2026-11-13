@@ -1,5 +1,6 @@
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "./types.js";
 import {anySignal, timeoutSignal} from "./util.js";
+import {httpRefusal, refusalOf, withReason, type Swap2RefusalInfo} from "./errors.js";
 
 /**
  * HTTP-proxied `CrossChainProvider`: forwards every provider call to a backend
@@ -64,6 +65,11 @@ export interface RemoteProviderOptions {
    */
   verifyBuild?: (quote: Quote, tx: UnsignedTx, params?: QuoteParams) => string | null | Promise<string | null>;
   /**
+   * The reason behind a text `verifyQuote` or `verifyBuild` just returned (shipped with the pins), so the stub's
+   * refusal carries a `reason` too. Undefined leaves the refusal unclassified.
+   */
+  reasonOf?: (refusal: string) => Swap2RefusalInfo | undefined;
+  /**
    * Let this stub's routes send the input to an address the backend names: a deposit address (NEAR Intents, a
    * THORChain or Chainflip Tron vault) or a plain value send. Off by default: such a route bypasses `callTargets`, so
    * a compromised backend could name its own address (scan 2026-10-28, F9). Opt in only for a provider whose deposit
@@ -120,23 +126,37 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
   async function call<T>(action: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
     const timeout = timeoutSignal(timeoutMs);
     const requestSignal = signal ? anySignal([signal, timeout]) : timeout;
-    const res = await doFetch(`${baseUrl}/${action}`, {
-      method: "POST",
-      headers: {...headers, "content-type": "application/json"},
-      // UnsignedTx carries bigint fields (value, gasLimit) — JSON.stringify
-      // throws on them ("Do not know how to serialize a BigInt", seen
-      // 2026-10-10 on a Solana → Base preflight). Wire them as decimal strings.
-      body: JSON.stringify({provider: name, ...body}, (_k, v) => (typeof v === "bigint" ? v.toString() : v)),
-      signal: requestSignal,
-    });
+    let res: Response;
+    try {
+      res = await doFetch(`${baseUrl}/${action}`, {
+        method: "POST",
+        headers: {...headers, "content-type": "application/json"},
+        // UnsignedTx carries bigint fields (value, gasLimit) — JSON.stringify
+        // throws on them ("Do not know how to serialize a BigInt", seen
+        // 2026-10-10 on a Solana → Base preflight). Wire them as decimal strings.
+        body: JSON.stringify({provider: name, ...body}, (_k, v) => (typeof v === "bigint" ? v.toString() : v)),
+        signal: requestSignal,
+      });
+    } catch (error) {
+      // The backend unreachable or slower than timeoutMs; the caller's own abort is no failure of the backend's.
+      if (!signal?.aborted && error instanceof Error) withReason(error, "upstream_unavailable");
+      throw error;
+    }
     if (!res.ok) {
       // Surface the backend's message — provider errors are actionable
       // ("quote expired", "route unsupported"), not just status codes.
       const text = await res.text().catch(() => "");
-      throw new Error(`swap2-remote ${name}/${action}: ${res.status} ${text.slice(0, 300)}`);
+      const error = new Error(`swap2-remote ${name}/${action}: ${res.status} ${text.slice(0, 300)}`);
+      // The backend's own classification first (a provider's refusal, an expired quote), else what the status says.
+      const info = bodyRefusal(text) ?? httpRefusal(res.status, res.headers?.get?.("retry-after"));
+      throw info ? withReason(error, info) : error;
     }
     return (await res.json()) as T;
   }
+  /** The app's `reasonOf` for a pins refusal; a throwing one leaves it unclassified. */
+  const reasonOfPins = (text: string): Swap2RefusalInfo | undefined => {
+    try { return refusalOf(opts.reasonOf?.(text)); } catch { return undefined; }
+  };
 
   return {
     name,
@@ -155,13 +175,20 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
       if (out && typeof out === "object" && "noQuote" in out) {
         // The backend forwarded the venue's own refusal — throw it so the
         // router records a REASON instead of an anonymous null.
-        throw new Error(String((out as {noQuote: unknown}).noQuote).slice(0, 300));
+        const {noQuote, reason, retryAfterMs, httpStatus} = out as {noQuote: unknown; reason?: unknown; retryAfterMs?: unknown; httpStatus?: unknown};
+        const error = new Error(String(noQuote).slice(0, 300));
+        const info = refusalOf({reason, retryAfterMs, httpStatus});
+        throw info ? withReason(error, info) : error;
       }
       if (out && typeof out === "object" && typeof out.intentId === "string") remember(out.intentId, params);
       if (out && opts.verifyQuote) {
         let refusal: string | null;
         try { refusal = opts.verifyQuote(params, out); } catch (e) { refusal = e instanceof Error ? e.message : String(e); }
-        if (refusal) throw new Error(`${name}: the quote fails this app's own check — ${refusal.slice(0, 240)}`);
+        if (refusal) {
+          const error = new Error(`${name}: the quote fails this app's own check — ${refusal.slice(0, 240)}`);
+          const info = reasonOfPins(refusal);
+          throw info ? withReason(error, info) : error;
+        }
       }
       return out;
     },
@@ -170,7 +197,11 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
       if (opts.verifyBuild) {
         let refusal: string | null;
         try { refusal = await opts.verifyBuild(quote, tx, requests.get(quote.intentId)); } catch (e) { refusal = e instanceof Error ? e.message : String(e); }
-        if (refusal) throw new Error(`${name}: the build fails this app's own check — ${refusal.slice(0, 240)}`);
+        if (refusal) {
+          const error = new Error(`${name}: the build fails this app's own check — ${refusal.slice(0, 240)}`);
+          const info = reasonOfPins(refusal);
+          throw info ? withReason(error, info) : error;
+        }
       }
       return tx;
     },
@@ -199,4 +230,17 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
     ...(opts.callTargets ? {callTargets: opts.callTargets} : {}),
     ...(opts.spenders ? {spenders: opts.spenders} : {}),
   };
+}
+
+/** The classification a backend's error body carries (`{error, reason, …}`), when it is JSON and names a known reason. */
+function bodyRefusal(text: string): Swap2RefusalInfo | undefined {
+  if (text.length > 4096) return undefined;
+  try {
+    const body: unknown = JSON.parse(text);
+    if (!body || typeof body !== "object" || Array.isArray(body)) return undefined;
+    const {reason, retryAfterMs, httpStatus} = body as {reason?: unknown; retryAfterMs?: unknown; httpStatus?: unknown};
+    return refusalOf({reason, retryAfterMs, httpStatus});
+  } catch {
+    return undefined;
+  }
 }

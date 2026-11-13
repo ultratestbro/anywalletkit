@@ -52,6 +52,9 @@ import {
   Swap2StatusError,
   Swap2UnsupportedOperationError,
   Swap2ValidationError,
+  combinedRefusal,
+  refusal,
+  type Swap2Refusal,
 } from "../errors.js";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -259,10 +262,10 @@ function nativeFeeCap(chain: string, fee: bigint, route?: NativeFeeRoute): bigin
 function declaredNativeFee(q: {txRequest?: {nativeFee?: string}}, chain: string, route?: NativeFeeRoute): bigint {
   const raw = q.txRequest?.nativeFee;
   if (raw === undefined) return 0n;
-  if (!/^\d+$/.test(raw)) throw new Error("swap2: quote declares a malformed native fee");
+  if (!/^\d+$/.test(raw)) throw refusal("upstream_unavailable", "swap2: quote declares a malformed native fee");
   const fee = BigInt(raw);
   const cap = nativeFeeCap(chain, fee, route);
-  if (fee > cap) throw new Error(`swap2: quoted native fee ${fee} exceeds the cap ${cap} for ${chain}`);
+  if (fee > cap) throw refusal("policy_refused", `swap2: quoted native fee ${fee} exceeds the cap ${cap} for ${chain}`);
   return fee;
 }
 
@@ -297,7 +300,7 @@ export function normalizeTypedDomain(domain: unknown): unknown {
  * chose — an allowance to anyone, signed off-chain — is refused.
  */
 function assertTypedOrder(typedData: string, approvalAddress: string | undefined, e: {self: string; token: string | undefined; amount: string; chainId: number | null}): void {
-  const fail = (why: string) => new Swap2ValidationError(`swap2: typed order refused — ${why}`);
+  const fail = (why: string) => new Swap2ValidationError(`swap2: typed order refused — ${why}`, {reason: "policy_refused"});
   let parsed: unknown;
   try { parsed = JSON.parse(typedData); } catch { throw fail("the typed data is not JSON"); }
   if (!parsed || typeof parsed !== "object") throw fail("the typed data is not an object");
@@ -785,7 +788,7 @@ function assertQuoteConstraints(q: Quote, options: Swap2Options): void {
   const nominal = BigInt(q.destAmount);
   const guaranteed = BigInt(q.minDestAmount);
   if (minAmountOut !== undefined && guaranteed < minAmountOut) {
-    throw new Error(`swap2: quoted minimum ${guaranteed} is below caller minAmountOut ${minAmountOut}`);
+    throw refusal("price_check_failed", `swap2: quoted minimum ${guaranteed} is below caller minAmountOut ${minAmountOut}`);
   }
   if (options.slippage !== undefined) {
     const scale = 1_000_000_000n;
@@ -794,7 +797,7 @@ function assertQuoteConstraints(q: Quote, options: Swap2Options): void {
     const permitted = BigInt(floorScaled(options.slippage, 1_000_000_000)) + BigInt(SLIPPAGE_ROUNDING_BPS) * 100_000n;
     const required = permitted >= scale ? 0n : (nominal * (scale - permitted)) / scale;
     if (guaranteed < required) {
-      throw new Error(`swap2: quote exceeds caller slippage (${options.slippage})`);
+      throw refusal("price_check_failed", `swap2: quote exceeds caller slippage (${options.slippage})`);
     }
   }
 }
@@ -885,6 +888,16 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
    *  from the surface that shows them. */
   protected noRouteDetail(): string {
     return "";
+  }
+  /** Each venue's refusal behind the last empty resolveQuote, classified where the venue could (`Swap2RefusalReason`). */
+  protected noRouteRefusals(): readonly Swap2Refusal[] {
+    return [];
+  }
+  /** The engine's "no route available", carrying every venue's refusal and the reason they add up to. */
+  private noRouteError(): Swap2QuoteError {
+    const detail = this.noRouteDetail();
+    const refusals = this.noRouteRefusals();
+    return new Swap2QuoteError(`swap2: no route available for the requested pair${detail ? ` :: ${detail}` : ""}`, {...combinedRefusal(refusals), refusals});
   }
   /** Look up a provider by name to resume/track an in-flight swap2. */
   protected abstract providerFor(name: string): CrossChainProvider | undefined;
@@ -1018,18 +1031,18 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       ["protocol", configured.maxProtocolFeeBps],
     ] as const;
     if (!caps.some(([, cap]) => cap !== undefined)) return;
-    if (!fees) throw new Swap2FeeLimitError("swap2: fee caps require an itemized provider fee breakdown");
+    if (!fees) throw new Swap2FeeLimitError("swap2: fee caps require an itemized provider fee breakdown", {reason: "policy_refused"});
     const normalizedSource = sourceToken.toLowerCase();
     for (const [type, cap] of caps) {
       if (cap === undefined) continue;
       const matching = fees.filter((fee) => fee.type === type);
       if (matching.some((fee) => fee.token.toLowerCase() !== normalizedSource)) {
-        throw new Swap2FeeLimitError(`swap2: cannot apply ${type} fee cap across different fee tokens`);
+        throw new Swap2FeeLimitError(`swap2: cannot apply ${type} fee cap across different fee tokens`, {reason: "policy_refused"});
       }
       const total = matching.reduce((sum, fee) => sum + fee.amount, 0n);
       const bps = typeof cap === "bigint" ? cap : BigInt(cap);
       if (total * 10_000n > sourceAmount * bps) {
-        throw new Swap2FeeLimitError(`swap2: ${type} fee exceeds configured cap`);
+        throw new Swap2FeeLimitError(`swap2: ${type} fee exceeds configured cap`, {reason: "policy_refused"});
       }
     }
   }
@@ -1089,10 +1102,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
   override async quoteSwap2(options: Swap2Options): Promise<Swap2Quote> {
     const snapshot = await this.prepareOptions(snapshotOptions(options));
     const q = await this.resolveQuote(this.toParams(snapshot, true));
-    if (!q) {
-      const detail = this.noRouteDetail();
-      throw new Swap2QuoteError(`swap2: no route available for the requested pair${detail ? ` :: ${detail}` : ""}`);
-    }
+    if (!q) throw this.noRouteError();
     assertQuoteConstraints(q, snapshot);
     this.assertQuoteFeeCaps(q, snapshot);
     return this.toQuote(q, snapshot);
@@ -1145,10 +1155,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     const executionOptions = await this.prepareOptions(snapshotOptions({...snapshot, recipient, refundAddress}));
     const params = this.toParams(executionOptions, false);
     const resolved = await this.resolveQuote(params);
-    if (!resolved) {
-      const detail = this.noRouteDetail();
-      throw new Swap2QuoteError(`swap2: no route available for the requested pair${detail ? ` :: ${detail}` : ""}`);
-    }
+    if (!resolved) throw this.noRouteError();
     const q = snapshotQuote(resolved);
     assertQuoteConstraints(q, executionOptions);
     this.assertQuoteFeeCaps(q, executionOptions, configSnapshot);
@@ -1157,7 +1164,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     if (!provider) throw new Error(`swap2: provider '${q.provider}' is not registered`);
     let providerEnabled = false;
     try { providerEnabled = provider.enabled(); } catch { /* fail closed below */ }
-    if (!providerEnabled) throw new Error(`swap2: provider '${q.provider}' is disabled`);
+    if (!providerEnabled) throw refusal("policy_refused", `swap2: provider '${q.provider}' is disabled`);
     let unsigned: UnsignedTx = Object.freeze({...await provider.buildDeposit(q)});
 
     const serialized = unsigned.serializedTx !== undefined;
@@ -1192,14 +1199,14 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         !sameAddress(unsigned.approvalAddress, tx.approvalAddress) ||
         unsigned.serializedTx !== tx.serializedTx
       ) {
-        throw new Error("swap2: provider build does not match the validated quote transaction");
+        throw refusal("policy_refused", "swap2: provider build does not match the validated quote transaction");
       }
     } else if (!unsigned.bodyBoc && !unsigned.typedData) {
       // A deposit-address quote commits the address and the memo only: the build may not add
       // calldata, a spender or a serialized transaction the quote never had (round 3, L15).
       if (!q.depositAddress || unsigned.to !== q.depositAddress || (unsigned.memo ?? null) !== q.depositMemo ||
         unsigned.data !== undefined || unsigned.approvalAddress !== undefined || unsigned.serializedTx !== undefined) {
-        throw new Error("swap2: provider build does not match the validated quote deposit");
+        throw refusal("vault_mismatch", "swap2: provider build does not match the validated quote deposit");
       }
     }
     const executionModels = [unsigned.data !== undefined, unsigned.bodyBoc !== undefined, unsigned.typedData !== undefined]
@@ -1215,7 +1222,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // every pin below; it runs only on a stub the app opened to such routes (scan 2026-10-28, F9).
     if (provider.remote === true && provider.depositAddressRoutes !== true &&
       unsigned.data === undefined && unsigned.bodyBoc === undefined && unsigned.typedData === undefined && !serialized) {
-      throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' sends the input to ${unsigned.to}, an address its backend named, and the app did not allow deposit-address routes for it (remoteProvider depositAddressRoutes) — refused`);
+      throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' sends the input to ${unsigned.to}, an address its backend named, and the app did not allow deposit-address routes for it (remoteProvider depositAddressRoutes) — refused`, {reason: "policy_refused"});
     }
     // Memo'd deposits: TON carries it as the message body, Tron in
     // raw_data.data (both TRX and TRC-20 — bifrost reads that field for
@@ -1317,7 +1324,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // declares what the account may let it take: the input for a native
       // source, nothing for a token source.
       if (executionValue !== (source.contract ? 0n : BigInt(q.sourceAmount))) {
-        throw new Error("swap2: provider execution amount does not match the validated quote");
+        throw refusal("policy_refused", "swap2: provider execution amount does not match the validated quote");
       }
     } else if (source.contract && this.fromChain.startsWith("eip155:")) {
       // Only a fee the sealed quote declared, and only up to the route's cap (the chain's, or the app's nativeFeeCeiling).
@@ -1328,7 +1335,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           : `swap2: token execution value ${executionValue} does not match the quoted native fee ${declared}`);
       }
     } else if (!unsigned.typedData && !unsigned.bodyBoc && executionValue !== BigInt(q.sourceAmount) + declaredNativeFee(q, this.fromChain, feeRoute)) {
-      throw new Error("swap2: provider execution amount does not match the validated quote");
+      throw refusal("policy_refused", "swap2: provider execution amount does not match the validated quote");
     }
 
     // A TON cell body is bound like every other build (scan 2026-10-27 modules, F7/F13/F18/F19): the TON it attaches is
@@ -1337,7 +1344,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // the app's own validator (`remoteProvider` `verifyBuild`, e.g. Omniston's `omnistonVerifyBuild`).
     let tonBody: TonBodySummary | undefined;
     if (cellBody !== undefined) {
-      const refuse = (why: string): never => { throw new Swap2ValidationError(`swap2: TON cell-body build refused — ${why}`); };
+      const refuse = (why: string): never => { throw new Swap2ValidationError(`swap2: TON cell-body build refused — ${why}`, {reason: "policy_refused"}); };
       const raw = (this._config as Swap2EngineConfig).tonGasCeiling;
       const ceiling = raw === undefined ? DEFAULT_TON_GAS_CEILING : BigInt(raw);
       if (ceiling < 0n) throw new Swap2ConfigurationError("swap2: tonGasCeiling must be non-negative");
@@ -1376,14 +1383,14 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     const pinnedTargets = remote ? pins(provider.callTargets?.(this.fromChain)) : [];
     const pinnedSpenders = remote ? pins(provider.spenders?.(this.fromChain)) : [];
     if (remote && unsigned.approvalAddress && !pinnedSpenders.includes(unsigned.approvalAddress.toLowerCase())) {
-      throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' asks to approve ${unsigned.approvalAddress} on ${this.fromChain}, which the app did not pin as a spender (remoteProvider spenders) — refused`);
+      throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' asks to approve ${unsigned.approvalAddress} on ${this.fromChain}, which the app did not pin as a spender (remoteProvider spenders) — refused`, {reason: "policy_refused"});
     }
     if (unsigned.typedData !== undefined) {
       // The engine binds the domain, the maker and the input; the price, the receiver, the traits and the extension
       // are the provider's to check. A remote stub's order is signed only after the app's own validator ran on it
       // (`remoteProvider` `verifyBuild`, e.g. `omnistonVerifyBuild`), as for cell bodies (scan 2026-10-28, F6).
       if (remote && provider.verifiesBuilds !== true) {
-        throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' asks to sign a typed order, which needs the app's own validator (remoteProvider verifyBuild) — refused`);
+        throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' asks to sign a typed order, which needs the app's own validator (remoteProvider verifyBuild) — refused`, {reason: "policy_refused"});
       }
       const chainId = this.fromChain.startsWith("eip155:") ? Number(this.fromChain.slice("eip155:".length)) : null;
       assertTypedOrder(unsigned.typedData, unsigned.approvalAddress, {self: selfAddress, token: source.contract ?? undefined, amount: q.sourceAmount, chainId});
@@ -1391,19 +1398,19 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     if (unsigned.data !== undefined && this.fromChain.startsWith("eip155:")) {
       const call = decodeCall({to: unsigned.to, data: unsigned.data, value: executionValue});
       // Calldata that is not hex bytes cannot be judged: refused, not passed as a plain call (scan 2026-10-27 modules F3).
-      if (call.undecodable) throw new Swap2ValidationError("swap2: quote calldata is not hex bytes — refused");
+      if (call.undecodable) throw new Swap2ValidationError("swap2: quote calldata is not hex bytes — refused", {reason: "policy_refused"});
       if (call.approval && call.approval.kind !== "erc20") {
-        throw new Swap2ValidationError(`swap2: quote calldata is ${call.approval.kind === "operator" ? "an operator approval (setApprovalForAll)" : "a Permit2 approval"} — never a swap's main call; refused`);
+        throw new Swap2ValidationError(`swap2: quote calldata is ${call.approval.kind === "operator" ? "an operator approval (setApprovalForAll)" : "a Permit2 approval"} — never a swap's main call; refused`, {reason: "policy_refused"});
       }
       if (call.transfer || call.approval) {
         // A token call: the token is the call's target.
         if (!source.contract || unsigned.to.toLowerCase() !== source.contract.toLowerCase()) {
-          throw new Swap2ValidationError(`swap2: quote calldata (${call.method}) moves ${getAddress(unsigned.to)}, not the source token — refused`);
+          throw new Swap2ValidationError(`swap2: quote calldata (${call.method}) moves ${getAddress(unsigned.to)}, not the source token — refused`, {reason: "policy_refused"});
         }
-        if (call.method === "transferFrom") throw new Swap2ValidationError("swap2: quote calldata pulls the source token with transferFrom — refused");
+        if (call.method === "transferFrom") throw new Swap2ValidationError("swap2: quote calldata pulls the source token with transferFrom — refused", {reason: "policy_refused"});
         const amount = call.transfer?.amount ?? call.approval?.amount ?? null;
         if (amount === null || amount > BigInt(q.sourceAmount)) {
-          throw new Swap2ValidationError(`swap2: quote calldata (${call.method}) covers ${amount === null ? "an unlimited amount" : amount} of the source token, more than the swap's ${q.sourceAmount} — refused`);
+          throw new Swap2ValidationError(`swap2: quote calldata (${call.method}) covers ${amount === null ? "an unlimited amount" : amount} of the source token, more than the swap's ${q.sourceAmount} — refused`, {reason: "policy_refused"});
         }
         const named = (call.transfer?.to ?? call.approval!.spender).toLowerCase();
         const allowed = engineTransfer
@@ -1412,14 +1419,14 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
             ? [selfAddress, ...pinnedTargets, ...pinnedSpenders]
             : [selfAddress, q.depositAddress, unsigned.approvalAddress];
         if (!allowed.filter((a): a is string => !!a).map((a) => a.toLowerCase()).includes(named)) {
-          throw new Swap2ValidationError(`swap2: quote calldata (${call.method}) names ${getAddress(named)}, which is not this account, the deposit address or ${remote ? "a spender the app pinned" : "the declared spender"} — refused`);
+          throw new Swap2ValidationError(`swap2: quote calldata (${call.method}) names ${getAddress(named)}, which is not this account, the deposit address or ${remote ? "a spender the app pinned" : "the declared spender"} — refused`, {reason: "recipient_mismatch"});
         }
       } else if (remote && !pinnedTargets.includes(unsigned.to.toLowerCase())) {
-        throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' calls ${getAddress(unsigned.to)} on ${this.fromChain}, which the app did not pin as a call target (remoteProvider callTargets) — refused`);
+        throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' calls ${getAddress(unsigned.to)} on ${this.fromChain}, which the app did not pin as a call target (remoteProvider callTargets) — refused`, {reason: "policy_refused"});
       } else if (remote && provider.verifiesQuotes !== true && provider.verifiesBuilds !== true) {
         // A pinned contract executes whatever its arguments say — recipient, domain, minimum (scan 2026-10-30, F3): the
         // app's own decode of the call (the provider's `verifyQuote`, or `verifyBuild`) must have run on it.
-        throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' calls ${getAddress(unsigned.to)} with calldata the app does not check (remoteProvider verifyQuote / verifyBuild) — refused`);
+        throw new Swap2ValidationError(`swap2: remote provider '${q.provider}' calls ${getAddress(unsigned.to)} with calldata the app does not check (remoteProvider verifyQuote / verifyBuild) — refused`, {reason: "policy_refused"});
       }
     }
 
@@ -1437,7 +1444,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // first pass mined would outlive this swap with nobody to revoke it.
       carried.adopted = true;
       await carried.revoke().catch(() => {});
-      throw new Swap2QuoteError("swap2: the fresh quote no longer spends through an allowance — aborted, the allowance was revoked");
+      throw new Swap2QuoteError("swap2: the fresh quote no longer spends through an allowance — aborted, the allowance was revoked", {reason: "policy_refused"});
     }
     if (needsApproval && carried) {
       // Re-quote pass: the allowance must fit the fresh quote exactly;
@@ -1445,7 +1452,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       if (!sameHex(carried.token, source.contract!) || !sameHex(carried.spender, unsigned.approvalAddress!) || carried.amount !== approvalAmount) {
         carried.adopted = true;
         await carried.revoke().catch(() => {});
-        throw new Swap2QuoteError(`swap2: the fresh quote moved the spender to ${unsigned.approvalAddress} — aborted, the allowance for ${carried.spender} was revoked`);
+        throw new Swap2QuoteError(`swap2: the fresh quote moved the spender to ${unsigned.approvalAddress} — aborted, the allowance for ${carried.spender} was revoked`, {reason: "vault_mismatch"});
       }
       carried.adopted = true;
       revokeApproval = carried.revoke;
@@ -1515,7 +1522,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           reviewed = deepFreeze(structuredCloneSafe(previous ? {...plan, requoted: true as const} : plan));
           await review(reviewed);
           if (q.validUntilMs > 0 && q.validUntilMs <= Date.now()) {
-            throw new Swap2QuoteError(`swap2: quote expired during review — ${previous ? "the allowance was revoked" : "nothing was signed"}`);
+            throw new Swap2QuoteError(`swap2: quote expired during review — ${previous ? "the allowance was revoked" : "nothing was signed"}`, {reason: "quote_expired"});
           }
         } catch (error) {
           // Second review: the allowance is ours and already adopted by this pass.
@@ -1581,12 +1588,12 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         }
       }
       await revokeApproval?.().catch(() => {});
-      throw new Swap2QuoteError("swap2: quote expired before source broadcast");
+      throw new Swap2QuoteError("swap2: quote expired before source broadcast", {reason: "quote_expired"});
     }
     try {
       let providerStillEnabled = false;
       try { providerStillEnabled = provider.enabled(); } catch { /* fail closed below */ }
-      if (!providerStillEnabled) throw new Error(`swap2: provider '${q.provider}' was disabled before source broadcast`);
+      if (!providerStillEnabled) throw refusal("policy_refused", `swap2: provider '${q.provider}' was disabled before source broadcast`);
       if (provider.preflightDeposit) this.emitPhase("preflight");
       await provider.preflightDeposit?.(q, unsigned);
     } catch (error) {

@@ -213,6 +213,64 @@ The source transaction may already be on its way. Retrying can send the money tw
 Track the id or hash instead.
 :::
 
+### Refusal reasons
+
+A refusal keeps its text, which is meant for logs and support. To decide what to show the user, switch on its
+`reason` instead of matching the text. `refusalOf(err)` reads the reason from the error, or from the first error in
+its `cause` chain that has one:
+
+```ts
+import { refusalOf } from '@anywalletkit/protocol-swap2-core'
+
+try {
+  await swaps.quoteSwap2(options)
+} catch (err) {
+  const refusal = refusalOf(err)
+  switch (refusal?.reason) {
+    case 'amount_too_small': return show('Increase the amount')
+    case 'unsupported_pair': return show('This pair is not supported')
+    case 'rate_limited': return retryIn(refusal.retryAfterMs ?? 5_000)
+    default: return show('No route right now')
+  }
+}
+```
+
+| `reason` | Meaning |
+|---|---|
+| `no_route` | The venue has no route for this request, or the venues that sat out did so for different reasons |
+| `unsupported_pair` | The venue does not serve this chain, token, pair, direction or flow |
+| `amount_too_small` / `amount_too_large` | Outside the venue's limits (fees above the output count as too small) |
+| `insufficient_liquidity` | The venue reports too little liquidity for the amount |
+| `rate_limited` | The venue throttled the request. `retryAfterMs` is set when it said how long to wait |
+| `key_rejected` | The venue rejected the API key, or its absence |
+| `upstream_unavailable` | The venue failed, timed out or answered in another shape. `httpStatus` is set when there was one |
+| `chain_halted` | The chain, its trading, or the venue's handling of it is halted or paused |
+| `recipient_unverifiable` | The transaction does not bind the delivery to a recipient the SDK can check |
+| `recipient_mismatch` | The transaction pays or refunds an address other than the requested one, or one that cannot receive |
+| `vault_mismatch` | The deposit target (vault, inbound address, router, escrow, settlement contract) is not the confirmed or pinned one |
+| `stale_node` | The node or indexer that answered trails the chain too far to be trusted |
+| `quote_expired` | The quote or its deadline ran out |
+| `price_check_failed` | The output, floor, slippage or value fails the check |
+| `simulation_failed` | The transaction reverted in simulation or preflight |
+| `policy_refused` | A policy of your app or of the SDK refuses it: fee caps, sponsorship, a disabled provider, addresses the app did not allow |
+
+Where the reason travels:
+
+- **The engine's "no route available"** (`Swap2QuoteError`) has `refusals`: each venue's refusal as
+  `{ provider, message, reason?, retryAfterMs?, httpStatus? }`. Its own `reason` is the venues' shared reason, or
+  `no_route` when they differ. A venue that sat out without a text (disabled, or not serving the pair) is listed too,
+  with an unchanged message.
+- **The router** keeps the same list in `lastRefusals`, next to `lastRejections`, and in `RouteSet.refusals`.
+- **`onRefusal`** gets the classification as a second argument: `onRefusal(text, { reason, retryAfterMs?, httpStatus? })`.
+- **A swap2 server** adds `reason` (and `retryAfterMs`, `httpStatus`) to its error bodies and to `noQuote`. The
+  `remoteProvider` stub puts it back on the error. A status alone also classifies: 429 → `rate_limited` (with
+  Retry-After), 401 / 403 → `key_rejected`, 408 / 425 / 5xx → `upstream_unavailable`.
+- **Provider pins** (`lifiPins`, `thorchainPins`, …) classify their own refusal texts through `reasonOf`, so a remote
+  stub's "fails this app's own check" carries a reason too.
+
+A refusal without `reason` is not classified. A wallet's `SimulationError` keeps its own `reason` field (the revert
+text): check `err.name === 'SimulationError'` for those.
+
 ## Fee caps
 
 `maxNetworkFeeBps` and `maxProtocolFeeBps` (basis points of the input) refuse routes whose

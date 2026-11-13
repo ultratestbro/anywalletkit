@@ -108,7 +108,7 @@ describe("swap2 server handler", () => {
     expect(await handle("track", {provider: "mock", ref: {intentId: (sealed as Quote).intentId}}, "u")).toEqual({status: 500, body: {error: "internal error"}});
     // a live quote refused without a reason is said so; a display quote may be a bare null
     const silent = createSwap2Handler({providers: [mockProvider({getQuote: async () => null}).provider], sealSecret: SECRET, guard: allow});
-    expect((await silent("quote", {provider: "mock", params: {...PARAMS, dry: false}}, "u")).body).toEqual({noQuote: "mock refused without naming a reason"});
+    expect((await silent("quote", {provider: "mock", params: {...PARAMS, dry: false}}, "u")).body).toEqual({noQuote: "mock refused without naming a reason", reason: "no_route"});
     expect((await silent("quote", {provider: "mock", params: {...PARAMS, dry: true}}, "u")).body).toBeNull();
   });
 

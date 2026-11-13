@@ -10,6 +10,27 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: refusal reasons
+
+Not breaking: every refusal text is unchanged. A classified refusal now also carries `reason`, one of the 17
+`Swap2RefusalReason` values (see [Refusal reasons](/guides/swaps/#refusal-reasons)).
+
+- **protocol-swap2-core:** `refusalOf(err)` reads it from an error or its `cause` chain. The engine's "no route
+  available" (`Swap2QuoteError`) lists each venue's refusal in `refusals`, and its `reason` is their shared one, or
+  `no_route`. The engine's own refusals are classified too: the floor and slippage (`price_check_failed`), fee caps and
+  the native fee cap (`policy_refused`), an expired quote (`quote_expired`), and the build checks. `onRefusal`
+  receives a second argument, `{ reason, retryAfterMs?, httpStatus? }`.
+- **A swap2 server and its clients:** `createSwap2Handler` adds `reason` (and `retryAfterMs`, `httpStatus`) to error
+  bodies and to `noQuote`. A test that compares a whole body with `toEqual` needs the new field. `remoteProvider`
+  puts the reason back on the error, or reads it from the status when the body has none: 429 → `rate_limited`,
+  401 / 403 → `key_rejected`, 408 / 425 / 5xx → `upstream_unavailable`. A disabled provider's 403 says
+  `policy_refused`, so it is not read as a rejected key. Bump the server and the app together to get reasons from
+  the server; either side alone works as before.
+- **protocol-swap2-router:** `lastRefusals` and `RouteSet.refusals` hold the same refusals as `lastRejections`, each
+  with its `reason`. With no enabled provider serving the route, `lastRefusals` holds one `unsupported_pair` entry.
+- **Refusals matched by text:** switch them to `reason`. A refusal without one is not classified. A wallet's
+  `SimulationError` keeps its own `reason` field (the revert text).
+
 ## 2026-11-13: USDT0 dry quotes without an address
 
 `protocol-swap2-usdt0` quotes are dry unless `dry: false`. A dry quote without `destAddress` used to be built for a

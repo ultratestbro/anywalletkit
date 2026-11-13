@@ -23,6 +23,7 @@ import {
   type Swap2EngineConfig,
 } from "@anywalletkit/protocol-swap2-core/swap2/base";
 import type {CrossChainProvider, Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
+import type {Swap2Refusal} from "@anywalletkit/protocol-swap2-core/errors";
 import type {ActivityItem, ChainTx, DescribeActivityContext, Swap2Options, Swap2Quote} from "@anywalletkit/core";
 import {CrossChainRouter, type RouteSet, type RouterOptions} from "../router.js";
 
@@ -130,6 +131,10 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
 
   protected override noRouteDetail(): string {
     return this.router.lastRejections.join("; ").slice(0, 400);
+  }
+
+  protected override noRouteRefusals(): readonly Swap2Refusal[] {
+    return this.router.lastRefusals;
   }
 
   protected providerFor(name: string): CrossChainProvider | undefined {
