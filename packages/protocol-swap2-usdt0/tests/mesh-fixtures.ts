@@ -44,6 +44,8 @@ export const ABI = parseAbi([
   "function approvalRequired() view returns (bool)",
   "function peers(uint32 eid) view returns (bytes32)",
   "error InsufficientCredits(uint32 eid, uint256 credits, uint256 amountWithdraw)",
+  "error SlippageExceeded(uint256 amountReceived, uint256 minAmount)",
+  "error TONComposeNotSupported()",
 ]);
 
 export interface MeshWorld {
@@ -51,8 +53,8 @@ export interface MeshWorld {
   credits?: bigint; fee?: bigint; lzTokenFee?: bigint;
   /** quoteOFT: the OFT's minimum and what it says arrives (default: amount − 3 bps). */
   oftMin?: bigint; received?: (amount: bigint) => bigint;
-  /** quoteSend: "credits" reverts with InsufficientCredits, "http" answers 500. */
-  quoteSendFails?: "credits" | "http";
+  /** quoteSend: "credits" reverts with InsufficientCredits, "slippage" with SlippageExceeded, "tonCompose" with TONComposeNotSupported, "http" answers 500. */
+  quoteSendFails?: "credits" | "slippage" | "tonCompose" | "http";
   message?: unknown; scanStatus?: number;
   tonEvent?: unknown; tonStatus?: number;
 }
@@ -94,8 +96,10 @@ export function meshWorld(o: MeshWorld = {}) {
         if (functionName === "quoteOFT") return enc([{minAmountLD: o.oftMin ?? 0n, maxAmountLD: o.credits ?? 10n ** 13n}, [], {amountSentLD: sp.amountLD, amountReceivedLD: (o.received ?? recvOf)(sp.amountLD)}]);
         if (functionName === "quoteSend") {
           if (o.quoteSendFails === "http") return new Response("upstream", {status: 500});
-          if (o.quoteSendFails === "credits") {
-            const err = encodeErrorResult({abi: ABI, errorName: "InsufficientCredits", args: [sp.dstEid, 5n, recvOf(sp.amountLD)]});
+          if (o.quoteSendFails === "credits" || o.quoteSendFails === "slippage" || o.quoteSendFails === "tonCompose") {
+            const err = o.quoteSendFails === "credits" ? encodeErrorResult({abi: ABI, errorName: "InsufficientCredits", args: [sp.dstEid, 5n, recvOf(sp.amountLD)]})
+              : o.quoteSendFails === "slippage" ? encodeErrorResult({abi: ABI, errorName: "SlippageExceeded", args: [sp.minAmountLD - 1n, sp.minAmountLD]})
+              : encodeErrorResult({abi: ABI, errorName: "TONComposeNotSupported"});
             return new Response(JSON.stringify({jsonrpc: "2.0", id: body.id, error: {code: 3, message: "execution reverted", data: err}}));
           }
           return enc({nativeFee: o.fee ?? (sp.dstEid === TRON.eid ? FEE_TRON : FEE_TON), lzTokenFee: o.lzTokenFee ?? 0n});
