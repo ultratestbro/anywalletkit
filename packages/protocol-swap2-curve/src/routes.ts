@@ -15,6 +15,7 @@ import {ccAssetByToken} from "@anywalletkit/swap2-assets";
 import type {RouterArgs} from "./abi.js";
 import {CURVE_DENIED_POOLS, MAX_ROUTE_POOLS, MAX_ROUTE_STEPS, ZERO_ADDRESS, type CurveDeployment} from "./deployments.js";
 import type {CurveChainPools, CurvePool, Hex} from "./pools/types.js";
+import {noted} from "./reasons.js";
 
 /** One router step: a pool swap, the native ↔ wrapped-native hop (8) or the ERC-4626 hop (9). */
 export type CurveStep =
@@ -230,7 +231,7 @@ export function routePools(args: RouterArgs): Hex[] {
  */
 export function checkRoute(chainId: number, deployment: CurveDeployment, table: CurveChainPools | undefined, args: RouterArgs, tokenIn: string, tokenOut: string): string | null {
   const cols = deployment.family === "ng5" ? 5 : 4;
-  if (args.route.length !== 11 || args.params.length !== 5 || args.params.some((r) => r.length !== cols)) return `the route is not address[11] with uint256[${cols}][5]`;
+  if (args.route.length !== 11 || args.params.length !== 5 || args.params.some((r) => r.length !== cols)) return noted(`the route is not address[11] with uint256[${cols}][5]`, "policy_refused");
   const index = poolIndex(chainId, deployment, table);
   const zero = lc(ZERO_ADDRESS);
   const eth = lc(deployment.eth);
@@ -238,14 +239,14 @@ export function checkRoute(chainId: number, deployment: CurveDeployment, table: 
   const v = erc4626Of(deployment);
   let steps = 0;
   while (steps < 5 && lc(args.route[2 * steps + 1]!) !== zero) steps++;
-  if (steps === 0) return "the route has no step";
-  if (steps > MAX_ROUTE_STEPS) return `the route has ${steps} steps, more than ${MAX_ROUTE_STEPS}`;
-  for (let k = 2 * steps + 1; k < 11; k++) if (lc(args.route[k]!) !== zero) return "the route names addresses after its end";
-  for (let k = steps; k < 5; k++) if (args.params[k]!.some((x) => x !== 0n)) return "the swap params carry rows after the route's end";
-  if (lc(args.route[0]!) !== lc(tokenIn)) return `the route starts at ${args.route[0]}, not the source token`;
-  if (lc(args.route[2 * steps]!) !== lc(tokenOut)) return `the route ends at ${args.route[2 * steps]}, not the destination token`;
+  if (steps === 0) return noted("the route has no step", "policy_refused");
+  if (steps > MAX_ROUTE_STEPS) return noted(`the route has ${steps} steps, more than ${MAX_ROUTE_STEPS}`, "policy_refused");
+  for (let k = 2 * steps + 1; k < 11; k++) if (lc(args.route[k]!) !== zero) return noted("the route names addresses after its end", "policy_refused");
+  for (let k = steps; k < 5; k++) if (args.params[k]!.some((x) => x !== 0n)) return noted("the swap params carry rows after the route's end", "policy_refused");
+  if (lc(args.route[0]!) !== lc(tokenIn)) return noted(`the route starts at ${args.route[0]}, not the source token`, "policy_refused");
+  if (lc(args.route[2 * steps]!) !== lc(tokenOut)) return noted(`the route ends at ${args.route[2 * steps]}, not the destination token`, "price_check_failed");
   for (let k = 1; k < steps; k++) {
-    if (!intermediateAllowed(chainId, deployment, args.route[2 * k]!)) return `step ${k} hands the swap through ${args.route[2 * k]}, a token the catalog does not list on this chain`;
+    if (!intermediateAllowed(chainId, deployment, args.route[2 * k]!)) return noted(`step ${k} hands the swap through ${args.route[2 * k]}, a token the catalog does not list on this chain`, "policy_refused");
   }
   const pools = new Set<string>();
   let wraps = 0;
@@ -256,45 +257,45 @@ export function checkRoute(chainId: number, deployment: CurveDeployment, table: 
     const b = lc(args.route[2 * k + 2]!);
     const row = args.params[k]!;
     const type = row[2]!;
-    if (a === b) return `step ${k + 1} trades a token for itself`;
+    if (a === b) return noted(`step ${k + 1} trades a token for itself`, "policy_refused");
     if (type === 1n || type === 2n) {
-      if (CURVE_DENIED_POOLS[chainId]?.has(swap)) return `step ${k + 1} crosses ${args.route[2 * k + 1]}, a pool this module refuses (fake coin, drained in 2023, or over a dead venue)`;
+      if (CURVE_DENIED_POOLS[chainId]?.has(swap)) return noted(`step ${k + 1} crosses ${args.route[2 * k + 1]}, a pool this module refuses (fake coin, drained in 2023, or over a dead venue)`, "vault_mismatch");
       const pool = index.get(swap);
-      if (!pool) return `step ${k + 1} crosses ${args.route[2 * k + 1]}, which is not in the pool allowlist`;
-      if (pools.has(swap)) return `the route crosses ${args.route[2 * k + 1]} twice`;
+      if (!pool) return noted(`step ${k + 1} crosses ${args.route[2 * k + 1]}, which is not in the pool allowlist`, "vault_mismatch");
+      if (pools.has(swap)) return noted(`the route crosses ${args.route[2 * k + 1]} twice`, "policy_refused");
       pools.add(swap);
-      if (!pool.swapTypes.includes(type === 1n ? 1 : 2)) return `step ${k + 1} uses swap_type ${type}, which pool ${pool.name} does not allow`;
-      if (row[3] !== BigInt(pool.poolType)) return `step ${k + 1} names pool_type ${row[3]}, not pool ${pool.name}'s ${pool.poolType}`;
-      if (type === 2n && deployment.family === "lite4" && pool.poolType !== 10) return `step ${k + 1}: exchange_underlying is for stable-ng metapools on this router`;
-      if (type === 2n && !underlyingAllowed(pool, index)) return `step ${k + 1}: exchange_underlying on pool ${pool.name} needs its base pool in the allowlist`;
+      if (!pool.swapTypes.includes(type === 1n ? 1 : 2)) return noted(`step ${k + 1} uses swap_type ${type}, which pool ${pool.name} does not allow`, "policy_refused");
+      if (row[3] !== BigInt(pool.poolType)) return noted(`step ${k + 1} names pool_type ${row[3]}, not pool ${pool.name}'s ${pool.poolType}`, "policy_refused");
+      if (type === 2n && deployment.family === "lite4" && pool.poolType !== 10) return noted(`step ${k + 1}: exchange_underlying is for stable-ng metapools on this router`, "policy_refused");
+      if (type === 2n && !underlyingAllowed(pool, index)) return noted(`step ${k + 1}: exchange_underlying on pool ${pool.name} needs its base pool in the allowlist`, "policy_refused");
       const list = type === 1n ? pool.coins : pool.underlying;
-      if (!list) return `step ${k + 1}: pool ${pool.name} lists no underlying coins`;
+      if (!list) return noted(`step ${k + 1}: pool ${pool.name} lists no underlying coins`, "policy_refused");
       const i = row[0]!, j = row[1]!;
-      if (i >= BigInt(list.length) || j >= BigInt(list.length) || i === j) return `step ${k + 1}: coin indexes ${i}/${j} are not two coins of pool ${pool.name}`;
+      if (i >= BigInt(list.length) || j >= BigInt(list.length) || i === j) return noted(`step ${k + 1}: coin indexes ${i}/${j} are not two coins of pool ${pool.name}`, "policy_refused");
       // i, j < list.length (≤ 8) here: Number() of the decimal string is exact.
-      if (lc(list[Number(i.toString())]!) !== a || lc(list[Number(j.toString())]!) !== b) return `step ${k + 1}: pool ${pool.name}'s coins ${i}/${j} are not the hop's tokens`;
-      if (deployment.family === "ng5" && row[4] !== BigInt(list.length)) return `step ${k + 1} names ${row[4]} coins, not pool ${pool.name}'s ${list.length}`;
-      if (deployment.family === "lite4" && (a === eth || b === eth)) return `step ${k + 1}: this router does not pass the native coin to pools`;
-      if (STABLE_POOL_TYPES.has(pool.poolType) && (i > 127n || j > 127n)) return `step ${k + 1}: coin index out of range`;
+      if (lc(list[Number(i.toString())]!) !== a || lc(list[Number(j.toString())]!) !== b) return noted(`step ${k + 1}: pool ${pool.name}'s coins ${i}/${j} are not the hop's tokens`, "policy_refused");
+      if (deployment.family === "ng5" && row[4] !== BigInt(list.length)) return noted(`step ${k + 1} names ${row[4]} coins, not pool ${pool.name}'s ${list.length}`, "policy_refused");
+      if (deployment.family === "lite4" && (a === eth || b === eth)) return noted(`step ${k + 1}: this router does not pass the native coin to pools`, "policy_refused");
+      if (STABLE_POOL_TYPES.has(pool.poolType) && (i > 127n || j > 127n)) return noted(`step ${k + 1}: coin index out of range`, "policy_refused");
     } else if (type === 8n) {
-      if (weth === zero) return "this chain's router has no wrapped native";
-      if (swap !== weth) return `step ${k + 1} wraps through ${args.route[2 * k + 1]}, not the pinned wrapped native`;
-      if (!((a === eth && b === weth) || (a === weth && b === eth))) return `step ${k + 1}: swap_type 8 is only native ↔ the pinned wrapped native here`;
-      if (row.some((x, c) => c !== 2 && x !== 0n)) return `step ${k + 1}: a wrap carries no other swap params`;
-      if (++wraps > 1) return "the route wraps more than once";
+      if (weth === zero) return noted("this chain's router has no wrapped native", "policy_refused");
+      if (swap !== weth) return noted(`step ${k + 1} wraps through ${args.route[2 * k + 1]}, not the pinned wrapped native`, "vault_mismatch");
+      if (!((a === eth && b === weth) || (a === weth && b === eth))) return noted(`step ${k + 1}: swap_type 8 is only native ↔ the pinned wrapped native here`, "policy_refused");
+      if (row.some((x, c) => c !== 2 && x !== 0n)) return noted(`step ${k + 1}: a wrap carries no other swap params`, "policy_refused");
+      if (++wraps > 1) return noted("the route wraps more than once", "policy_refused");
     } else if (type === 9n) {
-      if (!v) return `swap_type 9 (ERC-4626) is not available on ${deployment.label}'s router ${deployment.version}`;
-      if (swap !== lc(v.vault)) return `step ${k + 1}: ERC-4626 hop through ${args.route[2 * k + 1]}, not the pinned vault`;
+      if (!v) return noted(`swap_type 9 (ERC-4626) is not available on ${deployment.label}'s router ${deployment.version}`, "policy_refused");
+      if (swap !== lc(v.vault)) return noted(`step ${k + 1}: ERC-4626 hop through ${args.route[2 * k + 1]}, not the pinned vault`, "vault_mismatch");
       const deposit = row[0] === 0n && a === lc(v.asset) && b === lc(v.vault);
       const redeem = row[0] === 1n && a === lc(v.vault) && b === lc(v.asset);
-      if (!deposit && !redeem) return `step ${k + 1}: the ERC-4626 hop is not a deposit of the vault's asset or a redeem of its shares`;
-      if (row.some((x, c) => c > 0 && c !== 2 && x !== 0n)) return `step ${k + 1}: an ERC-4626 hop carries no other swap params`;
-      if (++vaults > 1) return "the route crosses the vault more than once";
+      if (!deposit && !redeem) return noted(`step ${k + 1}: the ERC-4626 hop is not a deposit of the vault's asset or a redeem of its shares`, "policy_refused");
+      if (row.some((x, c) => c > 0 && c !== 2 && x !== 0n)) return noted(`step ${k + 1}: an ERC-4626 hop carries no other swap params`, "policy_refused");
+      if (++vaults > 1) return noted("the route crosses the vault more than once", "policy_refused");
     } else {
-      return `step ${k + 1} uses swap_type ${type}, which this module never builds`;
+      return noted(`step ${k + 1} uses swap_type ${type}, which this module never builds`, "policy_refused");
     }
   }
-  if (pools.size > MAX_ROUTE_POOLS) return `the route crosses ${pools.size} pools, more than ${MAX_ROUTE_POOLS}`;
-  if (pools.size === 0 && vaults === 0) return "the route crosses no pool";
+  if (pools.size > MAX_ROUTE_POOLS) return noted(`the route crosses ${pools.size} pools, more than ${MAX_ROUTE_POOLS}`, "policy_refused");
+  if (pools.size === 0 && vaults === 0) return noted("the route crosses no pool", "policy_refused");
   return null;
 }

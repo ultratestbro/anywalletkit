@@ -1,3 +1,4 @@
+import {httpRefusal, refusal, refusalOf, withReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {redactUrls, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 
 export type RpcCall = {method: string; params: unknown[]};
@@ -46,18 +47,19 @@ export function rpcClient(rpcUrls: Readonly<Record<number, readonly string[]>>) 
       body: JSON.stringify(calls.map((c, id) => ({jsonrpc: "2.0", id, ...c}))),
       signal: signal ?? timeoutSignal(12_000),
     });
-    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), {limited: res.status === 429});
+    // A node's refusal by its status: 429 rate_limited (with Retry-After), 401 / 403 key_rejected, anything else upstream_unavailable.
+    if (!res.ok) throw withReason(Object.assign(new Error(`HTTP ${res.status}`), {limited: res.status === 429}), httpRefusal(res.status, res.headers?.get?.("retry-after")) ?? {reason: "upstream_unavailable", httpStatus: res.status});
     const body = (await res.json()) as {id: number; result?: unknown; error?: unknown}[] | {error?: {message?: string}};
-    if (!Array.isArray(body)) throw Object.assign(new Error(body.error?.message ?? "batch refused"), {limited: isRateLimit(body.error)});
+    if (!Array.isArray(body)) throw withReason(Object.assign(new Error(body.error?.message ?? "batch refused"), {limited: isRateLimit(body.error)}), isRateLimit(body.error) ? "rate_limited" : "upstream_unavailable");
     const out: (unknown | null)[] = calls.map(() => null);
     const answered = new Set<number>();
     for (const r of body) {
       if (typeof r.id !== "number" || r.id < 0 || r.id >= out.length) continue;
-      if (r.error !== undefined && r.error !== null && !isExecutionError(r.error)) throw Object.assign(new Error(errorText(r.error)), {limited: isRateLimit(r.error)});
+      if (r.error !== undefined && r.error !== null && !isExecutionError(r.error)) throw withReason(Object.assign(new Error(errorText(r.error)), {limited: isRateLimit(r.error)}), isRateLimit(r.error) ? "rate_limited" : "upstream_unavailable");
       answered.add(r.id);
       if (r.error === undefined || r.error === null) out[r.id] = r.result ?? null;
     }
-    if (answered.size !== calls.length) throw new Error(`answered ${answered.size} of ${calls.length} calls`);
+    if (answered.size !== calls.length) throw refusal("upstream_unavailable", `answered ${answered.size} of ${calls.length} calls`);
     return out;
   }
 
@@ -76,7 +78,11 @@ export function rpcClient(rpcUrls: Readonly<Record<number, readonly string[]>>) 
         }
       }
     }
-    throw new Error(`curve: no RPC answered on chain ${chainId} (${lastErr instanceof Error ? lastErr.message : String(lastErr)})`);
+    const error = new Error(`curve: no RPC answered on chain ${chainId} (${lastErr instanceof Error ? lastErr.message : String(lastErr)})`);
+    // Every endpoint failed: the last one's reason (throttled, a rejected key), else upstream_unavailable — a node down, a
+    // timeout, an answer in another shape. The caller's own abort, or a chain with no endpoint at all, stays unclassified.
+    if (lastErr === undefined || signal?.aborted) throw error;
+    throw withReason(error, refusalOf(lastErr) ?? "upstream_unavailable");
   }
   return async function rpc(chainId: number, calls: RpcCall[], signal?: AbortSignal): Promise<(unknown | null)[]> {
     if (calls.length <= RPC_BATCH_MAX) return batch(chainId, calls, signal);
