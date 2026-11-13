@@ -1,6 +1,7 @@
 import {decodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
 import {sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import type {Quote, QuoteParams, RemotePins} from "@anywalletkit/protocol-swap2-core/types";
+import {refusalNotes} from "@anywalletkit/protocol-swap2-core/errors";
 
 /**
  * Uniswap v3 deployments this module trusts: the UniswapV3Factory, QuoterV2 and
@@ -70,6 +71,8 @@ export const ROUTER_ABI = parseAbi([
 ]);
 /** Most pools one `exactInput` path may cross: the provider builds direct and one-hop (two-pool) routes only. */
 const MAX_PATH_POOLS = 2;
+/** The reasons of the texts {@link uniswapVerifyQuote} returned, for `uniswapPins.reasonOf`. */
+const notes = refusalNotes();
 
 /**
  * The swap a Uniswap quote's router call makes, opened on the client against the app's own request (scan 2026-10-28,
@@ -83,15 +86,15 @@ const MAX_PATH_POOLS = 2;
 export function uniswapVerifyQuote(params: QuoteParams, quote: Quote): string | null {
   const id = /^eip155:[0-9]+$/.test(params.sourceChain) ? Number(params.sourceChain.slice(7)) : NaN;
   const d = Object.prototype.hasOwnProperty.call(UNISWAP_V3, id) ? UNISWAP_V3[id] : undefined;
-  if (!d || params.destChain !== params.sourceChain) return "not a same-chain swap on a pinned Uniswap deployment";
+  if (!d || params.destChain !== params.sourceChain) return notes.note("not a same-chain swap on a pinned Uniswap deployment", "unsupported_pair");
   const tx = quote.txRequest;
-  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no router call";
-  if (getAddress(tx.to) !== getAddress(d.router)) return `the call targets ${tx.to}, not the SwapRouter`;
+  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return notes.note("the quote carries no router call", "policy_refused");
+  if (getAddress(tx.to) !== getAddress(d.router)) return notes.note(`the call targets ${tx.to}, not the SwapRouter`, "vault_mismatch");
   const src = sourceAssetOf(params);
-  if (!src) return `unknown source token ${params.sourceToken}`;
+  if (!src) return notes.note(`unknown source token ${params.sourceToken}`, "unsupported_pair");
   const nativeIn = !src.contract;
   const nativeOut = /^0x0+$/.test(params.destToken);
-  if ((nativeIn || nativeOut) && d.nativeWrap === false) return "this chain's router has no wrapped native";
+  if ((nativeIn || nativeOut) && d.nativeWrap === false) return notes.note("this chain's router has no wrapped native", "unsupported_pair");
   let tokenIn: string, tokenOut: string, recipient: string, amountIn: bigint, minOut: bigint;
   try {
     tokenIn = getAddress(nativeIn ? d.weth : src.contract!);
@@ -104,41 +107,42 @@ export function uniswapVerifyQuote(params: QuoteParams, quote: Quote): string | 
   }
   if (nativeIn ? BigInt(tx.value ?? "0") !== amountIn || tx.approvalAddress !== undefined
     : BigInt(tx.value ?? "0") !== 0n || !tx.approvalAddress || getAddress(tx.approvalAddress) !== getAddress(d.router)) {
-    return nativeIn ? "a native input is paid as exactly the input in value, with no approval" : "a token input attaches no value and approves the SwapRouter";
+    return notes.note(nativeIn ? "a native input is paid as exactly the input in value, with no approval" : "a token input attaches no value and approves the SwapRouter", "policy_refused");
   }
   let legs: readonly Hex[];
   try {
     const outer = decodeFunctionData({abi: ROUTER_ABI, data: tx.data as Hex});
-    if (outer.functionName !== "multicall") return `${outer.functionName} is not multicall(deadline, legs)`;
+    if (outer.functionName !== "multicall") return notes.note(`${outer.functionName} is not multicall(deadline, legs)`, "policy_refused");
     legs = outer.args[1];
   } catch {
-    return "the router call is not multicall(deadline, legs)";
+    return notes.note("the router call is not multicall(deadline, legs)", "policy_refused");
   }
   const decode = (leg: Hex) => { try { return decodeFunctionData({abi: ROUTER_ABI, data: leg}); } catch { return null; } };
   if (nativeIn && legs.length === 2 && decode(legs[1]!)?.functionName === "refundETH") legs = legs.slice(0, 1);
-  if (legs.length !== (nativeOut ? 2 : 1)) return `the multicall has ${legs.length} legs, not a swap${nativeOut ? " and an unwrap" : nativeIn ? " (and a refund)" : ""}`;
+  if (legs.length !== (nativeOut ? 2 : 1)) return notes.note(`the multicall has ${legs.length} legs, not a swap${nativeOut ? " and an unwrap" : nativeIn ? " (and a refund)" : ""}`, "policy_refused");
   const swap = decode(legs[0]!);
   const swapTo = nativeOut ? ADDRESS_THIS : recipient;
   if (swap?.functionName === "exactInputSingle") {
     const a = swap.args[0];
-    if (getAddress(a.tokenIn) !== tokenIn || getAddress(a.tokenOut) !== tokenOut) return "the swap trades other tokens";
-    if (a.amountIn !== amountIn || a.amountOutMinimum !== minOut || a.sqrtPriceLimitX96 !== 0n) return "the swap's input, minimum or price limit is not the quote's";
-    if (getAddress(a.recipient) !== getAddress(swapTo)) return `the swap pays ${a.recipient}, not the recipient`;
+    if (getAddress(a.tokenIn) !== tokenIn || getAddress(a.tokenOut) !== tokenOut) return notes.note("the swap trades other tokens", "policy_refused");
+    if (a.amountIn !== amountIn || a.amountOutMinimum !== minOut || a.sqrtPriceLimitX96 !== 0n) return notes.note("the swap's input, minimum or price limit is not the quote's", "price_check_failed");
+    if (getAddress(a.recipient) !== getAddress(swapTo)) return notes.note(`the swap pays ${a.recipient}, not the recipient`, "recipient_mismatch");
   } else if (swap?.functionName === "exactInput") {
     const a = swap.args[0];
     const path = a.path.slice(2);
     const pools = (path.length / 2 - 20) / 23;
-    if (!/^[0-9a-fA-F]*$/.test(path) || !Number.isInteger(pools) || pools < 1 || pools > MAX_PATH_POOLS) return "the swap path is not 1–2 pools";
-    if (getAddress(`0x${path.slice(0, 40)}`) !== tokenIn || getAddress(`0x${path.slice(-40)}`) !== tokenOut) return "the swap path trades other tokens";
-    if (a.amountIn !== amountIn || a.amountOutMinimum !== minOut) return "the swap's input or minimum is not the quote's";
-    if (getAddress(a.recipient) !== getAddress(swapTo)) return `the swap pays ${a.recipient}, not the recipient`;
+    if (!/^[0-9a-fA-F]*$/.test(path) || !Number.isInteger(pools) || pools < 1 || pools > MAX_PATH_POOLS) return notes.note("the swap path is not 1–2 pools", "policy_refused");
+    if (getAddress(`0x${path.slice(0, 40)}`) !== tokenIn || getAddress(`0x${path.slice(-40)}`) !== tokenOut) return notes.note("the swap path trades other tokens", "policy_refused");
+    if (a.amountIn !== amountIn || a.amountOutMinimum !== minOut) return notes.note("the swap's input or minimum is not the quote's", "price_check_failed");
+    if (getAddress(a.recipient) !== getAddress(swapTo)) return notes.note(`the swap pays ${a.recipient}, not the recipient`, "recipient_mismatch");
   } else {
-    return `${swap?.functionName ?? "an unknown call"} is not exactInputSingle / exactInput`;
+    return notes.note(`${swap?.functionName ?? "an unknown call"} is not exactInputSingle / exactInput`, "policy_refused");
   }
   if (nativeOut) {
     const unwrap = decode(legs[1]!);
-    if (unwrap?.functionName !== "unwrapWETH9") return `${unwrap?.functionName ?? "an unknown call"} is not unwrapWETH9`;
-    if (unwrap.args[0] !== minOut || getAddress(unwrap.args[1]) !== recipient) return "the unwrap pays someone else or less than the minimum";
+    if (unwrap?.functionName !== "unwrapWETH9") return notes.note(`${unwrap?.functionName ?? "an unknown call"} is not unwrapWETH9`, "policy_refused");
+    // One text for two checks; the reason names the one that failed (another recipient wins over the amount).
+    if (unwrap.args[0] !== minOut || getAddress(unwrap.args[1]) !== recipient) return notes.note("the unwrap pays someone else or less than the minimum", getAddress(unwrap.args[1]) !== recipient ? "recipient_mismatch" : "price_check_failed");
   }
   return null;
 }
@@ -146,12 +150,13 @@ export function uniswapVerifyQuote(params: QuoteParams, quote: Quote): string | 
 /**
  * The SwapRouter a Uniswap swap calls and approves on a chain (the shipped {@link UNISWAP_V3} table), and
  * {@link uniswapVerifyQuote} — the app's pins for `remoteProvider({name: "uniswap", baseUrl, ...uniswapPins})` (scan
- * 2026-10-27 modules, F9; scan 2026-10-28, F1).
+ * 2026-10-27 modules, F9; scan 2026-10-28, F1). `reasonOf` classifies the texts `uniswapVerifyQuote` returned.
  */
 export const uniswapPins: RemotePins = Object.freeze({
   callTargets: (chain: string): readonly string[] => uniswapRouterFor(chain),
   spenders: (chain: string): readonly string[] => uniswapRouterFor(chain),
   verifyQuote: uniswapVerifyQuote,
+  reasonOf: (refusal: string) => notes.reasonOf(refusal),
 });
 function uniswapRouterFor(chain: string): readonly string[] {
   const id = /^eip155:[0-9]+$/.test(chain) ? Number(chain.slice(7)) : NaN;

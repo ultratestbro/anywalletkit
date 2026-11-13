@@ -2,6 +2,7 @@ import {decodeFunctionResult, encodeFunctionData, encodePacked, getAddress, pars
 import {describeUniswapActivity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
 import {evmRef, isEvm, timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
+import {httpRefusal, refusal, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, ROUTER_ABI, UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
 import {bigintToNumber} from "@anywalletkit/core";
@@ -121,7 +122,11 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           body: JSON.stringify(calls.map((c, id) => ({jsonrpc: "2.0", id, ...c}))),
           signal: signal ?? timeoutSignal(12_000),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const error = new Error(`HTTP ${res.status}`);
+          const info = httpRefusal(res.status, res.headers?.get?.("retry-after"));
+          throw info ? withReason(error, info) : error;
+        }
         const body = (await res.json()) as {id: number; result?: unknown; error?: unknown}[] | {error?: {message?: string}};
         if (!Array.isArray(body)) throw new Error(body.error?.message ?? "batch refused");
         const out: (unknown | null)[] = calls.map(() => null);
@@ -131,7 +136,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         lastErr = e;
       }
     }
-    throw new Error(`uniswap: no RPC answered on chain ${chainId} (${lastErr instanceof Error ? lastErr.message : String(lastErr)})`);
+    const error = new Error(`uniswap: no RPC answered on chain ${chainId} (${lastErr instanceof Error ? lastErr.message : String(lastErr)})`);
+    // Every endpoint failed: the last one's own classification (a 429, a rejected key), else unavailable — never the caller's abort.
+    throw signal?.aborted ? error : withReason(error, refusalOf(lastErr) ?? "upstream_unavailable");
   }
 
   const call = (to: string, data: Hex): RpcCall => ({method: "eth_call", params: [{to, data}, "latest"]});
@@ -148,7 +155,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const addr = (r: unknown) => (typeof r === "string" && r.length >= 42 ? getAddress(`0x${r.slice(-40)}`) : null);
         const wrapped = d.nativeWrap === false ? getAddress(ZERO) : getAddress(d.weth);
         const ok = [rf, qf].every((r) => addr(r) === getAddress(d.factory)) && addr(rw) === wrapped && addr(qw) === wrapped;
-        if (!ok) throw new Error(`uniswap: the router/quoter on chain ${chainId} do not match the pinned deployment — refusing`);
+        if (!ok) throw refusal("vault_mismatch", `uniswap: the router/quoter on chain ${chainId} do not match the pinned deployment — refusing`);
       })();
       p.catch(() => verified.delete(chainId));
       verified.set(chainId, p);
@@ -188,22 +195,22 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     },
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
-      const refuse = (why: string): null => {
-        params.onRefusal?.(`uniswap: ${why}`);
+      const refuse = (why: string, info?: Swap2RefusalReason | Swap2RefusalInfo): null => {
+        params.onRefusal?.(`uniswap: ${why}`, typeof info === "string" ? {reason: info} : info);
         return null;
       };
-      if (params.flex) return refuse("amount-flexible deposits are not supported");
-      if (params.sourceChain !== params.destChain) return refuse("same-chain swaps only");
+      if (params.flex) return refuse("amount-flexible deposits are not supported", "unsupported_pair");
+      if (params.sourceChain !== params.destChain) return refuse("same-chain swaps only", "unsupported_pair");
       const chainId = chainIdOf(params.sourceChain);
-      if (chainId === null) return refuse(`no Uniswap v3 deployment or RPC for ${params.sourceChain}`);
+      if (chainId === null) return refuse(`no Uniswap v3 deployment or RPC for ${params.sourceChain}`, "unsupported_pair");
       const d = deployments[chainId]!;
       const src = sourceAssetOf(params);
-      if (!src) return refuse(`unknown source token ${params.sourceToken}`);
+      if (!src) return refuse(`unknown source token ${params.sourceToken}`, "unsupported_pair");
       const nativeIn = !src.contract;
       const nativeOut = /^0x0+$/.test(params.destToken);
-      if ((nativeIn || nativeOut) && d.nativeWrap === false) return refuse("this chain's router has no wrapped native — swap the coin's ERC-20 instead");
-      if (!nativeOut && !/^0x[0-9a-fA-F]{40}$/.test(params.destToken)) return refuse("destination token must be an EVM address");
-      if (!/^0x[0-9a-fA-F]{40}$/.test(params.destAddress)) return refuse("recipient must be an EVM address");
+      if ((nativeIn || nativeOut) && d.nativeWrap === false) return refuse("this chain's router has no wrapped native — swap the coin's ERC-20 instead", "unsupported_pair");
+      if (!nativeOut && !/^0x[0-9a-fA-F]{40}$/.test(params.destToken)) return refuse("destination token must be an EVM address", "unsupported_pair");
+      if (!/^0x[0-9a-fA-F]{40}$/.test(params.destAddress)) return refuse("recipient must be an EVM address", "recipient_mismatch");
       let amountIn: bigint;
       try {
         amountIn = BigInt(params.amountIn);
@@ -213,7 +220,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       if (amountIn <= 0n) return refuse("amount must be positive");
       const tokenIn = getAddress(nativeIn ? d.weth : src.contract!);
       const tokenOut = getAddress(nativeOut ? d.weth : params.destToken);
-      if (tokenIn === tokenOut) return refuse(nativeIn || nativeOut ? "that is a wrap/unwrap, not a swap" : "same token in and out");
+      if (tokenIn === tokenOut) return refuse(nativeIn || nativeOut ? "that is a wrap/unwrap, not a swap" : "same token in and out", "unsupported_pair");
 
       try {
         await verifyDeployment(chainId);
@@ -247,7 +254,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
             /* a malformed slot is just not a candidate */
           }
         });
-        if (!best) return refuse(partial ? PARTIAL_FILL : "no Uniswap v3 pool route for this pair and amount");
+        if (!best) return refuse(partial ? PARTIAL_FILL : "no Uniswap v3 pool route for this pair and amount", partial ? "insufficient_liquidity" : "no_route");
         const {route, out, gas} = best as {route: Route; out: bigint; gas: bigint};
 
         // Price impact (SDK-127): a probe 1/1000 the size on the same route gives the pool's
@@ -279,9 +286,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
 
         const bps = params.slippageBps ?? slippageDefault;
         const minOut = (out * BigInt(10_000 - bps)) / 10_000n;
-        if (minOut <= 0n) return refuse(`the minimum output rounds to 0 (quoted ${out} at ${bps} bps slippage) — the amount is too small for this pool`);
+        if (minOut <= 0n) return refuse(`the minimum output rounds to 0 (quoted ${out} at ${bps} bps slippage) — the amount is too small for this pool`, "amount_too_small");
         if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) {
-          return refuse(`floor breach (min=${minOut} < floor=${params.minAmountOut})`);
+          return refuse(`floor breach (min=${minOut} < floor=${params.minAmountOut})`, "price_check_failed");
         }
         const recipient = getAddress(params.destAddress);
         const swapTo = nativeOut ? ADDRESS_THIS : recipient;
@@ -338,7 +345,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           },
         };
       } catch (e) {
-        return refuse(e instanceof Error ? e.message.replace(/^uniswap: /, "") : String(e));
+        return refuse(e instanceof Error ? e.message.replace(/^uniswap: /, "") : String(e), refusalOf(e));
       }
     },
 
@@ -358,17 +365,23 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         ? encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInputSingle", args: [{tokenIn: pd.tokenIn as Hex, tokenOut: pd.tokenOut as Hex, amountIn: BigInt(pd.amountIn), fee: Number(pd.fee), sqrtPriceLimitX96: 0n}]})
         : encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInput", args: [pd.path as Hex, BigInt(pd.amountIn)]});
       const [raw] = await rpc(chainId, [call(d.quoter, data)]);
-      if (typeof raw !== "string" || raw === "0x") throw new Error("uniswap: the pool no longer quotes this route — refresh and try again");
-      const {out, drained} = decodeQuote(!!pd.fee, raw as Hex);
-      if (drained) throw new Error(`uniswap: ${PARTIAL_FILL} — the pool can no longer take this swap. Nothing was sent; refresh the quote.`);
+      if (typeof raw !== "string" || raw === "0x") throw refusal("no_route", "uniswap: the pool no longer quotes this route — refresh and try again");
+      let quoted: ReturnType<typeof decodeQuote>;
+      try {
+        quoted = decodeQuote(!!pd.fee, raw as Hex);
+      } catch (e) {
+        throw e instanceof Error ? withReason(e, "upstream_unavailable") : e; // the node answered in another shape
+      }
+      const {out, drained} = quoted;
+      if (drained) throw refusal("insufficient_liquidity", `uniswap: ${PARTIAL_FILL} — the pool can no longer take this swap. Nothing was sent; refresh the quote.`);
       if (out < BigInt(pd.minOut)) {
-        throw new Error(`uniswap: price moved — the pool now pays ${out}, under your minimum ${pd.minOut}. Nothing was sent; refresh the quote.`);
+        throw refusal("price_check_failed", `uniswap: price moved — the pool now pays ${out}, under your minimum ${pd.minOut}. Nothing was sent; refresh the quote.`);
       }
     },
 
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
       const tx = quote.txRequest;
-      if (!tx?.to || !tx.data) throw new Error("swap2: Uniswap quote has no transaction request");
+      if (!tx?.to || !tx.data) throw refusal("policy_refused", "swap2: Uniswap quote has no transaction request");
       return {
         chain: "",
         to: tx.to,
