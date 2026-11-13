@@ -3,6 +3,7 @@ import {decodeFunctionData, decodeFunctionResult, encodeFunctionData, getAddress
 import {describeWrapActivity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
 import {evmRef, isEvm, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import {httpRefusal, refusal, refusalNotes, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 /**
@@ -95,15 +96,18 @@ export function wrapProvider(config: WrapProviderConfig): CrossChainProvider {
           body: JSON.stringify({jsonrpc: "2.0", id: 1, method, params}),
           signal: timeoutSignal(10_000),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const body = (await res.json()) as {result?: unknown; error?: {message?: string}};
-        if (body.error) throw new Error(body.error.message ?? "rpc error");
+        // 429 rate_limited (Retry-After), 401 / 403 key_rejected, anything else the node failing.
+        if (!res.ok) throw withReason(new Error(`HTTP ${res.status}`), httpRefusal(res.status, res.headers?.get?.("retry-after")) ?? {reason: "upstream_unavailable", httpStatus: res.status});
+        const body = (await res.json()) as {result?: unknown; error?: {code?: number; message?: string}};
+        // A node's throttling answer (-32005 "limit exceeded", or a 429 code in the body): rate_limited; any other RPC error: upstream_unavailable.
+        if (body.error) throw refusal(body.error.code === -32005 || body.error.code === 429 ? "rate_limited" : "upstream_unavailable", body.error.message ?? "rpc error");
         return body.result ?? null;
       } catch (e) {
         lastErr = e;
       }
     }
-    throw new Error(`wrap: no RPC answered on chain ${chainId} (${lastErr instanceof Error ? lastErr.message : String(lastErr)})`);
+    // The last endpoint's classification (its HTTP status); a network failure, a timeout or malformed JSON: upstream_unavailable.
+    throw withReason(new Error(`wrap: no RPC answered on chain ${chainId} (${lastErr instanceof Error ? lastErr.message : String(lastErr)})`), refusalOf(lastErr) ?? {reason: "upstream_unavailable"});
   }
 
   function verify(chainId: number): Promise<void> {
@@ -114,7 +118,7 @@ export function wrapProvider(config: WrapProviderConfig): CrossChainProvider {
         const read = async (fn: "symbol" | "decimals") =>
           decodeFunctionResult({abi: WETH_ABI, functionName: fn, data: (await rpc(chainId, "eth_call", [{to: w.address, data: encodeFunctionData({abi: WETH_ABI, functionName: fn})}, "latest"])) as Hex});
         const [symbol, decimals] = await Promise.all([read("symbol"), read("decimals")]);
-        if (symbol !== w.symbol || Number(decimals) !== 18) throw new Error(`wrap: ${w.address} on chain ${chainId} is not ${w.symbol} — refusing`);
+        if (symbol !== w.symbol || Number(decimals) !== 18) throw refusal("vault_mismatch", `wrap: ${w.address} on chain ${chainId} is not ${w.symbol} — refusing`);
       })();
       p.catch(() => verified.delete(chainId));
       verified.set(chainId, p);
@@ -134,27 +138,30 @@ export function wrapProvider(config: WrapProviderConfig): CrossChainProvider {
     },
 
     async getQuote(params: QuoteParams): Promise<Quote | null> {
-      const refuse = (why: string): null => {
-        params.onRefusal?.(`wrap: ${why}`);
+      // The reason goes to onRefusal next to the text; an unclassified refusal (a developer's bad argument) has none.
+      const refuse = (why: string, reason?: Swap2RefusalReason | Swap2RefusalInfo): null => {
+        const info = typeof reason === "string" ? {reason} : reason;
+        if (info) params.onRefusal?.(`wrap: ${why}`, info);
+        else params.onRefusal?.(`wrap: ${why}`);
         return null;
       };
-      if (params.flex) return refuse("amount-flexible deposits are not supported");
-      if (params.sourceChain !== params.destChain) return refuse("same-chain only");
+      if (params.flex) return refuse("amount-flexible deposits are not supported", "unsupported_pair");
+      if (params.sourceChain !== params.destChain) return refuse("same-chain only", "unsupported_pair");
       const chainId = chainIdOf(params.sourceChain);
-      if (chainId === null) return refuse(`no wrapped native token or RPC for ${params.sourceChain}`);
+      if (chainId === null) return refuse(`no wrapped native token or RPC for ${params.sourceChain}`, "unsupported_pair");
       const w = wrapped[chainId]!;
       const src = ccAsset(params.sourceChain, params.sourceToken);
-      if (!src) return refuse(`unknown source token ${params.sourceToken}`);
+      if (!src) return refuse(`unknown source token ${params.sourceToken}`, "unsupported_pair");
       const nativeIn = !src.contract;
       const srcIsWrapped = !!src.contract && /^0x[0-9a-fA-F]{40}$/.test(src.contract) && getAddress(src.contract) === getAddress(w.address);
       const nativeOut = /^0x0+$/.test(params.destToken);
       const destIsWrapped = /^0x[0-9a-fA-F]{40}$/.test(params.destToken) && !nativeOut && getAddress(params.destToken) === getAddress(w.address);
       const wrap = nativeIn && destIsWrapped;
       const unwrap = srcIsWrapped && nativeOut;
-      if (!wrap && !unwrap) return refuse(`only ${w.symbol.slice(1)} ↔ ${w.symbol}`);
+      if (!wrap && !unwrap) return refuse(`only ${w.symbol.slice(1)} ↔ ${w.symbol}`, "unsupported_pair");
       // WETH9 credits / pays msg.sender: the recipient can only be the sender.
       if (params.refundAddress && /^0x[0-9a-fA-F]{40}$/.test(params.refundAddress) && getAddress(params.refundAddress) !== getAddress(params.destAddress)) {
-        return refuse("wrapping pays the sender's own address — send the result separately");
+        return refuse("wrapping pays the sender's own address — send the result separately", "recipient_mismatch");
       }
       let amount: bigint;
       try {
@@ -162,12 +169,13 @@ export function wrapProvider(config: WrapProviderConfig): CrossChainProvider {
       } catch {
         return refuse("amount is not an integer");
       }
-      if (amount <= 0n) return refuse("amount must be positive");
-      if (params.minAmountOut !== undefined && amount < BigInt(params.minAmountOut)) return refuse(`floor breach (min=${amount} < floor=${params.minAmountOut})`);
+      if (amount <= 0n) return refuse("amount must be positive", "amount_too_small");
+      if (params.minAmountOut !== undefined && amount < BigInt(params.minAmountOut)) return refuse(`floor breach (min=${amount} < floor=${params.minAmountOut})`, "price_check_failed");
       try {
         await verify(chainId);
       } catch (e) {
-        return refuse(e instanceof Error ? e.message.replace(/^wrap: /, "") : String(e));
+        // vault_mismatch for a contract that is not the pinned wrapper; the RPC's own failure; an undecodable answer: upstream_unavailable.
+        return refuse(e instanceof Error ? e.message.replace(/^wrap: /, "") : String(e), refusalOf(e) ?? "upstream_unavailable");
       }
       const data = wrap ? encodeFunctionData({abi: WETH_ABI, functionName: "deposit"}) : encodeFunctionData({abi: WETH_ABI, functionName: "withdraw", args: [amount]});
       return {
@@ -189,7 +197,7 @@ export function wrapProvider(config: WrapProviderConfig): CrossChainProvider {
 
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
       const tx = quote.txRequest;
-      if (!tx?.to || !tx.data) throw new Error("swap2: wrap quote has no transaction request");
+      if (!tx?.to || !tx.data) throw refusal("policy_refused", "swap2: wrap quote has no transaction request");
       return {chain: "", to: tx.to, value: tx.value ?? "0", data: tx.data, ...(tx.chainId !== undefined ? {chainId: tx.chainId} : {}), ...(tx.gasLimit ? {gasLimit: tx.gasLimit} : {})};
     },
 
@@ -208,6 +216,29 @@ export function wrapProvider(config: WrapProviderConfig): CrossChainProvider {
   };
 }
 
+/**
+ * The reason behind each text {@link wrapVerifyQuote} returns, read back by `wrapPins.reasonOf` so a remote stub's
+ * refusal carries it: a pair or route this venue does not serve (`unsupported_pair`), a recipient other than the
+ * sender (`recipient_mismatch`), another contract or an approval (`vault_mismatch`), amounts that are not integers
+ * (`upstream_unavailable`), any other call, chain, amount or value (`policy_refused`).
+ */
+const notes = refusalNotes();
+const note = notes.note;
+
+/**
+ * `read(value)` over a field of the backend's quote. What it throws (an amount that is not an integer, a target that is
+ * not an address) is thrown as before; its text is noted (`upstream_unavailable`: an answer of another shape), so the
+ * stub's "fails this app's own check" carries the reason.
+ */
+function shaped<A, R>(read: (value: A) => R, value: A): R {
+  try {
+    return read(value);
+  } catch (e) {
+    if (e instanceof Error) note(e.message, "upstream_unavailable");
+    throw e;
+  }
+}
+
 function wrappedFor(chain: string): {address: `0x${string}`; symbol: string} | undefined {
   const id = /^eip155:[0-9]+$/.test(chain) ? Number(chain.slice(7)) : NaN;
   return Object.prototype.hasOwnProperty.call(WRAPPED_NATIVE, id) ? WRAPPED_NATIVE[id] : undefined;
@@ -221,44 +252,44 @@ function wrappedFor(chain: string): {address: `0x${string}`; symbol: string} | u
  */
 export function wrapVerifyQuote(params: QuoteParams, quote: Quote): string | null {
   const w = wrappedFor(params.sourceChain);
-  if (!w || params.destChain !== params.sourceChain) return "not a same-chain wrap on a pinned wrapped native";
+  if (!w || params.destChain !== params.sourceChain) return note("not a same-chain wrap on a pinned wrapped native", "unsupported_pair");
   const src = ccAsset(params.sourceChain, params.sourceToken);
-  if (!src) return `unknown source token ${params.sourceToken}`;
+  if (!src) return note(`unknown source token ${params.sourceToken}`, "unsupported_pair");
   const nativeIn = !src.contract;
   const srcIsWrapped = !!src.contract && /^0x[0-9a-fA-F]{40}$/.test(src.contract) && getAddress(src.contract) === getAddress(w.address);
   const nativeOut = /^0x0+$/.test(params.destToken);
   const destIsWrapped = /^0x[0-9a-fA-F]{40}$/.test(params.destToken) && !nativeOut && getAddress(params.destToken) === getAddress(w.address);
   const wrap = nativeIn && destIsWrapped;
-  if (!wrap && !(srcIsWrapped && nativeOut)) return `only ${w.symbol.slice(1)} ↔ ${w.symbol}`;
+  if (!wrap && !(srcIsWrapped && nativeOut)) return note(`only ${w.symbol.slice(1)} ↔ ${w.symbol}`, "unsupported_pair");
   if (params.refundAddress && /^0x[0-9a-fA-F]{40}$/.test(params.refundAddress) && (!/^0x[0-9a-fA-F]{40}$/.test(params.destAddress) || getAddress(params.refundAddress) !== getAddress(params.destAddress))) {
-    return "wrapping pays the sender's own address";
+    return note("wrapping pays the sender's own address", "recipient_mismatch");
   }
   const tx = quote.txRequest;
-  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no wrapped-native call";
-  if (getAddress(tx.to) !== getAddress(w.address)) return `the call targets ${tx.to}, not ${w.symbol}`;
-  if (tx.approvalAddress !== undefined) return "a wrap approves nothing";
-  if (tx.chainId !== undefined && `eip155:${tx.chainId}` !== params.sourceChain) return `the call is for chain ${tx.chainId}`;
+  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return note("the quote carries no wrapped-native call", "policy_refused");
+  if (shaped(getAddress, tx.to) !== getAddress(w.address)) return note(`the call targets ${tx.to}, not ${w.symbol}`, "vault_mismatch");
+  if (tx.approvalAddress !== undefined) return note("a wrap approves nothing", "vault_mismatch");
+  if (tx.chainId !== undefined && `eip155:${tx.chainId}` !== params.sourceChain) return note(`the call is for chain ${tx.chainId}`, "policy_refused");
   let amount: bigint, value: bigint;
   try {
     amount = BigInt(params.amountIn);
     value = BigInt(tx.value ?? "0");
   } catch {
-    return "the request does not name amounts";
+    return note("the request does not name amounts", "upstream_unavailable");
   }
-  if (BigInt(quote.sourceAmount) !== amount) return `the quote moves ${quote.sourceAmount}, not the ${amount} input`;
+  if (shaped(BigInt, quote.sourceAmount) !== amount) return note(`the quote moves ${quote.sourceAmount}, not the ${amount} input`, "policy_refused");
   let call: {functionName: string; args?: readonly unknown[]};
   try {
     call = decodeFunctionData({abi: WETH_ABI, data: tx.data as Hex});
   } catch {
-    return "the call is neither deposit() nor withdraw(amount)";
+    return note("the call is neither deposit() nor withdraw(amount)", "policy_refused");
   }
   if (wrap) {
-    if (call.functionName !== "deposit" || tx.data.length !== 10) return `${call.functionName} is not deposit()`;
-    if (value !== amount) return `deposit() attaches ${value}, not the ${amount} input`;
+    if (call.functionName !== "deposit" || tx.data.length !== 10) return note(`${call.functionName} is not deposit()`, "policy_refused");
+    if (value !== amount) return note(`deposit() attaches ${value}, not the ${amount} input`, "policy_refused");
   } else {
-    if (call.functionName !== "withdraw") return `${call.functionName} is not withdraw(amount)`;
-    if (call.args?.[0] !== amount) return `withdraw(${String(call.args?.[0])}) is not the ${amount} input`;
-    if (value !== 0n) return "withdraw attaches no value";
+    if (call.functionName !== "withdraw") return note(`${call.functionName} is not withdraw(amount)`, "policy_refused");
+    if (call.args?.[0] !== amount) return note(`withdraw(${String(call.args?.[0])}) is not the ${amount} input`, "policy_refused");
+    if (value !== 0n) return note("withdraw attaches no value", "policy_refused");
   }
   return null;
 }
@@ -275,4 +306,5 @@ export const wrapPins: RemotePins = Object.freeze({
   },
   spenders: (): readonly string[] => [],
   verifyQuote: wrapVerifyQuote,
+  reasonOf: notes.reasonOf,
 });
