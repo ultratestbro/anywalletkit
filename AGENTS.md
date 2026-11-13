@@ -280,6 +280,11 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
 
 - `quoteSwap2(options)` returns the single best quote; `quoteSwap2Routes` streams every provider's.
 - Execution **requires** `minAmountOut` and re-quotes; pass the same `slippage` you quoted with.
+- A native fee a route charges on top of the input is capped per chain at execution (0.005 ETH on Ethereum and chains
+  without a row, 100 CELO on Celo …). To allow one route above it, set `nativeFeeCeiling: (ctx) => bigint | undefined`
+  on the config: `ctx` = `{ provider, intentId, fromChain, destChain, nativeFee, defaultCap, maxCeiling }`; return the
+  cap in base units for the routes you mean (at most `ctx.maxCeiling` = 20 × the chain's cap) and `undefined` for every
+  other. Anything else or a throw refuses the swap. Quotes and `quoteSwap2Routes` do not apply the cap.
 - Errors: `Swap2MaybeSentError` (may be on chain — never retry, track `e.id`/`e.hash`), `Swap2InFlightError`
   (double tap), `Swap2InsufficientGasError`, `Swap2FeeLimitError`, `Swap2QuoteError` (no route; message says why).
 - Keys: LI.FI `apiKey` (rate limit), 1Click `jwt` (no fee). Fynd needs an `apiKey`. Chainflip, Uniswap,

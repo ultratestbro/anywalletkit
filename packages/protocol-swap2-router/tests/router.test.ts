@@ -381,3 +381,68 @@ describe("quoteValues (SDK-127): USD in / out / loss and the better alternative 
     expect(v.find((x) => x.provider === "lifi")!.betterAlternative).toBeUndefined();
   });
 });
+
+describe("nativeFeeCeiling through the router (USDT0 Legacy Mesh into Tron, 2026-11-13)", () => {
+  const OFT = "0x1F748c76dE468e9D11bd340fA9D5CBADf315dFB0";
+  const FEE = 6_676_000_000_000_000n; // 0.006676 ETH: the live LayerZero fee into Tron + the provider's 25 % headroom
+  const mesh = (name = "usdt0", intentId = "usdt0-mesh:30101:30420") => provider(name, {
+    getQuote: async (params) => ({
+      provider: name, intentId, depositAddress: "", depositMemo: null,
+      txRequest: {to: OFT, data: "0xc7c7f5b3", value: FEE.toString(), chainId: 1, gasLimit: "400000", approvalAddress: OFT, nativeFee: FEE.toString()},
+      sourceAmount: params.amountIn, destAmount: "9997000", minDestAmount: "9997000",
+      feeUsd: 0, etaSeconds: 120, reliability: 1, validUntilMs: Date.now() + 60_000,
+    }),
+    buildDeposit: async (q) => {
+      const {nativeFee: _fee, ...tx} = q.txRequest!;
+      return {...tx, chain: "eip155:1", to: tx.to!, value: tx.value ?? "0"};
+    },
+  });
+  const account = (sent: string[]) => ({
+    getAddress: async () => "0x4444444444444444444444444444444444444444", getChainId: async () => 1, getAllowance: async () => 0n,
+    sendTransaction: async (tx: {data?: string}) => { sent.push(tx.data ?? ""); return {hash: "0x1"}; },
+  });
+  const options = {fromToken: "USDT", toToken: "USDT", toChain: "tron:728126428", recipient: "TJRabPrwbZy45sbavfcjinPJC18kjpRTv8", fromTokenAmount: 10_000_000n, minAmountOut: 9_997_000n};
+  const tronMesh = ({provider: name, intentId, fromChain, destChain}: {provider: string; intentId: string; fromChain: string; destChain: string}) =>
+    name === "usdt0" && destChain === "tron:728126428" && /^usdt0-mesh:\d+:30420(?:~|$)/.test(intentId) && fromChain === "eip155:1" ? 10n ** 16n : undefined;
+  /** swap2() through `protocol`, stopped at the review: the reviewed value, or the refusal. */
+  const attempt = async (protocol: RouterSwap2Protocol): Promise<bigint | string> => {
+    try {
+      await protocol.swap2(options);
+      return "resolved";
+    } catch (e) {
+      const m = (e as Error).message;
+      return m.startsWith("stopped at review: ") ? BigInt(m.slice("stopped at review: ".length)) : m;
+    }
+  };
+  const review = (plan: {source: {kind: string; value?: bigint}}) => { throw new Error(`stopped at review: ${plan.source.value}`); };
+
+  it("the router executes the route the app allows, and refuses it with today's text without the hook", async () => {
+    const sent: string[] = [];
+    const allowed = new RouterSwap2Protocol(account(sent), {fromChain: "eip155:1", providers: [mesh()], nativeFeeCeiling: tronMesh, reviewExecution: review});
+    expect(await attempt(allowed)).toBe(FEE);
+    const plain = new RouterSwap2Protocol(account(sent), {fromChain: "eip155:1", providers: [mesh()], reviewExecution: review});
+    expect(await attempt(plain)).toBe("swap2: quoted native fee 6676000000000000 exceeds the cap 5000000000000000 for eip155:1");
+    const other = new RouterSwap2Protocol(account(sent), {fromChain: "eip155:1", providers: [mesh("copycat")], nativeFeeCeiling: tronMesh, reviewExecution: review});
+    expect(await attempt(other)).toBe("swap2: quoted native fee 6676000000000000 exceeds the cap 5000000000000000 for eip155:1");
+    expect(sent).toEqual([]);
+  });
+
+  it("using() — the route the user picked — keeps the hook, and a later change to the caller's config does not reach it", async () => {
+    const sent: string[] = [];
+    const config: ConstructorParameters<typeof RouterSwap2Protocol>[1] = {fromChain: "eip155:1", providers: [mesh(), provider("other")], nativeFeeCeiling: tronMesh, reviewExecution: review};
+    const swap2 = new RouterSwap2Protocol(account(sent), config);
+    config.nativeFeeCeiling = () => undefined;
+    expect(await attempt(swap2.using("usdt0"))).toBe(FEE);
+    expect(await attempt(swap2)).toBe(FEE);
+    expect(sent).toEqual([]);
+  });
+
+  it("the route list has no native-fee check: the route is listed with or without the hook, and only swap2() decides", async () => {
+    const withHook = new RouterSwap2Protocol(undefined, {fromChain: "eip155:1", providers: [mesh()], nativeFeeCeiling: () => { throw new Error("not asked at quote time"); }});
+    const without = new RouterSwap2Protocol(undefined, {fromChain: "eip155:1", providers: [mesh()]});
+    for (const p of [withHook, without]) {
+      expect((await p.quoteSwap2Routes(options)).map((r) => r.provider)).toEqual(["usdt0"]);
+      expect((await p.quoteSwap2(options)).toTokenAmountMin).toBe(9_997_000n);
+    }
+  });
+});

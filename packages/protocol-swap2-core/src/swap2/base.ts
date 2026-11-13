@@ -171,12 +171,97 @@ const NATIVE_FEE_CAP: Readonly<Record<string, bigint>> = Object.freeze({
 });
 const DEFAULT_NATIVE_FEE_CAP = 5_000_000_000_000_000n; // 0.005 of an ETH-denominated L2
 
-function declaredNativeFee(q: {txRequest?: {nativeFee?: string}}, chain: string): bigint {
+/**
+ * The hard maximum of {@link Swap2EngineConfig.nativeFeeCeiling}: it may name at most this many times the chain's
+ * default cap (0.1 ETH on Ethereum and the ETH-denominated L2s, 2000 CELO on Celo). A value above it is refused, so a
+ * units slip (wei for gwei, an extra zero) or a "no limit" sentinel cannot switch the ceiling off.
+ */
+export const NATIVE_FEE_CEILING_MAX_MULTIPLE = 20n;
+
+/** What {@link Swap2EngineConfig.nativeFeeCeiling} is asked about: the native fee one execution's quote declares. */
+export interface Swap2NativeFeeCeilingContext {
+  /**
+   * The provider the route came from, e.g. `"usdt0"`: the name it is installed under (the router binds every quote to
+   * its provider's name, so a quote cannot claim another venue's).
+   */
+  readonly provider: string;
+  /**
+   * The quote's intent id as the provider wrote it, e.g. `"usdt0-mesh:30101:30420"` (USDT0 Legacy Mesh, Ethereum →
+   * Tron). Through a swap2 server (`remoteProvider`) it ends in `~<token>`: match its start.
+   */
+  readonly intentId: string;
+  /** CAIP-2 of the source chain, where the fee is paid (`"eip155:1"`). */
+  readonly fromChain: string;
+  /** CAIP-2 of the destination in the catalog form: Tron is `"tron:728126428"` whichever form the app passed. */
+  readonly destChain: string;
+  /** The native fee the quote declares, in base units of the source chain's native coin. */
+  readonly nativeFee: bigint;
+  /** The engine's own cap for `fromChain`: what applies when the hook returns `undefined`. */
+  readonly defaultCap: bigint;
+  /** The most the hook may return: {@link NATIVE_FEE_CEILING_MAX_MULTIPLE} × `defaultCap`. */
+  readonly maxCeiling: bigint;
+}
+
+/** The route a declared native fee is judged for, and the app's hook (absent: the per-chain cap). */
+interface NativeFeeRoute {
+  provider: string;
+  intentId: string;
+  destChain: string;
+  ceiling?: (ctx: Swap2NativeFeeCeilingContext) => bigint | undefined;
+}
+
+/** A hook's answer for a refusal text: its type and a short rendering, never the whole value. */
+function describeCeilingAnswer(value: unknown): string {
+  if (value === null) return "null";
+  if (typeof value === "bigint") return String(value);
+  if (typeof value === "string") return `the string "${value.slice(0, 40)}"`;
+  if (typeof value === "number" || typeof value === "boolean") return `the ${typeof value} ${String(value)}`;
+  if (typeof value === "function") return "a function";
+  let thenable = false;
+  try {
+    thenable = typeof (value as {then?: unknown}).then === "function";
+    // An async hook: its answer comes too late to count, and its rejection must not surface as an unhandled one.
+    if (thenable) (value as Promise<unknown>).then(undefined, () => {});
+  } catch { /* an exotic object: described as one */ }
+  return thenable ? "a Promise (the hook must answer synchronously)" : typeof value === "object" ? "an object" : `a ${typeof value}`;
+}
+
+/** The cap a declared `fee` on `chain` is held to: the per-chain default, or the app's hook for this route. */
+function nativeFeeCap(chain: string, fee: bigint, route?: NativeFeeRoute): bigint {
+  const defaultCap = NATIVE_FEE_CAP[chain] ?? DEFAULT_NATIVE_FEE_CAP;
+  const hook = route?.ceiling;
+  if (hook === undefined) return defaultCap;
+  const maxCeiling = defaultCap * NATIVE_FEE_CEILING_MAX_MULTIPLE;
+  const where = `${route!.provider} ${chain} → ${route!.destChain}`;
+  if (typeof hook !== "function") {
+    throw new Swap2ConfigurationError(`swap2: nativeFeeCeiling is ${describeCeilingAnswer(hook)}, not a function — the native fee of ${where} is refused`);
+  }
+  const ctx: Swap2NativeFeeCeilingContext = Object.freeze({
+    provider: route!.provider, intentId: route!.intentId, fromChain: chain, destChain: route!.destChain, nativeFee: fee, defaultCap, maxCeiling,
+  });
+  let answer: unknown;
+  try {
+    answer = hook(ctx);
+  } catch (error) {
+    const why = (error instanceof Error ? error.message : String(error)).slice(0, 160);
+    throw new Swap2ConfigurationError(`swap2: nativeFeeCeiling threw for ${where} (${why}) — the native fee is refused`, {cause: error});
+  }
+  if (answer === undefined) return defaultCap;
+  if (typeof answer !== "bigint" || answer < 0n) {
+    throw new Swap2ConfigurationError(`swap2: nativeFeeCeiling returned ${describeCeilingAnswer(answer)} for ${where}, not a non-negative bigint or undefined — the native fee is refused`);
+  }
+  if (answer > maxCeiling) {
+    throw new Swap2ConfigurationError(`swap2: nativeFeeCeiling returned ${answer} for ${where}, above the hard maximum ${maxCeiling} (${NATIVE_FEE_CEILING_MAX_MULTIPLE} × the default cap ${defaultCap}) — the native fee is refused`);
+  }
+  return answer;
+}
+
+function declaredNativeFee(q: {txRequest?: {nativeFee?: string}}, chain: string, route?: NativeFeeRoute): bigint {
   const raw = q.txRequest?.nativeFee;
   if (raw === undefined) return 0n;
   if (!/^\d+$/.test(raw)) throw new Error("swap2: quote declares a malformed native fee");
   const fee = BigInt(raw);
-  const cap = NATIVE_FEE_CAP[chain] ?? DEFAULT_NATIVE_FEE_CAP;
+  const cap = nativeFeeCap(chain, fee, route);
   if (fee > cap) throw new Error(`swap2: quoted native fee ${fee} exceeds the cap ${cap} for ${chain}`);
   return fee;
 }
@@ -268,6 +353,36 @@ export interface Swap2EngineConfig extends Swap2ProtocolConfig {
    * refused (scan 2026-10-27 modules, F7).
    */
   tonGasCeiling?: bigint | number | string;
+  /**
+   * The app's native-fee ceiling for a route. A route may charge native coin on top of the input (a bridge's messaging
+   * fee, declared by the quote); the engine refuses a fee above its per-chain cap (0.005 ETH on Ethereum and on chains
+   * without a row, 100 CELO on Celo, …). This hook is asked for every execution pass whose quote declares a native fee, before
+   * that pass's review and approvals (once, unless the quote expires during an approval and the engine re-quotes: the
+   * fresh quote is asked again; a refusal then revokes the allowance just granted):
+   *
+   * - a non-negative `bigint` is the cap for that execution, in place of the chain's own (higher or lower; `0n` refuses
+   *   any fee). It may be at most {@link NATIVE_FEE_CEILING_MAX_MULTIPLE} × the chain's cap (`ctx.maxCeiling`);
+   * - `undefined` keeps the chain's cap, exactly as without the hook;
+   * - anything else (a number, a string, `null`, a Promise), a value above `ctx.maxCeiling`, or a throw refuses the
+   *   execution (`Swap2ConfigurationError`). There is no answer that removes the cap. The option itself is a function or
+   *   left out: any other value (`null` included) refuses every execution that declares a native fee.
+   *
+   * Route policy is the app's: match the provider, the destination and the intent id, and leave every other route to
+   * the default. USDT0 Legacy Mesh into Tron (LayerZero eid 30420; its fee, 0.0053 ETH / 170 CELO on 2026-11-12 plus
+   * the provider's 25 % headroom, is above the default caps):
+   *
+   * ```ts
+   * const TRON_MESH = new Map([["eip155:1", 10n ** 16n], ["eip155:42161", 10n ** 16n], ["eip155:42220", 300n * 10n ** 18n]]);
+   * nativeFeeCeiling: ({provider, intentId, fromChain, destChain}) =>
+   *   provider === "usdt0" && destChain === "tron:728126428" && /^usdt0-mesh:\d+:30420(?:~|$)/.test(intentId)
+   *     ? TRON_MESH.get(fromChain) // 0.01 ETH on Ethereum and Arbitrum, 300 CELO on Celo; other sources: the default
+   *     : undefined
+   * ```
+   *
+   * Only execution (`swap2()`) applies a native-fee cap: `quoteSwap2` and the router's route list do not check one, so
+   * they list a route whose fee is above the cap, and its `swap2()` refuses it.
+   */
+  nativeFeeCeiling?: (ctx: Swap2NativeFeeCeilingContext) => bigint | undefined;
   /**
    * Review gate: called once the live quote is built and every payload/value
    * check has passed, BEFORE any approval or signature. It receives a copy of
@@ -1194,6 +1309,9 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     const source = this.sourceAsset(executionOptions);
     if (!source) throw new Error(`swap2: unknown source token '${executionOptions.fromToken}' on ${this.fromChain}`);
     const executionValue = BigInt(unsigned.value);
+    // The route a declared native fee is capped for: the app's nativeFeeCeiling sees it, the per-chain cap otherwise.
+    const ceiling = (this._config as Swap2EngineConfig).nativeFeeCeiling;
+    const feeRoute: NativeFeeRoute = {provider: q.provider, intentId: q.intentId, destChain: params.destChain, ...(ceiling !== undefined ? {ceiling} : {})};
     if (serialized) {
       // The native coin leaves through the serialized tx itself; `value` only
       // declares what the account may let it take: the input for a native
@@ -1202,14 +1320,14 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         throw new Error("swap2: provider execution amount does not match the validated quote");
       }
     } else if (source.contract && this.fromChain.startsWith("eip155:")) {
-      // Only a fee the sealed quote declared, and only up to the chain's cap.
-      const declared = declaredNativeFee(q, this.fromChain);
+      // Only a fee the sealed quote declared, and only up to the route's cap (the chain's, or the app's nativeFeeCeiling).
+      const declared = declaredNativeFee(q, this.fromChain, feeRoute);
       if (executionValue !== declared) {
         throw new Error(declared === 0n
           ? "swap2: token execution attempted to attach native value"
           : `swap2: token execution value ${executionValue} does not match the quoted native fee ${declared}`);
       }
-    } else if (!unsigned.typedData && !unsigned.bodyBoc && executionValue !== BigInt(q.sourceAmount) + declaredNativeFee(q, this.fromChain)) {
+    } else if (!unsigned.typedData && !unsigned.bodyBoc && executionValue !== BigInt(q.sourceAmount) + declaredNativeFee(q, this.fromChain, feeRoute)) {
       throw new Error("swap2: provider execution amount does not match the validated quote");
     }
 

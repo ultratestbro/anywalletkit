@@ -93,7 +93,9 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
       ...(config.tieBand !== undefined ? {tieBand: config.tieBand} : {}),
     });
     this.account = account;
-    this.routerConfig = config;
+    // A snapshot, like the engine's own: `using()` builds the picked route's protocol from it, so a later change to the
+    // caller's object cannot hand that route another `nativeFeeCeiling` or `reviewExecution`, nor change `prefer` after construction.
+    this.routerConfig = Object.freeze({...config});
   }
 
   protected resolveQuote(params: QuoteParams): Promise<Quote | null> {
