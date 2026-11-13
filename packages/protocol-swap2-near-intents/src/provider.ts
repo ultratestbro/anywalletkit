@@ -3,6 +3,8 @@ import {describeNearIntentsActivity} from "./activity.js";
 import {namespace, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import {CC_DEST, ccAsset, ccAssetByToken, ccChain} from "@anywalletkit/swap2-assets";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {httpRefusal, parseRetryAfter, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
+import {reasonOf} from "./refusals.js";
 
 /**
  * NEAR Intents (1Click) provider — the core route, broadest coverage:
@@ -139,6 +141,41 @@ function minimumRefusal(message: string, origin: {symbol: string; decimals: numb
   return null;
 }
 
+/** 1Click's error messages that name one reason (its error answers carry a message, no code). */
+const ONE_CLICK_MESSAGE_REASONS: readonly (readonly [RegExp, Swap2RefusalReason])[] = [
+  [/no liquidity|insufficient liquidity|not enough liquidity/i, "insufficient_liquidity"],
+  [/minimum swap amount|amount is too (?:low|small)|below the minimum/i, "amount_too_small"],
+  [/maximum swap amount|amount is too (?:high|large)|above the maximum/i, "amount_too_large"],
+  [/rate limit|too many requests/i, "rate_limited"],
+  [/invalid (?:recipient|refund)|(?:recipient|refund)\w* (?:address )?is (?:not valid|invalid)/i, "recipient_mismatch"],
+  [/paused|halted|maintenance|suspended/i, "chain_halted"],
+  [/unknown asset|not supported|unsupported|not available|is not valid/i, "unsupported_pair"],
+  [/no quote|no route|failed to get quote/i, "no_route"],
+];
+
+/** What a message may still name on a 408 / 425 / 5xx: a passing condition, never a verdict on the pair or the route. */
+const ONE_CLICK_TRANSIENT_REASONS: ReadonlySet<Swap2RefusalReason> = new Set(["insufficient_liquidity", "rate_limited", "chain_halted"]);
+
+/**
+ * Why 1Click answered a quote with an error status (or never answered): 429 (with Retry-After) and 401 / 403 by
+ * their status; 408 / 425 / 5xx as `upstream_unavailable` unless the message names a passing condition (liquidity,
+ * throttling, a halt), since a failing 1Click says nothing about the pair or the route; any other status by what
+ * its message says, else 1Click declining to route the request (`no_route`). No answer at all is `upstream_unavailable`.
+ */
+function oneClickRefusal(status: number | undefined, retryAfter: string | null | undefined, message: string): Swap2RefusalInfo {
+  if (status === undefined) return {reason: "upstream_unavailable"};
+  const http = httpRefusal(status, retryAfter);
+  if (http && http.reason !== "upstream_unavailable") return http;
+  const byMessage = ONE_CLICK_MESSAGE_REASONS.find(([pattern]) => pattern.test(message))?.[1];
+  if (http && !(byMessage !== undefined && ONE_CLICK_TRANSIENT_REASONS.has(byMessage))) return http;
+  if (byMessage === "rate_limited") {
+    const wait = parseRetryAfter(retryAfter);
+    return {reason: byMessage, httpStatus: status, ...(wait !== undefined ? {retryAfterMs: wait} : {})};
+  }
+  if (byMessage) return {reason: byMessage};
+  return {reason: "no_route"};
+}
+
 /** Explicit constructor configuration; no deployment environment is read. */
 export interface NearIntentsProviderConfig {
   enabled?: boolean;
@@ -235,11 +272,14 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
       // is just `null`), and "no route" bugs hide in exactly that silence.
       // `shown`, when given, is the user-presentable text the caller hands on (a router rejection,
       // the server's {noQuote}); the log line keeps the debug suffix either way.
-      const refuse = (reason: string, shown?: string): null => {
+      // `why` classifies the refusal (see Swap2RefusalReason); the text is the same with or without it.
+      const refuse = (reason: string, shown?: string, why?: Swap2RefusalReason | Swap2RefusalInfo): null => {
         const detail = `${reason} [dry=${params.dry !== false} ${params.sourceChain}->${params.destChain} amount=${params.amountIn}]`;
         // Caller fields and 1Click text are untrusted: no control characters in server logs.
         console.warn(`near-intents: no quote — ${detail.replace(/[\u0000-\u001f\u007f]/g, " ")}`);
-        params.onRefusal?.(shown ?? detail);
+        const info = typeof why === "string" ? {reason: why} : why;
+        if (info) params.onRefusal?.(shown ?? detail, info);
+        else params.onRefusal?.(shown ?? detail);
         return null;
       };
       // Up-front, named refusals — no wire call for a corridor 1Click cannot
@@ -251,15 +291,15 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
       const rawIntentsDest = intents && INTENTS_TOKEN_ID.test(params.destToken);
       const chainRefusal = nearIntentsChainRefusal(params.sourceChain, paused)
         ?? (rawIntentsDest ? null : nearIntentsChainRefusal(params.destChain, paused));
-      if (chainRefusal) return refuse(chainRefusal);
-      if (!intentsDestOk(params.destChain)) return refuse(`${recipientType} credits intents.near: destChain must be a NEAR chain, not ${params.destChain}`);
+      if (chainRefusal) return refuse(chainRefusal, undefined, reasonOf(chainRefusal));
+      if (!intentsDestOk(params.destChain)) return refuse(`${recipientType} credits intents.near: destChain must be a NEAR chain, not ${params.destChain}`, undefined, "unsupported_pair");
       if (intents && !intentsAccountId(params.destAddress)) {
-        return refuse(`${recipientType} recipient must be a NEAR Intents account id`);
+        return refuse(`${recipientType} recipient must be a NEAR Intents account id`, undefined, "recipient_mismatch");
       }
       const origin = ccAsset(params.sourceChain, params.sourceToken);
-      if (!origin?.assetId) return refuse(`1Click does not list ${params.sourceChain} ${params.sourceToken}`);
+      if (!origin?.assetId) return refuse(`1Click does not list ${params.sourceChain} ${params.sourceToken}`, undefined, "unsupported_pair");
       const destination = destinationAsset(params.destChain, params.destToken);
-      if (!destination) return refuse(`1Click does not list ${params.destChain} ${params.destToken}`);
+      if (!destination) return refuse(`1Click does not list ${params.destChain} ${params.destToken}`, undefined, "unsupported_pair");
       const dry = params.dry !== false;
       // A live quote derives the deposit address from the refund config —
       // never create one without a real refund destination.
@@ -322,27 +362,33 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
           const message = String(data.message ?? "").slice(0, 200);
           // A known amount floor goes out as a stable, presentable reason; any other answer keeps the raw text.
           const below = res?.status === 400 ? minimumRefusal(message, origin) : null;
-          return refuse(`1Click ${res?.status ?? "network error"}: ${message}`, below ?? undefined);
+          return refuse(
+            `1Click ${res?.status ?? "network error"}: ${message}`,
+            below ?? undefined,
+            below ? "amount_too_small" : oneClickRefusal(res?.status, res?.headers?.get?.("retry-after"), message),
+          );
         }
         const q = (data.quote ?? {}) as Record<string, unknown>;
 
         const depositAddress = typeof q.depositAddress === "string" ? q.depositAddress : "";
-        if (!dry && !depositAddress) return refuse("live quote came back without a deposit address");
+        if (!dry && !depositAddress) return refuse("live quote came back without a deposit address", undefined, "upstream_unavailable");
         const inUsd = Number.parseFloat(String(q.amountInUsd ?? "0"));
         const outUsd = Number.parseFloat(String(q.amountOutUsd ?? "0"));
         const parsedDeadline = Date.parse(String(q.deadline ?? ""));
-        if (!dry && (!Number.isFinite(parsedDeadline) || parsedDeadline <= Date.now())) return refuse(`unusable deadline ${String(q.deadline)}`);
+        if (!dry && (!Number.isFinite(parsedDeadline) || parsedDeadline <= Date.now())) {
+          return refuse(`unusable deadline ${String(q.deadline)}`, undefined, Number.isFinite(parsedDeadline) ? "quote_expired" : "upstream_unavailable");
+        }
         const deadline = Number.isFinite(parsedDeadline) && parsedDeadline > Date.now()
           ? Math.min(parsedDeadline, Date.now() + QUOTE_TTL_MS)
           : Date.now() + QUOTE_TTL_MS;
 
-        if (q.amountIn !== undefined && String(q.amountIn) !== params.amountIn) return refuse(`amountIn mismatch (${String(q.amountIn)} vs ${params.amountIn})`);
+        if (q.amountIn !== undefined && String(q.amountIn) !== params.amountIn) return refuse(`amountIn mismatch (${String(q.amountIn)} vs ${params.amountIn})`, undefined, "policy_refused");
 
         // amountOut is optimistic, not a guaranteed floor. Live execution must
         // not fabricate a minimum when the provider omits it.
-        if (q.minAmountOut === undefined || q.minAmountOut === null) return refuse("quote has no minAmountOut");
+        if (q.minAmountOut === undefined || q.minAmountOut === null) return refuse("quote has no minAmountOut", undefined, "upstream_unavailable");
         const minDestAmount = String(q.minAmountOut);
-        if (params.minAmountOut !== undefined && BigInt(minDestAmount) < BigInt(params.minAmountOut)) return refuse(`floor breach (min=${minDestAmount} < floor=${params.minAmountOut})`);
+        if (params.minAmountOut !== undefined && BigInt(minDestAmount) < BigInt(params.minAmountOut)) return refuse(`floor breach (min=${minDestAmount} < floor=${params.minAmountOut})`, undefined, "price_check_failed");
         const depositMemo =
           (typeof q.depositMemo === "string" && q.depositMemo) ||
           (typeof q.memo === "string" && q.memo) ||
@@ -361,7 +407,12 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
           validUntilMs: deadline,
         };
       } catch (err) {
-        return refuse(`threw: ${err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)}`);
+        // The network, 1Click's own 12 s deadline or an answer that does not parse; the caller's own abort is not classified.
+        return refuse(
+          `threw: ${err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)}`,
+          undefined,
+          signal?.aborted ? undefined : (refusalOf(err) ?? "upstream_unavailable"),
+        );
       }
     },
 
@@ -381,8 +432,15 @@ export function nearIntentsProvider(config: NearIntentsProviderConfig = {}): Cro
         headers: authHeaders(config.jwt),
         body: JSON.stringify({depositAddress, txHash}),
         signal: timeoutSignal(12_000),
+      }).catch((err: unknown) => {
+        // Unreachable, or slower than its own 12 s deadline (there is no caller signal here).
+        throw err instanceof Error ? withReason(err, "upstream_unavailable") : err;
       });
-      if (!res.ok) throw new Error(`near-intents: deposit notification failed (${res.status})`);
+      if (!res.ok) {
+        const error = new Error(`near-intents: deposit notification failed (${res.status})`);
+        const info = httpRefusal(res.status, res.headers?.get?.("retry-after"));
+        throw info ? withReason(error, info) : error;
+      }
     },
 
     async trackIntent(ref: IntentRef): Promise<IntentStatus> {

@@ -1,6 +1,7 @@
 import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {namespace} from "@anywalletkit/protocol-swap2-core/util";
 import {ccChain} from "@anywalletkit/swap2-assets";
+import {note} from "./refusals.js";
 
 // ── NEAR Intents (1Click) — core, broadest coverage ─────────────────────────
 const NEAR_INTENTS_NS = new Set([
@@ -18,15 +19,16 @@ export type NearIntentsSuspendedChains = Readonly<Record<string, string>>;
 
 /** Why a chain is refused up front, or null when 1Click can serve it. */
 export function nearIntentsChainRefusal(chain: string, suspended: NearIntentsSuspendedChains = {}): string | null {
-  if (!NEAR_INTENTS_NS.has(namespace(chain))) return `1Click does not serve ${chain}`;
+  if (!NEAR_INTENTS_NS.has(namespace(chain))) return note(`1Click does not serve ${chain}`, "unsupported_pair");
   const why = suspended[chain];
-  if (why) return `1Click corridor paused by the app: ${chain} — ${why}`;
+  // The app's own switch (a disabled provider, for one corridor): its policy, whatever made it pause the corridor.
+  if (why) return note(`1Click corridor paused by the app: ${chain} — ${why}`, "policy_refused");
   // A chain the catalog knows but carries no 1Click asset id for (World Chain,
   // Sei, Ink, Plume, X Layer, Unichain, MegaETH, Linea, Sonic, …) is LI.FI /
   // CCTP territory: the eip155 namespace alone used to claim it, and every
   // quote then died as "unknown asset" (2026-10-16 funded run).
   const listed = ccChain(chain)?.assets.some((a) => a.assetId.length > 0) ?? false;
-  return listed ? null : `1Click does not list ${chain}`;
+  return listed ? null : note(`1Click does not list ${chain}`, "unsupported_pair");
 }
 
 export const nearIntents = {
