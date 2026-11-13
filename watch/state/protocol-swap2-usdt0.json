@@ -1,0 +1,315 @@
+{
+ "module": "@anywalletkit/protocol-swap2-usdt0",
+ "sources": {
+  "mesh-peer-tron-arbitrum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42161,
+    "to": "0x77652d5aba086137b595875263fc200182919b92",
+    "signature": "peers(uint32)",
+    "args": [
+     30420
+    ],
+    "decode": "bytes32"
+   },
+   "value": "\"0x0000000000000000000000003a08f76772e200653bb55c2a92998daca62e0e97\"",
+   "meta": {
+    "call": "peers(uint32) [30420]",
+    "result": "0x0000000000000000000000003a08f76772e200653bb55c2a92998daca62e0e97"
+   },
+   "seenAt": "2026-11-13T14:33:45.720Z",
+   "changedAt": "2026-11-13T14:33:45.720Z"
+  },
+  "mesh-fee-bps-ethereum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x1f748c76de468e9d11bd340fa9d5cbadf315dfb0",
+    "signature": "feeBps()",
+    "decode": "uint256"
+   },
+   "value": "\"3\"",
+   "meta": {
+    "call": "feeBps()",
+    "result": "3"
+   },
+   "seenAt": "2026-11-13T14:33:45.725Z",
+   "changedAt": "2026-11-13T14:33:45.725Z"
+  },
+  "mesh-peer-tron-ethereum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x1f748c76de468e9d11bd340fa9d5cbadf315dfb0",
+    "signature": "peers(uint32)",
+    "args": [
+     30420
+    ],
+    "decode": "bytes32"
+   },
+   "value": "\"0x0000000000000000000000003a08f76772e200653bb55c2a92998daca62e0e97\"",
+   "meta": {
+    "call": "peers(uint32) [30420]",
+    "result": "0x0000000000000000000000003a08f76772e200653bb55c2a92998daca62e0e97"
+   },
+   "seenAt": "2026-11-13T14:33:45.726Z",
+   "changedAt": "2026-11-13T14:33:45.726Z"
+  },
+  "mesh-peer-ton-arbitrum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42161,
+    "to": "0x77652d5aba086137b595875263fc200182919b92",
+    "signature": "peers(uint32)",
+    "args": [
+     30343
+    ],
+    "decode": "bytes32"
+   },
+   "value": "\"0x1ddf580052174ed1dd0d66c35bfdc1a5fcc69af4f4ae36154b13dcfc6c14a35f\"",
+   "meta": {
+    "call": "peers(uint32) [30343]",
+    "result": "0x1ddf580052174ed1dd0d66c35bfdc1a5fcc69af4f4ae36154b13dcfc6c14a35f"
+   },
+   "seenAt": "2026-11-13T14:33:45.727Z",
+   "changedAt": "2026-11-13T14:33:45.727Z"
+  },
+  "mesh-peer-ton-ethereum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x1f748c76de468e9d11bd340fa9d5cbadf315dfb0",
+    "signature": "peers(uint32)",
+    "args": [
+     30343
+    ],
+    "decode": "bytes32"
+   },
+   "value": "\"0x1ddf580052174ed1dd0d66c35bfdc1a5fcc69af4f4ae36154b13dcfc6c14a35f\"",
+   "meta": {
+    "call": "peers(uint32) [30343]",
+    "result": "0x1ddf580052174ed1dd0d66c35bfdc1a5fcc69af4f4ae36154b13dcfc6c14a35f"
+   },
+   "seenAt": "2026-11-13T14:33:45.727Z",
+   "changedAt": "2026-11-13T14:33:45.727Z"
+  },
+  "mesh-oft-arbitrum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x77652d5aba086137b595875263fc200182919b92"
+   },
+   "value": "793fdcf72cd38e67",
+   "meta": {
+    "codeHash": "793fdcf72cd38e67",
+    "bytes": 16575
+   },
+   "seenAt": "2026-11-13T14:33:45.728Z",
+   "changedAt": "2026-11-13T14:33:45.728Z"
+  },
+  "mesh-oft-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x1f748c76de468e9d11bd340fa9d5cbadf315dfb0"
+   },
+   "value": "bfcd6908e89cb415",
+   "meta": {
+    "codeHash": "bfcd6908e89cb415",
+    "bytes": 16575
+   },
+   "seenAt": "2026-11-13T14:33:45.729Z",
+   "changedAt": "2026-11-13T14:33:45.729Z"
+  },
+  "mesh-fee-bps-arbitrum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42161,
+    "to": "0x77652d5aba086137b595875263fc200182919b92",
+    "signature": "feeBps()",
+    "decode": "uint256"
+   },
+   "value": "\"3\"",
+   "meta": {
+    "call": "feeBps()",
+    "result": "3"
+   },
+   "seenAt": "2026-11-13T14:33:45.731Z",
+   "changedAt": "2026-11-13T14:33:45.731Z"
+  },
+  "mesh-oft-celo": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42220,
+    "address": "0xf10e161027410128e63e75d0200fb6d34b2db243"
+   },
+   "value": "f2eae5351c0ed2e1",
+   "meta": {
+    "codeHash": "f2eae5351c0ed2e1",
+    "bytes": 16575
+   },
+   "seenAt": "2026-11-13T14:33:45.809Z",
+   "changedAt": "2026-11-13T14:33:45.809Z"
+  },
+  "mesh-peer-ton-celo": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42220,
+    "to": "0xf10e161027410128e63e75d0200fb6d34b2db243",
+    "signature": "peers(uint32)",
+    "args": [
+     30343
+    ],
+    "decode": "bytes32"
+   },
+   "value": "\"0x1ddf580052174ed1dd0d66c35bfdc1a5fcc69af4f4ae36154b13dcfc6c14a35f\"",
+   "meta": {
+    "call": "peers(uint32) [30343]",
+    "result": "0x1ddf580052174ed1dd0d66c35bfdc1a5fcc69af4f4ae36154b13dcfc6c14a35f"
+   },
+   "seenAt": "2026-11-13T14:33:45.810Z",
+   "changedAt": "2026-11-13T14:33:45.810Z"
+  },
+  "mesh-fee-bps-celo": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42220,
+    "to": "0xf10e161027410128e63e75d0200fb6d34b2db243",
+    "signature": "feeBps()",
+    "decode": "uint256"
+   },
+   "value": "\"3\"",
+   "meta": {
+    "call": "feeBps()",
+    "result": "3"
+   },
+   "seenAt": "2026-11-13T14:33:45.813Z",
+   "changedAt": "2026-11-13T14:33:45.813Z"
+  },
+  "mesh-oft-ton-code": {
+   "type": "ton-code",
+   "target": {
+    "address": "EQAd31gAUhdO0d0NZsNb_cGl_Maa9PSuNhVLE9z8bBSjX6Gq"
+   },
+   "value": "a20f24935874e4e4",
+   "meta": {
+    "codeHash": "a20f24935874e4e4",
+    "state": "active"
+   },
+   "seenAt": "2026-11-13T14:33:45.825Z",
+   "changedAt": "2026-11-13T14:33:45.825Z"
+  },
+  "mesh-peer-tron-celo": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42220,
+    "to": "0xf10e161027410128e63e75d0200fb6d34b2db243",
+    "signature": "peers(uint32)",
+    "args": [
+     30420
+    ],
+    "decode": "bytes32"
+   },
+   "value": "\"0x0000000000000000000000003a08f76772e200653bb55c2a92998daca62e0e97\"",
+   "meta": {
+    "call": "peers(uint32) [30420]",
+    "result": "0x0000000000000000000000003a08f76772e200653bb55c2a92998daca62e0e97"
+   },
+   "seenAt": "2026-11-13T14:33:45.988Z",
+   "changedAt": "2026-11-13T14:33:45.988Z"
+  },
+  "docs-deployments-native": {
+   "type": "http-json",
+   "target": {
+    "url": "https://docs.usdt0.to/api/deployments",
+    "path": "usdt0.native"
+   },
+   "value": "94e12cf270011d0f9bd75cec18a98b55d08ace4d762b994aa1993aab3449ee10",
+   "meta": {
+    "hash": "94e12cf270011d0f",
+    "count": 24
+   },
+   "seenAt": "2026-11-13T14:33:46.079Z",
+   "changedAt": "2026-11-13T14:33:46.079Z"
+  },
+  "docs-deployments-legacy-mesh": {
+   "type": "http-json",
+   "target": {
+    "url": "https://docs.usdt0.to/api/deployments",
+    "path": "usdt0.legacyMesh"
+   },
+   "value": "e8a48e5c954ca1bd51393f5fc72513b70f746d971419f3dc464e9ee96f754219",
+   "meta": {
+    "hash": "e8a48e5c954ca1bd",
+    "count": 6
+   },
+   "seenAt": "2026-11-13T14:33:46.091Z",
+   "changedAt": "2026-11-13T14:33:46.091Z"
+  },
+  "docs-legacy-mesh": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.usdt0.to/overview/the-legacy-mesh"
+   },
+   "value": "fc19e8aee0adae518ac5a5fd5b1d7e7504ee86be1c902c52a78a44ed5881df45",
+   "meta": {
+    "hash": "fc19e8aee0adae51",
+    "chars": 4513
+   },
+   "seenAt": "2026-11-13T14:33:46.216Z",
+   "changedAt": "2026-11-13T14:33:46.216Z"
+  },
+  "lz-scan-messages-tx": {
+   "type": "http-json",
+   "target": {
+    "url": "https://scan.layerzero-api.com/v1/openapi",
+    "path": "paths./messages/tx/{tx}"
+   },
+   "value": "38e56ef6dc0d239dde5550db6902570e25d309234fe1949ee0f1795294e5e0f7",
+   "meta": {
+    "hash": "38e56ef6dc0d239d"
+   },
+   "seenAt": "2026-11-13T14:33:46.235Z",
+   "changedAt": "2026-11-13T14:33:46.235Z"
+  },
+  "docs-developer": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.usdt0.to/technical-documentation/developer"
+   },
+   "value": "a7c53c0c7370fcfe12209d1db79dd0cc539dd5db4b57099ce68722aec1b2fbd0",
+   "meta": {
+    "hash": "a7c53c0c7370fcfe",
+    "chars": 21358
+   },
+   "seenAt": "2026-11-13T14:33:46.244Z",
+   "changedAt": "2026-11-13T14:33:46.244Z"
+  },
+  "tonapi-jetton-transfer-action": {
+   "type": "http-json",
+   "target": {
+    "url": "https://tonapi.io/v2/openapi.json",
+    "path": "components.schemas.JettonTransferAction"
+   },
+   "value": "f2cca2bfdbf4fa09721c87e84d6df767de3070ce6feafbaa464ccd360ae71e86",
+   "meta": {
+    "hash": "f2cca2bfdbf4fa09"
+   },
+   "seenAt": "2026-11-13T14:33:46.380Z",
+   "changedAt": "2026-11-13T14:33:46.380Z"
+  },
+  "tonapi-events": {
+   "type": "http-json",
+   "target": {
+    "url": "https://tonapi.io/v2/openapi.json",
+    "path": "paths./v2/events/{event_id}"
+   },
+   "value": "a2077fe6af300d85c76ac39665c048b1e571e1a3049381b7b07c05a97b6c7f5b",
+   "meta": {
+    "hash": "a2077fe6af300d85"
+   },
+   "seenAt": "2026-11-13T14:33:46.628Z",
+   "changedAt": "2026-11-13T14:33:46.628Z"
+  }
+ }
+}

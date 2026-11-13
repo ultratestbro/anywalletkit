@@ -242,7 +242,7 @@
      "nep245:v2_1.omni.hot.tg:9745_3aL9skCy1yhPoDB8oKMmRHRN7SJW"
     ]
    },
-   "seenAt": "2026-11-12T15:10:54.901Z",
+   "seenAt": "2026-11-13T14:33:40.658Z",
    "changedAt": "2026-11-12T15:10:54.901Z"
   },
   "docs-1click-api": {
@@ -250,26 +250,26 @@
    "target": {
     "url": "https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api"
    },
-   "value": "d41ff1f8a1e59c32919b2bc7de393bd36e92f3b3f289c529b48176923949b320",
+   "value": "8f463cbb3d78f9e631f9c0dd14bae66589aae68dd9ff8374e427bf115a15363e",
    "meta": {
-    "hash": "d41ff1f8a1e59c32",
-    "chars": 1658
+    "hash": "8f463cbb3d78f9e6",
+    "chars": 1654
    },
-   "seenAt": "2026-11-12T15:10:54.906Z",
-   "changedAt": "2026-11-12T15:10:54.906Z"
+   "seenAt": "2026-11-13T14:33:40.711Z",
+   "changedAt": "2026-11-13T14:33:40.711Z"
   },
   "docs-chain-support": {
    "type": "http-text",
    "target": {
     "url": "https://docs.near-intents.org/near-intents/chain-address-support"
    },
-   "value": "061760a0257c7b31da767b6af0020931b807f04b5c6465301519088b7ddc4bd5",
+   "value": "d3c1bbccd7ec32463c3e605667e8e5db1b23b144b79cb769c506cfe1617eb275",
    "meta": {
-    "hash": "061760a0257c7b31",
-    "chars": 7084
+    "hash": "d3c1bbccd7ec3246",
+    "chars": 7032
    },
-   "seenAt": "2026-11-12T15:10:54.953Z",
-   "changedAt": "2026-10-14T15:10:54.196Z"
+   "seenAt": "2026-11-13T14:33:40.969Z",
+   "changedAt": "2026-11-13T14:33:40.969Z"
   },
   "intents": {
    "type": "github-releases",
@@ -284,7 +284,7 @@
     "url": "https://github.com/near/intents/releases/tag/wallet/v0.2.0",
     "prerelease": true
    },
-   "seenAt": "2026-11-12T15:10:54.805Z",
+   "seenAt": "2026-11-13T14:33:40.558Z",
    "changedAt": "2026-10-14T15:12:21.191Z"
   },
   "one-click-sdk-typescript": {
@@ -299,7 +299,7 @@
     "url": "https://github.com/defuse-protocol/one-click-sdk-typescript/commit/ae8b24e064785c8cba8081263e03e52fed4de089",
     "note": "default branch: fix virtual (#21)"
    },
-   "seenAt": "2026-11-12T15:10:55.270Z",
+   "seenAt": "2026-11-13T14:33:40.970Z",
    "changedAt": "2026-10-14T15:12:22.239Z"
   },
   "docs-changelog": {
@@ -307,13 +307,13 @@
    "target": {
     "url": "https://docs.near-intents.org/changelog/overview.md"
    },
-   "value": "7772a18f9f3caa19841e6758dfd6606a678fdd8da76b8d4b2f7882a437b74272",
+   "value": "6072e0f0c0d82afba27a1b430c70323d38cc8b6ae77560de66497ef087cb6c8b",
    "meta": {
-    "hash": "7772a18f9f3caa19",
-    "chars": 6430
+    "hash": "6072e0f0c0d82afb",
+    "chars": 6382
    },
-   "seenAt": "2026-11-12T15:10:54.700Z",
-   "changedAt": "2026-11-12T15:10:54.700Z"
+   "seenAt": "2026-11-13T14:33:40.602Z",
+   "changedAt": "2026-11-13T14:33:40.602Z"
   }
  }
 }
