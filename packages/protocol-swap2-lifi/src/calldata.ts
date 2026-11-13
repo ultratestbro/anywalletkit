@@ -35,6 +35,7 @@
  */
 
 import {associatedTokenAccount, base58, solanaKey} from "./solana-address.js";
+import {note} from "./refusals.js";
 
 /**
  * The V3 entry points move one asset kind in and one out, and check the minimum against THAT kind's balance: a
@@ -250,18 +251,18 @@ function swapsAt(r: Reader, base: number, head: number): SwapStep[] {
 function checkSteps(steps: SwapStep[], e: DiamondExpectation, finalAsset: string): string | null {
   const first = steps[0]!;
   const last = steps[steps.length - 1]!;
-  if (!same(first.sendingAssetId, e.fromToken)) return `spends ${first.sendingAssetId}, not ${e.fromToken}`;
-  if (first.fromAmount === 0n || first.fromAmount > e.amountIn) return `swaps ${first.fromAmount}, not the ${e.amountIn} spent`;
+  if (!same(first.sendingAssetId, e.fromToken)) return note(`spends ${first.sendingAssetId}, not ${e.fromToken}`, "policy_refused");
+  if (first.fromAmount === 0n || first.fromAmount > e.amountIn) return note(`swaps ${first.fromAmount}, not the ${e.amountIn} spent`, "policy_refused");
   let deposited = 0n;
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i]!;
-    if (i > 0 && !same(step.sendingAssetId, steps[i - 1]!.receivingAssetId)) return `step ${i} spends ${step.sendingAssetId}, which step ${i - 1} does not deliver`;
+    if (i > 0 && !same(step.sendingAssetId, steps[i - 1]!.receivingAssetId)) return note(`step ${i} spends ${step.sendingAssetId}, which step ${i - 1} does not deliver`, "policy_refused");
     if (!step.requiresDeposit) continue;
-    if (!same(step.sendingAssetId, e.fromToken)) return `step ${i} pulls ${step.sendingAssetId} from the wallet, not the input ${e.fromToken}`;
+    if (!same(step.sendingAssetId, e.fromToken)) return note(`step ${i} pulls ${step.sendingAssetId} from the wallet, not the input ${e.fromToken}`, "policy_refused");
     deposited += step.fromAmount;
   }
-  if (deposited > e.amountIn) return `the steps pull ${deposited} from the wallet, more than the ${e.amountIn} spent`;
-  if (!same(last.receivingAssetId, finalAsset)) return `delivers ${last.receivingAssetId}, not ${finalAsset}`;
+  if (deposited > e.amountIn) return note(`the steps pull ${deposited} from the wallet, more than the ${e.amountIn} spent`, "policy_refused");
+  if (!same(last.receivingAssetId, finalAsset)) return note(`delivers ${last.receivingAssetId}, not ${finalAsset}`, "policy_refused");
   return null;
 }
 
@@ -324,24 +325,24 @@ const ERC20_TRANSFER = "0xa9059cbb";
 function ecoDelivery(r: Reader, at: number, e: DiamondExpectation): string | null {
   // A native delivery has no token `transfer` to read (it would be a value call to the recipient), so it is refused
   // outright — not left to the token comparison below, where a `transfer` "of" the zero address would match.
-  if (kindOf(e.toToken) === "native") return "an Eco route to the native token cannot be checked here";
+  if (kindOf(e.toToken) === "native") return note("an Eco route to the native token cannot be checked here", "recipient_unverifiable");
   const destination = r.word(at + 32 * 3);
-  if (destination !== e.destChainId) return `the Eco intent executes on chain ${destination}, not the destination ${e.destChainId} — a route whose delivery cannot be checked here`;
+  if (destination !== e.destChainId) return note(`the Eco intent executes on chain ${destination}, not the destination ${e.destChainId} — a route whose delivery cannot be checked here`, "recipient_unverifiable");
   const route = r.bytes(at, at + 32 * 4);
   const tuple = route.small(0);
   const calls = tuple + route.small(tuple + 32 * 5);
   const n = route.small(calls);
-  if (n === 0) return "the Eco route makes no calls on the destination chain";
-  if (n > 16) return `the Eco route makes ${n} calls on the destination chain, more than the 16 read here`;
+  if (n === 0) return note("the Eco route makes no calls on the destination chain", "recipient_unverifiable");
+  if (n > 16) return note(`the Eco route makes ${n} calls on the destination chain, more than the 16 read here`, "recipient_unverifiable");
   const last = calls + 32 + route.small(calls + 32 + 32 * (n - 1));
   const target = route.address(last);
   const data = route.bytes(last, last + 32);
-  if (route.word(last + 64) !== 0n || data.length !== 68 || data.raw(0, 4) !== ERC20_TRANSFER) return "the Eco route does not end in a token transfer";
+  if (route.word(last + 64) !== 0n || data.length !== 68 || data.raw(0, 4) !== ERC20_TRANSFER) return note("the Eco route does not end in a token transfer", "recipient_unverifiable");
   const to = data.address(4);
   const amount = data.word(36);
-  if (!same(target, e.toToken)) return `the Eco route delivers ${target}, not ${e.toToken}`;
-  if (!same(to, e.receiver)) return `the Eco route pays ${to}, not ${e.receiver}`;
-  if (amount < e.minOut) return `the Eco route delivers ${amount}, below the ${e.minOut} shown`;
+  if (!same(target, e.toToken)) return note(`the Eco route delivers ${target}, not ${e.toToken}`, "policy_refused");
+  if (!same(to, e.receiver)) return note(`the Eco route pays ${to}, not ${e.receiver}`, "recipient_mismatch");
+  if (amount < e.minOut) return note(`the Eco route delivers ${amount}, below the ${e.minOut} shown`, "price_check_failed");
   return null;
 }
 /**
@@ -353,11 +354,11 @@ function ecoDelivery(r: Reader, at: number, e: DiamondExpectation): string | nul
  */
 function m0Delivery(r: Reader, at: number, e: DiamondExpectation): string | null {
   // M0Facet refuses a zero tokenOut (the OrderBook would escrow the input with nothing to fill): no native delivery.
-  if (kindOf(e.toToken) === "native") return "an M0 order cannot deliver the native token";
+  if (kindOf(e.toToken) === "native") return note("an M0 order cannot deliver the native token", "unsupported_pair");
   const tokenOut = r.address(at + 32 * 3);
   const amountOut = r.word(at + 32 * 5);
-  if (!same(tokenOut, e.toToken)) return `the M0 order asks for ${tokenOut}, not ${e.toToken}`;
-  if (amountOut < e.minOut) return `the M0 order asks for ${amountOut}, below the ${e.minOut} shown`;
+  if (!same(tokenOut, e.toToken)) return note(`the M0 order asks for ${tokenOut}, not ${e.toToken}`, "policy_refused");
+  if (amountOut < e.minOut) return note(`the M0 order asks for ${amountOut}, below the ${e.minOut} shown`, "price_check_failed");
   return null;
 }
 
@@ -419,13 +420,13 @@ function facetDataAt(r: Reader, bridge: {sourceSwaps: boolean}, spec: FacetData)
 /** A refund or fallback in the bridge's facet data that pays neither the sender nor the recipient, or null. */
 function refundMismatch(r: Reader, bridge: {sourceSwaps: boolean; facet: string}, e: DiamondExpectation): string | null {
   const spec = FACET_DATA[bridge.facet];
-  if (!spec) return NO_REFUND_FIELDS.has(bridge.facet) ? null : `no known refund layout for ${bridge.facet}`;
+  if (!spec) return NO_REFUND_FIELDS.has(bridge.facet) ? null : note(`no known refund layout for ${bridge.facet}`, "recipient_unverifiable");
   const at = facetDataAt(r, bridge, spec);
   const paid: Refund[] = (spec.refunds ?? []).map(([field, word]) => [`${bridge.facet} ${field}`, r.address(at + 32 * word), spec.zeroRefused === true]);
   paid.push(...(spec.nested?.(r, at) ?? []));
   for (const [what, to, zeroRefused] of paid) {
     if (zeroRefused && /^0x0{40}$/.test(to)) continue;
-    if (!same(to, e.sender) && !same(to, e.receiver)) return `${what} pays ${to}, neither the sender ${e.sender} nor the recipient`;
+    if (!same(to, e.sender) && !same(to, e.receiver)) return note(`${what} pays ${to}, neither the sender ${e.sender} nor the recipient`, "recipient_mismatch");
   }
   return null;
 }
@@ -478,20 +479,20 @@ const keyOf = (word: string): string => base58(Uint8Array.from(word.slice(2).mat
  */
 function mayanToSolana(r: Reader, at: number, t: SolanaTarget): string | null {
   const declared = r.raw(at, 32);
-  if (declared !== t.ownerHex) return `Mayan's nonEVMReceiver is ${keyOf(declared)}, not the recipient ${t.e.receiver}`;
+  if (declared !== t.ownerHex) return note(`Mayan's nonEVMReceiver is ${keyOf(declared)}, not the recipient ${t.e.receiver}`, "recipient_mismatch");
   const p = r.bytes(at, at + 32 * 2);
   const selector = p.raw(0, 4);
   const o = MAYAN_SOLANA[selector];
-  if (!o) return `the Mayan call ${selector} is an entry point whose Solana recipient cannot be checked here`;
+  if (!o) return note(`the Mayan call ${selector} is an entry point whose Solana recipient cannot be checked here`, "recipient_unverifiable");
   const word = (i: number) => 4 + 32 * i;
-  if (o.payloadType && p.word(word(o.payloadType[0])) !== o.payloadType[1]) return `the Mayan call ${selector} carries payload type ${p.word(word(o.payloadType[0]))}, not a plain delivery`;
+  if (o.payloadType && p.word(word(o.payloadType[0])) !== o.payloadType[1]) return note(`the Mayan call ${selector} carries payload type ${p.word(word(o.payloadType[0]))}, not a plain delivery`, "recipient_unverifiable");
   const dest = p.raw(word(o.destAddr), 32);
-  if (dest !== t.ownerHex) return `the Mayan order pays ${keyOf(dest)} on Solana, not the recipient ${t.e.receiver}`;
+  if (dest !== t.ownerHex) return note(`the Mayan order pays ${keyOf(dest)} on Solana, not the recipient ${t.e.receiver}`, "recipient_mismatch");
   const chain = p.word(word(o.chain));
-  if (chain !== (o.cctp ? CCTP_DOMAIN_SOLANA : WORMHOLE_SOLANA)) return `the Mayan order goes to ${o.cctp ? "CCTP domain" : "Wormhole chain"} ${chain}, not Solana`;
-  if (o.tokenOut === undefined) return t.e.toToken === SOLANA_USDC ? null : `a Mayan CCTP transfer delivers USDC, not ${t.e.toToken}`;
+  if (chain !== (o.cctp ? CCTP_DOMAIN_SOLANA : WORMHOLE_SOLANA)) return note(`the Mayan order goes to ${o.cctp ? "CCTP domain" : "Wormhole chain"} ${chain}, not Solana`, "policy_refused");
+  if (o.tokenOut === undefined) return t.e.toToken === SOLANA_USDC ? null : note(`a Mayan CCTP transfer delivers USDC, not ${t.e.toToken}`, "policy_refused");
   const token = p.raw(word(o.tokenOut), 32);
-  return token === t.mintHex ? null : `the Mayan order delivers ${keyOf(token)}, not ${t.e.toToken}`;
+  return token === t.mintHex ? null : note(`the Mayan order delivers ${keyOf(token)}, not ${t.e.toToken}`, "policy_refused");
 }
 
 /**
@@ -501,21 +502,21 @@ function mayanToSolana(r: Reader, at: number, t: SolanaTarget): string | null {
  */
 function polymerToSolana(r: Reader, at: number, t: SolanaTarget): string | null {
   const declared = r.raw(at + 32 * 2, 32);
-  if (declared !== t.ownerHex) return `Polymer CCTP's nonEVMReceiver is ${keyOf(declared)}, not the recipient ${t.e.receiver}`;
-  if (t.e.toToken !== SOLANA_USDC) return `Polymer CCTP delivers USDC, not ${t.e.toToken}`;
+  if (declared !== t.ownerHex) return note(`Polymer CCTP's nonEVMReceiver is ${keyOf(declared)}, not the recipient ${t.e.receiver}`, "recipient_mismatch");
+  if (t.e.toToken !== SOLANA_USDC) return note(`Polymer CCTP delivers USDC, not ${t.e.toToken}`, "policy_refused");
   const mintTo = r.raw(at + 32 * 3, 32);
   const account = hexOf(associatedTokenAccount(t.owner, t.mint));
-  return mintTo === account ? null : `the Polymer CCTP transfer mints to ${keyOf(mintTo)}, not the recipient's USDC account ${keyOf(account)}`;
+  return mintTo === account ? null : note(`the Polymer CCTP transfer mints to ${keyOf(mintTo)}, not the recipient's USDC account ${keyOf(account)}`, "recipient_mismatch");
 }
 
 /** Chainflip (ChainflipFacet 1.0.1): the vault swap's dstAddress is `nonEVMReceiver` verbatim (32 bytes, the owner, for Solana) and `dstToken` Chainflip's asset id. */
 function chainflipToSolana(r: Reader, at: number, t: SolanaTarget): string | null {
   const dst = r.bytes(at, at);
-  if (dst.length !== 32) return `Chainflip pays a ${dst.length}-byte address on Solana, not the recipient ${t.e.receiver}`;
-  if (dst.raw(0, 32) !== t.ownerHex) return `Chainflip pays ${keyOf(dst.raw(0, 32))} on Solana, not the recipient ${t.e.receiver}`;
+  if (dst.length !== 32) return note(`Chainflip pays a ${dst.length}-byte address on Solana, not the recipient ${t.e.receiver}`, "recipient_mismatch");
+  if (dst.raw(0, 32) !== t.ownerHex) return note(`Chainflip pays ${keyOf(dst.raw(0, 32))} on Solana, not the recipient ${t.e.receiver}`, "recipient_mismatch");
   const asset = r.word(at + 32);
   const want = CHAINFLIP_SOLANA_ASSETS[t.e.toToken];
-  return want !== undefined && asset === want ? null : `Chainflip delivers its asset ${asset}, not ${t.e.toToken}`;
+  return want !== undefined && asset === want ? null : note(`Chainflip delivers its asset ${asset}, not ${t.e.toToken}`, "policy_refused");
 }
 
 const SOLANA_DELIVERY: Readonly<Record<string, (r: Reader, at: number, t: SolanaTarget) => string | null>> = {
@@ -552,67 +553,67 @@ const INTENTS_FACET = "LiFiIntentEscrowV2";
  * ({@link INTENTS_TO_SOLANA}). Any other facet keeps the non-EVM refusal.
  */
 function solanaRecipientMismatch(r: Reader, bridge: {sourceSwaps: boolean; facet: string}, receiver: string, e: DiamondExpectation): string | null {
-  if (e.destChainId !== LIFI_SOLANA_CHAIN_ID) return NON_EVM_UNREAD;
-  if (!same(receiver, NON_EVM_ADDRESS)) return `BridgeData pays ${receiver}, not LI.FI's non-EVM placeholder ${NON_EVM_ADDRESS}, on a Solana route`;
-  if (DEPOSIT_FACETS.has(bridge.facet)) return `${bridge.facet} pays a deposit address whose off-chain order names the Solana recipient — the transaction does not bind it`;
-  if (bridge.facet === INTENTS_FACET) return INTENTS_TO_SOLANA;
+  if (e.destChainId !== LIFI_SOLANA_CHAIN_ID) return note(NON_EVM_UNREAD, "recipient_unverifiable");
+  if (!same(receiver, NON_EVM_ADDRESS)) return note(`BridgeData pays ${receiver}, not LI.FI's non-EVM placeholder ${NON_EVM_ADDRESS}, on a Solana route`, "recipient_mismatch");
+  if (DEPOSIT_FACETS.has(bridge.facet)) return note(`${bridge.facet} pays a deposit address whose off-chain order names the Solana recipient — the transaction does not bind it`, "recipient_unverifiable");
+  if (bridge.facet === INTENTS_FACET) return note(INTENTS_TO_SOLANA, "recipient_unverifiable");
   const read = SOLANA_DELIVERY[bridge.facet];
-  if (!read) return NON_EVM_UNREAD;
+  if (!read) return note(NON_EVM_UNREAD, "recipient_unverifiable");
   const owner = solanaKey(e.receiver);
-  if (!owner) return `the recipient ${e.receiver} is not a Solana address`;
+  if (!owner) return note(`the recipient ${e.receiver} is not a Solana address`, "recipient_mismatch");
   const mint = solanaKey(e.toToken);
-  if (!mint) return `the destination token ${e.toToken} is not a Solana mint`;
+  if (!mint) return note(`the destination token ${e.toToken} is not a Solana mint`, "unsupported_pair");
   return read(r, facetDataAt(r, bridge, FACET_DATA[bridge.facet]!), {owner, ownerHex: hexOf(owner), mint, mintHex: hexOf(mint), e});
 }
 
 /** Why the Diamond calldata does not do what the quote says, or null when it does. */
 export function diamondCallMismatch(data: string, e: DiamondExpectation): string | null {
   let r: Reader;
-  try { r = new Reader(data); } catch { return "the calldata is not hex"; }
-  if (r.length < 4 + 32 * 2) return "the calldata is too short";
+  try { r = new Reader(data); } catch { return note("the calldata is not hex", "upstream_unavailable"); }
+  if (r.length < 4 + 32 * 2) return note("the calldata is too short", "upstream_unavailable");
   const selector = data.slice(0, 10).toLowerCase();
   const generic = GENERIC_SWAPS[selector];
   try {
     if (generic) {
-      if (!e.sameChain) return "a same-chain swap call on a cross-chain route";
+      if (!e.sameChain) return note("a same-chain swap call on a cross-chain route", "policy_refused");
       // (bytes32 txId, string integrator, string referrer, address receiver, uint256 minAmount, SwapData | SwapData[])
       const receiver = r.address(4 + 96);
       const minAmount = r.word(4 + 128);
       const steps = generic.single ? [swapAt(r, 4 + r.small(4 + 160))] : swapsAt(r, 4, 4 + 160);
-      if (!e.evmDestination || !same(receiver, e.receiver)) return `pays ${receiver}, not ${e.receiver}`;
-      if (minAmount < e.minOut) return `accepts ${minAmount}, below the ${e.minOut} shown`;
-      if (generic.from && kindOf(e.fromToken) !== generic.from) return `${selector} swaps from ${generic.from === "native" ? "the native coin" : "a token"}, but the input is ${kindOf(e.fromToken) === "native" ? "the native coin" : "a token"}`;
+      if (!e.evmDestination || !same(receiver, e.receiver)) return note(`pays ${receiver}, not ${e.receiver}`, "recipient_mismatch");
+      if (minAmount < e.minOut) return note(`accepts ${minAmount}, below the ${e.minOut} shown`, "price_check_failed");
+      if (generic.from && kindOf(e.fromToken) !== generic.from) return note(`${selector} swaps from ${generic.from === "native" ? "the native coin" : "a token"}, but the input is ${kindOf(e.fromToken) === "native" ? "the native coin" : "a token"}`, "policy_refused");
       if (generic.to && (kindOf(e.toToken) !== generic.to || kindOf(steps[steps.length - 1]!.receivingAssetId) !== generic.to)) {
-        return `${selector} delivers ${generic.to === "native" ? "the native coin" : "a token"}, but the output is ${kindOf(e.toToken) === "native" ? "the native coin" : "a token"} — its minimum would be counted in the wrong asset`;
+        return note(`${selector} delivers ${generic.to === "native" ? "the native coin" : "a token"}, but the output is ${kindOf(e.toToken) === "native" ? "the native coin" : "a token"} — its minimum would be counted in the wrong asset`, "policy_refused");
       }
       return checkSteps(steps, e, e.toToken);
     }
     // Bridge facets: (BridgeData, [SwapData[],] FacetData), only the listed ABI entry points.
     // BridgeData is dynamic (it holds strings), so its offset is the head size.
     const unbound = UNBOUND_BRIDGES[selector];
-    if (unbound) return `${unbound} delivers to a recipient the transaction does not bind (an off-chain order or unchecked facet data)`;
+    if (unbound) return note(`${unbound} delivers to a recipient the transaction does not bind (an off-chain order or unchecked facet data)`, "recipient_unverifiable");
     const bridge = BRIDGE_CALLS[selector];
-    if (!bridge) return `unknown Diamond call ${selector}`;
-    if (bridge.facet === INTENTS_FACET && e.evmDestination) return INTENTS_UNPINNED;
+    if (!bridge) return note(`unknown Diamond call ${selector}`, "policy_refused");
+    if (bridge.facet === INTENTS_FACET && e.evmDestination) return note(INTENTS_UNPINNED, "recipient_unverifiable");
     const head = r.small(4);
-    if (head < (bridge.sourceSwaps ? 96 : 64) || head % 32 !== 0 || head > 32 * 32) return `unknown Diamond call ${selector}`;
+    if (head < (bridge.sourceSwaps ? 96 : 64) || head % 32 !== 0 || head > 32 * 32) return note(`unknown Diamond call ${selector}`, "policy_refused");
     const at = 4 + head;
     // BridgeData: (txId, string bridge, string integrator, referrer, sendingAssetId, receiver, minAmount, destinationChainId, hasSourceSwaps, hasDestinationCall)
-    if (r.small(at + 32) !== 320) return `unknown Diamond call ${selector}`;
+    if (r.small(at + 32) !== 320) return note(`unknown Diamond call ${selector}`, "policy_refused");
     const sendingAssetId = r.address(at + 128);
     const receiver = r.address(at + 160);
     const minAmount = r.word(at + 192);
     const destinationChainId = r.word(at + 224);
     const hasSourceSwaps = r.bool(at + 256);
     const hasDestinationCall = r.bool(at + 288);
-    if (e.sameChain) return "a bridge call on a same-chain route";
-    if (destinationChainId !== e.destChainId) return `bridges to chain ${destinationChainId}, not ${e.destChainId}`;
-    if (hasDestinationCall) return "the route runs a call on the destination chain, whose recipient cannot be checked here";
+    if (e.sameChain) return note("a bridge call on a same-chain route", "policy_refused");
+    if (destinationChainId !== e.destChainId) return note(`bridges to chain ${destinationChainId}, not ${e.destChainId}`, "policy_refused");
+    if (hasDestinationCall) return note("the route runs a call on the destination chain, whose recipient cannot be checked here", "recipient_unverifiable");
     if (!e.evmDestination) {
       const why = solanaRecipientMismatch(r, bridge, receiver, e);
       if (why) return why;
-    } else if (!same(receiver, e.receiver)) return `pays ${receiver}, not ${e.receiver}`;
-    if (hasSourceSwaps !== bridge.sourceSwaps) return `unknown Diamond call ${selector}`;
+    } else if (!same(receiver, e.receiver)) return note(`pays ${receiver}, not ${e.receiver}`, "recipient_mismatch");
+    if (hasSourceSwaps !== bridge.sourceSwaps) return note(`unknown Diamond call ${selector}`, "policy_refused");
     const refund = refundMismatch(r, bridge, e);
     if (refund) return refund;
     const spec = FACET_DATA[bridge.facet];
@@ -621,15 +622,15 @@ export function diamondCallMismatch(data: string, e: DiamondExpectation): string
     // After source swaps the bridged amount is in the swapped token's units: only the swaps' input is comparable.
     if (hasSourceSwaps) {
       // The swapped amount is the facet's own (it replaces minAmount after the swaps); a zero is a route that bridges nothing.
-      if (minAmount === 0n) return "bridges nothing after the source swaps";
+      if (minAmount === 0n) return note("bridges nothing after the source swaps", "policy_refused");
       return checkSteps(swapsAt(r, 4, 4 + 32), e, sendingAssetId);
     }
     // Without source swaps the Diamond pulls minAmount: the input, or the input less a bridge's own fee (Glacis takes
     // 0.25 %, matrix v7). Anything further below leaves the rest of the allowance behind for the next call to take
     // (scan 2026-10-27 modules, F22): a minAmount of 1 is refused.
-    if (minAmount > e.amountIn || minAmount * 10_000n < e.amountIn * (10_000n - BRIDGE_INPUT_FEE_MAX_BPS)) return `bridges ${minAmount}, not the ${e.amountIn} spent`;
-    return same(sendingAssetId, e.fromToken) ? null : `bridges ${sendingAssetId}, not ${e.fromToken}`;
+    if (minAmount > e.amountIn || minAmount * 10_000n < e.amountIn * (10_000n - BRIDGE_INPUT_FEE_MAX_BPS)) return note(`bridges ${minAmount}, not the ${e.amountIn} spent`, "policy_refused");
+    return same(sendingAssetId, e.fromToken) ? null : note(`bridges ${sendingAssetId}, not ${e.fromToken}`, "policy_refused");
   } catch (err) {
-    return `the Diamond calldata does not decode (${err instanceof Error ? err.message : String(err)})`;
+    return note(`the Diamond calldata does not decode (${err instanceof Error ? err.message : String(err)})`, "policy_refused");
   }
 }
