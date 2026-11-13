@@ -10,7 +10,7 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
-## Next release: USDT0 dry quotes without an address
+## 2026-11-13: USDT0 dry quotes without an address
 
 `protocol-swap2-usdt0` quotes are dry unless `dry: false`. A dry quote without `destAddress` used to be built for a
 stand-in recipient — vitalik.eth between EVM chains, the zero account on Tron and TON — and one without `refundAddress`
@@ -36,7 +36,7 @@ addresses).
   spelling) are refused, dry or live: "destination is the zero account — nothing sent there can be recovered". An app
   that used the zero address as a "no recipient yet" value in USDT0 quotes must leave `destAddress` empty instead.
 
-## Next release: THORChain's rotating inbound vault
+## 2026-11-13: THORChain's rotating inbound vault
 
 THORChain's inbound address moves among its active asgard vaults every few minutes, and public nodes a browser can
 reach often trail the quoting node by ~25–28 blocks. `protocol-swap2-thorchain` 0.3.5 and older required the
@@ -80,7 +80,7 @@ another inbound vault — refused until they agree").
   could not confirm the inbound vault (behind or unreachable)"; "`<CHAIN>` is halted / paused" can now name the
   destination chain.
 
-## Next release: LI.FI to Solana, LI.FI Intents and dry quotes
+## 2026-11-13: LI.FI to Solana, LI.FI Intents and dry quotes
 
 `protocol-swap2-lifi` quotes EVM → Solana routes (Mayan, Polymer CCTP and Chainflip, their Solana recipient read from
 the calldata on the device), refuses LI.FI Intents on every route from an EVM chain, and no longer hands out a transaction LI.FI built for a
@@ -110,7 +110,7 @@ placeholder address. `protocol-swap2-router` values the quotes that carry no tra
   LayerSwap, Smart Deposits and LI.FI Intents are refused for that direction with named reasons; other Solana bridges
   keep the existing refusal.
 
-## Next release: an app-set native fee ceiling for swaps
+## 2026-11-13: an app-set native fee ceiling for swaps
 
 Not breaking, and nothing to do unless you want it: without the new option every swap behaves as before, with the
 same caps and the same error texts.
@@ -128,7 +128,7 @@ same caps and the same error texts.
 - **protocol-swap2-router:** `using(provider)` now runs with the config the router was created with (a frozen copy),
   so the picked route keeps your `nativeFeeCeiling` and `reviewExecution` even if you change the config object later.
 
-## Next release: Omniston's new TON Escrow Minter
+## 2026-11-12: Omniston's new TON Escrow Minter
 
 Since 2026-11-10 Omniston quotes TON ↔ EVM orders on a new TON Escrow Minter (rev2),
 `EQDybO88l2lrrAmALRUqpmgEE_tuxk510F4Yd4xjbQZxC9IA`. `protocol-swap2-omniston` 0.5.4 and older refuse those quotes
@@ -162,7 +162,7 @@ EVM routes are gone until you bump. TON → TON swaps are not affected.
   `eb503578b4d9cd791c9c0ecd0da6da4064aae2bcb19d3c924d4001c493386bc5`: without it EVM → TON orders on rev2 fill and
   then fail the check before the secret is disclosed, and are cancelled after their timelocks.
 
-## Next release: hidden hashes in text messages
+## 2026-11-12: hidden hashes in text messages
 
 A message whose signed bytes are exactly 32 is a blind hash signature (an order or a transfer to a CoW
 Protocol `ethsign` or Safe verifier), whatever form it comes in. Until now only the hex form and raw bytes were
