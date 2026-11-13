@@ -1,4 +1,5 @@
 import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
+import {httpRefusal, refusal, refusalNotes, withReason, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {createPublicClient, decodeFunctionData, encodeFunctionData, getAddress, http, isAddress, pad, parseAbi, zeroHash, type Hex} from "viem";
 import {describeCctpActivity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
@@ -86,6 +87,25 @@ interface ApiMessage {
 }
 
 const isHexData = (v: unknown): v is Hex => typeof v === "string" && /^0x(?:[0-9a-fA-F]{2})+$/.test(v);
+
+/**
+ * Tags a failed read with what it means and hands back the same error: a network failure, our own timeout or an
+ * answer that is not JSON is `upstream_unavailable`; the caller's own abort stays unclassified.
+ */
+function unreachable<E>(error: E, signal?: AbortSignal): E {
+  if (!signal?.aborted && error instanceof Error) withReason(error, "upstream_unavailable");
+  return error;
+}
+
+/** A contract read on the caller's RPC that failed: an `eth_call` that reverted or found no code, else the node's failure. */
+function rpcFailure<E>(error: E): E {
+  if (!(error instanceof Error)) return error;
+  let reverted = false;
+  for (let e: unknown = error, i = 0; e instanceof Error && i < 8; e = e.cause, i++) {
+    if (e.name === "ContractFunctionRevertedError" || e.name === "ContractFunctionZeroDataError" || e.name === "ExecutionRevertedError") reverted = true;
+  }
+  return withReason(error, reverted ? "simulation_failed" : "upstream_unavailable");
+}
 const same = (a: string | undefined, b: string) => !!a && a.toLowerCase() === b.toLowerCase();
 
 /** `amount × bps` rounded up; `bps` may be fractional (Circle publishes 1.3). */
@@ -124,10 +144,26 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
   };
 
   async function getJson<T>(path: string, signal?: AbortSignal): Promise<T | null> {
-    const res = await doFetch(`${api}${path}`, {headers: {accept: "application/json"}, signal: signal ?? timeoutSignal(12_000)});
+    let res: Response;
+    try {
+      res = await doFetch(`${api}${path}`, {headers: {accept: "application/json"}, signal: signal ?? timeoutSignal(12_000)});
+    } catch (e) {
+      throw unreachable(e, signal);
+    }
     if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`cctp: ${path} → ${res.status}`);
-    return (await res.json()) as T;
+    if (!res.ok) {
+      // 429 (with Retry-After), 408 / 425 / 5xx; any other status stays unclassified. Circle's API takes no key, so a
+      // 401 / 403 (a block in front of it) is upstream_unavailable with its status, never key_rejected.
+      const byStatus = httpRefusal(res.status, res.headers?.get?.("retry-after"));
+      const info = byStatus?.reason === "key_rejected" ? {reason: "upstream_unavailable" as const, httpStatus: res.status} : byStatus;
+      const error = new Error(`cctp: ${path} → ${res.status}`);
+      throw info ? withReason(error, info) : error;
+    }
+    try {
+      return (await res.json()) as T;
+    } catch (e) {
+      throw unreachable(e, signal);
+    }
   }
 
   /** Circle's published fee per finality threshold, in bps of the burnt amount. */
@@ -193,24 +229,28 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
       if (params.sourceToken.toUpperCase() !== "USDC") return null;
       if (!(same(params.destToken, dst.usdc) || params.destToken.toUpperCase() === "USDC")) return null;
       const usdc = usdcOf(src);
-      if (!usdc) { params.onRefusal?.("catalog USDC on the source chain is not Circle's native USDC"); return null; }
+      if (!usdc) { params.onRefusal?.("catalog USDC on the source chain is not Circle's native USDC", {reason: "unsupported_pair"}); return null; }
       if (!/^\d+$/.test(params.amountIn)) return null;
       const amount = BigInt(params.amountIn);
       if (amount <= 0n) return null;
       // The placeholder prices a dry quote; a live one without a recipient would mint to it (round 3, H8).
       const recipient = params.destAddress || (params.dry !== false ? EVM_PLACEHOLDER : "");
-      if (!recipient) { params.onRefusal?.("a live quote needs a recipient"); return null; }
+      if (!recipient) { params.onRefusal?.("a live quote needs a recipient", {reason: "policy_refused"}); return null; }
       if (!isAddress(recipient)) { params.onRefusal?.("destination must be an EVM address"); return null; }
 
       try {
         const fees = await feeRows(src, dst, signal);
-        if (!fees || !Array.isArray(fees) || fees.length === 0) { params.onRefusal?.("Circle publishes no fee for this pair"); return null; }
+        if (!fees || !Array.isArray(fees) || fees.length === 0) {
+          // No fee list (404) or an empty one: Circle does not serve the pair; a list of another shape is a broken answer.
+          params.onRefusal?.("Circle publishes no fee for this pair", {reason: !fees || Array.isArray(fees) ? "unsupported_pair" : "upstream_unavailable"});
+          return null;
+        }
         const fast = fees.find((f) => f.finalityThreshold === FINALITY_FAST);
         const standard = fees.find((f) => f.finalityThreshold === FINALITY_STANDARD);
         let threshold: number;
         let bps: number;
         if (mode === "standard") {
-          if (!standard) { params.onRefusal?.("Standard Transfer is not offered for this pair"); return null; }
+          if (!standard) { params.onRefusal?.("Standard Transfer is not offered for this pair", {reason: "unsupported_pair"}); return null; }
           threshold = FINALITY_STANDARD; bps = standard.minimumFee;
         } else {
           let fastOk = !!fast;
@@ -220,13 +260,16 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
             if (typeof allowance?.allowance === "number" && allowance.allowance * 1e6 < bigintToNumber(amount)) fastOk = false;
           }
           if (fastOk) { threshold = FINALITY_FAST; bps = fast!.minimumFee; }
-          else if (mode === "fast") { params.onRefusal?.(fast ? "Fast Transfer allowance is exhausted" : "Fast Transfer is not offered for this pair"); return null; }
+          else if (mode === "fast") {
+            params.onRefusal?.(fast ? "Fast Transfer allowance is exhausted" : "Fast Transfer is not offered for this pair", {reason: fast ? "insufficient_liquidity" : "unsupported_pair"});
+            return null;
+          }
           else if (standard) { threshold = FINALITY_STANDARD; bps = standard.minimumFee; }
-          else { params.onRefusal?.("neither Fast nor Standard is offered"); return null; }
+          else { params.onRefusal?.("neither Fast nor Standard is offered", {reason: "unsupported_pair"}); return null; }
         }
         if (!Number.isFinite(bps) || bps < 0) return null;
         const maxFee = feeFor(amount, bps, bufferPct);
-        if (maxFee >= amount) { params.onRefusal?.("amount is below the Fast Transfer fee"); return null; }
+        if (maxFee >= amount) { params.onRefusal?.("amount is below the Fast Transfer fee", {reason: "amount_too_small"}); return null; }
         const out = amount - maxFee;
         if (params.minAmountOut !== undefined && out < BigInt(params.minAmountOut)) return null;
 
@@ -263,7 +306,7 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
       const tx = quote.txRequest;
       const parsed = parseIntent(quote.intentId);
-      if (!tx || !parsed) throw new Error("swap2: CCTP quote has no transaction request");
+      if (!tx || !parsed) throw refusal("policy_refused", "swap2: CCTP quote has no transaction request");
       return {
         chain: parsed.src.caip2,
         to: tx.to ?? "",
@@ -283,21 +326,23 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
      */
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
       const parsed = parseIntent(quote.intentId);
-      if (!parsed) throw new Error("cctp: malformed intent id");
-      if (!same(tx.to, parsed.src.tokenMessenger)) throw new Error("cctp: deposit target is not the TokenMessengerV2 of the source domain");
+      if (!parsed) throw refusal("policy_refused", "cctp: malformed intent id");
+      if (!same(tx.to, parsed.src.tokenMessenger)) throw refusal("vault_mismatch", "cctp: deposit target is not the TokenMessengerV2 of the source domain");
       if (parsed.threshold === FINALITY_FAST) {
         const fast = (await feeRows(parsed.src, parsed.dst))?.find((f) => f.finalityThreshold === FINALITY_FAST);
-        if (!fast || !Number.isFinite(fast.minimumFee) || fast.minimumFee < 0) throw new Error("cctp: Circle no longer publishes a Fast Transfer fee for this pair — re-quote");
+        if (!fast || !Number.isFinite(fast.minimumFee) || fast.minimumFee < 0) throw refusal("quote_expired", "cctp: Circle no longer publishes a Fast Transfer fee for this pair — re-quote");
         const minFee = feeFor(BigInt(quote.sourceAmount), fast.minimumFee, 0);
         const maxFee = BigInt(quote.providerData?.maxFee ?? "0");
-        if (minFee > maxFee) throw new Error(`cctp: Circle's Fast Transfer fee ${minFee} (${fast.minimumFee} bps) exceeds the quoted maxFee ${maxFee} — re-quote`);
+        if (minFee > maxFee) throw refusal("quote_expired", `cctp: Circle's Fast Transfer fee ${minFee} (${fast.minimumFee} bps) exceeds the quoted maxFee ${maxFee} — re-quote`);
       }
       const c = client(parsed.src.caip2);
       if (!c) return;
-      const transmitter = await c.readContract({address: getAddress(parsed.src.tokenMessenger), abi: TOKEN_MESSENGER_ABI, functionName: "localMessageTransmitter"});
-      if (!same(transmitter, parsed.src.messageTransmitter)) throw new Error("cctp: TokenMessengerV2 does not point at the expected MessageTransmitterV2");
-      const domain = await c.readContract({address: getAddress(parsed.src.messageTransmitter), abi: MESSAGE_TRANSMITTER_ABI, functionName: "localDomain"});
-      if (Number(domain) !== parsed.src.domain) throw new Error(`cctp: MessageTransmitterV2 reports domain ${domain}, expected ${parsed.src.domain}`);
+      const transmitter = await c.readContract({address: getAddress(parsed.src.tokenMessenger), abi: TOKEN_MESSENGER_ABI, functionName: "localMessageTransmitter"})
+        .catch((e: unknown) => { throw rpcFailure(e); });
+      if (!same(transmitter, parsed.src.messageTransmitter)) throw refusal("vault_mismatch", "cctp: TokenMessengerV2 does not point at the expected MessageTransmitterV2");
+      const domain = await c.readContract({address: getAddress(parsed.src.messageTransmitter), abi: MESSAGE_TRANSMITTER_ABI, functionName: "localDomain"})
+        .catch((e: unknown) => { throw rpcFailure(e); });
+      if (Number(domain) !== parsed.src.domain) throw refusal("vault_mismatch", `cctp: MessageTransmitterV2 reports domain ${domain}, expected ${parsed.src.domain}`);
     },
 
     async trackIntent(ref: IntentRef): Promise<IntentStatus> {
@@ -342,10 +387,10 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
       if (!m || m.status !== "complete" || !isHexData(m.attestation) || !isHexData(m.message)) return null;
       // Bind the attested message to the route it claims to complete.
       if (m.decodedMessage?.destinationDomain !== undefined && Number(m.decodedMessage.destinationDomain) !== parsed.dst.domain) {
-        throw new Error("cctp: attested message is for another destination domain");
+        throw refusal("recipient_mismatch", "cctp: attested message is for another destination domain");
       }
       if (m.decodedMessage?.sourceDomain !== undefined && Number(m.decodedMessage.sourceDomain) !== parsed.src.domain) {
-        throw new Error("cctp: attested message is for another source domain");
+        throw refusal("policy_refused", "cctp: attested message is for another source domain");
       }
       // Fast messages expire at `expirationBlock` on the destination; an expired
       // one needs Circle's re-attestation before it can be received. The
@@ -381,6 +426,10 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
   };
 }
 
+/** The reason behind each text {@link cctpVerifyQuote} returns (`cctpPins.reasonOf`). */
+const notes = refusalNotes();
+const why = (text: string, reason: Swap2RefusalReason): string => notes.note(text, reason);
+
 /**
  * A remote CCTP quote's burn, decoded on the device against the app's own request (scan 2026-10-30, F3): exactly
  * `depositForBurn` on the source TokenMessengerV2 with no value, approving it; the input amount; the destination
@@ -391,21 +440,21 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
 export function cctpVerifyQuote(params: QuoteParams, quote: Quote): string | null {
   const src = Object.prototype.hasOwnProperty.call(CCTP_DOMAINS, params.sourceChain) ? CCTP_DOMAINS[params.sourceChain] : undefined;
   const dst = Object.prototype.hasOwnProperty.call(CCTP_DOMAINS, params.destChain) ? CCTP_DOMAINS[params.destChain] : undefined;
-  if (!src || !dst || src === dst) return "not a CCTP route between two domains";
-  if (params.sourceToken.toUpperCase() !== "USDC" || !(same(params.destToken, dst.usdc) || params.destToken.toUpperCase() === "USDC")) return "not USDC to USDC";
+  if (!src || !dst || src === dst) return why("not a CCTP route between two domains", "unsupported_pair");
+  if (params.sourceToken.toUpperCase() !== "USDC" || !(same(params.destToken, dst.usdc) || params.destToken.toUpperCase() === "USDC")) return why("not USDC to USDC", "unsupported_pair");
   const tx = quote.txRequest;
-  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return "the quote carries no TokenMessenger call";
-  if (!same(tx.to, src.tokenMessenger)) return `the call targets ${tx.to}, not the TokenMessengerV2`;
-  if (BigInt(tx.value ?? "0") !== 0n) return "a burn attaches no value";
-  if (!tx.approvalAddress || !same(tx.approvalAddress, src.tokenMessenger)) return "the burn approves another spender than the TokenMessengerV2";
-  if (tx.chainId !== undefined && tx.chainId !== src.chainId) return `the call is for chain ${tx.chainId}, not ${src.chainId}`;
+  if (!tx?.data || !tx.to || tx.serializedTx !== undefined) return why("the quote carries no TokenMessenger call", "policy_refused");
+  if (!same(tx.to, src.tokenMessenger)) return why(`the call targets ${tx.to}, not the TokenMessengerV2`, "vault_mismatch");
+  if (BigInt(tx.value ?? "0") !== 0n) return why("a burn attaches no value", "policy_refused");
+  if (!tx.approvalAddress || !same(tx.approvalAddress, src.tokenMessenger)) return why("the burn approves another spender than the TokenMessengerV2", "vault_mismatch");
+  if (tx.chainId !== undefined && tx.chainId !== src.chainId) return why(`the call is for chain ${tx.chainId}, not ${src.chainId}`, "policy_refused");
   let args: readonly unknown[];
   try {
     const d = decodeFunctionData({abi: TOKEN_MESSENGER_ABI, data: tx.data as Hex});
-    if (d.functionName !== "depositForBurn") return `${d.functionName} is not depositForBurn`;
+    if (d.functionName !== "depositForBurn") return why(`${d.functionName} is not depositForBurn`, "policy_refused");
     args = d.args;
   } catch {
-    return "the call is not depositForBurn";
+    return why("the call is not depositForBurn", "policy_refused");
   }
   const [amount, domain, mintRecipient, burnToken, caller, maxFee, threshold] = args as [bigint, number, Hex, string, Hex, bigint, number];
   let amountIn: bigint, floor: bigint;
@@ -414,22 +463,22 @@ export function cctpVerifyQuote(params: QuoteParams, quote: Quote): string | nul
     floor = BigInt(quote.minDestAmount);
     if (params.minAmountOut !== undefined && BigInt(params.minAmountOut) > floor) floor = BigInt(params.minAmountOut);
   } catch {
-    return "the request does not name amounts";
+    return why("the request does not name amounts", "upstream_unavailable");
   }
-  if (amount !== amountIn || BigInt(quote.sourceAmount) !== amountIn) return `the burn moves ${amount}, not the ${amountIn} input`;
-  if (domain !== dst.domain) return `the burn mints on domain ${domain}, not ${dst.name} (${dst.domain})`;
+  if (amount !== amountIn || BigInt(quote.sourceAmount) !== amountIn) return why(`the burn moves ${amount}, not the ${amountIn} input`, "policy_refused");
+  if (domain !== dst.domain) return why(`the burn mints on domain ${domain}, not ${dst.name} (${dst.domain})`, "recipient_mismatch");
   // A dry quote without a recipient prices the placeholder the provider uses; it is never built (the engine re-quotes live).
   if (params.destAddress || params.dry === false) {
     if (!isAddress(params.destAddress)) return "the recipient is not an EVM address";
-    if (mintRecipient.toLowerCase() !== pad(getAddress(params.destAddress), {size: 32}).toLowerCase()) return `the burn mints to ${mintRecipient}, not the recipient`;
+    if (mintRecipient.toLowerCase() !== pad(getAddress(params.destAddress), {size: 32}).toLowerCase()) return why(`the burn mints to ${mintRecipient}, not the recipient`, "recipient_mismatch");
   }
-  if (!same(burnToken, src.usdc)) return `the burn spends ${burnToken}, not the source domain's USDC`;
-  if (caller !== zeroHash) return "the burn names a destination caller";
-  if (threshold !== FINALITY_FAST && threshold !== FINALITY_STANDARD) return `finality threshold ${threshold} is neither Fast nor Standard`;
-  if (maxFee >= amount || amount - maxFee < floor) return `the burn's maxFee ${maxFee} leaves less than the ${floor} minimum`;
+  if (!same(burnToken, src.usdc)) return why(`the burn spends ${burnToken}, not the source domain's USDC`, "policy_refused");
+  if (caller !== zeroHash) return why("the burn names a destination caller", "policy_refused");
+  if (threshold !== FINALITY_FAST && threshold !== FINALITY_STANDARD) return why(`finality threshold ${threshold} is neither Fast nor Standard`, "policy_refused");
+  if (maxFee >= amount || amount - maxFee < floor) return why(`the burn's maxFee ${maxFee} leaves less than the ${floor} minimum`, "price_check_failed");
   // The server appends its intent token (`<id>~<tag>`); the id before it is what the server's provider tracks and claims.
-  if ((/^([\s\S]+)~[0-9a-f]{32}$/.exec(quote.intentId)?.[1] ?? quote.intentId) !== `cctp:${src.domain}:${dst.domain}:${threshold}`) return "the intent id does not name this burn";
-  if (quote.providerData?.maxFee !== undefined && quote.providerData.maxFee !== maxFee.toString()) return "the quoted maxFee is not the burn's";
+  if ((/^([\s\S]+)~[0-9a-f]{32}$/.exec(quote.intentId)?.[1] ?? quote.intentId) !== `cctp:${src.domain}:${dst.domain}:${threshold}`) return why("the intent id does not name this burn", "policy_refused");
+  if (quote.providerData?.maxFee !== undefined && quote.providerData.maxFee !== maxFee.toString()) return why("the quoted maxFee is not the burn's", "policy_refused");
   return null;
 }
 
@@ -437,12 +486,14 @@ export function cctpVerifyQuote(params: QuoteParams, quote: Quote): string | nul
  * The TokenMessenger a CCTP burn calls and approves, and the MessageTransmitter its claim calls, per
  * chain, and {@link cctpVerifyQuote} — the app's pins for `remoteProvider({name: "cctp", baseUrl, ...cctpPins})`
  * (scan 2026-10-27 modules, F8/F16; claims since round 3, M24; the burn's arguments since scan 2026-10-30, F3).
+ * `reasonOf` classifies each text the verifier returns (`Swap2RefusalReason`), so a remote stub's refusal carries it.
  */
 export const cctpPins: RemotePins & {claimTargets(chain: string): readonly string[]} = Object.freeze({
   callTargets: (chain: string): readonly string[] => cctpMessengerFor(chain),
   spenders: (chain: string): readonly string[] => cctpMessengerFor(chain),
   claimTargets: cctpClaimTargets,
   verifyQuote: cctpVerifyQuote,
+  reasonOf: notes.reasonOf,
 });
 function cctpMessengerFor(chain: string): readonly string[] {
   const d = Object.prototype.hasOwnProperty.call(CCTP_DOMAINS, chain) ? CCTP_DOMAINS[chain] : undefined;
