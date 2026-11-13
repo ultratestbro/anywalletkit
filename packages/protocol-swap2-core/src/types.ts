@@ -4,6 +4,7 @@
  * A provider can only delay/refund delivery — it can never affect vault safety.
  */
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
+import type {Swap2RefusalInfo} from "./errors.js";
 
 /** A token on a chain, as providers see it. */
 export interface Asset {
@@ -15,8 +16,9 @@ export interface Asset {
 export interface QuoteParams {
   /** Local-only (never serialized): called with the reason when the provider
    *  refuses to quote — a shared-instance "last refusal" field raced under
-   *  concurrent quotes, so the reason rides per-call. */
-  onRefusal?: (reason: string) => void;
+   *  concurrent quotes, so the reason rides per-call. `info` classifies the
+   *  refusal (`info.reason`, see Swap2RefusalReason) when the provider can. */
+  onRefusal?: (reason: string, info?: Swap2RefusalInfo) => void;
   sourceChain: string; // CAIP-2
   sourceToken: string; // token SYMBOL on source (resolved via the asset catalog), or an unlisted token's contract / mint
   /**
@@ -218,6 +220,11 @@ export interface RemotePins {
   verifyQuote?(params: QuoteParams, quote: Quote): string | null;
   /** A client-side check of a remote build (typed order, cell body) against its quote: the reason it fails, or null. */
   verifyBuild?(quote: Quote, tx: UnsignedTx, params?: QuoteParams): string | null | Promise<string | null>;
+  /**
+   * The classification of a text `verifyQuote` or `verifyBuild` returned (`reason`, see Swap2RefusalReason), so a
+   * remote stub's refusal carries it; undefined for a text these pins did not produce.
+   */
+  reasonOf?(refusal: string): Swap2RefusalInfo | undefined;
   /**
    * The provider's routes pay an address the backend names — a deposit address, or a plain value send — instead of
    * calling a pinned contract (`thorchainPins` for a Tron vault, NEAR Intents' per-quote deposit addresses). Without

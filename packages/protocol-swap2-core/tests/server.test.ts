@@ -65,7 +65,7 @@ describe("swap2 server handler", () => {
     const handle = createSwap2Handler({providers: [provider], sealSecret: SECRET, guard: allow, now: () => now});
     const sealed = (await handle("quote", {provider: "mock", params: PARAMS}, "u")).body as Quote;
     const tampered = {...sealed, minDestAmount: "1"};
-    expect(await handle("build", {provider: "mock", quote: tampered}, "u")).toEqual({status: 400, body: {error: "quote integrity check failed"}});
+    expect(await handle("build", {provider: "mock", quote: tampered}, "u")).toEqual({status: 400, body: {error: "quote integrity check failed", reason: "policy_refused"}});
     expect((await handle("build", {provider: "mock", quote: QUOTE}, "u")).status).toBe(400);
     const otherSecret = createSwap2Handler({providers: [provider], sealSecret: SECRET + "x", guard: allow});
     expect((await otherSecret("build", {provider: "mock", quote: sealed}, "u")).status).toBe(400);
@@ -108,7 +108,7 @@ describe("swap2 server handler", () => {
     expect(await handle("track", {provider: "mock", ref: {intentId: (sealed as Quote).intentId}}, "u")).toEqual({status: 500, body: {error: "internal error"}});
     // a live quote refused without a reason is said so; a display quote may be a bare null
     const silent = createSwap2Handler({providers: [mockProvider({getQuote: async () => null}).provider], sealSecret: SECRET, guard: allow});
-    expect((await silent("quote", {provider: "mock", params: {...PARAMS, dry: false}}, "u")).body).toEqual({noQuote: "mock refused without naming a reason"});
+    expect((await silent("quote", {provider: "mock", params: {...PARAMS, dry: false}}, "u")).body).toEqual({noQuote: "mock refused without naming a reason", reason: "no_route"});
     expect((await silent("quote", {provider: "mock", params: {...PARAMS, dry: true}}, "u")).body).toBeNull();
   });
 

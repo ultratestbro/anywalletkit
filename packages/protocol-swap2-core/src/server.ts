@@ -1,6 +1,7 @@
 import type {Asset, CrossChainProvider, IntentRef, Quote, QuoteParams, TxRequest, UnsignedTx} from "./types.js";
 import {redactUrls} from "./util.js";
-import {validQuote} from "./validate.js";
+import {refusalInfo, refusalOf, withReason, type Swap2RefusalInfo} from "./errors.js";
+import {quoteRejection} from "./validate.js";
 
 /**
  * The server side of {@link remoteProvider}: runs real providers behind your backend so API
@@ -148,10 +149,10 @@ export function createSwap2Handler<C = unknown>(opts: Swap2HandlerOptions<C>): (
     const m = TOKENED.exec(wireId);
     if (!m) {
       if (action === "track" && opts.acceptUntokenedTrackUntil !== undefined && now() < opts.acceptUntokenedTrackUntil) return wireId;
-      throw new Swap2HandlerError(403, "swap id carries no intent token from this server");
+      throw withReason(new Swap2HandlerError(403, "swap id carries no intent token from this server"), "policy_refused");
     }
     if (!sameHex(await intentTag(provider, subject, m[1]!), m[2]!)) {
-      throw new Swap2HandlerError(403, subject === undefined ? "swap id carries an invalid intent token" : "swap id was not issued to this caller");
+      throw withReason(new Swap2HandlerError(403, subject === undefined ? "swap id carries an invalid intent token" : "swap id was not issued to this caller"), "policy_refused");
     }
     return m[1]!;
   }
@@ -176,34 +177,44 @@ export function createSwap2Handler<C = unknown>(opts: Swap2HandlerOptions<C>): (
 
       const provider = byName.get(providerName);
       if (!provider) return fail(404, `unknown provider '${providerName}'`);
-      if (!provider.enabled()) return fail(403, `provider '${providerName}' is disabled`);
+      if (!provider.enabled()) return fail(403, `provider '${providerName}' is disabled`, {reason: "policy_refused"});
 
       switch (act) {
         case "quote": {
           const {params} = request as {params: QuoteParams};
           let refusal: string | null = null; // per request: a shared field races under parallel quotes
-          const quote = await provider.getQuote({...params, onRefusal: (reason) => { refusal = reason; }});
+          let refusalDetail: Swap2RefusalInfo | undefined;
+          let quote: Quote | null;
+          try {
+            quote = await provider.getQuote({...params, onRefusal: (reason, info) => { refusal = reason; refusalDetail = refusalInfo(info); }});
+          } catch (err) {
+            if (err instanceof Swap2HandlerError) throw err;
+            // Still the opaque 500, but a classified refusal keeps its reason (an enum, nothing of the provider's internals).
+            return fail(500, "internal error", refusalOf(err));
+          }
           if (quote) {
             let normalized: Quote;
             try { normalized = normalizeQuote(quote, INTENT_MAX); } catch { return fail(502, `${providerName} returned a quote this server refuses to seal`); }
             // A seal vouches for the quote: hold it to the engine's own checks (provider, input, floor,
             // slippage, expiry) so a client that does not re-validate cannot be handed a bad one.
-            if (!validQuote(normalized, params, providerName) || normalized.validUntilMs <= now()) {
-              return fail(502, `${providerName} returned a quote the swap engine would reject`);
+            const rejected = quoteRejection(normalized, params, providerName);
+            if (rejected || normalized.validUntilMs <= now()) {
+              const reason = rejected?.reason ?? (normalized.validUntilMs <= now() ? "quote_expired" : undefined);
+              return fail(502, `${providerName} returned a quote the swap engine would reject`, reason ? {reason} : undefined);
             }
             const tokened = {...normalized, intentId: `${normalized.intentId}~${await intentTag(providerName, subject, normalized.intentId)}`};
             return ok(await seal(providerName, subject, tokened));
           }
-          if (refusal) return ok({noQuote: clientText(String(refusal))});
-          return ok(params.dry === false ? {noQuote: `${providerName} refused without naming a reason`} : null);
+          if (refusal) return ok({noQuote: clientText(String(refusal)), ...refusalDetail});
+          return ok(params.dry === false ? {noQuote: `${providerName} refused without naming a reason`, reason: "no_route"} : null);
         }
         case "build":
         case "preflight": {
           const {quote, tx} = request as {quote: Quote; tx?: UnsignedTx};
           if (!(await verify(providerName, subject, quote))) {
-            return subject === undefined ? fail(400, "quote integrity check failed") : fail(403, "quote was not sealed for this caller");
+            return subject === undefined ? fail(400, "quote integrity check failed", {reason: "policy_refused"}) : fail(403, "quote was not sealed for this caller", {reason: "policy_refused"});
           }
-          if (quote.validUntilMs < now()) return fail(410, "quote expired: ask for a new one");
+          if (quote.validUntilMs < now()) return fail(410, "quote expired: ask for a new one", {reason: "quote_expired"});
           if (act === "build") return ok(await refused(() => provider.buildDeposit(forProvider(quote))));
           if (!provider.preflightDeposit) return ok({});
           await refused(() => provider.preflightDeposit!(forProvider(quote), tx!));
@@ -234,7 +245,7 @@ export function createSwap2Handler<C = unknown>(opts: Swap2HandlerOptions<C>): (
         }
       }
     } catch (err) {
-      if (err instanceof Swap2HandlerError) return fail(err.status, err.message);
+      if (err instanceof Swap2HandlerError) return fail(err.status, err.message, refusalOf(err));
       return fail(500, "internal error"); // never echo provider internals or upstream URLs
     }
   };
@@ -268,13 +279,15 @@ function sameHex(a: string, b: string): boolean {
 
 // ---- refusals -------------------------------------------------------------------------------
 
-/** A provider's own refusal ("lifi: …") is actionable: 422 with the redacted text. Anything else is a 500. */
+/** A provider's own refusal ("lifi: …") is actionable: 422 with the redacted text and its reason. Anything else is a 500. */
 async function refused<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (err) {
     if (err instanceof Error && /^[a-z0-9_-]+: \S/i.test(err.message)) {
-      throw new Swap2HandlerError(422, clientText(err.message));
+      const info = refusalOf(err);
+      const handled = new Swap2HandlerError(422, clientText(err.message));
+      throw info ? withReason(handled, info) : handled;
     }
     throw err;
   }
@@ -284,7 +297,9 @@ async function refused<T>(fn: () => Promise<T>): Promise<T> {
 const clientText = (text: string): string => redactUrls(text.slice(0, 2_048)).slice(0, 300);
 
 const ok = (body: unknown): Swap2Response => ({status: 200, body: body === undefined ? null : body});
-const fail = (status: number, error: string): Swap2Response => ({status, body: {error: clientText(error)}});
+/** The body of a failed request: the redacted text, and the refusal's reason when it has one (`Swap2RefusalReason`). */
+const fail = (status: number, error: string, info?: Swap2RefusalInfo): Swap2Response =>
+  ({status, body: {error: clientText(error), ...refusalInfo(info)}});
 
 // ---- validation (the limits mirror a production backend's schema) --------------------------
 

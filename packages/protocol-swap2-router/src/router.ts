@@ -12,7 +12,8 @@ import type {
   RoutedQuote,
   ScoreWeights,
 } from "@anywalletkit/protocol-swap2-core/types";
-import {remotePinRefusal, validQuote} from "@anywalletkit/protocol-swap2-core/validate";
+import {quoteRejection, remotePinRefusal} from "@anywalletkit/protocol-swap2-core/validate";
+import {refusal, refusalInfo, refusalOf, type Swap2Refusal, type Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 import {bigintToNumber} from "@anywalletkit/core";
 
@@ -59,6 +60,8 @@ export interface RouteSet {
   pending: string[];
   /** Why the venues that sat out did (same as `lastRejections`). */
   rejections: string[];
+  /** The same refusals, each classified where its venue could (same as `lastRefusals`). */
+  refusals: Swap2Refusal[];
 }
 // LI.FI's /quote routinely takes ~3.5s (it builds executable calldata) — 4s
 // raced it out of every round. All providers still run in parallel.
@@ -85,7 +88,7 @@ async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
     // swallowed every provider error — including forwarded venue refusals —
     // into a null indistinguishable from "no route", which made execution
     // failures undiagnosable from the surface (the '(c2)' hunt of 2026-08-31).
-    const timer = setTimeout(() => reject(new Error(`quote timed out after ${ms}ms`)), ms);
+    const timer = setTimeout(() => reject(refusal("upstream_unavailable", `quote timed out after ${ms}ms`)), ms);
     p.then(resolve, reject).finally(() => clearTimeout(timer));
   });
 }
@@ -103,6 +106,24 @@ export class CrossChainRouter {
   /** Why providers sat out the last auction, one line each. */
   get lastRejections(): readonly string[] {
     return this._lastRejections;
+  }
+  private _lastRefusals: Swap2Refusal[] = [];
+  /**
+   * The same refusals as `lastRejections`, one per venue, each with its `reason` when the venue
+   * classified it. With no enabled provider serving the route, one `unsupported_pair` entry.
+   */
+  get lastRefusals(): readonly Swap2Refusal[] {
+    return this._lastRefusals;
+  }
+  /** Each call's own rejections and refusals, keyed by the params object it was given: overlapping auctions never read each other's. */
+  private readonly outcomes = new WeakMap<QuoteParams, {rejections: readonly string[]; refusals: readonly Swap2Refusal[]}>();
+  /** `lastRejections` for the auction that was given exactly this `params` object (undefined for another object). */
+  rejectionsFor(params: QuoteParams): readonly string[] | undefined {
+    return this.outcomes.get(params)?.rejections;
+  }
+  /** `lastRefusals` for the auction that was given exactly this `params` object (undefined for another object). */
+  refusalsFor(params: QuoteParams): readonly Swap2Refusal[] | undefined {
+    return this.outcomes.get(params)?.refusals;
   }
   private readonly weights: ScoreWeights;
   private readonly valueUsd: RouterOptions["valueUsd"];
@@ -255,6 +276,15 @@ export class CrossChainRouter {
     // a complete execution snapshot.
     const rejections: string[] = [];
     this._lastRejections = rejections;
+    const classified: Swap2Refusal[] = [];
+    this._lastRefusals = classified;
+    this.outcomes.set(params, {rejections, refusals: classified});
+    // The venue's classification is normalized and its slot's name and text written last: an adapter can neither
+    // smuggle a value outside the reasons nor file its refusal under another venue.
+    const reject = (provider: string, message: string, info: unknown) => {
+      rejections.push(message);
+      classified.push({...refusalInfo(info), message, provider});
+    };
     const snapshot = Object.freeze({...params});
     const from = Object.freeze({chain: snapshot.sourceChain, token: snapshot.sourceToken});
     const to = Object.freeze({chain: snapshot.destChain, token: snapshot.destToken});
@@ -265,7 +295,17 @@ export class CrossChainRouter {
     if (snapshot.sourceChain === snapshot.destChain) {
       eligible = eligible.filter((p) => p.supportsSameChain === true);
     }
-    if (eligible.length === 0) return null;
+    if (eligible.length === 0) {
+      // Why nobody was asked: the venues that serve the route are disabled (one policy_refused entry each), or none serves it.
+      const dark = this.providers.filter((p) => {
+        try {
+          return !p.enabled() && p.supportsRoute(from, to) && (snapshot.sourceChain !== snapshot.destChain || p.supportsSameChain === true);
+        } catch { return false; }
+      });
+      if (dark.length > 0) for (const p of dark) classified.push({reason: "policy_refused", message: `${p.name}: disabled`, provider: p.name});
+      else classified.push({message: "swap2-router: no enabled provider serves this route", reason: "unsupported_pair"});
+      return null;
+    }
 
     // The short timeout protects the AUCTION — one slow venue must not hold
     // the others hostage. With a single eligible provider (a pinned execution
@@ -275,36 +315,42 @@ export class CrossChainRouter {
     const timeoutMs = eligible.length === 1 ? SOLO_QUOTE_TIMEOUT_MS : QUOTE_TIMEOUT_MS;
     // Each venue names its own refusal (per call, so concurrent quotes cannot race).
     const refusals: (string | undefined)[] = [];
+    const refusalInfos: (Swap2RefusalInfo | undefined)[] = [];
     const accepted: Quote[] = [];
     const pending = new Set(eligible.map((p) => p.name));
     const publish = () => {
       if (!options?.onUpdate || accepted.length === 0) return;
-      const set = this.rank(accepted, snapshot, [...pending], rejections);
+      const set = this.rank(accepted, snapshot, [...pending], rejections, classified);
       try { options.onUpdate(set); } catch { /* an observer must not break the auction */ }
     };
     await Promise.all(eligible.map(async (p, i) => {
       const controller = new AbortController();
-      const own = Object.freeze({...snapshot, onRefusal: (reason: string) => {
-        refusals[i] ??= reason.startsWith(`${p.name}:`) ? reason : `${p.name}: ${reason}`;
-        try { snapshot.onRefusal?.(reason); } catch { /* diagnostics only */ }
+      const own = Object.freeze({...snapshot, onRefusal: (reason: string, info?: Swap2RefusalInfo) => {
+        const valid = refusalInfo(info);
+        if (refusals[i] === undefined) {
+          refusals[i] = reason.startsWith(`${p.name}:`) ? reason : `${p.name}: ${reason}`;
+          refusalInfos[i] = valid;
+        }
+        try { snapshot.onRefusal?.(reason, valid); } catch { /* diagnostics only */ }
       }});
       let q: Quote | null = null;
+      let rejected: ReturnType<typeof quoteRejection> = null;
       try {
         q = await withTimeout(p.getQuote(own, controller.signal), timeoutMs);
         if (!q) {
           // A provider RETURNING null (vs throwing) was the one silent path
           // left — record it so the surfaced no-route error names the venue.
-          rejections.push(refusals[i] ?? `${p.name}: returned no quote`);
-        } else if (!validQuote(q, snapshot, p.name)) {
+          reject(p.name, refusals[i] ?? `${p.name}: returned no quote`, refusals[i] !== undefined ? refusalInfos[i] : {reason: "no_route"});
+        } else if ((rejected = quoteRejection(q, snapshot, p.name))) {
           const reason = `${p.name}: rejected by validation (minDest=${q.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"}, validUntil=${q.validUntilMs}, now=${Date.now()})`;
-          rejections.push(reason);
+          reject(p.name, reason, rejected);
           console.warn(`swap2-router: ${reason}`);
           q = null;
         } else {
           // A remote stub's route that calls or approves an address the app did not pin: execution would refuse it.
           const unpinned = remotePinRefusal(p, q, snapshot.sourceChain);
           if (unpinned) {
-            rejections.push(unpinned);
+            reject(p.name, unpinned, {reason: "policy_refused"});
             console.warn(`swap2-router: ${unpinned}`);
             q = null;
           } else if (options?.requireImmediateExecution && !(q.depositAddress.length > 0 || q.txRequest !== undefined)) {
@@ -318,7 +364,7 @@ export class CrossChainRouter {
         // route" — record why (surfaced through lastRejections) and say it in
         // the console (same posture as onModuleSkipped).
         const reason = `${p.name}: ${err instanceof Error ? err.message.slice(0, 160) : String(err).slice(0, 160)}`;
-        rejections.push(reason);
+        reject(p.name, reason, refusalOf(err));
         console.warn(`swap2-router: quote failed — ${reason}`);
         q = null;
       } finally {
@@ -331,7 +377,7 @@ export class CrossChainRouter {
       publish();
     }));
     if (accepted.length === 0) return null;
-    return this.rank(accepted, snapshot, [], rejections);
+    return this.rank(accepted, snapshot, [], rejections, classified);
   }
 
   /** Status from the named provider; `failed` when it is not installed. */
@@ -359,7 +405,7 @@ export class CrossChainRouter {
    * that lands in seconds instead of twenty minutes, and a route that charges
    * a native bridge fee on top no longer wins on its gross output.
    */
-  private rank(quotes: Quote[], params: QuoteParams, pending: string[], rejections: string[]): RouteSet {
+  private rank(quotes: Quote[], params: QuoteParams, pending: string[], rejections: string[], refusals: Swap2Refusal[]): RouteSet {
     const usd = this.valueUsd ? quotes.map((q) => {
       try {
         const v = this.valueUsd!(q, params);
@@ -401,7 +447,7 @@ export class CrossChainRouter {
 
     // The list reads top-down by value; the pick leads its price tier.
     ranked.sort((a, b) => (a === best ? -1 : b === best ? 1 : b.relativeValue - a.relativeValue || a.etaSeconds - b.etaSeconds));
-    return {quotes: ranked, best, fastest, pending, rejections: [...rejections]};
+    return {quotes: ranked, best, fastest, pending, rejections: [...rejections], refusals: [...refusals]};
   }
 }
 
