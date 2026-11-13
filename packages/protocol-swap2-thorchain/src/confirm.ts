@@ -8,6 +8,8 @@
  * `inbound_addresses` and `lastblock` go through the same readers, and another shape makes that node unavailable.
  */
 
+import {httpRefusal, withReason, type Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
+
 /**
  * The only reads sent to a confirming node: GET, these fixed paths, no query string, no body. A proxy in front of a
  * node may pass exactly these and refuse everything else. `lastblock` and `inbound_addresses` go to every node;
@@ -51,9 +53,19 @@ export function confirmOptions(o: {confirmMaxLagBlocks?: number; confirmTimeoutM
  * a reason to shop the same question to another node.
  */
 export class HostUnavailable extends Error {
-  constructor(host: string, reason: string) {
+  /**
+   * `info` classifies the failure (`refusalOf` reads it back): what the HTTP status says (429 `rate_limited`, 401 / 403
+   * `key_rejected`), else `upstream_unavailable` — unreachable, timed out, a 5xx, redirected or another shape.
+   */
+  constructor(host: string, reason: string, info?: Swap2RefusalInfo) {
     super(`thorchain: ${host} unavailable (${reason})`);
+    withReason(this, info ?? "upstream_unavailable");
   }
+}
+
+/** A non-2xx answer's classification: what its status says, else `upstream_unavailable` with the status. */
+export function statusRefusal(status: number, retryAfter?: string | null): Swap2RefusalInfo {
+  return httpRefusal(status, retryAfter) ?? {reason: "upstream_unavailable", httpStatus: status};
 }
 
 export interface InboundAddress {
@@ -131,7 +143,7 @@ export async function nodeRead(host: string, path: string, clientId: string, sig
     throw new HostUnavailable(host, error instanceof Error ? error.message : "fetch failed");
   }
   if (res.redirected === true || !sameRequestUrl(res.url, url)) throw new HostUnavailable(host, `${path} redirected`);
-  if (!res.ok) throw new HostUnavailable(host, `${path} HTTP ${res.status}`);
+  if (!res.ok) throw new HostUnavailable(host, `${path} HTTP ${res.status}`, statusRefusal(res.status, res.headers?.get?.("retry-after")));
   try {
     return await res.json();
   } catch (error) {
