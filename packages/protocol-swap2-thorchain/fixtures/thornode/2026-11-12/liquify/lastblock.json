@@ -1,0 +1,80 @@
+[
+  {
+    "chain": "AVAX",
+    "last_observed_in": 100124443,
+    "last_signed_out": 28643269,
+    "thorchain": 28643286
+  },
+  {
+    "chain": "BASE",
+    "last_observed_in": 56577857,
+    "last_signed_out": 28643269,
+    "thorchain": 28643286
+  },
+  {
+    "chain": "BCH",
+    "last_observed_in": 977067,
+    "last_signed_out": 28643269,
+    "thorchain": 28643286
+  },
+  {
+    "chain": "BSC",
+    "last_observed_in": 133201754,
+    "last_signed_out": 28643269,
+    "thorchain": 28643286
+  },
+  {
+    "chain": "BTC",
+    "last_observed_in": 975577,
+    "last_signed_out": 28643269,
+    "thorchain": 28643286
+  },
+  {
+    "chain": "DOGE",
+    "last_observed_in": 6454738,
+    "last_signed_out": 28643269,
+    "thorchain": 28643286
+  },
+  {
+    "chain": "ETH",
+    "last_observed_in": 26400437,
+    "last_signed_out": 28643269,
+    "thorchain": 28643286
+  },
+  {
+    "chain": "GAIA",
+    "last_observed_in": 33847110,
+    "last_signed_out": 28643269,
+    "thorchain": 28643286
+  },
+  {
+    "chain": "LTC",
+    "last_observed_in": 3211918,
+    "last_signed_out": 28643269,
+    "thorchain": 28643286
+  },
+  {
+    "chain": "SOL",
+    "last_observed_in": 468602392,
+    "last_signed_out": 28643269,
+    "thorchain": 28643286
+  },
+  {
+    "chain": "TRON",
+    "last_observed_in": 87944165,
+    "last_signed_out": 28643269,
+    "thorchain": 28643286
+  },
+  {
+    "chain": "XRP",
+    "last_observed_in": 108286880,
+    "last_signed_out": 28643269,
+    "thorchain": 28643286
+  },
+  {
+    "chain": "ZEC",
+    "last_observed_in": 3566158,
+    "last_signed_out": 28643269,
+    "thorchain": 28643286
+  }
+]

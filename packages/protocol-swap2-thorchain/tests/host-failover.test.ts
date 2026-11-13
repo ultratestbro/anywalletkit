@@ -5,6 +5,7 @@
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {thorchainProvider} from "../src/provider.js";
+import {confirmReads} from "./thornode-stub.js";
 import type {QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 
 const PRIMARY = "https://primary.invalid";
@@ -53,6 +54,8 @@ beforeEach(() => {
     const url = String(input);
     const host = Object.keys(hosts).find((h) => url.startsWith(h));
     if (!host) return new Response("nope", {status: 404});
+    const confirm = confirmReads(url, () => (hosts[host]!.inbound === "down" ? [] : (hosts[host]!.inbound as {body: unknown}).body));
+    if (confirm) return confirm;
     const kind = url.includes("/quote/swap") ? "quote" : url.includes("/inbound_addresses") ? "inbound" : null;
     if (!kind) return new Response("nope", {status: 404});
     calls.push(`${host} ${kind}`);
@@ -113,6 +116,8 @@ describe("THORNode host failover", () => {
     hosts[PRIMARY]!.quote = {status: 400, body: {code: 3, message: "emit asset 96000 less than price limit 97000"}};
     vi.stubGlobal("fetch", async (input: string | URL) => {
       const url = String(input);
+      const confirm = confirmReads(url, inboundBody);
+      if (confirm) return confirm;
       if (url.startsWith(PRIMARY) && url.includes("/quote/swap")) {
         calls.push(`${PRIMARY} quote`);
         if (first) {

@@ -9,6 +9,7 @@ import {createSwap2Handler} from "@anywalletkit/protocol-swap2-core/server";
 import {SingleProviderSwap2} from "@anywalletkit/protocol-swap2-core/swap2/single";
 import type {CrossChainProvider} from "@anywalletkit/protocol-swap2-core/types";
 import {thorchainPins, thorchainProvider} from "../src/provider.js";
+import {confirmReads} from "./thornode-stub.js";
 
 const NODES = ["https://primary.invalid", "https://secondary.invalid"];
 const TRON = "tron:728126428";
@@ -26,6 +27,8 @@ beforeEach(() => {
   // Both nodes answer the same inbound snapshot; the quote's memo names the request's destination and refund.
   vi.stubGlobal("fetch", async (input: string | URL) => {
     const url = new URL(String(input));
+    const confirm = confirmReads(String(input), () => []);
+    if (confirm) return confirm;
     if (url.pathname.endsWith("/inbound_addresses")) {
       return new Response(JSON.stringify([
         {chain: "TRON", address: TRON_VAULT, halted: false, dust_threshold: "10000000"},

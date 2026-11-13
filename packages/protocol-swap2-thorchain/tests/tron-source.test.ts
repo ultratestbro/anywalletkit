@@ -5,6 +5,7 @@
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {thorchainProvider} from "../src/provider.js";
+import {confirmReads} from "./thornode-stub.js";
 import type {Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 
 const NODE = "https://thor.invalid";
@@ -45,6 +46,8 @@ beforeEach(() => {
   gw = {quote: quoteBody(`=:e:${ETH_DEST}:${LIMIT_WEI_1E8}`), status: 200, inbounds: inbound(), urls: []};
   vi.stubGlobal("fetch", async (input: string | URL) => {
     const url = String(input);
+    const confirm = confirmReads(url, () => gw.inbounds ?? []);
+    if (confirm) return confirm;
     if (url.includes("/quote/swap")) {
       gw.urls.push(url);
       return new Response(JSON.stringify(gw.quote), {status: gw.status});
