@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-relay",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Relay (relay.link) for the swap2 engine, with the whole order verified on the device before anything is signed: the order id recomputed from the order (EIP-712 hashStruct), the solver's signature recovered to a pinned signer, recipient / chain / token / minimum / refunds held to the user's request, and the deposit built here for the pinned RelayDepository. EVM to EVM, exact input, native coin and ERC-20.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
